@@ -1,352 +1,210 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon,  6 Feb 2012 16:19:38 +0100
-Subject: [PATCH v2 03/10] of: Add PWM support.
+Date: Mon,  6 Feb 2012 16:19:45 +0100
+Subject: [PATCH v2 10/10] pwm-backlight: Add rudimentary device tree support
 In-Reply-To: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1328541585-24642-4-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1328541585-24642-11-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds helpers to support device tree bindings for the generic
-PWM API. Device tree binding documentation for PWM controllers is also
-provided.
+This commit adds very basic support for device tree probing. Currently,
+only a PWM and maximum and default brightness values can be specified.
+Enabling or disabling backlight power via GPIOs is not yet supported.
+
+A pointer to the exit() callback is stored in the driver data to keep it
+around until the driver is unloaded.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
 Changes in v2:
-  - add device tree binding documentation
-  - add of_xlate to parse controller-specific PWM-specifier
+  - avoid oops by keeping a reference to the platform-specific exit()
+    callback
 
- Documentation/devicetree/bindings/pwm/pwm.txt |   50 ++++++++++
- drivers/of/Kconfig                            |    6 +
- drivers/of/Makefile                           |    1 +
- drivers/of/pwm.c                              |  130 +++++++++++++++++++++++++
- include/linux/of_pwm.h                        |   51 ++++++++++
- include/linux/pwm.h                           |   17 +++
- 6 files changed, 255 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm.txt
- create mode 100644 drivers/of/pwm.c
- create mode 100644 include/linux/of_pwm.h
+ .../bindings/video/backlight/pwm-backlight         |   16 ++++
+ drivers/video/backlight/Kconfig                    |    2 +-
+ drivers/video/backlight/pwm_bl.c                   |   81 ++++++++++++++++++--
+ 3 files changed, 90 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/video/backlight/pwm-backlight
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
+diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
 new file mode 100644
-index 0000000..1c34e86
+index 0000000..ce65280
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm.txt
-@@ -0,0 +1,50 @@
-+Specifying PWM information for devices
-+======================================
++++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
+@@ -0,0 +1,16 @@
++pwm-backlight bindings
 +
-+1) PWM user nodes
-+-----------------
++Required properties:
++  - compatible: "pwm-backlight"
++  - default-brightness: the default brightness setting
++  - max-brightness: the maximum brightness setting
++  - pwm: OF device-tree PWM specification
 +
-+PWM users should specify a list of PWM devices that they want to use
-+with a property containing a 'pwm-list':
++Example:
 +
-+	pwm-list ::= <single-pwm> [pwm-list]
-+	single-pwm ::= <pwm-phandle> <pwm-specifier>
-+	pwm-phandle : phandle to PWM controller node
-+	pwm-specifier : array of #pwm-cells specifying the given PWM
-+			(controller specific)
-+
-+PWM properties should be named "[<name>-]pwms". Exact meaning of each
-+pwms property must be documented in the device tree binding for each
-+device.
-+
-+The following example could be used to describe a PWM-based backlight
-+device:
-+
-+	pwm: pwm {
-+		#pwm-cells = <2>;
++	backlight {
++		compatible = "pwm-backlight";
++		default-brightness = <224>;
++		max-brightness = <255>;
++		pwm = <&pwm 0 5000000>;
 +	};
-+
-+	[...]
-+
-+	bl: backlight {
-+		pwms = <&pwm 0 5000000>;
-+	};
-+
-+pwm-specifier typically encodes the chip-relative PWM number and the PWM
-+period in nanoseconds.
-+
-+2) PWM controller nodes
-+-----------------------
-+
-+PWM controller nodes must specify the number of cells used for the
-+specifier using the '#pwm-cells' property.
-+
-+An example PWM controller might look like this:
-+
-+	pwm: pwm at 7000a000 {
-+		compatible = "nvidia,tegra20-pwm";
-+		reg = <0x7000a000 0x100>;
-+		#pwm-cells = <2>;
-+	};
-+
-+TODO: do we need an empty 'pwm-controller' property?
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index 268163d..9635468 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -56,6 +56,12 @@ config OF_GPIO
- 	help
- 	  OpenFirmware GPIO accessors
+diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+index 49e7d83..37982fa 100644
+--- a/drivers/video/backlight/Kconfig
++++ b/drivers/video/backlight/Kconfig
+@@ -233,7 +233,7 @@ config BACKLIGHT_CARILLO_RANCH
  
-+config OF_PWM
-+	def_bool y
-+	depends on PWM
-+	help
-+	  OpenFirmware PWM accessors
-+
- config OF_I2C
- 	def_tristate I2C
- 	depends on I2C && !SPARC
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index a73f5a5..3dd13e3 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -5,6 +5,7 @@ obj-$(CONFIG_OF_ADDRESS)  += address.o
- obj-$(CONFIG_OF_IRQ)    += irq.o
- obj-$(CONFIG_OF_DEVICE) += device.o platform.o
- obj-$(CONFIG_OF_GPIO)   += gpio.o
-+obj-$(CONFIG_OF_PWM)	+= pwm.o
- obj-$(CONFIG_OF_I2C)	+= of_i2c.o
- obj-$(CONFIG_OF_NET)	+= of_net.o
- obj-$(CONFIG_OF_SPI)	+= of_spi.o
-diff --git a/drivers/of/pwm.c b/drivers/of/pwm.c
-new file mode 100644
-index 0000000..d6f7f33
---- /dev/null
-+++ b/drivers/of/pwm.c
-@@ -0,0 +1,130 @@
-+/*
-+ * OF helpers for the PWM API
-+ *
-+ * Copyright (c) 2011 Avionic Design GmbH
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/errno.h>
-+#include <linux/device.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pwm.h>
-+
-+static int of_pwmchip_is_match(struct pwm_chip *chip, void *data)
+ config BACKLIGHT_PWM
+ 	tristate "Generic PWM based Backlight Driver"
+-	depends on HAVE_PWM
++	depends on HAVE_PWM || PWM
+ 	help
+ 	  If you have a LCD backlight adjustable by PWM, say Y to enable
+ 	  this driver.
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index 342b7d7..5c81397 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -17,6 +17,7 @@
+ #include <linux/fb.h>
+ #include <linux/backlight.h>
+ #include <linux/err.h>
++#include <linux/of_pwm.h>
+ #include <linux/pwm.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/slab.h>
+@@ -31,6 +32,7 @@ struct pwm_bl_data {
+ 	void			(*notify_after)(struct device *,
+ 					int brightness);
+ 	int			(*check_fb)(struct device *, struct fb_info *);
++	void			(*exit)(struct device *);
+ };
+ 
+ static int pwm_backlight_update_status(struct backlight_device *bl)
+@@ -83,17 +85,79 @@ static const struct backlight_ops pwm_backlight_ops = {
+ 	.check_fb	= pwm_backlight_check_fb,
+ };
+ 
++#ifdef CONFIG_OF
++static int pwm_backlight_parse_dt(struct device *dev,
++				  struct platform_pwm_backlight_data *data)
 +{
-+	return chip->dev ? chip->dev->of_node == data : 0;
-+}
-+
-+/**
-+ * of_node_to_pwmchip() - finds the PWM chip associated with a device node
-+ * @np: device node of the PWM chip
-+ *
-+ * Returns a pointer to the PWM chip associated with the specified device
-+ * node or NULL if the device node doesn't represent a PWM chip.
-+ */
-+struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-+{
-+	return pwmchip_find(np, of_pwmchip_is_match);
-+}
-+
-+int of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args,
-+			struct pwm_spec *spec)
-+{
-+	if (pc->of_pwm_n_cells < 2)
-+		return -EINVAL;
-+
-+	if (args->args_count < pc->of_pwm_n_cells)
-+		return -EINVAL;
-+
-+	if (args->args[0] >= pc->npwm)
-+		return -EINVAL;
-+
-+	if (spec)
-+		spec->period = args->args[1];
-+
-+	return args->args[0];
-+}
-+
-+void of_pwmchip_add(struct pwm_chip *chip)
-+{
-+	if (!chip->dev || !chip->dev->of_node)
-+		return;
-+
-+	if (!chip->of_xlate) {
-+		chip->of_xlate = of_pwm_simple_xlate;
-+		chip->of_pwm_n_cells = 2;
-+	}
-+
-+	of_node_get(chip->dev->of_node);
-+}
-+
-+void of_pwmchip_remove(struct pwm_chip *chip)
-+{
-+	if (chip->dev && chip->dev->of_node)
-+		of_node_put(chip->dev->of_node);
-+}
-+
-+/**
-+ * of_get_named_pwm() - get a PWM number and period to use with the PWM API
-+ * @np: device node to get the PWM from
-+ * @propname: property name containing PWM specifier(s)
-+ * @index: index of the PWM
-+ * @spec: a pointer to a struct pwm_spec to fill in
-+ *
-+ * Returns PWM number to use with the Linux generic PWM API or a negative
-+ * error code on failure. If @spec is not NULL the function fills in the
-+ * values parsed from the device tree.
-+ */
-+int of_get_named_pwm(struct device_node *np, const char *propname,
-+		     int index, struct pwm_spec *spec)
-+{
-+	struct of_phandle_args args;
-+	struct pwm_chip *pc;
++	struct device_node *node = dev->of_node;
++	struct pwm_spec spec;
++	u32 value;
 +	int ret;
 +
-+	ret = of_parse_phandle_with_args(np, propname, "#pwm-cells", index,
-+					  &args);
-+	if (ret) {
-+		pr_debug("%s(): can't parse pwms property\n", __func__);
-+		goto out;
-+	}
++	if (!node)
++		return -ENODEV;
 +
-+	pc = of_node_to_pwmchip(args.np);
-+	if (!pc) {
-+		ret = -ENODEV;
-+		goto put;
-+	}
++	memset(data, 0, sizeof(*data));
 +
-+	if (args.args_count != pc->of_pwm_n_cells) {
-+		pr_debug("%s: wrong #pwm-cells for %s\n", np->full_name,
-+			 args.np->full_name);
-+		ret = -EINVAL;
-+		goto put;
-+	}
++	ret = of_get_named_pwm(node, "pwm", 0, &spec);
++	if (ret < 0)
++		return ret;
++
++	data->pwm_period_ns = spec.period;
++	data->pwm_id = ret;
++
++	ret = of_property_read_u32(node, "default-brightness", &value);
++	if (ret < 0)
++		return ret;
++
++	data->dft_brightness = value;
++
++	ret = of_property_read_u32(node, "max-brightness", &value);
++	if (ret < 0)
++		return ret;
++
++	data->max_brightness = value;
 +
 +	/*
-+	 * reset the specifier structure since .of_xlate might decide not to
-+	 * fill it in
++	 * TODO: Most users of this driver use a number of GPIOs to control
++	 *       backlight power. Support for specifying these needs to be
++	 *       added.
 +	 */
-+	if (spec)
-+		spec->period = 0;
 +
-+	ret = pc->of_xlate(pc, &args, spec);
-+	if (ret < 0)
-+		goto put;
-+
-+	ret += pc->base;
-+
-+put:
-+	of_node_put(args.np);
-+out:
-+	pr_debug("%s() exited with status %d\n", __func__, ret);
-+	return ret;
-+}
-+EXPORT_SYMBOL(of_get_named_pwm);
-diff --git a/include/linux/of_pwm.h b/include/linux/of_pwm.h
-new file mode 100644
-index 0000000..a6af951
---- /dev/null
-+++ b/include/linux/of_pwm.h
-@@ -0,0 +1,51 @@
-+/*
-+ * OF helpers for the PWM API
-+ *
-+ * Copyright (c) 2011 Avionic Design GmbH
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __LINUX_OF_PWM_H
-+#define __LINUX_OF_PWM_H
-+
-+#include <linux/pwm.h>
-+
-+struct device_node;
-+
-+#ifdef CONFIG_OF_PWM
-+
-+struct pwm_chip *of_node_to_pwmchip(struct device_node *np);
-+int of_get_named_pwm(struct device_node *np, const char *propname,
-+		     int index, struct pwm_spec *spec);
-+void of_pwmchip_add(struct pwm_chip *pc);
-+void of_pwmchip_remove(struct pwm_chip *pc);
-+
-+#else
-+
-+static inline struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-+{
-+	return NULL;
++	return 0;
 +}
 +
-+static inline int of_get_named_pwm(struct device_node *np,
-+				   const char *propname, int index,
-+				   unsigned int *period_ns)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline void of_pwmchip_add(struct pwm_chip *pc)
-+{
-+}
-+
-+static inline void of_pwmchip_remove(struct pwm_chip *pc)
-+{
-+}
-+
-+#endif /* CONFIG_OF_PWM */
-+
-+#endif /* __LINUX_OF_PWM_H */
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 0f8d105..8595be4 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -1,6 +1,8 @@
- #ifndef __LINUX_PWM_H
- #define __LINUX_PWM_H
- 
-+#include <linux/of.h>
-+
- struct pwm_device;
- 
- /*
-@@ -56,6 +58,14 @@ struct pwm_ops {
- };
- 
- /**
-+ * struct pwm_spec - device tree PWM specifier
-+ * @period: PWM period (in nanoseconds)
-+ */
-+struct pwm_spec {
-+	unsigned int period;
++static struct of_device_id pwm_backlight_of_match[] = {
++	{ .compatible = "pwm-backlight" },
++	{ }
 +};
 +
-+/**
-  * struct pwm_chip - abstract a PWM controller
-  * @dev: device providing the PWMs
-  * @ops: callbacks for this PWM controller
-@@ -67,6 +77,13 @@ struct pwm_chip {
- 	struct pwm_ops		*ops;
- 	int			base;
- 	unsigned int		npwm;
-+
-+#ifdef CONFIG_OF_PWM
-+	int			(*of_xlate)(struct pwm_chip *pc,
-+					    const struct of_phandle_args *args,
-+					    struct pwm_spec *spec);
-+	unsigned int		of_pwm_n_cells;
++MODULE_DEVICE_TABLE(of, pwm_backlight_of_match);
++#else
++static int pwm_backlight_parse_dt(struct device *dev,
++				  struct platform_pwm_backlight_data *data)
++{
++	return -ENODEV;
++}
 +#endif
- };
++
+ static int pwm_backlight_probe(struct platform_device *pdev)
+ {
+ 	struct backlight_properties props;
+ 	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
++	struct platform_pwm_backlight_data defdata;
+ 	struct backlight_device *bl;
+ 	struct pwm_bl_data *pb;
+ 	int ret;
  
- int pwm_set_chip_data(unsigned int pwm, void *data);
+ 	if (!data) {
+-		dev_err(&pdev->dev, "failed to find platform data\n");
+-		return -EINVAL;
++		ret = pwm_backlight_parse_dt(&pdev->dev, &defdata);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "failed to find platform data\n");
++			return ret;
++		}
++
++		data = &defdata;
+ 	}
+ 
+ 	if (data->init) {
+@@ -113,6 +177,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	pb->notify = data->notify;
+ 	pb->notify_after = data->notify_after;
+ 	pb->check_fb = data->check_fb;
++	pb->exit = data->exit;
+ 	pb->lth_brightness = data->lth_brightness *
+ 		(data->pwm_period_ns / data->max_brightness);
+ 	pb->dev = &pdev->dev;
+@@ -152,7 +217,6 @@ err_alloc:
+ 
+ static int pwm_backlight_remove(struct platform_device *pdev)
+ {
+-	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
+ 	struct backlight_device *bl = platform_get_drvdata(pdev);
+ 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
+ 
+@@ -160,8 +224,8 @@ static int pwm_backlight_remove(struct platform_device *pdev)
+ 	pwm_config(pb->pwm, 0, pb->period);
+ 	pwm_disable(pb->pwm);
+ 	pwm_free(pb->pwm);
+-	if (data->exit)
+-		data->exit(&pdev->dev);
++	if (pb->exit)
++		pb->exit(&pdev->dev);
+ 	return 0;
+ }
+ 
+@@ -195,11 +259,12 @@ static SIMPLE_DEV_PM_OPS(pwm_backlight_pm_ops, pwm_backlight_suspend,
+ 
+ static struct platform_driver pwm_backlight_driver = {
+ 	.driver		= {
+-		.name	= "pwm-backlight",
+-		.owner	= THIS_MODULE,
++		.name		= "pwm-backlight",
++		.owner		= THIS_MODULE,
+ #ifdef CONFIG_PM
+-		.pm	= &pwm_backlight_pm_ops,
++		.pm		= &pwm_backlight_pm_ops,
+ #endif
++		.of_match_table	= of_match_ptr(pwm_backlight_of_match),
+ 	},
+ 	.probe		= pwm_backlight_probe,
+ 	.remove		= pwm_backlight_remove,
 -- 
 1.7.9
