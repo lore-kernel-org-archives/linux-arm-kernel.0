@@ -1,195 +1,173 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 06 Feb 2012 15:10:28 +0100
-Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
-In-Reply-To: <4F2F9B2C.8030009@stericsson.com>
-References: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
- <4F2F9B2C.8030009@stericsson.com>
-Message-ID: <4F2FDF54.8080701@linaro.org>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Mon, 6 Feb 2012 15:38:11 +0100
+Subject: [PATCH v3] dmaengine: Add support for MEMCPY for imx-dma.
+In-Reply-To: <1328528294.26182.80.camel@vkoul-udesk3>
+References: <1328006840-7345-1-git-send-email-javier.martin@vista-silicon.com>
+ <1328528294.26182.80.camel@vkoul-udesk3>
+Message-ID: <CACKLOr16kN+9DfF_vxzF_uzcmQC7cvAzR_oXpbNmc1D1qDY9sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2012 10:19 AM, Rickard Andersson wrote:
-> Hi!
->
-> Our comments:
+Hi Vinod,
+thank you for your review.
 
-Thanks Rickard and Jonas for your comments.
+Let me first explain who we are and what are we trying to accomplish
+so you can get a global view.
+We are an small company of 10 workers where I am the only one in
+charge of developing for the kernel. With all these DMA changes we are
+trying to develop a generic, video mem2mem deinterlacing driver, and
+we plan to have it ready for the next merge window which will be
+probably in March, according to the Linux kernel development cycle.
 
-> - function names don't match commit comment disable/enable vs
-> recouple/decouple. Decouple is a better name than disable, because GIC
-> is not really disabled it is just disconnected.
+Following the rule "post early, post often" we've divided our
+development process in several steps:
 
-Ok, that makes sense.
+- Step 1 (this patch):
+[PATCH v3] dmaengine: Add support for MEMCPY for imx-dma.
 
-> - there is no reason to place these functions inside the db8500-prcmu.c
-> file. There is so much stuff in the PRCMU register base so we can not
-> have everything in one file. Why not have it as it is?
+This step is important for us since it gives us access to the dmatest
+module and allows to develop a first prototype of the driver which
+just copies the content of one buffer into another.
 
-Why spread the prcmu code when it is related to the prcmu ?
+- Step 2 (also submitted to the mainling list):
+[PATCH 1/2] i.MX DMA: Add support for 2D transfers.
+[PATCH 2/2] dmaengine: i.MX: Add support for interleaved transfers.
 
-Linus ? What do you think ?
+With this step we have know a first working version of a driver which
+actually does video deinterlacing. However, since current dmaengine
+support for imx only regards a single descriptor, this code is quite
+ugly and dirty.
 
-> - why the gic_mask function?
+- Step 3 (developing):
+dmaengine: i.MX: Support multiple descriptors.
 
-Because the register has 31 bits reserved which could be used later 
-without modifying this function.
-
-> - The original code has been updated and now looks like this:
-
-That is the same code, except the while loop where, if this code 
-assumption is correct, means we will do only one iteration in the loop.
+Supporting multiple descriptors gives us access to the feature of
+queueing multiple DMA transfers and therefore we can make a cleaner
+deinterlacing driver.
 
 
-Thanks
-   -- Daniel
-
-> /* Decouple GIC from the interrupt bus */
-> void ux500_pm_gic_decouple(void)
-> {
-> prcmu_write_masked(PRCM_A9_MASK_REQ,
-> PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ,
-> PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ);
->
-> (void)prcmu_read(PRCM_A9_MASK_REQ);
->
-> udelay(GIC_FREEZE_DELAY); /* Wait for the GIC to freeze */
-> }
->
-> /* Recouple GIC with the interrupt bus */
-> void ux500_pm_gic_recouple(void)
-> {
-> prcmu_write_masked(PRCM_A9_MASK_REQ,
-> PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ,
-> 0);
-> }
->
-> BR
-> Rickard Andersson& Jonas Aberg
->
->> This patch allows to decouple and recouple the gic from the PRCMU.
->> This is needed to put the A9 core in retention mode with the cpuidle
->> driver.
+On 6 February 2012 12:38, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Tue, 2012-01-31 at 11:47 +0100, Javier Martin wrote:
+>> MEMCPY transfers allow DMA copies from memory to
+>> memory. This patch has been tested with dmatest
+>> device driver.
 >>
->> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 >> ---
->> drivers/mfd/db8500-prcmu.c | 42 ++++++++++++++++++++++++++++++++++++++
->> include/linux/mfd/db8500-prcmu.h | 2 +
->> include/linux/mfd/dbx500-prcmu.h | 16 ++++++++++++++
->> 3 files changed, 60 insertions(+), 0 deletions(-)
+>> ?drivers/dma/imx-dma.c | ? 36 +++++++++++++++++++++++++++++++++++-
+>> ?1 files changed, 35 insertions(+), 1 deletions(-)
 >>
->> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
->> index af8e0ef..c708431 100644
->> --- a/drivers/mfd/db8500-prcmu.c
->> +++ b/drivers/mfd/db8500-prcmu.c
->> @@ -528,6 +528,10 @@ static const char
->> *hwacc_ret_regulator_name[NUM_HW_ACC] = {
+>> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+>> index 3296a73..9aa6e85 100644
+>> --- a/drivers/dma/imx-dma.c
+>> +++ b/drivers/dma/imx-dma.c
+>> @@ -196,7 +196,8 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
+>> ? ? ? struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+>> ? ? ? struct imx_dma_data *data = chan->private;
 >>
->> #define PRCMU_PLLDSI_LOCKP_LOCKED 0x3
->>
->> +#define PRCMU_A9_MASK_REQ 0x00000328
->> +#define PRCMU_A9_MASK_REQ_MASK 0x00000001
->> +#define PRCMU_A9_MASK_ACK 0x0000032C
->> +
->> static struct {
->> u8 project_number;
->> u8 api_version;
->> @@ -787,6 +791,44 @@ int db8500_prcmu_set_power_state(u8 state, bool
->> keep_ulp_clk, bool keep_ap_pll)
->> return 0;
->> }
->>
->> +/*
->> + * prcmu_gic_mask - apply the mask to the mask request
->> + * register. This mask has the bits [1-31] reserved and
->> + * the request applies to the bit 0 of this register.
->> + */
->> +static inline void prcmu_gic_mask(u32 mask)
->> +{
->> + u32 val = readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
->> + writel((val& ~PRCMU_A9_MASK_REQ_MASK) | mask,
->> + _PRCMU_BASE + PRCMU_A9_MASK_REQ);
->> +}
->> +
->> +/*
->> + * db8500_prcmu_gic_disable - This function decouple the gic
->> + * from the prcmu.
->> + */
->> +void db8500_prcmu_gic_disable(void)
->> +{
->> + prcmu_gic_mask(PRCMU_A9_MASK_REQ_MASK);
->> +
->> + /* Wait for gic mask register update */
->> + while (!(readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ)&
->> + PRCMU_A9_MASK_REQ_MASK))
->> + cpu_relax();
->> +
->> + /* Wait a few cycles for the gic mask completion */
->> + udelay(1);
->> +}
->> +
->> +/*
->> + * db8500_prcmu_gic_enable - This function recouple the gic
->> + * with the prcmu.
->> + */
->> +void db8500_prcmu_gic_enable(void)
->> +{
->> + prcmu_gic_mask(0);
->> +}
->> +
->> /* This function should only be called while mb0_transfer.lock is
->> held. */
->> static void config_wakeups(void)
->> {
->> diff --git a/include/linux/mfd/db8500-prcmu.h
->> b/include/linux/mfd/db8500-prcmu.h
->> index 60d27f7..4a1032c 100644
->> --- a/include/linux/mfd/db8500-prcmu.h
->> +++ b/include/linux/mfd/db8500-prcmu.h
->> @@ -536,6 +536,8 @@ int prcmu_load_a9wdog(u8 id, u32 val);
->>
->> void db8500_prcmu_system_reset(u16 reset_code);
->> int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool
->> keep_ap_pll);
->> +void db8500_prcmu_gic_disable(void);
->> +void db8500_prcmu_gic_enable(void);
->> void db8500_prcmu_enable_wakeups(u32 wakeups);
->> int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state);
->> int db8500_prcmu_request_clock(u8 clock, bool enable);
->> diff --git a/include/linux/mfd/dbx500-prcmu.h
->> b/include/linux/mfd/dbx500-prcmu.h
->> index bac942f..a5fee69 100644
->> --- a/include/linux/mfd/dbx500-prcmu.h
->> +++ b/include/linux/mfd/dbx500-prcmu.h
->> @@ -237,6 +237,22 @@ static inline int prcmu_set_power_state(u8 state,
->> bool keep_ulp_clk,
->> keep_ap_pll);
->> }
->>
->> +static inline void prcmu_gic_disable(void)
->> +{
->> + if (machine_is_u5500())
->> + return;
->> + else
->> + return db8500_prcmu_gic_disable();
->> +}
->> +
->> +static inline void prcmu_gic_enable(void)
->> +{
->> + if (machine_is_u5500())
->> + return;
->> + else
->> + return db8500_prcmu_gic_enable();
->> +}
->> +
->> static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
->> {
->> if (machine_is_u5500())
->
+>> - ? ? imxdmac->dma_request = data->dma_request;
+>> + ? ? if (data != NULL)
+>> + ? ? ? ? ? ? imxdmac->dma_request = data->dma_request;
+> if you support memcopy then why should it _always_ require private
+> pointer?
+
+This is precisely why I have added this lines. Just to consider those
+cases where a private pointer is not needed.  Note that when this
+pointer is null I don't use it.
 
 
+>>
+>> ? ? ? dma_async_tx_descriptor_init(&imxdmac->desc, chan);
+>> ? ? ? imxdmac->desc.tx_submit = imxdma_tx_submit;
+>> @@ -328,6 +329,36 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+>> ? ? ? return &imxdmac->desc;
+>> ?}
+>>
+>> +static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+>> + ? ? struct dma_chan *chan, dma_addr_t dest,
+>> + ? ? dma_addr_t src, size_t len, unsigned long flags)
+>> +{
+>> + ? ? struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+>> + ? ? struct imxdma_engine *imxdma = imxdmac->imxdma;
+>> + ? ? int ret;
+>> +
+>> + ? ? dev_dbg(imxdma->dev, "%s channel: %d src=0x%x dst=0x%x len=%d\n",
+>> + ? ? ? ? ? ? ? ? ? ? __func__, imxdmac->channel, src, dest, len);
+>> +
+>> + ? ? if (imxdmac->status == DMA_IN_PROGRESS)
+>> + ? ? ? ? ? ? return NULL;
+> thats not right, you should be able to prepare descriptors even if dmac
+> is busy. Prepare != start
+
+As you've probably noticed, all existen prepare callbacks (slave_sg,
+cyclic)in this driver are programmed in the same way. As the driver
+does only support a single descriptor, every call to a prepare
+function of an active channel will fail some way or another (because
+there are no free descriptors available). You can argue that actual
+configuration of the HW should be done in the "tx_submit()" callback
+but, since this driver does not support more than one descriptor this
+wouldn't make any difference.
+
+Moreover, I don't think it's convenient punishing developers of new
+functionality for poor previous decissions, although as a maintainer I
+understand you want the drivers to be clean. However, we are enforced
+to fix this in "Step 3" of our development process anyway, since we
+need to add support for multiple descriptors. So, it would make things
+easier for us if you could let these patches pass.
+
+>> + ? ? imxdmac->status = DMA_IN_PROGRESS;
+>> +
+>> + ? ? ret = imx_dma_config_channel(imxdmac->imxdma_channel,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?0, 0);
+>> + ? ? if (ret)
+>> + ? ? ? ? ? ? return NULL;
+>> +
+>> + ? ? ret = imx_dma_setup_single(imxdmac->imxdma_channel, src, len,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dest, DMA_MODE_WRITE);
+>> + ? ? if (ret)
+>> + ? ? ? ? ? ? return NULL;
+>> +
+>> + ? ? return &imxdmac->desc;
+>> +}
+>> +
+>> ?static void imxdma_issue_pending(struct dma_chan *chan)
+>> ?{
+>> ? ? ? struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+>> @@ -349,6 +380,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+>>
+>> ? ? ? dma_cap_set(DMA_SLAVE, imxdma->dma_device.cap_mask);
+>> ? ? ? dma_cap_set(DMA_CYCLIC, imxdma->dma_device.cap_mask);
+>> + ? ? dma_cap_set(DMA_MEMCPY, imxdma->dma_device.cap_mask);
+>>
+>> ? ? ? /* Initialize channel parameters */
+>> ? ? ? for (i = 0; i < MAX_DMA_CHANNELS; i++) {
+>> @@ -382,11 +414,13 @@ static int __init imxdma_probe(struct platform_device *pdev)
+>> ? ? ? imxdma->dma_device.device_tx_status = imxdma_tx_status;
+>> ? ? ? imxdma->dma_device.device_prep_slave_sg = imxdma_prep_slave_sg;
+>> ? ? ? imxdma->dma_device.device_prep_dma_cyclic = imxdma_prep_dma_cyclic;
+>> + ? ? imxdma->dma_device.device_prep_dma_memcpy = imxdma_prep_dma_memcpy;
+>> ? ? ? imxdma->dma_device.device_control = imxdma_control;
+>> ? ? ? imxdma->dma_device.device_issue_pending = imxdma_issue_pending;
+>>
+>> ? ? ? platform_set_drvdata(pdev, imxdma);
+>>
+>> + ? ? imxdma->dma_device.copy_align = 2; /* 2^2 = 4 bytes alignment */
+> what is this magic number?
+
+It indicates this driver support 32bit aligned memory accesses and we
+use it as it is done in other drivers like:
+http://lxr.linux.no/#linux+v3.2.4/drivers/dma/ste_dma40.c#L2437
+http://lxr.linux.no/#linux+v3.2.4/drivers/dma/coh901318.c#L1557
+
+
+Regards.
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
