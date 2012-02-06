@@ -1,26 +1,153 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 6 Feb 2012 13:41:40 +0530
-Subject: [PATCH V3 08/12] dmaengine/dw_dmac: Unmap all memory buffers
- after completion of non-slave transfers
-In-Reply-To: <20120202121523.GG889@n2100.arm.linux.org.uk>
-References: <cover.1328091915.git.viresh.kumar@st.com>
- <c098ca5959c947b3634555bc7bf4a8b3af82a2ae.1328091915.git.viresh.kumar@st.com>
- <20120202121523.GG889@n2100.arm.linux.org.uk>
-Message-ID: <4F2F8B3C.7050107@st.com>
+From: rickard.andersson@stericsson.com (Rickard Andersson)
+Date: Mon, 6 Feb 2012 10:19:40 +0100
+Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
+In-Reply-To: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <4F2F9B2C.8030009@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/2/2012 5:45 PM, Russell King - ARM Linux wrote:
-> I'm still unconvinced that this is anywhere close to correct.
-> 
-> Look.  DMA engines only automatically unmap when they're being used by the
-> async_tx stuff for memcpy's, and RAID computation offload, and the like.
-> These work with individual single buffers, not scatterlists.  These will
-> not be fragmented.
+Hi!
 
-Got it. You are right.
+Our comments:
 
-@Vinod: Please drop this patch.
+- function names don't match commit comment disable/enable vs recouple/decouple. Decouple is a better name than disable, because GIC is not really disabled it is just disconnected.
+- there is no reason to place these functions inside the db8500-prcmu.c file. There is so much stuff in the PRCMU register base so we can not have everything in one file. Why not have it as it is?
+- why the gic_mask function?
+- The original code has been updated and now looks like this:
 
--- 
-viresh
+
+/* Decouple GIC from the interrupt bus */
+void ux500_pm_gic_decouple(void)
+{
+         prcmu_write_masked(PRCM_A9_MASK_REQ,
+                            PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ,
+                            PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ);
+
+         (void)prcmu_read(PRCM_A9_MASK_REQ);
+
+         udelay(GIC_FREEZE_DELAY); /* Wait for the GIC to freeze */
+}
+
+/* Recouple GIC with the interrupt bus */
+void ux500_pm_gic_recouple(void)
+{
+         prcmu_write_masked(PRCM_A9_MASK_REQ,
+                            PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ,
+                            0);
+}
+
+BR
+Rickard Andersson&  Jonas Aberg
+
+> This patch allows to decouple and recouple the gic from the PRCMU.
+> This is needed to put the A9 core in retention mode with the cpuidle
+> driver.
+>
+> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+> ---
+>   drivers/mfd/db8500-prcmu.c       |   42 ++++++++++++++++++++++++++++++++++++++
+>   include/linux/mfd/db8500-prcmu.h |    2 +
+>   include/linux/mfd/dbx500-prcmu.h |   16 ++++++++++++++
+>   3 files changed, 60 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index af8e0ef..c708431 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -528,6 +528,10 @@ static const char *hwacc_ret_regulator_name[NUM_HW_ACC] = {
+>
+>   #define PRCMU_PLLDSI_LOCKP_LOCKED	0x3
+>
+> +#define PRCMU_A9_MASK_REQ               0x00000328
+> +#define PRCMU_A9_MASK_REQ_MASK          0x00000001
+> +#define PRCMU_A9_MASK_ACK               0x0000032C
+> +
+>   static struct {
+>   	u8 project_number;
+>   	u8 api_version;
+> @@ -787,6 +791,44 @@ int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
+>   	return 0;
+>   }
+>
+> +/*
+> + * prcmu_gic_mask - apply the mask to the mask request
+> + * register. This mask has the bits [1-31] reserved and
+> + * the request applies to the bit 0 of this register.
+> + */
+> +static inline void prcmu_gic_mask(u32 mask)
+> +{
+> +	u32 val = readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
+> +	writel((val&  ~PRCMU_A9_MASK_REQ_MASK) | mask,
+> +	       _PRCMU_BASE + PRCMU_A9_MASK_REQ);
+> +}
+> +
+> +/*
+> + * db8500_prcmu_gic_disable - This function decouple the gic
+> + * from the prcmu.
+> + */
+> +void db8500_prcmu_gic_disable(void)
+> +{
+> +	prcmu_gic_mask(PRCMU_A9_MASK_REQ_MASK);
+> +
+> +	/* Wait for gic mask register update */
+> +	while (!(readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ)&
+> +		 PRCMU_A9_MASK_REQ_MASK))
+> +		cpu_relax();
+> +
+> +	/* Wait a few cycles for the gic mask completion */
+> +	udelay(1);
+> +}
+> +
+> +/*
+> + * db8500_prcmu_gic_enable - This function recouple the gic
+> + * with the prcmu.
+> + */
+> +void db8500_prcmu_gic_enable(void)
+> +{
+> +	prcmu_gic_mask(0);
+> +}
+> +
+>   /* This function should only be called while mb0_transfer.lock is held. */
+>   static void config_wakeups(void)
+>   {
+> diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
+> index 60d27f7..4a1032c 100644
+> --- a/include/linux/mfd/db8500-prcmu.h
+> +++ b/include/linux/mfd/db8500-prcmu.h
+> @@ -536,6 +536,8 @@ int prcmu_load_a9wdog(u8 id, u32 val);
+>
+>   void db8500_prcmu_system_reset(u16 reset_code);
+>   int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
+> +void db8500_prcmu_gic_disable(void);
+> +void db8500_prcmu_gic_enable(void);
+>   void db8500_prcmu_enable_wakeups(u32 wakeups);
+>   int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state);
+>   int db8500_prcmu_request_clock(u8 clock, bool enable);
+> diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
+> index bac942f..a5fee69 100644
+> --- a/include/linux/mfd/dbx500-prcmu.h
+> +++ b/include/linux/mfd/dbx500-prcmu.h
+> @@ -237,6 +237,22 @@ static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+>   			keep_ap_pll);
+>   }
+>
+> +static inline void prcmu_gic_disable(void)
+> +{
+> +	if (machine_is_u5500())
+> +		return;
+> +	else
+> +		return db8500_prcmu_gic_disable();
+> +}
+> +
+> +static inline void prcmu_gic_enable(void)
+> +{
+> +	if (machine_is_u5500())
+> +		return;
+> +	else
+> +		return db8500_prcmu_gic_enable();
+> +}
+> +
+>   static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
+>   {
+>   	if (machine_is_u5500())
