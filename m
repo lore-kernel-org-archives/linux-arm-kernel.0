@@ -1,42 +1,212 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 6 Feb 2012 10:20:36 +0800
-Subject: [PATCH v5] I2C: add CSR SiRFprimaII on-chip I2C controllers driver
-In-Reply-To: <CAGsJ_4yHn1M3s6CPezaW_jwOcsX6NuaZRHcNWX0qnSfhx30AHQ@mail.gmail.com>
-References: <1327846668-3053-1-git-send-email-21cnbao@gmail.com>
- <20120205223757.GA10680@nekote.pengutronix.de>
- <CAGsJ_4yHn1M3s6CPezaW_jwOcsX6NuaZRHcNWX0qnSfhx30AHQ@mail.gmail.com>
-Message-ID: <CAGsJ_4zNjkLOs_A8H1-yteDTZodFGjh=3k9x0P-hmBb1w2q4vg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sun, 5 Feb 2012 19:07:51 -0800
+Subject: An extremely simplified pinctrl bindings proposal
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
+Message-ID: <CAJuYYwQ2yczBh+CBFWohZPM+9jHXYxyxYzL8CS4puE96v4fDXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
->>> index 3101dd5..a3c43fc 100644
->>> --- a/drivers/i2c/busses/Kconfig
->>> +++ b/drivers/i2c/busses/Kconfig
->>> @@ -618,6 +618,16 @@ config I2C_SH_MOBILE
->>> ? ? ? ? This driver can also be built as a module. ?If so, the module
->>> ? ? ? ? will be called i2c-sh_mobile.
->>>
->>> +config I2C_SIRF
->>> + ? ? tristate "CSR SiRFprimaII I2C interface"
->>> + ? ? depends on ARCH_PRIMA2
->>> + ? ? help
->>> + ? ? ? If you say yes to this option, support will be included for the
->>> + ? ? ? CSR SiRFprimaII I2C interface.
->>> +
->>> + ? ? ? This driver can also be built as a module. ?If so, the module
->>> + ? ? ? will be called i2c-sirf.
->>> +
->>
->> Sorting is broken, same with Makefile.
->
-> sorry. i don't get this. I2C_SIRF have be placed in "I2C system bus
-> drivers (mostly embedded / system-on-chip)" submenu and placed between
-> "I2C_SH_MOBILE" and "I2C_SIMTEC".
-> what is the problem?
->
+Hi Stephen,
 
-Oh.... i was making some stupid mistake. i thought R is earlier than
-M. in fact,  it is L->M->N->O->P->Q->R, so move I2C_SIRF behind
-"I2C_SIMTEC".
--barry
+On 4 February 2012 21:31, Stephen Warren <swarren@nvidia.com> wrote:
+> Sorry, I haven't had a chance to read any of the pincrl emails from
+> Friday onwards. However, I thought a bit more about this, and decided
+> to propose someting much simpler:
+>
+> Thoughts:
+>
+> * Defining all the pins, groups, functions, ... takes a lot of space,
+> ?whether it's in static data in pinctrl drivers or in the device tree.
+> ?The lists must also be stored in RAM at runtime.
+>
+> * It's been very difficult to come up with a generic description of all
+> ?pin controller's capabilities. This is true even irrespective of device
+> ?tree; think pin config where we've agonized over whether we can create
+> ?a standardized list of pin config properties, or need to allow each
+> ?pinctrl driver to define its own set of properties, etc.
+>
+> * The only real use of the lists is for debugfs. Drivers shouldn't expect
+> ?to directly request specific pinctrl settings, since that would encode
+> ?knowledge of an individual SoC's pin controller. This should be
+> ?abstracted from drivers.
+>
+> * The data in debugfs could easily be replaced by a raw register dump
+> ?coupled with a SoC-specific script to print out what each register
+> ?means.
+>
+> My proposal below is to radically simplify the pinctrl subsystem, and
+> make it little more than a system to execute a list of arbitrary register
+> writes.
+
+Thanks for your work on pinctrl bindings proposal.
+
+With this new approach, how much of the pinctrl susbystem is used in
+device tree mode. Last time I had proposed something similar to this
+(http://marc.info/?l=linux-kernel&m=132697880016289&w=2), you were not
+happy about that approach since the pinctrl subsystem is largely
+under-utilized (http://marc.info/?l=linux-kernel&m=132735884622374&w=2),
+expect for providing a interface which individual
+pinctrl/pinmux/pinconfig drivers will use to implement a function that
+programs the hardware.
+
+There need not be pinmux/pinctrl/pinconfig bindings that are designed
+for the linux pinctrl subsystem. DT allows specifying the
+pinconfig/pinmux properties in a simple way, which was not possible in
+non-dt case and hence the pinctrl subsystem. Other OS'es which might
+not have a pinctrl subsystem, similar to what linux has, should also
+find the pinctrl bindings useful.
+
+Regards,
+Thomas.
+
+>
+> Advantages:
+>
+> * No need to define any kind of data model for pinctrl.
+>
+> * No need to store any list of pins/groups/function/parameters/... either
+> ?in static data, in device tree, or at run-time.
+>
+> * No need to store the the selected board-specific settings anywhere either.
+>
+> * Completely generic; can handle anything that exists now or in the future.
+>
+> * Handles pin mux and pin config identically.
+>
+> * Extremely simple to implement and understand; probably just a few K
+> ?of code and no data. I assume this will be very appealing to those
+> ?interested in using the binding within U-Boot too.
+>
+> * The lists of register writes can just as easily be provided by board
+> ?files as device tree, so operation should be identical.
+>
+> Disadvantages:
+>
+> * Creating the list of register values/masks may be a little painful. If
+> ?we move forward with this, we'd want to strongly push dtc towards
+> ?providing named constants, expressesion, macros, etc. Those dtc features
+> ?would be very useful anyway.
+>
+> * Lack of high-level semantic meaning to the data; but I assert there's
+> ?little benefit to having that anyway.
+>
+> ?To solve this, write a script to parse each pinctrl driver's regcache
+> ?file and print out all the register meanings.
+>
+> * This scheme wouldn't represent which device "owns" which pins/groups,
+> ?nor be able to validate that different devices' pinmux settings don't
+> ?conflict.
+>
+> ?I don't think this is a huge issue though, since that's mainly error-
+> ?checking. Any problems should be just as obvious during testing whether
+> ?they cause the HW to fail to operate correctly, or whether they cause
+> ?pinctrl to throw an error. Equally, there are many error conditions
+> ?that pinctrl core wasn't checking for anyway.
+>
+> Precedent:
+>
+> * There was previous discussion on using this exact technique for pinmux
+> ?at a previous Linaro Connect:
+>
+> ?http://www.spinics.net/lists/linux-tegra/msg01943.html
+>
+> * There is an existing binding that works very similarly, for the Mavell
+> ?PHY:
+>
+> ?http://www.gossamer-threads.com/lists/linux/kernel/1305624
+> ?drivers/net/phy/marvell.c
+>
+> ?Explicit mention was made here that a simple list of register writes
+> ?avoiding the complexity of representing a huge number of combinations
+> ?in the device tree.
+>
+> tegra20.dtsi:
+>
+> pinmux: pinmux at 70000000 {
+> ? ? ? ?compatible = "nvidia,tegra20-pinmux";
+> ? ? ? ?reg = <0x70000014 0x10> ?/* Tri-state registers */
+> ? ? ? ? ? ? ?<0x70000080 0x20> ?/* Mux registers */
+> ? ? ? ? ? ? ?<0x700000a0 0x14> ?/* Pull-up/down registers */
+> ? ? ? ? ? ? ?<0x70000868 0xa8>; /* Pad control registers */
+>
+> ? ? ? ?pinmux_i2c1_spdio_active: pinmux-i2c1-spdio-active {
+> ? ? ? ? ? ? ? ?reg-init =
+> ? ? ? ? ? ? ? ? ? ?/* Set pingroup SPDO to function I2C1 */
+> ? ? ? ? ? ? ? ? ? ?<
+> ? ? ? ? ? ? ? ? ? ? ? ?1 ? ? ? ? ?/* Register "bank" in controller */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x8c ? ? ? /* Register offset */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x000000c0 /* Write bitmask, 0 for whole register */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x00000080 /* Write value */
+> ? ? ? ? ? ? ? ? ? ?>
+> ? ? ? ? ? ? ? ? ? ?/* Set pingroup SPDI to function I2C1 */
+> ? ? ? ? ? ? ? ? ? ?<
+> ? ? ? ? ? ? ? ? ? ? ? ?1 ? ? ? ? ?/* Register "bank" in controller */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x8c ? ? ? /* Register offset */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x00000300 /* Write bitmask, 0 for whole register */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x00000200 /* Write value */
+> ? ? ? ? ? ? ? ? ? ?>;
+> ? ? ? ?};
+> ? ? ? ?pinmux_i2c1_spdio_suspend: pinmux-i2c1-spdio-suspend {
+> ? ? ? ? ? ? ? ?...
+> ? ? ? ?};
+> };
+>
+> tegra-seaboard.dts:
+>
+> i2c at 7000c000 {
+> ? ? ? ?/*
+> ? ? ? ? * These are phandles to nodes that containthe reg-init list. Can
+> ? ? ? ? * we have phandles to properties instead? Then we wouldn't need
+> ? ? ? ? * all those nodes which each just contains 1 property.
+> ? ? ? ? */
+> ? ? ? ?pinctrl = <&pinmux_i2c1_spdio_active &pinmux_i2c1_spdio_suspend>;
+> ? ? ? ?pinctrl-names = "active", "suspend";
+> };
+>
+> In order to support programming more than one pin controller at once, we
+> could include the phandle of the pin controller in the "reg-init" property:
+>
+> somewhere-other-than-under-a-pin-controller {
+> ? ? ? ?pinmux-foo {
+> ? ? ? ? ? ? ? ?reg-init =
+> ? ? ? ? ? ? ? ? ? ?<
+> ? ? ? ? ? ? ? ? ? ? ? ?&tegra_pmx /* Pin controller */
+> ? ? ? ? ? ? ? ? ? ? ? ?2 ? ? ? ? ?/* Number of entries for this controller */
+> ? ? ? ? ? ? ? ? ? ?>
+> ? ? ? ? ? ? ? ? ? ?<
+> ? ? ? ? ? ? ? ? ? ? ? ?1 ? ? ? ? ?/* Register "bank" in controller */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x8c ? ? ? /* Register offset */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x000000c0 /* Write bitmask, 0 for whole register */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x00000080 /* Write value */
+> ? ? ? ? ? ? ? ? ? ?>
+> ? ? ? ? ? ? ? ? ? ?<
+> ? ? ? ? ? ? ? ? ? ? ? ?1 ? ? ? ? ?/* Register "bank" in controller */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x8c ? ? ? /* Register offset */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x00000300 /* Write bitmask, 0 for whole register */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x00000200 /* Write value */
+> ? ? ? ? ? ? ? ? ? ?>
+> ? ? ? ? ? ? ? ? ? ?<
+> ? ? ? ? ? ? ? ? ? ? ? ?&other_pmx /* Pin controller */
+> ? ? ? ? ? ? ? ? ? ? ? ?1 ? ? ? ? ?/* Number of entries for this controller */
+> ? ? ? ? ? ? ? ? ? ?>
+> ? ? ? ? ? ? ? ? ? ?<
+> ? ? ? ? ? ? ? ? ? ? ? ?0 ? ? ? ? ?/* Register "bank" in controller */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x04 ? ? ? /* Register offset */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x000000ff /* Write bitmask, 0 for whole register */
+> ? ? ? ? ? ? ? ? ? ? ? ?0x0000005a /* Write value */
+> ? ? ? ? ? ? ? ? ? ?>;
+> ? ? ? ?}
+> };
+>
+> When parsing a reg-init property, we know if it contains phandles by:
+> * If node containing property is a child of a pin controller, the property
+> ?doesn't containt pin controller phandles.
+> * Otherwise, it does.
+>
+> What are people's thoughts. Thinking about all the issues involved, this
+> is certainly the approach I like most right now.
+>
+> --
+> nvpublic
+>
