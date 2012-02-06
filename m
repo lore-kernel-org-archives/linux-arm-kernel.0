@@ -1,28 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 6 Feb 2012 19:41:25 +0000
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 6 Feb 2012 20:56:47 +0100
 Subject: An extremely simplified pinctrl bindings proposal
-In-Reply-To: <4F2F6AE2.1040504@nvidia.com>
+In-Reply-To: <20120206190315.GU1426@atomide.com>
 References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
  <CACRpkdahin4srDh7dphgvq306gjz7CGP=h4dVkUY+w0z0wpXRQ@mail.gmail.com>
  <4F2F6AE2.1040504@nvidia.com>
-Message-ID: <20120206194125.GA23030@sirena.org.uk>
+ <CACRpkdbtTPSoX1x4aBtNVGZ2Qex9t77D09V9JgON_jfShQdx6w@mail.gmail.com>
+ <20120206190315.GU1426@atomide.com>
+Message-ID: <CACRpkdZthbejmTqRJAWHb8jU-p8LPT_+zj_CY1q0voMb4FKz2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 05, 2012 at 09:53:38PM -0800, Stephen Warren wrote:
-> On 02/05/2012 08:20 PM, Linus Walleij wrote:
+On Mon, Feb 6, 2012 at 8:03 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-> > A controlled set of register read/writes and maybe also conditionals
-> > (if that bit is 1, do this, else do that, plus a loop command to wait
-> > for a flag or similar) are known as a "jam tables" and usually used
-> > in BIOSes to do a compact machine initialization. I learned this term
-> > in Bunnie Huang's "Hacking the Xbox, where he describes finding a
-> > jam table interpreter in the Xbox ROM.
+> So far the only
+> change needed for pinctrl drivers containing no data is that
+> we should make the string names optional and structure debugfs
+> around the physical register addresses instead. I'm basically
+> just setting the mux register physcal address as the pin name
+> for now to work around this.
 
-FWIW I just added a subset of this functionality (called "patches" for
-want of a better name) to regmap, just a simple list of register writes
-that get blasted in htere.  The intent is somewhat different, though -
-it's there for dumping undocumented or partially documented register
-write sequences from vendors into devices since there's a common pattern
-of doing that when bringing things out of reset, more like what Grant
-seems to have been talking about in that thread.
+OK please make a patch to do it really optional in the core if
+you find the time, it seems like a good change anyway, because
+it will make it possible to reduce some current pin name lists
+quite easily.
+
+If you need to change the layout of debugfs just do it.
+
+I actually had something like unnamed pins in the early patches
+to register a bunch of anonymous pins ranges, so why not bring
+it back in.
+
+Thanks,
+Linus Walleij
