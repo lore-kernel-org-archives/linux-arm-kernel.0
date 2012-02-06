@@ -1,48 +1,189 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 6 Feb 2012 10:29:57 +0000
-Subject: [PATCH 4/7] Store huge page linux pte in mm_struct
-In-Reply-To: <4F2F352B.9080408@gmail.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-5-git-send-email-bill4carson@gmail.com>
- <20120131100154.GC889@n2100.arm.linux.org.uk>
- <4F28D18D.1040402@gmail.com> <4F2F352B.9080408@gmail.com>
-Message-ID: <20120206102957.GB26538@arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon,  6 Feb 2012 11:35:11 +0100
+Subject: [PATCH 4/6 V2] of/mtd/nand: add generic bindings and helpers
+In-Reply-To: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1328524512-18159-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bill4carson wrote:
-> Normal page based pte has hardware version and linux version, these
-> two kinds of ptes occupy half of 4K page, and each of two pmd level
-> entry pointer to this half 4K page.
->
-> For huge page, mappings only exist in pmd level from hardware
-> perspective, however mm subsystem also needs to know the linux version
-> *pte* of this huge page based mapping, problems is where to store
-> these huge page linux pte?
->
-> A:
-> Store huge page linux pte in mm_struct
->
-> B:
-> Store huge page linux pte in mm_context_t suggested by Catalin.
-> This is almost like option A, while it's nice to modify arm code only
-> and take small effort to make it happen.
->
-> C:
-> Modify pgd_alloc to allocate 2048 pgd_t entries plus two void pointers
-> Use these two additional pointers to store huge page linux pte.
-> It's feasible, but I don't know whether this is a good idea.
+- nand-ecc-mode : String, operation mode of the NAND ecc mode.
+  Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
+  "soft_bch".
+- nand-bus-width : 8 or 16 bus width if not present 8
+- nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
 
-I wouldn't add this to pgd_alloc since not all tasks need huge pages.
-First option is also not feasible as we shouldn't touch generic code.
-This leaves us with B, unless better options are suggested.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-mtd at lists.infradead.org
+---
+ Documentation/devicetree/bindings/mtd/nand.txt |    7 ++
+ drivers/of/Kconfig                             |    4 +
+ drivers/of/Makefile                            |    1 +
+ drivers/of/of_mtd.c                            |   90 ++++++++++++++++++++++++
+ include/linux/of_mtd.h                         |   19 +++++
+ 5 files changed, 121 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/nand.txt
+ create mode 100644 drivers/of/of_mtd.c
+ create mode 100644 include/linux/of_mtd.h
 
-I had a patch couple of years ago
-(http://article.gmane.org/gmane.linux.ports.arm.kernel/55045) to use the
-AF (Access Flag) bit and free up some bits in the page table, allowing
-us to drop the Linux PTE. But we end up in a bigger configuration mess
-as we already have to choose between classic MMU and LPAE. The
-performance advantage wasn't that big either.
-
+diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
+new file mode 100644
+index 0000000..03855c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/nand.txt
+@@ -0,0 +1,7 @@
++* MTD generic binding
++
++- nand-ecc-mode : String, operation mode of the NAND ecc mode.
++  Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
++  "soft_bch".
++- nand-bus-width : 8 or 16 bus width if not present 8
++- nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index 268163d..fa666a9 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -90,4 +90,8 @@ config OF_PCI_IRQ
+ 	help
+ 	  OpenFirmware PCI IRQ routing helpers
+ 
++config OF_MTD
++	depends on MTD
++	def_bool y
++
+ endmenu # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index a73f5a5..8c4980a 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -12,3 +12,4 @@ obj-$(CONFIG_OF_SELFTEST) += selftest.o
+ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+ obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
++obj-$(CONFIG_OF_NET)	+= of_mtd.o
+diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
+new file mode 100644
+index 0000000..d7183de
+--- /dev/null
++++ b/drivers/of/of_mtd.c
+@@ -0,0 +1,90 @@
++/*
++ * Copyright 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * OF helpers for mtd.
++ *
++ * This file is released under the GPLv2
++ *
++ */
++#include <linux/kernel.h>
++#include <linux/of_mtd.h>
++#include <linux/mtd/nand.h>
++#include <linux/export.h>
++
++/**
++ * It maps 'enum nand_ecc_modes_t' found in include/linux/mtd/nand.h
++ * into the device tree binding of 'nand-ecc', so that MTD
++ * device driver can get nand ecc from device tree.
++ */
++static const char *nand_ecc_modes[] = {
++	[NAND_ECC_NONE]		= "none",
++	[NAND_ECC_SOFT]		= "soft",
++	[NAND_ECC_HW]		= "hw",
++	[NAND_ECC_HW_SYNDROME]	= "hw_syndrome",
++	[NAND_ECC_HW_OOB_FIRST]	= "hw_oob_first",
++	[NAND_ECC_SOFT_BCH]	= "soft_bch",
++};
++
++/**
++ * of_get_nand_ecc_mode - Get nand ecc mode for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * The function gets ecc mode string from property 'nand-ecc-mode',
++ * and return its index in nand_ecc_modes table, or errno in error case.
++ */
++const int of_get_nand_ecc_mode(struct device_node *np)
++{
++	const char *pm;
++	int err, i;
++
++	err = of_property_read_string(np, "nand-ecc-mode", &pm);
++	if (err < 0)
++		return err;
++
++	for (i = 0; i < ARRAY_SIZE(nand_ecc_modes); i++)
++		if (!strcasecmp(pm, nand_ecc_modes[i]))
++			return i;
++
++	return -ENODEV;
++}
++EXPORT_SYMBOL_GPL(of_get_nand_ecc_mode);
++
++/**
++ * of_get_nand_bus_width - Get nand bus witdh for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * return bus width option, or errno in error case.
++ */
++int of_get_nand_bus_width(struct device_node *np)
++{
++	u32 val;
++
++	if (of_property_read_u32(np, "nand-bus-width", &val))
++		return 8;
++
++	switch(val) {
++	case 8:
++	case 16:
++		return val;
++	default:
++		return -EIO;
++	}
++}
++EXPORT_SYMBOL_GPL(of_get_nand_bus_width);
++
++/**
++ * of_get_nand_on_flash_bbt - Get nand on flash bbt for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * return true if 1 false other wise
++ */
++bool of_get_nand_on_flash_bbt(struct device_node *np)
++{
++	u32 val;
++
++	if (of_property_read_u32(np, "nand-on-flash-bbt", &val))
++		return false;
++
++	return val ? true : false;
++}
++EXPORT_SYMBOL_GPL(of_get_nand_on_flash_bbt);
+diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
+new file mode 100644
+index 0000000..bae1b60
+--- /dev/null
++++ b/include/linux/of_mtd.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * OF helpers for mtd.
++ *
++ * This file is released under the GPLv2
++ */
++
++#ifndef __LINUX_OF_MTD_H
++#define __LINUX_OF_NET_H
++
++#ifdef CONFIG_OF_MTD
++#include <linux/of.h>
++extern const int of_get_nand_ecc_mode(struct device_node *np);
++int of_get_nand_bus_width(struct device_node *np);
++bool of_get_nand_on_flash_bbt(struct device_node *np);
++#endif
++
++#endif /* __LINUX_OF_MTD_H */
 -- 
-Catalin
+1.7.7
