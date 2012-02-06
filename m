@@ -1,38 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Feb 2012 00:15:30 +0100
-Subject: An extremely simplified pinctrl bindings proposal
-In-Reply-To: <20120206210456.GV1426@atomide.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
- <CACRpkdahin4srDh7dphgvq306gjz7CGP=h4dVkUY+w0z0wpXRQ@mail.gmail.com>
- <4F2F6AE2.1040504@nvidia.com>
- <CACRpkdbtTPSoX1x4aBtNVGZ2Qex9t77D09V9JgON_jfShQdx6w@mail.gmail.com>
- <20120206190315.GU1426@atomide.com>
- <CACRpkdZthbejmTqRJAWHb8jU-p8LPT_+zj_CY1q0voMb4FKz2Q@mail.gmail.com>
- <20120206210456.GV1426@atomide.com>
-Message-ID: <CACRpkdYrbD3PpJ3wb69yb3Ya8SeZJnPpgJdtttjWTkS5xsD-4g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 6 Feb 2012 15:16:00 -0800 (PST)
+Subject: [regression] Re: Enabling runtime P2V by default
+In-Reply-To: <20120206223147.GA3760@burratino>
+References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
+ <20110810091635.GF1831@n2100.arm.linux.org.uk>
+ <20110810092206.GE10121@e102144-lin.cambridge.arm.com>
+ <20120206223147.GA3760@burratino>
+Message-ID: <alpine.LFD.2.02.1202061514430.1656@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 6, 2012 at 10:04 PM, Tony Lindgren <tony@atomide.com> wrote:
+On Mon, 6 Feb 2012, Jonathan Nieder wrote:
 
->> I actually had something like unnamed pins in the early patches
->> to register a bunch of anonymous pins ranges, so why not bring
->> it back in.
->
-> Yeah it seems that the mux registers should be listed, it might
-> require a little bit of thinking for cases where one register
-> controls multiple pins. So maybe we need just a new entry for
-> mux registers?
+> Will Deacon wrote:
+> > On Wed, Aug 10, 2011 at 10:16:35AM +0100, Russell King - ARM Linux wrote:
+> >> On Tue, Aug 09, 2011 at 09:41:38PM +0200, Linus Walleij wrote:
+> 
+> >>> From: Linus Walleij <linus.walleij@linaro.org>
+> >>>
+> >>> This works like a charm so I'll just default-select it.
+> >>
+> >> Well, we can remove the EXPERIMENTAL status of this option now.  This
+> >> raises the question is whether we should now default it to 'y' - I
+> >> think we should.  Anyone have any objections?
+> >
+> > I've been running with this option enabled for the collection of ARM boards
+> > I have and the only problem I have encountered was related to u-boot loading
+> > at the wrong address.
+> 
+> Hm, another u-boot problem was found[1].  On the affected machines it
+> prevents booting a compressed kernel (but uncompressed kernels are
+> fine) unless CONFIG_ARM_PATCH_PHYS_VIRT is disabled or u-boot is
+> patched.
+> 
+> > So I'm all for enabling it by default, especially since it will force out
+> > any remaining issues for boards where this hasn't been used extensively.
+> 
+> Looks like it worked. ;-)
+> 
+> So, what now?  Is there anything the kernel can do to work around
+> this, or should we just live with the regression until people patch
+> their u-boot?
 
-I'm not sure if I'm following completely, if this is inside the devicetree-based
-driver file, would it work to just add a struct dentry * to the
-pinctrl_desc where you put a per-driver file?
+You really do want to have uboot patched.  Who knows what other latent 
+issues are there that you don't know about.
 
-Or maybe add extern void pinctrl_add_debugfs(struct dentry *) that adds
-a new file to the existing per-driver directory through the core and then
-have this add that file?
 
-Or did you mean that the core.c should be register-aware?
-
-Yours,
-Linus Walleij
+Nicolas
