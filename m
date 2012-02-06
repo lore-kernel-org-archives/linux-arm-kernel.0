@@ -1,36 +1,110 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 6 Feb 2012 18:37:51 +0100
-Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
-In-Reply-To: <4F2FDF54.8080701@linaro.org>
-References: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
- <4F2F9B2C.8030009@stericsson.com> <4F2FDF54.8080701@linaro.org>
-Message-ID: <CACRpkdaW+xBNvEjXe3sYxWq379Gk3HkX66YKe=mWKJMKFercyw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 6 Feb 2012 17:39:50 +0000
+Subject: [PATCH 2/2] misc: c2c: Add C2C(Chip to Chip) device driver for
+ EXYNOS
+In-Reply-To: <000601cce315$18c82510$4a586f30$%lee@samsung.com>
+References: <000601cce315$18c82510$4a586f30$%lee@samsung.com>
+Message-ID: <20120206173950.GA17927@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 6, 2012 at 3:10 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 02/06/2012 10:19 AM, Rickard Andersson wrote:
+On Sat, Feb 04, 2012 at 05:15:03PM +0900, Kisang Lee wrote:
+> Cc: Arnd Bergmann <arnd <at> arndb.de>
+> Cc: Greg Kroah-Hartman <greg <at> kroah.com>
+> 
+> Signed-off-by: Kisang Lee <kisang80.lee@samsung.com>
 
->> - there is no reason to place these functions inside the db8500-prcmu.c
->> file. There is so much stuff in the PRCMU register base so we can not
->> have everything in one file. Why not have it as it is?
->
-> Why spread the prcmu code when it is related to the prcmu ?
->
-> Linus ? What do you think ?
+What is a chip to chip driver?  It looks like there is some overlap with
+the remoteproc work that Ohad Ben-Cohen has been doing, or I think there
+was also some work for communicating with things like basebands?
+Perhaps even UIO?
 
-I have no strong opinions on this. When I discussed it with Mattias
-who wrote much of the driver we concluded that the PRCMU drivers needs
-a lot of shaping up. Mainly it may need to be split into two parts: one
-which is a "pure" MFD device (register access part) one MFD firmware
-interaction part, and then a platform-specific (U8500) part.
+> +		if (opp_val == C2C_OPP100)
+> +			req_clk = c2c_con.clk_opp100;
+> +		else if (opp_val == C2C_OPP50)
+> +			req_clk = c2c_con.clk_opp50;
+> +		else if (opp_val == C2C_OPP25)
+> +			req_clk = c2c_con.clk_opp25;
 
-This would help getting code in more logical places.
+This looks like a switch statement.
 
-For now I would suggest not moving stuff around, I thin Mattias is onto
-cleaning up the structure as per above and we could be messing it up
-for him, which is not good.
+> +		dev_info(c2c_con.c2c_dev, "Get C2C sclk rate : %ld\n",
+> +					clk_get_rate(c2c_con.c2c_sclk));
+> +		dev_info(c2c_con.c2c_dev, "Get C2C aclk rate : %ld\n",
+> +					clk_get_rate(c2c_con.c2c_aclk));
+> +		break;
+> +	default:
+> +		dev_info(c2c_con.c2c_dev, "---C2C Operation Number---\n");
+> +		dev_info(c2c_con.c2c_dev, "1. C2C Reset\n");
+> +		dev_info(c2c_con.c2c_dev, "2. Set OPP25\n");
+> +		dev_info(c2c_con.c2c_dev, "3. Set OPP50\n");
+> +		dev_info(c2c_con.c2c_dev, "4. Set OPP100\n");
 
-Yours,
-Linus Walleij
+These log messages probably shouldn't be in.
+
+> +static irqreturn_t c2c_sscm0_irq(int irq, void *data)
+> +{
+> +	/* Nothing here yet */
+> +	return IRQ_HANDLED;
+> +}
+
+This doesn't look terribly clever - if the interrupt has been asserted
+and we don't do anything to handle it won't we end up spinning for ever
+with repeated calls to the interrupt handler?
+
+> +		if (opp_val == C2C_OPP100)
+> +			req_clk = c2c_con.clk_opp100;
+> +		else if (opp_val == C2C_OPP50)
+> +			req_clk = c2c_con.clk_opp50;
+> +		else if (opp_val == C2C_OPP25)
+> +			req_clk = c2c_con.clk_opp25;
+
+This and the surrounding code looks a lot like the code I commented on
+above - shouldn't this be factored out into a single function called
+from both places?
+
+> +	/* resource for AP's SSCM region */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "no memory resource defined(AP's SSCM)\n");
+> +		return -ENOENT;
+> +	}
+
+devm_requets_and_ioremap() perhaps?
+
+> +#ifdef CONFIG_PM
+> +static int samsung_c2c_suspend(struct platform_device *dev, pm_message_t pm)
+> +{
+> +	/* Nothing here yet */
+> +	return 0;
+> +}
+> +
+> +static int samsung_c2c_resume(struct platform_device *dev)
+> +{
+> +	/* Nothing here yet */
+> +	return 0;
+> +}
+> +#else
+> +#define samsung_c2c_suspend NULL
+> +#define samsung_c2c_resume NULL
+> +#endif
+
+No need to include this if it doesn't do anything.
+
+> +static struct platform_driver samsung_c2c_driver = {
+> +	.probe		= samsung_c2c_probe,
+> +	.remove		= __devexit_p(samsung_c2c_remove),
+> +	.suspend	= samsung_c2c_suspend,
+> +	.resume		= samsung_c2c_resume,
+
+If you were including pm operations they should be in the pm_ops rather
+than using the platform-specific variants - this makes it easier to do
+things like runtime PM later.
+
+> +static int __init samsung_c2c_init(void)
+> +{
+> +	return platform_driver_register(&samsung_c2c_driver);
+> +}
+> +module_init(samsung_c2c_init);
+
+module_platform_driver().
