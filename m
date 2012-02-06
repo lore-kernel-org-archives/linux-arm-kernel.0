@@ -1,105 +1,79 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Mon, 6 Feb 2012 11:14:55 -0600
-Subject: [RFC PATCH v4 1/4] cpuidle: Add time keeping and irq enabling
-In-Reply-To: <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
-References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
- <1328065215-28108-2-git-send-email-rob.lee@linaro.org>
- <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
-Message-ID: <CAMXH7KG4bfH=tbLmniZZVegyphY_p8q27NAtoo5PHjUCG+ULRg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 6 Feb 2012 18:29:35 +0100
+Subject: An extremely simplified pinctrl bindings proposal
+In-Reply-To: <4F2F6AE2.1040504@nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
+ <CACRpkdahin4srDh7dphgvq306gjz7CGP=h4dVkUY+w0z0wpXRQ@mail.gmail.com>
+ <4F2F6AE2.1040504@nvidia.com>
+Message-ID: <CACRpkdbtTPSoX1x4aBtNVGZ2Qex9t77D09V9JgON_jfShQdx6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Colin, thanks for the review.
+On Mon, Feb 6, 2012 at 6:53 AM, Stephen Warren <swarren@nvidia.com> wrote:
 
-On Sat, Feb 4, 2012 at 1:02 PM, Colin Cross <ccross@google.com> wrote:
-> On Tue, Jan 31, 2012 at 7:00 PM, Robert Lee <rob.lee@linaro.org> wrote:
->> Make necessary changes to add implement time keepign and irq enabling
-> keeping
->> in the core cpuidle code. ?This will allow the remove of these
->> functionalities from the platform cpuidle implementations.
->>
->> Signed-off-by: Robert Lee <rob.lee@linaro.org>
->> ---
->> ?drivers/cpuidle/cpuidle.c | ? 75 +++++++++++++++++++++++++++++++++++---------
->> ?include/linux/cpuidle.h ? | ? 26 ++++++++++-----
->> ?2 files changed, 76 insertions(+), 25 deletions(-)
->>
->> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
->> index 59f4261..8ea0fc3 100644
->> --- a/drivers/cpuidle/cpuidle.c
->> +++ b/drivers/cpuidle/cpuidle.c
->> @@ -57,14 +57,18 @@ static int __cpuidle_register_device(struct cpuidle_device *dev);
->> ?* cpuidle_idle_call - the main idle loop
->> ?*
->> ?* NOTE: no locks or semaphores should be used here
->> + * NOTE: Should only be called from a local irq disabled context
->> ?* return non-zero on failure
->> + *
->> ?*/
->> ?int cpuidle_idle_call(void)
->> ?{
->> ? ? ? ?struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
->> ? ? ? ?struct cpuidle_driver *drv = cpuidle_get_driver();
->> ? ? ? ?struct cpuidle_state *target_state;
->> - ? ? ? int next_state, entered_state;
->> + ? ? ? int idx, ret = 0;
->> + ? ? ? ktime_t t1, t2;
->> + ? ? ? s64 diff;
->>
->> ? ? ? ?if (off)
->> ? ? ? ? ? ? ? ?return -ENODEV;
->> @@ -86,37 +90,76 @@ int cpuidle_idle_call(void)
->> ?#endif
->>
->> ? ? ? ?/* ask the governor for the next state */
->> - ? ? ? next_state = cpuidle_curr_governor->select(drv, dev);
->> + ? ? ? idx = cpuidle_curr_governor->select(drv, dev);
->> +
->> + ? ? ? target_state = &drv->states[idx];
->> +
->> + ? ? ? /*
->> + ? ? ? ?* Check with the device to see if it can enter this state or if another
->> + ? ? ? ?* state should be used.
->> + ? ? ? ?*/
->> + ? ? ? if (target_state->pre_enter) {
->> + ? ? ? ? ? ? ? idx = target_state->
->> + ? ? ? ? ? ? ? ? ? ? ? pre_enter(dev, drv, idx);
-> Unnecessary line wrap and braces.
-
-Thanks.
-
+> I think the main argument to call it pinctrl/pinmux still is to provide
+> some named API and reason for drivers to invoke when they wanted to make
+> use of the feature.
 >
-> What's the point of the pre_enter call? ?This seems very similar to
-> the prepare call that was removed in 3.2. ?Drivers can already demote
-> the target state in their enter call. ?The only thing you do between
-> pre_enter and enter is trace and account for the time. ?Is there some
-> long call you don't want included in the idle time? ?Some
-> documentation would help, and you need to very clearly define the
-> semantics of when post_enter gets called when pre_enter or enter
-> return errors.
+> In other words, it's pretty easy to see why and when a driver would
+> invoke a pin control API to configure the HW surrounding the HW module
+> that driver controls. If we don't call that pinctrl, what else might we
+> call it? That said, I'm sure we can come up with some reasonable more
+> general-purpose name.
 
-pre_enter's purpose is to perform any necessary platform technology
-that can be performed before entering that actual idle or some
-restricted idle context where only platform specific code can run.  If
-I try to consolidate the timekeeping in the core cpuidle driver
-without pre_enter, then my idle time will incorrectly account for this
-platform preparation time.  Perhaps this small idle time accounting
-error isn't of concern to anyone though.
+I feel pinctrl would be misleading and overly specific. Maybe something
+like "hwstates" or "initvectors" or similar is more to the point. Or
+just "soc-bios" :-)
 
-The previous version of this patch submission used a different
-approach by adding a wrapper that could be used by fairly simple
-cpuidle implementations.  In the v3 submission of this patch series,
-Daniel asked about the possibility of just performing this
-consolidation in the cpuidle_idle_call function itself.  Instead of
-debating the pros and cons of it, I thought it might be better to send
-this version of the patch and discuss it further.
+An elegant way of doing it would be to hide the current pinctrl calls
+behind the new API, say
 
-Another approach I thought about may be to add flags that indicate
-whether or not the platform or the core driver should perform the time
-keeping.  Or, go back to the wrapper function approach.  Please feel
-free to give your opinion on the preferred approach.
+hws = hardware_state_get(dev);
+hardware_state_enable(hws);
+hardware_state_disable(hws);
+hardware_state_put(hws);
 
-Agree on the documentation.  I was trying to just get this patch
-series out there for discussion before spending more time on it in
-case it is not the desired approach to timekeeping and irq disabling
-consolidation.
+Then these can boil down to simple register read/writes or divert to
+pinctrl or pinconfig.
+
+>> A controlled set of register read/writes and maybe also conditionals
+>> (...)
+>
+> I think anything beyond a simple linear list of register writes would
+> get a /lot/ of pushback. See for example Grant's comments in one of the
+> links I referenced:
+
+OK. Keeping it simple is best then I guess.
+
+> I can imagine the data including flags like 8/16/32/64-bit register
+> accesses, or read-modify-write vs. just write (i.e. do we need to
+> include a mask or not) being reasonable, but any state, looping, delay,
+> conditionals etc. being nak'd.
+
+Sure.
+
+I have this mux on the AB8500 on the Ux500 that is on I2C.
+So this off-chip device can mux its pins between GPIO and some
+other functions. So I'd need something that can provide a
+read/write function handle or so rather than plain register writes.
+Or is this concept only for memory-mapped stuff?
+
+>> While I would probably mourn the death of sematics I also see
+>> that if the goal is to get huge static data sets out of the kernel,
+>> something like this may be the best way to get there.
+>
+> Yes, the loss of semantics also doesn't entirely appeal to me. However,
+> I wonder if the other advantages don't outweigh that.
+
+I will certainly finalize the pinctrl subsystem as-is, adding the
+pin configurations states as the last major piece. If for nothing
+else it provides some understanding of the problem space.
+
+I think we should keep both for the time being and consider the
+alternative approach when patches appear. So if/when someone
+creates a new subsystem like this, drivers can move over to it on a
+per-driver basis. If there are zero drivers left in pinctrl it can be
+deleted.
+
+Yours,
+Linus Walleij
