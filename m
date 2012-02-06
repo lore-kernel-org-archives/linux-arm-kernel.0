@@ -1,50 +1,88 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 06 Feb 2012 22:47:22 +0100
-Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
-In-Reply-To: <CACRpkdaW+xBNvEjXe3sYxWq379Gk3HkX66YKe=mWKJMKFercyw@mail.gmail.com>
-References: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
- <4F2F9B2C.8030009@stericsson.com> <4F2FDF54.8080701@linaro.org>
- <CACRpkdaW+xBNvEjXe3sYxWq379Gk3HkX66YKe=mWKJMKFercyw@mail.gmail.com>
-Message-ID: <4F304A6A.9070703@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 06 Feb 2012 14:21:38 -0800 (PST)
+Subject: [PATCH 1/3] ARM: make arch_ret_to_user macro optional
+In-Reply-To: <1328562200-8810-2-git-send-email-robherring2@gmail.com>
+References: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
+ <1328562200-8810-2-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1202061417210.1656@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2012 06:37 PM, Linus Walleij wrote:
-> On Mon, Feb 6, 2012 at 3:10 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org>  wrote:
->> On 02/06/2012 10:19 AM, Rickard Andersson wrote:
->
->>> - there is no reason to place these functions inside the db8500-prcmu.c
->>> file. There is so much stuff in the PRCMU register base so we can not
->>> have everything in one file. Why not have it as it is?
->>
->> Why spread the prcmu code when it is related to the prcmu ?
->>
->> Linus ? What do you think ?
->
-> I have no strong opinions on this. When I discussed it with Mattias
-> who wrote much of the driver we concluded that the PRCMU drivers needs
-> a lot of shaping up. Mainly it may need to be split into two parts: one
-> which is a "pure" MFD device (register access part) one MFD firmware
-> interaction part, and then a platform-specific (U8500) part.
->
-> This would help getting code in more logical places.
->
-> For now I would suggest not moving stuff around, I thin Mattias is onto
-> cleaning up the structure as per above and we could be messing it up
-> for him, which is not good.
+On Mon, 6 Feb 2012, Rob Herring wrote:
 
-Ok, I will resend the patch with the name changed to decouple/recouple. 
-Is the patch acceptable as it is ?
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Only 3 platforms need arch_ret_to_user macro, so add ARCH_HAS_RET_TO_USER
+> kconfig option and make iop13xx, iop32x and iop33x select it.
 
-Thanks
-   -- Daniel
+Please make it CONFIG_NEED_RET_TO_USER instead to more clearly indicate 
+why it is there.  See NEED_MACH_MEMORY_H for example.
 
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/Kconfig               |    6 ++++++
+>  arch/arm/kernel/entry-common.S |    8 +++++++-
+>  2 files changed, 13 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a48aecc..322f2ad 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -43,6 +43,9 @@ config ARM
+>  config ARM_HAS_SG_CHAIN
+>  	bool
+>  
+> +config ARCH_HAS_RET_TO_USER
+> +	bool
+> +
+>  config HAVE_PWM
+>  	bool
+>  
+> @@ -473,6 +476,7 @@ config ARCH_H720X
+>  config ARCH_IOP13XX
+>  	bool "IOP13xx-based"
+>  	depends on MMU
+> +	select ARCH_HAS_RET_TO_USER
+>  	select CPU_XSC3
+>  	select PLAT_IOP
+>  	select PCI
+> @@ -485,6 +489,7 @@ config ARCH_IOP13XX
+>  config ARCH_IOP32X
+>  	bool "IOP32x-based"
+>  	depends on MMU
+> +	select ARCH_HAS_RET_TO_USER
+>  	select CPU_XSCALE
+>  	select PLAT_IOP
+>  	select PCI
+> @@ -496,6 +501,7 @@ config ARCH_IOP32X
+>  config ARCH_IOP33X
+>  	bool "IOP33x-based"
+>  	depends on MMU
+> +	select ARCH_HAS_RET_TO_USER
+>  	select CPU_XSCALE
+>  	select PLAT_IOP
+>  	select PCI
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 9fd0ba9..5fe6ea8 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -10,9 +10,15 @@
+>  
+>  #include <asm/unistd.h>
+>  #include <asm/ftrace.h>
+> -#include <mach/entry-macro.S>
+>  #include <asm/unwind.h>
+>  
+> +#ifdef CONFIG_ARCH_HAS_RET_TO_USER
+> +#include <mach/entry-macro.S>
+> +#else
+> +	.macro  arch_ret_to_user, tmp1, tmp2
+> +	.endm
+> +#endif
+> +
+>  #include "entry-header.S"
+>  
+>  
+> -- 
+> 1.7.5.4
+> 
