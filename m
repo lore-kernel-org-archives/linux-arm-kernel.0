@@ -1,47 +1,82 @@
-From: mikey@neuling.org (Michael Neuling)
-Date: Mon, 06 Feb 2012 16:22:41 +1100
-Subject: [PATCH v3 21/25] irqdomain/powerpc: Replace custom xlate
- functions with library functions
-In-Reply-To: <1327700179-17454-22-git-send-email-grant.likely@secretlab.ca>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-22-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <24476.1328505761@neuling.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Sun, 05 Feb 2012 21:44:46 -0800
+Subject: An extremely simplified pinctrl bindings proposal
+In-Reply-To: <CAJuYYwQ2yczBh+CBFWohZPM+9jHXYxyxYzL8CS4puE96v4fDXw@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
+ <CAJuYYwQ2yczBh+CBFWohZPM+9jHXYxyxYzL8CS4puE96v4fDXw@mail.gmail.com>
+Message-ID: <4F2F68CE.3030208@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  static const struct irq_domain_ops pmac_pic_host_ops = {
->  	.match = pmac_pic_host_match,
->  	.map = pmac_pic_host_map,
-> -	.xlate = pmac_pic_host_xlate,
-> +	.xlate = irq_domain_xlate_onecell;
->  };
->  
+On 02/05/2012 07:07 PM, Thomas Abraham wrote:
+> Hi Stephen,
+> 
+> On 4 February 2012 21:31, Stephen Warren <swarren@nvidia.com> wrote:
+>> Sorry, I haven't had a chance to read any of the pincrl emails from
+>> Friday onwards. However, I thought a bit more about this, and decided
+>> to propose someting much simpler:
+>>
+>> Thoughts:
+>>
+>> * Defining all the pins, groups, functions, ... takes a lot of space,
+>>  whether it's in static data in pinctrl drivers or in the device tree.
+>>  The lists must also be stored in RAM at runtime.
+>>
+>> * It's been very difficult to come up with a generic description of all
+>>  pin controller's capabilities. This is true even irrespective of device
+>>  tree; think pin config where we've agonized over whether we can create
+>>  a standardized list of pin config properties, or need to allow each
+>>  pinctrl driver to define its own set of properties, etc.
+>>
+>> * The only real use of the lists is for debugfs. Drivers shouldn't expect
+>>  to directly request specific pinctrl settings, since that would encode
+>>  knowledge of an individual SoC's pin controller. This should be
+>>  abstracted from drivers.
+>>
+>> * The data in debugfs could easily be replaced by a raw register dump
+>>  coupled with a SoC-specific script to print out what each register
+>>  means.
+>>
+>> My proposal below is to radically simplify the pinctrl subsystem, and
+>> make it little more than a system to execute a list of arbitrary register
+>> writes.
+> 
+> Thanks for your work on pinctrl bindings proposal.
+> 
+> With this new approach, how much of the pinctrl susbystem is used in
+> device tree mode.
 
-This causes a compile fail (in next-20120206):
-  arch/powerpc/platforms/powermac/pic.c:294: error: expected '}' before ';' token
-Trivial fix below:
+Probably not a lot of the actual implementation. I'd assume that the
+APIs called by device drivers would remain constant, or roughly so, in
+order to still provide a simple interface for drivers.
 
+> Last time I had proposed something similar to this
+> (http://marc.info/?l=linux-kernel&m=132697880016289&w=2), you were not
+> happy about that approach since the pinctrl subsystem is largely
+> under-utilized (http://marc.info/?l=linux-kernel&m=132735884622374&w=2),
+> expect for providing a interface which individual
+> pinctrl/pinmux/pinconfig drivers will use to implement a function that
+> programs the hardware.
 
+That's true.
 
-irqdomain/powerpc: Fix compile error in powermac/pic.c
+AS LinusW says in his later reply, losing the semantic representation in
+the pinctrl system is a pity, which is the main reasoning behind my
+previous response. However, I'm beginning to lean towards the simplicity
+of something like a list of register writes trumping the lack of semantics.
 
-Error introduced in:
-  commit 72d6b477675374eafd206720d6c9146520df18ce
-  Author: Grant Likely <grant.likely@secretlab.ca>
-  irqdomain/powerpc: Replace custom xlate functions with library functions
+> There need not be pinmux/pinctrl/pinconfig bindings that are designed
+> for the linux pinctrl subsystem. DT allows specifying the
+> pinconfig/pinmux properties in a simple way, which was not possible in
+> non-dt case and hence the pinctrl subsystem. Other OS'es which might
+> not have a pinctrl subsystem, similar to what linux has, should also
+> find the pinctrl bindings useful.
 
-Signed-off-by: Michael Neuling <mikey@neuling.org>
+True.
 
-diff --git a/arch/powerpc/platforms/powermac/pic.c b/arch/powerpc/platforms/powermac/pic.c
-index 3af29d1..92afc38 100644
---- a/arch/powerpc/platforms/powermac/pic.c
-+++ b/arch/powerpc/platforms/powermac/pic.c
-@@ -291,7 +291,7 @@ static int pmac_pic_host_map(struct irq_domain *h, unsigned int virq,
- static const struct irq_domain_ops pmac_pic_host_ops = {
- 	.match = pmac_pic_host_match,
- 	.map = pmac_pic_host_map,
--	.xlate = irq_domain_xlate_onecell;
-+	.xlate = irq_domain_xlate_onecell,
- };
- 
- static void __init pmac_pic_probe_oldstyle(void)
+I think that pinctrl in a non-DT system probably could do something like
+this DT binding proposal though, so we need not have DT/non-DT work
+differently.
+
+-- 
+nvpublic
