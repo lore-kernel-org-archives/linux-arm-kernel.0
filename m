@@ -1,73 +1,184 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Mon, 06 Feb 2012 21:07:14 -1000
-Subject: An extremely simplified pinctrl bindings proposal
-In-Reply-To: <4F30B79C.4030404@nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
- <4F302474.1020701@firmworks.com> <4F30B79C.4030404@nvidia.com>
-Message-ID: <4F30CDA2.7010008@firmworks.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 6 Feb 2012 15:38:05 -0800
+Subject: [PATCH][RFC] tracing/rcu: Add trace_##name##__rcuidle() static
+ tracepoint for inside rcu_idle_exit() sections
+In-Reply-To: <1328563113.2200.39.camel@gandalf.stny.rr.com>
+References: <20120202190708.GE2518@linux.vnet.ibm.com> <87obtgc1xx.fsf@ti.com>
+ <4F2B1307.5010207@gmail.com>
+ <1328223819.5882.133.camel@gandalf.stny.rr.com>
+ <20120202232736.GL2518@linux.vnet.ibm.com>
+ <1328237131.5882.135.camel@gandalf.stny.rr.com>
+ <20120203060458.GF2380@linux.vnet.ibm.com>
+ <1328295309.5882.178.camel@gandalf.stny.rr.com>
+ <20120203194005.GK2382@linux.vnet.ibm.com>
+ <1328563113.2200.39.camel@gandalf.stny.rr.com>
+Message-ID: <20120206233804.GM5941@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/6/2012 7:33 PM, Stephen Warren wrote:
-> On 02/06/2012 11:05 AM, Mitch Bradley wrote:
->> I like the general approach of simplifying the pinctrl thing, as the
->> previous approach did not appear to be converging.
->>
->> One possible name would be "gpconfig" - for general purpose configuration.
->
-> Sounds reasonable
->
->> The register access model in the strawman proposal is probably too
->> simple.  32-bit memory mapped registers are certainly the most common
->> subcase on ARM, but there are many other cases that occur in practice:
->>
->> * Registers that must be accessed with 8, 16, or 64-bit cycles.
->> * Registers that have side effects on read, so read-mask-write must be
->> avoided
->> * Registers accessed via an index/data cycle pair, thus having locking
->> requirements
->> * Registers that must be read after being written, or otherwise
->> requiring some sort of memory-ordering enforcement.
->> * Time delays between pairs of writes
->> * PCI configuration registers, which often have some combination of the
->> above
->> * Registers behind serial buses like I2C
->>
->> Both Open Firmware and ACPI have addressed this general problem.  In
->> addition to a numeric identifier for the register, you need to specify
->> the access semantics.  It's difficult to finitely enumerate all possible
->> cases, but you can get to 99.9% with a modest number of access models,
->> and then add new models as needed.
->
-> My thinking was that each driver that permitted execution of these
-> register write sequences on its registers would provide an extremely
-> simple driver to support this. Perhaps just one "op" function that
-> implemented each write, and took care of details such as timing delays
-> for the IO, indexed addressing, using I2C instead of memory-mapped,
-> perhaps register access width, etc.
->
-> Some of the items in the list above could be solved by explicit flags in
-> the data instead (register access width comes to mind for memory-mapped
-> devices at least).
->
-> Do you have any direct pointers to how OF and ACPI solved this kind of
-> thing; it'd be good background.
+On Mon, Feb 06, 2012 at 04:18:33PM -0500, Steven Rostedt wrote:
+> As I have said, I may find a better solution than to create a
+> TRACE_EVENT_IDLE(), and I believe I have :-)
+> 
+> A added a new static inline function that lets *any* tracepoint be used
+> inside a rcu_idle_exit() section. And this also solves the problem where
+> the same tracepoint may be used inside a rcu_idle_exit() section as well
+> as outside of one.
+> 
+> I added a new tracepoint function with a "_rcuidle" extension. All
+> tracepoints can be used with either the normal "trace_foobar()"
+> function, or the "trace_foobar_rcuidle()" function when inside a
+> rcu_idle_exit() section.
+> 
+> Ideally, this patch would be broken up into two commits. The first would
+> change the tracepoint.h to introduce the new trace_foobar_rcuidle()
+> static inline, and the second patch would change the power tracepoints
+> to use this tracepoint function. For the RFC, I'm keeping it as a single
+> patch.
+> 
+> Another nice aspect about this patch is that "static inline"s are not
+> compiled into text when not used. So only the tracepoints that actually
+> use the _rcuidle() version will have them defined in the actual text
+> that is booted.
+> 
+> -- Steve
 
-In ACPI, you declare an "OperationRegion" with a given "region space" 
-(an enumeration from SystemMemory, SystemIO, PCIConfig, SMBus, 
-EmbeddedControl, CMOS, PCIBARTarget) - ACPI spec section 17.5.89. 
-Inside that operation region, you declare various fields, further 
-specifying the subordinate access type from a region-dependent list. 
-Those access types include ByteAcc, WordAcc, DWordAcc, QWordAcc, and 
-BufferAcc.  The field declaration further specifies whether or not a 
-mutex must be acquired, and a rule for what to do about unmodified bits 
-within the larger object containing the field.  ACPI Spec 17.5.44
+Aside from the "pre;" below needing to precede rcu_read_lock_sched_notrace()
+as Josh noted, this looks reasonable to me.
 
-In OFW, each parent bus has a set of methods for performing 
-memory-mapped I/O operations on its addressable regions.  The child 
-devices invoke a "map-in" method in the parent to acquire an address 
-token, then pass that token to access methods in the parent node.  For 
-the common case, there are a set of fetch and store methods for the 
-usual sizes (8, 16, 32), and for more complex cases, the parent can define
-whatever methods make sense for its needs.  The methods are implemented 
-by byte code associated with the parent driver.
+							Thanx, Paul
+
+> Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+> 
+> Index: linux-trace.git/include/linux/tracepoint.h
+> ===================================================================
+> --- linux-trace.git.orig/include/linux/tracepoint.h
+> +++ linux-trace.git/include/linux/tracepoint.h
+> @@ -114,7 +114,7 @@ static inline void tracepoint_synchroniz
+>   * as "(void *, void)". The DECLARE_TRACE_NOARGS() will pass in just
+>   * "void *data", where as the DECLARE_TRACE() will pass in "void *data, proto".
+>   */
+> -#define __DO_TRACE(tp, proto, args, cond)				\
+> +#define __DO_TRACE(tp, proto, args, cond, pre, post)			\
+>  	do {								\
+>  		struct tracepoint_func *it_func_ptr;			\
+>  		void *it_func;						\
+> @@ -123,6 +123,7 @@ static inline void tracepoint_synchroniz
+>  		if (!(cond))						\
+>  			return;						\
+>  		rcu_read_lock_sched_notrace();				\
+> +		pre;							\
+>  		it_func_ptr = rcu_dereference_sched((tp)->funcs);	\
+>  		if (it_func_ptr) {					\
+>  			do {						\
+> @@ -132,6 +133,7 @@ static inline void tracepoint_synchroniz
+>  			} while ((++it_func_ptr)->func);		\
+>  		}							\
+>  		rcu_read_unlock_sched_notrace();			\
+> +		post;							\
+>  	} while (0)
+> 
+>  /*
+> @@ -139,7 +141,7 @@ static inline void tracepoint_synchroniz
+>   * not add unwanted padding between the beginning of the section and the
+>   * structure. Force alignment to the same alignment as the section start.
+>   */
+> -#define __DECLARE_TRACE(name, proto, args, cond, data_proto, data_args)	\
+> +#define __DECLARE_TRACE(name, proto, args, cond, data_proto, data_args) \
+>  	extern struct tracepoint __tracepoint_##name;			\
+>  	static inline void trace_##name(proto)				\
+>  	{								\
+> @@ -147,7 +149,17 @@ static inline void tracepoint_synchroniz
+>  			__DO_TRACE(&__tracepoint_##name,		\
+>  				TP_PROTO(data_proto),			\
+>  				TP_ARGS(data_args),			\
+> -				TP_CONDITION(cond));			\
+> +				TP_CONDITION(cond),,);			\
+> +	}								\
+> +	static inline void trace_##name##_rcuidle(proto)		\
+> +	{								\
+> +		if (static_branch(&__tracepoint_##name.key))		\
+> +			__DO_TRACE(&__tracepoint_##name,		\
+> +				TP_PROTO(data_proto),			\
+> +				TP_ARGS(data_args),			\
+> +				TP_CONDITION(cond),			\
+> +				rcu_idle_exit(),			\
+> +				rcu_idle_enter());			\
+>  	}								\
+>  	static inline int						\
+>  	register_trace_##name(void (*probe)(data_proto), void *data)	\
+> @@ -190,7 +202,7 @@ static inline void tracepoint_synchroniz
+>  	EXPORT_SYMBOL(__tracepoint_##name)
+> 
+>  #else /* !CONFIG_TRACEPOINTS */
+> -#define __DECLARE_TRACE(name, proto, args, cond, data_proto, data_args)	\
+> +#define __DECLARE_TRACE(name, proto, args, cond, data_proto, data_args) \
+>  	static inline void trace_##name(proto)				\
+>  	{ }								\
+>  	static inline int						\
+> Index: linux-trace.git/arch/x86/kernel/process.c
+> ===================================================================
+> --- linux-trace.git.orig/arch/x86/kernel/process.c
+> +++ linux-trace.git/arch/x86/kernel/process.c
+> @@ -377,8 +377,8 @@ static inline int hlt_use_halt(void)
+>  void default_idle(void)
+>  {
+>  	if (hlt_use_halt()) {
+> -		trace_power_start(POWER_CSTATE, 1, smp_processor_id());
+> -		trace_cpu_idle(1, smp_processor_id());
+> +		trace_power_start_rcuidle(POWER_CSTATE, 1, smp_processor_id());
+> +		trace_cpu_idle_rcuidle(1, smp_processor_id());
+>  		current_thread_info()->status &= ~TS_POLLING;
+>  		/*
+>  		 * TS_POLLING-cleared state must be visible before we
+> @@ -391,7 +391,7 @@ void default_idle(void)
+>  		else
+>  			local_irq_enable();
+>  		current_thread_info()->status |= TS_POLLING;
+> -		trace_power_end(smp_processor_id());
+> +		trace_power_end_rcuidle(smp_processor_id());
+>  		trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
+>  	} else {
+>  		local_irq_enable();
+> @@ -450,8 +450,8 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
+>  static void mwait_idle(void)
+>  {
+>  	if (!need_resched()) {
+> -		trace_power_start(POWER_CSTATE, 1, smp_processor_id());
+> -		trace_cpu_idle(1, smp_processor_id());
+> +		trace_power_start_rcuidle(POWER_CSTATE, 1, smp_processor_id());
+> +		trace_cpu_idle_rcuidle(1, smp_processor_id());
+>  		if (this_cpu_has(X86_FEATURE_CLFLUSH_MONITOR))
+>  			clflush((void *)&current_thread_info()->flags);
+> 
+> @@ -461,8 +461,8 @@ static void mwait_idle(void)
+>  			__sti_mwait(0, 0);
+>  		else
+>  			local_irq_enable();
+> -		trace_power_end(smp_processor_id());
+> -		trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
+> +		trace_power_end_rcuidle(smp_processor_id());
+> +		trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+>  	} else
+>  		local_irq_enable();
+>  }
+> @@ -474,13 +474,13 @@ static void mwait_idle(void)
+>   */
+>  static void poll_idle(void)
+>  {
+> -	trace_power_start(POWER_CSTATE, 0, smp_processor_id());
+> -	trace_cpu_idle(0, smp_processor_id());
+> +	trace_power_start_rcuidle(POWER_CSTATE, 0, smp_processor_id());
+> +	trace_cpu_idle_rcuidle(0, smp_processor_id());
+>  	local_irq_enable();
+>  	while (!need_resched())
+>  		cpu_relax();
+> -	trace_power_end(smp_processor_id());
+> -	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
+> +	trace_power_end_rcuidle(smp_processor_id());
+> +	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+>  }
+> 
+>  /*
+> 
+> 
