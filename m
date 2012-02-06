@@ -1,52 +1,112 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Feb 2012 15:57:33 -0800
-Subject: An extremely simplified pinctrl bindings proposal
-In-Reply-To: <CACRpkdYrbD3PpJ3wb69yb3Ya8SeZJnPpgJdtttjWTkS5xsD-4g@mail.gmail.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
- <CACRpkdahin4srDh7dphgvq306gjz7CGP=h4dVkUY+w0z0wpXRQ@mail.gmail.com>
- <4F2F6AE2.1040504@nvidia.com>
- <CACRpkdbtTPSoX1x4aBtNVGZ2Qex9t77D09V9JgON_jfShQdx6w@mail.gmail.com>
- <20120206190315.GU1426@atomide.com>
- <CACRpkdZthbejmTqRJAWHb8jU-p8LPT_+zj_CY1q0voMb4FKz2Q@mail.gmail.com>
- <20120206210456.GV1426@atomide.com>
- <CACRpkdYrbD3PpJ3wb69yb3Ya8SeZJnPpgJdtttjWTkS5xsD-4g@mail.gmail.com>
-Message-ID: <20120206235733.GY1426@atomide.com>
+From: neilb@suse.de (NeilBrown)
+Date: Tue, 7 Feb 2012 10:58:20 +1100
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <EF62F09C0797D947AD4180A1043C0DF734934E9D@DLEE10.ent.ti.com>
+References: <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+ <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
+ <20120204163931.GH1275@n2100.arm.linux.org.uk>
+ <EF62F09C0797D947AD4180A1043C0DF734934E36@DLEE10.ent.ti.com>
+ <20120205160329.GO1275@n2100.arm.linux.org.uk>
+ <EF62F09C0797D947AD4180A1043C0DF734934E9D@DLEE10.ent.ti.com>
+Message-ID: <20120207105820.367361c5@notabene.brown>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [120206 14:44]:
-> On Mon, Feb 6, 2012 at 10:04 PM, Tony Lindgren <tony@atomide.com> wrote:
+On Sun, 5 Feb 2012 17:57:40 +0000 "Woodruff, Richard" <r-woodruff2@ti.com>
+wrote:
+
 > 
-> >> I actually had something like unnamed pins in the early patches
-> >> to register a bunch of anonymous pins ranges, so why not bring
-> >> it back in.
-> >
-> > Yeah it seems that the mux registers should be listed, it might
-> > require a little bit of thinking for cases where one register
-> > controls multiple pins. So maybe we need just a new entry for
-> > mux registers?
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Sunday, February 05, 2012 10:03 AM
+> > To: Woodruff, Richard
 > 
-> I'm not sure if I'm following completely, if this is inside the devicetree-based
-> driver file, would it work to just add a struct dentry * to the
-> pinctrl_desc where you put a per-driver file?
+> > On Sun, Feb 05, 2012 at 03:37:21PM +0000, Woodruff, Richard wrote:
+> > > [x] What is acceptable depends is not black and white.  Is there some
+> > > QOS mapping which can be set per channel which allows runtime PM to
+> > > pick a best chose (which may allow for loss and frame issues)?.
+> > 
+> > What you're asking is whether there's anything in the kernel which can
+> > predict when the next character is to arrive.
+> 
+> No, this was not the comment's intent.
+> 
+> > But, the fact of the matter is that deriving the UART clocks from a PLL
+> > which takes a finite time to lock, and the PLL is shut down during runtime
+> > PM _is_ _going_ _to_ _cause_ _problems_.  There is absolutely no getting
+> > away from that.
+> 
+> Yes this is one of the issues to be worked around.
+> 
+> > Let's take your modem example.  Modems today would typically be used with
+> > some IP based protocol, probably PPP based.  Incoming traffic on IP is
+> > entirely unpredictable.  You wouldn't know when the next character would
+> > be received.
+> > 
+> > One solution to this is to transmit an 0xff character before your real
+> > data to ensure that your end is awake and properly synchronized...
+> 
+> This approach as you say has issues.  This is solved in different ways for modems.
+> 
+> <sleep>My observation is modem software which many talk over ppp over ip over serial of some sort (might be uart, might be usb), will send a command to the modem to go into a low power mode. Now you can cut clocks with out hurting modem and getting SOC power.
+> 
+> <wake>When some event happens at modem or processor (timer near beacon or other) the modem or apps processor can signal the other with some wake event (maybe over gpio) which then puts system in a state where it can receive data in trusted manner.
+> 
+> The modem channel driver try's to inform kernel about entering/exiting modes to set expectation.
 
-I was thinking generic debufs entries for all drivers.
- 
-> Or maybe add extern void pinctrl_add_debugfs(struct dentry *) that adds
-> a new file to the existing per-driver directory through the core and then
-> have this add that file?
+I think the correct way to "inform the kernel" would be with the 'CREAD'
+c_cflag in termios.  Clearing it indicates that we don't expect to read which
+would allow the UART to go to sleep.
+When the GPIO interrupt arrives, we would use termios to set CREAD and then
+start talking to the modem.
 
-Sounds like you've thought it further than me already :)
+However it is easy to imagine situations where this wouldn't be enough.
+A fairly obvious way to wake a sleeping serial connection is with a 'break'.
+I have a GPS which can be put to sleep and then woken by sending a 'break'.
+Similarly the OMAP uart can reliably receive a break when asleep, but cannot
+reliably receive any other input.
 
-Maybe that's the way to go to solve the one register for
-multiple pins issue.
- 
-> Or did you mean that the core.c should be register-aware?
+Though maybe if BRKINT is set in c_iflag, then we could still receive a break
+even when CREAD is clear.  Then clearing CREAD would be enough to allow
+low-power mode.
 
-I was just thinking string name ignoring core.c, so that would
-be the pinctrl_add_debugfs() option then. Do you see problems
-with this approach?
+> 
+> > So, go ahead with having PM drop random characters if you want, but don't
+> > expect anyone in their right mind to accept broken workarounds to the
+> > kernel serial driver to try to drop maybe 16 characters or more at a time
+> > on the floor when a framing error occurs just because the PM is broken.
+> 
+> No character was dropped in modem example.  On the UART-to-Debug console it may be ok to drop a character.  Ether needs a coordination hook.
 
-Regards,
+I don't think it is really OK to drop chars on the UART-to-Debug console.
+However it is OK to drop the BAUD rate to 57600 where we can wake up in time
+for to catch the first bit.  So if you want power saving, drop the console
+buad rate.
 
-Tony
+So I would suggest:
+ - remove the autosuspend timeouts
+ - allow runtime_pm to shutdown the device when it is not open, or when
+   rate is 57600 or below, or when 'CREAD' is clear
+ - keep runtime_pm active whenever there are bytes in the output queue or
+   fifo
+
+The only case that wouldn't support is when a device will wake up the SOC by
+sending a non-break character which it is OK to receive corrupted.  The tty
+would have to be in !CREAD for that to happen, and then there would be no way
+for the app to know that a non-break character was received.
+Would it be reasonable to treat any input while CREAD is clear as a break?
+
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 828 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120207/fe3e4d1c/attachment.sig>
