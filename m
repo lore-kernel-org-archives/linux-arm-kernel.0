@@ -1,35 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Feb 2012 11:03:15 -0800
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Mon, 06 Feb 2012 09:05:24 -1000
 Subject: An extremely simplified pinctrl bindings proposal
-In-Reply-To: <CACRpkdbtTPSoX1x4aBtNVGZ2Qex9t77D09V9JgON_jfShQdx6w@mail.gmail.com>
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
 References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
- <CACRpkdahin4srDh7dphgvq306gjz7CGP=h4dVkUY+w0z0wpXRQ@mail.gmail.com>
- <4F2F6AE2.1040504@nvidia.com>
- <CACRpkdbtTPSoX1x4aBtNVGZ2Qex9t77D09V9JgON_jfShQdx6w@mail.gmail.com>
-Message-ID: <20120206190315.GU1426@atomide.com>
+Message-ID: <4F302474.1020701@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [120206 08:58]:
-> On Mon, Feb 6, 2012 at 6:53 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> 
-> I will certainly finalize the pinctrl subsystem as-is, adding the
-> pin configurations states as the last major piece. If for nothing
-> else it provides some understanding of the problem space.
-> 
-> I think we should keep both for the time being and consider the
-> alternative approach when patches appear. So if/when someone
-> creates a new subsystem like this, drivers can move over to it on a
-> per-driver basis. If there are zero drivers left in pinctrl it can be
-> deleted.
+I like the general approach of simplifying the pinctrl thing, as the 
+previous approach did not appear to be converging.
 
-Yes it seems that we can easily do both. So far the only
-change needed for pinctrl drivers containing no data is that
-we should make the string names optional and structure debugfs
-around the physical register addresses instead. I'm basically
-just setting the mux register physcal address as the pin name
-for now to work around this.
+One possible name would be "gpconfig" - for general purpose configuration.
 
-Regards,
+The register access model in the strawman proposal is probably too 
+simple.  32-bit memory mapped registers are certainly the most common 
+subcase on ARM, but there are many other cases that occur in practice:
 
-Tony
+* Registers that must be accessed with 8, 16, or 64-bit cycles.
+* Registers that have side effects on read, so read-mask-write must be 
+avoided
+* Registers accessed via an index/data cycle pair, thus having locking 
+requirements
+* Registers that must be read after being written, or otherwise 
+requiring some sort of memory-ordering enforcement.
+* Time delays between pairs of writes
+* PCI configuration registers, which often have some combination of the 
+above
+* Registers behind serial buses like I2C
+
+Both Open Firmware and ACPI have addressed this general problem.  In 
+addition to a numeric identifier for the register, you need to specify 
+the access semantics.  It's difficult to finitely enumerate all possible 
+cases, but you can get to 99.9% with a modest number of access models, 
+and then add new models as needed.
