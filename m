@@ -1,36 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon,  6 Feb 2012 10:19:37 +0100
-Subject: [PATCH 1/1] ARM: at91: board/dt drop default console
-Message-ID: <1328519977-6388-1-git-send-email-plagnioj@jcrosoft.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 6 Feb 2012 15:08:15 +0530
+Subject: [PATCH] ARM: OMAP4: cpuidle: Fix the C-state reporting to cpuidle
+ governor.
+Message-ID: <1328521095-24025-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will simplify multiple soc enable in the same kernel
+OMAP4 cpuidle driver is reporting the state requested by governor rather than
+the actually attempted one.
 
-the console can still be selected by cmdline
+This is obviously misleading sysfs and powertop cpuidle statistics.
+Fix it so that stats are reported correctly.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Reported-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-at91/board-dt.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/cpuidle44xx.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-index 0579315..08c8ad8 100644
---- a/arch/arm/mach-at91/board-dt.c
-+++ b/arch/arm/mach-at91/board-dt.c
-@@ -38,12 +38,6 @@ static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 12.000 MHz crystal */
- 	at91_initialize(12000000);
--
--	/* DGBU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* set serial console to ttyS0 (ie, DBGU) */
--	at91_set_serial_console(0);
- }
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index cfdbb86..f128489 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -85,6 +85,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
+ 	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
+ 	if (cpu1_state != PWRDM_POWER_OFF) {
+ 		new_state_idx = drv->safe_state_index;
++		index = drv->safe_state_index;
+ 		cx = cpuidle_get_statedata(&dev->states_usage[new_state_idx]);
+ 	}
  
- /* det_pin is not connected */
 -- 
-1.7.7
+1.7.4.1
