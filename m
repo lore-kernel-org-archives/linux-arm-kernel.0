@@ -1,101 +1,57 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 06 Feb 2012 17:08:14 +0530
-Subject: [PATCH v3] dmaengine: Add support for MEMCPY for imx-dma.
-In-Reply-To: <1328006840-7345-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1328006840-7345-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1328528294.26182.80.camel@vkoul-udesk3>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 6 Feb 2012 17:23:18 +0530
+Subject: [PATCH v9 00/25] gpio/omap: driver cleanup and fixes
+In-Reply-To: <87pqdv4oo3.fsf@ti.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <87pqdv4oo3.fsf@ti.com>
+Message-ID: <CAC83ZvJndyGv6KAuzn1GLYMMNH1cC-u3=sdHxqO+q-xtaFbnVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-01-31 at 11:47 +0100, Javier Martin wrote:
-> MEMCPY transfers allow DMA copies from memory to
-> memory. This patch has been tested with dmatest
-> device driver.
-> 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
->  drivers/dma/imx-dma.c |   36 +++++++++++++++++++++++++++++++++++-
->  1 files changed, 35 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-> index 3296a73..9aa6e85 100644
-> --- a/drivers/dma/imx-dma.c
-> +++ b/drivers/dma/imx-dma.c
-> @@ -196,7 +196,8 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
->  	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
->  	struct imx_dma_data *data = chan->private;
->  
-> -	imxdmac->dma_request = data->dma_request;
-> +	if (data != NULL)
-> +		imxdmac->dma_request = data->dma_request;
-if you support memcopy then why should it _always_ require private
-pointer?
->  
->  	dma_async_tx_descriptor_init(&imxdmac->desc, chan);
->  	imxdmac->desc.tx_submit = imxdma_tx_submit;
-> @@ -328,6 +329,36 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
->  	return &imxdmac->desc;
->  }
->  
-> +static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
-> +	struct dma_chan *chan, dma_addr_t dest,
-> +	dma_addr_t src, size_t len, unsigned long flags)
-> +{
-> +	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-> +	struct imxdma_engine *imxdma = imxdmac->imxdma;
-> +	int ret;
-> +
-> +	dev_dbg(imxdma->dev, "%s channel: %d src=0x%x dst=0x%x len=%d\n",
-> +			__func__, imxdmac->channel, src, dest, len);
-> +
-> +	if (imxdmac->status == DMA_IN_PROGRESS)
-> +		return NULL;
-thats not right, you should be able to prepare descriptors even if dmac
-is busy. Prepare != start
-> +	imxdmac->status = DMA_IN_PROGRESS;
-> +
-> +	ret = imx_dma_config_channel(imxdmac->imxdma_channel,
-> +			       IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
-> +			       IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
-> +			       0, 0);
-> +	if (ret)
-> +		return NULL;
-> +
-> +	ret = imx_dma_setup_single(imxdmac->imxdma_channel, src, len,
-> +				   dest, DMA_MODE_WRITE);
-> +	if (ret)
-> +		return NULL;
-> +
-> +	return &imxdmac->desc;
-> +}
-> +
->  static void imxdma_issue_pending(struct dma_chan *chan)
->  {
->  	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-> @@ -349,6 +380,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
->  
->  	dma_cap_set(DMA_SLAVE, imxdma->dma_device.cap_mask);
->  	dma_cap_set(DMA_CYCLIC, imxdma->dma_device.cap_mask);
-> +	dma_cap_set(DMA_MEMCPY, imxdma->dma_device.cap_mask);
->  
->  	/* Initialize channel parameters */
->  	for (i = 0; i < MAX_DMA_CHANNELS; i++) {
-> @@ -382,11 +414,13 @@ static int __init imxdma_probe(struct platform_device *pdev)
->  	imxdma->dma_device.device_tx_status = imxdma_tx_status;
->  	imxdma->dma_device.device_prep_slave_sg = imxdma_prep_slave_sg;
->  	imxdma->dma_device.device_prep_dma_cyclic = imxdma_prep_dma_cyclic;
-> +	imxdma->dma_device.device_prep_dma_memcpy = imxdma_prep_dma_memcpy;
->  	imxdma->dma_device.device_control = imxdma_control;
->  	imxdma->dma_device.device_issue_pending = imxdma_issue_pending;
->  
->  	platform_set_drvdata(pdev, imxdma);
->  
-> +	imxdma->dma_device.copy_align = 2; /* 2^2 = 4 bytes alignment */
-what is this magic number?
->  	imxdma->dma_device.dev->dma_parms = &imxdma->dma_parms;
->  	dma_set_max_seg_size(imxdma->dma_device.dev, 0xffffff);
->  
+Kevin,
 
+On Sat, Feb 4, 2012 at 2:31 AM, Kevin Hilman <khilman@ti.com> wrote:
+>
+> Hi Tarun,
+>
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>
+> > The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+> > ? Linus Torvalds (1):
+> > ? ? ? ? Linux 3.3-rc2
+> >
+> > are available in the git repository at:
+> > http://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev
+> > Branch: for_3.4/gpio_cleanup_fixes_v9
+> >
+> > This series is continuation of cleanup of OMAP GPIO driver and fixes.
+> > The cleanup include getting rid of cpu_is_* checks wherever possible,
+> > use of gpio_bank list instead of static array, use of unique platform
+> > specific value associated data member to OMAP platforms to avoid
+> > cpu_is_* checks. The series also include PM runtime support.
+>
+> This version is looking pretty good, and I'm almost ready to queue it up
+> for Grant.
+>
+> However, one more minor nit. ?Please fix up the compile warnings when
+> built without CONFIG_PM_SLEEP or CONFIG_PM_RUNTIME.
+>
+> The definitons of the dev_pm_ops callbacks need to be conditional when
+> using the SET_*_PM_OPS() macros, otherwise you get these warnings:
 
--- 
-~Vinod
+I have updated the branch with the required changes.
+--
+Tarun
+>
+>
+>
+> ?CC ? ? ?drivers/gpio/gpio-omap.o
+> /work/kernel/omap/pm/drivers/gpio/gpio-omap.c:1142:12: warning: 'omap_gpio_suspend' defined but not used [-Wunused-function]
+> /work/kernel/omap/pm/drivers/gpio/gpio-omap.c:1167:12: warning: 'omap_gpio_resume' defined but not used [-Wunused-function]
+> /work/kernel/omap/pm/drivers/gpio/gpio-omap.c:1191:12: warning: 'omap_gpio_runtime_suspend' defined but not used [-Wunused-function]
+> /work/kernel/omap/pm/drivers/gpio/gpio-omap.c:1237:12: warning: 'omap_gpio_runtime_resume' defined but not used [-Wunused-function]
+>
+>
+> Thanks,
+>
+> Kevin
