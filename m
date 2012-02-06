@@ -1,173 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  6 Feb 2012 11:22:26 -0800
-Subject: [PATCH 6/6] mach-ux500: remove intermediary add_platform_device*
- functions
-In-Reply-To: <1328556146-3730-1-git-send-email-lee.jones@linaro.org>
-References: <1328556146-3730-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1328556146-3730-7-git-send-email-lee.jones@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 6 Feb 2012 20:26:52 +0100
+Subject: An extremely simplified pinctrl bindings proposal
+In-Reply-To: <4F302474.1020701@firmworks.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
+ <4F302474.1020701@firmworks.com>
+Message-ID: <CACRpkdYt-L+an5DTdYkS5Hi+18-rszAt7hXwZNUNVK-d0UaCWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are no longer required since a 'parent' pointer is now
-passed to each registering device.
+On Mon, Feb 6, 2012 at 8:05 PM, Mitch Bradley <wmb@firmworks.com> wrote:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/devices-common.c |   53 ----------------------------------
- arch/arm/mach-ux500/devices-common.h |   46 ++++++++++++++++-------------
- arch/arm/mach-ux500/devices-db8500.h |   10 ++++--
- 3 files changed, 33 insertions(+), 76 deletions(-)
+> I like the general approach of simplifying the pinctrl thing, as the
+> previous approach did not appear to be converging.
 
-diff --git a/arch/arm/mach-ux500/devices-common.c b/arch/arm/mach-ux500/devices-common.c
-index 96effbd..c3bc094 100644
---- a/arch/arm/mach-ux500/devices-common.c
-+++ b/arch/arm/mach-ux500/devices-common.c
-@@ -59,59 +59,6 @@ dbx500_add_amba_device(struct device *parent, const char *name,
- }
- 
- static struct platform_device *
--dbx500_add_platform_device(const char *name, int id, void *pdata,
--			   struct resource *res, int resnum)
--{
--	struct platform_device *dev;
--	int ret;
--
--	dev = platform_device_alloc(name, id);
--	if (!dev)
--		return ERR_PTR(-ENOMEM);
--
--	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
--	dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
--
--	ret = platform_device_add_resources(dev, res, resnum);
--	if (ret)
--		goto out_free;
--
--	dev->dev.platform_data = pdata;
--
--	ret = platform_device_add(dev);
--	if (ret)
--		goto out_free;
--
--	return dev;
--
--out_free:
--	platform_device_put(dev);
--	return ERR_PTR(ret);
--}
--
--struct platform_device *
--dbx500_add_platform_device_4k1irq(const char *name, int id,
--				  resource_size_t base,
--				  int irq, void *pdata)
--{
--	struct resource resources[] = {
--		[0] = {
--			.start	= base,
--			.end	= base + SZ_4K - 1,
--			.flags	= IORESOURCE_MEM,
--		},
--		[1] = {
--			.start	= irq,
--			.end	= irq,
--			.flags	= IORESOURCE_IRQ,
--		}
--	};
--
--	return dbx500_add_platform_device(name, id, pdata, resources,
--					  ARRAY_SIZE(resources));
--}
--
--static struct platform_device *
- dbx500_add_gpio(struct device *parent, int id, resource_size_t addr, int irq,
- 		struct nmk_gpio_platform_data *pdata)
- {
-diff --git a/arch/arm/mach-ux500/devices-common.h b/arch/arm/mach-ux500/devices-common.h
-index f8adff8..39c74ec 100644
---- a/arch/arm/mach-ux500/devices-common.h
-+++ b/arch/arm/mach-ux500/devices-common.h
-@@ -8,14 +8,15 @@
- #ifndef __DEVICES_COMMON_H
- #define __DEVICES_COMMON_H
- 
--extern struct amba_device *
--dbx500_add_amba_device(struct device *parent, const char *name, resource_size_t base,
--		       int irq, void *pdata, unsigned int periphid);
-+#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/sys_soc.h>
-+#include <plat/i2c.h>
- 
--extern struct platform_device *
--dbx500_add_platform_device_4k1irq(const char *name, int id,
--				  resource_size_t base,
--				  int irq, void *pdata);
-+extern struct amba_device *
-+dbx500_add_amba_device(struct device *parent, const char *name,
-+		       resource_size_t base, int irq, void *pdata,
-+		       unsigned int periphid);
- 
- struct spi_master_cntlr;
- 
-@@ -60,20 +61,25 @@ struct nmk_i2c_controller;
- 
- static inline struct platform_device *
- dbx500_add_i2c(struct device *parent, int id, resource_size_t base, int irq,
--	       struct nmk_i2c_controller *pdata)
--{
--	return dbx500_add_platform_device_4k1irq("nmk-i2c", id, base, irq,
--						 pdata);
--}
--
--struct msp_i2s_platform_data;
--
--static inline struct platform_device *
--dbx500_add_msp_i2s(int id, resource_size_t base, int irq,
--		   struct msp_i2s_platform_data *pdata)
-+	       struct nmk_i2c_controller *data)
- {
--	return dbx500_add_platform_device_4k1irq("MSP_I2S", id, base, irq,
--						 pdata);
-+	struct resource res[] = {
-+		DEFINE_RES_MEM(base, SZ_4K),
-+		DEFINE_RES_IRQ(irq),
-+	};
-+
-+	struct platform_device_info pdevinfo = {
-+		.parent = parent,
-+		.name = "nmk-i2c",
-+		.id = id,
-+		.res = res,
-+		.num_res = ARRAY_SIZE(res),
-+		.data = data,
-+		.size_data = sizeof(*data),
-+		.dma_mask = DMA_BIT_MASK(32),
-+	};
-+
-+	return platform_device_register_full(&pdevinfo);
- }
- 
- static inline struct amba_device *
-diff --git a/arch/arm/mach-ux500/devices-db8500.h b/arch/arm/mach-ux500/devices-db8500.h
-index 9bd08ad..9fd93e9 100644
---- a/arch/arm/mach-ux500/devices-db8500.h
-+++ b/arch/arm/mach-ux500/devices-db8500.h
-@@ -18,9 +18,13 @@ db8500_add_ske_keypad(struct device *parent,
- 		      struct ske_keypad_platform_data *pdata,
- 		      size_t size)
- {
--	return dbx500_add_platform_device_4k1irq("nmk-ske-keypad", -1,
--						 U8500_SKE_BASE,
--						 IRQ_DB8500_KB, pdata);
-+	struct resource resources[] = {
-+		DEFINE_RES_MEM(U8500_SKE_BASE, SZ_4K),
-+		DEFINE_RES_IRQ(IRQ_DB8500_KB),
-+	};
-+
-+	return platform_device_register_resndata(parent, "nmk-ske-keypad", -1,
-+						 resources, 2, pdata, size);
- }
- 
- static inline struct amba_device *
--- 
-1.7.5.4
+pinctrl as such is upstream, widely ACKed and quite converged I'd say.
+
+But the Device Tree bindings and general path to get data out of the drivers
+and board files are not (yet) converging...
+
+> Both Open Firmware and ACPI have addressed this general problem. ?In
+> addition to a numeric identifier for the register, you need to specify the
+> access semantics. ?It's difficult to finitely enumerate all possible cases,
+> but you can get to 99.9% with a modest number of access models, and then add
+> new models as needed.
+
+This is interesting. So are you referring to a piece of Open Firmware
+that is not in the Device Tree? Since this is all about device tree that
+comes from OF, we might be reinventing the wheel.
+Can you give some pointers?
+
+Indeed it seems related to ACPI or some BIOS stuff on
+non-embedded systems.
+
+Yours,
+Linus Walleij
