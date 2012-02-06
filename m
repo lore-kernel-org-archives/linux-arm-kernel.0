@@ -1,110 +1,192 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 6 Feb 2012 17:39:50 +0000
-Subject: [PATCH 2/2] misc: c2c: Add C2C(Chip to Chip) device driver for
- EXYNOS
-In-Reply-To: <000601cce315$18c82510$4a586f30$%lee@samsung.com>
-References: <000601cce315$18c82510$4a586f30$%lee@samsung.com>
-Message-ID: <20120206173950.GA17927@sirena.org.uk>
+From: k.lewandowsk@samsung.com (Karol Lewandowski)
+Date: Mon, 06 Feb 2012 19:38:29 +0100
+Subject: [PATCH 1/4] i2c/gpio-i2c add: add DT support
+In-Reply-To: <1328438337-21185-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1328438337-21185-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4F301E25.5060507@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 04, 2012 at 05:15:03PM +0900, Kisang Lee wrote:
-> Cc: Arnd Bergmann <arnd <at> arndb.de>
-> Cc: Greg Kroah-Hartman <greg <at> kroah.com>
-> 
-> Signed-off-by: Kisang Lee <kisang80.lee@samsung.com>
+On 05.02.2012 11:38, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-What is a chip to chip driver?  It looks like there is some overlap with
-the remoteproc work that Ohad Ben-Cohen has been doing, or I think there
-was also some work for communicating with things like basebands?
-Perhaps even UIO?
+Hi!
 
-> +		if (opp_val == C2C_OPP100)
-> +			req_clk = c2c_con.clk_opp100;
-> +		else if (opp_val == C2C_OPP50)
-> +			req_clk = c2c_con.clk_opp50;
-> +		else if (opp_val == C2C_OPP25)
-> +			req_clk = c2c_con.clk_opp25;
+> +Device-Tree bindings for i2c gpio driver
+> +
+> +Required properties:
+> +	- compatible = "gpio-i2c";
 
-This looks like a switch statement.
+Driver name is "i2c-gpio" in file i2c-gpio.c. Previous version of patch 
+adding DT-support (prepared by Thomas Chou[1]) used i2c-gpio - could we 
+stick to that name?
 
-> +		dev_info(c2c_con.c2c_dev, "Get C2C sclk rate : %ld\n",
-> +					clk_get_rate(c2c_con.c2c_sclk));
-> +		dev_info(c2c_con.c2c_dev, "Get C2C aclk rate : %ld\n",
-> +					clk_get_rate(c2c_con.c2c_aclk));
-> +		break;
-> +	default:
-> +		dev_info(c2c_con.c2c_dev, "---C2C Operation Number---\n");
-> +		dev_info(c2c_con.c2c_dev, "1. C2C Reset\n");
-> +		dev_info(c2c_con.c2c_dev, "2. Set OPP25\n");
-> +		dev_info(c2c_con.c2c_dev, "3. Set OPP50\n");
-> +		dev_info(c2c_con.c2c_dev, "4. Set OPP100\n");
+[1] https://lkml.org/lkml/2011/2/23/584
 
-These log messages probably shouldn't be in.
+> +	- gpios: sda and scl gpio
+> +
+> +
+> +Optional properties:
+> +	- gpio-i2c,sda_is_open_drain: sda as open drain
+> +	- gpio-i2c,scl_is_open_drain: scl as open drain
+> +	- gpio-i2c,scl_is_output_only: scl as output only
 
-> +static irqreturn_t c2c_sscm0_irq(int irq, void *data)
+Most of DT-properties I've seen used hyphen, not underscore.  Could we 
+stick to that convention?
+
+(Nitpick: I think that "is" in property names is redundant too.)
+
+> +	- udelay: half clock cycle time in us (may depend on each platform)
+
+Could we use "clock-frequency" as Grant have suggested during review of 
+previous patch to i2c-gpio?
+
+   https://lkml.org/lkml/2011/2/24/220
+
+> +	- timeout: timeout to get data
+> +
+> +
+> +Example nodes:
+> +
+> +i2c-gpio at 0 {
+> +	compatible = "gpio-i2c";
+> +	gpios =<&pioA 23 0 /* sda */
+> +		&pioA 24 0 /* scl */
+> +		>;
+> +	gpio-i2c,sda_is_open_drain;
+> +	gpio-i2c,scl_is_open_drain;
+> +	udelay =<2>;		/* ~100 kHz */
+> +	#address-cells =<1>;
+> +	#size-cells =<0>;
+> +
+> +	rv3029c2 at 56 {
+> +		compatible = "rv3029c2";
+> +		reg =<0x56>;
+> +	};
+> +};
+> diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
+> index a651779..6b5d794 100644
+> --- a/drivers/i2c/busses/i2c-gpio.c
+> +++ b/drivers/i2c/busses/i2c-gpio.c
+> @@ -14,6 +14,8 @@
+>   #include<linux/module.h>
+>   #include<linux/slab.h>
+>   #include<linux/platform_device.h>
+> +#include<linux/of_gpio.h>
+> +#include<linux/of_i2c.h>
+>
+>   #include<asm/gpio.h>
+>
+> @@ -78,16 +80,51 @@ static int i2c_gpio_getscl(void *data)
+>   	return gpio_get_value(pdata->scl_pin);
+>   }
+>
+> +static int of_i2c_gpio_probe(struct device_node *np,
+> +			     struct i2c_gpio_platform_data *pdata)
 > +{
-> +	/* Nothing here yet */
-> +	return IRQ_HANDLED;
-> +}
+> +	u32 reg;
+> +
 
-This doesn't look terribly clever - if the interrupt has been asserted
-and we don't do anything to handle it won't we end up spinning for ever
-with repeated calls to the interrupt handler?
+if (of_gpio_count(np) < 2)
+	return -EINVAL;
 
-> +		if (opp_val == C2C_OPP100)
-> +			req_clk = c2c_con.clk_opp100;
-> +		else if (opp_val == C2C_OPP50)
-> +			req_clk = c2c_con.clk_opp50;
-> +		else if (opp_val == C2C_OPP25)
-> +			req_clk = c2c_con.clk_opp25;
+> +	pdata->sda_pin = of_get_gpio(np, 0);
+> +	pdata->scl_pin = of_get_gpio(np, 1);
 
-This and the surrounding code looks a lot like the code I commented on
-above - shouldn't this be factored out into a single function called
-from both places?
+if (pdata->sda_pin < 0 || pdata->scl_pin < 0)
+	return -EINVAL;
 
-> +	/* resource for AP's SSCM region */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "no memory resource defined(AP's SSCM)\n");
-> +		return -ENOENT;
-> +	}
-
-devm_requets_and_ioremap() perhaps?
-
-> +#ifdef CONFIG_PM
-> +static int samsung_c2c_suspend(struct platform_device *dev, pm_message_t pm)
-> +{
-> +	/* Nothing here yet */
+> +
+> +	if (of_property_read_u32(np, "udelay",&reg))
+> +		pdata->udelay = reg;
+> +
+> +	if (of_property_read_u32(np, "timeout",&reg))
+> +		pdata->timeout = reg;
+> +
+> +	pdata->sda_is_open_drain =
+> +		!!of_get_property(np, "gpio-i2c,sda_is_open_drain", NULL);
+> +	pdata->scl_is_open_drain =
+> +		!!of_get_property(np, "gpio-i2c,scl_is_open_drain", NULL);
+> +	pdata->scl_is_output_only =
+> +		!!of_get_property(np, "gpio-i2c,scl_is_output_only", NULL);
+> +
 > +	return 0;
 > +}
 > +
-> +static int samsung_c2c_resume(struct platform_device *dev)
-> +{
-> +	/* Nothing here yet */
-> +	return 0;
-> +}
-> +#else
-> +#define samsung_c2c_suspend NULL
-> +#define samsung_c2c_resume NULL
-> +#endif
+>   static int __devinit i2c_gpio_probe(struct platform_device *pdev)
+>   {
+>   	struct i2c_gpio_platform_data *pdata;
+>   	struct i2c_algo_bit_data *bit_data;
+>   	struct i2c_adapter *adap;
+>   	int ret;
+> +	int len = sizeof(struct i2c_gpio_platform_data);
+>
+> -	pdata = pdev->dev.platform_data;
+> +	pdata = kzalloc(len, GFP_KERNEL);
 
-No need to include this if it doesn't do anything.
+Could you also take into account Grant's comment about private/platform 
+data?
 
-> +static struct platform_driver samsung_c2c_driver = {
-> +	.probe		= samsung_c2c_probe,
-> +	.remove		= __devexit_p(samsung_c2c_remove),
-> +	.suspend	= samsung_c2c_suspend,
-> +	.resume		= samsung_c2c_resume,
+   https://lkml.org/lkml/2011/2/3/221
 
-If you were including pm operations they should be in the pm_ops rather
-than using the platform-specific variants - this makes it easier to do
-things like runtime PM later.
+>   	if (!pdata)
+> -		return -ENXIO;
+> +		return -ENOMEM;
+> +
+> +	if (pdev->dev.of_node) {
+> +		of_i2c_gpio_probe(pdev->dev.of_node, pdata);
 
-> +static int __init samsung_c2c_init(void)
-> +{
-> +	return platform_driver_register(&samsung_c2c_driver);
-> +}
-> +module_init(samsung_c2c_init);
+Above might fail if configuration is corrupted.
 
-module_platform_driver().
+> +	} else {
+> +		if (!pdev->dev.platform_data) {
+> +			ret = -ENXIO;
+> +			goto err_alloc_adap;
+> +		}
+> +		memcpy(pdata, pdev->dev.platform_data, len);
+> +	}
+>
+>   	ret = -ENOMEM;
+>   	adap = kzalloc(sizeof(struct i2c_adapter), GFP_KERNEL);
+> @@ -143,6 +180,7 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
+>   	adap->algo_data = bit_data;
+>   	adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
+>   	adap->dev.parent =&pdev->dev;
+> +	adap->dev.of_node = pdev->dev.of_node;
+>
+>   	/*
+>   	 * If "dev->id" is negative we consider it as zero.
+> @@ -154,6 +192,8 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
+>   	if (ret)
+>   		goto err_add_bus;
+>
+> +	of_i2c_register_devices(adap);
+> +
+>   	platform_set_drvdata(pdev, adap);
+>
+>   	dev_info(&pdev->dev, "using pins %u (SDA) and %u (SCL%s)\n",
+> @@ -172,6 +212,7 @@ err_request_sda:
+>   err_alloc_bit_data:
+>   	kfree(adap);
+>   err_alloc_adap:
+> +	kfree(pdata);
+>   	return ret;
+>   }
+>
+> @@ -192,10 +233,20 @@ static int __devexit i2c_gpio_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id gpio_i2c_dt_ids[] = {
+> +	{ .compatible = "gpio-i2c", },
+
+There seem to be no good reason to make DT-compatible string different 
+from driver's name that's already in use:
+
+>   static struct platform_driver i2c_gpio_driver = {
+>   	.driver		= {
+>   		.name	= "i2c-gpio",
+
+Regards,
+-- 
+Karol Lewandowski | Samsung Poland R&D Center | Linux/Platform
