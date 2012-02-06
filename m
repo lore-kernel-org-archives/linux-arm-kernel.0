@@ -1,24 +1,26 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 6 Feb 2012 17:20:24 +0100
-Subject: [PATCH 4/6 V2] of/mtd/nand: add generic bindings and helpers
-In-Reply-To: <1328524512-18159-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
- <1328524512-18159-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <201202061720.24996.sr@denx.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 6 Feb 2012 16:26:56 +0000
+Subject: [PATCH 2/7] Add various hugetlb page table fix
+In-Reply-To: <4F28AD1D.1000106@gmail.com>
+References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
+ <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
+ <20120131095811.GB889@n2100.arm.linux.org.uk>
+ <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
+ <4F28AD1D.1000106@gmail.com>
+Message-ID: <20120206162656.GG26538@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On Wed, Feb 01, 2012 at 03:10:21AM +0000, bill4carson wrote:
+> Why L_PTE_HUGEPAGE is needed?
+> 
+> hugetlb subsystem will call pte_page to derive the corresponding page 
+> struct from a given pte, and pte_pfn is used first to convert pte into
+> a page frame number.
 
-On Monday 06 February 2012 11:35:11 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> - nand-ecc-mode : String, operation mode of the NAND ecc mode.
->   Supported values are: "none", "soft", "hw", "hw_syndrome",
-> "hw_oob_first", "soft_bch".
-> - nand-bus-width : 8 or 16 bus width if not present 8
-> - nand-on-flash-bbt: boolean to enable on flash bbt option if not present
-> false
+Are you sure the pte_pfn() conversion is right? Does it need to be
+different from the 4K pfn? I haven't seen any other architecture doing
+shifts other than PAGE_SHIFT even for huge pages.
 
-Why not use an "empty" type (without argument) for nand-on-flash-bbt then?
-
-Thanks,
-Stefan
+-- 
+Catalin
