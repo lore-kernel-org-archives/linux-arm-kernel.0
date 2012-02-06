@@ -1,116 +1,79 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 6 Feb 2012 08:40:45 +0200
-Subject: [PATCH v9 01/25] gpio/omap: remove dependency on gpio_bank_count
-In-Reply-To: <CAMQu2gzaQ+uHGpu-mpEPaxFim4_yRayKw_XBPBUgu7ML7daR2w@mail.gmail.com>
-References: <20120202215350.GB22888@legolas.emea.dhcp.ti.com>
- <4F2B078B.1040709@ti.com>
- <20120202220744.GA23092@legolas.emea.dhcp.ti.com>
- <87liojajs4.fsf@ti.com>
- <20120204160802.GA10818@legolas.emea.dhcp.ti.com>
- <CA+HSevqvHAgA+PPLm8BH5vfWkc8yY8W+fRpqjT2urq2EWtSYiA@mail.gmail.com>
- <20120205090805.GA13300@legolas.emea.dhcp.ti.com>
- <CAMQu2gyNhEJ3vr7_o_xYAQOYKaRofJViobKtfH2HoxwgU7nUpw@mail.gmail.com>
- <20120205113521.GA13533@legolas.emea.dhcp.ti.com>
- <CAMQu2gzaQ+uHGpu-mpEPaxFim4_yRayKw_XBPBUgu7ML7daR2w@mail.gmail.com>
-Message-ID: <20120206064043.GB15652@legolas.emea.dhcp.ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 6 Feb 2012 16:06:23 +0800
+Subject: [BUG] Spitz charger broken (and other sharpsl warnings)?
+In-Reply-To: <20120204124534.GT889@n2100.arm.linux.org.uk>
+References: <20120204124534.GT889@n2100.arm.linux.org.uk>
+Message-ID: <CAN1soZyjy+UsojvZWvCLpzX5d-3+32_3ULPpR_8vvpSZ2Sa1bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 05, 2012 at 06:05:37PM +0530, Shilimkar, Santosh wrote:
-> On Sun, Feb 5, 2012 at 5:05 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Hi,
-> >
-> > On Sun, Feb 05, 2012 at 02:46:19PM +0530, Shilimkar, Santosh wrote:
-> >> >> bank->mod_usage check is used to take care of doing pm_runtime_get*/put* only
-> >> >> if all the GPIOs in a particular bank are enabled or disabled respectively.
-> >> >
-> >> > and why should you care about that ? The first get will enable the
-> >> > resources you need, the second get will just increase a counter and so
-> >> > on. So if you have 32 gets, you will disable the module when you have 32
-> >> > puts.
-> >> >
-> >> Am not sure if it is clear to you that the GPIO resources like clock,
-> >> debounce clk are per bank wise and not per GPIO line. So doing 32
-> >
-> > this is just one more reason to have usage counters.
-> >
-> >> get/put per bank is stupid. runtime pm is for managing pm
-> >
-> > what's stupid is trying to use the pm usage counters as a binary flag,
-> > see below.
-> >
-> >> resources and if the pm resource is per bank, it has to be
-> >> handled per bank.
-> >
-> > hehe, what are you talking about Santosh ? That's the whole point of
-> > reference counting. If there are 32 users for 1 resource, you want to
-> > make sure that you only free the resources (clocks, or whatever resource
-> > you want) after all 32 users are done with it.
-> >
-> > Trying to use the pm usage counter as a binary flag, that's the stupid
-> > part of the OMAP GPIO driver.
-> >
-> > Instead of adding checks such as:
-> >
-> > if (module_isnt_used())
-> > ? ? ? ?enable_clocks();
-> >
-> > on get and:
-> >
-> > if (module_isnt_needed_anymore())
-> > ? ? ? ?disable_clcoks()
-> >
-> > on put is the most useless piece of code on that driver. Because such
-> > checks are already available on PM core through usage counters. The way
-> > that part of the code works is as follow:
-> >
-> > get() {
-> > ? ? ? ?if (pm_counter_is_zero(dev)) {
-> > ? ? ? ? ? ? ? ?atomic_inc();
-> >
-> > ? ? ? ? ? ? ? ?rpm_resume();
-> > ? ? ? ?}
-> > }
-> >
-> > put() {
-> > ? ? ? ?atomic_dec();
-> >
-> > ? ? ? ?if (pm_counter_is_zero(dev)) {
-> > ? ? ? ? ? ? ? ?rpm_suspend();
-> > ? ? ? ?}
-> > }
-> >
-> > Do you not see that you're duplicating functionality by trying to use
-> > the pm counter a binary flag ?
-> >
-> Ahh.. Now I see your point. I miss-understood the point first time
-> and thought that we have disconnect on the pm resources from
-> number of GPIO perspective.
-> 
-> What you are saying is to use pm runtime reference counters rather
-> than creating local ones for GPIO which seems to be right thing to
-> do. Sorry for the noise.
+On Sat, Feb 4, 2012 at 8:45 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> While building my test PXA configuration, it spat out these warnings.
+> There's three of them, the first probably does need fixing ASAP.
+>
+> This one is particularly nasty:
+> arch/arm/mach-pxa/spitz_pm.c: In function 'spitz_charger_wakeup':
+> arch/arm/mach-pxa/spitz_pm.c:178: warning: left shift count >= width of type
+>
+> static unsigned long spitz_charger_wakeup(void)
+> {
+> ? ? ? ?unsigned long ret;
+> ? ? ? ?ret = (!gpio_get_value(SPITZ_GPIO_KEY_INT)
+> ? ? ? ? ? ? ? ?<< GPIO_bit(SPITZ_GPIO_KEY_INT))
+> ? ? ? ? ? ? ? ?| (!gpio_get_value(SPITZ_GPIO_SYNC)
+> ? ? ? ? ? ? ? ?<< GPIO_bit(SPITZ_GPIO_SYNC)); <========
+> ? ? ? ?return ret;
+> }
+>
+> If this impacts the way the charger works, it's definitely something that
+> needs fixing. ?We don't want more exploding batteries.
+>
+> ----------------------------------------------------------------------------
+> arch/arm/mach-pxa/sharpsl_pm.c: In function 'sharpsl_pm_pxa_read_max1111':
+> arch/arm/mach-pxa/sharpsl_pm.c:180: warning: ISO C90 forbids mixed declarations and code
+>
+> int sharpsl_pm_pxa_read_max1111(int channel)
+> {
+> ? ? ? ?/* Ugly, better move this function into another module */
+> ? ? ? ?if (machine_is_tosa())
+> ? ? ? ? ? ?return 0;
+>
+> ? ? ? ?extern int max1111_read_channel(int); <=====
+>
+> ? ? ? ?/* max1111 accepts channels from 0-3, however,
+> ? ? ? ? * it is encoded from 0-7 here in the code.
+> ? ? ? ? */
+> ? ? ? ?return max1111_read_channel(channel >> 1);
+>
+> ----------------------------------------------------------------------------
+> arch/arm/mach-pxa/sharpsl_pm.c: At top level:
+> arch/arm/mach-pxa/sharpsl_pm.c:694: warning: 'sharpsl_fatal_check' defined but not used
+>
+> This warning has been around for a long time, since:
+>
+> commit 99f329a2ba3c2d07cc90ca9309babf27ddf98bff
+> Author: Pavel Machek <pavel@ucw.cz>
+> Date: ? Sun Sep 6 07:28:40 2009 +0200
+>
+> ? ?[ARM] pxa/sharpsl_pm: zaurus c3000 aka spitz: fix resume
+>
+> ? ?sharpsl_pm.c code tries to read battery state very early during
+> ? ?resume, but those battery meters are connected on SPI and that's only
+> ? ?resumed way later.
+>
+> ? ?Replace the check with simple checking of battery fatal signal, that
+> ? ?actually works at this stage.
+>
+> ? ?Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> ? ?Tested-by: Stanislav Brabec <utx@penguin.cz>
+> ? ?Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>
 
-no problem.
+I can fix the first two bugs.
 
-> The agressive clock cutting was tried initially without much success
-> and may be we can revisit this one more time.
+For the third one, could Pavel fix this issue? From the commit log,
+Pavel should rework the checking of battery fatal signal, isn't it?
 
-I think one issue will be wrt to IRQ handling. If you want pm_runtime_*
-calls to be irq_safe, they will keep the parent always on, so we need to
-find a way to make that part work properly, I guess.
-
-> As per as this series is concerned, we would like to fix
-> the build error pointed by Kevin and queue it for 3.4.
-
-sure, go ahead. No problems with that at all.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120206/f7cbdac8/attachment.sig>
+Best Regards
+Haojian
