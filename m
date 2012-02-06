@@ -1,76 +1,31 @@
-From: mstowe@redhat.com (Myron Stowe)
-Date: Mon, 06 Feb 2012 10:59:17 -0700
-Subject: [BUG] Multiple definition of pcibios_max_latency
-In-Reply-To: <20120204125904.GU889@n2100.arm.linux.org.uk>
-References: <20120204125904.GU889@n2100.arm.linux.org.uk>
-Message-ID: <1328551157.2264.11.camel@zim.stowe>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Mon, 6 Feb 2012 20:15:52 +0100
+Subject: [PATCH 1/4] i2c/gpio-i2c add: add DT support
+In-Reply-To: <4F301E25.5060507@samsung.com>
+References: <1328438337-21185-1-git-send-email-plagnioj@jcrosoft.com>
+ <4F301E25.5060507@samsung.com>
+Message-ID: <20120206201552.153eba5d@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-02-04 at 12:59 +0000, Russell King - ARM Linux wrote:
-> While building my test PXA configuration, I came across:
+On Mon, 06 Feb 2012 19:38:29 +0100, Karol Lewandowski wrote:
+> On 05.02.2012 11:38, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > 
-> drivers/built-in.o:(.data+0x230): multiple definition of `pcibios_max_latency'
-> arch/arm/common/built-in.o:(.data+0x40c): first defined here
-> make[1]: *** [vmlinux.o] Error 1
+> Hi!
 > 
-> This was introduced by:
+> > +Device-Tree bindings for i2c gpio driver
+> > +
+> > +Required properties:
+> > +	- compatible = "gpio-i2c";
 > 
-> commit 96c5590058d7fded14f43af2ab521436cecf3125
-> Author: Myron Stowe <mstowe@redhat.com>
-> Date:   Fri Oct 28 15:48:38 2011 -0600
+> Driver name is "i2c-gpio" in file i2c-gpio.c. Previous version of patch 
+> adding DT-support (prepared by Thomas Chou[1]) used i2c-gpio - could we 
+> stick to that name?
 > 
->     PCI: Pull PCI 'latency timer' setup up into the core
-> 
->     The 'latency timer' of PCI devices, both Type 0 and Type 1,
->     is setup in architecture-specific code [see: 'pcibios_set_master()'].
->     There are two approaches being taken by all the architectures - check
->     if the 'latency timer' is currently set between 16 and 255 and if not
->     bring it within bounds, or, do nothing (and then there is the
->     gratuitously different PA-RISC implementation).
-> 
->     There is nothing architecture-specific about PCI's 'latency timer' so
->     this patch pulls its setup functionality up into the PCI core by
->     creating a generic 'pcibios_set_master()' function using the '__weak'
->     attribute which can be used by all architectures as a default which,
->     if necessary, can then be over-ridden by architecture-specific code.
-> 
->     No functional change.
-> 
->     Signed-off-by: Myron Stowe <myron.stowe@redhat.com>
->     Signed-off-by: Jesse Barnes <jbarnes@virtuousgeek.org>
-> 
-> which moved the handling of pcibios_set_master() into core code for
-> everyone but ARM:
-> 
->  arch/blackfin/include/asm/pci.h         |    4 ----
->  arch/frv/mb93090-mb00/pci-frv.c         |    6 ------
->  arch/frv/mb93090-mb00/pci-frv.h         |    2 --
->  arch/h8300/include/asm/pci.h            |    5 -----
->  arch/mips/pci/pci.c                     |    6 ------
->  arch/mn10300/unit-asb2305/pci-asb2305.c |    6 ------
->  arch/mn10300/unit-asb2305/pci-asb2305.h |    2 --
->  arch/sh/drivers/pci/pci.c               |    6 ------
->  arch/x86/include/asm/pci_x86.h          |    2 --
->  arch/x86/pci/i386.c                     |    6 ------
->  drivers/pci/pci.c                       |   29 +++++++++++++++++++++++++++++
->  include/linux/pci.h                     |    3 +++
->  12 files changed, 32 insertions(+), 45 deletions(-)
-> 
-> I think the right solution is to delete the (now duplicate) definition 
-> of pcibios_max_latency in arch/arm/common/it8152.c.  Please comment.
+> [1] https://lkml.org/lkml/2011/2/23/584
 
-Yes, that commit is the culprit.  I was concerned about ARM in general
-when I posted this series as I do not have a compile environment for it,
-nor am I at all familiar with ARM to know if I had covered all the
-possible variations (i.e. 8152 vs other, non 8152 types).
+Yes, please. The gpio subsystem normalized its driver names to gpio-*,
+so we shouldn't use that anywhere else to avoid confusion.
 
-Will deleting the 'pcibios_max_latency' definition in
-arch/arm/common/it8152.c be the correct solution for all ARM variations
-(I don't want to try and fix one while breaking others)?
-
-I'll wait for your response/guidance and if this is the correct action
-generate a patch right away.
-
-Thanks,
- Myron
+-- 
+Jean Delvare
