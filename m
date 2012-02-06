@@ -1,33 +1,52 @@
-From: jrnieder@gmail.com (Jonathan Nieder)
-Date: Mon, 6 Feb 2012 17:23:29 -0600
-Subject: [regression] Re: Enabling runtime P2V by default
-In-Reply-To: <alpine.LFD.2.02.1202061514430.1656@xanadu.home>
-References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
- <20110810091635.GF1831@n2100.arm.linux.org.uk>
- <20110810092206.GE10121@e102144-lin.cambridge.arm.com>
- <20120206223147.GA3760@burratino>
- <alpine.LFD.2.02.1202061514430.1656@xanadu.home>
-Message-ID: <20120206232328.GA1941@burratino>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 Feb 2012 15:57:33 -0800
+Subject: An extremely simplified pinctrl bindings proposal
+In-Reply-To: <CACRpkdYrbD3PpJ3wb69yb3Ya8SeZJnPpgJdtttjWTkS5xsD-4g@mail.gmail.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
+ <CACRpkdahin4srDh7dphgvq306gjz7CGP=h4dVkUY+w0z0wpXRQ@mail.gmail.com>
+ <4F2F6AE2.1040504@nvidia.com>
+ <CACRpkdbtTPSoX1x4aBtNVGZ2Qex9t77D09V9JgON_jfShQdx6w@mail.gmail.com>
+ <20120206190315.GU1426@atomide.com>
+ <CACRpkdZthbejmTqRJAWHb8jU-p8LPT_+zj_CY1q0voMb4FKz2Q@mail.gmail.com>
+ <20120206210456.GV1426@atomide.com>
+ <CACRpkdYrbD3PpJ3wb69yb3Ya8SeZJnPpgJdtttjWTkS5xsD-4g@mail.gmail.com>
+Message-ID: <20120206235733.GY1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
+* Linus Walleij <linus.walleij@linaro.org> [120206 14:44]:
+> On Mon, Feb 6, 2012 at 10:04 PM, Tony Lindgren <tony@atomide.com> wrote:
+> 
+> >> I actually had something like unnamed pins in the early patches
+> >> to register a bunch of anonymous pins ranges, so why not bring
+> >> it back in.
+> >
+> > Yeah it seems that the mux registers should be listed, it might
+> > require a little bit of thinking for cases where one register
+> > controls multiple pins. So maybe we need just a new entry for
+> > mux registers?
+> 
+> I'm not sure if I'm following completely, if this is inside the devicetree-based
+> driver file, would it work to just add a struct dentry * to the
+> pinctrl_desc where you put a per-driver file?
 
-> You really do want to have uboot patched.  Who knows what other latent 
-> issues are there that you don't know about.
+I was thinking generic debufs entries for all drivers.
+ 
+> Or maybe add extern void pinctrl_add_debugfs(struct dentry *) that adds
+> a new file to the existing per-driver directory through the core and then
+> have this add that file?
 
-Ah, sorry for the lack of clarity.  I don't believe this u-boot patch[1]
-has been committed anywhere, so even people with the latest u-boot are
-affected.  It's just available from the mailing list archive.
+Sounds like you've thought it further than me already :)
 
-"It's not worth working around this bootloader bug" may still be the
-right answer.  After all, in a couple of months presumably most people
-will have the patch applied.  And for all I know, it might not even be
-possible to work around this bootloader bug, short of flipping the P2V
-default again (which seems like a bad idea).  I just wanted to make
-sure you were aware of it.
+Maybe that's the way to go to solve the one register for
+multiple pins issue.
+ 
+> Or did you mean that the core.c should be register-aware?
 
-Cheers,
-Jonathan
+I was just thinking string name ignoring core.c, so that would
+be the pinctrl_add_debugfs() option then. Do you see problems
+with this approach?
 
-[1] http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/124051/focus=124062
+Regards,
+
+Tony
