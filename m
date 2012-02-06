@@ -1,79 +1,65 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 6 Feb 2012 16:06:23 +0800
-Subject: [BUG] Spitz charger broken (and other sharpsl warnings)?
-In-Reply-To: <20120204124534.GT889@n2100.arm.linux.org.uk>
-References: <20120204124534.GT889@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZyjy+UsojvZWvCLpzX5d-3+32_3ULPpR_8vvpSZ2Sa1bg@mail.gmail.com>
+From: LW@KARO-electronics.de (=?us-ascii?Q?=3D=3Futf-8=3FQ=3FLothar=5FWa=3DC3=3D9Fmann=3F=3D?=)
+Date: Mon, 6 Feb 2012 09:14:47 +0100
+Subject: [BUG] genirq: Race condition in ONESHOT IRQ handler disabling IRQ
+ forever
+Message-ID: <20271.35831.227679.177366@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 4, 2012 at 8:45 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> While building my test PXA configuration, it spat out these warnings.
-> There's three of them, the first probably does need fixing ASAP.
->
-> This one is particularly nasty:
-> arch/arm/mach-pxa/spitz_pm.c: In function 'spitz_charger_wakeup':
-> arch/arm/mach-pxa/spitz_pm.c:178: warning: left shift count >= width of type
->
-> static unsigned long spitz_charger_wakeup(void)
-> {
-> ? ? ? ?unsigned long ret;
-> ? ? ? ?ret = (!gpio_get_value(SPITZ_GPIO_KEY_INT)
-> ? ? ? ? ? ? ? ?<< GPIO_bit(SPITZ_GPIO_KEY_INT))
-> ? ? ? ? ? ? ? ?| (!gpio_get_value(SPITZ_GPIO_SYNC)
-> ? ? ? ? ? ? ? ?<< GPIO_bit(SPITZ_GPIO_SYNC)); <========
-> ? ? ? ?return ret;
-> }
->
-> If this impacts the way the charger works, it's definitely something that
-> needs fixing. ?We don't want more exploding batteries.
->
-> ----------------------------------------------------------------------------
-> arch/arm/mach-pxa/sharpsl_pm.c: In function 'sharpsl_pm_pxa_read_max1111':
-> arch/arm/mach-pxa/sharpsl_pm.c:180: warning: ISO C90 forbids mixed declarations and code
->
-> int sharpsl_pm_pxa_read_max1111(int channel)
-> {
-> ? ? ? ?/* Ugly, better move this function into another module */
-> ? ? ? ?if (machine_is_tosa())
-> ? ? ? ? ? ?return 0;
->
-> ? ? ? ?extern int max1111_read_channel(int); <=====
->
-> ? ? ? ?/* max1111 accepts channels from 0-3, however,
-> ? ? ? ? * it is encoded from 0-7 here in the code.
-> ? ? ? ? */
-> ? ? ? ?return max1111_read_channel(channel >> 1);
->
-> ----------------------------------------------------------------------------
-> arch/arm/mach-pxa/sharpsl_pm.c: At top level:
-> arch/arm/mach-pxa/sharpsl_pm.c:694: warning: 'sharpsl_fatal_check' defined but not used
->
-> This warning has been around for a long time, since:
->
-> commit 99f329a2ba3c2d07cc90ca9309babf27ddf98bff
-> Author: Pavel Machek <pavel@ucw.cz>
-> Date: ? Sun Sep 6 07:28:40 2009 +0200
->
-> ? ?[ARM] pxa/sharpsl_pm: zaurus c3000 aka spitz: fix resume
->
-> ? ?sharpsl_pm.c code tries to read battery state very early during
-> ? ?resume, but those battery meters are connected on SPI and that's only
-> ? ?resumed way later.
->
-> ? ?Replace the check with simple checking of battery fatal signal, that
-> ? ?actually works at this stage.
->
-> ? ?Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> ? ?Tested-by: Stanislav Brabec <utx@penguin.cz>
-> ? ?Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
->
+Hi,
 
-I can fix the first two bugs.
+I already sent this to <linux-kernel@vger.kernel.org> on Feb. 1, 2012
+but did not get any response there. So resending to a wider audience
+with improved subject line:
 
-For the third one, could Pavel fix this issue? From the commit log,
-Pavel should rework the checking of battery fatal signal, isn't it?
+there is a race condition in the threaded IRQ handler code for oneshot
+interrupts that may lead to disabling an IRQ indefinitely. IRQs are
+masked before calling the hard-irq handler and are unmasked only after
+the soft-irq handler has been run. Thus if the hard-irq handler
+returns IRQ_HANDLED instead of IRQ_WAKE_THREAD, meaning the soft-irq
+will not be called, the interrupt will remain masked forever.
 
-Best Regards
-Haojian
+This can happen due to a short pulse on the interrupt line, that
+triggers the interrupt logic, but goes undetected by the hard-irq
+handler. The problem can be reproduced with the TSC2007 touch
+controller driver that uses ONESHOT interrupts.
+
+The problem arises also with interrupt controllers that latch a level
+triggered IRQ until it is acknowledged (like the i.MX28 does).
+In this case the IRQ status bit will remain asserted after the
+soft-irq finishes and retrigger the interrupt while the interrupt line
+is already deasserted.
+
+The following patch would solve the problem, but I'm not sure whether
+it's the Right Thing(TM) to do. Especially wrt. shared interrupts.
+
+diff --git a/kernel/irq/handle.c b/kernel/irq/handle.c
+index 470d08c..93beadb 100644
+--- a/kernel/irq/handle.c
++++ b/kernel/irq/handle.c
+@@ -146,6 +146,11 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
+ 			/* Fall through to add to randomness */
+ 		case IRQ_HANDLED:
+ 			random |= action->flags;
++			/* unmask the IRQ that has been left masked
++			 * due to race condition
++			 */
++			if (res == IRQ_HANDLED && (action->flags & IRQF_ONESHOT))
++				unmask_irq(desc);
+ 			break;
+ 
+ 		default:
+
+Best regards,
+
+Lothar Wassmann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
