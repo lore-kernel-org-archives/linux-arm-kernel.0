@@ -1,81 +1,47 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  6 Feb 2012 15:03:18 -0600
-Subject: [PATCH 1/3] ARM: make arch_ret_to_user macro optional
+Date: Mon,  6 Feb 2012 15:03:19 -0600
+Subject: [PATCH 2/3] ARM: make disable_fiq macro optional
 In-Reply-To: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
 References: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1328562200-8810-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1328562200-8810-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Only 3 platforms need arch_ret_to_user macro, so add ARCH_HAS_RET_TO_USER
-kconfig option and make iop13xx, iop32x and iop33x select it.
+Only rpc uses disable_fiq, so make its use conditional on ARCH_RPC.
+
+With this, entry-macro.S is no longer needed for platforms that
+select MULTI_IRQ_HANDLER and the include of it can be conditional.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/Kconfig               |    6 ++++++
- arch/arm/kernel/entry-common.S |    8 +++++++-
- 2 files changed, 13 insertions(+), 1 deletions(-)
+ arch/arm/kernel/entry-armv.S |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a48aecc..322f2ad 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -43,6 +43,9 @@ config ARM
- config ARM_HAS_SG_CHAIN
- 	bool
- 
-+config ARCH_HAS_RET_TO_USER
-+	bool
-+
- config HAVE_PWM
- 	bool
- 
-@@ -473,6 +476,7 @@ config ARCH_H720X
- config ARCH_IOP13XX
- 	bool "IOP13xx-based"
- 	depends on MMU
-+	select ARCH_HAS_RET_TO_USER
- 	select CPU_XSC3
- 	select PLAT_IOP
- 	select PCI
-@@ -485,6 +489,7 @@ config ARCH_IOP13XX
- config ARCH_IOP32X
- 	bool "IOP32x-based"
- 	depends on MMU
-+	select ARCH_HAS_RET_TO_USER
- 	select CPU_XSCALE
- 	select PLAT_IOP
- 	select PCI
-@@ -496,6 +501,7 @@ config ARCH_IOP32X
- config ARCH_IOP33X
- 	bool "IOP33x-based"
- 	depends on MMU
-+	select ARCH_HAS_RET_TO_USER
- 	select CPU_XSCALE
- 	select PLAT_IOP
- 	select PCI
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 9fd0ba9..5fe6ea8 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -10,9 +10,15 @@
- 
- #include <asm/unistd.h>
- #include <asm/ftrace.h>
--#include <mach/entry-macro.S>
- #include <asm/unwind.h>
- 
-+#ifdef CONFIG_ARCH_HAS_RET_TO_USER
-+#include <mach/entry-macro.S>
-+#else
-+	.macro  arch_ret_to_user, tmp1, tmp2
-+	.endm
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 3a456c6..15caa06 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -19,7 +19,9 @@
+ #include <asm/glue-df.h>
+ #include <asm/glue-pf.h>
+ #include <asm/vfpmacros.h>
++#ifndef CONFIG_MULTI_IRQ_HANDLER
+ #include <mach/entry-macro.S>
 +#endif
-+
- #include "entry-header.S"
+ #include <asm/thread_notify.h>
+ #include <asm/unwind.h>
+ #include <asm/unistd.h>
+@@ -1101,7 +1103,9 @@ __stubs_start:
+  * get out of that mode without clobbering one register.
+  */
+ vector_fiq:
++#ifdef CONFIG_ARCH_RPC
+ 	disable_fiq
++#endif
+ 	subs	pc, lr, #4
  
- 
+ /*=============================================================================
 -- 
 1.7.5.4
