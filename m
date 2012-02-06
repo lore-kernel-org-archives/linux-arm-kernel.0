@@ -1,31 +1,38 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Mon, 6 Feb 2012 20:15:52 +0100
-Subject: [PATCH 1/4] i2c/gpio-i2c add: add DT support
-In-Reply-To: <4F301E25.5060507@samsung.com>
-References: <1328438337-21185-1-git-send-email-plagnioj@jcrosoft.com>
- <4F301E25.5060507@samsung.com>
-Message-ID: <20120206201552.153eba5d@endymion.delvare>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  6 Feb 2012 11:22:20 -0800
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform clean-up
+Message-ID: <1328556146-3730-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 06 Feb 2012 19:38:29 +0100, Karol Lewandowski wrote:
-> On 05.02.2012 11:38, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> Hi!
-> 
-> > +Device-Tree bindings for i2c gpio driver
-> > +
-> > +Required properties:
-> > +	- compatible = "gpio-i2c";
-> 
-> Driver name is "i2c-gpio" in file i2c-gpio.c. Previous version of patch 
-> adding DT-support (prepared by Thomas Chou[1]) used i2c-gpio - could we 
-> stick to that name?
-> 
-> [1] https://lkml.org/lkml/2011/2/23/584
+This patch-set satisfies 4 objectives:
+ 1. Ensures each platform device can specify a suitable parent
+ 2. Provides a bus for SoC devices as a means to export information
+ 3. Allows ux500 to make use of the new SoC bus
+ 4. Cleans up unnecessary complexity from ux500 code
 
-Yes, please. The gpio subsystem normalized its driver names to gpio-*,
-so we shouldn't use that anywhere else to avoid confusion.
-
--- 
-Jean Delvare
+---
+ Documentation/ABI/testing/sysfs-devices-soc    |   58 ++++++++
+ arch/arm/mach-ux500/Kconfig                    |    1 +
+ arch/arm/mach-ux500/board-mop500-sdi.c         |   31 ++--
+ arch/arm/mach-ux500/board-mop500.c             |   74 ++++++----
+ arch/arm/mach-ux500/board-mop500.h             |    8 +-
+ arch/arm/mach-ux500/board-u5500-sdi.c          |    4 +-
+ arch/arm/mach-ux500/board-u5500.c              |   27 ++--
+ arch/arm/mach-ux500/cpu-db5500.c               |   36 ++++-
+ arch/arm/mach-ux500/cpu-db8500.c               |   44 +++++-
+ arch/arm/mach-ux500/cpu.c                      |   75 ++++++++++
+ arch/arm/mach-ux500/devices-common.c           |   79 ++--------
+ arch/arm/mach-ux500/devices-common.h           |   83 ++++++-----
+ arch/arm/mach-ux500/devices-db5500.h           |  116 +++++++++------
+ arch/arm/mach-ux500/devices-db8500.h           |  176 +++++++++++++----------
+ arch/arm/mach-ux500/dma-db5500.c               |    3 +-
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
+ arch/arm/mach-ux500/include/mach/setup.h       |   10 +-
+ arch/arm/mach-ux500/include/mach/usb.h         |    4 +-
+ arch/arm/mach-ux500/usb.c                      |    7 +-
+ drivers/base/Kconfig                           |    3 +
+ drivers/base/Makefile                          |    1 +
+ drivers/base/soc.c                             |  186 ++++++++++++++++++++++++
+ include/linux/syssoc.h                         |   74 ++++++++++
+ 23 files changed, 799 insertions(+), 304 deletions(-)
