@@ -1,49 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 6 Feb 2012 15:16:00 -0800 (PST)
-Subject: [regression] Re: Enabling runtime P2V by default
-In-Reply-To: <20120206223147.GA3760@burratino>
-References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
- <20110810091635.GF1831@n2100.arm.linux.org.uk>
- <20110810092206.GE10121@e102144-lin.cambridge.arm.com>
- <20120206223147.GA3760@burratino>
-Message-ID: <alpine.LFD.2.02.1202061514430.1656@xanadu.home>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 6 Feb 2012 15:20:28 -0800
+Subject: [PATCH 1/2] genalloc: add support of named pool
+In-Reply-To: <1328466576-29384-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1328466576-29384-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20120206152028.310656a3.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Feb 2012, Jonathan Nieder wrote:
+On Sun,  5 Feb 2012 19:29:35 +0100
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
 
-> Will Deacon wrote:
-> > On Wed, Aug 10, 2011 at 10:16:35AM +0100, Russell King - ARM Linux wrote:
-> >> On Tue, Aug 09, 2011 at 09:41:38PM +0200, Linus Walleij wrote:
+> so we can get the pool in the driver by name instead of passing it via
+> parameter
 > 
-> >>> From: Linus Walleij <linus.walleij@linaro.org>
-> >>>
-> >>> This works like a charm so I'll just default-select it.
-> >>
-> >> Well, we can remove the EXPERIMENTAL status of this option now.  This
-> >> raises the question is whether we should now default it to 'y' - I
-> >> think we should.  Anyone have any objections?
-> >
-> > I've been running with this option enabled for the collection of ARM boards
-> > I have and the only problem I have encountered was related to u-boot loading
-> > at the wrong address.
+> this will be use on AT91 to get access from different drivers to the sram or
+> gpbr as example
 > 
-> Hm, another u-boot problem was found[1].  On the affected machines it
-> prevents booting a compressed kernel (but uncompressed kernels are
-> fine) unless CONFIG_ARM_PATCH_PHYS_VIRT is disabled or u-boot is
-> patched.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> ---
+> Hi,
 > 
-> > So I'm all for enabling it by default, especially since it will force out
-> > any remaining issues for boards where this hasn't been used extensively.
-> 
-> Looks like it worked. ;-)
-> 
-> So, what now?  Is there anything the kernel can do to work around
-> this, or should we just live with the regression until people patch
-> their u-boot?
+> 	if you don't mind I'll apply this via at91 tree as it's needed to
+> 	finish a cleanup on at91 to allow multiple soc in the same kernel
 
-You really do want to have uboot patched.  Who knows what other latent 
-issues are there that you don't know about.
+Please do not do this.
 
-
-Nicolas
+The patch is still as buggy as it was when I reviewed it in December. 
+You didn't reply to my review email and you didn't reply to Steven
+Rothwell's review email and you fixed almost none of our review
+comments.
