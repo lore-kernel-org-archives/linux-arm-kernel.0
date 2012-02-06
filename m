@@ -1,91 +1,99 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 05 Feb 2012 18:51:48 -0600
-Subject: [PATCH v3 00/25] irq_domain generalization and refinement
-In-Reply-To: <20120204221748.GN14129@n2100.arm.linux.org.uk>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <20120204221748.GN14129@n2100.arm.linux.org.uk>
-Message-ID: <4F2F2424.3060702@gmail.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Mon, 06 Feb 2012 10:04:27 +0800
+Subject: [PATCH 4/7] Store huge page linux pte in mm_struct
+In-Reply-To: <4F28D18D.1040402@gmail.com>
+References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
+ <1327910238-18704-5-git-send-email-bill4carson@gmail.com>
+ <20120131100154.GC889@n2100.arm.linux.org.uk> <4F28D18D.1040402@gmail.com>
+Message-ID: <4F2F352B.9080408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
 
-On 02/04/2012 04:17 PM, Russell King - ARM Linux wrote:
-> On Fri, Jan 27, 2012 at 02:35:54PM -0700, Grant Likely wrote:
->> Hey everyone,
+
+On 2012?02?01? 13:45, bill4carson wrote:
+>
+>
+> On 2012?01?31? 18:01, Russell King - ARM Linux wrote:
+>> On Mon, Jan 30, 2012 at 03:57:15PM +0800, bill4carson at gmail.com wrote:
+>>> From: Bill Carson<bill4carson@gmail.com>
+>>>
+>>> One easy way to store huge page linux pte is mm_struct instead of
+>>> thread_info
+>>> that's because when parent task with huge page VMA calls fork, parent
+>>> huge page
+>>> pagetable entries are copied into child pagetable. This is done in
+>>>
+>>> int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct
+>>> *src,
+>>> struct vm_area_struct *vma)
+>>>
+>>> We cannot derive child's thread_info just using struct mm_struct *dst.
+>>> if we have struct mm_struct **dst, then it's easy to find the
+>>> corresponding
+>>> task_struct as well as thread_info, but we only get struct mm_struct
+>>> *dst.
+>>> It's possible to find the desired task_struct by iterating the global
+>>> task list
+>>> by comparing task_struct->mm with dst.
+>>> So mm_struct is used for huge page linux pte for faster lookup and
+>>> efficient.
+>> I really do not understand this description, and it doesn't seem to tie
+>> up with the code. What problem are you trying to solve here?
 >>
->> This patch series is ready for much wider consumption now.  I'd like
->> to get it into linux-next ASAP because there will be ARM board support
->> depending on it.  I'll wait a few days before I ask Stephen to pull
->> this in.
-> 
-> Grant,
-> 
-> Can you answer me this: does this irqdomain support require DT?
-> 
+>> Note that a mm_struct can be shared between multiple task_structs, so
+>> if your thinking is that something in the mm_struct or page table needs
+>> to know about a task_struct, you're ideas are wrong.
+>>
+> Normal page based pte has hardware version and linux version, these two
+> kinds of
+> ptes occupy half of 4K page, and each of two pmd level entry pointer to
+> this half 4K
+> page.
+>
+> For huge page, mappings only exist in pmd level from hardware
+> perspective, however
+> mm subsystem also needs to know the linux version *pte* of this huge
+> page based
+> mapping, problems is where to store these huge page linux pte?
+>
+> A:
+> Store huge page linux pte in mm_struct
+>
+> B:
+> Store huge page linux pte in mm_context_t suggested by Catalin.
+> This is almost like option A, while it's nice to modify arm code only
+> and take small effort to make it happen.
+>
+> C:
+> Modify pgd_alloc to allocate 2048 pgd_t entries plus two void pointers
+> Use these two additional pointers to store huge page linux pte.
+> It's feasible, but I don't know whether this is a good idea.
+>
+> Russelll and Catalin:
+>
+> Could you please give your advice on this?
+>
+>
 
-No. It's the other way around, DT requires irqdomain. The GIC and VIC
-code for example can be built with or w/o DT enabled, but both select
-IRQ_DOMAIN.
+Hi, Russell
 
-FYI, I just submitted a patch that selects IRQ_DOMAIN for all of ARM:
+I didn't mean to derive task_struct from a mm_struct, as you said,
+multiple tasks could possible share one mm_struct.
 
-http://www.gossamer-threads.com/lists/linux/kernel/1487231?page=last
+What I did is to store huge page linux pte on mm_struct(or
+mm_context_t), cause all hugetlb up layer hooks have mm_struct in
+parameters. IMHO, that's what I could figure out right now, if this
+idea sounds wrong or silly, please let me know.
 
-Either we do that or we select IRQ_DOMAIN one irq_chip at a time. With
-the "new" irq_domain code, we could probably do better to shrink the
-code needed in the non-DT case.
+And I'm wondering could you please review the other parts of this patch?
 
-> The question comes up because OMAP has converted some of their support
-> to require irq domain support for their PMICs, and it seems irq domain
-> support requires DT.  This seems to have made the whole of OMAP
-> essentially become a DT-only platform.
 
-I think we should select DT or not at the sub-arch level. Trying to
-support both builds is a needless headache.
+thanks
 
-> 
-> Removing the dependency on IRQ_DOMAIN brings up these build errors
-> in the twl-core code (that being the PMIC for OMAP CPUs):
-> 
-> drivers/mfd/twl-core.c: In function 'twl_probe':
-> drivers/mfd/twl-core.c:1229: error: invalid use of undefined type 'struct irq_domain'
-> drivers/mfd/twl-core.c:1230: error: invalid use of undefined type 'struct irq_domain'
-> drivers/mfd/twl-core.c:1235: error: implicit declaration of function 'irq_domain_add'
-> 
-> That's a bit of a problem, because afaik there aren't the DT descriptions
-> for the boards I have yet, so it's causing me to see regressions when
-> building and booting kernels with CONFIG_OF=n.
-> 
-> The more core-code we end up with which requires DT, the worse this
-> problem is going to become - and obviously saying "everyone must now
-> convert to DT" is, even today, a mammoth task.
-> 
-> Now, here's the thing: I believe that IRQ domains - at least as far as
-> the hwirq stuff - should be available irrespective of whether we have
-> the rest of the IRQ domain support code in place, so that IRQ support
-> code doesn't have to keep playing games to decode from the global
-> space to the per-controller number space.
-> 
-> I believe that would certainly help the current OMAP problems, where
-> the current lack of CONFIG_IRQ_DOMAIN basically makes the kernel oops
-> on boot.
-> 
-> How we fix this regression for 3.4 I've no idea at present, I'm trying
-> to work out what the real dependencies are for OMAP on this stuff.
-> 
-> Finally, do we need asm/irq.h in our asm/prom.h ?  That's causing
-> fragility between DT and non-DT builds, because people are finding
-> that their DT builds work without their mach/irqs.h includes but
-> fail when built with non-DT.  The only thing which DT might need -
-> at the most - is NR_IRQS, but I'd hope with things like irq domains
-> it doesn't actually require it.
 
-Doesn't look like it is needed.
+-- 
+I am a slow learner
+but I will keep trying to fight for my dreams!
 
-Rob
-
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+--bill
