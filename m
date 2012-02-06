@@ -1,37 +1,46 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 07 Feb 2012 09:22:52 +1100
-Subject: [PATCH 0/3] entry-macro.S clean-up
-In-Reply-To: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
-References: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
-Message-ID: <4F3052BC.2050505@gmail.com>
+From: jrnieder@gmail.com (Jonathan Nieder)
+Date: Mon, 6 Feb 2012 16:31:47 -0600
+Subject: [regression] Re: Enabling runtime P2V by default
+In-Reply-To: <20110810092206.GE10121@e102144-lin.cambridge.arm.com>
+References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
+ <20110810091635.GF1831@n2100.arm.linux.org.uk>
+ <20110810092206.GE10121@e102144-lin.cambridge.arm.com>
+Message-ID: <20120206223147.GA3760@burratino>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/12 08:03, Rob Herring wrote:
+Will Deacon wrote:
+> On Wed, Aug 10, 2011 at 10:16:35AM +0100, Russell King - ARM Linux wrote:
+>> On Tue, Aug 09, 2011 at 09:41:38PM +0200, Linus Walleij wrote:
 
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> With the recent MULTI_IRQ_HANDLER support, many of the platform
-> entry-macro.S files can be removed. This series removes empty
-> isable_fiq and arch_ret_to_user macros from most platforms.
-> 
-> This leaves rpc, iop13xx, iop32x and iop33x with compile time
-> difference from other platforms.
-> 
-> Rob
-> 
-> Rob Herring (3):
->   ARM: make arch_ret_to_user macro optional
->   ARM: make disable_fiq macro optional
->   ARM: remove empty disable_fiq and arch_ret_to_user macros
-> 
+>>> From: Linus Walleij <linus.walleij@linaro.org>
+>>>
+>>> This works like a charm so I'll just default-select it.
+>>
+>> Well, we can remove the EXPERIMENTAL status of this option now.  This
+>> raises the question is whether we should now default it to 'y' - I
+>> think we should.  Anyone have any objections?
+>
+> I've been running with this option enabled for the collection of ARM boards
+> I have and the only problem I have encountered was related to u-boot loading
+> at the wrong address.
 
+Hm, another u-boot problem was found[1].  On the affected machines it
+prevents booting a compressed kernel (but uncompressed kernels are
+fine) unless CONFIG_ARM_PATCH_PHYS_VIRT is disabled or u-boot is
+patched.
 
-<snip>
+> So I'm all for enabling it by default, especially since it will force out
+> any remaining issues for boards where this hasn't been used extensively.
 
->  arch/arm/mach-ep93xx/include/mach/entry-macro.S    |   17 ------------
+Looks like it worked. ;-)
 
+So, what now?  Is there anything the kernel can do to work around
+this, or should we just live with the regression until people patch
+their u-boot?
 
-Build tested only, but looks correct to me. For ep93xx:
+Thanks,
+Jonathan
 
-Acked-by: Ryan Mallon <rmallon@gmail.com>
+[1] http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/124051/focus=124062
+https://bugzilla.kernel.org/show_bug.cgi?id=42680
