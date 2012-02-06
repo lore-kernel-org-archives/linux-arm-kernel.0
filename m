@@ -1,32 +1,44 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 6 Feb 2012 15:20:28 -0800
-Subject: [PATCH 1/2] genalloc: add support of named pool
-In-Reply-To: <1328466576-29384-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1328466576-29384-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20120206152028.310656a3.akpm@linux-foundation.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 7 Feb 2012 01:23:05 +0200
+Subject: [PATCH v2 8/8] ARM: tegra: support for secondary cores on Tegra30
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E124AA5@HQMAIL01.nvidia.com>
+References: <1328028051-24271-1-git-send-email-pdeschrijver@nvidia.com>
+ <1328028051-24271-9-git-send-email-pdeschrijver@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178E124AA5@HQMAIL01.nvidia.com>
+Message-ID: <20120206232305.GV24948@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  5 Feb 2012 19:29:35 +0100
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-
-> so we can get the pool in the driver by name instead of passing it via
-> parameter
+On Thu, Feb 02, 2012 at 07:04:12PM +0100, Stephen Warren wrote:
+> Peter De Schrijver wrote at Tuesday, January 31, 2012 9:41 AM:
+> > Add support for bringing up secondary cores on Tegra30. On Tegra30 secondary
+> > CPU cores are powergated, so we need to turn on the domains before we can bring
+> > the CPU cores online. Bringing secondary cores online happens early during the
+> > sytem boot, so we call powergating initialization from platform early_init
+> > function.
+> > 
+> > Based on work by:
+> > 
+> > Scott Williams <scwilliams@nvidia.com>
+> > Colin Cross <ccross@android.com>
+> > Alex Frid <afrid@nvidia.com>
+> > 
+> > Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 > 
-> this will be use on AT91 to get access from different drivers to the sram or
-> gpbr as example
+> The series,
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> ---
-> Hi,
+> Tested-by: Stephen Warren <swarren@nvidia.com>
 > 
-> 	if you don't mind I'll apply this via at91 tree as it's needed to
-> 	finish a cleanup on at91 to allow multiple soc in the same kernel
+> This time, since I now have the SD card working, I managed to test real
+> user-space processes running on all 4 cores.
+> 
+> Note, patch 3 shouldn't compile due to a typo in a .size directive. It
+> does for me, so I could test this! But, it didn't for Olof. Aside from
+> that (which perhaps Olof would fixup during patch application?),
 
-Please do not do this.
+Indeed. The .size symbol is never used though, which might explain why it
+compiled for you and me. I will leave it out in th enext version.
 
-The patch is still as buggy as it was when I reviewed it in December. 
-You didn't reply to my review email and you didn't reply to Steven
-Rothwell's review email and you fixed almost none of our review
-comments.
+Cheers,
+
+Peter.
