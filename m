@@ -1,66 +1,116 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Mon, 06 Feb 2012 07:36:11 +0100
-Subject: [RFC PATCH 1/7] ARM: davinci,
- intc: Add OF support for TI interrupt controller
-In-Reply-To: <20120202045459.GI15343@ponder.secretlab.ca>
-References: <1327308967-8092-1-git-send-email-hs@denx.de>
- <1327308967-8092-2-git-send-email-hs@denx.de>
- <20120202045459.GI15343@ponder.secretlab.ca>
-Message-ID: <4F2F74DB.7010604@denx.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 6 Feb 2012 08:40:45 +0200
+Subject: [PATCH v9 01/25] gpio/omap: remove dependency on gpio_bank_count
+In-Reply-To: <CAMQu2gzaQ+uHGpu-mpEPaxFim4_yRayKw_XBPBUgu7ML7daR2w@mail.gmail.com>
+References: <20120202215350.GB22888@legolas.emea.dhcp.ti.com>
+ <4F2B078B.1040709@ti.com>
+ <20120202220744.GA23092@legolas.emea.dhcp.ti.com>
+ <87liojajs4.fsf@ti.com>
+ <20120204160802.GA10818@legolas.emea.dhcp.ti.com>
+ <CA+HSevqvHAgA+PPLm8BH5vfWkc8yY8W+fRpqjT2urq2EWtSYiA@mail.gmail.com>
+ <20120205090805.GA13300@legolas.emea.dhcp.ti.com>
+ <CAMQu2gyNhEJ3vr7_o_xYAQOYKaRofJViobKtfH2HoxwgU7nUpw@mail.gmail.com>
+ <20120205113521.GA13533@legolas.emea.dhcp.ti.com>
+ <CAMQu2gzaQ+uHGpu-mpEPaxFim4_yRayKw_XBPBUgu7ML7daR2w@mail.gmail.com>
+Message-ID: <20120206064043.GB15652@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Grant,
-
-Grant Likely wrote:
-> On Mon, Jan 23, 2012 at 09:56:01AM +0100, Heiko Schocher wrote:
->> Add a function to initialize the davinci interrupt controller (INTC)
->> using a device tree node.
->>
->> Signed-off-by: Heiko Schocher <hs@denx.de>
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Wolfgang Denk <wd@denx.de>
->> ---
->>  .../devicetree/bindings/arm/davinci/intc.txt       |   26 ++++++++++
->>  arch/arm/mach-davinci/cp_intc.c                    |   51 ++++++++++++++++++++
->>  arch/arm/mach-davinci/include/mach/cp_intc.h       |    1 +
->>  3 files changed, 78 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
-[...]
->> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
->> index f83152d..2c6e2e4 100644
->> --- a/arch/arm/mach-davinci/cp_intc.c
->> +++ b/arch/arm/mach-davinci/cp_intc.c
-[...]
->> +	cp_intc_init();
->> +	irq_domain_add_simple(node, 0);
+On Sun, Feb 05, 2012 at 06:05:37PM +0530, Shilimkar, Santosh wrote:
+> On Sun, Feb 5, 2012 at 5:05 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > Hi,
+> >
+> > On Sun, Feb 05, 2012 at 02:46:19PM +0530, Shilimkar, Santosh wrote:
+> >> >> bank->mod_usage check is used to take care of doing pm_runtime_get*/put* only
+> >> >> if all the GPIOs in a particular bank are enabled or disabled respectively.
+> >> >
+> >> > and why should you care about that ? The first get will enable the
+> >> > resources you need, the second get will just increase a counter and so
+> >> > on. So if you have 32 gets, you will disable the module when you have 32
+> >> > puts.
+> >> >
+> >> Am not sure if it is clear to you that the GPIO resources like clock,
+> >> debounce clk are per bank wise and not per GPIO line. So doing 32
+> >
+> > this is just one more reason to have usage counters.
+> >
+> >> get/put per bank is stupid. runtime pm is for managing pm
+> >
+> > what's stupid is trying to use the pm usage counters as a binary flag,
+> > see below.
+> >
+> >> resources and if the pm resource is per bank, it has to be
+> >> handled per bank.
+> >
+> > hehe, what are you talking about Santosh ? That's the whole point of
+> > reference counting. If there are 32 users for 1 resource, you want to
+> > make sure that you only free the resources (clocks, or whatever resource
+> > you want) after all 32 users are done with it.
+> >
+> > Trying to use the pm usage counter as a binary flag, that's the stupid
+> > part of the OMAP GPIO driver.
+> >
+> > Instead of adding checks such as:
+> >
+> > if (module_isnt_used())
+> > ? ? ? ?enable_clocks();
+> >
+> > on get and:
+> >
+> > if (module_isnt_needed_anymore())
+> > ? ? ? ?disable_clcoks()
+> >
+> > on put is the most useless piece of code on that driver. Because such
+> > checks are already available on PM core through usage counters. The way
+> > that part of the code works is as follow:
+> >
+> > get() {
+> > ? ? ? ?if (pm_counter_is_zero(dev)) {
+> > ? ? ? ? ? ? ? ?atomic_inc();
+> >
+> > ? ? ? ? ? ? ? ?rpm_resume();
+> > ? ? ? ?}
+> > }
+> >
+> > put() {
+> > ? ? ? ?atomic_dec();
+> >
+> > ? ? ? ?if (pm_counter_is_zero(dev)) {
+> > ? ? ? ? ? ? ? ?rpm_suspend();
+> > ? ? ? ?}
+> > }
+> >
+> > Do you not see that you're duplicating functionality by trying to use
+> > the pm counter a binary flag ?
+> >
+> Ahh.. Now I see your point. I miss-understood the point first time
+> and thought that we have disconnect on the pm resources from
+> number of GPIO perspective.
 > 
-> Take a look at the irq_domain patches that will be (probably) merged
-> in v3.4.  Instead of calling irq_domain_add_simple(), you should
-> migrate the whole interrupt controller to natively use an irq_domain
-> for hwirq <--> irq mapping.
+> What you are saying is to use pm runtime reference counters rather
+> than creating local ones for GPIO which seems to be right thing to
+> do. Sorry for the noise.
 
-I rebased my hole patchset to:
+no problem.
 
-git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
-and reworked the arch/arm/mach-davinci/cp_intc.c irq driver to use
-irq_domain, works good on the enbw_cmc board :-)
+> The agressive clock cutting was tried initially without much success
+> and may be we can revisit this one more time.
 
-Waiting for your comment to my question to the
-[RFC PATCH 7/7] ARM: davinci: add support for the am1808 based enbw_cmc board
-patch, see:
-http://www.mail-archive.com/linux-i2c at vger.kernel.org/msg07132.html
+I think one issue will be wrt to IRQ handling. If you want pm_runtime_*
+calls to be irq_safe, they will keep the parent always on, so we need to
+find a way to make that part work properly, I guess.
 
-and resend the hole reworked patchserie. Is it OK, if I use the above
-branch as base for sending this patchserie, or should I use another
-tree/branch for it?
+> As per as this series is concerned, we would like to fix
+> the build error pointed by Kevin and queue it for 3.4.
 
-bye,
-Heiko
+sure, go ahead. No problems with that at all.
+
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120206/f7cbdac8/attachment.sig>
