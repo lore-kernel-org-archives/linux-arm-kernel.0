@@ -1,24 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 6 Feb 2012 10:47:00 -0200
-Subject: [PATCH] arm/imx6: Rename DEBUG_IMX6Q_UART to UART4
-In-Reply-To: <CAOMZO5CgdY-QJADM8EWe6UbACRCL+5GyiCXcqM44tL01iCF7sA@mail.gmail.com>
-References: <1328530759-6291-1-git-send-email-dirk.behme@de.bosch.com>
- <CAOMZO5CgdY-QJADM8EWe6UbACRCL+5GyiCXcqM44tL01iCF7sA@mail.gmail.com>
-Message-ID: <CAOMZO5CJxZB02MEPJXDrtLUEkVnc=M7oxJr4WB0aj+nyUDKZng@mail.gmail.com>
+From: dhillf@gmail.com (Hillf Danton)
+Date: Mon, 6 Feb 2012 20:51:54 +0800
+Subject: [PATCH 12/15] drivers: add Contiguous Memory Allocator
+In-Reply-To: <op.v87mpive3l0zgt@mpn-glaptop>
+References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
+ <1328271538-14502-13-git-send-email-m.szyprowski@samsung.com>
+ <CAJd=RBBPOwftZJUfe3xc6y24=T8un5hPk0wEOT_5v6WMCbDSag@mail.gmail.com>
+ <op.v87mpive3l0zgt@mpn-glaptop>
+Message-ID: <CAJd=RBCqw=4AEDZU5aPexX2+xVKVhB+uo-ta2hviSAJO63axvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/6/12, Fabio Estevam <festevam@gmail.com> wrote:
-> On 2/6/12, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+2012/2/5 Michal Nazarewicz <mina86@mina86.com>:
+> On Sun, 05 Feb 2012 05:25:40 +0100, Hillf Danton <dhillf@gmail.com> wrote:
+>>
+>> Without boot mem reservation, what is the successful rate of CMA to
+>> serve requests of 1MiB, 2MiB, 4MiB and 8MiB chunks?
 >
->>  		  Say Y here if you want kernel low-level debugging support
->> -		  on i.MX6Q.
->> +		  on i.MX6Q UART4.
 >
-> Maybe a typo here?
+> CMA will work as long as you manage to get some pageblocks marked as
+> MIGRATE_CMA and move all non-movable pages away. ?You might try and get it
+> done after system has booted but we have not tried nor tested it.
 
-Nevermind, I misread it and thought it was referring to the "depends on" line.
+Better to include whatever test results in change log.
 
-Regards,
-
-Fabio Estevam
+And no more questions ;)
