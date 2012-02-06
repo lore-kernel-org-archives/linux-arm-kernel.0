@@ -1,45 +1,105 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 6 Feb 2012 17:07:09 +0000
-Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
-In-Reply-To: <1327910238-18704-2-git-send-email-bill4carson@gmail.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-2-git-send-email-bill4carson@gmail.com>
-Message-ID: <20120206170709.GJ26538@arm.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Mon, 6 Feb 2012 11:14:55 -0600
+Subject: [RFC PATCH v4 1/4] cpuidle: Add time keeping and irq enabling
+In-Reply-To: <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
+References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+ <1328065215-28108-2-git-send-email-rob.lee@linaro.org>
+ <CAMbhsRQxgvRN0skteFxeDBqmUArTa3wu2uZPqowDnBTSWuqScg@mail.gmail.com>
+Message-ID: <CAMXH7KG4bfH=tbLmniZZVegyphY_p8q27NAtoo5PHjUCG+ULRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 07:57:12AM +0000, bill4carson at gmail.com wrote:
-> +static inline void set_hugepte_section(struct mm_struct *mm, unsigned long addr,
-> +                                  pte_t *ptep, pte_t pte)
-> +{
-> +       pgd_t *pgd;
-> +       pud_t *pud;
-> +       pmd_t *pmd;
-> +
-> +       int col, row;
-> +       pte_t **huge_linuxpte = &mm->huge_2m_pte[0];
-> +
-> +       row = HUGEPAGE_2M_PTE_ARRAY_ROW(addr);
-> +       col = HUGEPAGE_2M_PTE_ARRAY_COL(addr);
-> +
-> +       /* an valid pte pointer is expected */
-> +       BUG_ON(huge_linuxpte[row] == 0);
-> +       BUG_ON(ptep != &huge_linuxpte[row][col]);
-> +
-> +       /* set linux pte first */
-> +       huge_linuxpte[row][col] = pte;
-> +
-> +       /* set hardware pte */
-> +       pgd = pgd_offset(mm, addr);
-> +       pud = pud_offset(pgd, addr);
-> +       pmd = pmd_offset(pud, addr);
-> +
-> +       set_hugepte_at(mm, addr, pmd, pte);
-> +}
+Hello Colin, thanks for the review.
 
-I haven't followed the whole structure of your patches but do we need to
-walk the page tables here? Isn't the ptep the same as the pmd when
-passed to this function (at least it was with my LPAE implementation).
+On Sat, Feb 4, 2012 at 1:02 PM, Colin Cross <ccross@google.com> wrote:
+> On Tue, Jan 31, 2012 at 7:00 PM, Robert Lee <rob.lee@linaro.org> wrote:
+>> Make necessary changes to add implement time keepign and irq enabling
+> keeping
+>> in the core cpuidle code. ?This will allow the remove of these
+>> functionalities from the platform cpuidle implementations.
+>>
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>> ---
+>> ?drivers/cpuidle/cpuidle.c | ? 75 +++++++++++++++++++++++++++++++++++---------
+>> ?include/linux/cpuidle.h ? | ? 26 ++++++++++-----
+>> ?2 files changed, 76 insertions(+), 25 deletions(-)
+>>
+>> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+>> index 59f4261..8ea0fc3 100644
+>> --- a/drivers/cpuidle/cpuidle.c
+>> +++ b/drivers/cpuidle/cpuidle.c
+>> @@ -57,14 +57,18 @@ static int __cpuidle_register_device(struct cpuidle_device *dev);
+>> ?* cpuidle_idle_call - the main idle loop
+>> ?*
+>> ?* NOTE: no locks or semaphores should be used here
+>> + * NOTE: Should only be called from a local irq disabled context
+>> ?* return non-zero on failure
+>> + *
+>> ?*/
+>> ?int cpuidle_idle_call(void)
+>> ?{
+>> ? ? ? ?struct cpuidle_device *dev = __this_cpu_read(cpuidle_devices);
+>> ? ? ? ?struct cpuidle_driver *drv = cpuidle_get_driver();
+>> ? ? ? ?struct cpuidle_state *target_state;
+>> - ? ? ? int next_state, entered_state;
+>> + ? ? ? int idx, ret = 0;
+>> + ? ? ? ktime_t t1, t2;
+>> + ? ? ? s64 diff;
+>>
+>> ? ? ? ?if (off)
+>> ? ? ? ? ? ? ? ?return -ENODEV;
+>> @@ -86,37 +90,76 @@ int cpuidle_idle_call(void)
+>> ?#endif
+>>
+>> ? ? ? ?/* ask the governor for the next state */
+>> - ? ? ? next_state = cpuidle_curr_governor->select(drv, dev);
+>> + ? ? ? idx = cpuidle_curr_governor->select(drv, dev);
+>> +
+>> + ? ? ? target_state = &drv->states[idx];
+>> +
+>> + ? ? ? /*
+>> + ? ? ? ?* Check with the device to see if it can enter this state or if another
+>> + ? ? ? ?* state should be used.
+>> + ? ? ? ?*/
+>> + ? ? ? if (target_state->pre_enter) {
+>> + ? ? ? ? ? ? ? idx = target_state->
+>> + ? ? ? ? ? ? ? ? ? ? ? pre_enter(dev, drv, idx);
+> Unnecessary line wrap and braces.
 
--- 
-Catalin
+Thanks.
+
+>
+> What's the point of the pre_enter call? ?This seems very similar to
+> the prepare call that was removed in 3.2. ?Drivers can already demote
+> the target state in their enter call. ?The only thing you do between
+> pre_enter and enter is trace and account for the time. ?Is there some
+> long call you don't want included in the idle time? ?Some
+> documentation would help, and you need to very clearly define the
+> semantics of when post_enter gets called when pre_enter or enter
+> return errors.
+
+pre_enter's purpose is to perform any necessary platform technology
+that can be performed before entering that actual idle or some
+restricted idle context where only platform specific code can run.  If
+I try to consolidate the timekeeping in the core cpuidle driver
+without pre_enter, then my idle time will incorrectly account for this
+platform preparation time.  Perhaps this small idle time accounting
+error isn't of concern to anyone though.
+
+The previous version of this patch submission used a different
+approach by adding a wrapper that could be used by fairly simple
+cpuidle implementations.  In the v3 submission of this patch series,
+Daniel asked about the possibility of just performing this
+consolidation in the cpuidle_idle_call function itself.  Instead of
+debating the pros and cons of it, I thought it might be better to send
+this version of the patch and discuss it further.
+
+Another approach I thought about may be to add flags that indicate
+whether or not the platform or the core driver should perform the time
+keeping.  Or, go back to the wrapper function approach.  Please feel
+free to give your opinion on the preferred approach.
+
+Agree on the documentation.  I was trying to just get this patch
+series out there for discussion before spending more time on it in
+case it is not the desired approach to timekeeping and irq disabling
+consolidation.
