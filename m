@@ -1,31 +1,36 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Mon, 6 Feb 2012 15:03:27 +0530
-Subject: [PATCH 0/2] ARM: OMAP: Couple of misc fixes for 3.3
-In-Reply-To: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAMQu2gyXA7Bj1d5fPJLZ6yC+0o3TM1K8+2qQFU1J2W_zQbDwWg@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon,  6 Feb 2012 10:19:37 +0100
+Subject: [PATCH 1/1] ARM: at91: board/dt drop default console
+Message-ID: <1328519977-6388-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+this will simplify multiple soc enable in the same kernel
 
-On Thu, Feb 2, 2012 at 7:33 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Patches are tested on OMAP4430 SDP.
->
-> The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
->
-> ?Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
->
-> Rajendra Nayak (1):
-> ?ARM: OMAP: Get rid of reset for system timer
->
-> Santosh Shilimkar (1):
-> ?ARM: OMAP4: Move the barrier memboclk_steal() as part of reserve
-> ? ?callback
->
-Can you please queue these two fixes if you are ok
-with them ?
+the console can still be selected by cmdline
 
-Regards
-Santosh
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/board-dt.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+index 0579315..08c8ad8 100644
+--- a/arch/arm/mach-at91/board-dt.c
++++ b/arch/arm/mach-at91/board-dt.c
+@@ -38,12 +38,6 @@ static void __init ek_init_early(void)
+ {
+ 	/* Initialize processor: 12.000 MHz crystal */
+ 	at91_initialize(12000000);
+-
+-	/* DGBU on ttyS0. (Rx & Tx only) */
+-	at91_register_uart(0, 0, 0);
+-
+-	/* set serial console to ttyS0 (ie, DBGU) */
+-	at91_set_serial_console(0);
+ }
+ 
+ /* det_pin is not connected */
+-- 
+1.7.7
