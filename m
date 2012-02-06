@@ -1,210 +1,122 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon,  6 Feb 2012 16:19:45 +0100
-Subject: [PATCH v2 10/10] pwm-backlight: Add rudimentary device tree support
-In-Reply-To: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1328541585-24642-11-git-send-email-thierry.reding@avionic-design.de>
+Date: Mon,  6 Feb 2012 16:19:35 +0100
+Subject: [PATCH v2 00/10] Add PWM framework and device-tree support.
+Message-ID: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds very basic support for device tree probing. Currently,
-only a PWM and maximum and default brightness values can be specified.
-Enabling or disabling backlight power via GPIOs is not yet supported.
+This patch series adds very rudimentary device-tree support for PWM devices.
+I fully realize that this is early work and it should not be merged as is.
+However I wanted to post these patches for review to make sure I'm not on a
+wild-goose chase.
 
-A pointer to the exit() callback is stored in the driver data to keep it
-around until the driver is unloaded.
+With all of these patches applied (plus one board-specific patch that is not
+included), I'm able to control the backlight on the device I'm working on
+using the sysfs interface provided by the pwm-backlight driver and the
+backlight class.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
----
-Changes in v2:
-  - avoid oops by keeping a reference to the platform-specific exit()
-    callback
+This series is based on Sascha Hauer's series of patches[0] to add a generic
+PWM framework. The first patch in this series is taken from Sascha's branch,
+while the second patch enables each PWM chip to provide multiple PWM devices
+(none of the drivers in Sascha's branch are converted yet). When this series
+is ready I think it would be best to merge patches 1 and 2.
 
- .../bindings/video/backlight/pwm-backlight         |   16 ++++
+Patch 3 adds some code to lookup a PWM chip given its device-tree handle. This
+code will be used later on by the pwm-backlight driver to find the PWM device
+that it should be using. Device tree binding documentation is also provided.
+
+Patch 4 was taken from the Chromium tree and is required to provide proper
+clocking of the Tegra2 PWFM controller. All Chromium-specific tags have been
+removed from the commit message.
+
+Patch 5 cleans up the clock registration for Tegra2 because patch 6 will only
+instantiate one device for the PWFM controller instead of four.
+
+Patch 6 adds a generic PWM framework driver for the Tegra2 PWFM controller.
+The code is taken from the Chromium tree with some adjustments to integrate it
+with the PWM framework.
+
+Patch 7 implements device tree based probing for the Tegra2 PWFM controller.
+
+Patches 8 and 9 are ports of the Blackfin PWM and the PXA PWM drivers to the
+PWM framework. These are only compile-tested as I do not have any hardware to
+test them on. They are meant as test-bed for the framework. I intend to port
+other drivers over to the framework for the next spin.
+
+Patch 10 implements DT-based probing in the pwm-backlight driver. Note that
+this code only handles the "pwm" property (by looking up the PWM device via
+the new PWM DT binding) and the "default-" and "max-brightness" properties.
+Switching power to the backlight via GPIOs is not supported yet.
+
+The whole series is based on the linux-next tree from 20120202. I think I've
+addressed all of the concerns raised in the first version, and those I
+haven't yet were still open for discussion (or I've explicitly marked them as
+TODO).
+
+Thierry
+
+[0]: http://git.pengutronix.de/?p=imx/linux-2.6.git;a=shortlog;h=refs/heads/pwmlib
+
+Sascha Hauer (1):
+  PWM: add pwm framework support
+
+Simon Que (1):
+  arm/tegra: Fix PWM clock programming
+
+Thierry Reding (8):
+  pwm: Allow chips to support multiple PWMs.
+  of: Add PWM support.
+  arm/tegra: Provide clock for only one PWM controller
+  pwm: Add NVIDIA Tegra SoC support
+  arm/tegra: Add PWFM controller device tree probing
+  pwm: Add Blackfin support
+  pwm: Add PXA support
+  pwm-backlight: Add rudimentary device tree support
+
+ Documentation/devicetree/bindings/pwm/pwm.txt      |   50 +++
+ .../bindings/video/backlight/pwm-backlight         |   16 +
+ Documentation/pwm.txt                              |   56 +++
+ MAINTAINERS                                        |    6 +
+ arch/arm/boot/dts/tegra20.dtsi                     |    6 +
+ arch/arm/boot/dts/tegra30.dtsi                     |    6 +
+ arch/arm/mach-tegra/board-dt-tegra20.c             |    1 +
+ arch/arm/mach-tegra/board-dt-tegra30.c             |    1 +
+ arch/arm/mach-tegra/clock.h                        |    1 +
+ arch/arm/mach-tegra/tegra2_clocks.c                |   33 ++-
+ arch/arm/plat-pxa/Makefile                         |    1 -
+ arch/arm/plat-pxa/pwm.c                            |  304 ----------------
+ arch/blackfin/Kconfig                              |   10 -
+ arch/blackfin/kernel/Makefile                      |    1 -
+ arch/blackfin/kernel/pwm.c                         |  100 ------
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/of/Kconfig                                 |    6 +
+ drivers/of/Makefile                                |    1 +
+ drivers/of/pwm.c                                   |  130 +++++++
+ drivers/pwm/Kconfig                                |   40 +++
+ drivers/pwm/Makefile                               |    4 +
+ drivers/pwm/core.c                                 |  367 ++++++++++++++++++++
+ drivers/pwm/pwm-bfin.c                             |  164 +++++++++
+ drivers/pwm/pwm-pxa.c                              |  243 +++++++++++++
+ drivers/pwm/pwm-tegra.c                            |  266 ++++++++++++++
  drivers/video/backlight/Kconfig                    |    2 +-
- drivers/video/backlight/pwm_bl.c                   |   81 ++++++++++++++++++--
- 3 files changed, 90 insertions(+), 9 deletions(-)
+ drivers/video/backlight/pwm_bl.c                   |   81 ++++-
+ include/linux/of_pwm.h                             |   51 +++
+ include/linux/pwm.h                                |   67 ++++
+ 30 files changed, 1584 insertions(+), 433 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm.txt
  create mode 100644 Documentation/devicetree/bindings/video/backlight/pwm-backlight
+ create mode 100644 Documentation/pwm.txt
+ delete mode 100644 arch/arm/plat-pxa/pwm.c
+ delete mode 100644 arch/blackfin/kernel/pwm.c
+ create mode 100644 drivers/of/pwm.c
+ create mode 100644 drivers/pwm/Kconfig
+ create mode 100644 drivers/pwm/Makefile
+ create mode 100644 drivers/pwm/core.c
+ create mode 100644 drivers/pwm/pwm-bfin.c
+ create mode 100644 drivers/pwm/pwm-pxa.c
+ create mode 100644 drivers/pwm/pwm-tegra.c
+ create mode 100644 include/linux/of_pwm.h
 
-diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
-new file mode 100644
-index 0000000..ce65280
---- /dev/null
-+++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
-@@ -0,0 +1,16 @@
-+pwm-backlight bindings
-+
-+Required properties:
-+  - compatible: "pwm-backlight"
-+  - default-brightness: the default brightness setting
-+  - max-brightness: the maximum brightness setting
-+  - pwm: OF device-tree PWM specification
-+
-+Example:
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		default-brightness = <224>;
-+		max-brightness = <255>;
-+		pwm = <&pwm 0 5000000>;
-+	};
-diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-index 49e7d83..37982fa 100644
---- a/drivers/video/backlight/Kconfig
-+++ b/drivers/video/backlight/Kconfig
-@@ -233,7 +233,7 @@ config BACKLIGHT_CARILLO_RANCH
- 
- config BACKLIGHT_PWM
- 	tristate "Generic PWM based Backlight Driver"
--	depends on HAVE_PWM
-+	depends on HAVE_PWM || PWM
- 	help
- 	  If you have a LCD backlight adjustable by PWM, say Y to enable
- 	  this driver.
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index 342b7d7..5c81397 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -17,6 +17,7 @@
- #include <linux/fb.h>
- #include <linux/backlight.h>
- #include <linux/err.h>
-+#include <linux/of_pwm.h>
- #include <linux/pwm.h>
- #include <linux/pwm_backlight.h>
- #include <linux/slab.h>
-@@ -31,6 +32,7 @@ struct pwm_bl_data {
- 	void			(*notify_after)(struct device *,
- 					int brightness);
- 	int			(*check_fb)(struct device *, struct fb_info *);
-+	void			(*exit)(struct device *);
- };
- 
- static int pwm_backlight_update_status(struct backlight_device *bl)
-@@ -83,17 +85,79 @@ static const struct backlight_ops pwm_backlight_ops = {
- 	.check_fb	= pwm_backlight_check_fb,
- };
- 
-+#ifdef CONFIG_OF
-+static int pwm_backlight_parse_dt(struct device *dev,
-+				  struct platform_pwm_backlight_data *data)
-+{
-+	struct device_node *node = dev->of_node;
-+	struct pwm_spec spec;
-+	u32 value;
-+	int ret;
-+
-+	if (!node)
-+		return -ENODEV;
-+
-+	memset(data, 0, sizeof(*data));
-+
-+	ret = of_get_named_pwm(node, "pwm", 0, &spec);
-+	if (ret < 0)
-+		return ret;
-+
-+	data->pwm_period_ns = spec.period;
-+	data->pwm_id = ret;
-+
-+	ret = of_property_read_u32(node, "default-brightness", &value);
-+	if (ret < 0)
-+		return ret;
-+
-+	data->dft_brightness = value;
-+
-+	ret = of_property_read_u32(node, "max-brightness", &value);
-+	if (ret < 0)
-+		return ret;
-+
-+	data->max_brightness = value;
-+
-+	/*
-+	 * TODO: Most users of this driver use a number of GPIOs to control
-+	 *       backlight power. Support for specifying these needs to be
-+	 *       added.
-+	 */
-+
-+	return 0;
-+}
-+
-+static struct of_device_id pwm_backlight_of_match[] = {
-+	{ .compatible = "pwm-backlight" },
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, pwm_backlight_of_match);
-+#else
-+static int pwm_backlight_parse_dt(struct device *dev,
-+				  struct platform_pwm_backlight_data *data)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int pwm_backlight_probe(struct platform_device *pdev)
- {
- 	struct backlight_properties props;
- 	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
-+	struct platform_pwm_backlight_data defdata;
- 	struct backlight_device *bl;
- 	struct pwm_bl_data *pb;
- 	int ret;
- 
- 	if (!data) {
--		dev_err(&pdev->dev, "failed to find platform data\n");
--		return -EINVAL;
-+		ret = pwm_backlight_parse_dt(&pdev->dev, &defdata);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "failed to find platform data\n");
-+			return ret;
-+		}
-+
-+		data = &defdata;
- 	}
- 
- 	if (data->init) {
-@@ -113,6 +177,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	pb->notify = data->notify;
- 	pb->notify_after = data->notify_after;
- 	pb->check_fb = data->check_fb;
-+	pb->exit = data->exit;
- 	pb->lth_brightness = data->lth_brightness *
- 		(data->pwm_period_ns / data->max_brightness);
- 	pb->dev = &pdev->dev;
-@@ -152,7 +217,6 @@ err_alloc:
- 
- static int pwm_backlight_remove(struct platform_device *pdev)
- {
--	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
- 	struct backlight_device *bl = platform_get_drvdata(pdev);
- 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
- 
-@@ -160,8 +224,8 @@ static int pwm_backlight_remove(struct platform_device *pdev)
- 	pwm_config(pb->pwm, 0, pb->period);
- 	pwm_disable(pb->pwm);
- 	pwm_free(pb->pwm);
--	if (data->exit)
--		data->exit(&pdev->dev);
-+	if (pb->exit)
-+		pb->exit(&pdev->dev);
- 	return 0;
- }
- 
-@@ -195,11 +259,12 @@ static SIMPLE_DEV_PM_OPS(pwm_backlight_pm_ops, pwm_backlight_suspend,
- 
- static struct platform_driver pwm_backlight_driver = {
- 	.driver		= {
--		.name	= "pwm-backlight",
--		.owner	= THIS_MODULE,
-+		.name		= "pwm-backlight",
-+		.owner		= THIS_MODULE,
- #ifdef CONFIG_PM
--		.pm	= &pwm_backlight_pm_ops,
-+		.pm		= &pwm_backlight_pm_ops,
- #endif
-+		.of_match_table	= of_match_ptr(pwm_backlight_of_match),
- 	},
- 	.probe		= pwm_backlight_probe,
- 	.remove		= pwm_backlight_remove,
 -- 
 1.7.9
