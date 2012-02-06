@@ -1,155 +1,124 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 6 Feb 2012 13:20:06 +0800
-Subject: [PATCH] mtd/gpmi : add gpmi support for mx6q
-Message-ID: <1328505606-27981-1-git-send-email-b32955@freescale.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Mon, 6 Feb 2012 10:48:44 +0530
+Subject: [PATCH v9 01/25] gpio/omap: remove dependency on gpio_bank_count
+In-Reply-To: <20120205090805.GA13300@legolas.emea.dhcp.ti.com>
+References: <20120202191630.GT15343@ponder.secretlab.ca>
+ <20120202194545.GA29351@legolas.emea.dhcp.ti.com>
+ <4F2AF68D.1000505@ti.com> <20120202214907.GA22888@legolas.emea.dhcp.ti.com>
+ <20120202215350.GB22888@legolas.emea.dhcp.ti.com> <4F2B078B.1040709@ti.com>
+ <20120202220744.GA23092@legolas.emea.dhcp.ti.com> <87liojajs4.fsf@ti.com>
+ <20120204160802.GA10818@legolas.emea.dhcp.ti.com>
+ <CA+HSevqvHAgA+PPLm8BH5vfWkc8yY8W+fRpqjT2urq2EWtSYiA@mail.gmail.com>
+ <20120205090805.GA13300@legolas.emea.dhcp.ti.com>
+Message-ID: <CA+HSevpbaT9b1cF85GJE4pB6rgX5nsnj2ttXdHMeUzqSBswfGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add gpmi support to mx6q.
+Felipe,
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/mtd/nand/gpmi-nand/bch-regs.h  |   42 ++++++++++++++++++++++++-------
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   14 ++++++----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    3 ++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    2 +
- 4 files changed, 45 insertions(+), 16 deletions(-)
+On Sun, Feb 5, 2012 at 14:38, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Sun, Feb 05, 2012 at 12:37:55PM +0530, Varadarajan, Charulatha wrote:
+>> Felipe,
+>>
+>> On Sat, Feb 4, 2012 at 21:38, Felipe Balbi <balbi@ti.com> wrote:
+>> >
+>> > Hi,
+>> >
+>> > On Fri, Feb 03, 2012 at 09:50:19AM -0800, Kevin Hilman wrote:
+>> > > Felipe Balbi <balbi@ti.com> writes:
+>> > >
+>> > > [...]
+>> > >
+>> > > >> >This question remains. Why do we need those funtions ?
+>> > > >>
+>> > > >> These functions are called from the CPUIdle path so outside the scope
+>> > > >> of the GPIO driver. These are part of a bunch of nasty PM hacks we
+>> > > >> are doing in the CPU idle loop. We are in the process of getting rid
+>> > > >> of most of them, but it looks like some are still needed.
+>> > > >
+>> > > > Too bad. I can see that the gpio pm implementation seems a bit
+>> > > > "peculiar". I mean, pm does reference counting and yet the driver has
+>> > > > checks to prevent multiple gets and puts on a single bank (meaning that
+>> > > > pm counter will be either 0 or 1 at any point in time).
+>> > > >
+>> > > > To me it looks like those functions are there in order to forcefully put
+>> > > > PER power domain in OFF because drivers are always holding a reference
+>> > > > to their gpios (drivers generally gpio_request() on probe() and
+>> > > > gpio_free() on remove()).
+>> > > >
+>> > > > Looks like the entire pm implementation on OMAP gpio driver has always
+>> > > > considered only the fact that gpios can be requested and freed, but
+>> > > > never that we want the system to go to OFF even while gpios are
+>> > > > requested, because we have I/O PAD wakeups. At some point that has to be
+>> > > > sorted out because that HACK is quite ugly :-)
+>> > > >
+>> > > > I'll see if I find some time to go over the interactions between
+>> > > > gpio-omap.c and pm24x.c and pm34xx.c any of these days, but I can't
+>> > > > promise anything ;-)
+>> > >
+>> > > If you look at the state of these prepare/resume hacks at the end of
+>> > > this series, you'll see that they are significantly cleaner and do
+>> > > nothing but call the runtime PM hooks.
+>> >
+>> > sure, definitely.
+>> >
+>> > > We have explored several ways to get rid of them completely in the idle
+>> > > path but have not yet come up with a clean way, but this series gets us
+>> > > a long ways towards that goal.
+>> >
+>> > have you thought about being a bit more aggressive at when to
+>> > runtime_get and runtime_put ?
+>> >
+>> > I didn't test below (will do probably on monday), but I think this will
+>> > help keeping GPIO block always suspended, and only wake it up when truly
+>> > needed. That way, you could, at some point, remove that list_head
+>> > because by the time you reach CPUIdle path, GPIO module is already
+>> > suspended. That's the theory at least, gotta run it first on silicon to
+>> > be sure
+>> >
+>> > diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> > index 4273401..2dd9ced 100644
+>> > --- a/drivers/gpio/gpio-omap.c
+>> > +++ b/drivers/gpio/gpio-omap.c
+>> > @@ -537,12 +537,7 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+>> > ? ? ? ?struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
+>> > ? ? ? ?unsigned long flags;
+>> >
+>> > - ? ? ? /*
+>> > - ? ? ? ?* If this is the first gpio_request for the bank,
+>> > - ? ? ? ?* enable the bank module.
+>> > - ? ? ? ?*/
+>> > - ? ? ? if (!bank->mod_usage)
+>> > - ? ? ? ? ? ? ? pm_runtime_get_sync(bank->dev);
+>> > + ? ? ? pm_runtime_get_sync(bank->dev);
+>>
+>> bank->mod_usage check is used to take care of doing pm_runtime_get*/put* only
+>> if all the GPIOs in a particular bank are enabled or disabled respectively.
+>
+> and why should you care about that ? The first get will enable the
+> resources you need, the second get will just increase a counter and so
+> on. So if you have 32 gets, you will disable the module when you have 32
+> puts.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/bch-regs.h b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-index 4effb8c..a092451 100644
---- a/drivers/mtd/nand/gpmi-nand/bch-regs.h
-+++ b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-@@ -51,15 +51,26 @@
- 
- #define BP_BCH_FLASH0LAYOUT0_ECC0		12
- #define BM_BCH_FLASH0LAYOUT0_ECC0	(0xf << BP_BCH_FLASH0LAYOUT0_ECC0)
--#define BF_BCH_FLASH0LAYOUT0_ECC0(v)		\
--	(((v) << BP_BCH_FLASH0LAYOUT0_ECC0) & BM_BCH_FLASH0LAYOUT0_ECC0)
-+#define MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0		11
-+#define MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)
-+#define BF_BCH_FLASH0LAYOUT0_ECC0(v, x)				\
-+	(GPMI_IS_MX6Q(x)					\
-+		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)	\
-+			& MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0)	\
-+		: (((v) << BP_BCH_FLASH0LAYOUT0_ECC0)		\
-+			& BM_BCH_FLASH0LAYOUT0_ECC0)		\
-+	)
- 
- #define BP_BCH_FLASH0LAYOUT0_DATA0_SIZE		0
- #define BM_BCH_FLASH0LAYOUT0_DATA0_SIZE		\
- 			(0xfff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
--#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v)	\
--	(((v) << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)\
--					 & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+#define MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE	\
-+			(0x3ff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v, x)				\
-+	(GPMI_IS_MX6Q(x)						\
-+		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)	\
-+		: ((v) & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)		\
-+	)
- 
- #define HW_BCH_FLASH0LAYOUT1			0x00000090
- 
-@@ -72,13 +83,24 @@
- 
- #define BP_BCH_FLASH0LAYOUT1_ECCN		12
- #define BM_BCH_FLASH0LAYOUT1_ECCN	(0xf << BP_BCH_FLASH0LAYOUT1_ECCN)
--#define BF_BCH_FLASH0LAYOUT1_ECCN(v)		\
--	(((v) << BP_BCH_FLASH0LAYOUT1_ECCN) & BM_BCH_FLASH0LAYOUT1_ECCN)
-+#define MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN		11
-+#define MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)
-+#define BF_BCH_FLASH0LAYOUT1_ECCN(v, x)				\
-+	(GPMI_IS_MX6Q(x)					\
-+		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)	\
-+			& MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN)	\
-+		: (((v) << BP_BCH_FLASH0LAYOUT1_ECCN)		\
-+			& BM_BCH_FLASH0LAYOUT1_ECCN)		\
-+	)
- 
- #define BP_BCH_FLASH0LAYOUT1_DATAN_SIZE		0
- #define BM_BCH_FLASH0LAYOUT1_DATAN_SIZE		\
- 			(0xfff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
--#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v)	\
--	(((v) << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE) \
--					 & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+#define MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE	\
-+			(0x3ff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v, x)				\
-+	(GPMI_IS_MX6Q(x)						\
-+		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)	\
-+		: ((v) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)		\
-+	)
- #endif
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 28f8df0..fd39350 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -223,13 +223,13 @@ int bch_set_geometry(struct gpmi_nand_data *this)
- 	/* Configure layout 0. */
- 	writel(BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)
- 			| BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size)
--			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)
--			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size),
-+			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength, this)
-+			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size, this),
- 			r->bch_regs + HW_BCH_FLASH0LAYOUT0);
- 
- 	writel(BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)
--			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)
--			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size),
-+			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength, this)
-+			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size, this),
- 			r->bch_regs + HW_BCH_FLASH0LAYOUT1);
- 
- 	/* Set *all* chip selects to use layout 0. */
-@@ -803,7 +803,8 @@ int gpmi_is_ready(struct gpmi_nand_data *this, unsigned chip)
- 	if (GPMI_IS_MX23(this)) {
- 		mask = MX23_BM_GPMI_DEBUG_READY0 << chip;
- 		reg = readl(r->gpmi_regs + HW_GPMI_DEBUG);
--	} else if (GPMI_IS_MX28(this)) {
-+	} else if (GPMI_IS_MX28(this) || GPMI_IS_MX6Q(this)) {
-+		/* MX28 shares the same R/B register as MX6Q. */
- 		mask = MX28_BF_GPMI_STAT_READY_BUSY(1 << chip);
- 		reg = readl(r->gpmi_regs + HW_GPMI_STAT);
- 	} else
-@@ -1066,8 +1067,9 @@ int gpmi_read_page(struct gpmi_nand_data *this,
- 		| BF_GPMI_CTRL0_ADDRESS(address)
- 		| BF_GPMI_CTRL0_XFER_COUNT(geo->page_size);
- 	pio[1] = 0;
-+	pio[2] = 0; /* set GPMI_HW_GPMI_ECCCTRL, disable the BCH. */
- 	desc = channel->device->device_prep_slave_sg(channel,
--				(struct scatterlist *)pio, 2,
-+				(struct scatterlist *)pio, 3,
- 				DMA_TRANS_NONE,
- 				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	if (!desc) {
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 493ec2f..90545e2 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1582,6 +1582,9 @@ static const struct platform_device_id gpmi_ids[] = {
- 	}, {
- 		.name = "imx28-gpmi-nand",
- 		.driver_data = IS_MX28,
-+	}, {
-+		.name = "imx6q-gpmi-nand",
-+		.driver_data = IS_MX6Q,
- 	}, {},
- };
- 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 1c7fdbb..a302dd1 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -268,6 +268,8 @@ extern int gpmi_read_page(struct gpmi_nand_data *,
- /* Use the platform_id to distinguish different Archs. */
- #define IS_MX23			0x1
- #define IS_MX28			0x2
-+#define IS_MX6Q			0x8
- #define GPMI_IS_MX23(x)		((x)->pdev->id_entry->driver_data == IS_MX23)
- #define GPMI_IS_MX28(x)		((x)->pdev->id_entry->driver_data == IS_MX28)
-+#define GPMI_IS_MX6Q(x)		((x)->pdev->id_entry->driver_data == IS_MX6Q)
- #endif
--- 
-1.7.0.4
+Agreed!
+
+-V Charulatha
+
+>
+>> With the above change, pm_runtime_put*/get* would be called for every
+>> gpio_request()
+>> /_free() (that is, for upto 32 pins in OMAP3/4) in a bank irrespective
+>> of whether other
+>
+> so ?
+>
+>> GPIO pins are enabled or disabled in the same bank. Hence it is
+>> required to have a
+>> check based on mod_usage.
+>
+> unnecessary.
+>
+> --
+> balbi
