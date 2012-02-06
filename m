@@ -1,35 +1,76 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Mon, 06 Feb 2012 09:05:24 -1000
-Subject: An extremely simplified pinctrl bindings proposal
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
-Message-ID: <4F302474.1020701@firmworks.com>
+From: mstowe@redhat.com (Myron Stowe)
+Date: Mon, 06 Feb 2012 10:59:17 -0700
+Subject: [BUG] Multiple definition of pcibios_max_latency
+In-Reply-To: <20120204125904.GU889@n2100.arm.linux.org.uk>
+References: <20120204125904.GU889@n2100.arm.linux.org.uk>
+Message-ID: <1328551157.2264.11.camel@zim.stowe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I like the general approach of simplifying the pinctrl thing, as the 
-previous approach did not appear to be converging.
+On Sat, 2012-02-04 at 12:59 +0000, Russell King - ARM Linux wrote:
+> While building my test PXA configuration, I came across:
+> 
+> drivers/built-in.o:(.data+0x230): multiple definition of `pcibios_max_latency'
+> arch/arm/common/built-in.o:(.data+0x40c): first defined here
+> make[1]: *** [vmlinux.o] Error 1
+> 
+> This was introduced by:
+> 
+> commit 96c5590058d7fded14f43af2ab521436cecf3125
+> Author: Myron Stowe <mstowe@redhat.com>
+> Date:   Fri Oct 28 15:48:38 2011 -0600
+> 
+>     PCI: Pull PCI 'latency timer' setup up into the core
+> 
+>     The 'latency timer' of PCI devices, both Type 0 and Type 1,
+>     is setup in architecture-specific code [see: 'pcibios_set_master()'].
+>     There are two approaches being taken by all the architectures - check
+>     if the 'latency timer' is currently set between 16 and 255 and if not
+>     bring it within bounds, or, do nothing (and then there is the
+>     gratuitously different PA-RISC implementation).
+> 
+>     There is nothing architecture-specific about PCI's 'latency timer' so
+>     this patch pulls its setup functionality up into the PCI core by
+>     creating a generic 'pcibios_set_master()' function using the '__weak'
+>     attribute which can be used by all architectures as a default which,
+>     if necessary, can then be over-ridden by architecture-specific code.
+> 
+>     No functional change.
+> 
+>     Signed-off-by: Myron Stowe <myron.stowe@redhat.com>
+>     Signed-off-by: Jesse Barnes <jbarnes@virtuousgeek.org>
+> 
+> which moved the handling of pcibios_set_master() into core code for
+> everyone but ARM:
+> 
+>  arch/blackfin/include/asm/pci.h         |    4 ----
+>  arch/frv/mb93090-mb00/pci-frv.c         |    6 ------
+>  arch/frv/mb93090-mb00/pci-frv.h         |    2 --
+>  arch/h8300/include/asm/pci.h            |    5 -----
+>  arch/mips/pci/pci.c                     |    6 ------
+>  arch/mn10300/unit-asb2305/pci-asb2305.c |    6 ------
+>  arch/mn10300/unit-asb2305/pci-asb2305.h |    2 --
+>  arch/sh/drivers/pci/pci.c               |    6 ------
+>  arch/x86/include/asm/pci_x86.h          |    2 --
+>  arch/x86/pci/i386.c                     |    6 ------
+>  drivers/pci/pci.c                       |   29 +++++++++++++++++++++++++++++
+>  include/linux/pci.h                     |    3 +++
+>  12 files changed, 32 insertions(+), 45 deletions(-)
+> 
+> I think the right solution is to delete the (now duplicate) definition 
+> of pcibios_max_latency in arch/arm/common/it8152.c.  Please comment.
 
-One possible name would be "gpconfig" - for general purpose configuration.
+Yes, that commit is the culprit.  I was concerned about ARM in general
+when I posted this series as I do not have a compile environment for it,
+nor am I at all familiar with ARM to know if I had covered all the
+possible variations (i.e. 8152 vs other, non 8152 types).
 
-The register access model in the strawman proposal is probably too 
-simple.  32-bit memory mapped registers are certainly the most common 
-subcase on ARM, but there are many other cases that occur in practice:
+Will deleting the 'pcibios_max_latency' definition in
+arch/arm/common/it8152.c be the correct solution for all ARM variations
+(I don't want to try and fix one while breaking others)?
 
-* Registers that must be accessed with 8, 16, or 64-bit cycles.
-* Registers that have side effects on read, so read-mask-write must be 
-avoided
-* Registers accessed via an index/data cycle pair, thus having locking 
-requirements
-* Registers that must be read after being written, or otherwise 
-requiring some sort of memory-ordering enforcement.
-* Time delays between pairs of writes
-* PCI configuration registers, which often have some combination of the 
-above
-* Registers behind serial buses like I2C
+I'll wait for your response/guidance and if this is the correct action
+generate a patch right away.
 
-Both Open Firmware and ACPI have addressed this general problem.  In 
-addition to a numeric identifier for the register, you need to specify 
-the access semantics.  It's difficult to finitely enumerate all possible 
-cases, but you can get to 99.9% with a modest number of access models, 
-and then add new models as needed.
+Thanks,
+ Myron
