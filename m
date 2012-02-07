@@ -1,53 +1,104 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue,  7 Feb 2012 15:01:15 +0200
-Subject: [PATCH v2 4/7] OMAP: 4430sdp: Correct fixed regulator device ID
+Date: Tue,  7 Feb 2012 15:01:16 +0200
+Subject: [PATCH v2 5/7] OMAP: sdp4430: Add fixed regulator for twl6040 needs
 In-Reply-To: <1328619678-26080-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1328619678-26080-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1328619678-26080-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1328619678-26080-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board has two fixed voltage regulator. Correct the
-device ID for the vbat, which used -1.
-Create defines for the fixed regulator IDs so when adding new
-regulators we know the next available ID to use for them.
+The twl6040 VIO power is connected to SMPS V1V8, the
+V2V1 power is coming from SMPS V2V1 of twl6030.
+These are fixed, always on regulators.
+Create fixed voltage regulators for these supplies.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-omap2/board-4430sdp.c |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-4430sdp.c |   58 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 58 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index f4ac553..d02172d 100644
+index d02172d..5de5753 100644
 --- a/arch/arm/mach-omap2/board-4430sdp.c
 +++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -62,6 +62,9 @@
- #define GPIO_WIFI_PMENA		54
- #define GPIO_WIFI_IRQ		53
+@@ -64,6 +64,8 @@
  
-+#define FIXED_REG_VBAT_ID	0
-+#define FIXED_REG_VWLAN_ID	1
-+
+ #define FIXED_REG_VBAT_ID	0
+ #define FIXED_REG_VWLAN_ID	1
++#define FIXED_REG_V2V1_ID	2
++#define FIXED_REG_V1V8_ID	3
+ 
  static const int sdp4430_keymap[] = {
  	KEY(0, 0, KEY_E),
- 	KEY(0, 1, KEY_R),
-@@ -368,7 +371,7 @@ static struct fixed_voltage_config sdp4430_vbat_pdata = {
+@@ -349,6 +351,60 @@ static int __init omap_ethernet_init(void)
+ 	return status;
+ }
  
- static struct platform_device sdp4430_vbat = {
- 	.name		= "reg-fixed-voltage",
--	.id		= -1,
-+	.id		= FIXED_REG_VBAT_ID,
- 	.dev = {
- 		.platform_data = &sdp4430_vbat_pdata,
- 	},
-@@ -478,7 +481,7 @@ static struct fixed_voltage_config sdp4430_vwlan = {
++static struct regulator_consumer_supply sdp4430_vpmic_v2v1_supply[] = {
++	REGULATOR_SUPPLY("v2v1", "1-004b"),
++};
++
++static struct regulator_init_data sdp4430_v2v1smps = {
++	.constraints = {
++		.always_on		= true,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(sdp4430_vpmic_v2v1_supply),
++	.consumer_supplies	= sdp4430_vpmic_v2v1_supply,
++};
++
++static struct fixed_voltage_config sdp4430_v2v1_pdata = {
++	.supply_name	= "VPMIC-V2V1",
++	.microvolts	= 2100000,
++	.init_data	= &sdp4430_v2v1smps,
++	.gpio		= -EINVAL,
++};
++
++static struct platform_device sdp4430_v2v1 = {
++	.name		= "reg-fixed-voltage",
++	.id		= FIXED_REG_V2V1_ID,
++	.dev = {
++		.platform_data = &sdp4430_v2v1_pdata,
++	},
++};
++
++static struct regulator_consumer_supply sdp4430_vpmic_v1v8_supply[] = {
++	REGULATOR_SUPPLY("vio", "1-004b"),
++};
++
++static struct regulator_init_data sdp4430_v1v8smps = {
++	.constraints = {
++		.always_on		= true,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(sdp4430_vpmic_v1v8_supply),
++	.consumer_supplies	= sdp4430_vpmic_v1v8_supply,
++};
++
++static struct fixed_voltage_config sdp4430_v1v8_pdata = {
++	.supply_name	= "VPMIC-V1V8",
++	.microvolts	= 1800000,
++	.init_data	= &sdp4430_v1v8smps,
++	.gpio		= -EINVAL,
++};
++
++static struct platform_device sdp4430_v1v8 = {
++	.name		= "reg-fixed-voltage",
++	.id		= FIXED_REG_V1V8_ID,
++	.dev = {
++		.platform_data = &sdp4430_v1v8_pdata,
++	},
++};
++
+ static struct regulator_consumer_supply sdp4430_vbat_supply[] = {
+ 	REGULATOR_SUPPLY("vddvibl", "twl6040-vibra"),
+ 	REGULATOR_SUPPLY("vddvibr", "twl6040-vibra"),
+@@ -416,6 +472,8 @@ static struct platform_device *sdp4430_devices[] __initdata = {
+ 	&sdp4430_vbat,
+ 	&sdp4430_dmic_codec,
+ 	&sdp4430_abe_audio,
++	&sdp4430_v1v8,
++	&sdp4430_v2v1,
+ };
  
- static struct platform_device omap_vwlan_device = {
- 	.name		= "reg-fixed-voltage",
--	.id		= 1,
-+	.id		= FIXED_REG_VWLAN_ID,
- 	.dev = {
- 		.platform_data = &sdp4430_vwlan,
- 	},
+ static struct omap_musb_board_data musb_board_data = {
 -- 
 1.7.8.4
