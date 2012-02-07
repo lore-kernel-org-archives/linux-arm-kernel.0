@@ -1,51 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 7 Feb 2012 12:15:11 +0000
-Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
-In-Reply-To: <1327910238-18704-2-git-send-email-bill4carson@gmail.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-2-git-send-email-bill4carson@gmail.com>
-Message-ID: <20120207121511.GH3351@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 07 Feb 2012 07:32:56 -0500
+Subject: [PATCH][RFC] tracing/rcu: Add trace_##name##__rcuidle() static
+ tracepoint for inside rcu_idle_exit() sections
+In-Reply-To: <20120206233804.GM5941@linux.vnet.ibm.com>
+References: <20120202190708.GE2518@linux.vnet.ibm.com>
+ <87obtgc1xx.fsf@ti.com> <4F2B1307.5010207@gmail.com>
+ <1328223819.5882.133.camel@gandalf.stny.rr.com>
+ <20120202232736.GL2518@linux.vnet.ibm.com>
+ <1328237131.5882.135.camel@gandalf.stny.rr.com>
+ <20120203060458.GF2380@linux.vnet.ibm.com>
+ <1328295309.5882.178.camel@gandalf.stny.rr.com>
+ <20120203194005.GK2382@linux.vnet.ibm.com>
+ <1328563113.2200.39.camel@gandalf.stny.rr.com>
+ <20120206233804.GM5941@linux.vnet.ibm.com>
+Message-ID: <1328617976.2200.66.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2012 at 07:57:12AM +0000, bill4carson at gmail.com wrote:
-> +/* 2M and 16M hugepage linux ptes are stored in an array
-> + *
-> + * 2M hugepage
-> + * ===========
-> + * one linux pte caters to two HW ptes,
-> + * so the maximum huge linux pte needed is 4096M/2M = 2048 entry pointers.
-> + * Two 4K page is used to store these entry pointers(2048 * 4 = 8192 bytes)
-> + * in a two-dimension array, huge_2m_pte[2][1024].
+On Mon, 2012-02-06 at 15:38 -0800, Paul E. McKenney wrote:
 
-Actually we only need to cover TASK_SIZE so for a 2:2 split you only
-need half of the above.
+> Aside from the "pre;" below needing to precede rcu_read_lock_sched_notrace()
+> as Josh noted, this looks reasonable to me.
+> 
 
-> + *
-> + * How to find the hugepage linux pte corresponding to a specific address ?
-> + * VA[31] is used as row index;
-> + * VA[30:21] is used as column  index;
+Does this mean I can add an Acked-by from you and Josh? Obviously with
+the post "pre" change.
 
-I haven't fully reviewed the code but can we not drop this row/column
-set up and just use a VA[31:21] as the index?
-
-> + *
-> + * 16M hugepage
-> + * ============
-> + * one linux pte caters for one HW pte,
-
-Actually that's a bit misleading as we need 16 consecutive pmd entries
-for a supersection. So one Linux pmd caters for 16 HW pmds.
-
-> + * so maxium huge linux pte needed is 4096M/16M = 256 entry pointers,
-> + * 256 * 4 = 1024 bytes spaces is allocated to store these linux pte;
-> + * this is a simple one-dimension array huge_16m_pte[256].
-> + *
-> + * VA[31:24] is used to index this array;
-
-Maybe we should call them Linux pmd rather than pte in the comments? It
-is less confusing (I know that the generic hugetlb code calls them
-ptes).
-
--- 
-Catalin
+-- Steve
