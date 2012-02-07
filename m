@@ -1,56 +1,69 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 06 Feb 2012 21:33:16 -0800
-Subject: An extremely simplified pinctrl bindings proposal
-In-Reply-To: <4F302474.1020701@firmworks.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
- <4F302474.1020701@firmworks.com>
-Message-ID: <4F30B79C.4030404@nvidia.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 7 Feb 2012 08:04:00 +0100
+Subject: [PATCH v2 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <4F3044A9.8000202@metafoo.de>
+References: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
+ <1328541585-24642-3-git-send-email-thierry.reding@avionic-design.de>
+ <4F3044A9.8000202@metafoo.de>
+Message-ID: <20120207070400.GA29238@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2012 11:05 AM, Mitch Bradley wrote:
-> I like the general approach of simplifying the pinctrl thing, as the 
-> previous approach did not appear to be converging.
+* Lars-Peter Clausen wrote:
+> On 02/06/2012 04:19 PM, Thierry Reding wrote:
+> > This commit modifies the PWM core to support multiple PWMs per struct
+> > pwm_chip.
 > 
-> One possible name would be "gpconfig" - for general purpose configuration.
+> I think you should mention what motivates this change.
 
-Sounds reasonable
+Okay, I can add that.
 
-> The register access model in the strawman proposal is probably too 
-> simple.  32-bit memory mapped registers are certainly the most common 
-> subcase on ARM, but there are many other cases that occur in practice:
+> > It achieves this in a similar way to how gpiolib works, by
+> > allowing PWM ranges to be requested dynamically (pwm_chip.base == -1) or
+> > starting at a given offset (pwm_chip.base >= 0).
 > 
-> * Registers that must be accessed with 8, 16, or 64-bit cycles.
-> * Registers that have side effects on read, so read-mask-write must be 
-> avoided
-> * Registers accessed via an index/data cycle pair, thus having locking 
-> requirements
-> * Registers that must be read after being written, or otherwise 
-> requiring some sort of memory-ordering enforcement.
-> * Time delays between pairs of writes
-> * PCI configuration registers, which often have some combination of the 
-> above
-> * Registers behind serial buses like I2C
+> If we've learned one thing from gpiolib, I think it is that using a global
+> index to identify a resource was a bad idea.
+
+Yes, that concern has been raised several times already. The reason for it
+being this way is that the current API requires it. So either we keep it as
+is for now and change it over to indexing on a per-chip basis later (which
+has the advantage of not breaking anything currently in-tree) or we make that
+change now, in which case this patch series will probably double in size. I'm
+also not sure if I can reasonably keep the series bisectible that way.
+
+One of the major problems when converting to a non-global namespace is how to
+represent the relationship in code. For device tree this should be easy to do
+because it has all the infrastructure in place. For non-device-tree devices I
+have no idea yet how this could be done. Perhaps by using something like the
+clock API and using names for lookup?
+
+> > A chip specifies how
+> > many PWMs it controls using the npwm member. Each of the functions in
+> > the pwm_ops structure gets an additional argument that specified the PWM
+> > number (it can be converted to a per-chip index by subtracting the
+> > chip's base).
+> > 
+> > The total maximum number of PWM devices is currently fixed to 64, but
+> > can easily be made configurable via Kconfig.
 > 
-> Both Open Firmware and ACPI have addressed this general problem.  In 
-> addition to a numeric identifier for the register, you need to specify 
-> the access semantics.  It's difficult to finitely enumerate all possible 
-> cases, but you can get to 99.9% with a modest number of access models, 
-> and then add new models as needed.
+> The code says 1024.
 
-My thinking was that each driver that permitted execution of these
-register write sequences on its registers would provide an extremely
-simple driver to support this. Perhaps just one "op" function that
-implemented each write, and took care of details such as timing delays
-for the IO, indexed addressing, using I2C instead of memory-mapped,
-perhaps register access width, etc.
+Right, I missed that. Thanks.
 
-Some of the items in the list above could be solved by explicit flags in
-the data instead (register access width comes to mind for memory-mapped
-devices at least).
+> > The patch is incomplete in that it doesn't convert any existing drivers
+> > that are now broken.
 
-Do you have any direct pointers to how OF and ACPI solved this kind of
-thing; it'd be good background.
+I just noticed that this isn't completely valid anymore either since I've
+ported two of the drivers. However, The remaining drivers won't work properly
+when built against a kernel with PWM framework support because of the
+duplicate symbols.
 
--- 
-nvpublic
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120207/f0c17d08/attachment.sig>
