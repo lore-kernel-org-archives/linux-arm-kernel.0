@@ -1,78 +1,107 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 7 Feb 2012 12:25:30 -0800
-Subject: [PATCH 1/2] genalloc: add support of named pool
-In-Reply-To: <20120207025212.GA15647@game.jcrosoft.org>
-References: <1328466576-29384-1-git-send-email-plagnioj@jcrosoft.com>
- <20120206152028.310656a3.akpm@linux-foundation.org>
- <20120207025212.GA15647@game.jcrosoft.org>
-Message-ID: <20120207122530.bb88568a.akpm@linux-foundation.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  7 Feb 2012 18:27:53 -0200
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+Message-ID: <1328646473-11828-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Feb 2012 03:52:12 +0100
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+commit c7e963f6 (net/smsc911x: Add regulator support) requires that regulator are provided 
+to smsc911x chip.
 
-> On 15:20 Mon 06 Feb     , Andrew Morton wrote:
-> > On Sun,  5 Feb 2012 19:29:35 +0100
-> > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > 
-> > > so we can get the pool in the driver by name instead of passing it via
-> > > parameter
-> > > 
-> > > this will be use on AT91 to get access from different drivers to the sram or
-> > > gpbr as example
-> > > 
-> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > Cc: Andrew Morton <akpm@linux-foundation.org>
-> > > ---
-> > > Hi,
-> > > 
-> > > 	if you don't mind I'll apply this via at91 tree as it's needed to
-> > > 	finish a cleanup on at91 to allow multiple soc in the same kernel
-> > 
-> > Please do not do this.
-> > 
-> > The patch is still as buggy as it was when I reviewed it in December. 
-> > You didn't reply to my review email and you didn't reply to Steven
-> > Rothwell's review email and you fixed almost none of our review
-> > comments.
-> I did
-> 
-> all comment from Stephen Rothwell as integrated
-> 
-> I put the lock on the list as you request
-> I drop the race condition
-> 
-> I put the example
-> 
-> so what did I miss?
-> 
+Provide regulator support to 3ds_debugboard so that mx31pdk/mx27pdk boards can have
+ethernet working again.
 
-The interface remains racy and cannot be fixed, without a lot of work. 
+Tested on a mx31pdk board. 
 
-gen_pool_create_byname() is racy, doing the lookup before taking the
-lock.  This bug is easily fixed by doing the lookup while holding the
-lock.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Sascha,
 
+If you think this patch is OK, then I can submit patches for fixing
+the other i.MX boards that have smsc911x.
 
-gen_pool_byname() returns a pointer to an object which can be released
-at any time, so any code which calls gen_pool_byname() cannot safely
-use that function's return value!
+ arch/arm/configs/imx_v6_v7_defconfig |    1 +
+ arch/arm/plat-mxc/3ds_debugboard.c   |   42 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 0 deletions(-)
 
-The way in which the kernel solves this problem is to take a refcount
-against the object (while holding the lock).  The caller who obtained
-that refcount via the lookup function is responsible for doing some
-put() operation on it.  On the last put(), the object is freed.
-
-If a resource is to be shared between multiple subsystems then this
-issue should be addressed.
-
-
-Also, the patch still has coding-style errors, detected by checkpatch.
-
-
-Also, it is unobvious why we need a "lookup by name" ability.  If a
-subsystem want to access another subsystem's exported data structures
-then this can be done with globally-scoped C symbols.  But this is just
-a different way of doing lookup: the lifetime management issues should
-still be addressed.
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 3a4fb2e..0b437d1 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -126,6 +126,7 @@ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_MC13XXX=y
+ CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_MC13892=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
+index f0ba072..37c9160 100644
+--- a/arch/arm/plat-mxc/3ds_debugboard.c
++++ b/arch/arm/plat-mxc/3ds_debugboard.c
+@@ -16,6 +16,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+ #include <linux/smsc911x.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/fixed.h>
+ 
+ #include <mach/hardware.h>
+ 
+@@ -61,6 +63,44 @@
+ 
+ static void __iomem *brd_io;
+ 
++#if defined(CONFIG_REGULATOR_FIXED_VOLTAGE) || defined(CONFIG_REGULATOR_FIXED_VOLTAGE_MODULE)
++static struct regulator_consumer_supply debugboard_smsc_supplies[] = {
++	REGULATOR_SUPPLY("vdd33a", NULL),
++	REGULATOR_SUPPLY("vddvario", NULL),
++};
++
++static struct regulator_init_data debugboard_smsc_init_data = {
++	.constraints	= {
++		.name	= "3V3",
++		.always_on = 1,
++	},
++	.consumer_supplies = debugboard_smsc_supplies,
++	.num_consumer_supplies = ARRAY_SIZE(debugboard_smsc_supplies),
++};
++
++static struct fixed_voltage_config debugboard_smsc_pdata = {
++	.supply_name	= "board-3V3",
++	.microvolts	= 3300000,
++	.gpio		= -EINVAL,
++	.enabled_at_boot = 1,
++	.init_data	= &debugboard_smsc_init_data,
++};
++static struct platform_device debugboard_voltage_regulator = {
++	.name		= "reg-fixed-voltage",
++	.id		= -1,
++	.num_resources	= 0,
++	.dev		= {
++		.platform_data	= &debugboard_smsc_pdata,
++	},
++};
++static void __init debugboard_add_regulators(void)
++{
++	platform_device_register(&debugboard_voltage_regulator);
++}
++#else
++static void __init debugboard_add_regulators(void) {}
++#endif
++
+ static struct resource smsc911x_resources[] = {
+ 	{
+ 		.flags = IORESOURCE_MEM,
+@@ -187,6 +227,8 @@ int __init mxc_expio_init(u32 base, u32 p_irq)
+ 	irq_set_irq_type(p_irq, IRQF_TRIGGER_LOW);
+ 	irq_set_chained_handler(p_irq, mxc_expio_irq_handler);
+ 
++	debugboard_add_regulators();
++
+ 	/* Register Lan device on the debugboard */
+ 	smsc911x_resources[0].start = LAN9217_BASE_ADDR(base);
+ 	smsc911x_resources[0].end = LAN9217_BASE_ADDR(base) + 0x100 - 1;
+-- 
+1.7.1
