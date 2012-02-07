@@ -1,29 +1,83 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 7 Feb 2012 09:41:46 -0800
-Subject: [RFC] ARM: cache-l2x0.c
-In-Reply-To: <CAMN7GVp8=iY7_Mcqra2G0dBBHFg_axiNbPfbaqycy4SGHFOV2A@mail.gmail.com>
-References: <CAMN7GVp8=iY7_Mcqra2G0dBBHFg_axiNbPfbaqycy4SGHFOV2A@mail.gmail.com>
-Message-ID: <CAMbhsRSEk5OZS0QhPpQHpdO9Y+-KmLD-LJL0DVFz74vYjB2u0Q@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 07 Feb 2012 09:42:38 -0800
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <4F309BAE.8000608@codeaurora.org>
+References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
+ <20120202204411.GB14129@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
+ <4F2B1E11.1040000@codeaurora.org>
+ <20120203003633.GD14129@n2100.arm.linux.org.uk>
+ <4F309BAE.8000608@codeaurora.org>
+Message-ID: <4F31628E.3030006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2012 at 3:07 AM, Per Fransson <per.fransson.ml@gmail.com> wrote:
-> Hi all,
+On 02/06/12 19:34, Saravana Kannan wrote:
+> On 02/02/2012 04:36 PM, Russell King - ARM Linux wrote:
+>> On Thu, Feb 02, 2012 at 03:36:49PM -0800, Stephen Boyd wrote:
+>>> On 02/02/12 13:38, Nicolas Pitre wrote:
+>>>> On Thu, 2 Feb 2012, Russell King - ARM Linux wrote
+>>>>> On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
+>>>>>> Should we move get_thread_info into assembler.h? It seems odd
+>>>>>> to include entry-header.S but I saw that vfp was doing the same.
+>>>>> Probably yes, and probably also have preempt_disable and
+>>>>> preempt_enable
+>>>>> assembler macros.  That's going to get rather icky if we have to
+>>>>> explicitly call the scheduler though (to solve (1)).
+>>>> What about a pair of helpers written in C instead?
+>>>>
+>>>> v7_flush_dcache_all() could be renamed, and a wrapper function called
+>>>> v7_flush_dcache_all() would call the preemption disable helper,
+>>>> call the
+>>>> former v7_flush_dcache_all code, then call the preemption enable
+>>>> helper.
+>>>>
+>>>> Then __v7_setup() could still call the core cache flush code without
+>>>> issues.
+>>>
+>>> I tried to put the preemption disable/enable right around the place
+>>> where it was needed. With this approach we would disable preemption
+>>> during the entire cache flush. I'm not sure if we want to make this
+>>> function worse for performance, do we? It certainly sounds easier than
+>>> writing all the preempt macros in assembly though.
+>>
+>> Err, why do you think it's a big task?
+>>
+>> preempt disable is a case of incrementing the thread preempt count,
+>> while
+>> preempt enable is a case of decrementing it, testing for zero, if zero,
+>> then checking whether TIF_NEED_RESCHED is set and calling a function.
+>>
+>> If that's too much, then the simple method in assembly to quickly
+>> disable
+>> preemption over a very few set of instructions is using mrs/msr and
+>> cpsid i.
+>> That'll be far cheaper than fiddling about with preempt counters or
+>> messing about with veneers in C code.
 >
-> In the android 3.0 kernel the workaround for PL310 errata 727915 is
-> applied both to:
+> Russell,
 >
-> * the clean & invalidate by way and
+> I think you misunderstood Stephen's point about the performance. He
+> isn't referring to the performance difference between a C call to
+> preemt disable/enable vs. a few assembly level instructions.
 >
-> * the clean by way
+> I believe he is referring to the performance hit of having preemption
+> disabled during the entirety of the cache flush operation vs. having
+> preemption disabled only for the duration of writing to CSSELR and
+> reading back CCSIDR.
 >
-> But the errata only mentions the first of these operations. Does
-> anyone know if it's actually applicable to clean by way as well?
+> I would think a cache flush is a fairly long operation and to have
+> preemption disable across it doesn't sound appealing to me.
 >
-> Regards,
-> Per
+> Thoughts?
+>
 
-I was able to trigger a reproducible kernel hang/watchdog reset inside
-l2x0_clean_all on an OMAP 4430 (pl310 r2p0, I believe), until I added
-the set-way based workaround for clean.  My patch came from
-discussions with Richard Woodruff.
+Sorry I messed up the headers for v2 of the patch. It didn't get sent to
+the msm list.
+
+Anyway, disabling interrupts for those few instructions sounds like the
+best approach and so I sent that out in v2.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
