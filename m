@@ -1,58 +1,110 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 7 Feb 2012 16:11:58 +0100
-Subject: [PATCH v5] I2C: add CSR SiRFprimaII on-chip I2C controllers driver
-In-Reply-To: <CAGsJ_4yJOg8XNfD=tgwPU_57BroBOBGvA428tG6_eUnYX2v8OQ@mail.gmail.com>
-References: <1327846668-3053-1-git-send-email-21cnbao@gmail.com>
- <20120205223757.GA10680@nekote.pengutronix.de>
- <CAGsJ_4yHn1M3s6CPezaW_jwOcsX6NuaZRHcNWX0qnSfhx30AHQ@mail.gmail.com>
- <20120206224714.GB25703@pengutronix.de>
- <CAGsJ_4yJOg8XNfD=tgwPU_57BroBOBGvA428tG6_eUnYX2v8OQ@mail.gmail.com>
-Message-ID: <20120207151117.GJ2539@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 07 Feb 2012 09:13:31 -0600
+Subject: [PATCH 1/1] of: introduce helper to manage boolean
+In-Reply-To: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4F313F9B.4020500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Barry,
-
-> if ACK is not received, an interrupt will be got and related register
-> status can show this error. that is just a common feature in almost
-> all i2c controllers? so the naming is confused. i just copied it from
-> the spec.
-
-Yes, this is common and yes, the naming is confusing :) This is why I
-asked if it really does what I believed it does. All is fine, no need
-for a change.
-
-> the mail webpages and clients really fails to show the difference. i
-
-Not all of them. gmane looks OK both in web-interface and via NNTP.
-
-> >> >> + ? ? siic->irq = platform_get_irq(pdev, 0);
-> >> >> + ? ? if (siic->irq < 0) {
-> >> >> + ? ? ? ? ? ? err = -EINVAL;
-> >> >> + ? ? ? ? ? ? goto out;
-> >> >> + ? ? }
-> >> >
-> >> > return the error code here?
-> >>
-> >> out lable will free resources and return error code.
-> >
-> > Sorry, I meant the error code you received which is in siic->irq.
+On 02/06/2012 10:13 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> of_property_read_bool
 > 
-> ok. err = -ENXIO
+> Search for a property in a device node and read a 32-bit value from
+> it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
+> 
+> this will allow to disable a boolean
+> 
+> is-ok;          => true
+> is-ok = <1>;    => true
+> is-ok = <0>;    => false
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
 
-err = ssic->irq?
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Regards,
+> ---
+> Hi,
+> 
+> 	if this is ok I'll rebase my mtd and i2c patch to use it
+> 
 
-   Wolfram
+I'm assuming you'll want to merge this patch with your mtd and i2c
+patches. If you want me to apply, let me know.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120207/194e1c40/attachment.sig>
+Rob
+
+> Best Regards,
+> J.
+>  drivers/of/base.c  |   30 ++++++++++++++++++++++++++++++
+>  include/linux/of.h |    8 ++++++++
+>  2 files changed, 38 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 133908a..a0eaf08 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -686,6 +686,36 @@ int of_property_read_u64(const struct device_node *np, const char *propname,
+>  EXPORT_SYMBOL_GPL(of_property_read_u64);
+>  
+>  /**
+> + * of_property_read_bool - Find and read a boolean from a property
+> + * @np:		device node from which the property value is to be read.
+> + * @propname:	name of the property to be searched.
+> + *
+> + * Search for a property in a device node and read a 32-bit value from
+> + * it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
+> + *
+> + * is-ok;	=> true
+> + * is-ok = <1>;	=> true
+> + * is-ok = <0>;	=> false
+> + */
+> +int of_property_read_bool(const struct device_node *np, const char *propname)
+> +{
+> +	u32 reg;
+> +	int ret = of_property_read_u32(np, propname, &reg);
+> +
+> +	switch (ret) {
+> +	case -EINVAL:
+> +		return false;
+> +	case -ENODATA:
+> +		return true;
+> +	case 0:
+> +		return reg == 1;
+> +	default:
+> +		return ret;
+> +	}
+> +}
+> +EXPORT_SYMBOL_GPL(of_property_read_bool);
+> +
+> +/**
+>   * of_property_read_string - Find and read a string from a property
+>   * @np:		device node from which the property value is to be read.
+>   * @propname:	name of the property to be searched.
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index a75a831..2e5f77b 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -210,6 +210,8 @@ extern int of_property_read_u32_array(const struct device_node *np,
+>  				      size_t sz);
+>  extern int of_property_read_u64(const struct device_node *np,
+>  				const char *propname, u64 *out_value);
+> +extern int of_property_read_bool(const struct device_node *np,
+> +				const char *propname);
+>  
+>  extern int of_property_read_string(struct device_node *np,
+>  				   const char *propname,
+> @@ -288,6 +290,12 @@ static inline int of_property_read_u32_array(const struct device_node *np,
+>  	return -ENOSYS;
+>  }
+>  
+> +static inline int of_property_read_bool(const struct device_node *np,
+> +				const char *propname)
+> +{
+> +	return -ENOSYS;
+> +}
+> +
+>  static inline int of_property_read_string(struct device_node *np,
+>  					  const char *propname,
+>  					  const char **out_string)
