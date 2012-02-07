@@ -1,71 +1,54 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 7 Feb 2012 17:09:17 +0530
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfJVEgVJoHcaPQbMg5mwz=tZUce4oibDUxtnevSF8bGY9g@mail.gmail.com>
-References: <1328578047.1724.17.camel@dave-Dell-System-XPS-L502X>
- <CAMQu2gwfo5JXAqQaLUNs7C7J3TUhEO2zOcyD0Rk-D_O61Yrfag@mail.gmail.com>
- <CAMsRxfLNBbQO5XF+EHJqNsnW+s=ay3mjSV5dh=sxdwzktUu03g@mail.gmail.com>
- <CAMQu2gzfNAwtf1c6jrTZpfGMSqBgBrQKmFTeCFzbvMh9ESBDUg@mail.gmail.com>
- <CAMsRxfKR1ODH56BtcUT5Dv6qOVEYGVheEcW9ugXsZmLKok==bg@mail.gmail.com>
- <CAMQu2gwWt6oQPjxc1YHgOoxVkHdck_q78Xf==7ncwRj0_uS-JQ@mail.gmail.com>
- <CAMQu2gyCPtbNfBa5V8ve2JORN+sDeAY+hvR0g0_9U354JgcuiA@mail.gmail.com>
- <CAMsRxfJVEgVJoHcaPQbMg5mwz=tZUce4oibDUxtnevSF8bGY9g@mail.gmail.com>
-Message-ID: <CAMQu2gxVUqDF2HkPD=QeX0N_tUd=9FTd+T+1LHCR0tsCgQxC8Q@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 7 Feb 2012 11:50:58 +0000
+Subject: [PATCH 2/7] Add various hugetlb page table fix
+In-Reply-To: <4F308169.4010904@gmail.com>
+References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
+ <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
+ <20120131095811.GB889@n2100.arm.linux.org.uk>
+ <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
+ <4F28AD1D.1000106@gmail.com> <20120206162656.GG26538@arm.com>
+ <4F308169.4010904@gmail.com>
+Message-ID: <20120207115058.GD3351@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2012 at 4:55 PM, stephane eranian <eranian@googlemail.com> wrote:
-> On Tue, Feb 7, 2012 at 12:09 PM, Shilimkar, Santosh
-> <santosh.shilimkar@ti.com> wrote:
->> On Tue, Feb 7, 2012 at 4:23 PM, Shilimkar, Santosh
->> <santosh.shilimkar@ti.com> wrote:
->>> ( Removing dead "linux-arm-kernel at lists.arm.linux.org.uk" and adding
->>> correct list
->>>
->>> On Tue, Feb 7, 2012 at 4:07 PM, stephane eranian <eranian@googlemail.com> wrote:
->>>> Hi,
->>>>
->>>> Ok, with Santosh's patch this is much better almost as expected, still
->>>> 10-15% off.
->>>>
->> [....]
->>
->>>> So the fix does help. I am wondering why we're not getting closer to
->>>> 10k samples. But that
->>>> may be due to some overhead somewhere in there.
->>>>
->>
->> There might be still a small corner case where few reads
->> might return the stale value. Counter need at least 1 32K
->> clock cycle for the sync. udelay is not accurate but
->> it will at least give min. 1/32768, so it should be
->> fine.
->>
->> May be you can try out below patch and see if it helps.
->>
->> Regards
->> Santosh
->>
->> diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
->> index 5f0f229..014d8bd 100644
->> --- a/arch/arm/plat-omap/counter_32k.c
->> +++ b/arch/arm/plat-omap/counter_32k.c
->> @@ -18,6 +18,7 @@
->> ?#include <linux/err.h>
->> ?#include <linux/io.h>
->> ?#include <linux/clocksource.h>
->> +#include <linux/delay.h>
->>
->> ?#include <asm/sched_clock.h>
->>
->> @@ -38,6 +39,8 @@ static void __iomem *timer_32k_base;
->>
->> ?static u32 notrace omap_32k_read_sched_clock(void)
->> ?{
->> + ? ? ? /* Counter might take 1 clock cycle for OCP sync */
->> + ? ? ? udelay(31);
->> ? ? ? ?return timer_32k_base ? __raw_readl(timer_32k_base) : 0;
->> ?}
-> That's worse with this patch (on top of the previous one).
->
-Thanks for the test. Forget about the last change
+On Tue, Feb 07, 2012 at 01:42:01AM +0000, bill4carson wrote:
+> On 2012?02?07? 00:26, Catalin Marinas wrote:
+> > On Wed, Feb 01, 2012 at 03:10:21AM +0000, bill4carson wrote:
+> >> Why L_PTE_HUGEPAGE is needed?
+> >>
+> >> hugetlb subsystem will call pte_page to derive the corresponding page
+> >> struct from a given pte, and pte_pfn is used first to convert pte into
+> >> a page frame number.
+> >
+> > Are you sure the pte_pfn() conversion is right? Does it need to be
+> > different from the 4K pfn?
+...
+> pte_page is defined as following to derive page struct from a given pte.
+> This macro is used both in generic mm as well as hugetlb sub-system, so
+> we need do the switch in pte_pfn to mark huge page based linux pte out
+> of normal page based linux pte, that's what L_PTE_HUGEPAGE for.
+> 
+> #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
+> 
+> So L_PTE_HUGEPAGE is *NOT* set in normal page based linux pte,
+> linux pte bits[31:12] is the page frame number;
+
+I agree.
+
+> otherwise, we got a huge page based linux pte, and linux pte
+> bits[31:20] is page frame number for SECTION mapping, and bits[31:24]
+> is page frame number for SUPER-SECTION mapping.
+
+Actually it is still 31:12 but with bits 19:12 or 23:12 masked out. So
+you do the correct shift by PAGE_SHIFT with the additional masking for
+huge pages (harmless).
+
+But do we actually need this masking? Do the huge_pte_offset() or
+huge_pte_alloc() functions return the Linux pte (pmd) for the huge page?
+If yes, can we not ensure that bits 19:12 are already zero? This
+shouldn't be any different from the 4K Linux pte but with an address
+aligned to 1MB.
+
+-- 
+Catalin
