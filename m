@@ -1,83 +1,68 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 07 Feb 2012 09:42:38 -0800
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <4F309BAE.8000608@codeaurora.org>
-References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
- <20120202204411.GB14129@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
- <4F2B1E11.1040000@codeaurora.org>
- <20120203003633.GD14129@n2100.arm.linux.org.uk>
- <4F309BAE.8000608@codeaurora.org>
-Message-ID: <4F31628E.3030006@codeaurora.org>
+From: jbaron@redhat.com (Jason Baron)
+Date: Tue, 7 Feb 2012 13:04:23 -0500
+Subject: [PATCHv2 5/6] jump label: detect %c support for ARM
+In-Reply-To: <CAH+eYFDzsWjrxOFiYcYO6sgPDusxcHOTQcjvN8hDaEPG+=LgAQ@mail.gmail.com>
+References: <1327757725-10114-1-git-send-email-rabin@rab.in>
+ <1327757725-10114-6-git-send-email-rabin@rab.in>
+ <CAH+eYFDzsWjrxOFiYcYO6sgPDusxcHOTQcjvN8hDaEPG+=LgAQ@mail.gmail.com>
+Message-ID: <20120207180423.GD2388@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/12 19:34, Saravana Kannan wrote:
-> On 02/02/2012 04:36 PM, Russell King - ARM Linux wrote:
->> On Thu, Feb 02, 2012 at 03:36:49PM -0800, Stephen Boyd wrote:
->>> On 02/02/12 13:38, Nicolas Pitre wrote:
->>>> On Thu, 2 Feb 2012, Russell King - ARM Linux wrote
->>>>> On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
->>>>>> Should we move get_thread_info into assembler.h? It seems odd
->>>>>> to include entry-header.S but I saw that vfp was doing the same.
->>>>> Probably yes, and probably also have preempt_disable and
->>>>> preempt_enable
->>>>> assembler macros.  That's going to get rather icky if we have to
->>>>> explicitly call the scheduler though (to solve (1)).
->>>> What about a pair of helpers written in C instead?
->>>>
->>>> v7_flush_dcache_all() could be renamed, and a wrapper function called
->>>> v7_flush_dcache_all() would call the preemption disable helper,
->>>> call the
->>>> former v7_flush_dcache_all code, then call the preemption enable
->>>> helper.
->>>>
->>>> Then __v7_setup() could still call the core cache flush code without
->>>> issues.
->>>
->>> I tried to put the preemption disable/enable right around the place
->>> where it was needed. With this approach we would disable preemption
->>> during the entire cache flush. I'm not sure if we want to make this
->>> function worse for performance, do we? It certainly sounds easier than
->>> writing all the preempt macros in assembly though.
->>
->> Err, why do you think it's a big task?
->>
->> preempt disable is a case of incrementing the thread preempt count,
->> while
->> preempt enable is a case of decrementing it, testing for zero, if zero,
->> then checking whether TIF_NEED_RESCHED is set and calling a function.
->>
->> If that's too much, then the simple method in assembly to quickly
->> disable
->> preemption over a very few set of instructions is using mrs/msr and
->> cpsid i.
->> That'll be far cheaper than fiddling about with preempt counters or
->> messing about with veneers in C code.
->
-> Russell,
->
-> I think you misunderstood Stephen's point about the performance. He
-> isn't referring to the performance difference between a C call to
-> preemt disable/enable vs. a few assembly level instructions.
->
-> I believe he is referring to the performance hit of having preemption
-> disabled during the entirety of the cache flush operation vs. having
-> preemption disabled only for the duration of writing to CSSELR and
-> reading back CCSIDR.
->
-> I would think a cache flush is a fairly long operation and to have
-> preemption disable across it doesn't sound appealing to me.
->
-> Thoughts?
->
+On Tue, Feb 07, 2012 at 09:48:24PM +0530, Rabin Vincent wrote:
+> Jason,
+> 
+> On Sat, Jan 28, 2012 at 19:05, Rabin Vincent <rabin@rab.in> wrote:
+> > Some versions of ARM GCC which do support asm goto, have problems
+> > handling the the %c specifier. ?Since we need the %c to support jump
+> > labels on ARM, detect that too in the asm goto detection script to avoid
+> > build errors with these versions.
+> >
+> > http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
+> >
+> > Cc: Jason Baron <jbaron@redhat.com>
+> > Cc: linux-kernel at vger.kernel.org
+> > Signed-off-by: Rabin Vincent <rabin@rab.in>
+> 
+> Could you please ack this patch if it's OK for you?  Then I could try to
+> send it via rmk's ARM patch system along with the rest of the series.
+> 
+> Thanks.
+> 
+> > ---
+> > ?scripts/gcc-goto.sh | ? 18 +++++++++++++++++-
+> > ?1 files changed, 17 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/scripts/gcc-goto.sh b/scripts/gcc-goto.sh
+> > index 98cffcb..9b744de 100644
+> > --- a/scripts/gcc-goto.sh
+> > +++ b/scripts/gcc-goto.sh
+> > @@ -2,4 +2,20 @@
+> > ?# Test for gcc 'asm goto' support
+> > ?# Copyright (C) 2010, Jason Baron <jbaron@redhat.com>
+> >
+> > -echo "int main(void) { entry: asm goto (\"\"::::entry); return 0; }" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
+> > +cat << "END" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
+> > +int main(void)
+> > +{
+> > +#ifdef __arm__
+> > + ? ? ? /*
+> > + ? ? ? ?* Not related to asm goto, but used by jump label
+> > + ? ? ? ?* and broken on some ARM GCC versions (see GCC Bug 48637).
+> > + ? ? ? ?*/
+> > + ? ? ? static struct { int dummy; int state; } tp;
+> > + ? ? ? asm ("@ %c0" :: "i" (&tp.state));
+> > +#endif
+> > +
+> > +entry:
+> > + ? ? ? asm goto ("" :::: entry);
+> > + ? ? ? return 0;
+> > +}
+> > +END
+> > --
+> > 1.7.8.3
+> >
 
-Sorry I messed up the headers for v2 of the patch. It didn't get sent to
-the msm list.
+Sure, patch works for me.
 
-Anyway, disabling interrupts for those few instructions sounds like the
-best approach and so I sent that out in v2.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Acked-by: Jason Baron <jbaron@redhat.com>
