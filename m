@@ -1,82 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Feb 2012 08:58:38 +0000
-Subject: [BUG] Multiple definition of pcibios_max_latency
-In-Reply-To: <1328551157.2264.11.camel@zim.stowe>
-References: <20120204125904.GU889@n2100.arm.linux.org.uk>
- <1328551157.2264.11.camel@zim.stowe>
-Message-ID: <20120207085838.GB889@n2100.arm.linux.org.uk>
+From: yong.zhang0@gmail.com (Yong Zhang)
+Date: Tue, 7 Feb 2012 17:03:05 +0800
+Subject: [BUG] genirq: Race condition in ONESHOT IRQ handler disabling
+ IRQ forever
+In-Reply-To: <20271.35831.227679.177366@ipc1.ka-ro>
+References: <20271.35831.227679.177366@ipc1.ka-ro>
+Message-ID: <20120207090305.GB32736@zhy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2012 at 10:59:17AM -0700, Myron Stowe wrote:
-> On Sat, 2012-02-04 at 12:59 +0000, Russell King - ARM Linux wrote:
-> > While building my test PXA configuration, I came across:
-> > 
-> > drivers/built-in.o:(.data+0x230): multiple definition of `pcibios_max_latency'
-> > arch/arm/common/built-in.o:(.data+0x40c): first defined here
-> > make[1]: *** [vmlinux.o] Error 1
-> > 
-> > This was introduced by:
-> > 
-> > commit 96c5590058d7fded14f43af2ab521436cecf3125
-> > Author: Myron Stowe <mstowe@redhat.com>
-> > Date:   Fri Oct 28 15:48:38 2011 -0600
-> > 
-> >     PCI: Pull PCI 'latency timer' setup up into the core
-> > 
-> >     The 'latency timer' of PCI devices, both Type 0 and Type 1,
-> >     is setup in architecture-specific code [see: 'pcibios_set_master()'].
-> >     There are two approaches being taken by all the architectures - check
-> >     if the 'latency timer' is currently set between 16 and 255 and if not
-> >     bring it within bounds, or, do nothing (and then there is the
-> >     gratuitously different PA-RISC implementation).
-> > 
-> >     There is nothing architecture-specific about PCI's 'latency timer' so
-> >     this patch pulls its setup functionality up into the PCI core by
-> >     creating a generic 'pcibios_set_master()' function using the '__weak'
-> >     attribute which can be used by all architectures as a default which,
-> >     if necessary, can then be over-ridden by architecture-specific code.
-> > 
-> >     No functional change.
-> > 
-> >     Signed-off-by: Myron Stowe <myron.stowe@redhat.com>
-> >     Signed-off-by: Jesse Barnes <jbarnes@virtuousgeek.org>
-> > 
-> > which moved the handling of pcibios_set_master() into core code for
-> > everyone but ARM:
-> > 
-> >  arch/blackfin/include/asm/pci.h         |    4 ----
-> >  arch/frv/mb93090-mb00/pci-frv.c         |    6 ------
-> >  arch/frv/mb93090-mb00/pci-frv.h         |    2 --
-> >  arch/h8300/include/asm/pci.h            |    5 -----
-> >  arch/mips/pci/pci.c                     |    6 ------
-> >  arch/mn10300/unit-asb2305/pci-asb2305.c |    6 ------
-> >  arch/mn10300/unit-asb2305/pci-asb2305.h |    2 --
-> >  arch/sh/drivers/pci/pci.c               |    6 ------
-> >  arch/x86/include/asm/pci_x86.h          |    2 --
-> >  arch/x86/pci/i386.c                     |    6 ------
-> >  drivers/pci/pci.c                       |   29 +++++++++++++++++++++++++++++
-> >  include/linux/pci.h                     |    3 +++
-> >  12 files changed, 32 insertions(+), 45 deletions(-)
-> > 
-> > I think the right solution is to delete the (now duplicate) definition 
-> > of pcibios_max_latency in arch/arm/common/it8152.c.  Please comment.
+On Mon, Feb 06, 2012 at 09:14:47AM +0100, =?utf-8?Q?Lothar_Wa=C3=9Fmann?= wrote:
+> Hi,
 > 
-> Yes, that commit is the culprit.  I was concerned about ARM in general
-> when I posted this series as I do not have a compile environment for it,
-> nor am I at all familiar with ARM to know if I had covered all the
-> possible variations (i.e. 8152 vs other, non 8152 types).
+> I already sent this to <linux-kernel@vger.kernel.org> on Feb. 1, 2012
+> but did not get any response there. So resending to a wider audience
+> with improved subject line:
 > 
-> Will deleting the 'pcibios_max_latency' definition in
-> arch/arm/common/it8152.c be the correct solution for all ARM variations
-> (I don't want to try and fix one while breaking others)?
+> there is a race condition in the threaded IRQ handler code for oneshot
+> interrupts that may lead to disabling an IRQ indefinitely. IRQs are
+> masked before calling the hard-irq handler and are unmasked only after
+> the soft-irq handler has been run. Thus if the hard-irq handler
+> returns IRQ_HANDLED instead of IRQ_WAKE_THREAD, meaning the soft-irq
+> will not be called, the interrupt will remain masked forever.
 > 
-> I'll wait for your response/guidance and if this is the correct action
-> generate a patch right away.
+> This can happen due to a short pulse on the interrupt line, that
+> triggers the interrupt logic, but goes undetected by the hard-irq
+> handler. The problem can be reproduced with the TSC2007 touch
+> controller driver that uses ONESHOT interrupts.
 
-Well, we never get two PCI host bridges built into the same kernel, so
-if you have an it8152 then you don't have anything of the others.
+Isn't it the responsibility of the driver (say TSC2007)?
 
-However, this is not my code, I don't know the platform, and I don't
-know why it was added as part of this support in the first place.  That's
-why Mike is on the CC list.
+In this case, TSC2007 should return IRQ_WAKE_THREAD IMHO.
+
+Thanks,
+Yong
+
+
+> 
+> The problem arises also with interrupt controllers that latch a level
+> triggered IRQ until it is acknowledged (like the i.MX28 does).
+> In this case the IRQ status bit will remain asserted after the
+> soft-irq finishes and retrigger the interrupt while the interrupt line
+> is already deasserted.
+> 
+> The following patch would solve the problem, but I'm not sure whether
+> it's the Right Thing(TM) to do. Especially wrt. shared interrupts.
+> 
+> diff --git a/kernel/irq/handle.c b/kernel/irq/handle.c
+> index 470d08c..93beadb 100644
+> --- a/kernel/irq/handle.c
+> +++ b/kernel/irq/handle.c
+> @@ -146,6 +146,11 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
+>  			/* Fall through to add to randomness */
+>  		case IRQ_HANDLED:
+>  			random |= action->flags;
+> +			/* unmask the IRQ that has been left masked
+> +			 * due to race condition
+> +			 */
+> +			if (res == IRQ_HANDLED && (action->flags & IRQF_ONESHOT))
+> +				unmask_irq(desc);
+>  			break;
+>  
+>  		default:
+> 
+> Best regards,
+> 
+> Lothar Wassmann
+> -- 
+> ___________________________________________________________
+> 
+> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> Gesch?ftsf?hrer: Matthias Kaussen
+> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> 
+> www.karo-electronics.de | info at karo-electronics.de
+> ___________________________________________________________
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+-- 
+Only stand for myself
