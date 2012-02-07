@@ -1,112 +1,49 @@
-From: neilb@suse.de (NeilBrown)
-Date: Tue, 7 Feb 2012 10:58:20 +1100
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <EF62F09C0797D947AD4180A1043C0DF734934E9D@DLEE10.ent.ti.com>
-References: <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
- <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
- <20120204163931.GH1275@n2100.arm.linux.org.uk>
- <EF62F09C0797D947AD4180A1043C0DF734934E36@DLEE10.ent.ti.com>
- <20120205160329.GO1275@n2100.arm.linux.org.uk>
- <EF62F09C0797D947AD4180A1043C0DF734934E9D@DLEE10.ent.ti.com>
-Message-ID: <20120207105820.367361c5@notabene.brown>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 06 Feb 2012 16:20:56 -0800
+Subject: Common clock API for i.MX
+In-Reply-To: <20120125084533.GD1068@n2100.arm.linux.org.uk>
+References: <CAKGA1bkHgnJQs3_n6QtQjf-8xaPn0YnxMmE2Q=+opWcsp10zQA@mail.gmail.com>
+ <20120125084533.GD1068@n2100.arm.linux.org.uk>
+Message-ID: <4F306E68.1090507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 5 Feb 2012 17:57:40 +0000 "Woodruff, Richard" <r-woodruff2@ti.com>
-wrote:
+On 01/25/2012 12:45 AM, Russell King - ARM Linux wrote:
+>
+> My conclusion, therefore, is that there's very little actual interest
+> amongst the ARM community to move towards a common clk API.
 
-> 
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > Sent: Sunday, February 05, 2012 10:03 AM
-> > To: Woodruff, Richard
-> 
-> > On Sun, Feb 05, 2012 at 03:37:21PM +0000, Woodruff, Richard wrote:
-> > > [x] What is acceptable depends is not black and white.  Is there some
-> > > QOS mapping which can be set per channel which allows runtime PM to
-> > > pick a best chose (which may allow for loss and frame issues)?.
-> > 
-> > What you're asking is whether there's anything in the kernel which can
-> > predict when the next character is to arrive.
-> 
-> No, this was not the comment's intent.
-> 
-> > But, the fact of the matter is that deriving the UART clocks from a PLL
-> > which takes a finite time to lock, and the PLL is shut down during runtime
-> > PM _is_ _going_ _to_ _cause_ _problems_.  There is absolutely no getting
-> > away from that.
-> 
-> Yes this is one of the issues to be worked around.
-> 
-> > Let's take your modem example.  Modems today would typically be used with
-> > some IP based protocol, probably PPP based.  Incoming traffic on IP is
-> > entirely unpredictable.  You wouldn't know when the next character would
-> > be received.
-> > 
-> > One solution to this is to transmit an 0xff character before your real
-> > data to ensure that your end is awake and properly synchronized...
-> 
-> This approach as you say has issues.  This is solved in different ways for modems.
-> 
-> <sleep>My observation is modem software which many talk over ppp over ip over serial of some sort (might be uart, might be usb), will send a command to the modem to go into a low power mode. Now you can cut clocks with out hurting modem and getting SOC power.
-> 
-> <wake>When some event happens at modem or processor (timer near beacon or other) the modem or apps processor can signal the other with some wake event (maybe over gpio) which then puts system in a state where it can receive data in trusted manner.
-> 
-> The modem channel driver try's to inform kernel about entering/exiting modes to set expectation.
+MSM is most certainly interested.
 
-I think the correct way to "inform the kernel" would be with the 'CREAD'
-c_cflag in termios.  Clearing it indicates that we don't expect to read which
-would allow the UART to go to sleep.
-When the GPIO interrupt arrives, we would use termios to set CREAD and then
-start talking to the modem.
+> I'm rather disappointed by that, and have been wondering for some time
+> why I wasted my time over the clk_prepare() stuff, and wondering why the
+> hell I bothered putting it in mainline.  I must have been under the
+> mistaken impression that this is something people wanted.  Obviously not.
 
-However it is easy to imagine situations where this wouldn't be enough.
-A fairly obvious way to wake a sleeping serial connection is with a 'break'.
-I have a GPS which can be put to sleep and then woken by sending a 'break'.
-Similarly the OMAP uart can reliably receive a break when asleep, but cannot
-reliably receive any other input.
+The time you spent on this certainly wasn't a waste. Once it got into 
+the mainline, we already back ported the stubs into our kernel tree. I 
+have already laid out a plan to migrate of all MSM drivers to the new 
+APIs and it's work in progress. Some drivers devs are already working on it.
 
-Though maybe if BRKINT is set in c_iflag, then we could still receive a break
-even when CREAD is clear.  Then clearing CREAD would be enough to allow
-low-power mode.
+Unfortunately, the fact that not all the MSM drivers are already merged 
+onto the mailine is a separate issue that I don't have much control 
+over. So, the interest for these APIs aren't easily visible to you.
 
-> 
-> > So, go ahead with having PM drop random characters if you want, but don't
-> > expect anyone in their right mind to accept broken workarounds to the
-> > kernel serial driver to try to drop maybe 16 characters or more at a time
-> > on the floor when a framing error occurs just because the PM is broken.
-> 
-> No character was dropped in modem example.  On the UART-to-Debug console it may be ok to drop a character.  Ether needs a coordination hook.
+> There's a good saying here: actions speak louder than words.  The action
+> here is the lack of patches from platform maintainers.  That definitely
+> shouts.
 
-I don't think it is really OK to drop chars on the UART-to-Debug console.
-However it is OK to drop the BAUD rate to 57600 where we can wake up in time
-for to catch the first bit.  So if you want power saving, drop the console
-buad rate.
+You are welcome to look at our kernel tree for proof of interest. I know 
+internal trees aren't of much relevance to you, but you can take that as 
+a precursor of what to expect when changes get pushed upstream.
 
-So I would suggest:
- - remove the autosuspend timeouts
- - allow runtime_pm to shutdown the device when it is not open, or when
-   rate is 57600 or below, or when 'CREAD' is clear
- - keep runtime_pm active whenever there are bytes in the output queue or
-   fifo
+> As a result of the lack of motivation by others over this, I've lost
+> interest in it.  Sorry.
+Hopefully, this email is of some help in restoring your interest.
 
-The only case that wouldn't support is when a device will wake up the SOC by
-sending a non-break character which it is OK to receive corrupted.  The tty
-would have to be in !CREAD for that to happen, and then there would be no way
-for the app to know that a non-break character was received.
-Would it be reasonable to treat any input while CREAD is clear as a break?
+Thanks,
+Saravana
 
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120207/fe3e4d1c/attachment.sig>
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
