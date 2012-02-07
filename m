@@ -1,63 +1,59 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon,  6 Feb 2012 17:09:15 -0800
-Subject: [PATCH] ARM: tegra: Demote EMC clock inconsistency BUG to WARN
-Message-ID: <1328576955-6295-1-git-send-email-swarren@nvidia.com>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Tue, 7 Feb 2012 01:13:04 +0000
+Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
+ in non-DMA" added to tty tree
+In-Reply-To: <20120207105820.367361c5@notabene.brown>
+References: <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
+ <20120203150708.386951d2@notabene.brown>
+ <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
+ <20120203205401.5ddf241d@notabene.brown>
+ <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
+ <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
+ <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
+ <20120204163931.GH1275@n2100.arm.linux.org.uk>
+ <EF62F09C0797D947AD4180A1043C0DF734934E36@DLEE10.ent.ti.com>
+ <20120205160329.GO1275@n2100.arm.linux.org.uk>
+ <EF62F09C0797D947AD4180A1043C0DF734934E9D@DLEE10.ent.ti.com>
+ <20120207105820.367361c5@notabene.brown>
+Message-ID: <EF62F09C0797D947AD4180A1043C0DF734938ED1@DLEE10.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When this inconsistency occurs, the system will typically operate without
-issue, it's just that EMC scaling won't optimally. Convert the BUG_ON to
-a WARN_ONCE in order to allow the kernel to boot, but still complain.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/tegra2_clocks.c |   30 +++++++++++++++++++++++++-----
- 1 files changed, 25 insertions(+), 5 deletions(-)
+> From: NeilBrown [mailto:neilb at suse.de]
+> Sent: Monday, February 06, 2012 5:58 PM
+> To: Woodruff, Richard
 
-diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 74d314fd..592a4ee 100644
---- a/arch/arm/mach-tegra/tegra2_clocks.c
-+++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -1143,15 +1143,35 @@ static void tegra2_emc_clk_init(struct clk *c)
- 
- static long tegra2_emc_clk_round_rate(struct clk *c, unsigned long rate)
- {
--	long new_rate = rate;
-+	long emc_rate;
-+	long clk_rate;
- 
--	new_rate = tegra_emc_round_rate(new_rate);
--	if (new_rate < 0)
-+	/*
-+	 * The slowest entry in the EMC clock table that is@least as
-+	 * fast as rate.
-+	 */
-+	emc_rate = tegra_emc_round_rate(rate);
-+	if (emc_rate < 0)
- 		return c->max_rate;
- 
--	BUG_ON(new_rate != tegra2_periph_clk_round_rate(c, new_rate));
-+	/*
-+	 * The fastest rate the PLL will generate that is at most the
-+	 * requested rate.
-+	 */
-+	clk_rate = tegra2_periph_clk_round_rate(c, emc_rate);
-+
-+	/*
-+	 * If this fails, and emc_rate > clk_rate, it's because the maximum
-+	 * rate in the EMC tables is larger than the maximum rate of the EMC
-+	 * clock. The EMC clock's max rate is the rate it was running when the
-+	 * kernel booted. Such a mismatch is probably due to using the wrong
-+	 * BCT, i.e. using a Tegra20 BCT with an EMC table written for Tegra25.
-+	 */
-+	WARN_ONCE(emc_rate != clk_rate,
-+		"emc_rate %ld != clk_rate %ld",
-+		emc_rate, clk_rate);
- 
--	return new_rate;
-+	return emc_rate;
- }
- 
- static int tegra2_emc_clk_set_rate(struct clk *c, unsigned long rate)
--- 
-1.7.5.4
+Apologies for mangled mails... I am years over due ditching current method.
+
+> I don't think it is really OK to drop chars on the UART-to-Debug console.
+> However it is OK to drop the BAUD rate to 57600 where we can wake up in
+> time
+> for to catch the first bit.  So if you want power saving, drop the console
+> buad rate.
+> 
+> So I would suggest:
+>  - remove the autosuspend timeouts
+>  - allow runtime_pm to shutdown the device when it is not open, or when
+>    rate is 57600 or below, or when 'CREAD' is clear
+>  - keep runtime_pm active whenever there are bytes in the output queue or
+>    fifo
+
+Yes slower baud + use of flow control should help. OMAP4 is like 10x better than OMAP2 with OMAP3 in middle.
+
+> The only case that wouldn't support is when a device will wake up the SOC
+> by
+> sending a non-break character which it is OK to receive corrupted.  The
+> tty
+> would have to be in !CREAD for that to happen, and then there would be no
+> way
+> for the app to know that a non-break character was received.
+> Would it be reasonable to treat any input while CREAD is clear as a break?
+
+Others would have to comment on this.  I never took this step as I was ok with degradation on debug console.
+
+If ever I wanted better logs I tended to telnet/ssh in on a network port which was better at retry at higher level.
+
+Regards,
+Richard W.
