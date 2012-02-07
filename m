@@ -1,23 +1,34 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 07 Feb 2012 15:52:00 +0200
-Subject: [PATCH v2 2/7] MFD: twl6040: Convert to i2c driver, and separate
- it from twl core
-In-Reply-To: <20120207134344.GP3332@opensource.wolfsonmicro.com>
-References: <1328619678-26080-1-git-send-email-peter.ujfalusi@ti.com>
- <1328619678-26080-3-git-send-email-peter.ujfalusi@ti.com>
- <20120207132925.GN3332@opensource.wolfsonmicro.com> <4F31298C.5090008@ti.com>
- <20120207134344.GP3332@opensource.wolfsonmicro.com>
-Message-ID: <4F312C80.2020108@ti.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 7 Feb 2012 06:11:42 -0800
+Subject: [PATCH][RFC] tracing/rcu: Add trace_##name##__rcuidle() static
+ tracepoint for inside rcu_idle_exit() sections
+In-Reply-To: <1328617976.2200.66.camel@gandalf.stny.rr.com>
+References: <4F2B1307.5010207@gmail.com>
+ <1328223819.5882.133.camel@gandalf.stny.rr.com>
+ <20120202232736.GL2518@linux.vnet.ibm.com>
+ <1328237131.5882.135.camel@gandalf.stny.rr.com>
+ <20120203060458.GF2380@linux.vnet.ibm.com>
+ <1328295309.5882.178.camel@gandalf.stny.rr.com>
+ <20120203194005.GK2382@linux.vnet.ibm.com>
+ <1328563113.2200.39.camel@gandalf.stny.rr.com>
+ <20120206233804.GM5941@linux.vnet.ibm.com>
+ <1328617976.2200.66.camel@gandalf.stny.rr.com>
+Message-ID: <20120207141142.GP5941@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2012 03:43 PM, Mark Brown wrote:
-> That just sounds far too icky - I'm really not happy that people have
-> been doing that in ASoC TBH, it just makes everything more tricky than
-> it should be.  It save a little bit of effort with the control but just
-> pushes that complexity elsewhere where you're not expecting it.
+On Tue, Feb 07, 2012 at 07:32:56AM -0500, Steven Rostedt wrote:
+> On Mon, 2012-02-06 at 15:38 -0800, Paul E. McKenney wrote:
+> 
+> > Aside from the "pre;" below needing to precede rcu_read_lock_sched_notrace()
+> > as Josh noted, this looks reasonable to me.
+> > 
+> 
+> Does this mean I can add an Acked-by from you and Josh? Obviously with
+> the post "pre" change.
 
-Fair enough. I'll find a way to do this properly.
+With the "pre" change,
 
-Thanks,
-P?ter
+Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+
+							Thanx, Paul
