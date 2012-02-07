@@ -1,121 +1,188 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 7 Feb 2012 17:14:12 +0100
-Subject: [PATCH 1/1] of: introduce helper to manage boolean
-In-Reply-To: <4F313F9B.4020500@gmail.com>
-References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
- <4F313F9B.4020500@gmail.com>
-Message-ID: <20120207161412.GG15647@game.jcrosoft.org>
+Date: Tue,  7 Feb 2012 17:18:30 +0100
+Subject: [PATCH 4/6 v3] of/mtd/nand: add generic bindings and helpers
+In-Reply-To: <1328524512-18159-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1328524512-18159-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1328631510-11688-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:13 Tue 07 Feb     , Rob Herring wrote:
-> On 02/06/2012 10:13 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > of_property_read_bool
-> > 
-> > Search for a property in a device node and read a 32-bit value from
-> > it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
-> > 
-> > this will allow to disable a boolean
-> > 
-> > is-ok;          => true
-> > is-ok = <1>;    => true
-> > is-ok = <0>;    => false
-> > 
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> 
-> > ---
-> > Hi,
-> > 
-> > 	if this is ok I'll rebase my mtd and i2c patch to use it
-> > 
-> 
-> I'm assuming you'll want to merge this patch with your mtd and i2c
-> patches. If you want me to apply, let me know.
-yes please
+- nand-ecc-mode : String, operation mode of the NAND ecc mode.
+  Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
+  "soft_bch".
+- nand-bus-width : 8 or 16 bus width if not present 8
+- nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
 
-I rebase the of_mtd over it
-
-if you can apply it too
-Acked-by Grant
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+---
+v3:
+	rebase over "of: introduce helper to manage boolean"
 
 Best Regards,
 J.
-> 
-> Rob
-> 
-> > Best Regards,
-> > J.
-> >  drivers/of/base.c  |   30 ++++++++++++++++++++++++++++++
-> >  include/linux/of.h |    8 ++++++++
-> >  2 files changed, 38 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/of/base.c b/drivers/of/base.c
-> > index 133908a..a0eaf08 100644
-> > --- a/drivers/of/base.c
-> > +++ b/drivers/of/base.c
-> > @@ -686,6 +686,36 @@ int of_property_read_u64(const struct device_node *np, const char *propname,
-> >  EXPORT_SYMBOL_GPL(of_property_read_u64);
-> >  
-> >  /**
-> > + * of_property_read_bool - Find and read a boolean from a property
-> > + * @np:		device node from which the property value is to be read.
-> > + * @propname:	name of the property to be searched.
-> > + *
-> > + * Search for a property in a device node and read a 32-bit value from
-> > + * it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
-> > + *
-> > + * is-ok;	=> true
-> > + * is-ok = <1>;	=> true
-> > + * is-ok = <0>;	=> false
-> > + */
-> > +int of_property_read_bool(const struct device_node *np, const char *propname)
-> > +{
-> > +	u32 reg;
-> > +	int ret = of_property_read_u32(np, propname, &reg);
-> > +
-> > +	switch (ret) {
-> > +	case -EINVAL:
-> > +		return false;
-> > +	case -ENODATA:
-> > +		return true;
-> > +	case 0:
-> > +		return reg == 1;
-> > +	default:
-> > +		return ret;
-> > +	}
-> > +}
-> > +EXPORT_SYMBOL_GPL(of_property_read_bool);
-> > +
-> > +/**
-> >   * of_property_read_string - Find and read a string from a property
-> >   * @np:		device node from which the property value is to be read.
-> >   * @propname:	name of the property to be searched.
-> > diff --git a/include/linux/of.h b/include/linux/of.h
-> > index a75a831..2e5f77b 100644
-> > --- a/include/linux/of.h
-> > +++ b/include/linux/of.h
-> > @@ -210,6 +210,8 @@ extern int of_property_read_u32_array(const struct device_node *np,
-> >  				      size_t sz);
-> >  extern int of_property_read_u64(const struct device_node *np,
-> >  				const char *propname, u64 *out_value);
-> > +extern int of_property_read_bool(const struct device_node *np,
-> > +				const char *propname);
-> >  
-> >  extern int of_property_read_string(struct device_node *np,
-> >  				   const char *propname,
-> > @@ -288,6 +290,12 @@ static inline int of_property_read_u32_array(const struct device_node *np,
-> >  	return -ENOSYS;
-> >  }
-> >  
-> > +static inline int of_property_read_bool(const struct device_node *np,
-> > +				const char *propname)
-> > +{
-> > +	return -ENOSYS;
-> > +}
-> > +
-> >  static inline int of_property_read_string(struct device_node *np,
-> >  					  const char *propname,
-> >  					  const char **out_string)
+ Documentation/devicetree/bindings/mtd/nand.txt |    7 ++
+ drivers/of/Kconfig                             |    4 +
+ drivers/of/Makefile                            |    1 +
+ drivers/of/of_mtd.c                            |   85 ++++++++++++++++++++++++
+ include/linux/of_mtd.h                         |   19 +++++
+ 5 files changed, 116 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/nand.txt
+ create mode 100644 drivers/of/of_mtd.c
+ create mode 100644 include/linux/of_mtd.h
+
+diff --git a/Documentation/devicetree/bindings/mtd/nand.txt b/Documentation/devicetree/bindings/mtd/nand.txt
+new file mode 100644
+index 0000000..03855c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/nand.txt
+@@ -0,0 +1,7 @@
++* MTD generic binding
++
++- nand-ecc-mode : String, operation mode of the NAND ecc mode.
++  Supported values are: "none", "soft", "hw", "hw_syndrome", "hw_oob_first",
++  "soft_bch".
++- nand-bus-width : 8 or 16 bus width if not present 8
++- nand-on-flash-bbt: boolean to enable on flash bbt option if not present false
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index 268163d..fa666a9 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -90,4 +90,8 @@ config OF_PCI_IRQ
+ 	help
+ 	  OpenFirmware PCI IRQ routing helpers
+ 
++config OF_MTD
++	depends on MTD
++	def_bool y
++
+ endmenu # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index a73f5a5..8c4980a 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -12,3 +12,4 @@ obj-$(CONFIG_OF_SELFTEST) += selftest.o
+ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+ obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
++obj-$(CONFIG_OF_NET)	+= of_mtd.o
+diff --git a/drivers/of/of_mtd.c b/drivers/of/of_mtd.c
+new file mode 100644
+index 0000000..e6a1074
+--- /dev/null
++++ b/drivers/of/of_mtd.c
+@@ -0,0 +1,85 @@
++/*
++ * Copyright 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * OF helpers for mtd.
++ *
++ * This file is released under the GPLv2
++ *
++ */
++#include <linux/kernel.h>
++#include <linux/of_mtd.h>
++#include <linux/mtd/nand.h>
++#include <linux/export.h>
++
++/**
++ * It maps 'enum nand_ecc_modes_t' found in include/linux/mtd/nand.h
++ * into the device tree binding of 'nand-ecc', so that MTD
++ * device driver can get nand ecc from device tree.
++ */
++static const char *nand_ecc_modes[] = {
++	[NAND_ECC_NONE]		= "none",
++	[NAND_ECC_SOFT]		= "soft",
++	[NAND_ECC_HW]		= "hw",
++	[NAND_ECC_HW_SYNDROME]	= "hw_syndrome",
++	[NAND_ECC_HW_OOB_FIRST]	= "hw_oob_first",
++	[NAND_ECC_SOFT_BCH]	= "soft_bch",
++};
++
++/**
++ * of_get_nand_ecc_mode - Get nand ecc mode for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * The function gets ecc mode string from property 'nand-ecc-mode',
++ * and return its index in nand_ecc_modes table, or errno in error case.
++ */
++const int of_get_nand_ecc_mode(struct device_node *np)
++{
++	const char *pm;
++	int err, i;
++
++	err = of_property_read_string(np, "nand-ecc-mode", &pm);
++	if (err < 0)
++		return err;
++
++	for (i = 0; i < ARRAY_SIZE(nand_ecc_modes); i++)
++		if (!strcasecmp(pm, nand_ecc_modes[i]))
++			return i;
++
++	return -ENODEV;
++}
++EXPORT_SYMBOL_GPL(of_get_nand_ecc_mode);
++
++/**
++ * of_get_nand_bus_width - Get nand bus witdh for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * return bus width option, or errno in error case.
++ */
++int of_get_nand_bus_width(struct device_node *np)
++{
++	u32 val;
++
++	if (of_property_read_u32(np, "nand-bus-width", &val))
++		return 8;
++
++	switch(val) {
++	case 8:
++	case 16:
++		return val;
++	default:
++		return -EIO;
++	}
++}
++EXPORT_SYMBOL_GPL(of_get_nand_bus_width);
++
++/**
++ * of_get_nand_on_flash_bbt - Get nand on flash bbt for given device_node
++ * @np:	Pointer to the given device_node
++ *
++ * return true if 1 false other wise
++ */
++bool of_get_nand_on_flash_bbt(struct device_node *np)
++{
++	return !!of_property_read_bool(np, "nand-on-flash-bbt");
++}
++EXPORT_SYMBOL_GPL(of_get_nand_on_flash_bbt);
+diff --git a/include/linux/of_mtd.h b/include/linux/of_mtd.h
+new file mode 100644
+index 0000000..bae1b60
+--- /dev/null
++++ b/include/linux/of_mtd.h
+@@ -0,0 +1,19 @@
++/*
++ * Copyright 2012 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * OF helpers for mtd.
++ *
++ * This file is released under the GPLv2
++ */
++
++#ifndef __LINUX_OF_MTD_H
++#define __LINUX_OF_NET_H
++
++#ifdef CONFIG_OF_MTD
++#include <linux/of.h>
++extern const int of_get_nand_ecc_mode(struct device_node *np);
++int of_get_nand_bus_width(struct device_node *np);
++bool of_get_nand_on_flash_bbt(struct device_node *np);
++#endif
++
++#endif /* __LINUX_OF_MTD_H */
+-- 
+1.7.7
