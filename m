@@ -1,54 +1,64 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 7 Feb 2012 11:50:58 +0000
-Subject: [PATCH 2/7] Add various hugetlb page table fix
-In-Reply-To: <4F308169.4010904@gmail.com>
+Date: Tue, 7 Feb 2012 11:54:48 +0000
+Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
+In-Reply-To: <4F3085B9.9070205@gmail.com>
 References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
- <20120131095811.GB889@n2100.arm.linux.org.uk>
- <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
- <4F28AD1D.1000106@gmail.com> <20120206162656.GG26538@arm.com>
- <4F308169.4010904@gmail.com>
-Message-ID: <20120207115058.GD3351@arm.com>
+ <1327910238-18704-2-git-send-email-bill4carson@gmail.com>
+ <20120206170709.GJ26538@arm.com> <4F3085B9.9070205@gmail.com>
+Message-ID: <20120207115448.GE3351@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2012 at 01:42:01AM +0000, bill4carson wrote:
-> On 2012?02?07? 00:26, Catalin Marinas wrote:
-> > On Wed, Feb 01, 2012 at 03:10:21AM +0000, bill4carson wrote:
-> >> Why L_PTE_HUGEPAGE is needed?
-> >>
-> >> hugetlb subsystem will call pte_page to derive the corresponding page
-> >> struct from a given pte, and pte_pfn is used first to convert pte into
-> >> a page frame number.
+On Tue, Feb 07, 2012 at 02:00:25AM +0000, bill4carson wrote:
+> On 2012?02?07? 01:07, Catalin Marinas wrote:
+> > On Mon, Jan 30, 2012 at 07:57:12AM +0000, bill4carson at gmail.com wrote:
+> >> +static inline void set_hugepte_section(struct mm_struct *mm, unsigned long addr,
+> >> +                                  pte_t *ptep, pte_t pte)
+> >> +{
+> >> +       pgd_t *pgd;
+> >> +       pud_t *pud;
+> >> +       pmd_t *pmd;
+> >> +
+> >> +       int col, row;
+> >> +       pte_t **huge_linuxpte =&mm->huge_2m_pte[0];
+> >> +
+> >> +       row = HUGEPAGE_2M_PTE_ARRAY_ROW(addr);
+> >> +       col = HUGEPAGE_2M_PTE_ARRAY_COL(addr);
+> >> +
+> >> +       /* an valid pte pointer is expected */
+> >> +       BUG_ON(huge_linuxpte[row] == 0);
+> >> +       BUG_ON(ptep !=&huge_linuxpte[row][col]);
+> >> +
+> >> +       /* set linux pte first */
+> >> +       huge_linuxpte[row][col] = pte;
+> >> +
+> >> +       /* set hardware pte */
+> >> +       pgd = pgd_offset(mm, addr);
+> >> +       pud = pud_offset(pgd, addr);
+> >> +       pmd = pmd_offset(pud, addr);
+> >> +
+> >> +       set_hugepte_at(mm, addr, pmd, pte);
+> >> +}
 > >
-> > Are you sure the pte_pfn() conversion is right? Does it need to be
-> > different from the 4K pfn?
-...
-> pte_page is defined as following to derive page struct from a given pte.
-> This macro is used both in generic mm as well as hugetlb sub-system, so
-> we need do the switch in pte_pfn to mark huge page based linux pte out
-> of normal page based linux pte, that's what L_PTE_HUGEPAGE for.
+> > I haven't followed the whole structure of your patches but do we need to
+> > walk the page tables here? Isn't the ptep the same as the pmd when
+> > passed to this function (at least it was with my LPAE implementation).
 > 
-> #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
+> Here, ptep is not the same as pmd, mm layer always manages linux pte.
+> For normal page, linux pte and hardware pte is just an 2048 bytes offset
+> away and cpu_v7_set_pte_ext can set both linux/hardware pte easily.
 > 
-> So L_PTE_HUGEPAGE is *NOT* set in normal page based linux pte,
-> linux pte bits[31:12] is the page frame number;
+> For huge page, linux pte is stored somewhere else,far away from hardware
+> pte table, in set_hugepte_section, "ptep" is the huge page based linux
+> pte address, first set linux pte value "pte" in there; and hardware pmd
+> address could only be derived from "addr" by a page table walk, then
+> setting hardware pmd value in set_hugepte_at, which
+> cpu_v7_set_hugepte_ext does the whole job.
 
-I agree.
-
-> otherwise, we got a huge page based linux pte, and linux pte
-> bits[31:20] is page frame number for SECTION mapping, and bits[31:24]
-> is page frame number for SUPER-SECTION mapping.
-
-Actually it is still 31:12 but with bits 19:12 or 23:12 masked out. So
-you do the correct shift by PAGE_SHIFT with the additional masking for
-huge pages (harmless).
-
-But do we actually need this masking? Do the huge_pte_offset() or
-huge_pte_alloc() functions return the Linux pte (pmd) for the huge page?
-If yes, can we not ensure that bits 19:12 are already zero? This
-shouldn't be any different from the 4K Linux pte but with an address
-aligned to 1MB.
+OK. I thought we already have some pointer in the Linux pmd for the
+actual hardware pmd. Walking the page table isn't expensive in this
+case, with only 2 levels. For LPAE we don't even need this since we
+don't have a separate Linux pte/pmd.
 
 -- 
 Catalin
