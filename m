@@ -1,49 +1,41 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 06 Feb 2012 16:20:56 -0800
-Subject: Common clock API for i.MX
-In-Reply-To: <20120125084533.GD1068@n2100.arm.linux.org.uk>
-References: <CAKGA1bkHgnJQs3_n6QtQjf-8xaPn0YnxMmE2Q=+opWcsp10zQA@mail.gmail.com>
- <20120125084533.GD1068@n2100.arm.linux.org.uk>
-Message-ID: <4F306E68.1090507@codeaurora.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 06 Feb 2012 19:36:28 -0500
+Subject: [PATCH][RFC] tracing/rcu: Add trace_##name##__rcuidle() static
+ tracepoint for inside rcu_idle_exit() sections
+In-Reply-To: <20120206220502.GA21340@leaf>
+References: <20120202190708.GE2518@linux.vnet.ibm.com>
+ <87obtgc1xx.fsf@ti.com> <4F2B1307.5010207@gmail.com>
+ <1328223819.5882.133.camel@gandalf.stny.rr.com>
+ <20120202232736.GL2518@linux.vnet.ibm.com>
+ <1328237131.5882.135.camel@gandalf.stny.rr.com>
+ <20120203060458.GF2380@linux.vnet.ibm.com>
+ <1328295309.5882.178.camel@gandalf.stny.rr.com>
+ <20120203194005.GK2382@linux.vnet.ibm.com>
+ <1328563113.2200.39.camel@gandalf.stny.rr.com>
+ <20120206220502.GA21340@leaf>
+Message-ID: <1328574988.2200.54.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2012 12:45 AM, Russell King - ARM Linux wrote:
->
-> My conclusion, therefore, is that there's very little actual interest
-> amongst the ARM community to move towards a common clk API.
+On Mon, 2012-02-06 at 14:05 -0800, Josh Triplett wrote:
+> >   */
+> > -#define __DO_TRACE(tp, proto, args, cond)				\
+> > +#define __DO_TRACE(tp, proto, args, cond, pre, post)			\
+> >  	do {								\
+> >  		struct tracepoint_func *it_func_ptr;			\
+> >  		void *it_func;						\
+> > @@ -123,6 +123,7 @@ static inline void tracepoint_synchroniz
+> >  		if (!(cond))						\
+> >  			return;						\
+> >  		rcu_read_lock_sched_notrace();				\
+> > +		pre;							\
+> >  		it_func_ptr = rcu_dereference_sched((tp)->funcs);	\
+> 
+> This results in calling rcu_idle_exit after rcu_read_lock; it needs to
+> occur before.
 
-MSM is most certainly interested.
+Bah! Good catch. The fumes of my furnace must have been sending out some
+strong narcotics. Yeah yeah, that's the reason for this mistake, and
+I'll stand by it!
 
-> I'm rather disappointed by that, and have been wondering for some time
-> why I wasted my time over the clk_prepare() stuff, and wondering why the
-> hell I bothered putting it in mainline.  I must have been under the
-> mistaken impression that this is something people wanted.  Obviously not.
-
-The time you spent on this certainly wasn't a waste. Once it got into 
-the mainline, we already back ported the stubs into our kernel tree. I 
-have already laid out a plan to migrate of all MSM drivers to the new 
-APIs and it's work in progress. Some drivers devs are already working on it.
-
-Unfortunately, the fact that not all the MSM drivers are already merged 
-onto the mailine is a separate issue that I don't have much control 
-over. So, the interest for these APIs aren't easily visible to you.
-
-> There's a good saying here: actions speak louder than words.  The action
-> here is the lack of patches from platform maintainers.  That definitely
-> shouts.
-
-You are welcome to look at our kernel tree for proof of interest. I know 
-internal trees aren't of much relevance to you, but you can take that as 
-a precursor of what to expect when changes get pushed upstream.
-
-> As a result of the lack of motivation by others over this, I've lost
-> interest in it.  Sorry.
-Hopefully, this email is of some help in restoring your interest.
-
-Thanks,
-Saravana
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+-- Steve
