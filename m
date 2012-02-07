@@ -1,51 +1,30 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 07 Feb 2012 10:22:29 +0100
-Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
-In-Reply-To: <4F30E324.4000005@stericsson.com>
-References: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
- <4F2F9B2C.8030009@stericsson.com> <4F2FDF54.8080701@linaro.org>
- <4F30E324.4000005@stericsson.com>
-Message-ID: <4F30ED55.6080908@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 07 Feb 2012 10:35:24 +0100
+Subject: [PATCH 3/3] ARM: remove empty disable_fiq and arch_ret_to_user
+ macros
+In-Reply-To: <1328562200-8810-4-git-send-email-robherring2@gmail.com>
+References: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
+ <1328562200-8810-4-git-send-email-robherring2@gmail.com>
+Message-ID: <4F30F05C.6070400@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2012 09:39 AM, Rickard Andersson wrote:
-> On 02/06/2012 03:10 PM, Daniel Lezcano wrote:
->> On 02/06/2012 10:19 AM, Rickard Andersson wrote:
->>> Hi!
->>>
->>> Our comments:
->> Thanks Rickard and Jonas for your comments.
->>
->>> - function names don't match commit comment disable/enable vs
->>> recouple/decouple. Decouple is a better name than disable, because GIC
->>> is not really disabled it is just disconnected.
->> Ok, that makes sense.
->>
->>> - there is no reason to place these functions inside the db8500-prcmu.c
->>> file. There is so much stuff in the PRCMU register base so we can not
->>> have everything in one file. Why not have it as it is?
->> Why spread the prcmu code when it is related to the prcmu ?
->>
->> Linus ? What do you think ?
->>
->>> - why the gic_mask function?
->> Because the register has 31 bits reserved which could be used later
->> without modifying this function.
-> This is will most likely not happen. If that happens we could add that
-> function then. We should remove it for now.
->>> - The original code has been updated and now looks like this:
->> That is the same code, except the while loop where, if this code
->> assumption is correct, means we will do only one iteration in the loop.
-> Yes, but in theory you can be stuck forever in that loop, so please
-> remove the loop.
+On 02/06/2012 10:03 PM, Rob Herring :
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Now that most platforms don't need disable_fiq and arch_ret_to_user
+> macros, we can remove the empty macros or empty entry-macro.S files.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/mach-at91/include/mach/entry-macro.S      |    6 ----
 
-Mmmh, can you elaborate please ? I think a comment and/or an error 
-should be returned in this case, no ?
+For AT91:
 
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+[..]
+
+Best regards,
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Nicolas Ferre
