@@ -1,47 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Feb 2012 02:07:14 +0100
-Subject: An extremely simplified pinctrl bindings proposal
-In-Reply-To: <20120206235733.GY1426@atomide.com>
-References: <74CDBE0F657A3D45AFBB94109FB122FF178E5D3160@HQMAIL01.nvidia.com>
- <CACRpkdahin4srDh7dphgvq306gjz7CGP=h4dVkUY+w0z0wpXRQ@mail.gmail.com>
- <4F2F6AE2.1040504@nvidia.com>
- <CACRpkdbtTPSoX1x4aBtNVGZ2Qex9t77D09V9JgON_jfShQdx6w@mail.gmail.com>
- <20120206190315.GU1426@atomide.com>
- <CACRpkdZthbejmTqRJAWHb8jU-p8LPT_+zj_CY1q0voMb4FKz2Q@mail.gmail.com>
- <20120206210456.GV1426@atomide.com>
- <CACRpkdYrbD3PpJ3wb69yb3Ya8SeZJnPpgJdtttjWTkS5xsD-4g@mail.gmail.com>
- <20120206235733.GY1426@atomide.com>
-Message-ID: <CACRpkdZVvSOOUvobiiahHdyP8pNcX65QRLeoGALBB6t++Ga5vg@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon,  6 Feb 2012 17:09:15 -0800
+Subject: [PATCH] ARM: tegra: Demote EMC clock inconsistency BUG to WARN
+Message-ID: <1328576955-6295-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2012 at 12:57 AM, Tony Lindgren <tony@atomide.com> wrote:
+When this inconsistency occurs, the system will typically operate without
+issue, it's just that EMC scaling won't optimally. Convert the BUG_ON to
+a WARN_ONCE in order to allow the kernel to boot, but still complain.
 
->> I'm not sure if I'm following completely, if this is inside the devicetree-based
->> driver file, would it work to just add a struct dentry * to the
->> pinctrl_desc where you put a per-driver file?
->
-> I was thinking generic debufs entries for all drivers.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/tegra2_clocks.c |   30 +++++++++++++++++++++++++-----
+ 1 files changed, 25 insertions(+), 5 deletions(-)
 
-OK.
-
->> Or maybe add extern void pinctrl_add_debugfs(struct dentry *) that adds
->> a new file to the existing per-driver directory through the core and then
->> have this add that file?
->
-> Sounds like you've thought it further than me already :)
->
-> Maybe that's the way to go to solve the one register for
-> multiple pins issue.
->
->> Or did you mean that the core.c should be register-aware?
->
-> I was just thinking string name ignoring core.c, so that would
-> be the pinctrl_add_debugfs() option then. Do you see problems
-> with this approach?
-
-No probs, something like that you call any number of times
-after registering the core device should work fine I guess.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 74d314fd..592a4ee 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -1143,15 +1143,35 @@ static void tegra2_emc_clk_init(struct clk *c)
+ 
+ static long tegra2_emc_clk_round_rate(struct clk *c, unsigned long rate)
+ {
+-	long new_rate = rate;
++	long emc_rate;
++	long clk_rate;
+ 
+-	new_rate = tegra_emc_round_rate(new_rate);
+-	if (new_rate < 0)
++	/*
++	 * The slowest entry in the EMC clock table that is@least as
++	 * fast as rate.
++	 */
++	emc_rate = tegra_emc_round_rate(rate);
++	if (emc_rate < 0)
+ 		return c->max_rate;
+ 
+-	BUG_ON(new_rate != tegra2_periph_clk_round_rate(c, new_rate));
++	/*
++	 * The fastest rate the PLL will generate that is at most the
++	 * requested rate.
++	 */
++	clk_rate = tegra2_periph_clk_round_rate(c, emc_rate);
++
++	/*
++	 * If this fails, and emc_rate > clk_rate, it's because the maximum
++	 * rate in the EMC tables is larger than the maximum rate of the EMC
++	 * clock. The EMC clock's max rate is the rate it was running when the
++	 * kernel booted. Such a mismatch is probably due to using the wrong
++	 * BCT, i.e. using a Tegra20 BCT with an EMC table written for Tegra25.
++	 */
++	WARN_ONCE(emc_rate != clk_rate,
++		"emc_rate %ld != clk_rate %ld",
++		emc_rate, clk_rate);
+ 
+-	return new_rate;
++	return emc_rate;
+ }
+ 
+ static int tegra2_emc_clk_set_rate(struct clk *c, unsigned long rate)
+-- 
+1.7.5.4
