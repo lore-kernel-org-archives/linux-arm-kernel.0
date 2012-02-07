@@ -1,44 +1,78 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 Feb 2012 21:18:10 +0100
-Subject: [RFC PATCH 00/11] Cortex-M3 support
-In-Reply-To: <20120122111230.GB14835@pengutronix.de>
-References: <20120122111230.GB14835@pengutronix.de>
-Message-ID: <20120207201810.GF8621@pengutronix.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 7 Feb 2012 12:25:30 -0800
+Subject: [PATCH 1/2] genalloc: add support of named pool
+In-Reply-To: <20120207025212.GA15647@game.jcrosoft.org>
+References: <1328466576-29384-1-git-send-email-plagnioj@jcrosoft.com>
+ <20120206152028.310656a3.akpm@linux-foundation.org>
+ <20120207025212.GA15647@game.jcrosoft.org>
+Message-ID: <20120207122530.bb88568a.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2012 at 12:12:30PM +0100, Uwe Kleine-K?nig wrote:
-> this series is mostly a port of patches done by Catalin Marinas for
-> 2.6.33. It's based on 3.3-rc1. There are still a few rough edges and I'm
-> sure I'm not aware of all of them as this deep architecture stuff is
-> mostly news for me. Some things are noted in the respective patches, I'm
-> sure you can find more.
-> 
-> My target machine is the EFM32 Giant Gecko by Energy Micro and my
-> complete tree can be found at
-> 
-> 	git://git.pengutronix.de/git/ukl/linux.git efm32
-> 
-> (with a gitweb being available at
-> 
-> 	http://git.pengutronix.de/?p=ukl/linux.git;a=shortlog;h=efm32
-> 
-> ).
-> 
-> I look forward to your comments.
-I didn't get much comments apart from a few trivial ones. I'd like to
-plan how to go forward here.
+On Tue, 7 Feb 2012 03:52:12 +0100
+Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
 
-Catalin, Russell, I guess it's just lack of time on your side that you
-didn't comment?
+> On 15:20 Mon 06 Feb     , Andrew Morton wrote:
+> > On Sun,  5 Feb 2012 19:29:35 +0100
+> > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > 
+> > > so we can get the pool in the driver by name instead of passing it via
+> > > parameter
+> > > 
+> > > this will be use on AT91 to get access from different drivers to the sram or
+> > > gpbr as example
+> > > 
+> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > > ---
+> > > Hi,
+> > > 
+> > > 	if you don't mind I'll apply this via at91 tree as it's needed to
+> > > 	finish a cleanup on at91 to allow multiple soc in the same kernel
+> > 
+> > Please do not do this.
+> > 
+> > The patch is still as buggy as it was when I reviewed it in December. 
+> > You didn't reply to my review email and you didn't reply to Steven
+> > Rothwell's review email and you fixed almost none of our review
+> > comments.
+> I did
+> 
+> all comment from Stephen Rothwell as integrated
+> 
+> I put the lock on the list as you request
+> I drop the race condition
+> 
+> I put the example
+> 
+> so what did I miss?
+> 
 
-There are a few things to fix and follow up (e.g. platform support,
-ftrace, adapt unwinding to the v7m model), but I first want to see the
-base patches in before I invest the time to address these.
+The interface remains racy and cannot be fixed, without a lot of work. 
 
-Best regards
-Uwe
+gen_pool_create_byname() is racy, doing the lookup before taking the
+lock.  This bug is easily fixed by doing the lookup while holding the
+lock.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+gen_pool_byname() returns a pointer to an object which can be released
+at any time, so any code which calls gen_pool_byname() cannot safely
+use that function's return value!
+
+The way in which the kernel solves this problem is to take a refcount
+against the object (while holding the lock).  The caller who obtained
+that refcount via the lookup function is responsible for doing some
+put() operation on it.  On the last put(), the object is freed.
+
+If a resource is to be shared between multiple subsystems then this
+issue should be addressed.
+
+
+Also, the patch still has coding-style errors, detected by checkpatch.
+
+
+Also, it is unobvious why we need a "lookup by name" ability.  If a
+subsystem want to access another subsystem's exported data structures
+then this can be done with globally-scoped C symbols.  But this is just
+a different way of doing lookup: the lifetime management issues should
+still be addressed.
