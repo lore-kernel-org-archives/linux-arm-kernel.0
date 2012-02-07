@@ -1,52 +1,47 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 7 Feb 2012 11:01:06 +0100
-Subject: [BUG] genirq: Race condition in ONESHOT IRQ handler disabling
- IRQ forever
-In-Reply-To: <20120207090305.GB32736@zhy>
-References: <20271.35831.227679.177366@ipc1.ka-ro> <20120207090305.GB32736@zhy>
-Message-ID: <20272.63074.235023.783459@ipc1.ka-ro>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Tue, 7 Feb 2012 15:32:22 +0530
+Subject: [PATCH 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
+In-Reply-To: <1328367090-10402-1-git-send-email-rnayak@ti.com>
+References: <1328367090-10402-1-git-send-email-rnayak@ti.com>
+Message-ID: <CANfBPZ-pD55YgneQSyfs1kKB-DUH8g7TQkKO7O6B95Ydfc8cFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Feb 4, 2012 at 8:21 PM, Rajendra Nayak <rnayak@ti.com> wrote:
+> This series mainly cleans up all instances of hardcoding's in
+> the driver based on pdev->id. This is cleanup leading to the
+> DT adaptation of omap_hsmmc driver.
+>
+> Patches are based on 3.3-rc2 and can be found here
+> git://gitorious.org/omap-pm/linux.git omap_hsmmc_cleanup
+>
+> Tested the patches on my omap4 boards (panda and SDP) but
+> haven't tested yet on omap3/2 since I did'nt have boards
+> handy. So any testing on any omap3/2 boards is really
+> appreciated.
 
-> On Mon, Feb 06, 2012 at 09:14:47AM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > I already sent this to <linux-kernel@vger.kernel.org> on Feb. 1, 2012
-> > but did not get any response there. So resending to a wider audience
-> > with improved subject line:
-> > 
-> > there is a race condition in the threaded IRQ handler code for oneshot
-> > interrupts that may lead to disabling an IRQ indefinitely. IRQs are
-> > masked before calling the hard-irq handler and are unmasked only after
-> > the soft-irq handler has been run. Thus if the hard-irq handler
-> > returns IRQ_HANDLED instead of IRQ_WAKE_THREAD, meaning the soft-irq
-> > will not be called, the interrupt will remain masked forever.
-> > 
-> > This can happen due to a short pulse on the interrupt line, that
-> > triggers the interrupt logic, but goes undetected by the hard-irq
-> > handler. The problem can be reproduced with the TSC2007 touch
-> > controller driver that uses ONESHOT interrupts.
-> 
-> Isn't it the responsibility of the driver (say TSC2007)?
-> 
-> In this case, TSC2007 should return IRQ_WAKE_THREAD IMHO.
-> 
-That would mean it had to return IRQ_WAKE_THREAD unconditionally
-making the return code useless.
-And it would cause an extra useless loop through the softirq
-handler.
+I gave it a spin on Beagleboard-XM (OMAP3630) with root filesystem
+on the SD card, and checked again on 4430SDP.
 
+Tested-by: Venkatraman S <svenkatr@ti.com>
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+>
+> regards,
+> Rajendra
+>
+> Balaji T K (3):
+> ?mmc: omap_hsmmc: use platform_get_resource_byname for tx/rx DMA
+> ? ?channels
+> ?mmc: omap_hsmmc: remove unused .set_sleep function
+> ?mmc: omap_hsmmc: Use OMAP_HSMMC_SUPPORTS_DUAL_VOLT flag to remove
+> ? ?host->id based hardcoding
+>
+> Rajendra Nayak (3):
+> ?mmc: omap_hsmmc: Get rid of omap_hsmmc_1_set_power function
+> ?mmc: omap_hsmmc: Get rid of omap_hsmmc_4_set_power function
+> ?mmc: omap_hsmmc: Don't expect MMC1 to always have vmmc supply
+>
+> ?arch/arm/plat-omap/include/plat/mmc.h | ? ?2 -
+> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? | ?158 +++------------------------------
+> ?2 files changed, 14 insertions(+), 146 deletions(-)
+>
