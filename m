@@ -1,112 +1,32 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 7 Feb 2012 16:25:10 +0100
-Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
-In-Reply-To: <4F3131FB.90809@linaro.org>
-References: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
- <4F2F9B2C.8030009@stericsson.com> <4F2FDF54.8080701@linaro.org>
- <4F30E324.4000005@stericsson.com> <4F30ED55.6080908@linaro.org>
- <4F30F594.7090607@stericsson.com> <4F3131FB.90809@linaro.org>
-Message-ID: <CAKfTPtA0_DaQDxwzwmcU0XG8SVKu_=rLy1drvZgYgicYUJ8yVA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 7 Feb 2012 15:26:27 +0000
+Subject: [PATCH v3 00/25] irq_domain generalization and refinement
+In-Reply-To: <20120205161348.GZ889@n2100.arm.linux.org.uk>
+References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
+ <20120204221748.GN14129@n2100.arm.linux.org.uk>
+ <20120204223125.GO14129@n2100.arm.linux.org.uk>
+ <20120205013853.GQ20333@atomide.com>
+ <20120205161348.GZ889@n2100.arm.linux.org.uk>
+Message-ID: <20120207152627.GA17825@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 February 2012 15:15, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> On 02/07/2012 10:57 AM, Rickard Andersson wrote:
->>
->> On 02/07/2012 10:22 AM, Daniel Lezcano wrote:
->>>
->>> On 02/07/2012 09:39 AM, Rickard Andersson wrote:
->>>>
->>>> On 02/06/2012 03:10 PM, Daniel Lezcano wrote:
->>>>>
->>>>> On 02/06/2012 10:19 AM, Rickard Andersson wrote:
->>>>>>
->>>>>> Hi!
->>>>>>
->>>>>> Our comments:
->>>>>
->>>>> Thanks Rickard and Jonas for your comments.
->>>>>
->>>>>> - function names don't match commit comment disable/enable vs
->>>>>> recouple/decouple. Decouple is a better name than disable, because GIC
->>>>>> is not really disabled it is just disconnected.
->>>>>
->>>>> Ok, that makes sense.
->>>>>
->>>>>> - there is no reason to place these functions inside the
->>>>>> db8500-prcmu.c
->>>>>> file. There is so much stuff in the PRCMU register base so we can not
->>>>>> have everything in one file. Why not have it as it is?
->>>>>
->>>>> Why spread the prcmu code when it is related to the prcmu ?
->>>>>
->>>>> Linus ? What do you think ?
->>>>>
->>>>>> - why the gic_mask function?
->>>>>
->>>>> Because the register has 31 bits reserved which could be used later
->>>>> without modifying this function.
->>>>
->>>> This is will most likely not happen. If that happens we could add that
->>>> function then. We should remove it for now.
->>>>>>
->>>>>> - The original code has been updated and now looks like this:
->>>>>
->>>>> That is the same code, except the while loop where, if this code
->>>>> assumption is correct, means we will do only one iteration in the loop.
->>>>
->>>> Yes, but in theory you can be stuck forever in that loop, so please
->>>> remove the loop.
->>>
->>> Mmmh, can you elaborate please ? I think a comment and/or an error
->>> should be returned in this case, no ?
->>>
->> We do not need the loop. PRCMU FW does decouple of the GIC and if they
->> for some reason does that at the same time (they should not) we will be
->> stuck.
->
->
-> Sorry, but I still don't get it. What is "they" ? Do you mean one cpu can
-> decouples the cpu while the other cpu recouples it ?
->
+On Sun, Feb 05, 2012 at 04:13:48PM +0000, Russell King - ARM Linux wrote:
 
-Normally, the cpu decouples the gic and the prcmu recouples it so if
-cpu decouples the gic and the prcmu recouples it between the write and
-the read access, you will never read the value PRCMU_A9_MASK_REQ_MASK
-and stay in your loop. This should not occurs because the prcmu has no
-reason to recouple at this moment
+> It's not quite correct, because OMAP4 has issues in this area as well
+> (which does select IRQ_DOMAIN but can be without OF.)  The result is
+> an oops from irq_domain_add() because domain->ops is NULL.
 
-> Taking the routine, why is needed the "read" if we don't care the return
-> value ?
+> The right solution is three fold:
 
-IMHO, the read access is used to ensure that your write access has
-really been done in the register and is not still in the system bus
->
->
-> void ux500_pm_gic_decouple(void)
-> {
-> ? ? ? ?prcmu_write_masked(PRCM_A9_MASK_REQ,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ);
->
-> ? ? ? ?(void)prcmu_read(PRCM_A9_MASK_REQ);
->
-> ? ? ? ?udelay(GIC_FREEZE_DELAY); /* Wait for the GIC to freeze */
-> }
->
-> Thanks
-> ?-- Daniel
->
->
-> --
-> ?<http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro: ?<http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
->
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
+> 1. Wrap the bits of code in CONFIG_IRQ_DOMAIN
+> 2. Get rid of the #ifdef CONFIG_OF there, so the 'ops' member can be
+>    initialized.
+> 3. Fix the OMAP vp code not to oops when voltdm->pmic is NULL
+
+> which I have in my combined patch for fixing OMAP so far.
+
+It'd also help if we supported null ops, I sent patches for that a few
+times over the 3.3 cycle since I was running into it on my systems but
+apparently to /dev/null and further changes in this area have made the
+patches not apply any more.
