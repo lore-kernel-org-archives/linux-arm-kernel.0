@@ -1,34 +1,106 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 7 Feb 2012 06:11:42 -0800
-Subject: [PATCH][RFC] tracing/rcu: Add trace_##name##__rcuidle() static
- tracepoint for inside rcu_idle_exit() sections
-In-Reply-To: <1328617976.2200.66.camel@gandalf.stny.rr.com>
-References: <4F2B1307.5010207@gmail.com>
- <1328223819.5882.133.camel@gandalf.stny.rr.com>
- <20120202232736.GL2518@linux.vnet.ibm.com>
- <1328237131.5882.135.camel@gandalf.stny.rr.com>
- <20120203060458.GF2380@linux.vnet.ibm.com>
- <1328295309.5882.178.camel@gandalf.stny.rr.com>
- <20120203194005.GK2382@linux.vnet.ibm.com>
- <1328563113.2200.39.camel@gandalf.stny.rr.com>
- <20120206233804.GM5941@linux.vnet.ibm.com>
- <1328617976.2200.66.camel@gandalf.stny.rr.com>
-Message-ID: <20120207141142.GP5941@linux.vnet.ibm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 7 Feb 2012 14:11:00 +0000
+Subject: [PATCH 2/7] Add various hugetlb page table fix
+In-Reply-To: <CAOMgcGLhGyz5xU1P2C=Av9LWazJF3X=U14riNi=xESZX68mdwQ@mail.gmail.com>
+References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
+ <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
+ <20120131095811.GB889@n2100.arm.linux.org.uk>
+ <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
+ <4F28AD1D.1000106@gmail.com> <20120206162656.GG26538@arm.com>
+ <4F308169.4010904@gmail.com> <20120207115058.GD3351@arm.com>
+ <CAOMgcGLhGyz5xU1P2C=Av9LWazJF3X=U14riNi=xESZX68mdwQ@mail.gmail.com>
+Message-ID: <20120207141100.GI3351@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2012 at 07:32:56AM -0500, Steven Rostedt wrote:
-> On Mon, 2012-02-06 at 15:38 -0800, Paul E. McKenney wrote:
+On Tue, Feb 07, 2012 at 01:24:09PM +0000, carson bill wrote:
+> 2012/2/7, Catalin Marinas <catalin.marinas@arm.com>:
+> > On Tue, Feb 07, 2012 at 01:42:01AM +0000, bill4carson wrote:
+> >> On 2012?02?07? 00:26, Catalin Marinas wrote:
+> >> > On Wed, Feb 01, 2012 at 03:10:21AM +0000, bill4carson wrote:
+> >> >> Why L_PTE_HUGEPAGE is needed?
+> >> >>
+> >> >> hugetlb subsystem will call pte_page to derive the corresponding page
+> >> >> struct from a given pte, and pte_pfn is used first to convert pte into
+> >> >> a page frame number.
+> >> >
+> >> > Are you sure the pte_pfn() conversion is right? Does it need to be
+> >> > different from the 4K pfn?
+> > ...
+> >> pte_page is defined as following to derive page struct from a given pte.
+> >> This macro is used both in generic mm as well as hugetlb sub-system, so
+> >> we need do the switch in pte_pfn to mark huge page based linux pte out
+> >> of normal page based linux pte, that's what L_PTE_HUGEPAGE for.
+> >>
+> >> #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
+> >>
+> >> So L_PTE_HUGEPAGE is *NOT* set in normal page based linux pte,
+> >> linux pte bits[31:12] is the page frame number;
+> >
+> > I agree.
+> >
+> >> otherwise, we got a huge page based linux pte, and linux pte
+> >> bits[31:20] is page frame number for SECTION mapping, and bits[31:24]
+> >> is page frame number for SUPER-SECTION mapping.
+> >
+> > Actually it is still 31:12 but with bits 19:12 or 23:12 masked out. So
+> > you do the correct shift by PAGE_SHIFT with the additional masking for
+> > huge pages (harmless).
+> >
+> > But do we actually need this masking? Do the huge_pte_offset() or
+> > huge_pte_alloc() functions return the Linux pte (pmd) for the huge page?
+> > If yes, can we not ensure that bits 19:12 are already zero? This
+> > shouldn't be any different from the 4K Linux pte but with an address
+> > aligned to 1MB.
 > 
-> > Aside from the "pre;" below needing to precede rcu_read_lock_sched_notrace()
-> > as Josh noted, this looks reasonable to me.
-> > 
+> I'm afraid there is some misunderstanding.
+> huge_pte_offset() returns the huge linux pte address if they exist;
+> huge_pte_alloc()  allocates a location to store huge linux pte, and
+> return this address;
+> non of above functions return huge linux pte *value*.
+
+I agree, huge_pte_offset() returns a pointer to the Linux pte/pmd if it
+exists. My point is that the values stored in Linux pte/pmd have bits
+20:12 cleared already as the address is at least 2MB aligned (well,
+apart from the additional L_PTE_HPAGE_* bits that you declared). Is this
+correct? If yes, then you don't need any additional masking for
+pte_pfn() even if it is passed a Linux pmd.
+
+> make_huge_pte() will return huge linux pte for a given page and vma
+> protection bits,
+> please notice pte_mkhuge is used to mark this pte as huge linux pte by setting
+> L_PTE_HUGEPAGE, then set_huge_pte_at() is used to set huge linux pte as well
+> huge hardware pte.
 > 
-> Does this mean I can add an Acked-by from you and Josh? Obviously with
-> the post "pre" change.
+> 
+> 2113static pte_t make_huge_pte(struct vm_area_struct *vma, struct page *page,
+> 2114                                int writable)
+> 2115{
+> 2116        pte_t entry;
+> 2117
+> 2118        if (writable) {
+> 2119                entry =
+> 2120                    pte_mkwrite(pte_mkdirty(mk_pte(page,
+> vma->vm_page_prot)));
+> 2121        } else {
+> 2122                entry = huge_pte_wrprotect(mk_pte(page, vma->vm_page_prot));
+> 2123        }
+> 2124        entry = pte_mkyoung(entry);
+> 2125        entry = pte_mkhuge(entry);
+> 2126
+> 2127        return entry;
+> 2128}
+> 
+> Hence, normal linux pte must has L_PTE_HUGEPAE cleared;
+> A huge linux pte must has L_PTE_HUGEPAGE(BIT11) set
+> This could lead to L_PTE_HPAGE_2M(BIT12) or L_PTE_HPAGE_16M(BIT13) set
+> respectively, that's why the masking is needed for pte_pfn.
 
-With the "pre" change,
+But if you avoid setting L_PTE_HPAGE_*, than we don't need the masking
+for pte_pfn. In which case, we don't need to differentiate between a
+normal and a huge pte in pte_pfn(), so no need for L_PTE_HUGEPAGE. The
+set_huge_pte_at() function is only called with a huge pte, so it doesn't
+need to check the L_PTE_HUGEPAGE bit either.
 
-Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-
-							Thanx, Paul
+-- 
+Catalin
