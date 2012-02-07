@@ -1,42 +1,51 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 07 Feb 2012 14:38:43 -0800
-Subject: [PATCH] ARM: OMAP4: cpuidle: Fix the C-state reporting to cpuidle
- governor.
-In-Reply-To: <1328521095-24025-1-git-send-email-santosh.shilimkar@ti.com>
- (Santosh Shilimkar's message of "Mon, 6 Feb 2012 15:08:15 +0530")
-References: <1328521095-24025-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87haz2gtfw.fsf@ti.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue,  7 Feb 2012 23:44:03 +0100
+Subject: [PATCH RESEND] FEC: Rename dev to ndev, fix compile error
+Message-ID: <1328654643-28442-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+The following commit introduced a typo, this commit fixes it.
 
-> OMAP4 cpuidle driver is reporting the state requested by governor rather than
-> the actually attempted one.
->
-> This is obviously misleading sysfs and powertop cpuidle statistics.
-> Fix it so that stats are reported correctly.
->
-> Reported-by: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/cpuidle44xx.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-> index cfdbb86..f128489 100644
-> --- a/arch/arm/mach-omap2/cpuidle44xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
-> @@ -85,6 +85,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
->  	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
->  	if (cpu1_state != PWRDM_POWER_OFF) {
->  		new_state_idx = drv->safe_state_index;
-> +		index = drv->safe_state_index;
+commit 21a4e46995fa1a76281ac0281ff837f706231a37
+Author: Pradeep A Dalvi <netdev@pradeepdalvi.com>
+Date:   Sun Feb 5 02:50:10 2012 +0000
 
-How about just get rid of new_state_idx all together and just update
-index and use it to index in to the states.
+    netdev: ethernet dev_alloc_skb to netdev_alloc_skb
 
-Kevin
+    Replaced deprecating dev_alloc_skb with netdev_alloc_skb in drivers/net/ethernet
+      - Removed extra skb->dev = dev after netdev_alloc_skb
 
->  		cx = cpuidle_get_statedata(&dev->states_usage[new_state_idx]);
->  	}
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Cc: Pradeep A Dalvi <netdev@pradeepdalvi.com>
+Cc: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/freescale/fec.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+RESEND: Typo in list address
+
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index f976619..0ee2ca7 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -711,7 +711,7 @@ fec_enet_rx(struct net_device *ndev)
+ 		 * include that when passing upstream as it messes up
+ 		 * bridging applications.
+ 		 */
+-		skb = netdev_alloc_skb(dev, pkt_len - 4 + NET_IP_ALIGN);
++		skb = netdev_alloc_skb(ndev, pkt_len - 4 + NET_IP_ALIGN);
+ 
+ 		if (unlikely(!skb)) {
+ 			printk("%s: Memory squeeze, dropping packet.\n",
+@@ -1210,7 +1210,7 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
+ 
+ 	bdp = fep->rx_bd_base;
+ 	for (i = 0; i < RX_RING_SIZE; i++) {
+-		skb = netdev_alloc_skb(dev, FEC_ENET_RX_FRSIZE);
++		skb = netdev_alloc_skb(ndev, FEC_ENET_RX_FRSIZE);
+ 		if (!skb) {
+ 			fec_enet_free_buffers(ndev);
+ 			return -ENOMEM;
+-- 
+1.7.8.3
