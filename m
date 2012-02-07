@@ -1,47 +1,37 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Tue, 7 Feb 2012 15:32:22 +0530
-Subject: [PATCH 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
-In-Reply-To: <1328367090-10402-1-git-send-email-rnayak@ti.com>
-References: <1328367090-10402-1-git-send-email-rnayak@ti.com>
-Message-ID: <CANfBPZ-pD55YgneQSyfs1kKB-DUH8g7TQkKO7O6B95Ydfc8cFg@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 7 Feb 2012 11:10:49 +0100
+Subject: [PATCH 4/6 V2] of/mtd/nand: add generic bindings and helpers
+In-Reply-To: <201202071045.30128.sr@denx.de>
+References: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
+ <201202061720.24996.sr@denx.de>
+ <20120207041606.GD15647@game.jcrosoft.org>
+ <201202071045.30128.sr@denx.de>
+Message-ID: <20120207101049.GE15647@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 4, 2012 at 8:21 PM, Rajendra Nayak <rnayak@ti.com> wrote:
-> This series mainly cleans up all instances of hardcoding's in
-> the driver based on pdev->id. This is cleanup leading to the
-> DT adaptation of omap_hsmmc driver.
->
-> Patches are based on 3.3-rc2 and can be found here
-> git://gitorious.org/omap-pm/linux.git omap_hsmmc_cleanup
->
-> Tested the patches on my omap4 boards (panda and SDP) but
-> haven't tested yet on omap3/2 since I did'nt have boards
-> handy. So any testing on any omap3/2 boards is really
-> appreciated.
+On 10:45 Tue 07 Feb     , Stefan Roese wrote:
+> On Tuesday 07 February 2012 05:16:06 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > - nand-on-flash-bbt: boolean to enable on flash bbt option if not
+> > > > present false
+> > > 
+> > > Why not use an "empty" type (without argument) for nand-on-flash-bbt
+> > > then?
+> > 
+> > I want to be able to disable it
+> 
+> Then just don't add this property.
+except if it's it done via include a cpu module enable it but the motherboard
+dts want to disable it
+>  
+> > I send a patch to add a helper to manage boolean
+> > 
+> > this will allow to disable a boolean
+> > 
+> >     is-ok;          => true
+> >     is-ok = <1>;    => true
+> >     is-ok = <0>;    => false
 
-I gave it a spin on Beagleboard-XM (OMAP3630) with root filesystem
-on the SD card, and checked again on 4430SDP.
 
-Tested-by: Venkatraman S <svenkatr@ti.com>
-
->
-> regards,
-> Rajendra
->
-> Balaji T K (3):
-> ?mmc: omap_hsmmc: use platform_get_resource_byname for tx/rx DMA
-> ? ?channels
-> ?mmc: omap_hsmmc: remove unused .set_sleep function
-> ?mmc: omap_hsmmc: Use OMAP_HSMMC_SUPPORTS_DUAL_VOLT flag to remove
-> ? ?host->id based hardcoding
->
-> Rajendra Nayak (3):
-> ?mmc: omap_hsmmc: Get rid of omap_hsmmc_1_set_power function
-> ?mmc: omap_hsmmc: Get rid of omap_hsmmc_4_set_power function
-> ?mmc: omap_hsmmc: Don't expect MMC1 to always have vmmc supply
->
-> ?arch/arm/plat-omap/include/plat/mmc.h | ? ?2 -
-> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? | ?158 +++------------------------------
-> ?2 files changed, 14 insertions(+), 146 deletions(-)
->
+Best Regrds,
+J.
