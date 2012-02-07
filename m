@@ -1,78 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 07 Feb 2012 15:15:23 +0100
-Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
-In-Reply-To: <4F30F594.7090607@stericsson.com>
-References: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
- <4F2F9B2C.8030009@stericsson.com> <4F2FDF54.8080701@linaro.org>
- <4F30E324.4000005@stericsson.com> <4F30ED55.6080908@linaro.org>
- <4F30F594.7090607@stericsson.com>
-Message-ID: <4F3131FB.90809@linaro.org>
+From: josh@joshtriplett.org (Josh Triplett)
+Date: Tue, 7 Feb 2012 06:40:17 -0800
+Subject: [PATCH][RFC] tracing/rcu: Add trace_##name##__rcuidle() static
+ tracepoint for inside rcu_idle_exit() sections
+In-Reply-To: <1328617976.2200.66.camel@gandalf.stny.rr.com>
+References: <4F2B1307.5010207@gmail.com>
+ <1328223819.5882.133.camel@gandalf.stny.rr.com>
+ <20120202232736.GL2518@linux.vnet.ibm.com>
+ <1328237131.5882.135.camel@gandalf.stny.rr.com>
+ <20120203060458.GF2380@linux.vnet.ibm.com>
+ <1328295309.5882.178.camel@gandalf.stny.rr.com>
+ <20120203194005.GK2382@linux.vnet.ibm.com>
+ <1328563113.2200.39.camel@gandalf.stny.rr.com>
+ <20120206233804.GM5941@linux.vnet.ibm.com>
+ <1328617976.2200.66.camel@gandalf.stny.rr.com>
+Message-ID: <20120207144017.GA8658@leaf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2012 10:57 AM, Rickard Andersson wrote:
-> On 02/07/2012 10:22 AM, Daniel Lezcano wrote:
->> On 02/07/2012 09:39 AM, Rickard Andersson wrote:
->>> On 02/06/2012 03:10 PM, Daniel Lezcano wrote:
->>>> On 02/06/2012 10:19 AM, Rickard Andersson wrote:
->>>>> Hi!
->>>>>
->>>>> Our comments:
->>>> Thanks Rickard and Jonas for your comments.
->>>>
->>>>> - function names don't match commit comment disable/enable vs
->>>>> recouple/decouple. Decouple is a better name than disable, because GIC
->>>>> is not really disabled it is just disconnected.
->>>> Ok, that makes sense.
->>>>
->>>>> - there is no reason to place these functions inside the
->>>>> db8500-prcmu.c
->>>>> file. There is so much stuff in the PRCMU register base so we can not
->>>>> have everything in one file. Why not have it as it is?
->>>> Why spread the prcmu code when it is related to the prcmu ?
->>>>
->>>> Linus ? What do you think ?
->>>>
->>>>> - why the gic_mask function?
->>>> Because the register has 31 bits reserved which could be used later
->>>> without modifying this function.
->>> This is will most likely not happen. If that happens we could add that
->>> function then. We should remove it for now.
->>>>> - The original code has been updated and now looks like this:
->>>> That is the same code, except the while loop where, if this code
->>>> assumption is correct, means we will do only one iteration in the loop.
->>> Yes, but in theory you can be stuck forever in that loop, so please
->>> remove the loop.
->> Mmmh, can you elaborate please ? I think a comment and/or an error
->> should be returned in this case, no ?
->>
-> We do not need the loop. PRCMU FW does decouple of the GIC and if they
-> for some reason does that at the same time (they should not) we will be
-> stuck.
+On Tue, Feb 07, 2012 at 07:32:56AM -0500, Steven Rostedt wrote:
+> On Mon, 2012-02-06 at 15:38 -0800, Paul E. McKenney wrote:
+> 
+> > Aside from the "pre;" below needing to precede rcu_read_lock_sched_notrace()
+> > as Josh noted, this looks reasonable to me.
+> > 
+> 
+> Does this mean I can add an Acked-by from you and Josh? Obviously with
+> the post "pre" change.
 
-Sorry, but I still don't get it. What is "they" ? Do you mean one cpu 
-can decouples the cpu while the other cpu recouples it ?
+With the pre change:
 
-Taking the routine, why is needed the "read" if we don't care the return 
-value ?
-
-void ux500_pm_gic_decouple(void)
-{
-         prcmu_write_masked(PRCM_A9_MASK_REQ,
-                            PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ,
-                            PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ);
-
-         (void)prcmu_read(PRCM_A9_MASK_REQ);
-
-         udelay(GIC_FREEZE_DELAY); /* Wait for the GIC to freeze */
-}
-
-Thanks
-   -- Daniel
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Reviewed-by: Josh Triplett <josh@joshtriplett.org>
