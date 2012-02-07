@@ -1,101 +1,31 @@
-From: bill4carson@gmail.com (carson bill)
-Date: Tue, 7 Feb 2012 21:24:09 +0800
-Subject: [PATCH 2/7] Add various hugetlb page table fix
-In-Reply-To: <20120207115058.GD3351@arm.com>
-References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
- <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
- <20120131095811.GB889@n2100.arm.linux.org.uk>
- <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
- <4F28AD1D.1000106@gmail.com> <20120206162656.GG26538@arm.com>
- <4F308169.4010904@gmail.com> <20120207115058.GD3351@arm.com>
-Message-ID: <CAOMgcGLhGyz5xU1P2C=Av9LWazJF3X=U14riNi=xESZX68mdwQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 7 Feb 2012 13:29:25 +0000
+Subject: [PATCH v2 2/7] MFD: twl6040: Convert to i2c driver, and separate
+ it from twl core
+In-Reply-To: <1328619678-26080-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1328619678-26080-1-git-send-email-peter.ujfalusi@ti.com>
+ <1328619678-26080-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120207132925.GN3332@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/2/7, Catalin Marinas <catalin.marinas@arm.com>:
-> On Tue, Feb 07, 2012 at 01:42:01AM +0000, bill4carson wrote:
->> On 2012?02?07? 00:26, Catalin Marinas wrote:
->> > On Wed, Feb 01, 2012 at 03:10:21AM +0000, bill4carson wrote:
->> >> Why L_PTE_HUGEPAGE is needed?
->> >>
->> >> hugetlb subsystem will call pte_page to derive the corresponding page
->> >> struct from a given pte, and pte_pfn is used first to convert pte into
->> >> a page frame number.
->> >
->> > Are you sure the pte_pfn() conversion is right? Does it need to be
->> > different from the 4K pfn?
-> ...
->> pte_page is defined as following to derive page struct from a given pte.
->> This macro is used both in generic mm as well as hugetlb sub-system, so
->> we need do the switch in pte_pfn to mark huge page based linux pte out
->> of normal page based linux pte, that's what L_PTE_HUGEPAGE for.
->>
->> #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
->>
->> So L_PTE_HUGEPAGE is *NOT* set in normal page based linux pte,
->> linux pte bits[31:12] is the page frame number;
->
-> I agree.
->
->> otherwise, we got a huge page based linux pte, and linux pte
->> bits[31:20] is page frame number for SECTION mapping, and bits[31:24]
->> is page frame number for SUPER-SECTION mapping.
->
-> Actually it is still 31:12 but with bits 19:12 or 23:12 masked out. So
-> you do the correct shift by PAGE_SHIFT with the additional masking for
-> huge pages (harmless).
->
-> But do we actually need this masking? Do the huge_pte_offset() or
-> huge_pte_alloc() functions return the Linux pte (pmd) for the huge page?
-> If yes, can we not ensure that bits 19:12 are already zero? This
-> shouldn't be any different from the 4K Linux pte but with an address
-> aligned to 1MB.
->
+On Tue, Feb 07, 2012 at 03:01:13PM +0200, Peter Ujfalusi wrote:
+> Complete the separation of the twl6040 from the twl core since
+> it is a separate chip, not part of the twl6030 PMIC.
 
-I'm afraid there is some misunderstanding.
-huge_pte_offset() returns the huge linux pte address if they exist;
-huge_pte_alloc()  allocates a location to store huge linux pte, and
-return this address;
-non of above functions return huge linux pte *value*.
+Looking good
 
-make_huge_pte() will return huge linux pte for a given page and vma
-protection bits,
-please notice pte_mkhuge is used to mark this pte as huge linux pte by setting
-L_PTE_HUGEPAGE, then set_huge_pte_at() is used to set huge linux pte as well
-huge hardware pte.
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonicro.com>
 
-
-2113static pte_t make_huge_pte(struct vm_area_struct *vma, struct page *page,
-2114                                int writable)
-2115{
-2116        pte_t entry;
-2117
-2118        if (writable) {
-2119                entry =
-2120                    pte_mkwrite(pte_mkdirty(mk_pte(page,
-vma->vm_page_prot)));
-2121        } else {
-2122                entry = huge_pte_wrprotect(mk_pte(page, vma->vm_page_prot));
-2123        }
-2124        entry = pte_mkyoung(entry);
-2125        entry = pte_mkhuge(entry);
-2126
-2127        return entry;
-2128}
-
-Hence, normal linux pte must has L_PTE_HUGEPAE cleared;
-A huge linux pte must has L_PTE_HUGEPAGE(BIT11) set
-This could lead to L_PTE_HPAGE_2M(BIT12) or L_PTE_HPAGE_16M(BIT13) set
-respectively, that's why the masking is needed for pte_pfn.
-
-
-+#ifdef CONFIG_ARM_HUGETLB_SUPPORT
-+#define L_PTE_HUGEPAGE	(_AT(pteval_t, 1) << 11) /* mark hugepage */
-+#define L_PTE_HPAGE_2M  (_AT(pteval_t, 1) << 12) /* only when HUGEPAGE set */
-+#define L_PTE_HPAGE_16M (_AT(pteval_t, 1) << 13) /* only when HUGEPAGE set */
-+#endif
-
-
-> --
-> Catalin
->
+and it looks like you'll save a bunch more code if you're able to
+convert over to using a regmap cache.  Note that as a first pass you
+just need to define which registers are volatile and enable a cache type
+- if defaults are omitted then the values will be read back from the
+device to start off with.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120207/819ed61f/attachment.sig>
