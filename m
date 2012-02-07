@@ -1,59 +1,90 @@
-From: r-woodruff2@ti.com (Woodruff, Richard)
-Date: Tue, 7 Feb 2012 01:13:04 +0000
-Subject: patch "tty: serial: OMAP: ensure FIFO levels are set correctly
- in non-DMA" added to tty tree
-In-Reply-To: <20120207105820.367361c5@notabene.brown>
-References: <alpine.DEB.2.00.1201261225520.32667@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021302070.586@utopia.booyaka.com>
- <20120203150708.386951d2@notabene.brown>
- <alpine.DEB.2.00.1202022137150.586@utopia.booyaka.com>
- <20120203205401.5ddf241d@notabene.brown>
- <CANOLnONsZKHJPbEx2+ic3EZ1PqcD30VT4Z2bR5iW-JNQJQL0GA@mail.gmail.com>
- <alpine.DEB.2.00.1202031234120.27947@utopia.booyaka.com>
- <CANOLnOPm-ZKRvu1PVs-jU2sceehRiwNPd=ysu2SDsLbarAPVbw@mail.gmail.com>
- <20120204163931.GH1275@n2100.arm.linux.org.uk>
- <EF62F09C0797D947AD4180A1043C0DF734934E36@DLEE10.ent.ti.com>
- <20120205160329.GO1275@n2100.arm.linux.org.uk>
- <EF62F09C0797D947AD4180A1043C0DF734934E9D@DLEE10.ent.ti.com>
- <20120207105820.367361c5@notabene.brown>
-Message-ID: <EF62F09C0797D947AD4180A1043C0DF734938ED1@DLEE10.ent.ti.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Tue, 07 Feb 2012 09:42:01 +0800
+Subject: [PATCH 2/7] Add various hugetlb page table fix
+In-Reply-To: <20120206162656.GG26538@arm.com>
+References: <1327910238-18704-1-git-send-email-bill4carson@gmail.com>
+ <1327910238-18704-3-git-send-email-bill4carson@gmail.com>
+ <20120131095811.GB889@n2100.arm.linux.org.uk>
+ <CAHkRjk4MnuHs6MZNds2YmufmY_29dSOoeCxX=ODZ5p23YEcjUw@mail.gmail.com>
+ <4F28AD1D.1000106@gmail.com> <20120206162656.GG26538@arm.com>
+Message-ID: <4F308169.4010904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> From: NeilBrown [mailto:neilb at suse.de]
-> Sent: Monday, February 06, 2012 5:58 PM
-> To: Woodruff, Richard
 
-Apologies for mangled mails... I am years over due ditching current method.
+On 2012?02?07? 00:26, Catalin Marinas wrote:
+> On Wed, Feb 01, 2012 at 03:10:21AM +0000, bill4carson wrote:
+>> Why L_PTE_HUGEPAGE is needed?
+>>
+>> hugetlb subsystem will call pte_page to derive the corresponding page
+>> struct from a given pte, and pte_pfn is used first to convert pte into
+>> a page frame number.
+>
+> Are you sure the pte_pfn() conversion is right? Does it need to be
+> different from the 4K pfn?
 
-> I don't think it is really OK to drop chars on the UART-to-Debug console.
-> However it is OK to drop the BAUD rate to 57600 where we can wake up in
-> time
-> for to catch the first bit.  So if you want power saving, drop the console
-> buad rate.
-> 
-> So I would suggest:
->  - remove the autosuspend timeouts
->  - allow runtime_pm to shutdown the device when it is not open, or when
->    rate is 57600 or below, or when 'CREAD' is clear
->  - keep runtime_pm active whenever there are bytes in the output queue or
->    fifo
+Hello, Catalin
 
-Yes slower baud + use of flow control should help. OMAP4 is like 10x better than OMAP2 with OMAP3 in middle.
+Let me take a few words to make this clear for us.
 
-> The only case that wouldn't support is when a device will wake up the SOC
-> by
-> sending a non-break character which it is OK to receive corrupted.  The
-> tty
-> would have to be in !CREAD for that to happen, and then there would be no
-> way
-> for the app to know that a non-break character was received.
-> Would it be reasonable to treat any input while CREAD is clear as a break?
+pte_page is defined as following to derive page struct from a given pte.
+This macro is used both in generic mm as well as hugetlb sub-system, so
+we need do the switch in pte_pfn to mark huge page based linux pte out
+of normal page based linux pte, that's what L_PTE_HUGEPAGE for.
 
-Others would have to comment on this.  I never took this step as I was ok with degradation on debug console.
+#define pte_page(pte)		pfn_to_page(pte_pfn(pte))
 
-If ever I wanted better logs I tended to telnet/ssh in on a network port which was better at retry at higher level.
 
-Regards,
-Richard W.
+So L_PTE_HUGEPAGE is *NOT* set in normal page based linux pte,
+linux pte bits[31:12] is the page frame number;
+otherwise, we got a huge page based linux pte, and linux pte
+bits[31:20] is page frame number for SECTION mapping, and bits[31:24]
+is page frame number for SUPER-SECTION mapping.
+
+I think this the full story of following code:
+
+#ifdef CONFIG_ARM_HUGETLB_SUPPORT
+
+#ifdef CONFIG_HUGEPAGE_SIZE_2MB
+#define hugepte_pfn(pte)    ((pte_val(pte) & SECTION_MASK) >> PAGE_SHIFT)
+#endif
+#ifdef CONFIG_HUGEPAGE_SIZE_16MB
+#define hugepte_pfn(pte)    ((pte_val(pte) & SUPERSECTION_MASK) >> 
+PAGE_SHIFT)
+#endif
+#define pte_is_huge(pte)	(pte_val(pte) & L_PTE_HUGEPAGE)
+#define pte_pfn(pte)	    (pte_is_huge(pte) ? \
+				hugepte_pfn(pte) : ((pte_val(pte) & PHYS_MASK) >> PAGE_SHIFT))
+#else
+#define pte_pfn(pte)		((pte_val(pte) & PHYS_MASK) >> PAGE_SHIFT)
+#endif /*!CONFIG_ARM_HUGETLB_SUPPORT*/
+
+
+#define pte_page(pte)		pfn_to_page(pte_pfn(pte))
+
+
+
+
+> I haven't seen any other architecture doing
+> shifts other than PAGE_SHIFT even for huge pages.
+>
+
+#define L_PTE_HUGEPAGE	(_AT(pteval_t, 1) << 11) /* mark hugepage */
+#define L_PTE_HPAGE_2M  (_AT(pteval_t, 1) << 12) /* only when HUGEPAGE 
+set */
+#define L_PTE_HPAGE_16M (_AT(pteval_t, 1) << 13) /* only when HUGEPAGE 
+set */
+
+See linux pte BIT12 is used to denote 2MB huge page, BIT13 is used for
+16MB page, that's why PAGE_SHIFT is not enough for do the shifting.
+
+I hope I understand your question and give the right answer :)
+
+
+
+-- 
+I am a slow learner
+but I will keep trying to fight for my dreams!
+
+--bill
