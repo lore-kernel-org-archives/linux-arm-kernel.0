@@ -1,110 +1,112 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 07 Feb 2012 09:13:31 -0600
-Subject: [PATCH 1/1] of: introduce helper to manage boolean
-In-Reply-To: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4F313F9B.4020500@gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 7 Feb 2012 16:25:10 +0100
+Subject: [PATCH] ux500 : decouple/recouple gic from the PRCMU
+In-Reply-To: <4F3131FB.90809@linaro.org>
+References: <1328270849-22324-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F2F9B2C.8030009@stericsson.com> <4F2FDF54.8080701@linaro.org>
+ <4F30E324.4000005@stericsson.com> <4F30ED55.6080908@linaro.org>
+ <4F30F594.7090607@stericsson.com> <4F3131FB.90809@linaro.org>
+Message-ID: <CAKfTPtA0_DaQDxwzwmcU0XG8SVKu_=rLy1drvZgYgicYUJ8yVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2012 10:13 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> of_property_read_bool
-> 
-> Search for a property in a device node and read a 32-bit value from
-> it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
-> 
-> this will allow to disable a boolean
-> 
-> is-ok;          => true
-> is-ok = <1>;    => true
-> is-ok = <0>;    => false
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
+On 7 February 2012 15:15, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On 02/07/2012 10:57 AM, Rickard Andersson wrote:
+>>
+>> On 02/07/2012 10:22 AM, Daniel Lezcano wrote:
+>>>
+>>> On 02/07/2012 09:39 AM, Rickard Andersson wrote:
+>>>>
+>>>> On 02/06/2012 03:10 PM, Daniel Lezcano wrote:
+>>>>>
+>>>>> On 02/06/2012 10:19 AM, Rickard Andersson wrote:
+>>>>>>
+>>>>>> Hi!
+>>>>>>
+>>>>>> Our comments:
+>>>>>
+>>>>> Thanks Rickard and Jonas for your comments.
+>>>>>
+>>>>>> - function names don't match commit comment disable/enable vs
+>>>>>> recouple/decouple. Decouple is a better name than disable, because GIC
+>>>>>> is not really disabled it is just disconnected.
+>>>>>
+>>>>> Ok, that makes sense.
+>>>>>
+>>>>>> - there is no reason to place these functions inside the
+>>>>>> db8500-prcmu.c
+>>>>>> file. There is so much stuff in the PRCMU register base so we can not
+>>>>>> have everything in one file. Why not have it as it is?
+>>>>>
+>>>>> Why spread the prcmu code when it is related to the prcmu ?
+>>>>>
+>>>>> Linus ? What do you think ?
+>>>>>
+>>>>>> - why the gic_mask function?
+>>>>>
+>>>>> Because the register has 31 bits reserved which could be used later
+>>>>> without modifying this function.
+>>>>
+>>>> This is will most likely not happen. If that happens we could add that
+>>>> function then. We should remove it for now.
+>>>>>>
+>>>>>> - The original code has been updated and now looks like this:
+>>>>>
+>>>>> That is the same code, except the while loop where, if this code
+>>>>> assumption is correct, means we will do only one iteration in the loop.
+>>>>
+>>>> Yes, but in theory you can be stuck forever in that loop, so please
+>>>> remove the loop.
+>>>
+>>> Mmmh, can you elaborate please ? I think a comment and/or an error
+>>> should be returned in this case, no ?
+>>>
+>> We do not need the loop. PRCMU FW does decouple of the GIC and if they
+>> for some reason does that at the same time (they should not) we will be
+>> stuck.
+>
+>
+> Sorry, but I still don't get it. What is "they" ? Do you mean one cpu can
+> decouples the cpu while the other cpu recouples it ?
+>
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Normally, the cpu decouples the gic and the prcmu recouples it so if
+cpu decouples the gic and the prcmu recouples it between the write and
+the read access, you will never read the value PRCMU_A9_MASK_REQ_MASK
+and stay in your loop. This should not occurs because the prcmu has no
+reason to recouple at this moment
 
-> ---
-> Hi,
-> 
-> 	if this is ok I'll rebase my mtd and i2c patch to use it
-> 
+> Taking the routine, why is needed the "read" if we don't care the return
+> value ?
 
-I'm assuming you'll want to merge this patch with your mtd and i2c
-patches. If you want me to apply, let me know.
-
-Rob
-
-> Best Regards,
-> J.
->  drivers/of/base.c  |   30 ++++++++++++++++++++++++++++++
->  include/linux/of.h |    8 ++++++++
->  2 files changed, 38 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 133908a..a0eaf08 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -686,6 +686,36 @@ int of_property_read_u64(const struct device_node *np, const char *propname,
->  EXPORT_SYMBOL_GPL(of_property_read_u64);
->  
->  /**
-> + * of_property_read_bool - Find and read a boolean from a property
-> + * @np:		device node from which the property value is to be read.
-> + * @propname:	name of the property to be searched.
-> + *
-> + * Search for a property in a device node and read a 32-bit value from
-> + * it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
-> + *
-> + * is-ok;	=> true
-> + * is-ok = <1>;	=> true
-> + * is-ok = <0>;	=> false
-> + */
-> +int of_property_read_bool(const struct device_node *np, const char *propname)
-> +{
-> +	u32 reg;
-> +	int ret = of_property_read_u32(np, propname, &reg);
-> +
-> +	switch (ret) {
-> +	case -EINVAL:
-> +		return false;
-> +	case -ENODATA:
-> +		return true;
-> +	case 0:
-> +		return reg == 1;
-> +	default:
-> +		return ret;
-> +	}
-> +}
-> +EXPORT_SYMBOL_GPL(of_property_read_bool);
-> +
-> +/**
->   * of_property_read_string - Find and read a string from a property
->   * @np:		device node from which the property value is to be read.
->   * @propname:	name of the property to be searched.
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index a75a831..2e5f77b 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -210,6 +210,8 @@ extern int of_property_read_u32_array(const struct device_node *np,
->  				      size_t sz);
->  extern int of_property_read_u64(const struct device_node *np,
->  				const char *propname, u64 *out_value);
-> +extern int of_property_read_bool(const struct device_node *np,
-> +				const char *propname);
->  
->  extern int of_property_read_string(struct device_node *np,
->  				   const char *propname,
-> @@ -288,6 +290,12 @@ static inline int of_property_read_u32_array(const struct device_node *np,
->  	return -ENOSYS;
->  }
->  
-> +static inline int of_property_read_bool(const struct device_node *np,
-> +				const char *propname)
-> +{
-> +	return -ENOSYS;
-> +}
-> +
->  static inline int of_property_read_string(struct device_node *np,
->  					  const char *propname,
->  					  const char **out_string)
+IMHO, the read access is used to ensure that your write access has
+really been done in the register and is not still in the system bus
+>
+>
+> void ux500_pm_gic_decouple(void)
+> {
+> ? ? ? ?prcmu_write_masked(PRCM_A9_MASK_REQ,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? PRCM_A9_MASK_REQ_PRCM_A9_MASK_REQ);
+>
+> ? ? ? ?(void)prcmu_read(PRCM_A9_MASK_REQ);
+>
+> ? ? ? ?udelay(GIC_FREEZE_DELAY); /* Wait for the GIC to freeze */
+> }
+>
+> Thanks
+> ?-- Daniel
+>
+>
+> --
+> ?<http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro: ?<http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
