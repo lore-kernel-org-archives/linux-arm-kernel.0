@@ -1,51 +1,47 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue,  7 Feb 2012 23:44:03 +0100
-Subject: [PATCH RESEND] FEC: Rename dev to ndev, fix compile error
-Message-ID: <1328654643-28442-1-git-send-email-marek.vasut@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 07 Feb 2012 16:52:14 -0600
+Subject: [PATCH 2/3] ARM: make disable_fiq macro optional
+In-Reply-To: <alpine.LFD.2.02.1202062116210.1656@xanadu.home>
+References: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
+ <1328562200-8810-3-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1202061424130.1656@xanadu.home> <4F30B225.60605@gmail.com>
+ <alpine.LFD.2.02.1202062116210.1656@xanadu.home>
+Message-ID: <4F31AB1E.4010800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following commit introduced a typo, this commit fixes it.
+On 02/06/2012 11:24 PM, Nicolas Pitre wrote:
+> On Mon, 6 Feb 2012, Rob Herring wrote:
+> 
+>> Nicolas,
+>>
+>> On 02/06/2012 04:34 PM, Nicolas Pitre wrote:
+>>> On Mon, 6 Feb 2012, Rob Herring wrote:
+>>>
+>>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>>
+>>>> Only rpc uses disable_fiq, so make its use conditional on ARCH_RPC.
+>>>>
+>>>> With this, entry-macro.S is no longer needed for platforms that
+>>>> select MULTI_IRQ_HANDLER and the include of it can be conditional.
+>>>
+>>> Using set_fiq_handler() in the rpc boot code we could get rid of 
+>>> disable_fiq entirely.
+>>>
+>>
+>> That's already being done here:
+>> arch/arm/mach-rpc/dma.c:290:    set_fiq_handler(fiqhandler_start,
+>> fiqhandler_length);
+>>
+>> Can the macro just be deleted? Or a default handler needs to be setup
+>> earlier?
+> 
+> That's the handler installed by the RPC DMA code.  Another one is needed 
+> by default for when that code is not active.
 
-commit 21a4e46995fa1a76281ac0281ff837f706231a37
-Author: Pradeep A Dalvi <netdev@pradeepdalvi.com>
-Date:   Sun Feb 5 02:50:10 2012 +0000
+Wouldn't the fiq be masked then? rpc_init_irq masks out the interrupts
+in the same register as disable_fiq macro:
 
-    netdev: ethernet dev_alloc_skb to netdev_alloc_skb
+iomd_writeb(0, IOMD_FIQMASK);
 
-    Replaced deprecating dev_alloc_skb with netdev_alloc_skb in drivers/net/ethernet
-      - Removed extra skb->dev = dev after netdev_alloc_skb
-
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-Cc: Pradeep A Dalvi <netdev@pradeepdalvi.com>
-Cc: David S. Miller <davem@davemloft.net>
----
- drivers/net/ethernet/freescale/fec.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-RESEND: Typo in list address
-
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index f976619..0ee2ca7 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -711,7 +711,7 @@ fec_enet_rx(struct net_device *ndev)
- 		 * include that when passing upstream as it messes up
- 		 * bridging applications.
- 		 */
--		skb = netdev_alloc_skb(dev, pkt_len - 4 + NET_IP_ALIGN);
-+		skb = netdev_alloc_skb(ndev, pkt_len - 4 + NET_IP_ALIGN);
- 
- 		if (unlikely(!skb)) {
- 			printk("%s: Memory squeeze, dropping packet.\n",
-@@ -1210,7 +1210,7 @@ static int fec_enet_alloc_buffers(struct net_device *ndev)
- 
- 	bdp = fep->rx_bd_base;
- 	for (i = 0; i < RX_RING_SIZE; i++) {
--		skb = netdev_alloc_skb(dev, FEC_ENET_RX_FRSIZE);
-+		skb = netdev_alloc_skb(ndev, FEC_ENET_RX_FRSIZE);
- 		if (!skb) {
- 			fec_enet_free_buffers(ndev);
- 			return -ENOMEM;
--- 
-1.7.8.3
+Rob
