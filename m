@@ -1,71 +1,58 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 06 Feb 2012 19:34:06 -0800
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <20120203003633.GD14129@n2100.arm.linux.org.uk>
-References: <1328210686-15909-1-git-send-email-sboyd@codeaurora.org>
- <20120202204411.GB14129@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1202021632400.2759@xanadu.home>
- <4F2B1E11.1040000@codeaurora.org>
- <20120203003633.GD14129@n2100.arm.linux.org.uk>
-Message-ID: <4F309BAE.8000608@codeaurora.org>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 7 Feb 2012 09:49:52 +0530
+Subject: Query: When will drv->poweroff() called
+In-Reply-To: <201202061307.40628.rjw@sisk.pl>
+References: <4F2F6B40.6070308@st.com> <201202061307.40628.rjw@sisk.pl>
+Message-ID: <4F30A668.8010407@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2012 04:36 PM, Russell King - ARM Linux wrote:
-> On Thu, Feb 02, 2012 at 03:36:49PM -0800, Stephen Boyd wrote:
->> On 02/02/12 13:38, Nicolas Pitre wrote:
->>> On Thu, 2 Feb 2012, Russell King - ARM Linux wrote
->>>> On Thu, Feb 02, 2012 at 11:24:46AM -0800, Stephen Boyd wrote:
->>>>> Should we move get_thread_info into assembler.h? It seems odd
->>>>> to include entry-header.S but I saw that vfp was doing the same.
->>>> Probably yes, and probably also have preempt_disable and preempt_enable
->>>> assembler macros.  That's going to get rather icky if we have to
->>>> explicitly call the scheduler though (to solve (1)).
->>> What about a pair of helpers written in C instead?
->>>
->>> v7_flush_dcache_all() could be renamed, and a wrapper function called
->>> v7_flush_dcache_all() would call the preemption disable helper, call the
->>> former v7_flush_dcache_all code, then call the preemption enable helper.
->>>
->>> Then __v7_setup() could still call the core cache flush code without
->>> issues.
->>
->> I tried to put the preemption disable/enable right around the place
->> where it was needed. With this approach we would disable preemption
->> during the entire cache flush. I'm not sure if we want to make this
->> function worse for performance, do we? It certainly sounds easier than
->> writing all the preempt macros in assembly though.
->
-> Err, why do you think it's a big task?
->
-> preempt disable is a case of incrementing the thread preempt count, while
-> preempt enable is a case of decrementing it, testing for zero, if zero,
-> then checking whether TIF_NEED_RESCHED is set and calling a function.
->
-> If that's too much, then the simple method in assembly to quickly disable
-> preemption over a very few set of instructions is using mrs/msr and cpsid i.
-> That'll be far cheaper than fiddling about with preempt counters or
-> messing about with veneers in C code.
 
-Russell,
+Thanks Rafael.
 
-I think you misunderstood Stephen's point about the performance. He 
-isn't referring to the performance difference between a C call to preemt 
-disable/enable vs. a few assembly level instructions.
+On 2/6/2012 5:37 PM, Rafael J. Wysocki wrote:
+> On Monday, February 06, 2012, Viresh Kumar wrote:
+>> > 
+>> > Hi Guys,
+>> > 
+>> > Sorry for asking this silly question, but i couldn't locate much
+>> > help for it in documentation, so asking it.
+>> > 
+>> > We were testing hibernation for SPEAr13xx SoC family, based on
+>> > ARM Cortex a9.
+>> > 
+>> > I observed that poweroff() callback of individual drivers are not
+>> > getting called at all, while we test hibernate.
+> They should be called in the last phase of hibernation, after the image
+> has been created and the system is going for "power off" (hance the
+> callback name).
+> 
+>> > I tried to go through the code to see what happened. It looked like
+>> > there should be call to hibernation_set_ops() for platforms that are
+>> > willing to get a call to poweroff() for their drivers.
+> That's correct.  The ->poweroff() callbacks are only executed if
+> hibernation_mode is equal to HIBERNATION_PLATFORM, which is not the
+> default.
+> 
+>> > Otherwise shutdown of the busses gets called, which is a completely
+>> > different path.
+>> > 
+>> > There are many drivers today, that are registering poweroff() from dev_pm_ops
+>> > but are not doing bus specific shutdown stuff.
+>> > 
+>> > Even i tried to look for hibernation_set_ops() in kernel, and only acpi
+>> > code is calling it.
+> That's correct too.
+> 
+>> > I didn't understood how other ARM Sub-Arch's are handling this.
+> Well, they are supposed to call hibernation_set_ops() and set the operations
+> appropriately.  Those operations may be empty routines if they don't need
+> to do anything, but they have to be defined.
 
-I believe he is referring to the performance hit of having preemption 
-disabled during the entirety of the cache flush operation vs. having 
-preemption disabled only for the duration of writing to CSSELR and 
-reading back CCSIDR.
+Hi Amit,
 
-I would think a cache flush is a fairly long operation and to have 
-preemption disable across it doesn't sound appealing to me.
-
-Thoughts?
-
-Thanks,
-Saravana
+Can you give some input on why none of the ARM platforms are calling
+this routine currently.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+viresh
