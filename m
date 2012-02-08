@@ -1,32 +1,36 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed,  8 Feb 2012 21:40:58 +0100
-Subject: [PATCH v4 0/7] ARM: Fixes to make LPC32xx compile and boot again
-Message-ID: <1328733665-17836-1-git-send-email-stigge@antcom.de>
+From: akpm@linux-foundation.org (akpm at linux-foundation.org)
+Date: Wed, 08 Feb 2012 12:42:24 -0800
+Subject: [patch 1/2] arch/arm/mach-ux500/mbox-db5500.c: world-writable sysfs
+ fifo file
+Message-ID: <20120208204224.EE758A03DE@akpm.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the bundle of basic patches to make LPC32xx compile and boot again,
-fixing several basic issues. Tested by Wolfram Sang and Acked by Kevin Wells of
-NXP, the original author and maintainer of LPC32xx.
+From: Vasiliy Kulikov <segoon@openwall.com>
+Subject: arch/arm/mach-ux500/mbox-db5500.c: world-writable sysfs fifo file
 
-Arnd and Olof, please tell if there is still something missing.
+Don't allow everybody to use a modem.
 
-Thanks in advance,
+Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
 
-Roland
+ arch/arm/mach-ux500/mbox-db5500.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Roland Stigge (7):
-  ARM: LPC32xx: Added lpc32xx_defconfig
-  ARM: LPC32XX: Remove broken non-static declaration
-  ARM: LPC32xx: clock.c: Missing header file
-  ARM: LPC32xx: clock.c: jiffies wrapping
-  ARM: LPC32xx: clock.c: Clock registration fixes
-  ARM: LPC32xx: clock.c: warning fix
-  ARM: LPC32xx: clock.c: Fix mutex lock issues
-
- arch/arm/mach-lpc32xx/clock.c        |   61 ++++----------
- arch/arm/configs/lpc32xx_defconfig   |  145 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/clock.c        |    1 
- arch/arm/mach-lpc32xx/common.h       |    1 
- 4 files changed, 166 insertions(+), 42 deletions(-)
+diff -puN arch/arm/mach-ux500/mbox-db5500.c~arch-arm-mach-ux500-mbox-db5500c-world-writable-sysfs-fifo-file arch/arm/mach-ux500/mbox-db5500.c
+--- a/arch/arm/mach-ux500/mbox-db5500.c~arch-arm-mach-ux500-mbox-db5500c-world-writable-sysfs-fifo-file
++++ a/arch/arm/mach-ux500/mbox-db5500.c
+@@ -168,7 +168,7 @@ static ssize_t mbox_read_fifo(struct dev
+ 	return sprintf(buf, "0x%X\n", mbox_value);
+ }
+ 
+-static DEVICE_ATTR(fifo, S_IWUGO | S_IRUGO, mbox_read_fifo, mbox_write_fifo);
++static DEVICE_ATTR(fifo, S_IWUSR | S_IRUGO, mbox_read_fifo, mbox_write_fifo);
+ 
+ static int mbox_show(struct seq_file *s, void *data)
+ {
+_
