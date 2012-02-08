@@ -1,29 +1,33 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed,  8 Feb 2012 21:41:00 +0100
-Subject: [PATCH v4 2/7] ARM: LPC32XX: Remove broken non-static declaration
+Date: Wed,  8 Feb 2012 21:41:03 +0100
+Subject: [PATCH v4 5/7] ARM: LPC32xx: clock.c: Clock registration fixes
 In-Reply-To: <1328733665-17836-1-git-send-email-stigge@antcom.de>
 References: <1328733665-17836-1-git-send-email-stigge@antcom.de>
-Message-ID: <1328733665-17836-3-git-send-email-stigge@antcom.de>
+Message-ID: <1328733665-17836-6-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a GCC compile error ("static declaration follows non-static
-declaration") for LPC32XX's watchdog, removing the extern declaration since
-it's not called externally.
+This patch adjusts the clock registration list, ported from the latest version
+of Kevin Wells' latest version of clock.c: i2s0_ck, i2s1_ck and dev:mmc0 have
+NULL pointers associated as the .dev_id and .con_id, respectively. The old
+values were not useful.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 Acked-by: Kevin Wells <kevin.wells@nxp.com>
 
-diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
-index 4b4e700..75640bfb 100644
---- a/arch/arm/mach-lpc32xx/common.h
-+++ b/arch/arm/mach-lpc32xx/common.h
-@@ -65,7 +65,6 @@ extern u32 clk_get_pclk_div(void);
-  */
- extern void lpc32xx_get_uid(u32 devid[4]);
- 
--extern void lpc32xx_watchdog_reset(void);
- extern u32 lpc32xx_return_iram_size(void);
- 
- /*
+--- a/arch/arm/mach-lpc32xx/clock.c
++++ b/arch/arm/mach-lpc32xx/clock.c
+@@ -1076,10 +1098,10 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("dev:ssp1", NULL, clk_ssp1)
+ 	_REGISTER_CLOCK("lpc32xx_keys.0", NULL, clk_kscan)
+ 	_REGISTER_CLOCK("lpc32xx-nand.0", "nand_ck", clk_nand)
+-	_REGISTER_CLOCK("tbd", "i2s0_ck", clk_i2s0)
+-	_REGISTER_CLOCK("tbd", "i2s1_ck", clk_i2s1)
++	_REGISTER_CLOCK(NULL, "i2s0_ck", clk_i2s0)
++	_REGISTER_CLOCK(NULL, "i2s1_ck", clk_i2s1)
+ 	_REGISTER_CLOCK("ts-lpc32xx", NULL, clk_tsc)
+-	_REGISTER_CLOCK("dev:mmc0", "MCLK", clk_mmc)
++	_REGISTER_CLOCK("dev:mmc0", NULL, clk_mmc)
+ 	_REGISTER_CLOCK("lpc-net.0", NULL, clk_net)
+ 	_REGISTER_CLOCK("dev:clcd", NULL, clk_lcd)
+ 	_REGISTER_CLOCK("lpc32xx_udc", "ck_usbd", clk_usbd)
