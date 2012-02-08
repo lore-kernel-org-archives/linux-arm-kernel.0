@@ -1,96 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 08 Feb 2012 13:47:21 -0600
-Subject: [PATCH] ARM: Exynos: Add irq domain and device tree support for
- interrupt combiner
-In-Reply-To: <1328724604-11192-1-git-send-email-thomas.abraham@linaro.org>
-References: <1328724604-11192-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F32D149.7030908@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Feb 2012 11:51:42 -0800
+Subject: [PATCH] ARM: OMAP: update omap1 and omap2plus defconfigs
+In-Reply-To: <20120208101958.GT1275@n2100.arm.linux.org.uk>
+References: <20120208053556.GB1426@atomide.com>
+ <1328696173-17226-1-git-send-email-grinberg@compulab.co.il>
+ <20120208101958.GT1275@n2100.arm.linux.org.uk>
+Message-ID: <20120208195141.GE1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2012 12:10 PM, Thomas Abraham wrote:
-> A common irq domain for the interrupts managed by the interrupt combiners is
-> setup. All the instances of irq combiner reference the common irq domain for
-> translating hardware interrupts to linux irq number.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120208 01:49]:
+> On Wed, Feb 08, 2012 at 12:16:13PM +0200, Igor Grinberg wrote:
+> > This patch updates omapX_defconfig to 3.3-rc1 and enables
+> > the CONFIG_DEBUG_SECTION_MISMATCH.
 > 
-> In case of device tree based boot, a interrupt specifier translator is setup
-> that can translate interrupt specifiers for device nodes which use combiner
-> as their interrupt parent.
+> You shouldn't enable this in the kernel supplied defconfigs.
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> Changes since v2:
-> - Rebased to Grant's irqdomain/next branch.
+> > The update is done by:
+> > 1) make mrproper && make omapX_defconfig
+> > 2) Enable the CONFIG_DEBUG_SECTION_MISMATCH
+> > 3) make savedefconfig
+> > 4) cp defconfig arch/arm/configs/omapX_defconfig
+> > 
+> > Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> > ---
+> > After updating omap1_defconfig,
+> > there are several section mismatch warnings seen.
+> > Hopefully, I will have time to fix those tomorrow
+> > (unless someone will be kind enough to fix them before me).
+> > The mismatches are:
 > 
-> Changes since v1:
-> - Includes all changes suggested by Rob Herring.
-> - Tested with SPARSE_IRQ enabled.
+> The correct way is to build with:
 > 
->  arch/arm/mach-exynos/common.c |  100 ++++++++++++++++++++++++++++++++--------
->  1 files changed, 80 insertions(+), 20 deletions(-)
+> make ... CONFIG_DEBUG_SECTION_MISMATCH=y
 > 
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index 6de298c..24693f0 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
+> or set it in your private configuration.
 
-snip
+OK that's the way to go then. Having the unoptimizer compiler flag
+-fno-inline-functions-called-once is not nice in defconfigs.. And
+we should already get the warning to enable section mismatch
+warnings anyways.
 
-> -	for (i = irq_start; i < combiner_data[combiner_nr].irq_offset
-> -				+ MAX_IRQ_IN_COMBINER; i++) {
-> -		irq_set_chip_and_handler(i, &combiner_chip, handle_level_irq);
-> -		irq_set_chip_data(i, &combiner_data[combiner_nr]);
-> -		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
-> +	if (combiner_init_irq_domain(COMBINER_IRQ(0, 0), MAX_COMBINER_NR *
-> +					MAX_IRQ_IN_COMBINER, np))
-> +		BUG();
+Regrads,
 
-You've already done a WARN. Do you need a BUG too?
-
-> +	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
-> +		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq));
-> +		combiner_cascade_irq(irq, IRQ_SPI(irq));
-
-This is relying on fixed Linux irq numbers and will break once GIC is
-using linear domains. Somehow you need to lookup the linux irq# using
-the GIC hw irq#.
-
-Rob
-
->  	}
->  }
->  
-> +
->  #ifdef CONFIG_OF
->  static const struct of_device_id exynos4_dt_irq_match[] = {
->  	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-> +	{ .compatible = "samsung,exynos4120-combiner",
-> +			.data = combiner_of_init, },
->  	{},
->  };
->  #endif
->  
->  void __init exynos4_init_irq(void)
->  {
-> -	int irq;
->  	unsigned int gic_bank_offset;
->  
->  	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
-> @@ -408,12 +472,8 @@ void __init exynos4_init_irq(void)
->  		of_irq_init(exynos4_dt_irq_match);
->  #endif
->  
-> -	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
-> -
-> -		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
-> -				COMBINER_IRQ(irq, 0));
-> -		combiner_cascade_irq(irq, IRQ_SPI(irq));
-> -	}
-> +	if (!of_have_populated_dt())
-> +		combiner_of_init(NULL, NULL);
->  
->  	/*
->  	 * The parameters of s5p_init_irq() are for VIC init.
+Tony
