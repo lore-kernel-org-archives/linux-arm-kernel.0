@@ -1,16 +1,16 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Feb 2012 23:56:20 +0000
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Feb 2012 15:57:16 -0800
 Subject: [PATCH 05/16] ARM: omap: fix vc.c PMIC error message
 In-Reply-To: <20120208235358.GD16877@atomide.com>
 References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
  <E1RvAWP-0006H3-1A@rmk-PC.arm.linux.org.uk>
  <20120208184539.GE29796@atomide.com> <87ty312ae0.fsf@ti.com>
  <20120208235358.GD16877@atomide.com>
-Message-ID: <20120208235620.GE25414@n2100.arm.linux.org.uk>
+Message-ID: <20120208235716.GE16877@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 03:53:58PM -0800, Tony Lindgren wrote:
+* Tony Lindgren <tony@atomide.com> [120208 15:22]:
 > * Kevin Hilman <khilman@ti.com> [120208 14:35]:
 > > Tony Lindgren <tony@atomide.com> writes:
 > > 
@@ -49,4 +49,12 @@ On Wed, Feb 08, 2012 at 03:53:58PM -0800, Tony Lindgren wrote:
 > 
 > Everybody OK with that?
 
-Does it fix the other issues I mention in the commit log as well?
+Also, what about this one in the cleanup branch:
+
+d269914ece0498f31603ecd85ed3d7a586b3cbcd ARM: OMAP2+: PM: only register TWL with voltage layer when device is present
+
+Should that be a fix too?
+
+Regards,
+
+Tony
