@@ -1,40 +1,58 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Wed, 08 Feb 2012 10:21:18 +0100
-Subject: [Linaro-mm-sig] [PATCH 11/15] mm: trigger page reclaim in
- alloc_contig_range() to stabilize watermarks
-In-Reply-To: <CA+K6fF49BQiNer=7Di+gCU_EX4E41q-teXJJUBjEd2xc12-j4w@mail.gmail.com>
-References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
- <1328271538-14502-12-git-send-email-m.szyprowski@samsung.com>
- <20120203140428.GG5796@csn.ul.ie>
- <CA+K6fF49BQiNer=7Di+gCU_EX4E41q-teXJJUBjEd2xc12-j4w@mail.gmail.com>
-Message-ID: <op.v9cr9sqm3l0zgt@mpn-glaptop>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed,  8 Feb 2012 12:13:27 +0200
+Subject: [PATCH 2/2] arm: orion5x: print mac address with %pM
+In-Reply-To: <1328696007-27538-1-git-send-email-andriy.shevchenko@linux.intel.com>
+References: <1328696007-27538-1-git-send-email-andriy.shevchenko@linux.intel.com>
+Message-ID: <1328696007-27538-2-git-send-email-andriy.shevchenko@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 08 Feb 2012 03:04:18 +0100, sandeep patil <psandeep.s@gmail.com> wrote:
-> There's another problem I am facing with zone watermarks and CMA.
->
-> Test details:
-> Memory  : 480 MB of total memory, 128 MB CMA region
-> Test case : around 600 MB of file transfer over USB RNDIS onto target
-> System Load : ftpd with console running on target.
-> No one is doing CMA allocations except for the DMA allocations done by the
-> drivers.
->
-> Result : After about 300MB transfer, I start getting GFP_ATOMIC
-> allocation failures.  This only happens if CMA region is reserved.
+Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+---
+ arch/arm/mach-orion5x/dns323-setup.c |    7 +++----
+ arch/arm/mach-orion5x/tsx09-common.c |    4 +---
+ 2 files changed, 4 insertions(+), 7 deletions(-)
 
-[...]
-
-> Total memory available is way above the zone watermarks. So, we ended
-> up starving
-> UNMOVABLE/RECLAIMABLE atomic allocations that cannot fallback on CMA region.
-
-This looks like something Mel warned me about.  I don't really have a good
-solution for that yet. ;/
-
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index 9eec294..9e12ef8 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -201,9 +201,8 @@ static int __init dns323_read_mac_addr(void)
+ 	}
+ 
+ 	iounmap(mac_page);
+-	printk("DNS-323: Found ethernet MAC address: ");
+-	for (i = 0; i < 6; i++)
+-		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
++
++	pr_info("DNS-323: Found ethernet MAC address: %pM.\n", addr);
+ 
+ 	memcpy(dns323_eth_data.mac_addr, addr, 6);
+ 
+@@ -637,7 +636,7 @@ static void __init dns323_init(void)
+ 	 * Configure peripherals.
+ 	 */
+ 	if (dns323_read_mac_addr() < 0)
+-		printk("DNS-323: Failed to read MAC address\n");
++		pr_warning("DNS-323: Failed to read MAC address\n");
+ 	orion5x_ehci0_init();
+ 	orion5x_eth_init(&dns323_eth_data);
+ 	orion5x_i2c_init();
+diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
+index e65b528f..c2d813c 100644
+--- a/arch/arm/mach-orion5x/tsx09-common.c
++++ b/arch/arm/mach-orion5x/tsx09-common.c
+@@ -71,9 +71,7 @@ static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
+ 			return -1;
+ 	}
+ 
+-	printk(KERN_INFO "tsx09: found ethernet mac address ");
+-	for (i = 0; i < 6; i++)
+-		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
++	pr_info("tsx09: found ethernet mac address %pM.\n", addr);
+ 
+ 	memcpy(qnap_tsx09_eth_data.mac_addr, addr, 6);
+ 
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+1.7.9
