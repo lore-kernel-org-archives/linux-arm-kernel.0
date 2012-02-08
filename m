@@ -1,33 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 08 Feb 2012 12:52:49 -0800 (PST)
-Subject: [PATCH 2/3] ARM: make disable_fiq macro optional
-In-Reply-To: <20120208203005.GB15849@n2100.arm.linux.org.uk>
-References: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
- <1328562200-8810-3-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1202061424130.1656@xanadu.home> <4F30B225.60605@gmail.com>
- <alpine.LFD.2.02.1202062116210.1656@xanadu.home> <4F31AB1E.4010800@gmail.com>
- <20120208083842.GE889@n2100.arm.linux.org.uk> <4F32D3ED.2020500@gmail.com>
- <20120208203005.GB15849@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1202081247190.1656@xanadu.home>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed,  8 Feb 2012 21:54:34 +0100
+Subject: [PATCH v4 0/7] ARM: Fixes to make LPC32xx compile and boot again
+Message-ID: <1328734474-18126-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Feb 2012, Russell King - ARM Linux wrote:
+This is the bundle of basic patches to make LPC32xx compile and boot again,
+fixing several basic issues. Tested by Wolfram Sang and Acked by Kevin Wells of
+NXP, the original author and maintainer of LPC32xx.
 
-> On Wed, Feb 08, 2012 at 01:58:37PM -0600, Rob Herring wrote:
-> > Nico suggested adding a default handler with set_fiq_handler which would
-> > do this same write to IOMD_FIQMASK. Or I can leave the ifdef for RPC
-> > around disable_fiq. Guidance with what you would like to see here would
-> > be helpful.
-> 
-> I don't think so - you either end up leaving a window where we disable
-> FIQs in the CPSR (which could get propagated to other threads) or you
-> leave a window where an errant FIQ could lock the system.
+Arnd and Olof, please tell if there is still something missing.
 
-I was thinking about hooking a subarch specific disable_fiq handler 
-using set_fiq_handler() from the mdesc->init_early callback.  This is 
-done after the vector page is initialized, and if I'm not mistaken, IRQs 
-and FIQs are still disabled at that point.
+Thanks in advance,
+
+Roland
 
 
-Nicolas
+Roland Stigge (7):
+  ARM: LPC32xx: Added lpc32xx_defconfig
+  ARM: LPC32XX: Remove broken non-static declaration
+  ARM: LPC32xx: clock.c: Missing header file
+  ARM: LPC32xx: clock.c: jiffies wrapping
+  ARM: LPC32xx: clock.c: Clock registration fixes
+  ARM: LPC32xx: clock.c: warning fix
+  ARM: LPC32xx: clock.c: Fix mutex lock issues
+
+ arch/arm/mach-lpc32xx/clock.c        |   61 ++++----------
+ arch/arm/configs/lpc32xx_defconfig   |  145 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-lpc32xx/clock.c        |    1 
+ arch/arm/mach-lpc32xx/common.h       |    1 
+ 4 files changed, 166 insertions(+), 42 deletions(-)
