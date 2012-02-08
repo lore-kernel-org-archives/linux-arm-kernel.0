@@ -1,33 +1,65 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed,  8 Feb 2012 18:43:50 +0100
-Subject: [PATCH 05/14] ARM: OMAP3+: SmartReflex: use __devexit_p annotation
+Date: Wed,  8 Feb 2012 18:43:51 +0100
+Subject: [PATCH 06/14] ARM: OMAP3+: SmartReflex: Fix status masking in
+ ERRCONFIG register
 In-Reply-To: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
 References: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1328723039-15952-6-git-send-email-j-pihet@ti.com>
+Message-ID: <1328723039-15952-7-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use __devexit_p() in struct platform_driver for functions that are
-defined with __devexit.
+From: Nishanth Menon <nm@ti.com>
 
-Reported-by: Felipe Balbi <balbi@ti.com>
+ERRCONFIG register has status bits that were intended not to
+be destroyed by bad modification. We cleanup and simplify the
+handling the status in the modify path.
+
+Reported-by: Vincent Bour <v-bour@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |   21 ++++++++-------------
+ 1 files changed, 8 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 9c39484..24ba80b 100644
+index 24ba80b..f2f2f2a 100644
 --- a/arch/arm/mach-omap2/smartreflex.c
 +++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -1079,7 +1079,7 @@ static void __devexit omap_sr_shutdown(struct platform_device *pdev)
- }
+@@ -74,10 +74,6 @@ static inline void sr_modify_reg(struct omap_sr *sr, unsigned offset, u32 mask,
+ 					u32 value)
+ {
+ 	u32 reg_val;
+-	u32 errconfig_offs = 0, errconfig_mask = 0;
+-
+-	reg_val = __raw_readl(sr->base + offset);
+-	reg_val &= ~mask;
  
- static struct platform_driver smartreflex_driver = {
--	.remove         = omap_sr_remove,
-+	.remove         = __devexit_p(omap_sr_remove),
- 	.shutdown	= __devexit_p(omap_sr_shutdown),
- 	.driver		= {
- 		.name	= "smartreflex",
+ 	/*
+ 	 * Smartreflex error config register is special as it contains
+@@ -88,16 +84,15 @@ static inline void sr_modify_reg(struct omap_sr *sr, unsigned offset, u32 mask,
+ 	 * if they are currently set, but does allow the caller to write
+ 	 * those bits.
+ 	 */
+-	if (sr->ip_type == SR_TYPE_V1) {
+-		errconfig_offs = ERRCONFIG_V1;
+-		errconfig_mask = ERRCONFIG_STATUS_V1_MASK;
+-	} else if (sr->ip_type == SR_TYPE_V2) {
+-		errconfig_offs = ERRCONFIG_V2;
+-		errconfig_mask = ERRCONFIG_VPBOUNDINTST_V2;
+-	}
++	if (sr->ip_type == SR_TYPE_V1 && offset == ERRCONFIG_V1)
++		mask |= ERRCONFIG_STATUS_V1_MASK;
++	else if (sr->ip_type == SR_TYPE_V2 && offset == ERRCONFIG_V2)
++		mask |= ERRCONFIG_VPBOUNDINTST_V2;
++
++	reg_val = __raw_readl(sr->base + offset);
++	reg_val &= ~mask;
+ 
+-	if (offset == errconfig_offs)
+-		reg_val &= ~errconfig_mask;
++	value &= mask;
+ 
+ 	reg_val |= value;
+ 
 -- 
 1.7.5.4
