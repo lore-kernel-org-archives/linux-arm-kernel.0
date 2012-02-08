@@ -1,78 +1,42 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed,  8 Feb 2012 18:43:59 +0100
-Subject: [PATCH 14/14] ARM: OMAP3+: SmartReflex: fix error handling
-In-Reply-To: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
-References: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1328723039-15952-15-git-send-email-j-pihet@ti.com>
+Date: Wed, 8 Feb 2012 18:52:34 +0100
+Subject: [PATCH v3 00/20] ARM: OMAP3+: SmartReflex: bugfixes
+In-Reply-To: <871uqdca5e.fsf@ti.com>
+References: <1328086199-28486-1-git-send-email-j-pihet@ti.com>
+ <871uqdca5e.fsf@ti.com>
+Message-ID: <CAORVsuWX=KSaLWP=Pe-u-Djh1-vTDkWBamr5vWe_eiPi5p9c+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the code to correctly use IS_ERR and PTR_ERR on the return
-values pointers
+Hi Kevin,
 
-Reported-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/smartreflex.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+On Thu, Feb 2, 2012 at 8:23 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Jean Pihet <jean.pihet@newoldbits.com> writes:
+>
+>> Integrate the latest SmartReflex bufixes from Felipe Balbi [1] and
+>> Nishant Menon [2], plus misc bugfixes.
+>>
+>> Based on latest master branch of the mainline git tree (3.3.0-rc1) [3], commit
+>> 27ba234c8dfe86c96675d4ef275d1d3c1f5f7053.
+>>
+>> [1] http://marc.info/?l=linux-omap&m=132134699423547&w=2
+>> [2] https://github.com/nmenon/linux-omap-ti-pm/commits/linux-omap-3.0
+>> [3] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=shortlog
+>
+> Can you break this series up further?
+>
+> There is lots of stuff in this series that does not qualify as a fix or
+> a cleanup. ?(specifically, all the ones starting with "introduce...").
+>
+> We need to keep fixes and cleanups separate from new features.
+Just re-sent the series with the bugfixes and minor clean-ups only, as
+'[PATCH v4 00/14] ARM: OMAP3+: SmartReflex: bugfixes and clean-ups'.
+This is based on 3.3-rc2 from mainline.
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index f6b8f45..008fbd7 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -421,7 +421,7 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
- 	if (IS_ERR(sr)) {
- 		pr_warning("%s: omap_sr struct for sr_%s not found\n",
- 			__func__, voltdm->name);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 
- 	if (!sr->clk_length)
-@@ -489,7 +489,7 @@ int sr_disable_errgen(struct voltagedomain *voltdm)
- 	if (IS_ERR(sr)) {
- 		pr_warning("%s: omap_sr struct for sr_%s not found\n",
- 			__func__, voltdm->name);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 
- 	switch (sr->ip_type) {
-@@ -540,7 +540,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
- 	if (IS_ERR(sr)) {
- 		pr_warning("%s: omap_sr struct for sr_%s not found\n",
- 			__func__, voltdm->name);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 
- 	if (!sr->clk_length)
-@@ -626,7 +626,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
- 	if (IS_ERR(sr)) {
- 		pr_warning("%s: omap_sr struct for sr_%s not found\n",
- 			__func__, voltdm->name);
--		return -EINVAL;
-+		return PTR_ERR(sr);
- 	}
- 
- 	volt_data = omap_voltage_get_voltdata(sr->voltdm, volt);
-@@ -634,7 +634,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
- 	if (IS_ERR(volt_data)) {
- 		dev_warn(&sr->pdev->dev, "%s: Unable to get voltage table"
- 			"for nominal voltage %ld\n", __func__, volt);
--		return -ENODATA;
-+		return PTR_ERR(volt_data);
- 	}
- 
- 	nvalue_reciprocal = sr_retrieve_nvalue(sr, volt_data->sr_efuse_offs);
-@@ -1079,7 +1079,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
- 	if (IS_ERR(sr_info)) {
- 		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
- 			__func__);
--		return -EINVAL;
-+		return PTR_ERR(sr_info);
- 	}
- 
- 	if (sr_info->autocomp_active)
--- 
-1.7.5.4
+The new functionality will be added as patch series on top of this one.
+
+>
+> Kevin
+
+Thanks,
+Jean
