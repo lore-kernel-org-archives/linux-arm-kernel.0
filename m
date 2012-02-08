@@ -1,33 +1,29 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 8 Feb 2012 12:16:43 +0100
-Subject: [PATCH v2 02/10] pwm: Allow chips to support multiple PWMs.
-In-Reply-To: <20120208090055.GP3852@pengutronix.de>
-References: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
- <1328541585-24642-3-git-send-email-thierry.reding@avionic-design.de>
- <4F31AB63.3020301@gmail.com>
- <20120208081508.GA6673@avionic-0098.mockup.avionic-design.de>
- <20120208090055.GP3852@pengutronix.de>
-Message-ID: <20120208111643.GC17615@avionic-0098.mockup.avionic-design.de>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Wed, 08 Feb 2012 15:50:30 +0400
+Subject: [PATCH 3.3] OMAP4: PRM: fix build breakage when CONFIG_OF is
+ not defined
+In-Reply-To: <1328698752-18756-1-git-send-email-coelho@ti.com>
+References: <1328698752-18756-1-git-send-email-coelho@ti.com>
+Message-ID: <4F326186.8090300@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sascha Hauer wrote:
-> I have a series porting all in kernel drivers to this framework. I can
-> follow up on this series once it's clear we want to go this way. With
-> this series the way will be free to move to a better pwm matching
-> without a global pwm index because the drivers won't be affected by
-> this change anymore.
+Hello.
 
-Nice. I already ported the PXA and Blackfin drivers in this series and was
-planning to port more in subsequent versions but if you've already done most
-of the work I can just skip. I should probably keep the Tegra driver in the
-series because it doesn't exist in the kernel tree yet.
+On 08-02-2012 14:59, Luciano Coelho wrote:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120208/e59e2c18/attachment.sig>
+> Since 3.3-rc1, prm44xx.c build breaks if CONFIG_OF is not set:
+
+> arch/arm/mach-omap2/prm44xx.c:41: error: 'OMAP44XX_IRQ_PRCM' undeclared here (not in a function)
+> make[1]: *** [arch/arm/mach-omap2/prm44xx.o] Error 1
+
+> This is because of a missing include, which is added indirectly if
+> CONFIG_OF is defined.  This problem was introduced in commit
+> 2f31b51659c2d8315ea2888ba5b93076febe672b
+
+    Please also specify the summary of that commit in parens.
+
+> Cc: Tero Kristo<t-kristo@ti.com>
+> Signed-off-by: Luciano Coelho<coelho@ti.com>
+
+WBR, Sergei
