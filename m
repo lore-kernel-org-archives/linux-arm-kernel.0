@@ -1,46 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Feb 2012 11:51:42 -0800
-Subject: [PATCH] ARM: OMAP: update omap1 and omap2plus defconfigs
-In-Reply-To: <20120208101958.GT1275@n2100.arm.linux.org.uk>
-References: <20120208053556.GB1426@atomide.com>
- <1328696173-17226-1-git-send-email-grinberg@compulab.co.il>
- <20120208101958.GT1275@n2100.arm.linux.org.uk>
-Message-ID: <20120208195141.GE1426@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 08 Feb 2012 13:58:37 -0600
+Subject: [PATCH 2/3] ARM: make disable_fiq macro optional
+In-Reply-To: <20120208083842.GE889@n2100.arm.linux.org.uk>
+References: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
+ <1328562200-8810-3-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1202061424130.1656@xanadu.home> <4F30B225.60605@gmail.com>
+ <alpine.LFD.2.02.1202062116210.1656@xanadu.home> <4F31AB1E.4010800@gmail.com>
+ <20120208083842.GE889@n2100.arm.linux.org.uk>
+Message-ID: <4F32D3ED.2020500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120208 01:49]:
-> On Wed, Feb 08, 2012 at 12:16:13PM +0200, Igor Grinberg wrote:
-> > This patch updates omapX_defconfig to 3.3-rc1 and enables
-> > the CONFIG_DEBUG_SECTION_MISMATCH.
+On 02/08/2012 02:38 AM, Russell King - ARM Linux wrote:
+> On Tue, Feb 07, 2012 at 04:52:14PM -0600, Rob Herring wrote:
+>> Wouldn't the fiq be masked then? rpc_init_irq masks out the interrupts
+>> in the same register as disable_fiq macro:
+>>
+>> iomd_writeb(0, IOMD_FIQMASK);
 > 
-> You shouldn't enable this in the kernel supplied defconfigs.
+> The point of the stuff in disable_fiq is to catch cases where the FIQMASK
+> register hasn't been disabled, and we receive a spurious FIQ.  What happens
+> in that case (without code in disable_fiq) is that we will endlessly spin
+> entering and re-entering the FIQ code.
 > 
-> > The update is done by:
-> > 1) make mrproper && make omapX_defconfig
-> > 2) Enable the CONFIG_DEBUG_SECTION_MISMATCH
-> > 3) make savedefconfig
-> > 4) cp defconfig arch/arm/configs/omapX_defconfig
-> > 
-> > Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> > ---
-> > After updating omap1_defconfig,
-> > there are several section mismatch warnings seen.
-> > Hopefully, I will have time to fix those tomorrow
-> > (unless someone will be kind enough to fix them before me).
-> > The mismatches are:
+> No normal interrupts will be received, and no non-FIQ handler instructions
+> will ever be executed.
 > 
-> The correct way is to build with:
+> Without this, we're 100% reliant on the FIQMASK register being correctly
+> set.
 > 
-> make ... CONFIG_DEBUG_SECTION_MISMATCH=y
-> 
-> or set it in your private configuration.
+> I would suggest that other platforms which _can_ receive FIQs should
+> implement the disable_fiq macro for safety against these kinds of silent
+> lockups.  It shouldn't be needed in the same way that printascii()
+> shouldn't be needed.
 
-OK that's the way to go then. Having the unoptimizer compiler flag
--fno-inline-functions-called-once is not nice in defconfigs.. And
-we should already get the warning to enable section mismatch
-warnings anyways.
+Couldn't this be fixed generically by masking FIQ in the SPSR rather
+than the source?
 
-Regrads,
+Nico suggested adding a default handler with set_fiq_handler which would
+do this same write to IOMD_FIQMASK. Or I can leave the ifdef for RPC
+around disable_fiq. Guidance with what you would like to see here would
+be helpful.
 
-Tony
+Rob
