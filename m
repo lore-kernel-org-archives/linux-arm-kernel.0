@@ -1,43 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 09 Feb 2012 00:42:48 +0100
-Subject: [PATCH v6 07/15] ARM: SoC: convert MSM SMP to SoC descriptor
-In-Reply-To: <20120208233907.GA4416@codeaurora.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 8 Feb 2012 15:42:53 -0800
+Subject: [PATCH v6 02/15] ARM: SoC: Add per SoC SMP and CPU hotplug
+ operations
+In-Reply-To: <1328661059-24584-3-git-send-email-marc.zyngier@arm.com>
 References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
- <1328661059-24584-8-git-send-email-marc.zyngier@arm.com>
- <20120208233907.GA4416@codeaurora.org>
-Message-ID: <e69d03ae47b5981b2fa7c48d5987ea9a@localhost>
+ <1328661059-24584-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20120208234253.GA16313@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 08, 2012 at 12:30:46AM +0000, Marc Zyngier wrote:
 
-On Wed, 8 Feb 2012 15:39:07 -0800, David Brown <davidb@codeaurora.org>
-wrote:
-> On Wed, Feb 08, 2012 at 12:30:51AM +0000, Marc Zyngier wrote:
-> 
->> @@ -146,6 +152,9 @@ MACHINE_END
->>  #ifdef CONFIG_OF
->>  /* TODO: General device tree support for all MSM. */
->>  DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
->> +	.soc = &msm_soc_desc,
->> +	.fixup = msm8x60_fixup,
->> +	.reserve = msm8x60_reserve,
->>  	.map_io = msm8x60_map_io,
->>  	.init_irq = msm8x60_init_irq,
->>  	.init_machine = msm8x60_dt_init,
-> 
-> The fixup and reserve aren't really needed (and probably not wanted)
-> for the DT board.  The fixup doesn't actually work, since it modifies
-> the tags, which don't exist.  The reservation should be passed in the
-> DT itself, since that has a mechanism for it.
+> +#ifdef CONFIG_SMP
+> +#define soc_smp_init_ops(ops)		.smp_init_ops = &(ops),
+> +#define soc_smp_ops(ops)		.smp_ops = &(ops),
+> +extern void soc_smp_ops_register(struct arm_soc_smp_init_ops *,
+> +				 struct arm_soc_smp_ops *);
+> +#else
+> +#define soc_smp_init_ops(ops)		/* empty */
+> +#define soc_smp_ops(ops)		/* empty */
+> +#define soc_smp_ops_register(a,b)	do {} while(0)
+> +#endif
 
-Evidently a copy/paste abuse. I'll fix that shortly.
+I'm not sure if this bothers anyone else, but these macros mess up
+editors that know how to indent C code, since the comma ends up inside
+the macro.  I'm not sure I have a better idea, though.
 
-> Otherwise, the MSM part looks ok.
-> 
-> Acked-By: David Brown <davidb@codeaurora.org>
+David
 
-Thanks David.
-
-        M.
 -- 
-Fast, cheap, reliable. Pick two.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
