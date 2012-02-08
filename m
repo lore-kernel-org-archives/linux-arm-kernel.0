@@ -1,30 +1,37 @@
-From: boojin.kim@samsung.com (Boojin Kim)
-Date: Wed, 08 Feb 2012 10:25:13 +0900
-Subject: [PATCH] ARM: EXYNOS: Configure ARM_NR_BANKS for EXYNOS SoC
-Message-ID: <003201cce600$81c8f100$855ad300$%kim@samsung.com>
+From: anton.vorontsov@linaro.org (Anton Vorontsov)
+Date: Wed, 8 Feb 2012 05:39:59 +0400
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+Message-ID: <20120208013959.GA24535@panacea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch increases the number of bank for EXYNOS4 and EXYNOS5
-to support bigger than 2GB memory on it.
+Hi all,
 
-Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
----
- arch/arm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+For some drivers we need to know when scheduler is idling. The most
+straightforward way is to gracefully hook into the idle loop.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f9d7c47..d646810 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1134,7 +1134,7 @@ source arch/arm/mm/Kconfig
+On x86 there are "CPU idle" notifiers in the inner idle loop, but
+scheduler idle notifiers are different. These notifiers do not run on
+every invocation/exit from cpuidle, instead they used to notify about
+scheduler state changes, not HW states.
 
- config ARM_NR_BANKS
- 	int
--	default 16 if ARCH_EP93XX
-+	default 16 if ARCH_EP93XX || ARCH_EXYNOS4 || ARCH_EXYNOS5
- 	default 8
+In other words, CPU idle notifiers work inside while(!need_resched())
+loop (nested into idle loop), while scheduler idle notifier work
+outside of the loop.
 
- config IWMMXT
---
-1.7.1
+The first two patches consolidate scheduler idle entry/exit
+points, and converts architectures to this new API.
+
+The third patch is a new cpufreq governor, the commit message
+briefly describes it.
+
+The fourth patch is another user of the notifiers, a trivial one.
+
+Thanks,
+
+p.s. For the reference, the old discussion about CPU/PM idle
+     notifiers: http://lkml.org/lkml/2011/6/27/391 
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
