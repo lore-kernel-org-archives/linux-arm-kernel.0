@@ -1,78 +1,30 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed,  8 Feb 2012 21:41:02 +0100
-Subject: [PATCH v4 4/7] ARM: LPC32xx: clock.c: jiffies wrapping
+Date: Wed,  8 Feb 2012 21:41:04 +0100
+Subject: [PATCH v4 6/7] ARM: LPC32xx: clock.c: warning fix
 In-Reply-To: <1328733665-17836-1-git-send-email-stigge@antcom.de>
 References: <1328733665-17836-1-git-send-email-stigge@antcom.de>
-Message-ID: <1328733665-17836-5-git-send-email-stigge@antcom.de>
+Message-ID: <1328733665-17836-7-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the jiffies wrapping bug in clock.c.
-
-It corrects the timeout computation based on jiffies, uses time_before() for
-correct wrapping handling and replaces a binary "&" which should really be a
-logical "&&" in a truth expression.
+This patch removes the debug warning on local_clk_disable() as done in Kevin
+Wells' driver update
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de> 
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 Acked-by: Kevin Wells <kevin.wells@nxp.com>
 
 diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index 8e79313..f64c9a1 100644
+index d527288..0606a63 100644
 --- a/arch/arm/mach-lpc32xx/clock.c
 +++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -128,7 +128,7 @@ static struct clk osc_32KHz = {
- static int local_pll397_enable(struct clk *clk, int enable)
+@@ -904,8 +904,6 @@ static inline void clk_unlock(void)
+ 
+ static void local_clk_disable(struct clk *clk)
  {
- 	u32 reg;
--	unsigned long timeout = 1 + msecs_to_jiffies(10);
-+	unsigned long timeout = jiffies + msecs_to_jiffies(10);
- 
- 	reg = __raw_readl(LPC32XX_CLKPWR_PLL397_CTRL);
- 
-@@ -143,7 +143,7 @@ static int local_pll397_enable(struct clk *clk, int enable)
- 		/* Wait for PLL397 lock */
- 		while (((__raw_readl(LPC32XX_CLKPWR_PLL397_CTRL) &
- 			LPC32XX_CLKPWR_SYSCTRL_PLL397_STS) == 0) &&
--			(timeout > jiffies))
-+			time_before(jiffies, timeout))
- 			cpu_relax();
- 
- 		if ((__raw_readl(LPC32XX_CLKPWR_PLL397_CTRL) &
-@@ -157,7 +157,7 @@ static int local_pll397_enable(struct clk *clk, int enable)
- static int local_oscmain_enable(struct clk *clk, int enable)
- {
- 	u32 reg;
--	unsigned long timeout = 1 + msecs_to_jiffies(10);
-+	unsigned long timeout = jiffies + msecs_to_jiffies(10);
- 
- 	reg = __raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL);
- 
-@@ -172,7 +172,7 @@ static int local_oscmain_enable(struct clk *clk, int enable)
- 		/* Wait for main oscillator to start */
- 		while (((__raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL) &
- 			LPC32XX_CLKPWR_MOSC_DISABLE) != 0) &&
--			(timeout > jiffies))
-+			time_before(jiffies, timeout))
- 			cpu_relax();
- 
- 		if ((__raw_readl(LPC32XX_CLKPWR_MAIN_OSC_CTRL) &
-@@ -384,7 +384,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
- {
- 	u32 reg;
- 	int ret = -ENODEV;
--	unsigned long timeout = 1 + msecs_to_jiffies(10);
-+	unsigned long timeout = jiffies + msecs_to_jiffies(10);
- 
- 	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
- 
-@@ -397,7 +397,7 @@ static int local_usbpll_enable(struct clk *clk, int enable)
- 		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
- 
- 		/* Wait for PLL lock */
--		while ((timeout > jiffies) & (ret == -ENODEV)) {
-+		while (time_before(jiffies, timeout) && (ret == -ENODEV)) {
- 			reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
- 			if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_STS)
- 				ret = 0;
+-	WARN_ON(clk->usecount == 0);
+-
+ 	/* Don't attempt to disable clock if it has no users */
+ 	if (clk->usecount > 0) {
+ 		clk->usecount--;
