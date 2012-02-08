@@ -1,48 +1,54 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 8 Feb 2012 11:31:20 +0100
-Subject: [PATCH v2 02/10] pwm: Allow chips to support multiple PWMs.
-In-Reply-To: <20120208091720.GI889@n2100.arm.linux.org.uk>
-References: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
- <1328541585-24642-3-git-send-email-thierry.reding@avionic-design.de>
- <4F31AB63.3020301@gmail.com>
- <20120208081508.GA6673@avionic-0098.mockup.avionic-design.de>
- <20120208091720.GI889@n2100.arm.linux.org.uk>
-Message-ID: <20120208103119.GA17615@avionic-0098.mockup.avionic-design.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 8 Feb 2012 11:38:18 +0100 (CET)
+Subject: [PATCH] genirq: Fix race condition in ONESHOT irq handler
+In-Reply-To: <20274.4237.63380.338503@ipc1.ka-ro>
+References: <4F31220A.2050708@metafoo.de>
+ <1328621921-17404-1-git-send-email-LW@KARO-electronics.de>
+ <alpine.LFD.2.02.1202071719340.2794@ionos>
+ <20274.4237.63380.338503@ipc1.ka-ro>
+Message-ID: <alpine.LFD.2.02.1202081123390.2794@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux wrote:
-> On Wed, Feb 08, 2012 at 09:15:08AM +0100, Thierry Reding wrote:
-> > * Ryan Mallon wrote:
-> > > On 07/02/12 02:19, Thierry Reding wrote:
-> > > > The total maximum number of PWM devices is currently fixed to 64, but
-> > > > can easily be made configurable via Kconfig.
-> > > 
-> > > It would be better to make the code handle arbitrary numbers of PWMs. A
-> > > Kconfig knob becomes annoying when you have more than one platform
-> > > configured into the kernel.
+On Wed, 8 Feb 2012, Lothar Wa?mann wrote:
+> > So it looks like driver developers decided that the oneshot mode might
+> > be interesting with a primary handler as well. I can see the reason
+> > why the tsc2007 driver uses it, but that does not make it a bug in the
+> > core code in the first place.
 > > 
-> > AFAICT handling an arbitrary number of PWMs will only be possible once we get
-> > rid of the global namespace and therefore should be postponed for later. I
-> > may be wrong, though, so if anybody can point me in the right direction I'm
-> > perfectly happy to change that in this series.
-> 
-> One solution would be to look at how genirq handles this.  Eg, it uses a
-> radix tree to store the irqdescs rather than an array, and a bitmap
-> showing which global numbers are allocated.
+> Then maybe the core code should not check the return value
+> of the primary handler for IRQ_WAKE_THREAD but call the secondary
+> handler unconditionally for ONESHOT interrupts.
+> Or it should be at least documented somewhere that primary handlers
+> have to return IRQ_WAKE_THREAD in any case for oneshot interrupts.
 
-That's exactly the solution implemented by this second version of the series.
-In fact I did turn to genirq for inspiration at the time I wrote the code.
-My understanding was that Ryan proposed to get rid of the bitmap altogether
-because it arbitrarily limits the number of PWMs. How that can be achieved
-with a global namespace I don't know. Thus my proposal to keep it as-is for
-now and get rid of it once per-chip indexing is implemented.
+Well, you know how good we are with documentation :)
+ 
+> > > The problem arises also with interrupt controllers that latch a level
+> > > triggered IRQ until it is acknowledged (like the i.MX28 does).
+> > > In this case the IRQ status bit will remain asserted after the
+> > > soft-irq finishes and retrigger the interrupt while the interrupt line
+> > > is already deasserted.
+> > 
+> > This does not make sense. We acknowledge interrupts via mask_ack_irq()
+> > right on entry of handle_level_irq(). So either the interrupt
+> > 
+> That's right. But at that point the IRQ line is still asserted and
+> since it is a level IRQ this will not actually clear the interrupt
+> status bit. Normally the IRQ status bit would self-clear when the IRQ
+> line is being deasserted (in this case by removing the finger from the
+> touch panel). But the i.MX28 leaves the IRQ status bit set and it
+> takes another write to the IRQ status register to remove the bogus IRQ
+> status.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120208/c61c04bf/attachment-0001.sig>
+So the question is whether the imx irq chip implementation should
+write to the status register on unmask for level type irqs to avoid
+spurious interrupts being generated in the first place. This is not
+only an optimization for threaded interrupts, afaict this spurious
+effect should happen with non threaded interrupts as well.
+
+Did my patch work for you ?
+
+Thanks,
+
+	tglx
