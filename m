@@ -1,23 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Feb 2012 10:48:53 -0800
-Subject: [PATCH 11/16] ARM: omap: fix section mismatch error for
- omap_4430sdp_display_init()
-In-Reply-To: <E1RvAYM-0006HW-IG@rmk-PC.arm.linux.org.uk>
+Date: Wed, 8 Feb 2012 10:49:31 -0800
+Subject: [PATCH 12/16] ARM: omap: fix section mismatch warning for
+ sdp3430_twl_gpio_setup()
+In-Reply-To: <E1RvAYg-0006Ha-Mf@rmk-PC.arm.linux.org.uk>
 References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
- <E1RvAYM-0006HW-IG@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120208184852.GK29796@atomide.com>
+ <E1RvAYg-0006Ha-Mf@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120208184930.GL29796@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Russell King - ARM Linux <linux@arm.linux.org.uk> [120208 08:08]:
-> WARNING: arch/arm/mach-omap2/built-in.o(.text+0xb798): Section mismatch in reference from the function omap_4430sdp_display_init() to the function .init.text:omap_display_init()
-> The function omap_4430sdp_display_init() references
-> the function __init omap_display_init().
-> This is often because omap_4430sdp_display_init lacks a __init
-> annotation or the annotation of omap_display_init is wrong.
+> WARNING: arch/arm/mach-omap2/built-in.o(.text+0xd0f0): Section mismatch in reference from the function sdp3430_twl_gpio_setup() to the function .init.text:omap2_hsmmc_init()
+> The function sdp3430_twl_gpio_setup() references
+> the function __init omap2_hsmmc_init().
+> This is often because sdp3430_twl_gpio_setup lacks a __init
+> annotation or the annotation of omap2_hsmmc_init is wrong.
 > 
-> Fix this by adding __init to omap_4430sdp_display_init().
+> sdp3430_twl_gpio_setup() is called via platform data from the
+> gpio-twl4030 module, which can be inserted and removed at runtime.
+> This makes sdp3430_twl_gpio_setup() callable at runtime, and prevents
+> it being marked with an __init annotation.
+> 
+> As it calls omap2_hsmmc_init() unconditionally, the only resolution to
+> this warning is to remove the __init markings from omap2_hsmmc_init()
+> and its called functions.  This addresses the functions in hsmmc.c.
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+We'll try to sort this out also properly for v3.4, meanwhile:
 
 Acked-by: Tony Lindgren <tony@atomide.com>
