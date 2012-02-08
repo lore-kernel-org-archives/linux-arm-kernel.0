@@ -1,72 +1,37 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 8 Feb 2012 04:00:13 +0000
-Subject: [PATCH v3 3/3] arm:davinci: move NAND and NOR devices as aemif
- MFD slaves
-In-Reply-To: <4F31552D.9060505@criticallink.com>
-References: <1328627513-30134-1-git-send-email-prakash.pm@ti.com>
- <1328627513-30134-4-git-send-email-prakash.pm@ti.com>
- <4F31552D.9060505@criticallink.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC31761D77@DBDE01.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Feb 2012 21:33:43 -0800
+Subject: [PATCH] ARM: OMAP2: Fix the OMAP2 only build break seen with
+ 2011+ ARM tool-chains
+In-Reply-To: <1328523587-21341-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1328523587-21341-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20120208053343.GA1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [120206 01:48]:
+> With the latest Sourcery G++ Lite 2011.03-41 and latest linaro
+> tool-chains OMAP2 only build breaks with below error.
+> 
+> arch/arm/mach-omap2/omap-smc.S: Assembler messages:
+> arch/arm/mach-omap2/omap-smc.S:30: Error: selected processor does not support ARM mode `smc #0'
+> arch/arm/mach-omap2/omap-smc.S:53: Error: selected processor does not support ARM mode `smc #0'
+> arch/arm/mach-omap2/omap-smc.S:61: Error: selected processor does not support ARM mode `smc #0'
+> arch/arm/mach-omap2/omap-smc.S:69: Error: selected processor does not support ARM mode `smc #0'
+> arch/arm/mach-omap2/omap-smc.S:77: Error: selected processor does not support ARM mode `smc #0'
+> make[1]: *** [arch/arm/mach-omap2/omap-smc.o] Error 1
+> 
+> OMAP2 devices doesn't have the security support but the security support
+> was getting built because of OMAP2PLUS. Don't build security code for
+> OMAP2 devices.
+> 
+> While at it, fix the secure-common line in the Makefile to use tabs
+> instead of spaces.
+> 
+> Reported-by: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-On Tue, Feb 07, 2012 at 22:15:33, Michael Williamson wrote:
-> Hello Prakash,
-> 
-> On 2/7/2012 10:11 AM, Manjunathappa, Prakash wrote:
-> 
-> > NAND and NOR device are made as aemif device slaves, hence all DaVinci
-> > board NAND/NOR device registration achieved via aemif MFD driver.
-> >
-> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> > ---
-> > Since v2:
-> > Make changes for all DaVinci boards in single patch.
-> 
-> 
-> 
-> [...]
-> 
-> > diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-> > index 672d820..bb29b7a 100644
-> > --- a/arch/arm/mach-davinci/board-mityomapl138.c
-> > +++ b/arch/arm/mach-davinci/board-mityomapl138.c
-> > @@ -19,6 +19,7 @@
-> >  #include <linux/etherdevice.h>
-> >  #include <linux/spi/spi.h>
-> >  #include <linux/spi/flash.h>
-> > +#include <linux/mfd/davinci_aemif.h>
-> >  
-> >  #include <asm/io.h>
-> >  #include <asm/mach-types.h>
-> > @@ -414,18 +415,35 @@ static struct resource mityomapl138_nandflash_resource[] = {
-> >  	},
-> >  };
-> >  
-> > -static struct platform_device mityomapl138_nandflash_device = {
-> > -	.name		= "davinci_nand",
-> > -	.id		= 1,
-> > -	.dev		= {
-> > -		.platform_data	= &mityomapl138_nandflash_data,
-> > +static struct platform_device mityomapl138_emif_devices[] __initdata = {
-> > +	{
-> > +		.name		= "davinci_nand",
-> > +		.id		= 0,
-> 
-> 
-> 
-> Pretty sure this still needs to be a 1.  The nand is on chip select 3,
-> EMA_CS3, which I believe is the same as the da850 EVM.
+Thanks, applying into fixes.
 
-Yes I could not test on this board. I will make id as 1.
+Regards,
 
-Thanks,
-Prakash
-
-> 
-> -Mike
-> 
-> 
-> 
+Tony
