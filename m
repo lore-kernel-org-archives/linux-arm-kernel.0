@@ -1,33 +1,31 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 8 Feb 2012 15:42:53 -0800
-Subject: [PATCH v6 02/15] ARM: SoC: Add per SoC SMP and CPU hotplug
- operations
-In-Reply-To: <1328661059-24584-3-git-send-email-marc.zyngier@arm.com>
-References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
- <1328661059-24584-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20120208234253.GA16313@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Feb 2012 15:46:54 -0800
+Subject: [PATCH 01/16] ARM: omap: fix oops in arch/arm/mach-omap2/vp.c
+ when pmic is not found
+In-Reply-To: <20120208183333.GA29796@atomide.com>
+References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
+ <E1RvAV6-0006Gj-Di@rmk-PC.arm.linux.org.uk>
+ <20120208183333.GA29796@atomide.com>
+Message-ID: <20120208234654.GC16877@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 12:30:46AM +0000, Marc Zyngier wrote:
+* Tony Lindgren <tony@atomide.com> [120208 10:02]:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120208 08:05]:
+> 
+> This is better than Kevin's earlier patch because of the descriptive
+> error:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-> +#ifdef CONFIG_SMP
-> +#define soc_smp_init_ops(ops)		.smp_init_ops = &(ops),
-> +#define soc_smp_ops(ops)		.smp_ops = &(ops),
-> +extern void soc_smp_ops_register(struct arm_soc_smp_init_ops *,
-> +				 struct arm_soc_smp_ops *);
-> +#else
-> +#define soc_smp_init_ops(ops)		/* empty */
-> +#define soc_smp_ops(ops)		/* empty */
-> +#define soc_smp_ops_register(a,b)	do {} while(0)
-> +#endif
+Hmm looks like the patch from Ahilash that Kevin queued has the
+also a test for missing uv_to_vsel:
 
-I'm not sure if this bothers anyone else, but these macros mess up
-editors that know how to indent C code, since the comma ends up inside
-the macro.  I'm not sure I have a better idea, though.
+if (!voltdm->pmic || !voltdm->pmic->uv_to_vsel)
 
-David
+So there seems to be more to it than what Russell's patch is
+doing.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+
+Tony
