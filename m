@@ -1,132 +1,107 @@
-From: psandeep.s@gmail.com (sandeep patil)
-Date: Tue, 7 Feb 2012 18:04:18 -0800
-Subject: [Linaro-mm-sig] [PATCH 11/15] mm: trigger page reclaim in
- alloc_contig_range() to stabilize watermarks
-In-Reply-To: <20120203140428.GG5796@csn.ul.ie>
-References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
- <1328271538-14502-12-git-send-email-m.szyprowski@samsung.com>
- <20120203140428.GG5796@csn.ul.ie>
-Message-ID: <CA+K6fF49BQiNer=7Di+gCU_EX4E41q-teXJJUBjEd2xc12-j4w@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 8 Feb 2012 10:24:00 +0800
+Subject: oprofile and ARM A9 hardware counter
+In-Reply-To: <CAMsRxfJH+9MS=Svmh0BvDSb8xqsPe2HPobkeKcn8JO35npjhwQ@mail.gmail.com>
+References: <1328578047.1724.17.camel@dave-Dell-System-XPS-L502X>
+ <CAMQu2gwfo5JXAqQaLUNs7C7J3TUhEO2zOcyD0Rk-D_O61Yrfag@mail.gmail.com>
+ <CAMsRxfLNBbQO5XF+EHJqNsnW+s=ay3mjSV5dh=sxdwzktUu03g@mail.gmail.com>
+ <CAMQu2gzfNAwtf1c6jrTZpfGMSqBgBrQKmFTeCFzbvMh9ESBDUg@mail.gmail.com>
+ <CAMsRxfKR1ODH56BtcUT5Dv6qOVEYGVheEcW9ugXsZmLKok==bg@mail.gmail.com>
+ <CAMQu2gwWt6oQPjxc1YHgOoxVkHdck_q78Xf==7ncwRj0_uS-JQ@mail.gmail.com>
+ <CAMQu2gyCPtbNfBa5V8ve2JORN+sDeAY+hvR0g0_9U354JgcuiA@mail.gmail.com>
+ <CAMsRxfJVEgVJoHcaPQbMg5mwz=tZUce4oibDUxtnevSF8bGY9g@mail.gmail.com>
+ <CAMQu2gxVUqDF2HkPD=QeX0N_tUd=9FTd+T+1LHCR0tsCgQxC8Q@mail.gmail.com>
+ <CAMsRxfJH+9MS=Svmh0BvDSb8xqsPe2HPobkeKcn8JO35npjhwQ@mail.gmail.com>
+Message-ID: <CACVXFVMx9Zx3ZQr6Q-17x5NVL8iuBJjOjtw39FJiWX=fGkZNZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2012 at 6:04 AM, Mel Gorman <mel@csn.ul.ie> wrote:
-> On Fri, Feb 03, 2012 at 01:18:54PM +0100, Marek Szyprowski wrote:
+Hi,
+
+CC lkml and perf guys, since looks it is related with perf core.
+
+On Tue, Feb 7, 2012 at 7:59 PM, stephane eranian <eranian@googlemail.com> wrote:
+> An easier way to verify we're getting the right number of samples is
+> to use perf top:
 >
-> Nothing prevents two or more processes updating the wmarks at the same
-> time which is racy and unpredictable. Today it is not much of a problem
-> but CMA makes this path hotter than it was and you may see weirdness
-> if two processes are updating zonelists at the same time. Swap-over-NFS
-> actually starts with a patch that serialises setup_per_zone_wmarks()
+> $ taskset -c 1 noploop 1000 &
+> $ sudo perf top
 >
-> You also potentially have a BIG problem here if this happens
+> You'll see around 850 irqs/sec, should be closer to 1000.
+> But if I drop the rate to 100Hz, then it works:
 >
-> min_free_kbytes = 32768
-> Process a: min_free_kbytes ?+= 65536
-> Process a: start direct reclaim
-> echo 16374 > /proc/sys/vm/min_free_kbytes
-> Process a: exit direct_reclaim
-> Process a: min_free_kbytes -= 65536
+> $ sudo perf top -F 100
 >
-> min_free_kbytes now wraps negative and the machine hangs.
->
+> That leads me to believe there is too much overhead somewhere.
+> Could be in perf_event itself.
 
-There's another problem I am facing with zone watermarks and CMA.
+Looks like the issue is caused by perf_event itself, but nothing to do
+with much overhead
+somewhere.
 
-Test details:
-Memory  : 480 MB of total memory, 128 MB CMA region
-Test case : around 600 MB of file transfer over USB RNDIS onto target
-System Load : ftpd with console running on target.
-No one is doing CMA allocations except for the DMA allocations done by the
-drivers.
+On OMAP4, HZ is 128, and perf_rotate_context may set a new sample period(~8ms),
+which is much longer than 1ms in 1000HZ freq mode, so less sample events are
+observed. X86 isn't affected since its HZ is 1000.
 
-Result : After about 300MB transfer, I start getting GFP_ATOMIC
-allocation failures.
-This only happens if CMA region is reserved.
+With patch[1], about 10000 sample events can be generated after running
+'perf record -e cycles  ./noploop 10' and 'perf report -D | tail -20'
+on panda board.
 
-Here's the free_list before I start the test
+I am not sure if patch[1] is a right fix, but it can verify the problem.
 
-Free pages count per migrate type at order       0      1      2
-3      4      5      6      7      8      9     10
-Node    0, zone   Normal, type    Unmovable      2      9      6
-7      3      3      3      4      2      1      0
-Node    0, zone   Normal, type  Reclaimable     31      4      1
-2      1      1      0      1      1      0      0
-Node    0, zone   Normal, type      Movable     22     20     23
-14      3      4      4      3      1      0     70
-Node    0, zone   Normal, type      Reserve      0      0      0
-0      0      0      0      0      0      0      1
-Node    0, zone   Normal, type          CMA      2      0      0
-2      1      1      1      1      1      1     34
-Node    0, zone   Normal, type      Isolate      0      0      0
-0      0      0      0      0      0      0      0
+thanks,
+--
+Ming Lei
 
-and here's what I get when I print the same when allocation fails.
+[1], fix adjusting frequency in perf_rotate_context
 
-Normal: Free pages count per migrate type at order       0      1
-2      3      4      5      6      7      8      9     10
-[  401.887634]                    zone   Normal, type    Unmovable
- 0      0      0      0      0      0      0      0      0      0
-0
-[  401.901916]                    zone   Normal, type  Reclaimable
- 0      0      0      0      0      0      0      0      0      0
-0
-[  401.916229]                    zone   Normal, type      Movable
- 0      0      0      0      0      0      0      0      0      0
-0
-[  401.930541]                    zone   Normal, type      Reserve
- 0      0      0      0      0      0      0      0      0      0
-0
-[  401.944824]                    zone   Normal, type          CMA
-6582   6580   2380      0      0      0      0      0      0      0
-  0
-[  401.961486]                    zone   Normal, type      Isolate
- 0      0      0      0      0      0      0      0      0      0
-0
-
-Total memory available is way above the zone watermarks. So, we ended
-up starving
-UNMOVABLE/RECLAIMABLE atomic allocations that cannot fallback on CMA region.
-
-I know the CMA region is big, but I think reducing the region size
-will only delay the problem.
-it walso on't recover as long as most of the CMA region pages get
-allocated and the zone
-watermark is hit
-
-To check my theory, I changed __zone_watermark_ok() to ignore free CMA pages
-With this change, the transfer succeeds w/o any failures.
-
-The patch does make things slow of course. Ideally, I would have liked
-to do this only if
-the watermark is being checked for non-Movable allocations, but I couldn't find
-an easy way to do that.
-
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 371a79f..b672d97 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -1580,6 +1580,21 @@ static bool __zone_watermark_ok(struct zone *z,
-int order, unsigned long mark,
- 		if (free_pages <= min)
- 			return false;
- 	}
-+
-+#ifdef CONFIG_CMA
-+	/* If cma is enabled, ignore free pages from MIGRATE_CMA list
-+	 * for watermark checks
-+	 */
-+	for (o = order; o < MAX_ORDER; o++) {
-+		struct list_head *curr;
-+		list_for_each(curr, &z->free_area[o].free_list[MIGRATE_CMA]) {
-+			free_pages -= (1 << o);
-+			if (free_pages <= min)
-+				return false;
-+		}
-+	}
-+#endif
-+
- 	return true;
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 32b48c8..db4faf2 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -2300,14 +2300,12 @@ do {					\
+ 	return div64_u64(dividend, divisor);
  }
 
-Sandeep
+-static void perf_adjust_period(struct perf_event *event, u64 nsec, u64 count)
++static void perf_adjust_period(struct perf_event *event, u64 period, u64 count)
+ {
+ 	struct hw_perf_event *hwc = &event->hw;
+-	s64 period, sample_period;
++	s64 sample_period;
+ 	s64 delta;
+
+-	period = perf_calculate_period(event, nsec, count);
+-
+ 	delta = (s64)(period - hwc->sample_period);
+ 	delta = (delta + 7) / 8; /* low pass filter */
+
+@@ -2363,8 +2361,13 @@ static void perf_ctx_adjust_freq(struct
+perf_event_context *ctx, u64 period)
+ 		delta = now - hwc->freq_count_stamp;
+ 		hwc->freq_count_stamp = now;
+
+-		if (delta > 0)
++		if (delta > 0) {
++			period = perf_calculate_period(event, period, delta);
++
++			if (period > 4*hwc->sample_period)
++				period = hwc->sample_period;
+ 			perf_adjust_period(event, period, delta);
++		}
+ 	}
+ }
+
+@@ -4533,8 +4536,10 @@ static int __perf_event_overflow(struct
+perf_event *event,
+
+ 		hwc->freq_time_stamp = now;
+
+-		if (delta > 0 && delta < 2*TICK_NSEC)
++		if (delta > 0 && delta < 2*TICK_NSEC) {
++			delta = perf_calculate_period(event, delta, hwc->last_period);
+ 			perf_adjust_period(event, delta, hwc->last_period);
++		}
+ 	}
+
+ 	/*
