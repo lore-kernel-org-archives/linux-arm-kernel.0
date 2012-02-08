@@ -1,195 +1,74 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 08 Feb 2012 16:40:10 +0000
-Subject: [PATCH 13/16] ARM: omap: fix section mismatch warnings in mux.c
- caused by hsmmc.c
+Date: Wed, 08 Feb 2012 16:40:30 +0000
+Subject: [PATCH 14/16] ARM: omap: fix wrapped error messages in omap_hwmod.c
 In-Reply-To: <20120208163546.GA15849@n2100.arm.linux.org.uk>
 References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
-Message-ID: <E1RvAZ0-0006He-RC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RvAZK-0006Hi-Vm@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous commit causes new section mismatch warnings:
+While trying to debug my OMAP platforms, they emitted this message:
 
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdb30): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_gpio()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_gpio().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_gpio is wrong.
+omap_hwmod: %s: enabled state can only be entered from initialized, idle, or disabled state
 
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdb4c): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_gpio()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_gpio().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_gpio is wrong.
+The following backtrace said it was from a function called '_enable',
+which didn't provide much clue.  Grepping didn't find it either.
 
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdb60): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdb6c): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdb78): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdb90): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdb9c): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdba8): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdbc0): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdbcc): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdbd8): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdbf8): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc04): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc10): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc28): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc34): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc40): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc58): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc64): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc70): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0xdc7c): Section mismatch in reference from the function omap_init_hsmmc() to the function .init.text:omap_mux_init_signal()
-The function omap_init_hsmmc() references
-the function __init omap_mux_init_signal().
-This is often because omap_init_hsmmc lacks a __init
-annotation or the annotation of omap_mux_init_signal is wrong.
-
-Again, as for omap2_hsmmc_init(), these functions are callable at
-runtime via the gpio-twl4030.c driver, and so these can't be marked
-__init.
+The message is wrapped, so unwrap the message so grep can find it.  Do
+the same for three other messages in this file.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/mux.c |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index f26b2fa..fb8bc9f 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -100,8 +100,8 @@ void omap_mux_write_array(struct omap_mux_partition *partition,
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 5192cab..eba6cd3 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1517,8 +1517,8 @@ static int _enable(struct omap_hwmod *oh)
+ 	if (oh->_state != _HWMOD_STATE_INITIALIZED &&
+ 	    oh->_state != _HWMOD_STATE_IDLE &&
+ 	    oh->_state != _HWMOD_STATE_DISABLED) {
+-		WARN(1, "omap_hwmod: %s: enabled state can only be entered "
+-		     "from initialized, idle, or disabled state\n", oh->name);
++		WARN(1, "omap_hwmod: %s: enabled state can only be entered from initialized, idle, or disabled state\n",
++			oh->name);
+ 		return -EINVAL;
+ 	}
  
- static char *omap_mux_options;
+@@ -1600,8 +1600,8 @@ static int _idle(struct omap_hwmod *oh)
+ 	pr_debug("omap_hwmod: %s: idling\n", oh->name);
  
--static int __init _omap_mux_init_gpio(struct omap_mux_partition *partition,
--				      int gpio, int val)
-+static int _omap_mux_init_gpio(struct omap_mux_partition *partition,
-+			       int gpio, int val)
- {
- 	struct omap_mux_entry *e;
- 	struct omap_mux *gpio_mux = NULL;
-@@ -145,7 +145,7 @@ static int __init _omap_mux_init_gpio(struct omap_mux_partition *partition,
- 	return 0;
- }
+ 	if (oh->_state != _HWMOD_STATE_ENABLED) {
+-		WARN(1, "omap_hwmod: %s: idle state can only be entered from "
+-		     "enabled state\n", oh->name);
++		WARN(1, "omap_hwmod: %s: idle state can only be entered from enabled state\n",
++			oh->name);
+ 		return -EINVAL;
+ 	}
  
--int __init omap_mux_init_gpio(int gpio, int val)
-+int omap_mux_init_gpio(int gpio, int val)
- {
- 	struct omap_mux_partition *partition;
- 	int ret;
-@@ -159,9 +159,9 @@ int __init omap_mux_init_gpio(int gpio, int val)
- 	return -ENODEV;
- }
+@@ -1682,8 +1682,8 @@ static int _shutdown(struct omap_hwmod *oh)
  
--static int __init _omap_mux_get_by_name(struct omap_mux_partition *partition,
--					const char *muxname,
--					struct omap_mux **found_mux)
-+static int _omap_mux_get_by_name(struct omap_mux_partition *partition,
-+				 const char *muxname,
-+				 struct omap_mux **found_mux)
- {
- 	struct omap_mux *mux = NULL;
- 	struct omap_mux_entry *e;
-@@ -240,7 +240,7 @@ omap_mux_get_by_name(const char *muxname,
- 	return -ENODEV;
- }
+ 	if (oh->_state != _HWMOD_STATE_IDLE &&
+ 	    oh->_state != _HWMOD_STATE_ENABLED) {
+-		WARN(1, "omap_hwmod: %s: disabled state can only be entered "
+-		     "from idle, or enabled state\n", oh->name);
++		WARN(1, "omap_hwmod: %s: disabled state can only be entered from idle, or enabled state\n",
++			oh->name);
+ 		return -EINVAL;
+ 	}
  
--int __init omap_mux_init_signal(const char *muxname, int val)
-+int omap_mux_init_signal(const char *muxname, int val)
- {
- 	struct omap_mux_partition *partition = NULL;
- 	struct omap_mux *mux = NULL;
+@@ -2240,8 +2240,8 @@ void omap_hwmod_ocp_barrier(struct omap_hwmod *oh)
+ 	BUG_ON(!oh);
+ 
+ 	if (!oh->class->sysc || !oh->class->sysc->sysc_flags) {
+-		WARN(1, "omap_device: %s: OCP barrier impossible due to "
+-		      "device configuration\n", oh->name);
++		WARN(1, "omap_device: %s: OCP barrier impossible due to device configuration\n",
++			oh->name);
+ 		return;
+ 	}
+ 
 -- 
 1.7.4.4
