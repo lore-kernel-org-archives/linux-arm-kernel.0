@@ -1,52 +1,72 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Wed, 08 Feb 2012 04:05:55 +0100
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <20120208013959.GA24535@panacea>
-References: <20120208013959.GA24535@panacea>
-Message-ID: <1328670355.2482.68.camel@laptop>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Wed, 8 Feb 2012 04:00:13 +0000
+Subject: [PATCH v3 3/3] arm:davinci: move NAND and NOR devices as aemif
+ MFD slaves
+In-Reply-To: <4F31552D.9060505@criticallink.com>
+References: <1328627513-30134-1-git-send-email-prakash.pm@ti.com>
+ <1328627513-30134-4-git-send-email-prakash.pm@ti.com>
+ <4F31552D.9060505@criticallink.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC31761D77@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-08 at 05:39 +0400, Anton Vorontsov wrote:
-> Hi all,
-> 
-> For some drivers we need to know when scheduler is idling. The most
-> straightforward way is to gracefully hook into the idle loop.
-> 
-> On x86 there are "CPU idle" notifiers in the inner idle loop, but
-> scheduler idle notifiers are different. These notifiers do not run on
-> every invocation/exit from cpuidle, instead they used to notify about
-> scheduler state changes, not HW states.
-> 
-> In other words, CPU idle notifiers work inside while(!need_resched())
-> loop (nested into idle loop), while scheduler idle notifier work
-> outside of the loop.
-> 
-> The first two patches consolidate scheduler idle entry/exit
-> points, and converts architectures to this new API.
-> 
-> The third patch is a new cpufreq governor, the commit message
-> briefly describes it.
+Hi Mike,
 
-Argh, no.. cpufreq so sucks rocks. Can we please just scrap it and write
-an entirely new infrastructure that is much more connected to the
-scheduler and do away with this stupid need to set P-states from a
-schedulable context.
+On Tue, Feb 07, 2012 at 22:15:33, Michael Williamson wrote:
+> Hello Prakash,
+> 
+> On 2/7/2012 10:11 AM, Manjunathappa, Prakash wrote:
+> 
+> > NAND and NOR device are made as aemif device slaves, hence all DaVinci
+> > board NAND/NOR device registration achieved via aemif MFD driver.
+> >
+> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> > ---
+> > Since v2:
+> > Make changes for all DaVinci boards in single patch.
+> 
+> 
+> 
+> [...]
+> 
+> > diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+> > index 672d820..bb29b7a 100644
+> > --- a/arch/arm/mach-davinci/board-mityomapl138.c
+> > +++ b/arch/arm/mach-davinci/board-mityomapl138.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/etherdevice.h>
+> >  #include <linux/spi/spi.h>
+> >  #include <linux/spi/flash.h>
+> > +#include <linux/mfd/davinci_aemif.h>
+> >  
+> >  #include <asm/io.h>
+> >  #include <asm/mach-types.h>
+> > @@ -414,18 +415,35 @@ static struct resource mityomapl138_nandflash_resource[] = {
+> >  	},
+> >  };
+> >  
+> > -static struct platform_device mityomapl138_nandflash_device = {
+> > -	.name		= "davinci_nand",
+> > -	.id		= 1,
+> > -	.dev		= {
+> > -		.platform_data	= &mityomapl138_nandflash_data,
+> > +static struct platform_device mityomapl138_emif_devices[] __initdata = {
+> > +	{
+> > +		.name		= "davinci_nand",
+> > +		.id		= 0,
+> 
+> 
+> 
+> Pretty sure this still needs to be a 1.  The nand is on chip select 3,
+> EMA_CS3, which I believe is the same as the da850 EVM.
 
-We can maybe keep cpufreq around for the broken ass hardware that needs
-to schedule in order to change its state, but gah.
+Yes I could not test on this board. I will make id as 1.
 
-We're going to do per-task avg-load tracking soon
-(https://lkml.org/lkml/2012/2/1/763) if you can use that (if not, tell
-why) you can do task based policy and migrate the P-state/freq along
-with tasks.
+Thanks,
+Prakash
 
-By keeping per-task avg-runtime and accounting on migration we can
-compute an avg-runtime per cpu, and select a freq based on that to
-either minimize idle time (if that's what your platform wants) or boost
-and run to idle right along with scheduling on wakeup and sleep.
-
-Arjan talked about something like that several times.. and I always
-forgets what policy is best for what chips etc. All I know is that
-cpufreq sucks because its strictly per-cpu and oblivious to task
-movement.
+> 
+> -Mike
+> 
+> 
+> 
