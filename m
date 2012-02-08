@@ -1,37 +1,34 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Wed, 8 Feb 2012 14:57:50 +0100
-Subject: [PATCH][RFC] tracing/rcu: Add trace_##name##__rcuidle() static
- tracepoint for inside rcu_idle_exit() sections
-In-Reply-To: <20120207141142.GP5941@linux.vnet.ibm.com>
-References: <1328223819.5882.133.camel@gandalf.stny.rr.com>
- <20120202232736.GL2518@linux.vnet.ibm.com>
- <1328237131.5882.135.camel@gandalf.stny.rr.com>
- <20120203060458.GF2380@linux.vnet.ibm.com>
- <1328295309.5882.178.camel@gandalf.stny.rr.com>
- <20120203194005.GK2382@linux.vnet.ibm.com>
- <1328563113.2200.39.camel@gandalf.stny.rr.com>
- <20120206233804.GM5941@linux.vnet.ibm.com>
- <1328617976.2200.66.camel@gandalf.stny.rr.com>
- <20120207141142.GP5941@linux.vnet.ibm.com>
-Message-ID: <20120208135747.GA25473@somewhere.redhat.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Wed, 08 Feb 2012 13:59:31 +0000
+Subject: [PATCH] ARM: pl330: fix null pointer dereference
+ in	pl330_chan_ctrl()
+In-Reply-To: <20120113130222.GU1068@n2100.arm.linux.org.uk>
+References: <1326458191-23492-1-git-send-email-mans.rullgard@linaro.org>
+ <20120113130222.GU1068@n2100.arm.linux.org.uk>
+Message-ID: <4F327FC3.3030209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2012 at 06:11:42AM -0800, Paul E. McKenney wrote:
-> On Tue, Feb 07, 2012 at 07:32:56AM -0500, Steven Rostedt wrote:
-> > On Mon, 2012-02-06 at 15:38 -0800, Paul E. McKenney wrote:
-> > 
-> > > Aside from the "pre;" below needing to precede rcu_read_lock_sched_notrace()
-> > > as Josh noted, this looks reasonable to me.
-> > > 
-> > 
-> > Does this mean I can add an Acked-by from you and Josh? Obviously with
-> > the post "pre" change.
+On 13/01/12 13:02, Russell King - ARM Linux wrote:
+> On Fri, Jan 13, 2012 at 12:36:31PM +0000, Mans Rullgard wrote:
+>> This fixes the thrd->req_running field being accessed before thrd
+>> is checked for null.  The error was introduced in abb959f.
+>>
+>> Signed-off-by: Mans Rullgard <mans.rullgard@linaro.org>
 > 
-> With the "pre" change,
-> 
-> Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> I don't know what's happening with the PL330 driver, but there's patches
+> around to remove this file and merge it with the DMA engine driver.
 
-Same for me! Good idea.
+The PL330 merge didn't happen in the 3.3 merge window and I can't see it
+in linux-next, so linux 3.3 will ship with the driver still split in
+arch/arm/common/pl330.c and drivers/dma/pl330.c .  I think this patch
+should be part of linux 3.3 (and you should add "Cc: stable at kernel.org"
+so that it's included in the next 3.2 stable release).
 
-Acked-by: Frederic Weisbecker <fweisbec@gmail.com>
+Unless somebody thinks otherwise, Mans, can you please submit it to
+rmk's patch tracking system?
+
+http://www.arm.linux.org.uk/developer/patches/
+
+Thanks,
+Javi
