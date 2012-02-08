@@ -1,197 +1,413 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  8 Feb 2012 00:30:48 +0000
-Subject: [PATCH v6 04/15] ARM: SoC: convert OMAP4 to SoC descriptor
+Date: Wed,  8 Feb 2012 00:30:47 +0000
+Subject: [PATCH v6 03/15] ARM: SoC: convert VExpress/RealView to SoC descriptor
 In-Reply-To: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
 References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1328661059-24584-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1328661059-24584-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert OMAP4 to use the SoC descriptor to provide its SMP
-and CPU hotplug operations.
+Convert both Realview and VExpress to use the SoC descriptor to
+provide their SMP and CPU hotplug operation.
 
-Tested on both Panda and IGEPv2 (MULTI_OMAP kernel)
-
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Nicolas Pitre <nico@fluxnic.net>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-omap2/board-4430sdp.c    |    1 +
- arch/arm/mach-omap2/board-omap4panda.c |    1 +
- arch/arm/mach-omap2/common.h           |   13 +++++++++++++
- arch/arm/mach-omap2/omap-hotplug.c     |    6 +++---
- arch/arm/mach-omap2/omap-smp.c         |   24 ++++++++++++++++++++----
- arch/arm/mach-omap2/omap4-common.c     |    7 +++++++
- 6 files changed, 45 insertions(+), 7 deletions(-)
+ arch/arm/mach-realview/core.c                  |    7 ++++++
+ arch/arm/mach-realview/core.h                  |    9 ++++++++
+ arch/arm/mach-realview/hotplug.c               |    6 ++--
+ arch/arm/mach-realview/platsmp.c               |   24 +++++++++++++++++++---
+ arch/arm/mach-realview/realview_eb.c           |    1 +
+ arch/arm/mach-realview/realview_pb1176.c       |    1 +
+ arch/arm/mach-realview/realview_pb11mp.c       |    1 +
+ arch/arm/mach-realview/realview_pba8.c         |    1 +
+ arch/arm/mach-realview/realview_pbx.c          |    1 +
+ arch/arm/mach-vexpress/core.h                  |   10 +++++++++
+ arch/arm/mach-vexpress/hotplug.c               |    6 ++--
+ arch/arm/mach-vexpress/platsmp.c               |   25 ++++++++++++++++++++---
+ arch/arm/mach-vexpress/v2m.c                   |    9 ++++++++
+ arch/arm/plat-versatile/include/plat/platsmp.h |   14 +++++++++++++
+ arch/arm/plat-versatile/platsmp.c              |    4 +-
+ 15 files changed, 103 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 39fba9d..21834d1 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -914,6 +914,7 @@ static void __init omap_4430sdp_init(void)
- MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
- 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
- 	.atag_offset	= 0x100,
-+	.soc		= &omap4_soc_desc,
- 	.reserve	= omap_reserve,
- 	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 30ad40d..f84cc0b 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -500,6 +500,7 @@ static void __init omap4_panda_init(void)
- MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
- 	/* Maintainer: David Anders - Texas Instruments Inc */
- 	.atag_offset	= 0x100,
-+	.soc		= &omap4_soc_desc,
- 	.reserve	= omap_reserve,
- 	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index febffde..961b79a 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -194,8 +194,21 @@ extern void omap_secondary_startup(void);
- extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
- extern void omap_auxcoreboot_addr(u32 cpu_addr);
- extern u32 omap_read_auxcoreboot0(void);
-+
-+extern int  omap4_cpu_kill(unsigned int cpu);
-+extern void omap4_cpu_die(unsigned int cpu);
-+extern int  omap4_cpu_disable(unsigned int cpu);
-+
-+struct arm_soc_smp_init_ops;
-+struct arm_soc_smp_ops;
-+
-+extern struct arm_soc_smp_init_ops	omap4_soc_smp_init_ops;
-+extern struct arm_soc_smp_ops		omap4_soc_smp_ops;
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index acd329a..0d4b633 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -33,6 +33,7 @@
+ #include <linux/clkdev.h>
+ #include <linux/mtd/physmap.h>
+ 
++#include <asm/soc.h>
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+@@ -533,3 +534,9 @@ void realview_fixup(struct tag *tags, char **from, struct meminfo *meminfo)
+ 	meminfo->nr_banks = 1;
  #endif
- 
-+struct arm_soc_desc;
-+extern struct arm_soc_desc		omap4_soc_desc;
-+
- #if defined(CONFIG_SMP) && defined(CONFIG_PM)
- extern int omap4_mpuss_init(void);
- extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
-diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
-index adbe4d8..e794f4b 100644
---- a/arch/arm/mach-omap2/omap-hotplug.c
-+++ b/arch/arm/mach-omap2/omap-hotplug.c
-@@ -24,7 +24,7 @@
- 
- #include "powerdomain.h"
- 
--int platform_cpu_kill(unsigned int cpu)
-+int omap4_cpu_kill(unsigned int cpu)
- {
- 	return 1;
  }
-@@ -33,7 +33,7 @@ int platform_cpu_kill(unsigned int cpu)
-  * platform-specific code to shutdown a CPU
-  * Called with IRQs disabled
-  */
--void platform_cpu_die(unsigned int cpu)
-+void omap4_cpu_die(unsigned int cpu)
- {
- 	unsigned int this_cpu;
++
++struct arm_soc_desc realview_soc_desc __initdata = {
++	.name		= "ARM RealView Platform",
++	soc_smp_init_ops(realview_soc_smp_init_ops)
++	soc_smp_ops(realview_soc_smp_ops)
++};
+diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
+index 735b57a..a23caa3 100644
+--- a/arch/arm/mach-realview/core.h
++++ b/arch/arm/mach-realview/core.h
+@@ -27,6 +27,7 @@
  
-@@ -62,7 +62,7 @@ void platform_cpu_die(unsigned int cpu)
+ #include <asm/setup.h>
+ #include <asm/leds.h>
++#include <asm/soc.h>
+ 
+ #define AMBA_DEVICE(name,busid,base,plat)			\
+ static struct amba_device name##_device = {			\
+@@ -66,4 +67,12 @@ extern void realview_init_early(void);
+ extern void realview_fixup(struct tag *tags, char **from,
+ 			   struct meminfo *meminfo);
+ 
++extern struct arm_soc_desc		realview_soc_desc;
++extern struct arm_soc_smp_init_ops	realview_soc_smp_init_ops;
++extern struct arm_soc_smp_ops		realview_soc_smp_ops;
++
++extern int  realview_cpu_kill(unsigned int cpu);
++extern void realview_cpu_die(unsigned int cpu);
++extern int  realview_cpu_disable(unsigned int cpu);
++
+ #endif
+diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+index eb55f05..ba4e2a86 100644
+--- a/arch/arm/mach-realview/hotplug.c
++++ b/arch/arm/mach-realview/hotplug.c
+@@ -88,7 +88,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
  	}
  }
  
+-int platform_cpu_kill(unsigned int cpu)
++int realview_cpu_kill(unsigned int cpu)
+ {
+ 	return 1;
+ }
+@@ -98,7 +98,7 @@ int platform_cpu_kill(unsigned int cpu)
+  *
+  * Called with IRQs disabled
+  */
+-void platform_cpu_die(unsigned int cpu)
++void realview_cpu_die(unsigned int cpu)
+ {
+ 	int spurious = 0;
+ 
+@@ -118,7 +118,7 @@ void platform_cpu_die(unsigned int cpu)
+ 		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
+ }
+ 
 -int platform_cpu_disable(unsigned int cpu)
-+int omap4_cpu_disable(unsigned int cpu)
++int realview_cpu_disable(unsigned int cpu)
  {
  	/*
  	 * we don't allow CPU 0 to be shutdown (it is still too special
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index c1bf3ef..4d39fd0 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -23,6 +23,7 @@
- #include <asm/cacheflush.h>
+diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
+index 17c878d..8e4a865 100644
+--- a/arch/arm/mach-realview/platsmp.c
++++ b/arch/arm/mach-realview/platsmp.c
+@@ -17,14 +17,15 @@
  #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
  #include <asm/smp_scu.h>
 +#include <asm/soc.h>
- #include <mach/hardware.h>
- #include <mach/omap-secure.h>
  
-@@ -40,7 +41,7 @@ void __iomem *omap4_get_scu_base(void)
- 	return scu_base;
- }
+ #include <mach/board-eb.h>
+ #include <mach/board-pb11mp.h>
+ #include <mach/board-pbx.h>
  
--void __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit omap4_secondary_init(unsigned int cpu)
+-#include "core.h"
++#include <plat/platsmp.h>
+ 
+-extern void versatile_secondary_startup(void);
++#include "core.h"
+ 
+ static void __iomem *scu_base_addr(void)
  {
- 	/*
- 	 * Configure ACTRL and enable NS SMP bit access on CPU1 on HS device.
-@@ -68,7 +69,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	spin_unlock(&boot_lock);
- }
- 
--int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	static struct clockdomain *cpu1_clkdm;
- 	static bool booted;
-@@ -144,7 +145,7 @@ static void __init wakeup_secondary(void)
+@@ -43,7 +44,7 @@ static void __iomem *scu_base_addr(void)
   * Initialise the CPU possible map early - this describes the CPUs
   * which may be present or become present in the system.
   */
 -void __init smp_init_cpus(void)
-+static void __init omap4_smp_init_cpus(void)
++static void __init realview_smp_init_cpus(void)
  {
+ 	void __iomem *scu_base = scu_base_addr();
  	unsigned int i, ncores;
- 
-@@ -170,7 +171,7 @@ void __init smp_init_cpus(void)
+@@ -63,7 +64,7 @@ void __init smp_init_cpus(void)
  	set_smp_cross_call(gic_raise_softirq);
  }
  
 -void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
++static void __init realview_smp_prepare_cpus(unsigned int max_cpus)
  {
  
- 	/*
-@@ -180,3 +181,18 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	scu_enable(scu_base);
- 	wakeup_secondary();
+ 	scu_enable(scu_base_addr());
+@@ -77,3 +78,18 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	__raw_writel(virt_to_phys(versatile_secondary_startup),
+ 		     __io_address(REALVIEW_SYS_FLAGSSET));
  }
 +
-+struct arm_soc_smp_init_ops omap4_soc_smp_init_ops __initdata = {
-+	.smp_init_cpus		= omap4_smp_init_cpus,
-+	.smp_prepare_cpus	= omap4_smp_prepare_cpus,
++struct arm_soc_smp_init_ops realview_soc_smp_init_ops __initdata = {
++	.smp_init_cpus		= realview_smp_init_cpus,
++	.smp_prepare_cpus	= realview_smp_prepare_cpus,
 +};
 +
-+struct arm_soc_smp_ops omap4_soc_smp_ops __initdata = {
-+	.smp_secondary_init	= omap4_secondary_init,
-+	.smp_boot_secondary	= omap4_boot_secondary,
++struct arm_soc_smp_ops realview_soc_smp_ops __initdata = {
++	.smp_secondary_init	= versatile_secondary_init,
++	.smp_boot_secondary	= versatile_boot_secondary,
 +#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_kill		= omap4_cpu_kill,
-+	.cpu_die		= omap4_cpu_die,
-+	.cpu_disable		= omap4_cpu_disable,
++	.cpu_kill		= realview_cpu_kill,
++	.cpu_die		= realview_cpu_die,
++	.cpu_disable		= realview_cpu_disable,
 +#endif
 +};
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 40a8fbc..0742ddf 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -17,6 +17,7 @@
- #include <linux/platform_device.h>
- #include <linux/memblock.h>
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 9578145..9218cae 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -456,6 +456,7 @@ static void __init realview_eb_init(void)
+ MACHINE_START(REALVIEW_EB, "ARM-RealView EB")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
++	.soc		= &realview_soc_desc,
+ 	.fixup		= realview_fixup,
+ 	.map_io		= realview_eb_map_io,
+ 	.init_early	= realview_init_early,
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index e4abe94..710230f 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -384,6 +384,7 @@ static void __init realview_pb1176_init(void)
+ MACHINE_START(REALVIEW_PB1176, "ARM-RealView PB1176")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
++	.soc		= &realview_soc_desc,
+ 	.fixup		= realview_pb1176_fixup,
+ 	.map_io		= realview_pb1176_map_io,
+ 	.init_early	= realview_init_early,
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index 2147335..fc9e278 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -353,6 +353,7 @@ static void __init realview_pb11mp_init(void)
+ MACHINE_START(REALVIEW_PB11MP, "ARM-RealView PB11MPCore")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
++	.soc		= &realview_soc_desc,
+ 	.fixup		= realview_fixup,
+ 	.map_io		= realview_pb11mp_map_io,
+ 	.init_early	= realview_init_early,
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index 25b2e59..8c6f8ca 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -308,6 +308,7 @@ static void __init realview_pba8_init(void)
+ MACHINE_START(REALVIEW_PBA8, "ARM-RealView PB-A8")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
++	.soc		= &realview_soc_desc,
+ 	.fixup		= realview_fixup,
+ 	.map_io		= realview_pba8_map_io,
+ 	.init_early	= realview_init_early,
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index ac71564..61369b0 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -391,6 +391,7 @@ static void __init realview_pbx_init(void)
+ MACHINE_START(REALVIEW_PBX, "ARM-RealView PBX")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
++	.soc		= &realview_soc_desc,
+ 	.fixup		= realview_pbx_fixup,
+ 	.map_io		= realview_pbx_map_io,
+ 	.init_early	= realview_init_early,
+diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
+index f439715..bd9065a 100644
+--- a/arch/arm/mach-vexpress/core.h
++++ b/arch/arm/mach-vexpress/core.h
+@@ -17,3 +17,13 @@ struct amba_device name##_device = {		\
+ 	.irq		= IRQ_##base,		\
+ 	/* .dma		= DMA_##base,*/		\
+ }
++
++struct arm_soc_smp_init_ops;
++struct arm_soc_smp_ops;
++
++extern struct arm_soc_smp_init_ops	vexpress_soc_smp_init_ops;
++extern struct arm_soc_smp_ops		vexpress_soc_smp_ops;
++
++extern int  vexpress_cpu_kill(unsigned int cpu);
++extern void vexpress_cpu_die(unsigned int cpu);
++extern int  vexpress_cpu_disable(unsigned int cpu);
+diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+index 3034a4d..ac6d034 100644
+--- a/arch/arm/mach-vexpress/hotplug.c
++++ b/arch/arm/mach-vexpress/hotplug.c
+@@ -84,7 +84,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 	}
+ }
+ 
+-int platform_cpu_kill(unsigned int cpu)
++int vexpress_cpu_kill(unsigned int cpu)
+ {
+ 	return 1;
+ }
+@@ -94,7 +94,7 @@ int platform_cpu_kill(unsigned int cpu)
+  *
+  * Called with IRQs disabled
+  */
+-void platform_cpu_die(unsigned int cpu)
++void vexpress_cpu_die(unsigned int cpu)
+ {
+ 	int spurious = 0;
+ 
+@@ -114,7 +114,7 @@ void platform_cpu_die(unsigned int cpu)
+ 		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
+ }
+ 
+-int platform_cpu_disable(unsigned int cpu)
++int vexpress_cpu_disable(unsigned int cpu)
+ {
+ 	/*
+ 	 * we don't allow CPU 0 to be shutdown (it is still too special
+diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+index 124ffb1..aba765b 100644
+--- a/arch/arm/mach-vexpress/platsmp.c
++++ b/arch/arm/mach-vexpress/platsmp.c
+@@ -13,23 +13,25 @@
+ #include <linux/smp.h>
+ #include <linux/io.h>
  
 +#include <asm/soc.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/map.h>
-@@ -198,3 +199,9 @@ static int __init omap4_sar_ram_init(void)
- 	return 0;
- }
- early_initcall(omap4_sar_ram_init);
 +
-+struct arm_soc_desc omap4_soc_desc __initdata = {
-+	.name		= "TI OMAP4",
-+	soc_smp_init_ops(omap4_soc_smp_init_ops)
-+	soc_smp_ops(omap4_soc_smp_ops)
+ #include <mach/motherboard.h>
+ #define V2M_PA_CS7 0x10000000
+ 
+-#include "core.h"
++#include <plat/platsmp.h>
+ 
+-extern void versatile_secondary_startup(void);
++#include "core.h"
+ 
+ /*
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
+  */
+-void __init smp_init_cpus(void)
++static void __init vexpress_smp_init_cpus(void)
+ {
+ 	ct_desc->init_cpu_map();
+ }
+ 
+-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++static void __init vexpress_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	/*
+ 	 * Initialise the present map, which describes the set of CPUs
+@@ -47,3 +49,18 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	writel(virt_to_phys(versatile_secondary_startup),
+ 		MMIO_P2V(V2M_SYS_FLAGSSET));
+ }
++
++struct arm_soc_smp_init_ops vexpress_soc_smp_init_ops __initdata = {
++	.smp_init_cpus		= vexpress_smp_init_cpus,
++	.smp_prepare_cpus	= vexpress_smp_prepare_cpus,
 +};
++
++struct arm_soc_smp_ops vexpress_soc_smp_ops __initdata = {
++	.smp_secondary_init	= versatile_secondary_init,
++	.smp_boot_secondary	= versatile_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_kill		= vexpress_cpu_kill,
++	.cpu_die		= vexpress_cpu_die,
++	.cpu_disable		= vexpress_cpu_disable,
++#endif
++};
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index b4a28ca..ffeac90 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -16,6 +16,7 @@
+ #include <linux/mtd/physmap.h>
+ 
+ #include <asm/mach-types.h>
++#include <asm/soc.h>
+ #include <asm/sizes.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -29,6 +30,7 @@
+ #include <mach/motherboard.h>
+ 
+ #include <plat/sched_clock.h>
++#include <plat/platsmp.h>
+ 
+ #include "core.h"
+ 
+@@ -442,8 +444,15 @@ static void __init v2m_init(void)
+ 	ct_desc->init_tile();
+ }
+ 
++static struct arm_soc_desc vexpress_soc_desc __initdata = {
++	.name		= "ARM VE Platform",
++	soc_smp_init_ops(vexpress_soc_smp_init_ops)
++	soc_smp_ops(vexpress_soc_smp_ops)
++};
++
+ MACHINE_START(VEXPRESS, "ARM-Versatile Express")
+ 	.atag_offset	= 0x100,
++	.soc		= &vexpress_soc_desc,
+ 	.map_io		= v2m_map_io,
+ 	.init_early	= v2m_init_early,
+ 	.init_irq	= v2m_init_irq,
+diff --git a/arch/arm/plat-versatile/include/plat/platsmp.h b/arch/arm/plat-versatile/include/plat/platsmp.h
+new file mode 100644
+index 0000000..50fb830
+--- /dev/null
++++ b/arch/arm/plat-versatile/include/plat/platsmp.h
+@@ -0,0 +1,14 @@
++/*
++ *  linux/arch/arm/plat-versatile/include/plat/platsmp.h
++ *
++ *  Copyright (C) 2011 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++extern void versatile_secondary_startup(void);
++extern void versatile_secondary_init(unsigned int cpu);
++extern int  versatile_boot_secondary(unsigned int cpu, struct task_struct *idle);
+diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
+index 49c7db4..41b4706 100644
+--- a/arch/arm/plat-versatile/platsmp.c
++++ b/arch/arm/plat-versatile/platsmp.c
+@@ -40,7 +40,7 @@ static void __cpuinit write_pen_release(int val)
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+-void __cpuinit platform_secondary_init(unsigned int cpu)
++void __cpuinit versatile_secondary_init(unsigned int cpu)
+ {
+ 	/*
+ 	 * if any interrupts are already enabled for the primary
+@@ -62,7 +62,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 	spin_unlock(&boot_lock);
+ }
+ 
+-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++int __cpuinit versatile_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	unsigned long timeout;
+ 
 -- 
 1.7.3.4
