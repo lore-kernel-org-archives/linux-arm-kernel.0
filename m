@@ -1,18 +1,186 @@
 From: mkl@blackshift.org (Marc Kleine-Budde)
-Date: Wed,  8 Feb 2012 20:24:27 +0100
-Subject: [PATCH 0/2] ARM: ixp4xx: fix compilation and oops
-Message-ID: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+Date: Wed,  8 Feb 2012 20:24:28 +0100
+Subject: [PATCH 1/2] ARM: ixp4xx: fix compilation, add gpiolib support
+In-Reply-To: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+Message-ID: <1328729069-21308-2-git-send-email-mkl@blackshift.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Imre Kaloz <kaloz@openwrt.org>
 
-this patch series targets current linus master (v3.3-rc2-230-gc2e50e3). It
-fixes compilation of several boards of the ARM ixp4xx architecture and
-a boot oops.
+The problem was introduced with commit:
+"eb9ae7f gpio: fix build error in include/asm-generic/gpio.h"
 
-With these patches applied I my nslu boots fine.
+This patch adds gpiolib support for the IXP4xx platform, which fixes the
+compilation of several ixp4xx platforms, e.g.:
 
-Please consider to applpy this series to the upcoming v3.3 kernel.
+In file included from arch/arm/mach-ixp4xx/include/mach/gpio.h:72,
+                 from /home/frogger/projects/server/linux/arch/arm/include/asm/gpio.h:9,
+                 from include/linux/gpio.h:30,
+                 from arch/arm/mach-ixp4xx/nslu2-setup.c:19:
+include/asm-generic/gpio.h: In function 'gpio_get_value_cansleep':
+include/asm-generic/gpio.h:218: error: implicit declaration of function '__gpio_get_value'
+include/asm-generic/gpio.h: In function 'gpio_set_value_cansleep':
+include/asm-generic/gpio.h:224: error: implicit declaration of function '__gpio_set_value'
 
-Regards, Marc
+Cc: Krzysztof Halasa <khc@pm.waw.pl>
+Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+[mkl: fix codingstyle; improve description]
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ arch/arm/Kconfig                         |    2 +-
+ arch/arm/mach-ixp4xx/common.c            |   44 ++++++++++++++++++++++++++++++
+ arch/arm/mach-ixp4xx/include/mach/gpio.h |   44 +++++++++---------------------
+ 3 files changed, 58 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a48aecc..56106e9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -528,7 +528,7 @@ config ARCH_IXP4XX
+ 	depends on MMU
+ 	select CLKSRC_MMIO
+ 	select CPU_XSCALE
+-	select GENERIC_GPIO
++	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_SCHED_CLOCK
+ 	select MIGHT_HAVE_PCI
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 3841ab4..963f752 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -36,6 +36,7 @@
+ #include <asm/page.h>
+ #include <asm/irq.h>
+ #include <asm/sched_clock.h>
++#include <asm/gpio.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+@@ -375,12 +376,55 @@ static struct platform_device *ixp46x_devices[] __initdata = {
+ unsigned long ixp4xx_exp_bus_size;
+ EXPORT_SYMBOL(ixp4xx_exp_bus_size);
+ 
++static int ixp4xx_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
++{
++	gpio_line_config(gpio, IXP4XX_GPIO_IN);
++
++	return 0;
++}
++
++static int ixp4xx_gpio_direction_output(struct gpio_chip *chip, unsigned gpio,
++					int level)
++{
++	gpio_line_set(gpio, level);
++	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
++
++	return 0;
++}
++
++static int ixp4xx_gpio_get_value(struct gpio_chip *chip, unsigned gpio)
++{
++	int value;
++
++	gpio_line_get(gpio, &value);
++
++	return value;
++}
++
++static void ixp4xx_gpio_set_value(struct gpio_chip *chip, unsigned gpio,
++				  int value)
++{
++	gpio_line_set(gpio, value);
++}
++
++static struct gpio_chip ixp4xx_gpio_chip = {
++	.label			= "IXP4XX_GPIO_CHIP",
++	.direction_input	= ixp4xx_gpio_direction_input,
++	.direction_output	= ixp4xx_gpio_direction_output,
++	.get			= ixp4xx_gpio_get_value,
++	.set			= ixp4xx_gpio_set_value,
++	.base			= 0,
++	.ngpio			= 16,
++};
++
+ void __init ixp4xx_sys_init(void)
+ {
+ 	ixp4xx_exp_bus_size = SZ_16M;
+ 
+ 	platform_add_devices(ixp4xx_devices, ARRAY_SIZE(ixp4xx_devices));
+ 
++	gpiochip_add(&ixp4xx_gpio_chip);
++
+ 	if (cpu_is_ixp46x()) {
+ 		int region;
+ 
+diff --git a/arch/arm/mach-ixp4xx/include/mach/gpio.h b/arch/arm/mach-ixp4xx/include/mach/gpio.h
+index 83d6b4e..093dfad 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/gpio.h
++++ b/arch/arm/mach-ixp4xx/include/mach/gpio.h
+@@ -27,49 +27,31 @@
+ 
+ #include <linux/kernel.h>
+ #include <mach/hardware.h>
++#include <asm-generic/gpio.h>			/* cansleep wrappers */
+ 
+ #define __ARM_GPIOLIB_COMPLEX
+ 
+-static inline int gpio_request(unsigned gpio, const char *label)
+-{
+-	return 0;
+-}
+-
+-static inline void gpio_free(unsigned gpio)
+-{
+-	might_sleep();
+-
+-	return;
+-}
+-
+-static inline int gpio_direction_input(unsigned gpio)
+-{
+-	gpio_line_config(gpio, IXP4XX_GPIO_IN);
+-	return 0;
+-}
+-
+-static inline int gpio_direction_output(unsigned gpio, int level)
+-{
+-	gpio_line_set(gpio, level);
+-	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
+-	return 0;
+-}
++#define NR_BUILTIN_GPIO 16
+ 
+ static inline int gpio_get_value(unsigned gpio)
+ {
+-	int value;
+-
+-	gpio_line_get(gpio, &value);
+-
+-	return value;
++	if (gpio < NR_BUILTIN_GPIO) {
++		int value;
++		gpio_line_get(gpio, &value);
++		return value;
++	} else
++		return __gpio_get_value(gpio);
+ }
+ 
+ static inline void gpio_set_value(unsigned gpio, int value)
+ {
+-	gpio_line_set(gpio, value);
++	if (gpio < NR_BUILTIN_GPIO)
++		gpio_line_set(gpio, value);
++	else
++		__gpio_set_value(gpio, value);
+ }
+ 
+-#include <asm-generic/gpio.h>			/* cansleep wrappers */
++#define gpio_cansleep __gpio_cansleep
+ 
+ extern int gpio_to_irq(int gpio);
+ #define gpio_to_irq gpio_to_irq
+-- 
+1.7.4.1
