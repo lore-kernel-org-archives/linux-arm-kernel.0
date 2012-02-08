@@ -1,47 +1,96 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Feb 2012 11:31:19 -0800
-Subject: [PATCH 14/16] ARM: omap: fix wrapped error messages in
- omap_hwmod.c
-In-Reply-To: <alpine.DEB.2.00.1202081225070.19286@utopia.booyaka.com>
-References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
- <E1RvAZK-0006Hi-Vm@rmk-PC.arm.linux.org.uk>
- <alpine.DEB.2.00.1202081039590.26892@utopia.booyaka.com>
- <20120208185407.GN29796@atomide.com>
- <alpine.DEB.2.00.1202081225070.19286@utopia.booyaka.com>
-Message-ID: <20120208193118.GR29796@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 08 Feb 2012 13:47:21 -0600
+Subject: [PATCH] ARM: Exynos: Add irq domain and device tree support for
+ interrupt combiner
+In-Reply-To: <1328724604-11192-1-git-send-email-thomas.abraham@linaro.org>
+References: <1328724604-11192-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4F32D149.7030908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120208 10:54]:
-> On Wed, 8 Feb 2012, Tony Lindgren wrote:
+On 02/08/2012 12:10 PM, Thomas Abraham wrote:
+> A common irq domain for the interrupts managed by the interrupt combiners is
+> setup. All the instances of irq combiner reference the common irq domain for
+> translating hardware interrupts to linux irq number.
 > 
-> > * Paul Walmsley <paul@pwsan.com> [120208 09:09]:
-> > > On Wed, 8 Feb 2012, Russell King - ARM Linux wrote:
-> > > 
-> > > > While trying to debug my OMAP platforms, they emitted this message:
-> > > > 
-> > > > omap_hwmod: %s: enabled state can only be entered from initialized, idle, or disabled state
-> > > > 
-> > > > The following backtrace said it was from a function called '_enable',
-> > > > which didn't provide much clue.  Grepping didn't find it either.
-> > > > 
-> > > > The message is wrapped, so unwrap the message so grep can find it.  Do
-> > > > the same for three other messages in this file.
-> > > > 
-> > > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > 
-> > > Thanks, I'll queue this for 3.4.
-> > 
-> > Looks like Russell is willing to take potential flamage and argue
-> > this should go into -rc because of the hard to find message.
-> > 
-> > Care to ack instead, or do you have objections to this being
-> > merged during the -rc?
+> In case of device tree based boot, a interrupt specifier translator is setup
+> that can translate interrupt specifiers for device nodes which use combiner
+> as their interrupt parent.
 > 
-> No objections.
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> Changes since v2:
+> - Rebased to Grant's irqdomain/next branch.
 > 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
+> Changes since v1:
+> - Includes all changes suggested by Rob Herring.
+> - Tested with SPARSE_IRQ enabled.
+> 
+>  arch/arm/mach-exynos/common.c |  100 ++++++++++++++++++++++++++++++++--------
+>  1 files changed, 80 insertions(+), 20 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 6de298c..24693f0 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
 
-OK cool:
+snip
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+> -	for (i = irq_start; i < combiner_data[combiner_nr].irq_offset
+> -				+ MAX_IRQ_IN_COMBINER; i++) {
+> -		irq_set_chip_and_handler(i, &combiner_chip, handle_level_irq);
+> -		irq_set_chip_data(i, &combiner_data[combiner_nr]);
+> -		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+> +	if (combiner_init_irq_domain(COMBINER_IRQ(0, 0), MAX_COMBINER_NR *
+> +					MAX_IRQ_IN_COMBINER, np))
+> +		BUG();
+
+You've already done a WARN. Do you need a BUG too?
+
+> +	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
+> +		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq));
+> +		combiner_cascade_irq(irq, IRQ_SPI(irq));
+
+This is relying on fixed Linux irq numbers and will break once GIC is
+using linear domains. Somehow you need to lookup the linux irq# using
+the GIC hw irq#.
+
+Rob
+
+>  	}
+>  }
+>  
+> +
+>  #ifdef CONFIG_OF
+>  static const struct of_device_id exynos4_dt_irq_match[] = {
+>  	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+> +	{ .compatible = "samsung,exynos4120-combiner",
+> +			.data = combiner_of_init, },
+>  	{},
+>  };
+>  #endif
+>  
+>  void __init exynos4_init_irq(void)
+>  {
+> -	int irq;
+>  	unsigned int gic_bank_offset;
+>  
+>  	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
+> @@ -408,12 +472,8 @@ void __init exynos4_init_irq(void)
+>  		of_irq_init(exynos4_dt_irq_match);
+>  #endif
+>  
+> -	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
+> -
+> -		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
+> -				COMBINER_IRQ(irq, 0));
+> -		combiner_cascade_irq(irq, IRQ_SPI(irq));
+> -	}
+> +	if (!of_have_populated_dt())
+> +		combiner_of_init(NULL, NULL);
+>  
+>  	/*
+>  	 * The parameters of s5p_init_irq() are for VIC init.
