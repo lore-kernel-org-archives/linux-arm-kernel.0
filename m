@@ -1,53 +1,46 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 08 Feb 2012 13:09:02 +0200
-Subject: [PATCH] ARM: OMAP: update omap1 and omap2plus defconfigs
-In-Reply-To: <20120208101958.GT1275@n2100.arm.linux.org.uk>
-References: <20120208053556.GB1426@atomide.com>
- <1328696173-17226-1-git-send-email-grinberg@compulab.co.il>
- <20120208101958.GT1275@n2100.arm.linux.org.uk>
-Message-ID: <4F3257CE.7070909@compulab.co.il>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 8 Feb 2012 12:12:32 +0100
+Subject: [PATCH v2 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <20120208091327.GH889@n2100.arm.linux.org.uk>
+References: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
+ <1328541585-24642-3-git-send-email-thierry.reding@avionic-design.de>
+ <4F3044A9.8000202@metafoo.de>
+ <20120207070400.GA29238@avionic-0098.mockup.avionic-design.de>
+ <20120208091327.GH889@n2100.arm.linux.org.uk>
+Message-ID: <20120208111232.GB17615@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On 02/08/12 12:19, Russell King - ARM Linux wrote:
-> On Wed, Feb 08, 2012 at 12:16:13PM +0200, Igor Grinberg wrote:
->> This patch updates omapX_defconfig to 3.3-rc1 and enables
->> the CONFIG_DEBUG_SECTION_MISMATCH.
+* Russell King - ARM Linux wrote:
+> On Tue, Feb 07, 2012 at 08:04:00AM +0100, Thierry Reding wrote:
+> > One of the major problems when converting to a non-global namespace is how to
+> > represent the relationship in code. For device tree this should be easy to do
+> > because it has all the infrastructure in place. For non-device-tree devices I
+> > have no idea yet how this could be done. Perhaps by using something like the
+> > clock API and using names for lookup?
 > 
-> You shouldn't enable this in the kernel supplied defconfigs.
-
-Hmmm... Ok, looks like I've forgot the purpose of defconfigs...
-It is intended for users rather than developers (right?) and
-the CONFIG_DEBUG_SECTION_MISMATCH has no use for users?
-Is it the case, or is there anything else?
-
+> Well, the first step is to make sure that the pwm 'chip' drivers don't
+> know anything about the global numberspace.
 > 
->> The update is done by:
->> 1) make mrproper && make omapX_defconfig
->> 2) Enable the CONFIG_DEBUG_SECTION_MISMATCH
->> 3) make savedefconfig
->> 4) cp defconfig arch/arm/configs/omapX_defconfig
->>
->> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->> ---
->> After updating omap1_defconfig,
->> there are several section mismatch warnings seen.
->> Hopefully, I will have time to fix those tomorrow
->> (unless someone will be kind enough to fix them before me).
->> The mismatches are:
-> 
-> The correct way is to build with:
-> 
-> make ... CONFIG_DEBUG_SECTION_MISMATCH=y
-> 
-> or set it in your private configuration.
+> That limits the extent of the global numberspace to the pwm core and
+> pwm users.  You then don't have to worry about the pwm chip drivers
+> while you work out how to solve the other half of the problem.
 
-In my current setup, command line switch would be most appropriate.
-Thanks for suggestion.
+I see. That would mean that pwm_request() gets a global PWM index, looks up
+the corresponding PWM chip and device then pass the chip-relative index to
+the driver's ops.
 
+I think that can be simplified even further. For instance if the pwm_device
+structure contains a pointer to its parent struct pwm_chip, then that can be
+used directly to call into the driver's ops. And the ops could be modified to
+take a pwm_device instead of the global PWM index. That would be similar to
+how struct irq_data is used.
 
--- 
-Regards,
-Igor.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120208/57c89e5a/attachment.sig>
