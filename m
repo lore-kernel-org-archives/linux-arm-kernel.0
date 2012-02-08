@@ -1,70 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 08 Feb 2012 15:30:44 -0800
-Subject: [PATCH 16/16] ARM: omap: disable cpuidle for OMAP3 platforms
-In-Reply-To: <87ipjg3osg.fsf@ti.com> (Kevin Hilman's message of "Wed, 08 Feb
- 2012 15:09:51 -0800")
-References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
- <E1RvAZz-0006Hr-9C@rmk-PC.arm.linux.org.uk>
- <20120208185905.GP29796@atomide.com> <87ipjg3osg.fsf@ti.com>
-Message-ID: <87haz0ykbf.fsf@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 8 Feb 2012 15:39:07 -0800
+Subject: [PATCH v6 07/15] ARM: SoC: convert MSM SMP to SoC descriptor
+In-Reply-To: <1328661059-24584-8-git-send-email-marc.zyngier@arm.com>
+References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
+ <1328661059-24584-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20120208233907.GA4416@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
+On Wed, Feb 08, 2012 at 12:30:51AM +0000, Marc Zyngier wrote:
 
-> Tony Lindgren <tony@atomide.com> writes:
->
->> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120208 08:10]:
->>> Commit 2fd149645eb4 (ARM: OMAP2+: UART: Remove omap_uart_can_sleep and add pm_qos)
->>> has caused a regression on OMAP3 platforms.
->>> 
->>> When the UART is trying to transmit data, if we enter a low power mode,
->>> transmission stops, which makes serial on OMAP3 unusable - a 'dmesg'
->>> takes five minutes to be output at 115200 baud, at a rate of around a
->>> block of 16 characters every couple of seconds.
->>> 
->>> Unfortunately, the commit above can't be reverted because of many other
->>> changes in this area, so this implements a dirty fix by disabling
->>> CPU idle in the places the original commit does, irrespective of the
->>> UART state.
->> ...
->>
->>> --- a/arch/arm/mach-omap2/pm34xx.c
->>> +++ b/arch/arm/mach-omap2/pm34xx.c
->>> @@ -421,7 +421,7 @@ static void omap3_pm_idle(void)
->>>  	local_irq_disable();
->>>  	local_fiq_disable();
->>>  
->>> -	if (omap_irq_pending() || need_resched())
->>> +	if (omap_irq_pending() || need_resched() || 1)
->>>  		goto out;
->>>  
->>>  	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
->>
->> Argh, this is just too ugly. There has got to be a better fix for the
->> -rc series.
->>
->> Looks like the patches to fix omap-serial.c are queued for v3.4,
->> so that won't help.
->>
->> Kevin, what do you have for the -rc fix here to avoid the if (1)
->> hack?
->
-> There was confusion with Greg about this serial fixes which were
-> supposed to be for -rc.
->
-> He pulled the original series in to -rc, and reverted them when Paul
-> updated the series.  Then he decided to queue the updated series for
-> 3.4. :(
->
-> I've now asked Greg if he can queue that series for 3.3.
+> @@ -146,6 +152,9 @@ MACHINE_END
+>  #ifdef CONFIG_OF
+>  /* TODO: General device tree support for all MSM. */
+>  DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+> +	.soc = &msm_soc_desc,
+> +	.fixup = msm8x60_fixup,
+> +	.reserve = msm8x60_reserve,
+>  	.map_io = msm8x60_map_io,
+>  	.init_irq = msm8x60_init_irq,
+>  	.init_machine = msm8x60_dt_init,
 
-And he refused (on the 34xx thread). :(
+The fixup and reserve aren't really needed (and probably not wanted)
+for the DT board.  The fixup doesn't actually work, since it modifies
+the tags, which don't exist.  The reservation should be passed in the
+DT itself, since that has a mechanism for it.
 
-It is a very targetted set of fixes that directly address the problems
-in the UART driver, but he has decided they should wait because we went
-through a couple revisions.
+Otherwise, the MSM part looks ok.
 
-Maybe you can respond to Greg saying that we really need them for 3.3?
+Acked-By: David Brown <davidb@codeaurora.org>
 
-Kevin
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
