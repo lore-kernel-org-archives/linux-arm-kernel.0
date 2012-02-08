@@ -1,24 +1,30 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 8 Feb 2012 17:17:17 +0100
-Subject: [PATCH] mmc: atmel-mci: save and restore sdioirq when soft
- reset is performed
-In-Reply-To: <20120208154528.GC4919@ldesroches-Latitude-E6320>
-References: <1328721759-10124-1-git-send-email-ludovic.desroches@atmel.com>
- <20120208152621.GH15647@game.jcrosoft.org>
- <20120208154528.GC4919@ldesroches-Latitude-E6320>
-Message-ID: <20120208161717.GI15647@game.jcrosoft.org>
+Date: Wed, 8 Feb 2012 17:26:39 +0100
+Subject: [PATCH v3] SPI: add CSR SiRFprimaII SPI controller driver
+In-Reply-To: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
+References: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <20120208162639.GJ15647@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:45 Wed 08 Feb     , Ludovic Desroches wrote:
-> Hello Jean-Christophe,
-> 
-> A customer using an Atheros AR6103 SDIO WLAN adapter faces this issue.
-> 
-> Sometimes we perform a software reset and he noticed that after he didn't get
-> sdio irq. The interrupt mask register is also resetted when performing
-> software reset.
-so put this in the commit
+ +
+> +static int spi_sirfsoc_setup(struct spi_device *spi)
+> +{
+> +	struct spi_bitbang *bitbang;
+> +	struct sirfsoc_spi *sspi;
+> +
+> +	if (!spi->max_speed_hz)
+> +		return -EINVAL;
+> +
+> +	sspi = spi_master_get_devdata(spi->master);
+> +	bitbang = &sspi->bitbang;
+why do you need this?
+> +
+> +	if (!spi->bits_per_word)
+> +		spi->bits_per_word = 8;
+> +
+> +	return spi_sirfsoc_setup_transfer(spi, NULL);
+> +}
 
 Best Regards,
 J.
