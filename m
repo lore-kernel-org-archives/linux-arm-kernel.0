@@ -1,39 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 7 Feb 2012 16:09:44 -0800
-Subject: [GIT PULL] please pull tegra fixes for 3.3-rc
-Message-ID: <CAOesGMhCC5axuZMZ9qcwqqitM2iUScd=SJPiGH=5A9gRYEDTbw@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed,  8 Feb 2012 01:12:55 +0100
+Subject: [PATCH] EHCI: Fix clk_enable/clk_disable for ehci-mxc usb clock
+Message-ID: <1328659975-3534-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The clock weren't enabled without the following change.
 
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/usb/host/ehci-mxc.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git fixes
-
-for you to fetch changes up to 0783a9bf4a5207e9d57b8c110022957f8dc88e2a:
-
-  ARM: tegra: paz00: fix wrong UART port on mini-pcie plug (2012-02-06
-18:32:51 -0800)
-
-----------------------------------------------------------------
-Marc Dietrich (2):
-      ARM: tegra: paz00: fix wrong SD1 power gpio
-      ARM: tegra: paz00: fix wrong UART port on mini-pcie plug
-
-Olof Johansson (1):
-      ARM: tegra: dma: fix buildbreak for !CONFIG_TEGRA_SYSTEM_DMA
-
-Shubhrajyoti Datta (1):
-      i2c: tegra: Add devexit_p() for remove
-
- arch/arm/boot/dts/tegra-paz00.dts      |    6 +++---
- arch/arm/mach-tegra/board-paz00.c      |    8 ++++----
- arch/arm/mach-tegra/board-paz00.h      |    2 +-
- arch/arm/mach-tegra/include/mach/dma.h |   10 +++++-----
- drivers/i2c/busses/i2c-tegra.c         |    2 +-
- 5 files changed, 14 insertions(+), 14 deletions(-)
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index 55978fc..f3faf0e 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -171,7 +171,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 		ret = PTR_ERR(priv->usbclk);
+ 		goto err_clk;
+ 	}
+-	clk_enable(priv->usbclk);
++	clk_prepare_enable(priv->usbclk);
+ 
+ 	if (!cpu_is_mx35() && !cpu_is_mx25()) {
+ 		priv->ahbclk = clk_get(dev, "usb_ahb");
+@@ -273,7 +273,7 @@ err_clk_phy:
+ 		clk_put(priv->ahbclk);
+ 	}
+ err_clk_ahb:
+-	clk_disable(priv->usbclk);
++	clk_disable_unprepare(priv->usbclk);
+ 	clk_put(priv->usbclk);
+ err_clk:
+ 	iounmap(hcd->regs);
+@@ -305,7 +305,7 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
+ 	usb_put_hcd(hcd);
+ 	platform_set_drvdata(pdev, NULL);
+ 
+-	clk_disable(priv->usbclk);
++	clk_disable_unprepare(priv->usbclk);
+ 	clk_put(priv->usbclk);
+ 	if (priv->ahbclk) {
+ 		clk_disable(priv->ahbclk);
+-- 
+1.7.8.3
