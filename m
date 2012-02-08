@@ -1,185 +1,120 @@
-From: dmitry.antipov@linaro.org (Dmitry Antipov)
-Date: Wed,  8 Feb 2012 15:58:36 -0800
-Subject: [PATCH] sched: generalize CONFIG_IRQ_TIME_ACCOUNTING for X86 and ARM
-Message-ID: <1328745516-14205-1-git-send-email-dmitry.antipov@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 08 Feb 2012 15:59:15 -0800 (PST)
+Subject: [PATCH v6 01/15] ARM: SoC: Introduce per SoC descriptor
+In-Reply-To: <1328661059-24584-2-git-send-email-marc.zyngier@arm.com>
+References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
+ <1328661059-24584-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <alpine.LFD.2.02.1202081558041.1656@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generalize CONFIG_IRQ_TIME_ACCOUNTING  between X86 and
-ARM, move "noirqtime=" option to common debugging code.
-For a bit of backward compatibility, X86-specific option
-"tsc=noirqtime" is preserved, but issues a warning.
+On Wed, 8 Feb 2012, Marc Zyngier wrote:
 
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Suggested-by: Venki Pallipadi <venki@google.com>
-Signed-off-by: Dmitry Antipov <dmitry.antipov@linaro.org>
----
- Documentation/kernel-parameters.txt |    9 +++++----
- arch/arm/kernel/sched_clock.c       |    3 +++
- arch/x86/Kconfig                    |   11 -----------
- arch/x86/kernel/tsc.c               |    7 ++++---
- include/linux/sched.h               |    2 ++
- lib/Kconfig.debug                   |   12 ++++++++++++
- lib/Makefile                        |    2 ++
- lib/irqtime.c                       |   12 ++++++++++++
- 8 files changed, 40 insertions(+), 18 deletions(-)
- create mode 100644 lib/irqtime.c
+> The ARM core code expects the various SoCs to hide their
+> implementation differences behind a well established API.
+> The various sub-arch-specific bit are often either at
+> the machine descriptor level, or provided at link time
+> by the sub-arch code.
+> 
+> The SoC descriptor is a container that holds the SoC
+> specific bits that can be moved away from the machine
+> descriptor as well as an indirection point for the
+> global symbols (SMP and CPU hotplug support, for example).
+> 
+> This patch introduce this SoC descriptor, with the only field
+> being the name of the SoC.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 033d4e6..b64a13f 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -1719,6 +1719,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 
- 	noautogroup	Disable scheduler automatic task group creation.
- 
-+	noirqtime	[X86,ARM] Used to run time disable IRQ_TIME_ACCOUNTING,
-+			should give a negligible performance improvement.			
-+
- 	nobats		[PPC] Do not use BATs for mapping kernel lowmem
- 			on "Classic" PPC cores.
- 
-@@ -2636,10 +2639,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			as the stability checks done at bootup.	Used to enable
- 			high-resolution timer mode on older hardware, and in
- 			virtualized environment.
--			[x86] noirqtime: Do not use TSC to do irq accounting.
--			Used to run time disable IRQ_TIME_ACCOUNTING on any
--			platforms where RDTSC is slow and this accounting
--			can add overhead.
-+			[x86] noirqtime: obsoleted by "noirqtime" generic option,
-+			see it's documentation for details.
- 
- 	turbografx.map[2|3]=	[HW,JOY]
- 			TurboGraFX parallel port interface
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 5416c7c..961bd2d 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -144,6 +144,9 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	 */
- 	cd.epoch_ns = 0;
- 
-+	if (!no_sched_irq_time)
-+		enable_sched_clock_irqtime();
-+
- 	pr_debug("Registered %pF as sched_clock source\n", read);
- }
- 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 5bed94e..4759676 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -805,17 +805,6 @@ config SCHED_MC
- 	  making when dealing with multi-core CPU chips at a cost of slightly
- 	  increased overhead in some places. If unsure say N here.
- 
--config IRQ_TIME_ACCOUNTING
--	bool "Fine granularity task level IRQ time accounting"
--	default n
--	---help---
--	  Select this option to enable fine granularity task irq time
--	  accounting. This is done by reading a timestamp on each
--	  transitions between softirq and hardirq state, so there can be a
--	  small performance impact.
--
--	  If in doubt, say N here.
--
- source "kernel/Kconfig.preempt"
- 
- config X86_UP_APIC
-diff --git a/arch/x86/kernel/tsc.c b/arch/x86/kernel/tsc.c
-index a62c201..70510a3 100644
---- a/arch/x86/kernel/tsc.c
-+++ b/arch/x86/kernel/tsc.c
-@@ -103,14 +103,15 @@ int __init notsc_setup(char *str)
- 
- __setup("notsc", notsc_setup);
- 
--static int no_sched_irq_time;
--
- static int __init tsc_setup(char *str)
- {
- 	if (!strcmp(str, "reliable"))
- 		tsc_clocksource_reliable = 1;
--	if (!strncmp(str, "noirqtime", 9))
-+	if (!strncmp(str, "noirqtime", 9)) {
-+		printk(KERN_WARNING "tsc: tsc=noirqtime is "
-+		       "obsolete, use noirqtime instead\n");
- 		no_sched_irq_time = 1;
-+	}
- 	return 1;
- }
- 
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 7d379a6..b3575b5 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -1966,9 +1966,11 @@ extern void sched_clock_idle_wakeup_event(u64 delta_ns);
-  * The reason for this explicit opt-in is not to have perf penalty with
-  * slow sched_clocks.
-  */
-+extern int no_sched_irq_time;
- extern void enable_sched_clock_irqtime(void);
- extern void disable_sched_clock_irqtime(void);
- #else
-+#define no_sched_irq_time 1
- static inline void enable_sched_clock_irqtime(void) {}
- static inline void disable_sched_clock_irqtime(void) {}
- #endif
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index 8745ac7..236e814 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -299,6 +299,18 @@ config SCHEDSTATS
- 	  application, you can say N to avoid the very slight overhead
- 	  this adds.
- 
-+config IRQ_TIME_ACCOUNTING
-+	bool "Fine granularity task level IRQ time accounting"
-+	depends on X86 || ARM
-+	default n
-+	---help---
-+	  Select this option to enable fine granularity task irq time
-+	  accounting. This is done by reading a timestamp on each
-+	  transitions between softirq and hardirq state, so there can be a
-+	  small performance impact.
-+
-+	  If in doubt, say N here.
-+
- config TIMER_STATS
- 	bool "Collect kernel timers statistics"
- 	depends on DEBUG_KERNEL && PROC_FS
-diff --git a/lib/Makefile b/lib/Makefile
-index 18515f0..44d67d4 100644
---- a/lib/Makefile
-+++ b/lib/Makefile
-@@ -49,6 +49,8 @@ obj-$(CONFIG_DEBUG_PREEMPT) += smp_processor_id.o
- obj-$(CONFIG_DEBUG_LIST) += list_debug.o
- obj-$(CONFIG_DEBUG_OBJECTS) += debugobjects.o
- 
-+obj-$(CONFIG_IRQ_TIME_ACCOUNTING) += irqtime.o
-+
- ifneq ($(CONFIG_HAVE_DEC_LOCK),y)
-   lib-y += dec_and_lock.o
- endif
-diff --git a/lib/irqtime.c b/lib/irqtime.c
-new file mode 100644
-index 0000000..10d440d
---- /dev/null
-+++ b/lib/irqtime.c
-@@ -0,0 +1,12 @@
-+#include <linux/kernel.h>
-+#include <linux/sched.h>
-+
-+int no_sched_irq_time;
-+
-+static int __init irqtime_setup(char *str)
-+{
-+	no_sched_irq_time = 1;
-+	return 1;
-+}
-+
-+__setup("noirqtime", irqtime_setup);
--- 
-1.7.7.6
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+
+> ---
+>  arch/arm/include/asm/mach/arch.h |    2 ++
+>  arch/arm/include/asm/soc.h       |   19 +++++++++++++++++++
+>  arch/arm/kernel/setup.c          |    7 +++++++
+>  3 files changed, 28 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/include/asm/soc.h
+> 
+> diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+> index d7692ca..cf7ef91 100644
+> --- a/arch/arm/include/asm/mach/arch.h
+> +++ b/arch/arm/include/asm/mach/arch.h
+> @@ -14,6 +14,7 @@ struct tag;
+>  struct meminfo;
+>  struct sys_timer;
+>  struct pt_regs;
+> +struct arm_soc_desc;
+>  
+>  struct machine_desc {
+>  	unsigned int		nr;		/* architecture number	*/
+> @@ -35,6 +36,7 @@ struct machine_desc {
+>  	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
+>  	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+>  	char			restart_mode;	/* default restart mode	*/
+> +	struct arm_soc_desc	*soc;		/* SoC descriptor	*/
+>  	void			(*fixup)(struct tag *, char **,
+>  					 struct meminfo *);
+>  	void			(*reserve)(void);/* reserve mem blocks	*/
+> diff --git a/arch/arm/include/asm/soc.h b/arch/arm/include/asm/soc.h
+> new file mode 100644
+> index 0000000..2d73e35
+> --- /dev/null
+> +++ b/arch/arm/include/asm/soc.h
+> @@ -0,0 +1,19 @@
+> +/*
+> + *  linux/arch/arm/include/asm/soc.h
+> + *
+> + *  Copyright (C) 2011 ARM Ltd.
+> + *  All Rights Reserved
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_ARM_SOC_H
+> +#define __ASM_ARM_SOC_H
+> +
+> +struct arm_soc_desc {
+> +	const char			*name;
+> +};
+> +
+> +#endif	/* __ASM_ARM_SOC_H */
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index a255c39..69ac002 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -45,6 +45,7 @@
+>  #include <asm/cachetype.h>
+>  #include <asm/tlbflush.h>
+>  #include <asm/system.h>
+> +#include <asm/soc.h>
+>  
+>  #include <asm/prom.h>
+>  #include <asm/mach/arch.h>
+> @@ -141,6 +142,7 @@ static const char *cpu_name;
+>  static const char *machine_name;
+>  static char __initdata cmd_line[COMMAND_LINE_SIZE];
+>  struct machine_desc *machine_desc __initdata;
+> +static const struct arm_soc_desc *soc_desc __initdata;
+>  
+>  static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
+>  static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
+> @@ -922,6 +924,11 @@ void __init setup_arch(char **cmdline_p)
+>  		mdesc = setup_machine_tags(machine_arch_type);
+>  	machine_desc = mdesc;
+>  	machine_name = mdesc->name;
+> +	if (mdesc->soc) {
+> +		soc_desc = mdesc->soc;
+> +		pr_info("SoC: %s\n", soc_desc->name);
+> +	} else
+> +		soc_desc = NULL;
+>  
+>  #ifdef CONFIG_ZONE_DMA
+>  	if (mdesc->dma_zone_size) {
+> -- 
+> 1.7.3.4
+> 
