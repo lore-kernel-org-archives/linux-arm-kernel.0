@@ -1,30 +1,30 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 8 Feb 2012 17:26:39 +0100
-Subject: [PATCH v3] SPI: add CSR SiRFprimaII SPI controller driver
-In-Reply-To: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
-References: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <20120208162639.GJ15647@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Feb 2012 16:35:47 +0000
+Subject: [PATCH 00/16] rmk's patch series for fixing OMAP
+Message-ID: <20120208163546.GA15849@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- +
-> +static int spi_sirfsoc_setup(struct spi_device *spi)
-> +{
-> +	struct spi_bitbang *bitbang;
-> +	struct sirfsoc_spi *sspi;
-> +
-> +	if (!spi->max_speed_hz)
-> +		return -EINVAL;
-> +
-> +	sspi = spi_master_get_devdata(spi->master);
-> +	bitbang = &sspi->bitbang;
-why do you need this?
-> +
-> +	if (!spi->bits_per_word)
-> +		spi->bits_per_word = 8;
-> +
-> +	return spi_sirfsoc_setup_transfer(spi, NULL);
-> +}
+This is my set of patches for fixing OMAP for v3.3.
 
-Best Regards,
-J.
+This is the complete series of patches I'm currently applying to _my_
+tree to get v3.3-rc2 into a usable and sane state.
+
+I want to see most of the problems uncovered in this series fixed sooner
+rather than later, and certainly not taking three plus weeks to get into
+mainline like this rather serious looking commit did:
+
+commit c49d005b6cc8491fad5b24f82805be2d6bcbd3dd
+Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Date:   Tue Jan 17 11:09:57 2012 +0200
+
+    OMAPDSS: HDMI: PHY burnout fix
+    
+    A hardware bug in the OMAP4 HDMI PHY causes physical damage to the board
+    if the HDMI PHY is kept powered on when the cable is not connected.
+
+which now has me wondering if, by trying to boot v3.3-rc2 on this board
+during the past week, I have a destroyed HDMI interface on it.
+
+So, a big thanks for sitting on that fix and exposing peoples hardware
+to damage, that shows real professionalism.
