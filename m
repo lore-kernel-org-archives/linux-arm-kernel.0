@@ -1,107 +1,52 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 8 Feb 2012 10:24:00 +0800
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CAMsRxfJH+9MS=Svmh0BvDSb8xqsPe2HPobkeKcn8JO35npjhwQ@mail.gmail.com>
-References: <1328578047.1724.17.camel@dave-Dell-System-XPS-L502X>
- <CAMQu2gwfo5JXAqQaLUNs7C7J3TUhEO2zOcyD0Rk-D_O61Yrfag@mail.gmail.com>
- <CAMsRxfLNBbQO5XF+EHJqNsnW+s=ay3mjSV5dh=sxdwzktUu03g@mail.gmail.com>
- <CAMQu2gzfNAwtf1c6jrTZpfGMSqBgBrQKmFTeCFzbvMh9ESBDUg@mail.gmail.com>
- <CAMsRxfKR1ODH56BtcUT5Dv6qOVEYGVheEcW9ugXsZmLKok==bg@mail.gmail.com>
- <CAMQu2gwWt6oQPjxc1YHgOoxVkHdck_q78Xf==7ncwRj0_uS-JQ@mail.gmail.com>
- <CAMQu2gyCPtbNfBa5V8ve2JORN+sDeAY+hvR0g0_9U354JgcuiA@mail.gmail.com>
- <CAMsRxfJVEgVJoHcaPQbMg5mwz=tZUce4oibDUxtnevSF8bGY9g@mail.gmail.com>
- <CAMQu2gxVUqDF2HkPD=QeX0N_tUd=9FTd+T+1LHCR0tsCgQxC8Q@mail.gmail.com>
- <CAMsRxfJH+9MS=Svmh0BvDSb8xqsPe2HPobkeKcn8JO35npjhwQ@mail.gmail.com>
-Message-ID: <CACVXFVMx9Zx3ZQr6Q-17x5NVL8iuBJjOjtw39FJiWX=fGkZNZA@mail.gmail.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Wed, 08 Feb 2012 04:05:55 +0100
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <20120208013959.GA24535@panacea>
+References: <20120208013959.GA24535@panacea>
+Message-ID: <1328670355.2482.68.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 2012-02-08 at 05:39 +0400, Anton Vorontsov wrote:
+> Hi all,
+> 
+> For some drivers we need to know when scheduler is idling. The most
+> straightforward way is to gracefully hook into the idle loop.
+> 
+> On x86 there are "CPU idle" notifiers in the inner idle loop, but
+> scheduler idle notifiers are different. These notifiers do not run on
+> every invocation/exit from cpuidle, instead they used to notify about
+> scheduler state changes, not HW states.
+> 
+> In other words, CPU idle notifiers work inside while(!need_resched())
+> loop (nested into idle loop), while scheduler idle notifier work
+> outside of the loop.
+> 
+> The first two patches consolidate scheduler idle entry/exit
+> points, and converts architectures to this new API.
+> 
+> The third patch is a new cpufreq governor, the commit message
+> briefly describes it.
 
-CC lkml and perf guys, since looks it is related with perf core.
+Argh, no.. cpufreq so sucks rocks. Can we please just scrap it and write
+an entirely new infrastructure that is much more connected to the
+scheduler and do away with this stupid need to set P-states from a
+schedulable context.
 
-On Tue, Feb 7, 2012 at 7:59 PM, stephane eranian <eranian@googlemail.com> wrote:
-> An easier way to verify we're getting the right number of samples is
-> to use perf top:
->
-> $ taskset -c 1 noploop 1000 &
-> $ sudo perf top
->
-> You'll see around 850 irqs/sec, should be closer to 1000.
-> But if I drop the rate to 100Hz, then it works:
->
-> $ sudo perf top -F 100
->
-> That leads me to believe there is too much overhead somewhere.
-> Could be in perf_event itself.
+We can maybe keep cpufreq around for the broken ass hardware that needs
+to schedule in order to change its state, but gah.
 
-Looks like the issue is caused by perf_event itself, but nothing to do
-with much overhead
-somewhere.
+We're going to do per-task avg-load tracking soon
+(https://lkml.org/lkml/2012/2/1/763) if you can use that (if not, tell
+why) you can do task based policy and migrate the P-state/freq along
+with tasks.
 
-On OMAP4, HZ is 128, and perf_rotate_context may set a new sample period(~8ms),
-which is much longer than 1ms in 1000HZ freq mode, so less sample events are
-observed. X86 isn't affected since its HZ is 1000.
+By keeping per-task avg-runtime and accounting on migration we can
+compute an avg-runtime per cpu, and select a freq based on that to
+either minimize idle time (if that's what your platform wants) or boost
+and run to idle right along with scheduling on wakeup and sleep.
 
-With patch[1], about 10000 sample events can be generated after running
-'perf record -e cycles  ./noploop 10' and 'perf report -D | tail -20'
-on panda board.
-
-I am not sure if patch[1] is a right fix, but it can verify the problem.
-
-thanks,
---
-Ming Lei
-
-[1], fix adjusting frequency in perf_rotate_context
-
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 32b48c8..db4faf2 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -2300,14 +2300,12 @@ do {					\
- 	return div64_u64(dividend, divisor);
- }
-
--static void perf_adjust_period(struct perf_event *event, u64 nsec, u64 count)
-+static void perf_adjust_period(struct perf_event *event, u64 period, u64 count)
- {
- 	struct hw_perf_event *hwc = &event->hw;
--	s64 period, sample_period;
-+	s64 sample_period;
- 	s64 delta;
-
--	period = perf_calculate_period(event, nsec, count);
--
- 	delta = (s64)(period - hwc->sample_period);
- 	delta = (delta + 7) / 8; /* low pass filter */
-
-@@ -2363,8 +2361,13 @@ static void perf_ctx_adjust_freq(struct
-perf_event_context *ctx, u64 period)
- 		delta = now - hwc->freq_count_stamp;
- 		hwc->freq_count_stamp = now;
-
--		if (delta > 0)
-+		if (delta > 0) {
-+			period = perf_calculate_period(event, period, delta);
-+
-+			if (period > 4*hwc->sample_period)
-+				period = hwc->sample_period;
- 			perf_adjust_period(event, period, delta);
-+		}
- 	}
- }
-
-@@ -4533,8 +4536,10 @@ static int __perf_event_overflow(struct
-perf_event *event,
-
- 		hwc->freq_time_stamp = now;
-
--		if (delta > 0 && delta < 2*TICK_NSEC)
-+		if (delta > 0 && delta < 2*TICK_NSEC) {
-+			delta = perf_calculate_period(event, delta, hwc->last_period);
- 			perf_adjust_period(event, delta, hwc->last_period);
-+		}
- 	}
-
- 	/*
+Arjan talked about something like that several times.. and I always
+forgets what policy is best for what chips etc. All I know is that
+cpufreq sucks because its strictly per-cpu and oblivious to task
+movement.
