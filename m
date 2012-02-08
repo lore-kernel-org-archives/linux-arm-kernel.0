@@ -1,159 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  8 Feb 2012 15:52:47 +0100
-Subject: [PATCH v2] arm:orion: Fix USB phy for orion5x.
-Message-ID: <1328712767-25725-1-git-send-email-andrew@lunn.ch>
+From: dmitry.antipov@linaro.org (Dmitry Antipov)
+Date: Wed, 08 Feb 2012 07:15:26 -0800
+Subject: [PATCH] sched: generalize CONFIG_IRQ_TIME_ACCOUNTING for X86
+ and ARM
+In-Reply-To: <20120208131833.GK889@n2100.arm.linux.org.uk>
+References: <1328705314-20978-1-git-send-email-dmitry.antipov@linaro.org>
+ <20120208131833.GK889@n2100.arm.linux.org.uk>
+Message-ID: <4F32918E.9000905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch "ARM: orion: Consolidate USB platform setup code.", commit
-4fcd3f374a928081d391cd9a570afe3b2c692fdc broke USB on TS-7800 and
-other orion5x boards, because the wrong type of PHY was being passed
-to the EHCI driver in the platform data. Orion5x needs EHCI_PHY_ORION
-and all the others want EHCI_PHY_NA.
+On 02/08/2012 05:18 AM, Russell King - ARM Linux wrote:
 
-Allow the mach- code to tell the generic plat-orion code which USB PHY
-enum to place into the platform data.
+>> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+>> index 5416c7c..56d2a9d 100644
+>> --- a/arch/arm/kernel/sched_clock.c
+>> +++ b/arch/arm/kernel/sched_clock.c
+>> @@ -162,5 +162,8 @@ void __init sched_clock_postinit(void)
+>>   	if (read_sched_clock == jiffy_sched_clock_read)
+>>   		setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
+>>
+>> +	if (!no_sched_irq_time)
+>> +		enable_sched_clock_irqtime();
+>
+> Why are you placing this here?  sched_clock is available from the point
+> that it's registered, which should be before the first sched_clock()
+> call.
 
-Versio 2: Rebase to v3.3-rc2.
+This is just because I'm thinking about:
 
-Reported-by: Ambroz Bizjak <ambrop7@gmail.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Ambroz Bizjak <ambrop7@gmail.com>
----
- arch/arm/mach-dove/common.c               |    3 ++-
- arch/arm/mach-kirkwood/common.c           |    3 ++-
- arch/arm/mach-mv78xx0/common.c            |    3 ++-
- arch/arm/mach-orion5x/common.c            |    4 +++-
- arch/arm/plat-orion/common.c              |    9 ++++-----
- arch/arm/plat-orion/include/plat/common.h |    3 ++-
- 6 files changed, 15 insertions(+), 10 deletions(-)
+if (read_sched_clock == jiffy_sched_clock_read)
+         setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
+else if (!no_sched_irq_time)
+	enable_sched_clock_irqtime();
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index dd1429a..bda7aca 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -28,6 +28,7 @@
- #include <asm/mach/arch.h>
- #include <linux/irq.h>
- #include <plat/time.h>
-+#include <plat/ehci-orion.h>
- #include <plat/common.h>
- #include <plat/addr-map.h>
- #include "common.h"
-@@ -71,7 +72,7 @@ void __init dove_map_io(void)
-  ****************************************************************************/
- void __init dove_ehci0_init(void)
- {
--	orion_ehci_init(DOVE_USB0_PHYS_BASE, IRQ_DOVE_USB0);
-+	orion_ehci_init(DOVE_USB0_PHYS_BASE, IRQ_DOVE_USB0, EHCI_PHY_NA);
- }
- 
- /*****************************************************************************
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index cc15426..77d4852 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -27,6 +27,7 @@
- #include <plat/cache-feroceon-l2.h>
- #include <plat/mvsdio.h>
- #include <plat/orion_nand.h>
-+#include <plat/ehci-orion.h>
- #include <plat/common.h>
- #include <plat/time.h>
- #include <plat/addr-map.h>
-@@ -73,7 +74,7 @@ unsigned int kirkwood_clk_ctrl = CGC_DUNIT | CGC_RESERVED;
- void __init kirkwood_ehci_init(void)
- {
- 	kirkwood_clk_ctrl |= CGC_USB0;
--	orion_ehci_init(USB_PHYS_BASE, IRQ_KIRKWOOD_USB);
-+	orion_ehci_init(USB_PHYS_BASE, IRQ_KIRKWOOD_USB, EHCI_PHY_NA);
- }
- 
- 
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index 0cdd410..a5dcf766 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -19,6 +19,7 @@
- #include <mach/mv78xx0.h>
- #include <mach/bridge-regs.h>
- #include <plat/cache-feroceon-l2.h>
-+#include <plat/ehci-orion.h>
- #include <plat/orion_nand.h>
- #include <plat/time.h>
- #include <plat/common.h>
-@@ -169,7 +170,7 @@ void __init mv78xx0_map_io(void)
-  ****************************************************************************/
- void __init mv78xx0_ehci0_init(void)
- {
--	orion_ehci_init(USB0_PHYS_BASE, IRQ_MV78XX0_USB_0);
-+	orion_ehci_init(USB0_PHYS_BASE, IRQ_MV78XX0_USB_0, EHCI_PHY_NA);
- }
- 
- 
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 0e28bae..5dad38e 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -29,6 +29,7 @@
- #include <mach/hardware.h>
- #include <mach/orion5x.h>
- #include <plat/orion_nand.h>
-+#include <plat/ehci-orion.h>
- #include <plat/time.h>
- #include <plat/common.h>
- #include <plat/addr-map.h>
-@@ -72,7 +73,8 @@ void __init orion5x_map_io(void)
-  ****************************************************************************/
- void __init orion5x_ehci0_init(void)
- {
--	orion_ehci_init(ORION5X_USB0_PHYS_BASE, IRQ_ORION5X_USB0_CTRL);
-+	orion_ehci_init(ORION5X_USB0_PHYS_BASE, IRQ_ORION5X_USB0_CTRL,
-+			EHCI_PHY_ORION);
- }
- 
- 
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index e5a2fde..089899a 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -789,10 +789,7 @@ void __init orion_xor1_init(unsigned long mapbase_low,
- /*****************************************************************************
-  * EHCI
-  ****************************************************************************/
--static struct orion_ehci_data orion_ehci_data = {
--	.phy_version	= EHCI_PHY_NA,
--};
--
-+static struct orion_ehci_data orion_ehci_data;
- static u64 ehci_dmamask = DMA_BIT_MASK(32);
- 
- 
-@@ -812,8 +809,10 @@ static struct platform_device orion_ehci = {
- };
- 
- void __init orion_ehci_init(unsigned long mapbase,
--			    unsigned long irq)
-+			    unsigned long irq,
-+			    enum orion_ehci_phy_ver phy_version)
- {
-+	orion_ehci_data.phy_version = phy_version;
- 	fill_resources(&orion_ehci, orion_ehci_resources, mapbase, SZ_4K - 1,
- 		       irq);
- 
-diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
-index 0fe08d7..a7fa005 100644
---- a/arch/arm/plat-orion/include/plat/common.h
-+++ b/arch/arm/plat-orion/include/plat/common.h
-@@ -89,7 +89,8 @@ void __init orion_xor1_init(unsigned long mapbase_low,
- 			    unsigned long irq_1);
- 
- void __init orion_ehci_init(unsigned long mapbase,
--			    unsigned long irq);
-+			    unsigned long irq,
-+			    enum orion_ehci_phy_ver phy_version);
- 
- void __init orion_ehci_1_init(unsigned long mapbase,
- 			      unsigned long irq);
--- 
-1.7.2.5
+I suppose that "fine granularity task irq time accounting"
+makes no sense if sched_clock() granularity is poor.
+
+> This could have been written:
+>
+> 	depends on X86 || (ARM&&  HAVE_SCHED_CLOCK)
+>
+> However, ARM will always have HAVE_SCHED_CLOCK after the next merge window,
+> so this can become a much simpler:
+>
+> 	depends on X86 || ARM
+
+OK.
+
+Dmitry
