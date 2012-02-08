@@ -1,135 +1,149 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  8 Feb 2012 00:30:56 +0000
-Subject: [PATCH v6 12/15] ARM: smp: Make SoC descriptor mandatory for SMP
- platforms
+Date: Wed,  8 Feb 2012 00:30:54 +0000
+Subject: [PATCH v6 10/15] ARM: SoC: convert highbank to SoC descriptor
 In-Reply-To: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
 References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1328661059-24584-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1328661059-24584-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all SMP platforms have been converted to the SOC descriptor
-and its SMP operations, remove the "weak" attribute from the hooks
-in smp.c, and make the functions static wherever possible.
+Convert the highbank platform to use the SoC descriptor to provide
+its SMP and CPU hotplug operations.
 
+Cc: Rob Herring <rob.herring@calxeda.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/smp.h |   15 ---------------
- arch/arm/kernel/smp.c      |   18 +++++++++---------
- 2 files changed, 9 insertions(+), 24 deletions(-)
+ arch/arm/mach-highbank/core.h     |    8 ++++++++
+ arch/arm/mach-highbank/highbank.c |    7 +++++++
+ arch/arm/mach-highbank/hotplug.c  |    6 +++---
+ arch/arm/mach-highbank/platsmp.c  |   23 +++++++++++++++++++----
+ 4 files changed, 37 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index ae29293..13753fa 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -61,16 +61,6 @@ extern int boot_secondary(unsigned int cpu, struct task_struct *);
- asmlinkage void secondary_start_kernel(void);
+diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+index d8e2d0b..d1fd356 100644
+--- a/arch/arm/mach-highbank/core.h
++++ b/arch/arm/mach-highbank/core.h
+@@ -1,3 +1,5 @@
++#include <asm/soc.h>
++
+ extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+ extern void highbank_clocks_init(void);
+ extern void highbank_restart(char, const char *);
+@@ -8,3 +10,9 @@ extern void highbank_lluart_map_io(void);
+ static inline void highbank_lluart_map_io(void) {}
+ #endif
  
- /*
-- * Perform platform specific initialisation of the specified CPU.
-- */
--extern void platform_secondary_init(unsigned int cpu);
--
--/*
-- * Initialize cpu_possible map, and enable coherency
-- */
--extern void platform_smp_prepare_cpus(unsigned int);
--
--/*
-  * Initial data for bringing up a secondary CPU.
++extern int highbank_cpu_kill(unsigned int cpu);
++extern void highbank_cpu_die(unsigned int cpu);
++extern int highbank_cpu_disable(unsigned int cpu);
++
++extern struct arm_soc_smp_init_ops	highbank_soc_smp_init_ops;
++extern struct arm_soc_smp_ops		highbank_soc_smp_ops;
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 8394d51..1a6a704 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -138,7 +138,14 @@ static const char *highbank_match[] __initconst = {
+ 	NULL,
+ };
+ 
++static struct arm_soc_desc highbank_soc_desc __initdata = {
++	.name	= "Calxeda Highbank",
++	soc_smp_init_ops(highbank_soc_smp_init_ops)
++	soc_smp_ops(highbank_soc_smp_ops)
++};
++
+ DT_MACHINE_START(HIGHBANK, "Highbank")
++	.soc		= &highbank_soc_desc,
+ 	.map_io		= highbank_map_io,
+ 	.init_irq	= highbank_init_irq,
+ 	.timer		= &highbank_timer,
+diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
+index 977cebb..7c25d49 100644
+--- a/arch/arm/mach-highbank/hotplug.c
++++ b/arch/arm/mach-highbank/hotplug.c
+@@ -24,7 +24,7 @@
+ 
+ extern void secondary_startup(void);
+ 
+-int platform_cpu_kill(unsigned int cpu)
++int highbank_cpu_kill(unsigned int cpu)
+ {
+ 	return 1;
+ }
+@@ -33,7 +33,7 @@ int platform_cpu_kill(unsigned int cpu)
+  * platform-specific code to shutdown a CPU
+  *
   */
- struct secondary_data {
-@@ -81,15 +71,10 @@ struct secondary_data {
- extern struct secondary_data secondary_data;
+-void platform_cpu_die(unsigned int cpu)
++void highbank_cpu_die(unsigned int cpu)
+ {
+ 	flush_cache_all();
  
- extern int __cpu_disable(void);
--extern int platform_cpu_disable(unsigned int cpu);
- 
- extern void __cpu_die(unsigned int cpu);
- extern void cpu_die(void);
- 
--extern void platform_cpu_die(unsigned int cpu);
--extern int platform_cpu_kill(unsigned int cpu);
--extern void platform_cpu_enable(unsigned int cpu);
--
- extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 49a904d..5321909 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -151,25 +151,25 @@ void __init soc_smp_ops_register(struct arm_soc_smp_init_ops *smp_init_ops,
- 	}
+@@ -46,7 +46,7 @@ void platform_cpu_die(unsigned int cpu)
+ 	panic("highbank: cpu %d unexpectedly exit from shutdown\n", cpu);
  }
  
--void __attribute__((weak)) __init smp_init_cpus(void)
-+void __init smp_init_cpus(void)
+-int platform_cpu_disable(unsigned int cpu)
++int highbank_cpu_disable(unsigned int cpu)
  {
- 	if (soc_smp_init_ops && soc_smp_init_ops->smp_init_cpus)
- 		soc_smp_init_ops->smp_init_cpus();
+ 	/*
+ 	 * CPU0 should not be shut down via hotplug.  cpu_idle can WFI
+diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+index d01364c..24162a7 100644
+--- a/arch/arm/mach-highbank/platsmp.c
++++ b/arch/arm/mach-highbank/platsmp.c
+@@ -25,12 +25,12 @@
+ 
+ extern void secondary_startup(void);
+ 
+-void __cpuinit platform_secondary_init(unsigned int cpu)
++static void __cpuinit highbank_secondary_init(unsigned int cpu)
+ {
+ 	gic_secondary_init(0);
  }
  
--void __attribute__((weak)) __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit highbank_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	if (soc_smp_ops && soc_smp_init_ops->smp_prepare_cpus)
- 		soc_smp_init_ops->smp_prepare_cpus(max_cpus);
- }
- 
--void __attribute__((weak)) __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit platform_secondary_init(unsigned int cpu)
- {
- 	if (soc_smp_ops && soc_smp_ops->smp_secondary_init)
- 		soc_smp_ops->smp_secondary_init(cpu);
- }
- 
--int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	if (soc_smp_ops && soc_smp_ops->smp_boot_secondary)
- 		return soc_smp_ops->smp_boot_secondary(cpu, idle);
-@@ -179,20 +179,20 @@ int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task
- #ifdef CONFIG_HOTPLUG_CPU
- static void percpu_timer_stop(void);
- 
--int __attribute__((weak)) __cpuinit platform_cpu_kill(unsigned int cpu)
-+static int __cpuinit platform_cpu_kill(unsigned int cpu)
- {
- 	if (soc_smp_ops && soc_smp_ops->cpu_kill)
- 		return soc_smp_ops->cpu_kill(cpu);
+ 	gic_raise_softirq(cpumask_of(cpu), 0);
  	return 0;
+@@ -40,7 +40,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
+  */
+-void __init smp_init_cpus(void)
++static void __init highbank_smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores;
+ 
+@@ -61,7 +61,7 @@ void __init smp_init_cpus(void)
+ 	set_smp_cross_call(gic_raise_softirq);
  }
  
--void __attribute__((weak)) __cpuinit platform_cpu_die(unsigned int cpu)
-+static void __cpuinit platform_cpu_die(unsigned int cpu)
+-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
  {
- 	if (soc_smp_ops && soc_smp_ops->cpu_die)
- 		soc_smp_ops->cpu_die(cpu);
- }
+ 	int i;
  
--int __attribute__((weak)) __cpuinit platform_cpu_disable(unsigned int cpu)
-+static int __cpuinit platform_cpu_disable(unsigned int cpu)
- {
- 	if (soc_smp_ops && soc_smp_ops->cpu_disable)
- 		return soc_smp_ops->cpu_disable(cpu);
-@@ -202,7 +202,7 @@ int __attribute__((weak)) __cpuinit platform_cpu_disable(unsigned int cpu)
- /*
-  * __cpu_disable runs on the processor to be shutdown.
-  */
--int __cpu_disable(void)
-+int __cpuinit __cpu_disable(void)
- {
- 	unsigned int cpu = smp_processor_id();
- 	struct task_struct *p;
-@@ -251,7 +251,7 @@ static DECLARE_COMPLETION(cpu_died);
-  * called on the thread which is asking for a CPU to be shutdown -
-  * waits until shutdown has completed, or it is timed out.
-  */
--void __cpu_die(unsigned int cpu)
-+void __cpuinit __cpu_die(unsigned int cpu)
- {
- 	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
- 		pr_err("CPU%u: cpu didn't die\n", cpu);
+@@ -76,3 +76,18 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	for (i = 1; i < max_cpus; i++)
+ 		highbank_set_cpu_jump(i, secondary_startup);
+ }
++
++struct arm_soc_smp_init_ops highbank_soc_smp_init_ops __initdata = {
++	.smp_init_cpus		= highbank_smp_init_cpus,
++	.smp_prepare_cpus	= highbank_smp_prepare_cpus,
++};
++
++struct arm_soc_smp_ops highbank_soc_smp_ops __initdata = {
++	.smp_secondary_init	= highbank_secondary_init,
++	.smp_boot_secondary	= highbank_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_kill		= highbank_cpu_kill,
++	.cpu_die		= highbank_cpu_die,
++	.cpu_disable		= highbank_cpu_disable,
++#endif
++};
 -- 
 1.7.3.4
