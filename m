@@ -1,40 +1,66 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed,  8 Feb 2012 18:43:47 +0100
-Subject: [PATCH 02/14] ARM: OMAP3+: SmartReflex: fix err interrupt disable
- sequence
+Date: Wed,  8 Feb 2012 18:43:49 +0100
+Subject: [PATCH 04/14] ARM: OMAP3+: SmartReflex: Add a shutdown hook
 In-Reply-To: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
 References: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1328723039-15952-3-git-send-email-j-pihet@ti.com>
+Message-ID: <1328723039-15952-5-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-sr_modify_mask takes mask, value as parameters, the usage
-currently is value, mask which is wrong, as a result
-vpboundint_st which was supposed to have been disabled,
-does not get disabled.
+SmartReflex fix for erratum ID i724.
+
+Since OMAP's VP and PRM modules do not get reset by warm reset,
+we should ensure that proper shutdown procedure is followed prior
+to allowing the kernel to reboot back up.
+
+Without this patch, Smartreflex module might be left active or
+system might be caught in an indeterminate sequence when reboot
+is triggered, leaving the next reboot behavior to be unpredictable.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 7e755bb..ee224df 100644
+index ec2b0e7..9c39484 100644
 --- a/arch/arm/mach-omap2/smartreflex.c
 +++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -447,8 +447,8 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
- 		sr_errconfig);
- 
- 	/* Enabling the interrupts if the ERROR module is used */
--	sr_modify_reg(sr, errconfig_offs,
--		vpboundint_en, (vpboundint_en | vpboundint_st));
-+	sr_modify_reg(sr, errconfig_offs, (vpboundint_en | vpboundint_st),
-+		      vpboundint_en);
- 
+@@ -1055,8 +1055,32 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
  	return 0;
  }
+ 
++static void __devexit omap_sr_shutdown(struct platform_device *pdev)
++{
++	struct omap_sr_data *pdata = pdev->dev.platform_data;
++	struct omap_sr *sr_info;
++
++	if (!pdata) {
++		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
++		return;
++	}
++
++	sr_info = _sr_lookup(pdata->voltdm);
++	if (IS_ERR(sr_info)) {
++		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
++			__func__);
++		return;
++	}
++
++	if (sr_info->autocomp_active)
++		sr_stop_vddautocomp(sr_info);
++
++	return;
++}
++
+ static struct platform_driver smartreflex_driver = {
+ 	.remove         = omap_sr_remove,
++	.shutdown	= __devexit_p(omap_sr_shutdown),
+ 	.driver		= {
+ 		.name	= "smartreflex",
+ 	},
 -- 
 1.7.5.4
