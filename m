@@ -1,62 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Feb 2012 20:30:05 +0000
-Subject: [PATCH 2/3] ARM: make disable_fiq macro optional
-In-Reply-To: <4F32D3ED.2020500@gmail.com>
-References: <1328562200-8810-1-git-send-email-robherring2@gmail.com>
- <1328562200-8810-3-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1202061424130.1656@xanadu.home> <4F30B225.60605@gmail.com>
- <alpine.LFD.2.02.1202062116210.1656@xanadu.home> <4F31AB1E.4010800@gmail.com>
- <20120208083842.GE889@n2100.arm.linux.org.uk> <4F32D3ED.2020500@gmail.com>
-Message-ID: <20120208203005.GB15849@n2100.arm.linux.org.uk>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Wed, 08 Feb 2012 20:31:49 +0000
+Subject: [PATCH 00/16] rmk's patch series for fixing OMAP
+In-Reply-To: <20120208163546.GA15849@n2100.arm.linux.org.uk>
+References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
+Message-ID: <4F32DBB5.4010004@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 01:58:37PM -0600, Rob Herring wrote:
-> On 02/08/2012 02:38 AM, Russell King - ARM Linux wrote:
-> > On Tue, Feb 07, 2012 at 04:52:14PM -0600, Rob Herring wrote:
-> >> Wouldn't the fiq be masked then? rpc_init_irq masks out the interrupts
-> >> in the same register as disable_fiq macro:
-> >>
-> >> iomd_writeb(0, IOMD_FIQMASK);
-> > 
-> > The point of the stuff in disable_fiq is to catch cases where the FIQMASK
-> > register hasn't been disabled, and we receive a spurious FIQ.  What happens
-> > in that case (without code in disable_fiq) is that we will endlessly spin
-> > entering and re-entering the FIQ code.
-> > 
-> > No normal interrupts will be received, and no non-FIQ handler instructions
-> > will ever be executed.
-> > 
-> > Without this, we're 100% reliant on the FIQMASK register being correctly
-> > set.
-> > 
-> > I would suggest that other platforms which _can_ receive FIQs should
-> > implement the disable_fiq macro for safety against these kinds of silent
-> > lockups.  It shouldn't be needed in the same way that printascii()
-> > shouldn't be needed.
+Hi Russell,
+
+On 02/08/2012 04:35 PM, Russell King - ARM Linux wrote:
+> commit c49d005b6cc8491fad5b24f82805be2d6bcbd3dd
+> Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Date:   Tue Jan 17 11:09:57 2012 +0200
 > 
-> Couldn't this be fixed generically by masking FIQ in the SPSR rather
-> than the source?
+>     OMAPDSS: HDMI: PHY burnout fix
+>     
+>     A hardware bug in the OMAP4 HDMI PHY causes physical damage to the board
+>     if the HDMI PHY is kept powered on when the cable is not connected.
 
-Yes, but that then makes it a lot harder to actually enable FIQs when
-you want them re-enabled (eg, because you want FIQs to work.)
+I agree this is a serious issue.
 
-The problem is, the FIQ state will be cached in any local_irq_save()
-call, and restored on any local_irq_restore() call.  That's rather a big
-problem if your FIQ is being used as a software-driven DMA.
+> which now has me wondering if, by trying to boot v3.3-rc2 on this board
+> during the past week, I have a destroyed HDMI interface on it.
 
-What we _could_ do is make the non-CONFIG_FIQ handler disable the FIQ
-state - basically, if CONFIG_FIQ is off, we assume that no one will
-_ever_ make use of FIQ.
+I am not sure as I don't keep track of all OMAP changes, but you make it sound
+like a regression, is there any difference to 3.2 behavior?
 
-Otherwise, if FIQ is enabled, then we require the platform to provide
-a disable_fiq macro.
+> So, a big thanks for sitting on that fix and exposing peoples hardware
+> to damage, that shows real professionalism.
 
-> Nico suggested adding a default handler with set_fiq_handler which would
-> do this same write to IOMD_FIQMASK. Or I can leave the ifdef for RPC
-> around disable_fiq. Guidance with what you would like to see here would
-> be helpful.
+Well, I am no professional to begin with, at least in the sense of getting paid
+for it. That said I'm quite happy if I manage to find a few hours every weekend
+to do the work. Given that the final thing should be tested in -next before I
+ask Linus to pull, it is completely usual (and even quite fast) if things take
+8-13 days on my end. If this isn't fast enough for Tomi, he'd better ask Linus
+to pull directly for such issues.
+This one was also somewhat special as I had to learn how to deal with PGP and
+signed tags to make Linus happy.
 
-I don't think so - you either end up leaving a window where we disable
-FIQs in the CPSR (which could get propagated to other threads) or you
-leave a window where an errant FIQ could lock the system.
+
+Best regards,
+
+Florian Tobias Schandinat
