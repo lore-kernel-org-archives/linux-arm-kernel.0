@@ -1,73 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 08 Feb 2012 16:36:08 +0000
-Subject: [PATCH 01/16] ARM: omap: fix oops in arch/arm/mach-omap2/vp.c when
- pmic is not found
+Date: Wed, 08 Feb 2012 16:37:08 +0000
+Subject: [PATCH 04/16] ARM: omap: fix prm44xx.c OMAP44XX_IRQ_PRCM build error
 In-Reply-To: <20120208163546.GA15849@n2100.arm.linux.org.uk>
 References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
-Message-ID: <E1RvAV6-0006Gj-Di@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1RvAW4-0006Gy-S6@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the PMIC is not found, voltdm->pmic will be NULL.  vp.c's
-initialization function tries to dereferences this, which causes an
-oops:
-
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = c0004000
-[00000000] *pgd=00000000
-Internal error: Oops: 5 [#1] PREEMPT
-Modules linked in:
-CPU: 0    Not tainted  (3.3.0-rc2+ #204)
-PC is at omap_vp_init+0x5c/0x15c
-LR is at omap_vp_init+0x58/0x15c
-pc : [<c03db880>]    lr : [<c03db87c>]    psr: 60000013
-sp : c181ff30  ip : c181ff68  fp : c181ff64
-r10: c0407808  r9 : c040786c  r8 : c0407814
-r7 : c0026868  r6 : c00264fc  r5 : c040ad6c  r4 : 00000000
-r3 : 00000040  r2 : 000032c8  r1 : 0000fa00  r0 : 000032c8
-Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c5387d  Table: 80004019  DAC: 00000015
-Process swapper (pid: 1, stack limit = 0xc181e2e8)
-Stack: (0xc181ff30 to 0xc1820000)
-ff20:                                     c0381d00 c02e9c6d c0383582 c040786c
-ff40: c040ad6c c00264fc c0026868 c0407814 00000000 c03d9de4 c181ff8c c181ff68
-ff60: c03db448 c03db830 c02e982c c03fdfb8 c03fe004 c0039988 00000013 00000000
-ff80: c181ff9c c181ff90 c03d9df8 c03db390 c181ffdc c181ffa0 c0008798 c03d9df0
-ffa0: c181ffc4 c181ffb0 c0055a44 c0187050 c0039988 c03fdfb8 c03fe004 c0039988
-ffc0: 00000013 00000000 00000000 00000000 c181fff4 c181ffe0 c03d1284 c0008708
-ffe0: 00000000 c03d1208 00000000 c181fff8 c0039988 c03d1214 1077ce40 01f7ee08
-Backtrace:
-[<c03db824>] (omap_vp_init+0x0/0x15c) from [<c03db448>] (omap_voltage_late_init+0xc4/0xfc)
-[<c03db384>] (omap_voltage_late_init+0x0/0xfc) from [<c03d9df8>] (omap2_common_pm_late_init+0x14/0x54)
- r8:00000000 r7:00000013 r6:c0039988 r5:c03fe004 r4:c03fdfb8
-[<c03d9de4>] (omap2_common_pm_late_init+0x0/0x54) from [<c0008798>] (do_one_initcall+0x9c/0x164)
-[<c00086fc>] (do_one_initcall+0x0/0x164) from [<c03d1284>] (kernel_init+0x7c/0x120)
-[<c03d1208>] (kernel_init+0x0/0x120) from [<c0039988>] (do_exit+0x0/0x2cc)
- r5:c03d1208 r4:00000000
-Code: e5ca300b e5900034 ebf69027 e5994024 (e5941000)
----[ end trace aed617dddaf32c3d ]---
-Kernel panic - not syncing: Attempted to kill init!
+arch/arm/mach-omap2/prm44xx.c:41: error: 'OMAP44XX_IRQ_PRCM' undeclared here (not in a function)
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap2/vp.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/prm44xx.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index 807391d..f16f6a5 100644
---- a/arch/arm/mach-omap2/vp.c
-+++ b/arch/arm/mach-omap2/vp.c
-@@ -41,6 +41,11 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
- 	u32 val, sys_clk_rate, timeout, waittime;
- 	u32 vddmin, vddmax, vstepmin, vstepmax;
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index 33dd655..a1d6154 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -19,6 +19,7 @@
  
-+	if (!voltdm->pmic) {
-+		pr_err("%s: No PMIC info for vdd_%s\n", __func__, voltdm->name);
-+		return;
-+	}
-+
- 	if (!voltdm->read || !voltdm->write) {
- 		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
- 			__func__, voltdm->name);
+ #include "common.h"
+ #include <plat/cpu.h>
++#include <plat/irqs.h>
+ #include <plat/prcm.h>
+ 
+ #include "vp.h"
 -- 
 1.7.4.4
