@@ -1,26 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Feb 2012 10:48:16 -0800
-Subject: [PATCH 09/16] ARM: omap: preemptively fix section mismatch in
- omap4_sdp4430_wifi_mux_init()
-In-Reply-To: <E1RvAXi-0006HN-9X@rmk-PC.arm.linux.org.uk>
+Date: Wed, 8 Feb 2012 10:48:32 -0800
+Subject: [PATCH 10/16] ARM: omap: fix section mismatch warning for
+ omap_secondary_startup()
+In-Reply-To: <E1RvAY2-0006HR-Dh@rmk-PC.arm.linux.org.uk>
 References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
- <E1RvAXi-0006HN-9X@rmk-PC.arm.linux.org.uk>
-Message-ID: <20120208184816.GI29796@atomide.com>
+ <E1RvAY2-0006HR-Dh@rmk-PC.arm.linux.org.uk>
+Message-ID: <20120208184832.GJ29796@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120208 08:07]:
-> Found by review.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120208 08:08]:
+> WARNING: vmlinux.o(.text+0x1c664): Section mismatch in reference from the function omap_secondary_startup() to the function .cpuinit.text:secondary_startup()
+> The function omap_secondary_startup() references
+> the function __cpuinit secondary_startup().
+> This is often because omap_secondary_startup lacks a __cpuinit
+> annotation or the annotation of secondary_startup is wrong.
 > 
-> omap4_sdp4430_wifi_mux_init() is called by an __init marked function,
-> and only calls omap_mux_init_gpio() and omap_mux_init_signal() which
-> are both also an __init marked functions.
+> Unfortunately, fixing this causes a new warning which is harder to
+> solve:
 > 
-> The only reason this doesn't issue a warning is because the compiler
-> inlines omap4_sdp4430_wifi_mux_init() into omap4_sdp4430_wifi_init().
+> WARNING: arch/arm/mach-omap2/built-in.o(.text+0x5328): Section mismatch in reference from the function omap4_hotplug_cpu() to the function .cpuinit.text:omap_secondary_startup()
+> The function omap4_hotplug_cpu() references
+> the function __cpuinit omap_secondary_startup().
+> This is often because omap4_hotplug_cpu lacks a __cpuinit
+> annotation or the annotation of omap_secondary_startup is wrong.
 > 
-> So, lets add the __init annotation to ensure this remains safe should
-> the compiler choose not to inline.
+> because omap4_hotplug_cpu() is used by power management code as well,
+> which may not end up using omap_secondary_startup().
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
