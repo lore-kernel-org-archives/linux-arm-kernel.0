@@ -1,32 +1,27 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed,  8 Feb 2012 21:54:34 +0100
-Subject: [PATCH v4 0/7] ARM: Fixes to make LPC32xx compile and boot again
-Message-ID: <1328734474-18126-1-git-send-email-stigge@antcom.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 8 Feb 2012 23:01:19 +0200
+Subject: [PATCH 1/2] remoteproc: bail out if firmware has different
+ endianess
+In-Reply-To: <20120131200945.GD22611@ponder.secretlab.ca>
+References: <1328028762-28352-1-git-send-email-ohad@wizery.com>
+ <20120131200945.GD22611@ponder.secretlab.ca>
+Message-ID: <CAK=WgbaHE4poc7jxhqc9EEYtbpRqDoC87jMGpS6=OJNZJfe9Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the bundle of basic patches to make LPC32xx compile and boot again,
-fixing several basic issues. Tested by Wolfram Sang and Acked by Kevin Wells of
-NXP, the original author and maintainer of LPC32xx.
+On Tue, Jan 31, 2012 at 10:09 PM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Tue, Jan 31, 2012 at 06:52:41PM +0200, Ohad Ben-Cohen wrote:
+>> At this point we don't support remote processors that have
+>> a different endianess than the host.
+>>
+>> Look out for these unsupported scenarios, and bail out if
+>> encountered.
+>>
+>> Reported-by: Grant Likely <grant.likely@secretlab.ca>
+>> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+>> Cc: Mark Grosen <mgrosen@ti.com>
+>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Arnd and Olof, please tell if there is still something missing.
-
-Thanks in advance,
-
-Roland
-
-
-Roland Stigge (7):
-  ARM: LPC32xx: Added lpc32xx_defconfig
-  ARM: LPC32XX: Remove broken non-static declaration
-  ARM: LPC32xx: clock.c: Missing header file
-  ARM: LPC32xx: clock.c: jiffies wrapping
-  ARM: LPC32xx: clock.c: Clock registration fixes
-  ARM: LPC32xx: clock.c: warning fix
-  ARM: LPC32xx: clock.c: Fix mutex lock issues
-
- arch/arm/mach-lpc32xx/clock.c        |   61 ++++----------
- arch/arm/configs/lpc32xx_defconfig   |  145 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/clock.c        |    1 
- arch/arm/mach-lpc32xx/common.h       |    1 
- 4 files changed, 166 insertions(+), 42 deletions(-)
+Thanks, applied both patches to remoteproc's for-next.
