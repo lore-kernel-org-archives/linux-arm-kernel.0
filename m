@@ -1,30 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Feb 2012 09:17:20 +0000
-Subject: [PATCH v2 02/10] pwm: Allow chips to support multiple PWMs.
-In-Reply-To: <20120208081508.GA6673@avionic-0098.mockup.avionic-design.de>
-References: <1328541585-24642-1-git-send-email-thierry.reding@avionic-design.de>
- <1328541585-24642-3-git-send-email-thierry.reding@avionic-design.de>
- <4F31AB63.3020301@gmail.com>
- <20120208081508.GA6673@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120208091720.GI889@n2100.arm.linux.org.uk>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Wed, 08 Feb 2012 10:21:18 +0100
+Subject: [Linaro-mm-sig] [PATCH 11/15] mm: trigger page reclaim in
+ alloc_contig_range() to stabilize watermarks
+In-Reply-To: <CA+K6fF49BQiNer=7Di+gCU_EX4E41q-teXJJUBjEd2xc12-j4w@mail.gmail.com>
+References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
+ <1328271538-14502-12-git-send-email-m.szyprowski@samsung.com>
+ <20120203140428.GG5796@csn.ul.ie>
+ <CA+K6fF49BQiNer=7Di+gCU_EX4E41q-teXJJUBjEd2xc12-j4w@mail.gmail.com>
+Message-ID: <op.v9cr9sqm3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 09:15:08AM +0100, Thierry Reding wrote:
-> * Ryan Mallon wrote:
-> > On 07/02/12 02:19, Thierry Reding wrote:
-> > > The total maximum number of PWM devices is currently fixed to 64, but
-> > > can easily be made configurable via Kconfig.
-> > 
-> > It would be better to make the code handle arbitrary numbers of PWMs. A
-> > Kconfig knob becomes annoying when you have more than one platform
-> > configured into the kernel.
-> 
-> AFAICT handling an arbitrary number of PWMs will only be possible once we get
-> rid of the global namespace and therefore should be postponed for later. I
-> may be wrong, though, so if anybody can point me in the right direction I'm
-> perfectly happy to change that in this series.
+On Wed, 08 Feb 2012 03:04:18 +0100, sandeep patil <psandeep.s@gmail.com> wrote:
+> There's another problem I am facing with zone watermarks and CMA.
+>
+> Test details:
+> Memory  : 480 MB of total memory, 128 MB CMA region
+> Test case : around 600 MB of file transfer over USB RNDIS onto target
+> System Load : ftpd with console running on target.
+> No one is doing CMA allocations except for the DMA allocations done by the
+> drivers.
+>
+> Result : After about 300MB transfer, I start getting GFP_ATOMIC
+> allocation failures.  This only happens if CMA region is reserved.
 
-One solution would be to look at how genirq handles this.  Eg, it uses a
-radix tree to store the irqdescs rather than an array, and a bitmap
-showing which global numbers are allocated.
+[...]
+
+> Total memory available is way above the zone watermarks. So, we ended
+> up starving
+> UNMOVABLE/RECLAIMABLE atomic allocations that cannot fallback on CMA region.
+
+This looks like something Mel warned me about.  I don't really have a good
+solution for that yet. ;/
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
