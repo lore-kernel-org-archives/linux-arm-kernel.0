@@ -1,27 +1,29 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed,  8 Feb 2012 21:41:01 +0100
-Subject: [PATCH v4 3/7] ARM: LPC32xx: clock.c: Missing header file
+Date: Wed,  8 Feb 2012 21:41:00 +0100
+Subject: [PATCH v4 2/7] ARM: LPC32XX: Remove broken non-static declaration
 In-Reply-To: <1328733665-17836-1-git-send-email-stigge@antcom.de>
 References: <1328733665-17836-1-git-send-email-stigge@antcom.de>
-Message-ID: <1328733665-17836-4-git-send-email-stigge@antcom.de>
+Message-ID: <1328733665-17836-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the compiler warnings regarding the EXPORT_SYMBOL usage
+This patch fixes a GCC compile error ("static declaration follows non-static
+declaration") for LPC32XX's watchdog, removing the extern declaration since
+it's not called externally.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 Acked-by: Kevin Wells <kevin.wells@nxp.com>
 
-diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-index 1e02751..8e79313 100644
---- a/arch/arm/mach-lpc32xx/clock.c
-+++ b/arch/arm/mach-lpc32xx/clock.c
-@@ -82,6 +82,7 @@
-  *   will also impact the individual peripheral rates.
+diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+index 4b4e700..75640bfb 100644
+--- a/arch/arm/mach-lpc32xx/common.h
++++ b/arch/arm/mach-lpc32xx/common.h
+@@ -65,7 +65,6 @@ extern u32 clk_get_pclk_div(void);
   */
+ extern void lpc32xx_get_uid(u32 devid[4]);
  
-+#include <linux/export.h>
- #include <linux/kernel.h>
- #include <linux/list.h>
- #include <linux/errno.h>
+-extern void lpc32xx_watchdog_reset(void);
+ extern u32 lpc32xx_return_iram_size(void);
+ 
+ /*
