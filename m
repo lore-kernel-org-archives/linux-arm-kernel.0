@@ -1,413 +1,309 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  8 Feb 2012 00:30:47 +0000
-Subject: [PATCH v6 03/15] ARM: SoC: convert VExpress/RealView to SoC descriptor
+Date: Wed,  8 Feb 2012 00:30:49 +0000
+Subject: [PATCH v6 05/15] ARM: SoC: convert Tegra to SoC descriptor
 In-Reply-To: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
 References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1328661059-24584-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1328661059-24584-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert both Realview and VExpress to use the SoC descriptor to
-provide their SMP and CPU hotplug operation.
+Convert Tegra to use the SoC descriptor to provide its SMP
+and CPU hotplug operations.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Nicolas Pitre <nico@fluxnic.net>
+Tested on Harmony.
+
+Cc: Colin Cross <ccross@android.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Olof Johansson <olof@lixom.net>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-realview/core.c                  |    7 ++++++
- arch/arm/mach-realview/core.h                  |    9 ++++++++
- arch/arm/mach-realview/hotplug.c               |    6 ++--
- arch/arm/mach-realview/platsmp.c               |   24 +++++++++++++++++++---
- arch/arm/mach-realview/realview_eb.c           |    1 +
- arch/arm/mach-realview/realview_pb1176.c       |    1 +
- arch/arm/mach-realview/realview_pb11mp.c       |    1 +
- arch/arm/mach-realview/realview_pba8.c         |    1 +
- arch/arm/mach-realview/realview_pbx.c          |    1 +
- arch/arm/mach-vexpress/core.h                  |   10 +++++++++
- arch/arm/mach-vexpress/hotplug.c               |    6 ++--
- arch/arm/mach-vexpress/platsmp.c               |   25 ++++++++++++++++++++---
- arch/arm/mach-vexpress/v2m.c                   |    9 ++++++++
- arch/arm/plat-versatile/include/plat/platsmp.h |   14 +++++++++++++
- arch/arm/plat-versatile/platsmp.c              |    4 +-
- 15 files changed, 103 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
+ arch/arm/mach-tegra/board-dt-tegra20.c |    2 ++
+ arch/arm/mach-tegra/board-dt-tegra30.c |    1 +
+ arch/arm/mach-tegra/board-harmony.c    |    2 ++
+ arch/arm/mach-tegra/board-paz00.c      |    2 ++
+ arch/arm/mach-tegra/board-seaboard.c   |    4 ++++
+ arch/arm/mach-tegra/board-trimslice.c  |    2 ++
+ arch/arm/mach-tegra/common.c           |    8 ++++++++
+ arch/arm/mach-tegra/common.h           |   11 +++++++++++
+ arch/arm/mach-tegra/hotplug.c          |    6 +++---
+ arch/arm/mach-tegra/platsmp.c          |   26 ++++++++++++++++++++++----
+ 10 files changed, 57 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/common.h
 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index acd329a..0d4b633 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -33,6 +33,7 @@
- #include <linux/clkdev.h>
- #include <linux/mtd/physmap.h>
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index 7a95e0b..759d340 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -46,6 +46,7 @@
+ #include "board-harmony.h"
+ #include "clock.h"
+ #include "devices.h"
++#include "common.h"
+ 
+ void harmony_pinmux_init(void);
+ void paz00_pinmux_init(void);
+@@ -141,6 +142,7 @@ static const char *tegra20_dt_board_compat[] = {
+ 
+ DT_MACHINE_START(TEGRA_DT, "nVidia Tegra20 (Flattened Device Tree)")
+ 	.map_io		= tegra_map_common_io,
++	.soc		= &tegra_soc_desc,
+ 	.init_early	= tegra20_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+ 	.handle_irq	= gic_handle_irq,
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index 3c197e2..8f058ab 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -52,6 +52,7 @@ static const char *tegra30_dt_board_compat[] = {
+ };
+ 
+ DT_MACHINE_START(TEGRA30_DT, "NVIDIA Tegra30 (Flattened Device Tree)")
++	.soc		= &tegra_soc_desc,
+ 	.map_io		= tegra_map_common_io,
+ 	.init_early	= tegra30_init_early,
+ 	.init_irq	= tegra_dt_init_irq,
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index 789bdc9..382161b 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -44,6 +44,7 @@
+ #include "clock.h"
+ #include "devices.h"
+ #include "gpio-names.h"
++#include "common.h"
+ 
+ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 	{
+@@ -184,6 +185,7 @@ static void __init tegra_harmony_init(void)
+ 
+ MACHINE_START(HARMONY, "harmony")
+ 	.atag_offset	= 0x100,
++	.soc		= &tegra_soc_desc,
+ 	.fixup		= tegra_harmony_fixup,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early	= tegra20_init_early,
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index fcf4f37..05bbc13 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -46,6 +46,7 @@
+ #include "clock.h"
+ #include "devices.h"
+ #include "gpio-names.h"
++#include "common.h"
+ 
+ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 	{
+@@ -214,6 +215,7 @@ static void __init tegra_paz00_init(void)
+ 
+ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
+ 	.atag_offset	= 0x100,
++	.soc		= &tegra_soc_desc,
+ 	.fixup		= tegra_paz00_fixup,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early	= tegra20_init_early,
+diff --git a/arch/arm/mach-tegra/board-seaboard.c b/arch/arm/mach-tegra/board-seaboard.c
+index ebac65f..36797bd 100644
+--- a/arch/arm/mach-tegra/board-seaboard.c
++++ b/arch/arm/mach-tegra/board-seaboard.c
+@@ -41,6 +41,7 @@
+ #include "clock.h"
+ #include "devices.h"
+ #include "gpio-names.h"
++#include "common.h"
+ 
+ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 	{
+@@ -282,6 +283,7 @@ static void __init tegra_wario_init(void)
+ 
+ MACHINE_START(SEABOARD, "seaboard")
+ 	.atag_offset    = 0x100,
++	.soc		= &tegra_soc_desc,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+@@ -293,6 +295,7 @@ MACHINE_END
+ 
+ MACHINE_START(KAEN, "kaen")
+ 	.atag_offset    = 0x100,
++	.soc		= &tegra_soc_desc,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+@@ -304,6 +307,7 @@ MACHINE_END
+ 
+ MACHINE_START(WARIO, "wario")
+ 	.atag_offset    = 0x100,
++	.soc		= &tegra_soc_desc,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early     = tegra20_init_early,
+ 	.init_irq       = tegra_init_irq,
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index cd52820..4391981 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -38,6 +38,7 @@
+ #include "clock.h"
+ #include "devices.h"
+ #include "gpio-names.h"
++#include "common.h"
+ 
+ #include "board-trimslice.h"
+ 
+@@ -173,6 +174,7 @@ static void __init tegra_trimslice_init(void)
+ 
+ MACHINE_START(TRIMSLICE, "trimslice")
+ 	.atag_offset	= 0x100,
++	.soc		= &tegra_soc_desc,
+ 	.fixup		= tegra_trimslice_fixup,
+ 	.map_io         = tegra_map_common_io,
+ 	.init_early	= tegra20_init_early,
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index a2eb901..bfc1e35 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -23,6 +23,7 @@
+ #include <linux/delay.h>
+ #include <linux/of_irq.h>
  
 +#include <asm/soc.h>
- #include <asm/system.h>
- #include <mach/hardware.h>
- #include <asm/irq.h>
-@@ -533,3 +534,9 @@ void realview_fixup(struct tag *tags, char **from, struct meminfo *meminfo)
- 	meminfo->nr_banks = 1;
- #endif
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
+ 
+@@ -32,6 +33,7 @@
+ #include "board.h"
+ #include "clock.h"
+ #include "fuse.h"
++#include "common.h"
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id tegra_dt_irq_match[] __initconst = {
+@@ -108,3 +110,9 @@ void __init tegra30_init_early(void)
+ 	tegra_init_cache(0x441, 0x551);
  }
-+
-+struct arm_soc_desc realview_soc_desc __initdata = {
-+	.name		= "ARM RealView Platform",
-+	soc_smp_init_ops(realview_soc_smp_init_ops)
-+	soc_smp_ops(realview_soc_smp_ops)
-+};
-diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
-index 735b57a..a23caa3 100644
---- a/arch/arm/mach-realview/core.h
-+++ b/arch/arm/mach-realview/core.h
-@@ -27,6 +27,7 @@
- 
- #include <asm/setup.h>
- #include <asm/leds.h>
-+#include <asm/soc.h>
- 
- #define AMBA_DEVICE(name,busid,base,plat)			\
- static struct amba_device name##_device = {			\
-@@ -66,4 +67,12 @@ extern void realview_init_early(void);
- extern void realview_fixup(struct tag *tags, char **from,
- 			   struct meminfo *meminfo);
- 
-+extern struct arm_soc_desc		realview_soc_desc;
-+extern struct arm_soc_smp_init_ops	realview_soc_smp_init_ops;
-+extern struct arm_soc_smp_ops		realview_soc_smp_ops;
-+
-+extern int  realview_cpu_kill(unsigned int cpu);
-+extern void realview_cpu_die(unsigned int cpu);
-+extern int  realview_cpu_disable(unsigned int cpu);
-+
  #endif
-diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-index eb55f05..ba4e2a86 100644
---- a/arch/arm/mach-realview/hotplug.c
-+++ b/arch/arm/mach-realview/hotplug.c
-@@ -88,7 +88,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
++
++struct arm_soc_desc tegra_soc_desc __initdata = {
++	.name		= "NVIDIA Tegra",
++	soc_smp_init_ops(tegra_soc_smp_init_ops)
++	soc_smp_ops(tegra_soc_smp_ops)
++};
+diff --git a/arch/arm/mach-tegra/common.h b/arch/arm/mach-tegra/common.h
+new file mode 100644
+index 0000000..e4c214d
+--- /dev/null
++++ b/arch/arm/mach-tegra/common.h
+@@ -0,0 +1,11 @@
++struct arm_soc_desc;
++extern struct arm_soc_desc tegra_soc_desc;
++
++struct arm_soc_smp_init_ops;
++struct arm_soc_smp_ops;
++extern struct arm_soc_smp_init_ops	tegra_soc_smp_init_ops;
++extern struct arm_soc_smp_ops		tegra_soc_smp_ops;
++
++extern int  tegra_cpu_kill(unsigned int cpu);
++extern void tegra_cpu_die(unsigned int cpu);
++extern int  tegra_cpu_disable(unsigned int cpu);
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index f329404..7319f5f 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -86,7 +86,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
  	}
  }
  
 -int platform_cpu_kill(unsigned int cpu)
-+int realview_cpu_kill(unsigned int cpu)
++int tegra_cpu_kill(unsigned int cpu)
  {
  	return 1;
  }
-@@ -98,7 +98,7 @@ int platform_cpu_kill(unsigned int cpu)
+@@ -96,7 +96,7 @@ int platform_cpu_kill(unsigned int cpu)
   *
   * Called with IRQs disabled
   */
 -void platform_cpu_die(unsigned int cpu)
-+void realview_cpu_die(unsigned int cpu)
++void tegra_cpu_die(unsigned int cpu)
  {
  	int spurious = 0;
  
-@@ -118,7 +118,7 @@ void platform_cpu_die(unsigned int cpu)
+@@ -116,7 +116,7 @@ void platform_cpu_die(unsigned int cpu)
  		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
  }
  
 -int platform_cpu_disable(unsigned int cpu)
-+int realview_cpu_disable(unsigned int cpu)
++int tegra_cpu_disable(unsigned int cpu)
  {
  	/*
  	 * we don't allow CPU 0 to be shutdown (it is still too special
-diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index 17c878d..8e4a865 100644
---- a/arch/arm/mach-realview/platsmp.c
-+++ b/arch/arm/mach-realview/platsmp.c
-@@ -17,14 +17,15 @@
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 7d2b5d0..519b110 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -23,9 +23,12 @@
  #include <asm/hardware/gic.h>
  #include <asm/mach-types.h>
  #include <asm/smp_scu.h>
 +#include <asm/soc.h>
  
- #include <mach/board-eb.h>
- #include <mach/board-pb11mp.h>
- #include <mach/board-pbx.h>
+ #include <mach/iomap.h>
  
--#include "core.h"
-+#include <plat/platsmp.h>
- 
--extern void versatile_secondary_startup(void);
-+#include "core.h"
- 
- static void __iomem *scu_base_addr(void)
- {
-@@ -43,7 +44,7 @@ static void __iomem *scu_base_addr(void)
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
-  */
--void __init smp_init_cpus(void)
-+static void __init realview_smp_init_cpus(void)
- {
- 	void __iomem *scu_base = scu_base_addr();
- 	unsigned int i, ncores;
-@@ -63,7 +64,7 @@ void __init smp_init_cpus(void)
- 	set_smp_cross_call(gic_raise_softirq);
- }
- 
--void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init realview_smp_prepare_cpus(unsigned int max_cpus)
- {
- 
- 	scu_enable(scu_base_addr());
-@@ -77,3 +78,18 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	__raw_writel(virt_to_phys(versatile_secondary_startup),
- 		     __io_address(REALVIEW_SYS_FLAGSSET));
- }
++#include "common.h"
 +
-+struct arm_soc_smp_init_ops realview_soc_smp_init_ops __initdata = {
-+	.smp_init_cpus		= realview_smp_init_cpus,
-+	.smp_prepare_cpus	= realview_smp_prepare_cpus,
-+};
-+
-+struct arm_soc_smp_ops realview_soc_smp_ops __initdata = {
-+	.smp_secondary_init	= versatile_secondary_init,
-+	.smp_boot_secondary	= versatile_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_kill		= realview_cpu_kill,
-+	.cpu_die		= realview_cpu_die,
-+	.cpu_disable		= realview_cpu_disable,
-+#endif
-+};
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index 9578145..9218cae 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -456,6 +456,7 @@ static void __init realview_eb_init(void)
- MACHINE_START(REALVIEW_EB, "ARM-RealView EB")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.atag_offset	= 0x100,
-+	.soc		= &realview_soc_desc,
- 	.fixup		= realview_fixup,
- 	.map_io		= realview_eb_map_io,
- 	.init_early	= realview_init_early,
-diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
-index e4abe94..710230f 100644
---- a/arch/arm/mach-realview/realview_pb1176.c
-+++ b/arch/arm/mach-realview/realview_pb1176.c
-@@ -384,6 +384,7 @@ static void __init realview_pb1176_init(void)
- MACHINE_START(REALVIEW_PB1176, "ARM-RealView PB1176")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.atag_offset	= 0x100,
-+	.soc		= &realview_soc_desc,
- 	.fixup		= realview_pb1176_fixup,
- 	.map_io		= realview_pb1176_map_io,
- 	.init_early	= realview_init_early,
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index 2147335..fc9e278 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -353,6 +353,7 @@ static void __init realview_pb11mp_init(void)
- MACHINE_START(REALVIEW_PB11MP, "ARM-RealView PB11MPCore")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.atag_offset	= 0x100,
-+	.soc		= &realview_soc_desc,
- 	.fixup		= realview_fixup,
- 	.map_io		= realview_pb11mp_map_io,
- 	.init_early	= realview_init_early,
-diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
-index 25b2e59..8c6f8ca 100644
---- a/arch/arm/mach-realview/realview_pba8.c
-+++ b/arch/arm/mach-realview/realview_pba8.c
-@@ -308,6 +308,7 @@ static void __init realview_pba8_init(void)
- MACHINE_START(REALVIEW_PBA8, "ARM-RealView PB-A8")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.atag_offset	= 0x100,
-+	.soc		= &realview_soc_desc,
- 	.fixup		= realview_fixup,
- 	.map_io		= realview_pba8_map_io,
- 	.init_early	= realview_init_early,
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index ac71564..61369b0 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -391,6 +391,7 @@ static void __init realview_pbx_init(void)
- MACHINE_START(REALVIEW_PBX, "ARM-RealView PBX")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.atag_offset	= 0x100,
-+	.soc		= &realview_soc_desc,
- 	.fixup		= realview_pbx_fixup,
- 	.map_io		= realview_pbx_map_io,
- 	.init_early	= realview_init_early,
-diff --git a/arch/arm/mach-vexpress/core.h b/arch/arm/mach-vexpress/core.h
-index f439715..bd9065a 100644
---- a/arch/arm/mach-vexpress/core.h
-+++ b/arch/arm/mach-vexpress/core.h
-@@ -17,3 +17,13 @@ struct amba_device name##_device = {		\
- 	.irq		= IRQ_##base,		\
- 	/* .dma		= DMA_##base,*/		\
- }
-+
-+struct arm_soc_smp_init_ops;
-+struct arm_soc_smp_ops;
-+
-+extern struct arm_soc_smp_init_ops	vexpress_soc_smp_init_ops;
-+extern struct arm_soc_smp_ops		vexpress_soc_smp_ops;
-+
-+extern int  vexpress_cpu_kill(unsigned int cpu);
-+extern void vexpress_cpu_die(unsigned int cpu);
-+extern int  vexpress_cpu_disable(unsigned int cpu);
-diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
-index 3034a4d..ac6d034 100644
---- a/arch/arm/mach-vexpress/hotplug.c
-+++ b/arch/arm/mach-vexpress/hotplug.c
-@@ -84,7 +84,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 	}
- }
- 
--int platform_cpu_kill(unsigned int cpu)
-+int vexpress_cpu_kill(unsigned int cpu)
- {
- 	return 1;
- }
-@@ -94,7 +94,7 @@ int platform_cpu_kill(unsigned int cpu)
-  *
-  * Called with IRQs disabled
-  */
--void platform_cpu_die(unsigned int cpu)
-+void vexpress_cpu_die(unsigned int cpu)
- {
- 	int spurious = 0;
- 
-@@ -114,7 +114,7 @@ void platform_cpu_die(unsigned int cpu)
- 		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
- }
- 
--int platform_cpu_disable(unsigned int cpu)
-+int vexpress_cpu_disable(unsigned int cpu)
- {
- 	/*
- 	 * we don't allow CPU 0 to be shutdown (it is still too special
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 124ffb1..aba765b 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -13,23 +13,25 @@
- #include <linux/smp.h>
- #include <linux/io.h>
- 
-+#include <asm/soc.h>
-+
- #include <mach/motherboard.h>
- #define V2M_PA_CS7 0x10000000
- 
--#include "core.h"
-+#include <plat/platsmp.h>
- 
--extern void versatile_secondary_startup(void);
-+#include "core.h"
- 
- /*
-  * Initialise the CPU possible map early - this describes the CPUs
-  * which may be present or become present in the system.
-  */
--void __init smp_init_cpus(void)
-+static void __init vexpress_smp_init_cpus(void)
- {
- 	ct_desc->init_cpu_map();
- }
- 
--void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init vexpress_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	/*
- 	 * Initialise the present map, which describes the set of CPUs
-@@ -47,3 +49,18 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- 	writel(virt_to_phys(versatile_secondary_startup),
- 		MMIO_P2V(V2M_SYS_FLAGSSET));
- }
-+
-+struct arm_soc_smp_init_ops vexpress_soc_smp_init_ops __initdata = {
-+	.smp_init_cpus		= vexpress_smp_init_cpus,
-+	.smp_prepare_cpus	= vexpress_smp_prepare_cpus,
-+};
-+
-+struct arm_soc_smp_ops vexpress_soc_smp_ops __initdata = {
-+	.smp_secondary_init	= versatile_secondary_init,
-+	.smp_boot_secondary	= versatile_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_kill		= vexpress_cpu_kill,
-+	.cpu_die		= vexpress_cpu_die,
-+	.cpu_disable		= vexpress_cpu_disable,
-+#endif
-+};
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index b4a28ca..ffeac90 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -16,6 +16,7 @@
- #include <linux/mtd/physmap.h>
- 
- #include <asm/mach-types.h>
-+#include <asm/soc.h>
- #include <asm/sizes.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -29,6 +30,7 @@
- #include <mach/motherboard.h>
- 
- #include <plat/sched_clock.h>
-+#include <plat/platsmp.h>
- 
- #include "core.h"
- 
-@@ -442,8 +444,15 @@ static void __init v2m_init(void)
- 	ct_desc->init_tile();
- }
- 
-+static struct arm_soc_desc vexpress_soc_desc __initdata = {
-+	.name		= "ARM VE Platform",
-+	soc_smp_init_ops(vexpress_soc_smp_init_ops)
-+	soc_smp_ops(vexpress_soc_smp_ops)
-+};
-+
- MACHINE_START(VEXPRESS, "ARM-Versatile Express")
- 	.atag_offset	= 0x100,
-+	.soc		= &vexpress_soc_desc,
- 	.map_io		= v2m_map_io,
- 	.init_early	= v2m_init_early,
- 	.init_irq	= v2m_init_irq,
-diff --git a/arch/arm/plat-versatile/include/plat/platsmp.h b/arch/arm/plat-versatile/include/plat/platsmp.h
-new file mode 100644
-index 0000000..50fb830
---- /dev/null
-+++ b/arch/arm/plat-versatile/include/plat/platsmp.h
-@@ -0,0 +1,14 @@
-+/*
-+ *  linux/arch/arm/plat-versatile/include/plat/platsmp.h
-+ *
-+ *  Copyright (C) 2011 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+extern void versatile_secondary_startup(void);
-+extern void versatile_secondary_init(unsigned int cpu);
-+extern int  versatile_boot_secondary(unsigned int cpu, struct task_struct *idle);
-diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
-index 49c7db4..41b4706 100644
---- a/arch/arm/plat-versatile/platsmp.c
-+++ b/arch/arm/plat-versatile/platsmp.c
-@@ -40,7 +40,7 @@ static void __cpuinit write_pen_release(int val)
+ extern void tegra_secondary_startup(void);
  
  static DEFINE_SPINLOCK(boot_lock);
+@@ -38,7 +41,7 @@ static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
+ #define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
+ 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
  
 -void __cpuinit platform_secondary_init(unsigned int cpu)
-+void __cpuinit versatile_secondary_init(unsigned int cpu)
++static void __cpuinit tegra_secondary_init(unsigned int cpu)
  {
  	/*
  	 * if any interrupts are already enabled for the primary
-@@ -62,7 +62,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+@@ -54,7 +57,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
  	spin_unlock(&boot_lock);
  }
  
 -int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+int __cpuinit versatile_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit tegra_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	unsigned long timeout;
+ 	unsigned long old_boot_vector;
+ 	unsigned long boot_vector;
+@@ -110,7 +113,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
+  */
+-void __init smp_init_cpus(void)
++static void __init tegra_smp_init_cpus(void)
+ {
+ 	unsigned int i, ncores = scu_get_core_count(scu_base);
  
+@@ -126,8 +129,23 @@ void __init smp_init_cpus(void)
+ 	set_smp_cross_call(gic_raise_softirq);
+ }
+ 
+-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++static void __init tegra_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 
+ 	scu_enable(scu_base);
+ }
++
++struct arm_soc_smp_init_ops tegra_soc_smp_init_ops __initdata = {
++	.smp_init_cpus		= tegra_smp_init_cpus,
++	.smp_prepare_cpus	= tegra_smp_prepare_cpus,
++};
++
++struct arm_soc_smp_ops tegra_soc_smp_ops __initdata = {
++	.smp_secondary_init	= tegra_secondary_init,
++	.smp_boot_secondary	= tegra_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_kill		= tegra_cpu_kill,
++	.cpu_die		= tegra_cpu_die,
++	.cpu_disable		= tegra_cpu_disable,
++#endif
++};
 -- 
 1.7.3.4
