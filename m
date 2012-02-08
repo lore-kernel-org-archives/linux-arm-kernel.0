@@ -1,56 +1,29 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 8 Feb 2012 09:53:44 -0700
-Subject: [PATCH] ep93xx: fix build of vision_ep93xx.c
-Message-ID: <201202080953.44853.hartleys@visionengravers.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 8 Feb 2012 10:40:47 -0700 (MST)
+Subject: [PATCH 14/16] ARM: omap: fix wrapped error messages in
+ omap_hwmod.c
+In-Reply-To: <E1RvAZK-0006Hi-Vm@rmk-PC.arm.linux.org.uk>
+References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
+ <E1RvAZK-0006Hi-Vm@rmk-PC.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1202081039590.26892@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix build breakage due to the following commits:
+On Wed, 8 Feb 2012, Russell King - ARM Linux wrote:
 
-Commit bd5f12a24766c1f299def0a78b008d4746f528f2
-? ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics
+> While trying to debug my OMAP platforms, they emitted this message:
+> 
+> omap_hwmod: %s: enabled state can only be entered from initialized, idle, or disabled state
+> 
+> The following backtrace said it was from a function called '_enable',
+> which didn't provide much clue.  Grepping didn't find it either.
+> 
+> The message is wrapped, so unwrap the message so grep can find it.  Do
+> the same for three other messages in this file.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Commit 257af9f9725aa8a863b306659208a031135d59e7
-? ARM: 7041/1: gpio-ep93xx: hookup the to_irq callback in the driver
+Thanks, I'll queue this for 3.4.
 
-The vision_ep9307 machine uses the ep93xx build-in gpios and needs to
-include <mach/gpio-ep93xx.h> to pickup the defines.
 
-The gpio_to_irq() call is now a callback to the gpio-ep93xx.c driver
-and cannot be used as a constant initializer for the .irq member of
-struct i2c_board_info.
-
-Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-Acked-by: Ryan Mallon <rmallon@gmail.com>
-
----
-
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index 03dd401..d5fb44f 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -32,6 +32,7 @@
-?#include <mach/hardware.h>
-?#include <mach/fb.h>
-?#include <mach/ep93xx_spi.h>
-+#include <mach/gpio-ep93xx.h>
-?
-?#include <asm/mach-types.h>
-?#include <asm/mach/map.h>
-@@ -153,7 +154,6 @@ static struct i2c_board_info vision_i2c_info[] __initdata = {
-????????}, {
-????????????????I2C_BOARD_INFO("pca9539", 0x74),
-????????????????.platform_data??= &pca953x_74_gpio_data,
--???????????????.irq????????????= gpio_to_irq(EP93XX_GPIO_LINE_F(7)),
-????????}, {
-????????????????I2C_BOARD_INFO("pca9539", 0x75),
-????????????????.platform_data??= &pca953x_75_gpio_data,
-@@ -348,6 +348,8 @@ static void __init vision_init_machine(void)
-????????????????????????????????"pca9539:74"))
-????????????????pr_warn("cannot request interrupt gpio for pca9539:74\n");
-?
-+???????vision_i2c_info[1].irq = gpio_to_irq(EP93XX_GPIO_LINE_F(7));
-+
-????????ep93xx_register_i2c(&vision_i2c_gpio_data, vision_i2c_info,
-????????????????????????????????ARRAY_SIZE(vision_i2c_info));
-????????ep93xx_register_spi(&vision_spi_master, vision_spi_board_info,
+- Paul
