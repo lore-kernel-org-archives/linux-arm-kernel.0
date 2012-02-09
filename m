@@ -1,39 +1,35 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 9 Feb 2012 15:17:03 +0100
-Subject: [PATCH 1/2] i.MX DMA: Add support for 2D transfers.
-In-Reply-To: <1328285474-26365-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1328285474-26365-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120209141703.GB3852@pengutronix.de>
+From: aneesh@ti.com (Aneesh V)
+Date: Thu, 09 Feb 2012 19:50:30 +0530
+Subject: [RFC PATCH 3/8] misc: emif: add register definitions for EMIF
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433179B3F3@DBDE01.ent.ti.com>
+References: <331ABD5ECB02734CA317220B2BBEABC1317897B8@DBDE01.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433179B3F3@DBDE01.ent.ti.com>
+Message-ID: <4F33D62E.8070403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 05:11:13PM +0100, Javier Martin wrote:
-> DMAC present in i.MX2 and i.MX1 chips have two
-> 2D configuration slots that any DMA channel can
-> use to make 2D DMA transfers.
-> 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+On Thursday 09 February 2012 04:55 PM, Bedia, Vaibhav wrote:
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of V, Aneesh
+>> Sent: Saturday, February 04, 2012 5:46 PM
+>> To: linux-omap at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org; akpm at linux-foundation.org; V, Aneesh
+>> Subject: [RFC PATCH 3/8] misc: emif: add register definitions for EMIF
+>>
+>
+> Sorry for the delayed response. Can these register definitions be put in a place
+> where the code from the arch/arm/mach-omap2/* can also access it?
 
-My problem with this patch is that it adds new code to
-arch/arm/mach-imx/dma-v1.c.
-The original intention of having a legacy driver in arch/arm/mach-imx/dma-v1.c
-and a dmaengine driver in drivers/dma was that we move remove the
-arch/arm parts to drivers/dma once all users have switched to the new
-API.  I fixed the sound drivers and the mxcmmc driver already.  We
-currently have the imxmmc driver and the i.MX1/2 camera drivers left
-in the tree.  The imxmmc driver is broken for ages and I think we can
-remove it when nobody takes care of putting it back to work. You seem to
-work on the i.MX2 camera driver and thus you should be able to fix it
-(do you use DMA here or the EMMA engine?). This leaves the i.MX1 driver
-and I have no possibility to fix it. I once pinged Paulius about this
-issue but appearently nothing has happened.
-I think we should start cleaning this up even if we risk breaking
-something. Otherwise we are stuck with the legacy driver forever.
+I don't have any issues with it as long as everybody is in agreement.
 
-Sascha
+>
+> Devices like AM335x and TI814x will need to reconfigure the EMIF when coming out
+> of low power states and putting these register definitions in a common place
+> will help us avoid some code duplication.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Can you elaborate on that. Does EMIF lose its settings in low-power
+mode? If so, are you going to do the re-initialization from internal
+RAM or something? For us EMIF doesn't lose its state in low power modes.
+
+br,
+Aneesh
