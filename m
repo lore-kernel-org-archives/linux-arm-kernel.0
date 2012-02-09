@@ -1,23 +1,49 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 9 Feb 2012 17:04:34 -0600
-Subject: [PATCH v2 3/4] ARM: make entry-macro.S depend on
- !MULTI_IRQ_HANDLER
-In-Reply-To: <1328751219-2552-4-git-send-email-robherring2@gmail.com>
-References: <1328751219-2552-1-git-send-email-robherring2@gmail.com>
- <1328751219-2552-4-git-send-email-robherring2@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41F9DF640@AUSP01VMBX24.collaborationhost.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 9 Feb 2012 15:36:04 -0800
+Subject: [PATCH v6] irq: add irq_domain support to generic-chip
+In-Reply-To: <4F344928.1060804@gmail.com>
+References: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
+ <1328741722-1254-1-git-send-email-robherring2@gmail.com>
+ <20120209194806.GA2493@r65073-Latitude-D630>
+ <4F344928.1060804@gmail.com>
+Message-ID: <20120209233602.GA3135@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 08, 2012 6:34 PM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> With the removal of disable_fiq on rpc and addition MULTI_IRQ_HANDLER,
-> entry-macro.S is no longer needed for platforms that select
-> MULTI_IRQ_HANDLER and the include of it can be conditional.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+On Thu, Feb 09, 2012 at 04:31:04PM -0600, Rob Herring wrote:
+> On 02/09/2012 01:48 PM, Shawn Guo wrote:
+> > On Wed, Feb 08, 2012 at 04:55:22PM -0600, Rob Herring wrote:
+...
+> >> +	if (node)
+> >> +		d = irq_domain_add_linear(node, hwirq_cnt,
+> >> +					  &irq_gc_irq_domain_ops, gc);
+> >> +	else
+> >> +		d = irq_domain_add_legacy(node, hwirq_cnt, irq_base, 0,
+> >> +					  &irq_gc_irq_domain_ops, gc);
+> >> +
+> > I do not think it's good to make this decision based on whether it's
+> > dt or non-dt case.  That said, it's fairly valid and actually
+> > encouraged that non-dt users use linear domain too, and also the
+> > irqdomain core has no limit on dt users to use legacy domain.  Instead,
+> > it's much more reasonable to make this decision based on if irq_base,
+> > something like you did in your v3 patch.
+> > 
+> >  
+> > -       if (node)
+> > +       if ((int) irq_base < 0)
+> > 
+> 
+> Really, we want to discourage/limit the use of legacy domains.
 
-For ep93xx:
+That's exactly the point I want to make.  Your current code forces
+non-dt users to use legacy domain, since they always get 'node' as
+NULL.  We should check irq_base, so that non-dt users can chose to
+use linear domain by passing irq_base as something like -1.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Regards,
+Shawn
+
+> This is
+> only used for ISA irqs on powerpc. Unfortunately, there's not really a
+> way to use linear domains for non-DT ATM. But maybe we can fix that.
+> 
