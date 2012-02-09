@@ -1,49 +1,114 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 09 Feb 2012 16:03:10 -0600
-Subject: [PATCH v4 4/4] gpio: pl061: enable interrupts with DT style
- binding
-In-Reply-To: <20120209200435.GB2493@r65073-Latitude-D630>
+Date: Thu, 09 Feb 2012 16:31:04 -0600
+Subject: [PATCH v6] irq: add irq_domain support to generic-chip
+In-Reply-To: <20120209194806.GA2493@r65073-Latitude-D630>
 References: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
- <1328308512-22594-5-git-send-email-robherring2@gmail.com>
- <20120209200435.GB2493@r65073-Latitude-D630>
-Message-ID: <4F34429E.8070605@gmail.com>
+ <1328741722-1254-1-git-send-email-robherring2@gmail.com>
+ <20120209194806.GA2493@r65073-Latitude-D630>
+Message-ID: <4F344928.1060804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/09/2012 02:04 PM, Shawn Guo wrote:
-> On Fri, Feb 03, 2012 at 04:35:12PM -0600, Rob Herring wrote:
+On 02/09/2012 01:48 PM, Shawn Guo wrote:
+> On Wed, Feb 08, 2012 at 04:55:22PM -0600, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Add irq domain support to irq generic-chip. This enables users of
+>> generic-chip to support dynamic irq assignment needed for DT interrupt
+>> binding.
+>>
+>> Thanks to Shawn Guo for fixes and testing.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> ---
+>> Here's the latest version. This has fixes from Shawn Guo, so should be
+>> working. This version is also available here:
+>>
+> Rob, yes it's working.  But I think it should be working in a better
+> way after I play it a little bit more.  See comment below.
 > ...
->> @@ -126,18 +127,16 @@ static void pl061_set_value(struct gpio_chip *gc, unsigned offset, int value)
->>  static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
->>  {
->>  	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
->> -
->> -	if (chip->irq_base <= 0)
->> -		return -EINVAL;
->> -
->> -	return chip->irq_base + offset;
->> +	if (!chip->irq_gc)
->> +		return -ENXIO;
->> +	return irq_find_mapping(chip->irq_gc->domain, offset);
+>> +int irq_setup_generic_chip_domain(const char *name, struct device_node *node,
+>> +				int num_ct, unsigned int irq_base,
+>> +				void __iomem *reg_base,
+>> +				irq_flow_handler_t handler, u32 hwirq_cnt,
+>> +				enum irq_gc_flags flags, unsigned int clr,
+>> +				unsigned int set,
+>> +				void (*gc_init_cb)(struct irq_chip_generic *),
+>> +				void *private)
+>> +{
+>> +	int ret, i;
+>> +	struct irq_chip_generic **gc;
+>> +	struct irq_domain *d;
+>> +	int num_gc = ALIGN(hwirq_cnt, 32) / 32;
+>> +
+>> +	gc = kzalloc(num_gc * sizeof(struct irq_chip_generic *), GFP_KERNEL);
+>> +	if (!gc)
+>> +		return -ENOMEM;
+>> +
+>> +	for (i = 0; i < num_gc; i++) {
+>> +		gc[i] = irq_alloc_generic_chip(name, num_ct, irq_base,
+>> +			       reg_base, handler);
+>> +		if (!gc[i]) {
+>> +			ret = -ENOMEM;
+>> +			goto err;
+>> +		}
+>> +		gc[i]->hwirq_base = i * 32;
+>> +		gc[i]->private = private;
+>> +
+>> +		gc_init_cb(gc[i]);
+>> +
+>> +		irq_setup_generic_chip(gc[i], 0, flags, clr, set);
+>> +	}
+>> +
+>> +	if (node)
+>> +		d = irq_domain_add_linear(node, hwirq_cnt,
+>> +					  &irq_gc_irq_domain_ops, gc);
+>> +	else
+>> +		d = irq_domain_add_legacy(node, hwirq_cnt, irq_base, 0,
+>> +					  &irq_gc_irq_domain_ops, gc);
+>> +
+> I do not think it's good to make this decision based on whether it's
+> dt or non-dt case.  That said, it's fairly valid and actually
+> encouraged that non-dt users use linear domain too, and also the
+> irqdomain core has no limit on dt users to use legacy domain.  Instead,
+> it's much more reasonable to make this decision based on if irq_base,
+> something like you did in your v3 patch.
 > 
-> If I understand the driver correctly, it will add a linear domain for
-> dt case.  Do you have code somewhere creating the mapping before this
-> irq_find_mapping gets called here?  The reason I'm asking this is I
-> have to call irq_create_mapping rather than irq_find_mapping here to
-> get imx gpio driver working with linear domain, otherwise the
-> irq_find_mapping call will fail.
+>  
+> -       if (node)
+> +       if ((int) irq_base < 0)
 > 
 
-Right, the user has to call irq_of_parse_and_map (which calls
-irq_create_mapping ultimately). Interrupts are allocated on demand. The
-dts needs to declare the gpio controller as an interrupt-controller and
-the node using the gpio line needs to set its interrupt parent and
-interrupt connection
+Really, we want to discourage/limit the use of legacy domains. This is
+only used for ISA irqs on powerpc. Unfortunately, there's not really a
+way to use linear domains for non-DT ATM. But maybe we can fix that.
+
+> Otherwise,
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Tested on imx51 with tzic and gpio interrupt controller.
+
+Thanks!
 
 Rob
-
+> 
 > Regards,
 > Shawn
 > 
->>  }
+>> +	for (i = 0; i < num_gc; i++)
+>> +		gc[i]->domain = d;
+>> +
+>> +	return 0;
+>> +
+>> + err:
+>> +	for ( ; i >= 0; i--)
+>> +		kfree(gc[i]);
+>> +	kfree(gc);
+>> +	return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(irq_setup_generic_chip_domain);
+>> +#endif
+>> +
