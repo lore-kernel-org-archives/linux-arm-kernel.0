@@ -1,82 +1,50 @@
-From: yong.zhang0@gmail.com (Yong Zhang)
-Date: Thu, 9 Feb 2012 10:51:03 +0800
-Subject: [PATCH] sched: generalize CONFIG_IRQ_TIME_ACCOUNTING for X86 and
- ARM
-In-Reply-To: <20120208131833.GK889@n2100.arm.linux.org.uk>
-References: <1328705314-20978-1-git-send-email-dmitry.antipov@linaro.org>
- <20120208131833.GK889@n2100.arm.linux.org.uk>
-Message-ID: <20120209025103.GC26152@zhy>
+From: Barry.Song@csr.com (Barry Song)
+Date: Thu, 9 Feb 2012 03:38:15 +0000
+Subject: [PATCH v3] SPI: add CSR SiRFprimaII SPI controller driver
+In-Reply-To: <20120208162639.GJ15647@game.jcrosoft.org>
+References: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
+ <20120208162639.GJ15647@game.jcrosoft.org>
+Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E99CB90C53@SHAASIEXM01.ASIA.ROOT.PRI>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 01:18:33PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 08, 2012 at 04:48:34AM -0800, Dmitry Antipov wrote:
-> > Generalize CONFIG_IRQ_TIME_ACCOUNTING  between X86 and
-> > ARM, move "noirqtime=" option to common debugging code.
-> > For a bit of backward compatibility, "tsc=noirqtime"
-> > is preserved, but issues a warning.
-> > 
-> > Suggested-by: Venki Pallipadi <venki@google.com>
-> > Signed-off-by: Dmitry Antipov <dmitry.antipov@linaro.org>
-> > ---
-> >  arch/arm/kernel/sched_clock.c |    3 +++
-> >  arch/x86/Kconfig              |   11 -----------
-> >  arch/x86/kernel/tsc.c         |    7 ++++---
-> >  include/linux/sched.h         |    2 ++
-> >  lib/Kconfig.debug             |   12 ++++++++++++
-> >  lib/Makefile                  |    2 ++
-> >  lib/irqtime.c                 |   12 ++++++++++++
-> >  7 files changed, 35 insertions(+), 14 deletions(-)
-> >  create mode 100644 lib/irqtime.c
-> > 
-> > diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-> > index 5416c7c..56d2a9d 100644
-> > --- a/arch/arm/kernel/sched_clock.c
-> > +++ b/arch/arm/kernel/sched_clock.c
-> > @@ -162,5 +162,8 @@ void __init sched_clock_postinit(void)
-> >  	if (read_sched_clock == jiffy_sched_clock_read)
-> >  		setup_sched_clock(jiffy_sched_clock_read, 32, HZ);
-> >  
-> > +	if (!no_sched_irq_time)
-> > +		enable_sched_clock_irqtime();
+> -----Original Message-----
+> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
+> Sent: Thursday, February 09, 2012 12:27 AM
+> To: Barry Song
+> Cc: grant.likely at secretlab.ca; spi-devel-general at lists.sourceforge.net; Barry
+> Song; linux-arm-kernel at lists.infradead.org; DL-SHA-WorkGroupLinux; Zhiwu
+> Song
+> Subject: Re: [PATCH v3] SPI: add CSR SiRFprimaII SPI controller driver
 > 
-> Why are you placing this here?  sched_clock is available from the point
-> that it's registered, which should be before the first sched_clock()
-> call.
-> 
-> > +config IRQ_TIME_ACCOUNTING
-> > +	bool "Fine granularity task level IRQ time accounting"
-> > +	depends on (X86 || (ARM && HAVE_SCHED_CLOCK))
-> 
-> Even though it's not bad here, please get out of the habbit of throwing
-> unnecessary parens into the mix.  It can make stuff more difficult to
-> read and therefore confirm correctness.  (I've spent many a time
-> rewriting if() statements because of paren overuse.)
-> 
-> This could have been written:
-> 
-> 	depends on X86 || (ARM && HAVE_SCHED_CLOCK)
-> 
-> However, ARM will always have HAVE_SCHED_CLOCK after the next merge window,
-> so this can become a much simpler:
-> 
-> 	depends on X86 || ARM
+>  +
+> > +static int spi_sirfsoc_setup(struct spi_device *spi)
+> > +{
+> > +	struct spi_bitbang *bitbang;
+> > +	struct sirfsoc_spi *sspi;
+> > +
+> > +	if (!spi->max_speed_hz)
+> > +		return -EINVAL;
+> > +
+> > +	sspi = spi_master_get_devdata(spi->master);
+> > +	bitbang = &sspi->bitbang;
+> why do you need this?
 
-Maybe we can hand the depend-things to every ARCH, say let ARCH provides
-HAVE_IRQ_TIME_ACCOUNTING. Thus we can make IRQ_TIME_ACCOUNTING
-denpend on HAVE_IRQ_TIME_ACCOUNTING.
+Jean, thanks! it is redundant code which misses cleanup. I'd like to wait whether Grant has more feedback and fix those together with this one.
 
-Thanks,
-Yong
-
+> > +
+> > +	if (!spi->bits_per_word)
+> > +		spi->bits_per_word = 8;
+> > +
+> > +	return spi_sirfsoc_setup_transfer(spi, NULL);
+> > +}
 > 
-> Apart from these two points, the rest of the patch looks fine to me but
-> the ultimate decision about its acceptability is up to other people.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Best Regards,
+> J.
 
--- 
-Only stand for myself
+-barry
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
