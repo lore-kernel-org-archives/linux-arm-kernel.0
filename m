@@ -1,196 +1,63 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 9 Feb 2012 12:48:27 +0530
-Subject: [PATCH v4 2/3] arm:davinci: move emif driver to drivers/mfd from
- mach-davinci folder
-In-Reply-To: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
-References: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <1328771908-32527-3-git-send-email-prakash.pm@ti.com>
+From: T.Gamez@phytec.de (Teresa Gamez)
+Date: Thu, 09 Feb 2012 09:30:20 +0100
+Subject: [PATCH 00/16] rmk's patch series for fixing OMAP
+In-Reply-To: <1328770969.1909.11.camel@deskari>
+References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
+ <4F32DBB5.4010004@gmx.de>  <20120209005334.GG25414@n2100.arm.linux.org.uk>
+ <1328770969.1909.11.camel@deskari>
+Message-ID: <1328776220.12747.5.camel@lws-gamez>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move aemif kernel module from arch/arm/mach-davinci/ to multi functional
-devices frame work. "davinci_aemif" MFD driver adds "davinci_nand" and
-"physmap-flash" slave devices.
+Am Donnerstag, den 09.02.2012, 09:02 +0200 schrieb Tomi Valkeinen:
+> On Thu, 2012-02-09 at 00:53 +0000, Russell King - ARM Linux wrote:
+> 
+> > Moreover, only last Monday did I enable the OMAP2 DSS subsystem on the
+> > 4430 SDP platform, _including_ the HDMI code, and looking at the commit
+> > it could be one of those platforms which is affected.
+> > 
+> > As I don't have a HDMI cable connected to the system, and I ran that
+> > kernel overnight, and I tried opening each /dev/fb* device, what I'm now
+> > wondering is: have I destroyed the HDMI PHY on my 4430SDP?
+> 
+> Probably not. I don't know the exact details of the HW bug (I wrote the
+> patch as it took too long for the person responsible for it to come up
+> with a decent patch), but my understanding is that the cable needs to be
+> plugged in at some point, and then removed.
+> 
+> Thinking about this now, I guess I should've sent queries to get a
+> proper description of the situation where the bug happens.
+> 
+> > However, you raise another point, a much more serious one at that.  Is
+> > this problem also present in 3.2?  The patch seems to apply almost cleanly
+> > to that kernel version, so I guess it is.  It fails to apply to v3.1
+> > because of missing files, so I guess 3.1 is unaffected.
+> > 
+> > So, why isn't this patch copied to the stable people?
+> 
+> Good point, I'll take it to the stable people.
+> 
+> The problem is present in all kernels where we have the HDMI driver, so
+> 2.6.39+.
 
-Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
----
-Since v3:
-No change. Resending as 3/3 in patch changed.
-Since v2:
-Modified emif MFD driver to load multiple instance of NAND/NOR devices.
-Since v1:
-Patch generated using -M option.
+Are there already backported patches out there for 3.0/3.1?
+We are quite interested in this.
 
- arch/arm/Kconfig                                   |    1 +
- arch/arm/mach-davinci/Makefile                     |    2 +-
- drivers/mfd/Makefile                               |    1 +
- .../aemif.c => drivers/mfd/davinci_aemif.c         |   75 +++++++++++++++++++-
- include/linux/mfd/davinci_aemif.h                  |   14 ++++
- 5 files changed, 91 insertions(+), 2 deletions(-)
- rename arch/arm/mach-davinci/aemif.c => drivers/mfd/davinci_aemif.c (66%)
+Regards,
+Teresa
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a48aecc..09dcb94 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -934,6 +934,7 @@ config ARCH_DAVINCI
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_IRQ_CHIP
- 	select ARCH_HAS_HOLES_MEMORYMODEL
-+	select MFD_CORE
- 	help
- 	  Support for TI's DaVinci platform.
- 
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 2db78bd..8bab47c 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -5,7 +5,7 @@
- 
- # Common objects
- obj-y 			:= time.o clock.o serial.o psc.o \
--			   dma.o usb.o common.o sram.o aemif.o
-+			   dma.o usb.o common.o sram.o
- 
- obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
- 
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index b953bab..54fc267 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_HTC_EGPIO)		+= htc-egpio.o
- obj-$(CONFIG_HTC_PASIC3)	+= htc-pasic3.o
- obj-$(CONFIG_HTC_I2CPLD)	+= htc-i2cpld.o
- 
-+obj-${CONFIG_ARCH_DAVINCI}	+= davinci_aemif.o
- obj-$(CONFIG_MFD_DAVINCI_VOICECODEC)	+= davinci_voicecodec.o
- obj-$(CONFIG_MFD_DM355EVM_MSP)	+= dm355evm_msp.o
- obj-$(CONFIG_MFD_TI_SSP)	+= ti-ssp.o
-diff --git a/arch/arm/mach-davinci/aemif.c b/drivers/mfd/davinci_aemif.c
-similarity index 66%
-rename from arch/arm/mach-davinci/aemif.c
-rename to drivers/mfd/davinci_aemif.c
-index b67c115..5fb490d 100644
---- a/arch/arm/mach-davinci/aemif.c
-+++ b/drivers/mfd/davinci_aemif.c
-@@ -14,8 +14,13 @@
- #include <linux/clk.h>
- #include <linux/module.h>
- #include <linux/time.h>
--
- #include <linux/mfd/davinci_aemif.h>
-+#include <linux/mtd/physmap.h>
-+#include <linux/slab.h>
-+#include <mach/nand.h>
-+
-+static char *name[] = {"davinci_nand", "physmap-flash",};
-+#define MAX ARRAY_SIZE(name)
- 
- /* Timing value configuration */
- 
-@@ -131,3 +136,71 @@ int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
- 	return 0;
- }
- EXPORT_SYMBOL(davinci_aemif_setup_timing);
-+
-+static int __init davinci_aemif_probe(struct platform_device *pdev)
-+{
-+	struct davinci_aemif_devices *davinci_aemif_devices =
-+		pdev->dev.platform_data;
-+	struct platform_device *devices;
-+	struct mfd_cell *cells;
-+	int ret, i, j, count;
-+
-+	devices = davinci_aemif_devices->devices;
-+
-+	cells = kzalloc(sizeof(struct mfd_cell) *
-+			davinci_aemif_devices->num_devices, GFP_KERNEL);
-+
-+	for (j = 0, count = 0; j < MAX; j++) {
-+		for (i = 0; i < davinci_aemif_devices->num_devices; i++) {
-+			if (strcmp(devices[i].name, name[j]))
-+				continue;
-+			cells[count].name = name[j];
-+			cells[count].platform_data =
-+				devices[i].dev.platform_data;
-+			cells[count].pdata_size =
-+				sizeof(struct davinci_nand_pdata);
-+			cells[count].id = devices[i].id;
-+			cells[count].resources = devices[i].resource;
-+			cells[count].num_resources = devices[i].num_resources;
-+			count++;
-+		}
-+	}
-+
-+	ret = mfd_add_devices(&pdev->dev, 0, cells,
-+			      count, NULL, 0);
-+	if (ret != 0)
-+		dev_err(&pdev->dev, "fail to register client devices\n");
-+
-+	return 0;
-+}
-+
-+static int __devexit davinci_aemif_remove(struct platform_device *pdev)
-+{
-+	mfd_remove_devices(&pdev->dev);
-+	return 0;
-+}
-+
-+static struct platform_driver davinci_aemif_driver = {
-+	.driver	= {
-+		.name = "davinci_aemif",
-+		.owner = THIS_MODULE,
-+	},
-+	.remove	= __devexit_p(davinci_aemif_remove),
-+};
-+
-+static int __init davinci_aemif_init(void)
-+{
-+	return platform_driver_probe(&davinci_aemif_driver,
-+			davinci_aemif_probe);
-+}
-+module_init(davinci_aemif_init);
-+
-+static void __exit davinci_aemif_exit(void)
-+{
-+	platform_driver_unregister(&davinci_aemif_driver);
-+}
-+module_exit(davinci_aemif_exit);
-+
-+MODULE_AUTHOR("Prakash Manjunathappa");
-+MODULE_DESCRIPTION("Texas Instruments AEMIF Interface");
-+MODULE_LICENSE("GPL");
-diff --git a/include/linux/mfd/davinci_aemif.h b/include/linux/mfd/davinci_aemif.h
-index 05b2934..18650c3 100644
---- a/include/linux/mfd/davinci_aemif.h
-+++ b/include/linux/mfd/davinci_aemif.h
-@@ -10,6 +10,10 @@
- #ifndef _MACH_DAVINCI_AEMIF_H
- #define _MACH_DAVINCI_AEMIF_H
- 
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/mfd/core.h>
-+
- #define NRCSR_OFFSET		0x00
- #define AWCCR_OFFSET		0x04
- #define A1CR_OFFSET		0x10
-@@ -18,6 +22,16 @@
- #define ACR_EW_MASK		BIT(30)
- #define ACR_SS_MASK		BIT(31)
- 
-+enum davinci_emif_cells {
-+	DAVINCI_NAND_DEVICE_CELL,
-+	DAVINCI_NOR_FLASH_CELL,
-+};
-+
-+struct davinci_aemif_devices {
-+	struct platform_device *devices;
-+	unsigned int num_devices;
-+};
-+
- /* All timings in nanoseconds */
- struct davinci_aemif_timing {
- 	u8	wsetup;
--- 
-1.7.1
+> 
+> > For hardware destruction issues, once the problem has been identified, it
+> > should be shouted about very loudly to get it upstream as quickly as
+> > possible.  I'm sure Linus would've even taken it in patch form.
+> > 
+> > (You do realise that Linus does apply patches as well as pulling trees?)
+> 
+> Yes, I should've taken this directly to Linus.
+> 
+>  Tomi
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
