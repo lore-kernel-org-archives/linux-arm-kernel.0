@@ -1,97 +1,33 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Feb 2012 22:42:56 +0900
-Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add device
- tree support
-In-Reply-To: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 9 Feb 2012 19:18:16 +0530
+Subject: [PATCH RFC] OMAP: serial: Remove the hardcode
+ serial_omap_console_ports array.
+Message-ID: <1328795296-22935-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> This patchset removes all uses of 'clk_type' member from the platform data
-> of sdhci-s3c driver and adds device tree support for sdhci-s3c driver.
-> 
-> In this patchset, all uses of 'clk_type' member from the platform data are
-> removed from the sdhci-s3c driver and platform code. The clk_type is a SoC
-> specific information and not a board/machine specific information. Hence,
-> this
-> information can be more aptly represented using SoC specific driver data
-> in the
-> sdhci-s3c driver.
-> 
-> Hence all uses of 'clk_type' member in sdhci-s3c driver's platform data is
-> removed. In place of that, the sdhci host qurik
-> 'SDHCI_QUIRK_NONSTANDARD_CLOCK'
-> is used to handle controllers that do not have a standard sdclk division
-> (like those in the exynos4 SoC's).
-> 
-> This is a pre-requisite for adding device tree support for sdhci-s3c
-> driver.
-> While migrating towards device tree support, retreving 'clk_type'
-> information
-> from device tree information does not seem correct and hence it has been
-> added
-> as SoC specific driver data. All this is handled in patches 1 to 3.
-> 
-> Patch 4 to 6 add device tree support for sdhci-s3c driver. The fourth
-> patch
-> derives the maximum transfer width host capability from the max_width
-> member
-> in platform data. The fifth patch modifies the sdhci-s3c driver to
-> mainatain
-> a local copy of the platform data, which makes it easier to add device
-> tree
-> support for the driver. The last patch adds device tree based discovery
-> for
-> the sdhci-s3c driver.
-> 
-> This patchset is based on the following tree.
->   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> [for-next]
-> 
-> Thomas Abraham (6):
->   mmc: sdhci-s3c: Remove usage of clk_type member in platform data
->   arm: exynos4: use 'exynos4-sdhci' as device name for sdhci controllers
->   arm: samsung: remove all uses of clk_type member in sdhci platform data
->   mmc: sdhci-s3c: derive transfer width host capability from max_width in
-> platform data
->   mmc: sdhci-s3c: Keep a copy of platform data and use it
->   mmc: sdhci-s3c: Add device tree support
-> 
->  .../devicetree/bindings/mmc/samsung-sdhci.txt      |   70 ++++++
->  arch/arm/mach-exynos/clock.c                       |   24 +-
->  arch/arm/mach-exynos/common.c                      |    5 +
->  arch/arm/mach-exynos/mach-armlex4210.c             |    3 -
->  arch/arm/mach-exynos/mach-nuri.c                   |    3 -
->  arch/arm/mach-exynos/mach-origen.c                 |    2 -
->  arch/arm/mach-exynos/mach-smdk4x12.c               |    2 -
->  arch/arm/mach-exynos/mach-smdkv310.c               |    4 -
->  arch/arm/mach-exynos/mach-universal_c210.c         |    2 -
->  arch/arm/plat-samsung/devs.c                       |    4 -
->  arch/arm/plat-samsung/include/plat/sdhci.h         |   35 +++-
->  arch/arm/plat-samsung/platformdata.c               |    2 -
->  drivers/mmc/host/sdhci-s3c.c                       |  235
-+++++++++++++++++++-
->  13 files changed, 341 insertions(+), 50 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/samsung-
-> sdhci.txt
+Currently the array serial_omap_console_ports is hard coded to 4.
+Make it depend on the macro OMAP_MAX_HSUART_PORTS(which is 4) which
+the maximum uart count.
 
-Hi,
+Cc: Govindraj Raja <govindraj.raja@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Looks ok to me and I'd like to pick this series in samsung tree with Chris'
-ack.
-
-Chris, is it ok? If you need to merge this in your tree, please let me know.
-I will provide topic branch for it.
-
-If any problems, please let me know.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 1c24269..c570696 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1021,7 +1021,7 @@ static int serial_omap_poll_get_char(struct uart_port *port)
+ 
+ #ifdef CONFIG_SERIAL_OMAP_CONSOLE
+ 
+-static struct uart_omap_port *serial_omap_console_ports[4];
++static struct uart_omap_port *serial_omap_console_ports[OMAP_MAX_HSUART_PORTS];
+ 
+ static struct uart_driver serial_omap_reg;
+ 
+-- 
+1.7.1
