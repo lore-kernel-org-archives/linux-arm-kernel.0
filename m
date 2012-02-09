@@ -1,56 +1,116 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Feb 2012 19:50:01 +0900
-Subject: [PATCH 2/9] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
-In-Reply-To: <CAH9JG2UjbC7-qRUirj_QqR92duyh+1FXLQufL-QW-N5te66KDA@mail.gmail.com>
-References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
- <1328024354-4277-3-git-send-email-kgene.kim@samsung.com>
- <CAH9JG2UjbC7-qRUirj_QqR92duyh+1FXLQufL-QW-N5te66KDA@mail.gmail.com>
-Message-ID: <068701cce718$92abdd70$b8039850$%kim@samsung.com>
+From: rickard.andersson@stericsson.com (Rickard Andersson)
+Date: Thu, 9 Feb 2012 11:52:05 +0100
+Subject: [PATCH][V2] ux500 : decouple/recouple gic from the PRCMU
+In-Reply-To: <1328782040-7786-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1328782040-7786-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <4F33A555.9040504@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+Hi Daniel!
 
-[snip]
+Please see my embedded comments.
 
-> > +static int exynos5_clk_gate_block(struct clk *clk, int enable)
-> exynos5_clk_block_ctrl?
+Also should we not keep the functions in pm.c file? I think Linus W 
+advised us not to move stuff around at this stage.
 
-OK, looks better, will change.
+BR
+Rickard
+> This patch allows to decouple and recouple the gic from the PRCMU.
+> This is needed to put the A9 core in retention mode with the cpuidle
+> driver.
+>
+> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+> ---
+>   drivers/mfd/db8500-prcmu.c       |   29 +++++++++++++++++++++++++++++
+>   include/linux/mfd/db8500-prcmu.h |    2 ++
+>   include/linux/mfd/dbx500-prcmu.h |   16 ++++++++++++++++
+>   3 files changed, 47 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index af8e0ef..70f39a1 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -787,6 +787,35 @@ int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
+>   	return 0;
+>   }
+>
+> +#define PRCMU_A9_MASK_REQ               0x00000328
+> +#define PRCMU_A9_MASK_REQ_MASK          0x00000001
+> +#define PRCMU_GIC_DELAY                 1
+> +
+> +/* This function decouple the gic from the prcmu */
+> +void db8500_prcmu_gic_decouple(void)
+> +{
+> +	u32 val = readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
+> +
+> +	/* Set bit 0 register value to 1 */
+> +	writel((val&  ~PRCMU_A9_MASK_REQ_MASK) | PRCMU_A9_MASK_REQ_MASK,
+> +	       _PRCMU_BASE + PRCMU_A9_MASK_REQ);
+No need to AND with ~PRCMU_A9_MASK_REQ_MASK. This is enough:
 
-[snip]
+writel((val | PRCMU_A9_MASK_REQ_MASK,
+	_PRCMU_BASE + PRCMU_A9_MASK_REQ);
 
-> > +		.name		= "mfc",
-> > +		.devname	= "s3c-mfc",
-> what's this?
-
-typo :( should be s5p-mfc.
-
-[snip]
-
-> > +		.name		= "hdmi",
-> > +		.devname	= "exynos5-hdmi",
-> I think exynos4x12 has same hdmi controller. so It will be changed as
-> exynos-hdmi.
-
-OK, let me check it but I'm not sure new exynos will have same hdmi later.
-
-[snip]
-
-> > +		.name		= "fimg2d",
-> > +		.devname	= "s5p-fimg2d",
-> s5p? exynos?
-
-Hmm, let me think again.
-
-[snip]
-
-Thanks :)
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> +
+> +	/* Make sure the register is updated */
+> +	readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
+> +
+> +	/* Wait a few cycles for the gic mask completion */
+> +	udelay(PRCMU_GIC_DELAY);
+> +}
+> +
+> +/* This function recouple the gic with the prcmu */
+> +void db8500_prcmu_gic_recouple(void)
+> +{
+> +	u32 val = readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
+> +
+> +	/* Set bit 0 register value to 0 */
+> +	writel((val&  ~PRCMU_A9_MASK_REQ_MASK), _PRCMU_BASE + PRCMU_A9_MASK_REQ);
+> +}
+> +
+>   /* This function should only be called while mb0_transfer.lock is held. */
+>   static void config_wakeups(void)
+>   {
+> diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
+> index 60d27f7..4a1032c 100644
+> --- a/include/linux/mfd/db8500-prcmu.h
+> +++ b/include/linux/mfd/db8500-prcmu.h
+> @@ -536,6 +536,8 @@ int prcmu_load_a9wdog(u8 id, u32 val);
+>
+>   void db8500_prcmu_system_reset(u16 reset_code);
+>   int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
+> +void db8500_prcmu_gic_disable(void);
+> +void db8500_prcmu_gic_enable(void);
+>   void db8500_prcmu_enable_wakeups(u32 wakeups);
+>   int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state);
+>   int db8500_prcmu_request_clock(u8 clock, bool enable);
+> diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
+> index bac942f..a5fee69 100644
+> --- a/include/linux/mfd/dbx500-prcmu.h
+> +++ b/include/linux/mfd/dbx500-prcmu.h
+> @@ -237,6 +237,22 @@ static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+>   			keep_ap_pll);
+>   }
+>
+> +static inline void prcmu_gic_disable(void)
+> +{
+> +	if (machine_is_u5500())
+> +		return;
+> +	else
+> +		return db8500_prcmu_gic_disable();
+> +}
+We have change name of this function in the .c file
+> +
+> +static inline void prcmu_gic_enable(void)
+> +{
+> +	if (machine_is_u5500())
+> +		return;
+> +	else
+> +		return db8500_prcmu_gic_enable();
+> +}
+We have change name of this function in the .c file
+> +
+>   static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
+>   {
+>   	if (machine_is_u5500())
