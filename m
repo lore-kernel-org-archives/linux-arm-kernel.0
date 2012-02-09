@@ -1,38 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  9 Feb 2012 20:00:50 +0100
-Subject: [PATCH 0/3] pinctrl: move the core per-device handlers to core
-Message-ID: <1328814050-22715-1-git-send-email-linus.walleij@linaro.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 9 Feb 2012 20:01:09 +0100
+Subject: [PATCH] ARM: OMAP2+: Fix prm2xxx_3xxx.c INT_34XX_PRCM_MPU_IRQ build
+ error
+Message-ID: <4F3417F5.2090901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After discussing with some people involved with pin control, we agreed
-that it will just cause trouble to have separate handles for pin muxing
-and pin configuration in callers - they will definately want to set all
-pin aspects regarding muxing and other configuration with one single
-call.
+If CONFIG_OF is not defined, the following error will happen.
 
-These three patches take the first step in this transformation by moving
-the per-device handles over to core code, and renaming all related
-functions with the pinctrl_* prefix.
+arch/arm/mach-omap2/prm2xxx_3xxx.c:41:11: error:
+ ?INT_34XX_PRCM_MPU_IRQ? undeclared here (not in a function)
 
-Linus Walleij (3):
-  pinctrl: break out a pinctrl consumer header
-  pinctrl: move generic functions to the pinctrl_ namespace
-  pinctrl: factor pin control handles over to the core
+This is due to some hidden headers path from linux/of.h to plat/irqs.h
+already reported by Russell for prm4xxx.c.
 
- Documentation/pinctrl.txt        |  124 ++++---
- arch/arm/mach-u300/core.c        |   24 +-
- drivers/pinctrl/core.c           |  602 +++++++++++++++++++++++++++++++-
- drivers/pinctrl/core.h           |   34 ++-
- drivers/pinctrl/pinctrl-coh901.c |    6 +-
- drivers/pinctrl/pinmux.c         |  732 ++++++--------------------------------
- drivers/pinctrl/pinmux.h         |   67 ++++-
- include/linux/pinctrl/consumer.h |  118 ++++++
- include/linux/pinctrl/machine.h  |    8 +-
- include/linux/pinctrl/pinconf.h  |   39 --
- include/linux/pinctrl/pinmux.h   |   52 ---
- 11 files changed, 991 insertions(+), 815 deletions(-)
- create mode 100644 include/linux/pinctrl/consumer.h
+Add the #include <plat/irqs.h> in prm2xxx_3xxx.c to avoid depending
+of that hidden dependency that should probably not exist in theory.
 
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+---
+ arch/arm/mach-omap2/prm2xxx_3xxx.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index c1c4d86..09e2916 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -18,6 +18,7 @@
+ 
+ #include "common.h"
+ #include <plat/cpu.h>
++#include <plat/irqs.h>
+ #include <plat/prcm.h>
+ 
+ #include "vp.h"
 -- 
-1.7.7.6
+1.7.5.4
