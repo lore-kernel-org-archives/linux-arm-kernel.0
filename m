@@ -1,51 +1,87 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 09 Feb 2012 14:15:33 +0100
-Subject: [PATCH 2/2] mtd: ixp4xx: oops in ixp4xx_flash_probe
-In-Reply-To: <1328789487.22240.84.camel@sauron.fi.intel.com>
-References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
- <1328729069-21308-3-git-send-email-mkl@blackshift.org>
- <1328789487.22240.84.camel@sauron.fi.intel.com>
-Message-ID: <4F33C6F5.3090907@pengutronix.de>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Thu,  9 Feb 2012 16:33:53 +0100
+Subject: [PATCH 1/2] mmc: atmel-mci: don't use dma features when dma is
+ present but there is no chan available
+Message-ID: <7ef1b8ff1e9425fc99bd737faaa9f63aa4f4f8b4.1328801500.git.ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2012 01:11 PM, Artem Bityutskiy wrote:
-> On Wed, 2012-02-08 at 20:24 +0100, Marc Kleine-Budde wrote:
->> In commit "c797533 mtd: abstract last MTD partition parser argument" the
->> third argument of "mtd_device_parse_register()" changed from start address
->> of the MTD device to a pointer to a struct.
-> 
-> Hi, thanks for the fix. Several comments:
-> 
-> 1. I've removed the huge oops from the description - it is not very
-> helpful and not worth having.
-> 2. It is usually a good idea to CC the author of the commit causing the
-> regression.
-> 3. For regressions like this it is a good idea put the stable tree tag.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Noted.
+Some callbacks are set too early ie we can have dma capabilities but we can't
+get a dma channel. So wait to get the dma channel before setting callbacks
+and change logs consequently.
 
-> I've added
-> 
-> Cc: stable at kernel.org [3.2+]
-> 
-> (git tag --contains c797533 gives the version)
-> 
-> and pushed to the l2-mtd.git tree, thanks!
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mmc/host/atmel-mci.c |   21 ++++++++++-----------
+ 1 files changed, 10 insertions(+), 11 deletions(-)
 
-Thanks
-
-
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index a7ee502..e71a158 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -1941,12 +1941,12 @@ static bool atmci_filter(struct dma_chan *chan, void *slave)
+ 	}
+ }
+ 
+-static void atmci_configure_dma(struct atmel_mci *host)
++static bool atmci_configure_dma(struct atmel_mci *host)
+ {
+ 	struct mci_platform_data	*pdata;
+ 
+ 	if (host == NULL)
+-		return;
++		return false;
+ 
+ 	pdata = host->pdev->dev.platform_data;
+ 
+@@ -1963,12 +1963,15 @@ static void atmci_configure_dma(struct atmel_mci *host)
+ 		host->dma.chan =
+ 			dma_request_channel(mask, atmci_filter, pdata->dma_slave);
+ 	}
+-	if (!host->dma.chan)
+-		dev_notice(&host->pdev->dev, "DMA not available, using PIO\n");
+-	else
++	if (!host->dma.chan) {
++		dev_warn(&host->pdev->dev, "no DMA channel available\n");
++		return false;
++	} else {
+ 		dev_info(&host->pdev->dev,
+ 					"Using %s for DMA transfers\n",
+ 					dma_chan_name(host->dma.chan));
++		return true;
++	}
+ }
+ 
+ static inline unsigned int atmci_get_version(struct atmel_mci *host)
+@@ -2078,8 +2081,7 @@ static int __init atmci_probe(struct platform_device *pdev)
+ 
+ 	/* Get MCI capabilities and set operations according to it */
+ 	atmci_get_cap(host);
+-	if (host->caps.has_dma) {
+-		dev_info(&pdev->dev, "using DMA\n");
++	if (host->caps.has_dma && atmci_configure_dma(host)) {
+ 		host->prepare_data = &atmci_prepare_data_dma;
+ 		host->submit_data = &atmci_submit_data_dma;
+ 		host->stop_transfer = &atmci_stop_transfer_dma;
+@@ -2089,15 +2091,12 @@ static int __init atmci_probe(struct platform_device *pdev)
+ 		host->submit_data = &atmci_submit_data_pdc;
+ 		host->stop_transfer = &atmci_stop_transfer_pdc;
+ 	} else {
+-		dev_info(&pdev->dev, "no DMA, no PDC\n");
++		dev_info(&pdev->dev, "using PIO\n");
+ 		host->prepare_data = &atmci_prepare_data;
+ 		host->submit_data = &atmci_submit_data;
+ 		host->stop_transfer = &atmci_stop_transfer;
+ 	}
+ 
+-	if (host->caps.has_dma)
+-		atmci_configure_dma(host);
+-
+ 	platform_set_drvdata(pdev, host);
+ 
+ 	/* We need at least one slot to succeed */
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120209/8e17db18/attachment.sig>
+1.7.5.4
