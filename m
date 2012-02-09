@@ -1,29 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Feb 2012 23:36:00 +0000
-Subject: [PATCH 5/9] ARM: EXYNOS: add board file for SMDK5250
-In-Reply-To: <069401cce71e$56bffe80$043ffb80$%kim@samsung.com>
+Date: Thu, 9 Feb 2012 23:41:08 +0000
+Subject: [PATCH 6/9] serial: samsung: Add support for EXYNOS5250
+In-Reply-To: <CAH9JG2XE7nj1je9SYQ=zJKo0_P5Sx_ruZrDjtpnsL0Qtvzb+_Q@mail.gmail.com>
 References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
- <20120201093423.GA3002@mudshark.cambridge.arm.com>
- <069401cce71e$56bffe80$043ffb80$%kim@samsung.com>
-Message-ID: <201202092336.00524.arnd@arndb.de>
+ <1328024354-4277-7-git-send-email-kgene.kim@samsung.com>
+ <CAH9JG2XE7nj1je9SYQ=zJKo0_P5Sx_ruZrDjtpnsL0Qtvzb+_Q@mail.gmail.com>
+Message-ID: <201202092341.08981.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 February 2012, Kukjin Kim wrote:
-> Will Deacon wrote:
-> > 
-> > On Wed, Feb 01, 2012 at 08:50:23AM +0000, Olof Johansson wrote:
-> > > On Tue, Jan 31, 2012 at 8:20 PM, Kyungmin Park <kmpark@infradead.org>
-> > wrote:
-> > > > As I remember only DT based board file is acceptable for mainline?
-> > >
-> > > For a new SoC family like 5250 it would be much preferred to only add
-> > > device-tree enabled boards.
-> > 
-> As I commented, I'd like to support both dt and non-dt for EXYNOS5250 and
-> I'm saying EXYNOS5250 DT patches will be submitted next time again.
+On Wednesday 01 February 2012, Kyungmin Park wrote:
+> >
+> > diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> > index 3b07fb9..c55e5fb 100644
+> > --- a/drivers/tty/serial/samsung.c
+> > +++ b/drivers/tty/serial/samsung.c
+> > @@ -1594,7 +1594,7 @@ static struct s3c24xx_serial_drv_data
+> > s5pv210_serial_drv_data = {
+> >  #endif
+> >
+> >  #if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) || \
+> > -     defined(CONFIG_SOC_EXYNOS4412)
+> > +     defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250)
+> I think you can make it simple just use "#ifdef CONFIG_ARCH_EXYNOS "
 
-I think it would be much better to start with just the DT based platform
-for exynos5 and leave out the atag based platform.
+Or you could just remove all the #ifdef. Most drivers just register
+for all devices that they support, even if you know which one to expect.
 
 	Arnd
