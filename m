@@ -1,44 +1,39 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Thu, 9 Feb 2012 19:28:31 +0530
-Subject: [PATCH RFC] OMAP: serial: Remove the hardcode
- serial_omap_console_ports array.
-In-Reply-To: <1328795296-22935-1-git-send-email-shubhrajyoti@ti.com>
-References: <1328795296-22935-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CAAL8m4yU5KPqO11FY2Rwpuqns+EBtGuAMna0gxcYwK0QZ1fSjA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 9 Feb 2012 15:17:03 +0100
+Subject: [PATCH 1/2] i.MX DMA: Add support for 2D transfers.
+In-Reply-To: <1328285474-26365-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1328285474-26365-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120209141703.GB3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 9, 2012 at 7:18 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> Currently the array serial_omap_console_ports is hard coded to 4.
-> Make it depend on the macro OMAP_MAX_HSUART_PORTS(which is 4) which
-> the maximum uart count.
->
-> Cc: Govindraj Raja <govindraj.raja@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+On Fri, Feb 03, 2012 at 05:11:13PM +0100, Javier Martin wrote:
+> DMAC present in i.MX2 and i.MX1 chips have two
+> 2D configuration slots that any DMA channel can
+> use to make 2D DMA transfers.
+> 
+> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 
-Acked-by: Govindraj.R <govindraj.raja@ti.com>
+My problem with this patch is that it adds new code to
+arch/arm/mach-imx/dma-v1.c.
+The original intention of having a legacy driver in arch/arm/mach-imx/dma-v1.c
+and a dmaengine driver in drivers/dma was that we move remove the
+arch/arm parts to drivers/dma once all users have switched to the new
+API.  I fixed the sound drivers and the mxcmmc driver already.  We
+currently have the imxmmc driver and the i.MX1/2 camera drivers left
+in the tree.  The imxmmc driver is broken for ages and I think we can
+remove it when nobody takes care of putting it back to work. You seem to
+work on the i.MX2 camera driver and thus you should be able to fix it
+(do you use DMA here or the EMMA engine?). This leaves the i.MX1 driver
+and I have no possibility to fix it. I once pinged Paulius about this
+issue but appearently nothing has happened.
+I think we should start cleaning this up even if we risk breaking
+something. Otherwise we are stuck with the legacy driver forever.
 
-> ---
-> ?drivers/tty/serial/omap-serial.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 1c24269..c570696 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -1021,7 +1021,7 @@ static int serial_omap_poll_get_char(struct uart_port *port)
->
-> ?#ifdef CONFIG_SERIAL_OMAP_CONSOLE
->
-> -static struct uart_omap_port *serial_omap_console_ports[4];
-> +static struct uart_omap_port *serial_omap_console_ports[OMAP_MAX_HSUART_PORTS];
->
-> ?static struct uart_driver serial_omap_reg;
->
-> --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
