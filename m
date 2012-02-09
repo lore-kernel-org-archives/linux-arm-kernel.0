@@ -1,54 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 9 Feb 2012 11:40:59 +0100
-Subject: [PATCH 2/6] mfd: mc13xxx-core: ADC conv: wait_for_completion
- returns a long
-In-Reply-To: <20120131080759.GN6305@pengutronix.de>
-References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
- <1327876408-22528-3-git-send-email-marc@cpdesign.com.au>
- <20120130072453.GG6305@pengutronix.de>
- <201201310840.55707.marc@cpdesign.com.au>
- <20120131080759.GN6305@pengutronix.de>
-Message-ID: <20120209104059.GN8621@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 09 Feb 2012 19:50:01 +0900
+Subject: [PATCH 2/9] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
+In-Reply-To: <CAH9JG2UjbC7-qRUirj_QqR92duyh+1FXLQufL-QW-N5te66KDA@mail.gmail.com>
+References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+ <1328024354-4277-3-git-send-email-kgene.kim@samsung.com>
+ <CAH9JG2UjbC7-qRUirj_QqR92duyh+1FXLQufL-QW-N5te66KDA@mail.gmail.com>
+Message-ID: <068701cce718$92abdd70$b8039850$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+Kyungmin Park wrote:
+> 
+> On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-On Tue, Jan 31, 2012 at 09:07:59AM +0100, Uwe Kleine-K?nig wrote:
-> > > > -	if (!ret)
-> > > > +	if (timeout <= 0) {
-> > > > +		dev_warn(mc13xxx->dev,
-> > > > +				"timed out waiting for ADC completion\n");
-> > > > 
-> > > >  		ret = -ETIMEDOUT;
-> > > > 
-> > > > +	}
-> > > 
-> > > I think this is wrong. wait_for_completion_interruptible_timeout returns
-> > > -ERESTARTSYS if it was interrupted. That's not a timeout and
-> > > -ERESTARTSYS should be propagated then. !ret is the correct test for
-> > > timeout.
-> > 
-> > It took me a little while to get your point here, and I guess I missed that in 
-> > my original understanding of the code, (which may be more of a reflection on 
-> > me :) )
-> >  
-> > I still think the way it was before is subtle, and would prefer something more 
-> > explicit, perhaps:
-> > 
-> > if (timeout == 0)
-> > 	ret = -ETIMEDOUT;
-> > else if (timeout < 0)
-> > 	ret = timeout;
-> Yeah, that's better than the original as it propagates an eventual
-> -ERESTARTSYS from wait_for_completion_interruptible_timeout. Don't know
-> if/how the upper layer handle that though.
-Just a small note, after starring again at the original code,
--ERESTARTSYS is propagated correctly. So it's only about style.
+[snip]
 
-Best regards
-Uwe
+> > +static int exynos5_clk_gate_block(struct clk *clk, int enable)
+> exynos5_clk_block_ctrl?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+OK, looks better, will change.
+
+[snip]
+
+> > +		.name		= "mfc",
+> > +		.devname	= "s3c-mfc",
+> what's this?
+
+typo :( should be s5p-mfc.
+
+[snip]
+
+> > +		.name		= "hdmi",
+> > +		.devname	= "exynos5-hdmi",
+> I think exynos4x12 has same hdmi controller. so It will be changed as
+> exynos-hdmi.
+
+OK, let me check it but I'm not sure new exynos will have same hdmi later.
+
+[snip]
+
+> > +		.name		= "fimg2d",
+> > +		.devname	= "s5p-fimg2d",
+> s5p? exynos?
+
+Hmm, let me think again.
+
+[snip]
+
+Thanks :)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
