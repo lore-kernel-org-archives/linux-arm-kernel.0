@@ -1,114 +1,85 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 09 Feb 2012 16:31:04 -0600
-Subject: [PATCH v6] irq: add irq_domain support to generic-chip
-In-Reply-To: <20120209194806.GA2493@r65073-Latitude-D630>
-References: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
- <1328741722-1254-1-git-send-email-robherring2@gmail.com>
- <20120209194806.GA2493@r65073-Latitude-D630>
-Message-ID: <4F344928.1060804@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 9 Feb 2012 22:48:30 +0000
+Subject: [PATCH v6 13/15] ARM: hotplug: Introduce dummy_cpu_kill
+In-Reply-To: <20120209084642.GO889@n2100.arm.linux.org.uk>
+References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
+ <1328661059-24584-14-git-send-email-marc.zyngier@arm.com>
+ <alpine.LFD.2.02.1202081608100.1656@xanadu.home>
+ <20120209084642.GO889@n2100.arm.linux.org.uk>
+Message-ID: <20120209224830.GB5789@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2012 01:48 PM, Shawn Guo wrote:
-> On Wed, Feb 08, 2012 at 04:55:22PM -0600, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> Add irq domain support to irq generic-chip. This enables users of
->> generic-chip to support dynamic irq assignment needed for DT interrupt
->> binding.
->>
->> Thanks to Shawn Guo for fixes and testing.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> ---
->> Here's the latest version. This has fixes from Shawn Guo, so should be
->> working. This version is also available here:
->>
-> Rob, yes it's working.  But I think it should be working in a better
-> way after I play it a little bit more.  See comment below.
-> ...
->> +int irq_setup_generic_chip_domain(const char *name, struct device_node *node,
->> +				int num_ct, unsigned int irq_base,
->> +				void __iomem *reg_base,
->> +				irq_flow_handler_t handler, u32 hwirq_cnt,
->> +				enum irq_gc_flags flags, unsigned int clr,
->> +				unsigned int set,
->> +				void (*gc_init_cb)(struct irq_chip_generic *),
->> +				void *private)
->> +{
->> +	int ret, i;
->> +	struct irq_chip_generic **gc;
->> +	struct irq_domain *d;
->> +	int num_gc = ALIGN(hwirq_cnt, 32) / 32;
->> +
->> +	gc = kzalloc(num_gc * sizeof(struct irq_chip_generic *), GFP_KERNEL);
->> +	if (!gc)
->> +		return -ENOMEM;
->> +
->> +	for (i = 0; i < num_gc; i++) {
->> +		gc[i] = irq_alloc_generic_chip(name, num_ct, irq_base,
->> +			       reg_base, handler);
->> +		if (!gc[i]) {
->> +			ret = -ENOMEM;
->> +			goto err;
->> +		}
->> +		gc[i]->hwirq_base = i * 32;
->> +		gc[i]->private = private;
->> +
->> +		gc_init_cb(gc[i]);
->> +
->> +		irq_setup_generic_chip(gc[i], 0, flags, clr, set);
->> +	}
->> +
->> +	if (node)
->> +		d = irq_domain_add_linear(node, hwirq_cnt,
->> +					  &irq_gc_irq_domain_ops, gc);
->> +	else
->> +		d = irq_domain_add_legacy(node, hwirq_cnt, irq_base, 0,
->> +					  &irq_gc_irq_domain_ops, gc);
->> +
-> I do not think it's good to make this decision based on whether it's
-> dt or non-dt case.  That said, it's fairly valid and actually
-> encouraged that non-dt users use linear domain too, and also the
-> irqdomain core has no limit on dt users to use legacy domain.  Instead,
-> it's much more reasonable to make this decision based on if irq_base,
-> something like you did in your v3 patch.
-> 
->  
-> -       if (node)
-> +       if ((int) irq_base < 0)
-> 
+On Thu, Feb 09, 2012 at 08:46:42AM +0000, Russell King - ARM Linux wrote:
+> I'm not sure that the call to platform_cpu_kill() in ipi_cpu_stop() is
+> correct - platform_cpu_kill() is supposed to run on a CPU which is not
+> the one going down, whereas platform_cpu_die() runs on the CPU which
+> is going down.
 
-Really, we want to discourage/limit the use of legacy domains. This is
-only used for ISA irqs on powerpc. Unfortunately, there's not really a
-way to use linear domains for non-DT ATM. But maybe we can fix that.
+I added that call for the kexec down path, where we re-use the hotplug
+code to kill a CPU and put it into a state where the new kernel can boot
+it via the usual SMP bringup path.
 
-> Otherwise,
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Tested on imx51 with tzic and gpio interrupt controller.
+If we need to ensure that the code runs on the CPU making the kexec then
+we need to hack smp_send_stop to make the callback for each CPU that was
+offlined (untested patch below). The only alternative I can think of is
+to add a platform callback from machine_kexec before we tear down the
+final processor but this precludes any reuse of the hotplug code.
 
-Thanks!
+Will
 
-Rob
-> 
-> Regards,
-> Shawn
-> 
->> +	for (i = 0; i < num_gc; i++)
->> +		gc[i]->domain = d;
->> +
->> +	return 0;
->> +
->> + err:
->> +	for ( ; i >= 0; i--)
->> +		kfree(gc[i]);
->> +	kfree(gc);
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(irq_setup_generic_chip_domain);
->> +#endif
->> +
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index cdeb727..3d279f7 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -506,10 +506,6 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 	local_fiq_disable();
+ 	local_irq_disable();
+ 
+-#ifdef CONFIG_HOTPLUG_CPU
+-	platform_cpu_kill(cpu);
+-#endif
+-
+ 	while (1)
+ 		cpu_relax();
+ }
+@@ -572,16 +568,25 @@ void smp_send_reschedule(int cpu)
+ 	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
+ }
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++static void smp_kill_cpus(cpumask_t *mask)
++{
++	unsigned int cpu;
++	for_each_cpu(cpu, mask)
++		platform_cpu_kill(cpu);
++}
++#else
++static void smp_kill_cpus(cpumask_t *mask) { }
++#endif
++
+ void smp_send_stop(void)
+ {
+ 	unsigned long timeout;
++	cpumask_t mask = cpu_online_map;
++	cpu_clear(smp_processor_id(), mask);
+ 
+-	if (num_online_cpus() > 1) {
+-		cpumask_t mask = cpu_online_map;
+-		cpu_clear(smp_processor_id(), mask);
+-
++	if (num_online_cpus() > 1)
+ 		smp_cross_call(&mask, IPI_CPU_STOP);
+-	}
+ 
+ 	/* Wait up to one second for other CPUs to stop */
+ 	timeout = USEC_PER_SEC;
+@@ -590,6 +595,8 @@ void smp_send_stop(void)
+ 
+ 	if (num_online_cpus() > 1)
+ 		pr_warning("SMP: failed to stop secondary CPUs\n");
++
++	smp_kill_cpus(&mask);
+ }
+ 
+ /*
