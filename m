@@ -1,42 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 8 Feb 2012 17:14:07 -0800
-Subject: [GIT PULL] mxs/clk for v3.4
-In-Reply-To: <20120131154552.GG26436@S2101-09.ap.freescale.net>
-References: <20120131154552.GG26436@S2101-09.ap.freescale.net>
-Message-ID: <CAOesGMhTTg88hUpG-5FYX5jT7JJG4be5B5-dS06oHVcJ-HMXCw@mail.gmail.com>
+Date: Wed, 8 Feb 2012 17:14:13 -0800
+Subject: [GIT PULL] i.MX clk_prepare/unprepare
+In-Reply-To: <20120201133623.GT1990@pengutronix.de>
+References: <20120201133623.GT1990@pengutronix.de>
+Message-ID: <CAOesGMhHVEXSJWOXJHhw4eDTKRMd-2hGEGZ0f4NNMWnUNw4EZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jan 31, 2012 at 7:45 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Hi Arnd, Olof,
+On Wed, Feb 1, 2012 at 5:36 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Olof,
 >
-> Please pull the following mxs clock changes for v3.4. ?It has no
-> conflict with rmk/for-armsoc branch.
+> Please pull the following for next. This series contains the
+> clk_prepare/clk_unprepare patches for i.MX.
 >
-> Regards,
-> Shawn
+> Sascha
 >
-> The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+> The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
 >
-> ?Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+> ?Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
 >
 > are available in the git repository at:
-> ?git://git.linaro.org/people/shawnguo/linux-2.6.git mxs/clk
->
-> Fabio Estevam (1):
-> ? ? ?ARM: mxs: Use a proper timeout mechanism
->
-> Lothar Wa?mann (1):
-> ? ? ?arm/mxs: Add support for SSP/MMC ports 2 & 3
->
-> Wolfram Sang (1):
-> ? ? ?ARM: mx28: check for gated clocks when setting saif divider
+> ?git://git.pengutronix.de/git/imx/linux-2.6.git features/imx-clk-prepare
 
-
-Pulled, thanks. Minor nit: in the future, please use the "ARM:
-<platform>:" format consistently for patch prefixes.
+Thanks, pulled.
 
 
 -Olof
