@@ -1,24 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 9 Feb 2012 19:24:09 -0200
-Subject: [alsa-devel] [RFC PATCH] ARM ASoC: add sound driver for imx27pdk
- using mc13783 codec
-In-Reply-To: <1635894.OLo8mNMWim@laptop>
-References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
- <2851519.TkeCdfD43W@laptop> <20120202173212.GA1785@sirena.org.uk>
- <1635894.OLo8mNMWim@laptop>
-Message-ID: <CAOMZO5BpUQz3kpkWmDngCiwp5mJyDOicvk9pLSXuejDCvD70Jw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  9 Feb 2012 22:30:34 +0100
+Subject: [PATCH] RM: OMAP4: board-4430sdp: don't initialize value that is
+ never used
+Message-ID: <1328823034-9668-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+sdp4430_spi_board_info.irq was initialized to ETH_KS8851_IRQ and in
+omap_4430sdp_init() overwritten with gpio_to_irq(ETH_KS8851_IRQ) before
+sdp4430_spi_board_info was registered. This is a bit confusing, so
+better don't initialize .irq and document that it is set later.
 
-2012/2/3 Philippe R?tornaz <philippe.retornaz@epfl.ch>:
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-omap2/board-4430sdp.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-> But before investing too much time on it I would really like to have Sascha
-> opinion about it as he is the main author of the mc13783 codec code.
-
-Could you please comment?
-
-Thanks,
-
-Fabio Estevam
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 39fba9d..991a289 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -321,7 +321,10 @@ static struct spi_board_info sdp4430_spi_board_info[] __initdata = {
+ 		.bus_num                = 1,
+ 		.chip_select            = 0,
+ 		.max_speed_hz           = 24000000,
+-		.irq                    = ETH_KS8851_IRQ,
++		/*
++		 * .irq is set to gpio_to_irq(ETH_KS8851_IRQ)
++		 * in omap_4430sdp_init
++		 */
+ 	},
+ };
+ 
+-- 
+1.7.9
