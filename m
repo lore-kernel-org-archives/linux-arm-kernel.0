@@ -1,235 +1,817 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Feb 2012 14:48:53 +0000
-Subject: [PATCH] ARM: OMAP1: ams-delta: clean up init data section
- assignments
-In-Reply-To: <1328786302-25131-1-git-send-email-jkrzyszt@tis.icnet.pl>
-References: <1328696173-17226-1-git-send-email-grinberg@compulab.co.il>
- <1328786302-25131-1-git-send-email-jkrzyszt@tis.icnet.pl>
-Message-ID: <20120209144853.GU1275@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 9 Feb 2012 07:23:40 -0800
+Subject: [PATCH v3] SPI: add CSR SiRFprimaII SPI controller driver
+In-Reply-To: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
+References: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <20120209152340.GB11249@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2012 at 12:18:22PM +0100, Janusz Krzysztofik wrote:
-> The main purpose of this patch is to fix several section mismatch
-> warnings from the board file and a few board specific drivers,
-> introduced mostly with recent Amstrad Delta patch series, some of them
-> rising up only when building with CONFIG_MODULES not set.
+On Thu, Feb 09, 2012 at 12:10:46AM +0800, Barry Song wrote:
+> From: Zhiwu Song <zhiwu.song@csr.com>
 > 
-> While being at it, section assignments of all init data found in the
-> board file have been revised and hopefully optimised.
-
-There is no optimisation to adding __refdata to stuff.  That's screaming
-that you have lots of bugs here.
-
+> CSR SiRFprimaII has two SPIs (SPI0 and SPI1). Features:
+> * Master and slave modes
+> * 8-/12-/16-/32-bit data unit
+> * 256 bytes receive data FIFO and 256 bytes transmit data FIFO
+> * Multi-unit frame
+> * Configurable SPI_EN (chip select pin) active state
+> * Configurable SPI_CLK polarity
+> * Configurable SPI_CLK phase
+> * Configurable MSB/LSB first
 > 
-> Created and tested on top of current linux-omap/omap1, commit
-> 967809bd7faf71ddc29c8081e0f21db8b201a0f4.
-> 
-> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> Signed-off-by: Zhiwu Song <zhiwu.song@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 > ---
->  arch/arm/mach-omap1/board-ams-delta.c |   35 +++++++++++++++++----------------
->  drivers/input/serio/ams_delta_serio.c |    2 +-
->  drivers/mtd/nand/ams-delta.c          |    2 +-
->  drivers/video/omap/lcd_ams_delta.c    |    2 +-
->  4 files changed, 21 insertions(+), 20 deletions(-)
+>  -v3:
+>  add missed SIRFSOC_SPI_ prefix before macros for registers;
+>  move writel/readl into tx/rx word functions;
+>  fix some other coding styles Grant pointed out;
+>  add missed device tree binding file.
 > 
-> diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-> index 87b1303..dc2455f 100644
-> --- a/arch/arm/mach-omap1/board-ams-delta.c
-> +++ b/arch/arm/mach-omap1/board-ams-delta.c
-> @@ -126,7 +126,7 @@ static const unsigned int ams_delta_keymap[] = {
->  #define LATCH2_PHYS	0x08000000
->  #define LATCH2_VIRT	0xEC000000
+>  Documentation/devicetree/bindings/spi/spi_sirf.txt |   14 +
+>  drivers/spi/Kconfig                                |    7 +
+>  drivers/spi/Makefile                               |    1 +
+>  drivers/spi/spi-sirf.c                             |  665 ++++++++++++++++++++
+>  include/linux/spi/spi-sirf.h                       |   27 +
+>  5 files changed, 714 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi_sirf.txt
+>  create mode 100644 drivers/spi/spi-sirf.c
+>  create mode 100644 include/linux/spi/spi-sirf.h
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi_sirf.txt b/Documentation/devicetree/bindings/spi/spi_sirf.txt
+> new file mode 100644
+> index 0000000..f7a58aa
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi_sirf.txt
+> @@ -0,0 +1,14 @@
+> +* CSR SiRFprimaII Serial Peripheral Interface
+> +
+> +Required properties:
+> +- compatible : Should be "sirf,prima2-spi"
+> +- reg : Offset and length of the register set for the device
+> +- interrupts : Should contain SPI interrupt
+> +
+> +Example:
+> +
+> +spi0: spi at b00d0000 {
+> +	compatible = "sirf,prima2-spi";
+> +	reg = <0xb00d0000 0x10000>;
+> +	interrupts = <15>;
+> +};
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index 3f9a47e..8311cc2 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -324,6 +324,13 @@ config SPI_SH_SCI
+>  	help
+>  	  SPI driver for SuperH SCI blocks.
 >  
-> -static struct map_desc ams_delta_io_desc[] __initdata = {
-> +static struct map_desc ams_delta_io_desc[] __initconst = {
+> +config SPI_SIRF
+> +        tristate "CSR SiRFprimaII SPI controller"
+> +	depends on ARCH_PRIMA2
+> +	select SPI_BITBANG
+> +	help
+> +	  SPI driver for CSR SiRFprimaII SoCs
+> +
+>  config SPI_STMP3XXX
+>  	tristate "Freescale STMP37xx/378x SPI/SSP controller"
+>  	depends on ARCH_STMP3XXX && SPI_MASTER
+> diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+> index 61c3261..e919846 100644
+> --- a/drivers/spi/Makefile
+> +++ b/drivers/spi/Makefile
+> @@ -51,6 +51,7 @@ obj-$(CONFIG_SPI_S3C64XX)		+= spi-s3c64xx.o
+>  obj-$(CONFIG_SPI_SH)			+= spi-sh.o
+>  obj-$(CONFIG_SPI_SH_MSIOF)		+= spi-sh-msiof.o
+>  obj-$(CONFIG_SPI_SH_SCI)		+= spi-sh-sci.o
+> +obj-$(CONFIG_SPI_SIRF)		+= spi-sirf.o
+>  obj-$(CONFIG_SPI_STMP3XXX)		+= spi-stmp.o
+>  obj-$(CONFIG_SPI_TEGRA)			+= spi-tegra.o
+>  obj-$(CONFIG_SPI_TI_SSP)		+= spi-ti-ssp.o
+> diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
+> new file mode 100644
+> index 0000000..6f326cb
+> --- /dev/null
+> +++ b/drivers/spi/spi-sirf.c
+> @@ -0,0 +1,665 @@
+> +/*
+> + * SPI bus driver for CSR SiRFprimaII
+> + *
+> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/slab.h>
+> +#include <linux/clk.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/bitops.h>
+> +#include <linux/err.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/spi/spi_bitbang.h>
+> +#include <linux/pinctrl/pinmux.h>
+> +#include <linux/spi/spi-sirf.h>
+> +
+> +#define DRIVER_NAME "sirfsoc_spi"
+> +
+> +#define SIRFSOC_SPI_CTRL		0x0000
+> +#define SIRFSOC_SPI_CMD			0x0004
+> +#define SIRFSOC_SPI_TX_RX_EN		0x0008
+> +#define SIRFSOC_SPI_INT_EN		0x000C
+> +#define SIRFSOC_SPI_INT_STATUS		0x0010
+> +#define SIRFSOC_SPI_TX_DMA_IO_CTRL	0x0100
+> +#define SIRFSOC_SPI_TX_DMA_IO_LEN	0x0104
+> +#define SIRFSOC_SPI_TXFIFO_CTRL		0x0108
+> +#define SIRFSOC_SPI_TXFIFO_LEVEL_CHK	0x010C
+> +#define SIRFSOC_SPI_TXFIFO_OP		0x0110
+> +#define SIRFSOC_SPI_TXFIFO_STATUS	0x0114
+> +#define SIRFSOC_SPI_TXFIFO_DATA		0x0118
+> +#define SIRFSOC_SPI_RX_DMA_IO_CTRL	0x0120
+> +#define SIRFSOC_SPI_RX_DMA_IO_LEN	0x0124
+> +#define SIRFSOC_SPI_RXFIFO_CTRL		0x0128
+> +#define SIRFSOC_SPI_RXFIFO_LEVEL_CHK	0x012C
+> +#define SIRFSOC_SPI_RXFIFO_OP		0x0130
+> +#define SIRFSOC_SPI_RXFIFO_STATUS	0x0134
+> +#define SIRFSOC_SPI_RXFIFO_DATA		0x0138
+> +#define SIRFSOC_SPI_DUMMY_DELAY_CTL	0x0144
+> +
+> +/* SPI CTRL register defines */
+> +#define SIRFSOC_SPI_SLV_MODE		BIT(16)
+> +#define SIRFSOC_SPI_CMD_MODE		BIT(17)
+> +#define SIRFSOC_SPI_CS_IO_OUT		BIT(18)
+> +#define SIRFSOC_SPI_CS_IO_MODE		BIT(19)
+> +#define SIRFSOC_SPI_CLK_IDLE_STAT	BIT(20)
+> +#define SIRFSOC_SPI_CS_IDLE_STAT	BIT(21)
+> +#define SIRFSOC_SPI_TRAN_MSB		BIT(22)
+> +#define SIRFSOC_SPI_DRV_POS_EDGE	BIT(23)
+> +#define SIRFSOC_SPI_CS_HOLD_TIME	BIT(24)
+> +#define SIRFSOC_SPI_CLK_SAMPLE_MODE	BIT(25)
+> +#define SIRFSOC_SPI_TRAN_DAT_FORMAT_8	(0 << 26)
+> +#define SIRFSOC_SPI_TRAN_DAT_FORMAT_12	(1 << 26)
+> +#define SIRFSOC_SPI_TRAN_DAT_FORMAT_16	(2 << 26)
+> +#define SIRFSOC_SPI_TRAN_DAT_FORMAT_32	(3 << 26)
+> +#define SIRFSOC_SPI_CMD_BYTE_NUM(x)		((x & 3) << 28)
+> +#define SIRFSOC_SPI_ENA_AUTO_CLR		BIT(30)
+> +#define SIRFSOC_SPI_MUL_DAT_MODE		BIT(31)
+> +
+> +/* Interrupt Enable */
+> +#define SIRFSOC_SPI_RX_DONE_INT_EN		BIT(0)
+> +#define SIRFSOC_SPI_TX_DONE_INT_EN		BIT(1)
+> +#define SIRFSOC_SPI_RX_OFLOW_INT_EN		BIT(2)
+> +#define SIRFSOC_SPI_TX_UFLOW_INT_EN		BIT(3)
+> +#define SIRFSOC_SPI_RX_IO_DMA_INT_EN	BIT(4)
+> +#define SIRFSOC_SPI_TX_IO_DMA_INT_EN	BIT(5)
+> +#define SIRFSOC_SPI_RXFIFO_FULL_INT_EN	BIT(6)
+> +#define SIRFSOC_SPI_TXFIFO_EMPTY_INT_EN	BIT(7)
+> +#define SIRFSOC_SPI_RXFIFO_THD_INT_EN	BIT(8)
+> +#define SIRFSOC_SPI_TXFIFO_THD_INT_EN	BIT(9)
+> +#define SIRFSOC_SPI_FRM_END_INT_EN	BIT(10)
+> +
+> +#define SIRFSOC_SPI_INT_MASK_ALL		0x1FFF
+> +
+> +/* Interrupt status */
+> +#define SIRFSOC_SPI_RX_DONE		BIT(0)
+> +#define SIRFSOC_SPI_TX_DONE		BIT(1)
+> +#define SIRFSOC_SPI_RX_OFLOW		BIT(2)
+> +#define SIRFSOC_SPI_TX_UFLOW		BIT(3)
+> +#define SIRFSOC_SPI_RX_FIFO_FULL	BIT(6)
+> +#define SIRFSOC_SPI_TXFIFO_EMPTY	BIT(7)
+> +#define SIRFSOC_SPI_RXFIFO_THD_REACH	BIT(8)
+> +#define SIRFSOC_SPI_TXFIFO_THD_REACH	BIT(9)
+> +#define SIRFSOC_SPI_FRM_END		BIT(10)
+> +
+> +/* TX RX enable */
+> +#define SIRFSOC_SPI_RX_EN		BIT(0)
+> +#define SIRFSOC_SPI_TX_EN		BIT(1)
+> +#define SIRFSOC_SPI_CMD_TX_EN		BIT(2)
+> +
+> +#define SIRFSOC_SPI_IO_MODE_SEL		BIT(0)
+> +#define SIRFSOC_SPI_RX_DMA_FLUSH	BIT(2)
+> +
+> +/* FIFO OPs */
+> +#define SIRFSOC_SPI_FIFO_RESET		BIT(0)
+> +#define SIRFSOC_SPI_FIFO_START		BIT(1)
+> +
+> +/* FIFO CTRL */
+> +#define SIRFSOC_SPI_FIFO_WIDTH_BYTE	(0 << 0)
+> +#define SIRFSOC_SPI_FIFO_WIDTH_WORD	(1 << 0)
+> +#define SIRFSOC_SPI_FIFO_WIDTH_DWORD	(2 << 0)
+> +
+> +/* FIFO Status */
+> +#define	SIRFSOC_SPI_FIFO_LEVEL_MASK	0xFF
+> +#define SIRFSOC_SPI_FIFO_FULL		BIT(8)
+> +#define SIRFSOC_SPI_FIFO_EMPTY		BIT(9)
+> +
+> +/* 256 bytes rx/tx FIFO */
+> +#define SIRFSOC_SPI_FIFO_SIZE		256
+> +#define SIRFSOC_SPI_DAT_FRM_LEN_MAX	(64 * 1024)
+> +
+> +#define SIRFSOC_SPI_FIFO_SC(x)		((x) & 0x3F)
+> +#define SIRFSOC_SPI_FIFO_LC(x)		(((x) & 0x3F) << 10)
+> +#define SIRFSOC_SPI_FIFO_HC(x)		(((x) & 0x3F) << 20)
+> +#define SIRFSOC_SPI_FIFO_THD(x)		(((x) & 0xFF) << 2)
+> +
+> +struct sirfsoc_spi {
+> +	struct spi_bitbang bitbang;
+> +	struct completion done;
+> +
+> +	u32 irq;
 
-You're not making this comst so don't change it to __initconst.
+irq is set once and never used outside the probe function.  Doesn't need
+to be here.
 
->  	/* AMS_DELTA_LATCH1 */
->  	{
->  		.virtual	= LATCH1_VIRT,
-> @@ -150,17 +150,17 @@ static struct map_desc ams_delta_io_desc[] __initdata = {
->  	}
->  };
->  
-> -static struct omap_lcd_config ams_delta_lcd_config = {
-> +static struct omap_lcd_config ams_delta_lcd_config __initconst = {
+> +	void __iomem *base;
+> +	u32 ctrl_freq;  /* SPI controller clock speed */
+> +	struct clk *clk;
+> +	int bus_num;
 
-This change probably adds a bug.  Are you sure this will never be used
-outside init context?
+bus_num is unused
 
->  	.ctrl_name	= "internal",
->  };
->  
-> -static struct omap_usb_config ams_delta_usb_config __initdata = {
-> +static struct omap_usb_config ams_delta_usb_config __initdata_or_module = {
+> +	struct pinmux *pmx;
+> +
+> +	/* rx & tx bufs from the spi_transfer */
+> +	const void *tx;
+> +	void *rx;
+> +
+> +	/* place received word into rx buffer */
+> +	void (*rx_word) (struct sirfsoc_spi *);
+> +	/* get word from tx buffer for sending */
+> +	void (*tx_word) (struct sirfsoc_spi *);
+> +
+> +	/* number of words left to be tranmitted/received */
+> +	unsigned int left_tx_cnt;
+> +	unsigned int left_rx_cnt;
+> +
+> +	/* tasklet to push tx msg into FIFO */
+> +	struct tasklet_struct tasklet_tx;
+> +};
+> +
+> +static void spi_sirfsoc_rx_word_u8(struct sirfsoc_spi *sspi)
+> +{
+> +	u32 data;
+> +	u8 *rx = sspi->rx;
+> +
+> +	data = readl(sspi->base + SIRFSOC_SPI_RXFIFO_DATA);
+> +
+> +	if (rx) {
+> +		*rx++ = (u8) data;
+> +		sspi->rx = rx;
+> +	}
+> +
+> +	sspi->left_rx_cnt--;
+> +}
+> +
+> +static void spi_sirfsoc_tx_word_u8(struct sirfsoc_spi *sspi)
+> +{
+> +	u32 data = 0;
+> +	const u8 *tx = sspi->tx;
+> +
+> +	if (tx) {
+> +		data = *tx++;
+> +		sspi->tx = tx;
+> +	}
+> +
+> +	writel(data, sspi->base + SIRFSOC_SPI_TXFIFO_DATA);
+> +	sspi->left_tx_cnt--;
+> +}
+> +
+> +static void spi_sirfsoc_rx_word_u16(struct sirfsoc_spi *sspi)
+> +{
+> +	u32 data;
+> +	u16 *rx = sspi->rx;
+> +
+> +	data = readl(sspi->base + SIRFSOC_SPI_RXFIFO_DATA);
+> +
+> +	if (rx) {
+> +		*rx++ = (u16) data;
+> +		sspi->rx = rx;
+> +	}
+> +
+> +	sspi->left_rx_cnt--;
+> +}
+> +
+> +static void spi_sirfsoc_tx_word_u16(struct sirfsoc_spi *sspi)
+> +{
+> +	u32 data = 0;
+> +	const u16 *tx = sspi->tx;
+> +
+> +	if (tx) {
+> +		data = *tx++;
+> +		sspi->tx = tx;
+> +	}
+> +
+> +	writel(data, sspi->base + SIRFSOC_SPI_TXFIFO_DATA);
+> +	sspi->left_tx_cnt--;
+> +}
+> +
+> +static void spi_sirfsoc_rx_word_u32(struct sirfsoc_spi *sspi)
+> +{
+> +	u32 data;
+> +	u32 *rx = sspi->rx;
+> +
+> +	data = readl(sspi->base + SIRFSOC_SPI_RXFIFO_DATA);
+> +
+> +	if (rx) {
+> +		*rx++ = (u32) data;
+> +		sspi->rx = rx;
+> +	}
+> +
+> +	sspi->left_rx_cnt--;
+> +
+> +}
+> +
+> +static void spi_sirfsoc_tx_word_u32(struct sirfsoc_spi *sspi)
+> +{
+> +	u32 data = 0;
+> +	const u32 *tx = sspi->tx;
+> +
+> +	if (tx) {
+> +		data = *tx++;
+> +		sspi->tx = tx;
+> +	}
+> +
+> +	writel(data, sspi->base + SIRFSOC_SPI_TXFIFO_DATA);
+> +	sspi->left_tx_cnt--;
+> +}
+> +
+> +static void spi_sirfsoc_tasklet_tx(unsigned long arg)
+> +{
+> +	struct sirfsoc_spi *sspi = (struct sirfsoc_spi *)arg;
+> +
+> +	/* Fill Tx FIFO while there are left words to be transmitted */
+> +	while (!((readl(sspi->base + SIRFSOC_SPI_TXFIFO_STATUS) &
+> +			SIRFSOC_SPI_FIFO_FULL)) &&
+> +			sspi->left_tx_cnt)
+> +		sspi->tx_word(sspi);
 
-Even if you don't have modules enabled, have you checked whether the
-driver can be bound and unbound via
-/sys/bus/platform/driver/<name>/{bind,unbind} ?
+Potential problem: if for any reason the device stalls and the FULL bit
+doesn't get cleared, then this function will be stuck in a tight loop.  This
+may not be an issue, but it should be considered.
 
-I suspect this is a bug.
+> +}
+> +
+> +static irqreturn_t spi_sirfsoc_irq(int irq, void *dev_id)
+> +{
+> +	struct sirfsoc_spi *sspi = dev_id;
+> +	u32 spi_stat = readl(sspi->base + SIRFSOC_SPI_INT_STATUS);
+> +
+> +	writel(spi_stat, sspi->base + SIRFSOC_SPI_INT_STATUS);
+> +
+> +	/* Error Conditions */
+> +	if (spi_stat & SIRFSOC_SPI_RX_OFLOW ||
+> +			spi_stat & SIRFSOC_SPI_TX_UFLOW) {
+> +		complete(&sspi->done);
+> +		writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
+> +	}
+> +
+> +	if (spi_stat & SIRFSOC_SPI_FRM_END) {
+> +		while (!((readl(sspi->base + SIRFSOC_SPI_RXFIFO_STATUS)
+> +				& SIRFSOC_SPI_FIFO_EMPTY)) &&
+> +				sspi->left_rx_cnt)
+> +			sspi->rx_word(sspi);
+> +
+> +		/* Received all words */
+> +		if ((sspi->left_rx_cnt == 0) && (sspi->left_tx_cnt == 0)) {
+> +			complete(&sspi->done);
+> +			writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
+> +		}
+> +	}
+> +
+> +	if (spi_stat & SIRFSOC_SPI_RXFIFO_THD_REACH ||
+> +		spi_stat & SIRFSOC_SPI_TXFIFO_THD_REACH ||
+> +		spi_stat & SIRFSOC_SPI_RX_FIFO_FULL ||
+> +		spi_stat & SIRFSOC_SPI_TXFIFO_EMPTY)
+> +		tasklet_schedule(&sspi->tasklet_tx);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int spi_sirfsoc_transfer(struct spi_device *spi, struct spi_transfer *t)
+> +{
+> +	struct sirfsoc_spi *sspi;
+> +	int timeout = t->len * 10;
+> +	sspi = spi_master_get_devdata(spi->master);
+> +
+> +	sspi->tx = t->tx_buf;
+> +	sspi->rx = t->rx_buf;
+> +	sspi->left_tx_cnt = sspi->left_rx_cnt = t->len;
+> +	INIT_COMPLETION(sspi->done);
+> +
+> +	writel(SIRFSOC_SPI_INT_MASK_ALL, sspi->base + SIRFSOC_SPI_INT_STATUS);
+> +
+> +	if (t->len == 1) {
+> +		writel(readl(sspi->base + SIRFSOC_SPI_CTRL) |
+> +			SIRFSOC_SPI_ENA_AUTO_CLR,
+> +			sspi->base + SIRFSOC_SPI_CTRL);
+> +		writel(0, sspi->base + SIRFSOC_SPI_TX_DMA_IO_LEN);
+> +		writel(0, sspi->base + SIRFSOC_SPI_RX_DMA_IO_LEN);
+> +	} else if ((t->len > 1) && (t->len < SIRFSOC_SPI_DAT_FRM_LEN_MAX)) {
+> +		writel(readl(sspi->base + SIRFSOC_SPI_CTRL) |
+> +				SIRFSOC_SPI_MUL_DAT_MODE |
+> +				SIRFSOC_SPI_ENA_AUTO_CLR,
+> +			sspi->base + SIRFSOC_SPI_CTRL);
+> +		writel(t->len - 1, sspi->base + SIRFSOC_SPI_TX_DMA_IO_LEN);
+> +		writel(t->len - 1, sspi->base + SIRFSOC_SPI_RX_DMA_IO_LEN);
+> +	} else {
+> +		writel(readl(sspi->base + SIRFSOC_SPI_CTRL),
+> +			sspi->base + SIRFSOC_SPI_CTRL);
+> +		writel(0, sspi->base + SIRFSOC_SPI_TX_DMA_IO_LEN);
+> +		writel(0, sspi->base + SIRFSOC_SPI_RX_DMA_IO_LEN);
+> +	}
+> +
+> +	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+> +
+> +	/* fill up the Tx FIFO */
+> +	while (!(readl(sspi->base + SIRFSOC_SPI_TXFIFO_STATUS) & SIRFSOC_SPI_FIFO_FULL)
+> +			&& (sspi->left_tx_cnt > 0))
+> +		sspi->tx_word(sspi);
+> +
+> +	writel(SIRFSOC_SPI_RX_OFLOW_INT_EN | SIRFSOC_SPI_TX_UFLOW_INT_EN |
+> +		SIRFSOC_SPI_RXFIFO_THD_INT_EN | SIRFSOC_SPI_TXFIFO_THD_INT_EN |
+> +		SIRFSOC_SPI_FRM_END_INT_EN | SIRFSOC_SPI_RXFIFO_FULL_INT_EN |
+> +		SIRFSOC_SPI_TXFIFO_EMPTY_INT_EN, sspi->base + SIRFSOC_SPI_INT_EN);
+> +	writel(SIRFSOC_SPI_RX_EN | SIRFSOC_SPI_TX_EN, sspi->base + SIRFSOC_SPI_TX_RX_EN);
+> +
+> +	if (wait_for_completion_timeout(&sspi->done, timeout) == 0)
+> +		dev_err(&spi->dev, "transfer timeout\n");
+> +
+> +	/* TX, RX FIFO stop */
+> +	writel(0, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+> +	writel(0, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+> +	writel(0, sspi->base + SIRFSOC_SPI_TX_RX_EN);
+> +	writel(0, sspi->base + SIRFSOC_SPI_INT_EN);
+> +
+> +	return t->len - sspi->left_rx_cnt;
+> +}
+> +
+> +static void spi_sirfsoc_chipselect(struct spi_device *spi, int value)
+> +{
+> +	struct sirfsoc_spi *sspi = spi_master_get_devdata(spi->master);
+> +	struct sirfsoc_spi_ctrldata *ctl_data = spi->controller_data;
 
->  	.register_host	= 1,
->  	.hmc_mode	= 16,
->  	.pins[0]	= 2,
->  };
->  
-> -static struct omap_board_config_kernel ams_delta_config[] __initdata = {
-> +static struct omap_board_config_kernel ams_delta_config[] __initconst = {
->  	{ OMAP_TAG_LCD,		&ams_delta_lcd_config },
->  };
->  
-> @@ -181,7 +181,7 @@ static struct bgpio_pdata latch1_pdata __initconst = {
->  	.ngpio	= LATCH1_NGPIO,
->  };
->  
-> -static struct platform_device latch1_gpio_device = {
-> +static struct platform_device latch1_gpio_device __refdata = {
->  	.name		= "basic-mmio-gpio",
->  	.id		= 0,
->  	.resource	= latch1_resources,
-> @@ -205,7 +205,7 @@ static struct bgpio_pdata latch2_pdata __initconst = {
->  	.ngpio	= AMS_DELTA_LATCH2_NGPIO,
->  };
->  
-> -static struct platform_device latch2_gpio_device = {
-> +static struct platform_device latch2_gpio_device __refdata = {
->  	.name		= "basic-mmio-gpio",
->  	.id		= 1,
->  	.resource	= latch2_resources,
-> @@ -271,7 +271,7 @@ void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value)
->  }
->  EXPORT_SYMBOL(ams_delta_latch_write);
->  
-> -static struct resource ams_delta_nand_resources[] = {
-> +static struct resource ams_delta_nand_resources[] __initconst_or_module = {
+Where does controller_data come from?  It is not set in the driver, and it is
+*not* something that the spi_device driver or the board code is allowed to set.
 
-This change definitely adds a bug.  The resources are _used_ _all_ _the_
-_time_ _the_ _device_ _is_ _registered_.  Try catting /proc/iomem after
-boot.
+If the driver needs controller_data, then it needs to be added to each spi
+device by the spi controller driver when the slave device is registered.
 
->  	[0] = {
->  		.start	= OMAP1_MPUIO_BASE,
->  		.end	= OMAP1_MPUIO_BASE +
-> @@ -280,14 +280,14 @@ static struct resource ams_delta_nand_resources[] = {
->  	},
->  };
->  
-> -static struct platform_device ams_delta_nand_device = {
-> +static struct platform_device ams_delta_nand_device __refdata = {
-
-Therefore, bug.
-
->  	.name	= "ams-delta-nand",
->  	.id	= -1,
->  	.num_resources	= ARRAY_SIZE(ams_delta_nand_resources),
->  	.resource	= ams_delta_nand_resources,
->  };
->  
-> -static struct resource ams_delta_kp_resources[] = {
-> +static struct resource ams_delta_kp_resources[] __initconst_or_module = {
-
-Bug.
-
->  	[0] = {
->  		.start	= INT_KEYBOARD,
->  		.end	= INT_KEYBOARD,
-> @@ -300,14 +300,14 @@ static const struct matrix_keymap_data ams_delta_keymap_data = {
->  	.keymap_size	= ARRAY_SIZE(ams_delta_keymap),
->  };
->  
-> -static struct omap_kp_platform_data ams_delta_kp_data __initdata = {
-> +static struct omap_kp_platform_data ams_delta_kp_data __initconst_or_module = {
-
-Probably a bug if you unbind/rebind the associated driver with modules
-disabled.
-
->  	.rows		= 8,
->  	.cols		= 8,
->  	.keymap_data	= &ams_delta_keymap_data,
->  	.delay		= 9,
->  };
->  
-> -static struct platform_device ams_delta_kp_device = {
-> +static struct platform_device ams_delta_kp_device __refdata = {
->  	.name		= "omap-keypad",
->  	.id		= -1,
->  	.dev		= {
-> @@ -363,7 +363,8 @@ static struct gpio_led_platform_data leds_pdata __initconst = {
->  	.num_leds	= ARRAY_SIZE(gpio_leds),
->  };
->  
-> -static struct i2c_board_info ams_delta_camera_board_info[] = {
-> +static struct i2c_board_info __initconst_or_module
-> +ams_delta_camera_board_info[] = {
-
-No.  It's
-
-static struct foo blah[] __whatever_init_attribute
-
-not
-
-static struct foo __whatever_init_attribute blah[]
-
-I've no idea where this fucked idea came from but it's something that's
-wasting a lot of review time with complaints like this about it.
-
->  	{
->  		I2C_BOARD_INFO("ov6650", 0x60),
->  	},
-> @@ -387,7 +388,7 @@ static int ams_delta_camera_power(struct device *dev, int power)
->  #define ams_delta_camera_power	NULL
->  #endif
->  
-> -static struct soc_camera_link ams_delta_iclink = {
-> +static struct soc_camera_link ams_delta_iclink __initconst_or_module = {
-
-Probably buggy.
-
->  	.bus_id         = 0,	/* OMAP1 SoC camera bus */
->  	.i2c_adapter_id = 1,
->  	.board_info     = &ams_delta_camera_board_info[0],
-> @@ -395,7 +396,7 @@ static struct soc_camera_link ams_delta_iclink = {
->  	.power		= ams_delta_camera_power,
->  };
->  
-> -static struct platform_device ams_delta_camera_device = {
-> +static struct platform_device ams_delta_camera_device __refdata = {
->  	.name   = "soc-camera-pdrv",
->  	.id     = 0,
->  	.dev    = {
-> @@ -408,7 +409,7 @@ static struct omap1_cam_platform_data ams_delta_camera_platform_data = {
->  	.lclk_khz_max	= 1334,		/* results in 5fps CIF, 10fps QCIF */
->  };
->  
-> -static struct platform_device *ams_delta_devices[] __initdata = {
-> +static struct platform_device *ams_delta_devices[] __initconst = {
-
-Missing const.  If you can't const it, don't put it in __initconst.
-
->  	&latch1_gpio_device,
->  	&latch2_gpio_device,
->  	&ams_delta_kp_device,
-> @@ -459,7 +460,7 @@ static void __init ams_delta_init(void)
->  	omap_writew(omap_readw(ARM_RSTCT1) | 0x0004, ARM_RSTCT1);
->  }
->  
-> -static struct plat_serial8250_port ams_delta_modem_ports[] = {
-> +static struct plat_serial8250_port ams_delta_modem_ports[] __initdata = {
-
-Buggy.
-
->  	{
->  		.membase	= IOMEM(MODEM_VIRT),
->  		.mapbase	= MODEM_PHYS,
-> @@ -473,7 +474,7 @@ static struct plat_serial8250_port ams_delta_modem_ports[] = {
->  	{ },
->  };
->  
-> -static struct platform_device ams_delta_modem_device = {
-> +static struct platform_device ams_delta_modem_device __refdata = {
->  	.name	= "serial8250",
->  	.id	= PLAT8250_DEV_PLATFORM1,
->  	.dev		= {
+> +	u32 regval = readl(sspi->base + SIRFSOC_SPI_CTRL);
+> +
+> +	switch (value) {
+> +	case BITBANG_CS_ACTIVE:
+> +		if (ctl_data->cs_type == SIRFSOC_SPI_CS_HW_CTRL) {
+> +			/*
+> +			 * In hardware control mode, CS output is controlled
+> +			 * by the CS hardware logic
+> +			 */
+> +			regval &= ~SIRFSOC_SPI_CS_IO_OUT;
+> +			if (ctl_data->cs_hold_clk == SIRFSOC_SPI_CS_HOLD_2)
+> +				regval |= SIRFSOC_SPI_CS_HOLD_TIME;
+> +		} else if (ctl_data->cs_type == SIRFSOC_SPI_CS_RISC_IO) {
+> +			/*
+> +			 * In I/O mode, CS outputs the value of the
+> +			 * SIRFSOC_SPI_CS_IO_OUT bit
+> +			 */
+> +			regval |= SIRFSOC_SPI_CS_IO_OUT;
+> +			if (spi->mode & SPI_CS_HIGH)
+> +				regval |= SIRFSOC_SPI_CS_IO_OUT;
+> +		} else if (ctl_data->cs_type == SIRFSOC_SPI_CS_GPIO)
+> +			ctl_data->chip_select();
+> +		break;
+> +	case BITBANG_CS_INACTIVE:
+> +		if (ctl_data->cs_type == SIRFSOC_SPI_CS_RISC_IO) {
+> +			if (spi->mode & SPI_CS_HIGH)
+> +				regval &= ~SIRFSOC_SPI_CS_IO_OUT;
+> +			else
+> +				regval |= SIRFSOC_SPI_CS_IO_OUT;
+> +		} else if (ctl_data->cs_type == SIRFSOC_SPI_CS_GPIO)
+> +			ctl_data->chip_deselect();
+> +		break;
+> +	}
+> +	writel(regval, sspi->base + SIRFSOC_SPI_CTRL);
+> +}
+> +
+> +static int
+> +spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
+> +{
+> +	struct sirfsoc_spi *sspi;
+> +	u8 bits_per_word = 0;
+> +	int hz = 0;
+> +	u32 regval;
+> +	u32 txfifo_ctrl, rxfifo_ctrl;
+> +	u32 fifo_size = SIRFSOC_SPI_FIFO_SIZE / 4;
+> +
+> +	sspi = spi_master_get_devdata(spi->master);
+> +
+> +	bits_per_word = t && t->bits_per_word ? t->bits_per_word :
+> +		spi->bits_per_word;
+> +	hz = t && t->speed_hz ? t->speed_hz : spi->max_speed_hz;
+> +
+> +	/* Enable IO mode for RX, TX */
+> +	writel(SIRFSOC_SPI_IO_MODE_SEL, sspi->base + SIRFSOC_SPI_TX_DMA_IO_CTRL);
+> +	writel(SIRFSOC_SPI_IO_MODE_SEL, sspi->base + SIRFSOC_SPI_RX_DMA_IO_CTRL);
+> +	regval = (sspi->ctrl_freq / (2 * hz)) - 1;
+> +
+> +	if (regval > 0xFFFF || regval < 0) {
+> +		dev_err(&spi->dev, "Speed %d not supported\n", hz);
+> +		return -EINVAL;
+> +	}
+> +
+> +	switch (bits_per_word) {
+> +	case 8:
+> +		regval |= SIRFSOC_SPI_TRAN_DAT_FORMAT_8;
+> +		sspi->rx_word = spi_sirfsoc_rx_word_u8;
+> +		sspi->tx_word = spi_sirfsoc_tx_word_u8;
+> +		txfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+> +					SIRFSOC_SPI_FIFO_WIDTH_BYTE;
+> +		rxfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+> +					SIRFSOC_SPI_FIFO_WIDTH_BYTE;
+> +		break;
+> +	case 12:
+> +	case 16:
+> +		regval |= (bits_per_word ==  12) ? SIRFSOC_SPI_TRAN_DAT_FORMAT_12 :
+> +			SIRFSOC_SPI_TRAN_DAT_FORMAT_16;
+> +		sspi->rx_word = spi_sirfsoc_rx_word_u16;
+> +		sspi->tx_word = spi_sirfsoc_tx_word_u16;
+> +		txfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+> +					SIRFSOC_SPI_FIFO_WIDTH_WORD;
+> +		rxfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+> +					SIRFSOC_SPI_FIFO_WIDTH_WORD;
+> +		break;
+> +	case 32:
+> +		regval |= SIRFSOC_SPI_TRAN_DAT_FORMAT_32;
+> +		sspi->rx_word = spi_sirfsoc_rx_word_u32;
+> +		sspi->tx_word = spi_sirfsoc_tx_word_u32;
+> +		txfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+> +					SIRFSOC_SPI_FIFO_WIDTH_DWORD;
+> +		rxfifo_ctrl = SIRFSOC_SPI_FIFO_THD(SIRFSOC_SPI_FIFO_SIZE / 2) |
+> +					SIRFSOC_SPI_FIFO_WIDTH_DWORD;
+> +		break;
+> +	default:
+> +		dev_err(&spi->dev, "Bits per word %d not supported\n",
+> +		       bits_per_word);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (!(spi->mode & SPI_CS_HIGH))
+> +		regval |= SIRFSOC_SPI_CS_IDLE_STAT;
+> +	if (!(spi->mode & SPI_LSB_FIRST))
+> +		regval |= SIRFSOC_SPI_TRAN_MSB;
+> +	if (spi->mode & SPI_CPOL)
+> +		regval |= SIRFSOC_SPI_CLK_IDLE_STAT;
+> +
+> +	/*
+> +	 * Data should be driven at least 1/2 cycle before the fetch edge to make
+> +	 * sure that data gets stable at the fetch edge.
+> +	 */
+> +	if (((spi->mode & SPI_CPOL) && (spi->mode & SPI_CPHA)) ||
+> +	    (!(spi->mode & SPI_CPOL) && !(spi->mode & SPI_CPHA)))
+> +		regval &= ~SIRFSOC_SPI_DRV_POS_EDGE;
+> +	else
+> +		regval |= SIRFSOC_SPI_DRV_POS_EDGE;
+> +
+> +	writel(SIRFSOC_SPI_FIFO_SC(fifo_size - 2) |
+> +			SIRFSOC_SPI_FIFO_LC(fifo_size / 2) |
+> +			SIRFSOC_SPI_FIFO_HC(2),
+> +		sspi->base + SIRFSOC_SPI_TXFIFO_LEVEL_CHK);
+> +	writel(SIRFSOC_SPI_FIFO_SC(2) |
+> +			SIRFSOC_SPI_FIFO_LC(fifo_size / 2) |
+> +			SIRFSOC_SPI_FIFO_HC(fifo_size - 2),
+> +		sspi->base + SIRFSOC_SPI_RXFIFO_LEVEL_CHK);
+> +	writel(txfifo_ctrl, sspi->base + SIRFSOC_SPI_TXFIFO_CTRL);
+> +	writel(rxfifo_ctrl, sspi->base + SIRFSOC_SPI_RXFIFO_CTRL);
+> +
+> +	writel(regval, sspi->base + SIRFSOC_SPI_CTRL);
+> +	return 0;
+> +}
+> +
+> +static int spi_sirfsoc_setup(struct spi_device *spi)
+> +{
+> +	struct spi_bitbang *bitbang;
+> +	struct sirfsoc_spi *sspi;
+> +
+> +	if (!spi->max_speed_hz)
+> +		return -EINVAL;
+> +
+> +	sspi = spi_master_get_devdata(spi->master);
+> +	bitbang = &sspi->bitbang;
+> +
+> +	if (!spi->bits_per_word)
+> +		spi->bits_per_word = 8;
+> +
+> +	return spi_sirfsoc_setup_transfer(spi, NULL);
+> +}
+> +
+> +static int __devinit spi_sirfsoc_probe(struct platform_device *pdev)
+> +{
+> +	struct sirfsoc_spi *sspi;
+> +	struct spi_master *master;
+> +	struct resource *mem_res;
+> +	int ret;
+> +
+> +	master = spi_alloc_master(&pdev->dev, sizeof(*sspi));
+> +	if (!master) {
+> +		dev_err(&pdev->dev, "Unable to allocate SPI master\n");
+> +		return -ENOMEM;
+> +	}
+> +	platform_set_drvdata(pdev, master);
+> +	sspi = spi_master_get_devdata(master);
+> +
+> +	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!mem_res) {
+> +		dev_err(&pdev->dev, "Unable to get IO resource\n");
+> +		ret = -ENOMEM;
+> +		goto free_master;
+> +	}
+> +
+> +	sspi->base = devm_request_and_ioremap(&pdev->dev, mem_res);
+> +	if (!sspi->base) {
+> +		dev_err(&pdev->dev, "IO remap failed!\n");
+> +		ret = -ENOMEM;
+> +		goto free_master;
+> +	}
+> +
+> +	sspi->irq = platform_get_irq(pdev, 0);
+> +	if (sspi->irq < 0) {
+> +		ret = -ENXIO;
+> +		goto free_master;
+> +	}
+> +	ret = devm_request_irq(&pdev->dev, sspi->irq, spi_sirfsoc_irq, 0,
+> +				DRIVER_NAME, sspi);
+> +	if (ret)
+> +		goto free_master;
+> +
+> +	sspi->bitbang.master = spi_master_get(master);
+> +	sspi->bitbang.chipselect = spi_sirfsoc_chipselect;
+> +	sspi->bitbang.setup_transfer = spi_sirfsoc_setup_transfer;
+> +	sspi->bitbang.txrx_bufs = spi_sirfsoc_transfer;
+> +	sspi->bitbang.master->setup = spi_sirfsoc_setup;
+> +	sspi->bitbang.master->num_chipselect = 0xFFFF;
+> +	master->bus_num = pdev->id;
+> +	sspi->bitbang.master->dev.of_node = pdev->dev.of_node;
+> +
+> +	sspi->pmx = pinmux_get(&pdev->dev, NULL);
+> +	ret = IS_ERR(sspi->pmx);
+> +	if (ret)
+> +		goto free_master;
+> +
+> +	pinmux_enable(sspi->pmx);
+> +
+> +	sspi->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(sspi->clk)) {
+> +		ret = -EINVAL;
+> +		goto free_pmx;
+> +	}
+> +	clk_enable(sspi->clk);
+> +	sspi->ctrl_freq = clk_get_rate(sspi->clk);
+> +
+> +	init_completion(&sspi->done);
+> +
+> +	tasklet_init(&sspi->tasklet_tx, spi_sirfsoc_tasklet_tx,
+> +		     (unsigned long)sspi);
+> +
+> +	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+> +	/* We are not using dummy delay between command and data */
+> +	writel(0, sspi->base + SIRFSOC_SPI_DUMMY_DELAY_CTL);
+> +
+> +	ret = spi_bitbang_start(&sspi->bitbang);
+> +	if (ret)
+> +		goto free_clk;
+> +
+> +	dev_info(&pdev->dev, "registerred, bus number = %d\n", master->bus_num);
+> +
+> +	return 0;
+> +
+> +free_clk:
+> +	clk_disable(sspi->clk);
+> +	clk_put(sspi->clk);
+> +free_pmx:
+> +	pinmux_disable(sspi->pmx);
+> +	pinmux_put(sspi->pmx);
+> +free_master:
+> +	spi_master_put(master);
+> +
+> +	return ret;
+> +}
+> +
+> +static int  __devexit spi_sirfsoc_remove(struct platform_device *pdev)
+> +{
+> +	struct spi_master *master;
+> +	struct sirfsoc_spi *sspi;
+> +
+> +	master = platform_get_drvdata(pdev);
+> +	sspi = spi_master_get_devdata(master);
+> +
+> +	spi_bitbang_stop(&sspi->bitbang);
+> +	clk_disable(sspi->clk);
+> +	clk_put(sspi->clk);
+> +	pinmux_disable(sspi->pmx);
+> +	pinmux_put(sspi->pmx);
+> +	spi_master_put(master);
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +static int spi_sirfsoc_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct spi_master *master = platform_get_drvdata(pdev);
+> +	struct sirfsoc_spi *sspi = spi_master_get_devdata(master);
+> +
+> +	clk_disable(sspi->clk);
+> +	return 0;
+> +}
+> +
+> +static int spi_sirfsoc_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct spi_master *master = platform_get_drvdata(pdev);
+> +	struct sirfsoc_spi *sspi = spi_master_get_devdata(master);
+> +
+> +	clk_enable(sspi->clk);
+> +	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+> +	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops spi_sirfsoc_pm_ops = {
+> +	.suspend = spi_sirfsoc_suspend,
+> +	.resume = spi_sirfsoc_resume,
+> +};
+> +#endif
+> +
+> +static const struct of_device_id spi_sirfsoc_of_match[] = {
+> +	{ .compatible = "sirf,prima2-spi", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, sirfsoc_spi_of_match);
+> +
+> +static struct platform_driver spi_sirfsoc_driver = {
+> +	.driver = {
+> +		.name = DRIVER_NAME,
+> +		.owner = THIS_MODULE,
+> +#ifdef CONFIG_PM
+> +		.pm     = &spi_sirfsoc_pm_ops,
+> +#endif
+> +		.of_match_table = spi_sirfsoc_of_match,
+> +	},
+> +	.probe = spi_sirfsoc_probe,
+> +	.remove = __devexit_p(spi_sirfsoc_remove),
+> +};
+> +module_platform_driver(spi_sirfsoc_driver);
+> +
+> +MODULE_DESCRIPTION("SiRF SoC SPI master driver");
+> +MODULE_AUTHOR("Zhiwu Song <Zhiwu.Song@csr.com>, "
+> +		"Barry Song <Baohua.Song@csr.com>");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/spi/spi-sirf.h b/include/linux/spi/spi-sirf.h
+> new file mode 100644
+> index 0000000..0a985fe
+> --- /dev/null
+> +++ b/include/linux/spi/spi-sirf.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * include/linux/spi/spi_sirfsoc.h
+> + *
+> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#ifndef __SIRFSOC_SPI_H__
+> +#define __SIRFSOC_SPI_H__
+> +
+> +struct sirfsoc_spi_ctrldata {
+> +	int cs_type;
+> +	void (*chip_select) (void);
+> +	void (*chip_deselect) (void);
+> +	int cs_hold_clk;
+> +};
+> +
+> +#define SIRFSOC_SPI_CS_HW_CTRL	1
+> +#define SIRFSOC_SPI_CS_RISC_IO	2
+> +#define SIRFSOC_SPI_CS_GPIO		3
+> +#define SIRFSOC_SPI_CS_SW_CTRL	4
+> +
+> +#define SIRFSOC_SPI_CS_HOLD_1	0
+> +#define SIRFSOC_SPI_CS_HOLD_2	1
+> +
+> +#endif
+> -- 
+> 1.7.0.4
+> 
