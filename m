@@ -1,31 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Feb 2012 19:56:56 +0900
-Subject: [PATCH 3/9] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
-In-Reply-To: <CAH9JG2UAPO6wfEaoTfOvu53x3whkLBjcM45SV4m7Pf4su7Gn2A@mail.gmail.com>
-References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
- <1328024354-4277-4-git-send-email-kgene.kim@samsung.com>
- <CAH9JG2UAPO6wfEaoTfOvu53x3whkLBjcM45SV4m7Pf4su7Gn2A@mail.gmail.com>
-Message-ID: <068c01cce719$8a69a600$9f3cf200$%kim@samsung.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 09 Feb 2012 11:57:17 +0100
+Subject: [PATCH 1/2] ARM: ixp4xx: fix compilation, add gpiolib support
+In-Reply-To: <20275.35898.120590.54388@pilspetsen.it.uu.se> (Mikael
+ Pettersson's message of "Thu, 9 Feb 2012 10:04:58 +0100")
+References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+ <1328729069-21308-2-git-send-email-mkl@blackshift.org>
+ <20275.35898.120590.54388@pilspetsen.it.uu.se>
+Message-ID: <87fweki8aa.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+Mikael Pettersson <mikpe@it.uu.se> writes:
 
-[snip]
+> Marc Kleine-Budde writes:
+>  > From: Imre Kaloz <kaloz@openwrt.org>
+>  > 
+>  > The problem was introduced with commit:
+>  > "eb9ae7f gpio: fix build error in include/asm-generic/gpio.h"
+>  > 
+>  > This patch adds gpiolib support for the IXP4xx platform, which fixes the
+>  > compilation of several ixp4xx platforms, e.g.:
+>  > 
+>  > In file included from arch/arm/mach-ixp4xx/include/mach/gpio.h:72,
+>  >                  from /home/frogger/projects/server/linux/arch/arm/include/asm/gpio.h:9,
+>  >                  from include/linux/gpio.h:30,
+>  >                  from arch/arm/mach-ixp4xx/nslu2-setup.c:19:
+>  > include/asm-generic/gpio.h: In function 'gpio_get_value_cansleep':
+>  > include/asm-generic/gpio.h:218: error: implicit declaration of function '__gpio_get_value'
+>  > include/asm-generic/gpio.h: In function 'gpio_set_value_cansleep':
+>  > include/asm-generic/gpio.h:224: error: implicit declaration of function '__gpio_set_value'
+>
+> This fix is needed for 3.2 too, right?  I got the same errors when
+> updating my (out-of-tree) ixp4xx/ds101 platform support to the 3.2 kernel
+> a few days ago.
 
-> > +	if (soc_is_exynos5250())
-> > +		;
-> > +		/* will be implemented with gpio function */
-> Do you want to include both exynos4-gpio and exynos5-gpio?
+fwiw, it's even needed for 3.1. We've added it in the debian kernel when it
+was sent to the linux-arm-kernel ml and it was for 3.1.
 
-Now, yes. But I think, I need to sort out the regarding gpio later.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Arnaud
