@@ -1,97 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Feb 2012 09:11:24 +0000
-Subject: [PATCH 1/2] ARM: ixp4xx: fix compilation, add gpiolib support
-In-Reply-To: <1328729069-21308-2-git-send-email-mkl@blackshift.org>
-References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
- <1328729069-21308-2-git-send-email-mkl@blackshift.org>
-Message-ID: <20120209091124.GR889@n2100.arm.linux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu,  9 Feb 2012 11:07:20 +0100
+Subject: [PATCH][V2] ux500 : decouple/recouple gic from the PRCMU
+Message-ID: <1328782040-7786-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 08:24:28PM +0100, Marc Kleine-Budde wrote:
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 3841ab4..963f752 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -36,6 +36,7 @@
->  #include <asm/page.h>
->  #include <asm/irq.h>
->  #include <asm/sched_clock.h>
-> +#include <asm/gpio.h>
+This patch allows to decouple and recouple the gic from the PRCMU.
+This is needed to put the A9 core in retention mode with the cpuidle
+driver.
 
-linux/gpio.h
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/mfd/db8500-prcmu.c       |   29 +++++++++++++++++++++++++++++
+ include/linux/mfd/db8500-prcmu.h |    2 ++
+ include/linux/mfd/dbx500-prcmu.h |   16 ++++++++++++++++
+ 3 files changed, 47 insertions(+), 0 deletions(-)
 
-> diff --git a/arch/arm/mach-ixp4xx/include/mach/gpio.h b/arch/arm/mach-ixp4xx/include/mach/gpio.h
-> index 83d6b4e..093dfad 100644
-> --- a/arch/arm/mach-ixp4xx/include/mach/gpio.h
-> +++ b/arch/arm/mach-ixp4xx/include/mach/gpio.h
-> @@ -27,49 +27,31 @@
->  
->  #include <linux/kernel.h>
->  #include <mach/hardware.h>
-> +#include <asm-generic/gpio.h>			/* cansleep wrappers */
->  
->  #define __ARM_GPIOLIB_COMPLEX
->  
-> -static inline int gpio_request(unsigned gpio, const char *label)
-> -{
-> -	return 0;
-> -}
-> -
-> -static inline void gpio_free(unsigned gpio)
-> -{
-> -	might_sleep();
-> -
-> -	return;
-> -}
-> -
-> -static inline int gpio_direction_input(unsigned gpio)
-> -{
-> -	gpio_line_config(gpio, IXP4XX_GPIO_IN);
-> -	return 0;
-> -}
-> -
-> -static inline int gpio_direction_output(unsigned gpio, int level)
-> -{
-> -	gpio_line_set(gpio, level);
-> -	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
-> -	return 0;
-> -}
-> +#define NR_BUILTIN_GPIO 16
->  
->  static inline int gpio_get_value(unsigned gpio)
->  {
-> -	int value;
-> -
-> -	gpio_line_get(gpio, &value);
-> -
-> -	return value;
-> +	if (gpio < NR_BUILTIN_GPIO) {
-> +		int value;
-> +		gpio_line_get(gpio, &value);
-> +		return value;
-> +	} else
-> +		return __gpio_get_value(gpio);
->  }
->  
->  static inline void gpio_set_value(unsigned gpio, int value)
->  {
-> -	gpio_line_set(gpio, value);
-> +	if (gpio < NR_BUILTIN_GPIO)
-> +		gpio_line_set(gpio, value);
-> +	else
-> +		__gpio_set_value(gpio, value);
->  }
->  
-> -#include <asm-generic/gpio.h>			/* cansleep wrappers */
-> +#define gpio_cansleep __gpio_cansleep
->  
->  extern int gpio_to_irq(int gpio);
->  #define gpio_to_irq gpio_to_irq
-
-Does anything on ixp4xx require fast access to on-chip GPIOs?  If not,
-it would be much better to get rid of this and just use the standard
-wrapping, which can be done by changing this entire file to be just a
-single line:
-
-/* empty */
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index af8e0ef..70f39a1 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -787,6 +787,35 @@ int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll)
+ 	return 0;
+ }
+ 
++#define PRCMU_A9_MASK_REQ               0x00000328
++#define PRCMU_A9_MASK_REQ_MASK          0x00000001
++#define PRCMU_GIC_DELAY                 1
++
++/* This function decouple the gic from the prcmu */
++void db8500_prcmu_gic_decouple(void)
++{
++	u32 val = readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
++
++	/* Set bit 0 register value to 1 */
++	writel((val & ~PRCMU_A9_MASK_REQ_MASK) | PRCMU_A9_MASK_REQ_MASK,
++	       _PRCMU_BASE + PRCMU_A9_MASK_REQ);
++
++	/* Make sure the register is updated */
++	readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
++
++	/* Wait a few cycles for the gic mask completion */
++	udelay(PRCMU_GIC_DELAY);
++}
++
++/* This function recouple the gic with the prcmu */
++void db8500_prcmu_gic_recouple(void)
++{
++	u32 val = readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
++
++	/* Set bit 0 register value to 0 */
++	writel((val & ~PRCMU_A9_MASK_REQ_MASK), _PRCMU_BASE + PRCMU_A9_MASK_REQ);
++}
++
+ /* This function should only be called while mb0_transfer.lock is held. */
+ static void config_wakeups(void)
+ {
+diff --git a/include/linux/mfd/db8500-prcmu.h b/include/linux/mfd/db8500-prcmu.h
+index 60d27f7..4a1032c 100644
+--- a/include/linux/mfd/db8500-prcmu.h
++++ b/include/linux/mfd/db8500-prcmu.h
+@@ -536,6 +536,8 @@ int prcmu_load_a9wdog(u8 id, u32 val);
+ 
+ void db8500_prcmu_system_reset(u16 reset_code);
+ int db8500_prcmu_set_power_state(u8 state, bool keep_ulp_clk, bool keep_ap_pll);
++void db8500_prcmu_gic_disable(void);
++void db8500_prcmu_gic_enable(void);
+ void db8500_prcmu_enable_wakeups(u32 wakeups);
+ int db8500_prcmu_set_epod(u16 epod_id, u8 epod_state);
+ int db8500_prcmu_request_clock(u8 clock, bool enable);
+diff --git a/include/linux/mfd/dbx500-prcmu.h b/include/linux/mfd/dbx500-prcmu.h
+index bac942f..a5fee69 100644
+--- a/include/linux/mfd/dbx500-prcmu.h
++++ b/include/linux/mfd/dbx500-prcmu.h
+@@ -237,6 +237,22 @@ static inline int prcmu_set_power_state(u8 state, bool keep_ulp_clk,
+ 			keep_ap_pll);
+ }
+ 
++static inline void prcmu_gic_disable(void)
++{
++	if (machine_is_u5500())
++		return;
++	else
++		return db8500_prcmu_gic_disable();
++}
++
++static inline void prcmu_gic_enable(void)
++{
++	if (machine_is_u5500())
++		return;
++	else
++		return db8500_prcmu_gic_enable();
++}
++
+ static inline int prcmu_set_epod(u16 epod_id, u8 epod_state)
+ {
+ 	if (machine_is_u5500())
+-- 
+1.7.5.4
