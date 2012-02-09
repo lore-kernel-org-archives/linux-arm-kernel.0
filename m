@@ -1,35 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Feb 2012 08:54:40 +0000
-Subject: [PATCH v6 02/15] ARM: SoC: Add per SoC SMP and CPU hotplug
- operations
-In-Reply-To: <1328661059-24584-3-git-send-email-marc.zyngier@arm.com>
-References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
- <1328661059-24584-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20120209085440.GQ889@n2100.arm.linux.org.uk>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Thu,  9 Feb 2012 11:55:29 +0100
+Subject: [PATCH] mmc: atmel-mci: save and restore sdioirq when soft reset is
+ performed
+In-Reply-To: <1328721759-10124-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1328721759-10124-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1328784929-24174-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 12:30:46AM +0000, Marc Zyngier wrote:
-> Populate the SoC descriptor structure with the SMP and CPU hotplug
-> operations. To allow the kernel to continue building, the platform
-> hooks are defined as weak symbols which are overrided by the
-> platform code. Once all platforms are converted, the "weak" attribute
-> will be removed and the function made static.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-NAK.
+Sometimes a software reset is needed. Then some registers are saved and
+restored but the interrupt mask register is missing. It causes issues
+with sdio devices whose interrupts are masked after reset.
 
-Why do we need two structures, one for init and one for non-init.  Where
-these are used, they're both marked with __initdata.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: stable at vger.kernel.org
+---
+ drivers/mmc/host/atmel-mci.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-If anything, you want to separate out the hotplug stuff, because you'll
-be referencing __cpu* marked functions from __initdata, which I believe
-will give a section mismatch warning.
-
-Also, you'll get section mismatch warnings for calling __cpuinit functions
-from __cpuexit marked code.
-
-You did build this with CONFIG_DEBUG_SECTION_MISMATCH=y before sending it
-out?
-
-So, all in all this causes a lot of additional section mismatches, and so
-needs reworking.
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 09ac13b..dfa5dd9 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -965,11 +965,14 @@ static void atmci_start_request(struct atmel_mci *host,
+ 	host->data_status = 0;
+ 
+ 	if (host->need_reset) {
++		iflags = atmci_readl(host, ATMCI_IMR);
++		iflags &= (ATMCI_SDIOIRQA | ATMCI_SDIOIRQB);
+ 		atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+ 		atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIEN);
+ 		atmci_writel(host, ATMCI_MR, host->mode_reg);
+ 		if (host->caps.has_cfg_reg)
+ 			atmci_writel(host, ATMCI_CFG, host->cfg_reg);
++		atmci_writel(host, ATMCI_IER, iflags);
+ 		host->need_reset = false;
+ 	}
+ 	atmci_writel(host, ATMCI_SDCR, slot->sdc_reg);
+-- 
+1.7.5.4
