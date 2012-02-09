@@ -1,37 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 9 Feb 2012 12:04:39 -0800
-Subject: [PATCH v4 4/4] gpio: pl061: enable interrupts with DT style
- binding
-In-Reply-To: <1328308512-22594-5-git-send-email-robherring2@gmail.com>
-References: <1328308512-22594-1-git-send-email-robherring2@gmail.com>
- <1328308512-22594-5-git-send-email-robherring2@gmail.com>
-Message-ID: <20120209200435.GB2493@r65073-Latitude-D630>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 9 Feb 2012 21:05:57 +0100
+Subject: [PATCH] ARM: OMAP2+: Fix prm2xxx_3xxx.c INT_34XX_PRCM_MPU_IRQ
+ build error
+In-Reply-To: <20120209191547.GD19159@n2100.arm.linux.org.uk>
+References: <4F3417F5.2090901@ti.com>
+ <20120209191547.GD19159@n2100.arm.linux.org.uk>
+Message-ID: <4F342725.5050704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2012 at 04:35:12PM -0600, Rob Herring wrote:
-...
-> @@ -126,18 +127,16 @@ static void pl061_set_value(struct gpio_chip *gc, unsigned offset, int value)
->  static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
->  {
->  	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
-> -
-> -	if (chip->irq_base <= 0)
-> -		return -EINVAL;
-> -
-> -	return chip->irq_base + offset;
-> +	if (!chip->irq_gc)
-> +		return -ENXIO;
-> +	return irq_find_mapping(chip->irq_gc->domain, offset);
+On 2/9/2012 8:15 PM, Russell King - ARM Linux wrote:
+> On Thu, Feb 09, 2012 at 08:01:09PM +0100, Cousson, Benoit wrote:
+>> If CONFIG_OF is not defined, the following error will happen.
+>>
+>> arch/arm/mach-omap2/prm2xxx_3xxx.c:41:11: error:
+>>   ?INT_34XX_PRCM_MPU_IRQ? undeclared here (not in a function)
+>>
+>> This is due to some hidden headers path from linux/of.h to plat/irqs.h
+>> already reported by Russell for prm4xxx.c.
+>
+> I have the following commit from mainline.  I suspect you have an old
+> tree.
 
-If I understand the driver correctly, it will add a linear domain for
-dt case.  Do you have code somewhere creating the mapping before this
-irq_find_mapping gets called here?  The reason I'm asking this is I
-have to call irq_create_mapping rather than irq_find_mapping here to
-get imx gpio driver working with linear domain, otherwise the
-irq_find_mapping call will fail.
+OK, it was part of the fixes Tony sent for for v3.3-rc2 but that are 
+were not in mainline until now.
+I've just pulled -rc3 and this is indeed there.
 
-Regards,
-Shawn
+Thanks,
+Benoit
 
->  }
+>
+> Note: for the next merge window, I'm removing the asm/irq.h include from
+> asm/prom.h so that this kind of thing doesn't happen in the future.
+>
+> commit d19e8f2e44a34b2a461f67ce9d0cb5bd43197c1e
+> Author: Paul Walmsley<paul@pwsan.com>
+> Date:   Wed Jan 25 12:57:49 2012 -0700
+>
+>      ARM: OMAP2/3: PRM: fix missing plat/irqs.h build breakage
+>
+>      Commit 22f51371f8c35869ed850f46aa76b6cc2b502110 ("ARM: OMAP3: pm: use
+>      prcm chain handler") breaks the build on a 2420-only config, due to
+>      a missing include for plat/irqs.h:
+>
+>        CC      arch/arm/mach-omap2/prm2xxx_3xxx.o
+>      arch/arm/mach-omap2/prm2xxx_3xxx.c:41:11: error: 'INT_34XX_PRCM_MPU_IRQ' undeclared here (not in a function)
+>
+>      Fix by explicitly including it.
+>
+>      Signed-off-by: Paul Walmsley<paul@pwsan.com>
+>      Cc: Tero Kristo<t-kristo@ti.com>
+>      Cc: Kevin Hilman<khilman@ti.com>
+>
+> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> index c1c4d86..9ce7654 100644
+> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> @@ -19,6 +19,7 @@
+>   #include "common.h"
+>   #include<plat/cpu.h>
+>   #include<plat/prcm.h>
+> +#include<plat/irqs.h>
+>
+>   #include "vp.h"
+>
