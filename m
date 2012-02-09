@@ -1,27 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 9 Feb 2012 04:41:36 -0800
-Subject: [GIT PULL] mxs/defconfig for 3.4
-In-Reply-To: <CAOesGMiiyQA0EyJcb7-EAQ2-uK35nwR9o3szSJ1eBCrBGcdpFg@mail.gmail.com>
-References: <20120201154628.GC2203@S2101-09.ap.freescale.net>
- <CAOesGMg5qEXvYDM1BEUj-na69XWE7E6XUWZ1m=pLNwvS8NYwhg@mail.gmail.com>
- <CAAQ0ZWQzxbQmD__N9zZoE=0N4JX+6XFbFz6CRKannjeBZBLF=A@mail.gmail.com>
- <CAOesGMiiyQA0EyJcb7-EAQ2-uK35nwR9o3szSJ1eBCrBGcdpFg@mail.gmail.com>
-Message-ID: <CAAQ0ZWQ4ipZvW5yVWMEyxQ7unkBWURJmFdGHNZ1k0HsX01B-qQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 09 Feb 2012 14:00:19 +0100
+Subject: [PATCH][V2] ux500 : decouple/recouple gic from the PRCMU
+In-Reply-To: <4F33B9B4.2090503@stericsson.com>
+References: <1328782040-7786-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F33A555.9040504@stericsson.com> <4F33AD37.4060604@linaro.org>
+ <4F33B9B4.2090503@stericsson.com>
+Message-ID: <4F33C363.1080308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 February 2012 22:59, Olof Johansson <olof@lixom.net> wrote:
-...
-> No, not just in one large branch. But you can collect patches on
-> specific topics into separate branches that are sent multiple times as
-> you add patches to it. I.e. similar to how most platform maintainers
-> have been collecting patches in topic branches with one pull request
-> done at the end, but with pull requests going in as the branch is
-> built up.
->
-> Does that explanation make sense? I can elaborate if it's still not quite clear.
->
-Got it, thanks for the explanation, Olof.
+On 02/09/2012 01:19 PM, Rickard Andersson wrote:
+> On 02/09/2012 12:25 PM, Daniel Lezcano wrote:
+>> On 02/09/2012 11:52 AM, Rickard Andersson wrote:
+>>> Hi Daniel!
+>>>
+>>> Please see my embedded comments.
+>>>
+>>> Also should we not keep the functions in pm.c file? I think Linus W
+>>> advised us not to move stuff around at this stage.
+>> The pm.c file does not exists for mach-ux500. May be I misunderstood
+>> Linus but I thought he was saying to that we should "not move stuff
+>> around" by letting this code in the db8500-prcmu.c file for the moment
+>> and let Mattias do its cleanups.
+> On our internal tree we have mach-ux500/pm/pm.c and this file contains
+> the decouple-gic functions as well as other power management related
+> help functions. By moving the code to drivers/mfd/db8500-prcmu.c I think
+> we are moving code around. Especially since it not clear how
+> db8500-prcmu.c will be handled in the future, db8500-prcmu.c should most
+> likely be split into several parts where one part only handles the
+> communication with the PRCMU firmware.
 
-Regards,
-Shawn
+Rickard,
+
+the reference is the mainstream code. Today there is no pm.c file and 
+everything is located in db8500-prcmu.c. Except if I misunderstood, if 
+Linus, who is the maintainer of the ux500 SoC, prefers to have this 
+portion of code in this file until Mattias does its cleanups, that does 
+not really matter if it is in pm.c or db8500-prcmu.c for the moment.
+
+That does not mean this code won't be moved to pm.c in the future.
+
+Thanks
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
