@@ -1,109 +1,95 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 9 Feb 2012 11:24:39 +0000
-Subject: [PATCH v4 2/2] Regulator: Add Anatop regulator driver
-In-Reply-To: <1328734286-30091-2-git-send-email-paul.liu@linaro.org>
-References: <1328734286-30091-2-git-send-email-paul.liu@linaro.org>
-Message-ID: <20120209112439.GC3058@opensource.wolfsonmicro.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 09 Feb 2012 12:25:43 +0100
+Subject: [PATCH][V2] ux500 : decouple/recouple gic from the PRCMU
+In-Reply-To: <4F33A555.9040504@stericsson.com>
+References: <1328782040-7786-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F33A555.9040504@stericsson.com>
+Message-ID: <4F33AD37.4060604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2012 at 04:51:26AM +0800, Ying-Chun Liu (PaulLiu) wrote:
+On 02/09/2012 11:52 AM, Rickard Andersson wrote:
+> Hi Daniel!
+>
+> Please see my embedded comments.
+>
+> Also should we not keep the functions in pm.c file? I think Linus W
+> advised us not to move stuff around at this stage.
 
-Overall this is looking pretty good, a few issues but relatively minor.
+The pm.c file does not exists for mach-ux500. May be I misunderstood 
+Linus but I thought he was saying to that we should "not move stuff 
+around" by letting this code in the db8500-prcmu.c file for the moment 
+and let Mattias do its cleanups.
 
-> +	if (uv < anatop_reg->rdata->min_voltage
-> +	    || uv > anatop_reg->rdata->max_voltage) {
-> +		if (max_uV > anatop_reg->rdata->min_voltage)
-> +			uv = anatop_reg->rdata->min_voltage;
-> +		else
-> +			return -EINVAL;
-> +	}
+> BR
+> Rickard
+>> This patch allows to decouple and recouple the gic from the PRCMU.
+>> This is needed to put the A9 core in retention mode with the cpuidle
+>> driver.
+>>
+>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>> ---
+>> drivers/mfd/db8500-prcmu.c | 29 +++++++++++++++++++++++++++++
+>> include/linux/mfd/db8500-prcmu.h | 2 ++
+>> include/linux/mfd/dbx500-prcmu.h | 16 ++++++++++++++++
+>> 3 files changed, 47 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+>> index af8e0ef..70f39a1 100644
+>> --- a/drivers/mfd/db8500-prcmu.c
+>> +++ b/drivers/mfd/db8500-prcmu.c
+>> @@ -787,6 +787,35 @@ int db8500_prcmu_set_power_state(u8 state, bool
+>> keep_ulp_clk, bool keep_ap_pll)
+>> return 0;
+>> }
+>>
+>> +#define PRCMU_A9_MASK_REQ 0x00000328
+>> +#define PRCMU_A9_MASK_REQ_MASK 0x00000001
+>> +#define PRCMU_GIC_DELAY 1
+>> +
+>> +/* This function decouple the gic from the prcmu */
+>> +void db8500_prcmu_gic_decouple(void)
+>> +{
+>> + u32 val = readl(_PRCMU_BASE + PRCMU_A9_MASK_REQ);
+>> +
+>> + /* Set bit 0 register value to 1 */
+>> + writel((val& ~PRCMU_A9_MASK_REQ_MASK) | PRCMU_A9_MASK_REQ_MASK,
+>> + _PRCMU_BASE + PRCMU_A9_MASK_REQ);
+> No need to AND with ~PRCMU_A9_MASK_REQ_MASK. This is enough:
+>
+> writel((val | PRCMU_A9_MASK_REQ_MASK,
+> _PRCMU_BASE + PRCMU_A9_MASK_REQ);
 
-This looks buggy (and is quite hard to follow).  The check for the
-voltage being above the minimum voltage is fine but surely if the
-voltage is too high then the first if statement will be true and max_uV
-will be greater than the minimum voltage so the second if will be true.
-This will cause us to choose the minimum voltage that the regulator can
-do which is less than the minimum voltage requested.
+Yep, right.
 
-You probably shouldn't be checking for the upper end of the range at all
-here...
 
-> +	if (anatop_reg->rdata->control_reg) {
-> +		sel = (uv - anatop_reg->rdata->min_voltage) / 25000;
-> +		val = anatop_reg->rdata->min_bit_val + sel;
-> +		*selector = sel;
-> +		pr_debug("%s: calculated val %d\n", __func__, val);
+[ cut ]
 
-...instead check that selector is in range here.
+>> +static inline void prcmu_gic_disable(void)
+>> +{
+>> + if (machine_is_u5500())
+>> + return;
+>> + else
+>> + return db8500_prcmu_gic_disable();
+>> +}
+> We have change name of this function in the .c file
+>> +
+>> +static inline void prcmu_gic_enable(void)
+>> +{
+>> + if (machine_is_u5500())
+>> + return;
+>> + else
+>> + return db8500_prcmu_gic_enable();
+>> +}
+> We have change name of this function in the .c file
 
-> +		anatop_reg->rdata->mfd->write(anatop_reg->rdata->mfd,
-> +					      anatop_reg->rdata->control_reg,
-> +					      anatop_reg->rdata->vol_bit_shift,
-> +					      anatop_reg->rdata->vol_bit_size,
-> +					      val);
+Do you want that in db8500-prcmu.c and declare the function in 
+db8500-prcmu.h or dbx500-prcmu.h ?
 
-Just have a write() function in the MFD.
 
-> +	memset(rdesc, 0, sizeof(struct regulator_desc));
-> +	rdesc->name = kstrdup(of_get_property(np, "regulator-name", NULL),
-> +			      GFP_KERNEL);
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-You should add binding documentation for the device since it's OF based.
-
-> +	sreg->rdata->name = kstrdup(rdesc->name, GFP_KERNEL);
-
-Can't you just point to rdesc->name?
-
-> +	if (IS_ERR(rdev)) {
-> +		dev_err(&pdev->dev, "failed to register %s\n",
-> +			rdesc->name);
-> +		return PTR_ERR(rdev);
-> +	}
-
-All your kstrdup()s need to be unwound in error and free cases.
-
-> +int anatop_regulator_init(void)
-> +{
-> +	return platform_driver_register(&anatop_regulator);
-> +}
-> +
-> +void anatop_regulator_exit(void)
-> +{
-> +	platform_driver_unregister(&anatop_regulator);
-> +}
-> +
-> +postcore_initcall(anatop_regulator_init);
-> +module_exit(anatop_regulator_exit);
-
-These should be adjacent to the functions.
-
-> +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
-
-Either omit this or put one or more humans as the author.
-
-> +struct anatop_regulator {
-> +       struct regulator_desc *regulator;
-> +       struct regulator_init_data *initdata;
-> +       struct anatop_regulator_data *rdata;
-> +};
-
-May as well just merge the regulator data in here - it's not ever used
-except with a 1:1 relationship between them.  Could also directly
-embed the desc and init_data, then you just have one allocation for the
-data rather than a series to error check.
-
-> +int anatop_register_regulator(
-> +		struct anatop_regulator *reg_data, int reg,
-> +		      struct regulator_init_data *initdata);
-
-This looks like it's not defined any more so could be removed and since
-you only appear to support OF the entire header could be merged into the
-driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120209/06f638d6/attachment.sig>
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
