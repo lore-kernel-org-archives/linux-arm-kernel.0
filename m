@@ -1,44 +1,37 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Thu, 9 Feb 2012 08:51:06 +0100
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <1328736834.2903.33.camel@pasglop>
-References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
- <20120208202314.GA28290@redhat.com>
- <1328736834.2903.33.camel@pasglop>
-Message-ID: <20120209075106.GB18387@elte.hu>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 9 Feb 2012 12:48:25 +0530
+Subject: [PATCH v4 0/3] Moving EMIF driver to MFD framework
+Message-ID: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Patch series are based on the discussion and concerns expressed in
+davinci-linux-open-source community. Here is the link for the same:
+http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
 
-* Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
+Manjunathappa, Prakash (3):
+  arm:davinci: prepare to move aemif driver to drivers/mfd
+  arm:davinci: move emif driver to drivers/mfd from mach-davinci folder
+  arm:davinci: move NAND and NOR devices as aemif MFD slaves
 
-> On Wed, 2012-02-08 at 15:23 -0500, Dave Jones wrote:
-> > I think the biggest mistake we ever made with cpufreq was making it
-> > so configurable. If we redesign it, just say no to plugin governors,
-> > and
-> > yes to a lot fewer sysfs knobs.
-> > 
-> > So, provide mechanism to kill off all the governors, and there's a
-> > migration path from what we have now to something that just works
-> > in a lot more cases, while remaining configurable enough for the
-> > corner-cases.
-> 
-> On the other hand, the need for schedulable contxts may not 
-> necessarily go away.
-
-We will support it, but the *sane* hw solution is where 
-frequency transitions can be done atomically. Most workloads 
-change their characteristics very quickly, and so does their 
-power management profile change.
-
-The user-space driven policy model failed for that reason: it 
-was *way* too slow in reacting) - and slow hardware transitions 
-suck for a similar reason as well.
-
-We accomodate all hardware as well as we can, but we *design* 
-for proper hardware. So Peter is right, this should be done 
-properly.
-
-Thanks,
-
-	Ingo
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/mach-davinci/Makefile                     |    2 +-
+ arch/arm/mach-davinci/aemif.c                      |  133 -------------
+ arch/arm/mach-davinci/board-da830-evm.c            |   33 +++-
+ arch/arm/mach-davinci/board-da850-evm.c            |   56 +++---
+ arch/arm/mach-davinci/board-dm355-evm.c            |   33 +++-
+ arch/arm/mach-davinci/board-dm355-leopard.c        |   35 +++-
+ arch/arm/mach-davinci/board-dm365-evm.c            |   34 +++-
+ arch/arm/mach-davinci/board-dm644x-evm.c           |  175 ++++++++++-------
+ arch/arm/mach-davinci/board-dm646x-evm.c           |   32 +++-
+ arch/arm/mach-davinci/board-mityomapl138.c         |   34 +++-
+ arch/arm/mach-davinci/board-neuros-osd2.c          |    1 +
+ arch/arm/mach-davinci/board-sffsdr.c               |   34 +++-
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/davinci_aemif.c                        |  206 ++++++++++++++++++++
+ drivers/mtd/nand/davinci_nand.c                    |    2 +-
+ .../aemif.h => include/linux/mfd/davinci_aemif.h   |   14 ++
+ 17 files changed, 527 insertions(+), 299 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/aemif.c
+ create mode 100644 drivers/mfd/davinci_aemif.c
+ rename arch/arm/mach-davinci/include/mach/aemif.h => include/linux/mfd/davinci_aemif.h (74%)
