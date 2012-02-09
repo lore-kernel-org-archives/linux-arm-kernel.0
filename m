@@ -1,100 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 08 Feb 2012 22:33:18 -0800 (PST)
-Subject: [PATCH v2 2/4] ARM: rpc: make default fiq handler run-time
- installed
-In-Reply-To: <1328751219-2552-3-git-send-email-robherring2@gmail.com>
-References: <1328751219-2552-1-git-send-email-robherring2@gmail.com>
- <1328751219-2552-3-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1202082229400.1656@xanadu.home>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 09 Feb 2012 06:34:50 +0000
+Subject: [regression] Re: Enabling runtime P2V by default
+In-Reply-To: <20120206232328.GA1941@burratino>
+References: <1312918898-11894-1-git-send-email-linus.walleij@stericsson.com>
+ <20110810091635.GF1831@n2100.arm.linux.org.uk>
+ <20110810092206.GE10121@e102144-lin.cambridge.arm.com>
+ <20120206223147.GA3760@burratino>
+ <alpine.LFD.2.02.1202061514430.1656@xanadu.home>
+ <20120206232328.GA1941@burratino>
+Message-ID: <1328769290.13189.76.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Feb 2012, Rob Herring wrote:
-
-> From: Rob Herring <rob.herring@calxeda.com>
+On Mon, 2012-02-06 at 17:23 -0600, Jonathan Nieder wrote:
+> Nicolas Pitre wrote:
 > 
-> Only rpc uses disable_fiq macro. Change it to a run-time installed
-> default FIQ handler. The handler is installed before interrupts are
-
-s/interrupts/FIQs/
-
-> enabled so the behavior should be unchanged.
+> > You really do want to have uboot patched.  Who knows what other latent 
+> > issues are there that you don't know about.
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/mach-rpc/Makefile |    2 +-
->  arch/arm/mach-rpc/fiq.S    |   12 ++++++++++++
->  arch/arm/mach-rpc/irq.c    |    6 ++++++
->  3 files changed, 19 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-rpc/fiq.S
-> 
-> diff --git a/arch/arm/mach-rpc/Makefile b/arch/arm/mach-rpc/Makefile
-> index aa77bc9..dfa405c 100644
-> --- a/arch/arm/mach-rpc/Makefile
-> +++ b/arch/arm/mach-rpc/Makefile
-> @@ -4,7 +4,7 @@
->  
->  # Object file lists.
->  
-> -obj-y			:= dma.o irq.o riscpc.o
-> +obj-y			:= dma.o fiq.o irq.o riscpc.o
->  obj-m			:=
->  obj-n			:=
->  obj-			:=
-> diff --git a/arch/arm/mach-rpc/fiq.S b/arch/arm/mach-rpc/fiq.S
-> new file mode 100644
-> index 0000000..e0e4ac5
-> --- /dev/null
-> +++ b/arch/arm/mach-rpc/fiq.S
-> @@ -0,0 +1,12 @@
-> +#include <linux/linkage.h>
-> +#include <asm/assembler.h>
-> +#include <mach/hardware.h>
-> +#include <mach/entry-macro.S>
-> +
-> +	.text
-> +
-> +	.global	rpc_default_fiq_end
-> +ENTRY(rpc_default_fiq_start)
-> +	disable_fiq
+> Ah, sorry for the lack of clarity.  I don't believe this u-boot patch[1]
+> has been committed anywhere, so even people with the latest u-boot are
+> affected.  It's just available from the mailing list archive.
 
-Given that you want to get rid of disable_fiq, it would be a good idea 
-to replace it with its content here.
+FYI it has now been applied to the Marvell u-boot custodian's tree:
+git://git.denx.de/u-boot-marvell.git
+
+Ian.
+
+-- 
+Ian Campbell
 
 
-> +	subs	pc, lr, #4
-> +rpc_default_fiq_end:
-> diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
-> index 2e1b530..cf0e669 100644
-> --- a/arch/arm/mach-rpc/irq.c
-> +++ b/arch/arm/mach-rpc/irq.c
-> @@ -5,6 +5,7 @@
->  #include <asm/mach/irq.h>
->  #include <asm/hardware/iomd.h>
->  #include <asm/irq.h>
-> +#include <asm/fiq.h>
->  
->  static void iomd_ack_irq_a(struct irq_data *d)
->  {
-> @@ -112,6 +113,8 @@ static struct irq_chip iomd_fiq_chip = {
->  	.irq_unmask	= iomd_unmask_irq_fiq,
->  };
->  
-> +extern unsigned char rpc_default_fiq_start, rpc_default_fiq_end;
-> +
->  void __init rpc_init_irq(void)
->  {
->  	unsigned int irq, flags;
-> @@ -121,6 +124,9 @@ void __init rpc_init_irq(void)
->  	iomd_writeb(0, IOMD_FIQMASK);
->  	iomd_writeb(0, IOMD_DMAMASK);
->  
-> +	set_fiq_handler(&rpc_default_fiq_start,
-> +		&rpc_default_fiq_end - &rpc_default_fiq_start);
-> +
->  	for (irq = 0; irq < NR_IRQS; irq++) {
->  		flags = IRQF_VALID;
->  
-> -- 
-> 1.7.5.4
-> 
+An evil mind is a great comfort.
