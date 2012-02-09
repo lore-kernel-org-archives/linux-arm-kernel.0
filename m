@@ -1,81 +1,87 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed,  8 Feb 2012 19:33:36 -0600
-Subject: [PATCH v2 1/4] ARM: make arch_ret_to_user macro optional
+Date: Wed,  8 Feb 2012 19:33:37 -0600
+Subject: [PATCH v2 2/4] ARM: rpc: make default fiq handler run-time installed
 In-Reply-To: <1328751219-2552-1-git-send-email-robherring2@gmail.com>
 References: <1328751219-2552-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1328751219-2552-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1328751219-2552-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Only 3 platforms need arch_ret_to_user macro, so add NEED_RET_TO_USER
-kconfig option and make iop13xx, iop32x and iop33x select it.
+Only rpc uses disable_fiq macro. Change it to a run-time installed
+default FIQ handler. The handler is installed before interrupts are
+enabled so the behavior should be unchanged.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/Kconfig               |    6 ++++++
- arch/arm/kernel/entry-common.S |    8 +++++++-
- 2 files changed, 13 insertions(+), 1 deletions(-)
+ arch/arm/mach-rpc/Makefile |    2 +-
+ arch/arm/mach-rpc/fiq.S    |   12 ++++++++++++
+ arch/arm/mach-rpc/irq.c    |    6 ++++++
+ 3 files changed, 19 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-rpc/fiq.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a48aecc..7d809b7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -186,6 +186,9 @@ config GENERIC_ISA_DMA
- config FIQ
- 	bool
+diff --git a/arch/arm/mach-rpc/Makefile b/arch/arm/mach-rpc/Makefile
+index aa77bc9..dfa405c 100644
+--- a/arch/arm/mach-rpc/Makefile
++++ b/arch/arm/mach-rpc/Makefile
+@@ -4,7 +4,7 @@
  
-+config NEED_RET_TO_USER
-+	bool
-+
- config ARCH_MTD_XIP
- 	bool
+ # Object file lists.
  
-@@ -479,6 +482,7 @@ config ARCH_IOP13XX
- 	select ARCH_SUPPORTS_MSI
- 	select VMSPLIT_1G
- 	select NEED_MACH_MEMORY_H
-+	select NEED_RET_TO_USER
- 	help
- 	  Support for Intel's IOP13XX (XScale) family of processors.
- 
-@@ -486,6 +490,7 @@ config ARCH_IOP32X
- 	bool "IOP32x-based"
- 	depends on MMU
- 	select CPU_XSCALE
-+	select NEED_RET_TO_USER
- 	select PLAT_IOP
- 	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -497,6 +502,7 @@ config ARCH_IOP33X
- 	bool "IOP33x-based"
- 	depends on MMU
- 	select CPU_XSCALE
-+	select NEED_RET_TO_USER
- 	select PLAT_IOP
- 	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 9fd0ba9..54ee265 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -10,9 +10,15 @@
- 
- #include <asm/unistd.h>
- #include <asm/ftrace.h>
--#include <mach/entry-macro.S>
- #include <asm/unwind.h>
- 
-+#ifdef CONFIG_NEED_RET_TO_USER
+-obj-y			:= dma.o irq.o riscpc.o
++obj-y			:= dma.o fiq.o irq.o riscpc.o
+ obj-m			:=
+ obj-n			:=
+ obj-			:=
+diff --git a/arch/arm/mach-rpc/fiq.S b/arch/arm/mach-rpc/fiq.S
+new file mode 100644
+index 0000000..e0e4ac5
+--- /dev/null
++++ b/arch/arm/mach-rpc/fiq.S
+@@ -0,0 +1,12 @@
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <mach/hardware.h>
 +#include <mach/entry-macro.S>
-+#else
-+	.macro  arch_ret_to_user, tmp1, tmp2
-+	.endm
-+#endif
 +
- #include "entry-header.S"
++	.text
++
++	.global	rpc_default_fiq_end
++ENTRY(rpc_default_fiq_start)
++	disable_fiq
++	subs	pc, lr, #4
++rpc_default_fiq_end:
+diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
+index 2e1b530..cf0e669 100644
+--- a/arch/arm/mach-rpc/irq.c
++++ b/arch/arm/mach-rpc/irq.c
+@@ -5,6 +5,7 @@
+ #include <asm/mach/irq.h>
+ #include <asm/hardware/iomd.h>
+ #include <asm/irq.h>
++#include <asm/fiq.h>
  
+ static void iomd_ack_irq_a(struct irq_data *d)
+ {
+@@ -112,6 +113,8 @@ static struct irq_chip iomd_fiq_chip = {
+ 	.irq_unmask	= iomd_unmask_irq_fiq,
+ };
+ 
++extern unsigned char rpc_default_fiq_start, rpc_default_fiq_end;
++
+ void __init rpc_init_irq(void)
+ {
+ 	unsigned int irq, flags;
+@@ -121,6 +124,9 @@ void __init rpc_init_irq(void)
+ 	iomd_writeb(0, IOMD_FIQMASK);
+ 	iomd_writeb(0, IOMD_DMAMASK);
+ 
++	set_fiq_handler(&rpc_default_fiq_start,
++		&rpc_default_fiq_end - &rpc_default_fiq_start);
++
+ 	for (irq = 0; irq < NR_IRQS; irq++) {
+ 		flags = IRQF_VALID;
  
 -- 
 1.7.5.4
