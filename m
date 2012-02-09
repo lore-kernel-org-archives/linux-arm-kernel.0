@@ -1,20 +1,20 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 08 Feb 2012 16:09:48 -0800
+Date: Wed, 08 Feb 2012 16:11:19 -0800
 Subject: [PATCH 05/16] ARM: omap: fix vc.c PMIC error message
-In-Reply-To: <20120208235620.GE25414@n2100.arm.linux.org.uk> (Russell King's
- message of "Wed, 8 Feb 2012 23:56:20 +0000")
+In-Reply-To: <20120208235716.GE16877@atomide.com> (Tony Lindgren's message of
+ "Wed, 8 Feb 2012 15:57:16 -0800")
 References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
  <E1RvAWP-0006H3-1A@rmk-PC.arm.linux.org.uk>
  <20120208184539.GE29796@atomide.com> <87ty312ae0.fsf@ti.com>
  <20120208235358.GD16877@atomide.com>
- <20120208235620.GE25414@n2100.arm.linux.org.uk>
-Message-ID: <87sjikx3xv.fsf@ti.com>
+ <20120208235716.GE16877@atomide.com>
+Message-ID: <87mx8sx3vc.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Tony Lindgren <tony@atomide.com> writes:
 
-> On Wed, Feb 08, 2012 at 03:53:58PM -0800, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [120208 15:22]:
 >> * Kevin Hilman <khilman@ti.com> [120208 14:35]:
 >> > Tony Lindgren <tony@atomide.com> writes:
 >> > 
@@ -53,12 +53,19 @@ Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 >> 
 >> Everybody OK with that?
 >
-> Does it fix the other issues I mention in the commit log as well?
+> Also, what about this one in the cleanup branch:
+>
+> d269914ece0498f31603ecd85ed3d7a586b3cbcd ARM: OMAP2+: PM: only register TWL with voltage layer when device is present
+>
+> Should that be a fix too?
+> 
 
-Like your patches 1 & 5, my series fixes the oops and also makes the
-error strings simple, non-wrapping ones.
+Yes.
 
-The one thing it doesn't fix is the spelling typo you fixed in the
-comment, but IMO we can leave that out for -rc.
+The AM35xx devices that don't use TWL PMICs have the problem fixed by
+this patch.
+
+Looking back, I'm not sure why I called this a cleaup branch when all
+the patches are fixes.
 
 Kevin
