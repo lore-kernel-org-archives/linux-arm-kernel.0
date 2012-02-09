@@ -1,219 +1,109 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Thu,  9 Feb 2012 12:18:22 +0100
-Subject: [PATCH] ARM: OMAP1: ams-delta: clean up init data section assignments
-In-Reply-To: <1328696173-17226-1-git-send-email-grinberg@compulab.co.il>
-References: <1328696173-17226-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1328786302-25131-1-git-send-email-jkrzyszt@tis.icnet.pl>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 9 Feb 2012 11:24:39 +0000
+Subject: [PATCH v4 2/2] Regulator: Add Anatop regulator driver
+In-Reply-To: <1328734286-30091-2-git-send-email-paul.liu@linaro.org>
+References: <1328734286-30091-2-git-send-email-paul.liu@linaro.org>
+Message-ID: <20120209112439.GC3058@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The main purpose of this patch is to fix several section mismatch
-warnings from the board file and a few board specific drivers,
-introduced mostly with recent Amstrad Delta patch series, some of them
-rising up only when building with CONFIG_MODULES not set.
+On Thu, Feb 09, 2012 at 04:51:26AM +0800, Ying-Chun Liu (PaulLiu) wrote:
 
-While being at it, section assignments of all init data found in the
-board file have been revised and hopefully optimised.
+Overall this is looking pretty good, a few issues but relatively minor.
 
-Created and tested on top of current linux-omap/omap1, commit
-967809bd7faf71ddc29c8081e0f21db8b201a0f4.
+> +	if (uv < anatop_reg->rdata->min_voltage
+> +	    || uv > anatop_reg->rdata->max_voltage) {
+> +		if (max_uV > anatop_reg->rdata->min_voltage)
+> +			uv = anatop_reg->rdata->min_voltage;
+> +		else
+> +			return -EINVAL;
+> +	}
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
- arch/arm/mach-omap1/board-ams-delta.c |   35 +++++++++++++++++----------------
- drivers/input/serio/ams_delta_serio.c |    2 +-
- drivers/mtd/nand/ams-delta.c          |    2 +-
- drivers/video/omap/lcd_ams_delta.c    |    2 +-
- 4 files changed, 21 insertions(+), 20 deletions(-)
+This looks buggy (and is quite hard to follow).  The check for the
+voltage being above the minimum voltage is fine but surely if the
+voltage is too high then the first if statement will be true and max_uV
+will be greater than the minimum voltage so the second if will be true.
+This will cause us to choose the minimum voltage that the regulator can
+do which is less than the minimum voltage requested.
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 87b1303..dc2455f 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -126,7 +126,7 @@ static const unsigned int ams_delta_keymap[] = {
- #define LATCH2_PHYS	0x08000000
- #define LATCH2_VIRT	0xEC000000
- 
--static struct map_desc ams_delta_io_desc[] __initdata = {
-+static struct map_desc ams_delta_io_desc[] __initconst = {
- 	/* AMS_DELTA_LATCH1 */
- 	{
- 		.virtual	= LATCH1_VIRT,
-@@ -150,17 +150,17 @@ static struct map_desc ams_delta_io_desc[] __initdata = {
- 	}
- };
- 
--static struct omap_lcd_config ams_delta_lcd_config = {
-+static struct omap_lcd_config ams_delta_lcd_config __initconst = {
- 	.ctrl_name	= "internal",
- };
- 
--static struct omap_usb_config ams_delta_usb_config __initdata = {
-+static struct omap_usb_config ams_delta_usb_config __initdata_or_module = {
- 	.register_host	= 1,
- 	.hmc_mode	= 16,
- 	.pins[0]	= 2,
- };
- 
--static struct omap_board_config_kernel ams_delta_config[] __initdata = {
-+static struct omap_board_config_kernel ams_delta_config[] __initconst = {
- 	{ OMAP_TAG_LCD,		&ams_delta_lcd_config },
- };
- 
-@@ -181,7 +181,7 @@ static struct bgpio_pdata latch1_pdata __initconst = {
- 	.ngpio	= LATCH1_NGPIO,
- };
- 
--static struct platform_device latch1_gpio_device = {
-+static struct platform_device latch1_gpio_device __refdata = {
- 	.name		= "basic-mmio-gpio",
- 	.id		= 0,
- 	.resource	= latch1_resources,
-@@ -205,7 +205,7 @@ static struct bgpio_pdata latch2_pdata __initconst = {
- 	.ngpio	= AMS_DELTA_LATCH2_NGPIO,
- };
- 
--static struct platform_device latch2_gpio_device = {
-+static struct platform_device latch2_gpio_device __refdata = {
- 	.name		= "basic-mmio-gpio",
- 	.id		= 1,
- 	.resource	= latch2_resources,
-@@ -271,7 +271,7 @@ void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value)
- }
- EXPORT_SYMBOL(ams_delta_latch_write);
- 
--static struct resource ams_delta_nand_resources[] = {
-+static struct resource ams_delta_nand_resources[] __initconst_or_module = {
- 	[0] = {
- 		.start	= OMAP1_MPUIO_BASE,
- 		.end	= OMAP1_MPUIO_BASE +
-@@ -280,14 +280,14 @@ static struct resource ams_delta_nand_resources[] = {
- 	},
- };
- 
--static struct platform_device ams_delta_nand_device = {
-+static struct platform_device ams_delta_nand_device __refdata = {
- 	.name	= "ams-delta-nand",
- 	.id	= -1,
- 	.num_resources	= ARRAY_SIZE(ams_delta_nand_resources),
- 	.resource	= ams_delta_nand_resources,
- };
- 
--static struct resource ams_delta_kp_resources[] = {
-+static struct resource ams_delta_kp_resources[] __initconst_or_module = {
- 	[0] = {
- 		.start	= INT_KEYBOARD,
- 		.end	= INT_KEYBOARD,
-@@ -300,14 +300,14 @@ static const struct matrix_keymap_data ams_delta_keymap_data = {
- 	.keymap_size	= ARRAY_SIZE(ams_delta_keymap),
- };
- 
--static struct omap_kp_platform_data ams_delta_kp_data __initdata = {
-+static struct omap_kp_platform_data ams_delta_kp_data __initconst_or_module = {
- 	.rows		= 8,
- 	.cols		= 8,
- 	.keymap_data	= &ams_delta_keymap_data,
- 	.delay		= 9,
- };
- 
--static struct platform_device ams_delta_kp_device = {
-+static struct platform_device ams_delta_kp_device __refdata = {
- 	.name		= "omap-keypad",
- 	.id		= -1,
- 	.dev		= {
-@@ -363,7 +363,8 @@ static struct gpio_led_platform_data leds_pdata __initconst = {
- 	.num_leds	= ARRAY_SIZE(gpio_leds),
- };
- 
--static struct i2c_board_info ams_delta_camera_board_info[] = {
-+static struct i2c_board_info __initconst_or_module
-+ams_delta_camera_board_info[] = {
- 	{
- 		I2C_BOARD_INFO("ov6650", 0x60),
- 	},
-@@ -387,7 +388,7 @@ static int ams_delta_camera_power(struct device *dev, int power)
- #define ams_delta_camera_power	NULL
- #endif
- 
--static struct soc_camera_link ams_delta_iclink = {
-+static struct soc_camera_link ams_delta_iclink __initconst_or_module = {
- 	.bus_id         = 0,	/* OMAP1 SoC camera bus */
- 	.i2c_adapter_id = 1,
- 	.board_info     = &ams_delta_camera_board_info[0],
-@@ -395,7 +396,7 @@ static struct soc_camera_link ams_delta_iclink = {
- 	.power		= ams_delta_camera_power,
- };
- 
--static struct platform_device ams_delta_camera_device = {
-+static struct platform_device ams_delta_camera_device __refdata = {
- 	.name   = "soc-camera-pdrv",
- 	.id     = 0,
- 	.dev    = {
-@@ -408,7 +409,7 @@ static struct omap1_cam_platform_data ams_delta_camera_platform_data = {
- 	.lclk_khz_max	= 1334,		/* results in 5fps CIF, 10fps QCIF */
- };
- 
--static struct platform_device *ams_delta_devices[] __initdata = {
-+static struct platform_device *ams_delta_devices[] __initconst = {
- 	&latch1_gpio_device,
- 	&latch2_gpio_device,
- 	&ams_delta_kp_device,
-@@ -459,7 +460,7 @@ static void __init ams_delta_init(void)
- 	omap_writew(omap_readw(ARM_RSTCT1) | 0x0004, ARM_RSTCT1);
- }
- 
--static struct plat_serial8250_port ams_delta_modem_ports[] = {
-+static struct plat_serial8250_port ams_delta_modem_ports[] __initdata = {
- 	{
- 		.membase	= IOMEM(MODEM_VIRT),
- 		.mapbase	= MODEM_PHYS,
-@@ -473,7 +474,7 @@ static struct plat_serial8250_port ams_delta_modem_ports[] = {
- 	{ },
- };
- 
--static struct platform_device ams_delta_modem_device = {
-+static struct platform_device ams_delta_modem_device __refdata = {
- 	.name	= "serial8250",
- 	.id	= PLAT8250_DEV_PLATFORM1,
- 	.dev		= {
-diff --git a/drivers/input/serio/ams_delta_serio.c b/drivers/input/serio/ams_delta_serio.c
-index 0571e2e..0830a76 100644
---- a/drivers/input/serio/ams_delta_serio.c
-+++ b/drivers/input/serio/ams_delta_serio.c
-@@ -103,7 +103,7 @@ static void ams_delta_serio_close(struct serio *serio)
- 	gpio_set_value(AMS_DELTA_GPIO_PIN_KEYBRD_PWR, 0);
- }
- 
--static struct gpio ams_delta_gpios[] __initconst_or_module = {
-+static const struct gpio ams_delta_gpios[] = {
- 	{
- 		.gpio	= AMS_DELTA_GPIO_PIN_KEYBRD_DATA,
- 		.flags	= GPIOF_DIR_IN,
-diff --git a/drivers/mtd/nand/ams-delta.c b/drivers/mtd/nand/ams-delta.c
-index 85934dc..7341695 100644
---- a/drivers/mtd/nand/ams-delta.c
-+++ b/drivers/mtd/nand/ams-delta.c
-@@ -145,7 +145,7 @@ static int ams_delta_nand_ready(struct mtd_info *mtd)
- 	return gpio_get_value(AMS_DELTA_GPIO_PIN_NAND_RB);
- }
- 
--static struct gpio _mandatory_gpio[] __initconst_or_module = {
-+static const struct gpio _mandatory_gpio[] = {
- 	{
- 		.gpio	= AMS_DELTA_GPIO_PIN_NAND_NCE,
- 		.flags	= GPIOF_OUT_INIT_HIGH,
-diff --git a/drivers/video/omap/lcd_ams_delta.c b/drivers/video/omap/lcd_ams_delta.c
-index 0e71e28..d3a3113 100644
---- a/drivers/video/omap/lcd_ams_delta.c
-+++ b/drivers/video/omap/lcd_ams_delta.c
-@@ -99,7 +99,7 @@ static struct lcd_ops ams_delta_lcd_ops = {
- 
- /* omapfb panel section */
- 
--static struct gpio _gpios[] __initconst_or_module = {
-+static const struct gpio _gpios[] = {
- 	{
- 		.gpio	= AMS_DELTA_GPIO_PIN_LCD_VBLEN,
- 		.flags	= GPIOF_OUT_INIT_LOW,
--- 
-1.7.3.4
+You probably shouldn't be checking for the upper end of the range at all
+here...
+
+> +	if (anatop_reg->rdata->control_reg) {
+> +		sel = (uv - anatop_reg->rdata->min_voltage) / 25000;
+> +		val = anatop_reg->rdata->min_bit_val + sel;
+> +		*selector = sel;
+> +		pr_debug("%s: calculated val %d\n", __func__, val);
+
+...instead check that selector is in range here.
+
+> +		anatop_reg->rdata->mfd->write(anatop_reg->rdata->mfd,
+> +					      anatop_reg->rdata->control_reg,
+> +					      anatop_reg->rdata->vol_bit_shift,
+> +					      anatop_reg->rdata->vol_bit_size,
+> +					      val);
+
+Just have a write() function in the MFD.
+
+> +	memset(rdesc, 0, sizeof(struct regulator_desc));
+> +	rdesc->name = kstrdup(of_get_property(np, "regulator-name", NULL),
+> +			      GFP_KERNEL);
+
+You should add binding documentation for the device since it's OF based.
+
+> +	sreg->rdata->name = kstrdup(rdesc->name, GFP_KERNEL);
+
+Can't you just point to rdesc->name?
+
+> +	if (IS_ERR(rdev)) {
+> +		dev_err(&pdev->dev, "failed to register %s\n",
+> +			rdesc->name);
+> +		return PTR_ERR(rdev);
+> +	}
+
+All your kstrdup()s need to be unwound in error and free cases.
+
+> +int anatop_regulator_init(void)
+> +{
+> +	return platform_driver_register(&anatop_regulator);
+> +}
+> +
+> +void anatop_regulator_exit(void)
+> +{
+> +	platform_driver_unregister(&anatop_regulator);
+> +}
+> +
+> +postcore_initcall(anatop_regulator_init);
+> +module_exit(anatop_regulator_exit);
+
+These should be adjacent to the functions.
+
+> +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
+
+Either omit this or put one or more humans as the author.
+
+> +struct anatop_regulator {
+> +       struct regulator_desc *regulator;
+> +       struct regulator_init_data *initdata;
+> +       struct anatop_regulator_data *rdata;
+> +};
+
+May as well just merge the regulator data in here - it's not ever used
+except with a 1:1 relationship between them.  Could also directly
+embed the desc and init_data, then you just have one allocation for the
+data rather than a series to error check.
+
+> +int anatop_register_regulator(
+> +		struct anatop_regulator *reg_data, int reg,
+> +		      struct regulator_init_data *initdata);
+
+This looks like it's not defined any more so could be removed and since
+you only appear to support OF the entire header could be merged into the
+driver.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120209/06f638d6/attachment.sig>
