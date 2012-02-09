@@ -1,38 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 09 Feb 2012 02:00:48 +0100
-Subject: [PATCH v6 02/15] ARM: SoC: Add per SoC SMP and CPU hotplug
- operations
-In-Reply-To: <20120208234253.GA16313@codeaurora.org>
-References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
- <1328661059-24584-3-git-send-email-marc.zyngier@arm.com>
- <20120208234253.GA16313@codeaurora.org>
-Message-ID: <3d0d2b3f4a1ffda7057c55655404f696@localhost>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 8 Feb 2012 17:14:01 -0800
+Subject: [GIT PULL] plat-nomadik timers for next
+In-Reply-To: <1327968625-2322-1-git-send-email-linus.walleij@linaro.org>
+References: <1327968625-2322-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAOesGMhRYAOGzhyDT391wd+NSKycR0WsJqc+wUOgRvCoy3WU7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Wed, 8 Feb 2012 15:42:53 -0800, David Brown <davidb@codeaurora.org>
-wrote:
-> On Wed, Feb 08, 2012 at 12:30:46AM +0000, Marc Zyngier wrote:
-> 
->> +#ifdef CONFIG_SMP
->> +#define soc_smp_init_ops(ops)		.smp_init_ops = &(ops),
->> +#define soc_smp_ops(ops)		.smp_ops = &(ops),
->> +extern void soc_smp_ops_register(struct arm_soc_smp_init_ops *,
->> +				 struct arm_soc_smp_ops *);
->> +#else
->> +#define soc_smp_init_ops(ops)		/* empty */
->> +#define soc_smp_ops(ops)		/* empty */
->> +#define soc_smp_ops_register(a,b)	do {} while(0)
->> +#endif
-> 
-> I'm not sure if this bothers anyone else, but these macros mess up
-> editors that know how to indent C code, since the comma ends up inside
-> the macro.  I'm not sure I have a better idea, though.
+On Mon, Jan 30, 2012 at 4:10 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> Hi Arnd, Olof,
+>
+> This is stuff for -next, i.e. not -rc:s, unless you find a
+> reason for.
+>
+> It consists of Nomadik timer cleanups and modernization
+> which makes this timer code look proper. All has been
+> reviewed on LAKML and now needs to rotate in -next.
+>
+> Yours,
+> Linus Walleij
+>
+>
+> The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+>
+> ?Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+>
+> are available in the git repository at:
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-timers
+>
+> Linus Walleij (3):
+> ? ? ?ARM: plat-nomadik: get rid of global mtu base pointer
+> ? ? ?ARM: plat-nomadik: handle clocking properly
+> ? ? ?ARM: plat-nomadik: modernize MTU timer
 
-Emacs seem quite happy when I wrote the code... Shall we re-open the
-editor war? ;-)
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+Thanks, pulled.
+
+-Olof
