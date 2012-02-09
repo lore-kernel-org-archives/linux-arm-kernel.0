@@ -1,53 +1,70 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Feb 2012 20:48:02 +0900
-Subject: [PATCH 1/2] ARM: EXYNOS: add support GPIO for EXYNOS5250
-In-Reply-To: <CAH9JG2W3Uk=J6GR4C6O6w-vkrG+b=j3ow5mEFbC21EFKS52Sdg@mail.gmail.com>
-References: <1328025040-4751-1-git-send-email-kgene.kim@samsung.com>
- <1328025040-4751-2-git-send-email-kgene.kim@samsung.com>
- <20120131224043.GD8338@n2100.arm.linux.org.uk>
- <CAH9JG2W3Uk=J6GR4C6O6w-vkrG+b=j3ow5mEFbC21EFKS52Sdg@mail.gmail.com>
-Message-ID: <06ae01cce720$ad9eb190$08dc14b0$%kim@samsung.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Thu, 9 Feb 2012 14:03:56 +0200
+Subject: [PATCH] gpio: omap: be more aggressive with pm_runtime
+In-Reply-To: <20120209111142.GZ1121@legolas.emea.dhcp.ti.com>
+References: <1328707614-20146-1-git-send-email-balbi@ti.com>
+ <877gzwyivt.fsf@ti.com>
+ <20120209060939.GB1121@legolas.emea.dhcp.ti.com>
+ <20120209111142.GZ1121@legolas.emea.dhcp.ti.com>
+Message-ID: <CANOLnONWuEyp9pCPs-tJgyOd_-RdTNAz1axQHJ0d_0Rq37b3=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> On 2/1/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Wed, Feb 01, 2012 at 12:50:39AM +0900, Kukjin Kim wrote:
-> >> From: Sangsu Park <sangsu4u.park@samsung.com>
-> >>
-> >> This patch adds follwing.
-> >> - IO-map for EXYNOS5250 GPIO support
-> >> - EXYNOS5250 GPIO bank size/number definitions
-> >> - memory map definition for S5P GPIO4
-> >>
-> >> Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
-> >> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> >
-> > Do you actually need these static mapping definitions?  The samsung
-> > gpiolib initialization is called from a core_initcall(), and at this
-> > time ioremap() is fully capable of working.
-> 
-> If it assumes it has 8 gpios, you can make it simple calculate it like
-> this.
-> 
-But unfortunately, it has not 8 gpios in each gpio bank.
+On Thu, Feb 9, 2012 at 1:11 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi again,
+>
+> On Thu, Feb 09, 2012 at 08:09:40AM +0200, Felipe Balbi wrote:
+>> On Wed, Feb 08, 2012 at 04:01:42PM -0800, Kevin Hilman wrote:
+>> > Felipe Balbi <balbi@ti.com> writes:
+>> >
+>> > > try to keep gpio block suspended as much as possible.
+>> > >
+>> > > Tested with pandaboard and a sysfs exported gpio.
+>> > >
+>> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> > > ---
+>> >
+>> > Looks like you need a few more get/puts around other places where
+>> > registers are accessed. ?It currently causes a boot crash on OMAP3 in
+>> > _set_gpio_triggering().
+>>
+>> it was a missing get/put on gpio_irq_set_type(). Fixed.
+>>
+>> > Did you test GPIO wakeups? ?both IO ring wakeups and GPIO module-level
+>> > wakeups?
+>>
+>> how can I test that easily with panda ?
+>
+> Ok, I have added gpio-keys to panda's boardfile:
+>
+> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> index 30ad40d..0a38282 100644
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -23,6 +23,7 @@
+> ?#include <linux/io.h>
+> ?#include <linux/leds.h>
+> ?#include <linux/gpio.h>
+> +#include <linux/gpio_keys.h>
+> ?#include <linux/usb/otg.h>
+> ?#include <linux/i2c/twl.h>
+> ?#include <linux/regulator/machine.h>
+> @@ -90,7 +91,30 @@ static struct platform_device leds_gpio = {
+> ? ? ? ?},
+> ?};
+>
+> +static struct gpio_keys_button gpio_buttons[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .code ? ? ? ? ? = BTN_EXTRA,
+> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? = 121,
+> + ? ? ? ? ? ? ? .desc ? ? ? ? ? = "user",
+> + ? ? ? ? ? ? ? .wakeup ? ? ? ? = 1,
 
-Thanks.
+While at it, could you also test GPIO module wakeups with debounce
+feature enabled? Kevin says it should work but it doesn't for me. Just
+add:
+    .debounce_interval = 10,
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-> enum exynos5_gpios {
->      EXYNOS5_GPIO_A,
->      ...
-> };
-> 
-> EXYNOS5_GPIO_A_START(n)          (EXYNOS5_GPIO_A * 8)
-> 
-> with this one, it can make a simple gpio driver when using irq domain for
-> GPIO.
-> 
+-- 
+Gra?vydas
