@@ -1,11 +1,11 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 08 Feb 2012 22:28:57 -0800 (PST)
-Subject: [PATCH v2 3/4] ARM: make entry-macro.S depend on
- !MULTI_IRQ_HANDLER
-In-Reply-To: <1328751219-2552-4-git-send-email-robherring2@gmail.com>
+Date: Wed, 08 Feb 2012 22:33:18 -0800 (PST)
+Subject: [PATCH v2 2/4] ARM: rpc: make default fiq handler run-time
+ installed
+In-Reply-To: <1328751219-2552-3-git-send-email-robherring2@gmail.com>
 References: <1328751219-2552-1-git-send-email-robherring2@gmail.com>
- <1328751219-2552-4-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1202082228020.1656@xanadu.home>
+ <1328751219-2552-3-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1202082229400.1656@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,40 +13,88 @@ On Wed, 8 Feb 2012, Rob Herring wrote:
 
 > From: Rob Herring <rob.herring@calxeda.com>
 > 
-> With the removal of disable_fiq on rpc and addition MULTI_IRQ_HANDLER,
-> entry-macro.S is no longer needed for platforms that select
-> MULTI_IRQ_HANDLER and the include of it can be conditional.
+> Only rpc uses disable_fiq macro. Change it to a run-time installed
+> default FIQ handler. The handler is installed before interrupts are
+
+s/interrupts/FIQs/
+
+> enabled so the behavior should be unchanged.
 > 
 > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
 > ---
->  arch/arm/kernel/entry-armv.S |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
+>  arch/arm/mach-rpc/Makefile |    2 +-
+>  arch/arm/mach-rpc/fiq.S    |   12 ++++++++++++
+>  arch/arm/mach-rpc/irq.c    |    6 ++++++
+>  3 files changed, 19 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-rpc/fiq.S
 > 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 3a456c6..5558f56 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -19,7 +19,9 @@
->  #include <asm/glue-df.h>
->  #include <asm/glue-pf.h>
->  #include <asm/vfpmacros.h>
-> +#ifndef CONFIG_MULTI_IRQ_HANDLER
->  #include <mach/entry-macro.S>
-> +#endif
->  #include <asm/thread_notify.h>
->  #include <asm/unwind.h>
->  #include <asm/unistd.h>
-> @@ -1101,7 +1103,6 @@ __stubs_start:
->   * get out of that mode without clobbering one register.
->   */
->  vector_fiq:
-> -	disable_fiq
->  	subs	pc, lr, #4
+> diff --git a/arch/arm/mach-rpc/Makefile b/arch/arm/mach-rpc/Makefile
+> index aa77bc9..dfa405c 100644
+> --- a/arch/arm/mach-rpc/Makefile
+> +++ b/arch/arm/mach-rpc/Makefile
+> @@ -4,7 +4,7 @@
 >  
->  /*=============================================================================
+>  # Object file lists.
+>  
+> -obj-y			:= dma.o irq.o riscpc.o
+> +obj-y			:= dma.o fiq.o irq.o riscpc.o
+>  obj-m			:=
+>  obj-n			:=
+>  obj-			:=
+> diff --git a/arch/arm/mach-rpc/fiq.S b/arch/arm/mach-rpc/fiq.S
+> new file mode 100644
+> index 0000000..e0e4ac5
+> --- /dev/null
+> +++ b/arch/arm/mach-rpc/fiq.S
+> @@ -0,0 +1,12 @@
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +#include <mach/hardware.h>
+> +#include <mach/entry-macro.S>
+> +
+> +	.text
+> +
+> +	.global	rpc_default_fiq_end
+> +ENTRY(rpc_default_fiq_start)
+> +	disable_fiq
+
+Given that you want to get rid of disable_fiq, it would be a good idea 
+to replace it with its content here.
+
+
+> +	subs	pc, lr, #4
+> +rpc_default_fiq_end:
+> diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
+> index 2e1b530..cf0e669 100644
+> --- a/arch/arm/mach-rpc/irq.c
+> +++ b/arch/arm/mach-rpc/irq.c
+> @@ -5,6 +5,7 @@
+>  #include <asm/mach/irq.h>
+>  #include <asm/hardware/iomd.h>
+>  #include <asm/irq.h>
+> +#include <asm/fiq.h>
+>  
+>  static void iomd_ack_irq_a(struct irq_data *d)
+>  {
+> @@ -112,6 +113,8 @@ static struct irq_chip iomd_fiq_chip = {
+>  	.irq_unmask	= iomd_unmask_irq_fiq,
+>  };
+>  
+> +extern unsigned char rpc_default_fiq_start, rpc_default_fiq_end;
+> +
+>  void __init rpc_init_irq(void)
+>  {
+>  	unsigned int irq, flags;
+> @@ -121,6 +124,9 @@ void __init rpc_init_irq(void)
+>  	iomd_writeb(0, IOMD_FIQMASK);
+>  	iomd_writeb(0, IOMD_DMAMASK);
+>  
+> +	set_fiq_handler(&rpc_default_fiq_start,
+> +		&rpc_default_fiq_end - &rpc_default_fiq_start);
+> +
+>  	for (irq = 0; irq < NR_IRQS; irq++) {
+>  		flags = IRQF_VALID;
+>  
 > -- 
 > 1.7.5.4
 > 
