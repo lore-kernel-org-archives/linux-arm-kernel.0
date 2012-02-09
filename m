@@ -1,70 +1,41 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Thu, 9 Feb 2012 14:03:56 +0200
-Subject: [PATCH] gpio: omap: be more aggressive with pm_runtime
-In-Reply-To: <20120209111142.GZ1121@legolas.emea.dhcp.ti.com>
-References: <1328707614-20146-1-git-send-email-balbi@ti.com>
- <877gzwyivt.fsf@ti.com>
- <20120209060939.GB1121@legolas.emea.dhcp.ti.com>
- <20120209111142.GZ1121@legolas.emea.dhcp.ti.com>
-Message-ID: <CANOLnONWuEyp9pCPs-tJgyOd_-RdTNAz1axQHJ0d_0Rq37b3=A@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 09 Feb 2012 14:11:27 +0200
+Subject: [PATCH 2/2] mtd: ixp4xx: oops in ixp4xx_flash_probe
+In-Reply-To: <1328729069-21308-3-git-send-email-mkl@blackshift.org>
+References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
+ <1328729069-21308-3-git-send-email-mkl@blackshift.org>
+Message-ID: <1328789487.22240.84.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 9, 2012 at 1:11 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi again,
->
-> On Thu, Feb 09, 2012 at 08:09:40AM +0200, Felipe Balbi wrote:
->> On Wed, Feb 08, 2012 at 04:01:42PM -0800, Kevin Hilman wrote:
->> > Felipe Balbi <balbi@ti.com> writes:
->> >
->> > > try to keep gpio block suspended as much as possible.
->> > >
->> > > Tested with pandaboard and a sysfs exported gpio.
->> > >
->> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
->> > > ---
->> >
->> > Looks like you need a few more get/puts around other places where
->> > registers are accessed. ?It currently causes a boot crash on OMAP3 in
->> > _set_gpio_triggering().
->>
->> it was a missing get/put on gpio_irq_set_type(). Fixed.
->>
->> > Did you test GPIO wakeups? ?both IO ring wakeups and GPIO module-level
->> > wakeups?
->>
->> how can I test that easily with panda ?
->
-> Ok, I have added gpio-keys to panda's boardfile:
->
-> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> index 30ad40d..0a38282 100644
-> --- a/arch/arm/mach-omap2/board-omap4panda.c
-> +++ b/arch/arm/mach-omap2/board-omap4panda.c
-> @@ -23,6 +23,7 @@
-> ?#include <linux/io.h>
-> ?#include <linux/leds.h>
-> ?#include <linux/gpio.h>
-> +#include <linux/gpio_keys.h>
-> ?#include <linux/usb/otg.h>
-> ?#include <linux/i2c/twl.h>
-> ?#include <linux/regulator/machine.h>
-> @@ -90,7 +91,30 @@ static struct platform_device leds_gpio = {
-> ? ? ? ?},
-> ?};
->
-> +static struct gpio_keys_button gpio_buttons[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .code ? ? ? ? ? = BTN_EXTRA,
-> + ? ? ? ? ? ? ? .gpio ? ? ? ? ? = 121,
-> + ? ? ? ? ? ? ? .desc ? ? ? ? ? = "user",
-> + ? ? ? ? ? ? ? .wakeup ? ? ? ? = 1,
+On Wed, 2012-02-08 at 20:24 +0100, Marc Kleine-Budde wrote:
+> In commit "c797533 mtd: abstract last MTD partition parser argument" the
+> third argument of "mtd_device_parse_register()" changed from start address
+> of the MTD device to a pointer to a struct.
 
-While at it, could you also test GPIO module wakeups with debounce
-feature enabled? Kevin says it should work but it doesn't for me. Just
-add:
-    .debounce_interval = 10,
+Hi, thanks for the fix. Several comments:
 
+1. I've removed the huge oops from the description - it is not very
+helpful and not worth having.
+2. It is usually a good idea to CC the author of the commit causing the
+regression.
+3. For regressions like this it is a good idea put the stable tree tag.
+
+I've added
+
+Cc: stable at kernel.org [3.2+]
+
+(git tag --contains c797533 gives the version)
+
+and pushed to the l2-mtd.git tree, thanks!
 
 -- 
-Gra?vydas
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120209/971916af/attachment.sig>
