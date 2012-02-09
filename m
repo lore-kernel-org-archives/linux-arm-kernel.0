@@ -1,52 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 09 Feb 2012 18:01:45 +0000
-Subject: [PATCH 05] ARM: omap: fix vc.c PMIC error message
-In-Reply-To: <20120208163546.GA15849@n2100.arm.linux.org.uk>
-References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
-Message-ID: <E1RvYJV-0003FG-Gq@rmk-PC.arm.linux.org.uk>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 9 Feb 2012 10:04:11 -0800
+Subject: hex number case in dts files.
+Message-ID: <20120209180411.GA5654@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While testing on my OMAP3430 platform, this error message was emitted:
+I've noticed an inconsistency in the case of letters in hex constants
+in various dts files.  The ones that are actually numbers probably
+don't really matter, the but the node names are case sensitive
+strings, and in some sense do matter.
 
-omap_vc_init_channel: PMIC info requried to configure vc forvdd_core not populated.Hence cannot initialize vc
+I ask because some people I've spoken with internally seem to have
+strong opinions about what case hex constants should be, and it'd be
+nice to be able to have some guideline about this.  Historically, I've
+always seen DT hex values in lowercase.
 
-Trying to find this message was difficult because it was wrapped across
-several lines.  It also mis-spells "required", doesn't read very well,
-and has spaces lacking.  Let's replace it with a more concise:
+Thanks,
+David
 
-omap_vc_init_channel: No PMIC info for vdd_core
-
-While we're here, fix a simple spelling error in a comment.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-omap2/vc.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index 031d116..a7da3da 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -247,7 +247,7 @@ static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
-  * omap_vc_i2c_init - initialize I2C interface to PMIC
-  * @voltdm: voltage domain containing VC data
-  *
-- * Use PMIC supplied seetings for I2C high-speed mode and
-+ * Use PMIC supplied settings for I2C high-speed mode and
-  * master code (if set) and program the VC I2C configuration
-  * register.
-  *
-@@ -292,9 +292,7 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
- 	u32 val;
- 
- 	if (!voltdm->pmic || !voltdm->pmic->uv_to_vsel) {
--		pr_err("%s: PMIC info requried to configure vc for"
--			"vdd_%s not populated.Hence cannot initialize vc\n",
--			__func__, voltdm->name);
-+		pr_err("%s: No PMIC info for vdd_%s\n", __func__, voltdm->name);
- 		return;
- 	}
- 
 -- 
-1.7.4.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
