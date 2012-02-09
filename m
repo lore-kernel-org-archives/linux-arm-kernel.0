@@ -1,79 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Feb 2012 00:53:34 +0000
-Subject: [PATCH 00/16] rmk's patch series for fixing OMAP
-In-Reply-To: <4F32DBB5.4010004@gmx.de>
-References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
- <4F32DBB5.4010004@gmx.de>
-Message-ID: <20120209005334.GG25414@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 09 Feb 2012 01:57:08 +0100
+Subject: [PATCH v6 13/15] ARM: hotplug: Introduce
+ =?UTF-8?Q?dummy=5Fcpu=5Fkill?=
+In-Reply-To: <alpine.LFD.2.02.1202081608100.1656@xanadu.home>
+References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
+ <1328661059-24584-14-git-send-email-marc.zyngier@arm.com>
+ <alpine.LFD.2.02.1202081608100.1656@xanadu.home>
+Message-ID: <6744403449c559f689ca7322eb0393b8@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 08:31:49PM +0000, Florian Tobias Schandinat wrote:
-> Hi Russell,
+
+On Wed, 8 Feb 2012 16:16:24 -0800 (PST), Nicolas Pitre
+<nicolas.pitre@linaro.org> wrote:
+> On Wed, 8 Feb 2012, Marc Zyngier wrote:
 > 
-> On 02/08/2012 04:35 PM, Russell King - ARM Linux wrote:
-> > commit c49d005b6cc8491fad5b24f82805be2d6bcbd3dd
-> > Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > Date:   Tue Jan 17 11:09:57 2012 +0200
-> > 
-> >     OMAPDSS: HDMI: PHY burnout fix
-> >     
-> >     A hardware bug in the OMAP4 HDMI PHY causes physical damage to the board
-> >     if the HDMI PHY is kept powered on when the cable is not connected.
+>> Most platforms don't implement their cpu_kill method.
+>> Some because they simply don't offer the capability, some other
+>> because nobody cared enough to implement the necessary code.
+>> 
+>> Either way, this code is duplicated all over the place. Implement
+>> a global dummy_cpu_kill method and convert all SMP (but shmobile)
+>> to use it. Hopefully the "dummy" prefix will be an incentive
+>> for people to do the right thing.
+>> 
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Colin Cross <ccross@android.com>
+>> Cc: David Brown <davidb@codeaurora.org>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Linus Walleij <linus.walleij@stericsson.com>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> Cc: Nicolas Pitre <nico@fluxnic.net>
+>> Cc: Paul Mundt <lethal@linux-sh.org>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Stephen Warren <swarren@nvidia.com>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> I agree this is a serious issue.
+> What avout this instead:
 > 
-> > which now has me wondering if, by trying to boot v3.3-rc2 on this board
-> > during the past week, I have a destroyed HDMI interface on it.
+> int __weak __cpuinit platform_cpu_kill(unsigned int cpu)
+> {
+> 	if (!soc_smp_ops)
+> 		return 0;
+> 	if (!soc_smp_ops->cpu_kill)
+> 		return 1;
+> 	return soc_smp_ops->cpu_kill(cpu);
+> }
 > 
-> I am not sure as I don't keep track of all OMAP changes, but you make it
-> sound like a regression, is there any difference to 3.2 behavior?
+> and get rid of the dummy handler entirely?
 
-I've no idea when the problem was introduced, that's not the point that
-I'm making.  The point that I'm making is that the patch is dated January
-17th, it was apparantly committed on the 26th, and it went into mainline
-on the 8th February.
+I thought the "dummy" prefix would maybe give maintainers a chance to
+think whether or not this is the best they can do (given that they mostly
+copied the RealView code, I'm quite sure it is possible...). I'll use your
+approach if you think it's better.
 
-For a patch which fixes a _hardware_ _destruction_ issue, three weeks is
-_FAR_ too long for it to take to get into mainline.
-
-Moreover, only last Monday did I enable the OMAP2 DSS subsystem on the
-4430 SDP platform, _including_ the HDMI code, and looking at the commit
-it could be one of those platforms which is affected.
-
-As I don't have a HDMI cable connected to the system, and I ran that
-kernel overnight, and I tried opening each /dev/fb* device, what I'm now
-wondering is: have I destroyed the HDMI PHY on my 4430SDP?
-
-But that's not really the point.  The point is, for someone to sit on such
-a patch for weeks is, in my opinion, as good as saying to your users "I
-don't care if you bust your hardware."
-
-However, you raise another point, a much more serious one at that.  Is
-this problem also present in 3.2?  The patch seems to apply almost cleanly
-to that kernel version, so I guess it is.  It fails to apply to v3.1
-because of missing files, so I guess 3.1 is unaffected.
-
-So, why isn't this patch copied to the stable people?
-
-And why is there this seemingly lack of care for hardware destruction bugs?
-
-Please, if it affects v3.2, PLEASE PLEASE PLEASE tell the stable people
-who know nothing about this commit until I asked them this evening about
-it.
-
-> > So, a big thanks for sitting on that fix and exposing peoples hardware
-> > to damage, that shows real professionalism.
-> 
-> Well, I am no professional to begin with, at least in the sense of getting paid
-> for it. That said I'm quite happy if I manage to find a few hours every weekend
-> to do the work. Given that the final thing should be tested in -next before I
-> ask Linus to pull, it is completely usual (and even quite fast) if things take
-> 8-13 days on my end. If this isn't fast enough for Tomi, he'd better ask Linus
-> to pull directly for such issues.
-
-For hardware destruction issues, once the problem has been identified, it
-should be shouted about very loudly to get it upstream as quickly as
-possible.  I'm sure Linus would've even taken it in patch form.
-
-(You do realise that Linus does apply patches as well as pulling trees?)
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
