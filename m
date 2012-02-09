@@ -1,39 +1,52 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Thu, 9 Feb 2012 04:32:43 +0400
-Subject: [PATCH 3/4] cpufreq: New 'interactive' governor
-In-Reply-To: <CAKfTPtBgVy+CmNtbwetP1LRDusrUkHPXGPzNXwq2J13qOjtJ1Q@mail.gmail.com>
-References: <20120208013959.GA24535@panacea> <20120208014437.GC459@panacea>
- <CAKfTPtBgVy+CmNtbwetP1LRDusrUkHPXGPzNXwq2J13qOjtJ1Q@mail.gmail.com>
-Message-ID: <20120209003243.GA24602@oksana.dev.rtsoft.ru>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Feb 2012 16:40:27 -0800
+Subject: [PATCH 05/16] ARM: omap: fix vc.c PMIC error message
+In-Reply-To: <87ipjgx3g3.fsf@ti.com>
+References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
+ <E1RvAWP-0006H3-1A@rmk-PC.arm.linux.org.uk>
+ <20120208184539.GE29796@atomide.com> <87ty312ae0.fsf@ti.com>
+ <20120208235358.GD16877@atomide.com>
+ <20120208235620.GE25414@n2100.arm.linux.org.uk>
+ <87sjikx3xv.fsf@ti.com>
+ <20120209001135.GF25414@n2100.arm.linux.org.uk>
+ <87ipjgx3g3.fsf@ti.com>
+Message-ID: <20120209004027.GF16877@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vincent,
+* Kevin Hilman <khilman@ti.com> [120208 15:49]:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> 
+> > On Wed, Feb 08, 2012 at 04:09:48PM -0800, Kevin Hilman wrote:
+> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> >> > Does it fix the other issues I mention in the commit log as well?
+> >> 
+> >> Like your patches 1 & 5, my series fixes the oops and also makes the
+> >> error strings simple, non-wrapping ones.
+> >> 
+> >> The one thing it doesn't fix is the spelling typo you fixed in the
+> >> comment, but IMO we can leave that out for -rc.
+> >
+> > OK, but it would be much better for that simple fix to go with another
+> > simple patch.  On its own it doesn't make sense as a commit.
+> 
+> Agreed.  We'll have some other VC/VP cleanup for v3.4, and I'll add this
+> into that cleanup.
 
-On Wed, Feb 08, 2012 at 03:00:59PM -0800, Vincent Guittot wrote:
-> Have you got some figures which shows the improvement of the
-> responsivness compared to other governor like the ondemand one ?
-> That could be interesting to test interactive governor with
-> cpufreq-bench and compare the results with ondemand ?
+Eek, looking at it, I'd rather stay away from this formatting patch
+for -rc series because the flaming potential causes me rash!
 
-I don't have any numbers handy, but no doubt the governor brings
-some improvements which you can see on a real device.
+Russell's patch 5 has way better description for the -rc series.
 
-Anyway, the point of sending out these RFC patches was to get a
-technical review of the approach, because there's no much point
-in pushing the code that isn't acceptable on technical merits,
-no matter how better numbers it might give.
+So I now suggest that Russell drops patch 1 and updates patch 5 to
+cover both vp.c and vc.c.
 
-And scheduler folks aren't happy on the whole approach, so I
-guess we should go back to the drawing board. :-)
+Then I'll move the following patches queued by Kevin from cleanup
+into fixes:
 
-Thanks,
+d269914ece0498f31603ecd85ed3d7a586b3cbcd ARM: OMAP2+: PM: only register TWL with voltage layer when device is present
+af9a2ed9667b49e7e125eac526d8f655183ce53e ARM: OMAP2+: voltage: add check for missing PMIC info in VP init
 
-p.s. Sure, in the end we'll have to measure 'interactive' vs.
-'ondemand' vs. 'newapproach'. And maybe now it's time to actually
-measure 'interactive' governor in numbers... I'll get back to
-this thread when I get the numbers.
+Everybody OK with that?
 
--- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+Tony
