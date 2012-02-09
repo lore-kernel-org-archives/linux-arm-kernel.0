@@ -1,35 +1,44 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 09 Feb 2012 09:47:22 +0200
-Subject: [PATCH v2 0/7] MFD: twl6040: Conversion to i2c driver
-In-Reply-To: <1328619678-26080-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1328619678-26080-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <4F337A0A.1010101@ti.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Thu, 9 Feb 2012 08:51:06 +0100
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <1328736834.2903.33.camel@pasglop>
+References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
+ <20120208202314.GA28290@redhat.com>
+ <1328736834.2903.33.camel@pasglop>
+Message-ID: <20120209075106.GB18387@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 02/07/2012 03:01 PM, Peter Ujfalusi wrote:
-> Still in the to-do list:
-> Implement proper regulator support on SDP4430, and PandaBoard for the needed
-> supplies by the twl6040.
-> The supply source is the same on both boards:
-> TWL6040 VDD2V1 <- TWL6030 V2V1 SMPS
-> TWL6040 VDDVIO <- TWL6030 V1V8 SMPS
+* Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
+
+> On Wed, 2012-02-08 at 15:23 -0500, Dave Jones wrote:
+> > I think the biggest mistake we ever made with cpufreq was making it
+> > so configurable. If we redesign it, just say no to plugin governors,
+> > and
+> > yes to a lot fewer sysfs knobs.
+> > 
+> > So, provide mechanism to kill off all the governors, and there's a
+> > migration path from what we have now to something that just works
+> > in a lot more cases, while remaining configurable enough for the
+> > corner-cases.
 > 
-> There seams to be no control implemented in the regulator driver for these SMPS
-> regulators, so this need to be done first.
-> 
-> The reason that I'm sending this series (even when I know that the proper
-> regulator support is missing for SDP4430/PandaBoard) is to get feedback for the
-> rest of the series, so I can include the fixes in the v3 series.
+> On the other hand, the need for schedulable contxts may not 
+> necessarily go away.
 
-I will separate the i2c driver conversion, and the regulator support to
-avoid bloating this series.
-Could you review the first three patch from this series (the i2c driver
-conversion part)?
-I can as well resend only that as version v3, but I would like to apply
-the fixes for the issues you might find before I send it.
+We will support it, but the *sane* hw solution is where 
+frequency transitions can be done atomically. Most workloads 
+change their characteristics very quickly, and so does their 
+power management profile change.
 
-Thank you,
-P?ter
+The user-space driven policy model failed for that reason: it 
+was *way* too slow in reacting) - and slow hardware transitions 
+suck for a similar reason as well.
+
+We accomodate all hardware as well as we can, but we *design* 
+for proper hardware. So Peter is right, this should be done 
+properly.
+
+Thanks,
+
+	Ingo
