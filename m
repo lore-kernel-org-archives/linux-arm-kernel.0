@@ -1,23 +1,64 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 8 Feb 2012 18:15:59 -0800
-Subject: [GIT PULL] mxs/defconfig for 3.4
-In-Reply-To: <CAOesGMg5qEXvYDM1BEUj-na69XWE7E6XUWZ1m=pLNwvS8NYwhg@mail.gmail.com>
-References: <20120201154628.GC2203@S2101-09.ap.freescale.net>
- <CAOesGMg5qEXvYDM1BEUj-na69XWE7E6XUWZ1m=pLNwvS8NYwhg@mail.gmail.com>
-Message-ID: <CAAQ0ZWQzxbQmD__N9zZoE=0N4JX+6XFbFz6CRKannjeBZBLF=A@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu,  9 Feb 2012 03:25:07 +0100
+Subject: [PATCH 3/4] ARM: at91: usb_a9g20 add DT i2c support
+In-Reply-To: <1328754308-7365-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1328754308-7365-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1328754308-7365-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 February 2012 17:14, Olof Johansson <olof@lixom.net> wrote:
-...
-> Yes, perfectly fine. If you prefer, you can keep your work on a
-> long-lived branch instead of creating new one-off branches for every
-> few patches, and send repeated pull requests for that branch.
->
-You mean that I can collect all types of patches on a single branch
-like for-arm-soc?  I'm not sure about that since the platform
-maintainers are asked to send pull-requests sorted in different
-branches for different type of patches.  Or I'm missing your point?
+use i2c-gpio and enable rv3029 RTC
 
-Regards,
-Shawn
+enable the in the sam9g20 defconfig
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+---
+ arch/arm/boot/dts/usb_a9g20.dts        |    9 +++++++++
+ arch/arm/configs/at91sam9g20_defconfig |    3 +++
+ 2 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/usb_a9g20.dts b/arch/arm/boot/dts/usb_a9g20.dts
+index 11be3e9..9d84374 100644
+--- a/arch/arm/boot/dts/usb_a9g20.dts
++++ b/arch/arm/boot/dts/usb_a9g20.dts
+@@ -121,6 +121,15 @@
+ 
+ 			};
+ 
++			i2c-gpio at 0 {
++				status = "okay";
++
++				rv3029c2 at 56 {
++					compatible = "rv3029c2";
++					reg = <0x56>;
++				};
++			};
++
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/configs/at91sam9g20_defconfig b/arch/arm/configs/at91sam9g20_defconfig
+index 9123568..994d331 100644
+--- a/arch/arm/configs/at91sam9g20_defconfig
++++ b/arch/arm/configs/at91sam9g20_defconfig
+@@ -74,6 +74,8 @@ CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_ATMEL=y
+ CONFIG_SERIAL_ATMEL_CONSOLE=y
+ CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++CONFIG_I2C_GPIO=y
+ CONFIG_SPI=y
+ CONFIG_SPI_ATMEL=y
+ CONFIG_SPI_SPIDEV=y
+@@ -105,6 +107,7 @@ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_RV3029C2=y
+ CONFIG_RTC_DRV_AT91SAM9=y
+ CONFIG_EXT2_FS=y
+ CONFIG_MSDOS_FS=y
+-- 
+1.7.7
