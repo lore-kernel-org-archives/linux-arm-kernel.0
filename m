@@ -1,57 +1,30 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Feb 2012 20:39:41 +0900
-Subject: [PATCH 3/9] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
-In-Reply-To: <CAOesGMg3xS7o1+F1ZmZvg1=oy59F+7QnSYWkJ9kTacCDu35aOg@mail.gmail.com>
-References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
- <1328024354-4277-4-git-send-email-kgene.kim@samsung.com>
- <CAOesGMg3xS7o1+F1ZmZvg1=oy59F+7QnSYWkJ9kTacCDu35aOg@mail.gmail.com>
-Message-ID: <06a001cce71f$82dd10b0$88973210$%kim@samsung.com>
+Date: Thu, 09 Feb 2012 20:42:02 +0900
+Subject: [PATCH 1/3] ARM: EXYNOS: Enable MDMA driver
+In-Reply-To: <4F28A8BD.9000601@linaro.org>
+References: <1328025437-5396-1-git-send-email-kgene.kim@samsung.com>
+ <1328025437-5396-2-git-send-email-kgene.kim@samsung.com>
+ <4F28A8BD.9000601@linaro.org>
+Message-ID: <06a101cce71f$d747c870$85d75950$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+Tushar Behera wrote:
 > 
-> Hi,
-> 
-Hi :)
-
-> On Tue, Jan 31, 2012 at 7:39 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> A brief patch description, please.
-> 
-OK. Will add, I thought we don't need same description with subject. But
-what this patch is and why this patch is needed will be added next time.
+> On 01/31/2012 09:27 PM, Kukjin Kim wrote:
+> > From: Boojin Kim <boojin.kim@samsung.com>
+> >
+> > This patch adds MDMA platform data and enables
+> > MDMA for DMA memcpy operation for EXYNOS SoCs.
 
 [...]
 
-> > - * linux/arch/arm/mach-exynos4/setup-i2c0.c
-> > + * linux/arch/arm/mach-exynos/setup-i2c0.c
+> > +static struct clk exynos4_clk_mdma1 = {
 > 
-> The file name fills very little purpose in files like these. Consider
-> removing them at some point.
+> exynos4_clk_mdma ?
 > 
-Yes, agree. Firstly, it will be removed when it is updated from now on.
-
-[...]
-
-> > ?void s3c_i2c0_cfg_gpio(struct platform_device *dev)
-> > ?{
-> > - ? ? ? s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
-> > - ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
-> > + ? ? ? if (soc_is_exynos5250())
-> > + ? ? ? ? ? ? ? ;
-> > + ? ? ? ? ? ? ? /* will be implemented with gpio function */
-> > + ? ? ? else
-> > + ? ? ? ? ? ? ? s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? S3C_GPIO_SFN(2),
-S3C_GPIO_PULL_UP);
-> > ?}
-> 
-> The above is pretty awkward. It's cleaner to return and avoid the else
-> side of the statement (move the comment accordingly, of course).
-> 
-OK.
+Boojin, could you please explain why you used 'exynos4_clk_mdma1' instead of
+just mdma here?
 
 Thanks.
 
