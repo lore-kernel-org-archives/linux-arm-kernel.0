@@ -1,126 +1,97 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 09 Feb 2012 14:40:40 +0100
-Subject: [PATCH 1/2] ARM: ixp4xx: fix compilation, add gpiolib support
-In-Reply-To: <20120209091124.GR889@n2100.arm.linux.org.uk>
-References: <1328729069-21308-1-git-send-email-mkl@blackshift.org>
- <1328729069-21308-2-git-send-email-mkl@blackshift.org>
- <20120209091124.GR889@n2100.arm.linux.org.uk>
-Message-ID: <4F33CCD8.6050407@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 09 Feb 2012 22:42:56 +0900
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add device
+ tree support
+In-Reply-To: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2012 10:11 AM, Russell King - ARM Linux wrote:
-> On Wed, Feb 08, 2012 at 08:24:28PM +0100, Marc Kleine-Budde wrote:
->> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
->> index 3841ab4..963f752 100644
->> --- a/arch/arm/mach-ixp4xx/common.c
->> +++ b/arch/arm/mach-ixp4xx/common.c
->> @@ -36,6 +36,7 @@
->>  #include <asm/page.h>
->>  #include <asm/irq.h>
->>  #include <asm/sched_clock.h>
->> +#include <asm/gpio.h>
+Thomas Abraham wrote:
 > 
-> linux/gpio.h
-
-Done.
-
+> This patchset removes all uses of 'clk_type' member from the platform data
+> of sdhci-s3c driver and adds device tree support for sdhci-s3c driver.
 > 
->> diff --git a/arch/arm/mach-ixp4xx/include/mach/gpio.h b/arch/arm/mach-ixp4xx/include/mach/gpio.h
->> index 83d6b4e..093dfad 100644
->> --- a/arch/arm/mach-ixp4xx/include/mach/gpio.h
->> +++ b/arch/arm/mach-ixp4xx/include/mach/gpio.h
->> @@ -27,49 +27,31 @@
->>  
->>  #include <linux/kernel.h>
->>  #include <mach/hardware.h>
->> +#include <asm-generic/gpio.h>			/* cansleep wrappers */
->>  
->>  #define __ARM_GPIOLIB_COMPLEX
->>  
->> -static inline int gpio_request(unsigned gpio, const char *label)
->> -{
->> -	return 0;
->> -}
->> -
->> -static inline void gpio_free(unsigned gpio)
->> -{
->> -	might_sleep();
->> -
->> -	return;
->> -}
->> -
->> -static inline int gpio_direction_input(unsigned gpio)
->> -{
->> -	gpio_line_config(gpio, IXP4XX_GPIO_IN);
->> -	return 0;
->> -}
->> -
->> -static inline int gpio_direction_output(unsigned gpio, int level)
->> -{
->> -	gpio_line_set(gpio, level);
->> -	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
->> -	return 0;
->> -}
->> +#define NR_BUILTIN_GPIO 16
->>  
->>  static inline int gpio_get_value(unsigned gpio)
->>  {
->> -	int value;
->> -
->> -	gpio_line_get(gpio, &value);
->> -
->> -	return value;
->> +	if (gpio < NR_BUILTIN_GPIO) {
->> +		int value;
->> +		gpio_line_get(gpio, &value);
->> +		return value;
->> +	} else
->> +		return __gpio_get_value(gpio);
->>  }
->>  
->>  static inline void gpio_set_value(unsigned gpio, int value)
->>  {
->> -	gpio_line_set(gpio, value);
->> +	if (gpio < NR_BUILTIN_GPIO)
->> +		gpio_line_set(gpio, value);
->> +	else
->> +		__gpio_set_value(gpio, value);
->>  }
->>  
->> -#include <asm-generic/gpio.h>			/* cansleep wrappers */
->> +#define gpio_cansleep __gpio_cansleep
->>  
->>  extern int gpio_to_irq(int gpio);
->>  #define gpio_to_irq gpio_to_irq
+> In this patchset, all uses of 'clk_type' member from the platform data are
+> removed from the sdhci-s3c driver and platform code. The clk_type is a SoC
+> specific information and not a board/machine specific information. Hence,
+> this
+> information can be more aptly represented using SoC specific driver data
+> in the
+> sdhci-s3c driver.
 > 
-> Does anything on ixp4xx require fast access to on-chip GPIOs?  If not,
-
-I don't know the ixp4xx hardware enough. Can someone comment on this?
-
-> it would be much better to get rid of this and just use the standard
-> wrapping, which can be done by changing this entire file to be just a
-> single line:
+> Hence all uses of 'clk_type' member in sdhci-s3c driver's platform data is
+> removed. In place of that, the sdhci host qurik
+> 'SDHCI_QUIRK_NONSTANDARD_CLOCK'
+> is used to handle controllers that do not have a standard sdclk division
+> (like those in the exynos4 SoC's).
 > 
-> /* empty */
+> This is a pre-requisite for adding device tree support for sdhci-s3c
+> driver.
+> While migrating towards device tree support, retreving 'clk_type'
+> information
+> from device tree information does not seem correct and hence it has been
+> added
+> as SoC specific driver data. All this is handled in patches 1 to 3.
+> 
+> Patch 4 to 6 add device tree support for sdhci-s3c driver. The fourth
+> patch
+> derives the maximum transfer width host capability from the max_width
+> member
+> in platform data. The fifth patch modifies the sdhci-s3c driver to
+> mainatain
+> a local copy of the platform data, which makes it easier to add device
+> tree
+> support for the driver. The last patch adds device tree based discovery
+> for
+> the sdhci-s3c driver.
+> 
+> This patchset is based on the following tree.
+>   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> [for-next]
+> 
+> Thomas Abraham (6):
+>   mmc: sdhci-s3c: Remove usage of clk_type member in platform data
+>   arm: exynos4: use 'exynos4-sdhci' as device name for sdhci controllers
+>   arm: samsung: remove all uses of clk_type member in sdhci platform data
+>   mmc: sdhci-s3c: derive transfer width host capability from max_width in
+> platform data
+>   mmc: sdhci-s3c: Keep a copy of platform data and use it
+>   mmc: sdhci-s3c: Add device tree support
+> 
+>  .../devicetree/bindings/mmc/samsung-sdhci.txt      |   70 ++++++
+>  arch/arm/mach-exynos/clock.c                       |   24 +-
+>  arch/arm/mach-exynos/common.c                      |    5 +
+>  arch/arm/mach-exynos/mach-armlex4210.c             |    3 -
+>  arch/arm/mach-exynos/mach-nuri.c                   |    3 -
+>  arch/arm/mach-exynos/mach-origen.c                 |    2 -
+>  arch/arm/mach-exynos/mach-smdk4x12.c               |    2 -
+>  arch/arm/mach-exynos/mach-smdkv310.c               |    4 -
+>  arch/arm/mach-exynos/mach-universal_c210.c         |    2 -
+>  arch/arm/plat-samsung/devs.c                       |    4 -
+>  arch/arm/plat-samsung/include/plat/sdhci.h         |   35 +++-
+>  arch/arm/plat-samsung/platformdata.c               |    2 -
+>  drivers/mmc/host/sdhci-s3c.c                       |  235
++++++++++++++++++++-
+>  13 files changed, 341 insertions(+), 50 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/samsung-
+> sdhci.txt
 
-I have to remove the ixp4xx specific gpio_to_irq and irq_to_gpio
-functions or keep the #define gpio_to_irq gpio_to_irq.
+Hi,
 
-It compiles now, I'll test on the hardware when I'm home.
+Looks ok to me and I'd like to pick this series in samsung tree with Chris'
+ack.
 
-regards,
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Chris, is it ok? If you need to merge this in your tree, please let me know.
+I will provide topic branch for it.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120209/2ac9b2c9/attachment.sig>
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
