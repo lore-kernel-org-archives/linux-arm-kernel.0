@@ -1,534 +1,313 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu,  9 Feb 2012 11:45:10 +0100
-Subject: [PATCH] use devm_ functions
-Message-ID: <1328784311-27272-1-git-send-email-Julia.Lawall@lip6.fr>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 9 Feb 2012 13:11:45 +0200
+Subject: [PATCH] gpio: omap: be more aggressive with pm_runtime
+In-Reply-To: <20120209060939.GB1121@legolas.emea.dhcp.ti.com>
+References: <1328707614-20146-1-git-send-email-balbi@ti.com>
+ <877gzwyivt.fsf@ti.com>
+ <20120209060939.GB1121@legolas.emea.dhcp.ti.com>
+Message-ID: <20120209111142.GZ1121@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The semantic patch (http://coccinelle.lip6.fr/) used in generating this
-patch is as follows.  Some manual cleanup was required.  This improves on
-the previous version in that allocated values are allowed to be renamed
-before they are freed.
-
-virtual after_start
-virtual returned
-virtual arg
-virtual get
-
-// ---------------------------------------------------------------------
-// find functions
-
-@plat depends on !after_start@
-identifier i,pfn,rfn;
-position p;
-@@
-
-struct platform_driver i at p = {
-  .probe = pfn,
-  .remove = (<+...rfn...+>),
-};
-
-// ---------------------------------------------------------------------
-// set up iteration
-
-@initialize:ocaml@
-
-type ret = UseReturned | UseReturned2 of string | UseArg | UseGet
-
-let add pfn rfn alloc free devm_alloc file rule =
-   let it = new iteration() in
-   it#set_files [file];
-   it#add_virtual_rule After_start;
-   (match rule with
-      UseReturned -> it#add_virtual_rule Returned
-    | UseReturned2(free) -> it#add_virtual_rule Returned;
-      it#add_virtual_identifier Second_free free
-    | UseArg -> it#add_virtual_rule Arg
-    | UseGet -> it#add_virtual_rule Get);
-   if not (pfn="") then it#add_virtual_identifier Pfn pfn;
-   if not (rfn="") then it#add_virtual_identifier Rfn rfn;
-   if not (alloc="") then it#add_virtual_identifier Alloc alloc;
-   if not (free="") then it#add_virtual_identifier Free free;
-   if not (devm_alloc="") then it#add_virtual_identifier Devm_alloc devm_alloc;
-   it#register()
-
-@script:ocaml@
-pfn << plat.pfn;
-rfn << plat.rfn;
-p << plat.p;
-@@
-
-let file = (List.hd p).file in
-add pfn rfn "kmalloc" "kfree" "devm_kzalloc" file UseReturned;
-add pfn rfn "kzalloc" "kfree" "devm_kzalloc" file UseReturned;
-add pfn rfn "ioremap" "iounmap" "devm_ioremap" file UseReturned;
-add pfn rfn "ioremap_nocache" "iounmap" "devm_ioremap_nocache" file
-   UseReturned;
-
-add pfn rfn "request_irq" "free_irq" "devm_request_irq" file UseArg;
-add pfn rfn "request_threaded_irq" "free_irq" "devm_request_threaded_irq" file
-  UseArg;
-add pfn rfn "dma_alloc_coherent" "dma_free_coherent" "dmam_alloc_coherent"
-  file UseArg;
-add pfn rfn "dma_alloc_noncoherent" "dma_free_noncoherent"
-  "dmam_alloc_noncoherent" file UseArg;
-
-(* several possibilities... *)
-add pfn rfn "request_region" "release_region" "devm_request_region" file
-  UseGet;
-add pfn rfn "request_mem_region" "release_mem_region"
-  "devm_request_mem_region" file UseGet;
-add pfn rfn "request_region" "release_region" "devm_request_region" file
-  UseArg;
-add pfn rfn "request_mem_region" "release_mem_region"
-  "devm_request_mem_region" file UseArg;
-(* fix a bug at the same time *)
-add pfn rfn "request_region" "release_resource" "devm_request_region" file
-  (UseReturned2("kfree"));
-add pfn rfn "request_mem_region" "release_resource"
-  "devm_request_mem_region" file (UseReturned2("kfree"));
-add pfn rfn "ioport_map" "ioport_unmap" "devm_ioport_map" file UseReturned
-
-// ---------------------------------------------------------------------
-// process the initial definition of the probe function
-
-@preprobe@
-identifier virtual.pfn;
-position p;
-@@
-
-pfn at p(...) { ... }
-
-@probe@
-identifier pfn;
-position preprobe.p;
-@@
-
-pfn@p(...) { ... }
-
-@labelled_return@
-identifier probe.pfn,l;
-expression e;
-@@
-
-pfn(...) { <+... l: return e; ...+> }
-
-// ---------------------------------------------------------------------
-// transform functions where free uses the result
-
-@prb depends on returned exists@
-identifier probe.pfn,pdev,virtual.alloc,virtual.free,virtual.second_free;
-expression x,y,e;
-expression list args;
-position p1,p2,p3;
-type T1,T2,T3;
-@@
-
-pfn(struct platform_device *pdev) { ... when any
-x = (T1)alloc at p1(args)
-<... when strict
-     when any
-     when forall
-(
-y = x;
-... when != y = e
-    when != &y
-free at p2((T2)y,...);
-... when != x
-    when != y
-second_free at p3((T3)y,...);
-|
-y = x;
-... when != y = e
-    when != &y
-free at p2((T2)y,...);
-|
-free at p2((T2)x,...);
-... when != x
-second_free at p3((T3)x,...);
-|
-free@p2((T2)x,...);
-)
-...>
-}
-
-@reme exists@
-identifier virtual.rfn,virtual.free;
-expression prb.x,prb.y;
-type T;
-@@
-
-rfn(...) { ... free((T)\(x\|y\),...); ... }
-
-@rem depends on reme@
-identifier virtual.rfn,virtual.free,virtual.second_free;
-expression prb.x,prb.y;
-position p4,p5;
-type T,T1;
-@@
-
-rfn(...) {
-<... when strict
-(
-free at p4((T)\(x\|y\),...);
-... when != x
-second_free at p5((T1)\(x\|y\),...);
-|
-free@p4((T)\(x\|y\),...);
-)
-...>
-}
-
-@bad@
-identifier virtual.free;
-expression prb.x,prb.y;
-position p != {prb.p2,rem.p4};
-type T;
-@@
-
-free at p((T)\(x\|y\),...)
-
-@modif depends on rem && !bad@
-expression x;
-identifier prb.pdev,virtual.alloc,virtual.free,virtual.devm_alloc;
-identifier virtual.second_free;
-expression list args;
-position prb.p1,prb.p2,prb.p3,rem.p4,rem.p5;
-type T;
-@@
-
-(
-- free at p2(...);
-|
-- second_free at p3(...);
-|
-- free at p4(...);
-|
-- second_free at p5(...);
-|
-  x =
-- alloc at p1(
-+ devm_alloc(&pdev->dev,
-    args)
-|
-  x = 
-- (T)alloc at p1(
-+ (T)devm_alloc(&pdev->dev,
-    args)
-)
-
-// ---------------------------------------------------------------------
-// transform functions where free uses the first argument
-
-@prbx depends on arg exists@
-identifier probe.pfn,pdev,virtual.alloc,virtual.free;
-expression x,y,e;
-expression list args;
-position p1,p2;
-@@
-
-pfn(struct platform_device *pdev) { ... when any
-alloc at p1(x,args)
-<... when strict
-     when any
-     when forall
-(
-y = x;
-... when != y = e
-    when != &y
-free at p2(y,...);
-|
-free@p2(x,...)
-)
-...>
-}
-
-@remxe exists@
-identifier virtual.rfn, virtual.free;
-expression prbx.x,prbx.y;
-@@
-
-rfn(...) { ... free(\(x\|y\),...); ... }
-
-@remx depends on remxe@
-identifier virtual.rfn, virtual.free;
-expression prbx.x,prbx.y;
-position p3;
-@@
-
-rfn(...) {
-<... when strict
-free@p3(\(x\|y\),...)
-...>
-}
-
-@badx@
-identifier virtual.free;
-expression prbx.x,prbx.y;
-position p != {prbx.p2,remx.p3};
-@@
-
-free at p(\(x\|y\),...)
-
-@modifx depends on remx && !badx@
-expression x;
-identifier prbx.pdev,virtual.alloc,virtual.free,virtual.devm_alloc;
-expression list args;
-position prbx.p1,prbx.p2,remx.p3;
-@@
-
-(
-- free at p2(...);
-|
-- free at p3(...);
-|
-- alloc at p1(
-+ devm_alloc(&pdev->dev,
-   x,args)
-)
-
-// ---------------------------------------------------------------------
-// transform functions where free uses the result of platform_get_resource
-
-@prbg depends on get exists@
-identifier probe.pfn,pdev,virtual.alloc,virtual.free;
-expression x,y,e;
-expression list args;
-position p1,p2;
-@@
-
-pfn(struct platform_device *pdev) { ... when any
-alloc at p1(x,args)
-<... when strict
-     when any
-     when forall
-(
-y = x;
-... when != y = e
-    when != &y
-free at p2(y,...);
-|
-free@p2(x,...)
-)
-...>
-}
-
-@remge exists@
-identifier virtual.rfn, virtual.free;
-identifier z;
-identifier pdev;
-expression e;
-@@
-
-rfn(struct platform_device *pdev) { ... when any
-z = platform_get_resource(pdev, IORESOURCE_MEM, 0)
-... when != z = e
-    when != &z
-free(z->start,...)
-...
-}
-
-@remg depends on remge@
-identifier virtual.rfn, virtual.free;
-identifier z;
-identifier pdev;
-position p3;
-expression e;
-@@
-
-rfn(struct platform_device *pdev) {
-<... when strict
-z = platform_get_resource(pdev, IORESOURCE_MEM, 0)
-... when strict
-    when != z = e
-    when != &z
-free@p3(z->start,...)
-...>
-}
-
-@badg@
-identifier virtual.free;
-position p != {prbg.p2,remg.p3};
-@@
-
-free at p(...)
-
-@modifg depends on remg && !badg@
-expression x;
-identifier prbg.pdev,virtual.alloc,virtual.free,virtual.devm_alloc;
-expression list args;
-position prbg.p1,prbg.p2,remg.p3;
-@@
-
-(
-- free at p2(...);
-|
-- free at p3(...);
-|
-- alloc at p1(
-+ devm_alloc(&pdev->dev,
-   x,args)
-)
-
-// ---------------------------------------------------------------------
-// cleanup, if the drvdata was only used to enable the free
-// probably only relevant for kmalloc/kzalloc
-
-@dclean depends on modif || modifx || modifg@
-identifier virtual.rfn, pdev, i;
-type T;
-@@
-
-rfn(struct platform_device *pdev) { ...
-(
-- T i = platform_get_drvdata(pdev);
-|
-- T i = dev_get_drvdata(&pdev->drv);
-|
-- T i;
-  ... when != i
-(
-- i = platform_get_drvdata(pdev);
-|
-- i = dev_get_drvdata(&pdev->drv);
-)
-)
-... when != i
-}
-
-@rclean depends on modif || modifx || modifg@
-identifier virtual.rfn, pdev, i;
-type T;
-@@
-
-rfn(struct platform_device *pdev) { ...
-(
-- T i = platform_get_resource(pdev,...);
-|
-- T i;
-  ... when != i
-- i = platform_get_resource(pdev,...);
-)
-... when != i
-}
-
-// ---------------------------------------------------------------------
-// cleanup empty ifs, etc
-
-@depends on modif || modifx || modifg@
-identifier probe.pfn;
-@@
-
-pfn(...) { <...
-- if (...) {}
-...> }
-
-@depends on modif || modifx || modifg@
-identifier virtual.rfn;
-@@
-
-rfn(...) { <...
-- if (...) {}
-...> }
-
-@depends on modif || modifx || modifg@
-identifier probe.pfn;
-expression ret,e;
-@@
-
-pfn(...) { <...
-+ return
-- ret =
- e;
-- return ret;
-...> }
-
-@depends on modif || modifx || modifg@
-identifier virtual.rfn;
-expression ret,e;
-@@
-
-rfn(...) { <...
-+ return
-- ret =
- e;
-- return ret;
-...> }
-
-// ---------------------------------------------------------------------
-
-// this is likely to leave dead code, if l: is preceded by a return
-// because we are control-flow based, there is no way to match on that
-@depends on labelled_return && (modif || modifx || modifg)@
-identifier l,l1,l2;
-expression e;
-statement S;
-identifier probe.pfn;
-identifier i;
-statement S1,S2;
-@@
-
-pfn(...) { <...
-- goto l;
-+ goto l2;
-...
--l:
-<... when != S
-     when any
-l1:
-...>
-l2:
-(
- (<+...i...+>);
-|
- if (...) S1 else S2
-|
- while (...) S1
-|
- for (...;...;...) S1
-|
- return e;
-)
-...> }
-
-@depends on !labelled_return && (modif || modifx || modifg)@
-identifier l,l1,l2;
-expression e;
-statement S;
-identifier probe.pfn;
-identifier i;
-statement S1,S2;
-@@
-
-pfn(...) { <...
-(
-- goto l;
-+ goto l2;
-...
--l:
-<... when != S
-     when any
-l1:
-...>
-l2:
-(
- (<+...i...+>);
-|
- if (...) S1 else S2
-|
- while (...) S1
-|
- for (...;...;...) S1
-)
-|
-- goto l;
-+ return e;
-...
--l:
-<... when != S
-     when any
-l1:
-...>
-return e;
-)
-...> }
+Hi again,
+
+On Thu, Feb 09, 2012 at 08:09:40AM +0200, Felipe Balbi wrote:
+> On Wed, Feb 08, 2012 at 04:01:42PM -0800, Kevin Hilman wrote:
+> > Felipe Balbi <balbi@ti.com> writes:
+> > 
+> > > try to keep gpio block suspended as much as possible.
+> > >
+> > > Tested with pandaboard and a sysfs exported gpio.
+> > >
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > 
+> > Looks like you need a few more get/puts around other places where
+> > registers are accessed.  It currently causes a boot crash on OMAP3 in
+> > _set_gpio_triggering().
+> 
+> it was a missing get/put on gpio_irq_set_type(). Fixed.
+> 
+> > Did you test GPIO wakeups?  both IO ring wakeups and GPIO module-level
+> > wakeups?
+> 
+> how can I test that easily with panda ?
+
+Ok, I have added gpio-keys to panda's boardfile:
+
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 30ad40d..0a38282 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/leds.h>
+ #include <linux/gpio.h>
++#include <linux/gpio_keys.h>
+ #include <linux/usb/otg.h>
+ #include <linux/i2c/twl.h>
+ #include <linux/regulator/machine.h>
+@@ -90,7 +91,30 @@ static struct platform_device leds_gpio = {
+ 	},
+ };
+ 
++static struct gpio_keys_button gpio_buttons[] = {
++	{
++		.code		= BTN_EXTRA,
++		.gpio		= 121,
++		.desc		= "user",
++		.wakeup		= 1,
++	},
++};
++
++static struct gpio_keys_platform_data gpio_key_info = {
++	.buttons	= gpio_buttons,
++	.nbuttons	= ARRAY_SIZE(gpio_buttons),
++};
++
++static struct platform_device keys_gpio = {
++	.name	= "gpio-keys",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &gpio_key_info,
++	},
++};
++
+ static struct platform_device *panda_devices[] __initdata = {
++	&keys_gpio,
+ 	&leds_gpio,
+ 	&wl1271_device,
+ };
+
+Then I enabled IRQ wake on gpio-keys driver:
+
+diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+index ed1ed46..e6a0c37a 100644
+--- a/drivers/input/keyboard/gpio_keys.c
++++ b/drivers/input/keyboard/gpio_keys.c
+@@ -410,6 +410,8 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
+ 		goto fail3;
+ 	}
+ 
++	enable_irq_wake(irq);
++
+ 	irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
+ 	/*
+ 	 * If platform has specified that the button can be disabled,
+
+
+and enabled wakeup on the gpio-keys:
+
+# echo enabled > /sys/devices/platform/gpio-keys/power/wakeup
+
+suspended the device, and woke it up by pressing S2 (user button). It
+almost works, hehe. I can suspend and wake pandaboard up with the user
+button. But after that, GPIO module is dead. BTW, I had to prevent
+gpio's suspend/resume functions from being called. For some reason,
+pm-core is still calling them:
+
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index db5dcca..d6c1fef 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1170,6 +1170,9 @@ static int omap_gpio_suspend(struct device *dev)
+ 	void __iomem *wakeup_enable;
+ 	unsigned long flags;
+ 
++	if (pm_runtime_suspended(dev))
++		return 0;
++
+ 	if (!bank->mod_usage || !bank->loses_context)
+ 		return 0;
+ 
+@@ -1194,6 +1197,9 @@ static int omap_gpio_resume(struct device *dev)
+ 	void __iomem *base = bank->base;
+ 	unsigned long flags;
+ 
++	if (pm_runtime_suspended(dev))
++		return 0;
++
+ 	if (!bank->mod_usage || !bank->loses_context)
+ 		return 0;
+ 
+
+I will continue debugging this, I think it's just something stupid that
+I did. Here's entire log:
+
+root at legalas:~# echo enabled > /sys/devices/platform/gpio-keys/power/wakeup
+root at legolas:~# echo enabled > /sys/devices/platform/omap/omap_uart.2/power/wakeup
+root at legolas:~# grep user /proc/interrupts 
+281:          0          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:          2          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:          5          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:          7          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:          8          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:          9          0      GPIO  user
+root at legolas:~# 
+root at legolas:~# 
+root at legolas:~# echo mem > /sys/power/state 
+[   62.593200] PM: Syncing filesystems ... done.
+[   62.605743] Freezing user space processes ... (elapsed 0.03 seconds) done.
+[   62.636230] Freezing remaining freezable tasks ... (elapsed 0.04 seconds) done.
+[   62.692993] Suspending console(s) (use no_console_suspend to debug)
+[   62.709960] PM: suspend of devices complete after 8.270 msecs
+[   62.711853] PM: late suspend of devices complete after 1.770 msecs
+[   62.711853] Disabling non-boot CPUs ...
+[   62.715118] CPU1: shutdown
+[   65.369873] Successfully put all powerdomains to target state
+[   65.369995] Enabling non-boot CPUs ...
+[   65.371612] CPU1: Booted secondary processor
+[   65.372161] Calibrating delay loop (skipped) already calibrated this CPU
+[   65.372741] CPU1 is up
+[   65.373962] PM: early resume of devices complete after 1.220 msecs
+[   65.373962] ------------[ cut here ]------------
+[   65.374114] WARNING: at arch/arm/mach-omap2/omap_l3_noc.c:113 l3_interrupt_handler+0x184/0x1c4()
+[   65.374114] L3 custom error: MASTER:MPU TARGET:L4 PER2
+[   65.374114] Modules linked in:
+[   65.374114] [<c001b824>] (unwind_backtrace+0x0/0xf0) from [<c0042a60>] (warn_slowpath_common+0x4c/0x64)
+[   65.374206] [<c0042a60>] (warn_slowpath_common+0x4c/0x64) from [<c0042b0c>] (warn_slowpath_fmt+0x30/0x40)
+[   65.374206] [<c0042b0c>] (warn_slowpath_fmt+0x30/0x40) from [<c0034a88>] (l3_interrupt_handler+0x184/0x1c4)
+[   65.374267] [<c0034a88>] (l3_interrupt_handler+0x184/0x1c4) from [<c00a1ef8>] (handle_irq_event_percpu+0x5c/0x22c)
+[   65.374267] [<c00a1ef8>] (handle_irq_event_percpu+0x5c/0x22c) from [<c00a2104>] (handle_irq_event+0x3c/0x5c)
+[   65.374298] [<c00a2104>] (handle_irq_event+0x3c/0x5c) from [<c00a4ba0>] (handle_fasteoi_irq+0x98/0x140)
+[   65.374328] [<c00a4ba0>] (handle_fasteoi_irq+0x98/0x140) from [<c00a170c>] (generic_handle_irq+0x30/0x48)
+[   65.374328] [<c00a170c>] (generic_handle_irq+0x30/0x48) from [<c0014bd8>] (handle_IRQ+0x4c/0xac)
+[   65.374389] [<c0014bd8>] (handle_IRQ+0x4c/0xac) from [<c000848c>] (gic_handle_irq+0x28/0xac)
+[   65.374389] [<c000848c>] (gic_handle_irq+0x28/0xac) from [<c04809e4>] (__irq_svc+0x44/0x60)
+[   65.374389] Exception stack(0xee147e60 to 0xee147ea8)
+[   65.374450] 7e60: 00011de7 00000003 00000000 ee0f7580 60000113 c068c194 00000000 c068c194
+[   65.374450] 7e80: 60000113 ee04d780 c068c140 000d7518 00001584 ee147ea8 00011de8 c04807a4
+[   65.374450] 7ea0: 20000113 ffffffff
+[   65.374481] [<c04809e4>] (__irq_svc+0x44/0x60) from [<c04807a4>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+[   65.374481] [<c04807a4>] (_raw_spin_unlock_irqrestore+0x34/0x44) from [<c00a717c>] (resume_irqs+0x9c/0xbc)
+[   65.374511] [<c00a717c>] (resume_irqs+0x9c/0xbc) from [<c0080998>] (suspend_enter+0xa4/0x168)
+[   65.374542] [<c0080998>] (suspend_enter+0xa4/0x168) from [<c0080b0c>] (suspend_devices_and_enter+0xb0/0x18c)
+[   65.374542] [<c0080b0c>] (suspend_devices_and_enter+0xb0/0x18c) from [<c0080d24>] (enter_state+0x13c/0x17c)
+[   65.374572] [<c0080d24>] (enter_state+0x13c/0x17c) from [<c007fa1c>] (state_store+0xd0/0x178)
+[   65.374603] [<c007fa1c>] (state_store+0xd0/0x178) from [<c0258f48>] (kobj_attr_store+0x14/0x20)
+[   65.374603] [<c0258f48>] (kobj_attr_store+0x14/0x20) from [<c0169958>] (sysfs_write_file+0x100/0x184)
+[   65.374633] [<c0169958>] (sysfs_write_file+0x100/0x184) from [<c0109d10>] (vfs_write+0xb4/0x148)
+[   65.374664] [<c0109d10>] (vfs_write+0xb4/0x148) from [<c0109f98>] (sys_write+0x40/0x70)
+[   65.374664] [<c0109f98>] (sys_write+0x40/0x70) from [<c0013cc0>] (ret_fast_syscall+0x0/0x3c)
+[   65.374694] ---[ end trace 4898b0d1d1bc4fab ]---
+[   65.374694] ------------[ cut here ]------------
+[   65.374694] WARNING: at arch/arm/mach-omap2/omap_l3_noc.c:113 l3_interrupt_handler+0x184/0x1c4()
+[   65.374694] L3 custom error: MASTER:MPU TARGET:L4 PER2
+[   65.375305] Modules linked in:
+[   65.375305] [<c001b824>] (unwind_backtrace+0x0/0xf0) from [<c0042a60>] (warn_slowpath_common+0x4c/0x64)
+[   65.375335] [<c0042a60>] (warn_slowpath_common+0x4c/0x64) from [<c0042b0c>] (warn_slowpath_fmt+0x30/0x40)
+[   65.375335] [<c0042b0c>] (warn_slowpath_fmt+0x30/0x40) from [<c0034a88>] (l3_interrupt_handler+0x184/0x1c4)
+[   65.375366] [<c0034a88>] (l3_interrupt_handler+0x184/0x1c4) from [<c00a1ef8>] (handle_irq_event_percpu+0x5c/0x22c)
+[   65.375396] [<c00a1ef8>] (handle_irq_event_percpu+0x5c/0x22c) from [<c00a2104>] (handle_irq_event+0x3c/0x5c)
+[   65.375396] [<c00a2104>] (handle_irq_event+0x3c/0x5c) from [<c00a4ba0>] (handle_fasteoi_irq+0x98/0x140)
+[   65.375427] [<c00a4ba0>] (handle_fasteoi_irq+0x98/0x140) from [<c00a170c>] (generic_handle_irq+0x30/0x48)
+[   65.375427] [<c00a170c>] (generic_handle_irq+0x30/0x48) from [<c0014bd8>] (handle_IRQ+0x4c/0xac)
+[   65.375457] [<c0014bd8>] (handle_IRQ+0x4c/0xac) from [<c000848c>] (gic_handle_irq+0x28/0xac)
+[   65.375457] [<c000848c>] (gic_handle_irq+0x28/0xac) from [<c04809e4>] (__irq_svc+0x44/0x60)
+[   65.375488] Exception stack(0xee147e60 to 0xee147ea8)
+[   65.375488] 7e60: 00011fc7 00000003 00000000 ee0f7580 60000113 c06974d4 00000000 c06974d4
+[   65.375488] 7e80: 60000113 ee04d780 c0697480 000d7518 00001584 ee147ea8 00011fc8 c04807a4
+[   65.375518] 7ea0: 20000113 ffffffff
+[   65.375518] [<c04809e4>] (__irq_svc+0x44/0x60) from [<c04807a4>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+[   65.375549] [<c04807a4>] (_raw_spin_unlock_irqrestore+0x34/0x44) from [<c00a717c>] (resume_irqs+0x9c/0xbc)
+[   65.375549] [<c00a717c>] (resume_irqs+0x9c/0xbc) from [<c0080998>] (suspend_enter+0xa4/0x168)
+[   65.375579] [<c0080998>] (suspend_enter+0xa4/0x168) from [<c0080b0c>] (suspend_devices_and_enter+0xb0/0x18c)
+[   65.375579] [<c0080b0c>] (suspend_devices_and_enter+0xb0/0x18c) from [<c0080d24>] (enter_state+0x13c/0x17c)
+[   65.375610] [<c0080d24>] (enter_state+0x13c/0x17c) from [<c007fa1c>] (state_store+0xd0/0x178)
+[   65.375610] [<c007fa1c>] (state_store+0xd0/0x178) from [<c0258f48>] (kobj_attr_store+0x14/0x20)
+[   65.375640] [<c0258f48>] (kobj_attr_store+0x14/0x20) from [<c0169958>] (sysfs_write_file+0x100/0x184)
+[   65.375640] [<c0169958>] (sysfs_write_file+0x100/0x184) from [<c0109d10>] (vfs_write+0xb4/0x148)
+[   65.375671] [<c0109d10>] (vfs_write+0xb4/0x148) from [<c0109f98>] (sys_write+0x40/0x70)
+[   65.375671] [<c0109f98>] (sys_write+0x40/0x70) from [<c0013cc0>] (ret_fast_syscall+0x0/0x3c)
+[   65.375671] ---[ end trace 4898b0d1d1bc4fac ]---
+[   65.375701] ------------[ cut here ]------------
+[   65.375762] WARNING: at arch/arm/mach-omap2/omap_l3_noc.c:113 l3_interrupt_handler+0x184/0x1c4()
+[   65.375762] L3 custom error: MASTER:MPU TARGET:L4 PER2
+[   65.375762] Modules linked in:
+[   65.375793] [<c001b824>] (unwind_backtrace+0x0/0xf0) from [<c0042a60>] (warn_slowpath_common+0x4c/0x64)
+[   65.375793] [<c0042a60>] (warn_slowpath_common+0x4c/0x64) from [<c0042b0c>] (warn_slowpath_fmt+0x30/0x40)
+[   65.375823] [<c0042b0c>] (warn_slowpath_fmt+0x30/0x40) from [<c0034a88>] (l3_interrupt_handler+0x184/0x1c4)
+[   65.375854] [<c0034a88>] (l3_interrupt_handler+0x184/0x1c4) from [<c00a1ef8>] (handle_irq_event_percpu+0x5c/0x22c)
+[   65.375854] [<c00a1ef8>] (handle_irq_event_percpu+0x5c/0x22c) from [<c00a2104>] (handle_irq_event+0x3c/0x5c)
+[   65.375885] [<c00a2104>] (handle_irq_event+0x3c/0x5c) from [<c00a4ba0>] (handle_fasteoi_irq+0x98/0x140)
+[   65.375885] [<c00a4ba0>] (handle_fasteoi_irq+0x98/0x140) from [<c00a170c>] (generic_handle_irq+0x30/0x48)
+[   65.375915] [<c00a170c>] (generic_handle_irq+0x30/0x48) from [<c0014bd8>] (handle_IRQ+0x4c/0xac)
+[   65.375915] [<c0014bd8>] (handle_IRQ+0x4c/0xac) from [<c000848c>] (gic_handle_irq+0x28/0xac)
+[   65.375946] [<c000848c>] (gic_handle_irq+0x28/0xac) from [<c04809e4>] (__irq_svc+0x44/0x60)
+[   65.375946] Exception stack(0xee147d60 to 0xee147da8)
+[   65.375946] 7d60: 00011fce 00000003 00000000 ee0f7580 c0697480 00000119 c06e669c c06e669c
+[   65.375976] 7d80: 00000000 c06854a8 c069f108 c0723300 00000000 ee147da8 00011fcf c00a4224
+[   65.375976] 7da0: 60000113 ffffffff
+[   65.375976] [<c04809e4>] (__irq_svc+0x44/0x60) from [<c00a4224>] (resend_irqs+0x50/0x74)
+[   65.376007] [<c00a4224>] (resend_irqs+0x50/0x74) from [<c0049990>] (tasklet_action+0x80/0x180)
+[   65.376037] [<c0049990>] (tasklet_action+0x80/0x180) from [<c0049f04>] (__do_softirq+0xd0/0x200)
+[   65.376037] [<c0049f04>] (__do_softirq+0xd0/0x200) from [<c004a4c0>] (irq_exit+0x94/0x9c)
+[   65.376068] [<c004a4c0>] (irq_exit+0x94/0x9c) from [<c0014bdc>] (handle_IRQ+0x50/0xac)
+[   65.376068] [<c0014bdc>] (handle_IRQ+0x50/0xac) from [<c000848c>] (gic_handle_irq+0x28/0xac)
+[   65.376098] [<c000848c>] (gic_handle_irq+0x28/0xac) from [<c04809e4>] (__irq_svc+0x44/0x60)
+[   65.376098] Exception stack(0xee147e60 to 0xee147ea8)
+[   65.376098] 7e60: 00011fc7 00000003 00000000 ee0f7580 60000113 c06974d4 00000000 c06974d4
+[   65.376129] 7e80: 60000113 ee04d780 c0697480 000d7518 00001584 ee147ea8 00011fc8 c04807a4
+[   65.376129] 7ea0: 20000113 ffffffff
+[   65.376159] [<c04809e4>] (__irq_svc+0x44/0x60) from [<c04807a4>] (_raw_spin_unlock_irqrestore+0x34/0x44)
+[   65.376159] [<c04807a4>] (_raw_spin_unlock_irqrestore+0x34/0x44) from [<c00a717c>] (resume_irqs+0x9c/0xbc)
+[   65.376190] [<c00a717c>] (resume_irqs+0x9c/0xbc) from [<c0080998>] (suspend_enter+0xa4/0x168)
+[   65.376190] [<c0080998>] (suspend_enter+0xa4/0x168) from [<c0080b0c>] (suspend_devices_and_enter+0xb0/0x18c)
+[   65.376220] [<c0080b0c>] (suspend_devices_and_enter+0xb0/0x18c) from [<c0080d24>] (enter_state+0x13c/0x17c)
+[   65.376220] [<c0080d24>] (enter_state+0x13c/0x17c) from [<c007fa1c>] (state_store+0xd0/0x178)
+[   65.376220] [<c007fa1c>] (state_store+0xd0/0x178) from [<c0258f48>] (kobj_attr_store+0x14/0x20)
+[   65.376251] [<c0258f48>] (kobj_attr_store+0x14/0x20) from [<c0169958>] (sysfs_write_file+0x100/0x184)
+[   65.376281] [<c0169958>] (sysfs_write_file+0x100/0x184) from [<c0109d10>] (vfs_write+0xb4/0x148)
+[   65.376281] [<c0109d10>] (vfs_write+0xb4/0x148) from [<c0109f98>] (sys_write+0x40/0x70)
+[   65.376312] [<c0109f98>] (sys_write+0x40/0x70) from [<c0013cc0>] (ret_fast_syscall+0x0/0x3c)
+[   65.376312] ---[ end trace 4898b0d1d1bc4fad ]---
+[   66.479217] PM: resume of devices complete after 1102.905 msecs
+[   67.393280] Restarting tasks ... done.
+root at legolas:~# [   71.719665] mmcblk0: error -110 transferring data, sector 3557217, nr 72, cmd response 0x900, card status 0xc00
+[   71.730468] end_request: I/O error, dev mmcblk0, sector 3557280
+[   71.730651] end_request: I/O error, dev mmcblk0, sector 3557281
+[   71.743591] Aborting journal on device mmcblk0p2.
+[   71.753845] EXT3-fs (mmcblk0p2): error: ext3_journal_start_sb: Detected aborted journal
+[   71.753845] EXT3-fs (mmcblk0p2): error: remounting filesystem read-only
+
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+root at legolas:~# grep user /proc/interrupts 
+281:         10          0      GPIO  user
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120209/1f0bec5b/attachment-0001.sig>
