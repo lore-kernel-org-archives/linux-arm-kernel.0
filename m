@@ -1,63 +1,55 @@
-From: T.Gamez@phytec.de (Teresa Gamez)
-Date: Thu, 09 Feb 2012 09:30:20 +0100
-Subject: [PATCH 00/16] rmk's patch series for fixing OMAP
-In-Reply-To: <1328770969.1909.11.camel@deskari>
-References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
- <4F32DBB5.4010004@gmx.de>  <20120209005334.GG25414@n2100.arm.linux.org.uk>
- <1328770969.1909.11.camel@deskari>
-Message-ID: <1328776220.12747.5.camel@lws-gamez>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 9 Feb 2012 09:40:09 +0100
+Subject: [PATCH] genirq: Fix race condition in ONESHOT irq handler
+In-Reply-To: <alpine.LFD.2.02.1202081123390.2794@ionos>
+References: <4F31220A.2050708@metafoo.de>
+ <1328621921-17404-1-git-send-email-LW@KARO-electronics.de>
+ <alpine.LFD.2.02.1202071719340.2794@ionos>
+ <20274.4237.63380.338503@ipc1.ka-ro>
+ <alpine.LFD.2.02.1202081123390.2794@ionos>
+Message-ID: <20275.34409.978854.416870@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 09.02.2012, 09:02 +0200 schrieb Tomi Valkeinen:
-> On Thu, 2012-02-09 at 00:53 +0000, Russell King - ARM Linux wrote:
-> 
-> > Moreover, only last Monday did I enable the OMAP2 DSS subsystem on the
-> > 4430 SDP platform, _including_ the HDMI code, and looking at the commit
-> > it could be one of those platforms which is affected.
-> > 
-> > As I don't have a HDMI cable connected to the system, and I ran that
-> > kernel overnight, and I tried opening each /dev/fb* device, what I'm now
-> > wondering is: have I destroyed the HDMI PHY on my 4430SDP?
-> 
-> Probably not. I don't know the exact details of the HW bug (I wrote the
-> patch as it took too long for the person responsible for it to come up
-> with a decent patch), but my understanding is that the cable needs to be
-> plugged in at some point, and then removed.
-> 
-> Thinking about this now, I guess I should've sent queries to get a
-> proper description of the situation where the bug happens.
-> 
-> > However, you raise another point, a much more serious one at that.  Is
-> > this problem also present in 3.2?  The patch seems to apply almost cleanly
-> > to that kernel version, so I guess it is.  It fails to apply to v3.1
-> > because of missing files, so I guess 3.1 is unaffected.
-> > 
-> > So, why isn't this patch copied to the stable people?
-> 
-> Good point, I'll take it to the stable people.
-> 
-> The problem is present in all kernels where we have the HDMI driver, so
-> 2.6.39+.
+Hi,
 
-Are there already backported patches out there for 3.0/3.1?
-We are quite interested in this.
+Thomas Gleixner writes:
+> On Wed, 8 Feb 2012, Lothar Wa?mann wrote:
+> > > > The problem arises also with interrupt controllers that latch a level
+> > > > triggered IRQ until it is acknowledged (like the i.MX28 does).
+> > > > In this case the IRQ status bit will remain asserted after the
+> > > > soft-irq finishes and retrigger the interrupt while the interrupt line
+> > > > is already deasserted.
+> > > 
+> > > This does not make sense. We acknowledge interrupts via mask_ack_irq()
+> > > right on entry of handle_level_irq(). So either the interrupt
+> > > 
+> > That's right. But at that point the IRQ line is still asserted and
+> > since it is a level IRQ this will not actually clear the interrupt
+> > status bit. Normally the IRQ status bit would self-clear when the IRQ
+> > line is being deasserted (in this case by removing the finger from the
+> > touch panel). But the i.MX28 leaves the IRQ status bit set and it
+> > takes another write to the IRQ status register to remove the bogus IRQ
+> > status.
+> 
+> So the question is whether the imx irq chip implementation should
+> write to the status register on unmask for level type irqs to avoid
+> spurious interrupts being generated in the first place. This is not
+> only an optimization for threaded interrupts, afaict this spurious
+> effect should happen with non threaded interrupts as well.
+> 
+> Did my patch work for you ?
+> 
+Sorry, I couldn't test it earlier. Yes, it works.
 
-Regards,
-Teresa
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-> 
-> > For hardware destruction issues, once the problem has been identified, it
-> > should be shouted about very loudly to get it upstream as quickly as
-> > possible.  I'm sure Linus would've even taken it in patch form.
-> > 
-> > (You do realise that Linus does apply patches as well as pulling trees?)
-> 
-> Yes, I should've taken this directly to Linus.
-> 
->  Tomi
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
