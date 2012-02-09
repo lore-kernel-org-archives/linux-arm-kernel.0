@@ -1,61 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 09 Feb 2012 01:57:08 +0100
-Subject: [PATCH v6 13/15] ARM: hotplug: Introduce
- =?UTF-8?Q?dummy=5Fcpu=5Fkill?=
-In-Reply-To: <alpine.LFD.2.02.1202081608100.1656@xanadu.home>
-References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
- <1328661059-24584-14-git-send-email-marc.zyngier@arm.com>
- <alpine.LFD.2.02.1202081608100.1656@xanadu.home>
-Message-ID: <6744403449c559f689ca7322eb0393b8@localhost>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 8 Feb 2012 16:57:39 -0800
+Subject: [GIT PULL] cs89x0 platform support
+In-Reply-To: <20120201155404.GW1990@pengutronix.de>
+References: <20120201134415.GU1990@pengutronix.de>
+ <20120201150909.GB2203@S2101-09.ap.freescale.net>
+ <20120201155404.GW1990@pengutronix.de>
+Message-ID: <CAOesGMiRTZZ9Gn9boEwyHbmG3H=jSqEHB7CDqf8Vr05LXTcx+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 1, 2012 at 7:54 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Feb 01, 2012 at 11:09:13PM +0800, Shawn Guo wrote:
+>> On Wed, Feb 01, 2012 at 02:44:15PM +0100, Sascha Hauer wrote:
+>> > Hi Olof,
+>> >
+>> > Please pull the following for next. It contains cs89x0 platform
+>> > support. David has acked the base patch and is fine with this
+>> > patch going via the Arm tree.
+>> >
+>> > Sascha
+>> >
+>> > The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+>> >
+>> > ? Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
+>> >
+>> > are available in the git repository at:
+>> > ? git://git.pengutronix.de/git/imx/linux-2.6.git features/cs89x0
+>> >
+>> > Jaccon Bastiaansen (4):
+>> > ? ? ? CS89x0 : add platform driver support
+>> > ? ? ? CS89x0 : add CS89x0 platform device to the iMX21ADS board
+>> > ? ? ? CS89x0 : remove QQ2440 board support from the CS89x0 driver
+>> > ? ? ? CS89x0 : add CS89x0 platform device to the iMX31ADS board
+>> >
+>> > ?arch/arm/configs/imx_v4_v5_defconfig ? ? ? ? ? | ? ?2 +
+>> > ?arch/arm/configs/mx3_defconfig ? ? ? ? ? ? ? ? | ? ?2 +
+>>
+>> The mx3_defconfig has been deleted from mainline. ?We may need to
+>> rebase the series to 3.3-rc2. ?Otherwise, we will eventually have
+>> conflict?
+>
+> Oops, yes. Just did that.
+>
+> Sascha
+>
+> The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+>
+> ?Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
+>
+> are available in the git repository at:
+> ?git://git.pengutronix.de/git/imx/linux-2.6.git features/cs89x0
 
-On Wed, 8 Feb 2012 16:16:24 -0800 (PST), Nicolas Pitre
-<nicolas.pitre@linaro.org> wrote:
-> On Wed, 8 Feb 2012, Marc Zyngier wrote:
-> 
->> Most platforms don't implement their cpu_kill method.
->> Some because they simply don't offer the capability, some other
->> because nobody cared enough to implement the necessary code.
->> 
->> Either way, this code is duplicated all over the place. Implement
->> a global dummy_cpu_kill method and convert all SMP (but shmobile)
->> to use it. Hopefully the "dummy" prefix will be an incentive
->> for people to do the right thing.
->> 
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Colin Cross <ccross@android.com>
->> Cc: David Brown <davidb@codeaurora.org>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Linus Walleij <linus.walleij@stericsson.com>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Cc: Nicolas Pitre <nico@fluxnic.net>
->> Cc: Paul Mundt <lethal@linux-sh.org>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Stephen Warren <swarren@nvidia.com>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> What avout this instead:
-> 
-> int __weak __cpuinit platform_cpu_kill(unsigned int cpu)
-> {
-> 	if (!soc_smp_ops)
-> 		return 0;
-> 	if (!soc_smp_ops->cpu_kill)
-> 		return 1;
-> 	return soc_smp_ops->cpu_kill(cpu);
-> }
-> 
-> and get rid of the dummy handler entirely?
+Hi,
 
-I thought the "dummy" prefix would maybe give maintainers a chance to
-think whether or not this is the best they can do (given that they mostly
-copied the RealView code, I'm quite sure it is possible...). I'll use your
-approach if you think it's better.
+Arnd had some outstanding comments on the ethernet driver, so I will
+hold off pulling until that is resolved.
 
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+
+-Olof
