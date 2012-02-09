@@ -1,159 +1,25 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 10 Feb 2012 01:47:50 +0200
-Subject: [PATCH v3 10/10] ARM: tegra: support for secondary cores on Tegra30
-In-Reply-To: <1328831277-21002-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1328831277-21002-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1328831277-21002-11-git-send-email-pdeschrijver@nvidia.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 10 Feb 2012 10:50:26 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120210105026.0075dcf9eba39eb98e7b44ef@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for bringing up secondary cores on Tegra30. On Tegra30 secondary
-CPU cores are powergated, so we need to turn on the domains before we can bring
-the CPU cores online. Bringing secondary cores online happens early during the
-sytem boot, so we call powergating initialization from platform early_init
-function.
+Hi all,
 
-Based on work by:
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-at91/at91cap9.c between commit fa23e771d863 ("Merge branch
+'fixes' into for-next") from the arm tree and commit 9918ceafd4a9 ("ARM:
+at91: code removal of CAP9 SoC") from the arm-soc tree.
 
-Scott Williams <scwilliams@nvidia.com>
-Colin Cross <ccross@android.com>
-Alex Frid <afrid@nvidia.com>
-
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/mach-tegra/headsmp.S |   32 ++++++++++++++++++++++++++
- arch/arm/mach-tegra/platsmp.c |   50 ++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 81 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-index 7973f1c..b63a4f7 100644
---- a/arch/arm/mach-tegra/headsmp.S
-+++ b/arch/arm/mach-tegra/headsmp.S
-@@ -163,6 +163,38 @@ __die:
- 	str	r1, [r7, #0x340]		@ CLK_RST_CPU_CMPLX_SET
- #endif
- 1:
-+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+	mov32	r6, TEGRA_FLOW_CTRL_BASE
-+
-+	cmp	r10, #0
-+	moveq	r1, #FLOW_CTRL_HALT_CPU0_EVENTS
-+	moveq	r2, #FLOW_CTRL_CPU0_CSR
-+	movne	r1, r10, lsl #3
-+	addne	r2, r1, #(FLOW_CTRL_CPU1_CSR-8)
-+	addne	r1, r1, #(FLOW_CTRL_HALT_CPU1_EVENTS-8)
-+
-+	/* Clear CPU "event" and "interrupt" flags and power gate
-+	   it when halting but not before it is in the "WFI" state. */
-+	ldr	r0, [r6, +r2]
-+	orr	r0, r0, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-+	orr	r0, r0, #FLOW_CTRL_CSR_ENABLE
-+	str	r0, [r6, +r2]
-+
-+	/* Unconditionally halt this CPU */
-+	mov	r0, #FLOW_CTRL_WAITEVENT
-+	str	r0, [r6, +r1]
-+	ldr	r0, [r6, +r1]			@ memory barrier
-+
-+	dsb
-+	isb
-+	wfi					@ CPU should be power gated here
-+
-+	/* If the CPU didn't power gate above just kill it's clock. */
-+
-+	mov	r0, r11, lsl #8
-+	str	r0, [r7, #348]			@ CLK_CPU_CMPLX_SET
-+#endif
-+
- 	/* If the CPU still isn't dead, just spin here. */
- 	b	.
- ENDPROC(__tegra_cpu_reset_handler)
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 79a241a..1a208db 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -24,7 +24,9 @@
- #include <asm/mach-types.h>
- #include <asm/smp_scu.h>
- 
-+#include <mach/clk.h>
- #include <mach/iomap.h>
-+#include <mach/powergate.h>
- 
- #include "fuse.h"
- #include "flowctrl.h"
-@@ -42,6 +44,8 @@ static void __iomem *scu_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE);
- 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x340)
- #define CLK_RST_CONTROLLER_RST_CPU_CMPLX_CLR \
- 	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x344)
-+#define CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR \
-+	(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + 0x34c)
- 
- #define CPU_CLOCK(cpu)	(0x1<<(8+cpu))
- #define CPU_RESET(cpu)	(0x1111ul<<(cpu))
-@@ -73,11 +77,52 @@ static int tegra20_power_up_cpu(unsigned int cpu)
- 	return 0;
- }
- 
-+static int tegra30_power_up_cpu(unsigned int cpu)
-+{
-+	u32 reg;
-+	int ret, pwrgateid;
-+	unsigned long timeout;
-+
-+	pwrgateid = tegra_cpu_powergate_id(cpu);
-+	if (pwrgateid < 0)
-+		return pwrgateid;
-+
-+	/* If this is the first boot, toggle powergates directly. */
-+	if (!tegra_powergate_is_powered(pwrgateid)) {
-+		ret = tegra_powergate_power_on(pwrgateid);
-+		if (ret)
-+			return ret;
-+
-+		/* Wait for the power to come up. */
-+		timeout = jiffies + 10*HZ;
-+		while (tegra_powergate_is_powered(pwrgateid)) {
-+			if (time_after(jiffies, timeout))
-+				return -ETIMEDOUT;
-+			udelay(10);
-+		}
-+	}
-+
-+	/* CPU partition is powered. Enable the CPU clock. */
-+	writel(CPU_CLOCK(cpu), CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
-+	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX_CLR);
-+	udelay(10);
-+
-+	/* Remove I/O clamps. */
-+	ret = tegra_powergate_remove_clamping(pwrgateid);
-+	udelay(10);
-+
-+	/* Clear flow controller CSR. */
-+	flowctrl_write_cpu_csr(cpu, 0);
-+
-+	return 0;
-+}
-+
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	int status;
- 
--	/* Force the CPU into reset. The CPU must remain in reset when the
-+	/*
-+	 * Force the CPU into reset. The CPU must remain in reset when the
- 	 * flow controller state is cleared (which will cause the flow
- 	 * controller to stop driving reset if the CPU has been power-gated
- 	 * via the flow controller). This will have no effect on first boot
-@@ -98,6 +143,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	case TEGRA20:
- 		status = tegra20_power_up_cpu(cpu);
- 		break;
-+	case TEGRA30:
-+		status = tegra30_power_up_cpu(cpu);
-+		break;
- 	default:
- 		status = -EINVAL;
- 		break;
+The latter removes the file, so I did that.
 -- 
-1.7.4.1
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120210/3cdd3487/attachment.sig>
