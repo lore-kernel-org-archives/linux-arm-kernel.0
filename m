@@ -1,29 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 Feb 2012 10:46:18 -0800
-Subject: [PATCH 05/16] ARM: omap: fix vc.c PMIC error message
-In-Reply-To: <20120209180634.GI1426@atomide.com>
-References: <20120208235620.GE25414@n2100.arm.linux.org.uk>
- <87sjikx3xv.fsf@ti.com>
- <20120209001135.GF25414@n2100.arm.linux.org.uk>
- <87ipjgx3g3.fsf@ti.com> <20120209004027.GF16877@atomide.com>
- <20120209164913.GB19159@n2100.arm.linux.org.uk>
- <20120209171830.GH16877@atomide.com>
- <20120209172747.GG1426@atomide.com>
- <20120209175937.GC19159@n2100.arm.linux.org.uk>
- <20120209180634.GI1426@atomide.com>
-Message-ID: <20120209184618.GK1426@atomide.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 9 Feb 2012 10:58:04 -0800
+Subject: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
+In-Reply-To: <1327652483-15655-1-git-send-email-riverful.kim@samsung.com>
+References: <1324624169-16102-1-git-send-email-riverful.kim@samsung.com>
+ <1327652483-15655-1-git-send-email-riverful.kim@samsung.com>
+Message-ID: <CAJuYYwRn7Luhj0223-i9u3ETutb8qgFUY7FEBq-ZOUi74DouMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120209 09:35]:
-> 
-> After you repost those two patches, I'll update linux-omap with
-> your fixes + tty fixes + my fixes for people to test with.
+Dear Mr. HeungJun Kim,
 
-The branch for testing is now pushed to:
+On 27 January 2012 00:21, HeungJun, Kim <riverful.kim@samsung.com> wrote:
+> This patch adds Samsung Mobile TRATS board support.
+>
+> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> ?arch/arm/mach-exynos/Kconfig ? ? ?| ? 11 ++
+> ?arch/arm/mach-exynos/Makefile ? ? | ? ?1 +
+> ?arch/arm/mach-exynos/mach-trats.c | ?344 +++++++++++++++++++++++++++++++++++++
+> ?3 files changed, 356 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/mach-exynos/mach-trats.c
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap testing-omap-fixes
+The exynos4 dt-enabled board file can support most of the features
+added in this board file. The other option that could be considered
+here would be to add DT support for this board file, and use AUX_DATA
+to supply platform data for drivers that do not have dt support yet.
+It would be better to use dt support for new board support that we
+add.
 
-Regards,
+Thanks,
+Thomas.
 
-Tony
+(snip)
