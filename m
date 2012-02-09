@@ -1,35 +1,35 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 9 Feb 2012 10:58:04 -0800
-Subject: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
-In-Reply-To: <1327652483-15655-1-git-send-email-riverful.kim@samsung.com>
-References: <1324624169-16102-1-git-send-email-riverful.kim@samsung.com>
- <1327652483-15655-1-git-send-email-riverful.kim@samsung.com>
-Message-ID: <CAJuYYwRn7Luhj0223-i9u3ETutb8qgFUY7FEBq-ZOUi74DouMA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 9 Feb 2012 19:58:32 +0100
+Subject: [PATCH 04/16] ARM: omap: fix prm44xx.c OMAP44XX_IRQ_PRCM build
+ error
+In-Reply-To: <20120208183951.GD29796@atomide.com>
+References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
+ <E1RvAW4-0006Gy-S6@rmk-PC.arm.linux.org.uk>
+ <20120208183951.GD29796@atomide.com>
+Message-ID: <4F341758.6080400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mr. HeungJun Kim,
+Hi Tony,
 
-On 27 January 2012 00:21, HeungJun, Kim <riverful.kim@samsung.com> wrote:
-> This patch adds Samsung Mobile TRATS board support.
->
-> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> ?arch/arm/mach-exynos/Kconfig ? ? ?| ? 11 ++
-> ?arch/arm/mach-exynos/Makefile ? ? | ? ?1 +
-> ?arch/arm/mach-exynos/mach-trats.c | ?344 +++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 356 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-exynos/mach-trats.c
+On 2/8/2012 7:39 PM, Tony Lindgren wrote:
+> * Russell King - ARM Linux<linux@arm.linux.org.uk>  [120208 08:06]:
+>> arch/arm/mach-omap2/prm44xx.c:41: error: 'OMAP44XX_IRQ_PRCM' undeclared here (not in a function)
+> 
+> Can you please add something like "This happens when CONFIG_OF is
+> not selected".
+> 
+>> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+> 
+> Other than that:
+> 
+> Acked-by: Tony Lindgren<tony@atomide.com>
 
-The exynos4 dt-enabled board file can support most of the features
-added in this board file. The other option that could be considered
-here would be to add DT support for this board file, and use AUX_DATA
-to supply platform data for drivers that do not have dt support yet.
-It would be better to use dt support for new board support that we
-add.
+It looks like prm2xxx_3xxx.c does have the exact same issue than prm44xx.c.
 
-Thanks,
-Thomas.
+arch/arm/mach-omap2/prm2xxx_3xxx.c:41:11: error: ?INT_34XX_PRCM_MPU_IRQ? undeclared here (not in a function)
 
-(snip)
+Patch will follow.
+
+Regards,
+Benoit
