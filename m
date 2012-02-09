@@ -1,31 +1,24 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu,  9 Feb 2012 15:16:26 -0500
-Subject: [PATCH 2/2] omap: build am3517crane board support by default
-In-Reply-To: <1328818586-7104-1-git-send-email-mporter@ti.com>
-References: <1328818586-7104-1-git-send-email-mporter@ti.com>
-Message-ID: <1328818586-7104-3-git-send-email-mporter@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 9 Feb 2012 19:24:09 -0200
+Subject: [alsa-devel] [RFC PATCH] ARM ASoC: add sound driver for imx27pdk
+ using mc13783 codec
+In-Reply-To: <1635894.OLo8mNMWim@laptop>
+References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+ <2851519.TkeCdfD43W@laptop> <20120202173212.GA1785@sirena.org.uk>
+ <1635894.OLo8mNMWim@laptop>
+Message-ID: <CAOMZO5BpUQz3kpkWmDngCiwp5mJyDOicvk9pLSXuejDCvD70Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set default to include support for the craneboard when
-using the omap2plus_defconfig.
+Hi Sascha,
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+2012/2/3 Philippe R?tornaz <philippe.retornaz@epfl.ch>:
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index d965da4..678b8ac 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -206,6 +206,7 @@ config MACH_OMAP3517EVM
- config MACH_CRANEBOARD
- 	bool "AM3517/05 CRANE board"
- 	depends on ARCH_OMAP3
-+	default y
- 	select OMAP_PACKAGE_CBB
- 
- config MACH_OMAP3_PANDORA
--- 
-1.7.5.4
+> But before investing too much time on it I would really like to have Sascha
+> opinion about it as he is the main author of the mc13783 codec code.
+
+Could you please comment?
+
+Thanks,
+
+Fabio Estevam
