@@ -1,35 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 8 Feb 2012 22:59:25 -0800
-Subject: [GIT PULL] mxs/defconfig for 3.4
-In-Reply-To: <CAAQ0ZWQzxbQmD__N9zZoE=0N4JX+6XFbFz6CRKannjeBZBLF=A@mail.gmail.com>
-References: <20120201154628.GC2203@S2101-09.ap.freescale.net>
- <CAOesGMg5qEXvYDM1BEUj-na69XWE7E6XUWZ1m=pLNwvS8NYwhg@mail.gmail.com>
- <CAAQ0ZWQzxbQmD__N9zZoE=0N4JX+6XFbFz6CRKannjeBZBLF=A@mail.gmail.com>
-Message-ID: <CAOesGMiiyQA0EyJcb7-EAQ2-uK35nwR9o3szSJ1eBCrBGcdpFg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 09 Feb 2012 09:02:49 +0200
+Subject: [PATCH 00/16] rmk's patch series for fixing OMAP
+In-Reply-To: <20120209005334.GG25414@n2100.arm.linux.org.uk>
+References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
+ <4F32DBB5.4010004@gmx.de>  <20120209005334.GG25414@n2100.arm.linux.org.uk>
+Message-ID: <1328770969.1909.11.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2012-02-09 at 00:53 +0000, Russell King - ARM Linux wrote:
 
-On Wed, Feb 8, 2012 at 6:15 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On 8 February 2012 17:14, Olof Johansson <olof@lixom.net> wrote:
-> ...
->> Yes, perfectly fine. If you prefer, you can keep your work on a
->> long-lived branch instead of creating new one-off branches for every
->> few patches, and send repeated pull requests for that branch.
->>
-> You mean that I can collect all types of patches on a single branch
-> like for-arm-soc? ?I'm not sure about that since the platform
-> maintainers are asked to send pull-requests sorted in different
-> branches for different type of patches. ?Or I'm missing your point?
+> Moreover, only last Monday did I enable the OMAP2 DSS subsystem on the
+> 4430 SDP platform, _including_ the HDMI code, and looking at the commit
+> it could be one of those platforms which is affected.
+> 
+> As I don't have a HDMI cable connected to the system, and I ran that
+> kernel overnight, and I tried opening each /dev/fb* device, what I'm now
+> wondering is: have I destroyed the HDMI PHY on my 4430SDP?
 
-No, not just in one large branch. But you can collect patches on
-specific topics into separate branches that are sent multiple times as
-you add patches to it. I.e. similar to how most platform maintainers
-have been collecting patches in topic branches with one pull request
-done at the end, but with pull requests going in as the branch is
-built up.
+Probably not. I don't know the exact details of the HW bug (I wrote the
+patch as it took too long for the person responsible for it to come up
+with a decent patch), but my understanding is that the cable needs to be
+plugged in at some point, and then removed.
 
-Does that explanation make sense? I can elaborate if it's still not quite clear.
+Thinking about this now, I guess I should've sent queries to get a
+proper description of the situation where the bug happens.
 
--Olof
+> However, you raise another point, a much more serious one at that.  Is
+> this problem also present in 3.2?  The patch seems to apply almost cleanly
+> to that kernel version, so I guess it is.  It fails to apply to v3.1
+> because of missing files, so I guess 3.1 is unaffected.
+> 
+> So, why isn't this patch copied to the stable people?
+
+Good point, I'll take it to the stable people.
+
+The problem is present in all kernels where we have the HDMI driver, so
+2.6.39+.
+
+> For hardware destruction issues, once the problem has been identified, it
+> should be shouted about very loudly to get it upstream as quickly as
+> possible.  I'm sure Linus would've even taken it in patch form.
+> 
+> (You do realise that Linus does apply patches as well as pulling trees?)
+
+Yes, I should've taken this directly to Linus.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120209/92321563/attachment.sig>
