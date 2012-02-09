@@ -1,52 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Feb 2012 16:40:27 -0800
-Subject: [PATCH 05/16] ARM: omap: fix vc.c PMIC error message
-In-Reply-To: <87ipjgx3g3.fsf@ti.com>
-References: <20120208163546.GA15849@n2100.arm.linux.org.uk>
- <E1RvAWP-0006H3-1A@rmk-PC.arm.linux.org.uk>
- <20120208184539.GE29796@atomide.com> <87ty312ae0.fsf@ti.com>
- <20120208235358.GD16877@atomide.com>
- <20120208235620.GE25414@n2100.arm.linux.org.uk>
- <87sjikx3xv.fsf@ti.com>
- <20120209001135.GF25414@n2100.arm.linux.org.uk>
- <87ipjgx3g3.fsf@ti.com>
-Message-ID: <20120209004027.GF16877@atomide.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Thu, 09 Feb 2012 09:44:51 +0900
+Subject: [PATCH] ARM: EXYNOS: Configure ARM_NR_BANKS for EXYNOS SoC
+In-Reply-To: <20120208084716.GG889@n2100.arm.linux.org.uk>
+References: <003201cce600$81c8f100$855ad300$%kim@samsung.com>
+ <20120208084716.GG889@n2100.arm.linux.org.uk>
+Message-ID: <000001cce6c4$0e1fb800$2a5f2800$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [120208 15:49]:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> 
-> > On Wed, Feb 08, 2012 at 04:09:48PM -0800, Kevin Hilman wrote:
-> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> >> > Does it fix the other issues I mention in the commit log as well?
-> >> 
-> >> Like your patches 1 & 5, my series fixes the oops and also makes the
-> >> error strings simple, non-wrapping ones.
-> >> 
-> >> The one thing it doesn't fix is the spelling typo you fixed in the
-> >> comment, but IMO we can leave that out for -rc.
+Russell King - ARM Linux wrote:
 > >
-> > OK, but it would be much better for that simple fix to go with another
-> > simple patch.  On its own it doesn't make sense as a commit.
-> 
-> Agreed.  We'll have some other VC/VP cleanup for v3.4, and I'll add this
-> into that cleanup.
+> >  config ARM_NR_BANKS
+> >  	int
+> > -	default 16 if ARCH_EP93XX
+> > +	default 16 if ARCH_EP93XX || ARCH_EXYNOS4 || ARCH_EXYNOS5
+>
+> ARCH_EXYNOS ?
+ARCH_EXYNOS5 may support the bigger memory than 4GB because it's running series.
+Anyway ARCH_EXYNOS seems be better now. I will resend it soon.
+Thank you..
 
-Eek, looking at it, I'd rather stay away from this formatting patch
-for -rc series because the flaming potential causes me rash!
-
-Russell's patch 5 has way better description for the -rc series.
-
-So I now suggest that Russell drops patch 1 and updates patch 5 to
-cover both vp.c and vc.c.
-
-Then I'll move the following patches queued by Kevin from cleanup
-into fixes:
-
-d269914ece0498f31603ecd85ed3d7a586b3cbcd ARM: OMAP2+: PM: only register TWL with voltage layer when device is present
-af9a2ed9667b49e7e125eac526d8f655183ce53e ARM: OMAP2+: voltage: add check for missing PMIC info in VP init
-
-Everybody OK with that?
-
-Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
