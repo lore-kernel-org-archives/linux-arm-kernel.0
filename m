@@ -1,40 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 Feb 2012 16:18:08 -0800
-Subject: [PATCHv3] [ARM][Orion] Fix Orion5x GPIO regression from MPP
- cleanup
-In-Reply-To: <alpine.LFD.2.02.1202081508040.1656@xanadu.home>
-References: <1328712727-25679-1-git-send-email-andrew@lunn.ch>
- <alpine.LFD.2.02.1202081508040.1656@xanadu.home>
-Message-ID: <20120210001808.GB14805@quad.lixom.net>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Fri, 10 Feb 2012 11:19:21 +1100
+Subject: hex number case in dts files.
+In-Reply-To: <4F340E71.7070004@gmail.com>
+References: <20120209180411.GA5654@codeaurora.org> <4F340E71.7070004@gmail.com>
+Message-ID: <20120210001921.GA10536@truffala.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 03:09:05PM -0800, Nicolas Pitre wrote:
-> On Wed, 8 Feb 2012, Andrew Lunn wrote:
-> 
-> > Patchset "ARM: orion: Refactor the MPP code common in the orion
-> > platform" broke at least Orion5x based platforms. These platforms have
-> > pins configured as GPIO when the selector is not 0x0. However the
-> > common code assumes the selector is always 0x0 for a GPIO lines. It
-> > then ignores the GPIO bits in the MPP definitions, resulting in that
-> > Orion5x machines cannot correctly configure there GPIO lines.
+On Thu, Feb 09, 2012 at 12:20:33PM -0600, Rob Herring wrote:
+> On 02/09/2012 12:04 PM, David Brown wrote:
+> > I've noticed an inconsistency in the case of letters in hex constants
+> > in various dts files.  The ones that are actually numbers probably
+> > don't really matter, the but the node names are case sensitive
+> > strings, and in some sense do matter.
 > > 
-> > The Fix removes the assumption that the selector is always 0x0.
-> > In order that none GPIO configurations are correctly blocked,
-> > Kirkwood and mv78xx0 MPP definitions are corrected to only set the
-> > GPIO bits for GPIO configurations.
+> > I ask because some people I've spoken with internally seem to have
+> > strong opinions about what case hex constants should be, and it'd be
+> > nice to be able to have some guideline about this.  Historically, I've
+> > always seen DT hex values in lowercase.
 > > 
-> > This third version, which does not contain any whitespace changes,
-> > and is rebased on v3.3-rc2.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> This needs a CC: stable at vger.kernel.org
+> Lower case should be used for dts files.
 
-Thanks, appled to arm-soc fixes branch for 3.3-rc. Since they conflict when
-applied to 3.2 I'll let you handle the -stable submission separately instead of
-cc:ing in the commit.
+Yes, the node names should always have the hex done in lower case.  I
+have plans to put more checks in for how reg is encoded into node
+names, but just need to get time.
 
--Olof
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
