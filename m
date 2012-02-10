@@ -1,82 +1,57 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 10 Feb 2012 18:32:16 +0100
-Subject: [PATCHv21 01/16] mm: page_alloc: remove trailing whitespace
+Date: Fri, 10 Feb 2012 18:32:18 +0100
+Subject: [PATCHv21 03/16] mm: compaction: introduce map_pages()
 In-Reply-To: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
 References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1328895151-5196-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1328895151-5196-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Michal Nazarewicz <mina86@mina86.com>
 
+This commit creates a map_pages() function which map pages freed
+using split_free_pages().  This merely moves some code from
+isolate_freepages() so that it can be reused in other places.
+
 Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Acked-by: Mel Gorman <mel@csn.ul.ie>
 ---
- mm/page_alloc.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ mm/compaction.c |   15 +++++++++++----
+ 1 files changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index d2186ec..7fe7697 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -513,10 +513,10 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
-  * free pages of length of (1 << order) and marked with _mapcount -2. Page's
-  * order is recorded in page_private(page) field.
-  * So when we are allocating or freeing one, we can derive the state of the
-- * other.  That is, if we allocate a small block, and both were   
-- * free, the remainder of the region must be split into blocks.   
-+ * other.  That is, if we allocate a small block, and both were
-+ * free, the remainder of the region must be split into blocks.
-  * If a block is freed, and its buddy is also free, then this
-- * triggers coalescing into a block of larger size.            
-+ * triggers coalescing into a block of larger size.
-  *
-  * -- wli
-  */
-@@ -1061,17 +1061,17 @@ retry_reserve:
- 	return page;
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 62902b6..9bbcc53 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -127,6 +127,16 @@ static bool suitable_migration_target(struct page *page)
+ 	return false;
  }
  
--/* 
-+/*
-  * Obtain a specified number of elements from the buddy allocator, all under
-  * a single hold of the lock, for efficiency.  Add them to the supplied list.
-  * Returns the number of new pages which were placed@*list.
-  */
--static int rmqueue_bulk(struct zone *zone, unsigned int order, 
-+static int rmqueue_bulk(struct zone *zone, unsigned int order,
- 			unsigned long count, struct list_head *list,
- 			int migratetype, int cold)
- {
- 	int i;
--	
++static void map_pages(struct list_head *list)
++{
++	struct page *page;
 +
- 	spin_lock(&zone->lock);
- 	for (i = 0; i < count; ++i) {
- 		struct page *page = __rmqueue(zone, order, migratetype);
-@@ -4258,7 +4258,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
- 	init_waitqueue_head(&pgdat->kswapd_wait);
- 	pgdat->kswapd_max_order = 0;
- 	pgdat_page_cgroup_init(pgdat);
--	
++	list_for_each_entry(page, list, lru) {
++		arch_alloc_page(page, 0);
++		kernel_map_pages(page, 1, 1);
++	}
++}
 +
- 	for (j = 0; j < MAX_NR_ZONES; j++) {
- 		struct zone *zone = pgdat->node_zones + j;
- 		unsigned long size, realsize, memmap_pages;
-@@ -5081,11 +5081,11 @@ int __meminit init_per_zone_wmark_min(void)
- module_init(init_per_zone_wmark_min)
- 
  /*
-- * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so 
-+ * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so
-  *	that we can call two helper functions whenever min_free_kbytes
-  *	changes.
-  */
--int min_free_kbytes_sysctl_handler(ctl_table *table, int write, 
-+int min_free_kbytes_sysctl_handler(ctl_table *table, int write,
- 	void __user *buffer, size_t *length, loff_t *ppos)
- {
- 	proc_dointvec(table, write, buffer, length, ppos);
+  * Based on information in the current compact_control, find blocks
+  * suitable for isolating free pages from and then isolate them.
+@@ -206,10 +216,7 @@ static void isolate_freepages(struct zone *zone,
+ 	}
+ 
+ 	/* split_free_page does not map the pages */
+-	list_for_each_entry(page, freelist, lru) {
+-		arch_alloc_page(page, 0);
+-		kernel_map_pages(page, 1, 1);
+-	}
++	map_pages(freelist);
+ 
+ 	cc->free_pfn = high_pfn;
+ 	cc->nr_freepages = nr_freepages;
 -- 
 1.7.1.569.g6f426
