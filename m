@@ -1,95 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 10 Feb 2012 01:42:09 -0700 (MST)
-Subject: ARM: OMAP2xxx: PM: remove obsolete timer disable code in the
- suspend path
-In-Reply-To: <alpine.DEB.2.00.1202092007540.17520@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1202092007540.17520@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1202100140430.2553@utopia.booyaka.com>
+From: bill4carson@gmail.com (Bill Carson)
+Date: Fri, 10 Feb 2012 17:27:52 +0800
+Subject: [PATCH V1] hotplug: eliminate warning Unknown IPI message 0x1
+Message-ID: <1328866073-14769-1-git-send-email-bill4carson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Feb 2012, Paul Walmsley wrote:
 
-> 
-> Remove omap_{read,write}l() from the 24xx PM code.  The clocksource
-> code should now handle what this was supposed to do.
-> 
-> Tested on N800 -- but it's hard to say whether this fixes anything.
-> OMAP24xx static suspend path is currently broken, and this patch
-> doesn't change that.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Rob Herring <robherring2@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-
-Just realized that a stray change made it into the patch that was posted.
-Below is a version with the stray change removed.  It applies on 
-Tony's v3.3-rc3 testing branch, plus the OMAP2420 serial fix patch that 
-was posted earlier.
+Hi, All
 
 
-- Paul
+Does the second parameter of gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+have special meaning? because most of the callers have 1 for this, while 0 for mach-highbank.
+This hard code value also causes hotplug warnings:
 
-From: Paul Walmsley <paul@pwsan.com>
-Date: Fri, 10 Feb 2012 01:40:04 -0700
-Subject: [PATCH v2] ARM: OMAP2xxx: PM: remove obsolete timer disable code 
-in the suspend path
+/sys/devices/system/cpu # echo 0 > cpu3/online 
+CPU3: shutdown
+/sys/devices/system/cpu # echo 1 > cpu3/online 
+CPU3: Booted secondary processor
+Calibrating delay loop (skipped) already calibrated this CPU
+CPU3: Unknown IPI message 0x1
 
-Remove omap_{read,write}l() from the 24xx PM code.  The clocksource
-code should now handle what this was supposed to do.
 
-Tested on N800 -- but it's hard to say whether this fixes anything.
-OMAP24xx static suspend path is currently broken, and this patch
-doesn't change that.
+IMHO, it's necessary to introduce a new ipi_msg_type to eliminate this warning.
+And I did the testing on vexpress board, so far so good.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/pm24xx.c |   22 +---------------------
- 1 files changed, 1 insertions(+), 21 deletions(-)
+So any comments?
 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index 23de98d..18eda53 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -254,26 +254,6 @@ static int omap2_pm_begin(suspend_state_t state)
- 	return 0;
- }
+
+
+
+
+
+Bill Carson(1)
+    hotplug: Introduce a new ipi_msg_type to eliminate phony warning
  
--static int omap2_pm_suspend(void)
--{
--	u32 wken_wkup, mir1;
--
--	wken_wkup = omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
--	wken_wkup &= ~OMAP24XX_EN_GPT1_MASK;
--	omap2_prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
--
--	/* Mask GPT1 */
--	mir1 = omap_readl(0x480fe0a4);
--	omap_writel(1 << 5, 0x480fe0ac);
--
--	omap2_enter_full_retention();
--
--	omap_writel(mir1, 0x480fe0a4);
--	omap2_prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
--
--	return 0;
--}
--
- static int omap2_pm_enter(suspend_state_t state)
- {
- 	int ret = 0;
-@@ -281,7 +261,7 @@ static int omap2_pm_enter(suspend_state_t state)
- 	switch (state) {
- 	case PM_SUSPEND_STANDBY:
- 	case PM_SUSPEND_MEM:
--		ret = omap2_pm_suspend();
-+		omap2_enter_full_retention();
- 		break;
- 	default:
- 		ret = -EINVAL;
--- 
-1.7.9
+
+Signed-off-by: Bill Carson <bill4carson@gmail.com>
+---
+ arch/arm/include/asm/hardirq.h    |    2 +-
+ arch/arm/kernel/smp.c             |    5 +++++
+ arch/arm/plat-versatile/platsmp.c |    2 +-
+ 3 files changed, 7 insertions(+), 2 deletions(-)
