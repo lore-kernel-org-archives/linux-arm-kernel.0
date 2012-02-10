@@ -1,44 +1,44 @@
-From: robin@protonic.nl (Robin van der Gracht)
-Date: Fri, 10 Feb 2012 08:58:48 +0100
-Subject: mfd: mc13xxx adc fixes and enhancements
-In-Reply-To: <20120130080714.GK6305@pengutronix.de>
-References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
- <20120130080714.GK6305@pengutronix.de>
-Message-ID: <4F34CE38.5040502@protonic.nl>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 10 Feb 2012 17:01:27 +0900
+Subject: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
+In-Reply-To: <CAJuYYwRn7Luhj0223-i9u3ETutb8qgFUY7FEBq-ZOUi74DouMA@mail.gmail.com>
+References: <1324624169-16102-1-git-send-email-riverful.kim@samsung.com>
+ <1327652483-15655-1-git-send-email-riverful.kim@samsung.com>
+ <CAJuYYwRn7Luhj0223-i9u3ETutb8qgFUY7FEBq-ZOUi74DouMA@mail.gmail.com>
+Message-ID: <CAH9JG2VLxmsafu09RmU5GPXnQUMnJo8XZSQcKTkBD2ZpnZ6yPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2012 09:07 AM, Uwe Kleine-K?nig wrote:
-> Hello,
->
-> On Mon, Jan 30, 2012 at 09:33:22AM +1100, Marc Reilly wrote:
->> This series provides some small fixes to the mc13xxx adc conversion funtion to
->> make it more robust. Readout of single channel conversions is fixed so that the
->> read out order corresponds to the sampling order (Critical for dedicated
->> battery reading).
->>
->> A new conversion function is introduced which allows the caller to enable the
->> dedicated readings and other adc functionality by providing a mask/ value pair
->> for the adc0,1 registers.
->>
->> These patches apply onto my 'add I2C support' series [1].
->> (I think only the first patch is required)
-> I wonder if Robin van der Gracht (added to Cc:) can say something to
-> this series as he seems to have used the adc recently.
->
-> @Robin: tell me if I should bounce you the series.
->
-> Best regards
-> Uwe
->
-Uwe,
-I would like to recieve the new series,
++ Karol for DT support later
 
-Regards,
-
--- 
-Robin van der Gracht
-Protonic Holland.
-tel.: +31 (0) 229 212928
-fax.: +31 (0) 229 210930
-Factorij 36 / 1689 AL Zwaag
+On Fri, Feb 10, 2012 at 3:58 AM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> Dear Mr. HeungJun Kim,
+>
+> On 27 January 2012 00:21, HeungJun, Kim <riverful.kim@samsung.com> wrote:
+>> This patch adds Samsung Mobile TRATS board support.
+>>
+>> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> ?arch/arm/mach-exynos/Kconfig ? ? ?| ? 11 ++
+>> ?arch/arm/mach-exynos/Makefile ? ? | ? ?1 +
+>> ?arch/arm/mach-exynos/mach-trats.c | ?344 +++++++++++++++++++++++++++++++++++++
+>> ?3 files changed, 356 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/mach-exynos/mach-trats.c
+>
+> The exynos4 dt-enabled board file can support most of the features
+> added in this board file. The other option that could be considered
+> here would be to add DT support for this board file, and use AUX_DATA
+> to supply platform data for drivers that do not have dt support yet.
+> It would be better to use dt support for new board support that we
+> add.
+>
+> Thanks,
+> Thomas.
+>
+> (snip)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
