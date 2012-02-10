@@ -1,67 +1,128 @@
-From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Fri, 10 Feb 2012 16:21:11 +0100
-Subject: [PATCH] cpufreq: get rid of remaining references to
- CONFIG_CPU_FREQ_DEBUG
-In-Reply-To: <1320866225.27598.11.camel@x61.thuisdomein>
-References: <1320866225.27598.11.camel@x61.thuisdomein>
-Message-ID: <20120210152111.GB26589@comet.dominikbrodowski.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 10 Feb 2012 16:36:43 +0100
+Subject: [PATCH 11/15] mm: trigger page reclaim in alloc_contig_range() to
+ stabilize watermarks
+In-Reply-To: <20120210111913.GP5796@csn.ul.ie>
+References: <1328271538-14502-1-git-send-email-m.szyprowski@samsung.com>
+ <1328271538-14502-12-git-send-email-m.szyprowski@samsung.com>
+ <20120203140428.GG5796@csn.ul.ie>
+ <000001cce674$64bb67e0$2e3237a0$%szyprowski@samsung.com>
+ <20120210111913.GP5796@csn.ul.ie>
+Message-ID: <00d101cce809$cabaa100$602fe300$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2011 at 08:17:05PM +0100, Paul Bolle wrote:
-> 0) Commit 2d06d8c49afdcc9bb35a85039fa50f0fe35bd40e ("[CPUFREQ] use
-> dynamic debug instead of custom infrastructure") dropped config
-> CPU_FREQ_DEBUG. But currently there are still two references to
-> CONFIG_CPU_FREQ_DEBUG (both in arch/arm).
+Hello,
 
-Thanks for noting this. These two instances can and should be updated
-accordingly.
+On Friday, February 10, 2012 12:19 PM Mel Gorman wrote:
 
-> 1) I've stared a bit at the (trivial) code still relying on
-> CONFIG_CPU_FREQ_DEBUG but wasn't sure how it could be rewritten. Perhaps
-> one of you does know how to do that.
+> On Wed, Feb 08, 2012 at 04:14:46PM +0100, Marek Szyprowski wrote:
+> > > > <SNIP>
+> > > > +static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
+> > > > +{
+> > > > +	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
+> > > > +	struct zonelist *zonelist = node_zonelist(0, gfp_mask);
+> > > > +	int did_some_progress = 0;
+> > > > +	int order = 1;
+> > > > +	unsigned long watermark;
+> > > > +
+> > > > +	/*
+> > > > +	 * Increase level of watermarks to force kswapd do his job
+> > > > +	 * to stabilize at new watermark level.
+> > > > +	 */
+> > > > +	min_free_kbytes += count * PAGE_SIZE / 1024;
+> > >
+> > > There is a risk of overflow here although it is incredibly
+> > > small. Still, a potentially nicer way of doing this was
+> > >
+> > > count << (PAGE_SHIFT - 10)
+> > >
+> > > > +	setup_per_zone_wmarks();
+> > > > +
+> > >
+> > > Nothing prevents two or more processes updating the wmarks at the same
+> > > time which is racy and unpredictable. Today it is not much of a problem
+> > > but CMA makes this path hotter than it was and you may see weirdness
+> > > if two processes are updating zonelists at the same time. Swap-over-NFS
+> > > actually starts with a patch that serialises setup_per_zone_wmarks()
+> > >
+> > > You also potentially have a BIG problem here if this happens
+> > >
+> > > min_free_kbytes = 32768
+> > > Process a: min_free_kbytes  += 65536
+> > > Process a: start direct reclaim
+> > > echo 16374 > /proc/sys/vm/min_free_kbytes
+> > > Process a: exit direct_reclaim
+> > > Process a: min_free_kbytes -= 65536
+> > >
+> > > min_free_kbytes now wraps negative and the machine hangs.
+> > >
+> > > The damage is confined to CMA though so I am not going to lose sleep
+> > > over it but you might want to consider at least preventing parallel
+> > > updates to min_free_kbytes from proc.
+> >
+> > Right. This approach was definitely too hacky. What do you think about replacing
+> > it with the following code (I assume that setup_per_zone_wmarks() serialization
+> > patch will be merged anyway so I skipped it here):
+> >
+> 
+> It's part of a larger series and the rest of that series is
+> controversial. That single patch can be split out obviously so feel free
+> to add it to your series and stick your Signed-off-by on the end of it.
 
-Well, as we now use dynamic debug, we can use the generic debug calls used
-througout the kernel ( pr_debug(...) ), and do not need to wrap the debug
-message in an #ifdef . That's the whole story, actually. Russell, do you
-want to take this through the ARM tree?
+Ok, I will grab it from that series.
 
-Best,
-	Dominik
+> > diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+> > index 82f4fa5..bb9ae41 100644
+> > --- a/include/linux/mmzone.h
+> > +++ b/include/linux/mmzone.h
+> > @@ -371,6 +371,13 @@ struct zone {
+> >         /* see spanned/present_pages for more description */
+> >         seqlock_t               span_seqlock;
+> >  #endif
+> > +#ifdef CONFIG_CMA
+> > +       /*
+> > +        * CMA needs to increase watermark levels during the allocation
+> > +        * process to make sure that the system is not starved.
+> > +        */
+> > +       unsigned long           min_cma_pages;
+> > +#endif
+> >         struct free_area        free_area[MAX_ORDER];
+> >
+> >  #ifndef CONFIG_SPARSEMEM
+> > diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> > index 824fb37..1ca52f0 100644
+> > --- a/mm/page_alloc.c
+> > +++ b/mm/page_alloc.c
+> > @@ -5044,6 +5044,11 @@ void setup_per_zone_wmarks(void)
+> >
+> >                 zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) + (tmp >> 2);
+> >                 zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) + (tmp >> 1);
+> > +#ifdef CONFIG_CMA
+> > +               zone->watermark[WMARK_MIN] += zone->min_cma_pages;
+> > +               zone->watermark[WMARK_LOW] += zone->min_cma_pages;
+> > +               zone->watermark[WMARK_HIGH] += zone->min_cma_pages;
+> > +#endif
+> >                 setup_zone_migrate_reserve(zone);
+> >                 spin_unlock_irqrestore(&zone->lock, flags);
+> >         }
+> 
+> This is better in that it is not vunerable to parallel updates of
+> min_free_kbytes. It would be slightly tidier to introduce something
+> like cma_wmark_pages() that returns min_cma_pages if CONFIG_CMA and 0
+> otherwise. Use the helper to get right of this ifdef CONFIG_CMA within
+> setup_per_zone_wmarks().
 
----
-cpufreq: get rid of remaining references to CONFIG_CPU_FREQ_DEBUG
-
-As noted by Paul Bolle <pebolle@tiscali.nl>, there are still two references
-to CONFIG_CPU_FREQ_DEBUG which can and should be removed.
-
-Signed-off-by: Dominik Brodowski <linux@dominikbrodowski.net>
-
-diff --git a/arch/arm/configs/ezx_defconfig b/arch/arm/configs/ezx_defconfig
-index d95763d..872d96e 100644
---- a/arch/arm/configs/ezx_defconfig
-+++ b/arch/arm/configs/ezx_defconfig
-@@ -28,7 +28,6 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="console=tty1 root=/dev/mmcblk0p2 rootfstype=ext2 rootdelay=3 ip=192.168.0.202:192.168.0.200:192.168.0.200:255.255.255.0 debug"
- CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
--CONFIG_CPU_FREQ_DEBUG=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=m
- CONFIG_CPU_FREQ_GOV_USERSPACE=m
- CONFIG_CPU_FREQ_GOV_ONDEMAND=m
-diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
-index bb5ce39..55b827f 100644
---- a/arch/arm/mach-tegra/cpu-tegra.c
-+++ b/arch/arm/mach-tegra/cpu-tegra.c
-@@ -97,10 +97,8 @@ static int tegra_update_cpu_speed(unsigned long rate)
- 	for_each_online_cpu(freqs.cpu)
- 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+Thanks for the hint. I will submit this change soon.
  
--#ifdef CONFIG_CPU_FREQ_DEBUG
--	printk(KERN_DEBUG "cpufreq-tegra: transition: %u --> %u\n",
-+	pr_debug("cpufreq-tegra: transition: %u --> %u\n",
- 	       freqs.old, freqs.new);
--#endif
- 
- 	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
- 	if (ret) {
+> You'll still have the problem of kswapd not taking CMA pages properly into
+> account when deciding whether to reclaim or not though.
+
+This will only affect CMA clients, I hope we can fix this later once the patches
+get merged. I would really like to get it into v3.4, what means that it should be
+tested in next asap.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
