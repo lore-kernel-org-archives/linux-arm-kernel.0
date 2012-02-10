@@ -1,94 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 10 Feb 2012 19:32:17 +0100
-Subject: [PULL REQUEST] DMA-mapping framework redesign preparation patches
-Message-ID: <1328898737-15854-1-git-send-email-m.szyprowski@samsung.com>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 10 Feb 2012 13:50:33 -0500
+Subject: [PATCH] omap: board-omap3evm: add required smsc911x regulators
+In-Reply-To: <20120210174046.GQ1426@atomide.com>
+References: <1328738812-26755-1-git-send-email-mporter@ti.com>
+ <20120210174046.GQ1426@atomide.com>
+Message-ID: <20120210185033.GC40045@h115-84.vpn.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Fri, Feb 10, 2012 at 09:40:47AM -0800, Tony Lindgren wrote:
+> * Matt Porter <matt@ohporter.com> [120208 13:35]:
+> > This fixes smsc911x support on omap3evm that has been broken since
+> > the smsc911x driver was updated to require the existence of vdd33a
+> > and vddvario supplies.
+> 
+> Great. Few comments:
+> 
+> 1. Could you please include the smsc911x commit and subject here too
+>    so it clearly shows the regression?
 
-Our patches with DMA-mapping framework redesign proposal have been
-hanging for over a month with just a few comments. We would like to go
-further in the development, but first I would like to ask You to give
-them a try in the linux-next kernel.
+Sure. Will do for v2.
 
-For everyone interested in this patch series, here is the relevant
-thread: https://lkml.org/lkml/2011/12/23/97
+> 2. Also, why don't you add this fixed regulator to gpmc-smsc911.c?
+> 
+> That way it gets fixed for other too, like zoom2/3.
 
-If there are any problems with our git tree, please contact Marek 
-Szyprowski <m.szyprowski@samsung.com> or alternatively Kyungmin Park
-<kyungmin.park@samsung.com>.
+Ok, so I considered that at first and had two concerns that made me just
+do it in the omap3evm specific way and see what the feedback was.
 
-The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+1) If we do a generic implementation in gpmc-smsc911x.c, there needs to
+be a way to override it. Another board may have a variable supply that
+feeds this consumer.
 
-  Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
+2) Technically, this omap3evm specific implementation matches the hardware
+in that the osk_3v3 rail is software controllable. Granted, I commented
+that we simply don't hook up the gpio at this time since this real
+hardware regulator has always been silently asserted on by the nature of
+the reset state of the TWL GPIOs and the board level pull downs as well.
 
-are available in the git repository at:
-  git://git.infradead.org/users/kmpark/linux-samsung dma-mapping-next
+So that said, I don't need #2 to make omap3evm work and I don't think
+anybody cares yet to actually turn that regulator off (as it will kill
+other things that appear to not have regulator support anyway). It looks
+like you talked me into respinning it as a generic implementation. Only
+question is whether I should bother consider not-yet-existing boards that
+may not want that generic regulator.
 
-Andrzej Pietrasiewicz (9):
-      X86: adapt for dma_map_ops changes
-      MIPS: adapt for dma_map_ops changes
-      PowerPC: adapt for dma_map_ops changes
-      IA64: adapt for dma_map_ops changes
-      SPARC: adapt for dma_map_ops changes
-      Alpha: adapt for dma_map_ops changes
-      SH: adapt for dma_map_ops changes
-      Microblaze: adapt for dma_map_ops changes
-      Unicore32: adapt for dma_map_ops changes
-
-Marek Szyprowski (5):
-      common: dma-mapping: introduce alloc_attrs and free_attrs methods
-      common: dma-mapping: remove old alloc_coherent and free_coherent methods
-      common: dma-mapping: introduce mmap method
-      common: DMA-mapping: add WRITE_COMBINE attribute
-      common: DMA-mapping: add NON-CONSISTENT attribute
-
- Documentation/DMA-attributes.txt          |   19 +++++++++++++++++++
- arch/alpha/include/asm/dma-mapping.h      |   18 ++++++++++++------
- arch/alpha/kernel/pci-noop.c              |   10 ++++++----
- arch/alpha/kernel/pci_iommu.c             |   10 ++++++----
- arch/ia64/hp/common/sba_iommu.c           |   11 ++++++-----
- arch/ia64/include/asm/dma-mapping.h       |   18 ++++++++++++------
- arch/ia64/kernel/pci-swiotlb.c            |    9 +++++----
- arch/ia64/sn/pci/pci_dma.c                |    9 +++++----
- arch/microblaze/include/asm/dma-mapping.h |   18 ++++++++++++------
- arch/microblaze/kernel/dma.c              |   10 ++++++----
- arch/mips/include/asm/dma-mapping.h       |   18 ++++++++++++------
- arch/mips/mm/dma-default.c                |    8 ++++----
- arch/powerpc/include/asm/dma-mapping.h    |   24 ++++++++++++++++--------
- arch/powerpc/kernel/dma-iommu.c           |   10 ++++++----
- arch/powerpc/kernel/dma-swiotlb.c         |    4 ++--
- arch/powerpc/kernel/dma.c                 |   10 ++++++----
- arch/powerpc/kernel/ibmebus.c             |   10 ++++++----
- arch/powerpc/platforms/cell/iommu.c       |   16 +++++++++-------
- arch/powerpc/platforms/ps3/system-bus.c   |   13 +++++++------
- arch/sh/include/asm/dma-mapping.h         |   28 ++++++++++++++++++----------
- arch/sh/kernel/dma-nommu.c                |    4 ++--
- arch/sh/mm/consistent.c                   |    6 ++++--
- arch/sparc/include/asm/dma-mapping.h      |   18 ++++++++++++------
- arch/sparc/kernel/iommu.c                 |   10 ++++++----
- arch/sparc/kernel/ioport.c                |   18 ++++++++++--------
- arch/sparc/kernel/pci_sun4v.c             |    9 +++++----
- arch/unicore32/include/asm/dma-mapping.h  |   18 ++++++++++++------
- arch/unicore32/mm/dma-swiotlb.c           |    4 ++--
- arch/x86/include/asm/dma-mapping.h        |   26 ++++++++++++++++----------
- arch/x86/kernel/amd_gart_64.c             |   11 ++++++-----
- arch/x86/kernel/pci-calgary_64.c          |    9 +++++----
- arch/x86/kernel/pci-dma.c                 |    3 ++-
- arch/x86/kernel/pci-nommu.c               |    6 +++---
- arch/x86/kernel/pci-swiotlb.c             |   12 +++++++-----
- arch/x86/xen/pci-swiotlb-xen.c            |    4 ++--
- drivers/iommu/amd_iommu.c                 |   10 ++++++----
- drivers/iommu/intel-iommu.c               |    9 +++++----
- drivers/xen/swiotlb-xen.c                 |    5 +++--
- include/linux/dma-attrs.h                 |    2 ++
- include/linux/dma-mapping.h               |   13 +++++++++----
- include/linux/swiotlb.h                   |    6 ++++--
- include/xen/swiotlb-xen.h                 |    6 ++++--
- lib/swiotlb.c                             |    5 +++--
- 43 files changed, 305 insertions(+), 182 deletions(-)
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
+-Matt
