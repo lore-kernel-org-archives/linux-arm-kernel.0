@@ -1,39 +1,95 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 Feb 2012 17:35:15 +0900
-Subject: [PATCH 8/9] ARM: EXYNOS: temporary add map definitions for uart
-In-Reply-To: <CAH9JG2VU-rLQ=fQT5Jx5kPcHSLOiEcTVdFaQjsWnxA=Yr6i0Gg@mail.gmail.com>
-References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
- <1328024354-4277-9-git-send-email-kgene.kim@samsung.com>
- <CAH9JG2VU-rLQ=fQT5Jx5kPcHSLOiEcTVdFaQjsWnxA=Yr6i0Gg@mail.gmail.com>
-Message-ID: <00fb01cce7ce$e9674440$bc35ccc0$%kim@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 10 Feb 2012 01:42:09 -0700 (MST)
+Subject: ARM: OMAP2xxx: PM: remove obsolete timer disable code in the
+ suspend path
+In-Reply-To: <alpine.DEB.2.00.1202092007540.17520@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1202092007540.17520@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1202100140430.2553@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
+On Thu, 9 Feb 2012, Paul Walmsley wrote:
+
 > 
-> On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
+> Remove omap_{read,write}l() from the 24xx PM code.  The clocksource
+> code should now handle what this was supposed to do.
+> 
+> Tested on N800 -- but it's hard to say whether this fixes anything.
+> OMAP24xx static suspend path is currently broken, and this patch
+> doesn't change that.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-[...]
+Just realized that a stray change made it into the patch that was posted.
+Below is a version with the stray change removed.  It applies on 
+Tony's v3.3-rc3 testing branch, plus the OMAP2420 serial fix patch that 
+was posted earlier.
 
-> > +#ifdef CONFIG_ARCH_EXYNOS4
-> > +#define S3C_PA_UART			EXYNOS4_PA_UART
-> > +#endif
-> > +
-> > +#ifdef CONFIG_ARCH_EXYNOS5
-> > +#define S3C_PA_UART			EXYNOS5_PA_UART
-> > +#endif
-> If it selects the both ARCH_EXYNOS4 and ARCH_EXYNOS5, how to handle
-> this one? I think it's time to clean up these macro magic.
 
-They will be updated for selection of EXYNOS4 and EXYNOS5 together in next
-version.
+- Paul
 
-Thanks.
+From: Paul Walmsley <paul@pwsan.com>
+Date: Fri, 10 Feb 2012 01:40:04 -0700
+Subject: [PATCH v2] ARM: OMAP2xxx: PM: remove obsolete timer disable code 
+in the suspend path
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Remove omap_{read,write}l() from the 24xx PM code.  The clocksource
+code should now handle what this was supposed to do.
+
+Tested on N800 -- but it's hard to say whether this fixes anything.
+OMAP24xx static suspend path is currently broken, and this patch
+doesn't change that.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/pm24xx.c |   22 +---------------------
+ 1 files changed, 1 insertions(+), 21 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 23de98d..18eda53 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -254,26 +254,6 @@ static int omap2_pm_begin(suspend_state_t state)
+ 	return 0;
+ }
+ 
+-static int omap2_pm_suspend(void)
+-{
+-	u32 wken_wkup, mir1;
+-
+-	wken_wkup = omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+-	wken_wkup &= ~OMAP24XX_EN_GPT1_MASK;
+-	omap2_prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
+-
+-	/* Mask GPT1 */
+-	mir1 = omap_readl(0x480fe0a4);
+-	omap_writel(1 << 5, 0x480fe0ac);
+-
+-	omap2_enter_full_retention();
+-
+-	omap_writel(mir1, 0x480fe0a4);
+-	omap2_prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
+-
+-	return 0;
+-}
+-
+ static int omap2_pm_enter(suspend_state_t state)
+ {
+ 	int ret = 0;
+@@ -281,7 +261,7 @@ static int omap2_pm_enter(suspend_state_t state)
+ 	switch (state) {
+ 	case PM_SUSPEND_STANDBY:
+ 	case PM_SUSPEND_MEM:
+-		ret = omap2_pm_suspend();
++		omap2_enter_full_retention();
+ 		break;
+ 	default:
+ 		ret = -EINVAL;
+-- 
+1.7.9
