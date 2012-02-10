@@ -1,30 +1,33 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 10 Feb 2012 21:06:24 +0530
-Subject: [PATCH 0/2] AM335X: SoC type detection & SRAM support
-Message-ID: <1328888184-1241-1-git-send-email-afzal@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 10 Feb 2012 09:52:56 -0600
+Subject: [PULL] Highbank for 3.4
+Message-ID: <4F353D58.5050101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Arnd, Olof,
 
-These changes does,
-1. detect SoC type (i.e. GP or not)
-2. add minimal SRAM support
- for AM335X devices
+Please pull highbank changes for 3.4. It's primarily just sched_clock
+support.
 
-These are required to get AM335X boot to prompt (but not sufficient)
+Rob
 
-Regards
-Afzal
+The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
 
-Afzal Mohammed (1):
-  arm:omap:am33xx: SoC type detection
+  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
 
-Vaibhav Bedia (1):
-  arm:omap: am33xx SRAM support (minimal)
+are available in the git repository at:
+  git://sources.calxeda.com/kernel/linux.git for-arm-soc
 
- arch/arm/mach-omap2/control.h          |    5 +++++
- arch/arm/mach-omap2/id.c               |    2 ++
- arch/arm/plat-omap/include/plat/sram.h |    1 +
- arch/arm/plat-omap/sram.c              |   14 ++++++++++++--
- 4 files changed, 20 insertions(+), 2 deletions(-)
+Rob Herring (3):
+      ARM: timer-sp: add sched_clock support
+      ARM: highbank: enable sp804 based sched_clock
+      ARM: highbank: remove unused memory.h
+
+ arch/arm/Kconfig                             |    1 +
+ arch/arm/common/timer-sp.c                   |   17 ++++++++++++++++-
+ arch/arm/include/asm/hardware/timer-sp.h     |   15 ++++++++++++++-
+ arch/arm/mach-highbank/highbank.c            |    2 +-
+ arch/arm/mach-highbank/include/mach/memory.h |    1 -
+ 5 files changed, 32 insertions(+), 4 deletions(-)
+ delete mode 100644 arch/arm/mach-highbank/include/mach/memory.h
