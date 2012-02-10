@@ -1,25 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 Feb 2012 16:05:04 -0800
-Subject: [PATCH v4 0/7] ARM: Fixes to make LPC32xx compile and boot again
-In-Reply-To: <1328733665-17836-1-git-send-email-stigge@antcom.de>
-References: <1328733665-17836-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120210000504.GA31927@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Feb 2012 00:10:56 +0000
+Subject: [GIT PULL] cs89x0 platform support
+In-Reply-To: <20120209074040.GS3852@pengutronix.de>
+References: <20120201134415.GU1990@pengutronix.de>
+ <CAOesGMiRTZZ9Gn9boEwyHbmG3H=jSqEHB7CDqf8Vr05LXTcx+w@mail.gmail.com>
+ <20120209074040.GS3852@pengutronix.de>
+Message-ID: <201202100010.56842.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 09:40:58PM +0100, Roland Stigge wrote:
-> This is the bundle of basic patches to make LPC32xx compile and boot again,
-> fixing several basic issues. Tested by Wolfram Sang and Acked by Kevin Wells of
-> NXP, the original author and maintainer of LPC32xx.
+On Thursday 09 February 2012, Sascha Hauer wrote:
+> > Arnd had some outstanding comments on the ethernet driver, so I will
+> > hold off pulling until that is resolved.
 > 
-> Arnd and Olof, please tell if there is still something missing.
+> I think what Arnd made is some suggestions to further clean up the
+> driver, I don't think that the current patches should depend on doing
+> more work. This series is a nice cleanup and a solution for a five year
+> old problem. For the first time we can enable the cs89x0 driver in the
+> defconfig and thus make ethernet work on some boards.
 
-Looks quite reasonable, thanks!
+Ok, fair enough. Let's apply your series for now then. If I get to
+make my io.h cleanup before you or someone else does the changes
+necessary to convert the driver to not use inb/outb, it will be broken
+again though.
 
-I've applied this series to next/fixes-non-critical, which will be sent to
-Linus during the 3.4 merge window.
-
-
-Regards,
-
--Olof
+	Arnd
