@@ -1,121 +1,81 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Fri, 10 Feb 2012 12:06:01 -0800
-Subject: [RFC PATCH v4 0/4] Consolidate cpuidle timekeeping and irq
- enabling
-In-Reply-To: <CAMXH7KEqeO4fV82PB9MSJg7tMPxqxUe5n=vc3jc6GttM0jKPtw@mail.gmail.com>
-References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
- <CAMXH7KEqeO4fV82PB9MSJg7tMPxqxUe5n=vc3jc6GttM0jKPtw@mail.gmail.com>
-Message-ID: <CAP245DWR98VyZurF5J-TL-2GCcT3cNdAUgMBg_WfqQiAcF8h1g@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 10 Feb 2012 12:12:34 -0800
+Subject: [PATCH 2/2] pinctrl: Add simple pinmux driver using device
+ tree data
+In-Reply-To: <20120207014449.GA2424@r65073-Latitude-D630>
+References: <20120203205049.4089.74610.stgit@kaulin.local>
+ <20120203205508.4089.35304.stgit@kaulin.local>
+ <20120207014449.GA2424@r65073-Latitude-D630>
+Message-ID: <20120210201234.GY1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2012 at 11:32 AM, Rob Lee <rob.lee@linaro.org> wrote:
-> Maintainers for drivers/cpuidle, do you have any comments/opinions
-> about this patch?
+Hi Shawn,
 
-Venki has changed employers (probably needs a patch to MAINTAINERS?).
-Cc'ing his new email address.
+Sorry for the delay, some of this we already talked this week
+at the conference.
 
-> Intel cpuidle and acpi cpuidle maintainers, do you have any
-> comments/opinions about this patch and the changes to your code?
->
-> Any other review and comments welcome.
->
-> Summary of positive and negatives as I understand them so far:
->
-> version 1, 2, and 3 (Original "wrapper" method of consolidating
-> timekeeping and interrupt enabling)
-> + opportunistically provides consolidation for simple platform cpuidle
-> implementations without disturbing the more complex implementations.
-> By simple, I mean those at can be wrapped in the time keeping calls
-> and interrupt enabling calls without significantly affecting idle time
-> keeping accuracy or interrupt latency
-> - Does not provide consolidation for the more complex platform cpuidle
-> implementations
-> - Adds an additional interface, perhaps unnecessarily if this
-> consolidation could be done in cpuidle
->
-> version 4 (modifications to drivers/cpuidle/cpuidle.c cpuidle_idle_call)
-> + Adds consolidation work to cpuidle_idle_call which allows all
-> platform timekeeping / interrupt handling to be consolidated.
-> - Requires splitting up of more complex platform cpuidle
-> implementations, adding further complexity and risk of breaking
-> something.
-> ? Allows both pre_enter or enter to change the idle state. ?Is there
-> an objection to this?
-> ? Splitting up the enter functions can require additional function
-> calls. ?Is there any concern that this is significant additional
-> overhead?
->
-> Thanks,
-> Rob
->
->
-> On Tue, Jan 31, 2012 at 7:00 PM, Robert Lee <rob.lee@linaro.org> wrote:
->> This patch series moves the timekeeping and irq enabling from the platform
->> code to the core cpuidle driver. ?Also, the platform irq disabling was removed
->> as it appears that all calls into cpuidle_call_idle will have already called
->> local_irq_disable().
->>
->> To save reviewers time, only a few platforms which required the most changes
->> are included in this version. ?If these changes are approved, the next version
->> will include the remaining platform code which should require minimal changes.
->>
->> For those who have followed the previous patch versions, as you know, the
->> previous version of this patch series added some helper functionality which
->> used a wrapper function to remove the time keeping and irq enabling/disabling
->> from the platform code. ?There was also initialization helper functionality
->> which has now been removed from this version. ?If the basic implementation
->> in this version is approved, then a separate patch submission effort can be
->> made to focus on consolidation of initialziation functionality.
->>
->> Based on 3.3-rc1
->>
->> v3 submission can be found here:
->> http://www.spinics.net/lists/arm-kernel/msg156751.html
->> Changes since v3:
->> * Removed drivers/cpuidle/common.c
->> ** Removed the initialization helper functions
->> ** Removed the wrapper used to consolidate time keeping and irq enable/disable
->> * Add time keeping and local_irq_disable handling in cpuidle_call_idle().
->> * Made necessary modifications to a few platforms that required the most changes
->> ** Note on omap3: changed structure of omap3_idle_drvdata and added
->> ? per_next_state and per_saved_state vars to accomodate new framework.
->>
->> v2 submission can be found here:
->> http://comments.gmane.org/gmane.linux.ports.arm.kernel/144199
->>
->> Changes since v2:
->> * Made various code organization and style changes as suggested in v1 review.
->> * Removed at91 use of common code. ?A separate effort is underway to clean
->> at91 code and the author has offered to convert to common interface as part
->> of those changes (if this common interface is accepted in time).
->> * Made platform cpuidle_driver objects __initdata and dynamically added one
->> persistent instance of this object in common code.
->> * Removed imx5 pm usage of gpc_dvfs clock as it is no longer needed after
->> being enabled during clock initialization.
->> * Re-organized patches.
->>
->> v1 submission can be found here:
->> http://comments.gmane.org/gmane.linux.ports.arm.kernel/142791
->>
->> Changes since v1:
->> * Common interface moved to drivers/cpuidle and made non arch-specific.
->> * Made various fixes and suggested additions to the common cpuidle
->> code from v1 review.
->> * Added callback for filling in driver_data field as needed.
->> * Modified the various platforms with these changes.
->>
->> Robert Lee (4):
->> ?cpuidle: Add time keeping and irq enabling
->> ?ARM: omap: Remove cpuidle timekeeping and irq enable/disable
->> ?acpi: Remove cpuidle timekeeping and irq enable/disable
->> ?x86: Remove cpuidle timekeeping and irq enable/disable
->>
->> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 96 ++++++++----------
->> ?drivers/acpi/processor_idle.c ? ? | ?203 ++++++++++++++++++++++---------------
->> ?drivers/cpuidle/cpuidle.c ? ? ? ? | ? 75 +++++++++++---
->> ?drivers/idle/intel_idle.c ? ? ? ? | ?110 ++++++++++++++------
->> ?include/linux/cpuidle.h ? ? ? ? ? | ? 26 +++--
->> ?5 files changed, 317 insertions(+), 193 deletions(-)
->>
+* Shawn Guo <shawn.guo@linaro.org> [120206 17:13]:
+> On Fri, Feb 03, 2012 at 12:55:08PM -0800, Tony Lindgren wrote:
+> > 
+> It's so great to eventually see some codes after such an extensive
+> discussion on the binding.  The code looks nice to me except a few
+> trivial comments below.  The only thing I'm concerned is the register
+> level implementation is not so generic to cover controllers like imx
+> one, where pinmux and pinconf have separate registers.  If we can make
+> that part as generic as pin table creating, function/pingroup/mapping
+> generating, the patch will be good for imx to migrate to.
+
+OK, maybe let's see how far we can get by adding other #pinmux-cells
+values to parse in addition to 2. And map some registers using
+compatible + .data entry related to it.
+ 
+> > +	/* board specific .dts file, such as omap4-sdp.dts */
+> > +	pinmux at 4a100040 {
+> > +		pmx_uart3: pinconfig-uart3 {
+> > +			mux = <0x0104 0x100
+> > +			       0x0106 0x0>;
+> > +                        };
+> 
+> The line is some leftover which should be deleted?
+
+Thanks that looks wrong..
+ 
+> > +config PINCTRL_SIMPLE
+> > +	tristate "Simple device tree based pinmux driver"
+> > +	depends on OF
+> > +	help
+> > +	  This selects the device tree based generic pinmux driver.
+> > +
+> 
+> We would call it pinctrl instead pinmux driver?
+
+Thanks, fixing.
+ 
+> > +	smux->desc->pins = smux->pins.pa;
+> > +	smux->desc->npins = smux->pins.max--;
+> > +
+> Hmm, why do you have pins.max minus 1 here and most of the places where
+> it gets used plus 1?  Keep it as it is and use pins.max - 1 in that
+> only place I have seen?
+
+Makes sense.
+
+> > +static int __init smux_register(struct smux_device *smux)
+> > +{
+> > +	int ret;
+> > +
+> > +	if (!smux->dev->of_node)
+> > +		return -ENODEV;
+> > +
+> > +	smux->pctlops = &smux_pinctrl_ops;
+> > +	smux->pmxops = &smux_pinmux_ops;
+> 
+> I do not see where these two pointers inside smux be used anywhere.
+> And also they can be got from smux below anyway.  So why bothering?
+
+Yes those are already gone in the second version I posted.
+
+Regards,
+
+Tony
