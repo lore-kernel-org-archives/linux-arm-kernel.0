@@ -1,64 +1,66 @@
-From: k.lewandowsk@samsung.com (Karol Lewandowski)
-Date: Fri, 10 Feb 2012 18:54:47 +0100
-Subject: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
-In-Reply-To: <CAH9JG2VLxmsafu09RmU5GPXnQUMnJo8XZSQcKTkBD2ZpnZ6yPQ@mail.gmail.com>
-References: <1324624169-16102-1-git-send-email-riverful.kim@samsung.com>
- <1327652483-15655-1-git-send-email-riverful.kim@samsung.com>
- <CAJuYYwRn7Luhj0223-i9u3ETutb8qgFUY7FEBq-ZOUi74DouMA@mail.gmail.com>
- <CAH9JG2VLxmsafu09RmU5GPXnQUMnJo8XZSQcKTkBD2ZpnZ6yPQ@mail.gmail.com>
-Message-ID: <4F3559E7.7060904@samsung.com>
+From: shubhrajyoti@ti.com (Datta, Shubhrajyoti)
+Date: Fri, 10 Feb 2012 23:31:47 +0530
+Subject: [PATCH RFC] OMAP: serial: Release the claimed memory region in
+ remove
+In-Reply-To: <CAOMWX4f0Mpj=NRBXZgtLbvCg3uo+8tZY8OAkriPu2YucRGoPkw@mail.gmail.com>
+References: <1328853482-3687-1-git-send-email-shubhrajyoti@ti.com>
+ <CAOMWX4f0Mpj=NRBXZgtLbvCg3uo+8tZY8OAkriPu2YucRGoPkw@mail.gmail.com>
+Message-ID: <CANQgH-Zy6XN+fqxx0eeVDERRSpBrU8zuOAkeSqtuL2un=6xmxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.02.2012 09:01, Kyungmin Park wrote:
-
-> + Karol for DT support later
-> 
-> On Fri, Feb 10, 2012 at 3:58 AM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
->> Dear Mr. HeungJun Kim,
+On Fri, Feb 10, 2012 at 8:53 PM, Menon, Nishanth <nm@ti.com> wrote:
+> On Thu, Feb 9, 2012 at 23:58, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
+>> Currently the memory region is not released the folowing error is
+>> observed.
 >>
->> On 27 January 2012 00:21, HeungJun, Kim <riverful.kim@samsung.com> wrote:
->>> This patch adds Samsung Mobile TRATS board support.
->>>
->>> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>>  arch/arm/mach-exynos/Kconfig      |   11 ++
->>>  arch/arm/mach-exynos/Makefile     |    1 +
->>>  arch/arm/mach-exynos/mach-trats.c |  344 +++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 356 insertions(+), 0 deletions(-)
->>>  create mode 100644 arch/arm/mach-exynos/mach-trats.c
+>> /testsuites # insmod omap-serial.ko
+>> [ ?130.746917] omap_uart omap_uart.0: memory region already claimed
+>> [ ?130.753143] omap_uart: probe of omap_uart.0 failed with error -16
+>> [ ?130.759338] omap_uart omap_uart.1: memory region already claimed
+>> [ ?130.765380] omap_uart: probe of omap_uart.1 failed with error -16
+>> [ ?130.771606] omap_uart omap_uart.2: memory region already claimed
+>> [ ?130.777679] omap_uart: probe of omap_uart.2 failed with error -16
+>> [ ?130.783905] omap_uart omap_uart.3: memory region already claimed
+>> [ ?130.789947] omap_uart: probe of omap_uart.3 failed with error -16
 >>
->> The exynos4 dt-enabled board file can support most of the features
->> added in this board file. The other option that could be considered
->> here would be to add DT support for this board file, and use AUX_DATA
->> to supply platform data for drivers that do not have dt support yet.
->> It would be better to use dt support for new board support that we
->> add.
+>> Fix it by releasing the memory region.
+>>
+>> Cc: Govindraj.R <govindraj.raja@ti.com>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>> ?drivers/tty/serial/omap-serial.c | ? ?4 ++++
+>> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+>> index 130f7f8..4def6c3 100644
+>> --- a/drivers/tty/serial/omap-serial.c
+>> +++ b/drivers/tty/serial/omap-serial.c
+>> @@ -1480,6 +1480,10 @@ do_release_region:
+>> ?static int serial_omap_remove(struct platform_device *dev)
+>> ?{
+>> ? ? ? ?struct uart_omap_port *up = platform_get_drvdata(dev);
+>> + ? ? ? struct resource ? ? ? ? *r;
+>> +
+>> + ? ? ? r = platform_get_resource(dev, IORESOURCE_MEM, 0);
+>> + ? ? ? release_mem_region(r->start, resource_size(r));
+> if this is the same region which ioremapped to up->port.membase, then
+> please release mem region after the unmap.
 
+My bad will send an updated patch.
+Thanks ,
 
-Thanks to Thomas' work TRATS can be booted today using exynos4-dt.
-However, we are still missing some bits needed to make it fully functional:
-
- - sdhci-s3c patchset[1] is needed for eMMC support
-
-   http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/9216
-
- - irq-eint[2] and max8997-pmic[3] for regulators
-
-   [2] http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/8197
-   [3] http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/8865
-
-These patches (created entirely by Thomas) would allow me to write
-description (dts) that should cover what mach-trats.c did.
-
-However, due to ongoing irqdomain and related changes I assume this
-might take a while.
-
-Thomas, may I ask about your plans wrt to irqdomains and wakeup/eints
-(this [2] patchset)?
-
-Regards,
--- 
-Karol Lewandowski | Samsung Poland R&D Center | Linux/Platform
+> Regards,
+> Nishanth Menon
+>
+>>
+>> ? ? ? ?if (up) {
+>> ? ? ? ? ? ? ? ?iounmap(up->port.membase);
+>> --
+>> 1.7.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
