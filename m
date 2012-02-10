@@ -1,131 +1,35 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 10 Feb 2012 12:05:16 +0200
-Subject: [PATCH 7/7] MFD: TWL6040: Add regulator support for VIO, V2V1 supplies
-In-Reply-To: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1328868316-24749-8-git-send-email-peter.ujfalusi@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 10 Feb 2012 19:16:17 +0900
+Subject: [PATCH 9/9] ARM: EXYNOS: temporary fixup regarding
+ get_core_count()
+In-Reply-To: <CAH9JG2Us-Edqjq2FryX_wdHOkutdGdTzeCWMD2RjqNFCn=P9hA@mail.gmail.com>
+References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+ <1328024354-4277-10-git-send-email-kgene.kim@samsung.com>
+ <CAH9JG2Us-Edqjq2FryX_wdHOkutdGdTzeCWMD2RjqNFCn=P9hA@mail.gmail.com>
+Message-ID: <010001cce7dd$071e59c0$155b0d40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-twl6040 has three power supply source:
-VBAT needs to be connected to VBAT, VIO, and V2V1.
-Add regulator support for the VIO, V2V1 supplies.
-Initially handle the two supply together with bulk commands.
+Kyungmin Park wrote:
+> 
+> On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- drivers/mfd/twl6040-core.c  |   33 +++++++++++++++++++++++++++++----
- include/linux/mfd/twl6040.h |    2 ++
- 2 files changed, 31 insertions(+), 4 deletions(-)
+[...]
 
-diff --git a/drivers/mfd/twl6040-core.c b/drivers/mfd/twl6040-core.c
-index ea00c69..566f6e0 100644
---- a/drivers/mfd/twl6040-core.c
-+++ b/drivers/mfd/twl6040-core.c
-@@ -27,6 +27,7 @@
- #include <linux/types.h>
- #include <linux/slab.h>
- #include <linux/kernel.h>
-+#include <linux/err.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/delay.h>
-@@ -35,8 +36,10 @@
- #include <linux/err.h>
- #include <linux/mfd/core.h>
- #include <linux/mfd/twl6040.h>
-+#include <linux/regulator/consumer.h>
- 
- #define VIBRACTRL_MEMBER(reg) ((reg == TWL6040_REG_VIBCTLL) ? 0 : 1)
-+#define TWL6040_NUM_SUPPLIES	(2)
- 
- int twl6040_reg_read(struct twl6040 *twl6040, unsigned int reg)
- {
-@@ -506,6 +509,21 @@ static int __devinit twl6040_probe(struct i2c_client *client,
- 
- 	i2c_set_clientdata(client, twl6040);
- 
-+	twl6040->supplies[0].supply = "vio";
-+	twl6040->supplies[1].supply = "v2v1";
-+	ret = regulator_bulk_get(&client->dev, TWL6040_NUM_SUPPLIES,
-+				 twl6040->supplies);
-+	if (ret != 0) {
-+		dev_err(&client->dev, "Failed to get supplies: %d\n", ret);
-+		goto regulator_get_err;
-+	}
-+
-+	ret = regulator_bulk_enable(TWL6040_NUM_SUPPLIES, twl6040->supplies);
-+	if (ret != 0) {
-+		dev_err(&client->dev, "Failed to enable supplies: %d\n", ret);
-+		goto power_err;
-+	}
-+
- 	twl6040->dev = &client->dev;
- 	twl6040->irq = client->irq;
- 	twl6040->irq_base = pdata->irq_base;
-@@ -526,13 +544,13 @@ static int __devinit twl6040_probe(struct i2c_client *client,
- 		ret = gpio_request_one(twl6040->audpwron, GPIOF_OUT_INIT_LOW,
- 				       "audpwron");
- 		if (ret)
--			goto gpio1_err;
-+			goto gpio_err;
- 	}
- 
- 	/* codec interrupt */
- 	ret = twl6040_irq_init(twl6040);
- 	if (ret)
--		goto gpio2_err;
-+		goto irq_init_err;
- 
- 	ret = request_threaded_irq(twl6040->irq_base + TWL6040_IRQ_READY,
- 				   NULL, twl6040_naudint_handler, 0,
-@@ -592,10 +610,14 @@ mfd_err:
- 	free_irq(twl6040->irq_base + TWL6040_IRQ_READY, twl6040);
- irq_err:
- 	twl6040_irq_exit(twl6040);
--gpio2_err:
-+irq_init_err:
- 	if (gpio_is_valid(twl6040->audpwron))
- 		gpio_free(twl6040->audpwron);
--gpio1_err:
-+gpio_err:
-+	regulator_bulk_disable(TWL6040_NUM_SUPPLIES, twl6040->supplies);
-+power_err:
-+	regulator_bulk_free(TWL6040_NUM_SUPPLIES, twl6040->supplies);
-+regulator_get_err:
- 	i2c_set_clientdata(client, NULL);
- 	regmap_exit(twl6040->regmap);
- err:
-@@ -619,6 +641,9 @@ static int __devexit twl6040_remove(struct i2c_client *client)
- 	i2c_set_clientdata(client, NULL);
- 	regmap_exit(twl6040->regmap);
- 
-+	regulator_bulk_disable(TWL6040_NUM_SUPPLIES, twl6040->supplies);
-+	regulator_bulk_free(TWL6040_NUM_SUPPLIES, twl6040->supplies);
-+
- 	return 0;
- }
- 
-diff --git a/include/linux/mfd/twl6040.h b/include/linux/mfd/twl6040.h
-index e3ff28d..2acdd7d 100644
---- a/include/linux/mfd/twl6040.h
-+++ b/include/linux/mfd/twl6040.h
-@@ -27,6 +27,7 @@
- 
- #include <linux/interrupt.h>
- #include <linux/mfd/core.h>
-+#include <linux/regulator/consumer.h>
- 
- #define TWL6040_REG_ASICID		0x01
- #define TWL6040_REG_ASICREV		0x02
-@@ -203,6 +204,7 @@ struct regmap;
- struct twl6040 {
- 	struct device *dev;
- 	struct regmap *regmap;
-+	struct regulator_bulk_data supplies[2]; /* supplies for vio, v2v1 */
- 	struct mutex mutex;
- 	struct mutex io_mutex;
- 	struct mutex irq_mutex;
--- 
-1.7.8.4
+> > -	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
+> > +	if (soc_is_exynos5250())
+> > +		ncores = 2;
+> I saw the related mail thread, I wonder then how to handle this at
+> other A15 board? Device Tree?
+
+Well, as you know, the EXYNOS5250 has two A15 cores :)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
