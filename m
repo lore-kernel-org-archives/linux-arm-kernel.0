@@ -1,47 +1,69 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 09 Feb 2012 20:58:23 -0800
-Subject: [PATCH 0/3] pinctrl: move the core per-device handlers to core
-In-Reply-To: <1328814050-22715-1-git-send-email-linus.walleij@linaro.org>
-References: <1328814050-22715-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4F34A3EF.3070207@nvidia.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Fri, 10 Feb 2012 05:06:15 +0000
+Subject: [PATCH v3] SPI: add CSR SiRFprimaII SPI controller driver
+In-Reply-To: <20120209152340.GB11249@ponder.secretlab.ca>
+References: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
+ <20120209152340.GB11249@ponder.secretlab.ca>
+Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E99CB93BC5@SHAASIEXM01.ASIA.ROOT.PRI>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2012 11:00 AM, Linus Walleij wrote:
-> After discussing with some people involved with pin control, we agreed
-> that it will just cause trouble to have separate handles for pin muxing
-> and pin configuration in callers - they will definately want to set all
-> pin aspects regarding muxing and other configuration with one single
-> call.
+Hi Grant,
+> > +
+> > +struct sirfsoc_spi {
+> > +	struct spi_bitbang bitbang;
+> > +	struct completion done;
+> > +
+> > +	u32 irq;
 > 
-> These three patches take the first step in this transformation by moving
-> the per-device handles over to core code, and renaming all related
-> functions with the pinctrl_* prefix.
+> irq is set once and never used outside the probe function.  Doesn't need
+> to be here.
 
-The series,
+ok
+> 
+> > +	void __iomem *base;
+> > +	u32 ctrl_freq;  /* SPI controller clock speed */
+> > +	struct clk *clk;
+> > +	int bus_num;
+> 
+> bus_num is unused
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Ok.
 
-Note that this series will cause some compile breakage in the series I
-previously posted to add a pinctrl-tegra driver and convert mach-tegra
-to use it. The following patches in that series should still be OK:
+> > +
+> > +static void spi_sirfsoc_tasklet_tx(unsigned long arg)
+> > +{
+> > +	struct sirfsoc_spi *sspi = (struct sirfsoc_spi *)arg;
+> > +
+> > +	/* Fill Tx FIFO while there are left words to be transmitted */
+> > +	while (!((readl(sspi->base + SIRFSOC_SPI_TXFIFO_STATUS) &
+> > +			SIRFSOC_SPI_FIFO_FULL)) &&
+> > +			sspi->left_tx_cnt)
+> > +		sspi->tx_word(sspi);
+> 
+> Potential problem: if for any reason the device stalls and the FULL bit
+> doesn't get cleared, then this function will be stuck in a tight loop.  This
+> may not be an issue, but it should be considered.
 
-pinctrl: add a driver for NVIDIA Tegra
-ARM: tegra: Select PINCTRL Kconfig variables
+Might timeout check.
 
-... so you can still go ahead and apply those, but the following will be
-broken:
+> > +
+> > +static void spi_sirfsoc_chipselect(struct spi_device *spi, int value)
+> > +{
+> > +	struct sirfsoc_spi *sspi = spi_master_get_devdata(spi->master);
+> > +	struct sirfsoc_spi_ctrldata *ctl_data = spi->controller_data;
+> 
+> Where does controller_data come from?  It is not set in the driver, and it is
+> *not* something that the spi_device driver or the board code is allowed to set.
+> 
+> If the driver needs controller_data, then it needs to be added to each spi
+> device by the spi controller driver when the slave device is registered.
+> 
+The controller_data is mainly for various kinds of chip selection. We might have a CS pin, a GPIO from prima2, or a GPIO from an extended MCU side by side with prima2.
+It seems like you think this driver should handle all different kinds of chip selection support and implement those callbacks in it? And every spi client use DT to describe the CS pin?
 
-ARM: tegra: Switch to new pinctrl driver
-ARM: tegra: Remove pre-pinctrl pinmux driver
+-barry
 
-also the separately posted:
 
-ARM: tegra: Add pinmux board file for Cardhu
-
-I'll probably hold off reposting those last 3; with any luck they'll be
-eclipsed by my implementing full DT binding support in the near future,
-given our consensus on that topic following discussion at Linaro Connect.
-
--- 
-nvpublic
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
