@@ -1,100 +1,116 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 10 Feb 2012 11:26:53 -0800
-Subject: ARM: OMAP2xxx: PM: remove obsolete timer disable code in the
- suspend path
-In-Reply-To: <alpine.DEB.2.00.1202100140430.2553@utopia.booyaka.com> (Paul
- Walmsley's message of "Fri, 10 Feb 2012 01:42:09 -0700 (MST)")
-References: <alpine.DEB.2.00.1202092007540.17520@utopia.booyaka.com>
- <alpine.DEB.2.00.1202100140430.2553@utopia.booyaka.com>
-Message-ID: <87y5saxzeq.fsf@ti.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Fri, 10 Feb 2012 11:32:31 -0800
+Subject: [RFC PATCH v4 0/4] Consolidate cpuidle timekeeping and irq
+ enabling
+In-Reply-To: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAMXH7KEqeO4fV82PB9MSJg7tMPxqxUe5n=vc3jc6GttM0jKPtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+Maintainers for drivers/cpuidle, do you have any comments/opinions
+about this patch?
 
-> On Thu, 9 Feb 2012, Paul Walmsley wrote:
->
->> 
->> Remove omap_{read,write}l() from the 24xx PM code.  The clocksource
->> code should now handle what this was supposed to do.
->> 
->> Tested on N800 -- but it's hard to say whether this fixes anything.
->> OMAP24xx static suspend path is currently broken, and this patch
->> doesn't change that.
->> 
->> Signed-off-by: Paul Walmsley <paul@pwsan.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Rob Herring <robherring2@gmail.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->
-> Just realized that a stray change made it into the patch that was posted.
-> Below is a version with the stray change removed.  It applies on 
-> Tony's v3.3-rc3 testing branch, plus the OMAP2420 serial fix patch that 
-> was posted earlier.
->
->
-> - Paul
->
-> From: Paul Walmsley <paul@pwsan.com>
-> Date: Fri, 10 Feb 2012 01:40:04 -0700
-> Subject: [PATCH v2] ARM: OMAP2xxx: PM: remove obsolete timer disable code 
-> in the suspend path
->
-> Remove omap_{read,write}l() from the 24xx PM code.  The clocksource
-> code should now handle what this was supposed to do.
->
-> Tested on N800 -- but it's hard to say whether this fixes anything.
-> OMAP24xx static suspend path is currently broken, and this patch
-> doesn't change that.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Rob Herring <robherring2@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
+Intel cpuidle and acpi cpuidle maintainers, do you have any
+comments/opinions about this patch and the changes to your code?
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+Any other review and comments welcome.
 
-> ---
->  arch/arm/mach-omap2/pm24xx.c |   22 +---------------------
->  1 files changed, 1 insertions(+), 21 deletions(-)
+Summary of positive and negatives as I understand them so far:
+
+version 1, 2, and 3 (Original "wrapper" method of consolidating
+timekeeping and interrupt enabling)
++ opportunistically provides consolidation for simple platform cpuidle
+implementations without disturbing the more complex implementations.
+By simple, I mean those at can be wrapped in the time keeping calls
+and interrupt enabling calls without significantly affecting idle time
+keeping accuracy or interrupt latency
+- Does not provide consolidation for the more complex platform cpuidle
+implementations
+- Adds an additional interface, perhaps unnecessarily if this
+consolidation could be done in cpuidle
+
+version 4 (modifications to drivers/cpuidle/cpuidle.c cpuidle_idle_call)
++ Adds consolidation work to cpuidle_idle_call which allows all
+platform timekeeping / interrupt handling to be consolidated.
+- Requires splitting up of more complex platform cpuidle
+implementations, adding further complexity and risk of breaking
+something.
+? Allows both pre_enter or enter to change the idle state.  Is there
+an objection to this?
+? Splitting up the enter functions can require additional function
+calls.  Is there any concern that this is significant additional
+overhead?
+
+Thanks,
+Rob
+
+
+On Tue, Jan 31, 2012 at 7:00 PM, Robert Lee <rob.lee@linaro.org> wrote:
+> This patch series moves the timekeeping and irq enabling from the platform
+> code to the core cpuidle driver. ?Also, the platform irq disabling was removed
+> as it appears that all calls into cpuidle_call_idle will have already called
+> local_irq_disable().
 >
-> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-> index 23de98d..18eda53 100644
-> --- a/arch/arm/mach-omap2/pm24xx.c
-> +++ b/arch/arm/mach-omap2/pm24xx.c
-> @@ -254,26 +254,6 @@ static int omap2_pm_begin(suspend_state_t state)
->  	return 0;
->  }
->  
-> -static int omap2_pm_suspend(void)
-> -{
-> -	u32 wken_wkup, mir1;
-> -
-> -	wken_wkup = omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
-> -	wken_wkup &= ~OMAP24XX_EN_GPT1_MASK;
-> -	omap2_prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
-> -
-> -	/* Mask GPT1 */
-> -	mir1 = omap_readl(0x480fe0a4);
-> -	omap_writel(1 << 5, 0x480fe0ac);
-> -
-> -	omap2_enter_full_retention();
-> -
-> -	omap_writel(mir1, 0x480fe0a4);
-> -	omap2_prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
-> -
-> -	return 0;
-> -}
-> -
->  static int omap2_pm_enter(suspend_state_t state)
->  {
->  	int ret = 0;
-> @@ -281,7 +261,7 @@ static int omap2_pm_enter(suspend_state_t state)
->  	switch (state) {
->  	case PM_SUSPEND_STANDBY:
->  	case PM_SUSPEND_MEM:
-> -		ret = omap2_pm_suspend();
-> +		omap2_enter_full_retention();
->  		break;
->  	default:
->  		ret = -EINVAL;
+> To save reviewers time, only a few platforms which required the most changes
+> are included in this version. ?If these changes are approved, the next version
+> will include the remaining platform code which should require minimal changes.
+>
+> For those who have followed the previous patch versions, as you know, the
+> previous version of this patch series added some helper functionality which
+> used a wrapper function to remove the time keeping and irq enabling/disabling
+> from the platform code. ?There was also initialization helper functionality
+> which has now been removed from this version. ?If the basic implementation
+> in this version is approved, then a separate patch submission effort can be
+> made to focus on consolidation of initialziation functionality.
+>
+> Based on 3.3-rc1
+>
+> v3 submission can be found here:
+> http://www.spinics.net/lists/arm-kernel/msg156751.html
+> Changes since v3:
+> * Removed drivers/cpuidle/common.c
+> ** Removed the initialization helper functions
+> ** Removed the wrapper used to consolidate time keeping and irq enable/disable
+> * Add time keeping and local_irq_disable handling in cpuidle_call_idle().
+> * Made necessary modifications to a few platforms that required the most changes
+> ** Note on omap3: changed structure of omap3_idle_drvdata and added
+> ? per_next_state and per_saved_state vars to accomodate new framework.
+>
+> v2 submission can be found here:
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/144199
+>
+> Changes since v2:
+> * Made various code organization and style changes as suggested in v1 review.
+> * Removed at91 use of common code. ?A separate effort is underway to clean
+> at91 code and the author has offered to convert to common interface as part
+> of those changes (if this common interface is accepted in time).
+> * Made platform cpuidle_driver objects __initdata and dynamically added one
+> persistent instance of this object in common code.
+> * Removed imx5 pm usage of gpc_dvfs clock as it is no longer needed after
+> being enabled during clock initialization.
+> * Re-organized patches.
+>
+> v1 submission can be found here:
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/142791
+>
+> Changes since v1:
+> * Common interface moved to drivers/cpuidle and made non arch-specific.
+> * Made various fixes and suggested additions to the common cpuidle
+> code from v1 review.
+> * Added callback for filling in driver_data field as needed.
+> * Modified the various platforms with these changes.
+>
+> Robert Lee (4):
+> ?cpuidle: Add time keeping and irq enabling
+> ?ARM: omap: Remove cpuidle timekeeping and irq enable/disable
+> ?acpi: Remove cpuidle timekeeping and irq enable/disable
+> ?x86: Remove cpuidle timekeeping and irq enable/disable
+>
+> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 96 ++++++++----------
+> ?drivers/acpi/processor_idle.c ? ? | ?203 ++++++++++++++++++++++---------------
+> ?drivers/cpuidle/cpuidle.c ? ? ? ? | ? 75 +++++++++++---
+> ?drivers/idle/intel_idle.c ? ? ? ? | ?110 ++++++++++++++------
+> ?include/linux/cpuidle.h ? ? ? ? ? | ? 26 +++--
+> ?5 files changed, 317 insertions(+), 193 deletions(-)
+>
