@@ -1,59 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 Feb 2012 19:53:46 +0900
-Subject: [GIT PULL] Samsung EXYNOS pm domains for devel
-Message-ID: <010a01cce7e2$438f6d40$caae47c0$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Feb 2012 11:08:00 +0000
+Subject: [GIT PULL] regarding PL330 driver for rmk or arm-soc, and
+ slave-dma
+In-Reply-To: <010601cce7e1$5850a600$08f1f200$%kim@samsung.com>
+References: <010601cce7e1$5850a600$08f1f200$%kim@samsung.com>
+Message-ID: <20120210110800.GU889@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Fri, Feb 10, 2012 at 07:47:12PM +0900, Kukjin Kim wrote:
+>  arch/arm/common/Kconfig                        |    3 -
+>  arch/arm/common/Makefile                       |    1 -
+>  arch/arm/common/pl330.c                        | 1959 ------------------------
+>  arch/arm/include/asm/hardware/pl330.h          |  338 +++--
 
-Please pull samsung exynos pm domains.
+I think I've already said this, but I'm going to say it again.
 
-It has been merged into linux-pm tree by Rafael and I think it should be
-pulled into arm-soc.
+Code in arch/arm/include/asm/hardware/pl330.h which is only used by
+drivers/dma/pl330.c, needs to move to drivers/dma/pl330.h or into
+drivers/dma/pl330.c itself.
 
-Following is regarding reply about that.
+Anything else left over which needs to be used by others can go into
+include/linux/amba/pl330.h.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/082909.h
-tml
-
-If any problems, please kindly let me know.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
-
-  Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-v3.4-for-rafael
-
-Thomas Abraham (2):
-      PM / Domains: Add OF support
-      ARM: EXYNOS: Hook up power domains to generic power domain
-infrastructure
-
- .../bindings/arm/exynos/power_domain.txt           |   21 ++
- arch/arm/mach-exynos/Kconfig                       |   10 +-
- arch/arm/mach-exynos/Makefile                      |    2 +-
- arch/arm/mach-exynos/dev-pd.c                      |  139 --------------
- arch/arm/mach-exynos/mach-nuri.c                   |   11 -
- arch/arm/mach-exynos/mach-origen.c                 |   14 --
- arch/arm/mach-exynos/mach-smdkv310.c               |   12 --
- arch/arm/mach-exynos/mach-universal_c210.c         |   17 --
- arch/arm/mach-exynos/pm_domains.c                  |  195
-++++++++++++++++++++
- drivers/base/power/domain.c                        |   32 ++++
- include/linux/pm_domain.h                          |   12 ++
- 11 files changed, 262 insertions(+), 203 deletions(-)
- create mode 100644
-Documentation/devicetree/bindings/arm/exynos/power_domain.txt
- delete mode 100644 arch/arm/mach-exynos/dev-pd.c
- create mode 100644 arch/arm/mach-exynos/pm_domains.c
+>  arch/arm/mach-exynos/Kconfig                   |    3 +
+>  arch/arm/mach-exynos/clock.c                   |    9 +
+>  arch/arm/mach-exynos/dma.c                     |  130 ++-
+>  arch/arm/mach-exynos/include/mach/irqs.h       |    2 +
+>  arch/arm/mach-exynos/include/mach/map.h        |    3 +-
+>  arch/arm/plat-samsung/include/plat/dma-pl330.h |   16 +
+>  drivers/dma/Kconfig                            |    1 -
+>  drivers/dma/pl330.c                            | 1856 ++++++++++++++++++++++
+>  12 files changed, 2197 insertions(+), 2124 deletions(-)
+>  delete mode 100644 arch/arm/common/pl330.c
