@@ -1,44 +1,39 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 10 Feb 2012 17:01:27 +0900
-Subject: [PATCH] ARM: EXYNOS: Adds Samsung TRATS board support
-In-Reply-To: <CAJuYYwRn7Luhj0223-i9u3ETutb8qgFUY7FEBq-ZOUi74DouMA@mail.gmail.com>
-References: <1324624169-16102-1-git-send-email-riverful.kim@samsung.com>
- <1327652483-15655-1-git-send-email-riverful.kim@samsung.com>
- <CAJuYYwRn7Luhj0223-i9u3ETutb8qgFUY7FEBq-ZOUi74DouMA@mail.gmail.com>
-Message-ID: <CAH9JG2VLxmsafu09RmU5GPXnQUMnJo8XZSQcKTkBD2ZpnZ6yPQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 10 Feb 2012 17:35:15 +0900
+Subject: [PATCH 8/9] ARM: EXYNOS: temporary add map definitions for uart
+In-Reply-To: <CAH9JG2VU-rLQ=fQT5Jx5kPcHSLOiEcTVdFaQjsWnxA=Yr6i0Gg@mail.gmail.com>
+References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
+ <1328024354-4277-9-git-send-email-kgene.kim@samsung.com>
+ <CAH9JG2VU-rLQ=fQT5Jx5kPcHSLOiEcTVdFaQjsWnxA=Yr6i0Gg@mail.gmail.com>
+Message-ID: <00fb01cce7ce$e9674440$bc35ccc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Karol for DT support later
+Kyungmin Park wrote:
+> 
+> On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
 
-On Fri, Feb 10, 2012 at 3:58 AM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> Dear Mr. HeungJun Kim,
->
-> On 27 January 2012 00:21, HeungJun, Kim <riverful.kim@samsung.com> wrote:
->> This patch adds Samsung Mobile TRATS board support.
->>
->> Signed-off-by: HeungJun, Kim <riverful.kim@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> ?arch/arm/mach-exynos/Kconfig ? ? ?| ? 11 ++
->> ?arch/arm/mach-exynos/Makefile ? ? | ? ?1 +
->> ?arch/arm/mach-exynos/mach-trats.c | ?344 +++++++++++++++++++++++++++++++++++++
->> ?3 files changed, 356 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-exynos/mach-trats.c
->
-> The exynos4 dt-enabled board file can support most of the features
-> added in this board file. The other option that could be considered
-> here would be to add DT support for this board file, and use AUX_DATA
-> to supply platform data for drivers that do not have dt support yet.
-> It would be better to use dt support for new board support that we
-> add.
->
-> Thanks,
-> Thomas.
->
-> (snip)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+[...]
+
+> > +#ifdef CONFIG_ARCH_EXYNOS4
+> > +#define S3C_PA_UART			EXYNOS4_PA_UART
+> > +#endif
+> > +
+> > +#ifdef CONFIG_ARCH_EXYNOS5
+> > +#define S3C_PA_UART			EXYNOS5_PA_UART
+> > +#endif
+> If it selects the both ARCH_EXYNOS4 and ARCH_EXYNOS5, how to handle
+> this one? I think it's time to clean up these macro magic.
+
+They will be updated for selection of EXYNOS4 and EXYNOS5 together in next
+version.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
