@@ -1,33 +1,52 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 10 Feb 2012 09:52:56 -0600
-Subject: [PULL] Highbank for 3.4
-Message-ID: <4F353D58.5050101@gmail.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Fri, 10 Feb 2012 21:07:03 +0530
+Subject: [PATCH 1/2] arm:omap:am33xx: SoC type detection
+Message-ID: <1328888223-1351-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Determine SoC type, i.e. whether GP or not
 
-Please pull highbank changes for 3.4. It's primarily just sched_clock
-support.
+Note: cpu_is_34xx() is true for am33xx also. Doing
+cpu_is_am33xx() check after cpu_is_34xx() will not
+achieve what we want due to the above reason.
+Hence cpu_is_am33xx() is done before cpu_is_34xx()
 
-Rob
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+---
+ arch/arm/mach-omap2/control.h |    5 +++++
+ arch/arm/mach-omap2/id.c      |    2 ++
+ 2 files changed, 7 insertions(+), 0 deletions(-)
 
-The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-
-  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
-
-are available in the git repository at:
-  git://sources.calxeda.com/kernel/linux.git for-arm-soc
-
-Rob Herring (3):
-      ARM: timer-sp: add sched_clock support
-      ARM: highbank: enable sp804 based sched_clock
-      ARM: highbank: remove unused memory.h
-
- arch/arm/Kconfig                             |    1 +
- arch/arm/common/timer-sp.c                   |   17 ++++++++++++++++-
- arch/arm/include/asm/hardware/timer-sp.h     |   15 ++++++++++++++-
- arch/arm/mach-highbank/highbank.c            |    2 +-
- arch/arm/mach-highbank/include/mach/memory.h |    1 -
- 5 files changed, 32 insertions(+), 4 deletions(-)
- delete mode 100644 arch/arm/mach-highbank/include/mach/memory.h
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index 0ba68d3..96c4bcc 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -339,6 +339,11 @@
+ #define AM35XX_VPFE_PCLK_SW_RST		BIT(4)
+ 
+ /*
++ * CONTROL AM33XX STATUS register
++ */
++#define AM33XX_CONTROL_STATUS		0x040
++
++/*
+  * CONTROL OMAP STATUS register to identify OMAP3 features
+  */
+ #define OMAP3_CONTROL_OMAP_STATUS	0x044c
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 92e4d55..2879c7b 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -44,6 +44,8 @@ int omap_type(void)
+ 
+ 	if (cpu_is_omap24xx()) {
+ 		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
++	} else if (cpu_is_am33xx()) {
++		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
+ 	} else if (cpu_is_omap34xx()) {
+ 		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
+ 	} else if (cpu_is_omap44xx()) {
+-- 
+1.7.1
