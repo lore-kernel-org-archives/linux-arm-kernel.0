@@ -1,174 +1,121 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Feb 2012 12:05:03 -0800
-Subject: [PATCH 2/2] pinctrl: Add simple pinmux driver using device
- tree data
-In-Reply-To: <CAA+hA=Tux3P0RyaB=vG7UeycTt8z4nX9dBicpjB7tQ+xzwoSDQ@mail.gmail.com>
-References: <20120203205049.4089.74610.stgit@kaulin.local>
- <20120203205508.4089.35304.stgit@kaulin.local>
- <20120204175903.GF1426@atomide.com>
- <CAA+hA=Tux3P0RyaB=vG7UeycTt8z4nX9dBicpjB7tQ+xzwoSDQ@mail.gmail.com>
-Message-ID: <20120210200503.GX1426@atomide.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Fri, 10 Feb 2012 12:06:01 -0800
+Subject: [RFC PATCH v4 0/4] Consolidate cpuidle timekeeping and irq
+ enabling
+In-Reply-To: <CAMXH7KEqeO4fV82PB9MSJg7tMPxqxUe5n=vc3jc6GttM0jKPtw@mail.gmail.com>
+References: <1328065215-28108-1-git-send-email-rob.lee@linaro.org>
+ <CAMXH7KEqeO4fV82PB9MSJg7tMPxqxUe5n=vc3jc6GttM0jKPtw@mail.gmail.com>
+Message-ID: <CAP245DWR98VyZurF5J-TL-2GCcT3cNdAUgMBg_WfqQiAcF8h1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
+On Fri, Feb 10, 2012 at 11:32 AM, Rob Lee <rob.lee@linaro.org> wrote:
+> Maintainers for drivers/cpuidle, do you have any comments/opinions
+> about this patch?
 
-* Dong Aisheng <dongas86@gmail.com> [120207 17:22]:
-> On 2/4/12, Tony Lindgren <tony@atomide.com> wrote:
+Venki has changed employers (probably needs a patch to MAINTAINERS?).
+Cc'ing his new email address.
+
+> Intel cpuidle and acpi cpuidle maintainers, do you have any
+> comments/opinions about this patch and the changes to your code?
 >
-> The most difference may be the function enable due to hw difference.
-> But i see that for DT case, it seems function and group creation may
-> also be a problem.
-
-What all do you see as a problem with group creation? Just the
-naming?
-
-> > +/**
-> > + * smux_add_pin() - add a pin to the static per controller pin array
-> > + * @smux: smux driver instance
-> > + * @offset: register offset from base
-> > + */
-> > +static int __init smux_add_pin(struct smux_device *smux, unsigned offset)
-> > +{
-> > +	struct pinctrl_pin_desc *pin;
-> > +	struct smux_name *pn;
-> > +	char *name;
-> > +	int i;
-> > +
-> > +	i = smux->pins.cur;
-> Can we drop cur if it's only temply used for add pin.
-
-Yes I think so, the pins should be static and added at once during
-the init. If you have other sets of pins, then they should probably
-be separate driver instances. So we should be able to get rid of it.
- 
-> > +	sprintf(name, "%lx",
-> > +		(unsigned long)smux->res->start + offset);
-> > +	pin->name = name;
-> I'm wondering how about other people do not want the reg address to be PIN name?
-> It's less meaningful.
-
-How about try adding optional pinctrl-simple,pin-name entry that you
-can add to each mux entry?
-
-The generic plan is to make the names optional in pinctrl framework,
-and then expose the register addresses for future user space debug
-tools. So you may end up noticing that the pinctrl-simple.c driver
-probably does not even need to care about the names.
- 
-> > +static int __init smux_allocate_pin_table(struct smux_device *smux)
-> > +{
-> > +	int mux_bytes, i;
-> > +
-> > +	mux_bytes = smux->width / BITS_PER_BYTE;
-> > +	smux->pins.max = smux->size / mux_bytes;
-> > +
-> The main issue for IMX to use this driver is that IMX pins number can
-> not be calculated in this way
-> since the imx pin controller reg range contains mux reg range and
-> config reg range as well as a few other misc registers
-> And it seems it's also not fit for Tegra since Tegra2's one register
-> may involve many pins.
-> This may need some proper way to fix.
-
-Well maybe take a look adding support for wider #pinmux-cells?
-
-So far I was thinking we could have:
-
-/* one mux register for each pin */
-#pinmux-cells = <2>;
-
-/* three mux registers for each pin */
-#pinmux-cells = <6>;
-...
-
-Note that for more complex mapping you may want to add a hardware
-specific .data entry that corresponds to the compatible flag, let's
-say for conf range offset to mux range offset.
- 
-> > +		res = smux_rename_function(function, np->full_name);
-> A little unclear for rename here.
-> Can we find a better way?
-
-You might want to play with parsing optional names from .dts file.
-I don't need the names and they slow down the parsing. For the names,
-we can show them with userspace tools using debugfs.
-
-For reference, this is what I get under debugfs function entry
-after the rename:
-
-function: /ocp/serial at 0x48020000, groups = [ pinconfig-uart3 ]
-
-> > +static int __init smux_parse_one_pinctrl_entry(struct smux_device *smux,
-> > +                                           struct device_node *np)
-> > +{
-> > +   int count = 0;
-> > +
-> > +   do {
-
-...
- 
-> > +	} while (++count);
-> This 'while' is for what? Define multi pinctrl properties?
-
-Yes each client device might request multiple muxes, let's say
-two pingroups from two different pinctrl driver instances.
- 
-> > +/**
-> > + * smux_load_mux_register() - parses all the device tree mux entries
-> > + * @smux: smux driver instance
-> > + */
-> > +static int __init smux_load_mux_registers(struct smux_device *smux)
-> > +{
-> > +	struct device_node *np;
-> > +	int ret;
-> > +
-> > +	for_each_child_of_node(smux->dev->of_node, np) {
-> > +		ret = smux_parse_one_pinmux_entry(smux, np);
-> > +	}
-> > +
-> > +	for_each_node_with_property(np, PMX_PINCTRL_NAME) {
-> > +		ret = smux_parse_one_pinctrl_entry(smux, np);
-> 
-> Can we put this in pinctrl core?
-> Just like something mentioned in my last proposal that pinctrl core
-> does the common pinmux node search, pinmux map table process and
-> register.
-> https://lkml.org/lkml/2012/2/3/276
-> That could be a very easy and flexible pinctrl binding.
-
-Yes to summarize what we've discussed for people who have not
-been at the conference this week: The idea is the have a generic
-functions for the common bindings. Then have separate driver
-specific bindings.
- 
-> > +	val = of_get_property(pdev->dev.of_node,
-> > +				"pinctrl-simple,register-width", &len);
-> Is there any reason not use of_property_read_u32 here? It may reduce some code.
-
-Hmm yes I guess u32 should be plenty for the register width :)
- 
-> > +	val = of_get_property(pdev->dev.of_node,
-> > +				"pinctrl-simple,function-off", &len);
-> > +	if (!val || len != 4) {
-> > +		dev_err(smux->dev, "function off mode not specified\n");
-> > +		ret = -EINVAL;
-> How about other SoCs not support function off mode?
-
-Maybe disable should not do anything if function-off is not specified?
- 
-> > +free:
-> > +	devm_kfree(smux->dev, smux);
-> > +
-> For devm_* routines, do you still need this error checking?
-> IIRC, the resource will be automatically released if probe failed.
-
-I guess, are there some recommendations somewhere for that?
-
-Also, most of the string copying can be avoided if we use the
-read-only strings in DT, and then have a separate optional name
-that can be allocated.
-
-Regards,
-
-Tony 
+> Any other review and comments welcome.
+>
+> Summary of positive and negatives as I understand them so far:
+>
+> version 1, 2, and 3 (Original "wrapper" method of consolidating
+> timekeeping and interrupt enabling)
+> + opportunistically provides consolidation for simple platform cpuidle
+> implementations without disturbing the more complex implementations.
+> By simple, I mean those at can be wrapped in the time keeping calls
+> and interrupt enabling calls without significantly affecting idle time
+> keeping accuracy or interrupt latency
+> - Does not provide consolidation for the more complex platform cpuidle
+> implementations
+> - Adds an additional interface, perhaps unnecessarily if this
+> consolidation could be done in cpuidle
+>
+> version 4 (modifications to drivers/cpuidle/cpuidle.c cpuidle_idle_call)
+> + Adds consolidation work to cpuidle_idle_call which allows all
+> platform timekeeping / interrupt handling to be consolidated.
+> - Requires splitting up of more complex platform cpuidle
+> implementations, adding further complexity and risk of breaking
+> something.
+> ? Allows both pre_enter or enter to change the idle state. ?Is there
+> an objection to this?
+> ? Splitting up the enter functions can require additional function
+> calls. ?Is there any concern that this is significant additional
+> overhead?
+>
+> Thanks,
+> Rob
+>
+>
+> On Tue, Jan 31, 2012 at 7:00 PM, Robert Lee <rob.lee@linaro.org> wrote:
+>> This patch series moves the timekeeping and irq enabling from the platform
+>> code to the core cpuidle driver. ?Also, the platform irq disabling was removed
+>> as it appears that all calls into cpuidle_call_idle will have already called
+>> local_irq_disable().
+>>
+>> To save reviewers time, only a few platforms which required the most changes
+>> are included in this version. ?If these changes are approved, the next version
+>> will include the remaining platform code which should require minimal changes.
+>>
+>> For those who have followed the previous patch versions, as you know, the
+>> previous version of this patch series added some helper functionality which
+>> used a wrapper function to remove the time keeping and irq enabling/disabling
+>> from the platform code. ?There was also initialization helper functionality
+>> which has now been removed from this version. ?If the basic implementation
+>> in this version is approved, then a separate patch submission effort can be
+>> made to focus on consolidation of initialziation functionality.
+>>
+>> Based on 3.3-rc1
+>>
+>> v3 submission can be found here:
+>> http://www.spinics.net/lists/arm-kernel/msg156751.html
+>> Changes since v3:
+>> * Removed drivers/cpuidle/common.c
+>> ** Removed the initialization helper functions
+>> ** Removed the wrapper used to consolidate time keeping and irq enable/disable
+>> * Add time keeping and local_irq_disable handling in cpuidle_call_idle().
+>> * Made necessary modifications to a few platforms that required the most changes
+>> ** Note on omap3: changed structure of omap3_idle_drvdata and added
+>> ? per_next_state and per_saved_state vars to accomodate new framework.
+>>
+>> v2 submission can be found here:
+>> http://comments.gmane.org/gmane.linux.ports.arm.kernel/144199
+>>
+>> Changes since v2:
+>> * Made various code organization and style changes as suggested in v1 review.
+>> * Removed at91 use of common code. ?A separate effort is underway to clean
+>> at91 code and the author has offered to convert to common interface as part
+>> of those changes (if this common interface is accepted in time).
+>> * Made platform cpuidle_driver objects __initdata and dynamically added one
+>> persistent instance of this object in common code.
+>> * Removed imx5 pm usage of gpc_dvfs clock as it is no longer needed after
+>> being enabled during clock initialization.
+>> * Re-organized patches.
+>>
+>> v1 submission can be found here:
+>> http://comments.gmane.org/gmane.linux.ports.arm.kernel/142791
+>>
+>> Changes since v1:
+>> * Common interface moved to drivers/cpuidle and made non arch-specific.
+>> * Made various fixes and suggested additions to the common cpuidle
+>> code from v1 review.
+>> * Added callback for filling in driver_data field as needed.
+>> * Modified the various platforms with these changes.
+>>
+>> Robert Lee (4):
+>> ?cpuidle: Add time keeping and irq enabling
+>> ?ARM: omap: Remove cpuidle timekeeping and irq enable/disable
+>> ?acpi: Remove cpuidle timekeeping and irq enable/disable
+>> ?x86: Remove cpuidle timekeeping and irq enable/disable
+>>
+>> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 96 ++++++++----------
+>> ?drivers/acpi/processor_idle.c ? ? | ?203 ++++++++++++++++++++++---------------
+>> ?drivers/cpuidle/cpuidle.c ? ? ? ? | ? 75 +++++++++++---
+>> ?drivers/idle/intel_idle.c ? ? ? ? | ?110 ++++++++++++++------
+>> ?include/linux/cpuidle.h ? ? ? ? ? | ? 26 +++--
+>> ?5 files changed, 317 insertions(+), 193 deletions(-)
+>>
