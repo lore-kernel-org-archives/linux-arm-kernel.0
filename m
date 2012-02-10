@@ -1,35 +1,29 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 10 Feb 2012 04:47:14 +0100
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A6498033336@039-SN2MPN1-021.039d.mgd.msft.net>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <201202041117.48190.marek.vasut@gmail.com>
- <F281D0F91ED19E4D8E63A7504E8A6498033336@039-SN2MPN1-021.039d.mgd.msft.net>
-Message-ID: <201202100447.14248.marek.vasut@gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 09 Feb 2012 20:21:45 -0800
+Subject: [PATCH] pinctrl: changes hog mechanism to be self-referential
+In-Reply-To: <1328834868-25030-1-git-send-email-linus.walleij@linaro.org>
+References: <1328834868-25030-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4F349B59.6070104@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > Hi,
-> > > > 
-> > > > any updates on the MXS USB Host front?
-> > > > 
-> > > > M
-> > > 
-> > > According to maintainer's suggestion, it needs to refine
-> > > i.mx usb framework first, then mainline i.mx usb remaining
-> > > drivers.
-> > > 
-> > > http://www.spinics.net/lists/linux-usb/msg55061.html
-> > > 
-> > > BR,
-> > > Peter
-> > 
-> > I did read the thread, but did it move anywhere ever since?
+On 02/09/2012 04:47 PM, Linus Walleij wrote:
+> Instead of a specific boolean field to indicate if a map entry shall
+> be hogged, treat self-reference as an indication of desired hogging.
+> This drops one field off the map struct and has a nice Douglas R.
+> Hofstadter-feel to it.
 > 
-> Now, we have almost finished the step 1.
-> -- Split phy from OTG structure.
+> Suggested-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Oh, so you're still working on it. All right then, I'll now dive into the IIO 
-LRADC driver and let you handle this.
+> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
 
-M
+> -PIN_MAP_PRIMARY_SYS_HOG("POWERMAP", "power_func")
+> +PIN_MAP_PRIMARY_SYS_HOG("POWERMAP", "pinctrl-foo". "power_func")
+
+That "." should be ",". Other than that,
+
+Acked-by: Stephen Warren <swarren@nvidia.com>
+
+-- 
+nvpublic
