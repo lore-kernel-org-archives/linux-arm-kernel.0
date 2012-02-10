@@ -1,48 +1,70 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 10 Feb 2012 13:50:33 -0500
-Subject: [PATCH] omap: board-omap3evm: add required smsc911x regulators
-In-Reply-To: <20120210174046.GQ1426@atomide.com>
-References: <1328738812-26755-1-git-send-email-mporter@ti.com>
- <20120210174046.GQ1426@atomide.com>
-Message-ID: <20120210185033.GC40045@h115-84.vpn.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 10 Feb 2012 19:58:37 +0100
+Subject: [PATCHv6 0/7] ARM: DMA-mapping framework redesign
+Message-ID: <1328900324-20946-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2012 at 09:40:47AM -0800, Tony Lindgren wrote:
-> * Matt Porter <matt@ohporter.com> [120208 13:35]:
-> > This fixes smsc911x support on omap3evm that has been broken since
-> > the smsc911x driver was updated to require the existence of vdd33a
-> > and vddvario supplies.
-> 
-> Great. Few comments:
-> 
-> 1. Could you please include the smsc911x commit and subject here too
->    so it clearly shows the regression?
+Hello,
 
-Sure. Will do for v2.
+This is another update on my works DMA-mapping framework redesign for
+ARM architecture. It includes a few minor cleanup and fixes since the
+last version posted by the end of December 2011. This patch series is
+now based on the generic, cross-arch dma-mapping redesign patches posted
+in the "[PATCH 00/14] DMA-mapping framework redesign preparation"
+thread: http://www.spinics.net/lists/linux-sh/msg09777.html
 
-> 2. Also, why don't you add this fixed regulator to gpmc-smsc911.c?
-> 
-> That way it gets fixed for other too, like zoom2/3.
+All patches have been now rebased onto v3.3-rc2 kernel.
 
-Ok, so I considered that at first and had two concerns that made me just
-do it in the omap3evm specific way and see what the feedback was.
+All the code has been tested on Samsung Exynos4 'UniversalC210' board
+with IOMMU driver posted by KyongHo Cho.
 
-1) If we do a generic implementation in gpmc-smsc911x.c, there needs to
-be a way to override it. Another board may have a variable supply that
-feeds this consumer.
 
-2) Technically, this omap3evm specific implementation matches the hardware
-in that the osk_3v3 rail is software controllable. Granted, I commented
-that we simply don't hook up the gpio at this time since this real
-hardware regulator has always been silently asserted on by the nature of
-the reset state of the TWL GPIOs and the board level pull downs as well.
+History of the development:
 
-So that said, I don't need #2 to make omap3evm work and I don't think
-anybody cares yet to actually turn that regulator off (as it will kill
-other things that appear to not have regulator support anyway). It looks
-like you talked me into respinning it as a generic implementation. Only
-question is whether I should bother consider not-yet-existing boards that
-may not want that generic regulator.
+v1: (initial version of the DMA-mapping redesign patches):
+http://www.spinics.net/lists/linux-mm/msg21241.html
 
--Matt
+v2:
+http://lists.linaro.org/pipermail/linaro-mm-sig/2011-September/000571.html
+http://lists.linaro.org/pipermail/linaro-mm-sig/2011-September/000577.html
+
+v3:
+http://www.spinics.net/lists/linux-mm/msg25490.html
+
+v4 and v5:
+http://www.spinics.net/lists/arm-kernel/msg151147.html
+http://www.spinics.net/lists/arm-kernel/msg154889.html
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+Patch summary:
+
+Marek Szyprowski (7):
+  ARM: dma-mapping: remove offset parameter to prepare for generic
+    dma_ops
+  ARM: dma-mapping: use asm-generic/dma-mapping-common.h
+  ARM: dma-mapping: implement dma sg methods on top of any generic dma
+    ops
+  ARM: dma-mapping: move all dma bounce code to separate dma ops
+    structure
+  ARM: dma-mapping: remove redundant code and cleanup
+  ARM: dma-mapping: use alloc, mmap, free from dma_ops
+  ARM: dma-mapping: add support for IOMMU mapper
+
+ arch/arm/Kconfig                   |    9 +
+ arch/arm/common/dmabounce.c        |   78 +++-
+ arch/arm/include/asm/device.h      |    4 +
+ arch/arm/include/asm/dma-iommu.h   |   34 ++
+ arch/arm/include/asm/dma-mapping.h |  404 +++++------------
+ arch/arm/mm/dma-mapping.c          |  897 ++++++++++++++++++++++++++++++------
+ arch/arm/mm/vmregion.h             |    2 +-
+ 7 files changed, 980 insertions(+), 448 deletions(-)
+ create mode 100644 arch/arm/include/asm/dma-iommu.h
+
+-- 
+1.7.1.569.g6f426
