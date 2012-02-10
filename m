@@ -1,33 +1,75 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 09 Feb 2012 18:33:46 -0800
-Subject: [PATCH] ARM: OMAP2xxx: PM: fix OMAP2xxx-specific UART idle bug in
- v3.3
-In-Reply-To: <alpine.DEB.2.00.1202091822170.5059@utopia.booyaka.com> (Paul
- Walmsley's message of "Thu, 9 Feb 2012 18:24:03 -0700 (MST)")
-References: <alpine.DEB.2.00.1202091822170.5059@utopia.booyaka.com>
-Message-ID: <8762ffzab9.fsf@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 9 Feb 2012 20:08:36 -0700 (MST)
+Subject: ARM: OMAP2xxx: PM: remove obsolete timer disable code in the suspend
+ path
+Message-ID: <alpine.DEB.2.00.1202092007540.17520@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
 
-> [ This patch is targeted for v3.3-rc ]
->
-> On OMAP2420-based systems, the PM code ignores the state of the UART
-> functional clocks when determining what idle state to enter.  This
-> breaks the serial port now that the UART driver's clock behavior can
-> be controlled via the PM autosuspend timeout.
->
-> To fix, remove the special-case idle handling for the UARTs in the
-> OMAP2420/2430 PM idle code added by commit
-> 4af4016c53f52b26461b8030211f8427a58fa5ed ("OMAP3: PM: UART: disable
-> clocks when idle and off-mode support").
->
-> Tested on Nokia N800.  This patch is a collaboration between Tony
-> Lindgren <tony@atomide.com> and Paul Walmsley <paul@pwsan.com>.
->
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Remove omap_{read,write}l() from the 24xx PM code.  The clocksource
+code should now handle what this was supposed to do.
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+Tested on N800 -- but it's hard to say whether this fixes anything.
+OMAP24xx static suspend path is currently broken, and this patch
+doesn't change that.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/pm24xx.c |   24 ++----------------------
+ 1 files changed, 2 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index b8822f8..7690b53 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -245,7 +245,7 @@ static void omap2_pm_idle(void)
+ 	if (omap_irq_pending())
+ 		goto out;
+ 
+-	omap2_enter_full_retention();
++	omap2_enter_mpu_retention();
+ 
+ out:
+ 	local_fiq_enable();
+@@ -260,26 +260,6 @@ static int omap2_pm_begin(suspend_state_t state)
+ 	return 0;
+ }
+ 
+-static int omap2_pm_suspend(void)
+-{
+-	u32 wken_wkup, mir1;
+-
+-	wken_wkup = omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+-	wken_wkup &= ~OMAP24XX_EN_GPT1_MASK;
+-	omap2_prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
+-
+-	/* Mask GPT1 */
+-	mir1 = omap_readl(0x480fe0a4);
+-	omap_writel(1 << 5, 0x480fe0ac);
+-
+-	omap2_enter_full_retention();
+-
+-	omap_writel(mir1, 0x480fe0a4);
+-	omap2_prm_write_mod_reg(wken_wkup, WKUP_MOD, PM_WKEN);
+-
+-	return 0;
+-}
+-
+ static int omap2_pm_enter(suspend_state_t state)
+ {
+ 	int ret = 0;
+@@ -287,7 +267,7 @@ static int omap2_pm_enter(suspend_state_t state)
+ 	switch (state) {
+ 	case PM_SUSPEND_STANDBY:
+ 	case PM_SUSPEND_MEM:
+-		ret = omap2_pm_suspend();
++		omap2_enter_full_retention();
+ 		break;
+ 	default:
+ 		ret = -EINVAL;
+-- 
+1.7.9
