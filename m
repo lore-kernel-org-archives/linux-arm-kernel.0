@@ -1,31 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 10 Feb 2012 11:24:41 +0000
-Subject: [PATCH 2/7] regulator: twl-regulator: Add fixed LDO for V1V8,
- V2V1 supply
-In-Reply-To: <1328868316-24749-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
- <1328868316-24749-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120210112441.GE3056@opensource.wolfsonmicro.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 10 Feb 2012 20:58:47 +0900
+Subject: [GIT PULL] regarding PL330 driver for rmk or arm-soc,
+ and	slave-dma
+In-Reply-To: <20120210110800.GU889@n2100.arm.linux.org.uk>
+References: <010601cce7e1$5850a600$08f1f200$%kim@samsung.com>
+ <20120210110800.GU889@n2100.arm.linux.org.uk>
+Message-ID: <012b01cce7eb$58baf500$0a30df00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2012 at 12:05:11PM +0200, Peter Ujfalusi wrote:
-> V1V8 supply most common use is to provide VIO for the system.
-> V2V1 supply is used on SDP4430/PandaBoards to provide 2.1V to
-> twl6040, and also as an input to VCXIO_IN, VDAC_IN of twl6030.
+Russell King - ARM Linux wrote:
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> On Fri, Feb 10, 2012 at 07:47:12PM +0900, Kukjin Kim wrote:
+> >  arch/arm/common/Kconfig                        |    3 -
+> >  arch/arm/common/Makefile                       |    1 -
+> >  arch/arm/common/pl330.c                        | 1959
+-----------------------
+> -
+> >  arch/arm/include/asm/hardware/pl330.h          |  338 +++--
+> 
+> I think I've already said this, but I'm going to say it again.
+> 
+> Code in arch/arm/include/asm/hardware/pl330.h which is only used by
+> drivers/dma/pl330.c, needs to move to drivers/dma/pl330.h or into
+> drivers/dma/pl330.c itself.
+> 
+> Anything else left over which needs to be used by others can go into
+> include/linux/amba/pl330.h.
+> 
+OK, I agree. I will address comment from you, then submit it and re-send
+'pull request' in the beginning of next week.
 
-Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+If any other problem, please kindly let me know.
 
-I'll not apply this as it'll cause runtime breakage if it goes via a
-different path to the rest of the series.  If it's getting near to the
-merge window and nothing is applied please remind me and this can go in
-by itself.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120210/74d77db7/attachment.sig>
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
