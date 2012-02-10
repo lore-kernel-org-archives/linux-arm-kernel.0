@@ -1,44 +1,41 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Fri, 10 Feb 2012 17:40:16 +0100
-Subject: [PATCH] ARM: OMAP1: ams-delta: fix incorrect section tags
-In-Reply-To: <Message-ID: <1580046.EEGIFOPvyy@vclass>
-References: <Message-ID: <1580046.EEGIFOPvyy@vclass>
-Message-ID: <1328892016-20673-1-git-send-email-jkrzyszt@tis.icnet.pl>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 10 Feb 2012 10:40:15 -0600
+Subject: [PATCH] ep93xx: fix build of vision_ep93xx.c
+In-Reply-To: <20120210064640.GA3847@mwesterb-mobl.ger.corp.intel.com>
+References: <201202080953.44853.hartleys@visionengravers.com>
+ <20120210064640.GA3847@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41F9DF77C@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While resolving section mismatches introduced with recent patches
-to for-next, a few dangerous, driver bind/unbind unaware section
-tagging already present in mainline have been identified. Fix them.
+On Thursday, February 09, 2012 11:47 PM, Mika Westerberg wrote:
+> On Wed, Feb 08, 2012 at 09:53:44AM -0700, H Hartley Sweeten wrote:
+>> Fix build breakage due to the following commits:
+>> 
+>> Commit bd5f12a24766c1f299def0a78b008d4746f528f2
+>> ? ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics
+>> 
+>> Commit 257af9f9725aa8a863b306659208a031135d59e7
+>> ? ARM: 7041/1: gpio-ep93xx: hookup the to_irq callback in the driver
+>> 
+>> The vision_ep9307 machine uses the ep93xx build-in gpios and needs to
+>> include <mach/gpio-ep93xx.h> to pickup the defines.
+>> 
+>> The gpio_to_irq() call is now a callback to the gpio-ep93xx.c driver
+>> and cannot be used as a constant initializer for the .irq member of
+>> struct i2c_board_info.
+>> 
+>> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+>> Acked-by: Ryan Mallon <rmallon@gmail.com>
+>
+> Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
 
-Created and tested against linux-3.3-rc2.
+Russell,
 
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
- arch/arm/mach-omap1/board-ams-delta.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Can this go to your Patch system or should it go thru the arm-soc tree?
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 88909cc..41589ed 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -163,7 +163,7 @@ static struct omap_lcd_config ams_delta_lcd_config = {
- 	.ctrl_name	= "internal",
- };
- 
--static struct omap_usb_config ams_delta_usb_config __initdata = {
-+static struct omap_usb_config ams_delta_usb_config = {
- 	.register_host	= 1,
- 	.hmc_mode	= 16,
- 	.pins[0]	= 2,
-@@ -202,7 +202,7 @@ static const struct matrix_keymap_data ams_delta_keymap_data = {
- 	.keymap_size	= ARRAY_SIZE(ams_delta_keymap),
- };
- 
--static struct omap_kp_platform_data ams_delta_kp_data __initdata = {
-+static struct omap_kp_platform_data ams_delta_kp_data = {
- 	.rows		= 8,
- 	.cols		= 8,
- 	.keymap_data	= &ams_delta_keymap_data,
--- 
-1.7.3.4
+The 3.2 kernel will not currently build with CONFIG_MACH_VISION_EP9307=y
+and needs this patch.
+
+Thanks,
+Hartley
