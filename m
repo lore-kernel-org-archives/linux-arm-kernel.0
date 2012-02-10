@@ -1,60 +1,67 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Fri, 10 Feb 2012 09:23:04 -0600
-Subject: [PATCH RFC] OMAP: serial: Release the claimed memory region in
- remove
-In-Reply-To: <1328853482-3687-1-git-send-email-shubhrajyoti@ti.com>
-References: <1328853482-3687-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CAOMWX4f0Mpj=NRBXZgtLbvCg3uo+8tZY8OAkriPu2YucRGoPkw@mail.gmail.com>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Fri, 10 Feb 2012 16:21:11 +0100
+Subject: [PATCH] cpufreq: get rid of remaining references to
+ CONFIG_CPU_FREQ_DEBUG
+In-Reply-To: <1320866225.27598.11.camel@x61.thuisdomein>
+References: <1320866225.27598.11.camel@x61.thuisdomein>
+Message-ID: <20120210152111.GB26589@comet.dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 9, 2012 at 23:58, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> Currently the memory region is not released the folowing error is
-> observed.
->
-> /testsuites # insmod omap-serial.ko
-> [ ?130.746917] omap_uart omap_uart.0: memory region already claimed
-> [ ?130.753143] omap_uart: probe of omap_uart.0 failed with error -16
-> [ ?130.759338] omap_uart omap_uart.1: memory region already claimed
-> [ ?130.765380] omap_uart: probe of omap_uart.1 failed with error -16
-> [ ?130.771606] omap_uart omap_uart.2: memory region already claimed
-> [ ?130.777679] omap_uart: probe of omap_uart.2 failed with error -16
-> [ ?130.783905] omap_uart omap_uart.3: memory region already claimed
-> [ ?130.789947] omap_uart: probe of omap_uart.3 failed with error -16
->
-> Fix it by releasing the memory region.
->
-> Cc: Govindraj.R <govindraj.raja@ti.com>
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
-> ?drivers/tty/serial/omap-serial.c | ? ?4 ++++
-> ?1 files changed, 4 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 130f7f8..4def6c3 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -1480,6 +1480,10 @@ do_release_region:
-> ?static int serial_omap_remove(struct platform_device *dev)
-> ?{
-> ? ? ? ?struct uart_omap_port *up = platform_get_drvdata(dev);
-> + ? ? ? struct resource ? ? ? ? *r;
-> +
-> + ? ? ? r = platform_get_resource(dev, IORESOURCE_MEM, 0);
-> + ? ? ? release_mem_region(r->start, resource_size(r));
-if this is the same region which ioremapped to up->port.membase, then
-please release mem region after the unmap.
-Regards,
-Nishanth Menon
+On Wed, Nov 09, 2011 at 08:17:05PM +0100, Paul Bolle wrote:
+> 0) Commit 2d06d8c49afdcc9bb35a85039fa50f0fe35bd40e ("[CPUFREQ] use
+> dynamic debug instead of custom infrastructure") dropped config
+> CPU_FREQ_DEBUG. But currently there are still two references to
+> CONFIG_CPU_FREQ_DEBUG (both in arch/arm).
 
->
-> ? ? ? ?if (up) {
-> ? ? ? ? ? ? ? ?iounmap(up->port.membase);
-> --
-> 1.7.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks for noting this. These two instances can and should be updated
+accordingly.
+
+> 1) I've stared a bit at the (trivial) code still relying on
+> CONFIG_CPU_FREQ_DEBUG but wasn't sure how it could be rewritten. Perhaps
+> one of you does know how to do that.
+
+Well, as we now use dynamic debug, we can use the generic debug calls used
+througout the kernel ( pr_debug(...) ), and do not need to wrap the debug
+message in an #ifdef . That's the whole story, actually. Russell, do you
+want to take this through the ARM tree?
+
+Best,
+	Dominik
+
+---
+cpufreq: get rid of remaining references to CONFIG_CPU_FREQ_DEBUG
+
+As noted by Paul Bolle <pebolle@tiscali.nl>, there are still two references
+to CONFIG_CPU_FREQ_DEBUG which can and should be removed.
+
+Signed-off-by: Dominik Brodowski <linux@dominikbrodowski.net>
+
+diff --git a/arch/arm/configs/ezx_defconfig b/arch/arm/configs/ezx_defconfig
+index d95763d..872d96e 100644
+--- a/arch/arm/configs/ezx_defconfig
++++ b/arch/arm/configs/ezx_defconfig
+@@ -28,7 +28,6 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="console=tty1 root=/dev/mmcblk0p2 rootfstype=ext2 rootdelay=3 ip=192.168.0.202:192.168.0.200:192.168.0.200:255.255.255.0 debug"
+ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+-CONFIG_CPU_FREQ_DEBUG=y
+ CONFIG_CPU_FREQ_GOV_POWERSAVE=m
+ CONFIG_CPU_FREQ_GOV_USERSPACE=m
+ CONFIG_CPU_FREQ_GOV_ONDEMAND=m
+diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
+index bb5ce39..55b827f 100644
+--- a/arch/arm/mach-tegra/cpu-tegra.c
++++ b/arch/arm/mach-tegra/cpu-tegra.c
+@@ -97,10 +97,8 @@ static int tegra_update_cpu_speed(unsigned long rate)
+ 	for_each_online_cpu(freqs.cpu)
+ 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+ 
+-#ifdef CONFIG_CPU_FREQ_DEBUG
+-	printk(KERN_DEBUG "cpufreq-tegra: transition: %u --> %u\n",
++	pr_debug("cpufreq-tegra: transition: %u --> %u\n",
+ 	       freqs.old, freqs.new);
+-#endif
+ 
+ 	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
+ 	if (ret) {
