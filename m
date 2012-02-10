@@ -1,42 +1,34 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Fri, 10 Feb 2012 12:25:38 +1100
-Subject: hex number case in dts files.
-In-Reply-To: <20120210002950.GA18408@codeaurora.org>
-References: <20120209180411.GA5654@codeaurora.org> <4F340E71.7070004@gmail.com>
- <20120210001921.GA10536@truffala.fritz.box>
- <20120210002950.GA18408@codeaurora.org>
-Message-ID: <20120210012538.GC10536@truffala.fritz.box>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 Feb 2012 17:52:25 -0800
+Subject: [PATCH] ARM: OMAP2xxx: PM: fix OMAP2xxx-specific UART idle bug
+ in v3.3
+In-Reply-To: <alpine.DEB.2.00.1202091822170.5059@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1202091822170.5059@utopia.booyaka.com>
+Message-ID: <20120210015225.GO1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2012 at 04:29:50PM -0800, David Brown wrote:
-> On Fri, Feb 10, 2012 at 11:19:21AM +1100, David Gibson wrote:
-> > On Thu, Feb 09, 2012 at 12:20:33PM -0600, Rob Herring wrote:
-> > > On 02/09/2012 12:04 PM, David Brown wrote:
-> > > > I've noticed an inconsistency in the case of letters in hex constants
-> > > > in various dts files.  The ones that are actually numbers probably
-> > > > don't really matter, the but the node names are case sensitive
-> > > > strings, and in some sense do matter.
-> > > > 
-> > > > I ask because some people I've spoken with internally seem to have
-> > > > strong opinions about what case hex constants should be, and it'd be
-> > > > nice to be able to have some guideline about this.  Historically, I've
-> > > > always seen DT hex values in lowercase.
-> > > > 
-> > > 
-> > > Lower case should be used for dts files.
-> > 
-> > Yes, the node names should always have the hex done in lower case.  I
-> > have plans to put more checks in for how reg is encoded into node
-> > names, but just need to get time.
+* Paul Walmsley <paul@pwsan.com> [120209 16:52]:
 > 
-> What about number of digits?  Should a register at 0x42 be
-> node at 00000042 or node at 42?  Again, I'm seeing both.
+> [ This patch is targeted for v3.3-rc ]
+> 
+> On OMAP2420-based systems, the PM code ignores the state of the UART
+> functional clocks when determining what idle state to enter.  This
+> breaks the serial port now that the UART driver's clock behavior can
+> be controlled via the PM autosuspend timeout.
+> 
+> To fix, remove the special-case idle handling for the UARTs in the
+> OMAP2420/2430 PM idle code added by commit
+> 4af4016c53f52b26461b8030211f8427a58fa5ed ("OMAP3: PM: UART: disable
+> clocks when idle and off-mode support").
+> 
+> Tested on Nokia N800.  This patch is a collaboration between Tony
+> Lindgren <tony@atomide.com> and Paul Walmsley <paul@pwsan.com>.
 
-node at 42
+Glad to see this piece of code finally gone with runtime PM :)
 
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+Applying into fixes.
+
+Regards,
+
+Tony
