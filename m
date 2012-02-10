@@ -1,33 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Feb 2012 23:34:29 +0000
-Subject: [GIT PULL] Samsung EXYNOS pm domains for devel
-In-Reply-To: <201202102305.45710.rjw@sisk.pl>
-References: <010a01cce7e2$438f6d40$caae47c0$%kim@samsung.com>
- <201202102305.45710.rjw@sisk.pl>
-Message-ID: <201202102334.29545.arnd@arndb.de>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 11 Feb 2012 07:36:50 +0800
+Subject: [PATCH v3 1/2] mxs-dma : move the mxs dma.h to a more common place
+In-Reply-To: <20120210162134.GA2723@r65073-Latitude-D630>
+References: <1328612075-5825-1-git-send-email-b32955@freescale.com>
+ <1328612075-5825-2-git-send-email-b32955@freescale.com>
+ <20120210162134.GA2723@r65073-Latitude-D630>
+Message-ID: <CAMiH66EP6UFDYkguzfSFgysDzVREPZ8P1x29TkYvQ+Cuvz-4hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 February 2012, Rafael J. Wysocki wrote:
-> On Friday, February 10, 2012, Kukjin Kim wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Please pull samsung exynos pm domains.
-> > 
-> > It has been merged into linux-pm tree by Rafael and I think it should be
-> > pulled into arm-soc.
-> 
-> No, this doesn't work like this.  A single patchset is not expected to be
-> present in two different trees at a time.
+hi,
 
-We've been doing this for a number of other branches and I see nothing wrong
-with this approach as long as we can rely on both trees not to rebase the
-patches so the commit IDs remain stable.
+On Sat, Feb 11, 2012 at 12:21 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, Feb 07, 2012 at 06:54:34PM +0800, Huang Shijie wrote:
+>> Move the header to a more common place.
+>> The mxs dma engine is not only used in mx23/mx28, but also used
+>> in mx50/mx6q. ?It will also be used in the future chips.
+>>
+>> Rename it to mxs-dma.h
+>>
+>> change mxs-dma driver, mxs-mmc driver, gpmi-nand driver, mxs-saif driver
+>> to the new header file.
+>>
+>> Signed-off-by: Huang Shijie <b32955@freescale.com>
+>> ---
+>> ?drivers/dma/mxs-dma.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?drivers/mmc/host/mxs-mmc.c ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
+>> ?drivers/mtd/nand/gpmi-nand/gpmi-nand.h ? ? ? ? ? ? | ? ?2 +-
+>> ?.../include/mach/dma.h => include/linux/mxs-dma.h ?| ? ?0
+>> ?sound/soc/mxs/mxs-pcm.c ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?sound/soc/mxs/mxs-pcm.h ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+>> ?sound/soc/mxs/mxs-saif.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
+>> ?7 files changed, 6 insertions(+), 6 deletions(-)
+>> ?rename arch/arm/mach-mxs/include/mach/dma.h => include/linux/mxs-dma.h (100%)
+>
+> I suggested you rename it include/linux/fsl/mxs-dma.h [1]. ?It seems
+> you are ignoring the comment. ?Can you explain why it's not a
+> reasonable suggestion?
 
-Rafael, do you want to keep the option of rebasing the patches that you
-got from Kukjin? If your workflow requires that, I can't take them, but
-if you can guarantee that the branch you have pulled them into is stable,
-I would prefer to pull it into a branch of arm-soc so that we can have
-other branches based on that where needed to avoid conflicts.
+For gpmi-nand.h is placed in include/linux/mtd/ directory, so i think
+it's better to place the mxs-dma.h
+to similar include/linux/dma/ directory, but the directory does not exit.
 
-	Arnd
+If i place it at include/linux/fsl/mxs-dma.h , i have to create a new
+folder, I am not sure i have the right
+to do so. But i can try it in the next version.
+
+thanks a lot.
+
+
+
+>
+> And Wolfram and Mark told you that you need to Cc subsystem maintainers
+> to collect their acks [2]. ?But you are still not Ccing Mark Brown and
+> Chris Ball for sound/soc/ and drivers/mmc changes. ?So you are not
+> listening.
+
+ok, i will CC them in next version.  I?really did not know to whom I?should cc .
+
+BR
+Huang Shijie
+
+>
+> Regards,
+> Shawn
+>
+> [1] http://article.gmane.org/gmane.linux.kernel.mmc/12301
+> [2] http://article.gmane.org/gmane.linux.alsa.devel/93751
