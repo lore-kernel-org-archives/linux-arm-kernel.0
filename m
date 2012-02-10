@@ -1,29 +1,44 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Fri, 10 Feb 2012 08:46:40 +0200
-Subject: [PATCH] ep93xx: fix build of vision_ep93xx.c
-In-Reply-To: <201202080953.44853.hartleys@visionengravers.com>
-References: <201202080953.44853.hartleys@visionengravers.com>
-Message-ID: <20120210064640.GA3847@mwesterb-mobl.ger.corp.intel.com>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Fri, 10 Feb 2012 08:58:48 +0100
+Subject: mfd: mc13xxx adc fixes and enhancements
+In-Reply-To: <20120130080714.GK6305@pengutronix.de>
+References: <1327876408-22528-1-git-send-email-marc@cpdesign.com.au>
+ <20120130080714.GK6305@pengutronix.de>
+Message-ID: <4F34CE38.5040502@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 09:53:44AM -0700, H Hartley Sweeten wrote:
-> Fix build breakage due to the following commits:
-> 
-> Commit bd5f12a24766c1f299def0a78b008d4746f528f2
-> ? ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics
-> 
-> Commit 257af9f9725aa8a863b306659208a031135d59e7
-> ? ARM: 7041/1: gpio-ep93xx: hookup the to_irq callback in the driver
-> 
-> The vision_ep9307 machine uses the ep93xx build-in gpios and needs to
-> include <mach/gpio-ep93xx.h> to pickup the defines.
-> 
-> The gpio_to_irq() call is now a callback to the gpio-ep93xx.c driver
-> and cannot be used as a constant initializer for the .irq member of
-> struct i2c_board_info.
-> 
-> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-> Acked-by: Ryan Mallon <rmallon@gmail.com>
+On 01/30/2012 09:07 AM, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Mon, Jan 30, 2012 at 09:33:22AM +1100, Marc Reilly wrote:
+>> This series provides some small fixes to the mc13xxx adc conversion funtion to
+>> make it more robust. Readout of single channel conversions is fixed so that the
+>> read out order corresponds to the sampling order (Critical for dedicated
+>> battery reading).
+>>
+>> A new conversion function is introduced which allows the caller to enable the
+>> dedicated readings and other adc functionality by providing a mask/ value pair
+>> for the adc0,1 registers.
+>>
+>> These patches apply onto my 'add I2C support' series [1].
+>> (I think only the first patch is required)
+> I wonder if Robin van der Gracht (added to Cc:) can say something to
+> this series as he seems to have used the adc recently.
+>
+> @Robin: tell me if I should bounce you the series.
+>
+> Best regards
+> Uwe
+>
+Uwe,
+I would like to recieve the new series,
 
-Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
+Regards,
+
+-- 
+Robin van der Gracht
+Protonic Holland.
+tel.: +31 (0) 229 212928
+fax.: +31 (0) 229 210930
+Factorij 36 / 1689 AL Zwaag
