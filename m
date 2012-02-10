@@ -1,57 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Feb 2012 14:53:41 -0800
-Subject: [PATCH] omap: board-omap3evm: add required smsc911x regulators
-In-Reply-To: <20120210185033.GC40045@h115-84.vpn.ti.com>
-References: <1328738812-26755-1-git-send-email-mporter@ti.com>
- <20120210174046.GQ1426@atomide.com>
- <20120210185033.GC40045@h115-84.vpn.ti.com>
-Message-ID: <20120210225340.GB21865@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Feb 2012 23:34:29 +0000
+Subject: [GIT PULL] Samsung EXYNOS pm domains for devel
+In-Reply-To: <201202102305.45710.rjw@sisk.pl>
+References: <010a01cce7e2$438f6d40$caae47c0$%kim@samsung.com>
+ <201202102305.45710.rjw@sisk.pl>
+Message-ID: <201202102334.29545.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@ti.com> [120210 10:19]:
-> On Fri, Feb 10, 2012 at 09:40:47AM -0800, Tony Lindgren wrote:
-> > * Matt Porter <matt@ohporter.com> [120208 13:35]:
-> > > This fixes smsc911x support on omap3evm that has been broken since
-> > > the smsc911x driver was updated to require the existence of vdd33a
-> > > and vddvario supplies.
+On Friday 10 February 2012, Rafael J. Wysocki wrote:
+> On Friday, February 10, 2012, Kukjin Kim wrote:
+> > Hi Arnd, Olof,
 > > 
-> > Great. Few comments:
+> > Please pull samsung exynos pm domains.
 > > 
-> > 1. Could you please include the smsc911x commit and subject here too
-> >    so it clearly shows the regression?
+> > It has been merged into linux-pm tree by Rafael and I think it should be
+> > pulled into arm-soc.
 > 
-> Sure. Will do for v2.
-> 
-> > 2. Also, why don't you add this fixed regulator to gpmc-smsc911.c?
-> > 
-> > That way it gets fixed for other too, like zoom2/3.
-> 
-> Ok, so I considered that at first and had two concerns that made me just
-> do it in the omap3evm specific way and see what the feedback was.
-> 
-> 1) If we do a generic implementation in gpmc-smsc911x.c, there needs to
-> be a way to override it. Another board may have a variable supply that
-> feeds this consumer.
-> 
-> 2) Technically, this omap3evm specific implementation matches the hardware
-> in that the osk_3v3 rail is software controllable. Granted, I commented
-> that we simply don't hook up the gpio at this time since this real
-> hardware regulator has always been silently asserted on by the nature of
-> the reset state of the TWL GPIOs and the board level pull downs as well.
+> No, this doesn't work like this.  A single patchset is not expected to be
+> present in two different trees at a time.
 
-OK
- 
-> So that said, I don't need #2 to make omap3evm work and I don't think
-> anybody cares yet to actually turn that regulator off (as it will kill
-> other things that appear to not have regulator support anyway). It looks
-> like you talked me into respinning it as a generic implementation. Only
-> question is whether I should bother consider not-yet-existing boards that
-> may not want that generic regulator.
+We've been doing this for a number of other branches and I see nothing wrong
+with this approach as long as we can rely on both trees not to rebase the
+patches so the commit IDs remain stable.
 
-Well for future boards the regulator should come from device tree,
-so for now it should be safe to add it to gpmc-smsc911.c.
+Rafael, do you want to keep the option of rebasing the patches that you
+got from Kukjin? If your workflow requires that, I can't take them, but
+if you can guarantee that the branch you have pulled them into is stable,
+I would prefer to pull it into a branch of arm-soc so that we can have
+other branches based on that where needed to avoid conflicts.
 
-Regards,
-
-Tony
+	Arnd
