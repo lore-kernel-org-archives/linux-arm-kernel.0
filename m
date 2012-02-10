@@ -1,19 +1,82 @@
-From: segher@kernel.crashing.org (Segher Boessenkool)
-Date: Fri, 10 Feb 2012 18:25:09 +0100
-Subject: hex number case in dts files.
-In-Reply-To: <20120210002950.GA18408@codeaurora.org>
-References: <20120209180411.GA5654@codeaurora.org>
- <4F340E71.7070004@gmail.com> <20120210001921.GA10536@truffala.fritz.box>
- <20120210002950.GA18408@codeaurora.org>
-Message-ID: <7100D251-EE4E-4575-A1BD-96652638755B@kernel.crashing.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 10 Feb 2012 18:32:16 +0100
+Subject: [PATCHv21 01/16] mm: page_alloc: remove trailing whitespace
+In-Reply-To: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
+References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1328895151-5196-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> What about number of digits?  Should a register at 0x42 be
-> node at 00000042 or node at 42?  Again, I'm seeing both.
+From: Michal Nazarewicz <mina86@mina86.com>
 
-It depends on the binding of the parent node.  Most use no
-leading zeroes except when representing 0 itself.
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Mel Gorman <mel@csn.ul.ie>
+---
+ mm/page_alloc.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
 
-
-Segher
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index d2186ec..7fe7697 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -513,10 +513,10 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
+  * free pages of length of (1 << order) and marked with _mapcount -2. Page's
+  * order is recorded in page_private(page) field.
+  * So when we are allocating or freeing one, we can derive the state of the
+- * other.  That is, if we allocate a small block, and both were   
+- * free, the remainder of the region must be split into blocks.   
++ * other.  That is, if we allocate a small block, and both were
++ * free, the remainder of the region must be split into blocks.
+  * If a block is freed, and its buddy is also free, then this
+- * triggers coalescing into a block of larger size.            
++ * triggers coalescing into a block of larger size.
+  *
+  * -- wli
+  */
+@@ -1061,17 +1061,17 @@ retry_reserve:
+ 	return page;
+ }
+ 
+-/* 
++/*
+  * Obtain a specified number of elements from the buddy allocator, all under
+  * a single hold of the lock, for efficiency.  Add them to the supplied list.
+  * Returns the number of new pages which were placed@*list.
+  */
+-static int rmqueue_bulk(struct zone *zone, unsigned int order, 
++static int rmqueue_bulk(struct zone *zone, unsigned int order,
+ 			unsigned long count, struct list_head *list,
+ 			int migratetype, int cold)
+ {
+ 	int i;
+-	
++
+ 	spin_lock(&zone->lock);
+ 	for (i = 0; i < count; ++i) {
+ 		struct page *page = __rmqueue(zone, order, migratetype);
+@@ -4258,7 +4258,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
+ 	init_waitqueue_head(&pgdat->kswapd_wait);
+ 	pgdat->kswapd_max_order = 0;
+ 	pgdat_page_cgroup_init(pgdat);
+-	
++
+ 	for (j = 0; j < MAX_NR_ZONES; j++) {
+ 		struct zone *zone = pgdat->node_zones + j;
+ 		unsigned long size, realsize, memmap_pages;
+@@ -5081,11 +5081,11 @@ int __meminit init_per_zone_wmark_min(void)
+ module_init(init_per_zone_wmark_min)
+ 
+ /*
+- * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so 
++ * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so
+  *	that we can call two helper functions whenever min_free_kbytes
+  *	changes.
+  */
+-int min_free_kbytes_sysctl_handler(ctl_table *table, int write, 
++int min_free_kbytes_sysctl_handler(ctl_table *table, int write,
+ 	void __user *buffer, size_t *length, loff_t *ppos)
+ {
+ 	proc_dointvec(table, write, buffer, length, ppos);
+-- 
+1.7.1.569.g6f426
