@@ -1,23 +1,25 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 10 Feb 2012 11:43:58 -0800
-Subject: [PATCH 0/6] ux500: Export SoC information and some platform
- clean-up
-In-Reply-To: <1328556146-3730-1-git-send-email-lee.jones@linaro.org>
-References: <1328556146-3730-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20120210194358.GA5537@kroah.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 10 Feb 2012 11:55:20 -0800
+Subject: [PATCH v9 00/25] gpio/omap: driver cleanup and fixes
+In-Reply-To: <20120210192416.GW1426@atomide.com> (Tony Lindgren's message of
+ "Fri, 10 Feb 2012 11:24:16 -0800")
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <20120210192416.GW1426@atomide.com>
+Message-ID: <87ty2yxy3b.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2012 at 11:22:20AM -0800, Lee Jones wrote:
-> This patch-set satisfies 4 objectives:
->  1. Ensures each platform device can specify a suitable parent
->  2. Provides a bus for SoC devices as a means to export information
->  3. Allows ux500 to make use of the new SoC bus
->  4. Cleans up unnecessary complexity from ux500 code
+Tony Lindgren <tony@atomide.com> writes:
 
-I've applied the driver-core bits, nice job in sticking with this.  I'll
-let the other bits trickle through the arch-specific trees.
+[...]
 
-thanks,
+> ..but are there also some patches in your series that should also be
+> applied separately as fixes for the -rc cycle?
 
-greg k-h
+IMO, there aren't any things in this series that fall into the
+regression category.
+
+After I get to a final review and test of this (early next week), I'm
+planning to sent a pull request to Grant.
+
+Kevin
