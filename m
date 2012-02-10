@@ -1,34 +1,55 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 10 Feb 2012 12:05:11 +0200
-Subject: [PATCH 2/7] regulator: twl-regulator: Add fixed LDO for V1V8,
- V2V1 supply
+Date: Fri, 10 Feb 2012 12:05:12 +0200
+Subject: [PATCH 3/7] MFD: twl-core: regulator configuration for twl6030 V1V8,
+ V2V1 SMPS
 In-Reply-To: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1328868316-24749-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1328868316-24749-4-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V1V8 supply most common use is to provide VIO for the system.
-V2V1 supply is used on SDP4430/PandaBoards to provide 2.1V to
-twl6040, and also as an input to VCXIO_IN, VDAC_IN of twl6030.
+To be able to attach consumers to these supplies from board
+files we need to have regulator_init_data for them.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/regulator/twl-regulator.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/mfd/twl-core.c  |   10 ++++++++++
+ include/linux/i2c/twl.h |    2 ++
+ 2 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/regulator/twl-regulator.c b/drivers/regulator/twl-regulator.c
-index 181a2cf..e4d8d3c 100644
---- a/drivers/regulator/twl-regulator.c
-+++ b/drivers/regulator/twl-regulator.c
-@@ -1005,6 +1005,8 @@ static struct twlreg_info twl_regs[] = {
- 	TWL6030_ADJUSTABLE_LDO(VMMC, 0x68, 1000, 3300),
- 	TWL6030_ADJUSTABLE_LDO(VPP, 0x6c, 1000, 3300),
- 	TWL6030_ADJUSTABLE_LDO(VUSIM, 0x74, 1000, 3300),
-+	TWL6030_FIXED_LDO(V1V8, 0x16, 1800, 0),
-+	TWL6030_FIXED_LDO(V2V1, 0x1c, 2100, 0),
- 	TWL6030_FIXED_LDO(VANA, 0x50, 2100, 0),
- 	TWL6030_FIXED_LDO(VCXIO, 0x60, 1800, 0),
- 	TWL6030_FIXED_LDO(VDAC, 0x64, 1800, 0),
+diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+index ac6fdd93..0cb7511 100644
+--- a/drivers/mfd/twl-core.c
++++ b/drivers/mfd/twl-core.c
+@@ -937,6 +937,16 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
+ 	/* twl6030 regulators */
+ 	if (twl_has_regulator() && twl_class_is_6030() &&
+ 			!(features & TWL6025_SUBCLASS)) {
++		child = add_regulator(TWL6030_REG_V1V8, pdata->v1v8,
++					features);
++		if (IS_ERR(child))
++			return PTR_ERR(child);
++
++		child = add_regulator(TWL6030_REG_V2V1, pdata->v2v1,
++					features);
++		if (IS_ERR(child))
++			return PTR_ERR(child);
++
+ 		child = add_regulator(TWL6030_REG_VMMC, pdata->vmmc,
+ 					features);
+ 		if (IS_ERR(child))
+diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+index 3826a53..35b6d53 100644
+--- a/include/linux/i2c/twl.h
++++ b/include/linux/i2c/twl.h
+@@ -721,6 +721,8 @@ struct twl4030_platform_data {
+ 	struct regulator_init_data              *vcxio;
+ 	struct regulator_init_data              *vusb;
+ 	struct regulator_init_data		*clk32kg;
++	struct regulator_init_data              *v1v8;
++	struct regulator_init_data              *v2v1;
+ 	/* TWL6025 LDO regulators */
+ 	struct regulator_init_data		*ldo1;
+ 	struct regulator_init_data		*ldo2;
 -- 
 1.7.8.4
