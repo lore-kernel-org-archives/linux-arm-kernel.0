@@ -1,42 +1,99 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 Feb 2012 20:58:47 +0900
-Subject: [GIT PULL] regarding PL330 driver for rmk or arm-soc,
- and	slave-dma
-In-Reply-To: <20120210110800.GU889@n2100.arm.linux.org.uk>
-References: <010601cce7e1$5850a600$08f1f200$%kim@samsung.com>
- <20120210110800.GU889@n2100.arm.linux.org.uk>
-Message-ID: <012b01cce7eb$58baf500$0a30df00$%kim@samsung.com>
+From: hs1218.kang@samsung.com (Huisung Kang)
+Date: Fri, 10 Feb 2012 21:11:45 +0900
+Subject: [PATCH] ARM: SAMSUNG: Change clock gating method feature of pwm
+Message-ID: <016e01cce7ed$28972040$79c560c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Fri, Feb 10, 2012 at 07:47:12PM +0900, Kukjin Kim wrote:
-> >  arch/arm/common/Kconfig                        |    3 -
-> >  arch/arm/common/Makefile                       |    1 -
-> >  arch/arm/common/pl330.c                        | 1959
------------------------
-> -
-> >  arch/arm/include/asm/hardware/pl330.h          |  338 +++--
-> 
-> I think I've already said this, but I'm going to say it again.
-> 
-> Code in arch/arm/include/asm/hardware/pl330.h which is only used by
-> drivers/dma/pl330.c, needs to move to drivers/dma/pl330.h or into
-> drivers/dma/pl330.c itself.
-> 
-> Anything else left over which needs to be used by others can go into
-> include/linux/amba/pl330.h.
-> 
-OK, I agree. I will address comment from you, then submit it and re-send
-'pull request' in the beginning of next week.
 
-If any other problem, please kindly let me know.
+We don't need to enable the clock for pwm everytime after
+probing. So, this patch moves its clock enabling/disabling
+into the pwm_{enable,disable}().
 
-Thanks.
+Signed-off-by: Huisung Kang <hs1218.kang@samsung.com>
+---
+ arch/arm/plat-samsung/pwm.c |   36 +++++++++++++++++++++++++++---------
+ 1 files changed, 27 insertions(+), 9 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/plat-samsung/pwm.c b/arch/arm/plat-samsung/pwm.c
+index c559d84..3a604ca 100644
+--- a/arch/arm/plat-samsung/pwm.c
++++ b/arch/arm/plat-samsung/pwm.c
+@@ -110,13 +110,19 @@ int pwm_enable(struct pwm_device *pwm)
+ 
+ 	local_irq_save(flags);
+ 
+-	tcon = __raw_readl(S3C2410_TCON);
+-	tcon |= pwm_tcon_start(pwm);
+-	__raw_writel(tcon, S3C2410_TCON);
++	if (!pwm->running) {
++		clk_enable(pwm->clk);
++		clk_enable(pwm->clk_div);
++
++		tcon = __raw_readl(S3C2410_TCON);
++		tcon |= pwm_tcon_start(pwm);
++		__raw_writel(tcon, S3C2410_TCON);
++
++		pwm->running = 1;
++	}
+ 
+ 	local_irq_restore(flags);
+ 
+-	pwm->running = 1;
+ 	return 0;
+ }
+ 
+@@ -129,13 +135,17 @@ void pwm_disable(struct pwm_device *pwm)
+ 
+ 	local_irq_save(flags);
+ 
+-	tcon = __raw_readl(S3C2410_TCON);
+-	tcon &= ~pwm_tcon_start(pwm);
+-	__raw_writel(tcon, S3C2410_TCON);
++	if (pwm->running) {
++		tcon = __raw_readl(S3C2410_TCON);
++		tcon &= ~pwm_tcon_start(pwm);
++		__raw_writel(tcon, S3C2410_TCON);
+ 
+-	local_irq_restore(flags);
++		clk_disable(pwm->clk);
++		clk_disable(pwm->clk_div);
++		pwm->running = 0;
++	}
+ 
+-	pwm->running = 0;
++	local_irq_restore(flags);
+ }
+ 
+ EXPORT_SYMBOL(pwm_disable);
+@@ -185,6 +195,9 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 	/* The TCMP and TCNT can be read without a lock, they're not
+ 	 * shared between the timers. */
+ 
++	clk_enable(pwm->clk);
++	clk_enable(pwm->clk_div);
++
+ 	tcmp = __raw_readl(S3C2410_TCMPB(pwm->pwm_id));
+ 	tcnt = __raw_readl(S3C2410_TCNTB(pwm->pwm_id));
+ 
+@@ -242,6 +255,9 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 
+ 	local_irq_restore(flags);
+ 
++	clk_disable(pwm->clk);
++	clk_disable(pwm->clk_div);
++
+ 	return 0;
+ }
+ 
+@@ -310,6 +326,8 @@ static int s3c_pwm_probe(struct platform_device *pdev)
+ 
+ 	local_irq_restore(flags);
+ 
++	clk_disable(pwm->clk);
++	clk_disable(pwm->clk_div);
+ 
+ 	ret = pwm_register(pwm);
+ 	if (ret) {
+-- 
+1.7.1
