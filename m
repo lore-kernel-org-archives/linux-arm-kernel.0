@@ -1,81 +1,46 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 10 Feb 2012 21:07:33 +0530
-Subject: [PATCH 2/2] arm:omap: am33xx SRAM support (minimal)
-Message-ID: <1328888253-1389-1-git-send-email-afzal@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Feb 2012 08:21:35 -0800
+Subject: [PATCH v3 1/2] mxs-dma : move the mxs dma.h to a more common place
+In-Reply-To: <1328612075-5825-2-git-send-email-b32955@freescale.com>
+References: <1328612075-5825-1-git-send-email-b32955@freescale.com>
+ <1328612075-5825-2-git-send-email-b32955@freescale.com>
+Message-ID: <20120210162134.GA2723@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+On Tue, Feb 07, 2012 at 06:54:34PM +0800, Huang Shijie wrote:
+> Move the header to a more common place.
+> The mxs dma engine is not only used in mx23/mx28, but also used
+> in mx50/mx6q.  It will also be used in the future chips.
+> 
+> Rename it to mxs-dma.h
+> 
+> change mxs-dma driver, mxs-mmc driver, gpmi-nand driver, mxs-saif driver
+> to the new header file.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  drivers/dma/mxs-dma.c                              |    2 +-
+>  drivers/mmc/host/mxs-mmc.c                         |    2 +-
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |    2 +-
+>  .../include/mach/dma.h => include/linux/mxs-dma.h  |    0
+>  sound/soc/mxs/mxs-pcm.c                            |    2 +-
+>  sound/soc/mxs/mxs-pcm.h                            |    2 +-
+>  sound/soc/mxs/mxs-saif.c                           |    2 +-
+>  7 files changed, 6 insertions(+), 6 deletions(-)
+>  rename arch/arm/mach-mxs/include/mach/dma.h => include/linux/mxs-dma.h (100%)
 
-Update SRAM start & size for am33xx SoC's.
+I suggested you rename it include/linux/fsl/mxs-dma.h [1].  It seems
+you are ignoring the comment.  Can you explain why it's not a
+reasonable suggestion?
 
-Note: cpu_is_34xx() is true for am33xx also. Doing
-cpu_is_am33xx() check after cpu_is_34xx() will not
-achieve what we want due to the above reason.
-Hence cpu_is_am33xx() is done before cpu_is_34xx()
+And Wolfram and Mark told you that you need to Cc subsystem maintainers
+to collect their acks [2].  But you are still not Ccing Mark Brown and
+Chris Ball for sound/soc/ and drivers/mmc changes.  So you are not
+listening.
 
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/plat-omap/include/plat/sram.h |    1 +
- arch/arm/plat-omap/sram.c              |   14 ++++++++++++--
- 2 files changed, 13 insertions(+), 2 deletions(-)
+Regards,
+Shawn
 
-diff --git a/arch/arm/plat-omap/include/plat/sram.h b/arch/arm/plat-omap/include/plat/sram.h
-index 75aa1b2..227ae26 100644
---- a/arch/arm/plat-omap/include/plat/sram.h
-+++ b/arch/arm/plat-omap/include/plat/sram.h
-@@ -101,4 +101,5 @@ static inline void omap_push_sram_idle(void) {}
- #else
- #define OMAP4_SRAM_PA		0x40300000
- #endif
-+#define AM33XX_SRAM_PA		0x40300000
- #endif
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index 4243bdc..596f222 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -86,7 +86,7 @@ static int is_sram_locked(void)
- 			__raw_writel(0xCFDE, OMAP24XX_VA_READPERM0);  /* all i-read */
- 			__raw_writel(0xCFDE, OMAP24XX_VA_WRITEPERM0); /* all i-write */
- 		}
--		if (cpu_is_omap34xx()) {
-+		if (cpu_is_omap34xx() && !cpu_is_am33xx()) {
- 			__raw_writel(0xFFFF, OMAP34XX_VA_REQINFOPERM0); /* all q-vects */
- 			__raw_writel(0xFFFF, OMAP34XX_VA_READPERM0);  /* all i-read */
- 			__raw_writel(0xFFFF, OMAP34XX_VA_WRITEPERM0); /* all i-write */
-@@ -124,7 +124,10 @@ static void __init omap_detect_sram(void)
- 				omap_sram_size = 0x800; /* 2K */
- 			}
- 		} else {
--			if (cpu_is_omap34xx()) {
-+			if (cpu_is_am33xx()) {
-+				omap_sram_start = AM33XX_SRAM_PA;
-+				omap_sram_size = 0x10000; /* 64K */
-+			} else if (cpu_is_omap34xx()) {
- 				omap_sram_start = OMAP3_SRAM_PA;
- 				omap_sram_size = 0x10000; /* 64K */
- 			} else if (cpu_is_omap44xx()) {
-@@ -368,6 +371,11 @@ static inline int omap34xx_sram_init(void)
- 	return 0;
- }
- 
-+static inline int am33xx_sram_init(void)
-+{
-+	return 0;
-+}
-+
- int __init omap_sram_init(void)
- {
- 	omap_detect_sram();
-@@ -379,6 +387,8 @@ int __init omap_sram_init(void)
- 		omap242x_sram_init();
- 	else if (cpu_is_omap2430())
- 		omap243x_sram_init();
-+	else if (cpu_is_am33xx())
-+		am33xx_sram_init();
- 	else if (cpu_is_omap34xx())
- 		omap34xx_sram_init();
- 
--- 
-1.7.1
+[1] http://article.gmane.org/gmane.linux.kernel.mmc/12301
+[2] http://article.gmane.org/gmane.linux.alsa.devel/93751
