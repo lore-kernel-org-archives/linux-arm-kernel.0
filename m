@@ -1,83 +1,18 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 10 Feb 2012 19:15:10 -0800
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <20120209075106.GB18387@elte.hu>
-References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
- <20120208202314.GA28290@redhat.com> <1328736834.2903.33.camel@pasglop>
- <20120209075106.GB18387@elte.hu>
-Message-ID: <4F35DD3E.4020406@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Feb 2012 19:32:22 -0800
+Subject: [PATCH v6 11/15] ARM: SoC: convert imx6q to SoC descriptor
+In-Reply-To: <1328661059-24584-12-git-send-email-marc.zyngier@arm.com>
+References: <1328661059-24584-1-git-send-email-marc.zyngier@arm.com>
+ <1328661059-24584-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20120211033221.GA2198@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2012 11:51 PM, Ingo Molnar wrote:
->
-> * Benjamin Herrenschmidt<benh@kernel.crashing.org>  wrote:
->
->> On Wed, 2012-02-08 at 15:23 -0500, Dave Jones wrote:
->>> I think the biggest mistake we ever made with cpufreq was making it
->>> so configurable. If we redesign it, just say no to plugin governors,
->>> and
->>> yes to a lot fewer sysfs knobs.
->>>
->>> So, provide mechanism to kill off all the governors, and there's a
->>> migration path from what we have now to something that just works
->>> in a lot more cases, while remaining configurable enough for the
->>> corner-cases.
->>
->> On the other hand, the need for schedulable contxts may not
->> necessarily go away.
->
-> We will support it, but the *sane* hw solution is where
-> frequency transitions can be done atomically.
+On Wed, Feb 08, 2012 at 12:30:55AM +0000, Marc Zyngier wrote:
+> Convert the imx6q platform to use the SoC descriptor to provide
+> its SMP and CPU hotplug operations.
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I'm not sure atomicity has much to do with this. From what I can tell, 
-it's about the physical characteristics of the voltage source and the 
-load on said source.
-
-After a quick digging around for some info for one of our platforms 
-(ARM/MSM), it looks like it will take 200us to ramp up the power rail 
-from the voltage for the lowest CPU freq to voltage for the highest CPU 
-freq. And that's ignoring any communication delay. The 200us is purely 
-how long it takes for the PMIC output to settle given the power load 
-from the CPU. I would think other PMICs from different manufacturers 
-would be in the same ballpark.
-
-200us is a lot of time to add to a context switch or to busy wait on 
-when the processors today can run at GHz speeds.
-
-So, with what I know this doesn't look like a matter of broken HW unless 
-the PMIC I'm looking up data for is a really crappy one. I'm sure other 
-in the community know more about PMICs than I do and they can correct me 
-if the general PMIC voltage settling characteristic is much better than 
-the one I'm look at.
-
-> Most workloads
-> change their characteristics very quickly, and so does their
-> power management profile change.
->
-> The user-space driven policy model failed for that reason: it
-> was *way* too slow in reacting) - and slow hardware transitions
-> suck for a similar reason as well.
-
-I think we all agree on this.
-
-> We accomodate all hardware as well as we can, but we *design*
-> for proper hardware. So Peter is right, this should be done
-> properly.
-
-When you say accommodate all hardware, does it mean we will keep around 
-CPUfreq and allow attempts at improving it? Or we will completely move 
-to scheduler based CPU freq scaling, but won't try to force atomicity? 
-Say, may be queue up a notification to a CPU driver to scale up the 
-frequency as soon as it can?
-
-IMHO, I think the problem with CPUfreq and its dynamic governors today 
-is that they do a timer based sampling of the CPU load instead of 
-getting some hints from the scheduler when the scheduler knows that the 
-load average is quite high.
-
--Saravana
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
