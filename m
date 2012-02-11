@@ -1,39 +1,46 @@
 From: hs1218.kang@samsung.com (Huisung Kang)
-Date: Sat, 11 Feb 2012 11:53:31 +0900
-Subject: [PATCH] ARM: SAMSUNG: Add locking sequence for nomal mode
-Message-ID: <018201cce868$5693a060$03bae120$@samsung.com>
+Date: Sat, 11 Feb 2012 12:12:33 +0900
+Subject: [PATCH] serial: samsung: disable irq before calling free_irq
+Message-ID: <018301cce86a$ff609980$fe21cc80$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dongsoo Ha <dsfine.ha@samsung.com>
+From: Kisang Lee <kisang80.lee@samsung.com>
 
-ADC need to lock the data when read the data from register.
-It is a complicated timing issue. Lock the data before start ADC and keep it.
+Pending UART irq may trigger spurious handling and may lead to
+softlockup. This patch will fix following softlockup.
 
-Signed-off-by: Dongsoo Ha <dsfine.ha@samsung.com>
+Signed-off-by: Kisang Lee <kisang80.lee@samsung.com>
 Signed-off-by: Huisung Kang <hs1218.kang@samsung.com>
 ---
- arch/arm/plat-samsung/adc.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/tty/serial/samsung.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c index fccc644..c68d56f 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -224,11 +224,16 @@ int s3c_adc_read(struct s3c_adc_client *client, unsigned int ch)  {
- 	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(wake);
- 	int ret;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&adc_dev->lock, flags);
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index c55e5fb..9067299 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -425,15 +425,19 @@ static void s3c24xx_serial_shutdown(struct uart_port *port)
+ 	struct s3c24xx_uart_port *ourport = to_ourport(port);
  
- 	client->convert_cb = s3c_convert_done;
- 	client->wait = &wake;
- 	client->result = -1;
+ 	if (ourport->tx_claimed) {
+-		if (!s3c24xx_serial_has_interrupt_mask(port))
++		if (!s3c24xx_serial_has_interrupt_mask(port)) {
++			disable_irq(ourport->tx_irq);
+ 			free_irq(ourport->tx_irq, ourport);
++		}
+ 		tx_enabled(port) = 0;
+ 		ourport->tx_claimed = 0;
+ 	}
  
-+	spin_unlock_irqrestore(&adc_dev->lock, flags);
-+
- 	ret = s3c_adc_start(client, ch, 1);
- 	if (ret < 0)
- 		goto err;
---
+ 	if (ourport->rx_claimed) {
+-		if (!s3c24xx_serial_has_interrupt_mask(port))
++		if (!s3c24xx_serial_has_interrupt_mask(port)) {
++			disable_irq(ourport->rx_irq);
+ 			free_irq(ourport->rx_irq, ourport);
++		}
+ 		ourport->rx_claimed = 0;
+ 		rx_enabled(port) = 0;
+ 	}
+-- 
 1.7.1
