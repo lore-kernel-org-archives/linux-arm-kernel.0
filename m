@@ -1,33 +1,74 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 11 Feb 2012 18:18:22 +0100
-Subject: [PATCH 0/6] ARM: LPC32xx: Second patch set w/ fixes and completion
- for this arch
-Message-ID: <1328980708-11749-1-git-send-email-stigge@antcom.de>
+Date: Sat, 11 Feb 2012 18:18:24 +0100
+Subject: [PATCH 2/6] ARM: LPC32xx: Add output reading to GPO P3
+In-Reply-To: <1328980708-11749-1-git-send-email-stigge@antcom.de>
+References: <1328980708-11749-1-git-send-email-stigge@antcom.de>
+Message-ID: <1328980708-11749-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is another bundle of patches for LPC32xx, fixing bugs and completing
-support for drivers using the LPC32xx base port.
+The chip offers the function to detect the current state of output of the GPO
+P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
+sysfs
 
-It synchronizes changes from lpclinux.com to the mainline kernel and applies
-cleanly to 3.3-rc3.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-
-Roland Stigge (6):
-  ARM: LPC32xx: Fix gpio-lpc32xx.c: Pin masking missing
-  ARM: LPC32xx: Add output reading to GPO P3
-  ARM: LPC32xx: Fix irq on GPI_28
-  ARM: LPC32xx: Fix missing and bad LPC32XX macros
-  ARM: LPC32xx: Fix interrupt controller init
-  ARM: LPC32xx: irq.c: Clear latched event
-
- arch/arm/mach-lpc32xx/irq.c                             |   11 ++
- b/arch/arm/mach-lpc32xx/include/mach/irqs.h             |    2 
- b/arch/arm/mach-lpc32xx/irq.c                           |    4 
- b/drivers/gpio/gpio-lpc32xx.c                           |   72 ++++++++--------
- drivers/gpio/gpio-lpc32xx.c                             |   17 +++
- linux-2.6/arch/arm/mach-lpc32xx/include/mach/platform.h |   51 ++++++-----
- linux-2.6/arch/arm/mach-lpc32xx/irq.c                   |   10 +-
- linux-2.6/arch/arm/mach-lpc32xx/pm.c                    |    2 
- linux-2.6/arch/arm/mach-lpc32xx/timer.c                 |   46 +++++-----
- 9 files changed, 125 insertions(+), 90 deletions(-)
+diff --git a/drivers/gpio/gpio-lpc32xx.c b/drivers/gpio/gpio-lpc32xx.c
+index 21b65e5..9bd59cf 100644
+--- a/drivers/gpio/gpio-lpc32xx.c
++++ b/drivers/gpio/gpio-lpc32xx.c
+@@ -62,9 +62,11 @@
+ #define GPIO3_PIN_IN_SEL(x, y)		(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
+ #define GPIO3_PIN5_IN_SEL(x)		(((x) >> 24) & 1)
+ #define GPI3_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
++#define GPO3_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
+ 
+ struct gpio_regs {
+ 	void __iomem *inp_state;
++	void __iomem *outp_state;
+ 	void __iomem *outp_set;
+ 	void __iomem *outp_clr;
+ 	void __iomem *dir_set;
+@@ -145,6 +147,7 @@ static struct gpio_regs gpio_grp_regs_p2 = {
+ 
+ static struct gpio_regs gpio_grp_regs_p3 = {
+ 	.inp_state	= LPC32XX_GPIO_P3_INP_STATE,
++	.outp_state	= LPC32XX_GPIO_P3_OUTP_STATE,
+ 	.outp_set	= LPC32XX_GPIO_P3_OUTP_SET,
+ 	.outp_clr	= LPC32XX_GPIO_P3_OUTP_CLR,
+ 	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
+@@ -240,6 +243,12 @@ static int __get_gpi_state_p3(struct lpc32xx_gpio_chip *group,
+ 	return GPI3_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state), pin);
+ }
+ 
++static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
++	unsigned pin)
++{
++	return GPO3_PIN_IN_SEL(__raw_readl(group->gpio_grp->outp_state), pin);
++}
++
+ /*
+  * GENERIC_GPIO primitives.
+  */
+@@ -340,6 +349,13 @@ static void lpc32xx_gpo_set_value(struct gpio_chip *chip, unsigned pin,
+ 	__set_gpo_level_p3(group, pin, value);
+ }
+ 
++static int lpc32xx_gpo_get_value(struct gpio_chip *chip, unsigned pin)
++{
++	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
++
++	return __get_gpo_state_p3(group, pin);
++}
++
+ static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
+ {
+ 	if (pin < chip->ngpio)
+@@ -427,6 +443,7 @@ static struct lpc32xx_gpio_chip lpc32xx_gpiochip[] = {
+ 			.label			= "gpo_p3",
+ 			.direction_output	= lpc32xx_gpio_dir_out_always,
+ 			.set			= lpc32xx_gpo_set_value,
++			.get			= lpc32xx_gpo_get_value,
+ 			.request		= lpc32xx_gpio_request,
+ 			.base			= LPC32XX_GPO_P3_GRP,
+ 			.ngpio			= LPC32XX_GPO_P3_MAX,
