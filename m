@@ -1,37 +1,68 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 11 Feb 2012 18:18:28 +0100
-Subject: [PATCH 6/6] ARM: LPC32xx: irq.c: Clear latched event
-In-Reply-To: <1328980708-11749-1-git-send-email-stigge@antcom.de>
-References: <1328980708-11749-1-git-send-email-stigge@antcom.de>
-Message-ID: <1328980708-11749-7-git-send-email-stigge@antcom.de>
+From: dong.aisheng@linaro.org (Dong Aisheng)
+Date: Sat, 11 Feb 2012 09:22:09 -0800
+Subject: [PATCH V3 1/1] dt: add of_get_child_count helper function
+Message-ID: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the wakeup disable function by clearing latched events.
+Currently most code to get child count in kernel are almost same,
+add a helper to implement this function for dt to use.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
 
-Index: linux-2.6/arch/arm/mach-lpc32xx/irq.c
-===================================================================
---- linux-2.6.orig/arch/arm/mach-lpc32xx/irq.c	2012-02-11 15:13:33.000000000 +0100
-+++ linux-2.6/arch/arm/mach-lpc32xx/irq.c	2012-02-11 15:14:53.000000000 +0100
-@@ -309,9 +309,18 @@
+---
+Hi Rob,
+
+Since my imx pinctrl driver series still depends on the pinctrl core dt
+binding patch which is still not in mainline, i'd like this pure dt patch
+go separately first in case others want to use.
+
+changes v2->v3:
+ Addressed some people's comments:
+ * do not use assignment as expression
+ * return 0 for non-dt case
+
+Changes v1->v2:
+ * change the name from of_get_child_number to of_get_child_count
+---
+ include/linux/of.h |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index a75a831..ae242ef 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -195,6 +195,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
+ 	for (child = of_get_next_child(parent, NULL); child != NULL; \
+ 	     child = of_get_next_child(parent, child))
  
- 		if (state)
- 			eventreg |= lpc32xx_events[d->irq].mask;
--		else
-+		else {
- 			eventreg &= ~lpc32xx_events[d->irq].mask;
- 
-+			/*
-+			 * When disabling the wakeup, clear the latched
-+			 * event
-+			 */
-+			__raw_writel(lpc32xx_events[d->irq].mask,
-+				lpc32xx_events[d->irq].
-+				event_group->rawstat_reg);
-+		}
++static inline int of_get_child_count(const struct device_node *np)
++{
++	struct device_node *child = NULL;
++	int num = 0;
 +
- 		__raw_writel(eventreg,
- 			lpc32xx_events[d->irq].event_group->enab_reg);
++	while ((child = of_get_next_child(np, child)) != NULL)
++		num++;
++
++	return num;
++}
++
+ extern struct device_node *of_find_node_with_property(
+ 	struct device_node *from, const char *prop_name);
+ #define for_each_node_with_property(dn, prop_name) \
+@@ -268,6 +279,11 @@ static inline bool of_have_populated_dt(void)
+ #define for_each_child_of_node(parent, child) \
+ 	while (0)
  
++static inline int of_get_child_count(const struct device_node *np)
++{
++	return 0;
++}
++
+ static inline int of_device_is_compatible(const struct device_node *device,
+ 					  const char *name)
+ {
+-- 
+1.7.5.4
