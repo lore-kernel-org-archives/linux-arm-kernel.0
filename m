@@ -1,148 +1,69 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Fri, 10 Feb 2012 16:33:38 -0800
-Subject: [PATCH 2/2] pinctrl: Add simple pinmux driver using device tree
- data
-In-Reply-To: <20120210200503.GX1426@atomide.com>
-References: <20120203205049.4089.74610.stgit@kaulin.local>
- <20120203205508.4089.35304.stgit@kaulin.local>
- <20120204175903.GF1426@atomide.com>
- <CAA+hA=Tux3P0RyaB=vG7UeycTt8z4nX9dBicpjB7tQ+xzwoSDQ@mail.gmail.com>
- <20120210200503.GX1426@atomide.com>
-Message-ID: <CAA+hA=Qa_3vXvgNMRuDjw93Wb3fGNOM1EqmvYVQO5CN9w2FA3A@mail.gmail.com>
+From: hs1218.kang@samsung.com (Huisung Kang)
+Date: Sat, 11 Feb 2012 11:44:22 +0900
+Subject: [PATCH] ARM: S5P: Can handle edge interrupt handler
+In-Reply-To: <1683433.XtZk95zyY3@flatron>
+References: <017401cce7f4$4623f5a0$d26be0e0$@samsung.com>
+ <1683433.XtZk95zyY3@flatron>
+Message-ID: <017e01cce867$0f9859e0$2ec90da0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Fri, Feb 10, 2012 at 12:05:03PM -0800, Tony Lindgren wrote:
-> Hi Dong,
->
-> * Dong Aisheng <dongas86@gmail.com> [120207 17:22]:
-> > On 2/4/12, Tony Lindgren <tony@atomide.com> wrote:
+> From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-soc-owner at vger.kernel.org] On Behalf Of Tomasz
+> Figa
+> Sent: Saturday, February 11, 2012 5:02 AM
+> To: Huisung Kang
+> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org; kgene.kim at samsung.com;
+> keyyoung.park at samsung.com
+> Subject: Re: [PATCH] ARM: S5P: Can handle edge interrupt handler
+> 
+> I wonder if same thing wouldn't be also needed for s3c64xx.
+> 
+> Also please see my comments inline.
+> 
+> On Friday 10 of February 2012 22:02:42 Huisung Kang wrote:
+> > From: KeyYoung Park <keyyoung.park@samsung.com>
 > >
-> > The most difference may be the function enable due to hw difference.
-> > But i see that for DT case, it seems function and group creation may
-> > also be a problem.
->
-> What all do you see as a problem with group creation? Just the
-> naming?
-I said from different SoC's pointer of view.
-Not only naming, but also if group and function created in driver or dt file
-and their map parsing.
-
-> > > + sprintf(name, "%lx",
-> > > +         (unsigned long)smux->res->start + offset);
-> > > + pin->name = name;
-> > I'm wondering how about other people do not want the reg address to be PIN name?
-> > It's less meaningful.
->
-> How about try adding optional pinctrl-simple,pin-name entry that you
-> can add to each mux entry?
->
-Put it in pinctrl device node?
-Then how do we name each pin?
-And for IMX, currently we name all pins in driver.
-I still can not find a good reason that i should name all pins in dt file.
-Yes, we indeed have such a case.
-For IMX, some special pins mux still need a setting called 'select input' which
-is controlled in other registers.
-But a rough idea in my mind that may choose different way to fix this issue.
-It's a little like:
-pinctrl_usdhc4: pinconfig-usdhc4 {
-       mux =
-               <MX6Q_SD4_CMD  0 SELECT_INPUT>
-               <MX6Q_SD4_CLK  0 0>
-               <MX6Q_SD4_DAT0 1 0>
-               <MX6Q_SD4_DAT1 1 0>
-               <MX6Q_SD4_DAT2 1 SELECT_INPUT>
-               <MX6Q_SD4_DAT3 1 0>
-               <MX6Q_SD4_DAT4 1 0>
-               <MX6Q_SD4_DAT5 1 0>
-               <MX6Q_SD4_DAT6 1 0>
-               <MX6Q_SD4_DAT7 1 0>;
-}
-This format would not make the dts writer to take too much care of
-register address
-and value. For this case, the #pinmux-cells would be <3>;
-It is a little different from OMAP.
-
-For your proposal, I'm afraid it is a little too much depend on the SoC register
-layout. We need to find a flexible enough way to cover all possible
-register layout
-difference for all SoCs.
-(Considering one register controls multi muxs?)
-
-> Note that for more complex mapping you may want to add a hardware
-> specific .data entry that corresponds to the compatible flag, let's
-> say for conf range offset to mux range offset.
->
-> > > +         res = smux_rename_function(function, np->full_name);
-> > A little unclear for rename here.
-> > Can we find a better way?
->
-> You might want to play with parsing optional names from .dts file.
-> I don't need the names and they slow down the parsing. For the names,
-> we can show them with userspace tools using debugfs.
->
-> For reference, this is what I get under debugfs function entry
-> after the rename:
->
-> function: /ocp/serial at 0x48020000, groups = [ pinconfig-uart3 ]
->
-The name looks reasonable to me.
-
-> > > +static int __init smux_parse_one_pinctrl_entry(struct smux_device *smux,
-> > > +                                           struct device_node *np)
-> > > +{
-> > > +   int count = 0;
-> > > +
-> > > +   do {
->
-> ...
->
-> > > + } while (++count);
-> > This 'while' is for what? Define multi pinctrl properties?
->
-> Yes each client device might request multiple muxes, let's say
-> two pingroups from two different pinctrl driver instances.
->
-You mean like this?
-serial at 48020000 {
-      pinctrl = <&pmx_uart3_x>;
-      pinctrl = <&pmx_uart3_y>;
-};
-
-Did i misunderstand?
-I still can not understand why need this.
-The pinctrl properly in device node can support multi pinmuxs .
-serial at 48020000 {
-      pinctrl = <&pmx_uart3_x &pmx_uart3_y>;
-It's good to me that the consensus we reached at Linaro Connect is much like
-my proposal in above URL. :)
-
-> > > + val = of_get_property(pdev->dev.of_node,
-> > > +                         "pinctrl-simple,function-off", &len);
-> > > + if (!val || len != 4) {
-> > > +         dev_err(smux->dev, "function off mode not specified\n");
-> > > +         ret = -EINVAL;
-> > How about other SoCs not support function off mode?
->
-> Maybe disable should not do anything if function-off is not specified?
->
-IIRC currently pinctrl must need a disable function, if that, yes.
-However i think we may change it in the future that make .disable function
-optinal.
-
-> > > +free:
-> > > + devm_kfree(smux->dev, smux);
-> > > +
-> > For devm_* routines, do you still need this error checking?
-> > IIRC, the resource will be automatically released if probe failed.
->
-> I guess, are there some recommendations somewhere for that?
-I don't know where it is.
-I just checked the code before.
-You can see really_probe in drivers/base/dd.c.
-
-Regards
-Dong Aisheng
+> > While wake up, if external interrupt uses handle_level_irq as
+> > handle_irq (it actually uses edge type irq), That interrupt is missed.
+> > So, if external uses edge type irq, it should use handle_edge_irq.
+> >
+> > Signed-off-by: KeyYoung Park <keyyoung.park@samsung.com>
+> > Signed-off-by: Huisung Kang <hs1218.kang@samsung.com>
+> > ---
+> >  arch/arm/plat-s5p/irq-eint.c |    6 ++++++
+> >  1 files changed, 6 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-s5p/irq-eint.c
+> > b/arch/arm/plat-s5p/irq-eint.c index c496b35..6ed395e 100644
+> > --- a/arch/arm/plat-s5p/irq-eint.c
+> > +++ b/arch/arm/plat-s5p/irq-eint.c
+> > @@ -65,6 +65,7 @@ static int s5p_irq_eint_set_type(struct irq_data
+> > *data, unsigned int type) int shift;
+> >  	u32 ctrl, mask;
+> >  	u32 newvalue = 0;
+> > +	struct irq_desc *desc = irq_to_desc(data->irq);
+> >
+> >  	switch (type) {
+> >  	case IRQ_TYPE_EDGE_RISING:
+> > @@ -115,6 +116,11 @@ static int s5p_irq_eint_set_type(struct irq_data
+> > *data, unsigned int type) else
+> >  		printk(KERN_ERR "No such irq number %d", offs);
+> >
+> > +	if (type & IRQ_TYPE_EDGE_BOTH)
+> > +		desc->handle_irq = handle_edge_irq;
+> > +	else
+> > +		desc->handle_irq = handle_level_irq;
+> 
+> Maybe it would be better to use __irq_set_handler_locked here instead of touching irq_desc directly?
+Thanks for your review. I will send new patch.
+> 
+> > +
+> >  	return 0;
+> >  }
+> 
+> Regards,
+> Tom
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in the body of a message to
+> majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
