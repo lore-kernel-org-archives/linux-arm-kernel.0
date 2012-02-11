@@ -1,68 +1,49 @@
-From: dong.aisheng@linaro.org (Dong Aisheng)
-Date: Sat, 11 Feb 2012 09:22:09 -0800
-Subject: [PATCH V3 1/1] dt: add of_get_child_count helper function
-Message-ID: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 11 Feb 2012 09:24:51 -0800
+Subject: [PATCH] MAINTAINERS: Update ARM/FREESCALE IMX entry
+Message-ID: <1328981091-12296-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently most code to get child count in kernel are almost same,
-add a helper to implement this function for dt to use.
+With arch/arm/mach-mx5 merged into arch/arm/mach-imx, it may be
+reasonable to make the following two changes.
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
+* Remove 'arch/arm/mach-mx*/' from entry 'ARM/FREESCALE IMX entry',
+  since mach-mx5 has gone into mach-imx and mach-mxs already gets
+  another separate entry, which means mach-mx* only stands for mach-imx
+  anyway.
 
+* Remove entry 'ARM/FREESCALE IMX51' completely, since mach-mx5 has
+  gone and it seems that Amit Kucheria has lost the interest in
+  maintaining IMX51 for some time.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Amit Kucheria <amit.kucheria@canonical.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 ---
-Hi Rob,
+ MAINTAINERS |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
-Since my imx pinctrl driver series still depends on the pinctrl core dt
-binding patch which is still not in mainline, i'd like this pure dt patch
-go separately first in case others want to use.
-
-changes v2->v3:
- Addressed some people's comments:
- * do not use assignment as expression
- * return 0 for non-dt case
-
-Changes v1->v2:
- * change the name from of_get_child_number to of_get_child_count
----
- include/linux/of.h |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
-
-diff --git a/include/linux/of.h b/include/linux/of.h
-index a75a831..ae242ef 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -195,6 +195,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
- 	for (child = of_get_next_child(parent, NULL); child != NULL; \
- 	     child = of_get_next_child(parent, child))
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a1fce9a..f0946a9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -785,16 +785,9 @@ M:	Sascha Hauer <kernel@pengutronix.de>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ T:	git git://git.pengutronix.de/git/imx/linux-2.6.git
+-F:	arch/arm/mach-mx*/
+ F:	arch/arm/mach-imx/
+ F:	arch/arm/plat-mxc/
  
-+static inline int of_get_child_count(const struct device_node *np)
-+{
-+	struct device_node *child = NULL;
-+	int num = 0;
-+
-+	while ((child = of_get_next_child(np, child)) != NULL)
-+		num++;
-+
-+	return num;
-+}
-+
- extern struct device_node *of_find_node_with_property(
- 	struct device_node *from, const char *prop_name);
- #define for_each_node_with_property(dn, prop_name) \
-@@ -268,6 +279,11 @@ static inline bool of_have_populated_dt(void)
- #define for_each_child_of_node(parent, child) \
- 	while (0)
- 
-+static inline int of_get_child_count(const struct device_node *np)
-+{
-+	return 0;
-+}
-+
- static inline int of_device_is_compatible(const struct device_node *device,
- 					  const char *name)
- {
+-ARM/FREESCALE IMX51
+-M:	Amit Kucheria <amit.kucheria@canonical.com>
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Maintained
+-F:	arch/arm/mach-mx5/
+-
+ ARM/FREESCALE IMX6
+ M:	Shawn Guo <shawn.guo@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
 1.7.5.4
