@@ -1,32 +1,18 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sat, 11 Feb 2012 16:31:25 +0800
-Subject: [PATCH] arm: omap4: allow disabling MPU local timer if 32K timer is
- enabled
-Message-ID: <1328949085-4452-1-git-send-email-tom.leiming@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Feb 2012 10:03:51 +0000
+Subject: [PATCH] arm: omap4: allow disabling MPU local timer if 32K
+ timer is enabled
+In-Reply-To: <1328949085-4452-1-git-send-email-tom.leiming@gmail.com>
+References: <1328949085-4452-1-git-send-email-tom.leiming@gmail.com>
+Message-ID: <20120211100351.GB13587@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With 32K gp timer, tick can be driven and system can run well, so
-allow MPU local timer to be disabled if someone requires it, otherwise
-MPU local timer is always chosen as the default clock_event_device.
+On Sat, Feb 11, 2012 at 04:31:25PM +0800, Ming Lei wrote:
+> With 32K gp timer, tick can be driven and system can run well, so
+> allow MPU local timer to be disabled if someone requires it, otherwise
+> MPU local timer is always chosen as the default clock_event_device.
 
-Signed-off-by: Ming Lei <tom.leiming@gmail.com>
----
- arch/arm/mach-omap2/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+The point being?
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index d965da4..12cd602 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -46,7 +46,7 @@ config ARCH_OMAP4
- 	select CPU_V7
- 	select ARM_GIC
- 	select HAVE_SMP
--	select LOCAL_TIMERS if SMP
-+	select LOCAL_TIMERS if (SMP && !OMAP_32K_TIMER)
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
- 	select ARM_ERRATA_720789
--- 
-1.7.9
+What if you want to use NO_HZ?
