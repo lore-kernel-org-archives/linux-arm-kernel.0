@@ -1,46 +1,83 @@
-From: hs1218.kang@samsung.com (Huisung Kang)
-Date: Sat, 11 Feb 2012 12:12:33 +0900
-Subject: [PATCH] serial: samsung: disable irq before calling free_irq
-Message-ID: <018301cce86a$ff609980$fe21cc80$@samsung.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 10 Feb 2012 19:15:10 -0800
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <20120209075106.GB18387@elte.hu>
+References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
+ <20120208202314.GA28290@redhat.com> <1328736834.2903.33.camel@pasglop>
+ <20120209075106.GB18387@elte.hu>
+Message-ID: <4F35DD3E.4020406@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kisang Lee <kisang80.lee@samsung.com>
+On 02/08/2012 11:51 PM, Ingo Molnar wrote:
+>
+> * Benjamin Herrenschmidt<benh@kernel.crashing.org>  wrote:
+>
+>> On Wed, 2012-02-08 at 15:23 -0500, Dave Jones wrote:
+>>> I think the biggest mistake we ever made with cpufreq was making it
+>>> so configurable. If we redesign it, just say no to plugin governors,
+>>> and
+>>> yes to a lot fewer sysfs knobs.
+>>>
+>>> So, provide mechanism to kill off all the governors, and there's a
+>>> migration path from what we have now to something that just works
+>>> in a lot more cases, while remaining configurable enough for the
+>>> corner-cases.
+>>
+>> On the other hand, the need for schedulable contxts may not
+>> necessarily go away.
+>
+> We will support it, but the *sane* hw solution is where
+> frequency transitions can be done atomically.
 
-Pending UART irq may trigger spurious handling and may lead to
-softlockup. This patch will fix following softlockup.
+I'm not sure atomicity has much to do with this. From what I can tell, 
+it's about the physical characteristics of the voltage source and the 
+load on said source.
 
-Signed-off-by: Kisang Lee <kisang80.lee@samsung.com>
-Signed-off-by: Huisung Kang <hs1218.kang@samsung.com>
----
- drivers/tty/serial/samsung.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+After a quick digging around for some info for one of our platforms 
+(ARM/MSM), it looks like it will take 200us to ramp up the power rail 
+from the voltage for the lowest CPU freq to voltage for the highest CPU 
+freq. And that's ignoring any communication delay. The 200us is purely 
+how long it takes for the PMIC output to settle given the power load 
+from the CPU. I would think other PMICs from different manufacturers 
+would be in the same ballpark.
 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index c55e5fb..9067299 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -425,15 +425,19 @@ static void s3c24xx_serial_shutdown(struct uart_port *port)
- 	struct s3c24xx_uart_port *ourport = to_ourport(port);
- 
- 	if (ourport->tx_claimed) {
--		if (!s3c24xx_serial_has_interrupt_mask(port))
-+		if (!s3c24xx_serial_has_interrupt_mask(port)) {
-+			disable_irq(ourport->tx_irq);
- 			free_irq(ourport->tx_irq, ourport);
-+		}
- 		tx_enabled(port) = 0;
- 		ourport->tx_claimed = 0;
- 	}
- 
- 	if (ourport->rx_claimed) {
--		if (!s3c24xx_serial_has_interrupt_mask(port))
-+		if (!s3c24xx_serial_has_interrupt_mask(port)) {
-+			disable_irq(ourport->rx_irq);
- 			free_irq(ourport->rx_irq, ourport);
-+		}
- 		ourport->rx_claimed = 0;
- 		rx_enabled(port) = 0;
- 	}
+200us is a lot of time to add to a context switch or to busy wait on 
+when the processors today can run at GHz speeds.
+
+So, with what I know this doesn't look like a matter of broken HW unless 
+the PMIC I'm looking up data for is a really crappy one. I'm sure other 
+in the community know more about PMICs than I do and they can correct me 
+if the general PMIC voltage settling characteristic is much better than 
+the one I'm look at.
+
+> Most workloads
+> change their characteristics very quickly, and so does their
+> power management profile change.
+>
+> The user-space driven policy model failed for that reason: it
+> was *way* too slow in reacting) - and slow hardware transitions
+> suck for a similar reason as well.
+
+I think we all agree on this.
+
+> We accomodate all hardware as well as we can, but we *design*
+> for proper hardware. So Peter is right, this should be done
+> properly.
+
+When you say accommodate all hardware, does it mean we will keep around 
+CPUfreq and allow attempts at improving it? Or we will completely move 
+to scheduler based CPU freq scaling, but won't try to force atomicity? 
+Say, may be queue up a notification to a CPU driver to scale up the 
+frequency as soon as it can?
+
+IMHO, I think the problem with CPUfreq and its dynamic governors today 
+is that they do a timer based sampling of the CPU load instead of 
+getting some hints from the scheduler when the scheduler knows that the 
+load average is quite high.
+
+-Saravana
+
 -- 
-1.7.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
