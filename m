@@ -1,34 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Feb 2012 10:26:44 +0000
-Subject: [PATCH] arm: omap4: allow disabling MPU local timer if 32K
- timer is enabled
-In-Reply-To: <CACVXFVNJ=L_H_whTm6AyEc++B=Tw_Jfnzmn-QRYwbbBqiH7H1g@mail.gmail.com>
-References: <1328949085-4452-1-git-send-email-tom.leiming@gmail.com>
- <20120211100351.GB13587@n2100.arm.linux.org.uk>
- <CACVXFVNJ=L_H_whTm6AyEc++B=Tw_Jfnzmn-QRYwbbBqiH7H1g@mail.gmail.com>
-Message-ID: <20120211102644.GD13587@n2100.arm.linux.org.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sat, 11 Feb 2012 13:28:12 +0200
+Subject: [PATCH V3] MTD: atmel_nand: Update driver to support
+ Programmable HW ECC controller
+In-Reply-To: <1328491977-30448-1-git-send-email-hong.xu@atmel.com>
+References: <1328491977-30448-1-git-send-email-hong.xu@atmel.com>
+Message-ID: <1328959692.22240.103.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 11, 2012 at 06:19:41PM +0800, Ming Lei wrote:
-> On Sat, Feb 11, 2012 at 6:03 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sat, Feb 11, 2012 at 04:31:25PM +0800, Ming Lei wrote:
-> >> With 32K gp timer, tick can be driven and system can run well, so
-> >> allow MPU local timer to be disabled if someone requires it, otherwise
-> >> MPU local timer is always chosen as the default clock_event_device.
-> >
-> > The point being?
-> 
-> IMO, 32K gp timer may be more energy-saving than MPU local timer
-> because gp timer has much less clock frequency and only half interrupts
-> generated in tick mode compared with mpu local timer.
-> 
-> >
-> > What if you want to use NO_HZ?
-> 
-> 32K gp timer supports oneshot mode, so it should support NO_HZ.  In my test
-> .config, NO_HZ is enabled and system can run well.
+On Mon, 2012-02-06 at 09:32 +0800, Hong Xu wrote:
+> +static int16_t *pmecc_get_index_of(struct atmel_nand_host *host)
+> +{
+> +       int16_t *p = (int16_t *)host->rom_base;
 
-Have you actually checked the tick rate of your timer in /proc/interrupts?
-Have you checked /proc/timer_list to see what mode the system is in?
+I did not really get into details, but you annotate rom_base with
+__iomem, and then you have to cast it to int16_t in several - this does
+not look very nice.
+
+Could you please CC the arm list? There are much more people who can
+give this code a review.
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120211/275f8346/attachment.sig>
