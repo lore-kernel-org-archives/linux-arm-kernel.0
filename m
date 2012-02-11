@@ -1,99 +1,44 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 11 Feb 2012 18:18:23 +0100
-Subject: [PATCH 1/6] ARM: LPC32xx: Fix gpio-lpc32xx.c: Pin masking missing
+Date: Sat, 11 Feb 2012 18:18:25 +0100
+Subject: [PATCH 3/6] ARM: LPC32xx: Fix irq on GPI_28
 In-Reply-To: <1328980708-11749-1-git-send-email-stigge@antcom.de>
 References: <1328980708-11749-1-git-send-email-stigge@antcom.de>
-Message-ID: <1328980708-11749-2-git-send-email-stigge@antcom.de>
+Message-ID: <1328980708-11749-4-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing mask to pin bit selection in gpio-lpc32xx.c
-(#define GPIO3_PIN_IN_SEL)
-
-A table indentation change was necessary due to line length restrictions.
+The GPI_28 IRQ was not registered properly. The registration of
+IRQ_LPC32XX_GPI_28 was added and the (wrong) IRQ_LPC32XX_GPI_11 at
+LPC32XX_SIC1_IRQ(4) was replaced by IRQ_LPC32XX_GPI_28 (see manual of LPC32xx /
+interrupt controller).
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-diff --git a/drivers/gpio/gpio-lpc32xx.c b/drivers/gpio/gpio-lpc32xx.c
-index ddfacc5..21b65e5 100644
---- a/drivers/gpio/gpio-lpc32xx.c
-+++ b/drivers/gpio/gpio-lpc32xx.c
-@@ -26,42 +26,42 @@
- #include <mach/platform.h>
- #include <mach/gpio-lpc32xx.h>
- 
--#define LPC32XX_GPIO_P3_INP_STATE		_GPREG(0x000)
--#define LPC32XX_GPIO_P3_OUTP_SET		_GPREG(0x004)
--#define LPC32XX_GPIO_P3_OUTP_CLR		_GPREG(0x008)
--#define LPC32XX_GPIO_P3_OUTP_STATE		_GPREG(0x00C)
--#define LPC32XX_GPIO_P2_DIR_SET			_GPREG(0x010)
--#define LPC32XX_GPIO_P2_DIR_CLR			_GPREG(0x014)
--#define LPC32XX_GPIO_P2_DIR_STATE		_GPREG(0x018)
--#define LPC32XX_GPIO_P2_INP_STATE		_GPREG(0x01C)
--#define LPC32XX_GPIO_P2_OUTP_SET		_GPREG(0x020)
--#define LPC32XX_GPIO_P2_OUTP_CLR		_GPREG(0x024)
--#define LPC32XX_GPIO_P2_MUX_SET			_GPREG(0x028)
--#define LPC32XX_GPIO_P2_MUX_CLR			_GPREG(0x02C)
--#define LPC32XX_GPIO_P2_MUX_STATE		_GPREG(0x030)
--#define LPC32XX_GPIO_P0_INP_STATE		_GPREG(0x040)
--#define LPC32XX_GPIO_P0_OUTP_SET		_GPREG(0x044)
--#define LPC32XX_GPIO_P0_OUTP_CLR		_GPREG(0x048)
--#define LPC32XX_GPIO_P0_OUTP_STATE		_GPREG(0x04C)
--#define LPC32XX_GPIO_P0_DIR_SET			_GPREG(0x050)
--#define LPC32XX_GPIO_P0_DIR_CLR			_GPREG(0x054)
--#define LPC32XX_GPIO_P0_DIR_STATE		_GPREG(0x058)
--#define LPC32XX_GPIO_P1_INP_STATE		_GPREG(0x060)
--#define LPC32XX_GPIO_P1_OUTP_SET		_GPREG(0x064)
--#define LPC32XX_GPIO_P1_OUTP_CLR		_GPREG(0x068)
--#define LPC32XX_GPIO_P1_OUTP_STATE		_GPREG(0x06C)
--#define LPC32XX_GPIO_P1_DIR_SET			_GPREG(0x070)
--#define LPC32XX_GPIO_P1_DIR_CLR			_GPREG(0x074)
--#define LPC32XX_GPIO_P1_DIR_STATE		_GPREG(0x078)
--
--#define GPIO012_PIN_TO_BIT(x)			(1 << (x))
--#define GPIO3_PIN_TO_BIT(x)			(1 << ((x) + 25))
--#define GPO3_PIN_TO_BIT(x)			(1 << (x))
--#define GPIO012_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
--#define GPIO3_PIN_IN_SHIFT(x)			((x) == 5 ? 24 : 10 + (x))
--#define GPIO3_PIN_IN_SEL(x, y)			((x) >> GPIO3_PIN_IN_SHIFT(y))
--#define GPIO3_PIN5_IN_SEL(x)			(((x) >> 24) & 1)
--#define GPI3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
-+#define LPC32XX_GPIO_P3_INP_STATE	_GPREG(0x000)
-+#define LPC32XX_GPIO_P3_OUTP_SET	_GPREG(0x004)
-+#define LPC32XX_GPIO_P3_OUTP_CLR	_GPREG(0x008)
-+#define LPC32XX_GPIO_P3_OUTP_STATE	_GPREG(0x00C)
-+#define LPC32XX_GPIO_P2_DIR_SET		_GPREG(0x010)
-+#define LPC32XX_GPIO_P2_DIR_CLR		_GPREG(0x014)
-+#define LPC32XX_GPIO_P2_DIR_STATE	_GPREG(0x018)
-+#define LPC32XX_GPIO_P2_INP_STATE	_GPREG(0x01C)
-+#define LPC32XX_GPIO_P2_OUTP_SET	_GPREG(0x020)
-+#define LPC32XX_GPIO_P2_OUTP_CLR	_GPREG(0x024)
-+#define LPC32XX_GPIO_P2_MUX_SET		_GPREG(0x028)
-+#define LPC32XX_GPIO_P2_MUX_CLR		_GPREG(0x02C)
-+#define LPC32XX_GPIO_P2_MUX_STATE	_GPREG(0x030)
-+#define LPC32XX_GPIO_P0_INP_STATE	_GPREG(0x040)
-+#define LPC32XX_GPIO_P0_OUTP_SET	_GPREG(0x044)
-+#define LPC32XX_GPIO_P0_OUTP_CLR	_GPREG(0x048)
-+#define LPC32XX_GPIO_P0_OUTP_STATE	_GPREG(0x04C)
-+#define LPC32XX_GPIO_P0_DIR_SET		_GPREG(0x050)
-+#define LPC32XX_GPIO_P0_DIR_CLR		_GPREG(0x054)
-+#define LPC32XX_GPIO_P0_DIR_STATE	_GPREG(0x058)
-+#define LPC32XX_GPIO_P1_INP_STATE	_GPREG(0x060)
-+#define LPC32XX_GPIO_P1_OUTP_SET	_GPREG(0x064)
-+#define LPC32XX_GPIO_P1_OUTP_CLR	_GPREG(0x068)
-+#define LPC32XX_GPIO_P1_OUTP_STATE	_GPREG(0x06C)
-+#define LPC32XX_GPIO_P1_DIR_SET		_GPREG(0x070)
-+#define LPC32XX_GPIO_P1_DIR_CLR		_GPREG(0x074)
-+#define LPC32XX_GPIO_P1_DIR_STATE	_GPREG(0x078)
-+
-+#define GPIO012_PIN_TO_BIT(x)		(1 << (x))
-+#define GPIO3_PIN_TO_BIT(x)		(1 << ((x) + 25))
-+#define GPO3_PIN_TO_BIT(x)		(1 << (x))
-+#define GPIO012_PIN_IN_SEL(x, y)	(((x) >> (y)) & 1)
-+#define GPIO3_PIN_IN_SHIFT(x)		((x) == 5 ? 24 : 10 + (x))
-+#define GPIO3_PIN_IN_SEL(x, y)		(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
-+#define GPIO3_PIN5_IN_SEL(x)		(((x) >> 24) & 1)
-+#define GPI3_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
- 
- struct gpio_regs {
- 	void __iomem *inp_state;
+diff --git a/arch/arm/mach-lpc32xx/irq.c b/arch/arm/mach-lpc32xx/irq.c
+index 4eae566..cee5975 100644
+--- a/arch/arm/mach-lpc32xx/irq.c
++++ b/arch/arm/mach-lpc32xx/irq.c
+@@ -118,6 +121,10 @@ static const struct lpc32xx_event_info lpc32xx_events[NR_IRQS] = {
+ 		.event_group = &lpc32xx_event_pin_regs,
+ 		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_06_BIT,
+ 	},
++	[IRQ_LPC32XX_GPI_28] = {
++		.event_group = &lpc32xx_event_pin_regs,
++		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_28_BIT,
++	},
+ 	[IRQ_LPC32XX_GPIO_00] = {
+ 		.event_group = &lpc32xx_event_int_regs,
+ 		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_00_BIT,
+diff --git a/arch/arm/mach-lpc32xx/include/mach/irqs.h b/arch/arm/mach-lpc32xx/include/mach/irqs.h
+index 2667f52..9e3b90d 100644
+--- a/arch/arm/mach-lpc32xx/include/mach/irqs.h
++++ b/arch/arm/mach-lpc32xx/include/mach/irqs.h
+@@ -61,7 +61,7 @@
+  */
+ #define IRQ_LPC32XX_JTAG_COMM_TX	LPC32XX_SIC1_IRQ(1)
+ #define IRQ_LPC32XX_JTAG_COMM_RX	LPC32XX_SIC1_IRQ(2)
+-#define IRQ_LPC32XX_GPI_11		LPC32XX_SIC1_IRQ(4)
++#define IRQ_LPC32XX_GPI_28		LPC32XX_SIC1_IRQ(4)
+ #define IRQ_LPC32XX_TS_P		LPC32XX_SIC1_IRQ(6)
+ #define IRQ_LPC32XX_TS_IRQ		LPC32XX_SIC1_IRQ(7)
+ #define IRQ_LPC32XX_TS_AUX		LPC32XX_SIC1_IRQ(8)
