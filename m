@@ -1,28 +1,38 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sat, 11 Feb 2012 20:42:22 +0800
-Subject: [PATCH] arm: omap4: allow disabling MPU local timer if 32K timer
- is enabled
-In-Reply-To: <20120211102644.GD13587@n2100.arm.linux.org.uk>
-References: <1328949085-4452-1-git-send-email-tom.leiming@gmail.com>
- <20120211100351.GB13587@n2100.arm.linux.org.uk>
- <CACVXFVNJ=L_H_whTm6AyEc++B=Tw_Jfnzmn-QRYwbbBqiH7H1g@mail.gmail.com>
- <20120211102644.GD13587@n2100.arm.linux.org.uk>
-Message-ID: <CACVXFVPzbSodv35RT_+ykRgDN8hQrhdCfiTFqfspJwSgOiWv3w@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 11 Feb 2012 13:17:19 +0000
+Subject: [PATCH v4 2/2] Regulator: Add Anatop regulator driver
+In-Reply-To: <20120211063637.GC2198@r65073-Latitude-D630>
+References: <1324980994-18462-1-git-send-email-paul.liu@linaro.org>
+ <1328734286-30091-1-git-send-email-paul.liu@linaro.org>
+ <1328734286-30091-2-git-send-email-paul.liu@linaro.org>
+ <20120211063637.GC2198@r65073-Latitude-D630>
+Message-ID: <20120211131718.GA31887@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 11, 2012 at 6:26 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Have you actually checked the tick rate of your timer in /proc/interrupts?
-> Have you checked /proc/timer_list to see what mode the system is in?
+On Fri, Feb 10, 2012 at 10:36:38PM -0800, Shawn Guo wrote:
+> On Thu, Feb 09, 2012 at 04:51:26AM +0800, Ying-Chun Liu (PaulLiu) wrote:
 
-After checking, the system works at periodic mode, but I still don't know why
-it can't be in one shot mode.
+> > +	rval = of_get_property(np, "min-voltage", NULL);
+> > +	if (rval)
+> > +		sreg->rdata->min_voltage = be32_to_cpu(*rval);
+> > +	rval = of_get_property(np, "max-voltage", NULL);
+> > +	if (rval)
+> > +		sreg->rdata->max_voltage = be32_to_cpu(*rval);
 
-Seems a single clock_event_device can't work well at system with more than
-one CPU, so the patch doesn't make sense, please ignore it.
+> We need a sensible binding document to understand those.  But at least,
+> shouldn't min-voltage and max-voltage be retrieved as the common
+> regulator binding documented in
+> Documentation/devicetree/bindings/regulator/regulator.txt?
 
-
-thanks,
--- 
-Ming Lei
+Normally this would be a bad idea as the set of voltages that can safely
+be used on a given board might differ from those which are supported by
+the device.  However in this case you might be OK as this is all
+internal to the SoC and so presumably won't vary from board to board.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120211/f42da0ce/attachment.sig>
