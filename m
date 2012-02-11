@@ -1,47 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 Feb 2012 19:55:00 +0000
-Subject: [PATCH] serial: samsung: disable irq before calling free_irq
-In-Reply-To: <018301cce86a$ff609980$fe21cc80$@samsung.com>
-References: <018301cce86a$ff609980$fe21cc80$@samsung.com>
-Message-ID: <20120211195500.GW889@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 11 Feb 2012 20:07:08 +0000
+Subject: [PATCH v2 03/11] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
+In-Reply-To: <1328981685-8602-4-git-send-email-kgene.kim@samsung.com>
+References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
+ <1328981685-8602-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <201202112007.08672.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 11, 2012 at 12:12:33PM +0900, Huisung Kang wrote:
-> From: Kisang Lee <kisang80.lee@samsung.com>
+On Saturday 11 February 2012, Kukjin Kim wrote:
+> This patch adds clock-exynos5.c for EXYNOS5250 now
+> and that can be used for other EXYNOS5 SoCs later.
 > 
-> Pending UART irq may trigger spurious handling and may lead to
-> softlockup. This patch will fix following softlockup.
-> 
-> Signed-off-by: Kisang Lee <kisang80.lee@samsung.com>
-> Signed-off-by: Huisung Kang <hs1218.kang@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > ---
->  drivers/tty/serial/samsung.c |    8 ++++++--
->  1 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index c55e5fb..9067299 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -425,15 +425,19 @@ static void s3c24xx_serial_shutdown(struct uart_port *port)
->  	struct s3c24xx_uart_port *ourport = to_ourport(port);
->  
->  	if (ourport->tx_claimed) {
-> -		if (!s3c24xx_serial_has_interrupt_mask(port))
-> +		if (!s3c24xx_serial_has_interrupt_mask(port)) {
-> +			disable_irq(ourport->tx_irq);
->  			free_irq(ourport->tx_irq, ourport);
+>  arch/arm/mach-exynos/clock-exynos5.c           | 1252 ++++++++++++++++++++++++
+>  arch/arm/mach-exynos/include/mach/regs-clock.h |   62 ++
+>  arch/arm/plat-s5p/clock.c                      |   36 +
+>  arch/arm/plat-samsung/include/plat/s5p-clock.h |    6 +
+>  4 files changed, 1356 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos/clock-exynos5.c
 
-Either genirq is broken or something else is going on.  Whatever, this is
-not a valid bug fix.
+I discussed this patch with a few people at linaro connect, I wanted to
+make sure we have consensus before asking for a drastic change. What
+we ended up agreeing on is that it should use the common struct clk
+from Mike Turquette. You can choose whether you want to take those
+patches and base yours on top or whether you want to use a copy of
+that the new header file and then move exynos5 over once both series
+are in arm-soc.git.
 
-Why?  If you have a pending IRQ at free_irq() time, then you may also have
-a pending IRQ before disable_irq() time.  If the problem is that interrupt
-causes a soft lockup, you're not really solving the issue.
+Further, moving over exynos5 but not changing exynos4 will prevent
+you from building both into the same kernel. You will have to decide
+what the risk is in changing exynos4 at the same time. It would
+be great if we can have all exynos use the common struct clk in 3.4,
+but I'm also happy if we just get exynos5 to do it that way from the
+beginning and move exynos4 over in 3.5 after you have had a chance
+to make sure everything still works.
 
-Instead, if the problem is that free_irq() is removing the handler before
-it masks the IRQ, then that's where the problem lies, but I doubt it -
-the flow handlers are written such that if there isn't a handler in place,
-they mask the interrupt themselves.
-
-So, this needs much more explanation about the failure scenario.
+	Arnd
