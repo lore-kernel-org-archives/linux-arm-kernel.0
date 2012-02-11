@@ -1,39 +1,39 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 12 Feb 2012 02:57:00 +0900
-Subject: [GIT PULL] Samsung EXYNOS pm domains for devel
-In-Reply-To: <201202111650.41617.arnd@arndb.de>
-References: <010a01cce7e2$438f6d40$caae47c0$%kim@samsung.com>
- <201202102334.29545.arnd@arndb.de> <201202110042.39803.rjw@sisk.pl>
- <201202111650.41617.arnd@arndb.de>
-Message-ID: <4F36ABEC.6040409@samsung.com>
+Date: Sun, 12 Feb 2012 03:02:15 +0900
+Subject: [GIT PULL] samsung dt fixes-3 for v3.3
+Message-ID: <4F36AD27.5000503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/12 01:50, Arnd Bergmann wrote:
-> On Friday 10 February 2012, Rafael J. Wysocki wrote:
->>> Rafael, do you want to keep the option of rebasing the patches that you
->>> got from Kukjin?
->>
->> No, I'm not going to rebase them.
->
-> Ok, very good!
->
->>> If your workflow requires that, I can't take them, but
->>> if you can guarantee that the branch you have pulled them into is stable,
->>> I would prefer to pull it into a branch of arm-soc so that we can have
->>> other branches based on that where needed to avoid conflicts.
->>
->> OK, the relevant branch is linux-pm/pm-domains and it won't be rebased.
->> Please feel free to pull from it.
->
-> Thanks,
+Hi Arnd, Olof,
 
-Rafael, Arnd,
+Please pull samsung fixes-3 for v3.3.
+There are regarding exynos dt fixes.
 
-Thank you, too :)
+If any problems, please let me know.
+
+Thanks.
 
 Best regards,
 Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
+
+   Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+  v3.3-samsung-fixes-3
+
+Karol Lewandowski (1):
+       ARM: EXYNOS: Bring exynos4-dt up to date
+
+Thomas Abraham (1):
+       ARM: EXYNOS: Add cpu-offset property in gic device tree node
+
+  arch/arm/boot/dts/exynos4210.dtsi      |    1 +
+  arch/arm/mach-exynos/mach-exynos4-dt.c |    8 ++++++--
+  2 files changed, 7 insertions(+), 2 deletions(-)
