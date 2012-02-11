@@ -1,38 +1,78 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 11 Feb 2012 13:17:19 +0000
-Subject: [PATCH v4 2/2] Regulator: Add Anatop regulator driver
-In-Reply-To: <20120211063637.GC2198@r65073-Latitude-D630>
-References: <1324980994-18462-1-git-send-email-paul.liu@linaro.org>
- <1328734286-30091-1-git-send-email-paul.liu@linaro.org>
- <1328734286-30091-2-git-send-email-paul.liu@linaro.org>
- <20120211063637.GC2198@r65073-Latitude-D630>
-Message-ID: <20120211131718.GA31887@opensource.wolfsonmicro.com>
+Date: Sat, 11 Feb 2012 14:39:51 +0000
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <4F35DD3E.4020406@codeaurora.org>
+References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
+ <20120208202314.GA28290@redhat.com>
+ <1328736834.2903.33.camel@pasglop> <20120209075106.GB18387@elte.hu>
+ <4F35DD3E.4020406@codeaurora.org>
+Message-ID: <20120211143951.GA24564@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2012 at 10:36:38PM -0800, Shawn Guo wrote:
-> On Thu, Feb 09, 2012 at 04:51:26AM +0800, Ying-Chun Liu (PaulLiu) wrote:
+On Fri, Feb 10, 2012 at 07:15:10PM -0800, Saravana Kannan wrote:
+> On 02/08/2012 11:51 PM, Ingo Molnar wrote:
+> >* Benjamin Herrenschmidt<benh@kernel.crashing.org>  wrote:
 
-> > +	rval = of_get_property(np, "min-voltage", NULL);
-> > +	if (rval)
-> > +		sreg->rdata->min_voltage = be32_to_cpu(*rval);
-> > +	rval = of_get_property(np, "max-voltage", NULL);
-> > +	if (rval)
-> > +		sreg->rdata->max_voltage = be32_to_cpu(*rval);
+> >>On the other hand, the need for schedulable contxts may not
+> >>necessarily go away.
 
-> We need a sensible binding document to understand those.  But at least,
-> shouldn't min-voltage and max-voltage be retrieved as the common
-> regulator binding documented in
-> Documentation/devicetree/bindings/regulator/regulator.txt?
+> >We will support it, but the *sane* hw solution is where
+> >frequency transitions can be done atomically.
 
-Normally this would be a bad idea as the set of voltages that can safely
-be used on a given board might differ from those which are supported by
-the device.  However in this case you might be OK as this is all
-internal to the SoC and so presumably won't vary from board to board.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120211/f42da0ce/attachment.sig>
+> I'm not sure atomicity has much to do with this. From what I can
+> tell, it's about the physical characteristics of the voltage source
+> and the load on said source.
+
+> After a quick digging around for some info for one of our platforms
+> (ARM/MSM), it looks like it will take 200us to ramp up the power
+> rail from the voltage for the lowest CPU freq to voltage for the
+> highest CPU freq. And that's ignoring any communication delay. The
+> 200us is purely how long it takes for the PMIC output to settle
+> given the power load from the CPU. I would think other PMICs from
+> different manufacturers would be in the same ballpark.
+
+No matter how good the PMICs get the CPUs are also improving the speed
+with which they can do frequency changes so I expect this is always
+going to need consideration on at least some systems.
+
+> 200us is a lot of time to add to a context switch or to busy wait on
+> when the processors today can run at GHz speeds.
+
+Absolutely, and as you say this ignores communication overheads - often
+PMICs are connected via I2C which can only be communicated with in
+schedulable context and which takes substantially more than microseconds
+to interact with.  Usually in systems where scaling performance is
+important there will also be GPIOs to signal voltage changes but we
+can't rely on them being there and you can often do some useful stuff
+if you also interact via I2C.
+
+For step downs this isn't such a big deal as we don't often care if the
+voltage drops immediately but for step ups it's critical as if the
+voltage hasn't ramped before the CPU tries to run at the higher
+frequency the CPU will brown out.
+
+> >We accomodate all hardware as well as we can, but we *design*
+> >for proper hardware. So Peter is right, this should be done
+> >properly.
+
+> When you say accommodate all hardware, does it mean we will keep
+> around CPUfreq and allow attempts at improving it? Or we will
+> completely move to scheduler based CPU freq scaling, but won't try
+> to force atomicity? Say, may be queue up a notification to a CPU
+> driver to scale up the frequency as soon as it can?
+
+We could also make the system aware of the multiple steps in scaling so
+that it can do things like kick off voltage ramps and wait for them to
+complete before performing the frequency change, I'm sure there's room
+to do useful things there.  Possibly having the concept of expanding the
+range of currently available frequencies for example.
+
+> IMHO, I think the problem with CPUfreq and its dynamic governors
+> today is that they do a timer based sampling of the CPU load instead
+> of getting some hints from the scheduler when the scheduler knows
+> that the load average is quite high.
+
+Yes, this seems like a big issue - often the interval before the
+governors will react can end up being human visible which is
+unfortunate.
