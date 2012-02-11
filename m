@@ -1,33 +1,29 @@
 From: cjb@laptop.org (Chris Ball)
-Date: Sat, 11 Feb 2012 16:26:59 -0500
-Subject: [PATCH] mmc: atmel-mci: save and restore sdioirq when soft reset
- is performed
-In-Reply-To: <4F338C6F.9030802@atmel.com> (Nicolas Ferre's message of "Thu, 09
- Feb 2012 10:05:51 +0100")
-References: <1328721759-10124-1-git-send-email-ludovic.desroches@atmel.com>
- <1328784929-24174-1-git-send-email-ludovic.desroches@atmel.com>
- <4F338C6F.9030802@atmel.com>
-Message-ID: <m2ipjdkqn0.fsf@bob.laptop.org>
+Date: Sat, 11 Feb 2012 16:37:31 -0500
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
+ device tree support
+In-Reply-To: <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com> (Kukjin Kim's
+ message of "Thu, 09 Feb 2012 22:42:56 +0900")
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
+Message-ID: <m2aa4pkq5g.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Feb 09 2012, Nicolas Ferre wrote:
-> On 02/09/2012 11:55 AM, ludovic.desroches at atmel.com :
->> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->> 
->> Sometimes a software reset is needed. Then some registers are saved and
->> restored but the interrupt mask register is missing. It causes issues
->> with sdio devices whose interrupts are masked after reset.
->> 
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Thu, Feb 09 2012, Kukjin Kim wrote:
+> Looks ok to me and I'd like to pick this series in samsung tree with Chris'
+> ack.
 >
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Chris, is it ok? If you need to merge this in your tree, please let me know.
+> I will provide topic branch for it.
 >
-> Chris, can you please queue this patch in a "fixes" branch?
+> If any problems, please let me know.
 
-Thanks, pushed to mmc-next for 3.3.
+I don't have a very strong opinion, but I think it's probably better to
+go via the mmc tree since the patch is so large and hence the chance of
+conflict before merging is high.  Thanks,
 
 - Chris.
 -- 
