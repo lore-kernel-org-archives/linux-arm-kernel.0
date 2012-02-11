@@ -1,50 +1,72 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Sat, 11 Feb 2012 13:03:27 +0530
-Subject: [PATCH] OMAP: serial: Release the claimed memory region in remove
-Message-ID: <1328945607-4025-1-git-send-email-shubhrajyoti@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Feb 2012 23:39:36 -0800
+Subject: [PATCH v3 1/2] mxs-dma : move the mxs dma.h to a more common place
+In-Reply-To: <CAMiH66EP6UFDYkguzfSFgysDzVREPZ8P1x29TkYvQ+Cuvz-4hg@mail.gmail.com>
+References: <1328612075-5825-1-git-send-email-b32955@freescale.com>
+ <1328612075-5825-2-git-send-email-b32955@freescale.com>
+ <20120210162134.GA2723@r65073-Latitude-D630>
+ <CAMiH66EP6UFDYkguzfSFgysDzVREPZ8P1x29TkYvQ+Cuvz-4hg@mail.gmail.com>
+Message-ID: <20120211073934.GE2198@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the memory region is not released the folowing error is
-observed.
+On Sat, Feb 11, 2012 at 07:36:50AM +0800, Huang Shijie wrote:
+> hi,
+> 
+> On Sat, Feb 11, 2012 at 12:21 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Tue, Feb 07, 2012 at 06:54:34PM +0800, Huang Shijie wrote:
+> >> Move the header to a more common place.
+> >> The mxs dma engine is not only used in mx23/mx28, but also used
+> >> in mx50/mx6q. ?It will also be used in the future chips.
+> >>
+> >> Rename it to mxs-dma.h
+> >>
+> >> change mxs-dma driver, mxs-mmc driver, gpmi-nand driver, mxs-saif driver
+> >> to the new header file.
+> >>
+> >> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> >> ---
+> >> ?drivers/dma/mxs-dma.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> >> ?drivers/mmc/host/mxs-mmc.c ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
+> >> ?drivers/mtd/nand/gpmi-nand/gpmi-nand.h ? ? ? ? ? ? | ? ?2 +-
+> >> ?.../include/mach/dma.h => include/linux/mxs-dma.h ?| ? ?0
+> >> ?sound/soc/mxs/mxs-pcm.c ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> >> ?sound/soc/mxs/mxs-pcm.h ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> >> ?sound/soc/mxs/mxs-saif.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
+> >> ?7 files changed, 6 insertions(+), 6 deletions(-)
+> >> ?rename arch/arm/mach-mxs/include/mach/dma.h => include/linux/mxs-dma.h (100%)
+> >
+> > I suggested you rename it include/linux/fsl/mxs-dma.h [1]. ?It seems
+> > you are ignoring the comment. ?Can you explain why it's not a
+> > reasonable suggestion?
+> 
+> For gpmi-nand.h is placed in include/linux/mtd/ directory, so i think
+> it's better to place the mxs-dma.h
+> to similar include/linux/dma/ directory, but the directory does not exit.
+> 
+Yes, from subsystem point of view, it makes sense too.
 
-/testsuites # insmod omap-serial.ko
-[  130.746917] omap_uart omap_uart.0: memory region already claimed
-[  130.753143] omap_uart: probe of omap_uart.0 failed with error -16
-[  130.759338] omap_uart omap_uart.1: memory region already claimed
-[  130.765380] omap_uart: probe of omap_uart.1 failed with error -16
-[  130.771606] omap_uart omap_uart.2: memory region already claimed
-[  130.777679] omap_uart: probe of omap_uart.2 failed with error -16
-[  130.783905] omap_uart omap_uart.3: memory region already claimed
-[  130.789947] omap_uart: probe of omap_uart.3 failed with error -16
+> If i place it at include/linux/fsl/mxs-dma.h , i have to create a new
+> folder, I am not sure i have the right
+> to do so. But i can try it in the next version.
+> 
+So either way works for me.  But you need to create a folder anyway.
+So let's do it to test people.
 
-Fix it by releasing the memory region.
+> thanks a lot.
+> 
+> 
+> 
+> >
+> > And Wolfram and Mark told you that you need to Cc subsystem maintainers
+> > to collect their acks [2]. ?But you are still not Ccing Mark Brown and
+> > Chris Ball for sound/soc/ and drivers/mmc changes. ?So you are not
+> > listening.
+> 
+> ok, i will CC them in next version.  I?really did not know to whom I?should cc .
+> 
+The file MAINTAINERS is created for this purpose.
 
-Cc: Govindraj.R <govindraj.raja@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
-changes from the rfc version - 
-move the release after the unmap.
-
- drivers/tty/serial/omap-serial.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 8c6f137..16aa4f0 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1480,9 +1480,12 @@ do_release_region:
- static int serial_omap_remove(struct platform_device *dev)
- {
- 	struct uart_omap_port *up = platform_get_drvdata(dev);
-+	struct resource		*r;
- 
- 	if (up) {
- 		iounmap(up->port.membase);
-+		r = platform_get_resource(dev, IORESOURCE_MEM, 0);
-+		release_mem_region(r->start, resource_size(r));
- 		pm_runtime_disable(&up->pdev->dev);
- 		uart_remove_one_port(&serial_omap_reg, &up->port);
- 		pm_qos_remove_request(&up->pm_qos_request);
 -- 
-1.7.1
+Regards,
+Shawn
