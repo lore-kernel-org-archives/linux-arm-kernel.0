@@ -1,19 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 11 Feb 2012 07:46:53 -0800
-Subject: [PATCH resend v3] ARM: mxs: add GPMI-NAND support for imx23/imx28
-In-Reply-To: <1328504901-27683-1-git-send-email-b32955@freescale.com>
-References: <1328504901-27683-1-git-send-email-b32955@freescale.com>
-Message-ID: <20120211154651.GA23494@r65073-Latitude-D630>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 11 Feb 2012 16:50:41 +0000
+Subject: [GIT PULL] Samsung EXYNOS pm domains for devel
+In-Reply-To: <201202110042.39803.rjw@sisk.pl>
+References: <010a01cce7e2$438f6d40$caae47c0$%kim@samsung.com>
+ <201202102334.29545.arnd@arndb.de> <201202110042.39803.rjw@sisk.pl>
+Message-ID: <201202111650.41617.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2012 at 01:08:21PM +0800, Huang Shijie wrote:
-> add GPMI-NAND support for imx23 and imx28.
+On Friday 10 February 2012, Rafael J. Wysocki wrote:
+> > Rafael, do you want to keep the option of rebasing the patches that you
+> > got from Kukjin?
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> No, I'm not going to rebase them.
 
-Applied, thanks.
+Ok, very good!
 
--- 
-Regards,
-Shawn
+> > If your workflow requires that, I can't take them, but
+> > if you can guarantee that the branch you have pulled them into is stable,
+> > I would prefer to pull it into a branch of arm-soc so that we can have
+> > other branches based on that where needed to avoid conflicts.
+> 
+> OK, the relevant branch is linux-pm/pm-domains and it won't be rebased.
+> Please feel free to pull from it.
+
+Thanks,
+
+	Arnd
