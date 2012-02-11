@@ -1,35 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 10 Feb 2012 22:58:31 -0800
-Subject: [PATCH v2 4/4] ARM: remove empty disable_fiq and
- arch_ret_to_user macros
-In-Reply-To: <1328751219-2552-5-git-send-email-robherring2@gmail.com>
-References: <1328751219-2552-1-git-send-email-robherring2@gmail.com>
- <1328751219-2552-5-git-send-email-robherring2@gmail.com>
-Message-ID: <20120211065830.GD2198@r65073-Latitude-D630>
+From: hs1218.kang@samsung.com (Huisung Kang)
+Date: Sat, 11 Feb 2012 16:01:46 +0900
+Subject: [PATCH] ARM: SAMSUNG: Fixup prevent bug related to 'Unchecked return
+ value'
+Message-ID: <018e01cce88b$0501bd40$0f0537c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2012 at 07:33:39PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Now that most platforms don't need disable_fiq and arch_ret_to_user
-> macros, we can remove the empty macros or empty entry-macro.S files.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Jamie Iles <jamie@jamieiles.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Ryan Mallon <rmallon@gmail.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-...
->  arch/arm/mach-mxs/include/mach/entry-macro.S       |    6 ----
-...
->  arch/arm/plat-mxc/include/mach/entry-macro.S       |   16 -----------
-...
->  delete mode 100644 arch/arm/plat-mxc/include/mach/entry-macro.S
 
-Nice.
+[prevent bug]
+In s5p_pmu_init(): Value returned from a function is not checked for
+erros before being used.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Huisung Kang <hs1218.kang@samsung.com>
+---
+ arch/arm/plat-samsung/devs.c |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index 3e38dc4..3e6e1f2 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -1092,7 +1092,14 @@ struct platform_device s5p_device_pmu = {
+ 
+ static int __init s5p_pmu_init(void)
+ {
+-	platform_device_register(&s5p_device_pmu);
++	int ret;
++
++	ret = platform_device_register(&s5p_device_pmu);
++	if (ret) {
++		pr_warning("s5p_pmu_init: pmu device not registered.\n");
++		return ret;
++	}
++
+ 	return 0;
+ }
+ arch_initcall(s5p_pmu_init);
+-- 
+1.7.1
