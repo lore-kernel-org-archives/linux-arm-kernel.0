@@ -1,62 +1,35 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 12 Feb 2012 00:37:46 +0400
-Subject: [PATCH V3 1/1] dt: add of_get_child_count helper function
-In-Reply-To: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
-References: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
-Message-ID: <4F36D19A.8050409@mvista.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 11 Feb 2012 16:26:59 -0500
+Subject: [PATCH] mmc: atmel-mci: save and restore sdioirq when soft reset
+ is performed
+In-Reply-To: <4F338C6F.9030802@atmel.com> (Nicolas Ferre's message of "Thu, 09
+ Feb 2012 10:05:51 +0100")
+References: <1328721759-10124-1-git-send-email-ludovic.desroches@atmel.com>
+ <1328784929-24174-1-git-send-email-ludovic.desroches@atmel.com>
+ <4F338C6F.9030802@atmel.com>
+Message-ID: <m2ipjdkqn0.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi,
 
-On 11-02-2012 21:22, Dong Aisheng wrote:
-
-> Currently most code to get child count in kernel are almost same,
-> add a helper to implement this function for dt to use.
-
-> Signed-off-by: Dong Aisheng<dong.aisheng@linaro.org>
-> Cc: Grant Likely<grant.likely@secretlab.ca>
-> Cc: Rob Herring<rob.herring@calxeda.com>
-
-> ---
-> Hi Rob,
-
-> Since my imx pinctrl driver series still depends on the pinctrl core dt
-> binding patch which is still not in mainline, i'd like this pure dt patch
-> go separately first in case others want to use.
-
-> changes v2->v3:
->   Addressed some people's comments:
->   * do not use assignment as expression
->   * return 0 for non-dt case
-
-> Changes v1->v2:
->   * change the name from of_get_child_number to of_get_child_count
-> ---
->   include/linux/of.h |   16 ++++++++++++++++
->   1 files changed, 16 insertions(+), 0 deletions(-)
-
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index a75a831..ae242ef 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -195,6 +195,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
->   	for (child = of_get_next_child(parent, NULL); child != NULL; \
->   	     child = of_get_next_child(parent, child))
+On Thu, Feb 09 2012, Nicolas Ferre wrote:
+> On 02/09/2012 11:55 AM, ludovic.desroches at atmel.com :
+>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> 
+>> Sometimes a software reset is needed. Then some registers are saved and
+>> restored but the interrupt mask register is missing. It causes issues
+>> with sdio devices whose interrupts are masked after reset.
+>> 
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 >
-> +static inline int of_get_child_count(const struct device_node *np)
-> +{
-> +	struct device_node *child = NULL;
-> +	int num = 0;
-> +
-> +	while ((child = of_get_next_child(np, child)) != NULL)
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> Chris, can you please queue this patch in a "fixes" branch?
 
-    Doesn't scripts/checkpatch.pl complain here?
+Thanks, pushed to mmc-next for 3.3.
 
-> +		num++;
-> +
-> +	return num;
-> +}
-> +
-
-WBR, Sergei
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
