@@ -1,233 +1,148 @@
-From: dmitry.antipov@linaro.org (Dmitry Antipov)
-Date: Fri, 10 Feb 2012 16:02:05 -0800
-Subject: [PATCH] sched: generalize CONFIG_IRQ_TIME_ACCOUNTING for X86 and ARM
-Message-ID: <1328918525-7309-1-git-send-email-dmitry.antipov@linaro.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 10 Feb 2012 16:33:38 -0800
+Subject: [PATCH 2/2] pinctrl: Add simple pinmux driver using device tree
+ data
+In-Reply-To: <20120210200503.GX1426@atomide.com>
+References: <20120203205049.4089.74610.stgit@kaulin.local>
+ <20120203205508.4089.35304.stgit@kaulin.local>
+ <20120204175903.GF1426@atomide.com>
+ <CAA+hA=Tux3P0RyaB=vG7UeycTt8z4nX9dBicpjB7tQ+xzwoSDQ@mail.gmail.com>
+ <20120210200503.GX1426@atomide.com>
+Message-ID: <CAA+hA=Qa_3vXvgNMRuDjw93Wb3fGNOM1EqmvYVQO5CN9w2FA3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generalize CONFIG_IRQ_TIME_ACCOUNTING  between X86 and
-ARM, move "noirqtime=" option to common debugging code.
-For a bit of backward compatibility, X86-specific option
-"tsc=noirqtime" is preserved, but issues a warning.
+Hi Tony,
 
-Suggested-by: Yong Zhang <yong.zhang0@gmail.com>
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Venkatesh Pallipadi <venki@google.com>
-Signed-off-by: Dmitry Antipov <dmitry.antipov@linaro.org>
----
- Documentation/kernel-parameters.txt |    9 +++++----
- arch/arm/kernel/sched_clock.c       |    2 ++
- arch/x86/Kconfig                    |   11 -----------
- arch/x86/kernel/tsc.c               |   12 ++++++------
- include/linux/sched.h               |   17 ++++++++++-------
- kernel/sched/core.c                 |   20 +++++++++++---------
- lib/Kconfig.debug                   |   12 ++++++++++++
- 7 files changed, 46 insertions(+), 37 deletions(-)
+On Fri, Feb 10, 2012 at 12:05:03PM -0800, Tony Lindgren wrote:
+> Hi Dong,
+>
+> * Dong Aisheng <dongas86@gmail.com> [120207 17:22]:
+> > On 2/4/12, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > The most difference may be the function enable due to hw difference.
+> > But i see that for DT case, it seems function and group creation may
+> > also be a problem.
+>
+> What all do you see as a problem with group creation? Just the
+> naming?
+I said from different SoC's pointer of view.
+Not only naming, but also if group and function created in driver or dt file
+and their map parsing.
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 033d4e6..a5da255 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -1790,6 +1790,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 	noirqdebug	[X86-32] Disables the code which attempts to detect and
- 			disable unhandled interrupt sources.
- 
-+	noirqtime	[X86,ARM] Run time disables IRQ_TIME_ACCOUNTING and
-+			eliminates the timestamping on irq/softirq entry/exit.
-+
- 	no_timer_check	[X86,APIC] Disables the code which tests for
- 			broken timer IRQ sources.
- 
-@@ -2636,10 +2639,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			as the stability checks done at bootup.	Used to enable
- 			high-resolution timer mode on older hardware, and in
- 			virtualized environment.
--			[x86] noirqtime: Do not use TSC to do irq accounting.
--			Used to run time disable IRQ_TIME_ACCOUNTING on any
--			platforms where RDTSC is slow and this accounting
--			can add overhead.
-+			[x86] noirqtime: obsoleted by "noirqtime" generic option,
-+			see it's documentation for details.
- 
- 	turbografx.map[2|3]=	[HW,JOY]
- 			TurboGraFX parallel port interface
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 5416c7c..30b5f89 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -144,6 +144,8 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	 */
- 	cd.epoch_ns = 0;
- 
-+	enable_sched_clock_irqtime();
-+
- 	pr_debug("Registered %pF as sched_clock source\n", read);
- }
- 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 5bed94e..4759676 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -805,17 +805,6 @@ config SCHED_MC
- 	  making when dealing with multi-core CPU chips at a cost of slightly
- 	  increased overhead in some places. If unsure say N here.
- 
--config IRQ_TIME_ACCOUNTING
--	bool "Fine granularity task level IRQ time accounting"
--	default n
--	---help---
--	  Select this option to enable fine granularity task irq time
--	  accounting. This is done by reading a timestamp on each
--	  transitions between softirq and hardirq state, so there can be a
--	  small performance impact.
--
--	  If in doubt, say N here.
--
- source "kernel/Kconfig.preempt"
- 
- config X86_UP_APIC
-diff --git a/arch/x86/kernel/tsc.c b/arch/x86/kernel/tsc.c
-index a62c201..f1b2b63 100644
---- a/arch/x86/kernel/tsc.c
-+++ b/arch/x86/kernel/tsc.c
-@@ -103,14 +103,15 @@ int __init notsc_setup(char *str)
- 
- __setup("notsc", notsc_setup);
- 
--static int no_sched_irq_time;
--
- static int __init tsc_setup(char *str)
- {
- 	if (!strcmp(str, "reliable"))
- 		tsc_clocksource_reliable = 1;
--	if (!strncmp(str, "noirqtime", 9))
--		no_sched_irq_time = 1;
-+	if (!strncmp(str, "noirqtime", 9)) {
-+		printk(KERN_WARNING "tsc: tsc=noirqtime is "
-+		       "obsolete, use noirqtime instead\n");
-+		disable_sched_clock_irqtime();
-+	}
- 	return 1;
- }
- 
-@@ -978,8 +979,7 @@ void __init tsc_init(void)
- 	/* now allow native_sched_clock() to use rdtsc */
- 	tsc_disabled = 0;
- 
--	if (!no_sched_irq_time)
--		enable_sched_clock_irqtime();
-+	enable_sched_clock_irqtime();
- 
- 	lpj = ((u64)tsc_khz * 1000);
- 	do_div(lpj, HZ);
-diff --git a/include/linux/sched.h b/include/linux/sched.h
-index 7d379a6..9b13f79 100644
---- a/include/linux/sched.h
-+++ b/include/linux/sched.h
-@@ -1961,13 +1961,16 @@ extern void sched_clock_idle_wakeup_event(u64 delta_ns);
- #endif
- 
- #ifdef CONFIG_IRQ_TIME_ACCOUNTING
--/*
-- * An i/f to runtime opt-in for irq time accounting based off of sched_clock.
-- * The reason for this explicit opt-in is not to have perf penalty with
-- * slow sched_clocks.
-- */
--extern void enable_sched_clock_irqtime(void);
--extern void disable_sched_clock_irqtime(void);
-+extern int sched_clock_irqtime;
-+static inline void enable_sched_clock_irqtime(void)
-+{
-+	if (sched_clock_irqtime == -1)
-+		sched_clock_irqtime = 1;
-+}
-+static inline void disable_sched_clock_irqtime(void)
-+{
-+	sched_clock_irqtime = 0;
-+}
- #else
- static inline void enable_sched_clock_irqtime(void) {}
- static inline void disable_sched_clock_irqtime(void) {}
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 5255c9d..a7ec043 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -757,18 +757,20 @@ static DEFINE_PER_CPU(u64, cpu_hardirq_time);
- static DEFINE_PER_CPU(u64, cpu_softirq_time);
- 
- static DEFINE_PER_CPU(u64, irq_start_time);
--static int sched_clock_irqtime;
- 
--void enable_sched_clock_irqtime(void)
--{
--	sched_clock_irqtime = 1;
--}
-+/* -1 if not initialized, 0 if disabled with "noirqtime" kernel option
-+ * or after unstable clock was detected, 1 if enabled and active.
-+ */
-+int sched_clock_irqtime = -1;
- 
--void disable_sched_clock_irqtime(void)
-+static int __init irqtime_setup(char *str)
- {
- 	sched_clock_irqtime = 0;
-+	return 1;
- }
- 
-+__setup("noirqtime", irqtime_setup);
-+
- #ifndef CONFIG_64BIT
- static DEFINE_PER_CPU(seqcount_t, irq_time_seq);
- 
-@@ -822,7 +824,7 @@ void account_system_vtime(struct task_struct *curr)
- 	s64 delta;
- 	int cpu;
- 
--	if (!sched_clock_irqtime)
-+	if (sched_clock_irqtime < 1)
- 		return;
- 
- 	local_irq_save(flags);
-@@ -2853,7 +2855,7 @@ void account_process_tick(struct task_struct *p, int user_tick)
- 	cputime_t one_jiffy_scaled = cputime_to_scaled(cputime_one_jiffy);
- 	struct rq *rq = this_rq();
- 
--	if (sched_clock_irqtime) {
-+	if (sched_clock_irqtime > 0) {
- 		irqtime_account_process_tick(p, user_tick, rq);
- 		return;
- 	}
-@@ -2887,7 +2889,7 @@ void account_steal_ticks(unsigned long ticks)
- void account_idle_ticks(unsigned long ticks)
- {
- 
--	if (sched_clock_irqtime) {
-+	if (sched_clock_irqtime > 0) {
- 		irqtime_account_idle_ticks(ticks);
- 		return;
- 	}
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index 8745ac7..236e814 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -299,6 +299,18 @@ config SCHEDSTATS
- 	  application, you can say N to avoid the very slight overhead
- 	  this adds.
- 
-+config IRQ_TIME_ACCOUNTING
-+	bool "Fine granularity task level IRQ time accounting"
-+	depends on X86 || ARM
-+	default n
-+	---help---
-+	  Select this option to enable fine granularity task irq time
-+	  accounting. This is done by reading a timestamp on each
-+	  transitions between softirq and hardirq state, so there can be a
-+	  small performance impact.
-+
-+	  If in doubt, say N here.
-+
- config TIMER_STATS
- 	bool "Collect kernel timers statistics"
- 	depends on DEBUG_KERNEL && PROC_FS
--- 
-1.7.7.6
+> > > + sprintf(name, "%lx",
+> > > +         (unsigned long)smux->res->start + offset);
+> > > + pin->name = name;
+> > I'm wondering how about other people do not want the reg address to be PIN name?
+> > It's less meaningful.
+>
+> How about try adding optional pinctrl-simple,pin-name entry that you
+> can add to each mux entry?
+>
+Put it in pinctrl device node?
+Then how do we name each pin?
+And for IMX, currently we name all pins in driver.
+I still can not find a good reason that i should name all pins in dt file.
+Yes, we indeed have such a case.
+For IMX, some special pins mux still need a setting called 'select input' which
+is controlled in other registers.
+But a rough idea in my mind that may choose different way to fix this issue.
+It's a little like:
+pinctrl_usdhc4: pinconfig-usdhc4 {
+       mux =
+               <MX6Q_SD4_CMD  0 SELECT_INPUT>
+               <MX6Q_SD4_CLK  0 0>
+               <MX6Q_SD4_DAT0 1 0>
+               <MX6Q_SD4_DAT1 1 0>
+               <MX6Q_SD4_DAT2 1 SELECT_INPUT>
+               <MX6Q_SD4_DAT3 1 0>
+               <MX6Q_SD4_DAT4 1 0>
+               <MX6Q_SD4_DAT5 1 0>
+               <MX6Q_SD4_DAT6 1 0>
+               <MX6Q_SD4_DAT7 1 0>;
+}
+This format would not make the dts writer to take too much care of
+register address
+and value. For this case, the #pinmux-cells would be <3>;
+It is a little different from OMAP.
+
+For your proposal, I'm afraid it is a little too much depend on the SoC register
+layout. We need to find a flexible enough way to cover all possible
+register layout
+difference for all SoCs.
+(Considering one register controls multi muxs?)
+
+> Note that for more complex mapping you may want to add a hardware
+> specific .data entry that corresponds to the compatible flag, let's
+> say for conf range offset to mux range offset.
+>
+> > > +         res = smux_rename_function(function, np->full_name);
+> > A little unclear for rename here.
+> > Can we find a better way?
+>
+> You might want to play with parsing optional names from .dts file.
+> I don't need the names and they slow down the parsing. For the names,
+> we can show them with userspace tools using debugfs.
+>
+> For reference, this is what I get under debugfs function entry
+> after the rename:
+>
+> function: /ocp/serial at 0x48020000, groups = [ pinconfig-uart3 ]
+>
+The name looks reasonable to me.
+
+> > > +static int __init smux_parse_one_pinctrl_entry(struct smux_device *smux,
+> > > +                                           struct device_node *np)
+> > > +{
+> > > +   int count = 0;
+> > > +
+> > > +   do {
+>
+> ...
+>
+> > > + } while (++count);
+> > This 'while' is for what? Define multi pinctrl properties?
+>
+> Yes each client device might request multiple muxes, let's say
+> two pingroups from two different pinctrl driver instances.
+>
+You mean like this?
+serial at 48020000 {
+      pinctrl = <&pmx_uart3_x>;
+      pinctrl = <&pmx_uart3_y>;
+};
+
+Did i misunderstand?
+I still can not understand why need this.
+The pinctrl properly in device node can support multi pinmuxs .
+serial at 48020000 {
+      pinctrl = <&pmx_uart3_x &pmx_uart3_y>;
+It's good to me that the consensus we reached at Linaro Connect is much like
+my proposal in above URL. :)
+
+> > > + val = of_get_property(pdev->dev.of_node,
+> > > +                         "pinctrl-simple,function-off", &len);
+> > > + if (!val || len != 4) {
+> > > +         dev_err(smux->dev, "function off mode not specified\n");
+> > > +         ret = -EINVAL;
+> > How about other SoCs not support function off mode?
+>
+> Maybe disable should not do anything if function-off is not specified?
+>
+IIRC currently pinctrl must need a disable function, if that, yes.
+However i think we may change it in the future that make .disable function
+optinal.
+
+> > > +free:
+> > > + devm_kfree(smux->dev, smux);
+> > > +
+> > For devm_* routines, do you still need this error checking?
+> > IIRC, the resource will be automatically released if probe failed.
+>
+> I guess, are there some recommendations somewhere for that?
+I don't know where it is.
+I just checked the code before.
+You can see really_probe in drivers/base/dd.c.
+
+Regards
+Dong Aisheng
