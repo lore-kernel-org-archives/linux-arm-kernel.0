@@ -1,74 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 12 Feb 2012 14:22:04 -0600
-Subject: [PATCH V3 1/1] dt: add of_get_child_count helper function
-In-Reply-To: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
-References: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
-Message-ID: <4F381F6C.1030908@gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 13 Feb 2012 08:33:10 +1100
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <1328971983.11320.5.camel@laptop>
+References: <20120208013959.GA24535@panacea>
+ <1328670355.2482.68.camel@laptop> <20120208202314.GA28290@redhat.com>
+ <1328736834.2903.33.camel@pasglop> <20120209075106.GB18387@elte.hu>
+ <4F35DD3E.4020406@codeaurora.org>  <20120211143951.GA24564@sirena.org.uk>
+ <1328971983.11320.5.camel@laptop>
+Message-ID: <1329082390.3019.17.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2012 11:22 AM, Dong Aisheng wrote:
-> Currently most code to get child count in kernel are almost same,
-> add a helper to implement this function for dt to use.
+On Sat, 2012-02-11 at 15:53 +0100, Peter Zijlstra wrote:
+> On Sat, 2012-02-11 at 14:39 +0000, Mark Brown wrote:
+> > 
+> > For step downs this isn't such a big deal as we don't often care if the
+> > voltage drops immediately but for step ups it's critical as if the
+> > voltage hasn't ramped before the CPU tries to run at the higher
+> > frequency the CPU will brown out. 
 > 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
+> Why isn't all this done by micro-controllers, software writes a desired
+> state in some machine register (fast), micro-controller sets about
+> making it so in an asynchronous way. If it finds the settings have
+> changed by the time it reached its former goal, goto 1.
 > 
-> ---
-> Hi Rob,
-> 
-> Since my imx pinctrl driver series still depends on the pinctrl core dt
-> binding patch which is still not in mainline, i'd like this pure dt patch
-> go separately first in case others want to use.
-> 
+> Having to actually wait for this in software is quite ridiculous.
 
-Applied for 3.4.
+Not necessarily micro-controllers no. Or rather, it's generally done by
+uC (or system controllers) on desktop or server machines, but not on
+embedded (ie. phones) where arguably that's where it is the most
+important :-)
 
-Rob
+Now often (but not always) the trigger to initiate a change is indeed a
+simple register or register-based gpio, so that's fast. But you also
+often have to wait for a transition to be complete before initiating
+another one, or sychronize between voltage and frequency.
 
-> changes v2->v3:
->  Addressed some people's comments:
->  * do not use assignment as expression
->  * return 0 for non-dt case
-> 
-> Changes v1->v2:
->  * change the name from of_get_child_number to of_get_child_count
-> ---
->  include/linux/of.h |   16 ++++++++++++++++
->  1 files changed, 16 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index a75a831..ae242ef 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -195,6 +195,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
->  	for (child = of_get_next_child(parent, NULL); child != NULL; \
->  	     child = of_get_next_child(parent, child))
->  
-> +static inline int of_get_child_count(const struct device_node *np)
-> +{
-> +	struct device_node *child = NULL;
-> +	int num = 0;
-> +
-> +	while ((child = of_get_next_child(np, child)) != NULL)
-> +		num++;
-> +
-> +	return num;
-> +}
-> +
->  extern struct device_node *of_find_node_with_property(
->  	struct device_node *from, const char *prop_name);
->  #define for_each_node_with_property(dn, prop_name) \
-> @@ -268,6 +279,11 @@ static inline bool of_have_populated_dt(void)
->  #define for_each_child_of_node(parent, child) \
->  	while (0)
->  
-> +static inline int of_get_child_count(const struct device_node *np)
-> +{
-> +	return 0;
-> +}
-> +
->  static inline int of_device_is_compatible(const struct device_node *device,
->  					  const char *name)
->  {
+For example, if you are ramping up, you need to up the voltage first,
+then wait for it to reach the nominal value & stabilize, then ramp up
+the frequency. It's not that often automated.
+
+Then there's the case where to communicate with those chips, you have to
+go via a bus such as i2c which requires schedulable contexts.
+
+Cheers,
+Ben.
