@@ -1,74 +1,74 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 12 Feb 2012 12:12:54 -0700 (MST)
-Subject: OMAP34xx
-In-Reply-To: <20120212104132.GA17557@n2100.arm.linux.org.uk>
-References: <20120204185453.GB17309@n2100.arm.linux.org.uk>
- <20120212104132.GA17557@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1202121148210.30322@utopia.booyaka.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 12 Feb 2012 14:22:04 -0600
+Subject: [PATCH V3 1/1] dt: add of_get_child_count helper function
+In-Reply-To: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
+References: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
+Message-ID: <4F381F6C.1030908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Sun, 12 Feb 2012, Russell King - ARM Linux wrote:
-
-> The other allnoconfig issue is:
+On 02/11/2012 11:22 AM, Dong Aisheng wrote:
+> Currently most code to get child count in kernel are almost same,
+> add a helper to implement this function for dt to use.
 > 
-> arch/arm/mach-omap2/built-in.o:(.data+0xa3d0): undefined reference to `omap_i2c_reset'
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <rob.herring@calxeda.com>
 > 
-> which looks like hwmod can't cope with the I2C_OMAP being disabled.
+> ---
+> Hi Rob,
 > 
-> I don't propose these are fixed for v3.3, but they certainly should be
-> fixed for v3.4.
+> Since my imx pinctrl driver series still depends on the pinctrl core dt
+> binding patch which is still not in mainline, i'd like this pure dt patch
+> go separately first in case others want to use.
+> 
 
-Thanks for the report.  Here's a patch for this for 3.4.  Compile-tested 
-only; will boot-test it as part of the v2 of the 3.4 hwmod changes.
+Applied for 3.4.
 
+Rob
 
-- Paul
-
-From: Paul Walmsley <paul@pwsan.com>
-Date: Sun, 12 Feb 2012 11:49:34 -0700
-Subject: [PATCH] ARM: OMAP2+: I2C: always compile I2C reset code, even if I2C
- driver is not built
-
-During kernel init, we reset all IP blocks on the OMAP that we can,
-even if there is no driver compiled for that IP block.  Unlike most IP
-blocks, the I2C block requires some extra programming for this to
-work.  This reset code is incorrectly omitted when the I2C driver is
-deselected.  In this circumstance, the build breaks.  Fix by compiling
-the I2C reset code unconditionally.
-
-Problem reported by Russell King <linux@arm.linux.org.uk>.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/mach-omap2/Makefile |    5 +----
- 1 files changed, 1 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index fc9b238..0d5676c 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -4,7 +4,7 @@
- 
- # Common support
- obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
--	 common.o gpio.o dma.o wd_timer.o display.o
-+	 common.o gpio.o dma.o wd_timer.o display.o i2c.o
- 
- omap-2-3-common				= irq.o sdrc.o
- hwmod-common				= omap_hwmod.o \
-@@ -182,9 +182,6 @@ obj-$(CONFIG_OMAP_IOMMU)		+= iommu2.o
- iommu-$(CONFIG_OMAP_IOMMU)		:= omap-iommu.o
- obj-y					+= $(iommu-m) $(iommu-y)
- 
--i2c-omap-$(CONFIG_I2C_OMAP)		:= i2c.o
--obj-y					+= $(i2c-omap-m) $(i2c-omap-y)
--
- ifneq ($(CONFIG_TIDSPBRIDGE),)
- obj-y					+= dsp.o
- endif
--- 
-1.7.9
+> changes v2->v3:
+>  Addressed some people's comments:
+>  * do not use assignment as expression
+>  * return 0 for non-dt case
+> 
+> Changes v1->v2:
+>  * change the name from of_get_child_number to of_get_child_count
+> ---
+>  include/linux/of.h |   16 ++++++++++++++++
+>  1 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index a75a831..ae242ef 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -195,6 +195,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
+>  	for (child = of_get_next_child(parent, NULL); child != NULL; \
+>  	     child = of_get_next_child(parent, child))
+>  
+> +static inline int of_get_child_count(const struct device_node *np)
+> +{
+> +	struct device_node *child = NULL;
+> +	int num = 0;
+> +
+> +	while ((child = of_get_next_child(np, child)) != NULL)
+> +		num++;
+> +
+> +	return num;
+> +}
+> +
+>  extern struct device_node *of_find_node_with_property(
+>  	struct device_node *from, const char *prop_name);
+>  #define for_each_node_with_property(dn, prop_name) \
+> @@ -268,6 +279,11 @@ static inline bool of_have_populated_dt(void)
+>  #define for_each_child_of_node(parent, child) \
+>  	while (0)
+>  
+> +static inline int of_get_child_count(const struct device_node *np)
+> +{
+> +	return 0;
+> +}
+> +
+>  static inline int of_device_is_compatible(const struct device_node *device,
+>  					  const char *name)
+>  {
