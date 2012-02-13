@@ -1,40 +1,33 @@
-From: shiraz.linux.kernel@gmail.com (shiraz hashim)
-Date: Mon, 13 Feb 2012 16:29:50 +0530
-Subject: Question on ARM Cortex R4 support in Linux
-In-Reply-To: <20120213105313.GD4994@arm.com>
-References: <CAPub149OKvBUiKoOie9BmKYfopB7L0_J1fSx2Nh-aRXr99RPaQ@mail.gmail.com>
- <20120213105313.GD4994@arm.com>
-Message-ID: <CAPub1482HL66wX92Oc7Vu75QaweOEd3k2S757mx513GueSkurA@mail.gmail.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Mon, 13 Feb 2012 15:00:04 +0400
+Subject: [PATCH 6/7] Add hugetlb Kconfig option
+In-Reply-To: <1329126268-11032-7-git-send-email-bill4carson@gmail.com>
+References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
+ <1329126268-11032-7-git-send-email-bill4carson@gmail.com>
+Message-ID: <4F38ED34.1030300@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hello.
 
-On Mon, Feb 13, 2012 at 4:23 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Mon, Feb 13, 2012 at 10:49:18AM +0000, shiraz hashim wrote:
->> We plan to use Linux on our Cortex R4 based SoC.
->> Can we use the latest Linux straight away or do we
->> require to add some support for it.
->>
->> I went through www.linux-arm.org/LinuxKernel/LinuxM3
->> which describes Cortex M3 support in Linux but was not
->> able to find any information on M4.
+On 13-02-2012 13:44, Bill Carson wrote:
+
+> Signed-off-by: Bill Carson<bill4carson@gmail.com>
+> ---
+>   arch/arm/Kconfig |   29 +++++++++++++++++++++++++++++
+>   1 files changed, 29 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a48aecc..161bca6 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -985,6 +985,35 @@ config ARCH_ZYNQ
+>   	  Support for Xilinx Zynq ARM Cortex A9 Platform
+>   endchoice
 >
-> Do you mean M4 or R4 here?
+> +config SYS_SUPPORTS_HUGETLBFS
+> +		def_bool n
 
-I am interested in R4 but was just thinking that M4 support can work
-for R4 as well.
+    This is probably overindented.
 
->> Has anybody used it on Cortex R4 based platform ?
->
-> In theory Linux support for R4 should just work (once CONFIG_MMU is
-> disabled). I used to test it in the past regularly but not recently.
-
-Great. I was planning to use linux-3.2, I hope the support is there ?
-
-Thanks for the quick reply :)
-
--- 
-regards
-Shiraz Hashim
+WBR, Sergei
