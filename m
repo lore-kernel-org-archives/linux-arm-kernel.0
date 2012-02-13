@@ -1,92 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Feb 2012 16:52:09 +0000
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <1329151422-2146-1-git-send-email-mporter@ti.com>
-References: <1329151422-2146-1-git-send-email-mporter@ti.com>
-Message-ID: <20120213165209.GA31482@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 13 Feb 2012 17:48:56 +0100
+Subject: [PATCH 0/6] ARM: at91: more at91_sys_read/write cleanup
+Message-ID: <20120213164856.GE3378@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 11:43:42AM -0500, Matt Porter wrote:
-> This fixes smsc911x support on platforms using gpmc_smsc911x_init().
-> Commit c7e963f6888816f04d1f5da0e07bec4e0092f227 added the requirement
-> that platforms provide vdd33a and vddvario supplies.
+Hi,
 
-Thanks.  Only one comment on this.
+	This path serie continue to cleanup the use of at91_sys_read/write
+	and make pmc and memory controller soc independant.
 
-> +static struct platform_device gpmc_smsc911x_regulator = {
-> +	.name		= "reg-fixed-voltage",
-> +	.id		= 0,
+	It will also make pm_slowclock soc independant and detect the memory
+	controller at runtime
 
-$ grep -A1 reg-fixed-voltage arch/arm/*omap* -r
-arch/arm/mach-omap2/board-omap3evm.c:	.name		= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-omap3evm.c-	.id		= 1,
---
-arch/arm/mach-omap2/board-zoom-peripherals.c:	.name		= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-zoom-peripherals.c-	.id		= 1,
---
-arch/arm/mach-omap2/board-overo.c:	.name		= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-overo.c-	.id		= 1,
---
-arch/arm/mach-omap2/board-omap4panda.c:	.name		= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-omap4panda.c-	.id		= 1,
---
-arch/arm/mach-omap2/board-rm680.c:	.name			= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-rm680.c-	.dev			= {
---
-arch/arm/mach-omap2/board-igep0020.c:	.name		= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-igep0020.c-	.id		= 0,
---
-arch/arm/mach-omap2/board-4430sdp.c:	.name		= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-4430sdp.c-	.id		= -1,
---
-arch/arm/mach-omap2/board-4430sdp.c:	.name		= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-4430sdp.c-	.id		= 1,
---
-arch/arm/mach-omap2/board-omap3pandora.c:	.name		= "reg-fixed-voltage",
-arch/arm/mach-omap2/board-omap3pandora.c-	.id		= 1,
+	this patch serie depends on irq_domain patch serie send by Nicolas
 
-igep0020.c does this:
+The following changes since commit 32c2e70e8a7fdb509c890ffd48642ebf49478d72:
 
-static struct omap_smsc911x_platform_data smsc911x_cfg = {
-        .cs             = IGEP2_SMSC911X_CS,
-        .gpio_irq       = IGEP2_SMSC911X_GPIO,
-        .gpio_reset     = -EINVAL,
-        .flags          = SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
-};
+  ARM: at91: make st soc independent (2012-02-14 00:42:19 +0800)
 
-static inline void __init igep2_init_smsc911x(void)
-{
-        gpmc_smsc911x_init(&smsc911x_cfg);
-}
+are available in the git repository at:
+  git at github.com:at91linux/linux-at91.git ..BRANCH.NOT.VERIFIED..
 
-so it seems to use the gpmc_smsc stuff as well.  So we're ending up with
-two "reg-fixed-voltage" devices both with ID 0.  That's not going to work,
-and the driver model/sysfs will give you a nice warning there about that.
+Jean-Christophe PLAGNIOL-VILLARD (6):
+      ARM: at91: pm_slowclock rename register to named define
+      ARM: at91: pm_slowclock move register definition to pm.c
+      ARM: at91: rm9200 move sdramc define to at91rm9200_sdramc
+      ARM: at91: make sdram/ddr register base soc independent
+      ARM: at91: pm_slowclock add runtime memory contoller detection
+      ARM: at91: make pmc register base soc independent
 
-I think OMAP (or even the reg-fixed-voltage folk) needs to create an enum
-similar to what I did for 8250 to control the allocation of platform
-device IDs for this, otherwise we're going to keep on running over this
-problem.
+ arch/arm/mach-at91/at91rm9200.c                    |    3 +-
+ arch/arm/mach-at91/at91rm9200_devices.c            |   13 +-
+ arch/arm/mach-at91/at91sam9260.c                   |    1 +
+ arch/arm/mach-at91/at91sam9261.c                   |    1 +
+ arch/arm/mach-at91/at91sam9263.c                   |    2 +
+ arch/arm/mach-at91/at91sam9_alt_reset.S            |   12 +-
+ arch/arm/mach-at91/at91sam9g45.c                   |    2 +
+ arch/arm/mach-at91/at91sam9g45_reset.S             |   12 +-
+ arch/arm/mach-at91/at91sam9rl.c                    |    1 +
+ arch/arm/mach-at91/at91sam9x5.c                    |    1 +
+ arch/arm/mach-at91/board-cpuat91.c                 |    1 +
+ arch/arm/mach-at91/board-eco920.c                  |    5 +-
+ arch/arm/mach-at91/board-kb9202.c                  |    1 +
+ arch/arm/mach-at91/board-picotux200.c              |    1 +
+ arch/arm/mach-at91/board-rm9200dk.c                |    1 +
+ arch/arm/mach-at91/board-rm9200ek.c                |    1 +
+ arch/arm/mach-at91/board-yl-9200.c                 |    3 +-
+ arch/arm/mach-at91/clock.c                         |   75 +++---
+ arch/arm/mach-at91/generic.h                       |    3 +
+ arch/arm/mach-at91/include/mach/at91_pmc.h         |   56 +++--
+ arch/arm/mach-at91/include/mach/at91_ramc.h        |   32 +++
+ arch/arm/mach-at91/include/mach/at91rm9200.h       |    6 +-
+ arch/arm/mach-at91/include/mach/at91rm9200_mc.h    |   58 +----
+ .../arm/mach-at91/include/mach/at91rm9200_sdramc.h |   63 +++++
+ arch/arm/mach-at91/include/mach/at91sam9260.h      |    3 +-
+ arch/arm/mach-at91/include/mach/at91sam9261.h      |    3 +-
+ arch/arm/mach-at91/include/mach/at91sam9263.h      |    5 +-
+ arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h  |    6 -
+ arch/arm/mach-at91/include/mach/at91sam9_sdramc.h  |    6 -
+ arch/arm/mach-at91/include/mach/at91sam9g45.h      |    5 +-
+ arch/arm/mach-at91/include/mach/at91sam9rl.h       |    3 +-
+ arch/arm/mach-at91/include/mach/at91sam9x5.h       |    5 +-
+ arch/arm/mach-at91/include/mach/hardware.h         |    3 +-
+ arch/arm/mach-at91/pm.c                            |   35 ++-
+ arch/arm/mach-at91/pm.h                            |   11 +-
+ arch/arm/mach-at91/pm_slowclock.S                  |  271 ++++++++++----------
+ drivers/pcmcia/at91_cf.c                           |    5 +-
+ drivers/usb/gadget/atmel_usba_udc.c                |    6 +-
+ 38 files changed, 409 insertions(+), 312 deletions(-)
+ create mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
 
-/*
- * Allocate 8250 platform device IDs.  Nothing is implied by
- * the numbering here, except for the legacy entry being -1.
- */
-enum {
-	PLAT8250_DEV_LEGACY = -1,
-	PLAT8250_DEV_PLATFORM,
-	PLAT8250_DEV_PLATFORM1,
-	PLAT8250_DEV_PLATFORM2,
-	PLAT8250_DEV_FOURPORT,
-	PLAT8250_DEV_ACCENT,
-	PLAT8250_DEV_BOCA,
-	PLAT8250_DEV_EXAR_ST16C554,
-	PLAT8250_DEV_HUB6,
-	PLAT8250_DEV_MCA,
-	PLAT8250_DEV_AU1X00,
-	PLAT8250_DEV_SM501,
-};
-
-Added Mark for his comment.
+Best Regards,
+J.
