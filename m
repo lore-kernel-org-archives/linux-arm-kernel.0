@@ -1,39 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 13 Feb 2012 10:23:22 +0100
-Subject: [PATCH 1/1] gpio: drop CONFIG_OF_GPIO in the definition of the struct
- gpio_chip
-Message-ID: <1329125002-21134-1-git-send-email-plagnioj@jcrosoft.com>
+From: bill4carson@gmail.com (Bill Carson)
+Date: Mon, 13 Feb 2012 17:44:21 +0800
+Subject: [RFC-PATCH V2] ARM hugetlb support
+Message-ID: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will allow to avoid the ifdef CONFIG_OF_GPIO in gpio drivers
+Hi All
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+This is 2nd RFC PATCH for ARM huge page support. 2MB(two 1MB page)/16MB
+huge page are supported, Versatile Express Cortex-A9x4 tile is used as test 
+board. Verification is done with libhugetlbfs with both arm/thumb2 instruction.
+
+ChangeLog From V1:
+    - Drop L_PTE_HUGEPAGE defines
+    - Check whether super-section is supported through mmfr3
+    - Using mmu_context_t to store huge linux pte instead of mm_struct
+
+Any suggestions would be truly welcome :)
+
+Bill Carson(3)
+    - Add hugetlb high level hooks
+    - Using mmu_context_t to store huge linux pte
+    - Introduce set_hugepte_ext to set hardware pte
+
+Signed-off-by: Bill Carson <bill4carson@gmail.com>
 ---
- include/asm-generic/gpio.h |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index 1ff4e22..c08b758 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -122,7 +122,6 @@ struct gpio_chip {
- 	unsigned		can_sleep:1;
- 	unsigned		exported:1;
- 
--#if defined(CONFIG_OF_GPIO)
- 	/*
- 	 * If CONFIG_OF is enabled, then all GPIO controllers described in the
- 	 * device tree automatically may have an OF translation
-@@ -131,7 +130,6 @@ struct gpio_chip {
- 	int of_gpio_n_cells;
- 	int (*of_xlate)(struct gpio_chip *gc,
- 		        const struct of_phandle_args *gpiospec, u32 *flags);
--#endif
- };
- 
- extern const char *gpiochip_is_requested(struct gpio_chip *chip,
--- 
-1.7.7
+ arch/arm/Kconfig                      |   29 ++++++
+ arch/arm/include/asm/glue-proc.h      |    3 +
+ arch/arm/include/asm/hugetlb.h        |  178 +++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/mmu.h            |    4 +
+ arch/arm/include/asm/page.h           |   15 +++
+ arch/arm/include/asm/pgtable-2level.h |    3 +
+ arch/arm/include/asm/pgtable.h        |    9 ++
+ arch/arm/include/asm/proc-fns.h       |    3 +
+ arch/arm/mm/Makefile                  |    1 +
+ arch/arm/mm/dma-mapping.c             |    3 -
+ arch/arm/mm/fault.c                   |   15 +++
+ arch/arm/mm/hugetlb.c                 |  132 ++++++++++++++++++++++++
+ arch/arm/mm/pgd.c                     |   11 ++
+ arch/arm/mm/proc-v7-2level.S          |   87 ++++++++++++++++
+ 14 files changed, 490 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb.h
+ create mode 100644 arch/arm/mm/hugetlb.c
