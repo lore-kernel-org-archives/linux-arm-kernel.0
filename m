@@ -1,27 +1,152 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 13 Feb 2012 06:48:21 -0800
-Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
-In-Reply-To: <20120213082741.GN3852@pengutronix.de>
-References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
- <20120213082741.GN3852@pengutronix.de>
-Message-ID: <20120213144820.GA3494@opensource.wolfsonmicro.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 13 Feb 2012 22:53:20 +0800
+Subject: Possible circular locking dependency (3.3-rc2)
+In-Reply-To: <20120208124147.GF16334@legolas.emea.dhcp.ti.com>
+References: <20120208124147.GF16334@legolas.emea.dhcp.ti.com>
+Message-ID: <CACVXFVMfmabcH57da-prx=J950KEoFtfb-zsuBWn7VY3NaMUUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 09:27:41AM +0100, Sascha Hauer wrote:
+Hi,
 
-> I really don't want to have that much code for saying 'we don't have a
-> regulator, just make this stupid driver happy'. This is fine for one
-> board, but not for the more than a dozen users of this driver in the tree.
-> We should really add a helper to simplify this.
+On Wed, Feb 8, 2012 at 8:41 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi guys,
+>
+> I have just triggered the folllowing:
+>
+> [ ? 84.860321] ======================================================
+> [ ? 84.860321] [ INFO: possible circular locking dependency detected ]
+> [ ? 84.860321] 3.3.0-rc2-00026-ge4e8a39 #474 Not tainted
+> [ ? 84.860321] -------------------------------------------------------
+> [ ? 84.860321] bash/949 is trying to acquire lock:
+> [ ? 84.860321] ?(sysfs_lock){+.+.+.}, at: [<c0275358>] gpio_value_store+0x24/0xcc
+> [ ? 84.860321]
+> [ ? 84.860321] but task is already holding lock:
+> [ ? 84.860321] ?(s_active#22){++++.+}, at: [<c016996c>] sysfs_write_file+0xdc/0x184
+> [ ? 84.911468]
+> [ ? 84.911468] which lock already depends on the new lock.
+> [ ? 84.911468]
+> [ ? 84.920043]
+> [ ? 84.920043] the existing dependency chain (in reverse order) is:
+> [ ? 84.920043]
+> [ ? 84.927886] -> #1 (s_active#22){++++.+}:
+> [ ? 84.927886] ? ? ? ?[<c008f640>] check_prevs_add+0xdc/0x150
+> [ ? 84.927886] ? ? ? ?[<c008fc18>] validate_chain.clone.24+0x564/0x694
+> [ ? 84.927886] ? ? ? ?[<c0090cdc>] __lock_acquire+0x49c/0x980
+> [ ? 84.951660] ? ? ? ?[<c0091838>] lock_acquire+0x98/0x100
+> [ ? 84.951660] ? ? ? ?[<c016a8e8>] sysfs_deactivate+0xb0/0x100
+> [ ? 84.962982] ? ? ? ?[<c016b1b4>] sysfs_addrm_finish+0x2c/0x6c
+> [ ? 84.962982] ? ? ? ?[<c016b8bc>] sysfs_remove_dir+0x84/0x98
+> [ ? 84.962982] ? ? ? ?[<c02590d8>] kobject_del+0x10/0x78
+> [ ? 84.974670] ? ? ? ?[<c02c29e8>] device_del+0x140/0x170
+> [ ? 84.974670] ? ? ? ?[<c02c2a24>] device_unregister+0xc/0x18
+> [ ? 84.985382] ? ? ? ?[<c0276894>] gpio_unexport+0xbc/0xdc
+> [ ? 84.985382] ? ? ? ?[<c02768c8>] gpio_free+0x14/0xfc
+> [ ? 85.001708] ? ? ? ?[<c0276a28>] unexport_store+0x78/0x8c
+> [ ? 85.001708] ? ? ? ?[<c02c5af8>] class_attr_store+0x18/0x24
+> [ ? 85.007293] ? ? ? ?[<c0169990>] sysfs_write_file+0x100/0x184
+> [ ? 85.018981] ? ? ? ?[<c0109d48>] vfs_write+0xb4/0x148
+> [ ? 85.018981] ? ? ? ?[<c0109fd0>] sys_write+0x40/0x70
+> [ ? 85.018981] ? ? ? ?[<c0013cc0>] ret_fast_syscall+0x0/0x3c
+> [ ? 85.035003]
+> [ ? 85.035003] -> #0 (sysfs_lock){+.+.+.}:
+> [ ? 85.035003] ? ? ? ?[<c008f54c>] check_prev_add+0x680/0x698
+> [ ? 85.035003] ? ? ? ?[<c008f640>] check_prevs_add+0xdc/0x150
+> [ ? 85.052093] ? ? ? ?[<c008fc18>] validate_chain.clone.24+0x564/0x694
+> [ ? 85.052093] ? ? ? ?[<c0090cdc>] __lock_acquire+0x49c/0x980
+> [ ? 85.052093] ? ? ? ?[<c0091838>] lock_acquire+0x98/0x100
+> [ ? 85.069885] ? ? ? ?[<c047e280>] mutex_lock_nested+0x3c/0x2f4
+> [ ? 85.069885] ? ? ? ?[<c0275358>] gpio_value_store+0x24/0xcc
+> [ ? 85.069885] ? ? ? ?[<c02c18dc>] dev_attr_store+0x18/0x24
+> [ ? 85.087158] ? ? ? ?[<c0169990>] sysfs_write_file+0x100/0x184
+> [ ? 85.087158] ? ? ? ?[<c0109d48>] vfs_write+0xb4/0x148
+> [ ? 85.098297] ? ? ? ?[<c0109fd0>] sys_write+0x40/0x70
+> [ ? 85.098297] ? ? ? ?[<c0013cc0>] ret_fast_syscall+0x0/0x3c
+> [ ? 85.109069]
+> [ ? 85.109069] other info that might help us debug this:
+> [ ? 85.109069]
+> [ ? 85.117462] ?Possible unsafe locking scenario:
+> [ ? 85.117462]
+> [ ? 85.117462] ? ? ? ?CPU0 ? ? ? ? ? ? ? ? ? ?CPU1
+> [ ? 85.128417] ? ? ? ?---- ? ? ? ? ? ? ? ? ? ?----
+> [ ? 85.128417] ? lock(s_active#22);
+> [ ? 85.128417] ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?lock(sysfs_lock);
+> [ ? 85.128417] ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?lock(s_active#22);
+> [ ? 85.142486] ? lock(sysfs_lock);
+> [ ? 85.151794]
+> [ ? 85.151794] ?*** DEADLOCK ***
+> [ ? 85.151794]
+> [ ? 85.151794] 2 locks held by bash/949:
+> [ ? 85.158020] ?#0: ?(&buffer->mutex){+.+.+.}, at: [<c01698b8>] sysfs_write_file+0x28/0x184
+> [ ? 85.170349] ?#1: ?(s_active#22){++++.+}, at: [<c016996c>] sysfs_write_file+0xdc/0x184
+> [ ? 85.170349]
+> [ ? 85.178588] stack backtrace:
+> [ ? 85.178588] [<c001b824>] (unwind_backtrace+0x0/0xf0) from [<c008de64>] (print_circular_bug+0x100/0x114)
+> [ ? 85.193023] [<c008de64>] (print_circular_bug+0x100/0x114) from [<c008f54c>] (check_prev_add+0x680/0x698)
+> [ ? 85.193023] [<c008f54c>] (check_prev_add+0x680/0x698) from [<c008f640>] (check_prevs_add+0xdc/0x150)
+> [ ? 85.212524] [<c008f640>] (check_prevs_add+0xdc/0x150) from [<c008fc18>] (validate_chain.clone.24+0x564/0x694)
+> [ ? 85.212524] [<c008fc18>] (validate_chain.clone.24+0x564/0x694) from [<c0090cdc>] (__lock_acquire+0x49c/0x980)
+> [ ? 85.233306] [<c0090cdc>] (__lock_acquire+0x49c/0x980) from [<c0091838>] (lock_acquire+0x98/0x100)
+> [ ? 85.233306] [<c0091838>] (lock_acquire+0x98/0x100) from [<c047e280>] (mutex_lock_nested+0x3c/0x2f4)
+> [ ? 85.242614] [<c047e280>] (mutex_lock_nested+0x3c/0x2f4) from [<c0275358>] (gpio_value_store+0x24/0xcc)
+> [ ? 85.261840] [<c0275358>] (gpio_value_store+0x24/0xcc) from [<c02c18dc>] (dev_attr_store+0x18/0x24)
+> [ ? 85.261840] [<c02c18dc>] (dev_attr_store+0x18/0x24) from [<c0169990>] (sysfs_write_file+0x100/0x184)
+> [ ? 85.271240] [<c0169990>] (sysfs_write_file+0x100/0x184) from [<c0109d48>] (vfs_write+0xb4/0x148)
+> [ ? 85.290008] [<c0109d48>] (vfs_write+0xb4/0x148) from [<c0109fd0>] (sys_write+0x40/0x70)
+> [ ? 85.298400] [<c0109fd0>] (sys_write+0x40/0x70) from [<c0013cc0>] (ret_fast_syscall+0x0/0x3c)
+> -bash: echo: write error: Operation not permitted
+>
+> the way to trigger is:
+>
+>
+> root at legolas:~# cd /sys/class/gpio/
+> root at legolas:/sys/class/gpio# echo 2 > export
+> root at legolas:/sys/class/gpio# echo 2 > unexport
+> root at legolas:/sys/class/gpio# echo 2 > export
+> root at legolas:/sys/class/gpio# cd gpio2/
+> root at legolas:/sys/class/gpio/gpio2# echo 1 > value
 
-If the board really has so few software controlled regulators then they
-should just be using the dummy regulator support which already exists,
-someone should just add a knob to turn it on automatically.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120213/299be1a2/attachment-0001.sig>
+Looks 'sysfs_lock' needn't to be held for unregister, so the patch below may
+fix the problem.
+
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 17fdf4b..d773540 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -873,6 +873,7 @@ void gpio_unexport(unsigned gpio)
+ {
+ 	struct gpio_desc	*desc;
+ 	int			status = 0;
++	struct device		*dev = NULL;
+
+ 	if (!gpio_is_valid(gpio)) {
+ 		status = -EINVAL;
+@@ -884,19 +885,20 @@ void gpio_unexport(unsigned gpio)
+ 	desc = &gpio_desc[gpio];
+
+ 	if (test_bit(FLAG_EXPORT, &desc->flags)) {
+-		struct device	*dev = NULL;
+
+ 		dev = class_find_device(&gpio_class, NULL, desc, match_export);
+ 		if (dev) {
+ 			gpio_setup_irq(desc, dev, 0);
+ 			clear_bit(FLAG_EXPORT, &desc->flags);
+-			put_device(dev);
+-			device_unregister(dev);
+ 		} else
+ 			status = -ENODEV;
+ 	}
+
+ 	mutex_unlock(&sysfs_lock);
++	if (dev) {
++		device_unregister(dev);
++		put_device(dev);
++	}
+ done:
+ 	if (status)
+ 		pr_debug("%s: gpio%d status %d\n", __func__, gpio, status);
+
+
+thanks,
+-- 
+Ming Lei
