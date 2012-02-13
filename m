@@ -1,58 +1,39 @@
-From: Hong.Xu@atmel.com (Xu, Hong)
-Date: Mon, 13 Feb 2012 17:04:54 +0800
-Subject: [PATCH] MTD: atmel_nand: Update driver to support Programmable HW
- ECC controller
-In-Reply-To: <20120213084516.GB3378@game.jcrosoft.org>
-References: <1329117469-23637-1-git-send-email-hong.xu@atmel.com>
- <20120213084516.GB3378@game.jcrosoft.org>
-Message-ID: <4C79549CB6F772498162A641D92D5328045B582C@penmb01.corp.atmel.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 13 Feb 2012 10:23:22 +0100
+Subject: [PATCH 1/1] gpio: drop CONFIG_OF_GPIO in the definition of the struct
+ gpio_chip
+Message-ID: <1329125002-21134-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi JC,
+this will allow to avoid the ifdef CONFIG_OF_GPIO in gpio drivers
 
-> -----Original Message-----
-> From: Jean-Christophe PLAGNIOL-VILLARD [mailto:plagnioj at jcrosoft.com]
-> Sent: Monday, February 13, 2012 4:45 PM
-> To: Xu, Hong
-> Cc: dedekind1 at gmail.com; linux-mtd at lists.infradead.org;
-dwmw2 at infradead.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] MTD: atmel_nand: Update driver to support
-Programmable
-> HW ECC controller
-> 
-> On 15:17 Mon 13 Feb     , Hong Xu wrote:
-> > The Programmable Hardware ECC (PMECC) controller is a programmable
-binary
-> > BCH(Bose, Chaudhuri and Hocquenghem) encoder and decoder. This
-controller
-> > can be used to support both SLC and MLC NAND Flash devices. It
-supports to
-> > generate ECC to correct 2, 4, 8, 12 or 24 bits of error per sector
-of data.
-> >
-> > To use this driver, the user needs to pass in the correction
-capability and
-> > the sector size.
-> >
-> > This driver has been tested on AT91SAM9X5-EK and AT91SAM9N12-EK with
-JFFS2,
-> > YAFFS2, UBIFS and mtd-utils.
-> >
-> > Signed-off-by: Hong Xu <hong.xu@atmel.com>
-> > ---
-> this patch must be based on the nand fixes and DT support
-> 
-> and pass the rom code base via resoruces
-> 
-> and drop the ifdef
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ include/asm-generic/gpio.h |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-OK no problem. I'll collect other comments, then merge and convert it
-with DT support.
-
-BR,
-Eric
-
-> Best Regards,
-> J.
+diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+index 1ff4e22..c08b758 100644
+--- a/include/asm-generic/gpio.h
++++ b/include/asm-generic/gpio.h
+@@ -122,7 +122,6 @@ struct gpio_chip {
+ 	unsigned		can_sleep:1;
+ 	unsigned		exported:1;
+ 
+-#if defined(CONFIG_OF_GPIO)
+ 	/*
+ 	 * If CONFIG_OF is enabled, then all GPIO controllers described in the
+ 	 * device tree automatically may have an OF translation
+@@ -131,7 +130,6 @@ struct gpio_chip {
+ 	int of_gpio_n_cells;
+ 	int (*of_xlate)(struct gpio_chip *gc,
+ 		        const struct of_phandle_args *gpiospec, u32 *flags);
+-#endif
+ };
+ 
+ extern const char *gpiochip_is_requested(struct gpio_chip *chip,
+-- 
+1.7.7
