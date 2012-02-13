@@ -1,44 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Feb 2012 13:24:01 -0800
-Subject: [PATCH] modpost: Fix section warnings for ARM for many compilers
-Message-ID: <20120213212401.GH1426@atomide.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 13 Feb 2012 13:33:21 -0800
+Subject: [Linaro-mm-sig] [PATCHv21 12/16] mm: trigger page reclaim in
+ alloc_contig_range() to stabilise watermarks
+In-Reply-To: <CAOCHtYjc39ThfrcAqdsxNf-bFqKzu=T8=O_W9Cg3cRNzQnX-OQ@mail.gmail.com>
+References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
+ <1328895151-5196-13-git-send-email-m.szyprowski@samsung.com>
+ <CAOCHtYi01NVp1j=MX+0-z7ygW5tJuoswn8eWTQp+0Z5mMGdeQw@mail.gmail.com>
+ <op.v9mt58ch3l0zgt@mpn-glaptop>
+ <CAOCHtYjc39ThfrcAqdsxNf-bFqKzu=T8=O_W9Cg3cRNzQnX-OQ@mail.gmail.com>
+Message-ID: <op.v9mzhvxt3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that many compilers don't show section warnings on ARM
-currently because handling for ARM_CALL relocs are missing from
-modpost.c.
+>> On Fri, Feb 10, 2012 at 11:32 AM, Marek Szyprowski
+>>> +static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
+>>> +{
+>>> +       enum zone_type high_zoneidx = gfp_zone(gfp_mask);
+>>> +       struct zonelist *zonelist = node_zonelist(0, gfp_mask);
+>>> +       int did_some_progress = 0;
+>>> +       int order = 1;
+>>> +       unsigned long watermark;
+>>> +
+>>> +       /*
+>>> +        * Increase level of watermarks to force kswapd do his job
+>>> +        * to stabilise at new watermark level.
+>>> +        */
+>>> +       __modify_min_cma_pages(zone, count);
 
-Based on commit c2e26114 ([ARM] 3205/1: Handle new EABI relocations when
-loading kernel modules) it seems that R_ARM_PC24, R_ARM_CALL and
-R_ARM_JUMP24 can be handled the same way.
+> 2012/2/13 Michal Nazarewicz <mina86@mina86.com>:
+>> This should read __update_cma_wmark_pages().  Sorry for the incorrect patch.
 
-As modpost.c includes elf.h, we need to also consider that at least
-Debian libc6-dev is missing defines for both R_ARM_CALL and R_ARM_JUMP24
-in /usr/include/elf.h.
+On Mon, 13 Feb 2012 13:15:13 -0800, Robert Nelson <robertcnelson@gmail.com> wrote:
+> Thanks Michal, that fixed it..
 
-So for now let's just use the numbers in modpost.c.
+You are most welcome.
 
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Ben Hutchings <ben@decadent.org.uk>
-Cc: Anders Kaseorg <andersk@ksplice.com>
-Cc: Greg KH <gregkh@linuxfoundation.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+> cma-v21 with Rob Clark's omapdrm works great on the Beagle xM..
 
----
+Can we take that as:
 
-Anybody got better ideas for dealing with the missing elf.h
-defines?
+Tested-by: Robert Nelson <robertcnelson@gmail.com>
 
---- a/scripts/mod/modpost.c
-+++ b/scripts/mod/modpost.c
-@@ -1505,6 +1505,8 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
- 		              (elf->symtab_start + ELF_R_SYM(r->r_info));
- 		break;
- 	case R_ARM_PC24:
-+	case 28:		/* R_ARM_CALL */
-+	case 29:		/* R_ARM_JUMP24 */
- 		/* From ARM ABI: ((S + A) | T) - P */
- 		r->r_addend = (int)(long)(elf->hdr +
- 		              sechdr->sh_offset +
+? ;)
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
