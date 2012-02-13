@@ -1,33 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Feb 2012 09:52:29 +0000
-Subject: [SPI] Fix section mismatch in spi-pl022.c
-Message-ID: <20120213095228.GC15338@n2100.arm.linux.org.uk>
+From: philippe.langlais@stericsson.com (Philippe Langlais)
+Date: Mon, 13 Feb 2012 10:51:22 +0100
+Subject: [PATCH] arm: Set ARCH_NR_GPIO to 355 on U8500 platforms
+Message-ID: <1329126682-19028-1-git-send-email-philippe.langlais@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+From: Philippe Langlais <philippe.langlais@linaro.org>
 
-WARNING: drivers/spi/built-in.o(.devinit.text+0xdb8): Section mismatch in reference from the function pl022_probe() to the function .init.text:pl022_dma_probe()
-The function __devinit pl022_probe() references
-a function __init pl022_dma_probe().
-If pl022_dma_probe is only used by pl022_probe then
-annotate pl022_dma_probe with a matching annotation.
+This is due to the increased number of AB8500 GPIOs.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
 ---
- drivers/spi/spi-pl022.c |    2 +-
+ arch/arm/Kconfig |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 2f9cb43..f37ad22 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -1083,7 +1083,7 @@ static int configure_dma(struct pl022 *pl022)
- 	return -ENOMEM;
- }
- 
--static int __init pl022_dma_probe(struct pl022 *pl022)
-+static int __devinit pl022_dma_probe(struct pl022 *pl022)
- {
- 	dma_cap_mask_t mask;
- 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 24626b0..f8988d0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1579,7 +1579,7 @@ config LOCAL_TIMERS
+ config ARCH_NR_GPIO
+ 	int
+ 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
+-	default 350 if ARCH_U8500
++	default 355 if ARCH_U8500
+ 	default 0
+ 	help
+ 	  Maximum number of GPIOs in the system.
+-- 
+1.7.6
