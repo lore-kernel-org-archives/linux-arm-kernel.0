@@ -1,28 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Feb 2012 20:48:19 +0100
-Subject: [PATCH 0/3] pinctrl: move the core per-device handlers to core
-In-Reply-To: <4F360853.3050402@nvidia.com>
-References: <1328814050-22715-1-git-send-email-linus.walleij@linaro.org>
- <4F34A3EF.3070207@nvidia.com>
- <CACRpkdZ0kTXLAfdsfMjeZZX4W-fx5zyEdeGboKCmKSzCaMVw_A@mail.gmail.com>
- <4F360853.3050402@nvidia.com>
-Message-ID: <CACRpkdYm3sb7wbJP1M9HmjkGHq1YuT06ar6-+V1RoZ1QdoT9BA@mail.gmail.com>
+Date: Mon, 13 Feb 2012 20:54:37 +0100
+Subject: [PATCH 0/6] ux500: Export SoC information and some platform
+ clean-up
+In-Reply-To: <201202130628.01081.arnd@arndb.de>
+References: <1328556146-3730-1-git-send-email-lee.jones@linaro.org>
+ <20120210194358.GA5537@kroah.com>
+ <201202130628.01081.arnd@arndb.de>
+Message-ID: <CACRpkdYYL4dKubDEwY54Jydn_pCmM6K2uT6jZ79BKHHvgEyHQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 11, 2012 at 7:18 AM, Stephen Warren <swarren@nvidia.com> wrote:
+On Mon, Feb 13, 2012 at 7:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> I'll probably want to rework the 3 patches your changes break anyway (in
-> order to completely remove use of board-*-pinmux.c when booting from DT,
-> once I write the DT code) and so you may as well not apply them, just
-> the driver itself. It'll save some churn.
+> I've applied the ux500 patches onto the ux500/soc branch of the arm-soc
+> tree now and added the current head of the driver-core tree as the
+> next/driver-core branch in the same tree.
 
-OK will that happen for this merge window or is the driver going to sit
-unused for the 3.4 cycle?
-
-I'm mainly thinking if the underlying driver may be subject to change I
-could just keep it out-of-tree, unless you want it merged in for some
-practical reason, then I'll just merge it.
+Thanks Arnd, I'll try to make sure upcoming ux500 stuff won't collide
+with this, please forgive me if it does...
 
 Yours,
 Linus Walleij
