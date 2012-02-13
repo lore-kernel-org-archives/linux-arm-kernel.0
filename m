@@ -1,25 +1,20 @@
-From: B32955@freescale.com (Huang Shijie-B32955)
-Date: Mon, 13 Feb 2012 15:48:05 +0000
-Subject: =?big5?B?tarOYDogtarOYDogW1BBVENIXSBtdGQvZ3BtaSA6IGFkZCBncG1pIHN1cHBvcnQg?=
- =?big5?Q?for_mx6q?=
-In-Reply-To: <1329147404.22240.178.camel@sauron.fi.intel.com>
-References: <1328505606-27981-1-git-send-email-b32955@freescale.com>	,
- <1329134454.22240.114.camel@sauron.fi.intel.com>
- <14C4E31473AF7E4B98176CB73615181C362D9F@039-SN1MPN1-006.039d.mgd.msft.net>,
- <1329147404.22240.178.camel@sauron.fi.intel.com>
-Message-ID: <14C4E31473AF7E4B98176CB73615181C363DF6@039-SN1MPN1-006.039d.mgd.msft.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Feb 2012 16:02:49 +0000
+Subject: [PATCH v7] ARM: net: JIT compiler for packet filters
+In-Reply-To: <4F392DFD.4070600@gmail.com>
+References: <1325937154-2656-1-git-send-email-mgherzan@gmail.com>
+ <4F392DFD.4070600@gmail.com>
+Message-ID: <20120213160248.GA25655@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 13, 2012 at 04:36:29PM +0100, Mircea Gherzan wrote:
+> Gentle ping. This patch has been in the tracking system for over a
+> month. Is there any reason not to apply it in arm/for-next?
 
-Hi,
+Yes.  It needs quite a review to make sure that there's absolutely no
+possibility for userspace to be able to generate malicious ARM code
+and then have it executed.  Or put it another way: security paranoia.
 
->scripts/kconfig/conf --savedefconfig=defconfig Kconfig
->warning: (MTD_NAND_GPMI_NAND) selects MTD_CMDLINE_PARTS which has unmet direct dependencies (MTD=y)
-
->Would mxs people send a fix?
-
-Do you mean i have to remove the "select MTD_CMD_LINE_PARTS" for gpmi-nand?
-
-BR
-Huang Shijie
+I'm afraid that I've not been able to look at it at all yet, and I
+haven't seen anyone looking at the code from that aspect.
