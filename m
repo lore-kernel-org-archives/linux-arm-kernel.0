@@ -1,53 +1,48 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 13 Feb 2012 15:43:02 +0100
-Subject: [PATCH 2/9] ARM: at91/snapper9260: move gpio_to_irq out of structure
- initialization
+Date: Mon, 13 Feb 2012 15:43:09 +0100
+Subject: [PATCH 9/9] ARM: at91/board-dt: remove AIC irq domain from board file
 In-Reply-To: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <e0557a2864e52e017a0e931c6c64fd341ae21559.1329139662.git.nicolas.ferre@atmel.com>
+Message-ID: <9d4eee84ad7c95fb7ad61194166696c64414fd3f.1329139662.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio_to_irq() implementation will be moved from a macro to a
-plain function: we cannot use it in a structure initialization
-anymore.
+Adding of irqdomain in AIC code make the specification
+of the irq domain in board file useless.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: rmallon at gmail.com
 ---
- arch/arm/mach-at91/board-snapper9260.c |   10 +++++++---
- 1 files changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/mach-at91/board-dt.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index 4770db0..3c2e3fc 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -145,11 +145,11 @@ static struct i2c_board_info __initdata snapper9260_i2c_devices[] = {
- 		/* Audio codec */
- 		I2C_BOARD_INFO("tlv320aic23", 0x1a),
- 	},
--	{
-+};
-+
-+static struct i2c_board_info __initdata snapper9260_i2c_isl1208 = {
- 		/* RTC */
- 		I2C_BOARD_INFO("isl1208", 0x6f),
--		.irq = gpio_to_irq(AT91_PIN_PA31),
--	},
- };
+diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
+index 0579315..6120978 100644
+--- a/arch/arm/mach-at91/board-dt.c
++++ b/arch/arm/mach-at91/board-dt.c
+@@ -15,8 +15,6 @@
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/gpio.h>
+-#include <linux/irqdomain.h>
+-#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
  
- static void __init snapper9260_add_device_nand(void)
-@@ -163,6 +163,10 @@ static void __init snapper9260_board_init(void)
+ #include <mach/hardware.h>
+@@ -88,14 +86,8 @@ static void __init ek_add_device_nand(void)
+ 	at91_add_device_nand(&ek_nand_data);
+ }
+ 
+-static const struct of_device_id aic_of_match[] __initconst = {
+-	{ .compatible = "atmel,at91rm9200-aic", },
+-	{},
+-};
+-
+ static void __init at91_dt_init_irq(void)
  {
- 	at91_add_device_i2c(snapper9260_i2c_devices,
- 			    ARRAY_SIZE(snapper9260_i2c_devices));
-+
-+	snapper9260_i2c_isl1208.irq = gpio_to_irq(AT91_PIN_PA31);
-+	i2c_register_board_info(0, &snapper9260_i2c_isl1208, 1);
-+
- 	at91_add_device_serial();
- 	at91_add_device_usbh(&snapper9260_usbh_data);
- 	at91_add_device_udc(&snapper9260_udc_data);
+-	irq_domain_generate_simple(aic_of_match, 0xfffff000, 0);
+ 	at91_init_irq_default();
+ }
+ 
 -- 
 1.7.9
