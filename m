@@ -1,32 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 13 Feb 2012 15:43:25 -0600
-Subject: [PATCH 12/15] ARM: clps711x: remove unneeded include of mach/io.h
-In-Reply-To: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 14 Feb 2012 08:52:24 +1100
+Subject: [PATCH 11/15] ARM: ep93xx: clean-up mach/io.h
+In-Reply-To: <1329169408-17253-12-git-send-email-robherring2@gmail.com>
 References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1329169408-17253-13-git-send-email-robherring2@gmail.com>
+ <1329169408-17253-12-git-send-email-robherring2@gmail.com>
+Message-ID: <4F398618.8070305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On 14/02/12 08:43, Rob Herring wrote:
 
-In preparation to remove mach/io.h, remove an unneeded include of it.
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Move ep93xx specifics in mach/io.h to ep93xx-regs.h.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> index c4a7b84..8933c62 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
+> @@ -25,6 +25,12 @@
+>   *	http://www.cirrus.com/en/pubs/appNote/AN273REV4.pdf
+>   */
+>  
+> +#ifdef __ASSEMBLER__
+> +#define IOMEM(p)                p
+> +#else
+> +#define IOMEM(p)                ((void __iomem __force *)(p))
+> +#endif
+> +
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-clps711x/include/mach/uncompress.h |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/include/mach/uncompress.h b/arch/arm/mach-clps711x/include/mach/uncompress.h
-index 7164310..35ed731 100644
---- a/arch/arm/mach-clps711x/include/mach/uncompress.h
-+++ b/arch/arm/mach-clps711x/include/mach/uncompress.h
-@@ -17,7 +17,6 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
--#include <mach/io.h>
- #include <mach/hardware.h>
- #include <asm/hardware/clps7111.h>
- 
--- 
-1.7.5.4
+I think you will get multiple definition warnings with this patch
+applied, but not the later patches (think git bisect, etc). For example,
+arch/arm/mach-ep93xx/clock.c includes both linux/io.h (includes
+mach/io.h) and mach/hardware.h (includes mach/ep93xx-regs.h) so you will
+get warnings about IOMEM being redefined.
+
+~Ryan
