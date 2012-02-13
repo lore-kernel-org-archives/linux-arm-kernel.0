@@ -1,40 +1,33 @@
-From: michal.wrobel@flytronic.pl (=?UTF-8?B?TWljaGHFgiBXcsOzYmVs?=)
-Date: Mon, 13 Feb 2012 18:49:47 +0100
-Subject: [PATCH] ixp4xx: clockevent set_next_event fix
-Message-ID: <4F394D3B.3080909@flytronic.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Feb 2012 18:02:36 +0000
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <20120213175233.GC1426@atomide.com>
+References: <1329151422-2146-1-git-send-email-mporter@ti.com>
+ <20120213165209.GA31482@n2100.arm.linux.org.uk>
+ <20120213165617.GE3494@opensource.wolfsonmicro.com>
+ <20120213175233.GC1426@atomide.com>
+Message-ID: <20120213180236.GB31482@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IXP43x Developer's Manual [17.4.3] and IXP4[56]x Developer's Manual
-[18.4.3] say that for predictable operation the timer needs to be
-stopped before writing a new value into the reload register. Indeed,
-tests on IXP435 show that writing a new value into the reload register
-without stopping the timer first has no immediate effect on the timer.
-This makes hrtimers started through hrtimer_start() to be delayed until
-the currently earliest hrtimer expires.
+On Mon, Feb 13, 2012 at 09:52:34AM -0800, Tony Lindgren wrote:
+> * Mark Brown <broonie@opensource.wolfsonmicro.com> [120213 08:25]:
+> > On Mon, Feb 13, 2012 at 04:52:09PM +0000, Russell King - ARM Linux wrote:
+> > 
+> > > I think OMAP (or even the reg-fixed-voltage folk) needs to create an enum
+> > > similar to what I did for 8250 to control the allocation of platform
+> > > device IDs for this, otherwise we're going to keep on running over this
+> > > problem.
+> > 
+> > > Added Mark for his comment.
+> > 
+> > Hrm, seems slightly icky but the enum will work if we can decide how to
+> > add elements to the enum since it'll be easy to bloat a lot it if it's
+> > central.  It's tempting to suggest just using a random number to assign
+> > the IDs randomly rather than have a central registry but obviously
+> > there's no guarantees there.
+> 
+> Can't we just leave out the .id and have it automatically assigned?
 
-IXP42x Developer's Manual [17.4.3] says that the timer will be reloaded
-immediately on setting the timer reload register, so the bug probably
-doesn't occur on those CPUs. However, stopping the timer shouldn't have
-any negative side effects, so it should be safe to apply it
-machine-wide.
-
-Signed-off-by: Micha? Wr?bel <michal.wrobel@flytronic.pl>
----
- arch/arm/mach-ixp4xx/common.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 3841ab4..fd37c83 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -434,6 +434,7 @@ static int ixp4xx_set_next_event(unsigned long evt,
- {
- 	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
- 
-+	*IXP4XX_OSRT1 = 0;
- 	*IXP4XX_OSRT1 = (evt & ~IXP4XX_OST_RELOAD_MASK) | opts;
- 
- 	return 0;
--- 
-1.7.5.4
+Unfortunately, there's no such infrastructure in the driver model.
