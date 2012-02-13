@@ -1,48 +1,27 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 13 Feb 2012 15:59:03 +0100
-Subject: [PATCH 1/1] gpio: drop CONFIG_OF_GPIO in the definition of the
- struct gpio_chip
-In-Reply-To: <4F391F1E.4020808@gmail.com>
-References: <1329125002-21134-1-git-send-email-plagnioj@jcrosoft.com>
- <4F391781.2020203@gmail.com> <20120213141229.GD3378@game.jcrosoft.org>
- <4F391F1E.4020808@gmail.com>
-Message-ID: <4F392537.8070505@atmel.com>
+From: B32955@freescale.com (Huang Shijie-B32955)
+Date: Mon, 13 Feb 2012 15:05:55 +0000
+Subject: =?big5?B?tarOYDogW1BBVENIXSBtdGQvZ3BtaSA6IGFkZCBncG1pIHN1cHBvcnQgZm9yIG14?=
+ =?big5?Q?6q?=
+In-Reply-To: <1329134454.22240.114.camel@sauron.fi.intel.com>
+References: <1328505606-27981-1-git-send-email-b32955@freescale.com>,
+ <1329134454.22240.114.camel@sauron.fi.intel.com>
+Message-ID: <14C4E31473AF7E4B98176CB73615181C362D9F@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2012 03:33 PM, Rob Herring :
-> On 02/13/2012 08:12 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 08:00 Mon 13 Feb     , Rob Herring wrote:
->>> On 02/13/2012 03:23 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>> this will allow to avoid the ifdef CONFIG_OF_GPIO in gpio drivers
->>>>
->>>
->>> So would always enabling CONFIG_OF on at91 and then only 1 sub-arch is
->>> paying the price for additional space. Then we would only have ifdefs in
->>> the truly cross-platform gpio drivers.
->> we talk about 12bytes and here it's force to put a ifdef in the gpio drivers
->> in platform_device we don't do so. So why should be do it here??
-> 
-> But you are affecting everyone. I'm not saying we shouldn't do this. I'm
-> just highlighting the reason this is a problem and gpio is just one
-> instance. I think sub-arches should either always select OF or not.
-> Trying to do both is just going to be a pain to maintain.
+Hi Artem:
 
-(nothing related to the particular case discussed here, but...)
+>Please, let me know how I can compile-test this. This diver depends on
+>imx23 or imx28 and I cannot find a defconfig for these. When I select
+>MXS platform the compilation fails. Could you please describe some way
+>to generate a compilable configuration which would include this driver
+>as well, or send me the defconfig file.
 
-Rob,
+use make mxs_defconfig to make the .config.
+and select the gpmi-nand driver. then you can compile it.
 
-It may be a pain to maintain (and I can tell it is), but we do not have
-the choice: the AT91 family is simply too widely spread in terms of
-number of SoC and release date of those SoC. We must maintain all of
-them working while we are doing the effort to switch most of the
-material to DT. As this work takes time I fear that the transition
-period will last for a long time.
+This patch is just part of the patches for mx6q, another two patches are the mxs-dma patches.
+So in the mx6q, I do not enable the  gpmi-nand driver. you can compile-test it just on mxs_defconfig.
 
-Older SoCs will surely never be converted to device-tree as both the
-lack of workforce, customer habits and amount of boards existing and
-working correctly in mainline will go against this.
-
-Best regards,
--- 
-Nicolas Ferre
+BR
+Huang Shijie
