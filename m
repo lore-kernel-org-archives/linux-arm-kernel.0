@@ -1,39 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Feb 2012 20:17:21 +0100
-Subject: No clkdev vs smp_twd.c
-In-Reply-To: <op.v9k40vvx2s3iss@ecaz>
-References: <op.v9k40vvx2s3iss@ecaz>
-Message-ID: <CACRpkda-Oth52Ww853VQfo_p3H6EwTxyh2qHMTb5yWsmF7TXLw@mail.gmail.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 13 Feb 2012 11:38:22 -0800
+Subject: [Linaro-mm-sig] [PATCHv21 12/16] mm: trigger page reclaim in
+ alloc_contig_range() to stabilise watermarks
+In-Reply-To: <CAOCHtYi01NVp1j=MX+0-z7ygW5tJuoswn8eWTQp+0Z5mMGdeQw@mail.gmail.com>
+References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
+ <1328895151-5196-13-git-send-email-m.szyprowski@samsung.com>
+ <CAOCHtYi01NVp1j=MX+0-z7ygW5tJuoswn8eWTQp+0Z5mMGdeQw@mail.gmail.com>
+Message-ID: <op.v9mt58ch3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 12, 2012 at 10:37 PM, Imre Kaloz <kaloz@openwrt.org> wrote:
+> On Fri, Feb 10, 2012 at 11:32 AM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>> @@ -5637,6 +5642,56 @@ static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
+>>        return ret > 0 ? 0 : ret;
+>>  }
+>>
+>> +/*
+>> + * Update zone's cma pages counter used for watermark level calculation.
+>> + */
+>> +static inline void __update_cma_wmark_pages(struct zone *zone, int count)
+>> +{
+>> +       unsigned long flags;
+>> +       spin_lock_irqsave(&zone->lock, flags);
+>> +       zone->min_cma_pages += count;
+>> +       spin_unlock_irqrestore(&zone->lock, flags);
+>> +       setup_per_zone_wmarks();
+>> +}
+>> +
+>> +/*
+>> + * Trigger memory pressure bump to reclaim some pages in order to be able to
+>> + * allocate 'count' pages in single page units. Does similar work as
+>> + *__alloc_pages_slowpath() function.
+>> + */
+>> +static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
+>> +{
+>> +       enum zone_type high_zoneidx = gfp_zone(gfp_mask);
+>> +       struct zonelist *zonelist = node_zonelist(0, gfp_mask);
+>> +       int did_some_progress = 0;
+>> +       int order = 1;
+>> +       unsigned long watermark;
+>> +
+>> +       /*
+>> +        * Increase level of watermarks to force kswapd do his job
+>> +        * to stabilise at new watermark level.
+>> +        */
+>> +       __modify_min_cma_pages(zone, count);
 
-> I've just noticed, that your changes broke smp_twd on platforms without
-> clkdev support.
->
-> Committing out the changes in
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=5def51b0f827931bb559e6195060d774894fc9f9
-> get me over the following errors:
->
-> arch/arm/kernel/built-in.o: In function `twd_timer_setup':
-> io.c:(.cpuinit.text+0x42c): undefined reference to `clk_get_sys'
-> io.c:(.cpuinit.text+0x44c): undefined reference to `clk_enable'
-> io.c:(.cpuinit.text+0x468): undefined reference to `clk_put'
-> io.c:(.cpuinit.text+0x5ec): undefined reference to `clk_get_rate'
-> make[5]: *** [vmlinux] Error 1
->
-> Do you have a fix in the pipeline maybe?
+On Mon, 13 Feb 2012 10:57:58 -0800, Robert Nelson <robertcnelson@gmail.com> wrote:
+> Hi Marek,   This ^^^ function doesn't seem to exist in this patchset,
+> is it in another set posted to lkml?
 
-What exact system and defconfig is this, so I can reproduce
-the problem?
+This should read __update_cma_wmark_pages().  Sorry for the incorrect patch.
 
-If you're not using clkdev I think the above functions need to be
-implemented anyway, since they're part of the <linux/clk.h>
-contract so then it'd be a patch to add some stubs to the clock
-implementation for your platform, but we might want to add an #ifdef
-for the !HAVE_CLK case if you have no clocks at all.
-(OTH: correct me if I get this wrong...)
-
-Yours,
-Linus Walleij
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
