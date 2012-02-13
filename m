@@ -1,54 +1,74 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 12 Feb 2012 17:04:20 -0700
-Subject: [PATCH V3 1/1] dt: add of_get_child_count helper function
-In-Reply-To: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
-References: <1328980929-5423-1-git-send-email-dong.aisheng@linaro.org>
-Message-ID: <CACxGe6tUVR+dWphnswTYcY+kut6V_WTN17ZMR8dFGd0XviyU9Q@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 13 Feb 2012 11:21:45 +1100
+Subject: [PULL REQUEST] DMA-mapping framework redesign preparation patches
+In-Reply-To: <1328898737-15854-1-git-send-email-m.szyprowski@samsung.com>
+References: <1328898737-15854-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120213112145.4b8990c739d297cd30714d52@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 11, 2012 at 10:22 AM, Dong Aisheng <dong.aisheng@linaro.org> wrote:
-> Currently most code to get child count in kernel are almost same,
-> add a helper to implement this function for dt to use.
->
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
->
-> ---
-> Hi Rob,
->
-> Since my imx pinctrl driver series still depends on the pinctrl core dt
-> binding patch which is still not in mainline, i'd like this pure dt patch
-> go separately first in case others want to use.
->
-> changes v2->v3:
-> ?Addressed some people's comments:
-> ?* do not use assignment as expression
-> ?* return 0 for non-dt case
->
-> Changes v1->v2:
-> ?* change the name from of_get_child_number to of_get_child_count
-> ---
-> ?include/linux/of.h | ? 16 ++++++++++++++++
-> ?1 files changed, 16 insertions(+), 0 deletions(-)
->
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index a75a831..ae242ef 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -195,6 +195,17 @@ extern struct device_node *of_get_next_child(const struct device_node *node,
-> ? ? ? ?for (child = of_get_next_child(parent, NULL); child != NULL; \
-> ? ? ? ? ? ? child = of_get_next_child(parent, child))
->
-> +static inline int of_get_child_count(const struct device_node *np)
-> +{
-> + ? ? ? struct device_node *child = NULL;
-> + ? ? ? int num = 0;
-> +
-> + ? ? ? while ((child = of_get_next_child(np, child)) != NULL)
-> + ? ? ? ? ? ? ? num++;
+Hi Marek,
 
-Use for_each_child_of_node()
+On Fri, 10 Feb 2012 19:32:17 +0100 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+> Our patches with DMA-mapping framework redesign proposal have been
+> hanging for over a month with just a few comments. We would like to go
+> further in the development, but first I would like to ask You to give
+> them a try in the linux-next kernel.
+> 
+> For everyone interested in this patch series, here is the relevant
+> thread: https://lkml.org/lkml/2011/12/23/97
+> 
+> If there are any problems with our git tree, please contact Marek 
+> Szyprowski <m.szyprowski@samsung.com> or alternatively Kyungmin Park
+> <kyungmin.park@samsung.com>.
+> 
+> The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+> 
+>   Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
+> 
+> are available in the git repository at:
+>   git://git.infradead.org/users/kmpark/linux-samsung dma-mapping-next
 
-g.
+I have added this from today.
+
+Thanks for adding your subsystem tree as a participant of linux-next.  As
+you may know, this is not a judgment of your code.  The purpose of
+linux-next is for integration testing and to lower the impact of
+conflicts between subsystems in the next merge window. 
+
+You will need to ensure that the patches/commits in your tree/series have
+been:
+     * submitted under GPL v2 (or later) and include the Contributor's
+	Signed-off-by,
+     * posted to the relevant mailing list,
+     * reviewed by you (or another maintainer of your subsystem tree),
+     * successfully unit tested, and 
+     * destined for the current or next Linux merge window.
+
+Basically, this should be just what you would send to Linus (or ask him
+to fetch).  It is allowed to be rebased if you deem it necessary.
+
+-- 
+Cheers,
+Stephen Rothwell 
+sfr at canb.auug.org.au
+
+Legal Stuff:
+By participating in linux-next, your subsystem tree contributions are
+public and will be included in the linux-next trees.  You may be sent
+e-mail messages indicating errors or other issues when the
+patches/commits from your subsystem tree are merged and tested in
+linux-next.  These messages may also be cross-posted to the linux-next
+mailing list, the linux-kernel mailing list, etc.  The linux-next tree
+project and IBM (my employer) make no warranties regarding the linux-next
+project, the testing procedures, the results, the e-mails, etc.  If you
+don't agree to these ground rules, let me know and I'll remove your tree
+from participation in linux-next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120213/14b57ce3/attachment.sig>
