@@ -1,28 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Feb 2012 14:22:21 -0800
-Subject: [PATCH 00/15] mach/io.h cleanup and removal
-In-Reply-To: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120213222220.GI1426@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 13 Feb 2012 14:23:29 -0800
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <20120213181501.GD25655@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1202022016480.2759@xanadu.home>
+ <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
+ <CAH+eYFCKcPzMMp_Ef5iX0Xp=xK8MdvJoUBRgKGT56SVjY5DXoA@mail.gmail.com>
+ <alpine.LFD.2.02.1202131307430.24536@xanadu.home>
+ <4F3952C7.3040502@codeaurora.org>
+ <20120213181501.GD25655@n2100.arm.linux.org.uk>
+Message-ID: <4F398D61.9080501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [120213 13:12]:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This series cleans-up mach/io.h and removes it for most platforms that have
-> the same definitions of __io() and __mem_pci(). This mainly leaves platforms
-> with PCI that need an io.h. Most of those can be converted once we have a
-> fixed IO space mapping. OMAP io.h also remains as moving all the extra io.h
-> stuff leaves it quite broken, so I'm leaving it to the OMAP folks to convert.
+On 02/13/12 10:15, Russell King - ARM Linux wrote:
+> On Mon, Feb 13, 2012 at 10:13:27AM -0800, Stephen Boyd wrote:
+>> Thanks. Russell has already merged the original patch to the fixes
+>> branch. Hopefully he can fold this one in.
+> Nope, I've asked Linus to pull it.
+>
+> So do we conclude that the original patch wasn't properly tested? :P
 
-I'll do some patches to use iomap.h on omaps. Are you planning to queue
-these for v3.4 merge window?
+Sigh. Lockdep strikes again! I promise I tested it with lockdep disabled.
 
-If these are for v3.5 merge window, then I'll do a cleanup series that
-just leaves a minimal io.h for omaps that's easy to convert. If you're
-still planning these for v3.4 merge window, I'll rebase on your series.
+It looks like Linus' hasn't pulled yet but maybe he just hasn't
+published it.
 
-Regards,
-
-Tony
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
