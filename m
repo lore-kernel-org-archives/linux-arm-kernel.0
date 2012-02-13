@@ -1,68 +1,59 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Mon, 13 Feb 2012 15:37:25 -0600
-Subject: [Linaro-mm-sig] [PATCHv21 12/16] mm: trigger page reclaim in
- alloc_contig_range() to stabilise watermarks
-In-Reply-To: <op.v9mzhvxt3l0zgt@mpn-glaptop>
-References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
- <1328895151-5196-13-git-send-email-m.szyprowski@samsung.com>
- <CAOCHtYi01NVp1j=MX+0-z7ygW5tJuoswn8eWTQp+0Z5mMGdeQw@mail.gmail.com>
- <op.v9mt58ch3l0zgt@mpn-glaptop>
- <CAOCHtYjc39ThfrcAqdsxNf-bFqKzu=T8=O_W9Cg3cRNzQnX-OQ@mail.gmail.com>
- <op.v9mzhvxt3l0zgt@mpn-glaptop>
-Message-ID: <CAOCHtYh8Gx+79_a-UtqX67gGP0WsMA26Y4MXbgi99AS7tqhH2Q@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Feb 2012 15:38:58 -0600
+Subject: [PATCH 1/8] irq: choose irq_domain type for generic-chip based
+ on irq_base
+In-Reply-To: <1328980472-11923-2-git-send-email-shawn.guo@linaro.org>
+References: <1328980472-11923-1-git-send-email-shawn.guo@linaro.org>
+ <1328980472-11923-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F3982F2.2030301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/2/13 Michal Nazarewicz <mina86@mina86.com>:
->>> On Fri, Feb 10, 2012 at 11:32 AM, Marek Szyprowski
->>>>
->>>> +static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int
->>>> count)
->>>>
->>>> +{
->>>> + ? ? ? enum zone_type high_zoneidx = gfp_zone(gfp_mask);
->>>> + ? ? ? struct zonelist *zonelist = node_zonelist(0, gfp_mask);
->>>> + ? ? ? int did_some_progress = 0;
->>>> + ? ? ? int order = 1;
->>>> + ? ? ? unsigned long watermark;
->>>> +
->>>> + ? ? ? /*
->>>> + ? ? ? ?* Increase level of watermarks to force kswapd do his job
->>>> + ? ? ? ?* to stabilise at new watermark level.
->>>> + ? ? ? ?*/
->>>> + ? ? ? __modify_min_cma_pages(zone, count);
->
->
->> 2012/2/13 Michal Nazarewicz <mina86@mina86.com>:
->>
->>> This should read __update_cma_wmark_pages(). ?Sorry for the incorrect
->>> patch.
->
->
-> On Mon, 13 Feb 2012 13:15:13 -0800, Robert Nelson <robertcnelson@gmail.com>
-> wrote:
->>
->> Thanks Michal, that fixed it..
->
->
-> You are most welcome.
->
->
->> cma-v21 with Rob Clark's omapdrm works great on the Beagle xM..
->
->
-> Can we take that as:
->
-> Tested-by: Robert Nelson <robertcnelson@gmail.com>
->
-> ? ;)
+On 02/11/2012 11:14 AM, Shawn Guo wrote:
+> Choosing irq_domain type for generic-chip based on device_node forces
+> non-DT users to use legacy irq_domain, which makes no sense, because
+> linear irq_domain is actually encouraged to be used by both DT and
+> non-DT users.
 
-Oh, of course:
+NAK
 
-Tested-by: Robert Nelson <robertcnelson@gmail.com>
+Encouraged by who? As we discussed in person at Connect, I said you
+should use legacy domain for non-DT case. Grant and I have discussed
+this as well and agree.
 
-Regards,
+> The patch changes it to make the decision based on irq_base.  If users
+> pass in a negative irq_base value, a linear irq_domain will be created,
+> otherwise a legacy irq_domain will be created.
 
--- 
-Robert Nelson
-http://www.rcn-ee.com/
+This allows DT users to decide as well and possibly use legacy domains
+which is explicitly what I was trying to prevent. DT users must use
+linear domains and non-DT must use legacy. Otherwise, we'll get more
+half done DT conversions like mx5 is.
+
+Getting linear domains to work for non-DT to work would be a worthwhile
+goal if we didn't plan to remove non-DT boards. I don't think we really
+need linear to work for non-DT case.
+
+Rob
+
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  kernel/irq/generic-chip.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+> index 3ac7fa1..839f882 100644
+> --- a/kernel/irq/generic-chip.c
+> +++ b/kernel/irq/generic-chip.c
+> @@ -346,7 +346,7 @@ int irq_setup_generic_chip_domain(const char *name, struct device_node *node,
+>  		irq_setup_generic_chip(gc[i], 0, flags, clr, set);
+>  	}
+>  
+> -	if (node)
+> +	if ((int) irq_base < 0)
+>  		d = irq_domain_add_linear(node, hwirq_cnt,
+>  					  &irq_gc_irq_domain_ops, gc);
+>  	else
