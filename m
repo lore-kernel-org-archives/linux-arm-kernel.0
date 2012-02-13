@@ -1,36 +1,38 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 13 Feb 2012 17:30:23 +0100
-Subject: [PATCH 2/4] ARM: OMAP2+: omap_device: Replace dev_warn by dev_dbg in
- omap_device_build_from_dt
+Date: Mon, 13 Feb 2012 17:30:25 +0100
+Subject: [PATCH 4/4] ARM: OMAP1: kconfig: Enable IRQ_DOMAIN by default for
+ OMAP1 platforms
 In-Reply-To: <1329150625-8604-2-git-send-email-b-cousson@ti.com>
 References: <1329150625-8604-2-git-send-email-b-cousson@ti.com>
-Message-ID: <1329150625-8604-3-git-send-email-b-cousson@ti.com>
+Message-ID: <1329150625-8604-5-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This warning becomes a little bit too verbose with the increase of
-device nodes in some DTS files.
+The devices that can act as an interrupt controller like the
+GPIO are going to be handled using the IRQ domain mechanism
+in order to avoid the static IRQ mapping done so far inside
+plat-omap/irqs.h.
 
-Change it to debug only.
+Enable IRQ_DOMAIN by default to allow the drivers shared with
+OMAP2+ to compile properly on OMAP1 platforms.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/plat-omap/omap_device.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 80d5e4c..125de17 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -343,7 +343,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 
- 	oh_cnt = of_property_count_strings(node, "ti,hwmods");
- 	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
--		dev_warn(&pdev->dev, "No 'hwmods' to build omap_device\n");
-+		dev_dbg(&pdev->dev, "No 'hwmods' to build omap_device\n");
- 		return -ENODEV;
- 	}
- 
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 734009a..e289dd2 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -14,6 +14,7 @@ config ARCH_OMAP1
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
++	select IRQ_DOMAIN
+ 	select HAVE_IDE
+ 	select NEED_MACH_MEMORY_H
+ 	help
 -- 
 1.7.0.4
