@@ -1,26 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Feb 2012 22:59:14 +0000
-Subject: [GIT PULL] omap fixes for v3.3-rc3
-In-Reply-To: <20120213174557.GB1426@atomide.com>
-References: <20120213174557.GB1426@atomide.com>
-Message-ID: <201202132259.14589.arnd@arndb.de>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 13 Feb 2012 18:07:04 -0500
+Subject: [PATCH v2 4/4] ARM: architected timers: add support for UP timer
+In-Reply-To: <1328115575-24866-5-git-send-email-marc.zyngier@arm.com>
+References: <1328115575-24866-1-git-send-email-marc.zyngier@arm.com>
+ <1328115575-24866-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4F399798.8010601@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 February 2012, Tony Lindgren wrote:
-> Hi Arnd and Olof,
-> 
-> Please pull omap fixes from:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
-> 
-> This contains a DT boot fix that was found sitting in the omap DT branch,
-> omap2 related PM fix for serial port, and few compile and warning fixes.
-> 
-> Note that Russell also has a series of omap fixes queued up that will get
-> merged via his tree. There should not be any conflicts between these
-> two series.
+Hi Marc,
 
-Thanks, merged into the fixes branch.
+On 02/01/2012 11:59 AM, Marc Zyngier wrote:
+> If CONFIG_LOCAL_TIMERS is not defined, let the architected timer
+> driver register a single clock_event_device that is used as a
+> global timer.
 
-	Arnd
+[snip]
+
+>  static int __init arch_timer_common_register(void)
+>  {
+> @@ -277,7 +281,16 @@ static int __init arch_timer_common_register(void)
+>  		}
+>  	}
+>  
+> -	err = local_timer_register(&arch_timer_ops);
+> +#ifdef CONFIG_LOCAL_TIMERS
+> +	if (is_smp())
+> +		err = local_timer_register(&arch_timer_ops);
+> +	else
+> +#endif
+> +	{
+> +		arch_timer_global_evt.cpumask = cpumask_of(0);
+> +		err = arch_timer_setup(&arch_timer_global_evt);
+> +	}
+> +
+>  	if (err)
+>  		goto out_free_irq;
+>  
+
+The logic here seems unnecessarily split between the preprocessor and
+compiler. Certainly this can be revised to a more elegant form that
+better keeps with the guidelines on ifdef usage [1].
+
+1. http://www.linuxjournal.com/article/5780?page=0,3
+
+Regards,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
