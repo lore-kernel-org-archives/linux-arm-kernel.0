@@ -1,28 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Feb 2012 22:36:53 +0000
-Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <1329169408-17253-14-git-send-email-robherring2@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Feb 2012 16:48:21 -0600
+Subject: [PATCH 03/15] ARM: provide runtime hook for ioremap
+In-Reply-To: <20120213223051.GE25655@n2100.arm.linux.org.uk>
 References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <1329169408-17253-14-git-send-email-robherring2@gmail.com>
-Message-ID: <20120213223653.GF25655@n2100.arm.linux.org.uk>
+ <1329169408-17253-4-git-send-email-robherring2@gmail.com>
+ <20120213223051.GE25655@n2100.arm.linux.org.uk>
+Message-ID: <4F399335.60908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 03:43:26PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On 02/13/2012 04:30 PM, Russell King - ARM Linux wrote:
+> On Mon, Feb 13, 2012 at 03:43:16PM -0600, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> We have compile time over-ride of ioremap, but an run-time override is
+>> needed for multi-platform builds.
 > 
-> Add a kconfig option NEED_MACH_IO_H to conditionally include mach/io.h.
-> 
-> Basing this on CONFIG_PCI and CONFIG_ISA doesn't quite work. Most ISA
-> platforms don't need mach/io.h, but ebsa110 does.
+> Are you sure we need this after Nicolas' updates to ioremap() ?
 
-This is architecturally wrong.  If you have ISA, and your __io() macro
-is essentially a 1:1 translation, you're asking for ISA drivers to
-scribble on whatever is at virtual address 0-64K.  Too bad if that
-happens to be where your CPU vectors are stored, you'll lose control
-of the CPU in that case.
+Yes, because these are adjusting the memory type, not redirecting the
+ioremap to a static mapping. There was some discussion among Nico, Arnd
+and myself about using static mappings instead as you can set the memory
+type. The imx case is all addresses below 0x8000000 except the interrupt
+controller need adjustment. This would burn up a lot more virtual space
+or be a long list of peripherals. I think my change is much simpler and
+is just generalizing what imx is doing for everyone.
 
-In other words, if you have PCI or ISA and your __io() macro is a 1:1
-translation, you _need_ an io.h to define a proper offset for this.
+There's also a few other custom ioremaps I didn't convert: ebsa110,
+iop13xx, and ixp4xx. These platforms already have multiple issues with
+single kernel.
 
-So, I think this patch series moves things in the wrong direction.
+Rob
