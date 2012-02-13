@@ -1,133 +1,28 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 13 Feb 2012 13:25:55 +0800
-Subject: [PATCH v5 1/2] mxs-dma : move the mxs dma.h to a more common place
-In-Reply-To: <1329110756-14434-1-git-send-email-b32955@freescale.com>
-References: <1329110756-14434-1-git-send-email-b32955@freescale.com>
-Message-ID: <1329110756-14434-2-git-send-email-b32955@freescale.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 13 Feb 2012 11:03:09 +0530
+Subject: [PATCH v9 00/25] gpio/omap: driver cleanup and fixes
+In-Reply-To: <87ty2yxy3b.fsf@ti.com>
+References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
+ <20120210192416.GW1426@atomide.com> <87ty2yxy3b.fsf@ti.com>
+Message-ID: <CAC83Zv+TBgKDH=y++AmG+uXj+quOt60U98OY=BO-41SH=6ozYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the header to a more common place.
-The mxs dma engine is not only used in mx23/mx28, but also used
-in mx50/mx6q.  It will also be used in the future chips.
-
-Rename it to mxs-dma.h, and create a new folder include/linux/fsl/ to
-store the Freescale's header files.
-
-change mxs-dma driver, mxs-mmc driver, gpmi-nand driver, mxs-saif driver
-to the new header file.
-
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/dma/mxs-dma.c                              |    2 +-
- drivers/mmc/host/mxs-mmc.c                         |    2 +-
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |    2 +-
- .../mach/dma.h => include/linux/fsl/mxs-dma.h      |    0
- sound/soc/mxs/mxs-pcm.c                            |    2 +-
- sound/soc/mxs/mxs-pcm.h                            |    2 +-
- sound/soc/mxs/mxs-saif.c                           |    2 +-
- 7 files changed, 6 insertions(+), 6 deletions(-)
- rename arch/arm/mach-mxs/include/mach/dma.h => include/linux/fsl/mxs-dma.h (100%)
-
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index b06cd4c..0afcedb 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -22,10 +22,10 @@
- #include <linux/platform_device.h>
- #include <linux/dmaengine.h>
- #include <linux/delay.h>
-+#include <linux/fsl/mxs-dma.h>
- 
- #include <asm/irq.h>
- #include <mach/mxs.h>
--#include <mach/dma.h>
- #include <mach/common.h>
- 
- /*
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 382c835..e5ea2b1 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -38,10 +38,10 @@
- #include <linux/gpio.h>
- #include <linux/regulator/consumer.h>
- #include <linux/module.h>
-+#include <linux/fsl/mxs-dma.h>
- 
- #include <mach/mxs.h>
- #include <mach/common.h>
--#include <mach/dma.h>
- #include <mach/mmc.h>
- 
- #define DRIVER_NAME	"mxs-mmc"
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index c93b0ae..b9002c8 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -20,7 +20,7 @@
- #include <linux/mtd/nand.h>
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
--#include <mach/dma.h>
-+#include <linux/fsl/mxs-dma.h>
- 
- struct resources {
- 	void          *gpmi_regs;
-diff --git a/arch/arm/mach-mxs/include/mach/dma.h b/include/linux/fsl/mxs-dma.h
-similarity index 100%
-rename from arch/arm/mach-mxs/include/mach/dma.h
-rename to include/linux/fsl/mxs-dma.h
-diff --git a/sound/soc/mxs/mxs-pcm.c b/sound/soc/mxs/mxs-pcm.c
-index 105f42a..420715e 100644
---- a/sound/soc/mxs/mxs-pcm.c
-+++ b/sound/soc/mxs/mxs-pcm.c
-@@ -28,6 +28,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/dmaengine.h>
-+#include <linux/fsl/mxs-dma.h>
- 
- #include <sound/core.h>
- #include <sound/initval.h>
-@@ -35,7 +36,6 @@
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- 
--#include <mach/dma.h>
- #include "mxs-pcm.h"
- 
- static struct snd_pcm_hardware snd_mxs_hardware = {
-diff --git a/sound/soc/mxs/mxs-pcm.h b/sound/soc/mxs/mxs-pcm.h
-index f55ac4f..d2c8b12 100644
---- a/sound/soc/mxs/mxs-pcm.h
-+++ b/sound/soc/mxs/mxs-pcm.h
-@@ -19,7 +19,7 @@
- #ifndef _MXS_PCM_H
- #define _MXS_PCM_H
- 
--#include <mach/dma.h>
-+#include <linux/fsl/mxs-dma.h>
- 
- struct mxs_pcm_dma_params {
- 	int chan_irq;
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index f204dba..ce59112 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -24,12 +24,12 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/time.h>
-+#include <linux/fsl/mxs-dma.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
- #include <sound/saif.h>
--#include <mach/dma.h>
- #include <asm/mach-types.h>
- #include <mach/hardware.h>
- #include <mach/mxs.h>
--- 
-1.7.0.4
+On Sat, Feb 11, 2012 at 1:25 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Tony Lindgren <tony@atomide.com> writes:
+>
+> [...]
+>
+>> ..but are there also some patches in your series that should also be
+>> applied separately as fixes for the -rc cycle?
+>
+> IMO, there aren't any things in this series that fall into the
+> regression category.
+That's right.
+--
+Tarun
+>
+> After I get to a final review and test of this (early next week), I'm
+> planning to sent a pull request to Grant.
+>
+> Kevin
