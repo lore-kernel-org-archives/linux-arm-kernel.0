@@ -1,65 +1,247 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 13 Feb 2012 21:36:35 +0530
-Subject: [PATCH] Optimize multi-CPU tlb flushing a little more
-In-Reply-To: <20110823110602.GG19622@n2100.arm.linux.org.uk>
-References: <20110823110602.GG19622@n2100.arm.linux.org.uk>
-Message-ID: <CAH+eYFC_mkdObV0NfN5Jtv0L6fM9e0YGOBghTEVSqf=TAFxdXw@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 13 Feb 2012 18:13:18 +0200
+Subject: =?UTF-8?Q?=E7=AD=94=E5=A4=8D=3A?=
+ =?UTF-8?Q?_=E7=AD=94=E5=A4=8D=3A?= [PATCH] mtd/gpmi : add gpmi support for
+ mx6q
+In-Reply-To: <14C4E31473AF7E4B98176CB73615181C363DF6@039-SN1MPN1-006.039d.mgd.msft.net>
+References: <1328505606-27981-1-git-send-email-b32955@freescale.com>
+ , <1329134454.22240.114.camel@sauron.fi.intel.com>
+ <14C4E31473AF7E4B98176CB73615181C362D9F@039-SN1MPN1-006.039d.mgd.msft.net>
+ , <1329147404.22240.178.camel@sauron.fi.intel.com>
+ <14C4E31473AF7E4B98176CB73615181C363DF6@039-SN1MPN1-006.039d.mgd.msft.net>
+Message-ID: <1329149598.22240.210.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 16:36, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> @@ -352,29 +359,22 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
-> ? ? ? ?if (tlb_flag(TLB_WB))
-> ? ? ? ? ? ? ? ?dsb();
->
-> - ? ? ? if (cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
-> - ? ? ? ? ? ? ? if (tlb_flag(TLB_V3_FULL))
-> - ? ? ? ? ? ? ? ? ? ? ? asm("mcr p15, 0, %0, c6, c0, 0" : : "r" (zero) : "cc");
-> - ? ? ? ? ? ? ? if (tlb_flag(TLB_V4_U_FULL))
-> - ? ? ? ? ? ? ? ? ? ? ? asm("mcr p15, 0, %0, c8, c7, 0" : : "r" (zero) : "cc");
-> - ? ? ? ? ? ? ? if (tlb_flag(TLB_V4_D_FULL))
-> - ? ? ? ? ? ? ? ? ? ? ? asm("mcr p15, 0, %0, c8, c6, 0" : : "r" (zero) : "cc");
-> - ? ? ? ? ? ? ? if (tlb_flag(TLB_V4_I_FULL))
-> - ? ? ? ? ? ? ? ? ? ? ? asm("mcr p15, 0, %0, c8, c5, 0" : : "r" (zero) : "cc");
-> + ? ? ? if (possible_tlb_flags & (TLB_V3_FULL|TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL) &&
-> + ? ? ? ? ? cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
-> + ? ? ? ? ? ? ? tlb_op(TLB_V3_FULL, "c6, c0, 0", zero);
-> + ? ? ? ? ? ? ? tlb_op(TLB_V4_U_FULL, "c8, c7, 0", zero);
-> + ? ? ? ? ? ? ? tlb_op(TLB_V4_D_FULL, "c8, c6, 0", zero);
-> + ? ? ? ? ? ? ? tlb_op(TLB_V4_I_FULL, "c8, c5, 0", zero);
-> ? ? ? ?}
-> ? ? ? ?put_cpu();
+On Mon, 2012-02-13 at 15:48 +0000, Huang Shijie-B32955 wrote:
+> Hi,
+> 
+> >scripts/kconfig/conf --savedefconfig=defconfig Kconfig
+> >warning: (MTD_NAND_GPMI_NAND) selects MTD_CMDLINE_PARTS which has unmet direct dependencies (MTD=y)
+> 
+> >Would mxs people send a fix?
+> 
+> Do you mean i have to remove the "select MTD_CMD_LINE_PARTS" for gpmi-nand?
 
-This part conditionally calls get_cpu() but unconditionally calls
-put_cpu():
+Not sure, think of something :-) I've attached the defconfig I used.
+Probably something to do with the fact that I enabled everything as a
+module. If you are unable to analyze, let me know and I'll try to look
+closer.
 
- ------------[ cut here ]------------
- WARNING: at /home/rabin/kernel/arm/kernel/sched/core.c:3051
-sub_preempt_count+0xa0/0xe0()
- Modules linked in:
- [<c0013c4c>] (unwind_backtrace+0x0/0xec) from [<c028b2e4>]
-(dump_stack+0x20/0x24)
- [<c028b2e4>] (dump_stack+0x20/0x24) from [<c001f808>]
-(warn_slowpath_common+0x5c/0x74)
- [<c001f808>] (warn_slowpath_common+0x5c/0x74) from [<c001f84c>]
-(warn_slowpath_null+0x2c/0x34)
- [<c001f84c>] (warn_slowpath_null+0x2c/0x34) from [<c004d588>]
-(sub_preempt_count+0xa0/0xe0)
- [<c004d588>] (sub_preempt_count+0xa0/0xe0) from [<c0012e54>]
-(flush_tlb_mm+0x64/0xa4)
- [<c0012e54>] (flush_tlb_mm+0x64/0xa4) from [<c00e25b8>]
-(setup_arg_pages+0x260/0x39c)
- [<c00e25b8>] (setup_arg_pages+0x260/0x39c) from [<c012000c>]
-(load_elf_binary+0x3ec/0x11d8)
- [<c012000c>] (load_elf_binary+0x3ec/0x11d8) from [<c00e1e78>]
-(search_binary_handler+0xd8/0x2c8)
- [<c00e1e78>] (search_binary_handler+0xd8/0x2c8) from [<c00e3b5c>]
-(do_execve+0x29c/0x3b4)
- [<c00e3b5c>] (do_execve+0x29c/0x3b4) from [<c0011080>]
-(kernel_execve+0x48/0x90)
- [<c0011080>] (kernel_execve+0x48/0x90) from [<c0037274>]
-(____call_usermodehelper+0x118/0x130)
- [<c0037274>] (____call_usermodehelper+0x118/0x130) from [<c000e784>]
-(kernel_thread_exit+0x0/0x8)
- ---[ end trace 309cd09e6562b6c8 ]---
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+CONFIG_EXPERIMENTAL=y
+CONFIG_SYSVIPC=y
+CONFIG_TASKSTATS=y
+CONFIG_TASK_DELAY_ACCT=y
+CONFIG_TASK_XACCT=y
+CONFIG_TASK_IO_ACCOUNTING=y
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+# CONFIG_UTS_NS is not set
+# CONFIG_IPC_NS is not set
+# CONFIG_USER_NS is not set
+# CONFIG_PID_NS is not set
+# CONFIG_NET_NS is not set
+CONFIG_PERF_EVENTS=y
+# CONFIG_COMPAT_BRK is not set
+CONFIG_MODULES=y
+CONFIG_MODULE_FORCE_LOAD=y
+CONFIG_MODULE_UNLOAD=y
+CONFIG_MODULE_FORCE_UNLOAD=y
+CONFIG_MODVERSIONS=y
+CONFIG_BLK_DEV_INTEGRITY=y
+# CONFIG_IOSCHED_DEADLINE is not set
+# CONFIG_IOSCHED_CFQ is not set
+CONFIG_ARCH_MXS=y
+CONFIG_MACH_STMP378X_DEVB=y
+CONFIG_MACH_MX23EVK=y
+CONFIG_MACH_MX28EVK=y
+CONFIG_MACH_TX28=y
+CONFIG_MACH_M28EVK=y
+# CONFIG_ARM_THUMB is not set
+CONFIG_NO_HZ=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_PREEMPT_VOLUNTARY=y
+CONFIG_AEABI=y
+CONFIG_DEFAULT_MMAP_MIN_ADDR=65536
+CONFIG_AUTO_ZRELADDR=y
+CONFIG_FPE_NWFPE=y
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+CONFIG_INET=y
+CONFIG_IP_PNP=y
+CONFIG_IP_PNP_DHCP=y
+CONFIG_SYN_COOKIES=y
+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+# CONFIG_INET_XFRM_MODE_BEET is not set
+# CONFIG_INET_LRO is not set
+# CONFIG_INET_DIAG is not set
+# CONFIG_IPV6 is not set
+CONFIG_CAN=m
+CONFIG_CAN_RAW=m
+CONFIG_CAN_BCM=m
+CONFIG_CAN_FLEXCAN=m
+# CONFIG_WIRELESS is not set
+CONFIG_DEVTMPFS=y
+# CONFIG_FIRMWARE_IN_KERNEL is not set
+CONFIG_MTD=m
+CONFIG_MTD_TESTS=m
+CONFIG_MTD_REDBOOT_PARTS=m
+CONFIG_MTD_AFS_PARTS=m
+CONFIG_MTD_AR7_PARTS=m
+CONFIG_MTD_CHAR=m
+CONFIG_MTD_BLOCK=m
+CONFIG_MTD_BLOCK_RO=m
+CONFIG_FTL=m
+CONFIG_NFTL=m
+CONFIG_INFTL=m
+CONFIG_RFD_FTL=m
+CONFIG_SSFDC=m
+CONFIG_SM_FTL=m
+CONFIG_MTD_OOPS=m
+CONFIG_MTD_SWAP=m
+CONFIG_MTD_CFI=m
+CONFIG_MTD_JEDECPROBE=m
+CONFIG_MTD_CFI_ADV_OPTIONS=y
+CONFIG_MTD_CFI_GEOMETRY=y
+CONFIG_MTD_CFI_I8=y
+CONFIG_MTD_OTP=y
+CONFIG_MTD_CFI_INTELEXT=m
+CONFIG_MTD_CFI_AMDSTD=m
+CONFIG_MTD_CFI_STAA=m
+CONFIG_MTD_ROM=m
+CONFIG_MTD_ABSENT=m
+CONFIG_MTD_COMPLEX_MAPPINGS=y
+CONFIG_MTD_PHYSMAP=m
+CONFIG_MTD_PHYSMAP_COMPAT=y
+CONFIG_MTD_GPIO_ADDR=m
+CONFIG_MTD_PLATRAM=m
+CONFIG_MTD_LATCH_ADDR=m
+CONFIG_MTD_DATAFLASH=m
+CONFIG_MTD_DATAFLASH_OTP=y
+CONFIG_MTD_M25P80=m
+CONFIG_MTD_SST25L=m
+CONFIG_MTD_SLRAM=m
+CONFIG_MTD_PHRAM=m
+CONFIG_MTD_MTDRAM=m
+CONFIG_MTD_BLOCK2MTD=m
+CONFIG_MTD_DOC2000=m
+CONFIG_MTD_DOC2001=m
+CONFIG_MTD_DOC2001PLUS=m
+CONFIG_MTD_DOCG3=m
+CONFIG_MTD_DOCPROBE_ADVANCED=y
+CONFIG_MTD_DOCPROBE_HIGH=y
+CONFIG_MTD_DOCPROBE_55AA=y
+CONFIG_MTD_NAND_ECC_SMC=y
+CONFIG_MTD_NAND=m
+CONFIG_MTD_NAND_VERIFY_WRITE=y
+CONFIG_MTD_NAND_ECC_BCH=y
+CONFIG_MTD_NAND_MUSEUM_IDS=y
+CONFIG_MTD_NAND_GPIO=m
+CONFIG_MTD_NAND_DISKONCHIP=m
+CONFIG_MTD_NAND_DISKONCHIP_BBTWRITE=y
+CONFIG_MTD_NAND_DOCG4=m
+CONFIG_MTD_NAND_NANDSIM=m
+CONFIG_MTD_NAND_GPMI_NAND=y
+CONFIG_MTD_NAND_PLATFORM=m
+CONFIG_MTD_ONENAND=m
+CONFIG_MTD_ONENAND_VERIFY_WRITE=y
+CONFIG_MTD_ONENAND_GENERIC=m
+CONFIG_MTD_ONENAND_OTP=y
+CONFIG_MTD_ONENAND_2X_PROGRAM=y
+CONFIG_MTD_ONENAND_SIM=m
+CONFIG_MTD_LPDDR=m
+CONFIG_MTD_UBI=m
+CONFIG_MTD_UBI_GLUEBI=m
+CONFIG_MTD_UBI_DEBUG=y
+# CONFIG_BLK_DEV is not set
+CONFIG_NETDEVICES=y
+CONFIG_ENC28J60=y
+# CONFIG_WLAN is not set
+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+CONFIG_INPUT_EVDEV=m
+# CONFIG_INPUT_KEYBOARD is not set
+# CONFIG_INPUT_MOUSE is not set
+CONFIG_INPUT_TOUCHSCREEN=y
+CONFIG_TOUCHSCREEN_TSC2007=m
+# CONFIG_SERIO is not set
+CONFIG_VT_HW_CONSOLE_BINDING=y
+CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+# CONFIG_LEGACY_PTYS is not set
+# CONFIG_DEVKMEM is not set
+CONFIG_SERIAL_AMBA_PL011=y
+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+# CONFIG_HW_RANDOM is not set
+CONFIG_I2C=m
+# CONFIG_I2C_COMPAT is not set
+CONFIG_I2C_CHARDEV=m
+CONFIG_I2C_MXS=m
+CONFIG_SPI=y
+CONFIG_SPI_GPIO=m
+CONFIG_DEBUG_GPIO=y
+CONFIG_GPIO_SYSFS=y
+# CONFIG_HWMON is not set
+# CONFIG_HID_SUPPORT is not set
+# CONFIG_USB_SUPPORT is not set
+CONFIG_MMC=y
+CONFIG_MMC_MXS=y
+CONFIG_RTC_CLASS=y
+CONFIG_RTC_DRV_DS1307=m
+CONFIG_DMADEVICES=y
+CONFIG_MXS_DMA=y
+CONFIG_EXT3_FS=y
+# CONFIG_DNOTIFY is not set
+CONFIG_FSCACHE=m
+CONFIG_FSCACHE_STATS=y
+CONFIG_CACHEFILES=m
+CONFIG_TMPFS=y
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_JFFS2_FS=m
+CONFIG_JFFS2_FS_WBUF_VERIFY=y
+CONFIG_JFFS2_SUMMARY=y
+CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+# CONFIG_JFFS2_RTIME is not set
+CONFIG_JFFS2_CMODE_NONE=y
+CONFIG_UBIFS_FS=m
+CONFIG_UBIFS_FS_XATTR=y
+CONFIG_UBIFS_FS_ADVANCED_COMPR=y
+# CONFIG_UBIFS_FS_LZO is not set
+# CONFIG_UBIFS_FS_ZLIB is not set
+CONFIG_UBIFS_FS_DEBUG=y
+CONFIG_LOGFS=m
+CONFIG_NFS_FS=y
+CONFIG_NFS_V3=y
+CONFIG_NFS_V3_ACL=y
+CONFIG_NFS_V4=y
+CONFIG_ROOT_NFS=y
+CONFIG_PRINTK_TIME=y
+CONFIG_FRAME_WARN=2048
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_UNUSED_SYMBOLS=y
+CONFIG_DEBUG_KERNEL=y
+CONFIG_LOCKUP_DETECTOR=y
+CONFIG_TIMER_STATS=y
+CONFIG_PROVE_LOCKING=y
+CONFIG_DEBUG_INFO=y
+CONFIG_SYSCTL_SYSCALL_CHECK=y
+CONFIG_BLK_DEV_IO_TRACE=y
+CONFIG_STRICT_DEVMEM=y
+CONFIG_DEBUG_USER=y
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_CRC32C=m
+# CONFIG_CRYPTO_ANSI_CPRNG is not set
+# CONFIG_CRYPTO_HW is not set
+CONFIG_CRC_ITU_T=m
+CONFIG_CRC7=m
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120213/8eb99ce3/attachment.sig>
