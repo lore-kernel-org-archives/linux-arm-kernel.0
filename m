@@ -1,27 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Feb 2012 05:52:52 +0000
-Subject: [GIT PULL] samsung dt fixes-3 for v3.3
-In-Reply-To: <4F36AD27.5000503@samsung.com>
-References: <4F36AD27.5000503@samsung.com>
-Message-ID: <201202130552.53075.arnd@arndb.de>
+Date: Mon, 13 Feb 2012 06:02:15 +0000
+Subject: [GIT PULL] samsung devel-rtc for v3.4
+In-Reply-To: <4F36AEDE.6060506@samsung.com>
+References: <4F36AEDE.6060506@samsung.com>
+Message-ID: <201202130602.15615.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Saturday 11 February 2012, Kukjin Kim wrote:
-> Please pull samsung fixes-3 for v3.3.
-> There are regarding exynos dt fixes.
+> Please pull samsung rtc developing which has been missed to upstream.
+> I rebased it Olof said and there is no conflicts with
+> arm-soc/depends/rmk/for-armsoc.
 > 
-> If any problems, please let me know.
+> If any problem, please kindly let me know.
 > 
+> Thanks.
 > 
-> The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
 > 
->    Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
+> The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+> 
+>    Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
 > 
 > are available in the git repository at:
->    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->   v3.3-samsung-fixes-3
+>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> v3.4-next/devel-samsung-rtc
+> 
 
-Pulled into the fixes branch, thanks!
+Pulled into next/drivers.
+
+Thanks!
 
 	Arnd
