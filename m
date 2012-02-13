@@ -1,56 +1,56 @@
 From: bill4carson@gmail.com (Bill Carson)
-Date: Mon, 13 Feb 2012 17:44:26 +0800
-Subject: [PATCH 5/7] Using do_page_fault for section fault handling
+Date: Mon, 13 Feb 2012 17:44:27 +0800
+Subject: [PATCH 6/7] Add hugetlb Kconfig option
 In-Reply-To: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
 References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
-Message-ID: <1329126268-11032-6-git-send-email-bill4carson@gmail.com>
+Message-ID: <1329126268-11032-7-git-send-email-bill4carson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Bill Carson <bill4carson@gmail.com>
 ---
- arch/arm/mm/fault.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig |   29 +++++++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index bb7eac3..af6703d 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -19,6 +19,7 @@
- #include <linux/sched.h>
- #include <linux/highmem.h>
- #include <linux/perf_event.h>
-+#include <linux/hugetlb.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a48aecc..161bca6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -985,6 +985,35 @@ config ARCH_ZYNQ
+ 	  Support for Xilinx Zynq ARM Cortex A9 Platform
+ endchoice
  
- #include <asm/exception.h>
- #include <asm/system.h>
-@@ -485,6 +486,7 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
- }
- #endif					/* CONFIG_MMU */
- 
-+#ifndef CONFIG_ARM_HUGETLB_SUPPORT
- /*
-  * Some section permission faults need to be handled gracefully.
-  * They can happen due to a __{get,put}_user during an oops.
-@@ -496,6 +498,19 @@ do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 	return 0;
- }
- 
-+#else
++config SYS_SUPPORTS_HUGETLBFS
++		def_bool n
 +
-+/* Since normal 4K page based vma will never fault into section traps,
-+ * This will enable us to use do_page_fault for section permission fault.
-+ */
-+static int
-+do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-+{
-+	do_page_fault(addr, fsr, regs);
-+	return 0;
-+}
-+#endif
++config ARM_HUGETLB_SUPPORT
++	bool "Support HUGETLB for ARMv7 (EXPERIMENTAL)"
++	depends on CPU_V7 && EXPERIMENTAL
++	select SYS_SUPPORTS_HUGETLBFS
++	select HUGETLBFS
++	default y
 +
- /*
-  * This abort handler always returns "fault".
-  */
++choice
++	prompt "Huge Page Size"
++	depends on ARM_HUGETLB_SUPPORT
++	default HUGEPAGE_SIZE_2MB
++
++config HUGEPAGE_SIZE_2MB
++	bool "2MB"
++	depends on ARM_HUGETLB_SUPPORT
++	help
++	 This option select huge page size in 2MB units
++
++config HUGEPAGE_SIZE_16MB
++	bool "16MB"
++	depends on ARM_HUGETLB_SUPPORT
++	help
++	  This option select huge page size in 16MB units
++
++endchoice
++
+ #
+ # This is sorted alphabetically by mach-* pathname.  However, plat-*
+ # Kconfigs may be included either alphabetically (according to the
 -- 
 1.7.1
