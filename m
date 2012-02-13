@@ -1,60 +1,79 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 13 Feb 2012 11:38:22 -0800
-Subject: [Linaro-mm-sig] [PATCHv21 12/16] mm: trigger page reclaim in
- alloc_contig_range() to stabilise watermarks
-In-Reply-To: <CAOCHtYi01NVp1j=MX+0-z7ygW5tJuoswn8eWTQp+0Z5mMGdeQw@mail.gmail.com>
-References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
- <1328895151-5196-13-git-send-email-m.szyprowski@samsung.com>
- <CAOCHtYi01NVp1j=MX+0-z7ygW5tJuoswn8eWTQp+0Z5mMGdeQw@mail.gmail.com>
-Message-ID: <op.v9mt58ch3l0zgt@mpn-glaptop>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 13 Feb 2012 12:40:14 -0700
+Subject: [PATCH v3] SPI: add CSR SiRFprimaII SPI controller driver
+In-Reply-To: <5EB3BFCD089AD643B9BB63439F5FD5E99CB93BC5@SHAASIEXM01.ASIA.ROOT.PRI>
+References: <1328717446-4526-1-git-send-email-21cnbao@gmail.com>
+ <20120209152340.GB11249@ponder.secretlab.ca>
+ <5EB3BFCD089AD643B9BB63439F5FD5E99CB93BC5@SHAASIEXM01.ASIA.ROOT.PRI>
+Message-ID: <20120213194014.GG11077@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Feb 10, 2012 at 11:32 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> @@ -5637,6 +5642,56 @@ static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
->>        return ret > 0 ? 0 : ret;
->>  }
->>
->> +/*
->> + * Update zone's cma pages counter used for watermark level calculation.
->> + */
->> +static inline void __update_cma_wmark_pages(struct zone *zone, int count)
->> +{
->> +       unsigned long flags;
->> +       spin_lock_irqsave(&zone->lock, flags);
->> +       zone->min_cma_pages += count;
->> +       spin_unlock_irqrestore(&zone->lock, flags);
->> +       setup_per_zone_wmarks();
->> +}
->> +
->> +/*
->> + * Trigger memory pressure bump to reclaim some pages in order to be able to
->> + * allocate 'count' pages in single page units. Does similar work as
->> + *__alloc_pages_slowpath() function.
->> + */
->> +static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
->> +{
->> +       enum zone_type high_zoneidx = gfp_zone(gfp_mask);
->> +       struct zonelist *zonelist = node_zonelist(0, gfp_mask);
->> +       int did_some_progress = 0;
->> +       int order = 1;
->> +       unsigned long watermark;
->> +
->> +       /*
->> +        * Increase level of watermarks to force kswapd do his job
->> +        * to stabilise at new watermark level.
->> +        */
->> +       __modify_min_cma_pages(zone, count);
+On Fri, Feb 10, 2012 at 05:06:15AM +0000, Barry Song wrote:
+> Hi Grant,
+> > > +
+> > > +struct sirfsoc_spi {
+> > > +	struct spi_bitbang bitbang;
+> > > +	struct completion done;
+> > > +
+> > > +	u32 irq;
+> > 
+> > irq is set once and never used outside the probe function.  Doesn't need
+> > to be here.
+> 
+> ok
+> > 
+> > > +	void __iomem *base;
+> > > +	u32 ctrl_freq;  /* SPI controller clock speed */
+> > > +	struct clk *clk;
+> > > +	int bus_num;
+> > 
+> > bus_num is unused
+> 
+> Ok.
+> 
+> > > +
+> > > +static void spi_sirfsoc_tasklet_tx(unsigned long arg)
+> > > +{
+> > > +	struct sirfsoc_spi *sspi = (struct sirfsoc_spi *)arg;
+> > > +
+> > > +	/* Fill Tx FIFO while there are left words to be transmitted */
+> > > +	while (!((readl(sspi->base + SIRFSOC_SPI_TXFIFO_STATUS) &
+> > > +			SIRFSOC_SPI_FIFO_FULL)) &&
+> > > +			sspi->left_tx_cnt)
+> > > +		sspi->tx_word(sspi);
+> > 
+> > Potential problem: if for any reason the device stalls and the FULL bit
+> > doesn't get cleared, then this function will be stuck in a tight loop.  This
+> > may not be an issue, but it should be considered.
+> 
+> Might timeout check.
+> 
+> > > +
+> > > +static void spi_sirfsoc_chipselect(struct spi_device *spi, int value)
+> > > +{
+> > > +	struct sirfsoc_spi *sspi = spi_master_get_devdata(spi->master);
+> > > +	struct sirfsoc_spi_ctrldata *ctl_data = spi->controller_data;
+> > 
+> > Where does controller_data come from?  It is not set in the driver, and it is
+> > *not* something that the spi_device driver or the board code is allowed to set.
+> > 
+> > If the driver needs controller_data, then it needs to be added to each spi
+> > device by the spi controller driver when the slave device is registered.
+> > 
+> The controller_data is mainly for various kinds of chip selection. We might have a CS pin, a GPIO from prima2, or a GPIO from an extended MCU side by side with prima2.
+> It seems like you think this driver should handle all different kinds of chip selection support and implement those callbacks in it? And every spi client use DT to describe the CS pin?
 
-On Mon, 13 Feb 2012 10:57:58 -0800, Robert Nelson <robertcnelson@gmail.com> wrote:
-> Hi Marek,   This ^^^ function doesn't seem to exist in this patchset,
-> is it in another set posted to lkml?
+What I am saying is that controller_data should not be prepopulated at
+spi_device registration time.  That pointer is 'owned' by the spi controller
+and if it is used, should be set by the spi_master.
 
-This should read __update_cma_wmark_pages().  Sorry for the incorrect patch.
+If the spi_master needs a controller_data pointer, then that data should
+either be passed to the spi_master via the spi_master's platform_data, or it
+should be decoded from the device tree.  In either case, it is the
+responsibility of the spi_master driver to set the value of controller_data
+for each of its spi_device children.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+Does that make sense?
+
+g.
