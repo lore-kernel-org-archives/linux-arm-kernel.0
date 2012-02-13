@@ -1,41 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Feb 2012 06:28:00 +0000
-Subject: [PATCH 0/6] ux500: Export SoC information and some platform
- clean-up
-In-Reply-To: <20120210194358.GA5537@kroah.com>
-References: <1328556146-3730-1-git-send-email-lee.jones@linaro.org>
- <20120210194358.GA5537@kroah.com>
-Message-ID: <201202130628.01081.arnd@arndb.de>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 13 Feb 2012 11:44:18 +0530
+Subject: [PATCH v2 0/2] AM335X: SoC type detection & SRAM support
+Message-ID: <1329113658-7417-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 February 2012, Greg KH wrote:
-> On Mon, Feb 06, 2012 at 11:22:20AM -0800, Lee Jones wrote:
-> > This patch-set satisfies 4 objectives:
-> >  1. Ensures each platform device can specify a suitable parent
-> >  2. Provides a bus for SoC devices as a means to export information
-> >  3. Allows ux500 to make use of the new SoC bus
-> >  4. Cleans up unnecessary complexity from ux500 code
-> 
-> I've applied the driver-core bits, nice job in sticking with this.  I'll
-> let the other bits trickle through the arch-specific trees.
+Hi,
 
-Ok, very good. Thanks both of you for your patience. I'm looking forward
-to many good patches from Lee now that he has made it through this.
+These changes does,
+1. detect SoC type (i.e. GP or not)
+2. add minimal SRAM support
+ for AM335X devices
 
-IIRC it was mostly an attempt for Lee to start contributing one of the
-"simpler" patches from the st-ericsson internal tree in order to get
-started. My feeling is that almost any other patch would have been easier
-because it does not involve infrastructure and APIs, but this was certainly
-a learning experience ;-).
+These are required to get AM335X boot to prompt (but not sufficient)
 
-I've applied the ux500 patches onto the ux500/soc branch of the arm-soc
-tree now and added the current head of the driver-core tree as the
-next/driver-core branch in the same tree. I will keep track of this
-and send out the ux500 patches during the next merge window after the
-core changes have been merged. Other platforms are very welcome to
-send patches based on the same interface for 3.4. I know from working
-with Greg that he does not rebase his trees, so I assume this is the
-best approach.
+v2: Use OMAP naming conventions for subject
 
-	Arnd
+Regards
+Afzal
+
+Afzal Mohammed (1):
+  ARM: OMAP2+: id: Add am33xx SoC type detection
+
+Vaibhav Bedia (1):
+  ARM: OMAP: sram: Add am33xx SRAM support (minimal)
+
+ arch/arm/mach-omap2/control.h          |    5 +++++
+ arch/arm/mach-omap2/id.c               |    2 ++
+ arch/arm/plat-omap/include/plat/sram.h |    1 +
+ arch/arm/plat-omap/sram.c              |   14 ++++++++++++--
+ 4 files changed, 20 insertions(+), 2 deletions(-)
