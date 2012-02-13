@@ -1,56 +1,35 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 13 Feb 2012 16:13:58 -0600
-Subject: [PATCH 03/15] ARM: provide runtime hook for ioremap
-In-Reply-To: <1329169408-17253-4-git-send-email-robherring2@gmail.com>
+Date: Mon, 13 Feb 2012 16:14:06 -0600
+Subject: [PATCH 02/15] ARM: add explicit include of system.h to processor.h
+In-Reply-To: <1329169408-17253-3-git-send-email-robherring2@gmail.com>
 References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <1329169408-17253-4-git-send-email-robherring2@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FCB4EB0@AUSP01VMBX24.collaborationhost.net>
+ <1329169408-17253-3-git-send-email-robherring2@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FCB4EB2@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Monday, February 13, 2012 2:43 PM, Rob Herring wrote:
 >
-> We have compile time over-ride of ioremap, but an run-time override is
-> needed for multi-platform builds.
+> cpu_relax in processor.h needs smp_mb which is defined in system.h.
 >
 > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > ---
->  arch/arm/include/asm/io.h |    5 ++++-
->  arch/arm/mm/ioremap.c     |    3 +++
->  2 files changed, 7 insertions(+), 1 deletions(-)
+>  arch/arm/include/asm/processor.h |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index 9275828..f5c6968 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -264,8 +264,11 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->   * Documentation/io-mapping.txt.
->   *
->   */
-> +
-> +extern void __iomem * (*arch_ioremap)(unsigned long, size_t, unsigned int);
-> +
->  #ifndef __arch_ioremap
-> -#define __arch_ioremap			__arm_ioremap
-> +#define __arch_ioremap			arch_ioremap
->  #define __arch_iounmap			__iounmap
->  #endif
+> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+> index ce280b8..cb8d638 100644
+> --- a/arch/arm/include/asm/processor.h
+> +++ b/arch/arm/include/asm/processor.h
+> @@ -22,6 +22,7 @@
+>  #include <asm/hw_breakpoint.h>
+>  #include <asm/ptrace.h>
+>  #include <asm/types.h>
+> +#include <asm/system.h>
 >  
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index 80632e8..f551c13 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -314,6 +314,9 @@ __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
->  }
->  EXPORT_SYMBOL(__arm_ioremap);
->  
-> +void __iomem * (*arch_ioremap)(unsigned long , size_t , unsigned int ) = __arm_ioremap;
-> +EXPORT_SYMBOL(arch_ioremap);
-> +
->  /*
->   * Remap an arbitrary physical address space into the kernel virtual
->   * address space as memory. Needed when the kernel wants to execute
+>  #ifdef __KERNEL__
+>  #define STACK_TOP	((current->personality & ADDR_LIMIT_32BIT) ? \
 
-On EP93xx:
+On EP93xx
 
 Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
