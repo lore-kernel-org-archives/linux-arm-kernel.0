@@ -1,146 +1,214 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 13 Feb 2012 17:53:28 +0100
-Subject: [PATCH 2/6] ARM: at91: pm_slowclock move register definition to pm.c
+Date: Mon, 13 Feb 2012 17:53:29 +0100
+Subject: [PATCH 3/6] ARM: at91: rm9200 move sdramc define to at91rm9200_sdramc
 In-Reply-To: <20120213164856.GE3378@game.jcrosoft.org>
 References: <20120213164856.GE3378@game.jcrosoft.org>
-Message-ID: <1329152010-23508-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1329152010-23508-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pass the reg via function parameter
-this will allow to have a soc independent pm_slowclock
+this will allow have multiple soc in the same image
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/pm.c           |   20 +++++++++++++++--
- arch/arm/mach-at91/pm_slowclock.S |   41 ++++++++----------------------------
- 2 files changed, 26 insertions(+), 35 deletions(-)
+ arch/arm/mach-at91/include/mach/at91rm9200_mc.h    |   44 --------------
+ .../arm/mach-at91/include/mach/at91rm9200_sdramc.h |   63 ++++++++++++++++++++
+ arch/arm/mach-at91/pm.c                            |    2 +-
+ arch/arm/mach-at91/pm.h                            |    7 +-
+ arch/arm/mach-at91/pm_slowclock.S                  |    3 +-
+ 5 files changed, 70 insertions(+), 49 deletions(-)
+ create mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
 
+diff --git a/arch/arm/mach-at91/include/mach/at91rm9200_mc.h b/arch/arm/mach-at91/include/mach/at91rm9200_mc.h
+index d34e4ed..0eb031b 100644
+--- a/arch/arm/mach-at91/include/mach/at91rm9200_mc.h
++++ b/arch/arm/mach-at91/include/mach/at91rm9200_mc.h
+@@ -87,50 +87,6 @@
+ #define		AT91_SMC_RWHOLD		(7 << 28)		/* Read & Write Signal Hold Time */
+ #define			AT91_SMC_RWHOLD_(x)	((x) << 28)
+ 
+-/* SDRAM Controller registers */
+-#define AT91_SDRAMC_MR		(AT91_MC + 0x90)	/* Mode Register */
+-#define		AT91_SDRAMC_MODE	(0xf << 0)		/* Command Mode */
+-#define			AT91_SDRAMC_MODE_NORMAL		(0 << 0)
+-#define			AT91_SDRAMC_MODE_NOP		(1 << 0)
+-#define			AT91_SDRAMC_MODE_PRECHARGE	(2 << 0)
+-#define			AT91_SDRAMC_MODE_LMR		(3 << 0)
+-#define			AT91_SDRAMC_MODE_REFRESH	(4 << 0)
+-#define		AT91_SDRAMC_DBW		(1   << 4)		/* Data Bus Width */
+-#define			AT91_SDRAMC_DBW_32	(0 << 4)
+-#define			AT91_SDRAMC_DBW_16	(1 << 4)
+-
+-#define AT91_SDRAMC_TR		(AT91_MC + 0x94)	/* Refresh Timer Register */
+-#define		AT91_SDRAMC_COUNT	(0xfff << 0)		/* Refresh Timer Count */
+-
+-#define AT91_SDRAMC_CR		(AT91_MC + 0x98)	/* Configuration Register */
+-#define		AT91_SDRAMC_NC		(3   <<  0)		/* Number of Column Bits */
+-#define			AT91_SDRAMC_NC_8	(0 << 0)
+-#define			AT91_SDRAMC_NC_9	(1 << 0)
+-#define			AT91_SDRAMC_NC_10	(2 << 0)
+-#define			AT91_SDRAMC_NC_11	(3 << 0)
+-#define		AT91_SDRAMC_NR		(3   <<  2)		/* Number of Row Bits */
+-#define			AT91_SDRAMC_NR_11	(0 << 2)
+-#define			AT91_SDRAMC_NR_12	(1 << 2)
+-#define			AT91_SDRAMC_NR_13	(2 << 2)
+-#define		AT91_SDRAMC_NB		(1   <<  4)		/* Number of Banks */
+-#define			AT91_SDRAMC_NB_2	(0 << 4)
+-#define			AT91_SDRAMC_NB_4	(1 << 4)
+-#define		AT91_SDRAMC_CAS		(3   <<  5)		/* CAS Latency */
+-#define			AT91_SDRAMC_CAS_2	(2 << 5)
+-#define		AT91_SDRAMC_TWR		(0xf <<  7)		/* Write Recovery Delay */
+-#define		AT91_SDRAMC_TRC		(0xf << 11)		/* Row Cycle Delay */
+-#define		AT91_SDRAMC_TRP		(0xf << 15)		/* Row Precharge Delay */
+-#define		AT91_SDRAMC_TRCD	(0xf << 19)		/* Row to Column Delay */
+-#define		AT91_SDRAMC_TRAS	(0xf << 23)		/* Active to Precharge Delay */
+-#define		AT91_SDRAMC_TXSR	(0xf << 27)		/* Exit Self Refresh to Active Delay */
+-
+-#define AT91_SDRAMC_SRR		(AT91_MC + 0x9c)	/* Self Refresh Register */
+-#define AT91_SDRAMC_LPR		(AT91_MC + 0xa0)	/* Low Power Register */
+-#define AT91_SDRAMC_IER		(AT91_MC + 0xa4)	/* Interrupt Enable Register */
+-#define AT91_SDRAMC_IDR		(AT91_MC + 0xa8)	/* Interrupt Disable Register */
+-#define AT91_SDRAMC_IMR		(AT91_MC + 0xac)	/* Interrupt Mask Register */
+-#define AT91_SDRAMC_ISR		(AT91_MC + 0xb0)	/* Interrupt Status Register */
+-
+ /* Burst Flash Controller register */
+ #define AT91_BFC_MR		(AT91_MC + 0xc0)	/* Mode Register */
+ #define		AT91_BFC_BFCOM		(3   <<  0)		/* Burst Flash Controller Operating Mode */
+diff --git a/arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h b/arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
+new file mode 100644
+index 0000000..7ad3597
+--- /dev/null
++++ b/arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
+@@ -0,0 +1,63 @@
++/*
++ * arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
++ *
++ * Copyright (C) 2005 Ivan Kokshaysky
++ * Copyright (C) SAN People
++ *
++ * Memory Controllers (SDRAMC only) - System peripherals registers.
++ * Based on AT91RM9200 datasheet revision E.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef AT91RM9200_SDRAMC_H
++#define AT91RM9200_SDRAMC_H
++
++/* SDRAM Controller registers */
++#define AT91RM9200_SDRAMC_MR		(AT91_MC + 0x90)	/* Mode Register */
++#define		AT91RM9200_SDRAMC_MODE	(0xf << 0)		/* Command Mode */
++#define			AT91RM9200_SDRAMC_MODE_NORMAL		(0 << 0)
++#define			AT91RM9200_SDRAMC_MODE_NOP		(1 << 0)
++#define			AT91RM9200_SDRAMC_MODE_PRECHARGE	(2 << 0)
++#define			AT91RM9200_SDRAMC_MODE_LMR		(3 << 0)
++#define			AT91RM9200_SDRAMC_MODE_REFRESH	(4 << 0)
++#define		AT91RM9200_SDRAMC_DBW		(1   << 4)		/* Data Bus Width */
++#define			AT91RM9200_SDRAMC_DBW_32	(0 << 4)
++#define			AT91RM9200_SDRAMC_DBW_16	(1 << 4)
++
++#define AT91RM9200_SDRAMC_TR		(AT91_MC + 0x94)	/* Refresh Timer Register */
++#define		AT91RM9200_SDRAMC_COUNT	(0xfff << 0)		/* Refresh Timer Count */
++
++#define AT91RM9200_SDRAMC_CR		(AT91_MC + 0x98)	/* Configuration Register */
++#define		AT91RM9200_SDRAMC_NC		(3   <<  0)		/* Number of Column Bits */
++#define			AT91RM9200_SDRAMC_NC_8	(0 << 0)
++#define			AT91RM9200_SDRAMC_NC_9	(1 << 0)
++#define			AT91RM9200_SDRAMC_NC_10	(2 << 0)
++#define			AT91RM9200_SDRAMC_NC_11	(3 << 0)
++#define		AT91RM9200_SDRAMC_NR		(3   <<  2)		/* Number of Row Bits */
++#define			AT91RM9200_SDRAMC_NR_11	(0 << 2)
++#define			AT91RM9200_SDRAMC_NR_12	(1 << 2)
++#define			AT91RM9200_SDRAMC_NR_13	(2 << 2)
++#define		AT91RM9200_SDRAMC_NB		(1   <<  4)		/* Number of Banks */
++#define			AT91RM9200_SDRAMC_NB_2	(0 << 4)
++#define			AT91RM9200_SDRAMC_NB_4	(1 << 4)
++#define		AT91RM9200_SDRAMC_CAS		(3   <<  5)		/* CAS Latency */
++#define			AT91RM9200_SDRAMC_CAS_2	(2 << 5)
++#define		AT91RM9200_SDRAMC_TWR		(0xf <<  7)		/* Write Recovery Delay */
++#define		AT91RM9200_SDRAMC_TRC		(0xf << 11)		/* Row Cycle Delay */
++#define		AT91RM9200_SDRAMC_TRP		(0xf << 15)		/* Row Precharge Delay */
++#define		AT91RM9200_SDRAMC_TRCD	(0xf << 19)		/* Row to Column Delay */
++#define		AT91RM9200_SDRAMC_TRAS	(0xf << 23)		/* Active to Precharge Delay */
++#define		AT91RM9200_SDRAMC_TXSR	(0xf << 27)		/* Exit Self Refresh to Active Delay */
++
++#define AT91RM9200_SDRAMC_SRR		(AT91_MC + 0x9c)	/* Self Refresh Register */
++#define AT91RM9200_SDRAMC_LPR		(AT91_MC + 0xa0)	/* Low Power Register */
++#define AT91RM9200_SDRAMC_IER		(AT91_MC + 0xa4)	/* Interrupt Enable Register */
++#define AT91RM9200_SDRAMC_IDR		(AT91_MC + 0xa8)	/* Interrupt Disable Register */
++#define AT91RM9200_SDRAMC_IMR		(AT91_MC + 0xac)	/* Interrupt Mask Register */
++#define AT91RM9200_SDRAMC_ISR		(AT91_MC + 0xb0)	/* Interrupt Status Register */
++
++#endif
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index d554e67..aac00ce 100644
+index aac00ce..8046a50 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -188,13 +188,27 @@ int at91_suspend_entering_slow_clock(void)
- EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
+@@ -315,7 +315,7 @@ static int __init at91_pm_init(void)
  
- 
--static void (*slow_clock)(void);
-+static void (*slow_clock)(void __iomem *pmc, void __iomem *ramc0, void __iomem *ramc1);
- 
- #ifdef CONFIG_AT91_SLOW_CLOCK
--extern void at91_slow_clock(void);
-+extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0, void __iomem *ramc1);
- extern u32 at91_slow_clock_sz;
+ #ifdef CONFIG_ARCH_AT91RM9200
+ 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+-	at91_sys_write(AT91_SDRAMC_LPR, 0);
++	at91_sys_write(AT91RM9200_SDRAMC_LPR, 0);
  #endif
  
-+static void __iomem *at91_pmc_base = (void __iomem*)(AT91_VA_BASE_SYS + AT91_PMC);
-+#ifdef CONFIG_ARCH_AT91RM9200
-+static void __iomem *at91_ramc0_base = (void __iomem*)AT91_VA_BASE_SYS;
-+#elif defined(CONFIG_ARCH_AT91SAM9G45)
-+static void __iomem *at91_ramc0_base = (void __iomem*)(AT91_VA_BASE_SYS + AT91_DDRSDRC0);
-+#else
-+static void __iomem *at91_ramc0_base = (void __iomem*)(AT91_VA_BASE_SYS + AT91_SDRAMC0);
-+#endif
-+
-+#if defined(CONFIG_ARCH_AT91SAM9G45)
-+static void __iomem *at91_ramc1_base = (void __iomem*)(AT91_VA_BASE_SYS + AT91_DDRSDRC1);
-+#else
-+static void __iomem *at91_ramc1_base = NULL;
-+#endif
+ 	suspend_set_ops(&at91_pm_ops);
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index bba9ce1..41cdd2b 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -13,6 +13,7 @@
  
- static int at91_pm_enter(suspend_state_t state)
- {
-@@ -232,7 +246,7 @@ static int at91_pm_enter(suspend_state_t state)
- 				/* copy slow_clock handler to SRAM, and call it */
- 				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
- #endif
--				slow_clock();
-+				slow_clock(at91_pmc_base, at91_ramc0_base, at91_ramc1_base);
- 				break;
- 			} else {
- 				pr_info("AT91: PM - no slow clock mode enabled ...\n");
-diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 97124f5..33fc4a7 100644
---- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -46,11 +46,11 @@
- #define PLLALOCK_TIMEOUT	1000
- #define PLLBLOCK_TIMEOUT	1000
- 
--#define pmc	r1
--#define sdramc	r2
-+#define pmc	r0
-+#define sdramc	r1
-+#define ramc1	r2
- #define tmp1	r3
- #define tmp2	r4
--#define ramc1	r5
+ #ifdef CONFIG_ARCH_AT91RM9200
+ #include <mach/at91rm9200_mc.h>
++#include <mach/at91rm9200_sdramc.h>
  
  /*
-  * Wait until master clock is ready (after switching master clock source)
-@@ -110,21 +110,19 @@
+  * The AT91RM9200 goes into self-refresh mode with this command, and will
+@@ -26,7 +27,7 @@
  
- 	.text
+ static inline void at91rm9200_standby(void)
+ {
+-	u32 lpr = at91_sys_read(AT91_SDRAMC_LPR);
++	u32 lpr = at91_sys_read(AT91RM9200_SDRAMC_LPR);
  
-+/* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc, void __iomem *ramc1) */
- ENTRY(at91_slow_clock)
- 	/* Save registers on stack */
--	stmfd	sp!, {r0 - r12, lr}
-+	stmfd	sp!, {r3 - r12, lr}
+ 	asm volatile(
+ 		"b    1f\n\t"
+@@ -37,8 +38,8 @@ static inline void at91rm9200_standby(void)
+ 		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
+ 		"    str    %5, [%1, %2]"
+ 		:
+-		: "r" (0), "r" (AT91_BASE_SYS), "r" (AT91_SDRAMC_LPR),
+-		  "r" (1), "r" (AT91_SDRAMC_SRR),
++		: "r" (0), "r" (AT91_BASE_SYS), "r" (AT91RM9200_SDRAMC_LPR),
++		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
+ 		  "r" (lpr));
+ }
  
- 	/*
- 	 * Register usage:
--	 *  R1 = Base address of AT91_PMC
--	 *  R2 = Base address of RAM Controller (SDRAM, DDRSDR, or AT91_SYS)
-+	 *  R0 = Base address of AT91_PMC
-+	 *  R1 = Base address of RAM Controller (SDRAM, DDRSDR, or AT91_SYS)
-+	 *  R2 = Base address of second RAM Controller or 0 if not present
- 	 *  R3 = temporary register
- 	 *  R4 = temporary register
--	 *  R5 = Base address of second RAM Controller or 0 if not present
- 	 */
--	ldr	pmc, .at91_va_base_pmc
--	ldr	sdramc, .at91_va_base_sdramc
--	ldr	ramc1, .at91_va_base_ramc1
+diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+index 33fc4a7..c2cc7d4 100644
+--- a/arch/arm/mach-at91/pm_slowclock.S
++++ b/arch/arm/mach-at91/pm_slowclock.S
+@@ -18,6 +18,7 @@
  
- 	/* Drain write buffer */
- 	mov	tmp1, #0
-@@ -283,7 +281,7 @@ ENTRY(at91_slow_clock)
- #endif
+ #if defined(CONFIG_ARCH_AT91RM9200)
+ #include <mach/at91rm9200_mc.h>
++#include <mach/at91rm9200_sdramc.h>
+ #elif defined(CONFIG_ARCH_AT91SAM9G45)
+ #include <mach/at91sam9_ddrsdr.h>
+ #else
+@@ -131,7 +132,7 @@ ENTRY(at91_slow_clock)
+ #ifdef CONFIG_ARCH_AT91RM9200
+ 	/* Put SDRAM in self-refresh mode */
+ 	mov	tmp1, #1
+-	str	tmp1, [sdramc, #AT91_SDRAMC_SRR]
++	str	tmp1, [sdramc, #AT91RM9200_SDRAMC_SRR]
+ #elif defined(CONFIG_ARCH_AT91SAM9G45)
  
- 	/* Restore registers, and return */
--	ldmfd	sp!, {r0 - r12, pc}
-+	ldmfd	sp!, {r3 - r12, pc}
- 
- 
- .saved_mckr:
-@@ -301,26 +299,5 @@ ENTRY(at91_slow_clock)
- .saved_sam9_lpr1:
- 	.word 0
- 
--.at91_va_base_pmc:
--	.word AT91_VA_BASE_SYS + AT91_PMC
--
--#ifdef CONFIG_ARCH_AT91RM9200
--.at91_va_base_sdramc:
--	.word AT91_VA_BASE_SYS
--#elif defined(CONFIG_ARCH_AT91SAM9G45)
--.at91_va_base_sdramc:
--	.word AT91_VA_BASE_SYS + AT91_DDRSDRC0
--#else
--.at91_va_base_sdramc:
--	.word AT91_VA_BASE_SYS + AT91_SDRAMC0
--#endif
--
--.at91_va_base_ramc1:
--#if defined(CONFIG_ARCH_AT91SAM9G45)
--	.word AT91_VA_BASE_SYS + AT91_DDRSDRC1
--#else
--	.word 0
--#endif
--
- ENTRY(at91_slow_clock_sz)
- 	.word .-at91_slow_clock
+ 	/* prepare for DDRAM self-refresh mode */
 -- 
 1.7.7
