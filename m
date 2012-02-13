@@ -1,58 +1,98 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 13 Feb 2012 15:43:00 +0100
-Subject: [PATCH 0/9] ARM: at91: irqdomain and device tree for AIC and GPIO
-Message-ID: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
+Date: Mon, 13 Feb 2012 15:43:04 +0100
+Subject: [PATCH 4/9] ARM: at91/gpio: change comments and one variable name
+In-Reply-To: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <032e5eba814724ec4f14c6b26bb2fa8556595efe.1329139662.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+What was true only on at91sam9263 about the sharing of a single AIC
+IRQ line for several GPIO banks is now used by several Atmel SoCs.
 
-This series adds irqdomain and device tree support for both the
-interrupt and GPIO controllers of AT91 SoC.
+Change a variable name to allow better understanding while
+introducing IRQ domains in following patches.
 
-The series has already been sent some time ago but has been
-reworked to address Rob and Grant comments. The reworked patches
-are marked with corresponding "vX" tags...
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/mach-at91/gpio.c |   25 ++++++++++++++-----------
+ 1 files changed, 14 insertions(+), 11 deletions(-)
 
-The series can go on top of Grant's patch series and depends on it:
-"[PATCH v3 00/25] irq_domain generalization and refinement".
-
-It also depends on the material already sent for at91 (base, pm_cleanup,
-device-board, 9x5 branches on arm-soc).
-
-The 3.3-rc3 is needed if you whish to test them (ioremap fix by Russell).
-
-The USB driver modification will need a "Acked-by" from someone at linux-usb.
-
-Note that I have remove all "Acked-by" form first round as the patches are
-deeply modified.
-
-All this is available here:
-git://github.com/at91linux/linux-at91.git  nfe/at91-3.4-base2+3.3-rc3+irqdomain+aic_gpio6
-
-Nicolas Ferre (9):
-      ARM: at91/aic: add irq domain and device tree support
-      ARM: at91/snapper9260: move gpio_to_irq out of structure initialization
-      ARM/USB: at91/ohci-at91: remove the use of irq_to_gpio
-      ARM: at91/gpio: change comments and one variable name
-      ARM: at91/gpio: add irqdomain and DT support
-      ARM: at91/gpio: non-DT builds do not have gpio_chip.of_node field
-      ARM: at91/gpio: add .to_irq gpio_chip handler
-      ARM: at91/gpio: remove the static specification of gpio_chip.base
-      ARM: at91/board-dt: remove AIC irq domain from board file
-
- .../devicetree/bindings/arm/atmel-aic.txt          |   38 +++
- .../devicetree/bindings/gpio/gpio_atmel.txt        |   20 ++
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/at91sam9g20.dtsi                 |   48 +++-
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   66 ++++-
- arch/arm/mach-at91/board-dt.c                      |    8 -
- arch/arm/mach-at91/board-snapper9260.c             |   10 +-
- arch/arm/mach-at91/gpio.c                          |  287 +++++++++++++++-----
- arch/arm/mach-at91/include/mach/gpio.h             |   12 -
- arch/arm/mach-at91/include/mach/irqs.h             |    3 +-
- arch/arm/mach-at91/irq.c                           |   74 ++++-
- drivers/usb/host/ohci-at91.c                       |    5 +-
- 12 files changed, 453 insertions(+), 119 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio_atmel.txt
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index 74d6783..b762afc 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -29,8 +29,8 @@
+ struct at91_gpio_chip {
+ 	struct gpio_chip	chip;
+ 	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
+-	int			id;		/* ID of register bank */
+-	void __iomem		*regbase;	/* Base of register bank */
++	int			pioc_hwirq;	/* PIO bank interrupt identifier on AIC */
++	void __iomem		*regbase;	/* PIO bank virtual address */
+ 	struct clk		*clock;		/* associated clock */
+ };
+ 
+@@ -285,7 +285,7 @@ static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
+ 	else
+ 		wakeups[bank] &= ~mask;
+ 
+-	irq_set_irq_wake(gpio_chip[bank].id, state);
++	irq_set_irq_wake(gpio_chip[bank].pioc_hwirq, state);
+ 
+ 	return 0;
+ }
+@@ -499,7 +499,7 @@ void __init at91_gpio_irq_setup(void)
+ 	for (pioc = 0, this = gpio_chip, prev = NULL;
+ 			pioc++ < gpio_banks;
+ 			prev = this, this++) {
+-		unsigned	id = this->id;
++		unsigned	pioc_hwirq = this->pioc_hwirq;
+ 		unsigned	i;
+ 
+ 		__raw_writel(~0, this->regbase + PIO_IDR);
+@@ -518,14 +518,14 @@ void __init at91_gpio_irq_setup(void)
+ 		}
+ 
+ 		/* The toplevel handler handles one bank of GPIOs, except
+-		 * AT91SAM9263_ID_PIOCDE handles three... PIOC is first in
+-		 * the list, so we only set up that handler.
++		 * on some SoC it can handles up to three...
++		 * We only set up the handler for the first of the list.
+ 		 */
+ 		if (prev && prev->next == this)
+ 			continue;
+ 
+-		irq_set_chip_data(id, this);
+-		irq_set_chained_handler(id, gpio_irq_handler);
++		irq_set_chip_data(pioc_hwirq, this);
++		irq_set_chained_handler(pioc_hwirq, gpio_irq_handler);
+ 	}
+ 	pr_info("AT91: %d gpio irqs in %d banks\n", irq - gpio_to_irq(0), gpio_banks);
+ }
+@@ -615,7 +615,7 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+ 	for (i = 0; i < nr_banks; i++) {
+ 		at91_gpio = &gpio_chip[i];
+ 
+-		at91_gpio->id = data[i].id;
++		at91_gpio->pioc_hwirq = data[i].pioc_hwirq;
+ 		at91_gpio->chip.base = i * 32;
+ 
+ 		at91_gpio->regbase = ioremap(data[i].regbase, 512);
+@@ -633,8 +633,11 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+ 		/* enable PIO controller's clock */
+ 		clk_enable(at91_gpio->clock);
+ 
+-		/* AT91SAM9263_ID_PIOCDE groups PIOC, PIOD, PIOE */
+-		if (last && last->id == at91_gpio->id)
++		/*
++		 * GPIO controller are grouped on some SoC:
++		 * PIOC, PIOD and PIOE can share the same IRQ line
++		 */
++		if (last && last->pioc_hwirq == at91_gpio->pioc_hwirq)
+ 			last->next = at91_gpio;
+ 		last = at91_gpio;
+ 
+-- 
+1.7.9
