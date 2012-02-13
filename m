@@ -1,84 +1,57 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 13 Feb 2012 11:45:15 +0530
-Subject: [PATCH v2 2/2] ARM: OMAP: sram: Add am33xx SRAM support (minimal)
-Message-ID: <1329113715-7634-1-git-send-email-afzal@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Feb 2012 06:58:12 +0000
+Subject: [PATCH] ep93xx: fix build of vision_ep93xx.c
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F41F9DF77C@AUSP01VMBX24.collaborationhost.net>
+References: <201202080953.44853.hartleys@visionengravers.com>
+ <20120210064640.GA3847@mwesterb-mobl.ger.corp.intel.com>
+ <ADE657CA350FB648AAC2C43247A983F001F41F9DF77C@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <201202130658.12505.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+On Friday 10 February 2012, H Hartley Sweeten wrote:
+> On Thursday, February 09, 2012 11:47 PM, Mika Westerberg wrote:
+> > On Wed, Feb 08, 2012 at 09:53:44AM -0700, H Hartley Sweeten wrote:
+> >> Fix build breakage due to the following commits:
+> >> 
+> >> Commit bd5f12a24766c1f299def0a78b008d4746f528f2
+> >>   ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics
+> >> 
+> >> Commit 257af9f9725aa8a863b306659208a031135d59e7
+> >>   ARM: 7041/1: gpio-ep93xx: hookup the to_irq callback in the driver
+> >> 
+> >> The vision_ep9307 machine uses the ep93xx build-in gpios and needs to
+> >> include <mach/gpio-ep93xx.h> to pickup the defines.
+> >> 
+> >> The gpio_to_irq() call is now a callback to the gpio-ep93xx.c driver
+> >> and cannot be used as a constant initializer for the .irq member of
+> >> struct i2c_board_info.
+> >> 
+> >> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+> >> Acked-by: Ryan Mallon <rmallon@gmail.com>
+> >
+> > Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
+> 
+> Russell,
+> 
+> Can this go to your Patch system or should it go thru the arm-soc tree?
+> 
+> The 3.2 kernel will not currently build with CONFIG_MACH_VISION_EP9307=y
+> and needs this patch.
 
-Update SRAM start & size for am33xx SoC's.
+Hi Hartley, Ryan and Mika,
 
-Note: cpu_is_34xx() is true for am33xx also. Doing
-cpu_is_am33xx() check after cpu_is_34xx() will not
-achieve what we want due to the above reason.
-Hence cpu_is_am33xx() is done before cpu_is_34xx()
+It should indeed go through the arm-soc tree, I'm sorry for having
+been so unresponsive recently. Olof was taking care of the other
+pull requests and bug fixes but unfortunately was not on Cc on this
+one, so we both ended up missing it until now.
 
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
+I've applied it on the "fixes" branch of the arm-soc tree now, it
+will get sent to Linus on the next opportunity.
 
-v2: Use OMAP naming conventions for subject
+I had a little trouble applying the patch from base64 format, but
+since you've had to wait so long already and I'm not completely sure
+which side the problem was on I took the time to recreate the diff
+from the base64 encoding and fix up the whitespace damage I got.
 
- arch/arm/plat-omap/include/plat/sram.h |    1 +
- arch/arm/plat-omap/sram.c              |   14 ++++++++++++--
- 2 files changed, 13 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/plat-omap/include/plat/sram.h b/arch/arm/plat-omap/include/plat/sram.h
-index 75aa1b2..227ae26 100644
---- a/arch/arm/plat-omap/include/plat/sram.h
-+++ b/arch/arm/plat-omap/include/plat/sram.h
-@@ -101,4 +101,5 @@ static inline void omap_push_sram_idle(void) {}
- #else
- #define OMAP4_SRAM_PA		0x40300000
- #endif
-+#define AM33XX_SRAM_PA		0x40300000
- #endif
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index 4243bdc..596f222 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -86,7 +86,7 @@ static int is_sram_locked(void)
- 			__raw_writel(0xCFDE, OMAP24XX_VA_READPERM0);  /* all i-read */
- 			__raw_writel(0xCFDE, OMAP24XX_VA_WRITEPERM0); /* all i-write */
- 		}
--		if (cpu_is_omap34xx()) {
-+		if (cpu_is_omap34xx() && !cpu_is_am33xx()) {
- 			__raw_writel(0xFFFF, OMAP34XX_VA_REQINFOPERM0); /* all q-vects */
- 			__raw_writel(0xFFFF, OMAP34XX_VA_READPERM0);  /* all i-read */
- 			__raw_writel(0xFFFF, OMAP34XX_VA_WRITEPERM0); /* all i-write */
-@@ -124,7 +124,10 @@ static void __init omap_detect_sram(void)
- 				omap_sram_size = 0x800; /* 2K */
- 			}
- 		} else {
--			if (cpu_is_omap34xx()) {
-+			if (cpu_is_am33xx()) {
-+				omap_sram_start = AM33XX_SRAM_PA;
-+				omap_sram_size = 0x10000; /* 64K */
-+			} else if (cpu_is_omap34xx()) {
- 				omap_sram_start = OMAP3_SRAM_PA;
- 				omap_sram_size = 0x10000; /* 64K */
- 			} else if (cpu_is_omap44xx()) {
-@@ -368,6 +371,11 @@ static inline int omap34xx_sram_init(void)
- 	return 0;
- }
- 
-+static inline int am33xx_sram_init(void)
-+{
-+	return 0;
-+}
-+
- int __init omap_sram_init(void)
- {
- 	omap_detect_sram();
-@@ -379,6 +387,8 @@ int __init omap_sram_init(void)
- 		omap242x_sram_init();
- 	else if (cpu_is_omap2430())
- 		omap243x_sram_init();
-+	else if (cpu_is_am33xx())
-+		am33xx_sram_init();
- 	else if (cpu_is_omap34xx())
- 		omap34xx_sram_init();
- 
--- 
-1.7.1
+	Arnd
