@@ -1,58 +1,144 @@
 From: bill4carson@gmail.com (Bill Carson)
-Date: Mon, 13 Feb 2012 17:44:23 +0800
-Subject: [PATCH 2/7] Add various hugetlb page table fix
+Date: Mon, 13 Feb 2012 17:44:24 +0800
+Subject: [PATCH 3/7] Introduce set_hugepte_ext api to setup huge hardware pmds
 In-Reply-To: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
 References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
-Message-ID: <1329126268-11032-3-git-send-email-bill4carson@gmail.com>
+Message-ID: <1329126268-11032-4-git-send-email-bill4carson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Bill Carson <bill4carson@gmail.com>
 ---
- arch/arm/include/asm/pgtable-2level.h |    3 +++
- arch/arm/include/asm/pgtable.h        |    9 +++++++++
- 2 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/glue-proc.h |    3 +
+ arch/arm/include/asm/proc-fns.h  |    3 +
+ arch/arm/mm/proc-v7-2level.S     |   87 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 93 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index 2317a71..031c50e 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -178,6 +178,9 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define pmd_addr_end(addr,end) (end)
- 
- #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
+diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
+index e2be7f1..2bbd452 100644
+--- a/arch/arm/include/asm/glue-proc.h
++++ b/arch/arm/include/asm/glue-proc.h
+@@ -256,6 +256,9 @@
+ #define cpu_dcache_clean_area		__glue(CPU_NAME,_dcache_clean_area)
+ #define cpu_do_switch_mm		__glue(CPU_NAME,_switch_mm)
+ #define cpu_set_pte_ext			__glue(CPU_NAME,_set_pte_ext)
 +#ifdef CONFIG_ARM_HUGETLB_SUPPORT
-+#define set_hugepte_ext(ptep,pte,ext) cpu_set_hugepte_ext(ptep,pte,ext)
++#define cpu_set_hugepte_ext		__glue(CPU_NAME,_set_hugepte_ext)
 +#endif
- 
- #endif /* __ASSEMBLY__ */
- 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index f66626d..a119ac6 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -213,6 +213,14 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 		set_pte_ext(ptep, pteval, PTE_EXT_NG);
- 	}
- }
+ #define cpu_suspend_size		__glue(CPU_NAME,_suspend_size)
+ #define cpu_do_suspend			__glue(CPU_NAME,_do_suspend)
+ #define cpu_do_resume			__glue(CPU_NAME,_do_resume)
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index f3628fb..75bd755 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -87,6 +87,9 @@ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
+ #else
+ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
 +#ifdef CONFIG_ARM_HUGETLB_SUPPORT
-+static inline void set_hugepte_at(struct mm_struct *mm, unsigned long addr,
-+			      pte_t *ptep, pte_t pteval)
-+{
-+	__sync_icache_dcache(pteval);
-+	set_hugepte_ext(ptep, pteval, PTE_EXT_NG);
-+}
++extern void cpu_set_hugepte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
 +#endif
+ #endif
+ extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
  
- #define pte_none(pte)		(!pte_val(pte))
- #define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
-@@ -236,6 +244,7 @@ PTE_BIT_FUNC(mkdirty,   |= L_PTE_DIRTY);
- PTE_BIT_FUNC(mkold,     &= ~L_PTE_YOUNG);
- PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
+diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+index 3a4b3e7..4dc1554 100644
+--- a/arch/arm/mm/proc-v7-2level.S
++++ b/arch/arm/mm/proc-v7-2level.S
+@@ -111,6 +111,93 @@ ENTRY(cpu_v7_set_pte_ext)
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_set_pte_ext)
  
-+static inline pte_t pte_mkhuge(pte_t pte) { return pte; }
- static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
- 
- static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
++#ifdef CONFIG_ARM_HUGETLB_SUPPORT
++ENTRY(cpu_v7_set_hugepte_ext)
++	@mask out AP[2:0] TEX[2:0] in first level section descriptor
++	bic	r3, r1, #0x0000fc00
++	@clear NX/IMP
++	bic	r3, r3,#0x210
++
++	@clear BIT1:0
++	bic	r3, r3, #PMD_TYPE_MASK
++
++	@set extension bit
++	orr	r3, r3, #PMD_SECT_nG @HUGEPAGE always non-global
++
++	@set SECT mapping,1M section or 16M supersection
++	orr	r3, r3, #PMD_SECT_AP_WRITE
++	orr	r3, r3, #PMD_TYPE_SECT
++
++	@BIT18 1: 16M supersection 0: 1M section
++	bic	r3, r3, #PMD_SECT_SUPER
++
++	@ shared bit
++	tst	r1,#L_PTE_SHARED
++	orrne	r3,r3,#PMD_SECT_S
++
++	@ shared device ?
++	tst	r1, #1 << 4
++	orrne	r3, r3, #PMD_SECT_TEX(1)
++
++	eor	r1, r1,  #L_PTE_DIRTY
++	tst	r1, #L_PTE_RDONLY | L_PTE_DIRTY
++	orrne	r3, r3, #PMD_SECT_APX
++
++	tst	r1, #L_PTE_USER
++	orrne	r3, r3, #PMD_SECT_AP_READ
++#ifdef CONFIG_CPU_USE_DOMAINS
++	tstne	r3, #PMD_SECT_APX
++	bicne	r3, r3, #PMD_SECT_APX | PMD_SECT_AP_WRITE
++#endif
++
++	@set domain
++	bic 	r3, r3, #(0xf << 5)
++	orr	r3, r3, #PMD_DOMAIN(0x1)
++
++#ifdef CONFIG_HUGEPAGE_SIZE_16MB
++	@ for supersection mapping
++	@ clear domain setting and extend addr
++	@ set BIT18 to denote supersection
++	ldr	r2, =((0xf << 5) | (0xf << 20))
++	bic	r3, r3, r2
++	orr	r3, r3, #PMD_SECT_SUPER
++#endif
++
++	tst	r1, #L_PTE_XN
++	orrne	r3, r3, #PMD_SECT_XN
++
++	tst	r1, #L_PTE_YOUNG
++	tstne	r1, #L_PTE_PRESENT
++	moveq	r3, #0
++
++#ifdef CONFIG_HUGEPAGE_SIZE_16MB
++	@ set 16M huge page
++	.rept 16
++ 	str r3, [r0]
++	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
++	add	r0, r0, #4
++	.endr
++#endif
++
++#ifdef CONFIG_HUGEPAGE_SIZE_2MB
++	@ set 2M huge page
++	@ 1st 1MB mapping
++ 	str r3, [r0]
++	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
++	@ 2st 1MB mapping
++	cmp	r3,#0
++	movne	r2,#0x100000
++	addne	r3, r3, r2
++
++	add	r0, r0, #4
++ 	str r3, [r0]
++	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
++#endif
++	mov pc, lr
++#endif /*COFNIG_ARM_HUGETLB_SUPPORT*/
++
++ENDPROC(cpu_v7_set_hugepte_ext)
++
+ 	/*
+ 	 * Memory region attributes with SCTLR.TRE=1
+ 	 *
 -- 
 1.7.1
