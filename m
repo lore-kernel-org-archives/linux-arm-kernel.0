@@ -1,31 +1,34 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 13 Feb 2012 13:58:23 +0100
-Subject: [PATCH] ARM: S3C24XX: Fix restart on S3C2442
-In-Reply-To: <201202131329.37465.GNUtoo@no-log.org>
-References: <1329051929-8303-1-git-send-email-GNUtoo@no-log.org>
- <201202121957.10472.GNUtoo@no-log.org> <201202131329.37465.GNUtoo@no-log.org>
-Message-ID: <201202131358.23652.heiko@sntech.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 13 Feb 2012 21:01:43 +0800
+Subject: [PATCH 02/11] Revert "ARM: pxa: add dummy clock for sa1100-rtc"
+In-Reply-To: <20120211194207.GV889@n2100.arm.linux.org.uk>
+References: <20120119153149.GB1068@n2100.arm.linux.org.uk>
+ <E1Rntz6-0002pN-UE@rmk-PC.arm.linux.org.uk>
+ <4F36BC63.70403@cam.ac.uk>
+ <20120211194207.GV889@n2100.arm.linux.org.uk>
+Message-ID: <CAN1soZxbju453j01g73E69UjzgY=9AKQ8_ct7oXaY1_+XE3=Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
-
-Am Montag, 13. Februar 2012, 13:29:37 schrieb Denis 'GNUtoo' Carikli:
-> >Thanks a lot for the patch.
-> >It compiles fine.
-> >Now time for me to look at runtime boot issues for my gta02.
-> 
-> I've now tested at runtime, here's the boot log:
-
-[snipped boot log]
-
-> It is now waiting for the rootfs that isn't there(since /dev/mmcblk0p1
-> depend on a driver that is not mainline and that I only applied the patch
-> to test on top of the master branch of linux-next).
-> 
-> Tested-by: Denis 'GNUtoo' Carikli" <GNUtoo@no-log.org>
-
-thanks for testing, and for still working on the Freerunner. At some point I'd 
-probably like to revive mine :-)
-
-Heiko
+On Sun, Feb 12, 2012 at 3:42 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Feb 11, 2012 at 07:07:15PM +0000, Jonathan Cameron wrote:
+>> On 01/19/2012 03:33 PM, Russell King - ARM Linux wrote:
+>> > This reverts commit 7557c175f60d8d40baf16b22caf79beadef8f081.
+>> >
+>> > This revert is necessary to revert the broken "RTC: sa1100:
+>> > support sa1100, pxa and mmp soc families" change.
+>>
+>> Taking out the lines concerning the dummy clk for pxa-gpio is
+>> causing stargate2's smc91x driver to fail to find the part.
+>>
+>> So reverting the regression cause caused a different regression.
+>>
+>> Something 'unusual' occured with the commit you reference above.
+>> The gpio line was added in 389eda15e0f41112d7c44213b3c4f8bd1c9398bc
+>
+> Sigh. ?I give up with this issue, people are obviously useless at
+> properly separating their changes. ?Someone else can sort out this
+> bloody mess.
+>
+Sure. I'll try to fix this issue in this week.
