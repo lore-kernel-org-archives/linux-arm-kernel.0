@@ -1,33 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 13 Feb 2012 16:48:21 -0600
-Subject: [PATCH 03/15] ARM: provide runtime hook for ioremap
-In-Reply-To: <20120213223051.GE25655@n2100.arm.linux.org.uk>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <1329169408-17253-4-git-send-email-robherring2@gmail.com>
- <20120213223051.GE25655@n2100.arm.linux.org.uk>
-Message-ID: <4F399335.60908@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Feb 2012 22:51:18 +0000
+Subject: [PATCH] modpost: Fix section warnings for ARM for many compilers
+In-Reply-To: <20120213222652.GL14173@pengutronix.de>
+References: <20120213212401.GH1426@atomide.com>
+ <20120213222652.GL14173@pengutronix.de>
+Message-ID: <20120213225118.GC31482@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2012 04:30 PM, Russell King - ARM Linux wrote:
-> On Mon, Feb 13, 2012 at 03:43:16PM -0600, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> We have compile time over-ride of ioremap, but an run-time override is
->> needed for multi-platform builds.
+On Mon, Feb 13, 2012 at 11:26:52PM +0100, Uwe Kleine-K?nig wrote:
+> On Mon, Feb 13, 2012 at 01:24:01PM -0800, Tony Lindgren wrote:
+> > It turns out that many compilers don't show section warnings on ARM
+> > currently because handling for ARM_CALL relocs are missing from
+> > modpost.c.
+> > 
+> > Based on commit c2e26114 ([ARM] 3205/1: Handle new EABI relocations when
+> > loading kernel modules) it seems that R_ARM_PC24, R_ARM_CALL and
+> > R_ARM_JUMP24 can be handled the same way.
+> > 
+> > As modpost.c includes elf.h, we need to also consider that at least
+> > Debian libc6-dev is missing defines for both R_ARM_CALL and R_ARM_JUMP24
+> > in /usr/include/elf.h.
+> Huh, even unstable's /usr/include/elf.h doesn't have these symbols.
 > 
-> Are you sure we need this after Nicolas' updates to ioremap() ?
+> > So for now let's just use the numbers in modpost.c.
+> > 
+> > Cc: Rusty Russell <rusty@rustcorp.com.au>
+> > Cc: Ben Hutchings <ben@decadent.org.uk>
+> > Cc: Anders Kaseorg <andersk@ksplice.com>
+> > Cc: Greg KH <gregkh@linuxfoundation.org>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > ---
+> > 
+> > Anybody got better ideas for dealing with the missing elf.h
+> > defines?
+> Maybe:
+> 
+> #ifndef R_ARM_CALL
+> #warning "you're elf.h include is outdated"
 
-Yes, because these are adjusting the memory type, not redirecting the
-ioremap to a static mapping. There was some discussion among Nico, Arnd
-and myself about using static mappings instead as you can set the memory
-type. The imx case is all addresses below 0x8000000 except the interrupt
-controller need adjustment. This would burn up a lot more virtual space
-or be a long list of peripherals. I think my change is much simpler and
-is just generalizing what imx is doing for everyone.
+"You are elf.h include is outdated" does not make sense.
 
-There's also a few other custom ioremaps I didn't convert: ebsa110,
-iop13xx, and ixp4xx. These platforms already have multiple issues with
-single kernel.
-
-Rob
+Why are you calling Tony an elf.h include?
