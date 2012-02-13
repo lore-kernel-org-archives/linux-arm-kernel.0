@@ -1,17 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 13 Feb 2012 12:45:07 -0200
-Subject: [PATCH] mtd/gpmi : add gpmi support for mx6q
-In-Reply-To: <20120213144126.GB9537@pengutronix.de>
-References: <1328505606-27981-1-git-send-email-b32955@freescale.com>
- <1329134454.22240.114.camel@sauron.fi.intel.com>
- <20120213144126.GB9537@pengutronix.de>
-Message-ID: <CAOMZO5AjibOf-jc_1_uKazcvoTTGwzOtJzNSe0T3YRgbCfJ7ow@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 13 Feb 2012 06:48:21 -0800
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120213082741.GN3852@pengutronix.de>
+References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
+ <20120213082741.GN3852@pengutronix.de>
+Message-ID: <20120213144820.GA3494@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/13/12, Wolfram Sang <w.sang@pengutronix.de> wrote:
+On Mon, Feb 13, 2012 at 09:27:41AM +0100, Sascha Hauer wrote:
 
-> I can't tell about MX6, but the defconfig for mx23/28 is called
-> mxs_defconfig.
+> I really don't want to have that much code for saying 'we don't have a
+> regulator, just make this stupid driver happy'. This is fine for one
+> board, but not for the more than a dozen users of this driver in the tree.
+> We should really add a helper to simplify this.
 
-For mx6 the defconfig is imx_v6_v7_defconfig.
+If the board really has so few software controlled regulators then they
+should just be using the dummy regulator support which already exists,
+someone should just add a knob to turn it on automatically.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120213/299be1a2/attachment-0001.sig>
