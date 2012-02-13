@@ -1,89 +1,116 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 13 Feb 2012 15:43:17 -0600
-Subject: [PATCH 04/15] ARM: imx: convert to common runtime ioremap hook
+Date: Mon, 13 Feb 2012 15:43:18 -0600
+Subject: [PATCH 05/15] ARM: msm: use runtime ioremap hook
 In-Reply-To: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
 References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1329169408-17253-5-git-send-email-robherring2@gmail.com>
+Message-ID: <1329169408-17253-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Convert i.MX platforms to use the common run-time ioremap hook instead of
-the imx specific hook.
+Convert msm platforms to use run-time ioremap hook instead of the compile
+time hook.
 
-Also, move addr_in_module out of io.h.
+According to David Brown, only the msm7201 needed the ioremap hook.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-imx/mm-imx3.c               |    4 ++--
- arch/arm/plat-mxc/include/mach/hardware.h |    3 +++
- arch/arm/plat-mxc/include/mach/io.h       |   17 -----------------
- 3 files changed, 5 insertions(+), 19 deletions(-)
+ arch/arm/mach-msm/board-halibut.c               |    6 ++++++
+ arch/arm/mach-msm/board-trout.c                 |    6 ++++++
+ arch/arm/mach-msm/include/mach/io.h             |    5 -----
+ arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ++++++
+ arch/arm/mach-msm/io.c                          |    1 -
+ 5 files changed, 18 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 31807d2..b33f736 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -135,7 +135,7 @@ void __init imx31_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX31);
- 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
- 	pm_idle = imx3_idle;
--	imx_ioremap = imx3_ioremap;
-+	arch_ioremap = imx3_ioremap;
- }
+diff --git a/arch/arm/mach-msm/board-halibut.c b/arch/arm/mach-msm/board-halibut.c
+index a60ab6d..b6cff3a 100644
+--- a/arch/arm/mach-msm/board-halibut.c
++++ b/arch/arm/mach-msm/board-halibut.c
+@@ -68,6 +68,11 @@ static struct platform_device *devices[] __initdata = {
  
- void __init mx31_init_irq(void)
-@@ -198,7 +198,7 @@ void __init imx35_init_early(void)
- 	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
- 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
- 	pm_idle = imx3_idle;
--	imx_ioremap = imx3_ioremap;
-+	arch_ioremap = imx3_ioremap;
- }
+ extern struct sys_timer msm_timer;
  
- void __init mx35_init_irq(void)
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index a599f01..ca06a68 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -28,6 +28,9 @@
- #define IOMEM(addr)	((void __force __iomem *)(addr))
- #endif
- 
-+#define addr_in_module(addr, mod) \
-+	((unsigned long)(addr) - mod ## _BASE_ADDR < mod ## _SIZE)
++static void __init halibut_init_early(void)
++{
++	arch_ioremap = __msm_ioremap;
++}
 +
- #define IMX_IO_P2V_MODULE(addr, module)					\
- 	(((addr) - module ## _BASE_ADDR) < module ## _SIZE ?		\
- 	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0)
-diff --git a/arch/arm/plat-mxc/include/mach/io.h b/arch/arm/plat-mxc/include/mach/io.h
-index 338300b..ea9d95e 100644
---- a/arch/arm/plat-mxc/include/mach/io.h
-+++ b/arch/arm/plat-mxc/include/mach/io.h
-@@ -14,23 +14,6 @@
- /* Allow IO space to be anywhere in the memory */
+ static void __init halibut_init_irq(void)
+ {
+ 	msm_init_irq();
+@@ -96,6 +101,7 @@ MACHINE_START(HALIBUT, "Halibut Board (QCT SURF7200A)")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= halibut_fixup,
+ 	.map_io		= halibut_map_io,
++	.init_early	= halibut_init_early,
+ 	.init_irq	= halibut_init_irq,
+ 	.init_machine	= halibut_init,
+ 	.timer		= &msm_timer,
+diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+index 6b9b227..509d94c 100644
+--- a/arch/arm/mach-msm/board-trout.c
++++ b/arch/arm/mach-msm/board-trout.c
+@@ -43,6 +43,11 @@ static struct platform_device *devices[] __initdata = {
+ 
+ extern struct sys_timer msm_timer;
+ 
++static void __init trout_init_early(void)
++{
++	arch_ioremap = __msm_ioremap;
++}
++
+ static void __init trout_init_irq(void)
+ {
+ 	msm_init_irq();
+@@ -96,6 +101,7 @@ MACHINE_START(TROUT, "HTC Dream")
+ 	.atag_offset	= 0x100,
+ 	.fixup		= trout_fixup,
+ 	.map_io		= trout_map_io,
++	.init_early	= trout_init_early,
+ 	.init_irq	= trout_init_irq,
+ 	.init_machine	= trout_init,
+ 	.timer		= &msm_timer,
+diff --git a/arch/arm/mach-msm/include/mach/io.h b/arch/arm/mach-msm/include/mach/io.h
+index dc1b928..c6ff9bb 100644
+--- a/arch/arm/mach-msm/include/mach/io.h
++++ b/arch/arm/mach-msm/include/mach/io.h
+@@ -18,11 +18,6 @@
+ 
  #define IO_SPACE_LIMIT 0xffffffff
  
--#define __arch_ioremap __imx_ioremap
+-#define __arch_ioremap __msm_ioremap
 -#define __arch_iounmap __iounmap
 -
--#define addr_in_module(addr, mod) \
--	((unsigned long)(addr) - mod ## _BASE_ADDR < mod ## _SIZE)
+-void __iomem *__msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype);
 -
--extern void __iomem *(*imx_ioremap)(unsigned long, size_t, unsigned int);
--
--static inline void __iomem *
--__imx_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
--{
--	if (imx_ioremap != NULL)
--		return imx_ioremap(phys_addr, size, mtype);
--	else
--		return __arm_ioremap(phys_addr, size, mtype);
--}
--
- /* io address mapping macro */
  #define __io(a)		__typesafe_io(a)
+ #define __mem_pci(a)    (a)
  
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
+index 8af4612..c355886 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
+@@ -111,5 +111,11 @@
+ #define MSM_AD5_PHYS          0xAC000000
+ #define MSM_AD5_SIZE          (SZ_1M*13)
+ 
++#ifndef __ASSEMBLY__
++
++extern void __iomem *
++__msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype);
++
++#endif
+ 
+ #endif
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index 578b04e..283cdff 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -187,4 +187,3 @@ __msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+ 	return __arm_ioremap_caller(phys_addr, size, mtype,
+ 		__builtin_return_address(0));
+ }
+-EXPORT_SYMBOL(__msm_ioremap);
 -- 
 1.7.5.4
