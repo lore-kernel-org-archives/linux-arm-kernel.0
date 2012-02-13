@@ -1,71 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Feb 2012 16:17:12 +0000
-Subject: Kirkwood, kernel 3.2, vmalloc region overlap, not starting up
-In-Reply-To: <4F313832.1070600@kernelconcepts.de>
-References: <4F313832.1070600@kernelconcepts.de>
-Message-ID: <20120213161711.GB25655@n2100.arm.linux.org.uk>
+From: artem.bityutskiy@intel.com (Bityutskiy, Artem)
+Date: Mon, 13 Feb 2012 16:22:49 +0000
+Subject: =?utf-8?B?UmU6IOetlOWkjTogW1BBVENIXSBtdGQvZ3BtaSA6IGFkZCBncG1pIHN1cHBv?=
+ =?utf-8?Q?rt_for_mx6q?=
+In-Reply-To: <14C4E31473AF7E4B98176CB73615181C362D9F@039-SN1MPN1-006.039d.mgd.msft.net>
+References: <1328505606-27981-1-git-send-email-b32955@freescale.com>	,
+ <1329134454.22240.114.camel@sauron.fi.intel.com>
+ <14C4E31473AF7E4B98176CB73615181C362D9F@039-SN1MPN1-006.039d.mgd.msft.net>
+Message-ID: <1329150312.22240.211.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2012 at 03:41:54PM +0100, Nils Faerber wrote:
-> Hello!
-> I am in the process of upgrading board support for my TK71 board from
-> 2.6.38 to 3.2 and am now halted by this strange issue...
+On Mon, 2012-02-13 at 15:05 +0000, Huang Shijie-B32955 wrote:
+> Hi Artem:
 > 
-> The board support for the TK71 is almost identical to the 3.2 included
-> board files for e.g. the Sheevaplug or the rd88f6281 reference design.
-> After applying my board patch and re-inserting my machine ID again the
-> kernel freezes very early.
+> >Please, let me know how I can compile-test this. This diver depends on
+> >imx23 or imx28 and I cannot find a defconfig for these. When I select
+> >MXS platform the compilation fails. Could you please describe some way
+> >to generate a compilable configuration which would include this driver
+> >as well, or send me the defconfig file.
 > 
-> After enabling earlyprintk I get the following:
+> use make mxs_defconfig to make the .config.
+> and select the gpmi-nand driver. then you can compile it.
 > 
-> Uncompressing Linux... done, booting the kernel.
-> 
-> [    0.000000] Linux version 3.2.0-00012-g980d683-dirty (nils at moi) (gcc
-> version 4.4.2 (GCC) ) #30 Tue Feb 7 15:18:57 CET 2012
-> [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE),
-> cr=00053977
-> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> 
-> [    0.000000] Machine: TK71 Kirkwood based Q7 formfactor board
-> 
-> [    0.000000] bootconsole [earlycon0] enabled
-> 
-> [    0.000000] Ignoring RAM at 00000000-0fffffff (vmalloc region
-> overlap).
+> This patch is just part of the patches for mx6q, another two patches are the mxs-dma patches.
+> So in the mx6q, I do not enable the  gpmi-nand driver. you can compile-test it just on mxs_defconfig.
 
-I think the problem may be due to something screwing up the v:p code
-fixups.  So, let's try to find out what the values the code decided on
-were, and how some of the __va() macros are behaving.  Could you try
-booting with this patch applied?
+I cannot apply this to l2-mtd.git tree anyway:
 
-If this is cache related, this _may_ change the behaviour and make the
-bug go away...
+$:~/git/l2-mtd$ git am ~/tmp/gpmi.mbox
+Applying: mtd/gpmi : add gpmi support for mx6q
+error: patch failed: drivers/mtd/nand/gpmi-nand/gpmi-lib.c:1066
+error: drivers/mtd/nand/gpmi-nand/gpmi-lib.c: patch does not apply
+Patch failed at 0001 mtd/gpmi : add gpmi support for mx6q
+When you have resolved this problem run "git am --resolved".
+If you would prefer to skip this patch, instead run "git am --skip".
+To restore the original branch and stop patching run "git am --abort".
+$:~/git/l2-mtd$ patch -p1 < .git/rebase-apply/patch 
+patching file drivers/mtd/nand/gpmi-nand/bch-regs.h
+patching file drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+Hunk #3 FAILED@1067.
+1 out of 3 hunks FAILED -- saving rejects to file drivers/mtd/nand/gpmi-nand/gpmi-lib.c.rej
+patching file drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+patching file drivers/mtd/nand/gpmi-nand/gpmi-nand.h
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 10303b3..98213f0 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -916,6 +916,9 @@ void __init setup_arch(char **cmdline_p)
- {
- 	struct machine_desc *mdesc;
- 
-+	pr_info("PHYS_OFFSET: 0x%08lx PAGE_OFFSET: 0x%08lx __pa(PAGE_OFFSET): 0x%08lx\n",
-+		PHYS_OFFSET, PAGE_OFFSET, __virt_to_phys(PAGE_OFFSET));
-+
- 	setup_processor();
- 	mdesc = setup_machine_fdt(__atags_pointer);
- 	if (!mdesc)
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index f77f1db..143430f 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -821,7 +821,7 @@ void __init sanity_check_meminfo(void)
- 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
- 		struct membank *bank = &meminfo.bank[j];
- 		*bank = meminfo.bank[i];
--
-+pr_info("block %u: pa0x%08lx va%p +0x%08lx\n", bank->start, __va(bank->start), bank->size);
- 		if (bank->start > ULONG_MAX)
- 			highmem = 1;
- 
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120213/893c4050/attachment.sig>
+-------------- next part --------------
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
