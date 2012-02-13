@@ -1,20 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Feb 2012 18:15:01 +0000
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <4F3952C7.3040502@codeaurora.org>
-References: <alpine.LFD.2.02.1202022016480.2759@xanadu.home>
- <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
- <CAH+eYFCKcPzMMp_Ef5iX0Xp=xK8MdvJoUBRgKGT56SVjY5DXoA@mail.gmail.com>
- <alpine.LFD.2.02.1202131307430.24536@xanadu.home>
- <4F3952C7.3040502@codeaurora.org>
-Message-ID: <20120213181501.GD25655@n2100.arm.linux.org.uk>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 13 Feb 2012 13:17:05 -0500
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <20120213165617.GE3494@opensource.wolfsonmicro.com>
+References: <1329151422-2146-1-git-send-email-mporter@ti.com>
+ <20120213165209.GA31482@n2100.arm.linux.org.uk>
+ <20120213165617.GE3494@opensource.wolfsonmicro.com>
+Message-ID: <20120213181704.GE40045@h115-84.vpn.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 10:13:27AM -0800, Stephen Boyd wrote:
-> Thanks. Russell has already merged the original patch to the fixes
-> branch. Hopefully he can fold this one in.
+On Mon, Feb 13, 2012 at 08:56:18AM -0800, Mark Brown wrote:
+> On Mon, Feb 13, 2012 at 04:52:09PM +0000, Russell King - ARM Linux wrote:
+> 
+> > I think OMAP (or even the reg-fixed-voltage folk) needs to create an enum
+> > similar to what I did for 8250 to control the allocation of platform
+> > device IDs for this, otherwise we're going to keep on running over this
+> > problem.
+> 
+> > Added Mark for his comment.
+> 
+> Hrm, seems slightly icky but the enum will work if we can decide how to
+> add elements to the enum since it'll be easy to bloat a lot it if it's
+> central.  It's tempting to suggest just using a random number to assign
+> the IDs randomly rather than have a central registry but obviously
+> there's no guarantees there.
 
-Nope, I've asked Linus to pull it.
+Another option might be to provide a generic platform device helper
+that instantiates a per-named-platform-device id list that simply
+provides the next available id sequentially as requests for platform
+device registration arrive.
 
-So do we conclude that the original patch wasn't properly tested? :P
+arch init:
+
+platform_create_id_list_create("reg-fixed-voltage"); 
+
+platform init:
+
+/* I = 0..N, .id filled in by _autoid() registration */
+static struct platform_device my_fixed_regulatorN = {
+	.name		= "reg-fixed-voltage",
+	.dev = ...
+}
+
+platform_device_register_autoid(&my_fixed_regulator0); 
+platform_device_register_autoid(&my_fixed_regulator1); 
+platform_device_register_autoid(&my_fixed_regulator2); 
+...
+platform_device_register_autoid(&my_fixed_regulatorN); 
+
+Something like this might be able to solve this once for the platform
+device users don't need a fixed enum id. It would require changes to
+platform_device_register() to update the list as static assignment
+of ids occurs so those will not be used by the _autoid() method.
+
+-Matt
