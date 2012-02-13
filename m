@@ -1,50 +1,73 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 13 Feb 2012 13:54:44 -0700
-Subject: [PATCH v2 03/11] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
-In-Reply-To: <20120213110453.GA13673@n2100.arm.linux.org.uk>
-References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
- <201202112007.08672.arnd@arndb.de>
- <20120211201430.GB24564@sirena.org.uk>
- <201202130547.48530.arnd@arndb.de>
- <20120213110453.GA13673@n2100.arm.linux.org.uk>
-Message-ID: <20120213205444.GH11077@ponder.secretlab.ca>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Mon, 13 Feb 2012 15:15:13 -0600
+Subject: [Linaro-mm-sig] [PATCHv21 12/16] mm: trigger page reclaim in
+ alloc_contig_range() to stabilise watermarks
+In-Reply-To: <op.v9mt58ch3l0zgt@mpn-glaptop>
+References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
+ <1328895151-5196-13-git-send-email-m.szyprowski@samsung.com>
+ <CAOCHtYi01NVp1j=MX+0-z7ygW5tJuoswn8eWTQp+0Z5mMGdeQw@mail.gmail.com>
+ <op.v9mt58ch3l0zgt@mpn-glaptop>
+Message-ID: <CAOCHtYjc39ThfrcAqdsxNf-bFqKzu=T8=O_W9Cg3cRNzQnX-OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 11:04:53AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 13, 2012 at 05:47:48AM +0000, Arnd Bergmann wrote:
-> > On Saturday 11 February 2012, Mark Brown wrote:
-> > > On Sat, Feb 11, 2012 at 08:07:08PM +0000, Arnd Bergmann wrote:
-> > > > what the risk is in changing exynos4 at the same time. It would
-> > > > be great if we can have all exynos use the common struct clk in 3.4,
-> > > > but I'm also happy if we just get exynos5 to do it that way from the
-> > > > beginning and move exynos4 over in 3.5 after you have had a chance
-> > > > to make sure everything still works.
-> > > 
-> > > Are we likely to get the common struct clk in 3.4?  It's all been
-> > > extremely quiet on that front except for complaints about the lack of
-> > > progress.
-> > 
-> > Yes, we discussed it during the subarch maintainers meeting at Linaro
-> > Connect last week and it looks like we're finally going forward on
-> > this now. Maybe Grant or Mike are better at explaining the current
-> > status regarding the clk implementation and bindings.
-> 
-> That would be good for those who weren't there to be updated with what
-> was discussed.
+2012/2/13 Michal Nazarewicz <mina86@mina86.com>:
+>> On Fri, Feb 10, 2012 at 11:32 AM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>>>
+>>> @@ -5637,6 +5642,56 @@ static int __alloc_contig_migrate_range(unsigned
+>>> long start, unsigned long end)
+>>> ? ? ? return ret > 0 ? 0 : ret;
+>>> ?}
+>>>
+>>> +/*
+>>> + * Update zone's cma pages counter used for watermark level calculation.
+>>> + */
+>>> +static inline void __update_cma_wmark_pages(struct zone *zone, int
+>>> count)
+>>> +{
+>>> + ? ? ? unsigned long flags;
+>>> + ? ? ? spin_lock_irqsave(&zone->lock, flags);
+>>> + ? ? ? zone->min_cma_pages += count;
+>>> + ? ? ? spin_unlock_irqrestore(&zone->lock, flags);
+>>> + ? ? ? setup_per_zone_wmarks();
+>>> +}
+>>> +
+>>> +/*
+>>> + * Trigger memory pressure bump to reclaim some pages in order to be
+>>> able to
+>>> + * allocate 'count' pages in single page units. Does similar work as
+>>> + *__alloc_pages_slowpath() function.
+>>> + */
+>>> +static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
+>>> +{
+>>> + ? ? ? enum zone_type high_zoneidx = gfp_zone(gfp_mask);
+>>> + ? ? ? struct zonelist *zonelist = node_zonelist(0, gfp_mask);
+>>> + ? ? ? int did_some_progress = 0;
+>>> + ? ? ? int order = 1;
+>>> + ? ? ? unsigned long watermark;
+>>> +
+>>> + ? ? ? /*
+>>> + ? ? ? ?* Increase level of watermarks to force kswapd do his job
+>>> + ? ? ? ?* to stabilise at new watermark level.
+>>> + ? ? ? ?*/
+>>> + ? ? ? __modify_min_cma_pages(zone, count);
+>
+>
+> On Mon, 13 Feb 2012 10:57:58 -0800, Robert Nelson <robertcnelson@gmail.com>
+> wrote:
+>>
+>> Hi Marek, ? This ^^^ function doesn't seem to exist in this patchset,
+>> is it in another set posted to lkml?
+>
+>
+> This should read __update_cma_wmark_pages(). ?Sorry for the incorrect patch.
 
-The decision was essentially Mike would repost his series ASAP with a view
-to getting it queued up for v3.4.  I think he is also going to get it into
-linux-next so at least it gets testing, even if the ultimate decision is to
-wait for v3.5.
+Thanks Michal, that fixed it.. cma-v21 with Rob Clark's omapdrm works
+great on the Beagle xM..
 
-I'm going to rebase my clk series on top of his patches rather that trying
-to merge my temporary versatile-only code.  If his series isn't ready to go
-in, I can still probably merge parts of the DT clock bindings anyway, but I'll
-need to do some cherry picking to do so.
+Regards
 
-The rough notes can be found here:
-
-https://blueprints.launchpad.net/linux-linaro/+spec/linaro-kernel-q112-maintainer-summit-1
-
-g.
+-- 
+Robert Nelson
+http://www.rcn-ee.com/
