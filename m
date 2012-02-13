@@ -1,28 +1,73 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Mon, 13 Feb 2012 11:03:09 +0530
-Subject: [PATCH v9 00/25] gpio/omap: driver cleanup and fixes
-In-Reply-To: <87ty2yxy3b.fsf@ti.com>
-References: <1328203851-20435-1-git-send-email-tarun.kanti@ti.com>
- <20120210192416.GW1426@atomide.com> <87ty2yxy3b.fsf@ti.com>
-Message-ID: <CAC83Zv+TBgKDH=y++AmG+uXj+quOt60U98OY=BO-41SH=6ozYg@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Mon, 13 Feb 2012 11:05:53 +0530
+Subject: OMAP34xx
+In-Reply-To: <alpine.DEB.2.00.1202121148210.30322@utopia.booyaka.com>
+References: <20120204185453.GB17309@n2100.arm.linux.org.uk>
+ <20120212104132.GA17557@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202121148210.30322@utopia.booyaka.com>
+Message-ID: <4F38A139.4090501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 11, 2012 at 1:25 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tony Lindgren <tony@atomide.com> writes:
+On Monday 13 February 2012 12:42 AM, Paul Walmsley wrote:
+> Hi
 >
-> [...]
+> On Sun, 12 Feb 2012, Russell King - ARM Linux wrote:
 >
->> ..but are there also some patches in your series that should also be
->> applied separately as fixes for the -rc cycle?
+>> The other allnoconfig issue is:
+>>
+>> arch/arm/mach-omap2/built-in.o:(.data+0xa3d0): undefined reference to `omap_i2c_reset'
+>>
+>> which looks like hwmod can't cope with the I2C_OMAP being disabled.
+>>
+>> I don't propose these are fixed for v3.3, but they certainly should be
+>> fixed for v3.4.
+> Thanks for the report.  Here's a patch for this for 3.4.  Compile-tested 
+> only; will boot-test it as part of the v2 of the 3.4 hwmod changes.
 >
-> IMO, there aren't any things in this series that fall into the
-> regression category.
-That's right.
---
-Tarun
+Boot tested on omap4430 sdp.
+> - Paul
 >
-> After I get to a final review and test of this (early next week), I'm
-> planning to sent a pull request to Grant.
+> From: Paul Walmsley <paul@pwsan.com>
+> Date: Sun, 12 Feb 2012 11:49:34 -0700
+> Subject: [PATCH] ARM: OMAP2+: I2C: always compile I2C reset code, even if I2C
+>  driver is not built
 >
-> Kevin
+> During kernel init, we reset all IP blocks on the OMAP that we can,
+> even if there is no driver compiled for that IP block.  Unlike most IP
+> blocks, the I2C block requires some extra programming for this to
+> work.  This reset code is incorrectly omitted when the I2C driver is
+> deselected.  In this circumstance, the build breaks.  Fix by compiling
+> the I2C reset code unconditionally.
+>
+> Problem reported by Russell King <linux@arm.linux.org.uk>.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-omap2/Makefile |    5 +----
+>  1 files changed, 1 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index fc9b238..0d5676c 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -4,7 +4,7 @@
+>  
+>  # Common support
+>  obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
+> -	 common.o gpio.o dma.o wd_timer.o display.o
+> +	 common.o gpio.o dma.o wd_timer.o display.o i2c.o
+>  
+>  omap-2-3-common				= irq.o sdrc.o
+>  hwmod-common				= omap_hwmod.o \
+> @@ -182,9 +182,6 @@ obj-$(CONFIG_OMAP_IOMMU)		+= iommu2.o
+>  iommu-$(CONFIG_OMAP_IOMMU)		:= omap-iommu.o
+>  obj-y					+= $(iommu-m) $(iommu-y)
+>  
+> -i2c-omap-$(CONFIG_I2C_OMAP)		:= i2c.o
+> -obj-y					+= $(i2c-omap-m) $(i2c-omap-y)
+> -
+>  ifneq ($(CONFIG_TIDSPBRIDGE),)
+>  obj-y					+= dsp.o
+>  endif
