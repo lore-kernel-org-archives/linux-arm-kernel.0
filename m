@@ -1,41 +1,51 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Mon, 13 Feb 2012 09:07:56 +0800
-Subject: [PATCH] hotplug: eliminate warning "Unknown IPI message 0x1"
-In-Reply-To: <20120210095955.GT889@n2100.arm.linux.org.uk>
-References: <1328866073-14769-1-git-send-email-bill4carson@gmail.com>
- <1328866073-14769-2-git-send-email-bill4carson@gmail.com>
- <20120210095955.GT889@n2100.arm.linux.org.uk>
-Message-ID: <4F38626C.5030607@gmail.com>
+From: Hong.Xu@atmel.com (Xu, Hong)
+Date: Mon, 13 Feb 2012 10:15:34 +0800
+Subject: [PATCH V3] MTD: atmel_nand: Update driver to support Programmable
+ HW ECC controller
+In-Reply-To: <1328959692.22240.103.camel@sauron.fi.intel.com>
+References: <1328491977-30448-1-git-send-email-hong.xu@atmel.com>
+ <1328959692.22240.103.camel@sauron.fi.intel.com>
+Message-ID: <4C79549CB6F772498162A641D92D5328045B52C6@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Artem,
+> -----Original Message-----
+> From: Artem Bityutskiy [mailto:dedekind1 at gmail.com]
+> Sent: Saturday, February 11, 2012 7:28 PM
+> To: Xu, Hong; linux-arm-kernel
+> Cc: linux-mtd at lists.infradead.org; ivan.djelic at parrot.com;
+> dwmw2 at infradead.org
+> Subject: Re: [PATCH V3] MTD: atmel_nand: Update driver to support
+Programmable
+> HW ECC controller
+> 
+> On Mon, 2012-02-06 at 09:32 +0800, Hong Xu wrote:
+> > +static int16_t *pmecc_get_index_of(struct atmel_nand_host *host)
+> > +{
+> > +       int16_t *p = (int16_t *)host->rom_base;
+> 
+> I did not really get into details, but you annotate rom_base with
+> __iomem, and then you have to cast it to int16_t in several - this
+does
+> not look very nice.
+> 
+OK, this line shall be removed actually, thanks.
+The logic here is, we want to use one lookup table which sits in ROM.
+ROM region is mapped into kernel space by ioremap and the VA is saved in
+rom_base. The function pmecc_get_index_of and pmecc_get_alpha_to are
+used to return the correct ROM offset according to SoC and PMECC
+configurations.
+The lookup table is of type int16.
 
+> Could you please CC the arm list? There are much more people who can
+> give this code a review.
+> 
 
-On 2012?02?10? 17:59, Russell King - ARM Linux wrote:
-> On Fri, Feb 10, 2012 at 05:27:53PM +0800, Bill Carson wrote:
->> When playing hotplug on vexpress board, a tiny warning pops out.
->>
->> /sys/devices/system/cpu # echo 0>  cpu3/online
->> CPU3: shutdown
->> /sys/devices/system/cpu # echo 1>  cpu3/online
->> CPU3: Booted secondary processor
->> Calibrating delay loop (skipped) already calibrated this CPU
->> CPU3: Unknown IPI message 0x1
->>        ^^^^^^^
->> It's a phony warning caused by handle_IPI as a result of calling
->> gic_raise_softirq(cpumask_of(cpu), 1). Introducing a new ipi_msg_type
->> IPI_WAKEUP_CPU to make this warning go away.
->
-> NAK.  I want people to move to SGI0 for this, so that we can have SGI1-N
-> as the proper IPIs.  The reason _I_ haven't done this is because it's
-> totally unclear whether anyone relies on the current IPI number.
->
+OK, I'll resend the patch and CC the arm list.
 
-Thanks for your explanation, now I understand what's going on here.
-
-
--- 
-I am a slow learner
-but I will keep trying to fight for my dreams!
-
---bill
+Thanks and Br,
+Eric
+> --
+> Best Regards,
+> Artem Bityutskiy
