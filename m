@@ -1,36 +1,49 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Feb 2012 09:49:40 +0000
-Subject: [CPUFREQ] Fix exposure of ARM_EXYNOS4210_CPUFREQ
-Message-ID: <20120213094940.GA15338@n2100.arm.linux.org.uk>
+Date: Mon, 13 Feb 2012 09:51:01 +0000
+Subject: [SPI/MFD] Fix build/section mismatch warnings in da9052-spi.c
+Message-ID: <20120213095101.GB15338@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-exynos4210-cpufreq.c is not buildable on non-exynos builds, so it's
-pointless allowing this option to be exposed.  Fix this by adding a
-dependency on ARCH_EXYNOS.
+drivers/mfd/da9052-spi.c:65: warning: 'da9052_spi_remove' defined but not used
 
-drivers/cpufreq/exynos4210-cpufreq.c:20:29: error: mach/regs-clock.h: No such file or directory
-drivers/cpufreq/exynos4210-cpufreq.c:21:26: error: mach/cpufreq.h: No such file or directory
+and:
+
+WARNING: drivers/mfd/built-in.o(.text+0xb818): Section mismatch in reference from the function da9052_spi_probe() to the function .devinit.text:da9052_device_init()
+The function da9052_spi_probe() references
+the function __devinit da9052_device_init().
+This is often because da9052_spi_probe lacks a __devinit
+annotation or the annotation of da9052_device_init is wrong.
+
+where found during an ARM randconfig build.  Fix these warnings by
+adding the annotations.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Dave Jones <davej@redhat.com>
-Cc: cpufreq at vger.kernel.org
-Cc: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/cpufreq/Kconfig.arm |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/mfd/da9052-spi.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index e0664fe..c8bde43 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -34,6 +34,7 @@ config ARM_EXYNOS_CPUFREQ
+diff --git a/drivers/mfd/da9052-spi.c b/drivers/mfd/da9052-spi.c
+index cdbc7ca..2693c87 100644
+--- a/drivers/mfd/da9052-spi.c
++++ b/drivers/mfd/da9052-spi.c
+@@ -21,7 +21,7 @@
  
- config ARM_EXYNOS4210_CPUFREQ
- 	bool "Samsung EXYNOS4210"
-+	depends on ARCH_EXYNOS
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS4210
- 	  SoC (S5PV310 or S5PC210).
+ #include <linux/mfd/da9052/da9052.h>
+ 
+-static int da9052_spi_probe(struct spi_device *spi)
++static int __devinit da9052_spi_probe(struct spi_device *spi)
+ {
+ 	int ret;
+ 	const struct spi_device_id *id = spi_get_device_id(spi);
+@@ -61,7 +61,7 @@ static int da9052_spi_probe(struct spi_device *spi)
+ 	return ret;
+ }
+ 
+-static int da9052_spi_remove(struct spi_device *spi)
++static int __devexit da9052_spi_remove(struct spi_device *spi)
+ {
+ 	struct da9052 *da9052 = dev_get_drvdata(&spi->dev);
+ 
