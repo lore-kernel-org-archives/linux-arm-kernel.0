@@ -1,24 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Feb 2012 20:43:50 +0100
-Subject: [PATCH][V3] ux500 : decouple/recouple gic from the PRCMU
-In-Reply-To: <4F34F39E.2080109@linaro.org>
-References: <1328869344-31332-1-git-send-email-daniel.lezcano@linaro.org>
- <4F34F39E.2080109@linaro.org>
-Message-ID: <CACRpkdYeTxU8qGJ7F2jWSfL3Mgd4xo2re6D=HfPgVxmEumtC_g@mail.gmail.com>
+Date: Mon, 13 Feb 2012 20:48:19 +0100
+Subject: [PATCH 0/3] pinctrl: move the core per-device handlers to core
+In-Reply-To: <4F360853.3050402@nvidia.com>
+References: <1328814050-22715-1-git-send-email-linus.walleij@linaro.org>
+ <4F34A3EF.3070207@nvidia.com>
+ <CACRpkdZ0kTXLAfdsfMjeZZX4W-fx5zyEdeGboKCmKSzCaMVw_A@mail.gmail.com>
+ <4F360853.3050402@nvidia.com>
+Message-ID: <CACRpkdYm3sb7wbJP1M9HmjkGHq1YuT06ar6-+V1RoZ1QdoT9BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2012 at 11:38 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
+On Sat, Feb 11, 2012 at 7:18 AM, Stephen Warren <swarren@nvidia.com> wrote:
 
-> I think I addressed all the concerns, is it possible to merge this patch ?
+> I'll probably want to rework the 3 patches your changes break anyway (in
+> order to completely remove use of board-*-pinmux.c when booting from DT,
+> once I write the DT code) and so you may as well not apply them, just
+> the driver itself. It'll save some churn.
 
-As detailed in another letter: does this build on top of the patch series
-"DB8500 PRCMU update" that was submitted some time ago? Please
-make sure it is either that or orthogonal so they don't collide.
+OK will that happen for this merge window or is the driver going to sit
+unused for the 3.4 cycle?
 
-Second: it's not me merging patches to the MFD subsystem, it's the
-MFD subsystem maintainer Saumel Ortiz.
+I'm mainly thinking if the underlying driver may be subject to change I
+could just keep it out-of-tree, unless you want it merged in for some
+practical reason, then I'll just merge it.
 
 Yours,
 Linus Walleij
