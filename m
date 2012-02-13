@@ -1,36 +1,56 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 13 Feb 2012 15:05:13 -0800
-Subject: [PATCH 05/15] ARM: msm: use runtime ioremap hook
-In-Reply-To: <1329169408-17253-6-git-send-email-robherring2@gmail.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <1329169408-17253-6-git-send-email-robherring2@gmail.com>
-Message-ID: <20120213230512.GB10827@codeaurora.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 13 Feb 2012 18:05:20 -0500
+Subject: [PATCH v2 3/4] ARM: architected timers: add DT support
+In-Reply-To: <1328115575-24866-4-git-send-email-marc.zyngier@arm.com>
+References: <1328115575-24866-1-git-send-email-marc.zyngier@arm.com>
+ <1328115575-24866-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4F399730.2070104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 03:43:18PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+Hi Marc,
+
+On 02/01/2012 11:59 AM, Marc Zyngier wrote:
+> Add runtime DT support and documentation for the Cortex A7/A15
+> architected timers.
 > 
-> Convert msm platforms to use run-time ioremap hook instead of the compile
-> time hook.
-> 
-> According to David Brown, only the msm7201 needed the ioremap hook.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/mach-msm/board-halibut.c               |    6 ++++++
->  arch/arm/mach-msm/board-trout.c                 |    6 ++++++
->  arch/arm/mach-msm/include/mach/io.h             |    5 -----
->  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ++++++
->  arch/arm/mach-msm/io.c                          |    1 -
->  5 files changed, 18 insertions(+), 6 deletions(-)
+>  .../devicetree/bindings/arm/arch_timer.txt         |   23 +++++++++
+>  arch/arm/kernel/arch_timer.c                       |   53 +++++++++++++++++---
+>  2 files changed, 69 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/arch_timer.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> new file mode 100644
+> index 0000000..84e93f7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> @@ -0,0 +1,23 @@
+> +* ARM architected timer
+> +
+> +ARM Cortex-A7 and Cortex-A15 have a per-core architected timer, which
+> +provides a per-cpu local timer.
+> +
+> +The timer is attached to a GIC to deliver its two per-processor
+> +interrupts (one for the secure mode, one for the non-secure mode).
+> +
+> +** Timer node properties:
+> +
+> +- compatible : Should be "arm,armv7-timer"
+> +
+> +- interrupts : One or two interrupts for secure and non-secure mode
+> +
+> +- clock-frequency : The frequency of the main counter, in Hz. Optionnal.
 
-Tested on 8660, compiled on all MSM targets (both patches that apply
-to msm).
+Spelling.
 
-Tetsed-by: David Brown <davidb@codeaurora.org>
-Acked-by: David Brown <davidb@codeaurora.org>
+[snip]
+
+Regards,
+Christopher
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum
