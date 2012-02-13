@@ -1,221 +1,144 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 13 Feb 2012 15:20:13 +0100
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
-References: <4F1EE861.4030405@monstr.eu>
- <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
- <4F1FF870.3000105@monstr.eu>
- <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
- <4F200F64.9060203@monstr.eu>
- <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
- <4F212E9E.9060807@monstr.eu>
- <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
-Message-ID: <4F391C1D.9020402@monstr.eu>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Feb 2012 08:22:12 -0600
+Subject: [PATCH 3/8] ARM: imx5: adopt generic_chip irq_domain support
+ for tzic
+In-Reply-To: <20120213135106.GB2247@r65073-Latitude-D630>
+References: <1328980472-11923-1-git-send-email-shawn.guo@linaro.org>
+ <1328980472-11923-4-git-send-email-shawn.guo@linaro.org>
+ <4F373291.7020407@gmail.com> <20120213135106.GB2247@r65073-Latitude-D630>
+Message-ID: <4F391C94.4070202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-Ohad Ben-Cohen wrote:
-> On Thu, Jan 26, 2012 at 12:44 PM, Michal Simek <monstr@monstr.eu> wrote:
->> I have one small problem which is that physical address is 0x10000000
->> which means that firmware entry point is the same.
-> 
-> This is what we do with the davinci DSPs, too.
-> 
->> In rproc_load_segments is da composed from phdr->p_paddr which is
->> 0x10000000.
-> 
-> Ok, I don't see any issue here.
-> 
->> And code is designed that this load addr is offset.
-> 
-> Not sure exactly what do you mean by that ?
-> 
->> Here is the code:
->>        /* go through the available ELF segments */
->>        for (i = 0; i < ehdr->e_phnum; i++, phdr++) {
->>                u32 da = phdr->p_paddr; // OFFSET 0x10000000
->>                u32 memsz = phdr->p_memsz;
+On 02/13/2012 07:51 AM, Shawn Guo wrote:
+> On Sat, Feb 11, 2012 at 09:31:29PM -0600, Rob Herring wrote:
+>> Shawn,
 >>
->> But for my case is physical address correct and it is not offset 0x10000000.
+>> On 02/11/2012 11:14 AM, Shawn Guo wrote:
+>>> It adopts generic_chip irq_domain support for tzic, so that the
+>>> irq_domain initialization for tzic in imx5 DT platform code can be
+>>> removed.
+>>>
+>>
+>> As I found in my attempt to re-factor this and we discussed, the init
+>> flow is all wrong for mx5.
+>>
+> But if we put this from point of supporting DT and non-DT with less
+> code churning, I would not way it's "wrong", or I would say I made
+> it "wrong" on purpose.
 > 
-> Again, I'm not sure what exactly is the issue. p_paddr is the physical
-> address where the image is expected, that sounds ok to me.
+>> The mach .init_irq function should call of_irq_init. mx5 is initializing
+>> tzic and then calling of_irq_init in the platform init calls which is
+>> wrong. Ultimately the compatible list should probably include avic,
+>> tzic, gic and any other secondary controllers you have. The of_irq_init
+>> callbacks need to do ioremap and initialize the controller.
+> 
+> Yes, this is absolutely right for DT only support.  But we are
+> supporting both DT and non-DT in a single image with the desire of
+> less code churning.
+> 
 
-sorry for delay. I was working on different issue.
-I have solved this issue by using ram address ranges 0x0 - 0x10000000.
+You're not saving anything, just delaying changes when you want to
+remove the non-DT code paths in the future.
 
-I am using CONFIG_PHYS_OFFSET=0x10000000 in linux which give me free space for rtos.
+>> You're
+>> basically removing the use of of_irq_init here.
+>>
+> The of_irq_init was added for hacking irqdomain initialization on imx5
+> at the first place.  Now the hack is replaced by generic-chip irqdomain
+> support, so the of_irq_init goes away here.  And I agree that we need
+> it for separating DT from non-DT support, but that belongs to another
+> series, and this series is just cleaning up irqdomain support.
+> 
 
-Here is how it is achieve
-	ret = dma_declare_coherent_memory(&zynq_freertos.dev, 0,
-				0, 0x10000000, DMA_MEMORY_MAP);
+No. Those are completely orthogonal. The way it was added for mx5 was
+certainly a hack though. of_irq_init has nothing to do with domains.
+It's purpose is to initialize interrupt controllers in the right order.
+You can't initialize secondary controllers before primary controllers.
+It removes the init ordering knowledge from the kernel and uses
+knowledge that's already present in the DT.
 
-which is fully compatible with remoteproc.
-I have also got trace buffer to work - there were problem with caches on cpu with rtos.
+>> Some more comments below.
+>>
+>>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>>> ---
+>>>  arch/arm/boot/dts/imx51.dtsi            |    6 +++++
+>>>  arch/arm/boot/dts/imx53.dtsi            |    6 +++++
+>>>  arch/arm/mach-mx5/clock-mx51-mx53.c     |    4 +-
+>>>  arch/arm/mach-mx5/imx51-dt.c            |    8 -------
+>>>  arch/arm/mach-mx5/imx53-dt.c            |    8 -------
+>>>  arch/arm/plat-mxc/include/mach/common.h |    2 +
+>>>  arch/arm/plat-mxc/tzic.c                |   32 ++++++++++++++++--------------
+>>>  7 files changed, 33 insertions(+), 33 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+>>> index 6663986..a5fda43 100644
+>>> --- a/arch/arm/boot/dts/imx51.dtsi
+>>> +++ b/arch/arm/boot/dts/imx51.dtsi
+>>> @@ -171,6 +171,12 @@
+>>>  				status = "disabled";
+>>>  			};
+>>>  
+>>> +			gpt at 73fa0000 {
+>>> +				compatible = "fsl,imx51-gpt", "fsl,gpt";
+>>> +				reg = <0x73fa0000 0x4000>;
+>>> +				interrupts = <39>;
+>>> +			};
+>>> +
+>>>  			uart1: uart at 73fbc000 {
+>>>  				compatible = "fsl,imx51-uart", "fsl,imx21-uart";
+>>>  				reg = <0x73fbc000 0x4000>;
+>>> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+>>> index 5dd91b9..05e6412 100644
+>>> --- a/arch/arm/boot/dts/imx53.dtsi
+>>> +++ b/arch/arm/boot/dts/imx53.dtsi
+>>> @@ -173,6 +173,12 @@
+>>>  				status = "disabled";
+>>>  			};
+>>>  
+>>> +			gpt at 53fa0000 {
+>>> +				compatible = "fsl,imx53-gpt", "fsl,gpt";
+>>> +				reg = <0x53fa0000 0x4000>;
+>>> +				interrupts = <39>;
+>>> +			};
+>>> +
+>>>  			uart1: uart at 53fbc000 {
+>>>  				compatible = "fsl,imx53-uart", "fsl,imx21-uart";
+>>>  				reg = <0x53fbc000 0x4000>;
+>>> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+>>> index 4cb2769..c558cb1 100644
+>>> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
+>>> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+>>> @@ -1593,7 +1593,7 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+>>>  
+>>>  	/* System timer */
+>>>  	mxc_timer_init(&gpt_clk, MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR),
+>>> -		MX51_INT_GPT);
+>>> +		       tzic_irq_create_mapping(MX51_INT_GPT));
+>>
+>> In the DT case, you should be calling irq_of_parse_and_map to setup the
+>> timer irq.
+>>
+>> I really think you need to separate DT and non-DT init functions. You
+>> need to ultimately be getting both the base address and the irq from the
+>> dts. This applies to both timer and irq controllers.
+> 
+> Yes, I agree with you I need to do those at some point when we fully
+> support DT and get ready to remove the non-DT support completely.  But
+> we are not there yet.  Can I cook another series to do that when we
+> get there, so that we make this series stay clean and focusing?
+> 
 
-I still have the problem to reset cpu1 but we are investigating how to do so. Maybe in future
-we will add new message which jumps back to bootloader code if not possible to do it throuth any
+Removing non-DT support has nothing to do with having full DT support.
 
+>> If you make the
+>> init code better separated, then you won't have the problems with legacy
+>> vs. linear domains.
+>>
+> I do not have any problem here, since both DT and non-DT are using
+> linear domain.  Isn't this something encouraged to do?
 
-I have looked at omap remoteproc and there is communication between cocpu through omap mbox
-and IRQs. I am working on similar communication for testing
-and I would like to know how vrings fit to this. Do you have any example of using it?
+You are making things harder on yourself trying to get linear domains to
+work for non-DT. Just use legacy.
 
-
-struct resource __resource resources[] = {
-     { TYPE_CARVEOUT, 0, TEXT_BASE + 0,    0, 0, 0, SZ_1M, 0, 0,0,0,0,"IPU_MEM_TEXT"},
-     { TYPE_VIRTIO_DEV,0, TEXT_BASE + 0,   0, 0, 0, SZ_1M, VIRTIO_ID_RPMSG,0,0,0,0,"vdev:rpmsg"},
-
-     { TYPE_VRING, 0, TEXT_BASE + 0x20000, 0, 0, 0, VQ0_SIZE,0,0,0,0,0,"vring:sysm3->mpu"},
-     { TYPE_VRING, 1, TEXT_BASE + 0x30000, 0, 0, 0, VQ1_SIZE,0,0,0,0,0,"vring:mpu->sysm3"},
-     { TYPE_TRACE, 0, TEXT_BASE + 0x40000, 0, 0, 0, 0x8000, 0,0,0,0,0,"trace:sysm3"},
-};
-
-Below is my full bootup log.
-
-Thanks,
-Michal
-
-
-Linux version 3.3.0-rc1+ (monstr at monstr.eu) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-62) ) #355 PREEMPT Mon Feb 13 15:10:48 CET 2012
-CPU: ARMv7 Processor [410fc090] revision 0 (ARMv7), cr=10c5387d
-CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-Machine: Xilinx Zynq Platform, model: ZC702_jason
-bootconsole [earlycon0] enabled
-vmalloc_min ef800000, PAGE_OFFSET c0000000
-Ignoring RAM at 00000000-0fffffff (vmalloc region overlap).
-vmalloc_min ef800000, PAGE_OFFSET c0000000
-dma_contiguous_reserve(limit 20000000)
-dma_contiguous_reserve: total available: 256 MiB, size absolute: 1 MiB, size percentage: 0 MiB
-dma_contiguous_reserve: reserving 1 MiB for global area
-dma_declare_contiguous(size 100000, base 00000000, limit 20000000)
-cma: CMA: reserved 8 MiB at 1f800000
-Memory policy: ECC disabled, Data cache writeback
-Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 65024
-Kernel command line:  console=ttyPS0,115200 earlyprintk
-PID hash table entries: 1024 (order: 0, 4096 bytes)
-Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
-Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
-Memory: 256MB = 256MB total
-Memory: 243984k/243984k available, 18160k reserved, 0K highmem
-Virtual kernel memory layout:
-     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-     vmalloc : 0xd0800000 - 0xff000000   ( 744 MB)
-     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
-     modules : 0xbf000000 - 0xc0000000   (  16 MB)
-       .text : 0xc0008000 - 0xc0283000   (2540 kB)
-       .init : 0xc0283000 - 0xc0753000   (4928 kB)
-       .data : 0xc0754000 - 0xc076c0c0   (  97 kB)
-        .bss : 0xc076c0e4 - 0xc07774c0   (  45 kB)
-NR_IRQS:246
-xlnx,ps7-ttc-1.00.a #0 at 0xd0800000, irq=43
-Calibrating delay loop... 2531.32 BogoMIPS (lpj=12656640)
-pid_max: default: 32768 minimum: 301
-Mount-cache hash table entries: 512
-CPU: Testing write buffer coherency: ok
-hw perfevents: enabled with ARMv7 Cortex-A9 PMU driver, 1 counters available
-Setting up static identity map for 0x101cc918 - 0x101cc94c
-devtmpfs: initialized
-NET: Registered protocol family 16
-DMA: preallocated 256 KiB pool for atomic coherent allocations
-L2x0 series cache controller enabled
-l2x0: 8 ways, CACHE_ID 0x00000000, AUX_CTRL 0x02060000, Cache size: 524288 B
-hw-breakpoint: debug architecture 0x0 unsupported.
-Switching to clocksource xttcpss_timer1
-NET: Registered protocol family 2
-IP route cache hash table entries: 2048 (order: 1, 8192 bytes)
-TCP established hash table entries: 8192 (order: 4, 65536 bytes)
-TCP bind hash table entries: 8192 (order: 3, 32768 bytes)
-TCP: Hash tables configured (established 8192 bind 8192)
-TCP reno registered
-UDP hash table entries: 256 (order: 0, 4096 bytes)
-UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
-NET: Registered protocol family 1
-msgmni has been set to 492
-e0001000.serial: ttyPS0 at MMIO 0xe0001000 (irq = 82) is a xuartps
-console [ttyPS0] enabled, bootconsole disabled
-console [ttyPS0] enabled, bootconsole disabled
-GEM: BASEADDRESS hw: e000b000 virt: d0806000
-XEMACPS mii bus: probed
-GEM: phydev ceaf7800, phydev->phy_id 0x1410cc2, phydev->addr 0x7
-GEM: MAC addr 00:b0:00:e0:ff:bf
-eth0, pdev->id -1, baseaddr 0xe000b000, irq 54
-eth0, phy_addr 0x7, phy_id 0x01410cc2
-eth0, attach [Generic PHY] phy driver
-zynq-rproc zynq-rproc.1: zynq_rproc_probe
-zynq-rproc zynq-rproc.1: cpu1_freertos is available
-zynq-rproc zynq-rproc.1: Note: remoteproc is still under development and considered experimental.
-zynq-rproc zynq-rproc.1: THE BINARY FORMAT IS NOT YET FINALIZED, and backward compatibility isn't yet guaranteed.
-rpmsg_init
-rpmsg_probe
-zynq-rproc zynq-rproc.1: powering up cpu1_freertos, firmware test
-zynq-rproc zynq-rproc.1: Booting fw image test, size 203250
-zynq-rproc zynq-rproc.1: iommu not found
-zynq-rproc zynq-rproc.1: rsc: type 0, da 0x0, pa 0x0, len 0x100000, id 0, name IPU_MEM_TEXT, flags 0
-zynq-rproc zynq-rproc.1: rsc: type 4, da 0x0, pa 0x0, len 0x100000, id 0, name vdev:rpmsg, flags 7
-zynq-rproc zynq-rproc.1: rsc: type 3, da 0x20000, pa 0x0, len 0x100, id 0, name vring:sysm3->mpu, flags 0
-zynq-rproc zynq-rproc.1: rsc: type 3, da 0x30000, pa 0x0, len 0x100, id 1, name vring:mpu->sysm3, flags 0
-zynq-rproc zynq-rproc.1: rsc: type 2, da 0x40000, pa 0x0, len 0x8000, id 0, name trace:sysm3, flags 0
-zynq-rproc zynq-rproc.1: phdr: type 1 da 0x0 memsz 0x1be80 filesz 0x1509c
-zynq-rproc zynq-rproc.1: zynq_rproc_start
-zynq-rproc zynq-rproc.1: zynq_device_enable Enable device - it means jump
-zynq-rproc zynq-rproc.1: remote processor cpu1_freertos is now up
-zynq-rproc zynq-rproc.1: zynq_rproc_kick vqid 0
-zynq_mbox_msg_send 1
-virtio_rpmsg_bus virtio0: rpmsg host is online
-TCP cubic registered
-NET: Registered protocol family 10
-IPv6 over IPv4 tunneling driver
-NET: Registered protocol family 17
-NET: Registered protocol family 40
-VFP support v0.3: implementor 41 architecture 3 part 40 variant 0 rev 0
-Registering SWP/SWPB emulation handler
-Freeing init memory: 4928K
-Mounting proc:
-Mounting var:
-Populating /var:
-Running local start scripts.
-Mounting debugfs:
-Mounting sysfs:
-mdev: initialising /dev
-mdev: Registering hotplug handler
-/proc/mtd doesn't exist. Will not create /dev/flash/* device nodes
-Mounting devpts:
-Setting hostname:
-Bringing up network interfaces:
-GEM: lp->tx_bd cf841000 lp->tx_bd_dma 1f841000 lp->tx_skb ceb3bbc0
-GEM: lp->rx_bd cf840000 lp->rx_bd_dma 1f840000 lp->rx_skb ceb3bac0
-GEM: MAC 0xe000b000, 0x0000bfff, 00:b0:00:e0:ff:bf
-Starting portmap:
-
-Welcome to
-  _____       _           _      _
-| ___ \     | |         | |    (_)
-| |_/ / ___ | |_   __ _ | |     _  _ __   _   _ __  __
-|  __/ / _ \| __| / _` || |    | || '_ \ | | | |\ \/ /
-| |   |  __/| |_ | (_| || |____| || | | || |_| | >  <
-\_|    \___| \__| \__,_|\_____/|_||_| |_| \__,_|/_/\_\
-
-on zynq-silicon
-
-
-zynq-silicon login: root
-Password:
-
-
-
-
-
-
-
-
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+Rob
