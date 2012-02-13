@@ -1,68 +1,92 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 13 Feb 2012 10:48:02 -0600
-Subject: [PATCH] ep93xx: fix build of vision_ep93xx.c
-In-Reply-To: <201202130658.12505.arnd@arndb.de>
-References: <201202080953.44853.hartleys@visionengravers.com>
- <20120210064640.GA3847@mwesterb-mobl.ger.corp.intel.com>
- <ADE657CA350FB648AAC2C43247A983F001F41F9DF77C@AUSP01VMBX24.collaborationhost.net>
- <201202130658.12505.arnd@arndb.de>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FCB4CD8@AUSP01VMBX24.collaborationhost.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Feb 2012 16:52:09 +0000
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <1329151422-2146-1-git-send-email-mporter@ti.com>
+References: <1329151422-2146-1-git-send-email-mporter@ti.com>
+Message-ID: <20120213165209.GA31482@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, February 12, 2012 11:58 PM, Arnd Bergmann wrote:
-> On Friday 10 February 2012, H Hartley Sweeten wrote:
->> On Thursday, February 09, 2012 11:47 PM, Mika Westerberg wrote:
->>> On Wed, Feb 08, 2012 at 09:53:44AM -0700, H Hartley Sweeten wrote:
->>>> Fix build breakage due to the following commits:
->>>> 
->>>> Commit bd5f12a24766c1f299def0a78b008d4746f528f2
->>>>   ARM: 7042/3: mach-ep93xx: break out GPIO driver specifics
->>>> 
->>>> Commit 257af9f9725aa8a863b306659208a031135d59e7
->>>>   ARM: 7041/1: gpio-ep93xx: hookup the to_irq callback in the driver
->>>> 
->>>> The vision_ep9307 machine uses the ep93xx build-in gpios and needs to
->>>> include <mach/gpio-ep93xx.h> to pickup the defines.
->>>> 
->>>> The gpio_to_irq() call is now a callback to the gpio-ep93xx.c driver
->>>> and cannot be used as a constant initializer for the .irq member of
->>>> struct i2c_board_info.
->>>> 
->>>> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
->>>> Acked-by: Ryan Mallon <rmallon@gmail.com>
->>>
->>> Acked-by: Mika Westerberg <mika.westerberg@iki.fi>
->> 
->> Russell,
->> 
->> Can this go to your Patch system or should it go thru the arm-soc tree?
->> 
->> The 3.2 kernel will not currently build with CONFIG_MACH_VISION_EP9307=y
->> and needs this patch.
->
-> Hi Hartley, Ryan and Mika,
->
-> It should indeed go through the arm-soc tree, I'm sorry for having
-> been so unresponsive recently. Olof was taking care of the other
-> pull requests and bug fixes but unfortunately was not on Cc on this
-> one, so we both ended up missing it until now.
->
-> I've applied it on the "fixes" branch of the arm-soc tree now, it
-> will get sent to Linus on the next opportunity.
+On Mon, Feb 13, 2012 at 11:43:42AM -0500, Matt Porter wrote:
+> This fixes smsc911x support on platforms using gpmc_smsc911x_init().
+> Commit c7e963f6888816f04d1f5da0e07bec4e0092f227 added the requirement
+> that platforms provide vdd33a and vddvario supplies.
 
-Thanks!
+Thanks.  Only one comment on this.
 
->I had a little trouble applying the patch from base64 format, but
->since you've had to wait so long already and I'm not completely sure
->which side the problem was on I took the time to recreate the diff
->from the base64 encoding and fix up the whitespace damage I got.
+> +static struct platform_device gpmc_smsc911x_regulator = {
+> +	.name		= "reg-fixed-voltage",
+> +	.id		= 0,
 
-Hmm... I'm not sure what caused the base64 encoding. I recently
-updated my host machine but I don't think anything I did would have
-caused the mail to be encoded differently.
+$ grep -A1 reg-fixed-voltage arch/arm/*omap* -r
+arch/arm/mach-omap2/board-omap3evm.c:	.name		= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-omap3evm.c-	.id		= 1,
+--
+arch/arm/mach-omap2/board-zoom-peripherals.c:	.name		= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-zoom-peripherals.c-	.id		= 1,
+--
+arch/arm/mach-omap2/board-overo.c:	.name		= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-overo.c-	.id		= 1,
+--
+arch/arm/mach-omap2/board-omap4panda.c:	.name		= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-omap4panda.c-	.id		= 1,
+--
+arch/arm/mach-omap2/board-rm680.c:	.name			= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-rm680.c-	.dev			= {
+--
+arch/arm/mach-omap2/board-igep0020.c:	.name		= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-igep0020.c-	.id		= 0,
+--
+arch/arm/mach-omap2/board-4430sdp.c:	.name		= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-4430sdp.c-	.id		= -1,
+--
+arch/arm/mach-omap2/board-4430sdp.c:	.name		= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-4430sdp.c-	.id		= 1,
+--
+arch/arm/mach-omap2/board-omap3pandora.c:	.name		= "reg-fixed-voltage",
+arch/arm/mach-omap2/board-omap3pandora.c-	.id		= 1,
 
-I'll look into it and try to find the problem.
+igep0020.c does this:
 
-Thanks,
-Hartley
+static struct omap_smsc911x_platform_data smsc911x_cfg = {
+        .cs             = IGEP2_SMSC911X_CS,
+        .gpio_irq       = IGEP2_SMSC911X_GPIO,
+        .gpio_reset     = -EINVAL,
+        .flags          = SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
+};
+
+static inline void __init igep2_init_smsc911x(void)
+{
+        gpmc_smsc911x_init(&smsc911x_cfg);
+}
+
+so it seems to use the gpmc_smsc stuff as well.  So we're ending up with
+two "reg-fixed-voltage" devices both with ID 0.  That's not going to work,
+and the driver model/sysfs will give you a nice warning there about that.
+
+I think OMAP (or even the reg-fixed-voltage folk) needs to create an enum
+similar to what I did for 8250 to control the allocation of platform
+device IDs for this, otherwise we're going to keep on running over this
+problem.
+
+/*
+ * Allocate 8250 platform device IDs.  Nothing is implied by
+ * the numbering here, except for the legacy entry being -1.
+ */
+enum {
+	PLAT8250_DEV_LEGACY = -1,
+	PLAT8250_DEV_PLATFORM,
+	PLAT8250_DEV_PLATFORM1,
+	PLAT8250_DEV_PLATFORM2,
+	PLAT8250_DEV_FOURPORT,
+	PLAT8250_DEV_ACCENT,
+	PLAT8250_DEV_BOCA,
+	PLAT8250_DEV_EXAR_ST16C554,
+	PLAT8250_DEV_HUB6,
+	PLAT8250_DEV_MCA,
+	PLAT8250_DEV_AU1X00,
+	PLAT8250_DEV_SM501,
+};
+
+Added Mark for his comment.
