@@ -1,322 +1,1234 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 13 Feb 2012 15:43:28 -0600
-Subject: [PATCH 15/15] ARM: kill off __mem_pci
+Date: Mon, 13 Feb 2012 15:43:27 -0600
+Subject: [PATCH 14/15] ARM: remove bunch of now unused mach/io.h files
 In-Reply-To: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
 References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1329169408-17253-16-git-send-email-robherring2@gmail.com>
+Message-ID: <1329169408-17253-15-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-__mem_pci is only used to enable readl/writel and friends. Just condition
-this on readl being defined and remove all the __mem_pci defines.
+Now that many platforms don't need mach/io.h, remove the usused ones.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/include/asm/io.h                  |   46 ++++++++++-----------------
- arch/arm/mach-dove/include/mach/io.h       |    1 -
- arch/arm/mach-footbridge/include/mach/io.h |   13 --------
- arch/arm/mach-integrator/include/mach/io.h |    1 -
- arch/arm/mach-iop13xx/include/mach/io.h    |    2 -
- arch/arm/mach-iop32x/include/mach/io.h     |    1 -
- arch/arm/mach-iop33x/include/mach/io.h     |    1 -
- arch/arm/mach-ixp2000/include/mach/io.h    |    1 -
- arch/arm/mach-ixp23xx/include/mach/io.h    |    1 -
- arch/arm/mach-ixp4xx/include/mach/io.h     |    6 +---
- arch/arm/mach-kirkwood/include/mach/io.h   |    2 -
- arch/arm/mach-mv78xx0/include/mach/io.h    |    2 -
- arch/arm/mach-rpc/include/mach/io.h        |    5 ---
- arch/arm/mach-s3c2410/include/mach/io.h    |    5 ---
- arch/arm/mach-shark/include/mach/io.h      |    2 -
- arch/arm/mach-tegra/include/mach/io.h      |    1 -
- arch/arm/mach-vt8500/include/mach/io.h     |    1 -
- 17 files changed, 18 insertions(+), 73 deletions(-)
+ arch/arm/mach-at91/include/mach/io.h      |   49 -----------------------------
+ arch/arm/mach-bcmring/include/mach/io.h   |   33 -------------------
+ arch/arm/mach-clps711x/include/mach/io.h  |   36 ---------------------
+ arch/arm/mach-cns3xxx/include/mach/io.h   |   17 ----------
+ arch/arm/mach-davinci/include/mach/io.h   |   24 --------------
+ arch/arm/mach-ep93xx/include/mach/io.h    |   22 -------------
+ arch/arm/mach-exynos/include/mach/io.h    |   26 ---------------
+ arch/arm/mach-gemini/include/mach/io.h    |   18 ----------
+ arch/arm/mach-h720x/include/mach/io.h     |   22 -------------
+ arch/arm/mach-highbank/include/mach/io.h  |    7 ----
+ arch/arm/mach-ks8695/include/mach/io.h    |   19 -----------
+ arch/arm/mach-lpc32xx/include/mach/io.h   |   27 ----------------
+ arch/arm/mach-mmp/include/mach/io.h       |   21 ------------
+ arch/arm/mach-msm/include/mach/io.h       |   24 --------------
+ arch/arm/mach-mxs/include/mach/io.h       |   22 -------------
+ arch/arm/mach-netx/include/mach/io.h      |   28 ----------------
+ arch/arm/mach-nomadik/include/mach/io.h   |   22 -------------
+ arch/arm/mach-orion5x/include/mach/io.h   |   21 ------------
+ arch/arm/mach-picoxcell/include/mach/io.h |   22 -------------
+ arch/arm/mach-pnx4008/include/mach/io.h   |   21 ------------
+ arch/arm/mach-prima2/include/mach/io.h    |   16 ---------
+ arch/arm/mach-pxa/include/mach/io.h       |   20 ------------
+ arch/arm/mach-realview/include/mach/io.h  |   28 ----------------
+ arch/arm/mach-s3c64xx/include/mach/io.h   |   18 ----------
+ arch/arm/mach-s5p64x0/include/mach/io.h   |   25 ---------------
+ arch/arm/mach-s5pc100/include/mach/io.h   |   18 ----------
+ arch/arm/mach-s5pv210/include/mach/io.h   |   26 ---------------
+ arch/arm/mach-sa1100/include/mach/io.h    |   20 ------------
+ arch/arm/mach-shmobile/include/mach/io.h  |    9 -----
+ arch/arm/mach-spear3xx/include/mach/io.h  |   19 -----------
+ arch/arm/mach-spear6xx/include/mach/io.h  |   20 ------------
+ arch/arm/mach-u300/include/mach/io.h      |   20 ------------
+ arch/arm/mach-ux500/include/mach/io.h     |   22 -------------
+ arch/arm/mach-versatile/include/mach/io.h |   28 ----------------
+ arch/arm/mach-vexpress/include/mach/io.h  |   26 ---------------
+ arch/arm/mach-w90x900/include/mach/io.h   |   30 -----------------
+ arch/arm/mach-zynq/include/mach/io.h      |   33 -------------------
+ arch/arm/plat-mxc/include/mach/io.h       |   22 -------------
+ arch/arm/plat-spear/include/plat/io.h     |   22 -------------
+ 39 files changed, 0 insertions(+), 903 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/io.h
+ delete mode 100644 arch/arm/mach-bcmring/include/mach/io.h
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-cns3xxx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/io.h
+ delete mode 100644 arch/arm/mach-ep93xx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-exynos/include/mach/io.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/io.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-highbank/include/mach/io.h
+ delete mode 100644 arch/arm/mach-ks8695/include/mach/io.h
+ delete mode 100644 arch/arm/mach-lpc32xx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-mmp/include/mach/io.h
+ delete mode 100644 arch/arm/mach-msm/include/mach/io.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/io.h
+ delete mode 100644 arch/arm/mach-netx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-nomadik/include/mach/io.h
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/io.h
+ delete mode 100644 arch/arm/mach-picoxcell/include/mach/io.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/io.h
+ delete mode 100644 arch/arm/mach-prima2/include/mach/io.h
+ delete mode 100644 arch/arm/mach-pxa/include/mach/io.h
+ delete mode 100644 arch/arm/mach-realview/include/mach/io.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-s5p64x0/include/mach/io.h
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/io.h
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/io.h
+ delete mode 100644 arch/arm/mach-sa1100/include/mach/io.h
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/io.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/io.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/io.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/io.h
+ delete mode 100644 arch/arm/mach-versatile/include/mach/io.h
+ delete mode 100644 arch/arm/mach-vexpress/include/mach/io.h
+ delete mode 100644 arch/arm/mach-w90x900/include/mach/io.h
+ delete mode 100644 arch/arm/mach-zynq/include/mach/io.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/io.h
+ delete mode 100644 arch/arm/plat-spear/include/plat/io.h
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 5e0ca53..0f506a8 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -113,7 +113,6 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
- #include <mach/io.h>
- #else
- #define __io(a)		({ (void)(a); __typesafe_io(0); })
+diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
+deleted file mode 100644
+index 4ca09ef..0000000
+--- a/arch/arm/mach-at91/include/mach/io.h
++++ /dev/null
+@@ -1,49 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/io.h
+- *
+- *  Copyright (C) 2003 SAN People
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
+-
+-#include <mach/hardware.h>
+-
+-#define IO_SPACE_LIMIT		0xFFFFFFFF
+-
+-#define __io(a)		__typesafe_io(a)
 -#define __mem_pci(a)	(a)
- #endif
- 
- /*
-@@ -216,18 +215,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
-  * Again, this are defined to perform little endian accesses.  See the
-  * IO port primitives for more information.
-  */
--#ifdef __mem_pci
--#define readb_relaxed(c) ({ u8  __r = __raw_readb(__mem_pci(c)); __r; })
-+#ifndef readl
-+#define readb_relaxed(c) ({ u8  __r = __raw_readb(c); __r; })
- #define readw_relaxed(c) ({ u16 __r = le16_to_cpu((__force __le16) \
--					__raw_readw(__mem_pci(c))); __r; })
-+					__raw_readw(c)); __r; })
- #define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
--					__raw_readl(__mem_pci(c))); __r; })
-+					__raw_readl(c)); __r; })
- 
--#define writeb_relaxed(v,c)	((void)__raw_writeb(v,__mem_pci(c)))
-+#define writeb_relaxed(v,c)	((void)__raw_writeb(v,c))
- #define writew_relaxed(v,c)	((void)__raw_writew((__force u16) \
--					cpu_to_le16(v),__mem_pci(c)))
-+					cpu_to_le16(v),c))
- #define writel_relaxed(v,c)	((void)__raw_writel((__force u32) \
--					cpu_to_le32(v),__mem_pci(c)))
-+					cpu_to_le32(v),c))
- 
- #define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
- #define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
-@@ -237,30 +236,19 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define writew(v,c)		({ __iowmb(); writew_relaxed(v,c); })
- #define writel(v,c)		({ __iowmb(); writel_relaxed(v,c); })
- 
--#define readsb(p,d,l)		__raw_readsb(__mem_pci(p),d,l)
--#define readsw(p,d,l)		__raw_readsw(__mem_pci(p),d,l)
--#define readsl(p,d,l)		__raw_readsl(__mem_pci(p),d,l)
-+#define readsb(p,d,l)		__raw_readsb(p,d,l)
-+#define readsw(p,d,l)		__raw_readsw(p,d,l)
-+#define readsl(p,d,l)		__raw_readsl(p,d,l)
- 
--#define writesb(p,d,l)		__raw_writesb(__mem_pci(p),d,l)
--#define writesw(p,d,l)		__raw_writesw(__mem_pci(p),d,l)
--#define writesl(p,d,l)		__raw_writesl(__mem_pci(p),d,l)
-+#define writesb(p,d,l)		__raw_writesb(p,d,l)
-+#define writesw(p,d,l)		__raw_writesw(p,d,l)
-+#define writesl(p,d,l)		__raw_writesl(p,d,l)
- 
--#define memset_io(c,v,l)	_memset_io(__mem_pci(c),(v),(l))
--#define memcpy_fromio(a,c,l)	_memcpy_fromio((a),__mem_pci(c),(l))
--#define memcpy_toio(c,a,l)	_memcpy_toio(__mem_pci(c),(a),(l))
-+#define memset_io(c,v,l)	_memset_io(c,(v),(l))
-+#define memcpy_fromio(a,c,l)	_memcpy_fromio((a),c,(l))
-+#define memcpy_toio(c,a,l)	_memcpy_toio(c,(a),(l))
- 
--#elif !defined(readb)
 -
--#define readb(c)			(__readwrite_bug("readb"),0)
--#define readw(c)			(__readwrite_bug("readw"),0)
--#define readl(c)			(__readwrite_bug("readl"),0)
--#define writeb(v,c)			__readwrite_bug("writeb")
--#define writew(v,c)			__readwrite_bug("writew")
--#define writel(v,c)			__readwrite_bug("writel")
+-#ifndef __ASSEMBLY__
 -
--#define check_signature(io,sig,len)	(0)
--
--#endif	/* __mem_pci */
-+#endif	/* readl */
- 
- /*
-  * ioremap and friends.
-diff --git a/arch/arm/mach-dove/include/mach/io.h b/arch/arm/mach-dove/include/mach/io.h
-index eb4936f..29c8b85 100644
---- a/arch/arm/mach-dove/include/mach/io.h
-+++ b/arch/arm/mach-dove/include/mach/io.h
-@@ -15,6 +15,5 @@
- 
- #define __io(a)  	((void __iomem *)(((a) - DOVE_PCIE0_IO_BUS_BASE) + \
- 						 DOVE_PCIE0_IO_VIRT_BASE))
--#define __mem_pci(a)	(a)
- 
- #endif
-diff --git a/arch/arm/mach-footbridge/include/mach/io.h b/arch/arm/mach-footbridge/include/mach/io.h
-index 15a7039..aba531ee 100644
---- a/arch/arm/mach-footbridge/include/mach/io.h
-+++ b/arch/arm/mach-footbridge/include/mach/io.h
-@@ -27,18 +27,5 @@
-  * Translation of various region addresses to virtual addresses
-  */
- #define __io(a)			((void __iomem *)(PCIO_BASE + (a)))
--#if 1
--#define __mem_pci(a)		(a)
--#else
--
--static inline void __iomem *___mem_pci(void __iomem *p)
+-static inline unsigned int at91_sys_read(unsigned int reg_offset)
 -{
--	unsigned long a = (unsigned long)p;
--	BUG_ON(a <= 0xc0000000 || a >= 0xe0000000);
--	return p;
+-	void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
+-
+-	return __raw_readl(addr + reg_offset);
 -}
 -
--#define __mem_pci(a)		___mem_pci(a)
+-static inline void at91_sys_write(unsigned int reg_offset, unsigned long value)
+-{
+-	void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
+-
+-	__raw_writel(value, addr + reg_offset);
+-}
+-
 -#endif
- 
- #endif
-diff --git a/arch/arm/mach-integrator/include/mach/io.h b/arch/arm/mach-integrator/include/mach/io.h
-index 37beed3..8de70de 100644
---- a/arch/arm/mach-integrator/include/mach/io.h
-+++ b/arch/arm/mach-integrator/include/mach/io.h
-@@ -29,6 +29,5 @@
- #define PCI_IO_VADDR            0xee000000
- 
- #define __io(a)			((void __iomem *)(PCI_IO_VADDR + (a)))
--#define __mem_pci(a)		(a)
- 
- #endif
-diff --git a/arch/arm/mach-iop13xx/include/mach/io.h b/arch/arm/mach-iop13xx/include/mach/io.h
-index dffb234..858ba98 100644
---- a/arch/arm/mach-iop13xx/include/mach/io.h
-+++ b/arch/arm/mach-iop13xx/include/mach/io.h
-@@ -22,8 +22,6 @@
- #define IO_SPACE_LIMIT 0xffffffff
- 
- #define __io(a) __iop13xx_io(a)
--#define __mem_pci(a) (a)
--#define __mem_isa(a) (a)
- 
- extern void __iomem * __iop13xx_io(unsigned long io_addr);
- extern void __iomem *__iop13xx_ioremap(unsigned long cookie, size_t size,
-diff --git a/arch/arm/mach-iop32x/include/mach/io.h b/arch/arm/mach-iop32x/include/mach/io.h
-index 2d88264..e2ada26 100644
---- a/arch/arm/mach-iop32x/include/mach/io.h
-+++ b/arch/arm/mach-iop32x/include/mach/io.h
-@@ -15,6 +15,5 @@
- 
- #define IO_SPACE_LIMIT		0xffffffff
- #define __io(p)		((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
--#define __mem_pci(a)		(a)
- 
- #endif
-diff --git a/arch/arm/mach-iop33x/include/mach/io.h b/arch/arm/mach-iop33x/include/mach/io.h
-index a8a66fc..f7c1b65 100644
---- a/arch/arm/mach-iop33x/include/mach/io.h
-+++ b/arch/arm/mach-iop33x/include/mach/io.h
-@@ -15,6 +15,5 @@
- 
- #define IO_SPACE_LIMIT		0xffffffff
- #define __io(p)		((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
--#define __mem_pci(a)		(a)
- 
- #endif
-diff --git a/arch/arm/mach-ixp2000/include/mach/io.h b/arch/arm/mach-ixp2000/include/mach/io.h
-index 859e584..f6552d6 100644
---- a/arch/arm/mach-ixp2000/include/mach/io.h
-+++ b/arch/arm/mach-ixp2000/include/mach/io.h
-@@ -18,7 +18,6 @@
- #include <mach/hardware.h>
- 
- #define IO_SPACE_LIMIT		0xffffffff
--#define __mem_pci(a)		(a)
- 
- /*
-  * The A? revisions of the IXP2000s assert byte lanes for PCI I/O
-diff --git a/arch/arm/mach-ixp23xx/include/mach/io.h b/arch/arm/mach-ixp23xx/include/mach/io.h
-index 4ce4353..a7aceb5 100644
---- a/arch/arm/mach-ixp23xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp23xx/include/mach/io.h
-@@ -18,6 +18,5 @@
- #define IO_SPACE_LIMIT 0xffffffff
- 
- #define __io(p)		((void __iomem*)((p) + IXP23XX_PCI_IO_VIRT))
+-
+-#endif
+diff --git a/arch/arm/mach-bcmring/include/mach/io.h b/arch/arm/mach-bcmring/include/mach/io.h
+deleted file mode 100644
+index dae5e9b..0000000
+--- a/arch/arm/mach-bcmring/include/mach/io.h
++++ /dev/null
+@@ -1,33 +0,0 @@
+-/*
+- *
+- *  Copyright (C) 1999 ARM Limited
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#include <mach/hardware.h>
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/*
+- * We don't actually have real ISA nor PCI buses, but there is so many
+- * drivers out there that might just work if we fake them...
+- */
+-#define __io(a)		__typesafe_io(a)
 -#define __mem_pci(a)	(a)
- 
- #endif
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index ffb9d6a..d76a9bb 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -39,11 +39,7 @@ extern int ixp4xx_pci_write(u32 addr, u32 cmd, u32 data);
-  *    but in some cases the performance hit is acceptable. In addition, you
-  *    cannot mmap() PCI devices in this case.
-  */
--#ifndef	CONFIG_IXP4XX_INDIRECT_PCI
 -
+-#endif
+diff --git a/arch/arm/mach-clps711x/include/mach/io.h b/arch/arm/mach-clps711x/include/mach/io.h
+deleted file mode 100644
+index 2e0b3ce..0000000
+--- a/arch/arm/mach-clps711x/include/mach/io.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- *  arch/arm/mach-clps711x/include/mach/io.h
+- *
+- *  Copyright (C) 1999 ARM Limited
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-/*
+- * We don't support ins[lb]/outs[lb].  Make them fault.
+- */
+-#define __raw_readsb(p,d,l)	do { *(int *)0 = 0; } while (0)
+-#define __raw_readsl(p,d,l)	do { *(int *)0 = 0; } while (0)
+-#define __raw_writesb(p,d,l)	do { *(int *)0 = 0; } while (0)
+-#define __raw_writesl(p,d,l)	do { *(int *)0 = 0; } while (0)
+-
+-#endif
+diff --git a/arch/arm/mach-cns3xxx/include/mach/io.h b/arch/arm/mach-cns3xxx/include/mach/io.h
+deleted file mode 100644
+index 33b6fc1..0000000
+--- a/arch/arm/mach-cns3xxx/include/mach/io.h
++++ /dev/null
+@@ -1,17 +0,0 @@
+-/*
+- * Copyright 2008 Cavium Networks
+- * Copyright 2003 ARM Limited
+- *
+- * This file is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License, Version 2, as
+- * published by the Free Software Foundation.
+- */
+-#ifndef __MACH_IO_H
+-#define __MACH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)			__typesafe_io(a)
 -#define __mem_pci(a)		(a)
 -
+-#endif
+diff --git a/arch/arm/mach-davinci/include/mach/io.h b/arch/arm/mach-davinci/include/mach/io.h
+deleted file mode 100644
+index b2267d1..0000000
+--- a/arch/arm/mach-davinci/include/mach/io.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/*
+- * DaVinci IO address definitions
+- *
+- * Copied from include/asm/arm/arch-omap/io.h
+- *
+- * 2007 (c) MontaVista Software, Inc. This file is licensed under
+- * the terms of the GNU General Public License version 2. This program
+- * is licensed "as is" without any warranty of any kind, whether express
+- * or implied.
+- */
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/*
+- * We don't actually have real ISA nor PCI buses, but there is so many
+- * drivers out there that might just work if we fake them...
+- */
+-#define __io(a)			__typesafe_io(a)
+-#define __mem_pci(a)		(a)
+-#define __mem_isa(a)		(a)
+-
+-#endif /* __ASM_ARCH_IO_H */
+diff --git a/arch/arm/mach-ep93xx/include/mach/io.h b/arch/arm/mach-ep93xx/include/mach/io.h
+deleted file mode 100644
+index 594b77f..0000000
+--- a/arch/arm/mach-ep93xx/include/mach/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * arch/arm/mach-ep93xx/include/mach/io.h
+- */
+-
+-#ifndef __ASM_MACH_IO_H
+-#define __ASM_MACH_IO_H
+-
+-#define IO_SPACE_LIMIT		0xffffffff
+-
+-#define __io(p)			__typesafe_io(p)
+-#define __mem_pci(p)		(p)
+-
+-/*
+- * A typesafe __io() variation for variable initialisers
+- */
+-#ifdef __ASSEMBLER__
+-#define IOMEM(p)		p
 -#else
-+#ifdef	CONFIG_IXP4XX_INDIRECT_PCI
- 
- /*
-  * In the case of using indirect PCI, we simply return the actual PCI
-diff --git a/arch/arm/mach-kirkwood/include/mach/io.h b/arch/arm/mach-kirkwood/include/mach/io.h
-index 49dd0cb..5d0ab61 100644
---- a/arch/arm/mach-kirkwood/include/mach/io.h
-+++ b/arch/arm/mach-kirkwood/include/mach/io.h
-@@ -20,7 +20,5 @@ static inline void __iomem *__io(unsigned long addr)
- }
- 
- #define __io(a)			__io(a)
--#define __mem_pci(a)		(a)
+-#define IOMEM(p)		((void __iomem __force *)(p))
+-#endif
 -
- 
- #endif
-diff --git a/arch/arm/mach-mv78xx0/include/mach/io.h b/arch/arm/mach-mv78xx0/include/mach/io.h
-index 450e0e1..c7d9d00 100644
---- a/arch/arm/mach-mv78xx0/include/mach/io.h
-+++ b/arch/arm/mach-mv78xx0/include/mach/io.h
-@@ -20,7 +20,5 @@ static inline void __iomem *__io(unsigned long addr)
- }
- 
- #define __io(a)			__io(a)
--#define __mem_pci(a)		(a)
+-#endif /* __ASM_MACH_IO_H */
+diff --git a/arch/arm/mach-exynos/include/mach/io.h b/arch/arm/mach-exynos/include/mach/io.h
+deleted file mode 100644
+index d5478d2..0000000
+--- a/arch/arm/mach-exynos/include/mach/io.h
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/io.h
+- *
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * Copyright 2008-2010 Ben Dooks <ben-linux@fluff.org>
+- *
+- * Based on arch/arm/mach-s5p6442/include/mach/io.h
+- *
+- * Default IO routines for EXYNOS4
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
 -
- 
- #endif
-diff --git a/arch/arm/mach-rpc/include/mach/io.h b/arch/arm/mach-rpc/include/mach/io.h
-index 695f4ed..707071a 100644
---- a/arch/arm/mach-rpc/include/mach/io.h
-+++ b/arch/arm/mach-rpc/include/mach/io.h
-@@ -28,9 +28,4 @@
-  */
- #define __io(a)		(PCIO_BASE + ((a) << 2))
- 
--/*
-- * 1:1 mapping for ioremapped regions.
-- */
--#define __mem_pci(x)	(x)
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H __FILE__
 -
- #endif
-diff --git a/arch/arm/mach-s3c2410/include/mach/io.h b/arch/arm/mach-s3c2410/include/mach/io.h
-index 118749f..5dd1db4 100644
---- a/arch/arm/mach-s3c2410/include/mach/io.h
-+++ b/arch/arm/mach-s3c2410/include/mach/io.h
-@@ -208,9 +208,4 @@ DECLARE_IO(int,l,"")
- #define outsw(p,d,l)	__raw_writesw(__ioaddr(p),d,l)
- #define outsl(p,d,l)	__raw_writesl(__ioaddr(p),d,l)
- 
--/*
-- * 1:1 mapping for ioremapped regions.
-- */
--#define __mem_pci(x)	(x)
--
- #endif
-diff --git a/arch/arm/mach-shark/include/mach/io.h b/arch/arm/mach-shark/include/mach/io.h
-index 9ccbcec..1a45fc0 100644
---- a/arch/arm/mach-shark/include/mach/io.h
-+++ b/arch/arm/mach-shark/include/mach/io.h
-@@ -15,6 +15,4 @@
- 
- #define __io(a)                 ((void __iomem *)(0xe0000000 + (a)))
- 
--#define __mem_pci(addr) (addr)
--
- #endif
-diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
-index 47b4b61..fe700f9 100644
---- a/arch/arm/mach-tegra/include/mach/io.h
-+++ b/arch/arm/mach-tegra/include/mach/io.h
-@@ -40,7 +40,6 @@ static inline void __iomem *__io(unsigned long addr)
- #endif
- 
- #define __io(a)         __io(a)
--#define __mem_pci(a)    (a)
- 
- #endif
- 
-diff --git a/arch/arm/mach-vt8500/include/mach/io.h b/arch/arm/mach-vt8500/include/mach/io.h
-index 46181ee..fe30fa9 100644
---- a/arch/arm/mach-vt8500/include/mach/io.h
-+++ b/arch/arm/mach-vt8500/include/mach/io.h
-@@ -21,6 +21,5 @@
- #define __ASM_ARM_ARCH_IO_H
- 
- #define __io(a)		__typesafe_io((a) + 0xf0000000)
+-/* No current ISA/PCI bus support. */
+-#define __io(a)		__typesafe_io(a)
 -#define __mem_pci(a)	(a)
- 
- #endif
+-
+-#define IO_SPACE_LIMIT (0xFFFFFFFF)
+-
+-#endif /* __ASM_ARM_ARCH_IO_H */
+diff --git a/arch/arm/mach-gemini/include/mach/io.h b/arch/arm/mach-gemini/include/mach/io.h
+deleted file mode 100644
+index c548056..0000000
+--- a/arch/arm/mach-gemini/include/mach/io.h
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/*
+- *  Copyright (C) 2001-2006 Storlink, Corp.
+- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#ifndef __MACH_IO_H
+-#define __MACH_IO_H
+-
+-#define IO_SPACE_LIMIT	0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif /* __MACH_IO_H */
+diff --git a/arch/arm/mach-h720x/include/mach/io.h b/arch/arm/mach-h720x/include/mach/io.h
+deleted file mode 100644
+index 2c8659c..0000000
+--- a/arch/arm/mach-h720x/include/mach/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * arch/arm/mach-h720x/include/mach/io.h
+- *
+- * Copyright (C) 2000 Steve Hill (sjhill at cotw.com)
+- *
+- * Changelog:
+- *
+- *  09-19-2001	JJKIM
+- *  		Created from arch/arm/mach-l7200/include/mach/io.h
+- *
+- *  03-27-2003  Robert Schwebel <r.schwebel@pengutronix.de>:
+- *  		re-unified header files for h720x
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-highbank/include/mach/io.h b/arch/arm/mach-highbank/include/mach/io.h
+deleted file mode 100644
+index 70cfa3b..0000000
+--- a/arch/arm/mach-highbank/include/mach/io.h
++++ /dev/null
+@@ -1,7 +0,0 @@
+-#ifndef __MACH_IO_H
+-#define __MACH_IO_H
+-
+-#define __io(a)		({ (void)(a); __typesafe_io(0); })
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-ks8695/include/mach/io.h b/arch/arm/mach-ks8695/include/mach/io.h
+deleted file mode 100644
+index a7a63ac..0000000
+--- a/arch/arm/mach-ks8695/include/mach/io.h
++++ /dev/null
+@@ -1,19 +0,0 @@
+-/*
+- * arch/arm/mach-ks8695/include/mach/io.h
+- *
+- * Copyright (C) 2006 Andrew Victor
+- *
+- * This file is licensed under  the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT		0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-lpc32xx/include/mach/io.h b/arch/arm/mach-lpc32xx/include/mach/io.h
+deleted file mode 100644
+index 9b59ab5..0000000
+--- a/arch/arm/mach-lpc32xx/include/mach/io.h
++++ /dev/null
+@@ -1,27 +0,0 @@
+-/*
+- * arch/arm/mach-lpc32xx/include/mach/io.h
+- *
+- * Author: Kevin Wells <kevin.wells@nxp.com>
+- *
+- * Copyright (C) 2010 NXP Semiconductors
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT	0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-mmp/include/mach/io.h b/arch/arm/mach-mmp/include/mach/io.h
+deleted file mode 100644
+index e7adf3d..0000000
+--- a/arch/arm/mach-mmp/include/mach/io.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * linux/arch/arm/mach-mmp/include/mach/io.h
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_MACH_IO_H
+-#define __ASM_MACH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/*
+- * We don't actually have real ISA nor PCI buses, but there is so many
+- * drivers out there that might just work if we fake them...
+- */
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif /* __ASM_MACH_IO_H */
+diff --git a/arch/arm/mach-msm/include/mach/io.h b/arch/arm/mach-msm/include/mach/io.h
+deleted file mode 100644
+index 1071f98..0000000
+--- a/arch/arm/mach-msm/include/mach/io.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/* arch/arm/mach-msm/include/mach/io.h
+- *
+- * Copyright (C) 2007 Google, Inc.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)    (a)
+-
+-#endif
+diff --git a/arch/arm/mach-mxs/include/mach/io.h b/arch/arm/mach-mxs/include/mach/io.h
+deleted file mode 100644
+index 289b722..0000000
+--- a/arch/arm/mach-mxs/include/mach/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- */
+-
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __MACH_MXS_IO_H__
+-#define __MACH_MXS_IO_H__
+-
+-/* Allow IO space to be anywhere in the memory */
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/* io address mapping macro */
+-#define __io(a)		__typesafe_io(a)
+-
+-#define __mem_pci(a)	(a)
+-
+-#endif /* __MACH_MXS_IO_H__ */
+diff --git a/arch/arm/mach-netx/include/mach/io.h b/arch/arm/mach-netx/include/mach/io.h
+deleted file mode 100644
+index c3921cb..0000000
+--- a/arch/arm/mach-netx/include/mach/io.h
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- *  arch/arm/mach-netx/include/mach/io.h
+- *
+- * Copyright (C) 2005 Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2
+- * as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)            (a)
+-
+-#endif
+diff --git a/arch/arm/mach-nomadik/include/mach/io.h b/arch/arm/mach-nomadik/include/mach/io.h
+deleted file mode 100644
+index 2e1eca1..0000000
+--- a/arch/arm/mach-nomadik/include/mach/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * arch/arm/mach-nomadik/include/mach/io.h   (copied from mach-sa1100)
+- *
+- * Copyright (C) 1997-1999 Russell King
+- *
+- * Modifications:
+- *  06-12-1997  RMK     Created.
+- *  07-04-1999  RMK     Major cleanup
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/*
+- * We don't actually have real ISA nor PCI buses, but there is so many
+- * drivers out there that might just work if we fake them...
+- */
+-#define __io(a)         __typesafe_io(a)
+-#define __mem_pci(a)    (a)
+-
+-#endif
+diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
+deleted file mode 100644
+index 444136d..0000000
+--- a/arch/arm/mach-orion5x/include/mach/io.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * arch/arm/mach-orion5x/include/mach/io.h
+- *
+- * Tzachi Perelstein <tzachi@marvell.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
+-
+-#include "orion5x.h"
+-
+-#define IO_SPACE_LIMIT		0xffffffff
+-
+-#define __io(a)			__typesafe_io(a)
+-#define __mem_pci(a)		(a)
+-
+-#endif
+diff --git a/arch/arm/mach-picoxcell/include/mach/io.h b/arch/arm/mach-picoxcell/include/mach/io.h
+deleted file mode 100644
+index 7573ec7..0000000
+--- a/arch/arm/mach-picoxcell/include/mach/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * Copyright (c) 2011 Picochip Ltd., Jamie Iles
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-/* No ioports, but needed for driver compatibility. */
+-#define __io(a)			__typesafe_io(a)
+-/* No PCI possible on picoxcell. */
+-#define __mem_pci(a)		(a)
+-
+-#endif /* __ASM_ARM_ARCH_IO_H */
+diff --git a/arch/arm/mach-pnx4008/include/mach/io.h b/arch/arm/mach-pnx4008/include/mach/io.h
+deleted file mode 100644
+index cbf0904..0000000
+--- a/arch/arm/mach-pnx4008/include/mach/io.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-
+-/*
+- *  arch/arm/mach-pnx4008/include/mach/io.h
+- *
+- * Author: Dmitry Chigirev <chigirev@ru.mvista.com>
+- *
+- * 2005 (c) MontaVista Software, Inc. This file is licensed under
+- * the terms of the GNU General Public License version 2. This program
+- * is licensed "as is" without any warranty of any kind, whether express
+- * or implied.
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-prima2/include/mach/io.h b/arch/arm/mach-prima2/include/mach/io.h
+deleted file mode 100644
+index 6c31e9e..0000000
+--- a/arch/arm/mach-prima2/include/mach/io.h
++++ /dev/null
+@@ -1,16 +0,0 @@
+-/*
+- * arch/arm/mach-prima2/include/mach/io.h
+- *
+- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+- *
+- * Licensed under GPLv2 or later.
+- */
+-
+-#ifndef __MACH_PRIMA2_IO_H
+-#define __MACH_PRIMA2_IO_H
+-
+-#define IO_SPACE_LIMIT ((resource_size_t)0)
+-
+-#define __mem_pci(a)            (a)
+-
+-#endif
+diff --git a/arch/arm/mach-pxa/include/mach/io.h b/arch/arm/mach-pxa/include/mach/io.h
+deleted file mode 100644
+index fdca3be..0000000
+--- a/arch/arm/mach-pxa/include/mach/io.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- * arch/arm/mach-pxa/include/mach/io.h
+- *
+- * Copied from asm/arch/sa1100/io.h
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#include <mach/hardware.h>
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/*
+- * We don't actually have real ISA nor PCI buses, but there is so many
+- * drivers out there that might just work if we fake them...
+- */
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-realview/include/mach/io.h b/arch/arm/mach-realview/include/mach/io.h
+deleted file mode 100644
+index f05bcdf..0000000
+--- a/arch/arm/mach-realview/include/mach/io.h
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- *  arch/arm/mach-realview/include/mach/io.h
+- *
+- *  Copyright (C) 2003 ARM Limited
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-s3c64xx/include/mach/io.h b/arch/arm/mach-s3c64xx/include/mach/io.h
+deleted file mode 100644
+index de5716d..0000000
+--- a/arch/arm/mach-s3c64xx/include/mach/io.h
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/* arch/arm/mach-s3c64xxinclude/mach/io.h
+- *
+- * Copyright 2008 Simtec Electronics
+- *	Ben Dooks <ben-linux@fluff.org>
+- *
+- * Default IO routines for S3C64XX based
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-/* No current ISA/PCI bus support. */
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#define IO_SPACE_LIMIT (0xFFFFFFFF)
+-
+-#endif
+diff --git a/arch/arm/mach-s5p64x0/include/mach/io.h b/arch/arm/mach-s5p64x0/include/mach/io.h
+deleted file mode 100644
+index a3e095c..0000000
+--- a/arch/arm/mach-s5p64x0/include/mach/io.h
++++ /dev/null
+@@ -1,25 +0,0 @@
+-/* linux/arch/arm/mach-s5p64x0/include/mach/io.h
+- *
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * Copyright 2008 Simtec Electronics
+- *	Ben Dooks <ben-linux@fluff.org>
+- *
+- * Default IO routines for S5P64X0 based
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-/* No current ISA/PCI bus support. */
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#define IO_SPACE_LIMIT (0xFFFFFFFF)
+-
+-#endif
+diff --git a/arch/arm/mach-s5pc100/include/mach/io.h b/arch/arm/mach-s5pc100/include/mach/io.h
+deleted file mode 100644
+index 819acf5..0000000
+--- a/arch/arm/mach-s5pc100/include/mach/io.h
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/* arch/arm/mach-s5pc100/include/mach/io.h
+- *
+- * Copyright 2008 Simtec Electronics
+- *	Ben Dooks <ben-linux@fluff.org>
+- *
+- * Default IO routines for S5PC100 systems
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-/* No current ISA/PCI bus support. */
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#define IO_SPACE_LIMIT (0xFFFFFFFF)
+-
+-#endif
+diff --git a/arch/arm/mach-s5pv210/include/mach/io.h b/arch/arm/mach-s5pv210/include/mach/io.h
+deleted file mode 100644
+index 5ab9d56..0000000
+--- a/arch/arm/mach-s5pv210/include/mach/io.h
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/* linux/arch/arm/mach-s5pv210/include/mach/io.h
+- *
+- * Copyright 2008-2010 Ben Dooks <ben-linux@fluff.org>
+- *
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com/
+- *
+- * Based on arch/arm/mach-s5p6442/include/mach/io.h
+- *
+- * Default IO routines for S5PV210
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H __FILE__
+-
+-/* No current ISA/PCI bus support. */
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#define IO_SPACE_LIMIT (0xFFFFFFFF)
+-
+-#endif /* __ASM_ARM_ARCH_IO_H */
+diff --git a/arch/arm/mach-sa1100/include/mach/io.h b/arch/arm/mach-sa1100/include/mach/io.h
+deleted file mode 100644
+index dfc27ff..0000000
+--- a/arch/arm/mach-sa1100/include/mach/io.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- * arch/arm/mach-sa1100/include/mach/io.h
+- *
+- * Copyright (C) 1997-1999 Russell King
+- *
+- * Modifications:
+- *  06-12-1997	RMK	Created.
+- *  07-04-1999	RMK	Major cleanup
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-/*
+- * __io() is required to be an equivalent mapping to __mem_pci() for
+- * SOC_COMMON to work.
+- */
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-shmobile/include/mach/io.h b/arch/arm/mach-shmobile/include/mach/io.h
+deleted file mode 100644
+index 7339fe4..0000000
+--- a/arch/arm/mach-shmobile/include/mach/io.h
++++ /dev/null
+@@ -1,9 +0,0 @@
+-#ifndef __ASM_MACH_IO_H
+-#define __ASM_MACH_IO_H
+-
+-#define IO_SPACE_LIMIT		0xffffffff
+-
+-#define __io(a)			((void __iomem *)(a))
+-#define __mem_pci(a)		(a)
+-
+-#endif /* __ASM_MACH_IO_H */
+diff --git a/arch/arm/mach-spear3xx/include/mach/io.h b/arch/arm/mach-spear3xx/include/mach/io.h
+deleted file mode 100644
+index 30cff8a..0000000
+--- a/arch/arm/mach-spear3xx/include/mach/io.h
++++ /dev/null
+@@ -1,19 +0,0 @@
+-/*
+- * arch/arm/mach-spear3xx/include/mach/io.h
+- *
+- * IO definitions for SPEAr3xx machine family
+- *
+- * Copyright (C) 2009 ST Microelectronics
+- * Viresh Kumar<viresh.kumar@st.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __MACH_IO_H
+-#define __MACH_IO_H
+-
+-#include <plat/io.h>
+-
+-#endif /* __MACH_IO_H */
+diff --git a/arch/arm/mach-spear6xx/include/mach/io.h b/arch/arm/mach-spear6xx/include/mach/io.h
+deleted file mode 100644
+index fb7c106..0000000
+--- a/arch/arm/mach-spear6xx/include/mach/io.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- * arch/arm/mach-spear6xx/include/mach/io.h
+- *
+- * IO definitions for SPEAr6xx machine family
+- *
+- * Copyright (C) 2009 ST Microelectronics
+- * Rajeev Kumar Kumar<rajeev-dlh.kumar@st.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __MACH_IO_H
+-#define __MACH_IO_H
+-
+-#include <plat/io.h>
+-
+-#endif	/* __MACH_IO_H */
+-
+diff --git a/arch/arm/mach-u300/include/mach/io.h b/arch/arm/mach-u300/include/mach/io.h
+deleted file mode 100644
+index 5d6b4c1..0000000
+--- a/arch/arm/mach-u300/include/mach/io.h
++++ /dev/null
+@@ -1,20 +0,0 @@
+-/*
+- *
+- * arch/arm/mach-u300/include/mach/io.h
+- *
+- *
+- * Copyright (C) 2006-2009 ST-Ericsson AB
+- * License terms: GNU General Public License (GPL) version 2
+- * Dummy IO map for being able to use writew()/readw(),
+- * writel()/readw() and similar accessor functions.
+- * Author: Linus Walleij <linus.walleij@stericsson.com>
+- */
+-#ifndef __MACH_IO_H
+-#define __MACH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-ux500/include/mach/io.h b/arch/arm/mach-ux500/include/mach/io.h
+deleted file mode 100644
+index 1cf3f44..0000000
+--- a/arch/arm/mach-ux500/include/mach/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * arch/arm/mach-u8500/include/mach/io.h
+- *
+- * Copyright (C) 1997-1999 Russell King
+- *
+- * Modifications:
+- *  06-12-1997	RMK	Created.
+- *  07-04-1999	RMK	Major cleanup
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/*
+- * We don't actually have real ISA nor PCI buses, but there is so many
+- * drivers out there that might just work if we fake them...
+- */
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-versatile/include/mach/io.h b/arch/arm/mach-versatile/include/mach/io.h
+deleted file mode 100644
+index f067c14..0000000
+--- a/arch/arm/mach-versatile/include/mach/io.h
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- *  arch/arm/mach-versatile/include/mach/io.h
+- *
+- *  Copyright (C) 2003 ARM Limited
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-vexpress/include/mach/io.h b/arch/arm/mach-vexpress/include/mach/io.h
+deleted file mode 100644
+index 13522d8..0000000
+--- a/arch/arm/mach-vexpress/include/mach/io.h
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- *  arch/arm/mach-vexpress/include/mach/io.h
+- *
+- *  Copyright (C) 2003 ARM Limited
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define __io(a)		__typesafe_io(a)
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/mach-w90x900/include/mach/io.h b/arch/arm/mach-w90x900/include/mach/io.h
+deleted file mode 100644
+index d96ab99..0000000
+--- a/arch/arm/mach-w90x900/include/mach/io.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * arch/arm/mach-w90x900/include/mach/io.h
+- *
+- * Copyright (c) 2008 Nuvoton technology corporation
+- * All rights reserved.
+- *
+- * Wan ZongShun <mcuos.com@gmail.com>
+- *
+- * Based on arch/arm/mach-s3c2410/include/mach/io.h
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- */
+-
+-#ifndef __ASM_ARM_ARCH_IO_H
+-#define __ASM_ARM_ARCH_IO_H
+-
+-#define IO_SPACE_LIMIT	0xffffffff
+-
+-/*
+- * 1:1 mapping for ioremapped regions.
+- */
+-
+-#define __mem_pci(a)	(a)
+-#define __io(a)		__typesafe_io(a)
+-
+-#endif
+diff --git a/arch/arm/mach-zynq/include/mach/io.h b/arch/arm/mach-zynq/include/mach/io.h
+deleted file mode 100644
+index 39d9885..0000000
+--- a/arch/arm/mach-zynq/include/mach/io.h
++++ /dev/null
+@@ -1,33 +0,0 @@
+-/* arch/arm/mach-zynq/include/mach/io.h
+- *
+- *  Copyright (C) 2011 Xilinx
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef __MACH_IO_H__
+-#define __MACH_IO_H__
+-
+-/* Allow IO space to be anywhere in the memory */
+-
+-#define IO_SPACE_LIMIT 0xffff
+-
+-/* IO address mapping macros, nothing special at this time but required */
+-
+-#ifdef __ASSEMBLER__
+-#define IOMEM(x)		(x)
+-#else
+-#define IOMEM(x)		((void __force __iomem *)(x))
+-#endif
+-
+-#define __io(a)			__typesafe_io(a)
+-#define __mem_pci(a)		(a)
+-
+-#endif
+diff --git a/arch/arm/plat-mxc/include/mach/io.h b/arch/arm/plat-mxc/include/mach/io.h
+deleted file mode 100644
+index ea9d95e..0000000
+--- a/arch/arm/plat-mxc/include/mach/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- */
+-
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_ARCH_MXC_IO_H__
+-#define __ASM_ARCH_MXC_IO_H__
+-
+-/* Allow IO space to be anywhere in the memory */
+-#define IO_SPACE_LIMIT 0xffffffff
+-
+-/* io address mapping macro */
+-#define __io(a)		__typesafe_io(a)
+-
+-#define __mem_pci(a)	(a)
+-
+-#endif
+diff --git a/arch/arm/plat-spear/include/plat/io.h b/arch/arm/plat-spear/include/plat/io.h
+deleted file mode 100644
+index 4d4ba82..0000000
+--- a/arch/arm/plat-spear/include/plat/io.h
++++ /dev/null
+@@ -1,22 +0,0 @@
+-/*
+- * arch/arm/plat-spear/include/plat/io.h
+- *
+- * IO definitions for SPEAr platform
+- *
+- * Copyright (C) 2009 ST Microelectronics
+- * Viresh Kumar<viresh.kumar@st.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#ifndef __PLAT_IO_H
+-#define __PLAT_IO_H
+-
+-#define IO_SPACE_LIMIT		0xFFFFFFFF
+-
+-#define __io(a)			__typesafe_io(a)
+-#define __mem_pci(a)		(a)
+-
+-#endif /* __PLAT_IO_H */
 -- 
 1.7.5.4
