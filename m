@@ -1,73 +1,44 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Mon, 13 Feb 2012 15:15:13 -0600
-Subject: [Linaro-mm-sig] [PATCHv21 12/16] mm: trigger page reclaim in
- alloc_contig_range() to stabilise watermarks
-In-Reply-To: <op.v9mt58ch3l0zgt@mpn-glaptop>
-References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
- <1328895151-5196-13-git-send-email-m.szyprowski@samsung.com>
- <CAOCHtYi01NVp1j=MX+0-z7ygW5tJuoswn8eWTQp+0Z5mMGdeQw@mail.gmail.com>
- <op.v9mt58ch3l0zgt@mpn-glaptop>
-Message-ID: <CAOCHtYjc39ThfrcAqdsxNf-bFqKzu=T8=O_W9Cg3cRNzQnX-OQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Feb 2012 13:24:01 -0800
+Subject: [PATCH] modpost: Fix section warnings for ARM for many compilers
+Message-ID: <20120213212401.GH1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/2/13 Michal Nazarewicz <mina86@mina86.com>:
->> On Fri, Feb 10, 2012 at 11:32 AM, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->>>
->>> @@ -5637,6 +5642,56 @@ static int __alloc_contig_migrate_range(unsigned
->>> long start, unsigned long end)
->>> ? ? ? return ret > 0 ? 0 : ret;
->>> ?}
->>>
->>> +/*
->>> + * Update zone's cma pages counter used for watermark level calculation.
->>> + */
->>> +static inline void __update_cma_wmark_pages(struct zone *zone, int
->>> count)
->>> +{
->>> + ? ? ? unsigned long flags;
->>> + ? ? ? spin_lock_irqsave(&zone->lock, flags);
->>> + ? ? ? zone->min_cma_pages += count;
->>> + ? ? ? spin_unlock_irqrestore(&zone->lock, flags);
->>> + ? ? ? setup_per_zone_wmarks();
->>> +}
->>> +
->>> +/*
->>> + * Trigger memory pressure bump to reclaim some pages in order to be
->>> able to
->>> + * allocate 'count' pages in single page units. Does similar work as
->>> + *__alloc_pages_slowpath() function.
->>> + */
->>> +static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
->>> +{
->>> + ? ? ? enum zone_type high_zoneidx = gfp_zone(gfp_mask);
->>> + ? ? ? struct zonelist *zonelist = node_zonelist(0, gfp_mask);
->>> + ? ? ? int did_some_progress = 0;
->>> + ? ? ? int order = 1;
->>> + ? ? ? unsigned long watermark;
->>> +
->>> + ? ? ? /*
->>> + ? ? ? ?* Increase level of watermarks to force kswapd do his job
->>> + ? ? ? ?* to stabilise at new watermark level.
->>> + ? ? ? ?*/
->>> + ? ? ? __modify_min_cma_pages(zone, count);
->
->
-> On Mon, 13 Feb 2012 10:57:58 -0800, Robert Nelson <robertcnelson@gmail.com>
-> wrote:
->>
->> Hi Marek, ? This ^^^ function doesn't seem to exist in this patchset,
->> is it in another set posted to lkml?
->
->
-> This should read __update_cma_wmark_pages(). ?Sorry for the incorrect patch.
+It turns out that many compilers don't show section warnings on ARM
+currently because handling for ARM_CALL relocs are missing from
+modpost.c.
 
-Thanks Michal, that fixed it.. cma-v21 with Rob Clark's omapdrm works
-great on the Beagle xM..
+Based on commit c2e26114 ([ARM] 3205/1: Handle new EABI relocations when
+loading kernel modules) it seems that R_ARM_PC24, R_ARM_CALL and
+R_ARM_JUMP24 can be handled the same way.
 
-Regards
+As modpost.c includes elf.h, we need to also consider that at least
+Debian libc6-dev is missing defines for both R_ARM_CALL and R_ARM_JUMP24
+in /usr/include/elf.h.
 
--- 
-Robert Nelson
-http://www.rcn-ee.com/
+So for now let's just use the numbers in modpost.c.
+
+Cc: Rusty Russell <rusty@rustcorp.com.au>
+Cc: Ben Hutchings <ben@decadent.org.uk>
+Cc: Anders Kaseorg <andersk@ksplice.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+---
+
+Anybody got better ideas for dealing with the missing elf.h
+defines?
+
+--- a/scripts/mod/modpost.c
++++ b/scripts/mod/modpost.c
+@@ -1505,6 +1505,8 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+ 		              (elf->symtab_start + ELF_R_SYM(r->r_info));
+ 		break;
+ 	case R_ARM_PC24:
++	case 28:		/* R_ARM_CALL */
++	case 29:		/* R_ARM_JUMP24 */
+ 		/* From ARM ABI: ((S + A) | T) - P */
+ 		r->r_addend = (int)(long)(elf->hdr +
+ 		              sechdr->sh_offset +
