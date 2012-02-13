@@ -1,74 +1,41 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 13 Feb 2012 11:21:45 +1100
-Subject: [PULL REQUEST] DMA-mapping framework redesign preparation patches
-In-Reply-To: <1328898737-15854-1-git-send-email-m.szyprowski@samsung.com>
-References: <1328898737-15854-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120213112145.4b8990c739d297cd30714d52@canb.auug.org.au>
+From: bill4carson@gmail.com (bill4carson)
+Date: Mon, 13 Feb 2012 09:07:56 +0800
+Subject: [PATCH] hotplug: eliminate warning "Unknown IPI message 0x1"
+In-Reply-To: <20120210095955.GT889@n2100.arm.linux.org.uk>
+References: <1328866073-14769-1-git-send-email-bill4carson@gmail.com>
+ <1328866073-14769-2-git-send-email-bill4carson@gmail.com>
+ <20120210095955.GT889@n2100.arm.linux.org.uk>
+Message-ID: <4F38626C.5030607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
 
-On Fri, 10 Feb 2012 19:32:17 +0100 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+
+On 2012?02?10? 17:59, Russell King - ARM Linux wrote:
+> On Fri, Feb 10, 2012 at 05:27:53PM +0800, Bill Carson wrote:
+>> When playing hotplug on vexpress board, a tiny warning pops out.
+>>
+>> /sys/devices/system/cpu # echo 0>  cpu3/online
+>> CPU3: shutdown
+>> /sys/devices/system/cpu # echo 1>  cpu3/online
+>> CPU3: Booted secondary processor
+>> Calibrating delay loop (skipped) already calibrated this CPU
+>> CPU3: Unknown IPI message 0x1
+>>        ^^^^^^^
+>> It's a phony warning caused by handle_IPI as a result of calling
+>> gic_raise_softirq(cpumask_of(cpu), 1). Introducing a new ipi_msg_type
+>> IPI_WAKEUP_CPU to make this warning go away.
 >
-> Our patches with DMA-mapping framework redesign proposal have been
-> hanging for over a month with just a few comments. We would like to go
-> further in the development, but first I would like to ask You to give
-> them a try in the linux-next kernel.
-> 
-> For everyone interested in this patch series, here is the relevant
-> thread: https://lkml.org/lkml/2011/12/23/97
-> 
-> If there are any problems with our git tree, please contact Marek 
-> Szyprowski <m.szyprowski@samsung.com> or alternatively Kyungmin Park
-> <kyungmin.park@samsung.com>.
-> 
-> The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
-> 
->   Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
-> 
-> are available in the git repository at:
->   git://git.infradead.org/users/kmpark/linux-samsung dma-mapping-next
+> NAK.  I want people to move to SGI0 for this, so that we can have SGI1-N
+> as the proper IPIs.  The reason _I_ haven't done this is because it's
+> totally unclear whether anyone relies on the current IPI number.
+>
 
-I have added this from today.
+Thanks for your explanation, now I understand what's going on here.
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
-
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
-
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
 
 -- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
+I am a slow learner
+but I will keep trying to fight for my dreams!
 
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120213/14b57ce3/attachment.sig>
+--bill
