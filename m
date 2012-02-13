@@ -1,98 +1,58 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 13 Feb 2012 15:43:04 +0100
-Subject: [PATCH 4/9] ARM: at91/gpio: change comments and one variable name
+Date: Mon, 13 Feb 2012 15:43:08 +0100
+Subject: [PATCH 8/9] ARM: at91/gpio: remove the static specification of
+ gpio_chip.base
 In-Reply-To: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <032e5eba814724ec4f14c6b26bb2fa8556595efe.1329139662.git.nicolas.ferre@atmel.com>
+Message-ID: <6f442941051964c268bfa3cfdd2a9a544c2860dc.1329139662.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-What was true only on at91sam9263 about the sharing of a single AIC
-IRQ line for several GPIO banks is now used by several Atmel SoCs.
-
-Change a variable name to allow better understanding while
-introducing IRQ domains in following patches.
+This value is determined at runtime using device tree or platform data
+information.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/mach-at91/gpio.c |   25 ++++++++++++++-----------
- 1 files changed, 14 insertions(+), 11 deletions(-)
+ arch/arm/mach-at91/gpio.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index 74d6783..b762afc 100644
+index e8f5831..ecf6bbb 100644
 --- a/arch/arm/mach-at91/gpio.c
 +++ b/arch/arm/mach-at91/gpio.c
-@@ -29,8 +29,8 @@
- struct at91_gpio_chip {
- 	struct gpio_chip	chip;
- 	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
--	int			id;		/* ID of register bank */
--	void __iomem		*regbase;	/* Base of register bank */
-+	int			pioc_hwirq;	/* PIO bank interrupt identifier on AIC */
-+	void __iomem		*regbase;	/* PIO bank virtual address */
- 	struct clk		*clock;		/* associated clock */
+@@ -51,7 +51,7 @@ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+ 					unsigned offset);
+ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 
+-#define AT91_GPIO_CHIP(name, base_gpio, nr_gpio)			\
++#define AT91_GPIO_CHIP(name, nr_gpio)					\
+ 	{								\
+ 		.chip = {						\
+ 			.label		  = name,			\
+@@ -60,18 +60,17 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
+ 			.get		  = at91_gpiolib_get,		\
+ 			.set		  = at91_gpiolib_set,		\
+ 			.dbg_show	  = at91_gpiolib_dbg_show,	\
+-			.base		  = base_gpio,			\
+ 			.to_irq		  = at91_gpiolib_to_irq,	\
+ 			.ngpio		  = nr_gpio,			\
+ 		},							\
+ 	}
+ 
+ static struct at91_gpio_chip gpio_chip[] = {
+-	AT91_GPIO_CHIP("pioA", 0x00, 32),
+-	AT91_GPIO_CHIP("pioB", 0x20, 32),
+-	AT91_GPIO_CHIP("pioC", 0x40, 32),
+-	AT91_GPIO_CHIP("pioD", 0x60, 32),
+-	AT91_GPIO_CHIP("pioE", 0x80, 32),
++	AT91_GPIO_CHIP("pioA", 32),
++	AT91_GPIO_CHIP("pioB", 32),
++	AT91_GPIO_CHIP("pioC", 32),
++	AT91_GPIO_CHIP("pioD", 32),
++	AT91_GPIO_CHIP("pioE", 32),
  };
  
-@@ -285,7 +285,7 @@ static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
- 	else
- 		wakeups[bank] &= ~mask;
- 
--	irq_set_irq_wake(gpio_chip[bank].id, state);
-+	irq_set_irq_wake(gpio_chip[bank].pioc_hwirq, state);
- 
- 	return 0;
- }
-@@ -499,7 +499,7 @@ void __init at91_gpio_irq_setup(void)
- 	for (pioc = 0, this = gpio_chip, prev = NULL;
- 			pioc++ < gpio_banks;
- 			prev = this, this++) {
--		unsigned	id = this->id;
-+		unsigned	pioc_hwirq = this->pioc_hwirq;
- 		unsigned	i;
- 
- 		__raw_writel(~0, this->regbase + PIO_IDR);
-@@ -518,14 +518,14 @@ void __init at91_gpio_irq_setup(void)
- 		}
- 
- 		/* The toplevel handler handles one bank of GPIOs, except
--		 * AT91SAM9263_ID_PIOCDE handles three... PIOC is first in
--		 * the list, so we only set up that handler.
-+		 * on some SoC it can handles up to three...
-+		 * We only set up the handler for the first of the list.
- 		 */
- 		if (prev && prev->next == this)
- 			continue;
- 
--		irq_set_chip_data(id, this);
--		irq_set_chained_handler(id, gpio_irq_handler);
-+		irq_set_chip_data(pioc_hwirq, this);
-+		irq_set_chained_handler(pioc_hwirq, gpio_irq_handler);
- 	}
- 	pr_info("AT91: %d gpio irqs in %d banks\n", irq - gpio_to_irq(0), gpio_banks);
- }
-@@ -615,7 +615,7 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
- 	for (i = 0; i < nr_banks; i++) {
- 		at91_gpio = &gpio_chip[i];
- 
--		at91_gpio->id = data[i].id;
-+		at91_gpio->pioc_hwirq = data[i].pioc_hwirq;
- 		at91_gpio->chip.base = i * 32;
- 
- 		at91_gpio->regbase = ioremap(data[i].regbase, 512);
-@@ -633,8 +633,11 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
- 		/* enable PIO controller's clock */
- 		clk_enable(at91_gpio->clock);
- 
--		/* AT91SAM9263_ID_PIOCDE groups PIOC, PIOD, PIOE */
--		if (last && last->id == at91_gpio->id)
-+		/*
-+		 * GPIO controller are grouped on some SoC:
-+		 * PIOC, PIOD and PIOE can share the same IRQ line
-+		 */
-+		if (last && last->pioc_hwirq == at91_gpio->pioc_hwirq)
- 			last->next = at91_gpio;
- 		last = at91_gpio;
- 
+ static int gpio_banks;
 -- 
 1.7.9
