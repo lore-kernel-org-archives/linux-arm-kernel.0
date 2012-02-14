@@ -1,57 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Feb 2012 17:40:35 +0000
-Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <201202141716.26930.arnd@arndb.de>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <201202140804.49026.arnd@arndb.de> <4F3A7158.2080702@gmail.com>
- <201202141716.26930.arnd@arndb.de>
-Message-ID: <20120214174035.GA29765@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 14 Feb 2012 18:56:08 +0100
+Subject: [PATCH v3 0/4] ARM: OMAP2+: Interrupt controllers adaptation to DT
+Message-ID: <1329242172-4214-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 05:16:26PM +0000, Arnd Bergmann wrote:
-> On Tuesday 14 February 2012, Rob Herring wrote:
-> > On 02/14/2012 02:04 AM, Arnd Bergmann wrote:
-> > > On Tuesday 14 February 2012, Rob Herring wrote:
-> > > 
-> > >> If we use CONFIG_PCI, then we have to move over all PCI enabled
-> > >> platforms at once. With a separate kconfig option, then we can move
-> > >> platforms one by one. Some are legacy and we may not want to move. This
-> > >> also helped with omap, but Tony has now fixed it.
-> > > 
-> > > We could also generalize the implementation from tegra, which seems
-> > > reasonable as a start:
-> > > 
-> > > 
-> > > #define IO_SPACE_LIMIT 0xffff
-> > > 
-> > > #if defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-> > > #include <mach/io.h>
-> > > #elif defined(CONFIG_PCI)
-> > > extern void __iomem *pci_io_base;
-> > > 
-> > > static inline void __iomem *__io(unsigned long addr)
-> > > {
-> > >         return pci_io_base + (addr & IO_SPACE_LIMIT);
-> > 
-> > But don't we want a constant pci_io_base? This would certainly be a
-> > quicker conversion, but I don't think we want to do it twice.
-> 
-> Yes, at least in the long run. Note that this should make no difference
-> at all from a performance point of view, but it does impact code size a bit.
+Hi Tony and Rob,
 
-That depends whether the additional reloads of pci_io_base can be properly
-scheduled by the compiler, and experience shows that you tend to end up
-with the load delay slot _not_ being filled on older processors.
+Here is a small update of the INTC controller series that was already
+acked-by in the v2 [1].
+This version is just updating the #2 patch to take advantage of the new
+irq_domain_add_legacy API introduced by Grant.
 
-Not only that, but the compiler _will_ evaluate the entire:
+Please note that in the near future that code can even be simplier with
+the introduction of the domain support inside generic irq chip.
 
-	pci_io_base + (addr & IO_SPACE_LIMIT)
+This series is based on lo/master + for_3.4/dt_base branch to get the needed
+cleanup and fixes for OMAP.
+It requires as well Grant's irq_domain generalization and refinement
+series available at:
+  git://git.secretlab.ca/git/linux-2.6 irqdomain/next
 
-thing every time.  With a 64K mask, that will include _reloading_ the
-mask every single access.
+The series is available here for reference:
+git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_irq_domain
 
-So, we'll probably end up with about three additional loads per IO
-operation, none of which would be scheduled particularly well.
+Regards,
+Benoit
 
-"Yuck" and "not in my kernel" comes to mind.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/079467.html
+
+
+Benoit Cousson (4):
+  arm/dts: OMAP4: Update DTS file with new GIC bindings
+  ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
+  arm/dts: OMAP3: Add interrupt-controller bindings for INTC
+  ARM: OMAP2+: board-generic: Use of_irq_init API
+
+ .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++
+ arch/arm/boot/dts/omap3.dtsi                       |    6 +-
+ arch/arm/boot/dts/omap4.dtsi                       |    2 +-
+ arch/arm/mach-omap2/board-generic.c                |   30 +++++-----
+ arch/arm/mach-omap2/common.h                       |   10 +++
+ arch/arm/mach-omap2/irq.c                          |   59 ++++++++++++++++---
+ 6 files changed, 107 insertions(+), 27 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
