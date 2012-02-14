@@ -1,40 +1,60 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Tue, 14 Feb 2012 12:51:41 +0100
-Subject: [PATCH 0/4] dmaengine: i.MX DMA series.
-In-Reply-To: <1328884300-18801-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1328884300-18801-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <CACKLOr1Gn_NR8HPhmyK6DW9W+7CGG8y7yoZm6PE3bH2zt6Ej-g@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Tue, 14 Feb 2012 13:01:53 +0100
+Subject: [PATCH RESEND] ixp4xx: clockevent set_next_event fix
+In-Reply-To: <4F3A2F79.6050806@flytronic.pl>
+References: <4F394D3B.3080909@flytronic.pl>
+ <4F3A2F79.6050806@flytronic.pl>
+Message-ID: <20120214120153.GA9808@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 February 2012 15:31, Javier Martin
-<javier.martin@vista-silicon.com> wrote:
-> Patches 1-3 have already been sent to the list (not merged yet)
-> but they are submitted so that everyone can get the whole picture
-> of what we're trying to do here.
->
-> A new patch(4) has been added which adds support for multiple
-> descriptors.
->
-> [PATCH 1/4] dmaengine: Add support for MEMCPY for imx-dma.
-> [PATCH 2/4] i.MX DMA: Add support for 2D transfers.
-> [PATCH 3/4] dmaengine: i.MX: Add support for interleaved transfers.
-> [PATCH 4/4] dmaengine: Add support for multiple descriptors for imx-dma.
+On Tue, Feb 14, 2012 at 10:55:05AM +0100, Micha?? Wr??bel wrote:
+> IXP43x Developer's Manual [17.4.3] and IXP4[56]x Developer's Manual
+> [18.4.3] say that for predictable operation the timer needs to be
+> stopped before writing a new value into the reload register. Indeed,
+> tests on IXP435 show that writing a new value into the reload register
+> without stopping the timer first has no immediate effect on the timer.
+> This makes hrtimers started through hrtimer_start() to be delayed until
+> the currently earliest hrtimer expires.
+> 
+> IXP42x Developer's Manual [14.3] says that the timer will be reloaded
+> immediately on setting the timer reload register, so the bug probably
+> doesn't occur on those CPUs. However, stopping the timer shouldn't have
+> any negative side effects, so it should be safe to apply it
+> machine-wide.
 
-Hi,
-what do you think of this series?
+Unless you test this out and confirm that it works for all IXP4xx, I
+would prefer to see a specific timer function for the 43x instead.
 
-Vinod: your concern about patch 1 is solved in patch 4
-Sascha: I know you are not comfortable with patch 2 since it adds code
-to a file which is meant to be removed. However, is there a chance you
-accept it without me having to rewrite the whole series?
+Thanks,
+Richard
 
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+
+> 
+> Signed-off-by: Micha?? Wr??bel <michal.wrobel@flytronic.pl>
+> ---
+>  arch/arm/mach-ixp4xx/common.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> The previous patch had a mistake in the description - wrong reference to
+> "General-Purpose Timers" section in IXP42x Developer's Manual.
+> 
+> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+> index 3841ab4..fd37c83 100644
+> --- a/arch/arm/mach-ixp4xx/common.c
+> +++ b/arch/arm/mach-ixp4xx/common.c
+> @@ -434,6 +434,7 @@ static int ixp4xx_set_next_event(unsigned long evt,
+>  {
+>  	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
+>  
+> +	*IXP4XX_OSRT1 = 0;
+>  	*IXP4XX_OSRT1 = (evt & ~IXP4XX_OST_RELOAD_MASK) | opts;
+>  
+>  	return 0;
+> -- 
+> 1.7.5.4
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
