@@ -1,30 +1,37 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Tue, 14 Feb 2012 16:30:31 +0900
-Subject: [PATCHv21 04/16] mm: compaction: introduce
- isolate_freepages_range()
-In-Reply-To: <1328895151-5196-5-git-send-email-m.szyprowski@samsung.com>
-References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
- <1328895151-5196-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120214163031.3f387964.kamezawa.hiroyu@jp.fujitsu.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Tue, 14 Feb 2012 15:34:15 +0800
+Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
+In-Reply-To: <20120214060627.GB13456@opensource.wolfsonmicro.com>
+References: <20120202085521.GB9773@S2101-09.ap.freescale.net>
+ <20120202091132.GD9773@S2101-09.ap.freescale.net>
+ <20120202092427.GB32403@b20223-02.ap.freescale.net>
+ <20120202130901.GE9773@S2101-09.ap.freescale.net>
+ <20120202135805.GB3015@richard-laptop>
+ <20120203021554.GE32403@b20223-02.ap.freescale.net>
+ <20120203133240.GB12915@S2101-09.ap.freescale.net>
+ <a9d9bad3-edd0-4a5f-9bb3-15787430d858@email.android.com>
+ <20120214013506.GA3276@b20223-02.ap.freescale.net>
+ <20120214060627.GB13456@opensource.wolfsonmicro.com>
+Message-ID: <20120214073414.GB3276@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Feb 2012 18:32:19 +0100
-Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Mon, Feb 13, 2012 at 10:06:28PM -0800, Mark Brown wrote:
+> On Tue, Feb 14, 2012 at 09:35:07AM +0800, Richard Zhao wrote:
+> > On Sun, Feb 05, 2012 at 12:50:15PM +0800, Richard Zhao wrote:
+> 
+> > > no, it is asoc machine driver to have machine specific code. 
+> > > the machine driver do not correspond to any hw device, which cause hard
+> > > to bind dt or create platform device.
+> 
+> > I'll have to keep audmux driver in arch/, till ASOC machine driver
+> > has a way to get platfrom parameters.
+> 
+> Machine drivers can easily get platform data, they're just regular
+> drivers of whatever type so can get platform data in the same way that
+> any other driver for their bus can.
+Machine drivers don't correspond to any hw devices. If we create a
+virtual platform device, it'll be hard for DT binding.
 
-> From: Michal Nazarewicz <mina86@mina86.com>
-> 
-> This commit introduces isolate_freepages_range() function which
-> generalises isolate_freepages_block() so that it can be used on
-> arbitrary PFN ranges.
-> 
-> isolate_freepages_block() is left with only minor changes.
-> 
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Mel Gorman <mel@csn.ul.ie>
-> Tested-by: Rob Clark <rob.clark@linaro.org>
-> Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-
-Reviewed-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Thanks
+Richard
