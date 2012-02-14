@@ -1,44 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Feb 2012 11:19:22 -0800
-Subject: [PATCH 1/2] ARM: OMAP: Get rid of reset for system timer
-In-Reply-To: <CAMQu2gxnHE8fps6LD93B2G_w-p=i7YmuadasPrE-601-S8mUkA@mail.gmail.com>
-References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
- <1328191435-18652-2-git-send-email-santosh.shilimkar@ti.com>
- <20120210191813.GU1426@atomide.com> <4F39EDD0.9010304@ti.com>
- <CAMQu2gxnHE8fps6LD93B2G_w-p=i7YmuadasPrE-601-S8mUkA@mail.gmail.com>
-Message-ID: <20120214191921.GQ1426@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 14 Feb 2012 14:28:12 -0500 (EST)
+Subject: Cache problems in user space - kernel space communication
+In-Reply-To: <CAKPCGKv=ph_KmJ-Lrq20f-cDonJ0kXoC1NAuBr2AHo98ToSnSw@mail.gmail.com>
+References: <CAKPCGKt6U6m8cnagCwgzaLB9R8f73KDWmV58W3ifHQ9n-Y7sTw@mail.gmail.com>
+ <4541F39E5122A64CA8A7F74880F94E5201E89013BD@MBX14.EXCHPROD.USA.NET>
+ <CAKPCGKv=ph_KmJ-Lrq20f-cDonJ0kXoC1NAuBr2AHo98ToSnSw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1202141421080.24536@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120213 22:44]:
-> On Tue, Feb 14, 2012 at 10:44 AM, Rajendra Nayak <rnayak@ti.com> wrote:
-> > On Saturday 11 February 2012 12:48 AM, Tony Lindgren wrote:
-> >>
-> >> * Santosh Shilimkar<santosh.shilimkar@ti.com> ?[120202 05:33]:
-> >>>
-> >>> > ?From: Rajendra Nayak<rnayak@ti.com>
-> >>> >
-> >>> > ?hwmod setup already does a reset and sets the OCP sysconfig
-> >>> > ?registers appropriately. Avoid doing a reset again and overriding
-> >>> > ?the OCP sysconfig settings in the system timer init code.
-> >
-> >>
-> >>
-> >> If we want this queued as a fix, it should also describe what
-> >> actually breaks? Timer? PM?
-> >
-> >
-> > It only fixes the redundant reset and overriding the smartidle-wakeup
-> > OCP setting (done by hwmod) with the smartidle in the driver.
-> > Doing this doesn't really break anything as yet in mainline, but will
-> > cause timer wakeup issues once OFF mode is in place for OMAP4. On OMAP5
-> > however this was causing more issues as the softreset bit position is
-> > different than on OMAP2/3/4.
-> > So it should be ok to queue this in for 3.4 considering neither OMAP4
-> > OFF, not OMAP5 support is in mainline yet.
-> >
-> I second Rajendra's comment.
+On Tue, 14 Feb 2012, Bart Jonkers wrote:
 
-OK thanks, will apply into fixes-non-critical.
+> On Tue, Feb 14, 2012 at 2:19 PM, Van Schaik, Carl <carl@ok-labs.com> wrote:
+> > Looks like you are mapping the same page cached to both kernel and user space (at different virtual addresses). With the VIVT cache, the two mappings will hash differently into the cache and access different cache lines. To successfully work like this on a VIVT cache you need to perform a lot of cache maintenance whenever switching from kernel to user. You would likely rather map the page uncached in both kernel and user to save all the effort.
+> >
+> 
+> This was also our conclusion but we didn't find a way to get the
+> memory area uncached for both user and kernel space.
+> Can somebody tell me how to do this?
 
-Tony
+You should allocate your memory using dma_alloc_coherent() or 
+dma_alloc_writecombine(), and use dma_mmap_coherent() or 
+dma_mmap_writecombine() to map it to user space.  Then your code should 
+use dma_free_coherent() to clean up.
+
+
+Nicolas
