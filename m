@@ -1,47 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 14 Feb 2012 11:59:56 +0100
-Subject: [PATCH] MAINTAINERS: remove arch/arm/mach-mx*/ from IMX entry
-In-Reply-To: <1329142226-2685-1-git-send-email-shawn.guo@linaro.org>
-References: <1329142226-2685-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120214105956.GT3852@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Feb 2012 11:08:36 +0000
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <1329151422-2146-1-git-send-email-mporter@ti.com>
+References: <1329151422-2146-1-git-send-email-mporter@ti.com>
+Message-ID: <20120214110836.GE15338@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 06:10:26AM -0800, Shawn Guo wrote:
-> With commit 784a90c0a7d8f5 ("ARM i.MX: Merge i.MX5 support into
-> mach-imx") merging mach-mx5 into mach-imx, arch/arm/mach-mx* only
-> covers mach-mxs now.  Since we already have a separate MXS entry
-> for arch/arm/mach-mxs, arch/arm/mach-mx* can simply be removed there.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
+Two more points:
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Mon, Feb 13, 2012 at 11:43:42AM -0500, Matt Porter wrote:
+> This fixes smsc911x support on platforms using gpmc_smsc911x_init().
+> Commit c7e963f6888816f04d1f5da0e07bec4e0092f227 added the requirement
 
+Always include the commit summary as well here, so:
 
-> ---
->  MAINTAINERS |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 55ca0be..37169f5 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -785,7 +785,6 @@ M:	Sascha Hauer <kernel@pengutronix.de>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  T:	git git://git.pengutronix.de/git/imx/linux-2.6.git
-> -F:	arch/arm/mach-mx*/
->  F:	arch/arm/mach-imx/
->  F:	arch/arm/plat-mxc/
+Commit c7e963f6888816 (net/smsc911x: Add regulator support) added the ...
+
+> @@ -55,6 +94,11 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
 >  
-> -- 
-> 1.7.5.4
-> 
-> 
+>  	gpmc_cfg = board_data;
+>  
+> +	if (platform_device_register(&gpmc_smsc911x_regulator) < 0) {
+> +		pr_err("Unable to register smsc911x regulators\n");
+> +		return;
+> +	}
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+It's always a good idea to indicate why something failed:
+
+	err = platform_device_register(&gpmc_smsc911x_regulator);
+	if (err < 0) {
+		pr_err("Unable to register smsc911x regulators: %d\n", err);
+		return;
+	}
+
+so that people can see not only what failed, but also why it failed.
