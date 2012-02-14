@@ -1,55 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Feb 2012 09:24:23 -0800
-Subject: [PATCH 00/15] mach/io.h cleanup and removal
-In-Reply-To: <4F39D2EE.80806@gmail.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <20120213234109.GJ1426@atomide.com> <4F39D2EE.80806@gmail.com>
-Message-ID: <20120214172423.GO1426@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 14 Feb 2012 09:29:04 -0800
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120214105823.GS3852@pengutronix.de>
+References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
+ <20120213082741.GN3852@pengutronix.de>
+ <20120213144820.GA3494@opensource.wolfsonmicro.com>
+ <20120214105823.GS3852@pengutronix.de>
+Message-ID: <20120214172902.GB3916@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [120213 18:49]:
-> On 02/13/2012 05:41 PM, Tony Lindgren wrote:
-> > * Rob Herring <robherring2@gmail.com> [120213 13:12]:
-> >>  arch/arm/mach-at91/include/mach/at91_io.h         |   44 +++++++++++++++++
-> >>  arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |    2 +
-> >>  arch/arm/mach-at91/include/mach/at91sam9_sdramc.h |    2 +
-> > ...
-> >>  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h   |    6 ++
-> >>  arch/arm/mach-msm/include/mach/msm_iomap-7x30.h   |    4 ++
-> >>  arch/arm/mach-msm/include/mach/msm_iomap-8960.h   |    4 ++
-> >>  arch/arm/mach-msm/include/mach/msm_iomap-8x50.h   |    4 ++
-> >>  arch/arm/mach-msm/include/mach/msm_iomap-8x60.h   |    4 ++
-> > ...
-> > 
-> > Considering the naming above..
-> > 
-> >>  arch/arm/mach-tegra/include/mach/iomap.h          |   48 ++++++++++++++++++
-> > 
-> > ..should this be called tegra-iomap.h instead?
-> 
-> Probably, but it's not a new header. Fixing include paths or names is a
-> separate problem when we start having multiple mach include directories.
-> Perhaps we can get them removed altogether before we have to start
-> renaming. Much of it is device addresses that will go in dts files.
+On Tue, Feb 14, 2012 at 11:58:23AM +0100, Sascha Hauer wrote:
+> On Mon, Feb 13, 2012 at 06:48:21AM -0800, Mark Brown wrote:
 
-Yes should be just the legacy drivers needing this for most part,
-so that's currently most of omap1 drivers for us.
+> > If the board really has so few software controlled regulators then they
+> > should just be using the dummy regulator support which already exists,
+> > someone should just add a knob to turn it on automatically.
 
-Anyways I'm using plat/omap-iomap.h for the name, so if somebody
-has better ideas for naming to avoid further search and replace
-later on, let me know.
+> I thought we agree that generally turning on the dummy regulator is a
+> bad idea. Now you are advocating for the dummy regulator again.
 
-I guess in the long run we could have
+Well, no.  I'm saying that people are being far too trigger happy with
+it and that if someone wants to add a mechanism for turning it on they
+need to deal with the fact that it currntly warns every time it does
+anything but there are some resonable use cases, especially on very old
+boards.
 
-#include <mach-omap1/iomap.h>
-
-instead of
-
-#include <plat/omap-iomap.h>
-
-as the plat can't be used for multi-subarch builds.
-
-Regards,
-
-Tony
+The main thing here is to avoid these driver specific bodges that people
+keep churning out again and again, it's quite depressing really.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120214/a0696ce7/attachment.sig>
