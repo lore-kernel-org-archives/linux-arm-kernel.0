@@ -1,49 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Feb 2012 12:38:01 -0800
-Subject: [PATCH 3.3 v2] OMAP4: PRM: fix build breakage when CONFIG_OF
- is not defined
-In-Reply-To: <1328699683-19357-1-git-send-email-coelho@ti.com>
-References: <1328699683-19357-1-git-send-email-coelho@ti.com>
-Message-ID: <20120214203801.GU1426@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 14 Feb 2012 13:39:39 -0700
+Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
+Message-ID: <1329251979-14805-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Luciano Coelho <coelho@ti.com> [120208 02:43]:
-> Since 3.3-rc1, prm44xx.c build breaks if CONFIG_OF is not set:
-> 
-> arch/arm/mach-omap2/prm44xx.c:41: error: 'OMAP44XX_IRQ_PRCM' undeclared here (not in a function)
-> make[1]: *** [arch/arm/mach-omap2/prm44xx.o] Error 1
-> 
-> This is because of a missing include, which is added indirectly if
-> CONFIG_OF is defined.  This problem was introduced in commit
-> 2f31b51 (ARM: OMAP4: PRM: use PRCM interrupt handler).
-> 
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Luciano Coelho <coelho@ti.com>
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
+The ARM IP revisions in Tegra are:
+Tegra20: CPU r1p1, PL310 r2p0
+Tegra30: CPU A01=r2p7/>=A02=r2p9, NEON r2p3-50, PL310 r3p1-50
 
-A similar patch should be already in mainline kernel queued by Russell.
+Based on work by Olof Johansson, although the actual list of errata is
+somewhat different here, since I added a bunch more and removed one PL310
+erratum that doesn't seem applicable.
 
-Tony
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Olof, should this be CC: stable?
 
-> ---
-> v2: changed the commit log to use abbrev sha and include the commit subject
-> 
->  arch/arm/mach-omap2/prm44xx.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-> index 33dd655..f2e06ad 100644
-> --- a/arch/arm/mach-omap2/prm44xx.c
-> +++ b/arch/arm/mach-omap2/prm44xx.c
-> @@ -20,6 +20,7 @@
->  #include "common.h"
->  #include <plat/cpu.h>
->  #include <plat/prcm.h>
-> +#include <plat/irqs.h>
->  
->  #include "vp.h"
->  #include "prm44xx.h"
-> -- 
-> 1.7.5.4
-> 
+ arch/arm/mach-tegra/Kconfig |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 32b420a..1978f59 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -12,6 +12,13 @@ config ARCH_TEGRA_2x_SOC
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB_SUPPORT
+ 	select USB_ULPI_VIEWPORT if USB_SUPPORT
++	select ARM_ERRATA_720789
++	select ARM_ERRATA_742230
++	select ARM_ERRATA_751472
++	select ARM_ERRATA_754327
++	select ARM_ERRATA_764369
++	select PL310_ERRATA_727915 if CACHE_L2X0
++	select PL310_ERRATA_769419 if CACHE_L2X0
+ 	help
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+@@ -27,6 +34,11 @@ config ARCH_TEGRA_3x_SOC
+ 	select USB_ULPI if USB_SUPPORT
+ 	select USB_ULPI_VIEWPORT if USB_SUPPORT
+ 	select USE_OF
++	select ARM_ERRATA_743622
++	select ARM_ERRATA_751472
++	select ARM_ERRATA_754322
++	select ARM_ERRATA_764369
++	select PL310_ERRATA_769419 if CACHE_L2X0
+ 	help
+ 	  Support for NVIDIA Tegra T30 processor family, based on the
+ 	  ARM CortexA9MP CPU and the ARM PL310 L2 cache controller
+-- 
+1.7.0.4
