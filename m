@@ -1,38 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Feb 2012 11:08:36 +0000
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <1329151422-2146-1-git-send-email-mporter@ti.com>
-References: <1329151422-2146-1-git-send-email-mporter@ti.com>
-Message-ID: <20120214110836.GE15338@n2100.arm.linux.org.uk>
+Date: Tue, 14 Feb 2012 11:13:05 +0000
+Subject: [PATCH 2/2] ARM: OMAP4: Move the barrier memboclk_steal() as
+ part of reserve callback
+In-Reply-To: <20120210191926.GV1426@atomide.com>
+References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
+ <1328191435-18652-3-git-send-email-santosh.shilimkar@ti.com>
+ <20120210191926.GV1426@atomide.com>
+Message-ID: <20120214111305.GF15338@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two more points:
+On Fri, Feb 10, 2012 at 11:19:26AM -0800, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120202 05:33]:
+> > arm_memblock_steal() is not suppose to be used outside ->reserve callback.
+> > OMAP barrier errata code was using it outside reserve callback and hence
+> > it was broken.
+> > 
+> > Move the allocation as part of ->reserve callback to fix the it.
+> 
+> Please update this to mention again commit that changed things
+> around for arm_memblock_steal() so it's clear why this is needed
+> as a fix.
 
-On Mon, Feb 13, 2012 at 11:43:42AM -0500, Matt Porter wrote:
-> This fixes smsc911x support on platforms using gpmc_smsc911x_init().
-> Commit c7e963f6888816f04d1f5da0e07bec4e0092f227 added the requirement
+It's more the case that this whole errata fix was broken right from the
+start, and the change to arm_memblock_steal() just enforced correct usage
+of the APIs.
 
-Always include the commit summary as well here, so:
-
-Commit c7e963f6888816 (net/smsc911x: Add regulator support) added the ...
-
-> @@ -55,6 +94,11 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->  
->  	gpmc_cfg = board_data;
->  
-> +	if (platform_device_register(&gpmc_smsc911x_regulator) < 0) {
-> +		pr_err("Unable to register smsc911x regulators\n");
-> +		return;
-> +	}
-
-It's always a good idea to indicate why something failed:
-
-	err = platform_device_register(&gpmc_smsc911x_regulator);
-	if (err < 0) {
-		pr_err("Unable to register smsc911x regulators: %d\n", err);
-		return;
-	}
-
-so that people can see not only what failed, but also why it failed.
+So, really the arm_memblock_steal() change has nothing to do with this.
