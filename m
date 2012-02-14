@@ -1,101 +1,48 @@
-From: jonkersbart@gmail.com (Bart Jonkers)
-Date: Tue, 14 Feb 2012 14:36:26 +0100
-Subject: Cache problems in user space - kernel space communication
-In-Reply-To: <4541F39E5122A64CA8A7F74880F94E5201E89013BD@MBX14.EXCHPROD.USA.NET>
-References: <CAKPCGKt6U6m8cnagCwgzaLB9R8f73KDWmV58W3ifHQ9n-Y7sTw@mail.gmail.com>
- <4541F39E5122A64CA8A7F74880F94E5201E89013BD@MBX14.EXCHPROD.USA.NET>
-Message-ID: <CAKPCGKv=ph_KmJ-Lrq20f-cDonJ0kXoC1NAuBr2AHo98ToSnSw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 Feb 2012 15:01:09 +0100
+Subject: How to deal with a PHY configuration related to the board?
+In-Reply-To: <20120214112248.GA20876@game.jcrosoft.org>
+References: <20120214092606.GE4723@ldesroches-Latitude-E6320>
+ <20120214094339.GA4338@sapphire.tkos.co.il>
+ <20120214103318.GF4723@ldesroches-Latitude-E6320>
+ <20120214112248.GA20876@game.jcrosoft.org>
+Message-ID: <4F3A6925.2060601@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 2:19 PM, Van Schaik, Carl <carl@ok-labs.com> wrote:
-> Looks like you are mapping the same page cached to both kernel and user space (at different virtual addresses). With the VIVT cache, the two mappings will hash differently into the cache and access different cache lines. To successfully work like this on a VIVT cache you need to perform a lot of cache maintenance whenever switching from kernel to user. You would likely rather map the page uncached in both kernel and user to save all the effort.
->
+On 02/14/2012 12:22 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 11:33 Tue 14 Feb     , Ludovic Desroches wrote:
+>> Hi Baruch,
+>>
+>> On Tue, Feb 14, 2012 at 11:43:39AM +0200, Baruch Siach wrote:
+>>> Hi Ludovic,
+>>>
+>>> On Tue, Feb 14, 2012 at 10:26:06AM +0100, Ludovic Desroches wrote:
+>>>> I am using a Micrel KSZ9021RN PHY and I would like to configure some 
+>>>> registers
+>>>> as 'RGMII Clock and Control Pad Skew' and 'RGMII RX Data Pad Skew'.
+>>>> So the values of these registers are board dependant and I wondering what is
+>>>> the proper way to set them.
+>>>> It seems there is no platform data usable for this case. Having a quick look
+>>>> to other PHYs, the situation seems the same.
+>>>>
+>>>> Can you give me some clues about how to do this? Did I miss anything which
+>>>> allow to do this?
+>>>
+>>> See ksz9021rn_phy_fixup() in arch/arm/mach-imx/mach-imx6q.c.
+>>>
+>>
+>> Thanks for your help.
+>>
+>> So the solution is to use phy_register_fixup function.
+> dts
 
-This was also our conclusion but we didn't find a way to get the
-memory area uncached for both user and kernel space.
-Can somebody tell me how to do this?
+?
 
-Regards,
-Bart
-> --
-> Carl
->
->> -----Original Message-----
->> From: Bart Jonkers [mailto:jonkersbart at gmail.com]
->> Sent: Tuesday, 14 February 2012 6:46 PM
->> To: linux-arm-kernel at lists.infradead.org
->> Subject: Cache problems in user space - kernel space communication
->>
->> All,
->>
->> I'm experiencing problems in our application where a driver and a user space
->> application performs bi-directional communication through a memory
->> buffer.
->>
->> We are running a 2.6.35.14 kernel on an kirkwood based SoC (Marvell
->> 88F6192):
->> [ ? ?0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE),
->> cr=00053977
->> [ ? ?0.000000] CPU: VIVT data cache, VIVT instruction cache
->>
->> /root> cat /proc/cpuinfo
->> Processor ? ? ? : Feroceon 88FR131 rev 1 (v5l)
->> BogoMIPS ? ? ? ?: 796.44
->> Features ? ? ? ?: swp half thumb fastmult edsp
->> CPU implementer : 0x56
->> CPU architecture: 5TE
->> CPU variant ? ? : 0x2
->> CPU part ? ? ? ?: 0x131
->> CPU revision ? ?: 1
->>
->> The kernel driver allocates some page aligned memory which is memory
->> mapped by the application.
->> The driver put some data in the memory area and informs the application.
->> The application processes the data, changes it and informs the kernel. The
->> kernel then processes the data further and remove it from the buffer.
->>
->> We see that the driver doesn't always see the changes of the application to
->> the data.
->> We see that the changes by the application near the initial kernel data are
->> not seen but if data is added on other places in the buffer which where not
->> accessed earlier by the kernel, the kernel sees the changes.
->> It seems that this area which is not updated in the kernel is the size of a
->> cache line of the L1 cache.
->>
->> In the mailing list archive I have found the following thread:
->> http://lists.arm.linux.org.uk/lurker/message/20091204.112345.0fbed99c.en.
->> html
->> I tried the suggested patch and it solves the problem described in the thread
->> but not our problem.
->> The problem in the thread is communication between two user space
->> programs as ours is between user space and kernel space.
->>
->> I made a small module and application to reproduce the problem (source
->> attached).
->> When it goes wrong i see the following output:
->>
->> [ 1211.827680] Sending packet with counter 0 to user space Received packet
->> from kernel with counter 0 [ 1211.834556] removing packet with counter 0
->>
->> [ 1216.841009]Sending packet with counter 1 to user space Received packet
->> from kernel with counter 1 [ 1216.852027] Value 5 of packet 1 is not equal.
->> [ 1216.857752] Value 6 of packet 1 is not equal.
->> [ 1216.863119] Value 7 of packet 1 is not equal.
->> [ 1216.867478] Value 8 of packet 1 is not equal.
->> [ 1216.871838] Value 9 of packet 1 is not equal.
->> [ 1216.876190] Value 10 of packet 1 is not equal.
->>
->> [ 1221.854343] Sending packet with counter 2 to user space Received packet
->> from kernel with counter 3 [ 1226.873237] removing packet with counter 3 [
->> 1226.878701] Value 5 of packet 3 is not equal.
->> [ 1226.884422] Value 6 of packet 3 is not equal.
->> [ 1226.889796] Value 7 of packet 3 is not equal.
->> [ 1226.894149] Value 8 of packet 3 is not equal.
->> ...
->>
->> The output shows that a part of the data written in user space is not read
->> back successful in kernel space.
->>
->> Regards,
->> Bart
+Can you please build sentences?
+
+(even if I suspect to know what you are talking about ;-))
+
+Bye,
+-- 
+Nicolas Ferre
