@@ -1,55 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2012 22:38:33 +0000
-Subject: [PATCH 00/15] mach/io.h cleanup and removal
-In-Reply-To: <4F3AD806.50402@gmail.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <201202142126.49849.arnd@arndb.de> <4F3AD806.50402@gmail.com>
-Message-ID: <201202142238.33697.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 14 Feb 2012 14:59:33 -0800
+Subject: [PATCH 6/6] arm: omap: pm-debug: enhanced usecount debug support
+In-Reply-To: <20120214202740.GT1426@atomide.com> (Tony Lindgren's message of
+ "Tue, 14 Feb 2012 12:27:40 -0800")
+References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
+ <1329237402-26008-7-git-send-email-t-kristo@ti.com>
+ <20120214202740.GT1426@atomide.com>
+Message-ID: <87fwed58dm.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 February 2012, Rob Herring wrote:
-> > I agree that this is the ideal, but as far as I can tell, we have a
-> > significant amount of functions that are defined in platform specific
-> > code but used in platform specific drivers. E.g. when you have a
-> > piece of code dealing with system management registers in your platform,
-> > that would be used in the cpufreq, irqchip, watchdog and more drivers.
-> 
-> From my quick survey, those categories are really the exception. I would
-> guess platform_data structs is at least half of it. Older platforms seem
-> to be another big chunk.
+Tony Lindgren <tony@atomide.com> writes:
 
-Good to hear. We can certainly take care of the platform data by moving
-it to include/linux/platform_data/*.h and the older platforms can
-usually keep exporting their header files because we won't get them
-to build into the same kernel with other platforms.
+> * Tero Kristo <t-kristo@ti.com> [120214 08:19]:
+>> Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
+>> their own file, 'usecount'. This file shows the usecounts for every
+>> active domain and their children recursively. 'count' file now only
+>> shows power state counts for powerdomains.
+>> 
+>> This patch also provices a way to do printk dumps from kernel code,
+>> by calling the pm_dbg_dump_X functions. The plan is to call these
+>> functions once an error condition is detected, e.g. failed suspend.
+>
+> Why don't you replace this all with a userspace tool that deciphers
+> the registers for you?
 
-> Lack of a common usb phy infrastructure is another example of custom
-> platform functions (tegra usb_phy.h).
+This patch isn't deciphering registers, it's just dumping usecounts, and
+I think that is extremely useful to have in debugfs.
 
-Good point.
+I've already removed all the register dumping from the kernel in the
+hopes that someone will write a userspace tool for that.
 
-> > * Any symbol that is required to be visible in device drivers
-> > gets declared in arch/arm/include/mach-*/*.h, but we are very
-> > careful about adding only the absolute minimum here.
-> 
-> Why not include/linux? Any includes for drivers which are either
-> multiple arches (ahci_platform.h) or multiple ARM machines
-> (linux/amba/pl061.h) are already there. Every platform trying to dump
-> dozens of includes there would certainly get attention and force some
-> clean-up.
-
-I strongly believe that any header file should be as localized as possible:
-
-a) no header, all declarations in the one file using it
-b) header file in local directory
-c) header file in per-platform directory
-d) header file in per-architecture directory
-e) global header file
-
-We need to get rid of category c in order to make cross-platform kernels
-work. Ideally we would move everything into categories a and b, which is
-often possible, but for those cases where it doesn't work the logical step
-is to have it in arch specific code, not global.
-
-	Arnd
+Kevin
