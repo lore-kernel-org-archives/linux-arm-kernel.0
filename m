@@ -1,103 +1,198 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 14 Feb 2012 14:17:48 +0530
-Subject: [PATCH] ARM: OMAP4: cpuidle: Fix the C-state reporting to cpuidle
- governor.
-In-Reply-To: <87haz2gtfw.fsf@ti.com>
-References: <1328521095-24025-1-git-send-email-santosh.shilimkar@ti.com>
- <87haz2gtfw.fsf@ti.com>
-Message-ID: <4F3A1FB4.5010304@ti.com>
+Date: Tue, 14 Feb 2012 14:19:41 +0530
+Subject: [PATCH 2/2] ARM: OMAP4: Move the barrier memboclk_steal() as
+ part of reserve callback
+In-Reply-To: <20120210191926.GV1426@atomide.com>
+References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
+ <1328191435-18652-3-git-send-email-santosh.shilimkar@ti.com>
+ <20120210191926.GV1426@atomide.com>
+Message-ID: <4F3A2025.9000609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 February 2012 04:08 AM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> OMAP4 cpuidle driver is reporting the state requested by governor rather than
->> the actually attempted one.
+On Saturday 11 February 2012 12:49 AM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [120202 05:33]:
+>> arm_memblock_steal() is not suppose to be used outside ->reserve callback.
+>> OMAP barrier errata code was using it outside reserve callback and hence
+>> it was broken.
 >>
->> This is obviously misleading sysfs and powertop cpuidle statistics.
->> Fix it so that stats are reported correctly.
->>
->> Reported-by: Kevin Hilman <khilman@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  arch/arm/mach-omap2/cpuidle44xx.c |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
->> index cfdbb86..f128489 100644
->> --- a/arch/arm/mach-omap2/cpuidle44xx.c
->> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
->> @@ -85,6 +85,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
->>  	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
->>  	if (cpu1_state != PWRDM_POWER_OFF) {
->>  		new_state_idx = drv->safe_state_index;
->> +		index = drv->safe_state_index;
+>> Move the allocation as part of ->reserve callback to fix the it.
 > 
-> How about just get rid of new_state_idx all together and just update
-> index and use it to index in to the states.
-> 
-Make sense. Updated patch below.
+> Please update this to mention again commit that changed things
+> around for arm_memblock_steal() so it's clear why this is needed
+> as a fix.
+
+Sure. Patch with updated change log below.
 
 Regards,
 Santosh
 
->From 939dc3eda7895043c03526110e2a6b41e9861146 Mon Sep 17 00:00:00 2001
+>From 4d1ea22985adfe458275b9ae3e00edc6e41a267f Mon Sep 17 00:00:00 2001
 From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Sun, 5 Feb 2012 13:18:44 +0530
-Subject: [PATCH 2/2] ARM: OMAP4: cpuidle: Fix the C-state reporting to
-cpuidle governor.
+Date: Thu, 2 Feb 2012 15:59:51 +0530
+Subject: [PATCH 1/2] ARM: OMAP4: Move the barrier memboclk_steal() as
+part of reserve callback
 
-OMAP4 cpuidle driver is reporting the state requested by governor rather
-than
-the actually attempted one.
+Commit 716a3dc{ARM: Add arm_memblock_steal() to allocate memory away
+from the kernel} introduced arm_memblock_steal() which lead to
+OMAP4_ERRATA_I688 to be broken and needed to be fixed.
 
-This is obviously misleading sysfs and powertop cpuidle statistics.
-Fix it so that stats are reported correctly.
+arm_memblock_steal() is not suppose to be used outside ->reserve callback.
+OMAP barrier errata code was using it outside reserve callback and hence
+it was broken.
 
-While at this, get rid of new_state_idx, update and use
-index in to the states.
+Move the allocation as part of ->reserve callback to fix the it.
 
-Reported-by: Kevin Hilman <khilman@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/Kconfig                   |    4 ++--
+ arch/arm/mach-omap2/common.h                  |    1 +
+ arch/arm/mach-omap2/io.c                      |    1 +
+ arch/arm/mach-omap2/omap4-common.c            |   25
+++++++++++++++++---------
+ arch/arm/plat-omap/common.c                   |    1 +
+ arch/arm/plat-omap/include/plat/omap-secure.h |    6 ++++++
+ 6 files changed, 27 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c
-b/arch/arm/mach-omap2/cpuidle44xx.c
-index cfdbb86..72e018b 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -65,7 +65,6 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
- 	struct timespec ts_preidle, ts_postidle, ts_idle;
- 	u32 cpu1_state;
- 	int idle_time;
--	int new_state_idx;
- 	int cpu_id = smp_processor_id();
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index d965da4..e20c8ab 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -364,8 +364,8 @@ config OMAP3_SDRC_AC_TIMING
+ 	  going on could result in system crashes;
 
- 	/* Used to keep track of the total time in idle */
-@@ -84,8 +83,8 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
- 	 */
- 	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
- 	if (cpu1_state != PWRDM_POWER_OFF) {
--		new_state_idx = drv->safe_state_index;
--		cx = cpuidle_get_statedata(&dev->states_usage[new_state_idx]);
-+		index = drv->safe_state_index;
-+		cx = cpuidle_get_statedata(&dev->states_usage[index]);
+ config OMAP4_ERRATA_I688
+-	bool "OMAP4 errata: Async Bridge Corruption (BROKEN)"
+-	depends on ARCH_OMAP4 && BROKEN
++	bool "OMAP4 errata: Async Bridge Corruption"
++	depends on ARCH_OMAP4
+ 	select ARCH_HAS_BARRIERS
+ 	help
+ 	  If a data is stalled inside asynchronous bridge because of back
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index febffde..7e9338e 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -132,6 +132,7 @@ void omap3_map_io(void);
+ void am33xx_map_io(void);
+ void omap4_map_io(void);
+ void ti81xx_map_io(void);
++void omap_barriers_init(void);
+
+ /**
+  * omap_test_timeout - busy-loop, testing a condition
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index eb50c29..fb11b44 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -307,6 +307,7 @@ void __init omapam33xx_map_common_io(void)
+ void __init omap44xx_map_common_io(void)
+ {
+ 	iotable_init(omap44xx_io_desc, ARRAY_SIZE(omap44xx_io_desc));
++	omap_barriers_init();
+ }
+ #endif
+
+diff --git a/arch/arm/mach-omap2/omap4-common.c
+b/arch/arm/mach-omap2/omap4-common.c
+index 40a8fbc..ebc5950 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -24,6 +24,7 @@
+
+ #include <plat/irqs.h>
+ #include <plat/sram.h>
++#include <plat/omap-secure.h>
+
+ #include <mach/hardware.h>
+ #include <mach/omap-wakeupgen.h>
+@@ -43,6 +44,9 @@ static void __iomem *sar_ram_base;
+
+ void __iomem *dram_sync, *sram_sync;
+
++static phys_addr_t paddr;
++static u32 size;
++
+ void omap_bus_sync(void)
+ {
+ 	if (dram_sync && sram_sync) {
+@@ -52,18 +56,20 @@ void omap_bus_sync(void)
  	}
+ }
 
- 	if (index > 0)
+-static int __init omap_barriers_init(void)
++/* Steal one page physical memory for barrier implementation */
++int __init omap_barrier_reserve_memblock(void)
+ {
+-	struct map_desc dram_io_desc[1];
+-	phys_addr_t paddr;
+-	u32 size;
+-
+-	if (!cpu_is_omap44xx())
+-		return -ENODEV;
+
+ 	size = ALIGN(PAGE_SIZE, SZ_1M);
+ 	paddr = arm_memblock_steal(size, SZ_1M);
+
++	return 0;
++}
++
++void __init omap_barriers_init(void)
++{
++	struct map_desc dram_io_desc[1];
++
+ 	dram_io_desc[0].virtual = OMAP4_DRAM_BARRIER_VA;
+ 	dram_io_desc[0].pfn = __phys_to_pfn(paddr);
+ 	dram_io_desc[0].length = size;
+@@ -75,9 +81,10 @@ static int __init omap_barriers_init(void)
+ 	pr_info("OMAP4: Map 0x%08llx to 0x%08lx for dram barrier\n",
+ 		(long long) paddr, dram_io_desc[0].virtual);
+
+-	return 0;
+ }
+-core_initcall(omap_barriers_init);
++#else
++void __init omap_barriers_init(void)
++{}
+ #endif
+
+ void __init gic_init_irq(void)
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index 06383b5..4de7d1e 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -69,6 +69,7 @@ void __init omap_reserve(void)
+ 	omap_vram_reserve_sdram_memblock();
+ 	omap_dsp_reserve_sdram_memblock();
+ 	omap_secure_ram_reserve_memblock();
++	omap_barrier_reserve_memblock();
+ }
+
+ void __init omap_init_consistent_dma_size(void)
+diff --git a/arch/arm/plat-omap/include/plat/omap-secure.h
+b/arch/arm/plat-omap/include/plat/omap-secure.h
+index 64f9d1c..0f14fb7 100644
+--- a/arch/arm/plat-omap/include/plat/omap-secure.h
++++ b/arch/arm/plat-omap/include/plat/omap-secure.h
+@@ -10,4 +10,10 @@ static inline void omap_secure_ram_reserve_memblock(void)
+ { }
+ #endif
+
++#ifdef CONFIG_OMAP4_ERRATA_I688
++extern int omap_barrier_reserve_memblock(void);
++#else
++static inline void omap_barrier_reserve_memblock(void)
++{ }
++#endif
+ #endif /* __OMAP_SECURE_H__ */
 -- 
 1.7.4.1
 
-
-
-
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0002-ARM-OMAP4-cpuidle-Fix-the-C-state-reporting-to-cpuid.patch
+Name: 0001-ARM-OMAP4-Move-the-barrier-memboclk_steal-as-part-of.patch
 Type: text/x-patch
-Size: 1620 bytes
+Size: 4978 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120214/ba57035c/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120214/3be0f2a6/attachment.bin>
