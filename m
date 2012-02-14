@@ -1,42 +1,87 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 14 Feb 2012 16:59:05 +0530
-Subject: [PATCH 2/2] ARM: OMAP4: Move the barrier memboclk_steal() as part
- of reserve callback
-In-Reply-To: <20120214111420.GG15338@n2100.arm.linux.org.uk>
-References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
- <1328191435-18652-3-git-send-email-santosh.shilimkar@ti.com>
- <20120210191926.GV1426@atomide.com> <4F3A2025.9000609@ti.com>
- <20120214111420.GG15338@n2100.arm.linux.org.uk>
-Message-ID: <CAMQu2gxRT3X7Q7bg0e-7=3HNKWjfQn7gLw9EQhY=g4U10yDMtg@mail.gmail.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Tue, 14 Feb 2012 11:40:35 +0000
+Subject: [PATCH 02/40] arm: Use set_current_blocked() and block_sigmask()
+In-Reply-To: <1329219673-28711-1-git-send-email-matt@console-pimps.org>
+References: <1329219673-28711-1-git-send-email-matt@console-pimps.org>
+Message-ID: <1329219673-28711-3-git-send-email-matt@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 4:44 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 14, 2012 at 02:19:41PM +0530, Santosh Shilimkar wrote:
->> >From 4d1ea22985adfe458275b9ae3e00edc6e41a267f Mon Sep 17 00:00:00 2001
->> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Date: Thu, 2 Feb 2012 15:59:51 +0530
->> Subject: [PATCH 1/2] ARM: OMAP4: Move the barrier memboclk_steal() as
->> part of reserve callback
->>
->> Commit 716a3dc{ARM: Add arm_memblock_steal() to allocate memory away
->> from the kernel} introduced arm_memblock_steal() which lead to
->> OMAP4_ERRATA_I688 to be broken and needed to be fixed.
->
-> That is misleading. ?Please don't attribute blame for this breakage to
-> that patch, which has nothing to do with introducing the breakage. ?The
-> errata was broken right from the start.
+From: Matt Fleming <matt.fleming@intel.com>
 
-That's right and I didn't mean that way.
-This was the same reason, first patch I just mentioned what was wrong
-in the code
-rather than mention of any commit.
+As described in e6fa16ab ("signal: sigprocmask() should do
+retarget_shared_pending()") the modification of current->blocked is
+incorrect as we need to check for shared signals we're about to block.
 
-Tony,
-Let me know if you want to add any commit history to the change since
-the issue was actually existing without 'arm_memblock_stea()' commit.
-I think, first change log was good enough from the fix point of view.
+Also, use the new helper function introduced in commit 5e6292c0f28f
+("signal: add block_sigmask() for adding sigmask to current->blocked")
+which centralises the code for updating current->blocked after
+successfully delivering a signal and reduces the amount of duplicate
+code across architectures. In the past some architectures got this
+code wrong, so using this helper function should stop that from
+happening again.
 
-Regards
-Santosh
+Cc: Oleg Nesterov <oleg@redhat.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+Cc: Dave Martin <dave.martin@linaro.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Matt Fleming <matt.fleming@intel.com>
+---
+ arch/arm/kernel/signal.c |   24 ++++++++----------------
+ 1 files changed, 8 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 9e617bd..7cb532f 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -66,12 +66,13 @@ const unsigned long syscall_restart_code[2] = {
+  */
+ asmlinkage int sys_sigsuspend(int restart, unsigned long oldmask, old_sigset_t mask)
+ {
+-	mask &= _BLOCKABLE;
+-	spin_lock_irq(&current->sighand->siglock);
++	sigset_t blocked;
++
+ 	current->saved_sigmask = current->blocked;
+-	siginitset(&current->blocked, mask);
+-	recalc_sigpending();
+-	spin_unlock_irq(&current->sighand->siglock);
++
++	mask &= _BLOCKABLE;
++	siginitset(&blocked, mask);
++	set_current_blocked(&blocked);
+ 
+ 	current->state = TASK_INTERRUPTIBLE;
+ 	schedule();
+@@ -280,10 +281,7 @@ static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
+ 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
+ 	if (err == 0) {
+ 		sigdelsetmask(&set, ~_BLOCKABLE);
+-		spin_lock_irq(&current->sighand->siglock);
+-		current->blocked = set;
+-		recalc_sigpending();
+-		spin_unlock_irq(&current->sighand->siglock);
++		set_current_blocked(&set);
+ 	}
+ 
+ 	__get_user_error(regs->ARM_r0, &sf->uc.uc_mcontext.arm_r0, err);
+@@ -636,13 +634,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
+ 	/*
+ 	 * Block the signal if we were successful.
+ 	 */
+-	spin_lock_irq(&tsk->sighand->siglock);
+-	sigorsets(&tsk->blocked, &tsk->blocked,
+-		  &ka->sa.sa_mask);
+-	if (!(ka->sa.sa_flags & SA_NODEFER))
+-		sigaddset(&tsk->blocked, sig);
+-	recalc_sigpending();
+-	spin_unlock_irq(&tsk->sighand->siglock);
++	block_sigmask(ka, sig);
+ 
+ 	return 0;
+ }
+-- 
+1.7.4.4
