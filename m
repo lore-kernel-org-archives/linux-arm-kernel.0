@@ -1,45 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2012 18:20:59 +0000
-Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F41FCB510C@AUSP01VMBX24.collaborationhost.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 14 Feb 2012 13:28:43 -0500 (EST)
+Subject: [PATCH 00/15] mach/io.h cleanup and removal
+In-Reply-To: <201202141757.03748.arnd@arndb.de>
 References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <201202140106.32856.arnd@arndb.de>
- <ADE657CA350FB648AAC2C43247A983F001F41FCB510C@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <201202141821.00192.arnd@arndb.de>
+ <4F39D2EE.80806@gmail.com> <20120214172423.GO1426@atomide.com>
+ <201202141757.03748.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1202141325460.24536@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 February 2012, H Hartley Sweeten wrote:
+On Tue, 14 Feb 2012, Arnd Bergmann wrote:
 
-> outb(v,p)
-> {
->         __iowmb();
->         __raw_writeb(v, /* not sure what happens to the (void)p */ (void __iomem *)0);
-> }
+> On Tuesday 14 February 2012, Tony Lindgren wrote:
+> > Yes should be just the legacy drivers needing this for most part,
+> > so that's currently most of omap1 drivers for us.
+> > 
+> > Anyways I'm using plat/omap-iomap.h for the name, so if somebody
+> > has better ideas for naming to avoid further search and replace
+> > later on, let me know.
+> > 
+> > I guess in the long run we could have
+> > 
+> > #include <mach-omap1/iomap.h>
+> > 
+> > instead of
+> > 
+> > #include <plat/omap-iomap.h>
+> > 
+> > as the plat can't be used for multi-subarch builds.
 > 
-> To me the original one looks more correct. With Rob's change it looks to me like all
-> the in/out macros end up reading/writing to address 0.
+> I think it /could/ be used, we just need to make a definite
+> decision which way we want to go for header files that
+> are defined by a platform and used by code outside of that
+> platform such as device drivers.
+> 
+> The two main approaches that I can see are
+> 
+> a) make every header file name unique for platforms that you want to
+> build together, and just add every path at the compiler command line.
+> Not too much work, but somewhat error prone when you start having
+> file name conflicts.
 
-Correct.
+The preprocessor will happily take the first file that matches in its 
+search path, masking any other files with the same name.  That can 
+become rather confusing.
 
-> I don't get what's happening in Rob's change. Could you enlighten me?
+> b) move all platform specific header files into a directory named after
+> the platform and change all device drivers using this. Lots of work, but
+> probably better in the long run.
 
-This is the version that gets used when you have neither PCI nor ISA/PCMCIA.
+I clearly favor (b).
 
-Ideally we would turn outb into an undefined symbol so that we get a 
-build error if someone tries to create a kernel that uses outb while
-not providing any buses on which it has an effect. Doing that would
-depend on a patch series that I started before but never completed,
-to ensure that we don't actually try to build device drivers with port
-I/O unless we also support one of the buses. The main problem is the 8250
-device driver.
 
-The macro from Rob's version always does a NULL pointer dereference, which
-is still a bug, but much better than having a potential root hole from
-letting (incorrectly built) ISA drivers poke at random addresses.
-
-I guess it would make sense to split this patch into two separate ones,
-one that moves all bogus definitions into a common place, and one that
-changes them to the NULL pointer dereference.
-
-	Arnd
+Nicolas
