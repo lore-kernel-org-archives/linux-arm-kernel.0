@@ -1,63 +1,87 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Feb 2012 12:43:39 -0800
-Subject: [PATCH 00/15] mach/io.h cleanup and removal
-In-Reply-To: <4F3AB8FE.2060704@gmail.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <4F39D2EE.80806@gmail.com> <20120214172423.GO1426@atomide.com>
- <201202141757.03748.arnd@arndb.de> <4F3AB8FE.2060704@gmail.com>
-Message-ID: <20120214204339.GV1426@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 14 Feb 2012 13:52:08 -0700
+Subject: [PATCH v3 2/4] ARM: OMAP2/3: intc: Add DT support for TI
+ interrupt controller
+In-Reply-To: <1329242172-4214-3-git-send-email-b-cousson@ti.com>
+References: <1329242172-4214-1-git-send-email-b-cousson@ti.com>
+ <1329242172-4214-3-git-send-email-b-cousson@ti.com>
+Message-ID: <20120214205208.GA2656@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [120214 11:10]:
-> On 02/14/2012 11:57 AM, Arnd Bergmann wrote:
-> > On Tuesday 14 February 2012, Tony Lindgren wrote:
-> >> Yes should be just the legacy drivers needing this for most part,
-> >> so that's currently most of omap1 drivers for us.
-> >>
-> >> Anyways I'm using plat/omap-iomap.h for the name, so if somebody
-> >> has better ideas for naming to avoid further search and replace
-> >> later on, let me know.
-> >>
-> >> I guess in the long run we could have
-> >>
-> >> #include <mach-omap1/iomap.h>
-> >>
-> >> instead of
-> >>
-> >> #include <plat/omap-iomap.h>
-> >>
-> >> as the plat can't be used for multi-subarch builds.
-> > 
-> > I think it /could/ be used, we just need to make a definite
-> > decision which way we want to go for header files that
-> > are defined by a platform and used by code outside of that
-> > platform such as device drivers.
-> > 
-> > The two main approaches that I can see are
-> > 
-> > a) make every header file name unique for platforms that you want to
-> > build together, and just add every path at the compiler command line.
-> > Not too much work, but somewhat error prone when you start having
-> > file name conflicts.
-> > 
-> > b) move all platform specific header files into a directory named after
-> > the platform and change all device drivers using this. Lots of work, but
-> > probably better in the long run.
-> > 
+On Tue, Feb 14, 2012 at 06:56:10PM +0100, Benoit Cousson wrote:
+> Add a function to initialize the OMAP2/3 interrupt controller (INTC)
+> using a device tree node.
 > 
-> c) Don't allow mach includes in drivers and sound dirs for
-> multi-platform kernels. This is already the case for any multi-arch
-> driver. A lot of the headers are platform_data structs or things that
-> should be cleaned up or need common infrastructure. Some cases I've
-> found seem like the include is unnecessary. Also, just fixing up the
-> name or path is no guarantee of avoiding namespace collisions.
+> This version take advantage of the new irq_domain_add_legacy API.
+> 
+> Replace some printk() with the proper pr_ macro.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++
+>  arch/arm/mach-omap2/common.h                       |   10 +++
+>  arch/arm/mach-omap2/irq.c                          |   59 ++++++++++++++++---
+>  3 files changed, 86 insertions(+), 10 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/intc.txt b/Documentation/devicetree/bindings/arm/omap/intc.txt
+> new file mode 100644
+> index 0000000..f2583e6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/omap/intc.txt
+> @@ -0,0 +1,27 @@
+> +* OMAP Interrupt Controller
+> +
+> +OMAP2/3 are using a TI interrupt controller that can support several
+> +configurable number of interrupts.
+> +
+> +Main node required properties:
+> +
+> +- compatible : should be:
+> +	"ti,omap2-intc"
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The type shall be a <u32> and the value shall be 1.
+> +
+> +  The cell contains the interrupt number in the range [0-128].
+> +- ti,intc-size: Number of interrupts handled by the interrupt controller.
+> +- reg: physical base address and size of the intc registers map.
+> +
+> +Example:
+> +
+> +	intc: interrupt-controller at 1 {
+> +		compatible = "ti,omap2-intc";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		ti,intc-size = <96>;
+> +		reg = <0x48200000 0x1000>;
+> +	};
+> +
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> index febffde..a87ce52 100644
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -174,6 +174,16 @@ void omap3_intc_handle_irq(struct pt_regs *regs);
+>  extern void __iomem *omap4_get_l2cache_base(void);
+>  #endif
+>  
+> +struct device_node;
+> +#ifdef CONFIG_OF
+> +int __init intc_of_init(struct device_node *node, struct device_node *parent);
 
-Out of the three options c) makes most sense for multi-subarch kernels.
-And that avoids having to sort out the name collisions with defines.
+This name is pretty generic for a global symbol.  How about omap2_intc_of_init?
 
-For dealing with legacy platforms, I too would prefer b).
+Otherwise this series looks good.
 
-Regards,
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Tony
+This series need to be committed on top of the irqdomain tree.  I can either
+pick it up myself (with Tony's ack) or I can stabilize the irqdomain/next tree
+so that you can use it as a stable base to commit against (which I should
+probably do anyway since there are others who will depend on it).
+
+g.
