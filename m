@@ -1,404 +1,262 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Tue, 14 Feb 2012 17:28:30 +0000
-Subject: [PATCH v3] ARM: LPC32xx: ADC support
-In-Reply-To: <1329235140-26895-1-git-send-email-stigge@antcom.de>
-References: <1329235140-26895-1-git-send-email-stigge@antcom.de>
-Message-ID: <a05faf3c-9a30-4562-bb86-f4d73b9e240f@email.android.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Feb 2012 17:16:26 +0000
+Subject: [PATCH 13/15] ARM: make mach/io.h include optional
+In-Reply-To: <4F3A7158.2080702@gmail.com>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <201202140804.49026.arnd@arndb.de> <4F3A7158.2080702@gmail.com>
+Message-ID: <201202141716.26930.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 14 February 2012, Rob Herring wrote:
+> On 02/14/2012 02:04 AM, Arnd Bergmann wrote:
+> > On Tuesday 14 February 2012, Rob Herring wrote:
+> > 
+> >> If we use CONFIG_PCI, then we have to move over all PCI enabled
+> >> platforms at once. With a separate kconfig option, then we can move
+> >> platforms one by one. Some are legacy and we may not want to move. This
+> >> also helped with omap, but Tony has now fixed it.
+> > 
+> > We could also generalize the implementation from tegra, which seems
+> > reasonable as a start:
+> > 
+> > 
+> > #define IO_SPACE_LIMIT 0xffff
+> > 
+> > #if defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
+> > #include <mach/io.h>
+> > #elif defined(CONFIG_PCI)
+> > extern void __iomem *pci_io_base;
+> > 
+> > static inline void __iomem *__io(unsigned long addr)
+> > {
+> >         return pci_io_base + (addr & IO_SPACE_LIMIT);
+> 
+> But don't we want a constant pci_io_base? This would certainly be a
+> quicker conversion, but I don't think we want to do it twice.
 
+Yes, at least in the long run. Note that this should make no difference
+at all from a performance point of view, but it does impact code size a bit.
 
-Roland Stigge <stigge@antcom.de> wrote:
+> > }
+> > #else
+> > static inline void __iomem *__io(unsigned long addr)
+> > {
+> >         return NULL;
+> > }
+> > #endif
+> > #define __io(a) __io(a)
+> > 
+> > Out of the platforms supporting PCI right now, we currently have these three classes:
+> > 
+> > 1. portable, but using different virtual addresses:
+> > arch/arm/mach-integrator/include/mach/io.h:#define __io(a)                      ((void __iomem *)(PCI_IO_VADDR + (a)))
+> > arch/arm/mach-ixp23xx/include/mach/io.h:#define __io(p)         ((void __iomem*)((p) + IXP23XX_PCI_IO_VIRT))
+> > arch/arm/mach-ixp2000/include/mach/io.h:#define __io(p)                 ((void __iomem *)((p)+IXP2000_PCI_IO_VIRT_BASE))
+> > arch/arm/mach-shark/include/mach/io.h:#define __io(a)                 ((void __iomem *)(0xe0000000 + (a)))
+> > arch/arm/mach-footbridge/include/mach/io.h:#define __io(a)                      ((void __iomem *)(PCIO_BASE + (a)))
+> > arch/arm/mach-tegra/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
+> > arch/arm/mach-kirkwood/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
+> > arch/arm/mach-dove/include/mach/io.h:#define __io(a)    ((void __iomem *)(((a) - DOVE_PCIE0_IO_BUS_BASE) + \
+> > 
+> > 2. Does not map the I/O space, or does not use it -- I cannot see how
+> >    any of these use PIO based PCI devices at all, probably broken already:
+> > arch/arm/mach-cns3xxx/include/mach/io.h:#define __io(a)                 __typesafe_io(a)
+> > arch/arm/mach-ixp4xx/include/mach/io.h:#define  __io(v)         __typesafe_io(v)
+> > arch/arm/mach-ks8695/include/mach/io.h:#define __io(a)          __typesafe_io(a)
+> > arch/arm/mach-orion5x/include/mach/io.h:#define __io(a)                 __typesafe_io(a)
+> > arch/arm/mach-sa1100/include/mach/io.h:#define __io(a)          __typesafe_io(a)
+> > arch/arm/mach-pxa/include/mach/io.h:#define __io(a)             __typesafe_io(a)
+> > arch/arm/mach-versatile/include/mach/io.h:#define __io(a)               __typesafe_io(a)
+> > 
+> > 3. scary multi-way translation, needs someone to really understand (Nico?, Lennert?)
+> > arch/arm/mach-iop32x/include/mach/io.h:#define __io(p)          ((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
+> > arch/arm/mach-iop33x/include/mach/io.h:#define __io(p)          ((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
+> > arch/arm/mach-iop13xx/include/mach/io.h:#define __io(a) __iop13xx_io(a)
+> > arch/arm/mach-mv78xx0/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
+> > 
+> > I think if we can figure out the third category, this should all become
+> > fairly easy for PCI based platforms.
+> > 
+> 
+> This looks correct AFAICT.
+> 
+> We could just call the 3rd category legacy and move on.
 
->This patch adds a 3-channel ADC driver for the LPC32xx ARM SoC
->
->Signed-off-by: Roland Stigge <stigge@antcom.de>
->
- Acked-by: Jonathan Cameron <jic23@kernel.org> for split version...  send iio part to Greg kh for merge ccing linux-iio. Please check it against staging-next just before you do as that can move fast.
->---
-> arch/arm/mach-lpc32xx/clock.c         |   36 +++++
-> arch/arm/mach-lpc32xx/common.c        |   22 +++
-> arch/arm/mach-lpc32xx/common.h        |    1 
-> arch/arm/mach-lpc32xx/phy3250.c       |    3 
-> drivers/staging/iio/adc/Kconfig       |    9 +
-> drivers/staging/iio/adc/Makefile      |    1 
->drivers/staging/iio/adc/lpc32xx_adc.c |  237
->++++++++++++++++++++++++++++++++++
-> 7 files changed, 309 insertions(+)
->
->--- linux-arm-soc.orig/arch/arm/mach-lpc32xx/clock.c
->+++ linux-arm-soc/arch/arm/mach-lpc32xx/clock.c
->@@ -721,6 +721,41 @@ static struct clk clk_tsc = {
-> 	.get_rate	= local_return_parent_rate,
-> };
-> 
->+static int adc_onoff_enable(struct clk *clk, int enable)
->+{
->+	u32 tmp;
->+	u32 divider;
->+
->+	/* Use PERIPH_CLOCK */
->+	tmp = __raw_readl(LPC32XX_CLKPWR_ADC_CLK_CTRL_1);
->+	tmp |= LPC32XX_CLKPWR_ADCCTRL1_PCLK_SEL;
->+	/*
->+	 * Set clock divider so that we have equal to or less than
->+	 * 4.5MHz clock at ADC
->+	 */
->+	divider = clk->get_rate(clk) / 4500000 + 1;
->+	tmp |= divider;
->+	__raw_writel(tmp, LPC32XX_CLKPWR_ADC_CLK_CTRL_1);
->+
->+	/* synchronize rate of this clock w/ actual HW setting */
->+	clk->rate = clk->get_rate(clk->parent) / divider;
->+
->+	if (enable == 0)
->+		__raw_writel(0, clk->enable_reg);
->+	else
->+		__raw_writel(clk->enable_mask, clk->enable_reg);
->+
->+	return 0;
->+}
->+
->+static struct clk clk_adc = {
->+	.parent		= &clk_pclk,
->+	.enable		= adc_onoff_enable,
->+	.enable_reg	= LPC32XX_CLKPWR_ADC_CLK_CTRL,
->+	.enable_mask	= LPC32XX_CLKPWR_ADC32CLKCTRL_CLK_EN,
->+	.get_rate	= local_return_parent_rate,
->+};
->+
-> static int mmc_onoff_enable(struct clk *clk, int enable)
-> {
-> 	u32 tmp;
->@@ -1055,6 +1090,7 @@ static struct clk_lookup lookups[] = {
-> 	_REGISTER_CLOCK("dev:ssp1", NULL, clk_ssp1)
-> 	_REGISTER_CLOCK("lpc32xx_keys.0", NULL, clk_kscan)
-> 	_REGISTER_CLOCK("lpc32xx-nand.0", "nand_ck", clk_nand)
->+	_REGISTER_CLOCK("lpc32xx-adc", NULL, clk_adc)
-> 	_REGISTER_CLOCK(NULL, "i2s0_ck", clk_i2s0)
-> 	_REGISTER_CLOCK(NULL, "i2s1_ck", clk_i2s1)
-> 	_REGISTER_CLOCK("ts-lpc32xx", NULL, clk_tsc)
->--- linux-arm-soc.orig/arch/arm/mach-lpc32xx/common.c
->+++ linux-arm-soc/arch/arm/mach-lpc32xx/common.c
->@@ -138,6 +138,28 @@ struct platform_device lpc32xx_rtc_devic
-> };
-> 
-> /*
->+ * ADC support
->+ */
->+static struct resource adc_resources[] = {
->+	{
->+		.start = LPC32XX_ADC_BASE,
->+		.end = LPC32XX_ADC_BASE + SZ_4K - 1,
->+		.flags = IORESOURCE_MEM,
->+	}, {
->+		.start = IRQ_LPC32XX_TS_IRQ,
->+		.end = IRQ_LPC32XX_TS_IRQ,
->+		.flags = IORESOURCE_IRQ,
->+	},
->+};
->+
->+struct platform_device lpc32xx_adc_device = {
->+	.name =  "lpc32xx-adc",
->+	.id = -1,
->+	.num_resources = ARRAY_SIZE(adc_resources),
->+	.resource = adc_resources,
->+};
->+
->+/*
->  * Returns the unique ID for the device
->  */
-> void lpc32xx_get_uid(u32 devid[4])
->--- linux-arm-soc.orig/arch/arm/mach-lpc32xx/common.h
->+++ linux-arm-soc/arch/arm/mach-lpc32xx/common.h
->@@ -29,6 +29,7 @@ extern struct platform_device lpc32xx_i2
-> extern struct platform_device lpc32xx_i2c1_device;
-> extern struct platform_device lpc32xx_i2c2_device;
-> extern struct platform_device lpc32xx_tsc_device;
->+extern struct platform_device lpc32xx_adc_device;
-> extern struct platform_device lpc32xx_rtc_device;
-> 
-> /*
->--- linux-arm-soc.orig/arch/arm/mach-lpc32xx/phy3250.c
->+++ linux-arm-soc/arch/arm/mach-lpc32xx/phy3250.c
->@@ -252,6 +252,9 @@ static struct platform_device *phy3250_d
-> 	&lpc32xx_i2c2_device,
-> 	&lpc32xx_watchdog_device,
-> 	&lpc32xx_gpio_led_device,
->+#if defined(CONFIG_LPC32XX_ADC)
->+	&lpc32xx_adc_device,
->+#endif
-> };
-> 
-> static struct amba_device *amba_devs[] __initdata = {
->--- linux-arm-soc.orig/drivers/staging/iio/adc/Kconfig
->+++ linux-arm-soc/drivers/staging/iio/adc/Kconfig
->@@ -193,4 +193,13 @@ config MAX1363_RING_BUFFER
-> 	  Say yes here to include ring buffer support in the MAX1363
-> 	  ADC driver.
-> 
->+config LPC32XX_ADC
->+	tristate "NXP LPC32XX ADC"
->+	depends on ARCH_LPC32XX && !TOUCHSCREEN_LPC32XX
->+	help
->+	  Say yes here to build support for the integrated ADC inside the
->+	  LPC32XX SoC. Note that this feature uses the same hardware as the
->+	  touchscreen driver, so you can only select one of the two drivers
->+	  (lpc32xx_adc or lpc32xx_ts). Provides direct access via sysfs.
->+
-> endmenu
->--- linux-arm-soc.orig/drivers/staging/iio/adc/Makefile
->+++ linux-arm-soc/drivers/staging/iio/adc/Makefile
->@@ -37,3 +37,4 @@ obj-$(CONFIG_AD7192) += ad7192.o
-> obj-$(CONFIG_ADT7310) += adt7310.o
-> obj-$(CONFIG_ADT7410) += adt7410.o
-> obj-$(CONFIG_AD7280) += ad7280a.o
->+obj-$(CONFIG_LPC32XX_ADC) += lpc32xx_adc.o
->--- /dev/null
->+++ linux-arm-soc/drivers/staging/iio/adc/lpc32xx_adc.c
->@@ -0,0 +1,237 @@
->+/*
->+ *  lpc32xx_adc.c - Support for ADC in LPC32XX
->+ *
->+ *  3-channel, 10-bit ADC
->+ *
->+ *  Copyright (C) 2011, 2012 Roland Stigge <stigge@antcom.de>
->+ *
->+ *  This program is free software; you can redistribute it and/or
->modify
->+ *  it under the terms of the GNU General Public License as published
->by
->+ *  the Free Software Foundation; either version 2 of the License, or
->+ *  (at your option) any later version.
->+ *
->+ *  This program is distributed in the hope that it will be useful,
->+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
->+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->+ *  GNU General Public License for more details.
->+ *
->+ *  You should have received a copy of the GNU General Public License
->+ *  along with this program; if not, write to the Free Software
->+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
->+ */
->+
->+#include <linux/module.h>
->+#include <linux/platform_device.h>
->+#include <linux/interrupt.h>
->+#include <linux/device.h>
->+#include <linux/kernel.h>
->+#include <linux/slab.h>
->+#include <linux/io.h>
->+#include <linux/clk.h>
->+#include <linux/err.h>
->+#include <linux/completion.h>
->+
->+#include "../iio.h"
->+#include "../sysfs.h"
->+
->+/*
->+ * LPC32XX registers definitions
->+ */
->+#define LPC32XX_ADC_SELECT(x)	((x) + 0x04)
->+#define LPC32XX_ADC_CTRL(x)	((x) + 0x08)
->+#define LPC32XX_ADC_VALUE(x)	((x) + 0x48)
->+
->+/* Bit definitions for LPC32XX_ADC_SELECT: */
->+#define AD_REFm         0x00000200 /* constant, always write this
->value! */
->+#define AD_REFp		0x00000080 /* constant, always write this value! */
->+#define AD_IN		0x00000010 /* multiple of this is the */
->+				   /* channel number: 0, 1, 2 */
->+#define AD_INTERNAL	0x00000004 /* constant, always write this value!
->*/
->+
->+/* Bit definitions for LPC32XX_ADC_CTRL: */
->+#define AD_STROBE	0x00000002
->+#define AD_PDN_CTRL	0x00000004
->+
->+/* Bit definitions for LPC32XX_ADC_VALUE: */
->+#define ADC_VALUE_MASK	0x000003FF
->+
->+#define MOD_NAME "lpc32xx-adc"
->+
->+struct lpc32xx_adc_info {
->+	void __iomem *adc_base;
->+	struct clk *clk;
->+	struct completion completion;
->+
->+	u32 value;
->+};
->+
->+static int lpc32xx_read_raw(struct iio_dev *indio_dev,
->+				struct iio_chan_spec const *chan,
->+				int *val,
->+				int *val2,
->+				long mask)
->+{
->+	struct lpc32xx_adc_info *info = iio_priv(indio_dev);
->+
->+	if (mask == 0) {
->+		mutex_lock(&indio_dev->mlock);
->+		clk_enable(info->clk);
->+		/* Measurement setup */
->+		__raw_writel(AD_INTERNAL | (chan->address) | AD_REFp | AD_REFm,
->+			LPC32XX_ADC_SELECT(info->adc_base));
->+		/* Trigger conversion */
->+		__raw_writel(AD_PDN_CTRL | AD_STROBE,
->+			LPC32XX_ADC_CTRL(info->adc_base));
->+		wait_for_completion(&info->completion); /* set by ISR */
->+		clk_disable(info->clk);
->+		*val = info->value;
->+		mutex_unlock(&indio_dev->mlock);
->+
->+		return IIO_VAL_INT;
->+	}
->+
->+	return -EINVAL;
->+}
->+
->+static const struct iio_info lpc32xx_adc_iio_info = {
->+	.read_raw = &lpc32xx_read_raw,
->+	.driver_module = THIS_MODULE,
->+};
->+
->+#define LPC32XX_ADC_CHANNEL(_index) {		\
->+	.type = IIO_VOLTAGE,			\
->+	.indexed = 1,				\
->+	.channel = _index,			\
->+	.address = AD_IN * _index,		\
->+	.scan_index = _index,			\
->+}
->+
->+static struct iio_chan_spec lpc32xx_adc_iio_channels[] = {
->+	LPC32XX_ADC_CHANNEL(0),
->+	LPC32XX_ADC_CHANNEL(1),
->+	LPC32XX_ADC_CHANNEL(2),
->+};
->+
->+static irqreturn_t lpc32xx_adc_isr(int irq, void *dev_id)
->+{
->+	struct lpc32xx_adc_info *info = (struct lpc32xx_adc_info *) dev_id;
->+
->+	/* Read value and clear irq */
->+	info->value = __raw_readl(LPC32XX_ADC_VALUE(info->adc_base)) &
->+				ADC_VALUE_MASK;
->+	complete(&info->completion);
->+
->+	return IRQ_HANDLED;
->+}
->+
->+static int __devinit lpc32xx_adc_probe(struct platform_device *pdev)
->+{
->+	struct lpc32xx_adc_info *info = NULL;
->+	struct resource *res;
->+	int retval = -ENODEV;
->+	struct iio_dev *iodev = NULL;
->+	int irq;
->+
->+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->+	if (!res) {
->+		dev_err(&pdev->dev, "failed to get platform I/O memory\n");
->+		retval = -EBUSY;
->+		goto errout1;
->+	}
->+
->+	iodev = iio_allocate_device(sizeof(struct lpc32xx_adc_info));
->+	if (!iodev) {
->+		dev_err(&pdev->dev, "failed allocating iio device\n");
->+		retval = -ENOMEM;
->+		goto errout1;
->+	}
->+
->+	info = iio_priv(iodev);
->+
->+	info->adc_base = ioremap(res->start, res->end - res->start + 1);
->+	if (!info->adc_base) {
->+		dev_err(&pdev->dev, "failed mapping memory\n");
->+		retval = -EBUSY;
->+		goto errout2;
->+	}
->+
->+	info->clk = clk_get(&pdev->dev, NULL);
->+	if (IS_ERR(info->clk)) {
->+		dev_err(&pdev->dev, "failed getting clock\n");
->+		goto errout3;
->+	}
->+
->+	irq = platform_get_irq(pdev, 0);
->+	if ((irq < 0) || (irq >= NR_IRQS)) {
->+		dev_err(&pdev->dev, "failed getting interrupt resource\n");
->+		retval = -EINVAL;
->+		goto errout4;
->+	}
->+
->+	retval = request_irq(irq, lpc32xx_adc_isr, 0, MOD_NAME, info);
->+	if (retval < 0) {
->+		dev_err(&pdev->dev, "failed requesting interrupt\n");
->+		goto errout4;
->+	}
->+
->+	platform_set_drvdata(pdev, iodev);
->+
->+	init_completion(&info->completion);
->+
->+	iodev->name = MOD_NAME;
->+	iodev->dev.parent = &pdev->dev;
->+	iodev->info = &lpc32xx_adc_iio_info;
->+	iodev->modes = INDIO_DIRECT_MODE;
->+	iodev->channels = lpc32xx_adc_iio_channels;
->+	iodev->num_channels = ARRAY_SIZE(lpc32xx_adc_iio_channels);
->+
->+	retval = iio_device_register(iodev);
->+	if (retval)
->+		goto errout5;
->+
->+	dev_info(&pdev->dev, "LPC32XX ADC driver loaded, IRQ %d\n", irq);
->+
->+	return 0;
->+
->+errout5:
->+	free_irq(irq, iodev);
->+errout4:
->+	clk_put(info->clk);
->+errout3:
->+	iounmap(info->adc_base);
->+errout2:
->+	iio_free_device(iodev);
->+errout1:
->+	return retval;
->+}
->+
->+static int __devexit lpc32xx_adc_remove(struct platform_device *pdev)
->+{
->+	struct iio_dev *iodev = platform_get_drvdata(pdev);
->+	struct lpc32xx_adc_info *info = iio_priv(iodev);
->+	int irq = platform_get_irq(pdev, 0);
->+
->+	iio_device_unregister(iodev);
->+	free_irq(irq, iodev);
->+	platform_set_drvdata(pdev, NULL);
->+	clk_put(info->clk);
->+	iounmap(info->adc_base);
->+	iio_free_device(iodev);
->+
->+	return 0;
->+}
->+
->+static struct platform_driver lpc32xx_adc_driver = {
->+	.probe		= lpc32xx_adc_probe,
->+	.remove		= __devexit_p(lpc32xx_adc_remove),
->+	.driver		= {
->+		.name	= MOD_NAME,
->+		.owner	= THIS_MODULE,
->+	},
->+};
->+
->+module_platform_driver(lpc32xx_adc_driver);
->+
->+MODULE_AUTHOR("Roland Stigge <stigge@antcom.de>");
->+MODULE_DESCRIPTION("LPC32XX ADC driver");
->+MODULE_LICENSE("GPL");
+I'm not ready to give up that fast. The platforms seem to be implemented
+reasonably well compared to category 2, but they can't be converted in
+a completely mechanical way. The patch below should put iop13xx it into
+category 1, but it really needs testing and review by a person who
+understands that platform. I can also take a look at the others if we
+agree that this is the right approach.
 
--- 
-Sent from my Android phone with K-9 Mail. Please excuse my brevity.
+When we have all platforms done in that way, we can move the virtual
+mapping base to a fixed location.
+
+8<--------------
+[PATCH] iop13xx: use more regular PCI I/O space handling
+
+iop13xx confuses I/O port numbers with physical addresses, which breaks
+legacy ISA I/O access behind PCI bridges and makes it unnecessarily hard
+to unify the inb/outb accessors with other platforms. This removes the
+special-casing and just puts all I/O ports into a single 128KB virtually
+mapped I/O port range starting at port zero.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-iop13xx/include/mach/io.h      |    6 +++-
+ arch/arm/mach-iop13xx/include/mach/iop13xx.h |   12 ++--------
+ arch/arm/mach-iop13xx/io.c                   |   27 --------------------------
+ arch/arm/mach-iop13xx/pci.c                  |   12 +++++-----
+ 4 files changed, 13 insertions(+), 44 deletions(-)
+
+diff --git a/arch/arm/mach-iop13xx/include/mach/io.h b/arch/arm/mach-iop13xx/include/mach/io.h
+index dffb234..90bb7df 100644
+--- a/arch/arm/mach-iop13xx/include/mach/io.h
++++ b/arch/arm/mach-iop13xx/include/mach/io.h
+@@ -19,9 +19,11 @@
+ #ifndef __ASM_ARM_ARCH_IO_H
+ #define __ASM_ARM_ARCH_IO_H
+ 
+-#define IO_SPACE_LIMIT 0xffffffff
++#include <mach/iop13xx.h>
+ 
+-#define __io(a) __iop13xx_io(a)
++#define IO_SPACE_LIMIT (IOP13XX_PCIE_IO_WINDOW_SIZE + IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
++
++#define __io(a) (IOP13XX_PCIX_LOWER_IO_VA + ((a) & IO_SPACE_LIMIT))
+ #define __mem_pci(a) (a)
+ #define __mem_isa(a) (a)
+ 
+diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+index 07e9ff7..ee1dfd2 100644
+--- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
++++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
+@@ -68,17 +68,15 @@ extern unsigned long get_iop_tick_rate(void);
+  * 0x8000.0000 + 928M	0x2.8000.0000   (ioremap)	PCIE outbound memory window
+  *
+  * IO MAP
+- * 0x1000 + 64K	0x0.fffb.1000	0xfec6.1000	PCIX outbound i/o window
++ * 0x1000 + 64K	0x0.fffb.1000	0xfed6.1000	PCIX outbound i/o window
+  * 0x1000 + 64K	0x0.fffd.1000	0xfed7.1000	PCIE outbound i/o window
+  */
+ #define IOP13XX_PCIX_IO_WINDOW_SIZE   0x10000UL
+ #define IOP13XX_PCIX_LOWER_IO_PA      0xfffb0000UL
+-#define IOP13XX_PCIX_LOWER_IO_VA      0xfec60000UL
++#define IOP13XX_PCIX_LOWER_IO_VA      0xfed60000UL
+ #define IOP13XX_PCIX_LOWER_IO_BA      0x0UL /* OIOTVR */
+ #define IOP13XX_PCIX_IO_BUS_OFFSET    0x1000UL
+-#define IOP13XX_PCIX_UPPER_IO_PA      (IOP13XX_PCIX_LOWER_IO_PA +\
+-				       IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
+-#define IOP13XX_PCIX_UPPER_IO_VA      (IOP13XX_PCIX_LOWER_IO_VA +\
++#define IOP13XX_PCIX_UPPER_IO_BA      (IOP13XX_PCIX_LOWER_IO_BA +\
+ 				       IOP13XX_PCIX_IO_WINDOW_SIZE - 1)
+ #define IOP13XX_PCIX_IO_PHYS_TO_VIRT(addr) (u32) ((u32) addr -\
+ 					   (IOP13XX_PCIX_LOWER_IO_PA\
+@@ -107,10 +105,6 @@ extern unsigned long get_iop_tick_rate(void);
+ #define IOP13XX_PCIE_LOWER_IO_VA      	 0xfed70000UL
+ #define IOP13XX_PCIE_LOWER_IO_BA      	 0x0UL  /* OIOTVR */
+ #define IOP13XX_PCIE_IO_BUS_OFFSET	 0x1000UL
+-#define IOP13XX_PCIE_UPPER_IO_PA      	 (IOP13XX_PCIE_LOWER_IO_PA +\
+-					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
+-#define IOP13XX_PCIE_UPPER_IO_VA      	 (IOP13XX_PCIE_LOWER_IO_VA +\
+-					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
+ #define IOP13XX_PCIE_UPPER_IO_BA      	 (IOP13XX_PCIE_LOWER_IO_BA +\
+ 					 IOP13XX_PCIE_IO_WINDOW_SIZE - 1)
+ #define IOP13XX_PCIE_IO_PHYS_TO_VIRT(addr) (u32) ((u32) addr -\
+diff --git a/arch/arm/mach-iop13xx/io.c b/arch/arm/mach-iop13xx/io.c
+index 48642e6..7a1ab4d 100644
+--- a/arch/arm/mach-iop13xx/io.c
++++ b/arch/arm/mach-iop13xx/io.c
+@@ -21,25 +21,6 @@
+ #include <linux/io.h>
+ #include <mach/hardware.h>
+ 
+-void * __iomem __iop13xx_io(unsigned long io_addr)
+-{
+-	void __iomem * io_virt;
+-
+-	switch (io_addr) {
+-	case IOP13XX_PCIE_LOWER_IO_PA ... IOP13XX_PCIE_UPPER_IO_PA:
+-		io_virt = (void *) IOP13XX_PCIE_IO_PHYS_TO_VIRT(io_addr);
+-		break;
+-	case IOP13XX_PCIX_LOWER_IO_PA ... IOP13XX_PCIX_UPPER_IO_PA:
+-		io_virt = (void *) IOP13XX_PCIX_IO_PHYS_TO_VIRT(io_addr);
+-		break;
+-	default:
+-		BUG();
+-	}
+-
+-	return io_virt;
+-}
+-EXPORT_SYMBOL(__iop13xx_io);
+-
+ void * __iomem __iop13xx_ioremap(unsigned long cookie, size_t size,
+ 	unsigned int mtype)
+ {
+@@ -65,12 +46,6 @@ void * __iomem __iop13xx_ioremap(unsigned long cookie, size_t size,
+ 				       (cookie - IOP13XX_PBI_LOWER_MEM_RA),
+ 				       size, mtype, __builtin_return_address(0));
+ 		break;
+-	case IOP13XX_PCIE_LOWER_IO_PA ... IOP13XX_PCIE_UPPER_IO_PA:
+-		retval = (void *) IOP13XX_PCIE_IO_PHYS_TO_VIRT(cookie);
+-		break;
+-	case IOP13XX_PCIX_LOWER_IO_PA ... IOP13XX_PCIX_UPPER_IO_PA:
+-		retval = (void *) IOP13XX_PCIX_IO_PHYS_TO_VIRT(cookie);
+-		break;
+ 	case IOP13XX_PMMR_PHYS_MEM_BASE ... IOP13XX_PMMR_UPPER_MEM_PA:
+ 		retval = (void *) IOP13XX_PMMR_PHYS_TO_VIRT(cookie);
+ 		break;
+@@ -100,8 +75,6 @@ void __iop13xx_iounmap(void __iomem *addr)
+ 		    goto skip;
+ 
+ 	switch ((u32) addr) {
+-	case IOP13XX_PCIE_LOWER_IO_VA ... IOP13XX_PCIE_UPPER_IO_VA:
+-	case IOP13XX_PCIX_LOWER_IO_VA ... IOP13XX_PCIX_UPPER_IO_VA:
+ 	case IOP13XX_PMMR_VIRT_MEM_BASE ... IOP13XX_PMMR_UPPER_MEM_VA:
+ 		goto skip;
+ 	}
+diff --git a/arch/arm/mach-iop13xx/pci.c b/arch/arm/mach-iop13xx/pci.c
+index b8f5a87..d72eddf 100644
+--- a/arch/arm/mach-iop13xx/pci.c
++++ b/arch/arm/mach-iop13xx/pci.c
+@@ -1042,8 +1042,8 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ 				  << IOP13XX_ATUX_PCIXSR_FUNC_NUM;
+ 		__raw_writel(pcixsr, IOP13XX_ATUX_PCIXSR);
+ 
+-		res[0].start = IOP13XX_PCIX_LOWER_IO_PA + IOP13XX_PCIX_IO_BUS_OFFSET;
+-		res[0].end   = IOP13XX_PCIX_UPPER_IO_PA;
++		res[0].start = IOP13XX_PCIX_LOWER_IO_BA + IOP13XX_PCIX_IO_BUS_OFFSET;
++		res[0].end   = IOP13XX_PCIX_UPPER_IO_BA;
+ 		res[0].name  = "IQ81340 ATUX PCI I/O Space";
+ 		res[0].flags = IORESOURCE_IO;
+ 
+@@ -1052,7 +1052,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ 		res[1].name  = "IQ81340 ATUX PCI Memory Space";
+ 		res[1].flags = IORESOURCE_MEM;
+ 		sys->mem_offset = IOP13XX_PCIX_MEM_OFFSET;
+-		sys->io_offset = IOP13XX_PCIX_LOWER_IO_PA;
++		sys->io_offset = IOP13XX_PCIX_LOWER_IO_BA;
+ 		break;
+ 	case IOP13XX_INIT_ATU_ATUE:
+ 		/* Note: the function number field in the PCSR is ro */
+@@ -1063,8 +1063,8 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ 
+ 		__raw_writel(pcsr, IOP13XX_ATUE_PCSR);
+ 
+-		res[0].start = IOP13XX_PCIE_LOWER_IO_PA + IOP13XX_PCIE_IO_BUS_OFFSET;
+-		res[0].end   = IOP13XX_PCIE_UPPER_IO_PA;
++		res[0].start = IOP13XX_PCIE_LOWER_IO_BA + IOP13XX_PCIE_IO_BUS_OFFSET;
++		res[0].end   = IOP13XX_PCIE_UPPER_IO_BA;
+ 		res[0].name  = "IQ81340 ATUE PCI I/O Space";
+ 		res[0].flags = IORESOURCE_IO;
+ 
+@@ -1073,7 +1073,7 @@ int iop13xx_pci_setup(int nr, struct pci_sys_data *sys)
+ 		res[1].name  = "IQ81340 ATUE PCI Memory Space";
+ 		res[1].flags = IORESOURCE_MEM;
+ 		sys->mem_offset = IOP13XX_PCIE_MEM_OFFSET;
+-		sys->io_offset = IOP13XX_PCIE_LOWER_IO_PA;
++		sys->io_offset = IOP13XX_PCIE_LOWER_IO_BA;
+ 		sys->map_irq = iop13xx_pcie_map_irq;
+ 		break;
+ 	default:
