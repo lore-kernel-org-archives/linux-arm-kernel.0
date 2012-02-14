@@ -1,31 +1,35 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 14 Feb 2012 11:22:04 +0800
-Subject: [PATCH] mtd/gpmi : fix compiler warning
-Message-ID: <1329189724-26100-1-git-send-email-b32955@freescale.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Feb 2012 21:20:14 -0600
+Subject: [PATCH 00/15] mach/io.h cleanup and removal
+In-Reply-To: <20120213234109.GJ1426@atomide.com>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <20120213234109.GJ1426@atomide.com>
+Message-ID: <4F39D2EE.80806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpmi driver selects the MTD_CMDLINE_PARTS directly.
-But we should not select a visible symbol.
+On 02/13/2012 05:41 PM, Tony Lindgren wrote:
+> * Rob Herring <robherring2@gmail.com> [120213 13:12]:
+>>  arch/arm/mach-at91/include/mach/at91_io.h         |   44 +++++++++++++++++
+>>  arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |    2 +
+>>  arch/arm/mach-at91/include/mach/at91sam9_sdramc.h |    2 +
+> ...
+>>  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h   |    6 ++
+>>  arch/arm/mach-msm/include/mach/msm_iomap-7x30.h   |    4 ++
+>>  arch/arm/mach-msm/include/mach/msm_iomap-8960.h   |    4 ++
+>>  arch/arm/mach-msm/include/mach/msm_iomap-8x50.h   |    4 ++
+>>  arch/arm/mach-msm/include/mach/msm_iomap-8x60.h   |    4 ++
+> ...
+> 
+> Considering the naming above..
+> 
+>>  arch/arm/mach-tegra/include/mach/iomap.h          |   48 ++++++++++++++++++
+> 
+> ..should this be called tegra-iomap.h instead?
 
-Just remove the select.
+Probably, but it's not a new header. Fixing include paths or names is a
+separate problem when we start having multiple mach include directories.
+Perhaps we can get them removed altogether before we have to start
+renaming. Much of it is device addresses that will go in dts files.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- drivers/mtd/nand/Kconfig |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 2474733..7612eae 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -440,7 +440,6 @@ config MTD_NAND_NANDSIM
- config MTD_NAND_GPMI_NAND
-         bool "GPMI NAND Flash Controller driver"
-         depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28)
--	select MTD_CMDLINE_PARTS
-         help
- 	 Enables NAND Flash support for IMX23 or IMX28.
- 	 The GPMI controller is very powerful, with the help of BCH
--- 
-1.7.0.4
+Rob
