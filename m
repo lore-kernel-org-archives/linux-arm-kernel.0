@@ -1,41 +1,44 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 14 Feb 2012 22:11:32 +0100
-Subject: [PATCH 1/2] ARM: OMAP4: cminst: Add boot time __init function for
- cminst
-In-Reply-To: <1329233348-23356-2-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Tue, 14 Feb 2012 20:59:07 +0530")
-References: <1329233348-23356-1-git-send-email-hvaibhav@ti.com>
- <1329233348-23356-2-git-send-email-hvaibhav@ti.com>
-Message-ID: <87bop1unln.fsf@macbook.be.48ers.dk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Feb 2012 21:26:49 +0000
+Subject: [PATCH 00/15] mach/io.h cleanup and removal
+In-Reply-To: <20120214204339.GV1426@atomide.com>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <4F3AB8FE.2060704@gmail.com> <20120214204339.GV1426@atomide.com>
+Message-ID: <201202142126.49849.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Vaibhav" == Vaibhav Hiremath <hvaibhav@ti.com> writes:
+On Tuesday 14 February 2012, Tony Lindgren wrote:
+> > c) Don't allow mach includes in drivers and sound dirs for
+> > multi-platform kernels. This is already the case for any multi-arch
+> > driver. A lot of the headers are platform_data structs or things that
+> > should be cleaned up or need common infrastructure. Some cases I've
+> > found seem like the include is unnecessary. Also, just fixing up the
+> > name or path is no guarantee of avoiding namespace collisions.
+> 
+> Out of the three options c) makes most sense for multi-subarch kernels.
+> And that avoids having to sort out the name collisions with defines.
 
- Vaibhav> AM33xx CM module is closer to OMAP4 CM module, and
- Vaibhav> in order to reuse cminst api's we have to address
- Vaibhav> some of the differences like, base addresses and partitions.
- Vaibhav> Unlike OMAP4 CM, AM33xx doesn't have any partitions and
- Vaibhav> maintains only single partition.
+I agree that this is the ideal, but as far as I can tell, we have a
+significant amount of functions that are defined in platform specific
+code but used in platform specific drivers. E.g. when you have a
+piece of code dealing with system management registers in your platform,
+that would be used in the cpufreq, irqchip, watchdog and more drivers.
 
- Vaibhav> So, in order to reuse the existing OMAP4 cminst code
- Vaibhav> for AM33xx this patch adds,
+There has to be some place where we can put function declarations
+for stuff like this, while at the same time we should try to minimise
+the amount that is required.
 
- Vaibhav>   - Boot time __init function, to initialize _cm_bases
- Vaibhav>     based on cpu_is_xxx
- Vaibhav>   - Instead of maintaining phy addr for CM partition
- Vaibhav>     in _cm_bases[] table and then changing it to virt addr,
- Vaibhav>     directly maintain respective virt addr.
+> For dealing with legacy platforms, I too would prefer b).
 
- Vaibhav> @@ -103,19 +106,19 @@ static bool _is_module_ready(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
- Vaibhav>  /* Read a register in a CM instance */
- Vaibhav>  u32 omap4_cminst_read_inst_reg(u8 part, s16 inst, u16 idx)
- Vaibhav>  {
- Vaibhav> -	BUG_ON(part >= OMAP4_MAX_PRCM_PARTITIONS ||
- Vaibhav> +	BUG_ON(part >= max_cm_partitions ||
- Vaibhav>  	       part == OMAP4430_INVALID_PRCM_PARTITION ||
+How about this:
 
-How about dropping the OMAP4430_ prefix here as it's no longer 4430 specific?
+* We stop providing arch/arm/{mach,plat}-*/include/ to C files
+outside of arch/arm/{mach,plat}-* when CONFIG_MULTIPLATFORM is
+enabled.
 
--- 
-Bye, Peter Korsgaard
+* Any symbol that is required to be visible in device drivers
+gets declared in arch/arm/include/mach-*/*.h, but we are very
+careful about adding only the absolute minimum here.
+
+	Arnd
