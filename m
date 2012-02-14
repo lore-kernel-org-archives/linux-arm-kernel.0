@@ -1,56 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Feb 2012 23:43:13 +0000
-Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <4F3AE98D.7030104@gmail.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <201202140804.49026.arnd@arndb.de> <4F3A7158.2080702@gmail.com>
- <201202141716.26930.arnd@arndb.de>
- <20120214174035.GA29765@n2100.arm.linux.org.uk> <4F3AE98D.7030104@gmail.com>
-Message-ID: <20120214234313.GD29765@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 14 Feb 2012 21:48:33 -0200
+Subject: [PATCH] ARM: mach-pcm038: Fix field name of regulator_consumer_supply
+ struct
+Message-ID: <1329263313-5014-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 05:09:01PM -0600, Rob Herring wrote:
-> What about something like this:
-> 
-> io.h:
-> #define PCI_IO_VIRT_BASE 0xfef00000
-> 
-> arch/arm/common/pci.c (new file):
-> static struct map_desc pci_io_desc[] __initdata = {
-> 	{
-> 		.virtual	= PCI_IO_VIRT_BASE,
-> 		.pfn		= 0,
-> 		.length		= SZ_1M,
-> 		.type		= MT_DEVICE,
-> 	},
-> };
-> 
-> void __init pci_map_io(unsigned long paddr)
-> {
-> 	pci_io_desc[0].pfn = __phys_to_pfn(paddr);
-> 	iotable_init(pci_io_desc, ARRAY_SIZE(pci_io_desc));
-> }
-> 
-> 
-> This is using the last 1MB of vmalloc region. This may require some
-> adjustment of platform's static memory, but most PCI platforms I've
-> checked don't use this address, so it shouldn't be too painful.
+Building imx_v4_v5_defconfig generates the following error:
 
-Yes, something like that.  There's arch/arm/kernel/isa.c which could
-take this, which only a few platforms use (it allows glibc inb() etc
-to work.)
+arch/arm/mach-imx/mach-pcm038.c:236: error: unknown field 'dev' specified in initializer
+make[1]: *** [arch/arm/mach-imx/mach-pcm038.o] Error 1
 
-> orion5x maps 2 1MB regions for PCI and PCIE. How would you support 2 io
-> ranges?
+Fix it by providing the correct "dev_name" field name.
 
-That's not the only platform which effectively has two IO ranges.  The
-PCMCIA sockets on SA11x0 and probably PXA both have their own separate
-IO region.  Arnd's idea for this was to map 32k from one and 32k from
-the other into a single 64k space, and adapt soc_common to cope.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-pcm038.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> BTW, I noticed some static mappings at 0xffxxxxxx. Are those even a
-> valid address?
-
-Nothing invalid about them as such, but I have tried to discourage their
-use in case we decide that we want to go for a default 14MB DMA region.
+diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
+index 16f126d..2f3debe 100644
+--- a/arch/arm/mach-imx/mach-pcm038.c
++++ b/arch/arm/mach-imx/mach-pcm038.c
+@@ -233,7 +233,7 @@ static struct regulator_init_data sdhc1_data = {
+ 
+ static struct regulator_consumer_supply cam_consumers[] = {
+ 	{
+-		.dev	= NULL,
++		.dev_name = NULL,
+ 		.supply	= "imx_cam_vcc",
+ 	},
+ };
+-- 
+1.7.1
