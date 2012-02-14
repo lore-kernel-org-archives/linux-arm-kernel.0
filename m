@@ -1,61 +1,42 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 14 Feb 2012 15:20:46 -0800
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <20120211144530.GA497@elte.hu>
-References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
- <20120208202314.GA28290@redhat.com> <1328736834.2903.33.camel@pasglop>
- <20120209075106.GB18387@elte.hu> <4F35DD3E.4020406@codeaurora.org>
- <20120211144530.GA497@elte.hu>
-Message-ID: <4F3AEC4E.9000303@codeaurora.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 14 Feb 2012 15:21:52 -0800
+Subject: [PATCH] Optimize multi-CPU tlb flushing a little more
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178FACB6D7@HQMAIL01.nvidia.com>
+References: <20110823110602.GG19622@n2100.arm.linux.org.uk>
+ <CAH+eYFC_mkdObV0NfN5Jtv0L6fM9e0YGOBghTEVSqf=TAFxdXw@mail.gmail.com>
+ <20120213162359.GC25655@n2100.arm.linux.org.uk>
+ <20120213165926.GA24426@debian>
+ <74CDBE0F657A3D45AFBB94109FB122FF178FACB6A1@HQMAIL01.nvidia.com>
+ <20120214222354.GB29765@n2100.arm.linux.org.uk>
+ <74CDBE0F657A3D45AFBB94109FB122FF178FACB6D7@HQMAIL01.nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178FACB70B@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Russell,
 
-On 02/11/2012 06:45 AM, Ingo Molnar wrote:
->
-> * Saravana Kannan<skannan@codeaurora.org>  wrote:
->
->> When you say accommodate all hardware, does it mean we will
->> keep around CPUfreq and allow attempts at improving it? Or we
->> will completely move to scheduler based CPU freq scaling, but
->> won't try to force atomicity? Say, may be queue up a
->> notification to a CPU driver to scale up the frequency as soon
->> as it can?
->
-> I don't think we should (or even could) force atomicity - we
-> adapt to whatever the hardware can do.
+One more query about the original patch; in the following chunk:
 
-May be I misread the emails from Peter and you, but it sounded like the 
-idea being proposed was to directly do a freq change from the scheduler. 
-That would force the freq change API to be atomic (if it can be 
-implemented is another issue). That's what I was referring to when I 
-loosely used the terms "force atomicity".
+@@ -491,15 +471,11 @@ static inline void clean_pmd_entry(void *pmd)
+ {
+        const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+-       if (tlb_flag(TLB_DCLEAN))
+-               asm("mcr        p15, 0, %0, c7, c10, 1  @ flush_pmd"
+-                       : : "r" (pmd) : "cc");
+-
+-       if (tlb_flag(TLB_L2CLEAN_FR))
+-               asm("mcr        p15, 1, %0, c15, c9, 1  @ L2 flush_pmd"
+-                       : : "r" (pmd) : "cc");
++       tlb_op(TLB_DCLEAN, "c7, c10, 1  @ flush_pmd", pmd);
++       tlb_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+ }
 
-> But the design should be directed at systems where frequency
-> changes can be done in a reasonably fast manner. That is what he
-> future is - any change we initiate today takes years to reach
-> actual products/systems.
+You'll notice that the second mcr instruction is passed "p15, 1, ...".
+However, the replacement code in tlb_op() always passes "p15, 0, ..."
+to mcr/mcrne. I assume this is a problem?
 
-As long as the new design doesn't treat archs needing schedulable 
-context to set freq as a second class citizen, I think we would all be 
-happy. Because it's not just a matter of it being old hardware. 
-Sometimes the decision to let the SW do the voltage scaling also comes 
-down to HW cost. Considering Linux runs on such a wide set of archs, I 
-think we shouldn't treat the need for schedulable context for freq 
-setting as "broken" or "not sane".
-
-
->> IMHO, I think the problem with CPUfreq and its dynamic
->> governors today is that they do a timer based sampling of the
->> CPU load instead of getting some hints from the scheduler when
->> the scheduler knows that the load average is quite high.
->
-> Yes - that is one of the "frequency changes are slow"
-> assumptions - which is wrong.
-
-Thanks,
-Saravana
+The same thing applies to flush_pmd_entry() too.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+nvpublic
