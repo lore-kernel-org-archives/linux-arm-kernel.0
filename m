@@ -1,92 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Feb 2012 17:12:28 -0800
-Subject: [PATCH] modpost: Fix section warnings for ARM for many compilers
-In-Reply-To: <878vk6cl5z.fsf@rustcorp.com.au>
-References: <20120213212401.GH1426@atomide.com>
- <20120213222652.GL14173@pengutronix.de>
- <20120213225118.GC31482@n2100.arm.linux.org.uk>
- <878vk6cl5z.fsf@rustcorp.com.au>
-Message-ID: <20120214011228.GM1426@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Feb 2012 19:26:02 -0600
+Subject: [PATCH 1/1] gpio: drop CONFIG_OF_GPIO in the definition of the
+ struct gpio_chip
+In-Reply-To: <4F392537.8070505@atmel.com>
+References: <1329125002-21134-1-git-send-email-plagnioj@jcrosoft.com>
+ <4F391781.2020203@gmail.com> <20120213141229.GD3378@game.jcrosoft.org>
+ <4F391F1E.4020808@gmail.com> <4F392537.8070505@atmel.com>
+Message-ID: <4F39B82A.3040404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rusty Russell <rusty@rustcorp.com.au> [120213 16:07]:
-> On Mon, 13 Feb 2012 22:51:18 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Mon, Feb 13, 2012 at 11:26:52PM +0100, Uwe Kleine-K?nig wrote:
-> > > On Mon, Feb 13, 2012 at 01:24:01PM -0800, Tony Lindgren wrote:
-> > > Maybe:
-> > > 
-> > > #ifndef R_ARM_CALL
-> > > #warning "you're elf.h include is outdated"
-> > 
-> > "You are elf.h include is outdated" does not make sense.
-> > 
-> > Why are you calling Tony an elf.h include?
+On 02/13/2012 08:59 AM, Nicolas Ferre wrote:
+> On 02/13/2012 03:33 PM, Rob Herring :
+>> On 02/13/2012 08:12 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> On 08:00 Mon 13 Feb     , Rob Herring wrote:
+>>>> On 02/13/2012 03:23 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>>> this will allow to avoid the ifdef CONFIG_OF_GPIO in gpio drivers
+>>>>>
+>>>>
+>>>> So would always enabling CONFIG_OF on at91 and then only 1 sub-arch is
+>>>> paying the price for additional space. Then we would only have ifdefs in
+>>>> the truly cross-platform gpio drivers.
+>>> we talk about 12bytes and here it's force to put a ifdef in the gpio drivers
+>>> in platform_device we don't do so. So why should be do it here??
+>>
+>> But you are affecting everyone. I'm not saying we shouldn't do this. I'm
+>> just highlighting the reason this is a problem and gpio is just one
+>> instance. I think sub-arches should either always select OF or not.
+>> Trying to do both is just going to be a pain to maintain.
 > 
-> Because he knew it would attract the attention of pedants to the patch?
-> :)
+> (nothing related to the particular case discussed here, but...)
+> 
+> Rob,
+> 
+> It may be a pain to maintain (and I can tell it is), but we do not have
+> the choice: the AT91 family is simply too widely spread in terms of
+> number of SoC and release date of those SoC. We must maintain all of
+> them working while we are doing the effort to switch most of the
+> material to DT. As this work takes time I fear that the transition
+> period will last for a long time.
+> 
+> Older SoCs will surely never be converted to device-tree as both the
+> lack of workforce, customer habits and amount of boards existing and
+> working correctly in mainline will go against this.
 
-I've been called worse than that :)
- 
-> Just do the #ifndef, and skip the warning.  There's not much the poor
-> user receiving the warning can do about it.
+I'm not saying convert all the boards to DT, just unconditionally enable
+the config option. The only impact with that is kernel size, but I
+haven't quantified how much of an increase that is though. Is it a big
+deal if the boards are only minimally being maintained compared to the
+maintenance?
 
-OK
- 
-> Acked-by: Rusty Russell <rusty@rustcorp.com.au>
-
-Assuming your ack applies for this patch below, let me know if that's
-not the case.  
-Regards,
-
-Tony
-
-
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 13 Feb 2012 12:30:09 -0800
-Subject: [PATCH] modpost: Fix section warnings for ARM for many compilers
-
-It turns out that many compilers don't show section warnings on ARM
-currently because handling for ARM_CALL relocs are missing from
-modpost.c.
-
-Based on commit c2e26114 ([ARM] 3205/1: Handle new EABI relocations when
-loading kernel modules) it seems that R_ARM_PC24, R_ARM_CALL and
-R_ARM_JUMP24 can be handled the same way.
-
-Note that at least Debian libc6-dev is missing defines for both
-R_ARM_CALL and R_ARM_JUMP24 in /usr/include/elf.h. So for now
-we need to define them in modpost.c if not defined.
-
-Acked-by: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Ben Hutchings <ben@decadent.org.uk>
-Cc: Anders Kaseorg <andersk@ksplice.com>
-Cc: Greg KH <gregkh@linuxfoundation.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/scripts/mod/modpost.c
-+++ b/scripts/mod/modpost.c
-@@ -1494,6 +1494,13 @@ static int addend_386_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
- 	return 0;
- }
- 
-+#ifndef R_ARM_CALL
-+#define R_ARM_CALL	28
-+#endif
-+#ifndef R_ARM_JUMP24
-+#define R_ARM_JUMP24	29
-+#endif
-+
- static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
- {
- 	unsigned int r_typ = ELF_R_TYPE(r->r_info);
-@@ -1505,6 +1512,8 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
- 		              (elf->symtab_start + ELF_R_SYM(r->r_info));
- 		break;
- 	case R_ARM_PC24:
-+	case R_ARM_CALL:
-+	case R_ARM_JUMP24:
- 		/* From ARM ABI: ((S + A) | T) - P */
- 		r->r_addend = (int)(long)(elf->hdr +
- 		              sechdr->sh_offset +
+Rob
