@@ -1,37 +1,58 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 14 Feb 2012 11:33:18 +0100
-Subject: How to deal with a PHY configuration related to the board?
-In-Reply-To: <20120214094339.GA4338@sapphire.tkos.co.il>
-References: <20120214092606.GE4723@ldesroches-Latitude-E6320>
- <20120214094339.GA4338@sapphire.tkos.co.il>
-Message-ID: <20120214103318.GF4723@ldesroches-Latitude-E6320>
+From: philippe.langlais@stericsson.com (Philippe Langlais)
+Date: Tue, 14 Feb 2012 11:47:36 +0100
+Subject: [PATCH] ux500: Remove keyboard pin definition for snowball
+Message-ID: <1329216456-5569-1-git-send-email-philippe.langlais@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+From: Philippe Langlais <philippe.langlais@linaro.org>
 
-On Tue, Feb 14, 2012 at 11:43:39AM +0200, Baruch Siach wrote:
-> Hi Ludovic,
-> 
-> On Tue, Feb 14, 2012 at 10:26:06AM +0100, Ludovic Desroches wrote:
-> > I am using a Micrel KSZ9021RN PHY and I would like to configure some 
-> > registers
-> > as 'RGMII Clock and Control Pad Skew' and 'RGMII RX Data Pad Skew'.
-> > So the values of these registers are board dependant and I wondering what is
-> > the proper way to set them.
-> > It seems there is no platform data usable for this case. Having a quick look
-> > to other PHYs, the situation seems the same.
-> > 
-> > Can you give me some clues about how to do this? Did I miss anything which
-> > allow to do this?
-> 
-> See ksz9021rn_phy_fixup() in arch/arm/mach-imx/mach-imx6q.c.
-> 
+Interfered with CG2900
 
-Thanks for your help.
+Signed-off-by: Benn P?rscke <benn.porscke@stericsson.com>
+Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-pins.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-So the solution is to use phy_register_fixup function.
-
-Regards
-
-Ludovic
+diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+index f8e7cd7..da17111 100644
+--- a/arch/arm/mach-ux500/board-mop500-pins.c
++++ b/arch/arm/mach-ux500/board-mop500-pins.c
+@@ -419,7 +419,6 @@ static struct ux500_pin_lookup mop500_pins[] = {
+ 	PIN_LOOKUP("nmk-i2c.1", &mop500_pins_i2c1),
+ 	PIN_LOOKUP("nmk-i2c.2", &mop500_pins_i2c2),
+ 	PIN_LOOKUP("nmk-i2c.3", &mop500_pins_i2c3),
+-	PIN_LOOKUP("ske", &mop500_pins_ske),
+ 	PIN_LOOKUP("sdi0", &mop500_pins_sdi0),
+ 	PIN_LOOKUP("sdi1", &mop500_pins_sdi1),
+ 	PIN_LOOKUP("sdi2", &mop500_pins_sdi2),
+@@ -428,6 +427,10 @@ static struct ux500_pin_lookup mop500_pins[] = {
+ 	PIN_LOOKUP("spi2", &mop500_pins_spi2),
+ };
+ 
++static struct ux500_pin_lookup mop500_ske_pins[] = {
++	PIN_LOOKUP("ske", &mop500_pins_ske),
++};
++
+ /*
+  * Sleep pin configuration for u8500 platform.
+  * If another HW is used the GPIO's must be configured
+@@ -930,6 +933,7 @@ void __init mop500_pins_init(void)
+ 			ARRAY_SIZE(mop500_pins_common));
+ 
+ 	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
++	ux500_pins_add(mop500_ske_pins, ARRAY_SIZE(mop500_ske_pins));
+ 
+ 	switch (pinsfor) {
+ 	case PINS_FOR_U9500:
+@@ -971,6 +975,7 @@ void __init hrefv60_pins_init(void)
+ 			ARRAY_SIZE(mop500_pins_common));
+ 
+ 	ux500_pins_add(mop500_pins, ARRAY_SIZE(mop500_pins));
++	ux500_pins_add(mop500_ske_pins, ARRAY_SIZE(mop500_ske_pins));
+ 
+ 	nmk_config_pins(hrefv60_pins,
+ 			ARRAY_SIZE(hrefv60_pins));
+-- 
+1.7.6
