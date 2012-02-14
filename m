@@ -1,57 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 Feb 2012 11:19:26 +0000
-Subject: [PATCH v2 4/4] ARM: architected timers: add support for UP timer
-In-Reply-To: <4F399798.8010601@codeaurora.org>
-References: <1328115575-24866-1-git-send-email-marc.zyngier@arm.com>
- <1328115575-24866-5-git-send-email-marc.zyngier@arm.com>
- <4F399798.8010601@codeaurora.org>
-Message-ID: <4F3A433E.4070309@arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 14 Feb 2012 12:22:48 +0100
+Subject: How to deal with a PHY configuration related to the board?
+In-Reply-To: <20120214103318.GF4723@ldesroches-Latitude-E6320>
+References: <20120214092606.GE4723@ldesroches-Latitude-E6320>
+ <20120214094339.GA4338@sapphire.tkos.co.il>
+ <20120214103318.GF4723@ldesroches-Latitude-E6320>
+Message-ID: <20120214112248.GA20876@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
-
-On 13/02/12 23:07, Christopher Covington wrote:
-> On 02/01/2012 11:59 AM, Marc Zyngier wrote:
->> If CONFIG_LOCAL_TIMERS is not defined, let the architected timer
->> driver register a single clock_event_device that is used as a
->> global timer.
+On 11:33 Tue 14 Feb     , Ludovic Desroches wrote:
+> Hi Baruch,
 > 
-> [snip]
+> On Tue, Feb 14, 2012 at 11:43:39AM +0200, Baruch Siach wrote:
+> > Hi Ludovic,
+> > 
+> > On Tue, Feb 14, 2012 at 10:26:06AM +0100, Ludovic Desroches wrote:
+> > > I am using a Micrel KSZ9021RN PHY and I would like to configure some 
+> > > registers
+> > > as 'RGMII Clock and Control Pad Skew' and 'RGMII RX Data Pad Skew'.
+> > > So the values of these registers are board dependant and I wondering what is
+> > > the proper way to set them.
+> > > It seems there is no platform data usable for this case. Having a quick look
+> > > to other PHYs, the situation seems the same.
+> > > 
+> > > Can you give me some clues about how to do this? Did I miss anything which
+> > > allow to do this?
+> > 
+> > See ksz9021rn_phy_fixup() in arch/arm/mach-imx/mach-imx6q.c.
+> > 
 > 
->>  static int __init arch_timer_common_register(void)
->>  {
->> @@ -277,7 +281,16 @@ static int __init arch_timer_common_register(void)
->>  		}
->>  	}
->>  
->> -	err = local_timer_register(&arch_timer_ops);
->> +#ifdef CONFIG_LOCAL_TIMERS
->> +	if (is_smp())
->> +		err = local_timer_register(&arch_timer_ops);
->> +	else
->> +#endif
->> +	{
->> +		arch_timer_global_evt.cpumask = cpumask_of(0);
->> +		err = arch_timer_setup(&arch_timer_global_evt);
->> +	}
->> +
->>  	if (err)
->>  		goto out_free_irq;
->>  
+> Thanks for your help.
 > 
-> The logic here seems unnecessarily split between the preprocessor and
-> compiler. Certainly this can be revised to a more elegant form that
-> better keeps with the guidelines on ifdef usage [1].
-> 
-> 1. http://www.linuxjournal.com/article/5780?page=0,3
+> So the solution is to use phy_register_fixup function.
+dts
 
-This would require a small change in the local timer code (basically
-refusing to register a local timer if not on an SMP platform). But this
-is just moving code from one #ifdef section to another...
-
-Thanks for reviewing.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best Regards,
+J.
