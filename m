@@ -1,46 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Feb 2012 12:20:10 +0000
-Subject: [BUG] LPAE can be enabled with non-LPAE capable CPUs
-In-Reply-To: <20120214121544.GB9050@arm.com>
-References: <20120214082129.GD15338@n2100.arm.linux.org.uk>
- <20120214121544.GB9050@arm.com>
-Message-ID: <20120214122010.GC13673@n2100.arm.linux.org.uk>
+From: michal.wrobel@flytronic.pl (=?UTF-8?B?TWljaGHFgiBXcsOzYmVs?=)
+Date: Tue, 14 Feb 2012 13:21:47 +0100
+Subject: [PATCH RESEND] ixp4xx: clockevent set_next_event fix
+In-Reply-To: <20120214120153.GA9808@localhost.localdomain>
+References: <4F394D3B.3080909@flytronic.pl> <4F3A2F79.6050806@flytronic.pl>
+ <20120214120153.GA9808@localhost.localdomain>
+Message-ID: <4F3A51DB.70000@flytronic.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 12:15:44PM +0000, Catalin Marinas wrote:
-> It makes sense. Something like this, unless you've already done it (I
-> also changed to CPU_32v7 for consistency):
+On 14.02.2012 13:01, Richard Cochran wrote:
+> On Tue, Feb 14, 2012 at 10:55:05AM +0100, Micha? Wr?bel wrote:
+>> IXP43x Developer's Manual [17.4.3] and IXP4[56]x Developer's Manual
+>> [18.4.3] say that (...)
+>>
+>> IXP42x Developer's Manual [14.3] says that (...)
+> Unless you test this out and confirm that it works for all IXP4xx, I
+> would prefer to see a specific timer function for the 43x instead.
+>
+> Thanks,
+> Richard
+I think I might have some IXP425-based boards available for testing.
+However, I certainly don't have any IXP45x- or IXP46x-based board. Maybe
+I'll prepare a small kernel module that will allow to easily test this
+issue by other list members who have IXP45x- and IXP46x-based boards?
 
-Looks good, please put it in the patch system, thanks.
-
-> commit d8d34065edfdc1b81f6e3886e15b5c2b2bd30b4e
-> Author: Catalin Marinas <catalin.marinas@arm.com>
-> Date:   Tue Feb 14 12:12:58 2012 +0000
-> 
->     ARM: Do not allow ARM_LPAE on pre-ARMv7 architectures
->     
->     This patch expands the Kconfig dependencies for ARM_LPAE to not allow
->     enabling when architectures other than ARMv7 are built into the kernel.
->     
->     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->     Reported-by: Russell King <linux@arm.linux.org.uk>
-> 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 1a3ca24..7edef91 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -631,7 +631,8 @@ comment "Processor Features"
->  
->  config ARM_LPAE
->  	bool "Support for the Large Physical Address Extension"
-> -	depends on MMU && CPU_V7
-> +	depends on MMU && CPU_32v7 && !CPU_32v6 && !CPU_32v5 && \
-> +		!CPU_32v4 && !CPU_32v3
->  	help
->  	  Say Y if you have an ARMv7 processor supporting the LPAE page
->  	  table format and you would like to access memory beyond the
-> 
-> 
-> -- 
-> Catalin
+Regards,
+Micha?
+>> Signed-off-by: Micha? Wr?bel <michal.wrobel@flytronic.pl>
+>> ---
+>>  arch/arm/mach-ixp4xx/common.c |    1 +
+>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> The previous patch had a mistake in the description - wrong reference to
+>> "General-Purpose Timers" section in IXP42x Developer's Manual.
+>>
+>> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+>> index 3841ab4..fd37c83 100644
+>> --- a/arch/arm/mach-ixp4xx/common.c
+>> +++ b/arch/arm/mach-ixp4xx/common.c
+>> @@ -434,6 +434,7 @@ static int ixp4xx_set_next_event(unsigned long evt,
+>>  {
+>>  	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
+>>  
+>> +	*IXP4XX_OSRT1 = 0;
+>>  	*IXP4XX_OSRT1 = (evt & ~IXP4XX_OST_RELOAD_MASK) | opts;
+>>  
+>>  	return 0;
+>> -- 
+>> 1.7.5.4
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
