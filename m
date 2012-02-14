@@ -1,73 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 14 Feb 2012 10:04:08 +0100
-Subject: [PATCH 2/9] ARM: at91/snapper9260: move gpio_to_irq out of
- structure initialization
-In-Reply-To: <4F396C4C.9060108@gmail.com>
-References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
- <e0557a2864e52e017a0e931c6c64fd341ae21559.1329139662.git.nicolas.ferre@atmel.com>
- <4F396C4C.9060108@gmail.com>
-Message-ID: <4F3A2388.7060801@atmel.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Tue, 14 Feb 2012 14:41:32 +0530
+Subject: [PATCH 00/10] I2C updates
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C3317B26A0@DBDE01.ent.ti.com>
+References: <1328882405-15284-1-git-send-email-shubhrajyoti@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C3317B26A0@DBDE01.ent.ti.com>
+Message-ID: <4F3A2544.2000407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2012 09:02 PM, Ryan Mallon :
-> On 14/02/12 01:43, Nicolas Ferre wrote:
-> 
->> gpio_to_irq() implementation will be moved from a macro to a
->> plain function: we cannot use it in a structure initialization
->> anymore.
-> 
-> What was the reason for the change? It was originally a macro for 
-> exactly this reason.
+On Tuesday 14 February 2012 11:42 AM, Hebbar, Gururaja wrote:
+> Hi,
+>
+> I am interested in testing these patches on AM335x.
 
-Linux vIRQ numbers will be allocated dynamically when switching to
-irqdomains. That will prevent the use of a static operation in a macro.
+Thanks for your interest in testin.
+>  Do you have a tree with these
+> patches applied so that I can pull.
 
-> Reviewed-by: Ryan Mallon <rmallon@gmail.com>
+tree        : git://gitorious.org/linus-tree/linus-tree.git
+branch    : i2c_misc_fixes
 
-Thanks.
-
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: rmallon at gmail.com
->> ---
->>  arch/arm/mach-at91/board-snapper9260.c |   10 +++++++---
->>  1 files changed, 7 insertions(+), 3 deletions(-)
+let me know if that works for you
+> On Fri, Feb 10, 2012 at 19:29:55, Datta, Shubhrajyoti wrote:
+>> This patch series colates the various i2c updates into
+>> a series.  Since it is collection of various patches
+>> the version info is not retained, however most of them undergone
+>> multiple versions.
 >>
->> diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
->> index 4770db0..3c2e3fc 100644
->> --- a/arch/arm/mach-at91/board-snapper9260.c
->> +++ b/arch/arm/mach-at91/board-snapper9260.c
->> @@ -145,11 +145,11 @@ static struct i2c_board_info __initdata snapper9260_i2c_devices[] = {
->>  		/* Audio codec */
->>  		I2C_BOARD_INFO("tlv320aic23", 0x1a),
->>  	},
->> -	{
->> +};
->> +
->> +static struct i2c_board_info __initdata snapper9260_i2c_isl1208 = {
->>  		/* RTC */
->>  		I2C_BOARD_INFO("isl1208", 0x6f),
->> -		.irq = gpio_to_irq(AT91_PIN_PA31),
->> -	},
->>  };
->>  
->>  static void __init snapper9260_add_device_nand(void)
->> @@ -163,6 +163,10 @@ static void __init snapper9260_board_init(void)
->>  {
->>  	at91_add_device_i2c(snapper9260_i2c_devices,
->>  			    ARRAY_SIZE(snapper9260_i2c_devices));
->> +
->> +	snapper9260_i2c_isl1208.irq = gpio_to_irq(AT91_PIN_PA31);
->> +	i2c_register_board_info(0, &snapper9260_i2c_isl1208, 1);
->> +
->>  	at91_add_device_serial();
->>  	at91_add_device_usbh(&snapper9260_usbh_data);
->>  	at91_add_device_udc(&snapper9260_udc_data);
-> 
-> 
-> 
-
-
--- 
-Nicolas Ferre
+>> This is rebased to linus head commit 63082402968f4b73f10b28a8ac1f3da821aeb82d
+>>
+>> The patch series does the following 
+>>
+>> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
+>> - I2C register restore only if context if the context is lost
+>> - Bus busy recovery mechanism.
+>> - the reset is not done in init.
+>>
+>> Tested on omap4sdp and omap3sdp. 
+>>
+>>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Ben Dooks <ben-linux@fluff.org>
+>>
+>> Jon Hunter (1):
+>>   I2C: OMAP: Correct I2C revision for OMAP3
+>>
+>> Shubhrajyoti D (8):
+>>   I2C : OMAP : make omap_i2c_unidle/idle functions depend on
+>>     CONFIG_PM_RUNTIME
+>>   OMAP : I2C : Remove reset at init
+>>   OMAP: I2C: I2C register restore only if context is lost
+>>   OMAP: I2C: Fix the interrupt clearing in OMAP4
+>>   OMAP: I2C: Fix the mismatch of pm_runtime enable and disable
+>>   OMAP: I2C: Optimise the remove code
+>>   OMAP: I2C: Fix the error handling
+>>   I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
+>>     than zero
+>>
+>> Vikram Pandita (1):
+>>   I2C: OMAP: Recover from Bus Busy condition
+>>
+>>  drivers/i2c/busses/i2c-omap.c |  173 ++++++++++++++++++++++++-----------------
+>>  1 files changed, 101 insertions(+), 72 deletions(-)
+>
+>
+> Regards, 
+> Gururaja
