@@ -1,29 +1,38 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 14 Feb 2012 10:48:46 +0530
-Subject: [PATCH 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
-In-Reply-To: <CANrkHUbXHrQ=LowgNq9nt+rnrcE-fTqLuOs2+MeCtodv_H-_Cw@mail.gmail.com>
-References: <1328367090-10402-1-git-send-email-rnayak@ti.com>	<CANfBPZ-pD55YgneQSyfs1kKB-DUH8g7TQkKO7O6B95Ydfc8cFg@mail.gmail.com>
- <CANrkHUbXHrQ=LowgNq9nt+rnrcE-fTqLuOs2+MeCtodv_H-_Cw@mail.gmail.com>
-Message-ID: <4F39EEB6.2020208@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 13 Feb 2012 22:06:28 -0800
+Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
+In-Reply-To: <20120214013506.GA3276@b20223-02.ap.freescale.net>
+References: <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
+ <20120202085521.GB9773@S2101-09.ap.freescale.net>
+ <20120202091132.GD9773@S2101-09.ap.freescale.net>
+ <20120202092427.GB32403@b20223-02.ap.freescale.net>
+ <20120202130901.GE9773@S2101-09.ap.freescale.net>
+ <20120202135805.GB3015@richard-laptop>
+ <20120203021554.GE32403@b20223-02.ap.freescale.net>
+ <20120203133240.GB12915@S2101-09.ap.freescale.net>
+ <a9d9bad3-edd0-4a5f-9bb3-15787430d858@email.android.com>
+ <20120214013506.GA3276@b20223-02.ap.freescale.net>
+Message-ID: <20120214060627.GB13456@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 February 2012 06:57 PM, T Krishnamoorthy, Balaji wrote:
-> On Tue, Feb 7, 2012 at 3:32 PM, S, Venkatraman<svenkatr@ti.com>  wrote:
->> >  On Sat, Feb 4, 2012 at 8:21 PM, Rajendra Nayak<rnayak@ti.com>  wrote:
->>> >>  This series mainly cleans up all instances of hardcoding's in
->>> >>  the driver based on pdev->id. This is cleanup leading to the
->>> >>  DT adaptation of omap_hsmmc driver.
->>> >>
->>> >>  Patches are based on 3.3-rc2 and can be found here
->>> >>  git://gitorious.org/omap-pm/linux.git omap_hsmmc_cleanup
->>> >>
->>> >>  Tested the patches on my omap4 boards (panda and SDP) but
->>> >>  haven't tested yet on omap3/2 since I did'nt have boards
->>> >>  handy. So any testing on any omap3/2 boards is really
->>> >>  appreciated.
-> Tested this series on 2430SDP with FS on SD card
->
-Thanks, will repost adding Tested-by from you and Venkat, also
-getting rid of the one instance of host->id usage left in a
-debug print.
+On Tue, Feb 14, 2012 at 09:35:07AM +0800, Richard Zhao wrote:
+> On Sun, Feb 05, 2012 at 12:50:15PM +0800, Richard Zhao wrote:
+
+> > no, it is asoc machine driver to have machine specific code. 
+> > the machine driver do not correspond to any hw device, which cause hard
+> > to bind dt or create platform device.
+
+> I'll have to keep audmux driver in arch/, till ASOC machine driver
+> has a way to get platfrom parameters.
+
+Machine drivers can easily get platform data, they're just regular
+drivers of whatever type so can get platform data in the same way that
+any other driver for their bus can.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120213/8c785d8b/attachment.sig>
