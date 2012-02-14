@@ -1,68 +1,26 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Tue, 14 Feb 2012 14:41:32 +0530
-Subject: [PATCH 00/10] I2C updates
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C3317B26A0@DBDE01.ent.ti.com>
-References: <1328882405-15284-1-git-send-email-shubhrajyoti@ti.com>
- <1BAFE6F6C881BF42822005164F1491C3317B26A0@DBDE01.ent.ti.com>
-Message-ID: <4F3A2544.2000407@ti.com>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Tue, 14 Feb 2012 14:50:56 +0530
+Subject: [PATCH] Add support for MSM GPIO IR receiver driver
+Message-ID: <1329211256-12896-1-git-send-email-kumarrav@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 February 2012 11:42 AM, Hebbar, Gururaja wrote:
-> Hi,
->
-> I am interested in testing these patches on AM335x.
+This driver is for GPIO based IR receivers, it can listen only to IR receiver 
+modules which gives demodulated signal as output, this driver only passes the 
+interrupt events to rc framework where pulse and space widths are calculated 
+and input to decoders avaliable.
 
-Thanks for your interest in testin.
->  Do you have a tree with these
-> patches applied so that I can pull.
+Ravi Kumar V (1):
+  msm: rc: Add support for MSM GPIO based IR Receiver driver.
 
-tree        : git://gitorious.org/linus-tree/linus-tree.git
-branch    : i2c_misc_fixes
+ drivers/media/rc/Kconfig        |    9 ++
+ drivers/media/rc/Makefile       |    1 +
+ drivers/media/rc/gpio-ir-recv.c |  189 +++++++++++++++++++++++++++++++++++++++
+ include/media/gpio-ir-recv.h    |   23 +++++
+ 4 files changed, 222 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/media/rc/gpio-ir-recv.c
+ create mode 100644 include/media/gpio-ir-recv.h
 
-let me know if that works for you
-> On Fri, Feb 10, 2012 at 19:29:55, Datta, Shubhrajyoti wrote:
->> This patch series colates the various i2c updates into
->> a series.  Since it is collection of various patches
->> the version info is not retained, however most of them undergone
->> multiple versions.
->>
->> This is rebased to linus head commit 63082402968f4b73f10b28a8ac1f3da821aeb82d
->>
->> The patch series does the following 
->>
->> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
->> - I2C register restore only if context if the context is lost
->> - Bus busy recovery mechanism.
->> - the reset is not done in init.
->>
->> Tested on omap4sdp and omap3sdp. 
->>
->>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Ben Dooks <ben-linux@fluff.org>
->>
->> Jon Hunter (1):
->>   I2C: OMAP: Correct I2C revision for OMAP3
->>
->> Shubhrajyoti D (8):
->>   I2C : OMAP : make omap_i2c_unidle/idle functions depend on
->>     CONFIG_PM_RUNTIME
->>   OMAP : I2C : Remove reset at init
->>   OMAP: I2C: I2C register restore only if context is lost
->>   OMAP: I2C: Fix the interrupt clearing in OMAP4
->>   OMAP: I2C: Fix the mismatch of pm_runtime enable and disable
->>   OMAP: I2C: Optimise the remove code
->>   OMAP: I2C: Fix the error handling
->>   I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
->>     than zero
->>
->> Vikram Pandita (1):
->>   I2C: OMAP: Recover from Bus Busy condition
->>
->>  drivers/i2c/busses/i2c-omap.c |  173 ++++++++++++++++++++++++-----------------
->>  1 files changed, 101 insertions(+), 72 deletions(-)
->
->
-> Regards, 
-> Gururaja
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
