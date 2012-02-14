@@ -1,51 +1,73 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 14 Feb 2012 10:54:46 +0200
-Subject: [PATCH] arm: omap: usb-host: fix compile warning
-Message-ID: <1329209686-25551-1-git-send-email-balbi@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 Feb 2012 10:04:08 +0100
+Subject: [PATCH 2/9] ARM: at91/snapper9260: move gpio_to_irq out of
+ structure initialization
+In-Reply-To: <4F396C4C.9060108@gmail.com>
+References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
+ <e0557a2864e52e017a0e931c6c64fd341ae21559.1329139662.git.nicolas.ferre@atmel.com>
+ <4F396C4C.9060108@gmail.com>
+Message-ID: <4F3A2388.7060801@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when commit 3528c58 (OMAP: omap_device: when
-building return platform_device instead of
-omap_device) started returning a platform_device
-instead of a omap_device pointer when building
-a device, it failed to convert all users introducing
-a compile warning when building
-arch/arm/mach-omap2/usb-host.c.
+On 02/13/2012 09:02 PM, Ryan Mallon :
+> On 14/02/12 01:43, Nicolas Ferre wrote:
+> 
+>> gpio_to_irq() implementation will be moved from a macro to a
+>> plain function: we cannot use it in a structure initialization
+>> anymore.
+> 
+> What was the reason for the change? It was originally a macro for 
+> exactly this reason.
 
-This patch fixes that warning.
+Linux vIRQ numbers will be allocated dynamically when switching to
+irqdomains. That will prevent the use of a static operation in a macro.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/mach-omap2/usb-host.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+> Reviewed-by: Ryan Mallon <rmallon@gmail.com>
 
-diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
-index 771dc78..f51348d 100644
---- a/arch/arm/mach-omap2/usb-host.c
-+++ b/arch/arm/mach-omap2/usb-host.c
-@@ -486,7 +486,7 @@ static void setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
- void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
- {
- 	struct omap_hwmod	*oh[2];
--	struct omap_device	*od;
-+	struct platform_device	*pdev;
- 	int			bus_id = -1;
- 	int			i;
- 
-@@ -522,11 +522,11 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
- 		return;
- 	}
- 
--	od = omap_device_build_ss(OMAP_USBHS_DEVICE, bus_id, oh, 2,
-+	pdev = omap_device_build_ss(OMAP_USBHS_DEVICE, bus_id, oh, 2,
- 				(void *)&usbhs_data, sizeof(usbhs_data),
- 				omap_uhhtll_latency,
- 				ARRAY_SIZE(omap_uhhtll_latency), false);
--	if (IS_ERR(od)) {
-+	if (IS_ERR(pdev)) {
- 		pr_err("Could not build hwmod devices %s,%s\n",
- 			USBHS_UHH_HWMODNAME, USBHS_TLL_HWMODNAME);
- 		return;
+Thanks.
+
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Cc: rmallon at gmail.com
+>> ---
+>>  arch/arm/mach-at91/board-snapper9260.c |   10 +++++++---
+>>  1 files changed, 7 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
+>> index 4770db0..3c2e3fc 100644
+>> --- a/arch/arm/mach-at91/board-snapper9260.c
+>> +++ b/arch/arm/mach-at91/board-snapper9260.c
+>> @@ -145,11 +145,11 @@ static struct i2c_board_info __initdata snapper9260_i2c_devices[] = {
+>>  		/* Audio codec */
+>>  		I2C_BOARD_INFO("tlv320aic23", 0x1a),
+>>  	},
+>> -	{
+>> +};
+>> +
+>> +static struct i2c_board_info __initdata snapper9260_i2c_isl1208 = {
+>>  		/* RTC */
+>>  		I2C_BOARD_INFO("isl1208", 0x6f),
+>> -		.irq = gpio_to_irq(AT91_PIN_PA31),
+>> -	},
+>>  };
+>>  
+>>  static void __init snapper9260_add_device_nand(void)
+>> @@ -163,6 +163,10 @@ static void __init snapper9260_board_init(void)
+>>  {
+>>  	at91_add_device_i2c(snapper9260_i2c_devices,
+>>  			    ARRAY_SIZE(snapper9260_i2c_devices));
+>> +
+>> +	snapper9260_i2c_isl1208.irq = gpio_to_irq(AT91_PIN_PA31);
+>> +	i2c_register_board_info(0, &snapper9260_i2c_isl1208, 1);
+>> +
+>>  	at91_add_device_serial();
+>>  	at91_add_device_usbh(&snapper9260_usbh_data);
+>>  	at91_add_device_udc(&snapper9260_udc_data);
+> 
+> 
+> 
+
+
 -- 
-1.7.9
+Nicolas Ferre
