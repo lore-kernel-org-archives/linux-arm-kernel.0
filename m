@@ -1,219 +1,160 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 14 Feb 2012 18:36:42 +0200
-Subject: [PATCH 6/6] arm: omap: pm-debug: enhanced usecount debug support
+Date: Tue, 14 Feb 2012 18:36:39 +0200
+Subject: [PATCH 3/6] arm: omap3+: voltage: add support for voltagedomain
+ usecounts
 In-Reply-To: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
 References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1329237402-26008-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1329237402-26008-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
-their own file, 'usecount'. This file shows the usecounts for every
-active domain and their children recursively. 'count' file now only
-shows power state counts for powerdomains.
-
-This patch also provices a way to do printk dumps from kernel code,
-by calling the pm_dbg_dump_X functions. The plan is to call these
-functions once an error condition is detected, e.g. failed suspend.
+These are updated based on powerdomain usecounts. Also added support
+for voltdm->sleep and voltdm->wakeup calls that will be invoked once
+voltagedomain enters sleep or wakes up based on usecount numbers. These
+will be used for controlling voltage scaling functionality.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/pm-debug.c |  128 ++++++++++++++++++++++++++++++++++------
- arch/arm/mach-omap2/pm.h       |    6 ++
- 2 files changed, 115 insertions(+), 19 deletions(-)
+ arch/arm/mach-omap2/powerdomain.c |    6 +++-
+ arch/arm/mach-omap2/voltage.c     |   48 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/voltage.h     |   11 ++++++++
+ 3 files changed, 63 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index 4411163..444588e 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -51,6 +51,7 @@ static int pm_dbg_init(void);
- enum {
- 	DEBUG_FILE_COUNTERS = 0,
- 	DEBUG_FILE_TIMERS,
-+	DEBUG_FILE_USECOUNT,
- };
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 78bf3c0..4ded0c8 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -987,12 +987,14 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm)
  
- static const char pwrdm_state_names[][PWRDM_MAX_PWRSTS] = {
-@@ -75,23 +76,6 @@ void pm_dbg_update_time(struct powerdomain *pwrdm, int prev)
- 	pwrdm->timer = t;
- }
- 
--static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
--{
--	struct seq_file *s = (struct seq_file *)user;
--
--	if (strcmp(clkdm->name, "emu_clkdm") == 0 ||
--		strcmp(clkdm->name, "wkup_clkdm") == 0 ||
--		strncmp(clkdm->name, "dpll", 4) == 0)
--		return 0;
--
--	seq_printf(s, "%s->%s (%d)", clkdm->name,
--			clkdm->pwrdm.ptr->name,
--			atomic_read(&clkdm->usecount));
--	seq_printf(s, "\n");
--
--	return 0;
--}
--
- static int pwrdm_dbg_show_counter(struct powerdomain *pwrdm, void *user)
+ void pwrdm_clkdm_enable(struct powerdomain *pwrdm)
  {
- 	struct seq_file *s = (struct seq_file *)user;
-@@ -145,11 +129,112 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
- 	return 0;
+-	atomic_inc(&pwrdm->usecount);
++	if (atomic_inc_return(&pwrdm->usecount) == 1)
++		voltdm_pwrdm_enable(pwrdm->voltdm.ptr);
  }
  
-+static struct voltagedomain *parent_voltdm;
-+static struct powerdomain *parent_pwrdm;
-+static struct clockdomain *parent_clkdm;
-+
-+#define PM_DBG_PRINT(s, fmt, args...)			\
-+	{						\
-+		if (s)					\
-+			seq_printf(s, fmt, ## args);	\
-+		else					\
-+			pr_info(fmt, ## args);		\
+ void pwrdm_clkdm_disable(struct powerdomain *pwrdm)
+ {
+-	atomic_dec(&pwrdm->usecount);
++	if (!atomic_dec_return(&pwrdm->usecount))
++		voltdm_pwrdm_disable(pwrdm->voltdm.ptr);
+ }
+ 
+ int pwrdm_pre_transition(void)
+diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+index 8a36342..88f0e98 100644
+--- a/arch/arm/mach-omap2/voltage.c
++++ b/arch/arm/mach-omap2/voltage.c
+@@ -38,6 +38,7 @@
+ 
+ #include "voltage.h"
+ #include "powerdomain.h"
++#include "smartreflex.h"
+ 
+ #include "vc.h"
+ #include "vp.h"
+@@ -325,6 +326,53 @@ int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm)
+ }
+ 
+ /**
++ * voltdm_pwrdm_enable - increase usecount for a voltagedomain
++ * @voltdm: struct voltagedomain * to increase count for
++ *
++ * Increases usecount for a given voltagedomain. If the usecount reaches
++ * 1, the domain is awakened from idle and the function will call the
++ * voltagedomain->wakeup callback for this domain, and also enable the
++ * smartreflex for the domain.
++ */
++void voltdm_pwrdm_enable(struct voltagedomain *voltdm)
++{
++	if (atomic_inc_return(&voltdm->usecount) == 1) {
++		if (voltdm->wakeup)
++			voltdm->wakeup(voltdm);
++		omap_sr_enable(voltdm);
 +	}
-+
-+static int _pm_dbg_dump_clk(struct clk *clk, void *user)
-+{
-+	struct seq_file *s = user;
-+
-+	if (clk->clkdm == parent_clkdm && clk->usecount && !clk->autoidle)
-+		PM_DBG_PRINT(s, "      ck:%s: %d\n", clk->name, clk->usecount);
-+
-+	return 0;
 +}
 +
-+static int _pm_dbg_dump_hwmod(struct omap_hwmod *oh, void *user)
++/**
++ * voltdm_pwrdm_disable - decrease usecount for a voltagedomain
++ * @voltdm: struct voltagedomain * to decrease count for
++ *
++ * Decreases the usecount for a given voltagedomain. If the usecount
++ * reaches zero, the domain can idle and the function will call the
++ * voltagedomain->sleep callback, disable smartreflex for the domain,
++ * and calculate the overall target state for the voltagedomain.
++ */
++void voltdm_pwrdm_disable(struct voltagedomain *voltdm)
 +{
-+	struct seq_file *s = user;
++	int target_state = -EINVAL;
++	int state;
++	struct powerdomain *pwrdm;
 +
-+	if (oh->clkdm != parent_clkdm)
-+		return 0;
-+
-+	if (oh->_state != _HWMOD_STATE_ENABLED)
-+		return 0;
-+
-+	PM_DBG_PRINT(s, "      oh:%s: enabled\n", oh->name);
-+
-+	return 0;
-+}
-+
-+static int _pm_dbg_dump_clkdm(struct clockdomain *clkdm, void *user)
-+{
-+	struct seq_file *s = user;
-+	u32 usecount;
-+
-+	if (clkdm->pwrdm.ptr == parent_pwrdm) {
-+		usecount = atomic_read(&clkdm->usecount);
-+		if (usecount) {
-+			PM_DBG_PRINT(s, "    cd:%s: %d\n", clkdm->name,
-+				usecount);
-+			parent_clkdm = clkdm;
-+			omap_hwmod_for_each(_pm_dbg_dump_hwmod, s);
-+			omap_clk_for_each(_pm_dbg_dump_clk, s);
++	if (!atomic_dec_return(&voltdm->usecount)) {
++		omap_sr_disable(voltdm);
++		/* Determine target state for voltdm */
++		list_for_each_entry(pwrdm, &voltdm->pwrdm_list, voltdm_node) {
++			state = pwrdm_read_next_pwrst(pwrdm);
++			if (state > target_state)
++				target_state = state;
 +		}
++		voltdm->target_state = target_state;
++		if (voltdm->sleep)
++			voltdm->sleep(voltdm);
 +	}
-+	return 0;
 +}
 +
-+static int _pm_dbg_dump_pwrdm(struct powerdomain *pwrdm, void *user)
-+{
-+	struct seq_file *s = user;
-+	u32 usecount;
-+
-+	if (pwrdm->voltdm.ptr == parent_voltdm) {
-+		usecount = atomic_read(&pwrdm->usecount);
-+		if (usecount) {
-+			PM_DBG_PRINT(s, "  pd:%s: %d\n", pwrdm->name, usecount);
-+			parent_pwrdm = pwrdm;
-+			clkdm_for_each(_pm_dbg_dump_clkdm, s);
-+		}
-+	}
-+	return 0;
-+}
-+
-+void pm_dbg_dump_pwrdm(struct powerdomain *pwrdm)
-+{
-+	pr_info("pd:%s: %d\n", pwrdm->name, atomic_read(&pwrdm->usecount));
-+	parent_pwrdm = pwrdm;
-+	clkdm_for_each(_pm_dbg_dump_clkdm, NULL);
-+}
-+
-+void pm_dbg_dump_voltdm(struct voltagedomain *voltdm)
-+{
-+	pr_info("vd:%s: %d\n", voltdm->name, atomic_read(&voltdm->usecount));
-+	parent_voltdm = voltdm;
-+	pwrdm_for_each(_pm_dbg_dump_pwrdm, NULL);
-+}
-+
-+static int _voltdm_dbg_show_counters(struct voltagedomain *voltdm, void *user)
-+{
-+	struct seq_file *s = user;
-+
-+	seq_printf(s, "vd:%s: %d\n", voltdm->name,
-+		atomic_read(&voltdm->usecount));
-+
-+	parent_voltdm = voltdm;
-+	pwrdm_for_each(_pm_dbg_dump_pwrdm, s);
-+	return 0;
-+}
-+
-+static int pm_dbg_show_usecount(struct seq_file *s, void *unused)
-+{
-+	voltdm_for_each(_voltdm_dbg_show_counters, s);
-+	return 0;
-+}
-+
- static int pm_dbg_show_counters(struct seq_file *s, void *unused)
- {
- 	pwrdm_for_each(pwrdm_dbg_show_counter, s);
--	clkdm_for_each(clkdm_dbg_show_counter, s);
--
- 	return 0;
- }
++/**
+  * voltdm_for_each_pwrdm - call function for each pwrdm in a voltdm
+  * @voltdm: struct voltagedomain * to iterate over
+  * @fn: callback function *
+diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+index 16a1b09..8829201 100644
+--- a/arch/arm/mach-omap2/voltage.h
++++ b/arch/arm/mach-omap2/voltage.h
+@@ -54,10 +54,14 @@ struct omap_vfsm_instance {
+  * @pwrdm_list: list_head linking all powerdomains in this voltagedomain
+  * @vc: pointer to VC channel associated with this voltagedomain
+  * @vp: pointer to VP associated with this voltagedomain
++ * @usecount: number of users for this voltagedomain
++ * @target_state: calculated target state for the children of this domain
+  * @read: read a VC/VP register
+  * @write: write a VC/VP register
+  * @read: read-modify-write a VC/VP register
+  * @sys_clk: system clock name/frequency, used for various timing calculations
++ * @sleep: function to call once the domain enters idle
++ * @wakeup: function to call once the domain wakes up from idle
+  * @scale: function used to scale the voltage of the voltagedomain
+  * @nominal_volt: current nominal voltage for this voltage domain
+  * @volt_data: voltage table having the distinct voltages supported
+@@ -73,6 +77,9 @@ struct voltagedomain {
+ 	struct omap_vp_instance *vp;
+ 	struct omap_voltdm_pmic *pmic;
  
-@@ -162,6 +247,9 @@ static int pm_dbg_show_timers(struct seq_file *s, void *unused)
- static int pm_dbg_open(struct inode *inode, struct file *file)
- {
- 	switch ((int)inode->i_private) {
-+	case DEBUG_FILE_USECOUNT:
-+		return single_open(file, pm_dbg_show_usecount,
-+			&inode->i_private);
- 	case DEBUG_FILE_COUNTERS:
- 		return single_open(file, pm_dbg_show_counters,
- 			&inode->i_private);
-@@ -271,6 +359,8 @@ static int __init pm_dbg_init(void)
- 		d, (void *)DEBUG_FILE_COUNTERS, &debug_fops);
- 	(void) debugfs_create_file("time", S_IRUGO,
- 		d, (void *)DEBUG_FILE_TIMERS, &debug_fops);
-+	(void) debugfs_create_file("usecount", S_IRUGO,
-+		d, (void *)DEBUG_FILE_USECOUNT, &debug_fops);
- 
- 	pwrdm_for_each(pwrdms_setup, (void *)d);
- 
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index b737b11..ec8f874 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -61,10 +61,16 @@ inline void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params)
- extern int omap3_pm_get_suspend_state(struct powerdomain *pwrdm);
- extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
- 
-+struct clk;
++	atomic_t usecount;
++	int target_state;
 +
- #ifdef CONFIG_PM_DEBUG
- extern u32 enable_off_mode;
-+extern void pm_dbg_dump_pwrdm(struct powerdomain *pwrdm);
-+extern void pm_dbg_dump_voltdm(struct voltagedomain *voltdm);
- #else
- #define enable_off_mode 0
-+static inline void pm_dbg_dump_pwrdm(struct powerdomain *pwrdm) { }
-+static inline void pm_dbg_dump_voltdm(struct voltagedomain *voltdm) { }
- #endif
+ 	/* VC/VP register access functions: SoC specific */
+ 	u32 (*read) (u8 offset);
+ 	void (*write) (u32 val, u8 offset);
+@@ -83,6 +90,8 @@ struct voltagedomain {
+ 		u32 rate;
+ 	} sys_clk;
  
- #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
++	void (*sleep) (struct voltagedomain *voltdm);
++	void (*wakeup) (struct voltagedomain *voltdm);
+ 	int (*scale) (struct voltagedomain *voltdm,
+ 		      unsigned long target_volt);
+ 
+@@ -161,6 +170,8 @@ extern void omap44xx_voltagedomains_init(void);
+ struct voltagedomain *voltdm_lookup(const char *name);
+ void voltdm_init(struct voltagedomain **voltdm_list);
+ int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm);
++void voltdm_pwrdm_enable(struct voltagedomain *voltdm);
++void voltdm_pwrdm_disable(struct voltagedomain *voltdm);
+ int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
+ 		    void *user);
+ int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
 -- 
 1.7.4.1
