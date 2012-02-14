@@ -1,65 +1,92 @@
-From: Hong.Xu@atmel.com (Xu, Hong)
-Date: Tue, 14 Feb 2012 09:10:29 +0800
-Subject: [PATCH] MTD: atmel_nand: Update driver to support Programmable HW
- ECC controller
-In-Reply-To: <1329134891.22240.116.camel@sauron.fi.intel.com>
-References: <1329117469-23637-1-git-send-email-hong.xu@atmel.com>
- <1329134891.22240.116.camel@sauron.fi.intel.com>
-Message-ID: <4C79549CB6F772498162A641D92D5328045B5ADE@penmb01.corp.atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Feb 2012 17:12:28 -0800
+Subject: [PATCH] modpost: Fix section warnings for ARM for many compilers
+In-Reply-To: <878vk6cl5z.fsf@rustcorp.com.au>
+References: <20120213212401.GH1426@atomide.com>
+ <20120213222652.GL14173@pengutronix.de>
+ <20120213225118.GC31482@n2100.arm.linux.org.uk>
+ <878vk6cl5z.fsf@rustcorp.com.au>
+Message-ID: <20120214011228.GM1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Artem,
+* Rusty Russell <rusty@rustcorp.com.au> [120213 16:07]:
+> On Mon, 13 Feb 2012 22:51:18 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Mon, Feb 13, 2012 at 11:26:52PM +0100, Uwe Kleine-K?nig wrote:
+> > > On Mon, Feb 13, 2012 at 01:24:01PM -0800, Tony Lindgren wrote:
+> > > Maybe:
+> > > 
+> > > #ifndef R_ARM_CALL
+> > > #warning "you're elf.h include is outdated"
+> > 
+> > "You are elf.h include is outdated" does not make sense.
+> > 
+> > Why are you calling Tony an elf.h include?
+> 
+> Because he knew it would attract the attention of pedants to the patch?
+> :)
 
-> -----Original Message-----
-> From: Artem Bityutskiy [mailto:dedekind1 at gmail.com]
-> Sent: Monday, February 13, 2012 8:08 PM
-> To: Xu, Hong
-> Cc: linux-mtd at lists.infradead.org; dwmw2 at infradead.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] MTD: atmel_nand: Update driver to support
-Programmable
-> HW ECC controller
-> 
-> On Mon, 2012-02-13 at 15:17 +0800, Hong Xu wrote:
-> > The Programmable Hardware ECC (PMECC) controller is a programmable
-binary
-> > BCH(Bose, Chaudhuri and Hocquenghem) encoder and decoder. This
-controller
-> > can be used to support both SLC and MLC NAND Flash devices. It
-supports to
-> > generate ECC to correct 2, 4, 8, 12 or 24 bits of error per sector
-of data.
-> >
-> > To use this driver, the user needs to pass in the correction
-capability and
-> > the sector size.
-> >
-> > This driver has been tested on AT91SAM9X5-EK and AT91SAM9N12-EK with
-JFFS2,
-> > YAFFS2, UBIFS and mtd-utils.
-> >
-> > Signed-off-by: Hong Xu <hong.xu@atmel.com>
-> 
-> Please, do not forget to fix the following warnings as well:
-> 
-> Sparse:
-> +drivers/mtd/nand/atmel_nand.c:1446:52: warning: Using plain integer
-as NULL
-> pointer [sparse]
-> 
-> gcc:
-> +drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
-> +drivers/mtd/nand/atmel_nand.c:1451:1: warning: label 'err' defined
-but not
-> used [-Wunused-label]
-> 
+I've been called worse than that :)
+ 
+> Just do the #ifndef, and skip the warning.  There's not much the poor
+> user receiving the warning can do about it.
 
-OK, I'll also check with `sparse' as well. Thanks.
+OK
+ 
+> Acked-by: Rusty Russell <rusty@rustcorp.com.au>
 
-BR,
-Eric
+Assuming your ack applies for this patch below, let me know if that's
+not the case.  
+Regards,
 
-> --
-> Best Regards,
-> Artem Bityutskiy
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 13 Feb 2012 12:30:09 -0800
+Subject: [PATCH] modpost: Fix section warnings for ARM for many compilers
+
+It turns out that many compilers don't show section warnings on ARM
+currently because handling for ARM_CALL relocs are missing from
+modpost.c.
+
+Based on commit c2e26114 ([ARM] 3205/1: Handle new EABI relocations when
+loading kernel modules) it seems that R_ARM_PC24, R_ARM_CALL and
+R_ARM_JUMP24 can be handled the same way.
+
+Note that at least Debian libc6-dev is missing defines for both
+R_ARM_CALL and R_ARM_JUMP24 in /usr/include/elf.h. So for now
+we need to define them in modpost.c if not defined.
+
+Acked-by: Rusty Russell <rusty@rustcorp.com.au>
+Cc: Ben Hutchings <ben@decadent.org.uk>
+Cc: Anders Kaseorg <andersk@ksplice.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/scripts/mod/modpost.c
++++ b/scripts/mod/modpost.c
+@@ -1494,6 +1494,13 @@ static int addend_386_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+ 	return 0;
+ }
+ 
++#ifndef R_ARM_CALL
++#define R_ARM_CALL	28
++#endif
++#ifndef R_ARM_JUMP24
++#define R_ARM_JUMP24	29
++#endif
++
+ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+ {
+ 	unsigned int r_typ = ELF_R_TYPE(r->r_info);
+@@ -1505,6 +1512,8 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
+ 		              (elf->symtab_start + ELF_R_SYM(r->r_info));
+ 		break;
+ 	case R_ARM_PC24:
++	case R_ARM_CALL:
++	case R_ARM_JUMP24:
+ 		/* From ARM ABI: ((S + A) | T) - P */
+ 		r->r_addend = (int)(long)(elf->hdr +
+ 		              sechdr->sh_offset +
