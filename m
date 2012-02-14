@@ -1,24 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Feb 2012 12:27:40 -0800
-Subject: [PATCH 6/6] arm: omap: pm-debug: enhanced usecount debug support
-In-Reply-To: <1329237402-26008-7-git-send-email-t-kristo@ti.com>
-References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
- <1329237402-26008-7-git-send-email-t-kristo@ti.com>
-Message-ID: <20120214202740.GT1426@atomide.com>
+Date: Tue, 14 Feb 2012 12:38:01 -0800
+Subject: [PATCH 3.3 v2] OMAP4: PRM: fix build breakage when CONFIG_OF
+ is not defined
+In-Reply-To: <1328699683-19357-1-git-send-email-coelho@ti.com>
+References: <1328699683-19357-1-git-send-email-coelho@ti.com>
+Message-ID: <20120214203801.GU1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [120214 08:19]:
-> Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
-> their own file, 'usecount'. This file shows the usecounts for every
-> active domain and their children recursively. 'count' file now only
-> shows power state counts for powerdomains.
+* Luciano Coelho <coelho@ti.com> [120208 02:43]:
+> Since 3.3-rc1, prm44xx.c build breaks if CONFIG_OF is not set:
 > 
-> This patch also provices a way to do printk dumps from kernel code,
-> by calling the pm_dbg_dump_X functions. The plan is to call these
-> functions once an error condition is detected, e.g. failed suspend.
+> arch/arm/mach-omap2/prm44xx.c:41: error: 'OMAP44XX_IRQ_PRCM' undeclared here (not in a function)
+> make[1]: *** [arch/arm/mach-omap2/prm44xx.o] Error 1
+> 
+> This is because of a missing include, which is added indirectly if
+> CONFIG_OF is defined.  This problem was introduced in commit
+> 2f31b51 (ARM: OMAP4: PRM: use PRCM interrupt handler).
+> 
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Luciano Coelho <coelho@ti.com>
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Why don't you replace this all with a userspace tool that deciphers
-the registers for you?
+A similar patch should be already in mainline kernel queued by Russell.
 
 Tony
+
+> ---
+> v2: changed the commit log to use abbrev sha and include the commit subject
+> 
+>  arch/arm/mach-omap2/prm44xx.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+> index 33dd655..f2e06ad 100644
+> --- a/arch/arm/mach-omap2/prm44xx.c
+> +++ b/arch/arm/mach-omap2/prm44xx.c
+> @@ -20,6 +20,7 @@
+>  #include "common.h"
+>  #include <plat/cpu.h>
+>  #include <plat/prcm.h>
+> +#include <plat/irqs.h>
+>  
+>  #include "vp.h"
+>  #include "prm44xx.h"
+> -- 
+> 1.7.5.4
+> 
