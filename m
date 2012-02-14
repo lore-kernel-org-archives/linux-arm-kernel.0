@@ -1,38 +1,60 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 13 Feb 2012 22:06:28 -0800
-Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
-In-Reply-To: <20120214013506.GA3276@b20223-02.ap.freescale.net>
-References: <1328148728-32258-7-git-send-email-richard.zhao@linaro.org>
- <20120202085521.GB9773@S2101-09.ap.freescale.net>
- <20120202091132.GD9773@S2101-09.ap.freescale.net>
- <20120202092427.GB32403@b20223-02.ap.freescale.net>
- <20120202130901.GE9773@S2101-09.ap.freescale.net>
- <20120202135805.GB3015@richard-laptop>
- <20120203021554.GE32403@b20223-02.ap.freescale.net>
- <20120203133240.GB12915@S2101-09.ap.freescale.net>
- <a9d9bad3-edd0-4a5f-9bb3-15787430d858@email.android.com>
- <20120214013506.GA3276@b20223-02.ap.freescale.net>
-Message-ID: <20120214060627.GB13456@opensource.wolfsonmicro.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Tue, 14 Feb 2012 06:12:33 +0000
+Subject: [PATCH 00/10] I2C updates 
+In-Reply-To: <1328882405-15284-1-git-send-email-shubhrajyoti@ti.com>
+References: <1328882405-15284-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C3317B26A0@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 09:35:07AM +0800, Richard Zhao wrote:
-> On Sun, Feb 05, 2012 at 12:50:15PM +0800, Richard Zhao wrote:
+Hi,
 
-> > no, it is asoc machine driver to have machine specific code. 
-> > the machine driver do not correspond to any hw device, which cause hard
-> > to bind dt or create platform device.
+I am interested in testing these patches on AM335x. Do you have a tree with these
+patches applied so that I can pull.
 
-> I'll have to keep audmux driver in arch/, till ASOC machine driver
-> has a way to get platfrom parameters.
+On Fri, Feb 10, 2012 at 19:29:55, Datta, Shubhrajyoti wrote:
+> This patch series colates the various i2c updates into
+> a series.  Since it is collection of various patches
+> the version info is not retained, however most of them undergone
+> multiple versions.
+> 
+> This is rebased to linus head commit 63082402968f4b73f10b28a8ac1f3da821aeb82d
+> 
+> The patch series does the following 
+> 
+> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
+> - I2C register restore only if context if the context is lost
+> - Bus busy recovery mechanism.
+> - the reset is not done in init.
+> 
+> Tested on omap4sdp and omap3sdp. 
+> 
+> 
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> 
+> Jon Hunter (1):
+>   I2C: OMAP: Correct I2C revision for OMAP3
+> 
+> Shubhrajyoti D (8):
+>   I2C : OMAP : make omap_i2c_unidle/idle functions depend on
+>     CONFIG_PM_RUNTIME
+>   OMAP : I2C : Remove reset at init
+>   OMAP: I2C: I2C register restore only if context is lost
+>   OMAP: I2C: Fix the interrupt clearing in OMAP4
+>   OMAP: I2C: Fix the mismatch of pm_runtime enable and disable
+>   OMAP: I2C: Optimise the remove code
+>   OMAP: I2C: Fix the error handling
+>   I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
+>     than zero
+> 
+> Vikram Pandita (1):
+>   I2C: OMAP: Recover from Bus Busy condition
+> 
+>  drivers/i2c/busses/i2c-omap.c |  173 ++++++++++++++++++++++++-----------------
+>  1 files changed, 101 insertions(+), 72 deletions(-)
 
-Machine drivers can easily get platform data, they're just regular
-drivers of whatever type so can get platform data in the same way that
-any other driver for their bus can.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120213/8c785d8b/attachment.sig>
+
+
+Regards, 
+Gururaja
