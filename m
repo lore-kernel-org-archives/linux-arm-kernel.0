@@ -1,98 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 14 Feb 2012 13:12:52 -0600
-Subject: [PATCH v3] ARM: rpc: make default fiq handler run-time installed
-In-Reply-To: <alpine.LFD.2.02.1202141233470.24536@xanadu.home>
-References: <alpine.LFD.2.02.1202082229400.1656@xanadu.home>
- <1329231018-15625-1-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1202141233470.24536@xanadu.home>
-Message-ID: <4F3AB234.3060704@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Feb 2012 11:18:21 -0800
+Subject: [PATCH 2/2] ARM: OMAP4: Move the barrier memboclk_steal() as
+ part of reserve callback
+In-Reply-To: <CAMQu2gxRT3X7Q7bg0e-7=3HNKWjfQn7gLw9EQhY=g4U10yDMtg@mail.gmail.com>
+References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
+ <1328191435-18652-3-git-send-email-santosh.shilimkar@ti.com>
+ <20120210191926.GV1426@atomide.com> <4F3A2025.9000609@ti.com>
+ <20120214111420.GG15338@n2100.arm.linux.org.uk>
+ <CAMQu2gxRT3X7Q7bg0e-7=3HNKWjfQn7gLw9EQhY=g4U10yDMtg@mail.gmail.com>
+Message-ID: <20120214191820.GP1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2012 11:37 AM, Nicolas Pitre wrote:
-> On Tue, 14 Feb 2012, Rob Herring wrote:
+* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120214 02:58]:
+> On Tue, Feb 14, 2012 at 4:44 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Feb 14, 2012 at 02:19:41PM +0530, Santosh Shilimkar wrote:
+> >> >From 4d1ea22985adfe458275b9ae3e00edc6e41a267f Mon Sep 17 00:00:00 2001
+> >> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> Date: Thu, 2 Feb 2012 15:59:51 +0530
+> >> Subject: [PATCH 1/2] ARM: OMAP4: Move the barrier memboclk_steal() as
+> >> part of reserve callback
+> >>
+> >> Commit 716a3dc{ARM: Add arm_memblock_steal() to allocate memory away
+> >> from the kernel} introduced arm_memblock_steal() which lead to
+> >> OMAP4_ERRATA_I688 to be broken and needed to be fixed.
+> >
+> > That is misleading. ?Please don't attribute blame for this breakage to
+> > that patch, which has nothing to do with introducing the breakage. ?The
+> > errata was broken right from the start.
 > 
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> Only rpc uses disable_fiq macro. Change it to a run-time installed
->> default FIQ handler. The handler is installed before FIQ is enabled
->> so the behavior should be unchanged.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->> Nico,
->>
->> This removes the use of disable_fiq now. To keep it bisectable, the macro
->> gets removed from entry-macro-iomd.S in the last patch now.
->>
+> That's right and I didn't mean that way.
+> This was the same reason, first patch I just mentioned what was wrong
+> in the code
+> rather than mention of any commit.
 > 
-> [...]
-> 
->> --- /dev/null
->> +++ b/arch/arm/mach-rpc/fiq.S
->> @@ -0,0 +1,16 @@
->> +#include <linux/linkage.h>
->> +#include <asm/assembler.h>
->> +#include <mach/hardware.h>
->> +#include <mach/entry-macro.S>
-> 
-> Do you need to include <mach/entry-macro.S> here?
-> 
+> Tony,
+> Let me know if you want to add any commit history to the change since
+> the issue was actually existing without 'arm_memblock_stea()' commit.
+> I think, first change log was good enough from the fix point of view.
 
-Yes, for...
+OK, makes sense. I'll apply it into fixes as is then.
 
-> In any case:
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
->> +
->> +	.text
->> +
->> +	.global	rpc_default_fiq_end
->> +ENTRY(rpc_default_fiq_start)
->> +	mov	r12, #ioc_base_high
+Regards,
 
-...these defines which are needed in both files.
-
-Rob
-
->> +	.if	ioc_base_low
->> +	orr	r12, r12, #ioc_base_low
->> +	.endif
->> +	strb	r12, [r12, #0x38]	@ Disable FIQ register
->> +	subs	pc, lr, #4
->> +rpc_default_fiq_end:
->> diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
->> index 2e1b530..cf0e669 100644
->> --- a/arch/arm/mach-rpc/irq.c
->> +++ b/arch/arm/mach-rpc/irq.c
->> @@ -5,6 +5,7 @@
->>  #include <asm/mach/irq.h>
->>  #include <asm/hardware/iomd.h>
->>  #include <asm/irq.h>
->> +#include <asm/fiq.h>
->>  
->>  static void iomd_ack_irq_a(struct irq_data *d)
->>  {
->> @@ -112,6 +113,8 @@ static struct irq_chip iomd_fiq_chip = {
->>  	.irq_unmask	= iomd_unmask_irq_fiq,
->>  };
->>  
->> +extern unsigned char rpc_default_fiq_start, rpc_default_fiq_end;
->> +
->>  void __init rpc_init_irq(void)
->>  {
->>  	unsigned int irq, flags;
->> @@ -121,6 +124,9 @@ void __init rpc_init_irq(void)
->>  	iomd_writeb(0, IOMD_FIQMASK);
->>  	iomd_writeb(0, IOMD_DMAMASK);
->>  
->> +	set_fiq_handler(&rpc_default_fiq_start,
->> +		&rpc_default_fiq_end - &rpc_default_fiq_start);
->> +
->>  	for (irq = 0; irq < NR_IRQS; irq++) {
->>  		flags = IRQF_VALID;
->>  
->> -- 
->> 1.7.5.4
->>
+Tony
