@@ -1,31 +1,25 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 14 Feb 2012 11:43:39 +0200
-Subject: How to deal with a PHY configuration related to the board?
-In-Reply-To: <20120214092606.GE4723@ldesroches-Latitude-E6320>
-References: <20120214092606.GE4723@ldesroches-Latitude-E6320>
-Message-ID: <20120214094339.GA4338@sapphire.tkos.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Feb 2012 09:48:35 +0000
+Subject: [PATCH 2/9] ARM: at91/snapper9260: move gpio_to_irq out of
+ structure initialization
+In-Reply-To: <4F396C4C.9060108@gmail.com>
+References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
+ <e0557a2864e52e017a0e931c6c64fd341ae21559.1329139662.git.nicolas.ferre@atmel.com>
+ <4F396C4C.9060108@gmail.com>
+Message-ID: <20120214094835.GB13673@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
-
-On Tue, Feb 14, 2012 at 10:26:06AM +0100, Ludovic Desroches wrote:
-> I am using a Micrel KSZ9021RN PHY and I would like to configure some 
-> registers
-> as 'RGMII Clock and Control Pad Skew' and 'RGMII RX Data Pad Skew'.
-> So the values of these registers are board dependant and I wondering what is
-> the proper way to set them.
-> It seems there is no platform data usable for this case. Having a quick look
-> to other PHYs, the situation seems the same.
+On Tue, Feb 14, 2012 at 07:02:20AM +1100, Ryan Mallon wrote:
+> On 14/02/12 01:43, Nicolas Ferre wrote:
 > 
-> Can you give me some clues about how to do this? Did I miss anything which
-> allow to do this?
+> > gpio_to_irq() implementation will be moved from a macro to a
+> > plain function: we cannot use it in a structure initialization
+> > anymore.
+> 
+> What was the reason for the change? It was originally a macro for 
+> exactly this reason.
 
-See ksz9021rn_phy_fixup() in arch/arm/mach-imx/mach-imx6q.c.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+gpio_to_irq() is supposed to work not only for built-in GPIOs, but also
+GPIOs provided by other devices.  Having it as a definition which only
+works for the SoC GPIOs is broken.
