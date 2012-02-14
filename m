@@ -1,55 +1,92 @@
-From: michal.wrobel@flytronic.pl (=?UTF-8?B?TWljaGHFgiBXcsOzYmVs?=)
-Date: Tue, 14 Feb 2012 13:21:47 +0100
-Subject: [PATCH RESEND] ixp4xx: clockevent set_next_event fix
-In-Reply-To: <20120214120153.GA9808@localhost.localdomain>
-References: <4F394D3B.3080909@flytronic.pl> <4F3A2F79.6050806@flytronic.pl>
- <20120214120153.GA9808@localhost.localdomain>
-Message-ID: <4F3A51DB.70000@flytronic.pl>
+From: carl@ok-labs.com (Van Schaik, Carl)
+Date: Tue, 14 Feb 2012 13:19:12 +0000
+Subject: Cache problems in user space - kernel space communication
+In-Reply-To: <CAKPCGKt6U6m8cnagCwgzaLB9R8f73KDWmV58W3ifHQ9n-Y7sTw@mail.gmail.com>
+References: <CAKPCGKt6U6m8cnagCwgzaLB9R8f73KDWmV58W3ifHQ9n-Y7sTw@mail.gmail.com>
+Message-ID: <4541F39E5122A64CA8A7F74880F94E5201E89013BD@MBX14.EXCHPROD.USA.NET>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.02.2012 13:01, Richard Cochran wrote:
-> On Tue, Feb 14, 2012 at 10:55:05AM +0100, Micha? Wr?bel wrote:
->> IXP43x Developer's Manual [17.4.3] and IXP4[56]x Developer's Manual
->> [18.4.3] say that (...)
->>
->> IXP42x Developer's Manual [14.3] says that (...)
-> Unless you test this out and confirm that it works for all IXP4xx, I
-> would prefer to see a specific timer function for the 43x instead.
->
-> Thanks,
-> Richard
-I think I might have some IXP425-based boards available for testing.
-However, I certainly don't have any IXP45x- or IXP46x-based board. Maybe
-I'll prepare a small kernel module that will allow to easily test this
-issue by other list members who have IXP45x- and IXP46x-based boards?
+Looks like you are mapping the same page cached to both kernel and user space (at different virtual addresses). With the VIVT cache, the two mappings will hash differently into the cache and access different cache lines. To successfully work like this on a VIVT cache you need to perform a lot of cache maintenance whenever switching from kernel to user. You would likely rather map the page uncached in both kernel and user to save all the effort.
 
-Regards,
-Micha?
->> Signed-off-by: Micha? Wr?bel <michal.wrobel@flytronic.pl>
->> ---
->>  arch/arm/mach-ixp4xx/common.c |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> The previous patch had a mistake in the description - wrong reference to
->> "General-Purpose Timers" section in IXP42x Developer's Manual.
->>
->> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
->> index 3841ab4..fd37c83 100644
->> --- a/arch/arm/mach-ixp4xx/common.c
->> +++ b/arch/arm/mach-ixp4xx/common.c
->> @@ -434,6 +434,7 @@ static int ixp4xx_set_next_event(unsigned long evt,
->>  {
->>  	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
->>  
->> +	*IXP4XX_OSRT1 = 0;
->>  	*IXP4XX_OSRT1 = (evt & ~IXP4XX_OST_RELOAD_MASK) | opts;
->>  
->>  	return 0;
->> -- 
->> 1.7.5.4
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+--
+Carl
+
+> -----Original Message-----
+> From: Bart Jonkers [mailto:jonkersbart at gmail.com]
+> Sent: Tuesday, 14 February 2012 6:46 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Subject: Cache problems in user space - kernel space communication
+> 
+> All,
+> 
+> I'm experiencing problems in our application where a driver and a user space
+> application performs bi-directional communication through a memory
+> buffer.
+> 
+> We are running a 2.6.35.14 kernel on an kirkwood based SoC (Marvell
+> 88F6192):
+> [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE),
+> cr=00053977
+> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> 
+> /root> cat /proc/cpuinfo
+> Processor       : Feroceon 88FR131 rev 1 (v5l)
+> BogoMIPS        : 796.44
+> Features        : swp half thumb fastmult edsp
+> CPU implementer : 0x56
+> CPU architecture: 5TE
+> CPU variant     : 0x2
+> CPU part        : 0x131
+> CPU revision    : 1
+> 
+> The kernel driver allocates some page aligned memory which is memory
+> mapped by the application.
+> The driver put some data in the memory area and informs the application.
+> The application processes the data, changes it and informs the kernel. The
+> kernel then processes the data further and remove it from the buffer.
+> 
+> We see that the driver doesn't always see the changes of the application to
+> the data.
+> We see that the changes by the application near the initial kernel data are
+> not seen but if data is added on other places in the buffer which where not
+> accessed earlier by the kernel, the kernel sees the changes.
+> It seems that this area which is not updated in the kernel is the size of a
+> cache line of the L1 cache.
+> 
+> In the mailing list archive I have found the following thread:
+> http://lists.arm.linux.org.uk/lurker/message/20091204.112345.0fbed99c.en.
+> html
+> I tried the suggested patch and it solves the problem described in the thread
+> but not our problem.
+> The problem in the thread is communication between two user space
+> programs as ours is between user space and kernel space.
+> 
+> I made a small module and application to reproduce the problem (source
+> attached).
+> When it goes wrong i see the following output:
+> 
+> [ 1211.827680] Sending packet with counter 0 to user space Received packet
+> from kernel with counter 0 [ 1211.834556] removing packet with counter 0
+> 
+> [ 1216.841009]Sending packet with counter 1 to user space Received packet
+> from kernel with counter 1 [ 1216.852027] Value 5 of packet 1 is not equal.
+> [ 1216.857752] Value 6 of packet 1 is not equal.
+> [ 1216.863119] Value 7 of packet 1 is not equal.
+> [ 1216.867478] Value 8 of packet 1 is not equal.
+> [ 1216.871838] Value 9 of packet 1 is not equal.
+> [ 1216.876190] Value 10 of packet 1 is not equal.
+> 
+> [ 1221.854343] Sending packet with counter 2 to user space Received packet
+> from kernel with counter 3 [ 1226.873237] removing packet with counter 3 [
+> 1226.878701] Value 5 of packet 3 is not equal.
+> [ 1226.884422] Value 6 of packet 3 is not equal.
+> [ 1226.889796] Value 7 of packet 3 is not equal.
+> [ 1226.894149] Value 8 of packet 3 is not equal.
+> ...
+> 
+> The output shows that a part of the data written in user space is not read
+> back successful in kernel space.
+> 
+> Regards,
+> Bart
