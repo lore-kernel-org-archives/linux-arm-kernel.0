@@ -1,285 +1,100 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 14 Feb 2012 08:11:07 -0600
-Subject: [PATCH v5 1/9] ARM: at91/aic: add irq domain and device tree
- support
-In-Reply-To: <4F3A3678.8090706@atmel.com>
-References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
- <2fd1ebedc5ad5ac7aeb15c590c4400212a3b06cf.1329139662.git.nicolas.ferre@atmel.com>
- <4F398A6E.8040905@gmail.com> <4F3A3678.8090706@atmel.com>
-Message-ID: <4F3A6B7B.9040406@gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 14 Feb 2012 19:45:24 +0530
+Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
+In-Reply-To: <20120213232901.GG25655@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1202022016480.2759@xanadu.home>
+ <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
+ <CAH+eYFCKcPzMMp_Ef5iX0Xp=xK8MdvJoUBRgKGT56SVjY5DXoA@mail.gmail.com>
+ <alpine.LFD.2.02.1202131307430.24536@xanadu.home>
+ <4F3952C7.3040502@codeaurora.org>
+ <20120213181501.GD25655@n2100.arm.linux.org.uk>
+ <4F398D61.9080501@codeaurora.org>
+ <20120213232901.GG25655@n2100.arm.linux.org.uk>
+Message-ID: <20120214141524.GB3310@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2012 04:24 AM, Nicolas Ferre wrote:
-> On 02/13/2012 11:10 PM, Rob Herring :
->> On 02/13/2012 08:43 AM, Nicolas Ferre wrote:
->>> Add an irqdomain for the AIC interrupt controller.
->>> The device tree support is mapping the registers and
->>> is using the irq_domain_add_legacy() to manage hwirq
->>> translation.
->>> The documentation is describing the meaning of the
->>> two cells required for using this "interrupt-controller"
->>> in a device tree node.
->>>
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> ---
->>> v5: - rebased on top of Grant's "irq_domain generalization and refinement"
->>>       patch series
->>>     - use of irq_domain_add_legacy() API
->>>
->>> v4: - use irq_alloc_descs() to find irq_base
->>>     - add a new constant AIC_BASE_IRQ that will allow to skip
->>>       first interrupt numbers (in the future)
->>>
->>> v3: - change number of cells to define an AIC interrupt (irq trigger type)
->>>     - change current .dtsi files to match specification
->>>     - use irq_domain_simple_ops (for DT mapping)
->>>
->>> v2: - use of_irq_init() function for device tree probing
->>>     - add documentation
->>>     - use own simple struct irq_domain_ops
->>>
->>>
->>>  .../devicetree/bindings/arm/atmel-aic.txt          |   38 ++++++++++
->>>  arch/arm/Kconfig                                   |    1 +
->>>  arch/arm/boot/dts/at91sam9g20.dtsi                 |   18 +++---
->>>  arch/arm/boot/dts/at91sam9g45.dtsi                 |   16 ++--
->>>  arch/arm/mach-at91/include/mach/irqs.h             |    3 +-
->>>  arch/arm/mach-at91/irq.c                           |   74 ++++++++++++++++----
->>>  6 files changed, 119 insertions(+), 31 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
+On Mon, Feb 13, 2012 at 11:29:01PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 13, 2012 at 02:23:29PM -0800, Stephen Boyd wrote:
+> > On 02/13/12 10:15, Russell King - ARM Linux wrote:
+> > > On Mon, Feb 13, 2012 at 10:13:27AM -0800, Stephen Boyd wrote:
+> > >> Thanks. Russell has already merged the original patch to the fixes
+> > >> branch. Hopefully he can fold this one in.
+> > > Nope, I've asked Linus to pull it.
+> > >
+> > > So do we conclude that the original patch wasn't properly tested? :P
+> > 
+> > Sigh. Lockdep strikes again! I promise I tested it with lockdep disabled.
+> > 
+> > It looks like Linus' hasn't pulled yet but maybe he just hasn't
+> > published it.
 > 
-> [..]
+> It's not nice to change something after you've sent a pull request -
+> there's no way of knowing when Linus actually pulls it before he's
+> published it, and if he gets something different then it can raise
+> questions.
 > 
->>> --- a/arch/arm/mach-at91/include/mach/irqs.h
->>> +++ b/arch/arm/mach-at91/include/mach/irqs.h
->>> @@ -25,6 +25,7 @@
->>>  #include <mach/at91_aic.h>
->>>  
->>>  #define NR_AIC_IRQS 32
->>> +#define AIC_BASE_IRQ 0
->>>  
->>>  
->>>  /*
->>> @@ -40,7 +41,7 @@
->>>   * symbols in gpio.h for ones handled indirectly as GPIOs.
->>>   * We make provision for 5 banks of GPIO.
->>>   */
->>> -#define	NR_IRQS		(NR_AIC_IRQS + (5 * 32))
->>> +#define	NR_IRQS		(AIC_BASE_IRQ + NR_AIC_IRQS + (5 * 32))
->>
->> Why? You're not changing anything.
->>
->> You should turn on SPARSE_IRQ at some point and then this value goes away.
-> 
-> Yes, my intention is to move to this step by step. I have tried hard to
-> rework completely the AIC driver without success so far. I plan:
-> - move the AIC_BASE_IRQ away from irq0
->   => this is why I introduce a constant here
-> - use SPARSE_IRQ
-> - move to generic irq & irq domain helpers (move DT case to "linear")
-> 
-> *once* the code for handling all this is stabilized and integrated in
-> mainline.
-> 
-> This rework is designed for 3.4 and a lot of code depend on this for all
-> our at91 DT move.
+> So, it's gone in as-is, and, as I'm now intending asking for another
+> pull request soo soon after my previous one, this is something that
+> we will have to live with probably for the remainder of the week.
 
-In that case, NR_IRQS will be removed. You will get the default of 16
-(NR_LEGACY_IRQS) and they will get reserved so irq_alloc_descs will skip
-over them. So there is no reason for you to have AIC_BASE_IRQ.
+OK, since it can't be folded in, here is a proper patch:
 
-> 
-> 
->>>  /* FIQ is AIC source 0. */
->>>  #define FIQ_START AT91_ID_FIQ
->>> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
->>> index be6b639..880da98 100644
->>> --- a/arch/arm/mach-at91/irq.c
->>> +++ b/arch/arm/mach-at91/irq.c
->>> @@ -24,6 +24,12 @@
->>>  #include <linux/module.h>
->>>  #include <linux/mm.h>
->>>  #include <linux/types.h>
->>> +#include <linux/irq.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/of_irq.h>
->>> +#include <linux/irqdomain.h>
->>> +#include <linux/err.h>
->>>  
->>>  #include <mach/hardware.h>
->>>  #include <asm/irq.h>
->>> @@ -34,22 +40,24 @@
->>>  #include <asm/mach/map.h>
->>>  
->>>  void __iomem *at91_aic_base;
->>> +static struct irq_domain *at91_aic_domain;
->>> +static struct device_node *at91_aic_np;
->>>  
->>>  static void at91_aic_mask_irq(struct irq_data *d)
->>>  {
->>>  	/* Disable interrupt on AIC */
->>> -	at91_aic_write(AT91_AIC_IDCR, 1 << d->irq);
->>> +	at91_aic_write(AT91_AIC_IDCR, 1 << d->hwirq);
->>>  }
->>>  
->>>  static void at91_aic_unmask_irq(struct irq_data *d)
->>>  {
->>>  	/* Enable interrupt on AIC */
->>> -	at91_aic_write(AT91_AIC_IECR, 1 << d->irq);
->>> +	at91_aic_write(AT91_AIC_IECR, 1 << d->hwirq);
->>>  }
->>>  
->>>  unsigned int at91_extern_irq;
->>>  
->>> -#define is_extern_irq(irq) ((1 << (irq)) & at91_extern_irq)
->>> +#define is_extern_irq(hwirq) ((1 << (hwirq)) & at91_extern_irq)
->>>  
->>>  static int at91_aic_set_type(struct irq_data *d, unsigned type)
->>>  {
->>> @@ -63,13 +71,13 @@ static int at91_aic_set_type(struct irq_data *d, unsigned type)
->>>  		srctype = AT91_AIC_SRCTYPE_RISING;
->>>  		break;
->>>  	case IRQ_TYPE_LEVEL_LOW:
->>> -		if ((d->irq == AT91_ID_FIQ) || is_extern_irq(d->irq))		/* only supported on external interrupts */
->>> +		if ((d->hwirq == AT91_ID_FIQ) || is_extern_irq(d->hwirq))		/* only supported on external interrupts */
->>>  			srctype = AT91_AIC_SRCTYPE_LOW;
->>>  		else
->>>  			return -EINVAL;
->>>  		break;
->>>  	case IRQ_TYPE_EDGE_FALLING:
->>> -		if ((d->irq == AT91_ID_FIQ) || is_extern_irq(d->irq))		/* only supported on external interrupts */
->>> +		if ((d->hwirq == AT91_ID_FIQ) || is_extern_irq(d->hwirq))		/* only supported on external interrupts */
->>>  			srctype = AT91_AIC_SRCTYPE_FALLING;
->>>  		else
->>>  			return -EINVAL;
->>> @@ -78,8 +86,8 @@ static int at91_aic_set_type(struct irq_data *d, unsigned type)
->>>  		return -EINVAL;
->>>  	}
->>>  
->>> -	smr = at91_aic_read(AT91_AIC_SMR(d->irq)) & ~AT91_AIC_SRCTYPE;
->>> -	at91_aic_write(AT91_AIC_SMR(d->irq), smr | srctype);
->>> +	smr = at91_aic_read(AT91_AIC_SMR(d->hwirq)) & ~AT91_AIC_SRCTYPE;
->>> +	at91_aic_write(AT91_AIC_SMR(d->hwirq), smr | srctype);
->>>  	return 0;
->>>  }
->>>  
->>> @@ -90,13 +98,13 @@ static u32 backups;
->>>  
->>>  static int at91_aic_set_wake(struct irq_data *d, unsigned value)
->>>  {
->>> -	if (unlikely(d->irq >= 32))
->>> +	if (unlikely(d->hwirq >= NR_AIC_IRQS))
->>>  		return -EINVAL;
->>>  
->>>  	if (value)
->>> -		wakeups |= (1 << d->irq);
->>> +		wakeups |= (1 << d->hwirq);
->>>  	else
->>> -		wakeups &= ~(1 << d->irq);
->>> +		wakeups &= ~(1 << d->hwirq);
->>>  
->>>  	return 0;
->>>  }
->>> @@ -127,24 +135,64 @@ static struct irq_chip at91_aic_chip = {
->>>  	.irq_set_wake	= at91_aic_set_wake,
->>>  };
->>>  
->>> +#if defined(CONFIG_OF)
->>> +static int __init __at91_aic_of_init(struct device_node *node,
->>> +				     struct device_node *parent)
->>> +{
->>> +	at91_aic_base = of_iomap(node, 0);
->>> +	at91_aic_np = node;
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static const struct of_device_id aic_ids[] __initconst = {
->>> +	{ .compatible = "atmel,at91rm9200-aic", .data = __at91_aic_of_init },
->>> +	{ /*sentinel*/ }
->>> +};
->>> +
->>> +static void __init at91_aic_of_init(void)
->>> +{
->>> +	of_irq_init(aic_ids);
->>
->> This call and match str belongs in your board file (init_irq function)
->> and you should be doing all setup in __at91_aic_of_init.
-> 
-> It has already been discussed here:
-> http://article.gmane.org/gmane.linux.drivers.devicetree/9834
-> 
-> I feel that this self-contained driver is the best solution for the
-> moment. Once the priorities will be encoded in the device tree (and
-> moreover once they will be useful for threaded interrupts), we may
-> re-consider this.
-> 
+8<---------
+>From 26f02624a20a61ed1997a4e8648e4c766a54d91d Mon Sep 17 00:00:00 2001
+From: Rabin Vincent <rabin@rab.in>
+Date: Tue, 14 Feb 2012 19:22:07 +0530
+Subject: [PATCH] ARM: fix v7 boot with lockdep enabled
 
-Can you setup the priorities after init with a separate function? Then
-you can follow standard init flow and afterwards set the priorities.
+Bootup with lockdep enabled has been broken on v7 since b46c0f74657d
+("ARM: 7321/1: cache-v7: Disable preemption when reading CCSIDR").
 
-BTW, We're probably going to start moving irqchips to a common
-drivers/irqchips. So it's important that init flow be consistent with
-other irqchips.
+This is because v7_setup (which is called very early during boot) calls
+v7_flush_dcache_all, and the save_and_disable_irqs added by that patch
+ends up attempting to call into lockdep C code (trace_hardirqs_off())
+when we are in no position to execute it (no stack, MMU off).
 
->>> +}
->>> +#else
->>> +static void __init at91_aic_of_init(void) {}
->>> +#endif
->>> +
->>>  /*
->>>   * Initialize the AIC interrupt controller.
->>>   */
->>>  void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
->>
->> Perhaps the priority should be a cell in your interrupts property?
-> 
-> Yes, it is a good idea. But that will prevent me from using a standard
-> irq_domain simple xlate operation... Maybe we can think about this a bit
-> more and implement it in the future.
+Fix this by using a notrace variant of save_and_disable_irqs.  The code
+already uses the notrace variant of restore_irqs.
 
-That's not a good argument. What Linux has or doesn't have should not
-really influence your binding. What is the right thing to do?
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: stable at vger.kernel.org
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/include/asm/assembler.h |    5 +++++
+ arch/arm/mm/cache-v7.S           |    2 +-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
 
-You can put the priority into the upper half word of cell 2. The trigger
-type is masked. But you would still need a custom translate function to
-extract the priority and set it.
-
-You could perhaps just put all the priorities as a property of the
-interrupt controller node. Then you don't have to increase the cell size.
-
->>>  {
->>>  	unsigned int i;
->>> +	int irq_base;
->>>  
->>> -	at91_aic_base = ioremap(AT91_AIC, 512);
->>> +	if (of_have_populated_dt())
->>> +		at91_aic_of_init();
->>
->> You should get to this point because of_irq_init called you and you
->> should already have a node ptr at point.
->>
->>> +	else
->>> +		at91_aic_base = ioremap(AT91_AIC, 512);
->>>  
->>>  	if (!at91_aic_base)
->>> -		panic("Impossible to ioremap AT91_AIC\n");
->>> +		panic("Unable to ioremap AIC registers\n");
->>> +
->>> +	/* Add irq domain for AIC */
->>> +	irq_base = irq_alloc_descs(-1, AIC_BASE_IRQ, NR_AIC_IRQS, 0);
->>
->> Really, you don't want to use irq0, but that would break your irq entry
->> code.
-> 
-> Exactly. I have the code for switching to MULTI_IRQ_HANDLER ready. But
-> that will require a little modification of each board file. This
-> scattered modification is maybe a bit late for 3.4 inclusion...
-> 
-
-Okay. It's fine for now. Just making sure you're aware of the issue.
-
-Rob
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 62f8095..23371b1 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -137,6 +137,11 @@
+ 	disable_irq
+ 	.endm
+ 
++	.macro	save_and_disable_irqs_notrace, oldcpsr
++	mrs	\oldcpsr, cpsr
++	disable_irq_notrace
++	.endm
++
+ /*
+  * Restore interrupt state previously stored in a register.  We don't
+  * guarantee that this will preserve the flags.
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 7a24d396..a655d3d 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -55,7 +55,7 @@ loop1:
+ 	cmp	r1, #2				@ see what cache we have at this level
+ 	blt	skip				@ skip if no cache, or just i-cache
+ #ifdef CONFIG_PREEMPT
+-	save_and_disable_irqs r9		@ make cssr&csidr read atomic
++	save_and_disable_irqs_notrace r9	@ make cssr&csidr read atomic
+ #endif
+ 	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
+ 	isb					@ isb to sych the new cssr&csidr
+-- 
+1.7.9
