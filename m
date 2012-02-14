@@ -1,91 +1,57 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 14 Feb 2012 11:38:44 -0600
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Feb 2012 17:40:35 +0000
 Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <201202140106.32856.arnd@arndb.de>
+In-Reply-To: <201202141716.26930.arnd@arndb.de>
 References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <1329169408-17253-14-git-send-email-robherring2@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F001F41FCB4EFA@AUSP01VMBX24.collaborationhost.net>
- <201202140106.32856.arnd@arndb.de>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FCB510C@AUSP01VMBX24.collaborationhost.net>
+ <201202140804.49026.arnd@arndb.de> <4F3A7158.2080702@gmail.com>
+ <201202141716.26930.arnd@arndb.de>
+Message-ID: <20120214174035.GA29765@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, February 13, 2012 6:07 PM, Arnd Bergmann wrote:
-> On Monday 13 February 2012, H Hartley Sweeten wrote:
->>> +#ifdef CONFIG_NEED_MACH_IO_H
->>>  #include <mach/io.h>
->>> +#else
->>> +#define __io(a)              ({ (void)(a); __typesafe_io(0); })
->>> +#define __mem_pci(a) (a)
->>> +#endif
->> 
->> Rob,
->> 
->> I compile and boot tested these patches on EP93xxbut did not check them
->> with sparse.
->> 
->> Most of the mach/io.h headers you remove in Patch 14/15 have the __io
->> macro defined like:
->> 
->> #define __io(a)         __typesafe_io(a)
->> 
->> Does your change above still keep the __io macro typesafe?
->> 
->> They don't appear equivalent to me...
->
-> It's not equivalent, but the new version is more correct for most
-> platforms because it turns a random pointer dereference into a NULL
-> pointer dereference.
->
-> If you have none of PCI/ISA/PCMCIA, then inb/outb should never be
-> used. Ideally we would undefine __io in that case, which results
-> in the inb/outb stuff also not getting defined, but some drivers
-> like 8250 serial then fail to build even for systems that only
-> use the readl/writel path.
+On Tue, Feb 14, 2012 at 05:16:26PM +0000, Arnd Bergmann wrote:
+> On Tuesday 14 February 2012, Rob Herring wrote:
+> > On 02/14/2012 02:04 AM, Arnd Bergmann wrote:
+> > > On Tuesday 14 February 2012, Rob Herring wrote:
+> > > 
+> > >> If we use CONFIG_PCI, then we have to move over all PCI enabled
+> > >> platforms at once. With a separate kconfig option, then we can move
+> > >> platforms one by one. Some are legacy and we may not want to move. This
+> > >> also helped with omap, but Tony has now fixed it.
+> > > 
+> > > We could also generalize the implementation from tegra, which seems
+> > > reasonable as a start:
+> > > 
+> > > 
+> > > #define IO_SPACE_LIMIT 0xffff
+> > > 
+> > > #if defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
+> > > #include <mach/io.h>
+> > > #elif defined(CONFIG_PCI)
+> > > extern void __iomem *pci_io_base;
+> > > 
+> > > static inline void __iomem *__io(unsigned long addr)
+> > > {
+> > >         return pci_io_base + (addr & IO_SPACE_LIMIT);
+> > 
+> > But don't we want a constant pci_io_base? This would certainly be a
+> > quicker conversion, but I don't think we want to do it twice.
+> 
+> Yes, at least in the long run. Note that this should make no difference
+> at all from a performance point of view, but it does impact code size a bit.
 
-Sorry... I don't quite understand the change here.
+That depends whether the additional reloads of pci_io_base can be properly
+scheduled by the compiler, and experience shows that you tend to end up
+with the load delay slot _not_ being filled on older processors.
 
-__typesafe_io is an inline function in asm/io.h. Most of the mach/io.h
-headers simply define __io to be __typesafe_io so they basically get
-this:
+Not only that, but the compiler _will_ evaluate the entire:
 
-void __iomem *__io(unsigned long addr)
-{
-	return (void __iomem *)addr;
-}
+	pci_io_base + (addr & IO_SPACE_LIMIT)
 
-With the change in Rob's patch they will get this:
+thing every time.  With a 64K mask, that will include _reloading_ the
+mask every single access.
 
-void __iomem *__io(unsigned long addr)
-{
-	(void)addr;
-	return (void __iomem *)(0);
-}
+So, we'll probably end up with about three additional loads per IO
+operation, none of which would be scheduled particularly well.
 
-If you then push these into something like the outb macro you get this:
-
-#define outb(v,p)	({ __iowmb(); __raw_writeb(v,__io(p)); })
-
-Original:
-
-outb(v,p)
-{
-	__iowmb();
-	__raw_writeb(v, (void __iomem*)p);
-}
-
-Rob's change:
-
-outb(v,p)
-{
-	__iowmb();
-	__raw_writeb(v, /* not sure what happens to the (void)p */ (void __iomem *)0);
-}
-
-To me the original one looks more correct. With Rob's change it looks to me like all
-the in/out macros end up reading/writing to address 0.
-
-I don't get what's happening in Rob's change. Could you enlighten me?
-
-Regards,
-Hartley
+"Yuck" and "not in my kernel" comes to mind.
