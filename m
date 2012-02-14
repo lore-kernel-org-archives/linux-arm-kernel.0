@@ -1,25 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Feb 2012 09:48:35 +0000
-Subject: [PATCH 2/9] ARM: at91/snapper9260: move gpio_to_irq out of
- structure initialization
-In-Reply-To: <4F396C4C.9060108@gmail.com>
-References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
- <e0557a2864e52e017a0e931c6c64fd341ae21559.1329139662.git.nicolas.ferre@atmel.com>
- <4F396C4C.9060108@gmail.com>
-Message-ID: <20120214094835.GB13673@n2100.arm.linux.org.uk>
+From: michal.wrobel@flytronic.pl (=?UTF-8?B?TWljaGHFgiBXcsOzYmVs?=)
+Date: Tue, 14 Feb 2012 10:55:05 +0100
+Subject: [PATCH RESEND] ixp4xx: clockevent set_next_event fix
+In-Reply-To: <4F394D3B.3080909@flytronic.pl>
+References: <4F394D3B.3080909@flytronic.pl>
+Message-ID: <4F3A2F79.6050806@flytronic.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 07:02:20AM +1100, Ryan Mallon wrote:
-> On 14/02/12 01:43, Nicolas Ferre wrote:
-> 
-> > gpio_to_irq() implementation will be moved from a macro to a
-> > plain function: we cannot use it in a structure initialization
-> > anymore.
-> 
-> What was the reason for the change? It was originally a macro for 
-> exactly this reason.
+IXP43x Developer's Manual [17.4.3] and IXP4[56]x Developer's Manual
+[18.4.3] say that for predictable operation the timer needs to be
+stopped before writing a new value into the reload register. Indeed,
+tests on IXP435 show that writing a new value into the reload register
+without stopping the timer first has no immediate effect on the timer.
+This makes hrtimers started through hrtimer_start() to be delayed until
+the currently earliest hrtimer expires.
 
-gpio_to_irq() is supposed to work not only for built-in GPIOs, but also
-GPIOs provided by other devices.  Having it as a definition which only
-works for the SoC GPIOs is broken.
+IXP42x Developer's Manual [14.3] says that the timer will be reloaded
+immediately on setting the timer reload register, so the bug probably
+doesn't occur on those CPUs. However, stopping the timer shouldn't have
+any negative side effects, so it should be safe to apply it
+machine-wide.
+
+Signed-off-by: Micha? Wr?bel <michal.wrobel@flytronic.pl>
+---
+ arch/arm/mach-ixp4xx/common.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+The previous patch had a mistake in the description - wrong reference to
+"General-Purpose Timers" section in IXP42x Developer's Manual.
+
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 3841ab4..fd37c83 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -434,6 +434,7 @@ static int ixp4xx_set_next_event(unsigned long evt,
+ {
+ 	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
+ 
++	*IXP4XX_OSRT1 = 0;
+ 	*IXP4XX_OSRT1 = (evt & ~IXP4XX_OST_RELOAD_MASK) | opts;
+ 
+ 	return 0;
+-- 
+1.7.5.4
