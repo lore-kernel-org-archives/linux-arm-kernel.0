@@ -1,33 +1,35 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Tue, 14 Feb 2012 10:59:12 +1030
-Subject: [PATCH] modpost: Fix section warnings for ARM for many compilers
-In-Reply-To: <20120213225118.GC31482@n2100.arm.linux.org.uk>
-References: <20120213212401.GH1426@atomide.com>
- <20120213222652.GL14173@pengutronix.de>
- <20120213225118.GC31482@n2100.arm.linux.org.uk>
-Message-ID: <878vk6cl5z.fsf@rustcorp.com.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Feb 2012 00:52:39 +0000
+Subject: [GIT PULL] at91: fixes for 3.3-rc4
+In-Reply-To: <4F394D34.6000604@atmel.com>
+References: <4F394D34.6000604@atmel.com>
+Message-ID: <201202140052.39979.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Feb 2012 22:51:18 +0000, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Mon, Feb 13, 2012 at 11:26:52PM +0100, Uwe Kleine-K?nig wrote:
-> > On Mon, Feb 13, 2012 at 01:24:01PM -0800, Tony Lindgren wrote:
-> > Maybe:
-> > 
-> > #ifndef R_ARM_CALL
-> > #warning "you're elf.h include is outdated"
+On Monday 13 February 2012, Nicolas Ferre wrote:
+> Olof, Arnd,
 > 
-> "You are elf.h include is outdated" does not make sense.
+> Here is the second "fixes" pull request. It collects a simple #ifdef fix, the
+> proper use of ioremap() in the RTC driver and a set of SMC related
+> modifications.
+> The SMC has been modified recently and has broken the pata_at91 driver. The
+> new accessors are fixing this situation. Finally, the old at91_ide driver is
+> removed because it is not maintained anymore, the IDE tree is frozen and PATA
+> should be used instead.
 > 
-> Why are you calling Tony an elf.h include?
+> I have also verified that it merges correctly with depends/rmk/for-armsoc and all
+> at91 related 3.4 material...
+> 
+> You can find all this here:
+> 
+> The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
 
-Because he knew it would attract the attention of pedants to the patch?
-:)
+Hmm, this is a bit bigger than I would have hoped for an -rc4 pull request.
 
-Just do the #ifndef, and skip the warning.  There's not much the poor
-user receiving the warning can do about it.
+I've applied it now to the fixes branch because it seems necessary, I hope
+this doesn't come back to us in a bad way. Olof, please have a look over
+these patches as well. If you're ok with these, I'll send the entire batch
+to Linus.
 
-Acked-by: Rusty Russell <rusty@rustcorp.com.au>
-
-Thanks,
-Rusty.
+	Arnd
