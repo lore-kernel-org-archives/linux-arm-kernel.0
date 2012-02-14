@@ -1,100 +1,151 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 14 Feb 2012 19:45:24 +0530
-Subject: [PATCH] ARM: cache-v7: Disable preemption when reading CCSIDR
-In-Reply-To: <20120213232901.GG25655@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1202022016480.2759@xanadu.home>
- <1328234629-32735-1-git-send-email-sboyd@codeaurora.org>
- <CAH+eYFCKcPzMMp_Ef5iX0Xp=xK8MdvJoUBRgKGT56SVjY5DXoA@mail.gmail.com>
- <alpine.LFD.2.02.1202131307430.24536@xanadu.home>
- <4F3952C7.3040502@codeaurora.org>
- <20120213181501.GD25655@n2100.arm.linux.org.uk>
- <4F398D61.9080501@codeaurora.org>
- <20120213232901.GG25655@n2100.arm.linux.org.uk>
-Message-ID: <20120214141524.GB3310@debian>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 14 Feb 2012 08:36:08 -0600
+Subject: [PATCH 13/15] ARM: make mach/io.h include optional
+In-Reply-To: <201202140804.49026.arnd@arndb.de>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <201202140203.15360.arnd@arndb.de> <4F39CCE0.200@gmail.com>
+ <201202140804.49026.arnd@arndb.de>
+Message-ID: <4F3A7158.2080702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 11:29:01PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 13, 2012 at 02:23:29PM -0800, Stephen Boyd wrote:
-> > On 02/13/12 10:15, Russell King - ARM Linux wrote:
-> > > On Mon, Feb 13, 2012 at 10:13:27AM -0800, Stephen Boyd wrote:
-> > >> Thanks. Russell has already merged the original patch to the fixes
-> > >> branch. Hopefully he can fold this one in.
-> > > Nope, I've asked Linus to pull it.
-> > >
-> > > So do we conclude that the original patch wasn't properly tested? :P
-> > 
-> > Sigh. Lockdep strikes again! I promise I tested it with lockdep disabled.
-> > 
-> > It looks like Linus' hasn't pulled yet but maybe he just hasn't
-> > published it.
+On 02/14/2012 02:04 AM, Arnd Bergmann wrote:
+> On Tuesday 14 February 2012, Rob Herring wrote:
+>> Arnd,
+>>
+>> On 02/13/2012 08:03 PM, Arnd Bergmann wrote:
+>>> On Monday 13 February 2012, Russell King - ARM Linux wrote:
+>>>> On Mon, Feb 13, 2012 at 03:43:26PM -0600, Rob Herring wrote:
+>>>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>>>
+>>>>> Add a kconfig option NEED_MACH_IO_H to conditionally include mach/io.h.
+>>>>>
+>>>>> Basing this on CONFIG_PCI and CONFIG_ISA doesn't quite work. Most ISA
+>>>>> platforms don't need mach/io.h, but ebsa110 does.
+>>>>
+>>>> This is architecturally wrong.  If you have ISA, and your __io() macro
+>>>> is essentially a 1:1 translation, you're asking for ISA drivers to
+>>>> scribble on whatever is at virtual address 0-64K.  Too bad if that
+>>>> happens to be where your CPU vectors are stored, you'll lose control
+>>>> of the CPU in that case.
+>>>
+>>> Right. I still think it should be conditional on PCI || ISA || PCMCIA,
+>>> not introducing a new kconfig symbol, and the next step should be to
+>>> unify the __io() implementations for the platforms that need them.
+>>
+>> As we discussed at Connect, that was my original intent. However, there
+>> are a couple of issues as NEED_MACH_IO_H is not exactly equivalent to
+>> PCI || ISA || PCMCIA.
+>>
+>> There are a few platforms which still need io.h for custom accessor
+>> functions: rpc, ixp4xx, s3c2410, and ebsa110.
 > 
-> It's not nice to change something after you've sent a pull request -
-> there's no way of knowing when Linus actually pulls it before he's
-> published it, and if he gets something different then it can raise
-> questions.
+> I've tried to interpret what is there, please correct me if this is wrong:
 > 
-> So, it's gone in as-is, and, as I'm now intending asking for another
-> pull request soo soon after my previous one, this is something that
-> we will have to live with probably for the remainder of the week.
+> RPC and ebsa110 have ISA, or some twisted version of that. I believe
+> RPC doesn't select CONFIG_ISA because it has no actual ISA slots but
+> it still uses legacy ISA I/O and we might just select it anyway.
+> 
+> s3c24xx seems to have ISA in a similar way on the "bast" machine,
+> while the setup code for that got copied into some platforms that
+> don't really require it.
+> 
+> ixp4xx has PCI, but does not always use direct MMIO to access the
+> memory or I/O spaces.
+> 
+> I guess the only way we can ever make these ones use a common header
+> file (in case we care) by letting them go through an indirect
+> struct io_ops { u8 (*inb)(int); void (*outb)(u8, int); ... };,
+> but we might not care enough.
+> 
+>> Also, a few platforms that
+>> only select ISA don't do any translation in __io(). These are sa1100,
+>> clps711x, and pxa. My understanding is that is wrong.
+> 
+> sa1100 has pcmcia slots that use their own method (setting io_offset)
+> of redirecting the i/o space into the right location. As Russell
+> mentioned, this is broken if you load an ISA device driver that
+> uses hardcoded port numbers, or as I might add when you use /dev/port.
+> 
+> pxa seems to do the same as sa1100 for PCMCIA and PCI, but I can't figure
+> out what they do for ISA. I suspect they only enable that in order to
+> get ISA device drivers for PCMCIA based add-on cards.
+> 
+> clps711x for all I can tell is broken as you say.
+> 
+> I think omap1 and at91 fit into the same category as sa1100 and pxa
+> regarding pcmcia. All four can in theory be converted to use a
+> common virtual mapping as we want to have for PCI.
+> 
+>> If we use CONFIG_PCI, then we have to move over all PCI enabled
+>> platforms at once. With a separate kconfig option, then we can move
+>> platforms one by one. Some are legacy and we may not want to move. This
+>> also helped with omap, but Tony has now fixed it.
+> 
+> We could also generalize the implementation from tegra, which seems
+> reasonable as a start:
+> 
+> 
+> #define IO_SPACE_LIMIT 0xffff
+> 
+> #if defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
+> #include <mach/io.h>
+> #elif defined(CONFIG_PCI)
+> extern void __iomem *pci_io_base;
+> 
+> static inline void __iomem *__io(unsigned long addr)
+> {
+>         return pci_io_base + (addr & IO_SPACE_LIMIT);
 
-OK, since it can't be folded in, here is a proper patch:
+But don't we want a constant pci_io_base? This would certainly be a
+quicker conversion, but I don't think we want to do it twice.
 
-8<---------
->From 26f02624a20a61ed1997a4e8648e4c766a54d91d Mon Sep 17 00:00:00 2001
-From: Rabin Vincent <rabin@rab.in>
-Date: Tue, 14 Feb 2012 19:22:07 +0530
-Subject: [PATCH] ARM: fix v7 boot with lockdep enabled
+> }
+> #else
+> static inline void __iomem *__io(unsigned long addr)
+> {
+>         return NULL;
+> }
+> #endif
+> #define __io(a) __io(a)
+> 
+> Out of the platforms supporting PCI right now, we currently have these three classes:
+> 
+> 1. portable, but using different virtual addresses:
+> arch/arm/mach-integrator/include/mach/io.h:#define __io(a)                      ((void __iomem *)(PCI_IO_VADDR + (a)))
+> arch/arm/mach-ixp23xx/include/mach/io.h:#define __io(p)         ((void __iomem*)((p) + IXP23XX_PCI_IO_VIRT))
+> arch/arm/mach-ixp2000/include/mach/io.h:#define __io(p)                 ((void __iomem *)((p)+IXP2000_PCI_IO_VIRT_BASE))
+> arch/arm/mach-shark/include/mach/io.h:#define __io(a)                 ((void __iomem *)(0xe0000000 + (a)))
+> arch/arm/mach-footbridge/include/mach/io.h:#define __io(a)                      ((void __iomem *)(PCIO_BASE + (a)))
+> arch/arm/mach-tegra/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
+> arch/arm/mach-kirkwood/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
+> arch/arm/mach-dove/include/mach/io.h:#define __io(a)    ((void __iomem *)(((a) - DOVE_PCIE0_IO_BUS_BASE) + \
+> 
+> 2. Does not map the I/O space, or does not use it -- I cannot see how
+>    any of these use PIO based PCI devices at all, probably broken already:
+> arch/arm/mach-cns3xxx/include/mach/io.h:#define __io(a)                 __typesafe_io(a)
+> arch/arm/mach-ixp4xx/include/mach/io.h:#define  __io(v)         __typesafe_io(v)
+> arch/arm/mach-ks8695/include/mach/io.h:#define __io(a)          __typesafe_io(a)
+> arch/arm/mach-orion5x/include/mach/io.h:#define __io(a)                 __typesafe_io(a)
+> arch/arm/mach-sa1100/include/mach/io.h:#define __io(a)          __typesafe_io(a)
+> arch/arm/mach-pxa/include/mach/io.h:#define __io(a)             __typesafe_io(a)
+> arch/arm/mach-versatile/include/mach/io.h:#define __io(a)               __typesafe_io(a)
+> 
+> 3. scary multi-way translation, needs someone to really understand (Nico?, Lennert?)
+> arch/arm/mach-iop32x/include/mach/io.h:#define __io(p)          ((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
+> arch/arm/mach-iop33x/include/mach/io.h:#define __io(p)          ((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
+> arch/arm/mach-iop13xx/include/mach/io.h:#define __io(a) __iop13xx_io(a)
+> arch/arm/mach-mv78xx0/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
+> 
+> I think if we can figure out the third category, this should all become
+> fairly easy for PCI based platforms.
+> 
 
-Bootup with lockdep enabled has been broken on v7 since b46c0f74657d
-("ARM: 7321/1: cache-v7: Disable preemption when reading CCSIDR").
+This looks correct AFAICT.
 
-This is because v7_setup (which is called very early during boot) calls
-v7_flush_dcache_all, and the save_and_disable_irqs added by that patch
-ends up attempting to call into lockdep C code (trace_hardirqs_off())
-when we are in no position to execute it (no stack, MMU off).
+We could just call the 3rd category legacy and move on.
 
-Fix this by using a notrace variant of save_and_disable_irqs.  The code
-already uses the notrace variant of restore_irqs.
+Rob
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: stable at vger.kernel.org
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/include/asm/assembler.h |    5 +++++
- arch/arm/mm/cache-v7.S           |    2 +-
- 2 files changed, 6 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 62f8095..23371b1 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -137,6 +137,11 @@
- 	disable_irq
- 	.endm
- 
-+	.macro	save_and_disable_irqs_notrace, oldcpsr
-+	mrs	\oldcpsr, cpsr
-+	disable_irq_notrace
-+	.endm
-+
- /*
-  * Restore interrupt state previously stored in a register.  We don't
-  * guarantee that this will preserve the flags.
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 7a24d396..a655d3d 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -55,7 +55,7 @@ loop1:
- 	cmp	r1, #2				@ see what cache we have at this level
- 	blt	skip				@ skip if no cache, or just i-cache
- #ifdef CONFIG_PREEMPT
--	save_and_disable_irqs r9		@ make cssr&csidr read atomic
-+	save_and_disable_irqs_notrace r9	@ make cssr&csidr read atomic
- #endif
- 	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
- 	isb					@ isb to sych the new cssr&csidr
--- 
-1.7.9
+> 
+> 	Arnd
