@@ -1,28 +1,75 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 14 Feb 2012 14:28:12 -0500 (EST)
-Subject: Cache problems in user space - kernel space communication
-In-Reply-To: <CAKPCGKv=ph_KmJ-Lrq20f-cDonJ0kXoC1NAuBr2AHo98ToSnSw@mail.gmail.com>
-References: <CAKPCGKt6U6m8cnagCwgzaLB9R8f73KDWmV58W3ifHQ9n-Y7sTw@mail.gmail.com>
- <4541F39E5122A64CA8A7F74880F94E5201E89013BD@MBX14.EXCHPROD.USA.NET>
- <CAKPCGKv=ph_KmJ-Lrq20f-cDonJ0kXoC1NAuBr2AHo98ToSnSw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1202141421080.24536@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 14 Feb 2012 11:35:51 -0800
+Subject: [PATCH 4/6] arm: omap3: add manual control for mpu_iva voltdm
+ usecounting
+In-Reply-To: <1329237402-26008-5-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Tue, 14 Feb 2012 18:36:40 +0200")
+References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
+ <1329237402-26008-5-git-send-email-t-kristo@ti.com>
+Message-ID: <8762f96wdk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Feb 2012, Bart Jonkers wrote:
+Tero Kristo <t-kristo@ti.com> writes:
 
-> On Tue, Feb 14, 2012 at 2:19 PM, Van Schaik, Carl <carl@ok-labs.com> wrote:
-> > Looks like you are mapping the same page cached to both kernel and user space (at different virtual addresses). With the VIVT cache, the two mappings will hash differently into the cache and access different cache lines. To successfully work like this on a VIVT cache you need to perform a lot of cache maintenance whenever switching from kernel to user. You would likely rather map the page uncached in both kernel and user to save all the effort.
-> >
-> 
-> This was also our conclusion but we didn't find a way to get the
-> memory area uncached for both user and kernel space.
-> Can somebody tell me how to do this?
+> mpu_iva voltdm usecount is now decreased during idle. This will
+> allow the voltagedomain to reflect actual usage, and will allow
+> proper usage of vc callbacks.
 
-You should allocate your memory using dma_alloc_coherent() or 
-dma_alloc_writecombine(), and use dma_mmap_coherent() or 
-dma_mmap_writecombine() to map it to user space.  Then your code should 
-use dma_free_coherent() to clean up.
+I don't follow why this is needed in the idle path.
 
+Why aren't the usecounts from clock/powerdomain disables (enables) causing this
+voltdm disable (enable) to happen automatcially?
 
-Nicolas
+If these are needed, seems like they should be in the
+pwrdm_[pre|post]_transition() hooks so they can be generic.
+
+Kevin
+
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/mach-omap2/pm34xx.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index fc69875..14defaf 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -74,6 +74,7 @@ void (*omap3_do_wfi_sram)(void);
+>  static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
+>  static struct powerdomain *core_pwrdm, *per_pwrdm;
+>  static struct powerdomain *cam_pwrdm;
+> +static struct voltagedomain *mpu_iva_voltdm;
+>  
+>  static inline void omap3_per_save_context(void)
+>  {
+> @@ -311,6 +312,8 @@ void omap_sram_idle(void)
+>  		return;
+>  	}
+>  
+> +	voltdm_pwrdm_disable(mpu_iva_voltdm);
+> +
+>  	/* NEON control */
+>  	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
+>  		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
+> @@ -393,6 +396,8 @@ void omap_sram_idle(void)
+>  	}
+>  	omap3_intc_resume_idle();
+>  
+> +	voltdm_pwrdm_enable(mpu_iva_voltdm);
+> +
+>  	pwrdm_post_transition();
+>  
+>  	/* PER */
+> @@ -828,6 +833,9 @@ static int __init omap3_pm_init(void)
+>  
+>  	(void) clkdm_for_each(clkdms_setup, NULL);
+>  
+> +	mpu_iva_voltdm = voltdm_lookup("mpu_iva");
+> +	voltdm_pwrdm_enable(mpu_iva_voltdm);
+> +
+>  	mpu_pwrdm = pwrdm_lookup("mpu_pwrdm");
+>  	if (mpu_pwrdm == NULL) {
+>  		printk(KERN_ERR "Failed to get mpu_pwrdm\n");
