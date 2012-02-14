@@ -1,159 +1,58 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 14 Feb 2012 10:36:19 +0800
-Subject: [PATCH v2] mtd/gpmi : add gpmi support for mx6q
-Message-ID: <1329186979-25382-1-git-send-email-b32955@freescale.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Feb 2012 20:54:24 -0600
+Subject: [PATCH 13/15] ARM: make mach/io.h include optional
+In-Reply-To: <201202140203.15360.arnd@arndb.de>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <1329169408-17253-14-git-send-email-robherring2@gmail.com>
+ <20120213223653.GF25655@n2100.arm.linux.org.uk>
+ <201202140203.15360.arnd@arndb.de>
+Message-ID: <4F39CCE0.200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add gpmi support to mx6q.
+Arnd,
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
-v1 --> v2:
-         create this patch based on l2-mtd.git tree.
+On 02/13/2012 08:03 PM, Arnd Bergmann wrote:
+> On Monday 13 February 2012, Russell King - ARM Linux wrote:
+>> On Mon, Feb 13, 2012 at 03:43:26PM -0600, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Add a kconfig option NEED_MACH_IO_H to conditionally include mach/io.h.
+>>>
+>>> Basing this on CONFIG_PCI and CONFIG_ISA doesn't quite work. Most ISA
+>>> platforms don't need mach/io.h, but ebsa110 does.
+>>
+>> This is architecturally wrong.  If you have ISA, and your __io() macro
+>> is essentially a 1:1 translation, you're asking for ISA drivers to
+>> scribble on whatever is at virtual address 0-64K.  Too bad if that
+>> happens to be where your CPU vectors are stored, you'll lose control
+>> of the CPU in that case.
+> 
+> Right. I still think it should be conditional on PCI || ISA || PCMCIA,
+> not introducing a new kconfig symbol, and the next step should be to
+> unify the __io() implementations for the platforms that need them.
 
+As we discussed at Connect, that was my original intent. However, there
+are a couple of issues as NEED_MACH_IO_H is not exactly equivalent to
+PCI || ISA || PCMCIA.
 
- drivers/mtd/nand/gpmi-nand/bch-regs.h  |   42 ++++++++++++++++++++++++-------
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   14 ++++++----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    3 ++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    2 +
- 4 files changed, 45 insertions(+), 16 deletions(-)
+There are a few platforms which still need io.h for custom accessor
+functions: rpc, ixp4xx, s3c2410, and ebsa110. Also, a few platforms that
+only select ISA don't do any translation in __io(). These are sa1100,
+clps711x, and pxa. My understanding is that is wrong.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/bch-regs.h b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-index 4effb8c..a092451 100644
---- a/drivers/mtd/nand/gpmi-nand/bch-regs.h
-+++ b/drivers/mtd/nand/gpmi-nand/bch-regs.h
-@@ -51,15 +51,26 @@
- 
- #define BP_BCH_FLASH0LAYOUT0_ECC0		12
- #define BM_BCH_FLASH0LAYOUT0_ECC0	(0xf << BP_BCH_FLASH0LAYOUT0_ECC0)
--#define BF_BCH_FLASH0LAYOUT0_ECC0(v)		\
--	(((v) << BP_BCH_FLASH0LAYOUT0_ECC0) & BM_BCH_FLASH0LAYOUT0_ECC0)
-+#define MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0		11
-+#define MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)
-+#define BF_BCH_FLASH0LAYOUT0_ECC0(v, x)				\
-+	(GPMI_IS_MX6Q(x)					\
-+		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)	\
-+			& MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0)	\
-+		: (((v) << BP_BCH_FLASH0LAYOUT0_ECC0)		\
-+			& BM_BCH_FLASH0LAYOUT0_ECC0)		\
-+	)
- 
- #define BP_BCH_FLASH0LAYOUT0_DATA0_SIZE		0
- #define BM_BCH_FLASH0LAYOUT0_DATA0_SIZE		\
- 			(0xfff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
--#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v)	\
--	(((v) << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)\
--					 & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+#define MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE	\
-+			(0x3ff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
-+#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v, x)				\
-+	(GPMI_IS_MX6Q(x)						\
-+		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)	\
-+		: ((v) & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)		\
-+	)
- 
- #define HW_BCH_FLASH0LAYOUT1			0x00000090
- 
-@@ -72,13 +83,24 @@
- 
- #define BP_BCH_FLASH0LAYOUT1_ECCN		12
- #define BM_BCH_FLASH0LAYOUT1_ECCN	(0xf << BP_BCH_FLASH0LAYOUT1_ECCN)
--#define BF_BCH_FLASH0LAYOUT1_ECCN(v)		\
--	(((v) << BP_BCH_FLASH0LAYOUT1_ECCN) & BM_BCH_FLASH0LAYOUT1_ECCN)
-+#define MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN		11
-+#define MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)
-+#define BF_BCH_FLASH0LAYOUT1_ECCN(v, x)				\
-+	(GPMI_IS_MX6Q(x)					\
-+		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)	\
-+			& MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN)	\
-+		: (((v) << BP_BCH_FLASH0LAYOUT1_ECCN)		\
-+			& BM_BCH_FLASH0LAYOUT1_ECCN)		\
-+	)
- 
- #define BP_BCH_FLASH0LAYOUT1_DATAN_SIZE		0
- #define BM_BCH_FLASH0LAYOUT1_DATAN_SIZE		\
- 			(0xfff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
--#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v)	\
--	(((v) << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE) \
--					 & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+#define MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE	\
-+			(0x3ff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
-+#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v, x)				\
-+	(GPMI_IS_MX6Q(x)						\
-+		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)	\
-+		: ((v) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)		\
-+	)
- #endif
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 7db6555..cbcf022 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -223,13 +223,13 @@ int bch_set_geometry(struct gpmi_nand_data *this)
- 	/* Configure layout 0. */
- 	writel(BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)
- 			| BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size)
--			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)
--			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size),
-+			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength, this)
-+			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size, this),
- 			r->bch_regs + HW_BCH_FLASH0LAYOUT0);
- 
- 	writel(BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)
--			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)
--			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size),
-+			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength, this)
-+			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size, this),
- 			r->bch_regs + HW_BCH_FLASH0LAYOUT1);
- 
- 	/* Set *all* chip selects to use layout 0. */
-@@ -803,7 +803,8 @@ int gpmi_is_ready(struct gpmi_nand_data *this, unsigned chip)
- 	if (GPMI_IS_MX23(this)) {
- 		mask = MX23_BM_GPMI_DEBUG_READY0 << chip;
- 		reg = readl(r->gpmi_regs + HW_GPMI_DEBUG);
--	} else if (GPMI_IS_MX28(this)) {
-+	} else if (GPMI_IS_MX28(this) || GPMI_IS_MX6Q(this)) {
-+		/* MX28 shares the same R/B register as MX6Q. */
- 		mask = MX28_BF_GPMI_STAT_READY_BUSY(1 << chip);
- 		reg = readl(r->gpmi_regs + HW_GPMI_STAT);
- 	} else
-@@ -1055,8 +1056,9 @@ int gpmi_read_page(struct gpmi_nand_data *this,
- 		| BF_GPMI_CTRL0_ADDRESS(address)
- 		| BF_GPMI_CTRL0_XFER_COUNT(geo->page_size);
- 	pio[1] = 0;
-+	pio[2] = 0; /* Set GPMI_HW_GPMI_ECCCTRL, disable the BCH. */
- 	desc = channel->device->device_prep_slave_sg(channel,
--				(struct scatterlist *)pio, 2,
-+				(struct scatterlist *)pio, 3,
- 				DMA_TRANS_NONE, 1);
- 	if (!desc) {
- 		pr_err("step 3 error\n");
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index f39f83e..cfcc0eb 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1582,6 +1582,9 @@ static const struct platform_device_id gpmi_ids[] = {
- 	}, {
- 		.name = "imx28-gpmi-nand",
- 		.driver_data = IS_MX28,
-+	}, {
-+		.name = "imx6q-gpmi-nand",
-+		.driver_data = IS_MX6Q,
- 	}, {},
- };
- 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index e023bcc..c93b0ae 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -268,6 +268,8 @@ extern int gpmi_read_page(struct gpmi_nand_data *,
- /* Use the platform_id to distinguish different Archs. */
- #define IS_MX23			0x1
- #define IS_MX28			0x2
-+#define IS_MX6Q			0x8
- #define GPMI_IS_MX23(x)		((x)->pdev->id_entry->driver_data == IS_MX23)
- #define GPMI_IS_MX28(x)		((x)->pdev->id_entry->driver_data == IS_MX28)
-+#define GPMI_IS_MX6Q(x)		((x)->pdev->id_entry->driver_data == IS_MX6Q)
- #endif
--- 
-1.7.0.4
+If we use CONFIG_PCI, then we have to move over all PCI enabled
+platforms at once. With a separate kconfig option, then we can move
+platforms one by one. Some are legacy and we may not want to move. This
+also helped with omap, but Tony has now fixed it.
+
+>> So, I think this patch series moves things in the wrong direction.
+> 
+> I would very much like to see a lot of the series get merged as it
+> brings us closer to the single zimage, but I agree we have to be
+> careful not to add extra complexity (or bugs, for that matter).
+
+It is at least clear which platforms are special now and we can figure
+out how to handle them from here.
+
+Rob
