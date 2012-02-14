@@ -1,151 +1,96 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 14 Feb 2012 08:36:08 -0600
-Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <201202140804.49026.arnd@arndb.de>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <201202140203.15360.arnd@arndb.de> <4F39CCE0.200@gmail.com>
- <201202140804.49026.arnd@arndb.de>
-Message-ID: <4F3A7158.2080702@gmail.com>
+From: michal.wrobel@flytronic.pl (=?UTF-8?B?TWljaGHFgiBXcsOzYmVs?=)
+Date: Tue, 14 Feb 2012 15:47:05 +0100
+Subject: [PATCH RESEND] ixp4xx: clockevent set_next_event fix (TESTERS
+ NEEDED)
+In-Reply-To: <4F3A51DB.70000@flytronic.pl>
+References: <4F394D3B.3080909@flytronic.pl> <4F3A2F79.6050806@flytronic.pl>
+ <20120214120153.GA9808@localhost.localdomain> <4F3A51DB.70000@flytronic.pl>
+Message-ID: <4F3A73E9.1020503@flytronic.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2012 02:04 AM, Arnd Bergmann wrote:
-> On Tuesday 14 February 2012, Rob Herring wrote:
->> Arnd,
->>
->> On 02/13/2012 08:03 PM, Arnd Bergmann wrote:
->>> On Monday 13 February 2012, Russell King - ARM Linux wrote:
->>>> On Mon, Feb 13, 2012 at 03:43:26PM -0600, Rob Herring wrote:
->>>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>>
->>>>> Add a kconfig option NEED_MACH_IO_H to conditionally include mach/io.h.
->>>>>
->>>>> Basing this on CONFIG_PCI and CONFIG_ISA doesn't quite work. Most ISA
->>>>> platforms don't need mach/io.h, but ebsa110 does.
->>>>
->>>> This is architecturally wrong.  If you have ISA, and your __io() macro
->>>> is essentially a 1:1 translation, you're asking for ISA drivers to
->>>> scribble on whatever is at virtual address 0-64K.  Too bad if that
->>>> happens to be where your CPU vectors are stored, you'll lose control
->>>> of the CPU in that case.
+On 14.02.2012 13:21, Micha? Wr?bel wrote:
+> On 14.02.2012 13:01, Richard Cochran wrote:
+>> On Tue, Feb 14, 2012 at 10:55:05AM +0100, Micha? Wr?bel wrote:
+>>> IXP43x Developer's Manual [17.4.3] and IXP4[56]x Developer's Manual
+>>> [18.4.3] say that (...)
 >>>
->>> Right. I still think it should be conditional on PCI || ISA || PCMCIA,
->>> not introducing a new kconfig symbol, and the next step should be to
->>> unify the __io() implementations for the platforms that need them.
+>>> IXP42x Developer's Manual [14.3] says that (...)
+>> Unless you test this out and confirm that it works for all IXP4xx, I
+>> would prefer to see a specific timer function for the 43x instead.
 >>
->> As we discussed at Connect, that was my original intent. However, there
->> are a couple of issues as NEED_MACH_IO_H is not exactly equivalent to
->> PCI || ISA || PCMCIA.
->>
->> There are a few platforms which still need io.h for custom accessor
->> functions: rpc, ixp4xx, s3c2410, and ebsa110.
-> 
-> I've tried to interpret what is there, please correct me if this is wrong:
-> 
-> RPC and ebsa110 have ISA, or some twisted version of that. I believe
-> RPC doesn't select CONFIG_ISA because it has no actual ISA slots but
-> it still uses legacy ISA I/O and we might just select it anyway.
-> 
-> s3c24xx seems to have ISA in a similar way on the "bast" machine,
-> while the setup code for that got copied into some platforms that
-> don't really require it.
-> 
-> ixp4xx has PCI, but does not always use direct MMIO to access the
-> memory or I/O spaces.
-> 
-> I guess the only way we can ever make these ones use a common header
-> file (in case we care) by letting them go through an indirect
-> struct io_ops { u8 (*inb)(int); void (*outb)(u8, int); ... };,
-> but we might not care enough.
-> 
->> Also, a few platforms that
->> only select ISA don't do any translation in __io(). These are sa1100,
->> clps711x, and pxa. My understanding is that is wrong.
-> 
-> sa1100 has pcmcia slots that use their own method (setting io_offset)
-> of redirecting the i/o space into the right location. As Russell
-> mentioned, this is broken if you load an ISA device driver that
-> uses hardcoded port numbers, or as I might add when you use /dev/port.
-> 
-> pxa seems to do the same as sa1100 for PCMCIA and PCI, but I can't figure
-> out what they do for ISA. I suspect they only enable that in order to
-> get ISA device drivers for PCMCIA based add-on cards.
-> 
-> clps711x for all I can tell is broken as you say.
-> 
-> I think omap1 and at91 fit into the same category as sa1100 and pxa
-> regarding pcmcia. All four can in theory be converted to use a
-> common virtual mapping as we want to have for PCI.
-> 
->> If we use CONFIG_PCI, then we have to move over all PCI enabled
->> platforms at once. With a separate kconfig option, then we can move
->> platforms one by one. Some are legacy and we may not want to move. This
->> also helped with omap, but Tony has now fixed it.
-> 
-> We could also generalize the implementation from tegra, which seems
-> reasonable as a start:
-> 
-> 
-> #define IO_SPACE_LIMIT 0xffff
-> 
-> #if defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-> #include <mach/io.h>
-> #elif defined(CONFIG_PCI)
-> extern void __iomem *pci_io_base;
-> 
-> static inline void __iomem *__io(unsigned long addr)
-> {
->         return pci_io_base + (addr & IO_SPACE_LIMIT);
+>> Thanks,
+>> Richard
+> I think I might have some IXP425-based boards available for testing.
+I will have it available later.
+> However, I certainly don't have any IXP45x- or IXP46x-based board.
+> Maybe I'll prepare a small kernel module that will allow to easily test this
+> issue
+Done. See the attachments.
 
-But don't we want a constant pci_io_base? This would certainly be a
-quicker conversion, but I don't think we want to do it twice.
+Results of my tests performed on IXP435-based board (667 MHz,
+CONFIG_HZ=100) follow below.
 
-> }
-> #else
-> static inline void __iomem *__io(unsigned long addr)
-> {
->         return NULL;
-> }
-> #endif
-> #define __io(a) __io(a)
-> 
-> Out of the platforms supporting PCI right now, we currently have these three classes:
-> 
-> 1. portable, but using different virtual addresses:
-> arch/arm/mach-integrator/include/mach/io.h:#define __io(a)                      ((void __iomem *)(PCI_IO_VADDR + (a)))
-> arch/arm/mach-ixp23xx/include/mach/io.h:#define __io(p)         ((void __iomem*)((p) + IXP23XX_PCI_IO_VIRT))
-> arch/arm/mach-ixp2000/include/mach/io.h:#define __io(p)                 ((void __iomem *)((p)+IXP2000_PCI_IO_VIRT_BASE))
-> arch/arm/mach-shark/include/mach/io.h:#define __io(a)                 ((void __iomem *)(0xe0000000 + (a)))
-> arch/arm/mach-footbridge/include/mach/io.h:#define __io(a)                      ((void __iomem *)(PCIO_BASE + (a)))
-> arch/arm/mach-tegra/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
-> arch/arm/mach-kirkwood/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
-> arch/arm/mach-dove/include/mach/io.h:#define __io(a)    ((void __iomem *)(((a) - DOVE_PCIE0_IO_BUS_BASE) + \
-> 
-> 2. Does not map the I/O space, or does not use it -- I cannot see how
->    any of these use PIO based PCI devices at all, probably broken already:
-> arch/arm/mach-cns3xxx/include/mach/io.h:#define __io(a)                 __typesafe_io(a)
-> arch/arm/mach-ixp4xx/include/mach/io.h:#define  __io(v)         __typesafe_io(v)
-> arch/arm/mach-ks8695/include/mach/io.h:#define __io(a)          __typesafe_io(a)
-> arch/arm/mach-orion5x/include/mach/io.h:#define __io(a)                 __typesafe_io(a)
-> arch/arm/mach-sa1100/include/mach/io.h:#define __io(a)          __typesafe_io(a)
-> arch/arm/mach-pxa/include/mach/io.h:#define __io(a)             __typesafe_io(a)
-> arch/arm/mach-versatile/include/mach/io.h:#define __io(a)               __typesafe_io(a)
-> 
-> 3. scary multi-way translation, needs someone to really understand (Nico?, Lennert?)
-> arch/arm/mach-iop32x/include/mach/io.h:#define __io(p)          ((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
-> arch/arm/mach-iop33x/include/mach/io.h:#define __io(p)          ((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
-> arch/arm/mach-iop13xx/include/mach/io.h:#define __io(a) __iop13xx_io(a)
-> arch/arm/mach-mv78xx0/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
-> 
-> I think if we can figure out the third category, this should all become
-> fairly easy for PCI based platforms.
-> 
+Without the patch:
 
-This looks correct AFAICT.
+starting measurements: 10000 samples * 1000000 ns
+measurements finished
+min: 2500 ns
+avg: 7894228 ns
+max: 9970743 ns
 
-We could just call the 3rd category legacy and move on.
+With the patch:
 
-Rob
+starting measurements: 10000 samples * 1000000 ns
+measurements finished
+min: 1637 ns
+avg: 4266 ns
+max: 100182 ns
 
-> 
-> 	Arnd
+>  by other list members who have IXP45x- and IXP46x-based boards?
+Does anyone have any IXP45x- and IXP46x-based board? If so, I would like
+to ask to compile ixp4xx_set_next_event_bug_test.c as a module and run
+it on such a board. Then, to apply the "ixp4xx: clockevent
+set_next_event fix" patch and re-run the tests. Of course, finally
+posting the results here.
+
+Note that the kernel used for testing has to be configured with
+CONFIG_HIGH_RES_TIMERS=y
+
+Thank you in advance!
+
+Best regards,
+Micha?
+
+>>> Signed-off-by: Micha? Wr?bel <michal.wrobel@flytronic.pl>
+>>> ---
+>>>  arch/arm/mach-ixp4xx/common.c |    1 +
+>>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>> (...)
+>>> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+>>> index 3841ab4..fd37c83 100644
+>>> --- a/arch/arm/mach-ixp4xx/common.c
+>>> +++ b/arch/arm/mach-ixp4xx/common.c
+>>> @@ -434,6 +434,7 @@ static int ixp4xx_set_next_event(unsigned long evt,
+>>>  {
+>>>  	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
+>>>  
+>>> +	*IXP4XX_OSRT1 = 0;
+>>>  	*IXP4XX_OSRT1 = (evt & ~IXP4XX_OST_RELOAD_MASK) | opts;
+>>>  
+>>>  	return 0;
+>>> -- 
+>>> 1.7.5.4
+
+
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: Makefile
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120214/f5d2d392/attachment.ksh>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ixp4xx_set_next_event_bug_test.c
+Type: text/x-csrc
+Size: 1670 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120214/f5d2d392/attachment.bin>
