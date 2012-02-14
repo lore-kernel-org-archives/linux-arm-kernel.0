@@ -1,121 +1,36 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 14 Feb 2012 10:02:55 -0500
-Subject: [PATCHv6 3/7] ARM: dma-mapping: implement dma sg methods on top
- of any generic dma ops
-In-Reply-To: <1328900324-20946-4-git-send-email-m.szyprowski@samsung.com>
-References: <1328900324-20946-1-git-send-email-m.szyprowski@samsung.com>
- <1328900324-20946-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120214150255.GC18359@phenom.dumpdata.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 14 Feb 2012 20:59:06 +0530
+Subject: [PATCH 0/2] ARM: OMAP4: Cleanup in cminst code 
+Message-ID: <1329233348-23356-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2012 at 07:58:40PM +0100, Marek Szyprowski wrote:
-> This patch converts all dma_sg methods to be generic (independent of the
-> current DMA mapping implementation for ARM architecture). All dma sg
-> operations are now implemented on top of respective
-> dma_map_page/dma_sync_single_for* operations from dma_map_ops structure.
+Similar to PRM code cleanup done recently to reuse prminst api's
+for AM33xx device, so in order to reuse the existing OMAP4
+cminst code for AM33xx this patch adds,
 
-Looks good, except the worry I've that the DMA debug API calls are now
-lost.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mm/dma-mapping.c |   35 +++++++++++++++--------------------
->  1 files changed, 15 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 91fe436..31ff699 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -635,12 +635,13 @@ EXPORT_SYMBOL(___dma_page_dev_to_cpu);
->  int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
->  		enum dma_data_direction dir, struct dma_attrs *attrs)
->  {
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
->  	struct scatterlist *s;
->  	int i, j;
->  
->  	for_each_sg(sg, s, nents, i) {
-> -		s->dma_address = __dma_map_page(dev, sg_page(s), s->offset,
-> -						s->length, dir);
-> +		s->dma_address = ops->map_page(dev, sg_page(s), s->offset,
-> +						s->length, dir, attrs);
->  		if (dma_mapping_error(dev, s->dma_address))
->  			goto bad_mapping;
->  	}
-> @@ -648,7 +649,7 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
->  
->   bad_mapping:
->  	for_each_sg(sg, s, i, j)
-> -		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
-> +		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
->  	return 0;
->  }
->  
-> @@ -665,11 +666,13 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
->  void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
->  		enum dma_data_direction dir, struct dma_attrs *attrs)
->  {
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
->  	struct scatterlist *s;
-> +
->  	int i;
->  
->  	for_each_sg(sg, s, nents, i)
-> -		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
-> +		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
->  }
->  
->  /**
-> @@ -682,17 +685,13 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
->  void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
->  			int nents, enum dma_data_direction dir)
->  {
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
->  	struct scatterlist *s;
->  	int i;
->  
-> -	for_each_sg(sg, s, nents, i) {
-> -		if (!dmabounce_sync_for_cpu(dev, sg_dma_address(s),
-> -					    sg_dma_len(s), dir))
-> -			continue;
-> -
-> -		__dma_page_dev_to_cpu(sg_page(s), s->offset,
-> -				      s->length, dir);
-> -	}
-> +	for_each_sg(sg, s, nents, i)
-> +		ops->sync_single_for_cpu(dev, sg_dma_address(s), s->length,
-> +					 dir);
->  }
->  
->  /**
-> @@ -705,17 +704,13 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
->  void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
->  			int nents, enum dma_data_direction dir)
->  {
-> +	struct dma_map_ops *ops = get_dma_ops(dev);
->  	struct scatterlist *s;
->  	int i;
->  
-> -	for_each_sg(sg, s, nents, i) {
-> -		if (!dmabounce_sync_for_device(dev, sg_dma_address(s),
-> -					sg_dma_len(s), dir))
-> -			continue;
-> -
-> -		__dma_page_cpu_to_dev(sg_page(s), s->offset,
-> -				      s->length, dir);
-> -	}
-> +	for_each_sg(sg, s, nents, i)
-> +		ops->sync_single_for_device(dev, sg_dma_address(s), s->length,
-> +					    dir);
->  }
->  
->  /*
-> -- 
-> 1.7.1.569.g6f426
-> 
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+  - Boot time __init function, to initialize _cm_bases
+    based on cpu_is_xxx
+  - Instead of maintaining phy addr for CM partition
+    in _cm_bases[] table and then changing it to virt addr,
+    directly maintain respective virt addr.
+
+And also hook-up support for AM33xx device to existing cminst
+code.
+
+Patch series is boot tested on AM335x EVM and AM37xEVM.
+
+NOTE: This patch series is dependent on earlier submitted PRM
+      cleanup patch-series -
+      http://www.spinics.net/lists/linux-omap/msg62351.html
+
+
+Vaibhav Hiremath (2):
+  ARM: OMAP4: cminst: Add boot time __init function for cminst
+  ARM: OMAP: am33xx: Hook-up am33xx support to existing cm code
+
+ arch/arm/mach-omap2/cminst44xx.c |   38 +++++++++++++++++++++++++++++---------
+ arch/arm/mach-omap2/cminst44xx.h |    1 +
+ arch/arm/mach-omap2/io.c         |    3 +++
+ arch/arm/mach-omap2/omap_hwmod.c |   23 +++++++++++++++--------
+ 4 files changed, 48 insertions(+), 17 deletions(-)
