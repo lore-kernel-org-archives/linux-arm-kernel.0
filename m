@@ -1,30 +1,29 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 14 Feb 2012 10:44:56 +0530
-Subject: [PATCH 1/2] ARM: OMAP: Get rid of reset for system timer
-In-Reply-To: <20120210191813.GU1426@atomide.com>
-References: <1328191435-18652-1-git-send-email-santosh.shilimkar@ti.com>
- <1328191435-18652-2-git-send-email-santosh.shilimkar@ti.com>
- <20120210191813.GU1426@atomide.com>
-Message-ID: <4F39EDD0.9010304@ti.com>
+Date: Tue, 14 Feb 2012 10:48:46 +0530
+Subject: [PATCH 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
+In-Reply-To: <CANrkHUbXHrQ=LowgNq9nt+rnrcE-fTqLuOs2+MeCtodv_H-_Cw@mail.gmail.com>
+References: <1328367090-10402-1-git-send-email-rnayak@ti.com>	<CANfBPZ-pD55YgneQSyfs1kKB-DUH8g7TQkKO7O6B95Ydfc8cFg@mail.gmail.com>
+ <CANrkHUbXHrQ=LowgNq9nt+rnrcE-fTqLuOs2+MeCtodv_H-_Cw@mail.gmail.com>
+Message-ID: <4F39EEB6.2020208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 11 February 2012 12:48 AM, Tony Lindgren wrote:
-> * Santosh Shilimkar<santosh.shilimkar@ti.com>  [120202 05:33]:
->> >  From: Rajendra Nayak<rnayak@ti.com>
->> >
->> >  hwmod setup already does a reset and sets the OCP sysconfig
->> >  registers appropriately. Avoid doing a reset again and overriding
->> >  the OCP sysconfig settings in the system timer init code.
- >
-> If we want this queued as a fix, it should also describe what
-> actually breaks? Timer? PM?
-
-It only fixes the redundant reset and overriding the smartidle-wakeup
-OCP setting (done by hwmod) with the smartidle in the driver.
-Doing this doesn't really break anything as yet in mainline, but will
-cause timer wakeup issues once OFF mode is in place for OMAP4. On OMAP5
-however this was causing more issues as the softreset bit position is
-different than on OMAP2/3/4.
-So it should be ok to queue this in for 3.4 considering neither OMAP4
-OFF, not OMAP5 support is in mainline yet.
+On Friday 10 February 2012 06:57 PM, T Krishnamoorthy, Balaji wrote:
+> On Tue, Feb 7, 2012 at 3:32 PM, S, Venkatraman<svenkatr@ti.com>  wrote:
+>> >  On Sat, Feb 4, 2012 at 8:21 PM, Rajendra Nayak<rnayak@ti.com>  wrote:
+>>> >>  This series mainly cleans up all instances of hardcoding's in
+>>> >>  the driver based on pdev->id. This is cleanup leading to the
+>>> >>  DT adaptation of omap_hsmmc driver.
+>>> >>
+>>> >>  Patches are based on 3.3-rc2 and can be found here
+>>> >>  git://gitorious.org/omap-pm/linux.git omap_hsmmc_cleanup
+>>> >>
+>>> >>  Tested the patches on my omap4 boards (panda and SDP) but
+>>> >>  haven't tested yet on omap3/2 since I did'nt have boards
+>>> >>  handy. So any testing on any omap3/2 boards is really
+>>> >>  appreciated.
+> Tested this series on 2430SDP with FS on SD card
+>
+Thanks, will repost adding Tested-by from you and Venkat, also
+getting rid of the one instance of host->id usage left in a
+debug print.
