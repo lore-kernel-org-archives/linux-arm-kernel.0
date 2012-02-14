@@ -1,42 +1,55 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 14 Feb 2012 09:23:43 -0800
-Subject: [PATCH v2 6/9] ARM: mx31ads: add audmux device
-In-Reply-To: <20120214073414.GB3276@b20223-02.ap.freescale.net>
-References: <20120202091132.GD9773@S2101-09.ap.freescale.net>
- <20120202092427.GB32403@b20223-02.ap.freescale.net>
- <20120202130901.GE9773@S2101-09.ap.freescale.net>
- <20120202135805.GB3015@richard-laptop>
- <20120203021554.GE32403@b20223-02.ap.freescale.net>
- <20120203133240.GB12915@S2101-09.ap.freescale.net>
- <a9d9bad3-edd0-4a5f-9bb3-15787430d858@email.android.com>
- <20120214013506.GA3276@b20223-02.ap.freescale.net>
- <20120214060627.GB13456@opensource.wolfsonmicro.com>
- <20120214073414.GB3276@b20223-02.ap.freescale.net>
-Message-ID: <20120214172342.GA3916@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Feb 2012 09:24:23 -0800
+Subject: [PATCH 00/15] mach/io.h cleanup and removal
+In-Reply-To: <4F39D2EE.80806@gmail.com>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <20120213234109.GJ1426@atomide.com> <4F39D2EE.80806@gmail.com>
+Message-ID: <20120214172423.GO1426@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 03:34:15PM +0800, Richard Zhao wrote:
-> On Mon, Feb 13, 2012 at 10:06:28PM -0800, Mark Brown wrote:
+* Rob Herring <robherring2@gmail.com> [120213 18:49]:
+> On 02/13/2012 05:41 PM, Tony Lindgren wrote:
+> > * Rob Herring <robherring2@gmail.com> [120213 13:12]:
+> >>  arch/arm/mach-at91/include/mach/at91_io.h         |   44 +++++++++++++++++
+> >>  arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |    2 +
+> >>  arch/arm/mach-at91/include/mach/at91sam9_sdramc.h |    2 +
+> > ...
+> >>  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h   |    6 ++
+> >>  arch/arm/mach-msm/include/mach/msm_iomap-7x30.h   |    4 ++
+> >>  arch/arm/mach-msm/include/mach/msm_iomap-8960.h   |    4 ++
+> >>  arch/arm/mach-msm/include/mach/msm_iomap-8x50.h   |    4 ++
+> >>  arch/arm/mach-msm/include/mach/msm_iomap-8x60.h   |    4 ++
+> > ...
+> > 
+> > Considering the naming above..
+> > 
+> >>  arch/arm/mach-tegra/include/mach/iomap.h          |   48 ++++++++++++++++++
+> > 
+> > ..should this be called tegra-iomap.h instead?
+> 
+> Probably, but it's not a new header. Fixing include paths or names is a
+> separate problem when we start having multiple mach include directories.
+> Perhaps we can get them removed altogether before we have to start
+> renaming. Much of it is device addresses that will go in dts files.
 
-> > Machine drivers can easily get platform data, they're just regular
-> > drivers of whatever type so can get platform data in the same way that
-> > any other driver for their bus can.
+Yes should be just the legacy drivers needing this for most part,
+so that's currently most of omap1 drivers for us.
 
-> Machine drivers don't correspond to any hw devices. If we create a
-> virtual platform device, it'll be hard for DT binding.
+Anyways I'm using plat/omap-iomap.h for the name, so if somebody
+has better ideas for naming to avoid further search and replace
+later on, let me know.
 
-As has been discussed repeatedly and at some considerable length the
-board design for audio is considered sufficiently interesting to be
-worth representing in the device tree directly, there are plenty of
-choices made during board design.  There is absolutely no technical
-problem from doing this on the device tree side.
+I guess in the long run we could have
 
-People working on device tree really need to talk to each other more...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120214/e4642b63/attachment.sig>
+#include <mach-omap1/iomap.h>
+
+instead of
+
+#include <plat/omap-iomap.h>
+
+as the plat can't be used for multi-subarch builds.
+
+Regards,
+
+Tony
