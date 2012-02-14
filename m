@@ -1,88 +1,91 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 14 Feb 2012 12:37:40 -0500 (EST)
-Subject: [PATCH v3] ARM: rpc: make default fiq handler run-time installed
-In-Reply-To: <1329231018-15625-1-git-send-email-robherring2@gmail.com>
-References: <alpine.LFD.2.02.1202082229400.1656@xanadu.home>
- <1329231018-15625-1-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1202141233470.24536@xanadu.home>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 14 Feb 2012 11:38:44 -0600
+Subject: [PATCH 13/15] ARM: make mach/io.h include optional
+In-Reply-To: <201202140106.32856.arnd@arndb.de>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <1329169408-17253-14-git-send-email-robherring2@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F001F41FCB4EFA@AUSP01VMBX24.collaborationhost.net>
+ <201202140106.32856.arnd@arndb.de>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FCB510C@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Feb 2012, Rob Herring wrote:
+On Monday, February 13, 2012 6:07 PM, Arnd Bergmann wrote:
+> On Monday 13 February 2012, H Hartley Sweeten wrote:
+>>> +#ifdef CONFIG_NEED_MACH_IO_H
+>>>  #include <mach/io.h>
+>>> +#else
+>>> +#define __io(a)              ({ (void)(a); __typesafe_io(0); })
+>>> +#define __mem_pci(a) (a)
+>>> +#endif
+>> 
+>> Rob,
+>> 
+>> I compile and boot tested these patches on EP93xxbut did not check them
+>> with sparse.
+>> 
+>> Most of the mach/io.h headers you remove in Patch 14/15 have the __io
+>> macro defined like:
+>> 
+>> #define __io(a)         __typesafe_io(a)
+>> 
+>> Does your change above still keep the __io macro typesafe?
+>> 
+>> They don't appear equivalent to me...
+>
+> It's not equivalent, but the new version is more correct for most
+> platforms because it turns a random pointer dereference into a NULL
+> pointer dereference.
+>
+> If you have none of PCI/ISA/PCMCIA, then inb/outb should never be
+> used. Ideally we would undefine __io in that case, which results
+> in the inb/outb stuff also not getting defined, but some drivers
+> like 8250 serial then fail to build even for systems that only
+> use the readl/writel path.
 
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Only rpc uses disable_fiq macro. Change it to a run-time installed
-> default FIQ handler. The handler is installed before FIQ is enabled
-> so the behavior should be unchanged.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-> Nico,
-> 
-> This removes the use of disable_fiq now. To keep it bisectable, the macro
-> gets removed from entry-macro-iomd.S in the last patch now.
-> 
+Sorry... I don't quite understand the change here.
 
-[...]
+__typesafe_io is an inline function in asm/io.h. Most of the mach/io.h
+headers simply define __io to be __typesafe_io so they basically get
+this:
 
-> --- /dev/null
-> +++ b/arch/arm/mach-rpc/fiq.S
-> @@ -0,0 +1,16 @@
-> +#include <linux/linkage.h>
-> +#include <asm/assembler.h>
-> +#include <mach/hardware.h>
-> +#include <mach/entry-macro.S>
+void __iomem *__io(unsigned long addr)
+{
+	return (void __iomem *)addr;
+}
 
-Do you need to include <mach/entry-macro.S> here?
+With the change in Rob's patch they will get this:
 
-In any case:
+void __iomem *__io(unsigned long addr)
+{
+	(void)addr;
+	return (void __iomem *)(0);
+}
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+If you then push these into something like the outb macro you get this:
 
-> +
-> +	.text
-> +
-> +	.global	rpc_default_fiq_end
-> +ENTRY(rpc_default_fiq_start)
-> +	mov	r12, #ioc_base_high
-> +	.if	ioc_base_low
-> +	orr	r12, r12, #ioc_base_low
-> +	.endif
-> +	strb	r12, [r12, #0x38]	@ Disable FIQ register
-> +	subs	pc, lr, #4
-> +rpc_default_fiq_end:
-> diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
-> index 2e1b530..cf0e669 100644
-> --- a/arch/arm/mach-rpc/irq.c
-> +++ b/arch/arm/mach-rpc/irq.c
-> @@ -5,6 +5,7 @@
->  #include <asm/mach/irq.h>
->  #include <asm/hardware/iomd.h>
->  #include <asm/irq.h>
-> +#include <asm/fiq.h>
->  
->  static void iomd_ack_irq_a(struct irq_data *d)
->  {
-> @@ -112,6 +113,8 @@ static struct irq_chip iomd_fiq_chip = {
->  	.irq_unmask	= iomd_unmask_irq_fiq,
->  };
->  
-> +extern unsigned char rpc_default_fiq_start, rpc_default_fiq_end;
-> +
->  void __init rpc_init_irq(void)
->  {
->  	unsigned int irq, flags;
-> @@ -121,6 +124,9 @@ void __init rpc_init_irq(void)
->  	iomd_writeb(0, IOMD_FIQMASK);
->  	iomd_writeb(0, IOMD_DMAMASK);
->  
-> +	set_fiq_handler(&rpc_default_fiq_start,
-> +		&rpc_default_fiq_end - &rpc_default_fiq_start);
-> +
->  	for (irq = 0; irq < NR_IRQS; irq++) {
->  		flags = IRQF_VALID;
->  
-> -- 
-> 1.7.5.4
-> 
+#define outb(v,p)	({ __iowmb(); __raw_writeb(v,__io(p)); })
+
+Original:
+
+outb(v,p)
+{
+	__iowmb();
+	__raw_writeb(v, (void __iomem*)p);
+}
+
+Rob's change:
+
+outb(v,p)
+{
+	__iowmb();
+	__raw_writeb(v, /* not sure what happens to the (void)p */ (void __iomem *)0);
+}
+
+To me the original one looks more correct. With Rob's change it looks to me like all
+the in/out macros end up reading/writing to address 0.
+
+I don't get what's happening in Rob's change. Could you enlighten me?
+
+Regards,
+Hartley
