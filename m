@@ -1,31 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 13 Feb 2012 21:09:30 -0600
-Subject: [PATCH 00/15] mach/io.h cleanup and removal
-In-Reply-To: <20120213222220.GI1426@atomide.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <20120213222220.GI1426@atomide.com>
-Message-ID: <4F39D06A.3060104@gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 14 Feb 2012 11:22:04 +0800
+Subject: [PATCH] mtd/gpmi : fix compiler warning
+Message-ID: <1329189724-26100-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2012 04:22 PM, Tony Lindgren wrote:
-> * Rob Herring <robherring2@gmail.com> [120213 13:12]:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This series cleans-up mach/io.h and removes it for most platforms that have
->> the same definitions of __io() and __mem_pci(). This mainly leaves platforms
->> with PCI that need an io.h. Most of those can be converted once we have a
->> fixed IO space mapping. OMAP io.h also remains as moving all the extra io.h
->> stuff leaves it quite broken, so I'm leaving it to the OMAP folks to convert.
-> 
-> I'll do some patches to use iomap.h on omaps. Are you planning to queue
-> these for v3.4 merge window?
-> 
-> If these are for v3.5 merge window, then I'll do a cleanup series that
-> just leaves a minimal io.h for omaps that's easy to convert. If you're
-> still planning these for v3.4 merge window, I'll rebase on your series.
+The gpmi driver selects the MTD_CMDLINE_PARTS directly.
+But we should not select a visible symbol.
 
-I would like to get it in for 3.4, but it really depends on Russell. If
-not, I'll at least get the header clean-ups in for 3.4.
+Just remove the select.
 
-Rob
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ drivers/mtd/nand/Kconfig |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 2474733..7612eae 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -440,7 +440,6 @@ config MTD_NAND_NANDSIM
+ config MTD_NAND_GPMI_NAND
+         bool "GPMI NAND Flash Controller driver"
+         depends on MTD_NAND && (SOC_IMX23 || SOC_IMX28)
+-	select MTD_CMDLINE_PARTS
+         help
+ 	 Enables NAND Flash support for IMX23 or IMX28.
+ 	 The GPMI controller is very powerful, with the help of BCH
+-- 
+1.7.0.4
