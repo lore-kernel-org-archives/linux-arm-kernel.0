@@ -1,28 +1,28 @@
 From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Tue, 14 Feb 2012 17:31:17 +0900
-Subject: [PATCHv21 09/16] mm: page_isolation: MIGRATE_CMA isolation
- functions added
-In-Reply-To: <1328895151-5196-10-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 14 Feb 2012 17:38:21 +0900
+Subject: [PATCHv21 10/16] mm: Serialize access to min_free_kbytes
+In-Reply-To: <1328895151-5196-11-git-send-email-m.szyprowski@samsung.com>
 References: <1328895151-5196-1-git-send-email-m.szyprowski@samsung.com>
- <1328895151-5196-10-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20120214173117.3f0bf523.kamezawa.hiroyu@jp.fujitsu.com>
+ <1328895151-5196-11-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120214173821.8a214716.kamezawa.hiroyu@jp.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Feb 2012 18:32:24 +0100
+On Fri, 10 Feb 2012 18:32:25 +0100
 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-> From: Michal Nazarewicz <mina86@mina86.com>
+> From: Mel Gorman <mgorman@suse.de>
 > 
-> This commit changes various functions that change pages and
-> pageblocks migrate type between MIGRATE_ISOLATE and
-> MIGRATE_MOVABLE in such a way as to allow to work with
-> MIGRATE_CMA migrate type.
+> There is a race between the min_free_kbytes sysctl, memory hotplug
+> and transparent hugepage support enablement.  Memory hotplug uses a
+> zonelists_mutex to avoid a race when building zonelists. Reuse it to
+> serialise watermark updates.
 > 
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+> [a.p.zijlstra at chello.nl: Older patch fixed the race with spinlock]
+> Signed-off-by: Mel Gorman <mgorman@suse.de>
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Tested-by: Rob Clark <rob.clark@linaro.org>
-> Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 
+At linux-next, conflicted with "mm: add extra free kbytes tunable"
+
+To the logic,
 Reviewed-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
