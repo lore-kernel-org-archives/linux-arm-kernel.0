@@ -1,35 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2012 00:52:39 +0000
-Subject: [GIT PULL] at91: fixes for 3.3-rc4
-In-Reply-To: <4F394D34.6000604@atmel.com>
-References: <4F394D34.6000604@atmel.com>
-Message-ID: <201202140052.39979.arnd@arndb.de>
+Date: Tue, 14 Feb 2012 01:06:32 +0000
+Subject: [PATCH 13/15] ARM: make mach/io.h include optional
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F41FCB4EFA@AUSP01VMBX24.collaborationhost.net>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <1329169408-17253-14-git-send-email-robherring2@gmail.com>
+ <ADE657CA350FB648AAC2C43247A983F001F41FCB4EFA@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <201202140106.32856.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 February 2012, Nicolas Ferre wrote:
-> Olof, Arnd,
+On Monday 13 February 2012, H Hartley Sweeten wrote:
+> > +#ifdef CONFIG_NEED_MACH_IO_H
+> >  #include <mach/io.h>
+> > +#else
+> > +#define __io(a)              ({ (void)(a); __typesafe_io(0); })
+> > +#define __mem_pci(a) (a)
+> > +#endif
 > 
-> Here is the second "fixes" pull request. It collects a simple #ifdef fix, the
-> proper use of ioremap() in the RTC driver and a set of SMC related
-> modifications.
-> The SMC has been modified recently and has broken the pata_at91 driver. The
-> new accessors are fixing this situation. Finally, the old at91_ide driver is
-> removed because it is not maintained anymore, the IDE tree is frozen and PATA
-> should be used instead.
+> Rob,
 > 
-> I have also verified that it merges correctly with depends/rmk/for-armsoc and all
-> at91 related 3.4 material...
+> I compile and boot tested these patches on EP93xxbut did not check them
+> with sparse.
 > 
-> You can find all this here:
+> Most of the mach/io.h headers you remove in Patch 14/15 have the __io
+> macro defined like:
 > 
-> The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
+> #define __io(a)         __typesafe_io(a)
+> 
+> Does your change above still keep the __io macro typesafe?
+> 
+> They don't appear equivalent to me...
 
-Hmm, this is a bit bigger than I would have hoped for an -rc4 pull request.
+It's not equivalent, but the new version is more correct for most
+platforms because it turns a random pointer dereference into a NULL
+pointer dereference.
 
-I've applied it now to the fixes branch because it seems necessary, I hope
-this doesn't come back to us in a bad way. Olof, please have a look over
-these patches as well. If you're ok with these, I'll send the entire batch
-to Linus.
+If you have none of PCI/ISA/PCMCIA, then inb/outb should never be
+used. Ideally we would undefine __io in that case, which results
+in the inb/outb stuff also not getting defined, but some drivers
+like 8250 serial then fail to build even for systems that only
+use the readl/writel path.
 
 	Arnd
