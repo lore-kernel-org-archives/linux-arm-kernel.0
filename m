@@ -1,44 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2012 01:06:32 +0000
-Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F41FCB4EFA@AUSP01VMBX24.collaborationhost.net>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <1329169408-17253-14-git-send-email-robherring2@gmail.com>
- <ADE657CA350FB648AAC2C43247A983F001F41FCB4EFA@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <201202140106.32856.arnd@arndb.de>
+From: Hong.Xu@atmel.com (Xu, Hong)
+Date: Tue, 14 Feb 2012 09:10:29 +0800
+Subject: [PATCH] MTD: atmel_nand: Update driver to support Programmable HW
+ ECC controller
+In-Reply-To: <1329134891.22240.116.camel@sauron.fi.intel.com>
+References: <1329117469-23637-1-git-send-email-hong.xu@atmel.com>
+ <1329134891.22240.116.camel@sauron.fi.intel.com>
+Message-ID: <4C79549CB6F772498162A641D92D5328045B5ADE@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 February 2012, H Hartley Sweeten wrote:
-> > +#ifdef CONFIG_NEED_MACH_IO_H
-> >  #include <mach/io.h>
-> > +#else
-> > +#define __io(a)              ({ (void)(a); __typesafe_io(0); })
-> > +#define __mem_pci(a) (a)
-> > +#endif
-> 
-> Rob,
-> 
-> I compile and boot tested these patches on EP93xxbut did not check them
-> with sparse.
-> 
-> Most of the mach/io.h headers you remove in Patch 14/15 have the __io
-> macro defined like:
-> 
-> #define __io(a)         __typesafe_io(a)
-> 
-> Does your change above still keep the __io macro typesafe?
-> 
-> They don't appear equivalent to me...
+HI Artem,
 
-It's not equivalent, but the new version is more correct for most
-platforms because it turns a random pointer dereference into a NULL
-pointer dereference.
+> -----Original Message-----
+> From: Artem Bityutskiy [mailto:dedekind1 at gmail.com]
+> Sent: Monday, February 13, 2012 8:08 PM
+> To: Xu, Hong
+> Cc: linux-mtd at lists.infradead.org; dwmw2 at infradead.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] MTD: atmel_nand: Update driver to support
+Programmable
+> HW ECC controller
+> 
+> On Mon, 2012-02-13 at 15:17 +0800, Hong Xu wrote:
+> > The Programmable Hardware ECC (PMECC) controller is a programmable
+binary
+> > BCH(Bose, Chaudhuri and Hocquenghem) encoder and decoder. This
+controller
+> > can be used to support both SLC and MLC NAND Flash devices. It
+supports to
+> > generate ECC to correct 2, 4, 8, 12 or 24 bits of error per sector
+of data.
+> >
+> > To use this driver, the user needs to pass in the correction
+capability and
+> > the sector size.
+> >
+> > This driver has been tested on AT91SAM9X5-EK and AT91SAM9N12-EK with
+JFFS2,
+> > YAFFS2, UBIFS and mtd-utils.
+> >
+> > Signed-off-by: Hong Xu <hong.xu@atmel.com>
+> 
+> Please, do not forget to fix the following warnings as well:
+> 
+> Sparse:
+> +drivers/mtd/nand/atmel_nand.c:1446:52: warning: Using plain integer
+as NULL
+> pointer [sparse]
+> 
+> gcc:
+> +drivers/mtd/nand/atmel_nand.c: In function 'atmel_nand_probe':
+> +drivers/mtd/nand/atmel_nand.c:1451:1: warning: label 'err' defined
+but not
+> used [-Wunused-label]
+> 
 
-If you have none of PCI/ISA/PCMCIA, then inb/outb should never be
-used. Ideally we would undefine __io in that case, which results
-in the inb/outb stuff also not getting defined, but some drivers
-like 8250 serial then fail to build even for systems that only
-use the readl/writel path.
+OK, I'll also check with `sparse' as well. Thanks.
 
-	Arnd
+BR,
+Eric
+
+> --
+> Best Regards,
+> Artem Bityutskiy
