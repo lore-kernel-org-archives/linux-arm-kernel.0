@@ -1,92 +1,82 @@
-From: carl@ok-labs.com (Van Schaik, Carl)
-Date: Tue, 14 Feb 2012 13:19:12 +0000
-Subject: Cache problems in user space - kernel space communication
-In-Reply-To: <CAKPCGKt6U6m8cnagCwgzaLB9R8f73KDWmV58W3ifHQ9n-Y7sTw@mail.gmail.com>
-References: <CAKPCGKt6U6m8cnagCwgzaLB9R8f73KDWmV58W3ifHQ9n-Y7sTw@mail.gmail.com>
-Message-ID: <4541F39E5122A64CA8A7F74880F94E5201E89013BD@MBX14.EXCHPROD.USA.NET>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 14 Feb 2012 07:24:39 -0600
+Subject: [PATCH 07/15] ARM: at91: clean-up mach/io.h
+In-Reply-To: <4F3A2797.7000402@atmel.com>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <1329169408-17253-8-git-send-email-robherring2@gmail.com>
+ <4F3A2797.7000402@atmel.com>
+Message-ID: <4F3A6097.2030606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like you are mapping the same page cached to both kernel and user space (at different virtual addresses). With the VIVT cache, the two mappings will hash differently into the cache and access different cache lines. To successfully work like this on a VIVT cache you need to perform a lot of cache maintenance whenever switching from kernel to user. You would likely rather map the page uncached in both kernel and user to save all the effort.
+On 02/14/2012 03:21 AM, Nicolas Ferre wrote:
+> On 02/13/2012 10:43 PM, Rob Herring :
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Move most of io.h into at91_io.h and update includes.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>>  arch/arm/mach-at91/at91cap9.c                     |    1 +
+>>  arch/arm/mach-at91/at91cap9_devices.c             |    1 +
+> 
+> Please do not touch the "*cap9*" files anymore: They are scheduled for
+> removal for 3.4 kernel:
+> Documentation/feature-removal-schedule.txt
 
---
-Carl
+Okay.
 
-> -----Original Message-----
-> From: Bart Jonkers [mailto:jonkersbart at gmail.com]
-> Sent: Tuesday, 14 February 2012 6:46 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Subject: Cache problems in user space - kernel space communication
 > 
-> All,
+>>  arch/arm/mach-at91/at91rm9200.c                   |    1 +
+>>  arch/arm/mach-at91/at91rm9200_devices.c           |    1 +
+>>  arch/arm/mach-at91/at91rm9200_time.c              |    1 +
+>>  arch/arm/mach-at91/at91sam9260.c                  |    1 +
+>>  arch/arm/mach-at91/at91sam9260_devices.c          |    1 +
+>>  arch/arm/mach-at91/at91sam9261.c                  |    1 +
+>>  arch/arm/mach-at91/at91sam9261_devices.c          |    1 +
+>>  arch/arm/mach-at91/at91sam9263.c                  |    1 +
+>>  arch/arm/mach-at91/at91sam9263_devices.c          |    1 +
+>>  arch/arm/mach-at91/at91sam9g45.c                  |    1 +
+>>  arch/arm/mach-at91/at91sam9g45_devices.c          |    1 +
+>>  arch/arm/mach-at91/at91sam9rl.c                   |    1 +
+>>  arch/arm/mach-at91/at91sam9rl_devices.c           |    1 +
+>>  arch/arm/mach-at91/at91x40.c                      |    1 +
+>>  arch/arm/mach-at91/at91x40_time.c                 |    1 +
+>>  arch/arm/mach-at91/board-cap9adk.c                |    1 +
+>>  arch/arm/mach-at91/board-cpu9krea.c               |    1 +
+>>  arch/arm/mach-at91/board-eco920.c                 |    1 +
+>>  arch/arm/mach-at91/board-yl-9200.c                |    1 +
+>>  arch/arm/mach-at91/clock.c                        |    1 +
+>>  arch/arm/mach-at91/include/mach/at91_io.h         |   44 +++++++++++++++++++++
+>>  arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |    2 +
+>>  arch/arm/mach-at91/include/mach/at91sam9_sdramc.h |    2 +
+>>  arch/arm/mach-at91/include/mach/uncompress.h      |    1 +
+>>  arch/arm/mach-at91/pm.c                           |    1 +
+>>  arch/arm/mach-at91/pm.h                           |    2 +
+>>  arch/arm/mach-at91/setup.c                        |    1 +
+>>  drivers/pcmcia/at91_cf.c                          |    1 +
+>>  drivers/rtc/rtc-at91sam9.c                        |    2 +-
+>>  drivers/usb/gadget/at91_udc.c                     |    1 +
+>>  drivers/watchdog/at91rm9200_wdt.c                 |    1 +
+>>  drivers/watchdog/at91sam9_wdt.c                   |    1 +
+>>  34 files changed, 80 insertions(+), 1 deletions(-)
+>>  create mode 100644 arch/arm/mach-at91/include/mach/at91_io.h
+>>
+
+snip
+
+>> diff --git a/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h b/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
+>> index e2f8da8..0427212 100644
+>> --- a/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
+>> +++ b/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
+>> @@ -12,6 +12,8 @@
+>>  #ifndef AT91SAM9_DDRSDR_H
+>>  #define AT91SAM9_DDRSDR_H
+>>  
+>> +#include <mach/at91_io.h>
 > 
-> I'm experiencing problems in our application where a driver and a user space
-> application performs bi-directional communication through a memory
-> buffer.
-> 
-> We are running a 2.6.35.14 kernel on an kirkwood based SoC (Marvell
-> 88F6192):
-> [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE),
-> cr=00053977
-> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> 
-> /root> cat /proc/cpuinfo
-> Processor       : Feroceon 88FR131 rev 1 (v5l)
-> BogoMIPS        : 796.44
-> Features        : swp half thumb fastmult edsp
-> CPU implementer : 0x56
-> CPU architecture: 5TE
-> CPU variant     : 0x2
-> CPU part        : 0x131
-> CPU revision    : 1
-> 
-> The kernel driver allocates some page aligned memory which is memory
-> mapped by the application.
-> The driver put some data in the memory area and informs the application.
-> The application processes the data, changes it and informs the kernel. The
-> kernel then processes the data further and remove it from the buffer.
-> 
-> We see that the driver doesn't always see the changes of the application to
-> the data.
-> We see that the changes by the application near the initial kernel data are
-> not seen but if data is added on other places in the buffer which where not
-> accessed earlier by the kernel, the kernel sees the changes.
-> It seems that this area which is not updated in the kernel is the size of a
-> cache line of the L1 cache.
-> 
-> In the mailing list archive I have found the following thread:
-> http://lists.arm.linux.org.uk/lurker/message/20091204.112345.0fbed99c.en.
-> html
-> I tried the suggested patch and it solves the problem described in the thread
-> but not our problem.
-> The problem in the thread is communication between two user space
-> programs as ours is between user space and kernel space.
-> 
-> I made a small module and application to reproduce the problem (source
-> attached).
-> When it goes wrong i see the following output:
-> 
-> [ 1211.827680] Sending packet with counter 0 to user space Received packet
-> from kernel with counter 0 [ 1211.834556] removing packet with counter 0
-> 
-> [ 1216.841009]Sending packet with counter 1 to user space Received packet
-> from kernel with counter 1 [ 1216.852027] Value 5 of packet 1 is not equal.
-> [ 1216.857752] Value 6 of packet 1 is not equal.
-> [ 1216.863119] Value 7 of packet 1 is not equal.
-> [ 1216.867478] Value 8 of packet 1 is not equal.
-> [ 1216.871838] Value 9 of packet 1 is not equal.
-> [ 1216.876190] Value 10 of packet 1 is not equal.
-> 
-> [ 1221.854343] Sending packet with counter 2 to user space Received packet
-> from kernel with counter 3 [ 1226.873237] removing packet with counter 3 [
-> 1226.878701] Value 5 of packet 3 is not equal.
-> [ 1226.884422] Value 6 of packet 3 is not equal.
-> [ 1226.889796] Value 7 of packet 3 is not equal.
-> [ 1226.894149] Value 8 of packet 3 is not equal.
-> ...
-> 
-> The output shows that a part of the data written in user space is not read
-> back successful in kernel space.
-> 
-> Regards,
-> Bart
+> Do we need this include in header files?
+
+Yes, for at91_sys_write/read used at the bottom.
+
+Rob
