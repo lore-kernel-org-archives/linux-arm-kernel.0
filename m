@@ -1,24 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Feb 2012 11:56:28 -0800
-Subject: [PATCH v5 1/2] mxs-dma : move the mxs dma.h to a more common place
-In-Reply-To: <1329110756-14434-2-git-send-email-b32955@freescale.com>
-References: <1329110756-14434-1-git-send-email-b32955@freescale.com>
- <1329110756-14434-2-git-send-email-b32955@freescale.com>
-Message-ID: <20120215195627.GC2399@r65073-Latitude-D630>
+From: eparis@redhat.com (Eric Paris)
+Date: Wed, 15 Feb 2012 14:57:59 -0500
+Subject: [PATCH] ARM: ptrace: Include linux/audit.h to fix build errors
+In-Reply-To: <20120215173443.GF27825@n2100.arm.linux.org.uk>
+References: <1329284188.12708.1.camel@phoenix>
+ <20120215083609.GD13673@n2100.arm.linux.org.uk>
+ <1329325622.2337.13.camel@localhost>
+ <20120215173443.GF27825@n2100.arm.linux.org.uk>
+Message-ID: <1329335879.2337.18.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 01:25:55PM +0800, Huang Shijie wrote:
-> Move the header to a more common place.
-> The mxs dma engine is not only used in mx23/mx28, but also used
-> in mx50/mx6q.  It will also be used in the future chips.
+On Wed, 2012-02-15 at 17:34 +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 15, 2012 at 12:07:02PM -0500, Eric Paris wrote:
+> > So if someone tells me how the code knows it's endianness I'll gladly
+> > write the ifdef to switch from AUDIT_ARCH_ARMEB to AUDIT_ARCH_ARM when
+> > appropriate....
 > 
-> Rename it to mxs-dma.h, and create a new folder include/linux/fsl/ to
-> store the Freescale's header files.
+> An easy way would be:
 > 
-> change mxs-dma driver, mxs-mmc driver, gpmi-nand driver, mxs-saif driver
-> to the new header file.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> #ifndef __ARMEB__
+> #define AUDIT_ARCH_NR AUDIT_ARCH_ARMEB
+> #else
+> #define AUDIT_ARCH_NR AUDIT_ARCH_ARM
+> #endif
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Is that actually exactly backwards?  ifndef?  (I don't have a clue when
+__ARMEB__ is set)
