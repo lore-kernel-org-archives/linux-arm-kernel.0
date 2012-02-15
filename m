@@ -1,182 +1,223 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 16 Feb 2012 06:37:09 +0900
-Subject: [PATCH v2 3/3] gpio/samsung: use ioremap() for EXYNOS4 GPIOlib
-In-Reply-To: <1329341829-14403-1-git-send-email-kgene.kim@samsung.com>
-References: <1329341829-14403-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1329341829-14403-4-git-send-email-kgene.kim@samsung.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 15 Feb 2012 13:46:55 -0800
+Subject: [PATCH v3] ARM: OMAP: clock: cleanup CPUfreq leftovers
+Message-ID: <1329342415-28702-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sangsu Park <sangsu4u.park@samsung.com>
+Now that we have OPP layer, and OMAP CPUfreq driver is using it, we no
+longer need/use the clock framework code for filling up CPUfreq
+tables.  Remove it.
 
-This patch changes to use ioremap() for EXYNOS4210
-so that we can drop the static mapping for EXYNOS
-SoCs.
+Thanks to Russell King for pointing out the parts I missed under
+plat-omap in the original version.
 
-Note: Will be updated for all of Samsung GPIOlibs
-to use ioremap() next time.
-
-Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-exynos/common.c |   15 ------------
- drivers/gpio/gpio-samsung.c   |   48 +++++++++++++++++++++++++++++------------
- 2 files changed, 34 insertions(+), 29 deletions(-)
+Paul, this is an updated version of the previous one after a different
+CPUfreq patch from Russell made me realize I missed the plat-omap pieces.
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 63a2b04..618e7f3 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -172,21 +172,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	}, {
--		.virtual	= (unsigned long)S5P_VA_GPIO1,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_GPIO1),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)S5P_VA_GPIO2,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_GPIO2),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)S5P_VA_GPIO3,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_GPIO3),
--		.length		= SZ_256,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S5P_VA_DMC0,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
- 		.length		= SZ_4K,
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index d6cfdee7..4627787 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -2331,7 +2331,6 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
- 			.label	= "GPY6",
- 		},
- 	}, {
--		.base	= (S5P_VA_GPIO2 + 0xC00),
- 		.config	= &samsung_gpio_cfgs[9],
- 		.irq_base = IRQ_EINT(0),
- 		.chip	= {
-@@ -2341,7 +2340,6 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
- 			.to_irq	= samsung_gpiolib_to_irq,
- 		},
- 	}, {
--		.base	= (S5P_VA_GPIO2 + 0xC20),
- 		.config	= &samsung_gpio_cfgs[9],
- 		.irq_base = IRQ_EINT(8),
- 		.chip	= {
-@@ -2351,7 +2349,6 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
- 			.to_irq	= samsung_gpiolib_to_irq,
- 		},
- 	}, {
--		.base	= (S5P_VA_GPIO2 + 0xC40),
- 		.config	= &samsung_gpio_cfgs[9],
- 		.irq_base = IRQ_EINT(16),
- 		.chip	= {
-@@ -2361,7 +2358,6 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
- 			.to_irq	= samsung_gpiolib_to_irq,
- 		},
- 	}, {
--		.base	= (S5P_VA_GPIO2 + 0xC60),
- 		.config	= &samsung_gpio_cfgs[9],
- 		.irq_base = IRQ_EINT(24),
- 		.chip	= {
-@@ -2789,9 +2785,16 @@ static __init int samsung_gpiolib_init(void)
- 		s5p_register_gpioint_bank(IRQ_GPIOINT, 0, S5P_GPIOINT_GROUP_MAXNR);
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   80 --------------------------
+ arch/arm/mach-omap2/clock.c                  |    5 --
+ arch/arm/mach-omap2/clock.h                  |    8 ---
+ arch/arm/plat-omap/clock.c                   |   26 --------
+ arch/arm/plat-omap/include/plat/clock.h      |   10 ---
+ 5 files changed, 0 insertions(+), 129 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+index 39f9d5a..9a13e07 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -164,83 +164,3 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
+ 
+ 	return 0;
+ }
+-
+-#ifdef CONFIG_CPU_FREQ
+-/*
+- * Walk PRCM rate table and fillout cpufreq freq_table
+- * XXX This should be replaced by an OPP layer in the near future
+- */
+-static struct cpufreq_frequency_table *freq_table;
+-
+-void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+-{
+-	const struct prcm_config *prcm;
+-	int i = 0;
+-	int tbl_sz = 0;
+-
+-	if (!cpu_is_omap24xx())
+-		return;
+-
+-	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+-		if (!(prcm->flags & cpu_mask))
+-			continue;
+-		if (prcm->xtal_speed != sclk->rate)
+-			continue;
+-
+-		/* don't put bypass rates in table */
+-		if (prcm->dpll_speed == prcm->xtal_speed)
+-			continue;
+-
+-		tbl_sz++;
+-	}
+-
+-	/*
+-	 * XXX Ensure that we're doing what CPUFreq expects for this error
+-	 * case and the following one
+-	 */
+-	if (tbl_sz == 0) {
+-		pr_warning("%s: no matching entries in rate_table\n",
+-			   __func__);
+-		return;
+-	}
+-
+-	/* Include the CPUFREQ_TABLE_END terminator entry */
+-	tbl_sz++;
+-
+-	freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) * tbl_sz,
+-			     GFP_ATOMIC);
+-	if (!freq_table) {
+-		pr_err("%s: could not kzalloc frequency table\n", __func__);
+-		return;
+-	}
+-
+-	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+-		if (!(prcm->flags & cpu_mask))
+-			continue;
+-		if (prcm->xtal_speed != sclk->rate)
+-			continue;
+-
+-		/* don't put bypass rates in table */
+-		if (prcm->dpll_speed == prcm->xtal_speed)
+-			continue;
+-
+-		freq_table[i].index = i;
+-		freq_table[i].frequency = prcm->mpu_speed / 1000;
+-		i++;
+-	}
+-
+-	freq_table[i].index = i;
+-	freq_table[i].frequency = CPUFREQ_TABLE_END;
+-
+-	*table = &freq_table[0];
+-}
+-
+-void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
+-{
+-	if (!cpu_is_omap24xx())
+-		return;
+-
+-	kfree(freq_table);
+-}
+-
+-#endif
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index f57ed5b..d9f4931 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -536,10 +536,5 @@ struct clk_functions omap2_clk_functions = {
+ 	.clk_set_rate		= omap2_clk_set_rate,
+ 	.clk_set_parent		= omap2_clk_set_parent,
+ 	.clk_disable_unused	= omap2_clk_disable_unused,
+-#ifdef CONFIG_CPU_FREQ
+-	/* These will be removed when the OPP code is integrated */
+-	.clk_init_cpufreq_table	= omap2_clk_init_cpufreq_table,
+-	.clk_exit_cpufreq_table	= omap2_clk_exit_cpufreq_table,
+-#endif
+ };
+ 
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index b8c2a68..a1bb23a 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -146,14 +146,6 @@ extern const struct clksel_rate gpt_sys_rates[];
+ extern const struct clksel_rate gfx_l3_rates[];
+ extern const struct clksel_rate dsp_ick_rates[];
+ 
+-#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_CPU_FREQ)
+-extern void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
+-extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
+-#else
+-#define omap2_clk_init_cpufreq_table	0
+-#define omap2_clk_exit_cpufreq_table	0
+-#endif
+-
+ extern const struct clkops clkops_omap2_iclk_dflt_wait;
+ extern const struct clkops clkops_omap2_iclk_dflt;
+ extern const struct clkops clkops_omap2_iclk_idle_only;
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 567e4b5..05a944b 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -399,32 +399,6 @@ struct clk dummy_ck = {
+ 	.ops	= &clkops_null,
+ };
+ 
+-#ifdef CONFIG_CPU_FREQ
+-void clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+-{
+-	unsigned long flags;
+-
+-	if (!arch_clock || !arch_clock->clk_init_cpufreq_table)
+-		return;
+-
+-	spin_lock_irqsave(&clockfw_lock, flags);
+-	arch_clock->clk_init_cpufreq_table(table);
+-	spin_unlock_irqrestore(&clockfw_lock, flags);
+-}
+-
+-void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
+-{
+-	unsigned long flags;
+-
+-	if (!arch_clock || !arch_clock->clk_exit_cpufreq_table)
+-		return;
+-
+-	spin_lock_irqsave(&clockfw_lock, flags);
+-	arch_clock->clk_exit_cpufreq_table(table);
+-	spin_unlock_irqrestore(&clockfw_lock, flags);
+-}
+-#endif
+-
+ /*
+  *
+  */
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 240a7b9..d0ef57c 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -272,8 +272,6 @@ struct clk {
  #endif
- 	} else if (soc_is_exynos4210()) {
--		group = 0;
-+#ifdef CONFIG_CPU_EXYNOS4210
-+		void __iomem *gpx_base;
+ };
  
- 		/* gpio part1 */
-+		gpio_base1 = ioremap(EXYNOS4_PA_GPIO1, SZ_4K);
-+		if (gpio_base1 == NULL) {
-+			pr_err("unable to ioremap for gpio_base1\n");
-+			goto err_ioremap1;
-+		}
-+
- 		chip = exynos4_gpios_1;
- 		nr_chips = ARRAY_SIZE(exynos4_gpios_1);
- 
-@@ -2800,14 +2803,25 @@ static __init int samsung_gpiolib_init(void)
- 				chip->config = &exynos_gpio_cfg;
- 				chip->group = group++;
- 			}
--#ifdef CONFIG_CPU_EXYNOS4210
- 			exynos_gpiolib_attach_ofnode(chip,
- 					EXYNOS4_PA_GPIO1, i * 0x20);
+-struct cpufreq_frequency_table;
+-
+ struct clk_functions {
+ 	int		(*clk_enable)(struct clk *clk);
+ 	void		(*clk_disable)(struct clk *clk);
+@@ -283,10 +281,6 @@ struct clk_functions {
+ 	void		(*clk_allow_idle)(struct clk *clk);
+ 	void		(*clk_deny_idle)(struct clk *clk);
+ 	void		(*clk_disable_unused)(struct clk *clk);
+-#ifdef CONFIG_CPU_FREQ
+-	void		(*clk_init_cpufreq_table)(struct cpufreq_frequency_table **);
+-	void		(*clk_exit_cpufreq_table)(struct cpufreq_frequency_table **);
 -#endif
- 		}
--		samsung_gpiolib_add_4bit_chips(exynos4_gpios_1, nr_chips, S5P_VA_GPIO1);
-+		samsung_gpiolib_add_4bit_chips(exynos4_gpios_1,
-+					       nr_chips, gpio_base1);
+ };
  
- 		/* gpio part2 */
-+		gpio_base2 = ioremap(EXYNOS4_PA_GPIO2, SZ_4K);
-+		if (gpio_base2 == NULL) {
-+			pr_err("unable to ioremap for gpio_base2\n");
-+			goto err_ioremap2;
-+		}
-+
-+		/* need to set base address for gpx */
-+		chip = &exynos4_gpios_2[16];
-+		gpx_base = gpio_base2 + 0xC00;
-+		for (i = 0; i < 4; i++, chip++, gpx_base += 0x20)
-+			chip->base = gpx_base;
-+
- 		chip = exynos4_gpios_2;
- 		nr_chips = ARRAY_SIZE(exynos4_gpios_2);
- 
-@@ -2816,14 +2830,19 @@ static __init int samsung_gpiolib_init(void)
- 				chip->config = &exynos_gpio_cfg;
- 				chip->group = group++;
- 			}
--#ifdef CONFIG_CPU_EXYNOS4210
- 			exynos_gpiolib_attach_ofnode(chip,
- 					EXYNOS4_PA_GPIO2, i * 0x20);
+ extern int mpurate;
+@@ -301,10 +295,6 @@ extern void recalculate_root_clocks(void);
+ extern unsigned long followparent_recalc(struct clk *clk);
+ extern void clk_enable_init_clocks(void);
+ unsigned long omap_fixed_divisor_recalc(struct clk *clk);
+-#ifdef CONFIG_CPU_FREQ
+-extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
+-extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
 -#endif
- 		}
--		samsung_gpiolib_add_4bit_chips(exynos4_gpios_2, nr_chips, S5P_VA_GPIO2);
-+		samsung_gpiolib_add_4bit_chips(exynos4_gpios_2,
-+					       nr_chips, gpio_base2);
- 
- 		/* gpio part3 */
-+		gpio_base3 = ioremap(EXYNOS4_PA_GPIO3, SZ_256);
-+		if (gpio_base3 == NULL) {
-+			pr_err("unable to ioremap for gpio_base3\n");
-+			goto err_ioremap3;
-+		}
-+
- 		chip = exynos4_gpios_3;
- 		nr_chips = ARRAY_SIZE(exynos4_gpios_3);
- 
-@@ -2832,17 +2851,18 @@ static __init int samsung_gpiolib_init(void)
- 				chip->config = &exynos_gpio_cfg;
- 				chip->group = group++;
- 			}
--#ifdef CONFIG_CPU_EXYNOS4210
- 			exynos_gpiolib_attach_ofnode(chip,
- 					EXYNOS4_PA_GPIO3, i * 0x20);
--#endif
- 		}
--		samsung_gpiolib_add_4bit_chips(exynos4_gpios_3, nr_chips, S5P_VA_GPIO3);
-+		samsung_gpiolib_add_4bit_chips(exynos4_gpios_3,
-+					       nr_chips, gpio_base3);
- 
- #if defined(CONFIG_CPU_EXYNOS4210) && defined(CONFIG_S5P_GPIO_INT)
- 		s5p_register_gpioint_bank(IRQ_GPIO_XA, 0, IRQ_GPIO1_NR_GROUPS);
- 		s5p_register_gpioint_bank(IRQ_GPIO_XB, IRQ_GPIO1_NR_GROUPS, IRQ_GPIO2_NR_GROUPS);
- #endif
-+
-+#endif	/* CONFIG_CPU_EXYNOS4210 */
- 	} else if (soc_is_exynos5250()) {
- #ifdef CONFIG_SOC_EXYNOS5250
- 		void __iomem *gpx_base;
+ extern struct clk *omap_clk_get_by_name(const char *name);
+ extern int omap_clk_enable_autoidle_all(void);
+ extern int omap_clk_disable_autoidle_all(void);
 -- 
-1.7.4.4
+1.7.9
