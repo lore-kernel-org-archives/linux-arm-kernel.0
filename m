@@ -1,21 +1,40 @@
-From: lk9150@gicom.com.cn (=?GB2312?B?tPfeyMi6?=)
-Date: Wed, 15 Feb 2012 10:38:06 +0800
-Subject: =?GB2312?B?serXvLmkyrHU2rmkyMvQvbPqyei8xtbQtcTTptPDSQ==?=
-Message-ID: <201202151038064262109@gicom.com.cn>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 15 Feb 2012 13:36:28 +0800
+Subject: [PATCH] ARM: ptrace: Include linux/audit.h to fix build errors
+Message-ID: <1329284188.12708.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-XBLQIFJA
+Include linux/audit.h to fix below build errors:
 
+  CC      arch/arm/kernel/ptrace.o
+arch/arm/kernel/ptrace.c: In function 'syscall_trace':
+arch/arm/kernel/ptrace.c:919: error: implicit declaration of function 'audit_syscall_exit'
+arch/arm/kernel/ptrace.c:921: error: implicit declaration of function 'audit_syscall_entry'
+arch/arm/kernel/ptrace.c:921: error: 'AUDIT_ARCH_ARMEB' undeclared (first use in this function)
+arch/arm/kernel/ptrace.c:921: error: (Each undeclared identifier is reported only once
+arch/arm/kernel/ptrace.c:921: error: for each function it appears in.)
+make[1]: *** [arch/arm/kernel/ptrace.o] Error 1
+make: *** [arch/arm/kernel] Error 2
 
-?????????????????
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+This patch is against linux-next 20120215.
 
+ arch/arm/kernel/ptrace.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-39687876
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: Asjuit9776.xls
-Type: application/x-msexcel
-Size: 30720 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120215/a75ec8b0/attachment-0001.bin>
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index e33870f..48970ad 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -23,6 +23,7 @@
+ #include <linux/perf_event.h>
+ #include <linux/hw_breakpoint.h>
+ #include <linux/regset.h>
++#include <linux/audit.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/system.h>
+-- 
+1.7.5.4
