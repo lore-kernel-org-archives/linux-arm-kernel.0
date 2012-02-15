@@ -1,52 +1,66 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 15 Feb 2012 08:14:00 -0600
-Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <alpine.LFD.2.02.1202141909260.24536@xanadu.home>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <201202140804.49026.arnd@arndb.de> <4F3A7158.2080702@gmail.com>
- <201202141716.26930.arnd@arndb.de>
- <20120214174035.GA29765@n2100.arm.linux.org.uk> <4F3AE98D.7030104@gmail.com>
- <20120214234313.GD29765@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1202141909260.24536@xanadu.home>
-Message-ID: <4F3BBDA8.8070801@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 15 Feb 2012 15:36:58 +0100
+Subject: remoteproc: Load coprocessor code to the specific main memory
+ location
+In-Reply-To: <4F3BA962.9040109@monstr.eu>
+References: <4F1EE861.4030405@monstr.eu>
+ <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
+ <4F1FF870.3000105@monstr.eu>
+ <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
+ <4F200F64.9060203@monstr.eu>
+ <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
+ <4F212E9E.9060807@monstr.eu>
+ <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
+ <4F391C1D.9020402@monstr.eu>
+ <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
+ <4F3BA962.9040109@monstr.eu>
+Message-ID: <4F3BC30A.4030301@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2012 06:25 PM, Nicolas Pitre wrote:
-> On Tue, 14 Feb 2012, Russell King - ARM Linux wrote:
-> 
->> On Tue, Feb 14, 2012 at 05:09:01PM -0600, Rob Herring wrote:
->>> BTW, I noticed some static mappings at 0xffxxxxxx. Are those even a
->>> valid address?
+Michal Simek wrote:
+> Ohad Ben-Cohen wrote:
+>> On Mon, Feb 13, 2012 at 3:20 PM, Michal Simek <monstr@monstr.eu> wrote:
+>>> Here is how it is achieve
+>>>        ret = dma_declare_coherent_memory(&zynq_freertos.dev, 0,
+>>>                                0, 0x10000000, DMA_MEMORY_MAP);
+>>>
+>>> which is fully compatible with remoteproc.
 >>
->> Nothing invalid about them as such, but I have tried to discourage their
->> use in case we decide that we want to go for a default 14MB DMA region.
+>> Great, this is what we've been doing with davinci too.
 > 
-> They should be invalid, and would be flagged by this code in 
-> create_mapping():
+> Cool.
 > 
->         if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
->             md->virtual >= PAGE_OFFSET &&
->             (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) 
->         {
->                 printk(KERN_WARNING "BUG: mapping for 0x%08llx"
->                        " at 0x%08lx out of vmalloc space\n",
->                        (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
->         }
+>>
+>>> Do you have any example of using it?
+>>
+>> What exactly are you looking for ? RTOS or Linux side ?
 > 
-> given that VMALLOC_END is now defined as 0xff000000.
+> Both side will be great. Rtos is freertos.
 > 
-> What are those static mappings at 0xffxxxxxx?  I was looking for them 
-> while reworking this code but I might have missed some.
+>>
+>> On the Linux side, you can just make the rpmsg sample work (it's part
+>> of the rpmsg patch set). For the RTOS side, feel free to just take our
+>> code (it's BSD licensed and hosted on github) and adapt it to your
+>> environment.
 > 
+> You mean that server_sample and rpmsg_omx right?
+> I have also found rpmsg-omx demo application.
+> What I am missing is how to probe rpmsg bus.
+> Do you have any working example?
+> 
+> Communication between cpus is done through swirqs. I have test sending 
+> it from linux to rtos.
 
-TS78XX_FPGA_REGS_VIRT_BASE
-IXP4XX_PERIPHERAL_BASE_VIRT
-IXP4XX_EXP_CFG_BASE_VIRT
-IXP4XX_PCI_CFG_BASE_VIRT
-IXP4XX_DEBUG_UART_BASE_VIRT
-CLPS7111_VIRT_BASE
-u300-regs.h
-cns3xxx.h
+ok. How that rpmsg channels are created? Is it based on data sent from remoteproc?
+Or based on resource table?
 
-Rob
+Thanks,
+Michal
+
+
+-- 
+Michal Simek, Ing. (M.Eng)
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
+Microblaze U-BOOT custodian
