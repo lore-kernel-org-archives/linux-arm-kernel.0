@@ -1,63 +1,108 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Feb 2012 10:28:19 -0800
-Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes for
- v3.4 merge window
-Message-ID: <20120215182355.18884.18682.stgit@kaulin.local>
+Date: Wed, 15 Feb 2012 10:28:23 -0800
+Subject: [PATCH 1/3] ARM: OMAP: omap_device: Expose omap_device_{alloc,
+ delete, register}
+In-Reply-To: <20120215182355.18884.18682.stgit@kaulin.local>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+Message-ID: <20120215182823.18884.59794.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Ohad Ben-Cohen <ohad@wizery.com>
 
-This series fixes up the issues noted by Russell on omap2_hsmmc_init()
-where if TWL PMIC is compiled as a module we can't keep a bunch of
-functions marked as __init like they should be. This series fixes
-the issues by splitting omap2_hsmmc_init() into two functions.
+Expose omap_device_{alloc, delete, register} so we can use them outside
+of omap_device.c.
 
-One more patch is needed to sort out the remaining issue with
-omap4 that has yet another luck based initialization for the
-same issue..
+This approach allows users, which need to manipulate an archdata member
+of a device before it is registered, to do so. This is also useful
+for users who have their devices created very early so they can be used
+at ->reserve() time to reserve CMA memory.
 
-Regards,
+The immediate use case for this is to set the private iommu archdata
+member, which binds a device to its associated iommu controller.
+This way, generic code will be able to attach omap devices to their
+iommus, without calling any omap-specific API.
 
-Tony
+With this in hand, we can further clean the existing mainline OMAP iommu
+driver and its mainline users, and focus on generic IOMMU approaches
+for future users (rpmsg/remoteproc and the upcoming generic DMA API).
 
+This patch is still considered an interim solution until DT fully materializes
+for omap; at that point, this functionality will be removed as DT will
+take care of creating the devices and configuring them correctly.
+
+Tested on OMAP4 with a generic rpmsg/remoteproc that doesn't use any
+omap-specific IOMMU API anymore.
+
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
+ arch/arm/plat-omap/include/plat/omap_device.h |    7 +++++++
+ arch/arm/plat-omap/omap_device.c              |   13 +++----------
+ 2 files changed, 10 insertions(+), 10 deletions(-)
 
-Ohad Ben-Cohen (1):
-      ARM: OMAP: omap_device: Expose omap_device_{alloc, delete, register}
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Split omap2_hsmmc_init() to properly support I2C GPIO pins
-      ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux related functions as __init
-
-
- arch/arm/mach-omap2/board-2430sdp.c           |    2 
- arch/arm/mach-omap2/board-3430sdp.c           |    5 +
- arch/arm/mach-omap2/board-4430sdp.c           |    6 +
- arch/arm/mach-omap2/board-am3517evm.c         |    2 
- arch/arm/mach-omap2/board-cm-t35.c            |    6 +
- arch/arm/mach-omap2/board-devkit8000.c        |    4 +
- arch/arm/mach-omap2/board-flash.c             |    2 
- arch/arm/mach-omap2/board-igep0020.c          |    7 +-
- arch/arm/mach-omap2/board-ldp.c               |    2 
- arch/arm/mach-omap2/board-omap3beagle.c       |   10 ++
- arch/arm/mach-omap2/board-omap3evm.c          |    8 +-
- arch/arm/mach-omap2/board-omap3logic.c        |    2 
- arch/arm/mach-omap2/board-omap3pandora.c      |    6 +
- arch/arm/mach-omap2/board-omap3stalker.c      |   15 ++-
- arch/arm/mach-omap2/board-omap3touchbook.c    |   17 ++--
- arch/arm/mach-omap2/board-omap4panda.c        |    6 +
- arch/arm/mach-omap2/board-overo.c             |    5 +
- arch/arm/mach-omap2/board-rm680.c             |    2 
- arch/arm/mach-omap2/board-rx51-peripherals.c  |    2 
- arch/arm/mach-omap2/board-zoom-peripherals.c  |    6 +
- arch/arm/mach-omap2/display.c                 |    8 +-
- arch/arm/mach-omap2/hsmmc.c                   |  111 ++++++++++++++++++-------
- arch/arm/mach-omap2/hsmmc.h                   |   12 ++-
- arch/arm/mach-omap2/mux.c                     |   22 ++---
- arch/arm/plat-omap/include/plat/omap_device.h |    7 ++
- arch/arm/plat-omap/omap_device.c              |   13 +--
- 26 files changed, 192 insertions(+), 96 deletions(-)
-
--- 
-Signature
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 51423d2..05f7615 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -100,6 +100,13 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ 					 struct omap_device_pm_latency *pm_lats,
+ 					 int pm_lats_cnt, int is_early_device);
+ 
++struct omap_device *omap_device_alloc(struct platform_device *pdev,
++				      struct omap_hwmod **ohs, int oh_cnt,
++				      struct omap_device_pm_latency *pm_lats,
++				      int pm_lats_cnt);
++void omap_device_delete(struct omap_device *od);
++int omap_device_register(struct platform_device *pdev);
++
+ void __iomem *omap_device_get_rt_va(struct omap_device *od);
+ struct device *omap_device_get_by_hwmod_name(const char *oh_name);
+ 
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index e8d9869..f72fafc 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -97,14 +97,7 @@
+ #define USE_WAKEUP_LAT			0
+ #define IGNORE_WAKEUP_LAT		1
+ 
+-static int omap_device_register(struct platform_device *pdev);
+ static int omap_early_device_register(struct platform_device *pdev);
+-static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+-				      struct omap_hwmod **ohs, int oh_cnt,
+-				      struct omap_device_pm_latency *pm_lats,
+-				      int pm_lats_cnt);
+-static void omap_device_delete(struct omap_device *od);
+-
+ 
+ static struct omap_device_pm_latency omap_default_latency[] = {
+ 	{
+@@ -509,7 +502,7 @@ static int omap_device_fill_resources(struct omap_device *od,
+  *
+  * Returns an struct omap_device pointer or ERR_PTR() on error;
+  */
+-static struct omap_device *omap_device_alloc(struct platform_device *pdev,
++struct omap_device *omap_device_alloc(struct platform_device *pdev,
+ 					struct omap_hwmod **ohs, int oh_cnt,
+ 					struct omap_device_pm_latency *pm_lats,
+ 					int pm_lats_cnt)
+@@ -591,7 +584,7 @@ oda_exit1:
+ 	return ERR_PTR(ret);
+ }
+ 
+-static void omap_device_delete(struct omap_device *od)
++void omap_device_delete(struct omap_device *od)
+ {
+ 	if (!od)
+ 		return;
+@@ -817,7 +810,7 @@ static struct dev_pm_domain omap_device_pm_domain = {
+  * platform_device_register() on the underlying platform_device.
+  * Returns the return value of platform_device_register().
+  */
+-static int omap_device_register(struct platform_device *pdev)
++int omap_device_register(struct platform_device *pdev)
+ {
+ 	pr_debug("omap_device: %s: registering\n", pdev->name);
+ 
