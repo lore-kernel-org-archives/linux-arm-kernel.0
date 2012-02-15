@@ -1,20 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Feb 2012 08:36:09 +0000
-Subject: [PATCH] ARM: ptrace: Include linux/audit.h to fix build errors
-In-Reply-To: <1329284188.12708.1.camel@phoenix>
-References: <1329284188.12708.1.camel@phoenix>
-Message-ID: <20120215083609.GD13673@n2100.arm.linux.org.uk>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Wed, 15 Feb 2012 14:48:36 +0530
+Subject: [PATCH 2/12] arch/arm: remove references to cpu_*_map.
+In-Reply-To: <1329281884.28702.rusty@rustcorp.com.au>
+References: <1329281884.28702.rusty@rustcorp.com.au>
+Message-ID: <4F3B786C.2080809@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 01:36:28PM +0800, Axel Lin wrote:
-> Include linux/audit.h to fix below build errors:
-> 
->   CC      arch/arm/kernel/ptrace.o
-> arch/arm/kernel/ptrace.c: In function 'syscall_trace':
-> arch/arm/kernel/ptrace.c:919: error: implicit declaration of function 'audit_syscall_exit'
-> arch/arm/kernel/ptrace.c:921: error: implicit declaration of function 'audit_syscall_entry'
-> arch/arm/kernel/ptrace.c:921: error: 'AUDIT_ARCH_ARMEB' undeclared (first use in this function)
+On 02/15/2012 10:28 AM, Rusty Russell wrote:
 
-Err, can someone explain why we seem to tell the audit code that we're
-always big endian?
+> From: Rusty Russell <rusty@rustcorp.com.au>
+> 
+> This has been obsolescent for a while; time for the final push.
+> 
+> Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+
+[...]
+
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -359,7 +359,7 @@ void __init smp_prepare_cpus(unsigned in
+>  		 * re-initialize the map in platform_smp_prepare_cpus() if
+>  		 * present != possible (e.g. physical hotplug).
+>  		 */
+> -		init_cpu_present(&cpu_possible_map);
+> +		init_cpu_present(cpu_possible_mask);
+>  
+>  		/*
+>  		 * Initialise the SCU if there are more than one CPU
+> @@ -577,8 +577,9 @@ void smp_send_stop(void)
+>  	unsigned long timeout;
+>  
+>  	if (num_online_cpus() > 1) {
+> -		cpumask_t mask = cpu_online_map;
+> -		cpu_clear(smp_processor_id(), mask);
+> +		struct cpumask mask;
+> +		cpumask_copy(&mask, cpu_online_mask);
+> +		cpumask_clear_cpu(&mask, smp_processor_id());
+>  
+
+
+This should be the other way around:
+		cpumask_clear_cpu(smp_processor_id(), &mask);
+
+>  		smp_cross_call(&mask, IPI_CPU_STOP);
+>  	}
+> 
+
+
+Regards,
+Srivatsa S. Bhat
