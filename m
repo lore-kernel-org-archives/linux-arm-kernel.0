@@ -1,40 +1,57 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Wed, 15 Feb 2012 13:36:28 +0800
-Subject: [PATCH] ARM: ptrace: Include linux/audit.h to fix build errors
-Message-ID: <1329284188.12708.1.camel@phoenix>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 15 Feb 2012 06:27:53 +0000
+Subject: [PATCH 1/2] ARM: OMAP4: cminst: Add boot time __init function
+ for cminst
+In-Reply-To: <87bop1unln.fsf@macbook.be.48ers.dk>
+References: <1329233348-23356-1-git-send-email-hvaibhav@ti.com>
+ <1329233348-23356-2-git-send-email-hvaibhav@ti.com>
+ <87bop1unln.fsf@macbook.be.48ers.dk>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317CF3B2@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include linux/audit.h to fix below build errors:
+On Wed, Feb 15, 2012 at 02:41:32, Peter Korsgaard wrote:
+> >>>>> "Vaibhav" == Vaibhav Hiremath <hvaibhav@ti.com> writes:
+> 
+>  Vaibhav> AM33xx CM module is closer to OMAP4 CM module, and
+>  Vaibhav> in order to reuse cminst api's we have to address
+>  Vaibhav> some of the differences like, base addresses and partitions.
+>  Vaibhav> Unlike OMAP4 CM, AM33xx doesn't have any partitions and
+>  Vaibhav> maintains only single partition.
+> 
+>  Vaibhav> So, in order to reuse the existing OMAP4 cminst code
+>  Vaibhav> for AM33xx this patch adds,
+> 
+>  Vaibhav>   - Boot time __init function, to initialize _cm_bases
+>  Vaibhav>     based on cpu_is_xxx
+>  Vaibhav>   - Instead of maintaining phy addr for CM partition
+>  Vaibhav>     in _cm_bases[] table and then changing it to virt addr,
+>  Vaibhav>     directly maintain respective virt addr.
+> 
+>  Vaibhav> @@ -103,19 +106,19 @@ static bool _is_module_ready(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
+>  Vaibhav>  /* Read a register in a CM instance */
+>  Vaibhav>  u32 omap4_cminst_read_inst_reg(u8 part, s16 inst, u16 idx)
+>  Vaibhav>  {
+>  Vaibhav> -	BUG_ON(part >= OMAP4_MAX_PRCM_PARTITIONS ||
+>  Vaibhav> +	BUG_ON(part >= max_cm_partitions ||
+>  Vaibhav>  	       part == OMAP4430_INVALID_PRCM_PARTITION ||
+> 
+> How about dropping the OMAP4430_ prefix here as it's no longer 4430 specific?
+> 
+Peter,
 
-  CC      arch/arm/kernel/ptrace.o
-arch/arm/kernel/ptrace.c: In function 'syscall_trace':
-arch/arm/kernel/ptrace.c:919: error: implicit declaration of function 'audit_syscall_exit'
-arch/arm/kernel/ptrace.c:921: error: implicit declaration of function 'audit_syscall_entry'
-arch/arm/kernel/ptrace.c:921: error: 'AUDIT_ARCH_ARMEB' undeclared (first use in this function)
-arch/arm/kernel/ptrace.c:921: error: (Each undeclared identifier is reported only once
-arch/arm/kernel/ptrace.c:921: error: for each function it appears in.)
-make[1]: *** [arch/arm/kernel/ptrace.o] Error 1
-make: *** [arch/arm/kernel] Error 2
+You could be right here, from this patch perspective, this change doesn't make sense.
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
-This patch is against linux-next 20120215.
+But at the first place I am quite not sure, why this has been named as
+OMAP4430_? Vs some macros are named as OMAP4_.
 
- arch/arm/kernel/ptrace.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+So first we need to understand why it has been named this way,
+may be "Paul Walmsley" can comment on this. He is original author of this 
+file.
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index e33870f..48970ad 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -23,6 +23,7 @@
- #include <linux/perf_event.h>
- #include <linux/hw_breakpoint.h>
- #include <linux/regset.h>
-+#include <linux/audit.h>
- 
- #include <asm/pgtable.h>
- #include <asm/system.h>
--- 
-1.7.5.4
+Thanks,
+Vaibhav
+
+> -- 
+> Bye, Peter Korsgaard
+> 
