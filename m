@@ -1,64 +1,21 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Wed, 15 Feb 2012 15:28:04 +1030
-Subject: [PATCH 2/12] arch/arm: remove references to cpu_*_map.
-Message-ID: <1329281884.28702.rusty@rustcorp.com.au>
+From: lk9150@gicom.com.cn (=?GB2312?B?tPfeyMi6?=)
+Date: Wed, 15 Feb 2012 10:38:06 +0800
+Subject: =?GB2312?B?serXvLmkyrHU2rmkyMvQvbPqyei8xtbQtcTTptPDSQ==?=
+Message-ID: <201202151038064262109@gicom.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rusty Russell <rusty@rustcorp.com.au>
+XBLQIFJA
 
-This has been obsolescent for a while; time for the final push.
 
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/kernel/kprobes.c |    4 ++--
- arch/arm/kernel/smp.c     |    7 ++++---
- 2 files changed, 6 insertions(+), 5 deletions(-)
+?????????????????
 
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -127,7 +127,7 @@ void __kprobes arch_arm_kprobe(struct kp
- 		flush_insns(addr, sizeof(u16));
- 	} else if (addr & 2) {
- 		/* A 32-bit instruction spanning two words needs special care */
--		stop_machine(set_t32_breakpoint, (void *)addr, &cpu_online_map);
-+		stop_machine(set_t32_breakpoint, (void *)addr, cpu_online_mask);
- 	} else {
- 		/* Word aligned 32-bit instruction can be written atomically */
- 		u32 bkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
-@@ -190,7 +190,7 @@ int __kprobes __arch_disarm_kprobe(void 
- 
- void __kprobes arch_disarm_kprobe(struct kprobe *p)
- {
--	stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
-+	stop_machine(__arch_disarm_kprobe, p, cpu_online_mask);
- }
- 
- void __kprobes arch_remove_kprobe(struct kprobe *p)
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -359,7 +359,7 @@ void __init smp_prepare_cpus(unsigned in
- 		 * re-initialize the map in platform_smp_prepare_cpus() if
- 		 * present != possible (e.g. physical hotplug).
- 		 */
--		init_cpu_present(&cpu_possible_map);
-+		init_cpu_present(cpu_possible_mask);
- 
- 		/*
- 		 * Initialise the SCU if there are more than one CPU
-@@ -577,8 +577,9 @@ void smp_send_stop(void)
- 	unsigned long timeout;
- 
- 	if (num_online_cpus() > 1) {
--		cpumask_t mask = cpu_online_map;
--		cpu_clear(smp_processor_id(), mask);
-+		struct cpumask mask;
-+		cpumask_copy(&mask, cpu_online_mask);
-+		cpumask_clear_cpu(&mask, smp_processor_id());
- 
- 		smp_cross_call(&mask, IPI_CPU_STOP);
- 	}
+
+39687876
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Asjuit9776.xls
+Type: application/x-msexcel
+Size: 30720 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120215/a75ec8b0/attachment-0001.bin>
