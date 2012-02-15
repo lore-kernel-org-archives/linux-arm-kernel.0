@@ -1,223 +1,68 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 15 Feb 2012 13:46:55 -0800
-Subject: [PATCH v3] ARM: OMAP: clock: cleanup CPUfreq leftovers
-Message-ID: <1329342415-28702-1-git-send-email-khilman@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Feb 2012 13:50:02 -0800
+Subject: [PATCH v3 24/25] irq_domain: remove "hint" when allocating irq
+ numbers
+In-Reply-To: <20120215202145.GH25779@ponder.secretlab.ca>
+References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
+ <1327700179-17454-25-git-send-email-grant.likely@secretlab.ca>
+ <4F316848.4060100@atmel.com> <4F3BC97C.6030203@atmel.com>
+ <20120215202145.GH25779@ponder.secretlab.ca>
+Message-ID: <20120215215001.GA30946@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have OPP layer, and OMAP CPUfreq driver is using it, we no
-longer need/use the clock framework code for filling up CPUfreq
-tables.  Remove it.
+On Wed, Feb 15, 2012 at 01:21:45PM -0700, Grant Likely wrote:
+> On Wed, Feb 15, 2012 at 04:04:28PM +0100, Nicolas Ferre wrote:
+> > On 02/07/2012 07:07 PM, Nicolas Ferre :
+> > > On 01/27/2012 10:36 PM, Grant Likely :
+> > >> The 'hint' used to try and line up irq numbers with hw irq numbers is
+> > >> rather a hack and not very useful.  Now that /proc/interrupts also outputs
+> > >> the hwirq number, it is even less useful to keep around the 'hint' heuristic.
+> > >>
+> > >> This patch removes it.
+> > > 
+> > > Grant,
+> > > 
+> > > While trying your patch series in conjunction with Rob one, I do not
+> > > find this patch in your irqdomain/next branch (and a couple of others).
+> > > Can you tell me if this v3 series is available as a git tree?
+> > 
+> > I am still interested by patch 24-25 of this series but still cannot
+> > find them in your irqdomain/next branch:
+> > Are they also expected to join the 3.4 merge window material?
+> 
+> I've held off on putting them in irqdomain/next because they are a bit more
+> risky than the other patches, and I want an explicit ack from Ben for patches
+> 24 & 25.  However, that shouldn't really cause any issues since the changes
+> in 24 & 25 don't impact the irq_domain functionality or API.  They are just
+> optimizations.
+> 
+I'm seeing that patch 24 does impact on irq_domain functionality
+a little bit.  On next tree which has no this patch yet,
+irq_create_mapping can reasonably create virq in range 1..15, while
+irq_find_mapping will only try to find the virq from 16
+(NUM_ISA_INTERRUPTS).  This will result in that any hwirq that is < 16
+gets multiple entries in the mapping table with different virq numbers
+mapped to the same one hwirq.
 
-Thanks to Russell King for pointing out the parts I missed under
-plat-omap in the original version.
+That's why I have to apply patch #24 (with one line change below) on
+top of next tree to get my imx irqdomain series work properly.
 
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Paul, this is an updated version of the previous one after a different
-CPUfreq patch from Russell made me realize I missed the plat-omap pieces.
+@@ -371,7 +371,7 @@ unsigned int irq_create_mapping(struct irq_domain *domain,
+                return irq_domain_legacy_revmap(domain, hwirq);
+ 
+        /* Allocate a virtual interrupt number */
+-       virq = irq_alloc_desc(0);
++       virq = irq_alloc_desc_from(1, 0);
+        if (!virq) {
+                pr_debug("irq: -> virq allocation failed\n");
+                return 0;
 
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   80 --------------------------
- arch/arm/mach-omap2/clock.c                  |    5 --
- arch/arm/mach-omap2/clock.h                  |    8 ---
- arch/arm/plat-omap/clock.c                   |   26 --------
- arch/arm/plat-omap/include/plat/clock.h      |   10 ---
- 5 files changed, 0 insertions(+), 129 deletions(-)
+I need this line of change, because the first call on irq_alloc_desc
+will always return 0 to virq and in turn irq_create_mapping fails.
+On imx, that's the mapping for timer irq.  Hence, the system will hang
+there due to irq mapping failure.
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-index 39f9d5a..9a13e07 100644
---- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-@@ -164,83 +164,3 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
- 
- 	return 0;
- }
--
--#ifdef CONFIG_CPU_FREQ
--/*
-- * Walk PRCM rate table and fillout cpufreq freq_table
-- * XXX This should be replaced by an OPP layer in the near future
-- */
--static struct cpufreq_frequency_table *freq_table;
--
--void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
--{
--	const struct prcm_config *prcm;
--	int i = 0;
--	int tbl_sz = 0;
--
--	if (!cpu_is_omap24xx())
--		return;
--
--	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
--		if (!(prcm->flags & cpu_mask))
--			continue;
--		if (prcm->xtal_speed != sclk->rate)
--			continue;
--
--		/* don't put bypass rates in table */
--		if (prcm->dpll_speed == prcm->xtal_speed)
--			continue;
--
--		tbl_sz++;
--	}
--
--	/*
--	 * XXX Ensure that we're doing what CPUFreq expects for this error
--	 * case and the following one
--	 */
--	if (tbl_sz == 0) {
--		pr_warning("%s: no matching entries in rate_table\n",
--			   __func__);
--		return;
--	}
--
--	/* Include the CPUFREQ_TABLE_END terminator entry */
--	tbl_sz++;
--
--	freq_table = kzalloc(sizeof(struct cpufreq_frequency_table) * tbl_sz,
--			     GFP_ATOMIC);
--	if (!freq_table) {
--		pr_err("%s: could not kzalloc frequency table\n", __func__);
--		return;
--	}
--
--	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
--		if (!(prcm->flags & cpu_mask))
--			continue;
--		if (prcm->xtal_speed != sclk->rate)
--			continue;
--
--		/* don't put bypass rates in table */
--		if (prcm->dpll_speed == prcm->xtal_speed)
--			continue;
--
--		freq_table[i].index = i;
--		freq_table[i].frequency = prcm->mpu_speed / 1000;
--		i++;
--	}
--
--	freq_table[i].index = i;
--	freq_table[i].frequency = CPUFREQ_TABLE_END;
--
--	*table = &freq_table[0];
--}
--
--void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
--{
--	if (!cpu_is_omap24xx())
--		return;
--
--	kfree(freq_table);
--}
--
--#endif
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index f57ed5b..d9f4931 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -536,10 +536,5 @@ struct clk_functions omap2_clk_functions = {
- 	.clk_set_rate		= omap2_clk_set_rate,
- 	.clk_set_parent		= omap2_clk_set_parent,
- 	.clk_disable_unused	= omap2_clk_disable_unused,
--#ifdef CONFIG_CPU_FREQ
--	/* These will be removed when the OPP code is integrated */
--	.clk_init_cpufreq_table	= omap2_clk_init_cpufreq_table,
--	.clk_exit_cpufreq_table	= omap2_clk_exit_cpufreq_table,
--#endif
- };
- 
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index b8c2a68..a1bb23a 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -146,14 +146,6 @@ extern const struct clksel_rate gpt_sys_rates[];
- extern const struct clksel_rate gfx_l3_rates[];
- extern const struct clksel_rate dsp_ick_rates[];
- 
--#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_CPU_FREQ)
--extern void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
--extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
--#else
--#define omap2_clk_init_cpufreq_table	0
--#define omap2_clk_exit_cpufreq_table	0
--#endif
--
- extern const struct clkops clkops_omap2_iclk_dflt_wait;
- extern const struct clkops clkops_omap2_iclk_dflt;
- extern const struct clkops clkops_omap2_iclk_idle_only;
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index 567e4b5..05a944b 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -399,32 +399,6 @@ struct clk dummy_ck = {
- 	.ops	= &clkops_null,
- };
- 
--#ifdef CONFIG_CPU_FREQ
--void clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
--{
--	unsigned long flags;
--
--	if (!arch_clock || !arch_clock->clk_init_cpufreq_table)
--		return;
--
--	spin_lock_irqsave(&clockfw_lock, flags);
--	arch_clock->clk_init_cpufreq_table(table);
--	spin_unlock_irqrestore(&clockfw_lock, flags);
--}
--
--void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
--{
--	unsigned long flags;
--
--	if (!arch_clock || !arch_clock->clk_exit_cpufreq_table)
--		return;
--
--	spin_lock_irqsave(&clockfw_lock, flags);
--	arch_clock->clk_exit_cpufreq_table(table);
--	spin_unlock_irqrestore(&clockfw_lock, flags);
--}
--#endif
--
- /*
-  *
-  */
-diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-index 240a7b9..d0ef57c 100644
---- a/arch/arm/plat-omap/include/plat/clock.h
-+++ b/arch/arm/plat-omap/include/plat/clock.h
-@@ -272,8 +272,6 @@ struct clk {
- #endif
- };
- 
--struct cpufreq_frequency_table;
--
- struct clk_functions {
- 	int		(*clk_enable)(struct clk *clk);
- 	void		(*clk_disable)(struct clk *clk);
-@@ -283,10 +281,6 @@ struct clk_functions {
- 	void		(*clk_allow_idle)(struct clk *clk);
- 	void		(*clk_deny_idle)(struct clk *clk);
- 	void		(*clk_disable_unused)(struct clk *clk);
--#ifdef CONFIG_CPU_FREQ
--	void		(*clk_init_cpufreq_table)(struct cpufreq_frequency_table **);
--	void		(*clk_exit_cpufreq_table)(struct cpufreq_frequency_table **);
--#endif
- };
- 
- extern int mpurate;
-@@ -301,10 +295,6 @@ extern void recalculate_root_clocks(void);
- extern unsigned long followparent_recalc(struct clk *clk);
- extern void clk_enable_init_clocks(void);
- unsigned long omap_fixed_divisor_recalc(struct clk *clk);
--#ifdef CONFIG_CPU_FREQ
--extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
--extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
--#endif
- extern struct clk *omap_clk_get_by_name(const char *name);
- extern int omap_clk_enable_autoidle_all(void);
- extern int omap_clk_disable_autoidle_all(void);
 -- 
-1.7.9
+Regards,
+Shawn
