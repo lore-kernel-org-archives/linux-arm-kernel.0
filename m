@@ -1,31 +1,104 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 15 Feb 2012 14:14:53 +0100
-Subject: [PATCH 1/4] ARM: OMAP2+: board-generic: Remove un-needed
- .atag_offset for DT_MACHINE
-In-Reply-To: <20120214195249.GS1426@atomide.com>
-References: <1329150625-8604-2-git-send-email-b-cousson@ti.com>
- <20120214195249.GS1426@atomide.com>
-Message-ID: <4F3BAFCD.2000508@ti.com>
+Date: Wed, 15 Feb 2012 14:21:48 +0100
+Subject: [PATCH v3 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
+ controller
+In-Reply-To: <20120214205208.GA2656@ponder.secretlab.ca>
+References: <1329242172-4214-1-git-send-email-b-cousson@ti.com>
+ <1329242172-4214-3-git-send-email-b-cousson@ti.com>
+ <20120214205208.GA2656@ponder.secretlab.ca>
+Message-ID: <4F3BB16C.90600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/14/2012 8:52 PM, Tony Lindgren wrote:
-> * Benoit Cousson<b-cousson@ti.com>  [120213 07:59]:
->> Some .atag_offset entries were wrongly added during a merge conflict
->> resolution in 3.3.
->> Remove them all, since DT boot does not use that attribute anymore.
+On 2/14/2012 9:52 PM, Grant Likely wrote:
+> On Tue, Feb 14, 2012 at 06:56:10PM +0100, Benoit Cousson wrote:
+>> Add a function to initialize the OMAP2/3 interrupt controller (INTC)
+>> using a device tree node.
 >>
->> Replace as well the #if... by #ifdef for consistency.
+>> This version take advantage of the new irq_domain_add_legacy API.
+>>
+>> Replace some printk() with the proper pr_ macro.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Tony Lindgren<tony@atomide.com>
+>> Cc: Rob Herring<rob.herring@calxeda.com>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> ---
+>>   .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++
+>>   arch/arm/mach-omap2/common.h                       |   10 +++
+>>   arch/arm/mach-omap2/irq.c                          |   59 ++++++++++++++++---
+>>   3 files changed, 86 insertions(+), 10 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/intc.txt b/Documentation/devicetree/bindings/arm/omap/intc.txt
+>> new file mode 100644
+>> index 0000000..f2583e6
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/omap/intc.txt
+>> @@ -0,0 +1,27 @@
+>> +* OMAP Interrupt Controller
+>> +
+>> +OMAP2/3 are using a TI interrupt controller that can support several
+>> +configurable number of interrupts.
+>> +
+>> +Main node required properties:
+>> +
+>> +- compatible : should be:
+>> +	"ti,omap2-intc"
+>> +- interrupt-controller : Identifies the node as an interrupt controller
+>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> +  interrupt source. The type shall be a<u32>  and the value shall be 1.
+>> +
+>> +  The cell contains the interrupt number in the range [0-128].
+>> +- ti,intc-size: Number of interrupts handled by the interrupt controller.
+>> +- reg: physical base address and size of the intc registers map.
+>> +
+>> +Example:
+>> +
+>> +	intc: interrupt-controller at 1 {
+>> +		compatible = "ti,omap2-intc";
+>> +		interrupt-controller;
+>> +		#interrupt-cells =<1>;
+>> +		ti,intc-size =<96>;
+>> +		reg =<0x48200000 0x1000>;
+>> +	};
+>> +
+>> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+>> index febffde..a87ce52 100644
+>> --- a/arch/arm/mach-omap2/common.h
+>> +++ b/arch/arm/mach-omap2/common.h
+>> @@ -174,6 +174,16 @@ void omap3_intc_handle_irq(struct pt_regs *regs);
+>>   extern void __iomem *omap4_get_l2cache_base(void);
+>>   #endif
+>>
+>> +struct device_node;
+>> +#ifdef CONFIG_OF
+>> +int __init intc_of_init(struct device_node *node, struct device_node *parent);
 >
-> How about let's also remove the 0x from the serial at 0x.. in the .dts
-> files in this clean-up patch?
+> This name is pretty generic for a global symbol.  How about omap2_intc_of_init?
 
-In the same patch?
+That's a good point, I was trying mimic the gic name without thinking in 
+my case it is not a generic IP :-(.
 
-I'm fine with fixing that as well, but since this is not in the same 
-file / directory, I'd rather do a different patch.
+I'll rename that omap2_intc_of_init and update the branch for the pull 
+request.
 
-I'll do the fix anyway, it is up to you for the proper location.
+> Otherwise this series looks good.
+>
+> Acked-by: Grant Likely<grant.likely@secretlab.ca>
+
+> This series need to be committed on top of the irqdomain tree.  I can either
+> pick it up myself (with Tony's ack) or I can stabilize the irqdomain/next tree
+> so that you can use it as a stable base to commit against (which I should
+> probably do anyway since there are others who will depend on it).
+
+This series is the base for all the other OMAP DT series, so I'd rather 
+keep it in Tony's tree that contains as well some OMAP fixes not yet in 
+mainline.
+
+I guess ideally the irqdomain/next should be stabilized and maybe pulled 
+in arm-soc. I'm not sure how Arnd / Olof are handling this kind of 
+dependency.
 
 Thanks,
 Benoit
