@@ -1,401 +1,283 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Feb 2012 10:47:46 -0800
-Subject: [PATCH v2 5/7] ARM: imx: eliminate macro IRQ_GPIOx()
+Date: Wed, 15 Feb 2012 10:47:47 -0800
+Subject: [PATCH v2 6/7] gpio/mxc: adopt irq_domain for gpio interrupt support
 In-Reply-To: <1329331668-30325-1-git-send-email-shawn.guo@linaro.org>
 References: <1329331668-30325-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1329331668-30325-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1329331668-30325-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes all the static gpio irq number assigning with
-IRQ_GPIOA() ... IRQ_GPIOF() to run-time assigning with gpio_to_irq
-call, and in turn eliminates these macros.
+It adopts irq_domain for imx gpio interrupt support, and fixes the
+translation between irq and gpio number for DT users.
+
+As the results, macro MXC_GPIO_IRQ_START is referenced nowhere in
+gpio-mxc driver, and the gpio irq_domain initilization in DT platform
+code is removed.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    3 ++-
- arch/arm/mach-imx/mach-apf9328.c             |    6 ++++--
- arch/arm/mach-imx/mach-cpuimx27.c            |   12 ++++++++----
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c  |    8 ++++----
- arch/arm/mach-imx/mach-mx21ads.c             |    5 ++---
- arch/arm/mach-imx/mach-mx27ads.c             |   12 ++++++------
- arch/arm/mach-imx/mach-mxt_td60.c            |    6 +++---
- arch/arm/mach-imx/mach-pca100.c              |    4 ++--
- arch/arm/mach-imx/mach-pcm038.c              |    4 +++-
- arch/arm/mach-imx/mach-scb9328.c             |    6 ++++--
- arch/arm/mach-imx/pcm970-baseboard.c         |   13 +++++++------
- arch/arm/plat-mxc/include/mach/iomux-v1.h    |   12 ++++++------
- 12 files changed, 51 insertions(+), 40 deletions(-)
+ arch/arm/mach-imx/mach-imx6q.c |   14 ---------
+ arch/arm/mach-mx5/imx51-dt.c   |   12 --------
+ arch/arm/mach-mx5/imx53-dt.c   |   12 --------
+ drivers/gpio/gpio-mxc.c        |   59 ++++++++++++++++-----------------------
+ 4 files changed, 24 insertions(+), 73 deletions(-)
 
-diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-index 5db3e14..420ef06 100644
---- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-@@ -267,7 +267,7 @@ static struct spi_board_info __maybe_unused
- 		.bus_num	= 0,
- 		.chip_select	= 0,
- 		.max_speed_hz	= 1500000,
--		.irq		= IRQ_GPIOD(25),
-+		/* irq number is run-time assigned */
- 		.platform_data	= &ads7846_config,
- 		.mode           = SPI_MODE_2,
- 	},
-@@ -349,6 +349,7 @@ void __init eukrea_mbimx27_baseboard_init(void)
- 	/* SPI_CS0 init */
- 	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
- 	imx27_add_spi_imx0(&eukrea_mbimx27_spi0_data);
-+	eukrea_mbimx27_spi_board_info[0].irq = gpio_to_irq(IMX_GPIOD(25));
- 	spi_register_board_info(eukrea_mbimx27_spi_board_info,
- 			ARRAY_SIZE(eukrea_mbimx27_spi_board_info));
- 
-diff --git a/arch/arm/mach-imx/mach-apf9328.c b/arch/arm/mach-imx/mach-apf9328.c
-index f4a63ee..1265b33 100644
---- a/arch/arm/mach-imx/mach-apf9328.c
-+++ b/arch/arm/mach-imx/mach-apf9328.c
-@@ -18,6 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/mtd/physmap.h>
- #include <linux/dm9000.h>
-+#include <linux/gpio.h>
- #include <linux/i2c.h>
- 
- #include <asm/mach-types.h>
-@@ -87,8 +88,7 @@ static struct resource dm9000_resources[] = {
- 		.end    = MX1_CS4_PHYS + 0x00C00003,
- 		.flags  = IORESOURCE_MEM,
- 	}, {
--		.start  = IRQ_GPIOB(14),
--		.end    = IRQ_GPIOB(14),
-+		/* irq number is run-time assigned */
- 		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
- 	},
- };
-@@ -129,6 +129,8 @@ static void __init apf9328_init(void)
- 
- 	imx1_add_imx_i2c(&apf9328_i2c_data);
- 
-+	dm9000_resources[2].start = gpio_to_irq(IMX_GPIOB(14));
-+	dm9000_resources[2].end = gpio_to_irq(IMX_GPIOB(14));
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- }
- 
-diff --git a/arch/arm/mach-imx/mach-cpuimx27.c b/arch/arm/mach-imx/mach-cpuimx27.c
-index d085aea..5c3792c 100644
---- a/arch/arm/mach-imx/mach-cpuimx27.c
-+++ b/arch/arm/mach-imx/mach-cpuimx27.c
-@@ -169,28 +169,28 @@ static struct i2c_board_info eukrea_cpuimx27_i2c_devices[] = {
- static struct plat_serial8250_port serial_platform_data[] = {
- 	{
- 		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x200000),
--		.irq = IRQ_GPIOB(23),
-+		/* irq number is run-time assigned */
- 		.uartclk = 14745600,
- 		.regshift = 1,
- 		.iotype = UPIO_MEM,
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x400000),
--		.irq = IRQ_GPIOB(22),
-+		/* irq number is run-time assigned */
- 		.uartclk = 14745600,
- 		.regshift = 1,
- 		.iotype = UPIO_MEM,
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x800000),
--		.irq = IRQ_GPIOB(27),
-+		/* irq number is run-time assigned */
- 		.uartclk = 14745600,
- 		.regshift = 1,
- 		.iotype = UPIO_MEM,
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX27_CS3_BASE_ADDR + 0x1000000),
--		.irq = IRQ_GPIOB(30),
-+		/* irq number is run-time assigned */
- 		.uartclk = 14745600,
- 		.regshift = 1,
- 		.iotype = UPIO_MEM,
-@@ -279,6 +279,10 @@ static void __init eukrea_cpuimx27_init(void)
- #endif
- 
- #if defined(CONFIG_SERIAL_8250) || defined(CONFIG_SERIAL_8250_MODULE)
-+	serial_platform_data[0].irq = IMX_GPIOB(23);
-+	serial_platform_data[1].irq = IMX_GPIOB(22);
-+	serial_platform_data[2].irq = IMX_GPIOB(27);
-+	serial_platform_data[3].irq = IMX_GPIOB(30);
- 	platform_device_register(&serial_device);
- #endif
- 
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index c2766ae..603ee9a 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -40,7 +40,7 @@
- #include "devices-imx27.h"
- 
- #define OTG_PHY_CS_GPIO (GPIO_PORTF + 17)
--#define SDHC1_IRQ IRQ_GPIOB(25)
-+#define SDHC1_IRQ_GPIO IMX_GPIOB(25)
- 
- static const int visstrim_m10_pins[] __initconst = {
- 	/* UART1 (console) */
-@@ -142,14 +142,14 @@ static int visstrim_m10_sdhc1_init(struct device *dev,
- {
- 	int ret;
- 
--	ret = request_irq(SDHC1_IRQ, detect_irq, IRQF_TRIGGER_FALLING,
--				"mmc-detect", data);
-+	ret = request_irq(gpio_to_irq(SDHC1_IRQ_GPIO), detect_irq,
-+			  IRQF_TRIGGER_FALLING, "mmc-detect", data);
- 	return ret;
- }
- 
- static void visstrim_m10_sdhc1_exit(struct device *dev, void *data)
- {
--	free_irq(SDHC1_IRQ, data);
-+	free_irq(gpio_to_irq(SDHC1_IRQ_GPIO), data);
- }
- 
- static const struct imxmmc_platform_data visstrim_m10_sdhc_pdata __initconst = {
-diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-index 8d9f955..a3bce99 100644
---- a/arch/arm/mach-imx/mach-mx21ads.c
-+++ b/arch/arm/mach-imx/mach-mx21ads.c
-@@ -37,7 +37,6 @@
- #define MX21ADS_REG_ADDR(offset)    (void __force __iomem *) \
- 		(MX21ADS_MMIO_BASE_ADDR + (offset))
- 
--#define MX21ADS_CS8900A_IRQ         IRQ_GPIOE(11)
- #define MX21ADS_CS8900A_IOBASE_REG  MX21ADS_REG_ADDR(0x000000)
- #define MX21ADS_ST16C255_IOBASE_REG MX21ADS_REG_ADDR(0x200000)
- #define MX21ADS_VERSION_REG         MX21ADS_REG_ADDR(0x400000)
-@@ -229,13 +228,13 @@ static int mx21ads_sdhc_get_ro(struct device *dev)
- static int mx21ads_sdhc_init(struct device *dev, irq_handler_t detect_irq,
- 	void *data)
- {
--	return request_irq(IRQ_GPIOD(25), detect_irq,
-+	return request_irq(gpio_to_irq(IMX_GPIOD(25)), detect_irq,
- 		IRQF_TRIGGER_FALLING, "mmc-detect", data);
- }
- 
- static void mx21ads_sdhc_exit(struct device *dev, void *data)
- {
--	free_irq(IRQ_GPIOD(25), data);
-+	free_irq(gpio_to_irq(IMX_GPIOD(25)), data);
- }
- 
- static const struct imxmmc_platform_data mx21ads_sdhc_pdata __initconst = {
-diff --git a/arch/arm/mach-imx/mach-mx27ads.c b/arch/arm/mach-imx/mach-mx27ads.c
-index 0228d2e..9be8e50 100644
---- a/arch/arm/mach-imx/mach-mx27ads.c
-+++ b/arch/arm/mach-imx/mach-mx27ads.c
-@@ -246,25 +246,25 @@ static const struct imx_fb_platform_data mx27ads_fb_data __initconst = {
- static int mx27ads_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
- 			      void *data)
- {
--	return request_irq(IRQ_GPIOE(21), detect_irq, IRQF_TRIGGER_RISING,
--			   "sdhc1-card-detect", data);
-+	return request_irq(gpio_to_irq(IMX_GPIOE(21)), detect_irq,
-+			   IRQF_TRIGGER_RISING, "sdhc1-card-detect", data);
- }
- 
- static int mx27ads_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
- 			      void *data)
- {
--	return request_irq(IRQ_GPIOB(7), detect_irq, IRQF_TRIGGER_RISING,
--			   "sdhc2-card-detect", data);
-+	return request_irq(gpio_to_irq(IMX_GPIOB(7)), detect_irq,
-+			   IRQF_TRIGGER_RISING, "sdhc2-card-detect", data);
- }
- 
- static void mx27ads_sdhc1_exit(struct device *dev, void *data)
- {
--	free_irq(IRQ_GPIOE(21), data);
-+	free_irq(gpio_to_irq(IMX_GPIOE(21)), data);
- }
- 
- static void mx27ads_sdhc2_exit(struct device *dev, void *data)
- {
--	free_irq(IRQ_GPIOB(7), data);
-+	free_irq(gpio_to_irq(IMX_GPIOB(7)), data);
- }
- 
- static const struct imxmmc_platform_data sdhc1_pdata __initconst = {
-diff --git a/arch/arm/mach-imx/mach-mxt_td60.c b/arch/arm/mach-imx/mach-mxt_td60.c
-index 8b3d3f0..45e63ec 100644
---- a/arch/arm/mach-imx/mach-mxt_td60.c
-+++ b/arch/arm/mach-imx/mach-mxt_td60.c
-@@ -213,13 +213,13 @@ static const struct imx_fb_platform_data mxt_td60_fb_data __initconst = {
- static int mxt_td60_sdhc1_init(struct device *dev, irq_handler_t detect_irq,
- 				void *data)
- {
--	return request_irq(IRQ_GPIOF(8), detect_irq, IRQF_TRIGGER_FALLING,
--				"sdhc1-card-detect", data);
-+	return request_irq(gpio_to_irq(IMX_GPIOF(8)), detect_irq,
-+			   IRQF_TRIGGER_FALLING, "sdhc1-card-detect", data);
- }
- 
- static void mxt_td60_sdhc1_exit(struct device *dev, void *data)
- {
--	free_irq(IRQ_GPIOF(8), data);
-+	free_irq(gpio_to_irq(IMX_GPIOF(8)), data);
- }
- 
- static const struct imxmmc_platform_data sdhc1_pdata __initconst = {
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index d3b9c6b..8cd7c6f 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -246,7 +246,7 @@ static int pca100_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
- {
- 	int ret;
- 
--	ret = request_irq(IRQ_GPIOC(29), detect_irq,
-+	ret = request_irq(gpio_to_irq(IMX_GPIOC(29)), detect_irq,
- 			  IRQF_DISABLED | IRQF_TRIGGER_FALLING,
- 			  "imx-mmc-detect", data);
- 	if (ret)
-@@ -258,7 +258,7 @@ static int pca100_sdhc2_init(struct device *dev, irq_handler_t detect_irq,
- 
- static void pca100_sdhc2_exit(struct device *dev, void *data)
- {
--	free_irq(IRQ_GPIOC(29), data);
-+	free_irq(gpio_to_irq(IMX_GPIOC(29)), data);
- }
- 
- static const struct imxmmc_platform_data sdhc_pdata __initconst = {
-diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-index 16f126d..3255d7b 100644
---- a/arch/arm/mach-imx/mach-pcm038.c
-+++ b/arch/arm/mach-imx/mach-pcm038.c
-@@ -27,6 +27,7 @@
- #include <linux/mfd/mc13783.h>
- #include <linux/spi/spi.h>
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 6075d4d..8268471 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -14,7 +14,6 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
  #include <linux/irq.h>
-+#include <linux/gpio.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -274,7 +275,7 @@ static struct mc13xxx_platform_data pcm038_pmic = {
- static struct spi_board_info pcm038_spi_board_info[] __initdata = {
- 	{
- 		.modalias = "mc13783",
--		.irq = IRQ_GPIOB(23),
-+		/* irq number is run-time assigned */
- 		.max_speed_hz = 300000,
- 		.bus_num = 0,
- 		.chip_select = 0,
-@@ -325,6 +326,7 @@ static void __init pcm038_init(void)
- 	mxc_gpio_mode(GPIO_PORTB | 23 | GPIO_GPIO | GPIO_IN);
- 
- 	imx27_add_spi_imx0(&pcm038_spi0_data);
-+	pcm038_spi_board_info[0].irq = gpio_to_irq(IMX_GPIOB(23));
- 	spi_register_board_info(pcm038_spi_board_info,
- 				ARRAY_SIZE(pcm038_spi_board_info));
- 
-diff --git a/arch/arm/mach-imx/mach-scb9328.c b/arch/arm/mach-imx/mach-scb9328.c
-index cb9ceae..3c94228 100644
---- a/arch/arm/mach-imx/mach-scb9328.c
-+++ b/arch/arm/mach-imx/mach-scb9328.c
-@@ -14,6 +14,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/interrupt.h>
- #include <linux/dm9000.h>
-+#include <linux/gpio.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -78,8 +79,7 @@ static struct resource dm9000x_resources[] = {
- 		.end	= MX1_CS5_PHYS + 5,
- 		.flags	= IORESOURCE_MEM,	/* data access */
- 	}, {
--		.start	= IRQ_GPIOC(3),
--		.end	= IRQ_GPIOC(3),
-+		/* irq number is run-time assigned */
- 		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
- 	},
- };
-@@ -123,6 +123,8 @@ static void __init scb9328_init(void)
- 	imx1_add_imx_uart0(&uart_pdata);
- 
- 	printk(KERN_INFO"Scb9328: Adding devices\n");
-+	dm9000x_resources[2].start = gpio_to_irq(IMX_GPIOC(3));
-+	dm9000x_resources[2].end = gpio_to_irq(IMX_GPIOC(3));
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
+-#include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+@@ -91,21 +90,8 @@ static void __init imx6q_map_io(void)
+ 	imx6q_clock_map_io();
  }
  
-diff --git a/arch/arm/mach-imx/pcm970-baseboard.c b/arch/arm/mach-imx/pcm970-baseboard.c
-index 99afbc3..8ca349e 100644
---- a/arch/arm/mach-imx/pcm970-baseboard.c
-+++ b/arch/arm/mach-imx/pcm970-baseboard.c
-@@ -95,14 +95,14 @@ static int pcm970_sdhc2_init(struct device *dev, irq_handler_t detect_irq, void
+-static int __init imx6q_gpio_add_irq_domain(struct device_node *np,
+-				struct device_node *interrupt_parent)
+-{
+-	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
+-
+-	gpio_irq_base -= 32;
+-	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops,
+-			      NULL);
+-
+-	return 0;
+-}
+-
+ static const struct of_device_id imx6q_irq_match[] __initconst = {
+ 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+-	{ .compatible = "fsl,imx6q-gpio", .data = imx6q_gpio_add_irq_domain, },
+ 	{ /* sentinel */ }
+ };
+ 
+diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
+index 636ef34..035a147 100644
+--- a/arch/arm/mach-mx5/imx51-dt.c
++++ b/arch/arm/mach-mx5/imx51-dt.c
+@@ -56,20 +56,8 @@ static int __init imx51_tzic_init_cb(struct device_node *np,
+ 	return 0;
+ }
+ 
+-static int __init imx51_gpio_add_irq_domain(struct device_node *np,
+-				struct device_node *interrupt_parent)
+-{
+-	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
+-
+-	gpio_irq_base -= 32;
+-	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
+-
+-	return 0;
+-}
+-
+ static const struct of_device_id imx51_irq_match[] __initconst = {
+ 	{ .compatible = "fsl,imx51-tzic", .data = imx51_tzic_init_cb, },
+-	{ .compatible = "fsl,imx51-gpio", .data = imx51_gpio_add_irq_domain, },
+ 	{ /* sentinel */ }
+ };
+ 
+diff --git a/arch/arm/mach-mx5/imx53-dt.c b/arch/arm/mach-mx5/imx53-dt.c
+index ce2b700..d59f4db 100644
+--- a/arch/arm/mach-mx5/imx53-dt.c
++++ b/arch/arm/mach-mx5/imx53-dt.c
+@@ -60,20 +60,8 @@ static int __init imx53_tzic_init_cb(struct device_node *np,
+ 	return 0;
+ }
+ 
+-static int __init imx53_gpio_add_irq_domain(struct device_node *np,
+-				struct device_node *interrupt_parent)
+-{
+-	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS;
+-
+-	gpio_irq_base -= 32;
+-	irq_domain_add_legacy(np, 32, gpio_irq_base, 0, &irq_domain_simple_ops, NULL);
+-
+-	return 0;
+-}
+-
+ static const struct of_device_id imx53_irq_match[] __initconst = {
+ 	{ .compatible = "fsl,imx53-tzic", .data = imx53_tzic_init_cb, },
+-	{ .compatible = "fsl,imx53-gpio", .data = imx53_gpio_add_irq_domain, },
+ 	{ /* sentinel */ }
+ };
+ 
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index e791476..0b15787 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -23,6 +23,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+@@ -33,8 +34,6 @@
+ #include <asm-generic/bug.h>
+ #include <asm/mach/irq.h>
+ 
+-#define irq_to_gpio(irq)	((irq) - MXC_GPIO_IRQ_START)
+-
+ enum mxc_gpio_hwtype {
+ 	IMX1_GPIO,	/* runs on i.mx1 */
+ 	IMX21_GPIO,	/* runs on i.mx21 and i.mx27 */
+@@ -61,7 +60,7 @@ struct mxc_gpio_port {
+ 	void __iomem *base;
+ 	int irq;
+ 	int irq_high;
+-	int virtual_irq_start;
++	struct irq_chip_generic *irq_gc;
+ 	struct bgpio_chip bgc;
+ 	u32 both_edges;
+ };
+@@ -144,14 +143,15 @@ static LIST_HEAD(mxc_gpio_ports);
+ 
+ static int gpio_set_irq_type(struct irq_data *d, u32 type)
  {
- 	int ret;
+-	u32 gpio = irq_to_gpio(d->irq);
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+ 	struct mxc_gpio_port *port = gc->private;
++	u32 gpio_idx = d->hwirq;
++	u32 gpio = port->bgc.gc.base + gpio_idx;
+ 	u32 bit, val;
+ 	int edge;
+ 	void __iomem *reg = port->base;
  
--	ret = request_irq(IRQ_GPIOC(29), detect_irq, IRQF_TRIGGER_FALLING,
--				"imx-mmc-detect", data);
-+	ret = request_irq(gpio_to_irq(IMX_GPIOC(29)), detect_irq,
-+			  IRQF_TRIGGER_FALLING, "imx-mmc-detect", data);
- 	if (ret)
- 		return ret;
- 
- 	ret = gpio_request(GPIO_PORTC + 28, "imx-mmc-ro");
- 	if (ret) {
--		free_irq(IRQ_GPIOC(29), data);
-+		free_irq(gpio_to_irq(IMX_GPIOC(29)), data);
- 		return ret;
+-	port->both_edges &= ~(1 << (gpio & 31));
++	port->both_edges &= ~(1 << gpio_idx);
+ 	switch (type) {
+ 	case IRQ_TYPE_EDGE_RISING:
+ 		edge = GPIO_INT_RISE_EDGE;
+@@ -168,7 +168,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+ 			edge = GPIO_INT_HIGH_LEV;
+ 			pr_debug("mxc: set GPIO %d to high trigger\n", gpio);
+ 		}
+-		port->both_edges |= 1 << (gpio & 31);
++		port->both_edges |= 1 << gpio_idx;
+ 		break;
+ 	case IRQ_TYPE_LEVEL_LOW:
+ 		edge = GPIO_INT_LOW_LEV;
+@@ -180,11 +180,11 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+ 		return -EINVAL;
  	}
  
-@@ -113,7 +113,7 @@ static int pcm970_sdhc2_init(struct device *dev, irq_handler_t detect_irq, void
+-	reg += GPIO_ICR1 + ((gpio & 0x10) >> 2); /* lower or upper register */
+-	bit = gpio & 0xf;
++	reg += GPIO_ICR1 + ((gpio_idx & 0x10) >> 2); /* ICR1 or ICR2 */
++	bit = gpio_idx & 0xf;
+ 	val = readl(reg) & ~(0x3 << (bit << 1));
+ 	writel(val | (edge << (bit << 1)), reg);
+-	writel(1 << (gpio & 0x1f), port->base + GPIO_ISR);
++	writel(1 << gpio_idx, port->base + GPIO_ISR);
  
- static void pcm970_sdhc2_exit(struct device *dev, void *data)
+ 	return 0;
+ }
+@@ -217,15 +217,14 @@ static void mxc_flip_edge(struct mxc_gpio_port *port, u32 gpio)
+ /* handle 32 interrupts in one status register */
+ static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
  {
--	free_irq(IRQ_GPIOC(29), data);
-+	free_irq(gpio_to_irq(IMX_GPIOC(29)), data);
- 	gpio_free(GPIO_PORTC + 28);
+-	u32 gpio_irq_no_base = port->virtual_irq_start;
+-
+ 	while (irq_stat != 0) {
+ 		int irqoffset = fls(irq_stat) - 1;
+ 
+ 		if (port->both_edges & (1 << irqoffset))
+ 			mxc_flip_edge(port, irqoffset);
+ 
+-		generic_handle_irq(gpio_irq_no_base + irqoffset);
++		generic_handle_irq(irq_find_mapping(port->irq_gc->domain,
++						    irqoffset));
+ 
+ 		irq_stat &= ~(1 << irqoffset);
+ 	}
+@@ -276,10 +275,9 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+  */
+ static int gpio_set_wake_irq(struct irq_data *d, u32 enable)
+ {
+-	u32 gpio = irq_to_gpio(d->irq);
+-	u32 gpio_idx = gpio & 0x1F;
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+ 	struct mxc_gpio_port *port = gc->private;
++	u32 gpio_idx = d->hwirq;
+ 
+ 	if (enable) {
+ 		if (port->irq_high && (gpio_idx >= 16))
+@@ -296,16 +294,13 @@ static int gpio_set_wake_irq(struct irq_data *d, u32 enable)
+ 	return 0;
  }
  
-@@ -192,8 +192,7 @@ static struct resource pcm970_sja1000_resources[] = {
- 		.end     = MX27_CS4_BASE_ADDR + 0x100 - 1,
- 		.flags   = IORESOURCE_MEM,
- 	}, {
--		.start   = IRQ_GPIOE(19),
--		.end     = IRQ_GPIOE(19),
-+		/* irq number is run-time assigned */
- 		.flags   = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
- 	},
- };
-@@ -227,5 +226,7 @@ void __init pcm970_baseboard_init(void)
- 	imx27_add_imx_fb(&pcm038_fb_data);
- 	mxc_gpio_mode(GPIO_PORTC | 28 | GPIO_GPIO | GPIO_IN);
- 	imx27_add_mxc_mmc(1, &sdhc_pdata);
-+	pcm970_sja1000_resources[1].start = gpio_to_irq(IMX_GPIOE(19));
-+	pcm970_sja1000_resources[1].end = gpio_to_irq(IMX_GPIOE(19));
- 	platform_device_register(&pcm970_sja1000);
+-static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port)
++static void __devinit mxc_gpio_init_gc(struct irq_chip_generic *gc)
+ {
+-	struct irq_chip_generic *gc;
+-	struct irq_chip_type *ct;
++	struct irq_chip_type *ct = gc->chip_types;
++	struct mxc_gpio_port *port = gc->private;
+ 
+-	gc = irq_alloc_generic_chip("gpio-mxc", 1, port->virtual_irq_start,
+-				    port->base, handle_level_irq);
+-	gc->private = port;
++	port->irq_gc = gc;
+ 
+-	ct = gc->chip_types;
+ 	ct->chip.irq_ack = irq_gc_ack_set_bit;
+ 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+ 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+@@ -313,9 +308,6 @@ static void __init mxc_gpio_init_gc(struct mxc_gpio_port *port)
+ 	ct->chip.irq_set_wake = gpio_set_wake_irq;
+ 	ct->regs.ack = GPIO_ISR;
+ 	ct->regs.mask = GPIO_IMR;
+-
+-	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_NESTED_LOCK,
+-			       IRQ_NOREQUEST, 0);
  }
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v1.h b/arch/arm/plat-mxc/include/mach/iomux-v1.h
-index 6fa8a70..2820341 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v1.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v1.h
-@@ -85,12 +85,12 @@
- #define GPIO_BOUT_0	(2 << GPIO_BOUT_SHIFT)
- #define GPIO_BOUT_1	(3 << GPIO_BOUT_SHIFT)
  
--#define IRQ_GPIOA(x)  (MXC_GPIO_IRQ_START + x)
--#define IRQ_GPIOB(x)  (IRQ_GPIOA(32) + x)
--#define IRQ_GPIOC(x)  (IRQ_GPIOB(32) + x)
--#define IRQ_GPIOD(x)  (IRQ_GPIOC(32) + x)
--#define IRQ_GPIOE(x)  (IRQ_GPIOD(32) + x)
--#define IRQ_GPIOF(x)  (IRQ_GPIOE(32) + x)
-+#define IMX_GPIOA(x)  (GPIO_PORTA + x)
-+#define IMX_GPIOB(x)  (GPIO_PORTB + x)
-+#define IMX_GPIOC(x)  (GPIO_PORTC + x)
-+#define IMX_GPIOD(x)  (GPIO_PORTD + x)
-+#define IMX_GPIOE(x)  (GPIO_PORTE + x)
-+#define IMX_GPIOF(x)  (GPIO_PORTF + x)
+ static void __devinit mxc_gpio_get_hw(struct platform_device *pdev)
+@@ -352,15 +344,14 @@ static int mxc_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
+ 	struct mxc_gpio_port *port =
+ 		container_of(bgc, struct mxc_gpio_port, bgc);
  
- extern int mxc_gpio_mode(int gpio_mode);
- extern int mxc_gpio_setup_multiple_pins(const int *pin_list, unsigned count,
+-	return port->virtual_irq_start + offset;
++	return irq_create_mapping(port->irq_gc->domain, offset);
+ }
+ 
+ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+ {
+-	struct device_node *np = pdev->dev.of_node;
+ 	struct mxc_gpio_port *port;
+ 	struct resource *iores;
+-	int err;
++	int err, irq_base;
+ 
+ 	mxc_gpio_get_hw(pdev);
+ 
+@@ -430,15 +421,13 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto out_bgpio_remove;
+ 
+-	/*
+-	 * In dt case, we use gpio number range dynamically
+-	 * allocated by gpio core.
+-	 */
+-	port->virtual_irq_start = MXC_GPIO_IRQ_START + (np ? port->bgc.gc.base :
+-							     pdev->id * 32);
+-
+ 	/* gpio-mxc can be a generic irq chip */
+-	mxc_gpio_init_gc(port);
++	irq_base = pdev->dev.of_node ? -1 : irq_alloc_descs(-1, 0, 32, 0);
++	irq_setup_generic_chip_domain("gpio-mxc",
++				      of_node_get(pdev->dev.of_node),
++				      1, irq_base, port->base, handle_level_irq,
++				      32, IRQ_GC_INIT_NESTED_LOCK,
++				      IRQ_NOREQUEST, 0, mxc_gpio_init_gc, port);
+ 
+ 	list_add_tail(&port->node, &mxc_gpio_ports);
+ 
 -- 
 1.7.5.4
