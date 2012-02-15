@@ -1,92 +1,76 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 15 Feb 2012 17:37:49 +0200
-Subject: [RFC 00/11]O MAP/ASoC: Move and merge McBSP driver under ASoC
-Message-ID: <1329320280-1621-1-git-send-email-peter.ujfalusi@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 15 Feb 2012 17:37:47 +0200
+Subject: [PATCHv2 1/8] arm: omap: clk: add support for omap_clk_for_each
+In-Reply-To: <1329320274-481-1-git-send-email-t-kristo@ti.com>
+References: <1329320274-481-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1329320274-481-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This works similarly to e.g. pwrdm_for_each(). Needed by enhanced
+usecounting debug functionality that will be added to pm-debug.
 
-The aim of this series is to move the plat-omap/mcbsp.c driver out to
-sound/soc/omap/
-By doing this we can combine the two levels of McBSP driver stack into a single
-one.
-Formally we had omap-mcbsp.[1-X] drivers (plat-omap/mcbsp.c), and
-omap-mcbsp-dai.[0-(X-1) drivers (sound/soc/omap/omap-mcbsp.c).
-We had global, shared structures, variables, pointers. The API between the two
-driver was a set of exported function calls where one of the parameter was the
-McBSP port id.
-
-With this series we will have one driver for McBSP (omap-mcbsp.[1-X]) which is
-basically the ASoC dai driver. All exported/shared global structures are gone
-since we can use driver data for all ports in this way.
-
-With the code in one place we can do further clean up in the McBSP driver, and
-adding new features will be much easier in the future. Also the DT support for
-McBSP will be significantly easier if we have one set of driver.
-
-McBSP is only used by audio, there are no known other users of the OMAP McBSP
-(well, Nokia n700 has the WLAN connected through McBSP but we do not have
-driver for that anyway).
-
-The series was created against Takashi's topic/asoc branch. I have tested it on
-Beagle xM, and compile tested it for OMAP1, OMAP2, and OMAP4 as well.
-
-I'm going to do more work on the cleanup, and the plan is to merge the two files
-into one (mcbsp.c -> omap-mcbsp.c) eventually.
-
-Comments, testers are welcome...
-
-CC-ing Samuel as well since he is the original author of the plat-omap/mcbsp.c
-driver.
-
-Regards,
-Peter
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
-Peter Ujfalusi (11):
-  ARM: OMAP: mcbsp: Convert core driver to proper platform driver
-  OMAP: mcbsp: Move core driver under sound/soc/omap
-  ASoC: OMAP: McBSP: Consolidate plat/mcbsp.h content
-  ASoC: core - Add API call to register dai kcontrols.
-  ASoC: omap-mcbsp: Create a single driver for McBSP
-  ARM: OMAP: Do not register omap-mcbsp-dai device
-  ASoC: OMAP: mcbsp.h: Clean up bit definitions
-  ASoC: OMAP McBSP: Remove redundant accessors
-  ASoC: omap-mcbsp: Cleanup of module probe/remove code
-  ASoC: omap-mcbsp: Merge the omap_mcbsp_data into omap_mcbsp structure
-  ASoC: omap-mcbsp: Simplify DMA configuration
+ arch/arm/plat-omap/clock.c              |   30 ++++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/clock.h |    2 ++
+ 2 files changed, 32 insertions(+), 0 deletions(-)
 
- arch/arm/mach-omap1/devices.c                  |    9 -
- arch/arm/mach-omap1/mcbsp.c                    |   14 +-
- arch/arm/mach-omap2/devices.c                  |   22 --
- arch/arm/mach-omap2/mcbsp.c                    |    8 +-
- arch/arm/plat-omap/Kconfig                     |    8 -
- arch/arm/plat-omap/Makefile                    |    2 -
- arch/arm/plat-omap/include/plat/mcbsp.h        |  321 ----------------
- include/sound/soc.h                            |    2 +
- sound/soc/omap/Kconfig                         |    4 +
- sound/soc/omap/Makefile                        |    1 +
- sound/soc/omap/am3517evm.c                     |    2 +-
- sound/soc/omap/ams-delta.c                     |    2 +-
- sound/soc/omap/igep0020.c                      |    2 +-
- {arch/arm/plat-omap => sound/soc/omap}/mcbsp.c |  463 ++++--------------------
- sound/soc/omap/mcbsp.h                         |  337 +++++++++++++++++
- sound/soc/omap/n810.c                          |    2 +-
- sound/soc/omap/omap-mcbsp.c                    |  287 ++++++++-------
- sound/soc/omap/omap-mcbsp.h                    |    2 +-
- sound/soc/omap/omap-pcm.h                      |    2 +
- sound/soc/omap/omap3beagle.c                   |    2 +-
- sound/soc/omap/omap3evm.c                      |    2 +-
- sound/soc/omap/omap3pandora.c                  |    4 +-
- sound/soc/omap/osk5912.c                       |    2 +-
- sound/soc/omap/overo.c                         |    2 +-
- sound/soc/omap/rx51.c                          |    4 +-
- sound/soc/omap/sdp3430.c                       |    4 +-
- sound/soc/omap/zoom2.c                         |    4 +-
- sound/soc/soc-core.c                           |   31 ++
- 28 files changed, 631 insertions(+), 914 deletions(-)
- rename {arch/arm/plat-omap => sound/soc/omap}/mcbsp.c (69%)
- create mode 100644 sound/soc/omap/mcbsp.h
-
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 567e4b5..e17ee5e2 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -356,6 +356,36 @@ int omap_clk_enable_autoidle_all(void)
+ 	return 0;
+ }
+ 
++/**
++ * omap_clk_for_each - call a function for each registered clock
++ * @fn: pointer to callback function
++ * @data: void * data to pass to callback function
++ *
++ * Call @fn for each registered clock, passing @data to each function.
++ * @fn must return 0 for success or any other value for failure. If
++ * @fn returns non-zero, the iteration across clocks will stop and
++ * the non-zero return value will be passed to the caller of
++ * omap_clk_for_each(). @fn is called with clockfw_lock held.
++ */
++int omap_clk_for_each(int (*fn)(struct clk *clk, void *user), void *user)
++{
++	struct clk *c;
++	unsigned long flags;
++	int ret = 0;
++
++	spin_lock_irqsave(&clockfw_lock, flags);
++
++	list_for_each_entry(c, &clocks, node) {
++		ret = fn(c, user);
++		if (ret)
++			break;
++	}
++
++	spin_unlock_irqrestore(&clockfw_lock, flags);
++
++	return ret;
++}
++
+ int omap_clk_disable_autoidle_all(void)
+ {
+ 	struct clk *c;
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 240a7b9..c84f2a4 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -300,6 +300,8 @@ extern void propagate_rate(struct clk *clk);
+ extern void recalculate_root_clocks(void);
+ extern unsigned long followparent_recalc(struct clk *clk);
+ extern void clk_enable_init_clocks(void);
++extern int omap_clk_for_each(int (*fn)(struct clk *clk, void *user),
++				void *user);
+ unsigned long omap_fixed_divisor_recalc(struct clk *clk);
+ #ifdef CONFIG_CPU_FREQ
+ extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
 -- 
-1.7.8.4
+1.7.4.1
