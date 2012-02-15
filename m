@@ -1,53 +1,41 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 14 Feb 2012 16:01:08 -0800
-Subject: [PATCH] Optimize multi-CPU tlb flushing a little more
-In-Reply-To: <20120214233400.GC29765@n2100.arm.linux.org.uk>
-References: <20110823110602.GG19622@n2100.arm.linux.org.uk>
- <CAH+eYFC_mkdObV0NfN5Jtv0L6fM9e0YGOBghTEVSqf=TAFxdXw@mail.gmail.com>
- <20120213162359.GC25655@n2100.arm.linux.org.uk>
- <20120213165926.GA24426@debian>
- <74CDBE0F657A3D45AFBB94109FB122FF178FACB6A1@HQMAIL01.nvidia.com>
- <20120214222354.GB29765@n2100.arm.linux.org.uk>
- <74CDBE0F657A3D45AFBB94109FB122FF178FACB6D7@HQMAIL01.nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178FACB70B@HQMAIL01.nvidia.com>
- <20120214233400.GC29765@n2100.arm.linux.org.uk>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF178FACB726@HQMAIL01.nvidia.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 14 Feb 2012 19:25:52 -0500 (EST)
+Subject: [PATCH 13/15] ARM: make mach/io.h include optional
+In-Reply-To: <20120214234313.GD29765@n2100.arm.linux.org.uk>
+References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
+ <201202140804.49026.arnd@arndb.de> <4F3A7158.2080702@gmail.com>
+ <201202141716.26930.arnd@arndb.de>
+ <20120214174035.GA29765@n2100.arm.linux.org.uk> <4F3AE98D.7030104@gmail.com>
+ <20120214234313.GD29765@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1202141909260.24536@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote at Tuesday, February 14, 2012 4:34 PM:
-> On Tue, Feb 14, 2012 at 03:21:52PM -0800, Stephen Warren wrote:
-> > Russell,
-> >
-> > One more query about the original patch; in the following chunk:
-> >
-> > @@ -491,15 +471,11 @@ static inline void clean_pmd_entry(void *pmd)
-> >  {
-> >         const unsigned int __tlb_flag = __cpu_tlb_flags;
-> >
-> > -       if (tlb_flag(TLB_DCLEAN))
-> > -               asm("mcr        p15, 0, %0, c7, c10, 1  @ flush_pmd"
-> > -                       : : "r" (pmd) : "cc");
-> > -
-> > -       if (tlb_flag(TLB_L2CLEAN_FR))
-> > -               asm("mcr        p15, 1, %0, c15, c9, 1  @ L2 flush_pmd"
-> > -                       : : "r" (pmd) : "cc");
-> > +       tlb_op(TLB_DCLEAN, "c7, c10, 1  @ flush_pmd", pmd);
-> > +       tlb_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
-> >  }
-> >
-> > You'll notice that the second mcr instruction is passed "p15, 1, ...".
-> > However, the replacement code in tlb_op() always passes "p15, 0, ..."
-> > to mcr/mcrne. I assume this is a problem?
-> >
-> > The same thing applies to flush_pmd_entry() too.
+On Tue, 14 Feb 2012, Russell King - ARM Linux wrote:
+
+> On Tue, Feb 14, 2012 at 05:09:01PM -0600, Rob Herring wrote:
+> > BTW, I noticed some static mappings at 0xffxxxxxx. Are those even a
+> > valid address?
 > 
-> Damn it.  Well spotted, yes this needs fixing.  Here's an updated patch.
-> ...
+> Nothing invalid about them as such, but I have tried to discourage their
+> use in case we decide that we want to go for a default 14MB DMA region.
 
-That looks reasonable to me.
+They should be invalid, and would be flagged by this code in 
+create_mapping():
 
-I didn't retest, since I didn't observe any problems due to this issue.
+        if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+            md->virtual >= PAGE_OFFSET &&
+            (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) 
+        {
+                printk(KERN_WARNING "BUG: mapping for 0x%08llx"
+                       " at 0x%08lx out of vmalloc space\n",
+                       (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+        }
 
--- 
-nvpublic
+given that VMALLOC_END is now defined as 0xff000000.
+
+What are those static mappings at 0xffxxxxxx?  I was looking for them 
+while reworking this code but I might have missed some.
+
+
+Nicolas
