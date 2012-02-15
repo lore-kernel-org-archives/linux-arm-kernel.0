@@ -1,761 +1,166 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Feb 2012 10:28:25 -0800
-Subject: [PATCH 2/3] ARM: OMAP2+: Split omap2_hsmmc_init() to properly
- support I2C GPIO pins
-In-Reply-To: <20120215182355.18884.18682.stgit@kaulin.local>
-References: <20120215182355.18884.18682.stgit@kaulin.local>
-Message-ID: <20120215182825.18884.40972.stgit@kaulin.local>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Feb 2012 10:37:22 -0800
+Subject: [PATCH] mtd/gpmi : add gpmi support for mx6q
+In-Reply-To: <1328505606-27981-1-git-send-email-b32955@freescale.com>
+References: <1328505606-27981-1-git-send-email-b32955@freescale.com>
+Message-ID: <20120215183720.GA2399@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise omap_device_build() and omap_mux related functions
-can't be marked as __init when twl is build as a module.
+On Mon, Feb 06, 2012 at 01:20:06PM +0800, Huang Shijie wrote:
+> add gpmi support to mx6q.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  drivers/mtd/nand/gpmi-nand/bch-regs.h  |   42 ++++++++++++++++++++++++-------
+>  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   14 ++++++----
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    3 ++
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    2 +
+>  4 files changed, 45 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/gpmi-nand/bch-regs.h b/drivers/mtd/nand/gpmi-nand/bch-regs.h
+> index 4effb8c..a092451 100644
+> --- a/drivers/mtd/nand/gpmi-nand/bch-regs.h
+> +++ b/drivers/mtd/nand/gpmi-nand/bch-regs.h
+> @@ -51,15 +51,26 @@
+>  
+>  #define BP_BCH_FLASH0LAYOUT0_ECC0		12
+>  #define BM_BCH_FLASH0LAYOUT0_ECC0	(0xf << BP_BCH_FLASH0LAYOUT0_ECC0)
+> -#define BF_BCH_FLASH0LAYOUT0_ECC0(v)		\
+> -	(((v) << BP_BCH_FLASH0LAYOUT0_ECC0) & BM_BCH_FLASH0LAYOUT0_ECC0)
+> +#define MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0		11
+> +#define MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)
+> +#define BF_BCH_FLASH0LAYOUT0_ECC0(v, x)				\
+> +	(GPMI_IS_MX6Q(x)					\
+> +		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)	\
+> +			& MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0)	\
+> +		: (((v) << BP_BCH_FLASH0LAYOUT0_ECC0)		\
+> +			& BM_BCH_FLASH0LAYOUT0_ECC0)		\
+> +	)
+>  
+>  #define BP_BCH_FLASH0LAYOUT0_DATA0_SIZE		0
+>  #define BM_BCH_FLASH0LAYOUT0_DATA0_SIZE		\
+>  			(0xfff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
+> -#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v)	\
+> -	(((v) << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)\
+> -					 & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)
+> +#define MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE	\
+> +			(0x3ff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
+> +#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v, x)				\
+> +	(GPMI_IS_MX6Q(x)						\
+> +		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)	\
+> +		: ((v) & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)		\
+> +	)
+>  
+>  #define HW_BCH_FLASH0LAYOUT1			0x00000090
+>  
+> @@ -72,13 +83,24 @@
+>  
+>  #define BP_BCH_FLASH0LAYOUT1_ECCN		12
+>  #define BM_BCH_FLASH0LAYOUT1_ECCN	(0xf << BP_BCH_FLASH0LAYOUT1_ECCN)
+> -#define BF_BCH_FLASH0LAYOUT1_ECCN(v)		\
+> -	(((v) << BP_BCH_FLASH0LAYOUT1_ECCN) & BM_BCH_FLASH0LAYOUT1_ECCN)
+> +#define MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN		11
+> +#define MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)
+> +#define BF_BCH_FLASH0LAYOUT1_ECCN(v, x)				\
+> +	(GPMI_IS_MX6Q(x)					\
+> +		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)	\
+> +			& MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN)	\
+> +		: (((v) << BP_BCH_FLASH0LAYOUT1_ECCN)		\
+> +			& BM_BCH_FLASH0LAYOUT1_ECCN)		\
+> +	)
+>  
+>  #define BP_BCH_FLASH0LAYOUT1_DATAN_SIZE		0
+>  #define BM_BCH_FLASH0LAYOUT1_DATAN_SIZE		\
+>  			(0xfff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
+> -#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v)	\
+> -	(((v) << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE) \
+> -					 & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)
+> +#define MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE	\
+> +			(0x3ff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
+> +#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v, x)				\
+> +	(GPMI_IS_MX6Q(x)						\
+> +		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)	\
+> +		: ((v) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)		\
+> +	)
+>  #endif
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> index 28f8df0..fd39350 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> @@ -223,13 +223,13 @@ int bch_set_geometry(struct gpmi_nand_data *this)
+>  	/* Configure layout 0. */
+>  	writel(BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)
+>  			| BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size)
+> -			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)
+> -			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size),
+> +			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength, this)
+> +			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size, this),
+>  			r->bch_regs + HW_BCH_FLASH0LAYOUT0);
+>  
+>  	writel(BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)
+> -			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)
+> -			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size),
+> +			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength, this)
+> +			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size, this),
+>  			r->bch_regs + HW_BCH_FLASH0LAYOUT1);
+>  
+>  	/* Set *all* chip selects to use layout 0. */
+> @@ -803,7 +803,8 @@ int gpmi_is_ready(struct gpmi_nand_data *this, unsigned chip)
+>  	if (GPMI_IS_MX23(this)) {
+>  		mask = MX23_BM_GPMI_DEBUG_READY0 << chip;
+>  		reg = readl(r->gpmi_regs + HW_GPMI_DEBUG);
+> -	} else if (GPMI_IS_MX28(this)) {
+> +	} else if (GPMI_IS_MX28(this) || GPMI_IS_MX6Q(this)) {
+> +		/* MX28 shares the same R/B register as MX6Q. */
+>  		mask = MX28_BF_GPMI_STAT_READY_BUSY(1 << chip);
+>  		reg = readl(r->gpmi_regs + HW_GPMI_STAT);
+>  	} else
+> @@ -1066,8 +1067,9 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+>  		| BF_GPMI_CTRL0_ADDRESS(address)
+>  		| BF_GPMI_CTRL0_XFER_COUNT(geo->page_size);
+>  	pio[1] = 0;
+> +	pio[2] = 0; /* set GPMI_HW_GPMI_ECCCTRL, disable the BCH. */
+>  	desc = channel->device->device_prep_slave_sg(channel,
+> -				(struct scatterlist *)pio, 2,
+> +				(struct scatterlist *)pio, 3,
+>  				DMA_TRANS_NONE,
+>  				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>  	if (!desc) {
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> index 493ec2f..90545e2 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> @@ -1582,6 +1582,9 @@ static const struct platform_device_id gpmi_ids[] = {
+>  	}, {
+>  		.name = "imx28-gpmi-nand",
+>  		.driver_data = IS_MX28,
+> +	}, {
+> +		.name = "imx6q-gpmi-nand",
+> +		.driver_data = IS_MX6Q,
+>  	}, {},
+>  };
+>  
+The imx6q only supports DT boot, but I do not see you are adding DT
+probe for the driver, so I'm wondering how you tested the driver on
+imx6q.
 
-If a board is using GPIO pins or regulators configured by an
-external chip, such as TWL PMIC on I2C bus, the board must
-mark those MMC controllers as deferred. Additionally both
-omap_hsmmc_init() and omap_hsmmc_late_init() must be called
-by the board.
+-- 
+Regards,
+Shawn
 
-For MMC controllers using internal GPIO pins for card
-detect and regulators the slots don't need to be marked
-deferred. In this case calling omap_hsmmc_init() is sufficient.
-
-Note that this patch does not change the behaviour for
-board-4430sdp.c board-omap4panda.c. These boards wrongly
-rely on the omap_hsmmc.c init function callback to configure
-the PMIC GPIO interrupt lines on external chip. If the PMIC
-interrupt lines are not configured during init, they will
-fail.
-
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-2430sdp.c          |    2 
- arch/arm/mach-omap2/board-3430sdp.c          |    5 +
- arch/arm/mach-omap2/board-4430sdp.c          |    4 -
- arch/arm/mach-omap2/board-am3517evm.c        |    2 
- arch/arm/mach-omap2/board-cm-t35.c           |    6 +
- arch/arm/mach-omap2/board-devkit8000.c       |    4 +
- arch/arm/mach-omap2/board-igep0020.c         |    7 +-
- arch/arm/mach-omap2/board-ldp.c              |    2 
- arch/arm/mach-omap2/board-omap3beagle.c      |    4 +
- arch/arm/mach-omap2/board-omap3evm.c         |    5 +
- arch/arm/mach-omap2/board-omap3logic.c       |    2 
- arch/arm/mach-omap2/board-omap3pandora.c     |    6 +
- arch/arm/mach-omap2/board-omap3stalker.c     |   12 ++-
- arch/arm/mach-omap2/board-omap3touchbook.c   |    4 +
- arch/arm/mach-omap2/board-omap4panda.c       |    4 -
- arch/arm/mach-omap2/board-overo.c            |    5 +
- arch/arm/mach-omap2/board-rm680.c            |    2 
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 
- arch/arm/mach-omap2/board-zoom-peripherals.c |    6 +
- arch/arm/mach-omap2/hsmmc.c                  |  107 +++++++++++++++++++-------
- arch/arm/mach-omap2/hsmmc.h                  |   12 ++-
- 21 files changed, 147 insertions(+), 56 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-index 7370983..c8bda62 100644
---- a/arch/arm/mach-omap2/board-2430sdp.c
-+++ b/arch/arm/mach-omap2/board-2430sdp.c
-@@ -279,7 +279,7 @@ static void __init omap_2430sdp_init(void)
- 	platform_add_devices(sdp2430_devices, ARRAY_SIZE(sdp2430_devices));
- 	omap_serial_init();
- 	omap_sdrc_init(NULL, NULL);
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_init(mmc);
- 	omap2_usbfs_init(&sdp2430_usb_config);
- 
- 	omap_mux_init_signal("usb0hs_stp", OMAP_PULL_ENA | OMAP_PULL_UP);
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 383717b..da75f23 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -232,11 +232,13 @@ static struct omap2_hsmmc_info mmc[] = {
- 		 */
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
- 		.gpio_wp	= 4,
-+		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 2,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
- 		.gpio_wp	= 7,
-+		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -249,7 +251,7 @@ static int sdp3430_twl_gpio_setup(struct device *dev,
- 	 */
- 	mmc[0].gpio_cd = gpio + 0;
- 	mmc[1].gpio_cd = gpio + 1;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	/* gpio + 7 is "sub_lcd_en_bkl" (output/PWM1) */
- 	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "sub_lcd_en_bkl");
-@@ -606,6 +608,7 @@ static void __init omap_3430sdp_init(void)
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap_board_config = sdp3430_config;
- 	omap_board_config_size = ARRAY_SIZE(sdp3430_config);
-+	omap_hsmmc_init(mmc);
- 	omap3430_i2c_init();
- 	omap_display_init(&sdp3430_dss_data);
- 	if (omap_rev() > OMAP3430_REV_ES1_0)
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 4e90715..09ae257 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -491,9 +491,9 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
- {
- 	struct omap2_hsmmc_info *c;
- 
--	omap2_hsmmc_init(controllers);
-+	omap_hsmmc_init(controllers);
- 	for (c = controllers; c->mmc; c++)
--		omap4_twl6030_hsmmc_set_late_init(c->dev);
-+		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index 4b1cfe3..71138a1 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -504,7 +504,7 @@ static void __init am3517_evm_init(void)
- 	am3517_evm_musb_init();
- 
- 	/* MMC init function */
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_init(mmc);
- }
- 
- MACHINE_START(OMAP3517EVM, "OMAP3517/AM3517 EVM")
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index e921e3b..60f0501 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -413,7 +413,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.caps		= MMC_CAP_4_BIT_DATA,
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
--
-+		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 2,
-@@ -422,6 +422,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
- 		.ocr_mask	= 0x00100000,	/* 3.3V */
-+		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -471,7 +472,7 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
- 
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	mmc[0].gpio_cd = gpio + 0;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	return 0;
- }
-@@ -639,6 +640,7 @@ static void __init cm_t3x_common_init(void)
- 	omap_serial_init();
- 	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
- 			     mt46h32m32lf6_sdrc_params);
-+	omap_hsmmc_init(mmc);
- 	cm_t35_init_i2c();
- 	omap_ads7846_init(1, CM_T35_GPIO_PENDOWN, 0, NULL);
- 	cm_t35_init_ethernet();
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index e873063..11cd2a8 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -100,6 +100,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
- 		.gpio_wp	= 29,
-+		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -228,7 +229,7 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
- 
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	mmc[0].gpio_cd = gpio + 0;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
- 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
-@@ -636,6 +637,7 @@ static void __init devkit8000_init(void)
- 
- 	omap_dm9000_init();
- 
-+	omap_hsmmc_init(mmc);
- 	devkit8000_i2c_init();
- 	platform_add_devices(devkit8000_devices,
- 			ARRAY_SIZE(devkit8000_devices));
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index a59ace0..ac1de09 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -295,6 +295,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.caps		= MMC_CAP_4_BIT_DATA,
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
-+		.deferred	= true,
- 	},
- #if defined(CONFIG_LIBERTAS_SDIO) || defined(CONFIG_LIBERTAS_SDIO_MODULE)
- 	{
-@@ -302,6 +303,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.caps		= MMC_CAP_4_BIT_DATA,
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
-+		.deferred	= true,
- 	},
- #endif
- 	{}      /* Terminator */
-@@ -402,7 +404,7 @@ static int igep_twl_gpio_setup(struct device *dev,
- 
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	mmc[0].gpio_cd = gpio + 0;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	/* TWL4030_GPIO_MAX + 1 == ledB (out, active low LED) */
- #if !defined(CONFIG_LEDS_GPIO) && !defined(CONFIG_LEDS_GPIO_MODULE)
-@@ -639,6 +641,9 @@ static void __init igep_init(void)
- 
- 	/* Get IGEP2 hardware revision */
- 	igep2_get_revision();
-+
-+	omap_hsmmc_init(mmc);
-+
- 	/* Register I2C busses and drivers */
- 	igep_i2c_init();
- 	platform_add_devices(igep_devices, ARRAY_SIZE(igep_devices));
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index 2d2a61f..b5bc9b2 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -424,7 +424,7 @@ static void __init omap_ldp_init(void)
- 	board_nand_init(ldp_nand_partitions,
- 		ARRAY_SIZE(ldp_nand_partitions), ZOOM_NAND_CS, 0);
- 
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_init(mmc);
- 	ldp_display_init();
- }
- 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 7ffcd28..78bfcd5 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -253,6 +253,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
- 		.gpio_wp	= -EINVAL,
-+		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -277,7 +278,7 @@ static int beagle_twl_gpio_setup(struct device *dev,
- 	mmc[0].gpio_wp = beagle_config.mmc1_gpio_wp;
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	mmc[0].gpio_cd = gpio + 0;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	/*
- 	 * TWL4030_GPIO_MAX + 0 == ledA, EHCI nEN_USB_PWR (out, XM active
-@@ -521,6 +522,7 @@ static void __init omap3_beagle_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap3_beagle_init_rev();
-+	omap_hsmmc_init(mmc);
- 	omap3_beagle_i2c_init();
- 
- 	gpio_buttons[0].gpio = beagle_config.usr_button_gpio;
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index c775bea..db0aa27 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -317,6 +317,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.caps		= MMC_CAP_4_BIT_DATA,
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= 63,
-+		.deferred	= true,
- 	},
- #ifdef CONFIG_WL12XX_PLATFORM_DATA
- 	{
-@@ -326,6 +327,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.gpio_wp	= -EINVAL,
- 		.gpio_cd	= -EINVAL,
- 		.nonremovable	= true,
-+		.deferred	= true,
- 	},
- #endif
- 	{}	/* Terminator */
-@@ -363,7 +365,7 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	omap_mux_init_gpio(63, OMAP_PIN_INPUT);
- 	mmc[0].gpio_cd = gpio + 0;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	/*
- 	 * Most GPIOs are for USB OTG.  Some are mostly sent to
-@@ -644,6 +646,7 @@ static void __init omap3_evm_init(void)
- 	omap_board_config = omap3_evm_config;
- 	omap_board_config_size = ARRAY_SIZE(omap3_evm_config);
- 
-+	omap_hsmmc_init(mmc);
- 	omap3_evm_i2c_init();
- 
- 	omap_display_init(&omap3_evm_dss_data);
-diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
-index 4198dd0..2304ba3 100644
---- a/arch/arm/mach-omap2/board-omap3logic.c
-+++ b/arch/arm/mach-omap2/board-omap3logic.c
-@@ -128,7 +128,7 @@ static void __init board_mmc_init(void)
- 		return;
- 	}
- 
--	omap2_hsmmc_init(board_mmc_info);
-+	omap_hsmmc_init(board_mmc_info);
- }
- 
- static struct omap_smsc911x_platform_data __initdata board_smsc911x_data = {
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index 1644b73..84c83c8 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -273,6 +273,7 @@ static struct omap2_hsmmc_info omap3pandora_mmc[] = {
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= 126,
- 		.ext_clock	= 0,
-+		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 2,
-@@ -281,6 +282,7 @@ static struct omap2_hsmmc_info omap3pandora_mmc[] = {
- 		.gpio_wp	= 127,
- 		.ext_clock	= 1,
- 		.transceiver	= true,
-+		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 3,
-@@ -288,6 +290,7 @@ static struct omap2_hsmmc_info omap3pandora_mmc[] = {
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
- 		.init_card	= pandora_wl1251_init_card,
-+		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -300,7 +303,7 @@ static int omap3pandora_twl_gpio_setup(struct device *dev,
- 	/* gpio + {0,1} is "mmc{0,1}_cd" (input/IRQ) */
- 	omap3pandora_mmc[0].gpio_cd = gpio + 0;
- 	omap3pandora_mmc[1].gpio_cd = gpio + 1;
--	omap2_hsmmc_init(omap3pandora_mmc);
-+	omap_hsmmc_late_init(omap3pandora_mmc);
- 
- 	/* gpio + 13 drives 32kHz buffer for wifi module */
- 	gpio_32khz = gpio + 13;
-@@ -580,6 +583,7 @@ static struct omap_board_mux board_mux[] __initdata = {
- static void __init omap3pandora_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_hsmmc_init(omap3pandora_mmc);
- 	omap3pandora_i2c_init();
- 	pandora_wl1251_init();
- 	platform_add_devices(omap3pandora_devices,
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index cb089a4..8eee993 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -209,10 +209,11 @@ static struct regulator_init_data omap3stalker_vsim = {
- 
- static struct omap2_hsmmc_info mmc[] = {
- 	{
--	 .mmc		= 1,
--	 .caps		= MMC_CAP_4_BIT_DATA,
--	 .gpio_cd	= -EINVAL,
--	 .gpio_wp	= 23,
-+		.mmc		= 1,
-+		.caps		= MMC_CAP_4_BIT_DATA,
-+		.gpio_cd	= -EINVAL,
-+		.gpio_wp	= 23,
-+		.deferred	= true,
- 	 },
- 	{}			/* Terminator */
- };
-@@ -284,7 +285,7 @@ omap3stalker_twl_gpio_setup(struct device *dev,
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	omap_mux_init_gpio(23, OMAP_PIN_INPUT);
- 	mmc[0].gpio_cd = gpio + 0;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	/*
- 	 * Most GPIOs are for USB OTG.  Some are mostly sent to
-@@ -425,6 +426,7 @@ static void __init omap3_stalker_init(void)
- 	omap_board_config = omap3_stalker_config;
- 	omap_board_config_size = ARRAY_SIZE(omap3_stalker_config);
- 
-+	omap_hsmmc_init(mmc);
- 	omap3_stalker_i2c_init();
- 
- 	platform_add_devices(omap3_stalker_devices,
-diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
-index a0b851a..ba9c118 100644
---- a/arch/arm/mach-omap2/board-omap3touchbook.c
-+++ b/arch/arm/mach-omap2/board-omap3touchbook.c
-@@ -100,6 +100,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
- 		.gpio_wp	= 29,
-+		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -125,7 +126,7 @@ static int touchbook_twl_gpio_setup(struct device *dev,
- 	}
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	mmc[0].gpio_cd = gpio + 0;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	/* REVISIT: need ehci-omap hooks for external VBUS
- 	 * power switch and overcurrent detect
-@@ -351,6 +352,7 @@ static void __init omap3_touchbook_init(void)
- 
- 	pm_power_off = omap3_touchbook_poweroff;
- 
-+	omap_hsmmc_init(mmc);
- 	omap3_touchbook_i2c_init();
- 	platform_add_devices(omap3_touchbook_devices,
- 			ARRAY_SIZE(omap3_touchbook_devices));
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 28fc271..bcc563c 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -245,9 +245,9 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
- {
- 	struct omap2_hsmmc_info *c;
- 
--	omap2_hsmmc_init(controllers);
-+	omap_hsmmc_init(controllers);
- 	for (c = controllers; c->mmc; c++)
--		omap4_twl6030_hsmmc_set_late_init(c->dev);
-+		omap4_twl6030_hsmmc_set_late_init(&c->pdev->dev);
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index 52c0cef..1fc5f7a 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -301,6 +301,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.caps		= MMC_CAP_4_BIT_DATA,
- 		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
-+		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 2,
-@@ -309,6 +310,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.gpio_wp	= -EINVAL,
- 		.transceiver	= true,
- 		.ocr_mask	= 0x00100000,	/* 3.3V */
-+		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -407,7 +409,7 @@ static inline void __init overo_init_keys(void) { return; }
- static int overo_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
- {
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
- 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
-@@ -505,6 +507,7 @@ static void __init overo_init(void)
- 	int ret;
- 
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_hsmmc_init(mmc);
- 	overo_i2c_init();
- 	omap_display_init(&overo_dss_data);
- 	omap_serial_init();
-diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
-index 8678b38..2d24c98 100644
---- a/arch/arm/mach-omap2/board-rm680.c
-+++ b/arch/arm/mach-omap2/board-rm680.c
-@@ -120,7 +120,7 @@ static void __init rm680_peripherals_init(void)
- 				ARRAY_SIZE(rm680_peripherals_devices));
- 	rm680_i2c_init();
- 	gpmc_onenand_init(board_onenand_data);
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_init(mmc);
- }
- 
- #ifdef CONFIG_OMAP_MUX
-diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index acb4e77..0e9d89a 100644
---- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -1145,7 +1145,7 @@ void __init rx51_peripherals_init(void)
- 
- 	partition = omap_mux_get("core");
- 	if (partition)
--		omap2_hsmmc_init(mmc);
-+		omap_hsmmc_init(mmc);
- 
- 	rx51_charger_init();
- }
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index c126461..82a0f7c 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -205,6 +205,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.caps		= MMC_CAP_4_BIT_DATA,
- 		.gpio_wp	= -EINVAL,
- 		.power_saving	= true,
-+		.deferred	= true,
- 	},
- 	{
- 		.name		= "internal",
-@@ -214,6 +215,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.gpio_wp	= -EINVAL,
- 		.nonremovable	= true,
- 		.power_saving	= true,
-+		.deferred	= true,
- 	},
- 	{
- 		.name		= "wl1271",
-@@ -222,6 +224,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.gpio_wp	= -EINVAL,
- 		.gpio_cd	= -EINVAL,
- 		.nonremovable	= true,
-+		.deferred	= true,
- 	},
- 	{}      /* Terminator */
- };
-@@ -233,7 +236,7 @@ static int zoom_twl_gpio_setup(struct device *dev,
- 
- 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
- 	mmc[0].gpio_cd = gpio + 0;
--	omap2_hsmmc_init(mmc);
-+	omap_hsmmc_late_init(mmc);
- 
- 	ret = gpio_request_one(LCD_PANEL_ENABLE_GPIO, GPIOF_OUT_INIT_LOW,
- 			       "lcd enable");
-@@ -301,6 +304,7 @@ void __init zoom_peripherals_init(void)
- 	if (ret)
- 		pr_err("error setting wl12xx data: %d\n", ret);
- 
-+	omap_hsmmc_init(mmc);
- 	omap_i2c_init();
- 	platform_device_register(&omap_vwlan_device);
- 	usb_musb_init(NULL);
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index b40c288..0f774e5 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -428,66 +428,119 @@ static int omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 	return 0;
- }
- 
-+void omap_hsmmc_late_init(struct omap2_hsmmc_info *controllers)
-+{
-+	struct platform_device *pdev;
-+	int res;
-+
-+	for (; controllers->mmc; controllers++) {
-+		if (!controllers->deferred)
-+			continue;
-+
-+		pdev = controllers->pdev;
-+		if (!pdev)
-+			continue;
-+
-+		res = omap_device_register(pdev);
-+		if (res) {
-+			pr_err("Could not late init MMC %s\n",
-+			       controllers->name);
-+			continue;
-+		}
-+	}
-+}
-+
- #define MAX_OMAP_MMC_HWMOD_NAME_LEN		16
- 
--void omap_init_hsmmc(struct omap2_hsmmc_info *hsmmcinfo, int ctrl_nr)
-+static void omap_hsmmc_init_one(struct omap2_hsmmc_info *hsmmcinfo,
-+					int ctrl_nr)
- {
- 	struct omap_hwmod *oh;
-+	struct omap_hwmod *ohs[1];
-+	struct omap_device *od;
- 	struct platform_device *pdev;
- 	char oh_name[MAX_OMAP_MMC_HWMOD_NAME_LEN];
- 	struct omap_mmc_platform_data *mmc_data;
- 	struct omap_mmc_dev_attr *mmc_dev_attr;
- 	char *name;
--	int l;
-+	int res;
- 
- 	mmc_data = kzalloc(sizeof(struct omap_mmc_platform_data), GFP_KERNEL);
- 	if (!mmc_data) {
- 		pr_err("Cannot allocate memory for mmc device!\n");
--		goto done;
-+		return;
- 	}
- 
--	if (omap_hsmmc_pdata_init(hsmmcinfo, mmc_data) < 0) {
--		pr_err("%s fails!\n", __func__);
--		goto done;
--	}
-+	res = omap_hsmmc_pdata_init(hsmmcinfo, mmc_data);
-+	if (res < 0)
-+		goto free_mmc;
-+
- 	omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
- 
- 	name = "omap_hsmmc";
--
--	l = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
-+	res = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
- 		     "mmc%d", ctrl_nr);
--	WARN(l >= MAX_OMAP_MMC_HWMOD_NAME_LEN,
-+	WARN(res >= MAX_OMAP_MMC_HWMOD_NAME_LEN,
- 	     "String buffer overflow in MMC%d device setup\n", ctrl_nr);
-+
- 	oh = omap_hwmod_lookup(oh_name);
- 	if (!oh) {
- 		pr_err("Could not look up %s\n", oh_name);
--		kfree(mmc_data->slots[0].name);
--		goto done;
-+		goto free_name;
- 	}
--
-+	ohs[0] = oh;
- 	if (oh->dev_attr != NULL) {
- 		mmc_dev_attr = oh->dev_attr;
- 		mmc_data->controller_flags = mmc_dev_attr->flags;
- 	}
- 
--	pdev = omap_device_build(name, ctrl_nr - 1, oh, mmc_data,
--		sizeof(struct omap_mmc_platform_data), NULL, 0, false);
--	if (IS_ERR(pdev)) {
--		WARN(1, "Can't build omap_device for %s:%s.\n", name, oh->name);
--		kfree(mmc_data->slots[0].name);
--		goto done;
-+	pdev = platform_device_alloc(name, ctrl_nr - 1);
-+	if (!pdev) {
-+		pr_err("Could not allocate pdev for %s\n", name);
-+		goto free_mmc;
- 	}
--	/*
--	 * return device handle to board setup code
--	 * required to populate for regulator framework structure
--	 */
--	hsmmcinfo->dev = &pdev->dev;
-+	dev_set_name(&pdev->dev, "%s.%d", pdev->name, pdev->id);
-+
-+	od = omap_device_alloc(pdev, ohs, 1, NULL, 0);
-+	if (!od) {
-+		pr_err("Could not allocate od for %s\n", name);
-+		goto put_pdev;
-+	}
-+
-+	res = platform_device_add_data(pdev, mmc_data,
-+			      sizeof(struct omap_mmc_platform_data));
-+	if (res) {
-+		pr_err("Could not add pdata for %s\n", name);
-+		goto put_pdev;
-+	}
-+
-+	hsmmcinfo->pdev = pdev;
-+
-+	if (hsmmcinfo->deferred)
-+		return;
-+
-+	res = omap_device_register(pdev);
-+	if (res) {
-+		pr_err("Could not register od for %s\n", name);
-+		goto free_od;
-+	}
-+
-+	goto free_name;
-+
-+free_od:
-+	omap_device_delete(od);
-+
-+put_pdev:
-+	platform_device_put(pdev);
-+
-+free_name:
-+	kfree(mmc_data->slots[0].name);
- 
--done:
-+free_mmc:
- 	kfree(mmc_data);
- }
- 
--void omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
-+void omap_hsmmc_init(struct omap2_hsmmc_info *controllers)
- {
- 	u32 reg;
- 
-@@ -515,7 +568,7 @@ void omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 	}
- 
- 	for (; controllers->mmc; controllers++)
--		omap_init_hsmmc(controllers, controllers->mmc);
-+		omap_hsmmc_init_one(controllers, controllers->mmc);
- 
- }
- 
-diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-index c440973..07831cc 100644
---- a/arch/arm/mach-omap2/hsmmc.h
-+++ b/arch/arm/mach-omap2/hsmmc.h
-@@ -21,10 +21,11 @@ struct omap2_hsmmc_info {
- 	bool	no_off;		/* power_saving and power is not to go off */
- 	bool	no_off_init;	/* no power off when not in MMC sleep state */
- 	bool	vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
-+	bool	deferred;	/* mmc needs a deferred probe */
- 	int	gpio_cd;	/* or -EINVAL */
- 	int	gpio_wp;	/* or -EINVAL */
- 	char	*name;		/* or NULL for default */
--	struct device *dev;	/* returned: pointer to mmc adapter */
-+	struct platform_device *pdev;	/* mmc controller instance */
- 	int	ocr_mask;	/* temporary HACK */
- 	/* Remux (pad configuration) when powering on/off */
- 	void (*remux)(struct device *dev, int slot, int power_on);
-@@ -34,11 +35,16 @@ struct omap2_hsmmc_info {
- 
- #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
- 
--void omap2_hsmmc_init(struct omap2_hsmmc_info *);
-+void omap_hsmmc_init(struct omap2_hsmmc_info *);
-+void omap_hsmmc_late_init(struct omap2_hsmmc_info *);
- 
- #else
- 
--static inline void omap2_hsmmc_init(struct omap2_hsmmc_info *info)
-+static inline void omap_hsmmc_init(struct omap2_hsmmc_info *info)
-+{
-+}
-+
-+static inline void omap_hsmmc_late_init(struct omap2_hsmmc_info *info)
- {
- }
- 
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> index 1c7fdbb..a302dd1 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> @@ -268,6 +268,8 @@ extern int gpmi_read_page(struct gpmi_nand_data *,
+>  /* Use the platform_id to distinguish different Archs. */
+>  #define IS_MX23			0x1
+>  #define IS_MX28			0x2
+> +#define IS_MX6Q			0x8
+>  #define GPMI_IS_MX23(x)		((x)->pdev->id_entry->driver_data == IS_MX23)
+>  #define GPMI_IS_MX28(x)		((x)->pdev->id_entry->driver_data == IS_MX28)
+> +#define GPMI_IS_MX6Q(x)		((x)->pdev->id_entry->driver_data == IS_MX6Q)
+>  #endif
+> -- 
+> 1.7.0.4
