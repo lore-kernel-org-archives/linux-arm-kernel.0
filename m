@@ -1,247 +1,425 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 Feb 2012 18:37:37 +0100
-Subject: [PATCH 2/3] ARM: at91: at91_rtc: provide select the RTT so use at soc
- level
+Date: Wed, 15 Feb 2012 18:37:38 +0100
+Subject: [PATCH 3/3] ARM: at91: at91_rtc: pass the GPBR to use via ressources
 In-Reply-To: <1329327458-9925-1-git-send-email-plagnioj@jcrosoft.com>
 References: <1329327458-9925-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1329327458-9925-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1329327458-9925-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+make it soc independant too
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/at91sam9260_devices.c |   11 +++++
- arch/arm/mach-at91/at91sam9261_devices.c |   10 +++++
- arch/arm/mach-at91/at91sam9263_devices.c |   25 ++++++++++++
- arch/arm/mach-at91/at91sam9g45_devices.c |   10 +++++
- arch/arm/mach-at91/at91sam9rl_devices.c  |   10 +++++
- drivers/rtc/rtc-at91sam9.c               |   61 ++++-------------------------
- 6 files changed, 75 insertions(+), 52 deletions(-)
+ arch/arm/mach-at91/at91sam9260_devices.c      |   10 +++++++-
+ arch/arm/mach-at91/at91sam9261_devices.c      |    8 ++++++-
+ arch/arm/mach-at91/at91sam9263_devices.c      |   16 +++++++++++--
+ arch/arm/mach-at91/at91sam9g45_devices.c      |    8 ++++++-
+ arch/arm/mach-at91/at91sam9rl_devices.c       |    8 ++++++-
+ arch/arm/mach-at91/include/mach/at91sam9260.h |    5 +--
+ arch/arm/mach-at91/include/mach/at91sam9261.h |    5 +--
+ arch/arm/mach-at91/include/mach/at91sam9263.h |    5 +--
+ arch/arm/mach-at91/include/mach/at91sam9g45.h |    5 +--
+ arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
+ drivers/rtc/rtc-at91sam9.c                    |   29 +++++++++++++++++++++---
+ 11 files changed, 76 insertions(+), 25 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 2760146..f3e4b32 100644
+index f3e4b32..a9b7b6f 100644
 --- a/arch/arm/mach-at91/at91sam9260_devices.c
 +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -728,8 +728,19 @@ static struct platform_device at91sam9260_rtt_device = {
- 	.num_resources	= ARRAY_SIZE(rtt_resources),
- };
- 
-+
-+#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	at91sam9260_rtt_device.name = "rtc-at91sam9";
-+}
-+#else
-+static void __init at91_add_device_rtt_rtc(void) {}
-+#endif
-+
- static void __init at91_add_device_rtt(void)
- {
-+	at91_add_device_rtt_rtc();
- 	platform_device_register(&at91sam9260_rtt_device);
- }
- 
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 52c1f1a..b3ceb97 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -614,8 +614,18 @@ static struct platform_device at91sam9261_rtt_device = {
- 	.num_resources	= ARRAY_SIZE(rtt_resources),
- };
- 
-+#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	at91sam9261_rtt_device.name = "rtc-at91sam9";
-+}
-+#else
-+static void __init at91_add_device_rtt_rtc(void) {}
-+#endif
-+
- static void __init at91_add_device_rtt(void)
- {
-+	at91_add_device_rtt_rtc();
- 	platform_device_register(&at91sam9261_rtt_device);
- }
- 
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 1de4c4f..0f351da 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -992,8 +992,33 @@ static struct platform_device at91sam9263_rtt1_device = {
- 	.num_resources	= ARRAY_SIZE(rtt1_resources),
- };
- 
-+#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	struct platform_device *pdev;
-+
-+	switch (CONFIG_RTC_DRV_AT91SAM9_RTT) {
-+	case 0:
-+		pdev = &at91sam9263_rtt0_device;
-+		break;
-+	case 1:
-+		pdev = &at91sam9263_rtt1_device;
-+		break;
-+	default:
-+		pr_err("at91sam9263: support only 2 RTT (%d)\n",
-+			 CONFIG_RTC_DRV_AT91SAM9_RTT);
-+		return;
-+	}
-+
-+	pdev->name = "rtc-at91sam9";
-+}
-+#else
-+static void __init at91_add_device_rtt_rtc(void) {}
-+#endif
-+
- static void __init at91_add_device_rtt(void)
- {
-+	at91_add_device_rtt_rtc();
- 	platform_device_register(&at91sam9263_rtt0_device);
- 	platform_device_register(&at91sam9263_rtt1_device);
- }
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 8c036ff..81d1adf 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1204,8 +1204,18 @@ static struct platform_device at91sam9g45_rtt_device = {
- 	.num_resources	= ARRAY_SIZE(rtt_resources),
- };
- 
-+#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	at91sam9g45_rtt_device.name = "rtc-at91sam9";
-+}
-+#else
-+static void __init at91_add_device_rtt_rtc(void) {}
-+#endif
-+
- static void __init at91_add_device_rtt(void)
- {
-+	at91_add_device_rtt_rtc();
- 	platform_device_register(&at91sam9g45_rtt_device);
- }
- 
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 936cf20..dd248c8 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -693,8 +693,18 @@ static struct platform_device at91sam9rl_rtt_device = {
- 	.num_resources	= ARRAY_SIZE(rtt_resources),
- };
- 
-+#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	at91sam9rl_rtt_device.name = "rtc-at91sam9";
-+}
-+#else
-+static void __init at91_add_device_rtt_rtc(void) {}
-+#endif
-+
- static void __init at91_add_device_rtt(void)
- {
-+	at91_add_device_rtt_rtc();
- 	platform_device_register(&at91sam9rl_rtt_device);
- }
- 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index ee3c122..08b69fd 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -287,7 +287,7 @@ static const struct rtc_class_ops at91_rtc_ops = {
- /*
-  * Initialize and install RTC driver
-  */
--static int __init at91_rtc_probe(struct platform_device *pdev)
-+static int __devinit at91_rtc_probe(struct platform_device *pdev)
- {
- 	struct resource	*r;
- 	struct sam9_rtc	*rtc;
-@@ -366,7 +366,7 @@ fail:
- /*
-  * Disable and remove the RTC driver
-  */
--static int __exit at91_rtc_remove(struct platform_device *pdev)
-+static int __devexit at91_rtc_remove(struct platform_device *pdev)
- {
- 	struct sam9_rtc	*rtc = platform_get_drvdata(pdev);
- 	u32		mr = rtt_readl(rtc, MR);
-@@ -440,63 +440,20 @@ static int at91_rtc_resume(struct platform_device *pdev)
- #endif
- 
- static struct platform_driver at91_rtc_driver = {
--	.driver.name	= "rtc-at91sam9",
--	.driver.owner	= THIS_MODULE,
--	.remove		= __exit_p(at91_rtc_remove),
-+	.probe		= at91_rtc_probe,
-+	.remove		= __devexit_p(at91_rtc_remove),
- 	.shutdown	= at91_rtc_shutdown,
- 	.suspend	= at91_rtc_suspend,
- 	.resume		= at91_rtc_resume,
-+	.driver		= {
-+		.name	= "rtc-at91sam9",
-+		.owner	= THIS_MODULE,
+@@ -718,14 +718,16 @@ static struct resource rtt_resources[] = {
+ 		.start	= AT91SAM9260_BASE_RTT,
+ 		.end	= AT91SAM9260_BASE_RTT + SZ_16 - 1,
+ 		.flags	= IORESOURCE_MEM,
+-	}
++	}, {
++		.flags	= IORESOURCE_MEM,
 +	},
  };
  
--/* Chips can have more than one RTT module, and they can be used for more
-- * than just RTCs.  So we can't just register as "the" RTT driver.
-- *
-- * A normal approach in such cases is to create a library to allocate and
-- * free the modules.  Here we just use bus_find_device() as like such a
-- * library, binding directly ... no runtime "library" footprint is needed.
-- */
--static int __init at91_rtc_match(struct device *dev, void *v)
--{
--	struct platform_device *pdev = to_platform_device(dev);
--	int ret;
--
--	/* continue searching if this isn't the RTT we need */
--	if (strcmp("at91_rtt", pdev->name) != 0
--			|| pdev->id != CONFIG_RTC_DRV_AT91SAM9_RTT)
--		goto fail;
--
--	/* else we found it ... but fail unless we can bind to the RTC driver */
--	if (dev->driver) {
--		dev_dbg(dev, "busy, can't use as RTC!\n");
--		goto fail;
--	}
--	dev->driver = &at91_rtc_driver.driver;
--	if (device_attach(dev) == 0) {
--		dev_dbg(dev, "can't attach RTC!\n");
--		goto fail;
--	}
--	ret = at91_rtc_probe(pdev);
--	if (ret == 0)
--		return true;
--
--	dev_dbg(dev, "RTC probe err %d!\n", ret);
--fail:
--	return false;
--}
--
- static int __init at91_rtc_init(void)
- {
--	int status;
--	struct device *rtc;
--
--	status = platform_driver_register(&at91_rtc_driver);
--	if (status)
--		return status;
--	rtc = bus_find_device(&platform_bus_type, NULL,
--			NULL, at91_rtc_match);
--	if (!rtc)
--		platform_driver_unregister(&at91_rtc_driver);
--	return rtc ? 0 : -ENODEV;
-+	return platform_driver_register(&at91_rtc_driver);
- }
- module_init(at91_rtc_init);
+ static struct platform_device at91sam9260_rtt_device = {
+ 	.name		= "at91_rtt",
+ 	.id		= 0,
+ 	.resource	= rtt_resources,
+-	.num_resources	= ARRAY_SIZE(rtt_resources),
++	.num_resources	= 1,
+ };
  
+ 
+@@ -733,6 +735,10 @@ static struct platform_device at91sam9260_rtt_device = {
+ static void __init at91_add_device_rtt_rtc(void)
+ {
+ 	at91sam9260_rtt_device.name = "rtc-at91sam9";
++	at91sam9260_rtt_device.num_resources++;
++	rtt_resources[1].start = AT91SAM9260_BASE_GPBR +
++				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
++	rtt_resources[1].end = rtt_resources[1].start + 3;
+ }
+ #else
+ static void __init at91_add_device_rtt_rtc(void) {}
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index b3ceb97..57dca50 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -604,6 +604,8 @@ static struct resource rtt_resources[] = {
+ 		.start	= AT91SAM9261_BASE_RTT,
+ 		.end	= AT91SAM9261_BASE_RTT + SZ_16 - 1,
+ 		.flags	= IORESOURCE_MEM,
++	}, {
++		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+ 
+@@ -611,13 +613,17 @@ static struct platform_device at91sam9261_rtt_device = {
+ 	.name		= "at91_rtt",
+ 	.id		= 0,
+ 	.resource	= rtt_resources,
+-	.num_resources	= ARRAY_SIZE(rtt_resources),
++	.num_resources	= 1,
+ };
+ 
+ #if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
+ static void __init at91_add_device_rtt_rtc(void)
+ {
+ 	at91sam9261_rtt_device.name = "rtc-at91sam9";
++	at91sam9261_rtt_device.num_resources++;
++	rtt_resources[1].start = AT91SAM9261_BASE_GPBR +
++				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
++	rtt_resources[1].end = rtt_resources[1].start + 3;
+ }
+ #else
+ static void __init at91_add_device_rtt_rtc(void) {}
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index 0f351da..d97f34c 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -967,6 +967,8 @@ static struct resource rtt0_resources[] = {
+ 		.start	= AT91SAM9263_BASE_RTT0,
+ 		.end	= AT91SAM9263_BASE_RTT0 + SZ_16 - 1,
+ 		.flags	= IORESOURCE_MEM,
++	}, {
++		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+ 
+@@ -974,7 +976,7 @@ static struct platform_device at91sam9263_rtt0_device = {
+ 	.name		= "at91_rtt",
+ 	.id		= 0,
+ 	.resource	= rtt0_resources,
+-	.num_resources	= ARRAY_SIZE(rtt0_resources),
++	.num_resources	= 1,
+ };
+ 
+ static struct resource rtt1_resources[] = {
+@@ -982,6 +984,8 @@ static struct resource rtt1_resources[] = {
+ 		.start	= AT91SAM9263_BASE_RTT1,
+ 		.end	= AT91SAM9263_BASE_RTT1 + SZ_16 - 1,
+ 		.flags	= IORESOURCE_MEM,
++	}, {
++		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+ 
+@@ -989,28 +993,34 @@ static struct platform_device at91sam9263_rtt1_device = {
+ 	.name		= "at91_rtt",
+ 	.id		= 1,
+ 	.resource	= rtt1_resources,
+-	.num_resources	= ARRAY_SIZE(rtt1_resources),
++	.num_resources	= 1,
+ };
+ 
+ #if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
+ static void __init at91_add_device_rtt_rtc(void)
+ {
+ 	struct platform_device *pdev;
++	struct resource *r;
+ 
+ 	switch (CONFIG_RTC_DRV_AT91SAM9_RTT) {
+ 	case 0:
+ 		pdev = &at91sam9263_rtt0_device;
++		r = rtt0_resources;
+ 		break;
+ 	case 1:
+ 		pdev = &at91sam9263_rtt1_device;
++		r = rtt1_resources;
+ 		break;
+ 	default:
+ 		pr_err("at91sam9263: support only 2 RTT (%d)\n",
+-			 CONFIG_RTC_DRV_AT91SAM9_RTT);
++		       CONFIG_RTC_DRV_AT91SAM9_RTT);
+ 		return;
+ 	}
+ 
++	r[1].start = AT91SAM9263_BASE_GPBR + 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
++	r[1].end = r[1].start + 3;
+ 	pdev->name = "rtc-at91sam9";
++	pdev->num_resources++;
+ }
+ #else
+ static void __init at91_add_device_rtt_rtc(void) {}
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 81d1adf..d184ae4 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -1194,6 +1194,8 @@ static struct resource rtt_resources[] = {
+ 		.start	= AT91SAM9G45_BASE_RTT,
+ 		.end	= AT91SAM9G45_BASE_RTT + SZ_16 - 1,
+ 		.flags	= IORESOURCE_MEM,
++	}, {
++		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+ 
+@@ -1201,13 +1203,17 @@ static struct platform_device at91sam9g45_rtt_device = {
+ 	.name		= "at91_rtt",
+ 	.id		= 0,
+ 	.resource	= rtt_resources,
+-	.num_resources	= ARRAY_SIZE(rtt_resources),
++	.num_resources	= 1,
+ };
+ 
+ #if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
+ static void __init at91_add_device_rtt_rtc(void)
+ {
+ 	at91sam9g45_rtt_device.name = "rtc-at91sam9";
++	at91sam9g45_rtt_device.num_resources++;
++	rtt_resources[1].start = AT91SAM9G45_BASE_GPBR +
++				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
++	rtt_resources[1].end = rtt_resources[1].start + 3;
+ }
+ #else
+ static void __init at91_add_device_rtt_rtc(void) {}
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index dd248c8..285dc6b 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -683,6 +683,8 @@ static struct resource rtt_resources[] = {
+ 		.start	= AT91SAM9RL_BASE_RTT,
+ 		.end	= AT91SAM9RL_BASE_RTT + SZ_16 - 1,
+ 		.flags	= IORESOURCE_MEM,
++	}, {
++		.flags	= IORESOURCE_MEM,
+ 	}
+ };
+ 
+@@ -690,13 +692,17 @@ static struct platform_device at91sam9rl_rtt_device = {
+ 	.name		= "at91_rtt",
+ 	.id		= 0,
+ 	.resource	= rtt_resources,
+-	.num_resources	= ARRAY_SIZE(rtt_resources),
++	.num_resources	= 1,
+ };
+ 
+ #if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
+ static void __init at91_add_device_rtt_rtc(void)
+ {
+ 	at91sam9rl_rtt_device.name = "rtc-at91sam9";
++	at91sam9rl_rtt_device.num_resources++;
++	rtt_resources[1].start = AT91SAM9RL_BASE_GPBR +
++				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
++	rtt_resources[1].end = rtt_resources[1].start + 3;
+ }
+ #else
+ static void __init at91_add_device_rtt_rtc(void) {}
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+index 5cfc9dc..08ae9af 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9260.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+@@ -78,10 +78,8 @@
+ #define AT91SAM9260_BASE_ADC		0xfffe0000
+ 
+ /*
+- * System Peripherals (offset from AT91_BASE_SYS)
++ * System Peripherals
+  */
+-#define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+-
+ #define AT91SAM9260_BASE_ECC	0xffffe800
+ #define AT91SAM9260_BASE_SDRAMC	0xffffea00
+ #define AT91SAM9260_BASE_SMC	0xffffec00
+@@ -95,6 +93,7 @@
+ #define AT91SAM9260_BASE_RTT	0xfffffd20
+ #define AT91SAM9260_BASE_PIT	0xfffffd30
+ #define AT91SAM9260_BASE_WDT	0xfffffd40
++#define AT91SAM9260_BASE_GPBR	0xfffffd50
+ 
+ #define AT91_USART0	AT91SAM9260_BASE_US0
+ #define AT91_USART1	AT91SAM9260_BASE_US1
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
+index a6a3c1d..44fbdc1 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9261.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
+@@ -63,10 +63,8 @@
+ 
+ 
+ /*
+- * System Peripherals (offset from AT91_BASE_SYS)
++ * System Peripherals
+  */
+-#define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+-
+ #define AT91SAM9261_BASE_SMC	0xffffec00
+ #define AT91SAM9261_BASE_MATRIX	0xffffee00
+ #define AT91SAM9261_BASE_SDRAMC	0xffffea00
+@@ -79,6 +77,7 @@
+ #define AT91SAM9261_BASE_RTT	0xfffffd20
+ #define AT91SAM9261_BASE_PIT	0xfffffd30
+ #define AT91SAM9261_BASE_WDT	0xfffffd40
++#define AT91SAM9261_BASE_GPBR	0xfffffd50
+ 
+ #define AT91_USART0	AT91SAM9261_BASE_US0
+ #define AT91_USART1	AT91SAM9261_BASE_US1
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
+index dda083d..d96cbb2 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9263.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
+@@ -72,10 +72,8 @@
+ #define AT91SAM9263_BASE_2DGE		0xfffc8000
+ 
+ /*
+- * System Peripherals (offset from AT91_BASE_SYS)
++ * System Peripherals
+  */
+-#define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+-
+ #define AT91SAM9263_BASE_ECC0	0xffffe000
+ #define AT91SAM9263_BASE_SDRAMC0 0xffffe200
+ #define AT91SAM9263_BASE_SMC0	0xffffe400
+@@ -95,6 +93,7 @@
+ #define AT91SAM9263_BASE_PIT	0xfffffd30
+ #define AT91SAM9263_BASE_WDT	0xfffffd40
+ #define AT91SAM9263_BASE_RTT1	0xfffffd50
++#define AT91SAM9263_BASE_GPBR	0xfffffd60
+ 
+ #define AT91_USART0	AT91SAM9263_BASE_US0
+ #define AT91_USART1	AT91SAM9263_BASE_US1
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+index a824e15..d052abc 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+@@ -84,10 +84,8 @@
+ #define AT91SAM9G45_BASE_TC5		0xfffd4080
+ 
+ /*
+- * System Peripherals (offset from AT91_BASE_SYS)
++ * System Peripherals
+  */
+-#define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+-
+ #define AT91SAM9G45_BASE_ECC	0xffffe200
+ #define AT91SAM9G45_BASE_DDRSDRC1 0xffffe400
+ #define AT91SAM9G45_BASE_DDRSDRC0 0xffffe600
+@@ -106,6 +104,7 @@
+ #define AT91SAM9G45_BASE_PIT	0xfffffd30
+ #define AT91SAM9G45_BASE_WDT	0xfffffd40
+ #define AT91SAM9G45_BASE_RTC	0xfffffdb0
++#define AT91SAM9G45_BASE_GPBR	0xfffffd60
+ 
+ #define AT91_USART0	AT91SAM9G45_BASE_US0
+ #define AT91_USART1	AT91SAM9G45_BASE_US1
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+index 2d7176a..e0073eb 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+@@ -70,7 +70,6 @@
+  * System Peripherals (offset from AT91_BASE_SYS)
+  */
+ #define AT91_SCKCR	(0xfffffd50 - AT91_BASE_SYS)
+-#define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+ 
+ #define AT91SAM9RL_BASE_DMA	0xffffe600
+ #define AT91SAM9RL_BASE_ECC	0xffffe800
+@@ -87,6 +86,7 @@
+ #define AT91SAM9RL_BASE_RTT	0xfffffd20
+ #define AT91SAM9RL_BASE_PIT	0xfffffd30
+ #define AT91SAM9RL_BASE_WDT	0xfffffd40
++#define AT91SAM9RL_BASE_GPBR	0xfffffd60
+ #define AT91SAM9RL_BASE_RTC	0xfffffe00
+ 
+ #define AT91_USART0	AT91SAM9RL_BASE_US0
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 08b69fd..d49feff 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -57,6 +57,7 @@ struct sam9_rtc {
+ 	void __iomem		*rtt;
+ 	struct rtc_device	*rtcdev;
+ 	u32			imr;
++	void __iomem		*gpbr;
+ };
+ 
+ #define rtt_readl(rtc, field) \
+@@ -65,9 +66,9 @@ struct sam9_rtc {
+ 	__raw_writel((val), (rtc)->rtt + AT91_RTT_ ## field)
+ 
+ #define gpbr_readl(rtc) \
+-	at91_sys_read(AT91_GPBR + 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR)
++	__raw_readl((rtc)->gpbr)
+ #define gpbr_writel(rtc, val) \
+-	at91_sys_write(AT91_GPBR + 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR, (val))
++	__raw_writel((val), (rtc)->gpbr)
+ 
+ /*
+  * Read current time and date in RTC
+@@ -289,14 +290,17 @@ static const struct rtc_class_ops at91_rtc_ops = {
+  */
+ static int __devinit at91_rtc_probe(struct platform_device *pdev)
+ {
+-	struct resource	*r;
++	struct resource	*r, *r_gpbr;
+ 	struct sam9_rtc	*rtc;
+ 	int		ret;
+ 	u32		mr;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!r)
++	r_gpbr = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!r || !r_gpbr) {
++		dev_err(&pdev->dev, "need 2 ressources\n");
+ 		return -ENODEV;
++	}
+ 
+ 	rtc = kzalloc(sizeof *rtc, GFP_KERNEL);
+ 	if (!rtc)
+@@ -314,6 +318,20 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
+ 		goto fail;
+ 	}
+ 
++	rtc->rtt = ioremap(r->start, resource_size(r));
++	if (!rtc->rtt) {
++		dev_err(&pdev->dev, "failed to map registers, aborting.\n");
++		ret = -ENOMEM;
++		goto fail;
++	}
++
++	rtc->gpbr = ioremap(r_gpbr->start, resource_size(r_gpbr));
++	if (!rtc->gpbr) {
++		dev_err(&pdev->dev, "failed to map gpbr registers, aborting.\n");
++		ret = -ENOMEM;
++		goto fail_gpbr;
++	}
++
+ 	mr = rtt_readl(rtc, MR);
+ 
+ 	/* unless RTT is counting at 1 Hz, re-initialize it */
+@@ -356,6 +374,8 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ fail_register:
++	iounmap(rtc->gpbr);
++fail_gpbr:
+ 	iounmap(rtc->rtt);
+ fail:
+ 	platform_set_drvdata(pdev, NULL);
+@@ -377,6 +397,7 @@ static int __devexit at91_rtc_remove(struct platform_device *pdev)
+ 
+ 	rtc_device_unregister(rtc->rtcdev);
+ 
++	iounmap(rtc->gpbr);
+ 	iounmap(rtc->rtt);
+ 	platform_set_drvdata(pdev, NULL);
+ 	kfree(rtc);
 -- 
 1.7.7
