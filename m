@@ -1,52 +1,91 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Wed, 15 Feb 2012 08:40:37 +0100
-Subject: [PATCH 1/2] ARM: OMAP4: cminst: Add boot time __init function for
- cminst
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8317CF3B2@DBDE01.ent.ti.com>
- (Vaibhav Hiremath's message of "Wed, 15 Feb 2012 06:27:53 +0000")
-References: <1329233348-23356-1-git-send-email-hvaibhav@ti.com>
- <1329233348-23356-2-git-send-email-hvaibhav@ti.com>
- <87bop1unln.fsf@macbook.be.48ers.dk>
- <79CD15C6BA57404B839C016229A409A8317CF3B2@DBDE01.ent.ti.com>
-Message-ID: <87mx8ktuh6.fsf@macbook.be.48ers.dk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 15 Feb 2012 10:16:05 +0200
+Subject: [PATCH 4/6] arm: omap3: add manual control for mpu_iva voltdm
+ usecounting
+In-Reply-To: <8762f96wdk.fsf@ti.com>
+References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
+ <1329237402-26008-5-git-send-email-t-kristo@ti.com> <8762f96wdk.fsf@ti.com>
+Message-ID: <1329293765.4102.335.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Vaibhav" == Hiremath, Vaibhav <hvaibhav@ti.com> writes:
+On Tue, 2012-02-14 at 11:35 -0800, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
+> 
+> > mpu_iva voltdm usecount is now decreased during idle. This will
+> > allow the voltagedomain to reflect actual usage, and will allow
+> > proper usage of vc callbacks.
+> 
+> I don't follow why this is needed in the idle path.
+> 
+> Why aren't the usecounts from clock/powerdomain disables (enables) causing this
+> voltdm disable (enable) to happen automatcially?
 
-Hi,
+The main issue is mpu powerdomain which doesn't contain any clocks that
+are controlled actively. Without adding a "virtual" usecount
+enable/disable hook, the usecount for mpu_iva will always remain at 0
+(or just follow the iva domain on omap3.) We want the usecount to
+reflect the actual idling of this domain also, so that we can control
+SR / auto-ret based on MPU activity.
 
- Vaibhav> -	BUG_ON(part >= OMAP4_MAX_PRCM_PARTITIONS ||
- Vaibhav> +	BUG_ON(part >= max_cm_partitions ||
- Vaibhav> part == OMAP4430_INVALID_PRCM_PARTITION ||
- >> 
- >> How about dropping the OMAP4430_ prefix here as it's no longer 4430 specific?
- >> 
- Vaibhav> Peter,
+> If these are needed, seems like they should be in the
+> pwrdm_[pre|post]_transition() hooks so they can be generic.
 
- Vaibhav> You could be right here, from this patch perspective, this
- Vaibhav> change doesn't make sense.
+This is actually a good idea, I could move them here. I could also add a
+manual triggering for core domain here, as I have a feeling it might be
+good to have so that core will also follow the idle cycle more tightly
+(basically as a virtual follow for sdrc clock which is idled by HW
+during wfi.)
 
- Vaibhav> But at the first place I am quite not sure, why this has been
- Vaibhav> named as OMAP4430_? Vs some macros are named as OMAP4_.
+-Tero
 
- Vaibhav> So first we need to understand why it has been named this way,
- Vaibhav> may be "Paul Walmsley" can comment on this. He is original
- Vaibhav> author of this file.
-
-As I read it, it doesn't have anything to do with any specific hardware,
-it's just to catch bugs when people forget to initialize the structure
-field:
-
-arch/arm/mach-omap2/prcm44xx.h:
-/*
- * OMAP4 PRCM partition IDs
- *
- * The numbers and order are arbitrary, but 0 is reserved for the
- * 'invalid' partition in case someone forgets to add a
- * .prcm_partition field.
- */
-#define OMAP4430_INVALID_PRCM_PARTITION         0
-
--- 
-Bye, Peter Korsgaard
+> 
+> Kevin
+> 
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/pm34xx.c |    8 ++++++++
+> >  1 files changed, 8 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> > index fc69875..14defaf 100644
+> > --- a/arch/arm/mach-omap2/pm34xx.c
+> > +++ b/arch/arm/mach-omap2/pm34xx.c
+> > @@ -74,6 +74,7 @@ void (*omap3_do_wfi_sram)(void);
+> >  static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
+> >  static struct powerdomain *core_pwrdm, *per_pwrdm;
+> >  static struct powerdomain *cam_pwrdm;
+> > +static struct voltagedomain *mpu_iva_voltdm;
+> >  
+> >  static inline void omap3_per_save_context(void)
+> >  {
+> > @@ -311,6 +312,8 @@ void omap_sram_idle(void)
+> >  		return;
+> >  	}
+> >  
+> > +	voltdm_pwrdm_disable(mpu_iva_voltdm);
+> > +
+> >  	/* NEON control */
+> >  	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
+> >  		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
+> > @@ -393,6 +396,8 @@ void omap_sram_idle(void)
+> >  	}
+> >  	omap3_intc_resume_idle();
+> >  
+> > +	voltdm_pwrdm_enable(mpu_iva_voltdm);
+> > +
+> >  	pwrdm_post_transition();
+> >  
+> >  	/* PER */
+> > @@ -828,6 +833,9 @@ static int __init omap3_pm_init(void)
+> >  
+> >  	(void) clkdm_for_each(clkdms_setup, NULL);
+> >  
+> > +	mpu_iva_voltdm = voltdm_lookup("mpu_iva");
+> > +	voltdm_pwrdm_enable(mpu_iva_voltdm);
+> > +
+> >  	mpu_pwrdm = pwrdm_lookup("mpu_pwrdm");
+> >  	if (mpu_pwrdm == NULL) {
+> >  		printk(KERN_ERR "Failed to get mpu_pwrdm\n");
