@@ -1,31 +1,48 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Wed, 15 Feb 2012 17:09:07 +0100
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <20120215160028.GD27825@n2100.arm.linux.org.uk>
-References: <1328670355.2482.68.camel@laptop>
- <20120208202314.GA28290@redhat.com> <1328736834.2903.33.camel@pasglop>
- <20120209075106.GB18387@elte.hu> <4F35DD3E.4020406@codeaurora.org>
- <20120211144530.GA497@elte.hu> <4F3AEC4E.9000303@codeaurora.org>
- <1329313085.2293.106.camel@twins>
- <20120215140245.GB27825@n2100.arm.linux.org.uk>
- <1329318063.2293.136.camel@twins>
- <20120215160028.GD27825@n2100.arm.linux.org.uk>
-Message-ID: <1329322147.2293.145.camel@twins>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Feb 2012 16:10:32 +0000
+Subject: [PATCH] ARM: ptrace: Include linux/audit.h to fix build errors
+In-Reply-To: <1329318658.2337.6.camel@localhost>
+References: <1329284188.12708.1.camel@phoenix>
+ <20120215083609.GD13673@n2100.arm.linux.org.uk>
+ <20120215095216.GA29319@mudshark.cambridge.arm.com>
+ <20120215101832.GF13673@n2100.arm.linux.org.uk>
+ <1329318658.2337.6.camel@localhost>
+Message-ID: <20120215161032.GE27825@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-15 at 16:00 +0000, Russell King - ARM Linux wrote:
+On Wed, Feb 15, 2012 at 10:10:58AM -0500, Eric Paris wrote:
+> On Wed, 2012-02-15 at 10:18 +0000, Russell King - ARM Linux wrote:
 > 
-> > A third possibility is to self-IPI and take it from there.. assuming
-> > these platforms can actually self-IPI.
+> > So, this gives us two options: either we revert the damned thing and start
+> > over with it (and hopefully audit folk will start co-operating with ARM
+> > folk) or we try to fix up their mess (and potentially they learn they can
+> > dump crap on us.)
 > 
-> Even if there was an IPI (not talking about SMP anyway) I'm not sure
-> what good it would be.  We can (and do) get an IRQ from the LCD
-> controller when its shutdown is complete, but that would have to be
-> somehow propagated back up to the cpufreq code.  And the cpufreq code
-> would have to know that the LCD controller was alive and therefore had
-> to be waited for.  All sounds rather yucky to me. 
+> It must be a conspiracy to screw with the ARM people!  Your jobs were
+> obviously too easy to begin with.  Rahrrrrr!  Down with ARM!
+> 
+> No seriously.  I am the audit folks.  You got us all right here in this
+> one e-mail.  You're right, I should have paid more attention to who was
+> in the cc list.  If you want to rewrite it, please feel free!  If you
+> want to push fixes yourself, please feel free!  If you want me to push
+> fixes, please just let me know what is broken and I'll do my best.
+> 
+> Sorry.  I just got the patch and was contacted by a number of people off
+> list asking when it was going to go in because they wanted it for their
+> project.  I obviously should have known who the ARM maintainers that
+> would have looked at a patch for the audit system was and should have
+> made sure they commented.  Sorry!  I'll be sure to hit the ARM list if
+> another patch goes by....
 
-If can self-ipi from the scheduler context (which has IRQs disabled),
-once you get to the ipi handler your scheduler locks are gone and you
-can queue a worklet or wake some kthread to do all the sleeping stuff.
+And... what about this endian-ness issue?
+
+Frustrated.
+
+I've tried discussing that issue with Nathaniel and haven't got anywhere
+with it (other than, seemingly, it's above his pay grade to know the
+answer.)
+
+Right, I've committed a revert of it to my tree.  When there's more
+interest in the feature, it can be revisited with proper review and
+proper testing of it.
