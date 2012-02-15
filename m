@@ -1,67 +1,28 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Feb 2012 13:50:02 -0800
-Subject: [PATCH v3 24/25] irq_domain: remove "hint" when allocating irq
- numbers
-In-Reply-To: <20120215202145.GH25779@ponder.secretlab.ca>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-25-git-send-email-grant.likely@secretlab.ca>
- <4F316848.4060100@atmel.com> <4F3BC97C.6030203@atmel.com>
- <20120215202145.GH25779@ponder.secretlab.ca>
-Message-ID: <20120215215001.GA30946@r65073-Latitude-D630>
+Date: Wed, 15 Feb 2012 13:56:37 -0800
+Subject: [PATCH v2 7/7] ARM: imx: remove macro MXC_GPIO_IRQ_START
+In-Reply-To: <20120215201635.GG25779@ponder.secretlab.ca>
+References: <1329331668-30325-1-git-send-email-shawn.guo@linaro.org>
+ <1329331668-30325-8-git-send-email-shawn.guo@linaro.org>
+ <20120215201635.GG25779@ponder.secretlab.ca>
+Message-ID: <20120215215636.GB30946@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 01:21:45PM -0700, Grant Likely wrote:
-> On Wed, Feb 15, 2012 at 04:04:28PM +0100, Nicolas Ferre wrote:
-> > On 02/07/2012 07:07 PM, Nicolas Ferre :
-> > > On 01/27/2012 10:36 PM, Grant Likely :
-> > >> The 'hint' used to try and line up irq numbers with hw irq numbers is
-> > >> rather a hack and not very useful.  Now that /proc/interrupts also outputs
-> > >> the hwirq number, it is even less useful to keep around the 'hint' heuristic.
-> > >>
-> > >> This patch removes it.
-> > > 
-> > > Grant,
-> > > 
-> > > While trying your patch series in conjunction with Rob one, I do not
-> > > find this patch in your irqdomain/next branch (and a couple of others).
-> > > Can you tell me if this v3 series is available as a git tree?
+On Wed, Feb 15, 2012 at 01:16:35PM -0700, Grant Likely wrote:
+> On Wed, Feb 15, 2012 at 10:47:48AM -0800, Shawn Guo wrote:
+> > Now, macro MXC_GPIO_IRQ_START is referenced nowhere, so remove it.
 > > 
-> > I am still interested by patch 24-25 of this series but still cannot
-> > find them in your irqdomain/next branch:
-> > Are they also expected to join the 3.4 merge window material?
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-> I've held off on putting them in irqdomain/next because they are a bit more
-> risky than the other patches, and I want an explicit ack from Ben for patches
-> 24 & 25.  However, that shouldn't really cause any issues since the changes
-> in 24 & 25 don't impact the irq_domain functionality or API.  They are just
-> optimizations.
+> Series looks okay to me on a brief review.  I'll let Rob pick it up since
+> it needs to be based on top of his generic_irq work.  There will still need
+> to be some rebasing while I stablize the irq_domain tree, but I'll try to
+> do that ASAP.
 > 
-I'm seeing that patch 24 does impact on irq_domain functionality
-a little bit.  On next tree which has no this patch yet,
-irq_create_mapping can reasonably create virq in range 1..15, while
-irq_find_mapping will only try to find the virq from 16
-(NUM_ISA_INTERRUPTS).  This will result in that any hwirq that is < 16
-gets multiple entries in the mapping table with different virq numbers
-mapped to the same one hwirq.
-
-That's why I have to apply patch #24 (with one line change below) on
-top of next tree to get my imx irqdomain series work properly.
-
-@@ -371,7 +371,7 @@ unsigned int irq_create_mapping(struct irq_domain *domain,
-                return irq_domain_legacy_revmap(domain, hwirq);
- 
-        /* Allocate a virtual interrupt number */
--       virq = irq_alloc_desc(0);
-+       virq = irq_alloc_desc_from(1, 0);
-        if (!virq) {
-                pr_debug("irq: -> virq allocation failed\n");
-                return 0;
-
-I need this line of change, because the first call on irq_alloc_desc
-will always return 0 to virq and in turn irq_create_mapping fails.
-On imx, that's the mapping for timer irq.  Hence, the system will hang
-there due to irq mapping failure.
+Thanks for looking at it, Grant.  But it does not work properly with
+your irqdomain/next yet.  It requires some little change on irq_domain
+side, which is mentioned in another reply to you.
 
 -- 
 Regards,
