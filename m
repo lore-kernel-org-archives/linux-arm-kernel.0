@@ -1,183 +1,70 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 15 Feb 2012 22:10:37 +0100
-Subject: [PATCH 1/4] spi/omap: Add DT support to McSPI driver
-In-Reply-To: <4F3C08D6.6000108@gmail.com>
-References: <1329327457-2121-1-git-send-email-b-cousson@ti.com>
- <1329327457-2121-2-git-send-email-b-cousson@ti.com>
- <4F3C08D6.6000108@gmail.com>
-Message-ID: <4F3C1F4D.7070700@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 15 Feb 2012 14:20:22 -0700
+Subject: [PATCH 1/8] irq: choose irq_domain type for generic-chip based
+ on irq_base
+In-Reply-To: <4F3982F2.2030301@gmail.com>
+References: <1328980472-11923-1-git-send-email-shawn.guo@linaro.org>
+ <1328980472-11923-2-git-send-email-shawn.guo@linaro.org>
+ <4F3982F2.2030301@gmail.com>
+Message-ID: <20120215212022.GK25779@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/15/2012 8:34 PM, Rob Herring wrote:
-> On 02/15/2012 11:37 AM, Benoit Cousson wrote:
->> Add device tree support to the OMAP2+ McSPI driver.
->> Add the bindings documentation.
->>
->> Based on original code from Rajendra.
->>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Grant Likely<grant.likely@secretlab.ca>
->> Cc: Rajendra Nayak<rnayak@ti.com>
->> ---
->>   Documentation/devicetree/bindings/spi/omap-spi.txt |   20 +++++++
->>   drivers/spi/spi-omap2-mcspi.c                      |   56 +++++++++++++++++---
->>   2 files changed, 68 insertions(+), 8 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/spi/omap-spi.txt
->>
->> diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
->> new file mode 100644
->> index 0000000..81df374
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
->> @@ -0,0 +1,20 @@
->> +OMAP2+ McSPI device
->> +
->> +Required properties:
->> +- compatible :
->> +  - "ti,omap2-spi" for OMAP2&  OMAP3.
->> +  - "ti,omap4-spi" for OMAP4+.
->> +- ti,spi-num-cs : Number of chipselect supported  by the instance.
->> +- ti,hwmods: Name of the hwmod associated to the McSPI
->> +
->> +
->> +Example:
->> +
->> +mcspi1: mcspi at 1 {
->
-> I don't recall if there's a generic name defined but just "spi" would
-> probably be better.
+On Mon, Feb 13, 2012 at 03:38:58PM -0600, Rob Herring wrote:
+> On 02/11/2012 11:14 AM, Shawn Guo wrote:
+> > Choosing irq_domain type for generic-chip based on device_node forces
+> > non-DT users to use legacy irq_domain, which makes no sense, because
+> > linear irq_domain is actually encouraged to be used by both DT and
+> > non-DT users.
+> 
+> NAK
+> 
+> Encouraged by who? As we discussed in person at Connect, I said you
+> should use legacy domain for non-DT case. Grant and I have discussed
+> this as well and agree.
 
-I was wondering as well, but based on Grant further comment it looks it 
-is the case.
-I couldn't find any list of generic name in the bindings documentation. 
-Is there some place we can get that?
+Yes.  I'd *like* for everyone (DT and non-DT) to be able to use the
+linear revmap, but I can't see any nice way to do it as long as
+devices are registered with hard coded #define irq numbers.
 
-> Also, shouldn't this be the base address?
+> 
+> > The patch changes it to make the decision based on irq_base.  If users
+> > pass in a negative irq_base value, a linear irq_domain will be created,
+> > otherwise a legacy irq_domain will be created.
+> 
+> This allows DT users to decide as well and possibly use legacy domains
+> which is explicitly what I was trying to prevent. DT users must use
+> linear domains and non-DT must use legacy. Otherwise, we'll get more
+> half done DT conversions like mx5 is.
+> 
+> Getting linear domains to work for non-DT to work would be a worthwhile
+> goal if we didn't plan to remove non-DT boards. I don't think we really
+> need linear to work for non-DT case.
 
-Yeah, it should, I've just explained the reason of this OMAP 
-irregularity in my answer to Grant. Let see if he'll be convinced or not :-)
+I agree with that.
 
-> Otherwise, for the series:
->
-> Acked-by: Rob Herring<rob.herring@calxeda.com>
-
-Thanks,
-Benoit
-
->
->
->> +    #address-cells =<1>;
->> +    #size-cells =<0>;
->> +    compatible = "ti,omap4-mcspi";
->> +    ti,hwmods = "mcspi1";
->> +    ti,spi-num-cs =<4>;
->> +};
->> +
->> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
->> index 0b0dfb7..bb9274c 100644
->> --- a/drivers/spi/spi-omap2-mcspi.c
->> +++ b/drivers/spi/spi-omap2-mcspi.c
->> @@ -34,6 +34,8 @@
->>   #include<linux/io.h>
->>   #include<linux/slab.h>
->>   #include<linux/pm_runtime.h>
->> +#include<linux/of.h>
->> +#include<linux/of_device.h>
->>
->>   #include<linux/spi/spi.h>
->>
->> @@ -1079,15 +1081,39 @@ static int omap_mcspi_runtime_resume(struct device *dev)
->>   	return 0;
->>   }
->>
->> +static struct omap2_mcspi_platform_config omap2_pdata = {
->> +	.regs_offset = 0,
->> +};
->> +
->> +static struct omap2_mcspi_platform_config omap4_pdata = {
->> +	.regs_offset = OMAP4_MCSPI_REG_OFFSET,
->> +};
->> +
->> +static const struct of_device_id omap_mcspi_of_match[] = {
->> +	{
->> +		.compatible = "ti,omap2-mcspi",
->> +		.data =&omap2_pdata,
->> +	},
->> +	{
->> +		.compatible = "ti,omap4-mcspi",
->> +		.data =&omap4_pdata,
->> +	},
->> +	{ },
->> +};
->> +MODULE_DEVICE_TABLE(of, omap_mcspi_of_match);
->>
->>   static int __init omap2_mcspi_probe(struct platform_device *pdev)
->>   {
->>   	struct spi_master	*master;
->> -	struct omap2_mcspi_platform_config *pdata = pdev->dev.platform_data;
->> +	struct omap2_mcspi_platform_config *pdata;
->>   	struct omap2_mcspi	*mcspi;
->>   	struct resource		*r;
->>   	int			status = 0, i;
->>   	char			wq_name[20];
->> +	u32			regs_offset = 0;
->> +	static int		bus_num = 1;
->> +	struct device_node	*node = pdev->dev.of_node;
->> +	const struct of_device_id *match;
->>
->>   	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
->>   	if (master == NULL) {
->> @@ -1098,13 +1124,26 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
->>   	/* the spi->mode bits understood by this driver: */
->>   	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
->>
->> -	if (pdev->id != -1)
->> -		master->bus_num = pdev->id;
->> -
->>   	master->setup = omap2_mcspi_setup;
->>   	master->transfer = omap2_mcspi_transfer;
->>   	master->cleanup = omap2_mcspi_cleanup;
->> -	master->num_chipselect = pdata->num_cs;
->> +	master->dev.of_node = node;
->> +
->> +	match = of_match_device(omap_mcspi_of_match,&pdev->dev);
->> +	if (match) {
->> +		u32 num_cs = 1; /* default number of chipselect */
->> +		pdata = match->data;
->> +
->> +		of_property_read_u32(node, "ti,spi-num-cs",&num_cs);
->> +		master->num_chipselect = num_cs;
->> +		master->bus_num = bus_num++;
->> +	} else {
->> +		pdata = pdev->dev.platform_data;
->> +		master->num_chipselect = pdata->num_cs;
->> +		if (pdev->id != -1)
->> +			master->bus_num = pdev->id;
->> +	}
->> +	regs_offset = pdata->regs_offset;
->>
->>   	dev_set_drvdata(&pdev->dev, master);
->>
->> @@ -1124,8 +1163,8 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
->>   		goto free_master;
->>   	}
->>
->> -	r->start += pdata->regs_offset;
->> -	r->end += pdata->regs_offset;
->> +	r->start += regs_offset;
->> +	r->end += regs_offset;
->>   	mcspi->phys = r->start;
->>   	if (!request_mem_region(r->start, resource_size(r),
->>   				dev_name(&pdev->dev))) {
->> @@ -1285,7 +1324,8 @@ static struct platform_driver omap2_mcspi_driver = {
->>   	.driver = {
->>   		.name =		"omap2_mcspi",
->>   		.owner =	THIS_MODULE,
->> -		.pm =		&omap2_mcspi_pm_ops
->> +		.pm =		&omap2_mcspi_pm_ops,
->> +		.of_match_table = omap_mcspi_of_match,
->>   	},
->>   	.remove =	__exit_p(omap2_mcspi_remove),
->>   };
->
+> 
+> Rob
+> 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > ---
+> >  kernel/irq/generic-chip.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+> > index 3ac7fa1..839f882 100644
+> > --- a/kernel/irq/generic-chip.c
+> > +++ b/kernel/irq/generic-chip.c
+> > @@ -346,7 +346,7 @@ int irq_setup_generic_chip_domain(const char *name, struct device_node *node,
+> >  		irq_setup_generic_chip(gc[i], 0, flags, clr, set);
+> >  	}
+> >  
+> > -	if (node)
+> > +	if ((int) irq_base < 0)
+> >  		d = irq_domain_add_linear(node, hwirq_cnt,
+> >  					  &irq_gc_irq_domain_ops, gc);
+> >  	else
+> 
