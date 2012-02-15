@@ -1,104 +1,35 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 15 Feb 2012 14:21:48 +0100
-Subject: [PATCH v3 2/4] ARM: OMAP2/3: intc: Add DT support for TI interrupt
- controller
-In-Reply-To: <20120214205208.GA2656@ponder.secretlab.ca>
-References: <1329242172-4214-1-git-send-email-b-cousson@ti.com>
- <1329242172-4214-3-git-send-email-b-cousson@ti.com>
- <20120214205208.GA2656@ponder.secretlab.ca>
-Message-ID: <4F3BB16C.90600@ti.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Wed, 15 Feb 2012 14:38:04 +0100
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <20120211153324.GC31887@opensource.wolfsonmicro.com>
+References: <20120208013959.GA24535@panacea>
+ <1328670355.2482.68.camel@laptop> <20120208202314.GA28290@redhat.com>
+ <1328736834.2903.33.camel@pasglop> <20120209075106.GB18387@elte.hu>
+ <4F35DD3E.4020406@codeaurora.org> <20120211143951.GA24564@sirena.org.uk>
+ <1328971983.11320.5.camel@laptop>
+ <20120211153324.GC31887@opensource.wolfsonmicro.com>
+Message-ID: <1329313084.2293.105.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/14/2012 9:52 PM, Grant Likely wrote:
-> On Tue, Feb 14, 2012 at 06:56:10PM +0100, Benoit Cousson wrote:
->> Add a function to initialize the OMAP2/3 interrupt controller (INTC)
->> using a device tree node.
->>
->> This version take advantage of the new irq_domain_add_legacy API.
->>
->> Replace some printk() with the proper pr_ macro.
->>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Tony Lindgren<tony@atomide.com>
->> Cc: Rob Herring<rob.herring@calxeda.com>
->> Cc: Grant Likely<grant.likely@secretlab.ca>
->> ---
->>   .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++
->>   arch/arm/mach-omap2/common.h                       |   10 +++
->>   arch/arm/mach-omap2/irq.c                          |   59 ++++++++++++++++---
->>   3 files changed, 86 insertions(+), 10 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/intc.txt b/Documentation/devicetree/bindings/arm/omap/intc.txt
->> new file mode 100644
->> index 0000000..f2583e6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/omap/intc.txt
->> @@ -0,0 +1,27 @@
->> +* OMAP Interrupt Controller
->> +
->> +OMAP2/3 are using a TI interrupt controller that can support several
->> +configurable number of interrupts.
->> +
->> +Main node required properties:
->> +
->> +- compatible : should be:
->> +	"ti,omap2-intc"
->> +- interrupt-controller : Identifies the node as an interrupt controller
->> +- #interrupt-cells : Specifies the number of cells needed to encode an
->> +  interrupt source. The type shall be a<u32>  and the value shall be 1.
->> +
->> +  The cell contains the interrupt number in the range [0-128].
->> +- ti,intc-size: Number of interrupts handled by the interrupt controller.
->> +- reg: physical base address and size of the intc registers map.
->> +
->> +Example:
->> +
->> +	intc: interrupt-controller at 1 {
->> +		compatible = "ti,omap2-intc";
->> +		interrupt-controller;
->> +		#interrupt-cells =<1>;
->> +		ti,intc-size =<96>;
->> +		reg =<0x48200000 0x1000>;
->> +	};
->> +
->> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
->> index febffde..a87ce52 100644
->> --- a/arch/arm/mach-omap2/common.h
->> +++ b/arch/arm/mach-omap2/common.h
->> @@ -174,6 +174,16 @@ void omap3_intc_handle_irq(struct pt_regs *regs);
->>   extern void __iomem *omap4_get_l2cache_base(void);
->>   #endif
->>
->> +struct device_node;
->> +#ifdef CONFIG_OF
->> +int __init intc_of_init(struct device_node *node, struct device_node *parent);
->
-> This name is pretty generic for a global symbol.  How about omap2_intc_of_init?
+On Sat, 2012-02-11 at 15:33 +0000, Mark Brown wrote:
+> > Having to actually wait for this in software is quite ridiculous.
+> 
+> Well, it's also not terribly hard. 
 
-That's a good point, I was trying mimic the gic name without thinking in 
-my case it is not a generic IP :-(.
+Having to schedule from the scheduler is. Which is exactly the situation
+you'll end up with if you want scheduler driven cpufreq, which I thought
+everybody wanted because polling state sucks.
 
-I'll rename that omap2_intc_of_init and update the branch for the pull 
-request.
+>  There's use cases for having this
+> stuff offloaded but if you're not doing that stuff then why deal with
+> the complication of designing the hardware? 
 
-> Otherwise this series looks good.
->
-> Acked-by: Grant Likely<grant.likely@secretlab.ca>
+Because doing it in software is more expensive?
 
-> This series need to be committed on top of the irqdomain tree.  I can either
-> pick it up myself (with Tony's ack) or I can stabilize the irqdomain/next tree
-> so that you can use it as a stable base to commit against (which I should
-> probably do anyway since there are others who will depend on it).
+Penny-wise pound-foolish like thing.. you make the software requirements
+more complex, which results in more bugs (more cost in debugging), more
+runtime (for doing the 'software' thing), less power savings.
 
-This series is the base for all the other OMAP DT series, so I'd rather 
-keep it in Tony's tree that contains as well some OMAP fixes not yet in 
-mainline.
-
-I guess ideally the irqdomain/next should be stabilized and maybe pulled 
-in arm-soc. I'm not sure how Arnd / Olof are handling this kind of 
-dependency.
-
-Thanks,
-Benoit
+Esp since all this uC/system-controller stuff is already available and
+validated.
