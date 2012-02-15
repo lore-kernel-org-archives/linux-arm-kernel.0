@@ -1,41 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 15 Feb 2012 12:12:19 -0800
-Subject: [PATCH] ARM: need to include asm/system.h in asm/processor.h
-In-Reply-To: <4F3C1051.7010404@gmail.com>
-References: <1329333610-4474-1-git-send-email-olof@lixom.net>
- <20120215195927.GA31373@codeaurora.org>
- <4F3C1051.7010404@gmail.com>
-Message-ID: <CAOesGMjTY1hmzdPK-XSf44jY+G-=P0m6wXWetGqVSKWKUtyAJA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 15 Feb 2012 13:16:35 -0700
+Subject: [PATCH v2 7/7] ARM: imx: remove macro MXC_GPIO_IRQ_START
+In-Reply-To: <1329331668-30325-8-git-send-email-shawn.guo@linaro.org>
+References: <1329331668-30325-1-git-send-email-shawn.guo@linaro.org>
+ <1329331668-30325-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120215201635.GG25779@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 12:06 PM, Rob Herring <robherring2@gmail.com> wrote:
-> On 02/15/2012 01:59 PM, David Brown wrote:
->> On Wed, Feb 15, 2012 at 11:20:10AM -0800, Olof Johansson wrote:
->>> For files that include asm/processor.h but not asm/system.h:
->>>
->>> arch/arm/mach-msm/include/mach/uncompress.h: In function 'putc':
->>> arch/arm/mach-msm/include/mach/uncompress.h:48:3: error: implicit declaration of function 'smp_mb' [-Werror=implicit-function-declaration]
->>>
->>> In this case, smp_mb() is from the cpu_relax() call in the msm putc().
->>>
->>> It likely went uncaught when the uncompress.h change went in since the
->>> defconfig didn't enable that code path, but later changes (e76f4750f4:
->>> ARM: debug: arrange Kconfig options more logically) resulted in the
->>> option being on for msm_defconfig and thus exposed it.
->>>
->>> Signed-off-by: Olof Johansson <olof@lixom.net>
->>
->> BTW, Rob Herring has this same patch in his io.h cleanup patches, so
->> it's probably best to coordinate with him.
->
-> I'd just assumed that I had broken things by implicitly dropping a lot
-> of includes when removing mach/io.h. Go ahead and apply yours and I'll
-> drop mine.
+On Wed, Feb 15, 2012 at 10:47:48AM -0800, Shawn Guo wrote:
+> Now, macro MXC_GPIO_IRQ_START is referenced nowhere, so remove it.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Cool, I had missed that -- sorry for the duplicate patches.
+Series looks okay to me on a brief review.  I'll let Rob pick it up since
+it needs to be based on top of his generic_irq work.  There will still need
+to be some rebasing while I stablize the irq_domain tree, but I'll try to
+do that ASAP.
 
-I'll forward mine now to Russell's patch tracker and he can pick it up there.
+g.
 
-
--Olof
+> ---
+>  arch/arm/plat-mxc/include/mach/irqs.h |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+> index fd9efb0..612fcf1 100644
+> --- a/arch/arm/plat-mxc/include/mach/irqs.h
+> +++ b/arch/arm/plat-mxc/include/mach/irqs.h
+> @@ -28,8 +28,6 @@
+>  #define MXC_INTERNAL_IRQS	64
+>  #endif
+>  
+> -#define MXC_GPIO_IRQ_START	MXC_INTERNAL_IRQS
+> -
+>  /*
+>   * The next 16 interrupts are for board specific purposes.  Since
+>   * the kernel can only run on one machine at a time, we can re-use
+> -- 
+> 1.7.5.4
+> 
