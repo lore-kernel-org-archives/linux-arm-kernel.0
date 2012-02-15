@@ -1,37 +1,24 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 15 Feb 2012 17:37:54 +0200
-Subject: [PATCHv2 8/8] arm: omap3: prevent per_clkdm from attempting manual
- domain transitions
-In-Reply-To: <1329320274-481-1-git-send-email-t-kristo@ti.com>
-References: <1329320274-481-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1329320274-481-9-git-send-email-t-kristo@ti.com>
+From: lrg@ti.com (Liam Girdwood)
+Date: Wed, 15 Feb 2012 15:46:21 +0000
+Subject: [RFC 04/11] ASoC: core - Add API call to register dai kcontrols.
+In-Reply-To: <1329320280-1621-5-git-send-email-peter.ujfalusi@ti.com>
+References: <1329320280-1621-1-git-send-email-peter.ujfalusi@ti.com>
+ <1329320280-1621-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1329320781.14552.1.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Attempting this will cause problems especially with off-mode enabled.
-Previously this issue was hidden by the fact that per_clkdm never
-attempted manual idle by software, as the usecounts for the clockdomain
-were broken.
+On Wed, 2012-02-15 at 17:37 +0200, Peter Ujfalusi wrote:
+> Allow dai drivers to register kcontrols.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  include/sound/soc.h  |    2 ++
+>  sound/soc/soc-core.c |   31 +++++++++++++++++++++++++++++++
+>  2 files changed, 33 insertions(+), 0 deletions(-)
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/clockdomains3xxx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+This feature has already been applied.
 
-diff --git a/arch/arm/mach-omap2/clockdomains3xxx_data.c b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-index b84e138..db31bbf 100644
---- a/arch/arm/mach-omap2/clockdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains3xxx_data.c
-@@ -282,7 +282,7 @@ static struct clockdomain usbhost_clkdm = {
- static struct clockdomain per_clkdm = {
- 	.name		= "per_clkdm",
- 	.pwrdm		= { .name = "per_pwrdm" },
--	.flags		= CLKDM_CAN_HWSUP_SWSUP,
-+	.flags		= CLKDM_CAN_HWSUP_SWSUP | CLKDM_NO_MANUAL_TRANS,
- 	.dep_bit	= OMAP3430_EN_PER_SHIFT,
- 	.wkdep_srcs	= per_wkdeps,
- 	.sleepdep_srcs	= per_sleepdeps,
--- 
-1.7.4.1
+Regards
+
+Liam
