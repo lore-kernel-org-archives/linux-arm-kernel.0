@@ -1,174 +1,106 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 15 Feb 2012 13:04:34 -0700
-Subject: [PATCH 1/4] spi/omap: Add DT support to McSPI driver
-In-Reply-To: <4F3C08D6.6000108@gmail.com>
-References: <1329327457-2121-1-git-send-email-b-cousson@ti.com>
- <1329327457-2121-2-git-send-email-b-cousson@ti.com>
- <4F3C08D6.6000108@gmail.com>
-Message-ID: <20120215200434.GC25779@ponder.secretlab.ca>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 15 Feb 2012 11:58:30 -0800
+Subject: [PATCH] ARM: OMAP: remove omap_device_parent
+Message-ID: <1329335910-27243-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 01:34:46PM -0600, Rob Herring wrote:
-> On 02/15/2012 11:37 AM, Benoit Cousson wrote:
-> > Add device tree support to the OMAP2+ McSPI driver.
-> > Add the bindings documentation.
-> > 
-> > Based on original code from Rajendra.
-> > 
-> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Rajendra Nayak <rnayak@ti.com>
-> > ---
-> >  Documentation/devicetree/bindings/spi/omap-spi.txt |   20 +++++++
-> >  drivers/spi/spi-omap2-mcspi.c                      |   56 +++++++++++++++++---
-> >  2 files changed, 68 insertions(+), 8 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/spi/omap-spi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/spi/omap-spi.txt b/Documentation/devicetree/bindings/spi/omap-spi.txt
-> > new file mode 100644
-> > index 0000000..81df374
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/spi/omap-spi.txt
-> > @@ -0,0 +1,20 @@
-> > +OMAP2+ McSPI device
-> > +
-> > +Required properties:
-> > +- compatible :
-> > +  - "ti,omap2-spi" for OMAP2 & OMAP3.
-> > +  - "ti,omap4-spi" for OMAP4+.
-> > +- ti,spi-num-cs : Number of chipselect supported  by the instance.
-> > +- ti,hwmods: Name of the hwmod associated to the McSPI
-> > +
-> > +
-> > +Example:
-> > +
-> > +mcspi1: mcspi at 1 {
-> 
-> I don't recall if there's a generic name defined but just "spi" would
-> probably be better. Also, shouldn't this be the base address?
-> 
-> Otherwise, for the series:
-> 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
+Currently all omap_devices are forced to have the dummy device
+'omap_device_parent' as a parent.  This was used to distinguish
+omap_devices from "normal" platform_devices in the OMAP PM core code.
 
-Yes, use the generic names recommended practice and name the node spi@<address>.
+Now that we implement the PM core using PM domains, this is no longer
+needed.
 
-g.
+This also frees up omap_devices to have a more complex parent/child
+relationships.
 
-> 
-> 
-> > +    #address-cells = <1>;
-> > +    #size-cells = <0>;
-> > +    compatible = "ti,omap4-mcspi";
-> > +    ti,hwmods = "mcspi1";
-> > +    ti,spi-num-cs = <4>;
-> > +};
-> > +
-> > diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-> > index 0b0dfb7..bb9274c 100644
-> > --- a/drivers/spi/spi-omap2-mcspi.c
-> > +++ b/drivers/spi/spi-omap2-mcspi.c
-> > @@ -34,6 +34,8 @@
-> >  #include <linux/io.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/pm_runtime.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_device.h>
-> >  
-> >  #include <linux/spi/spi.h>
-> >  
-> > @@ -1079,15 +1081,39 @@ static int omap_mcspi_runtime_resume(struct device *dev)
-> >  	return 0;
-> >  }
-> >  
-> > +static struct omap2_mcspi_platform_config omap2_pdata = {
-> > +	.regs_offset = 0,
-> > +};
-> > +
-> > +static struct omap2_mcspi_platform_config omap4_pdata = {
-> > +	.regs_offset = OMAP4_MCSPI_REG_OFFSET,
-> > +};
-> > +
-> > +static const struct of_device_id omap_mcspi_of_match[] = {
-> > +	{
-> > +		.compatible = "ti,omap2-mcspi",
-> > +		.data = &omap2_pdata,
-> > +	},
-> > +	{
-> > +		.compatible = "ti,omap4-mcspi",
-> > +		.data = &omap4_pdata,
-> > +	},
-> > +	{ },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, omap_mcspi_of_match);
-> >  
-> >  static int __init omap2_mcspi_probe(struct platform_device *pdev)
-> >  {
-> >  	struct spi_master	*master;
-> > -	struct omap2_mcspi_platform_config *pdata = pdev->dev.platform_data;
-> > +	struct omap2_mcspi_platform_config *pdata;
-> >  	struct omap2_mcspi	*mcspi;
-> >  	struct resource		*r;
-> >  	int			status = 0, i;
-> >  	char			wq_name[20];
-> > +	u32			regs_offset = 0;
-> > +	static int		bus_num = 1;
-> > +	struct device_node	*node = pdev->dev.of_node;
-> > +	const struct of_device_id *match;
-> >  
-> >  	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
-> >  	if (master == NULL) {
-> > @@ -1098,13 +1124,26 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
-> >  	/* the spi->mode bits understood by this driver: */
-> >  	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
-> >  
-> > -	if (pdev->id != -1)
-> > -		master->bus_num = pdev->id;
-> > -
-> >  	master->setup = omap2_mcspi_setup;
-> >  	master->transfer = omap2_mcspi_transfer;
-> >  	master->cleanup = omap2_mcspi_cleanup;
-> > -	master->num_chipselect = pdata->num_cs;
-> > +	master->dev.of_node = node;
-> > +
-> > +	match = of_match_device(omap_mcspi_of_match, &pdev->dev);
-> > +	if (match) {
-> > +		u32 num_cs = 1; /* default number of chipselect */
-> > +		pdata = match->data;
-> > +
-> > +		of_property_read_u32(node, "ti,spi-num-cs", &num_cs);
-> > +		master->num_chipselect = num_cs;
-> > +		master->bus_num = bus_num++;
-> > +	} else {
-> > +		pdata = pdev->dev.platform_data;
-> > +		master->num_chipselect = pdata->num_cs;
-> > +		if (pdev->id != -1)
-> > +			master->bus_num = pdev->id;
-> > +	}
-> > +	regs_offset = pdata->regs_offset;
-> >  
-> >  	dev_set_drvdata(&pdev->dev, master);
-> >  
-> > @@ -1124,8 +1163,8 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
-> >  		goto free_master;
-> >  	}
-> >  
-> > -	r->start += pdata->regs_offset;
-> > -	r->end += pdata->regs_offset;
-> > +	r->start += regs_offset;
-> > +	r->end += regs_offset;
-> >  	mcspi->phys = r->start;
-> >  	if (!request_mem_region(r->start, resource_size(r),
-> >  				dev_name(&pdev->dev))) {
-> > @@ -1285,7 +1324,8 @@ static struct platform_driver omap2_mcspi_driver = {
-> >  	.driver = {
-> >  		.name =		"omap2_mcspi",
-> >  		.owner =	THIS_MODULE,
-> > -		.pm =		&omap2_mcspi_pm_ops
-> > +		.pm =		&omap2_mcspi_pm_ops,
-> > +		.of_match_table = omap_mcspi_of_match,
-> >  	},
-> >  	.remove =	__exit_p(omap2_mcspi_remove),
-> >  };
-> 
+The only in-tree user of omap_device_parent was the OMAP PM layer
+to handle lost-context count for omap_devices.  That was converted
+to use the presence of the omap_device_pm_domain instead.
+
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/plat-omap/include/plat/omap_device.h |    2 +-
+ arch/arm/plat-omap/omap-pm-noop.c             |    2 +-
+ arch/arm/plat-omap/omap_device.c              |   12 ++----------
+ 3 files changed, 4 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 51423d2..d93ac93 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -36,7 +36,7 @@
+ 
+ #include <plat/omap_hwmod.h>
+ 
+-extern struct device omap_device_parent;
++extern struct dev_pm_domain omap_device_pm_domain;
+ 
+ /* omap_device._state values */
+ #define OMAP_DEVICE_STATE_UNKNOWN	0
+diff --git a/arch/arm/plat-omap/omap-pm-noop.c b/arch/arm/plat-omap/omap-pm-noop.c
+index 3dc3801..5a97b4d 100644
+--- a/arch/arm/plat-omap/omap-pm-noop.c
++++ b/arch/arm/plat-omap/omap-pm-noop.c
+@@ -319,7 +319,7 @@ int omap_pm_get_dev_context_loss_count(struct device *dev)
+ 	if (WARN_ON(!dev))
+ 		return -ENODEV;
+ 
+-	if (dev->parent == &omap_device_parent) {
++	if (dev->pm_domain == &omap_device_pm_domain) {
+ 		count = omap_device_get_context_loss_count(pdev);
+ 	} else {
+ 		WARN_ONCE(off_mode_enabled, "omap_pm: using dummy context loss counter; device %s should be converted to omap_device",
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index e8d9869..3643900 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -320,8 +320,6 @@ static void _add_hwmod_clocks_clkdev(struct omap_device *od,
+ }
+ 
+ 
+-static struct dev_pm_domain omap_device_pm_domain;
+-
+ /**
+  * omap_device_build_from_dt - build an omap_device with multiple hwmods
+  * @pdev_name: name of the platform_device driver to use
+@@ -799,7 +797,7 @@ static int _od_resume_noirq(struct device *dev)
+ #define _od_resume_noirq NULL
+ #endif
+ 
+-static struct dev_pm_domain omap_device_pm_domain = {
++struct dev_pm_domain omap_device_pm_domain = {
+ 	.ops = {
+ 		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
+ 				   _od_runtime_idle)
+@@ -821,7 +819,6 @@ static int omap_device_register(struct platform_device *pdev)
+ {
+ 	pr_debug("omap_device: %s: registering\n", pdev->name);
+ 
+-	pdev->dev.parent = &omap_device_parent;
+ 	pdev->dev.pm_domain = &omap_device_pm_domain;
+ 	return platform_device_add(pdev);
+ }
+@@ -1130,11 +1127,6 @@ int omap_device_enable_clocks(struct omap_device *od)
+ 	return 0;
+ }
+ 
+-struct device omap_device_parent = {
+-	.init_name	= "omap",
+-	.parent         = &platform_bus,
+-};
+-
+ static struct notifier_block platform_nb = {
+ 	.notifier_call = _omap_device_notifier_call,
+ };
+@@ -1142,6 +1134,6 @@ static struct notifier_block platform_nb = {
+ static int __init omap_device_init(void)
+ {
+ 	bus_register_notifier(&platform_bus_type, &platform_nb);
+-	return device_register(&omap_device_parent);
++	return 0;
+ }
+ core_initcall(omap_device_init);
+-- 
+1.7.9
