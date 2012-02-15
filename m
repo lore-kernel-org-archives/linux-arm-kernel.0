@@ -1,37 +1,52 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Wed, 15 Feb 2012 09:20:02 +0200
-Subject: [PATCH 3.3 v2] OMAP4: PRM: fix build breakage when CONFIG_OF is
- not defined
-In-Reply-To: <20120214203801.GU1426@atomide.com>
-References: <1328699683-19357-1-git-send-email-coelho@ti.com>
- <20120214203801.GU1426@atomide.com>
-Message-ID: <1329290402.19569.24.camel@cumari>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 15 Feb 2012 08:40:37 +0100
+Subject: [PATCH 1/2] ARM: OMAP4: cminst: Add boot time __init function for
+ cminst
+In-Reply-To: <79CD15C6BA57404B839C016229A409A8317CF3B2@DBDE01.ent.ti.com>
+ (Vaibhav Hiremath's message of "Wed, 15 Feb 2012 06:27:53 +0000")
+References: <1329233348-23356-1-git-send-email-hvaibhav@ti.com>
+ <1329233348-23356-2-git-send-email-hvaibhav@ti.com>
+ <87bop1unln.fsf@macbook.be.48ers.dk>
+ <79CD15C6BA57404B839C016229A409A8317CF3B2@DBDE01.ent.ti.com>
+Message-ID: <87mx8ktuh6.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+>>>>> "Vaibhav" == Hiremath, Vaibhav <hvaibhav@ti.com> writes:
 
-On Tue, 2012-02-14 at 12:38 -0800, Tony Lindgren wrote: 
-> * Luciano Coelho <coelho@ti.com> [120208 02:43]:
-> > Since 3.3-rc1, prm44xx.c build breaks if CONFIG_OF is not set:
-> > 
-> > arch/arm/mach-omap2/prm44xx.c:41: error: 'OMAP44XX_IRQ_PRCM' undeclared here (not in a function)
-> > make[1]: *** [arch/arm/mach-omap2/prm44xx.o] Error 1
-> > 
-> > This is because of a missing include, which is added indirectly if
-> > CONFIG_OF is defined.  This problem was introduced in commit
-> > 2f31b51 (ARM: OMAP4: PRM: use PRCM interrupt handler).
-> > 
-> > Cc: Tero Kristo <t-kristo@ti.com>
-> > Signed-off-by: Luciano Coelho <coelho@ti.com>
-> > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> 
-> A similar patch should be already in mainline kernel queued by Russell.
+Hi,
 
-Right, someone pointed this out to me after I sent the two patches.
-Sorry for the trouble, I should have looked more carefully before
-jumping in to fix this stuff. ;)
+ Vaibhav> -	BUG_ON(part >= OMAP4_MAX_PRCM_PARTITIONS ||
+ Vaibhav> +	BUG_ON(part >= max_cm_partitions ||
+ Vaibhav> part == OMAP4430_INVALID_PRCM_PARTITION ||
+ >> 
+ >> How about dropping the OMAP4430_ prefix here as it's no longer 4430 specific?
+ >> 
+ Vaibhav> Peter,
+
+ Vaibhav> You could be right here, from this patch perspective, this
+ Vaibhav> change doesn't make sense.
+
+ Vaibhav> But at the first place I am quite not sure, why this has been
+ Vaibhav> named as OMAP4430_? Vs some macros are named as OMAP4_.
+
+ Vaibhav> So first we need to understand why it has been named this way,
+ Vaibhav> may be "Paul Walmsley" can comment on this. He is original
+ Vaibhav> author of this file.
+
+As I read it, it doesn't have anything to do with any specific hardware,
+it's just to catch bugs when people forget to initialize the structure
+field:
+
+arch/arm/mach-omap2/prcm44xx.h:
+/*
+ * OMAP4 PRCM partition IDs
+ *
+ * The numbers and order are arbitrary, but 0 is reserved for the
+ * 'invalid' partition in case someone forgets to add a
+ * .prcm_partition field.
+ */
+#define OMAP4430_INVALID_PRCM_PARTITION         0
 
 -- 
-Cheers,
-Luca.
+Bye, Peter Korsgaard
