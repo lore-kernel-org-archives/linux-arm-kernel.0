@@ -1,28 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Feb 2012 14:14:08 -0800
-Subject: [PATCH] ARM: OMAP: convert omap_device_build() and callers to
- __init
-In-Reply-To: <1329343522-15759-1-git-send-email-khilman@ti.com>
-References: <1329343522-15759-1-git-send-email-khilman@ti.com>
-Message-ID: <20120215221408.GZ1426@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 15 Feb 2012 14:24:42 -0800
+Subject: [PATCH] ARM: iop: add missing includes
+Message-ID: <1329344682-29962-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [120215 13:33]:
-> Building omap_devices should only be done at init time, and since
-> omap_device_build() is using early_platform calls which are also
-> __init, this ensures that omap_device isn't trying to use functions
-> that disappear.
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Tony, I tested this on top of your MMC series, and it gets rid of the
-> rest of the section mismatch warnings except the
-> omap_secondary_startup() one which is unrelated to this patch.
+Resolves two build breaks. One is a boatload of "unknown type name 'u32'"
+in iop3xx.h due to missing include of <linux/types.h>.
 
-OK thanks, I'll apply them all with your patch into hsmmc branch once
-they're done because this depends on the hsmmc changes.
+The other is:
+arch/arm/plat-iop/restart.c: In function 'iop3xx_restart':
+arch/arm/plat-iop/restart.c:18:2: error: implicit declaration of function 'soft_restart' [-Werror=implicit-function-declaration]
 
-Regards,
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
 
-Tony
+ arch/arm/include/asm/hardware/iop3xx.h |    2 ++
+ arch/arm/plat-iop/restart.c            |    1 +
+ 2 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardware/iop3xx.h b/arch/arm/include/asm/hardware/iop3xx.h
+index 077c323..ec0224d 100644
+--- a/arch/arm/include/asm/hardware/iop3xx.h
++++ b/arch/arm/include/asm/hardware/iop3xx.h
+@@ -15,6 +15,8 @@
+ #ifndef __IOP3XX_H
+ #define __IOP3XX_H
+ 
++#include <linux/types.h>
++
+ /*
+  * IOP3XX GPIO handling
+  */
+diff --git a/arch/arm/plat-iop/restart.c b/arch/arm/plat-iop/restart.c
+index 6a85a0c..a6ee3b6 100644
+--- a/arch/arm/plat-iop/restart.c
++++ b/arch/arm/plat-iop/restart.c
+@@ -8,6 +8,7 @@
+  * published by the Free Software Foundation.
+  */
+ #include <asm/hardware/iop3xx.h>
++#include <asm/system.h>
+ #include <mach/hardware.h>
+ 
+ void iop3xx_restart(char mode, const char *cmd)
+-- 
+1.7.9.209.gb6b3b
