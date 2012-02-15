@@ -1,48 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 15 Feb 2012 14:24:42 -0800
-Subject: [PATCH] ARM: iop: add missing includes
-Message-ID: <1329344682-29962-1-git-send-email-olof@lixom.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 16 Feb 2012 00:25:51 +0200
+Subject: [PATCH v3 00/10] Add tegra30 support for secondary cores
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178FACB954@HQMAIL01.nvidia.com>
+References: <1328831277-21002-1-git-send-email-pdeschrijver@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF178FACB954@HQMAIL01.nvidia.com>
+Message-ID: <20120215222551.GN16501@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resolves two build breaks. One is a boatload of "unknown type name 'u32'"
-in iop3xx.h due to missing include of <linux/types.h>.
+On Wed, Feb 15, 2012 at 10:27:43PM +0100, Stephen Warren wrote:
+> Peter De Schrijver wrote at Thursday, February 09, 2012 4:48 PM:
+> > This patchset introduces support for secondary cores on tegra30. It also
+> > introduces some functions for the flowcontroller and adds basic support for
+> > tegra30 powerdomains.
+> 
+> The code looks fine to me. I do notice the following when running
+> "shutdown -h now":
+> 
+> [   27.762124] SMP: failed to stop secondary CPUs
+> 
+> So, this patch series makes the secondary cores boot OK, but not shut
+> down it appears. Is that expected? It's probably something we can fix
+> with a following on patch rather than re-spinning this series though?
+> 
 
-The other is:
-arch/arm/plat-iop/restart.c: In function 'iop3xx_restart':
-arch/arm/plat-iop/restart.c:18:2: error: implicit declaration of function 'soft_restart' [-Werror=implicit-function-declaration]
+This seems to be a bug indeed. I will look at it next week when I'm back in
+finland.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
+Cheers,
 
- arch/arm/include/asm/hardware/iop3xx.h |    2 ++
- arch/arm/plat-iop/restart.c            |    1 +
- 2 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/hardware/iop3xx.h b/arch/arm/include/asm/hardware/iop3xx.h
-index 077c323..ec0224d 100644
---- a/arch/arm/include/asm/hardware/iop3xx.h
-+++ b/arch/arm/include/asm/hardware/iop3xx.h
-@@ -15,6 +15,8 @@
- #ifndef __IOP3XX_H
- #define __IOP3XX_H
- 
-+#include <linux/types.h>
-+
- /*
-  * IOP3XX GPIO handling
-  */
-diff --git a/arch/arm/plat-iop/restart.c b/arch/arm/plat-iop/restart.c
-index 6a85a0c..a6ee3b6 100644
---- a/arch/arm/plat-iop/restart.c
-+++ b/arch/arm/plat-iop/restart.c
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- #include <asm/hardware/iop3xx.h>
-+#include <asm/system.h>
- #include <mach/hardware.h>
- 
- void iop3xx_restart(char mode, const char *cmd)
--- 
-1.7.9.209.gb6b3b
+Peter.
