@@ -1,26 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Feb 2012 17:34:43 +0000
-Subject: [PATCH] ARM: ptrace: Include linux/audit.h to fix build errors
-In-Reply-To: <1329325622.2337.13.camel@localhost>
-References: <1329284188.12708.1.camel@phoenix>
- <20120215083609.GD13673@n2100.arm.linux.org.uk>
- <1329325622.2337.13.camel@localhost>
-Message-ID: <20120215173443.GF27825@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 15 Feb 2012 18:37:33 +0100
+Subject: [PATCH 0/4] spi/omap: Adaptation to Device Tree
+Message-ID: <1329327457-2121-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 12:07:02PM -0500, Eric Paris wrote:
-> So if someone tells me how the code knows it's endianness I'll gladly
-> write the ifdef to switch from AUDIT_ARCH_ARMEB to AUDIT_ARCH_ARM when
-> appropriate....
+Hi Grant,
 
-An easy way would be:
+You might think I'm harassing you with all these series, but it looks like
+you are the maintainer of all the stuff I care about for the moment :-)
 
-#ifndef __ARMEB__
-#define AUDIT_ARCH_NR AUDIT_ARCH_ARMEB
-#else
-#define AUDIT_ARCH_NR AUDIT_ARCH_ARM
-#endif
+Here are a couple of SPI patches + the addition of a SPI ethernet device
+needed for sdp4430 board.
 
-and then:
-	audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
+This driver is still relying on a valid bus_number which is clearly bad.
+A cleanup is definitively needed, and will be done later.
+
+This series is based on lo/master (a37cdd9) + for_3.4/dt_base branch to get
+the needed cleanup and fixes for OMAP.
+
+Please note that due to the changes in the various OMAP DTS files, I have
+to base this series on top of my other DT series (gpio for example), otherwise
+the merge of the two series will generate some merge conflict in the DTS since
+they are both adding some new nodes at the exact same location.
+
+I'm not sure how this should be handled.
+
+This series is available here for reference:
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_spi_eth
+
+Regards,
+Benoit
+
+
+Benoit Cousson (4):
+  spi/omap: Add DT support to McSPI driver
+  arm/dts: OMAP4: Add SPI controller nodes
+  arm/dts: OMAP3: Add SPI controller nodes
+  arm/dts: omap4-sdp: Add ks8851 ethernet SPI device
+
+ Documentation/devicetree/bindings/spi/omap-spi.txt |   20 +++++++
+ arch/arm/boot/dts/omap3.dtsi                       |   32 +++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts                    |   21 +++++++
+ arch/arm/boot/dts/omap4.dtsi                       |   32 +++++++++++
+ arch/arm/mach-omap2/devices.c                      |    4 +-
+ drivers/spi/spi-omap2-mcspi.c                      |   56 +++++++++++++++++---
+ 6 files changed, 156 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/omap-spi.txt
