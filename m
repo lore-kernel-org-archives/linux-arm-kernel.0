@@ -1,33 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 15 Feb 2012 16:04:28 +0100
-Subject: [PATCH v3 24/25] irq_domain: remove "hint" when allocating irq
- numbers
-In-Reply-To: <4F316848.4060100@atmel.com>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-25-git-send-email-grant.likely@secretlab.ca>
- <4F316848.4060100@atmel.com>
-Message-ID: <4F3BC97C.6030203@atmel.com>
+From: eparis@redhat.com (Eric Paris)
+Date: Wed, 15 Feb 2012 10:10:58 -0500
+Subject: [PATCH] ARM: ptrace: Include linux/audit.h to fix build errors
+In-Reply-To: <20120215101832.GF13673@n2100.arm.linux.org.uk>
+References: <1329284188.12708.1.camel@phoenix>
+ <20120215083609.GD13673@n2100.arm.linux.org.uk>
+ <20120215095216.GA29319@mudshark.cambridge.arm.com>
+ <20120215101832.GF13673@n2100.arm.linux.org.uk>
+Message-ID: <1329318658.2337.6.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2012 07:07 PM, Nicolas Ferre :
-> On 01/27/2012 10:36 PM, Grant Likely :
->> The 'hint' used to try and line up irq numbers with hw irq numbers is
->> rather a hack and not very useful.  Now that /proc/interrupts also outputs
->> the hwirq number, it is even less useful to keep around the 'hint' heuristic.
->>
->> This patch removes it.
-> 
-> Grant,
-> 
-> While trying your patch series in conjunction with Rob one, I do not
-> find this patch in your irqdomain/next branch (and a couple of others).
-> Can you tell me if this v3 series is available as a git tree?
+On Wed, 2012-02-15 at 10:18 +0000, Russell King - ARM Linux wrote:
 
-I am still interested by patch 24-25 of this series but still cannot
-find them in your irqdomain/next branch:
-Are they also expected to join the 3.4 merge window material?
+> So, this gives us two options: either we revert the damned thing and start
+> over with it (and hopefully audit folk will start co-operating with ARM
+> folk) or we try to fix up their mess (and potentially they learn they can
+> dump crap on us.)
 
-Bye,
--- 
-Nicolas Ferre
+It must be a conspiracy to screw with the ARM people!  Your jobs were
+obviously too easy to begin with.  Rahrrrrr!  Down with ARM!
+
+No seriously.  I am the audit folks.  You got us all right here in this
+one e-mail.  You're right, I should have paid more attention to who was
+in the cc list.  If you want to rewrite it, please feel free!  If you
+want to push fixes yourself, please feel free!  If you want me to push
+fixes, please just let me know what is broken and I'll do my best.
+
+Sorry.  I just got the patch and was contacted by a number of people off
+list asking when it was going to go in because they wanted it for their
+project.  I obviously should have known who the ARM maintainers that
+would have looked at a patch for the audit system was and should have
+made sure they commented.  Sorry!  I'll be sure to hit the ARM list if
+another patch goes by....
