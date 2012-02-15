@@ -1,84 +1,48 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 15 Feb 2012 17:04:14 +0100
-Subject: [PATCH 5/5] arm/dts: OMAP3: Add gpio nodes
-In-Reply-To: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1329321854-24490-6-git-send-email-b-cousson@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 15 Feb 2012 08:04:38 -0800
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <1329313084.2293.105.camel@twins>
+References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
+ <20120208202314.GA28290@redhat.com>
+ <1328736834.2903.33.camel@pasglop> <20120209075106.GB18387@elte.hu>
+ <4F35DD3E.4020406@codeaurora.org>
+ <20120211143951.GA24564@sirena.org.uk>
+ <1328971983.11320.5.camel@laptop>
+ <20120211153324.GC31887@opensource.wolfsonmicro.com>
+ <1329313084.2293.105.camel@twins>
+Message-ID: <20120215160437.GD2996@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the 6 GPIOs controller nodes present in OMAP3.
+On Wed, Feb 15, 2012 at 02:38:04PM +0100, Peter Zijlstra wrote:
+> On Sat, 2012-02-11 at 15:33 +0000, Mark Brown wrote:
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
----
- arch/arm/boot/dts/omap3.dtsi |   54 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 54 insertions(+), 0 deletions(-)
+> >  There's use cases for having this
+> > stuff offloaded but if you're not doing that stuff then why deal with
+> > the complication of designing the hardware? 
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index ca37ba5..8eb181e 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -69,6 +69,60 @@
- 			reg = <0x48200000 0x1000>;
- 		};
- 
-+		gpio1: gpio at 1 {
-+			compatible = "ti,omap3-gpio";
-+			ti,hwmods = "gpio1";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio2: gpio at 2 {
-+			compatible = "ti,omap3-gpio";
-+			ti,hwmods = "gpio2";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio3: gpio at 3 {
-+			compatible = "ti,omap3-gpio";
-+			ti,hwmods = "gpio3";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio4: gpio at 4 {
-+			compatible = "ti,omap3-gpio";
-+			ti,hwmods = "gpio4";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio5: gpio at 5 {
-+			compatible = "ti,omap3-gpio";
-+			ti,hwmods = "gpio5";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		gpio6: gpio at 6 {
-+			compatible = "ti,omap3-gpio";
-+			ti,hwmods = "gpio6";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
- 		uart1: serial at 0x4806a000 {
- 			compatible = "ti,omap3-uart";
- 			ti,hwmods = "uart1";
--- 
-1.7.0.4
+> Because doing it in software is more expensive?
+
+> Penny-wise pound-foolish like thing.. you make the software requirements
+> more complex, which results in more bugs (more cost in debugging), more
+> runtime (for doing the 'software' thing), less power savings.
+
+> Esp since all this uC/system-controller stuff is already available and
+> validated.
+
+It's really not - like I say most of the times people have tried to
+deploy this on embedded systems it's just made everyone more miserable
+and typically winds up getting turned off or bypassed.  The PMICs are
+much more decoupled from the CPUs and the power control on the SoCs is
+more fine grained than you seem to see in the desktop market.  There's
+software effort but people are willing to spend that for microamps and
+all other things being equal they'd typically rather spend it in the
+software stack they're already working with rather than in a separate
+stack for a microcontroller.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120215/8aec5865/attachment-0001.sig>
