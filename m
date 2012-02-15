@@ -1,38 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 15 Feb 2012 11:20:10 -0800
-Subject: [PATCH] ARM: need to include asm/system.h in asm/processor.h
-Message-ID: <1329333610-4474-1-git-send-email-olof@lixom.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 15 Feb 2012 11:21:49 -0800
+Subject: [PATCH] cpufreq: OMAP driver depends CPUfreq tables
+Message-ID: <1329333709-29964-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For files that include asm/processor.h but not asm/system.h:
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-arch/arm/mach-msm/include/mach/uncompress.h: In function 'putc':
-arch/arm/mach-msm/include/mach/uncompress.h:48:3: error: implicit declaration of function 'smp_mb' [-Werror=implicit-function-declaration]
+The OMAP driver depends on CPUfreq table support for creating a table
+of frequencies from the OPP layer.  Ensure that it's build to avoid
+link-time errors.
 
-In this case, smp_mb() is from the cpu_relax() call in the msm putc().
-
-It likely went uncaught when the uncompress.h change went in since the
-defconfig didn't enable that code path, but later changes (e76f4750f4:
-ARM: debug: arrange Kconfig options more logically) resulted in the
-option being on for msm_defconfig and thus exposed it.
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/include/asm/processor.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/cpufreq/Kconfig.arm |    5 +++++
+ drivers/cpufreq/Makefile    |    2 +-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-index d7038fa..d27b071 100644
---- a/arch/arm/include/asm/processor.h
-+++ b/arch/arm/include/asm/processor.h
-@@ -22,6 +22,7 @@
- #include <asm/hw_breakpoint.h>
- #include <asm/ptrace.h>
- #include <asm/types.h>
-+#include <asm/system.h>
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index e0664fe..015f026 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -2,6 +2,11 @@
+ # ARM CPU Frequency scaling drivers
+ #
  
- #ifdef __KERNEL__
- #define STACK_TOP	((current->personality & ADDR_LIMIT_32BIT) ? \
++config ARM_OMAP2PLUS_CPUFREQ
++	bool
++	depends on ARCH_OMAP2PLUS
++	select CPU_FREQ_TABLE
++
+ config ARM_S3C64XX_CPUFREQ
+ 	bool "Samsung S3C64XX"
+ 	depends on CPU_S3C6410
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index ac000fa..fda94c7 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -44,7 +44,7 @@ obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
+ obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
+-obj-$(CONFIG_ARCH_OMAP2PLUS)            += omap-cpufreq.o
++obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)     += omap-cpufreq.o
+ 
+ ##################################################################################
+ # PowerPC platform drivers
 -- 
-1.7.9.209.gb6b3b
+1.7.9
