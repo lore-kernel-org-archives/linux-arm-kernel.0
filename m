@@ -1,89 +1,247 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 Feb 2012 18:37:36 +0100
-Subject: [PATCH 1/3] ARM: at91: pm select memory controler at runtime
-Message-ID: <1329327458-9925-1-git-send-email-plagnioj@jcrosoft.com>
+Date: Wed, 15 Feb 2012 18:37:37 +0100
+Subject: [PATCH 2/3] ARM: at91: at91_rtc: provide select the RTT so use at soc
+ level
+In-Reply-To: <1329327458-9925-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1329327458-9925-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1329327458-9925-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/pm.c |   12 ++++++++----
- arch/arm/mach-at91/pm.h |   13 -------------
- 2 files changed, 8 insertions(+), 17 deletions(-)
+ arch/arm/mach-at91/at91sam9260_devices.c |   11 +++++
+ arch/arm/mach-at91/at91sam9261_devices.c |   10 +++++
+ arch/arm/mach-at91/at91sam9263_devices.c |   25 ++++++++++++
+ arch/arm/mach-at91/at91sam9g45_devices.c |   10 +++++
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   10 +++++
+ drivers/rtc/rtc-at91sam9.c               |   61 ++++-------------------------
+ 6 files changed, 75 insertions(+), 52 deletions(-)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 44f4b08..524d407 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -274,7 +274,12 @@ static int at91_pm_enter(suspend_state_t state)
- 			 * For ARM 926 based chips, this requirement is weaker
- 			 * as at91sam9 can access a RAM in self-refresh mode.
- 			 */
--			at91_standby();
-+			if (cpu_is_at91rm9200())
-+				at91rm9200_standby();
-+			else if (cpu_is_at91sam9g45())
-+				at91sam9g45_standby();
-+			else
-+				at91sam9_standby();
- 			break;
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 2760146..f3e4b32 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -728,8 +728,19 @@ static struct platform_device at91sam9260_rtt_device = {
+ 	.num_resources	= ARRAY_SIZE(rtt_resources),
+ };
  
- 		case PM_SUSPEND_ON:
-@@ -320,10 +325,9 @@ static int __init at91_pm_init(void)
- 
- 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
- 
--#ifdef CONFIG_ARCH_AT91RM9200
- 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
--	at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
--#endif
-+	if (cpu_is_at91rm9200())
-+		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
- 
- 	suspend_set_ops(&at91_pm_ops);
- 
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 89f56f3..1b4865e 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -12,7 +12,6 @@
- #define __ARCH_ARM_MACH_AT91_PM
- 
- #include <mach/at91_ramc.h>
--#ifdef CONFIG_ARCH_AT91RM9200
- #include <mach/at91rm9200_sdramc.h>
- 
- /*
-@@ -43,10 +42,6 @@ static inline void at91rm9200_standby(void)
- 		  "r" (lpr));
++
++#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
++static void __init at91_add_device_rtt_rtc(void)
++{
++	at91sam9260_rtt_device.name = "rtc-at91sam9";
++}
++#else
++static void __init at91_add_device_rtt_rtc(void) {}
++#endif
++
+ static void __init at91_add_device_rtt(void)
+ {
++	at91_add_device_rtt_rtc();
+ 	platform_device_register(&at91sam9260_rtt_device);
  }
  
--#define at91_standby at91rm9200_standby
--
--#elif defined(CONFIG_ARCH_AT91SAM9G45)
--
- /* We manage both DDRAM/SDRAM controllers, we need more than one value to
-  * remember.
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index 52c1f1a..b3ceb97 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -614,8 +614,18 @@ static struct platform_device at91sam9261_rtt_device = {
+ 	.num_resources	= ARRAY_SIZE(rtt_resources),
+ };
+ 
++#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
++static void __init at91_add_device_rtt_rtc(void)
++{
++	at91sam9261_rtt_device.name = "rtc-at91sam9";
++}
++#else
++static void __init at91_add_device_rtt_rtc(void) {}
++#endif
++
+ static void __init at91_add_device_rtt(void)
+ {
++	at91_add_device_rtt_rtc();
+ 	platform_device_register(&at91sam9261_rtt_device);
+ }
+ 
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index 1de4c4f..0f351da 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -992,8 +992,33 @@ static struct platform_device at91sam9263_rtt1_device = {
+ 	.num_resources	= ARRAY_SIZE(rtt1_resources),
+ };
+ 
++#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
++static void __init at91_add_device_rtt_rtc(void)
++{
++	struct platform_device *pdev;
++
++	switch (CONFIG_RTC_DRV_AT91SAM9_RTT) {
++	case 0:
++		pdev = &at91sam9263_rtt0_device;
++		break;
++	case 1:
++		pdev = &at91sam9263_rtt1_device;
++		break;
++	default:
++		pr_err("at91sam9263: support only 2 RTT (%d)\n",
++			 CONFIG_RTC_DRV_AT91SAM9_RTT);
++		return;
++	}
++
++	pdev->name = "rtc-at91sam9";
++}
++#else
++static void __init at91_add_device_rtt_rtc(void) {}
++#endif
++
+ static void __init at91_add_device_rtt(void)
+ {
++	at91_add_device_rtt_rtc();
+ 	platform_device_register(&at91sam9263_rtt0_device);
+ 	platform_device_register(&at91sam9263_rtt1_device);
+ }
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 8c036ff..81d1adf 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -1204,8 +1204,18 @@ static struct platform_device at91sam9g45_rtt_device = {
+ 	.num_resources	= ARRAY_SIZE(rtt_resources),
+ };
+ 
++#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
++static void __init at91_add_device_rtt_rtc(void)
++{
++	at91sam9g45_rtt_device.name = "rtc-at91sam9";
++}
++#else
++static void __init at91_add_device_rtt_rtc(void) {}
++#endif
++
+ static void __init at91_add_device_rtt(void)
+ {
++	at91_add_device_rtt_rtc();
+ 	platform_device_register(&at91sam9g45_rtt_device);
+ }
+ 
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index 936cf20..dd248c8 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -693,8 +693,18 @@ static struct platform_device at91sam9rl_rtt_device = {
+ 	.num_resources	= ARRAY_SIZE(rtt_resources),
+ };
+ 
++#if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
++static void __init at91_add_device_rtt_rtc(void)
++{
++	at91sam9rl_rtt_device.name = "rtc-at91sam9";
++}
++#else
++static void __init at91_add_device_rtt_rtc(void) {}
++#endif
++
+ static void __init at91_add_device_rtt(void)
+ {
++	at91_add_device_rtt_rtc();
+ 	platform_device_register(&at91sam9rl_rtt_device);
+ }
+ 
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index ee3c122..08b69fd 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -287,7 +287,7 @@ static const struct rtc_class_ops at91_rtc_ops = {
+ /*
+  * Initialize and install RTC driver
   */
-@@ -75,10 +70,6 @@ static inline void at91sam9g45_standby(void)
- 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
- }
- 
--#define at91_standby at91sam9g45_standby
--
--#else
--
- #ifdef CONFIG_ARCH_AT91SAM9263
+-static int __init at91_rtc_probe(struct platform_device *pdev)
++static int __devinit at91_rtc_probe(struct platform_device *pdev)
+ {
+ 	struct resource	*r;
+ 	struct sam9_rtc	*rtc;
+@@ -366,7 +366,7 @@ fail:
  /*
-  * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
-@@ -102,8 +93,4 @@ static inline void at91sam9_standby(void)
- 	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
- }
- 
--#define at91_standby at91sam9_standby
--
--#endif
--
+  * Disable and remove the RTC driver
+  */
+-static int __exit at91_rtc_remove(struct platform_device *pdev)
++static int __devexit at91_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct sam9_rtc	*rtc = platform_get_drvdata(pdev);
+ 	u32		mr = rtt_readl(rtc, MR);
+@@ -440,63 +440,20 @@ static int at91_rtc_resume(struct platform_device *pdev)
  #endif
+ 
+ static struct platform_driver at91_rtc_driver = {
+-	.driver.name	= "rtc-at91sam9",
+-	.driver.owner	= THIS_MODULE,
+-	.remove		= __exit_p(at91_rtc_remove),
++	.probe		= at91_rtc_probe,
++	.remove		= __devexit_p(at91_rtc_remove),
+ 	.shutdown	= at91_rtc_shutdown,
+ 	.suspend	= at91_rtc_suspend,
+ 	.resume		= at91_rtc_resume,
++	.driver		= {
++		.name	= "rtc-at91sam9",
++		.owner	= THIS_MODULE,
++	},
+ };
+ 
+-/* Chips can have more than one RTT module, and they can be used for more
+- * than just RTCs.  So we can't just register as "the" RTT driver.
+- *
+- * A normal approach in such cases is to create a library to allocate and
+- * free the modules.  Here we just use bus_find_device() as like such a
+- * library, binding directly ... no runtime "library" footprint is needed.
+- */
+-static int __init at91_rtc_match(struct device *dev, void *v)
+-{
+-	struct platform_device *pdev = to_platform_device(dev);
+-	int ret;
+-
+-	/* continue searching if this isn't the RTT we need */
+-	if (strcmp("at91_rtt", pdev->name) != 0
+-			|| pdev->id != CONFIG_RTC_DRV_AT91SAM9_RTT)
+-		goto fail;
+-
+-	/* else we found it ... but fail unless we can bind to the RTC driver */
+-	if (dev->driver) {
+-		dev_dbg(dev, "busy, can't use as RTC!\n");
+-		goto fail;
+-	}
+-	dev->driver = &at91_rtc_driver.driver;
+-	if (device_attach(dev) == 0) {
+-		dev_dbg(dev, "can't attach RTC!\n");
+-		goto fail;
+-	}
+-	ret = at91_rtc_probe(pdev);
+-	if (ret == 0)
+-		return true;
+-
+-	dev_dbg(dev, "RTC probe err %d!\n", ret);
+-fail:
+-	return false;
+-}
+-
+ static int __init at91_rtc_init(void)
+ {
+-	int status;
+-	struct device *rtc;
+-
+-	status = platform_driver_register(&at91_rtc_driver);
+-	if (status)
+-		return status;
+-	rtc = bus_find_device(&platform_bus_type, NULL,
+-			NULL, at91_rtc_match);
+-	if (!rtc)
+-		platform_driver_unregister(&at91_rtc_driver);
+-	return rtc ? 0 : -ENODEV;
++	return platform_driver_register(&at91_rtc_driver);
+ }
+ module_init(at91_rtc_init);
+ 
 -- 
 1.7.7
