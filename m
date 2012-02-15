@@ -1,24 +1,20 @@
-From: lrg@ti.com (Liam Girdwood)
-Date: Wed, 15 Feb 2012 15:46:21 +0000
-Subject: [RFC 04/11] ASoC: core - Add API call to register dai kcontrols.
-In-Reply-To: <1329320280-1621-5-git-send-email-peter.ujfalusi@ti.com>
-References: <1329320280-1621-1-git-send-email-peter.ujfalusi@ti.com>
- <1329320280-1621-5-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1329320781.14552.1.camel@odin>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 15 Feb 2012 08:52:59 -0700 (MST)
+Subject: OMAP34xx
+In-Reply-To: <4F38A139.4090501@ti.com>
+References: <20120204185453.GB17309@n2100.arm.linux.org.uk>
+ <20120212104132.GA17557@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1202121148210.30322@utopia.booyaka.com>
+ <4F38A139.4090501@ti.com>
+Message-ID: <alpine.DEB.2.00.1202150852370.29723@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-15 at 17:37 +0200, Peter Ujfalusi wrote:
-> Allow dai drivers to register kcontrols.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  include/sound/soc.h  |    2 ++
->  sound/soc/soc-core.c |   31 +++++++++++++++++++++++++++++++
->  2 files changed, 33 insertions(+), 0 deletions(-)
+On Mon, 13 Feb 2012, Shubhrajyoti wrote:
 
-This feature has already been applied.
+> Boot tested on omap4430 sdp.
 
-Regards
+Thanks Shubhrajyoti!  Added your Tested-by.
 
-Liam
+
+- Paul
