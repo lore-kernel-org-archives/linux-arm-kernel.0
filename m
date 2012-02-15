@@ -1,91 +1,48 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 15 Feb 2012 10:16:05 +0200
-Subject: [PATCH 4/6] arm: omap3: add manual control for mpu_iva voltdm
- usecounting
-In-Reply-To: <8762f96wdk.fsf@ti.com>
+Date: Wed, 15 Feb 2012 10:34:26 +0200
+Subject: [PATCH 6/6] arm: omap: pm-debug: enhanced usecount debug support
+In-Reply-To: <20120214235218.GX1426@atomide.com>
 References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
- <1329237402-26008-5-git-send-email-t-kristo@ti.com> <8762f96wdk.fsf@ti.com>
-Message-ID: <1329293765.4102.335.camel@sokoban>
+ <1329237402-26008-7-git-send-email-t-kristo@ti.com>
+ <20120214202740.GT1426@atomide.com> <87fwed58dm.fsf@ti.com>
+ <20120214235218.GX1426@atomide.com>
+Message-ID: <1329294866.4102.343.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-02-14 at 11:35 -0800, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
+On Tue, 2012-02-14 at 15:52 -0800, Tony Lindgren wrote:
+> * Kevin Hilman <khilman@ti.com> [120214 14:28]:
+> > Tony Lindgren <tony@atomide.com> writes:
+> > 
+> > > * Tero Kristo <t-kristo@ti.com> [120214 08:19]:
+> > >> Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
+> > >> their own file, 'usecount'. This file shows the usecounts for every
+> > >> active domain and their children recursively. 'count' file now only
+> > >> shows power state counts for powerdomains.
+> > >> 
+> > >> This patch also provices a way to do printk dumps from kernel code,
+> > >> by calling the pm_dbg_dump_X functions. The plan is to call these
+> > >> functions once an error condition is detected, e.g. failed suspend.
+> > >
+> > > Why don't you replace this all with a userspace tool that deciphers
+> > > the registers for you?
+> > 
+> > This patch isn't deciphering registers, it's just dumping usecounts, and
+> > I think that is extremely useful to have in debugfs.
+> > 
+> > I've already removed all the register dumping from the kernel in the
+> > hopes that someone will write a userspace tool for that.
 > 
-> > mpu_iva voltdm usecount is now decreased during idle. This will
-> > allow the voltagedomain to reflect actual usage, and will allow
-> > proper usage of vc callbacks.
-> 
-> I don't follow why this is needed in the idle path.
-> 
-> Why aren't the usecounts from clock/powerdomain disables (enables) causing this
-> voltdm disable (enable) to happen automatcially?
+> OK good to hear you're already considering it.
 
-The main issue is mpu powerdomain which doesn't contain any clocks that
-are controlled actively. Without adding a "virtual" usecount
-enable/disable hook, the usecount for mpu_iva will always remain at 0
-(or just follow the iva domain on omap3.) We want the usecount to
-reflect the actual idling of this domain also, so that we can control
-SR / auto-ret based on MPU activity.
+Yes, register dumps are gone, and I am actually one of the persons who
+is missing it.
 
-> If these are needed, seems like they should be in the
-> pwrdm_[pre|post]_transition() hooks so they can be generic.
-
-This is actually a good idea, I could move them here. I could also add a
-manual triggering for core domain here, as I have a feeling it might be
-good to have so that core will also follow the idle cycle more tightly
-(basically as a virtual follow for sdrc clock which is idled by HW
-during wfi.)
+I think there should still be some capability to get register snapshots
+from certain points during kernel execution, this is useful for
+debugging purposes. I don't know if it would be possible to do a
+call_usermodehelper() or something from kernel space just before wfi to
+read all (or part of) the PRCM registers, store them somewhere, and then
+decipher this data later with another tool. Any comments to this?
 
 -Tero
-
-> 
-> Kevin
-> 
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/pm34xx.c |    8 ++++++++
-> >  1 files changed, 8 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> > index fc69875..14defaf 100644
-> > --- a/arch/arm/mach-omap2/pm34xx.c
-> > +++ b/arch/arm/mach-omap2/pm34xx.c
-> > @@ -74,6 +74,7 @@ void (*omap3_do_wfi_sram)(void);
-> >  static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
-> >  static struct powerdomain *core_pwrdm, *per_pwrdm;
-> >  static struct powerdomain *cam_pwrdm;
-> > +static struct voltagedomain *mpu_iva_voltdm;
-> >  
-> >  static inline void omap3_per_save_context(void)
-> >  {
-> > @@ -311,6 +312,8 @@ void omap_sram_idle(void)
-> >  		return;
-> >  	}
-> >  
-> > +	voltdm_pwrdm_disable(mpu_iva_voltdm);
-> > +
-> >  	/* NEON control */
-> >  	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
-> >  		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
-> > @@ -393,6 +396,8 @@ void omap_sram_idle(void)
-> >  	}
-> >  	omap3_intc_resume_idle();
-> >  
-> > +	voltdm_pwrdm_enable(mpu_iva_voltdm);
-> > +
-> >  	pwrdm_post_transition();
-> >  
-> >  	/* PER */
-> > @@ -828,6 +833,9 @@ static int __init omap3_pm_init(void)
-> >  
-> >  	(void) clkdm_for_each(clkdms_setup, NULL);
-> >  
-> > +	mpu_iva_voltdm = voltdm_lookup("mpu_iva");
-> > +	voltdm_pwrdm_enable(mpu_iva_voltdm);
-> > +
-> >  	mpu_pwrdm = pwrdm_lookup("mpu_pwrdm");
-> >  	if (mpu_pwrdm == NULL) {
-> >  		printk(KERN_ERR "Failed to get mpu_pwrdm\n");
