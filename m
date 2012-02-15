@@ -1,60 +1,89 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 15 Feb 2012 18:37:37 +0100
-Subject: [PATCH 4/4] arm/dts: omap4-sdp: Add ks8851 ethernet SPI device
-In-Reply-To: <1329327457-2121-1-git-send-email-b-cousson@ti.com>
-References: <1329327457-2121-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1329327457-2121-5-git-send-email-b-cousson@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Feb 2012 18:37:36 +0100
+Subject: [PATCH 1/3] ARM: at91: pm select memory controler at runtime
+Message-ID: <1329327458-9925-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an ethernet SPI chip in the OMAP4 SDP/Blaze board DTS file.
-
-Add a fixed regulator node controlled by a GPIO line to supply
-the ethernet chip.
-
-Based on original code from Rajendra.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/boot/dts/omap4-sdp.dts |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/mach-at91/pm.c |   12 ++++++++----
+ arch/arm/mach-at91/pm.h |   13 -------------
+ 2 files changed, 8 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 01db8b7..31938c1 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -17,6 +17,16 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
-+
-+	vdd_eth: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDD_ETH";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 16 0>;  /* gpio line 48 */
-+		enable-active-high;
-+		regulator-boot-on;
-+	};
- };
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 44f4b08..524d407 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -274,7 +274,12 @@ static int at91_pm_enter(suspend_state_t state)
+ 			 * For ARM 926 based chips, this requirement is weaker
+ 			 * as at91sam9 can access a RAM in self-refresh mode.
+ 			 */
+-			at91_standby();
++			if (cpu_is_at91rm9200())
++				at91rm9200_standby();
++			else if (cpu_is_at91sam9g45())
++				at91sam9g45_standby();
++			else
++				at91sam9_standby();
+ 			break;
  
- &i2c1 {
-@@ -70,3 +80,14 @@
- 		reg = <0x1e>;
- 	};
- };
-+
-+&mcspi1 {
-+	eth at 0 {
-+		compatible = "ks8851";
-+		spi-max-frequency = <24000000>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <2>; /* gpio line 34 */
-+		vdd-supply = <&vdd_eth>;
-+	};
-+};
+ 		case PM_SUSPEND_ON:
+@@ -320,10 +325,9 @@ static int __init at91_pm_init(void)
+ 
+ 	pr_info("AT91: Power Management%s\n", (slow_clock ? " (with slow clock mode)" : ""));
+ 
+-#ifdef CONFIG_ARCH_AT91RM9200
+ 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+-	at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+-#endif
++	if (cpu_is_at91rm9200())
++		at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
+ 
+ 	suspend_set_ops(&at91_pm_ops);
+ 
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 89f56f3..1b4865e 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -12,7 +12,6 @@
+ #define __ARCH_ARM_MACH_AT91_PM
+ 
+ #include <mach/at91_ramc.h>
+-#ifdef CONFIG_ARCH_AT91RM9200
+ #include <mach/at91rm9200_sdramc.h>
+ 
+ /*
+@@ -43,10 +42,6 @@ static inline void at91rm9200_standby(void)
+ 		  "r" (lpr));
+ }
+ 
+-#define at91_standby at91rm9200_standby
+-
+-#elif defined(CONFIG_ARCH_AT91SAM9G45)
+-
+ /* We manage both DDRAM/SDRAM controllers, we need more than one value to
+  * remember.
+  */
+@@ -75,10 +70,6 @@ static inline void at91sam9g45_standby(void)
+ 	at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+ }
+ 
+-#define at91_standby at91sam9g45_standby
+-
+-#else
+-
+ #ifdef CONFIG_ARCH_AT91SAM9263
+ /*
+  * FIXME either or both the SDRAM controllers (EB0, EB1) might be in use;
+@@ -102,8 +93,4 @@ static inline void at91sam9_standby(void)
+ 	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr);
+ }
+ 
+-#define at91_standby at91sam9_standby
+-
+-#endif
+-
+ #endif
 -- 
-1.7.0.4
+1.7.7
