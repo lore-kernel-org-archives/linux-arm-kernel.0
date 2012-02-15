@@ -1,76 +1,33 @@
-From: a.p.zijlstra@chello.nl (Peter Zijlstra)
-Date: Wed, 15 Feb 2012 16:01:03 +0100
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <20120215140245.GB27825@n2100.arm.linux.org.uk>
-References: <20120208013959.GA24535@panacea>
- <1328670355.2482.68.camel@laptop> <20120208202314.GA28290@redhat.com>
- <1328736834.2903.33.camel@pasglop> <20120209075106.GB18387@elte.hu>
- <4F35DD3E.4020406@codeaurora.org> <20120211144530.GA497@elte.hu>
- <4F3AEC4E.9000303@codeaurora.org> <1329313085.2293.106.camel@twins>
- <20120215140245.GB27825@n2100.arm.linux.org.uk>
-Message-ID: <1329318063.2293.136.camel@twins>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 15 Feb 2012 16:04:28 +0100
+Subject: [PATCH v3 24/25] irq_domain: remove "hint" when allocating irq
+ numbers
+In-Reply-To: <4F316848.4060100@atmel.com>
+References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
+ <1327700179-17454-25-git-send-email-grant.likely@secretlab.ca>
+ <4F316848.4060100@atmel.com>
+Message-ID: <4F3BC97C.6030203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-15 at 14:02 +0000, Russell King - ARM Linux wrote:
-
-> There's a problem with that: SA11x0 platforms (for which cpufreq was
-> _originally_ written for before it spouted all the policy stuff which
-> Linus demanded) need to notify drivers when the CPU frequency changes so
-> that drivers can readjust stuff to keep within the bounds of the hardware.
+On 02/07/2012 07:07 PM, Nicolas Ferre :
+> On 01/27/2012 10:36 PM, Grant Likely :
+>> The 'hint' used to try and line up irq numbers with hw irq numbers is
+>> rather a hack and not very useful.  Now that /proc/interrupts also outputs
+>> the hwirq number, it is even less useful to keep around the 'hint' heuristic.
+>>
+>> This patch removes it.
 > 
-> Unfortunately, there's embedded platforms out there where the CPU core
-> clock is not just the CPU core clock, but also is the memory bus clock,
-> PCMCIA clock, and some peripheral clocks.  All these peripherals need
-> their timing registers rewritten when the CPU core clock changes.
+> Grant,
 > 
-> Even more unfortunately, some of these peripherals can't be adjusted
-> with the click of your fingers: you have to wait for them to finish
-> what they're doing.  In the case of a LCD controller, that means the
-> hardware must finish displaying the current frame before the LCD
-> controller will shut down and let you change its registers.
-> 
-> We _could_ make it atomic, but in return we'd have to spin in the driver
-> for maybe 20+ ms, during which time the system would not be able to do
-> anything else, not even those threaded IRQs. 
+> While trying your patch series in conjunction with Rob one, I do not
+> find this patch in your irqdomain/next branch (and a couple of others).
+> Can you tell me if this v3 series is available as a git tree?
 
-Thing is, the scheduler doesn't care about completion, all it needs is
-to be able to kick-start the thing atomically. So you really have to
-wait for it or can you do an interrupt driven state machine?
+I am still interested by patch 24-25 of this series but still cannot
+find them in your irqdomain/next branch:
+Are they also expected to join the 3.4 merge window material?
 
-Anyway, one possibility is to keep cpufreq in its current state and use
-that for this 'interesting' class of hardware -- clearly its current
-state is good enough for it. And transition all sane hardware over to a
-new scheme.
-
-Another possibility is we'll try and fudge something in the scheduler
-that either wakes a special per-cpu thread or allow enqueueing work and
-make this CONFIG_goo available to these platforms so as not to add to
-fast-path overhead of others.
-
-A third possibility is to self-IPI and take it from there.. assuming
-these platforms can actually self-IPI.
-
->  That's on top of however
-> long it takes for the CPU core clock PLL to re-lock at the requested
-> frequency.  That might not be too bad if the CPU clock rate changes
-> only occasionally, but if we're talking about doing that more often
-> then I think there's something wrong with the cpufreq policy design.
-
-I guess that all will depend on the hardware.. there'll still be some
-sort of governor in between taking the per-cpu/task load-tracking data
-and scheduler events and using that to compute some volt/freq setting.
-
->From what I've heard there's a number of different classes of hardware
-out there, some like race to idle, some can power gate more than others
-etc.. I'm not particularly bothered by those details, I'm sure there's
-people who are.
-
-All I really want is to consolidate all the various statistics we have
-across cpufreq/cpuidle/sched and provide cpufreq with scheduler
-callbacks because they've been telling me their current polling stuff
-sucks rocks.
-
-Also the current state of affairs is that the cpufreq stuff is trying to
-guess what the scheduler is doing, and people are feeding that back into
-the scheduler. This I need to stop from happening ;-)
+Bye,
+-- 
+Nicolas Ferre
