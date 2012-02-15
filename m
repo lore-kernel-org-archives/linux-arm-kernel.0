@@ -1,42 +1,91 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 15 Feb 2012 11:59:27 -0800
-Subject: [PATCH] ARM: need to include asm/system.h in asm/processor.h
-In-Reply-To: <1329333610-4474-1-git-send-email-olof@lixom.net>
-References: <1329333610-4474-1-git-send-email-olof@lixom.net>
-Message-ID: <20120215195927.GA31373@codeaurora.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 15 Feb 2012 13:02:40 -0700
+Subject: [PATCH 2/4] arm/dts: OMAP4: Add SPI controller nodes
+In-Reply-To: <1329327457-2121-3-git-send-email-b-cousson@ti.com>
+References: <1329327457-2121-1-git-send-email-b-cousson@ti.com>
+ <1329327457-2121-3-git-send-email-b-cousson@ti.com>
+Message-ID: <20120215200240.GA25779@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 11:20:10AM -0800, Olof Johansson wrote:
-> For files that include asm/processor.h but not asm/system.h:
+On Wed, Feb 15, 2012 at 06:37:35PM +0100, Benoit Cousson wrote:
+> Add the 4 McSPI controller nodes present in an OMAP4 device.
 > 
-> arch/arm/mach-msm/include/mach/uncompress.h: In function 'putc':
-> arch/arm/mach-msm/include/mach/uncompress.h:48:3: error: implicit declaration of function 'smp_mb' [-Werror=implicit-function-declaration]
+> Remove SPI static device initialisation if DT is populated.
 > 
-> In this case, smp_mb() is from the cpu_relax() call in the msm putc().
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  arch/arm/boot/dts/omap4.dtsi  |   32 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/devices.c |    4 +++-
+>  2 files changed, 35 insertions(+), 1 deletions(-)
 > 
-> It likely went uncaught when the uncompress.h change went in since the
-> defconfig didn't enable that code path, but later changes (e76f4750f4:
-> ARM: debug: arrange Kconfig options more logically) resulted in the
-> option being on for msm_defconfig and thus exposed it.
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 4b81f03..7fc0cbe 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -209,5 +209,37 @@
+>  			#size-cells = <0>;
+>  			ti,hwmods = "i2c4";
+>  		};
+> +
+> +		mcspi1: mcspi at 1 {
+> +			compatible = "ti,omap4-mcspi";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			ti,hwmods = "mcspi1";
+> +			ti,spi-num-cs = <4>;
+
+No reg or interrupts properties?  And the @<num> in the name must match the
+first entry in a reg property.  This looks wrong.
+
+> +		};
+> +
+> +		mcspi2: mcspi at 2 {
+> +			compatible = "ti,omap4-mcspi";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			ti,hwmods = "mcspi2";
+> +			ti,spi-num-cs = <2>;
+> +		};
+> +
+> +		mcspi3: mcspi at 3 {
+> +			compatible = "ti,omap4-mcspi";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			ti,hwmods = "mcspi3";
+> +			ti,spi-num-cs = <2>;
+> +		};
+> +
+> +		mcspi4: mcspi at 4 {
+> +			compatible = "ti,omap4-mcspi";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			ti,hwmods = "mcspi4";
+> +			ti,spi-num-cs = <1>;
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index 283d11e..8a489ba 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -725,7 +725,9 @@ static int __init omap2_init_devices(void)
+>  	omap_init_dmic();
+>  	omap_init_camera();
+>  	omap_init_mbox();
+> -	omap_init_mcspi();
+> +	/* If dtb is there, the devices will be created dynamically */
+> +	if (!of_have_populated_dt())
+> +		omap_init_mcspi();
+>  	omap_init_pmu();
+>  	omap_hdq_init();
+>  	omap_init_sti();
+> -- 
+> 1.7.0.4
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-
-BTW, Rob Herring has this same patch in his io.h cleanup patches, so
-it's probably best to coordinate with him.
-
-Author: Rob Herring <rob.herring@calxeda.com>
-Date:   Mon Feb 13 15:43:15 2012 -0600
-
-    ARM: add explicit include of system.h to processor.h
-    
-    cpu_relax in processor.h needs smp_mb which is defined in
-    system.h.
-    
-    Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
