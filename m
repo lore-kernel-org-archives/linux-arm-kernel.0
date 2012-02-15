@@ -1,234 +1,218 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 16 Feb 2012 07:55:43 +0900
-Subject: [PATCH 09/12] ARM: S3C2416: move mach-s3c2416/* into mach-s3c24xx/
+Date: Thu, 16 Feb 2012 07:55:45 +0900
+Subject: [PATCH 11/12] ARM: S3C2443: move mach-s3c2443/* into mach-s3c24xx/
 In-Reply-To: <1329346545-16373-1-git-send-email-kgene.kim@samsung.com>
 References: <1329346545-16373-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1329346545-16373-10-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1329346545-16373-12-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves S3C2416 stuff into mach-s3c24xx/ directory
+This patch moves S3C2443 stuff into mach-s3c24xx/ directory
 so that we can merge the s3c24 series' directories to the
 just one mach-s3c24xx/ directory.
 
 Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c2416/Kconfig                      |   46 -------------------
- arch/arm/mach-s3c2416/Makefile                     |   10 ----
- arch/arm/mach-s3c24xx/Kconfig                      |   47 ++++++++++++++++++++
- arch/arm/mach-s3c24xx/Makefile                     |    9 ++++
- .../clock.c => mach-s3c24xx/clock-s3c2416.c}       |    0
- .../irq.c => mach-s3c24xx/irq-s3c2416.c}           |    0
- .../{mach-s3c2416 => mach-s3c24xx}/mach-smdk2416.c |    0
- .../pm.c => mach-s3c24xx/pm-s3c2416.c}             |    0
- arch/arm/{mach-s3c2416 => mach-s3c24xx}/s3c2416.c  |    0
- .../setup-sdhci-gpio.c                             |    0
- 10 files changed, 56 insertions(+), 56 deletions(-)
- rename arch/arm/{mach-s3c2416/clock.c => mach-s3c24xx/clock-s3c2416.c} (100%)
- rename arch/arm/{mach-s3c2416/irq.c => mach-s3c24xx/irq-s3c2416.c} (100%)
- rename arch/arm/{mach-s3c2416 => mach-s3c24xx}/mach-smdk2416.c (100%)
- rename arch/arm/{mach-s3c2416/pm.c => mach-s3c24xx/pm-s3c2416.c} (100%)
- rename arch/arm/{mach-s3c2416 => mach-s3c24xx}/s3c2416.c (100%)
- rename arch/arm/{mach-s3c2416 => mach-s3c24xx}/setup-sdhci-gpio.c (100%)
+ arch/arm/Kconfig                                   |    1 -
+ arch/arm/Makefile                                  |    2 +-
+ arch/arm/mach-s3c2443/Kconfig                      |   32 --------------------
+ arch/arm/mach-s3c2443/Makefile                     |   20 ------------
+ arch/arm/mach-s3c24xx/Kconfig                      |   29 ++++++++++++++++++
+ arch/arm/mach-s3c24xx/Makefile                     |    5 +++
+ .../clock.c => mach-s3c24xx/clock-s3c2443.c}       |    0
+ .../dma.c => mach-s3c24xx/dma-s3c2443.c}           |    0
+ .../irq.c => mach-s3c24xx/irq-s3c2443.c}           |    0
+ .../{mach-s3c2443 => mach-s3c24xx}/mach-smdk2443.c |    0
+ arch/arm/{mach-s3c2443 => mach-s3c24xx}/s3c2443.c  |    0
+ 11 files changed, 35 insertions(+), 54 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2443/Kconfig
+ delete mode 100644 arch/arm/mach-s3c2443/Makefile
+ rename arch/arm/{mach-s3c2443/clock.c => mach-s3c24xx/clock-s3c2443.c} (100%)
+ rename arch/arm/{mach-s3c2443/dma.c => mach-s3c24xx/dma-s3c2443.c} (100%)
+ rename arch/arm/{mach-s3c2443/irq.c => mach-s3c24xx/irq-s3c2443.c} (100%)
+ rename arch/arm/{mach-s3c2443 => mach-s3c24xx}/mach-smdk2443.c (100%)
+ rename arch/arm/{mach-s3c2443 => mach-s3c24xx}/s3c2443.c (100%)
 
-diff --git a/arch/arm/mach-s3c2416/Kconfig b/arch/arm/mach-s3c2416/Kconfig
-index 53d5c2b..faaa289 100644
---- a/arch/arm/mach-s3c2416/Kconfig
-+++ b/arch/arm/mach-s3c2416/Kconfig
-@@ -7,54 +7,8 @@
- # note, this also supports the S3C2450 which is so similar it has the same
- # ID code as the S3C2416.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f8044e9..22d6db3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1072,7 +1072,6 @@ if ARCH_S3C24XX
+ source "arch/arm/mach-s3c2412/Kconfig"
+ source "arch/arm/mach-s3c2416/Kconfig"
+ source "arch/arm/mach-s3c2440/Kconfig"
+-source "arch/arm/mach-s3c2443/Kconfig"
+ endif
  
--config CPU_S3C2416
+ if ARCH_S3C64XX
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 59d9df4..f3f6d97 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -175,7 +175,7 @@ machine-$(CONFIG_ARCH_PRIMA2)		:= prima2
+ machine-$(CONFIG_ARCH_PXA)		:= pxa
+ machine-$(CONFIG_ARCH_REALVIEW)		:= realview
+ machine-$(CONFIG_ARCH_RPC)		:= rpc
+-machine-$(CONFIG_ARCH_S3C24XX)		:= s3c24xx s3c2412 s3c2416 s3c2440 s3c2443
++machine-$(CONFIG_ARCH_S3C24XX)		:= s3c24xx s3c2412 s3c2416 s3c2440
+ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
+ machine-$(CONFIG_ARCH_S5P64X0)		:= s5p64x0
+ machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
+diff --git a/arch/arm/mach-s3c2443/Kconfig b/arch/arm/mach-s3c2443/Kconfig
+deleted file mode 100644
+index 793a0fe..0000000
+--- a/arch/arm/mach-s3c2443/Kconfig
++++ /dev/null
+@@ -1,32 +0,0 @@
+-# Copyright 2007 Simtec Electronics
+-#
+-# Licensed under GPLv2
+-
+-config CPU_S3C2443
 -	bool
 -	depends on ARCH_S3C24XX
--	select CPU_ARM926T
--	select S3C2416_DMA if S3C2410_DMA
+-	select CPU_ARM920T
+-	select S3C2443_DMA if S3C2410_DMA
 -	select CPU_LLSERIAL_S3C2440
 -	select SAMSUNG_CLKSRC
 -	select S3C2443_CLOCK
 -	help
--	  Support for the S3C2416 SoC from the S3C24XX line
+-	  Support for the S3C2443 SoC from the S3C24XX line
 -
- config S3C2416_DMA
- 	bool
- 	depends on CPU_S3C2416
- 	help
- 	  Internal config node for S3C2416 DMA support
--
--config S3C2416_PM
+-config S3C2443_DMA
 -	bool
--	select S3C2412_PM_SLEEP
+-	depends on CPU_S3C2443
 -	help
--	  Internal config node to apply S3C2416 power management
+-	  Internal config node for S3C2443 DMA support
 -
--config S3C2416_SETUP_SDHCI
--	bool
--	select S3C2416_SETUP_SDHCI_GPIO
--	help
--	  Internal helper functions for S3C2416 based SDHCI systems
+-menu "S3C2443 Machines"
 -
--config S3C2416_SETUP_SDHCI_GPIO
--	bool
--	help
--	  Common setup code for SDHCI gpio.
--
--menu "S3C2416 Machines"
--
--config MACH_SMDK2416
--	bool "SMDK2416"
--	select CPU_S3C2416
+-config MACH_SMDK2443
+-	bool "SMDK2443"
+-	select CPU_S3C2443
 -	select MACH_SMDK
--	select S3C_DEV_FB
--	select S3C_DEV_HSMMC
 -	select S3C_DEV_HSMMC1
--	select S3C_DEV_NAND
--	select S3C_DEV_USB_HOST
--	select S3C2416_SETUP_SDHCI
--	select S3C2416_PM if PM
 -	help
--	  Say Y here if you are using an SMDK2416
+-	  Say Y here if you are using an SMDK2443
 -
 -endmenu
-diff --git a/arch/arm/mach-s3c2416/Makefile b/arch/arm/mach-s3c2416/Makefile
-index ca0cd22..3299f19 100644
---- a/arch/arm/mach-s3c2416/Makefile
-+++ b/arch/arm/mach-s3c2416/Makefile
-@@ -9,14 +9,4 @@ obj-m				:=
- obj-n				:=
- obj-				:=
- 
--obj-$(CONFIG_CPU_S3C2416)	+= s3c2416.o clock.o
--obj-$(CONFIG_CPU_S3C2416)	+= irq.o
--obj-$(CONFIG_S3C2416_PM)	+= pm.o
- #obj-$(CONFIG_S3C2416_DMA)	+= dma.o
+diff --git a/arch/arm/mach-s3c2443/Makefile b/arch/arm/mach-s3c2443/Makefile
+deleted file mode 100644
+index d1843c9..0000000
+--- a/arch/arm/mach-s3c2443/Makefile
++++ /dev/null
+@@ -1,20 +0,0 @@
+-# arch/arm/mach-s3c2443/Makefile
+-#
+-# Copyright 2007 Simtec Electronics
+-#
+-# Licensed under GPLv2
 -
--# Device setup
--obj-$(CONFIG_S3C2416_SETUP_SDHCI_GPIO) += setup-sdhci-gpio.o
+-obj-y				:=
+-obj-m				:=
+-obj-n				:=
+-obj-				:=
+-
+-obj-$(CONFIG_CPU_S3C2443)	+= s3c2443.o
+-obj-$(CONFIG_CPU_S3C2443)	+= irq.o
+-obj-$(CONFIG_CPU_S3C2443)	+= clock.o
+-
+-obj-$(CONFIG_S3C2443_DMA)	+= dma.o
 -
 -# Machine support
 -
--obj-$(CONFIG_MACH_SMDK2416)	+= mach-smdk2416.o
+-obj-$(CONFIG_MACH_SMDK2443)	+= mach-smdk2443.o
 diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index c130d5f..69529dd 100644
+index aa295f8..e537577 100644
 --- a/arch/arm/mach-s3c24xx/Kconfig
 +++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -35,6 +35,18 @@ config CPU_S3C2412
- 	help
- 	  Support for the S3C2412 and S3C2413 SoCs from the S3C24XX line
+@@ -70,6 +70,17 @@ config CPU_S3C244X
+ 	def_bool y
+ 	depends on CPU_S3C2440 || CPU_S3C2442
  
-+config CPU_S3C2416
-+	bool "SAMSUNG S3C2416/S3C2450"
++config CPU_S3C2443
++	bool "SAMSUNG S3C2443"
 +	depends on ARCH_S3C24XX
-+	select CPU_ARM926T
++	select CPU_ARM920T
 +	select CPU_LLSERIAL_S3C2440
 +	select SAMSUNG_CLKSRC
 +	select S3C2443_CLOCK
-+	select S3C2416_DMA if S3C24XX_DMA
-+	select S3C2416_PM if PM
++	select S3C2443_DMA if S3C24XX_DMA
 +	help
-+	  Support for the S3C2416 SoC from the S3C24XX line
++	  Support for the S3C2443 SoC from the S3C24XX line
 +
  if CPU_S3C2410
  
  config S3C2410_DMA
-@@ -247,6 +259,41 @@ config MACH_VSTMS
+@@ -459,6 +470,24 @@ config SMDK2440_CPU2442
  
- endif	# CPU_S3C2412
+ endif	# CPU_S3C2440
  
-+if CPU_S3C2416
++if CPU_S3C2443
 +
-+config S3C2416_PM
-+	bool
-+	select S3C2412_PM_SLEEP
-+	help
-+	  Internal config node to apply S3C2416 power management
-+
-+config S3C2416_SETUP_SDHCI
-+	bool
-+	select S3C2416_SETUP_SDHCI_GPIO
-+	help
-+	  Internal helper functions for S3C2416 based SDHCI systems
-+
-+config S3C2416_SETUP_SDHCI_GPIO
++config S3C2443_DMA
 +	bool
 +	help
-+	  Common setup code for SDHCI gpio.
++	  Internal config node for S3C2443 DMA support
 +
-+comment "S3C2416 Boards"
++comment "S3C2443 Boards"
 +
-+config MACH_SMDK2416
-+	bool "SMDK2416"
++config MACH_SMDK2443
++	bool "SMDK2443"
 +	select MACH_SMDK
-+	select S3C_DEV_FB
-+	select S3C_DEV_HSMMC
 +	select S3C_DEV_HSMMC1
-+	select S3C_DEV_NAND
-+	select S3C_DEV_USB_HOST
-+	select S3C2416_SETUP_SDHCI
 +	help
-+	  Say Y here if you are using an SMDK2416
++	  Say Y here if you are using an SMDK2443
 +
-+endif	# CPU_S3C2416
++endif	# CPU_S3C2443
 +
  endmenu	# SAMSUNG S3C24XX SoCs Support
  
  endif	# ARCH_S3C24XX
 diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
-index f5af4af..789aa5c 100644
+index f458cf2..08b44a3 100644
 --- a/arch/arm/mach-s3c24xx/Makefile
 +++ b/arch/arm/mach-s3c24xx/Makefile
-@@ -23,6 +23,9 @@ obj-$(CONFIG_S3C2412_DMA)	+= dma-s3c2412.o
- obj-$(CONFIG_S3C2412_PM)	+= pm-s3c2412.o
- obj-$(CONFIG_S3C2412_PM_SLEEP)	+= sleep-s3c2412.o
+@@ -31,6 +31,9 @@ obj-$(CONFIG_CPU_S3C2442)	+= s3c2442.o
+ obj-$(CONFIG_CPU_S3C244X)	+= s3c244x.o irq-s3c244x.o clock-s3c244x.o
+ obj-$(CONFIG_S3C2440_DMA)	+= dma-s3c2440.o
  
-+obj-$(CONFIG_CPU_S3C2416)	+= s3c2416.o irq-s3c2416.o clock-s3c2416.o
-+obj-$(CONFIG_S3C2416_PM)	+= pm-s3c2416.o
++obj-$(CONFIG_CPU_S3C2443)	+= s3c2443.o irq-s3c2443.o clock-s3c2443.o
++obj-$(CONFIG_S3C2443_DMA)	+= dma-s3c2443.o
 +
  #
  # machine support
  # following is ordered alphabetically by option text.
-@@ -45,6 +48,8 @@ obj-$(CONFIG_MACH_JIVE)			+= mach-jive.o
- obj-$(CONFIG_MACH_SMDK2413)		+= mach-smdk2413.o
- obj-$(CONFIG_MACH_VSTMS)		+= mach-vstms.o
+@@ -66,6 +69,8 @@ obj-$(CONFIG_ARCH_S3C2440)		+= mach-smdk2440.o
+ obj-$(CONFIG_MACH_NEO1973_GTA02)	+= mach-gta02.o
+ obj-$(CONFIG_MACH_RX1950)		+= mach-rx1950.o
  
-+obj-$(CONFIG_MACH_SMDK2416)		+= mach-smdk2416.o
++obj-$(CONFIG_MACH_SMDK2443)		+= mach-smdk2443.o
 +
  # common bits of machine support
  
  obj-$(CONFIG_SIMTEC_NOR)		+= nor-simtec.o
-@@ -52,3 +57,7 @@ obj-$(CONFIG_SIMTEC_NOR)		+= nor-simtec.o
- # machine additions
- 
- obj-$(CONFIG_MACH_BAST_IDE)		+= bast-ide.o
-+
-+# device setup
-+
-+obj-$(CONFIG_S3C2416_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c24xx/clock-s3c2416.c
+diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c24xx/clock-s3c2443.c
 similarity index 100%
-rename from arch/arm/mach-s3c2416/clock.c
-rename to arch/arm/mach-s3c24xx/clock-s3c2416.c
-diff --git a/arch/arm/mach-s3c2416/irq.c b/arch/arm/mach-s3c24xx/irq-s3c2416.c
+rename from arch/arm/mach-s3c2443/clock.c
+rename to arch/arm/mach-s3c24xx/clock-s3c2443.c
+diff --git a/arch/arm/mach-s3c2443/dma.c b/arch/arm/mach-s3c24xx/dma-s3c2443.c
 similarity index 100%
-rename from arch/arm/mach-s3c2416/irq.c
-rename to arch/arm/mach-s3c24xx/irq-s3c2416.c
-diff --git a/arch/arm/mach-s3c2416/mach-smdk2416.c b/arch/arm/mach-s3c24xx/mach-smdk2416.c
+rename from arch/arm/mach-s3c2443/dma.c
+rename to arch/arm/mach-s3c24xx/dma-s3c2443.c
+diff --git a/arch/arm/mach-s3c2443/irq.c b/arch/arm/mach-s3c24xx/irq-s3c2443.c
 similarity index 100%
-rename from arch/arm/mach-s3c2416/mach-smdk2416.c
-rename to arch/arm/mach-s3c24xx/mach-smdk2416.c
-diff --git a/arch/arm/mach-s3c2416/pm.c b/arch/arm/mach-s3c24xx/pm-s3c2416.c
+rename from arch/arm/mach-s3c2443/irq.c
+rename to arch/arm/mach-s3c24xx/irq-s3c2443.c
+diff --git a/arch/arm/mach-s3c2443/mach-smdk2443.c b/arch/arm/mach-s3c24xx/mach-smdk2443.c
 similarity index 100%
-rename from arch/arm/mach-s3c2416/pm.c
-rename to arch/arm/mach-s3c24xx/pm-s3c2416.c
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c24xx/s3c2416.c
+rename from arch/arm/mach-s3c2443/mach-smdk2443.c
+rename to arch/arm/mach-s3c24xx/mach-smdk2443.c
+diff --git a/arch/arm/mach-s3c2443/s3c2443.c b/arch/arm/mach-s3c24xx/s3c2443.c
 similarity index 100%
-rename from arch/arm/mach-s3c2416/s3c2416.c
-rename to arch/arm/mach-s3c24xx/s3c2416.c
-diff --git a/arch/arm/mach-s3c2416/setup-sdhci-gpio.c b/arch/arm/mach-s3c24xx/setup-sdhci-gpio.c
-similarity index 100%
-rename from arch/arm/mach-s3c2416/setup-sdhci-gpio.c
-rename to arch/arm/mach-s3c24xx/setup-sdhci-gpio.c
+rename from arch/arm/mach-s3c2443/s3c2443.c
+rename to arch/arm/mach-s3c24xx/s3c2443.c
 -- 
 1.7.4.4
