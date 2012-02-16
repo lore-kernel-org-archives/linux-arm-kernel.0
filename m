@@ -1,37 +1,48 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 16 Feb 2012 23:22:19 +0100
-Subject: [GIT PULL] ARM: OMAP: Miscellaneous DT cleanup for 3.4
-Message-ID: <4F3D819B.6020007@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 16 Feb 2012 14:52:19 -0800
+Subject: [PATCH v5 00/27] irq_domain generalization and rework
+In-Reply-To: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <20120216145219.0f1c1b98.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, 16 Feb 2012 02:09:01 -0700
+Grant Likely <grant.likely@secretlab.ca> wrote:
 
-Here is a small cleanup series to prepare for further DT series for 3.4.
+> 
+> This series generalizes the "irq_host" infrastructure from powerpc
+> so that it can be used by all architectures and renames it to "irq_domain".
 
-Thanks,
-Benoit
+drivers/mfd/twl-core.c is fairly horked on i386 allmodconfig:
+
+drivers/mfd/twl-core.c: In function 'twl_probe':
+drivers/mfd/twl-core.c:1218: error: implicit declaration of function 'irq_alloc_descs'
+drivers/mfd/twl-core.c:1226: error: implicit declaration of function 'irq_domain_add_legacy'
+drivers/mfd/twl-core.c:1227: error: 'irq_domain_simple_ops' undeclared (first use in this function)
+drivers/mfd/twl-core.c:1227: error: (Each undeclared identifier is reported only once
+drivers/mfd/twl-core.c:1227: error: for each function it appears in.)
 
 
-The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-  Linus Torvalds (1):
-        Linux 3.3-rc3
+This is today's linux-next so it has rmk's "ARM: omap: fix broken
+twl-core dependencies and ifdefs" in there, which looks like it
+attempts to repair this stuff.
 
-are available in the git repository at:
+It's looking for things which are in both linux/irq.h and in
+linux/irqdomain.h.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_base
 
-Benoit Cousson (5):
-      ARM: OMAP2+: board-generic: Remove un-needed .atag_offset for DT_MACHINE
-      ARM: OMAP2+: omap_device: Replace dev_warn by dev_dbg in omap_device_build_from_dt
-      ARM: OMAP2+: pm: Do not init statically the SR and voltage layer with DT
-      ARM: OMAP1: kconfig: Enable IRQ_DOMAIN by default for OMAP1 platforms
-      arm/dts: OMAP3&4: Remove the '0x' prefix for serial nodes
 
- arch/arm/boot/dts/omap3.dtsi        |    8 ++++----
- arch/arm/boot/dts/omap4.dtsi        |    8 ++++----
- arch/arm/mach-omap2/board-generic.c |   12 ++++--------
- arch/arm/mach-omap2/pm.c            |    8 ++++++++
- arch/arm/plat-omap/Kconfig          |    1 +
- arch/arm/plat-omap/omap_device.c    |    2 +-
- 6 files changed, 22 insertions(+), 17 deletions(-)
+btw, Russell, regarding this comment in include/linux/irq.h:
+
+/*
+ * Please do not include this file in generic code.  There is currently
+ * no requirement for any architecture to implement anything held
+ * within this file.
+ *
+ * Thanks. --rmk
+ */
+
+A quick grep indicates that we've lost this battle ;) Is the comments
+still true?  Should we stop discouraging inclusion of linux/irq.h? 
+Does anyone even know that it's discouraged ;)
