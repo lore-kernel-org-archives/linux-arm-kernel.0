@@ -1,49 +1,133 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Feb 2012 05:50:42 +0000
-Subject: [PATCH v2 03/11] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
-In-Reply-To: <CAJOA=zPujvu0WNmn8UPa4NogJ1w6UqEg-RDNEcnfBZQW3SS+eQ@mail.gmail.com>
-References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
- <201202160522.35249.arnd@arndb.de>
- <CAJOA=zPujvu0WNmn8UPa4NogJ1w6UqEg-RDNEcnfBZQW3SS+eQ@mail.gmail.com>
-Message-ID: <201202160550.42192.arnd@arndb.de>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Thu, 16 Feb 2012 11:23:47 +0530
+Subject: [PATCH 1/5] gpio/omap: Remove bank->id information and misc
+ cleanup
+In-Reply-To: <1329321854-24490-2-git-send-email-b-cousson@ti.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-2-git-send-email-b-cousson@ti.com>
+Message-ID: <CAC83ZvJuHpaBbGoysW7GwOHtqfi72EDhFYja2LE4NyBd+QgFWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 February 2012, Turquette, Mike wrote:
-> >
-> >> Ah, one more, would be better to us if arm-soc tree could provide
-> >> the topic branch for 'common struct clk' working as a base.
-> >
-> > Good point. Mike, can you send a pull request for whatever you have
-> > now as another staging branch for arm-soc?
-> 
-> Arnd, we discussed linux-next as the target for the common clk core
-> code at Linaro Connect.  Are you now asking for that code in arm-soc?
-> If so, I think it would be better to keep things simple only target
-> linux-next once V5 has hit the lists after ELC.
+On Wed, Feb 15, 2012 at 9:34 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> The driver does not need anymore any id to identify the GPIO instance.
+> Remove every occurence of the bank->id inside the driver.
+>
+> Remove two trailing spaces.
+> Add a dev variable for better readability in probe.
+> Remove unused variable bank->pbase.
+>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Looks fine.
+If needed you can add my Acked-by:
+--
+Tarun
 
-I guess waiting for you to send out v5 is a good idea, but as Kgene
-mentioned it would be nice to have the series in arm-soc in order
-to base other branches on top of it, and we have now made it possible
-to update branches like this one by declaring them "staging".
-
-The main advantage that I see of putting your series into arm-soc
-is that I can handle the dependencies: If you want to update the
-series based to v6 after more review and send me a replacement pull
-request, I can rebase the exynos5 patches (and other conversions)
-on top of that. If you have a different tree in linux-next and plan
-to rebase it, I cannot take any other patches into arm-soc that depend
-on yours.
-
-The alternative would be that I take the exynos5 patches in their
-current shape into arm-soc and you put your patches into linux-next
-based on the branch that I have, and with a patch to convert exynos5
-to it on top.
-
-> If you are instead referring to OMAP platform support for common clk,
-> that code is very infantile and not yet ready for arm-soc, especially
-> as it breaks OMAP2+ multi-boot.
-
-I did not mean the omap specific parts.
-
-	Arnd
+> ---
+> ?drivers/gpio/gpio-omap.c | ? 23 +++++++++--------------
+> ?1 files changed, 9 insertions(+), 14 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index f49bd6f..a0c3e03 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -50,7 +50,6 @@ struct gpio_regs {
+>
+> ?struct gpio_bank {
+> ? ? ? ?struct list_head node;
+> - ? ? ? unsigned long pbase;
+> ? ? ? ?void __iomem *base;
+> ? ? ? ?u16 irq;
+> ? ? ? ?u16 virtual_irq_start;
+> @@ -77,7 +76,6 @@ struct gpio_bank {
+> ? ? ? ?int stride;
+> ? ? ? ?u32 width;
+> ? ? ? ?int context_loss_count;
+> - ? ? ? u16 id;
+> ? ? ? ?int power_mode;
+> ? ? ? ?bool workaround_enabled;
+>
+> @@ -155,7 +153,7 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
+> ?{
+> ? ? ? ?int l = __raw_readl(base + reg);
+>
+> - ? ? ? if (set)
+> + ? ? ? if (set)
+> ? ? ? ? ? ? ? ?l |= mask;
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?l &= ~mask;
+> @@ -495,7 +493,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+> ? ? ? ?unsigned long flags;
+>
+> ? ? ? ?if (bank->non_wakeup_gpios & gpio_bit) {
+> - ? ? ? ? ? ? ? dev_err(bank->dev,
+> + ? ? ? ? ? ? ? dev_err(bank->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ?"Unable to modify wakeup on non-wakeup GPIO%d\n", gpio);
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> ? ? ? ?}
+> @@ -1048,37 +1046,36 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+>
+> ?static int __devinit omap_gpio_probe(struct platform_device *pdev)
+> ?{
+> + ? ? ? struct device *dev = &pdev->dev;
+> ? ? ? ?struct omap_gpio_platform_data *pdata;
+> ? ? ? ?struct resource *res;
+> ? ? ? ?struct gpio_bank *bank;
+> ? ? ? ?int ret = 0;
+>
+> - ? ? ? if (!pdev->dev.platform_data) {
+> + ? ? ? if (!dev->platform_data) {
+> ? ? ? ? ? ? ? ?ret = -EINVAL;
+> ? ? ? ? ? ? ? ?goto err_exit;
+> ? ? ? ?}
+>
+> ? ? ? ?bank = kzalloc(sizeof(struct gpio_bank), GFP_KERNEL);
+> ? ? ? ?if (!bank) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "Memory alloc failed for gpio_bank\n");
+> + ? ? ? ? ? ? ? dev_err(dev, "Memory alloc failed\n");
+> ? ? ? ? ? ? ? ?ret = -ENOMEM;
+> ? ? ? ? ? ? ? ?goto err_exit;
+> ? ? ? ?}
+>
+> ? ? ? ?res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> ? ? ? ?if (unlikely(!res)) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "GPIO Bank %i Invalid IRQ resource\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->id);
+> + ? ? ? ? ? ? ? dev_err(dev, "Invalid IRQ resource\n");
+> ? ? ? ? ? ? ? ?ret = -ENODEV;
+> ? ? ? ? ? ? ? ?goto err_free;
+> ? ? ? ?}
+>
+> ? ? ? ?bank->irq = res->start;
+> - ? ? ? bank->id = pdev->id;
+>
+> ? ? ? ?pdata = pdev->dev.platform_data;
+> ? ? ? ?bank->virtual_irq_start = pdata->virtual_irq_start;
+> - ? ? ? bank->dev = &pdev->dev;
+> + ? ? ? bank->dev = dev;
+> ? ? ? ?bank->dbck_flag = pdata->dbck_flag;
+> ? ? ? ?bank->stride = pdata->bank_stride;
+> ? ? ? ?bank->width = pdata->bank_width;
+> @@ -1098,16 +1095,14 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+> ? ? ? ?/* Static mapping, never released */
+> ? ? ? ?res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> ? ? ? ?if (unlikely(!res)) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "GPIO Bank %i Invalid mem resource\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->id);
+> + ? ? ? ? ? ? ? dev_err(dev, "Invalid mem resource\n");
+> ? ? ? ? ? ? ? ?ret = -ENODEV;
+> ? ? ? ? ? ? ? ?goto err_free;
+> ? ? ? ?}
+>
+> ? ? ? ?bank->base = ioremap(res->start, resource_size(res));
+> ? ? ? ?if (!bank->base) {
+> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "Could not ioremap gpio bank%i\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->id);
+> + ? ? ? ? ? ? ? dev_err(dev, "Could not ioremap\n");
+> ? ? ? ? ? ? ? ?ret = -ENOMEM;
+> ? ? ? ? ? ? ? ?goto err_free;
+> ? ? ? ?}
+> --
+> 1.7.0.4
+>
