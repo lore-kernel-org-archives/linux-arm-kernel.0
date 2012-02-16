@@ -1,53 +1,55 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 16 Feb 2012 06:23:50 -0700
-Subject: [PATCH v5 08/27] irq_domain: Move irq_domain code from powerpc to
- kernel/irq
-In-Reply-To: <1329383368-12122-9-git-send-email-grant.likely@secretlab.ca>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-9-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <CACxGe6sKzDzxKUxs2ZVNpf07bzaJSsJ8m+3mdPkU+4mf3EajdQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 16 Feb 2012 07:29:49 -0600
+Subject: [PATCH v2 00/13] Make mach/irqs.h optional
+In-Reply-To: <20120216090542.GA23641@n2100.arm.linux.org.uk>
+References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
+ <20120216084536.GH13673@n2100.arm.linux.org.uk>
+ <20120216090542.GA23641@n2100.arm.linux.org.uk>
+Message-ID: <4F3D04CD.80504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 2:09 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> This patch only moves the code. ?It doesn't make any changes, and the
-> code is still only compiled for powerpc. ?Follow-on patches will generalize
-> the code for other architectures.
->
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Milton Miller <miltonm@bga.com>
-> Tested-by: Olof Johansson <olof@lixom.net>
-> ---
-> +unsigned int irq_find_mapping(struct irq_domain *host,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq_hw_number_t hwirq)
-> +{
-> + ? ? ? unsigned int i;
-> + ? ? ? unsigned int hint = hwirq % irq_virq_count;
-> +
-> + ? ? ? /* Look for default host if nececssary */
-> + ? ? ? if (host == NULL)
-> + ? ? ? ? ? ? ? host = irq_default_host;
-> + ? ? ? if (host == NULL)
-> + ? ? ? ? ? ? ? return NO_IRQ;
-> +
-> + ? ? ? /* legacy -> bail early */
-> + ? ? ? if (host->revmap_type == IRQ_DOMAIN_MAP_LEGACY)
-> + ? ? ? ? ? ? ? return hwirq;
-> +
-> + ? ? ? /* Slow path does a linear search of the map */
-> + ? ? ? if (hint == 0)
-> + ? ? ? ? ? ? ? hint = 1;
-> + ? ? ? i = hint;
-> + ? ? ? do {
-> + ? ? ? ? ? ? ? struct irq_data *data = irq_get_irq_data(i);
-> + ? ? ? ? ? ? ? if (data && (data->domain == host) && (data->hwirq == hwirq))
-> + ? ? ? ? ? ? ? ? ? ? ? return i;
-> + ? ? ? ? ? ? ? i++;
-> + ? ? ? ? ? ? ? if (i >= irq_virq_count)
-> + ? ? ? ? ? ? ? ? ? ? ? i = 1
+Russell,
 
-Typo on this line; missing semicolon.  Fixed in my tree now.
+On 02/16/2012 03:05 AM, Russell King - ARM Linux wrote:
+> On Thu, Feb 16, 2012 at 08:45:36AM +0000, Russell King - ARM Linux wrote:
+>> On Fri, Jan 20, 2012 at 02:32:58PM -0600, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> This series removes the include of mach/irqs.h from asm/irq.h when
+>>> SPARSE_IRQ is selected. Platforms which select SPARSE_IRQ have been
+>>> updated.
+>>
+>> Rob,
+>>
+>> Last night, I merged devel-stable into the stuff which gets built, and it
+>> seems your IRQ changes are breaking PXA:
+>>
+>> Before merge:
+>> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=129
+>>
+>> After merge:
+>> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=137
+> 
+> Also see SA11x0 breakage - before:
+> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=127
+> after:
+> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=135
 
-g.
+For SA1100, it's due to this change being done before my changes and
+also possibly reverting of rtc driver changes. I'm working on fixes.
+
+commit 7b7c67bc4284d07285985d487b4ee1a7cc8456e2
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Sun Jan 29 11:40:08 2012 +0000
+
+    ARM: sa11x0: convert to sparse IRQ
+
+    Now that Neponset, UCB1x00 and SA1111 are all converted to use the IRQ
+    allocation interfaces, we can enable sparse IRQ support for SA11x0
+    platforms.
+
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+
+Rob
