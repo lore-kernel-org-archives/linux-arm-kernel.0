@@ -1,36 +1,17 @@
-From: danny.kukawka@bisect.de (Danny Kukawka)
-Date: Thu, 16 Feb 2012 16:33:24 +0100
-Subject: [PATCH] arch/arm/mach-ks8695/leds.c: included linux/gpio.h twice
-In-Reply-To: <1329403574-32717-1-git-send-email-danny.kukawka@bisect.de>
-References: <1329403574-32717-1-git-send-email-danny.kukawka@bisect.de>
-Message-ID: <201202161633.25223.danny.kukawka@bisect.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Feb 2012 15:55:07 +0000
+Subject: ARM: add xz kernel compression support
+In-Reply-To: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <20120216155507.GO13673@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 16, 2012 at 03:54:15PM +0100, Michael Opdenacker wrote:
+> This patchset applies on Linus' tree
+> 
+> It adds xz support to the ARM tree. x86 already has it, so let's have it too!
+> My benchmarks below show that xz is better than lzma in terms of image size
+> and uncompression time.
 
-Ignore this one since the fix is already in linux-next.
-
-Danny
-
-On Donnerstag, 16. Februar 2012, Danny Kukawka wrote:
-> arch/arm/mach-ks8695/leds.c: included 'linux/gpio.h' twice,
-> remove the duplicate.
->
-> Signed-off-by: Danny Kukawka <danny.kukawka@bisect.de>
-> ---
->  arch/arm/mach-ks8695/leds.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-ks8695/leds.c b/arch/arm/mach-ks8695/leds.c
-> index d6f6502..4bd7075 100644
-> --- a/arch/arm/mach-ks8695/leds.c
-> +++ b/arch/arm/mach-ks8695/leds.c
-> @@ -11,7 +11,6 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/init.h>
-> -#include <linux/gpio.h>
->
->  #include <asm/leds.h>
->  #include <mach/devices.h>
+Have you checked what's in my tree?  Have you checked patch 7001/2 ?
