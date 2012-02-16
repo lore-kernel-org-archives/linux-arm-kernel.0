@@ -1,31 +1,37 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Thu, 16 Feb 2012 17:03:10 +0100
-Subject: ARM: add xz kernel compression support
-In-Reply-To: <20120216155507.GO13673@n2100.arm.linux.org.uk>
-References: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
- <20120216155507.GO13673@n2100.arm.linux.org.uk>
-Message-ID: <4F3D28BE.7070601@free-electrons.com>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Thu, 16 Feb 2012 17:05:25 +0100
+Subject: [PATCH] ARM: amba: don't include <asm/sizes.h>
+Message-ID: <20120216160525.GA30558@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2012 04:55 PM, Russell King - ARM Linux wrote:
-> On Thu, Feb 16, 2012 at 03:54:15PM +0100, Michael Opdenacker wrote:
->> This patchset applies on Linus' tree
->>
->> It adds xz support to the ARM tree. x86 already has it, so let's have it too!
->> My benchmarks below show that xz is better than lzma in terms of image size
->> and uncompression time.
-> Have you checked what's in my tree?  Have you checked patch 7001/2 ?
-No, I haven't. Promise to do my homework better next time ;-)
-Thanks for your time anyway.
+The file uses no SZ_* symbol and some architectures miss sizes.h
 
-Cheers,
+Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+---
 
-Michael.
+There a number of files including but not using it. This one
+in particular I need under x86 so the fix is trivial.
 
+However, I remember different feelings about sizes.h . Should it die
+or should it proliferate to other archs using asm-generic/sizes.h ?
+
+
+ drivers/amba/bus.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 01c2cf4..928f80f 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -18,7 +18,6 @@
+ #include <linux/amba/bus.h>
+ 
+ #include <asm/irq.h>
+-#include <asm/sizes.h>
+ 
+ #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
+ 
 -- 
-Michael Opdenacker, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
-+33 484 253 396
+1.7.7.2
