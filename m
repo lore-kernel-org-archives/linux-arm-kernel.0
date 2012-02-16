@@ -1,58 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2012 17:36:20 +0000
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Thu, 16 Feb 2012 09:37:02 -0800
 Subject: Query: Multiple Mappings to Mem and ARMV6+
-In-Reply-To: <20120216172928.GD9151@arm.com>
+In-Reply-To: <20120216171520.GA9151@arm.com>
 References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
  <20120216171520.GA9151@arm.com>
- <20120216172242.GH27825@n2100.arm.linux.org.uk>
- <20120216172928.GD9151@arm.com>
-Message-ID: <20120216173620.GI27825@n2100.arm.linux.org.uk>
+Message-ID: <CAOh2x=nUPb-CcyJBmZ2wv=tsNzi=r3F16NynsbChXD=q5hSGiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 05:29:28PM +0000, Catalin Marinas wrote:
-> On Thu, Feb 16, 2012 at 05:22:42PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Feb 16, 2012 at 05:15:20PM +0000, Catalin Marinas wrote:
-> > > On Thu, Feb 16, 2012 at 04:41:02PM +0000, viresh kumar wrote:
-> > > > Sorry for starting the long old thread again, but i have to start it as i
-> > > > was a bit confused. :(
-> > > > 
-> > > > We know that we can't have multiple mappings with different attributes
-> > > > to the same physical memory on ARMv6+ machines due to speculative
-> > > > prefetch.
-> > > > 
-> > > > So, we have following kind of mappings in kernel now (please correct me
-> > > > if i am wrong):
-> > > > - Low Mem: Mapped at boot time to - Normal Cacheable - Bufferable
-> > > > - ioremap() - blocked on Low Mem, so that we don't create Device type mapping
-> > > > to same mem
-> > > > - dma_alloc_coherent() and others:
-> > > >          - Without DMA_MEM_BUFFERABLE selected - gives strongly ordered mem
-> > > >           (i.e. Non cacheable - Non Bufferable)
-> > > >          - With DMA_MEM_BUFFERABLE selected - gives Normal - Non cacheable -
-> > > >            Bufferable mapping
-> > > >          - Maybe some other too...
-> > > > 
-> > > > I have a doubt with the last mapping mentioned above. We have two
-> > > > mappings possibly to the same physical memory, with different
-> > > > attributes: One is Cacheable and other one is not.
-> > > > 
-> > > > Is this allowed by ARM? Because the patch in which Russell blocked
-> > > > ioremap on Low Mem, he clearly mentioned that these attributes are
-> > > > also important and they should be same.
-> > > 
-> > > Section A3.5.7 in the latest ARM ARM (revC) clarifies the mismatched
-> > 
-> > There's a new version?
-> 
-> Rev C has been available for a while. I thought you got it already:
+On Thu, Feb 16, 2012 at 9:15 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> To summarise, if you mix Normal with Device or SO memory, you only get
+> the guarantees of the Normal memory (e.g. early write acknowledgement,
+> write buffer gathering, speculative accesses), so it's not recommended.
+> If you mix Normal Cacheable with Normal Non-cacheable, you need to make
+> sure that the cacheable mapping does not have any dirty cache lines that
+> could be evicted. Additionally, if you read the buffer through the
+> cacheable mapping later, you need to invalidate it first in case cache
+> lines have been speculatively fetched. The ARM ARM definition however
+> guarantees that accesses through the Non-cacheable mapping does not hit
+> any cache lines (brought in via the Cacheable mapping).
 
-No, if no one tells me when a new version is available, then, unless I
-waste time regularly polling the website below, I have no way to know.
+I don't know if i understood correctly the earlier mails over the list, but with
+speculative writes to Normal Cacheable Memory (Low Mem), we can still
+enter an undefined state if we have separate kind of mapping as we have in
+dma_alloc_*() and low mem.
 
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0406c/index.html
-> 
-> It contains the LPAE and virtualisation extensions.
-> 
-> -- 
-> Catalin
+Or
+
+Who is responsible here to take care of cleaning and invalidate cached low
+mem mappings in case of speculative writes?
+
+--
+viresh
