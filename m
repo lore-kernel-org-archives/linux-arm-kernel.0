@@ -1,32 +1,36 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Thu, 16 Feb 2012 10:14:18 -0800
-Subject: Query: Multiple Mappings to Mem and ARMV6+
-In-Reply-To: <20120216174813.GE9151@arm.com>
-References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
- <20120216171520.GA9151@arm.com>
- <CAOh2x=nUPb-CcyJBmZ2wv=tsNzi=r3F16NynsbChXD=q5hSGiw@mail.gmail.com>
- <20120216174813.GE9151@arm.com>
-Message-ID: <CAOh2x=m_XWmHzm+KZX-E+P9b26=Bz9Ou76vCaSrHaTz-7xqHxA@mail.gmail.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Thu, 16 Feb 2012 12:14:16 -0600
+Subject: [PATCH 6/6] arm: omap: pm-debug: enhanced usecount debug support
+In-Reply-To: <87y5s2hebb.fsf@ti.com>
+References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
+ <1329237402-26008-7-git-send-email-t-kristo@ti.com>
+ <20120214202740.GT1426@atomide.com>
+ <87fwed58dm.fsf@ti.com> <20120214235218.GX1426@atomide.com>
+ <1329294866.4102.343.camel@sokoban> <874nus5djf.fsf@ti.com>
+ <CAOMWX4cg4mfBQGcHLodjFaVY0vVGnKJKvsa9ngMLO-0Ca7gBTQ@mail.gmail.com>
+ <87y5s2hebb.fsf@ti.com>
+Message-ID: <CAOMWX4di8HN=jk7MPVnusYfdYbC5Nj24trNuiy9paGvYFgbtgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 9:48 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> The DMA API implementation on ARM takes care of the cache cleaning and
-> invalidating.
+On Thu, Feb 16, 2012 at 11:35, Kevin Hilman <khilman@ti.com> wrote:
 >
+>>> IMO, the one thing we're still missing is the ability to take register
+>>> snapshots (like immediately before and after WFI) and somehow feed those
+>>> to omapconf for deciphering.
+>>>
+>> Something like this perhaps?
+>> https://github.com/nmenon/linux-omap-ti-pm/commit/3cd1994fc0df9a8e3e0be74ec3f3add3ff3aef95
+>
+> Yes, although that is targetted pretty narrowly at suspend and only PRM
+> registers.
+>
+> Do you then use omapconf to display the results?
+on the platform we worked on, not everyone had access to omapconf, it
+was just 'cat' to take the dump.
+omapconf support makes sense if this is a consistent interface cross
+OMAP variants, even better if a similar
+framework is available cross SoCs.
 
-I believe that this is the reason why we have cache re-invalidation
-(we invalidated
-it in dma_map_*() earlier) in dma_unmap_*() calls for ARMv6+ for
-DMA_FROM_DEVICE.
-Am i Correct?
-
-> BTW, I would say cache evictions rather than speculative writes as the
-> latter is something else and ARM processors don't do it (only
-> speculative reads).
-
-Oops!! Sorry for the wrong words :(
-
---
-viresh
+Regards,
+Nishanth Menon
