@@ -1,93 +1,329 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 16 Feb 2012 10:13:52 +0100
-Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
-In-Reply-To: <20120216075825.GA11631@opensource.wolfsonmicro.com>
-References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
- <20120213082741.GN3852@pengutronix.de>
- <20120213144820.GA3494@opensource.wolfsonmicro.com>
- <20120214105823.GS3852@pengutronix.de>
- <20120214172902.GB3916@opensource.wolfsonmicro.com>
- <20120216073236.GE3852@pengutronix.de>
- <20120216075825.GA11631@opensource.wolfsonmicro.com>
-Message-ID: <20120216091352.GK3852@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 16 Feb 2012 02:09:23 -0700
+Subject: [PATCH v5 22/27] irq_domain/powerpc: constify irq_domain_ops
+In-Reply-To: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <1329383368-12122-23-git-send-email-grant.likely@secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 11:58:26PM -0800, Mark Brown wrote:
-> On Thu, Feb 16, 2012 at 08:32:36AM +0100, Sascha Hauer wrote:
-> > On Tue, Feb 14, 2012 at 09:29:04AM -0800, Mark Brown wrote:
-> 
-> > > The main thing here is to avoid these driver specific bodges that people
-> > > keep churning out again and again, it's quite depressing really.
-> 
-> > I think this churning will continue until we either make the dummy
-> > regulator non optional and drop this warning that gets printed each
-> > time it is used, or we at least provide a way to easily add a fixed
-> 
-> That's obviously not a good idea, if we do that we may as well just drop
-> all error checking from the API.
-> 
-> > dummy regulator without adding >20 lines of code to each board just
-> > for saying that we don't have a regulator for this particular device.
-> 
-> It's not per device, of course - there's an overhead from putting a
-> fixed regulator in but then per supply it's just a line.
+Make all the irq_domain_ops structures in powerpc 'static const'
 
-You mean one supply if the voltages are the same, right? Otherwise
-we need multiple fixed regulators (or we shouldn't claim that the
-board-dummy-fixed-catch-all regulator has a particular voltage)
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Milton Miller <miltonm@bga.com>
+Tested-by: Olof Johansson <olof@lixom.net>
+---
+ arch/powerpc/platforms/512x/mpc5121_ads_cpld.c   |    2 +-
+ arch/powerpc/platforms/52xx/media5200.c          |    2 +-
+ arch/powerpc/platforms/52xx/mpc52xx_gpt.c        |    2 +-
+ arch/powerpc/platforms/52xx/mpc52xx_pic.c        |    2 +-
+ arch/powerpc/platforms/82xx/pq2ads-pci-pic.c     |    2 +-
+ arch/powerpc/platforms/85xx/socrates_fpga_pic.c  |    2 +-
+ arch/powerpc/platforms/86xx/gef_pic.c            |    2 +-
+ arch/powerpc/platforms/cell/axon_msi.c           |    2 +-
+ arch/powerpc/platforms/cell/beat_interrupt.c     |    2 +-
+ arch/powerpc/platforms/cell/interrupt.c          |    2 +-
+ arch/powerpc/platforms/cell/spider-pic.c         |    2 +-
+ arch/powerpc/platforms/embedded6xx/flipper-pic.c |    2 +-
+ arch/powerpc/platforms/embedded6xx/hlwd-pic.c    |    2 +-
+ arch/powerpc/platforms/iseries/irq.c             |    2 +-
+ arch/powerpc/platforms/powermac/pic.c            |    2 +-
+ arch/powerpc/platforms/powermac/smp.c            |    2 +-
+ arch/powerpc/platforms/ps3/interrupt.c           |    2 +-
+ arch/powerpc/platforms/wsp/opb_pic.c             |    2 +-
+ arch/powerpc/sysdev/cpm1.c                       |    2 +-
+ arch/powerpc/sysdev/cpm2_pic.c                   |    2 +-
+ arch/powerpc/sysdev/ehv_pic.c                    |    2 +-
+ arch/powerpc/sysdev/fsl_msi.c                    |    2 +-
+ 22 files changed, 22 insertions(+), 22 deletions(-)
 
-> 
-> > +#if IS_ENABLED(CONFIG_REGULATOR_FIXED_VOLTAGE)
-> > +struct platform_device *regulator_register_fixed(const char *name, int id,
-> > +		int microvolts, struct regulator_consumer_supply *supplies,
-> > +		int num_supplies);
-> > +#else
-> > +static struct platform_device *regulator_register_fixed(const char *name, int id,
-> > +		int microvolts, struct regulator_consumer_supply *supplies,
-> > +		int num_supplies)
-> > +{
-> > +	return NULL;
-> > +}
-> > +#endif
-> 
-> This is obviously not good for users, they'd still have to do error
-> checking to determine if the device was created or not and then manually
-> register the device with the driver core and ideally also care if that
-> worked or not.
-
-I understand that error checking is a good idea, but what do you mean
-with 'manually register the device with the core'? The regulator is
-registered with the core in this function.
-
-> I'm not sure something like this will really save enough
-> unless the device actually gets registered by the function, otherwise
-> it's going to be converting data to code.
-> 
-> I'd also drop the microvolts and name parameters, if people are going to
-> be doing enough work to describe the individual rails on the board
-> they're probably not going to be put off by having to register a
-> platform device.
-> 
-> Of course with device tree this all becomes moot as this won't be
-> happening from code anyway...
-
-I wonder what the devicetree guys will do with this situation anyway.
-The devicetree won't describe regulators that are actually not present
-in the hardware, does it?
-
-Don't get me wrong. All I want is just a way for people to be able to
-add regulator support to drivers *without* breaking its users. Normally
-we have the policy in the kernel that changes to the kernel do not break
-its users. The smsc case violated this and it will happen again. In the
-end it doesn't even matter if a particular board could control a supply
-via software or not. Patches should not simply declare all users of a
-driver as broken.
-
-Sascha
-
+diff --git a/arch/powerpc/platforms/512x/mpc5121_ads_cpld.c b/arch/powerpc/platforms/512x/mpc5121_ads_cpld.c
+index 291d61c..ca3a062 100644
+--- a/arch/powerpc/platforms/512x/mpc5121_ads_cpld.c
++++ b/arch/powerpc/platforms/512x/mpc5121_ads_cpld.c
+@@ -137,7 +137,7 @@ cpld_pic_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops cpld_pic_host_ops = {
++static const struct irq_domain_ops cpld_pic_host_ops = {
+ 	.match = cpld_pic_host_match,
+ 	.map = cpld_pic_host_map,
+ };
+diff --git a/arch/powerpc/platforms/52xx/media5200.c b/arch/powerpc/platforms/52xx/media5200.c
+index 5db5cfb..17d91b7 100644
+--- a/arch/powerpc/platforms/52xx/media5200.c
++++ b/arch/powerpc/platforms/52xx/media5200.c
+@@ -136,7 +136,7 @@ static int media5200_irq_xlate(struct irq_domain *h, struct device_node *ct,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops media5200_irq_ops = {
++static const struct irq_domain_ops media5200_irq_ops = {
+ 	.map = media5200_irq_map,
+ 	.xlate = media5200_irq_xlate,
+ };
+diff --git a/arch/powerpc/platforms/52xx/mpc52xx_gpt.c b/arch/powerpc/platforms/52xx/mpc52xx_gpt.c
+index b53275d..028470b 100644
+--- a/arch/powerpc/platforms/52xx/mpc52xx_gpt.c
++++ b/arch/powerpc/platforms/52xx/mpc52xx_gpt.c
+@@ -236,7 +236,7 @@ static int mpc52xx_gpt_irq_xlate(struct irq_domain *h, struct device_node *ct,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops mpc52xx_gpt_irq_ops = {
++static const struct irq_domain_ops mpc52xx_gpt_irq_ops = {
+ 	.map = mpc52xx_gpt_irq_map,
+ 	.xlate = mpc52xx_gpt_irq_xlate,
+ };
+diff --git a/arch/powerpc/platforms/52xx/mpc52xx_pic.c b/arch/powerpc/platforms/52xx/mpc52xx_pic.c
+index 41fa671..8520b58 100644
+--- a/arch/powerpc/platforms/52xx/mpc52xx_pic.c
++++ b/arch/powerpc/platforms/52xx/mpc52xx_pic.c
+@@ -384,7 +384,7 @@ static int mpc52xx_irqhost_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops mpc52xx_irqhost_ops = {
++static const struct irq_domain_ops mpc52xx_irqhost_ops = {
+ 	.xlate = mpc52xx_irqhost_xlate,
+ 	.map = mpc52xx_irqhost_map,
+ };
+diff --git a/arch/powerpc/platforms/82xx/pq2ads-pci-pic.c b/arch/powerpc/platforms/82xx/pq2ads-pci-pic.c
+index 4ef9d69..328d221 100644
+--- a/arch/powerpc/platforms/82xx/pq2ads-pci-pic.c
++++ b/arch/powerpc/platforms/82xx/pq2ads-pci-pic.c
+@@ -112,7 +112,7 @@ static int pci_pic_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops pci_pic_host_ops = {
++static const struct irq_domain_ops pci_pic_host_ops = {
+ 	.map = pci_pic_host_map,
+ };
+ 
+diff --git a/arch/powerpc/platforms/85xx/socrates_fpga_pic.c b/arch/powerpc/platforms/85xx/socrates_fpga_pic.c
+index 1092c12..3bbbf74 100644
+--- a/arch/powerpc/platforms/85xx/socrates_fpga_pic.c
++++ b/arch/powerpc/platforms/85xx/socrates_fpga_pic.c
+@@ -269,7 +269,7 @@ static int socrates_fpga_pic_host_xlate(struct irq_domain *h,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops socrates_fpga_pic_host_ops = {
++static const struct irq_domain_ops socrates_fpga_pic_host_ops = {
+ 	.map    = socrates_fpga_pic_host_map,
+ 	.xlate  = socrates_fpga_pic_host_xlate,
+ };
+diff --git a/arch/powerpc/platforms/86xx/gef_pic.c b/arch/powerpc/platforms/86xx/gef_pic.c
+index 126a94b..af3fd69 100644
+--- a/arch/powerpc/platforms/86xx/gef_pic.c
++++ b/arch/powerpc/platforms/86xx/gef_pic.c
+@@ -177,7 +177,7 @@ static int gef_pic_host_xlate(struct irq_domain *h, struct device_node *ct,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops gef_pic_host_ops = {
++static const struct irq_domain_ops gef_pic_host_ops = {
+ 	.map	= gef_pic_host_map,
+ 	.xlate	= gef_pic_host_xlate,
+ };
+diff --git a/arch/powerpc/platforms/cell/axon_msi.c b/arch/powerpc/platforms/cell/axon_msi.c
+index cf9fd3c..db360fc 100644
+--- a/arch/powerpc/platforms/cell/axon_msi.c
++++ b/arch/powerpc/platforms/cell/axon_msi.c
+@@ -327,7 +327,7 @@ static int msic_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops msic_host_ops = {
++static const struct irq_domain_ops msic_host_ops = {
+ 	.map	= msic_host_map,
+ };
+ 
+diff --git a/arch/powerpc/platforms/cell/beat_interrupt.c b/arch/powerpc/platforms/cell/beat_interrupt.c
+index bbdf574..e5c3a2c 100644
+--- a/arch/powerpc/platforms/cell/beat_interrupt.c
++++ b/arch/powerpc/platforms/cell/beat_interrupt.c
+@@ -172,7 +172,7 @@ static int beatic_pic_host_match(struct irq_domain *h, struct device_node *np)
+ 	return 1;
+ }
+ 
+-static struct irq_domain_ops beatic_pic_host_ops = {
++static const struct irq_domain_ops beatic_pic_host_ops = {
+ 	.map = beatic_pic_host_map,
+ 	.unmap = beatic_pic_host_unmap,
+ 	.xlate = beatic_pic_host_xlate,
+diff --git a/arch/powerpc/platforms/cell/interrupt.c b/arch/powerpc/platforms/cell/interrupt.c
+index c844797..2d42f3b 100644
+--- a/arch/powerpc/platforms/cell/interrupt.c
++++ b/arch/powerpc/platforms/cell/interrupt.c
+@@ -285,7 +285,7 @@ static int iic_host_xlate(struct irq_domain *h, struct device_node *ct,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops iic_host_ops = {
++static const struct irq_domain_ops iic_host_ops = {
+ 	.match = iic_host_match,
+ 	.map = iic_host_map,
+ 	.xlate = iic_host_xlate,
+diff --git a/arch/powerpc/platforms/cell/spider-pic.c b/arch/powerpc/platforms/cell/spider-pic.c
+index 6521d20..d8b7cc8 100644
+--- a/arch/powerpc/platforms/cell/spider-pic.c
++++ b/arch/powerpc/platforms/cell/spider-pic.c
+@@ -194,7 +194,7 @@ static int spider_host_xlate(struct irq_domain *h, struct device_node *ct,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops spider_host_ops = {
++static const struct irq_domain_ops spider_host_ops = {
+ 	.map = spider_host_map,
+ 	.xlate = spider_host_xlate,
+ };
+diff --git a/arch/powerpc/platforms/embedded6xx/flipper-pic.c b/arch/powerpc/platforms/embedded6xx/flipper-pic.c
+index 4345971..675335a 100644
+--- a/arch/powerpc/platforms/embedded6xx/flipper-pic.c
++++ b/arch/powerpc/platforms/embedded6xx/flipper-pic.c
+@@ -113,7 +113,7 @@ static int flipper_pic_match(struct irq_domain *h, struct device_node *np)
+ }
+ 
+ 
+-static struct irq_domain_ops flipper_irq_domain_ops = {
++static const struct irq_domain_ops flipper_irq_domain_ops = {
+ 	.map = flipper_pic_map,
+ 	.match = flipper_pic_match,
+ };
+diff --git a/arch/powerpc/platforms/embedded6xx/hlwd-pic.c b/arch/powerpc/platforms/embedded6xx/hlwd-pic.c
+index 499d410..da6ca02 100644
+--- a/arch/powerpc/platforms/embedded6xx/hlwd-pic.c
++++ b/arch/powerpc/platforms/embedded6xx/hlwd-pic.c
+@@ -100,7 +100,7 @@ static int hlwd_pic_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops hlwd_irq_domain_ops = {
++static const struct irq_domain_ops hlwd_irq_domain_ops = {
+ 	.map = hlwd_pic_map,
+ };
+ 
+diff --git a/arch/powerpc/platforms/iseries/irq.c b/arch/powerpc/platforms/iseries/irq.c
+index 5538b59..05ce516 100644
+--- a/arch/powerpc/platforms/iseries/irq.c
++++ b/arch/powerpc/platforms/iseries/irq.c
+@@ -356,7 +356,7 @@ static int iseries_irq_host_match(struct irq_domain *h, struct device_node *np)
+ 	return 1;
+ }
+ 
+-static struct irq_domain_ops iseries_irq_domain_ops = {
++static const struct irq_domain_ops iseries_irq_domain_ops = {
+ 	.map = iseries_irq_host_map,
+ 	.match = iseries_irq_host_match,
+ };
+diff --git a/arch/powerpc/platforms/powermac/pic.c b/arch/powerpc/platforms/powermac/pic.c
+index 646fdf3..46a5f32 100644
+--- a/arch/powerpc/platforms/powermac/pic.c
++++ b/arch/powerpc/platforms/powermac/pic.c
+@@ -299,7 +299,7 @@ static int pmac_pic_host_xlate(struct irq_domain *h, struct device_node *ct,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops pmac_pic_host_ops = {
++static const struct irq_domain_ops pmac_pic_host_ops = {
+ 	.match = pmac_pic_host_match,
+ 	.map = pmac_pic_host_map,
+ 	.xlate = pmac_pic_host_xlate,
+diff --git a/arch/powerpc/platforms/powermac/smp.c b/arch/powerpc/platforms/powermac/smp.c
+index 09afd70..a81e5a8 100644
+--- a/arch/powerpc/platforms/powermac/smp.c
++++ b/arch/powerpc/platforms/powermac/smp.c
+@@ -184,7 +184,7 @@ static int psurge_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-struct irq_domain_ops psurge_host_ops = {
++static const struct irq_domain_ops psurge_host_ops = {
+ 	.map	= psurge_host_map,
+ };
+ 
+diff --git a/arch/powerpc/platforms/ps3/interrupt.c b/arch/powerpc/platforms/ps3/interrupt.c
+index c05808f..2a4ff86 100644
+--- a/arch/powerpc/platforms/ps3/interrupt.c
++++ b/arch/powerpc/platforms/ps3/interrupt.c
+@@ -684,7 +684,7 @@ static int ps3_host_match(struct irq_domain *h, struct device_node *np)
+ 	return 1;
+ }
+ 
+-static struct irq_domain_ops ps3_host_ops = {
++static const struct irq_domain_ops ps3_host_ops = {
+ 	.map = ps3_host_map,
+ 	.match = ps3_host_match,
+ };
+diff --git a/arch/powerpc/platforms/wsp/opb_pic.c b/arch/powerpc/platforms/wsp/opb_pic.c
+index 4837515..0c6fe0b 100644
+--- a/arch/powerpc/platforms/wsp/opb_pic.c
++++ b/arch/powerpc/platforms/wsp/opb_pic.c
+@@ -207,7 +207,7 @@ static int opb_host_xlate(struct irq_domain *host, struct device_node *dn,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops opb_host_ops = {
++static const struct irq_domain_ops opb_host_ops = {
+ 	.map = opb_host_map,
+ 	.xlate = opb_host_xlate,
+ };
+diff --git a/arch/powerpc/sysdev/cpm1.c b/arch/powerpc/sysdev/cpm1.c
+index 53f39db..d4fa03f 100644
+--- a/arch/powerpc/sysdev/cpm1.c
++++ b/arch/powerpc/sysdev/cpm1.c
+@@ -123,7 +123,7 @@ static struct irqaction cpm_error_irqaction = {
+ 	.name = "error",
+ };
+ 
+-static struct irq_domain_ops cpm_pic_host_ops = {
++static const struct irq_domain_ops cpm_pic_host_ops = {
+ 	.map = cpm_pic_host_map,
+ };
+ 
+diff --git a/arch/powerpc/sysdev/cpm2_pic.c b/arch/powerpc/sysdev/cpm2_pic.c
+index b364332..8c9fc9c 100644
+--- a/arch/powerpc/sysdev/cpm2_pic.c
++++ b/arch/powerpc/sysdev/cpm2_pic.c
+@@ -236,7 +236,7 @@ static int cpm2_pic_host_xlate(struct irq_domain *h, struct device_node *ct,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops cpm2_pic_host_ops = {
++static const struct irq_domain_ops cpm2_pic_host_ops = {
+ 	.map = cpm2_pic_host_map,
+ 	.xlate = cpm2_pic_host_xlate,
+ };
+diff --git a/arch/powerpc/sysdev/ehv_pic.c b/arch/powerpc/sysdev/ehv_pic.c
+index adea322..6e0e100 100644
+--- a/arch/powerpc/sysdev/ehv_pic.c
++++ b/arch/powerpc/sysdev/ehv_pic.c
+@@ -248,7 +248,7 @@ static int ehv_pic_host_xlate(struct irq_domain *h, struct device_node *ct,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops ehv_pic_host_ops = {
++static const struct irq_domain_ops ehv_pic_host_ops = {
+ 	.match = ehv_pic_host_match,
+ 	.map = ehv_pic_host_map,
+ 	.xlate = ehv_pic_host_xlate,
+diff --git a/arch/powerpc/sysdev/fsl_msi.c b/arch/powerpc/sysdev/fsl_msi.c
+index f4fd95b..0c01deb 100644
+--- a/arch/powerpc/sysdev/fsl_msi.c
++++ b/arch/powerpc/sysdev/fsl_msi.c
+@@ -74,7 +74,7 @@ static int fsl_msi_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static struct irq_domain_ops fsl_msi_host_ops = {
++static const struct irq_domain_ops fsl_msi_host_ops = {
+ 	.map = fsl_msi_host_map,
+ };
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9
