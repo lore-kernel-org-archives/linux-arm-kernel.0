@@ -1,37 +1,23 @@
-From: danny.kukawka@bisect.de (Danny Kukawka)
-Date: Thu, 16 Feb 2012 16:30:52 +0100
-Subject: [PATCH] arch/arm/mach-bcmring/dma.c: included linux/sched.h twice
-In-Reply-To: <1329403558-32661-1-git-send-email-danny.kukawka@bisect.de>
-References: <1329403558-32661-1-git-send-email-danny.kukawka@bisect.de>
-Message-ID: <201202161630.53031.danny.kukawka@bisect.de>
+From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
+Date: Thu, 16 Feb 2012 17:37:57 +0200
+Subject: ARM: add xz kernel compression support
+In-Reply-To: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <4F3D22D5.3060607@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Ignore this one since the fix is already in linux-next.
+On 02/16/2012 04:54 PM, Michael Opdenacker wrote:
+> It adds xz support to the ARM tree. x86 already has it, so let's
+> have it too!
 
-Danny
+XZ support is already applied to Russell's for-next through patch
+tracking system [1].
 
-On Donnerstag, 16. Februar 2012, Danny Kukawka wrote:
-> arch/arm/mach-bcmring/dma.c included 'linux/sched.h' twice,
-> remove the duplicates.
->
-> Signed-off-by: Danny Kukawka <danny.kukawka@bisect.de>
-> ---
->  arch/arm/mach-bcmring/dma.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
-> index 1024396..e5fd241 100644
-> --- a/arch/arm/mach-bcmring/dma.c
-> +++ b/arch/arm/mach-bcmring/dma.c
-> @@ -35,7 +35,6 @@
->
->  #include <linux/pfn.h>
->  #include <linux/atomic.h>
-> -#include <linux/sched.h>
->  #include <mach/dma.h>
->
->  /* ---- Public Variables -------------------------------------------------
-> */
+[1]:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7001/2
+
+--
+Veli-Pekka Peltola
