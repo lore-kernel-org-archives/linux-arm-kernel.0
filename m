@@ -1,91 +1,60 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Thu, 16 Feb 2012 22:24:00 +0530
-Subject: [PATCH v6] I2C: add CSR SiRFprimaII on-chip I2C controllers driver
-In-Reply-To: <1328714915-12287-1-git-send-email-21cnbao@gmail.com>
-References: <1328714915-12287-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CAM=Q2ct7EHht06uCHVpR_HoO39WZjO2+N6DhxuMthRQRQBRnyw@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 16 Feb 2012 17:01:42 +0000
+Subject: Oops in guest after ioremap() on ARMv7
+In-Reply-To: <CAHkRjk68rw2TKnitc7M+R1FCpwrGkqFHwd4YmS78mveR9uO_2Q@mail.gmail.com>
+References: <4EF31DA7.9030407@citrix.com> <20111222144937.GE20635@arm.com>
+ <4EF35CFF.3050200@citrix.com> <20111222181356.GI20635@arm.com>
+ <4EF37802.30300@citrix.com>
+ <1324641625.7877.161.camel@zakaz.uk.xensource.com>
+ <20120103165027.GD22876@arm.com>
+ <1326994510.17599.97.camel@zakaz.uk.xensource.com>
+ <CAHkRjk68rw2TKnitc7M+R1FCpwrGkqFHwd4YmS78mveR9uO_2Q@mail.gmail.com>
+Message-ID: <1329411702.3133.4.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Catalin,
 
-On Wed, Feb 8, 2012 at 8:58 PM, Barry Song <21cnbao@gmail.com> wrote:
-> From: Zhiwu Song <Zhiwu.Song@csr.com>
->
-> SiRFprimaII is the latest generation application processor from CSR?s
-> multi-function SoC product family.
-> The SoC support codes are in arch/arm/mach-prima2 from Linux mainline
-> 3.0.
-> There are two I2C controllers on primaII, features include:
-> * Two I2C controller modules are on chip
-> * RISC I/O bus read write register
-> * Up to 16 bytes data buffer for issuing commands and writing data
-> ?at the same time
-> * Up to 16 commands, and receiving read data 16 bytes at a time
-> * Error INT report (ACK check)
-> * No-ACK bus protocols (SCCB bus protocols)
->
-> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> Signed-off-by: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
-> Signed-off-by: Yuping Luo <Yuping.Luo@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
-> ?-v6:
-> ?fix/cleanup lots of minor issues pointed out by wolfram;
-> ?add OF property clock-frequency to support freq setting by DT;
-> ?add lost devicetree binding document;
->
-> ?Documentation/devicetree/bindings/i2c/sirf-i2c.txt | ? 19 +
-> ?drivers/i2c/busses/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? | ? 10 +
-> ?drivers/i2c/busses/Makefile ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?drivers/i2c/busses/i2c-sirf.c ? ? ? ? ? ? ? ? ? ? ?| ?459 ++++++++++++++++++++
-> ?4 files changed, 489 insertions(+), 0 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/i2c/sirf-i2c.txt
-> ?create mode 100644 drivers/i2c/busses/i2c-sirf.c
->
-> diff --git a/Documentation/devicetree/bindings/i2c/sirf-i2c.txt b/Documentation/devicetree/bindings/i2c/sirf-i2c.txt
-> new file mode 100644
-> index 0000000..7baf9e1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/i2c/sirf-i2c.txt
-<snip>
+On Tue, 2012-01-31 at 14:40 +0000, Catalin Marinas wrote:
+> On 19 January 2012 17:35, Ian Campbell <Ian.Campbell@citrix.com> wrote:
+> > On Tue, 2012-01-03 at 16:50 +0000, Catalin Marinas wrote:
+> >> On Fri, Dec 23, 2011 at 12:00:25PM +0000, Ian Campbell wrote:
+> >> > At the moment we build the entire p2m before we ever load the VTTBR or
+> >> > enable stage-2 translations in the HCR. Is that sufficient or do we also
+> >> > need to flush something?
+> >>
+> >> If the model does not correctly implement cacheable page table walks for
+> >> either stage 1 or stage 2 translation (though ID_MMFR3[23:20] indicate
+> >> that it should), the hypervisor would need to clean the D-cache to the
+> >> point of unification (not necessary to go to the point of coherency)
+> >> before any of the state 2 translation tables are used.
+> >
+> > I added a copy of Linux's v7_flush_dcache_all after building the p2m but
+> > just before loading the VTTBR and it didn't help.
+> >
+> > I turned off cacheability in VTCR and that didn't help either.
+> >
+> > Then I turned off cacheability in the Linux TTBR{0,1} (by frobbing both
+> > TTB_FLAGS_UP and TTB_FLAGS_SMP to use FOO_NC everywhere) and this _did_
+> > make a difference -- the kernel now boots.
+> >
+> > I then tested just that change by itself and it seems to have done the
+> > trick.
+> >
+> > Does that indicate a model bug?
+> 
+> It is possible. The scenario I'm thinking of is that with cacheable
+> PTWs enabled in TTBR, the model wrongly decides to use the
+> intermediate physical address (IPA) to look up the caches and gets the
+> wrong information.
+> 
+> I'll take this to the model guys but most likely they'll ask for an
+> image to load and just run. Could you provide such simple image
+> (minimal filesystem)? I'm not familiar with Xen and building it.
+> 
+> (I'll first ask the model guys, maybe they can spot the error easily
+> without additional debugging).
 
-> +
-> + ? ? ? ? ? ? ? if (i2c_stat & SIRFSOC_I2C_STAT_NACK)
-> + ? ? ? ? ? ? ? ? ? ? ? dev_err(&siic->adapter.dev, "ACK not received\n");
-Could we send stop here?
-> + ? ? ? ? ? ? ? else
-> + ? ? ? ? ? ? ? ? ? ? ? dev_err(&siic->adapter.dev, "I2C error\n");
-> +
-> + ? ? ? ? ? ? ? complete(&siic->done);
-<Snip>
+Did they conclude anything? Can I provide any more info?
 
-> +static int i2c_sirfsoc_resume(struct device *dev)
-> +{
-> + ? ? ? struct platform_device *pdev = to_platform_device(dev);
-> + ? ? ? struct i2c_adapter *adapter = platform_get_drvdata(pdev);
-> + ? ? ? struct sirfsoc_i2c *siic = adapter->algo_data;
-> +
-> + ? ? ? clk_enable(siic->clk);
-> + ? ? ? writel(SIRFSOC_I2C_RESET, siic->base + SIRFSOC_I2C_CTRL);
-Could you explain why is a reset needed.
-Or am I missing something.
-
-> + ? ? ? writel(SIRFSOC_I2C_CORE_EN | SIRFSOC_I2C_MASTER_MODE,
-> + ? ? ? ? ? ? ? siic->base + SIRFSOC_I2C_CTRL);
-> + ? ? ? writel(siic->clk_div, siic->base + SIRFSOC_I2C_CLK_CTRL);
-> + ? ? ? writel(siic->sda_delay, siic->base + SIRFSOC_I2C_SDA_DELAY);
-> + ? ? ? clk_disable(siic->clk);
-> + ? ? ? return 0;
-> +}
-> +
-> +static const struct dev_pm_ops i2c_sirfsoc_pm_ops = {
-> + ? ? ? .suspend = i2c_sirfsoc_suspend,
-> + ? ? ? .resume = i2c_sirfsoc_resume,
-Could we use simple dev_pm ops here?
-
-> +};
-> +#endif
-> +
-> +static const struct of_device_id sirfsoc_i2c_of_match[] __devinitconst = {
-> + ? ? ? { .compatible = "sirf,prima2-i2c", },
+Ian.
