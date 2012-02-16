@@ -1,26 +1,16 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2012 08:45:36 +0000
-Subject: [PATCH v2 00/13] Make mach/irqs.h optional
-In-Reply-To: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
-References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20120216084536.GH13673@n2100.arm.linux.org.uk>
+Date: Thu, 16 Feb 2012 08:50:10 +0000
+Subject: [PATCH] ARM: boot/compressed/decompress.c cleanup
+In-Reply-To: <1329370449-12033-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1329370449-12033-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <20120216085010.GI13673@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2012 at 02:32:58PM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This series removes the include of mach/irqs.h from asm/irq.h when
-> SPARSE_IRQ is selected. Platforms which select SPARSE_IRQ have been
-> updated.
+On Thu, Feb 16, 2012 at 06:34:09AM +0100, Michael Opdenacker wrote:
+> - Remove the ARCH_HAS_DECOMP_WDOG define
+>   because it is only used in lib/deflate.c, which
+>   only the alpha architecture uses. No other architecture
+>   uses this define
 
-Rob,
-
-Last night, I merged devel-stable into the stuff which gets built, and it
-seems your IRQ changes are breaking PXA:
-
-Before merge:
-http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=129
-
-After merge:
-http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=137
+No.  Your grepping is broken.
