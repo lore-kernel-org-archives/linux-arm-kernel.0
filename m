@@ -1,52 +1,69 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Feb 2012 22:03:35 -0800
-Subject: [PATCH v3 24/25] irq_domain: remove "hint" when allocating irq
- numbers
-In-Reply-To: <20120216053243.GM25779@ponder.secretlab.ca>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-25-git-send-email-grant.likely@secretlab.ca>
- <4F316848.4060100@atmel.com> <4F3BC97C.6030203@atmel.com>
- <20120215202145.GH25779@ponder.secretlab.ca>
- <20120215215001.GA30946@r65073-Latitude-D630>
- <20120216053243.GM25779@ponder.secretlab.ca>
-Message-ID: <20120216060334.GA11758@r65073-Latitude-D630>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 16 Feb 2012 14:17:31 +0800
+Subject: [PATCH v6 0/2] patch set about the MXS-DMA
+Message-ID: <1329373053-19494-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 10:32:43PM -0700, Grant Likely wrote:
-...
-> That's a bug then.  The implementation should work without patch 24.  Does
-> this patch fix it?
-> 
-Yes, it fixes the problem for me.
+patch 1: move the mxs dma header to a more common place.
+	Beside the mx23/mx28, the apbh-dma is also used by MX50 and MX6Q.
+	So move the mxs dma header file to a more common place, and rename
+	it to mxs-dma.h
 
-Regards,
-Shawn
+patch 2: rewrite the last parameter of mxs_dma_prep_slave_sg().
+	In the new GPMI version, some hardware behavior changes.
+	The WAIT4END bit should be set in the middle one of the ECC READ page DMA chain.
+	The DMA chain should be set like this:
 
-> ---
-> 
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 2c1d6f8..2d3dfff 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -516,8 +516,8 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
->  		return irq_domain_legacy_revmap(domain, hwirq);
->  
->  	/* Slow path does a linear search of the map */
-> -	if (hint < NUM_ISA_INTERRUPTS)
-> -		hint = NUM_ISA_INTERRUPTS;
-> +	if (hint == 0)
-> +		hint = 1;
->  	i = hint;
->  	do {
->  		struct irq_data *data = irq_get_irq_data(i);
-> @@ -525,7 +525,7 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
->  			return i;
->  		i++;
->  		if (i >= irq_virq_count)
-> -			i = NUM_ISA_INTERRUPTS;
-> +			i = 1
->  	} while(i != hint);
->  	return 0;
->  }
-> 
+          +-----+               +-----+                      +-----+
+          | cmd | ------------> | cmd | ------------------>  | cmd |
+          +-----+               +-----+                      +-----+
+                                   ^                            ^
+                                   |                            |
+                                   |                            |
+                              set WAIT4END here too        set WAIT4END here
+
+        So rewrite the last parameter of mxs_dma_prep_slave_sg(), use the
+	dma_ctrl_flags to set the proper DMA bit for DMA Command Structure.
+	And change the relative drivers with the dma_ctrl_flags.
+
+TEST:
+	Tested the mxs-mmc driver and gpmi-nand drive with the two patches
+	in MX28 board.
+
+v5 --> v6:
+	[1] create this patch set based on the mainline.
+
+v4 --> v5:
+	[1] remove GPMI_IS_MX6Q(), make the mxs and mx6q use the same code.
+		
+v3 --> v4:
+	[1] create a new folder include/linux/fsl/ for store the Freescale's
+	    header files.
+	[2] add more CCs.
+
+v2 --> v3:
+	[1] remove field gpmi_version, use GPMI_IS_MX6Q() instead.
+
+v1 --> v2:
+	[1] squash the trial patches into single patch.
+	[2] use the dma_ctrl_flags.
+
+
+Huang Shijie (2):
+  mxs-dma : move the mxs dma.h to a more common place
+  mxs-dma : rewrite the last parameter of mxs_dma_prep_slave_sg()
+
+ drivers/dma/mxs-dma.c                              |   34 +++++++++++++++++---
+ drivers/mmc/host/mxs-mmc.c                         |   12 +++---
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c              |   19 +++++++---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |    2 +-
+ .../mach/dma.h => include/linux/fsl/mxs-dma.h      |    0
+ sound/soc/mxs/mxs-pcm.c                            |    2 +-
+ sound/soc/mxs/mxs-pcm.h                            |    2 +-
+ sound/soc/mxs/mxs-saif.c                           |    2 +-
+ 8 files changed, 52 insertions(+), 21 deletions(-)
+ rename arch/arm/mach-mxs/include/mach/dma.h => include/linux/fsl/mxs-dma.h (100%)
+
+-- 
+1.7.3.2
