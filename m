@@ -1,20 +1,37 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 16 Feb 2012 23:27:14 +0800
-Subject: [PATCH] arch/arm/mach-mmp/: some files include some headers twice
-In-Reply-To: <1329403520-32551-1-git-send-email-danny.kukawka@bisect.de>
-References: <1329403520-32551-1-git-send-email-danny.kukawka@bisect.de>
-Message-ID: <CAN1soZyGoVA8A1BKyh73EHDxoR-St8g9eM1QOWLqp1+H2r0dXw@mail.gmail.com>
+From: danny.kukawka@bisect.de (Danny Kukawka)
+Date: Thu, 16 Feb 2012 16:30:52 +0100
+Subject: [PATCH] arch/arm/mach-bcmring/dma.c: included linux/sched.h twice
+In-Reply-To: <1329403558-32661-1-git-send-email-danny.kukawka@bisect.de>
+References: <1329403558-32661-1-git-send-email-danny.kukawka@bisect.de>
+Message-ID: <201202161630.53031.danny.kukawka@bisect.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 10:45 PM, Danny Kukawka <danny.kukawka@bisect.de> wrote:
-> arch/arm/mach-mmp/: some files include some headers twice:
-> - arch/arm/mach-mmp/aspenite.c and
-> ?arch/arm/mach-mmp/tavorevb.c: 'linux/gpio.h'
-> - arch/arm/mach-mmp/pxa168.c: 'linux/platform_device.h'
->
-> Remove the duplicates.
+Hi,
+
+Ignore this one since the fix is already in linux-next.
+
+Danny
+
+On Donnerstag, 16. Februar 2012, Danny Kukawka wrote:
+> arch/arm/mach-bcmring/dma.c included 'linux/sched.h' twice,
+> remove the duplicates.
 >
 > Signed-off-by: Danny Kukawka <danny.kukawka@bisect.de>
-
-Applied. Thanks
+> ---
+>  arch/arm/mach-bcmring/dma.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
+> index 1024396..e5fd241 100644
+> --- a/arch/arm/mach-bcmring/dma.c
+> +++ b/arch/arm/mach-bcmring/dma.c
+> @@ -35,7 +35,6 @@
+>
+>  #include <linux/pfn.h>
+>  #include <linux/atomic.h>
+> -#include <linux/sched.h>
+>  #include <mach/dma.h>
+>
+>  /* ---- Public Variables -------------------------------------------------
+> */
