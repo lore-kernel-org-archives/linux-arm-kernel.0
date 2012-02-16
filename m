@@ -1,55 +1,126 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 16 Feb 2012 16:28:37 +0530
-Subject: [PATCH] gpio/gpio-pl061: No need of thaw and poweroff routines
- for hibernate
-In-Reply-To: <7662253849428ce018fb7f7359e0585fca9fb597.1326274467.git.viresh.kumar@st.com>
-References: <7662253849428ce018fb7f7359e0585fca9fb597.1326274467.git.viresh.kumar@st.com>
-Message-ID: <4F3CE15D.6010902@st.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 16 Feb 2012 12:00:34 +0100
+Subject: [PATCH 1/4] ARM: OMAP2+: board-generic: Remove un-needed
+ .atag_offset for DT_MACHINE
+In-Reply-To: <20120215181313.GY1426@atomide.com>
+References: <1329150625-8604-2-git-send-email-b-cousson@ti.com>
+ <20120214195249.GS1426@atomide.com> <4F3BAFCD.2000508@ti.com>
+ <20120215181313.GY1426@atomide.com>
+Message-ID: <4F3CE1D2.5010202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/11/2012 3:25 PM, Viresh KUMAR wrote:
-> pl061 uses same routines for suspend/freeze/poweroff and resume/thaw/restore.
-> We are only saving and restoring register values on these routines.
+On 2/15/2012 7:13 PM, Tony Lindgren wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [120215 04:43]:
+>> On 2/14/2012 8:52 PM, Tony Lindgren wrote:
+>>> * Benoit Cousson<b-cousson@ti.com>   [120213 07:59]:
+>>>> Some .atag_offset entries were wrongly added during a merge conflict
+>>>> resolution in 3.3.
+>>>> Remove them all, since DT boot does not use that attribute anymore.
+>>>>
+>>>> Replace as well the #if... by #ifdef for consistency.
+>>>
+>>> How about let's also remove the 0x from the serial at 0x.. in the .dts
+>>> files in this clean-up patch?
+>>
+>> In the same patch?
+>>
+>> I'm fine with fixing that as well, but since this is not in the same
+>> file / directory, I'd rather do a different patch.
+>>
+>> I'll do the fix anyway, it is up to you for the proper location.
 > 
-> During hibernation, in freeze() we take a snapshot of gpio registers. In thaw()
-> we don't actually need to restore these registers, as power was never shut down
-> till now. Similarly, in poweroff() we don't need to take snapshot of these
-> registers again, as it was done during freeze() and by now the image is already
-> saved on disk.
-> 
-> This patch passes poweroff() and thaw() routines as NULL to avoid this extra
-> work done.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
+> OK separate patch is fine with me.
 
-Hi Grant/Rafael,
+Please find the patch below, I'll include it in the branch for the pull request.
 
-Any feedback on the below patch?
-
->  drivers/gpio/gpio-pl061.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-> index 84ba1dd..45b884b 100644
-> --- a/drivers/gpio/gpio-pl061.c
-> +++ b/drivers/gpio/gpio-pl061.c
-> @@ -430,7 +430,12 @@ static int pl061_resume(struct device *dev)
->  	return 0;
->  }
->  
-> -static SIMPLE_DEV_PM_OPS(pl061_dev_pm_ops, pl061_suspend, pl061_resume);
-> +static const struct dev_pm_ops pl061_dev_pm_ops = {
-> +	.suspend = pl061_suspend,
-> +	.resume = pl061_resume,
-> +	.freeze = pl061_suspend,
-> +	.restore = pl061_resume,
-> +};
->  #endif
->  
->  static struct amba_id pl061_ids[] = {
+Thanks,
+Benoit
 
 
+---
+>From edc05cc7396228f21d169dd34f1871464f0a00b8 Mon Sep 17 00:00:00 2001
+From: Benoit Cousson <b-cousson@ti.com>
+Date: Thu, 16 Feb 2012 11:55:27 +0100
+Subject: [PATCH] arm/dts: OMAP3&4: Remove the '0x' prefix for serial nodes
+
+Follow the DTS convention and thus name the nodes <name>@<address> without
+any '0x' prefix in the physical address.
+
+Suggested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+---
+ arch/arm/boot/dts/omap3.dtsi |    8 ++++----
+ arch/arm/boot/dts/omap4.dtsi |    8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 216c331..1c9d10a 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -67,25 +67,25 @@
+ 			#interrupt-cells = <1>;
+ 		};
+ 
+-		uart1: serial at 0x4806a000 {
++		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart1";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+-		uart2: serial at 0x4806c000 {
++		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+-		uart3: serial at 0x49020000 {
++		uart3: serial at 49020000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+-		uart4: serial at 0x49042000 {
++		uart4: serial at 49042000 {
+ 			compatible = "ti,omap3-uart";
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index e8fe75f..f40af04 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -104,25 +104,25 @@
+ 			      <0x48240100 0x0100>;
+ 		};
+ 
+-		uart1: serial at 0x4806a000 {
++		uart1: serial at 4806a000 {
+ 			compatible = "ti,omap4-uart";
+ 			ti,hwmods = "uart1";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+-		uart2: serial at 0x4806c000 {
++		uart2: serial at 4806c000 {
+ 			compatible = "ti,omap4-uart";
+ 			ti,hwmods = "uart2";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+-		uart3: serial at 0x48020000 {
++		uart3: serial at 48020000 {
+ 			compatible = "ti,omap4-uart";
+ 			ti,hwmods = "uart3";
+ 			clock-frequency = <48000000>;
+ 		};
+ 
+-		uart4: serial at 0x4806e000 {
++		uart4: serial at 4806e000 {
+ 			compatible = "ti,omap4-uart";
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
 -- 
-viresh
+1.7.0.4
