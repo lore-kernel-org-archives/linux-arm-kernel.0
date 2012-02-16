@@ -1,73 +1,231 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 16 Feb 2012 11:21:13 +0200
-Subject: [PATCH 06/12] ARM: S3C24XX: change the ARCH_S3C2410 to
- ARCH_S3C24XX
-In-Reply-To: <1329346545-16373-7-git-send-email-kgene.kim@samsung.com>
-References: <1329346545-16373-1-git-send-email-kgene.kim@samsung.com>
- <1329346545-16373-7-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20120216092111.GJ1925@legolas.emea.dhcp.ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 16 Feb 2012 02:09:24 -0700
+Subject: [PATCH v5 23/27] irq_domain/powerpc: Replace custom xlate functions
+ with library functions
+In-Reply-To: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <1329383368-12122-24-git-send-email-grant.likely@secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch converts a number of the powerpc drivers to use the common library
+of irq_domain xlate functions, dropping a bunch of lines in the process.
 
-On Thu, Feb 16, 2012 at 07:55:40AM +0900, Kukjin Kim wrote:
-> This patch changes the ARCH name to "ARCH_S3C24XX" for Samsung
-> S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443,
-> and S3C2450 SoCs so that we can merge the mach-xxx directories
-> and plat-s3c24xx dir. to just one mach-s3c24xx for them.
-> 
-> I think this should be sent to upstream via samsung tree because
-> this touches many samsung stuff.
-> 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Greg Kroah-Hartman <gregkh@suse.de>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: Sangbeom Kim <sbkim73@samsung.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  arch/arm/Kconfig                      |   23 +++++++++++------------
->  arch/arm/Makefile                     |    2 +-
->  arch/arm/boot/compressed/head.S       |    2 +-
->  arch/arm/configs/mini2440_defconfig   |    2 +-
->  arch/arm/configs/s3c2410_defconfig    |    2 +-
->  arch/arm/configs/tct_hammer_defconfig |    2 +-
->  arch/arm/mach-s3c2410/Kconfig         |    2 +-
->  arch/arm/mach-s3c2412/Kconfig         |    4 ++--
->  arch/arm/mach-s3c2416/Kconfig         |    2 +-
->  arch/arm/mach-s3c2443/Kconfig         |    2 +-
->  arch/arm/plat-s3c24xx/Kconfig         |    6 +++---
->  arch/arm/plat-s3c24xx/Makefile        |    2 +-
->  arch/arm/plat-samsung/Kconfig         |    4 ++--
->  drivers/input/touchscreen/Kconfig     |    2 +-
->  drivers/leds/Kconfig                  |    2 +-
->  drivers/mmc/host/Kconfig              |    2 +-
->  drivers/mtd/nand/Kconfig              |    2 +-
->  drivers/rtc/Kconfig                   |    2 +-
->  drivers/spi/Kconfig                   |    2 +-
->  drivers/usb/Kconfig                   |    2 +-
->  drivers/usb/gadget/Kconfig            |    4 ++--
+v5: - Remove tsi108 changes from patch
 
-for the gadget part:
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Milton Miller <miltonm@bga.com>
+Tested-by: Olof Johansson <olof@lixom.net>
+---
+ arch/powerpc/platforms/powermac/pic.c |   13 +------------
+ arch/powerpc/platforms/wsp/opb_pic.c  |   13 +------------
+ arch/powerpc/sysdev/cpm2_pic.c        |   14 +-------------
+ arch/powerpc/sysdev/ipic.c            |   18 +-----------------
+ arch/powerpc/sysdev/qe_lib/qe_ic.c    |   15 +--------------
+ arch/powerpc/sysdev/uic.c             |   14 +-------------
+ drivers/gpio/gpio-mpc8xxx.c           |   17 +----------------
+ 7 files changed, 7 insertions(+), 97 deletions(-)
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-
+diff --git a/arch/powerpc/platforms/powermac/pic.c b/arch/powerpc/platforms/powermac/pic.c
+index 46a5f32..92afc38 100644
+--- a/arch/powerpc/platforms/powermac/pic.c
++++ b/arch/powerpc/platforms/powermac/pic.c
+@@ -288,21 +288,10 @@ static int pmac_pic_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static int pmac_pic_host_xlate(struct irq_domain *h, struct device_node *ct,
+-			       const u32 *intspec, unsigned int intsize,
+-			       irq_hw_number_t *out_hwirq,
+-			       unsigned int *out_flags)
+-
+-{
+-	*out_flags = IRQ_TYPE_NONE;
+-	*out_hwirq = *intspec;
+-	return 0;
+-}
+-
+ static const struct irq_domain_ops pmac_pic_host_ops = {
+ 	.match = pmac_pic_host_match,
+ 	.map = pmac_pic_host_map,
+-	.xlate = pmac_pic_host_xlate,
++	.xlate = irq_domain_xlate_onecell,
+ };
+ 
+ static void __init pmac_pic_probe_oldstyle(void)
+diff --git a/arch/powerpc/platforms/wsp/opb_pic.c b/arch/powerpc/platforms/wsp/opb_pic.c
+index 0c6fe0b..cb565bf 100644
+--- a/arch/powerpc/platforms/wsp/opb_pic.c
++++ b/arch/powerpc/platforms/wsp/opb_pic.c
+@@ -196,20 +196,9 @@ static int opb_host_map(struct irq_domain *host, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static int opb_host_xlate(struct irq_domain *host, struct device_node *dn,
+-		const u32 *intspec, unsigned int intsize,
+-		irq_hw_number_t *out_hwirq, unsigned int *out_type)
+-{
+-	/* Interrupt size must == 2 */
+-	BUG_ON(intsize != 2);
+-	*out_hwirq = intspec[0];
+-	*out_type = intspec[1];
+-	return 0;
+-}
+-
+ static const struct irq_domain_ops opb_host_ops = {
+ 	.map = opb_host_map,
+-	.xlate = opb_host_xlate,
++	.xlate = irq_domain_xlate_twocell,
+ };
+ 
+ irqreturn_t opb_irq_handler(int irq, void *private)
+diff --git a/arch/powerpc/sysdev/cpm2_pic.c b/arch/powerpc/sysdev/cpm2_pic.c
+index 8c9fc9c..d3be961 100644
+--- a/arch/powerpc/sysdev/cpm2_pic.c
++++ b/arch/powerpc/sysdev/cpm2_pic.c
+@@ -224,21 +224,9 @@ static int cpm2_pic_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static int cpm2_pic_host_xlate(struct irq_domain *h, struct device_node *ct,
+-			    const u32 *intspec, unsigned int intsize,
+-			    irq_hw_number_t *out_hwirq, unsigned int *out_flags)
+-{
+-	*out_hwirq = intspec[0];
+-	if (intsize > 1)
+-		*out_flags = intspec[1];
+-	else
+-		*out_flags = IRQ_TYPE_NONE;
+-	return 0;
+-}
+-
+ static const struct irq_domain_ops cpm2_pic_host_ops = {
+ 	.map = cpm2_pic_host_map,
+-	.xlate = cpm2_pic_host_xlate,
++	.xlate = irq_domain_xlate_onetwocell,
+ };
+ 
+ void cpm2_pic_init(struct device_node *node)
+diff --git a/arch/powerpc/sysdev/ipic.c b/arch/powerpc/sysdev/ipic.c
+index 0eaaa01..b50f978 100644
+--- a/arch/powerpc/sysdev/ipic.c
++++ b/arch/powerpc/sysdev/ipic.c
+@@ -692,26 +692,10 @@ static int ipic_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static int ipic_host_xlate(struct irq_domain *h, struct device_node *ct,
+-			   const u32 *intspec, unsigned int intsize,
+-			   irq_hw_number_t *out_hwirq, unsigned int *out_flags)
+-
+-{
+-	/* interrupt sense values coming from the device tree equal either
+-	 * LEVEL_LOW (low assertion) or EDGE_FALLING (high-to-low change)
+-	 */
+-	*out_hwirq = intspec[0];
+-	if (intsize > 1)
+-		*out_flags = intspec[1];
+-	else
+-		*out_flags = IRQ_TYPE_NONE;
+-	return 0;
+-}
+-
+ static struct irq_domain_ops ipic_host_ops = {
+ 	.match	= ipic_host_match,
+ 	.map	= ipic_host_map,
+-	.xlate	= ipic_host_xlate,
++	.xlate	= irq_domain_xlate_onetwocell,
+ };
+ 
+ struct ipic * __init ipic_init(struct device_node *node, unsigned int flags)
+diff --git a/arch/powerpc/sysdev/qe_lib/qe_ic.c b/arch/powerpc/sysdev/qe_lib/qe_ic.c
+index e9b3d5c..2fba6ef 100644
+--- a/arch/powerpc/sysdev/qe_lib/qe_ic.c
++++ b/arch/powerpc/sysdev/qe_lib/qe_ic.c
+@@ -272,23 +272,10 @@ static int qe_ic_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static int qe_ic_host_xlate(struct irq_domain *h, struct device_node *ct,
+-			    const u32 * intspec, unsigned int intsize,
+-			    irq_hw_number_t * out_hwirq,
+-			    unsigned int *out_flags)
+-{
+-	*out_hwirq = intspec[0];
+-	if (intsize > 1)
+-		*out_flags = intspec[1];
+-	else
+-		*out_flags = IRQ_TYPE_NONE;
+-	return 0;
+-}
+-
+ static struct irq_domain_ops qe_ic_host_ops = {
+ 	.match = qe_ic_host_match,
+ 	.map = qe_ic_host_map,
+-	.xlate = qe_ic_host_xlate,
++	.xlate = irq_domain_xlate_onetwocell,
+ };
+ 
+ /* Return an interrupt vector or NO_IRQ if no interrupt is pending. */
+diff --git a/arch/powerpc/sysdev/uic.c b/arch/powerpc/sysdev/uic.c
+index 84e59c9..9203393 100644
+--- a/arch/powerpc/sysdev/uic.c
++++ b/arch/powerpc/sysdev/uic.c
+@@ -190,21 +190,9 @@ static int uic_host_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static int uic_host_xlate(struct irq_domain *h, struct device_node *ct,
+-			  const u32 *intspec, unsigned int intsize,
+-			  irq_hw_number_t *out_hwirq, unsigned int *out_type)
+-
+-{
+-	/* UIC intspecs must have 2 cells */
+-	BUG_ON(intsize != 2);
+-	*out_hwirq = intspec[0];
+-	*out_type = intspec[1];
+-	return 0;
+-}
+-
+ static struct irq_domain_ops uic_host_ops = {
+ 	.map	= uic_host_map,
+-	.xlate	= uic_host_xlate,
++	.xlate	= irq_domain_xlate_twocell,
+ };
+ 
+ void uic_irq_cascade(unsigned int virq, struct irq_desc *desc)
+diff --git a/drivers/gpio/gpio-mpc8xxx.c b/drivers/gpio/gpio-mpc8xxx.c
+index 149d987..e6568c1 100644
+--- a/drivers/gpio/gpio-mpc8xxx.c
++++ b/drivers/gpio/gpio-mpc8xxx.c
+@@ -296,24 +296,9 @@ static int mpc8xxx_gpio_irq_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
+-static int mpc8xxx_gpio_irq_xlate(struct irq_domain *h, struct device_node *ct,
+-				  const u32 *intspec, unsigned int intsize,
+-				  irq_hw_number_t *out_hwirq,
+-				  unsigned int *out_flags)
+-
+-{
+-	/* interrupt sense values coming from the device tree equal either
+-	 * EDGE_FALLING or EDGE_BOTH
+-	 */
+-	*out_hwirq = intspec[0];
+-	*out_flags = intspec[1];
+-
+-	return 0;
+-}
+-
+ static struct irq_domain_ops mpc8xxx_gpio_irq_ops = {
+ 	.map	= mpc8xxx_gpio_irq_map,
+-	.xlate	= mpc8xxx_gpio_irq_xlate,
++	.xlate	= irq_domain_xlate_twocell,
+ };
+ 
+ static struct of_device_id mpc8xxx_gpio_ids[] __initdata = {
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120216/49e15eeb/attachment-0001.sig>
+1.7.9
