@@ -1,60 +1,40 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Thu, 16 Feb 2012 12:25:15 +0100
-Subject: [PATCH] ARM: boot/compressed/decompress.c cleanup
-Message-ID: <1329391515-20492-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 16 Feb 2012 12:28:38 +0100
+Subject: remoteproc: Load coprocessor code to the specific main memory
+ location
+In-Reply-To: <4F3CC899.4070302@monstr.eu>
+References: <4F1EE861.4030405@monstr.eu>
+ <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
+ <4F1FF870.3000105@monstr.eu>
+ <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
+ <4F200F64.9060203@monstr.eu>
+ <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
+ <4F212E9E.9060807@monstr.eu>
+ <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
+ <4F391C1D.9020402@monstr.eu>
+ <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
+ <4F3BA962.9040109@monstr.eu> <4F3BC30A.4030301@monstr.eu>
+ <4F3CC899.4070302@monstr.eu>
+Message-ID: <CAK=WgbaRF-L7M3VMZQdqFLUFOJuwFVkBH1hUNuJ51kSrzkaVjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Remove unused declarations and includes
-- Remove the Trace<xx> and Assert functions which aren't used
-  in decompression routines.
+On Thu, Feb 16, 2012 at 10:12 AM, Michal Simek <monstr@monstr.eu> wrote:
+> I should be more specific. Can you point me to remoteproc code which publish
+> remote service based on them Linux rpmsg driver will be probed? It is rtos
+> part of code.
+> In your ELCE presentation is called rpmsg-client-sample service.
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/boot/compressed/decompress.c |   21 ---------------------
- 1 files changed, 0 insertions(+), 21 deletions(-)
+Sorry for the late response (I'm in ELC).
 
-diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
-index 07be5a2..ce0ceb1 100644
---- a/arch/arm/boot/compressed/decompress.c
-+++ b/arch/arm/boot/compressed/decompress.c
-@@ -1,37 +1,16 @@
--#define _LINUX_STRING_H_
--
- #include <linux/compiler.h>	/* for inline */
- #include <linux/types.h>	/* for size_t */
- #include <linux/stddef.h>	/* for NULL */
--#include <linux/linkage.h>
- #include <asm/string.h>
- 
- extern unsigned long free_mem_ptr;
- extern unsigned long free_mem_end_ptr;
--extern void error(char *);
- 
- #define STATIC static
- #define STATIC_RW_DATA	/* non-static please */
- 
- #define ARCH_HAS_DECOMP_WDOG
- 
--/* Diagnostic functions */
--#ifdef DEBUG
--#  define Assert(cond,msg) {if(!(cond)) error(msg);}
--#  define Trace(x) fprintf x
--#  define Tracev(x) {if (verbose) fprintf x ;}
--#  define Tracevv(x) {if (verbose>1) fprintf x ;}
--#  define Tracec(c,x) {if (verbose && (c)) fprintf x ;}
--#  define Tracecv(c,x) {if (verbose>1 && (c)) fprintf x ;}
--#else
--#  define Assert(cond,msg)
--#  define Trace(x)
--#  define Tracev(x)
--#  define Tracevv(x)
--#  define Tracec(c,x)
--#  define Tracecv(c,x)
--#endif
--
- #ifdef CONFIG_KERNEL_GZIP
- #include "../../../../lib/decompress_inflate.c"
- #endif
--- 
-1.7.4.1
+Yes, use the client sample (which is part of the submitted patch set)
+and not the omx/server samples (which are public, but were never
+submitted nor cleaned up).
+
+The channels are created dynamically: the rpmsg bus designates address
+53 for a name service, which listens to channel creation/removal
+announcements coming from the remote processor. Take a look in
+virtio_rpmsg_bus.c and you'll immediately see it.
+
+Hope this helps,
+Ohad.
