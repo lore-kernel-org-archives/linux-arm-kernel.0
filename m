@@ -1,58 +1,89 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 16 Feb 2012 10:38:36 -0800
-Subject: [PATCH v2 03/11] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
-In-Reply-To: <201202160550.42192.arnd@arndb.de>
-References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
- <201202160522.35249.arnd@arndb.de>
- <CAJOA=zPujvu0WNmn8UPa4NogJ1w6UqEg-RDNEcnfBZQW3SS+eQ@mail.gmail.com>
- <201202160550.42192.arnd@arndb.de>
-Message-ID: <CAJOA=zOERYdm8_kGRjHrQExaHVPE-0=iJC3e75pPWEeffAZmcQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Feb 2012 19:43:48 +0100
+Subject: [PATCH] serial/sirf: fixup for changes to pin control
+Message-ID: <1329417828-6005-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 9:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 16 February 2012, Turquette, Mike wrote:
->> >
->> >> Ah, one more, would be better to us if arm-soc tree could provide
->> >> the topic branch for 'common struct clk' working as a base.
->> >
->> > Good point. Mike, can you send a pull request for whatever you have
->> > now as another staging branch for arm-soc?
->>
->> Arnd, we discussed linux-next as the target for the common clk core
->> code at Linaro Connect. ?Are you now asking for that code in arm-soc?
->> If so, I think it would be better to keep things simple only target
->> linux-next once V5 has hit the lists after ELC.
->
-> I guess waiting for you to send out v5 is a good idea, but as Kgene
-> mentioned it would be nice to have the series in arm-soc in order
-> to base other branches on top of it, and we have now made it possible
-> to update branches like this one by declaring them "staging".
->
-> The main advantage that I see of putting your series into arm-soc
-> is that I can handle the dependencies: If you want to update the
-> series based to v6 after more review and send me a replacement pull
-> request, I can rebase the exynos5 patches (and other conversions)
-> on top of that. If you have a different tree in linux-next and plan
-> to rebase it, I cannot take any other patches into arm-soc that depend
-> on yours.
+We changed the signature of the pin multiplexing functions to
+handle any pin business, so fix up the Sirf driver to call this
+new interface and rename some variables to make the semantics
+understandable.
 
-Per our conversation at ELC, we can host in arm-soc to make it easier
-for folks to port.  But the code should likely be merged through
-Russell once we have the final version.
+Cc: linux-serial at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/tty/serial/sirfsoc_uart.c |   20 ++++++++++----------
+ drivers/tty/serial/sirfsoc_uart.h |    2 +-
+ 2 files changed, 11 insertions(+), 11 deletions(-)
 
-Regards,
-Mike
-
-> The alternative would be that I take the exynos5 patches in their
-> current shape into arm-soc and you put your patches into linux-next
-> based on the branch that I have, and with a patch to convert exynos5
-> to it on top.
->
->> If you are instead referring to OMAP platform support for common clk,
->> that code is very infantile and not yet ready for arm-soc, especially
->> as it breaks OMAP2+ multi-boot.
->
-> I did not mean the omap specific parts.
->
-> ? ? ? ?Arnd
+diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+index a60523f..c1a871e 100644
+--- a/drivers/tty/serial/sirfsoc_uart.c
++++ b/drivers/tty/serial/sirfsoc_uart.c
+@@ -22,7 +22,7 @@
+ #include <linux/io.h>
+ #include <asm/irq.h>
+ #include <asm/mach/irq.h>
+-#include <linux/pinctrl/pinmux.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include "sirfsoc_uart.h"
+ 
+@@ -673,12 +673,12 @@ int sirfsoc_uart_probe(struct platform_device *pdev)
+ 	port->irq = res->start;
+ 
+ 	if (sirfport->hw_flow_ctrl) {
+-		sirfport->pmx = pinmux_get(&pdev->dev, NULL);
+-		ret = IS_ERR(sirfport->pmx);
++		sirfport->p = pinctrl_get(&pdev->dev, NULL);
++		ret = IS_ERR(sirfport->p);
+ 		if (ret)
+-			goto pmx_err;
++			goto pin_err;
+ 
+-		pinmux_enable(sirfport->pmx);
++		pinctrl_enable(sirfport->p);
+ 	}
+ 
+ 	port->ops = &sirfsoc_uart_ops;
+@@ -696,10 +696,10 @@ int sirfsoc_uart_probe(struct platform_device *pdev)
+ port_err:
+ 	platform_set_drvdata(pdev, NULL);
+ 	if (sirfport->hw_flow_ctrl) {
+-		pinmux_disable(sirfport->pmx);
+-		pinmux_put(sirfport->pmx);
++		pinctrl_disable(sirfport->p);
++		pinctrl_put(sirfport->p);
+ 	}
+-pmx_err:
++pin_err:
+ irq_err:
+ 	devm_iounmap(&pdev->dev, port->membase);
+ err:
+@@ -712,8 +712,8 @@ static int sirfsoc_uart_remove(struct platform_device *pdev)
+ 	struct uart_port *port = &sirfport->port;
+ 	platform_set_drvdata(pdev, NULL);
+ 	if (sirfport->hw_flow_ctrl) {
+-		pinmux_disable(sirfport->pmx);
+-		pinmux_put(sirfport->pmx);
++		pinctrl_disable(sirfport->p);
++		pinctrl_put(sirfport->p);
+ 	}
+ 	devm_iounmap(&pdev->dev, port->membase);
+ 	uart_remove_one_port(&sirfsoc_uart_drv, port);
+diff --git a/drivers/tty/serial/sirfsoc_uart.h b/drivers/tty/serial/sirfsoc_uart.h
+index fc64260..6e207fd 100644
+--- a/drivers/tty/serial/sirfsoc_uart.h
++++ b/drivers/tty/serial/sirfsoc_uart.h
+@@ -162,7 +162,7 @@ struct sirfsoc_uart_port {
+ 	unsigned char			ms_enabled;
+ 
+ 	struct uart_port		port;
+-	struct pinmux			*pmx;
++	struct pinctrl			*p;
+ };
+ 
+ /* Hardware Flow Control */
+-- 
+1.7.7.6
