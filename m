@@ -1,72 +1,93 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 16 Feb 2012 10:12:57 +0100
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <4F3BC30A.4030301@monstr.eu>
-References: <4F1EE861.4030405@monstr.eu>
- <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
- <4F1FF870.3000105@monstr.eu>
- <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
- <4F200F64.9060203@monstr.eu>
- <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
- <4F212E9E.9060807@monstr.eu>
- <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
- <4F391C1D.9020402@monstr.eu>
- <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
- <4F3BA962.9040109@monstr.eu> <4F3BC30A.4030301@monstr.eu>
-Message-ID: <4F3CC899.4070302@monstr.eu>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 16 Feb 2012 10:13:52 +0100
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120216075825.GA11631@opensource.wolfsonmicro.com>
+References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
+ <20120213082741.GN3852@pengutronix.de>
+ <20120213144820.GA3494@opensource.wolfsonmicro.com>
+ <20120214105823.GS3852@pengutronix.de>
+ <20120214172902.GB3916@opensource.wolfsonmicro.com>
+ <20120216073236.GE3852@pengutronix.de>
+ <20120216075825.GA11631@opensource.wolfsonmicro.com>
+Message-ID: <20120216091352.GK3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal Simek wrote:
-> Michal Simek wrote:
->> Ohad Ben-Cohen wrote:
->>> On Mon, Feb 13, 2012 at 3:20 PM, Michal Simek <monstr@monstr.eu> wrote:
->>>> Here is how it is achieve
->>>>        ret = dma_declare_coherent_memory(&zynq_freertos.dev, 0,
->>>>                                0, 0x10000000, DMA_MEMORY_MAP);
->>>>
->>>> which is fully compatible with remoteproc.
->>>
->>> Great, this is what we've been doing with davinci too.
->>
->> Cool.
->>
->>>
->>>> Do you have any example of using it?
->>>
->>> What exactly are you looking for ? RTOS or Linux side ?
->>
->> Both side will be great. Rtos is freertos.
->>
->>>
->>> On the Linux side, you can just make the rpmsg sample work (it's part
->>> of the rpmsg patch set). For the RTOS side, feel free to just take our
->>> code (it's BSD licensed and hosted on github) and adapt it to your
->>> environment.
->>
->> You mean that server_sample and rpmsg_omx right?
->> I have also found rpmsg-omx demo application.
->> What I am missing is how to probe rpmsg bus.
->> Do you have any working example?
->>
->> Communication between cpus is done through swirqs. I have test sending 
->> it from linux to rtos.
+On Wed, Feb 15, 2012 at 11:58:26PM -0800, Mark Brown wrote:
+> On Thu, Feb 16, 2012 at 08:32:36AM +0100, Sascha Hauer wrote:
+> > On Tue, Feb 14, 2012 at 09:29:04AM -0800, Mark Brown wrote:
 > 
-> ok. How that rpmsg channels are created? Is it based on data sent from 
-> remoteproc?
-> Or based on resource table?
+> > > The main thing here is to avoid these driver specific bodges that people
+> > > keep churning out again and again, it's quite depressing really.
+> 
+> > I think this churning will continue until we either make the dummy
+> > regulator non optional and drop this warning that gets printed each
+> > time it is used, or we at least provide a way to easily add a fixed
+> 
+> That's obviously not a good idea, if we do that we may as well just drop
+> all error checking from the API.
+> 
+> > dummy regulator without adding >20 lines of code to each board just
+> > for saying that we don't have a regulator for this particular device.
+> 
+> It's not per device, of course - there's an overhead from putting a
+> fixed regulator in but then per supply it's just a line.
 
-I should be more specific. Can you point me to remoteproc code which publish
-remote service based on them Linux rpmsg driver will be probed? It is rtos part of code.
-In your ELCE presentation is called rpmsg-client-sample service.
+You mean one supply if the voltages are the same, right? Otherwise
+we need multiple fixed regulators (or we shouldn't claim that the
+board-dummy-fixed-catch-all regulator has a particular voltage)
 
-Thanks,
-Michal
+> 
+> > +#if IS_ENABLED(CONFIG_REGULATOR_FIXED_VOLTAGE)
+> > +struct platform_device *regulator_register_fixed(const char *name, int id,
+> > +		int microvolts, struct regulator_consumer_supply *supplies,
+> > +		int num_supplies);
+> > +#else
+> > +static struct platform_device *regulator_register_fixed(const char *name, int id,
+> > +		int microvolts, struct regulator_consumer_supply *supplies,
+> > +		int num_supplies)
+> > +{
+> > +	return NULL;
+> > +}
+> > +#endif
+> 
+> This is obviously not good for users, they'd still have to do error
+> checking to determine if the device was created or not and then manually
+> register the device with the driver core and ideally also care if that
+> worked or not.
 
+I understand that error checking is a good idea, but what do you mean
+with 'manually register the device with the core'? The regulator is
+registered with the core in this function.
+
+> I'm not sure something like this will really save enough
+> unless the device actually gets registered by the function, otherwise
+> it's going to be converting data to code.
+> 
+> I'd also drop the microvolts and name parameters, if people are going to
+> be doing enough work to describe the individual rails on the board
+> they're probably not going to be put off by having to register a
+> platform device.
+> 
+> Of course with device tree this all becomes moot as this won't be
+> happening from code anyway...
+
+I wonder what the devicetree guys will do with this situation anyway.
+The devicetree won't describe regulators that are actually not present
+in the hardware, does it?
+
+Don't get me wrong. All I want is just a way for people to be able to
+add regulator support to drivers *without* breaking its users. Normally
+we have the policy in the kernel that changes to the kernel do not break
+its users. The smsc case violated this and it will happen again. In the
+end it doesn't even matter if a particular board could control a supply
+via software or not. Patches should not simply declare all users of a
+driver as broken.
+
+Sascha
 
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
