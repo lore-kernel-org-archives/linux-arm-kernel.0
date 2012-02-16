@@ -1,33 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2012 22:20:02 +0000
-Subject: [PATCH 5/5] ARM: Cortex-M3: Add support for exception handling
-In-Reply-To: <1329423490-15580-5-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20120216200143.GS14173@pengutronix.de>
- <1329423490-15580-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1329423490-15580-5-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20120216222002.GL27825@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 16 Feb 2012 23:22:19 +0100
+Subject: [GIT PULL] ARM: OMAP: Miscellaneous DT cleanup for 3.4
+Message-ID: <4F3D819B.6020007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 09:18:10PM +0100, Uwe Kleine-K?nig wrote:
-> +	.macro	v7m_exception_entry
-> +	cpsid	i
-> +	tst	lr, #0x8		@ check the return stack
-> +	bne	1f			@ exception on process stack
-> +	add	r12, sp, #32		@ MSP before exception
-> +	stmdb	sp!, {r4-r12, lr}	@ push unsaved registers
-> +	b	2f
-> +1:
-> +	mrs	r12, psp		@ get the process stack
-> +	sub	sp, #S_FRAME_SIZE
-> +	stmia	sp, {r4-r12, lr}	@ push unsaved registers
-> +	ldmia	r12, {r0-r3, r6, r8-r10} @ load automatically saved registers
-> +	add	r12, sp, #S_R0
-> +	stmia	r12, {r0-r3, r6, r8-r10} @ fill in the rest of struct pt_regs
+Hi Tony,
 
-I guess this means that pt_regs no longer contains r0..pc, cpsr, old_r0
-on this Cortex-M ?
+Here is a small cleanup series to prepare for further DT series for 3.4.
 
-If so, that's a problem - tools like gdb, strace, and other user programs
-which make use of siginfo stuff all expect ARM to have a certain ptrace
-layout.  This is major ABI breakage.
+Thanks,
+Benoit
+
+
+The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
+  Linus Torvalds (1):
+        Linux 3.3-rc3
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_base
+
+Benoit Cousson (5):
+      ARM: OMAP2+: board-generic: Remove un-needed .atag_offset for DT_MACHINE
+      ARM: OMAP2+: omap_device: Replace dev_warn by dev_dbg in omap_device_build_from_dt
+      ARM: OMAP2+: pm: Do not init statically the SR and voltage layer with DT
+      ARM: OMAP1: kconfig: Enable IRQ_DOMAIN by default for OMAP1 platforms
+      arm/dts: OMAP3&4: Remove the '0x' prefix for serial nodes
+
+ arch/arm/boot/dts/omap3.dtsi        |    8 ++++----
+ arch/arm/boot/dts/omap4.dtsi        |    8 ++++----
+ arch/arm/mach-omap2/board-generic.c |   12 ++++--------
+ arch/arm/mach-omap2/pm.c            |    8 ++++++++
+ arch/arm/plat-omap/Kconfig          |    1 +
+ arch/arm/plat-omap/omap_device.c    |    2 +-
+ 6 files changed, 22 insertions(+), 17 deletions(-)
