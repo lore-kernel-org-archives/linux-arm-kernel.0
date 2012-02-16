@@ -1,56 +1,44 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 16 Feb 2012 12:44:52 -0500 (EST)
-Subject: [PATCH 1/2] ARM: remove memmove from boot/compressed/string.c
-In-Reply-To: <1329404057-26346-2-git-send-email-michael.opdenacker@free-electrons.com>
-References: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
- <1329404057-26346-2-git-send-email-michael.opdenacker@free-electrons.com>
-Message-ID: <alpine.LFD.2.02.1202161226580.24536@xanadu.home>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 Feb 2012 17:48:13 +0000
+Subject: Query: Multiple Mappings to Mem and ARMV6+
+In-Reply-To: <CAOh2x=nUPb-CcyJBmZ2wv=tsNzi=r3F16NynsbChXD=q5hSGiw@mail.gmail.com>
+References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
+ <20120216171520.GA9151@arm.com>
+ <CAOh2x=nUPb-CcyJBmZ2wv=tsNzi=r3F16NynsbChXD=q5hSGiw@mail.gmail.com>
+Message-ID: <20120216174813.GE9151@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Feb 2012, Michael Opdenacker wrote:
+On Thu, Feb 16, 2012 at 05:37:02PM +0000, viresh kumar wrote:
+> On Thu, Feb 16, 2012 at 9:15 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > To summarise, if you mix Normal with Device or SO memory, you only get
+> > the guarantees of the Normal memory (e.g. early write acknowledgement,
+> > write buffer gathering, speculative accesses), so it's not recommended.
+> > If you mix Normal Cacheable with Normal Non-cacheable, you need to make
+> > sure that the cacheable mapping does not have any dirty cache lines that
+> > could be evicted. Additionally, if you read the buffer through the
+> > cacheable mapping later, you need to invalidate it first in case cache
+> > lines have been speculatively fetched. The ARM ARM definition however
+> > guarantees that accesses through the Non-cacheable mapping does not hit
+> > any cache lines (brought in via the Cacheable mapping).
+> 
+> I don't know if i understood correctly the earlier mails over the list, but with
+> speculative writes to Normal Cacheable Memory (Low Mem), we can still
+> enter an undefined state if we have separate kind of mapping as we have in
+> dma_alloc_*() and low mem.
+> 
+> Or
+> 
+> Who is responsible here to take care of cleaning and invalidate cached low
+> mem mappings in case of speculative writes?
 
-> This patch removes the memmove function from boot/compressed/string.c
+The DMA API implementation on ARM takes care of the cache cleaning and
+invalidating.
 
-... breaking CONFIG_ARM_ATAG_DTB_COMPAT.
+BTW, I would say cache evictions rather than speculative writes as the
+latter is something else and ARM processors don't do it (only
+speculative reads).
 
-> - This definition conflicts with the one in lib/decompress_unxz.c
->   This change is required to support xz compression on ARM.
-
-No, it's the decompress_unxz.c code which is wrong.
-
-To work around it, just do:
-
-#define memmove memmove
-
-before including lib/decompress_unxz.c.
-
-> - memmove is not used in any of the other decompressors
->   in lib/decompress_*.c
-
-Doesn't mean it isn't used at all.
-
-Here's a trick.  Next time you can do:
-
-	git blame arch/arm/boot/compressed/string.c
-
-That will list all the file content, annotated with references to the 
-commits that brought them there.
-
-Looking for memmove() you'll see that commit df4879fa260 is responsible 
-for it. Its commit log says:
-
-    ARM: zImage: gather some string functions into string.c
-
-    This is a small subset of string functions needed by commits to 
-    come.
-
-OK, doing a full 'git log' and searching for that commit, just to back 
-up to the next one you'll see:
-
-    ARM: zImage: allow supplementing appended DTB with traditional ATAG  data
-
-That explains why memmove() is required, and by which code.
-
-
-Nicolas
+-- 
+Catalin
