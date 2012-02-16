@@ -1,231 +1,139 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 16 Feb 2012 02:09:24 -0700
-Subject: [PATCH v5 23/27] irq_domain/powerpc: Replace custom xlate functions
- with library functions
-In-Reply-To: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <1329383368-12122-24-git-send-email-grant.likely@secretlab.ca>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 16 Feb 2012 10:33:57 +0100
+Subject: [PATCH 1/5] gpio/omap: Remove bank->id information and misc
+ cleanup
+In-Reply-To: <CAC83ZvJuHpaBbGoysW7GwOHtqfi72EDhFYja2LE4NyBd+QgFWw@mail.gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-2-git-send-email-b-cousson@ti.com>
+ <CAC83ZvJuHpaBbGoysW7GwOHtqfi72EDhFYja2LE4NyBd+QgFWw@mail.gmail.com>
+Message-ID: <4F3CCD85.1050303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts a number of the powerpc drivers to use the common library
-of irq_domain xlate functions, dropping a bunch of lines in the process.
+On 2/16/2012 6:53 AM, DebBarma, Tarun Kanti wrote:
+> On Wed, Feb 15, 2012 at 9:34 PM, Benoit Cousson<b-cousson@ti.com>  wrote:
+>> The driver does not need anymore any id to identify the GPIO instance.
+>> Remove every occurence of the bank->id inside the driver.
+>>
+>> Remove two trailing spaces.
+>> Add a dev variable for better readability in probe.
+>> Remove unused variable bank->pbase.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> Looks fine.
+> If needed you can add my Acked-by:
 
-v5: - Remove tsi108 changes from patch
+Thanks,
+Benoit
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Milton Miller <miltonm@bga.com>
-Tested-by: Olof Johansson <olof@lixom.net>
----
- arch/powerpc/platforms/powermac/pic.c |   13 +------------
- arch/powerpc/platforms/wsp/opb_pic.c  |   13 +------------
- arch/powerpc/sysdev/cpm2_pic.c        |   14 +-------------
- arch/powerpc/sysdev/ipic.c            |   18 +-----------------
- arch/powerpc/sysdev/qe_lib/qe_ic.c    |   15 +--------------
- arch/powerpc/sysdev/uic.c             |   14 +-------------
- drivers/gpio/gpio-mpc8xxx.c           |   17 +----------------
- 7 files changed, 7 insertions(+), 97 deletions(-)
-
-diff --git a/arch/powerpc/platforms/powermac/pic.c b/arch/powerpc/platforms/powermac/pic.c
-index 46a5f32..92afc38 100644
---- a/arch/powerpc/platforms/powermac/pic.c
-+++ b/arch/powerpc/platforms/powermac/pic.c
-@@ -288,21 +288,10 @@ static int pmac_pic_host_map(struct irq_domain *h, unsigned int virq,
- 	return 0;
- }
- 
--static int pmac_pic_host_xlate(struct irq_domain *h, struct device_node *ct,
--			       const u32 *intspec, unsigned int intsize,
--			       irq_hw_number_t *out_hwirq,
--			       unsigned int *out_flags)
--
--{
--	*out_flags = IRQ_TYPE_NONE;
--	*out_hwirq = *intspec;
--	return 0;
--}
--
- static const struct irq_domain_ops pmac_pic_host_ops = {
- 	.match = pmac_pic_host_match,
- 	.map = pmac_pic_host_map,
--	.xlate = pmac_pic_host_xlate,
-+	.xlate = irq_domain_xlate_onecell,
- };
- 
- static void __init pmac_pic_probe_oldstyle(void)
-diff --git a/arch/powerpc/platforms/wsp/opb_pic.c b/arch/powerpc/platforms/wsp/opb_pic.c
-index 0c6fe0b..cb565bf 100644
---- a/arch/powerpc/platforms/wsp/opb_pic.c
-+++ b/arch/powerpc/platforms/wsp/opb_pic.c
-@@ -196,20 +196,9 @@ static int opb_host_map(struct irq_domain *host, unsigned int virq,
- 	return 0;
- }
- 
--static int opb_host_xlate(struct irq_domain *host, struct device_node *dn,
--		const u32 *intspec, unsigned int intsize,
--		irq_hw_number_t *out_hwirq, unsigned int *out_type)
--{
--	/* Interrupt size must == 2 */
--	BUG_ON(intsize != 2);
--	*out_hwirq = intspec[0];
--	*out_type = intspec[1];
--	return 0;
--}
--
- static const struct irq_domain_ops opb_host_ops = {
- 	.map = opb_host_map,
--	.xlate = opb_host_xlate,
-+	.xlate = irq_domain_xlate_twocell,
- };
- 
- irqreturn_t opb_irq_handler(int irq, void *private)
-diff --git a/arch/powerpc/sysdev/cpm2_pic.c b/arch/powerpc/sysdev/cpm2_pic.c
-index 8c9fc9c..d3be961 100644
---- a/arch/powerpc/sysdev/cpm2_pic.c
-+++ b/arch/powerpc/sysdev/cpm2_pic.c
-@@ -224,21 +224,9 @@ static int cpm2_pic_host_map(struct irq_domain *h, unsigned int virq,
- 	return 0;
- }
- 
--static int cpm2_pic_host_xlate(struct irq_domain *h, struct device_node *ct,
--			    const u32 *intspec, unsigned int intsize,
--			    irq_hw_number_t *out_hwirq, unsigned int *out_flags)
--{
--	*out_hwirq = intspec[0];
--	if (intsize > 1)
--		*out_flags = intspec[1];
--	else
--		*out_flags = IRQ_TYPE_NONE;
--	return 0;
--}
--
- static const struct irq_domain_ops cpm2_pic_host_ops = {
- 	.map = cpm2_pic_host_map,
--	.xlate = cpm2_pic_host_xlate,
-+	.xlate = irq_domain_xlate_onetwocell,
- };
- 
- void cpm2_pic_init(struct device_node *node)
-diff --git a/arch/powerpc/sysdev/ipic.c b/arch/powerpc/sysdev/ipic.c
-index 0eaaa01..b50f978 100644
---- a/arch/powerpc/sysdev/ipic.c
-+++ b/arch/powerpc/sysdev/ipic.c
-@@ -692,26 +692,10 @@ static int ipic_host_map(struct irq_domain *h, unsigned int virq,
- 	return 0;
- }
- 
--static int ipic_host_xlate(struct irq_domain *h, struct device_node *ct,
--			   const u32 *intspec, unsigned int intsize,
--			   irq_hw_number_t *out_hwirq, unsigned int *out_flags)
--
--{
--	/* interrupt sense values coming from the device tree equal either
--	 * LEVEL_LOW (low assertion) or EDGE_FALLING (high-to-low change)
--	 */
--	*out_hwirq = intspec[0];
--	if (intsize > 1)
--		*out_flags = intspec[1];
--	else
--		*out_flags = IRQ_TYPE_NONE;
--	return 0;
--}
--
- static struct irq_domain_ops ipic_host_ops = {
- 	.match	= ipic_host_match,
- 	.map	= ipic_host_map,
--	.xlate	= ipic_host_xlate,
-+	.xlate	= irq_domain_xlate_onetwocell,
- };
- 
- struct ipic * __init ipic_init(struct device_node *node, unsigned int flags)
-diff --git a/arch/powerpc/sysdev/qe_lib/qe_ic.c b/arch/powerpc/sysdev/qe_lib/qe_ic.c
-index e9b3d5c..2fba6ef 100644
---- a/arch/powerpc/sysdev/qe_lib/qe_ic.c
-+++ b/arch/powerpc/sysdev/qe_lib/qe_ic.c
-@@ -272,23 +272,10 @@ static int qe_ic_host_map(struct irq_domain *h, unsigned int virq,
- 	return 0;
- }
- 
--static int qe_ic_host_xlate(struct irq_domain *h, struct device_node *ct,
--			    const u32 * intspec, unsigned int intsize,
--			    irq_hw_number_t * out_hwirq,
--			    unsigned int *out_flags)
--{
--	*out_hwirq = intspec[0];
--	if (intsize > 1)
--		*out_flags = intspec[1];
--	else
--		*out_flags = IRQ_TYPE_NONE;
--	return 0;
--}
--
- static struct irq_domain_ops qe_ic_host_ops = {
- 	.match = qe_ic_host_match,
- 	.map = qe_ic_host_map,
--	.xlate = qe_ic_host_xlate,
-+	.xlate = irq_domain_xlate_onetwocell,
- };
- 
- /* Return an interrupt vector or NO_IRQ if no interrupt is pending. */
-diff --git a/arch/powerpc/sysdev/uic.c b/arch/powerpc/sysdev/uic.c
-index 84e59c9..9203393 100644
---- a/arch/powerpc/sysdev/uic.c
-+++ b/arch/powerpc/sysdev/uic.c
-@@ -190,21 +190,9 @@ static int uic_host_map(struct irq_domain *h, unsigned int virq,
- 	return 0;
- }
- 
--static int uic_host_xlate(struct irq_domain *h, struct device_node *ct,
--			  const u32 *intspec, unsigned int intsize,
--			  irq_hw_number_t *out_hwirq, unsigned int *out_type)
--
--{
--	/* UIC intspecs must have 2 cells */
--	BUG_ON(intsize != 2);
--	*out_hwirq = intspec[0];
--	*out_type = intspec[1];
--	return 0;
--}
--
- static struct irq_domain_ops uic_host_ops = {
- 	.map	= uic_host_map,
--	.xlate	= uic_host_xlate,
-+	.xlate	= irq_domain_xlate_twocell,
- };
- 
- void uic_irq_cascade(unsigned int virq, struct irq_desc *desc)
-diff --git a/drivers/gpio/gpio-mpc8xxx.c b/drivers/gpio/gpio-mpc8xxx.c
-index 149d987..e6568c1 100644
---- a/drivers/gpio/gpio-mpc8xxx.c
-+++ b/drivers/gpio/gpio-mpc8xxx.c
-@@ -296,24 +296,9 @@ static int mpc8xxx_gpio_irq_map(struct irq_domain *h, unsigned int virq,
- 	return 0;
- }
- 
--static int mpc8xxx_gpio_irq_xlate(struct irq_domain *h, struct device_node *ct,
--				  const u32 *intspec, unsigned int intsize,
--				  irq_hw_number_t *out_hwirq,
--				  unsigned int *out_flags)
--
--{
--	/* interrupt sense values coming from the device tree equal either
--	 * EDGE_FALLING or EDGE_BOTH
--	 */
--	*out_hwirq = intspec[0];
--	*out_flags = intspec[1];
--
--	return 0;
--}
--
- static struct irq_domain_ops mpc8xxx_gpio_irq_ops = {
- 	.map	= mpc8xxx_gpio_irq_map,
--	.xlate	= mpc8xxx_gpio_irq_xlate,
-+	.xlate	= irq_domain_xlate_twocell,
- };
- 
- static struct of_device_id mpc8xxx_gpio_ids[] __initdata = {
--- 
-1.7.9
+> --
+> Tarun
+>
+>> ---
+>>   drivers/gpio/gpio-omap.c |   23 +++++++++--------------
+>>   1 files changed, 9 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index f49bd6f..a0c3e03 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -50,7 +50,6 @@ struct gpio_regs {
+>>
+>>   struct gpio_bank {
+>>         struct list_head node;
+>> -       unsigned long pbase;
+>>         void __iomem *base;
+>>         u16 irq;
+>>         u16 virtual_irq_start;
+>> @@ -77,7 +76,6 @@ struct gpio_bank {
+>>         int stride;
+>>         u32 width;
+>>         int context_loss_count;
+>> -       u16 id;
+>>         int power_mode;
+>>         bool workaround_enabled;
+>>
+>> @@ -155,7 +153,7 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
+>>   {
+>>         int l = __raw_readl(base + reg);
+>>
+>> -       if (set)
+>> +       if (set)
+>>                 l |= mask;
+>>         else
+>>                 l&= ~mask;
+>> @@ -495,7 +493,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+>>         unsigned long flags;
+>>
+>>         if (bank->non_wakeup_gpios&  gpio_bit) {
+>> -               dev_err(bank->dev,
+>> +               dev_err(bank->dev,
+>>                         "Unable to modify wakeup on non-wakeup GPIO%d\n", gpio);
+>>                 return -EINVAL;
+>>         }
+>> @@ -1048,37 +1046,36 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+>>
+>>   static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>>   {
+>> +       struct device *dev =&pdev->dev;
+>>         struct omap_gpio_platform_data *pdata;
+>>         struct resource *res;
+>>         struct gpio_bank *bank;
+>>         int ret = 0;
+>>
+>> -       if (!pdev->dev.platform_data) {
+>> +       if (!dev->platform_data) {
+>>                 ret = -EINVAL;
+>>                 goto err_exit;
+>>         }
+>>
+>>         bank = kzalloc(sizeof(struct gpio_bank), GFP_KERNEL);
+>>         if (!bank) {
+>> -               dev_err(&pdev->dev, "Memory alloc failed for gpio_bank\n");
+>> +               dev_err(dev, "Memory alloc failed\n");
+>>                 ret = -ENOMEM;
+>>                 goto err_exit;
+>>         }
+>>
+>>         res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>>         if (unlikely(!res)) {
+>> -               dev_err(&pdev->dev, "GPIO Bank %i Invalid IRQ resource\n",
+>> -                               pdev->id);
+>> +               dev_err(dev, "Invalid IRQ resource\n");
+>>                 ret = -ENODEV;
+>>                 goto err_free;
+>>         }
+>>
+>>         bank->irq = res->start;
+>> -       bank->id = pdev->id;
+>>
+>>         pdata = pdev->dev.platform_data;
+>>         bank->virtual_irq_start = pdata->virtual_irq_start;
+>> -       bank->dev =&pdev->dev;
+>> +       bank->dev = dev;
+>>         bank->dbck_flag = pdata->dbck_flag;
+>>         bank->stride = pdata->bank_stride;
+>>         bank->width = pdata->bank_width;
+>> @@ -1098,16 +1095,14 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>>         /* Static mapping, never released */
+>>         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>         if (unlikely(!res)) {
+>> -               dev_err(&pdev->dev, "GPIO Bank %i Invalid mem resource\n",
+>> -                               pdev->id);
+>> +               dev_err(dev, "Invalid mem resource\n");
+>>                 ret = -ENODEV;
+>>                 goto err_free;
+>>         }
+>>
+>>         bank->base = ioremap(res->start, resource_size(res));
+>>         if (!bank->base) {
+>> -               dev_err(&pdev->dev, "Could not ioremap gpio bank%i\n",
+>> -                               pdev->id);
+>> +               dev_err(dev, "Could not ioremap\n");
+>>                 ret = -ENOMEM;
+>>                 goto err_free;
+>>         }
+>> --
+>> 1.7.0.4
+>>
