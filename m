@@ -1,26 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Feb 2012 19:57:16 +0100
-Subject: [PATCH 14/15] ARM: remove bunch of now unused mach/io.h files
-In-Reply-To: <1329169408-17253-15-git-send-email-robherring2@gmail.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <1329169408-17253-15-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkdYKe_HqXAnD+66FMEn+Gzn+CWS_aWZgfyTipONPbfkH2A@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 16 Feb 2012 11:01:17 -0800
+Subject: [PATCH] serial/sirf: fixup for changes to pin control
+In-Reply-To: <1329417828-6005-1-git-send-email-linus.walleij@linaro.org>
+References: <1329417828-6005-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1790EC8791@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2012 at 10:43 PM, Rob Herring <robherring2@gmail.com> wrote:
+Linus Walleij wrote at Thursday, February 16, 2012 11:44 AM:
+> We changed the signature of the pin multiplexing functions to
+> handle any pin business, so fix up the Sirf driver to call this
+> new interface and rename some variables to make the semantics
+> understandable.
+> 
+> Cc: linux-serial at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-> Now that many platforms don't need mach/io.h, remove the usused ones.
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Looks good to me for now.
 
-Great!
+I'll have to do another similar change when I implement the pinctrl_get
+API changes we discussed at Linaro Connect (I should start implementing
+that today), but I guess that's no big deal.
 
-For these:
-> ?arch/arm/mach-nomadik/include/mach/io.h ? | ? 22 -------------
-> ?arch/arm/mach-u300/include/mach/io.h ? ? ?| ? 20 ------------
-> ?arch/arm/mach-ux500/include/mach/io.h ? ? | ? 22 -------------
+Should this patch be put into the pinctrl tree since that's where the
+API changed, perhaps even squashed into the original commit to avoid
+git bisect breakage, unless your branch needs to be stable? Otherwise,
+this change will conflict with my future similar change if pulled for
+the same kernel version.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+-- 
+nvpublic
