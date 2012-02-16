@@ -1,37 +1,45 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 16 Feb 2012 10:34:48 +0800
-Subject: [PATCH] arch/arm/mach-pxa/pxa27x.c: included linux/gpio.h twice
-In-Reply-To: <1329333565-31718-1-git-send-email-danny.kukawka@bisect.de>
-References: <1329333565-31718-1-git-send-email-danny.kukawka@bisect.de>
-Message-ID: <CAN1soZyuqMHAsTU2Yjj=uxPREzqrTTxMpwgc3_wkvd6nVbfssw@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 16 Feb 2012 10:38:26 +0800
+Subject: [PATCH] mtd/gpmi : add gpmi support for mx6q
+In-Reply-To: <20120216021841.GG30946@r65073-Latitude-D630>
+References: <1328505606-27981-1-git-send-email-b32955@freescale.com>
+ <20120215183720.GA2399@r65073-Latitude-D630> <4F3C623A.3000301@freescale.com>
+ <20120216021841.GG30946@r65073-Latitude-D630>
+Message-ID: <4F3C6C22.2010003@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 3:19 AM, Danny Kukawka <danny.kukawka@bisect.de> wrote:
-> arch/arm/mach-pxa/pxa27x.c included 'linux/gpio.h' twice, remove
-> the duplicate.
+Hi,
+> On Thu, Feb 16, 2012 at 09:56:10AM +0800, Huang Shijie wrote:
+>> Hi,
+>>> The imx6q only supports DT boot, but I do not see you are adding DT
+>>> probe for the driver, so I'm wondering how you tested the driver on
+>>> imx6q.
+>>>
+>> This patch is just the first patch  for mx6q. My following patches will
+>> add DT to the gpmi nand driver for mx6q. Due to the dependency
+>> issue, I will send the patches
+>> in the following order:
+>> [1] mtd/gpmi: add gpmi support for mx6q.
+>> [2] [PATCH v5] patch set about the MXS-DMA
+>> [3] add DT support to gpmi for mx6q.
+>>
+> It should be:
 >
-> Signed-off-by: Danny Kukawka <danny.kukawka@bisect.de>
-> ---
-> ?arch/arm/mach-pxa/pxa27x.c | ? ?1 -
-> ?1 files changed, 0 insertions(+), 1 deletions(-)
+>   1. MXS-DMA series
+>   2. Add imx6q support with DT probe
 >
-> diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-> index aed6cbc..c1673b3 100644
-> --- a/arch/arm/mach-pxa/pxa27x.c
-> +++ b/arch/arm/mach-pxa/pxa27x.c
-> @@ -22,7 +22,6 @@
-> ?#include <linux/io.h>
-> ?#include <linux/irq.h>
-> ?#include <linux/i2c/pxa-i2c.h>
-> -#include <linux/gpio.h>
+I ever did so in this order. But the mxs-dma series delayed for long 
+time( I missed the CCs).
+But Artem's tree is faster to merge patch.
+>> I tested this patch based on our bsp code.
+>>
+> This is wrong approach.  You are submitting patches to mainline, so
+> you should test your patches on mainline tree.
 >
-> ?#include <asm/mach/map.h>
-> ?#include <mach/hardware.h>
-> --
-> 1.7.8.3
->
-Applied.
+Beside the DT, the gpmi nand driver is the same.
 
-Thanks
-Haojian
+Is the mainline tree ready now? How can i to set the pinmux for gpmi?
+
+BR
+Huang Shijie
