@@ -1,93 +1,59 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Thu, 16 Feb 2012 12:23:27 -0600
-Subject: [PATCHv9 3/5] arm: omap3: add common twl configurations for vdd1
- and vdd2
-In-Reply-To: <1329388073-17879-4-git-send-email-t-kristo@ti.com>
-References: <1329388073-17879-1-git-send-email-t-kristo@ti.com>
- <1329388073-17879-4-git-send-email-t-kristo@ti.com>
-Message-ID: <CAOMWX4d8C4pjYSr+i3qmqfJHDsHQdtRkvfbGR29U7hXf0SkVZg@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 16 Feb 2012 10:30:27 -0800
+Subject: [PATCH v2] cpufreq: OMAP driver depends CPUfreq tables
+In-Reply-To: <1329333709-29964-1-git-send-email-khilman@ti.com>
+References: <1329333709-29964-1-git-send-email-khilman@ti.com>
+Message-ID: <1329417027-3254-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 04:27, Tero Kristo <t-kristo@ti.com> wrote:
-> VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
-> to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
-> are needed by DVFS.
->
-> Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manual.
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Please provide documentation version referenced, else we will loose
-track of details at a later point of time.
+The OMAP driver depends on CPUfreq table support for creating a table
+of frequencies from the OPP layer.  Ensure that it's build to avoid
+link-time errors.
 
-Also should we rename VDD1 with vdd_mpu_iva and VDD2 as vdd_core to be readable?
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+[khilman at ti.com: make user-selectable, but default y]
+Tested-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+This version changes the new Kconfig option to be user-selectable, but
+keeps the default value to be y whenever ARCH_OMAP2PLUS is enabled.
+I've also tested this one with various Kconfig options.
 
-Regards,
-Nishanth Menon
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
-> ?arch/arm/mach-omap2/twl-common.c | ? 36 ++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 36 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> index 10b20c6..5f62e51 100644
-> --- a/arch/arm/mach-omap2/twl-common.c
-> +++ b/arch/arm/mach-omap2/twl-common.c
-> @@ -126,6 +126,38 @@ static struct regulator_init_data omap3_vpll2_idata = {
-> ? ? ? ?.consumer_supplies ? ? ? ? ? ? ?= omap3_vpll2_supplies,
-> ?};
->
-> +static struct regulator_consumer_supply omap3_vdd1_supply[] = {
-> + ? ? ? REGULATOR_SUPPLY("vcc", "mpu.0"),
-> +};
-> +
-> +static struct regulator_consumer_supply omap3_vdd2_supply[] = {
-> + ? ? ? REGULATOR_SUPPLY("vcc", "l3_main.0"),
-> +};
-> +
-> +static struct regulator_init_data omap3_vdd1 = {
-> + ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "VDD1",
-> + ? ? ? ? ? ? ? .min_uV ? ? ? ? ? ? ? ? = 600000,
-> + ? ? ? ? ? ? ? .max_uV ? ? ? ? ? ? ? ? = 1450000,
-> + ? ? ? ? ? ? ? .valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL,
-> + ? ? ? ? ? ? ? .valid_ops_mask ? ? ? ? = REGULATOR_CHANGE_VOLTAGE,
-> + ? ? ? },
-> + ? ? ? .num_consumer_supplies ? ? ? ? ?= ARRAY_SIZE(omap3_vdd1_supply),
-> + ? ? ? .consumer_supplies ? ? ? ? ? ? ?= omap3_vdd1_supply,
-> +};
-> +
-> +static struct regulator_init_data omap3_vdd2 = {
-> + ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "VDD2",
-> + ? ? ? ? ? ? ? .min_uV ? ? ? ? ? ? ? ? = 600000,
-> + ? ? ? ? ? ? ? .max_uV ? ? ? ? ? ? ? ? = 1450000,
-> + ? ? ? ? ? ? ? .valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL,
-> + ? ? ? ? ? ? ? .valid_ops_mask ? ? ? ? = REGULATOR_CHANGE_VOLTAGE,
-> + ? ? ? },
-> + ? ? ? .num_consumer_supplies ? ? ? ? ?= ARRAY_SIZE(omap3_vdd2_supply),
-> + ? ? ? .consumer_supplies ? ? ? ? ? ? ?= omap3_vdd2_supply,
-> +};
-> +
-> ?void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 pdata_flags, u32 regulators_flags)
-> ?{
-> @@ -133,6 +165,10 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
-> ? ? ? ? ? ? ? ?pmic_data->irq_base = TWL4030_IRQ_BASE;
-> ? ? ? ?if (!pmic_data->irq_end)
-> ? ? ? ? ? ? ? ?pmic_data->irq_end = TWL4030_IRQ_END;
-> + ? ? ? if (!pmic_data->vdd1)
-> + ? ? ? ? ? ? ? pmic_data->vdd1 = &omap3_vdd1;
-> + ? ? ? if (!pmic_data->vdd2)
-> + ? ? ? ? ? ? ? pmic_data->vdd2 = &omap3_vdd2;
->
-> ? ? ? ?/* Common platform data configurations */
-> ? ? ? ?if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ drivers/cpufreq/Kconfig.arm |    5 +++++
+ drivers/cpufreq/Makefile    |    2 +-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index e0664fe..82f1aa9 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -2,6 +2,11 @@
+ # ARM CPU Frequency scaling drivers
+ #
+ 
++config ARM_OMAP2PLUS_CPUFREQ
++	bool "TI OMAP2+"
++	default ARCH_OMAP2PLUS
++	select CPU_FREQ_TABLE
++
+ config ARM_S3C64XX_CPUFREQ
+ 	bool "Samsung S3C64XX"
+ 	depends on CPU_S3C6410
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index ac000fa..fda94c7 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -44,7 +44,7 @@ obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
+ obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
+-obj-$(CONFIG_ARCH_OMAP2PLUS)            += omap-cpufreq.o
++obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)     += omap-cpufreq.o
+ 
+ ##################################################################################
+ # PowerPC platform drivers
+-- 
+1.7.9
