@@ -1,58 +1,38 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 16 Feb 2012 18:38:41 +0100
-Subject: [PATCH v5 08/27] irq_domain: Move irq_domain code from powerpc
- to kernel/irq
-In-Reply-To: <1329383368-12122-9-git-send-email-grant.likely@secretlab.ca>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <1329383368-12122-9-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <4F3D3F21.3060905@ti.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Thu, 16 Feb 2012 18:25:51 +0100
+Subject: [PATCH] ARM: amba: don't include <asm/sizes.h>
+In-Reply-To: <20120216160525.GA30558@mail.gnudd.com>
+References: <20120216160525.GA30558@mail.gnudd.com>
+Message-ID: <20120216172551.GA31306@merkur.ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Thu, Feb 16, 2012 at 05:05:25PM +0100, Alessandro Rubini wrote:
+> The file uses no SZ_* symbol and some architectures miss sizes.h
+> 
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> ---
+> 
+> There a number of files including but not using it. This one
+> in particular I need under x86 so the fix is trivial.
+> 
+> However, I remember different feelings about sizes.h . Should it die
+> or should it proliferate to other archs using asm-generic/sizes.h ?
 
-It looks like there is a small regression in that update, it cannot 
-build due to a missing semi-colon.
+It would be good to have it included for all architectures.
+It really has nothing arch specific in it so it ought to live in
+include/linux:
 
-On 2/16/2012 10:09 AM, Grant Likely wrote:
-> +/**
-> + * irq_find_mapping() - Find a linux irq from an hw irq number.
-> + * @host: domain owning this hardware interrupt
-> + * @hwirq: hardware irq number in that host space
-> + *
-> + * This is a slow path, for use by generic code. It's expected that an
-> + * irq controller implementation directly calls the appropriate low level
-> + * mapping function.
-> + */
-> +unsigned int irq_find_mapping(struct irq_domain *host,
-> +			      irq_hw_number_t hwirq)
-> +{
-> +	unsigned int i;
-> +	unsigned int hint = hwirq % irq_virq_count;
-> +
-> +	/* Look for default host if nececssary */
-> +	if (host == NULL)
-> +		host = irq_default_host;
-> +	if (host == NULL)
-> +		return NO_IRQ;
-> +
-> +	/* legacy ->  bail early */
-> +	if (host->revmap_type == IRQ_DOMAIN_MAP_LEGACY)
-> +		return hwirq;
-> +
-> +	/* Slow path does a linear search of the map */
-> +	if (hint == 0)
-> +		hint = 1;
-> +	i = hint;
-> +	do {
-> +		struct irq_data *data = irq_get_irq_data(i);
-> +		if (data&&  (data->domain == host)&&  (data->hwirq == hwirq))
-> +			return i;
-> +		i++;
-> +		if (i>= irq_virq_count)
-> +			i = 1
+    git mv include/asm-generic include/linux
+    And a fix for the archs that will be broken by this.
+    A small wrapper in arch/$ARCH/include/asm could do the trick
 
-The ";" is missing.
 
-Regards,
-Benoit
+And speaking of this file I sometime have missed:
+#define SZ_1K_BITS                       10
+#define SZ_2K_BITS                       11
+
+Or something similar.
+
+	Sam
