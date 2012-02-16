@@ -1,47 +1,78 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 16 Feb 2012 18:04:25 +0530
-Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
- for v3.4 merge window
-In-Reply-To: <20120216121234.GJ15338@n2100.arm.linux.org.uk>
-References: <20120215182355.18884.18682.stgit@kaulin.local>
- <CACYZBRE_Vf8qDQYPRgsL03T8oy2Kv4fYRfE8U7y79Xhb1nwC2A@mail.gmail.com>
- <20120216121234.GJ15338@n2100.arm.linux.org.uk>
-Message-ID: <4F3CF7D1.8050807@ti.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 16 Feb 2012 13:42:16 +0100
+Subject: [PATCH v2] cpufreq: Add S3C2416/S3C2450 cpufreq driver
+In-Reply-To: <4F3CF1D9.5030109@samsung.com>
+References: <201202161142.32485.heiko@sntech.de> <4F3CF1D9.5030109@samsung.com>
+Message-ID: <201202161342.17657.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 February 2012 05:42 PM, Russell King - ARM Linux wrote:
-> On Thu, Feb 16, 2012 at 05:30:59PM +0530, Nayak, Rajendra wrote:
->>> One more patch is needed to sort out the remaining issue with
->>> omap4 that has yet another luck based initialization for the
->>> same issue..
->>>
->>
->> I did this patch on top of your series which should fix the
->> issue on all omap4 boards too. Tested on omap4panda and
->> omap4sdp boards.
->
-> Can you test something with these patches?
->
-> 1. Build the gpio-twl4030.c as a module, but with HSMMC support built in
-> 2. Boot on the 4430SDP
+Hi Kgene,
 
-twl4030 gpio is used for card detect on OMAP3, so I tried this
-on my Beagle instead of 4430SDP.
-The kernel boots up but does not detect/enumerate the mmc card.
+Am Donnerstag, 16. Februar 2012, 13:08:57 schrieben Sie:
+> On 02/16/12 19:42, Heiko St?bner wrote:
+> > The S3C2416/S3C2450 SoCs support two sources for the armclk.
+> > 
+> > The first source is the so called armdiv which divides the msysclk down
+> > to provide necessary cpu rates. In this mode the core voltage must be
+> > always at 1.3V. The frequency from the armdiv is not allowed to be
+> > lower than the hclk frequency.
+> > 
+> > In the second mode the armclk can be sourced directly from the hclk in
+> > the so called "dynamic voltags scaling" (dvs) mode. Here the armdiv
+> > isn't used at all. Also in this mode the core voltage may be lowered.
+> > Existing hardware and tests with it suggest 1.0V as sufficient.
+> > 
+> > When changing the clock source to the armdiv from the hclk, the SoC
+> > shows stability issues if the new frequency is higher than the current
+> > hclk frequency. Hence the driver always forces the armdiv to the hclk
+> > frequency before the source change and lets the cpufreq issue another
+> > set_target call for higher frequencies.
+> > 
+> > To mark the hclk frequency as lower as the corresponding armdiv
+> > frequency it is set 1MHz below the real frequency. This lets the cpufreq
+> > framework change between 133MHz based on hclk and 133MHz based on armdiv
+> > at will.
+> > 
+> > Signed-off-by: Heiko Stuebner<heiko@sntech.de>
+> > Tested-by: Andrey Gusakov<dron0gus@gmail.com>
+> > ---
+> > changes since v1: correct the frequencies of the S3C2450 variant
+> > changes since RFC: reboot-notifier to leave dvs mode on reboot
+> > and a lot of cleanups
+> > 
+> >   drivers/cpufreq/Kconfig.arm       |   22 ++
+> >   drivers/cpufreq/Makefile          |    1 +
+> >   drivers/cpufreq/s3c2416-cpufreq.c |  542
+> >   +++++++++++++++++++++++++++++++++++++ 3 files changed, 565
+> >   insertions(+), 0 deletions(-)
+> >   create mode 100644 drivers/cpufreq/s3c2416-cpufreq.c
+> 
+> As you know, I'm working on move cpufreq drivers of s3c2410, s3c2412 and
+> s3c2440 into drivers/cpufreq/.
+> 
+> Now I'm not sure some common function can be used for them and this as
+> well. But I think, if so, would be better to us.
+> 
+> So please wait for some time to finish my working. Maybe next week?
+> 
+> Then, let me back on this.
 
-> 3. Load the gpio-twl4030 module
+With most components there is a dividing line between the SoCs before and 
+after S3C2443.
 
-I was expecting this to now detect the card, but I instead got
-this error which seems to tell gpio-twl4030 has problems
-when built/used as a module, outside of the mmc issues.
+On the SoCs before S3C2443 the fclk comes directly from the pll. Hence when 
+one wants to change its frequency the pll has to be reset and frequencies of 
+the depending periphal clocks also have to be recalculated.
 
-# insmod gpio-twl4030.ko
-[   16.217864] twl4030_gpio twl4030_gpio: can't dispatch IRQs from modules
-[   16.242004] gpiochip_add: registered GPIOs 192 to 211 on device: twl4030
+On SoCs starting from S3C2443 the msysclk (from the mpll) feeds a complete 
+separate divider (called armdiv) which supplies exclusivly the armclk. The 
+periphal clocks don't need to be touched normally.
+
+Therefore the cpufreq functionality of S3C2416/S3C2443/S3C2450 is more in line 
+with the S3C64xx and shows no real commonalities with earlier S3C-SoCs, as the 
+clock structure is vastly different and can also do with a much simpler driver 
+than the earlier S3C SoCs.
 
 
-> 4. Remove the gpio-twl4030 module
-> 5. Re-load the gpio-twl4030.ko module
->
-> and report back what you get.  Thanks.
+Heiko
