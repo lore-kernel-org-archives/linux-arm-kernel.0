@@ -1,25 +1,76 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 16 Feb 2012 14:31:37 +1100
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <1329318063.2293.136.camel@twins>
-References: <20120208013959.GA24535@panacea>
- <1328670355.2482.68.camel@laptop> <20120208202314.GA28290@redhat.com>
- <1328736834.2903.33.camel@pasglop> <20120209075106.GB18387@elte.hu>
- <4F35DD3E.4020406@codeaurora.org> <20120211144530.GA497@elte.hu>
- <4F3AEC4E.9000303@codeaurora.org> <1329313085.2293.106.camel@twins>
- <20120215140245.GB27825@n2100.arm.linux.org.uk>
- <1329318063.2293.136.camel@twins>
-Message-ID: <1329363097.3772.46.camel@pasglop>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 16 Feb 2012 12:42:58 +0900
+Subject: [PATCH v2 03/11] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
+In-Reply-To: <20120213205444.GH11077@ponder.secretlab.ca>
+References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
+ <201202112007.08672.arnd@arndb.de> <20120211201430.GB24564@sirena.org.uk>
+ <201202130547.48530.arnd@arndb.de>
+ <20120213110453.GA13673@n2100.arm.linux.org.uk>
+ <20120213205444.GH11077@ponder.secretlab.ca>
+Message-ID: <052801ccec5d$137aa460$3a6fed20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-15 at 16:01 +0100, Peter Zijlstra wrote:
+Grant Likely wrote:
 > 
-> Thing is, the scheduler doesn't care about completion, all it needs is
-> to be able to kick-start the thing atomically. So you really have to
-> wait for it or can you do an interrupt driven state machine?
+> On Mon, Feb 13, 2012 at 11:04:53AM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Feb 13, 2012 at 05:47:48AM +0000, Arnd Bergmann wrote:
+> > > On Saturday 11 February 2012, Mark Brown wrote:
+> > > > On Sat, Feb 11, 2012 at 08:07:08PM +0000, Arnd Bergmann wrote:
+> > > > > what the risk is in changing exynos4 at the same time. It would
+> > > > > be great if we can have all exynos use the common struct clk in 3.4,
+> > > > > but I'm also happy if we just get exynos5 to do it that way from the
+> > > > > beginning and move exynos4 over in 3.5 after you have had a chance
+> > > > > to make sure everything still works.
+> > > >
+> > > > Are we likely to get the common struct clk in 3.4?  It's all been
+> > > > extremely quiet on that front except for complaints about the lack of
+> > > > progress.
+> > >
+> > > Yes, we discussed it during the subarch maintainers meeting at Linaro
+> > > Connect last week and it looks like we're finally going forward on
+> > > this now. Maybe Grant or Mike are better at explaining the current
+> > > status regarding the clk implementation and bindings.
+> >
+> > That would be good for those who weren't there to be updated with what
+> > was discussed.
+> 
+> The decision was essentially Mike would repost his series ASAP with a view
+> to getting it queued up for v3.4.  I think he is also going to get it into
+> linux-next so at least it gets testing, even if the ultimate decision is to
+> wait for v3.5.
+> 
+Hmm...so I'm not sure if some exynos5250 products use v3.4, it can use common struct clk for mass production?
 
-Or the scheduler callback could schedule a wq to do the job ?
+If not, I think, this should be kept on v3.4 then it can be changed to use common struct clk from v3.5.
 
-Cheers,
-Ben.
+> I'm going to rebase my clk series on top of his patches rather that trying
+
+OK, sounds good to me.
+
+> to merge my temporary versatile-only code.  If his series isn't ready to go
+> in, I can still probably merge parts of the DT clock bindings anyway, but I'll
+> need to do some cherry picking to do so.
+> 
+If any branch is ready for it, please let me know.
+
+> The rough notes can be found here:
+> 
+> https://blueprints.launchpad.net/linux-linaro/+spec/linaro-kernel-q112-maintainer-summit-1
+> 
+Thanks for your sharing.
+
+OK, I and my team will follow up 'common struct clk' for exynos5250 and it will be done maybe next week. And since I need to
+implement other features for exynos5250 now, firstly let me use this and test this series in linux-next in a day.
+
+Of course, if any updates, let you know.
+
+Ah, one more, would be better to us if arm-soc tree could provide the topic branch for 'common struct clk' working as a base.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
