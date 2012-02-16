@@ -1,40 +1,53 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 16 Feb 2012 18:27:34 +0100
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <4F3CFFAD.9030402@monstr.eu>
-References: <4F1EE861.4030405@monstr.eu>
- <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
- <4F1FF870.3000105@monstr.eu>
- <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
- <4F200F64.9060203@monstr.eu>
- <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
- <4F212E9E.9060807@monstr.eu>
- <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
- <4F391C1D.9020402@monstr.eu>
- <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
- <4F3BA962.9040109@monstr.eu> <4F3BC30A.4030301@monstr.eu>
- <4F3CC899.4070302@monstr.eu>
- <CAK=WgbaRF-L7M3VMZQdqFLUFOJuwFVkBH1hUNuJ51kSrzkaVjA@mail.gmail.com>
- <4F3CFFAD.9030402@monstr.eu>
-Message-ID: <CAK=WgbbNaDGObazuLZODad6-O_8oJ5j=isS50gQ0DFefo+UW1w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 Feb 2012 17:29:28 +0000
+Subject: Query: Multiple Mappings to Mem and ARMV6+
+In-Reply-To: <20120216172242.GH27825@n2100.arm.linux.org.uk>
+References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
+ <20120216171520.GA9151@arm.com>
+ <20120216172242.GH27825@n2100.arm.linux.org.uk>
+Message-ID: <20120216172928.GD9151@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 2:07 PM, Michal Simek <monstr@monstr.eu> wrote:
-> Above is condition "if (virtio_has_feature(vdev, VIRTIO_RPMSG_F_NS))" which
-> is failing for me.
+On Thu, Feb 16, 2012 at 05:22:42PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Feb 16, 2012 at 05:15:20PM +0000, Catalin Marinas wrote:
+> > On Thu, Feb 16, 2012 at 04:41:02PM +0000, viresh kumar wrote:
+> > > Sorry for starting the long old thread again, but i have to start it as i
+> > > was a bit confused. :(
+> > > 
+> > > We know that we can't have multiple mappings with different attributes
+> > > to the same physical memory on ARMv6+ machines due to speculative
+> > > prefetch.
+> > > 
+> > > So, we have following kind of mappings in kernel now (please correct me
+> > > if i am wrong):
+> > > - Low Mem: Mapped at boot time to - Normal Cacheable - Bufferable
+> > > - ioremap() - blocked on Low Mem, so that we don't create Device type mapping
+> > > to same mem
+> > > - dma_alloc_coherent() and others:
+> > >          - Without DMA_MEM_BUFFERABLE selected - gives strongly ordered mem
+> > >           (i.e. Non cacheable - Non Bufferable)
+> > >          - With DMA_MEM_BUFFERABLE selected - gives Normal - Non cacheable -
+> > >            Bufferable mapping
+> > >          - Maybe some other too...
+> > > 
+> > > I have a doubt with the last mapping mentioned above. We have two
+> > > mappings possibly to the same physical memory, with different
+> > > attributes: One is Cacheable and other one is not.
+> > > 
+> > > Is this allowed by ARM? Because the patch in which Russell blocked
+> > > ioremap on Low Mem, he clearly mentioned that these attributes are
+> > > also important and they should be same.
+> > 
+> > Section A3.5.7 in the latest ARM ARM (revC) clarifies the mismatched
+> 
+> There's a new version?
 
-You might want to debug why.
+Rev C has been available for a while. I thought you got it already:
 
-For the dynamic channel creation to work, your rpmsg vdev should have
-VIRTIO_RPMSG_F_NS. But that's part of the generic code, and you should
-not bother about it - it should just work.
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0406c/index.html
 
-> How does look like that structure for vring channels? It is probably mapped
-> any structure. Can you point me which one?
+It contains the LPAE and virtualisation extensions.
 
-I'm sorry, can you please rephrase the question ? I'm not sure I'm following.
-
-Thanks,
-Ohad.
+-- 
+Catalin
