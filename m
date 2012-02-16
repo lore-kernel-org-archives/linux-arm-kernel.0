@@ -1,48 +1,33 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 16 Feb 2012 10:58:26 +0200
-Subject: [PATCHv2 7/8] arm: omap: clockdomain: add support for
- preventing domain transitions
-In-Reply-To: <CAMQu2gwjfBd2ybKhEj+1Y1+b4yT+9i-DomozuxCMpKgcSfm9Gw@mail.gmail.com>
-References: <1329320274-481-1-git-send-email-t-kristo@ti.com>
- <1329320274-481-8-git-send-email-t-kristo@ti.com> <87vcn799g8.fsf@ti.com>
- <1329381549.4102.381.camel@sokoban>
- <CAMQu2gwjfBd2ybKhEj+1Y1+b4yT+9i-DomozuxCMpKgcSfm9Gw@mail.gmail.com>
-Message-ID: <1329382706.4102.387.camel@sokoban>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Feb 2012 09:05:42 +0000
+Subject: [PATCH v2 00/13] Make mach/irqs.h optional
+In-Reply-To: <20120216084536.GH13673@n2100.arm.linux.org.uk>
+References: <1327091591-27125-1-git-send-email-robherring2@gmail.com>
+ <20120216084536.GH13673@n2100.arm.linux.org.uk>
+Message-ID: <20120216090542.GA23641@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-02-16 at 14:13 +0530, Shilimkar, Santosh wrote:
-> Tero,
-> On Thu, Feb 16, 2012 at 2:09 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> > On Wed, 2012-02-15 at 11:35 -0800, Kevin Hilman wrote:
-> >> Tero Kristo <t-kristo@ti.com> writes:
-> >>
-> >> > Some clockdomains can't support manual domain transitions triggered by
-> >> > clock framework, and must be prevented from doing so. Added clkdm flag
-> >> > CLKDM_NO_MANUAL_TRANS for doing this.
-> >> >
-> >> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >> > Cc: Paul Walmsley <paul@pwsan.com>
-> >> > Cc: Kevin Hilman <khilman@ti.com>
-> >>
-> >> Dumb Q: what's the difference between this new flag and CLKDM_CAN_SWSUP?
-> >
-> > CAN_SWSUP controls software wakeup / sleep (clktrctrl values 1 and 2),
-> > but it still allows hwsup based transitions during runtime (basically
-> > using values 0 & 3 for the same register.) NO_MANUAL_TRANS prevents
-> > both, but still allows hwauto mode being enabled in the first place.
-> >
-> > I was thinking about adding a flag for preventing the autodep disabling
-> > as this was the root cause for the problem I saw, but I wanted to
-> > optimize the _clkdm_clk_hwmod_enable/disable for this case, as the
-> > domain is not going through any transitions.
-> >
-> Which clock-domain you are refering here which needs this
-> flag ?
-
-per_clkdm, see patch 8 in this same set for comments. This happens with
-omap3.
-
+On Thu, Feb 16, 2012 at 08:45:36AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 20, 2012 at 02:32:58PM -0600, Rob Herring wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > This series removes the include of mach/irqs.h from asm/irq.h when
+> > SPARSE_IRQ is selected. Platforms which select SPARSE_IRQ have been
+> > updated.
 > 
-> Regards
-> santosh
+> Rob,
+> 
+> Last night, I merged devel-stable into the stuff which gets built, and it
+> seems your IRQ changes are breaking PXA:
+> 
+> Before merge:
+> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=129
+> 
+> After merge:
+> http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=137
+
+Also see SA11x0 breakage - before:
+http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=127
+after:
+http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=135
