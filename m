@@ -1,38 +1,56 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Thu, 16 Feb 2012 18:25:51 +0100
-Subject: [PATCH] ARM: amba: don't include <asm/sizes.h>
-In-Reply-To: <20120216160525.GA30558@mail.gnudd.com>
-References: <20120216160525.GA30558@mail.gnudd.com>
-Message-ID: <20120216172551.GA31306@merkur.ravnborg.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 16 Feb 2012 12:44:52 -0500 (EST)
+Subject: [PATCH 1/2] ARM: remove memmove from boot/compressed/string.c
+In-Reply-To: <1329404057-26346-2-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+ <1329404057-26346-2-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <alpine.LFD.2.02.1202161226580.24536@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 05:05:25PM +0100, Alessandro Rubini wrote:
-> The file uses no SZ_* symbol and some architectures miss sizes.h
-> 
-> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
-> ---
-> 
-> There a number of files including but not using it. This one
-> in particular I need under x86 so the fix is trivial.
-> 
-> However, I remember different feelings about sizes.h . Should it die
-> or should it proliferate to other archs using asm-generic/sizes.h ?
+On Thu, 16 Feb 2012, Michael Opdenacker wrote:
 
-It would be good to have it included for all architectures.
-It really has nothing arch specific in it so it ought to live in
-include/linux:
+> This patch removes the memmove function from boot/compressed/string.c
 
-    git mv include/asm-generic include/linux
-    And a fix for the archs that will be broken by this.
-    A small wrapper in arch/$ARCH/include/asm could do the trick
+... breaking CONFIG_ARM_ATAG_DTB_COMPAT.
+
+> - This definition conflicts with the one in lib/decompress_unxz.c
+>   This change is required to support xz compression on ARM.
+
+No, it's the decompress_unxz.c code which is wrong.
+
+To work around it, just do:
+
+#define memmove memmove
+
+before including lib/decompress_unxz.c.
+
+> - memmove is not used in any of the other decompressors
+>   in lib/decompress_*.c
+
+Doesn't mean it isn't used at all.
+
+Here's a trick.  Next time you can do:
+
+	git blame arch/arm/boot/compressed/string.c
+
+That will list all the file content, annotated with references to the 
+commits that brought them there.
+
+Looking for memmove() you'll see that commit df4879fa260 is responsible 
+for it. Its commit log says:
+
+    ARM: zImage: gather some string functions into string.c
+
+    This is a small subset of string functions needed by commits to 
+    come.
+
+OK, doing a full 'git log' and searching for that commit, just to back 
+up to the next one you'll see:
+
+    ARM: zImage: allow supplementing appended DTB with traditional ATAG  data
+
+That explains why memmove() is required, and by which code.
 
 
-And speaking of this file I sometime have missed:
-#define SZ_1K_BITS                       10
-#define SZ_2K_BITS                       11
-
-Or something similar.
-
-	Sam
+Nicolas
