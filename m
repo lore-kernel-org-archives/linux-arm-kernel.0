@@ -1,41 +1,31 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Thu, 16 Feb 2012 08:41:02 -0800
-Subject: Query: Multiple Mappings to Mem and ARMV6+
-Message-ID: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Feb 2012 08:41:07 -0800
+Subject: [PATCH 3/3] ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux
+ related functions as __init
+In-Reply-To: <20120216101123.GI15338@n2100.arm.linux.org.uk>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+ <20120215182829.18884.69168.stgit@kaulin.local>
+ <20120216101123.GI15338@n2100.arm.linux.org.uk>
+Message-ID: <20120216164106.GC15692@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guys,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120216 01:40]:
+> On Wed, Feb 15, 2012 at 10:28:30AM -0800, Tony Lindgren wrote:
+> > Now that omap hsmmc init is split into two functions, it's safe
+> > to mark omap_hsmmc_init and omap_mux related functions to __init.
+> > 
+> > This basically reverts the following fixes for the case where
+> > TWL was compiled as a module:
+> > 
+> > d5de63 (ARM: omap: preemptively fix section mismatch in omap4_sdp4430_wifi_mux_init())
+> 
+> Why did you include this one?  This is unrelated to the TWL problems.
 
-Sorry for starting the long old thread again, but i have to start it as i
-was a bit confused. :(
+Oops sorry, thanks for noticing. Your patch makes it __init,
+I was reading the patch wrong way around. Your patch should
+stay and my patch now changes it the wrong way.
 
-We know that we can't have multiple mappings with different attributes
-to the same physical memory on ARMv6+ machines due to speculative
-prefetch.
+Regards,
 
-So, we have following kind of mappings in kernel now (please correct me
-if i am wrong):
-- Low Mem: Mapped at boot time to - Normal Cacheable - Bufferable
-- ioremap() - blocked on Low Mem, so that we don't create Device type mapping
-to same mem
-- dma_alloc_coherent() and others:
-         - Without DMA_MEM_BUFFERABLE selected - gives strongly ordered mem
-          (i.e. Non cacheable - Non Bufferable)
-         - With DMA_MEM_BUFFERABLE selected - gives Normal - Non cacheable -
-           Bufferable mapping
-         - Maybe some other too...
-
-I have a doubt with the last mapping mentioned above. We have two mappings
-possibly to the same physical memory, with different attributes: One
-is Cacheable
-and other one is not.
-
-Is this allowed by ARM? Because the patch in which Russell blocked ioremap on
-Low Mem, he clearly mentioned that these attributes are also important and they
-should be same.
-
-Sorry if i am missing something :)
-
---
-viresh
+Tony
