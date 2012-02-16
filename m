@@ -1,60 +1,70 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 Feb 2012 17:15:20 +0000
-Subject: Query: Multiple Mappings to Mem and ARMV6+
-In-Reply-To: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
-References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
-Message-ID: <20120216171520.GA9151@arm.com>
+Date: Thu, 16 Feb 2012 17:18:22 +0000
+Subject: Oops in guest after ioremap() on ARMv7
+In-Reply-To: <1329411702.3133.4.camel@zakaz.uk.xensource.com>
+References: <4EF31DA7.9030407@citrix.com> <20111222144937.GE20635@arm.com>
+ <4EF35CFF.3050200@citrix.com> <20111222181356.GI20635@arm.com>
+ <4EF37802.30300@citrix.com>
+ <1324641625.7877.161.camel@zakaz.uk.xensource.com>
+ <20120103165027.GD22876@arm.com>
+ <1326994510.17599.97.camel@zakaz.uk.xensource.com>
+ <CAHkRjk68rw2TKnitc7M+R1FCpwrGkqFHwd4YmS78mveR9uO_2Q@mail.gmail.com>
+ <1329411702.3133.4.camel@zakaz.uk.xensource.com>
+Message-ID: <20120216171822.GB9151@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 04:41:02PM +0000, viresh kumar wrote:
-> Sorry for starting the long old thread again, but i have to start it as i
-> was a bit confused. :(
+On Thu, Feb 16, 2012 at 05:01:42PM +0000, Ian Campbell wrote:
+> On Tue, 2012-01-31 at 14:40 +0000, Catalin Marinas wrote:
+> > On 19 January 2012 17:35, Ian Campbell <Ian.Campbell@citrix.com> wrote:
+> > > On Tue, 2012-01-03 at 16:50 +0000, Catalin Marinas wrote:
+> > >> On Fri, Dec 23, 2011 at 12:00:25PM +0000, Ian Campbell wrote:
+> > >> > At the moment we build the entire p2m before we ever load the VTTBR or
+> > >> > enable stage-2 translations in the HCR. Is that sufficient or do we also
+> > >> > need to flush something?
+> > >>
+> > >> If the model does not correctly implement cacheable page table walks for
+> > >> either stage 1 or stage 2 translation (though ID_MMFR3[23:20] indicate
+> > >> that it should), the hypervisor would need to clean the D-cache to the
+> > >> point of unification (not necessary to go to the point of coherency)
+> > >> before any of the state 2 translation tables are used.
+> > >
+> > > I added a copy of Linux's v7_flush_dcache_all after building the p2m but
+> > > just before loading the VTTBR and it didn't help.
+> > >
+> > > I turned off cacheability in VTCR and that didn't help either.
+> > >
+> > > Then I turned off cacheability in the Linux TTBR{0,1} (by frobbing both
+> > > TTB_FLAGS_UP and TTB_FLAGS_SMP to use FOO_NC everywhere) and this _did_
+> > > make a difference -- the kernel now boots.
+> > >
+> > > I then tested just that change by itself and it seems to have done the
+> > > trick.
+> > >
+> > > Does that indicate a model bug?
+> > 
+> > It is possible. The scenario I'm thinking of is that with cacheable
+> > PTWs enabled in TTBR, the model wrongly decides to use the
+> > intermediate physical address (IPA) to look up the caches and gets the
+> > wrong information.
+> > 
+> > I'll take this to the model guys but most likely they'll ask for an
+> > image to load and just run. Could you provide such simple image
+> > (minimal filesystem)? I'm not familiar with Xen and building it.
+> > 
+> > (I'll first ask the model guys, maybe they can spot the error easily
+> > without additional debugging).
 > 
-> We know that we can't have multiple mappings with different attributes
-> to the same physical memory on ARMv6+ machines due to speculative
-> prefetch.
-> 
-> So, we have following kind of mappings in kernel now (please correct me
-> if i am wrong):
-> - Low Mem: Mapped at boot time to - Normal Cacheable - Bufferable
-> - ioremap() - blocked on Low Mem, so that we don't create Device type mapping
-> to same mem
-> - dma_alloc_coherent() and others:
->          - Without DMA_MEM_BUFFERABLE selected - gives strongly ordered mem
->           (i.e. Non cacheable - Non Bufferable)
->          - With DMA_MEM_BUFFERABLE selected - gives Normal - Non cacheable -
->            Bufferable mapping
->          - Maybe some other too...
-> 
-> I have a doubt with the last mapping mentioned above. We have two
-> mappings possibly to the same physical memory, with different
-> attributes: One is Cacheable and other one is not.
-> 
-> Is this allowed by ARM? Because the patch in which Russell blocked
-> ioremap on Low Mem, he clearly mentioned that these attributes are
-> also important and they should be same.
+> Did they conclude anything? Can I provide any more info?
 
-Section A3.5.7 in the latest ARM ARM (revC) clarifies the mismatched
-memory attributes (more precise compared to the original "unpredictable"
-statement, though the description there is not an easy read). While
-changes to the ARM ARM do not apply to already implemented processors,
-to my knowledge all existing cores comply with the new ARM ARM
-description.
+No, they didn't :(. They would like to run some image showing the
+problem so they can trace the internal state of the model. Unfortunately
+I didn't have time to look into this.
 
-To summarise, if you mix Normal with Device or SO memory, you only get
-the guarantees of the Normal memory (e.g. early write acknowledgement,
-write buffer gathering, speculative accesses), so it's not recommended.
-If you mix Normal Cacheable with Normal Non-cacheable, you need to make
-sure that the cacheable mapping does not have any dirty cache lines that
-could be evicted. Additionally, if you read the buffer through the
-cacheable mapping later, you need to invalidate it first in case cache
-lines have been speculatively fetched. The ARM ARM definition however
-guarantees that accesses through the Non-cacheable mapping does not hit
-any cache lines (brought in via the Cacheable mapping).
+Is it possible for you to create an ELF image that can be loaded onto
+the model with some instructions to show the failure?
 
-So regarding your ioremap() lowmem, even if Linux allowed you to do that
-you wouldn't get the guarantees of the Device memory.
+Thanks.
 
 -- 
 Catalin
