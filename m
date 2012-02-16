@@ -1,20 +1,93 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Thu, 16 Feb 2012 19:20:23 +0100
-Subject: [PATCH] ARM: amba: don't include <asm/sizes.h>
-In-Reply-To: <20120216172551.GA31306@merkur.ravnborg.org>
-References: <20120216172551.GA31306@merkur.ravnborg.org>
- <20120216160525.GA30558@mail.gnudd.com>
-Message-ID: <20120216182023.GA18485@mail.gnudd.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Thu, 16 Feb 2012 12:23:27 -0600
+Subject: [PATCHv9 3/5] arm: omap3: add common twl configurations for vdd1
+ and vdd2
+In-Reply-To: <1329388073-17879-4-git-send-email-t-kristo@ti.com>
+References: <1329388073-17879-1-git-send-email-t-kristo@ti.com>
+ <1329388073-17879-4-git-send-email-t-kristo@ti.com>
+Message-ID: <CAOMWX4d8C4pjYSr+i3qmqfJHDsHQdtRkvfbGR29U7hXf0SkVZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> It would be good to have it included for all architectures.
-> It really has nothing arch specific in it so it ought to live in
-> include/linux:
-> 
->     git mv include/asm-generic include/linux
+On Thu, Feb 16, 2012 at 04:27, Tero Kristo <t-kristo@ti.com> wrote:
+> VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
+> to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
+> are needed by DVFS.
+>
+> Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manual.
 
-Ok. I can do this if it has any chance to be accepted.  I find more
-and more SZ_4K as I dig into my PCIe-AMBA bridge.
+Please provide documentation version referenced, else we will loose
+track of details at a later point of time.
 
-/alessandro
+Also should we rename VDD1 with vdd_mpu_iva and VDD2 as vdd_core to be readable?
+
+Regards,
+Nishanth Menon
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+> ?arch/arm/mach-omap2/twl-common.c | ? 36 ++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 36 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+> index 10b20c6..5f62e51 100644
+> --- a/arch/arm/mach-omap2/twl-common.c
+> +++ b/arch/arm/mach-omap2/twl-common.c
+> @@ -126,6 +126,38 @@ static struct regulator_init_data omap3_vpll2_idata = {
+> ? ? ? ?.consumer_supplies ? ? ? ? ? ? ?= omap3_vpll2_supplies,
+> ?};
+>
+> +static struct regulator_consumer_supply omap3_vdd1_supply[] = {
+> + ? ? ? REGULATOR_SUPPLY("vcc", "mpu.0"),
+> +};
+> +
+> +static struct regulator_consumer_supply omap3_vdd2_supply[] = {
+> + ? ? ? REGULATOR_SUPPLY("vcc", "l3_main.0"),
+> +};
+> +
+> +static struct regulator_init_data omap3_vdd1 = {
+> + ? ? ? .constraints = {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "VDD1",
+> + ? ? ? ? ? ? ? .min_uV ? ? ? ? ? ? ? ? = 600000,
+> + ? ? ? ? ? ? ? .max_uV ? ? ? ? ? ? ? ? = 1450000,
+> + ? ? ? ? ? ? ? .valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL,
+> + ? ? ? ? ? ? ? .valid_ops_mask ? ? ? ? = REGULATOR_CHANGE_VOLTAGE,
+> + ? ? ? },
+> + ? ? ? .num_consumer_supplies ? ? ? ? ?= ARRAY_SIZE(omap3_vdd1_supply),
+> + ? ? ? .consumer_supplies ? ? ? ? ? ? ?= omap3_vdd1_supply,
+> +};
+> +
+> +static struct regulator_init_data omap3_vdd2 = {
+> + ? ? ? .constraints = {
+> + ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "VDD2",
+> + ? ? ? ? ? ? ? .min_uV ? ? ? ? ? ? ? ? = 600000,
+> + ? ? ? ? ? ? ? .max_uV ? ? ? ? ? ? ? ? = 1450000,
+> + ? ? ? ? ? ? ? .valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL,
+> + ? ? ? ? ? ? ? .valid_ops_mask ? ? ? ? = REGULATOR_CHANGE_VOLTAGE,
+> + ? ? ? },
+> + ? ? ? .num_consumer_supplies ? ? ? ? ?= ARRAY_SIZE(omap3_vdd2_supply),
+> + ? ? ? .consumer_supplies ? ? ? ? ? ? ?= omap3_vdd2_supply,
+> +};
+> +
+> ?void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 pdata_flags, u32 regulators_flags)
+> ?{
+> @@ -133,6 +165,10 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+> ? ? ? ? ? ? ? ?pmic_data->irq_base = TWL4030_IRQ_BASE;
+> ? ? ? ?if (!pmic_data->irq_end)
+> ? ? ? ? ? ? ? ?pmic_data->irq_end = TWL4030_IRQ_END;
+> + ? ? ? if (!pmic_data->vdd1)
+> + ? ? ? ? ? ? ? pmic_data->vdd1 = &omap3_vdd1;
+> + ? ? ? if (!pmic_data->vdd2)
+> + ? ? ? ? ? ? ? pmic_data->vdd2 = &omap3_vdd2;
+>
+> ? ? ? ?/* Common platform data configurations */
+> ? ? ? ?if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
+> --
+> 1.7.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
