@@ -1,31 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2012 13:11:44 +0000
-Subject: ftp.arm.linux.org.uk now using dumb http git protocol
-Message-ID: <20120216131144.GM13673@n2100.arm.linux.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 16 Feb 2012 18:45:50 +0530
+Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
+ for v3.4 merge window
+In-Reply-To: <4F3CF7D1.8050807@ti.com>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+ <CACYZBRE_Vf8qDQYPRgsL03T8oy2Kv4fYRfE8U7y79Xhb1nwC2A@mail.gmail.com>
+ <20120216121234.GJ15338@n2100.arm.linux.org.uk> <4F3CF7D1.8050807@ti.com>
+Message-ID: <4F3D0186.2010500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A couple of days I disabled the smart git protocol over http on
-ftp.arm.linux.org.uk because the smart git protocol over http is
-far too heavyweight for the poor x86 machine.  It's now using the
-lighter-weight dumb http file serving stuff instead.  This has made
-the machine load go back to virtually zero instead of skyrocketing.
+On Thursday 16 February 2012 06:04 PM, Rajendra Nayak wrote:
+>> Can you test something with these patches?
+>>
+>> 1. Build the gpio-twl4030.c as a module, but with HSMMC support built in
+>> 2. Boot on the 4430SDP
+>
+> twl4030 gpio is used for card detect on OMAP3, so I tried this
+> on my Beagle instead of 4430SDP.
+> The kernel boots up but does not detect/enumerate the mmc card.
+>
+>> 3. Load the gpio-twl4030 module
+>
+> I was expecting this to now detect the card, but I instead got
+> this error which seems to tell gpio-twl4030 has problems
+> when built/used as a module, outside of the mmc issues.
 
-It's revealed something rather interesting though: people _have_ been
-updating their trees from my tree without first ensuring that their tree
-is up to date with Linus' tree.  I suspect people have been cloning
-the tree as well.
+Looks like I was mislead with the errors and though the twl4030
+gpio probe was bailing out with errors, which its not.
+It does seem to go ahead, does a mmc late init which registers
+the mmc omap_device and hence does a platform_device_add, but the
+device never seem to get probed. mmc driver is built in and
+registered.
 
-This action puts more load on the server, load it can do without.
-
-So, as of a couple of days ago, it's now using the dumb http stuff,
-which means if you abort it, you _will_ get corrupted pack files in
-your .git/objects/pack directory.
-
-You can avoid much of that pain by following what you should've been
-doing in the first place: first update your trees by pulling from
-Linus' tree.  Then, and only then, update your tree from my tree.
-Doing that will minimise the time you have to wait, and minimise the
-chance of a corrupted pack file.
-
-Thank you.
+>
+> # insmod gpio-twl4030.ko
+> [   16.217864] twl4030_gpio twl4030_gpio: can't dispatch IRQs from modules
+> [   16.242004] gpiochip_add: registered GPIOs 192 to 211 on device: twl4030
+>
+>
+>> 4. Remove the gpio-twl4030 module
+>> 5. Re-load the gpio-twl4030.ko module
+>>
+>> and report back what you get.  Thanks.
