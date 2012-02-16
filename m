@@ -1,202 +1,138 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 16 Feb 2012 02:09:19 -0700
-Subject: [PATCH v5 18/27] irq_domain: constify irq_domain_ops
+Date: Thu, 16 Feb 2012 02:09:18 -0700
+Subject: [PATCH v5 17/27] irq_domain: Create common xlate functions that
+ device drivers can use
 In-Reply-To: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
 References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
-Message-ID: <1329383368-12122-19-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <1329383368-12122-18-git-send-email-grant.likely@secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make irq_domain_ops pointer a constant to make it safer for multiple
-instances to share the same ops pointer and change the irq_domain code
-so that it does not modify the ops.
+Rather than having each interrupt controller driver creating its own barely
+unique .xlate function for irq_domain, create a library of translators which
+any driver can use directly.
 
-v4: Fix mismatched type reference in powerpc code
+v5: - Remove irq_domain_xlate_pci().  It was incorrect.
 
 Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Rob Herring <rob.herring@calxeda.com>
 Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Milton Miller <miltonm@bga.com>
 Tested-by: Olof Johansson <olof@lixom.net>
 ---
- arch/powerpc/sysdev/mpic_msi.c |    2 +-
- include/linux/irqdomain.h      |   14 +++++++-------
- kernel/irq/irqdomain.c         |   31 +++++++++++++++----------------
- 3 files changed, 23 insertions(+), 24 deletions(-)
+ include/linux/irqdomain.h |   12 ++++++++
+ kernel/irq/irqdomain.c    |   65 ++++++++++++++++++++++++++++++++++++++-------
+ 2 files changed, 67 insertions(+), 10 deletions(-)
 
-diff --git a/arch/powerpc/sysdev/mpic_msi.c b/arch/powerpc/sysdev/mpic_msi.c
-index 00395f4..0622aa9 100644
---- a/arch/powerpc/sysdev/mpic_msi.c
-+++ b/arch/powerpc/sysdev/mpic_msi.c
-@@ -32,7 +32,7 @@ void mpic_msi_reserve_hwirq(struct mpic *mpic, irq_hw_number_t hwirq)
- static int mpic_msi_reserve_u3_hwirqs(struct mpic *mpic)
- {
- 	irq_hw_number_t hwirq;
--	struct irq_domain_ops *ops = mpic->irqhost->ops;
-+	const struct irq_domain_ops *ops = mpic->irqhost->ops;
- 	struct device_node *np;
- 	int flags, index, i;
- 	struct of_irq oirq;
 diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index ea58f36..5245488 100644
+index e7379a3..ea58f36 100644
 --- a/include/linux/irqdomain.h
 +++ b/include/linux/irqdomain.h
-@@ -106,7 +106,7 @@ struct irq_domain {
- 		} linear;
- 		struct radix_tree_root tree;
- 	} revmap_data;
--	struct irq_domain_ops *ops;
-+	const struct irq_domain_ops *ops;
- 	void *host_data;
- 	irq_hw_number_t inval_irq;
- 
-@@ -119,17 +119,17 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- 					 unsigned int size,
- 					 unsigned int first_irq,
- 					 irq_hw_number_t first_hwirq,
--					 struct irq_domain_ops *ops,
-+					 const struct irq_domain_ops *ops,
- 					 void *host_data);
- struct irq_domain *irq_domain_add_linear(struct device_node *of_node,
- 					 unsigned int size,
--					 struct irq_domain_ops *ops,
-+					 const struct irq_domain_ops *ops,
- 					 void *host_data);
- struct irq_domain *irq_domain_add_nomap(struct device_node *of_node,
--					 struct irq_domain_ops *ops,
-+					 const struct irq_domain_ops *ops,
- 					 void *host_data);
- struct irq_domain *irq_domain_add_tree(struct device_node *of_node,
--					 struct irq_domain_ops *ops,
-+					 const struct irq_domain_ops *ops,
- 					 void *host_data);
- 
- extern struct irq_domain *irq_find_host(struct device_node *node);
-@@ -138,7 +138,7 @@ extern void irq_set_virq_count(unsigned int count);
- 
- static inline struct irq_domain *irq_domain_add_legacy_isa(
- 				struct device_node *of_node,
--				struct irq_domain_ops *ops,
-+				const struct irq_domain_ops *ops,
- 				void *host_data)
- {
- 	return irq_domain_add_legacy(of_node, NUM_ISA_INTERRUPTS, 0, 0, ops,
-@@ -162,7 +162,7 @@ extern unsigned int irq_radix_revmap_lookup(struct irq_domain *host,
- extern unsigned int irq_linear_revmap(struct irq_domain *host,
+@@ -163,6 +163,18 @@ extern unsigned int irq_linear_revmap(struct irq_domain *host,
  				      irq_hw_number_t hwirq);
  
--extern struct irq_domain_ops irq_domain_simple_ops;
-+extern const struct irq_domain_ops irq_domain_simple_ops;
- 
- /* stock xlate functions */
- int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
+ extern struct irq_domain_ops irq_domain_simple_ops;
++
++/* stock xlate functions */
++int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type);
++int irq_domain_xlate_twocell(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type);
++int irq_domain_xlate_onetwocell(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type);
++
+ #if defined(CONFIG_OF_IRQ)
+ extern void irq_domain_generate_simple(const struct of_device_id *match,
+ 					u64 phys_base, unsigned int irq_start);
 diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 9a8f95e..2d3dfff 100644
+index 03f571a..9a8f95e 100644
 --- a/kernel/irq/irqdomain.c
 +++ b/kernel/irq/irqdomain.c
-@@ -26,11 +26,6 @@ static DEFINE_MUTEX(revmap_trees_mutex);
- static unsigned int irq_virq_count = NR_IRQS;
- static struct irq_domain *irq_default_domain;
- 
--static int default_irq_domain_match(struct irq_domain *d, struct device_node *np)
--{
--	return d->of_node != NULL && d->of_node == np;
--}
--
- /**
-  * irq_domain_alloc() - Allocate a new irq_domain data structure
-  * @of_node: optional device-tree node of the interrupt controller
-@@ -44,7 +39,7 @@ static int default_irq_domain_match(struct irq_domain *d, struct device_node *np
-  */
- static struct irq_domain *irq_domain_alloc(struct device_node *of_node,
- 					   unsigned int revmap_type,
--					   struct irq_domain_ops *ops,
-+					   const struct irq_domain_ops *ops,
- 					   void *host_data)
- {
- 	struct irq_domain *domain;
-@@ -59,9 +54,6 @@ static struct irq_domain *irq_domain_alloc(struct device_node *of_node,
- 	domain->host_data = host_data;
- 	domain->of_node = of_node_get(of_node);
- 
--	if (domain->ops->match == NULL)
--		domain->ops->match = default_irq_domain_match;
--
- 	return domain;
+@@ -699,25 +699,70 @@ int irq_domain_simple_map(struct irq_domain *d, unsigned int irq,
+ 	return 0;
  }
  
-@@ -104,7 +96,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- 					 unsigned int size,
- 					 unsigned int first_irq,
- 					 irq_hw_number_t first_hwirq,
--					 struct irq_domain_ops *ops,
-+					 const struct irq_domain_ops *ops,
- 					 void *host_data)
+-int irq_domain_simple_xlate(struct irq_domain *d,
+-			    struct device_node *controller,
+-			    const u32 *intspec, unsigned int intsize,
+-			    unsigned long *out_hwirq, unsigned int *out_type)
++/**
++ * irq_domain_xlate_onecell() - Generic xlate for direct one cell bindings
++ *
++ * Device Tree IRQ specifier translation function which works with one cell
++ * bindings where the cell value maps directly to the hwirq number.
++ */
++int irq_domain_xlate_onecell(struct irq_domain *d, struct device_node *ctrlr,
++			     const u32 *intspec, unsigned int intsize,
++			     unsigned long *out_hwirq, unsigned int *out_type)
  {
- 	struct irq_domain *domain;
-@@ -170,7 +162,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
-  */
- struct irq_domain *irq_domain_add_linear(struct device_node *of_node,
- 					 unsigned int size,
--					 struct irq_domain_ops *ops,
-+					 const struct irq_domain_ops *ops,
- 					 void *host_data)
- {
- 	struct irq_domain *domain;
-@@ -192,7 +184,7 @@ struct irq_domain *irq_domain_add_linear(struct device_node *of_node,
+-	if (d->of_node != controller)
+-		return -EINVAL;
+-	if (intsize < 1)
++	if (WARN_ON(intsize < 1))
+ 		return -EINVAL;
+ 	*out_hwirq = intspec[0];
+ 	*out_type = IRQ_TYPE_NONE;
+-	if (intsize > 1)
+-		*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+ 	return 0;
  }
- 
- struct irq_domain *irq_domain_add_nomap(struct device_node *of_node,
--					 struct irq_domain_ops *ops,
-+					 const struct irq_domain_ops *ops,
- 					 void *host_data)
- {
- 	struct irq_domain *domain = irq_domain_alloc(of_node,
-@@ -211,7 +203,7 @@ struct irq_domain *irq_domain_add_nomap(struct device_node *of_node,
-  * (the reverse mapping will use the slow path until that happens).
-  */
- struct irq_domain *irq_domain_add_tree(struct device_node *of_node,
--					 struct irq_domain_ops *ops,
-+					 const struct irq_domain_ops *ops,
- 					 void *host_data)
- {
- 	struct irq_domain *domain = irq_domain_alloc(of_node,
-@@ -230,6 +222,7 @@ struct irq_domain *irq_domain_add_tree(struct device_node *of_node,
- struct irq_domain *irq_find_host(struct device_node *node)
- {
- 	struct irq_domain *h, *found = NULL;
-+	int rc;
- 
- 	/* We might want to match the legacy controller last since
- 	 * it might potentially be set to match all interrupts in
-@@ -237,11 +230,17 @@ struct irq_domain *irq_find_host(struct device_node *node)
- 	 * yet though...
- 	 */
- 	mutex_lock(&irq_domain_mutex);
--	list_for_each_entry(h, &irq_domain_list, link)
--		if (h->ops->match(h, node)) {
-+	list_for_each_entry(h, &irq_domain_list, link) {
-+		if (h->ops->match)
-+			rc = h->ops->match(h, node);
-+		else
-+			rc = (h->of_node != NULL) && (h->of_node == node);
++EXPORT_SYMBOL_GPL(irq_domain_xlate_onecell);
 +
-+		if (rc) {
- 			found = h;
- 			break;
- 		}
-+	}
- 	mutex_unlock(&irq_domain_mutex);
- 	return found;
- }
-@@ -760,7 +759,7 @@ int irq_domain_xlate_onetwocell(struct irq_domain *d,
- }
- EXPORT_SYMBOL_GPL(irq_domain_xlate_onetwocell);
++/**
++ * irq_domain_xlate_twocell() - Generic xlate for direct two cell bindings
++ *
++ * Device Tree IRQ specifier translation function which works with two cell
++ * bindings where the cell values map directly to the hwirq number
++ * and linux irq flags.
++ */
++int irq_domain_xlate_twocell(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type)
++{
++	if (WARN_ON(intsize < 2))
++		return -EINVAL;
++	*out_hwirq = intspec[0];
++	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(irq_domain_xlate_twocell);
++
++/**
++ * irq_domain_xlate_onetwocell() - Generic xlate for one or two cell bindings
++ *
++ * Device Tree IRQ specifier translation function which works with either one
++ * or two cell bindings where the cell values map directly to the hwirq number
++ * and linux irq flags.
++ *
++ * Note: don't use this function unless your interrupt controller explicitly
++ * supports both one and two cell bindings.  For the majority of controllers
++ * the _onecell() or _twocell() variants above should be used.
++ */
++int irq_domain_xlate_onetwocell(struct irq_domain *d,
++				struct device_node *ctrlr,
++				const u32 *intspec, unsigned int intsize,
++				unsigned long *out_hwirq, unsigned int *out_type)
++{
++	if (WARN_ON(intsize < 1))
++		return -EINVAL;
++	*out_hwirq = intspec[0];
++	*out_type = (intsize > 1) ? intspec[1] : IRQ_TYPE_NONE;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(irq_domain_xlate_onetwocell);
  
--struct irq_domain_ops irq_domain_simple_ops = {
-+const struct irq_domain_ops irq_domain_simple_ops = {
+ struct irq_domain_ops irq_domain_simple_ops = {
  	.map = irq_domain_simple_map,
- 	.xlate = irq_domain_xlate_onetwocell,
+-	.xlate = irq_domain_simple_xlate,
++	.xlate = irq_domain_xlate_onetwocell,
  };
+ EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
+ 
 -- 
 1.7.9
