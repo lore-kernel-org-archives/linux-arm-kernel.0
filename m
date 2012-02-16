@@ -1,65 +1,43 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Thu, 16 Feb 2012 07:16:11 -0800
-Subject: Query: When will drv->poweroff() called
-In-Reply-To: <4F30A668.8010407@st.com>
-References: <4F2F6B40.6070308@st.com> <201202061307.40628.rjw@sisk.pl>
- <4F30A668.8010407@st.com>
-Message-ID: <CAOh2x=n42kU+9Yvz2-KFxAm2OFvoc427oibSh4Y7bkQxWRdy5w@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 16 Feb 2012 16:09:33 +0100
+Subject: [PATCH 1/2] ARM: remove memmove from boot/compressed/string.c
+In-Reply-To: <1329404057-26346-2-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+ <1329404057-26346-2-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <20120216150933.GD19779@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Sorry for mailing again, earlier mail bounced on linux-pm list,
-as i wasn't subscribed to it]
+On 15:54 Thu 16 Feb     , Michael Opdenacker wrote:
+> This patch removes the memmove function from boot/compressed/string.c
+> - This definition conflicts with the one in lib/decompress_unxz.c
+>   This change is required to support xz compression on ARM.
+> - memmove is not used in any of the other decompressors
+>   in lib/decompress_*.c
+> 
+> Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+> ---
+>  arch/arm/boot/compressed/string.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
+> index 36e53ef..369443a 100644
+> --- a/arch/arm/boot/compressed/string.c
+> +++ b/arch/arm/boot/compressed/string.c
+> @@ -40,6 +40,7 @@ void *memcpy(void *__dest, __const void *__src, size_t __n)
+>  	return __dest;
+>  }
+>  
+> +/*
+>  void *memmove(void *__dest, __const void *__src, size_t count)
+>  {
+>  	unsigned char *d = __dest;
+> @@ -55,6 +56,7 @@ void *memmove(void *__dest, __const void *__src, size_t count)
+>  		d[count] = s[count];
+>  	return __dest;
+>  }
+> +*/
+so why not drop it cleanly
 
-Hi Amit,
-
-Can you please clear my doubt regarding calling of
-hibernation_set_ops() for ARM SoC's?
-
---
-viresh
-
-On Mon, Feb 6, 2012 at 8:19 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 2/6/2012 5:37 PM, Rafael J. Wysocki wrote:
->> On Monday, February 06, 2012, Viresh Kumar wrote:
->>> >
->>> > Hi Guys,
->>> >
->>> > Sorry for asking this silly question, but i couldn't locate much
->>> > help for it in documentation, so asking it.
->>> >
->>> > We were testing hibernation for SPEAr13xx SoC family, based on
->>> > ARM Cortex a9.
->>> >
->>> > I observed that poweroff() callback of individual drivers are not
->>> > getting called at all, while we test hibernate.
->> They should be called in the last phase of hibernation, after the image
->> has been created and the system is going for "power off" (hance the
->> callback name).
->>
->>> > I tried to go through the code to see what happened. It looked like
->>> > there should be call to hibernation_set_ops() for platforms that are
->>> > willing to get a call to poweroff() for their drivers.
->> That's correct. ?The ->poweroff() callbacks are only executed if
->> hibernation_mode is equal to HIBERNATION_PLATFORM, which is not the
->> default.
->>
->>> > Otherwise shutdown of the busses gets called, which is a completely
->>> > different path.
->>> >
->>> > There are many drivers today, that are registering poweroff() from dev_pm_ops
->>> > but are not doing bus specific shutdown stuff.
->>> >
->>> > Even i tried to look for hibernation_set_ops() in kernel, and only acpi
->>> > code is calling it.
->> That's correct too.
->>
->>> > I didn't understood how other ARM Sub-Arch's are handling this.
->> Well, they are supposed to call hibernation_set_ops() and set the operations
->> appropriately. ?Those operations may be empty routines if they don't need
->> to do anything, but they have to be defined.
->
-> Hi Amit,
->
-> Can you give some input on why none of the ARM platforms are calling
-> this routine currently.
+Best Regards,
+J.
