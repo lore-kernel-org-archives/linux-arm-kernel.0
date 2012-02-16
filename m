@@ -1,103 +1,39 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 16 Feb 2012 09:31:07 -0800
-Subject: [PATCHv2 8/8] arm: omap3: prevent per_clkdm from attempting
- manual domain transitions
-In-Reply-To: <1329410895.4102.404.camel@sokoban> (Tero Kristo's message of
- "Thu, 16 Feb 2012 18:48:15 +0200")
-References: <1329320274-481-1-git-send-email-t-kristo@ti.com>
- <1329320274-481-9-git-send-email-t-kristo@ti.com>
- <87pqdf99c2.fsf@ti.com> <1329382652.4102.386.camel@sokoban>
- <CAMQu2gx5JdKfTTUhi28N_=EZ3tDo7nTRA00ErrMpuGMkOh9rgw@mail.gmail.com>
- <1329398159.4102.391.camel@sokoban>
- <1329405804.4102.400.camel@sokoban>
- <CAMQu2gwMboftdRo9dE38ECp+5o2nTPgxeZ60JrbV0xd8HLNfUg@mail.gmail.com>
- <1329410895.4102.404.camel@sokoban>
-Message-ID: <877gzmit2c.fsf@ti.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 16 Feb 2012 18:34:26 +0100
+Subject: remoteproc: Load coprocessor code to the specific main memory
+ location
+In-Reply-To: <4F3D032B.6090700@monstr.eu>
+References: <4F1EE861.4030405@monstr.eu>
+ <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
+ <4F1FF870.3000105@monstr.eu>
+ <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
+ <4F200F64.9060203@monstr.eu>
+ <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
+ <4F212E9E.9060807@monstr.eu>
+ <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
+ <4F391C1D.9020402@monstr.eu>
+ <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
+ <4F3BA962.9040109@monstr.eu> <4F3BC30A.4030301@monstr.eu>
+ <4F3CC899.4070302@monstr.eu>
+ <CAK=WgbaRF-L7M3VMZQdqFLUFOJuwFVkBH1hUNuJ51kSrzkaVjA@mail.gmail.com>
+ <4F3CFFAD.9030402@monstr.eu> <4F3D032B.6090700@monstr.eu>
+Message-ID: <CAK=WgbZ3oXc+NQscdShqmu2wkzv=M-qBDCH2-k=5qSRX9W=z3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+On Thu, Feb 16, 2012 at 2:22 PM, Michal Simek <monstr@monstr.eu> wrote:
+> ok on that addresses above is mapped vring_desc structure. I expect that
+> addr is address to any memory location when data are places. Next is filled
+> by init because of ring buffer. What flags should be used? And what is data
+> structure?
 
-> On Thu, 2012-02-16 at 21:15 +0530, Shilimkar, Santosh wrote:
->> On Thu, Feb 16, 2012 at 8:53 PM, Tero Kristo <t-kristo@ti.com> wrote:
->> > On Thu, 2012-02-16 at 15:15 +0200, Tero Kristo wrote:
->> >> On Thu, 2012-02-16 at 15:27 +0530, Shilimkar, Santosh wrote:
->> >> > On Thu, Feb 16, 2012 at 2:27 PM, Tero Kristo <t-kristo@ti.com> wrote:
->> >> > > On Wed, 2012-02-15 at 11:37 -0800, Kevin Hilman wrote:
->> >> > >> Tero Kristo <t-kristo@ti.com> writes:
->> >> > >>
->> >> > >> > Attempting this will cause problems especially with off-mode enabled.
->> >> > >>
->> >> > >> Please be more verbose about the problems seen, and the root cause(s).
->> >> > >>
->> >> > >
->> >> > > I was actually looking forward for some help with this commit message,
->> >> > > as I am still not quite sure what is going on in here. :) Here is the
->> >> > > log for suspend (btw, cam_pwrdm does not go to off in mainline yet, but
->> >> > > I think that is probably fixed by the patch from Paul,
->> >> > > omap_set_pwrdm_state() does not work properly.) The warning comes out
->> >> > > after wakeup from off-mode, and it is triggered by the disabling of
->> >> > > autodeps before off-mode entry.
->> >> > >
->> >> > This mostly indicates that one of the per clock-domain module
->> >> > clock turning ON seems to be not working well with auto deps
->> >> > disabled. This leads to interconnect violation.
->> >> >
->> >> > if not tried already, can you put the per_clockdomain in SW_WKUP
->> >> > in the low power code early resume path and see if this
->> >> > error goes away.
->> >>
->> >> This seems to get rid of the dump also. It looks like some driver resume
->> >> is not behaving nicely, I am trying to pinpoint the culprit currently
->> >> and see whether it can provide more info.
->> >
->> > Okay, I have some more info about this now.
->> >
->> > What happens is that when entering off-mode, PER domain remains OFF even
->> > during the execution of the exit phase from omap_sram_idle. Adding a
->> > manual SW_WKUP it comes up and there are no issues. If autodeps are
->> > enabled on the domain, it comes back from off mode as active.
->> >
->> > Looking further in the code, we have this at the end of omap_sram_idle:
->> >
->> >        if (per_next_state < PWRDM_POWER_ON) {
->> >                per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
->> >                omap2_gpio_resume_after_idle();
->> >                wake_per();
->> >                if (per_prev_state == PWRDM_POWER_OFF)
->> >                        omap3_per_restore_context();
->> >        }
->> >
->> > ... which seems to assume that per domain is on. Gpio code does not
->> > control any clocks currently, as it only requires the interface clock to
->> > be on, and as this is autoidled....
->> >
->> > Any comments how we should handle this? Shall we just keep these two
->> > patches for handling this or add some different hackery for the gpio
->> > issue?
->> >
->> Good. I thought too that issue will disappear.
->> The issue is pretty clear. Technically every driver pm_runtime() code should
->> be able to manage a clock->clockdomain->power domain power up/down
->> sequence. That should work without auto deps.
->> 
->> Do you narrowed down which driver resume is creating the dump ?
->> UART , GPIO ?
->
-> It is the gpio base stuff called from omap_sram_idle(), basically the
-> restore context part. If I force enable per domain before the code
-> snippet before, there is no dump, but if it is done after, I get the
-> dump.
->
-> The thing is that gpio driver doesn't currently have this kind of
-> mechanism for the restore context part, at least not on omap3 due to
-> above clocking issue (only autoidled interface clock is used.)
+I'm sorry, but can you please rephrase this question too ? I'm just not
+sure I understand you correctly.
 
-I'm not sure if it fully addresses this, but Tarun's series converts
-GPIO to runtime PM.
+In general, you don't need to fiddle with the vring_desc structure -
+that's internal to virtio, and things should just work.
 
-Can you try with Tarun's series.  See the for_3.4/gpio_cleanup_fixes_v9
-branch here:
-git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev.git
+Or are you asking about the rtos side ?
 
-Kevin
+Thanks,
+Ohad.
