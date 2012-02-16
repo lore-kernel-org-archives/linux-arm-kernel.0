@@ -1,139 +1,65 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 16 Feb 2012 10:33:57 +0100
-Subject: [PATCH 1/5] gpio/omap: Remove bank->id information and misc
- cleanup
-In-Reply-To: <CAC83ZvJuHpaBbGoysW7GwOHtqfi72EDhFYja2LE4NyBd+QgFWw@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-2-git-send-email-b-cousson@ti.com>
- <CAC83ZvJuHpaBbGoysW7GwOHtqfi72EDhFYja2LE4NyBd+QgFWw@mail.gmail.com>
-Message-ID: <4F3CCD85.1050303@ti.com>
+From: afleming@gmail.com (Andy Fleming)
+Date: Thu, 16 Feb 2012 03:51:38 -0600
+Subject: How to deal with a PHY configuration related to the board?
+In-Reply-To: <4F3A6925.2060601@atmel.com>
+References: <20120214092606.GE4723@ldesroches-Latitude-E6320>
+ <20120214094339.GA4338@sapphire.tkos.co.il>
+ <20120214103318.GF4723@ldesroches-Latitude-E6320>
+ <20120214112248.GA20876@game.jcrosoft.org>
+ <4F3A6925.2060601@atmel.com>
+Message-ID: <CAKWjMd7ZEBMC4XeqWUC=WBw9UXFDx3bt_4c3tcQOZPThRwMU+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/16/2012 6:53 AM, DebBarma, Tarun Kanti wrote:
-> On Wed, Feb 15, 2012 at 9:34 PM, Benoit Cousson<b-cousson@ti.com>  wrote:
->> The driver does not need anymore any id to identify the GPIO instance.
->> Remove every occurence of the bank->id inside the driver.
->>
->> Remove two trailing spaces.
->> Add a dev variable for better readability in probe.
->> Remove unused variable bank->pbase.
->>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
-> Looks fine.
-> If needed you can add my Acked-by:
+On Tue, Feb 14, 2012 at 8:01 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 02/14/2012 12:22 PM, Jean-Christophe PLAGNIOL-VILLARD :
+>> On 11:33 Tue 14 Feb ? ? , Ludovic Desroches wrote:
+>>> Hi Baruch,
+>>>
+>>> On Tue, Feb 14, 2012 at 11:43:39AM +0200, Baruch Siach wrote:
+>>>> Hi Ludovic,
+>>>>
+>>>> On Tue, Feb 14, 2012 at 10:26:06AM +0100, Ludovic Desroches wrote:
+>>>>> I am using a Micrel KSZ9021RN PHY and I would like to configure some
+>>>>> registers
+>>>>> as 'RGMII Clock and Control Pad Skew' and 'RGMII RX Data Pad Skew'.
+>>>>> So the values of these registers are board dependant and I wondering what is
+>>>>> the proper way to set them.
+>>>>> It seems there is no platform data usable for this case. Having a quick look
+>>>>> to other PHYs, the situation seems the same.
+>>>>>
+>>>>> Can you give me some clues about how to do this? Did I miss anything which
+>>>>> allow to do this?
+>>>>
+>>>> See ksz9021rn_phy_fixup() in arch/arm/mach-imx/mach-imx6q.c.
+>>>>
+>>>
+>>> Thanks for your help.
+>>>
+>>> So the solution is to use phy_register_fixup function.
 
-Thanks,
-Benoit
+phy_register_fixup() is the appropriate method.
 
-> --
-> Tarun
+
+>> dts
 >
->> ---
->>   drivers/gpio/gpio-omap.c |   23 +++++++++--------------
->>   1 files changed, 9 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index f49bd6f..a0c3e03 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -50,7 +50,6 @@ struct gpio_regs {
->>
->>   struct gpio_bank {
->>         struct list_head node;
->> -       unsigned long pbase;
->>         void __iomem *base;
->>         u16 irq;
->>         u16 virtual_irq_start;
->> @@ -77,7 +76,6 @@ struct gpio_bank {
->>         int stride;
->>         u32 width;
->>         int context_loss_count;
->> -       u16 id;
->>         int power_mode;
->>         bool workaround_enabled;
->>
->> @@ -155,7 +153,7 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
->>   {
->>         int l = __raw_readl(base + reg);
->>
->> -       if (set)
->> +       if (set)
->>                 l |= mask;
->>         else
->>                 l&= ~mask;
->> @@ -495,7 +493,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
->>         unsigned long flags;
->>
->>         if (bank->non_wakeup_gpios&  gpio_bit) {
->> -               dev_err(bank->dev,
->> +               dev_err(bank->dev,
->>                         "Unable to modify wakeup on non-wakeup GPIO%d\n", gpio);
->>                 return -EINVAL;
->>         }
->> @@ -1048,37 +1046,36 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
->>
->>   static int __devinit omap_gpio_probe(struct platform_device *pdev)
->>   {
->> +       struct device *dev =&pdev->dev;
->>         struct omap_gpio_platform_data *pdata;
->>         struct resource *res;
->>         struct gpio_bank *bank;
->>         int ret = 0;
->>
->> -       if (!pdev->dev.platform_data) {
->> +       if (!dev->platform_data) {
->>                 ret = -EINVAL;
->>                 goto err_exit;
->>         }
->>
->>         bank = kzalloc(sizeof(struct gpio_bank), GFP_KERNEL);
->>         if (!bank) {
->> -               dev_err(&pdev->dev, "Memory alloc failed for gpio_bank\n");
->> +               dev_err(dev, "Memory alloc failed\n");
->>                 ret = -ENOMEM;
->>                 goto err_exit;
->>         }
->>
->>         res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->>         if (unlikely(!res)) {
->> -               dev_err(&pdev->dev, "GPIO Bank %i Invalid IRQ resource\n",
->> -                               pdev->id);
->> +               dev_err(dev, "Invalid IRQ resource\n");
->>                 ret = -ENODEV;
->>                 goto err_free;
->>         }
->>
->>         bank->irq = res->start;
->> -       bank->id = pdev->id;
->>
->>         pdata = pdev->dev.platform_data;
->>         bank->virtual_irq_start = pdata->virtual_irq_start;
->> -       bank->dev =&pdev->dev;
->> +       bank->dev = dev;
->>         bank->dbck_flag = pdata->dbck_flag;
->>         bank->stride = pdata->bank_stride;
->>         bank->width = pdata->bank_width;
->> @@ -1098,16 +1095,14 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
->>         /* Static mapping, never released */
->>         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>         if (unlikely(!res)) {
->> -               dev_err(&pdev->dev, "GPIO Bank %i Invalid mem resource\n",
->> -                               pdev->id);
->> +               dev_err(dev, "Invalid mem resource\n");
->>                 ret = -ENODEV;
->>                 goto err_free;
->>         }
->>
->>         bank->base = ioremap(res->start, resource_size(res));
->>         if (!bank->base) {
->> -               dev_err(&pdev->dev, "Could not ioremap gpio bank%i\n",
->> -                               pdev->id);
->> +               dev_err(dev, "Could not ioremap\n");
->>                 ret = -ENOMEM;
->>                 goto err_free;
->>         }
->> --
->> 1.7.0.4
->>
+> ?
+>
+> Can you please build sentences?
+>
+> (even if I suspect to know what you are talking about ;-))
+
+
+I'm going to take this moment to grumble about the dts solution, which
+is less flexible than the fixup solution, while impeding the sharing
+of knowledge and code.
+
+'RGMII Clock and Control Pad Skew' and 'RGMII RX Data Pad Skew' sound
+like features that a variety of board vendors might want to configure
+differently, so why not implement code which modifies those values in
+the driver, and then have the board code register a fixup which calls
+that code? Then we all know what's happening, and why. The "dts"
+solution is just to do a series of undocumented register writes. We
+are thus left unenlightened.
+
+Andy
