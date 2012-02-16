@@ -1,73 +1,58 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 16 Feb 2012 09:35:04 -0800
-Subject: [PATCH 6/6] arm: omap: pm-debug: enhanced usecount debug support
-In-Reply-To: <CAOMWX4cg4mfBQGcHLodjFaVY0vVGnKJKvsa9ngMLO-0Ca7gBTQ@mail.gmail.com>
- (Nishanth Menon's message of "Thu, 16 Feb 2012 11:06:38 -0600")
-References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
- <1329237402-26008-7-git-send-email-t-kristo@ti.com>
- <20120214202740.GT1426@atomide.com> <87fwed58dm.fsf@ti.com>
- <20120214235218.GX1426@atomide.com>
- <1329294866.4102.343.camel@sokoban> <874nus5djf.fsf@ti.com>
- <CAOMWX4cg4mfBQGcHLodjFaVY0vVGnKJKvsa9ngMLO-0Ca7gBTQ@mail.gmail.com>
-Message-ID: <87y5s2hebb.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Feb 2012 17:36:20 +0000
+Subject: Query: Multiple Mappings to Mem and ARMV6+
+In-Reply-To: <20120216172928.GD9151@arm.com>
+References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
+ <20120216171520.GA9151@arm.com>
+ <20120216172242.GH27825@n2100.arm.linux.org.uk>
+ <20120216172928.GD9151@arm.com>
+Message-ID: <20120216173620.GI27825@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Menon, Nishanth" <nm@ti.com> writes:
+On Thu, Feb 16, 2012 at 05:29:28PM +0000, Catalin Marinas wrote:
+> On Thu, Feb 16, 2012 at 05:22:42PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Feb 16, 2012 at 05:15:20PM +0000, Catalin Marinas wrote:
+> > > On Thu, Feb 16, 2012 at 04:41:02PM +0000, viresh kumar wrote:
+> > > > Sorry for starting the long old thread again, but i have to start it as i
+> > > > was a bit confused. :(
+> > > > 
+> > > > We know that we can't have multiple mappings with different attributes
+> > > > to the same physical memory on ARMv6+ machines due to speculative
+> > > > prefetch.
+> > > > 
+> > > > So, we have following kind of mappings in kernel now (please correct me
+> > > > if i am wrong):
+> > > > - Low Mem: Mapped at boot time to - Normal Cacheable - Bufferable
+> > > > - ioremap() - blocked on Low Mem, so that we don't create Device type mapping
+> > > > to same mem
+> > > > - dma_alloc_coherent() and others:
+> > > >          - Without DMA_MEM_BUFFERABLE selected - gives strongly ordered mem
+> > > >           (i.e. Non cacheable - Non Bufferable)
+> > > >          - With DMA_MEM_BUFFERABLE selected - gives Normal - Non cacheable -
+> > > >            Bufferable mapping
+> > > >          - Maybe some other too...
+> > > > 
+> > > > I have a doubt with the last mapping mentioned above. We have two
+> > > > mappings possibly to the same physical memory, with different
+> > > > attributes: One is Cacheable and other one is not.
+> > > > 
+> > > > Is this allowed by ARM? Because the patch in which Russell blocked
+> > > > ioremap on Low Mem, he clearly mentioned that these attributes are
+> > > > also important and they should be same.
+> > > 
+> > > Section A3.5.7 in the latest ARM ARM (revC) clarifies the mismatched
+> > 
+> > There's a new version?
+> 
+> Rev C has been available for a while. I thought you got it already:
 
-> On Wed, Feb 15, 2012 at 09:20, Kevin Hilman <khilman@ti.com> wrote:
->> Tero Kristo <t-kristo@ti.com> writes:
->>
->>> On Tue, 2012-02-14 at 15:52 -0800, Tony Lindgren wrote:
->>>> * Kevin Hilman <khilman@ti.com> [120214 14:28]:
->>>> > Tony Lindgren <tony@atomide.com> writes:
->>>> >
->>>> > > * Tero Kristo <t-kristo@ti.com> [120214 08:19]:
->>>> > >> Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
->>>> > >> their own file, 'usecount'. This file shows the usecounts for every
->>>> > >> active domain and their children recursively. 'count' file now only
->>>> > >> shows power state counts for powerdomains.
->>>> > >>
->>>> > >> This patch also provices a way to do printk dumps from kernel code,
->>>> > >> by calling the pm_dbg_dump_X functions. The plan is to call these
->>>> > >> functions once an error condition is detected, e.g. failed suspend.
->>>> > >
->>>> > > Why don't you replace this all with a userspace tool that deciphers
->>>> > > the registers for you?
->>>> >
->>>> > This patch isn't deciphering registers, it's just dumping usecounts, and
->>>> > I think that is extremely useful to have in debugfs.
->>>> >
->>>> > I've already removed all the register dumping from the kernel in the
->>>> > hopes that someone will write a userspace tool for that.
->>>>
->>>> OK good to hear you're already considering it.
->>>
->>> Yes, register dumps are gone, and I am actually one of the persons who
->>> is missing it.
->>>
->>> I think there should still be some capability to get register snapshots
->>> from certain points during kernel execution, this is useful for
->>> debugging purposes. I don't know if it would be possible to do a
->>> call_usermodehelper() or something from kernel space just before wfi to
->>> read all (or part of) the PRCM registers, store them somewhere, and then
->>> decipher this data later with another tool. Any comments to this?
->>
->> You should look into the omapconf tool (TI internal only currently)
->>
->> This tool already has the ability to use /dev/mem to read/decipher OMAP
->> PM related registers.
->>
->> IMO, the one thing we're still missing is the ability to take register
->> snapshots (like immediately before and after WFI) and somehow feed those
->> to omapconf for deciphering.
->>
-> Something like this perhaps?
-> https://github.com/nmenon/linux-omap-ti-pm/commit/3cd1994fc0df9a8e3e0be74ec3f3add3ff3aef95
+No, if no one tells me when a new version is available, then, unless I
+waste time regularly polling the website below, I have no way to know.
 
-Yes, although that is targetted pretty narrowly at suspend and only PRM
-registers.
-
-Do you then use omapconf to display the results?
-
-Kevin
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0406c/index.html
+> 
+> It contains the LPAE and virtualisation extensions.
+> 
+> -- 
+> Catalin
