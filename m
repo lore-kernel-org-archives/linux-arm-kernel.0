@@ -1,50 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2012 13:51:51 +0000
-Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
- for v3.4 merge window
-In-Reply-To: <4F3D0186.2010500@ti.com>
-References: <20120215182355.18884.18682.stgit@kaulin.local>
- <CACYZBRE_Vf8qDQYPRgsL03T8oy2Kv4fYRfE8U7y79Xhb1nwC2A@mail.gmail.com>
- <20120216121234.GJ15338@n2100.arm.linux.org.uk> <4F3CF7D1.8050807@ti.com>
- <4F3D0186.2010500@ti.com>
-Message-ID: <20120216135151.GK15338@n2100.arm.linux.org.uk>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 16 Feb 2012 14:58:19 +0100
+Subject: [PATCH v3 0/6] ARM: Remove the __ARCH_WANT_INTERRUPTS_ON_CTXSW
+ definition
+In-Reply-To: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
+References: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1329400699.2293.221.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 06:45:50PM +0530, Rajendra Nayak wrote:
-> On Thursday 16 February 2012 06:04 PM, Rajendra Nayak wrote:
->>> Can you test something with these patches?
->>>
->>> 1. Build the gpio-twl4030.c as a module, but with HSMMC support built in
->>> 2. Boot on the 4430SDP
->>
->> twl4030 gpio is used for card detect on OMAP3, so I tried this
->> on my Beagle instead of 4430SDP.
->> The kernel boots up but does not detect/enumerate the mmc card.
->>
->>> 3. Load the gpio-twl4030 module
->>
->> I was expecting this to now detect the card, but I instead got
->> this error which seems to tell gpio-twl4030 has problems
->> when built/used as a module, outside of the mmc issues.
->
-> Looks like I was mislead with the errors and though the twl4030
-> gpio probe was bailing out with errors, which its not.
-> It does seem to go ahead, does a mmc late init which registers
-> the mmc omap_device and hence does a platform_device_add, but the
-> device never seem to get probed. mmc driver is built in and
-> registered.
->
->>
->> # insmod gpio-twl4030.ko
->> [   16.217864] twl4030_gpio twl4030_gpio: can't dispatch IRQs from modules
->> [   16.242004] gpiochip_add: registered GPIOs 192 to 211 on device: twl4030
->>
->>
->>> 4. Remove the gpio-twl4030 module
->>> 5. Re-load the gpio-twl4030.ko module
->>>
->>> and report back what you get.  Thanks.
->
+On Fri, 2012-01-20 at 17:42 +0000, Catalin Marinas wrote:
+> Hi,
+> 
+> This is version 3 of the set of patches removing
+> __ARCH_WANT_INTERRUPTS_ON_CTXSW on ARM. The series was rebased on top of
+> 3.3-rc1 and fixed the conflicts with the kernel/sched/ changes and the
+> ARM LPAE patches. There are no functional changes from v2. I plan to
+> push this to -next and get it ready for 3.4-rc1.
+> 
+> Question for Peter/Ingo - how do we merge the first patch that
+> introduces finish_arch_post_lock_switch? Do you pick it up or I can
+> merge it via rmk (with your ack)?
 
-(4) and (5) are the key bits of what I was asking you to do.
+Russell, what's the status of these patches? I'd like to see them land
+in 3.4 if possible.
+
+If you take them in your arm tree, I can ask Ingo to pull from there and
+then I can build on them from there..
