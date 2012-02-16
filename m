@@ -1,35 +1,58 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Thu, 16 Feb 2012 09:37:02 -0800
-Subject: Query: Multiple Mappings to Mem and ARMV6+
-In-Reply-To: <20120216171520.GA9151@arm.com>
-References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
- <20120216171520.GA9151@arm.com>
-Message-ID: <CAOh2x=nUPb-CcyJBmZ2wv=tsNzi=r3F16NynsbChXD=q5hSGiw@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 16 Feb 2012 18:38:41 +0100
+Subject: [PATCH v5 08/27] irq_domain: Move irq_domain code from powerpc
+ to kernel/irq
+In-Reply-To: <1329383368-12122-9-git-send-email-grant.likely@secretlab.ca>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <1329383368-12122-9-git-send-email-grant.likely@secretlab.ca>
+Message-ID: <4F3D3F21.3060905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 9:15 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> To summarise, if you mix Normal with Device or SO memory, you only get
-> the guarantees of the Normal memory (e.g. early write acknowledgement,
-> write buffer gathering, speculative accesses), so it's not recommended.
-> If you mix Normal Cacheable with Normal Non-cacheable, you need to make
-> sure that the cacheable mapping does not have any dirty cache lines that
-> could be evicted. Additionally, if you read the buffer through the
-> cacheable mapping later, you need to invalidate it first in case cache
-> lines have been speculatively fetched. The ARM ARM definition however
-> guarantees that accesses through the Non-cacheable mapping does not hit
-> any cache lines (brought in via the Cacheable mapping).
+Hi Grant,
 
-I don't know if i understood correctly the earlier mails over the list, but with
-speculative writes to Normal Cacheable Memory (Low Mem), we can still
-enter an undefined state if we have separate kind of mapping as we have in
-dma_alloc_*() and low mem.
+It looks like there is a small regression in that update, it cannot 
+build due to a missing semi-colon.
 
-Or
+On 2/16/2012 10:09 AM, Grant Likely wrote:
+> +/**
+> + * irq_find_mapping() - Find a linux irq from an hw irq number.
+> + * @host: domain owning this hardware interrupt
+> + * @hwirq: hardware irq number in that host space
+> + *
+> + * This is a slow path, for use by generic code. It's expected that an
+> + * irq controller implementation directly calls the appropriate low level
+> + * mapping function.
+> + */
+> +unsigned int irq_find_mapping(struct irq_domain *host,
+> +			      irq_hw_number_t hwirq)
+> +{
+> +	unsigned int i;
+> +	unsigned int hint = hwirq % irq_virq_count;
+> +
+> +	/* Look for default host if nececssary */
+> +	if (host == NULL)
+> +		host = irq_default_host;
+> +	if (host == NULL)
+> +		return NO_IRQ;
+> +
+> +	/* legacy ->  bail early */
+> +	if (host->revmap_type == IRQ_DOMAIN_MAP_LEGACY)
+> +		return hwirq;
+> +
+> +	/* Slow path does a linear search of the map */
+> +	if (hint == 0)
+> +		hint = 1;
+> +	i = hint;
+> +	do {
+> +		struct irq_data *data = irq_get_irq_data(i);
+> +		if (data&&  (data->domain == host)&&  (data->hwirq == hwirq))
+> +			return i;
+> +		i++;
+> +		if (i>= irq_virq_count)
+> +			i = 1
 
-Who is responsible here to take care of cleaning and invalidate cached low
-mem mappings in case of speculative writes?
+The ";" is missing.
 
---
-viresh
+Regards,
+Benoit
