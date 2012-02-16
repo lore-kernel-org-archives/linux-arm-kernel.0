@@ -1,30 +1,33 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 16 Feb 2012 08:05:39 +0800
-Subject: Possible circular locking dependency (3.3-rc2)
-In-Reply-To: <20120215200731.GD25779@ponder.secretlab.ca>
-References: <20120208124147.GF16334@legolas.emea.dhcp.ti.com>
- <CACVXFVMfmabcH57da-prx=J950KEoFtfb-zsuBWn7VY3NaMUUQ@mail.gmail.com>
- <CACRpkdZ7bs=i6Zg1ckXk-xBhY9z5VbvhVMk7p2_kP-=eB2bCKw@mail.gmail.com>
- <20120215200731.GD25779@ponder.secretlab.ca>
-Message-ID: <CACVXFVNsRuvs91dw0YuvJkFCqc_kNjoBc17wsAo7yOPo0kfSag@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Feb 2012 16:15:59 -0800
+Subject: [PATCH v2 5/7] ARM: imx: eliminate macro IRQ_GPIOx()
+In-Reply-To: <CAOMZO5AZvzbMmMSvMDVE5Xi7JoKkOttdN96Vai0k8ZH5TKdmbw@mail.gmail.com>
+References: <1329331668-30325-1-git-send-email-shawn.guo@linaro.org>
+ <1329331668-30325-6-git-send-email-shawn.guo@linaro.org>
+ <CAOMZO5AZvzbMmMSvMDVE5Xi7JoKkOttdN96Vai0k8ZH5TKdmbw@mail.gmail.com>
+Message-ID: <20120216001558.GC30946@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 4:07 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Feb 15, 2012 at 07:54:56PM +0100, Linus Walleij wrote:
->> On Mon, Feb 13, 2012 at 3:53 PM, Ming Lei <tom.leiming@gmail.com> wrote:
->>
->> > Looks 'sysfs_lock' needn't to be held for unregister, so the patch below may
->> > fix the problem.
->>
->> Looks correct to me!
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Ming, can I have a proper Signed-off-by: line from you so I can apply this
-> patch?
+On Wed, Feb 15, 2012 at 09:29:27PM -0200, Fabio Estevam wrote:
+> On Wed, Feb 15, 2012 at 4:47 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> 
+> > +#define IMX_GPIOA(x) ?(GPIO_PORTA + x)
+> > +#define IMX_GPIOB(x) ?(GPIO_PORTB + x)
+> > +#define IMX_GPIOC(x) ?(GPIO_PORTC + x)
+> > +#define IMX_GPIOD(x) ?(GPIO_PORTD + x)
+> > +#define IMX_GPIOE(x) ?(GPIO_PORTE + x)
+> > +#define IMX_GPIOF(x) ?(GPIO_PORTF + x)
+> 
+> Do we really need this new macros?
+> 
+They are not brand new.  They are here to help a plain translation
+from IRQ_GPIOx() to IMX_GPIOx().
 
-Sure, :-)
+> Why not use the standard IMX_GPIO_NR macro instead?
 
-thanks
+It can be another patch, if you are interested.
+
 -- 
-Ming Lei
+Regards,
+Shawn
