@@ -1,198 +1,71 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Thu, 16 Feb 2012 17:24:22 +0100
-Subject: [PATCH] i.MX27: visstrim_m10: Add video support.
-Message-ID: <1329409462-20072-1-git-send-email-javier.martin@vista-silicon.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 16 Feb 2012 08:27:04 -0800
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120216091352.GK3852@pengutronix.de>
+References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
+ <20120213082741.GN3852@pengutronix.de>
+ <20120213144820.GA3494@opensource.wolfsonmicro.com>
+ <20120214105823.GS3852@pengutronix.de>
+ <20120214172902.GB3916@opensource.wolfsonmicro.com>
+ <20120216073236.GE3852@pengutronix.de>
+ <20120216075825.GA11631@opensource.wolfsonmicro.com>
+ <20120216091352.GK3852@pengutronix.de>
+Message-ID: <20120216162703.GB3383@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vista Silicon Visstrim_m10 board has a tvp5150
-video decoder attached to the CSI interface.
+On Thu, Feb 16, 2012 at 10:13:52AM +0100, Sascha Hauer wrote:
+> On Wed, Feb 15, 2012 at 11:58:26PM -0800, Mark Brown wrote:
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- arch/arm/mach-imx/Kconfig                   |    1 +
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c |  113 ++++++++++++++++++++++++++-
- 2 files changed, 112 insertions(+), 2 deletions(-)
+> > It's not per device, of course - there's an overhead from putting a
+> > fixed regulator in but then per supply it's just a line.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 4defb97..f994f10 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -322,6 +322,7 @@ config MACH_IMX27_VISSTRIM_M10
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MXC_MMC
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
-+	select IMX_HAVE_PLATFORM_MX2_CAMERA
- 	help
- 	  Include support for Visstrim_m10 platform and its different variants.
- 	  This includes specific configurations for the board and its
-diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index c2766ae..40da83a 100644
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@ -30,6 +30,9 @@
- #include <linux/input.h>
- #include <linux/gpio.h>
- #include <linux/delay.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/memblock.h>
-+#include <media/soc_camera.h>
- #include <sound/tlv320aic32x4.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -39,6 +42,8 @@
- 
- #include "devices-imx27.h"
- 
-+#define TVP5150_RSTN (GPIO_PORTC + 18)
-+#define TVP5150_PWDN (GPIO_PORTC + 19)
- #define OTG_PHY_CS_GPIO (GPIO_PORTF + 17)
- #define SDHC1_IRQ IRQ_GPIOB(25)
- 
-@@ -100,8 +105,108 @@ static const int visstrim_m10_pins[] __initconst = {
- 	PE1_PF_USBOTG_STP,
- 	PB23_PF_USB_PWR,
- 	PB24_PF_USB_OC,
-+	/* CSI */
-+	PB10_PF_CSI_D0,
-+	PB11_PF_CSI_D1,
-+	PB12_PF_CSI_D2,
-+	PB13_PF_CSI_D3,
-+	PB14_PF_CSI_D4,
-+	PB15_PF_CSI_MCLK,
-+	PB16_PF_CSI_PIXCLK,
-+	PB17_PF_CSI_D5,
-+	PB18_PF_CSI_D6,
-+	PB19_PF_CSI_D7,
-+	PB20_PF_CSI_VSYNC,
-+	PB21_PF_CSI_HSYNC,
- };
- 
-+/* Camera */
-+static int visstrim_camera_power(struct device *dev, int on)
-+{
-+	gpio_set_value(TVP5150_PWDN, on);
-+
-+	return 0;
-+};
-+
-+static int visstrim_camera_reset(struct device *dev)
-+{
-+	gpio_set_value(TVP5150_RSTN, 0);
-+	ndelay(500);
-+	gpio_set_value(TVP5150_RSTN, 1);
-+
-+	return 0;
-+};
-+
-+static struct i2c_board_info visstrim_i2c_camera =  {
-+	I2C_BOARD_INFO("tvp5150", 0x5d),
-+};
-+
-+static struct soc_camera_link iclink_tvp5150 = {
-+	.bus_id         = 0,
-+	.board_info     = &visstrim_i2c_camera,
-+	.i2c_adapter_id = 0,
-+	.power = visstrim_camera_power,
-+	.reset = visstrim_camera_reset,
-+};
-+
-+static struct platform_device visstrim_tvp5150 = {
-+	.name   = "soc-camera-pdrv",
-+	.id     = 0,
-+	.dev    = {
-+		.platform_data = &iclink_tvp5150,
-+	},
-+};
-+
-+
-+static struct mx2_camera_platform_data visstrim_camera = {
-+	.flags = MX2_CAMERA_CCIR | MX2_CAMERA_CCIR_INTERLACE |
-+			MX2_CAMERA_SWAP16 | MX2_CAMERA_PCLK_SAMPLE_RISING,
-+	.clk = 100000,
-+};
-+
-+static phys_addr_t mx2_camera_base __initdata;
-+#define MX2_CAMERA_BUF_SIZE SZ_8M
-+
-+static void __init visstrim_camera_init(void)
-+{
-+	struct platform_device *pdev;
-+	int dma;
-+
-+	/* Initialize tvp5150 gpios */
-+	mxc_gpio_mode(TVP5150_RSTN | GPIO_GPIO | GPIO_OUT);
-+	mxc_gpio_mode(TVP5150_PWDN | GPIO_GPIO | GPIO_OUT);
-+	gpio_set_value(TVP5150_RSTN, 1);
-+	gpio_set_value(TVP5150_PWDN, 0);
-+	ndelay(1);
-+
-+	gpio_set_value(TVP5150_PWDN, 1);
-+	ndelay(1);
-+	gpio_set_value(TVP5150_RSTN, 0);
-+	ndelay(500);
-+	gpio_set_value(TVP5150_RSTN, 1);
-+	ndelay(200000);
-+
-+	pdev = imx27_add_mx2_camera(&visstrim_camera);
-+	if (IS_ERR(pdev))
-+		return;
-+
-+	dma = dma_declare_coherent_memory(&pdev->dev,
-+				mx2_camera_base, mx2_camera_base,
-+				MX2_CAMERA_BUF_SIZE,
-+				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-+	if (!(dma & DMA_MEMORY_MAP))
-+		return;
-+}
-+
-+static void __init visstrim_reserve(void)
-+{
-+	/* reserve 4 MiB for mx2-camera */
-+	mx2_camera_base = memblock_alloc(MX2_CAMERA_BUF_SIZE,
-+			MX2_CAMERA_BUF_SIZE);
-+	memblock_free(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
-+	memblock_remove(mx2_camera_base, MX2_CAMERA_BUF_SIZE);
-+}
-+
- /* GPIOs used as events for applications */
- static struct gpio_keys_button visstrim_gpio_keys[] = {
- 	{
-@@ -180,6 +285,7 @@ static struct platform_device visstrim_m10_nor_mtd_device = {
- 
- static struct platform_device *platform_devices[] __initdata = {
- 	&visstrim_m10_nor_mtd_device,
-+	&visstrim_tvp5150,
- };
- 
- /* Visstrim_M10 uses UART0 as console */
-@@ -254,15 +360,17 @@ static void __init visstrim_m10_board_init(void)
- 	imx27_add_imx_ssi(0, &visstrim_m10_ssi_pdata);
- 	imx27_add_imx_uart0(&uart_pdata);
- 
--	i2c_register_board_info(0, visstrim_m10_i2c_devices,
--				ARRAY_SIZE(visstrim_m10_i2c_devices));
- 	imx27_add_imx_i2c(0, &visstrim_m10_i2c_data);
- 	imx27_add_imx_i2c(1, &visstrim_m10_i2c_data);
-+	i2c_register_board_info(0, visstrim_m10_i2c_devices,
-+				ARRAY_SIZE(visstrim_m10_i2c_devices));
-+
- 	imx27_add_mxc_mmc(0, &visstrim_m10_sdhc_pdata);
- 	imx27_add_mxc_ehci_otg(&visstrim_m10_usbotg_pdata);
- 	imx27_add_fec(NULL);
- 	imx_add_gpio_keys(&visstrim_gpio_keys_platform_data);
- 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+	visstrim_camera_init();
- }
- 
- static void __init visstrim_m10_timer_init(void)
-@@ -276,6 +384,7 @@ static struct sys_timer visstrim_m10_timer = {
- 
- MACHINE_START(IMX27_VISSTRIM_M10, "Vista Silicon Visstrim_M10")
- 	.atag_offset = 0x100,
-+	.reserve = visstrim_reserve,
- 	.map_io = mx27_map_io,
- 	.init_early = imx27_init_early,
- 	.init_irq = mx27_init_irq,
--- 
-1.7.0.4
+> You mean one supply if the voltages are the same, right? Otherwise
+> we need multiple fixed regulators (or we shouldn't claim that the
+> board-dummy-fixed-catch-all regulator has a particular voltage)
+
+I'd expect that anyone who's bothered by all this stuff wouldn't be
+going to fill in the voltages accurately.
+
+> > This is obviously not good for users, they'd still have to do error
+> > checking to determine if the device was created or not and then manually
+> > register the device with the driver core and ideally also care if that
+> > worked or not.
+
+> I understand that error checking is a good idea, but what do you mean
+> with 'manually register the device with the core'? The regulator is
+> registered with the core in this function.
+
+Oh, in that case it seems really odd that it's returning a pointer to
+the device rather than just returning success or failure.
+
+> > Of course with device tree this all becomes moot as this won't be
+> > happening from code anyway...
+
+> I wonder what the devicetree guys will do with this situation anyway.
+> The devicetree won't describe regulators that are actually not present
+> in the hardware, does it?
+
+In all these cases there is actually a physical supply of some kind; if
+there isn't one then you'd expect the driver would have explicit code to
+handle that in some way.
+
+> Don't get me wrong. All I want is just a way for people to be able to
+> add regulator support to drivers *without* breaking its users. Normally
+> we have the policy in the kernel that changes to the kernel do not break
+> its users. The smsc case violated this and it will happen again. In the
+> end it doesn't even matter if a particular board could control a supply
+> via software or not. Patches should not simply declare all users of a
+> driver as broken.
+
+Yes, I'm quite disappointed with people who are adding regulator support
+without making an effort to go round all the uers and at least notify
+the existing users of the device that they need updates.  There's a
+limited amount we can do in the core
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120216/37a0292b/attachment.sig>
