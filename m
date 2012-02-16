@@ -1,35 +1,25 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 16 Feb 2012 12:45:13 -0800
-Subject: [GIT PULL] ARM: OMAP: PM fixes for 3.3-rc
-Message-ID: <87wr7mecdi.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Feb 2012 22:14:55 +0000
+Subject: [PATCH] ARM: amba: don't include <asm/sizes.h>
+In-Reply-To: <20120216160525.GA30558@mail.gnudd.com>
+References: <20120216160525.GA30558@mail.gnudd.com>
+Message-ID: <20120216221455.GK27825@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, Feb 16, 2012 at 05:05:25PM +0100, Alessandro Rubini wrote:
+> The file uses no SZ_* symbol and some architectures miss sizes.h
+> 
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> ---
+> 
+> There a number of files including but not using it. This one
+> in particular I need under x86 so the fix is trivial.
+> 
+> However, I remember different feelings about sizes.h . Should it die
+> or should it proliferate to other archs using asm-generic/sizes.h ?
 
-Here's a couple more OMAP PM fixes for v3.3-rc
-
-Kevin
-
-The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-
-  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.3/fixes/pm
-
-for you to fetch changes up to 03e4fd6eb25e6b46536ecdb0d1b7d33d46b15480:
-
-  ARM: OMAP4: cpuidle: Fix the C-state reporting to cpuidle governor. (2012-02-14 10:59:26 -0800)
-
-----------------------------------------------------------------
-NeilBrown (1):
-      ARM: OMAP: add RCU locking to omap2_set_init_voltage.
-
-Santosh Shilimkar (1):
-      ARM: OMAP4: cpuidle: Fix the C-state reporting to cpuidle governor.
-
- arch/arm/mach-omap2/cpuidle44xx.c |    5 ++---
- arch/arm/mach-omap2/pm.c          |    3 +++
- 2 files changed, 5 insertions(+), 3 deletions(-)
+If you're going to continue with this change, please make sure you
+test build Versatile Express, Versatile and Realview to ensure that
+this doesn't cause breakage.
