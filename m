@@ -1,31 +1,27 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 16 Feb 2012 14:24:20 +0900
-Subject: [PATCH v2 06/11] ARM: EXYNOS: add support uart for EXYNOS4 and
- EXYNOS5
-In-Reply-To: <1328981685-8602-7-git-send-email-kgene.kim@samsung.com>
+Date: Thu, 16 Feb 2012 14:28:45 +0900
+Subject: [PATCH v2 04/11] ARM: EXYNOS: add interrupt definitions for
+ EXYNOS5250
+In-Reply-To: <1328981685-8602-5-git-send-email-kgene.kim@samsung.com>
 References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
- <1328981685-8602-7-git-send-email-kgene.kim@samsung.com>
-Message-ID: <054701ccec6b$3c563440$b5029cc0$%kim@samsung.com>
+ <1328981685-8602-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <054801ccec6b$da57ba60$8f072f20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Kukjin Kim wrote:
+>
+> This patch adds the interrupt definitions for EXYNOS5250 at
+> <mach/irqs.h> file. Basically, now it is needed for EXYNOS5250
+> interrupt and will be updated for single zImage next time.
 
 [...]
 
-> +struct s3c24xx_uart_resources exynos4_uart_resources[] __initdata = {
-> +	[0] = {
-> +		.resources	= exynos4_uart0_resource,
-> +		.nr_resources	= ARRAY_SIZE(exynos4_uart0_resource),
-> +	},
-> +	[1] = {
-> +		.resources	= exynos4_uart1_resource,
-> +		.nr_resources	= ARRAY_SIZE(exynos4_uart0_resource),
+> +#define JOP_IRQ_NUMBER		IRQ_SPI(118)
 
-Ooops, should be...
+Typo :( Should be 'JOB_IRQ_...'
 
-		.nr_resources	= ARRAY_SIZE(exynos4_uart1_resource),
-
+And I need to update every IRQ definitions...
 
 Thanks.
 
