@@ -1,54 +1,42 @@
 From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Thu, 16 Feb 2012 15:54:15 +0100
-Subject: ARM: add xz kernel compression support
-Message-ID: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+Date: Thu, 16 Feb 2012 15:54:16 +0100
+Subject: [PATCH 1/2] ARM: remove memmove from boot/compressed/string.c
+In-Reply-To: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+References: <1329404057-26346-1-git-send-email-michael.opdenacker@free-electrons.com>
+Message-ID: <1329404057-26346-2-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset applies on Linus' tree
+This patch removes the memmove function from boot/compressed/string.c
+- This definition conflicts with the one in lib/decompress_unxz.c
+  This change is required to support xz compression on ARM.
+- memmove is not used in any of the other decompressors
+  in lib/decompress_*.c
 
-It adds xz support to the ARM tree. x86 already has it, so let's have it too!
-My benchmarks below show that xz is better than lzma in terms of image size
-and uncompression time.
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/boot/compressed/string.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-My benchmarks below show that xz is better than lzma in terms of image size
-and uncompression time.
-
-lzma and xz remain pretty bad in terms of boot time, but they may be useful
-in cases where RAM usage and kernel size are critical (booting on FPGAs in early
-CPU design?).
-
-However, on fast CPUs like OMAP4 with slow storage, xz is almost as good as
-lzo, but uses much less space. Therefore, it can be a good compromise.
-
-This patch and all other compression options were tested on two boards:
-- OMAP4430 Panda board
-- AT91SAM9623 USB-A9263 board from Calao Systems
-
-Results on OMAP4 Panda
-----------------------
-
-Booting from MMC
-
-Comp.           Size            Loading time    Uncompressing time      Total time
-gzip            3355768         2.213376        0.501500                2.714876
-lzma            2488144         1.647410        1.399552                3.046962
-xz              2366192         1.566978        1.299516                2.866494
-lzo             3697840         2.471497        0.160596                2.632093
-None            6965644         4.626749        0                       4.626749
-
-Results on Calao Systems USB-A9263 (AT91)
------------------------------------------
-
-Booting from NAND
-
-Compression     Size            Loading time    Uncompressing time      Total time
-gzip            2386936         5.843289        0.935495                6.778784
-lzma            1794344         4.465542        6.513644                10.979186
-xz              1725360         4.308605        4.816191                9.124796
-lzo             2608624         6.351539        0.447336                6.798875
-None            4647908         11.080560       0                       11.080560
-
-Loading time: between "reading uImage" and "OK" (right before "Starting kernel")
-Compression time measured by:
-~/bin/grabserial -v -d /dev/ttyUSB0 -e 15 -t -m "Uncompressing Linux" -i "done," > booting-lzo.log
+diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
+index 36e53ef..369443a 100644
+--- a/arch/arm/boot/compressed/string.c
++++ b/arch/arm/boot/compressed/string.c
+@@ -40,6 +40,7 @@ void *memcpy(void *__dest, __const void *__src, size_t __n)
+ 	return __dest;
+ }
+ 
++/*
+ void *memmove(void *__dest, __const void *__src, size_t count)
+ {
+ 	unsigned char *d = __dest;
+@@ -55,6 +56,7 @@ void *memmove(void *__dest, __const void *__src, size_t count)
+ 		d[count] = s[count];
+ 	return __dest;
+ }
++*/
+ 
+ size_t strlen(const char *s)
+ {
+-- 
+1.7.4.1
