@@ -1,78 +1,51 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 15 Feb 2012 22:32:43 -0700
-Subject: [PATCH v3 24/25] irq_domain: remove "hint" when allocating irq
- numbers
-In-Reply-To: <20120215215001.GA30946@r65073-Latitude-D630>
-References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
- <1327700179-17454-25-git-send-email-grant.likely@secretlab.ca>
- <4F316848.4060100@atmel.com> <4F3BC97C.6030203@atmel.com>
- <20120215202145.GH25779@ponder.secretlab.ca>
- <20120215215001.GA30946@r65073-Latitude-D630>
-Message-ID: <20120216053243.GM25779@ponder.secretlab.ca>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 15 Feb 2012 21:33:36 -0800
+Subject: [PATCH v2 03/11] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
+In-Reply-To: <201202160522.35249.arnd@arndb.de>
+References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
+ <20120213205444.GH11077@ponder.secretlab.ca>
+ <052801ccec5d$137aa460$3a6fed20$%kim@samsung.com>
+ <201202160522.35249.arnd@arndb.de>
+Message-ID: <CAJOA=zPujvu0WNmn8UPa4NogJ1w6UqEg-RDNEcnfBZQW3SS+eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 01:50:02PM -0800, Shawn Guo wrote:
-> On Wed, Feb 15, 2012 at 01:21:45PM -0700, Grant Likely wrote:
-> > On Wed, Feb 15, 2012 at 04:04:28PM +0100, Nicolas Ferre wrote:
-> > > On 02/07/2012 07:07 PM, Nicolas Ferre :
-> > > > On 01/27/2012 10:36 PM, Grant Likely :
-> > > >> The 'hint' used to try and line up irq numbers with hw irq numbers is
-> > > >> rather a hack and not very useful.  Now that /proc/interrupts also outputs
-> > > >> the hwirq number, it is even less useful to keep around the 'hint' heuristic.
-> > > >>
-> > > >> This patch removes it.
-> > > > 
-> > > > Grant,
-> > > > 
-> > > > While trying your patch series in conjunction with Rob one, I do not
-> > > > find this patch in your irqdomain/next branch (and a couple of others).
-> > > > Can you tell me if this v3 series is available as a git tree?
-> > > 
-> > > I am still interested by patch 24-25 of this series but still cannot
-> > > find them in your irqdomain/next branch:
-> > > Are they also expected to join the 3.4 merge window material?
-> > 
-> > I've held off on putting them in irqdomain/next because they are a bit more
-> > risky than the other patches, and I want an explicit ack from Ben for patches
-> > 24 & 25.  However, that shouldn't really cause any issues since the changes
-> > in 24 & 25 don't impact the irq_domain functionality or API.  They are just
-> > optimizations.
-> > 
-> I'm seeing that patch 24 does impact on irq_domain functionality
-> a little bit.  On next tree which has no this patch yet,
-> irq_create_mapping can reasonably create virq in range 1..15, while
-> irq_find_mapping will only try to find the virq from 16
-> (NUM_ISA_INTERRUPTS).  This will result in that any hwirq that is < 16
-> gets multiple entries in the mapping table with different virq numbers
-> mapped to the same one hwirq.
+On Wed, Feb 15, 2012 at 9:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 16 February 2012, Kukjin Kim wrote:
+>> Thanks for your sharing.
+>>
+>> OK, I and my team will follow up 'common struct clk' for exynos5250
+>> and it will be done maybe next week. And since I need to
+>> implement other features for exynos5250 now, firstly let me use this
+>> and test this series in linux-next in a day.
+>
+> Ok, sounds good to me.
+>
+> If you like, you could also send the patches that you expect to stay
+> stable for inclusion into arm-soc, or send the entire series as a
+> preliminary branch that I will put into arm-soc now and then
+> replace when you are done with the remaining changes.
+>
+> As we discussed last week at Linaro Connect, we will start taking
+> both stable and unstable branches into arm-soc now, whereas we used
+> to take only stable branches. Anything that is not considered stable
+> yet will be marked as a staging branch, e.g. staging/samsung/soc instead
+> of samsung/soc.
+>
+>> Ah, one more, would be better to us if arm-soc tree could provide
+>> the topic branch for 'common struct clk' working as a base.
+>
+> Good point. Mike, can you send a pull request for whatever you have
+> now as another staging branch for arm-soc?
 
-That's a bug then.  The implementation should work without patch 24.  Does
-this patch fix it?
+Arnd, we discussed linux-next as the target for the common clk core
+code at Linaro Connect.  Are you now asking for that code in arm-soc?
+If so, I think it would be better to keep things simple only target
+linux-next once V5 has hit the lists after ELC.
 
----
+If you are instead referring to OMAP platform support for common clk,
+that code is very infantile and not yet ready for arm-soc, especially
+as it breaks OMAP2+ multi-boot.
 
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 2c1d6f8..2d3dfff 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -516,8 +516,8 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
- 		return irq_domain_legacy_revmap(domain, hwirq);
- 
- 	/* Slow path does a linear search of the map */
--	if (hint < NUM_ISA_INTERRUPTS)
--		hint = NUM_ISA_INTERRUPTS;
-+	if (hint == 0)
-+		hint = 1;
- 	i = hint;
- 	do {
- 		struct irq_data *data = irq_get_irq_data(i);
-@@ -525,7 +525,7 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
- 			return i;
- 		i++;
- 		if (i >= irq_virq_count)
--			i = NUM_ISA_INTERRUPTS;
-+			i = 1
- 	} while(i != hint);
- 	return 0;
- }
+Regards,
+Mike
