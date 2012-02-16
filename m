@@ -1,43 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 16 Feb 2012 14:19:16 +0900
-Subject: [PATCH v2 08/11] ARM: EXYNOS: add support for ARCH_EXYNOS5 and
- EXYNOS5250
-In-Reply-To: <201202160515.00068.arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Feb 2012 05:22:35 +0000
+Subject: [PATCH v2 03/11] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
+In-Reply-To: <052801ccec5d$137aa460$3a6fed20$%kim@samsung.com>
 References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
- <1328981685-8602-9-git-send-email-kgene.kim@samsung.com>
- <CAH9JG2Usa5k0J0uoyOPxnPG5y9bZAFD+5AR43mbFN04P7t3Npw@mail.gmail.com>
- <201202160515.00068.arnd@arndb.de>
-Message-ID: <054501ccec6a$872fb140$958f13c0$%kim@samsung.com>
+ <20120213205444.GH11077@ponder.secretlab.ca>
+ <052801ccec5d$137aa460$3a6fed20$%kim@samsung.com>
+Message-ID: <201202160522.35249.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On Thursday 16 February 2012, Kukjin Kim wrote:
+> Thanks for your sharing.
 > 
-> On Thursday 16 February 2012, Kyungmin Park wrote:
-> > >
-> > > +config ARCH_EXYNOS5
-> > > +     bool "SAMSUNG EXYNOS5"
-> > > +     select HAVE_SMP
-> > > +     help
-> > > +       Samsung EXYNOS5 (Cortex-A15) SoC based systems
-> > This config is located at choice. It means it can't build the exynos4
-> > and exynos5 simultaneously. I'm not sure it's acceptable for mainline.
-> 
-> If we use the new common struct clk on exynos5 but not exynos4, it should
-> stay a "choice" for the time being and get turned into a nonexclusive
-> selection as soon as exynos4 moves over.
-> 
-Yes, right.
+> OK, I and my team will follow up 'common struct clk' for exynos5250
+> and it will be done maybe next week. And since I need to
+> implement other features for exynos5250 now, firstly let me use this
+> and test this series in linux-next in a day.
 
-> If exynos4 and exynos5 end up using the same struct clk in 3.4, I would
-> indeed ask to do this change now.
-> 
-If possible, yes. But I'm going to move common struct clk for exynos4 and exynos5 next time.
+Ok, sounds good to me.
 
-Thanks.
+If you like, you could also send the patches that you expect to stay
+stable for inclusion into arm-soc, or send the entire series as a
+preliminary branch that I will put into arm-soc now and then
+replace when you are done with the remaining changes.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+As we discussed last week at Linaro Connect, we will start taking
+both stable and unstable branches into arm-soc now, whereas we used
+to take only stable branches. Anything that is not considered stable
+yet will be marked as a staging branch, e.g. staging/samsung/soc instead
+of samsung/soc.
+
+> Ah, one more, would be better to us if arm-soc tree could provide
+> the topic branch for 'common struct clk' working as a base.
+
+Good point. Mike, can you send a pull request for whatever you have
+now as another staging branch for arm-soc?
+
+	Arnd
