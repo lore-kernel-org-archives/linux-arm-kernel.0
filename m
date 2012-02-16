@@ -1,133 +1,52 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 16 Feb 2012 11:23:47 +0530
-Subject: [PATCH 1/5] gpio/omap: Remove bank->id information and misc
- cleanup
-In-Reply-To: <1329321854-24490-2-git-send-email-b-cousson@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-2-git-send-email-b-cousson@ti.com>
-Message-ID: <CAC83ZvJuHpaBbGoysW7GwOHtqfi72EDhFYja2LE4NyBd+QgFWw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Feb 2012 22:03:35 -0800
+Subject: [PATCH v3 24/25] irq_domain: remove "hint" when allocating irq
+ numbers
+In-Reply-To: <20120216053243.GM25779@ponder.secretlab.ca>
+References: <1327700179-17454-1-git-send-email-grant.likely@secretlab.ca>
+ <1327700179-17454-25-git-send-email-grant.likely@secretlab.ca>
+ <4F316848.4060100@atmel.com> <4F3BC97C.6030203@atmel.com>
+ <20120215202145.GH25779@ponder.secretlab.ca>
+ <20120215215001.GA30946@r65073-Latitude-D630>
+ <20120216053243.GM25779@ponder.secretlab.ca>
+Message-ID: <20120216060334.GA11758@r65073-Latitude-D630>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 9:34 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> The driver does not need anymore any id to identify the GPIO instance.
-> Remove every occurence of the bank->id inside the driver.
->
-> Remove two trailing spaces.
-> Add a dev variable for better readability in probe.
-> Remove unused variable bank->pbase.
->
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Looks fine.
-If needed you can add my Acked-by:
---
-Tarun
+On Wed, Feb 15, 2012 at 10:32:43PM -0700, Grant Likely wrote:
+...
+> That's a bug then.  The implementation should work without patch 24.  Does
+> this patch fix it?
+> 
+Yes, it fixes the problem for me.
+
+Regards,
+Shawn
 
 > ---
-> ?drivers/gpio/gpio-omap.c | ? 23 +++++++++--------------
-> ?1 files changed, 9 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index f49bd6f..a0c3e03 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -50,7 +50,6 @@ struct gpio_regs {
->
-> ?struct gpio_bank {
-> ? ? ? ?struct list_head node;
-> - ? ? ? unsigned long pbase;
-> ? ? ? ?void __iomem *base;
-> ? ? ? ?u16 irq;
-> ? ? ? ?u16 virtual_irq_start;
-> @@ -77,7 +76,6 @@ struct gpio_bank {
-> ? ? ? ?int stride;
-> ? ? ? ?u32 width;
-> ? ? ? ?int context_loss_count;
-> - ? ? ? u16 id;
-> ? ? ? ?int power_mode;
-> ? ? ? ?bool workaround_enabled;
->
-> @@ -155,7 +153,7 @@ static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
-> ?{
-> ? ? ? ?int l = __raw_readl(base + reg);
->
-> - ? ? ? if (set)
-> + ? ? ? if (set)
-> ? ? ? ? ? ? ? ?l |= mask;
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?l &= ~mask;
-> @@ -495,7 +493,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
-> ? ? ? ?unsigned long flags;
->
-> ? ? ? ?if (bank->non_wakeup_gpios & gpio_bit) {
-> - ? ? ? ? ? ? ? dev_err(bank->dev,
-> + ? ? ? ? ? ? ? dev_err(bank->dev,
-> ? ? ? ? ? ? ? ? ? ? ? ?"Unable to modify wakeup on non-wakeup GPIO%d\n", gpio);
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
-> @@ -1048,37 +1046,36 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
->
-> ?static int __devinit omap_gpio_probe(struct platform_device *pdev)
-> ?{
-> + ? ? ? struct device *dev = &pdev->dev;
-> ? ? ? ?struct omap_gpio_platform_data *pdata;
-> ? ? ? ?struct resource *res;
-> ? ? ? ?struct gpio_bank *bank;
-> ? ? ? ?int ret = 0;
->
-> - ? ? ? if (!pdev->dev.platform_data) {
-> + ? ? ? if (!dev->platform_data) {
-> ? ? ? ? ? ? ? ?ret = -EINVAL;
-> ? ? ? ? ? ? ? ?goto err_exit;
-> ? ? ? ?}
->
-> ? ? ? ?bank = kzalloc(sizeof(struct gpio_bank), GFP_KERNEL);
-> ? ? ? ?if (!bank) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "Memory alloc failed for gpio_bank\n");
-> + ? ? ? ? ? ? ? dev_err(dev, "Memory alloc failed\n");
-> ? ? ? ? ? ? ? ?ret = -ENOMEM;
-> ? ? ? ? ? ? ? ?goto err_exit;
-> ? ? ? ?}
->
-> ? ? ? ?res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> ? ? ? ?if (unlikely(!res)) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "GPIO Bank %i Invalid IRQ resource\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->id);
-> + ? ? ? ? ? ? ? dev_err(dev, "Invalid IRQ resource\n");
-> ? ? ? ? ? ? ? ?ret = -ENODEV;
-> ? ? ? ? ? ? ? ?goto err_free;
-> ? ? ? ?}
->
-> ? ? ? ?bank->irq = res->start;
-> - ? ? ? bank->id = pdev->id;
->
-> ? ? ? ?pdata = pdev->dev.platform_data;
-> ? ? ? ?bank->virtual_irq_start = pdata->virtual_irq_start;
-> - ? ? ? bank->dev = &pdev->dev;
-> + ? ? ? bank->dev = dev;
-> ? ? ? ?bank->dbck_flag = pdata->dbck_flag;
-> ? ? ? ?bank->stride = pdata->bank_stride;
-> ? ? ? ?bank->width = pdata->bank_width;
-> @@ -1098,16 +1095,14 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
-> ? ? ? ?/* Static mapping, never released */
-> ? ? ? ?res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> ? ? ? ?if (unlikely(!res)) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "GPIO Bank %i Invalid mem resource\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->id);
-> + ? ? ? ? ? ? ? dev_err(dev, "Invalid mem resource\n");
-> ? ? ? ? ? ? ? ?ret = -ENODEV;
-> ? ? ? ? ? ? ? ?goto err_free;
-> ? ? ? ?}
->
-> ? ? ? ?bank->base = ioremap(res->start, resource_size(res));
-> ? ? ? ?if (!bank->base) {
-> - ? ? ? ? ? ? ? dev_err(&pdev->dev, "Could not ioremap gpio bank%i\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->id);
-> + ? ? ? ? ? ? ? dev_err(dev, "Could not ioremap\n");
-> ? ? ? ? ? ? ? ?ret = -ENOMEM;
-> ? ? ? ? ? ? ? ?goto err_free;
-> ? ? ? ?}
-> --
-> 1.7.0.4
->
+> 
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 2c1d6f8..2d3dfff 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -516,8 +516,8 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
+>  		return irq_domain_legacy_revmap(domain, hwirq);
+>  
+>  	/* Slow path does a linear search of the map */
+> -	if (hint < NUM_ISA_INTERRUPTS)
+> -		hint = NUM_ISA_INTERRUPTS;
+> +	if (hint == 0)
+> +		hint = 1;
+>  	i = hint;
+>  	do {
+>  		struct irq_data *data = irq_get_irq_data(i);
+> @@ -525,7 +525,7 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
+>  			return i;
+>  		i++;
+>  		if (i >= irq_virq_count)
+> -			i = NUM_ISA_INTERRUPTS;
+> +			i = 1
+>  	} while(i != hint);
+>  	return 0;
+>  }
+> 
