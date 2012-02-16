@@ -1,95 +1,29 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 16 Feb 2012 15:23:51 +0100
-Subject: [PATCH 07/15] ARM: at91: clean-up mach/io.h
-In-Reply-To: <4F3D0DCB.6090403@gmail.com>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <1329169408-17253-8-git-send-email-robherring2@gmail.com>
- <4F3A2797.7000402@atmel.com> <4F3A6097.2030606@gmail.com>
- <20120216074300.GA19779@game.jcrosoft.org>
- <4F3D0DCB.6090403@gmail.com>
-Message-ID: <20120216142351.GC19779@game.jcrosoft.org>
+From: danny.kukawka@bisect.de (Danny Kukawka)
+Date: Thu, 16 Feb 2012 15:43:53 +0100
+Subject: [PATCH] arch/arm/plat-omap/clock.c: included linux/debugfs.h twice
+Message-ID: <1329403433-32327-1-git-send-email-danny.kukawka@bisect.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:08 Thu 16 Feb     , Rob Herring wrote:
-> On 02/16/2012 01:43 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 07:24 Tue 14 Feb     , Rob Herring wrote:
-> >> On 02/14/2012 03:21 AM, Nicolas Ferre wrote:
-> >>> On 02/13/2012 10:43 PM, Rob Herring :
-> >>>> From: Rob Herring <rob.herring@calxeda.com>
-> >>>>
-> >>>> Move most of io.h into at91_io.h and update includes.
-> >>>>
-> >>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >>>> ---
-> >>>>  arch/arm/mach-at91/at91cap9.c                     |    1 +
-> >>>>  arch/arm/mach-at91/at91cap9_devices.c             |    1 +
-> >>>
-> >>> Please do not touch the "*cap9*" files anymore: They are scheduled for
-> >>> removal for 3.4 kernel:
-> >>> Documentation/feature-removal-schedule.txt
-> >>
-> >> Okay.
-> >>
-> >>>
-> >>>>  arch/arm/mach-at91/at91rm9200.c                   |    1 +
-> >>>>  arch/arm/mach-at91/at91rm9200_devices.c           |    1 +
-> >>>>  arch/arm/mach-at91/at91rm9200_time.c              |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9260.c                  |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9260_devices.c          |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9261.c                  |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9261_devices.c          |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9263.c                  |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9263_devices.c          |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9g45.c                  |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9g45_devices.c          |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9rl.c                   |    1 +
-> >>>>  arch/arm/mach-at91/at91sam9rl_devices.c           |    1 +
-> >>>>  arch/arm/mach-at91/at91x40.c                      |    1 +
-> >>>>  arch/arm/mach-at91/at91x40_time.c                 |    1 +
-> >>>>  arch/arm/mach-at91/board-cap9adk.c                |    1 +
-> >>>>  arch/arm/mach-at91/board-cpu9krea.c               |    1 +
-> >>>>  arch/arm/mach-at91/board-eco920.c                 |    1 +
-> >>>>  arch/arm/mach-at91/board-yl-9200.c                |    1 +
-> >>>>  arch/arm/mach-at91/clock.c                        |    1 +
-> >>>>  arch/arm/mach-at91/include/mach/at91_io.h         |   44 +++++++++++++++++++++
-> >>>>  arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h |    2 +
-> >>>>  arch/arm/mach-at91/include/mach/at91sam9_sdramc.h |    2 +
-> >>>>  arch/arm/mach-at91/include/mach/uncompress.h      |    1 +
-> >>>>  arch/arm/mach-at91/pm.c                           |    1 +
-> >>>>  arch/arm/mach-at91/pm.h                           |    2 +
-> >>>>  arch/arm/mach-at91/setup.c                        |    1 +
-> >>>>  drivers/pcmcia/at91_cf.c                          |    1 +
-> >>>>  drivers/rtc/rtc-at91sam9.c                        |    2 +-
-> >>>>  drivers/usb/gadget/at91_udc.c                     |    1 +
-> >>>>  drivers/watchdog/at91rm9200_wdt.c                 |    1 +
-> >>>>  drivers/watchdog/at91sam9_wdt.c                   |    1 +
-> >>>>  34 files changed, 80 insertions(+), 1 deletions(-)
-> >>>>  create mode 100644 arch/arm/mach-at91/include/mach/at91_io.h
-> >>>>
-> >>
-> >> snip
-> >>
-> >>>> diff --git a/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h b/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
-> >>>> index e2f8da8..0427212 100644
-> >>>> --- a/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
-> >>>> +++ b/arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h
-> >>>> @@ -12,6 +12,8 @@
-> >>>>  #ifndef AT91SAM9_DDRSDR_H
-> >>>>  #define AT91SAM9_DDRSDR_H
-> >>>>  
-> >>>> +#include <mach/at91_io.h>
-> >>>
-> >>> Do we need this include in header files?
-> >>
-> >> Yes, for at91_sys_write/read used at the bottom.
-> > no need I droped the at91_sys_read/write for 3.4
-> > 
-> 
-> Everywhere or just this header? Is this in a stable branch somewhere?
-everywhere
+arch/arm/plat-omap/clock.c: included 'linux/debugfs.h' twice,
+remove the duplicate.
 
-I'm preparing it
+Signed-off-by: Danny Kukawka <danny.kukawka@bisect.de>
+---
+ arch/arm/plat-omap/clock.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Best Regards,
-J.
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 567e4b5..56b6f8b 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -20,7 +20,6 @@
+ #include <linux/clk.h>
+ #include <linux/mutex.h>
+ #include <linux/cpufreq.h>
+-#include <linux/debugfs.h>
+ #include <linux/io.h>
+ 
+ #include <plat/clock.h>
+-- 
+1.7.8.3
