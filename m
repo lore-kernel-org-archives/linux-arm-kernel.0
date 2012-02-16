@@ -1,114 +1,169 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 16 Feb 2012 11:11:52 +0530
-Subject: [PATCH 2/5] gpio/omap: Use devm_ API and add request_mem_region
-In-Reply-To: <1329321854-24490-3-git-send-email-b-cousson@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-3-git-send-email-b-cousson@ti.com>
-Message-ID: <CAC83ZvKuOkLKdAVNeoVjRZriouDCGPXPhkZZ+MgcktH+9pYN3w@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 16 Feb 2012 13:44:33 +0800
+Subject: [PATCH v2] mtd/gpmi : add gpmi support for mx6q
+In-Reply-To: <1329186979-25382-1-git-send-email-b32955@freescale.com>
+References: <1329186979-25382-1-git-send-email-b32955@freescale.com>
+Message-ID: <4F3C97C1.6000508@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+Hi Artem:
 
-On Wed, Feb 15, 2012 at 9:34 PM, Benoit Cousson <b-cousson@ti.com> wrote:
-> Replace the regular kzalloc and ioremap with the devm_ equivalent
-> to simplify error handling.
+Please ignore this patch. I will send out the new version when the
+mxs-dma patch
+is merged.
+
+thanks .
+
+Huang Shijie
+
+> add gpmi support to mx6q.
 >
-> Add the missing devm_request_mem_region to reserve the region used
-> by the driver.
->
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 > ---
-> ?drivers/gpio/gpio-omap.c | ? 35 +++++++++++++++--------------------
-> ?1 files changed, 15 insertions(+), 20 deletions(-)
+> v1 --> v2:
+>          create this patch based on l2-mtd.git tree.
 >
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index a0c3e03..c3a9dc8 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -19,7 +19,7 @@
-> ?#include <linux/err.h>
-> ?#include <linux/clk.h>
-> ?#include <linux/io.h>
-> -#include <linux/slab.h>
-> +#include <linux/device.h>
-> ?#include <linux/pm_runtime.h>
-> ?#include <linux/pm.h>
 >
-> @@ -1052,23 +1052,19 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
-> ? ? ? ?struct gpio_bank *bank;
-> ? ? ? ?int ret = 0;
+>  drivers/mtd/nand/gpmi-nand/bch-regs.h  |   42 ++++++++++++++++++++++++-------
+>  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   14 ++++++----
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    3 ++
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |    2 +
+>  4 files changed, 45 insertions(+), 16 deletions(-)
 >
-> - ? ? ? if (!dev->platform_data) {
-> - ? ? ? ? ? ? ? ret = -EINVAL;
-> - ? ? ? ? ? ? ? goto err_exit;
-> - ? ? ? }
-> + ? ? ? if (!dev->platform_data)
-> + ? ? ? ? ? ? ? return -EINVAL;
->
-> - ? ? ? bank = kzalloc(sizeof(struct gpio_bank), GFP_KERNEL);
-> + ? ? ? bank = devm_kzalloc(&pdev->dev, sizeof(struct gpio_bank), GFP_KERNEL);
-> ? ? ? ?if (!bank) {
-> ? ? ? ? ? ? ? ?dev_err(dev, "Memory alloc failed\n");
-> - ? ? ? ? ? ? ? ret = -ENOMEM;
-> - ? ? ? ? ? ? ? goto err_exit;
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> ? ? ? ?}
->
-> ? ? ? ?res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> ? ? ? ?if (unlikely(!res)) {
-> ? ? ? ? ? ? ? ?dev_err(dev, "Invalid IRQ resource\n");
-> - ? ? ? ? ? ? ? ret = -ENODEV;
-> - ? ? ? ? ? ? ? goto err_free;
-> + ? ? ? ? ? ? ? return -ENODEV;
-How is the memory allocated to 'bank' getting freed before return -ENODEV?
-
-> ? ? ? ?}
->
-> ? ? ? ?bank->irq = res->start;
-> @@ -1096,15 +1092,19 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
-> ? ? ? ?res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> ? ? ? ?if (unlikely(!res)) {
-> ? ? ? ? ? ? ? ?dev_err(dev, "Invalid mem resource\n");
-> - ? ? ? ? ? ? ? ret = -ENODEV;
-> - ? ? ? ? ? ? ? goto err_free;
-> + ? ? ? ? ? ? ? return -ENODEV;
-And here?
-
-> + ? ? ? }
-> +
-> + ? ? ? if (!devm_request_mem_region(dev, res->start, resource_size(res),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pdev->name)) {
-> + ? ? ? ? ? ? ? dev_err(dev, "Region already claimed\n");
-> + ? ? ? ? ? ? ? return -EBUSY;
-> ? ? ? ?}
->
-> - ? ? ? bank->base = ioremap(res->start, resource_size(res));
-> + ? ? ? bank->base = devm_ioremap(dev, res->start, resource_size(res));
-> ? ? ? ?if (!bank->base) {
-> ? ? ? ? ? ? ? ?dev_err(dev, "Could not ioremap\n");
-> - ? ? ? ? ? ? ? ret = -ENOMEM;
-> - ? ? ? ? ? ? ? goto err_free;
-> + ? ? ? ? ? ? ? return -ENOMEM;
-And here?
---
-Tarun
-> ? ? ? ?}
->
-> ? ? ? ?platform_set_drvdata(pdev, bank);
-> @@ -1125,11 +1125,6 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
-> ? ? ? ?list_add_tail(&bank->node, &omap_gpio_list);
->
-> ? ? ? ?return ret;
-> -
-> -err_free:
-> - ? ? ? kfree(bank);
-> -err_exit:
-> - ? ? ? return ret;
-> ?}
->
-> ?#ifdef CONFIG_ARCH_OMAP2PLUS
-> --
-> 1.7.0.4
->
+> diff --git a/drivers/mtd/nand/gpmi-nand/bch-regs.h b/drivers/mtd/nand/gpmi-nand/bch-regs.h
+> index 4effb8c..a092451 100644
+> --- a/drivers/mtd/nand/gpmi-nand/bch-regs.h
+> +++ b/drivers/mtd/nand/gpmi-nand/bch-regs.h
+> @@ -51,15 +51,26 @@
+>  
+>  #define BP_BCH_FLASH0LAYOUT0_ECC0		12
+>  #define BM_BCH_FLASH0LAYOUT0_ECC0	(0xf << BP_BCH_FLASH0LAYOUT0_ECC0)
+> -#define BF_BCH_FLASH0LAYOUT0_ECC0(v)		\
+> -	(((v) << BP_BCH_FLASH0LAYOUT0_ECC0) & BM_BCH_FLASH0LAYOUT0_ECC0)
+> +#define MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0		11
+> +#define MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)
+> +#define BF_BCH_FLASH0LAYOUT0_ECC0(v, x)				\
+> +	(GPMI_IS_MX6Q(x)					\
+> +		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)	\
+> +			& MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0)	\
+> +		: (((v) << BP_BCH_FLASH0LAYOUT0_ECC0)		\
+> +			& BM_BCH_FLASH0LAYOUT0_ECC0)		\
+> +	)
+>  
+>  #define BP_BCH_FLASH0LAYOUT0_DATA0_SIZE		0
+>  #define BM_BCH_FLASH0LAYOUT0_DATA0_SIZE		\
+>  			(0xfff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
+> -#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v)	\
+> -	(((v) << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)\
+> -					 & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)
+> +#define MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE	\
+> +			(0x3ff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
+> +#define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v, x)				\
+> +	(GPMI_IS_MX6Q(x)						\
+> +		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)	\
+> +		: ((v) & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)		\
+> +	)
+>  
+>  #define HW_BCH_FLASH0LAYOUT1			0x00000090
+>  
+> @@ -72,13 +83,24 @@
+>  
+>  #define BP_BCH_FLASH0LAYOUT1_ECCN		12
+>  #define BM_BCH_FLASH0LAYOUT1_ECCN	(0xf << BP_BCH_FLASH0LAYOUT1_ECCN)
+> -#define BF_BCH_FLASH0LAYOUT1_ECCN(v)		\
+> -	(((v) << BP_BCH_FLASH0LAYOUT1_ECCN) & BM_BCH_FLASH0LAYOUT1_ECCN)
+> +#define MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN		11
+> +#define MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)
+> +#define BF_BCH_FLASH0LAYOUT1_ECCN(v, x)				\
+> +	(GPMI_IS_MX6Q(x)					\
+> +		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)	\
+> +			& MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN)	\
+> +		: (((v) << BP_BCH_FLASH0LAYOUT1_ECCN)		\
+> +			& BM_BCH_FLASH0LAYOUT1_ECCN)		\
+> +	)
+>  
+>  #define BP_BCH_FLASH0LAYOUT1_DATAN_SIZE		0
+>  #define BM_BCH_FLASH0LAYOUT1_DATAN_SIZE		\
+>  			(0xfff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
+> -#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v)	\
+> -	(((v) << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE) \
+> -					 & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)
+> +#define MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE	\
+> +			(0x3ff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
+> +#define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v, x)				\
+> +	(GPMI_IS_MX6Q(x)						\
+> +		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)	\
+> +		: ((v) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)		\
+> +	)
+>  #endif
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> index 7db6555..cbcf022 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> @@ -223,13 +223,13 @@ int bch_set_geometry(struct gpmi_nand_data *this)
+>  	/* Configure layout 0. */
+>  	writel(BF_BCH_FLASH0LAYOUT0_NBLOCKS(block_count)
+>  			| BF_BCH_FLASH0LAYOUT0_META_SIZE(metadata_size)
+> -			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength)
+> -			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size),
+> +			| BF_BCH_FLASH0LAYOUT0_ECC0(ecc_strength, this)
+> +			| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(block_size, this),
+>  			r->bch_regs + HW_BCH_FLASH0LAYOUT0);
+>  
+>  	writel(BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(page_size)
+> -			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength)
+> -			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size),
+> +			| BF_BCH_FLASH0LAYOUT1_ECCN(ecc_strength, this)
+> +			| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(block_size, this),
+>  			r->bch_regs + HW_BCH_FLASH0LAYOUT1);
+>  
+>  	/* Set *all* chip selects to use layout 0. */
+> @@ -803,7 +803,8 @@ int gpmi_is_ready(struct gpmi_nand_data *this, unsigned chip)
+>  	if (GPMI_IS_MX23(this)) {
+>  		mask = MX23_BM_GPMI_DEBUG_READY0 << chip;
+>  		reg = readl(r->gpmi_regs + HW_GPMI_DEBUG);
+> -	} else if (GPMI_IS_MX28(this)) {
+> +	} else if (GPMI_IS_MX28(this) || GPMI_IS_MX6Q(this)) {
+> +		/* MX28 shares the same R/B register as MX6Q. */
+>  		mask = MX28_BF_GPMI_STAT_READY_BUSY(1 << chip);
+>  		reg = readl(r->gpmi_regs + HW_GPMI_STAT);
+>  	} else
+> @@ -1055,8 +1056,9 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+>  		| BF_GPMI_CTRL0_ADDRESS(address)
+>  		| BF_GPMI_CTRL0_XFER_COUNT(geo->page_size);
+>  	pio[1] = 0;
+> +	pio[2] = 0; /* Set GPMI_HW_GPMI_ECCCTRL, disable the BCH. */
+>  	desc = channel->device->device_prep_slave_sg(channel,
+> -				(struct scatterlist *)pio, 2,
+> +				(struct scatterlist *)pio, 3,
+>  				DMA_TRANS_NONE, 1);
+>  	if (!desc) {
+>  		pr_err("step 3 error\n");
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> index f39f83e..cfcc0eb 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> @@ -1582,6 +1582,9 @@ static const struct platform_device_id gpmi_ids[] = {
+>  	}, {
+>  		.name = "imx28-gpmi-nand",
+>  		.driver_data = IS_MX28,
+> +	}, {
+> +		.name = "imx6q-gpmi-nand",
+> +		.driver_data = IS_MX6Q,
+>  	}, {},
+>  };
+>  
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> index e023bcc..c93b0ae 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> @@ -268,6 +268,8 @@ extern int gpmi_read_page(struct gpmi_nand_data *,
+>  /* Use the platform_id to distinguish different Archs. */
+>  #define IS_MX23			0x1
+>  #define IS_MX28			0x2
+> +#define IS_MX6Q			0x8
+>  #define GPMI_IS_MX23(x)		((x)->pdev->id_entry->driver_data == IS_MX23)
+>  #define GPMI_IS_MX28(x)		((x)->pdev->id_entry->driver_data == IS_MX28)
+> +#define GPMI_IS_MX6Q(x)		((x)->pdev->id_entry->driver_data == IS_MX6Q)
+>  #endif
