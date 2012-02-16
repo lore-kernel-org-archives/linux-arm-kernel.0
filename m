@@ -1,60 +1,58 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 16 Feb 2012 17:01:42 +0000
-Subject: Oops in guest after ioremap() on ARMv7
-In-Reply-To: <CAHkRjk68rw2TKnitc7M+R1FCpwrGkqFHwd4YmS78mveR9uO_2Q@mail.gmail.com>
-References: <4EF31DA7.9030407@citrix.com> <20111222144937.GE20635@arm.com>
- <4EF35CFF.3050200@citrix.com> <20111222181356.GI20635@arm.com>
- <4EF37802.30300@citrix.com>
- <1324641625.7877.161.camel@zakaz.uk.xensource.com>
- <20120103165027.GD22876@arm.com>
- <1326994510.17599.97.camel@zakaz.uk.xensource.com>
- <CAHkRjk68rw2TKnitc7M+R1FCpwrGkqFHwd4YmS78mveR9uO_2Q@mail.gmail.com>
-Message-ID: <1329411702.3133.4.camel@zakaz.uk.xensource.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Feb 2012 09:06:10 -0800
+Subject: [PATCH 2/3] ARM: OMAP2+: Split omap2_hsmmc_init() to properly
+ support I2C GPIO pins
+In-Reply-To: <4F3D33F9.70107@ti.com>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+ <20120215182825.18884.40972.stgit@kaulin.local>
+ <4F3CD460.7000306@ti.com> <4F3CD6CE.1090201@ti.com>
+ <20120216163558.GB15692@atomide.com> <4F3D33F9.70107@ti.com>
+Message-ID: <20120216170610.GA18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On Tue, 2012-01-31 at 14:40 +0000, Catalin Marinas wrote:
-> On 19 January 2012 17:35, Ian Campbell <Ian.Campbell@citrix.com> wrote:
-> > On Tue, 2012-01-03 at 16:50 +0000, Catalin Marinas wrote:
-> >> On Fri, Dec 23, 2011 at 12:00:25PM +0000, Ian Campbell wrote:
-> >> > At the moment we build the entire p2m before we ever load the VTTBR or
-> >> > enable stage-2 translations in the HCR. Is that sufficient or do we also
-> >> > need to flush something?
-> >>
-> >> If the model does not correctly implement cacheable page table walks for
-> >> either stage 1 or stage 2 translation (though ID_MMFR3[23:20] indicate
-> >> that it should), the hypervisor would need to clean the D-cache to the
-> >> point of unification (not necessary to go to the point of coherency)
-> >> before any of the state 2 translation tables are used.
-> >
-> > I added a copy of Linux's v7_flush_dcache_all after building the p2m but
-> > just before loading the VTTBR and it didn't help.
-> >
-> > I turned off cacheability in VTCR and that didn't help either.
-> >
-> > Then I turned off cacheability in the Linux TTBR{0,1} (by frobbing both
-> > TTB_FLAGS_UP and TTB_FLAGS_SMP to use FOO_NC everywhere) and this _did_
-> > make a difference -- the kernel now boots.
-> >
-> > I then tested just that change by itself and it seems to have done the
-> > trick.
-> >
-> > Does that indicate a model bug?
+* Rajendra Nayak <rnayak@ti.com> [120216 08:19]:
+> On Thursday 16 February 2012 10:05 PM, Tony Lindgren wrote:
+> >>On Thursday 16 February 2012 03:33 PM, Rajendra Nayak wrote:
+> >>>>  >better still, I think we should just populate them statically in
+> >>>>  >omap2_hsmmc_info struct above, so omap_hsmmc_init() takes care
+> >>>>  >of it already.
+> >>>
+> >>>  I just tried this and it seems to work...
+> >>>
+> >>>  ---
+> >>>    arch/arm/mach-omap2/board-omap3beagle.c |    1 +
+> >>>    1 file changed, 1 insertion(+)
+> >>>
+> >>>  Index: linux-2.6/arch/arm/mach-omap2/board-omap3beagle.c
+> >>>  ===================================================================
+> >>>  --- linux-2.6.orig/arch/arm/mach-omap2/board-omap3beagle.c
+> >>>  2012-02-16 15:38:47.046933403 +0530
+> >>>  +++ linux-2.6/arch/arm/mach-omap2/board-omap3beagle.c   2012-02-16
+> >>>  15:40:17.355349064 +0530
+> >>>  @@ -253,6 +253,7 @@
+> >>>                   .mmc            = 1,
+> >>>                   .caps           = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+> >>>                   .gpio_wp        = -EINVAL,
+> >>>  +               .gpio_cd        = OMAP_MAX_GPIO_LINES + 0,
+> >>>                   .deferred       = true,
+> >>>           },
+> >>>           {}      /* Terminator */
+> >Would be nice to avoid the hard coded gpio numbering for the
+> >external chips though..
 > 
-> It is possible. The scenario I'm thinking of is that with cacheable
-> PTWs enabled in TTBR, the model wrongly decides to use the
-> intermediate physical address (IPA) to look up the caches and gets the
-> wrong information.
-> 
-> I'll take this to the model guys but most likely they'll ask for an
-> image to load and just run. Could you provide such simple image
-> (minimal filesystem)? I'm not familiar with Xen and building it.
-> 
-> (I'll first ask the model guys, maybe they can spot the error easily
-> without additional debugging).
+> But if you look closely, thats exactly how its handled today.
+> All board files hardcode gpio_base to OMAP_MAX_GPIO_LINES in
+> twl4030_gpio_platform_data. And thats what gets passed back
+> when the driver calls pdata->setup() from within probe.
 
-Did they conclude anything? Can I provide any more info?
+Hmm that's not necessarily safe to do as you might have multiple
+external GPIO connected, such as a PMIC and FPGA..
 
-Ian.
+Anyways, it seems OK to me for now, as the DT solves that issue
+properly and I don't think we currently have any boards with
+multiple external GPIO chips.
+
+Regards,
+
+Tony
