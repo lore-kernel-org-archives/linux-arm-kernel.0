@@ -1,29 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2012 19:34:14 +0000
-Subject: ftp.arm.linux.org.uk now using dumb http git protocol
-In-Reply-To: <alpine.LFD.2.02.1202161309450.24536@xanadu.home>
-References: <20120216131144.GM13673@n2100.arm.linux.org.uk>
- <alpine.LFD.2.02.1202161309450.24536@xanadu.home>
-Message-ID: <20120216193414.GJ27825@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Feb 2012 20:39:39 +0100
+Subject: [PATCH] serial/sirf: fixup for changes to pin control
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1790EC8791@HQMAIL01.nvidia.com>
+References: <1329417828-6005-1-git-send-email-linus.walleij@linaro.org>
+ <74CDBE0F657A3D45AFBB94109FB122FF1790EC8791@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdavPdK13cJ-mdDXwbz3jNCSCzaa8LTdMDXOy4mi+pmdmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 01:29:21PM -0500, Nicolas Pitre wrote:
-> On Thu, 16 Feb 2012, Russell King - ARM Linux wrote:
-> > This action puts more load on the server, load it can do without.
-> > 
-> > So, as of a couple of days ago, it's now using the dumb http stuff,
-> > which means if you abort it, you _will_ get corrupted pack files in
-> > your .git/objects/pack directory.
-> > 
-> > You can avoid much of that pain by following what you should've been
-> > doing in the first place: first update your trees by pulling from
-> > Linus' tree.  Then, and only then, update your tree from my tree.
-> > Doing that will minimise the time you have to wait, and minimise the
-> > chance of a corrupted pack file.
-> 
-> That will work only if Linus' tree is contained in a pack of its own on 
-> the server, and your stuff not mixed up with it.
+On Thu, Feb 16, 2012 at 8:01 PM, Stephen Warren <swarren@nvidia.com> wrote:
 
-That is guaranteed by the way I fetch Linus' tree and push my tree to
-there - for the git objects and packs, it's all rsync based.
+> Should this patch be put into the pinctrl tree since that's where the
+> API changed, perhaps even squashed into the original commit to avoid
+> git bisect breakage, unless your branch needs to be stable?
+
+Hm yeah I will for sure put it into the pinctrl tree.
+The Sirf doesn't even have a defconfig so it was just my memory of
+the Sirf that got me to remember it. I might squash if I don't get any
+comments on this patch.
+
+> Otherwise,
+> this change will conflict with my future similar change if pulled for
+> the same kernel version.
+
+It'll be in linux-next tomorrow or so.
+
+Yours,
+Linus Walleij
