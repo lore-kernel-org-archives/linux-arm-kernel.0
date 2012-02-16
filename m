@@ -1,39 +1,73 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 16 Feb 2012 18:34:26 +0100
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <4F3D032B.6090700@monstr.eu>
-References: <4F1EE861.4030405@monstr.eu>
- <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
- <4F1FF870.3000105@monstr.eu>
- <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
- <4F200F64.9060203@monstr.eu>
- <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
- <4F212E9E.9060807@monstr.eu>
- <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
- <4F391C1D.9020402@monstr.eu>
- <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
- <4F3BA962.9040109@monstr.eu> <4F3BC30A.4030301@monstr.eu>
- <4F3CC899.4070302@monstr.eu>
- <CAK=WgbaRF-L7M3VMZQdqFLUFOJuwFVkBH1hUNuJ51kSrzkaVjA@mail.gmail.com>
- <4F3CFFAD.9030402@monstr.eu> <4F3D032B.6090700@monstr.eu>
-Message-ID: <CAK=WgbZ3oXc+NQscdShqmu2wkzv=M-qBDCH2-k=5qSRX9W=z3Q@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 16 Feb 2012 09:35:04 -0800
+Subject: [PATCH 6/6] arm: omap: pm-debug: enhanced usecount debug support
+In-Reply-To: <CAOMWX4cg4mfBQGcHLodjFaVY0vVGnKJKvsa9ngMLO-0Ca7gBTQ@mail.gmail.com>
+ (Nishanth Menon's message of "Thu, 16 Feb 2012 11:06:38 -0600")
+References: <1329237402-26008-1-git-send-email-t-kristo@ti.com>
+ <1329237402-26008-7-git-send-email-t-kristo@ti.com>
+ <20120214202740.GT1426@atomide.com> <87fwed58dm.fsf@ti.com>
+ <20120214235218.GX1426@atomide.com>
+ <1329294866.4102.343.camel@sokoban> <874nus5djf.fsf@ti.com>
+ <CAOMWX4cg4mfBQGcHLodjFaVY0vVGnKJKvsa9ngMLO-0Ca7gBTQ@mail.gmail.com>
+Message-ID: <87y5s2hebb.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 2:22 PM, Michal Simek <monstr@monstr.eu> wrote:
-> ok on that addresses above is mapped vring_desc structure. I expect that
-> addr is address to any memory location when data are places. Next is filled
-> by init because of ring buffer. What flags should be used? And what is data
-> structure?
+"Menon, Nishanth" <nm@ti.com> writes:
 
-I'm sorry, but can you please rephrase this question too ? I'm just not
-sure I understand you correctly.
+> On Wed, Feb 15, 2012 at 09:20, Kevin Hilman <khilman@ti.com> wrote:
+>> Tero Kristo <t-kristo@ti.com> writes:
+>>
+>>> On Tue, 2012-02-14 at 15:52 -0800, Tony Lindgren wrote:
+>>>> * Kevin Hilman <khilman@ti.com> [120214 14:28]:
+>>>> > Tony Lindgren <tony@atomide.com> writes:
+>>>> >
+>>>> > > * Tero Kristo <t-kristo@ti.com> [120214 08:19]:
+>>>> > >> Voltdm, pwrdm, clkdm, hwmod and clk usecounts are now separeted to
+>>>> > >> their own file, 'usecount'. This file shows the usecounts for every
+>>>> > >> active domain and their children recursively. 'count' file now only
+>>>> > >> shows power state counts for powerdomains.
+>>>> > >>
+>>>> > >> This patch also provices a way to do printk dumps from kernel code,
+>>>> > >> by calling the pm_dbg_dump_X functions. The plan is to call these
+>>>> > >> functions once an error condition is detected, e.g. failed suspend.
+>>>> > >
+>>>> > > Why don't you replace this all with a userspace tool that deciphers
+>>>> > > the registers for you?
+>>>> >
+>>>> > This patch isn't deciphering registers, it's just dumping usecounts, and
+>>>> > I think that is extremely useful to have in debugfs.
+>>>> >
+>>>> > I've already removed all the register dumping from the kernel in the
+>>>> > hopes that someone will write a userspace tool for that.
+>>>>
+>>>> OK good to hear you're already considering it.
+>>>
+>>> Yes, register dumps are gone, and I am actually one of the persons who
+>>> is missing it.
+>>>
+>>> I think there should still be some capability to get register snapshots
+>>> from certain points during kernel execution, this is useful for
+>>> debugging purposes. I don't know if it would be possible to do a
+>>> call_usermodehelper() or something from kernel space just before wfi to
+>>> read all (or part of) the PRCM registers, store them somewhere, and then
+>>> decipher this data later with another tool. Any comments to this?
+>>
+>> You should look into the omapconf tool (TI internal only currently)
+>>
+>> This tool already has the ability to use /dev/mem to read/decipher OMAP
+>> PM related registers.
+>>
+>> IMO, the one thing we're still missing is the ability to take register
+>> snapshots (like immediately before and after WFI) and somehow feed those
+>> to omapconf for deciphering.
+>>
+> Something like this perhaps?
+> https://github.com/nmenon/linux-omap-ti-pm/commit/3cd1994fc0df9a8e3e0be74ec3f3add3ff3aef95
 
-In general, you don't need to fiddle with the vring_desc structure -
-that's internal to virtio, and things should just work.
+Yes, although that is targetted pretty narrowly at suspend and only PRM
+registers.
 
-Or are you asking about the rtos side ?
+Do you then use omapconf to display the results?
 
-Thanks,
-Ohad.
+Kevin
