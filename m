@@ -1,68 +1,137 @@
-From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
-Date: Thu, 16 Feb 2012 06:34:09 +0100
-Subject: [PATCH] ARM: boot/compressed/decompress.c cleanup
-Message-ID: <1329370449-12033-1-git-send-email-michael.opdenacker@free-electrons.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 16 Feb 2012 14:40:13 +0900
+Subject: [PATCH v2 03/11] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
+In-Reply-To: <1328981685-8602-4-git-send-email-kgene.kim@samsung.com>
+References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
+ <1328981685-8602-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <055301ccec6d$747a8a40$5d6f9ec0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes against Linus' tree
+Kukjin Kim wrote:
+> 
+> This patch adds clock-exynos5.c for EXYNOS5250 now
+> and that can be used for other EXYNOS5 SoCs later.
 
-- Remove unused declarations and includes
-- Remove the ARCH_HAS_DECOMP_WDOG define
-  because it is only used in lib/deflate.c, which
-  only the alpha architecture uses. No other architecture
-  uses this define
-- Remove the Trace<xx> and Assert functions which aren't used
-  in decompression routines.
+[...]
 
-Tested successfully on Linux 3.3.0-rc3
+> +static int exynos5_clk_ip_acp_ctrl(struct clk *clk, int enable)
+> +{
+> +	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_ACP, clk, enable);
+> +}
 
-Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
----
- arch/arm/boot/compressed/decompress.c |   23 -----------------------
- 1 files changed, 0 insertions(+), 23 deletions(-)
+This is not used yet. So I removed this function.
 
-diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
-index 07be5a2..36f92ca 100644
---- a/arch/arm/boot/compressed/decompress.c
-+++ b/arch/arm/boot/compressed/decompress.c
-@@ -1,37 +1,14 @@
--#define _LINUX_STRING_H_
--
- #include <linux/compiler.h>	/* for inline */
- #include <linux/types.h>	/* for size_t */
- #include <linux/stddef.h>	/* for NULL */
--#include <linux/linkage.h>
- #include <asm/string.h>
- 
- extern unsigned long free_mem_ptr;
- extern unsigned long free_mem_end_ptr;
--extern void error(char *);
- 
- #define STATIC static
- #define STATIC_RW_DATA	/* non-static please */
- 
--#define ARCH_HAS_DECOMP_WDOG
--
--/* Diagnostic functions */
--#ifdef DEBUG
--#  define Assert(cond,msg) {if(!(cond)) error(msg);}
--#  define Trace(x) fprintf x
--#  define Tracev(x) {if (verbose) fprintf x ;}
--#  define Tracevv(x) {if (verbose>1) fprintf x ;}
--#  define Tracec(c,x) {if (verbose && (c)) fprintf x ;}
--#  define Tracecv(c,x) {if (verbose>1 && (c)) fprintf x ;}
--#else
--#  define Assert(cond,msg)
--#  define Trace(x)
--#  define Tracev(x)
--#  define Tracevv(x)
--#  define Tracec(c,x)
--#  define Tracecv(c,x)
--#endif
--
- #ifdef CONFIG_KERNEL_GZIP
- #include "../../../../lib/decompress_inflate.c"
- #endif
--- 
-1.7.4.1
+[...]
+
+> +static struct clksrc_clk exynos5_clk_sclk_hdmi = {
+> +	.clk	= {
+> +		.name           = "sclk_hdmi",
+                     ^^^^^^^^^^^
+I fixed to use tab at above mark ^
+
+[...]
+
+> +static struct clk exynos5_clk_pdma0 = {
+> +	.name		= "dma",
+> +	.devname	= "dma-pl330.0",
+> +	.enable		= exynos5_clk_ip_gen_ctrl,
+> +	.ctrlbit	= (1 << 4),
+
+I fixed like following.
+
+	.enable		= exynos5_clk_ip_fsys_ctrl,
+	.ctrlbit	= (1 << 1),
+
+[...]
+
+> +static struct clk exynos5_clk_pdma2 = {
+> +	.name		= "dma",
+> +	.devname	= "dma-pl330.2",
+> +	.enable		= exynos5_clk_ip_fsys_ctrl,
+> +	.ctrlbit	= (1 << 1),
+
+static struct clk exynos5_clk_mdma1 = {
+	.name		= "dma",
+	.devname	= "dma-pl330.2",
+	.enable		= exynos5_clk_ip_gen_ctrl,
+	.ctrlbit	= (1 << 4),
+
+[...]
+
+> +static struct clksrc_clk exynos5_clk_sclk_mmc1 = {
+> +	.clk	= {
+> +		.name		= "sclk_mmc",
+> +		.devname	= "s3c-sdhci.1",
+> +		.parent         = &exynos5_clk_dout_mmc1.clk,
+                       ^^^^^^^^^
+same as above
+
+[...]
+
+> +static struct clksrc_clk exynos5_clk_sclk_mmc2 = {
+> +	.clk	= {
+> +		.name		= "sclk_mmc",
+> +		.devname	= "s3c-sdhci.2",
+> +		.parent         = &exynos5_clk_dout_mmc2.clk,
+                       ^^^^^^^^^
+
+[...]
+
+> +static struct clksrc_clk exynos5_clk_sclk_mmc3 = {
+> +	.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS2, .shift = 8, .size = 8 },
+
+Ooops, this should be moved in above 'exynos5_clk_sclk_mmc2' :(
+
+> +	.clk	= {
+> +		.name		= "sclk_mmc",
+> +		.devname	= "s3c-sdhci.3",
+> +		.parent         = &exynos5_clk_dout_mmc3.clk,
+                       ^^^^^^^^^
+
+[...]
+
+> +static struct clksrc_clk exynos5_clksrcs[] = {
+> +	{
+> +		.clk	= {
+> +			.name		= "sclk_dwmci",
+> +			.parent         = &exynos5_clk_dout_mmc4.clk,
+                               ^^^^^^^^^
+
+[...]
+
+> +static struct clk *exynos5_clk_cdev[] = {
+> +	&exynos5_clk_pdma0,
+> +	&exynos5_clk_pdma1,
+> +	&exynos5_clk_pdma2,
+
+according to above changes,
+
+	&exynos5_clk_mdma1,
+
+[...]
+
+> +	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &exynos5_clk_pdma0),
+> +	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &exynos5_clk_pdma1),
+> +	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_pdma2),
+
+	CLKDEV_INIT("dma-pl330.2", "apb_pclk", &exynos5_clk_mdma1),
+
+[...]
+
+> +struct syscore_ops exynos5_clock_syscore_ops = {
+> +	.suspend        = exynos5_clock_suspend,
+                ^^^^^^^^
+> +	.resume         = exynos5_clock_resume,
+               ^^^^^^^^^
+Tab
+
+[...]
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
