@@ -1,30 +1,82 @@
-From: danny.kukawka@bisect.de (Danny Kukawka)
-Date: Thu, 16 Feb 2012 15:46:38 +0100
-Subject: [PATCH] arch/arm/mach-shmobile/board-ag5evm.c: included
- linux/dma-mapping.h twice
-Message-ID: <1329403598-304-1-git-send-email-danny.kukawka@bisect.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 16 Feb 2012 15:47:44 +0100
+Subject: [PATCH RESEND] i2c: mxs: only flag completion when queue is
+ completely done
+Message-ID: <1329403664-17936-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-shmobile/board-ag5evm.c: included 'linux/dma-mapping.h'
-twice, remove the duplicate.
+The hardware generates an interrupt for every completed command in the
+queue while the code assumed that it will only generate one interrupt
+when the queue is empty. So, explicitly check if the queue is really
+empty. This patch fixed problems which occurred due to high traffic on
+the bus. While we are here, move the completion-initialization after the
+parameter error checking.
 
-Signed-off-by: Danny Kukawka <danny.kukawka@bisect.de>
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Marek Vasut <marek.vasut@gmail.com>
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Cc: Ben Dooks <ben-i2c@fluff.org>
 ---
- arch/arm/mach-shmobile/board-ag5evm.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index eff8a96..014b8e2 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -37,7 +37,6 @@
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
- #include <linux/sh_clk.h>
--#include <linux/dma-mapping.h>
- #include <video/sh_mobile_lcdc.h>
- #include <video/sh_mipi_dsi.h>
- #include <sound/sh_fsi.h>
+Ben, will you send this to Linus? Should get a stable tag, too, IMO.
+
+ drivers/i2c/busses/i2c-mxs.c |   13 ++++++++++---
+ 1 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+index 7e78f7c..3d471d5 100644
+--- a/drivers/i2c/busses/i2c-mxs.c
++++ b/drivers/i2c/busses/i2c-mxs.c
+@@ -72,6 +72,7 @@
+ 
+ #define MXS_I2C_QUEUESTAT	(0x70)
+ #define MXS_I2C_QUEUESTAT_RD_QUEUE_EMPTY        0x00002000
++#define MXS_I2C_QUEUESTAT_WRITE_QUEUE_CNT_MASK	0x0000001F
+ 
+ #define MXS_I2C_QUEUECMD	(0x80)
+ 
+@@ -219,14 +220,14 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
+ 	int ret;
+ 	int flags;
+ 
+-	init_completion(&i2c->cmd_complete);
+-
+ 	dev_dbg(i2c->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+ 		msg->addr, msg->len, msg->flags, stop);
+ 
+ 	if (msg->len == 0)
+ 		return -EINVAL;
+ 
++	init_completion(&i2c->cmd_complete);
++
+ 	flags = stop ? MXS_I2C_CTRL0_POST_SEND_STOP : 0;
+ 
+ 	if (msg->flags & I2C_M_RD)
+@@ -286,6 +287,7 @@ static irqreturn_t mxs_i2c_isr(int this_irq, void *dev_id)
+ {
+ 	struct mxs_i2c_dev *i2c = dev_id;
+ 	u32 stat = readl(i2c->regs + MXS_I2C_CTRL1) & MXS_I2C_IRQ_MASK;
++	bool is_last_cmd;
+ 
+ 	if (!stat)
+ 		return IRQ_NONE;
+@@ -300,9 +302,14 @@ static irqreturn_t mxs_i2c_isr(int this_irq, void *dev_id)
+ 	else
+ 		i2c->cmd_err = 0;
+ 
+-	complete(&i2c->cmd_complete);
++	is_last_cmd = (readl(i2c->regs + MXS_I2C_QUEUESTAT) &
++		MXS_I2C_QUEUESTAT_WRITE_QUEUE_CNT_MASK) == 0;
++
++	if (is_last_cmd || i2c->cmd_err)
++		complete(&i2c->cmd_complete);
+ 
+ 	writel(stat, i2c->regs + MXS_I2C_CTRL1_CLR);
++
+ 	return IRQ_HANDLED;
+ }
+ 
 -- 
 1.7.8.3
