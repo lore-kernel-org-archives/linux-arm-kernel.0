@@ -1,62 +1,60 @@
-From: ffainelli@freebox.fr (Florian Fainelli)
-Date: Thu, 16 Feb 2012 12:04:52 +0100
-Subject: [PATCH] mtd: fix the wrong check condition
-In-Reply-To: <4F3C7433.5030306@freescale.com>
-References: <1329302008-10228-1-git-send-email-b32955@freescale.com>
- <4F3C712A.5060406@gmail.com> <4F3C7433.5030306@freescale.com>
-Message-ID: <4F3CE2D4.4070506@freebox.fr>
+From: michael.opdenacker@free-electrons.com (Michael Opdenacker)
+Date: Thu, 16 Feb 2012 12:25:15 +0100
+Subject: [PATCH] ARM: boot/compressed/decompress.c cleanup
+Message-ID: <1329391515-20492-1-git-send-email-michael.opdenacker@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+- Remove unused declarations and includes
+- Remove the Trace<xx> and Assert functions which aren't used
+  in decompression routines.
 
-On 02/16/12 04:12, Huang Shijie wrote:
-> Hi,
->> (Add Florian and Matthieu)
->>
->> On 2/15/2012 2:33 AM, Huang Shijie wrote:
->>> If we use `||` check condition, many NAND chips which are not
->>> ONFI nands have to do the ONFI detection.
->>
->> Running the ONFI detection on non-ONFI NAND should not, ideally, be a
->> problem. They should fail one or both tests included in the routine:
->> the 'O N F I' string check or the CRC calculation.
-> NO.
+Signed-off-by: Michael Opdenacker <michael.opdenacker@free-electrons.com>
+---
+ arch/arm/boot/compressed/decompress.c |   21 ---------------------
+ 1 files changed, 0 insertions(+), 21 deletions(-)
 
-Can you please post the dump of the ONFI page as read by your 
-controller? Is the CRC check passing? The ONFI crc function is made so 
-that a page full of zeroes or 0xff won't generate a respectively 0 or ff 
-checksum, so we should catch this during the CRC check.
-
->
-> I have Hynix nand in my hand: H27UBG8T2A (page size :8192, oob:448).
-> It is not an ONFI nand. See the datasheet in the attachment.
-> But it accidentally can pass the ONFI detection, and get the result :
-> page size 4192, oob:96. This is a wrong result.
-
-I have already seen a Hynix chip answering to the READID command too, 
-and this was highly confusing our bootloader, however, I suppose that we 
-should be able to circumvent this issue anyway.
-
->
->
->
->
->>
->>> Use `&&` here to detect the ONFI NAND when we can not find any type
->>> in the nand_flash_ids.
->>
->> There are many chips whose ID might be in the NAND table but for which
->> it is preferable (or even required) to check by ONFI for one reason or
->> another. For instance, some ONFI chips might use odd-sized OOB that
->> isn't in the ID decoding algorithm.
->>
-> This nand is 32Gb, but we can not parse it out from the id.
-> I ever want to add a new database which use the all the 8/6 bytes id as
-> key.
-> It seems it's time to change it now.
-
-You have said that already, but we have yet to see patches for this, I 
-guess if you can post your database patch that will be easier to comment on.
---
-Florian
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index 07be5a2..ce0ceb1 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -1,37 +1,16 @@
+-#define _LINUX_STRING_H_
+-
+ #include <linux/compiler.h>	/* for inline */
+ #include <linux/types.h>	/* for size_t */
+ #include <linux/stddef.h>	/* for NULL */
+-#include <linux/linkage.h>
+ #include <asm/string.h>
+ 
+ extern unsigned long free_mem_ptr;
+ extern unsigned long free_mem_end_ptr;
+-extern void error(char *);
+ 
+ #define STATIC static
+ #define STATIC_RW_DATA	/* non-static please */
+ 
+ #define ARCH_HAS_DECOMP_WDOG
+ 
+-/* Diagnostic functions */
+-#ifdef DEBUG
+-#  define Assert(cond,msg) {if(!(cond)) error(msg);}
+-#  define Trace(x) fprintf x
+-#  define Tracev(x) {if (verbose) fprintf x ;}
+-#  define Tracevv(x) {if (verbose>1) fprintf x ;}
+-#  define Tracec(c,x) {if (verbose && (c)) fprintf x ;}
+-#  define Tracecv(c,x) {if (verbose>1 && (c)) fprintf x ;}
+-#else
+-#  define Assert(cond,msg)
+-#  define Trace(x)
+-#  define Tracev(x)
+-#  define Tracevv(x)
+-#  define Tracec(c,x)
+-#  define Tracecv(c,x)
+-#endif
+-
+ #ifdef CONFIG_KERNEL_GZIP
+ #include "../../../../lib/decompress_inflate.c"
+ #endif
+-- 
+1.7.4.1
