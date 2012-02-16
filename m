@@ -1,21 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2012 10:11:23 +0000
-Subject: [PATCH 3/3] ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux
- related functions as __init
-In-Reply-To: <20120215182829.18884.69168.stgit@kaulin.local>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 16 Feb 2012 15:43:34 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: Split omap2_hsmmc_init() to properly
+ support I2C GPIO pins
+In-Reply-To: <4F3CD460.7000306@ti.com>
 References: <20120215182355.18884.18682.stgit@kaulin.local>
- <20120215182829.18884.69168.stgit@kaulin.local>
-Message-ID: <20120216101123.GI15338@n2100.arm.linux.org.uk>
+ <20120215182825.18884.40972.stgit@kaulin.local> <4F3CD460.7000306@ti.com>
+Message-ID: <4F3CD6CE.1090201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 10:28:30AM -0800, Tony Lindgren wrote:
-> Now that omap hsmmc init is split into two functions, it's safe
-> to mark omap_hsmmc_init and omap_mux related functions to __init.
-> 
-> This basically reverts the following fixes for the case where
-> TWL was compiled as a module:
-> 
-> d5de63 (ARM: omap: preemptively fix section mismatch in omap4_sdp4430_wifi_mux_init())
+On Thursday 16 February 2012 03:33 PM, Rajendra Nayak wrote:
+> better still, I think we should just populate them statically in
+> omap2_hsmmc_info struct above, so omap_hsmmc_init() takes care
+> of it already.
 
-Why did you include this one?  This is unrelated to the TWL problems.
+I just tried this and it seems to work...
+
+---
+  arch/arm/mach-omap2/board-omap3beagle.c |    1 +
+  1 file changed, 1 insertion(+)
+
+Index: linux-2.6/arch/arm/mach-omap2/board-omap3beagle.c
+===================================================================
+--- linux-2.6.orig/arch/arm/mach-omap2/board-omap3beagle.c 
+2012-02-16 15:38:47.046933403 +0530
++++ linux-2.6/arch/arm/mach-omap2/board-omap3beagle.c   2012-02-16 
+15:40:17.355349064 +0530
+@@ -253,6 +253,7 @@
+                 .mmc            = 1,
+                 .caps           = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+                 .gpio_wp        = -EINVAL,
++               .gpio_cd        = OMAP_MAX_GPIO_LINES + 0,
+                 .deferred       = true,
+         },
+         {}      /* Terminator */
