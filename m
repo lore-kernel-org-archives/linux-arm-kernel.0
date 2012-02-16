@@ -1,96 +1,29 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 16 Feb 2012 14:07:57 +0100
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <CAK=WgbaRF-L7M3VMZQdqFLUFOJuwFVkBH1hUNuJ51kSrzkaVjA@mail.gmail.com>
-References: <4F1EE861.4030405@monstr.eu>
- <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
- <4F1FF870.3000105@monstr.eu>
- <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
- <4F200F64.9060203@monstr.eu>
- <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
- <4F212E9E.9060807@monstr.eu>
- <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
- <4F391C1D.9020402@monstr.eu>
- <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
- <4F3BA962.9040109@monstr.eu> <4F3BC30A.4030301@monstr.eu>
- <4F3CC899.4070302@monstr.eu>
- <CAK=WgbaRF-L7M3VMZQdqFLUFOJuwFVkBH1hUNuJ51kSrzkaVjA@mail.gmail.com>
-Message-ID: <4F3CFFAD.9030402@monstr.eu>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 16 Feb 2012 08:08:33 -0500
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
+ device tree support
+In-Reply-To: <4F3CFEED.6060206@samsung.com> (Kukjin Kim's message of "Thu, 16
+ Feb 2012 22:04:45 +0900")
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
+ <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
+Message-ID: <m239abgc32.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ohad Ben-Cohen wrote:
-> On Thu, Feb 16, 2012 at 10:12 AM, Michal Simek <monstr@monstr.eu> wrote:
->> I should be more specific. Can you point me to remoteproc code which publish
->> remote service based on them Linux rpmsg driver will be probed? It is rtos
->> part of code.
->> In your ELCE presentation is called rpmsg-client-sample service.
-> 
-> Sorry for the late response (I'm in ELC).
-> 
-> Yes, use the client sample (which is part of the submitted patch set)
-> and not the omx/server samples (which are public, but were never
-> submitted nor cleaned up).
+Hi,
 
-Client sample is clear because it is probed when services are published.
+On Thu, Feb 16 2012, Kukjin Kim wrote:
+> I mean if I or you create topic branch for this whole series, can be
+> merged into both tree for avoiding conflicts with further working. Of
+> course, the topic branch don't have to rebase after merging into each
+> tree.
+>
+> If you're ok on this and my opinion, let me create the topic branch.
 
-> 
-> The channels are created dynamically: the rpmsg bus designates address
-> 53 for a name service, which listens to channel creation/removal
-> announcements coming from the remote processor. Take a look in
-> virtio_rpmsg_bus.c and you'll immediately see it.
+Okay, sure.  Thanks,
 
-I see that values but I can't see how rtos should send that messages.
-
-Have checked both vrings - one for rx and one for tx. They are
-initialized correctly on addresses I like.
-
-(gdb) x /80x 0xe1100000
-0xe1100000:     0x31140000      0x00000000      0x00000200      0x00010002
-0xe1100010:     0x31140200      0x00000000      0x00000200      0x00020002
-0xe1100020:     0x31140400      0x00000000      0x00000200      0x00030002
-0xe1100030:     0x31140600      0x00000000      0x00000200      0x00040002
-0xe1100040:     0x31140800      0x00000000      0x00000200      0x00050002
-
-(gdb) x /80x 0xe1104000
-0xe1104000:     0x00000000      0x00000000      0x00000000      0x00010000
-0xe1104010:     0x00000000      0x00000000      0x00000000      0x00020000
-0xe1104020:     0x00000000      0x00000000      0x00000000      0x00030000
-0xe1104030:     0x00000000      0x00000000      0x00000000      0x00040000
-0xe1104040:     0x00000000      0x00000000      0x00000000      0x00050000
-0xe1104050:     0x00000000      0x00000000      0x00000000      0x00060000
-0xe1104060:     0x00000000      0x00000000      0x00000000      0x00070000
-
-
-
-rtos can handle kick from Linux
-Linux is able to catch kick from freertos and run rproc_vg_interrupt
-
- From code I see that in rpmsg_probe function is virtqueue_kick which means sending
-kick to rtos. Then rtos can send the message.
-
-
-Above is condition "if (virtio_has_feature(vdev, VIRTIO_RPMSG_F_NS))" which is failing for me.
-Not sure if is correct.
-
-I am still not sure how to propagate that messages from rtos side.
-In TI software it is in NameMap.c file which calls MessageQCopy_send function with address 53(which fits).
-If I look at that function you copy data to msg->payload, setup data length, dstAddr is 53, srcAddr is don't know yet,
-flag is 0, reserverd is 0 then you call VirtQueue_addUsedBuf and kick.
-
-How does look like that structure for vring channels? It is probably mapped any structure. Can you point me which one?
-Channel description is rpmsg_channel_info struct.
-
-Thanks,
-Michal
-
-
-
-
-
+- Chris.
 -- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
