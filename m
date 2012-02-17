@@ -1,146 +1,85 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 17 Feb 2012 20:30:32 +0100
-Subject: [PATCHv22 12/16] mm: trigger page reclaim in alloc_contig_range() to
- stabilise watermarks
+Date: Fri, 17 Feb 2012 20:30:31 +0100
+Subject: [PATCHv22 11/16] mm: extract reclaim code from
+ __alloc_pages_direct_reclaim()
 In-Reply-To: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
 References: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1329507036-24362-13-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1329507036-24362-12-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-alloc_contig_range() performs memory allocation so it also should keep
-track on keeping the correct level of memory watermarks. This commit adds
-a call to *_slowpath style reclaim to grab enough pages to make sure that
-the final collection of contiguous pages from freelists will not starve
-the system.
+This patch extracts common reclaim code from __alloc_pages_direct_reclaim()
+function to separate function: __perform_reclaim() which can be later used
+by alloc_contig_range().
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-CC: Michal Nazarewicz <mina86@mina86.com>
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Acked-by: Mel Gorman <mel@csn.ul.ie>
 Tested-by: Rob Clark <rob.clark@linaro.org>
 Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
 Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 Tested-by: Robert Nelson <robertcnelson@gmail.com>
 ---
- include/linux/mmzone.h |    9 +++++++
- mm/page_alloc.c        |   62 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 71 insertions(+), 0 deletions(-)
+ mm/page_alloc.c |   30 +++++++++++++++++++++---------
+ 1 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 82f4fa5..6a6c2cc 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -63,8 +63,10 @@ enum {
- 
- #ifdef CONFIG_CMA
- #  define is_migrate_cma(migratetype) unlikely((migratetype) == MIGRATE_CMA)
-+#  define cma_wmark_pages(zone)	zone->min_cma_pages
- #else
- #  define is_migrate_cma(migratetype) false
-+#  define cma_wmark_pages(zone) 0
- #endif
- 
- #define for_each_migratetype_order(order, type) \
-@@ -371,6 +373,13 @@ struct zone {
- 	/* see spanned/present_pages for more description */
- 	seqlock_t		span_seqlock;
- #endif
-+#ifdef CONFIG_CMA
-+	/*
-+	 * CMA needs to increase watermark levels during the allocation
-+	 * process to make sure that the system is not starved.
-+	 */
-+	unsigned long		min_cma_pages;
-+#endif
- 	struct free_area	free_area[MAX_ORDER];
- 
- #ifndef CONFIG_SPARSEMEM
 diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index e42b4a3..443f623 100644
+index 444e3fd..e42b4a3 100644
 --- a/mm/page_alloc.c
 +++ b/mm/page_alloc.c
-@@ -5035,6 +5035,11 @@ static void __setup_per_zone_wmarks(void)
- 
- 		zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) + (tmp >> 2);
- 		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) + (tmp >> 1);
-+
-+		zone->watermark[WMARK_MIN] += cma_wmark_pages(zone);
-+		zone->watermark[WMARK_LOW] += cma_wmark_pages(zone);
-+		zone->watermark[WMARK_HIGH] += cma_wmark_pages(zone);
-+
- 		setup_zone_migrate_reserve(zone);
- 		spin_unlock_irqrestore(&zone->lock, flags);
- 	}
-@@ -5637,6 +5642,56 @@ static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
- 	return ret > 0 ? 0 : ret;
+@@ -2092,16 +2092,13 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
  }
+ #endif /* CONFIG_COMPACTION */
  
-+/*
-+ * Update zone's cma pages counter used for watermark level calculation.
-+ */
-+static inline void __update_cma_watermarks(struct zone *zone, int count)
-+{
-+	unsigned long flags;
-+	spin_lock_irqsave(&zone->lock, flags);
-+	zone->min_cma_pages += count;
-+	spin_unlock_irqrestore(&zone->lock, flags);
-+	setup_per_zone_wmarks();
+-/* The really slow allocator path where we enter direct reclaim */
+-static inline struct page *
+-__alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
+-	struct zonelist *zonelist, enum zone_type high_zoneidx,
+-	nodemask_t *nodemask, int alloc_flags, struct zone *preferred_zone,
+-	int migratetype, unsigned long *did_some_progress)
++/* Perform direct synchronous page reclaim */
++static int
++__perform_reclaim(gfp_t gfp_mask, unsigned int order, struct zonelist *zonelist,
++		  nodemask_t *nodemask)
+ {
+-	struct page *page = NULL;
+ 	struct reclaim_state reclaim_state;
+-	bool drained = false;
++	int progress;
+ 
+ 	cond_resched();
+ 
+@@ -2112,7 +2109,7 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
+ 	reclaim_state.reclaimed_slab = 0;
+ 	current->reclaim_state = &reclaim_state;
+ 
+-	*did_some_progress = try_to_free_pages(zonelist, order, gfp_mask, nodemask);
++	progress = try_to_free_pages(zonelist, order, gfp_mask, nodemask);
+ 
+ 	current->reclaim_state = NULL;
+ 	lockdep_clear_current_reclaim_state();
+@@ -2120,6 +2117,21 @@ __alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
+ 
+ 	cond_resched();
+ 
++	return progress;
 +}
 +
-+/*
-+ * Trigger memory pressure bump to reclaim some pages in order to be able to
-+ * allocate 'count' pages in single page units. Does similar work as
-+ *__alloc_pages_slowpath() function.
-+ */
-+static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
++/* The really slow allocator path where we enter direct reclaim */
++static inline struct page *
++__alloc_pages_direct_reclaim(gfp_t gfp_mask, unsigned int order,
++	struct zonelist *zonelist, enum zone_type high_zoneidx,
++	nodemask_t *nodemask, int alloc_flags, struct zone *preferred_zone,
++	int migratetype, unsigned long *did_some_progress)
 +{
-+	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
-+	struct zonelist *zonelist = node_zonelist(0, gfp_mask);
-+	int did_some_progress = 0;
-+	int order = 1;
-+	unsigned long watermark;
++	struct page *page = NULL;
++	bool drained = false;
 +
-+	/*
-+	 * Increase level of watermarks to force kswapd do his job
-+	 * to stabilise at new watermark level.
-+	 */
-+	__update_cma_watermarks(zone, count);
-+
-+	/* Obey watermarks as if the page was being allocated */
-+	watermark = low_wmark_pages(zone) + count;
-+	while (!zone_watermark_ok(zone, 0, watermark, 0, 0)) {
-+		wake_all_kswapd(order, zonelist, high_zoneidx, zone_idx(zone));
-+
-+		did_some_progress = __perform_reclaim(gfp_mask, order, zonelist,
-+						      NULL);
-+		if (!did_some_progress) {
-+			/* Exhausted what can be done so it's blamo time */
-+			out_of_memory(zonelist, gfp_mask, order, NULL);
-+		}
-+	}
-+
-+	/* Restore original watermark levels. */
-+	__update_cma_watermarks(zone, -count);
-+
-+	return count;
-+}
-+
- /**
-  * alloc_contig_range() -- tries to allocate given range of pages
-  * @start:	start PFN to allocate
-@@ -5735,6 +5790,13 @@ int alloc_contig_range(unsigned long start, unsigned long end,
- 		goto done;
- 	}
++	*did_some_progress = __perform_reclaim(gfp_mask, order, zonelist,
++					       nodemask);
+ 	if (unlikely(!(*did_some_progress)))
+ 		return NULL;
  
-+	/*
-+	 * Reclaim enough pages to make sure that contiguous allocation
-+	 * will not starve the system.
-+	 */
-+	__reclaim_pages(zone, GFP_HIGHUSER_MOVABLE, end-start);
-+
-+	/* Grab isolated pages from freelists. */
- 	outer_end = isolate_freepages_range(outer_start, end);
- 	if (!outer_end) {
- 		ret = -EBUSY;
 -- 
 1.7.1
