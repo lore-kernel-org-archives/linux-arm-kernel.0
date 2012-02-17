@@ -1,94 +1,66 @@
-From: ffainelli@freebox.fr (Florian Fainelli)
-Date: Fri, 17 Feb 2012 09:50:05 +0100
-Subject: [PATCH] mtd: fix the wrong check condition
-In-Reply-To: <CAMiH66GRD97y4mK-9TCRqsQkTOoqqwVp4gREv3=0qiX_vrueGA@mail.gmail.com>
-References: <1329302008-10228-1-git-send-email-b32955@freescale.com>
- <4F3C712A.5060406@gmail.com> <4F3C7433.5030306@freescale.com>
- <4F3CE2D4.4070506@freebox.fr>
- <CAMiH66GRD97y4mK-9TCRqsQkTOoqqwVp4gREv3=0qiX_vrueGA@mail.gmail.com>
-Message-ID: <4F3E14BD.10705@freebox.fr>
+From: linux@dominikbrodowski.net (Dominik Brodowski)
+Date: Fri, 17 Feb 2012 10:00:22 +0100
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <1329318063.2293.136.camel@twins>
+References: <1328670355.2482.68.camel@laptop>
+ <20120208202314.GA28290@redhat.com>
+ <1328736834.2903.33.camel@pasglop> <20120209075106.GB18387@elte.hu>
+ <4F35DD3E.4020406@codeaurora.org> <20120211144530.GA497@elte.hu>
+ <4F3AEC4E.9000303@codeaurora.org> <1329313085.2293.106.camel@twins>
+ <20120215140245.GB27825@n2100.arm.linux.org.uk>
+ <1329318063.2293.136.camel@twins>
+Message-ID: <20120217090022.GA24856@comet.dominikbrodowski.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/17/12 04:07, Huang Shijie a ?crit :
-> hi,
->
-> On Thu, Feb 16, 2012 at 7:04 PM, Florian Fainelli<ffainelli@freebox.fr>  wrote:
->> Hi,
->>
->> On 02/16/12 04:12, Huang Shijie wrote:
->>> Hi,
->>>> (Add Florian and Matthieu)
->>>>
->>>> On 2/15/2012 2:33 AM, Huang Shijie wrote:
->>>>> If we use `||` check condition, many NAND chips which are not
->>>>> ONFI nands have to do the ONFI detection.
->>>>
->>>> Running the ONFI detection on non-ONFI NAND should not, ideally, be a
->>>> problem. They should fail one or both tests included in the routine:
->>>> the 'O N F I' string check or the CRC calculation.
->>> NO.
->>
->> Can you please post the dump of the ONFI page as read by your controller? Is
->> the CRC check passing? The ONFI crc function is made so that a page full of
->> zeroes or 0xff won't generate a respectively 0 or ff checksum, so we should
->> catch this during the CRC check.
->>
-> Sorry. I did not check the log carefully.
->
-> the Hynix nand does _not_ pass the CRC check, but it passed the "ONFI"
-> string check.
+On Wed, Feb 15, 2012 at 04:01:03PM +0100, Peter Zijlstra wrote:
+> On Wed, 2012-02-15 at 14:02 +0000, Russell King - ARM Linux wrote:
+> 
+> > There's a problem with that: SA11x0 platforms (for which cpufreq was
+> > _originally_ written for before it spouted all the policy stuff which
+> > Linus demanded) need to notify drivers when the CPU frequency changes so
+> > that drivers can readjust stuff to keep within the bounds of the hardware.
+> > 
+> > Unfortunately, there's embedded platforms out there where the CPU core
+> > clock is not just the CPU core clock, but also is the memory bus clock,
+> > PCMCIA clock, and some peripheral clocks.  All these peripherals need
+> > their timing registers rewritten when the CPU core clock changes.
+> > 
+> > Even more unfortunately, some of these peripherals can't be adjusted
+> > with the click of your fingers: you have to wait for them to finish
+> > what they're doing.  In the case of a LCD controller, that means the
+> > hardware must finish displaying the current frame before the LCD
+> > controller will shut down and let you change its registers.
+> > 
+> > We _could_ make it atomic, but in return we'd have to spin in the driver
+> > for maybe 20+ ms, during which time the system would not be able to do
+> > anything else, not even those threaded IRQs. 
+> 
+> Thing is, the scheduler doesn't care about completion, all it needs is
+> to be able to kick-start the thing atomically. So you really have to
+> wait for it or can you do an interrupt driven state machine?
+> 
+> Anyway, one possibility is to keep cpufreq in its current state and use
+> that for this 'interesting' class of hardware -- clearly its current
+> state is good enough for it. And transition all sane hardware over to a
+> new scheme.
+> 
+> Another possibility is we'll try and fudge something in the scheduler
+> that either wakes a special per-cpu thread or allow enqueueing work and
+> make this CONFIG_goo available to these platforms so as not to add to
+> fast-path overhead of others.
 
-This is exactly what I saw too with a different Hynix chip, it replied 
-ONFI, but the CRC check failed.
+Well, we can actually have both: Adding a new cpufreq governor "scheduler"
+is easy. The scheduler stores the target frequency (in per-cent or
+per-mille) in (per-cpu) data available to this governor, and kick a
+(per-cpu?) thread which then handels the rest -- by existing cpufreq means.
+The cpufreq part is easy, the sched part less so (I think).
 
->
-> The log "ONFI flash detected" made me misunderstood.
+Of course, this is still slower than manipulating some MSRs in sched.c
+directly. However, we could make use of the existing infrastructure, and not
+worry about whether things need to schedule, need to busy-loop etc, whether
+we have thermal implications which mean that some frequences are not
+available etc.
 
-Yes I agree, the log is there too soon, thanks for your patch.
-
-Thanks.
-
->
-> BR
-> Huang Shijie
->
->
->>> I have Hynix nand in my hand: H27UBG8T2A (page size :8192, oob:448).
->>> It is not an ONFI nand. See the datasheet in the attachment.
->>> But it accidentally can pass the ONFI detection, and get the result :
->>> page size 4192, oob:96. This is a wrong result.
->>
->> I have already seen a Hynix chip answering to the READID command too, and
->> this was highly confusing our bootloader, however, I suppose that we should
->> be able to circumvent this issue anyway.
->>
->>>
->>>
->>>
->>>>> Use `&&` here to detect the ONFI NAND when we can not find any type
->>>>> in the nand_flash_ids.
->>>>
->>>> There are many chips whose ID might be in the NAND table but for which
->>>> it is preferable (or even required) to check by ONFI for one reason or
->>>> another. For instance, some ONFI chips might use odd-sized OOB that
->>>> isn't in the ID decoding algorithm.
->>>>
->>> This nand is 32Gb, but we can not parse it out from the id.
->>> I ever want to add a new database which use the all the 8/6 bytes id as
->>> key.
->>> It seems it's time to change it now.
->>
->> You have said that already, but we have yet to see patches for this, I guess
->> if you can post your database patch that will be easier to comment on.
->> --
->> Florian
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best,
+	Dominik
