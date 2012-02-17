@@ -1,80 +1,91 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 17 Feb 2012 13:24:02 +0800
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120216180841.GC31977@mudshark.cambridge.arm.com>
-References: <CAMsRxfJVEgVJoHcaPQbMg5mwz=tZUce4oibDUxtnevSF8bGY9g@mail.gmail.com>
- <CAMQu2gxVUqDF2HkPD=QeX0N_tUd=9FTd+T+1LHCR0tsCgQxC8Q@mail.gmail.com>
- <CAMsRxfJH+9MS=Svmh0BvDSb8xqsPe2HPobkeKcn8JO35npjhwQ@mail.gmail.com>
- <CACVXFVMx9Zx3ZQr6Q-17x5NVL8iuBJjOjtw39FJiWX=fGkZNZA@mail.gmail.com>
- <1329323900.2293.150.camel@twins>
- <CACVXFVPce0A3LfL=mFo3UbN-Om7xLOo_d-LfKXDjdN5dFQdhiA@mail.gmail.com>
- <20120216150004.GE2641@mudshark.cambridge.arm.com>
- <CACVXFVM472hz+na7o2wJr1CPq-W=YB7i0UwtrsUf62+ryzWp8A@mail.gmail.com>
- <1329409183.2293.245.camel@twins>
- <CACVXFVOygObWqPMLjg6uOB6inBkvvUjsQncNW0fbmpa4Xspw0Q@mail.gmail.com>
- <20120216180841.GC31977@mudshark.cambridge.arm.com>
-Message-ID: <CACVXFVO4eexVK-S5TdRk2T6pyKRzpW1HxBQxo0Yfk_ziaO_U4Q@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 17 Feb 2012 08:40:07 +0100
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120216162703.GB3383@opensource.wolfsonmicro.com>
+References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
+ <20120213082741.GN3852@pengutronix.de>
+ <20120213144820.GA3494@opensource.wolfsonmicro.com>
+ <20120214105823.GS3852@pengutronix.de>
+ <20120214172902.GB3916@opensource.wolfsonmicro.com>
+ <20120216073236.GE3852@pengutronix.de>
+ <20120216075825.GA11631@opensource.wolfsonmicro.com>
+ <20120216091352.GK3852@pengutronix.de>
+ <20120216162703.GB3383@opensource.wolfsonmicro.com>
+Message-ID: <20120217074007.GM3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2012 at 2:08 AM, Will Deacon <will.deacon@arm.com> wrote:
+On Thu, Feb 16, 2012 at 08:27:04AM -0800, Mark Brown wrote:
+> On Thu, Feb 16, 2012 at 10:13:52AM +0100, Sascha Hauer wrote:
+> > On Wed, Feb 15, 2012 at 11:58:26PM -0800, Mark Brown wrote:
+> 
+> > > It's not per device, of course - there's an overhead from putting a
+> > > fixed regulator in but then per supply it's just a line.
+> 
+> > You mean one supply if the voltages are the same, right? Otherwise
+> > we need multiple fixed regulators (or we shouldn't claim that the
+> > board-dummy-fixed-catch-all regulator has a particular voltage)
+> 
+> I'd expect that anyone who's bothered by all this stuff wouldn't be
+> going to fill in the voltages accurately.
 
->
-> The more I think about this, the more I think that the overflow parameter to
-> armpmu_event_update needs to go. It was introduced to prevent massive event
-> loss in non-sampling mode, but I think we can get around that by changing
-> the default sample_period to be half of the max_period, therefore giving
-> ourselves a much better chance of handling the interrupt before new wraps
-> around past prev.
->
-> Ming Lei - can you try the following please? If it works for you, then I'll
-> do it properly and kill the overflow parameter altogether.
+Ok, so then I'll drop the voltage parameter.
 
-Of course, it does work for the problem reported by Stephane since
-it changes the delta computation basically as I did, but I am afraid that
-it may be not good enough for the issue fixed in a737823d ("ARM: 6835/1:
-perf: ensure overflows aren't missed due to IRQ latency").
+> 
+> > > This is obviously not good for users, they'd still have to do error
+> > > checking to determine if the device was created or not and then manually
+> > > register the device with the driver core and ideally also care if that
+> > > worked or not.
+> 
+> > I understand that error checking is a good idea, but what do you mean
+> > with 'manually register the device with the core'? The regulator is
+> > registered with the core in this function.
+> 
+> Oh, in that case it seems really odd that it's returning a pointer to
+> the device rather than just returning success or failure.
 
->
-> Thanks,
->
-> Will
->
-> git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 5bb91bf..ef597a3 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -193,13 +193,7 @@ again:
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? new_raw_count) != prev_raw_count)
-> ? ? ? ? ? ? ? ?goto again;
->
-> - ? ? ? new_raw_count &= armpmu->max_period;
-> - ? ? ? prev_raw_count &= armpmu->max_period;
-> -
-> - ? ? ? if (overflow)
-> - ? ? ? ? ? ? ? delta = armpmu->max_period - prev_raw_count + new_raw_count + 1;
-> - ? ? ? else
-> - ? ? ? ? ? ? ? delta = new_raw_count - prev_raw_count;
-> + ? ? ? delta = (new_raw_count - prev_raw_count) & armpmu->max_period;
->
-> ? ? ? ?local64_add(delta, &event->count);
-> ? ? ? ?local64_sub(delta, &hwc->period_left);
-> @@ -518,7 +512,7 @@ __hw_perf_event_init(struct perf_event *event)
-> ? ? ? ?hwc->config_base ? ? ? ? ? ?|= (unsigned long)mapping;
->
-> ? ? ? ?if (!hwc->sample_period) {
-> - ? ? ? ? ? ? ? hwc->sample_period ?= armpmu->max_period;
-> + ? ? ? ? ? ? ? hwc->sample_period ?= armpmu->max_period >> 1;
+It has to as it gives you a pointer which you can use to unregister the
+device later. Also it's in line with the platform helpers like
+platform_device_register_resndata, platform_device_register_simple and
+others.
 
-If you assume that the issue addressed by a737823d can only happen in
-non-sample situation, Peter's idea of u32 cast is OK and maybe simpler.
+> 
+> > > Of course with device tree this all becomes moot as this won't be
+> > > happening from code anyway...
+> 
+> > I wonder what the devicetree guys will do with this situation anyway.
+> > The devicetree won't describe regulators that are actually not present
+> > in the hardware, does it?
+> 
+> In all these cases there is actually a physical supply of some kind; if
+> there isn't one then you'd expect the driver would have explicit code to
+> handle that in some way.
 
-But I am afraid that the issue still can be triggered in sample-based situation,
-especially in very high frequency case: suppose the sample freq is 10000,
-100us IRQ delay may trigger the issue.
+Yes, there is one. But I think it will only be described in the device
+tree if it's software controllable.
 
-So we may use the overflow information to make perf more robust, IMO.
+> 
+> > Don't get me wrong. All I want is just a way for people to be able to
+> > add regulator support to drivers *without* breaking its users. Normally
+> > we have the policy in the kernel that changes to the kernel do not break
+> > its users. The smsc case violated this and it will happen again. In the
+> > end it doesn't even matter if a particular board could control a supply
+> > via software or not. Patches should not simply declare all users of a
+> > driver as broken.
+> 
+> Yes, I'm quite disappointed with people who are adding regulator support
+> without making an effort to go round all the uers and at least notify
+> the existing users of the device that they need updates.  There's a
+> limited amount we can do in the core
 
-thanks
---
-Ming Lei
+Are you then willing to merge my patch to make it easier to not break
+boards? I would remove the voltage parameter and fix a remaining
+Kconfig/ifdef issue then.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
