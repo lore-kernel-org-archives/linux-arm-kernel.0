@@ -1,31 +1,27 @@
-From: khlebnikov@openvz.org (Konstantin Khlebnikov)
-Date: Sat, 18 Feb 2012 00:38:47 +0400
-Subject: ARM: __enabled_CONFIG_NUMA undeclared
-In-Reply-To: <CAOMZO5CarXUJ1XVJMWCEt1AXvnE5Gvunou_8nydjLmPVkZERMA@mail.gmail.com>
-References: <CAOMZO5CarXUJ1XVJMWCEt1AXvnE5Gvunou_8nydjLmPVkZERMA@mail.gmail.com>
-Message-ID: <4F3EBAD7.6090705@openvz.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 Feb 2012 13:23:18 -0800
+Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
+ for v3.4 merge window
+In-Reply-To: <20120217091433.GL15338@n2100.arm.linux.org.uk>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+ <CACYZBRE_Vf8qDQYPRgsL03T8oy2Kv4fYRfE8U7y79Xhb1nwC2A@mail.gmail.com>
+ <20120216121234.GJ15338@n2100.arm.linux.org.uk>
+ <4F3CF7D1.8050807@ti.com> <4F3D0186.2010500@ti.com>
+ <20120216135151.GK15338@n2100.arm.linux.org.uk>
+ <20120217091433.GL15338@n2100.arm.linux.org.uk>
+Message-ID: <20120217212318.GG18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam wrote:
-> Hi,
->
-> Building today's linux-next for ARM:
->
->    CC      arch/arm/kernel/asm-offsets.s
-> In file included from include/linux/mm.h:8:0,
->                   from arch/arm/kernel/asm-offsets.c:14:
-> include/linux/gfp.h: In function 'gfp_zonelist':
-> include/linux/gfp.h:267:1: error: '__enabled_CONFIG_NUMA' undeclared
-> (first use in this function)
-> include/linux/gfp.h:267:1: note: each undeclared identifier is
-> reported only once for each function it appears in
-> include/linux/gfp.h:267:1: error: '__enabled_CONFIG_NUMA_MODULE'
-> undeclared (first use in this function)
-> make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
->
-> , which is caused by commit 053361e1a (mm: replace NUMA_BUILD with
-> IS_ENABLED(CONFIG_NUMA)
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [120217 00:43]:
+> 
+> Tony: I think there's a bug here - if the gpio-twl4030 module is inserted,
+> removed and re-inserted, I think we'll end up creating the devices for MMC
+> twice with the same name, resulting in sysfs complaining very loudly.
 
-Thanks. Stephen Rothwell already reported about this bug.
-see patch "mm: add config NUMA stub to all architectures"
+I guess you mean without splitting omap2_hsmmc_init() into two functions.
+Yup that's a nasty surprise that should be fixed for the -rc series.
+
+Regards,
+
+Tony
