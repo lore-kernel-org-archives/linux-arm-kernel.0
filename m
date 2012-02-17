@@ -1,27 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Feb 2012 13:23:18 -0800
-Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
- for v3.4 merge window
-In-Reply-To: <20120217091433.GL15338@n2100.arm.linux.org.uk>
-References: <20120215182355.18884.18682.stgit@kaulin.local>
- <CACYZBRE_Vf8qDQYPRgsL03T8oy2Kv4fYRfE8U7y79Xhb1nwC2A@mail.gmail.com>
- <20120216121234.GJ15338@n2100.arm.linux.org.uk>
- <4F3CF7D1.8050807@ti.com> <4F3D0186.2010500@ti.com>
- <20120216135151.GK15338@n2100.arm.linux.org.uk>
- <20120217091433.GL15338@n2100.arm.linux.org.uk>
-Message-ID: <20120217212318.GG18185@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 17 Feb 2012 13:38:57 -0800
+Subject: [PATCH 1/2] ARM: U300: Don't specify regulator consumers by
+ struct device
+In-Reply-To: <1329449029.17110.1.camel@phoenix>
+References: <1329449029.17110.1.camel@phoenix>
+Message-ID: <20120217213856.GA21717@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120217 00:43]:
-> 
-> Tony: I think there's a bug here - if the gpio-twl4030 module is inserted,
-> removed and re-inserted, I think we'll end up creating the devices for MMC
-> twice with the same name, resulting in sysfs complaining very loudly.
+On Fri, Feb 17, 2012 at 11:23:49AM +0800, Axel Lin wrote:
+> The dev field is remove from struct regulator_consumer_supply since commit
+> 737f36 "regulator: Remove support for supplies specified by struct device".
 
-I guess you mean without splitting omap2_hsmmc_init() into two functions.
-Yup that's a nasty surprise that should be fixed for the -rc series.
-
-Regards,
-
-Tony
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120217/5b548ca0/attachment.sig>
