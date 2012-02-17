@@ -1,72 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Feb 2012 10:26:43 +0000
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <CACVXFVO4eexVK-S5TdRk2T6pyKRzpW1HxBQxo0Yfk_ziaO_U4Q@mail.gmail.com>
-References: <CAMsRxfJH+9MS=Svmh0BvDSb8xqsPe2HPobkeKcn8JO35npjhwQ@mail.gmail.com>
- <CACVXFVMx9Zx3ZQr6Q-17x5NVL8iuBJjOjtw39FJiWX=fGkZNZA@mail.gmail.com>
- <1329323900.2293.150.camel@twins>
- <CACVXFVPce0A3LfL=mFo3UbN-Om7xLOo_d-LfKXDjdN5dFQdhiA@mail.gmail.com>
- <20120216150004.GE2641@mudshark.cambridge.arm.com>
- <CACVXFVM472hz+na7o2wJr1CPq-W=YB7i0UwtrsUf62+ryzWp8A@mail.gmail.com>
- <1329409183.2293.245.camel@twins>
- <CACVXFVOygObWqPMLjg6uOB6inBkvvUjsQncNW0fbmpa4Xspw0Q@mail.gmail.com>
- <20120216180841.GC31977@mudshark.cambridge.arm.com>
- <CACVXFVO4eexVK-S5TdRk2T6pyKRzpW1HxBQxo0Yfk_ziaO_U4Q@mail.gmail.com>
-Message-ID: <20120217102643.GA17909@mudshark.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 17 Feb 2012 15:56:37 +0530
+Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
+ for v3.4 merge window
+In-Reply-To: <4F3E2984.6000201@ti.com>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+ <CACYZBRE_Vf8qDQYPRgsL03T8oy2Kv4fYRfE8U7y79Xhb1nwC2A@mail.gmail.com>
+ <20120216121234.GJ15338@n2100.arm.linux.org.uk> <4F3CF7D1.8050807@ti.com>
+ <4F3D0186.2010500@ti.com> <20120216135151.GK15338@n2100.arm.linux.org.uk>
+ <20120217091433.GL15338@n2100.arm.linux.org.uk> <4F3E1ED5.6090305@ti.com>
+ <4F3E251B.6040404@ti.com> <20120217100632.GM15338@n2100.arm.linux.org.uk>
+ <4F3E2984.6000201@ti.com>
+Message-ID: <4F3E2B5D.6040601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2012 at 05:24:02AM +0000, Ming Lei wrote:
-> On Fri, Feb 17, 2012 at 2:08 AM, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> >
-> > The more I think about this, the more I think that the overflow parameter to
-> > armpmu_event_update needs to go. It was introduced to prevent massive event
-> > loss in non-sampling mode, but I think we can get around that by changing
-> > the default sample_period to be half of the max_period, therefore giving
-> > ourselves a much better chance of handling the interrupt before new wraps
-> > around past prev.
-> >
-> > Ming Lei - can you try the following please? If it works for you, then I'll
-> > do it properly and kill the overflow parameter altogether.
-> 
-> Of course, it does work for the problem reported by Stephane since
-> it changes the delta computation basically as I did, but I am afraid that
-> it may be not good enough for the issue fixed in a737823d ("ARM: 6835/1:
-> perf: ensure overflows aren't missed due to IRQ latency").
+On Friday 17 February 2012 03:48 PM, Rajendra Nayak wrote:
+>>
+>
+> Yes, I did get a WARN saying the device is already registered. An
+> unregister in my teardown should fix that too.
 
-I think it does solve that problem.
-
-> >
-> > ? ? ? ?if (!hwc->sample_period) {
-> > - ? ? ? ? ? ? ? hwc->sample_period ?= armpmu->max_period;
-> > + ? ? ? ? ? ? ? hwc->sample_period ?= armpmu->max_period >> 1;
-> 
-> If you assume that the issue addressed by a737823d can only happen in
-> non-sample situation, Peter's idea of u32 cast is OK and maybe simpler.
-
-I don't want to assume that the counters are 32-bit in this code as we may
-want to plug in some other PMU with 16-bit counters, for example. That's why
-we have max_period defined for each PMU. Furthermore, it still doesn't help us
-in the stat case where prev will typically be quite small after we've had an
-overflow and new may well overtake it.
-
-> But I am afraid that the issue still can be triggered in sample-based situation,
-> especially in very high frequency case: suppose the sample freq is 10000,
-> 100us IRQ delay may trigger the issue.
-
-Not sure I follow. If the frequency is 10000, then we write 0xffffd8f0 to
-the counter. That means we have a 0xffffd8f0 event window to read the
-counter after it overflows before new overtakes prev and we get confused.
-If this passed in 100us then either your clock speed is 4.3*10^12Hz or you
-have a seriously wide issue :)
-
-> So we may use the overflow information to make perf more robust, IMO.
-
-There's a trade off between allowing the counter to wrap back around past
-its previous value or being able to handle overflow on a non-interrupt path.
-Given that the former problem is only a real issue for non-sampling runs,
-halving the period in that case should sort it (and it does stop my simple
-test case from exploding).
-
-Will
+And now I see there is no way to unregister an omap_device :-)
+which needs to be added.
