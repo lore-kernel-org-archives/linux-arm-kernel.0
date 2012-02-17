@@ -1,89 +1,106 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 17 Feb 2012 18:42:31 +0100
-Subject: [PATCH v5 00/27] irq_domain generalization and rework
-In-Reply-To: <20120216145219.0f1c1b98.akpm@linux-foundation.org>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <20120216145219.0f1c1b98.akpm@linux-foundation.org>
-Message-ID: <4F3E9187.9080308@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 17 Feb 2012 18:49:52 +0100
+Subject: [PATCH 00/18] at91 first cleanup series for 3.4
+Message-ID: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+This series removes the at91_sys_read/write() functions that where
+used for all System Controller devices. The static offsets that were
+used prevented us from compiling several AT91 SoC support in a single
+zImage.
 
-On 2/16/2012 11:52 PM, Andrew Morton wrote:
-> On Thu, 16 Feb 2012 02:09:01 -0700
-> Grant Likely<grant.likely@secretlab.ca>  wrote:
-> 
->>
->> This series generalizes the "irq_host" infrastructure from powerpc
->> so that it can be used by all architectures and renames it to "irq_domain".
-> 
-> drivers/mfd/twl-core.c is fairly horked on i386 allmodconfig:
-> 
-> drivers/mfd/twl-core.c: In function 'twl_probe':
-> drivers/mfd/twl-core.c:1218: error: implicit declaration of function 'irq_alloc_descs'
-> drivers/mfd/twl-core.c:1226: error: implicit declaration of function 'irq_domain_add_legacy'
-> drivers/mfd/twl-core.c:1227: error: 'irq_domain_simple_ops' undeclared (first use in this function)
-> drivers/mfd/twl-core.c:1227: error: (Each undeclared identifier is reported only once
-> drivers/mfd/twl-core.c:1227: error: for each function it appears in.)
-> 
-> 
-> This is today's linux-next so it has rmk's "ARM: omap: fix broken
-> twl-core dependencies and ifdefs" in there, which looks like it
-> attempts to repair this stuff.
+The other cleanup is the move of some early console initialization.
 
-If we cannot assume this driver will be used only on architecture that does support IRQ_DOMAIN, we have to keep the #ifdef and then add the missing linux/irq.h.
+All this goes on top of current material that is already in arm-soc
+git tree (merge of all at91/* branches).
 
-Since this driver is using IRQ_DOMAIN only for Device Tree support, we can still avoid using irq_domain_add_legacy for the legacy non-DT case.
-That's too bad because I was expecting to use irq_domain to clean the cascading IRQ scheme used in that driver, but that can wait.
+Jean-Christophe PLAGNIOL-VILLARD (18):
+      ARM: at91: factorise duplicated at91sam9 idle
+      ARM: at91/at91x40: remove use of at91_sys_read/write
+      ARM: at91: make matrix register base soc independent
+      ARM: at91: make ST (System Timer) soc independent
+      ARM: at91/pm_slowclock: rename register to named define
+      ARM: at91/pm_slowclock: function slow_clock() accepts parameters
+      ARM: at91: move at91rm9200 sdramc defines to at91rm9200_sdramc.h
+      ARM: at91: make sdram/ddr register base soc independent
+      ARM: at91/pm_slowclock: add runtime detection of memory contoller
+      ARM: at91/PMC: make register base soc independent
+      ARM: at91/rtc-at91sam9: each SoC can select the RTT device to use
+      ARM: at91:rtc/rtc-at91sam9: ioremap register bank
+      ARM: at91/rtc-at91sam9: pass the GPBR to use via ressources
+      ARM: at91: finally drop at91_sys_read/write
+      ARM: at91: merge SRAM Memory banks thanks to mirroring
+      Atmel: move console default platform_device to serial driver
+      ARM: at91/board-dt: drop default console
+      ARM: at91/board-dt: move at91_initialize() to init_irq()
 
-The fix is trivial, but here it is just in case.
+ arch/arm/mach-at91/at91rm9200.c                    |    7 +-
+ arch/arm/mach-at91/at91rm9200_devices.c            |   14 +-
+ arch/arm/mach-at91/at91rm9200_time.c               |   37 ++-
+ arch/arm/mach-at91/at91sam9260.c                   |   23 +-
+ arch/arm/mach-at91/at91sam9260_devices.c           |   31 ++-
+ arch/arm/mach-at91/at91sam9261.c                   |   10 +-
+ arch/arm/mach-at91/at91sam9261_devices.c           |   24 ++-
+ arch/arm/mach-at91/at91sam9263.c                   |   11 +-
+ arch/arm/mach-at91/at91sam9263_devices.c           |   49 +++-
+ arch/arm/mach-at91/at91sam9_alt_reset.S            |   12 +-
+ arch/arm/mach-at91/at91sam9g45.c                   |   11 +-
+ arch/arm/mach-at91/at91sam9g45_devices.c           |   24 ++-
+ arch/arm/mach-at91/at91sam9g45_reset.S             |   12 +-
+ arch/arm/mach-at91/at91sam9rl.c                    |   10 +-
+ arch/arm/mach-at91/at91sam9rl_devices.c            |   24 ++-
+ arch/arm/mach-at91/at91sam9x5.c                    |    5 +-
+ arch/arm/mach-at91/at91x40.c                       |    2 +-
+ arch/arm/mach-at91/at91x40_time.c                  |   28 ++-
+ arch/arm/mach-at91/board-cpu9krea.c                |    5 +-
+ arch/arm/mach-at91/board-cpuat91.c                 |    1 +
+ arch/arm/mach-at91/board-dt.c                      |   16 +-
+ arch/arm/mach-at91/board-eco920.c                  |    5 +-
+ arch/arm/mach-at91/board-kb9202.c                  |    1 +
+ arch/arm/mach-at91/board-picotux200.c              |    1 +
+ arch/arm/mach-at91/board-rm9200dk.c                |    1 +
+ arch/arm/mach-at91/board-rm9200ek.c                |    1 +
+ arch/arm/mach-at91/board-yl-9200.c                 |    3 +-
+ arch/arm/mach-at91/clock.c                         |   81 ++++---
+ arch/arm/mach-at91/generic.h                       |   10 +
+ arch/arm/mach-at91/include/mach/at91_matrix.h      |   23 ++
+ arch/arm/mach-at91/include/mach/at91_pmc.h         |   56 +++--
+ arch/arm/mach-at91/include/mach/at91_ramc.h        |   32 +++
+ arch/arm/mach-at91/include/mach/at91_st.h          |   32 ++-
+ arch/arm/mach-at91/include/mach/at91rm9200.h       |   10 +-
+ arch/arm/mach-at91/include/mach/at91rm9200_mc.h    |   58 +----
+ .../arm/mach-at91/include/mach/at91rm9200_sdramc.h |   63 +++++
+ arch/arm/mach-at91/include/mach/at91sam9260.h      |   14 +-
+ .../mach-at91/include/mach/at91sam9260_matrix.h    |   36 ++--
+ arch/arm/mach-at91/include/mach/at91sam9261.h      |   10 +-
+ .../mach-at91/include/mach/at91sam9261_matrix.h    |   18 +-
+ arch/arm/mach-at91/include/mach/at91sam9263.h      |   12 +-
+ .../mach-at91/include/mach/at91sam9263_matrix.h    |   74 +++---
+ arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h  |    6 -
+ arch/arm/mach-at91/include/mach/at91sam9_sdramc.h  |    6 -
+ arch/arm/mach-at91/include/mach/at91sam9g45.h      |   12 +-
+ .../mach-at91/include/mach/at91sam9g45_matrix.h    |   84 +++---
+ arch/arm/mach-at91/include/mach/at91sam9rl.h       |    7 +-
+ .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |   42 ++--
+ arch/arm/mach-at91/include/mach/at91sam9x5.h       |    5 +-
+ arch/arm/mach-at91/include/mach/at91x40.h          |   18 +-
+ arch/arm/mach-at91/include/mach/hardware.h         |    3 +-
+ arch/arm/mach-at91/include/mach/io.h               |   18 --
+ arch/arm/mach-at91/pm.c                            |   35 ++-
+ arch/arm/mach-at91/pm.h                            |   11 +-
+ arch/arm/mach-at91/pm_slowclock.S                  |  271 ++++++++++----------
+ arch/arm/mach-at91/setup.c                         |    9 +
+ arch/avr32/mach-at32ap/at32ap700x.c                |    2 -
+ drivers/pcmcia/at91_cf.c                           |    5 +-
+ drivers/rtc/rtc-at91sam9.c                         |  103 ++++-----
+ drivers/tty/serial/atmel_serial.c                  |    2 +
+ drivers/usb/gadget/at91_udc.c                      |    9 +-
+ drivers/usb/gadget/atmel_usba_udc.c                |    6 +-
+ drivers/watchdog/at91rm9200_wdt.c                  |    8 +-
+ 63 files changed, 877 insertions(+), 682 deletions(-)
+ create mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
 
-Regards,
-Benoit
-
-
----
->From 0faf51f8475025260d5db808b1651a38b409803d Mon Sep 17 00:00:00 2001
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Fri, 17 Feb 2012 18:13:31 +0100
-Subject: [PATCH] mfd: twl-core: Fix IRQ_DOMAIN dependency
-
-TWL chips might be potentially used on architecture that does not support
-ird_domain yet.
-
-Do not call ird_domain API in that case.
-
-Include <linux/irq.h> directly since it will not be included anymore by
-<linux/irqdomain.h> if !IRQ_DOMAIN.
- 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
----
- drivers/mfd/twl-core.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index 59888f5..61441e2 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -38,6 +38,7 @@
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <linux/irq.h>
- #include <linux/irqdomain.h>
- 
- #include <linux/regulator/machine.h>
-@@ -1237,8 +1238,10 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 
- 	pdata->irq_base = status;
- 	pdata->irq_end = pdata->irq_base + nr_irqs;
-+#ifdef IRQ_DOMAIN
- 	irq_domain_add_legacy(node, nr_irqs, pdata->irq_base, 0,
- 			      &irq_domain_simple_ops, NULL);
-+#endif
- 
- 	if (i2c_check_functionality(client->adapter, I2C_FUNC_I2C) == 0) {
- 		dev_dbg(&client->dev, "can't talk I2C?\n");
--- 
-1.7.5.4
+Best regards,
