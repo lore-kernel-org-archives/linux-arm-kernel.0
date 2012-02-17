@@ -1,39 +1,42 @@
-From: walle@corscience.de (Bernhard Walle)
-Date: Fri, 17 Feb 2012 15:44:19 +0100
-Subject: [PATCH] ARM: OMAP2+: GPMC: Export gpmc_enable_hwecc and
- gpmc_calculate_ecc
-Message-ID: <1329489859-23929-1-git-send-email-walle@corscience.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 17 Feb 2012 15:49:59 +0100
+Subject: [PATCH] MAINTAINERS: hand over atmel-mci (sd/mmc interface)
+In-Reply-To: <e3d27dde7a46fcd0e440e17e4a66469f6b22697f.1328801500.git.ludovic.desroches@atmel.com>
+References: <e3d27dde7a46fcd0e440e17e4a66469f6b22697f.1328801500.git.ludovic.desroches@atmel.com>
+Message-ID: <1329490199-18362-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be able to compile kernel/drivers/mtd/nand/omap2.ko as module, that
-two symbols need to be exported. Otherwise, I get following error
-message
+Modify MAINTAINERS entry for Atmel SD/MMC drivers.
+I hand the atmel-mci and at91_mci drivers over to Ludovic.
 
-    ERROR: "gpmc_calculate_ecc" [drivers/mtd/nand/omap2.ko] undefined!
-    ERROR: "gpmc_enable_hwecc" [drivers/mtd/nand/omap2.ko] undefined!
-
-Signed-off-by: Bernhard Walle <walle@corscience.de>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- arch/arm/mach-omap2/gpmc.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ MAINTAINERS |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index dfffbbf..00d5108 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -888,6 +888,7 @@ int gpmc_enable_hwecc(int cs, int mode, int dev_width, int ecc_size)
- 	gpmc_write_reg(GPMC_ECC_CONFIG, val);
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(gpmc_enable_hwecc);
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 55ca0be..16c1b08 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1311,7 +1311,7 @@ F:	drivers/atm/
+ F:	include/linux/atm*
  
- /**
-  * gpmc_calculate_ecc - generate non-inverted ecc bytes
-@@ -918,3 +919,4 @@ int gpmc_calculate_ecc(int cs, const u_char *dat, u_char *ecc_code)
- 	gpmc_ecc_used = -EINVAL;
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(gpmc_calculate_ecc);
+ ATMEL AT91 MCI DRIVER
+-M:	Nicolas Ferre <nicolas.ferre@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@atmel.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://www.atmel.com/products/AT91/
+ W:	http://www.at91.com/
+@@ -1319,7 +1319,7 @@ S:	Maintained
+ F:	drivers/mmc/host/at91_mci.c
+ 
+ ATMEL AT91 / AT32 MCI DRIVER
+-M:	Nicolas Ferre <nicolas.ferre@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@atmel.com>
+ S:	Maintained
+ F:	drivers/mmc/host/atmel-mci.c
+ F:	drivers/mmc/host/atmel-mci-regs.h
 -- 
-1.7.9.1
+1.7.9
