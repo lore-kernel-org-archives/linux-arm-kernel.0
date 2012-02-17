@@ -1,120 +1,56 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Feb 2012 13:06:54 +0200
-Subject: [PATCHv9 3/5] arm: omap3: add common twl configurations for
- vdd1 and vdd2
-In-Reply-To: <CAOMWX4d8C4pjYSr+i3qmqfJHDsHQdtRkvfbGR29U7hXf0SkVZg@mail.gmail.com>
-References: <1329388073-17879-1-git-send-email-t-kristo@ti.com>
- <1329388073-17879-4-git-send-email-t-kristo@ti.com>
- <CAOMWX4d8C4pjYSr+i3qmqfJHDsHQdtRkvfbGR29U7hXf0SkVZg@mail.gmail.com>
-Message-ID: <1329476814.4102.433.camel@sokoban>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 17 Feb 2012 12:07:00 +0100
+Subject: [PATCH] ARM i.MX5/6: Add dt support for generic boards
+Message-ID: <1329476820-27066-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-02-16 at 12:23 -0600, Menon, Nishanth wrote:
-> On Thu, Feb 16, 2012 at 04:27, Tero Kristo <t-kristo@ti.com> wrote:
-> > VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
-> > to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
-> > are needed by DVFS.
-> >
-> > Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manual.
-> 
-> Please provide documentation version referenced, else we will loose
-> track of details at a later point of time.
+Apart from the iomux setup which may not be needed on custom
+boards the kernel starts fine using the devicetree, so add
+generic boards to the dt_compat entries.
 
-How should this be marked down? There are too many naming conventions
-for the TI docs, and I couldn't find any example from kernel commit logs
-for this. Personally I was using twl5030 es1.2 DM rev E / twl4030 es3.1
-DM rev L. Or should the literature code be used? Or is there also some
-numerical version info available somewhere?
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/imx51-dt.c   |    1 +
+ arch/arm/mach-imx/imx53-dt.c   |    1 +
+ arch/arm/mach-imx/mach-imx6q.c |    1 +
+ 3 files changed, 3 insertions(+), 0 deletions(-)
 
-> 
-> Also should we rename VDD1 with vdd_mpu_iva and VDD2 as vdd_core to be readable?
-
-This can be changed if needed, it is just a name.
-regulator/twl-regulator.c is using vdd1 / vdd2 though, and also
-pmic_data struct uses these. All the other regulators use Vxx type
-naming also. These are the names I see on my board through
-sys/class/regulator:
-
-dummy
-VDD1
-VDD2
-VMMC1
-VDAC
-VDVI
-VSIM
-
-
--Tero
-
-> 
-> Regards,
-> Nishanth Menon
-> >
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/twl-common.c |   36 ++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 36 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-> > index 10b20c6..5f62e51 100644
-> > --- a/arch/arm/mach-omap2/twl-common.c
-> > +++ b/arch/arm/mach-omap2/twl-common.c
-> > @@ -126,6 +126,38 @@ static struct regulator_init_data omap3_vpll2_idata = {
-> >        .consumer_supplies              = omap3_vpll2_supplies,
-> >  };
-> >
-> > +static struct regulator_consumer_supply omap3_vdd1_supply[] = {
-> > +       REGULATOR_SUPPLY("vcc", "mpu.0"),
-> > +};
-> > +
-> > +static struct regulator_consumer_supply omap3_vdd2_supply[] = {
-> > +       REGULATOR_SUPPLY("vcc", "l3_main.0"),
-> > +};
-> > +
-> > +static struct regulator_init_data omap3_vdd1 = {
-> > +       .constraints = {
-> > +               .name                   = "VDD1",
-> > +               .min_uV                 = 600000,
-> > +               .max_uV                 = 1450000,
-> > +               .valid_modes_mask       = REGULATOR_MODE_NORMAL,
-> > +               .valid_ops_mask         = REGULATOR_CHANGE_VOLTAGE,
-> > +       },
-> > +       .num_consumer_supplies          = ARRAY_SIZE(omap3_vdd1_supply),
-> > +       .consumer_supplies              = omap3_vdd1_supply,
-> > +};
-> > +
-> > +static struct regulator_init_data omap3_vdd2 = {
-> > +       .constraints = {
-> > +               .name                   = "VDD2",
-> > +               .min_uV                 = 600000,
-> > +               .max_uV                 = 1450000,
-> > +               .valid_modes_mask       = REGULATOR_MODE_NORMAL,
-> > +               .valid_ops_mask         = REGULATOR_CHANGE_VOLTAGE,
-> > +       },
-> > +       .num_consumer_supplies          = ARRAY_SIZE(omap3_vdd2_supply),
-> > +       .consumer_supplies              = omap3_vdd2_supply,
-> > +};
-> > +
-> >  void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
-> >                                  u32 pdata_flags, u32 regulators_flags)
-> >  {
-> > @@ -133,6 +165,10 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
-> >                pmic_data->irq_base = TWL4030_IRQ_BASE;
-> >        if (!pmic_data->irq_end)
-> >                pmic_data->irq_end = TWL4030_IRQ_END;
-> > +       if (!pmic_data->vdd1)
-> > +               pmic_data->vdd1 = &omap3_vdd1;
-> > +       if (!pmic_data->vdd2)
-> > +               pmic_data->vdd2 = &omap3_vdd2;
-> >
-> >        /* Common platform data configurations */
-> >        if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
-> > --
-> > 1.7.4.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
+index e6bad17..b0d830f 100644
+--- a/arch/arm/mach-imx/imx51-dt.c
++++ b/arch/arm/mach-imx/imx51-dt.c
+@@ -104,6 +104,7 @@ static struct sys_timer imx51_timer = {
+ 
+ static const char *imx51_dt_board_compat[] __initdata = {
+ 	"fsl,imx51-babbage",
++	"fsl,imx51",
+ 	NULL
+ };
+ 
+diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
+index 05ebb3e..d75a267 100644
+--- a/arch/arm/mach-imx/imx53-dt.c
++++ b/arch/arm/mach-imx/imx53-dt.c
+@@ -114,6 +114,7 @@ static const char *imx53_dt_board_compat[] __initdata = {
+ 	"fsl,imx53-evk",
+ 	"fsl,imx53-qsb",
+ 	"fsl,imx53-smd",
++	"fsl,imx53",
+ 	NULL
+ };
+ 
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index c257281..f3adf2f 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -128,6 +128,7 @@ static struct sys_timer imx6q_timer = {
+ static const char *imx6q_dt_compat[] __initdata = {
+ 	"fsl,imx6q-arm2",
+ 	"fsl,imx6q-sabrelite",
++	"fsl,imx6q",
+ 	NULL,
+ };
+ 
+-- 
+1.7.9
