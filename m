@@ -1,40 +1,68 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Fri, 17 Feb 2012 11:25:21 +0800
-Subject: [PATCH 2/2] ARM: imx/pcm038: Don't specify regulator consumers by
- struct device
-In-Reply-To: <1329449029.17110.1.camel@phoenix>
-References: <1329449029.17110.1.camel@phoenix>
-Message-ID: <1329449121.17110.2.camel@phoenix>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 16 Feb 2012 21:32:10 -0600
+Subject: [PATCH 0/4] sparse irq fixes for pxa and sa1100
+Message-ID: <1329449534-23811-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dev field is remove from struct regulator_consumer_supply since commit
-737f36 "regulator: Remove support for supplies specified by struct device".
+From: Rob Herring <rob.herring@calxeda.com>
 
-This fixes below build error:
-  CC      arch/arm/mach-imx/mach-pcm038.o
-arch/arm/mach-imx/mach-pcm038.c:236: error: unknown field 'dev' specified in initializer
-make[1]: *** [arch/arm/mach-imx/mach-pcm038.o] Error 1
-make: *** [arch/arm/mach-imx] Error 2
+Russell,
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
-This patch is against linux-next 20120217.
+Here's fixes for sa1100 and pxa. This is based on your for-next branch.
+I've built all the boards for both, but there could be some more drivers
+lurking if they aren't enabled in the defconfigs. I'm running an all
+defconfig build now.
 
- arch/arm/mach-imx/mach-pcm038.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+I've published the branch below if you want to pull the changes. I'm going
+to be offline most of the next 4 days.
 
-diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-index 16f126d..bfcc1ea 100644
---- a/arch/arm/mach-imx/mach-pcm038.c
-+++ b/arch/arm/mach-imx/mach-pcm038.c
-@@ -233,7 +233,6 @@ static struct regulator_init_data sdhc1_data = {
- 
- static struct regulator_consumer_supply cam_consumers[] = {
- 	{
--		.dev	= NULL,
- 		.supply	= "imx_cam_vcc",
- 	},
- };
+Also, I found a few other unrelated things breaking builds, but haven't done
+a fix:
+-xip mtd is broken on pxa.
+-exynos cpufreq needs to depend on exynos.
+
+Rob
+
+The following changes since commit 41bc99e49cc9ab74a4f1a5083d79231fd6ea2704:
+
+  Merge branch 'devel-stable' into for-next (2012-02-16 00:34:44 +0000)
+
+are available in the git repository at:
+
+  git://sources.calxeda.com/kernel/linux.git sparse-irq-fixes
+
+Rob Herring (4):
+  ARM: sa1100: fix sa1100 after sparse irq conversion
+  ARM: sa1100: fix simpad compile error
+  ARM: pxa: mainstone: add missing include for IRQ_BOARD_START
+  rtc: sa1100: include mach/irqs.h instead of asm/irq.h
+
+ arch/arm/mach-pxa/include/mach/mainstone.h |    2 ++
+ arch/arm/mach-sa1100/assabet.c             |    2 ++
+ arch/arm/mach-sa1100/badge4.c              |    1 +
+ arch/arm/mach-sa1100/cerf.c                |    2 ++
+ arch/arm/mach-sa1100/collie.c              |    2 ++
+ arch/arm/mach-sa1100/generic.c             |    4 +++-
+ arch/arm/mach-sa1100/h3100.c               |    2 ++
+ arch/arm/mach-sa1100/h3600.c               |    2 ++
+ arch/arm/mach-sa1100/hackkit.c             |    5 ++++-
+ arch/arm/mach-sa1100/include/mach/irqs.h   |    2 +-
+ arch/arm/mach-sa1100/irq.c                 |    1 +
+ arch/arm/mach-sa1100/jornada720.c          |    5 ++++-
+ arch/arm/mach-sa1100/lart.c                |    2 ++
+ arch/arm/mach-sa1100/nanoengine.c          |    2 ++
+ arch/arm/mach-sa1100/neponset.c            |    1 +
+ arch/arm/mach-sa1100/pleb.c                |    1 +
+ arch/arm/mach-sa1100/shannon.c             |    2 ++
+ arch/arm/mach-sa1100/simpad.c              |    4 +++-
+ arch/arm/mach-sa1100/ssp.c                 |    1 +
+ arch/arm/mach-sa1100/time.c                |    1 +
+ drivers/gpio/gpio-sa1100.c                 |    1 +
+ drivers/net/ethernet/smsc/smc91x.c         |    4 ++++
+ drivers/rtc/rtc-sa1100.c                   |    2 +-
+ drivers/tty/serial/sa1100.c                |    1 +
+ 24 files changed, 46 insertions(+), 6 deletions(-)
+
 -- 
 1.7.5.4
