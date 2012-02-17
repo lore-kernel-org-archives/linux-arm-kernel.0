@@ -1,58 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2012 23:26:48 +0000
-Subject: [PATCH v5 00/27] irq_domain generalization and rework
-In-Reply-To: <20120216145219.0f1c1b98.akpm@linux-foundation.org>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <20120216145219.0f1c1b98.akpm@linux-foundation.org>
-Message-ID: <20120216232648.GM27825@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 16 Feb 2012 16:10:13 -0800
+Subject: [PATCH v2 04/11] ARM: EXYNOS: add interrupt definitions for
+ EXYNOS5250
+In-Reply-To: <1328981685-8602-5-git-send-email-kgene.kim@samsung.com>
+References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
+ <1328981685-8602-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAOesGMhmcnt6LPb9O+3420VgG=PiCnOjzZA3JqsA=4OdHN-R-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 02:52:19PM -0800, Andrew Morton wrote:
-> On Thu, 16 Feb 2012 02:09:01 -0700
-> Grant Likely <grant.likely@secretlab.ca> wrote:
-> > This series generalizes the "irq_host" infrastructure from powerpc
-> > so that it can be used by all architectures and renames it to "irq_domain".
-> 
-> drivers/mfd/twl-core.c is fairly horked on i386 allmodconfig:
-> 
-> drivers/mfd/twl-core.c: In function 'twl_probe':
-> drivers/mfd/twl-core.c:1218: error: implicit declaration of function 'irq_alloc_descs'
-> drivers/mfd/twl-core.c:1226: error: implicit declaration of function 'irq_domain_add_legacy'
-> drivers/mfd/twl-core.c:1227: error: 'irq_domain_simple_ops' undeclared (first use in this function)
-> drivers/mfd/twl-core.c:1227: error: (Each undeclared identifier is reported only once
-> drivers/mfd/twl-core.c:1227: error: for each function it appears in.)
-> 
-> This is today's linux-next so it has rmk's "ARM: omap: fix broken
-> twl-core dependencies and ifdefs" in there, which looks like it
-> attempts to repair this stuff.
+Hi,
 
-Yes, you're the third to report this breakage.
+On Sat, Feb 11, 2012 at 9:34 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> This patch adds the interrupt definitions for EXYNOS5250 at
+> <mach/irqs.h> file. Basically, now it is needed for EXYNOS5250
+> interrupt and will be updated for single zImage next time.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?arch/arm/mach-exynos/include/mach/irqs.h | ?236 +++++++++++++++++++++++++++++-
+> ?1 files changed, 232 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+> index f77bce0..0dab1b1 100644
+> --- a/arch/arm/mach-exynos/include/mach/irqs.h
+> +++ b/arch/arm/mach-exynos/include/mach/irqs.h
+> @@ -1,9 +1,8 @@
+> -/* linux/arch/arm/mach-exynos4/include/mach/irqs.h
+> - *
+> - * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+> +/*
+> + * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
+> ?* ? ? ? ? ? ? http://www.samsung.com
+> ?*
+> - * EXYNOS4 - IRQ definitions
+> + * EXYNOS - IRQ definitions
+> ?*
+> ?* This program is free software; you can redistribute it and/or modify
+> ?* it under the terms of the GNU General Public License version 2 as
+> @@ -25,6 +24,8 @@
+>
+> ?#define IRQ_SPI(x) ? ? ? ? ? ? (x+32)
+>
+> +#ifdef CONFIG_ARCH_EXYNOS4
+> +
 
-Grant's response on Tuesday over this was:
-| This is irq_domain related.  It's related to an API change.  I'm
-| tracking to get it solved, either by moving the twl commit into the
-| irqdomain branch or by deferring the api change to v3.5.
-|
-| I've also got a patch that converts x86 over to the new api, but I
-| don't have sufficient review to put it into the irqdomain tree yet.
+irqs.h seems to be one of the major files that causes conflicts if a
+combined EXYNOS4+5 kernel is built (after editing Kconfig to allow
+both). Can you please try to come up with a way to allow both of them
+to coexist instead of making them exclusive?
 
-> btw, Russell, regarding this comment in include/linux/irq.h:
-> 
-> /*
->  * Please do not include this file in generic code.  There is currently
->  * no requirement for any architecture to implement anything held
->  * within this file.
->  *
->  * Thanks. --rmk
->  */
-> 
-> A quick grep indicates that we've lost this battle ;) Is the comments
-> still true?  Should we stop discouraging inclusion of linux/irq.h? 
-> Does anyone even know that it's discouraged ;)
 
-It's still true for any platform which hasn't been converted to genirq,
-as such a platform would not have asm/hw_irq.h.  That said, since
-genirq, it's now necessary for any driver which contains interrupt
-controller code like GPIO drivers.  So I suspect the comment should now
-be lost, even though it's not really a replacement for asm/irq.h.
+-Olof
+
+
+
+-Olof
