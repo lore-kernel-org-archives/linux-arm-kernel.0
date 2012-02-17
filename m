@@ -1,58 +1,50 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 17 Feb 2012 18:50:10 +0100
-Subject: [PATCH 18/18] ARM: at91/board-dt: move at91_initialize() to init_irq()
+Date: Fri, 17 Feb 2012 18:50:06 +0100
+Subject: [PATCH 14/18] ARM: at91: finally drop at91_sys_read/write
 In-Reply-To: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <aae37f6919530b6d394eb5f44d48d17dde1f3fb8.1329500622.git.nicolas.ferre@atmel.com>
+Message-ID: <c28d0078ad5d9ebb86c986959b37be6ac15fce55.1329500622.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Remove the need for at91_initialize() to be called at init_early().
-We move it to init_irq() function as we still need it before the
-timer initialization.
+Remove at91_sys_read/write() from io.h file. This function
+is not used anymore and was a stopper on the way to single
+zImage kernel for AT91.
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/board-dt.c |   10 +++-------
- 1 files changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/mach-at91/include/mach/io.h |   18 ------------------
+ 1 files changed, 0 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-index 08c8ad8..8868b3c 100644
---- a/arch/arm/mach-at91/board-dt.c
-+++ b/arch/arm/mach-at91/board-dt.c
-@@ -34,12 +34,6 @@
- #include "generic.h"
+diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
+index 4ca09ef..4003001 100644
+--- a/arch/arm/mach-at91/include/mach/io.h
++++ b/arch/arm/mach-at91/include/mach/io.h
+@@ -28,22 +28,4 @@
+ #define __io(a)		__typesafe_io(a)
+ #define __mem_pci(a)	(a)
  
- 
--static void __init ek_init_early(void)
+-#ifndef __ASSEMBLY__
+-
+-static inline unsigned int at91_sys_read(unsigned int reg_offset)
 -{
--	/* Initialize processor: 12.000 MHz crystal */
--	at91_initialize(12000000);
+-	void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
+-
+-	return __raw_readl(addr + reg_offset);
 -}
 -
- /* det_pin is not connected */
- static struct atmel_nand_data __initdata ek_nand_data = {
- 	.ale		= 21,
-@@ -89,6 +83,9 @@ static const struct of_device_id aic_of_match[] __initconst = {
- 
- static void __init at91_dt_init_irq(void)
- {
-+	/* Initialize processor: 12.000 MHz crystal */
-+	at91_initialize(12000000);
-+
- 	irq_domain_generate_simple(aic_of_match, 0xfffff000, 0);
- 	at91_init_irq_default();
- }
-@@ -112,7 +109,6 @@ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
- 	/* Maintainer: Atmel */
- 	.timer		= &at91sam926x_timer,
- 	.map_io		= at91_map_io,
--	.init_early	= ek_init_early,
- 	.init_irq	= at91_dt_init_irq,
- 	.init_machine	= at91_dt_device_init,
- 	.dt_compat	= at91_dt_board_compat,
+-static inline void at91_sys_write(unsigned int reg_offset, unsigned long value)
+-{
+-	void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
+-
+-	__raw_writel(value, addr + reg_offset);
+-}
+-
+-#endif
+-
+ #endif
 -- 
 1.7.9
