@@ -1,67 +1,87 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 17 Feb 2012 02:55:33 +0100
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <CAHTX3dJ4PruKO-wJLJU8W0boHFL0f6eoF+QNaoNjm5hu26YEow@mail.gmail.com>
-References: <4F1EE861.4030405@monstr.eu>
- <CAK=Wgba5kT8AwLtuHyosucYnWf-EA+xpE1kzmssfhSC7ZXQA=g@mail.gmail.com>
- <4F1FF870.3000105@monstr.eu>
- <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
- <4F200F64.9060203@monstr.eu>
- <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
- <4F212E9E.9060807@monstr.eu>
- <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
- <4F391C1D.9020402@monstr.eu>
- <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
- <4F3BA962.9040109@monstr.eu> <4F3BC30A.4030301@monstr.eu>
- <4F3CC899.4070302@monstr.eu>
- <CAK=WgbaRF-L7M3VMZQdqFLUFOJuwFVkBH1hUNuJ51kSrzkaVjA@mail.gmail.com>
- <4F3CFFAD.9030402@monstr.eu> <4F3D032B.6090700@monstr.eu>
- <CAK=WgbZ3oXc+NQscdShqmu2wkzv=M-qBDCH2-k=5qSRX9W=z3Q@mail.gmail.com>
- <CAHTX3dJ4PruKO-wJLJU8W0boHFL0f6eoF+QNaoNjm5hu26YEow@mail.gmail.com>
-Message-ID: <CAK=WgbZBJJbFcoeZ+hY=BgyW_4yvOJPVNMZ18_9o+zY7tEc_pQ@mail.gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Fri, 17 Feb 2012 09:57:22 +0800
+Subject: [PATCH RESNED] pxa/hx4700: add platform device and I2C info for
+ AK4641 codec
+Message-ID: <1329443842.3284.4.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 9:21 PM, Michal Simek <monstr@monstr.eu> wrote:
-> IRC in init part Linux kick rtos which send which services are available.in
-> any format which is unknown to me.
+The audio on hx4700 needs this to properly work.
 
-Check out struct rpmsg_ns_msg - that's the exact format of the name
-service notification messages (it's also mentioned by
-Documentation/rpmsg.txt).
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+Tested-by: Paul Parsons <lost.distance@yahoo.com>
+Cc: stable at vger.kernel.org [3.0+]
+---
+Hi Eric, Haojian,
+The audio on hx4700 needs this patch to properly work.
+Any chance to apply it for 3.3?
+I also add CC stable for 3.0+ in the commit log, this patch is required
+since commit c26f64 "ASoC: add iPAQ hx4700 machine driver".
 
-Of course, these messages, like any other message that is sent across,
-need to begin with the usual rpmsg header. Its format is defined by
-struct rpmsg_hdr.
+Regards,
+Axel
+ arch/arm/mach-pxa/hx4700.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-To send the message from the rtos to Linux, you then need to grab a
-buffer from the available ring (of the vring which is used by Linux to
-receive messages), fill it with the message, put it in the used ring,
-and kick the Linux side.
-
-> Please also correct me if I read the code wrongly. that mailbox in omap
-> driver is used just to say which buffer contains that message. Is it
-> correct?
-
-We're using the mailbox payload in order to indicate which vring has
-pending buffers.
-
-> I can create 15 sw signals to tell rtos which buffer contains message.
-
-You can also just use a single interrupt and then, when it is
-triggered, check both vrings for pending buffers. It's just another if
-statement and shouldn't be too much of an overhead.
-
-> Will be help if I clear my code and send it to you for review? Maybe you
-> will see where the problem is.
-
-I'm not sure I'll have the time to review it, but let's try to
-progress this way and see how it goes.
-
-Sorry I couldn't answer faster this week - I'm in ELC and was a bit
-away from emails. I'll soon be flying back and that will keep me away
-from emails again, but b/o next week I'll be online again.
-
-Thanks,
-Ohad.
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index fb9b62d..208eef1 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -45,6 +45,7 @@
+ #include <mach/hx4700.h>
+ #include <mach/irda.h>
+ 
++#include <sound/ak4641.h>
+ #include <video/platform_lcd.h>
+ #include <video/w100fb.h>
+ 
+@@ -765,6 +766,28 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
+ };
+ 
+ /*
++ * Asahi Kasei AK4641 on I2C
++ */
++
++static struct ak4641_platform_data ak4641_info = {
++	.gpio_power = GPIO27_HX4700_CODEC_ON,
++	.gpio_npdn  = GPIO109_HX4700_CODEC_nPDN,
++};
++
++static struct i2c_board_info i2c_board_info[] __initdata = {
++	{
++		I2C_BOARD_INFO("ak4641", 0x12),
++		.platform_data = &ak4641_info,
++	},
++};
++
++static struct platform_device audio = {
++	.name	= "hx4700-audio",
++	.id	= -1,
++};
++
++
++/*
+  * PCMCIA
+  */
+ 
+@@ -790,6 +813,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&gpio_vbus,
+ 	&power_supply,
+ 	&strataflash,
++	&audio,
+ 	&pcmcia,
+ };
+ 
+@@ -827,6 +851,7 @@ static void __init hx4700_init(void)
+ 	pxa_set_ficp_info(&ficp_info);
+ 	pxa27x_set_i2c_power_info(NULL);
+ 	pxa_set_i2c_info(NULL);
++	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
+ 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
+ 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
+ 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
+-- 
+1.7.5.4
