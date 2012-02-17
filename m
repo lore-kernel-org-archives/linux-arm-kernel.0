@@ -1,60 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Feb 2012 12:21:25 -0800
-Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
- for v3.4 merge window
-In-Reply-To: <4F3E6323.9020101@ti.com>
-References: <20120215182355.18884.18682.stgit@kaulin.local>
- <4F3E6323.9020101@ti.com>
-Message-ID: <20120217202125.GF18185@atomide.com>
+From: richard.weinberger@gmail.com (richard -rw- weinberger)
+Date: Fri, 17 Feb 2012 21:27:53 +0100
+Subject: ARM: __enabled_CONFIG_NUMA undeclared
+In-Reply-To: <CAOMZO5CarXUJ1XVJMWCEt1AXvnE5Gvunou_8nydjLmPVkZERMA@mail.gmail.com>
+References: <CAOMZO5CarXUJ1XVJMWCEt1AXvnE5Gvunou_8nydjLmPVkZERMA@mail.gmail.com>
+Message-ID: <CAFLxGvwSVq1GhSVnHyt9jKTy4cvZ4a0hQUau6Kh36fQuw9bdjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [120217 05:53]:
-> Tony,
-> 
-> On Wednesday 15 February 2012 11:58 PM, Tony Lindgren wrote:
-> >Hi all,
-> >
-> >This series fixes up the issues noted by Russell on omap2_hsmmc_init()
-> >where if TWL PMIC is compiled as a module we can't keep a bunch of
-> >functions marked as __init like they should be. This series fixes
-> >the issues by splitting omap2_hsmmc_init() into two functions.
-> 
-> I have a re-spin of this series ready with all the fixes I did
-> while testing the insmod/unbind/bind test suggested by Russell.
-> I could not figure out what branch your original patches were
-> based on. So let me know what branch of your tree you want me
-> to post this series on.
+On Fri, Feb 17, 2012 at 9:12 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi,
+>
+> Building today's linux-next for ARM:
+>
+> ?CC ? ? ?arch/arm/kernel/asm-offsets.s
+> In file included from include/linux/mm.h:8:0,
+> ? ? ? ? ? ? ? ? from arch/arm/kernel/asm-offsets.c:14:
+> include/linux/gfp.h: In function 'gfp_zonelist':
+> include/linux/gfp.h:267:1: error: '__enabled_CONFIG_NUMA' undeclared
+> (first use in this function)
+> include/linux/gfp.h:267:1: note: each undeclared identifier is
+> reported only once for each function it appears in
+> include/linux/gfp.h:267:1: error: '__enabled_CONFIG_NUMA_MODULE'
+> undeclared (first use in this function)
+> make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
+>
+> , which is caused by commit 053361e1a (mm: replace NUMA_BUILD with
+> IS_ENABLED(CONFIG_NUMA)
 
-I have them on mainline commit a269c2f5a5ad2b24a19fdd723363daf18394ec85.
+UML is affected too.
 
-Note that we should fix what Russell noted separately for the -rc
-series for the issue where reloading gpio-twl4030.ko calls
-omap2_hsmmc_init() twice, maybe something like below for that.
-
-Regards,
-
-Tony
-
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -428,6 +428,7 @@ static int omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 	return 0;
- }
- 
-+static int omap_hsmmc_done;
- #define MAX_OMAP_MMC_HWMOD_NAME_LEN		16
- 
- void omap_init_hsmmc(struct omap2_hsmmc_info *hsmmcinfo, int ctrl_nr)
-@@ -491,6 +492,11 @@ void omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
- {
- 	u32 reg;
- 
-+	if (omap_hsmmc_done)
-+		return;
-+
-+	omap_hsmmc_done = 1;
-+
- 	if (!cpu_is_omap44xx()) {
- 		if (cpu_is_omap2430()) {
- 			control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
+-- 
+Thanks,
+//richard
