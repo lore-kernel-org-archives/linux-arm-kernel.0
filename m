@@ -1,91 +1,53 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 17 Feb 2012 15:07:33 +0530
-Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
- for v3.4 merge window
-In-Reply-To: <4F3E1ED5.6090305@ti.com>
-References: <20120215182355.18884.18682.stgit@kaulin.local>
- <CACYZBRE_Vf8qDQYPRgsL03T8oy2Kv4fYRfE8U7y79Xhb1nwC2A@mail.gmail.com>
- <20120216121234.GJ15338@n2100.arm.linux.org.uk> <4F3CF7D1.8050807@ti.com>
- <4F3D0186.2010500@ti.com> <20120216135151.GK15338@n2100.arm.linux.org.uk>
- <20120217091433.GL15338@n2100.arm.linux.org.uk> <4F3E1ED5.6090305@ti.com>
-Message-ID: <4F3E1FDD.7080804@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 17 Feb 2012 10:41:32 +0100
+Subject: [PATCH 3/9] ARM/USB: at91/ohci-at91: remove the use of irq_to_gpio
+In-Reply-To: <fab15f7eaf6622e68e62bc3afa533b12f48ca27e.1329139662.git.nicolas.ferre@atmel.com>
+References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
+ <fab15f7eaf6622e68e62bc3afa533b12f48ca27e.1329139662.git.nicolas.ferre@atmel.com>
+Message-ID: <4F3E20CC.5090205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 February 2012 03:03 PM, Rajendra Nayak wrote:
-> []...
->>>>>> 3. Load the gpio-twl4030 module
->>>>>
->>>>> I was expecting this to now detect the card, but I instead got
->>>>> this error which seems to tell gpio-twl4030 has problems
->>>>> when built/used as a module, outside of the mmc issues.
->>>>
->>>> Looks like I was mislead with the errors and though the twl4030
->>>> gpio probe was bailing out with errors, which its not.
->>>> It does seem to go ahead, does a mmc late init which registers
->>>> the mmc omap_device and hence does a platform_device_add, but the
->>>> device never seem to get probed. mmc driver is built in and
->>>> registered.
->>>>
->>>>>
->>>>> # insmod gpio-twl4030.ko
->>>>> [ 16.217864] twl4030_gpio twl4030_gpio: can't dispatch IRQs from
->>>>> modules
->>>>> [ 16.242004] gpiochip_add: registered GPIOs 192 to 211 on device:
->>>>> twl4030
->>>>>
->>>>>
->>>>>> 4. Remove the gpio-twl4030 module
->>>>>> 5. Re-load the gpio-twl4030.ko module
->>>>>>
->>>>>> and report back what you get. Thanks.
->>>>
->>>
->>> (4) and (5) are the key bits of what I was asking you to do.
->>
->> Okay, so that was a total waste of time and effort, because you didn't do
->> what I asked.
->
-> Sorry, I did'nt repond back because I wanted to get this resolved
-> completely before I did.
->
-> (3) did not probe the inserted mmc device because the driver was
-> doing a platform_driver_probe() and not a platform_driver_register().
->
-> Once I fixed that and removed the __init from probe, I then hit a
-> failure with gpio_to_irq() call in the mmc driver probe.
->
-> This was beacuse the twl gpio driver does not register irqs as said by
-> this error at driver load...
->  >>>> [ 16.217864] twl4030_gpio twl4030_gpio: can't dispatch IRQs from
-> modules
-> ... apparently because there is no way to unregister a irq once the
-> module is unloaded.
->
-> That makes sdmmc pretty much unusable if twl gpio is built as a module.
->
->>
->> Tony: I think there's a bug here - if the gpio-twl4030 module is
->> inserted,
->> removed and re-inserted, I think we'll end up creating the devices for
->> MMC
->> twice with the same name, resulting in sysfs complaining very loudly.
->
-> I still went ahead and tried (4) becasue I knew I would hit the above
-> issue. However I end up with a rmmod complaining 'resource temporarily
-> unavailable' because I see there are 3 gpio_requests, which I found
-> were from the .setup callback in the board file (I am using beagle).
-> The beagle board file does not seem to however register a .teardown
-> hook provided by twl4030 gpio platform_data structure to do a gpio_free.
+On 02/13/2012 03:43 PM, Nicolas Ferre :
+> irq_to_gpio() macro will be removed from AT91 GPIO interrupt
+> controller. So we replace it with the use of gpio_to_irq()
+> and a reworked test.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: linux-usb at vger.kernel.org
 
-Forgot to mention, its not just the beagle but *all* omap3 board files
-with .teardown missing.
+Hi Greg,
 
-> So I am now trying to get the teardown function clean stuff up including
-> unregister the mmc device, which should also fix the problem with
-> multiple mmc device register that you reported with insmod/rmmod/insmod
-> sequence.
->
-> I will post patches on top of Tony's series to fix all these issues.
->
->
+I would like to queue this patch through arm-soc git tree (with all AT91
+material of this patch series).
+
+So, can I have your "Acked-by" on this one?
+
+> ---
+>  drivers/usb/host/ohci-at91.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 77afabc..8e855eb 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -448,10 +448,11 @@ static irqreturn_t ohci_hcd_at91_overcurrent_irq(int irq, void *data)
+>  
+>  	/* From the GPIO notifying the over-current situation, find
+>  	 * out the corresponding port */
+> -	gpio = irq_to_gpio(irq);
+>  	for (port = 0; port < ARRAY_SIZE(pdata->overcurrent_pin); port++) {
+> -		if (pdata->overcurrent_pin[port] == gpio)
+> +		if (gpio_to_irq(pdata->overcurrent_pin[port]) == irq) {
+> +			gpio = pdata->overcurrent_pin[port];
+>  			break;
+> +		}
+>  	}
+>  
+>  	if (port == ARRAY_SIZE(pdata->overcurrent_pin)) {
+
+Thanks, best regards,
+-- 
+Nicolas Ferre
