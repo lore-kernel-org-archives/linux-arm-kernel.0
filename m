@@ -1,40 +1,47 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 17 Feb 2012 11:22:37 +0800
-Subject: [PATCH] mtd :  change the location of the ONFI detected log
-Message-ID: <1329448957-9756-1-git-send-email-b32955@freescale.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Fri, 17 Feb 2012 11:23:49 +0800
+Subject: [PATCH 1/2] ARM: U300: Don't specify regulator consumers by struct
+ device
+Message-ID: <1329449029.17110.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some strange nand chip(such as Hynix H27UBG8T2A) can pass the `ONFI` signature
-check. So the log can be printed out even it is not an ONFI nand indeed.
+The dev field is remove from struct regulator_consumer_supply since commit
+737f36 "regulator: Remove support for supplies specified by struct device".
 
-Change this log to the end of the function. Print out the log only when we
-really detect an ONFI nand.
+This fixes below build error:
+  CC      arch/arm/mach-u300/i2c.o
+arch/arm/mach-u300/i2c.c:63: error: unknown field 'dev' specified in initializer
+arch/arm/mach-u300/i2c.c:95: error: unknown field 'dev' specified in initializer
+make[1]: *** [arch/arm/mach-u300/i2c.o] Error 1
+make: *** [arch/arm/mach-u300] Error 2
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
 ---
- drivers/mtd/nand/nand_base.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+This patch is against linux-next 20120217.
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 5822e3a..1e907dc 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -2853,7 +2853,6 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
- 		chip->read_byte(mtd) != 'F' || chip->read_byte(mtd) != 'I')
- 		return 0;
- 
--	pr_info("ONFI flash detected\n");
- 	chip->cmdfunc(mtd, NAND_CMD_PARAM, 0, -1);
- 	for (i = 0; i < 3; i++) {
- 		chip->read_buf(mtd, (uint8_t *)p, sizeof(*p));
-@@ -2903,6 +2902,7 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
- 	chip->options |= (NAND_NO_READRDY |
- 			NAND_NO_AUTOINCR) & NAND_CHIPOPTIONS_MSK;
- 
-+	pr_info("ONFI flash detected\n");
- 	return 1;
- }
- 
+ arch/arm/mach-u300/i2c.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-u300/i2c.c b/arch/arm/mach-u300/i2c.c
+index 5140dee..a38f802 100644
+--- a/arch/arm/mach-u300/i2c.c
++++ b/arch/arm/mach-u300/i2c.c
+@@ -60,7 +60,6 @@ static struct regulator_consumer_supply supply_ldo_c[] = {
+  */
+ static struct regulator_consumer_supply supply_ldo_d[] = {
+ 	{
+-		.dev = NULL,
+ 		.supply = "vana15", /* Powers the SoC (CPU etc) */
+ 	},
+ };
+@@ -92,7 +91,6 @@ static struct regulator_consumer_supply supply_ldo_k[] = {
+  */
+ static struct regulator_consumer_supply supply_ldo_ext[] = {
+ 	{
+-		.dev = NULL,
+ 		.supply = "vext", /* External power */
+ 	},
+ };
 -- 
-1.7.0.4
+1.7.5.4
