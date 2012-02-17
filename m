@@ -1,128 +1,76 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 17 Feb 2012 14:58:14 +0100
-Subject: [PATCH v5] ARM: LPC32xx: ADC support for mach-lpc32xx
-Message-ID: <1329487094-3486-1-git-send-email-stigge@antcom.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 17 Feb 2012 19:54:35 +0530
+Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
+ for v3.4 merge window
+In-Reply-To: <20120215182355.18884.18682.stgit@kaulin.local>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+Message-ID: <4F3E6323.9020101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the mach specific support for the LPC32XX ADC driver (the
-latter being already in staging/iio)
+Tony,
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+On Wednesday 15 February 2012 11:58 PM, Tony Lindgren wrote:
+> Hi all,
+>
+> This series fixes up the issues noted by Russell on omap2_hsmmc_init()
+> where if TWL PMIC is compiled as a module we can't keep a bunch of
+> functions marked as __init like they should be. This series fixes
+> the issues by splitting omap2_hsmmc_init() into two functions.
 
----
- Olof, can you please add this to the updated LPC32xx support? The patch
- applies cleanly to current arm-soc.git/for-next. The actual ADC driver that is
- used here was already accepted to staging/iio by GregKH.
+I have a re-spin of this series ready with all the fixes I did
+while testing the insmod/unbind/bind test suggested by Russell.
+I could not figure out what branch your original patches were
+based on. So let me know what branch of your tree you want me
+to post this series on.
 
- arch/arm/mach-lpc32xx/clock.c   |   36 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.c  |   22 ++++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.h  |    1 +
- arch/arm/mach-lpc32xx/phy3250.c |    1 +
- 4 files changed, 60 insertions(+)
+regards,
+Rajendra
 
---- linux-arm-soc.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-arm-soc/arch/arm/mach-lpc32xx/clock.c
-@@ -721,6 +721,41 @@ static struct clk clk_tsc = {
- 	.get_rate	= local_return_parent_rate,
- };
- 
-+static int adc_onoff_enable(struct clk *clk, int enable)
-+{
-+	u32 tmp;
-+	u32 divider;
-+
-+	/* Use PERIPH_CLOCK */
-+	tmp = __raw_readl(LPC32XX_CLKPWR_ADC_CLK_CTRL_1);
-+	tmp |= LPC32XX_CLKPWR_ADCCTRL1_PCLK_SEL;
-+	/*
-+	 * Set clock divider so that we have equal to or less than
-+	 * 4.5MHz clock at ADC
-+	 */
-+	divider = clk->get_rate(clk) / 4500000 + 1;
-+	tmp |= divider;
-+	__raw_writel(tmp, LPC32XX_CLKPWR_ADC_CLK_CTRL_1);
-+
-+	/* synchronize rate of this clock w/ actual HW setting */
-+	clk->rate = clk->get_rate(clk->parent) / divider;
-+
-+	if (enable == 0)
-+		__raw_writel(0, clk->enable_reg);
-+	else
-+		__raw_writel(clk->enable_mask, clk->enable_reg);
-+
-+	return 0;
-+}
-+
-+static struct clk clk_adc = {
-+	.parent		= &clk_pclk,
-+	.enable		= adc_onoff_enable,
-+	.enable_reg	= LPC32XX_CLKPWR_ADC_CLK_CTRL,
-+	.enable_mask	= LPC32XX_CLKPWR_ADC32CLKCTRL_CLK_EN,
-+	.get_rate	= local_return_parent_rate,
-+};
-+
- static int mmc_onoff_enable(struct clk *clk, int enable)
- {
- 	u32 tmp;
-@@ -1055,6 +1090,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("dev:ssp1", NULL, clk_ssp1)
- 	_REGISTER_CLOCK("lpc32xx_keys.0", NULL, clk_kscan)
- 	_REGISTER_CLOCK("lpc32xx-nand.0", "nand_ck", clk_nand)
-+	_REGISTER_CLOCK("lpc32xx-adc", NULL, clk_adc)
- 	_REGISTER_CLOCK(NULL, "i2s0_ck", clk_i2s0)
- 	_REGISTER_CLOCK(NULL, "i2s1_ck", clk_i2s1)
- 	_REGISTER_CLOCK("ts-lpc32xx", NULL, clk_tsc)
---- linux-arm-soc.orig/arch/arm/mach-lpc32xx/common.c
-+++ linux-arm-soc/arch/arm/mach-lpc32xx/common.c
-@@ -138,6 +138,28 @@ struct platform_device lpc32xx_rtc_devic
- };
- 
- /*
-+ * ADC support
-+ */
-+static struct resource adc_resources[] = {
-+	{
-+		.start = LPC32XX_ADC_BASE,
-+		.end = LPC32XX_ADC_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = IRQ_LPC32XX_TS_IRQ,
-+		.end = IRQ_LPC32XX_TS_IRQ,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device lpc32xx_adc_device = {
-+	.name =  "lpc32xx-adc",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(adc_resources),
-+	.resource = adc_resources,
-+};
-+
-+/*
-  * Returns the unique ID for the device
-  */
- void lpc32xx_get_uid(u32 devid[4])
---- linux-arm-soc.orig/arch/arm/mach-lpc32xx/common.h
-+++ linux-arm-soc/arch/arm/mach-lpc32xx/common.h
-@@ -29,6 +29,7 @@ extern struct platform_device lpc32xx_i2
- extern struct platform_device lpc32xx_i2c1_device;
- extern struct platform_device lpc32xx_i2c2_device;
- extern struct platform_device lpc32xx_tsc_device;
-+extern struct platform_device lpc32xx_adc_device;
- extern struct platform_device lpc32xx_rtc_device;
- 
- /*
---- linux-arm-soc.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-arm-soc/arch/arm/mach-lpc32xx/phy3250.c
-@@ -254,6 +254,7 @@ static struct platform_device *phy3250_d
- 	&lpc32xx_i2c2_device,
- 	&lpc32xx_watchdog_device,
- 	&lpc32xx_gpio_led_device,
-+	&lpc32xx_adc_device,
- };
- 
- static struct amba_device *amba_devs[] __initdata = {
+>
+> One more patch is needed to sort out the remaining issue with
+> omap4 that has yet another luck based initialization for the
+> same issue..
+>
+> Regards,
+>
+> Tony
+>
+> ---
+>
+> Ohad Ben-Cohen (1):
+>        ARM: OMAP: omap_device: Expose omap_device_{alloc, delete, register}
+>
+> Tony Lindgren (2):
+>        ARM: OMAP2+: Split omap2_hsmmc_init() to properly support I2C GPIO pins
+>        ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux related functions as __init
+>
+>
+>   arch/arm/mach-omap2/board-2430sdp.c           |    2
+>   arch/arm/mach-omap2/board-3430sdp.c           |    5 +
+>   arch/arm/mach-omap2/board-4430sdp.c           |    6 +
+>   arch/arm/mach-omap2/board-am3517evm.c         |    2
+>   arch/arm/mach-omap2/board-cm-t35.c            |    6 +
+>   arch/arm/mach-omap2/board-devkit8000.c        |    4 +
+>   arch/arm/mach-omap2/board-flash.c             |    2
+>   arch/arm/mach-omap2/board-igep0020.c          |    7 +-
+>   arch/arm/mach-omap2/board-ldp.c               |    2
+>   arch/arm/mach-omap2/board-omap3beagle.c       |   10 ++
+>   arch/arm/mach-omap2/board-omap3evm.c          |    8 +-
+>   arch/arm/mach-omap2/board-omap3logic.c        |    2
+>   arch/arm/mach-omap2/board-omap3pandora.c      |    6 +
+>   arch/arm/mach-omap2/board-omap3stalker.c      |   15 ++-
+>   arch/arm/mach-omap2/board-omap3touchbook.c    |   17 ++--
+>   arch/arm/mach-omap2/board-omap4panda.c        |    6 +
+>   arch/arm/mach-omap2/board-overo.c             |    5 +
+>   arch/arm/mach-omap2/board-rm680.c             |    2
+>   arch/arm/mach-omap2/board-rx51-peripherals.c  |    2
+>   arch/arm/mach-omap2/board-zoom-peripherals.c  |    6 +
+>   arch/arm/mach-omap2/display.c                 |    8 +-
+>   arch/arm/mach-omap2/hsmmc.c                   |  111 ++++++++++++++++++-------
+>   arch/arm/mach-omap2/hsmmc.h                   |   12 ++-
+>   arch/arm/mach-omap2/mux.c                     |   22 ++---
+>   arch/arm/plat-omap/include/plat/omap_device.h |    7 ++
+>   arch/arm/plat-omap/omap_device.c              |   13 +--
+>   26 files changed, 192 insertions(+), 96 deletions(-)
+>
