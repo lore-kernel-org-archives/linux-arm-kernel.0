@@ -1,87 +1,91 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Fri, 17 Feb 2012 09:57:22 +0800
-Subject: [PATCH RESNED] pxa/hx4700: add platform device and I2C info for
- AK4641 codec
-Message-ID: <1329443842.3284.4.camel@phoenix>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Fri, 17 Feb 2012 11:07:44 +0800
+Subject: [PATCH] mtd: fix the wrong check condition
+In-Reply-To: <4F3CE2D4.4070506@freebox.fr>
+References: <1329302008-10228-1-git-send-email-b32955@freescale.com>
+ <4F3C712A.5060406@gmail.com> <4F3C7433.5030306@freescale.com>
+ <4F3CE2D4.4070506@freebox.fr>
+Message-ID: <CAMiH66GRD97y4mK-9TCRqsQkTOoqqwVp4gREv3=0qiX_vrueGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audio on hx4700 needs this to properly work.
+hi,
 
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
-Tested-by: Paul Parsons <lost.distance@yahoo.com>
-Cc: stable at vger.kernel.org [3.0+]
----
-Hi Eric, Haojian,
-The audio on hx4700 needs this patch to properly work.
-Any chance to apply it for 3.3?
-I also add CC stable for 3.0+ in the commit log, this patch is required
-since commit c26f64 "ASoC: add iPAQ hx4700 machine driver".
+On Thu, Feb 16, 2012 at 7:04 PM, Florian Fainelli <ffainelli@freebox.fr> wrote:
+> Hi,
+>
+> On 02/16/12 04:12, Huang Shijie wrote:
+>>
+>> Hi,
+>>>
+>>> (Add Florian and Matthieu)
+>>>
+>>> On 2/15/2012 2:33 AM, Huang Shijie wrote:
+>>>>
+>>>> If we use `||` check condition, many NAND chips which are not
+>>>> ONFI nands have to do the ONFI detection.
+>>>
+>>>
+>>> Running the ONFI detection on non-ONFI NAND should not, ideally, be a
+>>> problem. They should fail one or both tests included in the routine:
+>>> the 'O N F I' string check or the CRC calculation.
+>>
+>> NO.
+>
+>
+> Can you please post the dump of the ONFI page as read by your controller? Is
+> the CRC check passing? The ONFI crc function is made so that a page full of
+> zeroes or 0xff won't generate a respectively 0 or ff checksum, so we should
+> catch this during the CRC check.
+>
+Sorry. I did not check the log carefully.
 
-Regards,
-Axel
- arch/arm/mach-pxa/hx4700.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+the Hynix nand does _not_ pass the CRC check, but it passed the "ONFI"
+string check.
 
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index fb9b62d..208eef1 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -45,6 +45,7 @@
- #include <mach/hx4700.h>
- #include <mach/irda.h>
- 
-+#include <sound/ak4641.h>
- #include <video/platform_lcd.h>
- #include <video/w100fb.h>
- 
-@@ -765,6 +766,28 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
- };
- 
- /*
-+ * Asahi Kasei AK4641 on I2C
-+ */
-+
-+static struct ak4641_platform_data ak4641_info = {
-+	.gpio_power = GPIO27_HX4700_CODEC_ON,
-+	.gpio_npdn  = GPIO109_HX4700_CODEC_nPDN,
-+};
-+
-+static struct i2c_board_info i2c_board_info[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("ak4641", 0x12),
-+		.platform_data = &ak4641_info,
-+	},
-+};
-+
-+static struct platform_device audio = {
-+	.name	= "hx4700-audio",
-+	.id	= -1,
-+};
-+
-+
-+/*
-  * PCMCIA
-  */
- 
-@@ -790,6 +813,7 @@ static struct platform_device *devices[] __initdata = {
- 	&gpio_vbus,
- 	&power_supply,
- 	&strataflash,
-+	&audio,
- 	&pcmcia,
- };
- 
-@@ -827,6 +851,7 @@ static void __init hx4700_init(void)
- 	pxa_set_ficp_info(&ficp_info);
- 	pxa27x_set_i2c_power_info(NULL);
- 	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
- 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
- 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
- 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
--- 
-1.7.5.4
+The log "ONFI flash detected" made me misunderstood.
+
+BR
+Huang Shijie
+
+
+>>
+>> I have Hynix nand in my hand: H27UBG8T2A (page size :8192, oob:448).
+>> It is not an ONFI nand. See the datasheet in the attachment.
+>> But it accidentally can pass the ONFI detection, and get the result :
+>> page size 4192, oob:96. This is a wrong result.
+>
+>
+> I have already seen a Hynix chip answering to the READID command too, and
+> this was highly confusing our bootloader, however, I suppose that we should
+> be able to circumvent this issue anyway.
+>
+>>
+>>
+>>
+>>
+>>>
+>>>> Use `&&` here to detect the ONFI NAND when we can not find any type
+>>>> in the nand_flash_ids.
+>>>
+>>>
+>>> There are many chips whose ID might be in the NAND table but for which
+>>> it is preferable (or even required) to check by ONFI for one reason or
+>>> another. For instance, some ONFI chips might use odd-sized OOB that
+>>> isn't in the ID decoding algorithm.
+>>>
+>> This nand is 32Gb, but we can not parse it out from the id.
+>> I ever want to add a new database which use the all the 8/6 bytes id as
+>> key.
+>> It seems it's time to change it now.
+>
+>
+> You have said that already, but we have yet to see patches for this, I guess
+> if you can post your database patch that will be easier to comment on.
+> --
+> Florian
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
