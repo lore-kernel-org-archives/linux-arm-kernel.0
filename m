@@ -1,58 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 17 Feb 2012 09:26:09 +0100
-Subject: [PATCH 2/2] ARM: imx/pcm038: Don't specify regulator consumers
- by struct device
-In-Reply-To: <1329449121.17110.2.camel@phoenix>
-References: <1329449029.17110.1.camel@phoenix>
- <1329449121.17110.2.camel@phoenix>
-Message-ID: <20120217082609.GP3852@pengutronix.de>
+From: ffainelli@freebox.fr (Florian Fainelli)
+Date: Fri, 17 Feb 2012 09:47:35 +0100
+Subject: [PATCH] mtd :  change the location of the ONFI detected log
+In-Reply-To: <1329448957-9756-1-git-send-email-b32955@freescale.com>
+References: <1329448957-9756-1-git-send-email-b32955@freescale.com>
+Message-ID: <4F3E1427.4080502@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2012 at 11:25:21AM +0800, Axel Lin wrote:
-> The dev field is remove from struct regulator_consumer_supply since commit
-> 737f36 "regulator: Remove support for supplies specified by struct device".
-> 
-> This fixes below build error:
->   CC      arch/arm/mach-imx/mach-pcm038.o
-> arch/arm/mach-imx/mach-pcm038.c:236: error: unknown field 'dev' specified in initializer
-> make[1]: *** [arch/arm/mach-imx/mach-pcm038.o] Error 1
-> make: *** [arch/arm/mach-imx] Error 2
+Le 02/17/12 04:22, Huang Shijie a ?crit :
+> Some strange nand chip(such as Hynix H27UBG8T2A) can pass the `ONFI` signature
+> check. So the log can be printed out even it is not an ONFI nand indeed.
+>
+> Change this log to the end of the function. Print out the log only when we
+> really detect an ONFI nand.
+>
+> Signed-off-by: Huang Shijie<b32955@freescale.com>
 
-This is a duplicate of one of Fabios patches, I just sent a pull
-request.
+Acked-by: Florian Fainelli <ffainelli@freebox.fr>
 
-Sascha
-
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 > ---
-> This patch is against linux-next 20120217.
-> 
->  arch/arm/mach-imx/mach-pcm038.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-> index 16f126d..bfcc1ea 100644
-> --- a/arch/arm/mach-imx/mach-pcm038.c
-> +++ b/arch/arm/mach-imx/mach-pcm038.c
-> @@ -233,7 +233,6 @@ static struct regulator_init_data sdhc1_data = {
->  
->  static struct regulator_consumer_supply cam_consumers[] = {
->  	{
-> -		.dev	= NULL,
->  		.supply	= "imx_cam_vcc",
->  	},
->  };
-> -- 
-> 1.7.5.4
-> 
-> 
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>   drivers/mtd/nand/nand_base.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+> index 5822e3a..1e907dc 100644
+> --- a/drivers/mtd/nand/nand_base.c
+> +++ b/drivers/mtd/nand/nand_base.c
+> @@ -2853,7 +2853,6 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
+>   		chip->read_byte(mtd) != 'F' || chip->read_byte(mtd) != 'I')
+>   		return 0;
+>
+> -	pr_info("ONFI flash detected\n");
+>   	chip->cmdfunc(mtd, NAND_CMD_PARAM, 0, -1);
+>   	for (i = 0; i<  3; i++) {
+>   		chip->read_buf(mtd, (uint8_t *)p, sizeof(*p));
+> @@ -2903,6 +2902,7 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
+>   	chip->options |= (NAND_NO_READRDY |
+>   			NAND_NO_AUTOINCR)&  NAND_CHIPOPTIONS_MSK;
+>
+> +	pr_info("ONFI flash detected\n");
+>   	return 1;
+>   }
+>
