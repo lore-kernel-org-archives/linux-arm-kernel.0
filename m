@@ -1,65 +1,39 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 17 Feb 2012 14:37:34 +0100
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix wrong SYSC_TYPE1_XXX_MASK bit
- definitions
-In-Reply-To: <1329477961-1307-1-git-send-email-hvaibhav@ti.com>
-References: <1329477961-1307-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <4F3E581E.1050009@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 17 Feb 2012 14:44:18 +0100
+Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
+In-Reply-To: <4EFC6992.4020501@gmail.com>
+References: <1323868927-3738-1-git-send-email-zonque@gmail.com>
+ <CANrkHUY3Zf4a2K5769Z=7Wng339zB6+z_Tgd4mOPChZ1RvZ=Kw@mail.gmail.com>
+ <4EFC6992.4020501@gmail.com>
+Message-ID: <CACTFLAMCoKfQbTe2RLTvi1_CH0nKzAOthAwrifNe2+F2sf3uPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/17/2012 12:26 PM, Vaibhav Hiremath wrote:
-> In the SYSC_TYPE1_XXX_MASK configuration, SYSC_XXX_SHIFT macro
-> is used which is not defined anywhere in the kernel.
-> Until now the build was going through successfully, since it
-> is not being used anywhere in kernel.
+ping? Could anyone care for queueing this please?
 
-Good catch.
 
-> This bug got introduced by the commit
-> 358f0e630d5409ab3837b86db3595560eae773b6 ("OMAP3: hwmod: support
-> to specify the offset position of various SYSCONFIG register bits.")
+On Thu, Dec 29, 2011 at 2:22 PM, Daniel Mack <zonque@gmail.com> wrote:
+> On 12/23/2011 04:40 PM, T Krishnamoorthy, Balaji wrote:
+>> On Wed, Dec 14, 2011 at 6:52 PM, Daniel Mack <zonque@gmail.com> wrote:
+>>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>>> index 101cd31..8215ef9 100644
+>>> --- a/drivers/mmc/host/omap_hsmmc.c
+>>> +++ b/drivers/mmc/host/omap_hsmmc.c
+>>> @@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+>>> ? ? ? ?if (mmc_slot(host).vcc_aux_disable_is_sleep)
+>>> ? ? ? ? ? ? ? ?mmc_slot(host).no_off = 1;
+>>>
+>>> - ? ? ? mmc->f_min ? ? ?= OMAP_MMC_MIN_CLOCK;
+>>> - ? ? ? mmc->f_max ? ? ?= OMAP_MMC_MAX_CLOCK;
+>>> + ? ? ? mmc->f_min = OMAP_MMC_MIN_CLOCK;
+>>
+>> Stray change for f_min ?
 >
-> Signed-off-by: Vaibhav Hiremath<hvaibhav@ti.com>
-
-Acked-by: Benoit Cousson <b-cousson@ti.com>
-
-Regards,
-Benoit
-
-
-> ---
->   arch/arm/plat-omap/include/plat/omap_hwmod.h |   12 ++++++------
->   1 files changed, 6 insertions(+), 6 deletions(-)
+> No, this was intended. The indentation doesn't make sense anymore when
+> not grouped with the f_max assignment.
 >
-> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> index dbc18ad..55bef2b 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> @@ -49,17 +49,17 @@ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type4;
->    * with the original PRCM protocol defined for OMAP2420
->    */
->   #define SYSC_TYPE1_MIDLEMODE_SHIFT	12
-> -#define SYSC_TYPE1_MIDLEMODE_MASK	(0x3<<  SYSC_MIDLEMODE_SHIFT)
-> +#define SYSC_TYPE1_MIDLEMODE_MASK	(0x3<<  SYSC_TYPE1_MIDLEMODE_SHIFT)
->   #define SYSC_TYPE1_CLOCKACTIVITY_SHIFT	8
-> -#define SYSC_TYPE1_CLOCKACTIVITY_MASK	(0x3<<  SYSC_CLOCKACTIVITY_SHIFT)
-> +#define SYSC_TYPE1_CLOCKACTIVITY_MASK	(0x3<<  SYSC_TYPE1_CLOCKACTIVITY_SHIFT)
->   #define SYSC_TYPE1_SIDLEMODE_SHIFT	3
-> -#define SYSC_TYPE1_SIDLEMODE_MASK	(0x3<<  SYSC_SIDLEMODE_SHIFT)
-> +#define SYSC_TYPE1_SIDLEMODE_MASK	(0x3<<  SYSC_TYPE1_SIDLEMODE_SHIFT)
->   #define SYSC_TYPE1_ENAWAKEUP_SHIFT	2
-> -#define SYSC_TYPE1_ENAWAKEUP_MASK	(1<<  SYSC_ENAWAKEUP_SHIFT)
-> +#define SYSC_TYPE1_ENAWAKEUP_MASK	(1<<  SYSC_TYPE1_ENAWAKEUP_SHIFT)
->   #define SYSC_TYPE1_SOFTRESET_SHIFT	1
-> -#define SYSC_TYPE1_SOFTRESET_MASK	(1<<  SYSC_SOFTRESET_SHIFT)
-> +#define SYSC_TYPE1_SOFTRESET_MASK	(1<<  SYSC_TYPE1_SOFTRESET_SHIFT)
->   #define SYSC_TYPE1_AUTOIDLE_SHIFT	0
-> -#define SYSC_TYPE1_AUTOIDLE_MASK	(1<<  SYSC_AUTOIDLE_SHIFT)
-> +#define SYSC_TYPE1_AUTOIDLE_MASK	(1<<  SYSC_TYPE1_AUTOIDLE_SHIFT)
+> Other than that, what is necessary to get this picked? Tony? :)
 >
->   /*
->    * OCP SYSCONFIG bit shifts/masks TYPE2. These are for IPs compliant
-> --
-> 1.7.0.4
 >
+> Thanks,
+> Daniel
