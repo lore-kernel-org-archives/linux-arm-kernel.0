@@ -1,57 +1,74 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 17 Feb 2012 13:48:34 +0200
-Subject: [PATCH 0/7] TWL6040: Regulator support
-In-Reply-To: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <4F3E3E92.30304@ti.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 17 Feb 2012 17:54:48 +0530
+Subject: [PATCH] ARM: OMAP2+: hwmod: Add new sysc_type3 into omap_hwmod
+ required for am33xx
+Message-ID: <1329481488-27771-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In case of AM33xx family of devices (like cpsw) have different sysc
+bit field offsets defined,
 
-On 02/10/2012 12:05 PM, Peter Ujfalusi wrote:
-> Hello,
-> 
-> This series depends on the V3 of MFD: twl6040: Conversion to i2c driver set.
-> 
-> In order to have proper regulator support for twl6040 on SDP4430, and
-> PandaBoards I needed to add support for the V1V8, and V2V1 SMPS supplies from
-> twl6030.
-> The configuration on both boards (and the TRM recommendations) are the same, so
-> it make sens to have the V1V8, V2V1 supply configured in the twl-common to avoid
-> duplicated code in board files.
-> 
-> The last patch in this series was part of the V2 of MFD: twl6040: Conversion to
-> i2c driver set. I have added Mark's Reviewd-by tag, and also addressed his
-> comment regarding to the supplies member of the twl6040 struct (no need to
-> allocate it separately).
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (7):
->   OMAP: 4430SDP: Correct fixed regulator device ID
->   regulator: twl-regulator: Add fixed LDO for V1V8, V2V1 supply
->   MFD: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS
->   OMAP4: twl-common: Add twl6030 V1V8, V2V1 SMPS common configuration
->   OMAP: 4430SDP: Use common configuration for V1V8, V2V1 supplies
->   OMAP: omap4panda: Use common configuration for V1V8, V2V1 supplies
->   MFD: TWL6040: Add regulator support for VIO, V2V1 supplies
-> 
->  arch/arm/mach-omap2/board-4430sdp.c    |   11 ++++++--
->  arch/arm/mach-omap2/board-omap4panda.c |    4 ++-
->  arch/arm/mach-omap2/twl-common.c       |   43 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/twl-common.h       |    2 +
->  drivers/mfd/twl-core.c                 |   10 +++++++
->  drivers/mfd/twl6040-core.c             |   33 +++++++++++++++++++++---
->  drivers/regulator/twl-regulator.c      |    2 +
->  include/linux/i2c/twl.h                |    2 +
->  include/linux/mfd/twl6040.h            |    2 +
->  9 files changed, 101 insertions(+), 8 deletions(-)
+sysc_type3:
+|  3     2  |  1    0  |
+| STDBYMODE | IDLEMODE |
 
-It has been a week since I have sent this series. It would be great if
-this be on time for 3.4 merge window (with the depending series which
-converts the twl6040 mfd part into i2c driver).
+So introduce new sysc_type3 in omap_hwmod common data.
 
-Thank you,
-P?ter
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_common_data.c |    9 +++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |   10 ++++++++++
+ 2 files changed, 19 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_common_data.c b/arch/arm/mach-omap2/omap_hwmod_common_data.c
+index 51e5418..6dd922e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_common_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_common_data.c
+@@ -49,6 +49,15 @@ struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2 = {
+ 	.srst_shift	= SYSC_TYPE2_SOFTRESET_SHIFT,
+ };
+ 
++/**
++ * struct omap_hwmod_sysc_type3 - TYPE3 sysconfig scheme.
++ * Used by some IPs on AM33xx
++ */
++struct omap_hwmod_sysc_fields omap_hwmod_sysc_type3 = {
++	.midle_shift	= SYSC_TYPE3_MIDLEMODE_SHIFT,
++	.sidle_shift	= SYSC_TYPE3_SIDLEMODE_SHIFT,
++};
++
+ struct omap_dss_dispc_dev_attr omap2_3_dss_dispc_dev_attr = {
+ 	.manager_count		= 2,
+ 	.has_framedonetv_irq	= 0
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 9db27aa..3128364 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -41,6 +41,7 @@ struct omap_device;
+ 
+ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type1;
+ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2;
++extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type3;
+ 
+ /*
+  * OCP SYSCONFIG bit shifts/masks TYPE1. These are for IPs compliant
+@@ -70,6 +71,15 @@ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2;
+ #define SYSC_TYPE2_MIDLEMODE_SHIFT	4
+ #define SYSC_TYPE2_MIDLEMODE_MASK	(0x3 << SYSC_TYPE2_MIDLEMODE_SHIFT)
+ 
++/*
++ * OCP SYSCONFIG bit shifts/masks TYPE3.
++ * This is applicable for some IPs present in AM33XX
++ */
++#define SYSC_TYPE3_SIDLEMODE_SHIFT	0
++#define SYSC_TYPE3_SIDLEMODE_MASK	(0x3 << SYSC_TYPE3_SIDLEMODE_SHIFT)
++#define SYSC_TYPE3_MIDLEMODE_SHIFT	2
++#define SYSC_TYPE3_MIDLEMODE_MASK	(0x3 << SYSC_TYPE3_MIDLEMODE_SHIFT)
++
+ /* OCP SYSSTATUS bit shifts/masks */
+ #define SYSS_RESETDONE_SHIFT		0
+ #define SYSS_RESETDONE_MASK		(1 << SYSS_RESETDONE_SHIFT)
+-- 
+1.7.0.4
