@@ -1,33 +1,62 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Fri, 17 Feb 2012 19:05:38 +0100
-Subject: [PATCH v5 00/27] irq_domain generalization and rework
-In-Reply-To: <20120216232648.GM27825@n2100.arm.linux.org.uk>
-References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
- <20120216145219.0f1c1b98.akpm@linux-foundation.org>
- <20120216232648.GM27825@n2100.arm.linux.org.uk>
-Message-ID: <20120217180538.GA11520@merkur.ravnborg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 Feb 2012 10:10:01 -0800
+Subject: [PATCH 2/3] ARM: OMAP2+: Split omap2_hsmmc_init() to properly
+ support I2C GPIO pins
+In-Reply-To: <20120216170610.GA18185@atomide.com>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+ <20120215182825.18884.40972.stgit@kaulin.local>
+ <4F3CD460.7000306@ti.com> <4F3CD6CE.1090201@ti.com>
+ <20120216163558.GB15692@atomide.com> <4F3D33F9.70107@ti.com>
+ <20120216170610.GA18185@atomide.com>
+Message-ID: <20120217181001.GC18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Tony Lindgren <tony@atomide.com> [120216 08:35]:
+> * Rajendra Nayak <rnayak@ti.com> [120216 08:19]:
+> > On Thursday 16 February 2012 10:05 PM, Tony Lindgren wrote:
+> > >>On Thursday 16 February 2012 03:33 PM, Rajendra Nayak wrote:
+> > >>>>  >better still, I think we should just populate them statically in
+> > >>>>  >omap2_hsmmc_info struct above, so omap_hsmmc_init() takes care
+> > >>>>  >of it already.
+> > >>>
+> > >>>  I just tried this and it seems to work...
+> > >>>
+> > >>>  ---
+> > >>>    arch/arm/mach-omap2/board-omap3beagle.c |    1 +
+> > >>>    1 file changed, 1 insertion(+)
+> > >>>
+> > >>>  Index: linux-2.6/arch/arm/mach-omap2/board-omap3beagle.c
+> > >>>  ===================================================================
+> > >>>  --- linux-2.6.orig/arch/arm/mach-omap2/board-omap3beagle.c
+> > >>>  2012-02-16 15:38:47.046933403 +0530
+> > >>>  +++ linux-2.6/arch/arm/mach-omap2/board-omap3beagle.c   2012-02-16
+> > >>>  15:40:17.355349064 +0530
+> > >>>  @@ -253,6 +253,7 @@
+> > >>>                   .mmc            = 1,
+> > >>>                   .caps           = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+> > >>>                   .gpio_wp        = -EINVAL,
+> > >>>  +               .gpio_cd        = OMAP_MAX_GPIO_LINES + 0,
+> > >>>                   .deferred       = true,
+> > >>>           },
+> > >>>           {}      /* Terminator */
+> > >Would be nice to avoid the hard coded gpio numbering for the
+> > >external chips though..
 > > 
-> > /*
-> >  * Please do not include this file in generic code.  There is currently
-> >  * no requirement for any architecture to implement anything held
-> >  * within this file.
-> >  *
-> >  * Thanks. --rmk
-> >  */
-> > 
-> > A quick grep indicates that we've lost this battle ;) Is the comments
-> > still true?  Should we stop discouraging inclusion of linux/irq.h? 
-> > Does anyone even know that it's discouraged ;)
+> > But if you look closely, thats exactly how its handled today.
+> > All board files hardcode gpio_base to OMAP_MAX_GPIO_LINES in
+> > twl4030_gpio_platform_data. And thats what gets passed back
+> > when the driver calls pdata->setup() from within probe.
 > 
-> It's still true for any platform which hasn't been converted to genirq,
-> as such a platform would not have asm/hw_irq.h.
+> Hmm that's not necessarily safe to do as you might have multiple
+> external GPIO connected, such as a PMIC and FPGA..
+> 
+> Anyways, it seems OK to me for now, as the DT solves that issue
+> properly and I don't think we currently have any boards with
+> multiple external GPIO chips.
 
-In-tree only s390 is not using genirq.
-All the rest are converted and provide hw_irq.h -
-most of the new archs provide hw_irq via asm-generic so it does
-not show up unless you look in the Kbuild file,.
+Found the reason for this, omap_hsmmc_late_init needs to copy
+gpio_cd and gpio_wp into the pdata. Or platform_device_add_data
+needs to be called a bit later. Will update my patch for that.
 
-	Sam
+Tony
