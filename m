@@ -1,45 +1,61 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Fri, 17 Feb 2012 20:52:19 +0530
-Subject: [PATCH] mtd: omap2: Release memory region in .remove function
-In-Reply-To: <1329490172-8043-1-git-send-email-walle@corscience.de>
-References: <1329490172-8043-1-git-send-email-walle@corscience.de>
-Message-ID: <CAM=Q2cuXfYA=bibwzDBdb41_KiHu1X4bExbyS2FsfjBM7RXopQ@mail.gmail.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Fri, 17 Feb 2012 09:22:54 -0600
+Subject: [PATCHv9 3/5] arm: omap3: add common twl configurations for vdd1
+ and vdd2
+In-Reply-To: <1329476814.4102.433.camel@sokoban>
+References: <1329388073-17879-1-git-send-email-t-kristo@ti.com>
+ <1329388073-17879-4-git-send-email-t-kristo@ti.com>
+ <CAOMWX4d8C4pjYSr+i3qmqfJHDsHQdtRkvfbGR29U7hXf0SkVZg@mail.gmail.com>
+ <1329476814.4102.433.camel@sokoban>
+Message-ID: <CAOMWX4cmwFKsQ9SV-9c=tfCEqdQ9N2TcJUJ+Sh=syBgOSPz1gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2012 at 8:19 PM, Bernhard Walle <walle@corscience.de> wrote:
-> When the driver is compiled as module, it's not possible to unload and
-> reload the driver again:
->
-> ? ?omap2-nand: probe of omap2-nand.0 failed with error -16
->
-Looks right to me
-Reviewed-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Regards,
+Nishanth Menon
 
-> This patch fixes the problem because it releases the memory region, so
-> that it can be requested again.
+
+
+On Fri, Feb 17, 2012 at 05:06, Tero Kristo <t-kristo@ti.com> wrote:
+> On Thu, 2012-02-16 at 12:23 -0600, Menon, Nishanth wrote:
+>> On Thu, Feb 16, 2012 at 04:27, Tero Kristo <t-kristo@ti.com> wrote:
+>> > VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
+>> > to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
+>> > are needed by DVFS.
+>> >
+>> > Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manual.
+>>
+>> Please provide documentation version referenced, else we will loose
+>> track of details at a later point of time.
 >
-> Signed-off-by: Bernhard Walle <walle@corscience.de>
-> ---
-> ?drivers/mtd/nand/omap2.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
+> How should this be marked down? There are too many naming conventions
+> for the TI docs, and I couldn't find any example from kernel commit logs
+> for this. Personally I was using twl5030 es1.2 DM rev E / twl4030 es3.1
+> DM rev L. Or should the literature code be used? Or is there also some
+> numerical version info available somewhere?
+Literature code is the best one. Adding, along with it, a human
+readable "TWL4030 ES3.1 DM rev L"
+is even better :)
+
+>> Also should we rename VDD1 with vdd_mpu_iva and VDD2 as vdd_core to be readable?
 >
-> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> index b3a883e..7dfcf68 100644
-> --- a/drivers/mtd/nand/omap2.c
-> +++ b/drivers/mtd/nand/omap2.c
-> @@ -1132,6 +1132,7 @@ static int omap_nand_remove(struct platform_device *pdev)
-> ? ? ? ?/* Release NAND device, its internal structures and partitions */
-> ? ? ? ?nand_release(&info->mtd);
-> ? ? ? ?iounmap(info->nand.IO_ADDR_R);
-> + ? ? ? release_mem_region(info->phys_base, NAND_IO_SIZE);
-> ? ? ? ?kfree(&info->mtd);
-> ? ? ? ?return 0;
-> ?}
-> --
-> 1.7.9.1
+> This can be changed if needed, it is just a name.
+> regulator/twl-regulator.c is using vdd1 / vdd2 though, and also
+> pmic_data struct uses these. All the other regulators use Vxx type
+> naming also. These are the names I see on my board through
+> sys/class/regulator:
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> dummy
+> VDD1
+> VDD2
+> VMMC1
+> VDAC
+> VDVI
+> VSIM
+
+no strong opinions on this - thinking from OMAP perspective, I read
+vdd_mpu,core,iva. from TWL perspective,
+4030/5030 - VDD1,2
+6030: VCORE1,2,3
+6032: SMPS1...5
+so I guess it is fine as long as it is in context.
