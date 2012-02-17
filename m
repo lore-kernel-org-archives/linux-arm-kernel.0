@@ -1,461 +1,182 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 17 Feb 2012 10:27:58 +0100
-Subject: [PATCH] ARM: at91: AIC and GPIO IRQ device tree initilization
-In-Reply-To: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1329470878-14635-1-git-send-email-nicolas.ferre@atmel.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 17 Feb 2012 11:28:58 +0200
+Subject: [PATCHv2 8/8] arm: omap3: prevent per_clkdm from attempting
+ manual domain transitions
+In-Reply-To: <877gzmit2c.fsf@ti.com>
+References: <1329320274-481-1-git-send-email-t-kristo@ti.com>
+ <1329320274-481-9-git-send-email-t-kristo@ti.com> <87pqdf99c2.fsf@ti.com>
+ <1329382652.4102.386.camel@sokoban>
+ <CAMQu2gx5JdKfTTUhi28N_=EZ3tDo7nTRA00ErrMpuGMkOh9rgw@mail.gmail.com>
+ <1329398159.4102.391.camel@sokoban> <1329405804.4102.400.camel@sokoban>
+ <CAMQu2gwMboftdRo9dE38ECp+5o2nTPgxeZ60JrbV0xd8HLNfUg@mail.gmail.com>
+ <1329410895.4102.404.camel@sokoban>  <877gzmit2c.fsf@ti.com>
+Message-ID: <1329470938.4102.408.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both AIC and GPIO controllers are now using the standard of_irq_init()
-function to initialize IRQs in case of DT use.
-The DT specific initialization functions are now separated from the
-non-DT case and are now using "linear" irq domains.
-The .map() irqdomain operation is responsible for positioning the IRQ
-handlers. In AIC case, the Linux IRQ number is directly programmed in
-the hardware to avoid an additional reverse mapping operation.
-The AIC position its irq domain as the "default" irq domain.
+On Thu, 2012-02-16 at 09:31 -0800, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
+> 
+> > On Thu, 2012-02-16 at 21:15 +0530, Shilimkar, Santosh wrote:
+> >> On Thu, Feb 16, 2012 at 8:53 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> >> > On Thu, 2012-02-16 at 15:15 +0200, Tero Kristo wrote:
+> >> >> On Thu, 2012-02-16 at 15:27 +0530, Shilimkar, Santosh wrote:
+> >> >> > On Thu, Feb 16, 2012 at 2:27 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> >> >> > > On Wed, 2012-02-15 at 11:37 -0800, Kevin Hilman wrote:
+> >> >> > >> Tero Kristo <t-kristo@ti.com> writes:
+> >> >> > >>
+> >> >> > >> > Attempting this will cause problems especially with off-mode enabled.
+> >> >> > >>
+> >> >> > >> Please be more verbose about the problems seen, and the root cause(s).
+> >> >> > >>
+> >> >> > >
+> >> >> > > I was actually looking forward for some help with this commit message,
+> >> >> > > as I am still not quite sure what is going on in here. :) Here is the
+> >> >> > > log for suspend (btw, cam_pwrdm does not go to off in mainline yet, but
+> >> >> > > I think that is probably fixed by the patch from Paul,
+> >> >> > > omap_set_pwrdm_state() does not work properly.) The warning comes out
+> >> >> > > after wakeup from off-mode, and it is triggered by the disabling of
+> >> >> > > autodeps before off-mode entry.
+> >> >> > >
+> >> >> > This mostly indicates that one of the per clock-domain module
+> >> >> > clock turning ON seems to be not working well with auto deps
+> >> >> > disabled. This leads to interconnect violation.
+> >> >> >
+> >> >> > if not tried already, can you put the per_clockdomain in SW_WKUP
+> >> >> > in the low power code early resume path and see if this
+> >> >> > error goes away.
+> >> >>
+> >> >> This seems to get rid of the dump also. It looks like some driver resume
+> >> >> is not behaving nicely, I am trying to pinpoint the culprit currently
+> >> >> and see whether it can provide more info.
+> >> >
+> >> > Okay, I have some more info about this now.
+> >> >
+> >> > What happens is that when entering off-mode, PER domain remains OFF even
+> >> > during the execution of the exit phase from omap_sram_idle. Adding a
+> >> > manual SW_WKUP it comes up and there are no issues. If autodeps are
+> >> > enabled on the domain, it comes back from off mode as active.
+> >> >
+> >> > Looking further in the code, we have this at the end of omap_sram_idle:
+> >> >
+> >> >        if (per_next_state < PWRDM_POWER_ON) {
+> >> >                per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
+> >> >                omap2_gpio_resume_after_idle();
+> >> >                wake_per();
+> >> >                if (per_prev_state == PWRDM_POWER_OFF)
+> >> >                        omap3_per_restore_context();
+> >> >        }
+> >> >
+> >> > ... which seems to assume that per domain is on. Gpio code does not
+> >> > control any clocks currently, as it only requires the interface clock to
+> >> > be on, and as this is autoidled....
+> >> >
+> >> > Any comments how we should handle this? Shall we just keep these two
+> >> > patches for handling this or add some different hackery for the gpio
+> >> > issue?
+> >> >
+> >> Good. I thought too that issue will disappear.
+> >> The issue is pretty clear. Technically every driver pm_runtime() code should
+> >> be able to manage a clock->clockdomain->power domain power up/down
+> >> sequence. That should work without auto deps.
+> >> 
+> >> Do you narrowed down which driver resume is creating the dump ?
+> >> UART , GPIO ?
+> >
+> > It is the gpio base stuff called from omap_sram_idle(), basically the
+> > restore context part. If I force enable per domain before the code
+> > snippet before, there is no dump, but if it is done after, I get the
+> > dump.
+> >
+> > The thing is that gpio driver doesn't currently have this kind of
+> > mechanism for the restore context part, at least not on omap3 due to
+> > above clocking issue (only autoidled interface clock is used.)
+> 
+> I'm not sure if it fully addresses this, but Tarun's series converts
+> GPIO to runtime PM.
+> 
+> Can you try with Tarun's series.  See the for_3.4/gpio_cleanup_fixes_v9
+> branch here:
+> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev.git
 
-For DT case, the priority is not yet filled in the SMR. It will be the
-subject of another patch.
+It does something for the issue, but I still get this during suspend to
+off:
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi,
+[   11.284973] PM: Syncing filesystems ... done.
+[   11.379241] Freezing user space processes ... (elapsed 0.02 seconds)
+done.
+[   11.408233] Freezing remaining freezable tasks ... (elapsed 0.02
+seconds) don
+e.
+[   11.439239] Suspending console(s) (use no_console_suspend to debug)
+[   11.564178] PM: suspend of devices complete after 115.506 msecs
+[   11.567382] PM: late suspend of devices complete after 3.204 msecs
+[   11.567443] Disabling non-boot CPUs ...
+[   12.004089] Powerdomain (cam_pwrdm) didn't enter target state 0
+[   12.004119] Could not enter target state in pm_suspend
+[   12.009368] PM: early resume of devices complete after 4.944 msecs
+[   12.436645] PM: resume of devices complete after 426.086 msecs
+[   12.480285] Restarting tasks ... done.
+/sys/kernel/debu[   12.488433] ------------[ cut here ]------------
+[   12.494415] WARNING: at arch/arm/mach-omap2/omap_hwmod.c:1604 _idle
++0x164/0x1
+7c()
+[   12.502258] omap_hwmod: gpio6: idle state can only be entered from
+enabled st
+ate
+[   12.509979] Modules linked in:
+[   12.513214] [<c001bcd0>] (unwind_backtrace+0x0/0xf4) from
+[<c0042968>] (warn_
+slowpath_common+0x4c/0x64)
+[   12.523071] [<c0042968>] (warn_slowpath_common+0x4c/0x64) from
+[<c0042a14>] (
+warn_slowpath_fmt+0x30/0x40)
+[   12.533081] [<c0042a14>] (warn_slowpath_fmt+0x30/0x40) from
+[<c0028d68>] (_id
+le+0x164/0x17c)
+[   12.541931] [<c0028d68>] (_idle+0x164/0x17c) from [<c00298b0>]
+(omap_hwmod_id
+le+0x28/0x3c)
+[   12.550567] [<c00298b0>] (omap_hwmod_idle+0x28/0x3c) from
+[<c003c664>] (omap_
+device_idle_hwmods+0x24/0x3c)
+[   12.560699] [<c003c664>] (omap_device_idle_hwmods+0x24/0x3c) from
+[<c003c898>
+] (_omap_device_deactivate+0xa4/0x138)
+[   12.571594] [<c003c898>] (_omap_device_deactivate+0xa4/0x138) from
+[<c003c954
+>] (omap_device_idle+0x28/0x54)
+[   12.581909] [<c003c954>] (omap_device_idle+0x28/0x54) from
+[<c003c99c>] (_od_
+runtime_suspend+0x1c/0x24)
+[   12.591735] [<c003c99c>] (_od_runtime_suspend+0x1c/0x24) from
+[<c02c5010>] (_
+_rpm_callback+0x2c/0x78)
+[   12.601379] [<c02c5010>] (__rpm_callback+0x2c/0x78) from [<c02c54d0>]
+(rpm_su
+spend+0x264/0x6c4)
+[   12.610504] [<c02c54d0>] (rpm_suspend+0x264/0x6c4) from [<c02c6998>]
+(__pm_ru
+ntime_suspend+0x5c/0x74)
+[   12.620178] [<c02c6998>] (__pm_runtime_suspend+0x5c/0x74) from
+[<c02731a4>] (
+omap2_gpio_prepare_for_idle+0x50/0x64)
+[   12.631103] [<c02731a4>] (omap2_gpio_prepare_for_idle+0x50/0x64) from
+[<c002b
+d30>] (omap_sram_idle+0xa0/0x3b0)
+[   12.641571] [<c002bd30>] (omap_sram_idle+0xa0/0x3b0) from
+[<c002c1d8>] (omap3
+_pm_idle+0x60/0x178)
+[   12.650848] [<c002c1d8>] (omap3_pm_idle+0x60/0x178) from [<c0015c10>]
+(cpu_id
+le+0xc4/0x108)
+[   12.659606] [<c0015c10>] (cpu_idle+0xc4/0x108) from [<c0626828>]
+(start_kerne
+l+0x2b0/0x304)
+[   12.668365] ---[ end trace 441b8fea2b56dcb1 ]---
 
-This patch goes on top of previous series:
-"[PATCH 0/9] ARM: at91: irqdomain and device tree for AIC and GPIO"
-(which goes on top of Grant's "irq_domain generalization and rework").
 
-It should address all advices by Rob Herring and I hope it is the best
-way to deal with irq domains in all DT/non-DT cases.
+Also, this goes away if I manually force wakeup for the per domain, so
+this might be caused by some additional latency.
 
-A simple concern is that the IRQ latency may be bigger because of the
-irq_create_mapping() call in .to_irq(). This is called in the hot path
-of GPIO IRQ handler...
-
-Best regards,
-
-
- arch/arm/mach-at91/board-dt.c |   11 +++-
- arch/arm/mach-at91/generic.h  |    6 ++
- arch/arm/mach-at91/gpio.c     |  124 +++++++++++++++++++++++++++++++----------
- arch/arm/mach-at91/irq.c      |   92 ++++++++++++++++++++-----------
- 4 files changed, 171 insertions(+), 62 deletions(-)
-
-diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-index 6120978..e0df4e5 100644
---- a/arch/arm/mach-at91/board-dt.c
-+++ b/arch/arm/mach-at91/board-dt.c
-@@ -15,6 +15,8 @@
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/gpio.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- 
- #include <mach/hardware.h>
-@@ -86,9 +88,16 @@ static void __init ek_add_device_nand(void)
- 	at91_add_device_nand(&ek_nand_data);
- }
- 
-+static const struct of_device_id irq_of_match[] __initconst = {
-+
-+	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
-+	{ .compatible = "atmel,at91rm9200-gpio", .data = at91_gpio_of_irq_setup },
-+	{ /*sentinel*/ }
-+};
-+
- static void __init at91_dt_init_irq(void)
- {
--	at91_init_irq_default();
-+	of_irq_init(irq_of_match);
- }
- 
- static void __init at91_dt_device_init(void)
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 78cd605..c5d16e5 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -9,6 +9,7 @@
-  */
- 
- #include <linux/clkdev.h>
-+#include <linux/of.h>
- 
-  /* Map io */
- extern void __init at91_map_io(void);
-@@ -25,6 +26,9 @@ extern void __init at91_init_irq_default(void);
- extern void __init at91_init_interrupts(unsigned int priority[]);
- extern void __init at91x40_init_interrupts(unsigned int priority[]);
- extern void __init at91_aic_init(unsigned int priority[]);
-+extern int  __init at91_aic_of_init(struct device_node *node,
-+				    struct device_node *parent);
-+
- 
-  /* Timer */
- struct sys_timer;
-@@ -75,5 +79,7 @@ struct at91_gpio_bank {
- };
- extern void __init at91_gpio_init(struct at91_gpio_bank *, int nr_banks);
- extern void __init at91_gpio_irq_setup(void);
-+extern int  __init at91_gpio_of_irq_setup(struct device_node *node,
-+					  struct device_node *parent);
- 
- extern int at91_extern_irq;
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index fbcb47e..64395a5 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -27,6 +27,7 @@
- #include <linux/irqdomain.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/of_gpio.h>
- 
- #include <mach/hardware.h>
- #include <mach/at91_pio.h>
-@@ -37,6 +38,7 @@ struct at91_gpio_chip {
- 	struct gpio_chip	chip;
- 	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
- 	int			pioc_hwirq;	/* PIO bank interrupt identifier on AIC */
-+	int			pioc_virq;	/* PIO bank Linux virtual interrupt */
- 	int			pioc_idx;	/* PIO bank index */
- 	void __iomem		*regbase;	/* PIO bank virtual address */
- 	struct clk		*clock;		/* associated clock */
-@@ -295,7 +297,7 @@ static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
- 	else
- 		wakeups[bank] &= ~mask;
- 
--	irq_set_irq_wake(gpio_chip[bank].pioc_hwirq, state);
-+	irq_set_irq_wake(at91_gpio->pioc_virq, state);
- 
- 	return 0;
- }
-@@ -397,12 +399,12 @@ static struct irq_chip gpio_irqchip = {
- 
- static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- {
--	unsigned	virq;
- 	struct irq_data *idata = irq_desc_get_irq_data(desc);
- 	struct irq_chip *chip = irq_data_get_irq_chip(idata);
- 	struct at91_gpio_chip *at91_gpio = irq_data_get_irq_chip_data(idata);
- 	void __iomem	*pio = at91_gpio->regbase;
--	u32		isr;
-+	unsigned long	isr;
-+	int		n;
- 
- 	/* temporarily mask (level sensitive) parent IRQ */
- 	chip->irq_ack(idata);
-@@ -420,13 +422,10 @@ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- 			continue;
- 		}
- 
--		virq = gpio_to_irq(at91_gpio->chip.base);
--
--		while (isr) {
--			if (isr & 1)
--				generic_handle_irq(virq);
--			virq++;
--			isr >>= 1;
-+		n = find_first_bit(&isr, BITS_PER_LONG);
-+		while (n < BITS_PER_LONG) {
-+			generic_handle_irq(at91_gpiolib_to_irq(&at91_gpio->chip, n));
-+			n = find_next_bit(&isr, BITS_PER_LONG, n + 1);
- 		}
- 	}
- 	chip->irq_unmask(idata);
-@@ -496,23 +495,91 @@ postcore_initcall(at91_gpio_debugfs_init);
- /*--------------------------------------------------------------------------*/
- 
- /*
-+ * This lock class tells lockdep that GPIO irqs are in a different
-+ * category than their parents, so it won't report false recursion.
-+ */
-+static struct lock_class_key gpio_lock_class;
-+
-+#if defined(CONFIG_OF)
-+static int at91_gpio_irq_map(struct irq_domain *h, unsigned int virq,
-+							irq_hw_number_t hw)
-+{
-+	struct at91_gpio_chip	*at91_gpio = h->host_data;
-+
-+	irq_set_lockdep_class(virq, &gpio_lock_class);
-+
-+	/*
-+	 * Can use the "simple" and not "edge" handler since it's
-+	 * shorter, and the AIC handles interrupts sanely.
-+	 */
-+	irq_set_chip_and_handler(virq, &gpio_irqchip,
-+				 handle_simple_irq);
-+	set_irq_flags(virq, IRQF_VALID);
-+	irq_set_chip_data(virq, at91_gpio);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops at91_gpio_ops = {
-+	.map	= at91_gpio_irq_map,
-+	.xlate	= irq_domain_xlate_twocell,
-+};
-+
-+int __init at91_gpio_of_irq_setup(struct device_node *node,
-+				     struct device_node *parent)
-+{
-+	struct at91_gpio_chip	*prev = NULL;
-+	int			alias_idx = of_alias_get_id(node, "gpio");
-+	struct at91_gpio_chip	*at91_gpio = &gpio_chip[alias_idx];
-+
-+	/* Disable irqs of this PIO controller */
-+	__raw_writel(~0, at91_gpio->regbase + PIO_IDR);
-+
-+	/* Setup irq domain */
-+	at91_gpio->domain = irq_domain_add_linear(node, at91_gpio->chip.ngpio,
-+						&at91_gpio_ops, at91_gpio);
-+	if (!at91_gpio->domain)
-+		panic("at91_gpio.%d: couldn't allocate irq domain (DT).\n",
-+			at91_gpio->pioc_idx);
-+
-+	/* Setup chained handler */
-+	if (at91_gpio->pioc_idx)
-+		prev = &gpio_chip[at91_gpio->pioc_idx - 1];
-+
-+	/* The toplevel handler handles one bank of GPIOs, except
-+	 * on some SoC it can handles up to three...
-+	 * We only set up the handler for the first of the list.
-+	 */
-+	if (prev && prev->next == at91_gpio)
-+		return 0;
-+
-+	at91_gpio->pioc_virq = irq_create_mapping(irq_find_host(parent),
-+							at91_gpio->pioc_hwirq);
-+	irq_set_chip_data(at91_gpio->pioc_virq, at91_gpio);
-+	irq_set_chained_handler(at91_gpio->pioc_virq, gpio_irq_handler);
-+
-+	return 0;
-+}
-+#else
-+int __init at91_gpio_of_irq_setup(struct device_node *node,
-+				     struct device_node *parent)
-+{
-+	return -EINVAL;
-+}
-+#endif
-+
-+/*
-  * irqdomain initialization: pile up irqdomains on top of AIC range
-  */
- static void __init at91_gpio_irqdomain(struct at91_gpio_chip *at91_gpio)
- {
- 	int irq_base;
--#if defined(CONFIG_OF)
--	struct device_node *of_node = at91_gpio->chip.of_node;
--#else
--	struct device_node *of_node = NULL;
--#endif
- 
- 	irq_base = irq_alloc_descs(-1, 0, at91_gpio->chip.ngpio, 0);
- 	if (irq_base < 0)
- 		panic("at91_gpio.%d: error %d: couldn't allocate IRQ numbers.\n",
- 			at91_gpio->pioc_idx, irq_base);
--	at91_gpio->domain = irq_domain_add_legacy(of_node,
--						  at91_gpio->chip.ngpio,
-+	at91_gpio->domain = irq_domain_add_legacy(NULL, at91_gpio->chip.ngpio,
- 						  irq_base, 0,
- 						  &irq_domain_simple_ops, NULL);
- 	if (!at91_gpio->domain)
-@@ -521,12 +588,6 @@ static void __init at91_gpio_irqdomain(struct at91_gpio_chip *at91_gpio)
- }
- 
- /*
-- * This lock class tells lockdep that GPIO irqs are in a different
-- * category than their parents, so it won't report false recursion.
-- */
--static struct lock_class_key gpio_lock_class;
--
--/*
-  * Called from the processor-specific init to enable GPIO interrupt support.
-  */
- void __init at91_gpio_irq_setup(void)
-@@ -538,8 +599,7 @@ void __init at91_gpio_irq_setup(void)
- 	for (pioc = 0, this = gpio_chip, prev = NULL;
- 			pioc++ < gpio_banks;
- 			prev = this, this++) {
--		unsigned	pioc_hwirq = this->pioc_hwirq;
--		int		offset;
-+		int offset;
- 
- 		__raw_writel(~0, this->regbase + PIO_IDR);
- 
-@@ -547,7 +607,7 @@ void __init at91_gpio_irq_setup(void)
- 		at91_gpio_irqdomain(this);
- 
- 		for (offset = 0; offset < this->chip.ngpio; offset++) {
--			unsigned int virq = irq_find_mapping(this->domain, offset);
-+			unsigned int virq = irq_create_mapping(this->domain, offset);
- 			irq_set_lockdep_class(virq, &gpio_lock_class);
- 
- 			/*
-@@ -569,8 +629,9 @@ void __init at91_gpio_irq_setup(void)
- 		if (prev && prev->next == this)
- 			continue;
- 
--		irq_set_chip_data(pioc_hwirq, this);
--		irq_set_chained_handler(pioc_hwirq, gpio_irq_handler);
-+		this->pioc_virq = irq_create_mapping(NULL, this->pioc_hwirq);
-+		irq_set_chip_data(this->pioc_virq, this);
-+		irq_set_chained_handler(this->pioc_virq, gpio_irq_handler);
- 	}
- 	pr_info("AT91: %d gpio irqs in %d banks\n", gpio_irqnbr, gpio_banks);
- }
-@@ -648,7 +709,12 @@ static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset)
- {
- 	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
--	int virq = irq_find_mapping(at91_gpio->domain, offset);
-+	int virq;
-+
-+	if (offset < chip->ngpio)
-+		virq = irq_create_mapping(at91_gpio->domain, offset);
-+	else
-+		virq = -ENXIO;
- 
- 	dev_dbg(chip->dev, "%s: request IRQ for GPIO %d, return %d\n",
- 				chip->label, offset + chip->base, virq);
-diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
-index 46682fa..2e4ee09 100644
---- a/arch/arm/mach-at91/irq.c
-+++ b/arch/arm/mach-at91/irq.c
-@@ -135,27 +135,72 @@ static struct irq_chip at91_aic_chip = {
- 	.irq_set_wake	= at91_aic_set_wake,
- };
- 
-+static void __init at91_aic_hw_init(unsigned int spu_vector)
-+{
-+	int i;
-+
-+	/*
-+	 * Perform 8 End Of Interrupt Command to make sure AIC
-+	 * will not Lock out nIRQ
-+	 */
-+	for (i = 0; i < 8; i++)
-+		at91_aic_write(AT91_AIC_EOICR, 0);
-+
-+	/*
-+	 * Spurious Interrupt ID in Spurious Vector Register.
-+	 * When there is no current interrupt, the IRQ Vector Register
-+	 * reads the value stored in AIC_SPU
-+	 */
-+	at91_aic_write(AT91_AIC_SPU, spu_vector);
-+
-+	/* No debugging in AIC: Debug (Protect) Control Register */
-+	at91_aic_write(AT91_AIC_DCR, 0);
-+
-+	/* Disable and clear all interrupts initially */
-+	at91_aic_write(AT91_AIC_IDCR, 0xFFFFFFFF);
-+	at91_aic_write(AT91_AIC_ICCR, 0xFFFFFFFF);
-+}
-+
-+
-+
- #if defined(CONFIG_OF)
--static int __init __at91_aic_of_init(struct device_node *node,
--				     struct device_node *parent)
-+static int at91_aic_irq_map(struct irq_domain *h, unsigned int virq,
-+							irq_hw_number_t hw)
- {
--	at91_aic_base = of_iomap(node, 0);
--	at91_aic_np = node;
-+	/* Put virq number in Source Vector Register */
-+	at91_aic_write(AT91_AIC_SVR(hw), virq);
-+
-+	/* Active Low interrupt, without priority */
-+	at91_aic_write(AT91_AIC_SMR(hw), AT91_AIC_SRCTYPE_LOW);
-+
-+	irq_set_chip_and_handler(virq, &at91_aic_chip, handle_level_irq);
-+	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
- 
- 	return 0;
- }
- 
--static const struct of_device_id aic_ids[] __initconst = {
--	{ .compatible = "atmel,at91rm9200-aic", .data = __at91_aic_of_init },
--	{ /*sentinel*/ }
-+static struct irq_domain_ops at91_aic_irq_ops = {
-+	.map	= at91_aic_irq_map,
-+	.xlate	= irq_domain_xlate_twocell,
- };
- 
--static void __init at91_aic_of_init(void)
-+int __init at91_aic_of_init(struct device_node *node,
-+				     struct device_node *parent)
- {
--	of_irq_init(aic_ids);
-+	at91_aic_base = of_iomap(node, 0);
-+	at91_aic_np = node;
-+
-+	at91_aic_domain = irq_domain_add_linear(at91_aic_np, NR_AIC_IRQS,
-+						&at91_aic_irq_ops, NULL);
-+	if (!at91_aic_domain)
-+		panic("Unable to add AIC irq domain (DT)\n");
-+
-+	irq_set_default_host(at91_aic_domain);
-+
-+	at91_aic_hw_init(NR_AIC_IRQS);
-+
-+	return 0;
- }
--#else
--static void __init at91_aic_of_init(void) {}
- #endif
- 
- /*
-@@ -166,11 +211,7 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
- 	unsigned int i;
- 	int irq_base;
- 
--	if (of_have_populated_dt())
--		at91_aic_of_init();
--	else
--		at91_aic_base = ioremap(AT91_AIC, 512);
--
-+	at91_aic_base = ioremap(AT91_AIC, 512);
- 	if (!at91_aic_base)
- 		panic("Unable to ioremap AIC registers\n");
- 
-@@ -187,6 +228,8 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
- 	if (!at91_aic_domain)
- 		panic("Unable to add AIC irq domain\n");
- 
-+	irq_set_default_host(at91_aic_domain);
-+
- 	/*
- 	 * The IVR is used by macro get_irqnr_and_base to read and verify.
- 	 * The irq number is NR_AIC_IRQS when a spurious interrupt has occurred.
-@@ -199,22 +242,7 @@ void __init at91_aic_init(unsigned int priority[NR_AIC_IRQS])
- 
- 		irq_set_chip_and_handler(i, &at91_aic_chip, handle_level_irq);
- 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
--
--		/* Perform 8 End Of Interrupt Command to make sure AIC will not Lock out nIRQ */
--		if (i < 8)
--			at91_aic_write(AT91_AIC_EOICR, 0);
- 	}
- 
--	/*
--	 * Spurious Interrupt ID in Spurious Vector Register is NR_AIC_IRQS
--	 * When there is no current interrupt, the IRQ Vector Register reads the value stored in AIC_SPU
--	 */
--	at91_aic_write(AT91_AIC_SPU, NR_AIC_IRQS);
--
--	/* No debugging in AIC: Debug (Protect) Control Register */
--	at91_aic_write(AT91_AIC_DCR, 0);
--
--	/* Disable and clear all interrupts initially */
--	at91_aic_write(AT91_AIC_IDCR, 0xFFFFFFFF);
--	at91_aic_write(AT91_AIC_ICCR, 0xFFFFFFFF);
-+	at91_aic_hw_init(NR_AIC_IRQS);
- }
--- 
-1.7.9
+-Tero
