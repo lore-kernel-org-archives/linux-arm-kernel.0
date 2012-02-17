@@ -1,58 +1,74 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 17 Feb 2012 08:29:09 -0800
-Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
-In-Reply-To: <20120217074007.GM3852@pengutronix.de>
-References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
- <20120213082741.GN3852@pengutronix.de>
- <20120213144820.GA3494@opensource.wolfsonmicro.com>
- <20120214105823.GS3852@pengutronix.de>
- <20120214172902.GB3916@opensource.wolfsonmicro.com>
- <20120216073236.GE3852@pengutronix.de>
- <20120216075825.GA11631@opensource.wolfsonmicro.com>
- <20120216091352.GK3852@pengutronix.de>
- <20120216162703.GB3383@opensource.wolfsonmicro.com>
- <20120217074007.GM3852@pengutronix.de>
-Message-ID: <20120217162909.GA10146@opensource.wolfsonmicro.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 17 Feb 2012 17:49:02 +0100
+Subject: [PATCHv9 3/5] arm: omap3: add common twl configurations for vdd1
+ and vdd2
+In-Reply-To: <CAOMWX4cmwFKsQ9SV-9c=tfCEqdQ9N2TcJUJ+Sh=syBgOSPz1gg@mail.gmail.com>
+References: <1329388073-17879-1-git-send-email-t-kristo@ti.com>
+ <1329388073-17879-4-git-send-email-t-kristo@ti.com>
+ <CAOMWX4d8C4pjYSr+i3qmqfJHDsHQdtRkvfbGR29U7hXf0SkVZg@mail.gmail.com>
+ <1329476814.4102.433.camel@sokoban>
+ <CAOMWX4cmwFKsQ9SV-9c=tfCEqdQ9N2TcJUJ+Sh=syBgOSPz1gg@mail.gmail.com>
+Message-ID: <4F3E84FE.3060407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2012 at 08:40:07AM +0100, Sascha Hauer wrote:
-> On Thu, Feb 16, 2012 at 08:27:04AM -0800, Mark Brown wrote:
+Hi Tero,
 
-> > Oh, in that case it seems really odd that it's returning a pointer to
-> > the device rather than just returning success or failure.
+On 2/17/2012 4:22 PM, Menon, Nishanth wrote:
+> On Fri, Feb 17, 2012 at 05:06, Tero Kristo<t-kristo@ti.com>  wrote:
+>> On Thu, 2012-02-16 at 12:23 -0600, Menon, Nishanth wrote:
+>>> On Thu, Feb 16, 2012 at 04:27, Tero Kristo<t-kristo@ti.com>  wrote:
+>>>> VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
+>>>> to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
+>>>> are needed by DVFS.
+>>>>
+>>>> Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manual.
+>>>
+>>> Please provide documentation version referenced, else we will loose
+>>> track of details at a later point of time.
+>>
+>> How should this be marked down? There are too many naming conventions
+>> for the TI docs, and I couldn't find any example from kernel commit logs
+>> for this. Personally I was using twl5030 es1.2 DM rev E / twl4030 es3.1
+>> DM rev L. Or should the literature code be used? Or is there also some
+>> numerical version info available somewhere?
+> Literature code is the best one. Adding, along with it, a human
+> readable "TWL4030 ES3.1 DM rev L"
+> is even better :)
+>
+>>> Also should we rename VDD1 with vdd_mpu_iva and VDD2 as vdd_core to be readable?
+>>
+>> This can be changed if needed, it is just a name.
+>> regulator/twl-regulator.c is using vdd1 / vdd2 though, and also
+>> pmic_data struct uses these. All the other regulators use Vxx type
+>> naming also. These are the names I see on my board through
+>> sys/class/regulator:
+>>
+>> dummy
+>> VDD1
+>> VDD2
+>> VMMC1
+>> VDAC
+>> VDVI
+>> VSIM
+>
+> no strong opinions on this - thinking from OMAP perspective, I read
+> vdd_mpu,core,iva. from TWL perspective,
+> 4030/5030 - VDD1,2
+> 6030: VCORE1,2,3
+> 6032: SMPS1...5
+> so I guess it is fine as long as it is in context.
 
-> It has to as it gives you a pointer which you can use to unregister the
-> device later. Also it's in line with the platform helpers like
-> platform_device_register_resndata, platform_device_register_simple and
-> others.
+Yes, you should take care of using the proper name depending of the context.
 
-Hrm, right.  Again I'd expect all users to be in board code so not ever
-unregistering anything.
+For TWL point of view this is just 2 generic SMPS outputs so VDD1 and 
+VDD2 are the only relevant name you can use.
 
-> > In all these cases there is actually a physical supply of some kind; if
-> > there isn't one then you'd expect the driver would have explicit code to
-> > handle that in some way.
+As far as OMAP3 is concern, the power rails were named as well vdd1 and 
+vdd2, but it was so confusing that we changed that on OMAP4 and maybe on 
+3630 to vdd_mpu, vdd_iva and vdd_core.
 
-> Yes, there is one. But I think it will only be described in the device
-> tree if it's software controllable.
+So using this terminology for OMAP power rails is strongly recommended.
 
-I don't see why that needs to be the case.
-
-> > without making an effort to go round all the uers and at least notify
-> > the existing users of the device that they need updates.  There's a
-> > limited amount we can do in the core
-
-> Are you then willing to merge my patch to make it easier to not break
-> boards? I would remove the voltage parameter and fix a remaining
-> Kconfig/ifdef issue then.
-
-Well, if you send a patch that looks sensible and is signed off and
-whatnot yes.  I've no problem with a helper function.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120217/e681d441/attachment.sig>
+Regards,
+Benoit
