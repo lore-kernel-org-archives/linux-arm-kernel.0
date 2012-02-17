@@ -1,66 +1,58 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Fri, 17 Feb 2012 17:03:56 +0800
-Subject: [V1 3/3] led: modified power control of pm860x led
-Message-ID: <1329469436-8247-1-git-send-email-jtzhou@marvell.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Feb 2012 09:14:33 +0000
+Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
+ for v3.4 merge window
+In-Reply-To: <20120216135151.GK15338@n2100.arm.linux.org.uk>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+ <CACYZBRE_Vf8qDQYPRgsL03T8oy2Kv4fYRfE8U7y79Xhb1nwC2A@mail.gmail.com>
+ <20120216121234.GJ15338@n2100.arm.linux.org.uk> <4F3CF7D1.8050807@ti.com>
+ <4F3D0186.2010500@ti.com> <20120216135151.GK15338@n2100.arm.linux.org.uk>
+Message-ID: <20120217091433.GL15338@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since several sub modules such as backlight, leds and vibrator depend
-on the refernce group and internal oscillator in pm8606, so modified
-the power control of led in pm8606 by unified interface.
+On Thu, Feb 16, 2012 at 01:51:51PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Feb 16, 2012 at 06:45:50PM +0530, Rajendra Nayak wrote:
+> > On Thursday 16 February 2012 06:04 PM, Rajendra Nayak wrote:
+> >>> Can you test something with these patches?
+> >>>
+> >>> 1. Build the gpio-twl4030.c as a module, but with HSMMC support built in
+> >>> 2. Boot on the 4430SDP
+> >>
+> >> twl4030 gpio is used for card detect on OMAP3, so I tried this
+> >> on my Beagle instead of 4430SDP.
+> >> The kernel boots up but does not detect/enumerate the mmc card.
+> >>
+> >>> 3. Load the gpio-twl4030 module
+> >>
+> >> I was expecting this to now detect the card, but I instead got
+> >> this error which seems to tell gpio-twl4030 has problems
+> >> when built/used as a module, outside of the mmc issues.
+> >
+> > Looks like I was mislead with the errors and though the twl4030
+> > gpio probe was bailing out with errors, which its not.
+> > It does seem to go ahead, does a mmc late init which registers
+> > the mmc omap_device and hence does a platform_device_add, but the
+> > device never seem to get probed. mmc driver is built in and
+> > registered.
+> >
+> >>
+> >> # insmod gpio-twl4030.ko
+> >> [   16.217864] twl4030_gpio twl4030_gpio: can't dispatch IRQs from modules
+> >> [   16.242004] gpiochip_add: registered GPIOs 192 to 211 on device: twl4030
+> >>
+> >>
+> >>> 4. Remove the gpio-twl4030 module
+> >>> 5. Re-load the gpio-twl4030.ko module
+> >>>
+> >>> and report back what you get.  Thanks.
+> >
+> 
+> (4) and (5) are the key bits of what I was asking you to do.
 
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
----
- drivers/leds/leds-88pm860x.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+Okay, so that was a total waste of time and effort, because you didn't do
+what I asked.
 
-diff --git a/drivers/leds/leds-88pm860x.c b/drivers/leds/leds-88pm860x.c
-index 4ca0062..5b61aaf 100644
---- a/drivers/leds/leds-88pm860x.c
-+++ b/drivers/leds/leds-88pm860x.c
-@@ -114,6 +114,27 @@ static inline int __blink_ctl_mask(int port)
- 	return ret;
- }
- 
-+static int led_power_set(struct pm860x_chip *chip, int port, int on)
-+{
-+	int ret = -EINVAL;
-+
-+	switch (port) {
-+	case PM8606_LED1_RED:
-+	case PM8606_LED1_GREEN:
-+	case PM8606_LED1_BLUE:
-+		ret = on ? pm8606_osc_enable(chip, RGB1_ENABLE) :
-+			pm8606_osc_disable(chip, RGB1_ENABLE);
-+		break;
-+	case PM8606_LED2_RED:
-+	case PM8606_LED2_GREEN:
-+	case PM8606_LED2_BLUE:
-+		ret = on ? pm8606_osc_enable(chip, RGB2_ENABLE) :
-+			pm8606_osc_disable(chip, RGB2_ENABLE);
-+		break;
-+	}
-+	return ret;
-+}
-+
- static void pm860x_led_work(struct work_struct *work)
- {
- 
-@@ -126,6 +147,7 @@ static void pm860x_led_work(struct work_struct *work)
- 	chip = led->chip;
- 	mutex_lock(&led->lock);
- 	if ((led->current_brightness == 0) && led->brightness) {
-+		led_power_set(chip, led->port, 1);
- 		if (led->iset) {
- 			pm860x_set_bits(led->i2c, __led_off(led->port),
- 					LED_CURRENT_MASK, led->iset);
-@@ -149,6 +171,7 @@ static void pm860x_led_work(struct work_struct *work)
- 					LED_CURRENT_MASK, 0);
- 			mask = __blink_ctl_mask(led->port);
- 			pm860x_set_bits(led->i2c, PM8606_WLED3B, mask, 0);
-+			led_power_set(chip, led->port, 0);
- 		}
- 	}
- 	led->current_brightness = led->brightness;
--- 
-1.7.0.4
+Tony: I think there's a bug here - if the gpio-twl4030 module is inserted,
+removed and re-inserted, I think we'll end up creating the devices for MMC
+twice with the same name, resulting in sysfs complaining very loudly.
