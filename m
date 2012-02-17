@@ -1,51 +1,56 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 17 Feb 2012 09:24:26 +0100
-Subject: [GIT PULL] i.MX assorted
-Message-ID: <20120217082426.GO3852@pengutronix.de>
+Date: Fri, 17 Feb 2012 09:26:09 +0100
+Subject: [PATCH 2/2] ARM: imx/pcm038: Don't specify regulator consumers
+ by struct device
+In-Reply-To: <1329449121.17110.2.camel@phoenix>
+References: <1329449029.17110.1.camel@phoenix>
+ <1329449121.17110.2.camel@phoenix>
+Message-ID: <20120217082609.GP3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Fri, Feb 17, 2012 at 11:25:21AM +0800, Axel Lin wrote:
+> The dev field is remove from struct regulator_consumer_supply since commit
+> 737f36 "regulator: Remove support for supplies specified by struct device".
+> 
+> This fixes below build error:
+>   CC      arch/arm/mach-imx/mach-pcm038.o
+> arch/arm/mach-imx/mach-pcm038.c:236: error: unknown field 'dev' specified in initializer
+> make[1]: *** [arch/arm/mach-imx/mach-pcm038.o] Error 1
+> make: *** [arch/arm/mach-imx] Error 2
 
-Please pull the following assorted updates for i.MX.
+This is a duplicate of one of Fabios patches, I just sent a pull
+request.
 
 Sascha
 
+> 
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ---
+> This patch is against linux-next 20120217.
+> 
+>  arch/arm/mach-imx/mach-pcm038.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
+> index 16f126d..bfcc1ea 100644
+> --- a/arch/arm/mach-imx/mach-pcm038.c
+> +++ b/arch/arm/mach-imx/mach-pcm038.c
+> @@ -233,7 +233,6 @@ static struct regulator_init_data sdhc1_data = {
+>  
+>  static struct regulator_consumer_supply cam_consumers[] = {
+>  	{
+> -		.dev	= NULL,
+>  		.supply	= "imx_cam_vcc",
+>  	},
+>  };
+> -- 
+> 1.7.5.4
+> 
+> 
+> 
+> 
 
-The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-
-  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git features/assorted
-
-for you to fetch changes up to bc17b36704e051ec67eeaa6e10d7e20ce32c76cf:
-
-  ARM: imx_v4_v5_defconfig: Fix the selection of 32 bit flash support for iMX21ADS board (2012-02-17 09:20:31 +0100)
-
-----------------------------------------------------------------
-Fabio Estevam (7):
-      ARM: mach-pcm038: Fix field name of regulator_consumer_supply struct
-      ARM: imx_v6_v7_defconfig: Add support for framebuffer and camera on mx31
-      ARM: mx27_3ds: Add camera support
-      ARM: imx_v4_v5_defconfig: Update defconfig
-      ARM: plat-mxc: audmux-v1: Remove unneeded ifdef's
-      ARM: mx3: Let mx31 and mx35 share the same CCM header file
-      ARM: imx_v4_v5_defconfig: Fix the selection of 32 bit flash support for iMX21ADS board
-
- arch/arm/configs/imx_v4_v5_defconfig               |   17 ++
- arch/arm/configs/imx_v6_v7_defconfig               |   32 ++++
- arch/arm/mach-imx/Kconfig                          |    1 +
- arch/arm/mach-imx/clock-imx31.c                    |    2 +-
- arch/arm/mach-imx/clock-imx35.c                    |  166 +++++++++-----------
- .../mach-imx/{crmregs-imx31.h => crmregs-imx3.h}   |   15 ++-
- arch/arm/mach-imx/mach-armadillo5x0.c              |    2 +-
- arch/arm/mach-imx/mach-mx27_3ds.c                  |  108 +++++++++++++
- arch/arm/mach-imx/mach-pcm038.c                    |    2 +-
- arch/arm/plat-mxc/audmux-v1.c                      |    5 +-
- 10 files changed, 251 insertions(+), 99 deletions(-)
- rename arch/arm/mach-imx/{crmregs-imx31.h => crmregs-imx3.h} (94%)
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
