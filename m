@@ -1,56 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 17 Feb 2012 12:07:00 +0100
-Subject: [PATCH] ARM i.MX5/6: Add dt support for generic boards
-Message-ID: <1329476820-27066-1-git-send-email-s.hauer@pengutronix.de>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 17 Feb 2012 13:09:19 +0200
+Subject: [PATCH] arm: smp-twd: check for uninitialized clock in
+ twd_cpufreq_init
+In-Reply-To: <CAMQu2gzP1co6QhP-Co9wAwB_pVrjE0X_2GgGni4+t94yjHKi1g@mail.gmail.com>
+References: <1329474869-32356-1-git-send-email-t-kristo@ti.com>
+ <CAMQu2gzP1co6QhP-Co9wAwB_pVrjE0X_2GgGni4+t94yjHKi1g@mail.gmail.com>
+Message-ID: <1329476959.4102.434.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apart from the iomux setup which may not be needed on custom
-boards the kernel starts fine using the devicetree, so add
-generic boards to the dt_compat entries.
+On Fri, 2012-02-17 at 16:17 +0530, Shilimkar, Santosh wrote:
+> On Fri, Feb 17, 2012 at 4:04 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> > Non-smp platforms don't have local timer support, but the twd_cpufreq_init
+> > only checks for IS_ERR during init. Check against null also, to avoid
+> > crashes during cpufreq transitions on non-smp platforms.
+> >
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > ---
+> I sent a patch for the same issue which Kevin reported.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/imx51-dt.c   |    1 +
- arch/arm/mach-imx/imx53-dt.c   |    1 +
- arch/arm/mach-imx/mach-imx6q.c |    1 +
- 3 files changed, 3 insertions(+), 0 deletions(-)
+Oh sorry for the noise then. I did a quick search for a similar patch
+but didn't find one. This patch can be ignored.
 
-diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-index e6bad17..b0d830f 100644
---- a/arch/arm/mach-imx/imx51-dt.c
-+++ b/arch/arm/mach-imx/imx51-dt.c
-@@ -104,6 +104,7 @@ static struct sys_timer imx51_timer = {
- 
- static const char *imx51_dt_board_compat[] __initdata = {
- 	"fsl,imx51-babbage",
-+	"fsl,imx51",
- 	NULL
- };
- 
-diff --git a/arch/arm/mach-imx/imx53-dt.c b/arch/arm/mach-imx/imx53-dt.c
-index 05ebb3e..d75a267 100644
---- a/arch/arm/mach-imx/imx53-dt.c
-+++ b/arch/arm/mach-imx/imx53-dt.c
-@@ -114,6 +114,7 @@ static const char *imx53_dt_board_compat[] __initdata = {
- 	"fsl,imx53-evk",
- 	"fsl,imx53-qsb",
- 	"fsl,imx53-smd",
-+	"fsl,imx53",
- 	NULL
- };
- 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index c257281..f3adf2f 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -128,6 +128,7 @@ static struct sys_timer imx6q_timer = {
- static const char *imx6q_dt_compat[] __initdata = {
- 	"fsl,imx6q-arm2",
- 	"fsl,imx6q-sabrelite",
-+	"fsl,imx6q",
- 	NULL,
- };
- 
--- 
-1.7.9
+-Tero
+
+> 
+> Thread.
+> http://www.spinics.net/lists/arm-kernel/msg160275.html
+> 
+> >  arch/arm/kernel/smp_twd.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> > index 4285daa..dae8902 100644
+> > --- a/arch/arm/kernel/smp_twd.c
+> > +++ b/arch/arm/kernel/smp_twd.c
+> > @@ -129,7 +129,7 @@ static struct notifier_block twd_cpufreq_nb = {
+> >
+> >  static int twd_cpufreq_init(void)
+> >  {
+> > -       if (!IS_ERR(twd_clk))
+> > +       if (twd_clk && !IS_ERR(twd_clk))
+> 
+> Checking the clock node is not enoough because you can
+> not have clock node and rely on calibration..
+> Testing twd_evt is safe to avoid the issue.
+> 
+> Regards
+> santosh
