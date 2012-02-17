@@ -1,41 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 17 Feb 2012 16:02:23 +0100
-Subject: [GIT PULL] at91 mmc fixes for 3.3-rc[45]
-Message-ID: <4F3E6BFF.9030307@atmel.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Fri, 17 Feb 2012 20:52:19 +0530
+Subject: [PATCH] mtd: omap2: Release memory region in .remove function
+In-Reply-To: <1329490172-8043-1-git-send-email-walle@corscience.de>
+References: <1329490172-8043-1-git-send-email-walle@corscience.de>
+Message-ID: <CAM=Q2cuXfYA=bibwzDBdb41_KiHu1X4bExbyS2FsfjBM7RXopQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Fri, Feb 17, 2012 at 8:19 PM, Bernhard Walle <walle@corscience.de> wrote:
+> When the driver is compiled as module, it's not possible to unload and
+> reload the driver again:
+>
+> ? ?omap2-nand: probe of omap2-nand.0 failed with error -16
+>
+Looks right to me
+Reviewed-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-This is a couple of patches that fixes a sequence in atmel-mci during 
-DMA/PDC detection + channel handling.
-
-I also add the MAINTAINERS update and hand the SD/MMC drivers over to 
-Ludovic Desroches who already made great efforts to enhance them.
-
-You can find that the following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-
-  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git mmc-at91-fixes-for-3.3-rc4
-
-for you to fetch changes up to 71055393e9e76a0c03f0b3b9d370a0ad2bae2763:
-
-  MAINTAINERS: hand over atmel-mci (sd/mmc interface) (2012-02-17 15:40:18 +0100)
-
-----------------------------------------------------------------
-Ludovic Desroches (2):
-      mmc: atmel-mci: don't use dma features when dma is present but there is no chan available
-      mmc: atmel-mci: fix typo
-
-Nicolas Ferre (1):
-      MAINTAINERS: hand over atmel-mci (sd/mmc interface)
-
- MAINTAINERS                  |    4 ++--
- drivers/mmc/host/atmel-mci.c |   23 +++++++++++------------
-
-Thanks a lot, best regards,
--- 
-Nicolas Ferre
+> This patch fixes the problem because it releases the memory region, so
+> that it can be requested again.
+>
+> Signed-off-by: Bernhard Walle <walle@corscience.de>
+> ---
+> ?drivers/mtd/nand/omap2.c | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index b3a883e..7dfcf68 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -1132,6 +1132,7 @@ static int omap_nand_remove(struct platform_device *pdev)
+> ? ? ? ?/* Release NAND device, its internal structures and partitions */
+> ? ? ? ?nand_release(&info->mtd);
+> ? ? ? ?iounmap(info->nand.IO_ADDR_R);
+> + ? ? ? release_mem_region(info->phys_base, NAND_IO_SIZE);
+> ? ? ? ?kfree(&info->mtd);
+> ? ? ? ?return 0;
+> ?}
+> --
+> 1.7.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
