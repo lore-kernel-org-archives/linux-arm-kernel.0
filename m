@@ -1,28 +1,15 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 17 Feb 2012 16:40:42 -0700 (MST)
-Subject: [PATCH v3] ARM: OMAP: clock: cleanup CPUfreq leftovers
-In-Reply-To: <1329342415-28702-1-git-send-email-khilman@ti.com>
-References: <1329342415-28702-1-git-send-email-khilman@ti.com>
-Message-ID: <alpine.DEB.2.00.1202171640120.859@utopia.booyaka.com>
+From: anca.emanuel@gmail.com (Anca Emanuel)
+Date: Sat, 18 Feb 2012 02:23:33 +0200
+Subject: [PATCHv22 00/16] Contiguous Memory Allocator
+In-Reply-To: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
+References: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAJL_dMtfD8FMMMN58Ng1aDMpDCsoyS=DNLTt+5BrSUTb-J4LmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Feb 2012, Kevin Hilman wrote:
+Do you have an git tree ?
+Now is time to include this in next.
+Please add "Stephen Rothwell" <sfr@canb.auug.org.au> to CC.
 
-> Now that we have OPP layer, and OMAP CPUfreq driver is using it, we no
-> longer need/use the clock framework code for filling up CPUfreq
-> tables.  Remove it.
-> 
-> Thanks to Russell King for pointing out the parts I missed under
-> plat-omap in the original version.
-> 
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Paul, this is an updated version of the previous one after a different
-> CPUfreq patch from Russell made me realize I missed the plat-omap pieces.
-
-Thanks, queued for 3.4.
-
-
-- Paul
+If you not have an git tree, ask somebody to take it NOW in a next tree.
+I want to see this in linux 3.4
