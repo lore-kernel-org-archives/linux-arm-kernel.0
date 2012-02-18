@@ -1,47 +1,37 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Sat, 18 Feb 2012 15:48:06 +0000
-Subject: [PATCH 1/2] ARM: dma-mapping: its array of pointer
-In-Reply-To: <1329484170-26329-1-git-send-email-ajeet.yadav.77@gmail.com>
-References: <1329484170-26329-1-git-send-email-ajeet.yadav.77@gmail.com>
-Message-ID: <1329580086.2448.12.camel@computer2.home>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Sat, 18 Feb 2012 19:56:30 +0400
+Subject: [PATCH] arm: smp-twd: check for uninitialized clock in
+ twd_cpufreq_init
+In-Reply-To: <1329474869-32356-1-git-send-email-t-kristo@ti.com>
+References: <1329474869-32356-1-git-send-email-t-kristo@ti.com>
+Message-ID: <4F3FCA2E.3000804@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-02-17 at 18:39 +0530, Ajeet Yadav wrote:
-> To be consistant with declaration and usage of
-        ^^^^^^^^^^
-Spelling mistake, should be 'consistent'
+Hello.
 
-> consistent_pte it need to be an array of (pte *)
-                    ^^^^
-Grammar mistake, should be 'needs'.
+On 17-02-2012 14:34, Tero Kristo wrote:
 
-> 
-> Signed-off-by: Ajeet Yadav <ajeet.yadav.77@gmail.com>
+> Non-smp platforms don't have local timer support, but the twd_cpufreq_init
+> only checks for IS_ERR during init. Check against null also, to avoid
+> crashes during cpufreq transitions on non-smp platforms.
 
-The title of this patch is a bit vague, perhaps something like:
-"ARM: dma-mapping: Fix the type used for consistent_pte size
-calculation"
-
-The actual patch looks correct.
-
--- 
-Tixy
-
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > ---
->  arch/arm/mm/dma-mapping.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 1aa664a..04bfa76 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -170,7 +170,7 @@ static int __init consistent_init(void)
->  	unsigned long base = consistent_base;
->  	unsigned long num_ptes = (CONSISTENT_END - base) >> PMD_SHIFT;
->  
-> -	consistent_pte = kmalloc(num_ptes * sizeof(pte_t), GFP_KERNEL);
-> +	consistent_pte = kmalloc(num_ptes * sizeof(pte_t *), GFP_KERNEL);
->  	if (!consistent_pte) {
->  		pr_err("%s: no memory\n", __func__);
->  		return -ENOMEM;
+>   arch/arm/kernel/smp_twd.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index 4285daa..dae8902 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -129,7 +129,7 @@ static struct notifier_block twd_cpufreq_nb = {
+>
+>   static int twd_cpufreq_init(void)
+>   {
+> -	if (!IS_ERR(twd_clk))
+> +	if (twd_clk&&  !IS_ERR(twd_clk))
+
+    Why not !IS_ERR_OR_NULL(twd_clk)?
+
+WBR, Sergei
