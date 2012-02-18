@@ -1,42 +1,47 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 18 Feb 2012 18:04:51 +0800
-Subject: [GIT PULL] [v3.3] fixes for arch-pxa in arm
-Message-ID: <CAN1soZwcL-ELxwW5MB7zNQOrr0YPpo6pXp40D7uEaKH6Li0haw@mail.gmail.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Sat, 18 Feb 2012 15:48:06 +0000
+Subject: [PATCH 1/2] ARM: dma-mapping: its array of pointer
+In-Reply-To: <1329484170-26329-1-git-send-email-ajeet.yadav.77@gmail.com>
+References: <1329484170-26329-1-git-send-email-ajeet.yadav.77@gmail.com>
+Message-ID: <1329580086.2448.12.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, 2012-02-17 at 18:39 +0530, Ajeet Yadav wrote:
+> To be consistant with declaration and usage of
+        ^^^^^^^^^^
+Spelling mistake, should be 'consistent'
 
-Here's the fixes for 3.3.
+> consistent_pte it need to be an array of (pte *)
+                    ^^^^
+Grammar mistake, should be 'needs'.
 
-The following changes since commit c38e23456278e967f094b08247ffc3711b1029b2:
+> 
+> Signed-off-by: Ajeet Yadav <ajeet.yadav.77@gmail.com>
 
-  i387: fix sense of sanity check (2012-02-15 08:05:18 -0800)
+The title of this patch is a bit vague, perhaps something like:
+"ARM: dma-mapping: Fix the type used for consistent_pte size
+calculation"
 
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git fixes
+The actual patch looks correct.
 
-Axel Lin (2):
-      ARM: pxa: fix error handling in pxa2xx_drv_pcmcia_probe
-      pxa/hx4700: add platform device and I2C info for AK4641 codec
+-- 
+Tixy
 
-Danny Kukawka (3):
-      ARM: pxa: fix including linux/gpio.h twice
-      arch/arm/mach-mmp/: some files include some headers twice
-      arch/arm/mach-pxa/: included linux/gpio.h twice
-
-Haojian Zhuang (2):
-      ARM: pxa: fix wrong parsing gpio event on spitz
-      ARM: pxa: fix mixed declarations and code in sharpsl_pm
-
- arch/arm/mach-mmp/aspenite.c   |    1 -
- arch/arm/mach-mmp/pxa168.c     |    1 -
- arch/arm/mach-mmp/tavorevb.c   |    1 -
- arch/arm/mach-pxa/hx4700.c     |   25 +++++++++++++++++++++++++
- arch/arm/mach-pxa/pxa25x.c     |    1 -
- arch/arm/mach-pxa/pxa27x.c     |    1 -
- arch/arm/mach-pxa/saarb.c      |    1 -
- arch/arm/mach-pxa/sharpsl_pm.c |    3 +--
- arch/arm/mach-pxa/spitz_pm.c   |    5 ++---
- drivers/pcmcia/pxa2xx_base.c   |   12 +++---------
- 10 files changed, 31 insertions(+), 20 deletions(-)
+> ---
+>  arch/arm/mm/dma-mapping.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 1aa664a..04bfa76 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -170,7 +170,7 @@ static int __init consistent_init(void)
+>  	unsigned long base = consistent_base;
+>  	unsigned long num_ptes = (CONSISTENT_END - base) >> PMD_SHIFT;
+>  
+> -	consistent_pte = kmalloc(num_ptes * sizeof(pte_t), GFP_KERNEL);
+> +	consistent_pte = kmalloc(num_ptes * sizeof(pte_t *), GFP_KERNEL);
+>  	if (!consistent_pte) {
+>  		pr_err("%s: no memory\n", __func__);
+>  		return -ENOMEM;
