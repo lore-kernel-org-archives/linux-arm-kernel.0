@@ -1,95 +1,43 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Sat, 18 Feb 2012 15:58:33 +0000
-Subject: [PATCH 2/2] ARM: dma-mapping: fix leak in consistent_init
-In-Reply-To: <1329484195-26361-1-git-send-email-ajeet.yadav.77@gmail.com>
-References: <1329484195-26361-1-git-send-email-ajeet.yadav.77@gmail.com>
-Message-ID: <1329580713.2448.17.camel@computer2.home>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Sat, 18 Feb 2012 20:00:23 +0400
+Subject: [PATCH] ARM: plat-mxc: audmux-v1: Remove unneeded ifdef's
+In-Reply-To: <1329437651-8341-1-git-send-email-festevam@gmail.com>
+References: <1329437651-8341-1-git-send-email-festevam@gmail.com>
+Message-ID: <4F3FCB17.1040706@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-02-17 at 18:39 +0530, Ajeet Yadav wrote:
-> Although the error in this case is unlikely, but logically
-> if error occurs then we leak memory.
-> 
-> Signed-off-by: Ajeet Yadav <ajeet.yadav.77@gmail.com>
+Hello.
 
-If you want to fix all the memory leaks then the page tables allocated
-by pte_alloc_kernel() need freeing as well, (and the pud and pmd
-tables?).
+On 17-02-2012 4:14, Fabio Estevam wrote:
 
-However, if we run out of memory this early in boot, then the system is
-unusable anyway and it doesn't seem worth adding the extra code
-complexity to avoid any of these memory leaks.
+> As we are able to build a single kernel that can run on mx21 and mx25,
+> there is no need for the ifdef's anymore inside audmux-v1.c.
 
--- 
-Tixy
-
+> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
 > ---
->  arch/arm/mm/dma-mapping.c |   24 ++++++++++++------------
->  1 files changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 04bfa76..b8cf062 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -161,7 +161,6 @@ static struct arm_vmregion_head consistent_head = {
->   */
->  static int __init consistent_init(void)
->  {
-> -	int ret = 0;
->  	pgd_t *pgd;
->  	pud_t *pud;
->  	pmd_t *pmd;
-> @@ -171,7 +170,7 @@ static int __init consistent_init(void)
->  	unsigned long num_ptes = (CONSISTENT_END - base) >> PMD_SHIFT;
->  
->  	consistent_pte = kmalloc(num_ptes * sizeof(pte_t *), GFP_KERNEL);
-> -	if (!consistent_pte) {
-> +	if (unlikely(!consistent_pte)) {
->  		pr_err("%s: no memory\n", __func__);
->  		return -ENOMEM;
->  	}
-> @@ -183,32 +182,33 @@ static int __init consistent_init(void)
->  		pgd = pgd_offset(&init_mm, base);
->  
->  		pud = pud_alloc(&init_mm, pgd, base);
-> -		if (!pud) {
-> +		if (unlikely(!pud)) {
->  			printk(KERN_ERR "%s: no pud tables\n", __func__);
-> -			ret = -ENOMEM;
-> -			break;
-> +			goto err;
->  		}
->  
->  		pmd = pmd_alloc(&init_mm, pud, base);
-> -		if (!pmd) {
-> +		if (unlikely(!pmd)) {
->  			printk(KERN_ERR "%s: no pmd tables\n", __func__);
-> -			ret = -ENOMEM;
-> -			break;
-> +			goto err;
->  		}
->  		WARN_ON(!pmd_none(*pmd));
->  
->  		pte = pte_alloc_kernel(pmd, base);
-> -		if (!pte) {
-> +		if (unlikely(!pte)) {
->  			printk(KERN_ERR "%s: no pte tables\n", __func__);
-> -			ret = -ENOMEM;
-> -			break;
-> +			goto err;
->  		}
->  
->  		consistent_pte[i++] = pte;
->  		base += PMD_SIZE;
->  	} while (base < CONSISTENT_END);
->  
-> -	return ret;
-> +	return 0;
-> +err:
-> +	kfree(consistent_pte);
-> +	consistent_pte = NULL;
-> +	return -ENOMEM;
->  }
->  
->  core_initcall(consistent_init);
+>   arch/arm/plat-mxc/audmux-v1.c |    5 +----
+>   1 files changed, 1 insertions(+), 4 deletions(-)
+
+> diff --git a/arch/arm/plat-mxc/audmux-v1.c b/arch/arm/plat-mxc/audmux-v1.c
+> index 1180bef..14a3c04 100644
+> --- a/arch/arm/plat-mxc/audmux-v1.c
+> +++ b/arch/arm/plat-mxc/audmux-v1.c
+> @@ -46,16 +46,13 @@ EXPORT_SYMBOL_GPL(mxc_audmux_v1_configure_port);
+>
+>   static int mxc_audmux_v1_init(void)
+>   {
+> -#ifdef CONFIG_MACH_MX21
+>   	if (cpu_is_mx21())
+>   		audmux_base = MX21_IO_ADDRESS(MX21_AUDMUX_BASE_ADDR);
+>   	else
+> -#endif
+> -#ifdef CONFIG_MACH_MX27
+> +
+>   	if (cpu_is_mx27())
+
+    This should become:
+
+	else if (cpu_is_mx27())
+
+WBR, Sergei
