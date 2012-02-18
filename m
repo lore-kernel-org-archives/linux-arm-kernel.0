@@ -1,56 +1,42 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Sat, 18 Feb 2012 10:17:49 +0100
-Subject: [PATCH 16/18] Atmel: move console default platform_device to
- serial driver
-In-Reply-To: <81ce940f5ac09c5d50bfa712ab10a785f28df4ea.1329500622.git.nicolas.ferre@atmel.com>
-References: <0d78171672a30e8ec8084f54a557e9948260356d.1329500622.git.nicolas.ferre@atmel.com>
- <81ce940f5ac09c5d50bfa712ab10a785f28df4ea.1329500622.git.nicolas.ferre@atmel.com>
-Message-ID: <20120218091749.GA22669@samfundet.no>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 18 Feb 2012 18:04:51 +0800
+Subject: [GIT PULL] [v3.3] fixes for arch-pxa in arm
+Message-ID: <CAN1soZwcL-ELxwW5MB7zNQOrr0YPpo6pXp40D7uEaKH6Li0haw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Fri 17 Feb 2012 18:50:08 +0100 or thereabout, Nicolas Ferre wrote:
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> This variable spread on every SoC that is using the atmel_serial.c
-> driver can be included directly into the latter.
-> 
-> This will allow to compile multiple soc in the same kernel.
+Hi Arnd,
 
-Sounds like a good idea, but...
+Here's the fixes for 3.3.
 
-<snipp AT91 changes>
+The following changes since commit c38e23456278e967f094b08247ffc3711b1029b2:
 
-> diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-> index 402a7bb..889c544 100644
-> --- a/arch/avr32/mach-at32ap/at32ap700x.c
-> +++ b/arch/avr32/mach-at32ap/at32ap700x.c
-> @@ -1055,8 +1055,6 @@ struct platform_device *__init at32_add_device_usart(unsigned int id)
->  	return at32_usarts[id];
->  }
->  
-> -struct platform_device *atmel_default_console_device;
-> -
->  void __init at32_setup_serial_console(unsigned int usart_id)
->  {
->  	atmel_default_console_device = at32_usarts[usart_id];
+  i387: fix sense of sanity check (2012-02-15 08:05:18 -0800)
 
-I doubt this assignment will work if you remove the struct above. I did not
-look at how AT91 does this, will it be similar affected?
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git fixes
 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 10605ec..f9a6be7 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -1526,6 +1526,8 @@ void __init atmel_register_uart_fns(struct atmel_port_fns *fns)
->  	atmel_pops.set_wake	= fns->set_wake;
->  }
->  
-> +struct platform_device *atmel_default_console_device;	/* the serial console device */
-> +
->  #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
->  static void atmel_console_putchar(struct uart_port *port, int ch)
->  {
--- 
-mvh
-Hans-Christian Egtvedt
+Axel Lin (2):
+      ARM: pxa: fix error handling in pxa2xx_drv_pcmcia_probe
+      pxa/hx4700: add platform device and I2C info for AK4641 codec
+
+Danny Kukawka (3):
+      ARM: pxa: fix including linux/gpio.h twice
+      arch/arm/mach-mmp/: some files include some headers twice
+      arch/arm/mach-pxa/: included linux/gpio.h twice
+
+Haojian Zhuang (2):
+      ARM: pxa: fix wrong parsing gpio event on spitz
+      ARM: pxa: fix mixed declarations and code in sharpsl_pm
+
+ arch/arm/mach-mmp/aspenite.c   |    1 -
+ arch/arm/mach-mmp/pxa168.c     |    1 -
+ arch/arm/mach-mmp/tavorevb.c   |    1 -
+ arch/arm/mach-pxa/hx4700.c     |   25 +++++++++++++++++++++++++
+ arch/arm/mach-pxa/pxa25x.c     |    1 -
+ arch/arm/mach-pxa/pxa27x.c     |    1 -
+ arch/arm/mach-pxa/saarb.c      |    1 -
+ arch/arm/mach-pxa/sharpsl_pm.c |    3 +--
+ arch/arm/mach-pxa/spitz_pm.c   |    5 ++---
+ drivers/pcmcia/pxa2xx_base.c   |   12 +++---------
+ 10 files changed, 31 insertions(+), 20 deletions(-)
