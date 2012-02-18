@@ -1,21 +1,23 @@
 From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Sat, 18 Feb 2012 20:00:23 +0400
-Subject: [PATCH] ARM: plat-mxc: audmux-v1: Remove unneeded ifdef's
-In-Reply-To: <1329437651-8341-1-git-send-email-festevam@gmail.com>
-References: <1329437651-8341-1-git-send-email-festevam@gmail.com>
-Message-ID: <4F3FCB17.1040706@ru.mvista.com>
+Date: Sat, 18 Feb 2012 20:01:18 +0400
+Subject: [PATCH v2] ARM: plat-mxc: audmux-v1: Remove unneeded ifdef's
+In-Reply-To: <1329437737-8378-1-git-send-email-festevam@gmail.com>
+References: <1329437737-8378-1-git-send-email-festevam@gmail.com>
+Message-ID: <4F3FCB4E.9020001@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 17-02-2012 4:14, Fabio Estevam wrote:
+On 17-02-2012 4:15, Fabio Estevam wrote:
 
-> As we are able to build a single kernel that can run on mx21 and mx25,
+> As we are able to build a single kernel that can run on mx21 and mx27,
 > there is no need for the ifdef's anymore inside audmux-v1.c.
 
 > Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
 > ---
+> Changes since v1:
+> - Replace mx25 with mx27 in the commit message
 >   arch/arm/plat-mxc/audmux-v1.c |    5 +----
 >   1 files changed, 1 insertions(+), 4 deletions(-)
 
@@ -36,8 +38,6 @@ On 17-02-2012 4:14, Fabio Estevam wrote:
 > +
 >   	if (cpu_is_mx27())
 
-    This should become:
-
-	else if (cpu_is_mx27())
+    Same comment about *else if*.
 
 WBR, Sergei
