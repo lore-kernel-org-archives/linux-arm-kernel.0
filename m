@@ -1,20 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 19 Feb 2012 18:20:08 +0000
-Subject: [PATCH 1/2] ALSA: Remove __devinit annotation for
- pxa2xx_ac97_hw_probe to fix section mismatch warning
-In-Reply-To: <1329637158.4818.4.camel@phoenix>
-References: <1329637158.4818.4.camel@phoenix>
-Message-ID: <20120219182005.GA16078@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 Feb 2012 19:39:44 +0000
+Subject: [PATCH 1/4] ARM: sa1100: fix sa1100 after sparse irq conversion
+In-Reply-To: <4F41136F.3060708@gmail.com>
+References: <1329449534-23811-1-git-send-email-robherring2@gmail.com>
+ <1329449534-23811-2-git-send-email-robherring2@gmail.com>
+ <20120218231849.GA1269@n2100.arm.linux.org.uk> <4F41136F.3060708@gmail.com>
+Message-ID: <20120219193943.GA28147@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 19, 2012 at 03:39:18PM +0800, Axel Lin wrote:
-> This fixes below build warning:
-> WARNING: vmlinux.o(.text+0x1e632c): Section mismatch in reference from the function pxa2xx_ac97_probe() to the function .devinit.text:pxa2xx_ac97_hw_probe()
-> The function pxa2xx_ac97_probe() references
-> the function __devinit pxa2xx_ac97_hw_probe().
-> This is often because pxa2xx_ac97_probe lacks a __devinit
-> annotation or the annotation of pxa2xx_ac97_hw_probe is wrong.
+On Sun, Feb 19, 2012 at 09:21:19AM -0600, Rob Herring wrote:
+> On 02/18/2012 05:18 PM, Russell King - ARM Linux wrote:
+> > On Thu, Feb 16, 2012 at 09:32:11PM -0600, Rob Herring wrote:
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> SA1100 was converted to sparse irq in parallel with include of mach/irqs.h
+> >> being removed from asm/irq.h when sparse irq is enabled, resulting in lots
+> >> of compile errors.
+> > 
+> > Can this be applied before the change to enable sparse IRQ for sa11x0
+> > platforms without breaking them?
+> 
+> All but the rename of NR_IRQS to SA1100_NR_IRQS should be fine, but I
+> can change it to leave NR_IRQS.
 
-This seems like the wrong fix - shouldn't we be adding annotations
-rather than removing them here?
+That sounds like a good thing to have sorted and merged into my sa11x0
+branch before the switching on of SPARSE_IRQ for sa11x0.
