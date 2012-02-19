@@ -1,39 +1,74 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Sun, 19 Feb 2012 15:40:19 +0800
-Subject: [PATCH 2/2] ALSA: pxa2xx-pcm: replace 0xffffffff with DMA_BIT_MASK
- macro
-In-Reply-To: <1329637158.4818.4.camel@phoenix>
-References: <1329637158.4818.4.camel@phoenix>
-Message-ID: <1329637219.4818.5.camel@phoenix>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sun, 19 Feb 2012 13:20:33 +0100
+Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
+Message-ID: <1329654033-19584-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- sound/arm/pxa2xx-pcm.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+External circuitry like level shifters may limit the maximum operation
+speed of the hsmmc controller. Add a field to struct omap2_hsmmc_info
+so boards can adjust the setting on demand.
 
-diff --git a/sound/arm/pxa2xx-pcm.c b/sound/arm/pxa2xx-pcm.c
-index 26422a3..cbe6374 100644
---- a/sound/arm/pxa2xx-pcm.c
-+++ b/sound/arm/pxa2xx-pcm.c
-@@ -80,7 +80,7 @@ static struct snd_pcm_ops pxa2xx_pcm_ops = {
- 	.mmap		= pxa2xx_pcm_mmap,
- };
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Cousson, Benoit <b-cousson@ti.com>
+---
+
+This trivial patch is in my queue for some time already, and Tony acked
+on it awhile back. I was told to take Chris Ball in the loop as there
+is currently no OMAP MMC maintainer.
+
+This still applies cleanly to 3.3-rc4. Chris, can you queue this?
+
+ arch/arm/mach-omap2/hsmmc.c   |    1 +
+ arch/arm/mach-omap2/hsmmc.h   |    2 ++
+ drivers/mmc/host/omap_hsmmc.c |    8 ++++++--
+ 3 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index f4a1020..4c7bc36 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -298,6 +298,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+ 	mmc->slots[0].caps = c->caps;
+ 	mmc->slots[0].internal_clock = !c->ext_clock;
+ 	mmc->dma_mask = 0xffffffff;
++	mmc->max_freq = c->max_freq;
+ 	if (cpu_is_omap44xx())
+ 		mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
+ 	else
+diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+index f757e78..65a8c12 100644
+--- a/arch/arm/mach-omap2/hsmmc.h
++++ b/arch/arm/mach-omap2/hsmmc.h
+@@ -25,6 +25,8 @@ struct omap2_hsmmc_info {
+ 	char	*name;		/* or NULL for default */
+ 	struct device *dev;	/* returned: pointer to mmc adapter */
+ 	int	ocr_mask;	/* temporary HACK */
++	int	max_freq;	/* maximum clock, if constrained by external
++				 * circuitry, or 0 for default */
+ 	/* Remux (pad configuration) when powering on/off */
+ 	void (*remux)(struct device *dev, int slot, int power_on);
+ 	/* init some special card */
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 101cd31..8215ef9 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+ 	if (mmc_slot(host).vcc_aux_disable_is_sleep)
+ 		mmc_slot(host).no_off = 1;
  
--static u64 pxa2xx_pcm_dmamask = 0xffffffff;
-+static u64 pxa2xx_pcm_dmamask = DMA_BIT_MASK(32);
+-	mmc->f_min	= OMAP_MMC_MIN_CLOCK;
+-	mmc->f_max	= OMAP_MMC_MAX_CLOCK;
++	mmc->f_min = OMAP_MMC_MIN_CLOCK;
++
++	if (pdata->max_freq > 0)
++		mmc->f_max = pdata->max_freq;
++	else
++		mmc->f_max = OMAP_MMC_MAX_CLOCK;
  
- int pxa2xx_pcm_new(struct snd_card *card, struct pxa2xx_pcm_client *client,
- 		   struct snd_pcm **rpcm)
-@@ -100,7 +100,7 @@ int pxa2xx_pcm_new(struct snd_card *card, struct pxa2xx_pcm_client *client,
- 	if (!card->dev->dma_mask)
- 		card->dev->dma_mask = &pxa2xx_pcm_dmamask;
- 	if (!card->dev->coherent_dma_mask)
--		card->dev->coherent_dma_mask = 0xffffffff;
-+		card->dev->coherent_dma_mask = DMA_BIT_MASK(32);
+ 	spin_lock_init(&host->irq_lock);
  
- 	if (play) {
- 		int stream = SNDRV_PCM_STREAM_PLAYBACK;
 -- 
-1.7.5.4
+1.7.7.4
