@@ -1,43 +1,45 @@
-From: neilb@suse.de (NeilBrown)
-Date: Sun, 19 Feb 2012 13:29:31 +1100
-Subject: [PATCH 2/2] ARM: OMAP2: remove some orphan function declarations.
-In-Reply-To: <20120219022841.8254.86264.stgit@notabene.brown>
-References: <20120219022841.8254.86264.stgit@notabene.brown>
-Message-ID: <20120219022931.8254.29652.stgit@notabene.brown>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 19 Feb 2012 08:07:38 +0100
+Subject: [PATCH 16/18] Atmel: move console default platform_device to
+ serial driver
+In-Reply-To: <20120218091749.GA22669@samfundet.no>
+References: <0d78171672a30e8ec8084f54a557e9948260356d.1329500622.git.nicolas.ferre@atmel.com>
+ <81ce940f5ac09c5d50bfa712ab10a785f28df4ea.1329500622.git.nicolas.ferre@atmel.com>
+ <20120218091749.GA22669@samfundet.no>
+Message-ID: <20120219070738.GA491@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 2fd149645eb removed omap_uart_can_sleep and omap3_can_sleep,
-but not their declarations.  So remove those now.
+On 10:17 Sat 18 Feb     , Hans-Christian Egtvedt wrote:
+> Around Fri 17 Feb 2012 18:50:08 +0100 or thereabout, Nicolas Ferre wrote:
+> > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > 
+> > This variable spread on every SoC that is using the atmel_serial.c
+> > driver can be included directly into the latter.
+> > 
+> > This will allow to compile multiple soc in the same kernel.
+> 
+> Sounds like a good idea, but...
+> 
+> <snipp AT91 changes>
+> 
+> > diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
+> > index 402a7bb..889c544 100644
+> > --- a/arch/avr32/mach-at32ap/at32ap700x.c
+> > +++ b/arch/avr32/mach-at32ap/at32ap700x.c
+> > @@ -1055,8 +1055,6 @@ struct platform_device *__init at32_add_device_usart(unsigned int id)
+> >  	return at32_usarts[id];
+> >  }
+> >  
+> > -struct platform_device *atmel_default_console_device;
+> > -
+> >  void __init at32_setup_serial_console(unsigned int usart_id)
+> >  {
+> >  	atmel_default_console_device = at32_usarts[usart_id];
+> 
+> I doubt this assignment will work if you remove the struct above. I did not
+> look at how AT91 does this, will it be similar affected?
+none the still exist in the kernel, its just moved
 
-Signed-off-by: NeilBrown <neilb@suse.de>
----
-
- arch/arm/mach-omap2/pm.h                 |    1 -
- arch/arm/plat-omap/include/plat/serial.h |    1 -
- 2 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index b737b11..6cd954d 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -18,7 +18,6 @@
- extern void *omap3_secure_ram_storage;
- extern void omap3_pm_off_mode_enable(int);
- extern void omap_sram_idle(void);
--extern int omap3_can_sleep(void);
- extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
- extern int omap3_idle_init(void);
- extern int omap4_idle_init(void);
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index 198d1e6..b073e5f 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -110,7 +110,6 @@ struct omap_board_data;
- struct omap_uart_port_info;
- 
- extern void omap_serial_init(void);
--extern int omap_uart_can_sleep(void);
- extern void omap_serial_board_init(struct omap_uart_port_info *platform_data);
- extern void omap_serial_init_port(struct omap_board_data *bdata,
- 		struct omap_uart_port_info *platform_data);
+Best Regards,
+J.
