@@ -1,36 +1,20 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sun, 19 Feb 2012 11:16:02 -0500
-Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
-In-Reply-To: <1329654033-19584-1-git-send-email-zonque@gmail.com> (Daniel
- Mack's message of "Sun, 19 Feb 2012 13:20:33 +0100")
-References: <1329654033-19584-1-git-send-email-zonque@gmail.com>
-Message-ID: <m2zkce6bp9.fsf@bob.laptop.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 19 Feb 2012 18:20:08 +0000
+Subject: [PATCH 1/2] ALSA: Remove __devinit annotation for
+ pxa2xx_ac97_hw_probe to fix section mismatch warning
+In-Reply-To: <1329637158.4818.4.camel@phoenix>
+References: <1329637158.4818.4.camel@phoenix>
+Message-ID: <20120219182005.GA16078@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Feb 19, 2012 at 03:39:18PM +0800, Axel Lin wrote:
+> This fixes below build warning:
+> WARNING: vmlinux.o(.text+0x1e632c): Section mismatch in reference from the function pxa2xx_ac97_probe() to the function .devinit.text:pxa2xx_ac97_hw_probe()
+> The function pxa2xx_ac97_probe() references
+> the function __devinit pxa2xx_ac97_hw_probe().
+> This is often because pxa2xx_ac97_probe lacks a __devinit
+> annotation or the annotation of pxa2xx_ac97_hw_probe is wrong.
 
-On Sun, Feb 19 2012, Daniel Mack wrote:
-> External circuitry like level shifters may limit the maximum operation
-> speed of the hsmmc controller. Add a field to struct omap2_hsmmc_info
-> so boards can adjust the setting on demand.
->
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: Cousson, Benoit <b-cousson@ti.com>
-> ---
->
-> This trivial patch is in my queue for some time already, and Tony acked
-> on it awhile back. I was told to take Chris Ball in the loop as there
-> is currently no OMAP MMC maintainer.
->
-> This still applies cleanly to 3.3-rc4. Chris, can you queue this?
-
-Thanks, queued in mmc-next now.  (The arch/arm/mach-omap2/hsmmc.c
-change did not apply cleanly, though; I fixed that.)
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+This seems like the wrong fix - shouldn't we be adding annotations
+rather than removing them here?
