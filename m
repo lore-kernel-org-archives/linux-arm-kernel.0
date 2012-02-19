@@ -1,28 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Feb 2012 19:39:44 +0000
-Subject: [PATCH 1/4] ARM: sa1100: fix sa1100 after sparse irq conversion
-In-Reply-To: <4F41136F.3060708@gmail.com>
-References: <1329449534-23811-1-git-send-email-robherring2@gmail.com>
- <1329449534-23811-2-git-send-email-robherring2@gmail.com>
- <20120218231849.GA1269@n2100.arm.linux.org.uk> <4F41136F.3060708@gmail.com>
-Message-ID: <20120219193943.GA28147@n2100.arm.linux.org.uk>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Sun, 19 Feb 2012 22:40:05 +0000
+Subject: [PATCH 00/13] sa1100fb cleanups
+In-Reply-To: <20120204093744.GQ889@n2100.arm.linux.org.uk>
+References: <20120204093744.GQ889@n2100.arm.linux.org.uk>
+Message-ID: <4F417A45.8040106@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 19, 2012 at 09:21:19AM -0600, Rob Herring wrote:
-> On 02/18/2012 05:18 PM, Russell King - ARM Linux wrote:
-> > On Thu, Feb 16, 2012 at 09:32:11PM -0600, Rob Herring wrote:
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> SA1100 was converted to sparse irq in parallel with include of mach/irqs.h
-> >> being removed from asm/irq.h when sparse irq is enabled, resulting in lots
-> >> of compile errors.
-> > 
-> > Can this be applied before the change to enable sparse IRQ for sa11x0
-> > platforms without breaking them?
-> 
-> All but the rename of NR_IRQS to SA1100_NR_IRQS should be fine, but I
-> can change it to leave NR_IRQS.
+Hi Russell,
 
-That sounds like a good thing to have sorted and merged into my sa11x0
-branch before the switching on of SPARSE_IRQ for sa11x0.
+On 02/04/2012 09:37 AM, Russell King - ARM Linux wrote:
+> Here's another bunch of SA11x0 stuff - its framebuffer driver.  This
+> set of patches fixes some section mismatch warnings, moves the board
+> configuration out to the board files, converts the Shannon stuff to
+> use gpiolib rather than poking at GPDR/GPSR/GPCR directly.
+> 
+> The function hooks for LCD and backlight power control are moved into
+> the platform data passed from the board, eliminating the global function
+> pointers.
+
+This series looks good to me.
+Acked-by: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+
+> This series will conflict with the previous series (in the case of
+> Assabet, the conflict is quite large) so I'd prefer to keep this in my
+> tree for the next merge window.
+
+Sure, feel free to proceed with this series as you like.
+
+
+Best regards,
+
+Florian Tobias Schandinat
