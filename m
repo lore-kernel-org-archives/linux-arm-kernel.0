@@ -1,58 +1,26 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Sun, 19 Feb 2012 19:06:00 +0530
-Subject: [PATCH 2/2] ARM: OMAP2: remove some orphan function declarations.
-In-Reply-To: <20120219022931.8254.29652.stgit@notabene.brown>
-References: <20120219022841.8254.86264.stgit@notabene.brown>
- <20120219022931.8254.29652.stgit@notabene.brown>
-Message-ID: <4F40FAC0.3010306@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 19 Feb 2012 09:21:19 -0600
+Subject: [PATCH 1/4] ARM: sa1100: fix sa1100 after sparse irq conversion
+In-Reply-To: <20120218231849.GA1269@n2100.arm.linux.org.uk>
+References: <1329449534-23811-1-git-send-email-robherring2@gmail.com>
+ <1329449534-23811-2-git-send-email-robherring2@gmail.com>
+ <20120218231849.GA1269@n2100.arm.linux.org.uk>
+Message-ID: <4F41136F.3060708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 February 2012 07:59 AM, NeilBrown wrote:
-> commit 2fd149645eb removed omap_uart_can_sleep and omap3_can_sleep,
-> but not their declarations.  So remove those now.
->
-a small description with the commit id would have been good.
+On 02/18/2012 05:18 PM, Russell King - ARM Linux wrote:
+> On Thu, Feb 16, 2012 at 09:32:11PM -0600, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> SA1100 was converted to sparse irq in parallel with include of mach/irqs.h
+>> being removed from asm/irq.h when sparse irq is enabled, resulting in lots
+>> of compile errors.
+> 
+> Can this be applied before the change to enable sparse IRQ for sa11x0
+> platforms without breaking them?
 
+All but the rename of NR_IRQS to SA1100_NR_IRQS should be fine, but I
+can change it to leave NR_IRQS.
 
-Looks good to me.
-Reviewed-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-
-thanks.
-> Signed-off-by: NeilBrown <neilb@suse.de>
-> ---
->
->  arch/arm/mach-omap2/pm.h                 |    1 -
->  arch/arm/plat-omap/include/plat/serial.h |    1 -
->  2 files changed, 0 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index b737b11..6cd954d 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -18,7 +18,6 @@
->  extern void *omap3_secure_ram_storage;
->  extern void omap3_pm_off_mode_enable(int);
->  extern void omap_sram_idle(void);
-> -extern int omap3_can_sleep(void);
->  extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
->  extern int omap3_idle_init(void);
->  extern int omap4_idle_init(void);
-> diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-> index 198d1e6..b073e5f 100644
-> --- a/arch/arm/plat-omap/include/plat/serial.h
-> +++ b/arch/arm/plat-omap/include/plat/serial.h
-> @@ -110,7 +110,6 @@ struct omap_board_data;
->  struct omap_uart_port_info;
->  
->  extern void omap_serial_init(void);
-> -extern int omap_uart_can_sleep(void);
->  extern void omap_serial_board_init(struct omap_uart_port_info *platform_data);
->  extern void omap_serial_init_port(struct omap_board_data *bdata,
->  		struct omap_uart_port_info *platform_data);
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Rob
