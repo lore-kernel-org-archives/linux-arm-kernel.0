@@ -1,45 +1,35 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 19 Feb 2012 08:07:38 +0100
-Subject: [PATCH 16/18] Atmel: move console default platform_device to
- serial driver
-In-Reply-To: <20120218091749.GA22669@samfundet.no>
-References: <0d78171672a30e8ec8084f54a557e9948260356d.1329500622.git.nicolas.ferre@atmel.com>
- <81ce940f5ac09c5d50bfa712ab10a785f28df4ea.1329500622.git.nicolas.ferre@atmel.com>
- <20120218091749.GA22669@samfundet.no>
-Message-ID: <20120219070738.GA491@game.jcrosoft.org>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Sun, 19 Feb 2012 15:39:18 +0800
+Subject: [PATCH 1/2] ALSA: Remove __devinit annotation for
+ pxa2xx_ac97_hw_probe to fix section mismatch warning
+Message-ID: <1329637158.4818.4.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:17 Sat 18 Feb     , Hans-Christian Egtvedt wrote:
-> Around Fri 17 Feb 2012 18:50:08 +0100 or thereabout, Nicolas Ferre wrote:
-> > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > 
-> > This variable spread on every SoC that is using the atmel_serial.c
-> > driver can be included directly into the latter.
-> > 
-> > This will allow to compile multiple soc in the same kernel.
-> 
-> Sounds like a good idea, but...
-> 
-> <snipp AT91 changes>
-> 
-> > diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
-> > index 402a7bb..889c544 100644
-> > --- a/arch/avr32/mach-at32ap/at32ap700x.c
-> > +++ b/arch/avr32/mach-at32ap/at32ap700x.c
-> > @@ -1055,8 +1055,6 @@ struct platform_device *__init at32_add_device_usart(unsigned int id)
-> >  	return at32_usarts[id];
-> >  }
-> >  
-> > -struct platform_device *atmel_default_console_device;
-> > -
-> >  void __init at32_setup_serial_console(unsigned int usart_id)
-> >  {
-> >  	atmel_default_console_device = at32_usarts[usart_id];
-> 
-> I doubt this assignment will work if you remove the struct above. I did not
-> look at how AT91 does this, will it be similar affected?
-none the still exist in the kernel, its just moved
+This fixes below build warning:
+WARNING: vmlinux.o(.text+0x1e632c): Section mismatch in reference from the function pxa2xx_ac97_probe() to the function .devinit.text:pxa2xx_ac97_hw_probe()
+The function pxa2xx_ac97_probe() references
+the function __devinit pxa2xx_ac97_hw_probe().
+This is often because pxa2xx_ac97_probe lacks a __devinit
+annotation or the annotation of pxa2xx_ac97_hw_probe is wrong.
 
-Best Regards,
-J.
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ sound/arm/pxa2xx-ac97-lib.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 0e9e822..5e926c4 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -313,7 +313,7 @@ int pxa2xx_ac97_hw_resume(void)
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_hw_resume);
+ #endif
+ 
+-int __devinit pxa2xx_ac97_hw_probe(struct platform_device *dev)
++int pxa2xx_ac97_hw_probe(struct platform_device *dev)
+ {
+ 	int ret;
+ 	pxa2xx_audio_ops_t *pdata = dev->dev.platform_data;
+-- 
+1.7.5.4
