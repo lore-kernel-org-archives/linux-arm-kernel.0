@@ -1,29 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 Feb 2012 11:00:40 +0000
-Subject: Query: Multiple Mappings to Mem and ARMV6+
-In-Reply-To: <CAOh2x=m_XWmHzm+KZX-E+P9b26=Bz9Ou76vCaSrHaTz-7xqHxA@mail.gmail.com>
-References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
- <20120216171520.GA9151@arm.com>
- <CAOh2x=nUPb-CcyJBmZ2wv=tsNzi=r3F16NynsbChXD=q5hSGiw@mail.gmail.com>
- <20120216174813.GE9151@arm.com>
- <CAOh2x=m_XWmHzm+KZX-E+P9b26=Bz9Ou76vCaSrHaTz-7xqHxA@mail.gmail.com>
-Message-ID: <CAHkRjk7sv6iHwhpOm1ZEH3eXppG75d8r2Y=D70SrtikyrjySwQ@mail.gmail.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Mon, 20 Feb 2012 12:03:49 +0100
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <20120217090022.GA24856@comet.dominikbrodowski.net>
+References: <1328670355.2482.68.camel@laptop>
+ <20120208202314.GA28290@redhat.com> <1328736834.2903.33.camel@pasglop>
+ <20120209075106.GB18387@elte.hu> <4F35DD3E.4020406@codeaurora.org>
+ <20120211144530.GA497@elte.hu> <4F3AEC4E.9000303@codeaurora.org>
+ <1329313085.2293.106.camel@twins>
+ <20120215140245.GB27825@n2100.arm.linux.org.uk>
+ <1329318063.2293.136.camel@twins>
+ <20120217090022.GA24856@comet.dominikbrodowski.net>
+Message-ID: <1329735829.2293.309.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2012 18:14, viresh kumar <viresh.linux@gmail.com> wrote:
-> On Thu, Feb 16, 2012 at 9:48 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> The DMA API implementation on ARM takes care of the cache cleaning and
->> invalidating.
->
-> I believe that this is the reason why we have cache re-invalidation
-> (we invalidated
-> it in dma_map_*() earlier) in dma_unmap_*() calls for ARMv6+ for
-> DMA_FROM_DEVICE.
-> Am i Correct?
+On Fri, 2012-02-17 at 10:00 +0100, Dominik Brodowski wrote:
+> 
+> Well, we can actually have both: Adding a new cpufreq governor "scheduler"
+> is easy. The scheduler stores the target frequency (in per-cent or
+> per-mille) in (per-cpu) data available to this governor, and kick a
+> (per-cpu?) thread which then handels the rest -- by existing cpufreq means.
+> The cpufreq part is easy, the sched part less so (I think). 
 
-Yes.
+You might not have been reading what I wrote, kicking a kthread (or
+doing any other scheduler activity) from within the scheduler is way
+ugly and something I'd really rather avoid if at all possible.
 
--- 
-Catalin
+Yes I could do it, but I really really don't want to.
