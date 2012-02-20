@@ -1,48 +1,126 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Feb 2012 18:37:09 +0000
-Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU platforms
-Message-ID: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Mon, 20 Feb 2012 19:08:33 +0000
+Subject: [PATCH 2/2] ARM: dma-mapping: fix leak in consistent_init
+In-Reply-To: <CAB4K4y5CV_MuEegiQuYn=_JN7zwxF11b4_kPvQVFS-V6mBwQmg@mail.gmail.com>
+References: <1329484195-26361-1-git-send-email-ajeet.yadav.77@gmail.com>
+ <1329580713.2448.17.camel@computer2.home>
+ <CAB4K4y5CV_MuEegiQuYn=_JN7zwxF11b4_kPvQVFS-V6mBwQmg@mail.gmail.com>
+Message-ID: <1329764913.2368.1.camel@computer2.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68b7f715 ("nommu: ptrace support") added definitions for
-PT_TEXT_ADDR and friends, as well as adding ptrace support for reading
-from these magic offsets.
+On Mon, 2012-02-20 at 21:42 +0530, Ajeet Yadav wrote:
+> Hi Tixy,
+> Thanks for review, so what do you suggest drop or improve the patch? 
+> 
+I would say drop the patch, unless the more experienced Linux hands here
+think otherwise.
 
-Unfortunately, this has probably never worked, since ptrace_read_user
-predicates reading on off < sizeof(struct user), returning -EOI
-otherwise.
-
-This patch moves the offset size check until after we have tried to
-match it against either a magic value or an offset into pt_regs.
-
-Cc: Paul Brook <paul@codesourcery.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/ptrace.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index e33870f..b68b52b 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -256,7 +256,7 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
- {
- 	unsigned long tmp;
- 
--	if (off & 3 || off >= sizeof(struct user))
-+	if (off & 3)
- 		return -EIO;
- 
- 	tmp = 0;
-@@ -268,6 +268,8 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
- 		tmp = tsk->mm->end_code;
- 	else if (off < sizeof(struct pt_regs))
- 		tmp = get_user_reg(tsk, off >> 2);
-+	else if (off >= sizeof(struct user))
-+		return -EIO;
- 
- 	return put_user(tmp, ret);
- }
 -- 
-1.7.4.1
+Tixy
+
+> With Regards,
+> Ajeet Yadav
+> 
+> On Feb 18, 2012 9:28 PM, "Tixy" <tixy@yxit.co.uk> wrote:
+>         On Fri, 2012-02-17 at 18:39 +0530, Ajeet Yadav wrote:
+>         > Although the error in this case is unlikely, but logically
+>         > if error occurs then we leak memory.
+>         >
+>         > Signed-off-by: Ajeet Yadav <ajeet.yadav.77@gmail.com>
+>         
+>         If you want to fix all the memory leaks then the page tables
+>         allocated
+>         by pte_alloc_kernel() need freeing as well, (and the pud and
+>         pmd
+>         tables?).
+>         
+>         However, if we run out of memory this early in boot, then the
+>         system is
+>         unusable anyway and it doesn't seem worth adding the extra
+>         code
+>         complexity to avoid any of these memory leaks.
+>         
+>         --
+>         Tixy
+>         
+>         > ---
+>         >  arch/arm/mm/dma-mapping.c |   24 ++++++++++++------------
+>         >  1 files changed, 12 insertions(+), 12 deletions(-)
+>         >
+>         > diff --git a/arch/arm/mm/dma-mapping.c
+>         b/arch/arm/mm/dma-mapping.c
+>         > index 04bfa76..b8cf062 100644
+>         > --- a/arch/arm/mm/dma-mapping.c
+>         > +++ b/arch/arm/mm/dma-mapping.c
+>         > @@ -161,7 +161,6 @@ static struct arm_vmregion_head
+>         consistent_head = {
+>         >   */
+>         >  static int __init consistent_init(void)
+>         >  {
+>         > -     int ret = 0;
+>         >       pgd_t *pgd;
+>         >       pud_t *pud;
+>         >       pmd_t *pmd;
+>         > @@ -171,7 +170,7 @@ static int __init consistent_init(void)
+>         >       unsigned long num_ptes = (CONSISTENT_END - base) >>
+>         PMD_SHIFT;
+>         >
+>         >       consistent_pte = kmalloc(num_ptes * sizeof(pte_t *),
+>         GFP_KERNEL);
+>         > -     if (!consistent_pte) {
+>         > +     if (unlikely(!consistent_pte)) {
+>         >               pr_err("%s: no memory\n", __func__);
+>         >               return -ENOMEM;
+>         >       }
+>         > @@ -183,32 +182,33 @@ static int __init
+>         consistent_init(void)
+>         >               pgd = pgd_offset(&init_mm, base);
+>         >
+>         >               pud = pud_alloc(&init_mm, pgd, base);
+>         > -             if (!pud) {
+>         > +             if (unlikely(!pud)) {
+>         >                       printk(KERN_ERR "%s: no pud tables\n",
+>         __func__);
+>         > -                     ret = -ENOMEM;
+>         > -                     break;
+>         > +                     goto err;
+>         >               }
+>         >
+>         >               pmd = pmd_alloc(&init_mm, pud, base);
+>         > -             if (!pmd) {
+>         > +             if (unlikely(!pmd)) {
+>         >                       printk(KERN_ERR "%s: no pmd tables\n",
+>         __func__);
+>         > -                     ret = -ENOMEM;
+>         > -                     break;
+>         > +                     goto err;
+>         >               }
+>         >               WARN_ON(!pmd_none(*pmd));
+>         >
+>         >               pte = pte_alloc_kernel(pmd, base);
+>         > -             if (!pte) {
+>         > +             if (unlikely(!pte)) {
+>         >                       printk(KERN_ERR "%s: no pte tables\n",
+>         __func__);
+>         > -                     ret = -ENOMEM;
+>         > -                     break;
+>         > +                     goto err;
+>         >               }
+>         >
+>         >               consistent_pte[i++] = pte;
+>         >               base += PMD_SIZE;
+>         >       } while (base < CONSISTENT_END);
+>         >
+>         > -     return ret;
+>         > +     return 0;
+>         > +err:
+>         > +     kfree(consistent_pte);
+>         > +     consistent_pte = NULL;
+>         > +     return -ENOMEM;
+>         >  }
+>         >
+>         >  core_initcall(consistent_init);
+>         
+>         
+>         
