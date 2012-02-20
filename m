@@ -1,55 +1,25 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Mon, 20 Feb 2012 12:52:45 +1100
-Subject: [PATCH 04/18] ARM: at91: make ST (System Timer) soc independent
-In-Reply-To: <20120220013825.GD29599@game.jcrosoft.org>
-References: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
- <957702b1ff83afcc0a8e842f53f05ff3f40b78b3.1329500622.git.nicolas.ferre@atmel.com>
- <4F419246.6080405@gmail.com> <20120220013825.GD29599@game.jcrosoft.org>
-Message-ID: <4F41A76D.1070409@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 19 Feb 2012 18:14:34 -0800
+Subject: [PATCH] ASoC: Add __devinit annotation for pxa2xx_ac97_probe
+In-Reply-To: <1329696290.16979.1.camel@phoenix>
+References: <1329696290.16979.1.camel@phoenix>
+Message-ID: <20120220021432.GG3194@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/12 12:38, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Mon, Feb 20, 2012 at 08:04:50AM +0800, Axel Lin wrote:
+> This fixes below build warning:
+> WARNING: vmlinux.o(.text+0x1e632c): Section mismatch in reference from the function pxa2xx_ac97_probe() to the function .devinit.text:pxa2xx_ac97_hw_probe()
+> The function pxa2xx_ac97_probe() references
+> the function __devinit pxa2xx_ac97_hw_probe().
+> This is often because pxa2xx_ac97_probe lacks a __devinit
+> annotation or the annotation of pxa2xx_ac97_hw_probe is wrong.
 
-> On 11:22 Mon 20 Feb     , Ryan Mallon wrote:
->> On 18/02/12 04:49, Nicolas Ferre wrote:
->>
->>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>>
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> ---
->>>  arch/arm/mach-at91/at91rm9200.c              |    4 +-
->>>  arch/arm/mach-at91/at91rm9200_time.c         |   37 ++++++++++++++++----------
->>>  arch/arm/mach-at91/generic.h                 |    1 +
->>>  arch/arm/mach-at91/include/mach/at91_st.h    |   32 +++++++++++++++-------
->>>  arch/arm/mach-at91/include/mach/at91rm9200.h |    2 +-
->>>  drivers/watchdog/at91rm9200_wdt.c            |    8 +++---
->>>  6 files changed, 53 insertions(+), 31 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
->>
->> Hi Jean, Nicolas,
->>
->> Patch looks mostly good, couple of points below.
->>
->> ~Ryan
->>
->> <snip>
->>
->>>  	/* Cancel any pending alarm; flush any pending IRQ */
->>> -	at91_sys_write(AT91_ST_RTAR, alm);
->>> -	(void) at91_sys_read(AT91_ST_SR);
->>> +	at91_st_write(AT91_ST_RTAR, alm);
->>> +	(void) at91_st_read(AT91_ST_SR);
->>
->>
->> Can we please remove the (void) casting of the return value when making
->> this change, especially since at91_st_read is now a macro which doesn't
->> even have a return value. Same in a few other places.
-> modification done by script and it's no the scope of this patch
-
-
-That isn't an excuse to leave incorrect code there. It is a simple fix.
-
-~Ryan
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120219/b0774825/attachment.sig>
