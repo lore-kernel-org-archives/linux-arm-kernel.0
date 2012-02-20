@@ -1,24 +1,19 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 20 Feb 2012 11:15:26 +0100
-Subject: [RFC 00/11]O MAP/ASoC: Move and merge McBSP driver under ASoC
-In-Reply-To: <CAPo=G1z6H+ZXd-cmYSpKXC-XNci7=iUz2he62ze9MyErkmUfOA@mail.gmail.com>
-References: <1329320280-1621-1-git-send-email-peter.ujfalusi@ti.com>
- <CAPo=G1z6H+ZXd-cmYSpKXC-XNci7=iUz2he62ze9MyErkmUfOA@mail.gmail.com>
-Message-ID: <2709954.pNx1BYjJOd@vclass>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 20 Feb 2012 12:26:04 +0200
+Subject: [PATCHv10 0/4] omap smps regulator support
+Message-ID: <1329733568-26676-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 of February 2012 17:56:15 Ujfalusi, Peter wrote:
-> Hi,
-> 
-> CC-ing Janusz, since he is the only one I know who have, and use OMAP1
-> with audio...
-> Janusz: if your time allows would you be able to test this series on
-> OMAP1 (it compiles...)?
+Hi,
 
-for OMAP1:
+Just some cosmetic changes compared to previous version:
 
-Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+- dropped out '[patchv9 4/5] regulator: twl4030: add support for external
+  controller', as this was accepted for merge by Mark
+- changed names of regulators from VDD1 / VDD2 -> vdd_mpu_iva / vdd_core
+  in patch 3
+- added document codes for TWL data manuals used as reference to commit log
+  in patch 3
 
-Thanks,
-Janusz
+-Tero
