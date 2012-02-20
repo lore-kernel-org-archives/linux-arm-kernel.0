@@ -1,70 +1,71 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Mon, 20 Feb 2012 08:04:50 +0800
-Subject: [PATCH] ASoC: Add __devinit annotation for pxa2xx_ac97_probe
-Message-ID: <1329696290.16979.1.camel@phoenix>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 20 Feb 2012 11:22:30 +1100
+Subject: [PATCH 04/18] ARM: at91: make ST (System Timer) soc independent
+In-Reply-To: <957702b1ff83afcc0a8e842f53f05ff3f40b78b3.1329500622.git.nicolas.ferre@atmel.com>
+References: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
+ <957702b1ff83afcc0a8e842f53f05ff3f40b78b3.1329500622.git.nicolas.ferre@atmel.com>
+Message-ID: <4F419246.6080405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes below build warning:
-WARNING: vmlinux.o(.text+0x1e632c): Section mismatch in reference from the function pxa2xx_ac97_probe() to the function .devinit.text:pxa2xx_ac97_hw_probe()
-The function pxa2xx_ac97_probe() references
-the function __devinit pxa2xx_ac97_hw_probe().
-This is often because pxa2xx_ac97_probe lacks a __devinit
-annotation or the annotation of pxa2xx_ac97_hw_probe is wrong.
+On 18/02/12 04:49, Nicolas Ferre wrote:
 
-Also rename pxa_ac97_dai to pxa_ac97_dai_driver to fix below build warning:
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/at91rm9200.c              |    4 +-
+>  arch/arm/mach-at91/at91rm9200_time.c         |   37 ++++++++++++++++----------
+>  arch/arm/mach-at91/generic.h                 |    1 +
+>  arch/arm/mach-at91/include/mach/at91_st.h    |   32 +++++++++++++++-------
+>  arch/arm/mach-at91/include/mach/at91rm9200.h |    2 +-
+>  drivers/watchdog/at91rm9200_wdt.c            |    8 +++---
+>  6 files changed, 53 insertions(+), 31 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
 
-  LD      sound/soc/pxa/built-in.o
-WARNING: sound/soc/pxa/built-in.o(.data+0x18c): Section mismatch in reference from the variable pxa_ac97_dai to the function .devinit.text:pxa2xx_ac97_probe()
-The variable pxa_ac97_dai references
-the function __devinit pxa2xx_ac97_probe()
-If the reference is valid then annotate the
-variable with __init* or __refdata (see linux/init.h) or name the variable:
-*driver, *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+Hi Jean, Nicolas,
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- sound/soc/pxa/pxa2xx-ac97.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+Patch looks mostly good, couple of points below.
 
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index 837ff34..4800d5f 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -103,7 +103,7 @@ static int pxa2xx_ac97_resume(struct snd_soc_dai *dai)
- #define pxa2xx_ac97_resume	NULL
- #endif
- 
--static int pxa2xx_ac97_probe(struct snd_soc_dai *dai)
-+static int __devinit pxa2xx_ac97_probe(struct snd_soc_dai *dai)
- {
- 	return pxa2xx_ac97_hw_probe(to_platform_device(dai->dev));
- }
-@@ -179,7 +179,7 @@ static const struct snd_soc_dai_ops pxa_ac97_mic_dai_ops = {
-  * There is only 1 physical AC97 interface for pxa2xx, but it
-  * has extra fifo's that can be used for aux DACs and ADCs.
-  */
--static struct snd_soc_dai_driver pxa_ac97_dai[] = {
-+static struct snd_soc_dai_driver pxa_ac97_dai_driver[] = {
- {
- 	.name = "pxa2xx-ac97",
- 	.ac97_control = 1,
-@@ -244,13 +244,13 @@ static __devinit int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- 	 * driver to do interesting things with the clocking to get us up
- 	 * and running.
- 	 */
--	return snd_soc_register_dais(&pdev->dev, pxa_ac97_dai,
--			ARRAY_SIZE(pxa_ac97_dai));
-+	return snd_soc_register_dais(&pdev->dev, pxa_ac97_dai_driver,
-+			ARRAY_SIZE(pxa_ac97_dai_driver));
- }
- 
- static int __devexit pxa2xx_ac97_dev_remove(struct platform_device *pdev)
- {
--	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(pxa_ac97_dai));
-+	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(pxa_ac97_dai_driver));
- 	return 0;
- }
- 
--- 
-1.7.5.4
+~Ryan
+
+<snip>
+
+>  	/* Cancel any pending alarm; flush any pending IRQ */
+> -	at91_sys_write(AT91_ST_RTAR, alm);
+> -	(void) at91_sys_read(AT91_ST_SR);
+> +	at91_st_write(AT91_ST_RTAR, alm);
+> +	(void) at91_st_read(AT91_ST_SR);
+
+
+Can we please remove the (void) casting of the return value when making
+this change, especially since at91_st_read is now a macro which doesn't
+even have a return value. Same in a few other places.
+
+>  
+>  	/* Schedule alarm by writing RTAR. */
+>  	alm += delta;
+> -	at91_sys_write(AT91_ST_RTAR, alm);
+> +	at91_st_write(AT91_ST_RTAR, alm);
+>  
+>  	return status;
+>  }
+> @@ -175,15 +175,24 @@ static struct clock_event_device clkevt = {
+>  	.set_mode	= clkevt32k_mode,
+>  };
+>  
+> +void __iomem *at91_st_base;
+> +
+> +void __init at91rm9200_ioremap_st(u32 addr)
+> +{
+> +	at91_st_base = ioremap(AT91RM9200_BASE_ST, 256);
+> +	if (!at91_st_base)
+> +		panic("Impossible to ioremap ST\n");
+> +}
+
+
+I can't see anything in this patch which calls this function? Also, why
+is it extern? Can't it just be moved to whichever file is going to call
+it and make it static there?
