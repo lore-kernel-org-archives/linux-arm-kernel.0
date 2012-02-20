@@ -1,78 +1,68 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 20 Feb 2012 12:26:07 +0200
-Subject: [PATCHv10 3/4] omap3: add common twl configurations for vdd1 and vdd2
-In-Reply-To: <1329733568-26676-1-git-send-email-t-kristo@ti.com>
-References: <1329733568-26676-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1329733568-26676-4-git-send-email-t-kristo@ti.com>
+From: armando.visconti@st.com (Armando Visconti)
+Date: Mon, 20 Feb 2012 11:26:44 +0100
+Subject: Question on ARM Cortex R4 support in Linux
+In-Reply-To: <20120220100122.GB14018@arm.com>
+References: <CAPub149OKvBUiKoOie9BmKYfopB7L0_J1fSx2Nh-aRXr99RPaQ@mail.gmail.com>
+ <20120213105313.GD4994@arm.com>
+ <CAPub1482HL66wX92Oc7Vu75QaweOEd3k2S757mx513GueSkurA@mail.gmail.com>
+ <20120213110730.GA7375@arm.com> <4F4217F7.6050908@st.com>
+ <20120220100122.GB14018@arm.com>
+Message-ID: <4F421FE4.3030106@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
-to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
-are needed by DVFS.
+Ciao Catalin,
 
-Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manuals:
-- SWCS019L : TWL4030 ES3.1 Data Manual rev L
-- SWCS030E : TWL5030 ES1.2 Data Manual rev E
+Thx for the answer.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/twl-common.c |   36 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 36 insertions(+), 0 deletions(-)
+On 02/20/2012 11:01 AM, Catalin Marinas wrote:
+> On Mon, Feb 20, 2012 at 09:52:55AM +0000, Armando Visconti wrote:
+>>>>>> Has anybody used it on Cortex R4 based platform ?
+>>>>>
+>>>>> In theory Linux support for R4 should just work (once CONFIG_MMU is
+>>>>> disabled). I used to test it in the past regularly but not recently.
+>>>>
+>>>> Great. I was planning to use linux-3.2, I hope the support is there ?
+>>>
+>>> It's been there for years, but some bit-rotting may have occurred.
+>>
+>> I'm assuming you have tried it on a FPGA solution, is that correct?
+>
+> It may have been a real silicon (core tile for a RealView EB board), I
+> don't remember the details.
+>
 
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 10b20c6..5f62e51 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -126,6 +126,38 @@ static struct regulator_init_data omap3_vpll2_idata = {
- 	.consumer_supplies		= omap3_vpll2_supplies,
- };
- 
-+static struct regulator_consumer_supply omap3_vdd1_supply[] = {
-+	REGULATOR_SUPPLY("vcc", "mpu.0"),
-+};
-+
-+static struct regulator_consumer_supply omap3_vdd2_supply[] = {
-+	REGULATOR_SUPPLY("vcc", "l3_main.0"),
-+};
-+
-+static struct regulator_init_data omap3_vdd1 = {
-+	.constraints = {
-+		.name			= "vdd_mpu_iva",
-+		.min_uV			= 600000,
-+		.max_uV			= 1450000,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
-+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
-+	},
-+	.num_consumer_supplies		= ARRAY_SIZE(omap3_vdd1_supply),
-+	.consumer_supplies		= omap3_vdd1_supply,
-+};
-+
-+static struct regulator_init_data omap3_vdd2 = {
-+	.constraints = {
-+		.name			= "vdd_core",
-+		.min_uV			= 600000,
-+		.max_uV			= 1450000,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
-+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
-+	},
-+	.num_consumer_supplies		= ARRAY_SIZE(omap3_vdd2_supply),
-+	.consumer_supplies		= omap3_vdd2_supply,
-+};
-+
- void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 				  u32 pdata_flags, u32 regulators_flags)
- {
-@@ -133,6 +165,10 @@ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
- 		pmic_data->irq_base = TWL4030_IRQ_BASE;
- 	if (!pmic_data->irq_end)
- 		pmic_data->irq_end = TWL4030_IRQ_END;
-+	if (!pmic_data->vdd1)
-+		pmic_data->vdd1 = &omap3_vdd1;
-+	if (!pmic_data->vdd2)
-+		pmic_data->vdd2 = &omap3_vdd2;
- 
- 	/* Common platform data configurations */
- 	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
+OK, I see.
+
+
+>> We are planning to buy a Cortex-R4 board from ARM.
+>> Lionel Belnet suggested to buy Versatile + a CoreTile with Cortex-R4F
+>> r1p2 Test Chip on it.
+>>
+>> Is there any Linux/ucLinux support already offered for this solution?
+>
+> On www.arm.com/linux there is a uClinux tab with images for download,
+> though the kernel is 2.6.35. Anyway, you can always get a newer kernel
+> and just disable CONFIG_MMU for a RealView/EB board with ARMv6
+> processor.
+>
+
+So, you are suggesting that we can got for a RealView + CoreTile with
+Cortex-R4F testchip instead of versatile?
+
+Why ARMv6?
+Maybe you meant ARMv7?
+
+Thx,
+Arm
+
+
 -- 
-1.7.4.1
+-- "Every step appears to be the unavoidable consequence of the
+-- preceding one." (A. Einstein)
+-- 
+Armando Visconti                  Mobile: (+39) 346 8879146
+Senior SW Engineer                Fax:    (+39) 02 93519290
+CPG                               Work:   (+39) 02 93519683
+Computer System Division          e-mail: armando.visconti at st.com
+ST Microelectronics               TINA:   051  4683
