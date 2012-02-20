@@ -1,92 +1,235 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Feb 2012 04:49:13 +0100
-Subject: [PATCH 04/18] ARM: at91: make ST (System Timer) soc independent
-In-Reply-To: <4F41C29D.2090702@gmail.com>
-References: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
- <957702b1ff83afcc0a8e842f53f05ff3f40b78b3.1329500622.git.nicolas.ferre@atmel.com>
- <4F419246.6080405@gmail.com>
- <20120220013825.GD29599@game.jcrosoft.org>
- <4F41A76D.1070409@gmail.com>
- <20120220030234.GE29599@game.jcrosoft.org>
- <4F41BB20.8000901@gmail.com>
- <20120220032324.GF29599@game.jcrosoft.org>
- <4F41C29D.2090702@gmail.com>
-Message-ID: <20120220034913.GG29599@game.jcrosoft.org>
+From: dmitry.antipov@linaro.org (Dmitry Antipov)
+Date: Mon, 20 Feb 2012 10:04:19 +0400
+Subject: [PATCH] sched: generalize CONFIG_IRQ_TIME_ACCOUNTING for X86 and ARM
+Message-ID: <1329717859-19378-1-git-send-email-dmitry.antipov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:48 Mon 20 Feb     , Ryan Mallon wrote:
-> On 20/02/12 14:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> > On 14:16 Mon 20 Feb     , Ryan Mallon wrote:
-> >> On 20/02/12 14:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>
-> >>> On 12:52 Mon 20 Feb     , Ryan Mallon wrote:
-> >>>> On 20/02/12 12:38, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>>>
-> >>>>> On 11:22 Mon 20 Feb     , Ryan Mallon wrote:
-> >>>>>> On 18/02/12 04:49, Nicolas Ferre wrote:
-> >>>>>>
-> >>>>>>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>>>>>>
-> >>>>>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>>>>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>>>>>> ---
-> >>>>>>>  arch/arm/mach-at91/at91rm9200.c              |    4 +-
-> >>>>>>>  arch/arm/mach-at91/at91rm9200_time.c         |   37 ++++++++++++++++----------
-> >>>>>>>  arch/arm/mach-at91/generic.h                 |    1 +
-> >>>>>>>  arch/arm/mach-at91/include/mach/at91_st.h    |   32 +++++++++++++++-------
-> >>>>>>>  arch/arm/mach-at91/include/mach/at91rm9200.h |    2 +-
-> >>>>>>>  drivers/watchdog/at91rm9200_wdt.c            |    8 +++---
-> >>>>>>>  6 files changed, 53 insertions(+), 31 deletions(-)
-> >>>>>>>
-> >>>>>>> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> >>>>>>
-> >>>>>> Hi Jean, Nicolas,
-> >>>>>>
-> >>>>>> Patch looks mostly good, couple of points below.
-> >>>>>>
-> >>>>>> ~Ryan
-> >>>>>>
-> >>>>>> <snip>
-> >>>>>>
-> >>>>>>>  	/* Cancel any pending alarm; flush any pending IRQ */
-> >>>>>>> -	at91_sys_write(AT91_ST_RTAR, alm);
-> >>>>>>> -	(void) at91_sys_read(AT91_ST_SR);
-> >>>>>>> +	at91_st_write(AT91_ST_RTAR, alm);
-> >>>>>>> +	(void) at91_st_read(AT91_ST_SR);
-> >>>>>>
-> >>>>>>
-> >>>>>> Can we please remove the (void) casting of the return value when making
-> >>>>>> this change, especially since at91_st_read is now a macro which doesn't
-> >>>>>> even have a return value. Same in a few other places.
-> >>>>> modification done by script and it's no the scope of this patch
-> >>>>
-> >>>>
-> >>>> That isn't an excuse to leave incorrect code there. It is a simple fix.
-> >>> no (void) in c means you don't care of the return so basically it's right
-> >>
-> >>
-> >> Because of the way the __raw_writel is defined you are casting the
-> >> result of an assignment, basically you are doing this:
-> >>
-> >>    int foo, bar;
-> >>
-> >>   (void)(foo = bar);
-> >>
-> >> Which is pointless. Don't make excuses for silly, redundant code. Fix
-> >> it, please.
-> > except it's a read it has nothing to do with that
-> 
-> 
-> It makes no difference, it is still equally pointless. We don't cast
-> unused return values to void, for functions or assignments, in the kernel.
-> 
-> It is pointless, superfluous code, and now is a really good opportunity
-> to fix it. You can probably even make your script do it for you :-).
-I do not want to do 2 thinks at the same time
-[
-if there is a need to o fix this, it must be done in other patch bisectable
+Generalize CONFIG_IRQ_TIME_ACCOUNTING  between X86 and
+ARM, move "noirqtime=" option to common debugging code.
+For a bit of backward compatibility, X86-specific option
+"tsc=noirqtime" is preserved, but issues a warning.
 
-Best Regards,
-J.
+Suggested-by: Yong Zhang <yong.zhang0@gmail.com>
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Suggested-by: Ingo Molnar <mingo@elte.hu>
+Acked-by: Venkatesh Pallipadi <venki@google.com>
+Signed-off-by: Dmitry Antipov <dmitry.antipov@linaro.org>
+---
+ Documentation/kernel-parameters.txt |    9 +++++----
+ arch/arm/kernel/sched_clock.c       |    2 ++
+ arch/x86/Kconfig                    |   11 -----------
+ arch/x86/kernel/tsc.c               |   12 ++++++------
+ include/linux/sched.h               |   17 ++++++++++-------
+ kernel/sched/core.c                 |   21 ++++++++++++---------
+ lib/Kconfig.debug                   |   12 ++++++++++++
+ 7 files changed, 47 insertions(+), 37 deletions(-)
+
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 033d4e6..a5da255 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -1790,6 +1790,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 	noirqdebug	[X86-32] Disables the code which attempts to detect and
+ 			disable unhandled interrupt sources.
+ 
++	noirqtime	[X86,ARM] Run time disables IRQ_TIME_ACCOUNTING and
++			eliminates the timestamping on irq/softirq entry/exit.
++
+ 	no_timer_check	[X86,APIC] Disables the code which tests for
+ 			broken timer IRQ sources.
+ 
+@@ -2636,10 +2639,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			as the stability checks done at bootup.	Used to enable
+ 			high-resolution timer mode on older hardware, and in
+ 			virtualized environment.
+-			[x86] noirqtime: Do not use TSC to do irq accounting.
+-			Used to run time disable IRQ_TIME_ACCOUNTING on any
+-			platforms where RDTSC is slow and this accounting
+-			can add overhead.
++			[x86] noirqtime: obsoleted by "noirqtime" generic option,
++			see it's documentation for details.
+ 
+ 	turbografx.map[2|3]=	[HW,JOY]
+ 			TurboGraFX parallel port interface
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index 5416c7c..30b5f89 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -144,6 +144,8 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	 */
+ 	cd.epoch_ns = 0;
+ 
++	enable_sched_clock_irqtime();
++
+ 	pr_debug("Registered %pF as sched_clock source\n", read);
+ }
+ 
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 5bed94e..4759676 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -805,17 +805,6 @@ config SCHED_MC
+ 	  making when dealing with multi-core CPU chips at a cost of slightly
+ 	  increased overhead in some places. If unsure say N here.
+ 
+-config IRQ_TIME_ACCOUNTING
+-	bool "Fine granularity task level IRQ time accounting"
+-	default n
+-	---help---
+-	  Select this option to enable fine granularity task irq time
+-	  accounting. This is done by reading a timestamp on each
+-	  transitions between softirq and hardirq state, so there can be a
+-	  small performance impact.
+-
+-	  If in doubt, say N here.
+-
+ source "kernel/Kconfig.preempt"
+ 
+ config X86_UP_APIC
+diff --git a/arch/x86/kernel/tsc.c b/arch/x86/kernel/tsc.c
+index a62c201..f1b2b63 100644
+--- a/arch/x86/kernel/tsc.c
++++ b/arch/x86/kernel/tsc.c
+@@ -103,14 +103,15 @@ int __init notsc_setup(char *str)
+ 
+ __setup("notsc", notsc_setup);
+ 
+-static int no_sched_irq_time;
+-
+ static int __init tsc_setup(char *str)
+ {
+ 	if (!strcmp(str, "reliable"))
+ 		tsc_clocksource_reliable = 1;
+-	if (!strncmp(str, "noirqtime", 9))
+-		no_sched_irq_time = 1;
++	if (!strncmp(str, "noirqtime", 9)) {
++		printk(KERN_WARNING "tsc: tsc=noirqtime is "
++		       "obsolete, use noirqtime instead\n");
++		disable_sched_clock_irqtime();
++	}
+ 	return 1;
+ }
+ 
+@@ -978,8 +979,7 @@ void __init tsc_init(void)
+ 	/* now allow native_sched_clock() to use rdtsc */
+ 	tsc_disabled = 0;
+ 
+-	if (!no_sched_irq_time)
+-		enable_sched_clock_irqtime();
++	enable_sched_clock_irqtime();
+ 
+ 	lpj = ((u64)tsc_khz * 1000);
+ 	do_div(lpj, HZ);
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 7d379a6..9b13f79 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1961,13 +1961,16 @@ extern void sched_clock_idle_wakeup_event(u64 delta_ns);
+ #endif
+ 
+ #ifdef CONFIG_IRQ_TIME_ACCOUNTING
+-/*
+- * An i/f to runtime opt-in for irq time accounting based off of sched_clock.
+- * The reason for this explicit opt-in is not to have perf penalty with
+- * slow sched_clocks.
+- */
+-extern void enable_sched_clock_irqtime(void);
+-extern void disable_sched_clock_irqtime(void);
++extern int sched_clock_irqtime;
++static inline void enable_sched_clock_irqtime(void)
++{
++	if (sched_clock_irqtime == -1)
++		sched_clock_irqtime = 1;
++}
++static inline void disable_sched_clock_irqtime(void)
++{
++	sched_clock_irqtime = 0;
++}
+ #else
+ static inline void enable_sched_clock_irqtime(void) {}
+ static inline void disable_sched_clock_irqtime(void) {}
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 5255c9d..4e7a197 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -757,18 +757,21 @@ static DEFINE_PER_CPU(u64, cpu_hardirq_time);
+ static DEFINE_PER_CPU(u64, cpu_softirq_time);
+ 
+ static DEFINE_PER_CPU(u64, irq_start_time);
+-static int sched_clock_irqtime;
+ 
+-void enable_sched_clock_irqtime(void)
+-{
+-	sched_clock_irqtime = 1;
+-}
++/*
++ * -1 if not initialized, 0 if disabled with "noirqtime" kernel option
++ * or after unstable clock was detected, 1 if enabled and active.
++ */
++__read_mostly int sched_clock_irqtime = -1;
+ 
+-void disable_sched_clock_irqtime(void)
++static int __init irqtime_setup(char *str)
+ {
+ 	sched_clock_irqtime = 0;
++	return 1;
+ }
+ 
++__setup("noirqtime", irqtime_setup);
++
+ #ifndef CONFIG_64BIT
+ static DEFINE_PER_CPU(seqcount_t, irq_time_seq);
+ 
+@@ -822,7 +825,7 @@ void account_system_vtime(struct task_struct *curr)
+ 	s64 delta;
+ 	int cpu;
+ 
+-	if (!sched_clock_irqtime)
++	if (sched_clock_irqtime < 1)
+ 		return;
+ 
+ 	local_irq_save(flags);
+@@ -2853,7 +2856,7 @@ void account_process_tick(struct task_struct *p, int user_tick)
+ 	cputime_t one_jiffy_scaled = cputime_to_scaled(cputime_one_jiffy);
+ 	struct rq *rq = this_rq();
+ 
+-	if (sched_clock_irqtime) {
++	if (sched_clock_irqtime > 0) {
+ 		irqtime_account_process_tick(p, user_tick, rq);
+ 		return;
+ 	}
+@@ -2887,7 +2890,7 @@ void account_steal_ticks(unsigned long ticks)
+ void account_idle_ticks(unsigned long ticks)
+ {
+ 
+-	if (sched_clock_irqtime) {
++	if (sched_clock_irqtime > 0) {
+ 		irqtime_account_idle_ticks(ticks);
+ 		return;
+ 	}
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 8745ac7..236e814 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -299,6 +299,18 @@ config SCHEDSTATS
+ 	  application, you can say N to avoid the very slight overhead
+ 	  this adds.
+ 
++config IRQ_TIME_ACCOUNTING
++	bool "Fine granularity task level IRQ time accounting"
++	depends on X86 || ARM
++	default n
++	---help---
++	  Select this option to enable fine granularity task irq time
++	  accounting. This is done by reading a timestamp on each
++	  transitions between softirq and hardirq state, so there can be a
++	  small performance impact.
++
++	  If in doubt, say N here.
++
+ config TIMER_STATS
+ 	bool "Collect kernel timers statistics"
+ 	depends on DEBUG_KERNEL && PROC_FS
+-- 
+1.7.7.6
