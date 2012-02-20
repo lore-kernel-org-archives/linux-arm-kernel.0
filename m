@@ -1,75 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Feb 2012 07:36:21 +0000
-Subject: [PATCH 13/18] ARM: at91/rtc-at91sam9: pass the GPBR to use via
- ressources
-In-Reply-To: <20120220012010.GA29599@game.jcrosoft.org>
-References: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
- <8187feb330895bf9e077ede21e68cc81a72438cc.1329500622.git.nicolas.ferre@atmel.com>
- <4F419742.70200@gmail.com> <20120220012010.GA29599@game.jcrosoft.org>
-Message-ID: <20120220073621.GB22562@n2100.arm.linux.org.uk>
+Date: Mon, 20 Feb 2012 07:39:41 +0000
+Subject: [PATCH 1/2] Documentation/gpio.txt: Explain expected pinctrl
+ interaction
+In-Reply-To: <1329719263-18971-1-git-send-email-swarren@nvidia.com>
+References: <1329719263-18971-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20120220073941.GC22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 02:20:10AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:43 Mon 20 Feb     , Ryan Mallon wrote:
-> > On 18/02/12 04:50, Nicolas Ferre wrote:
-> > 
-> > > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > 
-> > > The GPBR registers are used for storing RTC values. The GPBR registers
-> > > to use are now provided using standard resource entry. The array is
-> > > filled in SoC specific code.
-> > > rtc-at91sam9 RTT as RTC driver is modified to retrieve this information.
-> > > 
-> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > ---
-> > >  arch/arm/mach-at91/at91sam9260_devices.c      |   10 +++++++-
-> > >  arch/arm/mach-at91/at91sam9261_devices.c      |    8 ++++++-
-> > >  arch/arm/mach-at91/at91sam9263_devices.c      |   16 +++++++++++--
-> > >  arch/arm/mach-at91/at91sam9g45_devices.c      |    8 ++++++-
-> > >  arch/arm/mach-at91/at91sam9rl_devices.c       |    8 ++++++-
-> > >  arch/arm/mach-at91/include/mach/at91sam9260.h |    5 +--
-> > >  arch/arm/mach-at91/include/mach/at91sam9261.h |    5 +--
-> > >  arch/arm/mach-at91/include/mach/at91sam9263.h |    5 +--
-> > >  arch/arm/mach-at91/include/mach/at91sam9g45.h |    5 +--
-> > >  arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
-> > >  drivers/rtc/rtc-at91sam9.c                    |   29 +++++++++++++++++++++---
-> > >  11 files changed, 76 insertions(+), 25 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> > > index 2071017..ae2b648 100644
-> > > --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> > > +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> > > @@ -718,14 +718,16 @@ static struct resource rtt_resources[] = {
-> > >  		.start	= AT91SAM9260_BASE_RTT,
-> > >  		.end	= AT91SAM9260_BASE_RTT + SZ_16 - 1,
-> > >  		.flags	= IORESOURCE_MEM,
-> > > -	}
-> > > +	}, {
-> > > +		.flags	= IORESOURCE_MEM,
-> > > +	},
-> > >  };
-> > >  
-> > >  static struct platform_device at91sam9260_rtt_device = {
-> > >  	.name		= "at91_rtt",
-> > >  	.id		= 0,
-> > >  	.resource	= rtt_resources,
-> > > -	.num_resources	= ARRAY_SIZE(rtt_resources),
-> > > +	.num_resources	= 1,
-> > 
-> > 
-> > Why this change? The device has two resources, and the rtc driver
-> > request both of them, so why are you saying there is only one resource
-> > here. It either needs to be changed back to use ARRAY_SIZE, or needs a
-> > comment explaining what magic is in use.
-> because the number of resources depends on the user of rtt
-> we must not hardcode the GPBR reg as this resource will be present only if the
-> rtc-at91sam9 is enabled
+On Sun, Feb 19, 2012 at 11:27:42PM -0700, Stephen Warren wrote:
+> Update gpio.txt based on recent discussions regarding interaction with the
+> pinctrl subsystem.
+> 
+> Previously, gpio_request() was described as explicitly not performing any
+> required mux setup operations etc.
+> 
+> Now, gpio_request() is explicitly as explicitly performing any required mux
+> setup operations where possible. In the case it isn't, platform code is
+> required to have set up any required muxing or other configuration prior to
+> gpio_request() being called, in order to maintain the same semantics.
 
-Better would be to leave .num_resources uninitalized and set that
-appropriately elsewhere when you make the decision whether GPBR is
-present or not.  That may help to avoid people trying to "fix" this
-for you via static checking tools.
-
-As Ryan mentions, a comment in the code would be a good idea too.
+So what if you need to have the pin as a GPIO, manipulate it as a GPIO,
+and then hand it off to a special function, and then take it back as
+a GPIO before you shut the special function down ?
