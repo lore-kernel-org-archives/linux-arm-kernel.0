@@ -1,53 +1,48 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 20 Feb 2012 15:04:57 -0800
-Subject: [PATCH v3 05/10] ARM: tegra: rework Tegra secondary CPU core
- bringup
-In-Reply-To: <1328831277-21002-6-git-send-email-pdeschrijver@nvidia.com>
-References: <1328831277-21002-1-git-send-email-pdeschrijver@nvidia.com>
- <1328831277-21002-6-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <CAMbhsRRkkjfymL=uDt+phM2sLunbypQRUhjZ=DHSO4y9Ko4NJA@mail.gmail.com>
+From: hector.oron@gmail.com (Hector Oron)
+Date: Tue, 21 Feb 2012 00:09:28 +0100
+Subject: [PATCH] efikamx: match machine descriptions with legacy
+Message-ID: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 9, 2012 at 3:47 PM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> Prepare the Tegra secondary CPU core bringup code for other Tegra variants.
-> The reset handler is also generalized to allow for future introduction of
-> powersaving modes which turn off the CPU cores.
->
-> Based on work by:
->
-> Scott Williams <scwilliams@nvidia.com>
-> Chris Johnson <cwj@nvidia.com>
-> Colin Cross <ccross@android.com>
->
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
-> ---
-<snip>
+  Rename machine descriptions to match legacy descriptions distributed by
+  manufacturer BSP. This way distributions can do clean upgrades from
+  userspace scripts which check for these values to differentiate platforms
+  with single kernel binaries.
 
-> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-> index b5349b2..7973f1c 100644
-> --- a/arch/arm/mach-tegra/headsmp.S
-> +++ b/arch/arm/mach-tegra/headsmp.S
+Signed-off-by: Hector Oron <hector.oron@gmail.com>
+Acked-by: Matt Sealey <matt@genesi-usa.com>
+---
+ arch/arm/mach-mx5/board-mx51_efikamx.c |    3 +--
+ arch/arm/mach-mx5/board-mx51_efikasb.c |    2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
-<snip>
-
-> @@ -47,15 +64,116 @@ ENTRY(v7_invalidate_l1)
-> ? ? ? ? mov ? ? pc, lr
-> ?ENDPROC(v7_invalidate_l1)
->
-> +
-> ?ENTRY(tegra_secondary_startup)
-> - ? ? ? msr ? ? cpsr_fsxc, #0xd3
-> ? ? ? ? bl ? ? ?v7_invalidate_l1
-> - ? ? ? mrc ? ? p15, 0, r0, c0, c0, 5
-> - ? ? ? ?and ? ?r0, r0, #15
-> - ? ? ? ?ldr ? ? r1, =0x6000f100
-> - ? ? ? ?str ? ? r0, [r1]
-> -1: ? ? ?ldr ? ? r2, [r1]
-> - ? ? ? ?cmp ? ? r0, r2
-> - ? ? ? ?beq ? ? 1b
-> + ? ? ? mov32 ? r0, 0xC5ACCE55
-> + ? ? ? mcr ? ? p14, 0, r0, c7, c12, 6
-
-One minor nit, you should comment that this is enabling coresight.
+diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+index 3a5ed2d..fbfccc7 100644
+--- a/arch/arm/mach-mx5/board-mx51_efikamx.c
++++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+@@ -283,8 +283,7 @@ static struct sys_timer mx51_efikamx_timer = {
+ 	.init = mx51_efikamx_timer_init,
+ };
+ 
+-MACHINE_START(MX51_EFIKAMX, "Genesi EfikaMX nettop")
+-	/* Maintainer: Amit Kucheria <amit.kucheria@linaro.org> */
++MACHINE_START(MX51_EFIKAMX, "Genesi Efika MX (Smarttop)")
+ 	.atag_offset = 0x100,
+ 	.map_io = mx51_map_io,
+ 	.init_early = imx51_init_early,
+diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
+index 4baf05c..dedbca5 100644
+--- a/arch/arm/mach-mx5/board-mx51_efikasb.c
++++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
+@@ -483,7 +483,7 @@ static struct sys_timer mx51_efikasb_timer = {
+ 	.init	= mx51_efikasb_timer_init,
+ };
+ 
+-MACHINE_START(MX51_EFIKASB, "Genesi Efika Smartbook")
++MACHINE_START(MX51_EFIKASB, "Genesi Efika MX (Smartbook)")
+ 	.atag_offset = 0x100,
+ 	.map_io = mx51_map_io,
+ 	.init_early = imx51_init_early,
+-- 
+1.7.9
