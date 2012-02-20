@@ -1,87 +1,66 @@
-From: enrico.scholz@sigma-chemnitz.de (Enrico Scholz)
-Date: Mon, 20 Feb 2012 14:52:05 +0100
-Subject: [PATCH] gpio/mxs: support irqs triggered by both edges
-Message-ID: <1329745925-7868-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 20 Feb 2012 14:46:34 +0100
+Subject: [PATCH 1/4 v2] i2c/gpio: add DT support
+In-Reply-To: <20120220133725.GD11307@game.jcrosoft.org>
+References: <1328754308-7365-1-git-send-email-plagnioj@jcrosoft.com>
+ <4F3945B1.9070900@samsung.com>
+ <20120220095813.GB11307@game.jcrosoft.org>
+ <20120220100843.GE22562@n2100.arm.linux.org.uk>
+ <20120220102231.GC11307@game.jcrosoft.org>
+ <20120220125054.GF22562@n2100.arm.linux.org.uk>
+ <20120220133725.GD11307@game.jcrosoft.org>
+Message-ID: <20120220134634.GE11307@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX28 silicon does not support irqs triggered by both gpio edges. Patch
-emulates this behavior by configuring such irqs as level triggered and
-by switching polarity in the interrupt handler.
+On 14:37 Mon 20 Feb     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:50 Mon 20 Feb     , Russell King - ARM Linux wrote:
+> > On Mon, Feb 20, 2012 at 11:22:31AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 10:08 Mon 20 Feb     , Russell King - ARM Linux wrote:
+> > > > On Mon, Feb 20, 2012 at 10:58:13AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > On 18:17 Mon 13 Feb     , Karol Lewandowski wrote:
+> > > > > > > +	- udelay: delay between GPIO operations (may depend on each platform)
+> > > > > > > +	- timeout: timeout to get data (ms)
+> > > > > > 
+> > > > > > 
+> > > > > > If these are really needed then I would prefer to have these fully
+> > > > > > qualified (with unit type "-ms/-millisecs" appended).
+> > > > > > 
+> > > > > > Regulator framework, with its "-microvolt/-microamp", serve here as
+> > > > > > prime example of being quite descriptive (one doesn't neet to look up
+> > > > > > the docs). Please see:
+> > > > > > 
+> > > > > >   http://permalink.gmane.org/gmane.linux.ports.arm.omap/67637
+> > > > > timeout are usualy in ms I don't really see the need of -ms or so
+> > > > 
+> > > > Which is obviously total crap for udelay, which would be in _micro_seconds.
+> > > agreed but here on i2c gpio I never see timetout as udelay so I don't see
+> > > the mandatory to force the name in the binding
+> > > 
+> > > futhermore it's maybe linux specific
+> > 
+> > Stop grabbing at straws.  There's nothing linux specific about the units
+> > of specification.
+> > 
+> > What is linux specific is specifying the _delay_ rather than specifying
+> > the bus frequency.  So as soon as you're trying to justify not adding
+> > the units because they may be linux specific, you've already lost that
+> > argument by using a delay rather than a bus frequency.  You can't have
+> > it both ways.
+> > 
+> > Moreover, mixing microseconds and milliseconds in the properties for a
+> > device is absolutely insane.
+> > 
+> > So, which ever way, your patch as it currently stands is wrong and broken.
+>  no what I said is the binding timeout is maybe linux specific for i2c gpio
 
-Signed-off-by: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
----
- drivers/gpio/gpio-mxs.c |   31 +++++++++++++++++++++++++++++--
- 1 files changed, 29 insertions(+), 2 deletions(-)
+I do not argue about that here we do not even disucss about the bus frequency
+but the specific bining to the i2c algo bit for it's internal timeout
 
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 385c58e..ab973be 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -57,6 +57,7 @@ struct mxs_gpio_port {
- 	int id;
- 	int irq;
- 	int virtual_irq_start;
-+	unsigned long both_edge;
- 	struct bgpio_chip bgc;
- };
- 
-@@ -68,9 +69,12 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- 	u32 pin_mask = 1 << (gpio & 31);
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct mxs_gpio_port *port = gc->private;
-+	int lvl;
- 	void __iomem *pin_addr;
- 	int edge;
- 
-+	clear_bit(gpio & 31, &port->both_edge);
-+
- 	switch (type) {
- 	case IRQ_TYPE_EDGE_RISING:
- 		edge = GPIO_INT_RISE_EDGE;
-@@ -84,6 +88,14 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- 	case IRQ_TYPE_LEVEL_HIGH:
- 		edge = GPIO_INT_HIGH_LEV;
- 		break;
-+	case IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING:
-+		/* mx28 does not support triggering irq by both edges; emulate
-+		 * behavior by configuring irq as level triggered and update
-+		 * irq polarity in the irq handler */
-+		set_bit(gpio & 31, &port->both_edge);
-+		lvl  = readl(port->base + PINCTRL_DIN(port->id));
-+		edge = (lvl & pin_mask) ? GPIO_INT_LOW_LEV : GPIO_INT_HIGH_LEV;
-+		break;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -114,11 +126,26 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- 	u32 irq_stat;
- 	struct mxs_gpio_port *port = irq_get_handler_data(irq);
- 	u32 gpio_irq_no_base = port->virtual_irq_start;
-+	void __iomem *base = port->base;
-+	u32 pol_msk;
- 
- 	desc->irq_data.chip->irq_ack(&desc->irq_data);
- 
--	irq_stat = readl(port->base + PINCTRL_IRQSTAT(port->id)) &
--			readl(port->base + PINCTRL_IRQEN(port->id));
-+	irq_stat = readl(base + PINCTRL_IRQSTAT(port->id)) &
-+			readl(base + PINCTRL_IRQEN(port->id));
-+
-+	/* handle irqs triggered by both edges */
-+	pol_msk = irq_stat & port->both_edge;
-+	if (pol_msk) {
-+		void __iomem *reg = base + PINCTRL_IRQPOL(port->id);
-+		u32 port_lvl = readl(base + PINCTRL_DIN(port->id));
-+
-+		/* \todo write into the TOGGLE register (without reading port
-+		 * level register); this requires a special unmask operation
-+		 * which updates the IRQPOL register */
-+		writel(pol_msk & port_lvl, reg + MXS_CLR);
-+		writel(pol_msk & ~port_lvl, reg + MXS_SET);
-+	}
- 
- 	while (irq_stat != 0) {
- 		int irqoffset = fls(irq_stat) - 1;
--- 
-1.7.7.6
+the timeout is used to do not end in an infinite loop while ready the scl on
+slow device
+
+that's why I said it's maybe linux specific
+
+Best Regards,
+J.
