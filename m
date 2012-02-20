@@ -1,67 +1,87 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 20 Feb 2012 15:51:55 +0200
-Subject: [2.6.39.3] [MX25] oops in driver_register for ADC touchscreen
- support (imx_adc_ts)
-In-Reply-To: <9741ebebcbc88e7e82a70d619e6c1d51@mail.fqingenieria.es>
-References: <50e2a71500444a5e1b951e5856d474bf@mail.fqingenieria.es>
- <20120220094013.GA9921@sapphire.tkos.co.il>
- <70cdf2c4b729fb7dfa1d641c4609c6f5@mail.fqingenieria.es>
- <20120220101157.GB9921@sapphire.tkos.co.il>
- <9741ebebcbc88e7e82a70d619e6c1d51@mail.fqingenieria.es>
-Message-ID: <20120220135155.GC9921@sapphire.tkos.co.il>
+From: enrico.scholz@sigma-chemnitz.de (Enrico Scholz)
+Date: Mon, 20 Feb 2012 14:52:05 +0100
+Subject: [PATCH] gpio/mxs: support irqs triggered by both edges
+Message-ID: <1329745925-7868-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi joancarles,
+iMX28 silicon does not support irqs triggered by both gpio edges. Patch
+emulates this behavior by configuring such irqs as level triggered and
+by switching polarity in the interrupt handler.
 
-On Mon, Feb 20, 2012 at 02:42:14PM +0100, joancarles wrote:
-> >>We are also trying a stock 3.3-rc kernel and can't get
-> >>our i.MX25 to boot ... yet.
-> >
-> >This is on-topic here. Can you share more details?
-> 
-> Right now, the only tree we have to test here is a 3.2.0-rc2, but I
-> will try a 3.3-rc kernel soon (slow Internet connection and an even
-> slower computer to cross-compile kernels inhibits us perform work
-> quicker). In case there is interest, this is the output of where it
-> hangs.
-> 
-> I believe it might have something to do with the way of how MTD
-> works, or doesn't in our case, with regard to 2.6.x kernels. It
-> can't find a list of partitions.
+Signed-off-by: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
+---
+ drivers/gpio/gpio-mxs.c |   31 +++++++++++++++++++++++++++++--
+ 1 files changed, 29 insertions(+), 2 deletions(-)
 
-[snip]
-
-> Kernel command line: console=ttymxc0,115200 root=/dev/mtdblock2
-> rootfstype=jffs2 mtdparts=physmap-flash.0:0x100000(u-boot),0x300000(kernel),0x3C00000(jffs2)
-> bootcmd=tftpboot 0x81000000 /v2.1.8-rc/uImage
-
-[snip]
-
-> List of all partitions:
-> No filesystem could mount root, tried:  jffs2
-> Kernel panic - not syncing: VFS: Unable to mount root fs on
-> unknown-block(0,0)
-> [<c00181d0>] (unwind_backtrace+0x0/0xf0) from [<c0325f58>]
-> (panic+0x60/0x198)
-> [<c0325f58>] (panic+0x60/0x198) from [<c041db7c>]
-> (mount_block_root+0x244/0x294)
-> [<c041db7c>] (mount_block_root+0x244/0x294) from [<c041dd4c>]
-> (prepare_namespace+0x11c/0x180)
-> [<c041dd4c>] (prepare_namespace+0x11c/0x180) from [<c041d800>]
-> (kernel_init+0xe8/0x11c)
-> [<c041d800>] (kernel_init+0xe8/0x11c) from [<c0013cf4>]
-> (kernel_thread_exit+0x0/0x8)
-
-MTD support in your kernel seems to be missing.
-
-What kind of flash do you have on your board? NOR? NAND?
-
-Please post your kernel .config file.
-
-baruch
-
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index 385c58e..ab973be 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -57,6 +57,7 @@ struct mxs_gpio_port {
+ 	int id;
+ 	int irq;
+ 	int virtual_irq_start;
++	unsigned long both_edge;
+ 	struct bgpio_chip bgc;
+ };
+ 
+@@ -68,9 +69,12 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+ 	u32 pin_mask = 1 << (gpio & 31);
+ 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+ 	struct mxs_gpio_port *port = gc->private;
++	int lvl;
+ 	void __iomem *pin_addr;
+ 	int edge;
+ 
++	clear_bit(gpio & 31, &port->both_edge);
++
+ 	switch (type) {
+ 	case IRQ_TYPE_EDGE_RISING:
+ 		edge = GPIO_INT_RISE_EDGE;
+@@ -84,6 +88,14 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+ 	case IRQ_TYPE_LEVEL_HIGH:
+ 		edge = GPIO_INT_HIGH_LEV;
+ 		break;
++	case IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING:
++		/* mx28 does not support triggering irq by both edges; emulate
++		 * behavior by configuring irq as level triggered and update
++		 * irq polarity in the irq handler */
++		set_bit(gpio & 31, &port->both_edge);
++		lvl  = readl(port->base + PINCTRL_DIN(port->id));
++		edge = (lvl & pin_mask) ? GPIO_INT_LOW_LEV : GPIO_INT_HIGH_LEV;
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -114,11 +126,26 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ 	u32 irq_stat;
+ 	struct mxs_gpio_port *port = irq_get_handler_data(irq);
+ 	u32 gpio_irq_no_base = port->virtual_irq_start;
++	void __iomem *base = port->base;
++	u32 pol_msk;
+ 
+ 	desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 
+-	irq_stat = readl(port->base + PINCTRL_IRQSTAT(port->id)) &
+-			readl(port->base + PINCTRL_IRQEN(port->id));
++	irq_stat = readl(base + PINCTRL_IRQSTAT(port->id)) &
++			readl(base + PINCTRL_IRQEN(port->id));
++
++	/* handle irqs triggered by both edges */
++	pol_msk = irq_stat & port->both_edge;
++	if (pol_msk) {
++		void __iomem *reg = base + PINCTRL_IRQPOL(port->id);
++		u32 port_lvl = readl(base + PINCTRL_DIN(port->id));
++
++		/* \todo write into the TOGGLE register (without reading port
++		 * level register); this requires a special unmask operation
++		 * which updates the IRQPOL register */
++		writel(pol_msk & port_lvl, reg + MXS_CLR);
++		writel(pol_msk & ~port_lvl, reg + MXS_SET);
++	}
+ 
+ 	while (irq_stat != 0) {
+ 		int irqoffset = fls(irq_stat) - 1;
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.7.7.6
