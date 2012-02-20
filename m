@@ -1,274 +1,114 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Mon, 20 Feb 2012 15:17:52 +0530
-Subject: [PATCH v2 1/1] rc: Add support for GPIO based IR Receiver driver.
-Message-ID: <1329731272-31476-1-git-send-email-kumarrav@codeaurora.org>
+From: Madhusudhan.Gowda@elektrobit.com (Madhusudhan.Gowda at elektrobit.com)
+Date: Mon, 20 Feb 2012 11:52:51 +0200
+Subject: [GIT PULL] OMAP PM EMU fix for v3.3
+In-Reply-To: <AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com>
+References: <87liw8agk4.fsf@ti.com>
+ <AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com>
+ <20120127190239.GC9339@atomide.com>
+ <AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com>
+Message-ID: <AA48DD8077D5D945A49BD1782C1140F10122E2B7@fioues08.ebgroup.elektrobit.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds GPIO based IR Receiver driver. It decodes signals using decoders
-available in rc framework.
+Hi Kevin,
 
-Signed-off-by: Ravi Kumar V <kumarrav@codeaurora.org>
----
- drivers/media/rc/Kconfig        |    9 ++
- drivers/media/rc/Makefile       |    1 +
- drivers/media/rc/gpio-ir-recv.c |  189 +++++++++++++++++++++++++++++++++++++++
- include/media/gpio-ir-recv.h    |   23 +++++
- 4 files changed, 222 insertions(+), 0 deletions(-)
- create mode 100644 drivers/media/rc/gpio-ir-recv.c
- create mode 100644 include/media/gpio-ir-recv.h
+I think you have missed my last mail. Could you please ACK the pull
+request and pull the same.
 
-diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
-index aeb7f43..6f63ded 100644
---- a/drivers/media/rc/Kconfig
-+++ b/drivers/media/rc/Kconfig
-@@ -256,4 +256,13 @@ config RC_LOOPBACK
- 	   To compile this driver as a module, choose M here: the module will
- 	   be called rc_loopback.
+Best Regards
+Gowda
+
+
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org
+[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
+linux-arm-kernel-bounces+madhusudhan.gowda=elektrobit.com at lists.infradea
+d.org
+Sent: 28 January 2012 09:58
+To: tony at atomide.com; khilman at ti.com
+Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: RE: [GIT PULL] OMAP PM EMU fix for v3.3
+
+Thanks Tony
+
+Hi Kevin
+Please do the needful and pull the same.
+
+Best Regards
+Gowda
+
+
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org
+[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Tony
+Lindgren
+Sent: 27 January 2012 21:03
+To: Gowda Madhusudhan
+Cc: Kevin Hilman; linux-omap at vger.kernel.org;
+linux-arm-kernel at lists.infradead.org
+Subject: Re: [GIT PULL] OMAP PM EMU fix for v3.3
+
+Hi,
+
+* Madhusudhan.Gowda at elektrobit.com <Madhusudhan.Gowda@elektrobit.com>
+[120127 10:25]:
+> Hi Tony,
+> 
+> Please pull the PM EMU off mode fix for v3.3
+
+It's best that Kevin queues this as it affects PM. Or it at least needs
+an ack from Kevin.
+
+Regards,
+
+Tony
  
-+config IR_GPIO_CIR
-+	tristate "GPIO IR remote control"
-+	depends on RC_CORE
-+	---help---
-+	   Say Y if you want to use GPIO based IR Receiver.
-+
-+	   To compile this driver as a module, choose M here: the module will
-+	   be called gpio-ir-recv.
-+
- endif #RC_CORE
-diff --git a/drivers/media/rc/Makefile b/drivers/media/rc/Makefile
-index 2156e78..9b3568e 100644
---- a/drivers/media/rc/Makefile
-+++ b/drivers/media/rc/Makefile
-@@ -25,3 +25,4 @@ obj-$(CONFIG_IR_REDRAT3) += redrat3.o
- obj-$(CONFIG_IR_STREAMZAP) += streamzap.o
- obj-$(CONFIG_IR_WINBOND_CIR) += winbond-cir.o
- obj-$(CONFIG_RC_LOOPBACK) += rc-loopback.o
-+obj-$(CONFIG_IR_GPIO_CIR) += gpio-ir-recv.o
-diff --git a/drivers/media/rc/gpio-ir-recv.c b/drivers/media/rc/gpio-ir-recv.c
-new file mode 100644
-index 0000000..cf6e7f6
---- /dev/null
-+++ b/drivers/media/rc/gpio-ir-recv.c
-@@ -0,0 +1,189 @@
-+/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/gpio.h>
-+#include <linux/slab.h>
-+#include <linux/platform_device.h>
-+#include <linux/irq.h>
-+#include <media/rc-core.h>
-+#include <media/gpio-ir-recv.h>
-+
-+#define GPIO_IR_DRIVER_NAME	"gpio-rc-recv"
-+#define GPIO_IR_DEVICE_NAME	"gpio_ir_recv"
-+
-+struct gpio_rc_dev {
-+	struct rc_dev *rcdev;
-+	struct mutex lock;
-+	unsigned int gpio_nr;
-+	bool active_low;
-+	bool can_wakeup;
-+};
-+
-+static irqreturn_t gpio_ir_recv_irq(int irq, void *dev_id)
-+{
-+	struct gpio_rc_dev *gpio_dev = dev_id;
-+	unsigned int gval;
-+	int rc = 0;
-+	enum raw_event_type type = IR_SPACE;
-+
-+	mutex_lock(&gpio_dev->lock);
-+	gval = gpio_get_value_cansleep(gpio_dev->gpio_nr);
-+
-+	if (gval < 0)
-+		goto err_get_value;
-+
-+	if (gpio_dev->active_low)
-+		gval = !gval;
-+
-+	if (gval == 1)
-+		type = IR_PULSE;
-+
-+	rc = ir_raw_event_store_edge(gpio_dev->rcdev, type);
-+	if (rc < 0)
-+		goto err_get_value;
-+
-+	ir_raw_event_handle(gpio_dev->rcdev);
-+
-+err_get_value:
-+	mutex_unlock(&gpio_dev->lock);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int __devinit gpio_ir_recv_probe(struct platform_device *pdev)
-+{
-+	struct gpio_rc_dev *gpio_dev;
-+	struct rc_dev *rcdev;
-+	const struct gpio_ir_recv_platform_data *pdata =
-+					pdev->dev.platform_data;
-+	int rc;
-+
-+	if (!pdata)
-+		return -EINVAL;
-+
-+	if (pdata->gpio_nr < 0)
-+		return -EINVAL;
-+
-+	gpio_dev = kzalloc(sizeof(struct gpio_rc_dev), GFP_KERNEL);
-+	if (!gpio_dev)
-+		return -ENOMEM;
-+
-+	mutex_init(&gpio_dev->lock);
-+
-+	rcdev = rc_allocate_device();
-+	if (!rcdev) {
-+		rc = -ENOMEM;
-+		goto err_allocate_device;
-+	}
-+
-+	rcdev->driver_type = RC_DRIVER_IR_RAW;
-+	rcdev->allowed_protos = RC_TYPE_NEC;
-+	rcdev->input_name = GPIO_IR_DEVICE_NAME;
-+	rcdev->input_id.bustype = BUS_HOST;
-+	rcdev->driver_name = GPIO_IR_DRIVER_NAME;
-+	rcdev->map_name = RC_MAP_EMPTY;
-+
-+	gpio_dev->rcdev = rcdev;
-+	gpio_dev->gpio_nr = pdata->gpio_nr;
-+	gpio_dev->active_low = pdata->active_low;
-+	gpio_dev->can_wakeup = pdata->can_wakeup;
-+
-+
-+	rc = gpio_request(pdata->gpio_nr, "gpio-ir-recv");
-+	if (rc < 0)
-+		goto err_gpio_request;
-+	rc  = gpio_direction_input(pdata->gpio_nr);
-+	if (rc < 0)
-+		goto err_gpio_direction_input;
-+
-+	rc = rc_register_device(rcdev);
-+	if (rc < 0) {
-+		dev_err(&pdev->dev, "failed to register rc device\n");
-+		goto err_register_rc_device;
-+	}
-+
-+	platform_set_drvdata(pdev, gpio_dev);
-+
-+	rc = request_threaded_irq(gpio_to_irq(pdata->gpio_nr),
-+			NULL, gpio_ir_recv_irq,
-+			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
-+			"gpio-ir-recv-irq", gpio_dev);
-+	if (rc < 0)
-+		goto err_request_irq;
-+
-+	if (pdata->can_wakeup == true) {
-+		rc = enable_irq_wake(gpio_to_irq(pdata->gpio_nr));
-+		if (rc < 0)
-+			goto err_enable_irq_wake;
-+	}
-+
-+	return 0;
-+
-+err_enable_irq_wake:
-+	free_irq(gpio_to_irq(gpio_dev->gpio_nr), gpio_dev);
-+err_request_irq:
-+	platform_set_drvdata(pdev, NULL);
-+	rc_unregister_device(rcdev);
-+err_register_rc_device:
-+err_gpio_direction_input:
-+	gpio_free(pdata->gpio_nr);
-+err_gpio_request:
-+	rc_free_device(rcdev);
-+	rcdev = NULL;
-+err_allocate_device:
-+	mutex_destroy(&gpio_dev->lock);
-+	kfree(gpio_dev);
-+	return rc;
-+}
-+
-+static int __devexit gpio_ir_recv_remove(struct platform_device *pdev)
-+{
-+	struct gpio_rc_dev *gpio_dev = platform_get_drvdata(pdev);
-+
-+	disable_irq_wake(gpio_to_irq(gpio_dev->gpio_nr));
-+	free_irq(gpio_to_irq(gpio_dev->gpio_nr), gpio_dev);
-+	platform_set_drvdata(pdev, NULL);
-+	rc_unregister_device(gpio_dev->rcdev);
-+	gpio_free(gpio_dev->gpio_nr);
-+	rc_free_device(gpio_dev->rcdev);
-+	mutex_destroy(&gpio_dev->lock);
-+	kfree(gpio_dev);
-+	return 0;
-+}
-+
-+static struct platform_driver gpio_ir_recv_driver = {
-+	.probe  = gpio_ir_recv_probe,
-+	.remove = __devexit_p(gpio_ir_recv_remove),
-+	.driver = {
-+		.name   = GPIO_IR_DRIVER_NAME,
-+		.owner  = THIS_MODULE,
-+	},
-+};
-+
-+static int __init gpio_ir_recv_init(void)
-+{
-+	return platform_driver_register(&gpio_ir_recv_driver);
-+}
-+module_init(gpio_ir_recv_init);
-+
-+static void __exit gpio_ir_recv_exit(void)
-+{
-+	platform_driver_unregister(&gpio_ir_recv_driver);
-+}
-+module_exit(gpio_ir_recv_exit);
-+
-+MODULE_DESCRIPTION("GPIO IR Receiver driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/media/gpio-ir-recv.h b/include/media/gpio-ir-recv.h
-new file mode 100644
-index 0000000..3eab611
---- /dev/null
-+++ b/include/media/gpio-ir-recv.h
-@@ -0,0 +1,23 @@
-+/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __GPIO_IR_RECV_H__
-+#define __GPIO_IR_RECV_H__
-+
-+struct gpio_ir_recv_platform_data {
-+	unsigned int gpio_nr;
-+	bool active_low;
-+	bool can_wakeup;
-+};
-+
-+#endif /* __GPIO_IR_RECV_H__ */
-+
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Thanks
+> Gowda
+> 
+> The following changes since commit
+> 1c6ece3c23e58d0dbc687407d606f3560ded582a:
+> 
+>   Merge branch 'omap_fixes_a_3.3rc' of git://git.pwsan.com/linux-2.6
+> (2012-01-26 16:48:37 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/elektrobit/linux.git linux-omap-emu-fix
+> 
+> Madhusudhan Gowda (1):
+>       ARM: OMAP3 PM:Save and restore EMU context across MPU OFF
+> 
+>  arch/arm/mach-omap2/cm2xxx_3xxx.c |   16 ++++++++++++----
+>  arch/arm/mach-omap2/cm2xxx_3xxx.h |    2 ++
+>  arch/arm/mach-omap2/pm34xx.c      |    8 ++++++++
+>  3 files changed, 22 insertions(+), 4 deletions(-)
+> 
+> 
+> ----------------------------------------------------------------
+> Please note: This e-mail may contain confidential information intended
+
+> solely for the addressee. If you have received this e-mail in error, 
+> please do not disclose it to anyone, notify the sender promptly, and 
+> delete the message from your system.
+> Thank you.
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+----------------------------------------------------------------
+Please note: This e-mail may contain confidential information intended
+solely for the addressee. If you have received this e-mail in error,
+please do not disclose it to anyone, notify the sender promptly, and
+delete the message from your system.
+Thank you.
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
