@@ -1,26 +1,40 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 20 Feb 2012 20:55:54 +0100
-Subject: [PATCH v2 7/7] MFD: TWL6040: Add regulator support for VIO, V2V1
- supplies
-In-Reply-To: <1328619678-26080-8-git-send-email-peter.ujfalusi@ti.com>
-References: <1328619678-26080-1-git-send-email-peter.ujfalusi@ti.com>
- <1328619678-26080-8-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120220195554.GQ5387@sortiz-mobl>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 Feb 2012 20:59:23 +0100
+Subject: [PATCH] ux500: Remove keyboard pin definition for snowball
+In-Reply-To: <1329216456-5569-1-git-send-email-philippe.langlais@stericsson.com>
+References: <1329216456-5569-1-git-send-email-philippe.langlais@stericsson.com>
+Message-ID: <CACRpkdZcer6Mvon7jmUbOWmg0Zwn2kjei=qni6b+E1J3EcQecw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, Feb 14, 2012 at 11:47 AM, Philippe Langlais
+<philippe.langlais@stericsson.com> wrote:
 
-On Tue, Feb 07, 2012 at 03:01:18PM +0200, Peter Ujfalusi wrote:
-> twl6040 has three power supply source:
-> VBAT needs to be connected to VBAT, VIO, and V2V1.
-> Add regulator support for the VIO, V2V1 supplies.
-> Initially handle the two supply together with bulk commands.
-I applied this one.
+> From: Philippe Langlais <philippe.langlais@linaro.org>
+>
+> Interfered with CG2900
+>
+> Signed-off-by: Benn P?rscke <benn.porscke@stericsson.com>
+> Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+> ---
+> ?arch/arm/mach-ux500/board-mop500-pins.c | ? ?7 ++++++-
+> ?1 files changed, 6 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+> index f8e7cd7..da17111 100644
+> --- a/arch/arm/mach-ux500/board-mop500-pins.c
+> +++ b/arch/arm/mach-ux500/board-mop500-pins.c
+> @@ -419,7 +419,6 @@ static struct ux500_pin_lookup mop500_pins[] = {
+> ? ? ? ?PIN_LOOKUP("nmk-i2c.1", &mop500_pins_i2c1),
+> ? ? ? ?PIN_LOOKUP("nmk-i2c.2", &mop500_pins_i2c2),
+> ? ? ? ?PIN_LOOKUP("nmk-i2c.3", &mop500_pins_i2c3),
+> - ? ? ? PIN_LOOKUP("ske", &mop500_pins_ske),
+> ? ? ? ?PIN_LOOKUP("sdi0", &mop500_pins_sdi0),
+> ? ? ? ?PIN_LOOKUP("sdi1", &mop500_pins_sdi1),
+> ? ? ? ?PIN_LOOKUP("sdi2", &mop500_pins_sdi2),
 
-Cheers,
-Samuel.
+I cannot apply this patch, the "PIN_LOOKUP()" stuff is not in the
+mainline kernel and needs submitting first/instead...
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Yours,
+Linus Walleij
