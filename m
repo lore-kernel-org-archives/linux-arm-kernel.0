@@ -1,27 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Feb 2012 10:08:43 +0000
-Subject: [PATCH 1/4 v2] i2c/gpio: add DT support
-In-Reply-To: <20120220095813.GB11307@game.jcrosoft.org>
-References: <1328754308-7365-1-git-send-email-plagnioj@jcrosoft.com>
- <4F3945B1.9070900@samsung.com> <20120220095813.GB11307@game.jcrosoft.org>
-Message-ID: <20120220100843.GE22562@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 20 Feb 2012 12:11:58 +0200
+Subject: [2.6.39.3] [MX25] oops in driver_register for ADC touchscreen
+ support (imx_adc_ts)
+In-Reply-To: <70cdf2c4b729fb7dfa1d641c4609c6f5@mail.fqingenieria.es>
+References: <50e2a71500444a5e1b951e5856d474bf@mail.fqingenieria.es>
+ <20120220094013.GA9921@sapphire.tkos.co.il>
+ <70cdf2c4b729fb7dfa1d641c4609c6f5@mail.fqingenieria.es>
+Message-ID: <20120220101157.GB9921@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 10:58:13AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 18:17 Mon 13 Feb     , Karol Lewandowski wrote:
-> > > +	- udelay: delay between GPIO operations (may depend on each platform)
-> > > +	- timeout: timeout to get data (ms)
-> > 
-> > 
-> > If these are really needed then I would prefer to have these fully
-> > qualified (with unit type "-ms/-millisecs" appended).
-> > 
-> > Regulator framework, with its "-microvolt/-microamp", serve here as
-> > prime example of being quite descriptive (one doesn't neet to look up
-> > the docs). Please see:
-> > 
-> >   http://permalink.gmane.org/gmane.linux.ports.arm.omap/67637
-> timeout are usualy in ms I don't really see the need of -ms or so
+Hi joancarles,
 
-Which is obviously total crap for udelay, which would be in _micro_seconds.
+On Mon, Feb 20, 2012 at 11:07:56AM +0100, joancarles wrote:
+
+[snip]
+
+> We are also trying a stock 3.3-rc kernel and can't get
+> our i.MX25 to boot ... yet.
+
+This is on-topic here. Can you share more details?
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
