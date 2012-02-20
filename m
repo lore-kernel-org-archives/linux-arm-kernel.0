@@ -1,57 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 20 Feb 2012 19:28:23 +0100
-Subject: [PATCH] ARM i.MX5/6: Add dt support for generic boards
-In-Reply-To: <20120220064213.GB19668@S2101-09.ap.freescale.net>
-References: <1329476820-27066-1-git-send-email-s.hauer@pengutronix.de>
- <20120220064213.GB19668@S2101-09.ap.freescale.net>
-Message-ID: <20120220182823.GY3852@pengutronix.de>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 20 Feb 2012 18:33:04 +0000
+Subject: [PATCH v7 5/8] davinci: dm644x: change vpfe capture structure
+ variables for consistency
+In-Reply-To: <1324475021-32509-6-git-send-email-manjunath.hadli@ti.com>
+References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
+ <1324475021-32509-6-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317C7DB4@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Manju,
 
-On Mon, Feb 20, 2012 at 02:42:15PM +0800, Shawn Guo wrote:
-> On Fri, Feb 17, 2012 at 12:07:00PM +0100, Sascha Hauer wrote:
-> > Apart from the iomux setup which may not be needed on custom
-> > boards the kernel starts fine using the devicetree, so add
-> > generic boards to the dt_compat entries.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  arch/arm/mach-imx/imx51-dt.c   |    1 +
-> >  arch/arm/mach-imx/imx53-dt.c   |    1 +
-> >  arch/arm/mach-imx/mach-imx6q.c |    1 +
-> >  3 files changed, 3 insertions(+), 0 deletions(-)
-> > 
-> I guess the point that the patch is trying to make is that we do not
-> need to touch these files whenever we add a new board booting with
-> device tree, if the board does not need any special handling there
-> with its compatible string.
-
-Yes.
-
+On Wed, Dec 21, 2011 at 19:13:38, Hadli, Manjunath wrote:
+> Add SoC and board prefixes to variable names so that it is
+> consistent with the rest of the file.
 > 
-> But we may still need a specific compatible string for the board in its
-> .dts file rather than just specific common like "fsl,imx6q".
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Yes, a dts file should definitely have a more specific compatible string
-with fsl,imx6q just being the fallback.
+Again the subject line was not following the conventions
+currently in place. I am pretty sure they were in place
+at the time you submitted the patch too. Please take care
+next time onwards. For now, I have fixed it while committing.
 
->  That
-> said, Documentation/devicetree/bindings/arm/fsl.txt needs an update
-> anyway whenever a new board support is added.
-> 
-> Also, isn't it a good thing to have the dt_compat list explicitly show
-> all the boards that the dt file supports?
+While I was at it, I also modified the subject line to make
+it less verbose. Here is what I committed:
 
-When we add the dts file to the kernel we can update Doc/../fsl.txt
-accordingly. I find it very useful to be able to run an unpatched kernel
-on various custom boards which are (not yet) in mainline.
+    ARM: davinci: dm644x: fix inconsistent variable naming
 
-Sascha
+    Add dm644x_ prefix to names of v4l2 variables in dm644x.c
+    Add dm644xevm_ prefix to names of v4l2 variables in board-dm644x-evm.c.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+    This makes the code consistent with rest of these files.
+
+    Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks,
+Sekhar
