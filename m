@@ -1,41 +1,29 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 Feb 2012 10:41:56 +0000
-Subject: Question on ARM Cortex R4 support in Linux
-In-Reply-To: <4F421FE4.3030106@st.com>
-References: <CAPub149OKvBUiKoOie9BmKYfopB7L0_J1fSx2Nh-aRXr99RPaQ@mail.gmail.com>
- <20120213105313.GD4994@arm.com>
- <CAPub1482HL66wX92Oc7Vu75QaweOEd3k2S757mx513GueSkurA@mail.gmail.com>
- <20120213110730.GA7375@arm.com> <4F4217F7.6050908@st.com>
- <20120220100122.GB14018@arm.com> <4F421FE4.3030106@st.com>
-Message-ID: <20120220104156.GD14018@arm.com>
+Date: Mon, 20 Feb 2012 11:00:40 +0000
+Subject: Query: Multiple Mappings to Mem and ARMV6+
+In-Reply-To: <CAOh2x=m_XWmHzm+KZX-E+P9b26=Bz9Ou76vCaSrHaTz-7xqHxA@mail.gmail.com>
+References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
+ <20120216171520.GA9151@arm.com>
+ <CAOh2x=nUPb-CcyJBmZ2wv=tsNzi=r3F16NynsbChXD=q5hSGiw@mail.gmail.com>
+ <20120216174813.GE9151@arm.com>
+ <CAOh2x=m_XWmHzm+KZX-E+P9b26=Bz9Ou76vCaSrHaTz-7xqHxA@mail.gmail.com>
+Message-ID: <CAHkRjk7sv6iHwhpOm1ZEH3eXppG75d8r2Y=D70SrtikyrjySwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 10:26:44AM +0000, Armando Visconti wrote:
-> On 02/20/2012 11:01 AM, Catalin Marinas wrote:
-> > On Mon, Feb 20, 2012 at 09:52:55AM +0000, Armando Visconti wrote:
-> >> We are planning to buy a Cortex-R4 board from ARM.
-> >> Lionel Belnet suggested to buy Versatile + a CoreTile with Cortex-R4F
-> >> r1p2 Test Chip on it.
-> >>
-> >> Is there any Linux/ucLinux support already offered for this solution?
-> >
-> > On www.arm.com/linux there is a uClinux tab with images for download,
-> > though the kernel is 2.6.35. Anyway, you can always get a newer kernel
-> > and just disable CONFIG_MMU for a RealView/EB board with ARMv6
-> > processor.
-> 
-> So, you are suggesting that we can got for a RealView + CoreTile with
-> Cortex-R4F testchip instead of versatile?
+On 16 February 2012 18:14, viresh kumar <viresh.linux@gmail.com> wrote:
+> On Thu, Feb 16, 2012 at 9:48 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+>> The DMA API implementation on ARM takes care of the cache cleaning and
+>> invalidating.
+>
+> I believe that this is the reason why we have cache re-invalidation
+> (we invalidated
+> it in dma_map_*() earlier) in dma_unmap_*() calls for ARMv6+ for
+> DMA_FROM_DEVICE.
+> Am i Correct?
 
-I wasn't aware that we have a Versatile board supporting a Cortex-R4
-tile. You could just mail support at arm.com and ask them to advise. I
-recall I only tested with with a RealView/EB board.
-
-> Why ARMv6?
-> Maybe you meant ARMv7?
-
-Yes, ARMv7 (ARM1156 is a v6).
+Yes.
 
 -- 
 Catalin
