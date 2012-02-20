@@ -1,76 +1,44 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 20 Feb 2012 22:39:08 +0100
-Subject: [PATCH 2/2] GPIO: LPC32xx: Add output reading to GPO P3
-In-Reply-To: <1329773948-4655-1-git-send-email-stigge@antcom.de>
-References: <1329773948-4655-1-git-send-email-stigge@antcom.de>
-Message-ID: <1329773948-4655-2-git-send-email-stigge@antcom.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Feb 2012 14:08:46 -0800
+Subject: ARM: OMAP2xxx: PM: remove obsolete timer disable code in the
+ suspend path
+In-Reply-To: <alpine.DEB.2.00.1202100140430.2553@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1202092007540.17520@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202100140430.2553@utopia.booyaka.com>
+Message-ID: <20120220220846.GO18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip offers the function to detect the current state of output of the GPO
-P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
-sysfs
+* Paul Walmsley <paul@pwsan.com> [120210 00:10]:
+> On Thu, 9 Feb 2012, Paul Walmsley wrote:
+> 
+> > 
+> > Remove omap_{read,write}l() from the 24xx PM code.  The clocksource
+> > code should now handle what this was supposed to do.
+> > 
+> > Tested on N800 -- but it's hard to say whether this fixes anything.
+> > OMAP24xx static suspend path is currently broken, and this patch
+> > doesn't change that.
+> > 
+> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> > Cc: Kevin Hilman <khilman@ti.com>
+> > Cc: Rob Herring <robherring2@gmail.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> 
+> Just realized that a stray change made it into the patch that was posted.
+> Below is a version with the stray change removed.  It applies on 
+> Tony's v3.3-rc3 testing branch, plus the OMAP2420 serial fix patch that 
+> was posted earlier.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Thanks I'll apply this into my clean-up branch along with other
+io.h changes. I also have fixed omap_read/write for the following
+on omap2+:
 
----
- drivers/gpio/gpio-lpc32xx.c |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+plat-omap/dma.c
+drivers/gpio/gpio-omap.c
 
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -62,9 +62,11 @@
- #define GPIO3_PIN_IN_SEL(x, y)		(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
- #define GPIO3_PIN5_IN_SEL(x)		(((x) >> 24) & 1)
- #define GPI3_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
-+#define GPO3_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
- 
- struct gpio_regs {
- 	void __iomem *inp_state;
-+	void __iomem *outp_state;
- 	void __iomem *outp_set;
- 	void __iomem *outp_clr;
- 	void __iomem *dir_set;
-@@ -145,6 +147,7 @@ static struct gpio_regs gpio_grp_regs_p2
- 
- static struct gpio_regs gpio_grp_regs_p3 = {
- 	.inp_state	= LPC32XX_GPIO_P3_INP_STATE,
-+	.outp_state	= LPC32XX_GPIO_P3_OUTP_STATE,
- 	.outp_set	= LPC32XX_GPIO_P3_OUTP_SET,
- 	.outp_clr	= LPC32XX_GPIO_P3_OUTP_CLR,
- 	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
-@@ -240,6 +243,12 @@ static int __get_gpi_state_p3(struct lpc
- 	return GPI3_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state), pin);
- }
- 
-+static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
-+	unsigned pin)
-+{
-+	return GPO3_PIN_IN_SEL(__raw_readl(group->gpio_grp->outp_state), pin);
-+}
-+
- /*
-  * GENERIC_GPIO primitives.
-  */
-@@ -340,6 +349,13 @@ static void lpc32xx_gpo_set_value(struct
- 	__set_gpo_level_p3(group, pin, value);
- }
- 
-+static int lpc32xx_gpo_get_value(struct gpio_chip *chip, unsigned pin)
-+{
-+	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
-+
-+	return __get_gpo_state_p3(group, pin);
-+}
-+
- static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
- {
- 	if (pin < chip->ngpio)
-@@ -427,6 +443,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.label			= "gpo_p3",
- 			.direction_output	= lpc32xx_gpio_dir_out_always,
- 			.set			= lpc32xx_gpo_set_value,
-+			.get			= lpc32xx_gpo_get_value,
- 			.request		= lpc32xx_gpio_request,
- 			.base			= LPC32XX_GPO_P3_GRP,
- 			.ngpio			= LPC32XX_GPO_P3_MAX,
+Planning to also fix plat-omap/usb.c.
+
+Regards,
+
+Tony
