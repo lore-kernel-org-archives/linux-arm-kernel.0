@@ -1,47 +1,60 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 20 Feb 2012 19:15:05 +0000
-Subject: [PATCH v7 6/8] davinci: dm644x: move vpfe init from soc to
- board	specific files
-In-Reply-To: <1324475021-32509-7-git-send-email-manjunath.hadli@ti.com>
-References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
- <1324475021-32509-7-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6317C7F07@DBDE01.ent.ti.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 20 Feb 2012 20:47:36 +0100
+Subject: [PATCH v3 0/3] MFD: twl6040: Conversion to i2c driver
+In-Reply-To: <1328868018-24668-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1328868018-24668-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120220194736.GN5387@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manju,
+Hi Peter,
 
-On Wed, Dec 21, 2011 at 19:13:39, Hadli, Manjunath wrote:
-> Move all vpfe platform device registrations to the board specific
-> file like the rest of the devices, and have all of them together.
-
-I dropped this line from commit text since EMAC and MDIO still
-seem to be registered all the time so the "like the rest of the
-devices" part isn't really true.
-
+On Fri, Feb 10, 2012 at 12:00:15PM +0200, Peter Ujfalusi wrote:
+> Hello,
 > 
-> This would remove the  restriction of inclusion and registration of
-> vpfe platform devices for non-vpfe boards.
+> Changes since v2:
+> - soc/codec/Kconfig: make twl6040 depend on I2C
+> - Regulator related patches has been removed (to be sent as separate series)
+I applied all 3 patches. Patch #2 did not apply cleanly, due to the fact that
+several struct twl4030_codec_data omap4panda.c references are not upstream
+yet. This is my .rej:
 
-I don't think the term "non-vpfe board" is in the right sense.
-So, I replace this with the expanded form: "boards which do not use vpfe".
+--- arch/arm/mach-omap2/board-omap4panda.c
++++ arch/arm/mach-omap2/board-omap4panda.c
+@@ -278,7 +279,7 @@
+ 	return 0;
+ }
+ 
+-static struct twl4030_codec_data twl6040_codec = {
++static struct twl6040_codec_data twl6040_codec = {
+ 	/* single-step ramp for headset and handsfree */
+ 	.hs_left_step	= 0x0f,
+ 	.hs_right_step	= 0x0f,
+@@ -286,17 +287,14 @@
+ 	.hf_right_step	= 0x1d,
+ };
+ 
+-static struct twl4030_audio_data twl6040_audio = {
++static struct twl6040_platform_data twl6040_data = {
+ 	.codec		= &twl6040_codec,
+ 	.audpwron_gpio	= 127,
+-	.naudint_irq	= OMAP44XX_IRQ_SYS_2N,
+ 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
+ };
+ 
+ /* Panda board uses the common PMIC configuration */
+-static struct twl4030_platform_data omap4_panda_twldata = {
+-	.audio		= &twl6040_audio,
+-};
++static struct twl4030_platform_data omap4_panda_twldata;
 
-Apart from this, I also added the "ARM: " prefix to subject.
+I'm not sure hwo we could handle that properly. Either by letting Tony
+carrying this patchset, or by sending me the panda patch that adds those
+structures. As you prefer.
 
-> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-> index 7d940f5..71aae93 100644
-> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+Cheers,
+Samuel.
 
-> +static struct platform_device *dm644x_video_devices[] __initdata = {
-> +	&dm644x_vpss_device,
-> +	&dm644x_ccdc_dev,
-> +	&dm644x_vpfe_dev,
-> +};
-
-You add this array here and remove it in the very next patch. That's
-not the right way of doing things. I dropped this array when committing
-this patch.
-
-Thanks,
-Sekhar
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
