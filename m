@@ -1,24 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Feb 2012 19:46:34 +0000
-Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
- platforms
-In-Reply-To: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
-References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20120220194634.GK26840@n2100.arm.linux.org.uk>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 20 Feb 2012 20:55:54 +0100
+Subject: [PATCH v2 7/7] MFD: TWL6040: Add regulator support for VIO, V2V1
+ supplies
+In-Reply-To: <1328619678-26080-8-git-send-email-peter.ujfalusi@ti.com>
+References: <1328619678-26080-1-git-send-email-peter.ujfalusi@ti.com>
+ <1328619678-26080-8-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120220195554.GQ5387@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 06:37:09PM +0000, Will Deacon wrote:
-> Commit 68b7f715 ("nommu: ptrace support") added definitions for
-> PT_TEXT_ADDR and friends, as well as adding ptrace support for reading
-> from these magic offsets.
-> 
-> Unfortunately, this has probably never worked, since ptrace_read_user
-> predicates reading on off < sizeof(struct user), returning -EOI
-> otherwise.
-> 
-> This patch moves the offset size check until after we have tried to
-> match it against either a magic value or an offset into pt_regs.
+Hi Peter,
 
-Does this actually get used?  The fact that it's been broken from day one
-and no one's raised the issue in 2.5 years suggests that it's dead code.
+On Tue, Feb 07, 2012 at 03:01:18PM +0200, Peter Ujfalusi wrote:
+> twl6040 has three power supply source:
+> VBAT needs to be connected to VBAT, VIO, and V2V1.
+> Add regulator support for the VIO, V2V1 supplies.
+> Initially handle the two supply together with bulk commands.
+I applied this one.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
