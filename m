@@ -1,204 +1,308 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 20 Feb 2012 21:25:23 +0100
-Subject: [PATCH v2] mach-u300: do away with MMC config files
-Message-ID: <1329769523-8819-1-git-send-email-linus.walleij@stericsson.com>
+From: james@albanarts.com (James Hogan)
+Date: Mon, 20 Feb 2012 20:29:30 +0000
+Subject: [PATCH v2 1/1] rc: Add support for GPIO based IR Receiver driver.
+In-Reply-To: <1329731272-31476-1-git-send-email-kumarrav@codeaurora.org>
+References: <1329731272-31476-1-git-send-email-kumarrav@codeaurora.org>
+Message-ID: <20120220202930.GB32005@balrog>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Feb 20, 2012 at 03:17:52PM +0530, Ravi Kumar V wrote:
+> Adds GPIO based IR Receiver driver. It decodes signals using decoders
+> available in rc framework.
+> 
+> Signed-off-by: Ravi Kumar V <kumarrav@codeaurora.org>
+> ---
+>  drivers/media/rc/Kconfig        |    9 ++
+>  drivers/media/rc/Makefile       |    1 +
+>  drivers/media/rc/gpio-ir-recv.c |  189 +++++++++++++++++++++++++++++++++++++++
+>  include/media/gpio-ir-recv.h    |   23 +++++
+>  4 files changed, 222 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/media/rc/gpio-ir-recv.c
+>  create mode 100644 include/media/gpio-ir-recv.h
+> 
+> diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+> index aeb7f43..6f63ded 100644
+> --- a/drivers/media/rc/Kconfig
+> +++ b/drivers/media/rc/Kconfig
+> @@ -256,4 +256,13 @@ config RC_LOOPBACK
+>  	   To compile this driver as a module, choose M here: the module will
+>  	   be called rc_loopback.
+>  
+> +config IR_GPIO_CIR
+> +	tristate "GPIO IR remote control"
+> +	depends on RC_CORE
+> +	---help---
+> +	   Say Y if you want to use GPIO based IR Receiver.
+> +
+> +	   To compile this driver as a module, choose M here: the module will
+> +	   be called gpio-ir-recv.
+> +
+>  endif #RC_CORE
+> diff --git a/drivers/media/rc/Makefile b/drivers/media/rc/Makefile
+> index 2156e78..9b3568e 100644
+> --- a/drivers/media/rc/Makefile
+> +++ b/drivers/media/rc/Makefile
+> @@ -25,3 +25,4 @@ obj-$(CONFIG_IR_REDRAT3) += redrat3.o
+>  obj-$(CONFIG_IR_STREAMZAP) += streamzap.o
+>  obj-$(CONFIG_IR_WINBOND_CIR) += winbond-cir.o
+>  obj-$(CONFIG_RC_LOOPBACK) += rc-loopback.o
+> +obj-$(CONFIG_IR_GPIO_CIR) += gpio-ir-recv.o
+> diff --git a/drivers/media/rc/gpio-ir-recv.c b/drivers/media/rc/gpio-ir-recv.c
+> new file mode 100644
+> index 0000000..cf6e7f6
+> --- /dev/null
+> +++ b/drivers/media/rc/gpio-ir-recv.c
+> @@ -0,0 +1,189 @@
+> +/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/gpio.h>
+> +#include <linux/slab.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/irq.h>
+> +#include <media/rc-core.h>
+> +#include <media/gpio-ir-recv.h>
+> +
+> +#define GPIO_IR_DRIVER_NAME	"gpio-rc-recv"
+> +#define GPIO_IR_DEVICE_NAME	"gpio_ir_recv"
+> +
+> +struct gpio_rc_dev {
+> +	struct rc_dev *rcdev;
+> +	struct mutex lock;
 
-All the special stuff (like registering input device and so on)
-for the U300 MMC is now done away with. We don't need these
-special MMC setup kludges, merge this into core.c and be done
-with it.
+I could be completely wrong here, but is this lock necessary since data
+is only read, and it's only used by a single interrupt handler?
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Rebased on top of Russells AMBA cleanups, will submit this
-  through Russell's patch tracker to minimize conflicts.
----
- arch/arm/mach-u300/Makefile |    1 -
- arch/arm/mach-u300/core.c   |   38 +++++++++++++++++--------------
- arch/arm/mach-u300/mmc.c    |   52 -------------------------------------------
- arch/arm/mach-u300/mmc.h    |   18 ---------------
- 4 files changed, 21 insertions(+), 88 deletions(-)
- delete mode 100644 arch/arm/mach-u300/mmc.c
- delete mode 100644 arch/arm/mach-u300/mmc.h
+> +	unsigned int gpio_nr;
+> +	bool active_low;
+> +	bool can_wakeup;
+> +};
+> +
+> +static irqreturn_t gpio_ir_recv_irq(int irq, void *dev_id)
+> +{
+> +	struct gpio_rc_dev *gpio_dev = dev_id;
+> +	unsigned int gval;
+> +	int rc = 0;
+> +	enum raw_event_type type = IR_SPACE;
+> +
+> +	mutex_lock(&gpio_dev->lock);
+> +	gval = gpio_get_value_cansleep(gpio_dev->gpio_nr);
+> +
+> +	if (gval < 0)
+> +		goto err_get_value;
+> +
+> +	if (gpio_dev->active_low)
+> +		gval = !gval;
+> +
+> +	if (gval == 1)
+> +		type = IR_PULSE;
+> +
+> +	rc = ir_raw_event_store_edge(gpio_dev->rcdev, type);
+> +	if (rc < 0)
+> +		goto err_get_value;
 
-diff --git a/arch/arm/mach-u300/Makefile b/arch/arm/mach-u300/Makefile
-index 2855381..fd3a5c3 100644
---- a/arch/arm/mach-u300/Makefile
-+++ b/arch/arm/mach-u300/Makefile
-@@ -8,7 +8,6 @@ obj-n		:=
- obj-		:=
- 
- obj-$(CONFIG_ARCH_U300)	          += u300.o
--obj-$(CONFIG_MMC)                 += mmc.o
- obj-$(CONFIG_SPI_PL022)           += spi.o
- obj-$(CONFIG_MACH_U300_SPIDUMMY)  += dummyspichip.o
- obj-$(CONFIG_I2C_STU300)          += i2c.o
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index d66bc97..02f5ac6 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -18,6 +18,7 @@
- #include <linux/termios.h>
- #include <linux/dmaengine.h>
- #include <linux/amba/bus.h>
-+#include <linux/amba/mmci.h>
- #include <linux/amba/serial.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
-@@ -43,9 +44,9 @@
- #include <mach/gpio-u300.h>
- 
- #include "clock.h"
--#include "mmc.h"
- #include "spi.h"
- #include "i2c.h"
-+#include "u300-gpio.h"
- 
- /*
-  * Static I/O mappings that are needed for booting the U300 platforms. The
-@@ -116,11 +117,6 @@ static AMBA_APB_DEVICE(uart1, "uart1", 0, U300_UART1_BASE,
- /* AHB device at 0x4000 offset */
- static AMBA_APB_DEVICE(pl172, "pl172", 0, U300_EMIF_CFG_BASE, { }, NULL);
- 
--
--/*
-- * Everything within this next ifdef deals with external devices connected to
-- * the APP SPI bus.
-- */
- /* Fast device at 0x6000 offset */
- static AMBA_APB_DEVICE(pl022, "pl022", 0, U300_SPI_BASE,
- 	{ IRQ_U300_SPI }, NULL);
-@@ -128,8 +124,26 @@ static AMBA_APB_DEVICE(pl022, "pl022", 0, U300_SPI_BASE,
- /* Fast device at 0x1000 offset */
- #define U300_MMCSD_IRQS	{ IRQ_U300_MMCSD_MCIINTR0, IRQ_U300_MMCSD_MCIINTR1 }
- 
-+static struct mmci_platform_data mmcsd_platform_data = {
-+	/*
-+	 * Do not set ocr_mask or voltage translation function,
-+	 * we have a regulator we can control instead.
-+	 */
-+	.f_max = 24000000,
-+	.gpio_wp = -1,
-+	.gpio_cd = U300_GPIO_PIN_MMC_CD,
-+	.cd_invert = true,
-+	.capabilities = MMC_CAP_MMC_HIGHSPEED |
-+	MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-+#ifdef CONFIG_COH901318
-+	.dma_filter = coh901318_filter_id,
-+	.dma_rx_param = (void *) U300_DMA_MMCSD_RX_TX,
-+	/* Don't specify a TX channel, this RX channel is bidirectional */
-+#endif
-+};
-+
- static AMBA_APB_DEVICE(mmcsd, "mmci", 0, U300_MMCSD_BASE,
--	U300_MMCSD_IRQS, NULL);
-+	U300_MMCSD_IRQS, &mmcsd_platform_data);
- 
- /*
-  * The order of device declaration may be important, since some devices
-@@ -1826,16 +1840,6 @@ void __init u300_init_devices(void)
- 	writew(val, U300_SYSCON_VBASE + U300_SYSCON_SMCR);
- }
- 
--static int core_module_init(void)
--{
--	/*
--	 * This needs to be initialized later: it needs the input framework
--	 * to be initialized first.
--	 */
--	return mmc_init(&mmcsd_device);
--}
--module_init(core_module_init);
--
- /* Forward declare this function from the watchdog */
- void coh901327_watchdog_reset(void);
- 
-diff --git a/arch/arm/mach-u300/mmc.c b/arch/arm/mach-u300/mmc.c
-deleted file mode 100644
-index 05abd6a..0000000
---- a/arch/arm/mach-u300/mmc.c
-+++ /dev/null
-@@ -1,52 +0,0 @@
--/*
-- *
-- * arch/arm/mach-u300/mmc.c
-- *
-- *
-- * Copyright (C) 2009 ST-Ericsson SA
-- * License terms: GNU General Public License (GPL) version 2
-- *
-- * Author: Linus Walleij <linus.walleij@stericsson.com>
-- * Author: Johan Lundin
-- * Author: Jonas Aaberg <jonas.aberg@stericsson.com>
-- */
--#include <linux/device.h>
--#include <linux/amba/bus.h>
--#include <linux/mmc/host.h>
--#include <linux/dmaengine.h>
--#include <linux/amba/mmci.h>
--#include <linux/slab.h>
--#include <mach/coh901318.h>
--#include <mach/dma_channels.h>
--
--#include "u300-gpio.h"
--#include "mmc.h"
--
--static struct mmci_platform_data mmc0_plat_data = {
--	/*
--	 * Do not set ocr_mask or voltage translation function,
--	 * we have a regulator we can control instead.
--	 */
--	/* Nominally 2.85V on our platform */
--	.f_max = 24000000,
--	.gpio_wp = -1,
--	.gpio_cd = U300_GPIO_PIN_MMC_CD,
--	.cd_invert = true,
--	.capabilities = MMC_CAP_MMC_HIGHSPEED |
--	MMC_CAP_SD_HIGHSPEED | MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
--#ifdef CONFIG_COH901318
--	.dma_filter = coh901318_filter_id,
--	.dma_rx_param = (void *) U300_DMA_MMCSD_RX_TX,
--	/* Don't specify a TX channel, this RX channel is bidirectional */
--#endif
--};
--
--int __devinit mmc_init(struct amba_device *adev)
--{
--	struct device *mmcsd_device = &adev->dev;
--	int ret = 0;
--
--	mmcsd_device->platform_data = &mmc0_plat_data;
--
--	return ret;
--}
-diff --git a/arch/arm/mach-u300/mmc.h b/arch/arm/mach-u300/mmc.h
-deleted file mode 100644
-index 92b8512..0000000
---- a/arch/arm/mach-u300/mmc.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- *
-- * arch/arm/mach-u300/mmc.h
-- *
-- *
-- * Copyright (C) 2009 ST-Ericsson AB
-- * License terms: GNU General Public License (GPL) version 2
-- *
-- * Author: Jonas Aaberg <jonas.aberg@stericsson.com>
-- */
--#ifndef MMC_H
--#define MMC_H
--
--#include <linux/amba/bus.h>
--
--int __devinit mmc_init(struct amba_device *adev);
--
--#endif
--- 
-1.7.8
+Since ir_raw_event_store_edge just puts the event into a kfifo for the
+ir-raw thread to handle, does this really have to be a threaded IRQ? I'd
+have thought you'd get more accurate time measurements (especially on
+slower/embedded CPUs) if the IRQ is serviced as soon as possible.
+
+If it needs to be threaded so that the gpio read can sleep, perhaps it
+could make use of a hard irq if the gpio can be accessed atomically, and
+fall back to threaded if not.
+
+> +
+> +	ir_raw_event_handle(gpio_dev->rcdev);
+> +
+> +err_get_value:
+> +	mutex_unlock(&gpio_dev->lock);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int __devinit gpio_ir_recv_probe(struct platform_device *pdev)
+> +{
+> +	struct gpio_rc_dev *gpio_dev;
+> +	struct rc_dev *rcdev;
+> +	const struct gpio_ir_recv_platform_data *pdata =
+> +					pdev->dev.platform_data;
+> +	int rc;
+> +
+> +	if (!pdata)
+> +		return -EINVAL;
+> +
+> +	if (pdata->gpio_nr < 0)
+> +		return -EINVAL;
+> +
+> +	gpio_dev = kzalloc(sizeof(struct gpio_rc_dev), GFP_KERNEL);
+> +	if (!gpio_dev)
+> +		return -ENOMEM;
+> +
+> +	mutex_init(&gpio_dev->lock);
+> +
+> +	rcdev = rc_allocate_device();
+> +	if (!rcdev) {
+> +		rc = -ENOMEM;
+> +		goto err_allocate_device;
+> +	}
+> +
+> +	rcdev->driver_type = RC_DRIVER_IR_RAW;
+> +	rcdev->allowed_protos = RC_TYPE_NEC;
+
+Is this necessary, since the driver is protocol agnostic?
+
+> +	rcdev->input_name = GPIO_IR_DEVICE_NAME;
+> +	rcdev->input_id.bustype = BUS_HOST;
+> +	rcdev->driver_name = GPIO_IR_DRIVER_NAME;
+> +	rcdev->map_name = RC_MAP_EMPTY;
+> +
+> +	gpio_dev->rcdev = rcdev;
+> +	gpio_dev->gpio_nr = pdata->gpio_nr;
+> +	gpio_dev->active_low = pdata->active_low;
+> +	gpio_dev->can_wakeup = pdata->can_wakeup;
+> +
+> +
+> +	rc = gpio_request(pdata->gpio_nr, "gpio-ir-recv");
+> +	if (rc < 0)
+> +		goto err_gpio_request;
+> +	rc  = gpio_direction_input(pdata->gpio_nr);
+> +	if (rc < 0)
+> +		goto err_gpio_direction_input;
+> +
+> +	rc = rc_register_device(rcdev);
+> +	if (rc < 0) {
+> +		dev_err(&pdev->dev, "failed to register rc device\n");
+> +		goto err_register_rc_device;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, gpio_dev);
+> +
+> +	rc = request_threaded_irq(gpio_to_irq(pdata->gpio_nr),
+> +			NULL, gpio_ir_recv_irq,
+> +			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+> +			"gpio-ir-recv-irq", gpio_dev);
+> +	if (rc < 0)
+> +		goto err_request_irq;
+> +
+> +	if (pdata->can_wakeup == true) {
+> +		rc = enable_irq_wake(gpio_to_irq(pdata->gpio_nr));
+> +		if (rc < 0)
+> +			goto err_enable_irq_wake;
+
+would this be better done in a suspend/resume callback, along with
+device_may_wakeup and device_set_wakeup_capable/device_init_wakeup so
+that it can be enabled and disabled with sysfs?
+
+Cheers
+James
+
+> +	}
+> +
+> +	return 0;
+> +
+> +err_enable_irq_wake:
+> +	free_irq(gpio_to_irq(gpio_dev->gpio_nr), gpio_dev);
+> +err_request_irq:
+> +	platform_set_drvdata(pdev, NULL);
+> +	rc_unregister_device(rcdev);
+> +err_register_rc_device:
+> +err_gpio_direction_input:
+> +	gpio_free(pdata->gpio_nr);
+> +err_gpio_request:
+> +	rc_free_device(rcdev);
+> +	rcdev = NULL;
+> +err_allocate_device:
+> +	mutex_destroy(&gpio_dev->lock);
+> +	kfree(gpio_dev);
+> +	return rc;
+> +}
+> +
+> +static int __devexit gpio_ir_recv_remove(struct platform_device *pdev)
+> +{
+> +	struct gpio_rc_dev *gpio_dev = platform_get_drvdata(pdev);
+> +
+> +	disable_irq_wake(gpio_to_irq(gpio_dev->gpio_nr));
+> +	free_irq(gpio_to_irq(gpio_dev->gpio_nr), gpio_dev);
+> +	platform_set_drvdata(pdev, NULL);
+> +	rc_unregister_device(gpio_dev->rcdev);
+> +	gpio_free(gpio_dev->gpio_nr);
+> +	rc_free_device(gpio_dev->rcdev);
+> +	mutex_destroy(&gpio_dev->lock);
+> +	kfree(gpio_dev);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver gpio_ir_recv_driver = {
+> +	.probe  = gpio_ir_recv_probe,
+> +	.remove = __devexit_p(gpio_ir_recv_remove),
+> +	.driver = {
+> +		.name   = GPIO_IR_DRIVER_NAME,
+> +		.owner  = THIS_MODULE,
+> +	},
+> +};
+> +
+> +static int __init gpio_ir_recv_init(void)
+> +{
+> +	return platform_driver_register(&gpio_ir_recv_driver);
+> +}
+> +module_init(gpio_ir_recv_init);
+> +
+> +static void __exit gpio_ir_recv_exit(void)
+> +{
+> +	platform_driver_unregister(&gpio_ir_recv_driver);
+> +}
+> +module_exit(gpio_ir_recv_exit);
+> +
+> +MODULE_DESCRIPTION("GPIO IR Receiver driver");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/media/gpio-ir-recv.h b/include/media/gpio-ir-recv.h
+> new file mode 100644
+> index 0000000..3eab611
+> --- /dev/null
+> +++ b/include/media/gpio-ir-recv.h
+> @@ -0,0 +1,23 @@
+> +/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __GPIO_IR_RECV_H__
+> +#define __GPIO_IR_RECV_H__
+> +
+> +struct gpio_ir_recv_platform_data {
+> +	unsigned int gpio_nr;
+> +	bool active_low;
+> +	bool can_wakeup;
+> +};
+> +
+> +#endif /* __GPIO_IR_RECV_H__ */
+> +
+> -- 
+> Sent by a consultant of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
