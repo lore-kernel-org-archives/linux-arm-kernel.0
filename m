@@ -1,126 +1,47 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Mon, 20 Feb 2012 19:08:33 +0000
-Subject: [PATCH 2/2] ARM: dma-mapping: fix leak in consistent_init
-In-Reply-To: <CAB4K4y5CV_MuEegiQuYn=_JN7zwxF11b4_kPvQVFS-V6mBwQmg@mail.gmail.com>
-References: <1329484195-26361-1-git-send-email-ajeet.yadav.77@gmail.com>
- <1329580713.2448.17.camel@computer2.home>
- <CAB4K4y5CV_MuEegiQuYn=_JN7zwxF11b4_kPvQVFS-V6mBwQmg@mail.gmail.com>
-Message-ID: <1329764913.2368.1.camel@computer2.home>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 20 Feb 2012 19:15:05 +0000
+Subject: [PATCH v7 6/8] davinci: dm644x: move vpfe init from soc to
+ board	specific files
+In-Reply-To: <1324475021-32509-7-git-send-email-manjunath.hadli@ti.com>
+References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
+ <1324475021-32509-7-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317C7F07@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-02-20 at 21:42 +0530, Ajeet Yadav wrote:
-> Hi Tixy,
-> Thanks for review, so what do you suggest drop or improve the patch? 
-> 
-I would say drop the patch, unless the more experienced Linux hands here
-think otherwise.
+Hi Manju,
 
--- 
-Tixy
+On Wed, Dec 21, 2011 at 19:13:39, Hadli, Manjunath wrote:
+> Move all vpfe platform device registrations to the board specific
+> file like the rest of the devices, and have all of them together.
 
-> With Regards,
-> Ajeet Yadav
+I dropped this line from commit text since EMAC and MDIO still
+seem to be registered all the time so the "like the rest of the
+devices" part isn't really true.
+
 > 
-> On Feb 18, 2012 9:28 PM, "Tixy" <tixy@yxit.co.uk> wrote:
->         On Fri, 2012-02-17 at 18:39 +0530, Ajeet Yadav wrote:
->         > Although the error in this case is unlikely, but logically
->         > if error occurs then we leak memory.
->         >
->         > Signed-off-by: Ajeet Yadav <ajeet.yadav.77@gmail.com>
->         
->         If you want to fix all the memory leaks then the page tables
->         allocated
->         by pte_alloc_kernel() need freeing as well, (and the pud and
->         pmd
->         tables?).
->         
->         However, if we run out of memory this early in boot, then the
->         system is
->         unusable anyway and it doesn't seem worth adding the extra
->         code
->         complexity to avoid any of these memory leaks.
->         
->         --
->         Tixy
->         
->         > ---
->         >  arch/arm/mm/dma-mapping.c |   24 ++++++++++++------------
->         >  1 files changed, 12 insertions(+), 12 deletions(-)
->         >
->         > diff --git a/arch/arm/mm/dma-mapping.c
->         b/arch/arm/mm/dma-mapping.c
->         > index 04bfa76..b8cf062 100644
->         > --- a/arch/arm/mm/dma-mapping.c
->         > +++ b/arch/arm/mm/dma-mapping.c
->         > @@ -161,7 +161,6 @@ static struct arm_vmregion_head
->         consistent_head = {
->         >   */
->         >  static int __init consistent_init(void)
->         >  {
->         > -     int ret = 0;
->         >       pgd_t *pgd;
->         >       pud_t *pud;
->         >       pmd_t *pmd;
->         > @@ -171,7 +170,7 @@ static int __init consistent_init(void)
->         >       unsigned long num_ptes = (CONSISTENT_END - base) >>
->         PMD_SHIFT;
->         >
->         >       consistent_pte = kmalloc(num_ptes * sizeof(pte_t *),
->         GFP_KERNEL);
->         > -     if (!consistent_pte) {
->         > +     if (unlikely(!consistent_pte)) {
->         >               pr_err("%s: no memory\n", __func__);
->         >               return -ENOMEM;
->         >       }
->         > @@ -183,32 +182,33 @@ static int __init
->         consistent_init(void)
->         >               pgd = pgd_offset(&init_mm, base);
->         >
->         >               pud = pud_alloc(&init_mm, pgd, base);
->         > -             if (!pud) {
->         > +             if (unlikely(!pud)) {
->         >                       printk(KERN_ERR "%s: no pud tables\n",
->         __func__);
->         > -                     ret = -ENOMEM;
->         > -                     break;
->         > +                     goto err;
->         >               }
->         >
->         >               pmd = pmd_alloc(&init_mm, pud, base);
->         > -             if (!pmd) {
->         > +             if (unlikely(!pmd)) {
->         >                       printk(KERN_ERR "%s: no pmd tables\n",
->         __func__);
->         > -                     ret = -ENOMEM;
->         > -                     break;
->         > +                     goto err;
->         >               }
->         >               WARN_ON(!pmd_none(*pmd));
->         >
->         >               pte = pte_alloc_kernel(pmd, base);
->         > -             if (!pte) {
->         > +             if (unlikely(!pte)) {
->         >                       printk(KERN_ERR "%s: no pte tables\n",
->         __func__);
->         > -                     ret = -ENOMEM;
->         > -                     break;
->         > +                     goto err;
->         >               }
->         >
->         >               consistent_pte[i++] = pte;
->         >               base += PMD_SIZE;
->         >       } while (base < CONSISTENT_END);
->         >
->         > -     return ret;
->         > +     return 0;
->         > +err:
->         > +     kfree(consistent_pte);
->         > +     consistent_pte = NULL;
->         > +     return -ENOMEM;
->         >  }
->         >
->         >  core_initcall(consistent_init);
->         
->         
->         
+> This would remove the  restriction of inclusion and registration of
+> vpfe platform devices for non-vpfe boards.
+
+I don't think the term "non-vpfe board" is in the right sense.
+So, I replace this with the expanded form: "boards which do not use vpfe".
+
+Apart from this, I also added the "ARM: " prefix to subject.
+
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index 7d940f5..71aae93 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+
+> +static struct platform_device *dm644x_video_devices[] __initdata = {
+> +	&dm644x_vpss_device,
+> +	&dm644x_ccdc_dev,
+> +	&dm644x_vpfe_dev,
+> +};
+
+You add this array here and remove it in the very next patch. That's
+not the right way of doing things. I dropped this array when committing
+this patch.
+
+Thanks,
+Sekhar
