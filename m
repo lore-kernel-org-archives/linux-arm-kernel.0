@@ -1,65 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Feb 2012 17:57:23 +0000
-Subject: Query: Multiple Mappings to Mem and ARMV6+
-In-Reply-To: <CAOh2x=nqancNQ1sHpcPFMm+rcPGYEPZ5-YvKeOo6N_TE+fOjTw@mail.gmail.com>
-References: <CAOh2x=nT365ixeHKsV7-313ZbKMoVLj0bEr9BvKB7jdGSnMV8w@mail.gmail.com>
- <20120216171520.GA9151@arm.com>
- <CAOh2x=nUPb-CcyJBmZ2wv=tsNzi=r3F16NynsbChXD=q5hSGiw@mail.gmail.com>
- <20120216174813.GE9151@arm.com>
- <CAOh2x=m_XWmHzm+KZX-E+P9b26=Bz9Ou76vCaSrHaTz-7xqHxA@mail.gmail.com>
- <CAHkRjk7sv6iHwhpOm1ZEH3eXppG75d8r2Y=D70SrtikyrjySwQ@mail.gmail.com>
- <CAOh2x=nqancNQ1sHpcPFMm+rcPGYEPZ5-YvKeOo6N_TE+fOjTw@mail.gmail.com>
-Message-ID: <20120220175723.GJ26840@n2100.arm.linux.org.uk>
+From: wade_farnsworth@mentor.com (Wade Farnsworth)
+Date: Mon, 20 Feb 2012 11:08:57 -0700
+Subject: ARM tracehook support
+In-Reply-To: <20120220154748.GG25462@mudshark.cambridge.arm.com>
+References: <4F4268D5.7070103@mentor.com>
+ <20120220154748.GG25462@mudshark.cambridge.arm.com>
+Message-ID: <4F428C39.40906@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 09:48:56AM -0800, viresh kumar wrote:
-> On Feb 20, 2012 4:31 PM, "Catalin Marinas" <catalin.marinas@arm.com> wrote:
-> >
-> > On 16 February 2012 18:14, viresh kumar <viresh.linux@gmail.com> wrote:
-> > > On Thu, Feb 16, 2012 at 9:48 AM, Catalin Marinas
-> > > <catalin.marinas@arm.com> wrote:
-> > >> The DMA API implementation on ARM takes care of the cache cleaning and
-> > >> invalidating.
-> > >
-> > > I believe that this is the reason why we have cache re-invalidation
-> > > (we invalidated
-> > > it in dma_map_*() earlier) in dma_unmap_*() calls for ARMv6+ for
-> > > DMA_FROM_DEVICE.
-> > > Am i Correct?
-> >
-> > Yes.
-> >
-> 
-> But why isn't keeping only the second one sufficient? Why don't we remove
-> it from dma_map_* routines?
+Will Deacon wrote:
+> On Mon, Feb 20, 2012 at 03:37:57PM +0000, Wade Farnsworth wrote:
+>> Hi all,
+>
+> Hello Wade,
+>
+>> A few months back, Steven Walter posted some patches that implemement
+>> syscall tracing support for ARM:
+>>
+>> http://lists.arm.linux.org.uk/lurker/message/20111129.162812.bd17d9b5.en.html#linux-arm-kernel
+>>
+>> I've been working on SystemTap support for ARM, and the tracehook patch
+>> in particular is interesting in that respect.  With that patch applied,
+>> it would allow utrace to be supported on ARM, which is necessary for
+>> userspace stap probes to function properly.
+>>
+>>   From what testing I've done, the patches don't appear to be harmful.
+>> So, I'm wondering what's preventing this from being pushed into
+>> mainline?  Are there still outstanding issues that need to be addressed?
+>
+> Yup, I posted some questions here:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/074802.html
 
-Please don't think for a moment that anyone likes the idea of having to
-walk over the cache twice for every DMA operation.  We don't.  But I can
-assure you that it's very very necessary.
+OK, so to continue that conversation:
 
-The first run through the affected cache lines on dma_map_*() is there
-to get rid of any cache lines for the buffer which may be marked 'dirty'.
-A dirty cache line can be evicted (written back) to memory at _any_ time.
-If this occurs while the DMA controller is reading data from a device,
-the results depend on the order which the particular cache line is written
-by the DMA controller, and by the cache line eviction.
+Will Deacon wrote:
+ > On Wed, Nov 30, 2011 at 02:46:20PM +0000, Steven Walter wrote:
+ >> +static inline void syscall_get_arguments(struct task_struct *task,
+ >> +					 struct pt_regs *regs,
+ >> +					 unsigned int i, unsigned int n,
+ >> +					 unsigned long *args)
+ >> +{
+ >> +	BUG_ON(i + n > 6);
+ >
+ > So I guess 6 is the maximum number of registers that are used for
+ > syscall passing. That sounds about right to me, but I wondered how
+ > you worked it out (and whether or not it should be defined
+ > somewhere?).
 
-If the cache line eviction happens after the DMA controller has written,
-the DMA'd data will be overwritten by old stale data.
+I believe the 6 argument constraint is a specific to 
+syscall_get_arguments().  Notice the comment in 
+include/asm-generic/syscall.h:
 
-So, we must get rid of these dirty cache lines.  We can do that either
-by cleaning the cache lines or invalidating them.  We chose to invalidate
-them because it makes very little difference.
+/*
+[...]
+  *
+  * It's only valid to call this when @task is stopped for tracing on
+  * entry to a system call, due to %TIF_SYSCALL_TRACE or %TIF_SYSCALL_AUDIT.
+  * It's invalid to call this with @i + @n > 6; we only support system calls
+  * taking up to 6 arguments.
+  */
 
-For the case where the DMA controller needs to read from memory, we
-obviously have to ensure that all data is pushed out of the cache for it
-to be visible to the DMA controller.  For this case, merely cleaning the
-cache is sufficient.
+Additionally, if you'll look at the other architectures' implementations 
+you'll see similar code.
 
-The second run through the affected cache lines is to prevent speculative
-prefetches occuring while the DMA controller is on operation, which could
-result in old data (before the DMA controller has written its data) being
-read by the CPU, resulting again in old stale data.
+ > In fact, how are these things supposed to deal with 64-bit arguments
+ > that straddle two registers? I think we always pack arguments such
+ > that we don't get holes in the register layout, but it might be worth 
+ > checking (EABI requires 64-bit arguments to be passed in even
+ > registers).
 
-I hope it's now clear why we need to run over the buffer twice.
+Hmm, I do believe that 32-bit powerpc has similar alignment issues 
+(64-bit args must be passed in odd/even pairs), but I don't see any 
+special handling of this in that architecture's 
+syscall_get/set_arguments().  So I'm wondering if the handling of this 
+is or should be handled elsewhere.  I'll keep digging on this.
+
+>
+> but I haven't heard anything from Steven since then, so it's all stalled at
+> the moment. They'll also obviously need rebasing onto latest mainline,
+> although that shouldn't be too hard since they're still fairly recent.
+>
+
+Yes, it does not appear to be too difficult.  I've already made some 
+progress here, and will post my patches once the other issues have been 
+resolved.
+
+Thanks again,
+
+-Wade
