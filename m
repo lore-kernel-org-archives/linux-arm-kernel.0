@@ -1,68 +1,62 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Feb 2012 10:58:13 +0100
-Subject: [PATCH 1/4 v2] i2c/gpio: add DT support
-In-Reply-To: <4F3945B1.9070900@samsung.com>
-References: <1328754308-7365-1-git-send-email-plagnioj@jcrosoft.com>
- <4F3945B1.9070900@samsung.com>
-Message-ID: <20120220095813.GB11307@game.jcrosoft.org>
+From: joancarles@fqingenieria.es (joancarles)
+Date: Mon, 20 Feb 2012 11:07:56 +0100
+Subject: [2.6.39.3] [MX25] oops in driver_register for ADC touchscreen
+ support (imx_adc_ts)
+In-Reply-To: <20120220094013.GA9921@sapphire.tkos.co.il>
+References: <50e2a71500444a5e1b951e5856d474bf@mail.fqingenieria.es>
+ <20120220094013.GA9921@sapphire.tkos.co.il>
+Message-ID: <70cdf2c4b729fb7dfa1d641c4609c6f5@mail.fqingenieria.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:17 Mon 13 Feb     , Karol Lewandowski wrote:
-> On 09.02.2012 03:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> Hi!
-> 
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj-sclMFOaUSTBWk0Htik3J/w@public.gmane.org>
-> > Cc: Nicolas Ferre <nicolas.ferre-AIFe0yeh4nAAvxtiuMwx3w@public.gmane.org>
-> > Cc: linux-i2c-u79uwXL29TY76Z2rM5mHXA at public.gmane.org
-> > Cc: devicetree-discuss-uLR06cmDAlY/bJ5BZ2RsiQ at public.gmane.org
-> > ---
-> > v2:
-> > 
-> > 	use devm
-> > 	update DT bindings to i2c-gpio and sda-open-drain...
-> > 	update against "of: introduce helper to manage boolean"
-> > 
-> > Best Regards,
-> > J.
-> >  .../devicetree/bindings/gpio/gpio_i2c.txt          |   32 +++++++
-> >  drivers/i2c/busses/i2c-gpio.c                      |   95 +++++++++++++++----
-> >  2 files changed, 107 insertions(+), 20 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/gpio/gpio_i2c.txt b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-> > new file mode 100644
-> > index 0000000..9710ed2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-> > @@ -0,0 +1,32 @@
-> > +Device-Tree bindings for i2c gpio driver
-> > +
-> > +Required properties:
-> > +	- compatible = "i2c-gpio";
-> > +	- gpios: sda and scl gpio
-> > +
-> > +
-> > +Optional properties:
-> > +	- i2c-gpio,sda-open-drain: sda as open drain
-> > +	- i2c-gpio,scl-open-drain: scl as open drain
-> > +	- i2c-gpio,scl-output-only: scl as output only
-> 
-> 
-> > +	- udelay: delay between GPIO operations (may depend on each platform)
-> > +	- timeout: timeout to get data (ms)
-> 
-> 
-> If these are really needed then I would prefer to have these fully
-> qualified (with unit type "-ms/-millisecs" appended).
-> 
-> Regulator framework, with its "-microvolt/-microamp", serve here as
-> prime example of being quite descriptive (one doesn't neet to look up
-> the docs). Please see:
-> 
->   http://permalink.gmane.org/gmane.linux.ports.arm.omap/67637
-timeout are usualy in ms I don't really see the need of -ms or so
+Hi Baruch
 
-Best Regards,
-J.
+Thanks for your reply.
+
+>> We're trying to get our ADC working (actually generic 4-way
+>> touchscreen support via ADC) on a custom PCB using the i.MX25
+>> infrastructure. It seems that there are not a lot of people out
+>> there, who have tried the Freescale implementation (based on their
+>> latest kernel drop: 2.6.31) of the ADC driver for touchscreen
+>> support. Freescale's support with regard to kernel development for
+>> out-of-tree implementation, somewhat understandably, has so far been
+>> close to non-existent.
+>
+> This list is for mainline kernel only. You should contact Freescale 
+> for
+> support for out of tree drivers in their kernel code. Unfortunately,
+> it seems that Freescale has no interest in mainline kernel support 
+> for i.MX25.
+
+We have contacted them and all they support is their L2.6.13 freeze 
+release for the i.MX25. It's actually even difficult to try to get in 
+contact with anyone from their kernel development team. We anticipated 
+that using our customized design based on an i.MX25, we'd run into these 
+kind of issues.
+
+> You may try a newer kernel drop from Freescale, based on 2.6.38 
+> (tagged
+> rel_imx_2.6.38_11.11.01). Get it from
+> 
+> http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=summary.
+
+We have tried all "*rel*" tagged kernel of their repository, but they 
+simply (especially touchscreen support) do not work. I wonder if anyone 
+ever got the ADC touch screen support working at all with the i.MX25. We 
+are also trying a stock 3.3-rc kernel and can't get our i.MX25 to boot 
+... yet.
+
+Best regards
+-- 
+Joan C. Abelaira
+  FQ Ingenier?a Electr?nica, S.A.
+Pol?gon Industrial Vilanoveta
+Av. de les Roquetes, 9
+E-08812 Sant Pere de Ribes (Barcelona)
+SPAIN
+Telf: +34 932 080 258
+Fax: +34 934 592 893
+M?vil: +34 638 331 745
+
+http://www.fqingenieria.es/
+email: joancarles at fqingenieria.es
