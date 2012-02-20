@@ -1,236 +1,88 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 20 Feb 2012 15:45:42 +0100
-Subject: [PATCH] ARM: at91/rtc-at91sam9: rework resources assignment
-In-Reply-To: <20120220100437.GD22562@n2100.arm.linux.org.uk>
-References: <20120220100437.GD22562@n2100.arm.linux.org.uk>
-Message-ID: <1329749142-6965-1-git-send-email-nicolas.ferre@atmel.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 20 Feb 2012 15:46:35 +0100
+Subject: [PATCH 1/4 v2] i2c/gpio: add DT support
+In-Reply-To: <20120220135807.GB26840@n2100.arm.linux.org.uk>
+References: <1328754308-7365-1-git-send-email-plagnioj@jcrosoft.com>
+ <4F3945B1.9070900@samsung.com>
+ <20120220095813.GB11307@game.jcrosoft.org>
+ <20120220100843.GE22562@n2100.arm.linux.org.uk>
+ <20120220102231.GC11307@game.jcrosoft.org>
+ <20120220125054.GF22562@n2100.arm.linux.org.uk>
+ <20120220133725.GD11307@game.jcrosoft.org>
+ <20120220134634.GE11307@game.jcrosoft.org>
+ <20120220135807.GB26840@n2100.arm.linux.org.uk>
+Message-ID: <20120220144635.GF11307@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Russell, Ryan,
+On 13:58 Mon 20 Feb     , Russell King - ARM Linux wrote:
+> On Mon, Feb 20, 2012 at 02:46:34PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 14:37 Mon 20 Feb     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 12:50 Mon 20 Feb     , Russell King - ARM Linux wrote:
+> > > > On Mon, Feb 20, 2012 at 11:22:31AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > On 10:08 Mon 20 Feb     , Russell King - ARM Linux wrote:
+> > > > > > On Mon, Feb 20, 2012 at 10:58:13AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > > > On 18:17 Mon 13 Feb     , Karol Lewandowski wrote:
+> > > > > > > > > +	- udelay: delay between GPIO operations (may depend on each platform)
+> > > > > > > > > +	- timeout: timeout to get data (ms)
+> > > > > > > > 
+> > > > > > > > 
+> > > > > > > > If these are really needed then I would prefer to have these fully
+> > > > > > > > qualified (with unit type "-ms/-millisecs" appended).
+> > > > > > > > 
+> > > > > > > > Regulator framework, with its "-microvolt/-microamp", serve here as
+> > > > > > > > prime example of being quite descriptive (one doesn't neet to look up
+> > > > > > > > the docs). Please see:
+> > > > > > > > 
+> > > > > > > >   http://permalink.gmane.org/gmane.linux.ports.arm.omap/67637
+> > > > > > > timeout are usualy in ms I don't really see the need of -ms or so
+> > > > > > 
+> > > > > > Which is obviously total crap for udelay, which would be in _micro_seconds.
+> > > > > agreed but here on i2c gpio I never see timetout as udelay so I don't see
+> > > > > the mandatory to force the name in the binding
+> > > > > 
+> > > > > futhermore it's maybe linux specific
+> > > > 
+> > > > Stop grabbing at straws.  There's nothing linux specific about the units
+> > > > of specification.
+> > > > 
+> > > > What is linux specific is specifying the _delay_ rather than specifying
+> > > > the bus frequency.  So as soon as you're trying to justify not adding
+> > > > the units because they may be linux specific, you've already lost that
+> > > > argument by using a delay rather than a bus frequency.  You can't have
+> > > > it both ways.
+> > > > 
+> > > > Moreover, mixing microseconds and milliseconds in the properties for a
+> > > > device is absolutely insane.
+> > > > 
+> > > > So, which ever way, your patch as it currently stands is wrong and broken.
+> > >  no what I said is the binding timeout is maybe linux specific for i2c gpio
+> > 
+> > I do not argue about that here we do not even disucss about the bus frequency
+> > but the specific bining to the i2c algo bit for it's internal timeout
+> > 
+> > the timeout is used to do not end in an infinite loop while ready the scl on
+> > slow device
+> 
+> The patch is still wrong and broken.
+> 
+> As you're not listening to me at all, I've lost patience, so I'm just going
+> to say this:
+> 
+> Explicit NAK on this patch.
+> 
+> When you feel like you can _constructively_ _consider_ the point that both
+> Karol and myself have raised with respect to the _U_N_I_T_S_ then feel free
+> to continue this discussion.  If not, don't waste your time writing another
+> email.  I hope that's plain.
+I do not discuss about the U_N_I_T_S at all in this reply
+so the NACK is no revelent
 
-As I do think that these changes need explanation, here is my rework of Jean's
-patch. I would like to know if the little comment and general rework of
-resources assignment sound ok...
+I just said here the bind for the "timeout" is maybe linux specific which means
+need to be prefixed by "linux,"
 
-I plan to merge this patch with the one discussed previously:
-"[PATCH 13/18] ARM: at91/rtc-at91sam9: pass the GPBR to use via ressources"
+so you discuss about timing again when I explain the binding named "timeout"
+meaming
 
-If you agree, I will repost the whole series afterwards.
-
-
- arch/arm/mach-at91/at91sam9260_devices.c |   13 ++++++++++---
- arch/arm/mach-at91/at91sam9261_devices.c |   13 ++++++++++---
- arch/arm/mach-at91/at91sam9263_devices.c |   22 ++++++++++++++++------
- arch/arm/mach-at91/at91sam9g45_devices.c |   13 ++++++++++---
- arch/arm/mach-at91/at91sam9rl_devices.c  |   13 ++++++++++---
- 5 files changed, 56 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index f8a88fb..df487ce 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -727,7 +727,6 @@ static struct platform_device at91sam9260_rtt_device = {
- 	.name		= "at91_rtt",
- 	.id		= 0,
- 	.resource	= rtt_resources,
--	.num_resources	= 1,
- };
- 
- 
-@@ -735,13 +734,21 @@ static struct platform_device at91sam9260_rtt_device = {
- static void __init at91_add_device_rtt_rtc(void)
- {
- 	at91sam9260_rtt_device.name = "rtc-at91sam9";
--	at91sam9260_rtt_device.num_resources++;
-+	/*
-+	 * The second resource is needed:
-+	 * GPBR will serve as the storage for RTC time offset
-+	 */
-+	at91sam9260_rtt_device.num_resources = 2;
- 	rtt_resources[1].start = AT91SAM9260_BASE_GPBR +
- 				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	rtt_resources[1].end = rtt_resources[1].start + 3;
- }
- #else
--static void __init at91_add_device_rtt_rtc(void) {}
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	/* Only one resource is needed: RTT not used as RTC */
-+	at91sam9260_rtt_device.num_resources = 1;
-+}
- #endif
- 
- static void __init at91_add_device_rtt(void)
-diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 32a20ef..3bd10ce 100644
---- a/arch/arm/mach-at91/at91sam9261_devices.c
-+++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -613,20 +613,27 @@ static struct platform_device at91sam9261_rtt_device = {
- 	.name		= "at91_rtt",
- 	.id		= 0,
- 	.resource	= rtt_resources,
--	.num_resources	= 1,
- };
- 
- #if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
- static void __init at91_add_device_rtt_rtc(void)
- {
- 	at91sam9261_rtt_device.name = "rtc-at91sam9";
--	at91sam9261_rtt_device.num_resources++;
-+	/*
-+	 * The second resource is needed:
-+	 * GPBR will serve as the storage for RTC time offset
-+	 */
-+	at91sam9261_rtt_device.num_resources = 2;
- 	rtt_resources[1].start = AT91SAM9261_BASE_GPBR +
- 				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	rtt_resources[1].end = rtt_resources[1].start + 3;
- }
- #else
--static void __init at91_add_device_rtt_rtc(void) {}
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	/* Only one resource is needed: RTT not used as RTC */
-+	at91sam9261_rtt_device.num_resources = 1;
-+}
- #endif
- 
- static void __init at91_add_device_rtt(void)
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 28cb074..7792de5 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -976,7 +976,6 @@ static struct platform_device at91sam9263_rtt0_device = {
- 	.name		= "at91_rtt",
- 	.id		= 0,
- 	.resource	= rtt0_resources,
--	.num_resources	= 1,
- };
- 
- static struct resource rtt1_resources[] = {
-@@ -993,7 +992,6 @@ static struct platform_device at91sam9263_rtt1_device = {
- 	.name		= "at91_rtt",
- 	.id		= 1,
- 	.resource	= rtt1_resources,
--	.num_resources	= 1,
- };
- 
- #if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
-@@ -1004,26 +1002,38 @@ static void __init at91_add_device_rtt_rtc(void)
- 
- 	switch (CONFIG_RTC_DRV_AT91SAM9_RTT) {
- 	case 0:
-+		/*
-+		 * The second resource is needed only for the chosen RTT:
-+		 * GPBR will serve as the storage for RTC time offset
-+		 */
-+		at91sam9263_rtt0_device.num_resources = 2;
-+		at91sam9263_rtt1_device.num_resources = 1;
- 		pdev = &at91sam9263_rtt0_device;
- 		r = rtt0_resources;
- 		break;
- 	case 1:
-+		at91sam9263_rtt0_device.num_resources = 1;
-+		at91sam9263_rtt1_device.num_resources = 2;
- 		pdev = &at91sam9263_rtt1_device;
- 		r = rtt1_resources;
- 		break;
- 	default:
--		pr_err("at91sam9263: support only 2 RTT (%d)\n",
-+		pr_err("at91sam9263: only supports 2 RTT (%d)\n",
- 		       CONFIG_RTC_DRV_AT91SAM9_RTT);
- 		return;
- 	}
- 
-+	pdev->name = "rtc-at91sam9";
- 	r[1].start = AT91SAM9263_BASE_GPBR + 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	r[1].end = r[1].start + 3;
--	pdev->name = "rtc-at91sam9";
--	pdev->num_resources++;
- }
- #else
--static void __init at91_add_device_rtt_rtc(void) {}
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	/* Only one resource is needed: RTT not used as RTC */
-+	at91sam9263_rtt0_device.num_resources = 1;
-+	at91sam9263_rtt1_device.num_resources = 1;
-+}
- #endif
- 
- static void __init at91_add_device_rtt(void)
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index bb7e2ce..4108295 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1203,20 +1203,27 @@ static struct platform_device at91sam9g45_rtt_device = {
- 	.name		= "at91_rtt",
- 	.id		= 0,
- 	.resource	= rtt_resources,
--	.num_resources	= 1,
- };
- 
- #if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
- static void __init at91_add_device_rtt_rtc(void)
- {
- 	at91sam9g45_rtt_device.name = "rtc-at91sam9";
--	at91sam9g45_rtt_device.num_resources++;
-+	/*
-+	 * The second resource is needed:
-+	 * GPBR will serve as the storage for RTC time offset
-+	 */
-+	at91sam9g45_rtt_device.num_resources = 2;
- 	rtt_resources[1].start = AT91SAM9G45_BASE_GPBR +
- 				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	rtt_resources[1].end = rtt_resources[1].start + 3;
- }
- #else
--static void __init at91_add_device_rtt_rtc(void) {}
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	/* Only one resource is needed: RTT not used as RTC */
-+	at91sam9g45_rtt_device.num_resources = 1;
-+}
- #endif
- 
- static void __init at91_add_device_rtt(void)
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 16fd20b..eda72e8 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -692,20 +692,27 @@ static struct platform_device at91sam9rl_rtt_device = {
- 	.name		= "at91_rtt",
- 	.id		= 0,
- 	.resource	= rtt_resources,
--	.num_resources	= 1,
- };
- 
- #if IS_ENABLED(CONFIG_RTC_DRV_AT91SAM9)
- static void __init at91_add_device_rtt_rtc(void)
- {
- 	at91sam9rl_rtt_device.name = "rtc-at91sam9";
--	at91sam9rl_rtt_device.num_resources++;
-+	/*
-+	 * The second resource is needed:
-+	 * GPBR will serve as the storage for RTC time offset
-+	 */
-+	at91sam9rl_rtt_device.num_resources = 2;
- 	rtt_resources[1].start = AT91SAM9RL_BASE_GPBR +
- 				 4 * CONFIG_RTC_DRV_AT91SAM9_GPBR;
- 	rtt_resources[1].end = rtt_resources[1].start + 3;
- }
- #else
--static void __init at91_add_device_rtt_rtc(void) {}
-+static void __init at91_add_device_rtt_rtc(void)
-+{
-+	/* Only one resource is needed: RTT not used as RTC */
-+	at91sam9rl_rtt_device.num_resources = 1;
-+}
- #endif
- 
- static void __init at91_add_device_rtt(void)
--- 
-1.7.9
+Best Regards,
+J.
