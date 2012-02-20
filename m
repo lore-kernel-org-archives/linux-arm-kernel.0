@@ -1,21 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 20 Feb 2012 09:21:59 -0800
-Subject: [RFC 02/11] OMAP: mcbsp: Move core driver under sound/soc/omap
-In-Reply-To: <1329320280-1621-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1329320280-1621-1-git-send-email-peter.ujfalusi@ti.com>
- <1329320280-1621-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120220172159.GK18185@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Feb 2012 17:21:58 +0000
+Subject: [PATCHv2 5/6] jump label: detect %c support for ARM
+In-Reply-To: <1327757725-10114-6-git-send-email-rabin@rab.in>
+References: <1327757725-10114-1-git-send-email-rabin@rab.in>
+ <1327757725-10114-6-git-send-email-rabin@rab.in>
+Message-ID: <20120220172158.GI26840@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [120215 07:07]:
-> In order to consolidate the McBSP driver move it out from
-> arch/arm/plat-omap directory under sound/soc/omap/
+On Sat, Jan 28, 2012 at 07:05:24PM +0530, Rabin Vincent wrote:
+> Some versions of ARM GCC which do support asm goto, have problems
+> handling the the %c specifier.  Since we need the %c to support jump
+> labels on ARM, detect that too in the asm goto detection script to avoid
+> build errors with these versions.
+
+I'm not sure how this detects properly working %c support.  %c support
+has been rather flakey on ARM for some time, I'm not sure which version
+of gcc was fixed for it.
+
+> http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Cc: Jason Baron <jbaron@redhat.com>
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  scripts/gcc-goto.sh |   18 +++++++++++++++++-
+>  1 files changed, 17 insertions(+), 1 deletions(-)
+> 
+> diff --git a/scripts/gcc-goto.sh b/scripts/gcc-goto.sh
+> index 98cffcb..9b744de 100644
+> --- a/scripts/gcc-goto.sh
+> +++ b/scripts/gcc-goto.sh
+> @@ -2,4 +2,20 @@
+>  # Test for gcc 'asm goto' support
+>  # Copyright (C) 2010, Jason Baron <jbaron@redhat.com>
+>  
+> -echo "int main(void) { entry: asm goto (\"\"::::entry); return 0; }" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
+> +cat << "END" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
+> +int main(void)
+> +{
+> +#ifdef __arm__
+> +	/*
+> +	 * Not related to asm goto, but used by jump label
+> +	 * and broken on some ARM GCC versions (see GCC Bug 48637).
+> +	 */
+> +	static struct { int dummy; int state; } tp;
+> +	asm ("@ %c0" :: "i" (&tp.state));
 
-Thanks for doing this! These may cause some minor merge
-conflicts with the planned header clean-up, but those should
-be trivial to deal with.
+While this detects the presence of the ICE, previous compilers included
+the '#' before the constant, which leads to problems.  I think a better
+check would be:
+	asm(".long %c0" :: "i" (&tp.state));
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+to make sure that it spits out something purely numeric, rather than
+something prefixed with a '#'.
