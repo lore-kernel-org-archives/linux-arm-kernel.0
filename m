@@ -1,50 +1,27 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Sun, 19 Feb 2012 22:53:40 +0000
-Subject: [PATCH 06/12] ARM: S3C24XX: change the ARCH_S3C2410 to
- ARCH_S3C24XX
-In-Reply-To: <1329346545-16373-7-git-send-email-kgene.kim@samsung.com>
-References: <1329346545-16373-1-git-send-email-kgene.kim@samsung.com>
- <1329346545-16373-7-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4F417D74.7020108@gmx.de>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Mon, 20 Feb 2012 08:03:13 +0800
+Subject: [PATCH 1/2] ALSA: Remove __devinit annotation for
+ pxa2xx_ac97_hw_probe to fix section mismatch warning
+In-Reply-To: <20120219182005.GA16078@opensource.wolfsonmicro.com>
+References: <1329637158.4818.4.camel@phoenix>
+ <20120219182005.GA16078@opensource.wolfsonmicro.com>
+Message-ID: <CAF+7xWkEb1UYFF79gnft9tCX1=9fHLpVGvieg5L4qAEytdQBeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2012/2/20 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> On Sun, Feb 19, 2012 at 03:39:18PM +0800, Axel Lin wrote:
+>> This fixes below build warning:
+>> WARNING: vmlinux.o(.text+0x1e632c): Section mismatch in reference from the function pxa2xx_ac97_probe() to the function .devinit.text:pxa2xx_ac97_hw_probe()
+>> The function pxa2xx_ac97_probe() references
+>> the function __devinit pxa2xx_ac97_hw_probe().
+>> This is often because pxa2xx_ac97_probe lacks a __devinit
+>> annotation or the annotation of pxa2xx_ac97_hw_probe is wrong.
+>
+> This seems like the wrong fix - shouldn't we be adding annotations
+> rather than removing them here?
+I'll send a new patch to fix it. Thanks.
+The change now is in sound/soc/pxa/pxa2xx-ac97.c, so I change the subject to:
+[PATCH] ASoC: Add __devinit annotation for pxa2xx_ac97_probe
 
-On 02/15/2012 10:55 PM, Kukjin Kim wrote:
-> This patch changes the ARCH name to "ARCH_S3C24XX" for Samsung
-> S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443,
-> and S3C2450 SoCs so that we can merge the mach-xxx directories
-> and plat-s3c24xx dir. to just one mach-s3c24xx for them.
-
-Great.
-
-> I think this should be sent to upstream via samsung tree because
-> this touches many samsung stuff.
-
-Okay, feel free to do so.
-
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Greg Kroah-Hartman <gregkh@suse.de>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-
-for the framebuffer (video) part:
-Acked-by: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Cc: Sangbeom Kim <sbkim73@samsung.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-
-Best regards,
-
-Florian Tobias Schandinat
+Axel
