@@ -1,88 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Feb 2012 10:04:37 +0000
-Subject: [PATCH 13/18] ARM: at91/rtc-at91sam9: pass the GPBR to use via
- ressources
-In-Reply-To: <20120220091647.GA28066@game.jcrosoft.org>
-References: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
- <8187feb330895bf9e077ede21e68cc81a72438cc.1329500622.git.nicolas.ferre@atmel.com>
- <4F419742.70200@gmail.com> <20120220012010.GA29599@game.jcrosoft.org>
- <20120220073621.GB22562@n2100.arm.linux.org.uk>
- <20120220091647.GA28066@game.jcrosoft.org>
-Message-ID: <20120220100437.GD22562@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 20 Feb 2012 10:58:13 +0100
+Subject: [PATCH 1/4 v2] i2c/gpio: add DT support
+In-Reply-To: <4F3945B1.9070900@samsung.com>
+References: <1328754308-7365-1-git-send-email-plagnioj@jcrosoft.com>
+ <4F3945B1.9070900@samsung.com>
+Message-ID: <20120220095813.GB11307@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 10:16:47AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 07:36 Mon 20 Feb     , Russell King - ARM Linux wrote:
-> > On Mon, Feb 20, 2012 at 02:20:10AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 11:43 Mon 20 Feb     , Ryan Mallon wrote:
-> > > > On 18/02/12 04:50, Nicolas Ferre wrote:
-> > > > 
-> > > > > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > > 
-> > > > > The GPBR registers are used for storing RTC values. The GPBR registers
-> > > > > to use are now provided using standard resource entry. The array is
-> > > > > filled in SoC specific code.
-> > > > > rtc-at91sam9 RTT as RTC driver is modified to retrieve this information.
-> > > > > 
-> > > > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > > > ---
-> > > > >  arch/arm/mach-at91/at91sam9260_devices.c      |   10 +++++++-
-> > > > >  arch/arm/mach-at91/at91sam9261_devices.c      |    8 ++++++-
-> > > > >  arch/arm/mach-at91/at91sam9263_devices.c      |   16 +++++++++++--
-> > > > >  arch/arm/mach-at91/at91sam9g45_devices.c      |    8 ++++++-
-> > > > >  arch/arm/mach-at91/at91sam9rl_devices.c       |    8 ++++++-
-> > > > >  arch/arm/mach-at91/include/mach/at91sam9260.h |    5 +--
-> > > > >  arch/arm/mach-at91/include/mach/at91sam9261.h |    5 +--
-> > > > >  arch/arm/mach-at91/include/mach/at91sam9263.h |    5 +--
-> > > > >  arch/arm/mach-at91/include/mach/at91sam9g45.h |    5 +--
-> > > > >  arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
-> > > > >  drivers/rtc/rtc-at91sam9.c                    |   29 +++++++++++++++++++++---
-> > > > >  11 files changed, 76 insertions(+), 25 deletions(-)
-> > > > > 
-> > > > > diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> > > > > index 2071017..ae2b648 100644
-> > > > > --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> > > > > +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> > > > > @@ -718,14 +718,16 @@ static struct resource rtt_resources[] = {
-> > > > >  		.start	= AT91SAM9260_BASE_RTT,
-> > > > >  		.end	= AT91SAM9260_BASE_RTT + SZ_16 - 1,
-> > > > >  		.flags	= IORESOURCE_MEM,
-> > > > > -	}
-> > > > > +	}, {
-> > > > > +		.flags	= IORESOURCE_MEM,
-> > > > > +	},
-> > > > >  };
-> > > > >  
-> > > > >  static struct platform_device at91sam9260_rtt_device = {
-> > > > >  	.name		= "at91_rtt",
-> > > > >  	.id		= 0,
-> > > > >  	.resource	= rtt_resources,
-> > > > > -	.num_resources	= ARRAY_SIZE(rtt_resources),
-> > > > > +	.num_resources	= 1,
-> > > > 
-> > > > 
-> > > > Why this change? The device has two resources, and the rtc driver
-> > > > request both of them, so why are you saying there is only one resource
-> > > > here. It either needs to be changed back to use ARRAY_SIZE, or needs a
-> > > > comment explaining what magic is in use.
-> > > because the number of resources depends on the user of rtt
-> > > we must not hardcode the GPBR reg as this resource will be present only if the
-> > > rtc-at91sam9 is enabled
+On 18:17 Mon 13 Feb     , Karol Lewandowski wrote:
+> On 09.02.2012 03:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+> Hi!
+> 
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj-sclMFOaUSTBWk0Htik3J/w@public.gmane.org>
+> > Cc: Nicolas Ferre <nicolas.ferre-AIFe0yeh4nAAvxtiuMwx3w@public.gmane.org>
+> > Cc: linux-i2c-u79uwXL29TY76Z2rM5mHXA at public.gmane.org
+> > Cc: devicetree-discuss-uLR06cmDAlY/bJ5BZ2RsiQ at public.gmane.org
+> > ---
+> > v2:
 > > 
-> > Better would be to leave .num_resources uninitalized and set that
-> > appropriately elsewhere when you make the decision whether GPBR is
-> > present or not.  That may help to avoid people trying to "fix" this
-> > for you via static checking tools.
+> > 	use devm
+> > 	update DT bindings to i2c-gpio and sda-open-drain...
+> > 	update against "of: introduce helper to manage boolean"
 > > 
-> > As Ryan mentions, a comment in the code would be a good idea too.
-> the comment is in the drivers code and Kconfig
+> > Best Regards,
+> > J.
+> >  .../devicetree/bindings/gpio/gpio_i2c.txt          |   32 +++++++
+> >  drivers/i2c/busses/i2c-gpio.c                      |   95 +++++++++++++++----
+> >  2 files changed, 107 insertions(+), 20 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_i2c.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/gpio/gpio_i2c.txt b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
+> > new file mode 100644
+> > index 0000000..9710ed2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
+> > @@ -0,0 +1,32 @@
+> > +Device-Tree bindings for i2c gpio driver
+> > +
+> > +Required properties:
+> > +	- compatible = "i2c-gpio";
+> > +	- gpios: sda and scl gpio
+> > +
+> > +
+> > +Optional properties:
+> > +	- i2c-gpio,sda-open-drain: sda as open drain
+> > +	- i2c-gpio,scl-open-drain: scl as open drain
+> > +	- i2c-gpio,scl-output-only: scl as output only
+> 
+> 
+> > +	- udelay: delay between GPIO operations (may depend on each platform)
+> > +	- timeout: timeout to get data (ms)
+> 
+> 
+> If these are really needed then I would prefer to have these fully
+> qualified (with unit type "-ms/-millisecs" appended).
+> 
+> Regulator framework, with its "-microvolt/-microamp", serve here as
+> prime example of being quite descriptive (one doesn't neet to look up
+> the docs). Please see:
+> 
+>   http://permalink.gmane.org/gmane.linux.ports.arm.omap/67637
+timeout are usualy in ms I don't really see the need of -ms or so
 
-Not good enough.  It needs to explain at the at91sam9260_rtt_device
-definition why there is a disparity between the number of resources
-and the number in the device definition.
-
-People running static checking tools or reading this code aren't going
-to look in the Kconfig nor the corresponding driver source for this
-information.
+Best Regards,
+J.
