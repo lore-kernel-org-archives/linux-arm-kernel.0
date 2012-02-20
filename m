@@ -1,28 +1,86 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Mon, 20 Feb 2012 14:07:29 +0100
-Subject: [2.6.39.3] [MX25] oops in driver_register for ADC touchscreen
- support (imx_adc_ts)
-In-Reply-To: <201202201207.55969.jbe@pengutronix.de>
-References: <50e2a71500444a5e1b951e5856d474bf@mail.fqingenieria.es>
- <20120220101157.GB9921@sapphire.tkos.co.il>
- <20120220113549.7f2a553e@eb-e6520>
- <201202201207.55969.jbe@pengutronix.de>
-Message-ID: <20120220140729.7599c2df@eb-e6520>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 20 Feb 2012 13:31:54 +0000
+Subject: [PATCH v7 2/8] ARM: davinci: create new common platform header
+ for	davinci
+In-Reply-To: <1324475021-32509-3-git-send-email-manjunath.hadli@ti.com>
+References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
+ <1324475021-32509-3-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317C78B6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
+Hi Manju,
 
-Le Mon, 20 Feb 2012 12:07:55 +0100,
-Juergen Beisert <jbe@pengutronix.de> a ?crit :
-> Then we should share it, as I'm also working in the ADC/touchscreen/hwmon 
-> driver for i.MX25.
+On Wed, Dec 21, 2011 at 19:13:35, Hadli, Manjunath wrote:
+> remove individual platform header files for dm365, dm355, dm644x
+> and dm646x and consolidate it into a single and common
+> header file davinci.h placed in arch/arm/mach-davinci.
 > 
-the dirty patch I talk about is only a quick port of the Freescale
-driver. I also started to write a new driver for the ADC a few months
-ago but didn't progress on that because of lack of time until now.
-If you have some code to test I can help when I find some free time.
+> This reduces the pollution in the include/mach and is consistent
+> with Russel's suggestions as part of his "pet peaves" mail.
 
-Eric
--- 
-http://eukrea.com/en/news/104-2012
+While committing this patch, I fixed Russell's name and added
+a link to his post.
+
+> 
+> The further patches in the series take  advantage of this consolidation
+> for easy implementation of IO_ADDRESS elimination.
+> 
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+
+> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+> index 635bf77..123bea8 100644
+> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+> @@ -36,7 +36,6 @@
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+>  
+> -#include <mach/dm646x.h>
+>  #include <mach/common.h>
+>  #include <mach/serial.h>
+>  #include <mach/i2c.h>
+> @@ -46,6 +45,7 @@
+>  #include <mach/aemif.h>
+>  
+>  #include "clock.h"
+> +#include "davinci.h"
+
+In cases where multiple local include files are present,
+I modified the patch to make davinci.h the first include
+file. I did this to keep the new include order closer
+to the original order.
+
+> diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+> new file mode 100644
+> index 0000000..238c282
+> --- /dev/null
+> +++ b/arch/arm/mach-davinci/davinci.h
+> @@ -0,0 +1,85 @@
+> +/*
+> + * This file contains the processor specific definitions
+> + * of the TI DM644x, DM355, DM365, and DM646x.
+> + *
+> + * Copyright (C) 2011 Texas Instruments Incorporated
+
+Deep Root Systems had a copyright on one of the files
+this code is derived from. I restored the copyright of
+Deep Root Systems in the file.
+
+[...]
+
+> +/* DM355 function declarations */
+> +struct spi_board_info;
+
+I saw no reason to maintain a forward declaration like this.
+I included linux/spi/spi.h in this file instead.
+
+I am making these changes myself since I was delayed in getting
+back to you and also since you have already spun 7 versions of
+this. I figured you must be getting tired already ;-)
+
+I will push the code to a branch on my tree, please give it a
+good test.
+
+Thanks,
+Sekhar
