@@ -1,48 +1,49 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Tue, 21 Feb 2012 00:09:28 +0100
-Subject: [PATCH] efikamx: match machine descriptions with legacy
-Message-ID: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 20 Feb 2012 15:13:10 -0800
+Subject: [PATCH v3 02/10] ARM: tegra: export Tegra chipid
+In-Reply-To: <1328831277-21002-3-git-send-email-pdeschrijver@nvidia.com>
+References: <1328831277-21002-1-git-send-email-pdeschrijver@nvidia.com>
+ <1328831277-21002-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <CAMbhsRT-ZTh7WQ1E0NUjX8FOMGAvx5zNnB-VYD=j8sWhM-9j+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Rename machine descriptions to match legacy descriptions distributed by
-  manufacturer BSP. This way distributions can do clean upgrades from
-  userspace scripts which check for these values to differentiate platforms
-  with single kernel binaries.
+On Thu, Feb 9, 2012 at 3:47 PM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> The powergating and reset handling code needs to differentiate between Tegra
+> variants. Therefore we export the chipid here.
+>
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> ---
+> ?arch/arm/mach-tegra/fuse.c | ? ?2 +-
+> ?arch/arm/mach-tegra/fuse.h | ? ?1 +
+> ?2 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+> index 032a936..3298880 100644
+> --- a/arch/arm/mach-tegra/fuse.c
+> +++ b/arch/arm/mach-tegra/fuse.c
+> @@ -34,7 +34,7 @@
+> ?int tegra_sku_id;
+> ?int tegra_cpu_process_id;
+> ?int tegra_core_process_id;
+> -static int tegra_chip_id;
+> +int tegra_chip_id;
+> ?enum tegra_revision tegra_revision;
+>
+> ?/* The BCT to use at boot is specified by board straps that can be read
+> diff --git a/arch/arm/mach-tegra/fuse.h b/arch/arm/mach-tegra/fuse.h
+> index c554572..d2107b2 100644
+> --- a/arch/arm/mach-tegra/fuse.h
+> +++ b/arch/arm/mach-tegra/fuse.h
+> @@ -41,6 +41,7 @@ enum tegra_revision {
+> ?extern int tegra_sku_id;
+> ?extern int tegra_cpu_process_id;
+> ?extern int tegra_core_process_id;
+> +extern int tegra_chip_id;
+> ?extern enum tegra_revision tegra_revision;
+>
+> ?extern int tegra_bct_strapping;
 
-Signed-off-by: Hector Oron <hector.oron@gmail.com>
-Acked-by: Matt Sealey <matt@genesi-usa.com>
----
- arch/arm/mach-mx5/board-mx51_efikamx.c |    3 +--
- arch/arm/mach-mx5/board-mx51_efikasb.c |    2 +-
- 2 files changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
-index 3a5ed2d..fbfccc7 100644
---- a/arch/arm/mach-mx5/board-mx51_efikamx.c
-+++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
-@@ -283,8 +283,7 @@ static struct sys_timer mx51_efikamx_timer = {
- 	.init = mx51_efikamx_timer_init,
- };
- 
--MACHINE_START(MX51_EFIKAMX, "Genesi EfikaMX nettop")
--	/* Maintainer: Amit Kucheria <amit.kucheria@linaro.org> */
-+MACHINE_START(MX51_EFIKAMX, "Genesi Efika MX (Smarttop)")
- 	.atag_offset = 0x100,
- 	.map_io = mx51_map_io,
- 	.init_early = imx51_init_early,
-diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
-index 4baf05c..dedbca5 100644
---- a/arch/arm/mach-mx5/board-mx51_efikasb.c
-+++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
-@@ -483,7 +483,7 @@ static struct sys_timer mx51_efikasb_timer = {
- 	.init	= mx51_efikasb_timer_init,
- };
- 
--MACHINE_START(MX51_EFIKASB, "Genesi Efika Smartbook")
-+MACHINE_START(MX51_EFIKASB, "Genesi Efika MX (Smartbook)")
- 	.atag_offset = 0x100,
- 	.map_io = mx51_map_io,
- 	.init_early = imx51_init_early,
--- 
-1.7.9
+Other platforms use accessors for this (cpu_is_xxx(), although
+soc_is_xxx() is probably more appropriate).
