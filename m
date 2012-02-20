@@ -1,37 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Feb 2012 11:22:31 +0100
-Subject: [PATCH 1/4 v2] i2c/gpio: add DT support
-In-Reply-To: <20120220100843.GE22562@n2100.arm.linux.org.uk>
-References: <1328754308-7365-1-git-send-email-plagnioj@jcrosoft.com>
- <4F3945B1.9070900@samsung.com>
- <20120220095813.GB11307@game.jcrosoft.org>
- <20120220100843.GE22562@n2100.arm.linux.org.uk>
-Message-ID: <20120220102231.GC11307@game.jcrosoft.org>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Mon, 20 Feb 2012 11:35:49 +0100
+Subject: [2.6.39.3] [MX25] oops in driver_register for ADC touchscreen
+ support (imx_adc_ts)
+In-Reply-To: <20120220101157.GB9921@sapphire.tkos.co.il>
+References: <50e2a71500444a5e1b951e5856d474bf@mail.fqingenieria.es>
+ <20120220094013.GA9921@sapphire.tkos.co.il>
+ <70cdf2c4b729fb7dfa1d641c4609c6f5@mail.fqingenieria.es>
+ <20120220101157.GB9921@sapphire.tkos.co.il>
+Message-ID: <20120220113549.7f2a553e@eb-e6520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:08 Mon 20 Feb     , Russell King - ARM Linux wrote:
-> On Mon, Feb 20, 2012 at 10:58:13AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 18:17 Mon 13 Feb     , Karol Lewandowski wrote:
-> > > > +	- udelay: delay between GPIO operations (may depend on each platform)
-> > > > +	- timeout: timeout to get data (ms)
-> > > 
-> > > 
-> > > If these are really needed then I would prefer to have these fully
-> > > qualified (with unit type "-ms/-millisecs" appended).
-> > > 
-> > > Regulator framework, with its "-microvolt/-microamp", serve here as
-> > > prime example of being quite descriptive (one doesn't neet to look up
-> > > the docs). Please see:
-> > > 
-> > >   http://permalink.gmane.org/gmane.linux.ports.arm.omap/67637
-> > timeout are usualy in ms I don't really see the need of -ms or so
+Hi Joan,
+
+Le Mon, 20 Feb 2012 12:11:58 +0200,
+Baruch Siach <baruch@tkos.co.il> a ?crit :
+> On Mon, Feb 20, 2012 at 11:07:56AM +0100, joancarles wrote:
 > 
-> Which is obviously total crap for udelay, which would be in _micro_seconds.
-agreed but here on i2c gpio I never see timetout as udelay so I don't see
-the mandatory to force the name in the binding
+> [snip]
+> 
+> > We are also trying a stock 3.3-rc kernel and can't get
+> > our i.MX25 to boot ... yet.
+> 
+3.3-rc works fine here (at least it was until 2 weeks ago).
 
-futhermore it's maybe linux specific
+I'll send you a dirty patch which works on 3.1 & 3.2 for the ADC.
 
-Best Regards,
-J.
+Eric
+-- 
+http://eukrea.com/en/news/104-2012
