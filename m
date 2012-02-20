@@ -1,28 +1,23 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Mon, 20 Feb 2012 08:37:57 -0700
-Subject: ARM tracehook support
-Message-ID: <4F4268D5.7070103@mentor.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 20 Feb 2012 07:46:31 -0800
+Subject: [PATCH] ASoC: imx/mxs: remove redundant SND_PCM selection
+In-Reply-To: <1329721524-28394-1-git-send-email-shawn.guo@linaro.org>
+References: <1329721524-28394-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120220154628.GC3258@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Feb 20, 2012 at 03:05:24PM +0800, Shawn Guo wrote:
+> SND_PCM is already selected by SND_SOC, there is no need for
+> SND_IMX_SOC and SND_MXS_SOC to select it again.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-A few months back, Steven Walter posted some patches that implemement 
-syscall tracing support for ARM:
-
-http://lists.arm.linux.org.uk/lurker/message/20111129.162812.bd17d9b5.en.html#linux-arm-kernel
-
-I've been working on SystemTap support for ARM, and the tracehook patch 
-in particular is interesting in that respect.  With that patch applied, 
-it would allow utrace to be supported on ARM, which is necessary for 
-userspace stap probes to function properly.
-
- From what testing I've done, the patches don't appear to be harmful. 
-So, I'm wondering what's preventing this from being pushed into 
-mainline?  Are there still outstanding issues that need to be addressed? 
-  I'd be happy to help solve them if it would help this patch get into 
-mainline quicker.
-
-Thanks in advance!
-
-Wade Farnsworth
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120220/164feaa5/attachment.sig>
