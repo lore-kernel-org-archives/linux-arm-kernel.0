@@ -1,40 +1,48 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 20 Feb 2012 18:33:04 +0000
-Subject: [PATCH v7 5/8] davinci: dm644x: change vpfe capture structure
- variables for consistency
-In-Reply-To: <1324475021-32509-6-git-send-email-manjunath.hadli@ti.com>
-References: <1324475021-32509-1-git-send-email-manjunath.hadli@ti.com>
- <1324475021-32509-6-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6317C7DB4@DBDE01.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Feb 2012 18:37:09 +0000
+Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU platforms
+Message-ID: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manju,
+Commit 68b7f715 ("nommu: ptrace support") added definitions for
+PT_TEXT_ADDR and friends, as well as adding ptrace support for reading
+from these magic offsets.
 
-On Wed, Dec 21, 2011 at 19:13:38, Hadli, Manjunath wrote:
-> Add SoC and board prefixes to variable names so that it is
-> consistent with the rest of the file.
-> 
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
+Unfortunately, this has probably never worked, since ptrace_read_user
+predicates reading on off < sizeof(struct user), returning -EOI
+otherwise.
 
-Again the subject line was not following the conventions
-currently in place. I am pretty sure they were in place
-at the time you submitted the patch too. Please take care
-next time onwards. For now, I have fixed it while committing.
+This patch moves the offset size check until after we have tried to
+match it against either a magic value or an offset into pt_regs.
 
-While I was at it, I also modified the subject line to make
-it less verbose. Here is what I committed:
+Cc: Paul Brook <paul@codesourcery.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/ptrace.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-    ARM: davinci: dm644x: fix inconsistent variable naming
-
-    Add dm644x_ prefix to names of v4l2 variables in dm644x.c
-    Add dm644xevm_ prefix to names of v4l2 variables in board-dm644x-evm.c.
-
-    This makes the code consistent with rest of these files.
-
-    Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index e33870f..b68b52b 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -256,7 +256,7 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
+ {
+ 	unsigned long tmp;
+ 
+-	if (off & 3 || off >= sizeof(struct user))
++	if (off & 3)
+ 		return -EIO;
+ 
+ 	tmp = 0;
+@@ -268,6 +268,8 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
+ 		tmp = tsk->mm->end_code;
+ 	else if (off < sizeof(struct pt_regs))
+ 		tmp = get_user_reg(tsk, off >> 2);
++	else if (off >= sizeof(struct user))
++		return -EIO;
+ 
+ 	return put_user(tmp, ret);
+ }
+-- 
+1.7.4.1
