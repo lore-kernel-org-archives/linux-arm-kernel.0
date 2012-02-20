@@ -1,60 +1,24 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 20 Feb 2012 20:47:36 +0100
-Subject: [PATCH v3 0/3] MFD: twl6040: Conversion to i2c driver
-In-Reply-To: <1328868018-24668-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1328868018-24668-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120220194736.GN5387@sortiz-mobl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Feb 2012 19:46:34 +0000
+Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
+ platforms
+In-Reply-To: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
+References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20120220194634.GK26840@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On Fri, Feb 10, 2012 at 12:00:15PM +0200, Peter Ujfalusi wrote:
-> Hello,
+On Mon, Feb 20, 2012 at 06:37:09PM +0000, Will Deacon wrote:
+> Commit 68b7f715 ("nommu: ptrace support") added definitions for
+> PT_TEXT_ADDR and friends, as well as adding ptrace support for reading
+> from these magic offsets.
 > 
-> Changes since v2:
-> - soc/codec/Kconfig: make twl6040 depend on I2C
-> - Regulator related patches has been removed (to be sent as separate series)
-I applied all 3 patches. Patch #2 did not apply cleanly, due to the fact that
-several struct twl4030_codec_data omap4panda.c references are not upstream
-yet. This is my .rej:
+> Unfortunately, this has probably never worked, since ptrace_read_user
+> predicates reading on off < sizeof(struct user), returning -EOI
+> otherwise.
+> 
+> This patch moves the offset size check until after we have tried to
+> match it against either a magic value or an offset into pt_regs.
 
---- arch/arm/mach-omap2/board-omap4panda.c
-+++ arch/arm/mach-omap2/board-omap4panda.c
-@@ -278,7 +279,7 @@
- 	return 0;
- }
- 
--static struct twl4030_codec_data twl6040_codec = {
-+static struct twl6040_codec_data twl6040_codec = {
- 	/* single-step ramp for headset and handsfree */
- 	.hs_left_step	= 0x0f,
- 	.hs_right_step	= 0x0f,
-@@ -286,17 +287,14 @@
- 	.hf_right_step	= 0x1d,
- };
- 
--static struct twl4030_audio_data twl6040_audio = {
-+static struct twl6040_platform_data twl6040_data = {
- 	.codec		= &twl6040_codec,
- 	.audpwron_gpio	= 127,
--	.naudint_irq	= OMAP44XX_IRQ_SYS_2N,
- 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
- };
- 
- /* Panda board uses the common PMIC configuration */
--static struct twl4030_platform_data omap4_panda_twldata = {
--	.audio		= &twl6040_audio,
--};
-+static struct twl4030_platform_data omap4_panda_twldata;
-
-I'm not sure hwo we could handle that properly. Either by letting Tony
-carrying this patchset, or by sending me the panda patch that adds those
-structures. As you prefer.
-
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Does this actually get used?  The fact that it's been broken from day one
+and no one's raised the issue in 2.5 years suggests that it's dead code.
