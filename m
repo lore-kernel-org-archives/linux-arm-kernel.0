@@ -1,84 +1,28 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 Feb 2012 10:16:47 +0100
-Subject: [PATCH 13/18] ARM: at91/rtc-at91sam9: pass the GPBR to use via
- ressources
-In-Reply-To: <20120220073621.GB22562@n2100.arm.linux.org.uk>
+Date: Mon, 20 Feb 2012 10:18:09 +0100
+Subject: [PATCH 04/18] ARM: at91: make ST (System Timer) soc independent
+In-Reply-To: <20120220073301.GA22562@n2100.arm.linux.org.uk>
 References: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
- <8187feb330895bf9e077ede21e68cc81a72438cc.1329500622.git.nicolas.ferre@atmel.com>
- <4F419742.70200@gmail.com>
- <20120220012010.GA29599@game.jcrosoft.org>
- <20120220073621.GB22562@n2100.arm.linux.org.uk>
-Message-ID: <20120220091647.GA28066@game.jcrosoft.org>
+ <957702b1ff83afcc0a8e842f53f05ff3f40b78b3.1329500622.git.nicolas.ferre@atmel.com>
+ <4F419246.6080405@gmail.com>
+ <20120220013825.GD29599@game.jcrosoft.org>
+ <4F41A76D.1070409@gmail.com>
+ <20120220030234.GE29599@game.jcrosoft.org>
+ <20120220073301.GA22562@n2100.arm.linux.org.uk>
+Message-ID: <20120220091809.GB28066@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07:36 Mon 20 Feb     , Russell King - ARM Linux wrote:
-> On Mon, Feb 20, 2012 at 02:20:10AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 11:43 Mon 20 Feb     , Ryan Mallon wrote:
-> > > On 18/02/12 04:50, Nicolas Ferre wrote:
-> > > 
-> > > > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > 
-> > > > The GPBR registers are used for storing RTC values. The GPBR registers
-> > > > to use are now provided using standard resource entry. The array is
-> > > > filled in SoC specific code.
-> > > > rtc-at91sam9 RTT as RTC driver is modified to retrieve this information.
-> > > > 
-> > > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > > ---
-> > > >  arch/arm/mach-at91/at91sam9260_devices.c      |   10 +++++++-
-> > > >  arch/arm/mach-at91/at91sam9261_devices.c      |    8 ++++++-
-> > > >  arch/arm/mach-at91/at91sam9263_devices.c      |   16 +++++++++++--
-> > > >  arch/arm/mach-at91/at91sam9g45_devices.c      |    8 ++++++-
-> > > >  arch/arm/mach-at91/at91sam9rl_devices.c       |    8 ++++++-
-> > > >  arch/arm/mach-at91/include/mach/at91sam9260.h |    5 +--
-> > > >  arch/arm/mach-at91/include/mach/at91sam9261.h |    5 +--
-> > > >  arch/arm/mach-at91/include/mach/at91sam9263.h |    5 +--
-> > > >  arch/arm/mach-at91/include/mach/at91sam9g45.h |    5 +--
-> > > >  arch/arm/mach-at91/include/mach/at91sam9rl.h  |    2 +-
-> > > >  drivers/rtc/rtc-at91sam9.c                    |   29 +++++++++++++++++++++---
-> > > >  11 files changed, 76 insertions(+), 25 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> > > > index 2071017..ae2b648 100644
-> > > > --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> > > > +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> > > > @@ -718,14 +718,16 @@ static struct resource rtt_resources[] = {
-> > > >  		.start	= AT91SAM9260_BASE_RTT,
-> > > >  		.end	= AT91SAM9260_BASE_RTT + SZ_16 - 1,
-> > > >  		.flags	= IORESOURCE_MEM,
-> > > > -	}
-> > > > +	}, {
-> > > > +		.flags	= IORESOURCE_MEM,
-> > > > +	},
-> > > >  };
-> > > >  
-> > > >  static struct platform_device at91sam9260_rtt_device = {
-> > > >  	.name		= "at91_rtt",
-> > > >  	.id		= 0,
-> > > >  	.resource	= rtt_resources,
-> > > > -	.num_resources	= ARRAY_SIZE(rtt_resources),
-> > > > +	.num_resources	= 1,
-> > > 
-> > > 
-> > > Why this change? The device has two resources, and the rtc driver
-> > > request both of them, so why are you saying there is only one resource
-> > > here. It either needs to be changed back to use ARRAY_SIZE, or needs a
-> > > comment explaining what magic is in use.
-> > because the number of resources depends on the user of rtt
-> > we must not hardcode the GPBR reg as this resource will be present only if the
-> > rtc-at91sam9 is enabled
+On 07:33 Mon 20 Feb     , Russell King - ARM Linux wrote:
+> On Mon, Feb 20, 2012 at 04:02:34AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 12:52 Mon 20 Feb     , Ryan Mallon wrote:
+> > > That isn't an excuse to leave incorrect code there. It is a simple fix.
+> > no (void) in c means you don't care of the return so basically it's right
 > 
-> Better would be to leave .num_resources uninitalized and set that
-> appropriately elsewhere when you make the decision whether GPBR is
-> present or not.  That may help to avoid people trying to "fix" this
-> for you via static checking tools.
-> 
-> As Ryan mentions, a comment in the code would be a good idea too.
-the comment is in the drivers code and Kconfig
+> Let's be clear: it's legal, but redundant and unnecessary.
+So as I said it's no the focus of this patch
 
-and will be drop soon in favor of DT
+I don't want to do it at the same time
 
 Best Regards,
 J.
