@@ -1,114 +1,47 @@
-From: Madhusudhan.Gowda@elektrobit.com (Madhusudhan.Gowda at elektrobit.com)
-Date: Mon, 20 Feb 2012 11:52:51 +0200
-Subject: [GIT PULL] OMAP PM EMU fix for v3.3
-In-Reply-To: <AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com>
-References: <87liw8agk4.fsf@ti.com>
- <AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com>
- <20120127190239.GC9339@atomide.com>
- <AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com>
-Message-ID: <AA48DD8077D5D945A49BD1782C1140F10122E2B7@fioues08.ebgroup.elektrobit.com>
+From: armando.visconti@st.com (Armando Visconti)
+Date: Mon, 20 Feb 2012 10:52:55 +0100
+Subject: Question on ARM Cortex R4 support in Linux
+In-Reply-To: <20120213110730.GA7375@arm.com>
+References: <CAPub149OKvBUiKoOie9BmKYfopB7L0_J1fSx2Nh-aRXr99RPaQ@mail.gmail.com>
+ <20120213105313.GD4994@arm.com>
+ <CAPub1482HL66wX92Oc7Vu75QaweOEd3k2S757mx513GueSkurA@mail.gmail.com>
+ <20120213110730.GA7375@arm.com>
+Message-ID: <4F4217F7.6050908@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-I think you have missed my last mail. Could you please ACK the pull
-request and pull the same.
-
-Best Regards
-Gowda
+Ciao Catalin,
 
 
------Original Message-----
-From: linux-arm-kernel-bounces@lists.infradead.org
-[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
-linux-arm-kernel-bounces+madhusudhan.gowda=elektrobit.com at lists.infradea
-d.org
-Sent: 28 January 2012 09:58
-To: tony at atomide.com; khilman at ti.com
-Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: RE: [GIT PULL] OMAP PM EMU fix for v3.3
+>>>> Has anybody used it on Cortex R4 based platform ?
+>>>
+>>> In theory Linux support for R4 should just work (once CONFIG_MMU is
+>>> disabled). I used to test it in the past regularly but not recently.
+>>
+>> Great. I was planning to use linux-3.2, I hope the support is there ?
+>
+> It's been there for years, but some bit-rotting may have occurred.
+>
 
-Thanks Tony
+I'm assuming you have tried it on a FPGA solution, is that correct?
 
-Hi Kevin
-Please do the needful and pull the same.
+We are planning to buy a Cortex-R4 board from ARM.
+Lionel Belnet suggested to buy Versatile + a CoreTile with Cortex-R4F
+r1p2 Test Chip on it.
 
-Best Regards
-Gowda
+Is there any Linux/ucLinux support already offered for this solution?
+Any other idea?
 
-
------Original Message-----
-From: linux-arm-kernel-bounces@lists.infradead.org
-[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Tony
-Lindgren
-Sent: 27 January 2012 21:03
-To: Gowda Madhusudhan
-Cc: Kevin Hilman; linux-omap at vger.kernel.org;
-linux-arm-kernel at lists.infradead.org
-Subject: Re: [GIT PULL] OMAP PM EMU fix for v3.3
-
-Hi,
-
-* Madhusudhan.Gowda at elektrobit.com <Madhusudhan.Gowda@elektrobit.com>
-[120127 10:25]:
-> Hi Tony,
-> 
-> Please pull the PM EMU off mode fix for v3.3
-
-It's best that Kevin queues this as it affects PM. Or it at least needs
-an ack from Kevin.
-
-Regards,
-
-Tony
- 
-> Thanks
-> Gowda
-> 
-> The following changes since commit
-> 1c6ece3c23e58d0dbc687407d606f3560ded582a:
-> 
->   Merge branch 'omap_fixes_a_3.3rc' of git://git.pwsan.com/linux-2.6
-> (2012-01-26 16:48:37 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/elektrobit/linux.git linux-omap-emu-fix
-> 
-> Madhusudhan Gowda (1):
->       ARM: OMAP3 PM:Save and restore EMU context across MPU OFF
-> 
->  arch/arm/mach-omap2/cm2xxx_3xxx.c |   16 ++++++++++++----
->  arch/arm/mach-omap2/cm2xxx_3xxx.h |    2 ++
->  arch/arm/mach-omap2/pm34xx.c      |    8 ++++++++
->  3 files changed, 22 insertions(+), 4 deletions(-)
-> 
-> 
-> ----------------------------------------------------------------
-> Please note: This e-mail may contain confidential information intended
-
-> solely for the addressee. If you have received this e-mail in error, 
-> please do not disclose it to anyone, notify the sender promptly, and 
-> delete the message from your system.
-> Thank you.
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thx,
+Arm
 
 
-----------------------------------------------------------------
-Please note: This e-mail may contain confidential information intended
-solely for the addressee. If you have received this e-mail in error,
-please do not disclose it to anyone, notify the sender promptly, and
-delete the message from your system.
-Thank you.
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+-- "Every step appears to be the unavoidable consequence of the
+-- preceding one." (A. Einstein)
+-- 
+Armando Visconti                  Mobile: (+39) 346 8879146
+Senior SW Engineer                Fax:    (+39) 02 93519290
+CPG                               Work:   (+39) 02 93519683
+Computer System Division          e-mail: armando.visconti at st.com
+ST Microelectronics               TINA:   051  4683
