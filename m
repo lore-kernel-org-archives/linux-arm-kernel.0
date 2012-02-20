@@ -1,42 +1,18 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 20 Feb 2012 15:05:24 +0800
-Subject: [PATCH] ASoC: imx/mxs: remove redundant SND_PCM selection
-Message-ID: <1329721524-28394-1-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Feb 2012 07:33:01 +0000
+Subject: [PATCH 04/18] ARM: at91: make ST (System Timer) soc independent
+In-Reply-To: <20120220030234.GE29599@game.jcrosoft.org>
+References: <1329501010-30468-1-git-send-email-nicolas.ferre@atmel.com>
+ <957702b1ff83afcc0a8e842f53f05ff3f40b78b3.1329500622.git.nicolas.ferre@atmel.com>
+ <4F419246.6080405@gmail.com> <20120220013825.GD29599@game.jcrosoft.org>
+ <4F41A76D.1070409@gmail.com> <20120220030234.GE29599@game.jcrosoft.org>
+Message-ID: <20120220073301.GA22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SND_PCM is already selected by SND_SOC, there is no need for
-SND_IMX_SOC and SND_MXS_SOC to select it again.
+On Mon, Feb 20, 2012 at 04:02:34AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:52 Mon 20 Feb     , Ryan Mallon wrote:
+> > That isn't an excuse to leave incorrect code there. It is a simple fix.
+> no (void) in c means you don't care of the return so basically it's right
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- sound/soc/imx/Kconfig |    1 -
- sound/soc/mxs/Kconfig |    1 -
- 2 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index 7383917..91b66ef 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -1,7 +1,6 @@
- menuconfig SND_IMX_SOC
- 	tristate "SoC Audio for Freescale i.MX CPUs"
- 	depends on ARCH_MXC
--	select SND_PCM
- 	select FIQ
- 	select SND_SOC_AC97_BUS
- 	help
-diff --git a/sound/soc/mxs/Kconfig b/sound/soc/mxs/Kconfig
-index e4ba8d5..21d20f3 100644
---- a/sound/soc/mxs/Kconfig
-+++ b/sound/soc/mxs/Kconfig
-@@ -1,7 +1,6 @@
- menuconfig SND_MXS_SOC
- 	tristate "SoC Audio for Freescale MXS CPUs"
- 	depends on ARCH_MXS
--	select SND_PCM
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the MXS SAIF interface.
--- 
-1.7.5.4
+Let's be clear: it's legal, but redundant and unnecessary.
