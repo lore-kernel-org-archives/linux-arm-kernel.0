@@ -1,91 +1,32 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 21 Feb 2012 16:52:05 +0200
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <84EBD7CD-1085-4B33-BF71-8CE104AE2933@antoniou-consulting.com>
-References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
- <20120208202314.GA28290@redhat.com>
- <1328736834.2903.33.camel@pasglop> <20120209075106.GB18387@elte.hu>
- <4F35DD3E.4020406@codeaurora.org> <20120211144530.GA497@elte.hu>
- <4F3AEC4E.9000303@codeaurora.org> <1329313085.2293.106.camel@twins>
- <20120215140245.GB27825@n2100.arm.linux.org.uk>
- <1329318063.2293.136.camel@twins>
- <69B0D95C-2A80-41A9-97E1-86F5840B84CF@antoniou-consulting.com>
- <1329828982.2293.405.camel@twins>
- <84EBD7CD-1085-4B33-BF71-8CE104AE2933@antoniou-consulting.com>
-Message-ID: <CAP245DXjrRtoJYbyLQ=xUvszmwt=5gus7+=s1UmwKWXcKc05AA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Feb 2012 14:53:22 +0000
+Subject: [PATCHv5 02/14] arm: omap: voltage: renamed vp_vddmin and
+ vp_vddmax fields
+In-Reply-To: <CAOMWX4cviUjAJ2eCB5LjUBmOpEWU5HP9-miPtZY1TwBGYyOPdA@mail.gmail.com>
+References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
+ <1329833098-19900-3-git-send-email-t-kristo@ti.com>
+ <CAOMWX4cviUjAJ2eCB5LjUBmOpEWU5HP9-miPtZY1TwBGYyOPdA@mail.gmail.com>
+Message-ID: <20120221145322.GD22675@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 3:31 PM, Pantelis Antoniou
-<panto@antoniou-consulting.com> wrote:
->
-> On Feb 21, 2012, at 2:56 PM, Peter Zijlstra wrote:
->
->> On Tue, 2012-02-21 at 14:38 +0200, Pantelis Antoniou wrote:
->>>
->>> If we go to all the trouble of integrating cpufreq/cpuidle/sched into scheduler
->>> callbacks, we should place hooks into the thermal framework/PM as well.
->>>
->>> It will pretty common to have per core temperature readings, on most
->>> modern SoCs.
->>>
->>> It is quite conceivable to have a case with a multi-core CPU where due
->>> to load imbalance, one (or more) of the cores is running at full speed
->>> while the rest are mostly idle. What you want do, for best performance
->>> and conceivably better power consumption, is not to throttle either
->>> frequency or lowers voltage to the overloaded CPU but to migrate the
->>> load to one of the cooler CPUs.
->>>
->>> This affects CPU capacity immediately, i.e. you shouldn't schedule more
->>> load on a CPU that its too hot, since you'll only end up triggering thermal
->>> shutdown. The ideal solution would be to round robin
->>> the load from the hot CPU to the cooler ones, but not so fast that we lose
->>> due to the migration of state from one CPU to the other.
->>>
->>> In a nutshell, the processing capacity of a core is not static, i.e. it
->>> might degrade over time due to the increase of temperature caused by the
->>> previous load.
->>>
->>> What do you think?
->>
->> This is called core-hopping, and yes that's a nice goal, although I
->> would like to do that after we get the 'simple' bits up and running. I
->> suspect it'll end up being slightly more complex than we'd like to due
->> to the fact that the goal conflicts with wanting to aggregate things on
->> cpu0 due to cpu0 being special for a host of reasons.
->>
->>
->
-> Hi Peter,
->
-> Agreed. We need to get there step by step, and I think that per-task load tracking
-> is the first one. We do have other metrics besides load that can influence the
-> scheduler decisions, with the most obvious being power consumption.
->
-> BTW, since we're going to the trouble of calculating per-task load with
-> increased accuracy, how about having some thought of translating the load numbers
-> in an absolute format. I.e. with the CPUs now having fluctuating performance
-> (due to cpufreq etc.) one would say that each CPU would have an X bogomips
-> (or some else absolute) capacity per OPP. Perhaps having such a bogomips number
-> calculated per-task would make things easier.
->
-> Perhaps the same can be done with power/energy, i.e. have a per-task power
-> consumption figure that we can use for scheduling, according to the available
-> power budget per CPU.
->
-> Dunno, it might not be feasible ATM, but having a power-aware scheduler would
-> assume some kind of power measurement, no?
+On Tue, Feb 21, 2012 at 08:40:22AM -0600, Menon, Nishanth wrote:
+> On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
+> > These are now called vddmin and vddmax, as these fields will be used
+> > globally for selecting voltage ranges for a pmic channel, and not
+> > only for voltage processor.
+> 
+> NAK. I think we need to setup voltage for SoC limits as well. the
+> programmed voltage to the VP register should be:
+> VP->vlimito->min = MAX(soc->vdd_min, pmic->vdd_min)
+> VP->vlimito->max = MIN(soc->vdd_max, pmic->vdd_max)
+> 
+> else you could be running the SoC beyond design voltage potentially
+> damaging the device.
 
-No please. We don't want to document ADC requirements, current probe
-specs and sampling rates to successfully run the Linux kernel. :)
+And if you're doing that kind of thing, you must also check that
+the resulting min and max are sane.  In other words, the minimum is
+less than the maximum.
 
-But from the scheduler mini-summit, there is acceptance that we need
-to pass *some* knowledge of CPU characteristics to Linux. These need
-to be distilled down to a few that guide scheduler policy e.g. power
-cost of using a core. This in turn would influence the scheduler's
-spread or gather decision (better to consolidate task onto few cores
-or spread them out at low frequencies). Manufacturing processes and
-CPU architecture obviously play a role in the differences here.
-However, I don't expect unit for these parameters to be in mW. :)
-
-/Amit
+Sure, it's something that should never happen (because it would be a
+design error) but if it did happen...
