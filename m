@@ -1,32 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Feb 2012 14:53:22 +0000
-Subject: [PATCHv5 02/14] arm: omap: voltage: renamed vp_vddmin and
- vp_vddmax fields
-In-Reply-To: <CAOMWX4cviUjAJ2eCB5LjUBmOpEWU5HP9-miPtZY1TwBGYyOPdA@mail.gmail.com>
-References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
- <1329833098-19900-3-git-send-email-t-kristo@ti.com>
- <CAOMWX4cviUjAJ2eCB5LjUBmOpEWU5HP9-miPtZY1TwBGYyOPdA@mail.gmail.com>
-Message-ID: <20120221145322.GD22675@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Feb 2012 14:58:22 +0000
+Subject: [PATCH] ARM/audit: use correct arch on audit_syscall_enter
+In-Reply-To: <1329832059-11000-1-git-send-email-eparis@redhat.com>
+References: <1329832059-11000-1-git-send-email-eparis@redhat.com>
+Message-ID: <20120221145822.GL19696@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 08:40:22AM -0600, Menon, Nishanth wrote:
-> On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
-> > These are now called vddmin and vddmax, as these fields will be used
-> > globally for selecting voltage ranges for a pmic channel, and not
-> > only for voltage processor.
-> 
-> NAK. I think we need to setup voltage for SoC limits as well. the
-> programmed voltage to the VP register should be:
-> VP->vlimito->min = MAX(soc->vdd_min, pmic->vdd_min)
-> VP->vlimito->max = MIN(soc->vdd_max, pmic->vdd_max)
-> 
-> else you could be running the SoC beyond design voltage potentially
-> damaging the device.
+Hi Eric,
 
-And if you're doing that kind of thing, you must also check that
-the resulting min and max are sane.  In other words, the minimum is
-less than the maximum.
+On Tue, Feb 21, 2012 at 01:47:39PM +0000, Eric Paris wrote:
+> ARM has both LE and BE versions however the audit code was called as if
+> it was always BE.  If audit userspace were to try to interpret the bits
+> it got from a LE system it would obviously do so incorrectly.  Fix this
+> by using the right arch flag on the right system.
+> 
+> Signed-off-by: Eric Paris <eparis@redhat.com>
+> ---
+>  arch/arm/kernel/ptrace.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
 
-Sure, it's something that should never happen (because it would be a
-design error) but if it did happen...
+It might be worth adding the #include <linux/audit.h> in this patch as well,
+since they're both fixes for problems introduced by the same commit. That
+way we only need to deal with one patch as well.
+
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index e33870f..8009e84 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -915,10 +915,15 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+>  	ip = regs->ARM_ip;
+>  	regs->ARM_ip = why;
+>  
+> +#ifdef __ARMEB__
+> +#define AUDIT_ARCH_NR AUDIT_ARCH_ARMEB
+> +#else
+> +#define AUDIT_ARCH_NR AUDIT_ARCH_ARM
+> +#endif
+
+Pedantry, but I prefer the #defines outside of the function scope (I'd probably
+just stick them before the function given that they're not used anywhere else).
+
+>  	if (!ip)
+>  		audit_syscall_exit(regs);
+>  	else
+> -		audit_syscall_entry(AUDIT_ARCH_ARMEB, scno, regs->ARM_r0,
+> +		audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
+>  				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
+>  
+>  	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+
+Cheers,
+
+Will
