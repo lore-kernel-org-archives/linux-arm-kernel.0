@@ -1,142 +1,86 @@
 From: nm@ti.com (Menon, Nishanth)
-Date: Tue, 21 Feb 2012 08:40:22 -0600
-Subject: [PATCHv5 02/14] arm: omap: voltage: renamed vp_vddmin and
- vp_vddmax fields
-In-Reply-To: <1329833098-19900-3-git-send-email-t-kristo@ti.com>
+Date: Tue, 21 Feb 2012 08:44:22 -0600
+Subject: [PATCHv5 06/14] arm: omap: add support for oscillator setup
+In-Reply-To: <1329833098-19900-7-git-send-email-t-kristo@ti.com>
 References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
- <1329833098-19900-3-git-send-email-t-kristo@ti.com>
-Message-ID: <CAOMWX4cviUjAJ2eCB5LjUBmOpEWU5HP9-miPtZY1TwBGYyOPdA@mail.gmail.com>
+ <1329833098-19900-7-git-send-email-t-kristo@ti.com>
+Message-ID: <CAOMWX4ccQ6Y4F-8YSD-6SNURCTYHi+MCEzJsVhCOb3CRwLoqmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
-> These are now called vddmin and vddmax, as these fields will be used
-> globally for selecting voltage ranges for a pmic channel, and not
-> only for voltage processor.
+> This contains startup and shutdown times for the oscillator. By default
+> use ULONG_MAX. Oscillator setup is used for calculating and setting up
+> latencies for sleep modes that disable oscillator.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+> ?arch/arm/mach-omap2/pm.c | ? 27 +++++++++++++++++++++++++++
+> ?arch/arm/mach-omap2/pm.h | ? ?8 ++++++++
+> ?2 files changed, 35 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index 1881fe9..2402e8e 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -28,6 +28,33 @@
+>
+> ?static struct omap_device_pm_latency *pm_lats;
+>
+> +/**
+> + * struct omap2_oscillator - Describe the board main oscillator latencies
+> + * @startup_time: oscillator startup latency
+> + * @shutdown_time: oscillator shutdown latency
+> + */
+> +struct omap2_oscillator {
+> + ? ? ? u32 startup_time;
+> + ? ? ? u32 shutdown_time;
+> +};
+> +
+> +static struct omap2_oscillator oscillator = {
+> + ? ? ? .startup_time = ULONG_MAX,
+> + ? ? ? .shutdown_time = ULONG_MAX,
+> +};
+> +
+> +void omap_pm_setup_oscillator(u32 tstart, u32 tshut)
+> +{
+> + ? ? ? oscillator.startup_time = tstart;
+> + ? ? ? oscillator.shutdown_time = tshut;
+> +}
+> +
+> +void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
+> +{
 
-NAK. I think we need to setup voltage for SoC limits as well. the
-programmed voltage to the VP register should be:
-VP->vlimito->min = MAX(soc->vdd_min, pmic->vdd_min)
-VP->vlimito->max = MIN(soc->vdd_max, pmic->vdd_max)
-
-else you could be running the SoC beyond design voltage potentially
-damaging the device.
+Maybe a nitpick - variable check needed?
 
 Regards,
 Nishanth Menon
 
 
+> + ? ? ? *tstart = oscillator.startup_time;
+> + ? ? ? *tshut = oscillator.shutdown_time;
+> +}
+> +
+> ?static int _init_omap_device(char *name)
+> ?{
+> ? ? ? ?struct omap_hwmod *oh;
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index ec8f874..797d2da 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -141,4 +141,12 @@ static inline int omap4_twl_init(void)
+> ?}
+> ?#endif
 >
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
-> ?arch/arm/mach-omap2/omap_twl.c | ? 27 ++++++++++-----------------
-> ?arch/arm/mach-omap2/voltage.h ?| ? ?4 ++--
-> ?arch/arm/mach-omap2/vp.c ? ? ? | ? ?4 ++--
-> ?3 files changed, 14 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-> index df4e7c3..5224fbd 100644
-> --- a/arch/arm/mach-omap2/omap_twl.c
-> +++ b/arch/arm/mach-omap2/omap_twl.c
-> @@ -149,8 +149,8 @@ static struct omap_voltdm_pmic omap3_mpu_pmic = {
-> ? ? ? ?.vp_erroroffset ? ? ? ? = OMAP3_VP_CONFIG_ERROROFFSET,
-> ? ? ? ?.vp_vstepmin ? ? ? ? ? ?= OMAP3_VP_VSTEPMIN_VSTEPMIN,
-> ? ? ? ?.vp_vstepmax ? ? ? ? ? ?= OMAP3_VP_VSTEPMAX_VSTEPMAX,
-> - ? ? ? .vp_vddmin ? ? ? ? ? ? ?= OMAP3430_VP1_VLIMITTO_VDDMIN,
-> - ? ? ? .vp_vddmax ? ? ? ? ? ? ?= OMAP3430_VP1_VLIMITTO_VDDMAX,
-> + ? ? ? .vddmin ? ? ? ? ? ? ? ? = 600000,
-> + ? ? ? .vddmax ? ? ? ? ? ? ? ? = 1450000,
-> ? ? ? ?.vp_timeout_us ? ? ? ? ?= OMAP3_VP_VLIMITTO_TIMEOUT_US,
-> ? ? ? ?.i2c_slave_addr ? ? ? ? = OMAP3_SRI2C_SLAVE_ADDR,
-> ? ? ? ?.volt_reg_addr ? ? ? ? ?= OMAP3_VDD_MPU_SR_CONTROL_REG,
-> @@ -170,8 +170,8 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
-> ? ? ? ?.vp_erroroffset ? ? ? ? = OMAP3_VP_CONFIG_ERROROFFSET,
-> ? ? ? ?.vp_vstepmin ? ? ? ? ? ?= OMAP3_VP_VSTEPMIN_VSTEPMIN,
-> ? ? ? ?.vp_vstepmax ? ? ? ? ? ?= OMAP3_VP_VSTEPMAX_VSTEPMAX,
-> - ? ? ? .vp_vddmin ? ? ? ? ? ? ?= OMAP3430_VP2_VLIMITTO_VDDMIN,
-> - ? ? ? .vp_vddmax ? ? ? ? ? ? ?= OMAP3430_VP2_VLIMITTO_VDDMAX,
-> + ? ? ? .vddmin ? ? ? ? ? ? ? ? = 600000,
-> + ? ? ? .vddmax ? ? ? ? ? ? ? ? = 1450000,
-> ? ? ? ?.vp_timeout_us ? ? ? ? ?= OMAP3_VP_VLIMITTO_TIMEOUT_US,
-> ? ? ? ?.i2c_slave_addr ? ? ? ? = OMAP3_SRI2C_SLAVE_ADDR,
-> ? ? ? ?.volt_reg_addr ? ? ? ? ?= OMAP3_VDD_CORE_SR_CONTROL_REG,
-> @@ -191,8 +191,8 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
-> ? ? ? ?.vp_erroroffset ? ? ? ? = OMAP4_VP_CONFIG_ERROROFFSET,
-> ? ? ? ?.vp_vstepmin ? ? ? ? ? ?= OMAP4_VP_VSTEPMIN_VSTEPMIN,
-> ? ? ? ?.vp_vstepmax ? ? ? ? ? ?= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-> - ? ? ? .vp_vddmin ? ? ? ? ? ? ?= OMAP4_VP_MPU_VLIMITTO_VDDMIN,
-> - ? ? ? .vp_vddmax ? ? ? ? ? ? ?= OMAP4_VP_MPU_VLIMITTO_VDDMAX,
-> + ? ? ? .vddmin ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? .vddmax ? ? ? ? ? ? ? ? = 1500000,
-> ? ? ? ?.vp_timeout_us ? ? ? ? ?= OMAP4_VP_VLIMITTO_TIMEOUT_US,
-> ? ? ? ?.i2c_slave_addr ? ? ? ? = OMAP4_SRI2C_SLAVE_ADDR,
-> ? ? ? ?.volt_reg_addr ? ? ? ? ?= OMAP4_VDD_MPU_SR_VOLT_REG,
-> @@ -213,8 +213,8 @@ static struct omap_voltdm_pmic omap4_iva_pmic = {
-> ? ? ? ?.vp_erroroffset ? ? ? ? = OMAP4_VP_CONFIG_ERROROFFSET,
-> ? ? ? ?.vp_vstepmin ? ? ? ? ? ?= OMAP4_VP_VSTEPMIN_VSTEPMIN,
-> ? ? ? ?.vp_vstepmax ? ? ? ? ? ?= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-> - ? ? ? .vp_vddmin ? ? ? ? ? ? ?= OMAP4_VP_IVA_VLIMITTO_VDDMIN,
-> - ? ? ? .vp_vddmax ? ? ? ? ? ? ?= OMAP4_VP_IVA_VLIMITTO_VDDMAX,
-> + ? ? ? .vddmin ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? .vddmax ? ? ? ? ? ? ? ? = 1500000,
-> ? ? ? ?.vp_timeout_us ? ? ? ? ?= OMAP4_VP_VLIMITTO_TIMEOUT_US,
-> ? ? ? ?.i2c_slave_addr ? ? ? ? = OMAP4_SRI2C_SLAVE_ADDR,
-> ? ? ? ?.volt_reg_addr ? ? ? ? ?= OMAP4_VDD_IVA_SR_VOLT_REG,
-> @@ -235,8 +235,8 @@ static struct omap_voltdm_pmic omap4_core_pmic = {
-> ? ? ? ?.vp_erroroffset ? ? ? ? = OMAP4_VP_CONFIG_ERROROFFSET,
-> ? ? ? ?.vp_vstepmin ? ? ? ? ? ?= OMAP4_VP_VSTEPMIN_VSTEPMIN,
-> ? ? ? ?.vp_vstepmax ? ? ? ? ? ?= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-> - ? ? ? .vp_vddmin ? ? ? ? ? ? ?= OMAP4_VP_CORE_VLIMITTO_VDDMIN,
-> - ? ? ? .vp_vddmax ? ? ? ? ? ? ?= OMAP4_VP_CORE_VLIMITTO_VDDMAX,
-> + ? ? ? .vddmin ? ? ? ? ? ? ? ? = 0,
-> + ? ? ? .vddmax ? ? ? ? ? ? ? ? = 1500000,
-> ? ? ? ?.vp_timeout_us ? ? ? ? ?= OMAP4_VP_VLIMITTO_TIMEOUT_US,
-> ? ? ? ?.i2c_slave_addr ? ? ? ? = OMAP4_SRI2C_SLAVE_ADDR,
-> ? ? ? ?.volt_reg_addr ? ? ? ? ?= OMAP4_VDD_CORE_SR_VOLT_REG,
-> @@ -271,13 +271,6 @@ int __init omap3_twl_init(void)
-> ? ? ? ?if (!cpu_is_omap34xx())
-> ? ? ? ? ? ? ? ?return -ENODEV;
->
-> - ? ? ? if (cpu_is_omap3630()) {
-> - ? ? ? ? ? ? ? omap3_mpu_pmic.vp_vddmin = OMAP3630_VP1_VLIMITTO_VDDMIN;
-> - ? ? ? ? ? ? ? omap3_mpu_pmic.vp_vddmax = OMAP3630_VP1_VLIMITTO_VDDMAX;
-> - ? ? ? ? ? ? ? omap3_core_pmic.vp_vddmin = OMAP3630_VP2_VLIMITTO_VDDMIN;
-> - ? ? ? ? ? ? ? omap3_core_pmic.vp_vddmax = OMAP3630_VP2_VLIMITTO_VDDMAX;
-> - ? ? ? }
-> -
-> ? ? ? ?/*
-> ? ? ? ? * The smartreflex bit on twl4030 specifies if the setting of voltage
-> ? ? ? ? * is done over the I2C_SR path. Since this setting is independent of
-> diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-> index fa5b3dc..949938d 100644
-> --- a/arch/arm/mach-omap2/voltage.h
-> +++ b/arch/arm/mach-omap2/voltage.h
-> @@ -162,8 +162,8 @@ struct omap_voltdm_pmic {
-> ? ? ? ?u8 vp_erroroffset;
-> ? ? ? ?u8 vp_vstepmin;
-> ? ? ? ?u8 vp_vstepmax;
-> - ? ? ? u32 vp_vddmin;
-> - ? ? ? u32 vp_vddmax;
-> + ? ? ? u32 vddmin;
-> + ? ? ? u32 vddmax;
-> ? ? ? ?u8 vp_timeout_us;
-> ? ? ? ?bool i2c_high_speed;
-> ? ? ? ?u8 i2c_mcode;
-> diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-> index 6ee0b4a..d9e0650 100644
-> --- a/arch/arm/mach-omap2/vp.c
-> +++ b/arch/arm/mach-omap2/vp.c
-> @@ -53,8 +53,8 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
-> ? ? ? ?sys_clk_rate = voltdm->sys_clk.rate / 1000;
->
-> ? ? ? ?timeout = (sys_clk_rate * voltdm->pmic->vp_timeout_us) / 1000;
-> - ? ? ? vddmin = voltdm->pmic->uv_to_vsel(voltdm->pmic->vp_vddmin);
-> - ? ? ? vddmax = voltdm->pmic->uv_to_vsel(voltdm->pmic->vp_vddmax);
-> + ? ? ? vddmin = voltdm->pmic->uv_to_vsel(voltdm->pmic->vddmin);
-> + ? ? ? vddmax = voltdm->pmic->uv_to_vsel(voltdm->pmic->vddmax);
->
-> ? ? ? ?waittime = ((voltdm->pmic->step_size / voltdm->pmic->slew_rate) *
-> ? ? ? ? ? ? ? ? ? ?sys_clk_rate) / 1000;
+> +#ifdef CONFIG_PM
+> +extern void omap_pm_setup_oscillator(u32 tstart, u32 tshut);
+> +extern void omap_pm_get_oscillator(u32 *tstart, u32 *tshut);
+> +#else
+> +static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
+> +static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { }
+> +#endif
+> +
+> ?#endif
 > --
 > 1.7.4.1
 >
