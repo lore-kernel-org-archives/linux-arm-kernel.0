@@ -1,46 +1,44 @@
-From: matt@ohporter.com (Matt Porter)
-Date: Tue, 21 Feb 2012 16:11:51 -0500
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <20120221184648.GR18185@atomide.com>
-References: <1329151422-2146-1-git-send-email-mporter@ti.com>
- <20120213165209.GA31482@n2100.arm.linux.org.uk>
- <20120213165617.GE3494@opensource.wolfsonmicro.com>
- <20120213175233.GC1426@atomide.com>
- <20120213180236.GB31482@n2100.arm.linux.org.uk>
- <20120213181410.GE1426@atomide.com>
- <20120213185823.GF3494@opensource.wolfsonmicro.com>
- <20120221184648.GR18185@atomide.com>
-Message-ID: <20120221211151.GA1609@beef>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 21 Feb 2012 22:21:41 +0100
+Subject: [PATCH 0/2] Move some stuff into the new mach-s3c24xx
+Message-ID: <201202212221.41744.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 10:46:48AM -0800, Tony Lindgren wrote:
-> * Mark Brown <broonie@opensource.wolfsonmicro.com> [120213 10:27]:
-> > On Mon, Feb 13, 2012 at 10:14:10AM -0800, Tony Lindgren wrote:
-> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [120213 09:31]:
-> > > > On Mon, Feb 13, 2012 at 09:52:34AM -0800, Tony Lindgren wrote:
-> > 
-> > > > > Can't we just leave out the .id and have it automatically assigned?
-> > 
-> > It'd be nice but...
-> > 
-> > > > Unfortunately, there's no such infrastructure in the driver model.
-> > 
-> > > Hmm OK, -1 seems to be just used for name in platform_device_add().
-> > 
-> > -1 is a valid ID also, it means "there's only one of these things so
-> > don't display a number".  Which is sad but there we are.  I'm at ELC/ABS
-> > so I might try and find Greg in person here to see if we can come up
-> > with something better, it seems like this is something the core ought to
-> > be able to help with in much the same way that the USB stuff can.
-> 
-> Matt, care to refresh your original patch using some other number so
-> we can apply it as a regression fix for the -rc series while the
-> long term solution is being discussed?
-> 
-> Just use some random number for now with a comment, 42?
+Hi,
 
-Will do, I'll post an update with this approach.
+These two patches move the s3c2443 common clock code and the dma
+base code from plat-s3c24xx to mach-s3c24xx and apply on top of the
+current s3c24xx-cleanup topic-branch.
 
--Matt
+The s3c2443-clock.c got a common-s3c2443.c name, to hold more common
+code for s3c2443/2416/2450 later on.
+
+I'm still not sure what would be a fitting name for "s3c2443 and later",
+so please speak up everyone with better ideas :-) .
+
+I can also do more later on, but would like to check first if my direction
+is correct :-)
+
+Heiko
+
+Heiko Stuebner (2):
+  ARM: S3C24XX: Move s3c2443-clock.c to mach-s3c24xx
+  ARM: S3C24XX: Move the DMA base code to mach-s3c24xx
+
+ arch/arm/mach-s3c24xx/Kconfig          |   32 +-
+ arch/arm/mach-s3c24xx/Makefile         |    5 +
+ arch/arm/mach-s3c24xx/common-s3c2443.c |  644 ++++++++++++++
+ arch/arm/mach-s3c24xx/dma.c            | 1469 ++++++++++++++++++++++++++++++++
+ arch/arm/plat-s3c24xx/Kconfig          |   22 -
+ arch/arm/plat-s3c24xx/Makefile         |    2 -
+ arch/arm/plat-s3c24xx/dma.c            | 1469 --------------------------------
+ arch/arm/plat-s3c24xx/s3c2443-clock.c  |  635 --------------
+ 8 files changed, 2148 insertions(+), 2130 deletions(-)
+ create mode 100644 arch/arm/mach-s3c24xx/common-s3c2443.c
+ create mode 100644 arch/arm/mach-s3c24xx/dma.c
+ delete mode 100644 arch/arm/plat-s3c24xx/dma.c
+ delete mode 100644 arch/arm/plat-s3c24xx/s3c2443-clock.c
+
+-- 
+1.7.2.3
