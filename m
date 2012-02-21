@@ -1,99 +1,54 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Tue, 21 Feb 2012 10:06:20 -0700
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Feb 2012 17:24:09 +0000
 Subject: ARM tracehook support
-In-Reply-To: <4F428C39.40906@mentor.com>
+In-Reply-To: <4F43CF0C.2020301@mentor.com>
 References: <4F4268D5.7070103@mentor.com>
  <20120220154748.GG25462@mudshark.cambridge.arm.com>
- <4F428C39.40906@mentor.com>
-Message-ID: <4F43CF0C.2020301@mentor.com>
+ <4F428C39.40906@mentor.com> <4F43CF0C.2020301@mentor.com>
+Message-ID: <20120221172408.GJ23133@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wade Farnsworth wrote:
-> Will Deacon wrote:
->> On Mon, Feb 20, 2012 at 03:37:57PM +0000, Wade Farnsworth wrote:
->>> Hi all,
->>
->> Hello Wade,
->>
->>> A few months back, Steven Walter posted some patches that implemement
->>> syscall tracing support for ARM:
->>>
->>> http://lists.arm.linux.org.uk/lurker/message/20111129.162812.bd17d9b5.en.html#linux-arm-kernel
->>>
->>>
->>> I've been working on SystemTap support for ARM, and the tracehook patch
->>> in particular is interesting in that respect. With that patch applied,
->>> it would allow utrace to be supported on ARM, which is necessary for
->>> userspace stap probes to function properly.
->>>
->>> From what testing I've done, the patches don't appear to be harmful.
->>> So, I'm wondering what's preventing this from being pushed into
->>> mainline? Are there still outstanding issues that need to be addressed?
->>
->> Yup, I posted some questions here:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-December/074802.html
->>
->
-> OK, so to continue that conversation:
->
-> Will Deacon wrote:
->  > On Wed, Nov 30, 2011 at 02:46:20PM +0000, Steven Walter wrote:
->  >> +static inline void syscall_get_arguments(struct task_struct *task,
->  >> + struct pt_regs *regs,
->  >> + unsigned int i, unsigned int n,
->  >> + unsigned long *args)
->  >> +{
->  >> + BUG_ON(i + n > 6);
->  >
->  > So I guess 6 is the maximum number of registers that are used for
->  > syscall passing. That sounds about right to me, but I wondered how
->  > you worked it out (and whether or not it should be defined
->  > somewhere?).
->
-> I believe the 6 argument constraint is a specific to
-> syscall_get_arguments(). Notice the comment in
-> include/asm-generic/syscall.h:
->
-> /*
-> [...]
-> *
-> * It's only valid to call this when @task is stopped for tracing on
-> * entry to a system call, due to %TIF_SYSCALL_TRACE or %TIF_SYSCALL_AUDIT.
-> * It's invalid to call this with @i + @n > 6; we only support system calls
-> * taking up to 6 arguments.
-> */
->
-> Additionally, if you'll look at the other architectures' implementations
-> you'll see similar code.
->
->  > In fact, how are these things supposed to deal with 64-bit arguments
->  > that straddle two registers? I think we always pack arguments such
->  > that we don't get holes in the register layout, but it might be worth
->  > checking (EABI requires 64-bit arguments to be passed in even
->  > registers).
->
-> Hmm, I do believe that 32-bit powerpc has similar alignment issues
-> (64-bit args must be passed in odd/even pairs), but I don't see any
-> special handling of this in that architecture's
-> syscall_get/set_arguments(). So I'm wondering if the handling of this is
-> or should be handled elsewhere. I'll keep digging on this.
->
+Hi Wade,
 
-This question also came up from an older attempt at ARM tracehook by 
-Roland McGrath:
+Thanks for following this up.
 
-http://lists.openwall.net/linux-kernel/2009/06/24/150
+On Tue, Feb 21, 2012 at 05:06:20PM +0000, Wade Farnsworth wrote:
+> >
+> > I believe the 6 argument constraint is a specific to
+> > syscall_get_arguments(). Notice the comment in
+> > include/asm-generic/syscall.h:
+> >
+> > /*
+> > [...]
+> > *
+> > * It's only valid to call this when @task is stopped for tracing on
+> > * entry to a system call, due to %TIF_SYSCALL_TRACE or %TIF_SYSCALL_AUDIT.
+> > * It's invalid to call this with @i + @n > 6; we only support system calls
+> > * taking up to 6 arguments.
+> > */
+> >
+> > Additionally, if you'll look at the other architectures' implementations
+> > you'll see similar code.
 
-In a nutshell, the argument is that syscall_get_arguments() doesn't need 
-to know about any of the argument semantics, they just pass all 
-registers that may contain arguments back up the stack.  It's then up to 
-the tracer to interpret the arguments.  The argument is similar for 
-syscall_set_arguments().  Since the same register set is used for both 
-EABI and OABI, there doesn't need to be any specific handling of one 
-versus the other here.
+In which case could we #define this somewhere to make it more obvious?
 
-Thanks,
+> In a nutshell, the argument is that syscall_get_arguments() doesn't need 
+> to know about any of the argument semantics, they just pass all 
+> registers that may contain arguments back up the stack.  It's then up to 
+> the tracer to interpret the arguments.  The argument is similar for 
+> syscall_set_arguments().  Since the same register set is used for both 
+> EABI and OABI, there doesn't need to be any specific handling of one 
+> versus the other here.
 
--Wade
+Ok, if the low-level code doesn't need to interpret arguments then that
+should be fine. sys_arm_fadvise64_64 would be the tricky case, but the
+argument ordering seems to have been chosen explicitly to place the 64-bit
+offsets naturally on even registers, fitting it neatly into 6 registers.
+
+Once you've rebased the code, please post a new version so it can be
+reviewed again.
+
+Cheers,
+
+Will
