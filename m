@@ -1,81 +1,40 @@
-From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Tue, 21 Feb 2012 15:31:27 +0200
-Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
-In-Reply-To: <1329828982.2293.405.camel@twins>
-References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
- <20120208202314.GA28290@redhat.com> <1328736834.2903.33.camel@pasglop>
- <20120209075106.GB18387@elte.hu> <4F35DD3E.4020406@codeaurora.org>
- <20120211144530.GA497@elte.hu> <4F3AEC4E.9000303@codeaurora.org>
- <1329313085.2293.106.camel@twins>
- <20120215140245.GB27825@n2100.arm.linux.org.uk>
- <1329318063.2293.136.camel@twins>
- <69B0D95C-2A80-41A9-97E1-86F5840B84CF@antoniou-consulting.com>
- <1329828982.2293.405.camel@twins>
-Message-ID: <84EBD7CD-1085-4B33-BF71-8CE104AE2933@antoniou-consulting.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Feb 2012 13:30:44 +0000
+Subject: [PATCH - linux-next] ARM: ptrace: Fix audit caused compile error
+In-Reply-To: <20120221131616.GI19696@mudshark.cambridge.arm.com>
+References: <1329825855-11902-1-git-send-email-peter.ujfalusi@ti.com>
+ <20120221131616.GI19696@mudshark.cambridge.arm.com>
+Message-ID: <20120221133044.GN22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Feb 21, 2012, at 2:56 PM, Peter Zijlstra wrote:
-
-> On Tue, 2012-02-21 at 14:38 +0200, Pantelis Antoniou wrote:
->> 
->> If we go to all the trouble of integrating cpufreq/cpuidle/sched into scheduler
->> callbacks, we should place hooks into the thermal framework/PM as well.
->> 
->> It will pretty common to have per core temperature readings, on most
->> modern SoCs. 
->> 
->> It is quite conceivable to have a case with a multi-core CPU where due
->> to load imbalance, one (or more) of the cores is running at full speed
->> while the rest are mostly idle. What you want do, for best performance
->> and conceivably better power consumption, is not to throttle either 
->> frequency or lowers voltage to the overloaded CPU but to migrate the
->> load to one of the cooler CPUs.
->> 
->> This affects CPU capacity immediately, i.e. you shouldn't schedule more
->> load on a CPU that its too hot, since you'll only end up triggering thermal 
->> shutdown. The ideal solution would be to round robin
->> the load from the hot CPU to the cooler ones, but not so fast that we lose
->> due to the migration of state from one CPU to the other.
->> 
->> In a nutshell, the processing capacity of a core is not static, i.e. it
->> might degrade over time due to the increase of temperature caused by the
->> previous load.
->> 
->> What do you think? 
+On Tue, Feb 21, 2012 at 01:16:17PM +0000, Will Deacon wrote:
+> On Tue, Feb 21, 2012 at 12:04:15PM +0000, Peter Ujfalusi wrote:
+> > While trying to compile the kernel for ARM (omap2plus_defconfig) the kernel
+> > build fails with:
+> > 
+> > arch/arm/kernel/ptrace.c: In function ?syscall_trace?:
+> > arch/arm/kernel/ptrace.c:920:3: error: implicit declaration of function ?audit_syscall_exit?
+> > arch/arm/kernel/ptrace.c:922:3: error: implicit declaration of function ?audit_syscall_entry?
+> > arch/arm/kernel/ptrace.c:922:23: error: ?AUDIT_ARCH_ARMEB? undeclared (first use in this function)
+> > arch/arm/kernel/ptrace.c:922:23: note: each undeclared identifier is reported only once for each function it appears in
+> > make[1]: *** [arch/arm/kernel/ptrace.o] Error 1
+> > 
+> > The issue created by commit:
+> > 29ef73b7 Kernel: Audit Support For The ARM Platform
+> > 
+> > We need to include the linux/audit.h header to the arch/arm/kernel/ptrace.c
+> > file to be able to compile the kernel.
 > 
-> This is called core-hopping, and yes that's a nice goal, although I
-> would like to do that after we get the 'simple' bits up and running. I
-> suspect it'll end up being slightly more complex than we'd like to due
-> to the fact that the goal conflicts with wanting to aggregate things on
-> cpu0 due to cpu0 being special for a host of reasons.
+> This was already reported and I think Russell was going to revert the
+> offending commit, since it needed some rework to handle little-endian
+> configurations.
 > 
-> 
+> I can't see the revert in any of the trees I'm tracking though...
 
-Hi Peter,
+I never pushed that out because I thought someone was going to fix it.
+Were any patches produced to fix it?  I can't see anything in the patch
+system and I couldn't see anything on the list.
 
-Agreed. We need to get there step by step, and I think that per-task load tracking
-is the first one. We do have other metrics besides load that can influence the
-scheduler decisions, with the most obvious being power consumption.
-
-BTW, since we're going to the trouble of calculating per-task load with 
-increased accuracy, how about having some thought of translating the load numbers
-in an absolute format. I.e. with the CPUs now having fluctuating performance
-(due to cpufreq etc.) one would say that each CPU would have an X bogomips 
-(or some else absolute) capacity per OPP. Perhaps having such a bogomips number
-calculated per-task would make things easier.
-
-Perhaps the same can be done with power/energy, i.e. have a per-task power
-consumption figure that we can use for scheduling, according to the available
-power budget per CPU.
-
-Dunno, it might not be feasible ATM, but having a power-aware scheduler would
-assume some kind of power measurement, no?
-
-Regards
-
--- Pantelis
-
-
- 
+It seems the previous thread about it just died.  Oh well, I guess a
+revert is what's required after all.
