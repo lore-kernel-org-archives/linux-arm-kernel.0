@@ -1,44 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 Feb 2012 10:22:38 +0100
-Subject: [PATCH 5/6 V2] atmel/nand: add DT support
-In-Reply-To: <20120207115306.GF15647@game.jcrosoft.org>
-References: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
- <1328524512-18159-2-git-send-email-plagnioj@jcrosoft.com>
- <4F30FD4B.4050501@atmel.com> <20120207115306.GF15647@game.jcrosoft.org>
-Message-ID: <4F43625E.7070908@atmel.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 21 Feb 2012 14:56:07 +0530
+Subject: SMP local timers and their CPUfreq notifiers setup on OMAP3
+In-Reply-To: <20120221091124.GB22675@n2100.arm.linux.org.uk>
+References: <8739aahc0n.fsf@ti.com> <4F3E0655.2040702@ti.com>
+ <0401fed02a58f7bc48cc274050adbac7@localhost>
+ <CAMQu2gwW6ES14jB8E6snE4pQRKg1q2ZF0pBedBtuPxeYV+7cow@mail.gmail.com>
+ <4F3E34A3.4000307@arm.com> <4F3E47F2.2090400@ti.com>
+ <20120221091124.GB22675@n2100.arm.linux.org.uk>
+Message-ID: <CAMQu2gzmTrODAks68o0cWF99sMenLRGjT-YTNUOOmAc3jAfvxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2012 12:53 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> On 11:30 Tue 07 Feb     , Nicolas Ferre wrote:
->> On 02/06/2012 11:35 AM, Jean-Christophe PLAGNIOL-VILLARD :
->>> use a local copy of board informatin and fill with DT data
->>>
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> Cc: devicetree-discuss at lists.ozlabs.org
->>> Cc: linux-mtd at lists.infradead.org
+On Tue, Feb 21, 2012 at 2:41 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Feb 17, 2012 at 05:58:34PM +0530, Santosh Shilimkar wrote:
+>> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+>> index 4285daa..9834851 100644
+>> --- a/arch/arm/kernel/smp_twd.c
+>> +++ b/arch/arm/kernel/smp_twd.c
+>> @@ -129,7 +129,7 @@ static struct notifier_block twd_cpufreq_nb = {
 >>
->> [..]
->>
->>> +static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
->>> +					 struct device_node *np)
->>
->> Maybe you will need to protect this function in case of !DT builds: I
->> suspect that some of the of_xxxxx() calls are not provided if !CONFIG_OF.
-> no-need on the of_ function are static inline it !CONFIG_OF
+>> ?static int twd_cpufreq_init(void)
+>> ?{
+>> - ? ? if (!IS_ERR(twd_clk))
+>> + ? ? ?if (twd_evt && *__this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
+>
+> You seem to have an additional space before 'if'.
+Yep.
+Fixed in the updated version in patch system.
+patch 7336/1
 
-Sorry to come back to this but:
-
-of_get_nand_ecc_mode(np);
-of_get_nand_on_flash_bbt(np);
-
-for example are not available in case of non-DT compilation: so we must
-protect the atmel_of_init_port() against this error.
-
-Can you please rework another patch.
-
-Bye,
--- 
-Nicolas Ferre
+Regards
+Santosh
