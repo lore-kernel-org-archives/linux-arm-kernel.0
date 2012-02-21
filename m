@@ -1,47 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 Feb 2012 10:59:17 +0100
-Subject: [PATCH 5/6 V3] atmel/nand: add DT support
-In-Reply-To: <1329817573-6473-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1328524512-18159-2-git-send-email-plagnioj@jcrosoft.com>
- <1329817573-6473-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4F436AF5.5030104@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Feb 2012 10:00:41 +0000
+Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
+ platforms
+In-Reply-To: <20120221083612.GG22562@n2100.arm.linux.org.uk>
+References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
+ <20120220194634.GK26840@n2100.arm.linux.org.uk>
+ <201202210124.23028.paul@codesourcery.com>
+ <20120221083612.GG22562@n2100.arm.linux.org.uk>
+Message-ID: <20120221100041.GA19696@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2012 10:46 AM, Jean-Christophe PLAGNIOL-VILLARD :
-> Use a local copy of board informatin and fill with DT data.
+On Tue, Feb 21, 2012 at 08:36:12AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 21, 2012 at 01:24:22AM +0000, Paul Brook wrote:
+> > I suspect I submitted the original patch.  I don't remember the details, but 
+> > it definitely worked at the time.   IIRC some other targets (m68k?) used an 
+> > even less palatable hack.
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-mtd at lists.infradead.org
-> ---
-> v3:
+> I don't believe that - looking at the history in git, since it was merged
+> the code has been:
 > 
-> 	protect against !CONFIG_OF
+> static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
+>                             unsigned long __user *ret)
+> {
+>         unsigned long tmp;
 > 
-> Best Regards,
-> J.
->  .../devicetree/bindings/mtd/atmel-nand.txt         |   41 +++++++
->  arch/arm/boot/dts/at91sam9g20.dtsi                 |   17 +++
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |   17 +++
->  arch/arm/boot/dts/at91sam9m10g45ek.dts             |   26 +++++-
->  arch/arm/boot/dts/usb_a9g20.dts                    |   46 ++++++++-
->  arch/arm/mach-at91/at91sam9x5.c                    |    5 -
+>         if (off & 3 || off >= sizeof(struct user))
+>                 return -EIO;
+> 
+>         tmp = 0;
+>         if (off == PT_TEXT_ADDR)
+>                 tmp = tsk->mm->start_code;
+>         else if (off == PT_DATA_ADDR)
+>                 tmp = tsk->mm->start_data;
+>         else if (off == PT_TEXT_END_ADDR)
+>                 tmp = tsk->mm->end_code;
+>         else if (off < sizeof(struct pt_regs))
+>                 tmp = get_user_reg(tsk, off >> 2);
+> 
+> And since PT_TEXT_ADDR is 0x10000, this will fail with -EIO.  So, there's
+> no way this could have been used successfully in the last 2.5 years.
 
-As we will put this series on top of 9x5, we may also add the entries in
-at91sam9x5.dtsi / at91sam9x5cm.dtsi ...
+Agreed, it does seem that this would always have failed, however a quick look
+at GDB also suggests that it would at least try to access these guys on an
+MMU-less system.
 
->  arch/arm/mach-at91/board-dt.c                      |   52 ---------
->  drivers/mtd/nand/atmel_nand.c                      |  113 ++++++++++++++++----
->  8 files changed, 238 insertions(+), 79 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> Maybe no one uses a debugger for uclinux programs?
 
-Otherwise,
+I confess to finding this by inspection rather than a debugging failure.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Bye,
--- 
-Nicolas Ferre
+Will
