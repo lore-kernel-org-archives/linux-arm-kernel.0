@@ -1,106 +1,73 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 21 Feb 2012 12:17:05 +0100
-Subject: [PATCH v4 1/2] mfd: Add anatop mfd driver
-In-Reply-To: <1328734286-30091-1-git-send-email-paul.liu@linaro.org>
-References: <1324980994-18462-1-git-send-email-paul.liu@linaro.org>
- <1328734286-30091-1-git-send-email-paul.liu@linaro.org>
-Message-ID: <20120221111705.GV5387@sortiz-mobl>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 21 Feb 2012 20:25:05 +0900
+Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
+In-Reply-To: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
+References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <00b401ccf08b$75b35870$611a0950$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-I didn't get patch #2, so I don't get to see how the read/write functions ar
-eused for example.
-
-On Thu, Feb 09, 2012 at 04:51:25AM +0800, Ying-Chun Liu (PaulLiu) wrote:
-> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+Kukjin Kim wrote:
 > 
-> Anatop is a mfd chip embedded in Freescale i.MX6Q SoC.
-> Anatop provides regulators and thermal.
-> This driver handles the address space and the operation of the mfd device.
-A few comments here:
+> From: Boojin Kim <boojin.kim@samsung.com>
+> 
+> Currently there were two part of DMAC PL330 driver for
+> support old styled s3c-pl330 which has been merged into
+> drivers/dma/pl330.c driver. Actually, there is no reason
+> to separate them now.
+> 
+> Basically this patch merges arch/arm/common/pl330.c into
+> drivers/dma/pl330.c driver and removes useless exported
+> symbol, externed function and so on.
+> 
+> The newer pl330 driver tested on SMDKV310 and SMDK4212 boards
+> 
+> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 
+Hi Russell,
 
+This addressed comments from you about moving 'asm/hardware/pl330.h' into
+'drivers/dma/', there is nowhere it is used except drivers/dma/.
 
-> +static u32 anatop_read(struct anatop *adata, u32 addr, int bit_shift, int bits)
-> +{
-> +	u32 val;
-> +	int mask;
-> +	if (bits == 32)
-> +		mask = 0xff;
-> +	else
-> +		mask = (1 << bits) - 1;
-> +
-> +	val = ioread32(adata->ioreg+addr);
-> +	val = (val >> bit_shift) & mask;
-> +	return val;
-> +}
-> +
-> +static void anatop_write(struct anatop *adata, u32 addr, int bit_shift,
-> +			 int bits, u32 data)
-> +{
-> +	u32 val;
-> +	int mask;
-> +	if (bits == 32)
-> +		mask = 0xff;
-> +	else
-> +		mask = (1 << bits) - 1;
-> +
-> +	val = ioread32(adata->ioreg+addr) & ~(mask << bit_shift);
-> +	iowrite32((data << bit_shift) | val, adata->ioreg);
-> +}
-Don't you need some sort of read/write atomic routine as well ? Locking would
-be needed then...
+If you have any objection on this, please let me know.
 
+As we talked last time, if you're ok on this let me send 'pull request' this
+series to you and Vinod. I think this should be sent to rmk tree and dma
+tree together.
 
-> +static const struct of_device_id of_anatop_regulator_match[] = {
-> +	{
-> +		.compatible = "fsl,anatop-regulator",
-> +	},
-> +	{
-> +		.compatible = "fsl,anatop-thermal",
-> +	},
-> +	{ },
-> +};
-> +
-> +static int of_anatop_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	u64 ofaddr;
-> +	u64 ofsize;
-> +	void *ioreg;
-> +	struct anatop *drvdata;
-> +	int ret = 0;
-> +	const __be32 *rval;
-> +
-> +	rval = of_get_address(np, 0, &ofsize, NULL);
-> +	if (rval)
-> +		ofaddr = be32_to_cpu(*rval);
-> +	else
-> +		return -EINVAL;
-> +
-> +	ioreg = ioremap(ofaddr, ofsize);
-> +	if (!ioreg)
-> +		return -EINVAL;
-> +	drvdata = devm_kzalloc(dev, sizeof(struct anatop), GFP_KERNEL);
-> +	if (!drvdata)
-> +		return -EINVAL;
-> +	drvdata->ioreg = ioreg;
-> +	drvdata->read = anatop_read;
-> +	drvdata->write = anatop_write;
-> +	platform_set_drvdata(pdev, drvdata);
-> +	of_platform_bus_probe(np, of_anatop_regulator_match, dev);
-> +	return ret;
-> +}
-So it seems that your driver here does nothing but extending your device tree
-definition. Correct me if I'm wrong, aren't you trying to fix a broken device
-tree definition here ?
+As a note, this is in 'v3.4-for-vkoul-v2' of linux-samsung.git now.
 
-Cheers,
-Samuel.
+Thanks.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Vinod Koul <vinod.koul@intel.com>
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> Changes since v2:
+> - Address comments from Russell King
+>   the 'asm/hardware/pl330.h' is moved to 'drivers/dma/pl330.h'
+>   which is used only in drivers/dma/
+> 
+>  arch/arm/common/Kconfig               |    3 -
+>  arch/arm/common/Makefile              |    1 -
+>  arch/arm/common/pl330.c               | 1959
+--------------------------------
+> -
+>  arch/arm/include/asm/hardware/pl330.h |  217 ----
+>  drivers/dma/Kconfig                   |    1 -
+>  drivers/dma/pl330.c                   | 1892
++++++++++++++++++++++++++++++++-
+>  drivers/dma/pl330.h                   |  251 +++++
+>  include/linux/amba/pl330.h            |    1 -
+>  8 files changed, 2142 insertions(+), 2183 deletions(-)
+>  delete mode 100644 arch/arm/common/pl330.c
+>  delete mode 100644 arch/arm/include/asm/hardware/pl330.h
+>  create mode 100644 drivers/dma/pl330.h
