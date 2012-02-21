@@ -1,52 +1,37 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 21 Feb 2012 21:30:07 +0000 (UTC)
-Subject: [PATCHv22 13/16] drivers: add Contiguous Memory Allocator
-In-Reply-To: <1329507036-24362-14-git-send-email-m.szyprowski@samsung.com>
-References: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
- <1329507036-24362-14-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <alpine.DEB.2.00.1202212121560.962@localhost>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 21 Feb 2012 15:02:07 -0700 (MST)
+Subject: [PATCH 2/3] tty: serial: OMAP: block idle while the UART is
+ transferring data in PIO mode
+In-Reply-To: <4F423E28.3040404@ti.com>
+References: <20120126024903.31613.24730.stgit@dusk>
+ <20120126025036.31613.67819.stgit@dusk> <4F423E28.3040404@ti.com>
+Message-ID: <alpine.DEB.2.00.1202211456160.25023@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Salut Beno?t,
 
-On Fri, 17 Feb 2012, Marek Szyprowski wrote:
-> +/**
-> + * dma_release_from_contiguous() - release allocated pages
-> + * @dev:   Pointer to device for which the pages were allocated.
-> + * @pages: Allocated pages.
-> + * @count: Number of allocated pages.
-> + *
-> + * This function releases memory allocated by dma_alloc_from_contiguous().
-> + * It returns false when provided pages do not belong to contiguous area and
-> + * true otherwise.
-> + */
-> +bool dma_release_from_contiguous(struct device *dev, struct page *pages,
-> +				 int count)
-> +{
-> +	struct cma *cma = dev_get_cma_area(dev);
-> +	unsigned long pfn;
-> +
-> +	if (!cma || !pages)
-> +		return false;
-> +
-> +	pr_debug("%s(page %p)\n", __func__, (void *)pages);
-> +
-> +	pfn = page_to_pfn(pages);
-> +
-> +	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
-> +		return false;
-> +
-> +	VM_BUG_ON(pfn + count > cma->base_pfn);
+On Mon, 20 Feb 2012, Cousson, Benoit wrote:
 
-Are you sure the VM_BUG_ON() condition is correct here?
+> 3.3-rc4 is broken in the DT case because of the serial driver. And it 
+> looks like it is due to this fix.  We cannot rely on pdata anymore in 
+> DT, and in that case it leads to an Oops due to NULL pdata.
 
-> +	mutex_lock(&cma_mutex);
-> +	bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
-> +	free_contig_range(pfn, count);
-> +	mutex_unlock(&cma_mutex);
-> +
-> +	return true;
-> +}
+Sorry about the breakage.  I agree with the diagnosis.  That code was just 
+copied from the DMA errata part of the driver, so it will need to be fixed 
+as well.  Otherwise the same problem will happen when DMA is enabled.
 
-A.
+> And then we will have to add the support for all these OMAP custom hooks without pdata.
+
+That's really the key question for the medium- to long-term...
+
+> A basic fix (below) for the moment is to test for valid pdata inside the driver.
+> I'll repost it properly if you are fine with it.
+
+Looks fine to me, although I'd suggest fixing the DMA workaround path as 
+well.
+
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
+
+
+- Paul
