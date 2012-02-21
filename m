@@ -1,46 +1,32 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 21 Feb 2012 17:32:50 +0200
-Subject: [PATCHv5 02/14] arm: omap: voltage: renamed vp_vddmin and
- vp_vddmax fields
-In-Reply-To: <20120221145322.GD22675@n2100.arm.linux.org.uk>
-References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
- <1329833098-19900-3-git-send-email-t-kristo@ti.com>
- <CAOMWX4cviUjAJ2eCB5LjUBmOpEWU5HP9-miPtZY1TwBGYyOPdA@mail.gmail.com>
- <20120221145322.GD22675@n2100.arm.linux.org.uk>
-Message-ID: <1329838370.4102.479.camel@sokoban>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Tue, 21 Feb 2012 23:34:58 +0800
+Subject: [PATCH] ARM: perf: do not handle deleted counter in irq handler
+ to avoid oops
+In-Reply-To: <20120221151909.GA23133@mudshark.cambridge.arm.com>
+References: <1329799058-27082-1-git-send-email-tom.leiming@gmail.com>
+ <20120221133228.GK19696@mudshark.cambridge.arm.com>
+ <CACVXFVMxpRDsG_hNn_WaX17uEdZCJmcraOvDwCL6JQ7Xyz5nig@mail.gmail.com>
+ <20120221151909.GA23133@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVOR7oF1nq9p55+3b2at2Appa_YyFEWhD=dF8jGfy0H+OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-02-21 at 14:53 +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 21, 2012 at 08:40:22AM -0600, Menon, Nishanth wrote:
-> > On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
-> > > These are now called vddmin and vddmax, as these fields will be used
-> > > globally for selecting voltage ranges for a pmic channel, and not
-> > > only for voltage processor.
-> > 
-> > NAK. I think we need to setup voltage for SoC limits as well. the
-> > programmed voltage to the VP register should be:
-> > VP->vlimito->min = MAX(soc->vdd_min, pmic->vdd_min)
-> > VP->vlimito->max = MIN(soc->vdd_max, pmic->vdd_max)
-> > 
+On Tue, Feb 21, 2012 at 11:19 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Feb 21, 2012 at 02:02:32PM +0000, Ming Lei wrote:
+>> On Tue, Feb 21, 2012 at 9:32 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > I have a couple of patches that solve this by (a) clearing the overflow flag
+>> > when disabling the counter for ARMv7 and (b) adding the event checks to the
+>>
+>> Maybe ARMv6 and xscale need to be fixed too if the overflow flag will be kept
+>> even after the counter is disabled.
+>
+> I don't think so - seems like we clear the overflow flag already for those
+> PMUs in the disable path (note that we write ~mask).
 
-This kind of code is actually introduced in patch #7 of this set. VP
-part of the code calculates the voltage processor vlimitto values in
-omap_vp_init. VC limits are handled in omap_vc_init_channel /
-omap_vc_calc_vsel.
+mask is only the counters enable bits, both v6 and xscale don't clear their
+overflow flag in disable callback.
 
-> > else you could be running the SoC beyond design voltage potentially
-> > damaging the device.
-> 
-> And if you're doing that kind of thing, you must also check that
-> the resulting min and max are sane.  In other words, the minimum is
-> less than the maximum.
-> 
-> Sure, it's something that should never happen (because it would be a
-> design error) but if it did happen...
 
-This could be added yes, current code assumes the limits themselves are
-at least somewhat sane, doesn't hurt to add a kern dump for this case I
-think as it sounds rather fatal.
-
--Tero
+thanks,
+-- 
+Ming Lei
