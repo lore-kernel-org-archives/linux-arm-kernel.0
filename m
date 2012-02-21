@@ -1,77 +1,42 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 21 Feb 2012 20:37:26 +0900
-Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add device
- tree support
-In-Reply-To: <m239abgc32.fsf@bob.laptop.org>
-References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
- <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
- <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
- <m239abgc32.fsf@bob.laptop.org>
-Message-ID: <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 21 Feb 2012 14:04:15 +0200
+Subject: [PATCH - linux-next] ARM: ptrace: Fix audit caused compile error
+Message-ID: <1329825855-11902-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris Ball wrote:
-> 
-> Hi,
-> 
-Hi,
+While trying to compile the kernel for ARM (omap2plus_defconfig) the kernel
+build fails with:
 
-> On Thu, Feb 16 2012, Kukjin Kim wrote:
-> > I mean if I or you create topic branch for this whole series, can be
-> > merged into both tree for avoiding conflicts with further working. Of
-> > course, the topic branch don't have to rebase after merging into each
-> > tree.
-> >
-> > If you're ok on this and my opinion, let me create the topic branch.
-> 
-> Okay, sure.  Thanks,
-> 
-I created topic branch for this we talked. You can pull that following:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-v3.4-for-cjb
+arch/arm/kernel/ptrace.c: In function ?syscall_trace?:
+arch/arm/kernel/ptrace.c:920:3: error: implicit declaration of function ?audit_syscall_exit?
+arch/arm/kernel/ptrace.c:922:3: error: implicit declaration of function ?audit_syscall_entry?
+arch/arm/kernel/ptrace.c:922:23: error: ?AUDIT_ARCH_ARMEB? undeclared (first use in this function)
+arch/arm/kernel/ptrace.c:922:23: note: each undeclared identifier is reported only once for each function it appears in
+make[1]: *** [arch/arm/kernel/ptrace.o] Error 1
 
-If any problems, please kindly let me know.
+The issue created by commit:
+29ef73b7 Kernel: Audit Support For The ARM Platform
 
-Thanks.
+We need to include the linux/audit.h header to the arch/arm/kernel/ptrace.c
+file to be able to compile the kernel.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/kernel/ptrace.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-
-  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-v3.4-for-cjb
-
-Thomas Abraham (6):
-      mmc: sdhci-s3c: Remove usage of clk_type member in platform data
-      ARM: EXYNOS: use 'exynos4-sdhci' as device name for sdhci controllers
-      ARM: SAMSUNG: remove all uses of clk_type member in sdhci platform
-data
-      mmc: sdhci-s3c: derive transfer width host capability from max_width
-in platform data
-      mmc: sdhci-s3c: Keep a copy of platform data and use it
-      mmc: sdhci-s3c: Add device tree support
-
- .../devicetree/bindings/mmc/samsung-sdhci.txt      |   70 ++++++
- arch/arm/mach-exynos/clock.c                       |   24 +-
- arch/arm/mach-exynos/common.c                      |    5 +
- arch/arm/mach-exynos/mach-armlex4210.c             |    3 -
- arch/arm/mach-exynos/mach-nuri.c                   |    3 -
- arch/arm/mach-exynos/mach-origen.c                 |    2 -
- arch/arm/mach-exynos/mach-smdk4x12.c               |    2 -
- arch/arm/mach-exynos/mach-smdkv310.c               |    4 -
- arch/arm/mach-exynos/mach-universal_c210.c         |    2 -
- arch/arm/plat-samsung/devs.c                       |    4 -
- arch/arm/plat-samsung/include/plat/sdhci.h         |   35 +++-
- arch/arm/plat-samsung/platformdata.c               |    2 -
- drivers/mmc/host/sdhci-s3c.c                       |  235
-+++++++++++++++++++-
- 13 files changed, 341 insertions(+), 50 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index e33870f..8e41ad2 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -15,6 +15,7 @@
+ #include <linux/elf.h>
+ #include <linux/smp.h>
+ #include <linux/ptrace.h>
++#include <linux/audit.h>
+ #include <linux/user.h>
+ #include <linux/security.h>
+ #include <linux/init.h>
+-- 
+1.7.8.4
