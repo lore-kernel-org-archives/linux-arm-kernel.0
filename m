@@ -1,44 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Feb 2012 10:46:48 -0800
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <20120213185823.GF3494@opensource.wolfsonmicro.com>
-References: <1329151422-2146-1-git-send-email-mporter@ti.com>
- <20120213165209.GA31482@n2100.arm.linux.org.uk>
- <20120213165617.GE3494@opensource.wolfsonmicro.com>
- <20120213175233.GC1426@atomide.com>
- <20120213180236.GB31482@n2100.arm.linux.org.uk>
- <20120213181410.GE1426@atomide.com>
- <20120213185823.GF3494@opensource.wolfsonmicro.com>
-Message-ID: <20120221184648.GR18185@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 21 Feb 2012 10:50:57 -0800
+Subject: [PATCH 1/2] Documentation/gpio.txt: Explain expected pinctrl
+ interaction
+In-Reply-To: <CACRpkdbMFN3=XTSg1oE310eTHecrs6XaMz+DCNYJzwOg8JEEiQ@mail.gmail.com>
+References: <1329719263-18971-1-git-send-email-swarren@nvidia.com>
+ <20120220073941.GC22562@n2100.arm.linux.org.uk>
+ <CACRpkdbMFN3=XTSg1oE310eTHecrs6XaMz+DCNYJzwOg8JEEiQ@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC37D@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [120213 10:27]:
-> On Mon, Feb 13, 2012 at 10:14:10AM -0800, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [120213 09:31]:
-> > > On Mon, Feb 13, 2012 at 09:52:34AM -0800, Tony Lindgren wrote:
+Linus Walleij wrote at Tuesday, February 21, 2012 3:42 AM:
+> On Mon, Feb 20, 2012 at 8:39 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Sun, Feb 19, 2012 at 11:27:42PM -0700, Stephen Warren wrote:
+> >> Update gpio.txt based on recent discussions regarding interaction with the
+> >> pinctrl subsystem.
+> >>
+> >> Previously, gpio_request() was described as explicitly not performing any
+> >> required mux setup operations etc.
+> >>
+> >> Now, gpio_request() is explicitly as explicitly performing any required mux
+> >> setup operations where possible. In the case it isn't, platform code is
+> >> required to have set up any required muxing or other configuration prior to
+> >> gpio_request() being called, in order to maintain the same semantics.
+> >
+> > So what if you need to have the pin as a GPIO, manipulate it as a GPIO,
+> > and then hand it off to a special function, and then take it back as
+> > a GPIO before you shut the special function down ?
 > 
-> > > > Can't we just leave out the .id and have it automatically assigned?
+> I remember this case very well and we designed for it, so it should be handled
+> by pin control and GPIO thusly:
 > 
-> It'd be nice but...
-> 
-> > > Unfortunately, there's no such infrastructure in the driver model.
-> 
-> > Hmm OK, -1 seems to be just used for name in platform_device_add().
-> 
-> -1 is a valid ID also, it means "there's only one of these things so
-> don't display a number".  Which is sad but there we are.  I'm at ELC/ABS
-> so I might try and find Greg in person here to see if we can come up
-> with something better, it seems like this is something the core ought to
-> be able to help with in much the same way that the USB stuff can.
+> Example: use pins 1,2 as I2C, then convert them to GPIO for a while
+> then back again:
 
-Matt, care to refresh your original patch using some other number so
-we can apply it as a regression fix for the -rc series while the
-long term solution is being discussed?
+The code below doesn't necessarily do exactly what Russell needs...
 
-Just use some random number for now with a comment, 42?
+> // This call looks up a map containing pins 1,2 and reserve them
+> p = pinctrl_get(dev, "i2c");
+> if (IS_ERR(p))
+>   ...
+> pinctrl_enable(p);
+> pinctrl_disable(p);
 
-Regards,
+Here, the pinctrl core will call the pinctrl driver's pinmux_ops.free()
+function. The whole point of this function is to change the pin's mux
+selection to something that is guaranteed not to conflict with any other
+pin's mux setting.
 
-Tony
+Now, if the HW only allows each signal to be routed to a specific pin
+(or not routed), then free() might be a no-op.
+
+However, if the HW allows the I2C module's signals to be routed to pins
+A+B or X+Y, then free() on pins A/B would need to reprogram the mux to
+route something else to pins A+B (or disable those pins or whatever the
+HW needs) so that if I2C was later selected on pins X+Y, there would be
+no conflict; it wouldn't be the case that both pins A+B and X+Y had I2C
+mux'd on to them.
+
+Hence, in general at least, pinctrl_disable() might glitch the output
+signals.
+
+As far as how to fix this; see my future responses to your future emails
+:-)
+
+> // This will free up the pins again
+> pinctrl_put(p);
+> // So now we can do this...
+> // NB: the GPIO driver calls pinctr_request_gpio() to check
+> // that it can take these pins
+> gpio_request(1, "gpio1"):
+> gpio_request(2, "gpio2");
+> // This will trigger a reset or something
+> gpio_direction_output(1, 1);
+> gpio_direction_output(2, 1);
+> // Release pins again
+> gpio_free(1);
+> gpio_free(2);
+> // Take them back for this function
+> p = pinctrl_get(dev, "i2c");
+...
+
+-- 
+nvpublic
