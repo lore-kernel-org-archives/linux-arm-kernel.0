@@ -1,81 +1,33 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 21 Feb 2012 16:04:54 +0200
-Subject: [PATCHv5 10/14] TEMP: arm: OMAP3: beagle rev-c4: enable OPP6
+Date: Tue, 21 Feb 2012 16:04:55 +0200
+Subject: [PATCHv5 11/14] arm: omap: beagle: set oscillator startup time to
+ 10ms for rev c4
 In-Reply-To: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
 References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1329833098-19900-11-git-send-email-t-kristo@ti.com>
+Message-ID: <1329833098-19900-12-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Beagleboard rev-c4 has a speed sorted OMAP3530 chip which can run at 720MHz.
+Based on the oscillator datasheet for this device.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c |   29 +++++++++++++++++++++++++++++
- arch/arm/mach-omap2/opp3xxx_data.c      |    4 ++++
- 2 files changed, 33 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-omap3beagle.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 7ffcd28..97678e5 100644
+index 97678e5..5489dbe 100644
 --- a/arch/arm/mach-omap2/board-omap3beagle.c
 +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -484,6 +484,35 @@ static void __init beagle_opp_init(void)
- 		return;
+@@ -511,6 +511,9 @@ static void __init beagle_opp_init(void)
+ 			opp_disable(mpu_dev, 720000000);
+ 			opp_disable(iva_dev, 520000000);
+ 		}
++
++		/* Set oscillator startup time to 10ms, shutdown not used */
++		omap_pm_setup_oscillator(10000, ULONG_MAX);
  	}
  
-+	if (omap3_beagle_version == OMAP3BEAGLE_BOARD_C4) {
-+		struct device *mpu_dev, *iva_dev;
-+
-+		mpu_dev = omap_device_get_by_hwmod_name("mpu");
-+		iva_dev = omap_device_get_by_hwmod_name("iva");
-+
-+		if (!mpu_dev || !iva_dev) {
-+			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
-+				__func__, mpu_dev, iva_dev);
-+			return;
-+		}
-+		/* Enable MPU 720MHz opp */
-+		r = opp_enable(mpu_dev, 720000000);
-+
-+		/* Enable IVA 520MHz opp */
-+		r |= opp_enable(iva_dev, 520000000);
-+
-+		if (r) {
-+			pr_err("%s: failed to enable higher opp %d\n",
-+				__func__, r);
-+			/*
-+			 * Cleanup - disable the higher freqs - we dont care
-+			 * about the results
-+			 */
-+			opp_disable(mpu_dev, 720000000);
-+			opp_disable(iva_dev, 520000000);
-+		}
-+	}
-+
  	/* Custom OPP enabled for all xM versions */
- 	if (cpu_is_omap3630()) {
- 		struct device *mpu_dev, *iva_dev;
-diff --git a/arch/arm/mach-omap2/opp3xxx_data.c b/arch/arm/mach-omap2/opp3xxx_data.c
-index d95f3f9..a0f5fe1 100644
---- a/arch/arm/mach-omap2/opp3xxx_data.c
-+++ b/arch/arm/mach-omap2/opp3xxx_data.c
-@@ -98,6 +98,8 @@ static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
- 	OPP_INITIALIZER("mpu", true, 550000000, OMAP3430_VDD_MPU_OPP4_UV),
- 	/* MPU OPP5 */
- 	OPP_INITIALIZER("mpu", true, 600000000, OMAP3430_VDD_MPU_OPP5_UV),
-+	/* MPU OPP6 : omap3530 high speed grade only */
-+	OPP_INITIALIZER("mpu", false, 720000000, OMAP3430_VDD_MPU_OPP5_UV),
- 
- 	/*
- 	 * L3 OPP1 - 41.5 MHz is disabled because: The voltage for that OPP is
-@@ -123,6 +125,8 @@ static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
- 	OPP_INITIALIZER("iva", true, 400000000, OMAP3430_VDD_MPU_OPP4_UV),
- 	/* DSP OPP5 */
- 	OPP_INITIALIZER("iva", true, 430000000, OMAP3430_VDD_MPU_OPP5_UV),
-+	/* DSP OPP6 : omap3530 high speed grade only */
-+	OPP_INITIALIZER("iva", false, 520000000, OMAP3430_VDD_MPU_OPP5_UV),
- };
- 
- static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 -- 
 1.7.4.1
