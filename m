@@ -1,54 +1,35 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 21 Feb 2012 12:37:38 +0800
-Subject: [PATCH] ARM: perf: do not handle deleted counter in irq handler to
- avoid oops
-Message-ID: <1329799058-27082-1-git-send-email-tom.leiming@gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 21 Feb 2012 10:49:18 +0530
+Subject: [PATCH 0/3] omap hsmmc init cleanup and section warning fixes
+ for v3.4 merge window
+In-Reply-To: <20120217202125.GF18185@atomide.com>
+References: <20120215182355.18884.18682.stgit@kaulin.local>
+ <4F3E6323.9020101@ti.com> <20120217202125.GF18185@atomide.com>
+Message-ID: <4F432956.6070601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds one check in irq handler to skip handling deleted
-counter for avoiding oops.
+On Saturday 18 February 2012 01:51 AM, Tony Lindgren wrote:
+> * Rajendra Nayak<rnayak@ti.com>  [120217 05:53]:
+>> Tony,
+>>
+>> On Wednesday 15 February 2012 11:58 PM, Tony Lindgren wrote:
+>>> Hi all,
+>>>
+>>> This series fixes up the issues noted by Russell on omap2_hsmmc_init()
+>>> where if TWL PMIC is compiled as a module we can't keep a bunch of
+>>> functions marked as __init like they should be. This series fixes
+>>> the issues by splitting omap2_hsmmc_init() into two functions.
+>>
+>> I have a re-spin of this series ready with all the fixes I did
+>> while testing the insmod/unbind/bind test suggested by Russell.
+>> I could not figure out what branch your original patches were
+>> based on. So let me know what branch of your tree you want me
+>> to post this series on.
+>
+> I have them on mainline commit a269c2f5a5ad2b24a19fdd723363daf18394ec85.
 
-When one counter is deleted, event reference(hw_events->events[idx])
-will be cleared but the hw overflow status may be kept, so the
-hw event may be handled and oops will be triggered in irq handler if
-pmu irq from other events come.
+I could not get them to apply on the above commit, but I was able to on
+this mainline commit instead '4f8a428dac431e7bd09673b404769d87df948eef'.
 
-The another candidate fix is to clear the overflow status for the
-event in arm_pmu->disable(), but looks it is a bit more complicated
-and has no obvious advantage than the fix in this patch.
----
- arch/arm/kernel/perf_event_v7.c     |    3 ++-
- arch/arm/kernel/perf_event_xscale.c |    2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 54964dc..05762e4 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -1082,8 +1082,9 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
- 		/*
- 		 * We have a single interrupt for all counters. Check that
- 		 * each counter has overflowed before we process it.
-+		 * Do not handle deleted counter.
- 		 */
--		if (!armv7_pmnc_counter_has_overflowed(pmnc, idx))
-+		if (!armv7_pmnc_counter_has_overflowed(pmnc, idx) || !event)
- 			continue;
- 
- 		hwc = &event->hw;
-diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
-index 831e019..1e07aec 100644
---- a/arch/arm/kernel/perf_event_xscale.c
-+++ b/arch/arm/kernel/perf_event_xscale.c
-@@ -592,7 +592,7 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
- 		struct perf_event *event = cpuc->events[idx];
- 		struct hw_perf_event *hwc;
- 
--		if (!xscale2_pmnc_counter_has_overflowed(pmnc, idx))
-+		if (!xscale2_pmnc_counter_has_overflowed(pmnc, idx) || !event)
- 			continue;
- 
- 		hwc = &event->hw;
--- 
-1.7.9
+Anyways, now that -rc4 is out I based my series on top of that.
