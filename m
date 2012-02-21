@@ -1,111 +1,57 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 21 Feb 2012 00:52:51 -0500 (EST)
-Subject: [PATCH] ARM: debug: add support for early console output via
- semihosting
-Message-ID: <alpine.LFD.2.02.1202210050300.24536@xanadu.home>
+From: amit.kachhap@linaro.org (Amit Daniel Kachhap)
+Date: Tue, 21 Feb 2012 11:49:45 +0530
+Subject: [PATCH V6 0/5] ARM: exynos4210: Add l2 retention mode cpuidle state
+Message-ID: <1329805190-8874-1-git-send-email-amit.kachhap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a very simple method for code running in an emulator, or under
-the supervision of a debugger, to use I/O facilities on the controlling
-host.
+Changes since V5:
+*Rebased the patchset against kernel 3.3-rc4
+*Added correct flag for exynos4210 evt1 based board
+*Removed CONFIG_OF from l2 cache configuration as suggested by 
+ Olof Johansson <olof@lixom.net>
 
-Tested with OpenOCD, and ARM's Fast Models.
+Changes since V4:
+*Rebased the patchset against for-next of samsung kernel tree.
+*Added Tushar suggestion of putting a check if L2 cache dt node not found.
+*Added Inder suggestion of removing the BUG_ON check in cpuidle driver.
 
-Details on semihosting can be found in chapter 8 of
-DUI0203I_rvct_developer_guide.pdf from ARM Ltd.
+Changes since V3:
+*Implemented Russell feedback and moved sleep magic 4byte memory before 
+s3c_cpu_resume to data section.
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Changes since V2:
+*Implemented the suggestion of MyungJoo Ham and used INFORM0/1
+registers for resume for some board versions.
+*Added back save/restore through CPU PM notifiers as suggested by 
+Lorenzo Pieralisi. This is useful to restore vfp state.
+*some patch modularization (s5p/exynos) and proper commit logs.  
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e0d236d7ff..755d9fbe32 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -100,6 +100,22 @@ choice
- 		  Note that the system will appear to hang during boot if there
- 		  is nothing connected to read from the DCC.
- 
-+	config DEBUG_SEMIHOSTING
-+		bool "Kernel low-level debug output via semihosting I"
-+		help
-+		  Semihosting enables code running on an ARM target to use
-+		  the I/O facilities on a host debugger/emulator through a
-+		  simple SVC calls. The host debugger or emulator must have
-+		  semihosting enabled for the special svc call to be trapped
-+		  otherwise the kernel will crash.
-+
-+		  This is known to work with OpenOCD, as wellas
-+		  ARM's Fast Models, or any other controlling environment
-+		  that implements semihosting.
-+
-+		  For more details about semihosting, please see
-+		  chapter 8 of DUI0203I_rvct_developer_guide.pdf from ARM Ltd.
-+
- 	config AT91_DEBUG_LL_DBGU0
- 		bool "Kernel low-level debugging on rm9200, 9260/9g20, 9261/9g10 and 9rl"
- 		depends on HAVE_AT91_DBGU0
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index 204e2160cf..d7c9076be1 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -155,6 +155,8 @@ hexbuf:		.space 16
- 
- 		.ltorg
- 
-+#ifndef CONFIG_DEBUG_SEMIHOSTING
-+
- ENTRY(printascii)
- 		addruart_current r3, r1, r2
- 		b	2f
-@@ -177,3 +179,24 @@ ENTRY(printch)
- 		mov	r0, #0
- 		b	1b
- ENDPROC(printch)
-+
-+#else
-+
-+ENTRY(printascii)
-+		mov	r1, r0
-+		mov	r0, #0x04		@ SYS_WRITE0
-+	ARM(	svc	#0x123456	)
-+	THUMB(	svc	#0xab		)
-+		mov	pc, lr
-+ENDPROC(printascii)
-+
-+ENTRY(printch)
-+		adr	r1, hexbuf
-+		strb	r0, [r1]
-+		mov	r0, #0x03		@ SYS_WRITEC
-+	ARM(	svc	#0x123456	)
-+	THUMB(	svc	#0xab		)
-+		mov	pc, lr
-+ENDPROC(printch)
-+
-+#endif
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 6d57911440..565f87d26c 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -265,7 +265,7 @@ __create_page_tables:
- 	str	r6, [r3]
- 
- #ifdef CONFIG_DEBUG_LL
--#ifndef CONFIG_DEBUG_ICEDCC
-+#if !defined(CONFIG_DEBUG_ICEDCC) && !defined(CONFIG_DEBUG_SEMIHOSTING)
- 	/*
- 	 * Map in IO space for serial debugging.
- 	 * This allows debug messages to be output
-@@ -297,10 +297,10 @@ __create_page_tables:
- 	cmp	r0, r6
- 	blo	1b
- 
--#else /* CONFIG_DEBUG_ICEDCC */
--	/* we don't need any serial debugging mappings for ICEDCC */
-+#else /* CONFIG_DEBUG_ICEDCC || CONFIG_DEBUG_SEMIHOSTING */
-+	/* we don't need any serial debugging mappings */
- 	ldr	r7, [r10, #PROCINFO_IO_MMUFLAGS] @ io_mmuflags
--#endif /* !CONFIG_DEBUG_ICEDCC */
-+#endif
- 
- #if defined(CONFIG_ARCH_NETWINDER) || defined(CONFIG_ARCH_CATS)
- 	/*
+Changes since V1:
+*rebased the whole patch against 3.2-rc1 tree
+*removed GIC save/restore in AFTR cpuidle state as it is external
+to cpu powerdomain
+*Added L2 setup code through device tree
+*Removed only l2 save/restore registers in sleep
+
+This Patch series adds support for AFTR mode cpuidle state based on
+patch (http://www.spinics.net/lists/arm-kernel/msg132243.html) earlier
+submitted by Jaecheol Lee <jc.lee@samsung.com>.
+
+This patch uses CPU PM notifiers , common l2 save/restore and
+new cpu_suspend/resume interfaces and is based on the tip of
+master branch of kernel.org tree(v3.3-rc4)
+
+Amit Daniel Kachhap (5):
+  ARM: exynos: Add support AFTR mode on EXYNOS4210
+  ARM: s5p: add L2 early resume code
+  ARM: exynos: save L2 settings during bootup
+  ARM: exynos: remove useless code to save/restore L2
+  ARM: exynos: Enable l2 configuration through device tree
+
+ arch/arm/mach-exynos/common.c           |   53 +++++++++---
+ arch/arm/mach-exynos/cpuidle.c          |  147 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-exynos/include/mach/pmu.h |    2 +
+ arch/arm/mach-exynos/pm.c               |   15 ---
+ arch/arm/plat-s5p/sleep.S               |   44 ++++++++--
+ 5 files changed, 225 insertions(+), 36 deletions(-)
