@@ -1,55 +1,36 @@
-From: eparis@redhat.com (Eric Paris)
-Date: Tue, 21 Feb 2012 08:49:22 -0500
-Subject: [PATCH - linux-next] ARM: ptrace: Fix audit caused compile error
-In-Reply-To: <1329831350.2337.43.camel@localhost>
-References: <1329825855-11902-1-git-send-email-peter.ujfalusi@ti.com>
- <20120221131616.GI19696@mudshark.cambridge.arm.com>
- <20120221133044.GN22562@n2100.arm.linux.org.uk>
- <1329831350.2337.43.camel@localhost>
-Message-ID: <1329832162.2337.44.camel@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Feb 2012 13:59:34 +0000
+Subject: [PATCH 1/2] ARM: perf: clear overflow flag when disabling counter on
+ ARMv7 PMU
+Message-ID: <1329832775-11203-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-02-21 at 08:35 -0500, Eric Paris wrote:
-> On Tue, 2012-02-21 at 13:30 +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 21, 2012 at 01:16:17PM +0000, Will Deacon wrote:
-> > > On Tue, Feb 21, 2012 at 12:04:15PM +0000, Peter Ujfalusi wrote:
-> > > > While trying to compile the kernel for ARM (omap2plus_defconfig) the kernel
-> > > > build fails with:
-> > > > 
-> > > > arch/arm/kernel/ptrace.c: In function ?syscall_trace?:
-> > > > arch/arm/kernel/ptrace.c:920:3: error: implicit declaration of function ?audit_syscall_exit?
-> > > > arch/arm/kernel/ptrace.c:922:3: error: implicit declaration of function ?audit_syscall_entry?
-> > > > arch/arm/kernel/ptrace.c:922:23: error: ?AUDIT_ARCH_ARMEB? undeclared (first use in this function)
-> > > > arch/arm/kernel/ptrace.c:922:23: note: each undeclared identifier is reported only once for each function it appears in
-> > > > make[1]: *** [arch/arm/kernel/ptrace.o] Error 1
-> > > > 
-> > > > The issue created by commit:
-> > > > 29ef73b7 Kernel: Audit Support For The ARM Platform
-> > > > 
-> > > > We need to include the linux/audit.h header to the arch/arm/kernel/ptrace.c
-> > > > file to be able to compile the kernel.
-> > > 
-> > > This was already reported and I think Russell was going to revert the
-> > > offending commit, since it needed some rework to handle little-endian
-> > > configurations.
-> > > 
-> > > I can't see the revert in any of the trees I'm tracking though...
-> > 
-> > I never pushed that out because I thought someone was going to fix it.
-> > Were any patches produced to fix it?  I can't see anything in the patch
-> > system and I couldn't see anything on the list.
-> > 
-> > It seems the previous thread about it just died.  Oh well, I guess a
-> > revert is what's required after all.
-> 
-> http://marc.info/?l=linux-arm-kernel&m=132928424120369&w=2
-> 
-> ???
+When disabling a counter on an ARMv7 PMU, we should also clear the
+overflow flag in case an overflow occurred whilst stopping the counter.
+This prevents a spurious overflow being picked up later and leading to
+either false accounting or a NULL dereference.
 
-You probably meant the arch endian bug.  I wrote a patch for it, but
-guess i never sent it.  It was just sitting on my audit arm branch.  So
-I just sent that one as well.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event_v7.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Thanks Russell!
--Eric
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 6f48861..050cc8b 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -809,6 +809,11 @@ static inline int armv7_pmnc_disable_intens(int idx)
+ 
+ 	counter = ARMV7_IDX_TO_COUNTER(idx);
+ 	asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
++	isb();
++	/* Clear the overflow flag in case an interrupt is pending. */
++	asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (BIT(counter)));
++	isb();
++
+ 	return idx;
+ }
+ 
+-- 
+1.7.4.1
