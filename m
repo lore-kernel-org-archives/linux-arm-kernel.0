@@ -1,64 +1,49 @@
-From: amit.kachhap@linaro.org (Amit Daniel Kachhap)
-Date: Tue, 21 Feb 2012 11:49:49 +0530
-Subject: [PATCH V6 4/5] ARM: exynos: remove useless code to save/restore L2
-In-Reply-To: <1329805190-8874-1-git-send-email-amit.kachhap@linaro.org>
-References: <1329805190-8874-1-git-send-email-amit.kachhap@linaro.org>
-Message-ID: <1329805190-8874-5-git-send-email-amit.kachhap@linaro.org>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 21 Feb 2012 06:24:56 +0000
+Subject: [PATCH v4 0/3] Moving EMIF driver to MFD framework
+In-Reply-To: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
+References: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC31769AF1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the merge of CPU PM notifiers and L2 resume code, this patch
-removes useless code to save and restore L2 registers.
+Hi,
 
-This is now automatically covered by suspend calls which integrated
-CPU PM notifiers and new sleep code that allows to resume L2 before MMU
-is turned on.
+I do not see any comments on this series. Can it be applied?
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
----
- arch/arm/mach-exynos/pm.c |   15 ---------------
- 1 files changed, 0 insertions(+), 15 deletions(-)
+Thanks,
+Prakash
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index e190130..4816827 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -155,13 +155,6 @@ static struct sleep_save exynos4_core_save[] = {
- 	SAVE_ITEM(S5P_SROM_BC3),
- };
- 
--static struct sleep_save exynos4_l2cc_save[] = {
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL),
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_DATA_LATENCY_CTRL),
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_PREFETCH_CTRL),
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_POWER_CTRL),
--	SAVE_ITEM(S5P_VA_L2CC + L2X0_AUX_CTRL),
--};
- 
- /* For Cortex-A9 Diagnostic and Power control register */
- static unsigned int save_arm_register[2];
-@@ -182,7 +175,6 @@ static void exynos4_pm_prepare(void)
- 	u32 tmp;
- 
- 	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
--	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
- 	s3c_pm_do_save(exynos4_epll_save, ARRAY_SIZE(exynos4_epll_save));
- 	s3c_pm_do_save(exynos4_vpll_save, ARRAY_SIZE(exynos4_vpll_save));
- 
-@@ -388,13 +380,6 @@ static void exynos4_pm_resume(void)
- 	scu_enable(S5P_VA_SCU);
- #endif
- 
--#ifdef CONFIG_CACHE_L2X0
--	s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
--	outer_inv_all();
--	/* enable L2X0*/
--	writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
--#endif
--
- early_wakeup:
- 	return;
- }
--- 
-1.7.1
+On Thu, Feb 09, 2012 at 12:48:25, Manjunathappa, Prakash wrote:
+> Patch series are based on the discussion and concerns expressed in
+> davinci-linux-open-source community. Here is the link for the same:
+> http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
+> 
+> Manjunathappa, Prakash (3):
+>   arm:davinci: prepare to move aemif driver to drivers/mfd
+>   arm:davinci: move emif driver to drivers/mfd from mach-davinci folder
+>   arm:davinci: move NAND and NOR devices as aemif MFD slaves
+> 
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/mach-davinci/Makefile                     |    2 +-
+>  arch/arm/mach-davinci/aemif.c                      |  133 -------------
+>  arch/arm/mach-davinci/board-da830-evm.c            |   33 +++-
+>  arch/arm/mach-davinci/board-da850-evm.c            |   56 +++---
+>  arch/arm/mach-davinci/board-dm355-evm.c            |   33 +++-
+>  arch/arm/mach-davinci/board-dm355-leopard.c        |   35 +++-
+>  arch/arm/mach-davinci/board-dm365-evm.c            |   34 +++-
+>  arch/arm/mach-davinci/board-dm644x-evm.c           |  175 ++++++++++-------
+>  arch/arm/mach-davinci/board-dm646x-evm.c           |   32 +++-
+>  arch/arm/mach-davinci/board-mityomapl138.c         |   34 +++-
+>  arch/arm/mach-davinci/board-neuros-osd2.c          |    1 +
+>  arch/arm/mach-davinci/board-sffsdr.c               |   34 +++-
+>  drivers/mfd/Makefile                               |    1 +
+>  drivers/mfd/davinci_aemif.c                        |  206 ++++++++++++++++++++
+>  drivers/mtd/nand/davinci_nand.c                    |    2 +-
+>  .../aemif.h => include/linux/mfd/davinci_aemif.h   |   14 ++
+>  17 files changed, 527 insertions(+), 299 deletions(-)
+>  delete mode 100644 arch/arm/mach-davinci/aemif.c
+>  create mode 100644 drivers/mfd/davinci_aemif.c
+>  rename arch/arm/mach-davinci/include/mach/aemif.h => include/linux/mfd/davinci_aemif.h (74%)
+> 
+> 
