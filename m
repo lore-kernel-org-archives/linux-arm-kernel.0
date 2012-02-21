@@ -1,51 +1,33 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 21 Feb 2012 16:04:57 +0200
-Subject: [PATCHv5 13/14] arm: omap3: voltage: fix channel configuration
+Date: Tue, 21 Feb 2012 16:04:58 +0200
+Subject: [PATCHv5 14/14] arm: omap: pm: wait for domain wakeup if changing
+ state of idle domain
 In-Reply-To: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
 References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1329833098-19900-14-git-send-email-t-kristo@ti.com>
+Message-ID: <1329833098-19900-15-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP3 uses the default settings for VDD1 channel, otherwise the settings will
-overlap with VDD2 and attempting to modify VDD1 voltage will actually change
-VDD2 voltage.
+If we are switching the state of an idle powerdomain, we must wait for
+the wakeup to complete before attempting to switch to the new state,
+otherwise the powerdomain may not be ready for the switch and will fail.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/vc.c          |    5 ++++-
- arch/arm/mach-omap2/vc3xxx_data.c |    1 +
- 2 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/pm.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index 49df835..a0023de 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -701,9 +701,12 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
- 		voltdm->rmw(vc->smps_cmdra_mask,
- 			    vc->cmd_reg_addr << __ffs(vc->smps_cmdra_mask),
- 			    vc->smps_cmdra_reg);
--		vc->cfg_channel |= vc_cfg_bits->rac | vc_cfg_bits->racen;
-+		vc->cfg_channel |= vc_cfg_bits->rac;
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 2402e8e..7a669f3 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -126,6 +126,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+ 		} else {
+ 			hwsup = clkdm_in_hwsup(pwrdm->pwrdm_clkdms[0]);
+ 			clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
++			pwrdm_wait_transition(pwrdm);
+ 			sleep_switch = FORCEWAKEUP_SWITCH;
+ 		}
  	}
- 
-+	if (vc->cmd_reg_addr == vc->volt_reg_addr)
-+		vc->cfg_channel |= vc_cfg_bits->racen;
-+
- 	/* Set up the on, inactive, retention and off voltage */
- 	on_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->on);
- 	onlp_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->onlp);
-diff --git a/arch/arm/mach-omap2/vc3xxx_data.c b/arch/arm/mach-omap2/vc3xxx_data.c
-index 0535e8e..75bc4aa 100644
---- a/arch/arm/mach-omap2/vc3xxx_data.c
-+++ b/arch/arm/mach-omap2/vc3xxx_data.c
-@@ -46,6 +46,7 @@ static struct omap_vc_common omap3_vc_common = {
- };
- 
- struct omap_vc_channel omap3_vc_mpu = {
-+	.flags = OMAP_VC_CHANNEL_DEFAULT,
- 	.common = &omap3_vc_common,
- 	.smps_sa_reg	 = OMAP3_PRM_VC_SMPS_SA_OFFSET,
- 	.smps_volra_reg	 = OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET,
 -- 
 1.7.4.1
