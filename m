@@ -1,82 +1,117 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 21 Feb 2012 11:02:39 -0600
-Subject: [PATCH 1/4] ARM: sa1100: fix sa1100 after sparse irq conversion
-In-Reply-To: <20120221132536.GM22562@n2100.arm.linux.org.uk>
-References: <1329449534-23811-1-git-send-email-robherring2@gmail.com>
- <1329449534-23811-2-git-send-email-robherring2@gmail.com>
- <20120218231849.GA1269@n2100.arm.linux.org.uk> <4F41136F.3060708@gmail.com>
- <20120221132536.GM22562@n2100.arm.linux.org.uk>
-Message-ID: <4F43CE2F.8040604@gmail.com>
+From: panto@antoniou-consulting.com (Pantelis Antoniou)
+Date: Tue, 21 Feb 2012 19:06:12 +0200
+Subject: [PATCH RFC 0/4] Scheduler idle notifiers and users
+In-Reply-To: <CAP245DXjrRtoJYbyLQ=xUvszmwt=5gus7+=s1UmwKWXcKc05AA@mail.gmail.com>
+References: <20120208013959.GA24535@panacea> <1328670355.2482.68.camel@laptop>
+ <20120208202314.GA28290@redhat.com> <1328736834.2903.33.camel@pasglop>
+ <20120209075106.GB18387@elte.hu> <4F35DD3E.4020406@codeaurora.org>
+ <20120211144530.GA497@elte.hu> <4F3AEC4E.9000303@codeaurora.org>
+ <1329313085.2293.106.camel@twins>
+ <20120215140245.GB27825@n2100.arm.linux.org.uk>
+ <1329318063.2293.136.camel@twins>
+ <69B0D95C-2A80-41A9-97E1-86F5840B84CF@antoniou-consulting.com>
+ <1329828982.2293.405.camel@twins>
+ <84EBD7CD-1085-4B33-BF71-8CE104AE2933@antoniou-consulting.com>
+ <CAP245DXjrRtoJYbyLQ=xUvszmwt=5gus7+=s1UmwKWXcKc05AA@mail.gmail.com>
+Message-ID: <3F162BCA-554B-4756-80C6-7044FB224DBC@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi Amit,
 
-On 02/21/2012 07:25 AM, Russell King - ARM Linux wrote:
-> On Sun, Feb 19, 2012 at 09:21:19AM -0600, Rob Herring wrote:
->> On 02/18/2012 05:18 PM, Russell King - ARM Linux wrote:
->>> On Thu, Feb 16, 2012 at 09:32:11PM -0600, Rob Herring wrote:
->>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>
->>>> SA1100 was converted to sparse irq in parallel with include of mach/irqs.h
->>>> being removed from asm/irq.h when sparse irq is enabled, resulting in lots
->>>> of compile errors.
->>>
->>> Can this be applied before the change to enable sparse IRQ for sa11x0
->>> platforms without breaking them?
->>
->> All but the rename of NR_IRQS to SA1100_NR_IRQS should be fine, but I
->> can change it to leave NR_IRQS.
+On Feb 21, 2012, at 4:52 PM, Amit Kucheria wrote:
+
+> On Tue, Feb 21, 2012 at 3:31 PM, Pantelis Antoniou
+> <panto@antoniou-consulting.com> wrote:
+>> 
+>> On Feb 21, 2012, at 2:56 PM, Peter Zijlstra wrote:
+>> 
+>>> On Tue, 2012-02-21 at 14:38 +0200, Pantelis Antoniou wrote:
+>>>> 
+>>>> If we go to all the trouble of integrating cpufreq/cpuidle/sched into scheduler
+>>>> callbacks, we should place hooks into the thermal framework/PM as well.
+>>>> 
+>>>> It will pretty common to have per core temperature readings, on most
+>>>> modern SoCs.
+>>>> 
+>>>> It is quite conceivable to have a case with a multi-core CPU where due
+>>>> to load imbalance, one (or more) of the cores is running at full speed
+>>>> while the rest are mostly idle. What you want do, for best performance
+>>>> and conceivably better power consumption, is not to throttle either
+>>>> frequency or lowers voltage to the overloaded CPU but to migrate the
+>>>> load to one of the cooler CPUs.
+>>>> 
+>>>> This affects CPU capacity immediately, i.e. you shouldn't schedule more
+>>>> load on a CPU that its too hot, since you'll only end up triggering thermal
+>>>> shutdown. The ideal solution would be to round robin
+>>>> the load from the hot CPU to the cooler ones, but not so fast that we lose
+>>>> due to the migration of state from one CPU to the other.
+>>>> 
+>>>> In a nutshell, the processing capacity of a core is not static, i.e. it
+>>>> might degrade over time due to the increase of temperature caused by the
+>>>> previous load.
+>>>> 
+>>>> What do you think?
+>>> 
+>>> This is called core-hopping, and yes that's a nice goal, although I
+>>> would like to do that after we get the 'simple' bits up and running. I
+>>> suspect it'll end up being slightly more complex than we'd like to due
+>>> to the fact that the goal conflicts with wanting to aggregate things on
+>>> cpu0 due to cpu0 being special for a host of reasons.
+>>> 
+>>> 
+>> 
+>> Hi Peter,
+>> 
+>> Agreed. We need to get there step by step, and I think that per-task load tracking
+>> is the first one. We do have other metrics besides load that can influence the
+>> scheduler decisions, with the most obvious being power consumption.
+>> 
+>> BTW, since we're going to the trouble of calculating per-task load with
+>> increased accuracy, how about having some thought of translating the load numbers
+>> in an absolute format. I.e. with the CPUs now having fluctuating performance
+>> (due to cpufreq etc.) one would say that each CPU would have an X bogomips
+>> (or some else absolute) capacity per OPP. Perhaps having such a bogomips number
+>> calculated per-task would make things easier.
+>> 
+>> Perhaps the same can be done with power/energy, i.e. have a per-task power
+>> consumption figure that we can use for scheduling, according to the available
+>> power budget per CPU.
+>> 
+>> Dunno, it might not be feasible ATM, but having a power-aware scheduler would
+>> assume some kind of power measurement, no?
 > 
-> This isn't going to work.
-> 
-> If we update stuff to include mach/irqs.h, then we end up with mach/irqs.h
-> trying to override NR_IRQS in asm/irq.h:
-> 
-> #ifndef CONFIG_SPARSE_IRQ
-> #include <mach/irqs.h>
-> #else
-> #define NR_IRQS NR_IRQS_LEGACY
-> #endif
-> 
-> which spits out a lovely warning:
-> 
-> In file included from arch/arm/mach-sa1100/irq.c:20:
-> arch/arm/mach-sa1100/include/mach/irqs.h:86:1: warning: "NR_IRQS" redefined
-> In file included from arch/arm/include/asm/hardirq.h:6,
->                  from include/linux/hardirq.h:7,
->                  from include/linux/interrupt.h:12,
->                  from arch/arm/mach-sa1100/irq.c:14:
-> arch/arm/include/asm/irq.h:9:1: warning: this is the location of the previous definition
+> No please. We don't want to document ADC requirements, current probe
+> specs and sampling rates to successfully run the Linux kernel. :)
 > 
 
-But this only occurs after you converted to SPARSE_IRQ, right? If you
-add an "#ifndef NR_IRQS" to mach/irqs.h in your conversion, then
-everything should be okay. Then after everything is merged, NR_IRQS can
-be removed.
+No, we certainly don't want to do that :). I only care about some kind
+of absolute value metric, and not something relative to the maximum
+speed of which one of the cores can run. Now if there's some way for
+a user-space app to convert that value into something like a mW measurement
+is somebody else's problem :)
 
-> There's three solutions I can think to this:
+> But from the scheduler mini-summit, there is acceptance that we need
+> to pass *some* knowledge of CPU characteristics to Linux. These need
+> to be distilled down to a few that guide scheduler policy e.g. power
+> cost of using a core. This in turn would influence the scheduler's
+> spread or gather decision (better to consolidate task onto few cores
+> or spread them out at low frequencies). Manufacturing processes and
+> CPU architecture obviously play a role in the differences here.
+> However, I don't expect unit for these parameters to be in mW. :)
 > 
-> 1. you need to decouple the SPARSE IRQ conversion from the removal of
->    mach/irqs.h, so that there's a clean way to transition
-> 2. I rebase the 100 odd otherwise unrelated sa11x0 patches on top of your
->    stuff, which isn't going to be a nice experience.
+> /Amit
 
-But the SPARSE_IRQ conversion commit is the last one on your sa11x0
-branch. I'm assuming you are okay with rebasing that commit.
+Yes, that is what we need. 
 
-> 3. I drop the final commit for this merge window to convert sa11x0 to
->    sparse IRQ and the sparse IRQ conversion patch becomes quite large
->    (basically meaning that all the includes have to be changed in unison
->    with enabling sparse IRQ.)
-> 
-> (1) I think is the right solution, because it means that there's a nice
-> easy transition path for everyone in the future without requiring (3)
-> to happen every time.
+The problem of a power-aware scheduler, the way I see it is a matter of getting 
+to a point of dynamic equilibrium between acceptable performance and acceptable 
+power-usage.
 
-Can you take a look at my branch sa11x0-sparse-irq I just pushed out.
-It's based on your sa11x0 branch with just your sparse irq conversion
-commit rebased. I've built it with and without the sparse irq conversion
-and also merged my sparse_irq branch in without conflict and built that.
+It seems we will have the per-task cpu load value, so we have a measure of 
+the force pushing to one side, we will need something pushing to the other.
 
-Rob
+Regards
+
+-- Pantelis
+ 
