@@ -1,71 +1,77 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 21 Feb 2012 21:51:55 +0530
-Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
-In-Reply-To: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
-References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>
+From: eparis@redhat.com (Eric Paris)
+Date: Tue, 21 Feb 2012 11:26:55 -0500
+Subject: [PATCH -v2] ARM/audit: include audit header and fix audit arch
+Message-ID: <1329841615-14132-1-git-send-email-eparis@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 2:57 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Boojin Kim <boojin.kim@samsung.com>
->
-> Currently there were two part of DMAC PL330 driver for
-> support old styled s3c-pl330 which has been merged into
-> drivers/dma/pl330.c driver. Actually, there is no reason
-> to separate them now.
->
-> Basically this patch merges arch/arm/common/pl330.c into
-> drivers/dma/pl330.c driver and removes useless exported
-> symbol, externed function and so on.
->
-> The newer pl330 driver tested on SMDKV310 and SMDK4212 boards
->
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> Changes since v2:
-> - Address comments from Russell King
-> ?the 'asm/hardware/pl330.h' is moved to 'drivers/dma/pl330.h'
-> ?which is used only in drivers/dma/
->
-> ?arch/arm/common/Kconfig ? ? ? ? ? ? ? | ? ?3 -
-> ?arch/arm/common/Makefile ? ? ? ? ? ? ?| ? ?1 -
-> ?arch/arm/common/pl330.c ? ? ? ? ? ? ? | 1959 ---------------------------------
-> ?arch/arm/include/asm/hardware/pl330.h | ?217 ----
-> ?drivers/dma/Kconfig ? ? ? ? ? ? ? ? ? | ? ?1 -
-> ?drivers/dma/pl330.c ? ? ? ? ? ? ? ? ? | 1892 +++++++++++++++++++++++++++++++-
-> ?drivers/dma/pl330.h ? ? ? ? ? ? ? ? ? | ?251 +++++
-> ?include/linux/amba/pl330.h ? ? ? ? ? ?| ? ?1 -
-> ?8 files changed, 2142 insertions(+), 2183 deletions(-)
-> ?delete mode 100644 arch/arm/common/pl330.c
-> ?delete mode 100644 arch/arm/include/asm/hardware/pl330.h
-> ?create mode 100644 drivers/dma/pl330.h
->
-I repeat yet again, the drivers/dma/pl330.h is included _only_ by
-drivers/dma/pl330.c so it'll be better to simply move its content
-in the c file and reduce file count by 1.
+Both bugs being fixed were introduced in:
+29ef73b7a823b77a7cd0bdd7d7cded3fb6c2587b
 
+Include linux/audit.h to fix below build errors:
 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index b8ec03e..65c5f24 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -1,4 +1,7 @@
-> -/* linux/drivers/dma/pl330.c
-> +/*
-> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-> + * ? ? ? ? ? ? http://www.samsung.com
-> + * Boojin Kim <boojin.kim@samsung.com>
-> ?*
-I object.
-If simply moving the code around grants you share of authorship, then
-every person who contributed even a single actual bug fix or feature qualifies
-too.
-Javi Merino from ARM Ltd contributed far more important patches to PL330
-and he never claimed authorship (though I think, if not me, he would have
-done the driver just as well or better).
+  CC      arch/arm/kernel/ptrace.o
+arch/arm/kernel/ptrace.c: In function 'syscall_trace':
+arch/arm/kernel/ptrace.c:919: error: implicit declaration of function 'audit_syscall_exit'
+arch/arm/kernel/ptrace.c:921: error: implicit declaration of function 'audit_syscall_entry'
+arch/arm/kernel/ptrace.c:921: error: 'AUDIT_ARCH_ARMEB' undeclared (first use in this function)
+arch/arm/kernel/ptrace.c:921: error: (Each undeclared identifier is reported only once
+arch/arm/kernel/ptrace.c:921: error: for each function it appears in.)
+make[1]: *** [arch/arm/kernel/ptrace.o] Error 1
+make: *** [arch/arm/kernel] Error 2
+
+This part of the patch is:
+Reported-by: Axel Lin <axel.lin@gmail.com>
+Reported-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+(They both provided patches to fix it)
+
+This patch also (at the request of the list) fixes the fact that
+ARM has both LE and BE versions however the audit code was called as if
+it was always BE.  If audit userspace were to try to interpret the bits
+it got from a LE system it would obviously do so incorrectly.  Fix this
+by using the right arch flag on the right system.
+
+This part of the patch is:
+Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
+
+Signed-off-by: Eric Paris <eparis@redhat.com>
+---
+ arch/arm/kernel/ptrace.c |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index e33870f..ede6443 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -23,6 +23,7 @@
+ #include <linux/perf_event.h>
+ #include <linux/hw_breakpoint.h>
+ #include <linux/regset.h>
++#include <linux/audit.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/system.h>
+@@ -904,6 +905,12 @@ long arch_ptrace(struct task_struct *child, long request,
+ 	return ret;
+ }
+ 
++#ifdef __ARMEB__
++#define AUDIT_ARCH_NR AUDIT_ARCH_ARMEB
++#else
++#define AUDIT_ARCH_NR AUDIT_ARCH_ARM
++#endif
++
+ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ {
+ 	unsigned long ip;
+@@ -918,7 +925,7 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ 	if (!ip)
+ 		audit_syscall_exit(regs);
+ 	else
+-		audit_syscall_entry(AUDIT_ARCH_ARMEB, scno, regs->ARM_r0,
++		audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
+ 				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
+ 
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+-- 
+1.7.1
