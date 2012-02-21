@@ -1,35 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Feb 2012 11:46:03 +0100
-Subject: [PATCH 1/2] Documentation/gpio.txt: Explain expected pinctrl
- interaction
-In-Reply-To: <1329719263-18971-1-git-send-email-swarren@nvidia.com>
-References: <1329719263-18971-1-git-send-email-swarren@nvidia.com>
-Message-ID: <CACRpkdbPeVBv5VWefDvib5HmGF0K2gT79Mx7g-yviyQj33+Z-w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Feb 2012 10:52:50 +0000
+Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
+ platforms
+In-Reply-To: <20120221101052.GH22562@n2100.arm.linux.org.uk>
+References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
+ <20120220194634.GK26840@n2100.arm.linux.org.uk>
+ <201202210124.23028.paul@codesourcery.com>
+ <20120221083612.GG22562@n2100.arm.linux.org.uk>
+ <20120221100041.GA19696@mudshark.cambridge.arm.com>
+ <20120221101052.GH22562@n2100.arm.linux.org.uk>
+Message-ID: <20120221105250.GC19696@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 7:27 AM, Stephen Warren <swarren@nvidia.com> wrote:
+On Tue, Feb 21, 2012 at 10:10:52AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 21, 2012 at 10:00:41AM +0000, Will Deacon wrote:
+> > On Tue, Feb 21, 2012 at 08:36:12AM +0000, Russell King - ARM Linux wrote:
+> > > Maybe no one uses a debugger for uclinux programs?
+> > 
+> > I confess to finding this by inspection rather than a debugging failure.
+> 
+> There is another explanation - that is no one in the uclinux world uses
+> mainline kernels, and this bug has been fixed ages ago in some uclinux
+> kernel tree.
+> 
+> That directly raises the question of the value of having the uclinux
+> baggage in the mainline kernel if no one is using mainline kernels for
+> uclinux work.  If the uclinux folk aren't willing to pass up bug fixes,
+> then having it in mainline is, frankly, a waste of space.
 
-> Update gpio.txt based on recent discussions regarding interaction with the
-> pinctrl subsystem.
->
-> Previously, gpio_request() was described as explicitly not performing any
-> required mux setup operations etc.
->
-> Now, gpio_request() is explicitly as explicitly performing any required mux
-> setup operations where possible. In the case it isn't, platform code is
-> required to have set up any required muxing or other configuration prior to
-> gpio_request() being called, in order to maintain the same semantics.
->
-> This is achieved by gpiolib drivers calling e.g. pinctrl_request_gpio() in
-> their .request() operation.
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+I know the validation guys in ARM use mainline kernels for bringup on
+MMU-less CPUs (ok, they have extra patches on top but these tend to be
+platform-specific hacks since they're running on an RTL emulator. Plus they do
+periodically rebase onto new release kernels.). Debugging tends to be at a
+much lower level than GDB can provide though (i.e. waveforms), so this would
+have gone un-noticed.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I think it's worth keeping the support, particularly in light of the recent
+interest in M-class CPUs on the list.
 
-Grant can you take this one? I'd prefer for you to have a look at
-it as well.
-
-Yours,
-Linus Walleij
+Will
