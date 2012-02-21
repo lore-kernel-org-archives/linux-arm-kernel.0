@@ -1,90 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Feb 2012 08:36:27 +0100
-Subject: [GIT PULL] ux500 patches for v3.4
-Message-ID: <1329809787-2788-1-git-send-email-linus.walleij@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Feb 2012 08:36:12 +0000
+Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
+ platforms
+In-Reply-To: <201202210124.23028.paul@codesourcery.com>
+References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
+ <20120220194634.GK26840@n2100.arm.linux.org.uk>
+ <201202210124.23028.paul@codesourcery.com>
+Message-ID: <20120221083612.GG22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 21, 2012 at 01:24:22AM +0000, Paul Brook wrote:
+> > On Mon, Feb 20, 2012 at 06:37:09PM +0000, Will Deacon wrote:
+> > > Commit 68b7f715 ("nommu: ptrace support") added definitions for
+> > > PT_TEXT_ADDR and friends, as well as adding ptrace support for reading
+> > > from these magic offsets.
+> > > 
+> > > Unfortunately, this has probably never worked, since ptrace_read_user
+> > > predicates reading on off < sizeof(struct user), returning -EOI
+> > > otherwise.
+> > > 
+> > > This patch moves the offset size check until after we have tried to
+> > > match it against either a magic value or an offset into pt_regs.
+> > 
+> > Does this actually get used?  The fact that it's been broken from day one
+> > and no one's raised the issue in 2.5 years suggests that it's dead code.
+> 
+> I suspect I submitted the original patch.  I don't remember the details, but 
+> it definitely worked at the time.   IIRC some other targets (m68k?) used an 
+> even less palatable hack.
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+I don't believe that - looking at the history in git, since it was merged
+the code has been:
 
-Hi Arnd, Olof,
+static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
+                            unsigned long __user *ret)
+{
+        unsigned long tmp;
 
-here are some accumulated patches for ux500 from the mailing
-list, intended for the next (3.4) merge window.
+        if (off & 3 || off >= sizeof(struct user))
+                return -EIO;
 
-In order to somewhat make sure that they do not unnecessary
-conflict with other stuff in the tree I pulled the whole
-shebang into a branch off yesterdays linux-next and it worked
-just fine, so it should be orthogonal to other changes.
+        tmp = 0;
+        if (off == PT_TEXT_ADDR)
+                tmp = tsk->mm->start_code;
+        else if (off == PT_DATA_ADDR)
+                tmp = tsk->mm->start_data;
+        else if (off == PT_TEXT_END_ADDR)
+                tmp = tsk->mm->end_code;
+        else if (off < sizeof(struct pt_regs))
+                tmp = get_user_reg(tsk, off >> 2);
 
-The main change is support for a new ASIC variant in the
-families named DB9540 and its platform the U9540.
+And since PT_TEXT_ADDR is 0x10000, this will fail with -EIO.  So, there's
+no way this could have been used successfully in the last 2.5 years.
 
-Thanks,
-Linus Walleij
-
-
-The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
-
-  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git/ for-arm-soc-20120220
-
-Linus Walleij (1):
-      ARM: ux500: core U9540 support
-
-Michel Jaouen (1):
-      ARM: ux500: ioremap differences for DB9540
-
-Ola Lilja (3):
-      ARM: ux500: Add placeholder for clk_set_parent
-      ARM: ux500: Add DMA-channels for MSP
-      ARM: ux500: Add audio-regulators
-
-Philippe Langlais (2):
-      ARM: ux500: set ARCH_NR_GPIO to 355 on U8500 platforms
-      ARM: ux500: fix around AB8500 GPIO macro name
-
- arch/arm/Kconfig                               |    2 +-
- arch/arm/mach-ux500/board-mop500-regulators.c  |   28 +++++++++++
- arch/arm/mach-ux500/board-mop500-uib.c         |    2 +-
- arch/arm/mach-ux500/board-mop500.c             |    2 +-
- arch/arm/mach-ux500/board-mop500.h             |    2 +-
- arch/arm/mach-ux500/cache-l2x0.c               |   14 +++++-
- arch/arm/mach-ux500/clock.c                    |    9 +++-
- arch/arm/mach-ux500/clock.h                    |    1 +
- arch/arm/mach-ux500/cpu-db8500.c               |   24 ++++++++--
- arch/arm/mach-ux500/cpu.c                      |    4 +-
- arch/arm/mach-ux500/devices-db8500.c           |    6 +++
- arch/arm/mach-ux500/id.c                       |   26 +++++++++++
- arch/arm/mach-ux500/include/mach/db8500-regs.h |    6 +++
- arch/arm/mach-ux500/include/mach/hardware.h    |   12 +++++
- arch/arm/mach-ux500/include/mach/id.h          |   17 +++++++-
- arch/arm/mach-ux500/include/mach/irqs-db9540.h |   58 ++++++++++++++++++++++++
- arch/arm/mach-ux500/include/mach/irqs.h        |    3 +-
- arch/arm/mach-ux500/include/mach/setup.h       |    7 +++
- arch/arm/mach-ux500/platsmp.c                  |    4 +-
- arch/arm/mach-ux500/timer.c                    |    2 +-
- drivers/cpufreq/db8500-cpufreq.c               |    2 +-
- 21 files changed, 212 insertions(+), 19 deletions(-)
- create mode 100644 arch/arm/mach-ux500/include/mach/irqs-db9540.h
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.12 (GNU/Linux)
-
-iQIcBAEBAgAGBQJPQ0ikAAoJEEEQszewGV1zB0wP/jeRLhLzYPYMOrJZR0ZD2ntR
-uMukCtAnqaxxOtIv7vNT9Zy6duzmtiUUyfK8wwicLusT2oaiIubFcXgMC0FRERe9
-dFlRMxyBU6CXX7piJjgZ6wedZzRqB8yiuMjKUbpMnPdhAr3BZDcxv4UuCnjZYfxd
-Hhboj0+wZm2qyvFYTGzMyPlTkzoXddHMDC4DsFDUifouPu9ovJeiCJlmXfPT0HYf
-tlE9Dytp6axtWUVlGduEMEgNU4IUUDxGOBtECSfqHAt0yyI28dGk0lftewiU3uj8
-RwEuW88BJXX66aVTBVhsdealEkSjK48UFzCAs8A39LGhz0bT60GmI6GCS+yO89Cf
-feX8Qejxm3YzHUzWN3ZI2c6SHYrdOtoqlNSuvYdhjfa3vfCstYGRXB7pgVgBqSrS
-npbRhYkzGYcY8PZKcNBnC/1xtKE11UCb56CujteTAtsKALGZNZv8nmpGcHmRVmX9
-YBgwA/c/p+/G5DyMe4V8tWE0hYfyVmkRUBAtCINDje4BRhuDVtE7HhGKEPZtgKvw
-ZVV3UfXVE5/qEoZ5u5xHS9OwbHZEQQdgUN7QwpBjUSue9QO4rz3iN2Gu0YMWtp2I
-F+hNBcGelAafL7ohqBa1xnTz7pgwV81VUWzGiqcG2htmLY2KblBUnZIIk0jvNC1u
-XoXMj6/h2ta0xFrMT3ys
-=3MW5
------END PGP SIGNATURE-----
+Maybe no one uses a debugger for uclinux programs?
