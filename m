@@ -1,52 +1,21 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 21 Feb 2012 10:33:34 -0800
-Subject: [PATCH] pinctrl: spawn U300 pinctrl from the COH901 GPIO
-In-Reply-To: <1329831275-21769-1-git-send-email-linus.walleij@stericsson.com>
-References: <1329831275-21769-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC368@HQMAIL01.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 21 Feb 2012 10:43:53 -0800
+Subject: [PATCH v3 2/3] MFD: twl6040: Convert to i2c driver, and
+ separate it from twl core
+In-Reply-To: <1328868018-24668-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1328868018-24668-1-git-send-email-peter.ujfalusi@ti.com>
+ <1328868018-24668-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120221184353.GP18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Tuesday, February 21, 2012 6:35 AM:
-> From: Linus Walleij <linus.walleij@linaro.org>
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120210 01:29]:
+> Complete the separation of the twl6040 from the twl core since
+> it is a separate chip, not part of the twl6030 PMIC.
 > 
-> This solves the riddle on how the U300 pin controller shall be
-> able to reference the struct gpio_chip even though these are
-> two separate drivers: spawn the pinctrl child from the GPIO
-> driver and pass in the struct gpio_chip as platform data.
-> In the process we rename the U300 "pinmux-u300" to
-> "pinctrl-u300" so as not to confuse.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Reviewed-by: Mark Brown <broonie@opensource.wolfsonicro.com>
 
-That's quite a neat solution, but it's not going to work very well with
-device tree, if U300 is being converted to it. The reason is that the
-two (GPIO, pinctrl) platform devices would be instantiated directly from
-DT by the core DT code. I guess your DT board file does have the option
-to explicitly override the platform data passed to your devices to
-achieve the same effect, but perhaps there's a different way of making
-this work, that doesn't require platform data...
+This should be OK to merge via the ASoC tree:
 
-I'd thought about doing the following for Tegra, where we're cheating a
-little with the gpio range base value:
-
-When GPIO driver is probed, call a function in the pinctrl driver to
-tell it what the "struct gpio_chip *" value is.
-
-When pinctrl is probed, if that call has happened, go ahead and register
-the GPIO range, else don't.
-
-In the call from GPIO to pinctrl, if the pinctrl driver has already
-probed, register the GPIO range, else just save the gpio_chip value for
-later use in the pinctrl driver's probe.
-
-This way, the communication is explicit in code in the drivers, works
-whichever order the drivers probe, etc.
-
-Does that sound like a reasonable solution?
-
-It's plausible that with deferred probe, this could be reworked to use
-that, but this way might still be better for this case?
-
--- 
-nvpublic
+Acked-by: Tony Lindgren <tony@atomide.com>
