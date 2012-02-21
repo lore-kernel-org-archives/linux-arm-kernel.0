@@ -1,49 +1,52 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 21 Feb 2012 06:24:56 +0000
-Subject: [PATCH v4 0/3] Moving EMIF driver to MFD framework
-In-Reply-To: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
-References: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC31769AF1@DBDE01.ent.ti.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 21 Feb 2012 12:19:29 +0530
+Subject: [PATCH V6 1/5] ARM: exynos: Add support AFTR mode on EXYNOS4210
+In-Reply-To: <1329805190-8874-2-git-send-email-amit.kachhap@linaro.org>
+References: <1329805190-8874-1-git-send-email-amit.kachhap@linaro.org>
+ <1329805190-8874-2-git-send-email-amit.kachhap@linaro.org>
+Message-ID: <4F433E79.2090309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Amit,
 
-I do not see any comments on this series. Can it be applied?
+On 02/21/2012 11:49 AM, Amit Daniel Kachhap wrote:
+> This patch adds support AFTR(ARM OFF TOP RUNNING) mode in
+> cpuidle driver. L2 cache keeps their data in this mode.
+> This patch ports the code to the latest interfaces to
+> save/restore CPU state inclusive of CPU PM notifiers, l2
+> resume and cpu_suspend/resume.
+> 
+> Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+> ---
+>  arch/arm/mach-exynos/cpuidle.c          |  147 ++++++++++++++++++++++++++++++-
+>  arch/arm/mach-exynos/include/mach/pmu.h |    2 +
+>  2 files changed, 146 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
 
-Thanks,
-Prakash
+[ snip ]
 
-On Thu, Feb 09, 2012 at 12:48:25, Manjunathappa, Prakash wrote:
-> Patch series are based on the discussion and concerns expressed in
-> davinci-linux-open-source community. Here is the link for the same:
-> http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
-> 
-> Manjunathappa, Prakash (3):
->   arm:davinci: prepare to move aemif driver to drivers/mfd
->   arm:davinci: move emif driver to drivers/mfd from mach-davinci folder
->   arm:davinci: move NAND and NOR devices as aemif MFD slaves
-> 
->  arch/arm/Kconfig                                   |    1 +
->  arch/arm/mach-davinci/Makefile                     |    2 +-
->  arch/arm/mach-davinci/aemif.c                      |  133 -------------
->  arch/arm/mach-davinci/board-da830-evm.c            |   33 +++-
->  arch/arm/mach-davinci/board-da850-evm.c            |   56 +++---
->  arch/arm/mach-davinci/board-dm355-evm.c            |   33 +++-
->  arch/arm/mach-davinci/board-dm355-leopard.c        |   35 +++-
->  arch/arm/mach-davinci/board-dm365-evm.c            |   34 +++-
->  arch/arm/mach-davinci/board-dm644x-evm.c           |  175 ++++++++++-------
->  arch/arm/mach-davinci/board-dm646x-evm.c           |   32 +++-
->  arch/arm/mach-davinci/board-mityomapl138.c         |   34 +++-
->  arch/arm/mach-davinci/board-neuros-osd2.c          |    1 +
->  arch/arm/mach-davinci/board-sffsdr.c               |   34 +++-
->  drivers/mfd/Makefile                               |    1 +
->  drivers/mfd/davinci_aemif.c                        |  206 ++++++++++++++++++++
->  drivers/mtd/nand/davinci_nand.c                    |    2 +-
->  .../aemif.h => include/linux/mfd/davinci_aemif.h   |   14 ++
->  17 files changed, 527 insertions(+), 299 deletions(-)
->  delete mode 100644 arch/arm/mach-davinci/aemif.c
->  create mode 100644 drivers/mfd/davinci_aemif.c
->  rename arch/arm/mach-davinci/include/mach/aemif.h => include/linux/mfd/davinci_aemif.h (74%)
-> 
-> 
+> +static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv,
+> +				int index)
+> +{
+
+[ snip ]
+
+> +	scu_enable(S5P_VA_SCU);
+
+#ifdef CONFIG_SMP
+	scu_enable(S5P_VA_SCU);
+#endif
+
+Without this, if SMP is not enabled, I am getting following build error.
+
+arch/arm/mach-exynos/built-in.o: In function `exynos4_enter_core0_aftr':
+arch/arm/mach-exynos/cpuidle.c:131: undefined reference to `scu_enable'
+
+
+-- 
+Tushar Behera
