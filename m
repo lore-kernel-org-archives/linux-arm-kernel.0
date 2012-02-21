@@ -1,109 +1,38 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 21 Feb 2012 14:12:05 -0800
-Subject: [PATCH] ARM: OMAP: omap_device: remove omap_device_parent
-Message-ID: <1329862325-10802-1-git-send-email-khilman@ti.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Tue, 21 Feb 2012 23:19:15 +0100
+Subject: [PATCH] arm/spear600: fix one-shot timer
+Message-ID: <1329862755-7439-1-git-send-email-gilles.chanteperdrix@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently all omap_devices are forced to have the dummy device
-'omap_device_parent' as a parent.  This was used to distinguish
-omap_devices from "normal" platform_devices in the OMAP PM core code.
+Currently, the "clockevent_next_event" function only works correctly
+if the timer is not running when this function is called, which is
+not always the case when running with CONFIG_HIGH_RES_TIMERS.
 
-Now that we implement the PM core using PM domains, this is no longer
-needed, and is removed.
+Fix this by stopping the timer at the beginning of this function.
 
-This also frees up omap_devices to have a more complex parent/child
-relationships that model actual device relationships.
-
-The only in-tree user of omap_device_parent was the OMAP PM layer to
-handle lost-context count for omap_devices.  That is now converted to
-use the presence of the omap_device_pm_domain instead.
-
-Signed-off-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
 ---
-Unless there are objections, this will be queued for 3.4 in my
-for_3.4/cleanup/pm branch.
+ arch/arm/plat-spear/time.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
- arch/arm/plat-omap/include/plat/omap_device.h |    2 +-
- arch/arm/plat-omap/omap-pm-noop.c             |    2 +-
- arch/arm/plat-omap/omap_device.c              |   12 ++----------
- 3 files changed, 4 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index 51423d2..d93ac93 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -36,7 +36,7 @@
- 
- #include <plat/omap_hwmod.h>
- 
--extern struct device omap_device_parent;
-+extern struct dev_pm_domain omap_device_pm_domain;
- 
- /* omap_device._state values */
- #define OMAP_DEVICE_STATE_UNKNOWN	0
-diff --git a/arch/arm/plat-omap/omap-pm-noop.c b/arch/arm/plat-omap/omap-pm-noop.c
-index 3dc3801..5a97b4d 100644
---- a/arch/arm/plat-omap/omap-pm-noop.c
-+++ b/arch/arm/plat-omap/omap-pm-noop.c
-@@ -319,7 +319,7 @@ int omap_pm_get_dev_context_loss_count(struct device *dev)
- 	if (WARN_ON(!dev))
- 		return -ENODEV;
- 
--	if (dev->parent == &omap_device_parent) {
-+	if (dev->pm_domain == &omap_device_pm_domain) {
- 		count = omap_device_get_context_loss_count(pdev);
- 	} else {
- 		WARN_ONCE(off_mode_enabled, "omap_pm: using dummy context loss counter; device %s should be converted to omap_device",
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index e8d9869..3643900 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -320,8 +320,6 @@ static void _add_hwmod_clocks_clkdev(struct omap_device *od,
- }
- 
- 
--static struct dev_pm_domain omap_device_pm_domain;
--
- /**
-  * omap_device_build_from_dt - build an omap_device with multiple hwmods
-  * @pdev_name: name of the platform_device driver to use
-@@ -799,7 +797,7 @@ static int _od_resume_noirq(struct device *dev)
- #define _od_resume_noirq NULL
- #endif
- 
--static struct dev_pm_domain omap_device_pm_domain = {
-+struct dev_pm_domain omap_device_pm_domain = {
- 	.ops = {
- 		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
- 				   _od_runtime_idle)
-@@ -821,7 +819,6 @@ static int omap_device_register(struct platform_device *pdev)
+diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
+index 0c77e42..ac15ff3 100644
+--- a/arch/arm/plat-spear/time.c
++++ b/arch/arm/plat-spear/time.c
+@@ -147,9 +147,12 @@ static int clockevent_next_event(unsigned long cycles,
  {
- 	pr_debug("omap_device: %s: registering\n", pdev->name);
+ 	u16 val;
  
--	pdev->dev.parent = &omap_device_parent;
- 	pdev->dev.pm_domain = &omap_device_pm_domain;
- 	return platform_device_add(pdev);
- }
-@@ -1130,11 +1127,6 @@ int omap_device_enable_clocks(struct omap_device *od)
- 	return 0;
- }
++	val = readw(gpt_base + CR(CLKEVT));
++	if ((val & CTRL_ENABLE))
++		writew(val & ~CTRL_ENABLE, gpt_base + CR(CLKEVT));
++
+ 	writew(cycles, gpt_base + LOAD(CLKEVT));
  
--struct device omap_device_parent = {
--	.init_name	= "omap",
--	.parent         = &platform_bus,
--};
--
- static struct notifier_block platform_nb = {
- 	.notifier_call = _omap_device_notifier_call,
- };
-@@ -1142,6 +1134,6 @@ static struct notifier_block platform_nb = {
- static int __init omap_device_init(void)
- {
- 	bus_register_notifier(&platform_bus_type, &platform_nb);
--	return device_register(&omap_device_parent);
-+	return 0;
- }
- core_initcall(omap_device_init);
+-	val = readw(gpt_base + CR(CLKEVT));
+ 	val |= CTRL_ENABLE | CTRL_INT_ENABLE;
+ 	writew(val, gpt_base + CR(CLKEVT));
+ 
 -- 
-1.7.9
+1.7.2.5
