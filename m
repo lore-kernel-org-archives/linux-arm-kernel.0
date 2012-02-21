@@ -1,27 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 Feb 2012 15:30:11 -0800
-Subject: [PATCH v3 02/10] ARM: tegra: export Tegra chipid
-In-Reply-To: <CAMbhsRT-ZTh7WQ1E0NUjX8FOMGAvx5zNnB-VYD=j8sWhM-9j+A@mail.gmail.com>
-References: <1328831277-21002-1-git-send-email-pdeschrijver@nvidia.com>
- <1328831277-21002-3-git-send-email-pdeschrijver@nvidia.com>
- <CAMbhsRT-ZTh7WQ1E0NUjX8FOMGAvx5zNnB-VYD=j8sWhM-9j+A@mail.gmail.com>
-Message-ID: <CAOesGMi=nsKr91uu=QTpJ_vKKhc9GBRHPWd6XEB+rOqph_P+yA@mail.gmail.com>
+From: paul@codesourcery.com (Paul Brook)
+Date: Tue, 21 Feb 2012 01:24:22 +0000
+Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
+ platforms
+In-Reply-To: <20120220194634.GK26840@n2100.arm.linux.org.uk>
+References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
+ <20120220194634.GK26840@n2100.arm.linux.org.uk>
+Message-ID: <201202210124.23028.paul@codesourcery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> On Mon, Feb 20, 2012 at 06:37:09PM +0000, Will Deacon wrote:
+> > Commit 68b7f715 ("nommu: ptrace support") added definitions for
+> > PT_TEXT_ADDR and friends, as well as adding ptrace support for reading
+> > from these magic offsets.
+> > 
+> > Unfortunately, this has probably never worked, since ptrace_read_user
+> > predicates reading on off < sizeof(struct user), returning -EOI
+> > otherwise.
+> > 
+> > This patch moves the offset size check until after we have tried to
+> > match it against either a magic value or an offset into pt_regs.
+> 
+> Does this actually get used?  The fact that it's been broken from day one
+> and no one's raised the issue in 2.5 years suggests that it's dead code.
 
-On Mon, Feb 20, 2012 at 3:13 PM, Colin Cross <ccross@android.com> wrote:
+I suspect I submitted the original patch.  I don't remember the details, but 
+it definitely worked at the time.   IIRC some other targets (m68k?) used an 
+even less palatable hack.
 
-> Other platforms use accessors for this (cpu_is_xxx(), although
-> soc_is_xxx() is probably more appropriate).
+This (or equivalent) is necessary to do any debugging on an mmu-less (i.e. 
+uclinux) system.
 
-I have previously objected to additions of said functions on tegra,
-since they tend to start crawling into drivers as runtime tests
-instead of providing more appropriate detection at probe time.
-
-I can be persuaded differently but I haven't yet seen a strong case
-for changing my mind. :)
-
-
--Olof
+Paul
