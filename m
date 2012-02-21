@@ -1,106 +1,61 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Tue, 21 Feb 2012 17:04:51 +0800
-Subject: [PATCH 2/7] rtc: sa1100: remove verification code of alarm
+Date: Tue, 21 Feb 2012 17:04:50 +0800
+Subject: [PATCH 1/7] rtc: sa1100: remove periodic code
 In-Reply-To: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1329815096-6200-3-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1329815096-6200-2-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since next alarm time is already calculated in rtc common interface, we
-needn't keep this logic in rtc-sa1100.c any more.
+Since periodic timer is already supported by hrtimer in rtc interface,
+we needn't keep the duplicated code in rtc-sa1100.c any more.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/rtc/rtc-sa1100.c |   66 +++++++--------------------------------------
- 1 files changed, 11 insertions(+), 55 deletions(-)
+ drivers/rtc/rtc-sa1100.c |   15 ---------------
+ 1 files changed, 0 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
-index fef52c8..91d58bd 100644
+index cb9a585..fef52c8 100644
 --- a/drivers/rtc/rtc-sa1100.c
 +++ b/drivers/rtc/rtc-sa1100.c
-@@ -44,54 +44,6 @@
+@@ -42,19 +42,8 @@
+ #define RTC_DEF_TRIM		0
+ 
  static const unsigned long RTC_FREQ = 1024;
+-static struct rtc_time rtc_alarm;
  static DEFINE_SPINLOCK(sa1100_rtc_lock);
  
--/*
-- * Calculate the next alarm time given the requested alarm time mask
-- * and the current time.
-- */
--static void rtc_next_alarm_time(struct rtc_time *next, struct rtc_time *now,
--	struct rtc_time *alrm)
+-static inline int rtc_periodic_alarm(struct rtc_time *tm)
 -{
--	unsigned long next_time;
--	unsigned long now_time;
--
--	next->tm_year = now->tm_year;
--	next->tm_mon = now->tm_mon;
--	next->tm_mday = now->tm_mday;
--	next->tm_hour = alrm->tm_hour;
--	next->tm_min = alrm->tm_min;
--	next->tm_sec = alrm->tm_sec;
--
--	rtc_tm_to_time(now, &now_time);
--	rtc_tm_to_time(next, &next_time);
--
--	if (next_time < now_time) {
--		/* Advance one day */
--		next_time += 60 * 60 * 24;
--		rtc_time_to_tm(next_time, next);
--	}
+-	return  (tm->tm_year == -1) ||
+-		((unsigned)tm->tm_mon >= 12) ||
+-		((unsigned)(tm->tm_mday - 1) >= 31) ||
+-		((unsigned)tm->tm_hour > 23) ||
+-		((unsigned)tm->tm_min > 59) ||
+-		((unsigned)tm->tm_sec > 59);
 -}
 -
--static int rtc_update_alarm(struct rtc_time *alrm)
--{
--	struct rtc_time alarm_tm, now_tm;
--	unsigned long now, time;
--	int ret;
+ /*
+  * Calculate the next alarm time given the requested alarm time mask
+  * and the current time.
+@@ -146,9 +135,6 @@ static irqreturn_t sa1100_rtc_interrupt(int irq, void *dev_id)
+ 
+ 	rtc_update_irq(rtc, 1, events);
+ 
+-	if (rtsr & RTSR_AL && rtc_periodic_alarm(&rtc_alarm))
+-		rtc_update_alarm(&rtc_alarm);
 -
--	do {
--		now = RCNR;
--		rtc_time_to_tm(now, &now_tm);
--		rtc_next_alarm_time(&alarm_tm, &now_tm, alrm);
--		ret = rtc_tm_to_time(&alarm_tm, &time);
--		if (ret != 0)
--			break;
--
--		RTSR = RTSR & (RTSR_HZE|RTSR_ALE|RTSR_AL);
--		RTAR = time;
--	} while (now != RCNR);
--
--	return ret;
--}
--
- static irqreturn_t sa1100_rtc_interrupt(int irq, void *dev_id)
+ 	spin_unlock(&sa1100_rtc_lock);
+ 
+ 	return IRQ_HANDLED;
+@@ -225,7 +211,6 @@ static int sa1100_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
  {
- 	struct platform_device *pdev = to_platform_device(dev_id);
-@@ -219,16 +171,20 @@ static int sa1100_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 	u32	rtsr;
  
- static int sa1100_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
- {
-+	unsigned long time;
- 	int ret;
- 
- 	spin_lock_irq(&sa1100_rtc_lock);
--	ret = rtc_update_alarm(&alrm->time);
--	if (ret == 0) {
--		if (alrm->enabled)
--			RTSR |= RTSR_ALE;
--		else
--			RTSR &= ~RTSR_ALE;
--	}
-+	ret = rtc_tm_to_time(&alrm->time, &time);
-+	if (ret != 0)
-+		goto out;
-+	RTSR = RTSR & (RTSR_HZE|RTSR_ALE|RTSR_AL);
-+	RTAR = time;
-+	if (alrm->enabled)
-+		RTSR |= RTSR_ALE;
-+	else
-+		RTSR &= ~RTSR_ALE;
-+out:
- 	spin_unlock_irq(&sa1100_rtc_lock);
- 
- 	return ret;
+-	memcpy(&alrm->time, &rtc_alarm, sizeof(struct rtc_time));
+ 	rtsr = RTSR;
+ 	alrm->enabled = (rtsr & RTSR_ALE) ? 1 : 0;
+ 	alrm->pending = (rtsr & RTSR_AL) ? 1 : 0;
 -- 
 1.7.0.4
