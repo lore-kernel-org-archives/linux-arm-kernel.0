@@ -1,28 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Feb 2012 10:10:52 +0000
-Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
- platforms
-In-Reply-To: <20120221100041.GA19696@mudshark.cambridge.arm.com>
-References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
- <20120220194634.GK26840@n2100.arm.linux.org.uk>
- <201202210124.23028.paul@codesourcery.com>
- <20120221083612.GG22562@n2100.arm.linux.org.uk>
- <20120221100041.GA19696@mudshark.cambridge.arm.com>
-Message-ID: <20120221101052.GH22562@n2100.arm.linux.org.uk>
+Date: Tue, 21 Feb 2012 10:16:30 +0000
+Subject: [PATCH] ARM: at91: AIC and GPIO IRQ device tree initilization
+In-Reply-To: <4F436C95.2040508@atmel.com>
+References: <1329144189-4535-1-git-send-email-nicolas.ferre@atmel.com>
+ <1329470878-14635-1-git-send-email-nicolas.ferre@atmel.com>
+ <4F436C95.2040508@atmel.com>
+Message-ID: <20120221101630.GI22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 10:00:41AM +0000, Will Deacon wrote:
-> On Tue, Feb 21, 2012 at 08:36:12AM +0000, Russell King - ARM Linux wrote:
-> > Maybe no one uses a debugger for uclinux programs?
+On Tue, Feb 21, 2012 at 11:06:13AM +0100, Nicolas Ferre wrote:
+> Grant, Rob,
 > 
-> I confess to finding this by inspection rather than a debugging failure.
+> I would like to have some feedback from you so that we will be able to
+> build our DT related work on top of this series.
+> 
+> If you agree with this work, we may need to send it through arm-soc git
+> tree. This will require to establish a dependency with Grant's irqdomain
+> branch: do you think that it is stable enough?
 
-There is another explanation - that is no one in the uclinux world uses
-mainline kernels, and this bug has been fixed ages ago in some uclinux
-kernel tree.
-
-That directly raises the question of the value of having the uclinux
-baggage in the mainline kernel if no one is using mainline kernels for
-uclinux work.  If the uclinux folk aren't willing to pass up bug fixes,
-then having it in mainline is, frankly, a waste of space.
+That depends whether Grant has fixed the x86 regression with
+drivers/mfd/twl-core.c yet.
