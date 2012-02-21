@@ -1,38 +1,46 @@
-From: neilb@suse.de (NeilBrown)
-Date: Wed, 22 Feb 2012 06:40:37 +1100
-Subject: [PATCH 0/2] Two trivial omap/serial patches
-In-Reply-To: <87boos57fd.fsf@ti.com>
-References: <20120219022841.8254.86264.stgit@notabene.brown>
- <87boos57fd.fsf@ti.com>
-Message-ID: <20120222064037.66d3e4d4@notabene.brown>
+From: matt@ohporter.com (Matt Porter)
+Date: Tue, 21 Feb 2012 16:11:51 -0500
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <20120221184648.GR18185@atomide.com>
+References: <1329151422-2146-1-git-send-email-mporter@ti.com>
+ <20120213165209.GA31482@n2100.arm.linux.org.uk>
+ <20120213165617.GE3494@opensource.wolfsonmicro.com>
+ <20120213175233.GC1426@atomide.com>
+ <20120213180236.GB31482@n2100.arm.linux.org.uk>
+ <20120213181410.GE1426@atomide.com>
+ <20120213185823.GF3494@opensource.wolfsonmicro.com>
+ <20120221184648.GR18185@atomide.com>
+Message-ID: <20120221211151.GA1609@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Feb 2012 11:10:30 -0800 Kevin Hilman <khilman@ti.com> wrote:
-
-> NeilBrown <neilb@suse.de> writes:
+On Tue, Feb 21, 2012 at 10:46:48AM -0800, Tony Lindgren wrote:
+> * Mark Brown <broonie@opensource.wolfsonmicro.com> [120213 10:27]:
+> > On Mon, Feb 13, 2012 at 10:14:10AM -0800, Tony Lindgren wrote:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [120213 09:31]:
+> > > > On Mon, Feb 13, 2012 at 09:52:34AM -0800, Tony Lindgren wrote:
+> > 
+> > > > > Can't we just leave out the .id and have it automatically assigned?
+> > 
+> > It'd be nice but...
+> > 
+> > > > Unfortunately, there's no such infrastructure in the driver model.
+> > 
+> > > Hmm OK, -1 seems to be just used for name in platform_device_add().
+> > 
+> > -1 is a valid ID also, it means "there's only one of these things so
+> > don't display a number".  Which is sad but there we are.  I'm at ELC/ABS
+> > so I might try and find Greg in person here to see if we can come up
+> > with something better, it seems like this is something the core ought to
+> > be able to help with in much the same way that the USB stuff can.
 > 
-> > Just a couple of small clean-ups following the recent major changes.
+> Matt, care to refresh your original patch using some other number so
+> we can apply it as a regression fix for the -rc series while the
+> long term solution is being discussed?
 > 
-> Thanks Neil.
-> 
-> I'll queue these as cleanups for v3.4 since I dont' think they're v3.3
-> material at this point of the cycle.
+> Just use some random number for now with a comment, 42?
 
-Thanks,
+Will do, I'll post an update with this approach.
 
-> 
-> I'll also update the changelogs to follow the practice of adding the
-> shortlog in parens after the commit ID.
-
-I'll try to remember that for next time.
-
-Thanks,
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120222/c548e47e/attachment.sig>
+-Matt
