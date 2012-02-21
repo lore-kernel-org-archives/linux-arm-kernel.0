@@ -1,55 +1,24 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Feb 2012 14:58:22 +0000
-Subject: [PATCH] ARM/audit: use correct arch on audit_syscall_enter
-In-Reply-To: <1329832059-11000-1-git-send-email-eparis@redhat.com>
-References: <1329832059-11000-1-git-send-email-eparis@redhat.com>
-Message-ID: <20120221145822.GL19696@mudshark.cambridge.arm.com>
+Date: Tue, 21 Feb 2012 15:19:10 +0000
+Subject: [PATCH] ARM: perf: do not handle deleted counter in irq handler
+ to avoid oops
+In-Reply-To: <CACVXFVMxpRDsG_hNn_WaX17uEdZCJmcraOvDwCL6JQ7Xyz5nig@mail.gmail.com>
+References: <1329799058-27082-1-git-send-email-tom.leiming@gmail.com>
+ <20120221133228.GK19696@mudshark.cambridge.arm.com>
+ <CACVXFVMxpRDsG_hNn_WaX17uEdZCJmcraOvDwCL6JQ7Xyz5nig@mail.gmail.com>
+Message-ID: <20120221151909.GA23133@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On Tue, Feb 21, 2012 at 01:47:39PM +0000, Eric Paris wrote:
-> ARM has both LE and BE versions however the audit code was called as if
-> it was always BE.  If audit userspace were to try to interpret the bits
-> it got from a LE system it would obviously do so incorrectly.  Fix this
-> by using the right arch flag on the right system.
+On Tue, Feb 21, 2012 at 02:02:32PM +0000, Ming Lei wrote:
+> On Tue, Feb 21, 2012 at 9:32 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > I have a couple of patches that solve this by (a) clearing the overflow flag
+> > when disabling the counter for ARMv7 and (b) adding the event checks to the
 > 
-> Signed-off-by: Eric Paris <eparis@redhat.com>
-> ---
->  arch/arm/kernel/ptrace.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
+> Maybe ARMv6 and xscale need to be fixed too if the overflow flag will be kept
+> even after the counter is disabled.
 
-It might be worth adding the #include <linux/audit.h> in this patch as well,
-since they're both fixes for problems introduced by the same commit. That
-way we only need to deal with one patch as well.
-
-> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-> index e33870f..8009e84 100644
-> --- a/arch/arm/kernel/ptrace.c
-> +++ b/arch/arm/kernel/ptrace.c
-> @@ -915,10 +915,15 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
->  	ip = regs->ARM_ip;
->  	regs->ARM_ip = why;
->  
-> +#ifdef __ARMEB__
-> +#define AUDIT_ARCH_NR AUDIT_ARCH_ARMEB
-> +#else
-> +#define AUDIT_ARCH_NR AUDIT_ARCH_ARM
-> +#endif
-
-Pedantry, but I prefer the #defines outside of the function scope (I'd probably
-just stick them before the function given that they're not used anywhere else).
-
->  	if (!ip)
->  		audit_syscall_exit(regs);
->  	else
-> -		audit_syscall_entry(AUDIT_ARCH_ARMEB, scno, regs->ARM_r0,
-> +		audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
->  				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
->  
->  	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-
-Cheers,
+I don't think so - seems like we clear the overflow flag already for those
+PMUs in the disable path (note that we write ~mask).
 
 Will
