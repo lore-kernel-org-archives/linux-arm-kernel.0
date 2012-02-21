@@ -1,120 +1,114 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 21 Feb 2012 17:31:10 -0600
-Subject: [PULL] entry-macro.S clean-up and removal
-Message-ID: <4F44293E.2090901@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 21 Feb 2012 15:40:32 -0800
+Subject: [PATCH 0/8] Split omap plat/io.h into local iomap.h files
+Message-ID: <20120221233619.18709.87982.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi all,
 
-Please pull entry-macro clean-up for 3.4. This should be pretty much
-free of any conflicts AFAICT. A merge of your for-next branch had no
-conflicts.
+Here's a better version of a patch set to cut down mach/io.h down to
+minimum to prepare for mach/io.h removal for omap2+.
 
-Cheers,
-Rob
+This is based on v3.3-rc4 + "ARM: OMAP2xxx: PM: remove obsolete timer
+disable code in the suspend path" patch.
 
-The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
+Regards,
 
-  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
+Tony
 
-are available in the git repository at:
-  git://sources.calxeda.com/kernel/linux.git entry-macro-cleanup
+---
 
-Rob Herring (4):
-      ARM: make arch_ret_to_user macro optional
-      ARM: rpc: make default fiq handler run-time installed
-      ARM: make entry-macro.S depend on !MULTI_IRQ_HANDLER
-      ARM: remove disable_fiq and arch_ret_to_user macros
+Tony Lindgren (8):
+      ARM: OMAP2+: Move DISPC L3 firewall to happen in omap_display_init()
+      ARM: OMAP2+: Move SDRC related functions from io.h into local common.h
+      ARM: OMAP: Move omap_init_consistent_dma_size() to local common.h
+      ARM: OMAP1: Move 16xx GPIO system clock to platform init code
+      ARM: OMAP1: Move most of plat/io.h into local iomap.h
+      ARM: OMAP2+: Move most of plat/io.h into local iomap.h
+      ARM: OMAP: Remove plat/io.h by moving it into mach/io.h
+      ARM: OMAP2+: Limit omap_read/write usage to legacy USB drivers
 
- arch/arm/Kconfig                                   |    6 ++++
- arch/arm/include/asm/hardware/entry-macro-iomd.S   |    8 ------
- arch/arm/kernel/entry-armv.S                       |    3 +-
- arch/arm/kernel/entry-common.S                     |    8 +++++-
- arch/arm/mach-at91/include/mach/entry-macro.S      |    6 ----
- arch/arm/mach-bcmring/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-clps711x/include/mach/entry-macro.S  |    6 ----
- arch/arm/mach-cns3xxx/include/mach/entry-macro.S   |   15 -----------
- arch/arm/mach-davinci/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-dove/include/mach/entry-macro.S      |    6 ----
- arch/arm/mach-ebsa110/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-ep93xx/include/mach/entry-macro.S    |   17 ------------
- arch/arm/mach-exynos/include/mach/entry-macro.S    |   16 -----------
- .../arm/mach-footbridge/include/mach/entry-macro.S |    6 ----
- arch/arm/mach-gemini/include/mach/entry-macro.S    |    6 ----
- arch/arm/mach-h720x/include/mach/entry-macro.S     |    6 ----
- arch/arm/mach-highbank/include/mach/entry-macro.S  |    5 ---
- .../arm/mach-integrator/include/mach/entry-macro.S |    6 ----
- arch/arm/mach-iop13xx/include/mach/entry-macro.S   |    3 --
- arch/arm/mach-iop32x/include/mach/entry-macro.S    |    3 --
- arch/arm/mach-iop33x/include/mach/entry-macro.S    |    3 --
- arch/arm/mach-ixp2000/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-ixp23xx/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-ixp4xx/include/mach/entry-macro.S    |    6 ----
- arch/arm/mach-kirkwood/include/mach/entry-macro.S  |    6 ----
- arch/arm/mach-ks8695/include/mach/entry-macro.S    |    6 ----
- arch/arm/mach-lpc32xx/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-mmp/include/mach/entry-macro.S       |    6 ----
- arch/arm/mach-msm/include/mach/entry-macro.S       |    6 ----
- arch/arm/mach-mv78xx0/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-mxs/include/mach/entry-macro.S       |    6 ----
- arch/arm/mach-netx/include/mach/entry-macro.S      |   26
--------------------
- arch/arm/mach-nomadik/include/mach/entry-macro.S   |   13 ---------
- arch/arm/mach-omap1/include/mach/entry-macro.S     |    6 ----
- arch/arm/mach-omap2/include/mach/entry-macro.S     |   18 -------------
- arch/arm/mach-orion5x/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-picoxcell/include/mach/entry-macro.S |   16 -----------
- arch/arm/mach-pnx4008/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-prima2/include/mach/entry-macro.S    |    7 -----
- arch/arm/mach-pxa/include/mach/entry-macro.S       |   15 -----------
- arch/arm/mach-realview/include/mach/entry-macro.S  |   16 -----------
- arch/arm/mach-rpc/Makefile                         |    2 +-
- arch/arm/mach-rpc/fiq.S                            |   16 +++++++++++
- arch/arm/mach-rpc/include/mach/entry-macro.S       |    4 ---
- arch/arm/mach-rpc/irq.c                            |    6 ++++
- arch/arm/mach-s3c2410/include/mach/entry-macro.S   |    8 ------
- arch/arm/mach-s3c64xx/include/mach/entry-macro.S   |   19 --------------
- arch/arm/mach-s5p64x0/include/mach/entry-macro.S   |   17 ------------
- arch/arm/mach-s5pc100/include/mach/entry-macro.S   |    6 ----
- arch/arm/mach-s5pv210/include/mach/entry-macro.S   |   17 ------------
- arch/arm/mach-sa1100/include/mach/entry-macro.S    |    6 ----
- arch/arm/mach-shark/include/mach/entry-macro.S     |    6 ----
- arch/arm/mach-shmobile/include/mach/entry-macro.S  |   22 ----------------
- arch/arm/mach-spear3xx/include/mach/entry-macro.S  |   18 -------------
- arch/arm/mach-spear6xx/include/mach/entry-macro.S  |   18 -------------
- arch/arm/mach-tegra/include/mach/entry-macro.S     |   20 --------------
- arch/arm/mach-u300/include/mach/entry-macro.S      |   16 -----------
- arch/arm/mach-ux500/include/mach/entry-macro.S     |   18 -------------
- arch/arm/mach-versatile/include/mach/entry-macro.S |   15 -----------
- arch/arm/mach-vexpress/include/mach/entry-macro.S  |    5 ---
- arch/arm/mach-vt8500/include/mach/entry-macro.S    |    6 ----
- arch/arm/mach-w90x900/include/mach/entry-macro.S   |    8 ------
- arch/arm/mach-zynq/include/mach/entry-macro.S      |   27
---------------------
- arch/arm/plat-mxc/include/mach/entry-macro.S       |   16 -----------
- 64 files changed, 38 insertions(+), 594 deletions(-)
- delete mode 100644 arch/arm/mach-cns3xxx/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-ep93xx/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-exynos/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-highbank/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-netx/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-nomadik/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-omap2/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-picoxcell/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-pxa/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-realview/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-rpc/fiq.S
- delete mode 100644 arch/arm/mach-s3c64xx/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-s5p64x0/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-s5pv210/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-shmobile/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-spear3xx/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-spear6xx/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-tegra/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-u300/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-ux500/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-versatile/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-vexpress/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-zynq/include/mach/entry-macro.S
- delete mode 100644 arch/arm/plat-mxc/include/mach/entry-macro.S
+
+ arch/arm/mach-omap1/ams-delta-fiq-handler.S    |    3 -
+ arch/arm/mach-omap1/ams-delta-fiq.c            |    1 
+ arch/arm/mach-omap1/board-ams-delta.c          |   10 +-
+ arch/arm/mach-omap1/board-fsample.c            |    7 +-
+ arch/arm/mach-omap1/board-h2.c                 |    6 +
+ arch/arm/mach-omap1/board-h3.c                 |    8 +-
+ arch/arm/mach-omap1/board-htcherald.c          |    5 -
+ arch/arm/mach-omap1/board-innovator.c          |    7 +-
+ arch/arm/mach-omap1/board-nokia770.c           |    6 +
+ arch/arm/mach-omap1/board-osk.c                |    7 +-
+ arch/arm/mach-omap1/board-palmte.c             |    4 +
+ arch/arm/mach-omap1/board-palmtt.c             |    9 +-
+ arch/arm/mach-omap1/board-palmz71.c            |    9 +-
+ arch/arm/mach-omap1/board-perseus2.c           |    7 +-
+ arch/arm/mach-omap1/board-sx1.c                |    6 +
+ arch/arm/mach-omap1/board-voiceblue.c          |    6 +
+ arch/arm/mach-omap1/clock.c                    |    2 
+ arch/arm/mach-omap1/clock_data.c               |    2 
+ arch/arm/mach-omap1/common.h                   |    1 
+ arch/arm/mach-omap1/devices.c                  |    8 +-
+ arch/arm/mach-omap1/dma.c                      |    2 
+ arch/arm/mach-omap1/flash.c                    |    2 
+ arch/arm/mach-omap1/fpga.c                     |    5 +
+ arch/arm/mach-omap1/gpio16xx.c                 |    7 ++
+ arch/arm/mach-omap1/id.c                       |    1 
+ arch/arm/mach-omap1/include/mach/entry-macro.S |    4 +
+ arch/arm/mach-omap1/include/mach/io.h          |   78 +++++++++++++++++++
+ arch/arm/mach-omap1/io.c                       |    3 +
+ arch/arm/mach-omap1/iomap.h                    |   18 ++++
+ arch/arm/mach-omap1/irq.c                      |    4 +
+ arch/arm/mach-omap1/lcd_dma.c                  |    3 -
+ arch/arm/mach-omap1/mcbsp.c                    |    5 +
+ arch/arm/mach-omap1/pm.c                       |    6 +
+ arch/arm/mach-omap1/reset.c                    |    3 -
+ arch/arm/mach-omap1/sleep.S                    |    4 +
+ arch/arm/mach-omap1/sram.S                     |    4 +
+ arch/arm/mach-omap1/time.c                     |    3 -
+ arch/arm/mach-omap1/timer32k.c                 |    7 +-
+ arch/arm/mach-omap2/clock2420_data.c           |    1 
+ arch/arm/mach-omap2/clock2430.c                |    1 
+ arch/arm/mach-omap2/clock2430_data.c           |    1 
+ arch/arm/mach-omap2/clock3xxx_data.c           |    3 -
+ arch/arm/mach-omap2/clock44xx_data.c           |    3 +
+ arch/arm/mach-omap2/cm2xxx_3xxx.c              |    2 
+ arch/arm/mach-omap2/cm44xx.c                   |    2 
+ arch/arm/mach-omap2/cminst44xx.c               |    2 
+ arch/arm/mach-omap2/common.c                   |    4 -
+ arch/arm/mach-omap2/common.h                   |    7 ++
+ arch/arm/mach-omap2/control.c                  |    3 -
+ arch/arm/mach-omap2/control.h                  |    1 
+ arch/arm/mach-omap2/devices.c                  |    2 
+ arch/arm/mach-omap2/display.c                  |    4 +
+ arch/arm/mach-omap2/include/mach/io.h          |   60 ++++++++++++++-
+ arch/arm/mach-omap2/io.c                       |   57 ++------------
+ arch/arm/mach-omap2/iomap.h                    |   98 ------------------------
+ arch/arm/mach-omap2/irq.c                      |    5 +
+ arch/arm/mach-omap2/omap-smp.c                 |    3 -
+ arch/arm/mach-omap2/pm24xx.c                   |    5 -
+ arch/arm/mach-omap2/prcm_mpu44xx.c             |    2 
+ arch/arm/mach-omap2/prm44xx.c                  |    3 -
+ arch/arm/mach-omap2/prminst44xx.c              |    2 
+ arch/arm/mach-omap2/sdram-nokia.c              |    1 
+ arch/arm/mach-omap2/sdrc2xxx.c                 |    5 +
+ arch/arm/mach-omap2/sleep24xx.S                |    1 
+ arch/arm/mach-omap2/sleep34xx.S                |    4 +
+ arch/arm/mach-omap2/sram242x.S                 |    4 +
+ arch/arm/mach-omap2/sram243x.S                 |    4 +
+ arch/arm/mach-omap2/sram34xx.S                 |    5 +
+ arch/arm/plat-omap/dma.c                       |    2 
+ arch/arm/plat-omap/include/plat/tc.h           |    4 +
+ arch/arm/plat-omap/include/plat/usb.h          |   40 ++++++++++
+ arch/arm/plat-omap/sram.c                      |    9 +-
+ arch/arm/plat-omap/usb.c                       |    2 
+ drivers/gpio/gpio-omap.c                       |    8 --
+ drivers/video/omap/Kconfig                     |    2 
+ drivers/video/omap2/dss/dispc.c                |    5 -
+ 76 files changed, 385 insertions(+), 255 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/iomap.h
+ rename arch/arm/{plat-omap/include/plat/io.h => mach-omap2/iomap.h} (67%)
+
+-- 
+Signature
