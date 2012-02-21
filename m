@@ -1,54 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Feb 2012 11:35:48 +0000
-Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
- platforms
-In-Reply-To: <20120221105250.GC19696@mudshark.cambridge.arm.com>
-References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
- <20120220194634.GK26840@n2100.arm.linux.org.uk>
- <201202210124.23028.paul@codesourcery.com>
- <20120221083612.GG22562@n2100.arm.linux.org.uk>
- <20120221100041.GA19696@mudshark.cambridge.arm.com>
- <20120221101052.GH22562@n2100.arm.linux.org.uk>
- <20120221105250.GC19696@mudshark.cambridge.arm.com>
-Message-ID: <20120221113548.GK22562@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 21 Feb 2012 20:37:26 +0900
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add device
+ tree support
+In-Reply-To: <m239abgc32.fsf@bob.laptop.org>
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
+ <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
+ <m239abgc32.fsf@bob.laptop.org>
+Message-ID: <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 10:52:50AM +0000, Will Deacon wrote:
-> On Tue, Feb 21, 2012 at 10:10:52AM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 21, 2012 at 10:00:41AM +0000, Will Deacon wrote:
-> > > On Tue, Feb 21, 2012 at 08:36:12AM +0000, Russell King - ARM Linux wrote:
-> > > > Maybe no one uses a debugger for uclinux programs?
-> > > 
-> > > I confess to finding this by inspection rather than a debugging failure.
-> > 
-> > There is another explanation - that is no one in the uclinux world uses
-> > mainline kernels, and this bug has been fixed ages ago in some uclinux
-> > kernel tree.
-> > 
-> > That directly raises the question of the value of having the uclinux
-> > baggage in the mainline kernel if no one is using mainline kernels for
-> > uclinux work.  If the uclinux folk aren't willing to pass up bug fixes,
-> > then having it in mainline is, frankly, a waste of space.
+Chris Ball wrote:
 > 
-> I know the validation guys in ARM use mainline kernels for bringup on
-> MMU-less CPUs (ok, they have extra patches on top but these tend to be
-> platform-specific hacks since they're running on an RTL emulator. Plus they do
-> periodically rebase onto new release kernels.). Debugging tends to be at a
-> much lower level than GDB can provide though (i.e. waveforms), so this would
-> have gone un-noticed.
+> Hi,
 > 
-> I think it's worth keeping the support, particularly in light of the recent
-> interest in M-class CPUs on the list.
+Hi,
 
-In any case, I think we need to know whether this really is a problem or
-not.  If no one has noticed that this is broken in the last 2.5 years,
-that implies that no one is using this, and so there's no point either
-the kernel or gdb carrying support which no one is using.
+> On Thu, Feb 16 2012, Kukjin Kim wrote:
+> > I mean if I or you create topic branch for this whole series, can be
+> > merged into both tree for avoiding conflicts with further working. Of
+> > course, the topic branch don't have to rebase after merging into each
+> > tree.
+> >
+> > If you're ok on this and my opinion, let me create the topic branch.
+> 
+> Okay, sure.  Thanks,
+> 
+I created topic branch for this we talked. You can pull that following:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.4-for-cjb
 
-The other thing is, as this has been broken right from the start, has
-gdb under uclinux even been tested?
+If any problems, please kindly let me know.
 
-I don't think fixing this in mainline until we know the full story behind
-this is the right thing to be doing.  There's no point fixing a feature
-which no one's using.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
+
+  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.4-for-cjb
+
+Thomas Abraham (6):
+      mmc: sdhci-s3c: Remove usage of clk_type member in platform data
+      ARM: EXYNOS: use 'exynos4-sdhci' as device name for sdhci controllers
+      ARM: SAMSUNG: remove all uses of clk_type member in sdhci platform
+data
+      mmc: sdhci-s3c: derive transfer width host capability from max_width
+in platform data
+      mmc: sdhci-s3c: Keep a copy of platform data and use it
+      mmc: sdhci-s3c: Add device tree support
+
+ .../devicetree/bindings/mmc/samsung-sdhci.txt      |   70 ++++++
+ arch/arm/mach-exynos/clock.c                       |   24 +-
+ arch/arm/mach-exynos/common.c                      |    5 +
+ arch/arm/mach-exynos/mach-armlex4210.c             |    3 -
+ arch/arm/mach-exynos/mach-nuri.c                   |    3 -
+ arch/arm/mach-exynos/mach-origen.c                 |    2 -
+ arch/arm/mach-exynos/mach-smdk4x12.c               |    2 -
+ arch/arm/mach-exynos/mach-smdkv310.c               |    4 -
+ arch/arm/mach-exynos/mach-universal_c210.c         |    2 -
+ arch/arm/plat-samsung/devs.c                       |    4 -
+ arch/arm/plat-samsung/include/plat/sdhci.h         |   35 +++-
+ arch/arm/plat-samsung/platformdata.c               |    2 -
+ drivers/mmc/host/sdhci-s3c.c                       |  235
++++++++++++++++++++-
+ 13 files changed, 341 insertions(+), 50 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
