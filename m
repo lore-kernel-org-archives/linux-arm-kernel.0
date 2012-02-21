@@ -1,42 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Feb 2012 10:52:50 +0000
-Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
- platforms
-In-Reply-To: <20120221101052.GH22562@n2100.arm.linux.org.uk>
-References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
- <20120220194634.GK26840@n2100.arm.linux.org.uk>
- <201202210124.23028.paul@codesourcery.com>
- <20120221083612.GG22562@n2100.arm.linux.org.uk>
- <20120221100041.GA19696@mudshark.cambridge.arm.com>
- <20120221101052.GH22562@n2100.arm.linux.org.uk>
-Message-ID: <20120221105250.GC19696@mudshark.cambridge.arm.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 21 Feb 2012 12:05:33 +0100
+Subject: [PATCH v3 0/3] MFD: twl6040: Conversion to i2c driver
+In-Reply-To: <4F4372E3.4050408@ti.com>
+References: <1328868018-24668-1-git-send-email-peter.ujfalusi@ti.com>
+ <20120220194736.GN5387@sortiz-mobl> <4F4372E3.4050408@ti.com>
+Message-ID: <20120221110533.GT5387@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 10:10:52AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 21, 2012 at 10:00:41AM +0000, Will Deacon wrote:
-> > On Tue, Feb 21, 2012 at 08:36:12AM +0000, Russell King - ARM Linux wrote:
-> > > Maybe no one uses a debugger for uclinux programs?
-> > 
-> > I confess to finding this by inspection rather than a debugging failure.
+Hi Peter,
+
+On Tue, Feb 21, 2012 at 12:33:07PM +0200, Peter Ujfalusi wrote:
+> > I'm not sure hwo we could handle that properly. Either by letting Tony
+> > carrying this patchset, or by sending me the panda patch that adds those
+> > structures. As you prefer.
 > 
-> There is another explanation - that is no one in the uclinux world uses
-> mainline kernels, and this bug has been fixed ages ago in some uclinux
-> kernel tree.
+> If Liam would take this series that would be probably the way forward.
+> If he does not have objections.
+> Liam: I can create a branch for you to pull from as soon as all other
+> patch receives the needed acks...
 > 
-> That directly raises the question of the value of having the uclinux
-> baggage in the mainline kernel if no one is using mainline kernels for
-> uclinux work.  If the uclinux folk aren't willing to pass up bug fixes,
-> then having it in mainline is, frankly, a waste of space.
+> Samuel: if Liam agrees is it possible for you to drop the twl6040
+> related patches from your for-next branch?
+That would make sense to me, yes.
+Liam, if you're ok with taking it, please add my:
 
-I know the validation guys in ARM use mainline kernels for bringup on
-MMU-less CPUs (ok, they have extra patches on top but these tend to be
-platform-specific hacks since they're running on an RTL emulator. Plus they do
-periodically rebase onto new release kernels.). Debugging tends to be at a
-much lower level than GDB can provide though (i.e. waveforms), so this would
-have gone un-noticed.
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
-I think it's worth keeping the support, particularly in light of the recent
-interest in M-class CPUs on the list.
+to this patchset.
 
-Will
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
