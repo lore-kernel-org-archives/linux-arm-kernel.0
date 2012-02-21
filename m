@@ -1,48 +1,57 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 Feb 2012 15:40:37 -0800
-Subject: [PATCH 2/8] ARM: OMAP2+: Move SDRC related functions from io.h into
+Date: Tue, 21 Feb 2012 15:40:40 -0800
+Subject: [PATCH 3/8] ARM: OMAP: Move omap_init_consistent_dma_size() to
  local common.h
 In-Reply-To: <20120221233619.18709.87982.stgit@kaulin.local>
 References: <20120221233619.18709.87982.stgit@kaulin.local>
-Message-ID: <20120221234037.18709.94932.stgit@kaulin.local>
+Message-ID: <20120221234040.18709.17025.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These should be local to omap2/3/4.
+We don't want to keep it in io.h as we want to remove io.h
+for omap2+ for the common zImage support.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/common.h         |    5 +++++
- arch/arm/plat-omap/include/plat/io.h |    4 ----
- 2 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap1/common.h         |    1 +
+ arch/arm/mach-omap2/common.h         |    2 ++
+ arch/arm/plat-omap/include/plat/io.h |    2 --
+ 3 files changed, 3 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
+index a9a5146..af658ad 100644
+--- a/arch/arm/mach-omap1/common.h
++++ b/arch/arm/mach-omap1/common.h
+@@ -58,5 +58,6 @@ void omap1_restart(char, const char *);
+ 
+ extern struct sys_timer omap1_timer;
+ extern bool omap_32k_timer_init(void);
++extern void __init omap_init_consistent_dma_size(void);
+ 
+ #endif /* __ARCH_ARM_MACH_OMAP1_COMMON_H */
 diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index febffde..5aa1acb 100644
+index 5aa1acb..f78ec4e 100644
 --- a/arch/arm/mach-omap2/common.h
 +++ b/arch/arm/mach-omap2/common.h
-@@ -235,5 +235,10 @@ static inline u32 omap4_mpuss_read_prev_context_state(void)
- 	return 0;
- }
- #endif
+@@ -133,6 +133,8 @@ void am33xx_map_io(void);
+ void omap4_map_io(void);
+ void ti81xx_map_io(void);
+ 
++extern void __init omap_init_consistent_dma_size(void);
 +
-+struct omap_sdrc_params;
-+extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
-+				      struct omap_sdrc_params *sdrc_cs1);
-+
- #endif /* __ASSEMBLER__ */
- #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
+ /**
+  * omap_test_timeout - busy-loop, testing a condition
+  * @cond: condition to test until it evaluates to true
 diff --git a/arch/arm/plat-omap/include/plat/io.h b/arch/arm/plat-omap/include/plat/io.h
-index 0696bae..f5b386b 100644
+index f5b386b..28cd796 100644
 --- a/arch/arm/plat-omap/include/plat/io.h
 +++ b/arch/arm/plat-omap/include/plat/io.h
-@@ -266,10 +266,6 @@ extern void omap_writeb(u8 v, u32 pa);
+@@ -266,8 +266,6 @@ extern void omap_writeb(u8 v, u32 pa);
  extern void omap_writew(u16 v, u32 pa);
  extern void omap_writel(u32 v, u32 pa);
  
--struct omap_sdrc_params;
--extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
--				      struct omap_sdrc_params *sdrc_cs1);
+-extern void __init omap_init_consistent_dma_size(void);
 -
- extern void __init omap_init_consistent_dma_size(void);
+ #endif
  
  #endif
