@@ -1,91 +1,86 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Tue, 21 Feb 2012 08:44:22 -0600
-Subject: [PATCHv5 06/14] arm: omap: add support for oscillator setup
-In-Reply-To: <1329833098-19900-7-git-send-email-t-kristo@ti.com>
-References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
- <1329833098-19900-7-git-send-email-t-kristo@ti.com>
-Message-ID: <CAOMWX4ccQ6Y4F-8YSD-6SNURCTYHi+MCEzJsVhCOb3CRwLoqmA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 21 Feb 2012 15:51:29 +0100
+Subject: [PATCH v5 00/27] irq_domain generalization and rework
+In-Reply-To: <20120217175550.GQ27825@n2100.arm.linux.org.uk>
+References: <1329383368-12122-1-git-send-email-grant.likely@secretlab.ca>
+ <20120216145219.0f1c1b98.akpm@linux-foundation.org> <4F3E9187.9080308@ti.com>
+ <20120217175550.GQ27825@n2100.arm.linux.org.uk>
+Message-ID: <4F43AF71.4060207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
-> This contains startup and shutdown times for the oscillator. By default
-> use ULONG_MAX. Oscillator setup is used for calculating and setting up
-> latencies for sleep modes that disable oscillator.
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
-> ?arch/arm/mach-omap2/pm.c | ? 27 +++++++++++++++++++++++++++
-> ?arch/arm/mach-omap2/pm.h | ? ?8 ++++++++
-> ?2 files changed, 35 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 1881fe9..2402e8e 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -28,6 +28,33 @@
->
-> ?static struct omap_device_pm_latency *pm_lats;
->
-> +/**
-> + * struct omap2_oscillator - Describe the board main oscillator latencies
-> + * @startup_time: oscillator startup latency
-> + * @shutdown_time: oscillator shutdown latency
-> + */
-> +struct omap2_oscillator {
-> + ? ? ? u32 startup_time;
-> + ? ? ? u32 shutdown_time;
-> +};
-> +
-> +static struct omap2_oscillator oscillator = {
-> + ? ? ? .startup_time = ULONG_MAX,
-> + ? ? ? .shutdown_time = ULONG_MAX,
-> +};
-> +
-> +void omap_pm_setup_oscillator(u32 tstart, u32 tshut)
-> +{
-> + ? ? ? oscillator.startup_time = tstart;
-> + ? ? ? oscillator.shutdown_time = tshut;
-> +}
-> +
-> +void omap_pm_get_oscillator(u32 *tstart, u32 *tshut)
-> +{
+On 2/17/2012 6:55 PM, Russell King - ARM Linux wrote:
+> On Fri, Feb 17, 2012 at 06:42:31PM +0100, Cousson, Benoit wrote:
 
-Maybe a nitpick - variable check needed?
+[...]
+
+>> @@ -1237,8 +1238,10 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>>
+>>   	pdata->irq_base = status;
+>>   	pdata->irq_end = pdata->irq_base + nr_irqs;
+>> +#ifdef IRQ_DOMAIN
+>>   	irq_domain_add_legacy(node, nr_irqs, pdata->irq_base, 0,
+>>   			&irq_domain_simple_ops, NULL);
+>> +#endif
+> 
+> Do you really need this?  If you've tested this, then apparantly the answer
+> is no, because it won't ever be built like that.  (You're missing a
+> CONFIG_ prefix.)
+
+Ooops, sorry about that.
+It was indeed working fine in every cases except for the DT boot :-(
+
+As explain before, for the moment the interrupt domain is used only for the DT boot. It is mandatory do get the interrupt binding to work properly for all the TWL sub modules (RTC...).
+
+> Maybe the only solution to the x86 problem is to ensure that the driver
+> includes linux/irq.h ?
+
+Both will be needed to allow a DT boot with OMAP. Here is the updated version.
 
 Regards,
-Nishanth Menon
+Benoit
 
+---
+>From d844a8fc84d4514884356c935967f59d88a00124 Mon Sep 17 00:00:00 2001
+From: Benoit Cousson <b-cousson@ti.com>
+Date: Mon, 20 Feb 2012 10:58:34 +0100
+Subject: [PATCH] mfd: twl-core: Fix IRQ_DOMAIN dependency
 
-> + ? ? ? *tstart = oscillator.startup_time;
-> + ? ? ? *tshut = oscillator.shutdown_time;
-> +}
-> +
-> ?static int _init_omap_device(char *name)
-> ?{
-> ? ? ? ?struct omap_hwmod *oh;
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index ec8f874..797d2da 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -141,4 +141,12 @@ static inline int omap4_twl_init(void)
-> ?}
-> ?#endif
->
-> +#ifdef CONFIG_PM
-> +extern void omap_pm_setup_oscillator(u32 tstart, u32 tshut);
-> +extern void omap_pm_get_oscillator(u32 *tstart, u32 *tshut);
-> +#else
-> +static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
-> +static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { }
-> +#endif
-> +
-> ?#endif
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+TWL chips might be potentially used on architecture that does not support
+ird_domain yet.
+
+Do not call ird_domain API in that case.
+
+Include <linux/irq.h> directly since it will not be included anymore by
+<linux/irqdomain.h> if !IRQ_DOMAIN.
+
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+---
+ drivers/mfd/twl-core.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+index 66f9bff..18c4f93 100644
+--- a/drivers/mfd/twl-core.c
++++ b/drivers/mfd/twl-core.c
+@@ -38,6 +38,7 @@
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ 
+ #include <linux/regulator/machine.h>
+@@ -1223,8 +1224,10 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ 
+ 	pdata->irq_base = status;
+ 	pdata->irq_end = pdata->irq_base + nr_irqs;
++#ifdef CONFIG_IRQ_DOMAIN
+ 	irq_domain_add_legacy(node, nr_irqs, pdata->irq_base, 0,
+ 			      &irq_domain_simple_ops, NULL);
++#endif
+ 
+ 	if (i2c_check_functionality(client->adapter, I2C_FUNC_I2C) == 0) {
+ 		dev_dbg(&client->dev, "can't talk I2C?\n");
+-- 
+1.7.0.4
