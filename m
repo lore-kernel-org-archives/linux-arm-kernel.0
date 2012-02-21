@@ -1,33 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Feb 2012 13:16:17 +0000
-Subject: [PATCH - linux-next] ARM: ptrace: Fix audit caused compile error
-In-Reply-To: <1329825855-11902-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1329825855-11902-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120221131616.GI19696@mudshark.cambridge.arm.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 21 Feb 2012 08:17:41 -0500
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add
+ device tree support
+In-Reply-To: <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com> (Kukjin Kim's
+ message of "Tue, 21 Feb 2012 20:37:26 +0900")
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>
+ <003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>
+ <m2aa4pkq5g.fsf@bob.laptop.org> <4F3CFEED.6060206@samsung.com>
+ <m239abgc32.fsf@bob.laptop.org>
+ <00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>
+Message-ID: <m2vcn0496y.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 12:04:15PM +0000, Peter Ujfalusi wrote:
-> While trying to compile the kernel for ARM (omap2plus_defconfig) the kernel
-> build fails with:
-> 
-> arch/arm/kernel/ptrace.c: In function ?syscall_trace?:
-> arch/arm/kernel/ptrace.c:920:3: error: implicit declaration of function ?audit_syscall_exit?
-> arch/arm/kernel/ptrace.c:922:3: error: implicit declaration of function ?audit_syscall_entry?
-> arch/arm/kernel/ptrace.c:922:23: error: ?AUDIT_ARCH_ARMEB? undeclared (first use in this function)
-> arch/arm/kernel/ptrace.c:922:23: note: each undeclared identifier is reported only once for each function it appears in
-> make[1]: *** [arch/arm/kernel/ptrace.o] Error 1
-> 
-> The issue created by commit:
-> 29ef73b7 Kernel: Audit Support For The ARM Platform
-> 
-> We need to include the linux/audit.h header to the arch/arm/kernel/ptrace.c
-> file to be able to compile the kernel.
+Hi,
 
-This was already reported and I think Russell was going to revert the
-offending commit, since it needed some rework to handle little-endian
-configurations.
+On Tue, Feb 21 2012, Kukjin Kim wrote:
+> I created topic branch for this we talked. You can pull that following:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.4-for-cjb
+>
+> If any problems, please kindly let me know.
 
-I can't see the revert in any of the trees I'm tracking though...
+Pushed to mmc-next, thanks.  (I'm expecting that you'll do the merge
+to Linus.)
 
-Will
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
