@@ -1,38 +1,44 @@
-From: pintu_agarwal@yahoo.com (PINTU KUMAR)
-Date: Tue, 21 Feb 2012 01:15:43 -0800 (PST)
-Subject: [HELP REQUIRED] : Andorid FIQ Debugger Porting issue on
- Kernel2.6.36
-In-Reply-To: <1329815642.22876.YahooMailNeo@web162001.mail.bf1.yahoo.com>
-References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
- <1329815096-6200-8-git-send-email-haojian.zhuang@marvell.com>
- <1329815642.22876.YahooMailNeo@web162001.mail.bf1.yahoo.com>
-Message-ID: <1329815743.52839.YahooMailNeo@web162005.mail.bf1.yahoo.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 21 Feb 2012 10:22:38 +0100
+Subject: [PATCH 5/6 V2] atmel/nand: add DT support
+In-Reply-To: <20120207115306.GF15647@game.jcrosoft.org>
+References: <1327727444-23908-1-git-send-email-plagnioj@jcrosoft.com>
+ <1328524512-18159-2-git-send-email-plagnioj@jcrosoft.com>
+ <4F30FD4B.4050501@atmel.com> <20120207115306.GF15647@game.jcrosoft.org>
+Message-ID: <4F43625E.7070908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?
-Dear All,
+On 02/07/2012 12:53 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 11:30 Tue 07 Feb     , Nicolas Ferre wrote:
+>> On 02/06/2012 11:35 AM, Jean-Christophe PLAGNIOL-VILLARD :
+>>> use a local copy of board informatin and fill with DT data
+>>>
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>> Cc: linux-mtd at lists.infradead.org
+>>
+>> [..]
+>>
+>>> +static int __devinit atmel_of_init_port(struct atmel_nand_host *host,
+>>> +					 struct device_node *np)
+>>
+>> Maybe you will need to protect this function in case of !DT builds: I
+>> suspect that some of the of_xxxxx() calls are not provided if !CONFIG_OF.
+> no-need on the of_ function are static inline it !CONFIG_OF
 
-This is regarding Android FIQ Debugger porting for another Linux mobile with kernel2.6.36.
-I have successfully ported the fiq_debugger.c, fiq_glue.S and others and resolved the compilation issues.
-I have enabled all the configs as below:
-CONFIG_FIQ=y
-CONFIG_FIQ_GLUE=y
-CONFIG_FIQ_DEBUGGER=y
-CONFIG_FIQ_DEBUGGER_NO_SLEEP=y
-CONFIG_FIQ_DEBUGGER_WAKEUP_IRQ_ALWAYS_ON=y
-CONFIG_FIQ_DEBUGGER_CONSOLE=y
+Sorry to come back to this but:
 
-But when I load the kernel on the device, the fiq handler is not getting called after I press ENTER?key many times during the following prompt.
-<hit enter to activate fiq debugger>
----
----
+of_get_nand_ecc_mode(np);
+of_get_nand_on_flash_bbt(np);
 
-What could be the problem?
+for example are not available in case of non-DT compilation: so we must
+protect the atmel_of_init_port() against this error.
 
-Can anybody provide some pointers to debug further?
+Can you please rework another patch.
 
-
-
-Thanks, Regards,
-Pintu
+Bye,
+-- 
+Nicolas Ferre
