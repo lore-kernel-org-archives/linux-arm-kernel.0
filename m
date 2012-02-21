@@ -1,29 +1,33 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 21 Feb 2012 15:02:59 +0100
-Subject: [PATCH 1/2] GPIO: LPC32xx: Fix missing bit selection mask
-In-Reply-To: <1329773948-4655-1-git-send-email-stigge@antcom.de>
-References: <1329773948-4655-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120221140259.GB3162@pengutronix.de>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 21 Feb 2012 16:04:44 +0200
+Subject: [PATCHv5 00/14] arm: omap3: auto-ret / auto-off support
+Message-ID: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 10:39:07PM +0100, Roland Stigge wrote:
-> Add missing mask to pin bit selection in gpio-lpc32xx.c
-> (#define GPIO3_PIN_IN_SEL)
-> 
-> A table indentation change was necessary due to line length restrictions, but
-> the only relevant change is the definition of GPIO3_PIN_IN_SEL.
+Hi,
 
-I'd vote for violating the 80 char limit and keep the change minimal
-here, i.e. change only the relevant define.
+This set applies on top of the pwrdm / clkdm / voltdm usecounting patch
+set I sent last week (see:
+http://www.spinics.net/lists/linux-omap/msg64670.html):
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120221/6690580a/attachment-0001.sig>
+Following changes done compared to previous version.
+
+- split out the basic usecounting support as its own set (see above)
+- added lots of new comments to the code, including kerneldoc style
+  function headers
+- changed pmic->vp_vddmin / vddmax to simply vddmin / vddmax, these
+  are now used as limits for all voltage related operations (both
+  vc / vp), pmic limits are checked against the values defined for
+  the omap chip itself to select proper voltage levels
+- some other minor fixes proposed for the previous version
+
+TBD:
+- omap4 support (will work with this once retention works for omap4)
+- pmic script support for omap3 (scaling to 0V level)
+
+Tested on omap3 beagle with retention / off, suspend and dynamic idle.
+Voltage rails for vdd1 (mpu) and vdd2 (core) measured and seen to scale
+correctly to retention / off voltage levels.
+
+-Tero
