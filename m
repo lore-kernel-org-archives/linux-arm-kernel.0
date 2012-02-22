@@ -1,96 +1,26 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 22 Feb 2012 17:14:40 +0800
-Subject: [PATCH] serial/sirf: fixup for changes to pin control
-In-Reply-To: <1329417828-6005-1-git-send-email-linus.walleij@linaro.org>
-References: <1329417828-6005-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAGsJ_4yLTPhLJEf9GHw694U9iYmtLgYPvYe3VGdyKKKcuX6pUA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Feb 2012 09:17:52 +0000
+Subject: [PATCH 2/2] iommu/omap: fix NULL pointer dereference
+In-Reply-To: <CAK=Wgba1CfpZpDqN3fruL-Ax_a_DwGuB=92pq4Ng3cSUGL8e2Q@mail.gmail.com>
+References: <1329900772-9306-1-git-send-email-ohad@wizery.com>
+ <1329900772-9306-2-git-send-email-ohad@wizery.com>
+ <20120222085623.GF22675@n2100.arm.linux.org.uk>
+ <CAK=Wgba1CfpZpDqN3fruL-Ax_a_DwGuB=92pq4Ng3cSUGL8e2Q@mail.gmail.com>
+Message-ID: <20120222091752.GG22675@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/2/17 Linus Walleij <linus.walleij@linaro.org>:
-> We changed the signature of the pin multiplexing functions to
-> handle any pin business, so fix up the Sirf driver to call this
-> new interface and rename some variables to make the semantics
-> understandable.
->
-> Cc: linux-serial at vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Wed, Feb 22, 2012 at 11:10:38AM +0200, Ohad Ben-Cohen wrote:
+> On Wed, Feb 22, 2012 at 10:56 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > There's something else which needs fixing here - the return code. ?If
+> > omap_find_iovm_area() returns an error code that needs propagating.
+> > Otherwise it might as well just return NULL for all errors.
+> 
+> Seems like it does just return NULL for all errors, so a cleaner fix
+> can probably just be s/IS_ERR(area)/!area/.
+> 
+> I'll submit it, but Joerg, if you feel this is becoming a "cleanup",
+> feel free to take the first version.
 
-Acked-by: Barry Song <Baohua.Song@csr.com>
-
-> ---
-> ?drivers/tty/serial/sirfsoc_uart.c | ? 20 ++++++++++----------
-> ?drivers/tty/serial/sirfsoc_uart.h | ? ?2 +-
-> ?2 files changed, 11 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-> index a60523f..c1a871e 100644
-> --- a/drivers/tty/serial/sirfsoc_uart.c
-> +++ b/drivers/tty/serial/sirfsoc_uart.c
-> @@ -22,7 +22,7 @@
-> ?#include <linux/io.h>
-> ?#include <asm/irq.h>
-> ?#include <asm/mach/irq.h>
-> -#include <linux/pinctrl/pinmux.h>
-> +#include <linux/pinctrl/consumer.h>
->
-> ?#include "sirfsoc_uart.h"
->
-> @@ -673,12 +673,12 @@ int sirfsoc_uart_probe(struct platform_device *pdev)
-> ? ? ? ?port->irq = res->start;
->
-> ? ? ? ?if (sirfport->hw_flow_ctrl) {
-> - ? ? ? ? ? ? ? sirfport->pmx = pinmux_get(&pdev->dev, NULL);
-> - ? ? ? ? ? ? ? ret = IS_ERR(sirfport->pmx);
-> + ? ? ? ? ? ? ? sirfport->p = pinctrl_get(&pdev->dev, NULL);
-> + ? ? ? ? ? ? ? ret = IS_ERR(sirfport->p);
-> ? ? ? ? ? ? ? ?if (ret)
-> - ? ? ? ? ? ? ? ? ? ? ? goto pmx_err;
-> + ? ? ? ? ? ? ? ? ? ? ? goto pin_err;
->
-> - ? ? ? ? ? ? ? pinmux_enable(sirfport->pmx);
-> + ? ? ? ? ? ? ? pinctrl_enable(sirfport->p);
-> ? ? ? ?}
->
-> ? ? ? ?port->ops = &sirfsoc_uart_ops;
-> @@ -696,10 +696,10 @@ int sirfsoc_uart_probe(struct platform_device *pdev)
-> ?port_err:
-> ? ? ? ?platform_set_drvdata(pdev, NULL);
-> ? ? ? ?if (sirfport->hw_flow_ctrl) {
-> - ? ? ? ? ? ? ? pinmux_disable(sirfport->pmx);
-> - ? ? ? ? ? ? ? pinmux_put(sirfport->pmx);
-> + ? ? ? ? ? ? ? pinctrl_disable(sirfport->p);
-> + ? ? ? ? ? ? ? pinctrl_put(sirfport->p);
-> ? ? ? ?}
-> -pmx_err:
-> +pin_err:
-> ?irq_err:
-> ? ? ? ?devm_iounmap(&pdev->dev, port->membase);
-> ?err:
-> @@ -712,8 +712,8 @@ static int sirfsoc_uart_remove(struct platform_device *pdev)
-> ? ? ? ?struct uart_port *port = &sirfport->port;
-> ? ? ? ?platform_set_drvdata(pdev, NULL);
-> ? ? ? ?if (sirfport->hw_flow_ctrl) {
-> - ? ? ? ? ? ? ? pinmux_disable(sirfport->pmx);
-> - ? ? ? ? ? ? ? pinmux_put(sirfport->pmx);
-> + ? ? ? ? ? ? ? pinctrl_disable(sirfport->p);
-> + ? ? ? ? ? ? ? pinctrl_put(sirfport->p);
-> ? ? ? ?}
-> ? ? ? ?devm_iounmap(&pdev->dev, port->membase);
-> ? ? ? ?uart_remove_one_port(&sirfsoc_uart_drv, port);
-> diff --git a/drivers/tty/serial/sirfsoc_uart.h b/drivers/tty/serial/sirfsoc_uart.h
-> index fc64260..6e207fd 100644
-> --- a/drivers/tty/serial/sirfsoc_uart.h
-> +++ b/drivers/tty/serial/sirfsoc_uart.h
-> @@ -162,7 +162,7 @@ struct sirfsoc_uart_port {
-> ? ? ? ?unsigned char ? ? ? ? ? ? ? ? ? ms_enabled;
->
-> ? ? ? ?struct uart_port ? ? ? ? ? ? ? ?port;
-> - ? ? ? struct pinmux ? ? ? ? ? ? ? ? ? *pmx;
-> + ? ? ? struct pinctrl ? ? ? ? ? ? ? ? ?*p;
-> ?};
->
-> ?/* Hardware Flow Control */
-> --
-> 1.7.7.6
->
+That sounds more like a bug fix than a cleanup to me.
