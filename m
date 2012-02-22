@@ -1,88 +1,37 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 22 Feb 2012 10:29:43 -0800
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <4F452484.5080503@gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Feb 2012 10:57:28 -0800
+Subject: [PATCH 8/8] ARM: OMAP2+: Limit omap_read/write usage to legacy
+ USB drivers
+In-Reply-To: <1329898441.2070.10.camel@deskari>
+References: <20120221233619.18709.87982.stgit@kaulin.local>
+ <20120221234051.18709.3571.stgit@kaulin.local>
+ <1329898441.2070.10.camel@deskari>
+Message-ID: <20120222185728.GJ18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring wrote at Wednesday, February 22, 2012 10:23 AM:
-> On 02/22/2012 08:31 AM, Cousson, Benoit wrote:
-> > On 2/22/2012 3:23 PM, Rob Herring wrote:
-> >> On 02/15/2012 10:04 AM, Benoit Cousson wrote:
-> >>> Adapt the GPIO driver to retrieve information from a DT file.
-> >>>
-> >>> Allocate the irq_base dynamically and rename bank->virtual_irq_start
-> >>> to bank->irq_base.
-> >>> Change irq_base type to int instead of u16 to match irq_alloc_descs
-> >>> output.
-> >>>
-> >>> Add documentation for GPIO properties specific to OMAP.
-> >>>
-> >>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> >>> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
-> >>
-> >> One comment below, but otherwise:
-> >>
-> >> Acked-by: Rob Herring<rob.herring@calxeda.com>
-> >>
-> >>> ---
-> >>>   .../devicetree/bindings/gpio/gpio-omap.txt         |   30 +++++
-> >>>   drivers/gpio/gpio-omap.c                           |  121
-> >>> ++++++++++++++++++--
-> >>>   2 files changed, 142 insertions(+), 9 deletions(-)
-> >>>   create mode 100644
-> >>> Documentation/devicetree/bindings/gpio/gpio-omap.txt
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-> >>> b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-> >>> new file mode 100644
-> >>> index 0000000..c1b3100
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-> >>> @@ -0,0 +1,30 @@
-> >>> +OMAP GPIO controller bindings
-> >>> +
-> >>> +Required properties:
-> >>> +- compatible:
-> >>> +  - "ti,omap2-gpio" for OMAP2 controllers
-> >>> +  - "ti,omap3-gpio" for OMAP3 controllers
-> >>> +  - "ti,omap4-gpio" for OMAP4 controllers
-> >>> +- #gpio-cells : Should be two.
-> >>> +  - first cell is the pin number
-> >>> +  - second cell is used to specify optional parameters (unused)
-> >>> +- gpio-controller : Marks the device node as a GPIO controller.
-> >>> +- #interrupt-cells : Should be one
-> >>
-> >> There's no level/edge settings for gpios?
-> >
-> > That's a good question, because I was wondering as well :-)
-> >
-> > I did no see how it was done in other GPIO implementation.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [120221 23:42]:
+> On Tue, 2012-02-21 at 15:40 -0800, Tony Lindgren wrote:
+> > Drivers should no longer use omap_read/write functions
+> > but instead use ioremap + read/write functions.
+> > 
+> > As some USB legacy code is still shared between omap1 and
+> > omap2420, let's limit the omap_read/write to plat/usb.h.
+> > 
+> > Also, let's make drivers/video/omap/lcdc.c depend on
+> > ARCH_OMAP1 as it is not needed for omap2+.
 > 
-> There's not really a good example that I've found. Many gpio nodes don't
-> even have "interrupt-controller" set.
-> 
-> So if you have an irq_set_type function for gpio's, then you should have
-> 2 cells.
+> I'm ok with the lcdc.c change, but I also have a patch series that makes
+> the same change, plus removes the omap2 code from drivers/video/omap/.
 
-Tegra's GPIO IRQ binding (gpio_nvidia.txt in linux-next at least) says:
+OK, I'll drop the lcdc.c change from my series as that should
+only affect randconfig builds.
+ 
+> Can you check the series, and give ack if the arch/arm side looks fine?
+> It's this one: [PATCH 00/16] OMAPDSS: old OMAPFB cleanup
 
-- #interrupt-cells : Should be 2.
-  The first cell is the GPIO number.
-  The second cell is used to specify flags:
-    bits[3:0] trigger type and level flags:
-      1 = low-to-high edge triggered.
-      2 = high-to-low edge triggered.
-      4 = active high level-sensitive.
-      8 = active low level-sensitive.
-      Valid combinations are 1, 2, 3, 4, 8.
+Yeah great, I've acked those. Let's do a test merge when I
+have these in cleanup branch, looks like the conflicts should
+be trivial.
 
-Presumably, that's what you meant.
-
--- 
-nvpublic
+Tony
