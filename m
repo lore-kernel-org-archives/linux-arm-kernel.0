@@ -1,43 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2012 16:47:23 +0000
-Subject: [PATCH v2 12/19] ARM: at91/rtc-at91sam9: each SoC can select the
- RTT device to use
-In-Reply-To: <20120222162442.GD9407@game.jcrosoft.org>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <201202221450.04390.arnd@arndb.de> <20120222162442.GD9407@game.jcrosoft.org>
-Message-ID: <201202221647.23430.arnd@arndb.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 22 Feb 2012 17:48:57 +0100
+Subject: [PATCHv23 16/16] ARM: Samsung: use CMA for 2 memory banks for s5p-mfc
+ device
+In-Reply-To: <1329929337-16648-1-git-send-email-m.szyprowski@samsung.com>
+References: <1329929337-16648-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1329929337-16648-17-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 February 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 14:50 Wed 22 Feb     , Arnd Bergmann wrote:
-> > On Wednesday 22 February 2012, Nicolas Ferre wrote:
-> > > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > 
-> > > For the RTT as RTC driver rtc-at91sam9, the platform_device structure
-> > > is filled during SoC initialization. This will allow to convert this
-> > > RTC driver as a standard platform driver.
-> > 
-> > Can you make this more elaborate? I don't see from this or the code why
-> > you don't just always register the RTT as "rtc-at91sam9". There seems to
-> > be no driver for the "at91_rtt" in tree, so I don't know if there is
-> > an out of tree driver binding to it.
-> > 
-> > Would it be possible to remove the compile time #if and the resetting
-> > of the device name if both drivers bind to the rtc name and the other
-> > rtt driver binds to both names?
-> because I see a quite some people use the rtt for something else
-> 
-> so I don't want to change on existing kernel
+Replace custom memory bank initialization using memblock_reserve and
+dma_declare_coherent with a single call to CMA's dma_declare_contiguous.
 
-But if you change the rtc driver to always bind to the existing
-"at91_rtt" platform_device and fail the probe() function for the
-case that you are on at91sam9263 probing the non-RTC device,
-you should get the exact same result without any extra code
-in the per-soc files.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/plat-s5p/dev-mfc.c |   51 ++++++-------------------------------------
+ 1 files changed, 7 insertions(+), 44 deletions(-)
 
-I guess it also makes sense to specify a device tree property
-that lets you detect whether the RTT is used as RTC or something
-else.
-
-	Arnd
+diff --git a/arch/arm/plat-s5p/dev-mfc.c b/arch/arm/plat-s5p/dev-mfc.c
+index a30d36b..fcb8400 100644
+--- a/arch/arm/plat-s5p/dev-mfc.c
++++ b/arch/arm/plat-s5p/dev-mfc.c
+@@ -14,6 +14,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
++#include <linux/dma-contiguous.h>
+ #include <linux/memblock.h>
+ #include <linux/ioport.h>
+ 
+@@ -22,52 +23,14 @@
+ #include <plat/irqs.h>
+ #include <plat/mfc.h>
+ 
+-struct s5p_mfc_reserved_mem {
+-	phys_addr_t	base;
+-	unsigned long	size;
+-	struct device	*dev;
+-};
+-
+-static struct s5p_mfc_reserved_mem s5p_mfc_mem[2] __initdata;
+-
+ void __init s5p_mfc_reserve_mem(phys_addr_t rbase, unsigned int rsize,
+ 				phys_addr_t lbase, unsigned int lsize)
+ {
+-	int i;
+-
+-	s5p_mfc_mem[0].dev = &s5p_device_mfc_r.dev;
+-	s5p_mfc_mem[0].base = rbase;
+-	s5p_mfc_mem[0].size = rsize;
+-
+-	s5p_mfc_mem[1].dev = &s5p_device_mfc_l.dev;
+-	s5p_mfc_mem[1].base = lbase;
+-	s5p_mfc_mem[1].size = lsize;
+-
+-	for (i = 0; i < ARRAY_SIZE(s5p_mfc_mem); i++) {
+-		struct s5p_mfc_reserved_mem *area = &s5p_mfc_mem[i];
+-		if (memblock_remove(area->base, area->size)) {
+-			printk(KERN_ERR "Failed to reserve memory for MFC device (%ld bytes at 0x%08lx)\n",
+-			       area->size, (unsigned long) area->base);
+-			area->base = 0;
+-		}
+-	}
+-}
+-
+-static int __init s5p_mfc_memory_init(void)
+-{
+-	int i;
+-
+-	for (i = 0; i < ARRAY_SIZE(s5p_mfc_mem); i++) {
+-		struct s5p_mfc_reserved_mem *area = &s5p_mfc_mem[i];
+-		if (!area->base)
+-			continue;
++	if (dma_declare_contiguous(&s5p_device_mfc_r.dev, rsize, rbase, 0))
++		printk(KERN_ERR "Failed to reserve memory for MFC device (%u bytes at 0x%08lx)\n",
++		       rsize, (unsigned long) rbase);
+ 
+-		if (dma_declare_coherent_memory(area->dev, area->base,
+-				area->base, area->size,
+-				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0)
+-			printk(KERN_ERR "Failed to declare coherent memory for MFC device (%ld bytes at 0x%08lx)\n",
+-			       area->size, (unsigned long) area->base);
+-	}
+-	return 0;
++	if (dma_declare_contiguous(&s5p_device_mfc_l.dev, lsize, lbase, 0))
++		printk(KERN_ERR "Failed to reserve memory for MFC device (%u bytes at 0x%08lx)\n",
++		       rsize, (unsigned long) rbase);
+ }
+-device_initcall(s5p_mfc_memory_init);
+-- 
+1.7.1.569.g6f426
