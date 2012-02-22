@@ -1,22 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Feb 2012 22:53:06 +0000
-Subject: [PULL] entry-macro.S clean-up and removal
-In-Reply-To: <20120222220628.GG7041@n2100.arm.linux.org.uk>
-References: <4F44293E.2090901@gmail.com>
- <20120222220628.GG7041@n2100.arm.linux.org.uk>
-Message-ID: <20120222225305.GI7041@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Feb 2012 15:01:09 -0800
+Subject: [PATCH 1/7] OMAP: 4430SDP: Correct fixed regulator device ID
+In-Reply-To: <1328868316-24749-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
+ <1328868316-24749-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120222230109.GQ18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 10:06:28PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 21, 2012 at 05:31:10PM -0600, Rob Herring wrote:
-> > Please pull entry-macro clean-up for 3.4. This should be pretty much
-> > free of any conflicts AFAICT. A merge of your for-next branch had no
-> > conflicts.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120210 01:34]:
+> The board has two fixed voltage regulator. Correct the
+> device ID for the vbat, which used -1.
+> Create defines for the fixed regulator IDs so when adding new
+> regulators we know the next available ID to use for them.
 > 
-> I'll pull this into my for-armsoc branch because it makes sense for
-> both trees to carry it.  It'll appear there in a few days time.
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-I should point out that it will appear in -next before it appears in
-for-armsoc (because I won't be updating for-armsoc until I'm ready
-to push it out for that.)
+Acked-by: Tony Lindgren <tony@atomide.com>
