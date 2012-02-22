@@ -1,79 +1,66 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Feb 2012 07:01:11 +0100
-Subject: [PATCH 1/2] Documentation/gpio.txt: Explain expected pinctrl
- interaction
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC3A1@HQMAIL01.nvidia.com>
-References: <1329719263-18971-1-git-send-email-swarren@nvidia.com>
- <20120220073941.GC22562@n2100.arm.linux.org.uk>
- <CACRpkdbMFN3=XTSg1oE310eTHecrs6XaMz+DCNYJzwOg8JEEiQ@mail.gmail.com>
- <20120221110618.GJ22562@n2100.arm.linux.org.uk>
- <CACRpkdYzRu4VPKPgxuttuvSDCpfHjvBGGq1rFEDExv1PsoLG=w@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC3A1@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdb+Vtyhsxi7L0ttDk_8Ra2-Kfh8H9esD7P_FC_=c4-=Mw@mail.gmail.com>
+Date: Wed, 22 Feb 2012 07:08:23 +0100
+Subject: [PATCH] pinctrl: spawn U300 pinctrl from the COH901 GPIO
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC368@HQMAIL01.nvidia.com>
+References: <1329831275-21769-1-git-send-email-linus.walleij@stericsson.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC368@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdbuCMV0k=bfST65ZNojzUQVvDpbOB=-NN=wd3Hc7Mj_MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 8:14 PM, Stephen Warren <swarren@nvidia.com> wrote:
-
-> Ignoring WARs like we're discussing, it's typically true that a given pin
-> should either be a special function or a GPIO for any given board. If
-> we do allow a pin to be owned/used by both, then how do we indicate, on
-> a per-board rather than per-SoC basis, which pins we should allow both
-> gpio_request() and pinmux usage?
-
-I was thinking about making this a property of the physical pin i.e.
-struct pin_desc and not of the board data.
-
-It seems to me like this arbitration has to be very close to the driver,
-since not all or even many controllers will support it (AFAICT).
-
-> The following considerations exist:
-> a) On Tegra, a pin group might include 10 pins that are mux'd as a group,
-> hence all owned e.g. by a NAND driver. If a few of those aren't used on a
-> particular board due to the way the NAND is hooked up and the driver
-> configured, do we only allow gpio_request() only on those pins we know the
-> NAND driver isn't actually using, to prevent someone using unexpected
-> pins as GPIO? We'd need a per-GPIO per-board way to represent this if
-> we care about this level of error-checking.
-
-In this case I would strive not to present unused pins to the functions
-in the first place. But maybe this collides with the new paradigm to
-assign aquire all possible pins on pinctrl_get() time?
-
-> b) In Linus's snooping example, how do we know the SoC can physically
-> implement enabling a pin as both a GPIO and a special function, such
-> that the gpio_request() for the snooping won't interfere with the mux'd
-> function?
-
-I think on U300 and SA1100 we can flag that in the pin descriptor
-as described above.
-
-> 2) Extend the pinctrl mapping table to explicitly represent GPIO usage.
-
-Seems like it could get complicated. Since the only hardwares we have
-that can do this would be fine with having it in their pin descriptor we
-can do it there?
-
-> This is required anyway for HW where there isn't a 1:1 mapping between
-> GPIO ID and pin ID, e.g. 1 pin could be used for two different GPIO
-> signals, e.g. 1 from each of 2 different GPIO HW modules, with different
-> capabilities, or where 1 GPIO could be routed to one of 2 or more pins.
+On Tue, Feb 21, 2012 at 7:33 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Linus Walleij wrote at Tuesday, February 21, 2012 6:35 AM:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This solves the riddle on how the U300 pin controller shall be
+>> able to reference the struct gpio_chip even though these are
+>> two separate drivers: spawn the pinctrl child from the GPIO
+>> driver and pass in the struct gpio_chip as platform data.
+>> In the process we rename the U300 "pinmux-u300" to
+>> "pinctrl-u300" so as not to confuse.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> In other words, make "gpio" an explicit mux function, thus allowing
-> pinctrl_select_state() to directly transition between special function
-> and GPIO usage, rather than having separate pinctrl and GPIO APIs for
-> this. This way would entail dropping my Documentation/gpio.txt patch
-> completely, I think.
+> That's quite a neat solution, but it's not going to work very well with
+> device tree, if U300 is being converted to it.
+
+Right now it looks like it won't happen.
+
+U300 has a hard-coded bootloader I cannot change so cannot pass
+DT from bootloader.
+
+I cannot use attached device tree either, since those can only be
+attached to compressed kernels, and U300 uses uncompressed
+kernels.
+
+If I try to fix either of the above, I have so much problems to
+fix that probeing of the devices is going to be eclipsed by
+those issues :-D
+
+> I'd thought about doing the following for Tegra, where we're cheating a
+> little with the gpio range base value:
 >
-> If we do this though, I think we'd want to extend pinctrl to allow muxing
-> on pins too, so that we don't need to create a pin group for every pin to
-> support per-pin GPIO ownership. This would also help out all the HW that
-> already muxes everything per-pin, since they need to create these single-
-> pin groups right now... I somewhat anticpated this in my naming of the
-> mapping table convenience macros in the most recent pinctrl patch I posted
-> to add pin config mapping table entries.
+> When GPIO driver is probed, call a function in the pinctrl driver to
+> tell it what the "struct gpio_chip *" value is.
+>
+> When pinctrl is probed, if that call has happened, go ahead and register
+> the GPIO range, else don't.
+>
+> In the call from GPIO to pinctrl, if the pinctrl driver has already
+> probed, register the GPIO range, else just save the gpio_chip value for
+> later use in the pinctrl driver's probe.
+>
+> This way, the communication is explicit in code in the drivers, works
+> whichever order the drivers probe, etc.
+>
+> Does that sound like a reasonable solution?
 
-Hm I think Tony also mentioned that he wanted to allow muxing of
-single pins from the mapping sometime so I sort of like the idea.
+Sure anything that works and can be understood... the root of the
+problem is the global GPIO pin space anyway, so we will have to live
+with any solutions to patch around it until that happens.
 
+Maybe some of the above described mechanisms can ge
+generalized though?
+
+Thanks,
 Linus Walleij
