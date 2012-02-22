@@ -1,82 +1,198 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 23 Feb 2012 04:13:26 +0530
-Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
-In-Reply-To: <20120222193526.GC7041@n2100.arm.linux.org.uk>
-References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
- <CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>
- <00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>
- <CABb+yY0j0j7Qw4MCwP_F+DKzmpdmZ3x0QC2Ktj2qmGnL=Ocx0Q@mail.gmail.com>
- <011c01ccf107$5624d020$026e7060$%kim@samsung.com>
- <CABb+yY1aeZ9=2GiHni3bZuRjW66Mxz7K0M753Lc-6UdxaVpBzA@mail.gmail.com>
- <1329906421.24656.93.camel@vkoul-udesk3>
- <4F451D24.1040009@samsung.com>
- <CABb+yY0Zy3Xx4OZTobo2y-J4NXokGCV47PdPyKs+aOnqtng7pQ@mail.gmail.com>
- <20120222193526.GC7041@n2100.arm.linux.org.uk>
-Message-ID: <CABb+yY2rhyRC=srq+4eKc5g_Yne0o3yqX0hV9wxH3NqohbFqHg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Feb 2012 14:44:11 -0800
+Subject: [PATCH 8/8] ARM: OMAP2+: Limit omap_read/write usage to legacy
+ USB drivers
+In-Reply-To: <20120222185728.GJ18185@atomide.com>
+References: <20120221233619.18709.87982.stgit@kaulin.local>
+ <20120221234051.18709.3571.stgit@kaulin.local>
+ <1329898441.2070.10.camel@deskari>
+ <20120222185728.GJ18185@atomide.com>
+Message-ID: <20120222224411.GO18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 1:05 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+* Tony Lindgren <tony@atomide.com> [120222 10:27]:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [120221 23:42]:
+> > On Tue, 2012-02-21 at 15:40 -0800, Tony Lindgren wrote:
+> > > Drivers should no longer use omap_read/write functions
+> > > but instead use ioremap + read/write functions.
+> > > 
+> > > As some USB legacy code is still shared between omap1 and
+> > > omap2420, let's limit the omap_read/write to plat/usb.h.
+> > > 
+> > > Also, let's make drivers/video/omap/lcdc.c depend on
+> > > ARCH_OMAP1 as it is not needed for omap2+.
+> > 
+> > I'm ok with the lcdc.c change, but I also have a patch series that makes
+> > the same change, plus removes the omap2 code from drivers/video/omap/.
+> 
+> OK, I'll drop the lcdc.c change from my series as that should
+> only affect randconfig builds.
 
-Just in case you didn't read the ugly thread fully, let me clarify a few points.
+Here's this one updated. Noticed one more legacy driver
+that needs omap_read/write defined to build on 2420.
 
-> That, to me, means that Samsung hold the copyrights, and Jaswinder Singh
-> was the author of it.  Jaswinder has no copyright on the code.
-Exactly what I've been saying.
+Regards,
 
-
-> Note that Boojin has contributed more lines of code than Javi.
->
-More lines of code, yes. Note 0 contribution to the engine of pl330.
-OTOH seeing the intricate fixes that Javi submitted to the core,
-is impressive. Being the author of code, I sense Javi
-has far better understanding of PL330 and the driver.
-
-
-> What would be fair is to add the first _two_ lines indicating that
-> Samsung maintains the copyright to 2012.
->
-OK, but that may not be scalable considering next year too someone
-could want to update the copyright to 2013 and so on.
-So I suggested simply change 2010 to 2010-2012 in the existing notice.
-
-
-> However, it would *not* be unreasonable to add Boojin Kim to
-> drivers/dma/pl330.c as a separate patch _before_ or _after_ this patch,
-> and I think that would be more warranted than adding Javi Merino as an
-> author based on the above stats.
->
-Based on the LOC stats, maybe. But not on the quality of patches.
-I say let's add Javi and Boojin both.
+Tony
 
 
->> Kukjin thinks merging two files is a serious enough change to
->> warrant co-authorship, which I disagree.
->
-> Get a clue.  Reading the patch.  Kukjin isn't claiming co-authorship.
-> Boojin is.  Different person.
->
-I meant Kukjin is defending co-ownership of Boojin on the basis of this merge.
+Date: Tue, 21 Feb 2012 13:27:33 -0800
+Subject: [PATCH] ARM: OMAP2+: Limit omap_read/write usage to legacy USB drivers
 
+Drivers should no longer use omap_read/write functions
+but instead use ioremap + read/write functions.
 
->> I am equally pissed off by the fact that Kukjin/Boojin sneaked in the
->> co-authorship in this revision while carrying over the Acked-by's from
->> previous revision as if it has already been approved by others.
->
->Go and check the file history, and you'll see it's justified.
->
-Actually I know more than the history of file. I have worked with Boojin.
+As some USB legacy code is still shared between omap1 and
+omap2420, let's limit the omap_read/write to plat/usb.h.
 
-> Rubbish.  It does make sense, because it's saying where the changes
-> came from.  That's done quite often when moving code around.
->
-> You could say that moving code from file A to file B and commenting
-> that it came from file A makes no sense because the code is no longer
-> in file A.  Well, that's definitely the case, but that doesn't mean
-> you don't credit where it came from in the first place.
->
-Btw _every_ file involved in the merger is authored by me, so we are not
-at the risk of wiping out credit log of someone's contribution.
-Anyways, I think I can live with that piece of history stuck to the
-file forever.
+Note that the long term fix is to update the drivers to
+use ioremap and read/write functions. That can now be
+done as a separate patch series that is limited to the
+USB drivers.
+
+Also make sure the legacy omap1-keypad.c driver builds
+if selected for 2420 based systems.
+
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 09ca9e9..f78ec4e 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -242,15 +242,5 @@ struct omap_sdrc_params;
+ extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+ 				      struct omap_sdrc_params *sdrc_cs1);
+ 
+-/*
+- * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+- */
+-extern u8 omap_readb(u32 pa);
+-extern u16 omap_readw(u32 pa);
+-extern u32 omap_readl(u32 pa);
+-extern void omap_writeb(u8 v, u32 pa);
+-extern void omap_writew(u16 v, u32 pa);
+-extern void omap_writel(u32 v, u32 pa);
+-
+ #endif /* __ASSEMBLER__ */
+ #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 0119807..3203128 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -487,43 +487,3 @@ void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+ 		_omap2_init_reprogram_sdrc();
+ 	}
+ }
+-
+-/*
+- * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+- */
+-
+-u8 omap_readb(u32 pa)
+-{
+-	return __raw_readb(OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_readb);
+-
+-u16 omap_readw(u32 pa)
+-{
+-	return __raw_readw(OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_readw);
+-
+-u32 omap_readl(u32 pa)
+-{
+-	return __raw_readl(OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_readl);
+-
+-void omap_writeb(u8 v, u32 pa)
+-{
+-	__raw_writeb(v, OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_writeb);
+-
+-void omap_writew(u16 v, u32 pa)
+-{
+-	__raw_writew(v, OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_writew);
+-
+-void omap_writel(u32 v, u32 pa)
+-{
+-	__raw_writel(v, OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_writel);
+diff --git a/arch/arm/plat-omap/include/plat/keypad.h b/arch/arm/plat-omap/include/plat/keypad.h
+index 793ce9d..4b35555 100644
+--- a/arch/arm/plat-omap/include/plat/keypad.h
++++ b/arch/arm/plat-omap/include/plat/keypad.h
+@@ -12,6 +12,8 @@
+ 
+ #ifndef CONFIG_ARCH_OMAP1
+ #warning Please update the board to use matrix-keypad driver
++#define omap_readw(reg)		0
++#define omap_writew(val, reg)	do {} while(0)
+ #endif
+ #include <linux/input/matrix_keypad.h>
+ 
+diff --git a/arch/arm/plat-omap/include/plat/usb.h b/arch/arm/plat-omap/include/plat/usb.h
+index dc864b5..5f6ced4 100644
+--- a/arch/arm/plat-omap/include/plat/usb.h
++++ b/arch/arm/plat-omap/include/plat/usb.h
+@@ -3,6 +3,7 @@
+ #ifndef	__ASM_ARCH_OMAP_USB_H
+ #define	__ASM_ARCH_OMAP_USB_H
+ 
++#include <linux/io.h>
+ #include <linux/usb/musb.h>
+ #include <plat/board.h>
+ 
+@@ -105,6 +106,45 @@ extern int omap4430_phy_set_clk(struct device *dev, int on);
+ extern int omap4430_phy_init(struct device *dev);
+ extern int omap4430_phy_exit(struct device *dev);
+ extern int omap4430_phy_suspend(struct device *dev, int suspend);
++
++/*
++ * NOTE: Please update omap USB drivers to use ioremap + read/write
++ */
++
++#define OMAP2_L4_IO_OFFSET		0xb2000000
++#define OMAP2_L4_IO_ADDRESS(pa)		IOMEM((pa) + OMAP2_L4_IO_OFFSET)
++
++static inline u8 omap_readb(u32 pa)
++{
++	return __raw_readb(OMAP2_L4_IO_ADDRESS(pa));
++}
++
++static inline u16 omap_readw(u32 pa)
++{
++	return __raw_readw(OMAP2_L4_IO_ADDRESS(pa));
++}
++
++static inline u32 omap_readl(u32 pa)
++{
++	return __raw_readl(OMAP2_L4_IO_ADDRESS(pa));
++}
++
++static inline void omap_writeb(u8 v, u32 pa)
++{
++	__raw_writeb(v, OMAP2_L4_IO_ADDRESS(pa));
++}
++
++
++static inline void omap_writew(u16 v, u32 pa)
++{
++	__raw_writew(v, OMAP2_L4_IO_ADDRESS(pa));
++}
++
++static inline void omap_writel(u32 v, u32 pa)
++{
++	__raw_writel(v, OMAP2_L4_IO_ADDRESS(pa));
++}
++
+ #endif
+ 
+ extern void am35x_musb_reset(void);
