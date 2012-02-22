@@ -1,129 +1,54 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 22 Feb 2012 19:14:54 +0200
-Subject: [GIT PULL] adding rpmsg and remoteproc to 3.4
-Message-ID: <CAK=WgbZ2vfyiR0kXa4+-3y9etxQLBfD8b7QRR+r8VCpbOuBruA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 22 Feb 2012 18:07:24 +0100
+Subject: [PATCH v2 12/19] ARM: at91/rtc-at91sam9: each SoC can select
+ the RTT device to use
+In-Reply-To: <201202221647.23430.arnd@arndb.de>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <201202221450.04390.arnd@arndb.de>
+ <20120222162442.GD9407@game.jcrosoft.org>
+ <201202221647.23430.arnd@arndb.de>
+Message-ID: <20120222170724.GF9407@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 16:47 Wed 22 Feb     , Arnd Bergmann wrote:
+> On Wednesday 22 February 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 14:50 Wed 22 Feb     , Arnd Bergmann wrote:
+> > > On Wednesday 22 February 2012, Nicolas Ferre wrote:
+> > > > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > > 
+> > > > For the RTT as RTC driver rtc-at91sam9, the platform_device structure
+> > > > is filled during SoC initialization. This will allow to convert this
+> > > > RTC driver as a standard platform driver.
+> > > 
+> > > Can you make this more elaborate? I don't see from this or the code why
+> > > you don't just always register the RTT as "rtc-at91sam9". There seems to
+> > > be no driver for the "at91_rtt" in tree, so I don't know if there is
+> > > an out of tree driver binding to it.
+> > > 
+> > > Would it be possible to remove the compile time #if and the resetting
+> > > of the device name if both drivers bind to the rtc name and the other
+> > > rtt driver binds to both names?
+> > because I see a quite some people use the rtt for something else
+> > 
+> > so I don't want to change on existing kernel
+> 
+> But if you change the rtc driver to always bind to the existing
+> "at91_rtt" platform_device and fail the probe() function for the
+> case that you are on at91sam9263 probing the non-RTC device,
+> you should get the exact same result without any extra code
+> in the per-soc files.
+agreed but as on at91sam9263 you have 2 RTTs so you can have 2 drivers at the
+same time that use the RTT. So we can not do this except if we set the second
+RTT to an other device name.
+> 
+> I guess it also makes sense to specify a device tree property
+> that lets you detect whether the RTT is used as RTC or something
+> else.
+>
+agreed for DT I think of something like this with a phandle maybe
 
-Please pull:
+but today not all the soc are DT and will not be switch to DT at first
 
-git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git rpmsg-for-3.4
-
-To get the very basic rpmsg+remoteproc core functionality for 3.4.
-
-This is basically the same stuff I sent for 3.3, with an additional
-fix and cleanup which were reported by Grant (and of course the two
-patches that fixed the 3.3 merge conflicts).
-
-This entire patch set has been sitting in linux-next for quite some
-time. I'm not sure if it'd conflict with your tree when you pull it,
-but I can of course ask Stephen to remove my tree if things look ok to
-you.
-
-Please tell me if there are any problems,
-
-Thanks a lot!
-Ohad.
-
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-
-  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-rpmsg-for-3.4
-
-for you to fetch changes up to e12bc14b88d44e5c1456dccb59ff58103f6c6edc:
-
-  remoteproc: s/big switch/lookup table/ (2012-02-22 18:28:49 +0200)
-
-----------------------------------------------------------------
-Adding the rpmsg and remoteproc frameworks, together with
-several bug fixes and clean ups that were collected along the way.
-
-Only very basic functionality is merged at this point (boot a remote
-processor, possibly after configuring its iommu, and then be able to talk
-with it).
-
-And there's a small rpmsg driver sample that shows how easy it is
-now to talk with a service running on a remote processor.
-
-At this point only OMAP4 is supported (but note that we're not populating
-OMAP's platform device yet, since it depends on CMA), but support for other
-platforms is coming soon too.
-
-----------------------------------------------------------------
-Axel Lin (1):
-      rpmsg: rename virtqueue_add_buf_gfp to virtqueue_add_buf
-
-Mark Grosen (2):
-      remoteproc: do not require an iommu
-      remoteproc: avoid registering a virtio device if not supported
-
-Ohad Ben-Cohen (16):
-      remoteproc: add framework for controlling remote processors
-      remoteproc: add debugfs entries
-      remoteproc: create rpmsg virtio device
-      remoteproc/omap: add a remoteproc driver for OMAP4
-      rpmsg: add virtio-based remote processor messaging bus
-      samples/rpmsg: add an rpmsg driver sample
-      remoteproc: remove unused resource type
-      remoteproc/omap: utilize module_platform_driver
-      remoteproc: look for truncated firmware images
-      remoteproc: add Kconfig menu
-      rpmsg: add Kconfig menu
-      remoteproc: depend on EXPERIMENTAL
-      rpmsg: depend on EXPERIMENTAL
-      remoteproc: don't use virtio's weak barriers
-      remoteproc: bail out if firmware has different endianess
-      remoteproc: s/big switch/lookup table/
-
- Documentation/ABI/testing/sysfs-bus-rpmsg    |   75 ++
- Documentation/remoteproc.txt                 |  324 ++++++
- Documentation/rpmsg.txt                      |  293 ++++++
- MAINTAINERS                                  |    7 +
- arch/arm/plat-omap/include/plat/remoteproc.h |   57 +
- drivers/Kconfig                              |    4 +
- drivers/Makefile                             |    2 +
- drivers/remoteproc/Kconfig                   |   29 +
- drivers/remoteproc/Makefile                  |    9 +
- drivers/remoteproc/omap_remoteproc.c         |  238 +++++
- drivers/remoteproc/omap_remoteproc.h         |   69 ++
- drivers/remoteproc/remoteproc_core.c         | 1450 ++++++++++++++++++++++++++
- drivers/remoteproc/remoteproc_debugfs.c      |  179 ++++
- drivers/remoteproc/remoteproc_internal.h     |   44 +
- drivers/remoteproc/remoteproc_rpmsg.c        |  299 ++++++
- drivers/rpmsg/Kconfig                        |   10 +
- drivers/rpmsg/Makefile                       |    1 +
- drivers/rpmsg/virtio_rpmsg_bus.c             | 1026 ++++++++++++++++++
- include/linux/mod_devicetable.h              |    9 +
- include/linux/remoteproc.h                   |  271 +++++
- include/linux/rpmsg.h                        |  326 ++++++
- include/linux/virtio_ids.h                   |    1 +
- samples/Kconfig                              |    8 +
- samples/Makefile                             |    2 +-
- samples/rpmsg/Makefile                       |    1 +
- samples/rpmsg/rpmsg_client_sample.c          |  100 ++
- 26 files changed, 4833 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-rpmsg
- create mode 100644 Documentation/remoteproc.txt
- create mode 100644 Documentation/rpmsg.txt
- create mode 100644 arch/arm/plat-omap/include/plat/remoteproc.h
- create mode 100644 drivers/remoteproc/Kconfig
- create mode 100644 drivers/remoteproc/Makefile
- create mode 100644 drivers/remoteproc/omap_remoteproc.c
- create mode 100644 drivers/remoteproc/omap_remoteproc.h
- create mode 100644 drivers/remoteproc/remoteproc_core.c
- create mode 100644 drivers/remoteproc/remoteproc_debugfs.c
- create mode 100644 drivers/remoteproc/remoteproc_internal.h
- create mode 100644 drivers/remoteproc/remoteproc_rpmsg.c
- create mode 100644 drivers/rpmsg/Kconfig
- create mode 100644 drivers/rpmsg/Makefile
- create mode 100644 drivers/rpmsg/virtio_rpmsg_bus.c
- create mode 100644 include/linux/remoteproc.h
- create mode 100644 include/linux/rpmsg.h
- create mode 100644 samples/rpmsg/Makefile
- create mode 100644 samples/rpmsg/rpmsg_client_sample.c
+Best Regards,
+J.
