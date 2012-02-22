@@ -1,34 +1,24 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 22 Feb 2012 15:57:01 +0530
-Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
-In-Reply-To: <CABb+yY1aeZ9=2GiHni3bZuRjW66Mxz7K0M753Lc-6UdxaVpBzA@mail.gmail.com>
-References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
- <CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>
- <00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>
- <CABb+yY0j0j7Qw4MCwP_F+DKzmpdmZ3x0QC2Ktj2qmGnL=Ocx0Q@mail.gmail.com>
- <011c01ccf107$5624d020$026e7060$%kim@samsung.com>
- <CABb+yY1aeZ9=2GiHni3bZuRjW66Mxz7K0M753Lc-6UdxaVpBzA@mail.gmail.com>
-Message-ID: <1329906421.24656.93.camel@vkoul-udesk3>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 22 Feb 2012 11:31:04 +0100
+Subject: [PATCH v2] arm/spear600: fix one-shot timer
+In-Reply-To: <1329905892-10085-1-git-send-email-gilles.chanteperdrix@xenomai.org>
+References: <4F446F4B.3030008@st.com>
+ <1329905892-10085-1-git-send-email-gilles.chanteperdrix@xenomai.org>
+Message-ID: <201202221131.04577.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-22 at 08:01 +0530, Jassi Brar wrote:
-> On Wed, Feb 22, 2012 at 7:41 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-Sadly, what a mess!!!
+On Wednesday 22 February 2012 11:18:12 Gilles Chanteperdrix wrote:
+> Currently, the "clockevent_next_event" function only works correctly
+> if the timer is not running when this function is called, which is
+> not always the case when running with CONFIG_HIGH_RES_TIMERS.
+> 
+> Fix this by stopping the timer at the beginning of this function.
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@st.com>
+> Signed-off-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
 
-Jassi, you don't own the copyright, your company did, as they employed
-you to do the job. So both your and Kukjin are not correct in claiming
-the copyright!!
+Acked-by: Stefan Roese <sr@denx.de>
 
-Jassi, your claim on being author is certainly right and you name should
-be there as MODULE_AUTHOR.
-Also, If you had a Authors line added and that was removed, then I would
-have agreed with you.
-
-And Kukjin, It wont hurt by giving credit to your former colleagues, by
-doing something like:
-http://permalink.gmane.org/gmane.linux.alsa.devel/94905
-
-
--- 
-~Vinod
+Thanks,
+Stefan
