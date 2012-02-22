@@ -1,26 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Feb 2012 13:18:16 +0000
-Subject: [PATCH v2 07/19] ARM: at91/pm_slowclock: function slow_clock()
- accepts parameters
-In-Reply-To: <20120222125814.GA9407@game.jcrosoft.org>
-References: <0d78171672a30e8ec8084f54a557e9948260356d.1329903206.git.nicolas.ferre@atmel.com>
- <5b8fbdf669825987a82b3b89b2e7f02239cad816.1329903206.git.nicolas.ferre@atmel.com>
- <20120222095250.GV22562@n2100.arm.linux.org.uk>
- <20120222125814.GA9407@game.jcrosoft.org>
-Message-ID: <20120222131816.GB22562@n2100.arm.linux.org.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 22 Feb 2012 18:51:32 +0530
+Subject: [PATCH 0/4] dmaengine: i.MX DMA series.
+In-Reply-To: <CACKLOr1Gn_NR8HPhmyK6DW9W+7CGG8y7yoZm6PE3bH2zt6Ej-g@mail.gmail.com>
+References: <1328884300-18801-1-git-send-email-javier.martin@vista-silicon.com>
+ <CACKLOr1Gn_NR8HPhmyK6DW9W+7CGG8y7yoZm6PE3bH2zt6Ej-g@mail.gmail.com>
+Message-ID: <1329916892.24656.110.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 01:58:14PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Btw I'm looking on a way to switch the assembly funciton to C but I didn,t find a
-> good way to calculate the function size except by touching at the linker
-> script. Which I don;t want to do.
+On Tue, 2012-02-14 at 12:51 +0100, javier Martin wrote:
+> On 10 February 2012 15:31, Javier Martin
+> <javier.martin@vista-silicon.com> wrote:
+> > Patches 1-3 have already been sent to the list (not merged yet)
+> > but they are submitted so that everyone can get the whole picture
+> > of what we're trying to do here.
+> >
+> > A new patch(4) has been added which adds support for multiple
+> > descriptors.
+> >
+> > [PATCH 1/4] dmaengine: Add support for MEMCPY for imx-dma.
+> > [PATCH 2/4] i.MX DMA: Add support for 2D transfers.
+> > [PATCH 3/4] dmaengine: i.MX: Add support for interleaved transfers.
+> > [PATCH 4/4] dmaengine: Add support for multiple descriptors for imx-dma.
+> 
+> Hi,
+> what do you think of this series?
+> 
+> Vinod: your concern about patch 1 is solved in patch 4
+> Sascha: I know you are not comfortable with patch 2 since it adds code
+> to a file which is meant to be removed. However, is there a chance you
+> accept it without me having to rewrite the whole series?
+Without 2, I think this patch set looks okay. Sascha have you tested
+this series, if so please let me know, I can apply the rest.
 
-Forget doing it in C.  C is too complicated, because either you have to
-keep its relocations and fix them up, or you have to compile and link it
-to run at a specific location and then copy it to that location.  You
-also have literal pools to think about.
 
-Assembly is much better controlled and you can write it so that you don't
-end up with any of that stuff.  You have absolute control over the code
-and associated data.
+-- 
+~Vinod
