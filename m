@@ -1,353 +1,333 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 22 Feb 2012 16:17:14 +0100
-Subject: [PATCH v3 03/10] of: Add PWM support.
+Date: Wed, 22 Feb 2012 16:17:17 +0100
+Subject: [PATCH v3 06/10] pwm: Add NVIDIA Tegra SoC support
 In-Reply-To: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1329923841-32017-4-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1329923841-32017-7-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds helpers to support device tree bindings for the generic
-PWM API. Device tree binding documentation for PWM controllers is also
-provided.
+This commit adds a generic PWM framework driver for the PWFM controller
+found on NVIDIA Tegra SoCs. The driver is based on code from the
+Chromium kernel tree and was originally written by Gary King (NVIDIA)
+and later modified by Simon Que (Chromium).
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
 Changes in v3:
-  - none
+  - use pwm_device.hwpwm instead of recomputing it
+  - update pwm_ops for changes in patch 2
 
 Changes in v2:
-  - add device tree binding documentation
-  - add of_xlate to parse controller-specific PWM-specifier
+  - set pwm_chip.dev field
+  - rename clk_enb to enable
+  - introduce NUM_PWM macro instead of hard-coding the number of PWM
+    devices
+  - update comment in tegra_pwm_config
+  - fix coding-style for multi-line comments
+  - use module_platform_driver
+  - change license to GPL
 
- Documentation/devicetree/bindings/pwm/pwm.txt |   48 +++++++++
- drivers/of/Kconfig                            |    6 +
- drivers/of/Makefile                           |    1 +
- drivers/of/pwm.c                              |  130 +++++++++++++++++++++++++
- include/linux/of_pwm.h                        |   51 ++++++++++
- include/linux/pwm.h                           |   17 +++
- 6 files changed, 253 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm.txt
- create mode 100644 drivers/of/pwm.c
- create mode 100644 include/linux/of_pwm.h
+ drivers/pwm/Kconfig     |   10 ++
+ drivers/pwm/Makefile    |    1 +
+ drivers/pwm/pwm-tegra.c |  263 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 274 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/pwm/pwm-tegra.c
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
-new file mode 100644
-index 0000000..9421fe7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm.txt
-@@ -0,0 +1,48 @@
-+Specifying PWM information for devices
-+======================================
-+
-+1) PWM user nodes
-+-----------------
-+
-+PWM users should specify a list of PWM devices that they want to use
-+with a property containing a 'pwm-list':
-+
-+	pwm-list ::= <single-pwm> [pwm-list]
-+	single-pwm ::= <pwm-phandle> <pwm-specifier>
-+	pwm-phandle : phandle to PWM controller node
-+	pwm-specifier : array of #pwm-cells specifying the given PWM
-+			(controller specific)
-+
-+PWM properties should be named "[<name>-]pwms". Exact meaning of each
-+pwms property must be documented in the device tree binding for each
-+device.
-+
-+The following example could be used to describe a PWM-based backlight
-+device:
-+
-+	pwm: pwm {
-+		#pwm-cells = <2>;
-+	};
-+
-+	[...]
-+
-+	bl: backlight {
-+		pwms = <&pwm 0 5000000>;
-+	};
-+
-+pwm-specifier typically encodes the chip-relative PWM number and the PWM
-+period in nanoseconds.
-+
-+2) PWM controller nodes
-+-----------------------
-+
-+PWM controller nodes must specify the number of cells used for the
-+specifier using the '#pwm-cells' property.
-+
-+An example PWM controller might look like this:
-+
-+	pwm: pwm at 7000a000 {
-+		compatible = "nvidia,tegra20-pwm";
-+		reg = <0x7000a000 0x100>;
-+		#pwm-cells = <2>;
-+	};
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index 6ea51dc..d47b8ee 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -57,6 +57,12 @@ config OF_GPIO
- 	help
- 	  OpenFirmware GPIO accessors
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 93c1052..bda6f23 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -9,4 +9,14 @@ menuconfig PWM
  
-+config OF_PWM
-+	def_bool y
-+	depends on PWM
+ if PWM
+ 
++config PWM_TEGRA
++	tristate "NVIDIA Tegra PWM support"
++	depends on ARCH_TEGRA
 +	help
-+	  OpenFirmware PWM accessors
++	  Generic PWM framework driver for the PWFM controller found on NVIDIA
++	  Tegra SoCs.
 +
- config OF_I2C
- 	def_tristate I2C
- 	depends on I2C && !SPARC
-diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-index a73f5a5..3dd13e3 100644
---- a/drivers/of/Makefile
-+++ b/drivers/of/Makefile
-@@ -5,6 +5,7 @@ obj-$(CONFIG_OF_ADDRESS)  += address.o
- obj-$(CONFIG_OF_IRQ)    += irq.o
- obj-$(CONFIG_OF_DEVICE) += device.o platform.o
- obj-$(CONFIG_OF_GPIO)   += gpio.o
-+obj-$(CONFIG_OF_PWM)	+= pwm.o
- obj-$(CONFIG_OF_I2C)	+= of_i2c.o
- obj-$(CONFIG_OF_NET)	+= of_net.o
- obj-$(CONFIG_OF_SPI)	+= of_spi.o
-diff --git a/drivers/of/pwm.c b/drivers/of/pwm.c
++	  To compile this driver as a module, choose M here: the module
++	  will be called pwm-tegra.
++
+ endif
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index 3469c3d..12300f5 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_PWM)		+= core.o
++obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
 new file mode 100644
-index 0000000..d6f7f33
+index 0000000..1c95e08
 --- /dev/null
-+++ b/drivers/of/pwm.c
-@@ -0,0 +1,130 @@
++++ b/drivers/pwm/pwm-tegra.c
+@@ -0,0 +1,263 @@
 +/*
-+ * OF helpers for the PWM API
++ * drivers/pwm/pwm-tegra.c
 + *
-+ * Copyright (c) 2011 Avionic Design GmbH
++ * Tegra pulse-width-modulation controller driver
++ *
++ * Copyright (c) 2010, NVIDIA Corporation.
++ * Based on arch/arm/plat-mxc/pwm.c by Sascha Hauer <s.hauer@pengutronix.de>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/device.h>
-+#include <linux/kernel.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/pwm.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
 +
-+static int of_pwmchip_is_match(struct pwm_chip *chip, void *data)
-+{
-+	return chip->dev ? chip->dev->of_node == data : 0;
-+}
++#define PWM_ENABLE	(1 << 31)
++#define PWM_DUTY_WIDTH	8
++#define PWM_DUTY_SHIFT	16
++#define PWM_SCALE_WIDTH	13
++#define PWM_SCALE_SHIFT	0
 +
-+/**
-+ * of_node_to_pwmchip() - finds the PWM chip associated with a device node
-+ * @np: device node of the PWM chip
-+ *
-+ * Returns a pointer to the PWM chip associated with the specified device
-+ * node or NULL if the device node doesn't represent a PWM chip.
-+ */
-+struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-+{
-+	return pwmchip_find(np, of_pwmchip_is_match);
-+}
++#define NUM_PWM 4
 +
-+int of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args,
-+			struct pwm_spec *spec)
-+{
-+	if (pc->of_pwm_n_cells < 2)
-+		return -EINVAL;
++struct tegra_pwm_chip {
++	struct pwm_chip		chip;
++	struct device		*dev;
 +
-+	if (args->args_count < pc->of_pwm_n_cells)
-+		return -EINVAL;
++	struct clk		*clk;
 +
-+	if (args->args[0] >= pc->npwm)
-+		return -EINVAL;
-+
-+	if (spec)
-+		spec->period = args->args[1];
-+
-+	return args->args[0];
-+}
-+
-+void of_pwmchip_add(struct pwm_chip *chip)
-+{
-+	if (!chip->dev || !chip->dev->of_node)
-+		return;
-+
-+	if (!chip->of_xlate) {
-+		chip->of_xlate = of_pwm_simple_xlate;
-+		chip->of_pwm_n_cells = 2;
-+	}
-+
-+	of_node_get(chip->dev->of_node);
-+}
-+
-+void of_pwmchip_remove(struct pwm_chip *chip)
-+{
-+	if (chip->dev && chip->dev->of_node)
-+		of_node_put(chip->dev->of_node);
-+}
-+
-+/**
-+ * of_get_named_pwm() - get a PWM number and period to use with the PWM API
-+ * @np: device node to get the PWM from
-+ * @propname: property name containing PWM specifier(s)
-+ * @index: index of the PWM
-+ * @spec: a pointer to a struct pwm_spec to fill in
-+ *
-+ * Returns PWM number to use with the Linux generic PWM API or a negative
-+ * error code on failure. If @spec is not NULL the function fills in the
-+ * values parsed from the device tree.
-+ */
-+int of_get_named_pwm(struct device_node *np, const char *propname,
-+		     int index, struct pwm_spec *spec)
-+{
-+	struct of_phandle_args args;
-+	struct pwm_chip *pc;
-+	int ret;
-+
-+	ret = of_parse_phandle_with_args(np, propname, "#pwm-cells", index,
-+					  &args);
-+	if (ret) {
-+		pr_debug("%s(): can't parse pwms property\n", __func__);
-+		goto out;
-+	}
-+
-+	pc = of_node_to_pwmchip(args.np);
-+	if (!pc) {
-+		ret = -ENODEV;
-+		goto put;
-+	}
-+
-+	if (args.args_count != pc->of_pwm_n_cells) {
-+		pr_debug("%s: wrong #pwm-cells for %s\n", np->full_name,
-+			 args.np->full_name);
-+		ret = -EINVAL;
-+		goto put;
-+	}
-+
-+	/*
-+	 * reset the specifier structure since .of_xlate might decide not to
-+	 * fill it in
-+	 */
-+	if (spec)
-+		spec->period = 0;
-+
-+	ret = pc->of_xlate(pc, &args, spec);
-+	if (ret < 0)
-+		goto put;
-+
-+	ret += pc->base;
-+
-+put:
-+	of_node_put(args.np);
-+out:
-+	pr_debug("%s() exited with status %d\n", __func__, ret);
-+	return ret;
-+}
-+EXPORT_SYMBOL(of_get_named_pwm);
-diff --git a/include/linux/of_pwm.h b/include/linux/of_pwm.h
-new file mode 100644
-index 0000000..a6af951
---- /dev/null
-+++ b/include/linux/of_pwm.h
-@@ -0,0 +1,51 @@
-+/*
-+ * OF helpers for the PWM API
-+ *
-+ * Copyright (c) 2011 Avionic Design GmbH
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __LINUX_OF_PWM_H
-+#define __LINUX_OF_PWM_H
-+
-+#include <linux/pwm.h>
-+
-+struct device_node;
-+
-+#ifdef CONFIG_OF_PWM
-+
-+struct pwm_chip *of_node_to_pwmchip(struct device_node *np);
-+int of_get_named_pwm(struct device_node *np, const char *propname,
-+		     int index, struct pwm_spec *spec);
-+void of_pwmchip_add(struct pwm_chip *pc);
-+void of_pwmchip_remove(struct pwm_chip *pc);
-+
-+#else
-+
-+static inline struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-+{
-+	return NULL;
-+}
-+
-+static inline int of_get_named_pwm(struct device_node *np,
-+				   const char *propname, int index,
-+				   unsigned int *period_ns)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline void of_pwmchip_add(struct pwm_chip *pc)
-+{
-+}
-+
-+static inline void of_pwmchip_remove(struct pwm_chip *pc)
-+{
-+}
-+
-+#endif /* CONFIG_OF_PWM */
-+
-+#endif /* __LINUX_OF_PWM_H */
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index b00a91f..a7cb543 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -1,6 +1,8 @@
- #ifndef __LINUX_PWM_H
- #define __LINUX_PWM_H
- 
-+#include <linux/of.h>
-+
- struct pwm_device;
- 
- /*
-@@ -75,6 +77,14 @@ struct pwm_ops {
- };
- 
- /**
-+ * struct pwm_spec - device tree PWM specifier
-+ * @period: PWM period (in nanoseconds)
-+ */
-+struct pwm_spec {
-+	unsigned int period;
++	int			enable[NUM_PWM];
++	void __iomem		*mmio_base;
 +};
 +
-+/**
-  * struct pwm_chip - abstract a PWM controller
-  * @dev: device providing the PWMs
-  * @ops: callbacks for this PWM controller
-@@ -89,6 +99,13 @@ struct pwm_chip {
- 	unsigned int		npwm;
- 
- 	struct pwm_device	*pwms;
++static inline struct tegra_pwm_chip *to_tegra_pwm_chip(struct pwm_chip *chip)
++{
++	return container_of(chip, struct tegra_pwm_chip, chip);
++}
 +
-+#ifdef CONFIG_OF_PWM
-+	int			(*of_xlate)(struct pwm_chip *pc,
-+					    const struct of_phandle_args *args,
-+					    struct pwm_spec *spec);
-+	unsigned int		of_pwm_n_cells;
++static inline int pwm_writel(struct tegra_pwm_chip *chip, unsigned int num,
++		unsigned long val)
++{
++	unsigned long offset = num << 4;
++	int rc;
++
++	rc = clk_enable(chip->clk);
++	if (WARN_ON(rc))
++		return rc;
++
++	writel(val, chip->mmio_base + offset);
++	clk_disable(chip->clk);
++
++	return 0;
++}
++
++static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++		int duty_ns, int period_ns)
++{
++	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
++	unsigned long long c;
++	unsigned long rate, hz;
++	u32 val = 0;
++
++	/*
++	 * Convert from duty_ns / period_ns to a fixed number of duty
++	 * ticks per (1 << PWM_DUTY_WIDTH) cycles.
++	 */
++	c = duty_ns * ((1 << PWM_DUTY_WIDTH) - 1);
++	do_div(c, period_ns);
++
++	val = (u32)c << PWM_DUTY_SHIFT;
++
++	/*
++	 * Compute the prescaler value for which (1 << PWM_DUTY_WIDTH)
++	 * cycles@the PWM clock rate will take period_ns nanoseconds.
++	 */
++	rate = clk_get_rate(pc->clk) >> PWM_DUTY_WIDTH;
++	hz = 1000000000ul / period_ns;
++
++	rate = (rate + (hz / 2)) / hz;
++
++	/*
++	 * Since the actual PWM divider is the register's frequency divider
++	 * field minus 1, we need to decrement to get the correct value to
++	 * write to the register.
++	 */
++	if (rate > 0)
++		rate--;
++
++	/*
++	 * Make sure that the rate will fit in the register's frequency
++	 * divider field.
++	 */
++	if (rate >> PWM_SCALE_WIDTH)
++		return -EINVAL;
++
++	val |= (rate << PWM_SCALE_SHIFT);
++
++	/* If the PWM channel is enabled, keep it enabled */
++	if (pc->enable[pwm->hwpwm])
++		val |= PWM_ENABLE;
++
++	return pwm_writel(pc, pwm->hwpwm, val);
++}
++
++static int tegra_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
++	int rc = 0;
++
++	if (!pc->enable[pwm->hwpwm]) {
++		rc = clk_enable(pc->clk);
++		if (!rc) {
++			unsigned long offset = pwm->hwpwm << 4;
++			u32 val;
++
++			val = readl(pc->mmio_base + offset);
++			val |= PWM_ENABLE;
++			writel(val, pc->mmio_base + offset);
++
++			pc->enable[pwm->hwpwm] = 1;
++		}
++	}
++
++	return 0;
++}
++
++static void tegra_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct tegra_pwm_chip *pc = to_tegra_pwm_chip(chip);
++
++	if (pc->enable[pwm->hwpwm]) {
++		unsigned long offset = pwm->hwpwm << 4;
++		u32 val;
++
++		val = readl(pc->mmio_base + offset);
++		val &= ~PWM_ENABLE;
++		writel(val, pc->mmio_base + offset);
++
++		clk_disable(pc->clk);
++		pc->enable[pwm->hwpwm] = 0;
++	}
++}
++
++static struct pwm_ops tegra_pwm_ops = {
++	.config = tegra_pwm_config,
++	.enable = tegra_pwm_enable,
++	.disable = tegra_pwm_disable,
++	.owner = THIS_MODULE,
++};
++
++static int tegra_pwm_probe(struct platform_device *pdev)
++{
++	struct tegra_pwm_chip *pwm;
++	struct resource *r;
++	int ret;
++
++	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
++	if (!pwm) {
++		dev_err(&pdev->dev, "failed to allocate memory\n");
++		return -ENOMEM;
++	}
++
++	pwm->dev = &pdev->dev;
++
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!r) {
++		dev_err(&pdev->dev, "no memory resources defined\n");
++		return -ENODEV;
++	}
++
++	r = devm_request_mem_region(&pdev->dev, r->start, resource_size(r),
++			pdev->name);
++	if (!r) {
++		dev_err(&pdev->dev, "failed to request memory\n");
++		return -EBUSY;
++	}
++
++	pwm->mmio_base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
++	if (!pwm->mmio_base) {
++		dev_err(&pdev->dev, "failed to ioremap() region\n");
++		return -ENODEV;
++	}
++
++	platform_set_drvdata(pdev, pwm);
++
++	pwm->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(pwm->clk))
++		return PTR_ERR(pwm->clk);
++
++	pwm->chip.dev = &pdev->dev;
++	pwm->chip.ops = &tegra_pwm_ops;
++	pwm->chip.base = -1;
++	pwm->chip.npwm = NUM_PWM;
++
++	ret = pwmchip_add(&pwm->chip);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
++		clk_put(pwm->clk);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int __devexit tegra_pwm_remove(struct platform_device *pdev)
++{
++	struct tegra_pwm_chip *pwm = platform_get_drvdata(pdev);
++	int i;
++
++	if (WARN_ON(!pwm))
++		return -ENODEV;
++
++	pwmchip_remove(&pwm->chip);
++
++	for (i = 0; i < NUM_PWM; i++) {
++		pwm_writel(pwm, i, 0);
++
++		if (pwm->enable[i])
++			clk_disable(pwm->clk);
++	}
++
++	clk_put(pwm->clk);
++
++	return 0;
++}
++
++#ifdef CONFIG_OF
++static struct of_device_id tegra_pwm_of_match[] = {
++	{ .compatible = "nvidia,tegra20-pwm" },
++	{ }
++};
 +#endif
- };
- 
- int pwm_set_chip_data(struct pwm_device *pwm, void *data);
++
++static struct platform_driver tegra_pwm_driver = {
++	.driver		= {
++		.name		= "tegra-pwm",
++		.of_match_table	= of_match_ptr(tegra_pwm_of_match),
++	},
++	.probe		= tegra_pwm_probe,
++	.remove		= __devexit_p(tegra_pwm_remove),
++};
++
++module_platform_driver(tegra_pwm_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("NVIDIA Corporation");
 -- 
 1.7.9.1
