@@ -1,27 +1,40 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 21 Feb 2012 16:00:52 -0800
-Subject: [PATCHv10 3/4] omap3: add common twl configurations for vdd1 and
- vdd2
-In-Reply-To: <1329733568-26676-4-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Mon, 20 Feb 2012 12:26:07 +0200")
-References: <1329733568-26676-1-git-send-email-t-kristo@ti.com>
- <1329733568-26676-4-git-send-email-t-kristo@ti.com>
-Message-ID: <871upn4tzf.fsf@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 22 Feb 2012 09:16:30 +0900
+Subject: Subject: [PATCH] MAINTAINERS: add maintainer entry for SAMSUNG EXYNOS
+ DeviceTree
+Message-ID: <00f301ccf0f7$39f222a0$add667e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+Add Samsung EXYNOS DT maintainer
 
-> VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
-> to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
-> are needed by DVFS.
->
-> Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manuals:
-> - SWCS019L : TWL4030 ES3.1 Data Manual rev L
-> - SWCS030E : TWL5030 ES1.2 Data Manual rev E
->
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ MAINTAINERS |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-Do you have a similar patch for OMAP4 support?
-
-Kevin
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9a648eb..5ac5aaf 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1065,6 +1065,16 @@ S:	Maintained
+ F:	arch/arm/mach-s5p*/
+ F:	arch/arm/mach-exynos*/
+ 
++ARM/SAMSUNG EXYNOS DEVICE TREE
++M:	Thomas Abraham <thomas.abraham@linaro.org>
++M:	Kukjin Kim <kgene.kim@samsung.com>
++L:	devicetree-discuss at lists.ozlabs.org (moderated for non-subscribers)
++L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/boot/dts/exynos*
++F:	arch/arm/mach-exynos/*dt.c
++F:	Documentation/devicetree/*/*/*samsung*
++
+ ARM/SAMSUNG MOBILE MACHINE SUPPORT
+ M:	Kyungmin Park <kyungmin.park@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.7.1
