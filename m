@@ -1,118 +1,49 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 22 Feb 2012 19:02:40 +0530
-Subject: [PATCHv2 5/6] jump label: detect %c support for ARM
-In-Reply-To: <20120220172158.GI26840@n2100.arm.linux.org.uk>
-References: <1327757725-10114-1-git-send-email-rabin@rab.in>
- <1327757725-10114-6-git-send-email-rabin@rab.in>
- <20120220172158.GI26840@n2100.arm.linux.org.uk>
-Message-ID: <20120222133240.GA9031@debian>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Feb 2012 13:36:09 +0000
+Subject: [PATCHv22 14/16] X86: integrate CMA with DMA-mapping subsystem
+In-Reply-To: <20120222090930.GS22562@n2100.arm.linux.org.uk>
+References: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
+ <20120221161802.f6a28085.akpm@linux-foundation.org>
+ <20120222090930.GS22562@n2100.arm.linux.org.uk>
+Message-ID: <201202221336.09808.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 05:21:58PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Jan 28, 2012 at 07:05:24PM +0530, Rabin Vincent wrote:
-> > Some versions of ARM GCC which do support asm goto, have problems
-> > handling the the %c specifier.  Since we need the %c to support jump
-> > labels on ARM, detect that too in the asm goto detection script to avoid
-> > build errors with these versions.
+On Wednesday 22 February 2012, Russell King - ARM Linux wrote:
+> On Tue, Feb 21, 2012 at 04:18:02PM -0800, Andrew Morton wrote:
+> > After a while I got it to compile for i386.  arm didn't go so well,
+> > partly because arm allmodconfig is presently horked (something to do
+> > with Kconfig not setting PHYS_OFFSET) and partly because arm defconfig
+> > doesn't permit CMA to be set.  Got bored, gave up.
 > 
-> I'm not sure how this detects properly working %c support.  %c support
-> has been rather flakey on ARM for some time, I'm not sure which version
-> of gcc was fixed for it.
-
-Right, it only detects that %c on a sym+offset doesn't ICE, which was
-what it had been doing since atleast version 4.3.
-
-The assumption was that since asm goto was only added in ~4.5, all older
-compilers (regardless of their state of %c support) would choke (as we
-want them to) on the existing second half of this script.
-
-I have added the change you suggested below.
-
+> That's not going to get fixed, unfortunately.  It requires us to find
+> some way to force various options to certain states on all*config
+> builds, because not surprisingly a value of 'y', 'm' or 'n' doesn't
+> work for integer or hex config options.
 > 
-> > http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
-> > 
-> > Cc: Jason Baron <jbaron@redhat.com>
-> > Cc: linux-kernel at vger.kernel.org
-> > Signed-off-by: Rabin Vincent <rabin@rab.in>
-> > ---
-> >  scripts/gcc-goto.sh |   18 +++++++++++++++++-
-> >  1 files changed, 17 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/scripts/gcc-goto.sh b/scripts/gcc-goto.sh
-> > index 98cffcb..9b744de 100644
-> > --- a/scripts/gcc-goto.sh
-> > +++ b/scripts/gcc-goto.sh
-> > @@ -2,4 +2,20 @@
-> >  # Test for gcc 'asm goto' support
-> >  # Copyright (C) 2010, Jason Baron <jbaron@redhat.com>
-> >  
-> > -echo "int main(void) { entry: asm goto (\"\"::::entry); return 0; }" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
-> > +cat << "END" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
-> > +int main(void)
-> > +{
-> > +#ifdef __arm__
-> > +	/*
-> > +	 * Not related to asm goto, but used by jump label
-> > +	 * and broken on some ARM GCC versions (see GCC Bug 48637).
-> > +	 */
-> > +	static struct { int dummy; int state; } tp;
-> > +	asm ("@ %c0" :: "i" (&tp.state));
+> So the only way all*config can be used on ARM is with a seed config file
+> to force various options to particular states to ensure that we end up
+> with a sane configuration that avoids crap like that.
 > 
-> While this detects the presence of the ICE, previous compilers included
-> the '#' before the constant, which leads to problems.  I think a better
-> check would be:
-> 	asm(".long %c0" :: "i" (&tp.state));
-> 
-> to make sure that it spits out something purely numeric, rather than
-> something prefixed with a '#'.
+> Alternatively, we need a way to tell kconfig that various options are to
+> be set in certain ways in the Kconfig files for all*config to avoid it
+> wanting values for hex or int options.
 
-OK, done:
+I usually set KCONFIG_ALLCONFIG to a file containing the extra options
+I want, for another reason: As long as we are building platforms
+separately, all{no,yes,mod}config and randconfig will always build
+for the versatile platform instead of something more modern.
 
-8<----------------
->From f3a3bd64f72720def5cfbaedf6ff83ca54f1644b Mon Sep 17 00:00:00 2001
-From: Rabin Vincent <rabin@rab.in>
-Date: Wed, 23 Nov 2011 20:05:09 +0530
-Subject: [PATCH] jump label: detect %c support for ARM
+We could change that and make mach-vexpress the default, but we can
+also wait until we have the initial multiplatform support done and
+then use that one.
 
-Some versions of ARM GCC which do support asm goto, do not support
-the %c specifier.  Since we need the %c to support jump labels
-on ARM, detect that too in the asm goto detection script to avoid
-build errors with these versions.
+Building vexpress_defconfig (or most other defconfig, I would expect)
+works fine with the CMA series applied. This should also work,
+but there a few bugs in unrelated device drivers that would need to get
+fixed first.
 
-http://gcc.gnu.org/bugzilla/show_bug.cgi?id=48637
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -sj3 allmodconfig \ 	
+	KCONFIG_ALLCONFIG=$PWD/arch/arm/configs/vexpress_defconfig
 
-Acked-by: Jason Baron <jbaron@redhat.com>
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- scripts/gcc-goto.sh |   18 +++++++++++++++++-
- 1 files changed, 17 insertions(+), 1 deletions(-)
-
-diff --git a/scripts/gcc-goto.sh b/scripts/gcc-goto.sh
-index 98cffcb..a2af2e8 100644
---- a/scripts/gcc-goto.sh
-+++ b/scripts/gcc-goto.sh
-@@ -2,4 +2,20 @@
- # Test for gcc 'asm goto' support
- # Copyright (C) 2010, Jason Baron <jbaron@redhat.com>
- 
--echo "int main(void) { entry: asm goto (\"\"::::entry); return 0; }" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
-+cat << "END" | $@ -x c - -c -o /dev/null >/dev/null 2>&1 && echo "y"
-+int main(void)
-+{
-+#ifdef __arm__
-+	/*
-+	 * Not related to asm goto, but used by jump label
-+	 * and broken on some ARM GCC versions (see GCC Bug 48637).
-+	 */
-+	static struct { int dummy; int state; } tp;
-+	asm (".long %c0" :: "i" (&tp.state));
-+#endif
-+
-+entry:
-+	asm goto ("" :::: entry);
-+	return 0;
-+}
-+END
--- 
-1.7.9
+	Arnd
