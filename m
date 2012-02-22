@@ -1,363 +1,281 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 22 Feb 2012 16:17:19 +0100
-Subject: [PATCH v3 08/10] pwm: Add Blackfin support
+Date: Wed, 22 Feb 2012 16:17:21 +0100
+Subject: [PATCH v3 10/10] pwm-backlight: Add rudimentary device tree support
 In-Reply-To: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1329923841-32017-9-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1329923841-32017-11-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This commit adds very basic support for device tree probing. Currently,
+only a PWM and a list of distinct brightness levels can be specified.
+Enabling or disabling backlight power via GPIOs is not yet supported.
+
+A pointer to the exit() callback is stored in the driver data to keep it
+around until the driver is unloaded.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
 Changes in v3:
-  - update PWM ops for changes in patch 2
+  - use a list of distinct brightness levels instead of a linear range
+    as discussed with Stephen Warren and Mitch Bradley
 
- arch/blackfin/Kconfig         |   10 ---
- arch/blackfin/kernel/Makefile |    1 -
- arch/blackfin/kernel/pwm.c    |  100 -------------------------
- drivers/pwm/Kconfig           |    9 ++
- drivers/pwm/Makefile          |    1 +
- drivers/pwm/pwm-bfin.c        |  164 +++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 174 insertions(+), 111 deletions(-)
- delete mode 100644 arch/blackfin/kernel/pwm.c
- create mode 100644 drivers/pwm/pwm-bfin.c
+Changes in v2:
+  - avoid oops by keeping a reference to the platform-specific exit()
+    callback
 
-diff --git a/arch/blackfin/Kconfig b/arch/blackfin/Kconfig
-index c1269a1..e08f39b 100644
---- a/arch/blackfin/Kconfig
-+++ b/arch/blackfin/Kconfig
-@@ -950,16 +950,6 @@ config BFIN_GPTIMERS
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called gptimers.
- 
--config HAVE_PWM
--	tristate "Enable PWM API support"
--	depends on BFIN_GPTIMERS
--	help
--	  Enable support for the Pulse Width Modulation framework (as
--	  found in linux/pwm.h).
--
--	  To compile this driver as a module, choose M here: the module
--	  will be called pwm.
--
- choice
- 	prompt "Uncached DMA region"
- 	default DMA_UNCACHED_1M
-diff --git a/arch/blackfin/kernel/Makefile b/arch/blackfin/kernel/Makefile
-index 1f88edd..03f60a6 100644
---- a/arch/blackfin/kernel/Makefile
-+++ b/arch/blackfin/kernel/Makefile
-@@ -21,7 +21,6 @@ obj-$(CONFIG_FUNCTION_TRACER)        += ftrace-entry.o
- obj-$(CONFIG_FUNCTION_GRAPH_TRACER)  += ftrace.o
- CFLAGS_REMOVE_ftrace.o = -pg
- 
--obj-$(CONFIG_HAVE_PWM)               += pwm.o
- obj-$(CONFIG_IPIPE)                  += ipipe.o
- obj-$(CONFIG_BFIN_GPTIMERS)          += gptimers.o
- obj-$(CONFIG_CPLB_INFO)              += cplbinfo.o
-diff --git a/arch/blackfin/kernel/pwm.c b/arch/blackfin/kernel/pwm.c
-deleted file mode 100644
-index 33f5942..0000000
---- a/arch/blackfin/kernel/pwm.c
-+++ /dev/null
-@@ -1,100 +0,0 @@
--/*
-- * Blackfin Pulse Width Modulation (PWM) core
-- *
-- * Copyright (c) 2011 Analog Devices Inc.
-- *
-- * Licensed under the GPL-2 or later.
-- */
--
--#include <linux/module.h>
--#include <linux/pwm.h>
--#include <linux/slab.h>
--
--#include <asm/gptimers.h>
--#include <asm/portmux.h>
--
--struct pwm_device {
--	unsigned id;
--	unsigned short pin;
--};
--
--static const unsigned short pwm_to_gptimer_per[] = {
--	P_TMR0, P_TMR1, P_TMR2, P_TMR3, P_TMR4, P_TMR5,
--	P_TMR6, P_TMR7, P_TMR8, P_TMR9, P_TMR10, P_TMR11,
--};
--
--struct pwm_device *pwm_request(int pwm_id, const char *label)
--{
--	struct pwm_device *pwm;
--	int ret;
--
--	/* XXX: pwm_id really should be unsigned */
--	if (pwm_id < 0)
--		return NULL;
--
--	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
--	if (!pwm)
--		return pwm;
--
--	pwm->id = pwm_id;
--	if (pwm->id >= ARRAY_SIZE(pwm_to_gptimer_per))
--		goto err;
--
--	pwm->pin = pwm_to_gptimer_per[pwm->id];
--	ret = peripheral_request(pwm->pin, label);
--	if (ret)
--		goto err;
--
--	return pwm;
-- err:
--	kfree(pwm);
--	return NULL;
--}
--EXPORT_SYMBOL(pwm_request);
--
--void pwm_free(struct pwm_device *pwm)
--{
--	peripheral_free(pwm->pin);
--	kfree(pwm);
--}
--EXPORT_SYMBOL(pwm_free);
--
--int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
--{
--	unsigned long period, duty;
--	unsigned long long val;
--
--	if (duty_ns < 0 || duty_ns > period_ns)
--		return -EINVAL;
--
--	val = (unsigned long long)get_sclk() * period_ns;
--	do_div(val, NSEC_PER_SEC);
--	period = val;
--
--	val = (unsigned long long)period * duty_ns;
--	do_div(val, period_ns);
--	duty = period - val;
--
--	if (duty >= period)
--		duty = period - 1;
--
--	set_gptimer_config(pwm->id, TIMER_MODE_PWM | TIMER_PERIOD_CNT);
--	set_gptimer_pwidth(pwm->id, duty);
--	set_gptimer_period(pwm->id, period);
--
--	return 0;
--}
--EXPORT_SYMBOL(pwm_config);
--
--int pwm_enable(struct pwm_device *pwm)
--{
--	enable_gptimer(pwm->id);
--	return 0;
--}
--EXPORT_SYMBOL(pwm_enable);
--
--void pwm_disable(struct pwm_device *pwm)
--{
--	disable_gptimer(pwm->id);
--}
--EXPORT_SYMBOL(pwm_disable);
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index bda6f23..eb54042 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -9,6 +9,15 @@ menuconfig PWM
- 
- if PWM
- 
-+config PWM_BFIN
-+	tristate "Blackfin PWM support"
-+	depends on BFIN_GPTIMERS
-+	help
-+	  Generic PWM framework driver for Blackfin.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-bfin.
-+
- config PWM_TEGRA
- 	tristate "NVIDIA Tegra PWM support"
- 	depends on ARCH_TEGRA
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 12300f5..251b8d2 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_PWM)		+= core.o
-+obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
- obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-diff --git a/drivers/pwm/pwm-bfin.c b/drivers/pwm/pwm-bfin.c
+TODO:
+  - add regulator support for backlight enable/disable
+
+ .../bindings/video/backlight/pwm-backlight         |   19 ++++
+ drivers/video/backlight/Kconfig                    |    2 +-
+ drivers/video/backlight/pwm_bl.c                   |  113 ++++++++++++++++++--
+ include/linux/pwm_backlight.h                      |    1 +
+ 4 files changed, 124 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/video/backlight/pwm-backlight
+
+diff --git a/Documentation/devicetree/bindings/video/backlight/pwm-backlight b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
 new file mode 100644
-index 0000000..a0c6bf9
+index 0000000..79db3dd
 --- /dev/null
-+++ b/drivers/pwm/pwm-bfin.c
-@@ -0,0 +1,164 @@
-+/*
-+ * Blackfin Pulse Width Modulation (PWM) core
-+ *
-+ * Copyright (c) 2011 Analog Devices Inc.
-+ *
-+ * Licensed under the GPL-2 or later.
-+ */
++++ b/Documentation/devicetree/bindings/video/backlight/pwm-backlight
+@@ -0,0 +1,19 @@
++pwm-backlight bindings
 +
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/slab.h>
++Required properties:
++  - compatible: "pwm-backlight"
++  - pwm: OF device-tree PWM specification
++  - num-brightness-levels: number of distinct brightness levels
++  - brightness-levels: array of distinct brightness levels
++  - default-brightness-level: the default brightness level
 +
-+#include <asm/gptimers.h>
-+#include <asm/portmux.h>
++Example:
 +
-+struct bfin_pwm_chip {
-+	struct pwm_chip chip;
-+};
++	backlight {
++		compatible = "pwm-backlight";
++		pwm = <&pwm 0 5000000>;
 +
-+struct bfin_pwm {
-+	unsigned short pin;
-+};
++		num-brightness-levels = <8>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++	};
+diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
+index ed68fde5..0003383 100644
+--- a/drivers/video/backlight/Kconfig
++++ b/drivers/video/backlight/Kconfig
+@@ -233,7 +233,7 @@ config BACKLIGHT_CARILLO_RANCH
+ 
+ config BACKLIGHT_PWM
+ 	tristate "Generic PWM based Backlight Driver"
+-	depends on HAVE_PWM
++	depends on HAVE_PWM || PWM
+ 	help
+ 	  If you have a LCD backlight adjustable by PWM, say Y to enable
+ 	  this driver.
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index 342b7d7..b65a0b6 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -17,6 +17,7 @@
+ #include <linux/fb.h>
+ #include <linux/backlight.h>
+ #include <linux/err.h>
++#include <linux/of_pwm.h>
+ #include <linux/pwm.h>
+ #include <linux/pwm_backlight.h>
+ #include <linux/slab.h>
+@@ -26,11 +27,13 @@ struct pwm_bl_data {
+ 	struct device		*dev;
+ 	unsigned int		period;
+ 	unsigned int		lth_brightness;
++	unsigned int		*levels;
+ 	int			(*notify)(struct device *,
+ 					  int brightness);
+ 	void			(*notify_after)(struct device *,
+ 					int brightness);
+ 	int			(*check_fb)(struct device *, struct fb_info *);
++	void			(*exit)(struct device *);
+ };
+ 
+ static int pwm_backlight_update_status(struct backlight_device *bl)
+@@ -52,6 +55,11 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
+ 		pwm_config(pb->pwm, 0, pb->period);
+ 		pwm_disable(pb->pwm);
+ 	} else {
++		if (pb->levels) {
++			brightness = pb->levels[brightness];
++			max = pb->levels[max];
++		}
 +
-+static const unsigned short pwm_to_gptimer_per[] = {
-+	P_TMR0, P_TMR1, P_TMR2, P_TMR3, P_TMR4, P_TMR5,
-+	P_TMR6, P_TMR7, P_TMR8, P_TMR9, P_TMR10, P_TMR11,
-+};
-+
-+static int bfin_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+ 		brightness = pb->lth_brightness +
+ 			(brightness * (pb->period - pb->lth_brightness) / max);
+ 		pwm_config(pb->pwm, brightness, pb->period);
+@@ -83,17 +91,96 @@ static const struct backlight_ops pwm_backlight_ops = {
+ 	.check_fb	= pwm_backlight_check_fb,
+ };
+ 
++#ifdef CONFIG_OF
++static int pwm_backlight_parse_dt(struct device *dev,
++				  struct platform_pwm_backlight_data *data)
 +{
-+	struct bfin_pwm *priv;
++	struct device_node *node = dev->of_node;
++	struct pwm_spec spec;
++	u32 value;
 +	int ret;
 +
-+	if (pwm->hwpwm >= ARRAY_SIZE(pwm_to_gptimer_per))
-+		return -EINVAL;
++	if (!node)
++		return -ENODEV;
 +
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
++	memset(data, 0, sizeof(*data));
 +
-+	priv->pin = pwm_to_gptimer_per[pwm->hwpwm];
-+
-+	ret = peripheral_request(priv->pin, NULL);
-+	if (ret) {
-+		kfree(priv);
++	ret = of_get_named_pwm(node, "pwm", 0, &spec);
++	if (ret < 0)
 +		return ret;
++
++	data->pwm_period_ns = spec.period;
++	data->pwm_id = ret;
++
++	ret = of_property_read_u32(node, "num-brightness-levels", &value);
++	if (ret < 0)
++		return ret;
++
++	data->max_brightness = value;
++
++	if (data->max_brightness > 0) {
++		size_t size = sizeof(*data->levels) * data->max_brightness;
++
++		data->levels = devm_kzalloc(dev, size, GFP_KERNEL);
++		if (!data->levels)
++			return -ENOMEM;
++
++		ret = of_property_read_u32_array(node, "brightness-levels",
++						 data->levels,
++						 data->max_brightness);
++		if (ret < 0)
++			return ret;
++
++		ret = of_property_read_u32(node, "default-brightness-level",
++					   &value);
++		if (ret < 0)
++			return ret;
++
++		data->dft_brightness = value;
++		data->max_brightness--;
 +	}
 +
-+	pwm_set_chip_data(pwm, priv);
++	/*
++	 * TODO: Most users of this driver use a number of GPIOs to control
++	 *       backlight power. Support for specifying these needs to be
++	 *       added.
++	 */
 +
 +	return 0;
 +}
 +
-+static void bfin_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct bfin_pwm *priv = pwm_get_chip_data(pwm);
-+
-+	if (priv) {
-+		peripheral_free(priv->pin);
-+		kfree(priv);
-+	}
-+}
-+
-+static int bfin_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+		int duty_ns, int period_ns)
-+{
-+	struct bfin_pwm *priv = pwm_get_chip_data(pwm);
-+	unsigned long period, duty;
-+	unsigned long long val;
-+
-+	if (duty_ns < 0 || duty_ns > period_ns)
-+		return -EINVAL;
-+
-+	val = (unsigned long long)get_sclk() * period_ns;
-+	do_div(val, NSEC_PER_SEC);
-+	period = val;
-+
-+	val = (unsigned long long)period * duty_ns;
-+	do_div(val, period_ns);
-+	duty = period - val;
-+
-+	if (duty >= period)
-+		duty = period - 1;
-+
-+	set_gptimer_config(priv->pin, TIMER_MODE_PWM | TIMER_PERIOD_CNT);
-+	set_gptimer_pwidth(priv->pin, duty);
-+	set_gptimer_period(priv->pin, period);
-+
-+	return 0;
-+}
-+
-+static int bfin_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct bfin_pwm *priv = pwm_get_chip_data(pwm);
-+
-+	enable_gptimer(priv->pin);
-+
-+	return 0;
-+}
-+
-+static void bfin_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct bfin_pwm *priv = pwm_get_chip_data(pwm);
-+
-+	disable_gptimer(priv->pin);
-+}
-+
-+static struct pwm_ops bfin_pwm_ops = {
-+	.request = bfin_pwm_request,
-+	.free = bfin_pwm_free,
-+	.config = bfin_pwm_config,
-+	.enable = bfin_pwm_enable,
-+	.disable = bfin_pwm_disable,
-+	.owner = THIS_MODULE,
++static struct of_device_id pwm_backlight_of_match[] = {
++	{ .compatible = "pwm-backlight" },
++	{ }
 +};
 +
-+static int bfin_pwm_probe(struct platform_device *pdev)
++MODULE_DEVICE_TABLE(of, pwm_backlight_of_match);
++#else
++static int pwm_backlight_parse_dt(struct device *dev,
++				  struct platform_pwm_backlight_data *data)
 +{
-+	struct bfin_pwm_chip *pwm;
-+	int ret;
-+
-+	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
-+	if (!pwm) {
-+		dev_err(&pdev->dev, "failed to allocate memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	platform_set_drvdata(pdev, pwm);
-+
-+	pwm->chip.dev = &pdev->dev;
-+	pwm->chip.ops = &bfin_pwm_ops;
-+	pwm->chip.base = -1;
-+	pwm->chip.npwm = 12;
-+
-+	ret = pwmchip_add(&pwm->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
++	return -ENODEV;
 +}
++#endif
 +
-+static int __devexit bfin_pwm_remove(struct platform_device *pdev)
-+{
-+	struct bfin_pwm_chip *pwm = platform_get_drvdata(pdev);
+ static int pwm_backlight_probe(struct platform_device *pdev)
+ {
+ 	struct backlight_properties props;
+ 	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
++	struct platform_pwm_backlight_data defdata;
+ 	struct backlight_device *bl;
+ 	struct pwm_bl_data *pb;
++	unsigned int max;
+ 	int ret;
+ 
+ 	if (!data) {
+-		dev_err(&pdev->dev, "failed to find platform data\n");
+-		return -EINVAL;
++		ret = pwm_backlight_parse_dt(&pdev->dev, &defdata);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "failed to find platform data\n");
++			return ret;
++		}
 +
-+	pwmchip_remove(&pwm->chip);
++		data = &defdata;
+ 	}
+ 
+ 	if (data->init) {
+@@ -109,12 +196,18 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 		goto err_alloc;
+ 	}
+ 
++	if (data->levels) {
++		max = data->levels[data->max_brightness];
++		pb->levels = data->levels;
++	} else
++		max = data->max_brightness;
 +
-+	return 0;
-+}
-+
-+static struct platform_driver bfin_pwm_driver = {
-+	.driver = {
-+		.name = "bfin-pwm",
-+	},
-+	.probe = bfin_pwm_probe,
-+	.remove = __devexit_p(bfin_pwm_remove),
-+};
-+
-+module_platform_driver(bfin_pwm_driver);
-+
-+MODULE_LICENSE("GPL");
+ 	pb->period = data->pwm_period_ns;
+ 	pb->notify = data->notify;
+ 	pb->notify_after = data->notify_after;
+ 	pb->check_fb = data->check_fb;
+-	pb->lth_brightness = data->lth_brightness *
+-		(data->pwm_period_ns / data->max_brightness);
++	pb->exit = data->exit;
++	pb->lth_brightness = data->lth_brightness * (data->pwm_period_ns / max);
+ 	pb->dev = &pdev->dev;
+ 
+ 	pb->pwm = pwm_request(data->pwm_id, "backlight");
+@@ -152,7 +245,6 @@ err_alloc:
+ 
+ static int pwm_backlight_remove(struct platform_device *pdev)
+ {
+-	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
+ 	struct backlight_device *bl = platform_get_drvdata(pdev);
+ 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
+ 
+@@ -160,8 +252,8 @@ static int pwm_backlight_remove(struct platform_device *pdev)
+ 	pwm_config(pb->pwm, 0, pb->period);
+ 	pwm_disable(pb->pwm);
+ 	pwm_free(pb->pwm);
+-	if (data->exit)
+-		data->exit(&pdev->dev);
++	if (pb->exit)
++		pb->exit(&pdev->dev);
+ 	return 0;
+ }
+ 
+@@ -195,11 +287,12 @@ static SIMPLE_DEV_PM_OPS(pwm_backlight_pm_ops, pwm_backlight_suspend,
+ 
+ static struct platform_driver pwm_backlight_driver = {
+ 	.driver		= {
+-		.name	= "pwm-backlight",
+-		.owner	= THIS_MODULE,
++		.name		= "pwm-backlight",
++		.owner		= THIS_MODULE,
+ #ifdef CONFIG_PM
+-		.pm	= &pwm_backlight_pm_ops,
++		.pm		= &pwm_backlight_pm_ops,
+ #endif
++		.of_match_table	= of_match_ptr(pwm_backlight_of_match),
+ 	},
+ 	.probe		= pwm_backlight_probe,
+ 	.remove		= pwm_backlight_remove,
+diff --git a/include/linux/pwm_backlight.h b/include/linux/pwm_backlight.h
+index 63d2df4..56f4a86 100644
+--- a/include/linux/pwm_backlight.h
++++ b/include/linux/pwm_backlight.h
+@@ -12,6 +12,7 @@ struct platform_pwm_backlight_data {
+ 	unsigned int dft_brightness;
+ 	unsigned int lth_brightness;
+ 	unsigned int pwm_period_ns;
++	unsigned int *levels;
+ 	int (*init)(struct device *dev);
+ 	int (*notify)(struct device *dev, int brightness);
+ 	void (*notify_after)(struct device *dev, int brightness);
 -- 
 1.7.9.1
