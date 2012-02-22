@@ -1,45 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Feb 2012 10:00:45 -0800
-Subject: [PATCH] gpio/omap: fix wakeups on level-triggered GPIOs
-In-Reply-To: <CAC83ZvKXSwSsU_hu7hrPV6DmVYv=G3iF7Wb5hF_qhSiL+BpfaQ@mail.gmail.com>
-References: <1329850878-22189-1-git-send-email-khilman@ti.com>
- <CAC83ZvKXSwSsU_hu7hrPV6DmVYv=G3iF7Wb5hF_qhSiL+BpfaQ@mail.gmail.com>
-Message-ID: <20120222180045.GW18185@atomide.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 22 Feb 2012 19:02:38 +0100
+Subject: [PATCH v2 12/19] ARM: at91/rtc-at91sam9: each SoC can select
+ the RTT device to use
+In-Reply-To: <201202221725.46150.arnd@arndb.de>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <201202221647.23430.arnd@arndb.de>
+ <20120222170724.GF9407@game.jcrosoft.org>
+ <201202221725.46150.arnd@arndb.de>
+Message-ID: <20120222180238.GH9407@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* DebBarma, Tarun Kanti <tarun.kanti@ti.com> [120222 08:46]:
-> On Wed, Feb 22, 2012 at 12:31 AM, Kevin Hilman <khilman@ti.com> wrote:
-> > While both level- and edge-triggered GPIOs are capable of generating
-> > interrupts, only edge-triggered GPIOs are capable of generating a
-> > module-level wakeup to the PRCM (c.f. 34xx NDA TRM section 25.5.3.2.)
+On 17:25 Wed 22 Feb     , Arnd Bergmann wrote:
+> On Wednesday 22 February 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > But if you change the rtc driver to always bind to the existing
+> > > "at91_rtt" platform_device and fail the probe() function for the
+> > > case that you are on at91sam9263 probing the non-RTC device,
+> > > you should get the exact same result without any extra code
+> > > in the per-soc files.
 > >
-> > In order to ensure that devices using level-triggered GPIOs as
-> > interrupts can also cause wakeups (e.g. from idle), this patch enables
-> > edge-triggering for wakeup-enabled, level-triggered GPIOs when a GPIO
-> > bank is runtime-suspended (which also happens during idle.)
-> >
-> > This fixes a problem found in GPMC-connected network cards with GPIO
-> > interrupts (e.g. smsc911x on Zoom3, Overo, ...) where network booting
-> > with NFSroot was very slow since the GPIO IRQs used by the NIC were
-> > not generating PRCM wakeups, and thus not waking the system from idle.
-> > NOTE: until v3.3, this boot-time problem was somewhat masked because
-> > the UART init prevented WFI during boot until the full serial driver
-> > was available. ?Preventing WFI allowed regular GPIO interrupts to fire
-> > and this problem was not seen. ?After the UART runtime PM cleanups, we
-> > no longer avoid WFI during boot, so GPIO IRQs that were not causing
-> > wakeups resulted in very slow IRQ response times.
-> >
-> > Tested on platforms using level-triggered GPIOs for network IRQs using
-> > the SMSC911x NIC: 3530/Overo and 3630/Zoom3.
-> >
-> > Reported-by: Tony Lindgren <tony@atomide.com>
-> > Signed-off-by: Kevin Hilman <khilman@ti.com>
+> > agreed but as on at91sam9263 you have 2 RTTs so you can have 2 drivers at the
+> > same time that use the RTT. So we can not do this except if we set the second
+> > RTT to an other device name.
 > 
-> I have tested on OMAP3430 by making modification to touchscreen GPIO.
-> (I had similar change in my next planned cleanup/fix series.)
-> If needed you can add my Tested-by:
+> Let me rephrase what I meant then:
+> 
+> The first driver should in its probe function do:
+> 
+> 	if (pdev->id != CONFIG_RTC_DRV_AT91SAM9_RTT)
+> 		return -ENODEV;
+> 
+> while the other driver does
+> 
+> 	if (pdev->id == CONFIG_RTC_DRV_AT91SAM9_RTT)
+> 		return -ENODEV;
+> 
+> This way, each driver binds to one device but not the other.
+> It should even work with an unmodified second driver, as long
+> as you guarantee that it's loaded after the first one.
+> 
+> Any reason why this won't work?
+just one other issue I need to pass the GPBR ressource to the RTC driver only
 
-Work for me too:
-
-Tested-by: Tony Lindgren <tony@atomide.com>
+Best Regards,
+J.
