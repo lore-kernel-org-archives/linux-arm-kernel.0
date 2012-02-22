@@ -1,143 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2012 16:15:11 +0000
-Subject: [PATCH v3 03/10] of: Add PWM support.
-In-Reply-To: <1329923841-32017-4-git-send-email-thierry.reding@avionic-design.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <1329923841-32017-4-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <201202221615.11605.arnd@arndb.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 22 Feb 2012 17:26:43 +0100
+Subject: [PATCHv22 13/16] drivers: add Contiguous Memory Allocator
+In-Reply-To: <alpine.DEB.2.00.1202212121560.962@localhost>
+References: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
+ <1329507036-24362-14-git-send-email-m.szyprowski@samsung.com>
+ <alpine.DEB.2.00.1202212121560.962@localhost>
+Message-ID: <000001ccf17e$c3e50040$4baf00c0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 February 2012, Thierry Reding wrote:
-> This patch adds helpers to support device tree bindings for the generic
-> PWM API. Device tree binding documentation for PWM controllers is also
-> provided.
+Hello,
+
+On Tuesday, February 21, 2012 10:30 PM Aaro Koskinen wrote:
+
+> On Fri, 17 Feb 2012, Marek Szyprowski wrote:
+> > +/**
+> > + * dma_release_from_contiguous() - release allocated pages
+> > + * @dev:   Pointer to device for which the pages were allocated.
+> > + * @pages: Allocated pages.
+> > + * @count: Number of allocated pages.
+> > + *
+> > + * This function releases memory allocated by dma_alloc_from_contiguous().
+> > + * It returns false when provided pages do not belong to contiguous area and
+> > + * true otherwise.
+> > + */
+> > +bool dma_release_from_contiguous(struct device *dev, struct page *pages,
+> > +				 int count)
+> > +{
+> > +	struct cma *cma = dev_get_cma_area(dev);
+> > +	unsigned long pfn;
+> > +
+> > +	if (!cma || !pages)
+> > +		return false;
+> > +
+> > +	pr_debug("%s(page %p)\n", __func__, (void *)pages);
+> > +
+> > +	pfn = page_to_pfn(pages);
+> > +
+> > +	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
+> > +		return false;
+> > +
+> > +	VM_BUG_ON(pfn + count > cma->base_pfn);
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> 
->  Documentation/devicetree/bindings/pwm/pwm.txt |   48 +++++++++
->  drivers/of/Kconfig                            |    6 +
->  drivers/of/Makefile                           |    1 +
->  drivers/of/pwm.c                              |  130 +++++++++++++++++++++++++
->  include/linux/of_pwm.h                        |   51 ++++++++++
->  include/linux/pwm.h                           |   17 +++
+> Are you sure the VM_BUG_ON() condition is correct here?
 
-I think it would make more sense to stick the device tree specific parts
-into drivers/pwm/of.c instead of drivers/of/pwm.c, but it's not a strong
-preference on my part.
+Thanks for pointing this bug. '+ cma->count' is missing in the second part.
 
-> @@ -0,0 +1,48 @@
-> +Specifying PWM information for devices
-> +======================================
-> +
-> +1) PWM user nodes
-> +-----------------
-> +
-> +PWM users should specify a list of PWM devices that they want to use
-> +with a property containing a 'pwm-list':
-> +
-> +	pwm-list ::= <single-pwm> [pwm-list]
-> +	single-pwm ::= <pwm-phandle> <pwm-specifier>
-> +	pwm-phandle : phandle to PWM controller node
-> +	pwm-specifier : array of #pwm-cells specifying the given PWM
-> +			(controller specific)
-> +
-> +PWM properties should be named "[<name>-]pwms". Exact meaning of each
-> +pwms property must be documented in the device tree binding for each
-> +device.
-> +
-> +The following example could be used to describe a PWM-based backlight
-> +device:
-> +
-> +	pwm: pwm {
-> +		#pwm-cells = <2>;
-> +	};
-> +
-> +	[...]
-> +
-> +	bl: backlight {
-> +		pwms = <&pwm 0 5000000>;
-> +	};
-> +
-> +pwm-specifier typically encodes the chip-relative PWM number and the PWM
-> +period in nanoseconds.
-
-I like these bindings, this looks very straightforward to use while also
-able to describe all possible cases.
-
-> +/**
-> + * of_node_to_pwmchip() - finds the PWM chip associated with a device node
-> + * @np: device node of the PWM chip
-> + *
-> + * Returns a pointer to the PWM chip associated with the specified device
-> + * node or NULL if the device node doesn't represent a PWM chip.
-> + */
-> +struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-> +{
-> +	return pwmchip_find(np, of_pwmchip_is_match);
-> +}
-> +
-> +int of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args,
-> +			struct pwm_spec *spec)
-> +{
-> +	if (pc->of_pwm_n_cells < 2)
-> +		return -EINVAL;
-> +
-> +	if (args->args_count < pc->of_pwm_n_cells)
-> +		return -EINVAL;
-> +
-> +	if (args->args[0] >= pc->npwm)
-> +		return -EINVAL;
-> +
-> +	if (spec)
-> +		spec->period = args->args[1];
-> +
-> +	return args->args[0];
-> +}
-
-I'm not sure why these functions are global. They are clearly marked
-so in your header file, but it seems that these are an implementation
-detail that neither a pwm controller driver not a driver using one
-would need to use directly.
-
-> +/**
-> + * of_get_named_pwm() - get a PWM number and period to use with the PWM API
-> + * @np: device node to get the PWM from
-> + * @propname: property name containing PWM specifier(s)
-> + * @index: index of the PWM
-> + * @spec: a pointer to a struct pwm_spec to fill in
-> + *
-> + * Returns PWM number to use with the Linux generic PWM API or a negative
-> + * error code on failure. If @spec is not NULL the function fills in the
-> + * values parsed from the device tree.
-> + */
-> +int of_get_named_pwm(struct device_node *np, const char *propname,
-> +		     int index, struct pwm_spec *spec)
-> +{
-
-This interface does not feel right to me, in multiple ways:
-
-* I would expect to pass a struct device in, not a device_node.
-
-* Why not include the pwm_request() call in this and return the
-  pwm_device directly? You said that you want to get rid of the
-  pwm_id eventually, which is a good idea, but this interface still
-  forces one to use it.
-
-* It is not clear what a pwm_spec is used for, or why a device
-  driver would need to be bothered by this. Maybe it just needs
-  more explanation, but it seems to me that if you do the previous
-  change, the pwm_spec would not be needed either.
-
-> +EXPORT_SYMBOL(of_get_named_pwm);
-
-EXPORT_SYMBOL_GPL?
-
-> +static inline int of_get_named_pwm(struct device_node *np,
-> +                                  const char *propname, int index,
-> +                                  unsigned int *period_ns)
-> +{
-
-The function prototype does not match.
-
-	Arnd
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
