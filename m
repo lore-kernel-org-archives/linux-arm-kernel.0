@@ -1,54 +1,111 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 22 Feb 2012 18:07:24 +0100
-Subject: [PATCH v2 12/19] ARM: at91/rtc-at91sam9: each SoC can select
- the RTT device to use
-In-Reply-To: <201202221647.23430.arnd@arndb.de>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <201202221450.04390.arnd@arndb.de>
- <20120222162442.GD9407@game.jcrosoft.org>
- <201202221647.23430.arnd@arndb.de>
-Message-ID: <20120222170724.GF9407@game.jcrosoft.org>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 22 Feb 2012 22:47:35 +0530
+Subject: [PATCH] gpio/omap: fix wakeups on level-triggered GPIOs
+In-Reply-To: <1329850878-22189-1-git-send-email-khilman@ti.com>
+References: <1329850878-22189-1-git-send-email-khilman@ti.com>
+Message-ID: <CAC83ZvKXSwSsU_hu7hrPV6DmVYv=G3iF7Wb5hF_qhSiL+BpfaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:47 Wed 22 Feb     , Arnd Bergmann wrote:
-> On Wednesday 22 February 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 14:50 Wed 22 Feb     , Arnd Bergmann wrote:
-> > > On Wednesday 22 February 2012, Nicolas Ferre wrote:
-> > > > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > 
-> > > > For the RTT as RTC driver rtc-at91sam9, the platform_device structure
-> > > > is filled during SoC initialization. This will allow to convert this
-> > > > RTC driver as a standard platform driver.
-> > > 
-> > > Can you make this more elaborate? I don't see from this or the code why
-> > > you don't just always register the RTT as "rtc-at91sam9". There seems to
-> > > be no driver for the "at91_rtt" in tree, so I don't know if there is
-> > > an out of tree driver binding to it.
-> > > 
-> > > Would it be possible to remove the compile time #if and the resetting
-> > > of the device name if both drivers bind to the rtc name and the other
-> > > rtt driver binds to both names?
-> > because I see a quite some people use the rtt for something else
-> > 
-> > so I don't want to change on existing kernel
-> 
-> But if you change the rtc driver to always bind to the existing
-> "at91_rtt" platform_device and fail the probe() function for the
-> case that you are on at91sam9263 probing the non-RTC device,
-> you should get the exact same result without any extra code
-> in the per-soc files.
-agreed but as on at91sam9263 you have 2 RTTs so you can have 2 drivers at the
-same time that use the RTT. So we can not do this except if we set the second
-RTT to an other device name.
-> 
-> I guess it also makes sense to specify a device tree property
-> that lets you detect whether the RTT is used as RTC or something
-> else.
+On Wed, Feb 22, 2012 at 12:31 AM, Kevin Hilman <khilman@ti.com> wrote:
+> While both level- and edge-triggered GPIOs are capable of generating
+> interrupts, only edge-triggered GPIOs are capable of generating a
+> module-level wakeup to the PRCM (c.f. 34xx NDA TRM section 25.5.3.2.)
 >
-agreed for DT I think of something like this with a phandle maybe
+> In order to ensure that devices using level-triggered GPIOs as
+> interrupts can also cause wakeups (e.g. from idle), this patch enables
+> edge-triggering for wakeup-enabled, level-triggered GPIOs when a GPIO
+> bank is runtime-suspended (which also happens during idle.)
+>
+> This fixes a problem found in GPMC-connected network cards with GPIO
+> interrupts (e.g. smsc911x on Zoom3, Overo, ...) where network booting
+> with NFSroot was very slow since the GPIO IRQs used by the NIC were
+> not generating PRCM wakeups, and thus not waking the system from idle.
+> NOTE: until v3.3, this boot-time problem was somewhat masked because
+> the UART init prevented WFI during boot until the full serial driver
+> was available. ?Preventing WFI allowed regular GPIO interrupts to fire
+> and this problem was not seen. ?After the UART runtime PM cleanups, we
+> no longer avoid WFI during boot, so GPIO IRQs that were not causing
+> wakeups resulted in very slow IRQ response times.
+>
+> Tested on platforms using level-triggered GPIOs for network IRQs using
+> the SMSC911x NIC: 3530/Overo and 3630/Zoom3.
+>
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 
-but today not all the soc are DT and will not be switch to DT at first
+I have tested on OMAP3430 by making modification to touchscreen GPIO.
+(I had similar change in my next planned cleanup/fix series.)
+If needed you can add my Tested-by:
+--
+Tarun
 
-Best Regards,
-J.
+> ---
+> This applies on top of the GPIO cleanup and runtime PM conversion series
+> which has been submitted for v3.4 and also available here:
+> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/gpio/runtime-pm-cleanup
+>
+> ?drivers/gpio/gpio-omap.c | ? 34 ++++++++++++++++++++++++++++++++++
+> ?1 files changed, 34 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index f49bd6f..752ae9b 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1196,8 +1196,30 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+> ? ? ? ?struct gpio_bank *bank = platform_get_drvdata(pdev);
+> ? ? ? ?u32 l1 = 0, l2 = 0;
+> ? ? ? ?unsigned long flags;
+> + ? ? ? u32 wake_low, wake_hi;
+>
+> ? ? ? ?spin_lock_irqsave(&bank->lock, flags);
+> +
+> + ? ? ? /*
+> + ? ? ? ?* Only edges can generate a wakeup event to the PRCM.
+> + ? ? ? ?*
+> + ? ? ? ?* Therefore, ensure any wake-up capable GPIOs have
+> + ? ? ? ?* edge-detection enabled before going idle to ensure a wakeup
+> + ? ? ? ?* to the PRCM is generated on a GPIO transition. (c.f. 34xx
+> + ? ? ? ?* NDA TRM 25.5.3.1)
+> + ? ? ? ?*
+> + ? ? ? ?* The normal values will be restored upon ->runtime_resume()
+> + ? ? ? ?* by writing back the values saved in bank->context.
+> + ? ? ? ?*/
+> + ? ? ? wake_low = bank->context.leveldetect0 & bank->context.wake_en;
+> + ? ? ? if (wake_low)
+> + ? ? ? ? ? ? ? __raw_writel(wake_low | bank->context.fallingdetect,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?bank->base + bank->regs->fallingdetect);
+> + ? ? ? wake_hi = bank->context.leveldetect1 & bank->context.wake_en;
+> + ? ? ? if (wake_hi)
+> + ? ? ? ? ? ? ? __raw_writel(wake_hi | bank->context.risingdetect,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?bank->base + bank->regs->risingdetect);
+> +
+> ? ? ? ?if (bank->power_mode != OFF_MODE) {
+> ? ? ? ? ? ? ? ?bank->power_mode = 0;
+> ? ? ? ? ? ? ? ?goto update_gpio_context_count;
+> @@ -1246,6 +1268,18 @@ static int omap_gpio_runtime_resume(struct device *dev)
+>
+> ? ? ? ?spin_lock_irqsave(&bank->lock, flags);
+> ? ? ? ?_gpio_dbck_enable(bank);
+> +
+> + ? ? ? /*
+> + ? ? ? ?* In ->runtime_suspend(), level-triggered, wakeup-enabled
+> + ? ? ? ?* GPIOs were set to edge trigger also in order to be able to
+> + ? ? ? ?* generate a PRCM wakeup. ?Here we restore the
+> + ? ? ? ?* pre-runtime_suspend() values for edge triggering.
+> + ? ? ? ?*/
+> + ? ? ? __raw_writel(bank->context.fallingdetect,
+> + ? ? ? ? ? ? ? ? ? ?bank->base + bank->regs->fallingdetect);
+> + ? ? ? __raw_writel(bank->context.risingdetect,
+> + ? ? ? ? ? ? ? ? ? ?bank->base + bank->regs->risingdetect);
+> +
+> ? ? ? ?if (!bank->enabled_non_wakeup_gpios || !bank->workaround_enabled) {
+> ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&bank->lock, flags);
+> ? ? ? ? ? ? ? ?return 0;
+> --
+> 1.7.9
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
