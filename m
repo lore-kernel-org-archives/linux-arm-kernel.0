@@ -1,30 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2012 14:26:00 +0000
-Subject: [PATCH v5] ARM: LPC32xx: ADC support for mach-lpc32xx
-In-Reply-To: <1329487094-3486-1-git-send-email-stigge@antcom.de>
-References: <1329487094-3486-1-git-send-email-stigge@antcom.de>
-Message-ID: <201202221426.00620.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 22 Feb 2012 15:31:19 +0100
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <4F44FA56.7020000@gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com>
+Message-ID: <4F44FC37.2000701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 February 2012, Roland Stigge wrote:
-> This patch adds the mach specific support for the LPC32XX ADC driver (the
-> latter being already in staging/iio)
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-> 
-> ---
->  Olof, can you please add this to the updated LPC32xx support? The patch
->  applies cleanly to current arm-soc.git/for-next. The actual ADC driver that is
->  used here was already accepted to staging/iio by GregKH.
+On 2/22/2012 3:23 PM, Rob Herring wrote:
+> On 02/15/2012 10:04 AM, Benoit Cousson wrote:
+>> Adapt the GPIO driver to retrieve information from a DT file.
+>>
+>> Allocate the irq_base dynamically and rename bank->virtual_irq_start
+>> to bank->irq_base.
+>> Change irq_base type to int instead of u16 to match irq_alloc_descs
+>> output.
+>>
+>> Add documentation for GPIO properties specific to OMAP.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+>
+> One comment below, but otherwise:
+>
+> Acked-by: Rob Herring<rob.herring@calxeda.com>
+>
+>> ---
+>>   .../devicetree/bindings/gpio/gpio-omap.txt         |   30 +++++
+>>   drivers/gpio/gpio-omap.c                           |  121 ++++++++++++++++++--
+>>   2 files changed, 142 insertions(+), 9 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>> new file mode 100644
+>> index 0000000..c1b3100
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>> @@ -0,0 +1,30 @@
+>> +OMAP GPIO controller bindings
+>> +
+>> +Required properties:
+>> +- compatible:
+>> +  - "ti,omap2-gpio" for OMAP2 controllers
+>> +  - "ti,omap3-gpio" for OMAP3 controllers
+>> +  - "ti,omap4-gpio" for OMAP4 controllers
+>> +- #gpio-cells : Should be two.
+>> +  - first cell is the pin number
+>> +  - second cell is used to specify optional parameters (unused)
+>> +- gpio-controller : Marks the device node as a GPIO controller.
+>> +- #interrupt-cells : Should be one
+>
+> There's no level/edge settings for gpios?
 
-Pulled into the next/drivers branch.
+That's a good question, because I was wondering as well :-)
 
-Because of the way we work with topic branches, it's easier if you
-submit patches that apply cleanly to an -rc release. I ended up doing
-the trivial backport of the patch and then resolving the trivial
-merge conflict with the bugfix we got earlier.
+I did no see how it was done in other GPIO implementation.
 
-	Arnd
+Benoit
