@@ -1,69 +1,34 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 22 Feb 2012 23:10:25 +0530
-Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
-In-Reply-To: <4F452616.30806@samsung.com>
-References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
- <CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>
- <00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>
- <CABb+yY0j0j7Qw4MCwP_F+DKzmpdmZ3x0QC2Ktj2qmGnL=Ocx0Q@mail.gmail.com>
- <011c01ccf107$5624d020$026e7060$%kim@samsung.com>
- <CABb+yY1aeZ9=2GiHni3bZuRjW66Mxz7K0M753Lc-6UdxaVpBzA@mail.gmail.com>
- <1329906421.24656.93.camel@vkoul-udesk3>
- <4F451D24.1040009@samsung.com>
- <CABb+yY0Zy3Xx4OZTobo2y-J4NXokGCV47PdPyKs+aOnqtng7pQ@mail.gmail.com>
- <4F452616.30806@samsung.com>
-Message-ID: <CABb+yY2FUj_iqYYWSN8UmXEqUrR0=E05O6EDtBABh4RiF4Qhhw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 22 Feb 2012 18:34:37 +0100
+Subject: [PATCH v2 06/19] ARM: at91/pm_slowclock: rename register to
+ named define
+In-Reply-To: <20120222095040.GU22562@n2100.arm.linux.org.uk>
+References: <0d78171672a30e8ec8084f54a557e9948260356d.1329903206.git.nicolas.ferre@atmel.com>
+ <cce50d2859ae080d6bfd9260fcd6932d634f7b9a.1329903206.git.nicolas.ferre@atmel.com>
+ <20120222095040.GU22562@n2100.arm.linux.org.uk>
+Message-ID: <20120222173437.GG9407@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 10:59 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->>>
->>> * Copyright (c) 2012 Samsung Electronics Co., Ltd.
->>> * ? ? ? ? ? ? ? http://www.samsung.com
->>> *
->>> * Copyright (C) 2010 Samsung Electronics Co. Ltd.
->>> * ? ? ? Jaswinder Singh<jassi.brar@samsung.com>
->>> *
->>
->> The following is more appropriate
->>
->> - ?* Copyright (C) 2010 Samsung Electronics Co. Ltd.
->> + * Copyright (C) 2010 - 2012 Samsung Electronics Co. Ltd.
->> ? ?* ? ? ? Jaswinder Singh<jassi.brar@samsung.com>
->>
-> Well, as I know, I don't have to change/update original your copyright. If
-> required, you should do it, next time.
->
-FYI that that is not my copyright. That is Samsung's copyright.
-     Jaswinder Singh<jassi.brar@samsung.com>   only claims to be the author.
+On 09:50 Wed 22 Feb     , Russell King - ARM Linux wrote:
+> On Wed, Feb 22, 2012 at 10:39:32AM +0100, Nicolas Ferre wrote:
+> >  #define PLLALOCK_TIMEOUT	1000
+> >  #define PLLBLOCK_TIMEOUT	1000
+> >  
+> > +#define pmc	r1
+> 
+> pmc	.req	r1
+> sdramc	.req	r2
+> 
+> etc.
+done
 
-And I don't expect you to correct my email id (we have to suffer an extra
-mundane patch)
+update
+[PATCH v3 07/20] ARM: at91/pm_slowclock: function slow_clock() accepts parameters
+[PATCH v3 06/20] ARM: at91/pm_slowclock: rename register to named define
+[PATCH v3 10/20] ARM: at91/pm_slowclock: add runtime detection of memory contoller
 
->
-> I think you can agree following. Let's finish this talking.
->
->
-> * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-> * ? ? ? ? ? ? ? http://www.samsung.com
-> *
-> and 'original copyright'...
->
-Doesn't make sense. Go look at other files in the kernel to find
-how it's done (if you must update the year).
+we will see if we need to resend the full series
 
-By your logic, next year someone would add
-    + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-    + *               http://www.samsung.com
-
-and another year later
-    + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-    + *               http://www.samsung.com
-
-and so on....
-
-As I said, simply updating the current year in the same line works.
- -  * Copyright (C) 2010 Samsung Electronics Co. Ltd.
- + * Copyright (C) 2010 - 2012 Samsung Electronics Co. Ltd.
-    *       Jaswinder Singh<jassi.brar@samsung.com>
-And don't worry, you won't be doing me any favor by doing that.
+Best Regards,
+J.
