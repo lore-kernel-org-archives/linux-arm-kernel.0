@@ -1,53 +1,66 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 22 Feb 2012 17:44:17 +0530
-Subject: [PATCH v3 3/4] ARM: Exynos4: Remove arch_initcall for wakeup interrupt
- initialization
+Date: Wed, 22 Feb 2012 17:44:15 +0530
+Subject: [PATCH v3 1/4] ARM: Exynos4: Simplify EINT number to linux irq number
+ translation
 In-Reply-To: <1329912858-32750-1-git-send-email-thomas.abraham@linaro.org>
 References: <1329912858-32750-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1329912858-32750-4-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1329912858-32750-2-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_irq_init function would be setup to invoke the exynos4_init_irq_eint
-function when booting using device tree. The arch_initcall for
-exynos4_init_irq_eint would duplicate its invocation in that case. Hence,
-arch_initcall for exynos4_init_irq_eint is removed and this function is invoked
-from the exynos4_init_irq for non-dt case.
-
-Moreover, with single kernel image build, the exynos4_init_irq_eint has no checks
-to ensure that it is running on a exynos4 platform. So it would be appropriate
-to invoke it from exynos4_init_irq.
+The exynos4_get_irq_nr function that converts a given wakeup interrupt
+source number to a linux irq number is simplified and replaced with
+the new macro exynos4_irq_eint_to_gic_irq.
 
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos/common.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-exynos/common.c |   26 +++-----------------------
+ 1 files changed, 3 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index ed50185..888e703 100644
+index ac5ac0e..7dd9dd0 100644
 --- a/arch/arm/mach-exynos/common.c
 +++ b/arch/arm/mach-exynos/common.c
-@@ -81,6 +81,8 @@ static struct cpu_table cpu_ids[] __initdata = {
- 	},
- };
+@@ -550,27 +550,7 @@ void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ static DEFINE_SPINLOCK(eint_lock);
  
-+static int exynos4_init_irq_eint(void);
-+
- /* Initial IO mappings */
+ static unsigned int eint0_15_data[16];
+-
+-static unsigned int exynos4_get_irq_nr(unsigned int number)
+-{
+-	u32 ret = 0;
+-
+-	switch (number) {
+-	case 0 ... 3:
+-		ret = (number + IRQ_EINT0);
+-		break;
+-	case 4 ... 7:
+-		ret = (number + (IRQ_EINT4 - 4));
+-		break;
+-	case 8 ... 15:
+-		ret = (number + (IRQ_EINT8 - 8));
+-		break;
+-	default:
+-		printk(KERN_ERR "number available : %d\n", number);
+-	}
+-
+-	return ret;
+-}
++#define exynos4_irq_eint_to_gic_irq(number) (IRQ_EINT0 + number)
  
- static struct map_desc exynos_iodesc[] __initdata = {
-@@ -485,6 +487,7 @@ void __init exynos4_init_irq(void)
- 	 * uses GIC instead of VIC.
- 	 */
- 	s5p_init_irq(NULL, 0);
-+	exynos4_init_irq_eint();
- }
+ static inline void exynos4_irq_eint_mask(struct irq_data *data)
+ {
+@@ -748,9 +728,9 @@ static int __init exynos4_init_irq_eint(void)
+ 	for (irq = 0 ; irq <= 15 ; irq++) {
+ 		eint0_15_data[irq] = IRQ_EINT(irq);
  
- struct bus_type exynos4_subsys = {
-@@ -775,4 +778,3 @@ static int __init exynos4_init_irq_eint(void)
- 	irq_set_handler_data(IRQ_EINT16_31, &eint_data);
- 	return 0;
- }
--arch_initcall(exynos4_init_irq_eint);
+-		irq_set_handler_data(exynos4_get_irq_nr(irq),
++		irq_set_handler_data(exynos4_irq_eint_to_gic_irq(irq),
+ 				     &eint0_15_data[irq]);
+-		irq_set_chained_handler(exynos4_get_irq_nr(irq),
++		irq_set_chained_handler(exynos4_irq_eint_to_gic_irq(irq),
+ 					exynos4_irq_eint0_15);
+ 	}
+ 
 -- 
 1.6.6.rc2
