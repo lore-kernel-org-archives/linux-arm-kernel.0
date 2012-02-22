@@ -1,176 +1,47 @@
-From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Wed, 22 Feb 2012 07:47:00 -0700
-Subject: [PATCH 3/3] ARM: support syscall tracing
-In-Reply-To: <4F44FF58.3060907@mentor.com>
-References: <4F44FF58.3060907@mentor.com>
-Message-ID: <4F44FFE4.5070708@mentor.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Feb 2012 14:50:03 +0000
+Subject: [PATCH v2 12/19] ARM: at91/rtc-at91sam9: each SoC can select the
+ RTT device to use
+In-Reply-To: <bcf67fab836268c6f3a5b5618d44e3fdf3525af0.1329903206.git.nicolas.ferre@atmel.com>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <bcf67fab836268c6f3a5b5618d44e3fdf3525af0.1329903206.git.nicolas.ferre@atmel.com>
+Message-ID: <201202221450.04390.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As specified by ftrace-design.txt, TIF_SYSCALL_TRACEPOINT was
-added, as well as NR_syscalls in asm/unistd.h.  Additionally,
-__sys_trace was modified to call trace_sys_enter and
-trace_sys_exit when appropriate.
+On Wednesday 22 February 2012, Nicolas Ferre wrote:
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> 
+> For the RTT as RTC driver rtc-at91sam9, the platform_device structure
+> is filled during SoC initialization. This will allow to convert this
+> RTC driver as a standard platform driver.
 
-Tests #2 - #4 of "perf test" now complete successfully.
+Can you make this more elaborate? I don't see from this or the code why
+you don't just always register the RTT as "rtc-at91sam9". There seems to
+be no driver for the "at91_rtt" in tree, so I don't know if there is
+an out of tree driver binding to it.
 
-Signed-off-by: Steven Walter <stevenrwalter@gmail.com>
-Signed-off-by: Wade Farnsworth <wade_farnsworth@mentor.com>
----
- arch/arm/Kconfig                   |    1 +
- arch/arm/include/asm/thread_info.h |    2 ++
- arch/arm/include/asm/unistd.h      |   12 ++++++++++++
- arch/arm/kernel/entry-common.S     |   16 ++++++++++++++--
- arch/arm/kernel/ptrace.c           |   23 ++++++++++++++++++-----
- 5 files changed, 47 insertions(+), 7 deletions(-)
+Would it be possible to remove the compile time #if and the resetting
+of the device name if both drivers bind to the rtc name and the other
+rtt driver binds to both names?
+ 
+>  static int __init at91_rtc_init(void)
+>  {
+> -	int status;
+> -	struct device *rtc;
+> -
+> -	status = platform_driver_register(&at91_rtc_driver);
+> -	if (status)
+> -		return status;
+> -	rtc = bus_find_device(&platform_bus_type, NULL,
+> -			NULL, at91_rtc_match);
+> -	if (!rtc)
+> -		platform_driver_unregister(&at91_rtc_driver);
+> -	return rtc ? 0 : -ENODEV;
+> +	return platform_driver_register(&at91_rtc_driver);
+>  }
+>  module_init(at91_rtc_init);
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0faad0c..b1d9396 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -11,6 +11,7 @@ config ARM
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_TRACEHOOK
-+	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_KPROBES if !XIP_KERNEL
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
- 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index d4c24d4..f2ff2de 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -146,6 +146,7 @@ extern void vfp_flush_hwstate(struct thread_info *);
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
- #define TIF_RESTORE_SIGMASK	20
- #define TIF_SECCOMP		21
-+#define TIF_SYSCALL_TRACEPOINT	22
- 
- #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-@@ -156,6 +157,7 @@ extern void vfp_flush_hwstate(struct thread_info *);
- #define _TIF_USING_IWMMXT	(1 << TIF_USING_IWMMXT)
- #define _TIF_RESTORE_SIGMASK	(1 << TIF_RESTORE_SIGMASK)
- #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
-+#define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
- 
- /* Checks for any syscall work in entry-common.S */
- #define _TIF_SYSCALL_WORK (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT)
-diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
-index 512cd14..e4a2e78 100644
---- a/arch/arm/include/asm/unistd.h
-+++ b/arch/arm/include/asm/unistd.h
-@@ -405,6 +405,18 @@
- #define __NR_process_vm_readv		(__NR_SYSCALL_BASE+376)
- #define __NR_process_vm_writev		(__NR_SYSCALL_BASE+377)
- 
-+#ifdef __KERNEL__
-+
-+/* This may need to be greater than __NR_last_syscall+1 in order to
-+ * account for the padding in the syscall table */
-+#define __NR_syscalls  (380)
-+
-+#ifndef __ASSEMBLY__
-+#define NR_syscalls (__NR_syscalls)
-+#endif /* __ASSEMBLY__ */
-+
-+#endif /* __KERNEL__ */
-+
- /*
-  * The following SWIs are ARM private.
-  */
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 9fd0ba9..9bed212 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -79,6 +79,11 @@ no_work_pending:
- ENDPROC(ret_to_user_from_irq)
- ENDPROC(ret_to_user)
- 
-+.macro test_syscall_tracing reg
-+       tst     \reg, #_TIF_SYSCALL_WORK
-+       tsteq   \reg, #_TIF_SYSCALL_TRACEPOINT
-+.endm
-+
- /*
-  * This is how we return from a fork.
-  */
-@@ -87,7 +92,7 @@ ENTRY(ret_from_fork)
- 	get_thread_info tsk
- 	ldr	r1, [tsk, #TI_FLAGS]		@ check for syscall tracing
- 	mov	why, #1
--	tst	r1, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
-+	test_syscall_tracing r1
- 	beq	ret_slow_syscall
- 	mov	r1, sp
- 	mov	r0, #1				@ trace exit [IP = 1]
-@@ -98,6 +103,13 @@ ENDPROC(ret_from_fork)
- 	.equ NR_syscalls,0
- #define CALL(x) .equ NR_syscalls,NR_syscalls+1
- #include "calls.S"
-+
-+/* Ensure that the system call table is not larger than __NR_syscalls,
-+ * which is the value the rest of the system sees */
-+.ifgt NR_syscalls - __NR_syscalls
-+.error "__NR_syscalls is less than the size of the syscall table"
-+.endif
-+
- #undef CALL
- #define CALL(x) .long x
- 
-@@ -446,7 +458,7 @@ ENTRY(vector_swi)
- 1:
- #endif
- 
--	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
-+	test_syscall_tracing r10
- 	bne	__sys_trace
- 
- 	cmp	scno, #NR_syscalls		@ check upper syscall limit
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 5cc5415..5e15e67 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -29,6 +29,9 @@
- #include <asm/system.h>
- #include <asm/traps.h>
- 
-+#define CREATE_TRACE_POINTS
-+#include <trace/events/syscalls.h>
-+
- #define REG_PC	15
- #define REG_PSR	16
- /*
-@@ -922,15 +925,25 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- 		audit_syscall_entry(AUDIT_ARCH_ARMEB, scno, regs->ARM_r0,
- 				    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
- 
--	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-+	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
-+	    !test_thread_flag(TIF_SYSCALL_TRACEPOINT))
- 		return scno;
- 
- 	current_thread_info()->syscall = scno;
- 
--	if (why)
--		tracehook_report_syscall_exit(regs, 0);
--	else if (tracehook_report_syscall_entry(regs))
--		current_thread_info()->syscall = -1;
-+	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
-+		if (why)
-+			tracehook_report_syscall_exit(regs, 0);
-+		else if (tracehook_report_syscall_entry(regs))
-+			current_thread_info()->syscall = -1;
-+	}
-+
-+	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT)) {
-+		if (why)
-+			trace_sys_exit(regs, scno);
-+		else
-+			trace_sys_enter(regs, scno);
-+	}
- 
- 	regs->ARM_ip = ip;
- 
--- 
-1.7.0.4
+This can become module_platform_driver().
+
+	Arnd
