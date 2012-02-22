@@ -1,49 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 22 Feb 2012 23:26:19 +0100
-Subject: [PATCH 1/3] arm: ignore devicetree blobs.
-In-Reply-To: <3629df9b5b96d3a3a63a34ebf6ddfca2fd72ccfc.1329936660.git.jason@lakedaemon.net>
-References: <cover.1312906908.git.jason@lakedaemon.net>
- <cover.1329936660.git.jason@lakedaemon.net>
- <3629df9b5b96d3a3a63a34ebf6ddfca2fd72ccfc.1329936660.git.jason@lakedaemon.net>
-Message-ID: <20120222222619.GY14173@pengutronix.de>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 23 Feb 2012 09:33:02 +1100
+Subject: [PATCH v2 09/19] ARM: at91: make sdram/ddr register base soc
+ independent
+In-Reply-To: <0acddc0a57ea5a198f662bf37047ebe95e3eb695.1329903206.git.nicolas.ferre@atmel.com>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <0acddc0a57ea5a198f662bf37047ebe95e3eb695.1329903206.git.nicolas.ferre@atmel.com>
+Message-ID: <4F456D1E.8070807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 07:18:44PM +0000, Jason Cooper wrote:
+On 22/02/12 20:39, Nicolas Ferre wrote:
+
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-/me claims prior art:
-
-	http://mid.gmane.org/1323808612-14976-1-git-send-email-u.kleine-koenig at pengutronix.de
-
-Best regards
-Uwe
-	
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
-> NOTE: This is the first version of this patch, so no change history.
-> 
->  arch/arm/boot/.gitignore |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/.gitignore b/arch/arm/boot/.gitignore
-> index ce1c5ff..3c79f85 100644
-> --- a/arch/arm/boot/.gitignore
-> +++ b/arch/arm/boot/.gitignore
-> @@ -3,3 +3,4 @@ zImage
->  xipImage
->  bootpImage
->  uImage
-> +*.dtb
-> -- 
-> 1.7.3.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+<snip>
+
+> +void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
+> +{
+> +	if (id > 1) {
+> +		pr_warn("%s: id > 2\n", __func__);
+> +		return;
+> +	}
+> +	at91_ramc_base[id] = ioremap(addr, size);
+> +	if (!at91_ramc_base[id])
+> +		pr_warn("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
+> +}
+
+
+If this fails then you will oops if you call either at91_ramc_read or
+at91_ramc_write since they don't check if at91_ramc_base[id] is a valid
+pointer. Either this function should panic, like the other at91_ioremap
+functions, or the at91_ramc_read/write functions should check for a
+valid pointer.
+
+Nitpick: The id check should probably also be BUG() or WARN() since it
+indicates a bug in the core AT91 code. pr_warn is likely to missed and
+not reported by users. Since the value is int, the check should be:
+
+  if (id < 0 || id > 1)
+
+Obviously the chance of this error happening are slim, but if you are
+going to check and warn for it, it should be done properly :-).
+
+~Ryan
