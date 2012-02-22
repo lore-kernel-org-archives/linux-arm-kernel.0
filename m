@@ -1,188 +1,199 @@
-From: Madhusudhan.Gowda@elektrobit.com (Madhusudhan.Gowda at elektrobit.com)
-Date: Wed, 22 Feb 2012 10:42:27 +0200
-Subject: [GIT PULL] OMAP PM EMU fix for v3.3
-In-Reply-To: <87linxa5gk.fsf@ti.com>
-References: <87liw8agk4.fsf@ti.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com><20120127190239.GC9339@atomide.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com><AA48DD8077D5D945A49BD1782C1140F10122E2B7@fioues08.ebgroup.elektrobit.com>
- <87linxa5gk.fsf@ti.com>
-Message-ID: <AA48DD8077D5D945A49BD1782C1140F10122E4FF@fioues08.ebgroup.elektrobit.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 22 Feb 2012 10:52:51 +0200
+Subject: [PATCH 1/2] iommu/omap: fix erroneous omap-iommu-debug API calls
+Message-ID: <1329900772-9306-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin / Paul,
+Adapt omap-iommu-debug to the latest omap-iommu API changes, which
+were introduced by commit fabdbca "iommu/omap: eliminate the public
+omap_find_iommu_device() method".
 
-I have tested this on beagle board as well as on OMAP3630 based
-propriatory phone using SDTI serial trace interface.
+In a nutshell, iommu users are not expected to provide the omap_iommu
+handle anymore - instead, iommus are attached using their user's device
+handle.
 
-Also you can test it by just observing the 
-CM_EMU (48005100) clkstctrl register
- 48 => 00000001
-Across MPU OFF alone
+omap-iommu-debug is a hybrid beast though: it invokes both public and
+private omap iommu API, so fix it as necessary (otherwise a crash
+is imminent).
 
-[root at beagleboard /]# echo 0 >
-/sys/kernel/debug/pm_debug/neon_pwrdm/suspend
-[root at beagleboard /]# echo 0 >
-/sys/kernel/debug/pm_debug/mpu_pwrdm/suspend
-[root at beagleboard /]# echo 1 >
-/sys/kernel/debug/pm_debug/core_pwrdm/suspend
-[root at beagleboard /]# echo 1 >
-/sys/kernel/debug/pm_debug/per_pwrdm/suspend
-[root at beagleboard /]# echo mem >/sys/power/state
-[   59.694671] PM: Syncing filesystems ... done.
-[   59.758209] Freezing user space processes ... (elapsed 0.02 seconds)
-done.
-[   59.789947] Freezing remaining freezable tasks ... (elapsed 0.02
-seconds) done.
-[   59.820709] Suspending console(s) (use no_console_suspend to debug)
-[   60.055816] PM: suspend of devices complete after 212.493 msecs
-[   60.059661] PM: late suspend of devices complete after 3.784 msecs
-[   60.059753] Disabling non-boot CPUs ...
-[   64.299865] Successfully put all powerdomains to target state
-[   64.302551] PM: early resume of devices complete after 2.319 msecs
-[   64.636444] PM: resume of devices complete after 332.336 msecs
-[   64.688446] Restarting tasks ... done.
-[root at beagleboard /]# 
+Note: omap-iommu-debug is a bit disturbing, as it fiddles with internal
+omap iommu data and requires exposing API which is otherwise not needed.
+It should better be more tightly coupled with omap-iommu, to prevent
+further bit rot and avoid exposing redundant API. Naturally that's out
+of scope for the -rc cycle, so for now just fix the obvious.
 
-And then print again the CM_EMU (48005100) clkstctrl register offset 48
-this will have the reset value and PRM_EMU (48307100) offset e4 =>
-00000100 register confirms the domain wakeup reset from OFF.
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Joerg Roedel <Joerg.Roedel@amd.com>
+---
+ drivers/iommu/omap-iommu-debug.c |   55 +++++++++++++++++++++++++++++--------
+ 1 files changed, 43 insertions(+), 12 deletions(-)
 
-At this moment the SDTI serial trace interface looses connection.
-
-With my patch applied the CM_EMU (48005100) clkstctrl register restores
-it initial setting across MPU OFF.
-
-Thanks
-Gowda
-
-
------Original Message-----
-From: Kevin Hilman [mailto:khilman at ti.com] 
-Sent: 20 February 2012 17:30
-To: Gowda Madhusudhan; Paul Walmsley
-Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-tony at atomide.com
-Subject: Re: [GIT PULL] OMAP PM EMU fix for v3.3
-
-+Paul
-
-Paul maintains the CM core code and should take this patch if he's OK
-with it.
-
-Also, it is most helpful if you describe what platforms it was tested on
-and exactly how you tested it.
-
-Thanks,
-
-Kevin
-
-<Madhusudhan.Gowda@elektrobit.com> writes:
-
-> Hi Kevin,
->
-> I think you have missed my last mail. Could you please ACK the pull 
-> request and pull the same.
->
-> Best Regards
-> Gowda
->
->
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> linux-arm-kernel-bounces+madhusudhan.gowda=elektrobit.com at lists.infrad
-> linux-arm-kernel-bounces+ea
-> d.org
-> Sent: 28 January 2012 09:58
-> To: tony at atomide.com; khilman at ti.com
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [GIT PULL] OMAP PM EMU fix for v3.3
->
-> Thanks Tony
->
-> Hi Kevin
-> Please do the needful and pull the same.
->
-> Best Regards
-> Gowda
->
->
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of 
-> Tony Lindgren
-> Sent: 27 January 2012 21:03
-> To: Gowda Madhusudhan
-> Cc: Kevin Hilman; linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [GIT PULL] OMAP PM EMU fix for v3.3
->
-> Hi,
->
-> * Madhusudhan.Gowda at elektrobit.com <Madhusudhan.Gowda@elektrobit.com>
-> [120127 10:25]:
->> Hi Tony,
->> 
->> Please pull the PM EMU off mode fix for v3.3
->
-> It's best that Kevin queues this as it affects PM. Or it at least 
-> needs an ack from Kevin.
->
-> Regards,
->
-> Tony
->  
->> Thanks
->> Gowda
->> 
->> The following changes since commit
->> 1c6ece3c23e58d0dbc687407d606f3560ded582a:
->> 
->>   Merge branch 'omap_fixes_a_3.3rc' of git://git.pwsan.com/linux-2.6
->> (2012-01-26 16:48:37 -0800)
->> 
->> are available in the git repository at:
->> 
->>   git://github.com/elektrobit/linux.git linux-omap-emu-fix
->> 
->> Madhusudhan Gowda (1):
->>       ARM: OMAP3 PM:Save and restore EMU context across MPU OFF
->> 
->>  arch/arm/mach-omap2/cm2xxx_3xxx.c |   16 ++++++++++++----
->>  arch/arm/mach-omap2/cm2xxx_3xxx.h |    2 ++
->>  arch/arm/mach-omap2/pm34xx.c      |    8 ++++++++
->>  3 files changed, 22 insertions(+), 4 deletions(-)
->> 
->> 
->> ----------------------------------------------------------------
->> Please note: This e-mail may contain confidential information 
->> intended
->
->> solely for the addressee. If you have received this e-mail in error, 
->> please do not disclose it to anyone, notify the sender promptly, and 
->> delete the message from your system.
->> Thank you.
->> 
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
-> ----------------------------------------------------------------
-> Please note: This e-mail may contain confidential information intended
-
-> solely for the addressee. If you have received this e-mail in error, 
-> please do not disclose it to anyone, notify the sender promptly, and 
-> delete the message from your system.
-> Thank you.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" 
-> in the body of a message to majordomo at vger.kernel.org More majordomo 
-> info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/iommu/omap-iommu-debug.c b/drivers/iommu/omap-iommu-debug.c
+index 288da5c..bad9f9d 100644
+--- a/drivers/iommu/omap-iommu-debug.c
++++ b/drivers/iommu/omap-iommu-debug.c
+@@ -44,7 +44,8 @@ static ssize_t debug_read_ver(struct file *file, char __user *userbuf,
+ static ssize_t debug_read_regs(struct file *file, char __user *userbuf,
+ 			       size_t count, loff_t *ppos)
+ {
+-	struct omap_iommu *obj = file->private_data;
++	struct device *dev = file->private_data;
++	struct omap_iommu *obj = dev_to_omap_iommu(dev);
+ 	char *p, *buf;
+ 	ssize_t bytes;
+ 
+@@ -67,7 +68,8 @@ static ssize_t debug_read_regs(struct file *file, char __user *userbuf,
+ static ssize_t debug_read_tlb(struct file *file, char __user *userbuf,
+ 			      size_t count, loff_t *ppos)
+ {
+-	struct omap_iommu *obj = file->private_data;
++	struct device *dev = file->private_data;
++	struct omap_iommu *obj = dev_to_omap_iommu(dev);
+ 	char *p, *buf;
+ 	ssize_t bytes, rest;
+ 
+@@ -97,7 +99,8 @@ static ssize_t debug_write_pagetable(struct file *file,
+ 	struct iotlb_entry e;
+ 	struct cr_regs cr;
+ 	int err;
+-	struct omap_iommu *obj = file->private_data;
++	struct device *dev = file->private_data;
++	struct omap_iommu *obj = dev_to_omap_iommu(dev);
+ 	char buf[MAXCOLUMN], *p = buf;
+ 
+ 	count = min(count, sizeof(buf));
+@@ -184,7 +187,8 @@ out:
+ static ssize_t debug_read_pagetable(struct file *file, char __user *userbuf,
+ 				    size_t count, loff_t *ppos)
+ {
+-	struct omap_iommu *obj = file->private_data;
++	struct device *dev = file->private_data;
++	struct omap_iommu *obj = dev_to_omap_iommu(dev);
+ 	char *p, *buf;
+ 	size_t bytes;
+ 
+@@ -212,7 +216,8 @@ static ssize_t debug_read_pagetable(struct file *file, char __user *userbuf,
+ static ssize_t debug_read_mmap(struct file *file, char __user *userbuf,
+ 			       size_t count, loff_t *ppos)
+ {
+-	struct omap_iommu *obj = file->private_data;
++	struct device *dev = file->private_data;
++	struct omap_iommu *obj = dev_to_omap_iommu(dev);
+ 	char *p, *buf;
+ 	struct iovm_struct *tmp;
+ 	int uninitialized_var(i);
+@@ -254,7 +259,7 @@ static ssize_t debug_read_mmap(struct file *file, char __user *userbuf,
+ static ssize_t debug_read_mem(struct file *file, char __user *userbuf,
+ 			      size_t count, loff_t *ppos)
+ {
+-	struct omap_iommu *obj = file->private_data;
++	struct device *dev = file->private_data;
+ 	char *p, *buf;
+ 	struct iovm_struct *area;
+ 	ssize_t bytes;
+@@ -268,7 +273,7 @@ static ssize_t debug_read_mem(struct file *file, char __user *userbuf,
+ 
+ 	mutex_lock(&iommu_debug_lock);
+ 
+-	area = omap_find_iovm_area(obj, (u32)ppos);
++	area = omap_find_iovm_area(dev, (u32)ppos);
+ 	if (IS_ERR(area)) {
+ 		bytes = -EINVAL;
+ 		goto err_out;
+@@ -287,7 +292,7 @@ err_out:
+ static ssize_t debug_write_mem(struct file *file, const char __user *userbuf,
+ 			       size_t count, loff_t *ppos)
+ {
+-	struct omap_iommu *obj = file->private_data;
++	struct device *dev = file->private_data;
+ 	struct iovm_struct *area;
+ 	char *p, *buf;
+ 
+@@ -305,7 +310,7 @@ static ssize_t debug_write_mem(struct file *file, const char __user *userbuf,
+ 		goto err_out;
+ 	}
+ 
+-	area = omap_find_iovm_area(obj, (u32)ppos);
++	area = omap_find_iovm_area(dev, (u32)ppos);
+ 	if (IS_ERR(area)) {
+ 		count = -EINVAL;
+ 		goto err_out;
+@@ -350,7 +355,7 @@ DEBUG_FOPS(mem);
+ 	{								\
+ 		struct dentry *dent;					\
+ 		dent = debugfs_create_file(#attr, mode, parent,		\
+-					   obj, &debug_##attr##_fops);	\
++					   dev, &debug_##attr##_fops);	\
+ 		if (!dent)						\
+ 			return -ENOMEM;					\
+ 	}
+@@ -362,20 +367,29 @@ static int iommu_debug_register(struct device *dev, void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_iommu *obj = platform_get_drvdata(pdev);
++	struct omap_iommu_arch_data *arch_data;
+ 	struct dentry *d, *parent;
+ 
+ 	if (!obj || !obj->dev)
+ 		return -EINVAL;
+ 
++	arch_data = kzalloc(sizeof(*arch_data), GFP_KERNEL);
++	if (!arch_data)
++		return -ENOMEM;
++
++	arch_data->iommu_dev = obj;
++
++	dev->archdata.iommu = arch_data;
++
+ 	d = debugfs_create_dir(obj->name, iommu_debug_root);
+ 	if (!d)
+-		return -ENOMEM;
++		goto nomem;
+ 	parent = d;
+ 
+ 	d = debugfs_create_u8("nr_tlb_entries", 400, parent,
+ 			      (u8 *)&obj->nr_tlb_entries);
+ 	if (!d)
+-		return -ENOMEM;
++		goto nomem;
+ 
+ 	DEBUG_ADD_FILE_RO(ver);
+ 	DEBUG_ADD_FILE_RO(regs);
+@@ -385,6 +399,22 @@ static int iommu_debug_register(struct device *dev, void *data)
+ 	DEBUG_ADD_FILE(mem);
+ 
+ 	return 0;
++
++nomem:
++	kfree(arch_data);
++	return -ENOMEM;
++}
++
++static int iommu_debug_unregister(struct device *dev, void *data)
++{
++	if (!dev->archdata.iommu)
++		return 0;
++
++	kfree(dev->archdata.iommu);
++
++	dev->archdata.iommu = NULL;
++
++	return 0;
+ }
+ 
+ static int __init iommu_debug_init(void)
+@@ -411,6 +441,7 @@ module_init(iommu_debug_init)
+ static void __exit iommu_debugfs_exit(void)
+ {
+ 	debugfs_remove_recursive(iommu_debug_root);
++	omap_foreach_iommu_device(NULL, iommu_debug_unregister);
+ }
+ module_exit(iommu_debugfs_exit)
+ 
+-- 
+1.7.5.4
