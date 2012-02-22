@@ -1,45 +1,107 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 22 Feb 2012 17:38:04 +0100
-Subject: [PATCH 0/7] share sa1100 rtc driver to arch-mmp
-In-Reply-To: <CAN1soZxTutYQ=uU0y_AvBTn37es+8tBU=1L6eKtJDUNONgwHFw@mail.gmail.com>
- (Haojian Zhuang's message of "Wed, 22 Feb 2012 23:37:27 +0800")
-References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
- <201202221239.54321.arnd@arndb.de>
- <CAN1soZwgtxR7pNGBQuMHZS0URXM7U6ZABD4disNmvRarZnjwxA@mail.gmail.com>
- <201202221350.00100.arnd@arndb.de>
- <CAN1soZxTutYQ=uU0y_AvBTn37es+8tBU=1L6eKtJDUNONgwHFw@mail.gmail.com>
-Message-ID: <87r4xmygb7.fsf@free.fr>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 22 Feb 2012 11:45:03 -0500
+Subject: [PATCH v2] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+Message-ID: <1329929103-28486-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+This fixes smsc911x support on platforms using gpmc_smsc911x_init().
 
-> I can remove the rtc-pxa support entirely. I still want to leave this
-> since this may be the only one choice in the future silicons.
->
-> Since some boards with pxa27x/pxa3xx are accessing RCNR (the old rtc
-> wrapper) directly, I use rtc-sa1100 to keep consistently. In pxa95x,
-> nobody is using the old rtc wrapper directly. So I only use it in
-> pxa95x.
+Commit c7e963f6888816 (net/smsc911x: Add regulator support) added
+the requirement that platforms provide vdd33a and vddvario supplies.
 
-No, I don't agree there.
+Signed-off-by: Matt Porter <mporter@ti.com>
+---
+Changes for v2:
+   - temporary fix to avoid platform device id conflicts
+   - add commit summary from the smsc911x regulator support commit
+   - incorporate platform device registration error cause reporting 
 
-The PXA RTC silicon support 2 different set of registers to access time :
- - RCNR (rtc-sa1100)
- - RYCR/RDCR (rtc-pxa)
+ arch/arm/mach-omap2/gpmc-smsc911x.c |   54 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 53 insertions(+), 1 deletions(-)
 
-The rtc-pxa driver was created to provide support for boards using the RYCR/RDCR
-rather than RCNR.
-
-Therefore I'm against removing rtc-pxa, unless there is a driver for pxa, which
-provides RTC using RYCR/RDCR registers.
-
-We had that discussion a long time ago, in [1].
-
-Cheers.
-
---
-Robert
-
-[1] Linux Arm Kernel Mailing List, 2008/09/30
-    http://lists.arm.linux.org.uk/lurker/message/20080930.193554.96feb95f.en.html
+diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+index 9970331..a7388ed 100644
+--- a/arch/arm/mach-omap2/gpmc-smsc911x.c
++++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+@@ -19,6 +19,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/smsc911x.h>
++#include <linux/regulator/fixed.h>
++#include <linux/regulator/machine.h>
+ 
+ #include <plat/board.h>
+ #include <plat/gpmc.h>
+@@ -42,6 +44,50 @@ static struct smsc911x_platform_config gpmc_smsc911x_config = {
+ 	.flags		= SMSC911X_USE_16BIT,
+ };
+ 
++static struct regulator_consumer_supply gpmc_smsc911x_supply[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
++/* Generic regulator definition to satisfy smsc911x */
++static struct regulator_init_data gpmc_smsc911x_reg_init_data = {
++	.constraints = {
++		.min_uV			= 3300000,
++		.max_uV			= 3300000,
++		.valid_modes_mask	= REGULATOR_MODE_NORMAL
++					| REGULATOR_MODE_STANDBY,
++		.valid_ops_mask		= REGULATOR_CHANGE_MODE
++					| REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(gpmc_smsc911x_supply),
++	.consumer_supplies	= gpmc_smsc911x_supply,
++};
++
++static struct fixed_voltage_config gpmc_smsc911x_fixed_reg_data = {
++	.supply_name		= "gpmc_smsc911x",
++	.microvolts		= 3300000,
++	.gpio			= -EINVAL,
++	.startup_delay		= 0,
++	.enable_high		= 0,
++	.enabled_at_boot	= 1,
++	.init_data		= &gpmc_smsc911x_reg_init_data,
++};
++
++/*
++ * Platform device id of 42 is a temporary fix to avoid conflicts
++ * with other reg-fixed-voltage devices. The real fix should
++ * involve the driver core providing a way of dynamically
++ * assigning a unique id on registration for platform devices
++ * in the same name space.
++ */
++static struct platform_device gpmc_smsc911x_regulator = {
++	.name		= "reg-fixed-voltage",
++	.id		= 42,
++	.dev = {
++		.platform_data	= &gpmc_smsc911x_fixed_reg_data,
++	},
++};
++
+ /*
+  * Initialize smsc911x device connected to the GPMC. Note that we
+  * assume that pin multiplexing is done in the board-*.c file,
+@@ -51,10 +97,16 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+ {
+ 	struct platform_device *pdev;
+ 	unsigned long cs_mem_base;
+-	int ret;
++	int ret, err;
+ 
+ 	gpmc_cfg = board_data;
+ 
++	err = platform_device_register(&gpmc_smsc911x_regulator);
++	if (err < 0) {
++		pr_err("Unable to register smsc911x regulators: %d\n", err);
++		return;
++	}
++
+ 	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
+ 		pr_err("Failed to request GPMC mem region\n");
+ 		return;
+-- 
+1.7.5.4
