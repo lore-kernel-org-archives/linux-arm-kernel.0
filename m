@@ -1,120 +1,105 @@
 From: wade_farnsworth@mentor.com (Wade Farnsworth)
-Date: Wed, 22 Feb 2012 07:45:36 -0700
-Subject: [PATCH 1/3] ARM: add support for the generic syscall.h interface
+Date: Wed, 22 Feb 2012 07:46:16 -0700
+Subject: [PATCH 2/3] ARM: add TRACEHOOK support
 In-Reply-To: <4F44FF58.3060907@mentor.com>
 References: <4F44FF58.3060907@mentor.com>
-Message-ID: <4F44FF90.4090009@mentor.com>
+Message-ID: <4F44FFB8.9020104@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supplying the asm-generic/syscall.h interface is a
-pre-requisite for HAVE_ARCH_TRACEHOOK
+Add calls to tracehook_report_syscall_{entry,exit} and tracehook_signal_handler
 
 Signed-off-by: Steven Walter <stevenrwalter@gmail.com>
 Signed-off-by: Wade Farnsworth <wade_farnsworth@mentor.com>
 ---
- arch/arm/include/asm/syscall.h |   93 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 93 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/syscall.h
+ arch/arm/Kconfig              |    1 +
+ arch/arm/include/asm/ptrace.h |    5 +++++
+ arch/arm/kernel/ptrace.c      |   21 ++++++---------------
+ arch/arm/kernel/signal.c      |    2 ++
+ 4 files changed, 14 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/include/asm/syscall.h b/arch/arm/include/asm/syscall.h
-new file mode 100644
-index 0000000..d5e30ef
---- /dev/null
-+++ b/arch/arm/include/asm/syscall.h
-@@ -0,0 +1,93 @@
-+/*
-+ * Access to user system call parameters and results
-+ *
-+ * See asm-generic/syscall.h for descriptions of what we must do here.
-+ */
-+
-+#ifndef _ASM_ARM_SYSCALL_H
-+#define _ASM_ARM_SYSCALL_H
-+
-+#include <linux/err.h>
-+
-+extern const unsigned long sys_call_table[];
-+
-+static inline int syscall_get_nr(struct task_struct *task,
-+				 struct pt_regs *regs)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a48aecc..0faad0c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -10,6 +10,7 @@ config ARM
+ 	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
+ 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+ 	select HAVE_ARCH_KGDB
++	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_KPROBES if !XIP_KERNEL
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+ 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
+diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
+index 451808b..355ece5 100644
+--- a/arch/arm/include/asm/ptrace.h
++++ b/arch/arm/include/asm/ptrace.h
+@@ -249,6 +249,11 @@ static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
+ 	return regs->ARM_sp;
+ }
+ 
++static inline unsigned long user_stack_pointer(struct pt_regs *regs)
 +{
-+	return task_thread_info(task)->syscall;
++	return regs->ARM_sp;
 +}
 +
-+static inline void syscall_rollback(struct task_struct *task,
-+				    struct pt_regs *regs)
-+{
-+	regs->ARM_r0 = regs->ARM_ORIG_r0;
-+}
+ #endif /* __KERNEL__ */
+ 
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index e33870f..5cc5415 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -23,6 +23,7 @@
+ #include <linux/perf_event.h>
+ #include <linux/hw_breakpoint.h>
+ #include <linux/regset.h>
++#include <linux/tracehook.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/system.h>
+@@ -923,24 +924,14 @@ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ 
+ 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+ 		return scno;
+-	if (!(current->ptrace & PT_PTRACED))
+-		return scno;
+ 
+ 	current_thread_info()->syscall = scno;
+ 
+-	/* the 0x80 provides a way for the tracing parent to distinguish
+-	   between a syscall stop and SIGTRAP delivery */
+-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+-				 ? 0x80 : 0));
+-	/*
+-	 * this isn't the same as continuing with a signal, but it will do
+-	 * for normal use.  strace only continues with a signal if the
+-	 * stopping signal is not SIGTRAP.  -brl
+-	 */
+-	if (current->exit_code) {
+-		send_sig(current->exit_code, current, 1);
+-		current->exit_code = 0;
+-	}
++	if (why)
++		tracehook_report_syscall_exit(regs, 0);
++	else if (tracehook_report_syscall_entry(regs))
++		current_thread_info()->syscall = -1;
 +
-+static inline long syscall_get_error(struct task_struct *task,
-+				     struct pt_regs *regs)
-+{
-+	unsigned long error = regs->ARM_r0;
-+	return IS_ERR_VALUE(error) ? error : 0;
-+}
+ 	regs->ARM_ip = ip;
+ 
+ 	return current_thread_info()->syscall;
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 9e617bd..6f084c1 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -644,6 +644,8 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
+ 	recalc_sigpending();
+ 	spin_unlock_irq(&tsk->sighand->siglock);
+ 
++	tracehook_signal_handler(sig, info, ka, regs, 0);
 +
-+static inline long syscall_get_return_value(struct task_struct *task,
-+					    struct pt_regs *regs)
-+{
-+	return regs->ARM_r0;
-+}
-+
-+static inline void syscall_set_return_value(struct task_struct *task,
-+					    struct pt_regs *regs,
-+					    int error, long val)
-+{
-+	regs->ARM_r0 = (long) error ?: val;
-+}
-+
-+#define SYSCALL_MAX_ARGS 7
-+
-+static inline void syscall_get_arguments(struct task_struct *task,
-+					 struct pt_regs *regs,
-+					 unsigned int i, unsigned int n,
-+					 unsigned long *args)
-+{
-+	if (i + n > SYSCALL_MAX_ARGS) {
-+		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
-+		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
-+		pr_warning("%s called with max args %d, handling only %d\n",
-+			   __func__, i + n, SYSCALL_MAX_ARGS);
-+		memset(args_bad, 0, n_bad * sizeof(args[0]));
-+		n = SYSCALL_MAX_ARGS - i;
-+	}
-+
-+	if (i == 0) {
-+		args[0] = regs->ARM_ORIG_r0;
-+		args++;
-+		i++;
-+		n--;
-+	}
-+
-+	memcpy(args, &regs->ARM_r0 + i, n * sizeof(args[0]));
-+}
-+
-+static inline void syscall_set_arguments(struct task_struct *task,
-+					 struct pt_regs *regs,
-+					 unsigned int i, unsigned int n,
-+					 const unsigned long *args)
-+{
-+	if (i + n > SYSCALL_MAX_ARGS) {
-+		pr_warning("%s called with max args %d, handling only %d\n",
-+			   __func__, i + n, SYSCALL_MAX_ARGS);
-+		n = SYSCALL_MAX_ARGS - i;
-+	}
-+
-+	if (i == 0) {
-+		regs->ARM_ORIG_r0 = args[0];
-+		args++;
-+		i++;
-+		n--;
-+	}
-+
-+	memcpy(&regs->ARM_r0 + i, args, n * sizeof(args[0]));
-+}
-+
-+#endif /* _ASM_ARM_SYSCALL_H */
+ 	return 0;
+ }
+ 
 -- 
 1.7.0.4
