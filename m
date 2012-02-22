@@ -1,86 +1,82 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 22 Feb 2012 14:41:05 -0800
-Subject: [GIT PULL] gpio/omap: cleanup and runtime PM conversion for v3.4
-In-Reply-To: <8762f6fr13.fsf@ti.com>
-References: <8762f6fr13.fsf@ti.com>
-Message-ID: <4F456F01.5020302@ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 23 Feb 2012 04:13:26 +0530
+Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
+In-Reply-To: <20120222193526.GC7041@n2100.arm.linux.org.uk>
+References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
+ <CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>
+ <00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>
+ <CABb+yY0j0j7Qw4MCwP_F+DKzmpdmZ3x0QC2Ktj2qmGnL=Ocx0Q@mail.gmail.com>
+ <011c01ccf107$5624d020$026e7060$%kim@samsung.com>
+ <CABb+yY1aeZ9=2GiHni3bZuRjW66Mxz7K0M753Lc-6UdxaVpBzA@mail.gmail.com>
+ <1329906421.24656.93.camel@vkoul-udesk3>
+ <4F451D24.1040009@samsung.com>
+ <CABb+yY0Zy3Xx4OZTobo2y-J4NXokGCV47PdPyKs+aOnqtng7pQ@mail.gmail.com>
+ <20120222193526.GC7041@n2100.arm.linux.org.uk>
+Message-ID: <CABb+yY2rhyRC=srq+4eKc5g_Yne0o3yqX0hV9wxH3NqohbFqHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Thu, Feb 23, 2012 at 1:05 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Any objections to this series? Can we get this queued and into linux-next?
+Just in case you didn't read the ugly thread fully, let me clarify a few points.
 
-I'll have an additional pull request for Benoit's GPIO DT stuff that 
-depends on this for v3.4 too after that series is finalized.
+> That, to me, means that Samsung hold the copyrights, and Jaswinder Singh
+> was the author of it.  Jaswinder has no copyright on the code.
+Exactly what I've been saying.
 
-Thanks,
 
-Kevin
+> Note that Boojin has contributed more lines of code than Javi.
+>
+More lines of code, yes. Note 0 contribution to the engine of pl330.
+OTOH seeing the intricate fixes that Javi submitted to the core,
+is impressive. Being the author of code, I sense Javi
+has far better understanding of PL330 and the driver.
 
-On 02/16/2012 12:43 PM, Kevin Hilman wrote:
-> Hi Grant,
+
+> What would be fair is to add the first _two_ lines indicating that
+> Samsung maintains the copyright to 2012.
 >
-> I've given this a final review and testing and I believe it's ready for
-> 3.4, so here you go.
+OK, but that may not be scalable considering next year too someone
+could want to update the copyright to 2013 and so on.
+So I suggested simply change 2010 to 2010-2012 in the existing notice.
+
+
+> However, it would *not* be unreasonable to add Boojin Kim to
+> drivers/dma/pl330.c as a separate patch _before_ or _after_ this patch,
+> and I think that would be more warranted than adding Javi Merino as an
+> author based on the above stats.
 >
-> Also note that Benoit's recently posted GPIO cleanups and DT conversion
-> depend on this series.
+Based on the LOC stats, maybe. But not on the quality of patches.
+I say let's add Javi and Boojin both.
+
+
+>> Kukjin thinks merging two files is a serious enough change to
+>> warrant co-authorship, which I disagree.
 >
-> Thanks,
+> Get a clue.  Reading the patch.  Kukjin isn't claiming co-authorship.
+> Boojin is.  Different person.
 >
-> Kevin
+I meant Kukjin is defending co-ownership of Boojin on the basis of this merge.
+
+
+>> I am equally pissed off by the fact that Kukjin/Boojin sneaked in the
+>> co-authorship in this revision while carrying over the Acked-by's from
+>> previous revision as if it has already been approved by others.
 >
+>Go and check the file history, and you'll see it's justified.
 >
-> The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+Actually I know more than the history of file. I have worked with Boojin.
+
+> Rubbish.  It does make sense, because it's saying where the changes
+> came from.  That's done quite often when moving code around.
 >
->    Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
+> You could say that moving code from file A to file B and commenting
+> that it came from file A makes no sense because the code is no longer
+> in file A.  Well, that's definitely the case, but that doesn't mean
+> you don't credit where it came from in the first place.
 >
-> are available in the git repository at:
->
->    git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/gpio/runtime-pm-cleanup
->
-> for you to fetch changes up to f86bcc302a8c570dd0f5a50097a6af96a0e717c2:
->
->    gpio/omap: handle set_dataout reg capable IP on restore (2012-02-06 16:58:45 +0530)
->
-> ----------------------------------------------------------------
-> Charulatha V (8):
->        gpio/omap: remove dependency on gpio_bank_count
->        gpio/omap: use flag to identify wakeup domain
->        gpio/omap: make gpio_context part of gpio_bank structure
->        gpio/omap: make non-wakeup GPIO part of pdata
->        gpio/omap: avoid cpu checks during module ena/disable
->        gpio/omap: use pinctrl offset instead of macro
->        gpio/omap: remove bank->method&  METHOD_* macros
->        gpio/omap: fix bankwidth for OMAP7xx MPUIO
->
-> Nishanth Menon (4):
->        gpio/omap: save and restore debounce registers
->        gpio/omap: enable irq at the end of all configuration in restore
->        gpio/omap: restore OE only after setting the output level
->        gpio/omap: handle set_dataout reg capable IP on restore
->
-> Tarun Kanti DebBarma (13):
->        gpio/omap: handle save/restore context in GPIO driver
->        gpio/omap: further cleanup using wkup_en register
->        gpio/omap: use level/edge detect reg offsets
->        gpio/omap: remove hardcoded offsets in context save/restore
->        gpio/omap: cleanup set_gpio_triggering function
->        gpio/omap: cleanup omap_gpio_mod_init function
->        gpio/omap: remove unnecessary bit-masking for read access
->        gpio/omap: use pm-runtime framework
->        gpio/omap: optimize suspend and resume functions
->        gpio/omap: cleanup prepare_for_idle and resume_after_idle
->        gpio/omap: fix debounce clock handling
->        gpio/omap: fix incorrect access of debounce module
->        gpio/omap: remove omap_gpio_save_context overhead
->
->   arch/arm/mach-omap1/gpio15xx.c         |    7 +-
->   arch/arm/mach-omap1/gpio16xx.c         |   47 ++-
->   arch/arm/mach-omap1/gpio7xx.c          |   14 +-
->   arch/arm/mach-omap2/gpio.c             |   36 +-
->   arch/arm/mach-omap2/pm34xx.c           |   14 -
->   arch/arm/plat-omap/include/plat/gpio.h |   29 +-
->   drivers/gpio/gpio-omap.c               | 1106 +++++++++++++-------------------
->   7 files changed, 555 insertions(+), 698 deletions(-)
+Btw _every_ file involved in the merger is authored by me, so we are not
+at the risk of wiping out credit log of someone's contribution.
+Anyways, I think I can live with that piece of history stuck to the
+file forever.
