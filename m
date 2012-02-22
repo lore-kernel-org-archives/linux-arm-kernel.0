@@ -1,46 +1,34 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 22 Feb 2012 11:29:01 -0500
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <20120214110836.GE15338@n2100.arm.linux.org.uk>
-References: <1329151422-2146-1-git-send-email-mporter@ti.com>
- <20120214110836.GE15338@n2100.arm.linux.org.uk>
-Message-ID: <20120222162901.GB20411@beef>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 22 Feb 2012 17:24:42 +0100
+Subject: [PATCH v2 12/19] ARM: at91/rtc-at91sam9: each SoC can select
+ the RTT device to use
+In-Reply-To: <201202221450.04390.arnd@arndb.de>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <bcf67fab836268c6f3a5b5618d44e3fdf3525af0.1329903206.git.nicolas.ferre@atmel.com>
+ <201202221450.04390.arnd@arndb.de>
+Message-ID: <20120222162442.GD9407@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 11:08:36AM +0000, Russell King - ARM Linux wrote:
-> Two more points:
+On 14:50 Wed 22 Feb     , Arnd Bergmann wrote:
+> On Wednesday 22 February 2012, Nicolas Ferre wrote:
+> > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > 
+> > For the RTT as RTC driver rtc-at91sam9, the platform_device structure
+> > is filled during SoC initialization. This will allow to convert this
+> > RTC driver as a standard platform driver.
 > 
-> On Mon, Feb 13, 2012 at 11:43:42AM -0500, Matt Porter wrote:
-> > This fixes smsc911x support on platforms using gpmc_smsc911x_init().
-> > Commit c7e963f6888816f04d1f5da0e07bec4e0092f227 added the requirement
+> Can you make this more elaborate? I don't see from this or the code why
+> you don't just always register the RTT as "rtc-at91sam9". There seems to
+> be no driver for the "at91_rtt" in tree, so I don't know if there is
+> an out of tree driver binding to it.
 > 
-> Always include the commit summary as well here, so:
-> 
-> Commit c7e963f6888816 (net/smsc911x: Add regulator support) added the ...
+> Would it be possible to remove the compile time #if and the resetting
+> of the device name if both drivers bind to the rtc name and the other
+> rtt driver binds to both names?
+because I see a quite some people use the rtt for something else
 
-Ok. Addressed in v2.
+so I don't want to change on existing kernel
 
-> > @@ -55,6 +94,11 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
-> >  
-> >  	gpmc_cfg = board_data;
-> >  
-> > +	if (platform_device_register(&gpmc_smsc911x_regulator) < 0) {
-> > +		pr_err("Unable to register smsc911x regulators\n");
-> > +		return;
-> > +	}
-> 
-> It's always a good idea to indicate why something failed:
-> 
-> 	err = platform_device_register(&gpmc_smsc911x_regulator);
-> 	if (err < 0) {
-> 		pr_err("Unable to register smsc911x regulators: %d\n", err);
-> 		return;
-> 	}
-> 
-> so that people can see not only what failed, but also why it failed.
-
-Looks much better, also addressed in v2.
-
--Matt
+Best Regards,
+J.
