@@ -1,67 +1,27 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Wed, 22 Feb 2012 07:59:25 +0800
-Subject: [GIT PULL] [v3.3] fixes for arch-pxa in arm
-In-Reply-To: <201202211727.19754.arnd@arndb.de>
-References: <CAN1soZwcL-ELxwW5MB7zNQOrr0YPpo6pXp40D7uEaKH6Li0haw@mail.gmail.com>
- <CAN1soZzwvefsZbJ4LXk-j0qjqQLTH-7Gp4ufgyncjbu-SevnZg@mail.gmail.com>
- <201202211727.19754.arnd@arndb.de>
-Message-ID: <CAF+7xWnXe24ZmtrC756+kXY32KdyrrfecO2vZF7ZY4y5+XpbOw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 21 Feb 2012 16:00:52 -0800
+Subject: [PATCHv10 3/4] omap3: add common twl configurations for vdd1 and
+ vdd2
+In-Reply-To: <1329733568-26676-4-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Mon, 20 Feb 2012 12:26:07 +0200")
+References: <1329733568-26676-1-git-send-email-t-kristo@ti.com>
+ <1329733568-26676-4-git-send-email-t-kristo@ti.com>
+Message-ID: <871upn4tzf.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Tero Kristo <t-kristo@ti.com> writes:
 
-2012/2/22 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 21 February 2012, Haojian Zhuang wrote:
->> On Sat, Feb 18, 2012 at 6:04 PM, Haojian Zhuang
->> <haojian.zhuang@gmail.com> wrote:
->> > Hi Arnd,
->> >
->> > Here's the fixes for 3.3.
->> >
->> > The following changes since commit c38e23456278e967f094b08247ffc3711b1029b2:
->> >
->> > ?i387: fix sense of sanity check (2012-02-15 08:05:18 -0800)
->> >
->> > are available in the git repository at:
->> > ?git://github.com/hzhuang1/linux.git fixes
->> >
->> > Axel Lin (2):
->> > ? ? ?ARM: pxa: fix error handling in pxa2xx_drv_pcmcia_probe
->> > ? ? ?pxa/hx4700: add platform device and I2C info for AK4641 codec
->> >
->> > Danny Kukawka (3):
->> > ? ? ?ARM: pxa: fix including linux/gpio.h twice
->> > ? ? ?arch/arm/mach-mmp/: some files include some headers twice
->> > ? ? ?arch/arm/mach-pxa/: included linux/gpio.h twice
->> >
->> > Haojian Zhuang (2):
->> > ? ? ?ARM: pxa: fix wrong parsing gpio event on spitz
->> > ? ? ?ARM: pxa: fix mixed declarations and code in sharpsl_pm
+> VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
+> to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
+> are needed by DVFS.
 >
-> Hi Haojian,
+> Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manuals:
+> - SWCS019L : TWL4030 ES3.1 Data Manual rev L
+> - SWCS030E : TWL5030 ES1.2 Data Manual rev E
 >
-> I've had a look now, sorry for the late reply.
->
-> How urgent is "pxa/hx4700: add platform device and I2C info
-> for AK4641 codec" amongst these? If not so urgent, I would prefer
-> putting this one on next/fixes-non-critical or even next/board
-> for 3.4 while applying the reset on the fixes branch for 3.3.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-This patch is required since commit c26f64
-"ASoC: add iPAQ hx4700 machine driver.
-The audio on hx4700 does not work without this patch.
+Do you have a similar patch for OMAP4 support?
 
-Actually, I think this patch should have CC stable tag for 3.0+.
-
-I was expet to see this patch in 3.2 since I sent the patch.
-I really hope it can be upstream in 3.3 now.
-
-Thanks,
-Axel
-
->
-> I'd prefer to cut down on non-trivial fixes for 3.3 now that
-> we are at -rc4.
->
-> ? ? ? ?Arnd
+Kevin
