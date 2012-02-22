@@ -1,177 +1,67 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 22 Feb 2012 10:39:27 +0100
-Subject: [PATCH v2 01/19] ARM: at91: factorise duplicated at91sam9 idle
+Date: Wed, 22 Feb 2012 10:39:39 +0100
+Subject: [PATCH v2 13/19] ARM: at91:rtc/rtc-at91sam9: ioremap register bank
 In-Reply-To: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <0d78171672a30e8ec8084f54a557e9948260356d.1329903206.git.nicolas.ferre@atmel.com>
+Message-ID: <bcbc282fb3f10de0cc2d5e0067759a888c71d11e.1329903206.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Remove duplicated at91sam9xxxx_idle() functions introduced
-by commit c9dfafb "ARM: mach-at91: move special idle code out of line".
-Replace by a generic at91sam9_idle() function in setup.c common
-location.
+Instead of computing virtual address with AT91_VA_BASE_SYS, use the
+appropriate ioremap() call on the driver "memory" resource.
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/at91sam9260.c |    8 +-------
- arch/arm/mach-at91/at91sam9261.c |    8 +-------
- arch/arm/mach-at91/at91sam9263.c |    8 +-------
- arch/arm/mach-at91/at91sam9g45.c |    8 +-------
- arch/arm/mach-at91/at91sam9rl.c  |    8 +-------
- arch/arm/mach-at91/clock.c       |    8 ++++++++
- arch/arm/mach-at91/generic.h     |    3 +++
- 7 files changed, 16 insertions(+), 35 deletions(-)
+ drivers/rtc/rtc-at91sam9.c |   13 ++++++++++---
+ 1 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 9ac8c6f..e965332 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -329,15 +329,9 @@ static void __init at91sam9260_ioremap_registers(void)
- 	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
- }
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 65896a3..08b69fd 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -307,8 +307,12 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
+ 		device_init_wakeup(&pdev->dev, 1);
  
--static void at91sam9260_idle(void)
--{
--	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
--	cpu_do_idle();
--}
--
- static void __init at91sam9260_initialize(void)
- {
--	arm_pm_idle = at91sam9260_idle;
-+	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
- 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
- 			| (1 << AT91SAM9260_ID_IRQ2);
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index ab76868..d7f51d6 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -287,15 +287,9 @@ static void __init at91sam9261_ioremap_registers(void)
- 	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
- }
+ 	platform_set_drvdata(pdev, rtc);
+-	rtc->rtt = (void __force __iomem *) (AT91_VA_BASE_SYS - AT91_BASE_SYS);
+-	rtc->rtt += r->start;
++	rtc->rtt = ioremap(r->start, resource_size(r));
++	if (!rtc->rtt) {
++		dev_err(&pdev->dev, "failed to map registers, aborting.\n");
++		ret = -ENOMEM;
++		goto fail;
++	}
  
--static void at91sam9261_idle(void)
--{
--	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
--	cpu_do_idle();
--}
--
- static void __init at91sam9261_initialize(void)
- {
--	arm_pm_idle = at91sam9261_idle;
-+	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
- 	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
- 			| (1 << AT91SAM9261_ID_IRQ2);
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 247ab63..8bdba2a 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -308,15 +308,9 @@ static void __init at91sam9263_ioremap_registers(void)
- 	at91sam9_ioremap_smc(1, AT91SAM9263_BASE_SMC1);
- }
+ 	mr = rtt_readl(rtc, MR);
  
--static void at91sam9263_idle(void)
--{
--	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
--	cpu_do_idle();
--}
--
- static void __init at91sam9263_initialize(void)
- {
--	arm_pm_idle = at91sam9263_idle;
-+	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
- 	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
- 
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 5b12192..5d2ff90 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -317,12 +317,6 @@ static struct at91_gpio_bank at91sam9g45_gpio[] __initdata = {
+@@ -326,7 +330,7 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
+ 				&at91_rtc_ops, THIS_MODULE);
+ 	if (IS_ERR(rtc->rtcdev)) {
+ 		ret = PTR_ERR(rtc->rtcdev);
+-		goto fail;
++		goto fail_register;
  	}
- };
  
--static void at91sam9g45_idle(void)
--{
--	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
--	cpu_do_idle();
--}
--
- /* --------------------------------------------------------------------
-  *  AT91SAM9G45 processor initialization
-  * -------------------------------------------------------------------- */
-@@ -343,7 +337,7 @@ static void __init at91sam9g45_ioremap_registers(void)
+ 	/* register irq handler after we know what name we'll use */
+@@ -351,6 +355,8 @@ static int __devinit at91_rtc_probe(struct platform_device *pdev)
  
- static void __init at91sam9g45_initialize(void)
- {
--	arm_pm_idle = at91sam9g45_idle;
-+	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9g45_restart;
- 	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
- 
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index fd60e22..e86c50b 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -292,15 +292,9 @@ static void __init at91sam9rl_ioremap_registers(void)
- 	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
- }
- 
--static void at91sam9rl_idle(void)
--{
--	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
--	cpu_do_idle();
--}
--
- static void __init at91sam9rl_initialize(void)
- {
--	arm_pm_idle = at91sam9rl_idle;
-+	arm_pm_idle = at91sam9_idle;
- 	arm_pm_restart = at91sam9_alt_restart;
- 	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
- 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index a5291e0..d1b4e07 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -28,6 +28,8 @@
- #include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
-+#include <asm/proc-fns.h>
-+
- #include "clock.h"
- #include "generic.h"
- 
-@@ -818,3 +820,9 @@ static int __init at91_clock_reset(void)
  	return 0;
- }
- late_initcall(at91_clock_reset);
-+
-+void at91sam9_idle(void)
-+{
-+	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
-+	cpu_do_idle();
-+}
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 7e8280e..4e322f34 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -56,6 +56,9 @@ struct device;
- extern void at91_irq_suspend(void);
- extern void at91_irq_resume(void);
  
-+/* idle */
-+extern void at91sam9_idle(void);
-+
- /* reset */
- extern void at91_ioremap_rstc(u32 base_addr);
- extern void at91sam9_alt_restart(char, const char *);
++fail_register:
++	iounmap(rtc->rtt);
+ fail:
+ 	platform_set_drvdata(pdev, NULL);
+ 	kfree(rtc);
+@@ -371,6 +377,7 @@ static int __devexit at91_rtc_remove(struct platform_device *pdev)
+ 
+ 	rtc_device_unregister(rtc->rtcdev);
+ 
++	iounmap(rtc->rtt);
+ 	platform_set_drvdata(pdev, NULL);
+ 	kfree(rtc);
+ 	return 0;
 -- 
 1.7.9
