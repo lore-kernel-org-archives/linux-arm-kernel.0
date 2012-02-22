@@ -1,40 +1,44 @@
-From: jason@lakedaemon.net (Jason)
-Date: Wed, 22 Feb 2012 16:09:19 -0500
-Subject: [PATCH 3/3] arm: kirkwood: convert uart0 to devicetree.
-In-Reply-To: <201202222055.27698.arnd@arndb.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 22 Feb 2012 16:17:21 -0500 (EST)
+Subject: [PATCH 2/3 v4] arm: kirkwood: add dreamplug (fdt) support.
+In-Reply-To: <201202222046.28707.arnd@arndb.de>
 References: <cover.1329936660.git.jason@lakedaemon.net>
- <0ad28cac6d608253b01e1d57bb479a29754ae823.1329936660.git.jason@lakedaemon.net>
- <201202222055.27698.arnd@arndb.de>
-Message-ID: <20120222210919.GK23524@titan.lakedaemon.net>
+ <8532afcdc4adbb3771e6f742bcc33ef9c0347858.1329936660.git.jason@lakedaemon.net>
+ <201202222046.28707.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1202221614560.24536@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 08:55:27PM +0000, Arnd Bergmann wrote:
+On Wed, 22 Feb 2012, Arnd Bergmann wrote:
+
 > On Wednesday 22 February 2012, Jason Cooper wrote:
-> > This uart is common to all kirkwood SoC's, so I placed it in the
-> > kirkwood.dtsi.
+> > Initially, copied guruplug-setup.c and did s/guruplug/dreamplug/g.
+> > Then, switched to SPI based NOR flash.
+> > 
+> > After talking to Arnd Bergman, chose an incremental approach to adding
+> > devicetree support.  First, we use the dtb to tell us we are on the
+> > dreamplug, then we gradually port over drivers.
+> > 
+> > Driver porting will start with the uart (see next patch), and progress
+> > from there.  Possibly, spi/flash/partitions will be next.
+> > 
+> > When done, board-dt.c will no longer be dreamplug specific, and dt's can
+> > be made for the other kirkwood boards.
 > > 
 > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 > 
-> I'm not sure how we are handling this for other platforms, but
-> my feeling is that the serial port information should be in
-> the board specific dts file, because there are multiple serial
-> ports on the chips and individual boards may only provide one
-> of them.
+> Looks good to me. 
+> 
+> I'm adding Nicolas and Lennert to Cc to make sure they see the mail.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-On closer inspection, it looks like the openrd board and the qnap boards
-are including uart1, nothing else does.  I'll redo it and resubmit.
+I'm fine with the approach.
 
-> Alternatively, you could list all serial ports in the dts file
-> and use the linux,stdout-path "chosen" property to tell the
-> kernel which one to use.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-All of the boards use uart0 as the default tty, so I'm thinking uart0 is
-declared in all boards (.dts), and the two that need it, declare uart1
-in the same dts.
+Arnd, Jason: please feel free to work something out between yourselves 
+to move those patches into the arm-soc tree.
 
-Does that sound right?
 
-thx,
-
-Jason.
+Nicolas
