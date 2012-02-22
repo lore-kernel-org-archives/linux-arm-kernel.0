@@ -1,28 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2012 17:18:00 +0000
-Subject: [PATCH 1/2] ARM: S3C24XX: Move s3c2443-clock.c to mach-s3c24xx
-In-Reply-To: <201202212226.01189.heiko@sntech.de>
-References: <201202212221.41744.heiko@sntech.de>
- <201202212226.01189.heiko@sntech.de>
-Message-ID: <201202221718.01137.arnd@arndb.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 22 Feb 2012 22:50:29 +0530
+Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
+In-Reply-To: <4F451D24.1040009@samsung.com>
+References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
+ <CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>
+ <00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>
+ <CABb+yY0j0j7Qw4MCwP_F+DKzmpdmZ3x0QC2Ktj2qmGnL=Ocx0Q@mail.gmail.com>
+ <011c01ccf107$5624d020$026e7060$%kim@samsung.com>
+ <CABb+yY1aeZ9=2GiHni3bZuRjW66Mxz7K0M753Lc-6UdxaVpBzA@mail.gmail.com>
+ <1329906421.24656.93.camel@vkoul-udesk3>
+ <4F451D24.1040009@samsung.com>
+Message-ID: <CABb+yY0Zy3Xx4OZTobo2y-J4NXokGCV47PdPyKs+aOnqtng7pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 February 2012, Heiko St?bner wrote:
-> S3C-SoCs starting with the S3C2443 can share a lot of functionality.
-> The file can collect more common code of these SocS later on and
-> therefore gets a new name to reflect this future purpose.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/mach-s3c24xx/Kconfig          |   14 +-
->  arch/arm/mach-s3c24xx/Makefile         |    4 +
->  arch/arm/mach-s3c24xx/common-s3c2443.c |  644 ++++++++++++++++++++++++++++++++
->  arch/arm/plat-s3c24xx/Kconfig          |    6 -
->  arch/arm/plat-s3c24xx/Makefile         |    1 -
->  arch/arm/plat-s3c24xx/s3c2443-clock.c  |  635 -------------------------------
+On Wed, Feb 22, 2012 at 10:21 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>
+> * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+> * ? ? ? ? ? ? ? http://www.samsung.com
+> *
+> * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+> * ? ? ? Jaswinder Singh <jassi.brar@samsung.com>
+> *
+The following is more appropriate
 
-No objections on the patch, but please use 'git format-patch -M' when moving
-files so that we can see which parts have changed in the process.
+-  * Copyright (C) 2010 Samsung Electronics Co. Ltd.
++ * Copyright (C) 2010 - 2012 Samsung Electronics Co. Ltd.
+   * ? ? ? Jaswinder Singh <jassi.brar@samsung.com>
 
-	Arnd
+
+> * Based on:
+> * ? ? ? arch/arm/common/pl330.c, arch/arm/include/asm/hardware/pl330.h
+> * ? ? ? Copyright (C) 2010 Samsung Electronics Co Ltd.
+>
+Doesn't make any sense because arch/arm/common/pl330.c
+and arch/arm/include/asm/hardware/pl330.h wouldn't exist anymore,
+and the changelog already provides that info.
