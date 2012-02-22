@@ -1,50 +1,76 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Wed, 22 Feb 2012 11:33:09 +1000
-Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
- platforms
-In-Reply-To: <20120221101052.GH22562@n2100.arm.linux.org.uk>
-References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
- <20120220194634.GK26840@n2100.arm.linux.org.uk>
- <201202210124.23028.paul@codesourcery.com>
- <20120221083612.GG22562@n2100.arm.linux.org.uk>
- <20120221100041.GA19696@mudshark.cambridge.arm.com>
- <20120221101052.GH22562@n2100.arm.linux.org.uk>
-Message-ID: <4F4445D5.9030306@snapgear.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 21 Feb 2012 17:39:37 -0800
+Subject: [PATCH] msm: timer: Support sched_clock()
+Message-ID: <1329874777-12758-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/12 20:10, Russell King - ARM Linux wrote:
-> On Tue, Feb 21, 2012 at 10:00:41AM +0000, Will Deacon wrote:
->> On Tue, Feb 21, 2012 at 08:36:12AM +0000, Russell King - ARM Linux wrote:
->>> Maybe no one uses a debugger for uclinux programs?
->>
->> I confess to finding this by inspection rather than a debugging failure.
->
-> There is another explanation - that is no one in the uclinux world uses
-> mainline kernels, and this bug has been fixed ages ago in some uclinux
-> kernel tree.
+Now that sched_clock is mandatory on ARM it's simple to add
+sched_clock support to the MSM timer code. Add it so that we get
+more accurate sched_clock output than the jiffies based version
+that's provided by default.
 
-There is no separate uclinux kernels or separate patch sets, hasn't been
-for a long time. No need, it is all in mainline. There are however plenty
-of vendors and individuals using non-MMU platforms who do not push back
-to mainline.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: David Brown <davidb@codeaurora.org>
+---
 
+This is based on Marc's mandatory sched_clock patch series
+located at
 
-> That directly raises the question of the value of having the uclinux
-> baggage in the mainline kernel if no one is using mainline kernels for
-> uclinux work.  If the uclinux folk aren't willing to pass up bug fixes,
-> then having it in mainline is, frankly, a waste of space.
+ git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git sched_clock-v3.3-rc3
 
-What has historically been called uclinux includes quite a number
-of architectures. The problem in this thread is quite clearly ARM
-specific. I guess noone using non-MMU Linux on ARM uses gdb to debug.
+ arch/arm/mach-msm/timer.c |   12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-Regards
-Greg
-
-
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close                             FAX:         +61 7 3217 5323
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 11d0d8f..61983da 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -24,6 +24,7 @@
+ #include <asm/mach/time.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/localtimer.h>
++#include <asm/sched_clock.h>
+ 
+ #include <mach/msm_iomap.h>
+ #include <mach/cpu.h>
+@@ -105,12 +106,12 @@ static union {
+ 
+ static void __iomem *source_base;
+ 
+-static cycle_t msm_read_timer_count(struct clocksource *cs)
++static notrace cycle_t msm_read_timer_count(struct clocksource *cs)
+ {
+ 	return readl_relaxed(source_base + TIMER_COUNT_VAL);
+ }
+ 
+-static cycle_t msm_read_timer_count_shift(struct clocksource *cs)
++static notrace cycle_t msm_read_timer_count_shift(struct clocksource *cs)
+ {
+ 	/*
+ 	 * Shift timer count down by a constant due to unreliable lower bits
+@@ -127,6 +128,11 @@ static struct clocksource msm_clocksource = {
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
++static notrace u32 msm_sched_clock_read(void)
++{
++	return msm_clocksource.read(&msm_clocksource);
++}
++
+ static void __init msm_timer_init(void)
+ {
+ 	struct clock_event_device *ce = &msm_clockevent;
+@@ -189,6 +195,8 @@ err:
+ 	res = clocksource_register_hz(cs, dgt_hz);
+ 	if (res)
+ 		pr_err("clocksource_register failed\n");
++	setup_sched_clock(msm_sched_clock_read,
++			cpu_is_msm7x01() ? 32 - MSM_DGT_SHIFT : 32, dgt_hz);
+ }
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
