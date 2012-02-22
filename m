@@ -1,29 +1,71 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 22 Feb 2012 09:34:55 +0200
-Subject: [PATCH v3 0/3] MFD: twl6040: Conversion to i2c driver
-In-Reply-To: <20120221184427.GQ18185@atomide.com>
-References: <1328868018-24668-1-git-send-email-peter.ujfalusi@ti.com>
- <20120220194736.GN5387@sortiz-mobl> <4F4372E3.4050408@ti.com>
- <20120221110533.GT5387@sortiz-mobl> <1329846755.20666.4.camel@odin>
- <20120221184427.GQ18185@atomide.com>
-Message-ID: <4F449A9F.1040907@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 22 Feb 2012 10:09:51 +0200
+Subject: [PATCH 1/8] ARM: OMAP2+: Move DISPC L3 firewall to happen in
+ omap_display_init()
+In-Reply-To: <20120221234035.18709.40664.stgit@kaulin.local>
+References: <20120221233619.18709.87982.stgit@kaulin.local>
+ <20120221234035.18709.40664.stgit@kaulin.local>
+Message-ID: <1329898191.2070.6.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
-On 02/21/2012 08:44 PM, Tony Lindgren wrote:
-> Yeah looks OK to me, acked that patch. Let me know if there are
-> others I should look.
+On Tue, 2012-02-21 at 15:40 -0800, Tony Lindgren wrote:
+> Otherwise we cannot move most of plat/io.h to be a local
+> iomap.h for mach-omap2.
+> 
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/display.c   |    3 +++
+>  drivers/video/omap2/dss/dispc.c |    5 -----
+>  2 files changed, 3 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+> index 3677b1f..5a7f12f 100644
+> --- a/arch/arm/mach-omap2/display.c
+> +++ b/arch/arm/mach-omap2/display.c
+> @@ -191,6 +191,9 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
+>  	memset(&pdata, 0, sizeof(pdata));
+>  
+>  	if (cpu_is_omap24xx()) {
+> +		/* L3 firewall setting: enable access to OCM RAM */
+> +		__raw_writel(0x402000b0, OMAP2_L3_IO_ADDRESS(0x680050a0));
+> +
+>  		curr_dss_hwmod = omap2_dss_hwmod_data;
+>  		oh_count = ARRAY_SIZE(omap2_dss_hwmod_data);
+>  	} else if (cpu_is_omap34xx()) {
+> diff --git a/drivers/video/omap2/dss/dispc.c b/drivers/video/omap2/dss/dispc.c
+> index e1626a1..cce0820 100644
+> --- a/drivers/video/omap2/dss/dispc.c
+> +++ b/drivers/video/omap2/dss/dispc.c
+> @@ -3272,11 +3272,6 @@ static void _omap_dispc_initial_config(void)
+>  	if (dss_has_feature(FEAT_FUNCGATED))
+>  		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
+>  
+> -	/* L3 firewall setting: enable access to OCM RAM */
+> -	/* XXX this should be somewhere in plat-omap */
+> -	if (cpu_is_omap24xx())
+> -		__raw_writel(0x402000b0, OMAP2_L3_IO_ADDRESS(0x680050a0));
+> -
+>  	_dispc_setup_color_conv_coef();
+>  
+>  	dispc_set_loadmode(OMAP_DSS_LOAD_FRAME_ONLY);
+> 
 
-I would appreciate if you could take a look at this series as well:
-TWL6040: Regulator support
-http://marc.info/?l=linux-omap&m=132947934522602&w=2
+I think the whole raw_writel line can be removed. It's been copied from
+the old omapfb, and my understanding is that it's about using SRAM for
+framebuffer. Using SRAM for fb is no longer supported, and I have a
+patch set that removes the remaining SRAM code from omapfb/omapdss.
 
-I have separated the twl6040 i2c driver conversion, and regulator
-support since they are dealing with different issues.
-If you know who should look at the drivers/regulator/twl-regulator.c,
-drivers/mfd/twl.c changes could you CC them as well?
+ Tomi
 
-Regards,
-P?ter
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120222/620c64ad/attachment.sig>
