@@ -1,38 +1,45 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 22 Feb 2012 18:51:32 +0530
-Subject: [PATCH 0/4] dmaengine: i.MX DMA series.
-In-Reply-To: <CACKLOr1Gn_NR8HPhmyK6DW9W+7CGG8y7yoZm6PE3bH2zt6Ej-g@mail.gmail.com>
-References: <1328884300-18801-1-git-send-email-javier.martin@vista-silicon.com>
- <CACKLOr1Gn_NR8HPhmyK6DW9W+7CGG8y7yoZm6PE3bH2zt6Ej-g@mail.gmail.com>
-Message-ID: <1329916892.24656.110.camel@vkoul-udesk3>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Feb 2012 13:20:29 +0000
+Subject: [PATCH 6/7] rtc: sa1100: enable clk support
+In-Reply-To: <201202221229.17934.arnd@arndb.de>
+References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
+ <1329815096-6200-7-git-send-email-haojian.zhuang@marvell.com>
+ <201202221229.17934.arnd@arndb.de>
+Message-ID: <20120222132029.GC22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-02-14 at 12:51 +0100, javier Martin wrote:
-> On 10 February 2012 15:31, Javier Martin
-> <javier.martin@vista-silicon.com> wrote:
-> > Patches 1-3 have already been sent to the list (not merged yet)
-> > but they are submitted so that everyone can get the whole picture
-> > of what we're trying to do here.
-> >
-> > A new patch(4) has been added which adds support for multiple
-> > descriptors.
-> >
-> > [PATCH 1/4] dmaengine: Add support for MEMCPY for imx-dma.
-> > [PATCH 2/4] i.MX DMA: Add support for 2D transfers.
-> > [PATCH 3/4] dmaengine: i.MX: Add support for interleaved transfers.
-> > [PATCH 4/4] dmaengine: Add support for multiple descriptors for imx-dma.
+On Wed, Feb 22, 2012 at 12:29:17PM +0000, Arnd Bergmann wrote:
+> On Tuesday 21 February 2012, Haojian Zhuang wrote:
+> > @@ -306,6 +308,13 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
+> >         if (!info)
+> >                 return -ENOMEM;
+> >  
+> > +       info->clk = clk_get(&pdev->dev, NULL);
+> > +       if (IS_ERR(info->clk)) {
+> > +               dev_err(&pdev->dev, "failed to find rtc clock source\n");
+> > +               ret = PTR_ERR(info->clk);
+> > +               goto err_clk;
+> > +       }
+> > +       clk_prepare_enable(info->clk);
+> >         info->iobase = res->start;
+> >         info->iosize = resource_size(res);
+> >         info->irq_1hz = irq_1hz;
+> > @@ -379,6 +388,9 @@ err_dev:
+> >         iounmap(info->reg_base);
+> >  err_map:
+> >         platform_set_drvdata(pdev, NULL);
+> > +       clk_disable_unprepare(info->clk);
+> > +       clk_put(info->clk);
+> > +err_clk:
+> >         kfree(info);
+> >         return ret;
 > 
-> Hi,
-> what do you think of this series?
-> 
-> Vinod: your concern about patch 1 is solved in patch 4
-> Sascha: I know you are not comfortable with patch 2 since it adds code
-> to a file which is meant to be removed. However, is there a chance you
-> accept it without me having to rewrite the whole series?
-Without 2, I think this patch set looks okay. Sascha have you tested
-this series, if so please let me know, I can apply the rest.
+> I wonder whether it would be easier to just make the clk handling
+> conditional here, like
 
+Eww.  No, just keep this hidden beneath the clk API.  Return a NULL
+clock for this device, and ensure that all the standard clk API
+functions know internally that that means 'no action required'.
 
--- 
-~Vinod
+There's no need to pollute drivers with this platform specific knowledge.
