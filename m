@@ -1,75 +1,96 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 22 Feb 2012 11:14:46 +0200
-Subject: [PATCH v2 2/2] iommu/omap: fix NULL pointer dereference
-Message-ID: <1329902086-13868-1-git-send-email-ohad@wizery.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 22 Feb 2012 17:14:40 +0800
+Subject: [PATCH] serial/sirf: fixup for changes to pin control
+In-Reply-To: <1329417828-6005-1-git-send-email-linus.walleij@linaro.org>
+References: <1329417828-6005-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAGsJ_4yLTPhLJEf9GHw694U9iYmtLgYPvYe3VGdyKKKcuX6pUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix this:
+2012/2/17 Linus Walleij <linus.walleij@linaro.org>:
+> We changed the signature of the pin multiplexing functions to
+> handle any pin business, so fix up the Sirf driver to call this
+> new interface and rename some variables to make the semantics
+> understandable.
+>
+> Cc: linux-serial at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-root at omap4430-panda:~# cat /debug/iommu/ducati/mem
-[   62.725708] Unable to handle kernel NULL pointer dereference at virtual addre
-ss 0000001c
-[   62.725708] pgd = e6240000
-[   62.737091] [0000001c] *pgd=a7168831, *pte=00000000, *ppte=00000000
-[   62.743682] Internal error: Oops: 17 [#1] SMP
-[   62.743682] Modules linked in: omap_iommu_debug omap_iovmm virtio_rpmsg_bus o
-map_remoteproc remoteproc virtio_ring virtio mailbox_mach mailbox
-[   62.743682] CPU: 0    Not tainted  (3.3.0-rc1-00265-g382f84e-dirty #682)
-[   62.743682] PC is at debug_read_mem+0x5c/0xac [omap_iommu_debug]
-[   62.743682] LR is at 0x1004
-[   62.777832] pc : [<bf033178>]    lr : [<00001004>]    psr: 60000013
-[   62.777832] sp : e72c7f40  ip : c0763c00  fp : 00000001
-[   62.777832] r10: 00000000  r9 : 00000000  r8 : e72c7f80
-[   62.777832] r7 : e6ffdc08  r6 : bed1ac78  r5 : 00001000  r4 : e7276000
-[   62.777832] r3 : e60f3460  r2 : 00000000  r1 : e60f38c0  r0 : 00000000
-[   62.777832] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   62.816375] Control: 10c53c7d  Table: a624004a  DAC: 00000015
-[   62.816375] Process cat (pid: 1176, stack limit = 0xe72c62f8)
-[   62.828369] Stack: (0xe72c7f40 to 0xe72c8000)
-...
-[   62.884185] [<bf033178>] (debug_read_mem+0x5c/0xac [omap_iommu_debug]) from [
-<c010e354>] (vfs_read+0xac/0x130)
-[   62.884185] [<c010e354>] (vfs_read+0xac/0x130) from [<c010e4a8>] (sys_read+0x
-40/0x70)
-[   62.884185] [<c010e4a8>] (sys_read+0x40/0x70) from [<c0014a00>] (ret_fast_sys
-call+0x0/0x3c)
+Acked-by: Barry Song <Baohua.Song@csr.com>
 
-Fix also its 'echo bla > /debug/iommu/ducati/mem' Oops sibling, too.
-
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Joerg Roedel <Joerg.Roedel@amd.com>
----
-v2: omap_find_iovm_area only returns NULL for errors. thanks, rmk.
-
- drivers/iommu/omap-iommu-debug.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/iommu/omap-iommu-debug.c b/drivers/iommu/omap-iommu-debug.c
-index bad9f9d..103dbd9 100644
---- a/drivers/iommu/omap-iommu-debug.c
-+++ b/drivers/iommu/omap-iommu-debug.c
-@@ -274,7 +274,7 @@ static ssize_t debug_read_mem(struct file *file, char __user *userbuf,
- 	mutex_lock(&iommu_debug_lock);
- 
- 	area = omap_find_iovm_area(dev, (u32)ppos);
--	if (IS_ERR(area)) {
-+	if (!area) {
- 		bytes = -EINVAL;
- 		goto err_out;
- 	}
-@@ -311,7 +311,7 @@ static ssize_t debug_write_mem(struct file *file, const char __user *userbuf,
- 	}
- 
- 	area = omap_find_iovm_area(dev, (u32)ppos);
--	if (IS_ERR(area)) {
-+	if (!area) {
- 		count = -EINVAL;
- 		goto err_out;
- 	}
--- 
-1.7.5.4
+> ---
+> ?drivers/tty/serial/sirfsoc_uart.c | ? 20 ++++++++++----------
+> ?drivers/tty/serial/sirfsoc_uart.h | ? ?2 +-
+> ?2 files changed, 11 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+> index a60523f..c1a871e 100644
+> --- a/drivers/tty/serial/sirfsoc_uart.c
+> +++ b/drivers/tty/serial/sirfsoc_uart.c
+> @@ -22,7 +22,7 @@
+> ?#include <linux/io.h>
+> ?#include <asm/irq.h>
+> ?#include <asm/mach/irq.h>
+> -#include <linux/pinctrl/pinmux.h>
+> +#include <linux/pinctrl/consumer.h>
+>
+> ?#include "sirfsoc_uart.h"
+>
+> @@ -673,12 +673,12 @@ int sirfsoc_uart_probe(struct platform_device *pdev)
+> ? ? ? ?port->irq = res->start;
+>
+> ? ? ? ?if (sirfport->hw_flow_ctrl) {
+> - ? ? ? ? ? ? ? sirfport->pmx = pinmux_get(&pdev->dev, NULL);
+> - ? ? ? ? ? ? ? ret = IS_ERR(sirfport->pmx);
+> + ? ? ? ? ? ? ? sirfport->p = pinctrl_get(&pdev->dev, NULL);
+> + ? ? ? ? ? ? ? ret = IS_ERR(sirfport->p);
+> ? ? ? ? ? ? ? ?if (ret)
+> - ? ? ? ? ? ? ? ? ? ? ? goto pmx_err;
+> + ? ? ? ? ? ? ? ? ? ? ? goto pin_err;
+>
+> - ? ? ? ? ? ? ? pinmux_enable(sirfport->pmx);
+> + ? ? ? ? ? ? ? pinctrl_enable(sirfport->p);
+> ? ? ? ?}
+>
+> ? ? ? ?port->ops = &sirfsoc_uart_ops;
+> @@ -696,10 +696,10 @@ int sirfsoc_uart_probe(struct platform_device *pdev)
+> ?port_err:
+> ? ? ? ?platform_set_drvdata(pdev, NULL);
+> ? ? ? ?if (sirfport->hw_flow_ctrl) {
+> - ? ? ? ? ? ? ? pinmux_disable(sirfport->pmx);
+> - ? ? ? ? ? ? ? pinmux_put(sirfport->pmx);
+> + ? ? ? ? ? ? ? pinctrl_disable(sirfport->p);
+> + ? ? ? ? ? ? ? pinctrl_put(sirfport->p);
+> ? ? ? ?}
+> -pmx_err:
+> +pin_err:
+> ?irq_err:
+> ? ? ? ?devm_iounmap(&pdev->dev, port->membase);
+> ?err:
+> @@ -712,8 +712,8 @@ static int sirfsoc_uart_remove(struct platform_device *pdev)
+> ? ? ? ?struct uart_port *port = &sirfport->port;
+> ? ? ? ?platform_set_drvdata(pdev, NULL);
+> ? ? ? ?if (sirfport->hw_flow_ctrl) {
+> - ? ? ? ? ? ? ? pinmux_disable(sirfport->pmx);
+> - ? ? ? ? ? ? ? pinmux_put(sirfport->pmx);
+> + ? ? ? ? ? ? ? pinctrl_disable(sirfport->p);
+> + ? ? ? ? ? ? ? pinctrl_put(sirfport->p);
+> ? ? ? ?}
+> ? ? ? ?devm_iounmap(&pdev->dev, port->membase);
+> ? ? ? ?uart_remove_one_port(&sirfsoc_uart_drv, port);
+> diff --git a/drivers/tty/serial/sirfsoc_uart.h b/drivers/tty/serial/sirfsoc_uart.h
+> index fc64260..6e207fd 100644
+> --- a/drivers/tty/serial/sirfsoc_uart.h
+> +++ b/drivers/tty/serial/sirfsoc_uart.h
+> @@ -162,7 +162,7 @@ struct sirfsoc_uart_port {
+> ? ? ? ?unsigned char ? ? ? ? ? ? ? ? ? ms_enabled;
+>
+> ? ? ? ?struct uart_port ? ? ? ? ? ? ? ?port;
+> - ? ? ? struct pinmux ? ? ? ? ? ? ? ? ? *pmx;
+> + ? ? ? struct pinctrl ? ? ? ? ? ? ? ? ?*p;
+> ?};
+>
+> ?/* Hardware Flow Control */
+> --
+> 1.7.7.6
+>
