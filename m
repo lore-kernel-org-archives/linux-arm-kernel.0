@@ -1,124 +1,273 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 22 Feb 2012 19:43:17 +0530
-Subject: [PATCHv2 1/6] ARM: ftrace: remove useless memory checks
-In-Reply-To: <20120220161601.GH26840@n2100.arm.linux.org.uk>
-References: <1327757725-10114-1-git-send-email-rabin@rab.in>
- <1327757725-10114-2-git-send-email-rabin@rab.in>
- <20120220161601.GH26840@n2100.arm.linux.org.uk>
-Message-ID: <20120222141317.GB9031@debian>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 22 Feb 2012 08:23:18 -0600
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+Message-ID: <4F44FA56.7020000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2012 at 04:16:01PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Jan 28, 2012 at 07:05:20PM +0530, Rabin Vincent wrote:
-> > diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> > index c0062ad..e9488ad 100644
-> > --- a/arch/arm/kernel/ftrace.c
-> > +++ b/arch/arm/kernel/ftrace.c
-> > @@ -125,11 +125,13 @@ static int ftrace_modify_code(unsigned long pc, unsigned long old,
-> >  {
-> >  	unsigned long replaced;
-> >  
-> > -	if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
-> > -		return -EFAULT;
-> > +	if (old) {
+On 02/15/2012 10:04 AM, Benoit Cousson wrote:
+> Adapt the GPIO driver to retrieve information from a DT file.
 > 
-> So, we're using the instruction value '0' to mean that we don't want to
-> check?  Wouldn'it it be better to pass a flag in to indicate this instead
-> of creating a magic value?
+> Allocate the irq_base dynamically and rename bank->virtual_irq_start
+> to bank->irq_base.
+> Change irq_base type to int instead of u16 to match irq_alloc_descs
+> output.
+> 
+> Add documentation for GPIO properties specific to OMAP.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 
-OK.  I think you applied this patch as-is anyway, so here is a follow-on
-patch:
+One comment below, but otherwise:
 
-8<------------
->From 18ad9e696a3b3986babb1c91807d3f39d6468176 Mon Sep 17 00:00:00 2001
-From: Rabin Vincent <rabin@rab.in>
-Date: Wed, 22 Feb 2012 19:11:46 +0530
-Subject: [PATCH] ARM: ftrace: use flag for memory check
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-We currently use a (magic) value of 0 for the old instruction value
-to detect if we should verify the old value in memory or not.  Pass
-a flag instead.
+> ---
+>  .../devicetree/bindings/gpio/gpio-omap.txt         |   30 +++++
+>  drivers/gpio/gpio-omap.c                           |  121 ++++++++++++++++++--
+>  2 files changed, 142 insertions(+), 9 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+> new file mode 100644
+> index 0000000..c1b3100
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+> @@ -0,0 +1,30 @@
+> +OMAP GPIO controller bindings
+> +
+> +Required properties:
+> +- compatible:
+> +  - "ti,omap2-gpio" for OMAP2 controllers
+> +  - "ti,omap3-gpio" for OMAP3 controllers
+> +  - "ti,omap4-gpio" for OMAP4 controllers
+> +- #gpio-cells : Should be two.
+> +  - first cell is the pin number
+> +  - second cell is used to specify optional parameters (unused)
+> +- gpio-controller : Marks the device node as a GPIO controller.
+> +- #interrupt-cells : Should be one
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/kernel/ftrace.c |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+There's no level/edge settings for gpios?
 
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 858c63f..df0bf0c 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -69,7 +69,7 @@ static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
- }
- 
- static int ftrace_modify_code(unsigned long pc, unsigned long old,
--			      unsigned long new)
-+			      unsigned long new, bool validate)
- {
- 	unsigned long replaced;
- 
-@@ -81,7 +81,7 @@ static int ftrace_modify_code(unsigned long pc, unsigned long old,
- 		new = __opcode_to_mem_arm(new);
- 	}
- 
--	if (old) {
-+	if (validate) {
- 		if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
- 			return -EFAULT;
- 
-@@ -106,14 +106,14 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
- 	pc = (unsigned long)&ftrace_call;
- 	new = ftrace_call_replace(pc, (unsigned long)func);
- 
--	ret = ftrace_modify_code(pc, 0, new);
-+	ret = ftrace_modify_code(pc, 0, new, false);
- 
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret) {
- 		pc = (unsigned long)&ftrace_call_old;
- 		new = ftrace_call_replace(pc, (unsigned long)func);
- 
--		ret = ftrace_modify_code(pc, 0, new);
-+		ret = ftrace_modify_code(pc, 0, new, false);
- 	}
- #endif
- 
-@@ -128,7 +128,7 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 	old = ftrace_nop_replace(rec);
- 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
- 
--	return ftrace_modify_code(rec->ip, old, new);
-+	return ftrace_modify_code(rec->ip, old, new, true);
- }
- 
- int ftrace_make_nop(struct module *mod,
-@@ -141,7 +141,7 @@ int ftrace_make_nop(struct module *mod,
- 
- 	old = ftrace_call_replace(ip, adjust_address(rec, addr));
- 	new = ftrace_nop_replace(rec);
--	ret = ftrace_modify_code(ip, old, new);
-+	ret = ftrace_modify_code(ip, old, new, true);
- 
- #ifdef CONFIG_OLD_MCOUNT
- 	if (ret == -EINVAL && addr == MCOUNT_ADDR) {
-@@ -149,7 +149,7 @@ int ftrace_make_nop(struct module *mod,
- 
- 		old = ftrace_call_replace(ip, adjust_address(rec, addr));
- 		new = ftrace_nop_replace(rec);
--		ret = ftrace_modify_code(ip, old, new);
-+		ret = ftrace_modify_code(ip, old, new, true);
- 	}
- #endif
- 
-@@ -210,7 +210,7 @@ static int __ftrace_modify_caller(unsigned long *callsite,
- 	unsigned long old = enable ? nop : branch;
- 	unsigned long new = enable ? branch : nop;
- 
--	return ftrace_modify_code(pc, old, new);
-+	return ftrace_modify_code(pc, old, new, true);
- }
- 
- static int ftrace_modify_graph_caller(bool enable)
--- 
-1.7.9
+> +- interrupt-controller: Mark the device node as an interrupt controller
+> +
+> +OMAP specific properties:
+> +- ti,hwmods: Name of the hwmod associated to the GPIO:
+> +  "gpio<X>", <X> being the 1-based instance number from the HW spec
+> +
+> +
+> +Example:
+> +
+> +gpio4: gpio4 {
+> +    compatible = "ti,omap4-gpio";
+> +    ti,hwmods = "gpio4";
+> +    #gpio-cells = <2>;
+> +    gpio-controller;
+> +    #interrupt-cells = <1>;
+> +    interrupt-controller;
+> +};
+> +
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index c3a9dc8..bc2bd69 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -22,6 +22,9 @@
+>  #include <linux/device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pm.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/irqdomain.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <asm/irq.h>
+> @@ -52,7 +55,8 @@ struct gpio_bank {
+>  	struct list_head node;
+>  	void __iomem *base;
+>  	u16 irq;
+> -	u16 virtual_irq_start;
+> +	int irq_base;
+> +	struct irq_domain *domain;
+>  	u32 suspend_wakeup;
+>  	u32 saved_wakeup;
+>  	u32 non_wakeup_gpios;
+> @@ -669,7 +673,7 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  		if (!isr)
+>  			break;
+>  
+> -		gpio_irq = bank->virtual_irq_start;
+> +		gpio_irq = bank->irq_base;
+>  		for (; isr != 0; isr >>= 1, gpio_irq++) {
+>  			gpio_index = GPIO_INDEX(bank, irq_to_gpio(gpio_irq));
+>  
+> @@ -915,7 +919,7 @@ static int gpio_2irq(struct gpio_chip *chip, unsigned offset)
+>  	struct gpio_bank *bank;
+>  
+>  	bank = container_of(chip, struct gpio_bank, chip);
+> -	return bank->virtual_irq_start + offset;
+> +	return bank->irq_base + offset;
+>  }
+>  
+>  /*---------------------------------------------------------------------*/
+> @@ -1028,8 +1032,7 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+>  
+>  	gpiochip_add(&bank->chip);
+>  
+> -	for (j = bank->virtual_irq_start;
+> -		     j < bank->virtual_irq_start + bank->width; j++) {
+> +	for (j = bank->irq_base; j < bank->irq_base + bank->width; j++) {
+>  		irq_set_lockdep_class(j, &gpio_lock_class);
+>  		irq_set_chip_data(j, bank);
+>  		if (bank->is_mpuio) {
+> @@ -1044,15 +1047,22 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+>  	irq_set_handler_data(bank->irq, bank);
+>  }
+>  
+> +static const struct of_device_id omap_gpio_match[];
+> +
+>  static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node;
+> +	const struct of_device_id *match;
+>  	struct omap_gpio_platform_data *pdata;
+>  	struct resource *res;
+>  	struct gpio_bank *bank;
+>  	int ret = 0;
+>  
+> -	if (!dev->platform_data)
+> +	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
+> +
+> +	pdata = match ? match->data : dev->platform_data;
+> +	if (!pdata)
+>  		return -EINVAL;
+>  
+>  	bank = devm_kzalloc(&pdev->dev, sizeof(struct gpio_bank), GFP_KERNEL);
+> @@ -1068,9 +1078,6 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	bank->irq = res->start;
+> -
+> -	pdata = pdev->dev.platform_data;
+> -	bank->virtual_irq_start = pdata->virtual_irq_start;
+>  	bank->dev = dev;
+>  	bank->dbck_flag = pdata->dbck_flag;
+>  	bank->stride = pdata->bank_stride;
+> @@ -1080,6 +1087,18 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>  	bank->loses_context = pdata->loses_context;
+>  	bank->get_context_loss_count = pdata->get_context_loss_count;
+>  	bank->regs = pdata->regs;
+> +#ifdef CONFIG_OF_GPIO
+> +	bank->chip.of_node = of_node_get(node);
+> +#endif
+> +
+> +	bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
+> +	if (bank->irq_base < 0) {
+> +		dev_err(dev, "Couldn't allocate IRQ numbers\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	bank->domain = irq_domain_add_legacy(node, bank->width, bank->irq_base,
+> +					     0, &irq_domain_simple_ops, NULL);
+>  
+>  	if (bank->regs->set_dataout && bank->regs->clr_dataout)
+>  		bank->set_dataout = _set_gpio_dataout_reg;
+> @@ -1387,11 +1406,95 @@ static const struct dev_pm_ops gpio_pm_ops = {
+>  									NULL)
+>  };
+>  
+> +#if defined(CONFIG_OF)
+> +static struct omap_gpio_reg_offs omap2_gpio_regs = {
+> +	.revision =		OMAP24XX_GPIO_REVISION,
+> +	.direction =		OMAP24XX_GPIO_OE,
+> +	.datain =		OMAP24XX_GPIO_DATAIN,
+> +	.dataout =		OMAP24XX_GPIO_DATAOUT,
+> +	.set_dataout =		OMAP24XX_GPIO_SETDATAOUT,
+> +	.clr_dataout =		OMAP24XX_GPIO_CLEARDATAOUT,
+> +	.irqstatus =		OMAP24XX_GPIO_IRQSTATUS1,
+> +	.irqstatus2 =		OMAP24XX_GPIO_IRQSTATUS2,
+> +	.irqenable =		OMAP24XX_GPIO_IRQENABLE1,
+> +	.irqenable2 =		OMAP24XX_GPIO_IRQENABLE2,
+> +	.set_irqenable =	OMAP24XX_GPIO_SETIRQENABLE1,
+> +	.clr_irqenable =	OMAP24XX_GPIO_CLEARIRQENABLE1,
+> +	.debounce =		OMAP24XX_GPIO_DEBOUNCE_VAL,
+> +	.debounce_en =		OMAP24XX_GPIO_DEBOUNCE_EN,
+> +	.ctrl =			OMAP24XX_GPIO_CTRL,
+> +	.wkup_en =		OMAP24XX_GPIO_WAKE_EN,
+> +	.leveldetect0 =		OMAP24XX_GPIO_LEVELDETECT0,
+> +	.leveldetect1 =		OMAP24XX_GPIO_LEVELDETECT1,
+> +	.risingdetect =		OMAP24XX_GPIO_RISINGDETECT,
+> +	.fallingdetect =	OMAP24XX_GPIO_FALLINGDETECT,
+> +};
+> +
+> +static struct omap_gpio_reg_offs omap4_gpio_regs = {
+> +	.revision =		OMAP4_GPIO_REVISION,
+> +	.direction =		OMAP4_GPIO_OE,
+> +	.datain =		OMAP4_GPIO_DATAIN,
+> +	.dataout =		OMAP4_GPIO_DATAOUT,
+> +	.set_dataout =		OMAP4_GPIO_SETDATAOUT,
+> +	.clr_dataout =		OMAP4_GPIO_CLEARDATAOUT,
+> +	.irqstatus =		OMAP4_GPIO_IRQSTATUS0,
+> +	.irqstatus2 =		OMAP4_GPIO_IRQSTATUS1,
+> +	.irqenable =		OMAP4_GPIO_IRQSTATUSSET0,
+> +	.irqenable2 =		OMAP4_GPIO_IRQSTATUSSET1,
+> +	.set_irqenable =	OMAP4_GPIO_IRQSTATUSSET0,
+> +	.clr_irqenable =	OMAP4_GPIO_IRQSTATUSCLR0,
+> +	.debounce =		OMAP4_GPIO_DEBOUNCINGTIME,
+> +	.debounce_en =		OMAP4_GPIO_DEBOUNCENABLE,
+> +	.ctrl =			OMAP4_GPIO_CTRL,
+> +	.wkup_en =		OMAP4_GPIO_IRQWAKEN0,
+> +	.leveldetect0 =		OMAP4_GPIO_LEVELDETECT0,
+> +	.leveldetect1 =		OMAP4_GPIO_LEVELDETECT1,
+> +	.risingdetect =		OMAP4_GPIO_RISINGDETECT,
+> +	.fallingdetect =	OMAP4_GPIO_FALLINGDETECT,
+> +};
+> +
+> +static struct omap_gpio_platform_data omap2_pdata = {
+> +	.regs = &omap2_gpio_regs,
+> +	.bank_width = 32,
+> +	.dbck_flag = false,
+> +};
+> +
+> +static struct omap_gpio_platform_data omap3_pdata = {
+> +	.regs = &omap2_gpio_regs,
+> +	.bank_width = 32,
+> +	.dbck_flag = true,
+> +};
+> +
+> +static struct omap_gpio_platform_data omap4_pdata = {
+> +	.regs = &omap4_gpio_regs,
+> +	.bank_width = 32,
+> +	.dbck_flag = true,
+> +};
+> +
+> +static const struct of_device_id omap_gpio_match[] = {
+> +	{
+> +		.compatible = "ti,omap4-gpio",
+> +		.data = &omap4_pdata,
+> +	},
+> +	{
+> +		.compatible = "ti,omap3-gpio",
+> +		.data = &omap3_pdata,
+> +	},
+> +	{
+> +		.compatible = "ti,omap2-gpio",
+> +		.data = &omap2_pdata,
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, omap_gpio_match);
+> +#endif
+> +
+>  static struct platform_driver omap_gpio_driver = {
+>  	.probe		= omap_gpio_probe,
+>  	.driver		= {
+>  		.name	= "omap_gpio",
+>  		.pm	= &gpio_pm_ops,
+> +		.of_match_table = of_match_ptr(omap_gpio_match),
+>  	},
+>  };
+>  
