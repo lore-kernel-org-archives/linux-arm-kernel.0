@@ -1,47 +1,53 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 22 Feb 2012 17:44:14 +0530
-Subject: [PATCH v3 0/4] ARM: Exynos4: Add irq domain and device tree support
- for wakeup interrupts
-Message-ID: <1329912858-32750-1-git-send-email-thomas.abraham@linaro.org>
+Date: Wed, 22 Feb 2012 17:44:17 +0530
+Subject: [PATCH v3 3/4] ARM: Exynos4: Remove arch_initcall for wakeup interrupt
+ initialization
+In-Reply-To: <1329912858-32750-1-git-send-email-thomas.abraham@linaro.org>
+References: <1329912858-32750-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1329912858-32750-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v2:
-- Reworked irq domain support based on v5 of the irq_domain generalization
-  patches.
+The of_irq_init function would be setup to invoke the exynos4_init_irq_eint
+function when booting using device tree. The arch_initcall for
+exynos4_init_irq_eint would duplicate its invocation in that case. Hence,
+arch_initcall for exynos4_init_irq_eint is removed and this function is invoked
+from the exynos4_init_irq for non-dt case.
 
-Changes since v1: (only patch 4/4 has changes)
-- Fixes based on Rob's comments:
-  a. Fixed the function prototype of exynos4_init_irq_eint(void)
-  b. Included interrupt-parent as an optional property for wakeup interrupt
-      controller node.
+Moreover, with single kernel image build, the exynos4_init_irq_eint has no checks
+to ensure that it is running on a exynos4 platform. So it would be appropriate
+to invoke it from exynos4_init_irq.
 
-Samsung Exynos4 includes 32 external wakeup interrupt sources. The first 16
-of these interrupts are connected to GIC SPI[31:16]. The last 16 of these
-interrupts are grouped together into one interrupt and connected to GIC
-SPI[32].
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ arch/arm/mach-exynos/common.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-This patchset adds irq domain and device tree support for these interrupts.
-Since there are users of fixed linux irq numbers of the external wakeup
-interrupts, the legacy mapping is used for the irq domain.
-
-This patchset is based on
-http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git [for-next]
-
-with all irq_domain (v5) patches merged from
-http://git.secretlab.ca/git/linux-2.6.git [irqdomain/next]
-
-This patchset should be applied after applying the following patch.
-[PATCH] ARM: Exynos: Add irq domain and device tree support for interrupt combiner
-
-Thomas Abraham (4):
-  ARM: Exynos4: Simplify EINT number to linux irq number translation
-  ARM: Exynos4: Add irq_domain support for gpio wakeup interrupts
-  ARM: Exynos4: Remove arch_initcall for wakeup interrupt initialization
-  ARM: Exynos4: Add device tree support for gpio wakeup interrupt controller
-
- .../bindings/arm/samsung/wakeup-eint.txt           |   37 +++++
- arch/arm/mach-exynos/common.c                      |  148 ++++++++++++--------
- arch/arm/mach-exynos/include/mach/regs-gpio.h      |    4 +-
- 3 files changed, 131 insertions(+), 58 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/samsung/wakeup-eint.txt
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index ed50185..888e703 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -81,6 +81,8 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 	},
+ };
+ 
++static int exynos4_init_irq_eint(void);
++
+ /* Initial IO mappings */
+ 
+ static struct map_desc exynos_iodesc[] __initdata = {
+@@ -485,6 +487,7 @@ void __init exynos4_init_irq(void)
+ 	 * uses GIC instead of VIC.
+ 	 */
+ 	s5p_init_irq(NULL, 0);
++	exynos4_init_irq_eint();
+ }
+ 
+ struct bus_type exynos4_subsys = {
+@@ -775,4 +778,3 @@ static int __init exynos4_init_irq_eint(void)
+ 	irq_set_handler_data(IRQ_EINT16_31, &eint_data);
+ 	return 0;
+ }
+-arch_initcall(exynos4_init_irq_eint);
+-- 
+1.6.6.rc2
