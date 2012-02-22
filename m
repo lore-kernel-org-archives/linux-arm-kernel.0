@@ -1,9 +1,9 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 22 Feb 2012 16:17:20 +0100
-Subject: [PATCH v3 09/10] pwm: Add PXA support
+Date: Wed, 22 Feb 2012 16:17:19 +0100
+Subject: [PATCH v3 08/10] pwm: Add Blackfin support
 In-Reply-To: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1329923841-32017-10-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1329923841-32017-9-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,128 +12,138 @@ Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Changes in v3:
   - update PWM ops for changes in patch 2
 
- arch/arm/plat-pxa/Makefile |    1 -
- arch/arm/plat-pxa/pwm.c    |  304 --------------------------------------------
- drivers/pwm/Kconfig        |    9 ++
- drivers/pwm/Makefile       |    1 +
- drivers/pwm/pwm-pxa.c      |  244 +++++++++++++++++++++++++++++++++++
- 5 files changed, 254 insertions(+), 305 deletions(-)
- delete mode 100644 arch/arm/plat-pxa/pwm.c
- create mode 100644 drivers/pwm/pwm-pxa.c
+ arch/blackfin/Kconfig         |   10 ---
+ arch/blackfin/kernel/Makefile |    1 -
+ arch/blackfin/kernel/pwm.c    |  100 -------------------------
+ drivers/pwm/Kconfig           |    9 ++
+ drivers/pwm/Makefile          |    1 +
+ drivers/pwm/pwm-bfin.c        |  164 +++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 174 insertions(+), 111 deletions(-)
+ delete mode 100644 arch/blackfin/kernel/pwm.c
+ create mode 100644 drivers/pwm/pwm-bfin.c
 
-diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
-index f302d04..af8e484 100644
---- a/arch/arm/plat-pxa/Makefile
-+++ b/arch/arm/plat-pxa/Makefile
-@@ -8,5 +8,4 @@ obj-$(CONFIG_PXA3xx)		+= mfp.o
- obj-$(CONFIG_PXA95x)		+= mfp.o
- obj-$(CONFIG_ARCH_MMP)		+= mfp.o
+diff --git a/arch/blackfin/Kconfig b/arch/blackfin/Kconfig
+index c1269a1..e08f39b 100644
+--- a/arch/blackfin/Kconfig
++++ b/arch/blackfin/Kconfig
+@@ -950,16 +950,6 @@ config BFIN_GPTIMERS
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called gptimers.
  
--obj-$(CONFIG_HAVE_PWM)		+= pwm.o
- obj-$(CONFIG_PXA_SSP)		+= ssp.o
-diff --git a/arch/arm/plat-pxa/pwm.c b/arch/arm/plat-pxa/pwm.c
+-config HAVE_PWM
+-	tristate "Enable PWM API support"
+-	depends on BFIN_GPTIMERS
+-	help
+-	  Enable support for the Pulse Width Modulation framework (as
+-	  found in linux/pwm.h).
+-
+-	  To compile this driver as a module, choose M here: the module
+-	  will be called pwm.
+-
+ choice
+ 	prompt "Uncached DMA region"
+ 	default DMA_UNCACHED_1M
+diff --git a/arch/blackfin/kernel/Makefile b/arch/blackfin/kernel/Makefile
+index 1f88edd..03f60a6 100644
+--- a/arch/blackfin/kernel/Makefile
++++ b/arch/blackfin/kernel/Makefile
+@@ -21,7 +21,6 @@ obj-$(CONFIG_FUNCTION_TRACER)        += ftrace-entry.o
+ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)  += ftrace.o
+ CFLAGS_REMOVE_ftrace.o = -pg
+ 
+-obj-$(CONFIG_HAVE_PWM)               += pwm.o
+ obj-$(CONFIG_IPIPE)                  += ipipe.o
+ obj-$(CONFIG_BFIN_GPTIMERS)          += gptimers.o
+ obj-$(CONFIG_CPLB_INFO)              += cplbinfo.o
+diff --git a/arch/blackfin/kernel/pwm.c b/arch/blackfin/kernel/pwm.c
 deleted file mode 100644
-index ef32686..0000000
---- a/arch/arm/plat-pxa/pwm.c
+index 33f5942..0000000
+--- a/arch/blackfin/kernel/pwm.c
 +++ /dev/null
-@@ -1,304 +0,0 @@
+@@ -1,100 +0,0 @@
 -/*
-- * linux/arch/arm/mach-pxa/pwm.c
+- * Blackfin Pulse Width Modulation (PWM) core
 - *
-- * simple driver for PWM (Pulse Width Modulator) controller
+- * Copyright (c) 2011 Analog Devices Inc.
 - *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * 2008-02-13	initial version
-- * 		eric miao <eric.miao@marvell.com>
+- * Licensed under the GPL-2 or later.
 - */
 -
 -#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/slab.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/io.h>
 -#include <linux/pwm.h>
+-#include <linux/slab.h>
 -
--#include <asm/div64.h>
--
--#define HAS_SECONDARY_PWM	0x10
--#define PWM_ID_BASE(d)		((d) & 0xf)
--
--static const struct platform_device_id pwm_id_table[] = {
--	/*   PWM    has_secondary_pwm? */
--	{ "pxa25x-pwm", 0 },
--	{ "pxa27x-pwm", 0 | HAS_SECONDARY_PWM },
--	{ "pxa168-pwm", 1 },
--	{ "pxa910-pwm", 1 },
--	{ },
--};
--MODULE_DEVICE_TABLE(platform, pwm_id_table);
--
--/* PWM registers and bits definitions */
--#define PWMCR		(0x00)
--#define PWMDCR		(0x04)
--#define PWMPCR		(0x08)
--
--#define PWMCR_SD	(1 << 6)
--#define PWMDCR_FD	(1 << 10)
+-#include <asm/gptimers.h>
+-#include <asm/portmux.h>
 -
 -struct pwm_device {
--	struct list_head	node;
--	struct pwm_device	*secondary;
--	struct platform_device	*pdev;
--
--	const char	*label;
--	struct clk	*clk;
--	int		clk_enabled;
--	void __iomem	*mmio_base;
--
--	unsigned int	use_count;
--	unsigned int	pwm_id;
+-	unsigned id;
+-	unsigned short pin;
 -};
 -
--/*
-- * period_ns = 10^9 * (PRESCALE + 1) * (PV + 1) / PWM_CLK_RATE
-- * duty_ns   = 10^9 * (PRESCALE + 1) * DC / PWM_CLK_RATE
-- */
+-static const unsigned short pwm_to_gptimer_per[] = {
+-	P_TMR0, P_TMR1, P_TMR2, P_TMR3, P_TMR4, P_TMR5,
+-	P_TMR6, P_TMR7, P_TMR8, P_TMR9, P_TMR10, P_TMR11,
+-};
+-
+-struct pwm_device *pwm_request(int pwm_id, const char *label)
+-{
+-	struct pwm_device *pwm;
+-	int ret;
+-
+-	/* XXX: pwm_id really should be unsigned */
+-	if (pwm_id < 0)
+-		return NULL;
+-
+-	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
+-	if (!pwm)
+-		return pwm;
+-
+-	pwm->id = pwm_id;
+-	if (pwm->id >= ARRAY_SIZE(pwm_to_gptimer_per))
+-		goto err;
+-
+-	pwm->pin = pwm_to_gptimer_per[pwm->id];
+-	ret = peripheral_request(pwm->pin, label);
+-	if (ret)
+-		goto err;
+-
+-	return pwm;
+- err:
+-	kfree(pwm);
+-	return NULL;
+-}
+-EXPORT_SYMBOL(pwm_request);
+-
+-void pwm_free(struct pwm_device *pwm)
+-{
+-	peripheral_free(pwm->pin);
+-	kfree(pwm);
+-}
+-EXPORT_SYMBOL(pwm_free);
+-
 -int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
 -{
--	unsigned long long c;
--	unsigned long period_cycles, prescale, pv, dc;
+-	unsigned long period, duty;
+-	unsigned long long val;
 -
--	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
+-	if (duty_ns < 0 || duty_ns > period_ns)
 -		return -EINVAL;
 -
--	c = clk_get_rate(pwm->clk);
--	c = c * period_ns;
--	do_div(c, 1000000000);
--	period_cycles = c;
+-	val = (unsigned long long)get_sclk() * period_ns;
+-	do_div(val, NSEC_PER_SEC);
+-	period = val;
 -
--	if (period_cycles < 1)
--		period_cycles = 1;
--	prescale = (period_cycles - 1) / 1024;
--	pv = period_cycles / (prescale + 1) - 1;
+-	val = (unsigned long long)period * duty_ns;
+-	do_div(val, period_ns);
+-	duty = period - val;
 -
--	if (prescale > 63)
--		return -EINVAL;
+-	if (duty >= period)
+-		duty = period - 1;
 -
--	if (duty_ns == period_ns)
--		dc = PWMDCR_FD;
--	else
--		dc = (pv + 1) * duty_ns / period_ns;
--
--	/* NOTE: the clock to PWM has to be enabled first
--	 * before writing to the registers
--	 */
--	clk_enable(pwm->clk);
--	__raw_writel(prescale, pwm->mmio_base + PWMCR);
--	__raw_writel(dc, pwm->mmio_base + PWMDCR);
--	__raw_writel(pv, pwm->mmio_base + PWMPCR);
--	clk_disable(pwm->clk);
+-	set_gptimer_config(pwm->id, TIMER_MODE_PWM | TIMER_PERIOD_CNT);
+-	set_gptimer_pwidth(pwm->id, duty);
+-	set_gptimer_period(pwm->id, period);
 -
 -	return 0;
 -}
@@ -141,422 +151,184 @@ index ef32686..0000000
 -
 -int pwm_enable(struct pwm_device *pwm)
 -{
--	int rc = 0;
--
--	if (!pwm->clk_enabled) {
--		rc = clk_enable(pwm->clk);
--		if (!rc)
--			pwm->clk_enabled = 1;
--	}
--	return rc;
+-	enable_gptimer(pwm->id);
+-	return 0;
 -}
 -EXPORT_SYMBOL(pwm_enable);
 -
 -void pwm_disable(struct pwm_device *pwm)
 -{
--	if (pwm->clk_enabled) {
--		clk_disable(pwm->clk);
--		pwm->clk_enabled = 0;
--	}
+-	disable_gptimer(pwm->id);
 -}
 -EXPORT_SYMBOL(pwm_disable);
--
--static DEFINE_MUTEX(pwm_lock);
--static LIST_HEAD(pwm_list);
--
--struct pwm_device *pwm_request(int pwm_id, const char *label)
--{
--	struct pwm_device *pwm;
--	int found = 0;
--
--	mutex_lock(&pwm_lock);
--
--	list_for_each_entry(pwm, &pwm_list, node) {
--		if (pwm->pwm_id == pwm_id) {
--			found = 1;
--			break;
--		}
--	}
--
--	if (found) {
--		if (pwm->use_count == 0) {
--			pwm->use_count++;
--			pwm->label = label;
--		} else
--			pwm = ERR_PTR(-EBUSY);
--	} else
--		pwm = ERR_PTR(-ENOENT);
--
--	mutex_unlock(&pwm_lock);
--	return pwm;
--}
--EXPORT_SYMBOL(pwm_request);
--
--void pwm_free(struct pwm_device *pwm)
--{
--	mutex_lock(&pwm_lock);
--
--	if (pwm->use_count) {
--		pwm->use_count--;
--		pwm->label = NULL;
--	} else
--		pr_warning("PWM device already freed\n");
--
--	mutex_unlock(&pwm_lock);
--}
--EXPORT_SYMBOL(pwm_free);
--
--static inline void __add_pwm(struct pwm_device *pwm)
--{
--	mutex_lock(&pwm_lock);
--	list_add_tail(&pwm->node, &pwm_list);
--	mutex_unlock(&pwm_lock);
--}
--
--static int __devinit pwm_probe(struct platform_device *pdev)
--{
--	const struct platform_device_id *id = platform_get_device_id(pdev);
--	struct pwm_device *pwm, *secondary = NULL;
--	struct resource *r;
--	int ret = 0;
--
--	pwm = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
--	if (pwm == NULL) {
--		dev_err(&pdev->dev, "failed to allocate memory\n");
--		return -ENOMEM;
--	}
--
--	pwm->clk = clk_get(&pdev->dev, NULL);
--	if (IS_ERR(pwm->clk)) {
--		ret = PTR_ERR(pwm->clk);
--		goto err_free;
--	}
--	pwm->clk_enabled = 0;
--
--	pwm->use_count = 0;
--	pwm->pwm_id = PWM_ID_BASE(id->driver_data) + pdev->id;
--	pwm->pdev = pdev;
--
--	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no memory resource defined\n");
--		ret = -ENODEV;
--		goto err_free_clk;
--	}
--
--	r = request_mem_region(r->start, resource_size(r), pdev->name);
--	if (r == NULL) {
--		dev_err(&pdev->dev, "failed to request memory resource\n");
--		ret = -EBUSY;
--		goto err_free_clk;
--	}
--
--	pwm->mmio_base = ioremap(r->start, resource_size(r));
--	if (pwm->mmio_base == NULL) {
--		dev_err(&pdev->dev, "failed to ioremap() registers\n");
--		ret = -ENODEV;
--		goto err_free_mem;
--	}
--
--	if (id->driver_data & HAS_SECONDARY_PWM) {
--		secondary = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
--		if (secondary == NULL) {
--			ret = -ENOMEM;
--			goto err_free_mem;
--		}
--
--		*secondary = *pwm;
--		pwm->secondary = secondary;
--
--		/* registers for the second PWM has offset of 0x10 */
--		secondary->mmio_base = pwm->mmio_base + 0x10;
--		secondary->pwm_id = pdev->id + 2;
--	}
--
--	__add_pwm(pwm);
--	if (secondary)
--		__add_pwm(secondary);
--
--	platform_set_drvdata(pdev, pwm);
--	return 0;
--
--err_free_mem:
--	release_mem_region(r->start, resource_size(r));
--err_free_clk:
--	clk_put(pwm->clk);
--err_free:
--	kfree(pwm);
--	return ret;
--}
--
--static int __devexit pwm_remove(struct platform_device *pdev)
--{
--	struct pwm_device *pwm;
--	struct resource *r;
--
--	pwm = platform_get_drvdata(pdev);
--	if (pwm == NULL)
--		return -ENODEV;
--
--	mutex_lock(&pwm_lock);
--
--	if (pwm->secondary) {
--		list_del(&pwm->secondary->node);
--		kfree(pwm->secondary);
--	}
--
--	list_del(&pwm->node);
--	mutex_unlock(&pwm_lock);
--
--	iounmap(pwm->mmio_base);
--
--	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	release_mem_region(r->start, resource_size(r));
--
--	clk_put(pwm->clk);
--	kfree(pwm);
--	return 0;
--}
--
--static struct platform_driver pwm_driver = {
--	.driver		= {
--		.name	= "pxa25x-pwm",
--		.owner	= THIS_MODULE,
--	},
--	.probe		= pwm_probe,
--	.remove		= __devexit_p(pwm_remove),
--	.id_table	= pwm_id_table,
--};
--
--static int __init pwm_init(void)
--{
--	return platform_driver_register(&pwm_driver);
--}
--arch_initcall(pwm_init);
--
--static void __exit pwm_exit(void)
--{
--	platform_driver_unregister(&pwm_driver);
--}
--module_exit(pwm_exit);
--
--MODULE_LICENSE("GPL v2");
 diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index eb54042..0ef4f30 100644
+index bda6f23..eb54042 100644
 --- a/drivers/pwm/Kconfig
 +++ b/drivers/pwm/Kconfig
-@@ -18,6 +18,15 @@ config PWM_BFIN
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-bfin.
+@@ -9,6 +9,15 @@ menuconfig PWM
  
-+config PWM_PXA
-+	tristate "PXA PWM support"
-+	depends on ARCH_PXA
+ if PWM
+ 
++config PWM_BFIN
++	tristate "Blackfin PWM support"
++	depends on BFIN_GPTIMERS
 +	help
-+	  Generic PWM framework driver for PXA.
++	  Generic PWM framework driver for Blackfin.
 +
 +	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-pxa.
++	  will be called pwm-bfin.
 +
  config PWM_TEGRA
  	tristate "NVIDIA Tegra PWM support"
  	depends on ARCH_TEGRA
 diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 251b8d2..e859c51 100644
+index 12300f5..251b8d2 100644
 --- a/drivers/pwm/Makefile
 +++ b/drivers/pwm/Makefile
-@@ -1,3 +1,4 @@
+@@ -1,2 +1,3 @@
  obj-$(CONFIG_PWM)		+= core.o
- obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
-+obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
++obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+diff --git a/drivers/pwm/pwm-bfin.c b/drivers/pwm/pwm-bfin.c
 new file mode 100644
-index 0000000..0f3ef5c
+index 0000000..a0c6bf9
 --- /dev/null
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -0,0 +1,244 @@
++++ b/drivers/pwm/pwm-bfin.c
+@@ -0,0 +1,164 @@
 +/*
-+ * linux/arch/arm/mach-pxa/pwm.c
++ * Blackfin Pulse Width Modulation (PWM) core
 + *
-+ * simple driver for PWM (Pulse Width Modulator) controller
++ * Copyright (c) 2011 Analog Devices Inc.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * 2008-02-13	initial version
-+ * 		eric miao <eric.miao@marvell.com>
++ * Licensed under the GPL-2 or later.
 + */
 +
 +#include <linux/module.h>
-+#include <linux/kernel.h>
 +#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
 +#include <linux/pwm.h>
++#include <linux/slab.h>
 +
-+#include <asm/div64.h>
++#include <asm/gptimers.h>
++#include <asm/portmux.h>
 +
-+#define HAS_SECONDARY_PWM	0x10
-+#define PWM_ID_BASE(d)		((d) & 0xf)
-+
-+static const struct platform_device_id pwm_id_table[] = {
-+	/*   PWM    has_secondary_pwm? */
-+	{ "pxa25x-pwm", 0 },
-+	{ "pxa27x-pwm", 0 | HAS_SECONDARY_PWM },
-+	{ "pxa168-pwm", 1 },
-+	{ "pxa910-pwm", 1 },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(platform, pwm_id_table);
-+
-+/* PWM registers and bits definitions */
-+#define PWMCR		(0x00)
-+#define PWMDCR		(0x04)
-+#define PWMPCR		(0x08)
-+
-+#define PWMCR_SD	(1 << 6)
-+#define PWMDCR_FD	(1 << 10)
-+
-+struct pxa_pwm_chip {
-+	struct pwm_chip	chip;
-+	struct device	*dev;
-+
-+	struct clk	*clk;
-+	int		clk_enabled;
-+	void __iomem	*mmio_base;
++struct bfin_pwm_chip {
++	struct pwm_chip chip;
 +};
 +
-+static inline struct pxa_pwm_chip *to_pxa_pwm_chip(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct pxa_pwm_chip, chip);
-+}
++struct bfin_pwm {
++	unsigned short pin;
++};
 +
-+/*
-+ * period_ns = 10^9 * (PRESCALE + 1) * (PV + 1) / PWM_CLK_RATE
-+ * duty_ns   = 10^9 * (PRESCALE + 1) * DC / PWM_CLK_RATE
-+ */
-+static int pxa_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+			  int duty_ns, int period_ns)
-+{
-+	struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
-+	unsigned long long c;
-+	unsigned long period_cycles, prescale, pv, dc;
-+	unsigned long offset;
++static const unsigned short pwm_to_gptimer_per[] = {
++	P_TMR0, P_TMR1, P_TMR2, P_TMR3, P_TMR4, P_TMR5,
++	P_TMR6, P_TMR7, P_TMR8, P_TMR9, P_TMR10, P_TMR11,
++};
 +
-+	if (period_ns == 0 || duty_ns > period_ns)
++static int bfin_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct bfin_pwm *priv;
++	int ret;
++
++	if (pwm->hwpwm >= ARRAY_SIZE(pwm_to_gptimer_per))
 +		return -EINVAL;
 +
-+	offset = pwm->hwpwm ? 0x10 : 0;
++	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
 +
-+	c = clk_get_rate(pc->clk);
-+	c = c * period_ns;
-+	do_div(c, 1000000000);
-+	period_cycles = c;
++	priv->pin = pwm_to_gptimer_per[pwm->hwpwm];
 +
-+	if (period_cycles < 1)
-+		period_cycles = 1;
-+	prescale = (period_cycles - 1) / 1024;
-+	pv = period_cycles / (prescale + 1) - 1;
++	ret = peripheral_request(priv->pin, NULL);
++	if (ret) {
++		kfree(priv);
++		return ret;
++	}
 +
-+	if (prescale > 63)
-+		return -EINVAL;
-+
-+	if (duty_ns == period_ns)
-+		dc = PWMDCR_FD;
-+	else
-+		dc = (pv + 1) * duty_ns / period_ns;
-+
-+	/* NOTE: the clock to PWM has to be enabled first
-+	 * before writing to the registers
-+	 */
-+	clk_enable(pc->clk);
-+	__raw_writel(prescale, pc->mmio_base + offset + PWMCR);
-+	__raw_writel(dc, pc->mmio_base + offset + PWMDCR);
-+	__raw_writel(pv, pc->mmio_base + offset + PWMPCR);
-+	clk_disable(pc->clk);
++	pwm_set_chip_data(pwm, priv);
 +
 +	return 0;
 +}
 +
-+static int pxa_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++static void bfin_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
 +{
-+	struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
-+	int rc = 0;
++	struct bfin_pwm *priv = pwm_get_chip_data(pwm);
 +
-+	if (!pc->clk_enabled) {
-+		rc = clk_enable(pc->clk);
-+		if (!rc)
-+			pc->clk_enabled++;
-+	}
-+	return rc;
-+}
-+
-+static void pxa_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct pxa_pwm_chip *pc = to_pxa_pwm_chip(chip);
-+
-+	if (pc->clk_enabled) {
-+		clk_disable(pc->clk);
-+		pc->clk_enabled--;
++	if (priv) {
++		peripheral_free(priv->pin);
++		kfree(priv);
 +	}
 +}
 +
-+static struct pwm_ops pxa_pwm_ops = {
-+	.config = pxa_pwm_config,
-+	.enable = pxa_pwm_enable,
-+	.disable = pxa_pwm_disable,
++static int bfin_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++		int duty_ns, int period_ns)
++{
++	struct bfin_pwm *priv = pwm_get_chip_data(pwm);
++	unsigned long period, duty;
++	unsigned long long val;
++
++	if (duty_ns < 0 || duty_ns > period_ns)
++		return -EINVAL;
++
++	val = (unsigned long long)get_sclk() * period_ns;
++	do_div(val, NSEC_PER_SEC);
++	period = val;
++
++	val = (unsigned long long)period * duty_ns;
++	do_div(val, period_ns);
++	duty = period - val;
++
++	if (duty >= period)
++		duty = period - 1;
++
++	set_gptimer_config(priv->pin, TIMER_MODE_PWM | TIMER_PERIOD_CNT);
++	set_gptimer_pwidth(priv->pin, duty);
++	set_gptimer_period(priv->pin, period);
++
++	return 0;
++}
++
++static int bfin_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct bfin_pwm *priv = pwm_get_chip_data(pwm);
++
++	enable_gptimer(priv->pin);
++
++	return 0;
++}
++
++static void bfin_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	struct bfin_pwm *priv = pwm_get_chip_data(pwm);
++
++	disable_gptimer(priv->pin);
++}
++
++static struct pwm_ops bfin_pwm_ops = {
++	.request = bfin_pwm_request,
++	.free = bfin_pwm_free,
++	.config = bfin_pwm_config,
++	.enable = bfin_pwm_enable,
++	.disable = bfin_pwm_disable,
 +	.owner = THIS_MODULE,
 +};
 +
-+static int __devinit pwm_probe(struct platform_device *pdev)
++static int bfin_pwm_probe(struct platform_device *pdev)
 +{
-+	const struct platform_device_id *id = platform_get_device_id(pdev);
-+	struct pxa_pwm_chip *pwm;
-+	struct resource *r;
-+	int ret = 0;
++	struct bfin_pwm_chip *pwm;
++	int ret;
 +
-+	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
-+	if (pwm == NULL) {
++	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
++	if (!pwm) {
 +		dev_err(&pdev->dev, "failed to allocate memory\n");
 +		return -ENOMEM;
 +	}
 +
-+	pwm->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pwm->clk)) {
-+		ret = PTR_ERR(pwm->clk);
-+		goto err_free;
-+	}
-+	pwm->clk_enabled = 0;
++	platform_set_drvdata(pdev, pwm);
 +
 +	pwm->chip.dev = &pdev->dev;
-+	pwm->chip.ops = &pxa_pwm_ops;
++	pwm->chip.ops = &bfin_pwm_ops;
 +	pwm->chip.base = -1;
-+	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (r == NULL) {
-+		dev_err(&pdev->dev, "no memory resource defined\n");
-+		ret = -ENODEV;
-+		goto err_free_clk;
-+	}
-+
-+	r = request_mem_region(r->start, resource_size(r), pdev->name);
-+	if (r == NULL) {
-+		dev_err(&pdev->dev, "failed to request memory resource\n");
-+		ret = -EBUSY;
-+		goto err_free_clk;
-+	}
-+
-+	pwm->mmio_base = ioremap(r->start, resource_size(r));
-+	if (pwm->mmio_base == NULL) {
-+		dev_err(&pdev->dev, "failed to ioremap() registers\n");
-+		ret = -ENODEV;
-+		goto err_free_mem;
-+	}
++	pwm->chip.npwm = 12;
 +
 +	ret = pwmchip_add(&pwm->chip);
 +	if (ret < 0) {
@@ -564,61 +336,28 @@ index 0000000..0f3ef5c
 +		return ret;
 +	}
 +
-+	platform_set_drvdata(pdev, pwm);
 +	return 0;
-+
-+err_free_mem:
-+	release_mem_region(r->start, resource_size(r));
-+err_free_clk:
-+	clk_put(pwm->clk);
-+err_free:
-+	kfree(pwm);
-+	return ret;
 +}
 +
-+static int __devexit pwm_remove(struct platform_device *pdev)
++static int __devexit bfin_pwm_remove(struct platform_device *pdev)
 +{
-+	struct pxa_pwm_chip *chip;
-+	struct resource *r;
++	struct bfin_pwm_chip *pwm = platform_get_drvdata(pdev);
 +
-+	chip = platform_get_drvdata(pdev);
-+	if (chip == NULL)
-+		return -ENODEV;
++	pwmchip_remove(&pwm->chip);
 +
-+	pwmchip_remove(&chip->chip);
-+
-+	iounmap(chip->mmio_base);
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	release_mem_region(r->start, resource_size(r));
-+
-+	clk_put(chip->clk);
-+	kfree(chip);
 +	return 0;
 +}
 +
-+static struct platform_driver pwm_driver = {
-+	.driver		= {
-+		.name	= "pxa25x-pwm",
-+		.owner	= THIS_MODULE,
++static struct platform_driver bfin_pwm_driver = {
++	.driver = {
++		.name = "bfin-pwm",
 +	},
-+	.probe		= pwm_probe,
-+	.remove		= __devexit_p(pwm_remove),
-+	.id_table	= pwm_id_table,
++	.probe = bfin_pwm_probe,
++	.remove = __devexit_p(bfin_pwm_remove),
 +};
 +
-+static int __init pwm_init(void)
-+{
-+	return platform_driver_register(&pwm_driver);
-+}
-+arch_initcall(pwm_init);
++module_platform_driver(bfin_pwm_driver);
 +
-+static void __exit pwm_exit(void)
-+{
-+	platform_driver_unregister(&pwm_driver);
-+}
-+module_exit(pwm_exit);
-+
-+MODULE_LICENSE("GPL v2");
++MODULE_LICENSE("GPL");
 -- 
 1.7.9.1
