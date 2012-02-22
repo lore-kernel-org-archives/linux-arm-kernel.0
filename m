@@ -1,44 +1,37 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 22 Feb 2012 16:17:21 -0500 (EST)
-Subject: [PATCH 2/3 v4] arm: kirkwood: add dreamplug (fdt) support.
-In-Reply-To: <201202222046.28707.arnd@arndb.de>
-References: <cover.1329936660.git.jason@lakedaemon.net>
- <8532afcdc4adbb3771e6f742bcc33ef9c0347858.1329936660.git.jason@lakedaemon.net>
- <201202222046.28707.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1202221614560.24536@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Feb 2012 21:28:21 +0000
+Subject: [PATCHv2 1/6] ARM: ftrace: remove useless memory checks
+In-Reply-To: <20120222141317.GB9031@debian>
+References: <1327757725-10114-1-git-send-email-rabin@rab.in>
+ <1327757725-10114-2-git-send-email-rabin@rab.in>
+ <20120220161601.GH26840@n2100.arm.linux.org.uk>
+ <20120222141317.GB9031@debian>
+Message-ID: <20120222212821.GE7041@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Feb 2012, Arnd Bergmann wrote:
-
-> On Wednesday 22 February 2012, Jason Cooper wrote:
-> > Initially, copied guruplug-setup.c and did s/guruplug/dreamplug/g.
-> > Then, switched to SPI based NOR flash.
+On Wed, Feb 22, 2012 at 07:43:17PM +0530, Rabin Vincent wrote:
+> On Mon, Feb 20, 2012 at 04:16:01PM +0000, Russell King - ARM Linux wrote:
+> > On Sat, Jan 28, 2012 at 07:05:20PM +0530, Rabin Vincent wrote:
+> > > diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+> > > index c0062ad..e9488ad 100644
+> > > --- a/arch/arm/kernel/ftrace.c
+> > > +++ b/arch/arm/kernel/ftrace.c
+> > > @@ -125,11 +125,13 @@ static int ftrace_modify_code(unsigned long pc, unsigned long old,
+> > >  {
+> > >  	unsigned long replaced;
+> > >  
+> > > -	if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
+> > > -		return -EFAULT;
+> > > +	if (old) {
 > > 
-> > After talking to Arnd Bergman, chose an incremental approach to adding
-> > devicetree support.  First, we use the dtb to tell us we are on the
-> > dreamplug, then we gradually port over drivers.
-> > 
-> > Driver porting will start with the uart (see next patch), and progress
-> > from there.  Possibly, spi/flash/partitions will be next.
-> > 
-> > When done, board-dt.c will no longer be dreamplug specific, and dt's can
-> > be made for the other kirkwood boards.
-> > 
-> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> > So, we're using the instruction value '0' to mean that we don't want to
+> > check?  Wouldn'it it be better to pass a flag in to indicate this instead
+> > of creating a magic value?
 > 
-> Looks good to me. 
-> 
-> I'm adding Nicolas and Lennert to Cc to make sure they see the mail.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> OK.  I think you applied this patch as-is anyway, so here is a follow-on
+> patch:
 
-I'm fine with the approach.
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-Arnd, Jason: please feel free to work something out between yourselves 
-to move those patches into the arm-soc tree.
-
-
-Nicolas
+I'd still much prefer it to be part of the original patch.  I can replace
+the patch I've merged or augment it with another patch - whichever way
+you prefer.
