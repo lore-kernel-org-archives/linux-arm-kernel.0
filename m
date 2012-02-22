@@ -1,107 +1,68 @@
-From: mporter@ti.com (Matt Porter)
-Date: Wed, 22 Feb 2012 11:45:03 -0500
-Subject: [PATCH v2] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-Message-ID: <1329929103-28486-1-git-send-email-mporter@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 22 Feb 2012 17:48:42 +0100
+Subject: [PATCHv23 01/16] mm: page_alloc: remove trailing whitespace
+In-Reply-To: <1329929337-16648-1-git-send-email-m.szyprowski@samsung.com>
+References: <1329929337-16648-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1329929337-16648-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes smsc911x support on platforms using gpmc_smsc911x_init().
+From: Michal Nazarewicz <mina86@mina86.com>
 
-Commit c7e963f6888816 (net/smsc911x: Add regulator support) added
-the requirement that platforms provide vdd33a and vddvario supplies.
-
-Signed-off-by: Matt Porter <mporter@ti.com>
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Mel Gorman <mel@csn.ul.ie>
 ---
-Changes for v2:
-   - temporary fix to avoid platform device id conflicts
-   - add commit summary from the smsc911x regulator support commit
-   - incorporate platform device registration error cause reporting 
+ mm/page_alloc.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
- arch/arm/mach-omap2/gpmc-smsc911x.c |   54 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 53 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-index 9970331..a7388ed 100644
---- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-@@ -19,6 +19,8 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/smsc911x.h>
-+#include <linux/regulator/fixed.h>
-+#include <linux/regulator/machine.h>
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 896cd4f..ba50b48 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -526,10 +526,10 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
+  * free pages of length of (1 << order) and marked with _mapcount -2. Page's
+  * order is recorded in page_private(page) field.
+  * So when we are allocating or freeing one, we can derive the state of the
+- * other.  That is, if we allocate a small block, and both were   
+- * free, the remainder of the region must be split into blocks.   
++ * other.  That is, if we allocate a small block, and both were
++ * free, the remainder of the region must be split into blocks.
+  * If a block is freed, and its buddy is also free, then this
+- * triggers coalescing into a block of larger size.            
++ * triggers coalescing into a block of larger size.
+  *
+  * -- wli
+  */
+@@ -1074,17 +1074,17 @@ retry_reserve:
+ 	return page;
+ }
  
- #include <plat/board.h>
- #include <plat/gpmc.h>
-@@ -42,6 +44,50 @@ static struct smsc911x_platform_config gpmc_smsc911x_config = {
- 	.flags		= SMSC911X_USE_16BIT,
- };
- 
-+static struct regulator_consumer_supply gpmc_smsc911x_supply[] = {
-+	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
-+	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
-+};
-+
-+/* Generic regulator definition to satisfy smsc911x */
-+static struct regulator_init_data gpmc_smsc911x_reg_init_data = {
-+	.constraints = {
-+		.min_uV			= 3300000,
-+		.max_uV			= 3300000,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask		= REGULATOR_CHANGE_MODE
-+					| REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(gpmc_smsc911x_supply),
-+	.consumer_supplies	= gpmc_smsc911x_supply,
-+};
-+
-+static struct fixed_voltage_config gpmc_smsc911x_fixed_reg_data = {
-+	.supply_name		= "gpmc_smsc911x",
-+	.microvolts		= 3300000,
-+	.gpio			= -EINVAL,
-+	.startup_delay		= 0,
-+	.enable_high		= 0,
-+	.enabled_at_boot	= 1,
-+	.init_data		= &gpmc_smsc911x_reg_init_data,
-+};
-+
+-/* 
 +/*
-+ * Platform device id of 42 is a temporary fix to avoid conflicts
-+ * with other reg-fixed-voltage devices. The real fix should
-+ * involve the driver core providing a way of dynamically
-+ * assigning a unique id on registration for platform devices
-+ * in the same name space.
-+ */
-+static struct platform_device gpmc_smsc911x_regulator = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 42,
-+	.dev = {
-+		.platform_data	= &gpmc_smsc911x_fixed_reg_data,
-+	},
-+};
-+
- /*
-  * Initialize smsc911x device connected to the GPMC. Note that we
-  * assume that pin multiplexing is done in the board-*.c file,
-@@ -51,10 +97,16 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+  * Obtain a specified number of elements from the buddy allocator, all under
+  * a single hold of the lock, for efficiency.  Add them to the supplied list.
+  * Returns the number of new pages which were placed@*list.
+  */
+-static int rmqueue_bulk(struct zone *zone, unsigned int order, 
++static int rmqueue_bulk(struct zone *zone, unsigned int order,
+ 			unsigned long count, struct list_head *list,
+ 			int migratetype, int cold)
  {
- 	struct platform_device *pdev;
- 	unsigned long cs_mem_base;
--	int ret;
-+	int ret, err;
- 
- 	gpmc_cfg = board_data;
- 
-+	err = platform_device_register(&gpmc_smsc911x_regulator);
-+	if (err < 0) {
-+		pr_err("Unable to register smsc911x regulators: %d\n", err);
-+		return;
-+	}
+ 	int i;
+-	
 +
- 	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
- 		pr_err("Failed to request GPMC mem region\n");
- 		return;
+ 	spin_lock(&zone->lock);
+ 	for (i = 0; i < count; ++i) {
+ 		struct page *page = __rmqueue(zone, order, migratetype);
+@@ -4309,7 +4309,7 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
+ 	init_waitqueue_head(&pgdat->kswapd_wait);
+ 	pgdat->kswapd_max_order = 0;
+ 	pgdat_page_cgroup_init(pgdat);
+-	
++
+ 	for (j = 0; j < MAX_NR_ZONES; j++) {
+ 		struct zone *zone = pgdat->node_zones + j;
+ 		unsigned long size, realsize, memmap_pages;
 -- 
-1.7.5.4
+1.7.1.569.g6f426
