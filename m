@@ -1,34 +1,48 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 22 Feb 2012 18:34:37 +0100
-Subject: [PATCH v2 06/19] ARM: at91/pm_slowclock: rename register to
- named define
-In-Reply-To: <20120222095040.GU22562@n2100.arm.linux.org.uk>
-References: <0d78171672a30e8ec8084f54a557e9948260356d.1329903206.git.nicolas.ferre@atmel.com>
- <cce50d2859ae080d6bfd9260fcd6932d634f7b9a.1329903206.git.nicolas.ferre@atmel.com>
- <20120222095040.GU22562@n2100.arm.linux.org.uk>
-Message-ID: <20120222173437.GG9407@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 23 Feb 2012 02:42:58 +0900
+Subject: [PATCH 1/2] ARM: S3C24XX: Move s3c2443-clock.c to mach-s3c24xx
+In-Reply-To: <201202221828.53363.heiko@sntech.de>
+References: <201202212221.41744.heiko@sntech.de>
+ <201202212226.01189.heiko@sntech.de> <201202221718.01137.arnd@arndb.de>
+ <201202221828.53363.heiko@sntech.de>
+Message-ID: <4F452922.3060600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:50 Wed 22 Feb     , Russell King - ARM Linux wrote:
-> On Wed, Feb 22, 2012 at 10:39:32AM +0100, Nicolas Ferre wrote:
-> >  #define PLLALOCK_TIMEOUT	1000
-> >  #define PLLBLOCK_TIMEOUT	1000
-> >  
-> > +#define pmc	r1
-> 
-> pmc	.req	r1
-> sdramc	.req	r2
-> 
-> etc.
-done
+On 02/23/12 02:28, Heiko St?bner wrote:
+> Am Mittwoch 22 Februar 2012, 18:18:00 schrieb Arnd Bergmann:
+>> On Tuesday 21 February 2012, Heiko St?bner wrote:
+>>> S3C-SoCs starting with the S3C2443 can share a lot of functionality.
+>>> The file can collect more common code of these SocS later on and
+>>> therefore gets a new name to reflect this future purpose.
+>>>
+>>> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
+>>> ---
+>>>
+>>>   arch/arm/mach-s3c24xx/Kconfig          |   14 +-
+>>>   arch/arm/mach-s3c24xx/Makefile         |    4 +
+>>>   arch/arm/mach-s3c24xx/common-s3c2443.c |  644
+>>>   ++++++++++++++++++++++++++++++++ arch/arm/plat-s3c24xx/Kconfig
+>>>   |    6 -
+>>>   arch/arm/plat-s3c24xx/Makefile         |    1 -
+>>>   arch/arm/plat-s3c24xx/s3c2443-clock.c  |  635
+>>>   -------------------------------
+>>
+>> No objections on the patch, but please use 'git format-patch -M' when
+>> moving files so that we can see which parts have changed in the process.
+> the results of -M look really nice, thanks for the hint and I will try to
+> remember it :-)
+>
+Or for that, you can add following at .gitconfig file
 
-update
-[PATCH v3 07/20] ARM: at91/pm_slowclock: function slow_clock() accepts parameters
-[PATCH v3 06/20] ARM: at91/pm_slowclock: rename register to named define
-[PATCH v3 10/20] ARM: at91/pm_slowclock: add runtime detection of memory contoller
+[diff]
+	renames = true
+	renameLimit = 50000
 
-we will see if we need to resend the full series
+Thanks.
 
-Best Regards,
-J.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
