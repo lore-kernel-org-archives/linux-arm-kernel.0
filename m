@@ -1,236 +1,243 @@
 From: hs@denx.de (Heiko Schocher)
-Date: Wed, 22 Feb 2012 07:50:07 +0100
-Subject: [PATCH v2 4/7] ARM: davinci: net: davinci_emac: add OF support
+Date: Wed, 22 Feb 2012 07:50:09 +0100
+Subject: [PATCH v2 6/7] ARM: mtd: nand: davinci: add OF support for davinci
+ nand controller
 In-Reply-To: <1329893410-24413-1-git-send-email-hs@denx.de>
 References: <1329893410-24413-1-git-send-email-hs@denx.de>
-Message-ID: <1329893410-24413-5-git-send-email-hs@denx.de>
+Message-ID: <1329893410-24413-7-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add of support for the davinci_emac driver.
+add OF support for the davinci nand controller.
 
 Signed-off-by: Heiko Schocher <hs@denx.de>
 Cc: davinci-linux-open-source at linux.davincidsp.com
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree-discuss at lists.ozlabs.org
-Cc: netdev at vger.kernel.org
+Cc: linux-mtd at lists.infradead.org
+Cc: David Woodhouse <dwmw2@infradead.org>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Sekhar Nori <nsekhar@ti.com>
 Cc: Wolfgang Denk <wd@denx.de>
-Cc: Anatoly Sivov <mm05@mail.ru>
+Cc: Scott Wood <scottwood@freescale.com>
 
 ---
 - changes for v2:
-  - add comment from Anatoly Sivov
-    - fix typo in davinci_emac.txt
-  - add comment from Grant Likely:
-    - add prefix "ti,davinci-" to davinci specific property names
-    - remove version property
-    - use compatible name "ti,davinci-dm6460-emac"
-    - use devm_kzalloc()
-    - use of_match_ptr()
-    - document all new properties
-    - remove of_address_to_resource() and do not overwrite
-      resource table
-    - whitespace fixes
-    - remove hw_ram_addr as it is not used in current
-      board code
+  - add comments from Scott Wood:
+    - add "ti,davinci-" prefix
+    - Dashes are preferred to underscores
+    - rename "nandflash" to "nand"
+    - introduce new "ti,davinci" specific properties for setting
+      up ecc_mode, ecc_bits, options and bbt options, instead
+      using linux defines
+    - readme fixes
 
-Signed-off-by: Heiko Schocher <hs@denx.de>
+ .../devicetree/bindings/arm/davinci/nand.txt       |   74 +++++++++++++++++
+ drivers/mtd/nand/davinci_nand.c                    |   85 +++++++++++++++++++-
+ 2 files changed, 158 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
 
- .../bindings/arm/davinci/davinci_emac.txt          |   43 +++++++++
- drivers/net/ethernet/ti/davinci_emac.c             |   94 +++++++++++++++++++-
- 2 files changed, 136 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+diff --git a/Documentation/devicetree/bindings/arm/davinci/nand.txt b/Documentation/devicetree/bindings/arm/davinci/nand.txt
 new file mode 100644
-index 0000000..a7b0911
+index 0000000..e02874a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
-@@ -0,0 +1,43 @@
-+* Texas Instruments Davinci EMAC
++++ b/Documentation/devicetree/bindings/arm/davinci/nand.txt
+@@ -0,0 +1,74 @@
++* Texas Instruments Davinci NAND
 +
-+This file provides information, what the device node
-+for the davinci_emac interface contain.
++This file provides information, what the device node for the
++davinci nand interface contain.
 +
 +Required properties:
-+- compatible: "ti,davinci-dm6460-emac";
-+- reg: Offset and length of the register set for the device
-+- ti,davinci-ctrl-reg-offset: offset to control register
-+- ti,davinci-ctrl-mod-reg-offset: offset to control module register
-+- ti,davinci-ctrl-ram-offset: offset to control module ram
-+- ti,davinci-ctrl-ram-size: size of control module ram
-+- ti,davinci-rmii-en: use RMII
-+- ti,davinci-no-bd-ram: has the emac controller BD RAM
-+- phy-handle: Contains a phandle to an Ethernet PHY.
-+              if not, davinci_emac driver defaults to 100/FULL
-+- interrupts: interrupt mapping for the davinci emac interrupts sources:
-+              4 sources: <Receive Threshold Interrupt
-+			  Receive Interrupt
-+			  Transmit Interrupt
-+			  Miscellaneous Interrupt>
-+- pinmux-handle: Contains a handle to configure the pinmux settings.
++- compatible: "ti,davinci-nand";
++- reg : contain 2 offset/length values:
++        - offset and length for the access window
++        - offset and length for accessing the aemif control registers
++- ti,davinci-chipselect: Indicates on the davinci_nand driver which
++                         chipselect is used for accessing the nand.
++
++Recommended properties :
++- ti,davinci-mask-ale: mask for ale
++- ti,davinci-mask-cle: mask for cle
++- ti,davinci-mask-chipsel: mask for chipselect
++- ti,davinci-ecc-mode: ECC mode valid values for davinci driver:
++		- "none"
++		- "soft"
++		- "hw"
++- ti,davinci-ecc-bits: used ECC bits, currently supported 1 or 4.
++- ti,davinci-nand-buswidth: buswidth 8 or 16
++- ti,davinci-nand-use-bbt: use flash based bad block table support.
 +
 +Optional properties:
-+- local-mac-address : 6 bytes, mac address
++- pinmux-handle: contains a handle to configure the pinmux settings.
++- timing-handle: contains a handle to setup aemif timing.
 +
 +Example (enbw_cmc board):
-+	eth0: emac at 1e20000 {
-+		compatible = "ti,davinci-dm6460-emac";
-+		reg = <0x220000 0x4000>;
-+		ti,davinci-ctrl-reg-offset = <0x3000>;
-+		ti,davinci-ctrl-mod-reg-offset = <0x2000>;
-+		ti,davinci-ctrl-ram-offset = <0>;
-+		ti,davinci-ctrl-ram-size = <0x2000>;
-+		local-mac-address = [ 00 00 00 00 00 00 ];
-+		interrupts = <33
-+				34
-+				35
-+				36
-+				>;
-+		interrupt-parent = <&intc>;
-+		pinmux-handle = <&emac_pins>;
++aemif at 60000000 {
++	compatible = "ti,davinci-aemif";
++	#address-cells = <2>;
++	#size-cells = <1>;
++	reg = <0x68000000 0x80000>;
++	ranges = <2 0 0x60000000 0x02000000
++		  3 0 0x62000000 0x02000000
++		  4 0 0x64000000 0x02000000
++		  5 0 0x66000000 0x02000000
++		  6 0 0x68000000 0x02000000>;
++	nand_cs: cs3 at 68000000 {
++		compatible = "ti,davinci-cs";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		/* all timings in nanoseconds */
++		cs = <3>;
++		asize = <0>;
++		ta = <0>;
++		rhold = <7>;
++		rstrobe = <42>;
++		rsetup = <7>;
++		whold = <7>;
++		wstrobe = <14>;
++		wsetup = <7>;
++		ew = <0>;
++		ss = <0>;
 +	};
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index 4fa0bcb..56e1c35 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -58,6 +58,12 @@
- #include <linux/io.h>
- #include <linux/uaccess.h>
- #include <linux/davinci_emac.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_net.h>
-+
++	nand at 3,0 {
++		compatible = "ti,davinci-nand";
++		reg = <3 0x0 0x807ff
++			6 0x0 0x8000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ti,davinci-chipselect = <1>;
++		ti,davinci-mask-ale = <0>;
++		ti,davinci-mask-cle = <0>;
++		ti,davinci-mask-chipsel = <0>;
++		ti,davinci-ecc-mode = "hw";
++		ti,davinci-ecc-bits = <4>;
++		ti,davinci-nand-use-bbt;
++		pinmux-handle = <&nand_pins>;
++		timing-handle = <&nand_cs>;
++	};
++};
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index 6e56615..bdd6edc 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -33,9 +33,12 @@
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/slab.h>
++#include <linux/of_i2c.h>
++#include <linux/of_device.h>
+ 
+ #include <mach/nand.h>
+ #include <mach/aemif.h>
 +#include <mach/mux.h>
  
- #include <asm/irq.h>
- #include <asm/page.h>
-@@ -339,6 +345,9 @@ struct emac_priv {
- 	u32 rx_addr_type;
- 	atomic_t cur_tx;
- 	const char *phy_id;
-+#ifdef CONFIG_OF
-+	struct device_node *phy_node;
-+#endif
- 	struct phy_device *phydev;
- 	spinlock_t lock;
- 	/*platform specific members*/
-@@ -1760,6 +1769,82 @@ static const struct net_device_ops emac_netdev_ops = {
- #endif
+ /*
+  * This is a device driver for the NAND flash controller found on the
+@@ -518,9 +521,86 @@ static struct nand_ecclayout hwecc4_2048 __initconst = {
+ 	},
  };
  
-+#ifdef CONFIG_OF
-+static struct emac_platform_data
-+	*davinci_emac_of_get_pdata(struct platform_device *pdev,
-+	struct emac_priv *priv)
++#if defined(CONFIG_OF)
++static const struct of_device_id davinci_nand_of_match[] = {
++	{.compatible = "ti,davinci-nand", },
++	{},
++}
++MODULE_DEVICE_TABLE(of, davinci_nand_of_match);
++
++static struct davinci_nand_pdata
++	*nand_davinci_get_pdata(struct platform_device *pdev)
 +{
-+	struct device_node *np;
-+	struct device_node *pinmux_np;
-+	struct emac_platform_data *pdata = NULL;
-+	const u8 *mac_addr;
-+	u32 data;
-+	int ret;
-+	int version;
++	if ((pdev->dev.platform_data == NULL) &&
++		(pdev->dev.of_node)) {
++		struct device_node *tmp_np;
++		struct davinci_nand_pdata *pdata;
++		const char *mode;
++		u32 prop;
++		int len;
 +
-+	np = pdev->dev.of_node;
-+	if (!np)
-+		goto nodata;
-+	else
-+		version = EMAC_VERSION_2;
-+
-+	pdata = pdev->dev.platform_data;
-+	if (!pdata) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		pdata =  kzalloc(sizeof(struct davinci_nand_pdata),
++				GFP_KERNEL);
++		pdev->dev.platform_data = pdata;
 +		if (!pdata)
-+			goto nodata;
++			return NULL;
++		if (!of_property_read_u32(pdev->dev.of_node,
++			"ti,davinci-chipselect", &prop))
++			pdev->id = prop;
++		if (!of_property_read_u32(pdev->dev.of_node,
++			"ti,davinci-mask-ale", &prop))
++			pdata->mask_ale = prop;
++		if (!of_property_read_u32(pdev->dev.of_node,
++			"ti,davinci-mask-cle", &prop))
++			pdata->mask_cle = prop;
++		if (!of_property_read_u32(pdev->dev.of_node,
++			"ti,davinci-mask-chipsel", &prop))
++			pdata->mask_chipsel = prop;
++		if (!of_property_read_string(pdev->dev.of_node,
++			"ti,davinci-ecc-mode", &mode)) {
++			if (!strncmp("none", mode, 4))
++				pdata->ecc_mode = NAND_ECC_NONE;
++			if (!strncmp("soft", mode, 4))
++				pdata->ecc_mode = NAND_ECC_SOFT;
++			if (!strncmp("hw", mode, 2))
++				pdata->ecc_mode = NAND_ECC_HW;
++		}
++		if (!of_property_read_u32(pdev->dev.of_node,
++			"ti,davinci-ecc-bits", &prop))
++			pdata->ecc_bits = prop;
++		if (!of_property_read_u32(pdev->dev.of_node,
++			"ti,davinci-nand-buswidth", &prop))
++			if (prop == 16)
++				pdata->options |= NAND_BUSWIDTH_16;
++		if (of_find_property(pdev->dev.of_node,
++			"ti,davinci-nand-use-bbt", &len))
++			pdata->bbt_options = NAND_BBT_USE_FLASH;
++
++		tmp_np = of_parse_phandle(pdev->dev.of_node,
++				"pinmux-handle", 0);
++		if (tmp_np)
++			davinci_cfg_reg_of(tmp_np);
++
++		tmp_np = of_parse_phandle(pdev->dev.of_node,
++				"timing-handle", 0);
++		if (tmp_np)
++			davinci_aemif_setup_timing_of(tmp_np);
 +	}
-+	pdata->version = version;
 +
-+	mac_addr = of_get_mac_address(np);
-+	if (mac_addr)
-+		memcpy(pdata->mac_addr, mac_addr, ETH_ALEN);
-+
-+	ret = of_property_read_u32(np, "ti,davinci-ctrl-reg-offset", &data);
-+	if (!ret)
-+		pdata->ctrl_reg_offset = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-ctrl-mod-reg-offset",
-+		&data);
-+	if (!ret)
-+		pdata->ctrl_mod_reg_offset = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-offset", &data);
-+	if (!ret)
-+		pdata->ctrl_ram_offset = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-ctrl-ram-size", &data);
-+	if (!ret)
-+		pdata->ctrl_ram_size = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-rmii-en", &data);
-+	if (!ret)
-+		pdata->rmii_en = data;
-+
-+	ret = of_property_read_u32(np, "ti,davinci-no-bd-ram", &data);
-+	if (!ret)
-+		pdata->no_bd_ram = data;
-+
-+	priv->phy_node = of_parse_phandle(np, "phy-handle", 0);
-+	if (!priv->phy_node)
-+		pdata->phy_id = "";
-+
-+	pinmux_np = of_parse_phandle(np, "pinmux-handle", 0);
-+	if (pinmux_np)
-+		davinci_cfg_reg_of(pinmux_np);
-+
-+	pdev->dev.platform_data = pdata;
-+nodata:
-+	return  pdata;
++	return pdev->dev.platform_data;
 +}
 +#else
-+static struct emac_platform_data
-+	*davinci_emac_of_get_pdata(struct platform_device *pdev,
-+	struct emac_priv *priv)
++#define davinci_nand_of_match NULL
++static struct davinci_nand_pdata
++	*nand_davinci_get_pdata(struct platform_device *pdev)
 +{
-+	return  pdev->dev.platform_data;
++	return pdev->dev.platform_data;
 +}
 +#endif
- /**
-  * davinci_emac_probe: EMAC device probe
-  * @pdev: The DaVinci EMAC device that we are removing
-@@ -1803,7 +1888,7 @@ static int __devinit davinci_emac_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&priv->lock);
- 
--	pdata = pdev->dev.platform_data;
-+	pdata = davinci_emac_of_get_pdata(pdev, priv);
- 	if (!pdata) {
- 		dev_err(&pdev->dev, "no platform data\n");
- 		rc = -ENODEV;
-@@ -2013,6 +2098,12 @@ static const struct dev_pm_ops davinci_emac_pm_ops = {
- 	.resume		= davinci_emac_resume,
- };
- 
-+static const struct of_device_id davinci_emac_of_match[] = {
-+	{.compatible = "ti,davinci-dm6460-emac", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, davinci_emac_of_match);
 +
- /**
-  * davinci_emac_driver: EMAC platform driver structure
-  */
-@@ -2021,6 +2112,7 @@ static struct platform_driver davinci_emac_driver = {
- 		.name	 = "davinci_emac",
- 		.owner	 = THIS_MODULE,
- 		.pm	 = &davinci_emac_pm_ops,
-+		.of_match_table = of_match_ptr(davinci_emac_of_match),
+ static int __init nand_davinci_probe(struct platform_device *pdev)
+ {
+-	struct davinci_nand_pdata	*pdata = pdev->dev.platform_data;
++	struct davinci_nand_pdata	*pdata;
+ 	struct davinci_nand_info	*info;
+ 	struct resource			*res1;
+ 	struct resource			*res2;
+@@ -530,6 +610,7 @@ static int __init nand_davinci_probe(struct platform_device *pdev)
+ 	uint32_t			val;
+ 	nand_ecc_modes_t		ecc_mode;
+ 
++	pdata = nand_davinci_get_pdata(pdev);
+ 	/* insist on board-specific configuration */
+ 	if (!pdata)
+ 		return -ENODEV;
+@@ -815,6 +896,8 @@ static struct platform_driver nand_davinci_driver = {
+ 	.remove		= __exit_p(nand_davinci_remove),
+ 	.driver		= {
+ 		.name	= "davinci_nand",
++		.owner	= THIS_MODULE,
++		.of_match_table = davinci_nand_of_match,
  	},
- 	.probe = davinci_emac_probe,
- 	.remove = __devexit_p(davinci_emac_remove),
+ };
+ MODULE_ALIAS("platform:davinci_nand");
 -- 
 1.7.7.6
