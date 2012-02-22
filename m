@@ -1,46 +1,59 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 22 Feb 2012 19:02:38 +0100
-Subject: [PATCH v2 12/19] ARM: at91/rtc-at91sam9: each SoC can select
- the RTT device to use
-In-Reply-To: <201202221725.46150.arnd@arndb.de>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <201202221647.23430.arnd@arndb.de>
- <20120222170724.GF9407@game.jcrosoft.org>
- <201202221725.46150.arnd@arndb.de>
-Message-ID: <20120222180238.GH9407@game.jcrosoft.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 22 Feb 2012 11:19:22 -0700
+Subject: [PATCH v1 04/11] arm/PCI: remove arch pci_flags definition
+In-Reply-To: <20120222181556.27513.9413.stgit@bhelgaas.mtv.corp.google.com>
+References: <20120222181556.27513.9413.stgit@bhelgaas.mtv.corp.google.com>
+Message-ID: <20120222181922.27513.3206.stgit@bhelgaas.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:25 Wed 22 Feb     , Arnd Bergmann wrote:
-> On Wednesday 22 February 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > But if you change the rtc driver to always bind to the existing
-> > > "at91_rtt" platform_device and fail the probe() function for the
-> > > case that you are on at91sam9263 probing the non-RTC device,
-> > > you should get the exact same result without any extra code
-> > > in the per-soc files.
-> >
-> > agreed but as on at91sam9263 you have 2 RTTs so you can have 2 drivers at the
-> > same time that use the RTT. So we can not do this except if we set the second
-> > RTT to an other device name.
-> 
-> Let me rephrase what I meant then:
-> 
-> The first driver should in its probe function do:
-> 
-> 	if (pdev->id != CONFIG_RTC_DRV_AT91SAM9_RTT)
-> 		return -ENODEV;
-> 
-> while the other driver does
-> 
-> 	if (pdev->id == CONFIG_RTC_DRV_AT91SAM9_RTT)
-> 		return -ENODEV;
-> 
-> This way, each driver binds to one device but not the other.
-> It should even work with an unmodified second driver, as long
-> as you guarantee that it's loaded after the first one.
-> 
-> Any reason why this won't work?
-just one other issue I need to pass the GPBR ressource to the RTC driver only
+The PCI core provides a pci_flags definition (currently __weak), so drop
+the arm definition in favor of that.
 
-Best Regards,
-J.
+We EXPORT_SYMBOL(pci_flags) as arm did previously.  I'm dubious about
+this: no other architecture exports it, and I didn't see any modules in
+the tree that reference it.
+
+CC: Rob Herring <rob.herring@calxeda.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ arch/arm/kernel/bios32.c |    2 ++
+ arch/arm/mm/iomap.c      |    3 ---
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index f58ba35..f3fd52b 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -525,6 +525,7 @@ void __init pci_common_init(struct hw_pci *hw)
+ 
+ 	INIT_LIST_HEAD(&hw->buses);
+ 
++	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+ 	if (hw->preinit)
+ 		hw->preinit();
+ 	pcibios_init_hw(hw);
+@@ -559,6 +560,7 @@ void __init pci_common_init(struct hw_pci *hw)
+ 		pci_bus_add_devices(bus);
+ 	}
+ }
++EXPORT_SYMBOL(pci_flags);
+ 
+ #ifndef CONFIG_PCI_HOST_ITE8152
+ void pcibios_set_master(struct pci_dev *dev)
+diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
+index e62956e..4614208 100644
+--- a/arch/arm/mm/iomap.c
++++ b/arch/arm/mm/iomap.c
+@@ -32,9 +32,6 @@ EXPORT_SYMBOL(pcibios_min_io);
+ unsigned long pcibios_min_mem = 0x01000000;
+ EXPORT_SYMBOL(pcibios_min_mem);
+ 
+-unsigned int pci_flags = PCI_REASSIGN_ALL_RSRC;
+-EXPORT_SYMBOL(pci_flags);
+-
+ void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
+ {
+ 	if ((unsigned long)addr >= VMALLOC_START &&
