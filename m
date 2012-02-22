@@ -1,79 +1,40 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 23 Feb 2012 10:13:42 +1100
-Subject: [PATCH v2 16/19] ARM: at91: merge SRAM Memory banks thanks to
- mirroring
-In-Reply-To: <0290a1a8c53da6ce02ef9b6f2447ba2da0859dc6.1329903206.git.nicolas.ferre@atmel.com>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <0290a1a8c53da6ce02ef9b6f2447ba2da0859dc6.1329903206.git.nicolas.ferre@atmel.com>
-Message-ID: <4F4576A6.3090901@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Feb 2012 23:58:05 +0000
+Subject: [PATCH 3/7] rtc: sa1100: use ioremap to map registers
+In-Reply-To: <1329815096-6200-4-git-send-email-haojian.zhuang@marvell.com>
+References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
+ <1329815096-6200-4-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20120222235804.GJ7041@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/02/12 20:39, Nicolas Ferre wrote:
-
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> On at91sam9260 and at91sam9g20 the SRAM banks are mirrored. We can
-> merge them together to be able to have bigger and continuous
-> internal RAM.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  arch/arm/mach-at91/at91sam9260.c              |   13 +++++--------
->  arch/arm/mach-at91/include/mach/at91sam9260.h |    4 ++++
->  2 files changed, 9 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> index 14882ae..4ade265 100644
-> --- a/arch/arm/mach-at91/at91sam9260.c
-> +++ b/arch/arm/mach-at91/at91sam9260.c
-> @@ -310,15 +310,12 @@ static void __init at91sam9xe_map_io(void)
->  
->  static void __init at91sam9260_map_io(void)
->  {
-> -	if (cpu_is_at91sam9xe()) {
-> +	if (cpu_is_at91sam9xe())
->  		at91sam9xe_map_io();
-> -	} else if (cpu_is_at91sam9g20()) {
-> -		at91_init_sram(0, AT91SAM9G20_SRAM0_BASE, AT91SAM9G20_SRAM0_SIZE);
-> -		at91_init_sram(1, AT91SAM9G20_SRAM1_BASE, AT91SAM9G20_SRAM1_SIZE);
-> -	} else {
-> -		at91_init_sram(0, AT91SAM9260_SRAM0_BASE, AT91SAM9260_SRAM0_SIZE);
-> -		at91_init_sram(1, AT91SAM9260_SRAM1_BASE, AT91SAM9260_SRAM1_SIZE);
-> -	}
-> +	else if (cpu_is_at91sam9g20())
-> +		at91_init_sram(0, AT91SAM9G20_SRAM_BASE, AT91SAM9G20_SRAM_SIZE);
-> +	else
-> +		at91_init_sram(0, AT91SAM9260_SRAM_BASE, AT91SAM9260_SRAM_SIZE);
+On Tue, Feb 21, 2012 at 05:04:52PM +0800, Haojian Zhuang wrote:
+> diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+> index bb10ee2..04a62a3 100644
+> --- a/arch/arm/mach-sa1100/generic.c
+> +++ b/arch/arm/mach-sa1100/generic.c
+> @@ -345,9 +345,29 @@ void sa11x0_register_irda(struct irda_platform_data *irda)
+>  	sa11x0_register_device(&sa11x0ir_device, irda);
 >  }
 >  
->  static void __init at91sam9260_ioremap_registers(void)
-> diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-> index 2e47b6d..08ae9af 100644
-> --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
-> +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-> @@ -113,6 +113,8 @@
->  #define AT91SAM9260_SRAM0_SIZE	SZ_4K		/* Internal SRAM 0 size (4Kb) */
->  #define AT91SAM9260_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
->  #define AT91SAM9260_SRAM1_SIZE	SZ_4K		/* Internal SRAM 1 size (4Kb) */
-> +#define AT91SAM9260_SRAM_BASE	0x002FF000	/* Internal SRAM base address */
-> +#define AT91SAM9260_SRAM_SIZE	SZ_8K		/* Internal SRAM size (8Kb) */
+> +static struct resource sa1100_rtc_resources[] = {
+> +	{
+> +		.start	= 0x90010000,
+> +		.end	= 0x9001003f,
+> +		.flags	= IORESOURCE_MEM,
+> +	}, {
+> +		.start  = IRQ_RTC1Hz,
+> +		.end    = IRQ_RTC1Hz,
+> +		.name	= "rtc 1Hz",
+> +		.flags  = IORESOURCE_IRQ,
+> +	}, {
+> +		.start  = IRQ_RTCAlrm,
+> +		.end    = IRQ_RTCAlrm,
+> +		.name	= "rtc alarm",
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +};
 
->  
->  #define AT91SAM9260_UHP_BASE	0x00500000	/* USB Host controller */
->  
-> @@ -126,6 +128,8 @@
->  #define AT91SAM9G20_SRAM0_SIZE	SZ_16K		/* Internal SRAM 0 size (16Kb) */
->  #define AT91SAM9G20_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
->  #define AT91SAM9G20_SRAM1_SIZE	SZ_16K		/* Internal SRAM 1 size (16Kb) */
-> +#define AT91SAM9G20_SRAM_BASE	0x002FC000	/* Internal SRAM base address */
-> +#define AT91SAM9G20_SRAM_SIZE	SZ_32K		/* Internal SRAM size (32Kb) */
-
-
-Where does the SRAM_BASE value come from? The at91sam9g20 guide says
-that the region 0x204000 - 0x2fffff is reserved, and I can't find any
-information in the at91sam9g20 guide about the sram being mirrored. Can
-you point me to some documentation for this?
-
-~Ryan
+As I've converted all resources in this file to use the DEFINE_RES_foo()
+macros, it would be a shame to have this initialization reintroduced.
+Please use DEFINE_RES_foo() here.
