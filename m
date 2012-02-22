@@ -1,52 +1,73 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 22 Feb 2012 17:26:43 +0100
-Subject: [PATCHv22 13/16] drivers: add Contiguous Memory Allocator
-In-Reply-To: <alpine.DEB.2.00.1202212121560.962@localhost>
-References: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
- <1329507036-24362-14-git-send-email-m.szyprowski@samsung.com>
- <alpine.DEB.2.00.1202212121560.962@localhost>
-Message-ID: <000001ccf17e$c3e50040$4baf00c0$%szyprowski@samsung.com>
+From: christian.riesch@omicron.at (Christian Riesch)
+Date: Wed, 22 Feb 2012 17:26:51 +0100
+Subject: [RFC PATCH] davinci_emac: Do not accidentally free all rx dma
+ descriptors during init
+Message-ID: <1329928011-32746-1-git-send-email-christian.riesch@omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch fixes a regression that was introduced by
 
-On Tuesday, February 21, 2012 10:30 PM Aaro Koskinen wrote:
+commit 0a5f38467765ee15478db90d81e40c269c8dda20
+davinci_emac: Add Carrier Link OK check in Davinci RX Handler
 
-> On Fri, 17 Feb 2012, Marek Szyprowski wrote:
-> > +/**
-> > + * dma_release_from_contiguous() - release allocated pages
-> > + * @dev:   Pointer to device for which the pages were allocated.
-> > + * @pages: Allocated pages.
-> > + * @count: Number of allocated pages.
-> > + *
-> > + * This function releases memory allocated by dma_alloc_from_contiguous().
-> > + * It returns false when provided pages do not belong to contiguous area and
-> > + * true otherwise.
-> > + */
-> > +bool dma_release_from_contiguous(struct device *dev, struct page *pages,
-> > +				 int count)
-> > +{
-> > +	struct cma *cma = dev_get_cma_area(dev);
-> > +	unsigned long pfn;
-> > +
-> > +	if (!cma || !pages)
-> > +		return false;
-> > +
-> > +	pr_debug("%s(page %p)\n", __func__, (void *)pages);
-> > +
-> > +	pfn = page_to_pfn(pages);
-> > +
-> > +	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
-> > +		return false;
-> > +
-> > +	VM_BUG_ON(pfn + count > cma->base_pfn);
-> 
-> Are you sure the VM_BUG_ON() condition is correct here?
+Said commit adds a check whether the carrier link is ok. If the link is
+not ok, the skb is freed and no new dma descriptor added to the rx dma
+channel. This causes trouble during initialization when the carrier
+status has not yet been updated. If a lot of packets are received while
+netif_carrier_ok returns false, all dma descriptors are freed and the
+rx dma transfer is stopped.
 
-Thanks for pointing this bug. '+ cma->count' is missing in the second part.
+To reproduce the bug, flood ping the davinci board while doing
+ifconfig eth0 down
+ifconfig eth0 up
+on the board.
 
-Best regards
+After that, the rx path stops working and the overrun value reported
+by ifconfig is counting up.
+
+This patch reverts commit 0a5f38467765ee15478db90d81e40c269c8dda20
+and instead issues warnings only if cpdma_chan_submit returns -ENOMEM.
+
+Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
+Cc: Hegde, Vinay <vinay.hegde@ti.com>
+Cc: Cyril Chemparathy <cyril@ti.com>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+
+Hi,
+This patch fixes the initialization problem that I described. However
+I am not sure if it correctly fixes the problem that was addressed
+by the original patch, 0a5f38467765ee15478db90d81e40c269c8dda20.
+Thanks for your comments!
+Regards, Christian
+
+ drivers/net/ethernet/ti/davinci_emac.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index 4fa0bcb..4b2f545 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -1009,7 +1009,7 @@ static void emac_rx_handler(void *token, int len, int status)
+ 	int			ret;
+ 
+ 	/* free and bail if we are shutting down */
+-	if (unlikely(!netif_running(ndev) || !netif_carrier_ok(ndev))) {
++	if (unlikely(!netif_running(ndev))) {
+ 		dev_kfree_skb_any(skb);
+ 		return;
+ 	}
+@@ -1038,7 +1038,9 @@ static void emac_rx_handler(void *token, int len, int status)
+ recycle:
+ 	ret = cpdma_chan_submit(priv->rxchan, skb, skb->data,
+ 			skb_tailroom(skb), GFP_KERNEL);
+-	if (WARN_ON(ret < 0))
++
++	WARN_ON(ret == -ENOMEM);
++	if (unlikely(ret < 0))
+ 		dev_kfree_skb_any(skb);
+ }
+ 
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.0.4
