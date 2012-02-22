@@ -1,37 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Feb 2012 21:28:21 +0000
-Subject: [PATCHv2 1/6] ARM: ftrace: remove useless memory checks
-In-Reply-To: <20120222141317.GB9031@debian>
-References: <1327757725-10114-1-git-send-email-rabin@rab.in>
- <1327757725-10114-2-git-send-email-rabin@rab.in>
- <20120220161601.GH26840@n2100.arm.linux.org.uk>
- <20120222141317.GB9031@debian>
-Message-ID: <20120222212821.GE7041@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 22 Feb 2012 13:40:05 -0800
+Subject: [PATCH] gpio/omap: fix wakeups on level-triggered GPIOs
+In-Reply-To: <CAC83ZvKXSwSsU_hu7hrPV6DmVYv=G3iF7Wb5hF_qhSiL+BpfaQ@mail.gmail.com>
+ (Tarun Kanti DebBarma's message of "Wed, 22 Feb 2012 22:47:35 +0530")
+References: <1329850878-22189-1-git-send-email-khilman@ti.com>
+ <CAC83ZvKXSwSsU_hu7hrPV6DmVYv=G3iF7Wb5hF_qhSiL+BpfaQ@mail.gmail.com>
+Message-ID: <87aa4azgwa.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 07:43:17PM +0530, Rabin Vincent wrote:
-> On Mon, Feb 20, 2012 at 04:16:01PM +0000, Russell King - ARM Linux wrote:
-> > On Sat, Jan 28, 2012 at 07:05:20PM +0530, Rabin Vincent wrote:
-> > > diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> > > index c0062ad..e9488ad 100644
-> > > --- a/arch/arm/kernel/ftrace.c
-> > > +++ b/arch/arm/kernel/ftrace.c
-> > > @@ -125,11 +125,13 @@ static int ftrace_modify_code(unsigned long pc, unsigned long old,
-> > >  {
-> > >  	unsigned long replaced;
-> > >  
-> > > -	if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
-> > > -		return -EFAULT;
-> > > +	if (old) {
-> > 
-> > So, we're using the instruction value '0' to mean that we don't want to
-> > check?  Wouldn'it it be better to pass a flag in to indicate this instead
-> > of creating a magic value?
-> 
-> OK.  I think you applied this patch as-is anyway, so here is a follow-on
-> patch:
+Hi Tarun,
 
-I'd still much prefer it to be part of the original patch.  I can replace
-the patch I've merged or augment it with another patch - whichever way
-you prefer.
+"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
+
+> On Wed, Feb 22, 2012 at 12:31 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> While both level- and edge-triggered GPIOs are capable of generating
+>> interrupts, only edge-triggered GPIOs are capable of generating a
+>> module-level wakeup to the PRCM (c.f. 34xx NDA TRM section 25.5.3.2.)
+>>
+>> In order to ensure that devices using level-triggered GPIOs as
+>> interrupts can also cause wakeups (e.g. from idle), this patch enables
+>> edge-triggering for wakeup-enabled, level-triggered GPIOs when a GPIO
+>> bank is runtime-suspended (which also happens during idle.)
+>>
+>> This fixes a problem found in GPMC-connected network cards with GPIO
+>> interrupts (e.g. smsc911x on Zoom3, Overo, ...) where network booting
+>> with NFSroot was very slow since the GPIO IRQs used by the NIC were
+>> not generating PRCM wakeups, and thus not waking the system from idle.
+>> NOTE: until v3.3, this boot-time problem was somewhat masked because
+>> the UART init prevented WFI during boot until the full serial driver
+>> was available. ?Preventing WFI allowed regular GPIO interrupts to fire
+>> and this problem was not seen. ?After the UART runtime PM cleanups, we
+>> no longer avoid WFI during boot, so GPIO IRQs that were not causing
+>> wakeups resulted in very slow IRQ response times.
+>>
+>> Tested on platforms using level-triggered GPIOs for network IRQs using
+>> the SMSC911x NIC: 3530/Overo and 3630/Zoom3.
+>>
+>> Reported-by: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>
+> I have tested on OMAP3430 by making modification to touchscreen GPIO.
+> (I had similar change in my next planned cleanup/fix series.)
+> If needed you can add my Tested-by:
+
+Thanks for testing, I'll add a Tested-by from you and Tony before
+submitting to Grant.
+
+Kevin
