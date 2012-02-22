@@ -1,37 +1,83 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 22 Feb 2012 17:26:31 +0100
-Subject: [PATCH v2 02/19] ARM: at91/at91x40: remove use of
- at91_sys_read/write
-In-Reply-To: <201202221436.29474.arnd@arndb.de>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <fac36a5ab9fe5a8bd977d2305eeccad48389cbb5.1329903206.git.nicolas.ferre@atmel.com>
- <201202221436.29474.arnd@arndb.de>
-Message-ID: <20120222162631.GE9407@game.jcrosoft.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Feb 2012 16:34:44 +0000
+Subject: [PATCH v3 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <1329923841-32017-3-git-send-email-thierry.reding@avionic-design.de>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <1329923841-32017-3-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <201202221634.45159.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:36 Wed 22 Feb     , Arnd Bergmann wrote:
-> Hi Nicolas and Jean-Christophe,
-> 
-> On Wednesday 22 February 2012, Nicolas Ferre wrote:
-> > --- a/arch/arm/mach-at91/at91x40.c
-> > +++ b/arch/arm/mach-at91/at91x40.c
-> > @@ -44,7 +44,7 @@ static void at91x40_idle(void)
-> >          * Disable the processor clock.  The processor will be automatically
-> >          * re-enabled by an interrupt or by a reset.
-> >          */
-> > -       at91_sys_write(AT91_PS_CR, AT91_PS_CR_CPU);
-> > +       __raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
-> >         cpu_do_idle();
-> >  }
-> 
-> How about making this writel_relaxed in the process?
-> I would like to see the use of __raw_*() get reduced in code that gets
-> touched. In most cases writel_relaxed/readl_relaxed is the correct
-> accessor function instead.
-It will for next release I plan to switch all of the at one
+On Wednesday 22 February 2012, Thierry Reding wrote:
 
-today I don't want to change it as the same time
+>  #include <linux/module.h>
+> +#include <linux/of_pwm.h>
+>  #include <linux/pwm.h>
 
-Best Regards,
-J.
+You should probably reorder the patches for bisectability, or move the
+of_* related changes out of this patch into patch 3. At the point
+where patch 2 is applied, linux/of_pwm.h does not exist yet.
+
+>  
+> +/**
+> + * pwmchip_find() - iterator for locating a specific pwm_chip
+> + * @data: data to pass to match function
+> + * @match: callback function to check pwm_chip
+> + */
+> +struct pwm_chip *pwmchip_find(void *data, int (*match)(struct pwm_chip *chip,
+> +						       void *data))
+> +{
+> +	struct pwm_chip *ret = NULL;
+> +	struct pwm_chip *chip;
+> +
+> +	mutex_lock(&pwm_lock);
+> +
+> +	list_for_each_entry(chip, &pwm_chips, list) {
+> +		if (match(chip, data)) {
+> +			ret = chip;
+> +			break;
+> +		}
+> +	}
+> +
+> +	mutex_unlock(&pwm_lock);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(pwmchip_find);
+
+Is this only used for the device tree functions? If so, I would recommend
+making it less generic and always search for a device node.
+
+> +static int pwm_show(struct seq_file *s, void *unused)
+> +{
+> +	const char *prefix = "";
+> +	struct pwm_chip *chip;
+> +
+> +	list_for_each_entry(chip, &pwm_chips, list) {
+> +		struct device *dev = chip->dev;
+> +
+> +		seq_printf(s, "%s%s/%s, %d PWM devices\n", prefix,
+> +			   dev->bus ? dev->bus->name : "no-bus",
+> +			   dev_name(dev), chip->npwm);
+> +
+> +		if (chip->ops->dbg_show)
+> +			chip->ops->dbg_show(chip, s);
+> +		else
+> +			pwm_dbg_show(chip, s);
+> +
+> +		prefix = "\n";
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int pwm_open(struct inode *inode, struct file *file)
+> +{
+> +	return single_open(file, pwm_show, NULL);
+> +}
+
+When you have a seq_file with a (possibly long) list of entries, better
+use seq_open instead of single_open and print each item in the
+->next() callback function.
+
+	Arnd
