@@ -1,59 +1,47 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 22 Feb 2012 11:19:22 -0700
-Subject: [PATCH v1 04/11] arm/PCI: remove arch pci_flags definition
+Date: Wed, 22 Feb 2012 11:19:27 -0700
+Subject: [PATCH v1 05/11] arm/PCI: use pci_flags PCI_PROBE_ONLY instead of
+ arm-specific flag
 In-Reply-To: <20120222181556.27513.9413.stgit@bhelgaas.mtv.corp.google.com>
 References: <20120222181556.27513.9413.stgit@bhelgaas.mtv.corp.google.com>
-Message-ID: <20120222181922.27513.3206.stgit@bhelgaas.mtv.corp.google.com>
+Message-ID: <20120222181927.27513.36301.stgit@bhelgaas.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI core provides a pci_flags definition (currently __weak), so drop
-the arm definition in favor of that.
-
-We EXPORT_SYMBOL(pci_flags) as arm did previously.  I'm dubious about
-this: no other architecture exports it, and I didn't see any modules in
-the tree that reference it.
-
-CC: Rob Herring <rob.herring@calxeda.com>
 CC: Russell King <linux@arm.linux.org.uk>
 CC: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- arch/arm/kernel/bios32.c |    2 ++
- arch/arm/mm/iomap.c      |    3 ---
- 2 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/kernel/bios32.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index f58ba35..f3fd52b 100644
+index f3fd52b..8d7c22d 100644
 --- a/arch/arm/kernel/bios32.c
 +++ b/arch/arm/kernel/bios32.c
-@@ -525,6 +525,7 @@ void __init pci_common_init(struct hw_pci *hw)
+@@ -16,7 +16,6 @@
+ #include <asm/mach/pci.h>
  
- 	INIT_LIST_HEAD(&hw->buses);
+ static int debug_pci;
+-static int use_firmware;
  
-+	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
- 	if (hw->preinit)
- 		hw->preinit();
- 	pcibios_init_hw(hw);
-@@ -559,6 +560,7 @@ void __init pci_common_init(struct hw_pci *hw)
- 		pci_bus_add_devices(bus);
+ /*
+  * We can't use pci_find_device() here since we are
+@@ -537,7 +536,7 @@ void __init pci_common_init(struct hw_pci *hw)
+ 	list_for_each_entry(sys, &hw->buses, node) {
+ 		struct pci_bus *bus = sys->bus;
+ 
+-		if (!use_firmware) {
++		if (!pci_has_flag(PCI_PROBE_ONLY)) {
+ 			/*
+ 			 * Size the bridge windows.
+ 			 */
+@@ -575,7 +574,7 @@ char * __init pcibios_setup(char *str)
+ 		debug_pci = 1;
+ 		return NULL;
+ 	} else if (!strcmp(str, "firmware")) {
+-		use_firmware = 1;
++		pci_add_flags(PCI_PROBE_ONLY);
+ 		return NULL;
  	}
- }
-+EXPORT_SYMBOL(pci_flags);
- 
- #ifndef CONFIG_PCI_HOST_ITE8152
- void pcibios_set_master(struct pci_dev *dev)
-diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
-index e62956e..4614208 100644
---- a/arch/arm/mm/iomap.c
-+++ b/arch/arm/mm/iomap.c
-@@ -32,9 +32,6 @@ EXPORT_SYMBOL(pcibios_min_io);
- unsigned long pcibios_min_mem = 0x01000000;
- EXPORT_SYMBOL(pcibios_min_mem);
- 
--unsigned int pci_flags = PCI_REASSIGN_ALL_RSRC;
--EXPORT_SYMBOL(pci_flags);
--
- void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
- {
- 	if ((unsigned long)addr >= VMALLOC_START &&
+ 	return str;
