@@ -1,41 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2012 17:25:45 +0000
-Subject: [PATCH v2 12/19] ARM: at91/rtc-at91sam9: each SoC can select the
- RTT device to use
-In-Reply-To: <20120222170724.GF9407@game.jcrosoft.org>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <201202221647.23430.arnd@arndb.de> <20120222170724.GF9407@game.jcrosoft.org>
-Message-ID: <201202221725.46150.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 23 Feb 2012 02:29:58 +0900
+Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
+In-Reply-To: <CABb+yY0Zy3Xx4OZTobo2y-J4NXokGCV47PdPyKs+aOnqtng7pQ@mail.gmail.com>
+References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>	<CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>	<00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>	<CABb+yY0j0j7Qw4MCwP_F+DKzmpdmZ3x0QC2Ktj2qmGnL=Ocx0Q@mail.gmail.com>	<011c01ccf107$5624d020$026e7060$%kim@samsung.com>	<CABb+yY1aeZ9=2GiHni3bZuRjW66Mxz7K0M753Lc-6UdxaVpBzA@mail.gmail.com>	<1329906421.24656.93.camel@vkoul-udesk3>	<4F451D24.1040009@samsung.com>
+ <CABb+yY0Zy3Xx4OZTobo2y-J4NXokGCV47PdPyKs+aOnqtng7pQ@mail.gmail.com>
+Message-ID: <4F452616.30806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 February 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > But if you change the rtc driver to always bind to the existing
-> > "at91_rtt" platform_device and fail the probe() function for the
-> > case that you are on at91sam9263 probing the non-RTC device,
-> > you should get the exact same result without any extra code
-> > in the per-soc files.
+On 02/23/12 02:20, Jassi Brar wrote:
+> On Wed, Feb 22, 2012 at 10:21 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>>
+>> * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+>> *               http://www.samsung.com
+>> *
+>> * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+>> *       Jaswinder Singh<jassi.brar@samsung.com>
+>> *
+> The following is more appropriate
 >
-> agreed but as on at91sam9263 you have 2 RTTs so you can have 2 drivers at the
-> same time that use the RTT. So we can not do this except if we set the second
-> RTT to an other device name.
+> -  * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+> + * Copyright (C) 2010 - 2012 Samsung Electronics Co. Ltd.
+>     *       Jaswinder Singh<jassi.brar@samsung.com>
+>
+Well, as I know, I don't have to change/update original your copyright. 
+If required, you should do it, next time.
 
-Let me rephrase what I meant then:
+>
+>> * Based on:
+>> *       arch/arm/common/pl330.c, arch/arm/include/asm/hardware/pl330.h
+>> *       Copyright (C) 2010 Samsung Electronics Co Ltd.
+>>
+> Doesn't make any sense because arch/arm/common/pl330.c
+> and arch/arm/include/asm/hardware/pl330.h wouldn't exist anymore,
+> and the changelog already provides that info.
 
-The first driver should in its probe function do:
+OK, will not add above 'based on'.
 
-	if (pdev->id != CONFIG_RTC_DRV_AT91SAM9_RTT)
-		return -ENODEV;
+I think you can agree following. Let's finish this talking.
 
-while the other driver does
+* Copyright (c) 2012 Samsung Electronics Co., Ltd.
+*		http://www.samsung.com
+*
+and 'original copyright'...
 
-	if (pdev->id == CONFIG_RTC_DRV_AT91SAM9_RTT)
-		return -ENODEV;
+Thanks.
 
-This way, each driver binds to one device but not the other.
-It should even work with an unmodified second driver, as long
-as you guarantee that it's loaded after the first one.
-
-Any reason why this won't work?
-
-	Arnd
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
