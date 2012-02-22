@@ -1,73 +1,46 @@
-From: christian.riesch@omicron.at (Christian Riesch)
-Date: Wed, 22 Feb 2012 17:26:51 +0100
-Subject: [RFC PATCH] davinci_emac: Do not accidentally free all rx dma
- descriptors during init
-Message-ID: <1329928011-32746-1-git-send-email-christian.riesch@omicron.at>
+From: mporter@ti.com (Matt Porter)
+Date: Wed, 22 Feb 2012 11:29:01 -0500
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <20120214110836.GE15338@n2100.arm.linux.org.uk>
+References: <1329151422-2146-1-git-send-email-mporter@ti.com>
+ <20120214110836.GE15338@n2100.arm.linux.org.uk>
+Message-ID: <20120222162901.GB20411@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a regression that was introduced by
+On Tue, Feb 14, 2012 at 11:08:36AM +0000, Russell King - ARM Linux wrote:
+> Two more points:
+> 
+> On Mon, Feb 13, 2012 at 11:43:42AM -0500, Matt Porter wrote:
+> > This fixes smsc911x support on platforms using gpmc_smsc911x_init().
+> > Commit c7e963f6888816f04d1f5da0e07bec4e0092f227 added the requirement
+> 
+> Always include the commit summary as well here, so:
+> 
+> Commit c7e963f6888816 (net/smsc911x: Add regulator support) added the ...
 
-commit 0a5f38467765ee15478db90d81e40c269c8dda20
-davinci_emac: Add Carrier Link OK check in Davinci RX Handler
+Ok. Addressed in v2.
 
-Said commit adds a check whether the carrier link is ok. If the link is
-not ok, the skb is freed and no new dma descriptor added to the rx dma
-channel. This causes trouble during initialization when the carrier
-status has not yet been updated. If a lot of packets are received while
-netif_carrier_ok returns false, all dma descriptors are freed and the
-rx dma transfer is stopped.
+> > @@ -55,6 +94,11 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+> >  
+> >  	gpmc_cfg = board_data;
+> >  
+> > +	if (platform_device_register(&gpmc_smsc911x_regulator) < 0) {
+> > +		pr_err("Unable to register smsc911x regulators\n");
+> > +		return;
+> > +	}
+> 
+> It's always a good idea to indicate why something failed:
+> 
+> 	err = platform_device_register(&gpmc_smsc911x_regulator);
+> 	if (err < 0) {
+> 		pr_err("Unable to register smsc911x regulators: %d\n", err);
+> 		return;
+> 	}
+> 
+> so that people can see not only what failed, but also why it failed.
 
-To reproduce the bug, flood ping the davinci board while doing
-ifconfig eth0 down
-ifconfig eth0 up
-on the board.
+Looks much better, also addressed in v2.
 
-After that, the rx path stops working and the overrun value reported
-by ifconfig is counting up.
-
-This patch reverts commit 0a5f38467765ee15478db90d81e40c269c8dda20
-and instead issues warnings only if cpdma_chan_submit returns -ENOMEM.
-
-Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
-Cc: Hegde, Vinay <vinay.hegde@ti.com>
-Cc: Cyril Chemparathy <cyril@ti.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
-
-Hi,
-This patch fixes the initialization problem that I described. However
-I am not sure if it correctly fixes the problem that was addressed
-by the original patch, 0a5f38467765ee15478db90d81e40c269c8dda20.
-Thanks for your comments!
-Regards, Christian
-
- drivers/net/ethernet/ti/davinci_emac.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index 4fa0bcb..4b2f545 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -1009,7 +1009,7 @@ static void emac_rx_handler(void *token, int len, int status)
- 	int			ret;
- 
- 	/* free and bail if we are shutting down */
--	if (unlikely(!netif_running(ndev) || !netif_carrier_ok(ndev))) {
-+	if (unlikely(!netif_running(ndev))) {
- 		dev_kfree_skb_any(skb);
- 		return;
- 	}
-@@ -1038,7 +1038,9 @@ static void emac_rx_handler(void *token, int len, int status)
- recycle:
- 	ret = cpdma_chan_submit(priv->rxchan, skb, skb->data,
- 			skb_tailroom(skb), GFP_KERNEL);
--	if (WARN_ON(ret < 0))
-+
-+	WARN_ON(ret == -ENOMEM);
-+	if (unlikely(ret < 0))
- 		dev_kfree_skb_any(skb);
- }
- 
--- 
-1.7.0.4
+-Matt
