@@ -1,63 +1,45 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 22 Feb 2012 17:36:25 +0100
-Subject: [PATCHv22 14/16] X86: integrate CMA with DMA-mapping subsystem
-In-Reply-To: <20120221161802.f6a28085.akpm@linux-foundation.org>
-References: <1329507036-24362-1-git-send-email-m.szyprowski@samsung.com>
- <1329507036-24362-15-git-send-email-m.szyprowski@samsung.com>
- <20120221161802.f6a28085.akpm@linux-foundation.org>
-Message-ID: <000101ccf180$1e5226b0$5af67410$%szyprowski@samsung.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 22 Feb 2012 17:38:04 +0100
+Subject: [PATCH 0/7] share sa1100 rtc driver to arch-mmp
+In-Reply-To: <CAN1soZxTutYQ=uU0y_AvBTn37es+8tBU=1L6eKtJDUNONgwHFw@mail.gmail.com>
+ (Haojian Zhuang's message of "Wed, 22 Feb 2012 23:37:27 +0800")
+References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
+ <201202221239.54321.arnd@arndb.de>
+ <CAN1soZwgtxR7pNGBQuMHZS0URXM7U6ZABD4disNmvRarZnjwxA@mail.gmail.com>
+ <201202221350.00100.arnd@arndb.de>
+ <CAN1soZxTutYQ=uU0y_AvBTn37es+8tBU=1L6eKtJDUNONgwHFw@mail.gmail.com>
+Message-ID: <87r4xmygb7.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
 
-On Wednesday, February 22, 2012 1:18 AM Andrew Morton wrote:
+> I can remove the rtc-pxa support entirely. I still want to leave this
+> since this may be the only one choice in the future silicons.
+>
+> Since some boards with pxa27x/pxa3xx are accessing RCNR (the old rtc
+> wrapper) directly, I use rtc-sa1100 to keep consistently. In pxa95x,
+> nobody is using the old rtc wrapper directly. So I only use it in
+> pxa95x.
 
-> > This patch adds support for CMA to dma-mapping subsystem for x86
-> > architecture that uses common pci-dma/pci-nommu implementation. This
-> > allows to test CMA on KVM/QEMU and a lot of common x86 boxes.
-> >
-> > ...
-> >
-> > --- a/arch/x86/Kconfig
-> > +++ b/arch/x86/Kconfig
-> > @@ -31,6 +31,7 @@ config X86
-> >  	select ARCH_WANT_OPTIONAL_GPIOLIB
-> >  	select ARCH_WANT_FRAME_POINTERS
-> >  	select HAVE_DMA_ATTRS
-> > +	select HAVE_DMA_CONTIGUOUS if !SWIOTLB
-> >  	select HAVE_KRETPROBES
-> >  	select HAVE_OPTPROBES
-> >  	select HAVE_FTRACE_MCOUNT_RECORD
-> 
-> I don't think it's compilable at all for x86_64, because that platform
-> selects SWIOTLB.
+No, I don't agree there.
 
-Right, x86 support is very basic, mainly for being able to test it on standard 
-configuration with QEmu.
+The PXA RTC silicon support 2 different set of registers to access time :
+ - RCNR (rtc-sa1100)
+ - RYCR/RDCR (rtc-pxa)
 
-> After a while I got it to compile for i386.  arm didn't go so well,
-> partly because arm allmodconfig is presently horked (something to do
-> with Kconfig not setting PHYS_OFFSET) and partly because arm defconfig
-> doesn't permit CMA to be set.  Got bored, gave up.
+The rtc-pxa driver was created to provide support for boards using the RYCR/RDCR
+rather than RCNR.
 
-I think that all*config are broken on ARM. To enable CMA compilation, one need to 
-select a subplatform based on ARMv6+ - for example one can start from 
-arch/arm/configs/exynos4_defconfig and then use oldnoconfig.
+Therefore I'm against removing rtc-pxa, unless there is a driver for pxa, which
+provides RTC using RYCR/RDCR registers.
 
-> The patchset collides pretty seriously with pending dma api changes and
-> pending arm changes in linux-next, so I didn't apply anything.  This
-> will all need to be looked at, please.
-> 
-> I'll make do with reading the patches for now ;)
+We had that discussion a long time ago, in [1].
 
-I've rebased the CMA patchset on top of next-20120222 kernel tree and I will send 
-them soon as v23.
+Cheers.
 
-I hope this will help getting them merged to your tree. If I should select different
-base for the patches, just let me know.
+--
+Robert
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+[1] Linux Arm Kernel Mailing List, 2008/09/30
+    http://lists.arm.linux.org.uk/lurker/message/20080930.193554.96feb95f.en.html
