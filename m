@@ -1,111 +1,217 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 22 Feb 2012 10:39:26 +0100
-Subject: [PATCH v2 00/19] at91 first cleanup series for 3.4
-Message-ID: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+Date: Wed, 22 Feb 2012 10:39:34 +0100
+Subject: [PATCH v2 08/19] ARM: at91: move at91rm9200 sdramc defines to
+ at91rm9200_sdramc.h
+In-Reply-To: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <0224eba3c4d010d44784d304f1754d12c2421bb7.1329903206.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is the second revision of this series of cleanup. It includes
-enhancements adviced by Ryan Mallon and Russell King.
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-This series removes the at91_sys_read/write() functions that where
-used for all System Controller devices. The static offsets that were
-used prevented us from compiling several AT91 SoC support in a single
-zImage.
+This cleanup is done to allow to have multiple SoC in the same image.
 
-The other cleanup is the move of some early console initialization.
-
-All this goes on top of current material that is already in arm-soc
-git tree (merge of all at91/* branches).
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (18):
-      ARM: at91: factorise duplicated at91sam9 idle
-      ARM: at91/at91x40: remove use of at91_sys_read/write
-      ARM: at91: make matrix register base soc independent
-      ARM: at91: make ST (System Timer) soc independent
-      ARM: at91/pm_slowclock: rename register to named define
-      ARM: at91/pm_slowclock: function slow_clock() accepts parameters
-      ARM: at91: move at91rm9200 sdramc defines to at91rm9200_sdramc.h
-      ARM: at91: make sdram/ddr register base soc independent
-      ARM: at91/pm_slowclock: add runtime detection of memory contoller
-      ARM: at91/PMC: make register base soc independent
-      ARM: at91/rtc-at91sam9: each SoC can select the RTT device to use
-      ARM: at91:rtc/rtc-at91sam9: ioremap register bank
-      ARM: at91/rtc-at91sam9: pass the GPBR to use via resources
-      ARM: at91: finally drop at91_sys_read/write
-      ARM: at91: merge SRAM Memory banks thanks to mirroring
-      Atmel: move console default platform_device to serial driver
-      ARM: at91/board-dt: drop default console
-      ARM: at91/board-dt: move at91_initialize() to init_irq()
-
-Nicolas Ferre (1):
-      ARM: at91/ST: remove not needed casts
-
- arch/arm/mach-at91/at91rm9200.c                    |    8 +-
- arch/arm/mach-at91/at91rm9200_devices.c            |   14 +-
- arch/arm/mach-at91/at91rm9200_time.c               |   37 ++-
- arch/arm/mach-at91/at91sam9260.c                   |   23 +-
- arch/arm/mach-at91/at91sam9260_devices.c           |   38 +++-
- arch/arm/mach-at91/at91sam9261.c                   |   10 +-
- arch/arm/mach-at91/at91sam9261_devices.c           |   31 ++-
- arch/arm/mach-at91/at91sam9263.c                   |   11 +-
- arch/arm/mach-at91/at91sam9263_devices.c           |   59 ++++-
- arch/arm/mach-at91/at91sam9_alt_reset.S            |   12 +-
- arch/arm/mach-at91/at91sam9g45.c                   |   11 +-
- arch/arm/mach-at91/at91sam9g45_devices.c           |   31 ++-
- arch/arm/mach-at91/at91sam9g45_reset.S             |   12 +-
- arch/arm/mach-at91/at91sam9rl.c                    |   10 +-
- arch/arm/mach-at91/at91sam9rl_devices.c            |   31 ++-
- arch/arm/mach-at91/at91sam9x5.c                    |    5 +-
- arch/arm/mach-at91/at91x40.c                       |    2 +-
- arch/arm/mach-at91/at91x40_time.c                  |   28 ++-
- arch/arm/mach-at91/board-cpu9krea.c                |    5 +-
- arch/arm/mach-at91/board-cpuat91.c                 |    1 +
- arch/arm/mach-at91/board-dt.c                      |   16 +-
- arch/arm/mach-at91/board-eco920.c                  |    5 +-
- arch/arm/mach-at91/board-kb9202.c                  |    1 +
- arch/arm/mach-at91/board-picotux200.c              |    1 +
- arch/arm/mach-at91/board-rm9200dk.c                |    1 +
- arch/arm/mach-at91/board-rm9200ek.c                |    1 +
- arch/arm/mach-at91/board-yl-9200.c                 |    3 +-
- arch/arm/mach-at91/clock.c                         |   81 ++++---
- arch/arm/mach-at91/generic.h                       |   10 +
- arch/arm/mach-at91/include/mach/at91_matrix.h      |   23 ++
- arch/arm/mach-at91/include/mach/at91_pmc.h         |   56 +++--
- arch/arm/mach-at91/include/mach/at91_ramc.h        |   32 +++
- arch/arm/mach-at91/include/mach/at91_st.h          |   32 ++-
- arch/arm/mach-at91/include/mach/at91rm9200.h       |   10 +-
- arch/arm/mach-at91/include/mach/at91rm9200_mc.h    |   58 +----
- .../arm/mach-at91/include/mach/at91rm9200_sdramc.h |   63 +++++
- arch/arm/mach-at91/include/mach/at91sam9260.h      |   14 +-
- .../mach-at91/include/mach/at91sam9260_matrix.h    |   36 ++--
- arch/arm/mach-at91/include/mach/at91sam9261.h      |   10 +-
- .../mach-at91/include/mach/at91sam9261_matrix.h    |   18 +-
- arch/arm/mach-at91/include/mach/at91sam9263.h      |   12 +-
- .../mach-at91/include/mach/at91sam9263_matrix.h    |   74 +++---
- arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h  |    6 -
- arch/arm/mach-at91/include/mach/at91sam9_sdramc.h  |    6 -
- arch/arm/mach-at91/include/mach/at91sam9g45.h      |   12 +-
- .../mach-at91/include/mach/at91sam9g45_matrix.h    |   84 +++---
- arch/arm/mach-at91/include/mach/at91sam9rl.h       |    7 +-
- .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |   42 ++--
- arch/arm/mach-at91/include/mach/at91sam9x5.h       |    5 +-
- arch/arm/mach-at91/include/mach/at91x40.h          |   18 +-
- arch/arm/mach-at91/include/mach/hardware.h         |    3 +-
- arch/arm/mach-at91/include/mach/io.h               |   18 --
- arch/arm/mach-at91/pm.c                            |   35 ++-
- arch/arm/mach-at91/pm.h                            |   11 +-
- arch/arm/mach-at91/pm_slowclock.S                  |  271 ++++++++++----------
- arch/arm/mach-at91/setup.c                         |    9 +
- arch/avr32/mach-at32ap/at32ap700x.c                |    2 -
- drivers/pcmcia/at91_cf.c                           |    5 +-
- drivers/rtc/rtc-at91sam9.c                         |   98 +++-----
- drivers/tty/serial/atmel_serial.c                  |    2 +
- drivers/usb/gadget/at91_udc.c                      |    9 +-
- drivers/usb/gadget/atmel_usba_udc.c                |    6 +-
- drivers/watchdog/at91rm9200_wdt.c                  |    8 +-
- 63 files changed, 910 insertions(+), 683 deletions(-)
- create mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
- create mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/include/mach/at91rm9200_mc.h    |   44 --------------
+ .../arm/mach-at91/include/mach/at91rm9200_sdramc.h |   63 ++++++++++++++++++++
+ arch/arm/mach-at91/pm.c                            |    2 +-
+ arch/arm/mach-at91/pm.h                            |    7 +-
+ arch/arm/mach-at91/pm_slowclock.S                  |    3 +-
+ 5 files changed, 70 insertions(+), 49 deletions(-)
  create mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
+
+diff --git a/arch/arm/mach-at91/include/mach/at91rm9200_mc.h b/arch/arm/mach-at91/include/mach/at91rm9200_mc.h
+index d34e4ed..0eb031b 100644
+--- a/arch/arm/mach-at91/include/mach/at91rm9200_mc.h
++++ b/arch/arm/mach-at91/include/mach/at91rm9200_mc.h
+@@ -87,50 +87,6 @@
+ #define		AT91_SMC_RWHOLD		(7 << 28)		/* Read & Write Signal Hold Time */
+ #define			AT91_SMC_RWHOLD_(x)	((x) << 28)
+ 
+-/* SDRAM Controller registers */
+-#define AT91_SDRAMC_MR		(AT91_MC + 0x90)	/* Mode Register */
+-#define		AT91_SDRAMC_MODE	(0xf << 0)		/* Command Mode */
+-#define			AT91_SDRAMC_MODE_NORMAL		(0 << 0)
+-#define			AT91_SDRAMC_MODE_NOP		(1 << 0)
+-#define			AT91_SDRAMC_MODE_PRECHARGE	(2 << 0)
+-#define			AT91_SDRAMC_MODE_LMR		(3 << 0)
+-#define			AT91_SDRAMC_MODE_REFRESH	(4 << 0)
+-#define		AT91_SDRAMC_DBW		(1   << 4)		/* Data Bus Width */
+-#define			AT91_SDRAMC_DBW_32	(0 << 4)
+-#define			AT91_SDRAMC_DBW_16	(1 << 4)
+-
+-#define AT91_SDRAMC_TR		(AT91_MC + 0x94)	/* Refresh Timer Register */
+-#define		AT91_SDRAMC_COUNT	(0xfff << 0)		/* Refresh Timer Count */
+-
+-#define AT91_SDRAMC_CR		(AT91_MC + 0x98)	/* Configuration Register */
+-#define		AT91_SDRAMC_NC		(3   <<  0)		/* Number of Column Bits */
+-#define			AT91_SDRAMC_NC_8	(0 << 0)
+-#define			AT91_SDRAMC_NC_9	(1 << 0)
+-#define			AT91_SDRAMC_NC_10	(2 << 0)
+-#define			AT91_SDRAMC_NC_11	(3 << 0)
+-#define		AT91_SDRAMC_NR		(3   <<  2)		/* Number of Row Bits */
+-#define			AT91_SDRAMC_NR_11	(0 << 2)
+-#define			AT91_SDRAMC_NR_12	(1 << 2)
+-#define			AT91_SDRAMC_NR_13	(2 << 2)
+-#define		AT91_SDRAMC_NB		(1   <<  4)		/* Number of Banks */
+-#define			AT91_SDRAMC_NB_2	(0 << 4)
+-#define			AT91_SDRAMC_NB_4	(1 << 4)
+-#define		AT91_SDRAMC_CAS		(3   <<  5)		/* CAS Latency */
+-#define			AT91_SDRAMC_CAS_2	(2 << 5)
+-#define		AT91_SDRAMC_TWR		(0xf <<  7)		/* Write Recovery Delay */
+-#define		AT91_SDRAMC_TRC		(0xf << 11)		/* Row Cycle Delay */
+-#define		AT91_SDRAMC_TRP		(0xf << 15)		/* Row Precharge Delay */
+-#define		AT91_SDRAMC_TRCD	(0xf << 19)		/* Row to Column Delay */
+-#define		AT91_SDRAMC_TRAS	(0xf << 23)		/* Active to Precharge Delay */
+-#define		AT91_SDRAMC_TXSR	(0xf << 27)		/* Exit Self Refresh to Active Delay */
+-
+-#define AT91_SDRAMC_SRR		(AT91_MC + 0x9c)	/* Self Refresh Register */
+-#define AT91_SDRAMC_LPR		(AT91_MC + 0xa0)	/* Low Power Register */
+-#define AT91_SDRAMC_IER		(AT91_MC + 0xa4)	/* Interrupt Enable Register */
+-#define AT91_SDRAMC_IDR		(AT91_MC + 0xa8)	/* Interrupt Disable Register */
+-#define AT91_SDRAMC_IMR		(AT91_MC + 0xac)	/* Interrupt Mask Register */
+-#define AT91_SDRAMC_ISR		(AT91_MC + 0xb0)	/* Interrupt Status Register */
+-
+ /* Burst Flash Controller register */
+ #define AT91_BFC_MR		(AT91_MC + 0xc0)	/* Mode Register */
+ #define		AT91_BFC_BFCOM		(3   <<  0)		/* Burst Flash Controller Operating Mode */
+diff --git a/arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h b/arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
+new file mode 100644
+index 0000000..7ad3597
+--- /dev/null
++++ b/arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
+@@ -0,0 +1,63 @@
++/*
++ * arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
++ *
++ * Copyright (C) 2005 Ivan Kokshaysky
++ * Copyright (C) SAN People
++ *
++ * Memory Controllers (SDRAMC only) - System peripherals registers.
++ * Based on AT91RM9200 datasheet revision E.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef AT91RM9200_SDRAMC_H
++#define AT91RM9200_SDRAMC_H
++
++/* SDRAM Controller registers */
++#define AT91RM9200_SDRAMC_MR		(AT91_MC + 0x90)	/* Mode Register */
++#define		AT91RM9200_SDRAMC_MODE	(0xf << 0)		/* Command Mode */
++#define			AT91RM9200_SDRAMC_MODE_NORMAL		(0 << 0)
++#define			AT91RM9200_SDRAMC_MODE_NOP		(1 << 0)
++#define			AT91RM9200_SDRAMC_MODE_PRECHARGE	(2 << 0)
++#define			AT91RM9200_SDRAMC_MODE_LMR		(3 << 0)
++#define			AT91RM9200_SDRAMC_MODE_REFRESH	(4 << 0)
++#define		AT91RM9200_SDRAMC_DBW		(1   << 4)		/* Data Bus Width */
++#define			AT91RM9200_SDRAMC_DBW_32	(0 << 4)
++#define			AT91RM9200_SDRAMC_DBW_16	(1 << 4)
++
++#define AT91RM9200_SDRAMC_TR		(AT91_MC + 0x94)	/* Refresh Timer Register */
++#define		AT91RM9200_SDRAMC_COUNT	(0xfff << 0)		/* Refresh Timer Count */
++
++#define AT91RM9200_SDRAMC_CR		(AT91_MC + 0x98)	/* Configuration Register */
++#define		AT91RM9200_SDRAMC_NC		(3   <<  0)		/* Number of Column Bits */
++#define			AT91RM9200_SDRAMC_NC_8	(0 << 0)
++#define			AT91RM9200_SDRAMC_NC_9	(1 << 0)
++#define			AT91RM9200_SDRAMC_NC_10	(2 << 0)
++#define			AT91RM9200_SDRAMC_NC_11	(3 << 0)
++#define		AT91RM9200_SDRAMC_NR		(3   <<  2)		/* Number of Row Bits */
++#define			AT91RM9200_SDRAMC_NR_11	(0 << 2)
++#define			AT91RM9200_SDRAMC_NR_12	(1 << 2)
++#define			AT91RM9200_SDRAMC_NR_13	(2 << 2)
++#define		AT91RM9200_SDRAMC_NB		(1   <<  4)		/* Number of Banks */
++#define			AT91RM9200_SDRAMC_NB_2	(0 << 4)
++#define			AT91RM9200_SDRAMC_NB_4	(1 << 4)
++#define		AT91RM9200_SDRAMC_CAS		(3   <<  5)		/* CAS Latency */
++#define			AT91RM9200_SDRAMC_CAS_2	(2 << 5)
++#define		AT91RM9200_SDRAMC_TWR		(0xf <<  7)		/* Write Recovery Delay */
++#define		AT91RM9200_SDRAMC_TRC		(0xf << 11)		/* Row Cycle Delay */
++#define		AT91RM9200_SDRAMC_TRP		(0xf << 15)		/* Row Precharge Delay */
++#define		AT91RM9200_SDRAMC_TRCD	(0xf << 19)		/* Row to Column Delay */
++#define		AT91RM9200_SDRAMC_TRAS	(0xf << 23)		/* Active to Precharge Delay */
++#define		AT91RM9200_SDRAMC_TXSR	(0xf << 27)		/* Exit Self Refresh to Active Delay */
++
++#define AT91RM9200_SDRAMC_SRR		(AT91_MC + 0x9c)	/* Self Refresh Register */
++#define AT91RM9200_SDRAMC_LPR		(AT91_MC + 0xa0)	/* Low Power Register */
++#define AT91RM9200_SDRAMC_IER		(AT91_MC + 0xa4)	/* Interrupt Enable Register */
++#define AT91RM9200_SDRAMC_IDR		(AT91_MC + 0xa8)	/* Interrupt Disable Register */
++#define AT91RM9200_SDRAMC_IMR		(AT91_MC + 0xac)	/* Interrupt Mask Register */
++#define AT91RM9200_SDRAMC_ISR		(AT91_MC + 0xb0)	/* Interrupt Status Register */
++
++#endif
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index aac00ce..8046a50 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -315,7 +315,7 @@ static int __init at91_pm_init(void)
+ 
+ #ifdef CONFIG_ARCH_AT91RM9200
+ 	/* AT91RM9200 SDRAM low-power mode cannot be used with self-refresh. */
+-	at91_sys_write(AT91_SDRAMC_LPR, 0);
++	at91_sys_write(AT91RM9200_SDRAMC_LPR, 0);
+ #endif
+ 
+ 	suspend_set_ops(&at91_pm_ops);
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index bba9ce1..41cdd2b 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -13,6 +13,7 @@
+ 
+ #ifdef CONFIG_ARCH_AT91RM9200
+ #include <mach/at91rm9200_mc.h>
++#include <mach/at91rm9200_sdramc.h>
+ 
+ /*
+  * The AT91RM9200 goes into self-refresh mode with this command, and will
+@@ -26,7 +27,7 @@
+ 
+ static inline void at91rm9200_standby(void)
+ {
+-	u32 lpr = at91_sys_read(AT91_SDRAMC_LPR);
++	u32 lpr = at91_sys_read(AT91RM9200_SDRAMC_LPR);
+ 
+ 	asm volatile(
+ 		"b    1f\n\t"
+@@ -37,8 +38,8 @@ static inline void at91rm9200_standby(void)
+ 		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
+ 		"    str    %5, [%1, %2]"
+ 		:
+-		: "r" (0), "r" (AT91_BASE_SYS), "r" (AT91_SDRAMC_LPR),
+-		  "r" (1), "r" (AT91_SDRAMC_SRR),
++		: "r" (0), "r" (AT91_BASE_SYS), "r" (AT91RM9200_SDRAMC_LPR),
++		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
+ 		  "r" (lpr));
+ }
+ 
+diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
+index 33fc4a7..c2cc7d4 100644
+--- a/arch/arm/mach-at91/pm_slowclock.S
++++ b/arch/arm/mach-at91/pm_slowclock.S
+@@ -18,6 +18,7 @@
+ 
+ #if defined(CONFIG_ARCH_AT91RM9200)
+ #include <mach/at91rm9200_mc.h>
++#include <mach/at91rm9200_sdramc.h>
+ #elif defined(CONFIG_ARCH_AT91SAM9G45)
+ #include <mach/at91sam9_ddrsdr.h>
+ #else
+@@ -131,7 +132,7 @@ ENTRY(at91_slow_clock)
+ #ifdef CONFIG_ARCH_AT91RM9200
+ 	/* Put SDRAM in self-refresh mode */
+ 	mov	tmp1, #1
+-	str	tmp1, [sdramc, #AT91_SDRAMC_SRR]
++	str	tmp1, [sdramc, #AT91RM9200_SDRAMC_SRR]
+ #elif defined(CONFIG_ARCH_AT91SAM9G45)
+ 
+ 	/* prepare for DDRAM self-refresh mode */
+-- 
+1.7.9
