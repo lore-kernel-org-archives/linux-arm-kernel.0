@@ -1,68 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Feb 2012 11:05:31 -0800
-Subject: [PATCH 1/8] ARM: OMAP2+: Move DISPC L3 firewall to happen in
- omap_display_init()
-In-Reply-To: <1329898191.2070.6.camel@deskari>
-References: <20120221233619.18709.87982.stgit@kaulin.local>
- <20120221234035.18709.40664.stgit@kaulin.local>
- <1329898191.2070.6.camel@deskari>
-Message-ID: <20120222190531.GK18185@atomide.com>
+From: ru@gnudd.com (Alessandro Rubini)
+Date: Wed, 22 Feb 2012 20:13:39 +0100
+Subject: AMBA devices behing a PCI bridge
+Message-ID: <20120222191339.GA28388@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [120221 23:38]:
-> Hi,
-> 
-> On Tue, 2012-02-21 at 15:40 -0800, Tony Lindgren wrote:
-> > Otherwise we cannot move most of plat/io.h to be a local
-> > iomap.h for mach-omap2.
-> > 
-> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > Cc: linux-fbdev at vger.kernel.org
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/mach-omap2/display.c   |    3 +++
-> >  drivers/video/omap2/dss/dispc.c |    5 -----
-> >  2 files changed, 3 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-> > index 3677b1f..5a7f12f 100644
-> > --- a/arch/arm/mach-omap2/display.c
-> > +++ b/arch/arm/mach-omap2/display.c
-> > @@ -191,6 +191,9 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
-> >  	memset(&pdata, 0, sizeof(pdata));
-> >  
-> >  	if (cpu_is_omap24xx()) {
-> > +		/* L3 firewall setting: enable access to OCM RAM */
-> > +		__raw_writel(0x402000b0, OMAP2_L3_IO_ADDRESS(0x680050a0));
-> > +
-> >  		curr_dss_hwmod = omap2_dss_hwmod_data;
-> >  		oh_count = ARRAY_SIZE(omap2_dss_hwmod_data);
-> >  	} else if (cpu_is_omap34xx()) {
-> > diff --git a/drivers/video/omap2/dss/dispc.c b/drivers/video/omap2/dss/dispc.c
-> > index e1626a1..cce0820 100644
-> > --- a/drivers/video/omap2/dss/dispc.c
-> > +++ b/drivers/video/omap2/dss/dispc.c
-> > @@ -3272,11 +3272,6 @@ static void _omap_dispc_initial_config(void)
-> >  	if (dss_has_feature(FEAT_FUNCGATED))
-> >  		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
-> >  
-> > -	/* L3 firewall setting: enable access to OCM RAM */
-> > -	/* XXX this should be somewhere in plat-omap */
-> > -	if (cpu_is_omap24xx())
-> > -		__raw_writel(0x402000b0, OMAP2_L3_IO_ADDRESS(0x680050a0));
-> > -
-> >  	_dispc_setup_color_conv_coef();
-> >  
-> >  	dispc_set_loadmode(OMAP_DSS_LOAD_FRAME_ONLY);
-> > 
-> 
-> I think the whole raw_writel line can be removed. It's been copied from
-> the old omapfb, and my understanding is that it's about using SRAM for
-> framebuffer. Using SRAM for fb is no longer supported, and I have a
-> patch set that removes the remaining SRAM code from omapfb/omapdss.
+Hello Russell.
+I'm working, with some mates, on a device which is basically a bridge
+from PCIe to AMBA.
 
-OK, I'll remove those from drivers/video/omap2/dss/dispc.c so this
-series keeps building.
+Some of the peripherals that live behind the bridge are actually
+normal primecell devices, with minor or no modifications from the
+original ARM cores. The list includes dma, uart, spi, i2c and mmc.
 
-Tony
+The code that I received (on show at sta2x11.sourceforge.net) includes
+several files that are almost exact copies of the respective amba
+drivers in a pci enclosure. Then, the actual code includes a number of
+other changes, but that's another issue that I'll attack later.
+
+I don't like this code duplication and I don't think it is acceptable
+upstream. So I tried to enable amba under arch/x86; in this way I
+could write a simple PCI driver that registers one amba
+device every time its probe function is called.  The ends meet and I
+happily find my 4 serial ports registered in the system -- they are
+not currently working: bugs are a fact of life and I'm working on it.
+
+I'm confident this is the way to go for all the devices listed above.
+If you agree with me, as ARM and AMBA maintainer, then I'd love to
+have your opinion about how to address the following three issues.  I
+currently just hacked stuff up to prove it works, but I can submit the
+relevant patches for discussion and integration, if the idea is
+accepted.
+
+* CONFIG_ARM_AMBA: maybe it's high time to rename it to CONFIG_AMBA (
+or CONFIG_PRIMECELL) like we have CONFIG_PCI, CONFIG_USB and a zillion
+others? (I expect both the new and old config names to be accepted
+for a while, to allow out-of-tree code to sync gracefully)
+
+* <asm/sizes.h>: most of the amba world uses this header. Maybe it should
+be turned into <linux/sizes.h>, since it has nothing arch-specific in it?
+(you may remember I removed the inclusion from amba/bus.c, but that's
+not enough as most amba code uses the header anyways).
+
+* Not all archs use the clk API. Currently I copied over the empty
+definitions found in arch/m68k/platform/coldfire/clk.c into
+arch/x86/platform/sta2x11/clk.c . Maybe we should offer weak empty
+definition for those functions? Or should the clk world be ported to x86
+and other architectures? (the latter I can't do by myself, I'm sorry).
+
+/alessandro
