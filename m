@@ -1,47 +1,88 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 22 Feb 2012 11:19:27 -0700
-Subject: [PATCH v1 05/11] arm/PCI: use pci_flags PCI_PROBE_ONLY instead of
- arm-specific flag
-In-Reply-To: <20120222181556.27513.9413.stgit@bhelgaas.mtv.corp.google.com>
-References: <20120222181556.27513.9413.stgit@bhelgaas.mtv.corp.google.com>
-Message-ID: <20120222181927.27513.36301.stgit@bhelgaas.mtv.corp.google.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 22 Feb 2012 10:29:43 -0800
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <4F452484.5080503@gmail.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/arm/kernel/bios32.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+Rob Herring wrote at Wednesday, February 22, 2012 10:23 AM:
+> On 02/22/2012 08:31 AM, Cousson, Benoit wrote:
+> > On 2/22/2012 3:23 PM, Rob Herring wrote:
+> >> On 02/15/2012 10:04 AM, Benoit Cousson wrote:
+> >>> Adapt the GPIO driver to retrieve information from a DT file.
+> >>>
+> >>> Allocate the irq_base dynamically and rename bank->virtual_irq_start
+> >>> to bank->irq_base.
+> >>> Change irq_base type to int instead of u16 to match irq_alloc_descs
+> >>> output.
+> >>>
+> >>> Add documentation for GPIO properties specific to OMAP.
+> >>>
+> >>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> >>> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> >>
+> >> One comment below, but otherwise:
+> >>
+> >> Acked-by: Rob Herring<rob.herring@calxeda.com>
+> >>
+> >>> ---
+> >>>   .../devicetree/bindings/gpio/gpio-omap.txt         |   30 +++++
+> >>>   drivers/gpio/gpio-omap.c                           |  121
+> >>> ++++++++++++++++++--
+> >>>   2 files changed, 142 insertions(+), 9 deletions(-)
+> >>>   create mode 100644
+> >>> Documentation/devicetree/bindings/gpio/gpio-omap.txt
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+> >>> b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+> >>> new file mode 100644
+> >>> index 0000000..c1b3100
+> >>> --- /dev/null
+> >>> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+> >>> @@ -0,0 +1,30 @@
+> >>> +OMAP GPIO controller bindings
+> >>> +
+> >>> +Required properties:
+> >>> +- compatible:
+> >>> +  - "ti,omap2-gpio" for OMAP2 controllers
+> >>> +  - "ti,omap3-gpio" for OMAP3 controllers
+> >>> +  - "ti,omap4-gpio" for OMAP4 controllers
+> >>> +- #gpio-cells : Should be two.
+> >>> +  - first cell is the pin number
+> >>> +  - second cell is used to specify optional parameters (unused)
+> >>> +- gpio-controller : Marks the device node as a GPIO controller.
+> >>> +- #interrupt-cells : Should be one
+> >>
+> >> There's no level/edge settings for gpios?
+> >
+> > That's a good question, because I was wondering as well :-)
+> >
+> > I did no see how it was done in other GPIO implementation.
+> 
+> There's not really a good example that I've found. Many gpio nodes don't
+> even have "interrupt-controller" set.
+> 
+> So if you have an irq_set_type function for gpio's, then you should have
+> 2 cells.
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index f3fd52b..8d7c22d 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -16,7 +16,6 @@
- #include <asm/mach/pci.h>
- 
- static int debug_pci;
--static int use_firmware;
- 
- /*
-  * We can't use pci_find_device() here since we are
-@@ -537,7 +536,7 @@ void __init pci_common_init(struct hw_pci *hw)
- 	list_for_each_entry(sys, &hw->buses, node) {
- 		struct pci_bus *bus = sys->bus;
- 
--		if (!use_firmware) {
-+		if (!pci_has_flag(PCI_PROBE_ONLY)) {
- 			/*
- 			 * Size the bridge windows.
- 			 */
-@@ -575,7 +574,7 @@ char * __init pcibios_setup(char *str)
- 		debug_pci = 1;
- 		return NULL;
- 	} else if (!strcmp(str, "firmware")) {
--		use_firmware = 1;
-+		pci_add_flags(PCI_PROBE_ONLY);
- 		return NULL;
- 	}
- 	return str;
+Tegra's GPIO IRQ binding (gpio_nvidia.txt in linux-next at least) says:
+
+- #interrupt-cells : Should be 2.
+  The first cell is the GPIO number.
+  The second cell is used to specify flags:
+    bits[3:0] trigger type and level flags:
+      1 = low-to-high edge triggered.
+      2 = high-to-low edge triggered.
+      4 = active high level-sensitive.
+      8 = active low level-sensitive.
+      Valid combinations are 1, 2, 3, 4, 8.
+
+Presumably, that's what you meant.
+
+-- 
+nvpublic
