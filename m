@@ -1,34 +1,38 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 22 Feb 2012 14:59:14 +0200
-Subject: remoteproc: Load coprocessor code to the specific main memory
- location
-In-Reply-To: <4F44DB23.4010303@monstr.eu>
-References: <4F1EE861.4030405@monstr.eu> <4F1FF870.3000105@monstr.eu>
- <CAK=WgbZwaxMPsMiNcq5yFvBLrcODqGgDT6b=mmQ91JBVtTEyXA@mail.gmail.com>
- <4F200F64.9060203@monstr.eu>
- <CAK=WgbZDADRf1OF=uWbbsF+t2dx36tqj=kRftn5nd4RA7DtEnA@mail.gmail.com>
- <4F212E9E.9060807@monstr.eu>
- <CAK=WgbYMBDp3Qm8TErNrnDwn2ZTFt62+OuyyQvVE-jrnNsL6kg@mail.gmail.com>
- <4F391C1D.9020402@monstr.eu>
- <CAK=WgbYn6hrS4YLEdfp=0jSEfEwy-HkJmt5S06_j6gZFf0UTmQ@mail.gmail.com>
- <4F3BA962.9040109@monstr.eu> <4F3BC30A.4030301@monstr.eu>
- <4F3CC899.4070302@monstr.eu>
- <CAK=WgbaRF-L7M3VMZQdqFLUFOJuwFVkBH1hUNuJ51kSrzkaVjA@mail.gmail.com>
- <4F3CFFAD.9030402@monstr.eu> <4F3D032B.6090700@monstr.eu>
- <CAK=WgbZ3oXc+NQscdShqmu2wkzv=M-qBDCH2-k=5qSRX9W=z3Q@mail.gmail.com>
- <CAHTX3dJ4PruKO-wJLJU8W0boHFL0f6eoF+QNaoNjm5hu26YEow@mail.gmail.com>
- <CAK=WgbZBJJbFcoeZ+hY=BgyW_4yvOJPVNMZ18_9o+zY7tEc_pQ@mail.gmail.com>
- <4F425711.80102@monstr.eu>
- <CAK=WgbbNJMpndKqgW4SJjE=H-BqT7yVsB+F-kEfJWmW+ikJM+A@mail.gmail.com>
- <4F44DB23.4010303@monstr.eu>
-Message-ID: <CAK=Wgbaa9rv1pg19sWYFVX_Dvt0J0AzbRtKhPVnhP6WGdMeT9A@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 22 Feb 2012 13:58:14 +0100
+Subject: [PATCH v2 07/19] ARM: at91/pm_slowclock: function slow_clock()
+ accepts parameters
+In-Reply-To: <20120222095250.GV22562@n2100.arm.linux.org.uk>
+References: <0d78171672a30e8ec8084f54a557e9948260356d.1329903206.git.nicolas.ferre@atmel.com>
+ <5b8fbdf669825987a82b3b89b2e7f02239cad816.1329903206.git.nicolas.ferre@atmel.com>
+ <20120222095250.GV22562@n2100.arm.linux.org.uk>
+Message-ID: <20120222125814.GA9407@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 2:10 PM, Michal Simek <monstr@monstr.eu> wrote:
-> That will be great to get it. Please let me know when you have them.
+On 09:52 Wed 22 Feb     , Russell King - ARM Linux wrote:
+> On Wed, Feb 22, 2012 at 10:39:33AM +0100, Nicolas Ferre wrote:
+> > @@ -232,7 +246,7 @@ static int at91_pm_enter(suspend_state_t state)
+> >  				/* copy slow_clock handler to SRAM, and call it */
+> >  				memcpy(slow_clock, at91_slow_clock, at91_slow_clock_sz);
+> >  #endif
+> > -				slow_clock();
+> > +				slow_clock(at91_pmc_base, at91_ramc0_base, at91_ramc1_base);
+> 
+> This should be updated to use the fncpy() stuff if there's any chance that
+> you'll be supporting Thumb-2.  Using fncpy() is probably a good idea even
+> if you aren't.  See asm/fncpy.h
+Yes I agree and I plan to do it
+but I'm work first on the update of the genalloc api to use it here to allocate
+the address in sram
 
-Will do.
+If it's ok with you I'll do it after
 
-Thanks,
-Ohad.
+Btw I'm looking on a way to switch the assembly funciton to C but I didn,t find a
+good way to calculate the function size except by touching at the linker
+script. Which I don;t want to do.
+
+Do you have any idea?
+
+Best Regards,
+J.
