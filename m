@@ -1,39 +1,19 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2012 16:02:08 +0000
-Subject: [PATCH v3 00/10] Add PWM framework and device tree support.
-In-Reply-To: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <201202221602.09116.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 22 Feb 2012 17:15:25 +0100
+Subject: [PATCH 0/2] ARM: at91: two additional patches to cleanup series
+In-Reply-To: <5a6951fcbe28c3093c936d40c4b28f7ae3161d8d.1329903206.git.nicolas.ferre@atmel.com>
+References: <5a6951fcbe28c3093c936d40c4b28f7ae3161d8d.1329903206.git.nicolas.ferre@atmel.com>
+Message-ID: <1329927327-10613-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 February 2012, Thierry Reding wrote:
-> This patch series adds very rudimentary device-tree support for PWM
-> devices. With all of these patches applied (plus one board-specific
-> patch that is not included), I'm able to control the backlight on the
-> device I'm working on using the sysfs interface provided by the pwm-bl
-> driver and the backlight class.
-> 
-> This series is based on Sascha Hauer's series of patches[0] to add a
-> generic PWM framework. The first patch in this series is taken from
-> Sascha's branch, while the second patch enables each PWM chip to provide
-> multiple PWM devices (the Blackfin and PXA drivers have been ported to
-> the framework for reference). When this series is ready I think it would
-> be best to merge patches 1 and 2. Currently a global namespace is still
-> provided to keep backwards-compatibility with the legacy PWM API. In
-> order to achieve this, the number of global PWM devices is limited to
-> 1024. However, patch 2 introduces per-chip indexing of PWM devices in
-> the core, so it should be easy to add an API to request a PWM device on
-> a per-chip basis and get rid of the global namespace eventually. The
-> device tree support code does not use the global namespace.
+Hi,
 
-Hi Thierry,
+I queue up two little paches for this cleanup series. They are dealing with
+Makefile.boot file and are more a kind of cosmetic modifications.
 
-I've just had a chance to look at your series and I think this looks
-very good overall, great work!
+Those two will go just after the patch:
+"[PATCH v2 18/19] ARM: at91/board-dt: drop default console"
+as the patch 19/19 will be dropped in the final draft of this series.
 
-I probably wouldn't bother merging patches 1 and 2 as you listed
-in the TODO section, in order to keep the authorship of each
-part obvious.
-
-	Arnd
+Best regards,
