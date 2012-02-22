@@ -1,37 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2012 13:12:24 +0000
-Subject: [GIT PULL] [v3.3] fixes for arch-pxa in arm
-In-Reply-To: <CAF+7xWnXe24ZmtrC756+kXY32KdyrrfecO2vZF7ZY4y5+XpbOw@mail.gmail.com>
-References: <CAN1soZwcL-ELxwW5MB7zNQOrr0YPpo6pXp40D7uEaKH6Li0haw@mail.gmail.com>
- <201202211727.19754.arnd@arndb.de>
- <CAF+7xWnXe24ZmtrC756+kXY32KdyrrfecO2vZF7ZY4y5+XpbOw@mail.gmail.com>
-Message-ID: <201202221312.24424.arnd@arndb.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 22 Feb 2012 21:16:31 +0800
+Subject: [PATCH 6/7] rtc: sa1100: enable clk support
+In-Reply-To: <201202221229.17934.arnd@arndb.de>
+References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
+ <1329815096-6200-7-git-send-email-haojian.zhuang@marvell.com>
+ <201202221229.17934.arnd@arndb.de>
+Message-ID: <CAN1soZyF7jWBctb-8=kzeMq0chXyyDCO4xKY5UMJy9XFoBnm6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 February 2012, Axel Lin wrote:
-> 2012/2/22 Arnd Bergmann <arnd@arndb.de>:
-> > How urgent is "pxa/hx4700: add platform device and I2C info
-> > for AK4641 codec" amongst these? If not so urgent, I would prefer
-> > putting this one on next/fixes-non-critical or even next/board
-> > for 3.4 while applying the reset on the fixes branch for 3.3.
-> 
-> This patch is required since commit c26f64
-> "ASoC: add iPAQ hx4700 machine driver.
-> The audio on hx4700 does not work without this patch.
-> 
-> Actually, I think this patch should have CC stable tag for 3.0+.
-> 
-> I was expet to see this patch in 3.2 since I sent the patch.
-> I really hope it can be upstream in 3.3 now.
+On Wed, Feb 22, 2012 at 8:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 21 February 2012, Haojian Zhuang wrote:
+>> @@ -306,6 +308,13 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
+>> ? ? ? ? if (!info)
+>> ? ? ? ? ? ? ? ? return -ENOMEM;
+>>
+>> + ? ? ? info->clk = clk_get(&pdev->dev, NULL);
+>> + ? ? ? if (IS_ERR(info->clk)) {
+>> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "failed to find rtc clock source\n");
+>> + ? ? ? ? ? ? ? ret = PTR_ERR(info->clk);
+>> + ? ? ? ? ? ? ? goto err_clk;
+>> + ? ? ? }
+>> + ? ? ? clk_prepare_enable(info->clk);
+>> ? ? ? ? info->iobase = res->start;
+>> ? ? ? ? info->iosize = resource_size(res);
+>> ? ? ? ? info->irq_1hz = irq_1hz;
+>> @@ -379,6 +388,9 @@ err_dev:
+>> ? ? ? ? iounmap(info->reg_base);
+>> ?err_map:
+>> ? ? ? ? platform_set_drvdata(pdev, NULL);
+>> + ? ? ? clk_disable_unprepare(info->clk);
+>> + ? ? ? clk_put(info->clk);
+>> +err_clk:
+>> ? ? ? ? kfree(info);
+>> ? ? ? ? return ret;
+>
+> I wonder whether it would be easier to just make the clk handling
+> conditional here, like
+>
+> ? ? ? ?info->clk = clk_get(&pdev->dev, NULL);
+> ? ? ? ?if (PTR_ERR(info->clk) == -ENOENT)
+> ? ? ? ? ? ? ? ?info->clk = NULL;
+> ? ? ? ?if (IS_ERR(info->clk)) {
+> ? ? ? ? ? ? ? ?ret = ?PTR_ERR(info->clk);
+> ? ? ? ? ? ? ? ?goto err_clk;
+> ? ? ? ?}
+>
+> ? ? ? ?if (info->clk)
+> ? ? ? ? ? ? ? ?clk_prepare_enable(info->clk);
+> ? ? ? ?...
+> ? ? ? ?if (info->clk) {
+> ? ? ? ? ? ? ? ?clk_disable_unprepare(info->clk);
+> ? ? ? ? ? ? ? ?clk_put(info->clk);
+> ? ? ? ?}
+>
+> With this, you would no longer need to add dummy clocks in platforms
+> that really have no clock handling.
+>
+> ? ? ? ?Arnd
 
-Hi Axel,
+It sounds good. I'll update it.
 
-I still wouldn't consider the patch a bug fix, but it's clear that
-this is needed and we should have merged it much earlier.
-
-I've merged the entire series into the fixes branch now, but in the
-future I want to see patches like this separate from bug fixes
-and only in the merge window.
-
-	Arnd
+Thanks
+Haojian
