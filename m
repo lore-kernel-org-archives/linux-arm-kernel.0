@@ -1,51 +1,46 @@
-From: ru@gnudd.com (Alessandro Rubini)
-Date: Wed, 22 Feb 2012 20:13:39 +0100
-Subject: AMBA devices behing a PCI bridge
-Message-ID: <20120222191339.GA28388@mail.gnudd.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 22 Feb 2012 11:16:42 -0800
+Subject: [PATCHv10 3/4] omap3: add common twl configurations for vdd1 and
+ vdd2
+In-Reply-To: <1329907675.4102.488.camel@sokoban> (Tero Kristo's message of
+ "Wed, 22 Feb 2012 12:47:55 +0200")
+References: <1329733568-26676-1-git-send-email-t-kristo@ti.com>
+ <1329733568-26676-4-git-send-email-t-kristo@ti.com>
+ <871upn4tzf.fsf@ti.com> <1329907675.4102.488.camel@sokoban>
+Message-ID: <8739a21xwl.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell.
-I'm working, with some mates, on a device which is basically a bridge
-from PCIe to AMBA.
+Tero Kristo <t-kristo@ti.com> writes:
 
-Some of the peripherals that live behind the bridge are actually
-normal primecell devices, with minor or no modifications from the
-original ARM cores. The list includes dma, uart, spi, i2c and mmc.
+> On Tue, 2012-02-21 at 16:00 -0800, Kevin Hilman wrote:
+>> Tero Kristo <t-kristo@ti.com> writes:
+>> 
+>> > VDD1 and VDD2 are the core voltage regulators on OMAP3. VDD1 is used
+>> > to control MPU/IVA voltage, and VDD2 is used for CORE. These regulators
+>> > are needed by DVFS.
+>> >
+>> > Voltage ranges for VDD1 and VDD2 are taken from twl4030/twl5030 data manuals:
+>> > - SWCS019L : TWL4030 ES3.1 Data Manual rev L
+>> > - SWCS030E : TWL5030 ES1.2 Data Manual rev E
+>> >
+>> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> 
+>> Do you have a similar patch for OMAP4 support?
+>
+> It looks like OMAP4 support requires some changes to the twl-regulator /
+> twl-core in addition to the twl-common.c. I have these available (just
+> created them), should I post these out? 
 
-The code that I received (on show at sta2x11.sourceforge.net) includes
-several files that are almost exact copies of the respective amba
-drivers in a pci enclosure. Then, the actual code includes a number of
-other changes, but that's another issue that I'll attack later.
+Yes please.
 
-I don't like this code duplication and I don't think it is acceptable
-upstream. So I tried to enable amba under arch/x86; in this way I
-could write a simple PCI driver that registers one amba
-device every time its probe function is called.  The ends meet and I
-happily find my 4 serial ports registered in the system -- they are
-not currently working: bugs are a fact of life and I'm working on it.
+> Attached here for reference in case you need to test something
+> quickly.
 
-I'm confident this is the way to go for all the devices listed above.
-If you agree with me, as ARM and AMBA maintainer, then I'd love to
-have your opinion about how to address the following three issues.  I
-currently just hacked stuff up to prove it works, but I can submit the
-relevant patches for discussion and integration, if the idea is
-accepted.
+Thanks, it's easier for me to validate actual voltage scaling on OMAP4
+since I have a setup to easily measure voltage rails.
 
-* CONFIG_ARM_AMBA: maybe it's high time to rename it to CONFIG_AMBA (
-or CONFIG_PRIMECELL) like we have CONFIG_PCI, CONFIG_USB and a zillion
-others? (I expect both the new and old config names to be accepted
-for a while, to allow out-of-tree code to sync gracefully)
+Thanks for these, I verified they work using my v2 CPUfreq driver on
+OMAP4430.
 
-* <asm/sizes.h>: most of the amba world uses this header. Maybe it should
-be turned into <linux/sizes.h>, since it has nothing arch-specific in it?
-(you may remember I removed the inclusion from amba/bus.c, but that's
-not enough as most amba code uses the header anyways).
-
-* Not all archs use the clk API. Currently I copied over the empty
-definitions found in arch/m68k/platform/coldfire/clk.c into
-arch/x86/platform/sta2x11/clk.c . Maybe we should offer weak empty
-definition for those functions? Or should the clk world be ported to x86
-and other architectures? (the latter I can't do by myself, I'm sorry).
-
-/alessandro
+Kevin
