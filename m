@@ -1,61 +1,55 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 22 Feb 2012 15:31:19 +0100
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <4F44FA56.7020000@gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com>
-Message-ID: <4F44FC37.2000701@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 22 Feb 2012 15:32:49 +0100
+Subject: [PATCH v5 2/2] ARM: at91/pit: add traces in case of error
+In-Reply-To: <06c78dfd072dd03b45acbecb0380ce67de0bee70.1329920069.git.nicolas.ferre@atmel.com>
+References: <1325866830-13259-1-git-send-email-nicolas.ferre@atmel.com>
+ <06c78dfd072dd03b45acbecb0380ce67de0bee70.1329920069.git.nicolas.ferre@atmel.com>
+Message-ID: <76116efd8af5f70ca2d3ccd18e51dfe791e2a616.1329920069.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/22/2012 3:23 PM, Rob Herring wrote:
-> On 02/15/2012 10:04 AM, Benoit Cousson wrote:
->> Adapt the GPIO driver to retrieve information from a DT file.
->>
->> Allocate the irq_base dynamically and rename bank->virtual_irq_start
->> to bank->irq_base.
->> Change irq_base type to int instead of u16 to match irq_alloc_descs
->> output.
->>
->> Add documentation for GPIO properties specific to OMAP.
->>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
->
-> One comment below, but otherwise:
->
-> Acked-by: Rob Herring<rob.herring@calxeda.com>
->
->> ---
->>   .../devicetree/bindings/gpio/gpio-omap.txt         |   30 +++++
->>   drivers/gpio/gpio-omap.c                           |  121 ++++++++++++++++++--
->>   2 files changed, 142 insertions(+), 9 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
->>
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
->> new file mode 100644
->> index 0000000..c1b3100
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
->> @@ -0,0 +1,30 @@
->> +OMAP GPIO controller bindings
->> +
->> +Required properties:
->> +- compatible:
->> +  - "ti,omap2-gpio" for OMAP2 controllers
->> +  - "ti,omap3-gpio" for OMAP3 controllers
->> +  - "ti,omap4-gpio" for OMAP4 controllers
->> +- #gpio-cells : Should be two.
->> +  - first cell is the pin number
->> +  - second cell is used to specify optional parameters (unused)
->> +- gpio-controller : Marks the device node as a GPIO controller.
->> +- #interrupt-cells : Should be one
->
-> There's no level/edge settings for gpios?
+Traces related to IRQ management are useful for timers in case of
+non-working IRQ subsystem (switch to irq_domain for instance).
 
-That's a good question, because I was wondering as well :-)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91sam926x_time.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-I did no see how it was done in other GPIO implementation.
-
-Benoit
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index 8e5cc37..e4f7ba0 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -174,8 +174,10 @@ int __init of_at91sam926x_pit_init(void)
+ 
+ 	/* Get the interrupts property */
+ 	ret = irq_of_parse_and_map(np, 0);
+-	if (!ret)
++	if (!ret) {
++		pr_crit("AT91: PIT: Unable to get IRQ from DT\n");
+ 		goto ioremap_err;
++	}
+ 	at91sam926x_pit_irq.irq = ret;
+ 
+ 	of_node_put(np);
+@@ -203,6 +205,7 @@ static void __init at91sam926x_pit_init(void)
+ {
+ 	unsigned long	pit_rate;
+ 	unsigned	bits;
++	int		ret;
+ 
+ 	/* For device tree enabled device: initialize here */
+ 	of_at91sam926x_pit_init();
+@@ -227,7 +230,9 @@ static void __init at91sam926x_pit_init(void)
+ 	clocksource_register_hz(&pit_clk, pit_rate);
+ 
+ 	/* Set up irq handler */
+-	setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
++	ret = setup_irq(at91sam926x_pit_irq.irq, &at91sam926x_pit_irq);
++	if (ret)
++		pr_crit("AT91: PIT: Unable to setup IRQ\n");
+ 
+ 	/* Set up and register clockevents */
+ 	pit_clkevt.mult = div_sc(pit_rate, NSEC_PER_SEC, pit_clkevt.shift);
+-- 
+1.7.9
