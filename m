@@ -1,19 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2012 12:39:54 +0000
-Subject: [PATCH 0/7] share sa1100 rtc driver to arch-mmp
-In-Reply-To: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <201202221239.54321.arnd@arndb.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 22 Feb 2012 18:21:03 +0530
+Subject: [PATCH V3 00/12] dmaengine: Pl08x and dw_dmac updates
+In-Reply-To: <cover.1328091915.git.viresh.kumar@st.com>
+References: <cover.1328091915.git.viresh.kumar@st.com>
+Message-ID: <1329915063.24656.97.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 February 2012, Haojian Zhuang wrote:
-> Remove the hardcode definition of rtc registers, use ioremap() instead.
-> Append clk support for arch-mmp, so add dummy clk in arch-sa1100/arch-pxa.
+On Wed, 2012-02-01 at 16:12 +0530, Viresh Kumar wrote:
+> Hi Vinod/Dan,
+> 
+>    This patchset does following:
+>    - Includes earlier patchset sent by Rajeev for cleanly applying this patchset
+>    - Adds device_fc (device flow control) field in struct DMA_SLAVE_CONFIG
+>    - Fixes existing users of DMAENGINE for device_fc.
+>    - Updates pl08x driver according to that
+>    - Fixes few issues/bugs in dw_dmac driver
+>    - Adds DMA_SLAVE_CONFIG for dw_dmac driver
+>    - Fixes existing users of dw_dmac driver
+> 
+> Change History:
+> Since V2:
+>  - fix code comment in 2/12
+>  - fix commit log in 8/12
+> 
+> Since V1:
+>    - used dev_get_platdata() instead of platform_get_drvdata(), as
+>    that was
+>    incorrect
+>    - Lots of fixes in: dmaengine/dw_dmac: Add support for
+>    DMA_SLAVE_CONFIG
+>    - Additional patches:
+>    - dmaengine/dw_dmac: Add 64 bit access width support for
+>    slave xfers on
+>    mem side
+>    - Fix other kernel driver for device_fc
+>    and dw_dmac changes.
+> 
+>    Rebased-on:
+> 
+>    commit
+>    3506c0d507144d9b0f19efd5a56d289f70611179
+>    Author: Tushar Behera
+>    <tushar.behera@linaro.org>
+>    Date:   Tue Dec 6 16:15:54 2011 +0530
+> 
+>    DMA: PL330: Remove pm_runtime_xxx
+>    calls from pl330 probe/remove
+> 
+> 
+> Rajeev KUMAR (1):
+>   dmaengine/dw_dmac: Hibernation support in dw_dmac
+> 
+> Viresh Kumar (11):
+>   dmaengine: Add flow controller information to dma_slave_config
+>   dmaengine: Pass dma_slave_config .device_fc = NULL for all existing
+>     users
+>   dmaengine/amba-pl08x: Take flow controller info from DMA_SLAVE_CONFIG
+>   dmaengine/dw_dmac: Don't use magic number for total number of
+>     channels
+>   dmaengine/dw_dmac: Use dev_get_platdata() instead of accessing dev
+>     directly
+>   dmaengine/dw_dmac: Don't handle block interrupts
+>   dmaengine/dw_dmac: Unmap all memory buffers after completion of
+>     non-slave transfers
+>   dmaengine/dw_dmac: Add 64 bit access width support for slave xfers on
+>     mem side
+>   dmaengine/dw_dmac: Add support for DMA_SLAVE_CONFIG
+>   dmaengine/dw_dmac: Fix dw_dmac user drivers to adapt to slave_config
+>     changes
+>   dmaengine/dw_dmac: Remove unused fields in struct dw_dma_slave
+> 
+>  arch/avr32/mach-at32ap/at32ap700x.c             |   13 --
+>  arch/avr32/mach-at32ap/include/mach/atmel-mci.h |    7 -
+>  drivers/dma/amba-pl08x.c                        |    4 +-
+>  drivers/dma/dw_dmac.c                           |  232 +++++++++++++++--------
+>  drivers/dma/dw_dmac_regs.h                      |   15 ++
+>  drivers/mmc/host/atmel-mci.c                    |   24 ++-
+>  drivers/mmc/host/mmci.c                         |    2 +
+>  drivers/mmc/host/mxcmmc.c                       |    2 +
+>  drivers/spi/spi-dw-mid.c                        |    3 +
+>  drivers/spi/spi-pl022.c                         |    2 +
+>  drivers/tty/serial/amba-pl011.c                 |    3 +
+>  drivers/usb/musb/ux500_dma.c                    |    1 +
+>  include/linux/amba/pl08x.h                      |    8 +-
+>  include/linux/dmaengine.h                       |    5 +
+>  include/linux/dw_dmac.h                         |   38 ----
+>  sound/atmel/abdac.c                             |   18 ++-
+>  sound/atmel/ac97c.c                             |   41 ++++-
+>  sound/soc/imx/imx-pcm-dma-mx2.c                 |    3 +
+>  18 files changed, 255 insertions(+), 166 deletions(-)
+> 
+applied all, except 8/12
 
-What is the status of the drivers/rtc/rtc-pxa.c driver after this series?
-Is is still required for some pxa machines or can it get removed now?
-It seems a little strange to register two platform devices for the
-rtc on each pxa machine, with the same resources.
-
-	Arnd
+-- 
+~Vinod
