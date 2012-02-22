@@ -1,76 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 21 Feb 2012 17:39:37 -0800
-Subject: [PATCH] msm: timer: Support sched_clock()
-Message-ID: <1329874777-12758-1-git-send-email-sboyd@codeaurora.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 22 Feb 2012 07:10:18 +0530
+Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
+In-Reply-To: <00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>
+References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
+ <CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>
+ <00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>
+Message-ID: <CABb+yY0j0j7Qw4MCwP_F+DKzmpdmZ3x0QC2Ktj2qmGnL=Ocx0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that sched_clock is mandatory on ARM it's simple to add
-sched_clock support to the MSM timer code. Add it so that we get
-more accurate sched_clock output than the jiffies based version
-that's provided by default.
+On Wed, Feb 22, 2012 at 5:52 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>
+> And since she has been doing these updates on behalf of Samsung, she has
+> added attribution to Samsung also (which you never did while at Samsung).
+>
+What the bloody fuck ?!!
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: David Brown <davidb@codeaurora.org>
----
+Can't you read this ? .....
 
-This is based on Marc's mandatory sched_clock patch series
-located at
+-------------------------
+/* linux/drivers/dma/pl330.c
+ *
+ * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+ *      Jaswinder Singh <jassi.brar@samsung.com>
+ *
+-------------------------
 
- git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git sched_clock-v3.3-rc3
+I challenge you to show 1 file that I wrote while in Samsung which
+doesn't show Samsung as the copyright holder.
 
- arch/arm/mach-msm/timer.c |   12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+>
+> And, I don't think some patches are more important than the other.
+> All patches, simple or complex, help in improving the code.
+>
+Bloody rant. Who said any type of patch is useless or doesn't improve code?!
 
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 11d0d8f..61983da 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -24,6 +24,7 @@
- #include <asm/mach/time.h>
- #include <asm/hardware/gic.h>
- #include <asm/localtimer.h>
-+#include <asm/sched_clock.h>
- 
- #include <mach/msm_iomap.h>
- #include <mach/cpu.h>
-@@ -105,12 +106,12 @@ static union {
- 
- static void __iomem *source_base;
- 
--static cycle_t msm_read_timer_count(struct clocksource *cs)
-+static notrace cycle_t msm_read_timer_count(struct clocksource *cs)
- {
- 	return readl_relaxed(source_base + TIMER_COUNT_VAL);
- }
- 
--static cycle_t msm_read_timer_count_shift(struct clocksource *cs)
-+static notrace cycle_t msm_read_timer_count_shift(struct clocksource *cs)
- {
- 	/*
- 	 * Shift timer count down by a constant due to unreliable lower bits
-@@ -127,6 +128,11 @@ static struct clocksource msm_clocksource = {
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-+static notrace u32 msm_sched_clock_read(void)
-+{
-+	return msm_clocksource.read(&msm_clocksource);
-+}
-+
- static void __init msm_timer_init(void)
- {
- 	struct clock_event_device *ce = &msm_clockevent;
-@@ -189,6 +195,8 @@ err:
- 	res = clocksource_register_hz(cs, dgt_hz);
- 	if (res)
- 		pr_err("clocksource_register failed\n");
-+	setup_sched_clock(msm_sched_clock_read,
-+			cpu_is_msm7x01() ? 32 - MSM_DGT_SHIFT : 32, dgt_hz);
- }
- 
- #ifdef CONFIG_LOCAL_TIMERS
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I said, and still say, merging two files written by same person doesn't
+grant you the right to add your own name as one of the authors.
+
+And if you think Boojin's patches were any great (even after discounting
+the number of iterations they took), Javi Merino's name should be added
+before Boojin's.
