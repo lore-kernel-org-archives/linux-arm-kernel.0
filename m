@@ -1,103 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Feb 2012 14:17:10 -0800
-Subject: [PATCH 1/8] ARM: OMAP2+: Move DISPC L3 firewall to happen in
- omap_display_init()
-In-Reply-To: <20120222190531.GK18185@atomide.com>
-References: <20120221233619.18709.87982.stgit@kaulin.local>
- <20120221234035.18709.40664.stgit@kaulin.local>
- <1329898191.2070.6.camel@deskari>
- <20120222190531.GK18185@atomide.com>
-Message-ID: <20120222221710.GN18185@atomide.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 23 Feb 2012 09:17:59 +1100
+Subject: [PATCH v2 03/19] ARM: at91: make matrix register base soc
+ independent
+In-Reply-To: <4b71fdf7ee746a09b7ee468aa3bc60d6c34d4c20.1329903206.git.nicolas.ferre@atmel.com>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <4b71fdf7ee746a09b7ee468aa3bc60d6c34d4c20.1329903206.git.nicolas.ferre@atmel.com>
+Message-ID: <4F456997.50500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120222 10:34]:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [120221 23:38]:
-> > Hi,
-> > 
-> > On Tue, 2012-02-21 at 15:40 -0800, Tony Lindgren wrote:
-> > > Otherwise we cannot move most of plat/io.h to be a local
-> > > iomap.h for mach-omap2.
-> > > 
-> > > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > > Cc: linux-fbdev at vger.kernel.org
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > ---
-> > >  arch/arm/mach-omap2/display.c   |    3 +++
-> > >  drivers/video/omap2/dss/dispc.c |    5 -----
-> > >  2 files changed, 3 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-> > > index 3677b1f..5a7f12f 100644
-> > > --- a/arch/arm/mach-omap2/display.c
-> > > +++ b/arch/arm/mach-omap2/display.c
-> > > @@ -191,6 +191,9 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
-> > >  	memset(&pdata, 0, sizeof(pdata));
-> > >  
-> > >  	if (cpu_is_omap24xx()) {
-> > > +		/* L3 firewall setting: enable access to OCM RAM */
-> > > +		__raw_writel(0x402000b0, OMAP2_L3_IO_ADDRESS(0x680050a0));
-> > > +
-> > >  		curr_dss_hwmod = omap2_dss_hwmod_data;
-> > >  		oh_count = ARRAY_SIZE(omap2_dss_hwmod_data);
-> > >  	} else if (cpu_is_omap34xx()) {
-> > > diff --git a/drivers/video/omap2/dss/dispc.c b/drivers/video/omap2/dss/dispc.c
-> > > index e1626a1..cce0820 100644
-> > > --- a/drivers/video/omap2/dss/dispc.c
-> > > +++ b/drivers/video/omap2/dss/dispc.c
-> > > @@ -3272,11 +3272,6 @@ static void _omap_dispc_initial_config(void)
-> > >  	if (dss_has_feature(FEAT_FUNCGATED))
-> > >  		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
-> > >  
-> > > -	/* L3 firewall setting: enable access to OCM RAM */
-> > > -	/* XXX this should be somewhere in plat-omap */
-> > > -	if (cpu_is_omap24xx())
-> > > -		__raw_writel(0x402000b0, OMAP2_L3_IO_ADDRESS(0x680050a0));
-> > > -
-> > >  	_dispc_setup_color_conv_coef();
-> > >  
-> > >  	dispc_set_loadmode(OMAP_DSS_LOAD_FRAME_ONLY);
-> > > 
-> > 
-> > I think the whole raw_writel line can be removed. It's been copied from
-> > the old omapfb, and my understanding is that it's about using SRAM for
-> > framebuffer. Using SRAM for fb is no longer supported, and I have a
-> > patch set that removes the remaining SRAM code from omapfb/omapdss.
+On 22/02/12 20:39, Nicolas Ferre wrote:
+
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> OK, I'll remove those from drivers/video/omap2/dss/dispc.c so this
-> series keeps building.
-
-Here's this one updated.
-
-Tony
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: linux-usb at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 20 Feb 2012 12:55:07 -0800
-Subject: [PATCH] ARM: OMAP2+: Drop DISPC L3 firewall code
+Looks okay, one comment (for future) below, but otherwise:
 
-This is only needed when using SRAM for framebuffer,
-and the support for SRAM framebuffer is about to get
-removed.
+Reviewed-by: Ryan Mallon <rmallon@gmail.com>
 
-Otherwise we cannot move most of plat/io.h to be a local
-iomap.h for mach-omap2.
+<snip>
 
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index 8bdba2a..5fd6fe8 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -306,6 +306,7 @@ static void __init at91sam9263_ioremap_registers(void)
+>  	at91sam926x_ioremap_pit(AT91SAM9263_BASE_PIT);
+>  	at91sam9_ioremap_smc(0, AT91SAM9263_BASE_SMC0);
+>  	at91sam9_ioremap_smc(1, AT91SAM9263_BASE_SMC1);
+> +	at91_ioremap_matrix(AT91SAM9263_BASE_MATRIX);
 
---- a/drivers/video/omap2/dss/dispc.c
-+++ b/drivers/video/omap2/dss/dispc.c
-@@ -3272,11 +3272,6 @@ static void _omap_dispc_initial_config(void)
- 	if (dss_has_feature(FEAT_FUNCGATED))
- 		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
- 
--	/* L3 firewall setting: enable access to OCM RAM */
--	/* XXX this should be somewhere in plat-omap */
--	if (cpu_is_omap24xx())
--		__raw_writel(0x402000b0, OMAP2_L3_IO_ADDRESS(0x680050a0));
--
- 	_dispc_setup_color_conv_coef();
- 
- 	dispc_set_loadmode(OMAP_DSS_LOAD_FRAME_ONLY);
+
+Not necessarily for this patch set, but this list of functions is
+getting long enough that it could be abstracted away by a table.
+Something like:
+
+  struct at91_sys_device {
+	const char *name;
+	void __iomem **base;
+	const unsigned long mem_start;
+	const unsigned long mem_size;
+  };
+
+  ...
+
+  static const struct
+  at91_sys_device at91sam9263_sys_devices[] __initconst = {
+	{"PIT",	&at91_pit_base,
+	 AT91SAM9263_BASE_PIT, AT91_PIT_SIZE},
+	...
+	{"matrix", &at91_matrix_base,
+	 AT91SAM9263_BASE_MATRIX, AT91_MATRIX_SIZE},
+  }
+
+  ...
+
+  void __init
+  at91_ioremap_sys_devices(const struct at91_sys_device *devices,
+			   int nr_devices)
+  {
+	int i;
+
+	for (i = 0; i < nr_devices; i++) {
+		void __iomem *base = *(dev[i].base);
+
+		base = ioremap(dev[i].mem_start, dev[i].mem_size);
+		if (!base)
+			panic("Impossible to ioremap AT91 %s\n",
+			      dev[i].name);
+  }
+
+~Ryan
