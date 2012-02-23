@@ -1,54 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Feb 2012 11:00:26 -0800
-Subject: [PATCH] ARM: OMAP: enable Bluetooth on the PandaBoard
-In-Reply-To: <201202231512.57684.arnd@arndb.de>
-References: <1329990318-4575-1-git-send-email-mgherzan@gmail.com>
- <201202231512.57684.arnd@arndb.de>
-Message-ID: <20120223190026.GA18185@atomide.com>
+From: jason@lakedaemon.net (Jason)
+Date: Thu, 23 Feb 2012 14:00:59 -0500
+Subject: [PATCH 2/3 v4] arm: kirkwood: add dreamplug (fdt) support.
+In-Reply-To: <CACxGe6veKy3eA=GCp9eZWG1h8UgEYwAP9aicJhwm90=m4Z33xg@mail.gmail.com>
+References: <cover.1329936660.git.jason@lakedaemon.net>
+ <8532afcdc4adbb3771e6f742bcc33ef9c0347858.1329936660.git.jason@lakedaemon.net>
+ <4F45B043.1080302@gmail.com> <201202230734.33583.arnd@arndb.de>
+ <20120223161210.GN23524@titan.lakedaemon.net>
+ <CACxGe6veKy3eA=GCp9eZWG1h8UgEYwAP9aicJhwm90=m4Z33xg@mail.gmail.com>
+Message-ID: <20120223190059.GO23524@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120223 06:41]:
-> On Thursday 23 February 2012, Mircea Gherzan wrote:
-> > The PandaBoard features a Texas Instruments WiLink7 Bluetooth
-> > chip, supported by the "btwilink" driver.
-> > 
-> > Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+On Thu, Feb 23, 2012 at 11:56:46AM -0700, Grant Likely wrote:
+> On Thu, Feb 23, 2012 at 9:12 AM, Jason <jason@lakedaemon.net> wrote:
+> > On Thu, Feb 23, 2012 at 07:34:33AM +0000, Arnd Bergmann wrote:
+> >> On Thursday 23 February 2012, Rob Herring wrote:
+> >> > On 02/22/2012 01:18 PM, Jason Cooper wrote:
+...
+> >> > > +
+> >> > > +static const char *kirkwood_dt_board_compat[] = {
+> >> > > + "marvell,dreamplug",
+> >> > > + NULL
+> >> > > +};
+> >>
+> >> Since you mention the name, it should probably be "globalscale,dreamplug"
+> >> because the device is made by GlobalScale instead of Marvell.
+> >
+> > hmm, Globalscale Tech is, as I understand it, a turn-key manufacturer.
+> > They are simply building Marvell's development platforms for them,
+> > handling sales, etc. ?My impression was that Marvell designed the board
+> > and contracted Globalscale to build and distribute it.
+> >
+> > I don't care which we use, but is the convention to use the SoC designer
+> > (marvell,dreamplug), the SoC (kirkwood,dreamplug), or the brand
+> > (globalscale,dreamplug)?
+> >
+> > If there is no set standard, I think the SoC is most accurate, as
+> > nothing prevents a manufacturer from swapping out ICs/SoCs between
+> > manufacturing runs of the same make/model. ?Look at certain wifi USB
+> > devices for examples.
 > 
-> No objections to the patch, but please send it to the maintainer,
-> not to me. You also misspelled the address of the linux-omap
-> list, so Tony probably didn't get it there either.
+> convention is to use the vendor of the device.  If it is marketed as a
+> Marvell product, then use "marvell,...".  If it is Globalscale, then
+> "globalscale,...".  The actual SoC on the device is irrelevant for the
+> top level compatible property name.
 
-Thanks, seeing the repost now. Will queue it.
+globalscale it is, then.  Thanks for the clarification.
 
-Tony
- 
-> > diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> > index 28fc271..b1d74d6 100644
-> > --- a/arch/arm/mach-omap2/board-omap4panda.c
-> > +++ b/arch/arm/mach-omap2/board-omap4panda.c
-> > @@ -91,9 +91,15 @@ static struct platform_device leds_gpio = {
-> >  	},
-> >  };
-> >  
-> > +static struct platform_device btwilink_device = {
-> > +	.name	= "btwilink",
-> > +	.id	= -1,
-> > +};
-> > +
-> >  static struct platform_device *panda_devices[] __initdata = {
-> >  	&leds_gpio,
-> >  	&wl1271_device,
-> > +	&btwilink_device,
-> >  };
-> >  
-> >  static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
-> > -- 
-> > 1.7.9.1
-> > 
-> > 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+thx,
+
+Jason.
