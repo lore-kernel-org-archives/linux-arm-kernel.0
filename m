@@ -1,73 +1,65 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 23 Feb 2012 16:56:44 +0530
-Subject: [PATCH v2 1/6] mmc: omap_hsmmc: use platform_get_resource_byname for
- tx/rx DMA channels
+Date: Thu, 23 Feb 2012 16:56:48 +0530
+Subject: [PATCH v2 5/6] mmc: omap_hsmmc: Get rid of omap_hsmmc_4_set_power
+ function
 In-Reply-To: <1329996409-26861-1-git-send-email-rnayak@ti.com>
 References: <1329996409-26861-1-git-send-email-rnayak@ti.com>
-Message-ID: <1329996409-26861-2-git-send-email-rnayak@ti.com>
+Message-ID: <1329996409-26861-6-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Balaji T K <balajitk@ti.com>
+Now that omap_hsmmc_set_power() already has a check to return 0
+if !host->vcc, it seems like it can be used even on MMC4 instead
+of the dummy omap_hsmmc_4_set_power().
 
-Git rid of hardcoded tx/rx DMA channels based on pdev->id
-and use platform_get_resource_byname() to retrieve them
-instead.
+This also helps get rid of all the host->id based check to
+populate the right function for on-chip/external level
+shifting and use omap_hsmmc_set_power() for all MMC modules.
 
-Signed-off-by: Balaji T K <balajitk@ti.com>
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Tested-by: Venkatraman S <svenkatr@ti.com>
+Tested-by: Balaji T K <balajitk@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   35 +++++++++++------------------------
- 1 files changed, 11 insertions(+), 24 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   21 +--------------------
+ 1 files changed, 1 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index fd0c661..2a660ab 100644
+index f98c599..17e264b 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1977,32 +1977,19 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+@@ -297,32 +297,13 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
+ 	return ret;
+ }
  
- 	omap_hsmmc_conf_bus_power(host);
+-static int omap_hsmmc_4_set_power(struct device *dev, int slot, int power_on,
+-					int vdd)
+-{
+-	return 0;
+-}
+-
+ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ {
+ 	struct regulator *reg;
+ 	int ret = 0;
+ 	int ocr_value = 0;
  
--	/* Select DMA lines */
 -	switch (host->id) {
 -	case OMAP_MMC1_DEVID:
--		host->dma_line_tx = OMAP24XX_DMA_MMC1_TX;
--		host->dma_line_rx = OMAP24XX_DMA_MMC1_RX;
--		break;
 -	case OMAP_MMC2_DEVID:
--		host->dma_line_tx = OMAP24XX_DMA_MMC2_TX;
--		host->dma_line_rx = OMAP24XX_DMA_MMC2_RX;
--		break;
 -	case OMAP_MMC3_DEVID:
--		host->dma_line_tx = OMAP34XX_DMA_MMC3_TX;
--		host->dma_line_rx = OMAP34XX_DMA_MMC3_RX;
+-	case OMAP_MMC5_DEVID:
+-		/* On-chip level shifting via PBIAS0/PBIAS1 */
+-		mmc_slot(host).set_power = omap_hsmmc_set_power;
 -		break;
 -	case OMAP_MMC4_DEVID:
--		host->dma_line_tx = OMAP44XX_DMA_MMC4_TX;
--		host->dma_line_rx = OMAP44XX_DMA_MMC4_RX;
--		break;
--	case OMAP_MMC5_DEVID:
--		host->dma_line_tx = OMAP44XX_DMA_MMC5_TX;
--		host->dma_line_rx = OMAP44XX_DMA_MMC5_RX;
--		break;
+-		mmc_slot(host).set_power = omap_hsmmc_4_set_power;
 -	default:
--		dev_err(mmc_dev(host->mmc), "Invalid MMC id\n");
-+	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
-+	if (!res) {
-+		dev_err(mmc_dev(host->mmc), "cannot get DMA TX channel\n");
-+		goto err_irq;
-+	}
-+	host->dma_line_tx = res->start;
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
-+	if (!res) {
-+		dev_err(mmc_dev(host->mmc), "cannot get DMA RX channel\n");
- 		goto err_irq;
- 	}
-+	host->dma_line_rx = res->start;
+-		pr_err("MMC%d configuration not supported!\n", host->id);
+-		return -EINVAL;
+-	}
++	mmc_slot(host).set_power = omap_hsmmc_set_power;
  
- 	/* Request IRQ for MMC operations */
- 	ret = request_irq(host->irq, omap_hsmmc_irq, 0,
+ 	reg = regulator_get(host->dev, "vmmc");
+ 	if (IS_ERR(reg)) {
 -- 
 1.7.1
