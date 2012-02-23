@@ -1,96 +1,208 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 22 Feb 2012 21:09:16 -0700 (MST)
-Subject: [GIT PULL] OMAP PM EMU fix for v3.3
-In-Reply-To: <AA48DD8077D5D945A49BD1782C1140F10122E4FF@fioues08.ebgroup.elektrobit.com>
-References: <87liw8agk4.fsf@ti.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com><20120127190239.GC9339@atomide.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com><AA48DD8077D5D945A49BD1782C1140F10122E2B7@fioues08.ebgroup.elektrobit.com>
- <87linxa5gk.fsf@ti.com>
- <AA48DD8077D5D945A49BD1782C1140F10122E4FF@fioues08.ebgroup.elektrobit.com>
-Message-ID: <alpine.DEB.2.00.1202222021460.12198@utopia.booyaka.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 23 Feb 2012 05:39:11 +0000
+Subject: [PATCH v4 2/3] arm:davinci: move emif driver to drivers/mfd
+ from mach-davinci folder
+In-Reply-To: <1328771908-32527-3-git-send-email-prakash.pm@ti.com>
+References: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
+ <1328771908-32527-3-git-send-email-prakash.pm@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3176A846@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gowda,
+Hi,
 
-A few questions...
-
-On Wed, 22 Feb 2012, Madhusudhan.Gowda at elektrobit.com wrote:
-
-> I have tested this on beagle board as well as on OMAP3630 based
-> propriatory phone using SDTI serial trace interface.
-
-What driver are you using for SDTI?  Does it use pm_runtime* or call 
-clk_enable() on some clock when it is in use?  Are you defining a hwmod 
-for it?  I don't see an SDTI driver in mainline, but maybe I am just 
-missing it.  If it's not there, could you please post it or post a link to 
-it so we can take a look at what it's doing?
-
-> Also you can test it by just observing the 
-> CM_EMU (48005100) clkstctrl register
->  48 => 00000001
-> Across MPU OFF alone
+On Thu, Feb 09, 2012 at 12:48:27, Manjunathappa, Prakash wrote:
+> Move aemif kernel module from arch/arm/mach-davinci/ to multi functional
+> devices frame work. "davinci_aemif" MFD driver adds "davinci_nand" and
+> "physmap-flash" slave devices.
 > 
-> [root at beagleboard /]# echo 0 >
-> /sys/kernel/debug/pm_debug/neon_pwrdm/suspend
-> [root at beagleboard /]# echo 0 >
-> /sys/kernel/debug/pm_debug/mpu_pwrdm/suspend
-> [root at beagleboard /]# echo 1 >
-> /sys/kernel/debug/pm_debug/core_pwrdm/suspend
-> [root at beagleboard /]# echo 1 >
-> /sys/kernel/debug/pm_debug/per_pwrdm/suspend
-> [root at beagleboard /]# echo mem >/sys/power/state
-> [   59.694671] PM: Syncing filesystems ... done.
-> [   59.758209] Freezing user space processes ... (elapsed 0.02 seconds)
-> done.
-> [   59.789947] Freezing remaining freezable tasks ... (elapsed 0.02
-> seconds) done.
-> [   59.820709] Suspending console(s) (use no_console_suspend to debug)
-> [   60.055816] PM: suspend of devices complete after 212.493 msecs
-> [   60.059661] PM: late suspend of devices complete after 3.784 msecs
-> [   60.059753] Disabling non-boot CPUs ...
-> [   64.299865] Successfully put all powerdomains to target state
-> [   64.302551] PM: early resume of devices complete after 2.319 msecs
-> [   64.636444] PM: resume of devices complete after 332.336 msecs
-> [   64.688446] Restarting tasks ... done.
-> [root at beagleboard /]# 
+> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> ---
+> Since v3:
+> No change. Resending as 3/3 in patch changed.
+> Since v2:
+> Modified emif MFD driver to load multiple instance of NAND/NOR devices.
+> Since v1:
+> Patch generated using -M option.
 > 
-> And then print again the CM_EMU (48005100) clkstctrl register offset 48
-> this will have the reset value and PRM_EMU (48307100) offset e4 =>
-> 00000100 register confirms the domain wakeup reset from OFF.
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/mach-davinci/Makefile                     |    2 +-
+>  drivers/mfd/Makefile                               |    1 +
+>  .../aemif.c => drivers/mfd/davinci_aemif.c         |   75 +++++++++++++++++++-
+>  include/linux/mfd/davinci_aemif.h                  |   14 ++++
+>  5 files changed, 91 insertions(+), 2 deletions(-)
+>  rename arch/arm/mach-davinci/aemif.c => drivers/mfd/davinci_aemif.c (66%)
 > 
-> At this moment the SDTI serial trace interface looses connection.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a48aecc..09dcb94 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -934,6 +934,7 @@ config ARCH_DAVINCI
+>  	select GENERIC_ALLOCATOR
+>  	select GENERIC_IRQ_CHIP
+>  	select ARCH_HAS_HOLES_MEMORYMODEL
+> +	select MFD_CORE
+>  	help
+>  	  Support for TI's DaVinci platform.
+>  
+> diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+> index 2db78bd..8bab47c 100644
+> --- a/arch/arm/mach-davinci/Makefile
+> +++ b/arch/arm/mach-davinci/Makefile
+> @@ -5,7 +5,7 @@
+>  
+>  # Common objects
+>  obj-y 			:= time.o clock.o serial.o psc.o \
+> -			   dma.o usb.o common.o sram.o aemif.o
+> +			   dma.o usb.o common.o sram.o
+>  
+>  obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
+>  
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index b953bab..54fc267 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -11,6 +11,7 @@ obj-$(CONFIG_HTC_EGPIO)		+= htc-egpio.o
+>  obj-$(CONFIG_HTC_PASIC3)	+= htc-pasic3.o
+>  obj-$(CONFIG_HTC_I2CPLD)	+= htc-i2cpld.o
+>  
+> +obj-${CONFIG_ARCH_DAVINCI}	+= davinci_aemif.o
+>  obj-$(CONFIG_MFD_DAVINCI_VOICECODEC)	+= davinci_voicecodec.o
+>  obj-$(CONFIG_MFD_DM355EVM_MSP)	+= dm355evm_msp.o
+>  obj-$(CONFIG_MFD_TI_SSP)	+= ti-ssp.o
+> diff --git a/arch/arm/mach-davinci/aemif.c b/drivers/mfd/davinci_aemif.c
+> similarity index 66%
+> rename from arch/arm/mach-davinci/aemif.c
+> rename to drivers/mfd/davinci_aemif.c
+> index b67c115..5fb490d 100644
+> --- a/arch/arm/mach-davinci/aemif.c
+> +++ b/drivers/mfd/davinci_aemif.c
+> @@ -14,8 +14,13 @@
+>  #include <linux/clk.h>
+>  #include <linux/module.h>
+>  #include <linux/time.h>
+> -
+>  #include <linux/mfd/davinci_aemif.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/slab.h>
+> +#include <mach/nand.h>
+> +
+> +static char *name[] = {"davinci_nand", "physmap-flash",};
+> +#define MAX ARRAY_SIZE(name)
+>  
+>  /* Timing value configuration */
+>  
+> @@ -131,3 +136,71 @@ int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
+>  	return 0;
+>  }
+>  EXPORT_SYMBOL(davinci_aemif_setup_timing);
+> +
+> +static int __init davinci_aemif_probe(struct platform_device *pdev)
+> +{
+> +	struct davinci_aemif_devices *davinci_aemif_devices =
+> +		pdev->dev.platform_data;
+> +	struct platform_device *devices;
+> +	struct mfd_cell *cells;
+> +	int ret, i, j, count;
+> +
+> +	devices = davinci_aemif_devices->devices;
+> +
+> +	cells = kzalloc(sizeof(struct mfd_cell) *
+> +			davinci_aemif_devices->num_devices, GFP_KERNEL);
+> +
+> +	for (j = 0, count = 0; j < MAX; j++) {
+> +		for (i = 0; i < davinci_aemif_devices->num_devices; i++) {
+> +			if (strcmp(devices[i].name, name[j]))
+> +				continue;
+> +			cells[count].name = name[j];
+> +			cells[count].platform_data =
+> +				devices[i].dev.platform_data;
+> +			cells[count].pdata_size =
+> +				sizeof(struct davinci_nand_pdata);
+
+Doesnot take care of updating nor platform data size, I will fix this send out next version.
+
+Thanks,
+Prakash
+
+> +			cells[count].id = devices[i].id;
+> +			cells[count].resources = devices[i].resource;
+> +			cells[count].num_resources = devices[i].num_resources;
+> +			count++;
+> +		}
+> +	}
+> +
+> +	ret = mfd_add_devices(&pdev->dev, 0, cells,
+> +			      count, NULL, 0);
+> +	if (ret != 0)
+> +		dev_err(&pdev->dev, "fail to register client devices\n");
+> +
+> +	return 0;
+> +}
+> +
+> +static int __devexit davinci_aemif_remove(struct platform_device *pdev)
+> +{
+> +	mfd_remove_devices(&pdev->dev);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver davinci_aemif_driver = {
+> +	.driver	= {
+> +		.name = "davinci_aemif",
+> +		.owner = THIS_MODULE,
+> +	},
+> +	.remove	= __devexit_p(davinci_aemif_remove),
+> +};
+> +
+> +static int __init davinci_aemif_init(void)
+> +{
+> +	return platform_driver_probe(&davinci_aemif_driver,
+> +			davinci_aemif_probe);
+> +}
+> +module_init(davinci_aemif_init);
+> +
+> +static void __exit davinci_aemif_exit(void)
+> +{
+> +	platform_driver_unregister(&davinci_aemif_driver);
+> +}
+> +module_exit(davinci_aemif_exit);
+> +
+> +MODULE_AUTHOR("Prakash Manjunathappa");
+> +MODULE_DESCRIPTION("Texas Instruments AEMIF Interface");
+> +MODULE_LICENSE("GPL");
+> diff --git a/include/linux/mfd/davinci_aemif.h b/include/linux/mfd/davinci_aemif.h
+> index 05b2934..18650c3 100644
+> --- a/include/linux/mfd/davinci_aemif.h
+> +++ b/include/linux/mfd/davinci_aemif.h
+> @@ -10,6 +10,10 @@
+>  #ifndef _MACH_DAVINCI_AEMIF_H
+>  #define _MACH_DAVINCI_AEMIF_H
+>  
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mfd/core.h>
+> +
+>  #define NRCSR_OFFSET		0x00
+>  #define AWCCR_OFFSET		0x04
+>  #define A1CR_OFFSET		0x10
+> @@ -18,6 +22,16 @@
+>  #define ACR_EW_MASK		BIT(30)
+>  #define ACR_SS_MASK		BIT(31)
+>  
+> +enum davinci_emif_cells {
+> +	DAVINCI_NAND_DEVICE_CELL,
+> +	DAVINCI_NOR_FLASH_CELL,
+> +};
+> +
+> +struct davinci_aemif_devices {
+> +	struct platform_device *devices;
+> +	unsigned int num_devices;
+> +};
+> +
+>  /* All timings in nanoseconds */
+>  struct davinci_aemif_timing {
+>  	u8	wsetup;
+> -- 
+> 1.7.1
 > 
-> With my patch applied the CM_EMU (48005100) clkstctrl register restores
-> it initial setting across MPU OFF.
-
-Maybe you can walk through these thoughts with me and see if it makes 
-sense to you.
-
-When the PM code initializes, it will put the EMU clockdomain to 
-software-supervised sleep.  (Ideally it would put it to 
-hardware-supervised idle, but Jouni turned this off a long time ago, 
-apparently due to some PRCM usecounting problem with it -- which may 
-simply have been some software problem on our part?)
-
-That accounts for CM_CLKSTCTRL_EMU being set to 0x1 before MPU OFF.  Does 
-the SDTI work for you when CM_CLKSTCTRL_EMU is set to 0x1? There's no 
-FCLKEN/ICLKEN bit for the PRCM to use-count, it seems :-( Although maybe 
-this is done through the SDTI_WINCTRL register?
-
-I observe the same phenomenon that you do, that when MPU comes back from 
-OFF, CM_CLKSTCTRL_EMU is set to 0x2.  From reading the TRM, it's not clear 
-to me what is causing that, although I'd agree with your conclusion that 
-it's related to the MPU's reset line.
-
-But here's the part that's unclear to me about your description: according 
-to the TRM, 0x2 means software-supervised wakeup.  So the EMU clockdomain 
-should be awake at that point.  That shouldn't prevent the SDTI from 
-working; in fact quite the opposite.  So I don't really understand how 
-your patch would fix anything in this regard.  Any thoughts?
-
-My suspicion, by the way, is that the underlying problem may be with the 
-SDTI driver that you're using.  My guess would be that it's not integrated 
-with the OMAP power management infrastructure (via pm_runtime* calls), 
-and that's what's causing the problem.
-
-
-- Paul
+> 
