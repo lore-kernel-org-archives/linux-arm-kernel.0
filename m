@@ -1,33 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 11:38:01 +0000
-Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
- register
-In-Reply-To: <4F462444.8060406@st.com>
-References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
- <20120223095345.GJ22562@n2100.arm.linux.org.uk> <4F461A97.1090201@st.com>
- <20120223111906.GS22562@n2100.arm.linux.org.uk> <4F462444.8060406@st.com>
-Message-ID: <20120223113801.GV22562@n2100.arm.linux.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 23 Feb 2012 17:10:40 +0530
+Subject: [PATCH v2 0/7] omap hsmmc init cleanup and section warning fixes for
+ v3.4 merge window
+Message-ID: <1329997247-27342-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 05:04:28PM +0530, Pratyush Anand wrote:
-> On 2/23/2012 4:49 PM, Russell King - ARM Linux wrote:
->> On Thu, Feb 23, 2012 at 04:23:11PM +0530, Viresh Kumar wrote:
->>> On 2/23/2012 3:23 PM, Russell King - ARM Linux wrote:
->>>> 1. Using the PCI/ISA IO macros for non-PCI/ISA IO purposes is silly
->>>
->>> We mistakenly placed it outside #ifdef __io, #endif
->>> Sorry, i am still missing your point.
->>
->> inb() et.al. are for PCI/ISA IO, not for general platform MMIO.
->>
->
-> Ok.. So, will it be fine if we keep it outside #ifdef __io and do not  
-> use __io macro in their implementation?
+Re-sending as these patches did not make it to the lists due to
+issues with my 'git send-email'
 
-No, I refuse to add another set of accessors to ARMs io.h.  They're private
-to PPC - it even says so in their header file.  They should not have leaked
-out of PPC.
+Hi Tony,
 
-The fact that 73 drivers in the kernel source use their accessors is their
-problem to solve.
+This is a re-spin of your series to fix up the section
+mismatch warnings noted by Russell with omap2_hsmmc_init().
+The previous series had an issue around multiple insmod/rmmod
+of the twl4030 gpio driver when built as a module as reported
+by Russell again.
+
+There were 2 issues, one with gpio_requests failing as they were
+never freed on the module unload/unbind. The other was with the
+mmc devices being registered again. I have fixed both these issues
+in this series, mainly by having a .teardown hook for twl4030 gpio
+driver populated from all OMAP3 board files, which release all the
+requested gpios and also unregister the mmc omap/platform device.
+
+regards,
+Rajendra
+
+Ohad Ben-Cohen (1):
+  ARM: OMAP: omap_device: Expose omap_device_{alloc, delete, register}
+
+Rajendra Nayak (4):
+  ARM: OMAP: omap_device: Add omap_device_unregister()
+  mmc: omap_hsmmc: Make the driver support hotpluggable devices
+  mmc: omap_hsmmc: If probe fails, give our error messages
+  ARM: OMAP3: Use .teardown of twl4030-gpio to clean board requests
+
+Tony Lindgren (2):
+  ARM: OMAP2+: Split omap2_hsmmc_init() to properly support I2C GPIO
+    pins
+  ARM: OMAP2+: Mark omap_hsmmc_init and omap_mux related functions as
+    __init
+
+ arch/arm/mach-omap2/board-2430sdp.c           |    2 +-
+ arch/arm/mach-omap2/board-3430sdp.c           |   22 +++-
+ arch/arm/mach-omap2/board-4430sdp.c           |    4 +-
+ arch/arm/mach-omap2/board-am3517evm.c         |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c            |   18 +++-
+ arch/arm/mach-omap2/board-devkit8000.c        |   17 +++-
+ arch/arm/mach-omap2/board-flash.c             |    2 +-
+ arch/arm/mach-omap2/board-igep0020.c          |   25 ++++-
+ arch/arm/mach-omap2/board-ldp.c               |   11 ++-
+ arch/arm/mach-omap2/board-omap3beagle.c       |   25 ++++-
+ arch/arm/mach-omap2/board-omap3evm.c          |   22 +++-
+ arch/arm/mach-omap2/board-omap3logic.c        |    2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c      |   22 +++-
+ arch/arm/mach-omap2/board-omap3stalker.c      |   28 ++++--
+ arch/arm/mach-omap2/board-omap3touchbook.c    |   30 ++++--
+ arch/arm/mach-omap2/board-omap4panda.c        |    6 +-
+ arch/arm/mach-omap2/board-overo.c             |   13 +++-
+ arch/arm/mach-omap2/board-rm680.c             |    2 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c  |   10 ++-
+ arch/arm/mach-omap2/board-zoom-peripherals.c  |   18 +++-
+ arch/arm/mach-omap2/display.c                 |    8 +-
+ arch/arm/mach-omap2/hsmmc.c                   |  130 +++++++++++++++++++------
+ arch/arm/mach-omap2/hsmmc.h                   |   17 +++-
+ arch/arm/mach-omap2/mux.c                     |   14 ++--
+ arch/arm/plat-omap/include/plat/omap_device.h |    8 ++
+ arch/arm/plat-omap/omap_device.c              |   33 ++++---
+ drivers/mmc/host/omap_hsmmc.c                 |   11 +-
+ 27 files changed, 372 insertions(+), 130 deletions(-)
