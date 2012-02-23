@@ -1,70 +1,123 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 23 Feb 2012 18:00:05 +0000
-Subject: [GIT PULL] Versatile Express DT support
-Message-ID: <1330020005.2727.11.camel@hornet.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Feb 2012 10:47:51 -0800
+Subject: [PATCH v2 5/7] ARM: OMAP2+: Split omap2_hsmmc_init() to
+ properly support I2C GPIO pins
+In-Reply-To: <4F464CFF.3080006@compulab.co.il>
+References: <1329997247-27342-1-git-send-email-rnayak@ti.com>
+ <1329997247-27342-6-git-send-email-rnayak@ti.com>
+ <4F464CFF.3080006@compulab.co.il>
+Message-ID: <20120223184751.GX18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Olof,
+* Igor Grinberg <grinberg@compulab.co.il> [120223 05:56]:
+> > --- a/arch/arm/mach-omap2/board-cm-t35.c
+> > +++ b/arch/arm/mach-omap2/board-cm-t35.c
+> > @@ -411,9 +411,9 @@ static struct omap2_hsmmc_info mmc[] = {
+> >  	{
+> >  		.mmc		= 1,
+> >  		.caps		= MMC_CAP_4_BIT_DATA,
+> > -		.gpio_cd	= -EINVAL,
+> > +		.gpio_cd	= OMAP_MAX_GPIO_LINES + 0,
+> >  		.gpio_wp	= -EINVAL,
 
-Please pull the Versatile Express DT patches, rebased on top of
-v3.3-rc4. I think I addressed all the comments I received:
-- fixed the difference between DT and non-DT machine name (missing '-')
-- as probing DEBUG_LL UART address proved to be unsafe, it is now
-determined based on a PERIPHBASE register, which can be safely checked
-- DTS don't include skeleton.dtsi any more, so there is no bogus memory
-node
-- changed TWD bindings to be in line with Marc Zygier's series
-- as the static mappings are now reused, all pointer arithmetic was
-replaced with ioremap()s
+I don't have these changes, in my second revision of the patch.
 
-First patch causes one trivial conflict with depends/rmk/for-armsoc (for
-your reference, I resolved it in vexpress-dt-rmk-for-armsoc branch)
+It's best not to hardcode the values here.
 
-Thanks!
+> > -
+> > +		.deferred	= true,
+> >  	},
+> >  	{
+> >  		.mmc		= 2,
+> > @@ -422,6 +422,7 @@ static struct omap2_hsmmc_info mmc[] = {
+> >  		.gpio_cd	= -EINVAL,
+> >  		.gpio_wp	= -EINVAL,
+> >  		.ocr_mask	= 0x00100000,	/* 3.3V */
+> > +		.deferred	= true,
+> 
+> Why do you defer this one?
+> It does not use external GPIO chip, in fact it does not use CD/WP at all.
 
-Pawel
+Why do you have the following then to set gpio_cd?
+ 
+> >  	},
+> >  	{}	/* Terminator */
+> >  };
+> > @@ -469,9 +470,7 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
+> >  		pr_err("CM-T35: could not obtain gpio for WiFi reset\n");
+> >  	}
+> >  
+> > -	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
+> > -	mmc[0].gpio_cd = gpio + 0;
+> > -	omap2_hsmmc_init(mmc);
+> > +	omap_hsmmc_deferred_add(mmc);
+> >  
+> >  	return 0;
+> >  }
 
-The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+Hmm I don't have omap_hsmmc_deferred_add() in my second version
+of the patch either.
 
-  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+Rajendra, please do the patches on that, now it's impossible to
+see what else you've changed. That's the version posted here:
 
-are available in the git repository at:
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress-dt-v3.3-rc4
+http://www.spinics.net/lists/linux-omap/msg64884.html
 
-Pawel Moll (8):
-      ARM: vexpress: Get rid of MMIO_P2V
-      ARM: versatile: Map local timers using Device Tree when possible
-      ARM: vexpress: Use FDT data in platform SMP calls
-      ARM: vexpress: Add Device Tree support
-      ARM: vexpress: Motherboard RS1 memory map support
-      ARM: vexpress: Add Device Tree for V2P-CA5s core tile
-      ARM: vexpress: Add Device Tree for V2P-CA9 core tile
-      ARM: vexpress: Add Device Tree for V2P-CA15 core tile (TC1 variant)
+> > @@ -639,6 +638,7 @@ static void __init cm_t3x_common_init(void)
+> >  	omap_serial_init();
+> >  	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
+> >  			     mt46h32m32lf6_sdrc_params);
+> > +	omap_hsmmc_init(mmc);
+> >  	cm_t35_init_i2c();
+> >  	omap_ads7846_init(1, CM_T35_GPIO_PENDOWN, 0, NULL);
+> >  	cm_t35_init_ethernet();
+> 
+> Other then the comment above, looks fine.
+> I will probably be able to test this on Sunday.
 
- Documentation/devicetree/bindings/arm/vexpress.txt |  146 ++++++++++
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  201 ++++++++++++++
- arch/arm/boot/dts/vexpress-v2m.dtsi                |  200 ++++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  157 +++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |  162 +++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  192 +++++++++++++
- arch/arm/include/asm/hardware/arm_timer.h          |    5 +
- arch/arm/mach-vexpress/Kconfig                     |   47 +++-
- arch/arm/mach-vexpress/Makefile.boot               |    6 +
- arch/arm/mach-vexpress/core.h                      |   11 +-
- arch/arm/mach-vexpress/ct-ca9x4.c                  |   58 ++---
- arch/arm/mach-vexpress/include/mach/ct-ca9x4.h     |    3 -
- arch/arm/mach-vexpress/include/mach/debug-macro.S  |   30 ++-
- arch/arm/mach-vexpress/include/mach/irqs.h         |    2 +-
- arch/arm/mach-vexpress/include/mach/motherboard.h  |   58 +++--
- arch/arm/mach-vexpress/include/mach/uncompress.h   |   22 ++-
- arch/arm/mach-vexpress/platsmp.c                   |  160 +++++++++++-
- arch/arm/mach-vexpress/v2m.c                       |  281 ++++++++++++++++++--
- arch/arm/plat-versatile/localtimer.c               |   26 ++
- 19 files changed, 1656 insertions(+), 111 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/vexpress.txt
- create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
- create mode 100644 arch/arm/boot/dts/vexpress-v2m.dtsi
- create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
- create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca5s.dts
- create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca9.dts
+OK
+ 
+> > diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+> > index a59ace0..11a6aa4 100644
+> > --- a/arch/arm/mach-omap2/board-igep0020.c
+> > +++ b/arch/arm/mach-omap2/board-igep0020.c
+> > @@ -293,8 +293,9 @@ static struct omap2_hsmmc_info mmc[] = {
+> >  	{
+> >  		.mmc		= 1,
+> >  		.caps		= MMC_CAP_4_BIT_DATA,
+> > -		.gpio_cd	= -EINVAL,
+> > +		.gpio_cd	= OMAP_MAX_GPIO_LINES + 0,
+> >  		.gpio_wp	= -EINVAL,
+> > +		.deferred	= true,
+> >  	},
+> >  #if defined(CONFIG_LIBERTAS_SDIO) || defined(CONFIG_LIBERTAS_SDIO_MODULE)
+> >  	{
+> > @@ -302,6 +303,7 @@ static struct omap2_hsmmc_info mmc[] = {
+> >  		.caps		= MMC_CAP_4_BIT_DATA,
+> >  		.gpio_cd	= -EINVAL,
+> >  		.gpio_wp	= -EINVAL,
+> > +		.deferred	= true,
+> 
+> same here, why defer it?
+
+Because it too sets gpio_cd in the callback.
+ 
+> ditto
+
+ditto, that too sets gpio_cd..
+ 
+> >  	},
+> >  #endif
+> >  	{}	/* Terminator */
+> > @@ -360,10 +362,8 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
+> >  {
+> >  	int r, lcd_bl_en;
+> >  
+> > -	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
+> >  	omap_mux_init_gpio(63, OMAP_PIN_INPUT);
+> > -	mmc[0].gpio_cd = gpio + 0;
+
+..here. Same for the others. So maybe check is some are wrong?
+
+Tony
