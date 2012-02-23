@@ -1,75 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Feb 2012 17:59:41 +0000
-Subject: [PATCH] ARM: LPAE: Invalidate the TLB for module addresses during
- translation fault
-Message-ID: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 23 Feb 2012 18:00:05 +0000
+Subject: [GIT PULL] Versatile Express DT support
+Message-ID: <1330020005.2727.11.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the free_pgtables() call all user and modules/pkmap entries are
-removed. If a translation fault for the modules/pkmap area occurs before
-we switched away from the current pgd, do_translation_fault() would copy
-the init_mm pud into the user pud.
+Hello Arnd, Olof,
 
-There is a small window between pud_clear() and pmd_free_tlb() in
-free_pmd_range() where the pud entry was cleared but the TLB has not
-been invalidated yet and the CPU may have cached the original (valid)
-pud entry in the TLB. A scenario like below would get stuck in
-continuous prefetch abort:
+Please pull the Versatile Express DT patches, rebased on top of
+v3.3-rc4. I think I addressed all the comments I received:
+- fixed the difference between DT and non-DT machine name (missing '-')
+- as probing DEBUG_LL UART address proved to be unsafe, it is now
+determined based on a PERIPHBASE register, which can be safely checked
+- DTS don't include skeleton.dtsi any more, so there is no bogus memory
+node
+- changed TWD bindings to be in line with Marc Zygier's series
+- as the static mappings are now reused, all pointer arithmetic was
+replaced with ioremap()s
 
-1. Current process exiting. The modules pmd entries not populated
-2. exit_mmap() -> ... -> pmd_free_tlb()
-3. pud_clear() for the 1GB pud containing user stack and modules (no TLB
-   invalidation yet)
-4. Interrupt -> module interrupt routine
-5. Level 2 (pmd) translation fault occurs when executing the module
-   interrupt routine. The CPU previously cached (TLB) the old valid pud
-   value for the modules area, so we don't get a level 1 translation
-   fault
-6. do_translation fault() copies the pud_k into the pud
-7. Linux returns to the faulty instruction. Goes back to 5
+First patch causes one trivial conflict with depends/rmk/for-armsoc (for
+your reference, I resolved it in vexpress-dt-rmk-for-armsoc branch)
 
-At point 7, since the CPU still has the old pud value, it goes back to
-point 5 and never gets out of this loop. With this patch, the stale pud
-TLB entry is invalidated after point 6 and the subsequent prefetch abort
-doesn't occur.
+Thanks!
 
-Reported-by: Tony Thompson <Anthony.Thompson@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mm/fault.c |   13 +++++++++++--
- 1 files changed, 11 insertions(+), 2 deletions(-)
+Pawel
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index bb7eac3..d9aacf0 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -444,8 +444,16 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
- 
- 	if (pud_none(*pud_k))
- 		goto bad_area;
--	if (!pud_present(*pud))
-+	if (!pud_present(*pud)) {
- 		set_pud(pud, *pud_k);
-+		/*
-+		 * There is a small window during free_pgtables() where the
-+		 * user *pud entry is 0 but the TLB has not been invalidated
-+		 * and we get a level 2 (pmd) translation fault caused by the
-+		 * intermediate TLB caching of the old level 1 (pud) entry.
-+		 */
-+		flush_tlb_kernel_page(addr);
-+	}
- 
- 	pmd = pmd_offset(pud, addr);
- 	pmd_k = pmd_offset(pud_k, addr);
-@@ -468,8 +476,9 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
- #endif
- 	if (pmd_none(pmd_k[index]))
- 		goto bad_area;
-+	if (!pmd_present(pmd[index]))
-+		copy_pmd(pmd, pmd_k);
- 
--	copy_pmd(pmd, pmd_k);
- 	return 0;
- 
- bad_area:
+The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+
+  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+
+are available in the git repository at:
+  git://git.linaro.org/people/pawelmoll/linux.git vexpress-dt-v3.3-rc4
+
+Pawel Moll (8):
+      ARM: vexpress: Get rid of MMIO_P2V
+      ARM: versatile: Map local timers using Device Tree when possible
+      ARM: vexpress: Use FDT data in platform SMP calls
+      ARM: vexpress: Add Device Tree support
+      ARM: vexpress: Motherboard RS1 memory map support
+      ARM: vexpress: Add Device Tree for V2P-CA5s core tile
+      ARM: vexpress: Add Device Tree for V2P-CA9 core tile
+      ARM: vexpress: Add Device Tree for V2P-CA15 core tile (TC1 variant)
+
+ Documentation/devicetree/bindings/arm/vexpress.txt |  146 ++++++++++
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  201 ++++++++++++++
+ arch/arm/boot/dts/vexpress-v2m.dtsi                |  200 ++++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  157 +++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |  162 +++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  192 +++++++++++++
+ arch/arm/include/asm/hardware/arm_timer.h          |    5 +
+ arch/arm/mach-vexpress/Kconfig                     |   47 +++-
+ arch/arm/mach-vexpress/Makefile.boot               |    6 +
+ arch/arm/mach-vexpress/core.h                      |   11 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c                  |   58 ++---
+ arch/arm/mach-vexpress/include/mach/ct-ca9x4.h     |    3 -
+ arch/arm/mach-vexpress/include/mach/debug-macro.S  |   30 ++-
+ arch/arm/mach-vexpress/include/mach/irqs.h         |    2 +-
+ arch/arm/mach-vexpress/include/mach/motherboard.h  |   58 +++--
+ arch/arm/mach-vexpress/include/mach/uncompress.h   |   22 ++-
+ arch/arm/mach-vexpress/platsmp.c                   |  160 +++++++++++-
+ arch/arm/mach-vexpress/v2m.c                       |  281 ++++++++++++++++++--
+ arch/arm/plat-versatile/localtimer.c               |   26 ++
+ 19 files changed, 1656 insertions(+), 111 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/vexpress.txt
+ create mode 100644 arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+ create mode 100644 arch/arm/boot/dts/vexpress-v2m.dtsi
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+ create mode 100644 arch/arm/boot/dts/vexpress-v2p-ca9.dts
