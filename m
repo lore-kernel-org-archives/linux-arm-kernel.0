@@ -1,207 +1,96 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 23 Feb 2012 17:48:32 +0000
-Subject: [PATCH-WIP 11/13] xen/arm: Introduce xen_pfn_t for pfn and mfn types
+Date: Thu, 23 Feb 2012 17:48:33 +0000
+Subject: [PATCH-WIP 12/13] xen/arm: compile and run xenbus
 In-Reply-To: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
 References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
-Message-ID: <1330019314-20865-11-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1330019314-20865-12-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the original Xen headers have xen_pfn_t as mfn and pfn type, however
-when they have been imported in Linux, xen_pfn_t has been replaced with
-unsigned long. That might work for x86 and ia64 but it does not for arm.
-Bring back xen_pfn_t and let each architecture define xen_pfn_t as they
-see fit.
+bind_evtchn_to_irqhandler can legitimately return 0 (irq 0), it is not
+an error.
+
+If Linux is running as an HVM domain and is running as Dom0, use
+xenstored_local_init to initialize the xenstore page and event channel,
+and do not call xs_reset_watches at boot.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/include/asm/xen/interface.h  |    3 +++
- arch/ia64/include/asm/xen/interface.h |    3 ++-
- arch/x86/include/asm/xen/interface.h  |    3 +++
- include/xen/interface/grant_table.h   |    4 ++--
- include/xen/interface/memory.h        |    6 +++---
- include/xen/interface/platform.h      |    4 ++--
- include/xen/interface/xen.h           |    6 +++---
- include/xen/privcmd.h                 |    2 --
- 8 files changed, 18 insertions(+), 13 deletions(-)
+ drivers/xen/xenbus/xenbus_comms.c |    2 +-
+ drivers/xen/xenbus/xenbus_probe.c |   26 ++++++++++++++++----------
+ drivers/xen/xenbus/xenbus_xs.c    |    3 ++-
+ 3 files changed, 19 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
-index 2ee39e8..65577de 100644
---- a/arch/arm/include/asm/xen/interface.h
-+++ b/arch/arm/include/asm/xen/interface.h
-@@ -24,6 +24,8 @@
- 		(hnd) = val;				\
- 	} while (0)
+diff --git a/drivers/xen/xenbus/xenbus_comms.c b/drivers/xen/xenbus/xenbus_comms.c
+index 2eff7a6..57b8230 100644
+--- a/drivers/xen/xenbus/xenbus_comms.c
++++ b/drivers/xen/xenbus/xenbus_comms.c
+@@ -224,7 +224,7 @@ int xb_init_comms(void)
+ 		int err;
+ 		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
+ 						0, "xenbus", &xb_waitq);
+-		if (err <= 0) {
++		if (err < 0) {
+ 			printk(KERN_ERR "XENBUS request irq failed %i\n", err);
+ 			return err;
+ 		}
+diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+index 1b178c6..f3d5105 100644
+--- a/drivers/xen/xenbus/xenbus_probe.c
++++ b/drivers/xen/xenbus/xenbus_probe.c
+@@ -731,16 +731,22 @@ static int __init xenbus_init(void)
+ 		return -ENODEV;
  
-+typedef uint64_t xen_pfn_t;
-+
- #ifndef __ASSEMBLY__
- /* Guest handles for primitive C types. */
- __DEFINE_GUEST_HANDLE(uchar, unsigned char);
-@@ -33,6 +35,7 @@ DEFINE_GUEST_HANDLE(char);
- DEFINE_GUEST_HANDLE(int);
- DEFINE_GUEST_HANDLE(long);
- DEFINE_GUEST_HANDLE(void);
-+DEFINE_GUEST_HANDLE(xen_pfn_t);
- #endif
+ 	if (xen_hvm_domain()) {
+-		uint64_t v = 0;
+-		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+-		if (err)
+-			goto out_error;
+-		xen_store_evtchn = (int)v;
+-		err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+-		if (err)
+-			goto out_error;
+-		xen_store_mfn = (unsigned long)v;
+-		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
++		if (xen_initial_domain()) {
++			err = xenstored_local_init();
++			xen_store_interface = phys_to_virt(xen_store_mfn << PAGE_SHIFT);
++		} else {
++			uint64_t v = 0;
++			err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
++			if (err)
++				goto out_error;
++			xen_store_evtchn = (int)v;
++			err = hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
++			if (err)
++				goto out_error;
++			xen_store_mfn = (unsigned long)v;
++			xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT,
++					PAGE_SIZE);
++		}
+ 	} else {
+ 		xen_store_evtchn = xen_start_info->store_evtchn;
+ 		xen_store_mfn = xen_start_info->store_mfn;
+diff --git a/drivers/xen/xenbus/xenbus_xs.c b/drivers/xen/xenbus/xenbus_xs.c
+index b3b8f2f..edcef19 100644
+--- a/drivers/xen/xenbus/xenbus_xs.c
++++ b/drivers/xen/xenbus/xenbus_xs.c
+@@ -44,6 +44,7 @@
+ #include <linux/rwsem.h>
+ #include <linux/module.h>
+ #include <linux/mutex.h>
++#include <asm/xen/hypervisor.h>
+ #include <xen/xenbus.h>
+ #include <xen/xen.h>
+ #include "xenbus_comms.h"
+@@ -907,7 +908,7 @@ int xs_init(void)
+ 		return PTR_ERR(task);
  
- /* Maximum number of virtual CPUs in multi-processor guests. */
-diff --git a/arch/ia64/include/asm/xen/interface.h b/arch/ia64/include/asm/xen/interface.h
-index 1d2427d..18904ac 100644
---- a/arch/ia64/include/asm/xen/interface.h
-+++ b/arch/ia64/include/asm/xen/interface.h
-@@ -66,6 +66,8 @@
- #define GUEST_HANDLE_64(name)		GUEST_HANDLE(name)
- #define set_xen_guest_handle(hnd, val)	do { (hnd).p = val; } while (0)
+ 	/* shutdown watches for kexec boot */
+-	if (xen_hvm_domain())
++	if (xen_hvm_domain() && !xen_initial_domain())
+ 		xs_reset_watches();
  
-+typedef unsigned long xen_pfn_t;
-+
- #ifndef __ASSEMBLY__
- /* Guest handles for primitive C types. */
- __DEFINE_GUEST_HANDLE(uchar, unsigned char);
-@@ -78,7 +80,6 @@ DEFINE_GUEST_HANDLE(long);
- DEFINE_GUEST_HANDLE(void);
- DEFINE_GUEST_HANDLE(uint64_t);
- 
--typedef unsigned long xen_pfn_t;
- DEFINE_GUEST_HANDLE(xen_pfn_t);
- #define PRI_xen_pfn	"lx"
- #endif
-diff --git a/arch/x86/include/asm/xen/interface.h b/arch/x86/include/asm/xen/interface.h
-index a1f2db5..59a37ec 100644
---- a/arch/x86/include/asm/xen/interface.h
-+++ b/arch/x86/include/asm/xen/interface.h
-@@ -46,6 +46,8 @@
- #endif
- #endif
- 
-+typedef unsigned long xen_pfn_t;
-+
- #ifndef __ASSEMBLY__
- /* Guest handles for primitive C types. */
- __DEFINE_GUEST_HANDLE(uchar, unsigned char);
-@@ -56,6 +58,7 @@ DEFINE_GUEST_HANDLE(int);
- DEFINE_GUEST_HANDLE(long);
- DEFINE_GUEST_HANDLE(void);
- DEFINE_GUEST_HANDLE(uint64_t);
-+DEFINE_GUEST_HANDLE(xen_pfn_t);
- #endif
- 
- #ifndef HYPERVISOR_VIRT_START
-diff --git a/include/xen/interface/grant_table.h b/include/xen/interface/grant_table.h
-index 39e5717..1fd3a66 100644
---- a/include/xen/interface/grant_table.h
-+++ b/include/xen/interface/grant_table.h
-@@ -254,7 +254,7 @@ DEFINE_GUEST_HANDLE_STRUCT(gnttab_dump_table);
- #define GNTTABOP_transfer                4
- struct gnttab_transfer {
-     /* IN parameters. */
--    unsigned long mfn;
-+    xen_pfn_t mfn;
-     domid_t       domid;
-     grant_ref_t   ref;
-     /* OUT parameters. */
-@@ -291,7 +291,7 @@ struct gnttab_copy {
- 	struct {
- 		union {
- 			grant_ref_t ref;
--			unsigned long   gmfn;
-+			xen_pfn_t   gmfn;
- 		} u;
- 		domid_t  domid;
- 		uint16_t offset;
-diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
-index eac3ce1..abbbff0 100644
---- a/include/xen/interface/memory.h
-+++ b/include/xen/interface/memory.h
-@@ -31,7 +31,7 @@ struct xen_memory_reservation {
-      *   OUT: GMFN bases of extents that were allocated
-      *   (NB. This command also updates the mach_to_phys translation table)
-      */
--    GUEST_HANDLE(ulong) extent_start;
-+    GUEST_HANDLE(xen_pfn_t) extent_start;
- 
-     /* Number of extents, and size/alignment of each (2^extent_order pages). */
-     unsigned long  nr_extents;
-@@ -130,7 +130,7 @@ struct xen_machphys_mfn_list {
-      * any large discontiguities in the machine address space, 2MB gaps in
-      * the machphys table will be represented by an MFN base of zero.
-      */
--    GUEST_HANDLE(ulong) extent_start;
-+    GUEST_HANDLE(xen_pfn_t) extent_start;
- 
-     /*
-      * Number of extents written to the above array. This will be smaller
-@@ -172,7 +172,7 @@ struct xen_add_to_physmap {
-     unsigned long idx;
- 
-     /* GPFN where the source mapping page should appear. */
--    unsigned long gpfn;
-+    xen_pfn_t gpfn;
- };
- DEFINE_GUEST_HANDLE_STRUCT(xen_add_to_physmap);
- 
-diff --git a/include/xen/interface/platform.h b/include/xen/interface/platform.h
-index c168468..1c172ce 100644
---- a/include/xen/interface/platform.h
-+++ b/include/xen/interface/platform.h
-@@ -54,7 +54,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime_t);
- #define XENPF_add_memtype         31
- struct xenpf_add_memtype {
- 	/* IN variables. */
--	unsigned long mfn;
-+	xen_pfn_t mfn;
- 	uint64_t nr_mfns;
- 	uint32_t type;
- 	/* OUT variables. */
-@@ -84,7 +84,7 @@ struct xenpf_read_memtype {
- 	/* IN variables. */
- 	uint32_t reg;
- 	/* OUT variables. */
--	unsigned long mfn;
-+	xen_pfn_t mfn;
- 	uint64_t nr_mfns;
- 	uint32_t type;
- };
-diff --git a/include/xen/interface/xen.h b/include/xen/interface/xen.h
-index 19354db..3edc110 100644
---- a/include/xen/interface/xen.h
-+++ b/include/xen/interface/xen.h
-@@ -192,7 +192,7 @@ struct mmuext_op {
- 	unsigned int cmd;
- 	union {
- 		/* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR */
--		unsigned long mfn;
-+		xen_pfn_t mfn;
- 		/* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
- 		unsigned long linear_addr;
- 	} arg1;
-@@ -432,11 +432,11 @@ struct start_info {
- 	unsigned long nr_pages;     /* Total pages allocated to this domain.  */
- 	unsigned long shared_info;  /* MACHINE address of shared info struct. */
- 	uint32_t flags;             /* SIF_xxx flags.                         */
--	unsigned long store_mfn;    /* MACHINE page number of shared page.    */
-+	xen_pfn_t store_mfn;        /* MACHINE page number of shared page.    */
- 	uint32_t store_evtchn;      /* Event channel for store communication. */
- 	union {
- 		struct {
--			unsigned long mfn;  /* MACHINE page number of console page.   */
-+			xen_pfn_t mfn;      /* MACHINE page number of console page.   */
- 			uint32_t  evtchn;   /* Event channel for console page.        */
- 		} domU;
- 		struct {
-diff --git a/include/xen/privcmd.h b/include/xen/privcmd.h
-index 4d58881..45c1aa1 100644
---- a/include/xen/privcmd.h
-+++ b/include/xen/privcmd.h
-@@ -37,8 +37,6 @@
- #include <linux/compiler.h>
- #include <xen/interface/xen.h>
- 
--typedef unsigned long xen_pfn_t;
--
- struct privcmd_hypercall {
- 	__u64 op;
- 	__u64 arg[5];
+ 	return 0;
 -- 
 1.7.2.5
