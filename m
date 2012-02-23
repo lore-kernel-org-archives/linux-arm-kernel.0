@@ -1,48 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 23 Feb 2012 09:46:55 +0900
-Subject: [PATCH v3] DMA: PL330: Merge PL330 driver into drivers/dma/
-In-Reply-To: <CABb+yY2rhyRC=srq+4eKc5g_Yne0o3yqX0hV9wxH3NqohbFqHg@mail.gmail.com>
-References: <1329341243-14314-1-git-send-email-kgene.kim@samsung.com>
- <CABb+yY1E0_ZhTv8QvRAfgUvc=2Vz+ioYbsEczknP5dKcL2ZCbw@mail.gmail.com>
- <00f401ccf0f8$0db84ec0$2928ec40$%kim@samsung.com>
- <CABb+yY0j0j7Qw4MCwP_F+DKzmpdmZ3x0QC2Ktj2qmGnL=Ocx0Q@mail.gmail.com>
- <011c01ccf107$5624d020$026e7060$%kim@samsung.com>
- <CABb+yY1aeZ9=2GiHni3bZuRjW66Mxz7K0M753Lc-6UdxaVpBzA@mail.gmail.com>
- <1329906421.24656.93.camel@vkoul-udesk3> <4F451D24.1040009@samsung.com>
- <CABb+yY0Zy3Xx4OZTobo2y-J4NXokGCV47PdPyKs+aOnqtng7pQ@mail.gmail.com>
- <20120222193526.GC7041@n2100.arm.linux.org.uk>
- <CABb+yY2rhyRC=srq+4eKc5g_Yne0o3yqX0hV9wxH3NqohbFqHg@mail.gmail.com>
-Message-ID: <020101ccf1c4$a43e4490$ecbacdb0$%kim@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 23 Feb 2012 08:51:47 +0800
+Subject: [PATCH 0/7] share sa1100 rtc driver to arch-mmp
+In-Reply-To: <87r4xmygb7.fsf@free.fr>
+References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
+ <201202221239.54321.arnd@arndb.de>
+ <CAN1soZwgtxR7pNGBQuMHZS0URXM7U6ZABD4disNmvRarZnjwxA@mail.gmail.com>
+ <201202221350.00100.arnd@arndb.de>
+ <CAN1soZxTutYQ=uU0y_AvBTn37es+8tBU=1L6eKtJDUNONgwHFw@mail.gmail.com>
+ <87r4xmygb7.fsf@free.fr>
+Message-ID: <CAN1soZx84dmAVz-Kyv18+fjOJyzvun7fpbXA+rYb6xeEhQbXtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
-> 
+On Thu, Feb 23, 2012 at 12:38 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+>
+>> I can remove the rtc-pxa support entirely. I still want to leave this
+>> since this may be the only one choice in the future silicons.
+>>
+>> Since some boards with pxa27x/pxa3xx are accessing RCNR (the old rtc
+>> wrapper) directly, I use rtc-sa1100 to keep consistently. In pxa95x,
+>> nobody is using the old rtc wrapper directly. So I only use it in
+>> pxa95x.
+>
+> No, I don't agree there.
+>
+> The PXA RTC silicon support 2 different set of registers to access time :
+> ?- RCNR (rtc-sa1100)
+> ?- RYCR/RDCR (rtc-pxa)
+>
+> The rtc-pxa driver was created to provide support for boards using the RYCR/RDCR
+> rather than RCNR.
+>
+> Therefore I'm against removing rtc-pxa, unless there is a driver for pxa, which
+> provides RTC using RYCR/RDCR registers.
+>
+> We had that discussion a long time ago, in [1].
+>
+Hi Robert,
 
-Thank you for suggestions.
+rtc-sa1100 driver is the only one choice on sa1100/pxa25x/pxa910/mmp2.
+And it's optional to pxa27x/pxa3xx/pxa95x.
 
-[...]
+Whatever we use RCNR or RDYR registers, they're in the same I/O range.
+It's impossible to define same resource range for two rtc device. We
+have to make a choice between rtc-sa1100 or rtc-pxa on
+pxa27x/pxa3xx/pxa95x.
 
-> 
-> > What would be fair is to add the first _two_ lines indicating that
-> > Samsung maintains the copyright to 2012.
-> >
-> OK, but that may not be scalable considering next year too someone
-> could want to update the copyright to 2013 and so on.
-> So I suggested simply change 2010 to 2010-2012 in the existing notice.
-> 
-It's time to finish this.
+I hadn't any plan to remove rtc-pxa driver. I only disabled it for
+pxa27x/pxa3xx. Please check the code of
+arch/arm/mach-pxa/sharpsl_pm.c. If we only enable rtc-pxa on pxa27x,
+we'll break the behavior on sharpsl since it's using rtc-sa1100. In
+order to keep code consistently, I disable rtc-pxa on pxa27x/pxa3xx.
+And use it on pxa95x since there's no legacy code issue.
 
-As I said, I will just add Samsung maintains the copyright to 2012 as per Russell King suggested.
-
-Then, if the name of Boojin is required there, she will send it next time.
-
-Again, I don't touch original copyright written by Jassi, because I don't have any right to do it with this patch.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Best Regards
+Haojian
