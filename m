@@ -1,35 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 19:50:03 +0000
-Subject: [PATCH] ARM: LPAE: Invalidate the TLB for module addresses
- during translation fault
-In-Reply-To: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
-References: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20120223195003.GD22562@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 23 Feb 2012 19:52:16 +0000
+Subject: [PATCH 0/2 v5] arm: kirkwood: add dreamplug/devicetree support
+In-Reply-To: <cover.1312906908.git.jason@lakedaemon.net>
+References: <cover.1312906908.git.jason@lakedaemon.net>
+Message-ID: <cover.1330025976.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 05:59:41PM +0000, Catalin Marinas wrote:
-> During the free_pgtables() call all user and modules/pkmap entries are
-> removed.
+This patch series provides initial support for devicetree on kirkwood for the
+dreamplug platform.  After discussing the approach with Arnd Bergman last week
+at ELC, we decided to take an incremental approach to the conversion.  First, I
+would detect that we were on the dreamplug via the devicetree blob.  Then,
+configure uart0 via devicetree.  We chose the uart since it is already well
+supported under devicetree.
 
-Err, no.  free_pgtables() should only ever touch up to TASK_SIZE, which
-is the maximum size of userspace.  Moreover, because TASK_SIZE does not
-cover an entire pud, free_pgtables() should not be removing the pud
-table.
+This patch series has been boot-tested on the dreamplug.
 
-> There is a small window between pud_clear() and pmd_free_tlb() in
-> free_pmd_range() where the pud entry was cleared but the TLB has not
-> been invalidated yet and the CPU may have cached the original (valid)
-> pud entry in the TLB. A scenario like below would get stuck in
-> continuous prefetch abort:
-> 
-> 1. Current process exiting. The modules pmd entries not populated
-> 2. exit_mmap() -> ... -> pmd_free_tlb()
-> 3. pud_clear() for the 1GB pud containing user stack and modules (no TLB
->    invalidation yet)
+In a future patch series, I plan to migrate spi/flash/partitions over to
+devicetree.
 
-This is where things are wrong.  Because the request should not be
-requesting that the entire pud is being cleared, it should not be
-removed from the pgd.
+When the migration is complete, board-dt.c will not be specific to the
+dreamplug, and dts files can be written for all of the other kirkwood boards.
 
-So, there's some debugging to be done here.
+Jason Cooper (2):
+  arm: kirkwood: add dreamplug (fdt) support.
+  arm: kirkwood: convert uart0 to devicetree.
+
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   25 ++++
+ arch/arm/boot/dts/kirkwood.dtsi          |    6 +
+ arch/arm/mach-kirkwood/Kconfig           |   14 +++
+ arch/arm/mach-kirkwood/Makefile          |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot     |    2 +
+ arch/arm/mach-kirkwood/board-dt.c        |  180 ++++++++++++++++++++++++++++++
+ 6 files changed, 228 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-dreamplug.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-dt.c
+
+-- 
+1.7.3.4
