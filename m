@@ -1,26 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 11:19:06 +0000
-Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
- register
-In-Reply-To: <4F461A97.1090201@st.com>
-References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
- <20120223095345.GJ22562@n2100.arm.linux.org.uk> <4F461A97.1090201@st.com>
-Message-ID: <20120223111906.GS22562@n2100.arm.linux.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 23 Feb 2012 16:56:44 +0530
+Subject: [PATCH v2 1/6] mmc: omap_hsmmc: use platform_get_resource_byname for
+ tx/rx DMA channels
+In-Reply-To: <1329996409-26861-1-git-send-email-rnayak@ti.com>
+References: <1329996409-26861-1-git-send-email-rnayak@ti.com>
+Message-ID: <1329996409-26861-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 04:23:11PM +0530, Viresh Kumar wrote:
-> On 2/23/2012 3:23 PM, Russell King - ARM Linux wrote:
-> > 1. Using the PCI/ISA IO macros for non-PCI/ISA IO purposes is silly
-> 
-> We mistakenly placed it outside #ifdef __io, #endif
-> Sorry, i am still missing your point.
+From: Balaji T K <balajitk@ti.com>
 
-inb() et.al. are for PCI/ISA IO, not for general platform MMIO.
+Git rid of hardcoded tx/rx DMA channels based on pdev->id
+and use platform_get_resource_byname() to retrieve them
+instead.
 
-> > 2. We should have readb_be() etc instead.
-> 
-> Actually, existing drivers are using out_be32(), etc in their implementation.
-> What do you suggest in order to use these drivers for SPEAr/ARM.
+Signed-off-by: Balaji T K <balajitk@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Tested-by: Venkatraman S <svenkatr@ti.com>
+---
+ drivers/mmc/host/omap_hsmmc.c |   35 +++++++++++------------------------
+ 1 files changed, 11 insertions(+), 24 deletions(-)
 
-Which drivers?
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index fd0c661..2a660ab 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1977,32 +1977,19 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+ 
+ 	omap_hsmmc_conf_bus_power(host);
+ 
+-	/* Select DMA lines */
+-	switch (host->id) {
+-	case OMAP_MMC1_DEVID:
+-		host->dma_line_tx = OMAP24XX_DMA_MMC1_TX;
+-		host->dma_line_rx = OMAP24XX_DMA_MMC1_RX;
+-		break;
+-	case OMAP_MMC2_DEVID:
+-		host->dma_line_tx = OMAP24XX_DMA_MMC2_TX;
+-		host->dma_line_rx = OMAP24XX_DMA_MMC2_RX;
+-		break;
+-	case OMAP_MMC3_DEVID:
+-		host->dma_line_tx = OMAP34XX_DMA_MMC3_TX;
+-		host->dma_line_rx = OMAP34XX_DMA_MMC3_RX;
+-		break;
+-	case OMAP_MMC4_DEVID:
+-		host->dma_line_tx = OMAP44XX_DMA_MMC4_TX;
+-		host->dma_line_rx = OMAP44XX_DMA_MMC4_RX;
+-		break;
+-	case OMAP_MMC5_DEVID:
+-		host->dma_line_tx = OMAP44XX_DMA_MMC5_TX;
+-		host->dma_line_rx = OMAP44XX_DMA_MMC5_RX;
+-		break;
+-	default:
+-		dev_err(mmc_dev(host->mmc), "Invalid MMC id\n");
++	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
++	if (!res) {
++		dev_err(mmc_dev(host->mmc), "cannot get DMA TX channel\n");
++		goto err_irq;
++	}
++	host->dma_line_tx = res->start;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "rx");
++	if (!res) {
++		dev_err(mmc_dev(host->mmc), "cannot get DMA RX channel\n");
+ 		goto err_irq;
+ 	}
++	host->dma_line_rx = res->start;
+ 
+ 	/* Request IRQ for MMC operations */
+ 	ret = request_irq(host->irq, omap_hsmmc_irq, 0,
+-- 
+1.7.1
