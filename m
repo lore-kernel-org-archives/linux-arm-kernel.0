@@ -1,7 +1,7 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Thu, 23 Feb 2012 19:47:39 +0800
+Date: Thu, 23 Feb 2012 19:52:08 +0800
 Subject: [V1 1/4] regulator: fix the ldo configure according to 88pm860x spec
-Message-ID: <1329997662-2931-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <1329997928-2995-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
