@@ -1,58 +1,87 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 23 Feb 2012 09:38:15 +0100
-Subject: [PATCH v2 11/19] ARM: at91/PMC: make register base soc independent
-In-Reply-To: <4F457128.6060407@gmail.com>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <bdea371b518c7b6d04ae1cfacacca2f75b191984.1329903206.git.nicolas.ferre@atmel.com>
- <4F457128.6060407@gmail.com>
-Message-ID: <4F45FAF7.3080409@atmel.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 23 Feb 2012 14:10:30 +0530
+Subject: [PATCH 2/2] ARM: OMAP: Fix section mismatch warning for
+ platform_cpu_die()
+In-Reply-To: <20120223074504.GZ14173@pengutronix.de>
+References: <1329980310-9007-1-git-send-email-santosh.shilimkar@ti.com>
+ <1329980310-9007-3-git-send-email-santosh.shilimkar@ti.com>
+ <20120223074504.GZ14173@pengutronix.de>
+Message-ID: <CAMQu2gxLJOY8HzMO71dHTr8VfQ+G=KJP+wv5SwvrktTi7b82+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2012 11:50 PM, Ryan Mallon :
-> On 22/02/12 20:39, Nicolas Ferre wrote:
-> 
->> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+2012/2/23 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+> On Thu, Feb 23, 2012 at 12:28:30PM +0530, Santosh Shilimkar wrote:
+>> WARNING: vmlinux.o(.text+0x226d0):
+>> Section mismatch in reference from the function
+>> platform_cpu_die() to the function .cpuinit.text:omap4_hotplug_cpu()
+>> The function platform_cpu_die() references
+>> the function __cpuinit omap4_hotplug_cpu().
+>> This is often because platform_cpu_die lacks a __cpuinit
+>> annotation or the annotation of omap4_hotplug_cpu is wrong.
 >>
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Reviewed-by: Ryan Mallon <rmallon@gmail.com>
->> ---
-> 
-> <snip>
-> 
->> -	seq_printf(s, "SCSR = %8x\n", scsr = at91_sys_read(AT91_PMC_SCSR));
->> -	seq_printf(s, "PCSR = %8x\n", pcsr = at91_sys_read(AT91_PMC_PCSR));
->> -	seq_printf(s, "MOR  = %8x\n", at91_sys_read(AT91_CKGR_MOR));
->> -	seq_printf(s, "MCFR = %8x\n", at91_sys_read(AT91_CKGR_MCFR));
->> -	seq_printf(s, "PLLA = %8x\n", at91_sys_read(AT91_CKGR_PLLAR));
->> +	seq_printf(s, "SCSR = %8x\n", scsr = at91_pmc_read(AT91_PMC_SCSR));
->> +	seq_printf(s, "PCSR = %8x\n", pcsr = at91_pmc_read(AT91_PMC_PCSR));
-> 
-> 
-> I realise the original code is wrong, so doesn't need to be fixed in
-> this patch, but can we please move the assignments out of the seq_printf
-> calls.
+>> Thanks to Russell King for suggesting __ref annotation trick
+>> just like it's parent function for this warning becasue __cupinit
+> s/it's/its/; s/becasue/because/; s/cup/cpu/
+>
+> Having said that I think the grammar is broken, too. Maybe:
+>
+> ? ? ? ?Thanks to Russell King for suggesting to use __ref instead of
+> ? ? ? ?the initial (and wrong) approach to use __cpuinit.
+>
+> (But note I'm not a native speaker, too)
+>
+Thanks for fixing the grammar. :)
+Updated patch below with comments corrected as per
+your suggestion.
 
-Well, I would not say "wrong". But ugly, for sure. I queue a patch to
-correct this just before this one.
+Regards
+Santosh
 
-> <snip>
-> 
->>  void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
->> @@ -208,7 +207,7 @@ void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
->>  	}
->>  	at91_ramc_base[id] = ioremap(addr, size);
->>  	if (!at91_ramc_base[id])
->> -		pr_warn("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
->> +		panic("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
-> 
-> 
-> This is in the wrong patch, and should be folded into the correct patch.
+>From a53dd2d822dc9c9894c2f2f3d239af341c66d891 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Wed, 22 Feb 2012 16:10:04 +0530
+Subject: [PATCH 2/2] ARM: OMAP: Fix section mismatch warning for
+platform_cpu_die()
 
-Absolutely, this belongs to the previous patch. Thanks for highlighting
-this.
+WARNING: vmlinux.o(.text+0x226d0):
+Section mismatch in reference from the function
+platform_cpu_die() to the function .cpuinit.text:omap4_hotplug_cpu()
+The function platform_cpu_die() references
+the function __cpuinit omap4_hotplug_cpu().
+This is often because platform_cpu_die lacks a __cpuinit
+annotation or the annotation of omap4_hotplug_cpu is wrong.
 
-Best regards,
+Thanks to Russell King for suggesting to use __ref instead of
+the initial (and wrong) approach to use __cpuinit.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/omap-hotplug.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap-hotplug.c
+b/arch/arm/mach-omap2/omap-hotplug.c
+index adbe4d8..56c345b 100644
+--- a/arch/arm/mach-omap2/omap-hotplug.c
++++ b/arch/arm/mach-omap2/omap-hotplug.c
+@@ -33,7 +33,7 @@ int platform_cpu_kill(unsigned int cpu)
+  * platform-specific code to shutdown a CPU
+  * Called with IRQs disabled
+  */
+-void platform_cpu_die(unsigned int cpu)
++void __ref platform_cpu_die(unsigned int cpu)
+ {
+ 	unsigned int this_cpu;
+
 -- 
-Nicolas Ferre
+1.7.4.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-ARM-OMAP-Fix-section-mismatch-warning-for-platform_c.patch
+Type: application/octet-stream
+Size: 1343 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120223/148fa317/attachment.obj>
