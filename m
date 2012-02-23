@@ -1,119 +1,177 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 23 Feb 2012 15:25:44 +0100
-Subject: [PATCH v3 00/21] at91 first cleanup series for 3.4
-Message-ID: <cover.1330006537.git.nicolas.ferre@atmel.com>
+Date: Thu, 23 Feb 2012 15:25:45 +0100
+Subject: [PATCH v3 01/21] ARM: at91: factorise duplicated at91sam9 idle
+In-Reply-To: <cover.1330006537.git.nicolas.ferre@atmel.com>
+References: <cover.1330006537.git.nicolas.ferre@atmel.com>
+Message-ID: <0d78171672a30e8ec8084f54a557e9948260356d.1330006537.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is the third revision of this series of cleanup. It includes
-new enhancements recommended by Ryan Mallon and Russell King.
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-This series removes the at91_sys_read/write() functions that where
-used for all System Controller devices. The static offsets that were
-used prevented us from compiling several AT91 SoC support in a single
-zImage.
+Remove duplicated at91sam9xxxx_idle() functions introduced
+by commit c9dfafb "ARM: mach-at91: move special idle code out of line".
+Replace by a generic at91sam9_idle() function in setup.c common
+location.
 
-The other cleanup is the move of some early console initialization. In
-addition, some Makefile.boot modifications have been performed to be
-able to make .dtb files.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91sam9260.c |    8 +-------
+ arch/arm/mach-at91/at91sam9261.c |    8 +-------
+ arch/arm/mach-at91/at91sam9263.c |    8 +-------
+ arch/arm/mach-at91/at91sam9g45.c |    8 +-------
+ arch/arm/mach-at91/at91sam9rl.c  |    8 +-------
+ arch/arm/mach-at91/clock.c       |    8 ++++++++
+ arch/arm/mach-at91/generic.h     |    3 +++
+ 7 files changed, 16 insertions(+), 35 deletions(-)
 
-All this goes on top of current material that is already in arm-soc
-git tree (merge of all at91/* branches).
-
-
-Jean-Christophe PLAGNIOL-VILLARD (18):
-  ARM: at91: factorise duplicated at91sam9 idle
-  ARM: at91/at91x40: remove use of at91_sys_read/write
-  ARM: at91: make matrix register base soc independent
-  ARM: at91: make ST (System Timer) soc independent
-  ARM: at91/pm_slowclock: rename register to named define
-  ARM: at91/pm_slowclock: function slow_clock() accepts parameters
-  ARM: at91: move at91rm9200 sdramc defines to at91rm9200_sdramc.h
-  ARM: at91: make sdram/ddr register base soc independent
-  ARM: at91/pm_slowclock: add runtime detection of memory contoller
-  ARM: at91/PMC: make register base soc independent
-  ARM: at91/rtc-at91sam9: each SoC can select the RTT device to use
-  ARM: at91:rtc/rtc-at91sam9: ioremap register bank
-  ARM: at91/rtc-at91sam9: pass the GPBR to use via resources
-  ARM: at91: finally drop at91_sys_read/write
-  ARM: at91: merge SRAM Memory banks thanks to mirroring
-  Atmel: move console default platform_device to serial driver
-  ARM: at91/board-dt: drop default console
-  ARM: at91: properly sort dtb files in Makefile.boot
-
-Nicolas Ferre (3):
-  ARM: at91/ST: remove not needed casts
-  ARM: at91/PMC: move assignment out of printf
-  ARM: at91: add at91sam9g25ek.dts in Makefile.boot
-
- arch/arm/mach-at91/Makefile.boot                   |    8 +-
- arch/arm/mach-at91/at91rm9200.c                    |    8 +-
- arch/arm/mach-at91/at91rm9200_devices.c            |   14 +-
- arch/arm/mach-at91/at91rm9200_time.c               |   37 ++-
- arch/arm/mach-at91/at91sam9260.c                   |   23 +-
- arch/arm/mach-at91/at91sam9260_devices.c           |   38 +++-
- arch/arm/mach-at91/at91sam9261.c                   |   10 +-
- arch/arm/mach-at91/at91sam9261_devices.c           |   31 ++-
- arch/arm/mach-at91/at91sam9263.c                   |   11 +-
- arch/arm/mach-at91/at91sam9263_devices.c           |   59 ++++-
- arch/arm/mach-at91/at91sam9_alt_reset.S            |   12 +-
- arch/arm/mach-at91/at91sam9g45.c                   |   11 +-
- arch/arm/mach-at91/at91sam9g45_devices.c           |   31 ++-
- arch/arm/mach-at91/at91sam9g45_reset.S             |   12 +-
- arch/arm/mach-at91/at91sam9rl.c                    |   10 +-
- arch/arm/mach-at91/at91sam9rl_devices.c            |   31 ++-
- arch/arm/mach-at91/at91sam9x5.c                    |    5 +-
- arch/arm/mach-at91/at91x40.c                       |    2 +-
- arch/arm/mach-at91/at91x40_time.c                  |   28 ++-
- arch/arm/mach-at91/board-cpu9krea.c                |    5 +-
- arch/arm/mach-at91/board-cpuat91.c                 |    1 +
- arch/arm/mach-at91/board-dt.c                      |    6 -
- arch/arm/mach-at91/board-eco920.c                  |    5 +-
- arch/arm/mach-at91/board-kb9202.c                  |    1 +
- arch/arm/mach-at91/board-picotux200.c              |    1 +
- arch/arm/mach-at91/board-rm9200dk.c                |    1 +
- arch/arm/mach-at91/board-rm9200ek.c                |    1 +
- arch/arm/mach-at91/board-yl-9200.c                 |    3 +-
- arch/arm/mach-at91/clock.c                         |   88 ++++---
- arch/arm/mach-at91/generic.h                       |   10 +
- arch/arm/mach-at91/include/mach/at91_matrix.h      |   23 ++
- arch/arm/mach-at91/include/mach/at91_pmc.h         |   56 +++--
- arch/arm/mach-at91/include/mach/at91_ramc.h        |   32 +++
- arch/arm/mach-at91/include/mach/at91_st.h          |   32 ++-
- arch/arm/mach-at91/include/mach/at91rm9200.h       |   10 +-
- arch/arm/mach-at91/include/mach/at91rm9200_mc.h    |   58 +----
- .../arm/mach-at91/include/mach/at91rm9200_sdramc.h |   63 +++++
- arch/arm/mach-at91/include/mach/at91sam9260.h      |   14 +-
- .../mach-at91/include/mach/at91sam9260_matrix.h    |   36 ++--
- arch/arm/mach-at91/include/mach/at91sam9261.h      |   10 +-
- .../mach-at91/include/mach/at91sam9261_matrix.h    |   18 +-
- arch/arm/mach-at91/include/mach/at91sam9263.h      |   12 +-
- .../mach-at91/include/mach/at91sam9263_matrix.h    |   74 +++---
- arch/arm/mach-at91/include/mach/at91sam9_ddrsdr.h  |    6 -
- arch/arm/mach-at91/include/mach/at91sam9_sdramc.h  |    6 -
- arch/arm/mach-at91/include/mach/at91sam9g45.h      |   12 +-
- .../mach-at91/include/mach/at91sam9g45_matrix.h    |   84 +++---
- arch/arm/mach-at91/include/mach/at91sam9rl.h       |    7 +-
- .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |   42 ++--
- arch/arm/mach-at91/include/mach/at91sam9x5.h       |    5 +-
- arch/arm/mach-at91/include/mach/at91x40.h          |   18 +-
- arch/arm/mach-at91/include/mach/hardware.h         |    3 +-
- arch/arm/mach-at91/include/mach/io.h               |   18 --
- arch/arm/mach-at91/pm.c                            |   35 ++-
- arch/arm/mach-at91/pm.h                            |   11 +-
- arch/arm/mach-at91/pm_slowclock.S                  |  271 ++++++++++----------
- arch/arm/mach-at91/setup.c                         |    9 +
- arch/avr32/mach-at32ap/at32ap700x.c                |    2 -
- drivers/pcmcia/at91_cf.c                           |    5 +-
- drivers/rtc/rtc-at91sam9.c                         |   98 +++-----
- drivers/tty/serial/atmel_serial.c                  |    2 +
- drivers/usb/gadget/at91_udc.c                      |    9 +-
- drivers/usb/gadget/atmel_usba_udc.c                |    6 +-
- drivers/watchdog/at91rm9200_wdt.c                  |    8 +-
- 64 files changed, 920 insertions(+), 678 deletions(-)
- create mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
- create mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
- create mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_sdramc.h
-
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 9ac8c6f..e965332 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -329,15 +329,9 @@ static void __init at91sam9260_ioremap_registers(void)
+ 	at91sam9_ioremap_smc(0, AT91SAM9260_BASE_SMC);
+ }
+ 
+-static void at91sam9260_idle(void)
+-{
+-	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-	cpu_do_idle();
+-}
+-
+ static void __init at91sam9260_initialize(void)
+ {
+-	arm_pm_idle = at91sam9260_idle;
++	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9_alt_restart;
+ 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
+ 			| (1 << AT91SAM9260_ID_IRQ2);
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index ab76868..d7f51d6 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -287,15 +287,9 @@ static void __init at91sam9261_ioremap_registers(void)
+ 	at91sam9_ioremap_smc(0, AT91SAM9261_BASE_SMC);
+ }
+ 
+-static void at91sam9261_idle(void)
+-{
+-	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-	cpu_do_idle();
+-}
+-
+ static void __init at91sam9261_initialize(void)
+ {
+-	arm_pm_idle = at91sam9261_idle;
++	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9_alt_restart;
+ 	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
+ 			| (1 << AT91SAM9261_ID_IRQ2);
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 247ab63..8bdba2a 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -308,15 +308,9 @@ static void __init at91sam9263_ioremap_registers(void)
+ 	at91sam9_ioremap_smc(1, AT91SAM9263_BASE_SMC1);
+ }
+ 
+-static void at91sam9263_idle(void)
+-{
+-	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-	cpu_do_idle();
+-}
+-
+ static void __init at91sam9263_initialize(void)
+ {
+-	arm_pm_idle = at91sam9263_idle;
++	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9_alt_restart;
+ 	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
+ 
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 5b12192..5d2ff90 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -317,12 +317,6 @@ static struct at91_gpio_bank at91sam9g45_gpio[] __initdata = {
+ 	}
+ };
+ 
+-static void at91sam9g45_idle(void)
+-{
+-	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-	cpu_do_idle();
+-}
+-
+ /* --------------------------------------------------------------------
+  *  AT91SAM9G45 processor initialization
+  * -------------------------------------------------------------------- */
+@@ -343,7 +337,7 @@ static void __init at91sam9g45_ioremap_registers(void)
+ 
+ static void __init at91sam9g45_initialize(void)
+ {
+-	arm_pm_idle = at91sam9g45_idle;
++	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9g45_restart;
+ 	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
+ 
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index fd60e22..e86c50b 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -292,15 +292,9 @@ static void __init at91sam9rl_ioremap_registers(void)
+ 	at91sam9_ioremap_smc(0, AT91SAM9RL_BASE_SMC);
+ }
+ 
+-static void at91sam9rl_idle(void)
+-{
+-	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
+-	cpu_do_idle();
+-}
+-
+ static void __init at91sam9rl_initialize(void)
+ {
+-	arm_pm_idle = at91sam9rl_idle;
++	arm_pm_idle = at91sam9_idle;
+ 	arm_pm_restart = at91sam9_alt_restart;
+ 	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
+ 
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index a5291e0..d1b4e07 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -28,6 +28,8 @@
+ #include <mach/at91_pmc.h>
+ #include <mach/cpu.h>
+ 
++#include <asm/proc-fns.h>
++
+ #include "clock.h"
+ #include "generic.h"
+ 
+@@ -818,3 +820,9 @@ static int __init at91_clock_reset(void)
+ 	return 0;
+ }
+ late_initcall(at91_clock_reset);
++
++void at91sam9_idle(void)
++{
++	at91_sys_write(AT91_PMC_SCDR, AT91_PMC_PCK);
++	cpu_do_idle();
++}
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 7e8280e..4e322f34 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -56,6 +56,9 @@ struct device;
+ extern void at91_irq_suspend(void);
+ extern void at91_irq_resume(void);
+ 
++/* idle */
++extern void at91sam9_idle(void);
++
+ /* reset */
+ extern void at91_ioremap_rstc(u32 base_addr);
+ extern void at91sam9_alt_restart(char, const char *);
 -- 
 1.7.9
