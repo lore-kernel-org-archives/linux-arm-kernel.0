@@ -1,39 +1,57 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 23 Feb 2012 17:40:25 +0530
-Subject: [PATCH 0/6] gpio/omap: Some more driver cleanup and fixes
-Message-ID: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
+Date: Thu, 23 Feb 2012 17:40:30 +0530
+Subject: [PATCH 5/6] gpio/omap: fix trigger type to unsigned
+In-Reply-To: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
+References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1329999031-6914-6-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cleanup is mostly getting rid of redundant fields in struct gpio_bank{}
-as we already have them as part of bank->context now. Also, remove un-used
-variable from gpio_irq_handler.
+The GPIO trigger parameter is of type unsigned.
+enum {
+        IRQ_TYPE_NONE           = 0x00000000,
+        IRQ_TYPE_EDGE_RISING    = 0x00000001,
+        IRQ_TYPE_EDGE_FALLING   = 0x00000002,
+        IRQ_TYPE_EDGE_BOTH      = (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING),
+        IRQ_TYPE_LEVEL_HIGH     = 0x00000004,
+        IRQ_TYPE_LEVEL_LOW      = 0x00000008,
+        IRQ_TYPE_LEVEL_MASK     = (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH),
+        IRQ_TYPE_SENSE_MASK     = 0x0000000f,
 
-The fix include correction of _set_gpio_irqenable() implementation and fix
-type mismatch of gpio trigger parameter.
+        IRQ_TYPE_PROBE          = 0x00000010,
+...
+};
+Even though gpio_irq_type(struct irq_data *d, unsigned type) has the right type
+of parameter, the subsequent called functions set_gpio_triggering() and
+set_gpio_trigger() wrongly makes it signed integer. Fix this.
 
-It is baselined on top of Kevin's following series:
-gpio/omap: cleanup and runtime PM conversion for v3.4
-git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/gpio/runtime-pm-cleanup
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+---
+ drivers/gpio/gpio-omap.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-I have applied Benoit's GPIO patches in following series on top of Kevin's
-before applying my changes.
-gpio/omap: Cleanup and adaptation to Device Tree
-git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_gpio
-
-Series is available here for reference:
-git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_further_cleanup_fixes
-
-Power Test: Off-mode and Retention on OMAP3430 (Suspend and Idle paths).
-Functional Test: OMAP2430, OMAP3430SDP, ZOOM3, OMAP4430, OMAP4-BLAZE
-
-Tarun Kanti DebBarma (6):
-  gpio/omap: remove saved_fallingdetect, saved_risingdetect fields
-  gpio/omap: remove saved_wakeup field from struct gpio_bank
-  gpio/omap: remove suspend_wakeup field from struct gpio_bank
-  gpio/omap: get rid of retrigger variable in gpio_irq_handler
-  gpio/omap: fix trigger type to unsigned
-  gpio/omap: fix _set_gpio_irqenable implementation
-
- drivers/gpio/gpio-omap.c |   56 +++++++++++++++++++--------------------------
- 1 files changed, 24 insertions(+), 32 deletions(-)
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 3dd4b3a..67535c8 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -232,7 +232,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
+ }
+ 
+ static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
+-						int trigger)
++						unsigned trigger)
+ {
+ 	void __iomem *base = bank->base;
+ 	u32 gpio_bit = 1 << gpio;
+@@ -314,7 +314,8 @@ static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio)
+ static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio) {}
+ #endif
+ 
+-static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
++static int _set_gpio_triggering(struct gpio_bank *bank, int gpio,
++							unsigned trigger)
+ {
+ 	void __iomem *reg = bank->base;
+ 	void __iomem *base = bank->base;
+-- 
+1.7.0.4
