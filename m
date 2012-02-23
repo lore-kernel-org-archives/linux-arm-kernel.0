@@ -1,70 +1,68 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 23 Feb 2012 11:08:53 +0200
-Subject: [PATCHv5 03/14] arm: omap3+: voltage: parameter segregation
-In-Reply-To: <CAOMWX4d+M9oagDtmSqG=X8Ln4kUEyLaqpfB9Pz0Y+6RmK=sjYw@mail.gmail.com>
-References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
- <1329833098-19900-4-git-send-email-t-kristo@ti.com>
- <CAOMWX4d+M9oagDtmSqG=X8Ln4kUEyLaqpfB9Pz0Y+6RmK=sjYw@mail.gmail.com>
-Message-ID: <1329988133.4102.500.camel@sokoban>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 23 Feb 2012 09:16:30 +0000
+Subject: [PATCH 1/3] arm: ignore devicetree blobs.
+In-Reply-To: <20120222222619.GY14173@pengutronix.de>
+References: <cover.1312906908.git.jason@lakedaemon.net>
+ <cover.1329936660.git.jason@lakedaemon.net>
+ <3629df9b5b96d3a3a63a34ebf6ddfca2fd72ccfc.1329936660.git.jason@lakedaemon.net>
+ <20120222222619.GY14173@pengutronix.de>
+Message-ID: <20120223091630.GA2036@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-22 at 19:37 -0600, Menon, Nishanth wrote:
-> On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
-> [...]
-> > diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-> > index 949938d..940a0d6 100644
-> > --- a/arch/arm/mach-omap2/voltage.h
-> > +++ b/arch/arm/mach-omap2/voltage.h
+On Wed, Feb 22, 2012 at 11:26:19PM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Feb 22, 2012 at 07:18:44PM +0000, Jason Cooper wrote:
+> > 
+> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> /me claims prior art:
 > 
-> [...]
-> > @@ -171,6 +169,18 @@ struct omap_voltdm_pmic {
-> >        u8 (*uv_to_vsel) (unsigned long uV);
-> >  };
-> >
-> > +struct omap_vp_param {
-> > +       u32 vddmax;
-> > +       u32 vddmin;
-> > +};
-> > +
-> 
-> Thinking a little deeper about this(SoC level vdd min and max) on a
-> slightly different angle- core of the question that intend to answer
-> are:
->  - what is the least voltage we want to allow in active transtion? it
-> should not be lower than retention voltage.
+> 	http://mid.gmane.org/1323808612-14976-1-git-send-email-u.kleine-koenig at pengutronix.de
 
-I think this is a fair assumption, so we could init the vddmin to be the
-same as the retention voltage for the domain (or even drop the
-parameter.)
+Multiple people proposed this...
 
-> - what is the max voltage we want to allow in active transition? it
-> should be the max Nom voltage of all the OPPs for that domain.
+Grant accepted my patch, and it is already in -next:
 
-Isn't it higher? I guess smartreflex can scale voltages even up from the
-nominal level if we have a really old and/or bad silicon. Limiting this
-to max opp would be bad, no? Maybe we could use max opp voltage + some
-margin though... but what would be a safe margin here?
+See next-20110222
+
+810ae3d26507e61d1f7a69e9716443df1ce41449
+ARM: devicetree: Add .dtb files to arch/arm/boot/.gitignore
+
+Cheers
+---Dave
 
 > 
-> In effect, why do we even need to register
-> "voltdm->vp_param->vdd[min|max]"? We already have that info - right?
-> On the other hand it might be safer to do this way to handle quirks in
-> future SoCs.. but thought I'd spit it out anyways..
+> Best regards
+> Uwe
+> 	
+> > ---
+> > NOTE: This is the first version of this patch, so no change history.
+> > 
+> >  arch/arm/boot/.gitignore |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/.gitignore b/arch/arm/boot/.gitignore
+> > index ce1c5ff..3c79f85 100644
+> > --- a/arch/arm/boot/.gitignore
+> > +++ b/arch/arm/boot/.gitignore
+> > @@ -3,3 +3,4 @@ zImage
+> >  xipImage
+> >  bootpImage
+> >  uImage
+> > +*.dtb
+> > -- 
+> > 1.7.3.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
 > 
-> > +struct omap_vc_param {
-> and elsewhere - please add kernel-doc struct documentation as well
-> when new structs are introduced?
-
-Yea, I can add those for next version.
-
-> > +       u32 on;
-> > +       u32 onlp;
-> > +       u32 ret;
-> > +       u32 off;
-> > +};
-> > +
-> [...]
-> 
-> Regards,
-> Nishanth Menon
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
