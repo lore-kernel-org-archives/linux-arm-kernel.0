@@ -1,42 +1,39 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 23 Feb 2012 17:40:29 +0530
-Subject: [PATCH 4/6] gpio/omap: get rid of retrigger variable in
- gpio_irq_handler
-In-Reply-To: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
-References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1329999031-6914-5-git-send-email-tarun.kanti@ti.com>
+Date: Thu, 23 Feb 2012 17:40:25 +0530
+Subject: [PATCH 0/6] gpio/omap: Some more driver cleanup and fixes
+Message-ID: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This local variable is just assigned zero and then OR'ed
-with isr. It does not appear to serve any purpose and so
-removing it.
+The cleanup is mostly getting rid of redundant fields in struct gpio_bank{}
+as we already have them as part of bank->context now. Also, remove un-used
+variable from gpio_irq_handler.
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
----
- drivers/gpio/gpio-omap.c |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+The fix include correction of _set_gpio_irqenable() implementation and fix
+type mismatch of gpio trigger parameter.
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index b62e861..3dd4b3a 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -623,7 +623,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	u32 isr;
- 	unsigned int gpio_irq, gpio_index;
- 	struct gpio_bank *bank;
--	u32 retrigger = 0;
- 	int unmasked = 0;
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
- 
-@@ -660,8 +659,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			chained_irq_exit(chip, desc);
- 		}
- 
--		isr |= retrigger;
--		retrigger = 0;
- 		if (!isr)
- 			break;
- 
--- 
-1.7.0.4
+It is baselined on top of Kevin's following series:
+gpio/omap: cleanup and runtime PM conversion for v3.4
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/gpio/runtime-pm-cleanup
+
+I have applied Benoit's GPIO patches in following series on top of Kevin's
+before applying my changes.
+gpio/omap: Cleanup and adaptation to Device Tree
+git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_gpio
+
+Series is available here for reference:
+git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_further_cleanup_fixes
+
+Power Test: Off-mode and Retention on OMAP3430 (Suspend and Idle paths).
+Functional Test: OMAP2430, OMAP3430SDP, ZOOM3, OMAP4430, OMAP4-BLAZE
+
+Tarun Kanti DebBarma (6):
+  gpio/omap: remove saved_fallingdetect, saved_risingdetect fields
+  gpio/omap: remove saved_wakeup field from struct gpio_bank
+  gpio/omap: remove suspend_wakeup field from struct gpio_bank
+  gpio/omap: get rid of retrigger variable in gpio_irq_handler
+  gpio/omap: fix trigger type to unsigned
+  gpio/omap: fix _set_gpio_irqenable implementation
+
+ drivers/gpio/gpio-omap.c |   56 +++++++++++++++++++--------------------------
+ 1 files changed, 24 insertions(+), 32 deletions(-)
