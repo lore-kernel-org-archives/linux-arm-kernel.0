@@ -1,36 +1,135 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 23 Feb 2012 17:05:52 +0530
-Subject: [PATCH v3 0/2] Device tree support for TWL regulators
-Message-ID: <1329996954-27083-1-git-send-email-rnayak@ti.com>
+Date: Thu, 23 Feb 2012 17:05:54 +0530
+Subject: [PATCH v3 2/2] arm/dts: twl: Pass regulator data from dt
+In-Reply-To: <1329996954-27083-1-git-send-email-rnayak@ti.com>
+References: <1329996954-27083-1-git-send-email-rnayak@ti.com>
+Message-ID: <1329996954-27083-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-sending as these patches did not make it to the lists due to
-issues with my 'git send-email'
+Pass all the voltage regulator information for
+twl6030/twl4030 PMIC from device tree.
 
-v3 has mainly 2 differences from v2
--1- TWL driver now uses just one table for both dt and
-non-dt based lookup for driver data.
--2- All common regulator nodes for twl4030 and twl6030 are
-now defined in the twl4030.dtsi and twl6030.dtsi instead of
-repeating the nodes in all board files, which also means
-the patch ('arm/dts: twl: Pass regulator data from dt')
-has a dependency with the series from Benoit which adds the
-twl4030.dtsi and twl6030.dtsi files[1].
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle.dts |    6 +++
+ arch/arm/boot/dts/twl4030.dtsi     |   18 +++++++++++
+ arch/arm/boot/dts/twl6030.dtsi     |   60 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 84 insertions(+), 0 deletions(-)
 
-I have tested the patches on omap4panda and omap3beagle boards.
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
-	for_3.4/dt_i2c_twl
-
-Rajendra Nayak (2):
-  regulator: twl: adapt twl-regulator driver to dt
-  arm/dts: twl: Pass regulator data from dt
-
- .../bindings/regulator/twl-regulator.txt           |   63 ++++++
- arch/arm/boot/dts/omap3-beagle.dts                 |    6 +
- arch/arm/boot/dts/twl4030.dtsi                     |   18 ++
- arch/arm/boot/dts/twl6030.dtsi                     |   60 +++++
- drivers/regulator/twl-regulator.c                  |  227 +++++++++++++-------
- 5 files changed, 301 insertions(+), 73 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 714ba5d..54556b1 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -26,6 +26,12 @@
+ 		reg = <0x48>;
+ 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+ 		interrupt-parent = <&intc>;
++
++		vsim: regulator at 10 {
++			compatible = "ti,twl4030-vsim";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <3000000>;
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+index 8be5223..a94654c 100644
+--- a/arch/arm/boot/dts/twl4030.dtsi
++++ b/arch/arm/boot/dts/twl4030.dtsi
+@@ -18,4 +18,22 @@
+ 		compatible = "ti,twl4030-rtc";
+ 		interrupts = <11>;
+ 	};
++
++	vdac: regulator at 0 {
++		compatible = "ti,twl4030-vdac";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
++	vpll2: regulator at 1 {
++		compatible = "ti,twl4030-vpll2";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
++	vmmc1: regulator at 2 {
++		compatible = "ti,twl4030-vmmc1";
++		regulator-min-microvolt = <1850000>;
++		regulator-max-microvolt = <3150000>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
+index b7b4e5e..efa19e8 100644
+--- a/arch/arm/boot/dts/twl6030.dtsi
++++ b/arch/arm/boot/dts/twl6030.dtsi
+@@ -19,4 +19,64 @@
+ 		compatible = "ti,twl4030-rtc";
+ 		interrupts = <11>;
+ 	};
++
++	vaux1: regulator at 0 {
++		compatible = "ti,twl6030-vaux1";
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <3000000>;
++	};
++
++	vaux2: regulator at 1 {
++		compatible = "ti,twl6030-vaux2";
++		regulator-min-microvolt = <1200000>;
++		regulator-max-microvolt = <2800000>;
++	};
++
++	vaux3: regulator at 2 {
++		compatible = "ti,twl6030-vaux3";
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <3000000>;
++	};
++
++	vmmc: regulator at 3 {
++		compatible = "ti,twl6030-vmmc";
++		regulator-min-microvolt = <1200000>;
++		regulator-max-microvolt = <3000000>;
++	};
++
++	vpp: regulator at 4 {
++		compatible = "ti,twl6030-vpp";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <2500000>;
++	};
++
++	vusim: regulator at 5 {
++		compatible = "ti,twl6030-vusim";
++		regulator-min-microvolt = <1200000>;
++		regulator-max-microvolt = <2900000>;
++	};
++
++	vdac: regulator at 6 {
++		compatible = "ti,twl6030-vdac";
++	};
++
++	vana: regulator at 7 {
++		compatible = "ti,twl6030-vana";
++	};
++
++	vcxio: regulator at 8 {
++		compatible = "ti,twl6030-vcxio";
++	};
++
++	vusb: regulator at 9 {
++		compatible = "ti,twl6030-vusb";
++	};
++
++	vusb: regulator at 9 {
++		compatible = "ti,twl6030-vusb";
++	};
++
++	clk32kg: regulator at 10 {
++		compatible = "ti,twl6030-clk32kg";
++	};
+ };
+-- 
+1.7.1
