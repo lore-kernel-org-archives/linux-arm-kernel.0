@@ -1,38 +1,140 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 23 Feb 2012 17:48:31 +0000
-Subject: [PATCH-WIP 10/13] xen/arm: empty implementation of
- xen_remap_domain_mfn_range
+Date: Thu, 23 Feb 2012 17:48:28 +0000
+Subject: [PATCH-WIP 07/13] xen/arm: receive xen events on arm
 In-Reply-To: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
 References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
-Message-ID: <1330019314-20865-10-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1330019314-20865-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Compile events.c and use IRQ 32 to receive events notifications.
+
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/xen/enlighten.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/xen/events.h |    9 +++++++++
+ drivers/xen/events.c              |   36 +++++++++++++++++++++++++++++++++++-
+ 2 files changed, 44 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index d76f3b4e..986bec3 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -25,6 +25,16 @@ EXPORT_SYMBOL_GPL(xen_have_vector_callback);
- int xen_platform_pci_unplug;
- EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
+diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+index efa7c61..94b4e90 100644
+--- a/arch/arm/include/asm/xen/events.h
++++ b/arch/arm/include/asm/xen/events.h
+@@ -1,9 +1,18 @@
+ #ifndef _ASM_ARM_XEN_EVENTS_H
+ #define _ASM_ARM_XEN_EVENTS_H
  
-+/* TODO */
-+int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
-+			       unsigned long addr,
-+			       unsigned long mfn, int nr,
-+			       pgprot_t prot, unsigned domid)
-+{
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
++#include <asm/ptrace.h>
 +
- void __ref xen_hvm_init_shared_info(void)
+ enum ipi_vector {
++	XEN_PLACEHOLDER_VECTOR,
++
+ 	/* Xen IPIs go here */
+ 	XEN_NR_IPIS,
+ };
+ 
++static inline int xen_irqs_disabled(struct pt_regs *regs)
++{
++	return raw_irqs_disabled_flags(regs->ARM_cpsr);
++}
++
+ #endif /* _ASM_ARM_XEN_EVENTS_H */
+diff --git a/drivers/xen/events.c b/drivers/xen/events.c
+index 6e075cd..18139ee 100644
+--- a/drivers/xen/events.c
++++ b/drivers/xen/events.c
+@@ -31,13 +31,15 @@
+ #include <linux/irqnr.h>
+ #include <linux/pci.h>
+ 
++#ifdef CONFIG_X86
+ #include <asm/desc.h>
+ #include <asm/ptrace.h>
+ #include <asm/irq.h>
+ #include <asm/idle.h>
+ #include <asm/io_apic.h>
+-#include <asm/sync_bitops.h>
+ #include <asm/xen/pci.h>
++#endif
++#include <asm/sync_bitops.h>
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/hypervisor.h>
+ 
+@@ -49,6 +51,8 @@
+ #include <xen/interface/event_channel.h>
+ #include <xen/interface/hvm/hvm_op.h>
+ #include <xen/interface/hvm/params.h>
++#include <xen/interface/physdev.h>
++#include <xen/interface/sched.h>
+ 
+ /*
+  * This lock protects updates to the following mapping and reference-count
+@@ -801,10 +805,12 @@ EXPORT_SYMBOL_GPL(xen_pirq_from_irq);
+ int bind_evtchn_to_irq(unsigned int evtchn)
  {
- 	int cpu;
+ 	int irq;
++	struct irq_desc *desc;
+ 
+ 	mutex_lock(&irq_mapping_update_lock);
+ 
+ 	irq = evtchn_to_irq[evtchn];
++	irq_clear_status_flags(irq, IRQ_NOREQUEST);
+ 
+ 	if (irq == -1) {
+ 		irq = xen_allocate_irq_dynamic();
+@@ -813,6 +819,8 @@ int bind_evtchn_to_irq(unsigned int evtchn)
+ 
+ 		irq_set_chip_and_handler_name(irq, &xen_dynamic_chip,
+ 					      handle_edge_irq, "event");
++		desc = irq_to_desc(irq);
++		irq_clear_status_flags(irq, IRQ_NOREQUEST);
+ 
+ 		xen_irq_info_evtchn_init(irq, evtchn);
+ 	}
+@@ -1282,7 +1290,9 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++#ifdef CONFIG_X86
+ 	exit_idle();
++#endif
+ 	irq_enter();
+ 
+ 	__xen_evtchn_do_upcall();
+@@ -1707,6 +1717,7 @@ void __init xen_init_IRQ(void)
+ 	for (i = 0; i < NR_EVENT_CHANNELS; i++)
+ 		mask_evtchn(i);
+ 
++#ifdef CONFIG_X86
+ 	if (xen_hvm_domain()) {
+ 		xen_callback_vector();
+ 		native_init_IRQ();
+@@ -1718,4 +1729,27 @@ void __init xen_init_IRQ(void)
+ 		if (xen_initial_domain())
+ 			pci_xen_initial_domain();
+ 	}
++#endif
+ }
++#ifdef CONFIG_ARM
++#define IRQ_EVTCHN_CALLBACK 63
++irqreturn_t xen_arm_callback(int irq, void *arg)
++{
++	__xen_evtchn_do_upcall();
++	return 0;
++}
++
++int __init xen_init_IRQ_arm(void)
++{
++	int rc;
++	xen_init_IRQ();
++	rc = request_irq(IRQ_EVTCHN_CALLBACK, xen_arm_callback,
++			IRQF_DISABLED | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
++			"events", "events");	
++	if (rc) {
++		printk(KERN_ERR "Error requesting IRQ %d\n", IRQ_EVTCHN_CALLBACK);
++	}
++	return rc;
++}
++core_initcall(xen_init_IRQ_arm);
++#endif
 -- 
 1.7.2.5
