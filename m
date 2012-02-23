@@ -1,22 +1,35 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 Feb 2012 14:30:20 +0200
-Subject: [PATCH 4/6] gpio/omap: get rid of retrigger variable in
- gpio_irq_handler
-In-Reply-To: <1329999031-6914-5-git-send-email-tarun.kanti@ti.com>
+Date: Thu, 23 Feb 2012 14:30:55 +0200
+Subject: [PATCH 5/6] gpio/omap: fix trigger type to unsigned
+In-Reply-To: <1329999031-6914-6-git-send-email-tarun.kanti@ti.com>
 References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
- <1329999031-6914-5-git-send-email-tarun.kanti@ti.com>
-Message-ID: <20120223123019.GH18463@legolas.emea.dhcp.ti.com>
+ <1329999031-6914-6-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20120223123052.GI18463@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 05:40:29PM +0530, Tarun Kanti DebBarma wrote:
-> This local variable is just assigned zero and then OR'ed
-> with isr. It does not appear to serve any purpose and so
-> removing it.
+On Thu, Feb 23, 2012 at 05:40:30PM +0530, Tarun Kanti DebBarma wrote:
+> The GPIO trigger parameter is of type unsigned.
+> enum {
+>         IRQ_TYPE_NONE           = 0x00000000,
+>         IRQ_TYPE_EDGE_RISING    = 0x00000001,
+>         IRQ_TYPE_EDGE_FALLING   = 0x00000002,
+>         IRQ_TYPE_EDGE_BOTH      = (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING),
+>         IRQ_TYPE_LEVEL_HIGH     = 0x00000004,
+>         IRQ_TYPE_LEVEL_LOW      = 0x00000008,
+>         IRQ_TYPE_LEVEL_MASK     = (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH),
+>         IRQ_TYPE_SENSE_MASK     = 0x0000000f,
+> 
+>         IRQ_TYPE_PROBE          = 0x00000010,
+> ...
+> };
+> Even though gpio_irq_type(struct irq_data *d, unsigned type) has the right type
+> of parameter, the subsequent called functions set_gpio_triggering() and
+> set_gpio_trigger() wrongly makes it signed integer. Fix this.
 > 
 > Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 
-hehe, makes a lot of sense :-)
+Cool, I guess sparse would also have caught that error :-)
 
 Acked-by: Felipe Balbi <balbi@ti.com>
 
@@ -28,4 +41,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120223/a92abce1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120223/c58dffc7/attachment.sig>
