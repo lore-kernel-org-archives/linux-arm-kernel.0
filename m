@@ -1,31 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Feb 2012 13:40:48 +0000
-Subject: [PATCH 2/2] GPIO: LPC32xx: Add output reading to GPO P3
-In-Reply-To: <1329773948-4655-2-git-send-email-stigge@antcom.de>
-References: <1329773948-4655-1-git-send-email-stigge@antcom.de>
- <1329773948-4655-2-git-send-email-stigge@antcom.de>
-Message-ID: <201202231340.48558.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 23 Feb 2012 19:15:08 +0530
+Subject: [PATCH 1/6] arm: omap4: suspend: Program all domains to RET
+In-Reply-To: <1330003320-17400-2-git-send-email-t-kristo@ti.com>
+References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
+ <1330003320-17400-2-git-send-email-t-kristo@ti.com>
+Message-ID: <CAMQu2gwdKXgjr=s7o8Wx_tM6_RKan3VoqPdnVULm8JvDTjJj2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 February 2012, Roland Stigge wrote:
-> The chip offers the function to detect the current state of output of the GPO
-> P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
-> sysfs
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
+On Thu, Feb 23, 2012 at 6:51 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> From: Rajendra Nayak <rnayak@ti.com>
+>
+> Remove the FIXME's in the suspend sequence since
+> we now intend to support system level RET support.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+$subject
+arm: omap4: suspend: Program all domains to RET
+s/arm/ARM
+s/omap4/OMAP4
+s/RET/retention
 
-> +static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
-> +       unsigned pin)
-> +{
-> +       return GPO3_PIN_IN_SEL(__raw_readl(group->gpio_grp->outp_state), pin);
-> +}
-> +
-
-It would be nice to convert this to use readl_relaxed() everywhere instead
-of __raw_readl(), but that is probably better done separately.
-
-	Arnd
+o.w looks good.
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
