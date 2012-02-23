@@ -1,208 +1,75 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Thu, 23 Feb 2012 05:39:11 +0000
-Subject: [PATCH v4 2/3] arm:davinci: move emif driver to drivers/mfd
- from mach-davinci folder
-In-Reply-To: <1328771908-32527-3-git-send-email-prakash.pm@ti.com>
-References: <1328771908-32527-1-git-send-email-prakash.pm@ti.com>
- <1328771908-32527-3-git-send-email-prakash.pm@ti.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3176A846@DBDE01.ent.ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 23 Feb 2012 07:01:51 +0100
+Subject: [PATCH v2 02/19] ARM: at91/at91x40: remove use of
+ at91_sys_read/write
+In-Reply-To: <4F45B985.1000204@gmail.com>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <fac36a5ab9fe5a8bd977d2305eeccad48389cbb5.1329903206.git.nicolas.ferre@atmel.com>
+ <4F456AAF.3090809@gmail.com>
+ <20120223032503.GA20176@game.jcrosoft.org>
+ <4F45B985.1000204@gmail.com>
+Message-ID: <20120223060151.GD20176@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 14:59 Thu 23 Feb     , Ryan Mallon wrote:
+> On 23/02/12 14:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+> > On 09:22 Thu 23 Feb     , Ryan Mallon wrote:
+> >> On 22/02/12 20:39, Nicolas Ferre wrote:
+> >>
+> >>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >>>
+> >>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>> ---
+> >>>  arch/arm/mach-at91/at91x40.c              |    2 +-
+> >>>  arch/arm/mach-at91/at91x40_time.c         |   28 +++++++++++++++++-----------
+> >>>  arch/arm/mach-at91/include/mach/at91x40.h |   18 +++++++++---------
+> >>>  3 files changed, 27 insertions(+), 21 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
+> >>> index 0154b7f..5400a1d 100644
+> >>> --- a/arch/arm/mach-at91/at91x40.c
+> >>> +++ b/arch/arm/mach-at91/at91x40.c
+> >>> @@ -44,7 +44,7 @@ static void at91x40_idle(void)
+> >>>  	 * Disable the processor clock.  The processor will be automatically
+> >>>  	 * re-enabled by an interrupt or by a reset.
+> >>>  	 */
+> >>> -	at91_sys_write(AT91_PS_CR, AT91_PS_CR_CPU);
+> >>> +	__raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
+> >>
+> >>
+> >> This doesn't seem to be equivalent, at91_sys_write does:
+> >>
+> >>   void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
+> >>   __raw_writel(value, addr + reg_offset);
+> >>
+> >> and this patch doesn't redefine AT91_PS_CR. Was it broken before this
+> >> patch? What am I missing?
+> > this is right
+> > #define AT91_PS_CR      (AT91_PS + 0)   /* PS Control register */
+> 
+> 
+> That doesn't answer my question.
+> 
+> The old, at91_sys_write, version was writing to (using __raw_writel):
+> 
+>   AT91_VA_BASE_SYS + AT91_PS_CR
+> 
+> The new version is writing, also using __raw_writel, to:
+> 
+>   AT91_PS_CR
+> 
+> The value of AT91_PS_CR is not changed in this patch. Assuming that
+> AT91_VA_BASE_SYS for at91x40 (which at a quick glance it is not), then
+> the old and the new version of the code are not writing to the same
+> address.
+> 
+> Was it previously incorrect, or is it incorrect now?
+it's as we update
 
-On Thu, Feb 09, 2012 at 12:48:27, Manjunathappa, Prakash wrote:
-> Move aemif kernel module from arch/arm/mach-davinci/ to multi functional
-> devices frame work. "davinci_aemif" MFD driver adds "davinci_nand" and
-> "physmap-flash" slave devices.
-> 
-> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> ---
-> Since v3:
-> No change. Resending as 3/3 in patch changed.
-> Since v2:
-> Modified emif MFD driver to load multiple instance of NAND/NOR devices.
-> Since v1:
-> Patch generated using -M option.
-> 
->  arch/arm/Kconfig                                   |    1 +
->  arch/arm/mach-davinci/Makefile                     |    2 +-
->  drivers/mfd/Makefile                               |    1 +
->  .../aemif.c => drivers/mfd/davinci_aemif.c         |   75 +++++++++++++++++++-
->  include/linux/mfd/davinci_aemif.h                  |   14 ++++
->  5 files changed, 91 insertions(+), 2 deletions(-)
->  rename arch/arm/mach-davinci/aemif.c => drivers/mfd/davinci_aemif.c (66%)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a48aecc..09dcb94 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -934,6 +934,7 @@ config ARCH_DAVINCI
->  	select GENERIC_ALLOCATOR
->  	select GENERIC_IRQ_CHIP
->  	select ARCH_HAS_HOLES_MEMORYMODEL
-> +	select MFD_CORE
->  	help
->  	  Support for TI's DaVinci platform.
->  
-> diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-> index 2db78bd..8bab47c 100644
-> --- a/arch/arm/mach-davinci/Makefile
-> +++ b/arch/arm/mach-davinci/Makefile
-> @@ -5,7 +5,7 @@
->  
->  # Common objects
->  obj-y 			:= time.o clock.o serial.o psc.o \
-> -			   dma.o usb.o common.o sram.o aemif.o
-> +			   dma.o usb.o common.o sram.o
->  
->  obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
->  
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index b953bab..54fc267 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -11,6 +11,7 @@ obj-$(CONFIG_HTC_EGPIO)		+= htc-egpio.o
->  obj-$(CONFIG_HTC_PASIC3)	+= htc-pasic3.o
->  obj-$(CONFIG_HTC_I2CPLD)	+= htc-i2cpld.o
->  
-> +obj-${CONFIG_ARCH_DAVINCI}	+= davinci_aemif.o
->  obj-$(CONFIG_MFD_DAVINCI_VOICECODEC)	+= davinci_voicecodec.o
->  obj-$(CONFIG_MFD_DM355EVM_MSP)	+= dm355evm_msp.o
->  obj-$(CONFIG_MFD_TI_SSP)	+= ti-ssp.o
-> diff --git a/arch/arm/mach-davinci/aemif.c b/drivers/mfd/davinci_aemif.c
-> similarity index 66%
-> rename from arch/arm/mach-davinci/aemif.c
-> rename to drivers/mfd/davinci_aemif.c
-> index b67c115..5fb490d 100644
-> --- a/arch/arm/mach-davinci/aemif.c
-> +++ b/drivers/mfd/davinci_aemif.c
-> @@ -14,8 +14,13 @@
->  #include <linux/clk.h>
->  #include <linux/module.h>
->  #include <linux/time.h>
-> -
->  #include <linux/mfd/davinci_aemif.h>
-> +#include <linux/mtd/physmap.h>
-> +#include <linux/slab.h>
-> +#include <mach/nand.h>
-> +
-> +static char *name[] = {"davinci_nand", "physmap-flash",};
-> +#define MAX ARRAY_SIZE(name)
->  
->  /* Timing value configuration */
->  
-> @@ -131,3 +136,71 @@ int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
->  	return 0;
->  }
->  EXPORT_SYMBOL(davinci_aemif_setup_timing);
-> +
-> +static int __init davinci_aemif_probe(struct platform_device *pdev)
-> +{
-> +	struct davinci_aemif_devices *davinci_aemif_devices =
-> +		pdev->dev.platform_data;
-> +	struct platform_device *devices;
-> +	struct mfd_cell *cells;
-> +	int ret, i, j, count;
-> +
-> +	devices = davinci_aemif_devices->devices;
-> +
-> +	cells = kzalloc(sizeof(struct mfd_cell) *
-> +			davinci_aemif_devices->num_devices, GFP_KERNEL);
-> +
-> +	for (j = 0, count = 0; j < MAX; j++) {
-> +		for (i = 0; i < davinci_aemif_devices->num_devices; i++) {
-> +			if (strcmp(devices[i].name, name[j]))
-> +				continue;
-> +			cells[count].name = name[j];
-> +			cells[count].platform_data =
-> +				devices[i].dev.platform_data;
-> +			cells[count].pdata_size =
-> +				sizeof(struct davinci_nand_pdata);
++#define AT91_PS		0xffff4000	/* Power Save */
 
-Doesnot take care of updating nor platform data size, I will fix this send out next version.
-
-Thanks,
-Prakash
-
-> +			cells[count].id = devices[i].id;
-> +			cells[count].resources = devices[i].resource;
-> +			cells[count].num_resources = devices[i].num_resources;
-> +			count++;
-> +		}
-> +	}
-> +
-> +	ret = mfd_add_devices(&pdev->dev, 0, cells,
-> +			      count, NULL, 0);
-> +	if (ret != 0)
-> +		dev_err(&pdev->dev, "fail to register client devices\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static int __devexit davinci_aemif_remove(struct platform_device *pdev)
-> +{
-> +	mfd_remove_devices(&pdev->dev);
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver davinci_aemif_driver = {
-> +	.driver	= {
-> +		.name = "davinci_aemif",
-> +		.owner = THIS_MODULE,
-> +	},
-> +	.remove	= __devexit_p(davinci_aemif_remove),
-> +};
-> +
-> +static int __init davinci_aemif_init(void)
-> +{
-> +	return platform_driver_probe(&davinci_aemif_driver,
-> +			davinci_aemif_probe);
-> +}
-> +module_init(davinci_aemif_init);
-> +
-> +static void __exit davinci_aemif_exit(void)
-> +{
-> +	platform_driver_unregister(&davinci_aemif_driver);
-> +}
-> +module_exit(davinci_aemif_exit);
-> +
-> +MODULE_AUTHOR("Prakash Manjunathappa");
-> +MODULE_DESCRIPTION("Texas Instruments AEMIF Interface");
-> +MODULE_LICENSE("GPL");
-> diff --git a/include/linux/mfd/davinci_aemif.h b/include/linux/mfd/davinci_aemif.h
-> index 05b2934..18650c3 100644
-> --- a/include/linux/mfd/davinci_aemif.h
-> +++ b/include/linux/mfd/davinci_aemif.h
-> @@ -10,6 +10,10 @@
->  #ifndef _MACH_DAVINCI_AEMIF_H
->  #define _MACH_DAVINCI_AEMIF_H
->  
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mfd/core.h>
-> +
->  #define NRCSR_OFFSET		0x00
->  #define AWCCR_OFFSET		0x04
->  #define A1CR_OFFSET		0x10
-> @@ -18,6 +22,16 @@
->  #define ACR_EW_MASK		BIT(30)
->  #define ACR_SS_MASK		BIT(31)
->  
-> +enum davinci_emif_cells {
-> +	DAVINCI_NAND_DEVICE_CELL,
-> +	DAVINCI_NOR_FLASH_CELL,
-> +};
-> +
-> +struct davinci_aemif_devices {
-> +	struct platform_device *devices;
-> +	unsigned int num_devices;
-> +};
-> +
->  /* All timings in nanoseconds */
->  struct davinci_aemif_timing {
->  	u8	wsetup;
-> -- 
-> 1.7.1
-> 
-> 
+Best Regards,
+J.
