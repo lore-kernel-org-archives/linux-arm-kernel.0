@@ -1,48 +1,94 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 23 Feb 2012 08:55:12 +0800
-Subject: [PATCH 3/7] rtc: sa1100: use ioremap to map registers
-In-Reply-To: <20120222235804.GJ7041@n2100.arm.linux.org.uk>
-References: <1329815096-6200-1-git-send-email-haojian.zhuang@marvell.com>
- <1329815096-6200-4-git-send-email-haojian.zhuang@marvell.com>
- <20120222235804.GJ7041@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZzMHLF32Be89tiSBVxQ5YgNU2M4dBfEtdyrxxXqgV7T=g@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 22 Feb 2012 18:37:46 -0700
+Subject: [GIT PULL] gpio/omap: cleanup and runtime PM conversion for v3.4
+In-Reply-To: <4F456F01.5020302@ti.com>
+References: <8762f6fr13.fsf@ti.com>
+ <4F456F01.5020302@ti.com>
+Message-ID: <20120223013746.GB3212@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 7:58 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 21, 2012 at 05:04:52PM +0800, Haojian Zhuang wrote:
->> diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
->> index bb10ee2..04a62a3 100644
->> --- a/arch/arm/mach-sa1100/generic.c
->> +++ b/arch/arm/mach-sa1100/generic.c
->> @@ -345,9 +345,29 @@ void sa11x0_register_irda(struct irda_platform_data *irda)
->> ? ? ? sa11x0_register_device(&sa11x0ir_device, irda);
->> ?}
->>
->> +static struct resource sa1100_rtc_resources[] = {
->> + ? ? {
->> + ? ? ? ? ? ? .start ?= 0x90010000,
->> + ? ? ? ? ? ? .end ? ?= 0x9001003f,
->> + ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
->> + ? ? }, {
->> + ? ? ? ? ? ? .start ?= IRQ_RTC1Hz,
->> + ? ? ? ? ? ? .end ? ?= IRQ_RTC1Hz,
->> + ? ? ? ? ? ? .name ? = "rtc 1Hz",
->> + ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
->> + ? ? }, {
->> + ? ? ? ? ? ? .start ?= IRQ_RTCAlrm,
->> + ? ? ? ? ? ? .end ? ?= IRQ_RTCAlrm,
->> + ? ? ? ? ? ? .name ? = "rtc alarm",
->> + ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
->> + ? ? },
->> +};
->
-> As I've converted all resources in this file to use the DEFINE_RES_foo()
-> macros, it would be a shame to have this initialization reintroduced.
-> Please use DEFINE_RES_foo() here.
->
-Sure. I'll update it right now.
+On Wed, Feb 22, 2012 at 02:41:05PM -0800, Kevin Hilman wrote:
+> Hi Grant,
+> 
+> Any objections to this series? Can we get this queued and into linux-next?
+> 
+> I'll have an additional pull request for Benoit's GPIO DT stuff that
+> depends on this for v3.4 too after that series is finalized.
 
-Thanks
-Haojian
+The diffstat is clean.  I've merged it in.
+
+g.
+
+> 
+> Thanks,
+> 
+> Kevin
+> 
+> On 02/16/2012 12:43 PM, Kevin Hilman wrote:
+> >Hi Grant,
+> >
+> >I've given this a final review and testing and I believe it's ready for
+> >3.4, so here you go.
+> >
+> >Also note that Benoit's recently posted GPIO cleanups and DT conversion
+> >depend on this series.
+> >
+> >Thanks,
+> >
+> >Kevin
+> >
+> >
+> >The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+> >
+> >   Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
+> >
+> >are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/gpio/runtime-pm-cleanup
+> >
+> >for you to fetch changes up to f86bcc302a8c570dd0f5a50097a6af96a0e717c2:
+> >
+> >   gpio/omap: handle set_dataout reg capable IP on restore (2012-02-06 16:58:45 +0530)
+> >
+> >----------------------------------------------------------------
+> >Charulatha V (8):
+> >       gpio/omap: remove dependency on gpio_bank_count
+> >       gpio/omap: use flag to identify wakeup domain
+> >       gpio/omap: make gpio_context part of gpio_bank structure
+> >       gpio/omap: make non-wakeup GPIO part of pdata
+> >       gpio/omap: avoid cpu checks during module ena/disable
+> >       gpio/omap: use pinctrl offset instead of macro
+> >       gpio/omap: remove bank->method&  METHOD_* macros
+> >       gpio/omap: fix bankwidth for OMAP7xx MPUIO
+> >
+> >Nishanth Menon (4):
+> >       gpio/omap: save and restore debounce registers
+> >       gpio/omap: enable irq at the end of all configuration in restore
+> >       gpio/omap: restore OE only after setting the output level
+> >       gpio/omap: handle set_dataout reg capable IP on restore
+> >
+> >Tarun Kanti DebBarma (13):
+> >       gpio/omap: handle save/restore context in GPIO driver
+> >       gpio/omap: further cleanup using wkup_en register
+> >       gpio/omap: use level/edge detect reg offsets
+> >       gpio/omap: remove hardcoded offsets in context save/restore
+> >       gpio/omap: cleanup set_gpio_triggering function
+> >       gpio/omap: cleanup omap_gpio_mod_init function
+> >       gpio/omap: remove unnecessary bit-masking for read access
+> >       gpio/omap: use pm-runtime framework
+> >       gpio/omap: optimize suspend and resume functions
+> >       gpio/omap: cleanup prepare_for_idle and resume_after_idle
+> >       gpio/omap: fix debounce clock handling
+> >       gpio/omap: fix incorrect access of debounce module
+> >       gpio/omap: remove omap_gpio_save_context overhead
+> >
+> >  arch/arm/mach-omap1/gpio15xx.c         |    7 +-
+> >  arch/arm/mach-omap1/gpio16xx.c         |   47 ++-
+> >  arch/arm/mach-omap1/gpio7xx.c          |   14 +-
+> >  arch/arm/mach-omap2/gpio.c             |   36 +-
+> >  arch/arm/mach-omap2/pm34xx.c           |   14 -
+> >  arch/arm/plat-omap/include/plat/gpio.h |   29 +-
+> >  drivers/gpio/gpio-omap.c               | 1106 +++++++++++++-------------------
+> >  7 files changed, 555 insertions(+), 698 deletions(-)
+> 
