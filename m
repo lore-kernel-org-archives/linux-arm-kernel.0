@@ -1,122 +1,80 @@
-From: d-elaidi@ti.com (Elaidi, Djamil)
-Date: Thu, 23 Feb 2012 15:58:44 +0000
-Subject: [PATCH 2/6] ARM: OMAP4 PM: Add IO Daisychain support
-In-Reply-To: <1330003320-17400-3-git-send-email-t-kristo@ti.com>
-References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
- <1330003320-17400-3-git-send-email-t-kristo@ti.com>
-Message-ID: <5672BD13E82B844A93BB4597F293F19A0B3F41AF@DNCE02.ent.ti.com>
+From: ashwinc@codeaurora.org (Ashwin Chaugule)
+Date: Thu, 23 Feb 2012 11:00:45 -0500
+Subject: [PATCH] ARM: perf: add PMU hotplug notifier
+In-Reply-To: <4F4661E2.9020405@codeaurora.org>
+References: <CAKHPGBaY1OFiVubic+f1vxxzNeKjmzibxraBg8eNxZnJbhYi+A@mail.gmail.com>
+ <4F4661E2.9020405@codeaurora.org>
+Message-ID: <4F4662AD.6030306@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kristo,
+Gah. Messed up email addr.
 
-I think you must also add a omap_test_timeout() check after the Trigger WUCLKIN disable, to verify WUCLK_STATUS has come back to 0.
-This is needed because the IO daisy chain will not be ready until the WUCLKIN falling edge has propagated.
+On 2/23/2012 10:57 AM, Ashwin Chaugule wrote:
+> Hi Will,
+> 
+> On Thu, Feb 23, 2012 at 10:41 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+>>
+>> When a CPU is taken out of reset, either cold booted or hotplugged in,
+>> some of its PMU registers can contain UNKNOWN values.
+>>
+>> This patch adds a hotplug notifier to ARM core perf code so that upon
+>> CPU restart the PMU unit is reset and becomes ready to use again.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> I was playing around with this stuff recently, but used the CPU PM code from
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052829.html
+> 
+>> ---
+>>  arch/arm/kernel/perf_event.c |   23 +++++++++++++++++++++++
+>>  1 files changed, 23 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+>> index ab59c3b..fa30ff9 100644
+>> --- a/arch/arm/kernel/perf_event.c
+>> +++ b/arch/arm/kernel/perf_event.c
+>> @@ -680,6 +680,28 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
+>>  }
+>>
+>>  /*
+>> + * PMU hardware loses all context when a CPU goes offline.
+>> + * When a CPU is hotplugged back in, since some hardware registers are
+>> + * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
+>> + * junk values out of them.
+>> + */
+>> +static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
+>> +                                       unsigned long action, void *hcpu)
+>> +{
+>> +       if (action != CPU_UP_PREPARE)
+>> +               return NOTIFY_DONE;
+>> +
+>> +       if (cpu_pmu && cpu_pmu->reset)
+>> +               cpu_pmu->reset(NULL);
+>> +
+>> +       return NOTIFY_OK;
+>> +}
+>> +
+> 
+> I realized I needed to save the counters before going to sleep. In my
+> case, the notifiers were being called from the idle thread, so I
+> didn't know which "sleep state" I was going to go into. In the deepest
+> idle state, the counters are completely reset. When we come out of
+> sleep, unless there had been an explicit "read" earlier, we will have
+> lost the cached value(event->count) of the counters. This manifests as
+> counts reduced by an order of magnitude.
+> 
+> I'll send a link to my code once the git server is up. It's a bit flaky today.
+> 
+> 
+> Cheers,
+> Ashwin
+> 
 
-+       /* Trigger WUCLKIN disable */
-+       omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
-+                       OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
-+       return;
-+       omap_test_timeout(
-+               (((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
-+                       OMAP4_PRM_IO_PMCTRL_OFFSET) &
-+                       OMAP4430_WUCLK_STATUS_MASK) >>
-+                       OMAP4430_WUCLK_STATUS_SHIFT) == 0),
-+               MAX_IOPAD_LATCH_TIME, i);
 
-
-Best regards
-Djamil ELA?DI
-+33 4 97 27 50 97
-Software Systems Engineer
-OMAP Platform Business Unit - PSI Modem Integration
-Texas Instruments
-
-
-Texas Instruments France SA, 821 Avenue Jack Kilby, 06270 Villeneuve Loubet. 036 420 040 R.C.S Antibes. Capital de EUR 753.920
-
------Original Message-----
-From: linux-omap-owner@vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Kristo, Tero
-Sent: jeudi 23 f?vrier 2012 14:22
-To: linux-omap at vger.kernel.org; Hilman, Kevin
-Cc: linux-arm-kernel at lists.infradead.org; Nayak, Rajendra; Sripathy, Vishwanath
-Subject: [PATCH 2/6] ARM: OMAP4 PM: Add IO Daisychain support
-
-From: Rajendra Nayak <rnayak@ti.com>
-
-patch adds IO Daisychain support for OMAP4 as per section 3.9.4 in OMAP4430
-Public TRM.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/prm44xx.c |   32 ++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prm44xx.h |    1 +
- 2 files changed, 33 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 33dd655..1557647 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -230,6 +230,41 @@ void omap44xx_prm_restore_irqen(u32 *saved_mask)
-                                 OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
- }
-
-+/**
-+ * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
-+ * the I/O ring after asserting WUCLKIN high
-+ */
-+#define MAX_IOPAD_LATCH_TIME 1000
-+
-+/* OMAP4 IO Daisychain trigger sequence */
-+void omap4_trigger_wuclk_ctrl(void)
-+{
-+       int i = 0;
-+
-+       /* Enable GLOBAL_WUEN */
-+       if (!(omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
-+               OMAP4_PRM_IO_PMCTRL_OFFSET) & OMAP4430_GLOBAL_WUEN_MASK))
-+               omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
-+                       OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_PRM_DEVICE_INST,
-+                       OMAP4_PRM_IO_PMCTRL_OFFSET);
-+
-+       /* Trigger WUCLKIN enable */
-+       omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK,
-+                       OMAP4430_WUCLK_CTRL_MASK, OMAP4430_PRM_DEVICE_INST,
-+                       OMAP4_PRM_IO_PMCTRL_OFFSET);
-+       omap_test_timeout(
-+               (((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
-+                       OMAP4_PRM_IO_PMCTRL_OFFSET) &
-+                       OMAP4430_WUCLK_STATUS_MASK) >>
-+                       OMAP4430_WUCLK_STATUS_SHIFT) == 1),
-+               MAX_IOPAD_LATCH_TIME, i);
-+
-+       /* Trigger WUCLKIN disable */
-+       omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
-+                       OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
-+       return;
-+}
-+
- static int __init omap4xxx_prcm_init(void)
- {
-        if (cpu_is_omap44xx())
-diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
-index 7978092..a840f0f 100644
---- a/arch/arm/mach-omap2/prm44xx.h
-+++ b/arch/arm/mach-omap2/prm44xx.h
-@@ -762,6 +762,7 @@ void omap4_prm_vp_clear_txdone(u8 vp_id);
- extern u32 omap4_prm_vcvp_read(u8 offset);
- extern void omap4_prm_vcvp_write(u32 val, u8 offset);
- extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
-+extern void omap4_trigger_wuclk_ctrl(void);
-
- /* PRM interrupt-related functions */
- extern void omap44xx_prm_read_pending_irqs(unsigned long *events);
---
-1.7.4.1
-
---
-To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-the body of a message to majordomo at vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
