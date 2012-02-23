@@ -1,365 +1,216 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 23 Feb 2012 22:48:38 +0800
-Subject: [PATCH 3/4] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
+Date: Thu, 23 Feb 2012 22:48:39 +0800
+Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
 In-Reply-To: <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
 References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
  <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1330008519-3584-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330008519-3584-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale PowerPC and ARM/IMX families share the same SSI IP block.
-The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
-code sharing and consolidation can happen.
-
-This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
-in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
-IMX platform.
+Change PowerPC dependent IO accessors to architecture independent
+ones, so that fsl_ssi driver can be built on both PowerPC and ARM/IMX.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- sound/soc/Kconfig                        |    1 -
- sound/soc/Makefile                       |    1 -
- sound/soc/fsl/Kconfig                    |   84 ++++++++++++++++++++++++++++++
- sound/soc/fsl/Makefile                   |   19 +++++++
- sound/soc/{imx => fsl}/eukrea-tlv320.c   |    2 +-
- sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c |    0
- sound/soc/{imx => fsl}/imx-pcm-fiq.c     |    0
- sound/soc/{imx => fsl}/imx-pcm.c         |    0
- sound/soc/{imx => fsl}/imx-pcm.h         |    0
- sound/soc/{imx => fsl}/imx-ssi.c         |    2 +-
- sound/soc/{imx => fsl}/imx-ssi.h         |    0
- sound/soc/{imx => fsl}/mx27vis-aic32x4.c |    0
- sound/soc/{imx => fsl}/phycore-ac97.c    |    0
- sound/soc/{imx => fsl}/wm1133-ev1.c      |    0
- sound/soc/imx/Kconfig                    |   71 -------------------------
- sound/soc/imx/Makefile                   |   19 -------
- 16 files changed, 105 insertions(+), 94 deletions(-)
- rename sound/soc/{imx => fsl}/eukrea-tlv320.c (99%)
- rename sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c (100%)
- rename sound/soc/{imx => fsl}/imx-pcm-fiq.c (100%)
- rename sound/soc/{imx => fsl}/imx-pcm.c (100%)
- rename sound/soc/{imx => fsl}/imx-pcm.h (100%)
- rename sound/soc/{imx => fsl}/imx-ssi.c (99%)
- rename sound/soc/{imx => fsl}/imx-ssi.h (100%)
- rename sound/soc/{imx => fsl}/mx27vis-aic32x4.c (100%)
- rename sound/soc/{imx => fsl}/phycore-ac97.c (100%)
- rename sound/soc/{imx => fsl}/wm1133-ev1.c (100%)
- delete mode 100644 sound/soc/imx/Kconfig
- delete mode 100644 sound/soc/imx/Makefile
+ sound/soc/fsl/fsl_ssi.c |   75 ++++++++++++++++++++++++++++------------------
+ 1 files changed, 46 insertions(+), 29 deletions(-)
 
-diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
-index 35e662d..2b95e6b 100644
---- a/sound/soc/Kconfig
-+++ b/sound/soc/Kconfig
-@@ -32,7 +32,6 @@ source "sound/soc/blackfin/Kconfig"
- source "sound/soc/davinci/Kconfig"
- source "sound/soc/ep93xx/Kconfig"
- source "sound/soc/fsl/Kconfig"
--source "sound/soc/imx/Kconfig"
- source "sound/soc/jz4740/Kconfig"
- source "sound/soc/nuc900/Kconfig"
- source "sound/soc/omap/Kconfig"
-diff --git a/sound/soc/Makefile b/sound/soc/Makefile
-index 9ea8ac8..d95a119 100644
---- a/sound/soc/Makefile
-+++ b/sound/soc/Makefile
-@@ -9,7 +9,6 @@ obj-$(CONFIG_SND_SOC)	+= blackfin/
- obj-$(CONFIG_SND_SOC)	+= davinci/
- obj-$(CONFIG_SND_SOC)	+= ep93xx/
- obj-$(CONFIG_SND_SOC)	+= fsl/
--obj-$(CONFIG_SND_SOC)   += imx/
- obj-$(CONFIG_SND_SOC)	+= jz4740/
- obj-$(CONFIG_SND_SOC)	+= mid-x86/
- obj-$(CONFIG_SND_SOC)	+= mxs/
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index ca693b2..a62dc28 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -1,3 +1,15 @@
-+config SND_SOC_FSL_SSI
-+	tristate
-+
-+menuconfig SND_POWERPC_SOC
-+	tristate "SoC Audio for Freescale PowerPC CPUs"
-+	depends on FSL_SOC
-+	help
-+	  Say Y or M if you want to add support for codecs attached to
-+	  the PowerPC CPUs.
-+
-+if SND_POWERPC_SOC
-+
- config SND_MPC52xx_DMA
- 	tristate
- 
-@@ -68,3 +80,75 @@ config SND_MPC52xx_SOC_EFIKA
- 	help
- 	  Say Y if you want to add support for sound on the Efika.
- 
-+endif # SND_POWERPC_SOC
-+
-+menuconfig SND_IMX_SOC
-+	tristate "SoC Audio for Freescale i.MX CPUs"
-+	depends on ARCH_MXC
-+	help
-+	  Say Y or M if you want to add support for codecs attached to
-+	  the i.MX CPUs.
-+
-+if SND_IMX_SOC
-+
-+config SND_SOC_IMX_SSI
-+	tristate
-+
-+config SND_SOC_IMX_PCM
-+	tristate
-+
-+config SND_MXC_SOC_FIQ
-+	tristate
-+	select FIQ
-+	select SND_SOC_IMX_PCM
-+
-+config SND_MXC_SOC_MX2
-+	tristate
-+	select SND_SOC_IMX_PCM
-+
-+config SND_MXC_SOC_WM1133_EV1
-+	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
-+	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
-+	select SND_SOC_WM8350
-+	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_SSI
-+	help
-+	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
-+	  PMIC board with WM8835x fitted.
-+
-+config SND_SOC_MX27VIS_AIC32X4
-+	tristate "SoC audio support for Visstrim M10 boards"
-+	depends on MACH_IMX27_VISSTRIM_M10 && I2C
-+	select SND_SOC_TLV320AIC32X4
-+	select SND_MXC_SOC_MX2
-+	select SND_SOC_IMX_SSI
-+	help
-+	  Say Y if you want to add support for SoC audio on Visstrim SM10
-+	  board with TLV320AIC32X4 codec.
-+
-+config SND_SOC_PHYCORE_AC97
-+	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
-+	depends on MACH_PCM043 || MACH_PCA100
-+	select SND_SOC_AC97_BUS
-+	select SND_SOC_WM9712
-+	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_SSI
-+	help
-+	  Say Y if you want to add support for SoC audio on Phytec phyCORE
-+	  and phyCARD boards in AC97 mode
-+
-+config SND_SOC_EUKREA_TLV320
-+	tristate "Eukrea TLV320"
-+	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
-+		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
-+		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
-+		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
-+	depends on I2C
-+	select SND_SOC_TLV320AIC23
-+	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_SSI
-+	help
-+	  Enable I2S based access to the TLV320AIC23B codec attached
-+	  to the SSI interface
-+
-+endif # SND_IMX_SOC
-diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
-index 95d483f..65087b1 100644
---- a/sound/soc/fsl/Makefile
-+++ b/sound/soc/fsl/Makefile
-@@ -21,3 +21,22 @@ obj-$(CONFIG_SND_SOC_MPC5200_AC97) += mpc5200_psc_ac97.o
- obj-$(CONFIG_SND_MPC52xx_SOC_PCM030) += pcm030-audio-fabric.o
- obj-$(CONFIG_SND_MPC52xx_SOC_EFIKA) += efika-audio-fabric.o
- 
-+# i.MX Platform Support
-+snd-soc-imx-ssi-objs := imx-ssi.o
-+obj-$(CONFIG_SND_SOC_IMX_SSI) += snd-soc-imx-ssi.o
-+
-+obj-$(CONFIG_SND_SOC_IMX_PCM) += snd-soc-imx-pcm.o
-+snd-soc-imx-pcm-y := imx-pcm.o
-+snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_FIQ) += imx-pcm-fiq.o
-+snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_MX2) += imx-pcm-dma-mx2.o
-+
-+# i.MX Machine Support
-+snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
-+snd-soc-phycore-ac97-objs := phycore-ac97.o
-+snd-soc-mx27vis-aic32x4-objs := mx27vis-aic32x4.o
-+snd-soc-wm1133-ev1-objs := wm1133-ev1.o
-+
-+obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
-+obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
-+obj-$(CONFIG_SND_SOC_MX27VIS_AIC32X4) += snd-soc-mx27vis-aic32x4.o
-+obj-$(CONFIG_SND_MXC_SOC_WM1133_EV1) += snd-soc-wm1133-ev1.o
-diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/fsl/eukrea-tlv320.c
-similarity index 99%
-rename from sound/soc/imx/eukrea-tlv320.c
-rename to sound/soc/fsl/eukrea-tlv320.c
-index 1c1fdd1..c33a303 100644
---- a/sound/soc/imx/eukrea-tlv320.c
-+++ b/sound/soc/fsl/eukrea-tlv320.c
-@@ -7,7 +7,7 @@
-  * which is Copyright 2009 Simtec Electronics
-  * and on sound/soc/imx/phycore-ac97.c which is
-  * Copyright 2009 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-- * 
-+ *
-  *  This program is free software; you can redistribute  it and/or modify it
-  *  under  the terms of  the GNU General  Public License as published by the
-  *  Free Software Foundation;  either version 2 of the  License, or (at your
-diff --git a/sound/soc/imx/imx-pcm-dma-mx2.c b/sound/soc/fsl/imx-pcm-dma-mx2.c
-similarity index 100%
-rename from sound/soc/imx/imx-pcm-dma-mx2.c
-rename to sound/soc/fsl/imx-pcm-dma-mx2.c
-diff --git a/sound/soc/imx/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
-similarity index 100%
-rename from sound/soc/imx/imx-pcm-fiq.c
-rename to sound/soc/fsl/imx-pcm-fiq.c
-diff --git a/sound/soc/imx/imx-pcm.c b/sound/soc/fsl/imx-pcm.c
-similarity index 100%
-rename from sound/soc/imx/imx-pcm.c
-rename to sound/soc/fsl/imx-pcm.c
-diff --git a/sound/soc/imx/imx-pcm.h b/sound/soc/fsl/imx-pcm.h
-similarity index 100%
-rename from sound/soc/imx/imx-pcm.h
-rename to sound/soc/fsl/imx-pcm.h
-diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
-similarity index 99%
-rename from sound/soc/imx/imx-ssi.c
-rename to sound/soc/fsl/imx-ssi.c
-index 9203cdd..3e0dac5a 100644
---- a/sound/soc/imx/imx-ssi.c
-+++ b/sound/soc/fsl/imx-ssi.c
-@@ -28,7 +28,7 @@
-  * value. When we read the same register two times (and the register still
-  * contains the same value) these status bits are not set. We work
-  * around this by not polling these bits but only wait a fixed delay.
-- * 
-+ *
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 3e06696..32fc84b 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -11,11 +11,14 @@
   */
  
- #include <linux/clk.h>
-diff --git a/sound/soc/imx/imx-ssi.h b/sound/soc/fsl/imx-ssi.h
-similarity index 100%
-rename from sound/soc/imx/imx-ssi.h
-rename to sound/soc/fsl/imx-ssi.h
-diff --git a/sound/soc/imx/mx27vis-aic32x4.c b/sound/soc/fsl/mx27vis-aic32x4.c
-similarity index 100%
-rename from sound/soc/imx/mx27vis-aic32x4.c
-rename to sound/soc/fsl/mx27vis-aic32x4.c
-diff --git a/sound/soc/imx/phycore-ac97.c b/sound/soc/fsl/phycore-ac97.c
-similarity index 100%
-rename from sound/soc/imx/phycore-ac97.c
-rename to sound/soc/fsl/phycore-ac97.c
-diff --git a/sound/soc/imx/wm1133-ev1.c b/sound/soc/fsl/wm1133-ev1.c
-similarity index 100%
-rename from sound/soc/imx/wm1133-ev1.c
-rename to sound/soc/fsl/wm1133-ev1.c
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-deleted file mode 100644
-index b9de8a8..0000000
---- a/sound/soc/imx/Kconfig
-+++ /dev/null
-@@ -1,71 +0,0 @@
--menuconfig SND_IMX_SOC
--	tristate "SoC Audio for Freescale i.MX CPUs"
--	depends on ARCH_MXC
--	help
--	  Say Y or M if you want to add support for codecs attached to
--	  the i.MX SSI interface.
--
--
--if SND_IMX_SOC
--
--config SND_SOC_IMX_SSI
--	tristate
--
--config SND_SOC_IMX_PCM
--	tristate
--
--config SND_MXC_SOC_FIQ
--	tristate
--	select FIQ
--	select SND_SOC_IMX_PCM
--
--config SND_MXC_SOC_MX2
--	tristate
--	select SND_SOC_IMX_PCM
--
--config SND_MXC_SOC_WM1133_EV1
--	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
--	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
--	select SND_SOC_WM8350
--	select SND_MXC_SOC_FIQ
--	select SND_SOC_IMX_SSI
--	help
--	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
--	  PMIC board with WM8835x fitted.
--
--config SND_SOC_MX27VIS_AIC32X4
--	tristate "SoC audio support for Visstrim M10 boards"
--	depends on MACH_IMX27_VISSTRIM_M10 && I2C
--	select SND_SOC_TLV320AIC32X4
--	select SND_MXC_SOC_MX2
--	select SND_SOC_IMX_SSI
--	help
--	  Say Y if you want to add support for SoC audio on Visstrim SM10
--	  board with TLV320AIC32X4 codec.
--
--config SND_SOC_PHYCORE_AC97
--	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
--	depends on MACH_PCM043 || MACH_PCA100
--	select SND_SOC_AC97_BUS
--	select SND_SOC_WM9712
--	select SND_MXC_SOC_FIQ
--	select SND_SOC_IMX_SSI
--	help
--	  Say Y if you want to add support for SoC audio on Phytec phyCORE
--	  and phyCARD boards in AC97 mode
--
--config SND_SOC_EUKREA_TLV320
--	tristate "Eukrea TLV320"
--	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
--		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
--		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
--		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
--	depends on I2C
--	select SND_SOC_TLV320AIC23
--	select SND_MXC_SOC_FIQ
--	select SND_SOC_IMX_SSI
--	help
--	  Enable I2S based access to the TLV320AIC23B codec attached
--	  to the SSI interface
--
--endif	# SND_IMX_SOC
-diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
-deleted file mode 100644
-index 981c9da..0000000
---- a/sound/soc/imx/Makefile
-+++ /dev/null
-@@ -1,19 +0,0 @@
--# i.MX Platform Support
--snd-soc-imx-ssi-objs := imx-ssi.o
--obj-$(CONFIG_SND_SOC_IMX_SSI) += snd-soc-imx-ssi.o
--
--obj-$(CONFIG_SND_SOC_IMX_PCM) += snd-soc-imx-pcm.o
--snd-soc-imx-pcm-y := imx-pcm.o
--snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_FIQ) += imx-pcm-fiq.o
--snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_MX2) += imx-pcm-dma-mx2.o
--
--# i.MX Machine Support
--snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
--snd-soc-phycore-ac97-objs := phycore-ac97.o
--snd-soc-mx27vis-aic32x4-objs := mx27vis-aic32x4.o
--snd-soc-wm1133-ev1-objs := wm1133-ev1.o
--
--obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
--obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
--obj-$(CONFIG_SND_SOC_MX27VIS_AIC32X4) += snd-soc-mx27vis-aic32x4.o
--obj-$(CONFIG_SND_MXC_SOC_WM1133_EV1) += snd-soc-wm1133-ev1.o
+ #include <linux/init.h>
++#include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+ #include <linux/device.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ 
+ #include <sound/core.h>
+@@ -145,7 +148,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 	   were interrupted for.  We mask it with the Interrupt Enable register
+ 	   so that we only check for events that we're interested in.
+ 	 */
+-	sisr = in_be32(&ssi->sisr) & SIER_FLAGS;
++	sisr = readl(&ssi->sisr) & SIER_FLAGS;
+ 
+ 	if (sisr & CCSR_SSI_SISR_RFRC) {
+ 		ssi_private->stats.rfrc++;
+@@ -260,7 +263,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+ 
+ 	/* Clear the bits that we set */
+ 	if (sisr2)
+-		out_be32(&ssi->sisr, sisr2);
++		writel(sisr2, &ssi->sisr);
+ 
+ 	return ret;
+ }
+@@ -280,6 +283,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 	struct fsl_ssi_private *ssi_private =
+ 		snd_soc_dai_get_drvdata(rtd->cpu_dai);
+ 	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates;
++	u32 val;
+ 
+ 	/*
+ 	 * If this is the first stream opened, then request the IRQ
+@@ -295,7 +299,9 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 * SSI needs to be disabled before updating the registers we set
+ 		 * here.
+ 		 */
+-		clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
++		val = readl(&ssi->scr);
++		val &= ~CCSR_SSI_SCR_SSIEN;
++		writel(val, &ssi->scr);
+ 
+ 		/*
+ 		 * Program the SSI into I2S Slave Non-Network Synchronous mode.
+@@ -303,20 +309,19 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 *
+ 		 * FIXME: Little-endian samples require a different shift dir
+ 		 */
+-		clrsetbits_be32(&ssi->scr,
+-			CCSR_SSI_SCR_I2S_MODE_MASK | CCSR_SSI_SCR_SYN,
+-			CCSR_SSI_SCR_TFR_CLK_DIS | CCSR_SSI_SCR_I2S_MODE_SLAVE
+-			| (synchronous ? CCSR_SSI_SCR_SYN : 0));
++		val = readl(&ssi->scr);
++		val &= ~(CCSR_SSI_SCR_I2S_MODE_MASK | CCSR_SSI_SCR_SYN);
++		val |= CCSR_SSI_SCR_TFR_CLK_DIS | CCSR_SSI_SCR_I2S_MODE_SLAVE |
++		       (synchronous ? CCSR_SSI_SCR_SYN : 0);
++		writel(val, &ssi->scr);
+ 
+-		out_be32(&ssi->stcr,
+-			 CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
++		writel(CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
+ 			 CCSR_SSI_STCR_TFSI | CCSR_SSI_STCR_TEFS |
+-			 CCSR_SSI_STCR_TSCKP);
++			 CCSR_SSI_STCR_TSCKP, &ssi->stcr);
+ 
+-		out_be32(&ssi->srcr,
+-			 CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
++		writel(CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
+ 			 CCSR_SSI_SRCR_RFSI | CCSR_SSI_SRCR_REFS |
+-			 CCSR_SSI_SRCR_RSCKP);
++			 CCSR_SSI_SRCR_RSCKP, &ssi->srcr);
+ 
+ 		/*
+ 		 * The DC and PM bits are only used if the SSI is the clock
+@@ -324,7 +329,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 */
+ 
+ 		/* Enable the interrupts and DMA requests */
+-		out_be32(&ssi->sier, SIER_FLAGS);
++		writel(SIER_FLAGS, &ssi->sier);
+ 
+ 		/*
+ 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
+@@ -339,9 +344,9 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 * make this value larger (and maybe we should), but this way
+ 		 * data will be written to memory as soon as it's available.
+ 		 */
+-		out_be32(&ssi->sfcsr,
+-			CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
+-			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2));
++		writel(CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
++			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2),
++			&ssi->sfcsr);
+ 
+ 		/*
+ 		 * We keep the SSI disabled because if we enable it, then the
+@@ -417,7 +422,8 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ 	unsigned int sample_size =
+ 		snd_pcm_format_width(params_format(hw_params));
+ 	u32 wl = CCSR_SSI_SxCCR_WL(sample_size);
+-	int enabled = in_be32(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
++	int enabled = readl(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
++	u32 val;
+ 
+ 	/*
+ 	 * If we're in synchronous mode, and the SSI is already enabled,
+@@ -438,10 +444,17 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
+ 
+ 	/* In synchronous mode, the SSI uses STCCR for capture */
+ 	if ((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ||
+-	    ssi_private->cpu_dai_drv.symmetric_rates)
+-		clrsetbits_be32(&ssi->stccr, CCSR_SSI_SxCCR_WL_MASK, wl);
+-	else
+-		clrsetbits_be32(&ssi->srccr, CCSR_SSI_SxCCR_WL_MASK, wl);
++	    ssi_private->cpu_dai_drv.symmetric_rates) {
++		val = readl(&ssi->stccr);
++		val &= CCSR_SSI_SxCCR_WL_MASK;
++		val |= wl;
++		writel(val, &ssi->stccr);
++	} else {
++		val = readl(&ssi->srccr);
++		val &= CCSR_SSI_SxCCR_WL_MASK;
++		val |= wl;
++		writel(val, &ssi->srccr);
++	}
+ 
+ 	return 0;
+ }
+@@ -461,29 +474,30 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+ 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++	u32 val;
+ 
++	val = readl(&ssi->scr);
+ 	switch (cmd) {
+ 	case SNDRV_PCM_TRIGGER_START:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+ 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-			setbits32(&ssi->scr,
+-				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE);
++			val |= CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE;
+ 		else
+-			setbits32(&ssi->scr,
+-				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE);
++			val |= CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE;
+ 		break;
+ 
+ 	case SNDRV_PCM_TRIGGER_STOP:
+ 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+ 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+-			clrbits32(&ssi->scr, CCSR_SSI_SCR_TE);
++			val &= ~CCSR_SSI_SCR_TE;
+ 		else
+-			clrbits32(&ssi->scr, CCSR_SSI_SCR_RE);
++			val &= ~CCSR_SSI_SCR_RE;
+ 		break;
+ 
+ 	default:
+ 		return -EINVAL;
+ 	}
++	writel(val, &ssi->scr);
+ 
+ 	return 0;
+ }
+@@ -498,6 +512,7 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
+ {
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
++	u32 val;
+ 
+ 	if (ssi_private->first_stream == substream)
+ 		ssi_private->first_stream = ssi_private->second_stream;
+@@ -510,7 +525,9 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
+ 	if (!ssi_private->first_stream) {
+ 		struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
+ 
+-		clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
++		val = readl(&ssi->scr);
++		val &= ~CCSR_SSI_SCR_SSIEN;
++		writel(val, &ssi->scr);
+ 	}
+ }
+ 
 -- 
 1.7.5.4
