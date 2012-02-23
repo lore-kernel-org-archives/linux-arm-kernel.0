@@ -1,19 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 22:53:29 +0000
-Subject: [PATCH 1/4] ARM: sa1100: fix sa1100 after sparse irq conversion
-In-Reply-To: <20120223222538.GB15494@n2100.arm.linux.org.uk>
-References: <1329449534-23811-1-git-send-email-robherring2@gmail.com>
- <1329449534-23811-2-git-send-email-robherring2@gmail.com>
- <20120223221144.GA15494@n2100.arm.linux.org.uk> <4F46BC87.2030503@gmail.com>
- <20120223222538.GB15494@n2100.arm.linux.org.uk>
-Message-ID: <20120223225329.GC15494@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Feb 2012 15:08:21 -0800
+Subject: [RFC PATCH] gpio/omap: Fix IRQ handling for SPARSE_IRQ
+In-Reply-To: <4F46C1AF.2040201@ti.com>
+References: <4F46C1AF.2040201@ti.com>
+Message-ID: <20120223230821.GD18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 10:25:38PM +0000, Russell King - ARM Linux wrote:
-> Probably best to just drop the change to this driver - it needs fixing
-> properly at some point.  In the mean time, enabling both pleb and neponset
-> will cause grief... ;(
+* Cousson, Benoit <b-cousson@ti.com> [120223 14:14]:
+> The GPIO driver is still relying on internal OMAP IRQ defines that
+> are not relevant anymore if OMAP is built with SPARSE_IRQ.
 
-In case I wasn't clear, a replacement patch for 7342/1 without the smsc
-change please.
+Great :)
+ 
+> Please note that this patch is still RFC, because I do not know
+> how to fix properly the ugly cpu_class_is_omap1 and the dependency
+> with IH_MPUIO_BASE to detect a MPUIO.
+
+Sounds like gpio_to_irq() needs to be set in the
+arch/arm/*omap*/gpio*.c then.
+
+Tony
