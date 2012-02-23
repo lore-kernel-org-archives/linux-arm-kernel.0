@@ -1,44 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 09:01:52 +0000
-Subject: [PATCH v2] ARM: vectors: use gate_vma for vectors user mapping
-In-Reply-To: <alpine.LFD.2.02.1201171410250.2722@xanadu.home>
-References: <1326819020-5004-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.02.1201171410250.2722@xanadu.home>
-Message-ID: <20120223090152.GI22562@n2100.arm.linux.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 23 Feb 2012 11:08:53 +0200
+Subject: [PATCHv5 03/14] arm: omap3+: voltage: parameter segregation
+In-Reply-To: <CAOMWX4d+M9oagDtmSqG=X8Ln4kUEyLaqpfB9Pz0Y+6RmK=sjYw@mail.gmail.com>
+References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
+ <1329833098-19900-4-git-send-email-t-kristo@ti.com>
+ <CAOMWX4d+M9oagDtmSqG=X8Ln4kUEyLaqpfB9Pz0Y+6RmK=sjYw@mail.gmail.com>
+Message-ID: <1329988133.4102.500.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 02:11:14PM -0500, Nicolas Pitre wrote:
-> On Tue, 17 Jan 2012, Will Deacon wrote:
+On Wed, 2012-02-22 at 19:37 -0600, Menon, Nishanth wrote:
+> On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
+> [...]
+> > diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+> > index 949938d..940a0d6 100644
+> > --- a/arch/arm/mach-omap2/voltage.h
+> > +++ b/arch/arm/mach-omap2/voltage.h
 > 
-> > The current user mapping for the vectors page is inserted as a `horrible
-> > hack vma' into each task via arch_setup_additional_pages. This causes
-> > problems with the MM subsystem and vm_normal_page, as described here:
-> > 
-> > https://lkml.org/lkml/2012/1/14/55
-> > 
-> > Following the suggestion from Hugh in the above thread, this patch uses
-> > the gate_vma for the vectors user mapping, therefore consolidating
-> > the horrible hack VMAs into one.
-> > 
-> > Cc: Nicolas Pitre <nico@fluxnic.net>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> [...]
+> > @@ -171,6 +169,18 @@ struct omap_voltdm_pmic {
+> >        u8 (*uv_to_vsel) (unsigned long uV);
+> >  };
+> >
+> > +struct omap_vp_param {
+> > +       u32 vddmax;
+> > +       u32 vddmin;
+> > +};
+> > +
 > 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Tested-by: Nicolas Pitre <nico@linaro.org>
+> Thinking a little deeper about this(SoC level vdd min and max) on a
+> slightly different angle- core of the question that intend to answer
+> are:
+>  - what is the least voltage we want to allow in active transtion? it
+> should not be lower than retention voltage.
 
-Al Viro has spotted this patch, and commented on it last night:
-| static struct vm_area_struct gate_vma;
-| static int __init gate_vma_init(void)
-| {
-|         gate_vma.vm_start       = 0xffff0000;
-|         gate_vma.vm_end         = 0xffff0000 + PAGE_SIZE;
-|         gate_vma.vm_page_prot   = PAGE_READONLY_EXEC;
-|         gate_vma.vm_flags       = VM_READ | VM_EXEC |
-|                                   VM_MAYREAD | VM_MAYEXEC |
-|                                   VM_ALWAYSDUMP;
-|         return 0;
-| }
-| why bother with initcall?
-| it's all constant, AFAICS
-| IOW, why not initialize it statically and be done with that?
+I think this is a fair assumption, so we could init the vddmin to be the
+same as the retention voltage for the domain (or even drop the
+parameter.)
+
+> - what is the max voltage we want to allow in active transition? it
+> should be the max Nom voltage of all the OPPs for that domain.
+
+Isn't it higher? I guess smartreflex can scale voltages even up from the
+nominal level if we have a really old and/or bad silicon. Limiting this
+to max opp would be bad, no? Maybe we could use max opp voltage + some
+margin though... but what would be a safe margin here?
+
+> 
+> In effect, why do we even need to register
+> "voltdm->vp_param->vdd[min|max]"? We already have that info - right?
+> On the other hand it might be safer to do this way to handle quirks in
+> future SoCs.. but thought I'd spit it out anyways..
+> 
+> > +struct omap_vc_param {
+> and elsewhere - please add kernel-doc struct documentation as well
+> when new structs are introduced?
+
+Yea, I can add those for next version.
+
+> > +       u32 on;
+> > +       u32 onlp;
+> > +       u32 ret;
+> > +       u32 off;
+> > +};
+> > +
+> [...]
+> 
+> Regards,
+> Nishanth Menon
