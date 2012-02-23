@@ -1,89 +1,128 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Thu, 23 Feb 2012 17:11:09 +0100
-Subject: [PATCH v2 2/2] iommu/omap: fix NULL pointer dereference
-In-Reply-To: <1329902086-13868-1-git-send-email-ohad@wizery.com>
-References: <1329902086-13868-1-git-send-email-ohad@wizery.com>
-Message-ID: <20120223161109.GB2454@amd.com>
+From: jason@lakedaemon.net (Jason)
+Date: Thu, 23 Feb 2012 11:12:10 -0500
+Subject: [PATCH 2/3 v4] arm: kirkwood: add dreamplug (fdt) support.
+In-Reply-To: <201202230734.33583.arnd@arndb.de>
+References: <cover.1329936660.git.jason@lakedaemon.net>
+ <8532afcdc4adbb3771e6f742bcc33ef9c0347858.1329936660.git.jason@lakedaemon.net>
+ <4F45B043.1080302@gmail.com> <201202230734.33583.arnd@arndb.de>
+Message-ID: <20120223161210.GN23524@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I guess these patches are 3.3 material? How about tagging them for
-stable too?
+On Thu, Feb 23, 2012 at 07:34:33AM +0000, Arnd Bergmann wrote:
+> On Thursday 23 February 2012, Rob Herring wrote:
+> > On 02/22/2012 01:18 PM, Jason Cooper wrote:
+> 
+> > > diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+> > > index 7fc603b..6095884 100644
+> > > --- a/arch/arm/mach-kirkwood/Kconfig
+> > > +++ b/arch/arm/mach-kirkwood/Kconfig
+> > > @@ -44,6 +44,20 @@ config MACH_GURUPLUG
+> > >  	  Say 'Y' here if you want your kernel to support the
+> > >  	  Marvell GuruPlug Reference Board.
+> > >  
+> > > +config ARCH_KIRKWOOD_DT
+> > > +	bool "Marvell Kirkwood Flattened Device Tree"
+> > > +	select USE_OF
+> > > +	help
+> > > +	  Say 'Y' here if you want your kernel to support the
+> > > +	  Marvell Kirkwood using flattened device tree.
+> > > +
+> > > +config MACH_DREAMPLUG_DT
+> > > +	bool "Marvell DreamPlug (Flattened Device Tree)"
+> > > +	depends on ARCH_KIRKWOOD_DT
+> > > +	help
+> > > +	  Say 'Y' here if you want your kernel to support the
+> > > +	  Marvell DreamPlug (Flattened Device Tree).
+> > 
+> > Why do you need 2 entries?
+> 
+> The first one is used to build the board file for all DT based machines,
+> the second one is used to select the dts file. I would be enough to have just
+> the first one, but that makes it harder to find for people looking for
+> dreamplug.
+> 
+> Maybe change the text to "Generic Marvell Kirkwood DT based (e.g. DreamPlug)"?
 
-On Wed, Feb 22, 2012 at 11:14:46AM +0200, Ohad Ben-Cohen wrote:
-> Fix this:
-> 
-> root at omap4430-panda:~# cat /debug/iommu/ducati/mem
-> [   62.725708] Unable to handle kernel NULL pointer dereference at virtual addre
-> ss 0000001c
-> [   62.725708] pgd = e6240000
-> [   62.737091] [0000001c] *pgd=a7168831, *pte=00000000, *ppte=00000000
-> [   62.743682] Internal error: Oops: 17 [#1] SMP
-> [   62.743682] Modules linked in: omap_iommu_debug omap_iovmm virtio_rpmsg_bus o
-> map_remoteproc remoteproc virtio_ring virtio mailbox_mach mailbox
-> [   62.743682] CPU: 0    Not tainted  (3.3.0-rc1-00265-g382f84e-dirty #682)
-> [   62.743682] PC is at debug_read_mem+0x5c/0xac [omap_iommu_debug]
-> [   62.743682] LR is at 0x1004
-> [   62.777832] pc : [<bf033178>]    lr : [<00001004>]    psr: 60000013
-> [   62.777832] sp : e72c7f40  ip : c0763c00  fp : 00000001
-> [   62.777832] r10: 00000000  r9 : 00000000  r8 : e72c7f80
-> [   62.777832] r7 : e6ffdc08  r6 : bed1ac78  r5 : 00001000  r4 : e7276000
-> [   62.777832] r3 : e60f3460  r2 : 00000000  r1 : e60f38c0  r0 : 00000000
-> [   62.777832] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> [   62.816375] Control: 10c53c7d  Table: a624004a  DAC: 00000015
-> [   62.816375] Process cat (pid: 1176, stack limit = 0xe72c62f8)
-> [   62.828369] Stack: (0xe72c7f40 to 0xe72c8000)
-> ...
-> [   62.884185] [<bf033178>] (debug_read_mem+0x5c/0xac [omap_iommu_debug]) from [
-> <c010e354>] (vfs_read+0xac/0x130)
-> [   62.884185] [<c010e354>] (vfs_read+0xac/0x130) from [<c010e4a8>] (sys_read+0x
-> 40/0x70)
-> [   62.884185] [<c010e4a8>] (sys_read+0x40/0x70) from [<c0014a00>] (ret_fast_sys
-> call+0x0/0x3c)
-> 
-> Fix also its 'echo bla > /debug/iommu/ducati/mem' Oops sibling, too.
-> 
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Joerg Roedel <Joerg.Roedel@amd.com>
-> ---
-> v2: omap_find_iovm_area only returns NULL for errors. thanks, rmk.
-> 
->  drivers/iommu/omap-iommu-debug.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/omap-iommu-debug.c b/drivers/iommu/omap-iommu-debug.c
-> index bad9f9d..103dbd9 100644
-> --- a/drivers/iommu/omap-iommu-debug.c
-> +++ b/drivers/iommu/omap-iommu-debug.c
-> @@ -274,7 +274,7 @@ static ssize_t debug_read_mem(struct file *file, char __user *userbuf,
->  	mutex_lock(&iommu_debug_lock);
->  
->  	area = omap_find_iovm_area(dev, (u32)ppos);
-> -	if (IS_ERR(area)) {
-> +	if (!area) {
->  		bytes = -EINVAL;
->  		goto err_out;
->  	}
-> @@ -311,7 +311,7 @@ static ssize_t debug_write_mem(struct file *file, const char __user *userbuf,
->  	}
->  
->  	area = omap_find_iovm_area(dev, (u32)ppos);
-> -	if (IS_ERR(area)) {
-> +	if (!area) {
->  		count = -EINVAL;
->  		goto err_out;
->  	}
-> -- 
-> 1.7.5.4
-> 
+I was thinking about this more, and had, I hope, a better idea:  change
+the 'depends on ARCH_KIRKWOOD_DT' to 'selects ARCH_KIRKWOOD_DT' and
+remove the first entry.  This way, the logic remains the same and the
+word 'Dreamplug' is always visible.  Any objections?
 
--- 
-AMD Operating System Research Center
+> > > +
+> > > +static unsigned int dreamplug_mpp_config[] __initdata = {
+> > > +	MPP0_SPI_SCn,
+> > > +	MPP1_SPI_MOSI,
+> > > +	MPP2_SPI_SCK,
+> > > +	MPP3_SPI_MISO,
+> > > +	MPP47_GPIO,	/* Bluetooth LED */
+> > > +	MPP48_GPIO,	/* Wifi LED */
+> > > +	MPP49_GPIO,	/* Wifi AP LED */
+> > > +	0
+> > > +};
+> > 
+> > Do you need this to boot? All this data should come from the dtb.
+> 
+> Putting this into the dtb would require converting kirkwood to use the
+> pinctrl subsystem first, if we want to have proper bindings. When I
+> did the hands-on review of the code with Jason during ELC, we decided
+> to leave this being done the legacy way for now, which also matches
+> how Tegra does it until we have the pinctrl bindings.
+> 
+> Also note how the patch description says "Driver porting will start
+> with the uart (see next patch), and progress from there.  Possibly,
+> spi/flash/partitions will be next." I think this is the best approach
+> indeed and I'd probably leave the pinctrl stuff until the end.
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Agreed.
+
+> > > +
+> > > +static void __init kirkwood_dt_init(void)
+> > > +{
+> > > +	kirkwood_init();
+> > > +
+> > > +	if (!of_machine_is_compatible("kirkwood,dreamplug"))
+> > 
+> > Huh? Your string doesn't match your dts file.
+> > 
+> > You've already matched against "marvell,dreamplug", so is this check
+> > necessary?
+> 
+> It's wrong, and the condition is negated. It should be
+> 
+> 	if (of_machine_is_compatible("marvell,dreamplug"))
+> 		dreamplug_init();
+> 
+> The idea is that there is one init function for all dt based
+> kirkwood machines, which contains special setup functions for
+> those boards that don't (yet) describe all the hardware in the
+> dt.
+
+Good catch, will fix in v5.
+
+> > > +
+> > > +static const char *kirkwood_dt_board_compat[] = {
+> > > +	"marvell,dreamplug",
+> > > +	NULL
+> > > +};
+> 
+> Since you mention the name, it should probably be "globalscale,dreamplug"
+> because the device is made by GlobalScale instead of Marvell.
+
+hmm, Globalscale Tech is, as I understand it, a turn-key manufacturer.
+They are simply building Marvell's development platforms for them,
+handling sales, etc.  My impression was that Marvell designed the board
+and contracted Globalscale to build and distribute it.
+
+I don't care which we use, but is the convention to use the SoC designer
+(marvell,dreamplug), the SoC (kirkwood,dreamplug), or the brand
+(globalscale,dreamplug)?
+
+If there is no set standard, I think the SoC is most accurate, as
+nothing prevents a manufacturer from swapping out ICs/SoCs between
+manufacturing runs of the same make/model.  Look at certain wifi USB
+devices for examples.
+
+thx,
+
+Jason.
