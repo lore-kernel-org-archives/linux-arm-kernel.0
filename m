@@ -1,25 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 10:26:27 +0000
-Subject: [PATCH v2 3/7] rtc: sa1100: use ioremap to map registers
-In-Reply-To: <1329967709-3786-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1329815096-6200-4-git-send-email-haojian.zhuang@marvell.com>
- <1329967709-3786-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20120223102627.GM22562@n2100.arm.linux.org.uk>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 23 Feb 2012 16:01:10 +0530
+Subject: [PATCH] ARM/sp810: introduce API to change system mode
+In-Reply-To: <20120223100344.GL22562@n2100.arm.linux.org.uk>
+References: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
+ <20120223100344.GL22562@n2100.arm.linux.org.uk>
+Message-ID: <4F46156E.80801@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 11:28:29AM +0800, Haojian Zhuang wrote:
->  static int sa1100_rtc_read_time(struct device *dev, struct rtc_time *tm)
->  {
-> -	rtc_time_to_tm(RCNR, tm);
-> +	struct sa1100_rtc *info = dev_get_drvdata(dev);
-> +	unsigned long rcnr;
-> +
-> +	rcnr = readl_relaxed(info->reg_rcnr);
-> +	rtc_time_to_tm(rcnr, tm);
+On 2/23/2012 3:33 PM, Russell King - ARM Linux wrote:
+> On Thu, Feb 23, 2012 at 02:43:44PM +0530, Viresh Kumar wrote:
+>> > From: Shiraz Hashim <shiraz.hashim@st.com>
+>> > 
+>> > sp810 controller can change system's working mode to various power save
+>> > states. Introduce an API to accomplish the same.
+> Where is the documentation for this peripheral?  I've never seen any
+> documentation on ARMs website for it.
+> 
 
-Just one nit - this could be:
+Even i couldn't locate it now :(
 
-	struct sa1100_rtc *info = dev_get_drvdata(dev);
+Documentation does mention it at several places, but didn't give a link.
 
-	rtc_time_to_tm(readl_relaxed(info->reg_rcnr), tm);
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0440b/CHDJAIGE.html
+-- 
+viresh
