@@ -1,33 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 23 Feb 2012 22:59:24 +0000
-Subject: [GIT PULL] Versatile Express DT support
-In-Reply-To: <1330020005.2727.11.camel@hornet.cambridge.arm.com>
-References: <1330020005.2727.11.camel@hornet.cambridge.arm.com>
-Message-ID: <20120223225924.GA12404@mudshark.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Feb 2012 15:15:28 -0800
+Subject: [GIT PULL] omap fixes for v3.3-rc4
+Message-ID: <20120223231528.GE18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+Hi Arnd & Olof,
 
-On Thu, Feb 23, 2012 at 06:00:05PM +0000, Pawel Moll wrote:
-> The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
-> 
->   Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
-> 
-> are available in the git repository at:
->   git://git.linaro.org/people/pawelmoll/linux.git vexpress-dt-v3.3-rc4
-> 
-> Pawel Moll (8):
->       ARM: vexpress: Get rid of MMIO_P2V
->       ARM: versatile: Map local timers using Device Tree when possible
->       ARM: vexpress: Use FDT data in platform SMP calls
+Please pull omap fixes from:
 
-This patch has a curious commit message, which ends like:
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
 
-	Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+This contains a fix for omap4 to call memblck_steal() from
+.reserve like it should be, and fixes a regression for smsc911x
+using boards as they now require regulators. Also included are
+fixes for errors that show up if the TWL PMIC is compiled as a
+module.
 
-	SMP update (change commit log!)
+Note that the top two patches are from today: The smsc911x patch
+was updated for to remove an unnecessary variable, and the
+mailbox compile fix I applied earlier today.
 
-Is that last line supposed to be there?
+Regards,
 
-Will
+Tony
+
+
+The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+  Linus Torvalds (1):
+        Linux 3.3-rc4
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
+
+Arnout Vandecappelle (Essensium/Mind) (1):
+      OMAP3 EVM: remove out-of-bounds array access of gpio_leds
+
+Felipe Balbi (1):
+      ARM: OMAP2+: usb-host: fix compile warning
+
+Matt Porter (1):
+      ARM: OMAP2+: gpmc-smsc911x: add required smsc911x regulators
+
+NeilBrown (1):
+      ARM: OMAP: add RCU locking to omap2_set_init_voltage.
+
+Ohad Ben-Cohen (1):
+      ARM: OMAP2: fix mailbox init code
+
+Santosh Shilimkar (2):
+      ARM: OMAP4: cpuidle: Fix the C-state reporting to cpuidle governor.
+      ARM: OMAP4: Move the barrier memboclk_steal() as part of reserve callback
+
+Tony Lindgren (5):
+      Merge branch 'for_3.3/fixes/pm' of git://git.kernel.org/.../khilman/linux-omap-pm into fixes
+      ARM: OMAP: Fix kernel panic with HSMMC when twl4030_gpio is a module
+      ARM: OMAP: Fix build error when mmc_omap is built as module
+      Merge branch 'fixes-mmc' into fixes
+      ARM: OMAP1: Fix out-of-bounds array access for Innovator
+
+ arch/arm/mach-omap1/board-innovator.c         |    4 +-
+ arch/arm/mach-omap2/Kconfig                   |    4 +-
+ arch/arm/mach-omap2/board-n8x0.c              |    4 ++
+ arch/arm/mach-omap2/board-omap3evm.c          |    2 +-
+ arch/arm/mach-omap2/common.h                  |    1 +
+ arch/arm/mach-omap2/cpuidle44xx.c             |    5 +-
+ arch/arm/mach-omap2/gpmc-smsc911x.c           |   52 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/hsmmc.c                   |    6 +++
+ arch/arm/mach-omap2/io.c                      |    1 +
+ arch/arm/mach-omap2/mailbox.c                 |   10 ++++-
+ arch/arm/mach-omap2/mux.c                     |    2 +-
+ arch/arm/mach-omap2/omap4-common.c            |   25 ++++++++----
+ arch/arm/mach-omap2/pm.c                      |    3 +
+ arch/arm/mach-omap2/usb-host.c                |    6 +-
+ arch/arm/plat-omap/common.c                   |    1 +
+ arch/arm/plat-omap/include/plat/omap-secure.h |    6 +++
+ 16 files changed, 110 insertions(+), 22 deletions(-)
