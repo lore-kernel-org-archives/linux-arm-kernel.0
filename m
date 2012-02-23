@@ -1,68 +1,96 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 23 Feb 2012 14:59:01 +1100
-Subject: [PATCH v2 02/19] ARM: at91/at91x40: remove use of
- at91_sys_read/write
-In-Reply-To: <20120223032503.GA20176@game.jcrosoft.org>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <fac36a5ab9fe5a8bd977d2305eeccad48389cbb5.1329903206.git.nicolas.ferre@atmel.com>
- <4F456AAF.3090809@gmail.com> <20120223032503.GA20176@game.jcrosoft.org>
-Message-ID: <4F45B985.1000204@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 22 Feb 2012 21:09:16 -0700 (MST)
+Subject: [GIT PULL] OMAP PM EMU fix for v3.3
+In-Reply-To: <AA48DD8077D5D945A49BD1782C1140F10122E4FF@fioues08.ebgroup.elektrobit.com>
+References: <87liw8agk4.fsf@ti.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com><20120127190239.GC9339@atomide.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com><AA48DD8077D5D945A49BD1782C1140F10122E2B7@fioues08.ebgroup.elektrobit.com>
+ <87linxa5gk.fsf@ti.com>
+ <AA48DD8077D5D945A49BD1782C1140F10122E4FF@fioues08.ebgroup.elektrobit.com>
+Message-ID: <alpine.DEB.2.00.1202222021460.12198@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/12 14:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
+Hello Gowda,
 
-> On 09:22 Thu 23 Feb     , Ryan Mallon wrote:
->> On 22/02/12 20:39, Nicolas Ferre wrote:
->>
->>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>>
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> ---
->>>  arch/arm/mach-at91/at91x40.c              |    2 +-
->>>  arch/arm/mach-at91/at91x40_time.c         |   28 +++++++++++++++++-----------
->>>  arch/arm/mach-at91/include/mach/at91x40.h |   18 +++++++++---------
->>>  3 files changed, 27 insertions(+), 21 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
->>> index 0154b7f..5400a1d 100644
->>> --- a/arch/arm/mach-at91/at91x40.c
->>> +++ b/arch/arm/mach-at91/at91x40.c
->>> @@ -44,7 +44,7 @@ static void at91x40_idle(void)
->>>  	 * Disable the processor clock.  The processor will be automatically
->>>  	 * re-enabled by an interrupt or by a reset.
->>>  	 */
->>> -	at91_sys_write(AT91_PS_CR, AT91_PS_CR_CPU);
->>> +	__raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
->>
->>
->> This doesn't seem to be equivalent, at91_sys_write does:
->>
->>   void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
->>   __raw_writel(value, addr + reg_offset);
->>
->> and this patch doesn't redefine AT91_PS_CR. Was it broken before this
->> patch? What am I missing?
-> this is right
-> #define AT91_PS_CR      (AT91_PS + 0)   /* PS Control register */
+A few questions...
+
+On Wed, 22 Feb 2012, Madhusudhan.Gowda at elektrobit.com wrote:
+
+> I have tested this on beagle board as well as on OMAP3630 based
+> propriatory phone using SDTI serial trace interface.
+
+What driver are you using for SDTI?  Does it use pm_runtime* or call 
+clk_enable() on some clock when it is in use?  Are you defining a hwmod 
+for it?  I don't see an SDTI driver in mainline, but maybe I am just 
+missing it.  If it's not there, could you please post it or post a link to 
+it so we can take a look at what it's doing?
+
+> Also you can test it by just observing the 
+> CM_EMU (48005100) clkstctrl register
+>  48 => 00000001
+> Across MPU OFF alone
+> 
+> [root at beagleboard /]# echo 0 >
+> /sys/kernel/debug/pm_debug/neon_pwrdm/suspend
+> [root at beagleboard /]# echo 0 >
+> /sys/kernel/debug/pm_debug/mpu_pwrdm/suspend
+> [root at beagleboard /]# echo 1 >
+> /sys/kernel/debug/pm_debug/core_pwrdm/suspend
+> [root at beagleboard /]# echo 1 >
+> /sys/kernel/debug/pm_debug/per_pwrdm/suspend
+> [root at beagleboard /]# echo mem >/sys/power/state
+> [   59.694671] PM: Syncing filesystems ... done.
+> [   59.758209] Freezing user space processes ... (elapsed 0.02 seconds)
+> done.
+> [   59.789947] Freezing remaining freezable tasks ... (elapsed 0.02
+> seconds) done.
+> [   59.820709] Suspending console(s) (use no_console_suspend to debug)
+> [   60.055816] PM: suspend of devices complete after 212.493 msecs
+> [   60.059661] PM: late suspend of devices complete after 3.784 msecs
+> [   60.059753] Disabling non-boot CPUs ...
+> [   64.299865] Successfully put all powerdomains to target state
+> [   64.302551] PM: early resume of devices complete after 2.319 msecs
+> [   64.636444] PM: resume of devices complete after 332.336 msecs
+> [   64.688446] Restarting tasks ... done.
+> [root at beagleboard /]# 
+> 
+> And then print again the CM_EMU (48005100) clkstctrl register offset 48
+> this will have the reset value and PRM_EMU (48307100) offset e4 =>
+> 00000100 register confirms the domain wakeup reset from OFF.
+> 
+> At this moment the SDTI serial trace interface looses connection.
+> 
+> With my patch applied the CM_EMU (48005100) clkstctrl register restores
+> it initial setting across MPU OFF.
+
+Maybe you can walk through these thoughts with me and see if it makes 
+sense to you.
+
+When the PM code initializes, it will put the EMU clockdomain to 
+software-supervised sleep.  (Ideally it would put it to 
+hardware-supervised idle, but Jouni turned this off a long time ago, 
+apparently due to some PRCM usecounting problem with it -- which may 
+simply have been some software problem on our part?)
+
+That accounts for CM_CLKSTCTRL_EMU being set to 0x1 before MPU OFF.  Does 
+the SDTI work for you when CM_CLKSTCTRL_EMU is set to 0x1? There's no 
+FCLKEN/ICLKEN bit for the PRCM to use-count, it seems :-( Although maybe 
+this is done through the SDTI_WINCTRL register?
+
+I observe the same phenomenon that you do, that when MPU comes back from 
+OFF, CM_CLKSTCTRL_EMU is set to 0x2.  From reading the TRM, it's not clear 
+to me what is causing that, although I'd agree with your conclusion that 
+it's related to the MPU's reset line.
+
+But here's the part that's unclear to me about your description: according 
+to the TRM, 0x2 means software-supervised wakeup.  So the EMU clockdomain 
+should be awake at that point.  That shouldn't prevent the SDTI from 
+working; in fact quite the opposite.  So I don't really understand how 
+your patch would fix anything in this regard.  Any thoughts?
+
+My suspicion, by the way, is that the underlying problem may be with the 
+SDTI driver that you're using.  My guess would be that it's not integrated 
+with the OMAP power management infrastructure (via pm_runtime* calls), 
+and that's what's causing the problem.
 
 
-That doesn't answer my question.
-
-The old, at91_sys_write, version was writing to (using __raw_writel):
-
-  AT91_VA_BASE_SYS + AT91_PS_CR
-
-The new version is writing, also using __raw_writel, to:
-
-  AT91_PS_CR
-
-The value of AT91_PS_CR is not changed in this patch. Assuming that
-AT91_VA_BASE_SYS for at91x40 (which at a quick glance it is not), then
-the old and the new version of the code are not writing to the same
-address.
-
-Was it previously incorrect, or is it incorrect now?
-
-~Ryan
+- Paul
