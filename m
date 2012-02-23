@@ -1,94 +1,54 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 22 Feb 2012 18:37:46 -0700
-Subject: [GIT PULL] gpio/omap: cleanup and runtime PM conversion for v3.4
-In-Reply-To: <4F456F01.5020302@ti.com>
-References: <8762f6fr13.fsf@ti.com>
- <4F456F01.5020302@ti.com>
-Message-ID: <20120223013746.GB3212@ponder.secretlab.ca>
+From: nm@ti.com (Menon, Nishanth)
+Date: Wed, 22 Feb 2012 19:37:30 -0600
+Subject: [PATCHv5 03/14] arm: omap3+: voltage: parameter segregation
+In-Reply-To: <1329833098-19900-4-git-send-email-t-kristo@ti.com>
+References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
+ <1329833098-19900-4-git-send-email-t-kristo@ti.com>
+Message-ID: <CAOMWX4d+M9oagDtmSqG=X8Ln4kUEyLaqpfB9Pz0Y+6RmK=sjYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 02:41:05PM -0800, Kevin Hilman wrote:
-> Hi Grant,
-> 
-> Any objections to this series? Can we get this queued and into linux-next?
-> 
-> I'll have an additional pull request for Benoit's GPIO DT stuff that
-> depends on this for v3.4 too after that series is finalized.
+On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
+[...]
+> diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+> index 949938d..940a0d6 100644
+> --- a/arch/arm/mach-omap2/voltage.h
+> +++ b/arch/arm/mach-omap2/voltage.h
 
-The diffstat is clean.  I've merged it in.
+[...]
+> @@ -171,6 +169,18 @@ struct omap_voltdm_pmic {
+> ? ? ? ?u8 (*uv_to_vsel) (unsigned long uV);
+> ?};
+>
+> +struct omap_vp_param {
+> + ? ? ? u32 vddmax;
+> + ? ? ? u32 vddmin;
+> +};
+> +
 
-g.
+Thinking a little deeper about this(SoC level vdd min and max) on a
+slightly different angle- core of the question that intend to answer
+are:
+ - what is the least voltage we want to allow in active transtion? it
+should not be lower than retention voltage.
+- what is the max voltage we want to allow in active transition? it
+should be the max Nom voltage of all the OPPs for that domain.
 
-> 
-> Thanks,
-> 
-> Kevin
-> 
-> On 02/16/2012 12:43 PM, Kevin Hilman wrote:
-> >Hi Grant,
-> >
-> >I've given this a final review and testing and I believe it's ready for
-> >3.4, so here you go.
-> >
-> >Also note that Benoit's recently posted GPIO cleanups and DT conversion
-> >depend on this series.
-> >
-> >Thanks,
-> >
-> >Kevin
-> >
-> >
-> >The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
-> >
-> >   Linux 3.3-rc2 (2012-01-31 13:31:54 -0800)
-> >
-> >are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/gpio/runtime-pm-cleanup
-> >
-> >for you to fetch changes up to f86bcc302a8c570dd0f5a50097a6af96a0e717c2:
-> >
-> >   gpio/omap: handle set_dataout reg capable IP on restore (2012-02-06 16:58:45 +0530)
-> >
-> >----------------------------------------------------------------
-> >Charulatha V (8):
-> >       gpio/omap: remove dependency on gpio_bank_count
-> >       gpio/omap: use flag to identify wakeup domain
-> >       gpio/omap: make gpio_context part of gpio_bank structure
-> >       gpio/omap: make non-wakeup GPIO part of pdata
-> >       gpio/omap: avoid cpu checks during module ena/disable
-> >       gpio/omap: use pinctrl offset instead of macro
-> >       gpio/omap: remove bank->method&  METHOD_* macros
-> >       gpio/omap: fix bankwidth for OMAP7xx MPUIO
-> >
-> >Nishanth Menon (4):
-> >       gpio/omap: save and restore debounce registers
-> >       gpio/omap: enable irq at the end of all configuration in restore
-> >       gpio/omap: restore OE only after setting the output level
-> >       gpio/omap: handle set_dataout reg capable IP on restore
-> >
-> >Tarun Kanti DebBarma (13):
-> >       gpio/omap: handle save/restore context in GPIO driver
-> >       gpio/omap: further cleanup using wkup_en register
-> >       gpio/omap: use level/edge detect reg offsets
-> >       gpio/omap: remove hardcoded offsets in context save/restore
-> >       gpio/omap: cleanup set_gpio_triggering function
-> >       gpio/omap: cleanup omap_gpio_mod_init function
-> >       gpio/omap: remove unnecessary bit-masking for read access
-> >       gpio/omap: use pm-runtime framework
-> >       gpio/omap: optimize suspend and resume functions
-> >       gpio/omap: cleanup prepare_for_idle and resume_after_idle
-> >       gpio/omap: fix debounce clock handling
-> >       gpio/omap: fix incorrect access of debounce module
-> >       gpio/omap: remove omap_gpio_save_context overhead
-> >
-> >  arch/arm/mach-omap1/gpio15xx.c         |    7 +-
-> >  arch/arm/mach-omap1/gpio16xx.c         |   47 ++-
-> >  arch/arm/mach-omap1/gpio7xx.c          |   14 +-
-> >  arch/arm/mach-omap2/gpio.c             |   36 +-
-> >  arch/arm/mach-omap2/pm34xx.c           |   14 -
-> >  arch/arm/plat-omap/include/plat/gpio.h |   29 +-
-> >  drivers/gpio/gpio-omap.c               | 1106 +++++++++++++-------------------
-> >  7 files changed, 555 insertions(+), 698 deletions(-)
-> 
+In effect, why do we even need to register
+"voltdm->vp_param->vdd[min|max]"? We already have that info - right?
+On the other hand it might be safer to do this way to handle quirks in
+future SoCs.. but thought I'd spit it out anyways..
+
+> +struct omap_vc_param {
+and elsewhere - please add kernel-doc struct documentation as well
+when new structs are introduced?
+> + ? ? ? u32 on;
+> + ? ? ? u32 onlp;
+> + ? ? ? u32 ret;
+> + ? ? ? u32 off;
+> +};
+> +
+[...]
+
+Regards,
+Nishanth Menon
