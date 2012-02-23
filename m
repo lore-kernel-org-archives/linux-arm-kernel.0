@@ -1,57 +1,61 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Fri, 24 Feb 2012 08:48:04 +1100
-Subject: [PATCH v3 16/21] ARM: at91: finally drop at91_sys_read/write
-In-Reply-To: <8c428b8d3316faa88cae80473bb67565561fb446.1330006537.git.nicolas.ferre@atmel.com>
+Date: Fri, 24 Feb 2012 08:50:44 +1100
+Subject: [PATCH v3 11/21] ARM: at91/PMC: move assignment out of printf
+In-Reply-To: <940192e3c651eb6b97b42cb4c28e9e8471675cd2.1330006537.git.nicolas.ferre@atmel.com>
 References: <cover.1330006537.git.nicolas.ferre@atmel.com>
- <8c428b8d3316faa88cae80473bb67565561fb446.1330006537.git.nicolas.ferre@atmel.com>
-Message-ID: <4F46B414.1090106@gmail.com>
+ <940192e3c651eb6b97b42cb4c28e9e8471675cd2.1330006537.git.nicolas.ferre@atmel.com>
+Message-ID: <4F46B4B4.3050707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/12 01:26, Nicolas Ferre wrote:
+On 24/02/12 01:25, Nicolas Ferre wrote:
 
-> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> We move the assignment of values of register out of the
+> seq_printf() calls: It is obviously more readable.
 > 
-> Remove at91_sys_read/write() from io.h file. This function
-> is not used anymore and was a stopper on the way to single
-> zImage kernel for AT91.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Reported-by: Ryan Mallon <rmallon@gmail.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 
-Nice work guys.
+Thanks:
 
 Acked-by: Ryan Mallon <rmallon@gmail.com>
 
 > ---
->  arch/arm/mach-at91/include/mach/io.h |   18 ------------------
->  1 files changed, 0 insertions(+), 18 deletions(-)
+>  arch/arm/mach-at91/clock.c |   15 ++++++++++-----
+>  1 files changed, 10 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
-> index 4ca09ef..4003001 100644
-> --- a/arch/arm/mach-at91/include/mach/io.h
-> +++ b/arch/arm/mach-at91/include/mach/io.h
-> @@ -28,22 +28,4 @@
->  #define __io(a)		__typesafe_io(a)
->  #define __mem_pci(a)	(a)
+> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+> index d1b4e07..9ab8627 100644
+> --- a/arch/arm/mach-at91/clock.c
+> +++ b/arch/arm/mach-at91/clock.c
+> @@ -432,19 +432,24 @@ static int at91_clk_show(struct seq_file *s, void *unused)
+>  	u32		scsr, pcsr, uckr = 0, sr;
+>  	struct clk	*clk;
 >  
-> -#ifndef __ASSEMBLY__
-> -
-> -static inline unsigned int at91_sys_read(unsigned int reg_offset)
-> -{
-> -	void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
-> -
-> -	return __raw_readl(addr + reg_offset);
-> -}
-> -
-> -static inline void at91_sys_write(unsigned int reg_offset, unsigned long value)
-> -{
-> -	void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
-> -
-> -	__raw_writel(value, addr + reg_offset);
-> -}
-> -
-> -#endif
-> -
->  #endif
+> -	seq_printf(s, "SCSR = %8x\n", scsr = at91_sys_read(AT91_PMC_SCSR));
+> -	seq_printf(s, "PCSR = %8x\n", pcsr = at91_sys_read(AT91_PMC_PCSR));
+> +	scsr = at91_sys_read(AT91_PMC_SCSR);
+> +	pcsr = at91_sys_read(AT91_PMC_PCSR);
+> +	sr = at91_sys_read(AT91_PMC_SR);
+> +	seq_printf(s, "SCSR = %8x\n", scsr);
+> +	seq_printf(s, "PCSR = %8x\n", pcsr);
+>  	seq_printf(s, "MOR  = %8x\n", at91_sys_read(AT91_CKGR_MOR));
+>  	seq_printf(s, "MCFR = %8x\n", at91_sys_read(AT91_CKGR_MCFR));
+>  	seq_printf(s, "PLLA = %8x\n", at91_sys_read(AT91_CKGR_PLLAR));
+>  	if (cpu_has_pllb())
+>  		seq_printf(s, "PLLB = %8x\n", at91_sys_read(AT91_CKGR_PLLBR));
+> -	if (cpu_has_utmi())
+> -		seq_printf(s, "UCKR = %8x\n", uckr = at91_sys_read(AT91_CKGR_UCKR));
+> +	if (cpu_has_utmi()) {
+> +		uckr = at91_sys_read(AT91_CKGR_UCKR);
+> +		seq_printf(s, "UCKR = %8x\n", uckr);
+> +	}
+>  	seq_printf(s, "MCKR = %8x\n", at91_sys_read(AT91_PMC_MCKR));
+>  	if (cpu_has_upll())
+>  		seq_printf(s, "USB  = %8x\n", at91_sys_read(AT91_PMC_USB));
+> -	seq_printf(s, "SR   = %8x\n", sr = at91_sys_read(AT91_PMC_SR));
+> +	seq_printf(s, "SR   = %8x\n", sr);
+>  
+>  	seq_printf(s, "\n");
+>  
