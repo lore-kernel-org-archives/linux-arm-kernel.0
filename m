@@ -1,40 +1,43 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Thu, 23 Feb 2012 19:52:08 +0800
-Subject: [V1 1/4] regulator: fix the ldo configure according to 88pm860x spec
-Message-ID: <1329997928-2995-1-git-send-email-jtzhou@marvell.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 23 Feb 2012 17:31:26 +0530
+Subject: [PATCH v2 0/4] omap hsmmc device tree support
+Message-ID: <1329998490-27555-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
----
- drivers/regulator/88pm8607.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+This series adds device tree support for OMAP hsmmc
+driver. The series is dependent on a couple other series,
+to add TWL regulator DT support[1] and another to clean
+the pdev->id usage within the hsmmc driver[2]
 
-diff --git a/drivers/regulator/88pm8607.c b/drivers/regulator/88pm8607.c
-index df33530..28b81ae 100644
---- a/drivers/regulator/88pm8607.c
-+++ b/drivers/regulator/88pm8607.c
-@@ -196,7 +196,7 @@ static const unsigned int LDO12_suspend_table[] = {
- };
- 
- static const unsigned int LDO13_table[] = {
--	1300000, 1800000, 2000000, 2500000, 2800000, 3000000, 0, 0,
-+	1200000, 1300000, 1800000, 2000000, 2500000, 2800000, 3000000, 0,
- };
- 
- static const unsigned int LDO13_suspend_table[] = {
-@@ -389,10 +389,10 @@ static struct pm8607_regulator_info pm8607_regulator_info[] = {
- 	PM8607_LDO( 7,         LDO7, 0, 3, SUPPLIES_EN12, 1),
- 	PM8607_LDO( 8,         LDO8, 0, 3, SUPPLIES_EN12, 2),
- 	PM8607_LDO( 9,         LDO9, 0, 3, SUPPLIES_EN12, 3),
--	PM8607_LDO(10,        LDO10, 0, 3, SUPPLIES_EN12, 4),
-+	PM8607_LDO(10,        LDO10, 0, 4, SUPPLIES_EN12, 4),
- 	PM8607_LDO(12,        LDO12, 0, 4, SUPPLIES_EN12, 5),
- 	PM8607_LDO(13, VIBRATOR_SET, 1, 3,  VIBRATOR_SET, 0),
--	PM8607_LDO(14,        LDO14, 0, 4, SUPPLIES_EN12, 6),
-+	PM8607_LDO(14,        LDO14, 0, 3, SUPPLIES_EN12, 6),
- };
- 
- static int __devinit pm8607_regulator_probe(struct platform_device *pdev)
--- 
-1.7.0.4
+all patches including the dependent series can be
+found here
+git://gitorious.org/omap-pm/linux.git for-dt/regulator
+
+The series is tested on omap4sdp (both external and emmc),
+omap4panda amd omap3beagle boards.
+
+Things to do:
+-1- Card detect isn't functional and needs twl4030 gpio
+to be DT converted.
+-2- pbias cell programming is missing and needs an OMAP
+control module driver.
+
+[1] http://marc.info/?l=linux-omap&m=132999699905180&w=2
+[2] http://marc.info/?l=linux-omap&m=132999646604985&w=2
+
+Rajendra Nayak (4):
+  mmc: omap_hsmmc: Convert hsmmc driver to use device tree
+  mmc: omap_hsmmc: Avoid a regulator voltage change with dt
+  arm/dts: OMAP4: Add mmc controller nodes and board data
+  arm/dts: OMAP3: Add mmc controller nodes and board data
+
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   31 +++++++
+ arch/arm/boot/dts/omap3-beagle.dts                 |    6 ++
+ arch/arm/boot/dts/omap3.dtsi                       |   26 ++++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   10 +++
+ arch/arm/boot/dts/omap4-sdp.dts                    |   16 ++++
+ arch/arm/boot/dts/omap4.dtsi                       |   31 +++++++
+ drivers/mmc/host/omap_hsmmc.c                      |   83 +++++++++++++++++++-
+ 7 files changed, 202 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
