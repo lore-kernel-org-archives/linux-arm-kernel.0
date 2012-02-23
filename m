@@ -1,39 +1,37 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 23 Feb 2012 16:56:43 +0530
-Subject: [PATCH v2 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
-Message-ID: <1329996409-26861-1-git-send-email-rnayak@ti.com>
+Date: Thu, 23 Feb 2012 16:56:46 +0530
+Subject: [PATCH v2 3/6] mmc: omap_hsmmc: Use OMAP_HSMMC_SUPPORTS_DUAL_VOLT
+ flag to remove host->id based hardcoding
+In-Reply-To: <1329996409-26861-1-git-send-email-rnayak@ti.com>
+References: <1329996409-26861-1-git-send-email-rnayak@ti.com>
+Message-ID: <1329996409-26861-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-sending as these patches did not make it to the lists due to
-issues with my 'git send-email'
+From: Balaji T K <balajitk@ti.com>
 
-This series mainly cleans up all instances of hardcoding's in
-the driver based on pdev->id. This is cleanup leading to the
-DT adaptation of omap_hsmmc driver.
+Use OMAP_HSMMC_SUPPORTS_DUAL_VOLT flag instead of host->id
+for identifying SD bus voltage capabilities.
 
-v2 mainly has some minor changes to get rid of a debug print
-which was still using host->id and getting rid of 'id' field
-entirely from omap_hsmmc_host struct.
+Signed-off-by: Balaji T K <balajitk@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Tested-by: Venkatraman S <svenkatr@ti.com>
+---
+ drivers/mmc/host/omap_hsmmc.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-The series is tested on OMAP4SDP, OMAP4panda, OMAP3beagle and OMAP2430SDP
-boards.
-
-regards,
-Rajendra
-
-Balaji T K (3):
-  mmc: omap_hsmmc: use platform_get_resource_byname for tx/rx DMA
-    channels
-  mmc: omap_hsmmc: remove unused .set_sleep function
-  mmc: omap_hsmmc: Use OMAP_HSMMC_SUPPORTS_DUAL_VOLT flag to remove
-    host->id based hardcoding
-
-Rajendra Nayak (3):
-  mmc: omap_hsmmc: Get rid of omap_hsmmc_1_set_power function
-  mmc: omap_hsmmc: Get rid of omap_hsmmc_4_set_power function
-  mmc: omap_hsmmc: Don't expect MMC1 to always have vmmc supply
-
- arch/arm/plat-omap/include/plat/mmc.h |    2 -
- drivers/mmc/host/omap_hsmmc.c         |  175 +++------------------------------
- 2 files changed, 16 insertions(+), 161 deletions(-)
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 9955aee..91faf42 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -650,7 +650,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 	OMAP_HSMMC_WRITE(host->base, SYSCONFIG,
+ 			OMAP_HSMMC_READ(host->base, SYSCONFIG) | AUTOIDLE);
+ 
+-	if (host->id == OMAP_MMC1_DEVID) {
++	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT) {
+ 		if (host->power_mode != MMC_POWER_OFF &&
+ 		    (1 << ios->vdd) <= MMC_VDD_23_24)
+ 			hctl = SDVS18;
+-- 
+1.7.1
