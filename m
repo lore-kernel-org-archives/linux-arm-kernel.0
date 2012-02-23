@@ -1,125 +1,246 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 23 Feb 2012 21:57:18 +0100
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-Message-ID: <1330030639-3796-1-git-send-email-stigge@antcom.de>
+Date: Thu, 23 Feb 2012 22:00:42 +0100
+Subject: [PATCH v2] ARM: LPC32xx: USB Support
+Message-ID: <1330030842-3848-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds OHCI support to the LPC32xx ARM platform
+This patch adds OHCI support to the LPC32xx ARM platform. Besides the trivial
+addition of platform "usb-ohci" support, fixes for the USB PLL have been added
+to arch/arm/mach-lpc32xx/clock.c, ported from NXP's lpclinux.com.
+
+(This is the mach-lpc32xx specific part, the USB subsystem specific changes are
+in a separate patch for the USB maintainers.)
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 ---
- drivers/usb/host/ohci-hcd.c     |    5 +++
- drivers/usb/host/ohci-pnx4008.c |   53 +++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 57 insertions(+), 1 deletion(-)
+ arch/arm/mach-lpc32xx/clock.c                 |   87 ++++++++++++++++++--------
+ arch/arm/mach-lpc32xx/common.c                |   26 +++++++
+ arch/arm/mach-lpc32xx/common.h                |    1 
+ arch/arm/mach-lpc32xx/include/mach/platform.h |    3 
+ arch/arm/mach-lpc32xx/phy3250.c               |    1 
+ 5 files changed, 94 insertions(+), 24 deletions(-)
 
---- linux-2.6.orig/drivers/usb/host/ohci-hcd.c
-+++ linux-2.6/drivers/usb/host/ohci-hcd.c
-@@ -1055,6 +1055,11 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
- #endif
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
++++ linux-2.6/arch/arm/mach-lpc32xx/common.c
+@@ -160,6 +160,32 @@ struct platform_device lpc32xx_adc_devic
+ };
  
-+#ifdef CONFIG_ARCH_LPC32XX
-+#include "ohci-pnx4008.c"
-+#define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
-+#endif
+ /*
++ * USB support
++ */
++/* The dmamask must be set for OHCI to work */
++static u64 ohci_dmamask = ~(u32) 0;
++static struct resource ohci_resources[] = {
++	{
++		.start = IO_ADDRESS(LPC32XX_USB_BASE),
++		.end = IO_ADDRESS(LPC32XX_USB_BASE + 0x100 - 1),
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_LPC32XX_USB_HOST,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++struct platform_device lpc32xx_ohci_device = {
++	.name = "usb-ohci",
++	.id = -1,
++	.dev = {
++		.dma_mask = &ohci_dmamask,
++		.coherent_dma_mask = 0xFFFFFFFF,
++	},
++	.num_resources = ARRAY_SIZE(ohci_resources),
++	.resource = ohci_resources,
++};
 +
- #ifdef CONFIG_ARCH_DAVINCI_DA8XX
- #include "ohci-da8xx.c"
- #define PLATFORM_DRIVER		ohci_hcd_da8xx_driver
---- linux-2.6.orig/drivers/usb/host/ohci-pnx4008.c
-+++ linux-2.6/drivers/usb/host/ohci-pnx4008.c
-@@ -143,8 +143,21 @@ static void i2c_write(u8 buf, u8 subaddr
- 	i2c_master_send(isp1301_i2c_client, &tmpbuf[0], 2);
- }
++/*
+  * Returns the unique ID for the device
+  */
+ void lpc32xx_get_uid(u32 devid[4])
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/common.h
++++ linux-2.6/arch/arm/mach-lpc32xx/common.h
+@@ -31,6 +31,7 @@ extern struct platform_device lpc32xx_i2
+ extern struct platform_device lpc32xx_tsc_device;
+ extern struct platform_device lpc32xx_adc_device;
+ extern struct platform_device lpc32xx_rtc_device;
++extern struct platform_device lpc32xx_ohci_device;
  
-+#ifdef CONFIG_ARCH_LPC32XX
-+static u16 i2c_read16(u8 subaddr)
-+{
-+	u16 data;
+ /*
+  * Other arch specific structures and functions
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
++++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
+@@ -277,6 +277,7 @@ static struct platform_device *phy3250_d
+ 	&lpc32xx_watchdog_device,
+ 	&lpc32xx_gpio_led_device,
+ 	&lpc32xx_adc_device,
++	&lpc32xx_ohci_device,
+ };
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
++++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
+@@ -87,6 +87,7 @@
+ #include <linux/list.h>
+ #include <linux/errno.h>
+ #include <linux/device.h>
++#include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/amba/bus.h>
+@@ -100,6 +101,8 @@
+ 
+ static DEFINE_SPINLOCK(global_clkregs_lock);
+ 
++static int usb_pll_enable, usb_pll_valid;
 +
-+	i2c_master_send(isp1301_i2c_client, &subaddr, 1);
-+	i2c_master_recv(isp1301_i2c_client, (u8 *) &data, 2);
-+
-+	return data;
-+}
-+#endif
-+
- static void isp1301_configure(void)
+ static struct clk clk_armpll;
+ static struct clk clk_usbpll;
+ 
+@@ -384,30 +387,62 @@ static u32 local_clk_usbpll_setup(struct
+ static int local_usbpll_enable(struct clk *clk, int enable)
  {
-+#if !defined(CONFIG_ARCH_LPC32XX)
- 	/* PNX4008 only supports DAT_SE0 USB mode */
- 	/* PNX4008 R2A requires setting the MAX603 to output 3.6V */
- 	/* Power up externel charge-pump */
-@@ -166,7 +179,41 @@ static void isp1301_configure(void)
- 		  ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
- 	i2c_write(0xFF,
- 		  ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
+ 	u32 reg;
+-	int ret = -ENODEV;
+-	unsigned long timeout = jiffies + msecs_to_jiffies(10);
++	int ret = 0;
++	unsigned long timeout = jiffies + msecs_to_jiffies(20);
+ 
+ 	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
+ 
+-	if (enable == 0) {
+-		reg &= ~(LPC32XX_CLKPWR_USBCTRL_CLK_EN1 |
+-			LPC32XX_CLKPWR_USBCTRL_CLK_EN2);
+-		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
+-	} else if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP) {
++	__raw_writel(reg & ~(LPC32XX_CLKPWR_USBCTRL_CLK_EN2 |
++		LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP),
++		LPC32XX_CLKPWR_USB_CTRL);
++	__raw_writel(reg & ~LPC32XX_CLKPWR_USBCTRL_CLK_EN1,
++		LPC32XX_CLKPWR_USB_CTRL);
++
++	if (enable && usb_pll_valid && usb_pll_enable) {
++		ret = -ENODEV;
++		/*
++		 * If the PLL rate has been previously set, then the rate
++		 * in the PLL register is valid and can be enabled here.
++		 * Otherwise, it needs to be enabled as part of setrate.
++		 */
++
++		/*
++		 * Gate clock into PLL
++		 */
+ 		reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN1;
+ 		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
+ 
+-		/* Wait for PLL lock */
++		/*
++		 * Enable PLL
++		 */
++		reg |= LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP;
++		__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
++
++		/*
++		 * Wait for PLL to lock
++		 */
+ 		while (time_before(jiffies, timeout) && (ret == -ENODEV)) {
+ 			reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
+ 			if (reg & LPC32XX_CLKPWR_USBCTRL_PLL_STS)
+ 				ret = 0;
++			else
++				udelay(10);
+ 		}
+ 
++		/*
++		 * Gate clock from PLL if PLL is locked
++		 */
+ 		if (ret == 0) {
+-			reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN2;
+-			__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
++			__raw_writel(reg | LPC32XX_CLKPWR_USBCTRL_CLK_EN2,
++				LPC32XX_CLKPWR_USB_CTRL);
++		} else {
++			__raw_writel(reg & ~(LPC32XX_CLKPWR_USBCTRL_CLK_EN1 |
++				LPC32XX_CLKPWR_USBCTRL_PLL_PWRUP),
++				LPC32XX_CLKPWR_USB_CTRL);
+ 		}
++	} else if ((enable == 0) && usb_pll_valid  && usb_pll_enable) {
++		usb_pll_valid = 0;
++		usb_pll_enable = 0;
+ 	}
+ 
+ 	return ret;
+@@ -425,7 +460,7 @@ static unsigned long local_usbpll_round_
+ 	 */
+ 	rate = rate * 1000;
+ 
+-	clkin = clk->parent->rate;
++	clkin = clk->get_rate(clk);
+ 	usbdiv = (__raw_readl(LPC32XX_CLKPWR_USBCLK_PDIV) &
+ 		LPC32XX_CLKPWR_USBPDIV_PLL_MASK) + 1;
+ 	clkin = clkin / usbdiv;
+@@ -439,7 +474,8 @@ static unsigned long local_usbpll_round_
+ 
+ static int local_usbpll_set_rate(struct clk *clk, unsigned long rate)
+ {
+-	u32 clkin, reg, usbdiv;
++	int ret = -ENODEV;
++	u32 clkin, usbdiv;
+ 	struct clk_pll_setup pllsetup;
+ 
+ 	/*
+@@ -448,7 +484,7 @@ static int local_usbpll_set_rate(struct
+ 	 */
+ 	rate = rate * 1000;
+ 
+-	clkin = clk->get_rate(clk);
++	clkin = clk->get_rate(clk->parent);
+ 	usbdiv = (__raw_readl(LPC32XX_CLKPWR_USBCLK_PDIV) &
+ 		LPC32XX_CLKPWR_USBPDIV_PLL_MASK) + 1;
+ 	clkin = clkin / usbdiv;
+@@ -457,22 +493,25 @@ static int local_usbpll_set_rate(struct
+ 	if (local_clk_find_pll_cfg(clkin, rate, &pllsetup) == 0)
+ 		return -EINVAL;
+ 
++	/*
++	 * Disable PLL clocks during PLL change
++	 */
+ 	local_usbpll_enable(clk, 0);
 -
-+#else
-+	/* LPC32XX only supports DAT_SE0 USB mode */
-+	/* This sequence is important */
+-	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
+-	reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN1;
+-	__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
+-
+-	pllsetup.analog_on = 1;
++	pllsetup.analog_on = 0;
+ 	local_clk_usbpll_setup(&pllsetup);
+ 
+-	clk->rate = clk_check_pll_setup(clkin, &pllsetup);
++	/*
++	 * Start USB PLL and check PLL status
++	 */
 +
-+	/* Disable transparent UART mode first */
-+	i2c_write(MC1_UART_EN, (ISP1301_I2C_MODE_CONTROL_1 |
-+		ISP1301_I2C_REG_CLEAR_ADDR));
-+
-+	i2c_write(~MC1_SPEED_REG, (ISP1301_I2C_MODE_CONTROL_1 |
-+		ISP1301_I2C_REG_CLEAR_ADDR));
-+	i2c_write(MC1_SPEED_REG, ISP1301_I2C_MODE_CONTROL_1);
-+	i2c_write(~0,
-+		(ISP1301_I2C_MODE_CONTROL_2 | ISP1301_I2C_REG_CLEAR_ADDR));
-+	i2c_write((MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL),
-+		ISP1301_I2C_MODE_CONTROL_2);
-+	i2c_write(~0, (ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
-+	i2c_write(MC1_DAT_SE0, ISP1301_I2C_MODE_CONTROL_1);
-+	i2c_write((OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN),
-+		ISP1301_I2C_OTG_CONTROL_1);
-+	i2c_write((OTG1_DM_PULLUP | OTG1_DP_PULLUP),
-+		(ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
-+	i2c_write(~0,
-+		 ISP1301_I2C_INTERRUPT_LATCH | ISP1301_I2C_REG_CLEAR_ADDR);
-+	i2c_write(~0,
-+		ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
-+	i2c_write(~0,
-+		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
-+
-+	/* Enable usb_need_clk clock after transceiver is initialized */
-+	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
-+
-+	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n", i2c_read16(0x00));
-+	printk(KERN_INFO "ISP1301 Product ID : 0x%04x\n", i2c_read16(0x02));
-+	printk(KERN_INFO "ISP1301 Version ID : 0x%04x\n", i2c_read16(0x14));
-+#endif
++	usb_pll_valid = 1;
++	usb_pll_enable = 1;
+ 
+-	reg = __raw_readl(LPC32XX_CLKPWR_USB_CTRL);
+-	reg |= LPC32XX_CLKPWR_USBCTRL_CLK_EN2;
+-	__raw_writel(reg, LPC32XX_CLKPWR_USB_CTRL);
++	ret = local_usbpll_enable(clk, 1);
++	if (ret >= 0)
++		clk->rate = clk_check_pll_setup(clkin, &pllsetup);
+ 
+-	return 0;
++	return ret;
  }
  
- static inline void isp1301_vbus_on(void)
-@@ -257,6 +304,7 @@ static const struct hc_driver ohci_pnx40
+ static struct clk clk_usbpll = {
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/platform.h
++++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/platform.h
+@@ -694,4 +694,7 @@
+ #define LPC32XX_GPIO_P2_MUX_CLR			_GPREG(0x02C)
+ #define LPC32XX_GPIO_P2_MUX_STATE		_GPREG(0x030)
  
- static void pnx4008_set_usb_bits(void)
- {
-+#if !defined(CONFIG_ARCH_LPC32XX)
- 	start_int_set_falling_edge(SE_USB_OTG_ATX_INT_N);
- 	start_int_ack(SE_USB_OTG_ATX_INT_N);
- 	start_int_umask(SE_USB_OTG_ATX_INT_N);
-@@ -280,16 +328,19 @@ static void pnx4008_set_usb_bits(void)
- 	start_int_set_rising_edge(SE_USB_AHB_NEED_CLK_INT);
- 	start_int_ack(SE_USB_AHB_NEED_CLK_INT);
- 	start_int_umask(SE_USB_AHB_NEED_CLK_INT);
-+#endif
- }
- 
- static void pnx4008_unset_usb_bits(void)
- {
-+#if !defined(CONFIG_ARCH_LPC32XX)
- 	start_int_mask(SE_USB_OTG_ATX_INT_N);
- 	start_int_mask(SE_USB_OTG_TIMER_INT);
- 	start_int_mask(SE_USB_I2C_INT);
- 	start_int_mask(SE_USB_INT);
- 	start_int_mask(SE_USB_NEED_CLK_INT);
- 	start_int_mask(SE_USB_AHB_NEED_CLK_INT);
-+#endif
- }
- 
- static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
++#define PNX4008_PWRMAN_BASE			LPC32XX_CLK_PM_BASE
++#define PNX4008_USB_CONFIG_BASE			LPC32XX_USB_BASE
++
+ #endif
