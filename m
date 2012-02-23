@@ -1,37 +1,75 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Thu, 23 Feb 2012 18:52:57 +0100
-Subject: [PATCH RESEND] ARM: OMAP: enable Bluetooth on the PandaBoard
-Message-ID: <1330019577-2106-1-git-send-email-mgherzan@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 Feb 2012 17:59:41 +0000
+Subject: [PATCH] ARM: LPAE: Invalidate the TLB for module addresses during
+ translation fault
+Message-ID: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PandaBoard features a Texas Instruments WiLink7 Bluetooth
-chip, supported by the "btwilink" driver.
+During the free_pgtables() call all user and modules/pkmap entries are
+removed. If a translation fault for the modules/pkmap area occurs before
+we switched away from the current pgd, do_translation_fault() would copy
+the init_mm pud into the user pud.
 
-Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+There is a small window between pud_clear() and pmd_free_tlb() in
+free_pmd_range() where the pud entry was cleared but the TLB has not
+been invalidated yet and the CPU may have cached the original (valid)
+pud entry in the TLB. A scenario like below would get stuck in
+continuous prefetch abort:
+
+1. Current process exiting. The modules pmd entries not populated
+2. exit_mmap() -> ... -> pmd_free_tlb()
+3. pud_clear() for the 1GB pud containing user stack and modules (no TLB
+   invalidation yet)
+4. Interrupt -> module interrupt routine
+5. Level 2 (pmd) translation fault occurs when executing the module
+   interrupt routine. The CPU previously cached (TLB) the old valid pud
+   value for the modules area, so we don't get a level 1 translation
+   fault
+6. do_translation fault() copies the pud_k into the pud
+7. Linux returns to the faulty instruction. Goes back to 5
+
+At point 7, since the CPU still has the old pud value, it goes back to
+point 5 and never gets out of this loop. With this patch, the stale pud
+TLB entry is invalidated after point 6 and the subsequent prefetch abort
+doesn't occur.
+
+Reported-by: Tony Thompson <Anthony.Thompson@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mach-omap2/board-omap4panda.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mm/fault.c |   13 +++++++++++--
+ 1 files changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 28fc271..b1d74d6 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -91,9 +91,15 @@ static struct platform_device leds_gpio = {
- 	},
- };
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index bb7eac3..d9aacf0 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -444,8 +444,16 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
  
-+static struct platform_device btwilink_device = {
-+	.name	= "btwilink",
-+	.id	= -1,
-+};
-+
- static struct platform_device *panda_devices[] __initdata = {
- 	&leds_gpio,
- 	&wl1271_device,
-+	&btwilink_device,
- };
+ 	if (pud_none(*pud_k))
+ 		goto bad_area;
+-	if (!pud_present(*pud))
++	if (!pud_present(*pud)) {
+ 		set_pud(pud, *pud_k);
++		/*
++		 * There is a small window during free_pgtables() where the
++		 * user *pud entry is 0 but the TLB has not been invalidated
++		 * and we get a level 2 (pmd) translation fault caused by the
++		 * intermediate TLB caching of the old level 1 (pud) entry.
++		 */
++		flush_tlb_kernel_page(addr);
++	}
  
- static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
--- 
-1.7.9.1
+ 	pmd = pmd_offset(pud, addr);
+ 	pmd_k = pmd_offset(pud_k, addr);
+@@ -468,8 +476,9 @@ do_translation_fault(unsigned long addr, unsigned int fsr,
+ #endif
+ 	if (pmd_none(pmd_k[index]))
+ 		goto bad_area;
++	if (!pmd_present(pmd[index]))
++		copy_pmd(pmd, pmd_k);
+ 
+-	copy_pmd(pmd, pmd_k);
+ 	return 0;
+ 
+ bad_area:
