@@ -1,68 +1,83 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 23 Feb 2012 15:39:08 -0600
-Subject: [PATCH v2 04/12] arm/PCI: remove arch pci_flags definition
-In-Reply-To: <20120223194322.20708.4942.stgit@bhelgaas.mtv.corp.google.com>
-References: <20120223194209.20708.54480.stgit@bhelgaas.mtv.corp.google.com>
- <20120223194322.20708.4942.stgit@bhelgaas.mtv.corp.google.com>
-Message-ID: <4F46B1FC.4050002@gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 24 Feb 2012 08:47:11 +1100
+Subject: [PATCH v3 17/21] ARM: at91: merge SRAM Memory banks thanks to
+ mirroring
+In-Reply-To: <c9b1e3ffbc322a1d1e1272062a9361abe536a33a.1330006537.git.nicolas.ferre@atmel.com>
+References: <cover.1330006537.git.nicolas.ferre@atmel.com>
+ <c9b1e3ffbc322a1d1e1272062a9361abe536a33a.1330006537.git.nicolas.ferre@atmel.com>
+Message-ID: <4F46B3DF.7010402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
+On 24/02/12 01:26, Nicolas Ferre wrote:
 
-On 02/23/2012 01:43 PM, Bjorn Helgaas wrote:
-> The PCI core provides a pci_flags definition (currently __weak), so drop
-> the arm definition in favor of that.
+> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > 
-> We EXPORT_SYMBOL(pci_flags) as arm did previously.  I'm dubious about
-> this: no other architecture exports it, and I didn't see any modules in
-> the tree that reference it.
+> On at91sam9260 and at91sam9g20 the SRAM banks are mirrored. We can
+> merge them together to be able to have bigger and continuous
+> internal RAM.
 
-I think you're right that it doesn't need to be exported.
+I think this patch needs some comments in the code. As mentioned in the
+last round, this functionality is not documented, so it is not obvious
+how/why this works. This is especially true for any user who has
+problems with this code and then tries to look up those addresses in
+their at91 manual only to find the regions are reserved.
 
-Rob
+Nicolas, are you able to give an official Atmel stance on this?
 
-> CC: Rob Herring <rob.herring@calxeda.com>
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+~Ryan
+
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
->  arch/arm/kernel/bios32.c |    2 ++
->  arch/arm/mm/iomap.c      |    3 ---
->  2 files changed, 2 insertions(+), 3 deletions(-)
+>  arch/arm/mach-at91/at91sam9260.c              |   13 +++++--------
+>  arch/arm/mach-at91/include/mach/at91sam9260.h |    4 ++++
+>  2 files changed, 9 insertions(+), 8 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index f58ba35..f3fd52b 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -525,6 +525,7 @@ void __init pci_common_init(struct hw_pci *hw)
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index 14882ae..4ade265 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -310,15 +310,12 @@ static void __init at91sam9xe_map_io(void)
 >  
->  	INIT_LIST_HEAD(&hw->buses);
->  
-> +	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
->  	if (hw->preinit)
->  		hw->preinit();
->  	pcibios_init_hw(hw);
-> @@ -559,6 +560,7 @@ void __init pci_common_init(struct hw_pci *hw)
->  		pci_bus_add_devices(bus);
->  	}
->  }
-> +EXPORT_SYMBOL(pci_flags);
->  
->  #ifndef CONFIG_PCI_HOST_ITE8152
->  void pcibios_set_master(struct pci_dev *dev)
-> diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
-> index e62956e..4614208 100644
-> --- a/arch/arm/mm/iomap.c
-> +++ b/arch/arm/mm/iomap.c
-> @@ -32,9 +32,6 @@ EXPORT_SYMBOL(pcibios_min_io);
->  unsigned long pcibios_min_mem = 0x01000000;
->  EXPORT_SYMBOL(pcibios_min_mem);
->  
-> -unsigned int pci_flags = PCI_REASSIGN_ALL_RSRC;
-> -EXPORT_SYMBOL(pci_flags);
-> -
->  void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
+>  static void __init at91sam9260_map_io(void)
 >  {
->  	if ((unsigned long)addr >= VMALLOC_START &&
-> 
+> -	if (cpu_is_at91sam9xe()) {
+> +	if (cpu_is_at91sam9xe())
+>  		at91sam9xe_map_io();
+> -	} else if (cpu_is_at91sam9g20()) {
+> -		at91_init_sram(0, AT91SAM9G20_SRAM0_BASE, AT91SAM9G20_SRAM0_SIZE);
+> -		at91_init_sram(1, AT91SAM9G20_SRAM1_BASE, AT91SAM9G20_SRAM1_SIZE);
+> -	} else {
+> -		at91_init_sram(0, AT91SAM9260_SRAM0_BASE, AT91SAM9260_SRAM0_SIZE);
+> -		at91_init_sram(1, AT91SAM9260_SRAM1_BASE, AT91SAM9260_SRAM1_SIZE);
+> -	}
+> +	else if (cpu_is_at91sam9g20())
+> +		at91_init_sram(0, AT91SAM9G20_SRAM_BASE, AT91SAM9G20_SRAM_SIZE);
+> +	else
+> +		at91_init_sram(0, AT91SAM9260_SRAM_BASE, AT91SAM9260_SRAM_SIZE);
+>  }
+>  
+>  static void __init at91sam9260_ioremap_registers(void)
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+> index 2e47b6d..08ae9af 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+> @@ -113,6 +113,8 @@
+>  #define AT91SAM9260_SRAM0_SIZE	SZ_4K		/* Internal SRAM 0 size (4Kb) */
+>  #define AT91SAM9260_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
+>  #define AT91SAM9260_SRAM1_SIZE	SZ_4K		/* Internal SRAM 1 size (4Kb) */
+> +#define AT91SAM9260_SRAM_BASE	0x002FF000	/* Internal SRAM base address */
+> +#define AT91SAM9260_SRAM_SIZE	SZ_8K		/* Internal SRAM size (8Kb) */
+>  
+>  #define AT91SAM9260_UHP_BASE	0x00500000	/* USB Host controller */
+>  
+> @@ -126,6 +128,8 @@
+>  #define AT91SAM9G20_SRAM0_SIZE	SZ_16K		/* Internal SRAM 0 size (16Kb) */
+>  #define AT91SAM9G20_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
+>  #define AT91SAM9G20_SRAM1_SIZE	SZ_16K		/* Internal SRAM 1 size (16Kb) */
+> +#define AT91SAM9G20_SRAM_BASE	0x002FC000	/* Internal SRAM base address */
+> +#define AT91SAM9G20_SRAM_SIZE	SZ_32K		/* Internal SRAM size (32Kb) */
+>  
+>  #define AT91SAM9G20_UHP_BASE	0x00500000	/* USB Host controller */
+>  
