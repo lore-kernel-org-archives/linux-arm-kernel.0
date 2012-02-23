@@ -1,43 +1,50 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 24 Feb 2012 07:27:37 +1100
-Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
- register
-In-Reply-To: <201202231335.04923.arnd@arndb.de>
-References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
- <201202231233.05622.arnd@arndb.de>
- <20120223125044.GW22562@n2100.arm.linux.org.uk>
- <201202231335.04923.arnd@arndb.de>
-Message-ID: <1330028857.20389.36.camel@pasglop>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 23 Feb 2012 21:44:40 +0100
+Subject: [PATCH 5/6] ARM: OMAP4: suspend: Do not get dsp/tesla out of reset
+In-Reply-To: <CAMQu2gzrGnWOUYacg4jvVqgjrNeHfaTJre6O5rNarQSjAuOzLg@mail.gmail.com>
+References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
+ <1330003320-17400-6-git-send-email-t-kristo@ti.com>
+ <CAMQu2gzrGnWOUYacg4jvVqgjrNeHfaTJre6O5rNarQSjAuOzLg@mail.gmail.com>
+Message-ID: <4F46A538.80008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-02-23 at 13:35 +0000, Arnd Bergmann wrote:
-> 
-> This would mean going through an indirect function call for platforms
-> where PCI is fundamentally different in hardware. We already do this
-> for CONFIG_PPC_INDIRECT_PCI, but I'd hope we can avoid this on ARM.
+On 2/23/2012 2:56 PM, Shilimkar, Santosh wrote:
+> $Subject
+> s/dsp/DSP
+> s/tesla/TESLA
 
-On PPC we do it a bit more sneakily using a bit in the address. It
-causes the inline accessor to be a big bigger but avoids the cost of the
-indirect call for the "normal" case.
+Even better... remove tesla :-)
 
-> Since devices that can bei either PCI or not are relatively rare, I'd
-> rather put them in the same category as those that can either use
-> PCI I/O space or some form of memory space and require that the
-> drivers use the "I don't care what you are, just do what I want"
-> accessors in the ioread/iowrite family that are already going through
-> an indirect function call on most architectures.
-> 
-> Also, the PCI aware readl/writel functions are already more
-> heavyweight
-> on most architectures (not on x86 though) than we want them to be,
-> because they have to do extra synchronizing operations against DMA
-> and/or spinlocks on weakly ordered architectures. We now have
-> the readl_relaxed family here, but I believe they are only used
-> for on-chip components at the moment.
+This is an internal codename that at some point should be removed from 
+the clkdm name. I just did not have the time to do that for OMAP4, but 
+it will not exist anymore on OMAP5.
 
-On-chip have the same issue vs. DMA and we wouldn't want the defaults to
-let them leak out of locks etc...
+Nit: The subject should be:
+"ARM: OMAP4: hwmod data: Do not get DSP out of reset at boot time"
 
-Cheers,
-Ben.
+Regards,
+Benoit
+
+>
+> On Thu, Feb 23, 2012 at 6:51 PM, Tero Kristo<t-kristo@ti.com>  wrote:
+>> From: Rajendra Nayak<rnayak@ti.com>
+>>
+>> With no driver handling DSP/TESLA, if brought out of reset, it stays
+>> active and does not assert standby.
+>>
+> Which lead to IVHA PD not transitiong and hence gating CHIP retention.
+> You may want to add these bits as well.
+>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+>> ---
+>
+> Patch is fine though script needs to be updated I guess
+>
+> Regards
+> Santosh
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
