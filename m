@@ -1,28 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 14:04:06 +0000
-Subject: [PATCH 0/7] share sa1100 rtc driver to arch-mmp
-In-Reply-To: <CAN1soZyL=659A2gLp_tLKaUTnBkLi1w0NgVq4SD4in1JE1v4VA@mail.gmail.com>
-References: <201202221350.00100.arnd@arndb.de>
- <CAN1soZxTutYQ=uU0y_AvBTn37es+8tBU=1L6eKtJDUNONgwHFw@mail.gmail.com>
- <87r4xmygb7.fsf@free.fr>
- <CAN1soZx84dmAVz-Kyv18+fjOJyzvun7fpbXA+rYb6xeEhQbXtQ@mail.gmail.com>
- <87booqx771.fsf@free.fr>
- <CAN1soZxbDKHjMxjNjDOXk8Ko9AyJEDGFV1XpqpiJCaL9ikNEdg@mail.gmail.com>
- <20120223100019.GK22562@n2100.arm.linux.org.uk>
- <CAN1soZwBSHJcFWojPXTY7mDdD4vw85ABoXCk5uufcTNiQzh6_A@mail.gmail.com>
- <20120223104937.GP22562@n2100.arm.linux.org.uk>
- <CAN1soZyL=659A2gLp_tLKaUTnBkLi1w0NgVq4SD4in1JE1v4VA@mail.gmail.com>
-Message-ID: <20120223140406.GX22562@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 23 Feb 2012 14:07:12 +0000
+Subject: [PATCH v3 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <20120223081235.GC8621@avionic-0098.mockup.avionic-design.de>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <201202221634.45159.arnd@arndb.de>
+ <20120223081235.GC8621@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201202231407.12981.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 09:32:30PM +0800, Haojian Zhuang wrote:
-> OK. I can keep the hard coded register definition and format patch right now.
-> The rtc register base of arch-sa1100, arch-pxa, arch-mmp are
-> different. It means
-> that I need use #ifdef CONFIG_ARCH to distinguish different arch. But I have a
-> question that removing #ifdef CONFIG_ARCH in driver code is our
-> target, isn't it?
+On Thursday 23 February 2012, Thierry Reding wrote:
+> > Is this only used for the device tree functions? If so, I would recommend
+> > making it less generic and always search for a device node.
+> 
+> It is currently only used to look up a struct pwm_chip for a given struct
+> device_node, yes. But I can see other uses for this. For instance this could
+> be useful if we ever want to provide an alternative way of requesting a PWM
+> on a per-chip basis.
 
-Yes, but we can't do that until the pxa-rtc vs sa1100-rtc issue is
-resolved.
+Nah, just keep it simple for now. If we need it later, we can still
+add something like this back, but for now it's just a source of
+confusion and possible bugs.
+
+> I was again basically looking at gpiolib for inspiration (maybe I should stop
+> doing that :-). Maybe gpiolib should be reworked to use seq_file's iterator
+> interface as well? Just in case anybody else turns to gpiolib for
+> inspiration.
+
+Good idea. Would you be able to send a patch for that, too? I would guess
+converting both at the same time would be easier for you than splitting
+the work between two people.
+
+	ARnd
