@@ -1,38 +1,23 @@
-From: ashwinc@codeaurora.org (Ashwin Chaugule)
-Date: Thu, 23 Feb 2012 11:12:59 -0500
-Subject: [PATCH] ARM: perf: add PMU hotplug notifier
-In-Reply-To: <20120223160450.GL29450@mudshark.cambridge.arm.com>
-References: <CAKHPGBaY1OFiVubic+f1vxxzNeKjmzibxraBg8eNxZnJbhYi+A@mail.gmail.com>
- <4F4661E2.9020405@codeaurora.org> <4F4662AD.6030306@codeaurora.org>
- <20120223160450.GL29450@mudshark.cambridge.arm.com>
-Message-ID: <4F46658B.3030903@codeaurora.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 23 Feb 2012 18:16:59 +0200
+Subject: [PATCH v2 2/2] iommu/omap: fix NULL pointer dereference
+In-Reply-To: <20120223161109.GB2454@amd.com>
+References: <1329902086-13868-1-git-send-email-ohad@wizery.com>
+ <20120223161109.GB2454@amd.com>
+Message-ID: <CAK=WgbYufgQY-O_MBcXc3aE23sx+r5ZQLS4h_bLUh6DKpLVqAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/23/2012 11:04 AM, Will Deacon wrote:
-> 
-> Ok. Note that the perf core will actually destroy perf events on a hotplug
-> down notification, so profiling runs will be dead on that core even if it
-> comes back up.
-> 
-> This patch just ensures that we have a sane state in the control registers
-> given that their state is UNKNOWN out of reset. Adding full hotplug support
-> to perf (that is, supporting hotplug events during a run and representing
-> that in a meaningful way) is a larger issue.
-> 
->>> I'll send a link to my code once the git server is up. It's a bit flaky today.
-> 
-> Ok, cool. Are you happy with me to proceed with the current code for the
-> time being?
-> 
+On Thu, Feb 23, 2012 at 6:11 PM, Joerg Roedel <Joerg.Roedel@amd.com> wrote:
+> I guess these patches are 3.3 material?
 
-Sure. We'll need to be able to distinguish between a hotplug and a CPU
-power-collapse / deep sleep / what-have-you state in this code at some
-point since they all have a different effect on the PMU regs.
+Yes.
 
-Cheers,
-Ashwin
+> How about tagging them for stable too?
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Good point. But it's only relevant for this 2nd patch (the NULL
+pointer dereference fix), as the first one is a 3.3 regression. Let me
+know if you want me to resend the 2nd one with the stable tag.
+
+Thanks,
+Ohad.
