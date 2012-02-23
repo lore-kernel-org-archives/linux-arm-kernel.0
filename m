@@ -1,32 +1,62 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 23 Feb 2012 18:21:52 +0200
-Subject: [PATCH] ARM: tegra: Avoid compiling cpuidle code when not configured
-Message-ID: <1330014112-26203-1-git-send-email-pdeschrijver@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Feb 2012 16:26:35 +0000
+Subject: [PATCH v3 4/7] ARM: sa1100: clean up clock support
+In-Reply-To: <1330012851-13693-5-git-send-email-haojian.zhuang@marvell.com>
+References: <1330012851-13693-1-git-send-email-haojian.zhuang@marvell.com>
+ <1330012851-13693-5-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20120223162635.GZ22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to compile cpuidle.c and sleep.S if cpuidle isn't configured in the
-kernel.
+On Fri, Feb 24, 2012 at 12:00:48AM +0800, Haojian Zhuang wrote:
+>  int clk_enable(struct clk *clk)
+>  {
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&clocks_lock, flags);
+>  	if (clk->enabled++ == 0)
+> -		clk_gpio27_enable();
+> +		clk->ops->enable(clk);
+>  	spin_unlock_irqrestore(&clocks_lock, flags);
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/mach-tegra/Makefile |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+If we're going to allow clk to be NULL, this needs:
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 82994c0..d4c1a6b 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -7,8 +7,8 @@ obj-y                                   += clock.o
- obj-y                                   += timer.o
- obj-y                                   += pinmux.o
- obj-y					+= fuse.o
--obj-y					+= cpuidle.o
--obj-y					+= sleep.o
-+obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
-+obj-$(CONFIG_CPU_IDLE)			+= sleep.o
- obj-y					+= pmc.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= powergate.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+	if (clk) {
+		...
+	}
+
+around it.
+
+> +
+>  	return 0;
+>  }
+>  EXPORT_SYMBOL(clk_enable);
+> @@ -76,13 +72,26 @@ void clk_disable(struct clk *clk)
+>  
+>  	spin_lock_irqsave(&clocks_lock, flags);
+>  	if (--clk->enabled == 0)
+> -		clk_gpio27_disable();
+> +		clk->ops->disable(clk);
+>  	spin_unlock_irqrestore(&clocks_lock, flags);
+
+Same here.
+
+>  }
+>  EXPORT_SYMBOL(clk_disable);
+>  
+> -unsigned long clk_get_rate(struct clk *clk)
+> +const struct clkops clk_gpio27_ops = {
+> +	.enable		= clk_gpio27_enable,
+> +	.disable	= clk_gpio27_disable,
+> +};
+> +
+> +static DEFINE_CLK(gpio27, &clk_gpio27_ops);
+> +
+> +static struct clk_lookup sa11xx_clkregs[] = {
+> +	CLKDEV_INIT("sa1111.0", NULL, &clk_gpio27),
+> +	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
+
+And as this introduces NULL clock, the above needs to be part of this
+patch.
+
+Apart from that, it's fine.
