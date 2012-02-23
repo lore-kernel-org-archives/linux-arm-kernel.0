@@ -1,49 +1,81 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 23 Feb 2012 23:23:19 +0100
-Subject: [PATCH 3/5] ARM: OMAP2+: wakeupgen: Fix wrong array size for
- irq_target_cpu
+Date: Thu, 23 Feb 2012 23:23:20 +0100
+Subject: [PATCH 4/5] ARM: OMAP2+: gpmc: Use irq_alloc_descs instead of static
+ IRQ range
 In-Reply-To: <1330035801-14937-1-git-send-email-b-cousson@ti.com>
 References: <1330035801-14937-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1330035801-14937-4-git-send-email-b-cousson@ti.com>
+Message-ID: <1330035801-14937-5-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wakeupgen was wrongly allocating an array based on the
-NR_IRQS value (410 on OMAP4) whereas it is just capable of handling 128
-entries.
-Moreover with SPARSE_IRQ, the NR_IRQS number might be 16, and thus
-cannot handle the proper number of entries. It will generate an oops as
-soon a driver will request an IRQ > 16.
+The gpmc code is still not a proper driver and is still using the bad old
+static way of declaring its IRQ range for the various CS it can handle (8).
 
-Allocate the array using the fixed MAX_IRQS value (128).
+Use irq_alloc_descs to get dynamically a set of IRQ descriptors.
+Clean some bad line wrapping here and there.
+
+Please note that this code is still not a real driver after this fix, and
+will require a massive cleanup...
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap-wakeupgen.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/gpmc.c |   22 +++++++++++++++-------
+ 1 files changed, 15 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index d3d8971..bec55e1 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -45,7 +45,7 @@ static void __iomem *wakeupgen_base;
- static void __iomem *sar_base;
- static DEFINE_PER_CPU(u32 [NR_REG_BANKS], irqmasks);
- static DEFINE_SPINLOCK(wakeupgen_lock);
--static unsigned int irq_target_cpu[NR_IRQS];
-+static unsigned int irq_target_cpu[MAX_IRQS];
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index dfffbbf..95ea50a 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -103,6 +103,8 @@ static struct clk *gpmc_l3_clk;
  
- /*
-  * Static helper functions.
-@@ -379,7 +379,7 @@ int __init omap_wakeupgen_init(void)
- 	 */
+ static irqreturn_t gpmc_handle_irq(int irq, void *dev);
  
- 	/* Associate all the IRQs to boot CPU like GIC init does. */
--	for (i = 0; i < NR_IRQS; i++)
-+	for (i = 0; i < MAX_IRQS; i++)
- 		irq_target_cpu[i] = boot_cpu;
++static int irq_base;
++
+ static void gpmc_write_reg(int idx, u32 val)
+ {
+ 	__raw_writel(val, gpmc_base + idx);
+@@ -747,7 +749,13 @@ static int __init gpmc_init(void)
+ 	gpmc_mem_init();
  
- 	irq_hotplug_init();
+ 	/* initalize the irq_chained */
+-	irq = OMAP_GPMC_IRQ_BASE;
++	irq_base = irq_alloc_descs(-1, 0, GPMC_CS_NUM, 0);
++	if (irq_base < 0) {
++		pr_err("%s() Couldn't allocate IRQs\n", __func__);
++		return -ENODEV;
++	}
++
++	irq = irq_base;
+ 	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
+ 		irq_set_chip_and_handler(irq, &dummy_irq_chip,
+ 						handle_simple_irq);
+@@ -755,11 +763,11 @@ static int __init gpmc_init(void)
+ 		irq++;
+ 	}
+ 
+-	ret = request_irq(gpmc_irq,
+-			gpmc_handle_irq, IRQF_SHARED, "gpmc", gpmc_base);
++	ret = request_irq(gpmc_irq, gpmc_handle_irq, IRQF_SHARED, "gpmc",
++			  gpmc_base);
+ 	if (ret)
+-		pr_err("gpmc: irq-%d could not claim: err %d\n",
+-						gpmc_irq, ret);
++		pr_err("gpmc: irq-%d could not claim: err %d\n", gpmc_irq, ret);
++
+ 	return ret;
+ }
+ postcore_initcall(gpmc_init);
+@@ -770,8 +778,8 @@ static irqreturn_t gpmc_handle_irq(int irq, void *dev)
+ 
+ 	/* check cs to invoke the irq */
+ 	cs = ((gpmc_read_reg(GPMC_PREFETCH_CONFIG1)) >> CS_NUM_SHIFT) & 0x7;
+-	if (OMAP_GPMC_IRQ_BASE+cs <= OMAP_GPMC_IRQ_END)
+-		generic_handle_irq(OMAP_GPMC_IRQ_BASE+cs);
++	if (cs <= GPMC_CS_NUM)
++		generic_handle_irq(irq_base + cs);
+ 
+ 	return IRQ_HANDLED;
+ }
 -- 
 1.7.0.4
