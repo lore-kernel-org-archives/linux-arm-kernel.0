@@ -1,62 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 16:26:35 +0000
-Subject: [PATCH v3 4/7] ARM: sa1100: clean up clock support
-In-Reply-To: <1330012851-13693-5-git-send-email-haojian.zhuang@marvell.com>
+Date: Thu, 23 Feb 2012 16:27:38 +0000
+Subject: [PATCH v3 5/7] ARM: pxa: add rtc dummy clock
+In-Reply-To: <1330012851-13693-6-git-send-email-haojian.zhuang@marvell.com>
 References: <1330012851-13693-1-git-send-email-haojian.zhuang@marvell.com>
- <1330012851-13693-5-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20120223162635.GZ22562@n2100.arm.linux.org.uk>
+ <1330012851-13693-6-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <20120223162738.GA22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 12:00:48AM +0800, Haojian Zhuang wrote:
->  int clk_enable(struct clk *clk)
->  {
->  	unsigned long flags;
->  
->  	spin_lock_irqsave(&clocks_lock, flags);
->  	if (clk->enabled++ == 0)
-> -		clk_gpio27_enable();
-> +		clk->ops->enable(clk);
->  	spin_unlock_irqrestore(&clocks_lock, flags);
+On Fri, Feb 24, 2012 at 12:00:49AM +0800, Haojian Zhuang wrote:
+> sa1100-rtc driver could be shared among sa1100/pxa/mmp series silicon.
+> Since clk is used in mmp series silicon, add dummy clock support in
+> pxa also.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> ---
+>  arch/arm/mach-pxa/pxa25x.c |    1 +
+>  arch/arm/mach-pxa/pxa27x.c |    1 +
+>  arch/arm/mach-pxa/pxa3xx.c |    1 +
+>  arch/arm/mach-pxa/pxa95x.c |    1 +
+>  4 files changed, 4 insertions(+), 0 deletions(-)
 
-If we're going to allow clk to be NULL, this needs:
-
-	if (clk) {
-		...
-	}
-
-around it.
-
-> +
->  	return 0;
->  }
->  EXPORT_SYMBOL(clk_enable);
-> @@ -76,13 +72,26 @@ void clk_disable(struct clk *clk)
->  
->  	spin_lock_irqsave(&clocks_lock, flags);
->  	if (--clk->enabled == 0)
-> -		clk_gpio27_disable();
-> +		clk->ops->disable(clk);
->  	spin_unlock_irqrestore(&clocks_lock, flags);
-
-Same here.
-
->  }
->  EXPORT_SYMBOL(clk_disable);
->  
-> -unsigned long clk_get_rate(struct clk *clk)
-> +const struct clkops clk_gpio27_ops = {
-> +	.enable		= clk_gpio27_enable,
-> +	.disable	= clk_gpio27_disable,
-> +};
-> +
-> +static DEFINE_CLK(gpio27, &clk_gpio27_ops);
-> +
-> +static struct clk_lookup sa11xx_clkregs[] = {
-> +	CLKDEV_INIT("sa1111.0", NULL, &clk_gpio27),
-> +	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
-
-And as this introduces NULL clock, the above needs to be part of this
-patch.
-
-Apart from that, it's fine.
+This is missing changes in arch/arm/mach-pxa/clock.c to prevent clk_enable()
+etc oopsing when called with a NULL clock.
