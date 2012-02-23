@@ -1,54 +1,334 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 23 Feb 2012 19:52:18 +0000
-Subject: [PATCH 2/2 v2] arm: kirkwood: convert uart0 to devicetree.
+Date: Thu, 23 Feb 2012 19:52:17 +0000
+Subject: [PATCH 1/2 v5] arm: kirkwood: add dreamplug (fdt) support.
 In-Reply-To: <cover.1330025976.git.jason@lakedaemon.net>
 References: <cover.1330025976.git.jason@lakedaemon.net>
-Message-ID: <9f193336dc57b808bc6c7b86b84770a6ba313cb7.1330025976.git.jason@lakedaemon.net>
+Message-ID: <1192198e66f9a30eb13fa427240e91fb7f0a49e4.1330025976.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uart is the primary console for the dreamplug.  Removed
-kirkwood_uart0_init() call from board-dt.c.
+Initially, copied guruplug-setup.c and did s/guruplug/dreamplug/g.
+Then, switched to SPI based NOR flash.
+
+After talking to Arnd Bergman, chose an incremental approach to adding
+devicetree support.  First, we use the dtb to tell us we are on the
+dreamplug, then we gradually port over drivers.
+
+Driver porting will start with the uart (see next patch), and progress
+from there.  Possibly, spi/flash/partitions will be next.
+
+When done, board-dt.c will no longer be dreamplug specific, and dt's can
+be made for the other kirkwood boards.
 
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
 Changes from v1
 
-    - moved serial config from kirkwood.dtsi to kirkwood-dreamplug.dts as
-      suggested by Arnd Bergman.
+   - attempting dts, looking for pointers.
 
- arch/arm/boot/dts/kirkwood-dreamplug.dts |    7 +++++++
- arch/arm/mach-kirkwood/board-dt.c        |    2 --
- 2 files changed, 7 insertions(+), 2 deletions(-)
+Changes from v2
+
+   - resubmit as MACH_TYPE_DREAMPLUG (3550) is in arm/for-next, rebased
+     against same.
+   - removed lame fdt attempt, others are working on kirkwood fdt.  Will
+     convert once kirkwood fdt is mainline.
+   - s/boot_params/atag_offset/
+   - added kirkwood_reset
+   - 1 checkpatch.pl warning (help in Kconfig), looks the same as all
+     other kirkwood boards...
+
+Changes from v3
+
+   - rebased against v3.3-rc3 (recommended by Arnd)
+   - use devicetree to determine which board we are on
+   - added patch to configure uart0 from devicetree
+
+Changes from v4
+
+   - fixed Kconfig logic so user can always see 'Dreamplug' in menuconfig.
+   - changed 'marvell,dreamplug' to 'globalscale,dreamplug' as suggested by
+     Grant Likely.
+   - fixed of_machine_is_compatible() logic for calling dreamplug specific
+     init functions.
+
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   18 +++
+ arch/arm/boot/dts/kirkwood.dtsi          |    6 +
+ arch/arm/mach-kirkwood/Kconfig           |   14 +++
+ arch/arm/mach-kirkwood/Makefile          |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot     |    2 +
+ arch/arm/mach-kirkwood/board-dt.c        |  182 ++++++++++++++++++++++++++++++
+ 6 files changed, 223 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-dreamplug.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-dt.c
 
 diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index 765813f..9cdda80 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
+new file mode 100644
+index 0000000..765813f
+--- /dev/null
 +++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -15,4 +15,11 @@
- 		bootargs = "console=ttyS0,115200n8 earlyprintk";
- 	};
- 
-+	serial at f1012000 {
-+		compatible = "ns16550a";
-+		reg = <0xf1012000 0xff>;
-+		reg-shift = <2>;
-+		interrupts = <33>;
-+		clock-frequency = <200000000>;
+@@ -0,0 +1,18 @@
++/dts-v1/;
++
++/include/ "kirkwood.dtsi"
++
++/ {
++	model = "Globalscale Technologies Dreamplug";
++	compatible = "globalscale,dreamplug", "globalscale,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x20000000>;
 +	};
- };
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 76392af..fbe6405 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -140,8 +140,6 @@ static void __init dreamplug_init(void)
- 	 */
- 	kirkwood_mpp_conf(dreamplug_mpp_config);
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 earlyprintk";
++	};
++
++};
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+new file mode 100644
+index 0000000..18fd47e
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -0,0 +1,6 @@
++/include/ "skeleton.dtsi"
++
++/ {
++	compatible = "globalscale,kirkwood";
++};
++
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 7fc603b..90ceab7 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -44,6 +44,20 @@ config MACH_GURUPLUG
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell GuruPlug Reference Board.
  
--	kirkwood_uart0_init();
--
- 	spi_register_board_info(dreamplug_spi_slave_info,
- 				ARRAY_SIZE(dreamplug_spi_slave_info));
- 	kirkwood_spi_init();
++config ARCH_KIRKWOOD_DT
++	bool "Marvell Kirkwood Flattened Device Tree"
++	select USE_OF
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell Kirkwood using flattened device tree.
++
++config MACH_DREAMPLUG_DT
++	bool "Marvell DreamPlug (Flattened Device Tree)"
++	select ARCH_KIRKWOOD_DT
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Marvell DreamPlug (Flattened Device Tree).
++
+ config MACH_TS219
+ 	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
+ 	help
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 5dcaa81..acbc5e1 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -20,3 +20,4 @@ obj-$(CONFIG_MACH_NET5BIG_V2)		+= netxbig_v2-setup.o lacie_v2-common.o
+ obj-$(CONFIG_MACH_T5325)		+= t5325-setup.o
+ 
+ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
++obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
+diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
+index 760a0ef..16f9385 100644
+--- a/arch/arm/mach-kirkwood/Makefile.boot
++++ b/arch/arm/mach-kirkwood/Makefile.boot
+@@ -1,3 +1,5 @@
+    zreladdr-y	+= 0x00008000
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
++
++dtb-$(CONFIG_MACH_DREAMPLUG_DT) += kirkwood-dreamplug.dtb
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+new file mode 100644
+index 0000000..76392af
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -0,0 +1,182 @@
++/*
++ * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
++ *
++ * arch/arm/mach-kirkwood/board-dt.c
++ *
++ * Marvell DreamPlug Reference Board Setup
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/partitions.h>
++#include <linux/ata_platform.h>
++#include <linux/mv643xx_eth.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_fdt.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/gpio.h>
++#include <linux/leds.h>
++#include <linux/mtd/physmap.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/orion_spi.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <mach/kirkwood.h>
++#include <plat/mvsdio.h>
++#include "common.h"
++#include "mpp.h"
++
++static struct of_device_id kirkwood_dt_match_table[] __initdata = {
++	{ .compatible = "simple-bus", },
++	{ }
++};
++
++struct mtd_partition dreamplug_partitions[] = {
++	{
++		.name	= "u-boot",
++		.size	= SZ_512K,
++		.offset = 0,
++	},
++	{
++		.name	= "u-boot env",
++		.size	= SZ_64K,
++		.offset = SZ_512K + SZ_512K,
++	},
++	{
++		.name	= "dtb",
++		.size	= SZ_64K,
++		.offset = SZ_512K + SZ_512K + SZ_512K,
++	},
++};
++
++static const struct flash_platform_data dreamplug_spi_slave_data = {
++	.type		= "mx25l1606e",
++	.name		= "spi_flash",
++	.parts		= dreamplug_partitions,
++	.nr_parts	= ARRAY_SIZE(dreamplug_partitions),
++};
++
++static struct spi_board_info __initdata dreamplug_spi_slave_info[] = {
++	{
++		.modalias	= "m25p80",
++		.platform_data	= &dreamplug_spi_slave_data,
++		.irq		= -1,
++		.max_speed_hz	= 50000000,
++		.bus_num	= 0,
++		.chip_select	= 0,
++	},
++};
++
++static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
++};
++
++static struct mv643xx_eth_platform_data dreamplug_ge01_data = {
++	.phy_addr	= MV643XX_ETH_PHY_ADDR(1),
++};
++
++static struct mv_sata_platform_data dreamplug_sata_data = {
++	.n_ports	= 1,
++};
++
++static struct mvsdio_platform_data dreamplug_mvsdio_data = {
++	/* unfortunately the CD signal has not been connected */
++};
++
++static struct gpio_led dreamplug_led_pins[] = {
++	{
++		.name			= "dreamplug:blue:bluetooth",
++		.gpio			= 47,
++		.active_low		= 1,
++	},
++	{
++		.name			= "dreamplug:green:wifi",
++		.gpio			= 48,
++		.active_low		= 1,
++	},
++	{
++		.name			= "dreamplug:green:wifi_ap",
++		.gpio			= 49,
++		.active_low		= 1,
++	},
++};
++
++static struct gpio_led_platform_data dreamplug_led_data = {
++	.leds		= dreamplug_led_pins,
++	.num_leds	= ARRAY_SIZE(dreamplug_led_pins),
++};
++
++static struct platform_device dreamplug_leds = {
++	.name	= "leds-gpio",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &dreamplug_led_data,
++	}
++};
++
++static unsigned int dreamplug_mpp_config[] __initdata = {
++	MPP0_SPI_SCn,
++	MPP1_SPI_MOSI,
++	MPP2_SPI_SCK,
++	MPP3_SPI_MISO,
++	MPP47_GPIO,	/* Bluetooth LED */
++	MPP48_GPIO,	/* Wifi LED */
++	MPP49_GPIO,	/* Wifi AP LED */
++	0
++};
++
++static void __init dreamplug_init(void)
++{
++	/*
++	 * Basic setup. Needs to be called early.
++	 */
++	kirkwood_mpp_conf(dreamplug_mpp_config);
++
++	kirkwood_uart0_init();
++
++	spi_register_board_info(dreamplug_spi_slave_info,
++				ARRAY_SIZE(dreamplug_spi_slave_info));
++	kirkwood_spi_init();
++
++	kirkwood_ehci_init();
++	kirkwood_ge00_init(&dreamplug_ge00_data);
++	kirkwood_ge01_init(&dreamplug_ge01_data);
++	kirkwood_sata_init(&dreamplug_sata_data);
++	kirkwood_sdio_init(&dreamplug_mvsdio_data);
++
++	platform_device_register(&dreamplug_leds);
++}
++
++static void __init kirkwood_dt_init(void)
++{
++	kirkwood_init();
++
++	if (of_machine_is_compatible("globalscale,dreamplug"))
++		dreamplug_init();
++
++	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
++}
++
++static const char *kirkwood_dt_board_compat[] = {
++	"globalscale,dreamplug",
++	NULL
++};
++
++DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
++	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
++	.map_io		= kirkwood_map_io,
++	.init_early	= kirkwood_init_early,
++	.init_irq	= kirkwood_init_irq,
++	.timer		= &kirkwood_timer,
++	.init_machine	= kirkwood_dt_init,
++	.restart	= kirkwood_restart,
++	.dt_compat	= kirkwood_dt_board_compat,
++MACHINE_END
 -- 
 1.7.3.4
