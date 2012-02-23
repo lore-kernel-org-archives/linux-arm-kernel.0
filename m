@@ -1,18 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Feb 2012 12:49:16 +0000
-Subject: [PATCH v2 1/2] GPIO: LPC32xx: Fix missing bit selection mask
-In-Reply-To: <1329845828-26497-1-git-send-email-stigge@antcom.de>
-References: <1329845828-26497-1-git-send-email-stigge@antcom.de>
-Message-ID: <201202231249.17206.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Feb 2012 12:50:44 +0000
+Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
+ register
+In-Reply-To: <201202231233.05622.arnd@arndb.de>
+References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
+ <4F462444.8060406@st.com> <20120223113801.GV22562@n2100.arm.linux.org.uk>
+ <201202231233.05622.arnd@arndb.de>
+Message-ID: <20120223125044.GW22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 February 2012, Roland Stigge wrote:
-> Add missing mask to pin bit selection in gpio-lpc32xx.c
-> (#define GPIO3_PIN_IN_SEL)
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+On Thu, Feb 23, 2012 at 12:33:04PM +0000, Arnd Bergmann wrote:
+> 3. Add a new set of consistent accessors that are explicitly meant for
+> non-PCI on-chip components and make sure we really get them right this
+> time and can retire some of the other ones eventually. This means it
+> needs to be completely arch independent, include relaxed and strict
+> accesses, little-endian/cpu-endian/native-endian and a well-documented
+> address space (or more than one).
 
-Sorry I picked on the old thread first.
+That won't work.  What's behind PCI in one area is on-chip on another.
+See that with various PXA peripherals appearing behind PCI devices on
+x86.  That's also happening with AMBA peripherals as well.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+We *really* need to get away from that "PCI is special and has its own
+accessors" or "on chip is special and has its own accessors" madness.
+That's already starting to bite as being wrong.
