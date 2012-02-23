@@ -1,102 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 23 Feb 2012 15:58:15 +0000
-Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU IRQ
- handlers
-In-Reply-To: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
-References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1330012696-13472-4-git-send-email-will.deacon@arm.com>
+Date: Thu, 23 Feb 2012 15:58:12 +0000
+Subject: [PATCH 0/4] perf IRQ fixes
+Message-ID: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMU IRQ handlers in perf assume that if a counter has overflowed
-then perf must be responsible. In the paranoid world of crazy hardware,
-this could be false, so check that we do have a valid event before
-attempting to dereference NULL in the interrupt path.
+Hello,
 
-Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/perf_event_v6.c     |   20 ++------------------
- arch/arm/kernel/perf_event_v7.c     |    4 ++++
- arch/arm/kernel/perf_event_xscale.c |    6 ++++++
- 3 files changed, 12 insertions(+), 18 deletions(-)
+This series is a set of fixes to the IRQ handling for perf-events on
+ARM. Thanks to Ming Lei for identifying a couple of the issues addressed
+here.
 
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-index 88bf152..b78af0c 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -467,23 +467,6 @@ armv6pmu_enable_event(struct hw_perf_event *hwc,
- 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
- }
- 
--static int counter_is_active(unsigned long pmcr, int idx)
--{
--	unsigned long mask = 0;
--	if (idx == ARMV6_CYCLE_COUNTER)
--		mask = ARMV6_PMCR_CCOUNT_IEN;
--	else if (idx == ARMV6_COUNTER0)
--		mask = ARMV6_PMCR_COUNT0_IEN;
--	else if (idx == ARMV6_COUNTER1)
--		mask = ARMV6_PMCR_COUNT1_IEN;
--
--	if (mask)
--		return pmcr & mask;
--
--	WARN_ONCE(1, "invalid counter number (%d)\n", idx);
--	return 0;
--}
--
- static irqreturn_t
- armv6pmu_handle_irq(int irq_num,
- 		    void *dev)
-@@ -513,7 +496,8 @@ armv6pmu_handle_irq(int irq_num,
- 		struct perf_event *event = cpuc->events[idx];
- 		struct hw_perf_event *hwc;
- 
--		if (!counter_is_active(pmcr, idx))
-+		/* Ignore if we don't have an event. */
-+		if (!event)
- 			continue;
- 
- 		/*
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 050cc8b..4d7095a 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -960,6 +960,10 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
- 		struct perf_event *event = cpuc->events[idx];
- 		struct hw_perf_event *hwc;
- 
-+		/* Ignore if we don't have an event. */
-+		if (!event)
-+			continue;
-+
- 		/*
- 		 * We have a single interrupt for all counters. Check that
- 		 * each counter has overflowed before we process it.
-diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
-index 831e019..a5bbd36 100644
---- a/arch/arm/kernel/perf_event_xscale.c
-+++ b/arch/arm/kernel/perf_event_xscale.c
-@@ -255,6 +255,9 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
- 		struct perf_event *event = cpuc->events[idx];
- 		struct hw_perf_event *hwc;
- 
-+		if (!event)
-+			continue;
-+
- 		if (!xscale1_pmnc_counter_has_overflowed(pmnc, idx))
- 			continue;
- 
-@@ -592,6 +595,9 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
- 		struct perf_event *event = cpuc->events[idx];
- 		struct hw_perf_event *hwc;
- 
-+		if (!event)
-+			continue;
-+
- 		if (!xscale2_pmnc_counter_has_overflowed(pmnc, idx))
- 			continue;
- 
+I tested the xscale2 changes on my Gumstix Verdex (PXA270 although the
+board isn't actually supported in mainline), the v6 changes on a PB1176
+and the v7 changes on a Cortex-A9 vexpress.
+
+I think all of these are candidates for -stable, although it may be too
+late for the final cut of 3.3.
+
+All comments welcome,
+
+Will
+
+
+Will Deacon (4):
+  ARM: perf: limit sample_period to half max_period in non-sampling
+    mode
+  ARM: perf: clear overflow flag when disabling counter on ARMv7 PMU
+  ARM: perf: check that we have an event in the PMU IRQ handlers
+  ARM: perf: fix overflow handling for xscale2 PMUs
+
+ arch/arm/include/asm/pmu.h          |    2 +-
+ arch/arm/kernel/perf_event.c        |   22 +++++++++++-----------
+ arch/arm/kernel/perf_event_v6.c     |   22 +++-------------------
+ arch/arm/kernel/perf_event_v7.c     |   11 ++++++++++-
+ arch/arm/kernel/perf_event_xscale.c |   20 ++++++++++++++++----
+ 5 files changed, 41 insertions(+), 36 deletions(-)
+
 -- 
 1.7.4.1
