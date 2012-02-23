@@ -1,75 +1,49 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 23 Feb 2012 07:01:51 +0100
-Subject: [PATCH v2 02/19] ARM: at91/at91x40: remove use of
- at91_sys_read/write
-In-Reply-To: <4F45B985.1000204@gmail.com>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <fac36a5ab9fe5a8bd977d2305eeccad48389cbb5.1329903206.git.nicolas.ferre@atmel.com>
- <4F456AAF.3090809@gmail.com>
- <20120223032503.GA20176@game.jcrosoft.org>
- <4F45B985.1000204@gmail.com>
-Message-ID: <20120223060151.GD20176@game.jcrosoft.org>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 23 Feb 2012 07:10:39 +0100
+Subject: [PATCH v3 09/10] pwm: Add PXA support
+In-Reply-To: <201202221540.16897.arnd@arndb.de>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <1329923841-32017-10-git-send-email-thierry.reding@avionic-design.de>
+ <201202221540.16897.arnd@arndb.de>
+Message-ID: <20120223061039.GB21091@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:59 Thu 23 Feb     , Ryan Mallon wrote:
-> On 23/02/12 14:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
+* Arnd Bergmann wrote:
+> On Wednesday 22 February 2012, Thierry Reding wrote:
+> > 
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > ---
+> > Changes in v3:
+> >   - update PWM ops for changes in patch 2
+> > 
+> >  arch/arm/plat-pxa/Makefile |    1 -
+> >  arch/arm/plat-pxa/pwm.c    |  304 --------------------------------------------
+> >  drivers/pwm/Kconfig        |    9 ++
+> >  drivers/pwm/Makefile       |    1 +
+> >  drivers/pwm/pwm-pxa.c      |  244 +++++++++++++++++++++++++++++++++++
+> >  5 files changed, 254 insertions(+), 305 deletions(-)
+> >  delete mode 100644 arch/arm/plat-pxa/pwm.c
+> >  create mode 100644 drivers/pwm/pwm-pxa.c
 > 
-> > On 09:22 Thu 23 Feb     , Ryan Mallon wrote:
-> >> On 22/02/12 20:39, Nicolas Ferre wrote:
-> >>
-> >>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>>
-> >>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >>> ---
-> >>>  arch/arm/mach-at91/at91x40.c              |    2 +-
-> >>>  arch/arm/mach-at91/at91x40_time.c         |   28 +++++++++++++++++-----------
-> >>>  arch/arm/mach-at91/include/mach/at91x40.h |   18 +++++++++---------
-> >>>  3 files changed, 27 insertions(+), 21 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-> >>> index 0154b7f..5400a1d 100644
-> >>> --- a/arch/arm/mach-at91/at91x40.c
-> >>> +++ b/arch/arm/mach-at91/at91x40.c
-> >>> @@ -44,7 +44,7 @@ static void at91x40_idle(void)
-> >>>  	 * Disable the processor clock.  The processor will be automatically
-> >>>  	 * re-enabled by an interrupt or by a reset.
-> >>>  	 */
-> >>> -	at91_sys_write(AT91_PS_CR, AT91_PS_CR_CPU);
-> >>> +	__raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
-> >>
-> >>
-> >> This doesn't seem to be equivalent, at91_sys_write does:
-> >>
-> >>   void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
-> >>   __raw_writel(value, addr + reg_offset);
-> >>
-> >> and this patch doesn't redefine AT91_PS_CR. Was it broken before this
-> >> patch? What am I missing?
-> > this is right
-> > #define AT91_PS_CR      (AT91_PS + 0)   /* PS Control register */
-> 
-> 
-> That doesn't answer my question.
-> 
-> The old, at91_sys_write, version was writing to (using __raw_writel):
-> 
->   AT91_VA_BASE_SYS + AT91_PS_CR
-> 
-> The new version is writing, also using __raw_writel, to:
-> 
->   AT91_PS_CR
-> 
-> The value of AT91_PS_CR is not changed in this patch. Assuming that
-> AT91_VA_BASE_SYS for at91x40 (which at a quick glance it is not), then
-> the old and the new version of the code are not writing to the same
-> address.
-> 
-> Was it previously incorrect, or is it incorrect now?
-it's as we update
+> Since most of this patch is a move of one file, it would help to use the -M
+> flag to git-format-patch so we can see the actual change.
 
-+#define AT91_PS		0xffff4000	/* Power Save */
+Okay, I'll make a note and see how that works out in the next version.
 
-Best Regards,
-J.
+> To make it even more explicit, you could separate the patches that move the
+> files around from the ones that convert the drivers to the new API.
+
+Sascha already mentioned that he has all of the in-tree drivers converted to
+the PWM framework, so if it is acceptable I'll leave that up to him. This
+series ports the Blackfin and PXA drivers merely as reference drivers to test
+the framework.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120223/2ca01bd4/attachment.sig>
