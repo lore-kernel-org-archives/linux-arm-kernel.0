@@ -1,46 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 23 Feb 2012 15:34:22 +0000
-Subject: [PATCH] regulator: twl6030: add support for vdd1, vdd2 and vdd3
- regulators
-In-Reply-To: <1329995109-4795-1-git-send-email-t-kristo@ti.com>
-References: <1329995109-4795-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20120223153422.GF4553@opensource.wolfsonmicro.com>
+From: timur@freescale.com (Timur Tabi)
+Date: Thu, 23 Feb 2012 09:40:00 -0600
+Subject: [PATCH 1/4] ASoC: imx: add an explicit Kconfig option for imx-ssi
+ driver
+In-Reply-To: <1330008519-3584-2-git-send-email-shawn.guo@linaro.org>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F465DD0.1020304@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 01:05:09PM +0200, Tero Kristo wrote:
+Shawn Guo wrote:
 
-> +static int twl6030coresmps_set_voltage(struct regulator_dev *rdev, int min_uV,
-> +	int max_uV, unsigned *selector)
-> +{
-> +	struct twlreg_info *info = rdev_get_drvdata(rdev);
-> +
-> +	if (info->set_voltage)
-> +		return info->set_voltage(info->data, min_uV);
-> +
-> +	return 0;
-> +}
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-This should be returning an error if it failed to set the voltage.
-Since you're using min_uV as the "register value" you probably ought to
-be returning that as the selector too and supplying a list_voltage()
-which just passes the selector back in case something tries to use it
-and gets confused.
+Since when do you work for Linaro?
 
-> +static int twl6030coresmps_get_voltage(struct regulator_dev *rdev)
-> +{
-> +	struct twlreg_info *info = rdev_get_drvdata(rdev);
+> ---
+>  sound/soc/imx/Kconfig  |    7 +++++++
+>  sound/soc/imx/Makefile |    4 ++--
+>  2 files changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
+> index 863a6b4..b9de8a8 100644
+> --- a/sound/soc/imx/Kconfig
+> +++ b/sound/soc/imx/Kconfig
+> @@ -8,6 +8,9 @@ menuconfig SND_IMX_SOC
+>  
+>  if SND_IMX_SOC
+>  
+> +config SND_SOC_IMX_SSI
+> +	tristate
 > +
-> +	if (info->get_voltage)
-> +		return info->get_voltage(info->data);
-> +
-> +	return 0;
 
-Similarly here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120223/7a7b9d61/attachment-0001.sig>
+I was hoping to see sound/soc/imx disappear completely, and all IMX
+support move into sound/soc/fsl.  After all, i.MX is a Freescale name.
+
+Anyway, I'm really glad to see this patchset, but I won't be able to
+devote much time to studying it until next week, at the earliest.
+
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
