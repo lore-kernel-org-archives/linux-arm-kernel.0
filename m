@@ -1,62 +1,185 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 22:25:38 +0000
-Subject: [PATCH 1/4] ARM: sa1100: fix sa1100 after sparse irq conversion
-In-Reply-To: <4F46BC87.2030503@gmail.com>
-References: <1329449534-23811-1-git-send-email-robherring2@gmail.com>
- <1329449534-23811-2-git-send-email-robherring2@gmail.com>
- <20120223221144.GA15494@n2100.arm.linux.org.uk> <4F46BC87.2030503@gmail.com>
-Message-ID: <20120223222538.GB15494@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 23 Feb 2012 23:46:07 +0100
+Subject: [RFC PATCH] gpio/omap: Fix IRQ handling for SPARSE_IRQ
+Message-ID: <4F46C1AF.2040201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 04:24:07PM -0600, Rob Herring wrote:
-> On 02/23/2012 04:11 PM, Russell King - ARM Linux wrote:
-> > On Thu, Feb 16, 2012 at 09:32:11PM -0600, Rob Herring wrote:
-> >> diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-> >> index 0dba050..0c16c0a 100644
-> >> --- a/drivers/net/ethernet/smsc/smc91x.c
-> >> +++ b/drivers/net/ethernet/smsc/smc91x.c
-> >> @@ -89,6 +89,10 @@ static const char version[] =
-> >>  
-> >>  #include <asm/io.h>
-> >>  
-> >> +#if defined(CONFIG_SA1100_ASSABET)
-> >> +#include <mach/neponset.h>
-> >> +#endif
-> >> +
-> >>  #include "smc91x.h"
-> >>  
-> >>  #ifndef SMC_NOWAIT
-> > 
-> > Why do you need this include when smc91x.h just below does this:
-> > 
-> > #elif defined(CONFIG_SA1100_ASSABET)
-> > 
-> > #include <mach/neponset.h>
-> > 
-> > /* We can only do 8-bit reads and writes in the static memory space. */
-> > #define SMC_CAN_USE_8BIT        1
-> > #define SMC_CAN_USE_16BIT       0
-> > #define SMC_CAN_USE_32BIT       0
-> > #define SMC_NOWAIT              1
-> > 
-> > /* The first two address lines aren't connected... */
-> > #define SMC_IO_SHIFT            2
-> > 
-> > #define SMC_inb(a, r)           readb((a) + (r))
-> > #define SMC_outb(v, a, r)       writeb(v, (a) + (r))
-> > #define SMC_insb(a, r, p, l)    readsb((a) + (r), p, (l))
-> > #define SMC_outsb(a, r, p, l)   writesb((a) + (r), p, (l))
-> > #define SMC_IRQ_FLAGS           (-1)    /* from resource */
-> > 
-> > My guess is you have PLEB enabled which overrides this definition.  Yes,
-> > this driver is rather horrible in this regard...
-> 
-> Yes, that's right. I assumed I had broken things and neponset.h was no
-> longer getting implicitly included. I guess it's not really a valid
-> config to have both enabled if you want working networking. What do you
-> want to do here?
+The GPIO driver is still relying on internal OMAP IRQ defines that
+are not relevant anymore if OMAP is built with SPARSE_IRQ.
 
-Probably best to just drop the change to this driver - it needs fixing
-properly at some point.  In the mean time, enabling both pleb and neponset
-will cause grief... ;(
+Replace the defines with the proper IRQ base number.
+Clean some comment style issue.
+Remove some hidden and ugly cpu_class_is_omap1() inside the
+gpio header.
+
+XXX: That fix might be broken for OMAP1 MPUIO case.
+
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+---
+
+Hi Tony,
+
+Please note that this patch is still RFC, because I do not know how to fix properly the ugly cpu_class_is_omap1 and the dependency with IH_MPUIO_BASE to detect a MPUIO.
+
+I'm still sending it, because it is needed to have SPARSE_IRQ working on OMAP4 with the previous series I've just sent.
+
+Regards,
+Benoit
+
+ arch/arm/plat-omap/include/plat/gpio.h |   22 ++------------------
+ drivers/gpio/gpio-omap.c               |   33 ++++++++++++++++---------------
+ 2 files changed, 20 insertions(+), 35 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index cb75b65..b8a96c6 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -218,30 +218,14 @@ extern void omap_set_gpio_debounce(int gpio, int enable);
+ extern void omap_set_gpio_debounce_time(int gpio, int enable);
+ /*-------------------------------------------------------------------------*/
+ 
+-/* Wrappers for "new style" GPIO calls, using the new infrastructure
++/*
++ * Wrappers for "new style" GPIO calls, using the new infrastructure
+  * which lets us plug in FPGA, I2C, and other implementations.
+- * *
++ *
+  * The original OMAP-specific calls should eventually be removed.
+  */
+ 
+ #include <linux/errno.h>
+ #include <asm-generic/gpio.h>
+ 
+-static inline int irq_to_gpio(unsigned irq)
+-{
+-	int tmp;
+-
+-	/* omap1 SOC mpuio */
+-	if (cpu_class_is_omap1() && (irq < (IH_MPUIO_BASE + 16)))
+-		return (irq - IH_MPUIO_BASE) + OMAP_MAX_GPIO_LINES;
+-
+-	/* SOC gpio */
+-	tmp = irq - IH_GPIO_BASE;
+-	if (tmp < OMAP_MAX_GPIO_LINES)
+-		return tmp;
+-
+-	/* we don't supply reverse mappings for non-SOC gpios */
+-	return -EIO;
+-}
+-
+ #endif
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index bc2bd69..afef0f7 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -93,6 +93,11 @@ struct gpio_bank {
+ #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
+ #define GPIO_MOD_CTRL_BIT	BIT(0)
+ 
++static int irq_to_gpio(struct gpio_bank *bank, unsigned int gpio_irq)
++{
++	return gpio_irq - bank->irq_base + bank->chip.base;
++}
++
+ static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+ {
+ 	void __iomem *reg = bank->base;
+@@ -369,7 +374,7 @@ static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
+ 
+ static int gpio_irq_type(struct irq_data *d, unsigned type)
+ {
+-	struct gpio_bank *bank;
++	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
+ 	unsigned gpio;
+ 	int retval;
+ 	unsigned long flags;
+@@ -377,13 +382,11 @@ static int gpio_irq_type(struct irq_data *d, unsigned type)
+ 	if (!cpu_class_is_omap2() && d->irq > IH_MPUIO_BASE)
+ 		gpio = OMAP_MPUIO(d->irq - IH_MPUIO_BASE);
+ 	else
+-		gpio = d->irq - IH_GPIO_BASE;
++		gpio = irq_to_gpio(bank, d->irq);
+ 
+ 	if (type & ~IRQ_TYPE_SENSE_MASK)
+ 		return -EINVAL;
+ 
+-	bank = irq_data_get_irq_chip_data(d);
+-
+ 	if (!bank->regs->leveldetect0 &&
+ 		(type & (IRQ_TYPE_LEVEL_LOW|IRQ_TYPE_LEVEL_HIGH)))
+ 		return -EINVAL;
+@@ -524,14 +527,10 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
+ /* Use disable_irq_wake() and enable_irq_wake() functions from drivers */
+ static int gpio_wake_enable(struct irq_data *d, unsigned int enable)
+ {
+-	unsigned int gpio = d->irq - IH_GPIO_BASE;
+-	struct gpio_bank *bank;
+-	int retval;
+-
+-	bank = irq_data_get_irq_chip_data(d);
+-	retval = _set_gpio_wakeup(bank, gpio, enable);
++	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
++	unsigned int gpio = irq_to_gpio(bank, d->irq);
+ 
+-	return retval;
++	return _set_gpio_wakeup(bank, gpio, enable);
+ }
+ 
+ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+@@ -675,11 +674,13 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 
+ 		gpio_irq = bank->irq_base;
+ 		for (; isr != 0; isr >>= 1, gpio_irq++) {
+-			gpio_index = GPIO_INDEX(bank, irq_to_gpio(gpio_irq));
++			int gpio = irq_to_gpio(bank, gpio_irq);
+ 
+ 			if (!(isr & 1))
+ 				continue;
+ 
++			gpio_index = GPIO_INDEX(bank, gpio);
++
+ 			/*
+ 			 * Some chips can't respond to both rising and falling
+ 			 * at the same time.  If this irq was requested with
+@@ -705,8 +706,8 @@ exit:
+ 
+ static void gpio_irq_shutdown(struct irq_data *d)
+ {
+-	unsigned int gpio = d->irq - IH_GPIO_BASE;
+ 	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
++	unsigned int gpio = irq_to_gpio(bank, d->irq);
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&bank->lock, flags);
+@@ -716,16 +717,16 @@ static void gpio_irq_shutdown(struct irq_data *d)
+ 
+ static void gpio_ack_irq(struct irq_data *d)
+ {
+-	unsigned int gpio = d->irq - IH_GPIO_BASE;
+ 	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
++	unsigned int gpio = irq_to_gpio(bank, d->irq);
+ 
+ 	_clear_gpio_irqstatus(bank, gpio);
+ }
+ 
+ static void gpio_mask_irq(struct irq_data *d)
+ {
+-	unsigned int gpio = d->irq - IH_GPIO_BASE;
+ 	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
++	unsigned int gpio = irq_to_gpio(bank, d->irq);
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&bank->lock, flags);
+@@ -736,8 +737,8 @@ static void gpio_mask_irq(struct irq_data *d)
+ 
+ static void gpio_unmask_irq(struct irq_data *d)
+ {
+-	unsigned int gpio = d->irq - IH_GPIO_BASE;
+ 	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
++	unsigned int gpio = irq_to_gpio(bank, d->irq);
+ 	unsigned int irq_mask = GPIO_BIT(bank, gpio);
+ 	u32 trigger = irqd_get_trigger_type(d);
+ 	unsigned long flags;
+-- 
+1.7.0.4
