@@ -1,64 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 23 Feb 2012 15:41:59 +0000
-Subject: [PATCH] ARM: perf: add PMU hotplug notifier
-Message-ID: <1330011719-13252-1-git-send-email-will.deacon@arm.com>
+From: timur@freescale.com (Timur Tabi)
+Date: Thu, 23 Feb 2012 09:44:37 -0600
+Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <4F465A33.3020208@ru.mvista.com>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-5-git-send-email-shawn.guo@linaro.org>
+ <4F465A33.3020208@ru.mvista.com>
+Message-ID: <4F465EE5.4010908@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+Sergei Shtylyov wrote:
+>     These functions are not equivalent concerning endianness. You should 
+> probably have used readl_be() instead, else it won't work on PPC anymore.
 
-When a CPU is taken out of reset, either cold booted or hotplugged in,
-some of its PMU registers can contain UNKNOWN values.
+readl_be() is not good enough, either.  The in/out_be functions have
+specific syncronization instructions in them, so that the operations
+conform to the PowerPC instruction ordering architecture.
 
-This patch adds a hotplug notifier to ARM core perf code so that upon
-CPU restart the PMU unit is reset and becomes ready to use again.
+You probably need to do something like this:
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/perf_event.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+#ifdef PPC
+#define read_ssi(x) in_be32(x)
+#else #if defined ARM
+#define read_ssi(x) readl(x)
+#endif
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index ab59c3b..fa30ff9 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -680,6 +680,28 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
- }
- 
- /*
-+ * PMU hardware loses all context when a CPU goes offline.
-+ * When a CPU is hotplugged back in, since some hardware registers are
-+ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-+ * junk values out of them.
-+ */
-+static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
-+					unsigned long action, void *hcpu)
-+{
-+	if (action != CPU_UP_PREPARE)
-+		return NOTIFY_DONE;
-+
-+	if (cpu_pmu && cpu_pmu->reset)
-+		cpu_pmu->reset(NULL);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block __cpuinitdata pmu_cpu_notifier = {
-+	.notifier_call = pmu_cpu_notify,
-+};
-+
-+/*
-  * CPU PMU identification and registration.
-  */
- static int __init
-@@ -733,6 +755,7 @@ init_hw_perf_events(void)
- 		pr_info("enabled with %s PMU driver, %d counters available\n",
- 			cpu_pmu->name, cpu_pmu->num_events);
- 		cpu_pmu_init(cpu_pmu);
-+		register_cpu_notifier(&pmu_cpu_notifier);
- 		armpmu_register(cpu_pmu, "cpu", PERF_TYPE_RAW);
- 	} else {
- 		pr_info("no hardware support available\n");
 -- 
-1.7.4.1
+Timur Tabi
+Linux kernel developer at Freescale
