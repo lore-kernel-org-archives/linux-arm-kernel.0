@@ -1,39 +1,59 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 23 Feb 2012 23:23:21 +0100
-Subject: [PATCH 5/5] ARM: OMAP: irqs: Set NR_IRQS to NR_IRQS_LEGACY for
- CONFIG_SPARSE_IRQ
-In-Reply-To: <1330035801-14937-1-git-send-email-b-cousson@ti.com>
-References: <1330035801-14937-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1330035801-14937-6-git-send-email-b-cousson@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 23 Feb 2012 16:24:07 -0600
+Subject: [PATCH 1/4] ARM: sa1100: fix sa1100 after sparse irq conversion
+In-Reply-To: <20120223221144.GA15494@n2100.arm.linux.org.uk>
+References: <1329449534-23811-1-git-send-email-robherring2@gmail.com>
+ <1329449534-23811-2-git-send-email-robherring2@gmail.com>
+ <20120223221144.GA15494@n2100.arm.linux.org.uk>
+Message-ID: <4F46BC87.2030503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_SPARSE_IRQ is set, the irqdescs will be allocated with
-NR_IRQS entries at boot time and thus will shift all the entries
-allocated dynamically by irq_alloc_descs for nothing.
+On 02/23/2012 04:11 PM, Russell King - ARM Linux wrote:
+> On Thu, Feb 16, 2012 at 09:32:11PM -0600, Rob Herring wrote:
+>> diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
+>> index 0dba050..0c16c0a 100644
+>> --- a/drivers/net/ethernet/smsc/smc91x.c
+>> +++ b/drivers/net/ethernet/smsc/smc91x.c
+>> @@ -89,6 +89,10 @@ static const char version[] =
+>>  
+>>  #include <asm/io.h>
+>>  
+>> +#if defined(CONFIG_SA1100_ASSABET)
+>> +#include <mach/neponset.h>
+>> +#endif
+>> +
+>>  #include "smc91x.h"
+>>  
+>>  #ifndef SMC_NOWAIT
+> 
+> Why do you need this include when smc91x.h just below does this:
+> 
+> #elif defined(CONFIG_SA1100_ASSABET)
+> 
+> #include <mach/neponset.h>
+> 
+> /* We can only do 8-bit reads and writes in the static memory space. */
+> #define SMC_CAN_USE_8BIT        1
+> #define SMC_CAN_USE_16BIT       0
+> #define SMC_CAN_USE_32BIT       0
+> #define SMC_NOWAIT              1
+> 
+> /* The first two address lines aren't connected... */
+> #define SMC_IO_SHIFT            2
+> 
+> #define SMC_inb(a, r)           readb((a) + (r))
+> #define SMC_outb(v, a, r)       writeb(v, (a) + (r))
+> #define SMC_insb(a, r, p, l)    readsb((a) + (r), p, (l))
+> #define SMC_outsb(a, r, p, l)   writesb((a) + (r), p, (l))
+> #define SMC_IRQ_FLAGS           (-1)    /* from resource */
+> 
+> My guess is you have PLEB enabled which overrides this definition.  Yes,
+> this driver is rather horrible in this regard...
 
-Set NR_IRQS to NR_IRQS_LEGACY if CONFIG_SPARSE_IRQ is set.
+Yes, that's right. I assumed I had broken things and neponset.h was no
+longer getting implicitly included. I guess it's not really a valid
+config to have both enabled if you want working networking. What do you
+want to do here?
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
----
- arch/arm/plat-omap/include/plat/irqs.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
-index 3d41a65..acc1ac8 100644
---- a/arch/arm/plat-omap/include/plat/irqs.h
-+++ b/arch/arm/plat-omap/include/plat/irqs.h
-@@ -438,7 +438,11 @@
- #define OMAP_GPMC_IRQ_END	(OMAP_GPMC_IRQ_BASE + OMAP_GPMC_NR_IRQS)
- 
- 
-+#ifdef CONFIG_SPARSE_IRQ
-+#define NR_IRQS			NR_IRQS_LEGACY
-+#else
- #define NR_IRQS			OMAP_GPMC_IRQ_END
-+#endif
- 
- #define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
- 
--- 
-1.7.0.4
+Rob
