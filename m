@@ -1,19 +1,18 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 12:46:26 +0000
-Subject: [PATCH 5/6] gpio/omap: fix trigger type to unsigned
-In-Reply-To: <4F463374.3080502@ti.com>
-References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
- <1329999031-6914-6-git-send-email-tarun.kanti@ti.com>
- <4F463374.3080502@ti.com>
-Message-ID: <20120223124625.GH22675@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 23 Feb 2012 12:49:16 +0000
+Subject: [PATCH v2 1/2] GPIO: LPC32xx: Fix missing bit selection mask
+In-Reply-To: <1329845828-26497-1-git-send-email-stigge@antcom.de>
+References: <1329845828-26497-1-git-send-email-stigge@antcom.de>
+Message-ID: <201202231249.17206.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 06:09:16PM +0530, Shubhrajyoti wrote:
-> On Thursday 23 February 2012 05:40 PM, Tarun Kanti DebBarma wrote:
-> > -static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
-> > +static int _set_gpio_triggering(struct gpio_bank *bank, int gpio,
-> > +							unsigned trigger)
-> you meant unsigned int ? could it be made u32.
+On Tuesday 21 February 2012, Roland Stigge wrote:
+> Add missing mask to pin bit selection in gpio-lpc32xx.c
+> (#define GPIO3_PIN_IN_SEL)
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-In C, unsigned is the same as unsigned int.
+Sorry I picked on the old thread first.
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
