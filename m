@@ -1,47 +1,35 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 23 Feb 2012 12:43:27 -0700
-Subject: [PATCH v2 05/12] arm/PCI: use pci_flags PCI_PROBE_ONLY instead of
- arm-specific flag
-In-Reply-To: <20120223194209.20708.54480.stgit@bhelgaas.mtv.corp.google.com>
-References: <20120223194209.20708.54480.stgit@bhelgaas.mtv.corp.google.com>
-Message-ID: <20120223194327.20708.30508.stgit@bhelgaas.mtv.corp.google.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Feb 2012 19:50:03 +0000
+Subject: [PATCH] ARM: LPAE: Invalidate the TLB for module addresses
+ during translation fault
+In-Reply-To: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
+References: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20120223195003.GD22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/arm/kernel/bios32.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+On Thu, Feb 23, 2012 at 05:59:41PM +0000, Catalin Marinas wrote:
+> During the free_pgtables() call all user and modules/pkmap entries are
+> removed.
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index f3fd52b..8d7c22d 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -16,7 +16,6 @@
- #include <asm/mach/pci.h>
- 
- static int debug_pci;
--static int use_firmware;
- 
- /*
-  * We can't use pci_find_device() here since we are
-@@ -537,7 +536,7 @@ void __init pci_common_init(struct hw_pci *hw)
- 	list_for_each_entry(sys, &hw->buses, node) {
- 		struct pci_bus *bus = sys->bus;
- 
--		if (!use_firmware) {
-+		if (!pci_has_flag(PCI_PROBE_ONLY)) {
- 			/*
- 			 * Size the bridge windows.
- 			 */
-@@ -575,7 +574,7 @@ char * __init pcibios_setup(char *str)
- 		debug_pci = 1;
- 		return NULL;
- 	} else if (!strcmp(str, "firmware")) {
--		use_firmware = 1;
-+		pci_add_flags(PCI_PROBE_ONLY);
- 		return NULL;
- 	}
- 	return str;
+Err, no.  free_pgtables() should only ever touch up to TASK_SIZE, which
+is the maximum size of userspace.  Moreover, because TASK_SIZE does not
+cover an entire pud, free_pgtables() should not be removing the pud
+table.
+
+> There is a small window between pud_clear() and pmd_free_tlb() in
+> free_pmd_range() where the pud entry was cleared but the TLB has not
+> been invalidated yet and the CPU may have cached the original (valid)
+> pud entry in the TLB. A scenario like below would get stuck in
+> continuous prefetch abort:
+> 
+> 1. Current process exiting. The modules pmd entries not populated
+> 2. exit_mmap() -> ... -> pmd_free_tlb()
+> 3. pud_clear() for the 1GB pud containing user stack and modules (no TLB
+>    invalidation yet)
+
+This is where things are wrong.  Because the request should not be
+requesting that the entire pud is being cleared, it should not be
+removed from the pgd.
+
+So, there's some debugging to be done here.
