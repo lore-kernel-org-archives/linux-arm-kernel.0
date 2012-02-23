@@ -1,38 +1,70 @@
-From: jason@lakedaemon.net (Jason)
-Date: Thu, 23 Feb 2012 10:56:57 -0500
-Subject: [PATCH 1/3] arm: ignore devicetree blobs.
-In-Reply-To: <20120223091630.GA2036@linaro.org>
-References: <cover.1312906908.git.jason@lakedaemon.net>
- <cover.1329936660.git.jason@lakedaemon.net>
- <3629df9b5b96d3a3a63a34ebf6ddfca2fd72ccfc.1329936660.git.jason@lakedaemon.net>
- <20120222222619.GY14173@pengutronix.de>
- <20120223091630.GA2036@linaro.org>
-Message-ID: <20120223155657.GM23524@titan.lakedaemon.net>
+From: ashwinc@codeaurora.org (Ashwin Chaugule)
+Date: Thu, 23 Feb 2012 10:57:22 -0500
+Subject: [PATCH] ARM: perf: add PMU hotplug notifier
+In-Reply-To: <CAKHPGBaY1OFiVubic+f1vxxzNeKjmzibxraBg8eNxZnJbhYi+A@mail.gmail.com>
+References: <CAKHPGBaY1OFiVubic+f1vxxzNeKjmzibxraBg8eNxZnJbhYi+A@mail.gmail.com>
+Message-ID: <4F4661E2.9020405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
+Hi Will,
 
-On Thu, Feb 23, 2012 at 09:16:30AM +0000, Dave Martin wrote:
-> On Wed, Feb 22, 2012 at 11:26:19PM +0100, Uwe Kleine-K?nig wrote:
-> > On Wed, Feb 22, 2012 at 07:18:44PM +0000, Jason Cooper wrote:
-> > > 
-> > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> > /me claims prior art:
-> > 
-> > 	http://mid.gmane.org/1323808612-14976-1-git-send-email-u.kleine-koenig at pengutronix.de
-> 
-> Multiple people proposed this...
-> 
-> Grant accepted my patch, and it is already in -next:
-> 
-> See next-20110222
-> 
-> 810ae3d26507e61d1f7a69e9716443df1ce41449
-> ARM: devicetree: Add .dtb files to arch/arm/boot/.gitignore
+On Thu, Feb 23, 2012 at 10:41 AM, Will Deacon <will.deacon@arm.com> wrote:
+> From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+>
+> When a CPU is taken out of reset, either cold booted or hotplugged in,
+> some of its PMU registers can contain UNKNOWN values.
+>
+> This patch adds a hotplug notifier to ARM core perf code so that upon
+> CPU restart the PMU unit is reset and becomes ready to use again.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-awesome, I'll drop this from the next version of the series, then.
+I was playing around with this stuff recently, but used the CPU PM code from
 
-thx,
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052829.html
 
-Jason.
+> ---
+>  arch/arm/kernel/perf_event.c |   23 +++++++++++++++++++++++
+>  1 files changed, 23 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index ab59c3b..fa30ff9 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -680,6 +680,28 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
+>  }
+>
+>  /*
+> + * PMU hardware loses all context when a CPU goes offline.
+> + * When a CPU is hotplugged back in, since some hardware registers are
+> + * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
+> + * junk values out of them.
+> + */
+> +static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
+> +                                       unsigned long action, void *hcpu)
+> +{
+> +       if (action != CPU_UP_PREPARE)
+> +               return NOTIFY_DONE;
+> +
+> +       if (cpu_pmu && cpu_pmu->reset)
+> +               cpu_pmu->reset(NULL);
+> +
+> +       return NOTIFY_OK;
+> +}
+> +
+
+I realized I needed to save the counters before going to sleep. In my
+case, the notifiers were being called from the idle thread, so I
+didn't know which "sleep state" I was going to go into. In the deepest
+idle state, the counters are completely reset. When we come out of
+sleep, unless there had been an explicit "read" earlier, we will have
+lost the cached value(event->count) of the counters. This manifests as
+counts reduced by an order of magnitude.
+
+I'll send a link to my code once the git server is up. It's a bit flaky today.
+
+
+Cheers,
+Ashwin
