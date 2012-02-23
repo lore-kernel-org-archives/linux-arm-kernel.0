@@ -1,51 +1,145 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 23 Feb 2012 15:25:49 +0100
-Subject: [PATCH v3 05/21] ARM: at91/ST: remove not needed casts
+Date: Thu, 23 Feb 2012 15:26:02 +0100
+Subject: [PATCH v3 18/21] Atmel: move console default platform_device to
+ serial driver
 In-Reply-To: <cover.1330006537.git.nicolas.ferre@atmel.com>
 References: <cover.1330006537.git.nicolas.ferre@atmel.com>
-Message-ID: <9e1c0b2ee8ae69dd4b35187ffbfb749272db3e00.1330006537.git.nicolas.ferre@atmel.com>
+Message-ID: <69f6a27bf4c86e986964100e560d991a8de03833.1330006537.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the unnecessary (void) cast on at91_st_read()
-return value.
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Ryan Mallon <rmallon@gmail.com>
+This variable spread on every SoC that is using the atmel_serial.c
+driver can be included directly into the latter.
+
+This will allow to compile multiple soc in the same kernel.
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Cc: kernel at avr32linux.org
 ---
- arch/arm/mach-at91/at91rm9200_time.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-at91/at91rm9200_devices.c  |    1 -
+ arch/arm/mach-at91/at91sam9260_devices.c |    1 -
+ arch/arm/mach-at91/at91sam9261_devices.c |    1 -
+ arch/arm/mach-at91/at91sam9263_devices.c |    1 -
+ arch/arm/mach-at91/at91sam9g45_devices.c |    1 -
+ arch/arm/mach-at91/at91sam9rl_devices.c  |    1 -
+ arch/arm/mach-at91/at91sam9x5.c          |    1 -
+ arch/avr32/mach-at32ap/at32ap700x.c      |    2 --
+ drivers/tty/serial/atmel_serial.c        |    2 ++
+ 9 files changed, 2 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index 0c1980c..dd7f782 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -111,7 +111,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index aca272b..640520c 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -1115,7 +1115,6 @@ static inline void configure_usart3_pins(unsigned pins)
+ }
+ 
+ static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
+-struct platform_device *atmel_default_console_device;	/* the serial console device */
+ 
+ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
  {
- 	/* Disable and flush pending timer interrupts */
- 	at91_st_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
--	(void) at91_st_read(AT91_ST_SR);
-+	at91_st_read(AT91_ST_SR);
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 34d2f5a..df487ce 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -1164,7 +1164,6 @@ static inline void configure_usart5_pins(void)
+ }
  
- 	last_crtr = read_CRTR();
- 	switch (mode) {
-@@ -157,7 +157,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
+ static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
+-struct platform_device *atmel_default_console_device;	/* the serial console device */
  
- 	/* Cancel any pending alarm; flush any pending IRQ */
- 	at91_st_write(AT91_ST_RTAR, alm);
--	(void) at91_st_read(AT91_ST_SR);
-+	at91_st_read(AT91_ST_SR);
+ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ {
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index b9c06c4..3bd10ce 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -1015,7 +1015,6 @@ static inline void configure_usart2_pins(unsigned pins)
+ }
  
- 	/* Schedule alarm by writing RTAR. */
- 	alm += delta;
-@@ -192,7 +192,7 @@ void __init at91rm9200_timer_init(void)
- 	/* Disable all timer interrupts, and clear any pending ones */
- 	at91_st_write(AT91_ST_IDR,
- 		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
--	(void) at91_st_read(AT91_ST_SR);
-+	at91_st_read(AT91_ST_SR);
+ static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
+-struct platform_device *atmel_default_console_device;	/* the serial console device */
  
- 	/* Make IRQs happen for the system timer */
- 	setup_irq(AT91_ID_SYS, &at91rm9200_timer_irq);
+ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ {
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index a8ae6f5..7792de5 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -1424,7 +1424,6 @@ static inline void configure_usart2_pins(unsigned pins)
+ }
+ 
+ static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
+-struct platform_device *atmel_default_console_device;	/* the serial console device */
+ 
+ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ {
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 98e4041..4108295 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -1683,7 +1683,6 @@ static inline void configure_usart3_pins(unsigned pins)
+ }
+ 
+ static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
+-struct platform_device *atmel_default_console_device;	/* the serial console device */
+ 
+ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ {
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index 342a6c5..eda72e8 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -1152,7 +1152,6 @@ static inline void configure_usart3_pins(unsigned pins)
+ }
+ 
+ static struct platform_device *__initdata at91_uarts[ATMEL_MAX_UART];	/* the UARTs to use */
+-struct platform_device *atmel_default_console_device;	/* the serial console device */
+ 
+ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins)
+ {
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index 67b37a0..90bb7ec 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -320,7 +320,6 @@ void __init at91sam9x5_initialize(void)
+  * -------------------------------------------------------------------- */
+ void __init at91_register_uart(unsigned id, unsigned portnr, unsigned pins) {}
+ void __init at91_set_serial_console(unsigned portnr) {}
+-struct platform_device *atmel_default_console_device = NULL;
+ 
+ void __init at91_add_device_nand(struct atmel_nand_data *data) {}
+ 
+diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
+index 402a7bb..889c544 100644
+--- a/arch/avr32/mach-at32ap/at32ap700x.c
++++ b/arch/avr32/mach-at32ap/at32ap700x.c
+@@ -1055,8 +1055,6 @@ struct platform_device *__init at32_add_device_usart(unsigned int id)
+ 	return at32_usarts[id];
+ }
+ 
+-struct platform_device *atmel_default_console_device;
+-
+ void __init at32_setup_serial_console(unsigned int usart_id)
+ {
+ 	atmel_default_console_device = at32_usarts[usart_id];
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 10605ec..f9a6be7 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1526,6 +1526,8 @@ void __init atmel_register_uart_fns(struct atmel_port_fns *fns)
+ 	atmel_pops.set_wake	= fns->set_wake;
+ }
+ 
++struct platform_device *atmel_default_console_device;	/* the serial console device */
++
+ #ifdef CONFIG_SERIAL_ATMEL_CONSOLE
+ static void atmel_console_putchar(struct uart_port *port, int ch)
+ {
 -- 
 1.7.9
