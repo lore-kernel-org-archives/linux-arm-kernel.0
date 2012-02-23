@@ -1,34 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Feb 2012 14:07:12 +0000
-Subject: [PATCH v3 02/10] pwm: Allow chips to support multiple PWMs.
-In-Reply-To: <20120223081235.GC8621@avionic-0098.mockup.avionic-design.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <201202221634.45159.arnd@arndb.de>
- <20120223081235.GC8621@avionic-0098.mockup.avionic-design.de>
-Message-ID: <201202231407.12981.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Feb 2012 14:14:19 +0000
+Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
+ register
+In-Reply-To: <201202231335.04923.arnd@arndb.de>
+References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
+ <201202231233.05622.arnd@arndb.de>
+ <20120223125044.GW22562@n2100.arm.linux.org.uk>
+ <201202231335.04923.arnd@arndb.de>
+Message-ID: <20120223141419.GY22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 February 2012, Thierry Reding wrote:
-> > Is this only used for the device tree functions? If so, I would recommend
-> > making it less generic and always search for a device node.
-> 
-> It is currently only used to look up a struct pwm_chip for a given struct
-> device_node, yes. But I can see other uses for this. For instance this could
-> be useful if we ever want to provide an alternative way of requesting a PWM
-> on a per-chip basis.
+On Thu, Feb 23, 2012 at 01:35:04PM +0000, Arnd Bergmann wrote:
+> Since devices that can bei either PCI or not are relatively rare, I'd
+> rather put them in the same category as those that can either use
+> PCI I/O space or some form of memory space and require that the
+> drivers use the "I don't care what you are, just do what I want"
+> accessors in the ioread/iowrite family that are already going through
+> an indirect function call on most architectures.
 
-Nah, just keep it simple for now. If we need it later, we can still
-add something like this back, but for now it's just a source of
-confusion and possible bugs.
+It's not a case of whether they themselves are PCI or not.  It's a case
+that manufacturers are starting to take existing ARM IP and sticking a
+PCI bridge in front of them.
 
-> I was again basically looking at gpiolib for inspiration (maybe I should stop
-> doing that :-). Maybe gpiolib should be reworked to use seq_file's iterator
-> interface as well? Just in case anybody else turns to gpiolib for
-> inspiration.
+That's why there's someone looking at a set of PCI drivers which create
+AMBA primecell devices to allow the existing primecell drivers to bind
+to these peripherals.
 
-Good idea. Would you be able to send a patch for that, too? I would guess
-converting both at the same time would be easier for you than splitting
-the work between two people.
+What that means is that in theory, you could have an AMBA primecell
+peripheral behind a PCI device on an IXP4xx platform with its weird
+windows, and that would necessitate the AMBA primecell drivers to use the
+special PCI space accessors.
 
-	ARnd
+I would not be surprised if some of these PPC freescale peripheral IPs
+using their private in_xxx() accessors end up in the same situation.
+That seems to be the direction the hardware folk are going.
+
+So, I think it's a big mistake to distinguish bus types by their
+accessors.  Or put it another way, it's a big mistake to have bus
+specific accessors.
+
+Consider the AMBA primecell behind a PCI device, and if AMBA had its own
+bus specific accessors.  Should we litter the drivers with ifdefs to
+select between the PCI accessors or the AMBA accessors?  Or something
+equally horrible?
