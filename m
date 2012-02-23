@@ -1,27 +1,39 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 23 Feb 2012 16:22:09 +0100
-Subject: [PATCH 3/7] MFD: twl-core: regulator configuration for twl6030
- V1V8, V2V1 SMPS
-In-Reply-To: <1328868316-24749-4-git-send-email-peter.ujfalusi@ti.com>
-References: <1328868316-24749-1-git-send-email-peter.ujfalusi@ti.com>
- <1328868316-24749-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120223152209.GA24377@sortiz-mobl>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Thu, 23 Feb 2012 19:24:35 +0400
+Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <1330008519-3584-5-git-send-email-shawn.guo@linaro.org>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F465A33.3020208@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hello.
 
-On Fri, Feb 10, 2012 at 12:05:12PM +0200, Peter Ujfalusi wrote:
-> To be able to attach consumers to these supplies from board
-> files we need to have regulator_init_data for them.
-If I understand correctly, this should also go through Liam's tree. If that's
-so, please add my:
+On 23-02-2012 18:48, Shawn Guo wrote:
 
-Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+> Change PowerPC dependent IO accessors to architecture independent
+> ones, so that fsl_ssi driver can be built on both PowerPC and ARM/IMX.
 
-Cheers,
-Samuel.
+> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
+> ---
+>   sound/soc/fsl/fsl_ssi.c |   75 ++++++++++++++++++++++++++++------------------
+>   1 files changed, 46 insertions(+), 29 deletions(-)
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+> diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+> index 3e06696..32fc84b 100644
+> --- a/sound/soc/fsl/fsl_ssi.c
+> +++ b/sound/soc/fsl/fsl_ssi.c
+[...]
+> @@ -145,7 +148,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
+>   	   were interrupted for.  We mask it with the Interrupt Enable register
+>   	   so that we only check for events that we're interested in.
+>   	 */
+> -	sisr = in_be32(&ssi->sisr) & SIER_FLAGS;
+> +	sisr = readl(&ssi->sisr) & SIER_FLAGS;
+
+    These functions are not equivalent concerning endianness. You should 
+probably have used readl_be() instead, else it won't work on PPC anymore.
+
+WBR, Sergei
