@@ -1,83 +1,68 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 23 Feb 2012 04:28:20 +0100
-Subject: [PATCH v2 16/19] ARM: at91: merge SRAM Memory banks thanks to
- mirroring
-In-Reply-To: <4F4576A6.3090901@gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 23 Feb 2012 14:59:01 +1100
+Subject: [PATCH v2 02/19] ARM: at91/at91x40: remove use of
+ at91_sys_read/write
+In-Reply-To: <20120223032503.GA20176@game.jcrosoft.org>
 References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <0290a1a8c53da6ce02ef9b6f2447ba2da0859dc6.1329903206.git.nicolas.ferre@atmel.com>
- <4F4576A6.3090901@gmail.com>
-Message-ID: <20120223032820.GC20176@game.jcrosoft.org>
+ <fac36a5ab9fe5a8bd977d2305eeccad48389cbb5.1329903206.git.nicolas.ferre@atmel.com>
+ <4F456AAF.3090809@gmail.com> <20120223032503.GA20176@game.jcrosoft.org>
+Message-ID: <4F45B985.1000204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:13 Thu 23 Feb     , Ryan Mallon wrote:
-> On 22/02/12 20:39, Nicolas Ferre wrote:
-> 
-> > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > 
-> > On at91sam9260 and at91sam9g20 the SRAM banks are mirrored. We can
-> > merge them together to be able to have bigger and continuous
-> > internal RAM.
-> > 
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > ---
-> >  arch/arm/mach-at91/at91sam9260.c              |   13 +++++--------
-> >  arch/arm/mach-at91/include/mach/at91sam9260.h |    4 ++++
-> >  2 files changed, 9 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> > index 14882ae..4ade265 100644
-> > --- a/arch/arm/mach-at91/at91sam9260.c
-> > +++ b/arch/arm/mach-at91/at91sam9260.c
-> > @@ -310,15 +310,12 @@ static void __init at91sam9xe_map_io(void)
-> >  
-> >  static void __init at91sam9260_map_io(void)
-> >  {
-> > -	if (cpu_is_at91sam9xe()) {
-> > +	if (cpu_is_at91sam9xe())
-> >  		at91sam9xe_map_io();
-> > -	} else if (cpu_is_at91sam9g20()) {
-> > -		at91_init_sram(0, AT91SAM9G20_SRAM0_BASE, AT91SAM9G20_SRAM0_SIZE);
-> > -		at91_init_sram(1, AT91SAM9G20_SRAM1_BASE, AT91SAM9G20_SRAM1_SIZE);
-> > -	} else {
-> > -		at91_init_sram(0, AT91SAM9260_SRAM0_BASE, AT91SAM9260_SRAM0_SIZE);
-> > -		at91_init_sram(1, AT91SAM9260_SRAM1_BASE, AT91SAM9260_SRAM1_SIZE);
-> > -	}
-> > +	else if (cpu_is_at91sam9g20())
-> > +		at91_init_sram(0, AT91SAM9G20_SRAM_BASE, AT91SAM9G20_SRAM_SIZE);
-> > +	else
-> > +		at91_init_sram(0, AT91SAM9260_SRAM_BASE, AT91SAM9260_SRAM_SIZE);
-> >  }
-> >  
-> >  static void __init at91sam9260_ioremap_registers(void)
-> > diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-> > index 2e47b6d..08ae9af 100644
-> > --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
-> > +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-> > @@ -113,6 +113,8 @@
-> >  #define AT91SAM9260_SRAM0_SIZE	SZ_4K		/* Internal SRAM 0 size (4Kb) */
-> >  #define AT91SAM9260_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
-> >  #define AT91SAM9260_SRAM1_SIZE	SZ_4K		/* Internal SRAM 1 size (4Kb) */
-> > +#define AT91SAM9260_SRAM_BASE	0x002FF000	/* Internal SRAM base address */
-> > +#define AT91SAM9260_SRAM_SIZE	SZ_8K		/* Internal SRAM size (8Kb) */
-> 
-> >  
-> >  #define AT91SAM9260_UHP_BASE	0x00500000	/* USB Host controller */
-> >  
-> > @@ -126,6 +128,8 @@
-> >  #define AT91SAM9G20_SRAM0_SIZE	SZ_16K		/* Internal SRAM 0 size (16Kb) */
-> >  #define AT91SAM9G20_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
-> >  #define AT91SAM9G20_SRAM1_SIZE	SZ_16K		/* Internal SRAM 1 size (16Kb) */
-> > +#define AT91SAM9G20_SRAM_BASE	0x002FC000	/* Internal SRAM base address */
-> > +#define AT91SAM9G20_SRAM_SIZE	SZ_32K		/* Internal SRAM size (32Kb) */
-> 
-> 
-> Where does the SRAM_BASE value come from? The at91sam9g20 guide says
-> that the region 0x204000 - 0x2fffff is reserved, and I can't find any
-> information in the at91sam9g20 guide about the sram being mirrored. Can
-> you point me to some documentation for this?
-This is not documented but it's correct
+On 23/02/12 14:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-Best Regards,
-J.
+> On 09:22 Thu 23 Feb     , Ryan Mallon wrote:
+>> On 22/02/12 20:39, Nicolas Ferre wrote:
+>>
+>>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>>
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> ---
+>>>  arch/arm/mach-at91/at91x40.c              |    2 +-
+>>>  arch/arm/mach-at91/at91x40_time.c         |   28 +++++++++++++++++-----------
+>>>  arch/arm/mach-at91/include/mach/at91x40.h |   18 +++++++++---------
+>>>  3 files changed, 27 insertions(+), 21 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
+>>> index 0154b7f..5400a1d 100644
+>>> --- a/arch/arm/mach-at91/at91x40.c
+>>> +++ b/arch/arm/mach-at91/at91x40.c
+>>> @@ -44,7 +44,7 @@ static void at91x40_idle(void)
+>>>  	 * Disable the processor clock.  The processor will be automatically
+>>>  	 * re-enabled by an interrupt or by a reset.
+>>>  	 */
+>>> -	at91_sys_write(AT91_PS_CR, AT91_PS_CR_CPU);
+>>> +	__raw_writel(AT91_PS_CR_CPU, AT91_PS_CR);
+>>
+>>
+>> This doesn't seem to be equivalent, at91_sys_write does:
+>>
+>>   void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
+>>   __raw_writel(value, addr + reg_offset);
+>>
+>> and this patch doesn't redefine AT91_PS_CR. Was it broken before this
+>> patch? What am I missing?
+> this is right
+> #define AT91_PS_CR      (AT91_PS + 0)   /* PS Control register */
+
+
+That doesn't answer my question.
+
+The old, at91_sys_write, version was writing to (using __raw_writel):
+
+  AT91_VA_BASE_SYS + AT91_PS_CR
+
+The new version is writing, also using __raw_writel, to:
+
+  AT91_PS_CR
+
+The value of AT91_PS_CR is not changed in this patch. Assuming that
+AT91_VA_BASE_SYS for at91x40 (which at a quick glance it is not), then
+the old and the new version of the code are not writing to the same
+address.
+
+Was it previously incorrect, or is it incorrect now?
+
+~Ryan
