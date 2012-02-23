@@ -1,42 +1,50 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 23 Feb 2012 14:47:22 +0800
-Subject: [PATCH 2/4] ASoC: imx: move SND_SOC_AC97_BUS selection down to
- machine driver
+Date: Thu, 23 Feb 2012 14:47:23 +0800
+Subject: [PATCH 3/4] ASoC: imx: initialize dma_params burstsize just in imx-ssi
 In-Reply-To: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
 References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1329979644-31046-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1329979644-31046-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SND_SOC_AC97_BUS is selected to enable the AC97 support in soc-core.
-Rather than selecting the option under SND_IMX_SOC, it's better to
-leave the selection to individual machine driver which knows if AC97
-support is needed or not.
+It's not necessary for imx-pcm-dma-mx2 to access imx_ssi.dma_params
+for burstsize initialization.  Instead, it can just be done in imx-ssi
+probe function once.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- sound/soc/imx/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ sound/soc/imx/imx-pcm-dma-mx2.c |    5 -----
+ sound/soc/imx/imx-ssi.c         |    2 +-
+ 2 files changed, 1 insertions(+), 6 deletions(-)
 
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index 17810d9..bca5d34 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -1,7 +1,6 @@
- menuconfig SND_IMX_SOC
- 	tristate "SoC Audio for Freescale i.MX CPUs"
- 	depends on ARCH_MXC
--	select SND_SOC_AC97_BUS
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the i.MX SSI interface.
-@@ -37,6 +36,7 @@ config SND_SOC_MX27VIS_AIC32X4
- config SND_SOC_PHYCORE_AC97
- 	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
- 	depends on MACH_PCM043 || MACH_PCA100
-+	select SND_SOC_AC97_BUS
- 	select SND_SOC_WM9712
- 	select SND_MXC_SOC_FIQ
- 	help
+diff --git a/sound/soc/imx/imx-pcm-dma-mx2.c b/sound/soc/imx/imx-pcm-dma-mx2.c
+index f974e61..1737141 100644
+--- a/sound/soc/imx/imx-pcm-dma-mx2.c
++++ b/sound/soc/imx/imx-pcm-dma-mx2.c
+@@ -271,11 +271,6 @@ static struct snd_soc_platform_driver imx_soc_platform_mx2 = {
+ 
+ static int __devinit imx_soc_platform_probe(struct platform_device *pdev)
+ {
+-	struct imx_ssi *ssi = platform_get_drvdata(pdev);
+-
+-	ssi->dma_params_tx.burstsize = 6;
+-	ssi->dma_params_rx.burstsize = 4;
+-
+ 	return snd_soc_register_platform(&pdev->dev, &imx_soc_platform_mx2);
+ }
+ 
+diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/imx/imx-ssi.c
+index dbf43f5..25c6231 100644
+--- a/sound/soc/imx/imx-ssi.c
++++ b/sound/soc/imx/imx-ssi.c
+@@ -668,7 +668,7 @@ static int imx_ssi_probe(struct platform_device *pdev)
+ 	ssi->dma_params_rx.dma_addr = res->start + SSI_SRX0;
+ 	ssi->dma_params_tx.dma_addr = res->start + SSI_STX0;
+ 
+-	ssi->dma_params_tx.burstsize = 4;
++	ssi->dma_params_tx.burstsize = 6;
+ 	ssi->dma_params_rx.burstsize = 4;
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx0");
 -- 
 1.7.5.4
