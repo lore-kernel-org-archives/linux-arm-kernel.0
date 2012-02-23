@@ -1,81 +1,39 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 23 Feb 2012 23:23:20 +0100
-Subject: [PATCH 4/5] ARM: OMAP2+: gpmc: Use irq_alloc_descs instead of static
- IRQ range
+Date: Thu, 23 Feb 2012 23:23:21 +0100
+Subject: [PATCH 5/5] ARM: OMAP: irqs: Set NR_IRQS to NR_IRQS_LEGACY for
+ CONFIG_SPARSE_IRQ
 In-Reply-To: <1330035801-14937-1-git-send-email-b-cousson@ti.com>
 References: <1330035801-14937-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1330035801-14937-5-git-send-email-b-cousson@ti.com>
+Message-ID: <1330035801-14937-6-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpmc code is still not a proper driver and is still using the bad old
-static way of declaring its IRQ range for the various CS it can handle (8).
+If CONFIG_SPARSE_IRQ is set, the irqdescs will be allocated with
+NR_IRQS entries at boot time and thus will shift all the entries
+allocated dynamically by irq_alloc_descs for nothing.
 
-Use irq_alloc_descs to get dynamically a set of IRQ descriptors.
-Clean some bad line wrapping here and there.
-
-Please note that this code is still not a real driver after this fix, and
-will require a massive cleanup...
+Set NR_IRQS to NR_IRQS_LEGACY if CONFIG_SPARSE_IRQ is set.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c |   22 +++++++++++++++-------
- 1 files changed, 15 insertions(+), 7 deletions(-)
+ arch/arm/plat-omap/include/plat/irqs.h |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index dfffbbf..95ea50a 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -103,6 +103,8 @@ static struct clk *gpmc_l3_clk;
+diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
+index 3d41a65..acc1ac8 100644
+--- a/arch/arm/plat-omap/include/plat/irqs.h
++++ b/arch/arm/plat-omap/include/plat/irqs.h
+@@ -438,7 +438,11 @@
+ #define OMAP_GPMC_IRQ_END	(OMAP_GPMC_IRQ_BASE + OMAP_GPMC_NR_IRQS)
  
- static irqreturn_t gpmc_handle_irq(int irq, void *dev);
  
-+static int irq_base;
-+
- static void gpmc_write_reg(int idx, u32 val)
- {
- 	__raw_writel(val, gpmc_base + idx);
-@@ -747,7 +749,13 @@ static int __init gpmc_init(void)
- 	gpmc_mem_init();
++#ifdef CONFIG_SPARSE_IRQ
++#define NR_IRQS			NR_IRQS_LEGACY
++#else
+ #define NR_IRQS			OMAP_GPMC_IRQ_END
++#endif
  
- 	/* initalize the irq_chained */
--	irq = OMAP_GPMC_IRQ_BASE;
-+	irq_base = irq_alloc_descs(-1, 0, GPMC_CS_NUM, 0);
-+	if (irq_base < 0) {
-+		pr_err("%s() Couldn't allocate IRQs\n", __func__);
-+		return -ENODEV;
-+	}
-+
-+	irq = irq_base;
- 	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
- 		irq_set_chip_and_handler(irq, &dummy_irq_chip,
- 						handle_simple_irq);
-@@ -755,11 +763,11 @@ static int __init gpmc_init(void)
- 		irq++;
- 	}
+ #define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
  
--	ret = request_irq(gpmc_irq,
--			gpmc_handle_irq, IRQF_SHARED, "gpmc", gpmc_base);
-+	ret = request_irq(gpmc_irq, gpmc_handle_irq, IRQF_SHARED, "gpmc",
-+			  gpmc_base);
- 	if (ret)
--		pr_err("gpmc: irq-%d could not claim: err %d\n",
--						gpmc_irq, ret);
-+		pr_err("gpmc: irq-%d could not claim: err %d\n", gpmc_irq, ret);
-+
- 	return ret;
- }
- postcore_initcall(gpmc_init);
-@@ -770,8 +778,8 @@ static irqreturn_t gpmc_handle_irq(int irq, void *dev)
- 
- 	/* check cs to invoke the irq */
- 	cs = ((gpmc_read_reg(GPMC_PREFETCH_CONFIG1)) >> CS_NUM_SHIFT) & 0x7;
--	if (OMAP_GPMC_IRQ_BASE+cs <= OMAP_GPMC_IRQ_END)
--		generic_handle_irq(OMAP_GPMC_IRQ_BASE+cs);
-+	if (cs <= GPMC_CS_NUM)
-+		generic_handle_irq(irq_base + cs);
- 
- 	return IRQ_HANDLED;
- }
 -- 
 1.7.0.4
