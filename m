@@ -1,46 +1,78 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Thu, 23 Feb 2012 10:44:33 -0600
-Subject: [PATCH] ARM: OMAP2: fix mailbox init code
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D12143317AD2B7@DBDE01.ent.ti.com>
-References: <1329987215-28227-1-git-send-email-ohad@wizery.com>
- <B5906170F1614E41A8A28DE3B8D12143317AD2B7@DBDE01.ent.ti.com>
-Message-ID: <CAB-zwWhBzbLLH7CDvUG_aaTfkMsK-iYZRG=FLHpjJQFZvYmxiA@mail.gmail.com>
+From: hector.oron@gmail.com (Hector Oron)
+Date: Thu, 23 Feb 2012 17:49:34 +0100
+Subject: [PATCH] efikamx: match machine descriptions with legacy
+In-Reply-To: <CAHLCerPwJpM7x6WJ=1FUwJ96X-rgfLUEN840eoJ3SQsHg5gBDA@mail.gmail.com>
+References: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
+ <CAHLCerPwJpM7x6WJ=1FUwJ96X-rgfLUEN840eoJ3SQsHg5gBDA@mail.gmail.com>
+Message-ID: <CAODfWeG4OpH1VkWOuHntUCygC8YVMfgTK=1onDweAZ8WYW6w+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Thu, Feb 23, 2012 at 3:18 AM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
-> On Thu, Feb 23, 2012 at 14:23:35, Ohad Ben-Cohen wrote:
-> [...]
+2012/2/23 Amit Kucheria <amit.kucheria@linaro.org>:
+> On Tue, Feb 21, 2012 at 1:09 AM, Hector Oron <hector.oron@gmail.com> wrote:
+
+>> ?Rename machine descriptions to match legacy descriptions distributed by
+>> ?manufacturer BSP. This way distributions can do clean upgrades from
+>> ?userspace scripts which check for these values to differentiate platforms
+>> ?with single kernel binaries.
 >>
->> Which happens on CONFIG_ARCH_OMAP2 && !CONFIG_SOC_OMAP2420, due to
->> missing omap2_mboxes declaration.
+>> Signed-off-by: Hector Oron <hector.oron@gmail.com>
+>> Acked-by: Matt Sealey <matt@genesi-usa.com>
+
+> This is likely to break flash-kernel used in debian/ubuntu/linaro I
+> suspect. Can you fix that too?
+
+Surely, I can and I will do.
+
+> Otherwise,
+> Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
+
+Thanks
+
+>> ---
+>> ?arch/arm/mach-mx5/board-mx51_efikamx.c | ? ?3 +--
+>> ?arch/arm/mach-mx5/board-mx51_efikasb.c | ? ?2 +-
+>> ?2 files changed, 2 insertions(+), 3 deletions(-)
 >>
-> [...]
+>> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> index 3a5ed2d..fbfccc7 100644
+>> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> @@ -283,8 +283,7 @@ static struct sys_timer mx51_efikamx_timer = {
+>> ? ? ? ?.init = mx51_efikamx_timer_init,
+>> ?};
 >>
->> -struct omap_mbox *omap2_mboxes[] = { &mbox_dsp_info, &mbox_iva_info, NULL };
->> +#ifdef CONFIG_ARCH_OMAP2
->> +struct omap_mbox *omap2_mboxes[] = {
->> + ? ? &mbox_dsp_info,
->> +#ifdef CONFIG_SOC_OMAP2420
->> + ? ? &mbox_iva_info,
->> +#endif
->> + ? ? NULL
->> +};
->> ?#endif
+>> -MACHINE_START(MX51_EFIKAMX, "Genesi EfikaMX nettop")
+>> - ? ? ? /* Maintainer: Amit Kucheria <amit.kucheria@linaro.org> */
+>> +MACHINE_START(MX51_EFIKAMX, "Genesi Efika MX (Smarttop)")
+>> ? ? ? ?.atag_offset = 0x100,
+>> ? ? ? ?.map_io = mx51_map_io,
+>> ? ? ? ?.init_early = imx51_init_early,
+>> diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
+>> index 4baf05c..dedbca5 100644
+>> --- a/arch/arm/mach-mx5/board-mx51_efikasb.c
+>> +++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
+>> @@ -483,7 +483,7 @@ static struct sys_timer mx51_efikasb_timer = {
+>> ? ? ? ?.init ? = mx51_efikasb_timer_init,
+>> ?};
 >>
->> ?#if defined(CONFIG_ARCH_OMAP4)
->
-> Instead of adding more #ifs can they be completely removed please?
+>> -MACHINE_START(MX51_EFIKASB, "Genesi Efika Smartbook")
+>> +MACHINE_START(MX51_EFIKASB, "Genesi Efika MX (Smartbook)")
+>> ? ? ? ?.atag_offset = 0x100,
+>> ? ? ? ?.map_io = mx51_map_io,
+>> ? ? ? ?.init_early = imx51_init_early,
+>> --
+>> 1.7.9
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I'll rebase/repost this series:
 
-[PATCH 0/7] OMAP: mailbox: removing static declarations
-http://comments.gmane.org/gmane.linux.ports.arm.omap/59620
 
-In the meantime I would appreciate comments.
-
-Regards,
-
-Omar
+-- 
+?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
