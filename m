@@ -1,85 +1,70 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 23 Feb 2012 21:51:46 +1100
-Subject: [PATCH v2 09/19] ARM: at91: make sdram/ddr register base soc
- independent
-In-Reply-To: <4F460DD0.1050108@atmel.com>
-References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
- <0acddc0a57ea5a198f662bf37047ebe95e3eb695.1329903206.git.nicolas.ferre@atmel.com>
- <4F456D1E.8070807@gmail.com> <4F45FF46.3060702@atmel.com>
- <4F460DD0.1050108@atmel.com>
-Message-ID: <4F461A42.2080202@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Feb 2012 10:49:37 +0000
+Subject: [PATCH 0/7] share sa1100 rtc driver to arch-mmp
+In-Reply-To: <CAN1soZwBSHJcFWojPXTY7mDdD4vw85ABoXCk5uufcTNiQzh6_A@mail.gmail.com>
+References: <201202221239.54321.arnd@arndb.de>
+ <CAN1soZwgtxR7pNGBQuMHZS0URXM7U6ZABD4disNmvRarZnjwxA@mail.gmail.com>
+ <201202221350.00100.arnd@arndb.de>
+ <CAN1soZxTutYQ=uU0y_AvBTn37es+8tBU=1L6eKtJDUNONgwHFw@mail.gmail.com>
+ <87r4xmygb7.fsf@free.fr>
+ <CAN1soZx84dmAVz-Kyv18+fjOJyzvun7fpbXA+rYb6xeEhQbXtQ@mail.gmail.com>
+ <87booqx771.fsf@free.fr>
+ <CAN1soZxbDKHjMxjNjDOXk8Ko9AyJEDGFV1XpqpiJCaL9ikNEdg@mail.gmail.com>
+ <20120223100019.GK22562@n2100.arm.linux.org.uk>
+ <CAN1soZwBSHJcFWojPXTY7mDdD4vw85ABoXCk5uufcTNiQzh6_A@mail.gmail.com>
+Message-ID: <20120223104937.GP22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/12 20:58, Nicolas Ferre wrote:
-
-> On 02/23/2012 09:56 AM, Nicolas Ferre :
->> On 02/22/2012 11:33 PM, Ryan Mallon :
->>> On 22/02/12 20:39, Nicolas Ferre wrote:
->>>
->>>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>>>
->>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>> ---
->>>
->>> <snip>
->>>
->>>> +void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
->>>> +{
->>>> +	if (id > 1) {
->>>> +		pr_warn("%s: id > 2\n", __func__);
->>>> +		return;
->>>> +	}
->>>> +	at91_ramc_base[id] = ioremap(addr, size);
->>>> +	if (!at91_ramc_base[id])
->>>> +		pr_warn("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
->>>> +}
->>>
->>>
->>> If this fails then you will oops if you call either at91_ramc_read or
->>> at91_ramc_write since they don't check if at91_ramc_base[id] is a valid
->>> pointer. Either this function should panic, like the other at91_ioremap
->>> functions, or the at91_ramc_read/write functions should check for a
->>> valid pointer.
->>
->> Yes, as you pointed out, it is done in a not-related following patch.
->> I will bring the code here.
->>
->>
->>> Nitpick: The id check should probably also be BUG() or WARN() since it
->>> indicates a bug in the core AT91 code. pr_warn is likely to missed and
->>> not reported by users. Since the value is int, the check should be:
->>>
->>>   if (id < 0 || id > 1)
->>>
->>> Obviously the chance of this error happening are slim, but if you are
->>> going to check and warn for it, it should be done properly :-).
->>
->> Yes, I agree and modify it at the very moment.
+On Thu, Feb 23, 2012 at 06:22:23PM +0800, Haojian Zhuang wrote:
+> On Thu, Feb 23, 2012 at 6:00 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Thu, Feb 23, 2012 at 05:45:20PM +0800, Haojian Zhuang wrote:
+> >> On Thu, Feb 23, 2012 at 4:52 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> >> > The behaviour should be as before, the config should be able to choose between
+> >> > rtc-pxa and rtc-sa1100 for a pxa27x based board. For sharpsl_pm, I suppose the
+> >> > rtc-sa1100 will be chosen in the .config, and for mioa701, it will be
+> >> > rtc-pxa.
+> >> >
+> >> > Just to clear, I'm against removing "resources, clock" from pxa27x platform code
+> >> > which would break rtc-pxa driver on pxa27x. Now I don't care if you're talking
+> >> > about changing some "defconfigs".
+> >> >
+> >>
+> >> How about to move the rtc-sa1100 or rtc-pxa device register from
+> >> pxa27x.c to board file? Then we'll be both happy.
+> >
+> > How about stopping thinking about "one or other" and start thinking "both" ?
+> > The RTC library can and does cope with more than one RTC, and each RTC is
+> > exposed uniquely to userspace. ?So there shouldn't be any problem in keeping
+> > both around, or even registering both together.
+> >
+> > You just have to make sure you don't use both of them together as their
+> > open functions will want to claim the same IRQ. ?That's not really a
+> > problem because that should provide exclusivity between the two.
 > 
-> 
-> What do you think about that:
-> If id is not setup properly, I try to find a way out by using id = 0...
-> Then, a panic is added if the iremap() fails.
-> 
-> 
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -200,13 +200,14 @@ void __iomem *at91_ramc_base[2];
->  
->  void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
->  {
-> -       if (id > 1) {
-> -               pr_warn("%s: id > 2\n", __func__);
-> -               return;
-> +       if (id < 0 || id > 1) {
-> +               WARN(1, "%s: Wrong RAM controller id (%d), set it to 0\n",
-> +                                                               __func__, id);
-> +               id = 0;
+> Resource is bind with platform device. We'll meet resource conflict if
+> we register them both.
 
+Ok, in that case we need patch 3 split up such that we can move forward
+and get some of the build errors fixed.
 
-I don't think you should try to fix the id, just issue the warning and
-return. 
+That probably means that the first half of patch 3 should be providing the
+IRQs and only the IRQs to the driver, and the driver making use of that
+information.  Nothing more than that - not even the differing register
+offsets.
 
-~Ryan
+The next stage would be to introduce the different device names, and use
+that to chose the different register layouts - but still using a hard coded
+base address.  That will involve adding a new define for this to both
+arch/arm/mach-sa1100/include/mach/SA-1100.h and
+arch/arm/mach-pxa/include/mach/regs-rtc.h.  At the same time, this patch
+should move the register definitions from those headers into the sa1100 RTC
+driver, and get rid of the virtual address definitions for these registers.
+
+The clocking issues can also be sorted out as well without solving the base
+address issue - and that gets most of this patch set ready for merging
+without causing Robert any problems.
+
+I would like to see this ASAP so that the current build regression with
+PXA can be fixed.
