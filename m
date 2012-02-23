@@ -1,46 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 14:14:19 +0000
-Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
- register
-In-Reply-To: <201202231335.04923.arnd@arndb.de>
-References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
- <201202231233.05622.arnd@arndb.de>
- <20120223125044.GW22562@n2100.arm.linux.org.uk>
- <201202231335.04923.arnd@arndb.de>
-Message-ID: <20120223141419.GY22562@n2100.arm.linux.org.uk>
+From: mporter@ti.com (Matt Porter)
+Date: Thu, 23 Feb 2012 09:16:04 -0500
+Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+Message-ID: <1330006564-13290-1-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 01:35:04PM +0000, Arnd Bergmann wrote:
-> Since devices that can bei either PCI or not are relatively rare, I'd
-> rather put them in the same category as those that can either use
-> PCI I/O space or some form of memory space and require that the
-> drivers use the "I don't care what you are, just do what I want"
-> accessors in the ioread/iowrite family that are already going through
-> an indirect function call on most architectures.
+This fixes smsc911x support on platforms using gpmc_smsc911x_init().
 
-It's not a case of whether they themselves are PCI or not.  It's a case
-that manufacturers are starting to take existing ARM IP and sticking a
-PCI bridge in front of them.
+Commit c7e963f6888816 (net/smsc911x: Add regulator support) added
+the requirement that platforms provide vdd33a and vddvario supplies.
 
-That's why there's someone looking at a set of PCI drivers which create
-AMBA primecell devices to allow the existing primecell drivers to bind
-to these peripherals.
+Signed-off-by: Matt Porter <mporter@ti.com>
+---
+Changes for v2:
+   - temporary fix to avoid platform device id conflicts
+   - add commit summary from the smsc911x regulator support commit
+   - incorporate platform device registration error cause reporting
+Changes for v3:
+   - remove unneeded local variable err
 
-What that means is that in theory, you could have an AMBA primecell
-peripheral behind a PCI device on an IXP4xx platform with its weird
-windows, and that would necessitate the AMBA primecell drivers to use the
-special PCI space accessors.
+ arch/arm/mach-omap2/gpmc-smsc911x.c |   52 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 52 insertions(+), 0 deletions(-)
 
-I would not be surprised if some of these PPC freescale peripheral IPs
-using their private in_xxx() accessors end up in the same situation.
-That seems to be the direction the hardware folk are going.
-
-So, I think it's a big mistake to distinguish bus types by their
-accessors.  Or put it another way, it's a big mistake to have bus
-specific accessors.
-
-Consider the AMBA primecell behind a PCI device, and if AMBA had its own
-bus specific accessors.  Should we litter the drivers with ifdefs to
-select between the PCI accessors or the AMBA accessors?  Or something
-equally horrible?
+diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+index 9970331..bbb870c 100644
+--- a/arch/arm/mach-omap2/gpmc-smsc911x.c
++++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+@@ -19,6 +19,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/smsc911x.h>
++#include <linux/regulator/fixed.h>
++#include <linux/regulator/machine.h>
+ 
+ #include <plat/board.h>
+ #include <plat/gpmc.h>
+@@ -42,6 +44,50 @@ static struct smsc911x_platform_config gpmc_smsc911x_config = {
+ 	.flags		= SMSC911X_USE_16BIT,
+ };
+ 
++static struct regulator_consumer_supply gpmc_smsc911x_supply[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
++};
++
++/* Generic regulator definition to satisfy smsc911x */
++static struct regulator_init_data gpmc_smsc911x_reg_init_data = {
++	.constraints = {
++		.min_uV			= 3300000,
++		.max_uV			= 3300000,
++		.valid_modes_mask	= REGULATOR_MODE_NORMAL
++					| REGULATOR_MODE_STANDBY,
++		.valid_ops_mask		= REGULATOR_CHANGE_MODE
++					| REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(gpmc_smsc911x_supply),
++	.consumer_supplies	= gpmc_smsc911x_supply,
++};
++
++static struct fixed_voltage_config gpmc_smsc911x_fixed_reg_data = {
++	.supply_name		= "gpmc_smsc911x",
++	.microvolts		= 3300000,
++	.gpio			= -EINVAL,
++	.startup_delay		= 0,
++	.enable_high		= 0,
++	.enabled_at_boot	= 1,
++	.init_data		= &gpmc_smsc911x_reg_init_data,
++};
++
++/*
++ * Platform device id of 42 is a temporary fix to avoid conflicts
++ * with other reg-fixed-voltage devices. The real fix should
++ * involve the driver core providing a way of dynamically
++ * assigning a unique id on registration for platform devices
++ * in the same name space.
++ */
++static struct platform_device gpmc_smsc911x_regulator = {
++	.name		= "reg-fixed-voltage",
++	.id		= 42,
++	.dev = {
++		.platform_data	= &gpmc_smsc911x_fixed_reg_data,
++	},
++};
++
+ /*
+  * Initialize smsc911x device connected to the GPMC. Note that we
+  * assume that pin multiplexing is done in the board-*.c file,
+@@ -55,6 +101,12 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+ 
+ 	gpmc_cfg = board_data;
+ 
++	ret = platform_device_register(&gpmc_smsc911x_regulator);
++	if (ret < 0) {
++		pr_err("Unable to register smsc911x regulators: %d\n", ret);
++		return;
++	}
++
+ 	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
+ 		pr_err("Failed to request GPMC mem region\n");
+ 		return;
+-- 
+1.7.5.4
