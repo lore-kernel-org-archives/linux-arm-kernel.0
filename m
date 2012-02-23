@@ -1,35 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 11:30:37 +0000
-Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
- register
-In-Reply-To: <20120223111906.GS22562@n2100.arm.linux.org.uk>
-References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
- <20120223095345.GJ22562@n2100.arm.linux.org.uk> <4F461A97.1090201@st.com>
- <20120223111906.GS22562@n2100.arm.linux.org.uk>
-Message-ID: <20120223113037.GU22562@n2100.arm.linux.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 23 Feb 2012 17:02:20 +0530
+Subject: [PATCH] mmc: omap_hsmmc: convert all pr_* to dev_*
+Message-ID: <1329996740-26966-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 11:19:06AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 23, 2012 at 04:23:11PM +0530, Viresh Kumar wrote:
-> > On 2/23/2012 3:23 PM, Russell King - ARM Linux wrote:
-> > > 1. Using the PCI/ISA IO macros for non-PCI/ISA IO purposes is silly
-> > 
-> > We mistakenly placed it outside #ifdef __io, #endif
-> > Sorry, i am still missing your point.
-> 
-> inb() et.al. are for PCI/ISA IO, not for general platform MMIO.
-> 
-> > > 2. We should have readb_be() etc instead.
-> > 
-> > Actually, existing drivers are using out_be32(), etc in their implementation.
-> > What do you suggest in order to use these drivers for SPEAr/ARM.
-> 
-> Which drivers?
+Convert all instances of pr_* prints within the driver
+to instead use dev_* prints.
 
-I see, some PPC folk allowed their private IO accessors to spread into
-generic drivers despite a comment in their io.h saying that they shouldn't.
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+Re-sending as this patch did not make it to the lists due to
+issues with my 'git send-email'
 
-The right solution is that this crap needs to get fixed, rather than
-spreading around yet another IO accessor which was supposed to be private
-to an arch.  I've mailed the PPC folk about it.
+ drivers/mmc/host/omap_hsmmc.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index e3eb9d4..35f6dc1 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -302,7 +302,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ 			mmc_slot(host).ocr_mask = ocr_value;
+ 		} else {
+ 			if (!(mmc_slot(host).ocr_mask & ocr_value)) {
+-				pr_err("MMC ocrmask %x is not supported\n",
++				dev_err(host->dev, "ocrmask %x is not supported\n",
+ 					mmc_slot(host).ocr_mask);
+ 				mmc_slot(host).ocr_mask = 0;
+ 				return -EINVAL;
+@@ -1132,14 +1132,14 @@ static void omap_hsmmc_protect_card(struct omap_hsmmc_host *host)
+ 	host->reqs_blocked = 0;
+ 	if (mmc_slot(host).get_cover_state(host->dev, host->slot_id)) {
+ 		if (host->protect_card) {
+-			pr_info("%s: cover is closed, "
++			dev_info(host->dev, "%s: cover is closed, "
+ 					 "card is now accessible\n",
+ 					 mmc_hostname(host->mmc));
+ 			host->protect_card = 0;
+ 		}
+ 	} else {
+ 		if (!host->protect_card) {
+-			pr_info("%s: cover is open, "
++			dev_info(host->dev, "%s: cover is open, "
+ 					 "card is now inaccessible\n",
+ 					 mmc_hostname(host->mmc));
+ 			host->protect_card = 1;
+@@ -1276,7 +1276,7 @@ static int omap_hsmmc_pre_dma_transfer(struct omap_hsmmc_host *host,
+ 
+ 	if (!next && data->host_cookie &&
+ 	    data->host_cookie != host->next_data.cookie) {
+-		pr_warning("[%s] invalid cookie: data->host_cookie %d"
++		dev_warn(host->dev, "[%s] invalid cookie: data->host_cookie %d"
+ 		       " host->next_data.cookie %d\n",
+ 		       __func__, data->host_cookie, host->next_data.cookie);
+ 		data->host_cookie = 0;
+-- 
+1.7.1
