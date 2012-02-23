@@ -1,52 +1,39 @@
-From: jason@lakedaemon.net (Jason)
-Date: Thu, 23 Feb 2012 14:00:59 -0500
-Subject: [PATCH 2/3 v4] arm: kirkwood: add dreamplug (fdt) support.
-In-Reply-To: <CACxGe6veKy3eA=GCp9eZWG1h8UgEYwAP9aicJhwm90=m4Z33xg@mail.gmail.com>
-References: <cover.1329936660.git.jason@lakedaemon.net>
- <8532afcdc4adbb3771e6f742bcc33ef9c0347858.1329936660.git.jason@lakedaemon.net>
- <4F45B043.1080302@gmail.com> <201202230734.33583.arnd@arndb.de>
- <20120223161210.GN23524@titan.lakedaemon.net>
- <CACxGe6veKy3eA=GCp9eZWG1h8UgEYwAP9aicJhwm90=m4Z33xg@mail.gmail.com>
-Message-ID: <20120223190059.GO23524@titan.lakedaemon.net>
+From: tpiepho@gmail.com (Trent Piepho)
+Date: Thu, 23 Feb 2012 14:01:20 -0500
+Subject: [alsa-devel] [PATCH 4/4] ASoC: fsl: make fsl_ssi driver
+ compilable on ARM/IMX
+In-Reply-To: <20120223171407.GC22562@n2100.arm.linux.org.uk>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-5-git-send-email-shawn.guo@linaro.org>
+ <4F465A33.3020208@ru.mvista.com> <4F465EE5.4010908@freescale.com>
+ <20120223165242.GB22562@n2100.arm.linux.org.uk>
+ <4F4671BB.7060409@freescale.com>
+ <20120223171407.GC22562@n2100.arm.linux.org.uk>
+Message-ID: <CA+7tXigQ=R3-b0jiFJF3rmBRQS4RM77Z9Thq2pkE2yrs03NYWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 11:56:46AM -0700, Grant Likely wrote:
-> On Thu, Feb 23, 2012 at 9:12 AM, Jason <jason@lakedaemon.net> wrote:
-> > On Thu, Feb 23, 2012 at 07:34:33AM +0000, Arnd Bergmann wrote:
-> >> On Thursday 23 February 2012, Rob Herring wrote:
-> >> > On 02/22/2012 01:18 PM, Jason Cooper wrote:
-...
-> >> > > +
-> >> > > +static const char *kirkwood_dt_board_compat[] = {
-> >> > > + "marvell,dreamplug",
-> >> > > + NULL
-> >> > > +};
-> >>
-> >> Since you mention the name, it should probably be "globalscale,dreamplug"
-> >> because the device is made by GlobalScale instead of Marvell.
-> >
-> > hmm, Globalscale Tech is, as I understand it, a turn-key manufacturer.
-> > They are simply building Marvell's development platforms for them,
-> > handling sales, etc. ?My impression was that Marvell designed the board
-> > and contracted Globalscale to build and distribute it.
-> >
-> > I don't care which we use, but is the convention to use the SoC designer
-> > (marvell,dreamplug), the SoC (kirkwood,dreamplug), or the brand
-> > (globalscale,dreamplug)?
-> >
-> > If there is no set standard, I think the SoC is most accurate, as
-> > nothing prevents a manufacturer from swapping out ICs/SoCs between
-> > manufacturing runs of the same make/model. ?Look at certain wifi USB
-> > devices for examples.
-> 
-> convention is to use the vendor of the device.  If it is marketed as a
-> Marvell product, then use "marvell,...".  If it is Globalscale, then
-> "globalscale,...".  The actual SoC on the device is irrelevant for the
-> top level compatible property name.
+On Thu, Feb 23, 2012 at 12:14 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Feb 23, 2012 at 11:04:59AM -0600, Timur Tabi wrote:
+>> Russell King - ARM Linux wrote:
+>> We almost never use readl. ?I see that it is used in some places, but
+>> honestly I can't see how it can be valid. ?For instance, the mpic driver
+>> uses it in mpic_startup_ht_interrupt(). ?I don't understand how that's
+>> valid, since there's nothing preventing the readl() from happening
+>> *before* the writeb.
+>
+> That just sounds broken. ?If readl() can happen before a writeb() issued
+> in program order, how do most of the PCI drivers work?
 
-globalscale it is, then.  Thanks for the clarification.
+I was under the impression that on powerpc io memory was mapped
+cache-inhibited and guarded, which provides most ordered, but not
+store to load ordering without an additional synchronization
+instruction.  See
+http://cache.freescale.com/files/32bit/doc/app_note/AN3441.pdf on page
+8.
 
-thx,
-
-Jason.
+PCI adds some additional complexity, since the PCI device is not
+connected directly to the CPU.  One must consider the actions of the
+PCI host controller.
