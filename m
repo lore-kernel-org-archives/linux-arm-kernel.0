@@ -1,44 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 23 Feb 2012 16:31:51 +0000
-Subject: [PATCH] ARM: perf: add PMU hotplug notifiery
-In-Reply-To: <4F46658B.3030903@codeaurora.org>
-References: <CAKHPGBaY1OFiVubic+f1vxxzNeKjmzibxraBg8eNxZnJbhYi+A@mail.gmail.com>
- <4F4661E2.9020405@codeaurora.org> <4F4662AD.6030306@codeaurora.org>
- <20120223160450.GL29450@mudshark.cambridge.arm.com>
- <4F46658B.3030903@codeaurora.org>
-Message-ID: <20120223163145.GD20046@e102568-lin.cambridge.arm.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 23 Feb 2012 17:32:16 +0100
+Subject: [V1 1/3] mfd: add power control interface for pm8606 chip
+In-Reply-To: <1329469400-8167-1-git-send-email-jtzhou@marvell.com>
+References: <1329469400-8167-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20120223163216.GL24377@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 04:12:59PM +0000, Ashwin Chaugule wrote:
-> On 2/23/2012 11:04 AM, Will Deacon wrote:
-> > 
-> > Ok. Note that the perf core will actually destroy perf events on a hotplug
-> > down notification, so profiling runs will be dead on that core even if it
-> > comes back up.
-> > 
-> > This patch just ensures that we have a sane state in the control registers
-> > given that their state is UNKNOWN out of reset. Adding full hotplug support
-> > to perf (that is, supporting hotplug events during a run and representing
-> > that in a meaningful way) is a larger issue.
-> > 
-> >>> I'll send a link to my code once the git server is up. It's a bit flaky today.
-> > 
-> > Ok, cool. Are you happy with me to proceed with the current code for the
-> > time being?
-> > 
-> 
-> Sure. We'll need to be able to distinguish between a hotplug and a CPU
-> power-collapse / deep sleep / what-have-you state in this code at some
-> point since they all have a different effect on the PMU regs.
+Hi Jett,
 
-I have a patch to save/restore PMU regs from idle, I will send it to
-Will for review soon so that he can merge the bits that you both deem
-worthwhile.
+On Fri, Feb 17, 2012 at 05:03:20PM +0800, Jett.Zhou wrote:
+> +int pm8606_osc_enable(struct pm860x_chip *chip, unsigned short client)
+> +{
+> +	int ret = -EIO;
+> +	struct i2c_client *i2c = (chip->id == CHIP_PM8606) ?
+> +		chip->client : chip->companion;
+> +
+> +	dev_dbg(chip->dev, "%s(B): client=0x%x\n", __func__, client);
+> +	dev_dbg(chip->dev, "%s(B): vote=0x%x status=%d\n",
+> +			__func__, chip->osc_vote,
+> +			chip->osc_status);
+> +
+> +	mutex_lock(&chip->osc_lock);
+> +	/* Update voting status */
+> +	chip->osc_vote |= client;
+> +	/* If reference group is off - turn on*/
+> +	if (chip->osc_status != PM8606_REF_GP_OSC_ON) {
+> +		do {
+> +			chip->osc_status =
+> +				PM8606_REF_GP_OSC_UNKNOWN;
+> +
+> +			/* Enable Reference group Vsys */
+> +			if (pm860x_set_bits(i2c, PM8606_VSYS,
+> +					PM8606_VSYS_EN, PM8606_VSYS_EN))
+> +				break;
+> +			/*Enable Internal Oscillator */
+> +			if (pm860x_set_bits(i2c, PM8606_MISC,
+> +					PM8606_MISC_OSC_EN, PM8606_MISC_OSC_EN))
+> +				break;
+> +
+> +			/* Update status (only if writes succeed) */
+> +			chip->osc_status = PM8606_REF_GP_OSC_ON;
+> +			ret = 0;
+> +		} while (0);
+Could you please remove the do {} while (0); scope ?
 
-save/restore will be called from CPU PM notifiers on deep-sleep
-entry/exit, it is up to the idle state enter function to trigger them when PMU
-state is lost.
 
-Thanks,
-Lorenzo
+> +	} else
+> +		ret = 0;
+> +	mutex_unlock(&chip->osc_lock);
+> +
+> +	dev_dbg(chip->dev, "%s(A): vote=0x%x status=%d ret=%d\n",
+> +			__func__, chip->osc_vote,
+> +			chip->osc_status, ret);
+> +	return ret;
+> +}
+Beside the unneeded scope, you should add more spacing in this routine. It
+would look more readable.
+
+> @@ -766,7 +867,14 @@ static void __devinit device_8607_init(struct pm860x_chip *chip,
+>  out:
+>  	return;
+>  }
+> -
+Keep this one here.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
