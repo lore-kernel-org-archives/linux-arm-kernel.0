@@ -1,43 +1,78 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 23 Feb 2012 17:31:26 +0530
-Subject: [PATCH v2 0/4] omap hsmmc device tree support
-Message-ID: <1329998490-27555-1-git-send-email-rnayak@ti.com>
+Date: Thu, 23 Feb 2012 17:31:28 +0530
+Subject: [PATCH v2 2/4] mmc: omap_hsmmc: Avoid a regulator voltage change with
+ dt
+In-Reply-To: <1329998490-27555-1-git-send-email-rnayak@ti.com>
+References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
+Message-ID: <1329998490-27555-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds device tree support for OMAP hsmmc
-driver. The series is dependent on a couple other series,
-to add TWL regulator DT support[1] and another to clean
-the pdev->id usage within the hsmmc driver[2]
+When booting with Device tree, the omap_hsmmc driver does not
+program the pbias cell (inside OMAP control module) during
+a regulator voltage change.
+In case of non-dt boot, this is handled using callbacks
+from within platform_data and implemented in machine code.
+To be able to do this with device tree, without invoking
+any machine code, a OMAP control module driver is needed
+which is yet missing.
 
-all patches including the dependent series can be
-found here
-git://gitorious.org/omap-pm/linux.git for-dt/regulator
+The pbias cell is used to provide a 1.8v or 3.0v reference
+to the mmc/sd/sdio1 interface supporting both 1.8v and 3.0v
+voltages.
 
-The series is tested on omap4sdp (both external and emmc),
-omap4panda amd omap3beagle boards.
+Until a OMAP control module driver is available to handle this,
+when booting with a device tree blob, never change the regulator
+voltage which might then require a pbias cell re-program.
+There are 2 instances where in the mmc regulator voltage can be
+changed.
+-1- when the regulator is turned OFF.
+-2- when attempting a switch to 1.8v from 3.0v for dual volt cards
 
-Things to do:
--1- Card detect isn't functional and needs twl4030 gpio
-to be DT converted.
--2- pbias cell programming is missing and needs an OMAP
-control module driver.
+This patch avoids a voltage change in both cases when booting from
+device tree, and hence compromises on power savings.
+Once the OMAP control module driver is available and hsmmc driver
+is modified to then do pbias programming even when booting
+with device tree, these limitaions can be removed to achieve better
+power savings.
 
-[1] http://marc.info/?l=linux-omap&m=132999699905180&w=2
-[2] http://marc.info/?l=linux-omap&m=132999646604985&w=2
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ drivers/mmc/host/omap_hsmmc.c |   15 ++++++++++++++-
+ 1 files changed, 14 insertions(+), 1 deletions(-)
 
-Rajendra Nayak (4):
-  mmc: omap_hsmmc: Convert hsmmc driver to use device tree
-  mmc: omap_hsmmc: Avoid a regulator voltage change with dt
-  arm/dts: OMAP4: Add mmc controller nodes and board data
-  arm/dts: OMAP3: Add mmc controller nodes and board data
-
- .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   31 +++++++
- arch/arm/boot/dts/omap3-beagle.dts                 |    6 ++
- arch/arm/boot/dts/omap3.dtsi                       |   26 ++++++
- arch/arm/boot/dts/omap4-panda.dts                  |   10 +++
- arch/arm/boot/dts/omap4-sdp.dts                    |   16 ++++
- arch/arm/boot/dts/omap4.dtsi                       |   31 +++++++
- drivers/mmc/host/omap_hsmmc.c                      |   83 +++++++++++++++++++-
- 7 files changed, 202 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 0c93d58..dffde8d 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -245,6 +245,13 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
+ 	 */
+ 	if (!host->vcc)
+ 		return 0;
++	/*
++	 * With DT, never turn OFF the regulator. This is because
++	 * the pbias cell programming support is still missing when
++	 * booting with Device tree
++	 */
++	if (of_have_populated_dt() && !vdd)
++		return 0;
+ 
+ 	if (mmc_slot(host).before_set_reg)
+ 		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
+@@ -1537,7 +1544,13 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		 * of external transceiver; but they all handle 1.8V.
+ 		 */
+ 		if ((OMAP_HSMMC_READ(host->base, HCTL) & SDVSDET) &&
+-			(ios->vdd == DUAL_VOLT_OCR_BIT)) {
++			(ios->vdd == DUAL_VOLT_OCR_BIT) &&
++			/*
++			 * With pbias cell programming missing, this
++			 * can't be allowed when booting with device
++			 * tree.
++			 */
++			(!of_have_populated_dt())) {
+ 				/*
+ 				 * The mmc_select_voltage fn of the core does
+ 				 * not seem to set the power_mode to
+-- 
+1.7.1
