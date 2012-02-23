@@ -1,62 +1,102 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 23 Feb 2012 16:57:18 +0100
-Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4F46609C.8080907@atmel.com>
-References: <4F22DEF2.5000807@ti.com> <4F44CA82.9060906@atmel.com>
- <4F460EF2.9010000@ti.com> <4F46609C.8080907@atmel.com>
-Message-ID: <4F4661DE.90704@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 23 Feb 2012 15:58:15 +0000
+Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU IRQ
+ handlers
+In-Reply-To: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
+References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1330012696-13472-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/23/2012 4:51 PM, Nicolas Ferre wrote:
-> On 02/23/2012 11:03 AM, Cousson, Benoit :
->> Salut Nico,
->
-> Coucou Benoit ;-)
->
->> On 2/22/2012 11:59 AM, Nicolas Ferre wrote:
->>> On 01/27/2012 06:29 PM, Cousson, Benoit :
->>>> Add some basic helpers to retrieve a DMA controller device_node
->>>> and the DMA request line number.
->>>>
->>>> For legacy reason another API will export the DMA request number
->>>> into a Linux resource of type IORESOURCE_DMA.
->>>> This API is usable only on system with an unique DMA controller.
->>>
->>> Hi,
->>>
->>> I followed that discussion and I like very much the biding that Benoit
->>> is proposing. It will help me a lot with my current work on Atmel DMA
->>> controller.
->>>
->>> If I understand correctly, some rework is needed before it can be
->>> integrated in a stable git tree (I mean before we can base our work on
->>> top of it). So, in the meantime, what should I do to help and make
->>> things go forward? to be quite frank, I would be interested to have a
->>> working DMA enabled device soon ;-)
->>
->> Me too, but unfortunately, I was busy trying to add irq_domain and
->> fixing issues with SPARSE_IRQ on OMAP :-(
->
-> Been there, loved that ;-)
->
->>> Do you think that 3.4 is out of reach?
->>
->> Maybe not, from the comments, it looks like we should add a .xlate
->> callback to allow any custom parsing of the DMA nodes attributes.
->>
->> I'll be more than happy, if you can finalize that patch :-)
->
-> I will try to figure out what I can understand from the irq mechanism of
-> .xlate and try to see if I can implement it on top of your patch.
+The PMU IRQ handlers in perf assume that if a counter has overflowed
+then perf must be responsible. In the paranoid world of crazy hardware,
+this could be false, so check that we do have a valid event before
+attempting to dereference NULL in the interrupt path.
 
-In fact that dma code is a big copy/paste of the of/gpio one and gpio 
-was already managing .xlate function.
-I removed it because I thought it was useless for the DMA :-)
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event_v6.c     |   20 ++------------------
+ arch/arm/kernel/perf_event_v7.c     |    4 ++++
+ arch/arm/kernel/perf_event_xscale.c |    6 ++++++
+ 3 files changed, 12 insertions(+), 18 deletions(-)
 
-You might just have to copy the original code...
-
-> I will keep you informed...
-
-Thanks for the help,
-Benoit
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 88bf152..b78af0c 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -467,23 +467,6 @@ armv6pmu_enable_event(struct hw_perf_event *hwc,
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static int counter_is_active(unsigned long pmcr, int idx)
+-{
+-	unsigned long mask = 0;
+-	if (idx == ARMV6_CYCLE_COUNTER)
+-		mask = ARMV6_PMCR_CCOUNT_IEN;
+-	else if (idx == ARMV6_COUNTER0)
+-		mask = ARMV6_PMCR_COUNT0_IEN;
+-	else if (idx == ARMV6_COUNTER1)
+-		mask = ARMV6_PMCR_COUNT1_IEN;
+-
+-	if (mask)
+-		return pmcr & mask;
+-
+-	WARN_ONCE(1, "invalid counter number (%d)\n", idx);
+-	return 0;
+-}
+-
+ static irqreturn_t
+ armv6pmu_handle_irq(int irq_num,
+ 		    void *dev)
+@@ -513,7 +496,8 @@ armv6pmu_handle_irq(int irq_num,
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
+-		if (!counter_is_active(pmcr, idx))
++		/* Ignore if we don't have an event. */
++		if (!event)
+ 			continue;
+ 
+ 		/*
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 050cc8b..4d7095a 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -960,6 +960,10 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
++		/* Ignore if we don't have an event. */
++		if (!event)
++			continue;
++
+ 		/*
+ 		 * We have a single interrupt for all counters. Check that
+ 		 * each counter has overflowed before we process it.
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 831e019..a5bbd36 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -255,6 +255,9 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
++		if (!event)
++			continue;
++
+ 		if (!xscale1_pmnc_counter_has_overflowed(pmnc, idx))
+ 			continue;
+ 
+@@ -592,6 +595,9 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+ 
++		if (!event)
++			continue;
++
+ 		if (!xscale2_pmnc_counter_has_overflowed(pmnc, idx))
+ 			continue;
+ 
+-- 
+1.7.4.1
