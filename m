@@ -1,52 +1,58 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 23 Feb 2012 09:14:59 +0100
-Subject: [PATCH v3 06/10] pwm: Add NVIDIA Tegra SoC support
-In-Reply-To: <4F459A94.4030104@gmail.com>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <1329923841-32017-7-git-send-email-thierry.reding@avionic-design.de>
- <4F459A94.4030104@gmail.com>
-Message-ID: <20120223081459.GD8621@avionic-0098.mockup.avionic-design.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 23 Feb 2012 09:38:15 +0100
+Subject: [PATCH v2 11/19] ARM: at91/PMC: make register base soc independent
+In-Reply-To: <4F457128.6060407@gmail.com>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <bdea371b518c7b6d04ae1cfacacca2f75b191984.1329903206.git.nicolas.ferre@atmel.com>
+ <4F457128.6060407@gmail.com>
+Message-ID: <4F45FAF7.3080409@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ryan Mallon wrote:
-> On 23/02/12 02:17, Thierry Reding wrote:
+On 02/22/2012 11:50 PM, Ryan Mallon :
+> On 22/02/12 20:39, Nicolas Ferre wrote:
 > 
-> > This commit adds a generic PWM framework driver for the PWFM controller
-> > found on NVIDIA Tegra SoCs. The driver is based on code from the
-> > Chromium kernel tree and was originally written by Gary King (NVIDIA)
-> > and later modified by Simon Que (Chromium).
-> > 
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
+>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Reviewed-by: Ryan Mallon <rmallon@gmail.com>
+>> ---
 > 
 > <snip>
 > 
-> > +
-> > +	pwm->chip.dev = &pdev->dev;
-> > +	pwm->chip.ops = &tegra_pwm_ops;
-> > +	pwm->chip.base = -1;
-> > +	pwm->chip.npwm = NUM_PWM;
+>> -	seq_printf(s, "SCSR = %8x\n", scsr = at91_sys_read(AT91_PMC_SCSR));
+>> -	seq_printf(s, "PCSR = %8x\n", pcsr = at91_sys_read(AT91_PMC_PCSR));
+>> -	seq_printf(s, "MOR  = %8x\n", at91_sys_read(AT91_CKGR_MOR));
+>> -	seq_printf(s, "MCFR = %8x\n", at91_sys_read(AT91_CKGR_MCFR));
+>> -	seq_printf(s, "PLLA = %8x\n", at91_sys_read(AT91_CKGR_PLLAR));
+>> +	seq_printf(s, "SCSR = %8x\n", scsr = at91_pmc_read(AT91_PMC_SCSR));
+>> +	seq_printf(s, "PCSR = %8x\n", pcsr = at91_pmc_read(AT91_PMC_PCSR));
 > 
-> > +
-> > +	ret = pwmchip_add(&pwm->chip);
 > 
-> 
-> If a driver fails to initialise the pwm_chip structure correctly it can
-> cause problems in the pwm core. For example, if the dev field doesn't
-> get set, then you will get an oops if you try to cat the pwm debugfs file.
-> 
-> pwmchip_add should probably verify that the initialisation of the
-> pwm_chip structure is sane to avoid problems like this.
+> I realise the original code is wrong, so doesn't need to be fixed in
+> this patch, but can we please move the assignments out of the seq_printf
+> calls.
 
-Absolutely. What would be the best response to an invalid struct pwm_chip? I
-suppose at least returning -EINVAL, perhaps complemented with WARN_ON?
+Well, I would not say "wrong". But ugly, for sure. I queue a patch to
+correct this just before this one.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120223/9a5b0415/attachment.sig>
+> <snip>
+> 
+>>  void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
+>> @@ -208,7 +207,7 @@ void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
+>>  	}
+>>  	at91_ramc_base[id] = ioremap(addr, size);
+>>  	if (!at91_ramc_base[id])
+>> -		pr_warn("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
+>> +		panic("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
+> 
+> 
+> This is in the wrong patch, and should be folded into the correct patch.
+
+Absolutely, this belongs to the previous patch. Thanks for highlighting
+this.
+
+Best regards,
+-- 
+Nicolas Ferre
