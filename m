@@ -1,54 +1,32 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Wed, 22 Feb 2012 19:37:30 -0600
-Subject: [PATCHv5 03/14] arm: omap3+: voltage: parameter segregation
-In-Reply-To: <1329833098-19900-4-git-send-email-t-kristo@ti.com>
-References: <1329833098-19900-1-git-send-email-t-kristo@ti.com>
- <1329833098-19900-4-git-send-email-t-kristo@ti.com>
-Message-ID: <CAOMWX4d+M9oagDtmSqG=X8Ln4kUEyLaqpfB9Pz0Y+6RmK=sjYw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 22 Feb 2012 18:46:34 -0700
+Subject: [PATCH 1/3 v2] RFC: arm/kirkwood: TEMP hack till mach-types is
+ updated.
+In-Reply-To: <5aff1d2c93408c44fdd3671f16f9643811945d1d.1312906908.git.jason@lakedaemon.net>
+References: <cover.1312906908.git.jason@lakedaemon.net>
+ <5aff1d2c93408c44fdd3671f16f9643811945d1d.1312906908.git.jason@lakedaemon.net>
+Message-ID: <20120223014634.GE3212@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 08:04, Tero Kristo <t-kristo@ti.com> wrote:
-[...]
-> diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-> index 949938d..940a0d6 100644
-> --- a/arch/arm/mach-omap2/voltage.h
-> +++ b/arch/arm/mach-omap2/voltage.h
+On Tue, Aug 09, 2011 at 04:47:31PM +0000, Jason Cooper wrote:
+> 	DO NOT SUBMIT!
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  arch/arm/tools/mach-types |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+> index 3b3776d..d5c5779 100644
+> --- a/arch/arm/tools/mach-types
+> +++ b/arch/arm/tools/mach-types
+> @@ -1113,3 +1113,4 @@ blissc			MACH_BLISSC		BLISSC			3491
+>  thales_adc		MACH_THALES_ADC		THALES_ADC		3492
+>  ubisys_p9d_evp		MACH_UBISYS_P9D_EVP	UBISYS_P9D_EVP		3493
+>  atdgp318		MACH_ATDGP318		ATDGP318		3494
+> +dreamplug		MACH_DREAMPLUG		DREAMPLUG		3550
 
-[...]
-> @@ -171,6 +169,18 @@ struct omap_voltdm_pmic {
-> ? ? ? ?u8 (*uv_to_vsel) (unsigned long uV);
-> ?};
->
-> +struct omap_vp_param {
-> + ? ? ? u32 vddmax;
-> + ? ? ? u32 vddmin;
-> +};
-> +
+Also completely unneeded when adding DT-only board support.
 
-Thinking a little deeper about this(SoC level vdd min and max) on a
-slightly different angle- core of the question that intend to answer
-are:
- - what is the least voltage we want to allow in active transtion? it
-should not be lower than retention voltage.
-- what is the max voltage we want to allow in active transition? it
-should be the max Nom voltage of all the OPPs for that domain.
-
-In effect, why do we even need to register
-"voltdm->vp_param->vdd[min|max]"? We already have that info - right?
-On the other hand it might be safer to do this way to handle quirks in
-future SoCs.. but thought I'd spit it out anyways..
-
-> +struct omap_vc_param {
-and elsewhere - please add kernel-doc struct documentation as well
-when new structs are introduced?
-> + ? ? ? u32 on;
-> + ? ? ? u32 onlp;
-> + ? ? ? u32 ret;
-> + ? ? ? u32 off;
-> +};
-> +
-[...]
-
-Regards,
-Nishanth Menon
+g.
