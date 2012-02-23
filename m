@@ -1,26 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 Feb 2012 09:58:14 +0000
-Subject: [PATCH 1/2] GPIO: LPC32xx: Fix missing bit selection mask
-In-Reply-To: <20120221140259.GB3162@pengutronix.de>
-References: <1329773948-4655-1-git-send-email-stigge@antcom.de>
- <20120221140259.GB3162@pengutronix.de>
-Message-ID: <201202230958.14801.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 23 Feb 2012 10:58:40 +0100
+Subject: [PATCH v2 09/19] ARM: at91: make sdram/ddr register base soc
+ independent
+In-Reply-To: <4F45FF46.3060702@atmel.com>
+References: <1329903585-30738-1-git-send-email-nicolas.ferre@atmel.com>
+ <0acddc0a57ea5a198f662bf37047ebe95e3eb695.1329903206.git.nicolas.ferre@atmel.com>
+ <4F456D1E.8070807@gmail.com> <4F45FF46.3060702@atmel.com>
+Message-ID: <4F460DD0.1050108@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 February 2012, Wolfram Sang wrote:
->   Show Details
->   On Mon, Feb 20, 2012 at 10:39:07PM +0100, Roland Stigge wrote:
-> > Add missing mask to pin bit selection in gpio-lpc32xx.c
-> > (#define GPIO3_PIN_IN_SEL)
-> > 
-> > A table indentation change was necessary due to line length restrictions, but
-> > the only relevant change is the definition of GPIO3_PIN_IN_SEL.
+On 02/23/2012 09:56 AM, Nicolas Ferre :
+> On 02/22/2012 11:33 PM, Ryan Mallon :
+>> On 22/02/12 20:39, Nicolas Ferre wrote:
+>>
+>>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>>
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> ---
+>>
+>> <snip>
+>>
+>>> +void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
+>>> +{
+>>> +	if (id > 1) {
+>>> +		pr_warn("%s: id > 2\n", __func__);
+>>> +		return;
+>>> +	}
+>>> +	at91_ramc_base[id] = ioremap(addr, size);
+>>> +	if (!at91_ramc_base[id])
+>>> +		pr_warn("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
+>>> +}
+>>
+>>
+>> If this fails then you will oops if you call either at91_ramc_read or
+>> at91_ramc_write since they don't check if at91_ramc_base[id] is a valid
+>> pointer. Either this function should panic, like the other at91_ioremap
+>> functions, or the at91_ramc_read/write functions should check for a
+>> valid pointer.
 > 
-> I'd vote for violating the 80 char limit and keep the change minimal
-> here, i.e. change only the relevant define.
+> Yes, as you pointed out, it is done in a not-related following patch.
+> I will bring the code here.
+> 
+> 
+>> Nitpick: The id check should probably also be BUG() or WARN() since it
+>> indicates a bug in the core AT91 code. pr_warn is likely to missed and
+>> not reported by users. Since the value is int, the check should be:
+>>
+>>   if (id < 0 || id > 1)
+>>
+>> Obviously the chance of this error happening are slim, but if you are
+>> going to check and warn for it, it should be done properly :-).
+> 
+> Yes, I agree and modify it at the very moment.
 
-Yes, that would be better. Another option would be to send two patches, but
-I would not bother with that.
 
-	Arnd
+What do you think about that:
+If id is not setup properly, I try to find a way out by using id = 0...
+Then, a panic is added if the iremap() fails.
+
+
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -200,13 +200,14 @@ void __iomem *at91_ramc_base[2];
+ 
+ void __init at91_ioremap_ramc(int id, u32 addr, u32 size)
+ {
+-       if (id > 1) {
+-               pr_warn("%s: id > 2\n", __func__);
+-               return;
++       if (id < 0 || id > 1) {
++               WARN(1, "%s: Wrong RAM controller id (%d), set it to 0\n",
++                                                               __func__, id);
++               id = 0;
+        }
+        at91_ramc_base[id] = ioremap(addr, size);
+        if (!at91_ramc_base[id])
+-               pr_warn("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
++               panic("Impossible to ioremap ramc.%d 0x%x\n", id, addr);
+ }
+ 
+ static int at91_pm_enter(suspend_state_t state)
+
+Best regards,
+-- 
+Nicolas Ferre
