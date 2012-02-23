@@ -1,43 +1,79 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 23 Feb 2012 17:48:25 +0000
-Subject: [PATCH-WIP 04/13] xen/arm: sync_bitops
+Date: Thu, 23 Feb 2012 17:48:26 +0000
+Subject: [PATCH-WIP 05/13] xen/arm: empty implementation of grant_table arch
+ specific functions
 In-Reply-To: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
 References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
-Message-ID: <1330019314-20865-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1330019314-20865-5-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sync_bitops functions are equivalent to the SMP implementation of the
-original functions, independently from CONFIG_SMP being defined.
-
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/include/asm/sync_bitops.h |   17 +++++++++++++++++
- 1 files changed, 17 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/sync_bitops.h
+ arch/arm/xen/Makefile      |    2 +-
+ arch/arm/xen/grant-table.c |   47 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/xen/grant-table.c
 
-diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
+index 0bad594..563f22a 100644
+--- a/arch/arm/xen/Makefile
++++ b/arch/arm/xen/Makefile
+@@ -1 +1 @@
+-obj-y		:= enlighten.o
++obj-y		:= enlighten.o grant-table.o
+diff --git a/arch/arm/xen/grant-table.c b/arch/arm/xen/grant-table.c
 new file mode 100644
-index 0000000..2b51456
+index 0000000..b82a799
 --- /dev/null
-+++ b/arch/arm/include/asm/sync_bitops.h
-@@ -0,0 +1,17 @@
-+#ifndef __ASM_SYNC_BITOPS_H__
-+#define __ASM_SYNC_BITOPS_H__
++++ b/arch/arm/xen/grant-table.c
+@@ -0,0 +1,47 @@
++/******************************************************************************
++ * grant_table.c
++ * ARM specific part
++ *
++ * Granting foreign access to our memory reservation.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License version 2
++ * as published by the Free Software Foundation; or, when distributed
++ * separately from the Linux kernel or incorporated into other
++ * software packages, subject to the following license:
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a copy
++ * of this source file (the "Software"), to deal in the Software without
++ * restriction, including without limitation the rights to use, copy, modify,
++ * merge, publish, distribute, sublicense, and/or sell copies of the Software,
++ * and to permit persons to whom the Software is furnished to do so, subject to
++ * the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++ * IN THE SOFTWARE.
++ */
 +
-+#include <asm/bitops.h>
-+#include <asm/system.h>
++#include <xen/interface/xen.h>
++#include <xen/page.h>
++#include <xen/grant_table.h>
 +
-+#define sync_set_bit(nr,p)		_set_bit(nr,p)
-+#define sync_clear_bit(nr,p)		_clear_bit(nr,p)
-+#define sync_change_bit(nr,p)		_change_bit(nr,p)
-+#define sync_test_and_set_bit(nr,p)	_test_and_set_bit(nr,p)
-+#define sync_test_and_clear_bit(nr,p)	_test_and_clear_bit(nr,p)
-+#define sync_test_and_change_bit(nr,p)	_test_and_change_bit(nr,p)
-+#define sync_test_bit(nr, addr)		test_bit(nr, addr)
-+#define sync_cmpxchg			cmpxchg
++int arch_gnttab_map_shared(unsigned long *frames, unsigned long nr_gframes,
++			   unsigned long max_nr_gframes,
++			   struct grant_entry **__shared)
++{
++	return -1;
++}
 +
-+
-+#endif
++void arch_gnttab_unmap_shared(struct grant_entry *shared,
++			      unsigned long nr_gframes)
++{
++	return;
++}
 -- 
 1.7.2.5
