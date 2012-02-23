@@ -1,70 +1,62 @@
-From: ashwinc@codeaurora.org (Ashwin Chaugule)
-Date: Thu, 23 Feb 2012 10:57:22 -0500
-Subject: [PATCH] ARM: perf: add PMU hotplug notifier
-In-Reply-To: <CAKHPGBaY1OFiVubic+f1vxxzNeKjmzibxraBg8eNxZnJbhYi+A@mail.gmail.com>
-References: <CAKHPGBaY1OFiVubic+f1vxxzNeKjmzibxraBg8eNxZnJbhYi+A@mail.gmail.com>
-Message-ID: <4F4661E2.9020405@codeaurora.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 23 Feb 2012 16:57:18 +0100
+Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4F46609C.8080907@atmel.com>
+References: <4F22DEF2.5000807@ti.com> <4F44CA82.9060906@atmel.com>
+ <4F460EF2.9010000@ti.com> <4F46609C.8080907@atmel.com>
+Message-ID: <4F4661DE.90704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Thu, Feb 23, 2012 at 10:41 AM, Will Deacon <will.deacon@arm.com> wrote:
-> From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+On 2/23/2012 4:51 PM, Nicolas Ferre wrote:
+> On 02/23/2012 11:03 AM, Cousson, Benoit :
+>> Salut Nico,
 >
-> When a CPU is taken out of reset, either cold booted or hotplugged in,
-> some of its PMU registers can contain UNKNOWN values.
+> Coucou Benoit ;-)
 >
-> This patch adds a hotplug notifier to ARM core perf code so that upon
-> CPU restart the PMU unit is reset and becomes ready to use again.
+>> On 2/22/2012 11:59 AM, Nicolas Ferre wrote:
+>>> On 01/27/2012 06:29 PM, Cousson, Benoit :
+>>>> Add some basic helpers to retrieve a DMA controller device_node
+>>>> and the DMA request line number.
+>>>>
+>>>> For legacy reason another API will export the DMA request number
+>>>> into a Linux resource of type IORESOURCE_DMA.
+>>>> This API is usable only on system with an unique DMA controller.
+>>>
+>>> Hi,
+>>>
+>>> I followed that discussion and I like very much the biding that Benoit
+>>> is proposing. It will help me a lot with my current work on Atmel DMA
+>>> controller.
+>>>
+>>> If I understand correctly, some rework is needed before it can be
+>>> integrated in a stable git tree (I mean before we can base our work on
+>>> top of it). So, in the meantime, what should I do to help and make
+>>> things go forward? to be quite frank, I would be interested to have a
+>>> working DMA enabled device soon ;-)
+>>
+>> Me too, but unfortunately, I was busy trying to add irq_domain and
+>> fixing issues with SPARSE_IRQ on OMAP :-(
 >
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-I was playing around with this stuff recently, but used the CPU PM code from
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052829.html
-
-> ---
->  arch/arm/kernel/perf_event.c |   23 +++++++++++++++++++++++
->  1 files changed, 23 insertions(+), 0 deletions(-)
+> Been there, loved that ;-)
 >
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index ab59c3b..fa30ff9 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -680,6 +680,28 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
->  }
+>>> Do you think that 3.4 is out of reach?
+>>
+>> Maybe not, from the comments, it looks like we should add a .xlate
+>> callback to allow any custom parsing of the DMA nodes attributes.
+>>
+>> I'll be more than happy, if you can finalize that patch :-)
 >
->  /*
-> + * PMU hardware loses all context when a CPU goes offline.
-> + * When a CPU is hotplugged back in, since some hardware registers are
-> + * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-> + * junk values out of them.
-> + */
-> +static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
-> +                                       unsigned long action, void *hcpu)
-> +{
-> +       if (action != CPU_UP_PREPARE)
-> +               return NOTIFY_DONE;
-> +
-> +       if (cpu_pmu && cpu_pmu->reset)
-> +               cpu_pmu->reset(NULL);
-> +
-> +       return NOTIFY_OK;
-> +}
-> +
+> I will try to figure out what I can understand from the irq mechanism of
+> .xlate and try to see if I can implement it on top of your patch.
 
-I realized I needed to save the counters before going to sleep. In my
-case, the notifiers were being called from the idle thread, so I
-didn't know which "sleep state" I was going to go into. In the deepest
-idle state, the counters are completely reset. When we come out of
-sleep, unless there had been an explicit "read" earlier, we will have
-lost the cached value(event->count) of the counters. This manifests as
-counts reduced by an order of magnitude.
+In fact that dma code is a big copy/paste of the of/gpio one and gpio 
+was already managing .xlate function.
+I removed it because I thought it was useless for the DMA :-)
 
-I'll send a link to my code once the git server is up. It's a bit flaky today.
+You might just have to copy the original code...
 
+> I will keep you informed...
 
-Cheers,
-Ashwin
+Thanks for the help,
+Benoit
