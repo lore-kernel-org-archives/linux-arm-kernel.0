@@ -1,140 +1,122 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 23 Feb 2012 17:48:28 +0000
-Subject: [PATCH-WIP 07/13] xen/arm: receive xen events on arm
+Date: Thu, 23 Feb 2012 17:48:30 +0000
+Subject: [PATCH-WIP 09/13] xen/arm: shared_info and start_info
 In-Reply-To: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
 References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
-Message-ID: <1330019314-20865-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1330019314-20865-9-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compile events.c and use IRQ 32 to receive events notifications.
+Allow xen_hvm_domain's to be xen_initial_domain.
+
+Set xen_domain_type to XEN_HVM_DOMAIN.
+
+Set xen_start_info to an empty struct, set flags to SIF_INITDOMAIN and
+SIF_PRIVILEGED so that we identify as initial domain by default.
+
+Map the real shared info page using XENMEM_add_to_physmap with
+XENMAPSPACE_shared_info.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/include/asm/xen/events.h |    9 +++++++++
- drivers/xen/events.c              |   36 +++++++++++++++++++++++++++++++++++-
- 2 files changed, 44 insertions(+), 1 deletions(-)
+ arch/arm/xen/enlighten.c |   61 ++++++++++++++++++++++++++++++++++++++++------
+ include/xen/xen.h        |    2 +-
+ 2 files changed, 54 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-index efa7c61..94b4e90 100644
---- a/arch/arm/include/asm/xen/events.h
-+++ b/arch/arm/include/asm/xen/events.h
-@@ -1,9 +1,18 @@
- #ifndef _ASM_ARM_XEN_EVENTS_H
- #define _ASM_ARM_XEN_EVENTS_H
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 39ef68c..d76f3b4e 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -1,24 +1,69 @@
+ #include <xen/xen.h>
+ #include <xen/interface/xen.h>
++#include <xen/interface/memory.h>
+ #include <asm/xen/hypervisor.h>
++#include <asm/xen/hypercall.h>
+ #include <linux/module.h>
  
-+#include <asm/ptrace.h>
-+
- enum ipi_vector {
-+	XEN_PLACEHOLDER_VECTOR,
-+
- 	/* Xen IPIs go here */
- 	XEN_NR_IPIS,
- };
+-struct start_info *xen_start_info;
++struct start_info _xen_start_info = { .flags = (SIF_INITDOMAIN|SIF_PRIVILEGED) };
++struct start_info *xen_start_info = &_xen_start_info;
+ EXPORT_SYMBOL_GPL(xen_start_info);
  
-+static inline int xen_irqs_disabled(struct pt_regs *regs)
-+{
-+	return raw_irqs_disabled_flags(regs->ARM_cpsr);
-+}
-+
- #endif /* _ASM_ARM_XEN_EVENTS_H */
-diff --git a/drivers/xen/events.c b/drivers/xen/events.c
-index 6e075cd..18139ee 100644
---- a/drivers/xen/events.c
-+++ b/drivers/xen/events.c
-@@ -31,13 +31,15 @@
- #include <linux/irqnr.h>
- #include <linux/pci.h>
+-enum xen_domain_type xen_domain_type = XEN_NATIVE;
++enum xen_domain_type xen_domain_type = XEN_HVM_DOMAIN;
+ EXPORT_SYMBOL_GPL(xen_domain_type);
  
-+#ifdef CONFIG_X86
- #include <asm/desc.h>
- #include <asm/ptrace.h>
- #include <asm/irq.h>
- #include <asm/idle.h>
- #include <asm/io_apic.h>
--#include <asm/sync_bitops.h>
- #include <asm/xen/pci.h>
-+#endif
-+#include <asm/sync_bitops.h>
- #include <asm/xen/hypercall.h>
++struct shared_info xen_dummy_shared_info;
++struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
+ 
+-/* TODO: remove these functions below and use the real implementation
+- * instead
+- */
+-void rebind_evtchn_irq(int evtchn, int irq)
++DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
++
++/* XXX: to be removed */
++__read_mostly int xen_have_vector_callback;
++EXPORT_SYMBOL_GPL(xen_have_vector_callback);
++
++/* XXX: to be removed */
++int xen_platform_pci_unplug;
++EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
++
++void __ref xen_hvm_init_shared_info(void)
+ {
++	int cpu;
++	struct xen_add_to_physmap xatp;
++	static struct shared_info *shared_info_page = 0;
++
++	if (!shared_info_page)
++		shared_info_page = (struct shared_info *)
++			get_zeroed_page(GFP_KERNEL);
++	if (!shared_info_page) {
++		printk(KERN_ERR "not enough memory");
++		return;
++	}
++	xatp.domid = DOMID_SELF;
++	xatp.idx = 0;
++	xatp.space = XENMAPSPACE_shared_info;
++	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
++	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
++		BUG();
++
++	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
++
++	/* xen_vcpu is a pointer to the vcpu_info struct in the shared_info
++	 * page, we use it in the event channel upcall and in some pvclock
++	 * related functions. We don't need the vcpu_info placement
++	 * optimizations because we don't use any pv_mmu or pv_irq op on
++	 * HVM.
++	 * When xen_hvm_init_shared_info is run at boot time only vcpu 0 is
++	 * online but xen_hvm_init_shared_info is run at resume time too and
++	 * in that case multiple vcpus might be online. */
++	for_each_online_cpu(cpu) {
++		per_cpu(xen_vcpu, cpu) = &HYPERVISOR_shared_info->vcpu_info[cpu];
++	}
+ }
+ 
+-int bind_evtchn_to_irq(unsigned int evtchn)
++static int __init xen_hvm_guest_init(void)
+ {
++	xen_hvm_init_shared_info();
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(bind_evtchn_to_irq);
++
++core_initcall(xen_hvm_guest_init);
+diff --git a/include/xen/xen.h b/include/xen/xen.h
+index a164024..2c0d3a5 100644
+--- a/include/xen/xen.h
++++ b/include/xen/xen.h
+@@ -23,7 +23,7 @@ extern enum xen_domain_type xen_domain_type;
+ #include <xen/interface/xen.h>
  #include <asm/xen/hypervisor.h>
  
-@@ -49,6 +51,8 @@
- #include <xen/interface/event_channel.h>
- #include <xen/interface/hvm/hvm_op.h>
- #include <xen/interface/hvm/params.h>
-+#include <xen/interface/physdev.h>
-+#include <xen/interface/sched.h>
- 
- /*
-  * This lock protects updates to the following mapping and reference-count
-@@ -801,10 +805,12 @@ EXPORT_SYMBOL_GPL(xen_pirq_from_irq);
- int bind_evtchn_to_irq(unsigned int evtchn)
- {
- 	int irq;
-+	struct irq_desc *desc;
- 
- 	mutex_lock(&irq_mapping_update_lock);
- 
- 	irq = evtchn_to_irq[evtchn];
-+	irq_clear_status_flags(irq, IRQ_NOREQUEST);
- 
- 	if (irq == -1) {
- 		irq = xen_allocate_irq_dynamic();
-@@ -813,6 +819,8 @@ int bind_evtchn_to_irq(unsigned int evtchn)
- 
- 		irq_set_chip_and_handler_name(irq, &xen_dynamic_chip,
- 					      handle_edge_irq, "event");
-+		desc = irq_to_desc(irq);
-+		irq_clear_status_flags(irq, IRQ_NOREQUEST);
- 
- 		xen_irq_info_evtchn_init(irq, evtchn);
- 	}
-@@ -1282,7 +1290,9 @@ void xen_evtchn_do_upcall(struct pt_regs *regs)
- {
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+#ifdef CONFIG_X86
- 	exit_idle();
-+#endif
- 	irq_enter();
- 
- 	__xen_evtchn_do_upcall();
-@@ -1707,6 +1717,7 @@ void __init xen_init_IRQ(void)
- 	for (i = 0; i < NR_EVENT_CHANNELS; i++)
- 		mask_evtchn(i);
- 
-+#ifdef CONFIG_X86
- 	if (xen_hvm_domain()) {
- 		xen_callback_vector();
- 		native_init_IRQ();
-@@ -1718,4 +1729,27 @@ void __init xen_init_IRQ(void)
- 		if (xen_initial_domain())
- 			pci_xen_initial_domain();
- 	}
-+#endif
- }
-+#ifdef CONFIG_ARM
-+#define IRQ_EVTCHN_CALLBACK 63
-+irqreturn_t xen_arm_callback(int irq, void *arg)
-+{
-+	__xen_evtchn_do_upcall();
-+	return 0;
-+}
-+
-+int __init xen_init_IRQ_arm(void)
-+{
-+	int rc;
-+	xen_init_IRQ();
-+	rc = request_irq(IRQ_EVTCHN_CALLBACK, xen_arm_callback,
-+			IRQF_DISABLED | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
-+			"events", "events");	
-+	if (rc) {
-+		printk(KERN_ERR "Error requesting IRQ %d\n", IRQ_EVTCHN_CALLBACK);
-+	}
-+	return rc;
-+}
-+core_initcall(xen_init_IRQ_arm);
-+#endif
+-#define xen_initial_domain()	(xen_pv_domain() && \
++#define xen_initial_domain()	(xen_domain() && \
+ 				 xen_start_info->flags & SIF_INITDOMAIN)
+ #else  /* !CONFIG_XEN_DOM0 */
+ #define xen_initial_domain()	(0)
 -- 
 1.7.2.5
