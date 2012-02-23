@@ -1,53 +1,97 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 23 Feb 2012 20:25:42 +1100
-Subject: [PATCH v3 06/10] pwm: Add NVIDIA Tegra SoC support
-In-Reply-To: <20120223081459.GD8621@avionic-0098.mockup.avionic-design.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <1329923841-32017-7-git-send-email-thierry.reding@avionic-design.de>
- <4F459A94.4030104@gmail.com>
- <20120223081459.GD8621@avionic-0098.mockup.avionic-design.de>
-Message-ID: <4F460616.3080400@gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 23 Feb 2012 14:43:44 +0530
+Subject: [PATCH] ARM/sp810: introduce API to change system mode
+Message-ID: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/12 19:14, Thierry Reding wrote:
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
-> * Ryan Mallon wrote:
->> On 23/02/12 02:17, Thierry Reding wrote:
->>
->>> This commit adds a generic PWM framework driver for the PWFM controller
->>> found on NVIDIA Tegra SoCs. The driver is based on code from the
->>> Chromium kernel tree and was originally written by Gary King (NVIDIA)
->>> and later modified by Simon Que (Chromium).
->>>
->>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->>> ---
->>
->> <snip>
->>
->>> +
->>> +	pwm->chip.dev = &pdev->dev;
->>> +	pwm->chip.ops = &tegra_pwm_ops;
->>> +	pwm->chip.base = -1;
->>> +	pwm->chip.npwm = NUM_PWM;
->>
->>> +
->>> +	ret = pwmchip_add(&pwm->chip);
->>
->>
->> If a driver fails to initialise the pwm_chip structure correctly it can
->> cause problems in the pwm core. For example, if the dev field doesn't
->> get set, then you will get an oops if you try to cat the pwm debugfs file.
->>
->> pwmchip_add should probably verify that the initialisation of the
->> pwm_chip structure is sane to avoid problems like this.
-> 
-> Absolutely. What would be the best response to an invalid struct pwm_chip? I
-> suppose at least returning -EINVAL, perhaps complemented with WARN_ON?
+sp810 controller can change system's working mode to various power save
+states. Introduce an API to accomplish the same.
 
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/include/asm/hardware/sp810.h |   57 +++++++++++++++++++++++++++++++++
+ 1 files changed, 57 insertions(+), 0 deletions(-)
 
-Just returning -EINVAL should be okay. I don't think you need a WARN_ON,
-since failing to register the hardware should be enough of a reason for
-a user to report a problem.
-
-~Ryan
+diff --git a/arch/arm/include/asm/hardware/sp810.h b/arch/arm/include/asm/hardware/sp810.h
+index e0d1c0c..df0960a 100644
+--- a/arch/arm/include/asm/hardware/sp810.h
++++ b/arch/arm/include/asm/hardware/sp810.h
+@@ -14,10 +14,25 @@
+ #ifndef __ASM_ARM_SP810_H
+ #define __ASM_ARM_SP810_H
+ 
++#include <linux/err.h>
+ #include <linux/io.h>
++#include <linux/delay.h>
++#include <linux/jiffies.h>
+ 
+ /* sysctl registers offset */
+ #define SCCTRL			0x000
++	#define SYS_MODE_STS_MASK		(0xF << 3)
++	#define SYS_MODE_STS_SLEEP		(0x0 << 3)
++	#define SYS_MODE_STS_DOZE		(0x1 << 3)
++	#define SYS_MODE_STS_SLOW		(0x2 << 3)
++	#define SYS_MODE_STS_NORMAL		(0x4 << 3)
++
++	#define SYS_MODE_MASK			(0x7 << 0)
++	#define SYS_MODE_SLEEP			(0x0 << 0)
++	#define SYS_MODE_DOZE			(0x1 << 0)
++	#define SYS_MODE_SLOW			(0x2 << 0)
++	#define SYS_MODE_NORMAL			(0x4 << 0)
++
+ #define SCSYSSTAT		0x004
+ #define SCIMCTRL		0x008
+ #define SCIMSTAT		0x00C
+@@ -65,4 +80,46 @@ static inline void sysctl_soft_reset(void __iomem *base)
+ 	writel(0, base + SCSYSSTAT);
+ }
+ 
++static inline int sysctl_change_mode(void __iomem *base, int mode)
++{
++	u32 val, mode_sts;
++	unsigned long finish;
++
++	switch (mode) {
++	case SYS_MODE_SLEEP:
++		mode_sts = SYS_MODE_STS_SLEEP;
++		break;
++	case SYS_MODE_DOZE:
++		mode_sts = SYS_MODE_STS_DOZE;
++		break;
++	case SYS_MODE_SLOW:
++		mode_sts = SYS_MODE_STS_SLOW;
++		break;
++	case SYS_MODE_NORMAL:
++		mode_sts = SYS_MODE_STS_NORMAL;
++		break;
++	default:
++		pr_err("Wrong system mode\n");
++		return -EINVAL;
++	}
++
++	val = readl(base + SCCTRL);
++	if ((val & SYS_MODE_STS_MASK) == mode_sts)
++		return 0;
++
++	val &= ~SYS_MODE_MASK;
++	val |= mode;
++	writel(val, base + SCCTRL);
++
++	/* read back if mode is set */
++	finish = jiffies + 2 * HZ;
++	do {
++		val = readl(base + SCCTRL);
++		if ((val & SYS_MODE_STS_MASK) == mode_sts)
++			return 0;
++		udelay(1000);
++	} while (!time_after_eq(jiffies, finish));
++
++	return -EFAULT;
++}
+ #endif	/* __ASM_ARM_SP810_H */
+-- 
+1.7.8.110.g4cb5d
