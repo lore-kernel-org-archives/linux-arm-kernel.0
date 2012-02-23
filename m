@@ -1,24 +1,17 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 23 Feb 2012 09:00:55 -0800
-Subject: [PATCH] ARM: tegra: Avoid compiling cpuidle code when not
- configured
-In-Reply-To: <1330014112-26203-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1330014112-26203-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC984@HQMAIL01.nvidia.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 23 Feb 2012 19:04:09 +0200
+Subject: [PATCH] ARM: OMAP2: fix mailbox init code
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D12143317AD2B7@DBDE01.ent.ti.com>
+References: <1329987215-28227-1-git-send-email-ohad@wizery.com>
+ <B5906170F1614E41A8A28DE3B8D12143317AD2B7@DBDE01.ent.ti.com>
+Message-ID: <CAK=WgbYsV4M6RYYyA85=FyJcEW-8O3yiqZit2ev2AW-mG+0-8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Thursday, February 23, 2012 9:22 AM:
-> No need to compile cpuidle.c and sleep.S if cpuidle isn't configured in the
-> kernel.
-> 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+On Thu, Feb 23, 2012 at 11:18 AM, Bedia, Vaibhav <vaibhav.bedia@ti.com> wrote:
+> Instead of adding more #ifs can they be completely removed please?
 
-It doesn't really need it since it's such a small change, but since I
-bothered to compile-test it:
+Care to propose something specific (which is viable for the -rc cycle) ?
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
-Tested-by: Stephen Warren <swarren@nvidia.com>
-
--- 
-nvpublic
+Thanks,
+Ohad.
