@@ -1,37 +1,54 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 Feb 2012 14:30:55 +0200
-Subject: [PATCH 5/6] gpio/omap: fix trigger type to unsigned
-In-Reply-To: <1329999031-6914-6-git-send-email-tarun.kanti@ti.com>
+Date: Thu, 23 Feb 2012 14:31:31 +0200
+Subject: [PATCH 6/6] gpio/omap: fix _set_gpio_irqenable implementation
+In-Reply-To: <1329999031-6914-7-git-send-email-tarun.kanti@ti.com>
 References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
- <1329999031-6914-6-git-send-email-tarun.kanti@ti.com>
-Message-ID: <20120223123052.GI18463@legolas.emea.dhcp.ti.com>
+ <1329999031-6914-7-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20120223123130.GJ18463@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 05:40:30PM +0530, Tarun Kanti DebBarma wrote:
-> The GPIO trigger parameter is of type unsigned.
-> enum {
->         IRQ_TYPE_NONE           = 0x00000000,
->         IRQ_TYPE_EDGE_RISING    = 0x00000001,
->         IRQ_TYPE_EDGE_FALLING   = 0x00000002,
->         IRQ_TYPE_EDGE_BOTH      = (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING),
->         IRQ_TYPE_LEVEL_HIGH     = 0x00000004,
->         IRQ_TYPE_LEVEL_LOW      = 0x00000008,
->         IRQ_TYPE_LEVEL_MASK     = (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH),
->         IRQ_TYPE_SENSE_MASK     = 0x0000000f,
-> 
->         IRQ_TYPE_PROBE          = 0x00000010,
-> ...
-> };
-> Even though gpio_irq_type(struct irq_data *d, unsigned type) has the right type
-> of parameter, the subsequent called functions set_gpio_triggering() and
-> set_gpio_trigger() wrongly makes it signed integer. Fix this.
+On Thu, Feb 23, 2012 at 05:40:31PM +0530, Tarun Kanti DebBarma wrote:
+> This function should be capable of both enabling and disabling interrupts
+> based upon the *enable* parameter. Right now the function only enables
+> the interrupt and *enable* is not used at all. So add the interrupt
+> disable capability also using the parameter.
 > 
 > Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 
-Cool, I guess sparse would also have caught that error :-)
+This one should probably be ported to stable releases, adding
+stable at vger to the cc list
 
 Acked-by: Felipe Balbi <balbi@ti.com>
+
+> ---
+>  drivers/gpio/gpio-omap.c |    5 ++++-
+>  1 files changed, 4 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 67535c8..acc71a0 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -473,7 +473,10 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+>  
+>  static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int enable)
+>  {
+> -	_enable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
+> +	if (enable)
+> +		_enable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
+> +	else
+> +		_disable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
+>  }
+>  
+>  /*
+> -- 
+> 1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
 -- 
 balbi
@@ -41,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120223/c58dffc7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120223/f56fa8fd/attachment-0001.sig>
