@@ -1,95 +1,38 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 23 Feb 2012 17:48:27 +0000
-Subject: [PATCH-WIP 06/13] xen/arm: missing includes
+Date: Thu, 23 Feb 2012 17:48:31 +0000
+Subject: [PATCH-WIP 10/13] xen/arm: empty implementation of
+ xen_remap_domain_mfn_range
 In-Reply-To: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
 References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
-Message-ID: <1330019314-20865-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1330019314-20865-10-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/include/asm/xen/grant_table.h     |    2 ++
- drivers/xen/grant-table.c                  |    2 ++
- drivers/xen/xenbus/xenbus_client.c         |    1 +
- drivers/xen/xenbus/xenbus_probe_frontend.c |    1 +
- drivers/xen/xenfs/xenstored.c              |    1 +
- include/xen/privcmd.h                      |    1 +
- 6 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/xen/enlighten.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/grant_table.h b/arch/arm/include/asm/xen/grant_table.h
-index 4e3f7b2..43c0d4b 100644
---- a/arch/arm/include/asm/xen/grant_table.h
-+++ b/arch/arm/include/asm/xen/grant_table.h
-@@ -1,6 +1,8 @@
- #ifndef _ASM_ARM_XEN_GRANT_TABLE_H
- #define _ASM_ARM_XEN_GRANT_TABLE_H
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index d76f3b4e..986bec3 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -25,6 +25,16 @@ EXPORT_SYMBOL_GPL(xen_have_vector_callback);
+ int xen_platform_pci_unplug;
+ EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
  
-+#include <asm/xen/mmu.h>
++/* TODO */
++int xen_remap_domain_mfn_range(struct vm_area_struct *vma,
++			       unsigned long addr,
++			       unsigned long mfn, int nr,
++			       pgprot_t prot, unsigned domid)
++{
++	return -ENOSYS;
++}
++EXPORT_SYMBOL_GPL(xen_remap_domain_mfn_range);
 +
- #define xen_alloc_vm_area(size)	alloc_vm_area(size)
- #define xen_free_vm_area(area)	free_vm_area(area)
- 
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index bf1c094..de77304 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -45,6 +45,8 @@
- #include <xen/grant_table.h>
- #include <xen/interface/memory.h>
- #include <asm/xen/hypercall.h>
-+#include <asm/xen/mmu.h>
-+#include <asm/xen/interface.h>
- 
- #include <asm/pgtable.h>
- #include <asm/sync_bitops.h>
-diff --git a/drivers/xen/xenbus/xenbus_client.c b/drivers/xen/xenbus/xenbus_client.c
-index 1906125..65088964 100644
---- a/drivers/xen/xenbus/xenbus_client.c
-+++ b/drivers/xen/xenbus/xenbus_client.c
-@@ -36,6 +36,7 @@
- #include <linux/export.h>
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/page.h>
-+#include <asm/xen/grant_table.h>
- #include <xen/interface/xen.h>
- #include <xen/interface/event_channel.h>
- #include <xen/events.h>
-diff --git a/drivers/xen/xenbus/xenbus_probe_frontend.c b/drivers/xen/xenbus/xenbus_probe_frontend.c
-index 2f73195..e8d1798 100644
---- a/drivers/xen/xenbus/xenbus_probe_frontend.c
-+++ b/drivers/xen/xenbus/xenbus_probe_frontend.c
-@@ -21,6 +21,7 @@
- #include <xen/xenbus.h>
- #include <xen/events.h>
- #include <xen/page.h>
-+#include <xen/xen.h>
- 
- #include <xen/platform_pci.h>
- 
-diff --git a/drivers/xen/xenfs/xenstored.c b/drivers/xen/xenfs/xenstored.c
-index fef20db..ddf2585 100644
---- a/drivers/xen/xenfs/xenstored.c
-+++ b/drivers/xen/xenfs/xenstored.c
-@@ -4,6 +4,7 @@
- #include <linux/fs.h>
- 
- #include <xen/page.h>
-+#include <asm/xen/mmu.h>
- 
- #include "xenfs.h"
- #include "../xenbus/xenbus_comms.h"
-diff --git a/include/xen/privcmd.h b/include/xen/privcmd.h
-index 17857fb..4d58881 100644
---- a/include/xen/privcmd.h
-+++ b/include/xen/privcmd.h
-@@ -35,6 +35,7 @@
- 
- #include <linux/types.h>
- #include <linux/compiler.h>
-+#include <xen/interface/xen.h>
- 
- typedef unsigned long xen_pfn_t;
- 
+ void __ref xen_hvm_init_shared_info(void)
+ {
+ 	int cpu;
 -- 
 1.7.2.5
