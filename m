@@ -1,27 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Feb 2012 12:50:44 +0000
-Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
- register
-In-Reply-To: <201202231233.05622.arnd@arndb.de>
-References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
- <4F462444.8060406@st.com> <20120223113801.GV22562@n2100.arm.linux.org.uk>
- <201202231233.05622.arnd@arndb.de>
-Message-ID: <20120223125044.GW22562@n2100.arm.linux.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 23 Feb 2012 15:21:54 +0200
+Subject: [PATCH 0/6] ARM: OMAP4: core retention support
+Message-ID: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 12:33:04PM +0000, Arnd Bergmann wrote:
-> 3. Add a new set of consistent accessors that are explicitly meant for
-> non-PCI on-chip components and make sure we really get them right this
-> time and can retire some of the other ones eventually. This means it
-> needs to be completely arch independent, include relaxed and strict
-> accesses, little-endian/cpu-endian/native-endian and a well-documented
-> address space (or more than one).
+Hi,
 
-That won't work.  What's behind PCI in one area is on-chip on another.
-See that with various PXA peripherals appearing behind PCI devices on
-x86.  That's also happening with AMBA peripherals as well.
+This set adds core retention support on top of mainline. The set
+also adds IO CHAIN wakeup capability for OMAP4, which is a nice feature
+to have while trying suspend / resume with CSWR as it is quite difficult
+to wake up the device without this.
 
-We *really* need to get away from that "PCI is special and has its own
-accessors" or "on chip is special and has its own accessors" madness.
-That's already starting to bite as being wrong.
+Patch 6 might cause some stir, but this is needed as omap4 PRCM chain
+handler currently does not work without SPARSE_IRQ. Enabling the
+SPARSE_IRQ causes a WARN from gic during boot for omap4, and attempting
+to fix this creates some spam from interrupt handling code which seems to
+originate from GPMC/GPIO. Also, omap3 boot breaks completely,
+thus it is impossible to enable this option as of now.
+
+Tested on OMAP4 blaze board, with OMAP4430 EMU chip. Suspend / resume
+works nicely, and wakeup with UART3 works. The powerdomain state info
+under pm-debug appears to be somewhat bogus right after boot, but fixes
+itself during suspend. This should be addressed separately. Also
+verified that suspend / resume with OMAP3 beagle is okay.
+
+-Tero
