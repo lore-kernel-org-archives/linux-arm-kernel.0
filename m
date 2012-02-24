@@ -1,56 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Feb 2012 09:58:06 +0000
-Subject: [PATCH] ARM: LPAE: Invalidate the TLB for module addresses
- during translation fault
-In-Reply-To: <20120223221343.GA27761@arm.com>
-References: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
- <20120223195003.GD22562@n2100.arm.linux.org.uk>
- <20120223221343.GA27761@arm.com>
-Message-ID: <20120224095806.GA13117@arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 24 Feb 2012 15:28:51 +0530
+Subject: [PATCH 0/6] Fix issues around twl4030-gpio used as a module
+Message-ID: <1330077537-19618-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 10:13:43PM +0000, Catalin Marinas wrote:
-> On Thu, Feb 23, 2012 at 07:50:03PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Feb 23, 2012 at 05:59:41PM +0000, Catalin Marinas wrote:
-> > > During the free_pgtables() call all user and modules/pkmap entries are
-> > > removed.
-> > 
-> > Err, no.  free_pgtables() should only ever touch up to TASK_SIZE, which
-> > is the maximum size of userspace.  Moreover, because TASK_SIZE does not
-> > cover an entire pud, free_pgtables() should not be removing the pud
-> > table.
-> 
-> Are you sure? exit_mmap() calls free_pgtables() with ceiling == 0.  If
-> free_pmd_range() is called for a range in the top 1GB of the task
-> address space (which includes modules), it also calls pud_clear()
-> because ceiling is 0.
+Hi Tony,
 
-BTW, an alternative patch but which needs wider acknowledgement as it
-touches generic code (I can post it to linux-mm):
+This series is based on top of 'hsmmc' branch in linux-omap
+on top of commit '0e91c8ddf0e0932da59ec1d116e34049791b0e73' as
+requested by you.
 
-diff --git a/mm/mmap.c b/mm/mmap.c
-index 3f758c7..5e5c8a8 100644
---- a/mm/mmap.c
-+++ b/mm/mmap.c
-@@ -1866,7 +1866,7 @@ static void unmap_region(struct mm_struct *mm,
- 	unmap_vmas(&tlb, vma, start, end, &nr_accounted, NULL);
- 	vm_unacct_memory(nr_accounted);
- 	free_pgtables(&tlb, vma, prev ? prev->vm_end : FIRST_USER_ADDRESS,
--				 next ? next->vm_start : 0);
-+				 next ? next->vm_start : TASK_SIZE);
- 	tlb_finish_mmu(&tlb, start, end);
- }
- 
-@@ -2241,7 +2241,7 @@ void exit_mmap(struct mm_struct *mm)
- 	end = unmap_vmas(&tlb, vma, 0, -1, &nr_accounted, NULL);
- 	vm_unacct_memory(nr_accounted);
- 
--	free_pgtables(&tlb, vma, FIRST_USER_ADDRESS, 0);
-+	free_pgtables(&tlb, vma, FIRST_USER_ADDRESS, TASK_SIZE);
- 	tlb_finish_mmu(&tlb, 0, end);
- 
- 	/*
+This mainly splits omap_hsmmc_late_init() into omap_hsmmc_deferred_add()
+and omap_hsmmc_deferred_del() and adds .teardown hooks in all omap3 boards
+to handle issues around multiple twl4030-gpio module insmod/unbind/bind
+as reported by Russell.
 
--- 
-Catalin
+In the process this series adds an api to unregister an
+omap_device, makes mmc driver work with hotpluggable devices
+and also removes 'deferred' flag for a few mmc devices on some
+boards which are not really dependent on twl4030-gpio for card
+detect as reported by Igor.
+
+I have tested this series on omap3 beagle, with twl4030-gpio built
+in, as well as twl4030-gpio built as a module and by doing multiple
+insmod/unbind/bind sequence. I have tested card-detect to work fine
+on beagle too.
+
+regards,
+Rajendra
+
+Rajendra Nayak (6):
+  ARM: OMAP: omap_device: Add omap_device_unregister()
+  mmc: omap_hsmmc: Make the driver support hotpluggable devices
+  mmc: omap_hsmmc: If probe fails, give our error messages
+  ARM: OMAP3: Make only mmc devices using gpio_cd as deferred
+  ARM: OMAP3: Modify omap_hsmmc_late_init to handle deleting mmc
+    devices
+  ARM: OMAP3: Use .teardown of twl4030-gpio to clean board requests
+
+ arch/arm/mach-omap2/board-3430sdp.c           |   15 ++++-
+ arch/arm/mach-omap2/board-cm-t35.c            |   15 ++++-
+ arch/arm/mach-omap2/board-devkit8000.c        |   15 ++++-
+ arch/arm/mach-omap2/board-igep0020.c          |   18 ++++-
+ arch/arm/mach-omap2/board-ldp.c               |   13 ++++
+ arch/arm/mach-omap2/board-omap3beagle.c       |   17 ++++-
+ arch/arm/mach-omap2/board-omap3evm.c          |   16 ++++-
+ arch/arm/mach-omap2/board-omap3pandora.c      |   14 +++-
+ arch/arm/mach-omap2/board-omap3stalker.c      |   16 ++++-
+ arch/arm/mach-omap2/board-omap3touchbook.c    |   15 ++++-
+ arch/arm/mach-omap2/board-overo.c             |   11 +++-
+ arch/arm/mach-omap2/board-rx51-peripherals.c  |   11 +++
+ arch/arm/mach-omap2/board-zoom-peripherals.c  |   14 +++-
+ arch/arm/mach-omap2/hsmmc.c                   |   93 ++++++++++++-------------
+ arch/arm/mach-omap2/hsmmc.h                   |    9 ++-
+ arch/arm/plat-omap/include/plat/omap_device.h |    1 +
+ arch/arm/plat-omap/omap_device.c              |   20 +++++-
+ drivers/mmc/host/omap_hsmmc.c                 |   11 ++--
+ 18 files changed, 249 insertions(+), 75 deletions(-)
