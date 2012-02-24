@@ -1,29 +1,61 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 24 Feb 2012 10:04:50 +0000
-Subject: [GIT PULL] Versatile Express DT support
-In-Reply-To: <20120223225924.GA12404@mudshark.cambridge.arm.com>
-References: <1330020005.2727.11.camel@hornet.cambridge.arm.com>
- <20120223225924.GA12404@mudshark.cambridge.arm.com>
-Message-ID: <1330077890.2727.14.camel@hornet.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 24 Feb 2012 15:40:48 +0530
+Subject: [PATCH v2 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
+In-Reply-To: <1329996409-26861-1-git-send-email-rnayak@ti.com>
+References: <1329996409-26861-1-git-send-email-rnayak@ti.com>
+Message-ID: <4F476228.7060607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Morning
+Chris,
 
-On Thu, 2012-02-23 at 22:59 +0000, Will Deacon wrote:
-> >       ARM: vexpress: Use FDT data in platform SMP calls
-> 
-> This patch has a curious commit message, which ends like:
-> 
-> 	Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> 
-> 	SMP update (change commit log!)
-> 
-> Is that last line supposed to be there?
+On Thursday 23 February 2012 04:56 PM, Rajendra Nayak wrote:
+> Re-sending as these patches did not make it to the lists due to
+> issues with my 'git send-email'
+>
+> This series mainly cleans up all instances of hardcoding's in
+> the driver based on pdev->id. This is cleanup leading to the
+> DT adaptation of omap_hsmmc driver.
+>
+> v2 mainly has some minor changes to get rid of a debug print
+> which was still using host->id and getting rid of 'id' field
+> entirely from omap_hsmmc_host struct.
+>
+> The series is tested on OMAP4SDP, OMAP4panda, OMAP3beagle and OMAP2430SDP
+> boards.
 
-No, of course not - patch squashing leftover. Fixed now.
+This series is reviewed/tested and acked by Balaji and Venkat.
+Care to pull this in for 3.4?
 
-Thanks for both you and Tixy (who was actually faster ;-) for spotting
-that!
+I have one other cleanup patch on top of this series to make all
+remaining pr_* prints in the driver to dev_* [1].
+It would be great if you could pick that up as well.
 
-Pawe?
+These patches are cleanups leading to the DT conversion of omap_hsmmc
+driver.
+
+regards,
+Rajendra
+
+[1] http://marc.info/?l=linux-mmc&m=132999677405098&w=3
+
+>
+> regards,
+> Rajendra
+>
+> Balaji T K (3):
+>    mmc: omap_hsmmc: use platform_get_resource_byname for tx/rx DMA
+>      channels
+>    mmc: omap_hsmmc: remove unused .set_sleep function
+>    mmc: omap_hsmmc: Use OMAP_HSMMC_SUPPORTS_DUAL_VOLT flag to remove
+>      host->id based hardcoding
+>
+> Rajendra Nayak (3):
+>    mmc: omap_hsmmc: Get rid of omap_hsmmc_1_set_power function
+>    mmc: omap_hsmmc: Get rid of omap_hsmmc_4_set_power function
+>    mmc: omap_hsmmc: Don't expect MMC1 to always have vmmc supply
+>
+>   arch/arm/plat-omap/include/plat/mmc.h |    2 -
+>   drivers/mmc/host/omap_hsmmc.c         |  175 +++------------------------------
+>   2 files changed, 16 insertions(+), 161 deletions(-)
+>
