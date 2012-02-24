@@ -1,117 +1,29 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 24 Feb 2012 13:25:24 +0100
-Subject: [PATCH v6] I2C: add CSR SiRFprimaII on-chip I2C controllers driver
-In-Reply-To: <CAM=Q2ct7EHht06uCHVpR_HoO39WZjO2+N6DhxuMthRQRQBRnyw@mail.gmail.com>
-References: <1328714915-12287-1-git-send-email-21cnbao@gmail.com>
- <CAM=Q2ct7EHht06uCHVpR_HoO39WZjO2+N6DhxuMthRQRQBRnyw@mail.gmail.com>
-Message-ID: <20120224122524.GG2479@pengutronix.de>
+From: dron0gus@gmail.com (Gusakov Andrey)
+Date: Fri, 24 Feb 2012 16:40:27 +0400
+Subject: [PATCH v3] S3C24XX DMA resume regression fix
+Message-ID: <1330087227-10450-1-git-send-email-dron0gus@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Barry,
+s3c2410_dma_suspend suspends channels from 0 to dma_channels.
+s3c2410_dma_resume resumes channels in reverse order. So 
+pointer should be decremented insted of being incremented.
+---
+ arch/arm/plat-s3c24xx/dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-On Thu, Feb 16, 2012 at 10:24:00PM +0530, Shubhrajyoti Datta wrote:
-
-please consider these comments.
-
-Thanks,
-
-   Wolfram
-
-> Hello,
-> 
-> On Wed, Feb 8, 2012 at 8:58 PM, Barry Song <21cnbao@gmail.com> wrote:
-> > From: Zhiwu Song <Zhiwu.Song@csr.com>
-> >
-> > SiRFprimaII is the latest generation application processor from CSR?s
-> > multi-function SoC product family.
-> > The SoC support codes are in arch/arm/mach-prima2 from Linux mainline
-> > 3.0.
-> > There are two I2C controllers on primaII, features include:
-> > * Two I2C controller modules are on chip
-> > * RISC I/O bus read write register
-> > * Up to 16 bytes data buffer for issuing commands and writing data
-> > ?at the same time
-> > * Up to 16 commands, and receiving read data 16 bytes at a time
-> > * Error INT report (ACK check)
-> > * No-ACK bus protocols (SCCB bus protocols)
-> >
-> > Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> > Signed-off-by: Xiangzhen Ye <Xiangzhen.Ye@csr.com>
-> > Signed-off-by: Yuping Luo <Yuping.Luo@csr.com>
-> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> > ---
-> > ?-v6:
-> > ?fix/cleanup lots of minor issues pointed out by wolfram;
-> > ?add OF property clock-frequency to support freq setting by DT;
-> > ?add lost devicetree binding document;
-> >
-> > ?Documentation/devicetree/bindings/i2c/sirf-i2c.txt | ? 19 +
-> > ?drivers/i2c/busses/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? | ? 10 +
-> > ?drivers/i2c/busses/Makefile ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
-> > ?drivers/i2c/busses/i2c-sirf.c ? ? ? ? ? ? ? ? ? ? ?| ?459 ++++++++++++++++++++
-> > ?4 files changed, 489 insertions(+), 0 deletions(-)
-> > ?create mode 100644 Documentation/devicetree/bindings/i2c/sirf-i2c.txt
-> > ?create mode 100644 drivers/i2c/busses/i2c-sirf.c
-> >
-> > diff --git a/Documentation/devicetree/bindings/i2c/sirf-i2c.txt b/Documentation/devicetree/bindings/i2c/sirf-i2c.txt
-> > new file mode 100644
-> > index 0000000..7baf9e1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/i2c/sirf-i2c.txt
-> <snip>
-> 
-> > +
-> > + ? ? ? ? ? ? ? if (i2c_stat & SIRFSOC_I2C_STAT_NACK)
-> > + ? ? ? ? ? ? ? ? ? ? ? dev_err(&siic->adapter.dev, "ACK not received\n");
-> Could we send stop here?
-> > + ? ? ? ? ? ? ? else
-> > + ? ? ? ? ? ? ? ? ? ? ? dev_err(&siic->adapter.dev, "I2C error\n");
-> > +
-> > + ? ? ? ? ? ? ? complete(&siic->done);
-> <Snip>
-> 
-> > +static int i2c_sirfsoc_resume(struct device *dev)
-> > +{
-> > + ? ? ? struct platform_device *pdev = to_platform_device(dev);
-> > + ? ? ? struct i2c_adapter *adapter = platform_get_drvdata(pdev);
-> > + ? ? ? struct sirfsoc_i2c *siic = adapter->algo_data;
-> > +
-> > + ? ? ? clk_enable(siic->clk);
-> > + ? ? ? writel(SIRFSOC_I2C_RESET, siic->base + SIRFSOC_I2C_CTRL);
-> Could you explain why is a reset needed.
-> Or am I missing something.
-> 
-> > + ? ? ? writel(SIRFSOC_I2C_CORE_EN | SIRFSOC_I2C_MASTER_MODE,
-> > + ? ? ? ? ? ? ? siic->base + SIRFSOC_I2C_CTRL);
-> > + ? ? ? writel(siic->clk_div, siic->base + SIRFSOC_I2C_CLK_CTRL);
-> > + ? ? ? writel(siic->sda_delay, siic->base + SIRFSOC_I2C_SDA_DELAY);
-> > + ? ? ? clk_disable(siic->clk);
-> > + ? ? ? return 0;
-> > +}
-> > +
-> > +static const struct dev_pm_ops i2c_sirfsoc_pm_ops = {
-> > + ? ? ? .suspend = i2c_sirfsoc_suspend,
-> > + ? ? ? .resume = i2c_sirfsoc_resume,
-> Could we use simple dev_pm ops here?
-> 
-> > +};
-> > +#endif
-> > +
-> > +static const struct of_device_id sirfsoc_i2c_of_match[] __devinitconst = {
-> > + ? ? ? { .compatible = "sirf,prima2-i2c", },
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
+diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+index 57abec9..16510d5 100644
+--- a/arch/arm/plat-s3c24xx/dma.c
++++ b/arch/arm/plat-s3c24xx/dma.c
+@@ -1249,7 +1249,7 @@ static void s3c2410_dma_resume(void)
+ 	struct s3c2410_dma_chan *cp = s3c2410_chans + dma_channels - 1;
+ 	int channel;
+ 
+-	for (channel = dma_channels - 1; channel >= 0; cp++, channel--)
++	for (channel = dma_channels - 1; channel >= 0; cp--, channel--)
+ 		s3c2410_dma_resume_chan(cp);
+ }
+ 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120224/608230f5/attachment.sig>
+1.7.0.4
