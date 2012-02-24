@@ -1,93 +1,32 @@
-From: b-cousson@ti.com (Cousson, Benoit)
+From: m.szyprowski@samsung.com (Marek Szyprowski)
 Date: Fri, 24 Feb 2012 16:30:16 +0100
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <1329321854-24490-4-git-send-email-b-cousson@ti.com>
- <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
- <4F452484.5080503@gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
-Message-ID: <4F47AD08.4030504@ti.com>
+Subject: [PATCHv6 7/7] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <201202241431.02170.arnd@arndb.de>
+References: <1328900324-20946-1-git-send-email-m.szyprowski@samsung.com>
+ <201202241249.44731.arnd@arndb.de>
+ <013301ccf2f6$bc4ad840$34e088c0$%szyprowski@samsung.com>
+ <201202241431.02170.arnd@arndb.de>
+Message-ID: <017701ccf309$357d6f90$a0784eb0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/22/2012 7:29 PM, Stephen Warren wrote:
-> Rob Herring wrote at Wednesday, February 22, 2012 10:23 AM:
->> On 02/22/2012 08:31 AM, Cousson, Benoit wrote:
->>> On 2/22/2012 3:23 PM, Rob Herring wrote:
->>>> On 02/15/2012 10:04 AM, Benoit Cousson wrote:
->>>>> Adapt the GPIO driver to retrieve information from a DT file.
->>>>>
->>>>> Allocate the irq_base dynamically and rename bank->virtual_irq_start
->>>>> to bank->irq_base.
->>>>> Change irq_base type to int instead of u16 to match irq_alloc_descs
->>>>> output.
->>>>>
->>>>> Add documentation for GPIO properties specific to OMAP.
->>>>>
->>>>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->>>>> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
->>>>
->>>> One comment below, but otherwise:
->>>>
->>>> Acked-by: Rob Herring<rob.herring@calxeda.com>
->>>>
->>>>> ---
->>>>>    .../devicetree/bindings/gpio/gpio-omap.txt         |   30 +++++
->>>>>    drivers/gpio/gpio-omap.c                           |  121
->>>>> ++++++++++++++++++--
->>>>>    2 files changed, 142 insertions(+), 9 deletions(-)
->>>>>    create mode 100644
->>>>> Documentation/devicetree/bindings/gpio/gpio-omap.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt
->>>>> b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
->>>>> new file mode 100644
->>>>> index 0000000..c1b3100
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
->>>>> @@ -0,0 +1,30 @@
->>>>> +OMAP GPIO controller bindings
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible:
->>>>> +  - "ti,omap2-gpio" for OMAP2 controllers
->>>>> +  - "ti,omap3-gpio" for OMAP3 controllers
->>>>> +  - "ti,omap4-gpio" for OMAP4 controllers
->>>>> +- #gpio-cells : Should be two.
->>>>> +  - first cell is the pin number
->>>>> +  - second cell is used to specify optional parameters (unused)
->>>>> +- gpio-controller : Marks the device node as a GPIO controller.
->>>>> +- #interrupt-cells : Should be one
->>>>
->>>> There's no level/edge settings for gpios?
->>>
->>> That's a good question, because I was wondering as well :-)
->>>
->>> I did no see how it was done in other GPIO implementation.
->>
->> There's not really a good example that I've found. Many gpio nodes don't
->> even have "interrupt-controller" set.
->>
->> So if you have an irq_set_type function for gpio's, then you should have
->> 2 cells.
+Hello,
 
-After checking the OMAP gpio code, I do have a gpio_irq_type and the 
-GPIO do support the 4 types. I'm not sure yet about the combinations.
+On Friday, February 24, 2012 3:31 PM Arnd Bergmann wrote:
 
-> Tegra's GPIO IRQ binding (gpio_nvidia.txt in linux-next at least) says:
->
-> - #interrupt-cells : Should be 2.
->    The first cell is the GPIO number.
->    The second cell is used to specify flags:
->      bits[3:0] trigger type and level flags:
->        1 = low-to-high edge triggered.
->        2 = high-to-low edge triggered.
->        4 = active high level-sensitive.
->        8 = active low level-sensitive.
->        Valid combinations are 1, 2, 3, 4, 8.
+> On Friday 24 February 2012, Marek Szyprowski wrote:
+> > I want to use some kind of chained arrays, each of at most of PAGE_SIZE. This code
+> > doesn't really need to keep these page pointers in contiguous virtual memory area, so
+> > it will not be a problem here.
+> >
+> Sounds like sg_alloc_table(), could you reuse that instead of rolling your own?
 
-Indeed, so I'll just copy / paste Tegra's binding...
+I only need to store 'struct page *' there. sg_alloc_table() operates on 'struct statterlist'
+entries, which are 4 to 6 times larger than a simple 'struct page *' entry. I don't want to waste
+so much memory just for reusing a two function. Implementing the same idea with pure 
+'struct page *' pointers will be just a matter of a few lines.
 
-Thanks,
-Benoit
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
