@@ -1,161 +1,142 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Fri, 24 Feb 2012 14:58:05 +0800
-Subject: [PATCH v4 4/7] ARM: sa1100: clean up clock support
-In-Reply-To: <1330012851-13693-5-git-send-email-haojian.zhuang@marvell.com>
-References: <1330012851-13693-5-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1330066685-17066-1-git-send-email-haojian.zhuang@marvell.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 24 Feb 2012 07:47:49 +0100
+Subject: [PATCH v3 03/10] of: Add PWM support.
+In-Reply-To: <201202231403.01614.arnd@arndb.de>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <201202221615.11605.arnd@arndb.de>
+ <20120223075537.GB8621@avionic-0098.mockup.avionic-design.de>
+ <201202231403.01614.arnd@arndb.de>
+Message-ID: <20120224064749.GB18786@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jett.Zhou <jtzhou@marvell.com>
+* Arnd Bergmann wrote:
+> On Thursday 23 February 2012, Thierry Reding wrote:
+> > * Arnd Bergmann wrote:
+> > > On Wednesday 22 February 2012, Thierry Reding wrote:
+> > > > This patch adds helpers to support device tree bindings for the generic
+> > > > PWM API. Device tree binding documentation for PWM controllers is also
+> > > > provided.
+> > > > 
+> > > > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > > > 
+> > > >  Documentation/devicetree/bindings/pwm/pwm.txt |   48 +++++++++
+> > > >  drivers/of/Kconfig                            |    6 +
+> > > >  drivers/of/Makefile                           |    1 +
+> > > >  drivers/of/pwm.c                              |  130 +++++++++++++++++++++++++
+> > > >  include/linux/of_pwm.h                        |   51 ++++++++++
+> > > >  include/linux/pwm.h                           |   17 +++
+> > > 
+> > > I think it would make more sense to stick the device tree specific parts
+> > > into drivers/pwm/of.c instead of drivers/of/pwm.c, but it's not a strong
+> > > preference on my part.
+> > 
+> > I was just following what everybody else seemed to be doing. drivers/of/
+> > already has support code for GPIO, IRQ, I2C, PCI and whatnot.
+> 
+> Yes, as I said, it's not entirely clear what's best here, and it would
+> be nice if other people could weigh in when they have a strong opinion
+> one way or another.
 
-Add rtc clock support and clean clock support for gpio.
+Okay, I'll wait some more for others to join in.
 
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- arch/arm/Kconfig             |    2 +-
- arch/arm/mach-sa1100/clock.c |   82 ++++++++++++++++++++++++------------------
- 2 files changed, 48 insertions(+), 36 deletions(-)
+[...]
+> > > * Why not include the pwm_request() call in this and return the
+> > >   pwm_device directly? You said that you want to get rid of the
+> > >   pwm_id eventually, which is a good idea, but this interface still
+> > >   forces one to use it.
+> > 
+> > Okay, that sounds sensible. I propose to rename the function to something like
+> > of_request_pwm().
+> 
+> Sounds good.
+> 
+> > It would of course need an additional parameter (name) to
+> > forward to pwm_request().
+> 
+> Not necessarily, it could use the dev_name(device) or the name
+> of the property, or a combination of the two.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a48aecc..6e40039 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -754,7 +754,7 @@ config ARCH_SA1100
- 	select ARCH_HAS_CPUFREQ
- 	select CPU_FREQ
- 	select GENERIC_CLOCKEVENTS
--	select HAVE_CLK
-+	select CLKDEV_LOOKUP
- 	select HAVE_SCHED_CLOCK
- 	select TICK_ONESHOT
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-index dab3c63..172ebd0 100644
---- a/arch/arm/mach-sa1100/clock.c
-+++ b/arch/arm/mach-sa1100/clock.c
-@@ -11,17 +11,29 @@
- #include <linux/clk.h>
- #include <linux/spinlock.h>
- #include <linux/mutex.h>
-+#include <linux/io.h>
-+#include <linux/clkdev.h>
- 
- #include <mach/hardware.h>
- 
--/*
-- * Very simple clock implementation - we only have one clock to deal with.
-- */
-+struct clkops {
-+	void			(*enable)(struct clk *);
-+	void			(*disable)(struct clk *);
-+};
-+
- struct clk {
-+	const struct clkops	*ops;
- 	unsigned int		enabled;
- };
- 
--static void clk_gpio27_enable(void)
-+#define DEFINE_CLK(_name, _ops)				\
-+struct clk clk_##_name = {				\
-+		.ops	= _ops,				\
-+	}
-+
-+static DEFINE_SPINLOCK(clocks_lock);
-+
-+static void clk_gpio27_enable(struct clk *clk)
- {
- 	/*
- 	 * First, set up the 3.6864MHz clock on GPIO 27 for the SA-1111:
-@@ -32,38 +44,24 @@ static void clk_gpio27_enable(void)
- 	TUCR = TUCR_3_6864MHz;
- }
- 
--static void clk_gpio27_disable(void)
-+static void clk_gpio27_disable(struct clk *clk)
- {
- 	TUCR = 0;
- 	GPDR &= ~GPIO_32_768kHz;
- 	GAFR &= ~GPIO_32_768kHz;
- }
- 
--static struct clk clk_gpio27;
--
--static DEFINE_SPINLOCK(clocks_lock);
--
--struct clk *clk_get(struct device *dev, const char *id)
--{
--	const char *devname = dev_name(dev);
--
--	return strcmp(devname, "sa1111.0") ? ERR_PTR(-ENOENT) : &clk_gpio27;
--}
--EXPORT_SYMBOL(clk_get);
--
--void clk_put(struct clk *clk)
--{
--}
--EXPORT_SYMBOL(clk_put);
--
- int clk_enable(struct clk *clk)
- {
- 	unsigned long flags;
- 
--	spin_lock_irqsave(&clocks_lock, flags);
--	if (clk->enabled++ == 0)
--		clk_gpio27_enable();
--	spin_unlock_irqrestore(&clocks_lock, flags);
-+	if (clk) {
-+		spin_lock_irqsave(&clocks_lock, flags);
-+		if (clk->enabled++ == 0)
-+			clk->ops->enable(clk);
-+		spin_unlock_irqrestore(&clocks_lock, flags);
-+	}
-+
- 	return 0;
- }
- EXPORT_SYMBOL(clk_enable);
-@@ -72,17 +70,31 @@ void clk_disable(struct clk *clk)
- {
- 	unsigned long flags;
- 
--	WARN_ON(clk->enabled == 0);
--
--	spin_lock_irqsave(&clocks_lock, flags);
--	if (--clk->enabled == 0)
--		clk_gpio27_disable();
--	spin_unlock_irqrestore(&clocks_lock, flags);
-+	if (clk) {
-+		WARN_ON(clk->enabled == 0);
-+		spin_lock_irqsave(&clocks_lock, flags);
-+		if (--clk->enabled == 0)
-+			clk->ops->disable(clk);
-+		spin_unlock_irqrestore(&clocks_lock, flags);
-+	}
- }
- EXPORT_SYMBOL(clk_disable);
- 
--unsigned long clk_get_rate(struct clk *clk)
-+const struct clkops clk_gpio27_ops = {
-+	.enable		= clk_gpio27_enable,
-+	.disable	= clk_gpio27_disable,
-+};
-+
-+static DEFINE_CLK(gpio27, &clk_gpio27_ops);
-+
-+static struct clk_lookup sa11xx_clkregs[] = {
-+	CLKDEV_INIT("sa1111.0", NULL, &clk_gpio27),
-+	CLKDEV_INIT("sa1100-rtc", NULL, NULL),
-+};
-+
-+static int __init sa11xx_clk_init(void)
- {
--	return 3686400;
-+	clkdev_add_table(sa11xx_clkregs, ARRAY_SIZE(sa11xx_clkregs));
-+	return 0;
- }
--EXPORT_SYMBOL(clk_get_rate);
-+core_initcall(sa11xx_clk_init);
--- 
-1.7.0.4
+The problem with that is that usually the device would be named something
+generic like "pwm", while in case where the PWM is used for the backlight
+it makes sense to label the PWM device "backlight".
+
+Looking at debugfs and seeing an entry "backlight" is much more straight-
+forward than "pwm.0". I mean "pwm.0" doesn't carry any useful information
+really, does it?
+
+> > > * It is not clear what a pwm_spec is used for, or why a device
+> > >   driver would need to be bothered by this. Maybe it just needs
+> > >   more explanation, but it seems to me that if you do the previous
+> > >   change, the pwm_spec would not be needed either.
+> > 
+> > pwm_spec is pretty much what the of_xlate() callback parses out of the data
+> > provided by the device tree. Currently, of_pwm_simple_xlate() only parses the
+> > period (in ns) but the idea was that if at some point in the future it was
+> > decided to provide more than the period via the device tree it could be
+> > extended without changing every call to of_get_named_pwm(). As I said, it also
+> > plays quite nicely with the concept of the of_xlate() callback and sort of
+> > serves as interface between the lower layer that retrieves PWM parameters and
+> > the upper layers that use it.
+> > 
+> > Thinking about it, perhaps renaming it to pwm_params may be more descriptive.
+> > Also to avoid breakage or confusion if fields get added it may be good to
+> > provide a bitmask of valid fields filled in by the of_xlate() callback.
+> > 
+> > 	enum {
+> > 		PWM_PARAMS_PERIOD,
+> > 		...
+> > 	};
+> > 
+> > 	struct pwm_params {
+> > 		unsigned long fields;
+> > 		unsigned int period;
+> > 	};
+> > 
+> > Then again, maybe that's just over-engineering and directly returning via an
+> > unsigned int *period_ns parameter would be better?
+> 
+> It certainly sounds like over-engineering to me. Why not keep all that
+> information hidden inside the struct pwm_device and provide accessor
+> functions like this?
+> 
+> unsigned int pwm_get_period(struct pwm_device *pwm);
+
+Heh, I like that. It is the obvious thing to do. Why didn't I think of it?
+:-)
+
+> > > > +EXPORT_SYMBOL(of_get_named_pwm);
+> > > 
+> > > EXPORT_SYMBOL_GPL?
+> > 
+> > It was brought up at some point that it might be nice to allow non-GPL
+> > drivers to use the PWM framework as well. I don't remember any discussion
+> > resulting from the comment. Perhaps we should have that discussion now and
+> > decide whether or not we want to keep it GPL-only or not.
+> 
+> I would definitely use EXPORT_SYMBOL_GPL for all new code unless it
+> replaces an earlier interface that was available as EXPORT_SYMBOL.
+
+I just grepped the code and noticed this:
+
+	$ $ git grep -n 'EXPORT_SYMBOL.*(pwm_request)'
+	arch/arm/mach-vt8500/pwm.c:139:EXPORT_SYMBOL(pwm_request);
+	arch/arm/plat-mxc/pwm.c:183:EXPORT_SYMBOL(pwm_request);
+	arch/arm/plat-samsung/pwm.c:83:EXPORT_SYMBOL(pwm_request);
+	arch/unicore32/kernel/pwm.c:132:EXPORT_SYMBOL(pwm_request);
+	drivers/mfd/twl6030-pwm.c:156:EXPORT_SYMBOL(pwm_request);
+	drivers/misc/ab8500-pwm.c:108:EXPORT_SYMBOL(pwm_request);
+	drivers/pwm/core.c:262:EXPORT_SYMBOL_GPL(pwm_request);
+
+It seems like the legacy PWM API used to be non-GPL. Should I switch it back?
+Also does it make sense to have something like of_request_pwm() GPL when the
+rest of the API isn't?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120224/69fe359d/attachment.sig>
