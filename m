@@ -1,106 +1,66 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Fri, 24 Feb 2012 10:31:42 +0800
-Subject: [V2 2/3] backlight: modified power control of pm860x backlight
-Message-ID: <1330050702-8975-1-git-send-email-jtzhou@marvell.com>
+Date: Fri, 24 Feb 2012 10:32:10 +0800
+Subject: [V2 3/3] led: modified power control of pm860x led
+Message-ID: <1330050730-9019-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Since several sub modules such as backlight, leds and vibrator depend
 on the refernce group and internal oscillator in pm8606, so modified
-the power control of backlight in pm8606 by unified interface.
+the power control of led in pm8606 by unified interface.
 
 Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 ---
- drivers/video/backlight/88pm860x_bl.c |   49 +++++++++++++++++++--------------
- 1 files changed, 28 insertions(+), 21 deletions(-)
+ drivers/leds/leds-88pm860x.c |   23 +++++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/video/backlight/88pm860x_bl.c b/drivers/video/backlight/88pm860x_bl.c
-index a1376dc..b6ea65f 100644
---- a/drivers/video/backlight/88pm860x_bl.c
-+++ b/drivers/video/backlight/88pm860x_bl.c
-@@ -67,6 +67,28 @@ static inline int wled_idc(int port)
+diff --git a/drivers/leds/leds-88pm860x.c b/drivers/leds/leds-88pm860x.c
+index 4ca0062..5b61aaf 100644
+--- a/drivers/leds/leds-88pm860x.c
++++ b/drivers/leds/leds-88pm860x.c
+@@ -114,6 +114,27 @@ static inline int __blink_ctl_mask(int port)
  	return ret;
  }
  
-+static int backlight_power_set(struct pm860x_chip *chip, int port,
-+		int on)
++static int led_power_set(struct pm860x_chip *chip, int port, int on)
 +{
 +	int ret = -EINVAL;
 +
 +	switch (port) {
-+	case PM8606_BACKLIGHT1:
-+		ret = on ? pm8606_osc_enable(chip, WLED1_DUTY) :
-+			pm8606_osc_disable(chip, WLED1_DUTY);
++	case PM8606_LED1_RED:
++	case PM8606_LED1_GREEN:
++	case PM8606_LED1_BLUE:
++		ret = on ? pm8606_osc_enable(chip, RGB1_ENABLE) :
++			pm8606_osc_disable(chip, RGB1_ENABLE);
 +		break;
-+	case PM8606_BACKLIGHT2:
-+		ret = on ? pm8606_osc_enable(chip, WLED2_DUTY) :
-+			pm8606_osc_disable(chip, WLED2_DUTY);
-+		break;
-+	case PM8606_BACKLIGHT3:
-+		ret = on ? pm8606_osc_enable(chip, WLED3_DUTY) :
-+			pm8606_osc_disable(chip, WLED3_DUTY);
++	case PM8606_LED2_RED:
++	case PM8606_LED2_GREEN:
++	case PM8606_LED2_BLUE:
++		ret = on ? pm8606_osc_enable(chip, RGB2_ENABLE) :
++			pm8606_osc_disable(chip, RGB2_ENABLE);
 +		break;
 +	}
 +	return ret;
 +}
 +
- static int pm860x_backlight_set(struct backlight_device *bl, int brightness)
+ static void pm860x_led_work(struct work_struct *work)
  {
- 	struct pm860x_backlight_data *data = bl_get_data(bl);
-@@ -79,6 +101,9 @@ static int pm860x_backlight_set(struct backlight_device *bl, int brightness)
- 	else
- 		value = brightness;
  
-+	if (brightness)
-+		backlight_power_set(chip, data->port, 1);
-+
- 	ret = pm860x_reg_write(data->i2c, wled_a(data->port), value);
- 	if (ret < 0)
- 		goto out;
-@@ -115,6 +140,9 @@ static int pm860x_backlight_set(struct backlight_device *bl, int brightness)
- 	if (ret < 0)
- 		goto out;
- 
-+	if (brightness == 0)
-+		backlight_power_set(chip, data->port, 0);
-+
- 	dev_dbg(chip->dev, "set brightness %d\n", value);
- 	data->current_brightness = value;
- 	return 0;
-@@ -170,7 +198,6 @@ static int pm860x_backlight_probe(struct platform_device *pdev)
- 	struct backlight_device *bl;
- 	struct resource *res;
- 	struct backlight_properties props;
--	unsigned char value;
- 	char name[MFD_NAME_SIZE];
- 	int ret;
- 
-@@ -218,26 +245,6 @@ static int pm860x_backlight_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, bl);
- 
--	/* Enable reference VSYS */
--	ret = pm860x_reg_read(data->i2c, PM8606_VSYS);
--	if (ret < 0)
--		goto out;
--	if ((ret & PM8606_VSYS_EN) == 0) {
--		value = ret | PM8606_VSYS_EN;
--		ret = pm860x_reg_write(data->i2c, PM8606_VSYS, value);
--		if (ret < 0)
--			goto out;
--	}
--	/* Enable reference OSC */
--	ret = pm860x_reg_read(data->i2c, PM8606_MISC);
--	if (ret < 0)
--		goto out;
--	if ((ret & PM8606_MISC_OSC_EN) == 0) {
--		value = ret | PM8606_MISC_OSC_EN;
--		ret = pm860x_reg_write(data->i2c, PM8606_MISC, value);
--		if (ret < 0)
--			goto out;
--	}
- 	/* read current backlight */
- 	ret = pm860x_backlight_get_brightness(bl);
- 	if (ret < 0)
+@@ -126,6 +147,7 @@ static void pm860x_led_work(struct work_struct *work)
+ 	chip = led->chip;
+ 	mutex_lock(&led->lock);
+ 	if ((led->current_brightness == 0) && led->brightness) {
++		led_power_set(chip, led->port, 1);
+ 		if (led->iset) {
+ 			pm860x_set_bits(led->i2c, __led_off(led->port),
+ 					LED_CURRENT_MASK, led->iset);
+@@ -149,6 +171,7 @@ static void pm860x_led_work(struct work_struct *work)
+ 					LED_CURRENT_MASK, 0);
+ 			mask = __blink_ctl_mask(led->port);
+ 			pm860x_set_bits(led->i2c, PM8606_WLED3B, mask, 0);
++			led_power_set(chip, led->port, 0);
+ 		}
+ 	}
+ 	led->current_brightness = led->brightness;
 -- 
 1.7.0.4
