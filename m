@@ -1,82 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Feb 2012 17:07:22 +0100
-Subject: [GIT PULL] ux500 patches for v3.4 take 2
-Message-ID: <1330099642-6265-1-git-send-email-linus.walleij@linaro.org>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Sat, 25 Feb 2012 01:08:36 +0900
+Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <014601ccf2fa$a25c8560$e7159020$%szyprowski@samsung.com>
+References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
+ <014601ccf2fa$a25c8560$e7159020$%szyprowski@samsung.com>
+Message-ID: <CAHQjnOPE5X=dn+8D348OruLqoYNGZwZk3eLtLRSERce-eTzXDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marek.
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Fri, Feb 24, 2012 at 10:45 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hi,
+>
+> On Thursday, December 29, 2011 1:24 PM KyongHo Cho wrote:
+>
+>> Changes since v7:
+>> - Rebased with the recent commits of the following git branches
+>> ? * git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git/next
+>> ? * git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/for-next
+>> - Changed magic numbers into macros
+>> - Setting owner of a System MMU in 'iommu' field of dev_archdata
+>> - Verbose message in the default fault handler
+>> - Some bug fixes.
+>
+> (snipped)
+>
+> The time is flying away and v3.4 merge windows will open soon. Do you plan to
+> send an updated version of the SYSMMU driver anytime soon? It will be really
+> nice to have it finally merged to v3.4.
+>
 
-Hi ARM-SoC maintainers,
+Thank you for asking.
 
-this is an iteration of the former pull request for the
-ux500 changes, replacing the U9540 patch with a v2 version
-without the IRQs defined, planning to get these into
-the device tree.
+I prepared a new patchset and it is ready for submitting.
+It includes several bugfixes and Exynos5 support.
 
-Thanks,
-Linus Walleij
+The last patche submitted has a bug when the following situation:
+   1. Allocating a 2nd level page table to map 4KB or 64KB on a virtual region
+   2. Unmapped all entries in the 2nd level page table.
+   3. Mapping to the same region with 1MB page.
+   Then iommu_map() will return -EADDRINUSE due to incorrect counting
+   free entries in 2nd level page table.
 
+The next patch will be submitted by 2/28.
 
-The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+BTW Marek, I want to know why MFC driver defines separate platform devices
+for left and right buses.
+The next IOMMU driver defines just one platform device for a H/W device.
+Thus, it defines just one SYSMMU_MFC platform device, for example.
+(the previous one defines 2 platform devices for SYSMMU_MFC)
+However, it is easy to separate the single platform device to multiple
+platform devices.
 
-  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+Regards,
 
-are available in the git repository at:
-  git://git.linaro.org/people/triad/linux-stericsson.git/ ..BRANCH.NOT.VERIFIED..
-
-Linus Walleij (1):
-      ARM: ux500: core U9540 support
-
-Michel Jaouen (1):
-      ARM: ux500: ioremap differences for DB9540
-
-Ola Lilja (3):
-      ARM: ux500: Add placeholder for clk_set_parent
-      ARM: ux500: Add DMA-channels for MSP
-      ARM: ux500: Add audio-regulators
-
-Philippe Langlais (2):
-      ARM: ux500: set ARCH_NR_GPIO to 355 on U8500 platforms
-      ARM: ux500: fix around AB8500 GPIO macro name
-
- arch/arm/Kconfig                               |    2 +-
- arch/arm/mach-ux500/board-mop500-regulators.c  |   28 ++++++++++++++++++++++++
- arch/arm/mach-ux500/board-mop500-uib.c         |    2 +-
- arch/arm/mach-ux500/board-mop500.c             |    2 +-
- arch/arm/mach-ux500/board-mop500.h             |    2 +-
- arch/arm/mach-ux500/cache-l2x0.c               |   14 ++++++++++-
- arch/arm/mach-ux500/clock.c                    |    9 ++++++-
- arch/arm/mach-ux500/clock.h                    |    1 +
- arch/arm/mach-ux500/cpu-db8500.c               |   24 +++++++++++++++++---
- arch/arm/mach-ux500/cpu.c                      |    4 +-
- arch/arm/mach-ux500/devices-db8500.c           |    6 +++++
- arch/arm/mach-ux500/id.c                       |   26 ++++++++++++++++++++++
- arch/arm/mach-ux500/include/mach/db8500-regs.h |    6 +++++
- arch/arm/mach-ux500/include/mach/hardware.h    |   12 ++++++++++
- arch/arm/mach-ux500/include/mach/id.h          |   17 +++++++++++++-
- arch/arm/mach-ux500/include/mach/irqs.h        |    2 +-
- arch/arm/mach-ux500/include/mach/setup.h       |    7 ++++++
- arch/arm/mach-ux500/platsmp.c                  |    4 +-
- arch/arm/mach-ux500/timer.c                    |    2 +-
- drivers/cpufreq/db8500-cpufreq.c               |    2 +-
- 20 files changed, 153 insertions(+), 19 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.12 (GNU/Linux)
-
-iQIcBAEBAgAGBQJPR0U7AAoJEEEQszewGV1z4wIQAIXY6g66kHYZzi00j1qyuEay
-1oRz38jur1DIM+MHDarpId36sZt9QRQ/aCXMYk855i41dwXCXTMtvNrnRWqRdJsz
-VOJR+XoNkZLhrxFUAdOQ2jSp1jpDEaaiklm/UjpYOb6JoXTqcI8ktz2Av3w9YWwG
-o/l7fFgFxm8Poa2tBdEj8zoQrWMH7XsG/LzP84gJW8yi0BhNIOlTYXpsWqJlHsY2
-M4K2Thb+6h2Q/AtMSICbuYC102AVg+MOGZRrZmO0koDsRi5h795lEzJ/GaavpaGx
-hJF17czDq0VDYpcSA6UwdomfzQOXGpORJI3+PJa8qKLN9CfjaYus9Tw7JcmJ9PWV
-2YEc2H6IT+MPDWqdwPwUhEP8iXsw/hcTgQ2gsP2f/6MG0d0cCMCsFHa9jrCti2o0
-t4MvJB/AimbbNXHI1z/DqBc8/swkf6wrqOSGMGj7G5GpTp6GymNj1DsDQmMVJpcP
-VpN0Bt3CzodY9jRUpvnH9Yth7cD4WmzQ/HLYUyz98u0bxU4xCnmuYZ7XIokGj4lv
-+Chr0iJljnlQ44rdAu3wI8B+NO8UOhonh1M1/jMUeHJXzLpRDNQQKI88scNKPL/x
-SEXumMz29IMWnbGVKjroSkGq+6HqZqTUihTiNfbqZ4FFSOdSjytyTMPMPHpAnOVw
-s7AFEcIfbJEL1JN5GZ/6
-=N9e7
------END PGP SIGNATURE-----
+Cho KyongHo.
