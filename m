@@ -1,35 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Feb 2012 10:11:30 +0000
-Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU
- IRQ handlers
-In-Reply-To: <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
-References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
- <1330012696-13472-4-git-send-email-will.deacon@arm.com>
- <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
-Message-ID: <20120224101130.GB13504@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Feb 2012 10:11:14 +0000
+Subject: [PATCH] msm: timer: Support sched_clock()
+In-Reply-To: <20120222215533.GA31480@codeaurora.org>
+References: <1329874777-12758-1-git-send-email-sboyd@codeaurora.org>
+ <20120222215533.GA31480@codeaurora.org>
+Message-ID: <4F476242.2020909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 01:34:32AM +0000, Ming Lei wrote:
-> On Thu, Feb 23, 2012 at 11:58 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > @@ -513,7 +496,8 @@ armv6pmu_handle_irq(int irq_num,
-> > ? ? ? ? ? ? ? ?struct perf_event *event = cpuc->events[idx];
-> > ? ? ? ? ? ? ? ?struct hw_perf_event *hwc;
-> >
-> > - ? ? ? ? ? ? ? if (!counter_is_active(pmcr, idx))
-> > + ? ? ? ? ? ? ? /* Ignore if we don't have an event. */
-> > + ? ? ? ? ? ? ? if (!event)
+On 22/02/12 21:55, David Brown wrote:
+> On Tue, Feb 21, 2012 at 05:39:37PM -0800, Stephen Boyd wrote:
+>> Now that sched_clock is mandatory on ARM it's simple to add
+>> sched_clock support to the MSM timer code. Add it so that we get
+>> more accurate sched_clock output than the jiffies based version
+>> that's provided by default.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: David Brown <davidb@codeaurora.org>
 > 
-> I think we should check it via test_bit(idx, cpuc->used_mask) because
-> 'hw_events->events[idx] = val' is not atomic operation and it is read here
-> in irq context.
+> Marc, are you able to pull this into your series, so they can all go
+> in together?  If so:
+> 
+>   Acked-by: David Brown <davidb@codeaurora.org>
 
-I dunno, that code is compiled to:
+David, Stephen,
 
-e5973000        ldr     r3, [r7]
-e7834106        str     r4, [r3, r6, lsl #2]
+Russell already pulled my sched_clock() patch series, so I'm not sure it
+is actually useful for me to carry it (and there is actually no
+dependency between this patch and the series). Maybe putting it in the
+patch system or via armsoc would be best?
 
-so you should either see the new value or the old one - you can't see half a
-pointer in there since it's a single 32-bit store.
+Otherwise:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
