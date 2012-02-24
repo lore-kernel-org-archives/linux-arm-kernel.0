@@ -1,65 +1,43 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 24 Feb 2012 22:09:36 +0800
-Subject: [PATCH 1/6] ASoC: fsl: correct get_dma_channel parameter name
+Date: Fri, 24 Feb 2012 22:09:37 +0800
+Subject: [PATCH 2/6] ASoC: fsl: align mpc8610_hpcd with p1022_ds on getting
+ codec node
 In-Reply-To: <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
 References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
  <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1330092582-21180-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330092582-21180-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second parameter of function get_dma_channel is actually a property
-name rather than a compatible string, so rename it for less confusing.
+Align mpc8610_hpcd with p1022_ds on getting codec node by just calling
+of_parse_phandle.  The bonus point of doing that is we can save
+exporting get_node_by_phandle_name() when we consolidate the common
+bits between mpc8610_hpcd and p1022_ds into a module, which can be
+shared by more machine drivers added later.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- sound/soc/fsl/mpc8610_hpcd.c |    4 ++--
- sound/soc/fsl/p1022_ds.c     |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ sound/soc/fsl/mpc8610_hpcd.c |    8 ++------
+ 1 files changed, 2 insertions(+), 6 deletions(-)
 
 diff --git a/sound/soc/fsl/mpc8610_hpcd.c b/sound/soc/fsl/mpc8610_hpcd.c
-index 0ea4a5a..15e06e9d 100644
+index 15e06e9d..93256b3 100644
 --- a/sound/soc/fsl/mpc8610_hpcd.c
 +++ b/sound/soc/fsl/mpc8610_hpcd.c
-@@ -273,7 +273,7 @@ static int codec_node_dev_name(struct device_node *np, char *buf, size_t len)
- }
- 
- static int get_dma_channel(struct device_node *ssi_np,
--			   const char *compatible,
-+			   const char *name,
- 			   struct snd_soc_dai_link *dai,
- 			   unsigned int *dma_channel_id,
- 			   unsigned int *dma_id)
-@@ -283,7 +283,7 @@ static int get_dma_channel(struct device_node *ssi_np,
+@@ -336,12 +336,8 @@ static int mpc8610_hpcd_probe(struct platform_device *pdev)
+ 	const char *sprop;
  	const u32 *iprop;
- 	int ret;
  
--	dma_channel_np = get_node_by_phandle_name(ssi_np, compatible,
-+	dma_channel_np = get_node_by_phandle_name(ssi_np, name,
- 						  "fsl,ssi-dma-channel");
- 	if (!dma_channel_np)
- 		return -EINVAL;
-diff --git a/sound/soc/fsl/p1022_ds.c b/sound/soc/fsl/p1022_ds.c
-index a5d4e80..d32ec46 100644
---- a/sound/soc/fsl/p1022_ds.c
-+++ b/sound/soc/fsl/p1022_ds.c
-@@ -276,7 +276,7 @@ static int codec_node_dev_name(struct device_node *np, char *buf, size_t len)
- }
- 
- static int get_dma_channel(struct device_node *ssi_np,
--			   const char *compatible,
-+			   const char *name,
- 			   struct snd_soc_dai_link *dai,
- 			   unsigned int *dma_channel_id,
- 			   unsigned int *dma_id)
-@@ -286,7 +286,7 @@ static int get_dma_channel(struct device_node *ssi_np,
- 	const u32 *iprop;
- 	int ret;
- 
--	dma_channel_np = get_node_by_phandle_name(ssi_np, compatible,
-+	dma_channel_np = get_node_by_phandle_name(ssi_np, name,
- 						  "fsl,ssi-dma-channel");
- 	if (!dma_channel_np)
+-	/* We are only interested in SSIs with a codec phandle in them,
+-	 * so let's make sure this SSI has one. The MPC8610 HPCD only
+-	 * knows about the CS4270 codec, so reject anything else.
+-	 */
+-	codec_np = get_node_by_phandle_name(np, "codec-handle",
+-					    "cirrus,cs4270");
++	/* Find the codec node for this SSI. */
++	codec_np = of_parse_phandle(np, "codec-handle", 0);
+ 	if (!codec_np) {
+ 		dev_err(dev, "invalid codec node\n");
  		return -EINVAL;
 -- 
 1.7.5.4
