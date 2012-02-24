@@ -1,52 +1,150 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Feb 2012 17:24:21 +0000
-Subject: [PATCH] msm: timer: Support sched_clock()
-In-Reply-To: <20120224170901.GA9312@codeaurora.org>
-References: <1329874777-12758-1-git-send-email-sboyd@codeaurora.org>
- <20120222215533.GA31480@codeaurora.org> <4F476242.2020909@arm.com>
- <20120224170901.GA9312@codeaurora.org>
-Message-ID: <4F47C7C5.4090806@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 Feb 2012 18:32:17 +0100
+Subject: [PATCH] ARM: integrator: convert to sparse irqs
+Message-ID: <1330104737-22782-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/12 17:09, David Brown wrote:
-> On Fri, Feb 24, 2012 at 10:11:14AM +0000, Marc Zyngier wrote:
->> On 22/02/12 21:55, David Brown wrote:
->>> On Tue, Feb 21, 2012 at 05:39:37PM -0800, Stephen Boyd wrote:
->>>> Now that sched_clock is mandatory on ARM it's simple to add
->>>> sched_clock support to the MSM timer code. Add it so that we get
->>>> more accurate sched_clock output than the jiffies based version
->>>> that's provided by default.
->>>>
->>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: David Brown <davidb@codeaurora.org>
->>>
->>> Marc, are you able to pull this into your series, so they can all go
->>> in together?  If so:
->>>
->>>   Acked-by: David Brown <davidb@codeaurora.org>
->>
->> David, Stephen,
->>
->> Russell already pulled my sched_clock() patch series, so I'm not sure it
->> is actually useful for me to carry it (and there is actually no
->> dependency between this patch and the series). Maybe putting it in the
->> patch system or via armsoc would be best?
->>
->> Otherwise:
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> I'll keep an eye on it then, and push it into the ARM soc tree when
-> the dependencies are there.
+This converts the Integrator AP/CP to use sparse IRQs.
+Tested on both machines.
 
-The whole thing is that there's no dependency. The sched_clock() stuff
-has hit mainline during the merge window. This patch could go in right
-now, without any harm.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/Kconfig                             |    1 +
+ arch/arm/mach-integrator/core.c              |    3 ++-
+ arch/arm/mach-integrator/include/mach/irqs.h |    3 ++-
+ arch/arm/mach-integrator/integrator_ap.c     |    3 ++-
+ arch/arm/mach-integrator/integrator_cp.c     |    3 ++-
+ arch/arm/mach-integrator/pci.c               |    3 ++-
+ arch/arm/mach-integrator/pci_v3.c            |    3 ++-
+ 7 files changed, 13 insertions(+), 6 deletions(-)
 
-What Russell pulled is just a cleanup to convert the last two platforms
-having their own sched_clock() and not relying on our framework.
-
-	M.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4852a6b..fc10ed8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -266,6 +266,7 @@ config ARCH_INTEGRATOR
+ 	select PLAT_VERSATILE
+ 	select PLAT_VERSATILE_FPGA_IRQ
+ 	select NEED_MACH_MEMORY_H
++	select SPARSE_IRQ
+ 	help
+ 	  Support for ARM's Integrator platform.
+ 
+diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+index 15b87f2..304dfb2 100644
+--- a/arch/arm/mach-integrator/core.c
++++ b/arch/arm/mach-integrator/core.c
+@@ -25,8 +25,9 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+-#include <asm/irq.h>
+ #include <mach/cm.h>
++#include <mach/irqs.h>
++
+ #include <asm/system.h>
+ #include <asm/leds.h>
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-integrator/include/mach/irqs.h b/arch/arm/mach-integrator/include/mach/irqs.h
+index 1fbe6d1..a19a1a2 100644
+--- a/arch/arm/mach-integrator/include/mach/irqs.h
++++ b/arch/arm/mach-integrator/include/mach/irqs.h
+@@ -78,5 +78,6 @@
+ #define IRQ_SIC_CP_LMINT7		46
+ #define IRQ_SIC_END			46
+ 
+-#define NR_IRQS                         47
++#define NR_IRQS_INTEGRATOR_AP		34
++#define NR_IRQS_INTEGRATOR_CP		47
+ 
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 4dde28b..871f148 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -38,13 +38,13 @@
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+ #include <asm/hardware/arm_timer.h>
+-#include <asm/irq.h>
+ #include <asm/setup.h>
+ #include <asm/param.h>		/* HZ */
+ #include <asm/mach-types.h>
+ #include <asm/sched_clock.h>
+ 
+ #include <mach/lm.h>
++#include <mach/irqs.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/irq.h>
+@@ -475,6 +475,7 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
+ 	.atag_offset	= 0x100,
+ 	.reserve	= integrator_reserve,
+ 	.map_io		= ap_map_io,
++	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
+ 	.init_early	= integrator_init_early,
+ 	.init_irq	= ap_init_irq,
+ 	.timer		= &ap_timer,
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index be9ead4..48a115a 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -26,7 +26,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+-#include <asm/irq.h>
+ #include <asm/setup.h>
+ #include <asm/mach-types.h>
+ #include <asm/hardware/arm_timer.h>
+@@ -34,6 +33,7 @@
+ 
+ #include <mach/cm.h>
+ #include <mach/lm.h>
++#include <mach/irqs.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/irq.h>
+@@ -464,6 +464,7 @@ MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
+ 	.atag_offset	= 0x100,
+ 	.reserve	= integrator_reserve,
+ 	.map_io		= intcp_map_io,
++	.nr_irqs	= NR_IRQS_INTEGRATOR_CP,
+ 	.init_early	= intcp_init_early,
+ 	.init_irq	= intcp_init_irq,
+ 	.timer		= &cp_timer,
+diff --git a/arch/arm/mach-integrator/pci.c b/arch/arm/mach-integrator/pci.c
+index 520b6bf..e15aa43 100644
+--- a/arch/arm/mach-integrator/pci.c
++++ b/arch/arm/mach-integrator/pci.c
+@@ -26,11 +26,12 @@
+ #include <linux/interrupt.h>
+ #include <linux/init.h>
+ 
+-#include <asm/irq.h>
+ #include <asm/system.h>
+ #include <asm/mach/pci.h>
+ #include <asm/mach-types.h>
+ 
++#include <mach/irqs.h>
++
+ /* 
+  * A small note about bridges and interrupts.  The DECchip 21050 (and
+  * later) adheres to the PCI-PCI bridge specification.  This says that
+diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+index 3c82566..65e5896 100644
+--- a/arch/arm/mach-integrator/pci_v3.c
++++ b/arch/arm/mach-integrator/pci_v3.c
+@@ -30,7 +30,8 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+-#include <asm/irq.h>
++#include <mach/irqs.h>
++
+ #include <asm/signal.h>
+ #include <asm/system.h>
+ #include <asm/mach/pci.h>
 -- 
-Jazz is not dead. It just smells funny...
+1.7.7.6
