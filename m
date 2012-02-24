@@ -1,40 +1,31 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Fri, 24 Feb 2012 17:14:12 -0600
-Subject: [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
-In-Reply-To: <20120224232148.GA24268@S2101-09.ap.freescale.net>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <20120224140200.GH5450@opensource.wolfsonmicro.com>
- <20120224142342.GA16659@S2101-09.ap.freescale.net>
- <20120224141705.GJ5450@opensource.wolfsonmicro.com>
- <20120224232148.GA24268@S2101-09.ap.freescale.net>
-Message-ID: <4F4819C4.5040709@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Feb 2012 23:15:02 +0000
+Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <4F4817AC.7050406@freescale.com>
+References: <4F465A33.3020208@ru.mvista.com> <4F465EE5.4010908@freescale.com>
+ <20120223165242.GB22562@n2100.arm.linux.org.uk>
+ <4F4671BB.7060409@freescale.com>
+ <20120223171407.GC22562@n2100.arm.linux.org.uk>
+ <4F480120.6080409@freescale.com>
+ <20120224215448.GA15120@n2100.arm.linux.org.uk>
+ <4F480871.9020206@freescale.com>
+ <20120224223512.GB15120@n2100.arm.linux.org.uk>
+ <4F4817AC.7050406@freescale.com>
+Message-ID: <20120224231501.GD15120@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
->> > That doesn't seem to be related to my point?  I'm asking you to not
->> > reply to an old version of your patch series in order to post a new
->> > version of it, just post the new version.
+On Fri, Feb 24, 2012 at 05:05:16PM -0600, Timur Tabi wrote:
+> Russell King - ARM Linux wrote:
+> 
+> > Ho hum.  So, what that's saying to me is that even implementing in_32be()
+> > on ARM results in rubbish because it wouldn't be big endian there.
+> 
+> Well, the "be" in in_be32() means to assume that 32-bit integer is stored
+> in big-endian format, and to convert it to native format during the read.
+>  An ARM implementation of in_be32() would include byte-swapping.
 
-> This is the first version of this series.
+So, let's go around this loop again.
 
-I think there's a communication breakdown.  Shawn, take a look at this:
-
-http://mailman.alsa-project.org/pipermail/alsa-devel/2012-February/thread.html
-
-Search for "[alsa-devel] [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl".
-
-You'll see that this email is indented, because it was posted to the
-mailing list AS A REPLY to "[alsa-devel] [PATCH 1/4] ASoC: imx: let
-SND_MXC_SOC_FIQ select FIQ".  That's because it has this line in the
-message header:
-
-In-Reply-To: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
-
-This is what Mark is talking about.  He wants new patch sets to be posted
-NOT as replies to other patch sets.
-
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+What would be wrong with converting in_be32() in these drivers to
+instead ioread32be()?
