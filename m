@@ -1,42 +1,37 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 24 Feb 2012 07:35:21 +0100
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <4F46AA06.30502@antcom.de>
-References: <1330030639-3796-1-git-send-email-stigge@antcom.de>
- <4F46AA06.30502@antcom.de>
-Message-ID: <20120224063521.GA16412@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 24 Feb 2012 14:36:26 +0800
+Subject: [PATCH v3 5/7] ARM: pxa: add rtc dummy clock
+In-Reply-To: <20120223162738.GA22562@n2100.arm.linux.org.uk>
+References: <1330012851-13693-1-git-send-email-haojian.zhuang@marvell.com>
+ <1330012851-13693-6-git-send-email-haojian.zhuang@marvell.com>
+ <20120223162738.GA22562@n2100.arm.linux.org.uk>
+Message-ID: <CAN1soZw=Xe4rmcACeVDMyyqMWoXGnJj-jPEb-Dk52Zj=ce5vEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Feb 24, 2012 at 12:27 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Feb 24, 2012 at 12:00:49AM +0800, Haojian Zhuang wrote:
+>> sa1100-rtc driver could be shared among sa1100/pxa/mmp series silicon.
+>> Since clk is used in mmp series silicon, add dummy clock support in
+>> pxa also.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+>> ---
+>> ?arch/arm/mach-pxa/pxa25x.c | ? ?1 +
+>> ?arch/arm/mach-pxa/pxa27x.c | ? ?1 +
+>> ?arch/arm/mach-pxa/pxa3xx.c | ? ?1 +
+>> ?arch/arm/mach-pxa/pxa95x.c | ? ?1 +
+>> ?4 files changed, 4 insertions(+), 0 deletions(-)
+>
+> This is missing changes in arch/arm/mach-pxa/clock.c to prevent clk_enable()
+> etc oopsing when called with a NULL clock.
+>
+Since I'm still using existed dummy clock in arch-pxa, I needn't to
+append checking for NULL clock. The dummy clock do nothing for
+clk_enable() & clk_disable().
 
-> To get rid of the remaining #ifdefs, I could as well create a new
-> ohci-lpc32xx.c instead of abusing ohci-pnx4008.c. Would this be the way
-> to go or are there any other suggestions?
+I'll remove dummy clock in arch-pxa later.
 
-If you could tell the difference between pnx4008 and lpc32xx, then you could
-simply do something like:
-
-	if (machine_is_pnx4008)
-		pnx4008_configure();
-	else
-		lpc32xx_configure();
-
-or
-
-	if (machine_is_pnx4008)
-		pnx4008_(un)set_usb_bits
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120224/0121d2f4/attachment.sig>
+Thanks
+Haojian
