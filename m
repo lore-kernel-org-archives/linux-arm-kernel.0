@@ -1,21 +1,18 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 24 Feb 2012 13:04:32 -0600
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 24 Feb 2012 20:15:41 +0100
 Subject: [PATCH] ARM: integrator: convert to sparse irqs
 In-Reply-To: <1330104737-22782-1-git-send-email-linus.walleij@linaro.org>
 References: <1330104737-22782-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4F47DF40.30703@gmail.com>
+Message-ID: <20120224191541.GB21556@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2012 11:32 AM, Linus Walleij wrote:
+On 18:32 Fri 24 Feb     , Linus Walleij wrote:
 > This converts the Integrator AP/CP to use sparse IRQs.
 > Tested on both machines.
 > 
 > Cc: Rob Herring <rob.herring@calxeda.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
 > ---
 >  arch/arm/Kconfig                             |    1 +
 >  arch/arm/mach-integrator/core.c              |    3 ++-
@@ -64,91 +61,7 @@ Acked-by: Rob Herring <rob.herring@calxeda.com>
 > -#define NR_IRQS                         47
 > +#define NR_IRQS_INTEGRATOR_AP		34
 > +#define NR_IRQS_INTEGRATOR_CP		47
->  
-> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-> index 4dde28b..871f148 100644
-> --- a/arch/arm/mach-integrator/integrator_ap.c
-> +++ b/arch/arm/mach-integrator/integrator_ap.c
-> @@ -38,13 +38,13 @@
->  #include <mach/hardware.h>
->  #include <mach/platform.h>
->  #include <asm/hardware/arm_timer.h>
-> -#include <asm/irq.h>
->  #include <asm/setup.h>
->  #include <asm/param.h>		/* HZ */
->  #include <asm/mach-types.h>
->  #include <asm/sched_clock.h>
->  
->  #include <mach/lm.h>
-> +#include <mach/irqs.h>
->  
->  #include <asm/mach/arch.h>
->  #include <asm/mach/irq.h>
-> @@ -475,6 +475,7 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
->  	.atag_offset	= 0x100,
->  	.reserve	= integrator_reserve,
->  	.map_io		= ap_map_io,
-> +	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
->  	.init_early	= integrator_init_early,
->  	.init_irq	= ap_init_irq,
->  	.timer		= &ap_timer,
-> diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-> index be9ead4..48a115a 100644
-> --- a/arch/arm/mach-integrator/integrator_cp.c
-> +++ b/arch/arm/mach-integrator/integrator_cp.c
-> @@ -26,7 +26,6 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/platform.h>
-> -#include <asm/irq.h>
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
->  #include <asm/hardware/arm_timer.h>
-> @@ -34,6 +33,7 @@
->  
->  #include <mach/cm.h>
->  #include <mach/lm.h>
-> +#include <mach/irqs.h>
->  
->  #include <asm/mach/arch.h>
->  #include <asm/mach/irq.h>
-> @@ -464,6 +464,7 @@ MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
->  	.atag_offset	= 0x100,
->  	.reserve	= integrator_reserve,
->  	.map_io		= intcp_map_io,
-> +	.nr_irqs	= NR_IRQS_INTEGRATOR_CP,
->  	.init_early	= intcp_init_early,
->  	.init_irq	= intcp_init_irq,
->  	.timer		= &cp_timer,
-> diff --git a/arch/arm/mach-integrator/pci.c b/arch/arm/mach-integrator/pci.c
-> index 520b6bf..e15aa43 100644
-> --- a/arch/arm/mach-integrator/pci.c
-> +++ b/arch/arm/mach-integrator/pci.c
-> @@ -26,11 +26,12 @@
->  #include <linux/interrupt.h>
->  #include <linux/init.h>
->  
-> -#include <asm/irq.h>
->  #include <asm/system.h>
->  #include <asm/mach/pci.h>
->  #include <asm/mach-types.h>
->  
-> +#include <mach/irqs.h>
-> +
->  /* 
->   * A small note about bridges and interrupts.  The DECchip 21050 (and
->   * later) adheres to the PCI-PCI bridge specification.  This says that
-> diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-> index 3c82566..65e5896 100644
-> --- a/arch/arm/mach-integrator/pci_v3.c
-> +++ b/arch/arm/mach-integrator/pci_v3.c
-> @@ -30,7 +30,8 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/platform.h>
-> -#include <asm/irq.h>
-> +#include <mach/irqs.h>
-> +
->  #include <asm/signal.h>
->  #include <asm/system.h>
->  #include <asm/mach/pci.h>
+why do you need to specified both?
+
+Best Regards,
+J.
