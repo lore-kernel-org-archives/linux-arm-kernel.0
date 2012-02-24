@@ -1,59 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Feb 2012 10:12:00 +0000
-Subject: [PATCH] ARM: LPAE: Invalidate the TLB for module addresses
- during translation fault
-In-Reply-To: <20120224095806.GA13117@arm.com>
-References: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
- <20120223195003.GD22562@n2100.arm.linux.org.uk>
- <20120223221343.GA27761@arm.com> <20120224095806.GA13117@arm.com>
-Message-ID: <20120224101200.GG22562@n2100.arm.linux.org.uk>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Fri, 24 Feb 2012 15:46:44 +0530
+Subject: [PATCH v2 3/4] arm/dts: OMAP4: Add mmc controller nodes and board
+ data
+In-Reply-To: <1329998490-27555-4-git-send-email-rnayak@ti.com>
+References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
+ <1329998490-27555-4-git-send-email-rnayak@ti.com>
+Message-ID: <CANrkHUaP7cV_vSKQYZkeF-aS5CEi2CAp3_9aDJKCVOX-67oNPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 09:58:06AM +0000, Catalin Marinas wrote:
-> On Thu, Feb 23, 2012 at 10:13:43PM +0000, Catalin Marinas wrote:
-> > On Thu, Feb 23, 2012 at 07:50:03PM +0000, Russell King - ARM Linux wrote:
-> > > On Thu, Feb 23, 2012 at 05:59:41PM +0000, Catalin Marinas wrote:
-> > > > During the free_pgtables() call all user and modules/pkmap entries are
-> > > > removed.
-> > > 
-> > > Err, no.  free_pgtables() should only ever touch up to TASK_SIZE, which
-> > > is the maximum size of userspace.  Moreover, because TASK_SIZE does not
-> > > cover an entire pud, free_pgtables() should not be removing the pud
-> > > table.
-> > 
-> > Are you sure? exit_mmap() calls free_pgtables() with ceiling == 0.  If
-> > free_pmd_range() is called for a range in the top 1GB of the task
-> > address space (which includes modules), it also calls pud_clear()
-> > because ceiling is 0.
-> 
-> BTW, an alternative patch but which needs wider acknowledgement as it
-> touches generic code (I can post it to linux-mm):
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 29f4589..9204f60 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -25,6 +25,11 @@
+> ? ? ? ? ? ? ? ?serial1 = &uart2;
+> ? ? ? ? ? ? ? ?serial2 = &uart3;
+> ? ? ? ? ? ? ? ?serial3 = &uart4;
+> + ? ? ? ? ? ? ? mmc1 = &mmc1;
+> + ? ? ? ? ? ? ? mmc2 = &mmc2;
+> + ? ? ? ? ? ? ? mmc3 = &mmc3;
+> + ? ? ? ? ? ? ? mmc4 = &mmc4;
+> + ? ? ? ? ? ? ? mmc5 = &mmc5;
+> ? ? ? ?};
+>
+> ? ? ? ?cpus {
+> @@ -155,5 +160,31 @@
+> ? ? ? ? ? ? ? ? ? ? ? ?#size-cells = <0>;
+> ? ? ? ? ? ? ? ? ? ? ? ?ti,hwmods = "i2c4";
+> ? ? ? ? ? ? ? ?};
+> +
+> + ? ? ? ? ? ? ? mmc1: mmc at 1 {
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap4-hsmmc";
+> + ? ? ? ? ? ? ? ? ? ? ? ti,hwmods = "mmc1";
+> + ? ? ? ? ? ? ? ? ? ? ? ti,dual-volt;
+> + ? ? ? ? ? ? ? };
+> +
+> + ? ? ? ? ? ? ? mmc2: mmc at 2 {
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap4-hsmmc";
+> + ? ? ? ? ? ? ? ? ? ? ? ti,hwmods = "mmc2";
+> + ? ? ? ? ? ? ? };
 
-I think that's the right solution.
+Hi Rajendra,
+Is there a way to control the device registration order,
+eMMC connected to mmc2 needs to be registered as /dev/mmcblk0p ...
+irrespective of whether SD card is mount or not on mmc1 card slot.
+So that bootargs would not have to be modified when filesystem is on eMMC.
 
-> diff --git a/mm/mmap.c b/mm/mmap.c
-> index 3f758c7..5e5c8a8 100644
-> --- a/mm/mmap.c
-> +++ b/mm/mmap.c
-> @@ -1866,7 +1866,7 @@ static void unmap_region(struct mm_struct *mm,
->  	unmap_vmas(&tlb, vma, start, end, &nr_accounted, NULL);
->  	vm_unacct_memory(nr_accounted);
->  	free_pgtables(&tlb, vma, prev ? prev->vm_end : FIRST_USER_ADDRESS,
-> -				 next ? next->vm_start : 0);
-> +				 next ? next->vm_start : TASK_SIZE);
->  	tlb_finish_mmu(&tlb, start, end);
->  }
->  
-> @@ -2241,7 +2241,7 @@ void exit_mmap(struct mm_struct *mm)
->  	end = unmap_vmas(&tlb, vma, 0, -1, &nr_accounted, NULL);
->  	vm_unacct_memory(nr_accounted);
->  
-> -	free_pgtables(&tlb, vma, FIRST_USER_ADDRESS, 0);
-> +	free_pgtables(&tlb, vma, FIRST_USER_ADDRESS, TASK_SIZE);
->  	tlb_finish_mmu(&tlb, 0, end);
->  
->  	/*
-> 
-> -- 
-> Catalin
+> +
+> + ? ? ? ? ? ? ? mmc3: mmc at 3 {
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap4-hsmmc";
+> + ? ? ? ? ? ? ? ? ? ? ? ti,hwmods = "mmc3";
+> + ? ? ? ? ? ? ? };
+> +
+> + ? ? ? ? ? ? ? mmc4: mmc at 4 {
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap4-hsmmc";
+> + ? ? ? ? ? ? ? ? ? ? ? ti,hwmods = "mmc4";
+> + ? ? ? ? ? ? ? };
+> +
+> + ? ? ? ? ? ? ? mmc5: mmc at 5 {
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap4-hsmmc";
+> + ? ? ? ? ? ? ? ? ? ? ? ti,hwmods = "mmc5";
+> + ? ? ? ? ? ? ? };
+> ? ? ? ?};
+> ?};
+> --
+> 1.7.1
+>
