@@ -1,9 +1,9 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Fri, 24 Feb 2012 15:00:52 +0530
+Date: Fri, 24 Feb 2012 15:01:45 +0530
 Subject: [PATCH 00/10] I2C updates
 In-Reply-To: <1328882405-15284-1-git-send-email-shubhrajyoti@ti.com>
 References: <1328882405-15284-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <4F4758CC.4010607@ti.com>
+Message-ID: <4F475901.10005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,6 +13,7 @@ On Friday 10 February 2012 07:29 PM, Shubhrajyoti D wrote:
 > the version info is not retained, however most of them undergone
 > multiple versions.
 If there are no further comments can this be queued.
+
 > This is rebased to linus head commit 63082402968f4b73f10b28a8ac1f3da821aeb82d
 >
 > The patch series does the following 
