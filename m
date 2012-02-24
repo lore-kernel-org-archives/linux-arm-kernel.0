@@ -1,54 +1,23 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Fri, 24 Feb 2012 10:05:01 +0800
-Subject: [PATCH 2/4] ARM: perf: clear overflow flag when disabling counter
- on ARMv7 PMU
-In-Reply-To: <1330012696-13472-3-git-send-email-will.deacon@arm.com>
-References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
- <1330012696-13472-3-git-send-email-will.deacon@arm.com>
-Message-ID: <CACVXFVOVW9bfxc1ZzqHSgJsfmUhde9ws++MhKnWJ7=SMKg5wGg@mail.gmail.com>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Fri, 24 Feb 2012 10:29:36 +0800
+Subject: [V2 0/3] patches for power control on pm8606 oscillator
+Message-ID: <1330050576-8841-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 11:58 PM, Will Deacon <will.deacon@arm.com> wrote:
-> When disabling a counter on an ARMv7 PMU, we should also clear the
-> overflow flag in case an overflow occurred whilst stopping the counter.
-> This prevents a spurious overflow being picked up later and leading to
-> either false accounting or a NULL dereference.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Thanks Samuel
+change log:
+V2:
+	1 remove the unneeded "do /while" for being readable;
+	2 keep the blank line for coding style;
 
-Reported-by: Ming Lei <tom.leiming@gmail.com>
+Jett.Zhou (3):
+  mfd: add power control interface for pm8606 chip
+  backlight: modified power control of pm860x backlight
+  led: modified power control of pm860x led
 
-> ---
-> ?arch/arm/kernel/perf_event_v7.c | ? ?5 +++++
-> ?1 files changed, 5 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-> index 6f48861..050cc8b 100644
-> --- a/arch/arm/kernel/perf_event_v7.c
-> +++ b/arch/arm/kernel/perf_event_v7.c
-> @@ -809,6 +809,11 @@ static inline int armv7_pmnc_disable_intens(int idx)
->
-> ? ? ? ?counter = ARMV7_IDX_TO_COUNTER(idx);
-> ? ? ? ?asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
-> + ? ? ? isb();
-> + ? ? ? /* Clear the overflow flag in case an interrupt is pending. */
-> + ? ? ? asm volatile("mcr p15, 0, %0, c9, c12, 3" : : "r" (BIT(counter)));
-> + ? ? ? isb();
-> +
-> ? ? ? ?return idx;
-> ?}
->
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Ming Lei
+ drivers/leds/leds-88pm860x.c          |   23 +++++++
+ drivers/mfd/88pm860x-core.c           |  106 +++++++++++++++++++++++++++++++-
+ drivers/video/backlight/88pm860x_bl.c |   49 +++++++++-------
+ include/linux/mfd/88pm860x.h          |   22 +++++++
+ 4 files changed, 175 insertions(+), 25 deletions(-)
