@@ -1,23 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Feb 2012 22:43:25 +0000
-Subject: [PATCH 5/5] ARM: Cortex-M3: Add support for exception handling
-In-Reply-To: <CAHkRjk70x+Fn+Z4iUxSMc7Zq2cKBo_ka0tNhV0i5JWmEixpRrA@mail.gmail.com>
-References: <20120216200143.GS14173@pengutronix.de>
- <1329423490-15580-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1329423490-15580-5-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120216222002.GL27825@n2100.arm.linux.org.uk>
- <20120224220122.GD14173@pengutronix.de>
- <CAHkRjk70x+Fn+Z4iUxSMc7Zq2cKBo_ka0tNhV0i5JWmEixpRrA@mail.gmail.com>
-Message-ID: <20120224224325.GC15120@n2100.arm.linux.org.uk>
+From: timur@freescale.com (Timur Tabi)
+Date: Fri, 24 Feb 2012 17:05:16 -0600
+Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <20120224223512.GB15120@n2100.arm.linux.org.uk>
+References: <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-5-git-send-email-shawn.guo@linaro.org>
+ <4F465A33.3020208@ru.mvista.com> <4F465EE5.4010908@freescale.com>
+ <20120223165242.GB22562@n2100.arm.linux.org.uk>
+ <4F4671BB.7060409@freescale.com>
+ <20120223171407.GC22562@n2100.arm.linux.org.uk>
+ <4F480120.6080409@freescale.com>
+ <20120224215448.GA15120@n2100.arm.linux.org.uk>
+ <4F480871.9020206@freescale.com>
+ <20120224223512.GB15120@n2100.arm.linux.org.uk>
+Message-ID: <4F4817AC.7050406@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 10:12:06PM +0000, Catalin Marinas wrote:
-> Just to reply to Russell - yes, this part needs changing (could be the
-> pt_regs saving or just the signal and trace code that copies them to
-> user so that we preserve the ABI).
+Russell King - ARM Linux wrote:
 
-It's more than just that.  What about the various exception handling
-code which needs to look up registers by numerical index?  That
-encompasses kprobes, alignment fixup, swp emulation, fp exception
-fixup, and so forth.
+> Ho hum.  So, what that's saying to me is that even implementing in_32be()
+> on ARM results in rubbish because it wouldn't be big endian there.
+
+Well, the "be" in in_be32() means to assume that 32-bit integer is stored
+in big-endian format, and to convert it to native format during the read.
+ An ARM implementation of in_be32() would include byte-swapping.
+
+> So are we heading towards driver specific sets of IO accessors? :-(  It
+> sounds like that's what it needs because of these different endian-ness
+> issues.
+
+I'm surprised that ioread32() on PowerPC always does a little-endian read,
+but I'm guessing that was done for compatibility.  I don't know what to do
+about that.
+
+> And lets not forget that we're talking just about this - there's also
+> the issue of on-SoC devices on ARM now appearing behind PCI buses on
+> x86, which would make those appear as LE.  I bet if any of those
+> appearing on PPC would appear in BE mode.  So, 'native endian' doesn't
+> work either.
+
+I think PCI is a special-case on most PowerPC parts, in that the registers
+are still little-endian.  But I don't know how pervasive that is.  In
+fact, I think on some Freescale PowerPC SOCs, the PCI registers are
+little-endian, and other others they're big-endian.  You can see that in
+fsl_pci.c.
+
+> So, I'm getting the feeling that something as simple as IO accessors are
+> just a huge mountain of crap waiting to bite.
+
+Very few devices are shared between Freescale's PowerPC and ARM SOCs, so
+the impact is only a few drivers.  That's why it might be okay (for now)
+to have "dual" I/O accessors in specific drivers.
+
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
