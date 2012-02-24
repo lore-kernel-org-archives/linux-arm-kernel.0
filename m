@@ -1,60 +1,74 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 24 Feb 2012 15:28:51 +0530
-Subject: [PATCH 0/6] Fix issues around twl4030-gpio used as a module
-Message-ID: <1330077537-19618-1-git-send-email-rnayak@ti.com>
+Date: Fri, 24 Feb 2012 15:28:52 +0530
+Subject: [PATCH 1/6] ARM: OMAP: omap_device: Add omap_device_unregister()
+In-Reply-To: <1330077537-19618-1-git-send-email-rnayak@ti.com>
+References: <1330077537-19618-1-git-send-email-rnayak@ti.com>
+Message-ID: <1330077537-19618-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Add support to unregister an omap_device using
+omap_device_unregister api.
 
-This series is based on top of 'hsmmc' branch in linux-omap
-on top of commit '0e91c8ddf0e0932da59ec1d116e34049791b0e73' as
-requested by you.
+While here, also fix the kerneldoc comments for
+omap_device_register.
 
-This mainly splits omap_hsmmc_late_init() into omap_hsmmc_deferred_add()
-and omap_hsmmc_deferred_del() and adds .teardown hooks in all omap3 boards
-to handle issues around multiple twl4030-gpio module insmod/unbind/bind
-as reported by Russell.
-
-In the process this series adds an api to unregister an
-omap_device, makes mmc driver work with hotpluggable devices
-and also removes 'deferred' flag for a few mmc devices on some
-boards which are not really dependent on twl4030-gpio for card
-detect as reported by Igor.
-
-I have tested this series on omap3 beagle, with twl4030-gpio built
-in, as well as twl4030-gpio built as a module and by doing multiple
-insmod/unbind/bind sequence. I have tested card-detect to work fine
-on beagle too.
-
-regards,
-Rajendra
-
-Rajendra Nayak (6):
-  ARM: OMAP: omap_device: Add omap_device_unregister()
-  mmc: omap_hsmmc: Make the driver support hotpluggable devices
-  mmc: omap_hsmmc: If probe fails, give our error messages
-  ARM: OMAP3: Make only mmc devices using gpio_cd as deferred
-  ARM: OMAP3: Modify omap_hsmmc_late_init to handle deleting mmc
-    devices
-  ARM: OMAP3: Use .teardown of twl4030-gpio to clean board requests
-
- arch/arm/mach-omap2/board-3430sdp.c           |   15 ++++-
- arch/arm/mach-omap2/board-cm-t35.c            |   15 ++++-
- arch/arm/mach-omap2/board-devkit8000.c        |   15 ++++-
- arch/arm/mach-omap2/board-igep0020.c          |   18 ++++-
- arch/arm/mach-omap2/board-ldp.c               |   13 ++++
- arch/arm/mach-omap2/board-omap3beagle.c       |   17 ++++-
- arch/arm/mach-omap2/board-omap3evm.c          |   16 ++++-
- arch/arm/mach-omap2/board-omap3pandora.c      |   14 +++-
- arch/arm/mach-omap2/board-omap3stalker.c      |   16 ++++-
- arch/arm/mach-omap2/board-omap3touchbook.c    |   15 ++++-
- arch/arm/mach-omap2/board-overo.c             |   11 +++-
- arch/arm/mach-omap2/board-rx51-peripherals.c  |   11 +++
- arch/arm/mach-omap2/board-zoom-peripherals.c  |   14 +++-
- arch/arm/mach-omap2/hsmmc.c                   |   93 ++++++++++++-------------
- arch/arm/mach-omap2/hsmmc.h                   |    9 ++-
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
  arch/arm/plat-omap/include/plat/omap_device.h |    1 +
- arch/arm/plat-omap/omap_device.c              |   20 +++++-
- drivers/mmc/host/omap_hsmmc.c                 |   11 ++--
- 18 files changed, 249 insertions(+), 75 deletions(-)
+ arch/arm/plat-omap/omap_device.c              |   20 ++++++++++++++++++--
+ 2 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 05f7615..ce0dc86 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -106,6 +106,7 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
+ 				      int pm_lats_cnt);
+ void omap_device_delete(struct omap_device *od);
+ int omap_device_register(struct platform_device *pdev);
++void omap_device_unregister(struct platform_device *pdev);
+ 
+ void __iomem *omap_device_get_rt_va(struct omap_device *od);
+ struct device *omap_device_get_by_hwmod_name(const char *oh_name);
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 2d00ab0..27aa02d 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -808,8 +808,8 @@ static struct dev_pm_domain omap_device_pm_domain = {
+  * @od: struct omap_device * to register
+  *
+  * Register the omap_device structure.  This currently just calls
+- * platform_device_register() on the underlying platform_device.
+- * Returns the return value of platform_device_register().
++ * platform_device_add() on the underlying platform_device.
++ * Returns the return value of platform_device_add().
+  */
+ int omap_device_register(struct platform_device *pdev)
+ {
+@@ -820,6 +820,22 @@ int omap_device_register(struct platform_device *pdev)
+ 	return platform_device_add(pdev);
+ }
+ 
++/**
++ * omap_device_unregister - unregister an omap_device with one omap_hwmod
++ * @od: struct omap_device * to unregister
++ *
++ * Unregister the omap_device structure.  This currently just calls
++ * platform_device_del() on the underlying platform_device.
++ * No return value.
++ */
++void omap_device_unregister(struct platform_device *pdev)
++{
++	pr_debug("omap_device: %s: unregistering\n", pdev->name);
++
++	pdev->dev.parent = &omap_device_parent;
++	pdev->dev.pm_domain = &omap_device_pm_domain;
++	platform_device_del(pdev);
++}
+ 
+ /* Public functions for use by device drivers through struct platform_data */
+ 
+-- 
+1.7.1
