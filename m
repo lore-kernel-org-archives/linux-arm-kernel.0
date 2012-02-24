@@ -1,77 +1,55 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 24 Feb 2012 15:56:52 +0530
-Subject: [PATCH v2 3/4] arm/dts: OMAP4: Add mmc controller nodes and board
- data
-In-Reply-To: <CANrkHUaP7cV_vSKQYZkeF-aS5CEi2CAp3_9aDJKCVOX-67oNPg@mail.gmail.com>
-References: <1329998490-27555-1-git-send-email-rnayak@ti.com>	<1329998490-27555-4-git-send-email-rnayak@ti.com>
- <CANrkHUaP7cV_vSKQYZkeF-aS5CEi2CAp3_9aDJKCVOX-67oNPg@mail.gmail.com>
-Message-ID: <4F4765EC.1000102@ti.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 24 Feb 2012 16:07:52 +0530
+Subject: [RFC PATCH] gpio/omap: Fix IRQ handling for SPARSE_IRQ
+In-Reply-To: <4F47623E.5060908@ti.com>
+References: <4F46C1AF.2040201@ti.com> <20120223230821.GD18185@atomide.com>
+ <4F47623E.5060908@ti.com>
+Message-ID: <CAC83ZvLm-ruk3pMkeLhiyOMAVVnByk9PPWsM40AyPErSqz=dKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 February 2012 03:46 PM, T Krishnamoorthy, Balaji wrote:
->> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
->> index 29f4589..9204f60 100644
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -25,6 +25,11 @@
->>                 serial1 =&uart2;
->>                 serial2 =&uart3;
->>                 serial3 =&uart4;
->> +               mmc1 =&mmc1;
->> +               mmc2 =&mmc2;
->> +               mmc3 =&mmc3;
->> +               mmc4 =&mmc4;
->> +               mmc5 =&mmc5;
->>         };
->>
->>         cpus {
->> @@ -155,5 +160,31 @@
->>                         #size-cells =<0>;
->>                         ti,hwmods = "i2c4";
->>                 };
->> +
->> +               mmc1: mmc at 1 {
->> +                       compatible = "ti,omap4-hsmmc";
->> +                       ti,hwmods = "mmc1";
->> +                       ti,dual-volt;
->> +               };
->> +
->> +               mmc2: mmc at 2 {
->> +                       compatible = "ti,omap4-hsmmc";
->> +                       ti,hwmods = "mmc2";
->> +               };
+On Fri, Feb 24, 2012 at 3:41 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> + Tarun
 >
-> Hi Rajendra,
-> Is there a way to control the device registration order,
-> eMMC connected to mmc2 needs to be registered as /dev/mmcblk0p ...
-> irrespective of whether SD card is mount or not on mmc1 card slot.
-> So that bootargs would not have to be modified when filesystem is on eMMC.
-
-I don't know if we can, but even if we could, we take care of the same
-bootargs working on two boards (say sdp and panda) *if* on sdp I have my
-filesystem on eMMC and on panda I have it on external card.
-What happens if I want to use my filesystem on both boards on external
-card?
-
 >
->> +
->> +               mmc3: mmc at 3 {
->> +                       compatible = "ti,omap4-hsmmc";
->> +                       ti,hwmods = "mmc3";
->> +               };
->> +
->> +               mmc4: mmc at 4 {
->> +                       compatible = "ti,omap4-hsmmc";
->> +                       ti,hwmods = "mmc4";
->> +               };
->> +
->> +               mmc5: mmc at 5 {
->> +                       compatible = "ti,omap4-hsmmc";
->> +                       ti,hwmods = "mmc5";
->> +               };
->>         };
->>   };
->> --
->> 1.7.1
+> On 2/24/2012 12:08 AM, Tony Lindgren wrote:
 >>
+>> * Cousson, Benoit<b-cousson@ti.com> ?[120223 14:14]:
+>>>
+>>> The GPIO driver is still relying on internal OMAP IRQ defines that
+>>> are not relevant anymore if OMAP is built with SPARSE_IRQ.
+>>
+>>
+>> Great :)
+>>
+>>> Please note that this patch is still RFC, because I do not know
+>>> how to fix properly the ugly cpu_class_is_omap1 and the dependency
+>>> with IH_MPUIO_BASE to detect a MPUIO.
+>>
+>>
+>> Sounds like gpio_to_irq() needs to be set in the
+>> arch/arm/*omap*/gpio*.c then.
+>
+>
+> In fact, after a second thought, that might even work for OMAP1 because I'm
+> using the proper base (IRQ and GPIO) to convert the IRQ number.
+>
+>
+> static int irq_to_gpio(struct gpio_bank *bank, unsigned int gpio_irq)
+> {
+>
+> ? ? ? ?return gpio_irq - bank->irq_base + bank->chip.base;
+> }
+>
+> But it might be good to test it on OMAP1 platform.
+>
+>
+> Tarun,
+>
+> Do you have an OMAP1 board to test that.
+Yes, I will test on OMAP1 board.
+--
+Tarun
+>
+> Regards,
+> Benoit
