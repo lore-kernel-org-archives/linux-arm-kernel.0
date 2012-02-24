@@ -1,56 +1,43 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 24 Feb 2012 15:54:52 +0100
-Subject: [RFC PATCH] gpio/omap: Fix IRQ handling for SPARSE_IRQ
-In-Reply-To: <4F479B31.7090508@gmail.com>
-References: <4F46C1AF.2040201@ti.com> <4F479B31.7090508@gmail.com>
-Message-ID: <4F47A4BC.3020307@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Feb 2012 14:56:03 +0000
+Subject: [GIT PULL] Versatile Express DT support
+In-Reply-To: <1330020005.2727.11.camel@hornet.cambridge.arm.com>
+References: <1330020005.2727.11.camel@hornet.cambridge.arm.com>
+Message-ID: <201202241456.03306.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/24/2012 3:14 PM, Rob Herring wrote:
-> On 02/23/2012 04:46 PM, Cousson, Benoit wrote:
-...
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index bc2bd69..afef0f7 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -93,6 +93,11 @@ struct gpio_bank {
->>   #define GPIO_BIT(bank, gpio) (1<<  GPIO_INDEX(bank, gpio))
->>   #define GPIO_MOD_CTRL_BIT	BIT(0)
->>
->> +static int irq_to_gpio(struct gpio_bank *bank, unsigned int gpio_irq)
->> +{
->> +	return gpio_irq - bank->irq_base + bank->chip.base;
->
-> Ideally, you could do something like this when you have a domain setup:
->
-> irq_get_irq_data(gpio_irq)->hw_irq + bank->chip.base
+On Thursday 23 February 2012, Pawel Moll wrote:
+> Hello Arnd, Olof,
+> 
+> Please pull the Versatile Express DT patches, rebased on top of
+> v3.3-rc4. I think I addressed all the comments I received:
+> - fixed the difference between DT and non-DT machine name (missing '-')
+> - as probing DEBUG_LL UART address proved to be unsafe, it is now
+> determined based on a PERIPHBASE register, which can be safely checked
+> - DTS don't include skeleton.dtsi any more, so there is no bogus memory
+> node
+> - changed TWD bindings to be in line with Marc Zygier's series
+> - as the static mappings are now reused, all pointer arithmetic was
+> replaced with ioremap()s
+> 
+> First patch causes one trivial conflict with depends/rmk/for-armsoc (for
+> your reference, I resolved it in vexpress-dt-rmk-for-armsoc branch)
+> 
+> Thanks!
+> 
+> Pawel
+> 
+> The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+> 
+>   Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/pawelmoll/linux.git vexpress-dt-v3.3-rc4
 
-OK, good to know. I still plan to move the current irq_domain basic 
-support to the irqchip stuff you have done. I'll do that after 3.4.
+Hi Pawel,
 
-> Also, with sparse irq you need to have a call to irq_alloc_desc.
+I've applied the series to the next/dt branch in arm-soc now,
+thanks a lot!
 
-irq_alloc_desc was already added as part of the DT migration patch.
-It was not explicit in the changelog, but that patch is based on GPIO 
-cleanup + DT migration series.
-
-> You can avoid that by setting NR_IRQS or machine .nr_irqs, but that needs to go
-> away.
-
-Based on a recommendation you did in the commit to fix GIC I did that in 
-the SPARSE_IRQ series I've just sent before that RFC patch:
-
-+#ifdef CONFIG_SPARSE_IRQ
-+#define NR_IRQS			NR_IRQS_LEGACY
-+#else
-  #define NR_IRQS			OMAP_GPMC_IRQ_END
-+#endif
-
-> Otherwise, it certainly is a step in the right direction.
-
-Yeah, there is still a long way to clean all the old nasty IRQ stuff in 
-OMAP :-)
-
-Thanks,
-Benoit
+	Arnd
