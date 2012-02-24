@@ -1,39 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Feb 2012 12:49:44 +0000
-Subject: [PATCHv6 7/7] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <00f301ccf2d7$b5b68570$21239050$%szyprowski@samsung.com>
-References: <1328900324-20946-1-git-send-email-m.szyprowski@samsung.com>
- <401E54CE964CD94BAE1EB4A729C7087E378E42AE18@HQMAIL04.nvidia.com>
- <00f301ccf2d7$b5b68570$21239050$%szyprowski@samsung.com>
-Message-ID: <201202241249.44731.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 24 Feb 2012 13:51:15 +0100
+Subject: [PATCH v2 1/4] mmc: omap_hsmmc: Convert hsmmc driver to use device
+ tree
+In-Reply-To: <4F4775FF.2090500@ti.com>
+References: <1329998490-27555-1-git-send-email-rnayak@ti.com>	<1329998490-27555-2-git-send-email-rnayak@ti.com>
+ <CANrkHUarg5ntUW=S7k20LXuYe+ZNCN-cYJhfvvLKM=X8+Db4fg@mail.gmail.com>
+ <4F4775FF.2090500@ti.com>
+Message-ID: <4F4787C3.1010507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 February 2012, Marek Szyprowski wrote:
-> > > +static struct page **__iommu_alloc_buffer(struct device *dev, size_t
-> > > +size, gfp_t gfp) {
-> > > +     struct page **pages;
-> > > +     int count = size >> PAGE_SHIFT;
-> > > +     int i=0;
-> > > +
-> > > +     pages = kzalloc(count * sizeof(struct page*), gfp);
-> > > +     if (!pages)
-> > > +             return NULL;
-> > 
-> > kzalloc can fail for any size bigger than PAGE_SIZE, if the system memory is
-> > fully fragmented.
-> > If there is a request for size bigger than 4MB, then the pages pointer array won't
-> > Fit in one page and kzalloc may fail. we should use vzalloc()/vfree()
-> > when pages pointer array size needed is bigger than PAGE_SIZE.
-> 
-> Right, thanks for spotting this. I will fix this in the next version.
+On 2/24/2012 12:35 PM, Rajendra Nayak wrote:
+> On Friday 24 February 2012 05:02 PM, T Krishnamoorthy, Balaji wrote:
+>> On Thu, Feb 23, 2012 at 5:31 PM, Rajendra Nayak<rnayak@ti.com> wrote:
+>>> Define dt bindings for the ti-omap-hsmmc, and adapt
+>>> the driver to extract data (which was earlier passed as
+>>> platform_data) from device tree.
+>>>
+>>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>>> ---
+>>> .../devicetree/bindings/mmc/ti-omap-hsmmc.txt | 31 +++++++++
+>>> drivers/mmc/host/omap_hsmmc.c | 68 ++++++++++++++++++++
+>>> 2 files changed, 99 insertions(+), 0 deletions(-)
+>>> create mode 100644
+>>> Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>>> b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>>> new file mode 100644
+>>> index 0000000..e4fa8f0
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>>> @@ -0,0 +1,31 @@
+>>> +* TI Highspeed MMC host controller for OMAP
+>>> +
+>>> +The Highspeed MMC Host Controller on TI OMAP family
+>>> +provides an interface for MMC, SD, and SDIO types of memory cards.
+>>> +
+>>> +Required properties:
+>>> +- compatible:
+>>> + Should be "ti,omap2-hsmmc", for OMAP2/3 controllers
+>>
+>> omap_hsmmc is applicable for omap2430 and omap3.
+>> omap2420 has non high speed controller mmci-omap -
+>> drivers/mmc/host/omap.c
+>> May be omap3-hsmmc compatible with omap2430 ?
+>
+> Agree. I think its best in that case for me to define a
+> compatible "ti,omap2430-hsmmc" for omap2430 and "ti,omap3-hsmmc"
+> for omap3. Though the IP blocks are same, I cant think of some
+> common compatible string without causing confusion.
 
-It's not clear though if that is the best solution. vzalloc comes at the
-price of using up space in the vmalloc area and as well as extra TLB entries,
-so we try to limit its use where possible. The other current code might fail
-in out of memory situations, but if a user wants to allocate a >4MB buffer
-(using up more than one physically contiguous page of pointers to pages), the
-following allocation of >1024 pages will likely fail as well, so we might
-just fail early.
+It depends, can we detect that using HW revision?
+In that case, there is no need to differentiate again with compatible.
 
-	Arnd
+Regards,
+Benoit
+
+>
+>>
+>>> + Should be "ti,omap4-hsmmc", for OMAP4 controllers
+>>> +- ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
+>>> +- reg : should contain hsmmc registers location and length
+>>> +
+>>> +Optional properties:
+>>> +ti,dual-volt: boolean, supports dual voltage cards
+>>> +<supply-name>-supply: phandle to the regulator device tree node
+>>> +"supply-name" examples are "vmmc", "vmmc_aux" etc
+>>> +ti,bus-width: Number of data lines, default assumed is 1 if the
+>>> property is missing.
+>>> +cd-gpios: GPIOs for card detection
+>>> +wp-gpios: GPIOs for write protection
+>>> +ti,non-removable: non-removable slot (like eMMC)
+>>> +
+>>> +Example:
+>>> + mmc1: mmc at 0x4809c000 {
+>>> + compatible = "ti,omap4-hsmmc";
+>>> + reg =<0x4809c000 0x400>;
+>>> + ti,hwmods = "mmc1";
+>>> + ti,dual-volt;
+>>> + ti,bus-width =<4>;
+>>> + vmmc-supply =<&vmmc>; /* phandle to regulator node */
+>>> + ti,non-removable;
+>>> + };
+>
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
