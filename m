@@ -1,66 +1,65 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 24 Feb 2012 12:23:05 +0100
-Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board
- data
-In-Reply-To: <4F470B71.1020308@ti.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Fri, 24 Feb 2012 17:02:07 +0530
+Subject: [PATCH v2 1/4] mmc: omap_hsmmc: Convert hsmmc driver to use
+ device tree
+In-Reply-To: <1329998490-27555-2-git-send-email-rnayak@ti.com>
 References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
- <1329998490-27555-5-git-send-email-rnayak@ti.com>
- <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
-Message-ID: <4F477319.7080409@ti.com>
+ <1329998490-27555-2-git-send-email-rnayak@ti.com>
+Message-ID: <CANrkHUarg5ntUW=S7k20LXuYe+ZNCN-cYJhfvvLKM=X8+Db4fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/24/2012 5:00 AM, Rajendra Nayak wrote:
-> On Friday 24 February 2012 12:27 AM, Tony Lindgren wrote:
->>> --- a/arch/arm/boot/dts/omap3.dtsi
->>> +++ b/arch/arm/boot/dts/omap3.dtsi
->>> @@ -113,5 +113,31 @@
->>> #size-cells =<0>;
->>> ti,hwmods = "i2c3";
->>> };
->>> +
->>> + mmc1: mmc at 1 {
->>> + compatible = "ti,omap2-hsmmc";
->>> + ti,hwmods = "mmc1";
->>> + ti,dual-volt;
->>> + };
->>> +
->>> + mmc2: mmc at 2 {
->>> + compatible = "ti,omap2-hsmmc";
->>> + ti,hwmods = "mmc2";
->>> + };
->>> +
->>> + mmc3: mmc at 3 {
->>> + compatible = "ti,omap2-hsmmc";
->>> + ti,hwmods = "mmc3";
->>> + };
->>> +
->>> + mmc4: mmc at 4 {
->>> + compatible = "ti,omap2-hsmmc";
->>> + ti,hwmods = "mmc4";
->>> + };
->>> +
->>> + mmc5: mmc at 5 {
->>> + compatible = "ti,omap2-hsmmc";
->>> + ti,hwmods = "mmc5";
->>> + };
->>> };
->>> };
->>
->> These all should all be "ti,omap3-hsmmc" I guess?
+On Thu, Feb 23, 2012 at 5:31 PM, Rajendra Nayak <rnayak@ti.com> wrote:
+> Define dt bindings for the ti-omap-hsmmc, and adapt
+> the driver to extract data (which was earlier passed as
+> platform_data) from device tree.
 >
-> Well, I defined the binding such that both omap2 and omap3
-> can use the same compatible "ti,omap2-hsmmc" since there is
-> no difference in the way they are defined or handled. If thats
-> confusing, I can have separate compatibles.
-> Btw, I guess we do the same with a few other re-used IPs as well,
-> I just checked and mcpsi does the same.
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+> ?.../devicetree/bindings/mmc/ti-omap-hsmmc.txt ? ? ?| ? 31 +++++++++
+> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? ? ? ? ? ? ? ?| ? 68 ++++++++++++++++++++
+> ?2 files changed, 99 insertions(+), 0 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> new file mode 100644
+> index 0000000..e4fa8f0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> @@ -0,0 +1,31 @@
+> +* TI Highspeed MMC host controller for OMAP
+> +
+> +The Highspeed MMC Host Controller on TI OMAP family
+> +provides an interface for MMC, SD, and SDIO types of memory cards.
+> +
+> +Required properties:
+> +- compatible:
+> + Should be "ti,omap2-hsmmc", for OMAP2/3 controllers
 
-Yes, the goal is mainly to identify the IP version, so since OMAP3 is 
-using OMAP2 IP, I do not think there is a need to add a new compatible 
-string for OMAP3. The should only be documented in the binding potentially.
-The advantage is that that will avoid adding an extra compatible string 
-in the driver as well whereas there is no change in the IP.
+omap_hsmmc is applicable for omap2430 and omap3.
+omap2420 has non high speed controller mmci-omap - drivers/mmc/host/omap.c
+May be omap3-hsmmc compatible with omap2430 ?
 
-Regards,
-Benoit
+> + Should be "ti,omap4-hsmmc", for OMAP4 controllers
+> +- ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
+> +- reg : should contain hsmmc registers location and length
+> +
+> +Optional properties:
+> +ti,dual-volt: boolean, supports dual voltage cards
+> +<supply-name>-supply: phandle to the regulator device tree node
+> +"supply-name" examples are "vmmc", "vmmc_aux" etc
+> +ti,bus-width: Number of data lines, default assumed is 1 if the property is missing.
+> +cd-gpios: GPIOs for card detection
+> +wp-gpios: GPIOs for write protection
+> +ti,non-removable: non-removable slot (like eMMC)
+> +
+> +Example:
+> + ? ? ? mmc1: mmc at 0x4809c000 {
+> + ? ? ? ? ? ? ? compatible = "ti,omap4-hsmmc";
+> + ? ? ? ? ? ? ? reg = <0x4809c000 0x400>;
+> + ? ? ? ? ? ? ? ti,hwmods = "mmc1";
+> + ? ? ? ? ? ? ? ti,dual-volt;
+> + ? ? ? ? ? ? ? ti,bus-width = <4>;
+> + ? ? ? ? ? ? ? vmmc-supply = <&vmmc>; /* phandle to regulator node */
+> + ? ? ? ? ? ? ? ti,non-removable;
+> + ? ? ? };
