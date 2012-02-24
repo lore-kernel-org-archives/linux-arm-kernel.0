@@ -1,56 +1,126 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 24 Feb 2012 15:28:53 +0530
-Subject: [PATCH 2/6] mmc: omap_hsmmc: Make the driver support hotpluggable
- devices
+Date: Fri, 24 Feb 2012 15:28:55 +0530
+Subject: [PATCH 4/6] ARM: OMAP3: Mark only those mmc devices which use gpio_cd,
+ as deferred
 In-Reply-To: <1330077537-19618-1-git-send-email-rnayak@ti.com>
 References: <1330077537-19618-1-git-send-email-rnayak@ti.com>
-Message-ID: <1330077537-19618-3-git-send-email-rnayak@ti.com>
+Message-ID: <1330077537-19618-5-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the hsmmc driver register the driver using platform_driver_register()
-so it can support hotpluggable devices.
+mmc devices which actually do not depend on twl4030-gpio for
+gpio_cd should not be maked as deferred.
 
-This is needed, for instance, in case of OMAP3, wherein some of the mmc
-devices might get added and removed dynamically based on dependent modules
-like twl4030-gpio.
+Also on overo, since none of the mmc devices need to be deferred,
+get rid of omap_hsmmc_late_init() altogether.
 
+Reported-by: Igor Grinberg <grinberg@compulab.co.il>
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: <linux-mmc@vger.kernel.org>
 ---
- drivers/mmc/host/omap_hsmmc.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-cm-t35.c           |    1 -
+ arch/arm/mach-omap2/board-igep0020.c         |    1 -
+ arch/arm/mach-omap2/board-omap3evm.c         |    1 -
+ arch/arm/mach-omap2/board-omap3pandora.c     |    1 -
+ arch/arm/mach-omap2/board-overo.c            |    4 ----
+ arch/arm/mach-omap2/board-zoom-peripherals.c |    2 --
+ 6 files changed, 0 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index fd0c661..21b8afa 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1847,7 +1847,7 @@ static void omap_hsmmc_debugfs(struct mmc_host *mmc)
- 
- #endif
- 
--static int __init omap_hsmmc_probe(struct platform_device *pdev)
-+static int omap_hsmmc_probe(struct platform_device *pdev)
- {
- 	struct omap_mmc_platform_data *pdata = pdev->dev.platform_data;
- 	struct mmc_host *mmc;
-@@ -2264,6 +2264,7 @@ static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
+diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+index 8eaed63..49e6405 100644
+--- a/arch/arm/mach-omap2/board-cm-t35.c
++++ b/arch/arm/mach-omap2/board-cm-t35.c
+@@ -422,7 +422,6 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.gpio_cd	= -EINVAL,
+ 		.gpio_wp	= -EINVAL,
+ 		.ocr_mask	= 0x00100000,	/* 3.3V */
+-		.deferred	= true,
+ 	},
+ 	{}	/* Terminator */
  };
- 
- static struct platform_driver omap_hsmmc_driver = {
-+	.probe		= omap_hsmmc_probe,
- 	.remove		= omap_hsmmc_remove,
- 	.driver		= {
- 		.name = DRIVER_NAME,
-@@ -2275,7 +2276,7 @@ static struct platform_driver omap_hsmmc_driver = {
- static int __init omap_hsmmc_init(void)
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index ac1de09..e558800 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -303,7 +303,6 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.caps		= MMC_CAP_4_BIT_DATA,
+ 		.gpio_cd	= -EINVAL,
+ 		.gpio_wp	= -EINVAL,
+-		.deferred	= true,
+ 	},
+ #endif
+ 	{}      /* Terminator */
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index 0f9a983..6b77ad9 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -327,7 +327,6 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.gpio_wp	= -EINVAL,
+ 		.gpio_cd	= -EINVAL,
+ 		.nonremovable	= true,
+-		.deferred	= true,
+ 	},
+ #endif
+ 	{}	/* Terminator */
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 84c83c8..ace466b 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -290,7 +290,6 @@ static struct omap2_hsmmc_info omap3pandora_mmc[] = {
+ 		.gpio_cd	= -EINVAL,
+ 		.gpio_wp	= -EINVAL,
+ 		.init_card	= pandora_wl1251_init_card,
+-		.deferred	= true,
+ 	},
+ 	{}	/* Terminator */
+ };
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index 1fc5f7a..668533e 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -301,7 +301,6 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.caps		= MMC_CAP_4_BIT_DATA,
+ 		.gpio_cd	= -EINVAL,
+ 		.gpio_wp	= -EINVAL,
+-		.deferred	= true,
+ 	},
+ 	{
+ 		.mmc		= 2,
+@@ -310,7 +309,6 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.gpio_wp	= -EINVAL,
+ 		.transceiver	= true,
+ 		.ocr_mask	= 0x00100000,	/* 3.3V */
+-		.deferred	= true,
+ 	},
+ 	{}	/* Terminator */
+ };
+@@ -409,8 +407,6 @@ static inline void __init overo_init_keys(void) { return; }
+ static int overo_twl_gpio_setup(struct device *dev,
+ 		unsigned gpio, unsigned ngpio)
  {
- 	/* Register the MMC driver */
--	return platform_driver_probe(&omap_hsmmc_driver, omap_hsmmc_probe);
-+	return platform_driver_register(&omap_hsmmc_driver);
- }
- 
- static void __exit omap_hsmmc_cleanup(void)
+-	omap_hsmmc_late_init(mmc);
+-
+ #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
+ 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
+ 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
+diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
+index 82a0f7c..3d39cdb 100644
+--- a/arch/arm/mach-omap2/board-zoom-peripherals.c
++++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
+@@ -215,7 +215,6 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.gpio_wp	= -EINVAL,
+ 		.nonremovable	= true,
+ 		.power_saving	= true,
+-		.deferred	= true,
+ 	},
+ 	{
+ 		.name		= "wl1271",
+@@ -224,7 +223,6 @@ static struct omap2_hsmmc_info mmc[] = {
+ 		.gpio_wp	= -EINVAL,
+ 		.gpio_cd	= -EINVAL,
+ 		.nonremovable	= true,
+-		.deferred	= true,
+ 	},
+ 	{}      /* Terminator */
+ };
 -- 
 1.7.1
