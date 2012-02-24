@@ -1,37 +1,123 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 24 Feb 2012 07:48:51 +0100
-Subject: [PATCH v3 06/10] pwm: Add NVIDIA Tegra SoC support
-In-Reply-To: <4F460616.3080400@gmail.com>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <1329923841-32017-7-git-send-email-thierry.reding@avionic-design.de>
- <4F459A94.4030104@gmail.com>
- <20120223081459.GD8621@avionic-0098.mockup.avionic-design.de>
- <4F460616.3080400@gmail.com>
-Message-ID: <20120224064851.GC18786@avionic-0098.mockup.avionic-design.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 24 Feb 2012 12:20:08 +0530
+Subject: [PATCH 2/6] ARM: OMAP4 PM: Add IO Daisychain support
+In-Reply-To: <5672BD13E82B844A93BB4597F293F19A0B3F41AF@DNCE02.ent.ti.com>
+References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
+ <1330003320-17400-3-git-send-email-t-kristo@ti.com>
+ <5672BD13E82B844A93BB4597F293F19A0B3F41AF@DNCE02.ent.ti.com>
+Message-ID: <4F473320.7000901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ryan Mallon wrote:
-> On 23/02/12 19:14, Thierry Reding wrote:
-> > * Ryan Mallon wrote:
-[...]
-> >> pwmchip_add should probably verify that the initialisation of the
-> >> pwm_chip structure is sane to avoid problems like this.
-> > 
-> > Absolutely. What would be the best response to an invalid struct pwm_chip? I
-> > suppose at least returning -EINVAL, perhaps complemented with WARN_ON?
-> 
-> Just returning -EINVAL should be okay. I don't think you need a WARN_ON,
-> since failing to register the hardware should be enough of a reason for
-> a user to report a problem.
+Djamil,
 
-Okay, will do.
+On Thursday 23 February 2012 09:28 PM, Elaidi, Djamil wrote:
+> Hi Kristo,
+>
+> I think you must also add a omap_test_timeout() check after the Trigger WUCLKIN disable, to verify WUCLK_STATUS has come back to 0.
+> This is needed because the IO daisy chain will not be ready until the WUCLKIN falling edge has propagated.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120224/2036d092/attachment.sig>
+You are right, this was missed and needs to be added.
+Thanks for the review.
+
+regards,
+Rajendra
+
+>
+> +	/* Trigger WUCLKIN disable */
+> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
+> +			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
+> +	return;
+> +	omap_test_timeout(
+> +		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+> +			OMAP4_PRM_IO_PMCTRL_OFFSET)&
+> +			OMAP4430_WUCLK_STATUS_MASK)>>
+> +			OMAP4430_WUCLK_STATUS_SHIFT) == 0),
+> +		MAX_IOPAD_LATCH_TIME, i);
+>
+>
+> Best regards
+> Djamil ELA?DI
+> +33 4 97 27 50 97
+> Software Systems Engineer
+> OMAP Platform Business Unit - PSI Modem Integration
+> Texas Instruments
+>
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Kristo, Tero
+> Sent: jeudi 23 f?vrier 2012 14:22
+> To: linux-omap at vger.kernel.org; Hilman, Kevin
+> Cc: linux-arm-kernel at lists.infradead.org; Nayak, Rajendra; Sripathy, Vishwanath
+> Subject: [PATCH 2/6] ARM: OMAP4 PM: Add IO Daisychain support
+>
+> From: Rajendra Nayak<rnayak@ti.com>
+>
+> patch adds IO Daisychain support for OMAP4 as per section 3.9.4 in OMAP4430
+> Public TRM.
+>
+> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com>
+> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> ---
+>   arch/arm/mach-omap2/prm44xx.c |   32 ++++++++++++++++++++++++++++++++
+>   arch/arm/mach-omap2/prm44xx.h |    1 +
+>   2 files changed, 33 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+> index 33dd655..1557647 100644
+> --- a/arch/arm/mach-omap2/prm44xx.c
+> +++ b/arch/arm/mach-omap2/prm44xx.c
+> @@ -230,6 +230,41 @@ void omap44xx_prm_restore_irqen(u32 *saved_mask)
+>   				 OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
+>   }
+>
+> +/**
+> + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
+> + * the I/O ring after asserting WUCLKIN high
+> + */
+> +#define MAX_IOPAD_LATCH_TIME 1000
+> +
+> +/* OMAP4 IO Daisychain trigger sequence */
+> +void omap4_trigger_wuclk_ctrl(void)
+> +{
+> +	int i = 0;
+> +
+> +	/* Enable GLOBAL_WUEN */
+> +	if (!(omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+> +		OMAP4_PRM_IO_PMCTRL_OFFSET)&  OMAP4430_GLOBAL_WUEN_MASK))
+> +		omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
+> +			OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_PRM_DEVICE_INST,
+> +			OMAP4_PRM_IO_PMCTRL_OFFSET);
+> +
+> +	/* Trigger WUCLKIN enable */
+> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK,
+> +			OMAP4430_WUCLK_CTRL_MASK, OMAP4430_PRM_DEVICE_INST,
+> +			OMAP4_PRM_IO_PMCTRL_OFFSET);
+> +	omap_test_timeout(
+> +		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+> +			OMAP4_PRM_IO_PMCTRL_OFFSET)&
+> +			OMAP4430_WUCLK_STATUS_MASK)>>
+> +			OMAP4430_WUCLK_STATUS_SHIFT) == 1),
+> +		MAX_IOPAD_LATCH_TIME, i);
+> +
+> +	/* Trigger WUCLKIN disable */
+> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
+> +			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
+> +	return;
+> +}
+> +
+>   static int __init omap4xxx_prcm_init(void)
+>   {
+>   	if (cpu_is_omap44xx())
+> diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+> index 7978092..a840f0f 100644
+> --- a/arch/arm/mach-omap2/prm44xx.h
+> +++ b/arch/arm/mach-omap2/prm44xx.h
+> @@ -762,6 +762,7 @@ void omap4_prm_vp_clear_txdone(u8 vp_id);
+>   extern u32 omap4_prm_vcvp_read(u8 offset);
+>   extern void omap4_prm_vcvp_write(u32 val, u8 offset);
+>   extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+> +extern void omap4_trigger_wuclk_ctrl(void);
+>
+>   /* PRM interrupt-related functions */
+>   extern void omap44xx_prm_read_pending_irqs(unsigned long *events);
