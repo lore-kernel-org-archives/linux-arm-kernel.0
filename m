@@ -1,42 +1,35 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 24 Feb 2012 11:11:10 +0100
-Subject: [RFC PATCH] gpio/omap: Fix IRQ handling for SPARSE_IRQ
-In-Reply-To: <20120223230821.GD18185@atomide.com>
-References: <4F46C1AF.2040201@ti.com> <20120223230821.GD18185@atomide.com>
-Message-ID: <4F47623E.5060908@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Feb 2012 10:11:30 +0000
+Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU
+ IRQ handlers
+In-Reply-To: <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
+References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
+ <1330012696-13472-4-git-send-email-will.deacon@arm.com>
+ <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
+Message-ID: <20120224101130.GB13504@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Tarun
+On Fri, Feb 24, 2012 at 01:34:32AM +0000, Ming Lei wrote:
+> On Thu, Feb 23, 2012 at 11:58 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > @@ -513,7 +496,8 @@ armv6pmu_handle_irq(int irq_num,
+> > ? ? ? ? ? ? ? ?struct perf_event *event = cpuc->events[idx];
+> > ? ? ? ? ? ? ? ?struct hw_perf_event *hwc;
+> >
+> > - ? ? ? ? ? ? ? if (!counter_is_active(pmcr, idx))
+> > + ? ? ? ? ? ? ? /* Ignore if we don't have an event. */
+> > + ? ? ? ? ? ? ? if (!event)
+> 
+> I think we should check it via test_bit(idx, cpuc->used_mask) because
+> 'hw_events->events[idx] = val' is not atomic operation and it is read here
+> in irq context.
 
-On 2/24/2012 12:08 AM, Tony Lindgren wrote:
-> * Cousson, Benoit<b-cousson@ti.com>  [120223 14:14]:
->> The GPIO driver is still relying on internal OMAP IRQ defines that
->> are not relevant anymore if OMAP is built with SPARSE_IRQ.
->
-> Great :)
->
->> Please note that this patch is still RFC, because I do not know
->> how to fix properly the ugly cpu_class_is_omap1 and the dependency
->> with IH_MPUIO_BASE to detect a MPUIO.
->
-> Sounds like gpio_to_irq() needs to be set in the
-> arch/arm/*omap*/gpio*.c then.
+I dunno, that code is compiled to:
 
-In fact, after a second thought, that might even work for OMAP1 because 
-I'm using the proper base (IRQ and GPIO) to convert the IRQ number.
+e5973000        ldr     r3, [r7]
+e7834106        str     r4, [r3, r6, lsl #2]
 
-static int irq_to_gpio(struct gpio_bank *bank, unsigned int gpio_irq)
-{
-	return gpio_irq - bank->irq_base + bank->chip.base;
-}
+so you should either see the new value or the old one - you can't see half a
+pointer in there since it's a single 32-bit store.
 
-But it might be good to test it on OMAP1 platform.
-
-
-Tarun,
-
-Do you have an OMAP1 board to test that.
-
-Regards,
-Benoit
+Will
