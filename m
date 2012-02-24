@@ -1,81 +1,117 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 25 Feb 2012 08:03:11 +1100
-Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
- register
-In-Reply-To: <201202241622.43468.arnd@arndb.de>
-References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
- <201202231233.05622.arnd@arndb.de> <1330028738.20389.34.camel@pasglop>
- <201202241622.43468.arnd@arndb.de>
-Message-ID: <1330117391.20389.47.camel@pasglop>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 24 Feb 2012 21:25:17 +0000
+Subject: [GIT PULL] DaVinci cleanups for v3.4
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317D2DB9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-02-24 at 16:22 +0000, Arnd Bergmann wrote:
-> 
-> It's certainly not easy to get consensus across arch maintainers, especially
-> for a topic that is so complex as this one. On the other hand, we did add
-> the readl_relaxed family just recently to all architectures, and I think
-> it was good to do it this way.
+Hi Arnd, Olof,
 
-Well, nobody added _relaxed ones to powerpc (at least not meaningful
-ones) nor do I remember being CCed on the patch going in :-) In any
-case, see below.
+Can you please pull these DaVinci clean-up patches for
+the v3.4 merge window? I have made sure that these don't
+have any conflicts with the rmk/for-armsoc branch of
+the arm-soc tree.
 
-> Using __raw_* is actually worse since it's not really well-defined 
-> what that means across architectures. We recently had a bug where
-> gcc would create byte-wise accesses on registers that are marked
-> "packed" by a driver writer, because the __raw_writel function just
-> does a cast to a variable of larger alignment, which is undefined
-> (IIRC, but maybe just implementation defined) in C.
+These patches need the following two commits from linux-next
+(next-20120224) to keep the VPIF and CQ93VC drivers building.
 
-Right, __raw_* is basically useless as an abstraction.
+2e932f2  ASoC: CQ93VC: remove machine specific header file inclusion from codec
+db38951  [media] davinci: vpif: remove machine specific header file includes
 
-> > I tried to propose a uniform set a while back, but that never went
-> > anywhere, I should have fought harder. You are welcome to bring that
-> > back on the table :-)
-> 
-> Since the _relaxed version comes from ARM, it's basically defined
-> to be convenient there, which means it is synchronized against the
-> instruction stream (spinlock, most importantly) but not against
-> DMA, because that tends to be expensive.
+However, there will not be any merge conflicts even if these patches
+are not applied.
 
-Argh. Crap. And why did you synchronize it with locks ? Seriously,
-synchronizing vs. instruction stream is horribly costly for IO and
-generally non-sensical. (The sync. vs a lock isn't even vs. instruction
-stream, it's also a storage ordering issue).
+These patches do generate merge conflicts in latest linux-next
+due to a recent DaVinci bug fix. I resolved the conflict in the
+following manner:
 
-Anyways, if you require the semantic of synchronizing against locks then
-power will have to keep sync's in there which totally defeats the
-purpose for us :-(
+diff --cc arch/arm/mach-davinci/board-dm644x-evm.c
+index 1247ecd,b89bebe..864f676
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@@ -40,7 -39,9 +39,9 @@@
+  #include <mach/usb.h>
+  #include <mach/aemif.h>
+  
++ #include "davinci.h"
++ 
+ -#define DM644X_EVM_PHY_ID		"0:01"
+ +#define DM644X_EVM_PHY_ID		"davinci_mdio-0:01"
+  #define LXT971_PHY_ID	(0x001378e2)
+  #define LXT971_PHY_MASK	(0xfffffff0)
+  
+diff --cc arch/arm/mach-davinci/board-neuros-osd2.c
+index 8d34f51,3d12a3a..a772bb4
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@@ -39,7 -38,9 +38,9 @@@
+  #include <mach/mmc.h>
+  #include <mach/usb.h>
+  
++ #include "davinci.h"
++ 
+ -#define NEUROS_OSD2_PHY_ID		"0:01"
+ +#define NEUROS_OSD2_PHY_ID		"davinci_mdio-0:01"
+  #define LXT971_PHY_ID			0x001378e2
+  #define LXT971_PHY_MASK			0xfffffff0
+  
+diff --cc arch/arm/mach-davinci/board-sffsdr.c
+index 31da3c5,897cec5..76e67509
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@@ -42,7 -41,9 +41,9 @@@
+  #include <mach/mux.h>
+  #include <mach/usb.h>
+  
++ #include "davinci.h"
++ 
+ -#define SFFSDR_PHY_ID		"0:01"
+ +#define SFFSDR_PHY_ID		"davinci_mdio-0:01"
+  static struct mtd_partition davinci_sffsdr_nandflash_partition[] = {
+  	/* U-Boot Environment: Block 0
+  	 * UBL:                Block 1
 
-Was that ever discussed with CC on the most likely to be affected archs
-such as us ? Looks like not...
+The pull request follows:
 
-> > > 2. change the ppc definition of the readl_relaxed() family to something
-> > > useful (fixed endian, relaxed ordering, iomem (possibly including PCI
-> > > -- same as in_le32 but without the ordering guarantee) and make any
-> > > driver that wants to be portable use those accessors with explicit I/O
-> > > barriers on spinlocks and DMA.
-> > 
-> > Last I looked, __relaxed() had a completely different meaning (relaxed
-> > ordering -on-the-bus- which is a totally different thing, so iirc only
-> > one arch ever implemented it).
-> 
-> I think you may be confusing it with relaxed ordering on DMA. Having
-> MMIO with relaxed ordering between the accesses would be silly.
+The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
+  Linus Torvalds (1):
+        Linux 3.3-rc1
 
-Well, my memory might be blurry, but back when I tried to get that
-sorted at least one arch (and it wasn't ARM from memory) had _relaxed
-accessors and the meaning of _relaxed was ... something else. Really.
-Unless I was lied to :-)
+are available in the git repository at:
 
-> only reason we have it on ARM is to remove the need to do an expensive
-> synchronization against a DMA operation on the same bus. IIRC that
-> would let you do an "eieio" instead of a full "sync" on powerpc but
-> should only be used in drivers that don't do DMA.
+  git://gitorious.org/linux-davinci/linux-davinci.git v3.4/cleanup
 
-That wouldn't solve the problem with locks. Besides, we'd want "relaxed"
-to not have eieio either wouldn't we ?
+Manjunath Hadli (8):
+      ARM: davinci: dm644x: move private definitions to C file
+      ARM: davinci: dm365: move private definitions to C file
+      ARM: davinci: dm646x: move private definitions to C file
+      ARM: davinci: create new common platform header for davinci
+      ARM: davinci: streamline sysmod access
+      ARM: davinci: dm644x: improve readability using macro
+      ARM: davinci: dm644x: fix inconsistent variable naming
+      ARM: davinci: dm644x: don't force vpfe registeration on all boards
 
-Cheers,
-Ben.
+ arch/arm/mach-davinci/board-dm355-evm.c       |    3 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c   |    3 +-
+ arch/arm/mach-davinci/board-dm365-evm.c       |    3 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c      |   28 ++++----
+ arch/arm/mach-davinci/board-dm646x-evm.c      |   32 +++------
+ arch/arm/mach-davinci/board-neuros-osd2.c     |    3 +-
+ arch/arm/mach-davinci/board-sffsdr.c          |    3 +-
+ arch/arm/mach-davinci/davinci.h               |   96 +++++++++++++++++++++++++
+ arch/arm/mach-davinci/devices.c               |   32 ++++++---
+ arch/arm/mach-davinci/dm355.c                 |    3 +-
+ arch/arm/mach-davinci/dm365.c                 |   19 +++++-
+ arch/arm/mach-davinci/dm644x.c                |   53 +++++++++-----
+ arch/arm/mach-davinci/dm646x.c                |   21 ++++--
+ arch/arm/mach-davinci/include/mach/dm355.h    |   32 --------
+ arch/arm/mach-davinci/include/mach/dm365.h    |   52 -------------
+ arch/arm/mach-davinci/include/mach/dm644x.h   |   47 ------------
+ arch/arm/mach-davinci/include/mach/dm646x.h   |   41 -----------
+ arch/arm/mach-davinci/include/mach/hardware.h |    2 -
+ 18 files changed, 218 insertions(+), 255 deletions(-)
+ create mode 100644 arch/arm/mach-davinci/davinci.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/dm355.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/dm646x.h
