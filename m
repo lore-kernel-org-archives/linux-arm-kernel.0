@@ -1,77 +1,51 @@
-From: Madhusudhan.Gowda@elektrobit.com (Madhusudhan.Gowda at elektrobit.com)
-Date: Fri, 24 Feb 2012 11:20:41 +0200
-Subject: [GIT PULL] OMAP PM EMU fix for v3.3
-In-Reply-To: <alpine.DEB.2.00.1202231627001.9361@utopia.booyaka.com>
-References: <87liw8agk4.fsf@ti.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com><20120127190239.GC9339@atomide.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com><AA48DD8077D5D945A49BD1782C1140F10122E2B7@fioues08.ebgroup.elektrobit.com>
- <87linxa5gk.fsf@ti.com>
- <AA48DD8077D5D945A49BD1782C1140F10122E4FF@fioues08.ebgroup.elektrobit.com>
- <alpine.DEB.2.00.1202222021460.12198@utopia.booyaka.com>
- <AA48DD8077D5D945A49BD1782C1140F10122E640@fioues08.ebgroup.elektrobit.com>
- <alpine.DEB.2.00.1202231627001.9361@utopia.booyaka.com>
-Message-ID: <AA48DD8077D5D945A49BD1782C1140F10122E744@fioues08.ebgroup.elektrobit.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Fri, 24 Feb 2012 15:00:52 +0530
+Subject: [PATCH 00/10] I2C updates
+In-Reply-To: <1328882405-15284-1-git-send-email-shubhrajyoti@ti.com>
+References: <1328882405-15284-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <4F4758CC.4010607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-Please find my comments inlined
-
-Thanks
-Gowda
-
------Original Message-----
-From: Paul Walmsley [mailto:paul at pwsan.com] 
-Sent: 24 February 2012 02:11
-To: Gowda Madhusudhan
-Cc: khilman at ti.com; tony at atomide.com; linux-omap at vger.kernel.org;
-linux-arm-kernel at lists.infradead.org
-Subject: RE: [GIT PULL] OMAP PM EMU fix for v3.3
-
-Hi
-
-On Thu, 23 Feb 2012, Madhusudhan.Gowda at elektrobit.com wrote:
-
-> [Gowda] I found this BUG in the CM code while trying to use both SDTI 
-> as well as requirement of enabling Hardware supervised transition 
-> CLKTRCTRL_EMU to 0x3.
-> 
-> SDTI requires the softwre supervised transition to keep connected, by 
-> enabling Hardware supervised transition SDTI does not like it so Jouni
-
-> had commented out the HW supervised transtion. Which I agree it is 
-> fine on SDTI part.
-> .flags          = /* CLKDM_CAN_ENABLE_AUTO |  */CLKDM_CAN_SWSUP,
-> 
-> But my point here is when I set the HW supervised transition, across 
-> MPU OFF the register loses its previous value and changes to reset 
-> value 0x2 (SW supervised) is not correct. So I submitted this patch 
-> for fixing this general CM code bug.
-
-Okay, that's a little more clear.  So this patch does not affect the
-SDTI functionality with your driver?  Your patch description reads:
-
-"Embedded trace debug tools like Serial Trace Interface(sti) using  EMU
-domain loses connection across MPU OFF. The patch fixes this issue"
-
-But it sounds like that's not the case?  At least, if the reset value
-for CM_CLKSTCTRL_EMU is 0x2, I don't understand how this patch could fix
-it.
-
-[GOWDA] I think I should edit the commit log to avoid any confusion on
-SDTI functionality, is it ok if I do this on the GIT PULL branch ?
-
-About the patch - I'm fine with the basic underlying idea, but so far it
-looks like this is material for 3.4 rather than 3.3-rc, since it's not a
-regression?
-[GOWDA] I agree it is not a regression patch so can be queued for 3.4.
-
-> Please let me know if my comments answers your question.
-
-Well I was hoping that you might answer my earlier questions about
-whether the driver you're using calls into the OMAP infrastructure via
-pm_runtime*(), and whether its clocks and hwmod data are defined.
-[GOWDA] It does not use the runtime pm infrastructure. In my environment
-# CONFIG_PM_RUNTIME is not set
-
-
-- Paul
+On Friday 10 February 2012 07:29 PM, Shubhrajyoti D wrote:
+> This patch series colates the various i2c updates into
+> a series.  Since it is collection of various patches
+> the version info is not retained, however most of them undergone
+> multiple versions.
+If there are no further comments can this be queued.
+> This is rebased to linus head commit 63082402968f4b73f10b28a8ac1f3da821aeb82d
+>
+> The patch series does the following 
+>
+> - Warn fixes if CONFIG_PM_RUNTIME is not selected.
+> - I2C register restore only if context if the context is lost
+> - Bus busy recovery mechanism.
+> - the reset is not done in init.
+>
+> Tested on omap4sdp and omap3sdp. 
+>
+>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+>
+> Jon Hunter (1):
+>   I2C: OMAP: Correct I2C revision for OMAP3
+>
+> Shubhrajyoti D (8):
+>   I2C : OMAP : make omap_i2c_unidle/idle functions depend on
+>     CONFIG_PM_RUNTIME
+>   OMAP : I2C : Remove reset at init
+>   OMAP: I2C: I2C register restore only if context is lost
+>   OMAP: I2C: Fix the interrupt clearing in OMAP4
+>   OMAP: I2C: Fix the mismatch of pm_runtime enable and disable
+>   OMAP: I2C: Optimise the remove code
+>   OMAP: I2C: Fix the error handling
+>   I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
+>     than zero
+>
+> Vikram Pandita (1):
+>   I2C: OMAP: Recover from Bus Busy condition
+>
+>  drivers/i2c/busses/i2c-omap.c |  173 ++++++++++++++++++++++++-----------------
+>  1 files changed, 101 insertions(+), 72 deletions(-)
+>
