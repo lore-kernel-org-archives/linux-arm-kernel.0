@@ -1,72 +1,45 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 24 Feb 2012 17:05:27 +0530
-Subject: [PATCH v2 1/4] mmc: omap_hsmmc: Convert hsmmc driver to use device
- tree
-In-Reply-To: <CANrkHUarg5ntUW=S7k20LXuYe+ZNCN-cYJhfvvLKM=X8+Db4fg@mail.gmail.com>
-References: <1329998490-27555-1-git-send-email-rnayak@ti.com>	<1329998490-27555-2-git-send-email-rnayak@ti.com>
- <CANrkHUarg5ntUW=S7k20LXuYe+ZNCN-cYJhfvvLKM=X8+Db4fg@mail.gmail.com>
-Message-ID: <4F4775FF.2090500@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Feb 2012 11:39:12 +0000
+Subject: [PATCH] ARM: LPAE: Invalidate the TLB for module addresses
+ during translation fault
+In-Reply-To: <20120224101200.GG22562@n2100.arm.linux.org.uk>
+References: <1330019981-18743-1-git-send-email-catalin.marinas@arm.com>
+ <20120223195003.GD22562@n2100.arm.linux.org.uk>
+ <20120223221343.GA27761@arm.com> <20120224095806.GA13117@arm.com>
+ <20120224101200.GG22562@n2100.arm.linux.org.uk>
+Message-ID: <20120224113912.GC13117@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 February 2012 05:02 PM, T Krishnamoorthy, Balaji wrote:
-> On Thu, Feb 23, 2012 at 5:31 PM, Rajendra Nayak<rnayak@ti.com>  wrote:
->> Define dt bindings for the ti-omap-hsmmc, and adapt
->> the driver to extract data (which was earlier passed as
->> platform_data) from device tree.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> ---
->>   .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   31 +++++++++
->>   drivers/mmc/host/omap_hsmmc.c                      |   68 ++++++++++++++++++++
->>   2 files changed, 99 insertions(+), 0 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
->> new file mode 100644
->> index 0000000..e4fa8f0
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
->> @@ -0,0 +1,31 @@
->> +* TI Highspeed MMC host controller for OMAP
->> +
->> +The Highspeed MMC Host Controller on TI OMAP family
->> +provides an interface for MMC, SD, and SDIO types of memory cards.
->> +
->> +Required properties:
->> +- compatible:
->> + Should be "ti,omap2-hsmmc", for OMAP2/3 controllers
->
-> omap_hsmmc is applicable for omap2430 and omap3.
-> omap2420 has non high speed controller mmci-omap - drivers/mmc/host/omap.c
-> May be omap3-hsmmc compatible with omap2430 ?
+On Fri, Feb 24, 2012 at 10:12:00AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 24, 2012 at 09:58:06AM +0000, Catalin Marinas wrote:
+> > On Thu, Feb 23, 2012 at 10:13:43PM +0000, Catalin Marinas wrote:
+> > > On Thu, Feb 23, 2012 at 07:50:03PM +0000, Russell King - ARM Linux wrote:
+> > > > On Thu, Feb 23, 2012 at 05:59:41PM +0000, Catalin Marinas wrote:
+> > > > > During the free_pgtables() call all user and modules/pkmap entries are
+> > > > > removed.
+> > > > 
+> > > > Err, no.  free_pgtables() should only ever touch up to TASK_SIZE, which
+> > > > is the maximum size of userspace.  Moreover, because TASK_SIZE does not
+> > > > cover an entire pud, free_pgtables() should not be removing the pud
+> > > > table.
+> > > 
+> > > Are you sure? exit_mmap() calls free_pgtables() with ceiling == 0.  If
+> > > free_pmd_range() is called for a range in the top 1GB of the task
+> > > address space (which includes modules), it also calls pud_clear()
+> > > because ceiling is 0.
+> > 
+> > BTW, an alternative patch but which needs wider acknowledgement as it
+> > touches generic code (I can post it to linux-mm):
+> 
+> I think that's the right solution.
 
-Agree. I think its best in that case for me to define a
-compatible "ti,omap2430-hsmmc" for omap2430 and "ti,omap3-hsmmc"
-for omap3. Though the IP blocks are same, I cant think of some
-common compatible string without causing confusion.
+Something similar is needed in shift_arg_pages() when calling
+free_pgd_range().
 
->
->> + Should be "ti,omap4-hsmmc", for OMAP4 controllers
->> +- ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
->> +- reg : should contain hsmmc registers location and length
->> +
->> +Optional properties:
->> +ti,dual-volt: boolean, supports dual voltage cards
->> +<supply-name>-supply: phandle to the regulator device tree node
->> +"supply-name" examples are "vmmc", "vmmc_aux" etc
->> +ti,bus-width: Number of data lines, default assumed is 1 if the property is missing.
->> +cd-gpios: GPIOs for card detection
->> +wp-gpios: GPIOs for write protection
->> +ti,non-removable: non-removable slot (like eMMC)
->> +
->> +Example:
->> +       mmc1: mmc at 0x4809c000 {
->> +               compatible = "ti,omap4-hsmmc";
->> +               reg =<0x4809c000 0x400>;
->> +               ti,hwmods = "mmc1";
->> +               ti,dual-volt;
->> +               ti,bus-width =<4>;
->> +               vmmc-supply =<&vmmc>; /* phandle to regulator node */
->> +               ti,non-removable;
->> +       };
+But my concern - are there other architectures that rely on
+free_pgtables() to remove page tables corresponding to vmas beyond
+TASK_SIZE (e.g. vsyscall)?
+
+-- 
+Catalin
