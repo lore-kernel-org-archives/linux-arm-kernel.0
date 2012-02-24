@@ -1,169 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Feb 2012 16:54:17 -0800
-Subject: [PATCH 7/7] ARM: OMAP2+: Fix multiple randconfig errors with
- SOC_OMAP and SOC_OMAP_NOOP
-In-Reply-To: <20120224005324.16794.73852.stgit@kaulin.local>
-References: <20120224005324.16794.73852.stgit@kaulin.local>
-Message-ID: <20120224005417.16794.52875.stgit@kaulin.local>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 24 Feb 2012 09:28:53 +0800
+Subject: [PATCH 1/4] ASoC: imx: add an explicit Kconfig option for
+ imx-ssi driver
+In-Reply-To: <4F465DD0.1020304@freescale.com>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-2-git-send-email-shawn.guo@linaro.org>
+ <4F465DD0.1020304@freescale.com>
+Message-ID: <20120224012850.GA4441@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we don't have ARCH_OMAP2, 3 or 4 selected randconfig will always
-fail with multiple errors as the CPU and MACHINE are not set.
+On Thu, Feb 23, 2012 at 09:40:00AM -0600, Timur Tabi wrote:
+> Shawn Guo wrote:
+> 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Since when do you work for Linaro?
+> 
+Since one year ago, as Freescale assignee to Linaro.  So I'm still
+employed by Freescale.
 
-Fix this by changing arch/arm/Makefile to build mach-omap2 based on
-ARCH_OMAP2PLUS. And let's introduce SOC_OMAP and SOC_OMAP_NOOP that
-allow randconfig to generate buildable .config files.
+> > ---
+> >  sound/soc/imx/Kconfig  |    7 +++++++
+> >  sound/soc/imx/Makefile |    4 ++--
+> >  2 files changed, 9 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
+> > index 863a6b4..b9de8a8 100644
+> > --- a/sound/soc/imx/Kconfig
+> > +++ b/sound/soc/imx/Kconfig
+> > @@ -8,6 +8,9 @@ menuconfig SND_IMX_SOC
+> >  
+> >  if SND_IMX_SOC
+> >  
+> > +config SND_SOC_IMX_SSI
+> > +	tristate
+> > +
+> 
+> I was hoping to see sound/soc/imx disappear completely, and all IMX
+> support move into sound/soc/fsl.  After all, i.MX is a Freescale name.
+> 
+That's what I'm doing.  But to be clear, imx-ssi driver will still
+exist for all those non-DT i.MX platforms.  We are supporting DT for
+imx5 and imx6, but have not seen a plan to migrate all those old i.MX
+platforms to DT.
 
-Note that we can also remove few uncecssary ARCH_OMAP2PLUS lines
-as they are all within if ARCH_OMAP2PLUS block.
-
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/Makefile           |    4 +--
- arch/arm/mach-omap2/Kconfig |   51 +++++++++++++++++++++++++++++--------------
- 2 files changed, 35 insertions(+), 20 deletions(-)
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 1683bfb..ea69448 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -164,9 +164,7 @@ machine-$(CONFIG_ARCH_MXS)		:= mxs
- machine-$(CONFIG_ARCH_NETX)		:= netx
- machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
- machine-$(CONFIG_ARCH_OMAP1)		:= omap1
--machine-$(CONFIG_ARCH_OMAP2)		:= omap2
--machine-$(CONFIG_ARCH_OMAP3)		:= omap2
--machine-$(CONFIG_ARCH_OMAP4)		:= omap2
-+machine-$(CONFIG_ARCH_OMAP2PLUS)	:= omap2
- machine-$(CONFIG_ARCH_ORION5X)		:= orion5x
- machine-$(CONFIG_ARCH_PICOXCELL)	:= picoxcell
- machine-$(CONFIG_ARCH_PNX4008)		:= pnx4008
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 337f98d..c4ae0a7 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -21,16 +21,12 @@ config ARCH_OMAP2PLUS_TYPICAL
- 	  Compile a kernel suitable for booting most boards
- 
- config ARCH_OMAP2
--	bool "TI OMAP2"
--	depends on ARCH_OMAP2PLUS
--	default y
-+	bool
- 	select CPU_V6
- 	select MULTI_IRQ_HANDLER
- 
- config ARCH_OMAP3
--	bool "TI OMAP3"
--	depends on ARCH_OMAP2PLUS
--	default y
-+	bool
- 	select CPU_V7
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select ARCH_HAS_OPP
-@@ -39,9 +35,7 @@ config ARCH_OMAP3
- 	select MULTI_IRQ_HANDLER
- 
- config ARCH_OMAP4
--	bool "TI OMAP4"
--	default y
--	depends on ARCH_OMAP2PLUS
-+	bool
- 	select CACHE_L2X0
- 	select CPU_V7
- 	select ARM_GIC
-@@ -56,36 +50,58 @@ config ARCH_OMAP4
- 	select ARM_CPU_SUSPEND if PM
- 
- comment "OMAP Core Type"
--	depends on ARCH_OMAP2
-+
-+config SOC_OMAP
-+	bool
- 
- config SOC_OMAP2420
- 	bool "OMAP2420 support"
--	depends on ARCH_OMAP2
- 	default y
-+	select SOC_OMAP
-+	select ARCH_OMAP2
- 	select OMAP_DM_TIMER
- 	select ARCH_OMAP_OTG
- 
- config SOC_OMAP2430
- 	bool "OMAP2430 support"
--	depends on ARCH_OMAP2
- 	default y
-+	select SOC_OMAP
-+	select ARCH_OMAP2
- 	select ARCH_OMAP_OTG
- 
- config SOC_OMAP3430
- 	bool "OMAP3430 support"
--	depends on ARCH_OMAP3
- 	default y
-+	select SOC_OMAP
-+	select ARCH_OMAP3
- 	select ARCH_OMAP_OTG
- 
- config SOC_OMAPTI81XX
- 	bool "TI81XX support"
--	depends on ARCH_OMAP3
- 	default y
-+	select SOC_OMAP
-+	select ARCH_OMAP3
- 
- config SOC_OMAPAM33XX
- 	bool "AM33XX support"
--	depends on ARCH_OMAP3
- 	default y
-+	select SOC_OMAP
-+	select ARCH_OMAP3
-+
-+config SOC_OMAP44XX
-+	bool "OMAP44XX support"
-+	default y
-+	select SOC_OMAP
-+	select ARCH_OMAP4
-+
-+config SOC_OMAP_NOOP
-+	bool
-+	depends on !SOC_OMAP
-+	default y
-+	select ARCH_OMAP2
-+	select ARCH_OMAP3
-+	select ARCH_OMAP4
-+	select MACH_OMAP_GENERIC
- 
- config OMAP_PACKAGE_ZAF
-        bool
-@@ -112,17 +128,17 @@ config OMAP_PACKAGE_CBS
-        bool
- 
- comment "OMAP Board Type"
--	depends on ARCH_OMAP2PLUS
- 
- config MACH_OMAP_GENERIC
- 	bool "Generic OMAP2+ board"
--	depends on ARCH_OMAP2PLUS
- 	select USE_OF
- 	default y
- 	help
- 	  Support for generic TI OMAP2+ boards using Flattened Device Tree.
- 	  More information at Documentation/devicetree
- 
-+if SOC_OMAP
-+
- config MACH_OMAP2_TUSB6010
- 	bool
- 	depends on ARCH_OMAP2 && SOC_OMAP2420
-@@ -343,6 +359,7 @@ config MACH_OMAP4_PANDA
- 	select OMAP_PACKAGE_CBS
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 
-+endif
- config OMAP3_EMU
- 	bool "OMAP3 debugging peripherals"
- 	depends on ARCH_OMAP3
+-- 
+Regards,
+Shawn
