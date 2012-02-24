@@ -1,49 +1,47 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Fri, 24 Feb 2012 15:53:58 +0400
-Subject: [PATCH 4/7] ARM: OMAP2+: Fix zoom LCD backlight if TWL_CORE is
- not selected
-In-Reply-To: <20120224005411.16794.720.stgit@kaulin.local>
-References: <20120224005324.16794.73852.stgit@kaulin.local>
- <20120224005411.16794.720.stgit@kaulin.local>
-Message-ID: <4F477A56.9000005@ru.mvista.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 24 Feb 2012 12:23:33 +0000
+Subject: [PATCH-WIP 07/13] xen/arm: receive xen events on arm
+In-Reply-To: <4F4770AD.6040703@citrix.com>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-7-git-send-email-stefano.stabellini@eu.citrix.com>
+ <4F4770AD.6040703@citrix.com>
+Message-ID: <alpine.DEB.2.00.1202241221440.23091@kaball-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 24-02-2012 4:54, Tony Lindgren wrote:
-
-> Otherwise we get:
-
-> arch/arm/mach-omap2/board-zoom-display.c:64: undefined reference to `twl_i2c_read_u8'
-> arch/arm/mach-omap2/board-zoom-display.c:65: undefined reference to `twl_i2c_read_u8'
-> arch/arm/mach-omap2/board-zoom-display.c:84: undefined reference to `twl_i2c_write_u8'
-> arch/arm/mach-omap2/board-zoom-display.c:86: undefined reference to `twl_i2c_write_u8'
-> arch/arm/mach-omap2/board-zoom-display.c:91: undefined reference to `twl_i2c_write_u8'
-> arch/arm/mach-omap2/board-zoom-display.c:92: undefined reference to `twl_i2c_write_u8'
-> arch/arm/mach-omap2/board-zoom-display.c:72: undefined reference to `twl_i2c_write_u8'
-
-> Signed-off-by: Tony Lindgren<tony@atomide.com>
-[...]
-
-> diff --git a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/board-zoom-display.c
-> index d4683ba..7f75fcd 100644
-> --- a/arch/arm/mach-omap2/board-zoom-display.c
-> +++ b/arch/arm/mach-omap2/board-zoom-display.c
-> @@ -53,8 +53,11 @@ static void zoom_panel_disable_lcd(struct omap_dss_device *dssdev)
->   #define TWL_LED_PWMON	0x0
->   #define TWL_LED_PWMOFF	0x1
->
-> +
->   static int zoom_set_bl_intensity(struct omap_dss_device *dssdev, int level)
->   {
-> +
-
-    Empty lines not needed.
-
-> +#ifdef CONFIG_TWL4030_CORE
->   	unsigned char c;
->   	u8 mux_pwm, enb_pwm;
->
-
-WBR, Sergei
+On Fri, 24 Feb 2012, David Vrabel wrote:
+> On 23/02/12 17:48, Stefano Stabellini wrote:
+> > Compile events.c and use IRQ 32 to receive events notifications.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> > +#ifdef CONFIG_ARM
+> > +#define IRQ_EVTCHN_CALLBACK 63
+> > +irqreturn_t xen_arm_callback(int irq, void *arg)
+> > +{
+> > +	__xen_evtchn_do_upcall();
+> > +	return 0;
+> > +}
+> > +
+> > +int __init xen_init_IRQ_arm(void)
+> > +{
+> > +	int rc;
+> > +	xen_init_IRQ();
+> > +	rc = request_irq(IRQ_EVTCHN_CALLBACK, xen_arm_callback,
+> > +			IRQF_DISABLED | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
+> > +			"events", "events");	
+> > +	if (rc) {
+> > +		printk(KERN_ERR "Error requesting IRQ %d\n", IRQ_EVTCHN_CALLBACK);
+> > +	}
+> > +	return rc;
+> > +}
+> > +core_initcall(xen_init_IRQ_arm);
+> > +#endif
+> 
+> You should (eventually) have a device tree binding for the event channel
+> and use a OF (device tree) device driver instead of this core_initcall()
+> to register the handler etc.
+ 
+Yes, that is the idea, once we have better device tree support in Xen.
+We should also pass the IRQ number to be used as event injection
+mechanism through the device tree.
