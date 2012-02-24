@@ -1,140 +1,94 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 24 Feb 2012 17:21:42 +0200
-Subject: [PATCHv2] regulator: twl6030: add support for vdd1,
- vdd2 and vdd3 regulators
-Message-ID: <1330096902-20933-1-git-send-email-t-kristo@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Feb 2012 15:23:18 +0000
+Subject: [GIT PULL] ux500 patches for v3.4
+In-Reply-To: <CACRpkdZywv-Exu0=-fvuNFnuBGRXKZCPFXUW7movcoeUn+1=6A@mail.gmail.com>
+References: <1329809787-2788-1-git-send-email-linus.walleij@linaro.org>
+ <201202211700.39669.arnd@arndb.de>
+ <CACRpkdZywv-Exu0=-fvuNFnuBGRXKZCPFXUW7movcoeUn+1=6A@mail.gmail.com>
+Message-ID: <201202241523.18355.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vdd1 and vdd2 are now common regulators for twl4030 and twl6030. Also
-added vdd3 as a new regulator for twl6030. twl6030 vdd1...vdd3 smps
-regulator voltages can only be controlled through the smartreflex
-voltage channel, thus the support for the voltage_get and set is
-minimal and requires external controller.
+On Friday 24 February 2012, Linus Walleij wrote:
+> On Tue, Feb 21, 2012 at 6:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
- drivers/mfd/twl-core.c            |   15 ++++++++++++++
- drivers/regulator/twl-regulator.c |   39 +++++++++++++++++++++++++++++++++++++
- include/linux/i2c/twl.h           |    5 ++-
- 3 files changed, 57 insertions(+), 2 deletions(-)
+> > * The handling of the DB9540_ROM adds a number of special cases,
+> > but in the end it looks like this is not used anywhere, so I'd
+> > recomment just removing it. If you get something that needs the
+> > ROM to be mapped, just make that use ioremap.
+> 
+> It is used to read out the ASIC ID, like this:
+> 
+> +static unsigned int u9540_read_asicid(phys_addr_t addr)
+> +{
+> +       phys_addr_t base = addr & ~0xfff;
+> +       struct map_desc desc = {
+> +               .virtual        = IO_ADDRESS_DB9540_ROM(base),
+> +               .pfn            = __phys_to_pfn(base),
+> +               .length         = SZ_16K,
+> +               .type           = MT_DEVICE,
+> +       };
+> +
+> +       iotable_init(&desc, 1);
+> +
+> +       /* As in devicemaps_init() */
+> +       local_flush_tlb_all();
+> +       flush_cache_all();
+> +
+> +       return readl(__io_address_db9540_rom(addr));
+> +}
 
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index 45ab243..0d3db89 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -949,6 +949,21 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
- 	/* twl6030 regulators */
- 	if (twl_has_regulator() && twl_class_is_6030() &&
- 			!(features & TWL6025_SUBCLASS)) {
-+		child = add_regulator(TWL6030_REG_VDD1, pdata->vdd1,
-+					features);
-+		if (IS_ERR(child))
-+			return PTR_ERR(child);
-+
-+		child = add_regulator(TWL6030_REG_VDD2, pdata->vdd2,
-+					features);
-+		if (IS_ERR(child))
-+			return PTR_ERR(child);
-+
-+		child = add_regulator(TWL6030_REG_VDD3, pdata->vdd3,
-+					features);
-+		if (IS_ERR(child))
-+			return PTR_ERR(child);
-+
- 		child = add_regulator(TWL6030_REG_VMMC, pdata->vmmc,
- 					features);
- 		if (IS_ERR(child))
-diff --git a/drivers/regulator/twl-regulator.c b/drivers/regulator/twl-regulator.c
-index 7ff8bb2..8611282 100644
---- a/drivers/regulator/twl-regulator.c
-+++ b/drivers/regulator/twl-regulator.c
-@@ -561,6 +561,32 @@ static struct regulator_ops twl4030smps_ops = {
- 	.get_voltage	= twl4030smps_get_voltage,
- };
- 
-+static int twl6030coresmps_set_voltage(struct regulator_dev *rdev, int min_uV,
-+	int max_uV, unsigned *selector)
-+{
-+	struct twlreg_info *info = rdev_get_drvdata(rdev);
-+
-+	if (info->set_voltage)
-+		return info->set_voltage(info->data, min_uV);
-+
-+	return -ENODEV;
-+}
-+
-+static int twl6030coresmps_get_voltage(struct regulator_dev *rdev)
-+{
-+	struct twlreg_info *info = rdev_get_drvdata(rdev);
-+
-+	if (info->get_voltage)
-+		return info->get_voltage(info->data);
-+
-+	return -ENODEV;
-+}
-+
-+static struct regulator_ops twl6030coresmps_ops = {
-+	.set_voltage	= twl6030coresmps_set_voltage,
-+	.get_voltage	= twl6030coresmps_get_voltage,
-+};
-+
- static int twl6030ldo_list_voltage(struct regulator_dev *rdev, unsigned index)
- {
- 	struct twlreg_info	*info = rdev_get_drvdata(rdev);
-@@ -926,6 +952,16 @@ static struct regulator_ops twlsmps_ops = {
- 		}, \
- 	}
- 
-+#define TWL6030_ADJUSTABLE_SMPS(label) { \
-+	.desc = { \
-+		.name = #label, \
-+		.id = TWL6030_REG_##label, \
-+		.ops = &twl6030coresmps_ops, \
-+		.type = REGULATOR_VOLTAGE, \
-+		.owner = THIS_MODULE, \
-+		}, \
-+	}
-+
- #define TWL6030_ADJUSTABLE_LDO(label, offset, min_mVolts, max_mVolts) { \
- 	.base = offset, \
- 	.min_mV = min_mVolts, \
-@@ -1027,6 +1063,9 @@ static struct twlreg_info twl_regs[] = {
- 	/* 6030 REG with base as PMC Slave Misc : 0x0030 */
- 	/* Turnon-delay and remap configuration values for 6030 are not
- 	   verified since the specification is not public */
-+	TWL6030_ADJUSTABLE_SMPS(VDD1),
-+	TWL6030_ADJUSTABLE_SMPS(VDD2),
-+	TWL6030_ADJUSTABLE_SMPS(VDD3),
- 	TWL6030_ADJUSTABLE_LDO(VAUX1_6030, 0x54, 1000, 3300),
- 	TWL6030_ADJUSTABLE_LDO(VAUX2_6030, 0x58, 1000, 3300),
- 	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 1000, 3300),
-diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-index 5790466..59e662b 100644
---- a/include/linux/i2c/twl.h
-+++ b/include/linux/i2c/twl.h
-@@ -700,6 +700,9 @@ struct twl4030_platform_data {
- 	struct regulator_init_data		*vaux1;
- 	struct regulator_init_data		*vaux2;
- 	struct regulator_init_data		*vaux3;
-+	struct regulator_init_data		*vdd1;
-+	struct regulator_init_data		*vdd2;
-+	struct regulator_init_data		*vdd3;
- 	/* TWL4030 LDO regulators */
- 	struct regulator_init_data		*vpll1;
- 	struct regulator_init_data		*vpll2;
-@@ -708,8 +711,6 @@ struct twl4030_platform_data {
- 	struct regulator_init_data		*vsim;
- 	struct regulator_init_data		*vaux4;
- 	struct regulator_init_data		*vio;
--	struct regulator_init_data		*vdd1;
--	struct regulator_init_data		*vdd2;
- 	struct regulator_init_data		*vintana1;
- 	struct regulator_init_data		*vintana2;
- 	struct regulator_init_data		*vintdig;
--- 
-1.7.4.1
+Do I understand this correctly that there is a new chip that
+is almost the same as the old one, but the main difference is
+location of the register that tells us which one it is? ;-)
+
+> Notice that ioremap() cannot be used here since it is used at
+> arch init time (as was discussed a while back with Nicolas
+> I think). Most platforms need to use an approach like this
+> to get chip ID:s at early init time.
+> 
+> The read-out ASIC ID is then used for the cpu_is_u9540() function
+> which is then used for the cpu_is_u8500_family()  to ensure that
+> the same codepath is used for the entire family.
+> 
+> So if I remove this part the support patch is moot.
+
+Ok, I see.
+
+How about hardcoding the virtual address for the id register so
+that you can actually use the same function:?
+
+static unsigned int ux500_read_asicid(phys_addr_t addr)
+{
+        phys_addr_t base = addr & ~PAGE_MASK;
+	unsigned long offset = addr & PAGE_MASK;
+
+        struct map_desc desc = {
+                .virtual        = (unsigned long)UX500_ASICID_ADDR,
+                .pfn            = __phys_to_pfn(base),
+                .length         = SZ_4K,
+                .type           = MT_DEVICE,
+        };
+
+        iotable_init(&desc, 1);
+
+        /* As in devicemaps_init() */
+        local_flush_tlb_all();
+        flush_cache_all();
+
+        return readl(UX500_ASICID_ADDR + offset);
+}       
+
+Then you just need to find a convenient value for UX500_ASICID_VIRT
+that does not conflict with the other static mappings.
+
+> > * I assume that we will need to add a few changes to make this
+> > actually work together with Lee's series.
+> 
+> It actually works just fine. I just merged this patchset into
+> next-20120224, compiled and booted, it JustWorks(TM) because the
+> changes are strangely enough orthogonal.
+
+Ok, good.
+
+	Arnd
