@@ -1,65 +1,154 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 24 Feb 2012 10:49:00 -0800
-Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and
- board data
-In-Reply-To: <4F470B71.1020308@ti.com>
-References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
- <1329998490-27555-5-git-send-email-rnayak@ti.com>
- <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
-Message-ID: <20120224184859.GN18185@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 24 Feb 2012 13:04:32 -0600
+Subject: [PATCH] ARM: integrator: convert to sparse irqs
+In-Reply-To: <1330104737-22782-1-git-send-email-linus.walleij@linaro.org>
+References: <1330104737-22782-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4F47DF40.30703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [120223 19:29]:
-> On Friday 24 February 2012 12:27 AM, Tony Lindgren wrote:
-> >>--- a/arch/arm/boot/dts/omap3.dtsi
-> >>+++ b/arch/arm/boot/dts/omap3.dtsi
-> >>@@ -113,5 +113,31 @@
-> >>  			#size-cells =<0>;
-> >>  			ti,hwmods = "i2c3";
-> >>  		};
-> >>+
-> >>+		mmc1: mmc at 1 {
-> >>+			compatible = "ti,omap2-hsmmc";
-> >>+			ti,hwmods = "mmc1";
-> >>+			ti,dual-volt;
-> >>+		};
-> >>+
-> >>+		mmc2: mmc at 2 {
-> >>+			compatible = "ti,omap2-hsmmc";
-> >>+			ti,hwmods = "mmc2";
-> >>+		};
-> >>+
-> >>+		mmc3: mmc at 3 {
-> >>+			compatible = "ti,omap2-hsmmc";
-> >>+			ti,hwmods = "mmc3";
-> >>+		};
-> >>+
-> >>+		mmc4: mmc at 4 {
-> >>+			compatible = "ti,omap2-hsmmc";
-> >>+			ti,hwmods = "mmc4";
-> >>+		};
-> >>+
-> >>+		mmc5: mmc at 5 {
-> >>+			compatible = "ti,omap2-hsmmc";
-> >>+			ti,hwmods = "mmc5";
-> >>+		};
-> >>  	};
-> >>  };
-> >
-> >These all should all be "ti,omap3-hsmmc" I guess?
+On 02/24/2012 11:32 AM, Linus Walleij wrote:
+> This converts the Integrator AP/CP to use sparse IRQs.
+> Tested on both machines.
 > 
-> Well, I defined the binding such that both omap2 and omap3
-> can use the same compatible "ti,omap2-hsmmc" since there is
-> no difference in the way they are defined or handled. If thats
-> confusing, I can have separate compatibles.
-> Btw, I guess we do the same with a few other re-used IPs as well,
-> I just checked and mcpsi does the same.
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yeah let's use separate compatibles to avoid confusion.
-For omap2 we also have the ti,omap2-mmc in addition to
-ti,omap2-hsmmc..
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-Regards,
-
-Tony
+> ---
+>  arch/arm/Kconfig                             |    1 +
+>  arch/arm/mach-integrator/core.c              |    3 ++-
+>  arch/arm/mach-integrator/include/mach/irqs.h |    3 ++-
+>  arch/arm/mach-integrator/integrator_ap.c     |    3 ++-
+>  arch/arm/mach-integrator/integrator_cp.c     |    3 ++-
+>  arch/arm/mach-integrator/pci.c               |    3 ++-
+>  arch/arm/mach-integrator/pci_v3.c            |    3 ++-
+>  7 files changed, 13 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 4852a6b..fc10ed8 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -266,6 +266,7 @@ config ARCH_INTEGRATOR
+>  	select PLAT_VERSATILE
+>  	select PLAT_VERSATILE_FPGA_IRQ
+>  	select NEED_MACH_MEMORY_H
+> +	select SPARSE_IRQ
+>  	help
+>  	  Support for ARM's Integrator platform.
+>  
+> diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
+> index 15b87f2..304dfb2 100644
+> --- a/arch/arm/mach-integrator/core.c
+> +++ b/arch/arm/mach-integrator/core.c
+> @@ -25,8 +25,9 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/platform.h>
+> -#include <asm/irq.h>
+>  #include <mach/cm.h>
+> +#include <mach/irqs.h>
+> +
+>  #include <asm/system.h>
+>  #include <asm/leds.h>
+>  #include <asm/mach-types.h>
+> diff --git a/arch/arm/mach-integrator/include/mach/irqs.h b/arch/arm/mach-integrator/include/mach/irqs.h
+> index 1fbe6d1..a19a1a2 100644
+> --- a/arch/arm/mach-integrator/include/mach/irqs.h
+> +++ b/arch/arm/mach-integrator/include/mach/irqs.h
+> @@ -78,5 +78,6 @@
+>  #define IRQ_SIC_CP_LMINT7		46
+>  #define IRQ_SIC_END			46
+>  
+> -#define NR_IRQS                         47
+> +#define NR_IRQS_INTEGRATOR_AP		34
+> +#define NR_IRQS_INTEGRATOR_CP		47
+>  
+> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+> index 4dde28b..871f148 100644
+> --- a/arch/arm/mach-integrator/integrator_ap.c
+> +++ b/arch/arm/mach-integrator/integrator_ap.c
+> @@ -38,13 +38,13 @@
+>  #include <mach/hardware.h>
+>  #include <mach/platform.h>
+>  #include <asm/hardware/arm_timer.h>
+> -#include <asm/irq.h>
+>  #include <asm/setup.h>
+>  #include <asm/param.h>		/* HZ */
+>  #include <asm/mach-types.h>
+>  #include <asm/sched_clock.h>
+>  
+>  #include <mach/lm.h>
+> +#include <mach/irqs.h>
+>  
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/irq.h>
+> @@ -475,6 +475,7 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
+>  	.atag_offset	= 0x100,
+>  	.reserve	= integrator_reserve,
+>  	.map_io		= ap_map_io,
+> +	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
+>  	.init_early	= integrator_init_early,
+>  	.init_irq	= ap_init_irq,
+>  	.timer		= &ap_timer,
+> diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+> index be9ead4..48a115a 100644
+> --- a/arch/arm/mach-integrator/integrator_cp.c
+> +++ b/arch/arm/mach-integrator/integrator_cp.c
+> @@ -26,7 +26,6 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/platform.h>
+> -#include <asm/irq.h>
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/hardware/arm_timer.h>
+> @@ -34,6 +33,7 @@
+>  
+>  #include <mach/cm.h>
+>  #include <mach/lm.h>
+> +#include <mach/irqs.h>
+>  
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/irq.h>
+> @@ -464,6 +464,7 @@ MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
+>  	.atag_offset	= 0x100,
+>  	.reserve	= integrator_reserve,
+>  	.map_io		= intcp_map_io,
+> +	.nr_irqs	= NR_IRQS_INTEGRATOR_CP,
+>  	.init_early	= intcp_init_early,
+>  	.init_irq	= intcp_init_irq,
+>  	.timer		= &cp_timer,
+> diff --git a/arch/arm/mach-integrator/pci.c b/arch/arm/mach-integrator/pci.c
+> index 520b6bf..e15aa43 100644
+> --- a/arch/arm/mach-integrator/pci.c
+> +++ b/arch/arm/mach-integrator/pci.c
+> @@ -26,11 +26,12 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/init.h>
+>  
+> -#include <asm/irq.h>
+>  #include <asm/system.h>
+>  #include <asm/mach/pci.h>
+>  #include <asm/mach-types.h>
+>  
+> +#include <mach/irqs.h>
+> +
+>  /* 
+>   * A small note about bridges and interrupts.  The DECchip 21050 (and
+>   * later) adheres to the PCI-PCI bridge specification.  This says that
+> diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+> index 3c82566..65e5896 100644
+> --- a/arch/arm/mach-integrator/pci_v3.c
+> +++ b/arch/arm/mach-integrator/pci_v3.c
+> @@ -30,7 +30,8 @@
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/platform.h>
+> -#include <asm/irq.h>
+> +#include <mach/irqs.h>
+> +
+>  #include <asm/signal.h>
+>  #include <asm/system.h>
+>  #include <asm/mach/pci.h>
