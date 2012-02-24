@@ -1,123 +1,81 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 24 Feb 2012 12:20:08 +0530
-Subject: [PATCH 2/6] ARM: OMAP4 PM: Add IO Daisychain support
-In-Reply-To: <5672BD13E82B844A93BB4597F293F19A0B3F41AF@DNCE02.ent.ti.com>
-References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
- <1330003320-17400-3-git-send-email-t-kristo@ti.com>
- <5672BD13E82B844A93BB4597F293F19A0B3F41AF@DNCE02.ent.ti.com>
-Message-ID: <4F473320.7000901@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 Feb 2012 07:51:02 +0100
+Subject: [GIT PULL] ux500 patches for v3.4
+In-Reply-To: <201202211700.39669.arnd@arndb.de>
+References: <1329809787-2788-1-git-send-email-linus.walleij@linaro.org>
+ <201202211700.39669.arnd@arndb.de>
+Message-ID: <CACRpkdZywv-Exu0=-fvuNFnuBGRXKZCPFXUW7movcoeUn+1=6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Djamil,
+On Tue, Feb 21, 2012 at 6:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Thursday 23 February 2012 09:28 PM, Elaidi, Djamil wrote:
-> Hi Kristo,
->
-> I think you must also add a omap_test_timeout() check after the Trigger WUCLKIN disable, to verify WUCLK_STATUS has come back to 0.
-> This is needed because the IO daisy chain will not be ready until the WUCLKIN falling edge has propagated.
+> Most of the patches look ok, but since this about a new SoC,
+> I decided to take a much closer look and found a few issues that
+> I think you can still fix:
 
-You are right, this was missed and needs to be added.
-Thanks for the review.
+Actually it's a sibling to U8500 more than a completely new one, an
+incremental step.
 
-regards,
-Rajendra
+> * The handling of the DB9540_ROM adds a number of special cases,
+> but in the end it looks like this is not used anywhere, so I'd
+> recomment just removing it. If you get something that needs the
+> ROM to be mapped, just make that use ioremap.
 
->
-> +	/* Trigger WUCLKIN disable */
-> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
-> +			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
-> +	return;
-> +	omap_test_timeout(
-> +		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
-> +			OMAP4_PRM_IO_PMCTRL_OFFSET)&
-> +			OMAP4430_WUCLK_STATUS_MASK)>>
-> +			OMAP4430_WUCLK_STATUS_SHIFT) == 0),
-> +		MAX_IOPAD_LATCH_TIME, i);
->
->
-> Best regards
-> Djamil ELA?DI
-> +33 4 97 27 50 97
-> Software Systems Engineer
-> OMAP Platform Business Unit - PSI Modem Integration
-> Texas Instruments
->
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Kristo, Tero
-> Sent: jeudi 23 f?vrier 2012 14:22
-> To: linux-omap at vger.kernel.org; Hilman, Kevin
-> Cc: linux-arm-kernel at lists.infradead.org; Nayak, Rajendra; Sripathy, Vishwanath
-> Subject: [PATCH 2/6] ARM: OMAP4 PM: Add IO Daisychain support
->
-> From: Rajendra Nayak<rnayak@ti.com>
->
-> patch adds IO Daisychain support for OMAP4 as per section 3.9.4 in OMAP4430
-> Public TRM.
->
-> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
-> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com>
-> Signed-off-by: Tero Kristo<t-kristo@ti.com>
-> ---
->   arch/arm/mach-omap2/prm44xx.c |   32 ++++++++++++++++++++++++++++++++
->   arch/arm/mach-omap2/prm44xx.h |    1 +
->   2 files changed, 33 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-> index 33dd655..1557647 100644
-> --- a/arch/arm/mach-omap2/prm44xx.c
-> +++ b/arch/arm/mach-omap2/prm44xx.c
-> @@ -230,6 +230,41 @@ void omap44xx_prm_restore_irqen(u32 *saved_mask)
->   				 OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
->   }
->
-> +/**
-> + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
-> + * the I/O ring after asserting WUCLKIN high
-> + */
-> +#define MAX_IOPAD_LATCH_TIME 1000
-> +
-> +/* OMAP4 IO Daisychain trigger sequence */
-> +void omap4_trigger_wuclk_ctrl(void)
-> +{
-> +	int i = 0;
-> +
-> +	/* Enable GLOBAL_WUEN */
-> +	if (!(omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
-> +		OMAP4_PRM_IO_PMCTRL_OFFSET)&  OMAP4430_GLOBAL_WUEN_MASK))
-> +		omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
-> +			OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_PRM_DEVICE_INST,
-> +			OMAP4_PRM_IO_PMCTRL_OFFSET);
-> +
-> +	/* Trigger WUCLKIN enable */
-> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK,
-> +			OMAP4430_WUCLK_CTRL_MASK, OMAP4430_PRM_DEVICE_INST,
-> +			OMAP4_PRM_IO_PMCTRL_OFFSET);
-> +	omap_test_timeout(
-> +		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
-> +			OMAP4_PRM_IO_PMCTRL_OFFSET)&
-> +			OMAP4430_WUCLK_STATUS_MASK)>>
-> +			OMAP4430_WUCLK_STATUS_SHIFT) == 1),
-> +		MAX_IOPAD_LATCH_TIME, i);
-> +
-> +	/* Trigger WUCLKIN disable */
-> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
-> +			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
-> +	return;
-> +}
-> +
->   static int __init omap4xxx_prcm_init(void)
->   {
->   	if (cpu_is_omap44xx())
-> diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
-> index 7978092..a840f0f 100644
-> --- a/arch/arm/mach-omap2/prm44xx.h
-> +++ b/arch/arm/mach-omap2/prm44xx.h
-> @@ -762,6 +762,7 @@ void omap4_prm_vp_clear_txdone(u8 vp_id);
->   extern u32 omap4_prm_vcvp_read(u8 offset);
->   extern void omap4_prm_vcvp_write(u32 val, u8 offset);
->   extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
-> +extern void omap4_trigger_wuclk_ctrl(void);
->
->   /* PRM interrupt-related functions */
->   extern void omap44xx_prm_read_pending_irqs(unsigned long *events);
+It is used to read out the ASIC ID, like this:
+
++static unsigned int u9540_read_asicid(phys_addr_t addr)
++{
++       phys_addr_t base = addr & ~0xfff;
++       struct map_desc desc = {
++               .virtual        = IO_ADDRESS_DB9540_ROM(base),
++               .pfn            = __phys_to_pfn(base),
++               .length         = SZ_16K,
++               .type           = MT_DEVICE,
++       };
++
++       iotable_init(&desc, 1);
++
++       /* As in devicemaps_init() */
++       local_flush_tlb_all();
++       flush_cache_all();
++
++       return readl(__io_address_db9540_rom(addr));
++}
+
+Notice that ioremap() cannot be used here since it is used at
+arch init time (as was discussed a while back with Nicolas
+I think). Most platforms need to use an approach like this
+to get chip ID:s at early init time.
+
+The read-out ASIC ID is then used for the cpu_is_u9540() function
+which is then used for the cpu_is_u8500_family()  to ensure that
+the same codepath is used for the entire family.
+
+So if I remove this part the support patch is moot.
+
+> * You add a new irqs-db9540.h file, but the macros defined in there
+> are not actually used. Better not add that file then, especially
+> since the interrupt definitions will soon all move into device
+> tree for ux500.
+
+OK that's true, I've deleted it and will respin a v2 without
+the IRQ file, then iterate the pull request.
+
+> * I assume that we will need to add a few changes to make this
+> actually work together with Lee's series.
+
+It actually works just fine. I just merged this patchset into
+next-20120224, compiled and booted, it JustWorks(TM) because the
+changes are strangely enough orthogonal.
+
+> I would suggest that
+> I put your series into the next/soc branch and merge it into
+> the next/soc2 branch as well, which already has his patches.
+> Then you can add a patch on top that adds the necessary changes,
+> if any.
+
+Hm, not quite following but I think it will just work :-)
+
+Yours,
+Linus Walleij
