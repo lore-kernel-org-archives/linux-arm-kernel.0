@@ -1,78 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Feb 2012 22:12:06 +0000
-Subject: [PATCH 5/5] ARM: Cortex-M3: Add support for exception handling
-In-Reply-To: <20120224220122.GD14173@pengutronix.de>
-References: <20120216200143.GS14173@pengutronix.de>
- <1329423490-15580-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1329423490-15580-5-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120216222002.GL27825@n2100.arm.linux.org.uk>
- <20120224220122.GD14173@pengutronix.de>
-Message-ID: <CAHkRjk70x+Fn+Z4iUxSMc7Zq2cKBo_ka0tNhV0i5JWmEixpRrA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 24 Feb 2012 14:19:47 -0800
+Subject: [PATCH v2 5/7] ARM: OMAP2+: Split omap2_hsmmc_init() to
+ properly support I2C GPIO pins
+In-Reply-To: <4F470DDA.7050603@ti.com>
+References: <1329997247-27342-1-git-send-email-rnayak@ti.com>
+ <1329997247-27342-6-git-send-email-rnayak@ti.com>
+ <4F464CFF.3080006@compulab.co.il>
+ <20120223184751.GX18185@atomide.com> <4F470DDA.7050603@ti.com>
+Message-ID: <20120224221947.GA18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+* Rajendra Nayak <rnayak@ti.com> [120223 19:39]:
+> On Friday 24 February 2012 12:17 AM, Tony Lindgren wrote:
+> >* Igor Grinberg<grinberg@compulab.co.il>  [120223 05:56]:
+> >>>--- a/arch/arm/mach-omap2/board-cm-t35.c
+> >>>+++ b/arch/arm/mach-omap2/board-cm-t35.c
+> >>>@@ -411,9 +411,9 @@ static struct omap2_hsmmc_info mmc[] = {
+> >>>  	{
+> >>>  		.mmc		= 1,
+> >>>  		.caps		= MMC_CAP_4_BIT_DATA,
+> >>>-		.gpio_cd	= -EINVAL,
+> >>>+		.gpio_cd	= OMAP_MAX_GPIO_LINES + 0,
+> >>>  		.gpio_wp	= -EINVAL,
+> >
+> >I don't have these changes, in my second revision of the patch.
+> >
+> >It's best not to hardcode the values here.
+> 
+> Ok, I just though doing it the other way is more round about
+> hardcoding where in the board passes a hardcoded value to
+> twl4030 gpio driver and the driver passes the *same* hardcoded
+> value back to the board callback, which is then populated in
+> mmc pdata. The board could as well directly hardcode it in the
+> mmc pdata. That makes it much more readable than this round about
+> hardcoding.
+> But I'll go back to the old way if you think thats how we should
+> handle this.
 
-2012/2/24 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Thu, Feb 16, 2012 at 10:20:02PM +0000, Russell King - ARM Linux wrote:
->> On Thu, Feb 16, 2012 at 09:18:10PM +0100, Uwe Kleine-K?nig wrote:
->> > + ? .macro ?v7m_exception_entry
->> > + ? cpsid ? i
->> > + ? tst ? ? lr, #0x8 ? ? ? ? ? ? ? ?@ check the return stack
->> > + ? bne ? ? 1f ? ? ? ? ? ? ? ? ? ? ?@ exception on process stack
->> > + ? add ? ? r12, sp, #32 ? ? ? ? ? ?@ MSP before exception
->> > + ? stmdb ? sp!, {r4-r12, lr} ? ? ? @ push unsaved registers
->> > + ? b ? ? ? 2f
->> > +1:
->> > + ? mrs ? ? r12, psp ? ? ? ? ? ? ? ?@ get the process stack
->> > + ? sub ? ? sp, #S_FRAME_SIZE
->> > + ? stmia ? sp, {r4-r12, lr} ? ? ? ?@ push unsaved registers
->> > + ? ldmia ? r12, {r0-r3, r6, r8-r10} @ load automatically saved registers
->> > + ? add ? ? r12, sp, #S_R0
->> > + ? stmia ? r12, {r0-r3, r6, r8-r10} @ fill in the rest of struct pt_regs
->>
->> I guess this means that pt_regs no longer contains r0..pc, cpsr, old_r0
->> on this Cortex-M ?
+Yes let's not change it, or if we need to change it, let's do
+it in a separate patch.
+ 
+> >
+> >>>-
+> >>>+		.deferred	= true,
+> >>>  	},
+> >>>  	{
+> >>>  		.mmc		= 2,
+> >>>@@ -422,6 +422,7 @@ static struct omap2_hsmmc_info mmc[] = {
+> >>>  		.gpio_cd	= -EINVAL,
+> >>>  		.gpio_wp	= -EINVAL,
+> >>>  		.ocr_mask	= 0x00100000,	/* 3.3V */
+> >>>+		.deferred	= true,
+> >>
+> >>Why do you defer this one?
+> >>It does not use external GPIO chip, in fact it does not use CD/WP at all.
+> >
+> >Why do you have the following then to set gpio_cd?
+> 
+> There is only one instance of gpio_cd being populated for the
+> first element in the array mmc[], which is already deferred.
+> 
+> >>> -	mmc[0].gpio_cd = gpio + 0;
+> 
+> Igor was asking about the second element in the array which never
+> has gpio_cd populated. Its just initialized to -EINVAL and stays
+> that way.
 
-Just to reply to Russell - yes, this part needs changing (could be the
-pt_regs saving or just the signal and trace code that copies them to
-user so that we preserve the ABI).
+Ah OK, sorry I forgot about that..
+ 
+> Sorry for the mess up. I will make sure I have taken all changes/fixes
+> from your reposts.
 
-> I stared at the code now for some time and I wonder if it wouldn't be
-> the most nice solution to just do something like this on exception
-> entry:
->
-> ? ? ? ?cpsid ? i
-> ? ? ? ?sub ? ? sp, #S_FRAME_SIZE
-> ? ? ? ?stmia ? sp, {r0-r12}
-> ? ? ? ?put_the_right_sp_to_sp[13]
-> ? ? ? ?put_lr_returnaddr_and_xPSR_from_right_stack_to_sp[14-16]
->
-> For returning you could just do:
->
-> ? ? ? ?add ? ? sp, #S_FRAME_SIZE
-> ? ? ? ?cpsie ? i
-> ? ? ? ?bx ? ? ?lr
+No problem, thanks.
 
-For this kind of returning, do we actually change between Process and
-Handler stack?
-
-But we still need to set the pt_regs to the user stack. The kernel
-would touch all of them if a signal is to be delivered (actually
-restoring them when returning from the signal handler).
-
-> after fixing r0 on the right stack in case you need to return something.
->
-> The machine takes care to restore {r0-r3,r12,lr} and the remaining
-> registers should be untouched as everything we called between entry and
-> exit is AAPCS conformant.
-
-As I said, we have sys_sigreturn which modifies those registers.
-
-> Anyhow, I will try to implement that if I still think it could work
-> after sleeping.
-
-It's late here as well :). We'll see next week.
-
--- 
-Catalin
+Tony
