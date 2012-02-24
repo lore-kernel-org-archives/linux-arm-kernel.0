@@ -1,36 +1,47 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 24 Feb 2012 14:24:04 +0100
-Subject: [PATCHv6 3/7] ARM: dma-mapping: implement dma sg methods on top of
- any generic dma ops
-In-Reply-To: <20120214150255.GC18359@phenom.dumpdata.com>
-References: <1328900324-20946-1-git-send-email-m.szyprowski@samsung.com>
- <1328900324-20946-4-git-send-email-m.szyprowski@samsung.com>
- <20120214150255.GC18359@phenom.dumpdata.com>
-Message-ID: <013401ccf2f7$9413a0e0$bc3ae2a0$%szyprowski@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 24 Feb 2012 13:24:09 +0000
+Subject: [PATCH] regulator: twl6030: add support for vdd1, vdd2 and vdd3
+ regulators
+In-Reply-To: <1330089398.4102.539.camel@sokoban>
+References: <1329995109-4795-1-git-send-email-t-kristo@ti.com>
+ <20120223153422.GF4553@opensource.wolfsonmicro.com>
+ <1330076289.4102.517.camel@sokoban>
+ <20120224114940.GB5450@opensource.wolfsonmicro.com>
+ <1330089398.4102.539.camel@sokoban>
+Message-ID: <20120224132408.GF5450@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Feb 24, 2012 at 03:16:38PM +0200, Tero Kristo wrote:
 
-On Tuesday, February 14, 2012 4:03 PM Konrad Rzeszutek Wilk wrote:
- 
-> On Fri, Feb 10, 2012 at 07:58:40PM +0100, Marek Szyprowski wrote:
-> > This patch converts all dma_sg methods to be generic (independent of the
-> > current DMA mapping implementation for ARM architecture). All dma sg
-> > operations are now implemented on top of respective
-> > dma_map_page/dma_sync_single_for* operations from dma_map_ops structure.
-> 
-> Looks good, except the worry I've that the DMA debug API calls are now
-> lost.
+> I still ain't quite sure how this would work, do you mean adding
+> something like this:
 
-Could You point me which DMA debug API calls are lost? The inline functions
-from include/asm-generic/dma-mapping-common.h already have all required
-dma debug calls, which replaced the previous calls in 
-arch/arm/include/dma-mapping.h.
+> +static int twl6030smps_list_voltage(struct regulator_dev *rdev,
+> +                                   unsigned int selector)
+> +{
+> +       return selector;
+> +}
 
-(snipped)
+Yes.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> I believe this would fail still. I took a look at a few drivers that use
+> regulator_list_voltage(), but all of these seem to numerate voltages
+> based on regulator_count_voltages(), which will return -EINVAL for the
+> SMPS ones as the num_voltages is zero. Also, even if I defined
+> num_voltages here, I would be attempting to list_voltage for zero index,
+> returning zero, but this would be invalid voltage for the cpu obviously
+> (and is also out of range for the regulator min_voltage, and also
+> according to docs invalid return value for the function in the first
+> place.)
+
+Well, clearly some of the values won't actually be useful and you should
+feel free to return error values for those or apply an offset or
+something but the basic principle applies.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120224/f044e41f/attachment.sig>
