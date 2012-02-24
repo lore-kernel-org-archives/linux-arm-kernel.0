@@ -1,74 +1,205 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Feb 2012 18:16:21 +0000
-Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
- platforms
-In-Reply-To: <20120224143655.GH13504@mudshark.cambridge.arm.com>
-References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
- <20120220194634.GK26840@n2100.arm.linux.org.uk>
- <201202210124.23028.paul@codesourcery.com>
- <20120221083612.GG22562@n2100.arm.linux.org.uk>
- <20120221100041.GA19696@mudshark.cambridge.arm.com>
- <20120221101052.GH22562@n2100.arm.linux.org.uk>
- <20120221105250.GC19696@mudshark.cambridge.arm.com>
- <20120221113548.GK22562@n2100.arm.linux.org.uk>
- <20120221132216.GJ19696@mudshark.cambridge.arm.com>
- <20120224143655.GH13504@mudshark.cambridge.arm.com>
-Message-ID: <20120224181621.GH22562@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 24 Feb 2012 10:25:51 -0800
+Subject: [PATCH 8/8] ARM: OMAP2+: Limit omap_read/write usage to legacy
+ USB drivers
+In-Reply-To: <20120222224411.GO18185@atomide.com>
+References: <20120221233619.18709.87982.stgit@kaulin.local>
+ <20120221234051.18709.3571.stgit@kaulin.local>
+ <1329898441.2070.10.camel@deskari>
+ <20120222185728.GJ18185@atomide.com>
+ <20120222224411.GO18185@atomide.com>
+Message-ID: <20120224182551.GM18185@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 02:36:55PM +0000, Will Deacon wrote:
-> On Tue, Feb 21, 2012 at 01:22:16PM +0000, Will Deacon wrote:
-> > On Tue, Feb 21, 2012 at 11:35:48AM +0000, Russell King - ARM Linux wrote:
-> > > I don't think fixing this in mainline until we know the full story behind
-> > > this is the right thing to be doing.  There's no point fixing a feature
-> > > which no one's using.
+* Tony Lindgren <tony@atomide.com> [120222 14:13]:
+> * Tony Lindgren <tony@atomide.com> [120222 10:27]:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [120221 23:42]:
+> > > On Tue, 2012-02-21 at 15:40 -0800, Tony Lindgren wrote:
+> > > > Drivers should no longer use omap_read/write functions
+> > > > but instead use ioremap + read/write functions.
+> > > > 
+> > > > As some USB legacy code is still shared between omap1 and
+> > > > omap2420, let's limit the omap_read/write to plat/usb.h.
+> > > > 
+> > > > Also, let's make drivers/video/omap/lcdc.c depend on
+> > > > ARCH_OMAP1 as it is not needed for omap2+.
+> > > 
+> > > I'm ok with the lcdc.c change, but I also have a patch series that makes
+> > > the same change, plus removes the omap2 code from drivers/video/omap/.
 > > 
-> > Understood. Paul - would you please be able to confirm that:
-> > 
-> > (a) GDB is currently broken on uclinux? (it certainly looks that way)
-> > (b) My proposed patch fixes the problem?
-> > 
-> > If you don't have an environment set up, I wonder if there's somebody else
-> > we can poke who's playing with this stuff.
+> > OK, I'll drop the lcdc.c change from my series as that should
+> > only affect randconfig builds.
 > 
-> Well in the meantime I had a play with the latest CodeSourcery tools:
-> 
-> GNU gdbserver (Sourcery G++ Lite 2011.03-46) 7.2.50.20100908-cvs
-> Copyright (C) 2010 Free Software Foundation, Inc.
-> gdbserver is free software, covered by the GNU General Public License.
-> This gdbserver was configured as "arm-uclinuxeabi"
-> 
-> on the target and
-> 
-> GNU gdb (Sourcery G++ Lite 2011.03-46) 7.2.50.20100908-cvs
-> Copyright (C) 2010 Free Software Foundation, Inc.
-> License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
-> This is free software: you are free to change and redistribute it.
-> There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
-> and "show warranty" for details.
-> This GDB was configured as "--host=i686-pc-linux-gnu --target=arm-uclinuxeabi".
-> 
-> on the host.
-> 
-> It seems as though my ptrace patch makes *no difference* because these
-> tools don't even use the PT_ADDR_TEXT etc magic offsets! As a result,
-> trying to set a breakpoint by symbol fails miserably because it tries to
-> poke the symbol offset directly, without adding on the base address of the
-> text.
-> 
-> Are there any tools available that use these magic numbers or are mine just
-> too old? Given that the whole thing dies after a while with:
-> 
-> [  909.062821] [430] gdbserver: obsolete system call 02b37558.
-> 
-> I'm not entirely convinced by the stability of what I'm using (that syscall
-> number looks like an address to me).
+> Here's this one updated. Noticed one more legacy driver
+> that needs omap_read/write defined to build on 2420.
 
-That suggests that this stuff definitely hasn't been tested, and there's
-no users of it (if there were I'm sure someone - either gdb folk or
-some kernel people) would've seen a bug report.
+This one needed some updates for usb.h after updating patch 7/8
+in this series. Updated patch below.
 
-Therefore, I propose that we remove this code from the kernel unless
-there's someone out there who can positively test this stuff as definitely
-working.
+Regards,
+
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 22 Feb 2012 14:52:41 -0800
+Subject: [PATCH] ARM: OMAP2+: Limit omap_read/write usage to legacy USB drivers
+
+Drivers should no longer use omap_read/write functions
+but instead use ioremap + read/write functions.
+
+As some USB legacy code is still shared between omap1 and
+omap2420, let's limit the omap_read/write to plat/usb.h.
+
+Note that the long term fix is to update the drivers to
+use ioremap and read/write functions. That can now be
+done as a separate patch series that is limited to the
+USB drivers.
+
+Also make sure the legacy omap1-keypad.c driver builds
+if selected for 2420 based systems.
+
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 09ca9e9..f78ec4e 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -242,15 +242,5 @@ struct omap_sdrc_params;
+ extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+ 				      struct omap_sdrc_params *sdrc_cs1);
+ 
+-/*
+- * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+- */
+-extern u8 omap_readb(u32 pa);
+-extern u16 omap_readw(u32 pa);
+-extern u32 omap_readl(u32 pa);
+-extern void omap_writeb(u8 v, u32 pa);
+-extern void omap_writew(u16 v, u32 pa);
+-extern void omap_writel(u32 v, u32 pa);
+-
+ #endif /* __ASSEMBLER__ */
+ #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 0119807..3203128 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -487,43 +487,3 @@ void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+ 		_omap2_init_reprogram_sdrc();
+ 	}
+ }
+-
+-/*
+- * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+- */
+-
+-u8 omap_readb(u32 pa)
+-{
+-	return __raw_readb(OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_readb);
+-
+-u16 omap_readw(u32 pa)
+-{
+-	return __raw_readw(OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_readw);
+-
+-u32 omap_readl(u32 pa)
+-{
+-	return __raw_readl(OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_readl);
+-
+-void omap_writeb(u8 v, u32 pa)
+-{
+-	__raw_writeb(v, OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_writeb);
+-
+-void omap_writew(u16 v, u32 pa)
+-{
+-	__raw_writew(v, OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_writew);
+-
+-void omap_writel(u32 v, u32 pa)
+-{
+-	__raw_writel(v, OMAP2_L4_IO_ADDRESS(pa));
+-}
+-EXPORT_SYMBOL(omap_writel);
+diff --git a/arch/arm/plat-omap/include/plat/keypad.h b/arch/arm/plat-omap/include/plat/keypad.h
+index 793ce9d..a6b21ed 100644
+--- a/arch/arm/plat-omap/include/plat/keypad.h
++++ b/arch/arm/plat-omap/include/plat/keypad.h
+@@ -12,6 +12,8 @@
+ 
+ #ifndef CONFIG_ARCH_OMAP1
+ #warning Please update the board to use matrix-keypad driver
++#define omap_readw(reg)		0
++#define omap_writew(val, reg)	do {} while (0)
+ #endif
+ #include <linux/input/matrix_keypad.h>
+ 
+diff --git a/arch/arm/plat-omap/include/plat/usb.h b/arch/arm/plat-omap/include/plat/usb.h
+index dc864b5..d0fc9f4 100644
+--- a/arch/arm/plat-omap/include/plat/usb.h
++++ b/arch/arm/plat-omap/include/plat/usb.h
+@@ -3,6 +3,7 @@
+ #ifndef	__ASM_ARCH_OMAP_USB_H
+ #define	__ASM_ARCH_OMAP_USB_H
+ 
++#include <linux/io.h>
+ #include <linux/usb/musb.h>
+ #include <plat/board.h>
+ 
+@@ -105,6 +106,46 @@ extern int omap4430_phy_set_clk(struct device *dev, int on);
+ extern int omap4430_phy_init(struct device *dev);
+ extern int omap4430_phy_exit(struct device *dev);
+ extern int omap4430_phy_suspend(struct device *dev, int suspend);
++
++/*
++ * NOTE: Please update omap USB drivers to use ioremap + read/write
++ */
++
++#define OMAP2_L4_IO_OFFSET	0xb2000000
++#define IOMEM(x)		((void __force __iomem *)(x))
++#define OMAP2_L4_IO_ADDRESS(pa)	IOMEM((pa) + OMAP2_L4_IO_OFFSET)
++
++static inline u8 omap_readb(u32 pa)
++{
++	return __raw_readb(OMAP2_L4_IO_ADDRESS(pa));
++}
++
++static inline u16 omap_readw(u32 pa)
++{
++	return __raw_readw(OMAP2_L4_IO_ADDRESS(pa));
++}
++
++static inline u32 omap_readl(u32 pa)
++{
++	return __raw_readl(OMAP2_L4_IO_ADDRESS(pa));
++}
++
++static inline void omap_writeb(u8 v, u32 pa)
++{
++	__raw_writeb(v, OMAP2_L4_IO_ADDRESS(pa));
++}
++
++
++static inline void omap_writew(u16 v, u32 pa)
++{
++	__raw_writew(v, OMAP2_L4_IO_ADDRESS(pa));
++}
++
++static inline void omap_writel(u32 v, u32 pa)
++{
++	__raw_writel(v, OMAP2_L4_IO_ADDRESS(pa));
++}
++
+ #endif
+ 
+ extern void am35x_musb_reset(void);
