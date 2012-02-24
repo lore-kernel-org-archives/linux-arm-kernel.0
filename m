@@ -1,32 +1,65 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 24 Feb 2012 22:09:35 +0800
-Subject: [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
-In-Reply-To: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri, 24 Feb 2012 22:09:36 +0800
+Subject: [PATCH 1/6] ASoC: fsl: correct get_dma_channel parameter name
+In-Reply-To: <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
 References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330092582-21180-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the third series towards reusing fsl_ssi driver on device tree
-based IMX platforms.  It makes a few cleanups on existing PowerPC code
-to ease the later addition of an IMX machine driver that works on
-fsl_ssi.
+The second parameter of function get_dma_channel is actually a property
+name rather than a compatible string, so rename it for less confusing.
 
-Shawn Guo (6):
-      ASoC: fsl: correct get_dma_channel parameter name
-      ASoC: fsl: align mpc8610_hpcd with p1022_ds on getting codec node
-      ASoC: Remove unnecessary -codec from cs4270 driver name
-      ASoC: fsl: create fsl_utils to accommodate the common functions
-      ASoC: fsl: use platform_device_id table to match p1022_ds device
-      ASoC: fsl: check property 'compatible' for the machine name
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ sound/soc/fsl/mpc8610_hpcd.c |    4 ++--
+ sound/soc/fsl/p1022_ds.c     |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
- sound/soc/codecs/cs4270.c    |    2 +-
- sound/soc/fsl/Kconfig        |    5 +
- sound/soc/fsl/Makefile       |    2 +
- sound/soc/fsl/fsl_ssi.c      |    6 +-
- sound/soc/fsl/fsl_utils.c    |  153 ++++++++++++++++++++++++++++++++++
- sound/soc/fsl/fsl_utils.h    |   29 +++++++
- sound/soc/fsl/mpc8610_hpcd.c |  167 +++----------------------------------
- sound/soc/fsl/p1022_ds.c     |  185 ++++-------------------------------------
- sound/soc/pxa/raumfeld.c     |    2 +-
- 9 files changed, 226 insertions(+), 325 deletions(-)
+diff --git a/sound/soc/fsl/mpc8610_hpcd.c b/sound/soc/fsl/mpc8610_hpcd.c
+index 0ea4a5a..15e06e9d 100644
+--- a/sound/soc/fsl/mpc8610_hpcd.c
++++ b/sound/soc/fsl/mpc8610_hpcd.c
+@@ -273,7 +273,7 @@ static int codec_node_dev_name(struct device_node *np, char *buf, size_t len)
+ }
+ 
+ static int get_dma_channel(struct device_node *ssi_np,
+-			   const char *compatible,
++			   const char *name,
+ 			   struct snd_soc_dai_link *dai,
+ 			   unsigned int *dma_channel_id,
+ 			   unsigned int *dma_id)
+@@ -283,7 +283,7 @@ static int get_dma_channel(struct device_node *ssi_np,
+ 	const u32 *iprop;
+ 	int ret;
+ 
+-	dma_channel_np = get_node_by_phandle_name(ssi_np, compatible,
++	dma_channel_np = get_node_by_phandle_name(ssi_np, name,
+ 						  "fsl,ssi-dma-channel");
+ 	if (!dma_channel_np)
+ 		return -EINVAL;
+diff --git a/sound/soc/fsl/p1022_ds.c b/sound/soc/fsl/p1022_ds.c
+index a5d4e80..d32ec46 100644
+--- a/sound/soc/fsl/p1022_ds.c
++++ b/sound/soc/fsl/p1022_ds.c
+@@ -276,7 +276,7 @@ static int codec_node_dev_name(struct device_node *np, char *buf, size_t len)
+ }
+ 
+ static int get_dma_channel(struct device_node *ssi_np,
+-			   const char *compatible,
++			   const char *name,
+ 			   struct snd_soc_dai_link *dai,
+ 			   unsigned int *dma_channel_id,
+ 			   unsigned int *dma_id)
+@@ -286,7 +286,7 @@ static int get_dma_channel(struct device_node *ssi_np,
+ 	const u32 *iprop;
+ 	int ret;
+ 
+-	dma_channel_np = get_node_by_phandle_name(ssi_np, compatible,
++	dma_channel_np = get_node_by_phandle_name(ssi_np, name,
+ 						  "fsl,ssi-dma-channel");
+ 	if (!dma_channel_np)
+ 		return -EINVAL;
+-- 
+1.7.5.4
