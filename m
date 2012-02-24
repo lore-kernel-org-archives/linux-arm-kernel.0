@@ -1,62 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Feb 2012 23:23:29 +0000
-Subject: [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
-In-Reply-To: <20120224232148.GA24268@S2101-09.ap.freescale.net>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <20120224140200.GH5450@opensource.wolfsonmicro.com>
- <20120224142342.GA16659@S2101-09.ap.freescale.net>
- <20120224141705.GJ5450@opensource.wolfsonmicro.com>
- <20120224232148.GA24268@S2101-09.ap.freescale.net>
-Message-ID: <20120224232329.GE15120@n2100.arm.linux.org.uk>
+Date: Fri, 24 Feb 2012 23:28:52 +0000
+Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <4F481BA6.7050705@freescale.com>
+References: <4F465A33.3020208@ru.mvista.com> <4F465EE5.4010908@freescale.com>
+ <20120223165242.GB22562@n2100.arm.linux.org.uk>
+ <4F4671BB.7060409@freescale.com>
+ <20120223171407.GC22562@n2100.arm.linux.org.uk>
+ <4F480120.6080409@freescale.com>
+ <20120224231501.GD15120@n2100.arm.linux.org.uk>
+ <4F481BA6.7050705@freescale.com>
+Message-ID: <20120224232851.GF15120@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 25, 2012 at 07:21:51AM +0800, Shawn Guo wrote:
-> On Fri, Feb 24, 2012 at 02:17:06PM +0000, Mark Brown wrote:
-> > On Fri, Feb 24, 2012 at 10:23:45PM +0800, Shawn Guo wrote:
-> > > On Fri, Feb 24, 2012 at 02:02:01PM +0000, Mark Brown wrote:
-> > 
-> > > > Please don't post new threads as followups to old threads, it makes
-> > > > things harder to follow in threaded mail readers.
-> > 
-> > > I did that because they are a big series, though some of the patches
-> > > can be standalone.
-> > 
-> > That doesn't seem to be related to my point?  I'm asking you to not
-> > reply to an old version of your patch series in order to post a new
-> > version of it, just post the new version.
+On Fri, Feb 24, 2012 at 05:22:14PM -0600, Timur Tabi wrote:
+> Russell King - ARM Linux wrote:
+> > What would be wrong with converting in_be32() in these drivers to
+> > instead ioread32be()?
 > 
-> This is the first version of this series.
+> Well, it wouldn't actually fix any problems.   It's just a stylistic
+> change for PowerPC.  On ARM, however, ioread32be() is wrong because the
+> SSI registers are little-endian.
 
-Your covering message for this series of six patches:
+So, to go around the loop a little further: to make this driver work
+_unaltered_ on ARM, we'd need an in_32be() that read the register
+_without_ doing the byte swapping.
 
-From: Shawn Guo <shawn.guo@linaro.org>
-To: alsa-devel at alsa-project.org
-Subject: [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
-Date: Fri, 24 Feb 2012 22:09:35 +0800
-Message-Id: <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
-X-Mailer: git-send-email 1.7.5.4
-In-Reply-To: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+But then, such an implementation of in_32be() would be absurd because
+it's not doing what it says.
 
-Your patch 1 from a previous series:
+So, the driver needs to change its accessor method.  There is no
+accessor in existance at present which does the right thing.
 
-From: Shawn Guo <shawn.guo@linaro.org>
-To: alsa-devel at alsa-project.org
-Subject: [PATCH 1/4] ASoC: imx: let SND_MXC_SOC_FIQ select FIQ
-Date: Thu, 23 Feb 2012 14:47:21 +0800
-Message-Id: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Notice the same message ids.  That means your covering letter with
-subject "[PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl" is a reply
-to your "[PATCH 1/4] ASoC: imx: let SND_MXC_SOC_FIQ select FIQ" message.
-
-Consequently anyone who reads list mail by threads gets your new series
-of six patches attached to your previous series of four patches.  That
-can be extremely annoying, especially when it ends up being buried in
-peoples mailboxes as a direct result of threaded sorting - and it's
-a recipe for your patches to be ignored.
+And then I went on to explain that there's more complicated cases too,
+where it seems that in theory you can end up with the same IP connected
+in BE mode and sitting behind a PCI bus, which presents the need for
+accessors which know the bus type by some means.
