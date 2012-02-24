@@ -1,66 +1,26 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Fri, 24 Feb 2012 10:55:28 +0800
-Subject: [V3 3/3] led: modified power control of pm860x led
-Message-ID: <1330052128-12302-1-git-send-email-jtzhou@marvell.com>
+From: B04825@freescale.com (Tabi Timur-B04825)
+Date: Fri, 24 Feb 2012 02:59:22 +0000
+Subject: [PATCH 1/4] ASoC: imx: add an explicit Kconfig option for
+ imx-ssi driver
+In-Reply-To: <20120224012850.GA4441@S2101-09.ap.freescale.net>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
+ <1330008519-3584-2-git-send-email-shawn.guo@linaro.org>
+ <4F465DD0.1020304@freescale.com>
+ <20120224012850.GA4441@S2101-09.ap.freescale.net>
+Message-ID: <4F46FD09.5020700@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since several sub modules such as backlight, leds and vibrator depend
-on the refernce group and internal oscillator in pm8606, so modified
-the power control of led in pm8606 by unified interface.
+Shawn Guo wrote:
+> That's what I'm doing.  But to be clear, imx-ssi driver will still
+> exist for all those non-DT i.MX platforms.  We are supporting DT for
+> imx5 and imx6, but have not seen a plan to migrate all those old i.MX
+> platforms to DT.
 
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
----
- drivers/leds/leds-88pm860x.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+On PowerPC, we handle this by creating cuImages.  These are kernel images 
+that have a DTB built-in.  Perhaps something like that is needed for ARM?
 
-diff --git a/drivers/leds/leds-88pm860x.c b/drivers/leds/leds-88pm860x.c
-index 4ca0062..5b61aaf 100644
---- a/drivers/leds/leds-88pm860x.c
-+++ b/drivers/leds/leds-88pm860x.c
-@@ -114,6 +114,27 @@ static inline int __blink_ctl_mask(int port)
- 	return ret;
- }
- 
-+static int led_power_set(struct pm860x_chip *chip, int port, int on)
-+{
-+	int ret = -EINVAL;
-+
-+	switch (port) {
-+	case PM8606_LED1_RED:
-+	case PM8606_LED1_GREEN:
-+	case PM8606_LED1_BLUE:
-+		ret = on ? pm8606_osc_enable(chip, RGB1_ENABLE) :
-+			pm8606_osc_disable(chip, RGB1_ENABLE);
-+		break;
-+	case PM8606_LED2_RED:
-+	case PM8606_LED2_GREEN:
-+	case PM8606_LED2_BLUE:
-+		ret = on ? pm8606_osc_enable(chip, RGB2_ENABLE) :
-+			pm8606_osc_disable(chip, RGB2_ENABLE);
-+		break;
-+	}
-+	return ret;
-+}
-+
- static void pm860x_led_work(struct work_struct *work)
- {
- 
-@@ -126,6 +147,7 @@ static void pm860x_led_work(struct work_struct *work)
- 	chip = led->chip;
- 	mutex_lock(&led->lock);
- 	if ((led->current_brightness == 0) && led->brightness) {
-+		led_power_set(chip, led->port, 1);
- 		if (led->iset) {
- 			pm860x_set_bits(led->i2c, __led_off(led->port),
- 					LED_CURRENT_MASK, led->iset);
-@@ -149,6 +171,7 @@ static void pm860x_led_work(struct work_struct *work)
- 					LED_CURRENT_MASK, 0);
- 			mask = __blink_ctl_mask(led->port);
- 			pm860x_set_bits(led->i2c, PM8606_WLED3B, mask, 0);
-+			led_power_set(chip, led->port, 0);
- 		}
- 	}
- 	led->current_brightness = led->brightness;
 -- 
-1.7.0.4
+Timur Tabi
+Linux kernel developer at Freescale
