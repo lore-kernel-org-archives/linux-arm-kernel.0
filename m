@@ -1,90 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Feb 2012 11:05:23 +0000
-Subject: [PATCH 3/3] ARM: support syscall tracing
-In-Reply-To: <4F44FFE4.5070708@mentor.com>
-References: <4F44FF58.3060907@mentor.com>
- <4F44FFE4.5070708@mentor.com>
-Message-ID: <20120224110522.GF13504@mudshark.cambridge.arm.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 24 Feb 2012 11:12:45 +0000
+Subject: [PATCH-WIP 07/13] xen/arm: receive xen events on arm
+In-Reply-To: <1330019314-20865-7-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <4F4770AD.6040703@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 02:47:00PM +0000, Wade Farnsworth wrote:
-> As specified by ftrace-design.txt, TIF_SYSCALL_TRACEPOINT was
-> added, as well as NR_syscalls in asm/unistd.h.  Additionally,
-> __sys_trace was modified to call trace_sys_enter and
-> trace_sys_exit when appropriate.
+On 23/02/12 17:48, Stefano Stabellini wrote:
+> Compile events.c and use IRQ 32 to receive events notifications.
 > 
-> Tests #2 - #4 of "perf test" now complete successfully.
-> 
-> Signed-off-by: Steven Walter <stevenrwalter@gmail.com>
-> Signed-off-by: Wade Farnsworth <wade_farnsworth@mentor.com>
-> ---
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-[...]
-
-> diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
-> index 512cd14..e4a2e78 100644
-> --- a/arch/arm/include/asm/unistd.h
-> +++ b/arch/arm/include/asm/unistd.h
-> @@ -405,6 +405,18 @@
->  #define __NR_process_vm_readv		(__NR_SYSCALL_BASE+376)
->  #define __NR_process_vm_writev		(__NR_SYSCALL_BASE+377)
->  
-> +#ifdef __KERNEL__
+> +#ifdef CONFIG_ARM
+> +#define IRQ_EVTCHN_CALLBACK 63
+> +irqreturn_t xen_arm_callback(int irq, void *arg)
+> +{
+> +	__xen_evtchn_do_upcall();
+> +	return 0;
+> +}
 > +
-> +/* This may need to be greater than __NR_last_syscall+1 in order to
-> + * account for the padding in the syscall table */
-> +#define __NR_syscalls  (380)
+> +int __init xen_init_IRQ_arm(void)
+> +{
+> +	int rc;
+> +	xen_init_IRQ();
+> +	rc = request_irq(IRQ_EVTCHN_CALLBACK, xen_arm_callback,
+> +			IRQF_DISABLED | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
+> +			"events", "events");	
+> +	if (rc) {
+> +		printk(KERN_ERR "Error requesting IRQ %d\n", IRQ_EVTCHN_CALLBACK);
+> +	}
+> +	return rc;
+> +}
+> +core_initcall(xen_init_IRQ_arm);
+> +#endif
 
-Do we actually have padding in the syscall table? It looks like a list of
-.long to me. I'd rather put the correct number in if possible.
+You should (eventually) have a device tree binding for the event channel
+and use a OF (device tree) device driver instead of this core_initcall()
+to register the handler etc.
 
-> +#ifndef __ASSEMBLY__
-> +#define NR_syscalls (__NR_syscalls)
-> +#endif /* __ASSEMBLY__ */
-
-Hmm, these guards feel like a hack. Would moving the define into syscall.h
-help?
-
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 9fd0ba9..9bed212 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -79,6 +79,11 @@ no_work_pending:
->  ENDPROC(ret_to_user_from_irq)
->  ENDPROC(ret_to_user)
->  
-> +.macro test_syscall_tracing reg
-> +       tst     \reg, #_TIF_SYSCALL_WORK
-> +       tsteq   \reg, #_TIF_SYSCALL_TRACEPOINT
-> +.endm
-> +
->  /*
->   * This is how we return from a fork.
->   */
-> @@ -87,7 +92,7 @@ ENTRY(ret_from_fork)
->  	get_thread_info tsk
->  	ldr	r1, [tsk, #TI_FLAGS]		@ check for syscall tracing
->  	mov	why, #1
-> -	tst	r1, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
-> +	test_syscall_tracing r1
->  	beq	ret_slow_syscall
->  	mov	r1, sp
->  	mov	r0, #1				@ trace exit [IP = 1]
-> @@ -98,6 +103,13 @@ ENDPROC(ret_from_fork)
->  	.equ NR_syscalls,0
->  #define CALL(x) .equ NR_syscalls,NR_syscalls+1
->  #include "calls.S"
-> +
-> +/* Ensure that the system call table is not larger than __NR_syscalls,
-> + * which is the value the rest of the system sees */
-> +.ifgt NR_syscalls - __NR_syscalls
-> +.error "__NR_syscalls is less than the size of the syscall table"
-> +.endif
-
-I think it would also be nice to check for equality here if we can.
-
-Rest of the code looks alright, but it should be tested with OABI if it
-hasn't been already.
-
-Will
+David
