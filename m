@@ -1,42 +1,50 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Feb 2012 16:54:04 -0800
-Subject: [PATCH 1/7] ARM: OMAP2+: Fix Kconfig dependencies for
- USB_ARCH_HAS_EHCI
+Date: Thu, 23 Feb 2012 16:54:07 -0800
+Subject: [PATCH 2/7] ARM: OMAP2+: Fix OMAP_HDQ_BASE build error
 In-Reply-To: <20120224005324.16794.73852.stgit@kaulin.local>
 References: <20120224005324.16794.73852.stgit@kaulin.local>
-Message-ID: <20120224005403.16794.15077.stgit@kaulin.local>
+Message-ID: <20120224005406.16794.76522.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise we get:
+If CONFIG_SOC_OMAP3430 is not set and CONFIG_HDQ_MASTER_OMAP
+is selected for w1 driver we get the following error:
 
-warning: (ARCH_OMAP3 && ARCH_OMAP4) selects USB_ARCH_HAS_EHCI
-which has unmet direct dependencies (USB_SUPPORT)
+arch/arm/mach-omap2/devices.c:662:13: error:
+'OMAP_HDQ_BASE' undeclared here (not in a function)
+
+Looks like OMAP_HDQ_BASE is valid for all omaps except
+2420, so we can remove the ifdef and not register
+the device on 2420.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/devices.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index d965da4..337f98d 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -32,7 +32,7 @@ config ARCH_OMAP3
- 	depends on ARCH_OMAP2PLUS
- 	default y
- 	select CPU_V7
--	select USB_ARCH_HAS_EHCI
-+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select ARCH_HAS_OPP
- 	select PM_OPP if PM
- 	select ARM_CPU_SUSPEND if PM
-@@ -52,7 +52,7 @@ config ARCH_OMAP4
- 	select ARM_ERRATA_720789
- 	select ARCH_HAS_OPP
- 	select PM_OPP if PM
--	select USB_ARCH_HAS_EHCI
-+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select ARM_CPU_SUSPEND if PM
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 283d11e..3ffefe2 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -654,9 +654,7 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+ /*-------------------------------------------------------------------------*/
  
- comment "OMAP Core Type"
+ #if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
+-#if defined(CONFIG_SOC_OMAP2430) || defined(CONFIG_SOC_OMAP3430)
+ #define OMAP_HDQ_BASE	0x480B2000
+-#endif
+ static struct resource omap_hdq_resources[] = {
+ 	{
+ 		.start		= OMAP_HDQ_BASE,
+@@ -679,7 +677,10 @@ static struct platform_device omap_hdq_dev = {
+ };
+ static inline void omap_hdq_init(void)
+ {
+-	(void) platform_device_register(&omap_hdq_dev);
++	if (cpu_is_omap2420())
++		return;
++
++	platform_device_register(&omap_hdq_dev);
+ }
+ #else
+ static inline void omap_hdq_init(void) {}
