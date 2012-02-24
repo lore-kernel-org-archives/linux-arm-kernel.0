@@ -1,46 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Feb 2012 17:37:57 +0000
-Subject: [PATCH] msm: timer: Support sched_clock()
-In-Reply-To: <4F47C9AA.5060806@codeaurora.org>
-References: <1329874777-12758-1-git-send-email-sboyd@codeaurora.org>
- <20120222215533.GA31480@codeaurora.org> <4F476242.2020909@arm.com>
- <20120224170901.GA9312@codeaurora.org> <4F47C7C5.4090806@arm.com>
- <4F47C9AA.5060806@codeaurora.org>
-Message-ID: <4F47CAF5.4000709@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Feb 2012 18:16:21 +0000
+Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
+ platforms
+In-Reply-To: <20120224143655.GH13504@mudshark.cambridge.arm.com>
+References: <1329763029-18220-1-git-send-email-will.deacon@arm.com>
+ <20120220194634.GK26840@n2100.arm.linux.org.uk>
+ <201202210124.23028.paul@codesourcery.com>
+ <20120221083612.GG22562@n2100.arm.linux.org.uk>
+ <20120221100041.GA19696@mudshark.cambridge.arm.com>
+ <20120221101052.GH22562@n2100.arm.linux.org.uk>
+ <20120221105250.GC19696@mudshark.cambridge.arm.com>
+ <20120221113548.GK22562@n2100.arm.linux.org.uk>
+ <20120221132216.GJ19696@mudshark.cambridge.arm.com>
+ <20120224143655.GH13504@mudshark.cambridge.arm.com>
+Message-ID: <20120224181621.GH22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/12 17:32, Stephen Boyd wrote:
-> Hi Marc,
+On Fri, Feb 24, 2012 at 02:36:55PM +0000, Will Deacon wrote:
+> On Tue, Feb 21, 2012 at 01:22:16PM +0000, Will Deacon wrote:
+> > On Tue, Feb 21, 2012 at 11:35:48AM +0000, Russell King - ARM Linux wrote:
+> > > I don't think fixing this in mainline until we know the full story behind
+> > > this is the right thing to be doing.  There's no point fixing a feature
+> > > which no one's using.
+> > 
+> > Understood. Paul - would you please be able to confirm that:
+> > 
+> > (a) GDB is currently broken on uclinux? (it certainly looks that way)
+> > (b) My proposed patch fixes the problem?
+> > 
+> > If you don't have an environment set up, I wonder if there's somebody else
+> > we can poke who's playing with this stuff.
 > 
-> On 02/24/12 09:24, Marc Zyngier wrote:
->> On 24/02/12 17:09, David Brown wrote:
->>> I'll keep an eye on it then, and push it into the ARM soc tree when
->>> the dependencies are there.
->> The whole thing is that there's no dependency. The sched_clock() stuff
->> has hit mainline during the merge window. This patch could go in right
->> now, without any harm.
->>
->> What Russell pulled is just a cleanup to convert the last two platforms
->> having their own sched_clock() and not relying on our framework.
->>
->>
+> Well in the meantime I had a play with the latest CodeSourcery tools:
 > 
-> This patch relies on the fact that the HAVE_SCHED_CLOCK config option no
-> longer exists. We could push it in if the patch had that option added to
-> the Kconfig, but then it would conflict with the removal of the Kconfig
-> by 6905a65 (ARM: Make the sched_clock framework mandatory, 2012-01-18).
+> GNU gdbserver (Sourcery G++ Lite 2011.03-46) 7.2.50.20100908-cvs
+> Copyright (C) 2010 Free Software Foundation, Inc.
+> gdbserver is free software, covered by the GNU General Public License.
+> This gdbserver was configured as "arm-uclinuxeabi"
+> 
+> on the target and
+> 
+> GNU gdb (Sourcery G++ Lite 2011.03-46) 7.2.50.20100908-cvs
+> Copyright (C) 2010 Free Software Foundation, Inc.
+> License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+> This is free software: you are free to change and redistribute it.
+> There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+> and "show warranty" for details.
+> This GDB was configured as "--host=i686-pc-linux-gnu --target=arm-uclinuxeabi".
+> 
+> on the host.
+> 
+> It seems as though my ptrace patch makes *no difference* because these
+> tools don't even use the PT_ADDR_TEXT etc magic offsets! As a result,
+> trying to set a breakpoint by symbol fails miserably because it tries to
+> poke the symbol offset directly, without adding on the base address of the
+> text.
+> 
+> Are there any tools available that use these magic numbers or are mine just
+> too old? Given that the whole thing dies after a while with:
+> 
+> [  909.062821] [430] gdbserver: obsolete system call 02b37558.
+> 
+> I'm not entirely convinced by the stability of what I'm using (that syscall
+> number looks like an address to me).
 
-Ah! Indeed, you're perfectly right.
+That suggests that this stuff definitely hasn't been tested, and there's
+no users of it (if there were I'm sure someone - either gdb folk or
+some kernel people) would've seen a bug report.
 
-> So I guess we send it through the arm-soc tree?
-
-I don't think arm-soc tracks rmk/for-next, so this has to go via
-Russell's tree. I'll take the patch and send Russell another pull
-request then.
-
-Cheers,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Therefore, I propose that we remove this code from the kernel unless
+there's someone out there who can positively test this stuff as definitely
+working.
