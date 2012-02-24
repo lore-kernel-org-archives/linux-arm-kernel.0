@@ -1,27 +1,30 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 24 Feb 2012 11:53:49 +0530
-Subject: [PATCH 2/5] ARM: OMAP: irqs: Delete irqs-44xx.h file
-In-Reply-To: <1330035801-14937-3-git-send-email-b-cousson@ti.com>
+Date: Fri, 24 Feb 2012 11:55:15 +0530
+Subject: [PATCH 4/5] ARM: OMAP2+: gpmc: Use irq_alloc_descs instead of
+ static IRQ range
+In-Reply-To: <1330035801-14937-5-git-send-email-b-cousson@ti.com>
 References: <1330035801-14937-1-git-send-email-b-cousson@ti.com>
- <1330035801-14937-3-git-send-email-b-cousson@ti.com>
-Message-ID: <CAMQu2gxhEuw_9Mr4_9LVwrOyaOE1oj6fc_pUG-RJ5KHcr1-c1A@mail.gmail.com>
+ <1330035801-14937-5-git-send-email-b-cousson@ti.com>
+Message-ID: <CAMQu2gwO=Kv5aPfrXuVOVMDA2P=S0SfR2ekMPT6o4MBTRsXHMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Feb 24, 2012 at 3:53 AM, Benoit Cousson <b-cousson@ti.com> wrote:
-> Since all IRQs should be retrieved using hwmod for the moment
-> and then device tree in the future, there is no need to keep
-> a file defining all the IRQ numbers.
+> The gpmc code is still not a proper driver and is still using the bad old
+> static way of declaring its IRQ range for the various CS it can handle (8).
 >
-> Delete the file and copy the 4 entries that are still used
-> directly by the board / driver until the code is properly cleaned.
+> Use irq_alloc_descs to get dynamically a set of IRQ descriptors.
+> Clean some bad line wrapping here and there.
 >
+> Please note that this code is still not a real driver after this fix, and
+> will require a massive cleanup...
+>
+Agree.
+
 > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 > ---
-> ?arch/arm/plat-omap/include/plat/irqs-44xx.h | ?144 ---------------------------
-> ?arch/arm/plat-omap/include/plat/irqs.h ? ? ?| ? 15 +++-
-> ?2 files changed, 12 insertions(+), 147 deletions(-)
-> ?delete mode 100644 arch/arm/plat-omap/include/plat/irqs-44xx.h
+> ?arch/arm/mach-omap2/gpmc.c | ? 22 +++++++++++++++-------
+> ?1 files changed, 15 insertions(+), 7 deletions(-)
 >
-Nice. -144 :)
+For the patch,
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
