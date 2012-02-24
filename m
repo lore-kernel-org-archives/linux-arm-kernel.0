@@ -1,32 +1,97 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 24 Feb 2012 14:12:07 +0000
-Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120224141207.GI5450@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 24 Feb 2012 08:14:09 -0600
+Subject: [RFC PATCH] gpio/omap: Fix IRQ handling for SPARSE_IRQ
+In-Reply-To: <4F46C1AF.2040201@ti.com>
+References: <4F46C1AF.2040201@ti.com>
+Message-ID: <4F479B31.7090508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 10:09:41PM +0800, Shawn Guo wrote:
-> The fsl_ssi probe function detects the client machine name using model
-> property of the device tree.  But it will not work for the ARM client
-> machines which are to be added.  The model property is given as a
-> descriptive string on all ARM device tree (arch/arm/boot/*.dts).
-> Instead, the compatible property gives the machine name.
+On 02/23/2012 04:46 PM, Cousson, Benoit wrote:
+> The GPIO driver is still relying on internal OMAP IRQ defines that
+> are not relevant anymore if OMAP is built with SPARSE_IRQ.
+> 
+> Replace the defines with the proper IRQ base number.
+> Clean some comment style issue.
+> Remove some hidden and ugly cpu_class_is_omap1() inside the
+> gpio header.
+> 
+> XXX: That fix might be broken for OMAP1 MPUIO case.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> ---
+> 
+> Hi Tony,
+> 
+> Please note that this patch is still RFC, because I do not know how to fix properly the ugly cpu_class_is_omap1 and the dependency with IH_MPUIO_BASE to detect a MPUIO.
+> 
+> I'm still sending it, because it is needed to have SPARSE_IRQ working on OMAP4 with the previous series I've just sent.
+> 
+> Regards,
+> Benoit
+> 
+>  arch/arm/plat-omap/include/plat/gpio.h |   22 ++------------------
+>  drivers/gpio/gpio-omap.c               |   33 ++++++++++++++++---------------
+>  2 files changed, 20 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+> index cb75b65..b8a96c6 100644
+> --- a/arch/arm/plat-omap/include/plat/gpio.h
+> +++ b/arch/arm/plat-omap/include/plat/gpio.h
+> @@ -218,30 +218,14 @@ extern void omap_set_gpio_debounce(int gpio, int enable);
+>  extern void omap_set_gpio_debounce_time(int gpio, int enable);
+>  /*-------------------------------------------------------------------------*/
+>  
+> -/* Wrappers for "new style" GPIO calls, using the new infrastructure
+> +/*
+> + * Wrappers for "new style" GPIO calls, using the new infrastructure
+>   * which lets us plug in FPGA, I2C, and other implementations.
+> - * *
+> + *
+>   * The original OMAP-specific calls should eventually be removed.
+>   */
+>  
+>  #include <linux/errno.h>
+>  #include <asm-generic/gpio.h>
+>  
+> -static inline int irq_to_gpio(unsigned irq)
+> -{
+> -	int tmp;
+> -
+> -	/* omap1 SOC mpuio */
+> -	if (cpu_class_is_omap1() && (irq < (IH_MPUIO_BASE + 16)))
+> -		return (irq - IH_MPUIO_BASE) + OMAP_MAX_GPIO_LINES;
+> -
+> -	/* SOC gpio */
+> -	tmp = irq - IH_GPIO_BASE;
+> -	if (tmp < OMAP_MAX_GPIO_LINES)
+> -		return tmp;
+> -
+> -	/* we don't supply reverse mappings for non-SOC gpios */
+> -	return -EIO;
+> -}
+> -
+>  #endif
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index bc2bd69..afef0f7 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -93,6 +93,11 @@ struct gpio_bank {
+>  #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
+>  #define GPIO_MOD_CTRL_BIT	BIT(0)
+>  
+> +static int irq_to_gpio(struct gpio_bank *bank, unsigned int gpio_irq)
+> +{
+> +	return gpio_irq - bank->irq_base + bank->chip.base;
 
-The ARM machines really shouldn't be using the bindings that PowerPC is
-using for the machine as they conflate the machine driver with the SSI
-binding.  The idiom for new systems is that machine drivers should be
-first class devices in the device tree referencing the SSI and CODEC.
+Ideally, you could do something like this when you have a domain setup:
 
-The current bindings should be preserved for existing systems of course.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120224/e1f0c88e/attachment.sig>
+irq_get_irq_data(gpio_irq)->hw_irq + bank->chip.base
+
+Also, with sparse irq you need to have a call to irq_alloc_desc. You can
+avoid that by setting NR_IRQS or machine .nr_irqs, but that needs to go
+away.
+
+Otherwise, it certainly is a step in the right direction.
+
+Rob
