@@ -1,37 +1,30 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Fri, 24 Feb 2012 15:29:04 -0600
-Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-In-Reply-To: <20120223171407.GC22562@n2100.arm.linux.org.uk>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
- <1330008519-3584-5-git-send-email-shawn.guo@linaro.org>
- <4F465A33.3020208@ru.mvista.com> <4F465EE5.4010908@freescale.com>
- <20120223165242.GB22562@n2100.arm.linux.org.uk>
- <4F4671BB.7060409@freescale.com>
- <20120223171407.GC22562@n2100.arm.linux.org.uk>
-Message-ID: <4F480120.6080409@freescale.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 24 Feb 2012 21:45:51 +0000
+Subject: [GIT PULL] DaVinci fix for v3.4
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317D2DDA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
->> > I'll have to ask around, because I'm sure I'm missing something.
-> If what you say is true, it means we have different semantics for the
-> same accessors on different architectures.  No wonder it's needing
-> drivers to gain ifdefs to select appropriate accessors.
-> 
-> This needs sorting out properly.  It needs the semantics of readl() etc
-> to be fully defined, and all architectures to implement those semantics
-> rather than what they think would be appropriate for them.
+Hi Arnd, Olof,
 
-So I asked around, and sure enough, my macro-fu was weak.  On PowerPC,
-readl() maps to in_le32().  Even though PowerPC is big-endian, some
-devices are little endian (e.g. PCI and some PICs).
+Can you please pull the following DaVinci fix for v3.4?
+It has no conflicts with rmk/for-armsoc branch of the
+arm-soc tree or with latest linux-next.
 
-in_le32() is the byte-swapping version of in_be32().  Both functions have
-instruction order synchronization instructions in them.
+Thanks,
+Sekhar
 
-So replacing in_be32() with readl() will break on PowerPC.
+The following changes since commit 62aa2b537c6f5957afd98e29f96897419ed5ebab:
+  Linus Torvalds (1):
+        Linux 3.3-rc2
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+are available in the git repository at:
+
+  git://gitorious.org/linux-davinci/linux-davinci.git v3.4/fixes
+
+Heiko Schocher (1):
+      ARM: davinci: map default_queue to edma channels
+
+ arch/arm/mach-davinci/dma.c               |    6 +-----
+ arch/arm/mach-davinci/include/mach/edma.h |    5 +++++
+ 2 files changed, 6 insertions(+), 5 deletions(-)
