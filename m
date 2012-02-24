@@ -1,60 +1,72 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Sat, 25 Feb 2012 01:08:36 +0900
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <014601ccf2fa$a25c8560$e7159020$%szyprowski@samsung.com>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <014601ccf2fa$a25c8560$e7159020$%szyprowski@samsung.com>
-Message-ID: <CAHQjnOPE5X=dn+8D348OruLqoYNGZwZk3eLtLRSERce-eTzXDg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Feb 2012 16:22:43 +0000
+Subject: [PATCH] arm/io.h: add macros to read/write big/little endian
+ register
+In-Reply-To: <1330028738.20389.34.camel@pasglop>
+References: <734349b4b6a4548703c723583d8ee1253184df37.1329988640.git.viresh.kumar@st.com>
+ <201202231233.05622.arnd@arndb.de> <1330028738.20389.34.camel@pasglop>
+Message-ID: <201202241622.43468.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek.
+On Thursday 23 February 2012, Benjamin Herrenschmidt wrote:
 
-On Fri, Feb 24, 2012 at 10:45 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hi,
->
-> On Thursday, December 29, 2011 1:24 PM KyongHo Cho wrote:
->
->> Changes since v7:
->> - Rebased with the recent commits of the following git branches
->> ? * git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git/next
->> ? * git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/for-next
->> - Changed magic numbers into macros
->> - Setting owner of a System MMU in 'iommu' field of dev_archdata
->> - Verbose message in the default fault handler
->> - Some bug fixes.
->
-> (snipped)
->
-> The time is flying away and v3.4 merge windows will open soon. Do you plan to
-> send an updated version of the SYSMMU driver anytime soon? It will be really
-> nice to have it finally merged to v3.4.
->
+> > The mistake on ppc was to make them private to one architecture instead of
+> > coming up with a well-defined set of accessors that are provided on all
+> > architectures.
+> 
+> That was never going to fly, we already have too many.
 
-Thank you for asking.
+It's certainly not easy to get consensus across arch maintainers, especially
+for a topic that is so complex as this one. On the other hand, we did add
+the readl_relaxed family just recently to all architectures, and I think
+it was good to do it this way.
+ 
+> >  We certainly have too many accessors already between
+> > inl/readl/ioread32/__raw_readl/readl_relaxed/in_le32, which makes this
+> > rather confusing, but IMHO there is still the need for cleanup and
+> > addition of missing variants like cpu-endian non-relaxed and
+> > big-endian relaxed as well as a replacement for __raw_* that actually
+> > defines them to something useful across architectures.
+> 
+> Right, the _relaxed don't have clear semantics and we do need "real"
+> relaxed ones badly as in "don't have memory barriers". Currently, a
+> driver that wants to avoid the sync's we have all over the place in our
+> accessors for performance reasons has to use __raw_* and thus handle
+> endian manually as well, which sucks since it also cannot use the
+> reverse-load/store instructions in that case.
 
-I prepared a new patchset and it is ready for submitting.
-It includes several bugfixes and Exynos5 support.
+Using __raw_* is actually worse since it's not really well-defined 
+what that means across architectures. We recently had a bug where
+gcc would create byte-wise accesses on registers that are marked
+"packed" by a driver writer, because the __raw_writel function just
+does a cast to a variable of larger alignment, which is undefined
+(IIRC, but maybe just implementation defined) in C.
 
-The last patche submitted has a bug when the following situation:
-   1. Allocating a 2nd level page table to map 4KB or 64KB on a virtual region
-   2. Unmapped all entries in the 2nd level page table.
-   3. Mapping to the same region with 1MB page.
-   Then iommu_map() will return -EADDRINUSE due to incorrect counting
-   free entries in 2nd level page table.
+> I tried to propose a uniform set a while back, but that never went
+> anywhere, I should have fought harder. You are welcome to bring that
+> back on the table :-)
 
-The next patch will be submitted by 2/28.
+Since the _relaxed version comes from ARM, it's basically defined
+to be convenient there, which means it is synchronized against the
+instruction stream (spinlock, most importantly) but not against
+DMA, because that tends to be expensive.
 
-BTW Marek, I want to know why MFC driver defines separate platform devices
-for left and right buses.
-The next IOMMU driver defines just one platform device for a H/W device.
-Thus, it defines just one SYSMMU_MFC platform device, for example.
-(the previous one defines 2 platform devices for SYSMMU_MFC)
-However, it is easy to separate the single platform device to multiple
-platform devices.
+> > 2. change the ppc definition of the readl_relaxed() family to something
+> > useful (fixed endian, relaxed ordering, iomem (possibly including PCI
+> > -- same as in_le32 but without the ordering guarantee) and make any
+> > driver that wants to be portable use those accessors with explicit I/O
+> > barriers on spinlocks and DMA.
+> 
+> Last I looked, __relaxed() had a completely different meaning (relaxed
+> ordering -on-the-bus- which is a totally different thing, so iirc only
+> one arch ever implemented it).
 
-Regards,
+I think you may be confusing it with relaxed ordering on DMA. Having
+MMIO with relaxed ordering between the accesses would be silly. The
+only reason we have it on ARM is to remove the need to do an expensive
+synchronization against a DMA operation on the same bus. IIRC that
+would let you do an "eieio" instead of a full "sync" on powerpc but
+should only be used in drivers that don't do DMA.
 
-Cho KyongHo.
+	Arnd
