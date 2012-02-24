@@ -1,43 +1,66 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 24 Feb 2012 11:12:45 +0000
-Subject: [PATCH-WIP 07/13] xen/arm: receive xen events on arm
-In-Reply-To: <1330019314-20865-7-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
- <1330019314-20865-7-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <4F4770AD.6040703@citrix.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 24 Feb 2012 12:23:05 +0100
+Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board
+ data
+In-Reply-To: <4F470B71.1020308@ti.com>
+References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
+ <1329998490-27555-5-git-send-email-rnayak@ti.com>
+ <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
+Message-ID: <4F477319.7080409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/12 17:48, Stefano Stabellini wrote:
-> Compile events.c and use IRQ 32 to receive events notifications.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On 2/24/2012 5:00 AM, Rajendra Nayak wrote:
+> On Friday 24 February 2012 12:27 AM, Tony Lindgren wrote:
+>>> --- a/arch/arm/boot/dts/omap3.dtsi
+>>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>>> @@ -113,5 +113,31 @@
+>>> #size-cells =<0>;
+>>> ti,hwmods = "i2c3";
+>>> };
+>>> +
+>>> + mmc1: mmc at 1 {
+>>> + compatible = "ti,omap2-hsmmc";
+>>> + ti,hwmods = "mmc1";
+>>> + ti,dual-volt;
+>>> + };
+>>> +
+>>> + mmc2: mmc at 2 {
+>>> + compatible = "ti,omap2-hsmmc";
+>>> + ti,hwmods = "mmc2";
+>>> + };
+>>> +
+>>> + mmc3: mmc at 3 {
+>>> + compatible = "ti,omap2-hsmmc";
+>>> + ti,hwmods = "mmc3";
+>>> + };
+>>> +
+>>> + mmc4: mmc at 4 {
+>>> + compatible = "ti,omap2-hsmmc";
+>>> + ti,hwmods = "mmc4";
+>>> + };
+>>> +
+>>> + mmc5: mmc at 5 {
+>>> + compatible = "ti,omap2-hsmmc";
+>>> + ti,hwmods = "mmc5";
+>>> + };
+>>> };
+>>> };
+>>
+>> These all should all be "ti,omap3-hsmmc" I guess?
+>
+> Well, I defined the binding such that both omap2 and omap3
+> can use the same compatible "ti,omap2-hsmmc" since there is
+> no difference in the way they are defined or handled. If thats
+> confusing, I can have separate compatibles.
+> Btw, I guess we do the same with a few other re-used IPs as well,
+> I just checked and mcpsi does the same.
 
-> +#ifdef CONFIG_ARM
-> +#define IRQ_EVTCHN_CALLBACK 63
-> +irqreturn_t xen_arm_callback(int irq, void *arg)
-> +{
-> +	__xen_evtchn_do_upcall();
-> +	return 0;
-> +}
-> +
-> +int __init xen_init_IRQ_arm(void)
-> +{
-> +	int rc;
-> +	xen_init_IRQ();
-> +	rc = request_irq(IRQ_EVTCHN_CALLBACK, xen_arm_callback,
-> +			IRQF_DISABLED | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
-> +			"events", "events");	
-> +	if (rc) {
-> +		printk(KERN_ERR "Error requesting IRQ %d\n", IRQ_EVTCHN_CALLBACK);
-> +	}
-> +	return rc;
-> +}
-> +core_initcall(xen_init_IRQ_arm);
-> +#endif
+Yes, the goal is mainly to identify the IP version, so since OMAP3 is 
+using OMAP2 IP, I do not think there is a need to add a new compatible 
+string for OMAP3. The should only be documented in the binding potentially.
+The advantage is that that will avoid adding an extra compatible string 
+in the driver as well whereas there is no change in the IP.
 
-You should (eventually) have a device tree binding for the event channel
-and use a OF (device tree) device driver instead of this core_initcall()
-to register the handler etc.
-
-David
+Regards,
+Benoit
