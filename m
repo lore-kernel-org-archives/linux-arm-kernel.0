@@ -1,153 +1,76 @@
-From: jason@lakedaemon.net (Jason)
-Date: Fri, 24 Feb 2012 09:35:17 -0500
-Subject: [PATCH 1/2 v5] arm: kirkwood: add dreamplug (fdt) support.
-In-Reply-To: <CACxGe6uMcOWC6ukTGF1soyfeTkT2fkmewhKUKA-AiK8hQDzCGQ@mail.gmail.com>
-References: <cover.1312906908.git.jason@lakedaemon.net>
- <cover.1330025976.git.jason@lakedaemon.net>
- <1192198e66f9a30eb13fa427240e91fb7f0a49e4.1330025976.git.jason@lakedaemon.net>
- <CACxGe6vjzXUwvGu73p+5L2-cW5EOJtFcR8JW8-gOUrRt-choJg@mail.gmail.com>
- <20120223211138.GP23524@titan.lakedaemon.net>
- <CACxGe6uMcOWC6ukTGF1soyfeTkT2fkmewhKUKA-AiK8hQDzCGQ@mail.gmail.com>
-Message-ID: <20120224143517.GQ23524@titan.lakedaemon.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 24 Feb 2012 16:35:44 +0200
+Subject: [PATCH 3/6] ARM: OMAP3PLUS PM: Add IO Daisychain support via
+ hwmod mux
+In-Reply-To: <CAMQu2gxQQTfiNoiwZszNWFiDWaei8+f6eKj+K2ZE1wNuvFLH9A@mail.gmail.com>
+References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
+ <1330003320-17400-4-git-send-email-t-kristo@ti.com>
+ <CAMQu2gxQQTfiNoiwZszNWFiDWaei8+f6eKj+K2ZE1wNuvFLH9A@mail.gmail.com>
+Message-ID: <1330094144.4102.554.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 02:21:15PM -0700, Grant Likely wrote:
-> On Thu, Feb 23, 2012 at 2:11 PM, Jason <jason@lakedaemon.net> wrote:
-> > On Thu, Feb 23, 2012 at 01:18:55PM -0700, Grant Likely wrote:
-> >> On Thu, Feb 23, 2012 at 12:52 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> >> > Initially, copied guruplug-setup.c and did s/guruplug/dreamplug/g.
-> >> > Then, switched to SPI based NOR flash.
-> >> >
-> >> > After talking to Arnd Bergman, chose an incremental approach to adding
-> >> > devicetree support. ?First, we use the dtb to tell us we are on the
-> >> > dreamplug, then we gradually port over drivers.
-> >> >
-> >> > Driver porting will start with the uart (see next patch), and progress
-> >> > from there. ?Possibly, spi/flash/partitions will be next.
-> >> >
-> >> > When done, board-dt.c will no longer be dreamplug specific, and dt's can
-> >> > be made for the other kirkwood boards.
-> >> >
-> >> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> >> > ---
-> >> > Changes from v1
-> >> >
-> >> > ? - attempting dts, looking for pointers.
-> >> >
-> >> > Changes from v2
-> >> >
-> >> > ? - resubmit as MACH_TYPE_DREAMPLUG (3550) is in arm/for-next, rebased
-> >> > ? ? against same.
-> >> > ? - removed lame fdt attempt, others are working on kirkwood fdt. ?Will
-> >> > ? ? convert once kirkwood fdt is mainline.
-> >> > ? - s/boot_params/atag_offset/
-> >> > ? - added kirkwood_reset
-> >> > ? - 1 checkpatch.pl warning (help in Kconfig), looks the same as all
-> >> > ? ? other kirkwood boards...
-> >> >
-> >> > Changes from v3
-> >> >
-> >> > ? - rebased against v3.3-rc3 (recommended by Arnd)
-> >> > ? - use devicetree to determine which board we are on
-> >> > ? - added patch to configure uart0 from devicetree
-> >> >
-> >> > Changes from v4
-> >> >
-> >> > ? - fixed Kconfig logic so user can always see 'Dreamplug' in menuconfig.
-> >> > ? - changed 'marvell,dreamplug' to 'globalscale,dreamplug' as suggested by
-> >> > ? ? Grant Likely.
-> >> > ? - fixed of_machine_is_compatible() logic for calling dreamplug specific
-> >> > ? ? init functions.
-> >> >
-> >> > ?arch/arm/boot/dts/kirkwood-dreamplug.dts | ? 18 +++
-> >> > ?arch/arm/boot/dts/kirkwood.dtsi ? ? ? ? ?| ? ?6 +
-> >> > ?arch/arm/mach-kirkwood/Kconfig ? ? ? ? ? | ? 14 +++
-> >> > ?arch/arm/mach-kirkwood/Makefile ? ? ? ? ?| ? ?1 +
-> >> > ?arch/arm/mach-kirkwood/Makefile.boot ? ? | ? ?2 +
-> >> > ?arch/arm/mach-kirkwood/board-dt.c ? ? ? ?| ?182 ++++++++++++++++++++++++++++++
-> >> > ?6 files changed, 223 insertions(+), 0 deletions(-)
-> >> > ?create mode 100644 arch/arm/boot/dts/kirkwood-dreamplug.dts
-> >> > ?create mode 100644 arch/arm/boot/dts/kirkwood.dtsi
-> >> > ?create mode 100644 arch/arm/mach-kirkwood/board-dt.c
-> >> >
-> >> > diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> >> > new file mode 100644
-> >> > index 0000000..765813f
-> >> > --- /dev/null
-> >> > +++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> >> > @@ -0,0 +1,18 @@
-> >> > +/dts-v1/;
-> >> > +
-> >> > +/include/ "kirkwood.dtsi"
-> >> > +
-> >> > +/ {
-> >> > + ? ? ? model = "Globalscale Technologies Dreamplug";
-> >> > + ? ? ? compatible = "globalscale,dreamplug", "globalscale,kirkwood";
-> >>
-> >> Hahaha... okay, more clarification is needed here.
-> >>
-> >> The compatible property is a list, and the first entry must always be
-> >> the exact device model. ?That is why the vendor of the hardware is in
-> >> the prefix. ?However, the following entries are a list of devices that
-> >> it is 'compatible' with. ?In the case of the top-level compatible
-> >> property, we've been using the convention of including a string for
-> >> the SoC, and in that case the manufacturer is indeed Marvell.
-> >>
-> >> Also, *be specific*. ?Kirkwood is a family of processors, not a single
-> >> SoC. ?The compatible string should reflect that. ?So, in your case,
-> >> compatible should look something like:
-> >>
-> >> compatible = "globalscale,dreamplug", "marvell,kirkwood-88f6281";
+On Thu, 2012-02-23 at 19:23 +0530, Shilimkar, Santosh wrote:
+> On Thu, Feb 23, 2012 at 6:51 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> > From: Vishwanath BS <vishwanath.bs@ti.com>
 > >
-> > ahhh... ok. ?So, my board-dt.c should have:
+> > IO Daisychain feature has to be triggered whenever there is a change in
+> > device's mux configuration (See section 3.9.4 in OMAP4 Public TRM vP).
 > >
-> > static const char *kirkwood_dt_board_compat[] = {
-> > ? ? ? ?"marvell,kirkwood",
-> > ? ? ? ?NULL
-> > };
+> > Now devices can idle independent of the powerdomain, there can be a
+> > window where device is idled and corresponding powerdomain can be
+> > ON/INACTIVE state. In such situations, since both module wake up is
+> > enabled at padlevel as well as io daisychain sequence is triggered,
+> > there will be 2 PRCM interrupts (Module async wake up via swakeup and
+> > IO Pad interrupt). But as PRCM Interrupt handler clears the Module
+> > Padlevel WKST bit in the first interrupt, module specific interrupt
+> > handler will not triggered for the second time
 > >
-> > And then the test to run the dreamplug specific init should be:
+> > Also look at detailed explanation given by Rajendra at
+> > http://www.spinics.net/lists/linux-serial/msg04480.html
 > >
-> > ? ? ? ?if (of_machine_is_compatible("globalscale,dreamplug"))
-> > ? ? ? ? ? ? ? ?dreamplug_init();
+> > Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/omap_hwmod.c |    9 +++++++--
+> >  arch/arm/mach-omap2/pm.c         |    7 +++++++
+> >  arch/arm/mach-omap2/pm.h         |    1 +
+> >  3 files changed, 15 insertions(+), 2 deletions(-)
 > >
-> > And then, kirkwood.dtsi:
-> >
-> > compatible = "marvell,kirkwood";
-> >
-> > and kirkwood-dreamplug.dts:
-> >
-> > compatible = "globalscale,dreamplug", "marvell,kirkwood-88f6281-a1";
-> >
-> >
-> > My only question is, should the kirkwood.dtsi have just
-> > "marvell,kirkwood", or "marvell,kirkwood","marvell,kirkwood-88f6281-a1"?
 > 
-> Fix the order.  The list is ordered from most specific to least.
-> Also, if the silicon revision can be read out of the SoC at runtime,
-> then including the -a1 revision is probably overkill.
-
-With kirkwood, it's able to determine the whole SoC part number (see
-arch/arm/mach-kirkwood/common.c:394 kirkwood_id()).  So, the kernel
-doesn't need to rely on the devicetree to determine which kirkwood it is
-at runtime.
-
-I'll include it as you've recommended.  I'd rather stick with convention
-until we can prove we need to do otherwise.
-
-> So, something like the following is fine:
+> [...]
 > 
-> compatible = "globalscale,dreamplug", "marvell,kirkwood-88f6281",
-> "marvell,kirkwood";
+> >
+> > diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> > index 1881fe9..e8b54eb 100644
+> > --- a/arch/arm/mach-omap2/pm.c
+> > +++ b/arch/arm/mach-omap2/pm.c
+> > @@ -25,6 +25,7 @@
+> >  #include "clockdomain.h"
+> >  #include "pm.h"
+> >  #include "twl-common.h"
+> > +#include "prm44xx.h"
+> >
+> >  static struct omap_device_pm_latency *pm_lats;
+> >
+> > @@ -64,6 +65,12 @@ static void omap2_init_processor_devices(void)
+> >        }
+> >  }
+> >
+> > +void omap_trigger_wuclk_ctrl(void)
+> > +{
+> > +       if (cpu_is_omap44xx())
 > 
-> BTW, does the dreamplug have a part number?
+> can we avoid above check to make it generic so that even OMAP5 can use this
+> code without any change. Some flag might do the trick.
 
-Yes, so I'll do in kirkwood-dreamplug.dts:
+Can't remove this check, as we don't want to execute this code for
+omap2 / omap3, it would just crash.
 
-compatible = "globalscale,dreamplug-003-ds2001",
-"globalscale,dreamplug", "marvell,kirkwood-88f6281", "marvell,kirkwood"
+-Tero
 
-Thanks for the help
-
-Jason.
+> 
+> Rest of the patch looks fine to me.
+> 
+> Regards
+> Santosh
