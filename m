@@ -1,94 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Feb 2012 16:06:58 -0800
-Subject: [PATCH 7/8] ARM: OMAP: Remove plat/io.h by moving it into
- mach/io.h
-In-Reply-To: <4F4451FB.7070007@gmail.com>
-References: <20120221233619.18709.87982.stgit@kaulin.local>
- <20120221234049.18709.28987.stgit@kaulin.local>
- <4F4451FB.7070007@gmail.com>
-Message-ID: <20120224000657.GJ18185@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 23 Feb 2012 17:11:17 -0700 (MST)
+Subject: [GIT PULL] OMAP PM EMU fix for v3.3
+In-Reply-To: <AA48DD8077D5D945A49BD1782C1140F10122E640@fioues08.ebgroup.elektrobit.com>
+References: <87liw8agk4.fsf@ti.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC7@fioues08.ebgroup.elektrobit.com><20120127190239.GC9339@atomide.com><AA48DD8077D5D945A49BD1782C1140F1011EBBC8@fioues08.ebgroup.elektrobit.com><AA48DD8077D5D945A49BD1782C1140F10122E2B7@fioues08.ebgroup.elektrobit.com>
+ <87linxa5gk.fsf@ti.com>
+ <AA48DD8077D5D945A49BD1782C1140F10122E4FF@fioues08.ebgroup.elektrobit.com>
+ <alpine.DEB.2.00.1202222021460.12198@utopia.booyaka.com>
+ <AA48DD8077D5D945A49BD1782C1140F10122E640@fioues08.ebgroup.elektrobit.com>
+Message-ID: <alpine.DEB.2.00.1202231627001.9361@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [120221 17:53]:
-> On 02/21/2012 05:40 PM, Tony Lindgren wrote:
-> > This is needed so we can eventually remove mach/io.h
-> > for omap2+.
-...
+Hi
 
-> > -#include <plat/io.h>
-> > +#ifndef __ASM_ARM_ARCH_IO_H
-> > +#define __ASM_ARM_ARCH_IO_H
-> > +
-> > +#include <mach/hardware.h>
+On Thu, 23 Feb 2012, Madhusudhan.Gowda at elektrobit.com wrote:
+
+> [Gowda] I found this BUG in the CM code while trying to use both SDTI as
+> well as requirement of enabling Hardware supervised transition
+> CLKTRCTRL_EMU to 0x3.
 > 
-> This shouldn't be needed.
-
-Good catch, will update things for that.
- 
-> > +
-> > +#define IO_SPACE_LIMIT 0xffffffff
-> > +
-> > +/*
-> > + * We don't actually have real ISA nor PCI buses, but there is so many
-> > + * drivers out there that might just work if we fake them...
-> > + */
-> > +#define __io(a)		__typesafe_io(a)
-> > +#define __mem_pci(a)	(a)
-> > +
-> > +/*
-> > + * ----------------------------------------------------------------------------
-> > + * I/O mapping
-> > + * ----------------------------------------------------------------------------
-> > + */
-> > +
-> > +#ifdef __ASSEMBLER__
-> > +#define IOMEM(x)		(x)
-> > +#else
-> > +#define IOMEM(x)		((void __force __iomem *)(x))
-> > +#endif
-> > +
+> SDTI requires the softwre supervised transition to keep connected, by
+> enabling Hardware supervised transition SDTI does not like it so Jouni
+> had commented out the HW supervised transtion. Which I agree it is fine
+> on SDTI part.
+> .flags          = /* CLKDM_CAN_ENABLE_AUTO |  */CLKDM_CAN_SWSUP,
 > 
-> This can't be moved to iomap.h? I did that for other platforms.
+> But my point here is when I set the HW supervised transition, across MPU
+> OFF the register loses its previous value and changes to reset value 0x2
+> (SW supervised) is not correct. So I submitted this patch for fixing
+> this general CM code bug.
 
-Well I was thinking we should define these somewhere for everybody,
-so I was trying to avoid adding yet another copy.. But I can move
-it and then we can clean it up later to avoid more dependencies here.
- 
-> > +/*
-> > + * ----------------------------------------------------------------------------
-> > + * Omap specific register access
-> > + * ----------------------------------------------------------------------------
-> > + */
-> > +
-> > +#ifndef __ASSEMBLER__
-> > +
-> > +/*
-> > + * NOTE: Please use ioremap + __raw_read/write where possible instead of these
-> > + */
-> > +
-> > +extern u8 omap_readb(u32 pa);
-> > +extern u16 omap_readw(u32 pa);
-> > +extern u32 omap_readl(u32 pa);
-> > +extern void omap_writeb(u8 v, u32 pa);
-> > +extern void omap_writew(u16 v, u32 pa);
-> > +extern void omap_writel(u32 v, u32 pa);
-> 
-> These can't be moved to common.h like omap2?
+Okay, that's a little more clear.  So this patch does not affect the SDTI 
+functionality with your driver?  Your patch description reads:
 
-Not for omap1 currently because a bunch of legacy drivers are
-using them :(
+"Embedded trace debug tools like Serial Trace Interface(sti) using
+ EMU domain loses connection across MPU OFF. The patch fixes this issue"
 
-Anyways, that should be OK for now as omap1 requires v5 flags
-and it currently does not make sense to try to compile into a
-common zImage. At least the USB driver already needs to be
-cleaned up for that, so eventually omap1 io.h can disappear
-too.
- 
-> Same comments on omap2 io.h.
+But it sounds like that's not the case?  At least, if the reset value for 
+CM_CLKSTCTRL_EMU is 0x2, I don't understand how this patch could fix it.
 
-Thanks, will post an updated patch.
+About the patch - I'm fine with the basic underlying idea, but so far it 
+looks like this is material for 3.4 rather than 3.3-rc, since it's not a 
+regression?
 
-Regards,
+> Please let me know if my comments answers your question.
 
-Tony
+Well I was hoping that you might answer my earlier questions about whether 
+the driver you're using calls into the OMAP infrastructure via 
+pm_runtime*(), and whether its clocks and hwmod data are defined.
+
+
+- Paul
