@@ -1,41 +1,56 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 24 Feb 2012 14:50:27 +0000
-Subject: [PATCH] regulator: twl6030: add support for vdd1, vdd2 and vdd3
- regulators
-In-Reply-To: <1330094532.4102.555.camel@sokoban>
-References: <20120223153422.GF4553@opensource.wolfsonmicro.com>
- <1330076289.4102.517.camel@sokoban>
- <20120224114940.GB5450@opensource.wolfsonmicro.com>
- <1330089398.4102.539.camel@sokoban>
- <20120224132408.GF5450@opensource.wolfsonmicro.com>
- <1330091765.4102.547.camel@sokoban>
- <20120224140109.GG5450@opensource.wolfsonmicro.com>
- <1330093512.4102.552.camel@sokoban>
- <20120224143415.GL5450@opensource.wolfsonmicro.com>
- <1330094532.4102.555.camel@sokoban>
-Message-ID: <20120224145027.GN5450@opensource.wolfsonmicro.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 24 Feb 2012 15:54:52 +0100
+Subject: [RFC PATCH] gpio/omap: Fix IRQ handling for SPARSE_IRQ
+In-Reply-To: <4F479B31.7090508@gmail.com>
+References: <4F46C1AF.2040201@ti.com> <4F479B31.7090508@gmail.com>
+Message-ID: <4F47A4BC.3020307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 04:42:12PM +0200, Tero Kristo wrote:
-> On Fri, 2012-02-24 at 14:34 +0000, Mark Brown wrote:
+On 2/24/2012 3:14 PM, Rob Herring wrote:
+> On 02/23/2012 04:46 PM, Cousson, Benoit wrote:
+...
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index bc2bd69..afef0f7 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -93,6 +93,11 @@ struct gpio_bank {
+>>   #define GPIO_BIT(bank, gpio) (1<<  GPIO_INDEX(bank, gpio))
+>>   #define GPIO_MOD_CTRL_BIT	BIT(0)
+>>
+>> +static int irq_to_gpio(struct gpio_bank *bank, unsigned int gpio_irq)
+>> +{
+>> +	return gpio_irq - bank->irq_base + bank->chip.base;
+>
+> Ideally, you could do something like this when you have a domain setup:
+>
+> irq_get_irq_data(gpio_irq)->hw_irq + bank->chip.base
 
-> > Ah, so it is - we're fixing things up in the core.  I'd forgotten we did
-> > that.
+OK, good to know. I still plan to move the current irq_domain basic 
+support to the irqchip stuff you have done. I'll do that after 3.4.
 
-> So, no need to add list_voltage to this, I just fix the return values
-> for the get / set and send the new version, am I right?
+> Also, with sparse irq you need to have a call to irq_alloc_desc.
 
-I guess.  Though actually given that there's no interaction with the
-chip itself at all I'm not sure I understand why this is part of the
-twl6030 driver rather than being a separate driver for whatever
-implements the operations - it's not like the case with the other
-regulators where there was some functionality implemented through the
-twl6030 driver beyond straight passthrough.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120224/5ffa8938/attachment.sig>
+irq_alloc_desc was already added as part of the DT migration patch.
+It was not explicit in the changelog, but that patch is based on GPIO 
+cleanup + DT migration series.
+
+> You can avoid that by setting NR_IRQS or machine .nr_irqs, but that needs to go
+> away.
+
+Based on a recommendation you did in the commit to fix GIC I did that in 
+the SPARSE_IRQ series I've just sent before that RFC patch:
+
++#ifdef CONFIG_SPARSE_IRQ
++#define NR_IRQS			NR_IRQS_LEGACY
++#else
+  #define NR_IRQS			OMAP_GPMC_IRQ_END
++#endif
+
+> Otherwise, it certainly is a step in the right direction.
+
+Yeah, there is still a long way to clean all the old nasty IRQ stuff in 
+OMAP :-)
+
+Thanks,
+Benoit
