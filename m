@@ -1,157 +1,86 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 24 Feb 2012 22:18:21 +0530
-Subject: [PATCHv2 1/6] ARM: ftrace: remove useless memory checks
-In-Reply-To: <20120222212821.GE7041@n2100.arm.linux.org.uk>
-References: <1327757725-10114-1-git-send-email-rabin@rab.in>
- <1327757725-10114-2-git-send-email-rabin@rab.in>
- <20120220161601.GH26840@n2100.arm.linux.org.uk>
- <20120222141317.GB9031@debian>
- <20120222212821.GE7041@n2100.arm.linux.org.uk>
-Message-ID: <20120224164821.GA22856@debian>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Feb 2012 16:58:31 +0000
+Subject: [PATCH v3 03/10] of: Add PWM support.
+In-Reply-To: <20120224064749.GB18786@avionic-0098.mockup.avionic-design.de>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <201202231403.01614.arnd@arndb.de>
+ <20120224064749.GB18786@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201202241658.32062.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2012 at 09:28:21PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 22, 2012 at 07:43:17PM +0530, Rabin Vincent wrote:
-> > On Mon, Feb 20, 2012 at 04:16:01PM +0000, Russell King - ARM Linux wrote:
-> > > On Sat, Jan 28, 2012 at 07:05:20PM +0530, Rabin Vincent wrote:
-> > > > diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> > > > index c0062ad..e9488ad 100644
-> > > > --- a/arch/arm/kernel/ftrace.c
-> > > > +++ b/arch/arm/kernel/ftrace.c
-> > > > @@ -125,11 +125,13 @@ static int ftrace_modify_code(unsigned long pc, unsigned long old,
-> > > >  {
-> > > >  	unsigned long replaced;
-> > > >  
-> > > > -	if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
-> > > > -		return -EFAULT;
-> > > > +	if (old) {
+On Friday 24 February 2012, Thierry Reding wrote:
+> * Arnd Bergmann wrote:
+> > On Thursday 23 February 2012, Thierry Reding wrote:
+> > > * Arnd Bergmann wrote:
+
+> [...]
+> > > > * Why not include the pwm_request() call in this and return the
+> > > >   pwm_device directly? You said that you want to get rid of the
+> > > >   pwm_id eventually, which is a good idea, but this interface still
+> > > >   forces one to use it.
 > > > 
-> > > So, we're using the instruction value '0' to mean that we don't want to
-> > > check?  Wouldn'it it be better to pass a flag in to indicate this instead
-> > > of creating a magic value?
+> > > Okay, that sounds sensible. I propose to rename the function to something like
+> > > of_request_pwm().
 > > 
-> > OK.  I think you applied this patch as-is anyway, so here is a follow-on
-> > patch:
+> > Sounds good.
+
+On second thought, I would actually prefer starting the name with pwm_ and
+making it independent of device tree. There might be other ways how to
+find the pwm_device from a struct device in the future, but it should always
+be possible using a device together with a string and/or numeric identifier,
+much in the same way that we can get a resource from a platform_device.
+
+Ideally, there would be a common theme behind finding a memory region,
+irq, gpio pin, clock, regulator, dma-channel and pwm or anything else
+that requires a link between two device nodes.
+
+> > > It would of course need an additional parameter (name) to
+> > > forward to pwm_request().
+> > 
+> > Not necessarily, it could use the dev_name(device) or the name
+> > of the property, or a combination of the two.
 > 
-> I'd still much prefer it to be part of the original patch.  I can replace
-> the patch I've merged or augment it with another patch - whichever way
-> you prefer.
+> The problem with that is that usually the device would be named something
+> generic like "pwm", while in case where the PWM is used for the backlight
+> it makes sense to label the PWM device "backlight".
+> 
+> Looking at debugfs and seeing an entry "backlight" is much more straight-
+> forward than "pwm.0". I mean "pwm.0" doesn't carry any useful information
+> really, does it?
 
-Replacing the original is OK with me, new patch below.  Note that "ARM:
-ftrace: use canonical Thumb-2 wide instruction format" will need to be
-manually rebased on top of it since there is a change in the context.
+But the device name would be from the device using the pwm, not the
+pwm controller, so it should be something more helpful, no?
 
-8<----------------
->From 11a4aea10f1b2d56c70c34def29b3f8d56b88dd5 Mon Sep 17 00:00:00 2001
-From: Rabin Vincent <rabin@rab.in>
-Date: Sat, 21 Jan 2012 21:52:19 +0530
-Subject: [PATCH] ARM: ftrace: remove useless memory checks
+> > > > > +EXPORT_SYMBOL(of_get_named_pwm);
+> > > > 
+> > > > EXPORT_SYMBOL_GPL?
+> > > 
+> > > It was brought up at some point that it might be nice to allow non-GPL
+> > > drivers to use the PWM framework as well. I don't remember any discussion
+> > > resulting from the comment. Perhaps we should have that discussion now and
+> > > decide whether or not we want to keep it GPL-only or not.
+> > 
+> > I would definitely use EXPORT_SYMBOL_GPL for all new code unless it
+> > replaces an earlier interface that was available as EXPORT_SYMBOL.
+> 
+> I just grepped the code and noticed this:
+> 
+> 	$ $ git grep -n 'EXPORT_SYMBOL.*(pwm_request)'
+> 	arch/arm/mach-vt8500/pwm.c:139:EXPORT_SYMBOL(pwm_request);
+> 	arch/arm/plat-mxc/pwm.c:183:EXPORT_SYMBOL(pwm_request);
+> 	arch/arm/plat-samsung/pwm.c:83:EXPORT_SYMBOL(pwm_request);
+> 	arch/unicore32/kernel/pwm.c:132:EXPORT_SYMBOL(pwm_request);
+> 	drivers/mfd/twl6030-pwm.c:156:EXPORT_SYMBOL(pwm_request);
+> 	drivers/misc/ab8500-pwm.c:108:EXPORT_SYMBOL(pwm_request);
+> 	drivers/pwm/core.c:262:EXPORT_SYMBOL_GPL(pwm_request);
+> 
+> It seems like the legacy PWM API used to be non-GPL. Should I switch it back?
+> Also does it make sense to have something like of_request_pwm() GPL when the
+> rest of the API isn't?
 
-Before replacing an instruction, the ftrace code determines what the old
-instruction should be and verifies that that's what's really there in
-memory before replacing it.  This is useful if for example a bug in
-mcountrecord causes it to record wrong locations.
+I guess the choice is to make between you and Sascha. The implementation is
+new, so you could pick EXPORT_SYMBOL_GPL, but you could also try to
+keep to the current API.
 
-However, in cases where we replace call sites in entry-common.S, these
-checks are not needed.  For these, we currently just memcpy() the memory
-content and then "verify" it -- this is quite useless and can be
-removed.
-
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/kernel/ftrace.c |   28 ++++++++++++++--------------
- 1 files changed, 14 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index c0062ad..6fd7c4a 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -121,15 +121,17 @@ static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
- }
- 
- static int ftrace_modify_code(unsigned long pc, unsigned long old,
--			      unsigned long new)
-+			      unsigned long new, bool validate)
- {
- 	unsigned long replaced;
- 
--	if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
--		return -EFAULT;
-+	if (validate) {
-+		if (probe_kernel_read(&replaced, (void *)pc, MCOUNT_INSN_SIZE))
-+			return -EFAULT;
- 
--	if (replaced != old)
--		return -EINVAL;
-+		if (replaced != old)
-+			return -EINVAL;
-+	}
- 
- 	if (probe_kernel_write((void *)pc, &new, MCOUNT_INSN_SIZE))
- 		return -EPERM;
-@@ -141,23 +143,21 @@ static int ftrace_modify_code(unsigned long pc, unsigned long old,
- 
- int ftrace_update_ftrace_func(ftrace_func_t func)
- {
--	unsigned long pc, old;
-+	unsigned long pc;
- 	unsigned long new;
- 	int ret;
- 
- 	pc = (unsigned long)&ftrace_call;
--	memcpy(&old, &ftrace_call, MCOUNT_INSN_SIZE);
- 	new = ftrace_call_replace(pc, (unsigned long)func);
- 
--	ret = ftrace_modify_code(pc, old, new);
-+	ret = ftrace_modify_code(pc, 0, new, false);
- 
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret) {
- 		pc = (unsigned long)&ftrace_call_old;
--		memcpy(&old, &ftrace_call_old, MCOUNT_INSN_SIZE);
- 		new = ftrace_call_replace(pc, (unsigned long)func);
- 
--		ret = ftrace_modify_code(pc, old, new);
-+		ret = ftrace_modify_code(pc, 0, new, false);
- 	}
- #endif
- 
-@@ -172,7 +172,7 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 	old = ftrace_nop_replace(rec);
- 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
- 
--	return ftrace_modify_code(rec->ip, old, new);
-+	return ftrace_modify_code(rec->ip, old, new, true);
- }
- 
- int ftrace_make_nop(struct module *mod,
-@@ -185,7 +185,7 @@ int ftrace_make_nop(struct module *mod,
- 
- 	old = ftrace_call_replace(ip, adjust_address(rec, addr));
- 	new = ftrace_nop_replace(rec);
--	ret = ftrace_modify_code(ip, old, new);
-+	ret = ftrace_modify_code(ip, old, new, true);
- 
- #ifdef CONFIG_OLD_MCOUNT
- 	if (ret == -EINVAL && addr == MCOUNT_ADDR) {
-@@ -193,7 +193,7 @@ int ftrace_make_nop(struct module *mod,
- 
- 		old = ftrace_call_replace(ip, adjust_address(rec, addr));
- 		new = ftrace_nop_replace(rec);
--		ret = ftrace_modify_code(ip, old, new);
-+		ret = ftrace_modify_code(ip, old, new, true);
- 	}
- #endif
- 
-@@ -254,7 +254,7 @@ static int __ftrace_modify_caller(unsigned long *callsite,
- 	unsigned long old = enable ? nop : branch;
- 	unsigned long new = enable ? branch : nop;
- 
--	return ftrace_modify_code(pc, old, new);
-+	return ftrace_modify_code(pc, old, new, true);
- }
- 
- static int ftrace_modify_graph_caller(bool enable)
--- 
-1.7.9
+	Arnd
