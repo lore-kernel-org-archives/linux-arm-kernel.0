@@ -1,76 +1,49 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 24 Feb 2012 16:35:44 +0200
-Subject: [PATCH 3/6] ARM: OMAP3PLUS PM: Add IO Daisychain support via
- hwmod mux
-In-Reply-To: <CAMQu2gxQQTfiNoiwZszNWFiDWaei8+f6eKj+K2ZE1wNuvFLH9A@mail.gmail.com>
-References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
- <1330003320-17400-4-git-send-email-t-kristo@ti.com>
- <CAMQu2gxQQTfiNoiwZszNWFiDWaei8+f6eKj+K2ZE1wNuvFLH9A@mail.gmail.com>
-Message-ID: <1330094144.4102.554.camel@sokoban>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 24 Feb 2012 15:35:44 +0100
+Subject: [PATCH 2/3] tty: serial: OMAP: block idle while the UART is
+ transferring data in PIO mode
+In-Reply-To: <alpine.DEB.2.00.1202211456160.25023@utopia.booyaka.com>
+References: <20120126024903.31613.24730.stgit@dusk>
+ <20120126025036.31613.67819.stgit@dusk> <4F423E28.3040404@ti.com>
+ <alpine.DEB.2.00.1202211456160.25023@utopia.booyaka.com>
+Message-ID: <4F47A040.6030502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-02-23 at 19:23 +0530, Shilimkar, Santosh wrote:
-> On Thu, Feb 23, 2012 at 6:51 PM, Tero Kristo <t-kristo@ti.com> wrote:
-> > From: Vishwanath BS <vishwanath.bs@ti.com>
-> >
-> > IO Daisychain feature has to be triggered whenever there is a change in
-> > device's mux configuration (See section 3.9.4 in OMAP4 Public TRM vP).
-> >
-> > Now devices can idle independent of the powerdomain, there can be a
-> > window where device is idled and corresponding powerdomain can be
-> > ON/INACTIVE state. In such situations, since both module wake up is
-> > enabled at padlevel as well as io daisychain sequence is triggered,
-> > there will be 2 PRCM interrupts (Module async wake up via swakeup and
-> > IO Pad interrupt). But as PRCM Interrupt handler clears the Module
-> > Padlevel WKST bit in the first interrupt, module specific interrupt
-> > handler will not triggered for the second time
-> >
-> > Also look at detailed explanation given by Rajendra at
-> > http://www.spinics.net/lists/linux-serial/msg04480.html
-> >
-> > Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/omap_hwmod.c |    9 +++++++--
-> >  arch/arm/mach-omap2/pm.c         |    7 +++++++
-> >  arch/arm/mach-omap2/pm.h         |    1 +
-> >  3 files changed, 15 insertions(+), 2 deletions(-)
-> >
-> 
-> [...]
-> 
-> >
-> > diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> > index 1881fe9..e8b54eb 100644
-> > --- a/arch/arm/mach-omap2/pm.c
-> > +++ b/arch/arm/mach-omap2/pm.c
-> > @@ -25,6 +25,7 @@
-> >  #include "clockdomain.h"
-> >  #include "pm.h"
-> >  #include "twl-common.h"
-> > +#include "prm44xx.h"
-> >
-> >  static struct omap_device_pm_latency *pm_lats;
-> >
-> > @@ -64,6 +65,12 @@ static void omap2_init_processor_devices(void)
-> >        }
-> >  }
-> >
-> > +void omap_trigger_wuclk_ctrl(void)
-> > +{
-> > +       if (cpu_is_omap44xx())
-> 
-> can we avoid above check to make it generic so that even OMAP5 can use this
-> code without any change. Some flag might do the trick.
+Salut Paul,
 
-Can't remove this check, as we don't want to execute this code for
-omap2 / omap3, it would just crash.
+On 2/21/2012 11:02 PM, Paul Walmsley wrote:
+> Salut Beno?t,
+>
+> On Mon, 20 Feb 2012, Cousson, Benoit wrote:
+>
+>> 3.3-rc4 is broken in the DT case because of the serial driver. And it
+>> looks like it is due to this fix.  We cannot rely on pdata anymore in
+>> DT, and in that case it leads to an Oops due to NULL pdata.
+>
+> Sorry about the breakage.  I agree with the diagnosis.  That code was just
+> copied from the DMA errata part of the driver, so it will need to be fixed
+> as well.  Otherwise the same problem will happen when DMA is enabled.
+>
+>> And then we will have to add the support for all these OMAP custom hooks without pdata.
+>
+> That's really the key question for the medium- to long-term...
 
--Tero
+I know you know, I'm always hoping that someone will step up and propose 
+some cool idea to fix that :-)
 
-> 
-> Rest of the patch looks fine to me.
-> 
-> Regards
-> Santosh
+>> A basic fix (below) for the moment is to test for valid pdata inside the driver.
+>> I'll repost it properly if you are fine with it.
+>
+> Looks fine to me, although I'd suggest fixing the DMA workaround path as
+> well.
+
+Mmm, I've tried to fix every instances of pdata in the code, you think I 
+missed some?
+
+I'll check again.
+
+> Reviewed-by: Paul Walmsley<paul@pwsan.com>
+
+Thanks,
+Benoit
