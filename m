@@ -1,55 +1,36 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 24 Feb 2012 15:16:38 +0200
-Subject: [PATCH] regulator: twl6030: add support for vdd1, vdd2 and
- vdd3 regulators
-In-Reply-To: <20120224114940.GB5450@opensource.wolfsonmicro.com>
-References: <1329995109-4795-1-git-send-email-t-kristo@ti.com>
- <20120223153422.GF4553@opensource.wolfsonmicro.com>
- <1330076289.4102.517.camel@sokoban>
- <20120224114940.GB5450@opensource.wolfsonmicro.com>
-Message-ID: <1330089398.4102.539.camel@sokoban>
+From: Joerg.Roedel@amd.com (Joerg Roedel)
+Date: Fri, 24 Feb 2012 14:16:38 +0100
+Subject: [PATCH v2 2/2] iommu/omap: fix NULL pointer dereference
+In-Reply-To: <CAK=WgbYufgQY-O_MBcXc3aE23sx+r5ZQLS4h_bLUh6DKpLVqAg@mail.gmail.com>
+References: <1329902086-13868-1-git-send-email-ohad@wizery.com>
+ <20120223161109.GB2454@amd.com>
+ <CAK=WgbYufgQY-O_MBcXc3aE23sx+r5ZQLS4h_bLUh6DKpLVqAg@mail.gmail.com>
+Message-ID: <20120224131638.GH2454@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-02-24 at 11:49 +0000, Mark Brown wrote:
-> On Fri, Feb 24, 2012 at 11:38:09AM +0200, Tero Kristo wrote:
-> > On Thu, 2012-02-23 at 15:34 +0000, Mark Brown wrote:
+On Thu, Feb 23, 2012 at 06:16:59PM +0200, Ohad Ben-Cohen wrote:
+> On Thu, Feb 23, 2012 at 6:11 PM, Joerg Roedel <Joerg.Roedel@amd.com> wrote:
+> > I guess these patches are 3.3 material?
 > 
-> > > Since you're using min_uV as the "register value" you probably ought to
-> > > be returning that as the selector too and supplying a list_voltage()
-> > > which just passes the selector back in case something tries to use it
-> > > and gets confused.
+> Yes.
 > 
-> > I was thinking at some point about adding a list_voltage for these
-> > regulators, however I dropped that idea, because the regulators can
-> > support a range of voltages (from min to max) with some stepping value.
-> > But... if you propose that the list_voltage would just return the
-> > current voltage back, wouldn't that also potentially confuse the user
-> > more, as it can only see the single voltage and nothing else, maybe
-> > making it to think that the regulator can only support one voltage
-> > level?
+> > How about tagging them for stable too?
 > 
-> Yes, that'd be completely broken.  You'd need to just return the
-> selector back which would tell them that they had voltage control in
-> microvolt steps.
+> Good point. But it's only relevant for this 2nd patch (the NULL
+> pointer dereference fix), as the first one is a 3.3 regression. Let me
+> know if you want me to resend the 2nd one with the stable tag.
 
-I still ain't quite sure how this would work, do you mean adding
-something like this:
+Applied both and added stable-tag to the second patch. I'll send the
+pull-request when you guys also send me the correct fix for the
+outstanding initialization order issue on OMAP.
 
-+static int twl6030smps_list_voltage(struct regulator_dev *rdev,
-+                                   unsigned int selector)
-+{
-+       return selector;
-+}
 
-I believe this would fail still. I took a look at a few drivers that use
-regulator_list_voltage(), but all of these seem to numerate voltages
-based on regulator_count_voltages(), which will return -EINVAL for the
-SMPS ones as the num_voltages is zero. Also, even if I defined
-num_voltages here, I would be attempting to list_voltage for zero index,
-returning zero, but this would be invalid voltage for the cpu obviously
-(and is also out of range for the regulator min_voltage, and also
-according to docs invalid return value for the function in the first
-place.)
+	Joerg
 
--Tero
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
