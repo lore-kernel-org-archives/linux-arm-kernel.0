@@ -1,43 +1,49 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 24 Feb 2012 03:25:31 -0500 (EST)
-Subject: [PATCH v2] davinci_emac: Do not free all rx dma descriptors
- during init
-In-Reply-To: <1329995657-7051-1-git-send-email-christian.riesch@omicron.at>
-References: <1329995657-7051-1-git-send-email-christian.riesch@omicron.at>
-Message-ID: <20120224.032531.607179170339382701.davem@davemloft.net>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 24 Feb 2012 00:41:05 -0800
+Subject: [V1 3/4] mfd: Add ability to wake the system for 88pm860x
+In-Reply-To: <1329997662-2931-3-git-send-email-jtzhou@marvell.com>
+References: <1329997662-2931-1-git-send-email-jtzhou@marvell.com>
+ <1329997662-2931-3-git-send-email-jtzhou@marvell.com>
+Message-ID: <20120224084105.GB10763@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christian Riesch <christian.riesch@omicron.at>
-Date: Thu, 23 Feb 2012 12:14:17 +0100
+Hi Jett,
 
-> This patch fixes a regression that was introduced by
-> 
-> commit 0a5f38467765ee15478db90d81e40c269c8dda20
-> davinci_emac: Add Carrier Link OK check in Davinci RX Handler
-> 
-> Said commit adds a check whether the carrier link is ok. If the link is
-> not ok, the skb is freed and no new dma descriptor added to the rx dma
-> channel. This causes trouble during initialization when the carrier
-> status has not yet been updated. If a lot of packets are received while
-> netif_carrier_ok returns false, all dma descriptors are freed and the
-> rx dma transfer is stopped.
-> 
-> The bug occurs when the board is connected to a network with lots of
-> traffic and the ifconfig down/up is done, e.g., when reconfiguring
-> the interface with DHCP.
-> 
-> The bug can be reproduced by flood pinging the davinci board while doing
-> ifconfig eth0 down
-> ifconfig eth0 up
-> on the board.
-> 
-> After that, the rx path stops working and the overrun value reported
-> by ifconfig is counting up.
-> 
-> This patch reverts commit 0a5f38467765ee15478db90d81e40c269c8dda20
-> and instead issues warnings only if cpdma_chan_submit returns -ENOMEM.
-> 
-> Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
+On Thu, Feb 23, 2012 at 07:47:41PM +0800, Jett.Zhou wrote:
+> +#ifdef CONFIG_PM_SLEEP
+> +static int pm860x_onkey_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+> +
+> +	if (device_may_wakeup(dev))
+> +		chip->wakeup_flag |= 1 << PM8607_IRQ_ONKEY;
+> +	return 0;
+> +}
+> +static int pm860x_onkey_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+> +
+> +	if (device_may_wakeup(dev))
+> +		chip->wakeup_flag &= ~(1 << PM8607_IRQ_ONKEY);
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(pm860x_onkey_pm_ops, pm860x_onkey_suspend, pm860x_onkey_resume);
+> +
+>  static struct platform_driver pm860x_onkey_driver = {
+>  	.driver		= {
+>  		.name	= "88pm860x-onkey",
+>  		.owner	= THIS_MODULE,
+> +#ifdef CONFIG_PM
 
-Applied to 'net', thanks.
+This ifdef is not needed, SIMPLE_DEV_PM_OPS() will produce at least
+empty dev_pm_ops structure.
+
+Thanks.
+
+-- 
+Dmitry
