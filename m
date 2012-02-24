@@ -1,7 +1,7 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Feb 2012 21:54:48 +0000
+From: timur@freescale.com (Timur Tabi)
+Date: Fri, 24 Feb 2012 16:00:17 -0600
 Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-In-Reply-To: <4F480120.6080409@freescale.com>
+In-Reply-To: <20120224215448.GA15120@n2100.arm.linux.org.uk>
 References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
  <1330008519-3584-1-git-send-email-shawn.guo@linaro.org>
  <1330008519-3584-5-git-send-email-shawn.guo@linaro.org>
@@ -10,31 +10,24 @@ References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
  <4F4671BB.7060409@freescale.com>
  <20120223171407.GC22562@n2100.arm.linux.org.uk>
  <4F480120.6080409@freescale.com>
-Message-ID: <20120224215448.GA15120@n2100.arm.linux.org.uk>
+ <20120224215448.GA15120@n2100.arm.linux.org.uk>
+Message-ID: <4F480871.9020206@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 03:29:04PM -0600, Timur Tabi wrote:
-> Russell King - ARM Linux wrote:
-> >> > I'll have to ask around, because I'm sure I'm missing something.
-> > If what you say is true, it means we have different semantics for the
-> > same accessors on different architectures.  No wonder it's needing
-> > drivers to gain ifdefs to select appropriate accessors.
-> > 
-> > This needs sorting out properly.  It needs the semantics of readl() etc
-> > to be fully defined, and all architectures to implement those semantics
-> > rather than what they think would be appropriate for them.
-> 
-> So I asked around, and sure enough, my macro-fu was weak.  On PowerPC,
-> readl() maps to in_le32().  Even though PowerPC is big-endian, some
-> devices are little endian (e.g. PCI and some PICs).
-> 
-> in_le32() is the byte-swapping version of in_be32().  Both functions have
-> instruction order synchronization instructions in them.
-> 
-> So replacing in_be32() with readl() will break on PowerPC.
+Russell King - ARM Linux wrote:
+> BenH tells me that he'll accept patches which converts in_32be() to
+> ioread32be(), as in_32be() is ancient PPC cruft that needs to die.
 
-But not a BE variant.  Like ioread32be().
+Where did he say this?  in_be32() (and its variants) are used EVERYWHERE
+in PowerPC code.
 
-BenH tells me that he'll accept patches which converts in_32be() to
-ioread32be(), as in_32be() is ancient PPC cruft that needs to die.
+Also, keep in mind that on ARM, ioread32be() is probably wrong, because we
+want to read the register as little-endian.  The SSI audio controller is
+little-endian on i.MX chips and big-endian on PowerPC chip.  So we really
+need a native-endian variant of ioread32be().  ioread32() is little-endian
+on PowerPC, so we can't use that.
+
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
