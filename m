@@ -1,52 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Feb 2012 15:03:27 +0000
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <20120224063521.GA16412@pengutronix.de>
-References: <1330030639-3796-1-git-send-email-stigge@antcom.de>
- <4F46AA06.30502@antcom.de> <20120224063521.GA16412@pengutronix.de>
-Message-ID: <201202241503.27406.arnd@arndb.de>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 24 Feb 2012 17:04:44 +0200
+Subject: [PATCH] regulator: twl6030: add support for vdd1, vdd2 and
+ vdd3 regulators
+In-Reply-To: <20120224145027.GN5450@opensource.wolfsonmicro.com>
+References: <20120223153422.GF4553@opensource.wolfsonmicro.com>
+ <1330076289.4102.517.camel@sokoban>
+ <20120224114940.GB5450@opensource.wolfsonmicro.com>
+ <1330089398.4102.539.camel@sokoban>
+ <20120224132408.GF5450@opensource.wolfsonmicro.com>
+ <1330091765.4102.547.camel@sokoban>
+ <20120224140109.GG5450@opensource.wolfsonmicro.com>
+ <1330093512.4102.552.camel@sokoban>
+ <20120224143415.GL5450@opensource.wolfsonmicro.com>
+ <1330094532.4102.555.camel@sokoban>
+ <20120224145027.GN5450@opensource.wolfsonmicro.com>
+Message-ID: <1330095884.4102.564.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 February 2012, Wolfram Sang wrote:
->   > To get rid of the remaining #ifdefs, I could as well create a new
-> > ohci-lpc32xx.c instead of abusing ohci-pnx4008.c. Would this be the way
-> > to go or are there any other suggestions?
+On Fri, 2012-02-24 at 14:50 +0000, Mark Brown wrote:
+> On Fri, Feb 24, 2012 at 04:42:12PM +0200, Tero Kristo wrote:
+> > On Fri, 2012-02-24 at 14:34 +0000, Mark Brown wrote:
 > 
-> If you could tell the difference between pnx4008 and lpc32xx, then you could
-> simply do something like:
+> > > Ah, so it is - we're fixing things up in the core.  I'd forgotten we did
+> > > that.
 > 
->         if (machine_is_pnx4008)
->                 pnx4008_configure();
->         else
->                 lpc32xx_configure();
+> > So, no need to add list_voltage to this, I just fix the return values
+> > for the get / set and send the new version, am I right?
 > 
-> or
-> 
->         if (machine_is_pnx4008)
->                 pnx4008_(un)set_usb_bits
+> I guess.  Though actually given that there's no interaction with the
+> chip itself at all I'm not sure I understand why this is part of the
+> twl6030 driver rather than being a separate driver for whatever
+> implements the operations - it's not like the case with the other
+> regulators where there was some functionality implemented through the
+> twl6030 driver beyond straight passthrough.
 
-I would recomment telling this from the device itself rather than from the
-platform. You can add a platform_device_id list and put information like this
-into the driver_data, then do
+Well, there are still some registers within twl6030 that could be
+accessed through the control channel, it is just that the voltage
+registers are no longer visible through this. We have the CFG_GRP,
+CFG_TRANS, CFG_STATE and CFG_STEP registers visible here, even though we
+are not accessing them right now.
 
-	switch (pdev->id.driver_data) {
-	case OHCI_PNX4008:
-                pnx4008_configure();
-		break;
-	case 
-		lpc32xx_configure();
-		break;
-	};
-
-	if (pdev->id.driver_data == OHCI_PNX4008)
-		pnx4008_(un)set_usb_bits()
-
-Alternatively, you can put the common code into one file, and use separate
-files for the parts that are different between pnx4008 and lpc32xx.
-
-Unfortunately, the way that ohci handles the abstraction between the
-various implementations is backwards, it would be much easier if the
-main driver was following that model to start with.
-
-	Arnd
+-Tero
