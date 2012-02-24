@@ -1,86 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Feb 2012 16:58:31 +0000
-Subject: [PATCH v3 03/10] of: Add PWM support.
-In-Reply-To: <20120224064749.GB18786@avionic-0098.mockup.avionic-design.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <201202231403.01614.arnd@arndb.de>
- <20120224064749.GB18786@avionic-0098.mockup.avionic-design.de>
-Message-ID: <201202241658.32062.arnd@arndb.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 24 Feb 2012 17:54:43 +0100
+Subject: [PATCH v3 17/21] ARM: at91: merge SRAM Memory banks thanks to
+ mirroring
+In-Reply-To: <4F46B3DF.7010402@gmail.com>
+References: <cover.1330006537.git.nicolas.ferre@atmel.com>
+ <c9b1e3ffbc322a1d1e1272062a9361abe536a33a.1330006537.git.nicolas.ferre@atmel.com>
+ <4F46B3DF.7010402@gmail.com>
+Message-ID: <20120224165443.GA21556@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 February 2012, Thierry Reding wrote:
-> * Arnd Bergmann wrote:
-> > On Thursday 23 February 2012, Thierry Reding wrote:
-> > > * Arnd Bergmann wrote:
-
-> [...]
-> > > > * Why not include the pwm_request() call in this and return the
-> > > >   pwm_device directly? You said that you want to get rid of the
-> > > >   pwm_id eventually, which is a good idea, but this interface still
-> > > >   forces one to use it.
-> > > 
-> > > Okay, that sounds sensible. I propose to rename the function to something like
-> > > of_request_pwm().
+On 08:47 Fri 24 Feb     , Ryan Mallon wrote:
+> On 24/02/12 01:26, Nicolas Ferre wrote:
+> 
+> > From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 > > 
-> > Sounds good.
+> > On at91sam9260 and at91sam9g20 the SRAM banks are mirrored. We can
+> > merge them together to be able to have bigger and continuous
+> > internal RAM.
+> 
+> I think this patch needs some comments in the code. As mentioned in the
+> last round, this functionality is not documented, so it is not obvious
+> how/why this works. This is especially true for any user who has
+> problems with this code and then tries to look up those addresses in
+> their at91 manual only to find the regions are reserved.
+> 
+> Nicolas, are you able to give an official Atmel stance on this?
+you have the ack from Nico and he send the e-mail
 
-On second thought, I would actually prefer starting the name with pwm_ and
-making it independent of device tree. There might be other ways how to
-find the pwm_device from a struct device in the future, but it should always
-be possible using a device together with a string and/or numeric identifier,
-much in the same way that we can get a resource from a platform_device.
-
-Ideally, there would be a common theme behind finding a memory region,
-irq, gpio pin, clock, regulator, dma-channel and pwm or anything else
-that requires a link between two device nodes.
-
-> > > It would of course need an additional parameter (name) to
-> > > forward to pwm_request().
+Best Regards,
+J.
+> 
+> ~Ryan
+> 
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >  arch/arm/mach-at91/at91sam9260.c              |   13 +++++--------
+> >  arch/arm/mach-at91/include/mach/at91sam9260.h |    4 ++++
+> >  2 files changed, 9 insertions(+), 8 deletions(-)
 > > 
-> > Not necessarily, it could use the dev_name(device) or the name
-> > of the property, or a combination of the two.
+> > diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> > index 14882ae..4ade265 100644
+> > --- a/arch/arm/mach-at91/at91sam9260.c
+> > +++ b/arch/arm/mach-at91/at91sam9260.c
+> > @@ -310,15 +310,12 @@ static void __init at91sam9xe_map_io(void)
+> >  
+> >  static void __init at91sam9260_map_io(void)
+> >  {
+> > -	if (cpu_is_at91sam9xe()) {
+> > +	if (cpu_is_at91sam9xe())
+> >  		at91sam9xe_map_io();
+> > -	} else if (cpu_is_at91sam9g20()) {
+> > -		at91_init_sram(0, AT91SAM9G20_SRAM0_BASE, AT91SAM9G20_SRAM0_SIZE);
+> > -		at91_init_sram(1, AT91SAM9G20_SRAM1_BASE, AT91SAM9G20_SRAM1_SIZE);
+> > -	} else {
+> > -		at91_init_sram(0, AT91SAM9260_SRAM0_BASE, AT91SAM9260_SRAM0_SIZE);
+> > -		at91_init_sram(1, AT91SAM9260_SRAM1_BASE, AT91SAM9260_SRAM1_SIZE);
+> > -	}
+> > +	else if (cpu_is_at91sam9g20())
+> > +		at91_init_sram(0, AT91SAM9G20_SRAM_BASE, AT91SAM9G20_SRAM_SIZE);
+> > +	else
+> > +		at91_init_sram(0, AT91SAM9260_SRAM_BASE, AT91SAM9260_SRAM_SIZE);
+> >  }
+> >  
+> >  static void __init at91sam9260_ioremap_registers(void)
+> > diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+> > index 2e47b6d..08ae9af 100644
+> > --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
+> > +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+> > @@ -113,6 +113,8 @@
+> >  #define AT91SAM9260_SRAM0_SIZE	SZ_4K		/* Internal SRAM 0 size (4Kb) */
+> >  #define AT91SAM9260_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
+> >  #define AT91SAM9260_SRAM1_SIZE	SZ_4K		/* Internal SRAM 1 size (4Kb) */
+> > +#define AT91SAM9260_SRAM_BASE	0x002FF000	/* Internal SRAM base address */
+> > +#define AT91SAM9260_SRAM_SIZE	SZ_8K		/* Internal SRAM size (8Kb) */
+> >  
+> >  #define AT91SAM9260_UHP_BASE	0x00500000	/* USB Host controller */
+> >  
+> > @@ -126,6 +128,8 @@
+> >  #define AT91SAM9G20_SRAM0_SIZE	SZ_16K		/* Internal SRAM 0 size (16Kb) */
+> >  #define AT91SAM9G20_SRAM1_BASE	0x00300000	/* Internal SRAM 1 base address */
+> >  #define AT91SAM9G20_SRAM1_SIZE	SZ_16K		/* Internal SRAM 1 size (16Kb) */
+> > +#define AT91SAM9G20_SRAM_BASE	0x002FC000	/* Internal SRAM base address */
+> > +#define AT91SAM9G20_SRAM_SIZE	SZ_32K		/* Internal SRAM size (32Kb) */
+> >  
+> >  #define AT91SAM9G20_UHP_BASE	0x00500000	/* USB Host controller */
+> >  
 > 
-> The problem with that is that usually the device would be named something
-> generic like "pwm", while in case where the PWM is used for the backlight
-> it makes sense to label the PWM device "backlight".
 > 
-> Looking at debugfs and seeing an entry "backlight" is much more straight-
-> forward than "pwm.0". I mean "pwm.0" doesn't carry any useful information
-> really, does it?
-
-But the device name would be from the device using the pwm, not the
-pwm controller, so it should be something more helpful, no?
-
-> > > > > +EXPORT_SYMBOL(of_get_named_pwm);
-> > > > 
-> > > > EXPORT_SYMBOL_GPL?
-> > > 
-> > > It was brought up at some point that it might be nice to allow non-GPL
-> > > drivers to use the PWM framework as well. I don't remember any discussion
-> > > resulting from the comment. Perhaps we should have that discussion now and
-> > > decide whether or not we want to keep it GPL-only or not.
-> > 
-> > I would definitely use EXPORT_SYMBOL_GPL for all new code unless it
-> > replaces an earlier interface that was available as EXPORT_SYMBOL.
-> 
-> I just grepped the code and noticed this:
-> 
-> 	$ $ git grep -n 'EXPORT_SYMBOL.*(pwm_request)'
-> 	arch/arm/mach-vt8500/pwm.c:139:EXPORT_SYMBOL(pwm_request);
-> 	arch/arm/plat-mxc/pwm.c:183:EXPORT_SYMBOL(pwm_request);
-> 	arch/arm/plat-samsung/pwm.c:83:EXPORT_SYMBOL(pwm_request);
-> 	arch/unicore32/kernel/pwm.c:132:EXPORT_SYMBOL(pwm_request);
-> 	drivers/mfd/twl6030-pwm.c:156:EXPORT_SYMBOL(pwm_request);
-> 	drivers/misc/ab8500-pwm.c:108:EXPORT_SYMBOL(pwm_request);
-> 	drivers/pwm/core.c:262:EXPORT_SYMBOL_GPL(pwm_request);
-> 
-> It seems like the legacy PWM API used to be non-GPL. Should I switch it back?
-> Also does it make sense to have something like of_request_pwm() GPL when the
-> rest of the API isn't?
-
-I guess the choice is to make between you and Sascha. The implementation is
-new, so you could pick EXPORT_SYMBOL_GPL, but you could also try to
-keep to the current API.
-
-	Arnd
