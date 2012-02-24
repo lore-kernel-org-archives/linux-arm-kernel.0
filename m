@@ -1,94 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Feb 2012 15:23:18 +0000
-Subject: [GIT PULL] ux500 patches for v3.4
-In-Reply-To: <CACRpkdZywv-Exu0=-fvuNFnuBGRXKZCPFXUW7movcoeUn+1=6A@mail.gmail.com>
-References: <1329809787-2788-1-git-send-email-linus.walleij@linaro.org>
- <201202211700.39669.arnd@arndb.de>
- <CACRpkdZywv-Exu0=-fvuNFnuBGRXKZCPFXUW7movcoeUn+1=6A@mail.gmail.com>
-Message-ID: <201202241523.18355.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 24 Feb 2012 16:30:16 +0100
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <1329321854-24490-4-git-send-email-b-cousson@ti.com>
+ <4F44FA56.7020000@gmail.com> <4F44FC37.2000701@ti.com>
+ <4F452484.5080503@gmail.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BD8BC6C1@HQMAIL01.nvidia.com>
+Message-ID: <4F47AD08.4030504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 February 2012, Linus Walleij wrote:
-> On Tue, Feb 21, 2012 at 6:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 2/22/2012 7:29 PM, Stephen Warren wrote:
+> Rob Herring wrote at Wednesday, February 22, 2012 10:23 AM:
+>> On 02/22/2012 08:31 AM, Cousson, Benoit wrote:
+>>> On 2/22/2012 3:23 PM, Rob Herring wrote:
+>>>> On 02/15/2012 10:04 AM, Benoit Cousson wrote:
+>>>>> Adapt the GPIO driver to retrieve information from a DT file.
+>>>>>
+>>>>> Allocate the irq_base dynamically and rename bank->virtual_irq_start
+>>>>> to bank->irq_base.
+>>>>> Change irq_base type to int instead of u16 to match irq_alloc_descs
+>>>>> output.
+>>>>>
+>>>>> Add documentation for GPIO properties specific to OMAP.
+>>>>>
+>>>>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>>>>> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+>>>>
+>>>> One comment below, but otherwise:
+>>>>
+>>>> Acked-by: Rob Herring<rob.herring@calxeda.com>
+>>>>
+>>>>> ---
+>>>>>    .../devicetree/bindings/gpio/gpio-omap.txt         |   30 +++++
+>>>>>    drivers/gpio/gpio-omap.c                           |  121
+>>>>> ++++++++++++++++++--
+>>>>>    2 files changed, 142 insertions(+), 9 deletions(-)
+>>>>>    create mode 100644
+>>>>> Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>>>> b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..c1b3100
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>>>>> @@ -0,0 +1,30 @@
+>>>>> +OMAP GPIO controller bindings
+>>>>> +
+>>>>> +Required properties:
+>>>>> +- compatible:
+>>>>> +  - "ti,omap2-gpio" for OMAP2 controllers
+>>>>> +  - "ti,omap3-gpio" for OMAP3 controllers
+>>>>> +  - "ti,omap4-gpio" for OMAP4 controllers
+>>>>> +- #gpio-cells : Should be two.
+>>>>> +  - first cell is the pin number
+>>>>> +  - second cell is used to specify optional parameters (unused)
+>>>>> +- gpio-controller : Marks the device node as a GPIO controller.
+>>>>> +- #interrupt-cells : Should be one
+>>>>
+>>>> There's no level/edge settings for gpios?
+>>>
+>>> That's a good question, because I was wondering as well :-)
+>>>
+>>> I did no see how it was done in other GPIO implementation.
+>>
+>> There's not really a good example that I've found. Many gpio nodes don't
+>> even have "interrupt-controller" set.
+>>
+>> So if you have an irq_set_type function for gpio's, then you should have
+>> 2 cells.
 
-> > * The handling of the DB9540_ROM adds a number of special cases,
-> > but in the end it looks like this is not used anywhere, so I'd
-> > recomment just removing it. If you get something that needs the
-> > ROM to be mapped, just make that use ioremap.
-> 
-> It is used to read out the ASIC ID, like this:
-> 
-> +static unsigned int u9540_read_asicid(phys_addr_t addr)
-> +{
-> +       phys_addr_t base = addr & ~0xfff;
-> +       struct map_desc desc = {
-> +               .virtual        = IO_ADDRESS_DB9540_ROM(base),
-> +               .pfn            = __phys_to_pfn(base),
-> +               .length         = SZ_16K,
-> +               .type           = MT_DEVICE,
-> +       };
-> +
-> +       iotable_init(&desc, 1);
-> +
-> +       /* As in devicemaps_init() */
-> +       local_flush_tlb_all();
-> +       flush_cache_all();
-> +
-> +       return readl(__io_address_db9540_rom(addr));
-> +}
+After checking the OMAP gpio code, I do have a gpio_irq_type and the 
+GPIO do support the 4 types. I'm not sure yet about the combinations.
 
-Do I understand this correctly that there is a new chip that
-is almost the same as the old one, but the main difference is
-location of the register that tells us which one it is? ;-)
+> Tegra's GPIO IRQ binding (gpio_nvidia.txt in linux-next at least) says:
+>
+> - #interrupt-cells : Should be 2.
+>    The first cell is the GPIO number.
+>    The second cell is used to specify flags:
+>      bits[3:0] trigger type and level flags:
+>        1 = low-to-high edge triggered.
+>        2 = high-to-low edge triggered.
+>        4 = active high level-sensitive.
+>        8 = active low level-sensitive.
+>        Valid combinations are 1, 2, 3, 4, 8.
 
-> Notice that ioremap() cannot be used here since it is used at
-> arch init time (as was discussed a while back with Nicolas
-> I think). Most platforms need to use an approach like this
-> to get chip ID:s at early init time.
-> 
-> The read-out ASIC ID is then used for the cpu_is_u9540() function
-> which is then used for the cpu_is_u8500_family()  to ensure that
-> the same codepath is used for the entire family.
-> 
-> So if I remove this part the support patch is moot.
+Indeed, so I'll just copy / paste Tegra's binding...
 
-Ok, I see.
-
-How about hardcoding the virtual address for the id register so
-that you can actually use the same function:?
-
-static unsigned int ux500_read_asicid(phys_addr_t addr)
-{
-        phys_addr_t base = addr & ~PAGE_MASK;
-	unsigned long offset = addr & PAGE_MASK;
-
-        struct map_desc desc = {
-                .virtual        = (unsigned long)UX500_ASICID_ADDR,
-                .pfn            = __phys_to_pfn(base),
-                .length         = SZ_4K,
-                .type           = MT_DEVICE,
-        };
-
-        iotable_init(&desc, 1);
-
-        /* As in devicemaps_init() */
-        local_flush_tlb_all();
-        flush_cache_all();
-
-        return readl(UX500_ASICID_ADDR + offset);
-}       
-
-Then you just need to find a convenient value for UX500_ASICID_VIRT
-that does not conflict with the other static mappings.
-
-> > * I assume that we will need to add a few changes to make this
-> > actually work together with Lee's series.
-> 
-> It actually works just fine. I just merged this patchset into
-> next-20120224, compiled and booted, it JustWorks(TM) because the
-> changes are strangely enough orthogonal.
-
-Ok, good.
-
-	Arnd
+Thanks,
+Benoit
