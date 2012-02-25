@@ -1,195 +1,45 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 25 Feb 2012 16:35:14 +0100
-Subject: [PATCH v2 2/6] ARM: LPC32xx: Fix missing and bad LPC32XX macros
+Date: Sat, 25 Feb 2012 16:35:13 +0100
+Subject: [PATCH v2 1/6] ARM: LPC32xx: Fix irq on GPI_28
 In-Reply-To: <1330184118-10270-1-git-send-email-stigge@antcom.de>
 References: <1330184118-10270-1-git-send-email-stigge@antcom.de>
-Message-ID: <1330184118-10270-3-git-send-email-stigge@antcom.de>
+Message-ID: <1330184118-10270-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the LPC32XX_* macros were typed ("LCP32XX_*"), which is fixed by this
-patch. (Besides another LCP doc typo.)
-
-Further, the LPC32XX_GPIO_P2_MUX_SET/CLR/STATE macros were missing.
+The GPI_28 IRQ was not registered properly. The registration of
+IRQ_LPC32XX_GPI_28 was added and the (wrong) IRQ_LPC32XX_GPI_11 at
+LPC32XX_SIC1_IRQ(4) was replaced by IRQ_LPC32XX_GPI_28 (see manual of
+LPC32xx / interrupt controller).
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 ---
- arch/arm/mach-lpc32xx/include/mach/platform.h |   51 +++++++++++++-------------
- arch/arm/mach-lpc32xx/pm.c                    |    2 -
- arch/arm/mach-lpc32xx/timer.c                 |   46 +++++++++++------------
- 3 files changed, 51 insertions(+), 48 deletions(-)
+ arch/arm/mach-lpc32xx/include/mach/irqs.h |    2 +-
+ arch/arm/mach-lpc32xx/irq.c               |    4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/platform.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/platform.h
-@@ -591,42 +591,42 @@
- /*
-  * Timer/counter register offsets
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/include/mach/irqs.h
++++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/irqs.h
+@@ -61,7 +61,7 @@
   */
--#define LCP32XX_TIMER_IR(x)			io_p2v((x) + 0x00)
--#define LCP32XX_TIMER_TCR(x)			io_p2v((x) + 0x04)
--#define LCP32XX_TIMER_TC(x)			io_p2v((x) + 0x08)
--#define LCP32XX_TIMER_PR(x)			io_p2v((x) + 0x0C)
--#define LCP32XX_TIMER_PC(x)			io_p2v((x) + 0x10)
--#define LCP32XX_TIMER_MCR(x)			io_p2v((x) + 0x14)
--#define LCP32XX_TIMER_MR0(x)			io_p2v((x) + 0x18)
--#define LCP32XX_TIMER_MR1(x)			io_p2v((x) + 0x1C)
--#define LCP32XX_TIMER_MR2(x)			io_p2v((x) + 0x20)
--#define LCP32XX_TIMER_MR3(x)			io_p2v((x) + 0x24)
--#define LCP32XX_TIMER_CCR(x)			io_p2v((x) + 0x28)
--#define LCP32XX_TIMER_CR0(x)			io_p2v((x) + 0x2C)
--#define LCP32XX_TIMER_CR1(x)			io_p2v((x) + 0x30)
--#define LCP32XX_TIMER_CR2(x)			io_p2v((x) + 0x34)
--#define LCP32XX_TIMER_CR3(x)			io_p2v((x) + 0x38)
--#define LCP32XX_TIMER_EMR(x)			io_p2v((x) + 0x3C)
--#define LCP32XX_TIMER_CTCR(x)			io_p2v((x) + 0x70)
-+#define LPC32XX_TIMER_IR(x)			io_p2v((x) + 0x00)
-+#define LPC32XX_TIMER_TCR(x)			io_p2v((x) + 0x04)
-+#define LPC32XX_TIMER_TC(x)			io_p2v((x) + 0x08)
-+#define LPC32XX_TIMER_PR(x)			io_p2v((x) + 0x0C)
-+#define LPC32XX_TIMER_PC(x)			io_p2v((x) + 0x10)
-+#define LPC32XX_TIMER_MCR(x)			io_p2v((x) + 0x14)
-+#define LPC32XX_TIMER_MR0(x)			io_p2v((x) + 0x18)
-+#define LPC32XX_TIMER_MR1(x)			io_p2v((x) + 0x1C)
-+#define LPC32XX_TIMER_MR2(x)			io_p2v((x) + 0x20)
-+#define LPC32XX_TIMER_MR3(x)			io_p2v((x) + 0x24)
-+#define LPC32XX_TIMER_CCR(x)			io_p2v((x) + 0x28)
-+#define LPC32XX_TIMER_CR0(x)			io_p2v((x) + 0x2C)
-+#define LPC32XX_TIMER_CR1(x)			io_p2v((x) + 0x30)
-+#define LPC32XX_TIMER_CR2(x)			io_p2v((x) + 0x34)
-+#define LPC32XX_TIMER_CR3(x)			io_p2v((x) + 0x38)
-+#define LPC32XX_TIMER_EMR(x)			io_p2v((x) + 0x3C)
-+#define LPC32XX_TIMER_CTCR(x)			io_p2v((x) + 0x70)
- 
- /*
-  * ir register definitions
-  */
--#define LCP32XX_TIMER_CNTR_MTCH_BIT(n)		(1 << ((n) & 0x3))
--#define LCP32XX_TIMER_CNTR_CAPT_BIT(n)		(1 << (4 + ((n) & 0x3)))
-+#define LPC32XX_TIMER_CNTR_MTCH_BIT(n)		(1 << ((n) & 0x3))
-+#define LPC32XX_TIMER_CNTR_CAPT_BIT(n)		(1 << (4 + ((n) & 0x3)))
- 
- /*
-  * tcr register definitions
-  */
--#define LCP32XX_TIMER_CNTR_TCR_EN		0x1
--#define LCP32XX_TIMER_CNTR_TCR_RESET		0x2
-+#define LPC32XX_TIMER_CNTR_TCR_EN		0x1
-+#define LPC32XX_TIMER_CNTR_TCR_RESET		0x2
- 
- /*
-  * mcr register definitions
-  */
--#define LCP32XX_TIMER_CNTR_MCR_MTCH(n)		(0x1 << ((n) * 3))
--#define LCP32XX_TIMER_CNTR_MCR_RESET(n)		(0x1 << (((n) * 3) + 1))
--#define LCP32XX_TIMER_CNTR_MCR_STOP(n)		(0x1 << (((n) * 3) + 2))
-+#define LPC32XX_TIMER_CNTR_MCR_MTCH(n)		(0x1 << ((n) * 3))
-+#define LPC32XX_TIMER_CNTR_MCR_RESET(n)		(0x1 << (((n) * 3) + 1))
-+#define LPC32XX_TIMER_CNTR_MCR_STOP(n)		(0x1 << (((n) * 3) + 2))
- 
- /*
-  * Standard UART register offsets
-@@ -690,5 +690,8 @@
- #define LPC32XX_GPIO_P1_MUX_SET			_GPREG(0x130)
- #define LPC32XX_GPIO_P1_MUX_CLR			_GPREG(0x134)
- #define LPC32XX_GPIO_P1_MUX_STATE		_GPREG(0x138)
-+#define LPC32XX_GPIO_P2_MUX_SET			_GPREG(0x028)
-+#define LPC32XX_GPIO_P2_MUX_CLR			_GPREG(0x02C)
-+#define LPC32XX_GPIO_P2_MUX_STATE		_GPREG(0x030)
- 
- #endif
---- linux-2.6.orig/arch/arm/mach-lpc32xx/pm.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/pm.c
-@@ -13,7 +13,7 @@
- /*
-  * LPC32XX CPU and system power management
-  *
-- * The LCP32XX has three CPU modes for controlling system power: run,
-+ * The LPC32XX has three CPU modes for controlling system power: run,
-  * direct-run, and halt modes. When switching between halt and run modes,
-  * the CPU transistions through direct-run mode. For Linux, direct-run
-  * mode is not used in normal operation. Halt mode is used when the
---- linux-2.6.orig/arch/arm/mach-lpc32xx/timer.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/timer.c
-@@ -34,11 +34,11 @@
- static int lpc32xx_clkevt_next_event(unsigned long delta,
-     struct clock_event_device *dev)
- {
--	__raw_writel(LCP32XX_TIMER_CNTR_TCR_RESET,
--		LCP32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
--	__raw_writel(delta, LCP32XX_TIMER_PR(LPC32XX_TIMER0_BASE));
--	__raw_writel(LCP32XX_TIMER_CNTR_TCR_EN,
--		LCP32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
-+	__raw_writel(LPC32XX_TIMER_CNTR_TCR_RESET,
-+		LPC32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
-+	__raw_writel(delta, LPC32XX_TIMER_PR(LPC32XX_TIMER0_BASE));
-+	__raw_writel(LPC32XX_TIMER_CNTR_TCR_EN,
-+		LPC32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
- 
- 	return 0;
- }
-@@ -58,7 +58,7 @@ static void lpc32xx_clkevt_mode(enum clo
- 		 * disable the timer to wait for the first call to
- 		 * set_next_event().
- 		 */
--		__raw_writel(0, LCP32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
-+		__raw_writel(0, LPC32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
- 		break;
- 
- 	case CLOCK_EVT_MODE_UNUSED:
-@@ -81,8 +81,8 @@ static irqreturn_t lpc32xx_timer_interru
- 	struct clock_event_device *evt = &lpc32xx_clkevt;
- 
- 	/* Clear match */
--	__raw_writel(LCP32XX_TIMER_CNTR_MTCH_BIT(0),
--		LCP32XX_TIMER_IR(LPC32XX_TIMER0_BASE));
-+	__raw_writel(LPC32XX_TIMER_CNTR_MTCH_BIT(0),
-+		LPC32XX_TIMER_IR(LPC32XX_TIMER0_BASE));
- 
- 	evt->event_handler(evt);
- 
-@@ -128,14 +128,14 @@ static void __init lpc32xx_timer_init(vo
- 	clkrate = clkrate / clk_get_pclk_div();
- 
- 	/* Initial timer setup */
--	__raw_writel(0, LCP32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
--	__raw_writel(LCP32XX_TIMER_CNTR_MTCH_BIT(0),
--		LCP32XX_TIMER_IR(LPC32XX_TIMER0_BASE));
--	__raw_writel(1, LCP32XX_TIMER_MR0(LPC32XX_TIMER0_BASE));
--	__raw_writel(LCP32XX_TIMER_CNTR_MCR_MTCH(0) |
--		LCP32XX_TIMER_CNTR_MCR_STOP(0) |
--		LCP32XX_TIMER_CNTR_MCR_RESET(0),
--		LCP32XX_TIMER_MCR(LPC32XX_TIMER0_BASE));
-+	__raw_writel(0, LPC32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
-+	__raw_writel(LPC32XX_TIMER_CNTR_MTCH_BIT(0),
-+		LPC32XX_TIMER_IR(LPC32XX_TIMER0_BASE));
-+	__raw_writel(1, LPC32XX_TIMER_MR0(LPC32XX_TIMER0_BASE));
-+	__raw_writel(LPC32XX_TIMER_CNTR_MCR_MTCH(0) |
-+		LPC32XX_TIMER_CNTR_MCR_STOP(0) |
-+		LPC32XX_TIMER_CNTR_MCR_RESET(0),
-+		LPC32XX_TIMER_MCR(LPC32XX_TIMER0_BASE));
- 
- 	/* Setup tick interrupt */
- 	setup_irq(IRQ_LPC32XX_TIMER0, &lpc32xx_timer_irq);
-@@ -151,14 +151,14 @@ static void __init lpc32xx_timer_init(vo
- 	clockevents_register_device(&lpc32xx_clkevt);
- 
- 	/* Use timer1 as clock source. */
--	__raw_writel(LCP32XX_TIMER_CNTR_TCR_RESET,
--		LCP32XX_TIMER_TCR(LPC32XX_TIMER1_BASE));
--	__raw_writel(0, LCP32XX_TIMER_PR(LPC32XX_TIMER1_BASE));
--	__raw_writel(0, LCP32XX_TIMER_MCR(LPC32XX_TIMER1_BASE));
--	__raw_writel(LCP32XX_TIMER_CNTR_TCR_EN,
--		LCP32XX_TIMER_TCR(LPC32XX_TIMER1_BASE));
-+	__raw_writel(LPC32XX_TIMER_CNTR_TCR_RESET,
-+		LPC32XX_TIMER_TCR(LPC32XX_TIMER1_BASE));
-+	__raw_writel(0, LPC32XX_TIMER_PR(LPC32XX_TIMER1_BASE));
-+	__raw_writel(0, LPC32XX_TIMER_MCR(LPC32XX_TIMER1_BASE));
-+	__raw_writel(LPC32XX_TIMER_CNTR_TCR_EN,
-+		LPC32XX_TIMER_TCR(LPC32XX_TIMER1_BASE));
- 
--	clocksource_mmio_init(LCP32XX_TIMER_TC(LPC32XX_TIMER1_BASE),
-+	clocksource_mmio_init(LPC32XX_TIMER_TC(LPC32XX_TIMER1_BASE),
- 		"lpc32xx_clksrc", clkrate, 300, 32, clocksource_mmio_readl_up);
- }
- 
+ #define IRQ_LPC32XX_JTAG_COMM_TX	LPC32XX_SIC1_IRQ(1)
+ #define IRQ_LPC32XX_JTAG_COMM_RX	LPC32XX_SIC1_IRQ(2)
+-#define IRQ_LPC32XX_GPI_11		LPC32XX_SIC1_IRQ(4)
++#define IRQ_LPC32XX_GPI_28		LPC32XX_SIC1_IRQ(4)
+ #define IRQ_LPC32XX_TS_P		LPC32XX_SIC1_IRQ(6)
+ #define IRQ_LPC32XX_TS_IRQ		LPC32XX_SIC1_IRQ(7)
+ #define IRQ_LPC32XX_TS_AUX		LPC32XX_SIC1_IRQ(8)
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/irq.c
++++ linux-2.6/arch/arm/mach-lpc32xx/irq.c
+@@ -118,6 +118,10 @@ static const struct lpc32xx_event_info l
+ 		.event_group = &lpc32xx_event_pin_regs,
+ 		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_06_BIT,
+ 	},
++	[IRQ_LPC32XX_GPI_28] = {
++		.event_group = &lpc32xx_event_pin_regs,
++		.mask = LPC32XX_CLKPWR_EXTSRC_GPI_28_BIT,
++	},
+ 	[IRQ_LPC32XX_GPIO_00] = {
+ 		.event_group = &lpc32xx_event_int_regs,
+ 		.mask = LPC32XX_CLKPWR_INTSRC_GPIO_00_BIT,
