@@ -1,79 +1,56 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 25 Feb 2012 16:35:17 +0100
-Subject: [PATCH v2 5/6] ARM: LPC32xx: serial.c: HW bug workaround
-In-Reply-To: <1330184118-10270-1-git-send-email-stigge@antcom.de>
-References: <1330184118-10270-1-git-send-email-stigge@antcom.de>
-Message-ID: <1330184118-10270-6-git-send-email-stigge@antcom.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 25 Feb 2012 10:46:53 -0500 (EST)
+Subject: [PATCH v2] USB: Support for LPC32xx SoC
+In-Reply-To: <201202250845.44427.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1202251033550.4173-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a HW bug by flushing RX FIFOs of the UARTs on init.
+On Sat, 25 Feb 2012, Arnd Bergmann wrote:
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+> On Saturday 25 February 2012, Wolfram Sang wrote:
+> > > Unfortunately, the way that ohci handles the abstraction between the
+> > > various implementations is backwards, it would be much easier if the
+> > > main driver was following that model to start with.
+> > 
+> > ... exactly for that reason I didn't suggest it. Looking at other ohci-sources
+> > (e.g. ohci-omap.c), machine_is_* seems to be the consistent use-case.
+> 
+> I still hope that someone takes the time to convert ohci and ehci into
+> something more regular, building the .c files separately instead of the
+> conditional #include "foo.c" inside of the main file.
+> 
+> Alan and Greg, do you know if anyone is working on that, and if not do you
+> think someone should do it?
 
----
- arch/arm/mach-lpc32xx/serial.c |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+You are talking about two separate issues.  One is the way the various
+bus-glue files get built into the driver, and the other is the way it
+#includes .c files.
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/serial.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/serial.c
-@@ -88,6 +88,7 @@ struct uartinit {
- 	char *uart_ck_name;
- 	u32 ck_mode_mask;
- 	void __iomem *pdiv_clk_reg;
-+	resource_size_t mapbase;
- };
- 
- static struct uartinit uartinit_data[] __initdata = {
-@@ -97,6 +98,7 @@ static struct uartinit uartinit_data[] _
- 		.ck_mode_mask =
- 			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 5),
- 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART5_CLK_CTRL,
-+		.mapbase = LPC32XX_UART5_BASE,
- 	},
- #endif
- #ifdef CONFIG_ARCH_LPC32XX_UART3_SELECT
-@@ -105,6 +107,7 @@ static struct uartinit uartinit_data[] _
- 		.ck_mode_mask =
- 			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 3),
- 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART3_CLK_CTRL,
-+		.mapbase = LPC32XX_UART3_BASE,
- 	},
- #endif
- #ifdef CONFIG_ARCH_LPC32XX_UART4_SELECT
-@@ -113,6 +116,7 @@ static struct uartinit uartinit_data[] _
- 		.ck_mode_mask =
- 			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 4),
- 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART4_CLK_CTRL,
-+		.mapbase = LPC32XX_UART4_BASE,
- 	},
- #endif
- #ifdef CONFIG_ARCH_LPC32XX_UART6_SELECT
-@@ -121,6 +125,7 @@ static struct uartinit uartinit_data[] _
- 		.ck_mode_mask =
- 			LPC32XX_UART_CLKMODE_LOAD(LPC32XX_UART_CLKMODE_ON, 6),
- 		.pdiv_clk_reg = LPC32XX_CLKPWR_UART6_CLK_CTRL,
-+		.mapbase = LPC32XX_UART6_BASE,
- 	},
- #endif
- };
-@@ -165,6 +170,19 @@ void __init lpc32xx_serial_init(void)
- 
- 		/* pre-UART clock divider set to 1 */
- 		__raw_writel(0x0101, uartinit_data[i].pdiv_clk_reg);
-+
-+		/*
-+		 * Force a flush of the RX FIFOs to work around a
-+		 * HW bug
-+		 */
-+		puart = uartinit_data[i].mapbase;
-+		__raw_writel(0xC1, LPC32XX_UART_IIR_FCR(puart));
-+		__raw_writel(0x00, LPC32XX_UART_DLL_FIFO(puart));
-+		j = LPC32XX_SUART_FIFO_SIZE;
-+		while (j--)
-+			tmp = __raw_readl(
-+				LPC32XX_UART_DLL_FIFO(puart));
-+		__raw_writel(0, LPC32XX_UART_IIR_FCR(puart));
- 	}
- 
- 	/* This needs to be done after all UART clocks are setup */
+I don't view the second as a big deal.  A few people have complained
+about it, but I don't see the point.  Sure, it has the disadvantage
+that you have to recompile the entire driver any time one of the files
+is changed.  I can live with that.  It has the advantage that symbols
+shared among the source files can be static; they don't have to get
+merged into the overall kernel namespace when the driver isn't build as
+a module.
+
+The first issue is more serious.  There are long-term plans to
+restructure both of those drivers so that the bus glue resides in a
+separate module from the main core of the driver.  However I have not
+started to work on that yet; there are other more pressing matters to
+do first.
+
+It doesn't seem extremely urgent.  Things are working the way they are.  
+The main advantage to restructuring is that it would allow distributors
+to build bus glue for multiple platforms in a single distribution
+image.  Currently that's not possible (except that any one of the
+platform glues can be enabled along with the PCI glue).
+
+A little progress has been made already.  We just received a submission
+for a "generic" platform bus glue file that will be able to take over
+the jobs of several of the existiing files.  If anyone wants to take
+this further I won't object, but I don't plan to work on it myself
+soon.
+
+Alan Stern
