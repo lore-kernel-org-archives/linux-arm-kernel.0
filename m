@@ -1,28 +1,21 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 25 Feb 2012 08:09:15 +0800
-Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <4F47BB0D.9080905@freescale.com>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
- <20120224141207.GI5450@opensource.wolfsonmicro.com>
- <4F47BB0D.9080905@freescale.com>
-Message-ID: <20120225000913.GE24268@S2101-09.ap.freescale.net>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Sat, 25 Feb 2012 01:26:37 +0100
+Subject: [PATCH v2 2/2] GPIO: LPC32xx: Add output reading to GPO P3
+In-Reply-To: <1329845828-26497-2-git-send-email-stigge@antcom.de>
+References: <1329845828-26497-1-git-send-email-stigge@antcom.de>
+ <1329845828-26497-2-git-send-email-stigge@antcom.de>
+Message-ID: <083DF309106F364B939360100EC290F81F30D7F482@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 10:30:05AM -0600, Timur Tabi wrote:
-> Mark Brown wrote:
-> > The ARM machines really shouldn't be using the bindings that PowerPC is
-> > using for the machine as they conflate the machine driver with the SSI
-> > binding.  The idiom for new systems is that machine drivers should be
-> > first class devices in the device tree referencing the SSI and CODEC.
-> 
-> Where is this documented?
-> 
-Documentation/devicetree/bindings/sound/tegra*, I guess.
+>The chip offers the function to detect the current state of output of the GPO
+>P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
+>sysfs
+>
+>Signed-off-by: Roland Stigge <stigge@antcom.de>
+>
 
--- 
-Regards,
-Shawn
+I hate to be picky on this one, but can a comment be added that this only
+reads the programmed output state and not the actual state of the pin?
+(Unfortunately) GPO pins have no method to monitor their actual output
+state.
