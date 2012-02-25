@@ -1,191 +1,179 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 25 Feb 2012 21:24:25 +0100
-Subject: [PATCH v2] ARM: LPC32xx: Ethernet support
-Message-ID: <1330201465-24103-1-git-send-email-stigge@antcom.de>
+From: joe@perches.com (Joe Perches)
+Date: Sat, 25 Feb 2012 12:41:25 -0800
+Subject: [PATCH v2] ARM: LPC32xx: Ethernet driver
+In-Reply-To: <1330201304-24037-1-git-send-email-stigge@antcom.de>
+References: <1330201304-24037-1-git-send-email-stigge@antcom.de>
+Message-ID: <1330202485.18464.56.camel@joe2Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds ethernet support to the LPC32xx ARM architecture. The actual
-driver in drivers/net is contained in a separate patch.
+On Sat, 2012-02-25 at 21:21 +0100, Roland Stigge wrote:
+> This patch adds an ethernet driver for the LPC32xx ARM SoC.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Just some style notes:
 
----
- arch/arm/mach-lpc32xx/Kconfig              |   26 ++++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.c             |   34 +++++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.h             |    4 +--
- arch/arm/mach-lpc32xx/include/mach/board.h |   32 +++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/irq.c                |    4 +++
- arch/arm/mach-lpc32xx/phy3250.c            |    2 +
- 6 files changed, 100 insertions(+), 2 deletions(-)
+> +++ linux-2.6/drivers/net/ethernet/nxp/lpc_eth.c
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/Kconfig
-+++ linux-2.6/arch/arm/mach-lpc32xx/Kconfig
-@@ -29,5 +29,31 @@ config ARCH_LPC32XX_UART6_SELECT
- 
- endmenu
- 
-+menu "LPC32XX chip components"
-+
-+config ARCH_LPC32XX_IRAM_FOR_NET
-+	bool "Use IRAM for network buffers"
-+	default n
-+	help
-+	  Say Y here to use the LPC internal fast IRAM (i.e. 256KB SRAM) as
-+	  network buffer.  If the total combined required buffer sizes is
-+	  larger than the size of IRAM, then SDRAM will be used instead.
-+
-+	  This can be enabled safely if the IRAM is not intended for other
-+	  uses.
-+
-+config ARCH_LPC32XX_MII_SUPPORT
-+	bool "Check to enable MII support or leave disabled for RMII support"
-+	default n
-+	help
-+	  Say Y here to enable MII support, or N for RMII support. Regardless of
-+	  which support is selected, the ethernet interface driver needs to be
-+	  selected in the device driver networking section.
-+
-+	  The PHY3250 reference board uses RMII, so users of this board should
-+	  say N.
-+
-+endmenu
-+
- endif
- 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/common.c
-@@ -186,6 +186,40 @@ struct platform_device lpc32xx_ohci_devi
- };
- 
- /*
-+ * Network Support
-+ */
-+static struct lpc_net_cfg lpc32xx_netdata = {
-+	.phy_irq = -1,
-+	.phy_mask = 0xFFFFFFF0,
-+};
-+
-+static struct resource net_resources[] = {
-+	[0] = {
-+		.start = LPC32XX_ETHERNET_BASE,
-+		.end = LPC32XX_ETHERNET_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = IRQ_LPC32XX_ETHERNET,
-+		.end = IRQ_LPC32XX_ETHERNET,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static u64 lpc32xx_mac_dma_mask = 0xffffffffUL;
-+struct platform_device lpc32xx_net_device = {
-+	.name = "lpc-net",
-+	.id = 0,
-+	.dev = {
-+		.dma_mask = &lpc32xx_mac_dma_mask,
-+		.coherent_dma_mask = 0xffffffffUL,
-+		.platform_data = &lpc32xx_netdata,
-+	},
-+	.num_resources = ARRAY_SIZE(net_resources),
-+	.resource = net_resources,
-+};
-+
-+/*
-  * Returns the unique ID for the device
-  */
- void lpc32xx_get_uid(u32 devid[4])
---- linux-2.6.orig/arch/arm/mach-lpc32xx/common.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/common.h
-@@ -19,6 +19,7 @@
- #ifndef __LPC32XX_COMMON_H
- #define __LPC32XX_COMMON_H
- 
-+#include <mach/board.h>
- #include <linux/platform_device.h>
- 
- /*
-@@ -32,6 +33,7 @@ extern struct platform_device lpc32xx_ts
- extern struct platform_device lpc32xx_adc_device;
- extern struct platform_device lpc32xx_rtc_device;
- extern struct platform_device lpc32xx_ohci_device;
-+extern struct platform_device lpc32xx_net_device;
- 
- /*
-  * Other arch specific structures and functions
-@@ -67,8 +69,6 @@ extern u32 clk_get_pclk_div(void);
-  */
- extern void lpc32xx_get_uid(u32 devid[4]);
- 
--extern u32 lpc32xx_return_iram_size(void);
--
- /*
-  * Pointers used for sizing and copying suspend function data
-  */
---- /dev/null
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/board.h
-@@ -0,0 +1,32 @@
-+/*
-+ * arm/arch/mach-lpc32xx/include/mach/board.h
-+ *
-+ * Author: Kevin Wells <kevin.wells@nxp.com>
-+ *
-+ * Copyright (C) 2010 NXP Semiconductors
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __ASM_ARCH_BOARD_H
-+#define __ASM_ARCH_BOARD_H
-+
-+/*
-+ * Network configuration structure
-+ */
-+struct lpc_net_cfg {
-+	int	phy_irq;        /* PHY IRQ number, or -1 for polling */
-+	u32	phy_mask;       /* PHY mask value */
-+};
-+
-+extern u32 lpc32xx_return_iram_size(void);
-+
-+#endif  /* __ASM_ARCH_BOARD_H */
---- linux-2.6.orig/arch/arm/mach-lpc32xx/irq.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/irq.c
-@@ -150,6 +150,10 @@ static const struct lpc32xx_event_info l
- 		.event_group = &lpc32xx_event_int_regs,
- 		.mask = LPC32XX_CLKPWR_INTSRC_KEY_BIT,
- 	},
-+	[IRQ_LPC32XX_ETHERNET] = {
-+		.event_group = &lpc32xx_event_int_regs,
-+		.mask = LPC32XX_CLKPWR_INTSRC_MAC_BIT,
-+	},
- 	[IRQ_LPC32XX_USB_OTG_ATX] = {
- 		.event_group = &lpc32xx_event_int_regs,
- 		.mask = LPC32XX_CLKPWR_INTSRC_USBATXINT_BIT,
---- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-@@ -37,6 +37,7 @@
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-+#include <mach/board.h>
- #include <mach/gpio-lpc32xx.h>
- #include "common.h"
- 
-@@ -278,6 +279,7 @@ static struct platform_device *phy3250_d
- 	&lpc32xx_gpio_led_device,
- 	&lpc32xx_adc_device,
- 	&lpc32xx_ohci_device,
-+	&lpc32xx_net_device,
- };
- 
- static struct amba_device *amba_devs[] __initdata = {
+[]
+
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/sched.h>
+> +#include <linux/slab.h>
+> +#include <linux/delay.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/errno.h>
+> +#include <linux/ioport.h>
+> +#include <linux/crc32.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/ethtool.h>
+> +#include <linux/mii.h>
+> +#include <linux/clk.h>
+> +#include <linux/workqueue.h>
+> +#include <linux/netdevice.h>
+> +#include <linux/etherdevice.h>
+> +#include <linux/skbuff.h>
+> +#include <linux/phy.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <mach/board.h>
+> +#include <mach/platform.h>
+> +#include <mach/hardware.h>
+> +#include "lpc_eth.h"
+> +
+> +#define MODNAME "lpc-net"
+
+lpc-net or lpc_eth?
+[]
+> +/*
+> + * MAC address is provided as a boot parameter (ethaddr)
+> + */
+> +static u8 mac_address[6] = {0, 0, 0, 0, 0, 0};
+[]
+> +static void __lpc_set_mac(struct netdata_local *pldat, u8 *mac)
+[]
+> +	pr_debug("Ethernet MAC address %02x:%02x:%02x:%02x:%02x:%02x\n",
+> +		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+> +}
+
+	pr_debug("MAC address: %pM\n", mac)
+
+[]
+> +static int lpc_mii_probe(struct net_device *ndev)
+> +{
+[]
+> +	if (!phydev) {
+> +		pr_err("%s: no PHY found\n", ndev->name);
+
+It looks like most of these pr_<level>(...) uses
+should be netdev_<level>(ndev, ...)
+
+[]
+> +static void __lpc_handle_recv(struct net_device *ndev)
+> +{
+> +	struct netdata_local *pldat = netdev_priv(ndev);
+> +	struct sk_buff *skb;
+> +	int rxconsidx, len, ethst;
+> +	struct rx_status_t *prxstat;
+> +	u8 *prdbuf;
+> +
+> +	/* Get the current RX buffer indexes */
+> +	rxconsidx = (int) readl(LPC_ENET_RXCONSUMEINDEX(pldat->net_base));
+
+Please try to be consistent with space or no space after cast.
+I think no space is better.
+
+> +	while (rxconsidx !=
+> +			(int)readl(LPC_ENET_RXPRODUCEINDEX(pldat->net_base))) {
+
+> +		/* Get pointer to receive status */
+> +		prxstat = (struct rx_status_t *) pldat->rx_stat_v[rxconsidx];
+> +		len = (prxstat->statusinfo & 0x7FF) + 1;
+> +
+> +		/* Status error? */
+> +		ethst = prxstat->statusinfo;
+> +		if ((ethst & 0xBF800000) == 0x84000000)
+> +			ethst &= ~0x80000000;
+> +
+> +		if (ethst & 0x80000000) {
+> +			/* Check statuses */
+> +			if (prxstat->statusinfo & (1 << 28)) {
+
+Might be better to use a temporary for prxstat->statusinfo
+
+> +				/* Overrun error */
+> +				ndev->stats.rx_fifo_errors++;
+> +			} else if (prxstat->statusinfo & (1 << 23)) {
+> +				/* CRC error */
+> +				ndev->stats.rx_crc_errors++;
+> +			} else if (prxstat->statusinfo & (1 << 25)) {
+> +				/* Length error */
+> +				ndev->stats.rx_length_errors++;
+> +			} else if (prxstat->statusinfo & 0x80000000) {
+> +				/* Other error */
+> +				ndev->stats.rx_length_errors++;
+> +			}
+> +			ndev->stats.rx_errors++;
+> +		} else {
+> +			/* Packet is good */
+> +			skb = dev_alloc_skb(len + 8);
+> +			if (!skb)
+> +				ndev->stats.rx_dropped++;
+> +			else {
+> +				skb_reserve(skb, 8);
+> +				prdbuf = skb_put(skb, (len - 0));
+> +
+> +				/* Copy packer from buffer */
+> +				memcpy(prdbuf,
+> +					(void *)pldat->rx_buff_v[rxconsidx],
+
+Probably don't need the cast to (void *)
+> +					len);
+> +
+[]
+> +static irqreturn_t __lpc_eth_interrupt(int irq, void *dev_id)
+> +{
+[]
+> +	/* Get the interrupt status */
+> +	tmp = readl(LPC_ENET_INTSTATUS(pldat->net_base));
+> +
+> +	while (tmp) {
+
+probably better as
+
+	while ((tmp = readl(...)) {
+[...]
+
+> +		/* Recheck the interrupt status */
+> +		tmp = readl(LPC_ENET_INTSTATUS(pldat->net_base));
+> +	}
+[]
+> +static int lpc_net_close(struct net_device *ndev)
+> +{
+> +	unsigned long flags;
+> +	struct netdata_local *pldat = netdev_priv(ndev);
+> +
+> +	if (netif_msg_ifdown(pldat))
+> +		dev_dbg(&pldat->pdev->dev, "shutting down %s\n", ndev->name);
+
+	netif_dbg(pltdat, ifdown, ndev, ...)
+[]
+> +static int lpc_net_drv_probe(struct platform_device *pdev)
+[]
+> +	if (use_iram_for_net()) {
+> +		dma_handle = (dma_addr_t) LPC32XX_IRAM_BASE;
+> +		if (pldat->dma_buff_size <= lpc32xx_return_iram_size())
+> +			pldat->dma_buff_base_v =
+> +				(u32) io_p2v(LPC32XX_IRAM_BASE);
+> +		else
+> +			pr_err("%s: IRAM not big enough for net buffers, "
+> +				"using SDRAM instead.\n", MODNAME);
+
+Please coalesce formats and ignore 80 column limits
+to make grep easier.
