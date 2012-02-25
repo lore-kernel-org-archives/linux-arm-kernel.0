@@ -1,69 +1,141 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 25 Feb 2012 13:27:06 +0000
-Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <20120225130943.GB25201@S2101-09.ap.freescale.net>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
- <20120224141207.GI5450@opensource.wolfsonmicro.com>
- <20120225012845.GF24268@S2101-09.ap.freescale.net>
- <20120225114227.GB3167@opensource.wolfsonmicro.com>
- <20120225130943.GB25201@S2101-09.ap.freescale.net>
-Message-ID: <20120225132705.GA3412@opensource.wolfsonmicro.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 25 Feb 2012 14:57:03 +0100
+Subject: [PATCH v3] USB: Support for LPC32xx SoC
+Message-ID: <1330178224-24999-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 25, 2012 at 09:09:53PM +0800, Shawn Guo wrote:
+This patch adds OHCI support to the LPC32xx ARM platform
 
-> DT aware IMX platforms.  From his POV, one big reason of why imx-ssi
-> was created is that ARM/IMX did not support DT before while fsl_ssi was
-> born to support DT only.  Since ARM/IMX starts supporting DT, fsl_ssi
-> should be reused there.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-No, that's not really a major reason - the big issue was more the lack
-of any support from Freescale for the i.MX in mainline at that time and
-the lack of any information on the similarities or differences between
-the IP implementations in the two processor families, there's quite a
-few quirks in the SSI register interface and it wasn't clear what was
-shared and what wasn't.  It was more important to get things working in
-mainline, the hope was that someone would come along later and merge if
-that was possible (which you're now doing!).
+---
+ drivers/usb/host/ohci-hcd.c     |    5 +++
+ drivers/usb/host/ohci-pnx4008.c |   66 +++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 67 insertions(+), 4 deletions(-)
 
-> I'm personally fine with either reusing fsl_ssi or adding DT support
-> into imx-ssi.  I do not see any problem with reusing fsl_ssi so far,
-> but I can quickly turn around to adding new binding for imx-ssi if
-> you are strong on this position.
-
-Nobody's suggesting that they don't get merged if they really are the
-same IP and can use the same code.  The device tree bindings are (and
-should be) a really small proportion of the code.
-
-> > Note that it's purely the bit where the machine driver is instantiated
-> > from the SSI (which is just one or two of several properties) that I'm
-> > talking about here, the bindings for the SSI itself look good.
-
-> Hmm, there is no SSI binding property contributing to instantiating
-> the machine driver.  It looks /model property for the device name used
-> to instantiate the machine driver, which I personally think is fine.
-
-The CODEC binding for the machine driver is part of the SSI binding, and
-a mandatory one at that.  It looks like the code should be refactored to
-register the SSI unconditionally and then optionally also register a
-machine driver if there's a CODEC property present.  That way existing
-systems should continue to work fine with their current bindings and new
-ones can use the modern binding style.
-
-Just using the plain machine name can get a bit inconvenient when you
-get reference designs cloned which share the audio but differ in other
-ways - the nVidia WM8903 driver is a good example of this, there's a
-large number of boards that are definitely distinct boards but are very
-similar from an audio point of view.  You'd have to add all the
-machines to the machine driver compatible list.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120225/73011a5c/attachment.sig>
+--- linux-2.6.orig/drivers/usb/host/ohci-hcd.c
++++ linux-2.6/drivers/usb/host/ohci-hcd.c
+@@ -1055,6 +1055,11 @@ MODULE_LICENSE ("GPL");
+ #define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
+ #endif
+ 
++#ifdef CONFIG_ARCH_LPC32XX
++#include "ohci-pnx4008.c"
++#define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
++#endif
++
+ #ifdef CONFIG_ARCH_DAVINCI_DA8XX
+ #include "ohci-da8xx.c"
+ #define PLATFORM_DRIVER		ohci_hcd_da8xx_driver
+--- linux-2.6.orig/drivers/usb/host/ohci-pnx4008.c
++++ linux-2.6/drivers/usb/host/ohci-pnx4008.c
+@@ -22,6 +22,7 @@
+ #include <linux/i2c.h>
+ 
+ #include <mach/hardware.h>
++#include <asm/mach-types.h>
+ #include <asm/io.h>
+ 
+ #include <mach/platform.h>
+@@ -143,7 +144,17 @@ static void i2c_write(u8 buf, u8 subaddr
+ 	i2c_master_send(isp1301_i2c_client, &tmpbuf[0], 2);
+ }
+ 
+-static void isp1301_configure(void)
++static u16 i2c_read16(u8 subaddr)
++{
++	u16 data;
++
++	i2c_master_send(isp1301_i2c_client, &subaddr, 1);
++	i2c_master_recv(isp1301_i2c_client, (u8 *) &data, 2);
++
++	return data;
++}
++
++static void isp1301_configure_pnx4008(void)
+ {
+ 	/* PNX4008 only supports DAT_SE0 USB mode */
+ 	/* PNX4008 R2A requires setting the MAX603 to output 3.6V */
+@@ -166,7 +177,51 @@ static void isp1301_configure(void)
+ 		  ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
+ 	i2c_write(0xFF,
+ 		  ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
++}
+ 
++static void isp1301_configure_lpc32xx(void)
++{
++	/* LPC32XX only supports DAT_SE0 USB mode */
++	/* This sequence is important */
++
++	/* Disable transparent UART mode first */
++	i2c_write(MC1_UART_EN, (ISP1301_I2C_MODE_CONTROL_1 |
++		ISP1301_I2C_REG_CLEAR_ADDR));
++
++	i2c_write(~MC1_SPEED_REG, (ISP1301_I2C_MODE_CONTROL_1 |
++		ISP1301_I2C_REG_CLEAR_ADDR));
++	i2c_write(MC1_SPEED_REG, ISP1301_I2C_MODE_CONTROL_1);
++	i2c_write(~0,
++		(ISP1301_I2C_MODE_CONTROL_2 | ISP1301_I2C_REG_CLEAR_ADDR));
++	i2c_write((MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL),
++		ISP1301_I2C_MODE_CONTROL_2);
++	i2c_write(~0, (ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
++	i2c_write(MC1_DAT_SE0, ISP1301_I2C_MODE_CONTROL_1);
++	i2c_write((OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN),
++		ISP1301_I2C_OTG_CONTROL_1);
++	i2c_write((OTG1_DM_PULLUP | OTG1_DP_PULLUP),
++		(ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
++	i2c_write(~0,
++		 ISP1301_I2C_INTERRUPT_LATCH | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(~0,
++		ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(~0,
++		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
++
++	/* Enable usb_need_clk clock after transceiver is initialized */
++	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
++
++	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n", i2c_read16(0x00));
++	printk(KERN_INFO "ISP1301 Product ID : 0x%04x\n", i2c_read16(0x02));
++	printk(KERN_INFO "ISP1301 Version ID : 0x%04x\n", i2c_read16(0x14));
++}
++
++static void isp1301_configure(void)
++{
++	if (machine_is_pnx4008())
++		isp1301_configure_pnx4008();
++	else
++		isp1301_configure_lpc32xx();
+ }
+ 
+ static inline void isp1301_vbus_on(void)
+@@ -375,7 +430,8 @@ static int __devinit usb_hcd_pnx4008_pro
+ 	}
+ 
+ 	/* Set all USB bits in the Start Enable register */
+-	pnx4008_set_usb_bits();
++	if (machine_is_pnx4008())
++		pnx4008_set_usb_bits();
+ 
+ 	hcd->rsrc_start = pdev->resource[0].start;
+ 	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
+@@ -404,7 +460,8 @@ static int __devinit usb_hcd_pnx4008_pro
+ 
+ 	pnx4008_stop_hc();
+ out4:
+-	pnx4008_unset_usb_bits();
++	if (machine_is_pnx4008())
++		pnx4008_unset_usb_bits();
+ 	usb_put_hcd(hcd);
+ out3:
+ 	clk_disable(usb_clk);
+@@ -427,7 +484,8 @@ static int usb_hcd_pnx4008_remove(struct
+ 	pnx4008_stop_hc();
+ 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+ 	usb_put_hcd(hcd);
+-	pnx4008_unset_usb_bits();
++	if (machine_is_pnx4008())
++		pnx4008_unset_usb_bits();
+ 	clk_disable(usb_clk);
+ 	clk_put(usb_clk);
+ 	i2c_unregister_device(isp1301_i2c_client);
