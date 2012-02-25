@@ -1,81 +1,116 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Sat, 25 Feb 2012 12:01:00 +0100
-Subject: [PATCH v3 2/2] GPIO: LPC32xx: Add output reading to GPO P3
-In-Reply-To: <1330167660-30694-1-git-send-email-stigge@antcom.de>
-References: <1330167660-30694-1-git-send-email-stigge@antcom.de>
-Message-ID: <1330167660-30694-2-git-send-email-stigge@antcom.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sat, 25 Feb 2012 12:27:41 +0100
+Subject: [PATCH] Add poll_get_char & poll_put_char to uart_ops for the
+ samsung UARTS.
+In-Reply-To: <CAHQa92Vjwh3gtME2u19EZz57My3H7R=fQK4CoJR9s_ktpsy_Ww@mail.gmail.com>
+References: <20120212182201.GA17975@debian>
+ <CAHQa92X=9kiVhxCspcAR+dK-NbFqaUW2xTCjjDOAHGfDx_yMBQ@mail.gmail.com>
+ <CAHQa92Vjwh3gtME2u19EZz57My3H7R=fQK4CoJR9s_ktpsy_Ww@mail.gmail.com>
+Message-ID: <201202251227.42284.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip offers the function to detect the current state of output of the GPO
-P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
-sysfs.
+Am Samstag 25 Februar 2012, 12:05:56 schrieb Pichon Julien:
+> > (please CC me in your replies as I am not suscribed to the ML)
+> > 
+> > The following patch allows users to use KGDB over serial console on
+> > board based on Samsung SOC. It has been tested on a mini2440.
+> > 
+> > Signed-off-by: Julien Pichon <pichon.jln@gmail.com>
+> > ---
+> >  drivers/tty/serial/samsung.c |   50
+> > ++++++++++++++++++++++++++++++++++++++++++ 1 files changed, 50
+> > insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> > index f96f37b..9f703ca 100644
+> > --- a/drivers/tty/serial/samsung.c
+> > +++ b/drivers/tty/serial/samsung.c
+> > @@ -877,11 +877,24 @@ s3c24xx_serial_verify_port(struct uart_port *port,
+> > struct serial_struct *ser)
+> > 
+> >  static struct console s3c24xx_serial_console;
+> > 
+> > +static int __init s3c24xx_serial_console_init(void)
+> > +{
+> > +     register_console(&s3c24xx_serial_console);
+> > +     return 0;
+> > +}
+> > +console_initcall(s3c24xx_serial_console_init);
+> > +
+> >  #define S3C24XX_SERIAL_CONSOLE &s3c24xx_serial_console
+> >  #else
+> >  #define S3C24XX_SERIAL_CONSOLE NULL
+> >  #endif
+> > 
+> > +#ifdef CONFIG_CONSOLE_POLL
+> > +static int s3c24xx_serial_get_poll_char(struct uart_port *port);
+> > +static void s3c24xx_serial_put_poll_char(struct uart_port *port,
+> > +                      unsigned char c);
+> > +#endif
+> > +
+> >  static struct uart_ops s3c24xx_serial_ops = {
+> >       .pm             = s3c24xx_serial_pm,
+> >       .tx_empty       = s3c24xx_serial_tx_empty,
+> > @@ -900,6 +913,10 @@ static struct uart_ops s3c24xx_serial_ops = {
+> >       .request_port   = s3c24xx_serial_request_port,
+> >       .config_port    = s3c24xx_serial_config_port,
+> >       .verify_port    = s3c24xx_serial_verify_port,
+> > +#ifdef CONFIG_CONSOLE_POLL
+> > +     .poll_get_char = s3c24xx_serial_get_poll_char,
+> > +     .poll_put_char = s3c24xx_serial_put_poll_char,
+> > +#endif
+> >  };
+> > 
+> >  static struct uart_driver s3c24xx_uart_drv = {
+> > @@ -1311,6 +1328,39 @@ s3c24xx_serial_console_txrdy(struct uart_port
+> > *port, unsigned int ufcon) return (utrstat & S3C2410_UTRSTAT_TXE) ? 1 :
+> > 0;
+> >  }
+> > 
+> > +#ifdef CONFIG_CONSOLE_POLL
+> > +/*
+> > + * Console polling routines for writing and reading from the uart while
+> > + * in an interrupt or debug context.
+> > + */
+> > +
+> > +static int s3c24xx_serial_get_poll_char(struct uart_port *port)
+> > +{
+> > +     struct s3c24xx_uart_port *ourport = to_ourport(port);
+> > +     unsigned int ufstat, count;
+> > +
+> > +     do {
+> > +             ufstat = rd_regl(port, S3C2410_UFSTAT);
+> > +             count = s3c24xx_serial_rx_fifocnt(ourport, ufstat);
+> > +             if (!count)
+> > +                     cpu_relax();
+> > +     } while (!count);
+> > +
+> > +     return rd_regb(port, S3C2410_URXH);
+> > +}
+> > +
+> > +static void s3c24xx_serial_put_poll_char(struct uart_port *port,
+> > +             unsigned char c)
+> > +{
+> > +     unsigned int ufcon = rd_regl(cons_uart, S3C2410_UFCON);
+> > +
+> > +     while (!s3c24xx_serial_console_txrdy(port, ufcon))
+> > +             cpu_relax();
+> > +     wr_regb(cons_uart, S3C2410_UTXH, c);
+> > +}
+> > +
+> > +#endif /* CONFIG_CONSOLE_POLL */
+> > +
+> >  static void
+> >  s3c24xx_serial_console_putchar(struct uart_port *port, int ch)
+> >  {
+> > --
+> > 1.7.2.5
+> 
+> (CC maintainers)
+> Someone has time to review this patch ?
 
-Please note that this only reads back the currently programmed output state,
-not the actual electrical level in terms of a GPI function. Finally, GPO3 is
-still just an output.
+It might be goot to included the linux-arm-kernel list to get a wider 
+audience. I always felt, that the samsung ml isn't read by many.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
----
- drivers/gpio/gpio-lpc32xx.c |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -62,9 +62,11 @@
- #define GPIO3_PIN_IN_SEL(x, y)			(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
- #define GPIO3_PIN5_IN_SEL(x)			(((x) >> 24) & 1)
- #define GPI3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
-+#define GPO3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
- 
- struct gpio_regs {
- 	void __iomem *inp_state;
-+	void __iomem *outp_state;
- 	void __iomem *outp_set;
- 	void __iomem *outp_clr;
- 	void __iomem *dir_set;
-@@ -145,6 +147,7 @@ static struct gpio_regs gpio_grp_regs_p2
- 
- static struct gpio_regs gpio_grp_regs_p3 = {
- 	.inp_state	= LPC32XX_GPIO_P3_INP_STATE,
-+	.outp_state	= LPC32XX_GPIO_P3_OUTP_STATE,
- 	.outp_set	= LPC32XX_GPIO_P3_OUTP_SET,
- 	.outp_clr	= LPC32XX_GPIO_P3_OUTP_CLR,
- 	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
-@@ -240,6 +243,12 @@ static int __get_gpi_state_p3(struct lpc
- 	return GPI3_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state), pin);
- }
- 
-+static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
-+	unsigned pin)
-+{
-+	return GPO3_PIN_IN_SEL(__raw_readl(group->gpio_grp->outp_state), pin);
-+}
-+
- /*
-  * GENERIC_GPIO primitives.
-  */
-@@ -340,6 +349,13 @@ static void lpc32xx_gpo_set_value(struct
- 	__set_gpo_level_p3(group, pin, value);
- }
- 
-+static int lpc32xx_gpo_get_value(struct gpio_chip *chip, unsigned pin)
-+{
-+	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
-+
-+	return __get_gpo_state_p3(group, pin);
-+}
-+
- static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
- {
- 	if (pin < chip->ngpio)
-@@ -427,6 +443,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.label			= "gpo_p3",
- 			.direction_output	= lpc32xx_gpio_dir_out_always,
- 			.set			= lpc32xx_gpo_set_value,
-+			.get			= lpc32xx_gpo_get_value,
- 			.request		= lpc32xx_gpio_request,
- 			.base			= LPC32XX_GPO_P3_GRP,
- 			.ngpio			= LPC32XX_GPO_P3_MAX,
+Heiko
