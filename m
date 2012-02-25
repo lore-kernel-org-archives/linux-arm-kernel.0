@@ -1,33 +1,36 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 24 Feb 2012 17:10:00 -0800
-Subject: [PATCH] msm: timer: Support sched_clock()
-In-Reply-To: <4F47CAF5.4000709@arm.com>
-References: <1329874777-12758-1-git-send-email-sboyd@codeaurora.org>
- <20120222215533.GA31480@codeaurora.org> <4F476242.2020909@arm.com>
- <20120224170901.GA9312@codeaurora.org> <4F47C7C5.4090806@arm.com>
- <4F47C9AA.5060806@codeaurora.org> <4F47CAF5.4000709@arm.com>
-Message-ID: <20120225011000.GA4611@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 25 Feb 2012 09:28:47 +0800
+Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
+ machine name
+In-Reply-To: <20120224141207.GI5450@opensource.wolfsonmicro.com>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
+ <20120224141207.GI5450@opensource.wolfsonmicro.com>
+Message-ID: <20120225012845.GF24268@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 05:37:57PM +0000, Marc Zyngier wrote:
-> > This patch relies on the fact that the HAVE_SCHED_CLOCK config option no
-> > longer exists. We could push it in if the patch had that option added to
-> > the Kconfig, but then it would conflict with the removal of the Kconfig
-> > by 6905a65 (ARM: Make the sched_clock framework mandatory, 2012-01-18).
+On Fri, Feb 24, 2012 at 02:12:07PM +0000, Mark Brown wrote:
+> On Fri, Feb 24, 2012 at 10:09:41PM +0800, Shawn Guo wrote:
+> > The fsl_ssi probe function detects the client machine name using model
+> > property of the device tree.  But it will not work for the ARM client
+> > machines which are to be added.  The model property is given as a
+> > descriptive string on all ARM device tree (arch/arm/boot/*.dts).
+> > Instead, the compatible property gives the machine name.
 > 
-> Ah! Indeed, you're perfectly right.
+> The ARM machines really shouldn't be using the bindings that PowerPC is
+> using for the machine as they conflate the machine driver with the SSI
+> binding.  The idiom for new systems is that machine drivers should be
+> first class devices in the device tree referencing the SSI and CODEC.
 > 
-> > So I guess we send it through the arm-soc tree?
-> 
-> I don't think arm-soc tracks rmk/for-next, so this has to go via
-> Russell's tree. I'll take the patch and send Russell another pull
-> request then.
+> The current bindings should be preserved for existing systems of course.
 
-Thanks, Marc.
+Per discussion [1], the whole point we move to fsl_ssi is that we can
+reuse the DT support already in fsl_ssi.  If it's something we should
+not use for IMX, I fail to see why we should make this move.
 
-David
+Regards,
+Shawn
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+[1] http://article.gmane.org/gmane.linux.drivers.devicetree/6637
