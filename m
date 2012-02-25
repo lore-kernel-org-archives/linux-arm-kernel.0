@@ -1,97 +1,56 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 25 Feb 2012 13:33:57 +0100
-Subject: [PATCH v3 03/10] of: Add PWM support.
-In-Reply-To: <201202241658.32062.arnd@arndb.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <201202231403.01614.arnd@arndb.de>
- <20120224064749.GB18786@avionic-0098.mockup.avionic-design.de>
- <201202241658.32062.arnd@arndb.de>
-Message-ID: <20120225123357.GU3852@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 25 Feb 2012 21:09:53 +0800
+Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
+ machine name
+In-Reply-To: <20120225114227.GB3167@opensource.wolfsonmicro.com>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
+ <20120224141207.GI5450@opensource.wolfsonmicro.com>
+ <20120225012845.GF24268@S2101-09.ap.freescale.net>
+ <20120225114227.GB3167@opensource.wolfsonmicro.com>
+Message-ID: <20120225130943.GB25201@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 04:58:31PM +0000, Arnd Bergmann wrote:
-> On Friday 24 February 2012, Thierry Reding wrote:
-> > * Arnd Bergmann wrote:
-> > > On Thursday 23 February 2012, Thierry Reding wrote:
-> > > > * Arnd Bergmann wrote:
+On Sat, Feb 25, 2012 at 11:42:28AM +0000, Mark Brown wrote:
+> On Sat, Feb 25, 2012 at 09:28:47AM +0800, Shawn Guo wrote:
 > 
-> > [...]
-> > > > > * Why not include the pwm_request() call in this and return the
-> > > > >   pwm_device directly? You said that you want to get rid of the
-> > > > >   pwm_id eventually, which is a good idea, but this interface still
-> > > > >   forces one to use it.
-> > > > 
-> > > > Okay, that sounds sensible. I propose to rename the function to something like
-> > > > of_request_pwm().
-> > > 
-> > > Sounds good.
+> > Per discussion [1], the whole point we move to fsl_ssi is that we can
+> > reuse the DT support already in fsl_ssi.  If it's something we should
+> > not use for IMX, I fail to see why we should make this move.
 > 
-> On second thought, I would actually prefer starting the name with pwm_ and
-> making it independent of device tree. There might be other ways how to
-> find the pwm_device from a struct device in the future, but it should always
-> be possible using a device together with a string and/or numeric identifier,
-> much in the same way that we can get a resource from a platform_device.
+> I was assuming that the idea was to share the code for device control
+> as the same IP block was being deployed in the various Freescale SoCs
+> - if the only thing they have in common is the device tree support it
+> would be a bit strange to merge them.
 > 
-> Ideally, there would be a common theme behind finding a memory region,
-> irq, gpio pin, clock, regulator, dma-channel and pwm or anything else
-> that requires a link between two device nodes.
-> 
-> > > > It would of course need an additional parameter (name) to
-> > > > forward to pwm_request().
-> > > 
-> > > Not necessarily, it could use the dev_name(device) or the name
-> > > of the property, or a combination of the two.
-> > 
-> > The problem with that is that usually the device would be named something
-> > generic like "pwm", while in case where the PWM is used for the backlight
-> > it makes sense to label the PWM device "backlight".
-> > 
-> > Looking at debugfs and seeing an entry "backlight" is much more straight-
-> > forward than "pwm.0". I mean "pwm.0" doesn't carry any useful information
-> > really, does it?
-> 
-> But the device name would be from the device using the pwm, not the
-> pwm controller, so it should be something more helpful, no?
-> 
-> > > > > > +EXPORT_SYMBOL(of_get_named_pwm);
-> > > > > 
-> > > > > EXPORT_SYMBOL_GPL?
-> > > > 
-> > > > It was brought up at some point that it might be nice to allow non-GPL
-> > > > drivers to use the PWM framework as well. I don't remember any discussion
-> > > > resulting from the comment. Perhaps we should have that discussion now and
-> > > > decide whether or not we want to keep it GPL-only or not.
-> > > 
-> > > I would definitely use EXPORT_SYMBOL_GPL for all new code unless it
-> > > replaces an earlier interface that was available as EXPORT_SYMBOL.
-> > 
-> > I just grepped the code and noticed this:
-> > 
-> > 	$ $ git grep -n 'EXPORT_SYMBOL.*(pwm_request)'
-> > 	arch/arm/mach-vt8500/pwm.c:139:EXPORT_SYMBOL(pwm_request);
-> > 	arch/arm/plat-mxc/pwm.c:183:EXPORT_SYMBOL(pwm_request);
-> > 	arch/arm/plat-samsung/pwm.c:83:EXPORT_SYMBOL(pwm_request);
-> > 	arch/unicore32/kernel/pwm.c:132:EXPORT_SYMBOL(pwm_request);
-> > 	drivers/mfd/twl6030-pwm.c:156:EXPORT_SYMBOL(pwm_request);
-> > 	drivers/misc/ab8500-pwm.c:108:EXPORT_SYMBOL(pwm_request);
-> > 	drivers/pwm/core.c:262:EXPORT_SYMBOL_GPL(pwm_request);
-> > 
-> > It seems like the legacy PWM API used to be non-GPL. Should I switch it back?
-> > Also does it make sense to have something like of_request_pwm() GPL when the
-> > rest of the API isn't?
-> 
-> I guess the choice is to make between you and Sascha. The implementation is
-> new, so you could pick EXPORT_SYMBOL_GPL, but you could also try to
-> keep to the current API.
+Here is the thing.
 
-I tend to use _GPL, but I have no strong objection using the non GPL
-variant.
+For historical reason, there are two drivers for the same SSI block
+found on PowerPC and IMX, fsl_ssi and imx-ssi.  The fsl_ssi driver is
+used on PowerPC with DT support, while imx-ssi is used on IMX with no
+DT support.  Along with the work of supporting DT for the modern IMX
+SoCs, I was planning to add DT support into imx-ssi.  But I was told
+by Timur that instead of doing that, I should reuse fsl_ssi for those
+DT aware IMX platforms.  From his POV, one big reason of why imx-ssi
+was created is that ARM/IMX did not support DT before while fsl_ssi was
+born to support DT only.  Since ARM/IMX starts supporting DT, fsl_ssi
+should be reused there.
 
-Sascha
+I'm personally fine with either reusing fsl_ssi or adding DT support
+into imx-ssi.  I do not see any problem with reusing fsl_ssi so far,
+but I can quickly turn around to adding new binding for imx-ssi if
+you are strong on this position.
+
+> Note that it's purely the bit where the machine driver is instantiated
+> from the SSI (which is just one or two of several properties) that I'm
+> talking about here, the bindings for the SSI itself look good.
+
+Hmm, there is no SSI binding property contributing to instantiating
+the machine driver.  It looks /model property for the device name used
+to instantiate the machine driver, which I personally think is fine.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Shawn
