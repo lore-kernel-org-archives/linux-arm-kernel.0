@@ -1,31 +1,39 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Sat, 25 Feb 2012 10:00:19 +0530
-Subject: [PATCH 4/6] ARM: OMAP3: Mark only those mmc devices which use
- gpio_cd, as deferred
-In-Reply-To: <20120224222136.GB18901@atomide.com>
+Date: Sat, 25 Feb 2012 10:15:50 +0530
+Subject: [PATCH 5/6] ARM: OMAP3: Modify omap_hsmmc_late_init to handle
+ deleting mmc devices
+In-Reply-To: <20120225003352.GC18901@atomide.com>
 References: <1330077537-19618-1-git-send-email-rnayak@ti.com>
- <1330077537-19618-5-git-send-email-rnayak@ti.com>
- <20120224222136.GB18901@atomide.com>
-Message-ID: <4F4863DB.9090702@ti.com>
+ <1330077537-19618-6-git-send-email-rnayak@ti.com>
+ <20120225003352.GC18901@atomide.com>
+Message-ID: <4F48677E.30803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 25 February 2012 03:51 AM, Tony Lindgren wrote:
-> * Rajendra Nayak<rnayak@ti.com>  [120224 01:27]:
->> mmc devices which actually do not depend on twl4030-gpio for
->> gpio_cd should not be maked as deferred.
->>
->> Also on overo, since none of the mmc devices need to be deferred,
->> get rid of omap_hsmmc_late_init() altogether.
->>
->> Reported-by: Igor Grinberg<grinberg@compulab.co.il>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+On Saturday 25 February 2012 06:03 AM, Tony Lindgren wrote:
+> Hi,
 >
-> Thanks, I'll fold this into the original patch with your SOB
-> so we avoid the extra churn.
+> * Rajendra Nayak<rnayak@ti.com>  [120224 01:27]:
+>> omap_hsmmc_late_init() adds deferred (if any) mmc devices which are
+>> dependent on twl4030-gpio device to be available.
+>> If twl4030-gpio is built as a module and inserted and deleted multiple
+>> times, the mmc devices also should be added and deleted accordingly.
+>> Split omap_hsmmc_late_init() into omap_hsmmc_deferred_add() and
+>> omap_hsmmc_deferred_del() to handle this.
+>> The .setup board hook for twl4030-gpio handles the runtime adding
+>> on deferred mmc devices. Similarly a .teardown board hook for twl4030-gpio
+>> should handle the runtime deletion by calling omap_hsmmc_deferred_del().
+>> This is done for all existing omap3 boards in subsequent patches.
+>
+> This gets complex.. But I think I've found a simpler way where we
+> can use the twl gpio offsets and let the drivers take care of the rest.
+> I'll post some patches hopefully on Monday.
 
-okay, thanks.
+I agree it gets complex. If you have a simpler way to handle this, that
+would be great.
 
+regards,
+Rajendra
 >
 > Regards,
 >
