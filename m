@@ -1,44 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 25 Feb 2012 10:17:58 +0000
-Subject: [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
-In-Reply-To: <4F483BB8.7030706@freescale.com>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <20120224140200.GH5450@opensource.wolfsonmicro.com>
- <20120224142342.GA16659@S2101-09.ap.freescale.net>
- <20120224141705.GJ5450@opensource.wolfsonmicro.com>
- <20120224232148.GA24268@S2101-09.ap.freescale.net>
- <4F4819C4.5040709@freescale.com>
- <20120225000319.GC24268@S2101-09.ap.freescale.net>
- <4F483BB8.7030706@freescale.com>
-Message-ID: <20120225101758.GJ22562@n2100.arm.linux.org.uk>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 25 Feb 2012 12:00:59 +0100
+Subject: [PATCH v3 1/2] GPIO: LPC32xx: Fix missing bit selection mask
+Message-ID: <1330167660-30694-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 25, 2012 at 01:39:05AM +0000, Tabi Timur-B04825 wrote:
-> Shawn Guo wrote:
-> > Yes, I did something wrong.  But my point is the following patches
-> > should belong to one big series.  They can not be applied separately.
-> >
-> > [PATCH 1/4] ASoC: imx: let SND_MXC_SOC_FIQ select FIQ
-> > [PATCH 2/4] ASoC: imx: move SND_SOC_AC97_BUS selection down to machine driver
-> > [PATCH 3/4] ASoC: imx: initialize dma_params burstsize just in imx-ssi
-> > [PATCH 4/4] ASoC: imx: separate imx-pcm bits from imx-ssi driver
-> > [PATCH 0/4] ASoC: merge imx into fsl
-> > [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
-> 
-> That's not what Mark is talking about.  You somehow posted patch 0/6 as a 
-> reply to the *previous* patchset, so the two patchsets were merged into 
-> one email thread.
+Add missing mask to pin bit selection in gpio-lpc32xx.c
+(#define GPIO3_PIN_IN_SEL)
 
-Sorry, you and Mark are not listening to Shawn.  Even worse, you're
-telling Shawn that what he's trying to explain to you is not the point
-when it is actually the whole point.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-The "[PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl" was posted as a
-follow-up to "[PATCH 1/4] ASoC: imx: let SND_MXC_SOC_FIQ select FIQ".
+---
+ drivers/gpio/gpio-lpc32xx.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-So, the "*previous* patchset" _was_ "[PATCH 1/4] ASoC: imx: let
-SND_MXC_SOC_FIQ select FIQ" and not some other random patch set.  That
-is a fundamental fact, which can't be argued.  Anyone can verify it, and
-it can be verified by checking the email headers.
+--- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
++++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+@@ -59,7 +59,7 @@
+ #define GPO3_PIN_TO_BIT(x)			(1 << (x))
+ #define GPIO012_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
+ #define GPIO3_PIN_IN_SHIFT(x)			((x) == 5 ? 24 : 10 + (x))
+-#define GPIO3_PIN_IN_SEL(x, y)			((x) >> GPIO3_PIN_IN_SHIFT(y))
++#define GPIO3_PIN_IN_SEL(x, y)			(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
+ #define GPIO3_PIN5_IN_SEL(x)			(((x) >> 24) & 1)
+ #define GPI3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
+ 
