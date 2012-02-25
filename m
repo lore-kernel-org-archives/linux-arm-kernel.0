@@ -1,37 +1,32 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 25 Feb 2012 04:51:28 +0100
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <201202241503.27406.arnd@arndb.de>
-References: <1330030639-3796-1-git-send-email-stigge@antcom.de>
- <4F46AA06.30502@antcom.de> <20120224063521.GA16412@pengutronix.de>
- <201202241503.27406.arnd@arndb.de>
-Message-ID: <20120225035128.GA4455@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Sat, 25 Feb 2012 10:00:19 +0530
+Subject: [PATCH 4/6] ARM: OMAP3: Mark only those mmc devices which use
+ gpio_cd, as deferred
+In-Reply-To: <20120224222136.GB18901@atomide.com>
+References: <1330077537-19618-1-git-send-email-rnayak@ti.com>
+ <1330077537-19618-5-git-send-email-rnayak@ti.com>
+ <20120224222136.GB18901@atomide.com>
+Message-ID: <4F4863DB.9090702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I would recomment telling this from the device itself rather than from the
-> platform.
+On Saturday 25 February 2012 03:51 AM, Tony Lindgren wrote:
+> * Rajendra Nayak<rnayak@ti.com>  [120224 01:27]:
+>> mmc devices which actually do not depend on twl4030-gpio for
+>> gpio_cd should not be maked as deferred.
+>>
+>> Also on overo, since none of the mmc devices need to be deferred,
+>> get rid of omap_hsmmc_late_init() altogether.
+>>
+>> Reported-by: Igor Grinberg<grinberg@compulab.co.il>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>
+> Thanks, I'll fold this into the original patch with your SOB
+> so we avoid the extra churn.
 
-Basically yes...
+okay, thanks.
 
-> Unfortunately, the way that ohci handles the abstraction between the
-> various implementations is backwards, it would be much easier if the
-> main driver was following that model to start with.
-
-... exactly for that reason I didn't suggest it. Looking at other ohci-sources
-(e.g. ohci-omap.c), machine_is_* seems to be the consistent use-case.
-
-Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120225/4e25fede/attachment.sig>
+>
+> Regards,
+>
+> Tony
