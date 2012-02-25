@@ -1,45 +1,52 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Fri, 24 Feb 2012 17:38:11 -0600
-Subject: [PATCH 4/4] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-In-Reply-To: <20120224232851.GF15120@n2100.arm.linux.org.uk>
-References: <4F465A33.3020208@ru.mvista.com> <4F465EE5.4010908@freescale.com>
- <20120223165242.GB22562@n2100.arm.linux.org.uk>
- <4F4671BB.7060409@freescale.com>
- <20120223171407.GC22562@n2100.arm.linux.org.uk>
- <4F480120.6080409@freescale.com> <20120224231501
- <20120224232851.GF15120@n2100.arm.linux.org.uk>
-Message-ID: <4F481F63.7090504@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 25 Feb 2012 08:03:20 +0800
+Subject: [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
+In-Reply-To: <4F4819C4.5040709@freescale.com>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <20120224140200.GH5450@opensource.wolfsonmicro.com>
+ <20120224142342.GA16659@S2101-09.ap.freescale.net>
+ <20120224141705.GJ5450@opensource.wolfsonmicro.com>
+ <20120224232148.GA24268@S2101-09.ap.freescale.net>
+ <4F4819C4.5040709@freescale.com>
+Message-ID: <20120225000319.GC24268@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-
-> So, to go around the loop a little further: to make this driver work
-> _unaltered_ on ARM, we'd need an in_32be() that read the register
-> _without_ doing the byte swapping.
+On Fri, Feb 24, 2012 at 05:14:12PM -0600, Timur Tabi wrote:
+> Shawn Guo wrote:
+> >> > That doesn't seem to be related to my point?  I'm asking you to not
+> >> > reply to an old version of your patch series in order to post a new
+> >> > version of it, just post the new version.
 > 
-> But then, such an implementation of in_32be() would be absurd because
-> it's not doing what it says.
+> > This is the first version of this series.
+> 
+> I think there's a communication breakdown.  Shawn, take a look at this:
+> 
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2012-February/thread.html
+> 
+> Search for "[alsa-devel] [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl".
+> 
+> You'll see that this email is indented, because it was posted to the
+> mailing list AS A REPLY to "[alsa-devel] [PATCH 1/4] ASoC: imx: let
+> SND_MXC_SOC_FIQ select FIQ".  That's because it has this line in the
+> message header:
+> 
+> In-Reply-To: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+> 
+> This is what Mark is talking about.  He wants new patch sets to be posted
+> NOT as replies to other patch sets.
+> 
+Yes, I did something wrong.  But my point is the following patches
+should belong to one big series.  They can not be applied separately.
 
-Exactly.
-
-> So, the driver needs to change its accessor method.  There is no
-> accessor in existance at present which does the right thing.
-
-Yes, that is my assessment.
-
-> And then I went on to explain that there's more complicated cases too,
-> where it seems that in theory you can end up with the same IP connected
-> in BE mode and sitting behind a PCI bus, which presents the need for
-> accessors which know the bus type by some means.
-
-And since most PCI devices are little-endian, I think that's why readl()
-is always little-endian.
-
-We might be able to modify the PowerPC version of ioread32() to be
-native-endian without too much difficulty, but that's something that Ben
-Herrenschmidt would need to approve.
+[PATCH 1/4] ASoC: imx: let SND_MXC_SOC_FIQ select FIQ
+[PATCH 2/4] ASoC: imx: move SND_SOC_AC97_BUS selection down to machine driver
+[PATCH 3/4] ASoC: imx: initialize dma_params burstsize just in imx-ssi
+[PATCH 4/4] ASoC: imx: separate imx-pcm bits from imx-ssi driver
+[PATCH 0/4] ASoC: merge imx into fsl
+[PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
 
 -- 
-Timur Tabi
-Linux kernel developer at Freescale
+Regards,
+Shawn
