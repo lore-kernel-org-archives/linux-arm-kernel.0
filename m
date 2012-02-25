@@ -1,56 +1,46 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 25 Feb 2012 10:46:53 -0500 (EST)
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <201202250845.44427.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1202251033550.4173-100000@netrider.rowland.org>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 25 Feb 2012 17:30:56 +0100
+Subject: [GIT PULL] LPC32xx fixes for v3.3-rc4
+Message-ID: <4F490CC0.5050303@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Feb 2012, Arnd Bergmann wrote:
+Hi Arnd and Olof,
 
-> On Saturday 25 February 2012, Wolfram Sang wrote:
-> > > Unfortunately, the way that ohci handles the abstraction between the
-> > > various implementations is backwards, it would be much easier if the
-> > > main driver was following that model to start with.
-> > 
-> > ... exactly for that reason I didn't suggest it. Looking at other ohci-sources
-> > (e.g. ohci-omap.c), machine_is_* seems to be the consistent use-case.
-> 
-> I still hope that someone takes the time to convert ohci and ehci into
-> something more regular, building the .c files separately instead of the
-> conditional #include "foo.c" inside of the main file.
-> 
-> Alan and Greg, do you know if anyone is working on that, and if not do you
-> think someone should do it?
+the fixes for LPC32xx that I just posted as patches are also available as a
+git branch to pull from as described below.
 
-You are talking about two separate issues.  One is the way the various
-bus-glue files get built into the driver, and the other is the way it
-#includes .c files.
+Thanks in advance,
 
-I don't view the second as a big deal.  A few people have complained
-about it, but I don't see the point.  Sure, it has the disadvantage
-that you have to recompile the entire driver any time one of the files
-is changed.  I can live with that.  It has the advantage that symbols
-shared among the source files can be static; they don't have to get
-merged into the overall kernel namespace when the driver isn't build as
-a module.
+Roland
 
-The first issue is more serious.  There are long-term plans to
-restructure both of those drivers so that the bus glue resides in a
-separate module from the main core of the driver.  However I have not
-started to work on that yet; there are other more pressing matters to
-do first.
 
-It doesn't seem extremely urgent.  Things are working the way they are.  
-The main advantage to restructuring is that it would allow distributors
-to build bus glue for multiple platforms in a single distribution
-image.  Currently that's not possible (except that any one of the
-platform glues can be enabled along with the PCI glue).
 
-A little progress has been made already.  We just received a submission
-for a "generic" platform bus glue file that will be able to take over
-the jobs of several of the existiing files.  If anyone wants to take
-this further I won't object, but I don't plan to work on it myself
-soon.
+The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
 
-Alan Stern
+  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+
+are available in the git repository at:
+
+  git://git.antcom.de/linux-2.6.git lpc32xx-fixes
+
+for you to fetch changes up to 3eddb16b7b275162c62f67bb75cc6bbe0ef8c075:
+
+  ARM: LPC32xx: serial.c: Fixed loop limit (2012-02-25 16:32:44 +0100)
+
+----------------------------------------------------------------
+Roland Stigge (6):
+      ARM: LPC32xx: Fix irq on GPI_28
+      ARM: LPC32xx: Fix missing and bad LPC32XX macros
+      ARM: LPC32xx: Fix interrupt controller init
+      ARM: LPC32xx: irq.c: Clear latched event
+      ARM: LPC32xx: serial.c: HW bug workaround
+      ARM: LPC32xx: serial.c: Fixed loop limit
+
+ arch/arm/mach-lpc32xx/include/mach/irqs.h     |    2 +-
+ arch/arm/mach-lpc32xx/include/mach/platform.h |   51 +++++++++++++------------
+ arch/arm/mach-lpc32xx/irq.c                   |   25 ++++++++++--
+ arch/arm/mach-lpc32xx/pm.c                    |    2 +-
+ arch/arm/mach-lpc32xx/serial.c                |   20 +++++++++-
+ arch/arm/mach-lpc32xx/timer.c                 |   48 ++++++++++++------------
+ 6 files changed, 92 insertions(+), 56 deletions(-)
