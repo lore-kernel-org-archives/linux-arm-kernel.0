@@ -1,47 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 25 Feb 2012 13:58:43 +0000
-Subject: [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
-In-Reply-To: <20120225121217.GK22562@n2100.arm.linux.org.uk>
-References: <20120224140200.GH5450@opensource.wolfsonmicro.com>
- <20120224142342.GA16659@S2101-09.ap.freescale.net>
- <20120224141705.GJ5450@opensource.wolfsonmicro.com>
- <20120224232148.GA24268@S2101-09.ap.freescale.net>
- <4F4819C4.5040709@freescale.com>
- <20120225000319.GC24268@S2101-09.ap.freescale.net>
- <4F483BB8.7030706@freescale.com>
- <20120225101758.GJ22562@n2100.arm.linux.org.uk>
- <20120225114414.GC3167@opensource.wolfsonmicro.com>
- <20120225121217.GK22562@n2100.arm.linux.org.uk>
-Message-ID: <20120225135842.GB3412@opensource.wolfsonmicro.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sat, 25 Feb 2012 15:03:46 +0100
+Subject: [PATCH v2] USB: Support for LPC32xx SoC
+In-Reply-To: <20120225035128.GA4455@pengutronix.de>
+References: <1330030639-3796-1-git-send-email-stigge@antcom.de>
+ <4F46AA06.30502@antcom.de> <20120224063521.GA16412@pengutronix.de>
+ <201202241503.27406.arnd@arndb.de> <20120225035128.GA4455@pengutronix.de>
+Message-ID: <4F48EA42.70408@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 25, 2012 at 12:12:17PM +0000, Russell King - ARM Linux wrote:
+On 25/02/12 04:51, Wolfram Sang wrote:
+>> Unfortunately, the way that ohci handles the abstraction between
+>> the various implementations is backwards, it would be much easier
+>> if the main driver was following that model to start with.
+> 
+> ... exactly for that reason I didn't suggest it. Looking at other
+> ohci-sources (e.g. ohci-omap.c), machine_is_* seems to be the
+> consistent use-case.
 
-> Take a look at the diffstat, and you'll see that there's no way that it's
-> a "new version of the same patch set".  Tell me, how can the set of six
+OK, considering this, I for now used machine_is_*() to get rid of the
+#ifdefs.
 
-Yeah, sorry - I misremembered the specific reason they were related when
-I replied to you.
+Using platform_device_id.driver_data as Arnd suggested is also a good
+idea, and switching to it will be easy when it is due.
 
-> And if you bother to read Shawn's reply to your question, you'll see that
-> the whole reason he grouped the two together is because they follow on
-> from each other.
+Thanks in advance,
 
-No, I understand that the patch sets are related, like I say I had
-misremembered the relation when replying to you.
-
-> So my point that you're not listening stands.
-
-I am, what I'm asking is that people don't send new patch sets in reply
-to old ones even if they are related as while the thought is good in
-that case the software tends not to do a great job with it.  Either just
-mentioning things in the cover letter or resending the previous stuff as
-part of a new, combined series tends to work better.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120225/722e71b2/attachment-0001.sig>
+Roland
