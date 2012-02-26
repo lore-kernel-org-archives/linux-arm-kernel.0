@@ -1,60 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sun, 26 Feb 2012 10:59:47 -0500 (EST)
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <201202261001.49937.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1202261040020.22970-100000@netrider.rowland.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 26 Feb 2012 13:27:04 -0300
+Subject: [PATCH] ARM: mach-imx: mx3: Fix section mismatch in imx3_init_l2x0()
+Message-ID: <1330273624-5757-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 26 Feb 2012, Arnd Bergmann wrote:
+Fix the following section mismatch:
 
-> We are doing a major rework of the ARM architecture tree right now
-> to allow building multiple SoC platforms together, which has not
-> been possible traditionally. The "PLATFORM_DRIVER" macro in ohci
-> and ehci is one of many things standing in the way still and will have
-> to be dealt with at some point.
+WARNING: vmlinux.o(.text+0x11be8): Section mismatch in reference from the function imx3_init_l2x0() to the function .init.text:l2x0_init()
+The function imx3_init_l2x0() references
+the function __init l2x0_init().
+This is often because imx3_init_l2x0 lacks a __init 
+annotation or the annotation of l2x0_init is wrong.
 
-Is there anybody in particular who is going to attack this issue?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mm-imx3.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> > A little progress has been made already.  We just received a submission
-> > for a "generic" platform bus glue file that will be able to take over
-> > the jobs of several of the existiing files.  If anyone wants to take
-> > this further I won't object, but I don't plan to work on it myself
-> > soon.
-> 
-> Ok, good to know. The approach of a generic glue is exactly what I
-> was going to suggest. As we get to ARM platforms that are currently
-> using PLATFORM_DRIVER, I will then ask people to convert the ohci
-> glue to use that generic glue instead of adding another *_DRIVER
-> macro to ohci/ehci.
-
-The problem is that several platforms have highly specialized needs
-that can't sanely be handled in a single generic driver.  Although a
-lot of drivers can be converted over, not all of them will.
-
-> I'm not sure about what we should do for lpc32xx. Is that
-> generic glue going into v3.4?
-
-That's up to Greg.  At the moment it isn't used by anything, and unless
-an existing driver can be converted over I'd guess it's not likely to
-get merged right away.
-
->  If so, we could convert the
-> pnx4008 driver to use that and abstract it in a way that works
-> nicely for pnx4008 and lpc32xx. OTOH, we might just let this
-> one go in as before and ask people to do it right for the next
-> one.
-
-I don't know anything about these two platforms.  If they are
-sufficiently similar then it does make sense to combine the drivers
-into a single file, with various platform-specific decisions made at
-runtime.  These decisions don't necessarily have to use a machine_is_*
-kind of test (although they can); it might be simpler to do such a
-test once during probe and store the result in a flag for later reuse.
-Or then again, it might not since there's no obvious place to keep 
-such a flag...
-
-At the moment, switching the pnx4008 driver to use the generic bus glue
-doesn't look easy.  The generic code doesn't know anything about i2c.
-
-Alan Stern
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 8404ee7..6222151 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -76,7 +76,7 @@ static void __iomem *imx3_ioremap(unsigned long phys_addr, size_t size,
+ 	return __arm_ioremap(phys_addr, size, mtype);
+ }
+ 
+-void imx3_init_l2x0(void)
++void __init imx3_init_l2x0(void)
+ {
+ 	void __iomem *l2x0_base;
+ 	void __iomem *clkctl_base;
+-- 
+1.7.1
