@@ -1,35 +1,44 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Sun, 26 Feb 2012 12:40:19 +0100
-Subject: [PATCH] MAINTAINERS: update maintainer entry for pxa/hx4700
-Message-ID: <1330256419.3673.27.camel@flow>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 26 Feb 2012 16:47:40 +0300
+Subject: [PATCH 1/3] ARM: PXA: Zipit Z2: Fix oops in z2_power_off
+Message-ID: <1330264062-5750-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Paul Parsons as maintainer for pxa/hx4700.
-Also, add a mailing list and update the files.
+pxa27x_set_pwrmode is marked with __init, so it's not legitimate
+to call it in pm_power_off hook.
 
-Cc: Paul Parsons <lost.distance@yahoo.com>
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- MAINTAINERS |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/include/mach/pxa27x.h |    2 +-
+ arch/arm/mach-pxa/pxa27x.c              |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9a648eb..154ab2b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -815,9 +815,12 @@ S:	Maintained
+diff --git a/arch/arm/mach-pxa/include/mach/pxa27x.h b/arch/arm/mach-pxa/include/mach/pxa27x.h
+index 7cff640..66c4cbf 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa27x.h
++++ b/arch/arm/mach-pxa/include/mach/pxa27x.h
+@@ -21,7 +21,7 @@
  
- ARM/H4700 (HP IPAQ HX4700) MACHINE SUPPORT
- M:	Philipp Zabel <philipp.zabel@gmail.com>
-+M:	Paul Parsons <lost.distance@yahoo.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-pxa/hx4700.c
- F:	arch/arm/mach-pxa/include/mach/hx4700.h
-+F:	sound/soc/pxa/hx4700.c
+ extern void __init pxa27x_map_io(void);
+ extern void __init pxa27x_init_irq(void);
+-extern int __init pxa27x_set_pwrmode(unsigned int mode);
++extern int pxa27x_set_pwrmode(unsigned int mode);
+ extern void pxa27x_cpu_pm_enter(suspend_state_t state);
  
- ARM/HP JORNADA 7XX MACHINE SUPPORT
- M:	Kristoffer Ericson <kristoffer.ericson@gmail.com>
+ #define pxa27x_handle_irq	ichp_handle_irq
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index bc5a98e..acbaa2b 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -241,7 +241,7 @@ static struct clk_lookup pxa27x_clkregs[] = {
+  */
+ static unsigned int pwrmode = PWRMODE_SLEEP;
+ 
+-int __init pxa27x_set_pwrmode(unsigned int mode)
++int pxa27x_set_pwrmode(unsigned int mode)
+ {
+ 	switch (mode) {
+ 	case PWRMODE_SLEEP:
 -- 
-1.7.9
+1.7.9.2
