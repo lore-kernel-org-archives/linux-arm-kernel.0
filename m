@@ -1,43 +1,60 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 26 Feb 2012 18:35:10 +0300
-Subject: [PATCH 3/3] ARM: PXA27x: Zipit Z2: disable wake on GPIO0
-In-Reply-To: <20120226152918.GP22562@n2100.arm.linux.org.uk>
-References: <1330264062-5750-1-git-send-email-anarsoul@gmail.com>
- <1330264062-5750-3-git-send-email-anarsoul@gmail.com>
- <20120226142616.GM22562@n2100.arm.linux.org.uk>
- <CA+E=qVdU-kDQYRD51TPRyj-SY4x7njdQ54Wy_wwOWdAue6Wjzg@mail.gmail.com>
- <20120226152918.GP22562@n2100.arm.linux.org.uk>
-Message-ID: <CA+E=qVc+kQe1_ThkMiED8Eh8Fv=kAnGT0Djeb09g58rXmhH+AQ@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sun, 26 Feb 2012 10:59:47 -0500 (EST)
+Subject: [PATCH v2] USB: Support for LPC32xx SoC
+In-Reply-To: <201202261001.49937.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1202261040020.22970-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/2/26 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sun, Feb 26, 2012 at 06:11:17PM +0300, Vasily Khoruzhick wrote:
->> 2012/2/26 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > On Sun, Feb 26, 2012 at 04:47:42PM +0300, Vasily Khoruzhick wrote:
->> >> We don't want machine to wake up on AC state change
->> >
->> > NAK. ?Stop polluting the machine callback methods. ?Use the right one.
->>
->> Ok, what's right one?
->
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*fixup)(struct tag *, char **,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct meminfo *);
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*reserve)(void);/* reserve mem blocks ?*/
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*map_io)(void);/* IO mapping function ?*/
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_early)(void);
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_irq)(void);
-> ? ? ? ?struct sys_timer ? ? ? ?*timer; ? ? ? ? /* system tick timer ? ?*/
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*init_machine)(void);
->
-> and chose a more appropriate one from that? ?Maybe init_early() if it
-> has to be done early, or preferably the init_machine() if it can wait
-> until arch_initcall() time.
->
-> But stuffing it into fixup, reserve, map_io, init_irq or the timer
-> initialization is pure abuse of those callbacks.
+On Sun, 26 Feb 2012, Arnd Bergmann wrote:
 
-Ok, thanks.
+> We are doing a major rework of the ARM architecture tree right now
+> to allow building multiple SoC platforms together, which has not
+> been possible traditionally. The "PLATFORM_DRIVER" macro in ohci
+> and ehci is one of many things standing in the way still and will have
+> to be dealt with at some point.
 
-Regards
-Vasily
+Is there anybody in particular who is going to attack this issue?
+
+> > A little progress has been made already.  We just received a submission
+> > for a "generic" platform bus glue file that will be able to take over
+> > the jobs of several of the existiing files.  If anyone wants to take
+> > this further I won't object, but I don't plan to work on it myself
+> > soon.
+> 
+> Ok, good to know. The approach of a generic glue is exactly what I
+> was going to suggest. As we get to ARM platforms that are currently
+> using PLATFORM_DRIVER, I will then ask people to convert the ohci
+> glue to use that generic glue instead of adding another *_DRIVER
+> macro to ohci/ehci.
+
+The problem is that several platforms have highly specialized needs
+that can't sanely be handled in a single generic driver.  Although a
+lot of drivers can be converted over, not all of them will.
+
+> I'm not sure about what we should do for lpc32xx. Is that
+> generic glue going into v3.4?
+
+That's up to Greg.  At the moment it isn't used by anything, and unless
+an existing driver can be converted over I'd guess it's not likely to
+get merged right away.
+
+>  If so, we could convert the
+> pnx4008 driver to use that and abstract it in a way that works
+> nicely for pnx4008 and lpc32xx. OTOH, we might just let this
+> one go in as before and ask people to do it right for the next
+> one.
+
+I don't know anything about these two platforms.  If they are
+sufficiently similar then it does make sense to combine the drivers
+into a single file, with various platform-specific decisions made at
+runtime.  These decisions don't necessarily have to use a machine_is_*
+kind of test (although they can); it might be simpler to do such a
+test once during probe and store the result in a flag for later reuse.
+Or then again, it might not since there's no obvious place to keep 
+such a flag...
+
+At the moment, switching the pnx4008 driver to use the generic bus glue
+doesn't look easy.  The generic code doesn't know anything about i2c.
+
+Alan Stern
