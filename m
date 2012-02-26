@@ -1,67 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 26 Feb 2012 10:01:49 +0000
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <Pine.LNX.4.44L0.1202251033550.4173-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1202251033550.4173-100000@netrider.rowland.org>
-Message-ID: <201202261001.49937.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 26 Feb 2012 12:14:14 +0200
+Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin omap3isp
+Message-ID: <1330251254-14693-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 25 February 2012, Alan Stern wrote:
-> You are talking about two separate issues.  One is the way the various
-> bus-glue files get built into the driver, and the other is the way it
-> #includes .c files.
-> 
-> I don't view the second as a big deal.  A few people have complained
-> about it, but I don't see the point.  Sure, it has the disadvantage
-> that you have to recompile the entire driver any time one of the files
-> is changed.
-> I can live with that.  It has the advantage that symbols
-> shared among the source files can be static; they don't have to get
-> merged into the overall kernel namespace when the driver isn't build as
-> a module.
+omap3isp depends on omap's iommu and will fail to probe if
+initialized before it (which always happen if they are builtin).
 
-Right, I don't really object that part (including .c files), with
-conditional includes I was referring to the inclusion of hw-specific
-glues into the driver.
+Make omap's iommu subsys_initcall as an interim solution until
+the probe deferral mechanism is merged.
 
-> The first issue is more serious.  There are long-term plans to
-> restructure both of those drivers so that the bus glue resides in a
-> separate module from the main core of the driver.  However I have not
-> started to work on that yet; there are other more pressing matters to
-> do first.
+Reported-by: James <angweiyang@gmail.com>
+Debugged-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Cc: stable <stable@vger.kernel.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+Cc: Joerg Roedel <Joerg.Roedel@amd.com>
+---
+ arch/arm/mach-omap2/mailbox.c |    3 ++-
+ drivers/iommu/omap-iommu.c    |    3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-Ok.
-
-> It doesn't seem extremely urgent.  Things are working the way they are.  
-> The main advantage to restructuring is that it would allow distributors
-> to build bus glue for multiple platforms in a single distribution
-> image.  Currently that's not possible (except that any one of the
-> platform glues can be enabled along with the PCI glue).
-
-We are doing a major rework of the ARM architecture tree right now
-to allow building multiple SoC platforms together, which has not
-been possible traditionally. The "PLATFORM_DRIVER" macro in ohci
-and ehci is one of many things standing in the way still and will have
-to be dealt with at some point.
-
-> A little progress has been made already.  We just received a submission
-> for a "generic" platform bus glue file that will be able to take over
-> the jobs of several of the existiing files.  If anyone wants to take
-> this further I won't object, but I don't plan to work on it myself
-> soon.
-
-Ok, good to know. The approach of a generic glue is exactly what I
-was going to suggest. As we get to ARM platforms that are currently
-using PLATFORM_DRIVER, I will then ask people to convert the ohci
-glue to use that generic glue instead of adding another *_DRIVER
-macro to ohci/ehci.
-
-I'm not sure about what we should do for lpc32xx. Is that
-generic glue going into v3.4? If so, we could convert the
-pnx4008 driver to use that and abstract it in a way that works
-nicely for pnx4008 and lpc32xx. OTOH, we might just let this
-one go in as before and ask people to do it right for the next
-one.
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index 609ea2d..a6db1e4 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -412,7 +412,8 @@ static void __exit omap2_mbox_exit(void)
+ 	platform_driver_unregister(&omap2_mbox_driver);
+ }
+ 
+-module_init(omap2_mbox_init);
++/* must be ready before omap3isp is probed */
++subsys_initcall(omap2_mbox_init);
+ module_exit(omap2_mbox_exit);
+ 
+ MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index 4e661f0..821062a 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -1222,7 +1222,8 @@ static int __init omap_iommu_init(void)
+ 
+ 	return platform_driver_register(&omap_iommu_driver);
+ }
+-module_init(omap_iommu_init);
++/* must be ready before omap3isp is probed */
++subsys_initcall(omap_iommu_init);
+ 
+ static void __exit omap_iommu_exit(void)
+ {
+-- 
+1.7.5.4
