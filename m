@@ -1,19 +1,43 @@
-From: GNUtoo@no-log.org (Denis 'GNUtoo' Carikli)
-Date: Sun, 26 Feb 2012 19:34:43 +0100
-Subject: [PATCH] Add poll_get_char & poll_put_char to uart_ops for the
- samsung UARTS.
-In-Reply-To: <201202251227.42284.heiko@sntech.de>
-References: <20120212182201.GA17975@debian>
- <CAHQa92Vjwh3gtME2u19EZz57My3H7R=fQK4CoJR9s_ktpsy_Ww@mail.gmail.com>
- <201202251227.42284.heiko@sntech.de>
-Message-ID: <201202261934.44079.GNUtoo@no-log.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 26 Feb 2012 19:44:09 +0100
+Subject: AT91: How copy kernel code to SRAM and execute?
+In-Reply-To: <4F4A6DD5.5040606@emagii.com>
+References: <4F4A6DD5.5040606@emagii.com>
+Message-ID: <20120226184409.GA3318@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->It might be goot to included the linux-arm-kernel list to get a wider 
->audience. I always felt, that the samsung ml isn't read by many.
-Why not the linux-serial mailing list?
-I sent a patch there and it was accepted in Greg Kroah-Hartman's tree really 
-fast(it didn't hit linux-next yet tough).
+On 18:37 Sun 26 Feb     , ARM Linux wrote:
+> I am looking for some examples on how to copy a small piece of kernel code
+> to internal SRAM and then execute it.
+> 
+> Why?
+> If you want to restart, you execute the "/sbin/reboot" command
+> which will eventually call the "arch_reset" function, which in the AT91
+> case will write to a "user reset" register.
+> 
+> The problem is that the chip may reset in the middle of an SDRAM
+> read transfer.
+> The SDRAM will see it's clock stopped and will continue to drive the bus.
+> 
+> When the ROM bootloader tries to access any boot memory (Parallel
+> flash or NAND flash)
+> on the parallel bus, there will be a bus conflict between the boot
+> memory and the SDRAM,
+> and the bootROM will not properly detect the boot program, and will enter
+> an In System Programming mode.
+> 
+> This is described in the SAM9G20 datasheet, but is probably valid
+> for all older generation AT91 devices as well.
+> 
+> The workaround seems to be to turn off the SDRAM and then do the reset.
+> Obviously you cannot read instructions from SDRAM after it has been
+> turned off.
+> 
+	Which version of the kernel do you use?
 
-Denis.
+	There is no need to put the code in the sram, you just need to put the
+	code in cached before shutdown the SDRAM/DDR
+
+Best Regards,
+J.
