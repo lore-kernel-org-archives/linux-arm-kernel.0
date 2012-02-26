@@ -1,28 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 26 Feb 2012 14:25:23 -0800
-Subject: [PATCH] ARM: tegra: select required CPU and L2 errata options
-In-Reply-To: <1329251979-14805-1-git-send-email-swarren@nvidia.com>
-References: <1329251979-14805-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120226222523.GH11189@quad.lixom.net>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 27 Feb 2012 09:45:48 +1100
+Subject: [PATCH v3 17/21] ARM: at91: merge SRAM Memory banks thanks to
+ mirroring
+In-Reply-To: <20120224165443.GA21556@game.jcrosoft.org>
+References: <cover.1330006537.git.nicolas.ferre@atmel.com>
+ <c9b1e3ffbc322a1d1e1272062a9361abe536a33a.1330006537.git.nicolas.ferre@atmel.com>
+ <4F46B3DF.7010402@gmail.com> <20120224165443.GA21556@game.jcrosoft.org>
+Message-ID: <4F4AB61C.4080404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2012 at 01:39:39PM -0700, Stephen Warren wrote:
-> The ARM IP revisions in Tegra are:
-> Tegra20: CPU r1p1, PL310 r2p0
-> Tegra30: CPU A01=r2p7/>=A02=r2p9, NEON r2p3-50, PL310 r3p1-50
-> 
-> Based on work by Olof Johansson, although the actual list of errata is
-> somewhat different here, since I added a bunch more and removed one PL310
-> erratum that doesn't seem applicable.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Olof, should this be CC: stable?
+On 25/02/12 03:54, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-Sounds reasonable. I've added the patch to for-3.4/cleanups_and_fixes and added
-the cc. Given that it's not a refression I'm hesitant to send a fix for 3.3 at
-this point in the release cycle.
+> On 08:47 Fri 24 Feb     , Ryan Mallon wrote:
+>> On 24/02/12 01:26, Nicolas Ferre wrote:
+>>
+>>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>>
+>>> On at91sam9260 and at91sam9g20 the SRAM banks are mirrored. We can
+>>> merge them together to be able to have bigger and continuous
+>>> internal RAM.
+>>
+>> I think this patch needs some comments in the code. As mentioned in the
+>> last round, this functionality is not documented, so it is not obvious
+>> how/why this works. This is especially true for any user who has
+>> problems with this code and then tries to look up those addresses in
+>> their at91 manual only to find the regions are reserved.
+>>
+>> Nicolas, are you able to give an official Atmel stance on this?
+> you have the ack from Nico and he send the e-mail
 
+Sure, but it would be nice to get some official documentation on this.
+Why was the feature, which seems quite useful, never documented? Is it
+supported on all revisions of the chips? Are there any restrictions or
+caveats to using the mirrored layout versus the separate layout?
 
--Olof
+At the very least, the code needs to be documented, since anyone using
+this code is not able to look up the details in the at91 technical manuals.
+
+~Ryan
