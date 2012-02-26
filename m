@@ -1,36 +1,37 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Sun, 26 Feb 2012 23:09:40 +0100 (CET)
-Subject: [PATCH][trivial] ARM: Remove redundant ';' from
- avic_irq_set_priority()
-Message-ID: <alpine.LNX.2.00.1202262307210.6089@swampdragon.chaosbits.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 26 Feb 2012 14:14:19 -0800
+Subject: [PATCH V2 1/2] ARM: tegra: Add pinmux board file for Cardhu
+In-Reply-To: <20120226215141.GA11189@quad.lixom.net>
+References: <1328138997-25665-1-git-send-email-swarren@nvidia.com>
+ <20120226215141.GA11189@quad.lixom.net>
+Message-ID: <CAOesGMj4BHL6A1Ej4nQpTkjAY3Z=MKfncc5H8DFwh4TTvPixnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One semi-colon at the end of the return statement is sufficient.
+On Sun, Feb 26, 2012 at 1:51 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Feb 01, 2012 at 04:29:56PM -0700, Stephen Warren wrote:
+>> For now, this just sets up the pinmux and GPIOs required for the SD
+>> card slot.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> v2:
+>> * Set PULL_UP for CMD and DATA pins on SD interface
+>> * Add power GPIO for SDMMC1
+>> * Add pinmux configuration for SDMMC4
+>>
+>> This will hopefully be replaced by the pinmux DT binding in the near
+>> future, but until that happens, Tegra30 pinmux functionality needs to
+>> be exposed somehow to unblock getting drivers tested on Tegra30.
+>
+> Thanks, applied to for-3.4/boards.
 
-Signed-off-by: Jesper Juhl <jj@chaosbits.net>
----
- arch/arm/plat-mxc/avic.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+...and I'm two for two on sending the apply email before I have
+checked dependencies.
 
-diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
-index 55f1569..689f81f 100644
---- a/arch/arm/plat-mxc/avic.c
-+++ b/arch/arm/plat-mxc/avic.c
-@@ -60,7 +60,7 @@ static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
- 	unsigned int mask = 0x0F << irq % 8 * 4;
- 
- 	if (irq >= AVIC_NUM_IRQS)
--		return -EINVAL;;
-+		return -EINVAL;
- 
- 	temp = __raw_readl(avic_base + AVIC_NIPRIORITY(irq / 8));
- 	temp &= ~mask;
--- 
-1.7.9.2
+This doesn't build, so I dropped it again. Probably a missing
+dependency on pinctrl changes but please revisit on top of just the
+tegra code and let me know.
 
 
--- 
-Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
-Don't top-post http://www.catb.org/jargon/html/T/top-post.html
-Plain text mails only, please.
+-Olof
