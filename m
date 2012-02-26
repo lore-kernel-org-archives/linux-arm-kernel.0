@@ -1,41 +1,68 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Mon, 27 Feb 2012 09:45:48 +1100
-Subject: [PATCH v3 17/21] ARM: at91: merge SRAM Memory banks thanks to
- mirroring
-In-Reply-To: <20120224165443.GA21556@game.jcrosoft.org>
-References: <cover.1330006537.git.nicolas.ferre@atmel.com>
- <c9b1e3ffbc322a1d1e1272062a9361abe536a33a.1330006537.git.nicolas.ferre@atmel.com>
- <4F46B3DF.7010402@gmail.com> <20120224165443.GA21556@game.jcrosoft.org>
-Message-ID: <4F4AB61C.4080404@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 26 Feb 2012 23:47:56 +0100
+Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
+ omap3isp
+In-Reply-To: <CAK=WgbYkVALqrVMVv1ma3WzN5dYriM8X0MfwH4knwWwojB6hjg@mail.gmail.com>
+References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
+ <3215700.hj2jFm3b0A@avalon>
+ <CAK=WgbYkVALqrVMVv1ma3WzN5dYriM8X0MfwH4knwWwojB6hjg@mail.gmail.com>
+Message-ID: <35010303.ArkW8BdIu6@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/02/12 03:54, Jean-Christophe PLAGNIOL-VILLARD wrote:
+Hi Ohad,
 
-> On 08:47 Fri 24 Feb     , Ryan Mallon wrote:
->> On 24/02/12 01:26, Nicolas Ferre wrote:
->>
->>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>>
->>> On at91sam9260 and at91sam9g20 the SRAM banks are mirrored. We can
->>> merge them together to be able to have bigger and continuous
->>> internal RAM.
->>
->> I think this patch needs some comments in the code. As mentioned in the
->> last round, this functionality is not documented, so it is not obvious
->> how/why this works. This is especially true for any user who has
->> problems with this code and then tries to look up those addresses in
->> their at91 manual only to find the regions are reserved.
->>
->> Nicolas, are you able to give an official Atmel stance on this?
-> you have the ack from Nico and he send the e-mail
+On Sunday 26 February 2012 20:30:17 Ohad Ben-Cohen wrote:
+> On Sun, Feb 26, 2012 at 7:34 PM, Laurent Pinchart wrote:
+> > On Sunday 26 February 2012 12:14:14 Ohad Ben-Cohen wrote:
+> >> omap3isp depends on omap's iommu and will fail to probe if
+> >> initialized before it (which always happen if they are builtin).
+> >> 
+> >> Make omap's iommu subsys_initcall as an interim solution until
+> >> the probe deferral mechanism is merged.
+> > 
+> > How will that fix the problem ?
+> 
+> Sorry, I'm not entirely sure I understand the question: are you asking
+> about this patch or about the probe deferral thingy ?
 
-Sure, but it would be nice to get some official documentation on this.
-Why was the feature, which seems quite useful, never documented? Is it
-supported on all revisions of the chips? Are there any restrictions or
-caveats to using the mirrored layout versus the separate layout?
+I'm asking about the probe deferral mechanism. The omap3-isp driver will still 
+call iommu_attach_device() in its probe function. What will happen then ? Will 
+it return an error ? On what basis will it do so ?
 
-At the very least, the code needs to be documented, since anyone using
-this code is not able to look up the details in the at91 technical manuals.
+> > I'm fine with this patch, as it fixes the problem as well, although I
+> > still believe modifying the link order would be a better fix in this case.
+> 
+> I'm personally not a huge fan of implicit link order dependencies, as
+> someone may change the order in the future (for whatever benign
+> reason) without even realizing he's breaking drivers.
 
-~Ryan
+That's what the comment in the Makefile is for ;-) I don't think it's a 
+perfect solution either, but it avoids playing with the various initcalls. The 
+OMAP3 IOMMU isn't a subsystem, subsys_initcall() looks a bit like an API abuse 
+to me. But as I mentioned in my previous mail, I'm fine with the patch if you 
+think it's a better solution.
+
+> >> +/* must be ready before omap3isp is probed */
+> > 
+> > The problem is not limited to the omap3isp driver, the DSP driver could be
+> > affected as well.
+> 
+> If you refer to tidspbridge, then I'm not sure it has the same issue:
+> IIUC it doesn't enable the iommu hw on probe; only in response to an
+> ioctl command (btw, tidspbridge doesn't even use this omap iommu
+> driver - it manipulates the iommu registers directly. iicks.)
+
+Looking at the tidspbridge driver, it seems to handle its IOMMU itself. That's 
+an item for someone's to-do list :-)
+
+Are drivers supposed to call iommu_attach_device() in their probe() function 
+or later on ? The API doesn't seem to be documented.
+
+> The omap4 solutions (remoteproc et al.) will only enable the iommu
+> after userspace is alive, so no risk there as well.
+
+-- 
+Regards,
+
+Laurent Pinchart
