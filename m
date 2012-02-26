@@ -1,105 +1,52 @@
-From: armlinux@emagii.com (ARM Linux)
-Date: Sun, 26 Feb 2012 21:52:31 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 26 Feb 2012 21:05:39 +0000
 Subject: AT91: How copy kernel code to SRAM and execute?
-In-Reply-To: <20120226184409.GA3318@game.jcrosoft.org>
+In-Reply-To: <4F4A9A84.3050204@emagii.com>
 References: <4F4A6DD5.5040606@emagii.com>
- <20120226184409.GA3318@game.jcrosoft.org>
-Message-ID: <4F4A9B8F.9070803@emagii.com>
+ <20120226175037.GA4706@n2100.arm.linux.org.uk> <4F4A9A84.3050204@emagii.com>
+Message-ID: <20120226210539.GB4706@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-02-26 19:44, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 18:37 Sun 26 Feb     , ARM Linux wrote:
->> I am looking for some examples on how to copy a small piece of kernel code
->> to internal SRAM and then execute it.
+On Sun, Feb 26, 2012 at 09:48:04PM +0100, Ulf Samuelsson wrote:
+> On 2012-02-26 18:50, Russell King - ARM Linux wrote:
+>> On Sun, Feb 26, 2012 at 06:37:25PM +0100, ARM Linux wrote:
+>>> I am looking for some examples on how to copy a small piece of kernel code
+>>> to internal SRAM and then execute it.
+>> See fncpy.h
 >>
->> Why?
->> If you want to restart, you execute the "/sbin/reboot" command
->> which will eventually call the "arch_reset" function, which in the AT91
->> case will write to a "user reset" register.
->>
->> The problem is that the chip may reset in the middle of an SDRAM
->> read transfer.
->> The SDRAM will see it's clock stopped and will continue to drive the bus.
->>
->> When the ROM bootloader tries to access any boot memory (Parallel
->> flash or NAND flash)
->> on the parallel bus, there will be a bus conflict between the boot
->> memory and the SDRAM,
->> and the bootROM will not properly detect the boot program, and will enter
->> an In System Programming mode.
->>
->> This is described in the SAM9G20 datasheet, but is probably valid
->> for all older generation AT91 devices as well.
->>
->> The workaround seems to be to turn off the SDRAM and then do the reset.
->> Obviously you cannot read instructions from SDRAM after it has been
->> turned off.
->>
-> 	Which version of the kernel do you use?
->
-On 2012-02-26 19:44, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 18:37 Sun 26 Feb     , ARM Linux wrote:
->> I am looking for some examples on how to copy a small piece of kernel code
->> to internal SRAM and then execute it.
->>
->> Why?
->> If you want to restart, you execute the "/sbin/reboot" command
->> which will eventually call the "arch_reset" function, which in the AT91
->> case will write to a "user reset" register.
->>
->> The problem is that the chip may reset in the middle of an SDRAM
->> read transfer.
->> The SDRAM will see it's clock stopped and will continue to drive the bus.
->>
->> When the ROM bootloader tries to access any boot memory (Parallel
->> flash or NAND flash)
->> on the parallel bus, there will be a bus conflict between the boot
->> memory and the SDRAM,
->> and the bootROM will not properly detect the boot program, and will enter
->> an In System Programming mode.
->>
->> This is described in the SAM9G20 datasheet, but is probably valid
->> for all older generation AT91 devices as well.
->>
->> The workaround seems to be to turn off the SDRAM and then do the reset.
->> Obviously you cannot read instructions from SDRAM after it has been
->> turned off.
->>
-> 	Which version of the kernel do you use?
->
-> 	There is no need to put the code in the sram, you just need to put the
-> 	code in cached before shutdown the SDRAM/DDR
->
-
-The vanilla 2.6.30 from linux4sam, but it is using a patchset from a 
-customer.
-I don't think it is an option to change kernel version right now.
-Cache is turned off in this version.
-
-> Best Regards,
-> J.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Thanks, this does the copy.
+> My problem is in making the SRAM executable.
+> I have already copied to SRAM (I think), but when I jump there
+> I get a trap and a stackdump.
 
 
-> 	There is no need to put the code in the sram, you just need to put the
-> 	code in cached before shutdown the SDRAM/DDR
->
-> Best Regards,
-> J.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
+> The "mmap" system call, seems to do what I want, but is this callable
+> from within the kernel, or is there a better way?
+>
+> I can see that is has been split upo into "old_mmap" (obsolete) and the  
+> newer
+> "sys_mmap2" which turns off the MAP_EXECUTABLE.
+> "mprotect" maybe can be used to fix that.
+>
+> Googling for how to call a system call from within the kernel gave:
+>
+>     mm_segment_t     oldfs = get_fs();
+>     set_fs(KERNEL_DS);
+>     /* Do SysCalls */
+>         sys_mprotect(sram_shutdown, PAGE_SIZE, ... );
+>     set_fs(old_fs);
 
--- 
-Best Regards
-Ulf Samuelsson
-ulf at emagii.com
-+46 722 427437
+Don't even think about that.  Google doesn't always answer the correct
+question.  In this case, it's completely the wrong thing because all
+the userspace APIs are _only_ designed to work with userspace addresses.
+
+Moreover, this will fail because it won't find a VMA for the address
+(which is a good thing - as it will attempt to modify the pages in
+ways which could end up exposing them to userspace.)
+
+In general, if you're coding inside the kernel, calling kernel syscalls
+is 99.999% of the time totally the wrong thing to do.
+
+The way to do this is to use __arm_ioremap_exec() to map the SRAM.
