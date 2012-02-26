@@ -1,19 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 26 Feb 2012 14:17:32 -0800
-Subject: [PATCH] ARM: tegra: Demote EMC clock inconsistency BUG to WARN
-In-Reply-To: <1328576955-6295-1-git-send-email-swarren@nvidia.com>
-References: <1328576955-6295-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120226221732.GF11189@quad.lixom.net>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 26 Feb 2012 23:20:27 +0100
+Subject: [PATCH 2/3] ARM: PXA27x: save/restore PWER on suspend/resume
+In-Reply-To: <20120226142703.GN22562@n2100.arm.linux.org.uk>
+References: <1330264062-5750-1-git-send-email-anarsoul@gmail.com>
+ <1330264062-5750-2-git-send-email-anarsoul@gmail.com>
+ <20120226142703.GN22562@n2100.arm.linux.org.uk>
+Message-ID: <201202262320.27934.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2012 at 05:09:15PM -0800, Stephen Warren wrote:
-> When this inconsistency occurs, the system will typically operate without
-> issue, it's just that EMC scaling won't optimally. Convert the BUG_ON to
-> a WARN_ONCE in order to allow the kernel to boot, but still complain.
+> On Sun, Feb 26, 2012 at 04:47:41PM +0300, Vasily Khoruzhick wrote:
+> > Bootloader can clobber PWER value, so save it state on suspend.
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> What boot loader is this,
 
-Thanks, applied to for-3.4/soc.
+U-Boot, patched, not mainline.
 
--Olof
+> and why is it being so idiotic?
+
+Mainline doesn't touch PWER, so please be careful about your accusations.
+
+> Why can't it
+> be fixed?
+
+Yes, either by using mainline uboot (to rule out the bootloader problem), 
+finding bug in linux kernel or reading the CPU manual.
+
+M
+
+PS. Vasily, keep me in Cc next time.
