@@ -1,44 +1,47 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 26 Feb 2012 16:47:40 +0300
-Subject: [PATCH 1/3] ARM: PXA: Zipit Z2: Fix oops in z2_power_off
-Message-ID: <1330264062-5750-1-git-send-email-anarsoul@gmail.com>
+Date: Sun, 26 Feb 2012 16:47:41 +0300
+Subject: [PATCH 2/3] ARM: PXA27x: save/restore PWER on suspend/resume
+In-Reply-To: <1330264062-5750-1-git-send-email-anarsoul@gmail.com>
+References: <1330264062-5750-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <1330264062-5750-2-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxa27x_set_pwrmode is marked with __init, so it's not legitimate
-to call it in pm_power_off hook.
+Bootloader can clobber PWER value, so save it state on suspend.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm/mach-pxa/include/mach/pxa27x.h |    2 +-
- arch/arm/mach-pxa/pxa27x.c              |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/pxa27x.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/include/mach/pxa27x.h b/arch/arm/mach-pxa/include/mach/pxa27x.h
-index 7cff640..66c4cbf 100644
---- a/arch/arm/mach-pxa/include/mach/pxa27x.h
-+++ b/arch/arm/mach-pxa/include/mach/pxa27x.h
-@@ -21,7 +21,7 @@
- 
- extern void __init pxa27x_map_io(void);
- extern void __init pxa27x_init_irq(void);
--extern int __init pxa27x_set_pwrmode(unsigned int mode);
-+extern int pxa27x_set_pwrmode(unsigned int mode);
- extern void pxa27x_cpu_pm_enter(suspend_state_t state);
- 
- #define pxa27x_handle_irq	ichp_handle_irq
 diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index bc5a98e..acbaa2b 100644
+index acbaa2b..2951872 100644
 --- a/arch/arm/mach-pxa/pxa27x.c
 +++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -241,7 +241,7 @@ static struct clk_lookup pxa27x_clkregs[] = {
-  */
- static unsigned int pwrmode = PWRMODE_SLEEP;
+@@ -262,6 +262,7 @@ enum {
+ 	SLEEP_SAVE_PSTR,
+ 	SLEEP_SAVE_MDREFR,
+ 	SLEEP_SAVE_PCFR,
++	SLEEP_SAVE_PWER,
+ 	SLEEP_SAVE_COUNT
+ };
  
--int __init pxa27x_set_pwrmode(unsigned int mode)
-+int pxa27x_set_pwrmode(unsigned int mode)
+@@ -269,7 +270,7 @@ void pxa27x_cpu_pm_save(unsigned long *sleep_save)
  {
- 	switch (mode) {
- 	case PWRMODE_SLEEP:
+ 	sleep_save[SLEEP_SAVE_MDREFR] = __raw_readl(MDREFR);
+ 	SAVE(PCFR);
+-
++	SAVE(PWER);
+ 	SAVE(PSTR);
+ }
+ 
+@@ -281,6 +282,7 @@ void pxa27x_cpu_pm_restore(unsigned long *sleep_save)
+ 	PSSR = PSSR_RDH | PSSR_PH;
+ 
+ 	RESTORE(PSTR);
++	RESTORE(PWER);
+ }
+ 
+ void pxa27x_cpu_pm_enter(suspend_state_t state)
 -- 
 1.7.9.2
