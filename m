@@ -1,68 +1,101 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 26 Feb 2012 23:47:56 +0100
-Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
- omap3isp
-In-Reply-To: <CAK=WgbYkVALqrVMVv1ma3WzN5dYriM8X0MfwH4knwWwojB6hjg@mail.gmail.com>
-References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
- <3215700.hj2jFm3b0A@avalon>
- <CAK=WgbYkVALqrVMVv1ma3WzN5dYriM8X0MfwH4knwWwojB6hjg@mail.gmail.com>
-Message-ID: <35010303.ArkW8BdIu6@avalon>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 26 Feb 2012 14:50:57 -0800
+Subject: What's in tegra.git for 3.4
+Message-ID: <CAOesGMjnWPgSa44hgRu+d0jrQLm9KuOcuufg9V8fYZ8TytsbPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi,
 
-On Sunday 26 February 2012 20:30:17 Ohad Ben-Cohen wrote:
-> On Sun, Feb 26, 2012 at 7:34 PM, Laurent Pinchart wrote:
-> > On Sunday 26 February 2012 12:14:14 Ohad Ben-Cohen wrote:
-> >> omap3isp depends on omap's iommu and will fail to probe if
-> >> initialized before it (which always happen if they are builtin).
-> >> 
-> >> Make omap's iommu subsys_initcall as an interim solution until
-> >> the probe deferral mechanism is merged.
-> > 
-> > How will that fix the problem ?
-> 
-> Sorry, I'm not entirely sure I understand the question: are you asking
-> about this patch or about the probe deferral thingy ?
+We're closing in on when things need to be in the sub-arch trees in
+time to get merged for the next merge window. The shortlog below is
+what i have queued up today.
 
-I'm asking about the probe deferral mechanism. The omap3-isp driver will still 
-call iommu_attach_device() in its probe function. What will happen then ? Will 
-it return an error ? On what basis will it do so ?
+There are some patches that I've had recent comments to, and most of
+those I expect follow-up or respins of. If there's something that I
+seem to have missed completely and been silent on (and it's not
+listed), then now is the time to speak up.
 
-> > I'm fine with this patch, as it fixes the problem as well, although I
-> > still believe modifying the link order would be a better fix in this case.
-> 
-> I'm personally not a huge fan of implicit link order dependencies, as
-> someone may change the order in the future (for whatever benign
-> reason) without even realizing he's breaking drivers.
+I'll let the below sit such that it gets picked up by linux-next
+tomorrow (I might have missed today's pulls by sfr), and then send the
+arm-soc pull requests.
 
-That's what the comment in the Makefile is for ;-) I don't think it's a 
-perfect solution either, but it avoids playing with the various initcalls. The 
-OMAP3 IOMMU isn't a subsystem, subsys_initcall() looks a bit like an API abuse 
-to me. But as I mentioned in my previous mail, I'm fine with the patch if you 
-think it's a better solution.
 
-> >> +/* must be ready before omap3isp is probed */
-> > 
-> > The problem is not limited to the omap3isp driver, the DSP driver could be
-> > affected as well.
-> 
-> If you refer to tidspbridge, then I'm not sure it has the same issue:
-> IIUC it doesn't enable the iommu hw on probe; only in response to an
-> ioctl command (btw, tidspbridge doesn't even use this omap iommu
-> driver - it manipulates the iommu registers directly. iicks.)
+-Olof
 
-Looking at the tidspbridge driver, it seems to handle its IOMMU itself. That's 
-an item for someone's to-do list :-)
+Doug Anderson (2):
+      ARM: tegra: Introduce define DEBUG_UART_SHIFT
+      ARM: tegra: uncompress.h: Store UART address in a variable
 
-Are drivers supposed to call iommu_attach_device() in their probe() function 
-or later on ? The API doesn't seem to be documented.
+Laxman Dewangan (2):
+      ARM: tegra: Pause DMA when reading transfer count
+      ARM: tegra: dma: not required to move requestor when stopping.
 
-> The omap4 solutions (remoteproc et al.) will only enable the iommu
-> after userspace is alive, so no risk there as well.
+Leon Romanovsky (2):
+      ARM: dt: tegra: Enable device tree audio codec on PAZ00 board.
+      ARM: dt: tegra: Enable headset autodetection on PAZ00 board.
 
--- 
-Regards,
+Marc Dietrich (5):
+      ARM: tegra: paz00: fix wrong SD1 power gpio
+      ARM: tegra: paz00: fix wrong UART port on mini-pcie plug
+      ARM: dt: tegra: add ADT7461 temperature sensor to paz00 device tree
+      ARM: dt: tegra: add the power gpio key to paz00 device tree
+      ARM: dt: tegra: add the wifi led to paz00 device tree
 
-Laurent Pinchart
+Olof Johansson (9):
+      ARM: tegra: emc: device tree bindings
+      ARM: tegra: seaboard: add EMC table to device tree
+      ARM: tegra: Don't WARN_ON() for too early dma channel allocations
+      ARM: tegra: use APB DMA for accessing APB devices
+      ARM: tegra: fuse: use apbio dma for register access
+      ARM: tegra: fuse: add functions to access chip revision
+      ARM: tegra: fuse: add bct strapping reading
+      ARM: tegra: emc: convert tegra2_emc to a platform driver
+      ARM: tegra: emc: device tree support
+
+Peter De Schrijver (19):
+      ARM: tegra: add support for tegra30 interrupts
+      ARM: tegra: add support for new clock framework features
+      ARM: tegra: implement basic tegra30 clock framework
+      ARM: tegra: enable tegra30 clock framework
+      ARM: tegra: initialize basic system clocks
+      ARM: tegra: definitions for flow controller
+      ARM: tegra: assembler code for LP3
+      ARM: tegra: cpuidle driver for tegra
+      ARM: tegra: cleanup use of chipid register
+      ARM: tegra: export Tegra chipid
+      ARM: tegra: initialize Tegra chipid early
+      ARM: tegra: functions to access the flowcontroller
+      ARM: tegra: rework Tegra secondary CPU core bringup
+      ARM: tegra: prepare powergate.c for multiple variants
+      ARM: tegra: export tegra_powergate_is_powered()
+      ARM: tegra: add support for Tegra30 powerdomains
+      ARM: tegra: support for Tegra30 CPU powerdomains
+      ARM: tegra: support for secondary cores on Tegra30
+      ARM: tegra: Avoid compiling cpuidle code when not configured
+
+Stephen Warren (21):
+      dt: tegra gpio: Flesh out binding documentation
+      ARM: dt: tegra30.dtsi: Reformat gpio's interrupts property
+      ARM: dt: tegra30.dtsi: Add extra GPIO interrupt
+      ARM: dt: tegra: Add Tegra APB DMA device tree binding
+      ARM: dt: tegra: Modify I2S nodes to match binding
+      ARM: dt: tegra: Add labels for I2S controllers
+      ARM: dt: tegra: Enable audio on WM8903 boards, disable others
+      ARM: dt: Add binding for Tegra PMC
+      ARM: tegra: Support Tegra30 in decompressor UART setup
+      ARM: tegra: uncompress.h: Choose a UART at runtime
+      ARM: tegra: Pass uncompress.h UART selection to DEBUG_LL
+      ARM: tegra: Remove use of TEGRA_GPIO_TO_IRQ
+      gpio: tegra: Dynamically allocate IRQ base, and support DT
+      gpio: tegra: Parameterize the number of banks
+      ARM: tegra: Fix EMC pdata initialization from registers
+      ARM: tegra: Add a simple PMC driver
+      ARM: tegra: Remove duplicate PMU interrupt inversion code
+      gpio: tegra: Fix build issue due to irq_domain rework.
+      ARM: dt: Add SD controller configuration to Tegra Cardhu
+      ARM: tegra: Demote EMC clock inconsistency BUG to WARN
+      ARM: tegra: select required CPU and L2 errata options
+
+Thierry Reding (1):
+      ARM: tegra: PCIe: Provide 3.3V supply voltage
