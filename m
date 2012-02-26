@@ -1,35 +1,72 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 26 Feb 2012 13:27:04 -0300
-Subject: [PATCH] ARM: mach-imx: mx3: Fix section mismatch in imx3_init_l2x0()
-Message-ID: <1330273624-5757-1-git-send-email-festevam@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 26 Feb 2012 18:34:28 +0100
+Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
+ omap3isp
+In-Reply-To: <1330251254-14693-1-git-send-email-ohad@wizery.com>
+References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
+Message-ID: <3215700.hj2jFm3b0A@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following section mismatch:
+Hi Ohad,
 
-WARNING: vmlinux.o(.text+0x11be8): Section mismatch in reference from the function imx3_init_l2x0() to the function .init.text:l2x0_init()
-The function imx3_init_l2x0() references
-the function __init l2x0_init().
-This is often because imx3_init_l2x0 lacks a __init 
-annotation or the annotation of l2x0_init is wrong.
+On Sunday 26 February 2012 12:14:14 Ohad Ben-Cohen wrote:
+> omap3isp depends on omap's iommu and will fail to probe if
+> initialized before it (which always happen if they are builtin).
+> 
+> Make omap's iommu subsys_initcall as an interim solution until
+> the probe deferral mechanism is merged.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/mm-imx3.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+How will that fix the problem ?
 
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 8404ee7..6222151 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -76,7 +76,7 @@ static void __iomem *imx3_ioremap(unsigned long phys_addr, size_t size,
- 	return __arm_ioremap(phys_addr, size, mtype);
- }
- 
--void imx3_init_l2x0(void)
-+void __init imx3_init_l2x0(void)
- {
- 	void __iomem *l2x0_base;
- 	void __iomem *clkctl_base;
+I'm fine with this patch, as it fixes the problem as well, although I still 
+believe modifying the link order would be a better fix in this case.
+
+> Reported-by: James <angweiyang@gmail.com>
+> Debugged-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: stable <stable@vger.kernel.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+> Cc: Joerg Roedel <Joerg.Roedel@amd.com>
+> ---
+>  arch/arm/mach-omap2/mailbox.c |    3 ++-
+>  drivers/iommu/omap-iommu.c    |    3 ++-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+> index 609ea2d..a6db1e4 100644
+> --- a/arch/arm/mach-omap2/mailbox.c
+> +++ b/arch/arm/mach-omap2/mailbox.c
+> @@ -412,7 +412,8 @@ static void __exit omap2_mbox_exit(void)
+>  	platform_driver_unregister(&omap2_mbox_driver);
+>  }
+> 
+> -module_init(omap2_mbox_init);
+> +/* must be ready before omap3isp is probed */
+
+The problem is not limited to the omap3isp driver, the DSP driver could be 
+affected as well.
+
+> +subsys_initcall(omap2_mbox_init);
+>  module_exit(omap2_mbox_exit);
+> 
+>  MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+> index 4e661f0..821062a 100644
+> --- a/drivers/iommu/omap-iommu.c
+> +++ b/drivers/iommu/omap-iommu.c
+> @@ -1222,7 +1222,8 @@ static int __init omap_iommu_init(void)
+> 
+>  	return platform_driver_register(&omap_iommu_driver);
+>  }
+> -module_init(omap_iommu_init);
+> +/* must be ready before omap3isp is probed */
+> +subsys_initcall(omap_iommu_init);
+> 
+>  static void __exit omap_iommu_exit(void)
+>  {
 -- 
-1.7.1
+Regards,
+
+Laurent Pinchart
