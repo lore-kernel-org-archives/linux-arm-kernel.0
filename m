@@ -1,45 +1,51 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 27 Feb 2012 00:47:01 +0100
-Subject: [PATCH 2/3] ARM: PXA27x: save/restore PWER on suspend/resume
-In-Reply-To: <20120226233648.GD4706@n2100.arm.linux.org.uk>
+Date: Mon, 27 Feb 2012 00:47:27 +0100
+Subject: [PATCH 3/3] ARM: PXA27x: Zipit Z2: disable wake on GPIO0
+In-Reply-To: <20120226233538.GC4706@n2100.arm.linux.org.uk>
 References: <1330264062-5750-1-git-send-email-anarsoul@gmail.com>
- <201202262320.27934.marek.vasut@gmail.com>
- <20120226233648.GD4706@n2100.arm.linux.org.uk>
-Message-ID: <201202270047.01509.marek.vasut@gmail.com>
+ <201202262321.50101.marek.vasut@gmail.com>
+ <20120226233538.GC4706@n2100.arm.linux.org.uk>
+Message-ID: <201202270047.27710.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sun, Feb 26, 2012 at 11:20:27PM +0100, Marek Vasut wrote:
-> > > On Sun, Feb 26, 2012 at 04:47:41PM +0300, Vasily Khoruzhick wrote:
-> > > > Bootloader can clobber PWER value, so save it state on suspend.
+> On Sun, Feb 26, 2012 at 11:21:49PM +0100, Marek Vasut wrote:
+> > > 2012/2/26 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > > > On Sun, Feb 26, 2012 at 06:11:17PM +0300, Vasily Khoruzhick wrote:
+> > > >> 2012/2/26 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > > >> > On Sun, Feb 26, 2012 at 04:47:42PM +0300, Vasily Khoruzhick wrote:
+> > > >> >> We don't want machine to wake up on AC state change
+> > > >> > 
+> > > >> > NAK.  Stop polluting the machine callback methods.  Use the right
+> > > >> > one.
+> > > >> 
+> > > >> Ok, what's right one?
+> > > >> 
+> > > >        void                    (*fixup)(struct tag *, char **,
+> > > >        
+> > > >                                         struct meminfo *);
+> > > >        
+> > > >        void                    (*reserve)(void);/* reserve mem blocks
+> > > >         */ void                    (*map_io)(void);/* IO mapping
+> > > >        function  */ void                    (*init_early)(void);
+> > > >        void                    (*init_irq)(void);
+> > > >        struct sys_timer        *timer;         /* system tick timer  
+> > > >         */ void                    (*init_machine)(void);
+> > > > 
+> > > > and chose a more appropriate one from that?  Maybe init_early() if it
+> > > > has to be done early, or preferably the init_machine() if it can wait
+> > > > until arch_initcall() time.
+> > > > 
+> > > > But stuffing it into fixup, reserve, map_io, init_irq or the timer
+> > > > initialization is pure abuse of those callbacks.
 > > > 
-> > > What boot loader is this,
+> > > Ok, thanks.
 > > 
-> > U-Boot, patched, not mainline.
-> > 
-> > > and why is it being so idiotic?
-> > 
-> > Mainline doesn't touch PWER, so please be careful about your accusations.
-> > 
-> > > Why can't it
-> > > be fixed?
-> > 
-> > Yes, either by using mainline uboot (to rule out the bootloader problem),
-> > finding bug in linux kernel or reading the CPU manual.
+> > Or this should be patched in the bootloader too. Also, please dont
 > 
-> Was there supposed to be any useful information in your reply, or are
-> you just trying to be your usual antagonistic self?
+> * introduce ad-hoc constants like "1 << 0", ever!
+> 
+> Fiddling with PWER should not be in the boot loader.  The kernel handles
+> PWER just fine.
 
-Um ... 
-
-1) PWER isn't reconfigured by uboot (see above)
-2) That you should try mainline uboot to avoid debugging problems with not-
-mainlined patches
-3) That the bug with PWER is likely in kernel, since there's an issue with 
-gpio_set_wake() on PXA
-4) That the CPU might not preserve PWER throughout the suspend and that this 
-information might be found in the CPU manual
-
-I was a bit terse there, sorry.
-
-M
+Right, good point
