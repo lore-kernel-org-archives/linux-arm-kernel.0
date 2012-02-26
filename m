@@ -1,52 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 26 Feb 2012 21:05:39 +0000
-Subject: AT91: How copy kernel code to SRAM and execute?
-In-Reply-To: <4F4A9A84.3050204@emagii.com>
-References: <4F4A6DD5.5040606@emagii.com>
- <20120226175037.GA4706@n2100.arm.linux.org.uk> <4F4A9A84.3050204@emagii.com>
-Message-ID: <20120226210539.GB4706@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 26 Feb 2012 13:51:41 -0800
+Subject: [PATCH V2 1/2] ARM: tegra: Add pinmux board file for Cardhu
+In-Reply-To: <1328138997-25665-1-git-send-email-swarren@nvidia.com>
+References: <1328138997-25665-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20120226215141.GA11189@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2012 at 09:48:04PM +0100, Ulf Samuelsson wrote:
-> On 2012-02-26 18:50, Russell King - ARM Linux wrote:
->> On Sun, Feb 26, 2012 at 06:37:25PM +0100, ARM Linux wrote:
->>> I am looking for some examples on how to copy a small piece of kernel code
->>> to internal SRAM and then execute it.
->> See fncpy.h
->>
-> Thanks, this does the copy.
-> My problem is in making the SRAM executable.
-> I have already copied to SRAM (I think), but when I jump there
-> I get a trap and a stackdump.
+On Wed, Feb 01, 2012 at 04:29:56PM -0700, Stephen Warren wrote:
+> For now, this just sets up the pinmux and GPIOs required for the SD
+> card slot.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> v2:
+> * Set PULL_UP for CMD and DATA pins on SD interface
+> * Add power GPIO for SDMMC1
+> * Add pinmux configuration for SDMMC4
+> 
+> This will hopefully be replaced by the pinmux DT binding in the near
+> future, but until that happens, Tegra30 pinmux functionality needs to
+> be exposed somehow to unblock getting drivers tested on Tegra30.
+
+Thanks, applied to for-3.4/boards.
 
 
-
-> The "mmap" system call, seems to do what I want, but is this callable
-> from within the kernel, or is there a better way?
->
-> I can see that is has been split upo into "old_mmap" (obsolete) and the  
-> newer
-> "sys_mmap2" which turns off the MAP_EXECUTABLE.
-> "mprotect" maybe can be used to fix that.
->
-> Googling for how to call a system call from within the kernel gave:
->
->     mm_segment_t     oldfs = get_fs();
->     set_fs(KERNEL_DS);
->     /* Do SysCalls */
->         sys_mprotect(sram_shutdown, PAGE_SIZE, ... );
->     set_fs(old_fs);
-
-Don't even think about that.  Google doesn't always answer the correct
-question.  In this case, it's completely the wrong thing because all
-the userspace APIs are _only_ designed to work with userspace addresses.
-
-Moreover, this will fail because it won't find a VMA for the address
-(which is a good thing - as it will attempt to modify the pages in
-ways which could end up exposing them to userspace.)
-
-In general, if you're coding inside the kernel, calling kernel syscalls
-is 99.999% of the time totally the wrong thing to do.
-
-The way to do this is to use __arm_ioremap_exec() to map the SRAM.
+-Olof
