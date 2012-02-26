@@ -1,32 +1,54 @@
 From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Sun, 26 Feb 2012 11:54:13 +0100
-Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
-In-Reply-To: <E1QKFPN-0003xV-Sf@outmx07.plus.net>
-References: <E1QKFPN-0003xV-Sf@outmx07.plus.net>
-Message-ID: <1330253653.3673.8.camel@flow>
+Date: Sun, 26 Feb 2012 11:55:36 +0100
+Subject: [PATCH REPOST] pxa/hx4700: Add ASIC3 LED support
+In-Reply-To: <E1QZT9S-0004Vb-Hv@outmx03.plus.net>
+References: <E1QZT9S-0004Vb-Hv@outmx03.plus.net>
+Message-ID: <1330253736.3673.9.camel@flow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 11.05.2011, 19:49 +0000 schrieb Paul Parsons:
-> Basic suspend/resume is fixed by ensuring that the PGSR registers are set correctly before sleep mode is entered. In particular four of the active low resets need to be driven high while in sleep mode, otherwise the unit resets itself instead of suspending. Another problem was that the PCFR_GPROD bit is apparently set by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail immediately after returning from sleep mode.
-> 
-> Driver-specific bugs still remain. In particular the mmc driver does not resume properly after returning from sleep mode, thus preventing sleep mode from being entered a second time.
+Am Mittwoch, den 22.06.2011, 19:31 +0000 schrieb Paul Parsons:
+> Add LED support for the HTC ASIC3. Underlying support is provided by the mfd/asic3 and leds/leds-asic3 drivers. An example configuration is provided by the pxa/hx4700 platform.
 > 
 > Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 > ---
-> --- clean-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c	2011-05-11 00:54:10.787247169 +0100
-> +++ linux-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c	2011-05-11 20:21:54.026109594 +0100
-> @@ -120,7 +120,11 @@ static unsigned long hx4700_pin_config[]
->  	GPIO19_SSP2_SCLK,
->  	GPIO86_SSP2_RXD,
->  	GPIO87_SSP2_TXD,
-> -	GPIO88_GPIO,
-> +	MFP_CFG_OUT(GPIO88, AF0, KEEP_OUTPUT),	/* TSC2046_CS */
+> 
+> This part of the HTC ASIC3 LED driver patch set was seemingly dropped, hence repost.
+> 
+> --- clean-3.0-rc4/arch/arm/mach-pxa/hx4700.c	2011-06-21 04:25:46.000000000 +0100
+> +++ linux-3.0-rc4/arch/arm/mach-pxa/hx4700.c	2011-06-22 10:43:18.986382990 +0100
+> @@ -280,6 +280,21 @@ static u16 asic3_gpio_config[] = {
+>  	ASIC3_GPIOD15_nPIOW,
+>  };
+>  
+> +static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
+> +	[0] = {
+> +		.name = "hx4700:amber",
+> +		.default_trigger = "ds2760-battery.0-charging-blink-full-solid",
+> +	},
+> +	[1] = {
+> +		.name = "hx4700:green",
+> +		.default_trigger = "unused",
+> +	},
+> +	[2] = {
+> +		.name = "hx4700:blue",
+> +		.default_trigger = "hx4700-radio",
+> +	},
+> +};
+> +
+>  static struct resource asic3_resources[] = {
+>  	/* GPIO part */
+>  	[0] = {
+> @@ -310,6 +325,7 @@ static struct asic3_platform_data asic3_
+>  	.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
+>  	.irq_base        = IRQ_BOARD_START,
+>  	.gpio_base       = HX4700_ASIC3_GPIO_BASE,
+> +	.leds            = asic3_leds,
+>  };
+>  
+>  static struct platform_device asic3 = {
+> 
 
-What you want here is to keep the SPI chip select deasserted (high)
-during suspend, so I think that should be DRIVE_HIGH instead.
-
-Otherwise,
 Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
 
 regards
