@@ -1,72 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 26 Feb 2012 18:34:28 +0100
-Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
- omap3isp
-In-Reply-To: <1330251254-14693-1-git-send-email-ohad@wizery.com>
-References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
-Message-ID: <3215700.hj2jFm3b0A@avalon>
+From: armlinux@emagii.com (ARM Linux)
+Date: Sun, 26 Feb 2012 18:37:25 +0100
+Subject: AT91: How copy kernel code to SRAM and execute?
+Message-ID: <4F4A6DD5.5040606@emagii.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+I am looking for some examples on how to copy a small piece of kernel code
+to internal SRAM and then execute it.
 
-On Sunday 26 February 2012 12:14:14 Ohad Ben-Cohen wrote:
-> omap3isp depends on omap's iommu and will fail to probe if
-> initialized before it (which always happen if they are builtin).
-> 
-> Make omap's iommu subsys_initcall as an interim solution until
-> the probe deferral mechanism is merged.
+Why?
+If you want to restart, you execute the "/sbin/reboot" command
+which will eventually call the "arch_reset" function, which in the AT91
+case will write to a "user reset" register.
 
-How will that fix the problem ?
+The problem is that the chip may reset in the middle of an SDRAM read 
+transfer.
+The SDRAM will see it's clock stopped and will continue to drive the bus.
 
-I'm fine with this patch, as it fixes the problem as well, although I still 
-believe modifying the link order would be a better fix in this case.
+When the ROM bootloader tries to access any boot memory (Parallel flash 
+or NAND flash)
+on the parallel bus, there will be a bus conflict between the boot 
+memory and the SDRAM,
+and the bootROM will not properly detect the boot program, and will enter
+an In System Programming mode.
 
-> Reported-by: James <angweiyang@gmail.com>
-> Debugged-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: stable <stable@vger.kernel.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-> Cc: Joerg Roedel <Joerg.Roedel@amd.com>
-> ---
->  arch/arm/mach-omap2/mailbox.c |    3 ++-
->  drivers/iommu/omap-iommu.c    |    3 ++-
->  2 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-> index 609ea2d..a6db1e4 100644
-> --- a/arch/arm/mach-omap2/mailbox.c
-> +++ b/arch/arm/mach-omap2/mailbox.c
-> @@ -412,7 +412,8 @@ static void __exit omap2_mbox_exit(void)
->  	platform_driver_unregister(&omap2_mbox_driver);
->  }
-> 
-> -module_init(omap2_mbox_init);
-> +/* must be ready before omap3isp is probed */
+This is described in the SAM9G20 datasheet, but is probably valid
+for all older generation AT91 devices as well.
 
-The problem is not limited to the omap3isp driver, the DSP driver could be 
-affected as well.
+The workaround seems to be to turn off the SDRAM and then do the reset.
+Obviously you cannot read instructions from SDRAM after it has been 
+turned off.
 
-> +subsys_initcall(omap2_mbox_init);
->  module_exit(omap2_mbox_exit);
-> 
->  MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-> index 4e661f0..821062a 100644
-> --- a/drivers/iommu/omap-iommu.c
-> +++ b/drivers/iommu/omap-iommu.c
-> @@ -1222,7 +1222,8 @@ static int __init omap_iommu_init(void)
-> 
->  	return platform_driver_register(&omap_iommu_driver);
->  }
-> -module_init(omap_iommu_init);
-> +/* must be ready before omap3isp is probed */
-> +subsys_initcall(omap_iommu_init);
-> 
->  static void __exit omap_iommu_exit(void)
->  {
+One possible workaround is to copy the code to SRAM and then execute.
+
+
+Looking for some hints on how first copy the code to the internal SRAM 
+located at 0x300000,
+and then jump and execute the code at this address.
+
+Note that when arch_reset is called, the CPU is no longer executing
+in its normal state.
+It is called from arm_machine_restart in "arch/arm/kernel/process.c"
+which has turned off the caches and setup some direct mapping at lower 
+addresses
+
 -- 
-Regards,
 
-Laurent Pinchart
+Best Regards
+Ulf Samuelsson
+ulf at emagii.com
++46 722 427437
