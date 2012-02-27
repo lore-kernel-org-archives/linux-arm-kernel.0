@@ -1,33 +1,39 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Mon, 27 Feb 2012 14:23:01 +0100
-Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
- omap3isp
-In-Reply-To: <1330251254-14693-1-git-send-email-ohad@wizery.com>
-References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
-Message-ID: <20120227132301.GC7905@amd.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Feb 2012 13:29:08 +0000
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120227090453.GE26642@pengutronix.de>
+References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
+ <20120213082741.GN3852@pengutronix.de>
+ <20120213144820.GA3494@opensource.wolfsonmicro.com>
+ <20120214105823.GS3852@pengutronix.de>
+ <20120214172902.GB3916@opensource.wolfsonmicro.com>
+ <20120216073236.GE3852@pengutronix.de>
+ <20120216075825.GA11631@opensource.wolfsonmicro.com>
+ <20120227090453.GE26642@pengutronix.de>
+Message-ID: <20120227132908.GA3191@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2012 at 12:14:14PM +0200, Ohad Ben-Cohen wrote:
-> omap3isp depends on omap's iommu and will fail to probe if
-> initialized before it (which always happen if they are builtin).
-> 
-> Make omap's iommu subsys_initcall as an interim solution until
-> the probe deferral mechanism is merged.
-> 
-> Reported-by: James <angweiyang@gmail.com>
-> Debugged-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: stable <stable@vger.kernel.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Hiroshi Doyu <hdoyu@nvidia.com>
-> Cc: Joerg Roedel <Joerg.Roedel@amd.com>
+On Mon, Feb 27, 2012 at 10:04:53AM +0100, Sascha Hauer wrote:
 
-Applied, thanks.
+> If I drop the microvolts parameter what microvolts should I assume? I
+> tried 0 but the regulator core does not like it:
 
--- 
-AMD Operating System Research Center
+> machine_constraints_voltage: dummy: unsupportable voltage constraints
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+> (with max: -2147483648 min: 2147483647)
+
+I'd expect zero to work, unless something wants a particular voltage in
+which case you really should be filling things in properly.  The fact
+that the fixed voltage regulator supports get_voltage() might be
+confusing things.
+
+Like I say if people can be bothered filling voltages in I suspect
+they're not your target audience for this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120227/2d1c2e04/attachment.sig>
