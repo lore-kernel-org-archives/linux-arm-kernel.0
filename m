@@ -1,72 +1,58 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 27 Feb 2012 15:14:39 +0100
-Subject: [GIT PULL] at91: irqdomain and device tree for AIC and GPIO
-Message-ID: <4F4B8FCF.2050702@atmel.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 27 Feb 2012 15:26:38 +0100
+Subject: [PATCH v5 2/3] arm:davinci: move emif driver to mfd framework
+In-Reply-To: <1330005504-25321-3-git-send-email-prakash.pm@ti.com>
+References: <y>
+ <1330005504-25321-3-git-send-email-prakash.pm@ti.com>
+Message-ID: <20120227142638.GN27687@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Prakash,
 
-This series adds irqdomain and device tree support for both the
-interrupt and GPIO controllers of AT91 SoC. It has been discussed a lot
-and I think that I have addressed all comments and advices.
+On Thu, Feb 23, 2012 at 07:28:23PM +0530, Manjunathappa, Prakash wrote:
+> +static int __init davinci_aemif_probe(struct platform_device *pdev)
+> +{
+> +	struct davinci_aemif_devices *davinci_aemif_devices =
+> +		pdev->dev.platform_data;
+> +	struct platform_device *devices;
+> +	struct mfd_cell *cells;
+> +	int i, ret, count;
+> +
+> +	devices = davinci_aemif_devices->devices;
+> +
+> +	cells = kzalloc(sizeof(struct mfd_cell) *
+> +			davinci_aemif_devices->num_devices, GFP_KERNEL);
+> +
+> +	for (i = 0, count = 0; i < davinci_aemif_devices->num_devices; i++) {
+> +		if (!strcmp(devices[i].name, "davinci_nand")) {
+> +			cells[count].pdata_size =
+> +				sizeof(struct davinci_nand_pdata);
+> +		} else if (!strcmp(devices[i].name, "physmap-flash")) {
+> +			cells[count].pdata_size =
+> +				sizeof(struct physmap_flash_data);
+> +		} else
+> +			continue;
+> +
+> +		cells[count].name = devices[i].name;
+> +		cells[count].platform_data =
+> +			devices[i].dev.platform_data;
+> +		cells[count].id = devices[i].id;
+> +		cells[count].resources = devices[i].resource;
+> +		cells[count].num_resources = devices[i].num_resources;
+> +		count++;
+> +	}
+So it seems you're passing a platform devices array through your mfd aemif
+platform data pointer. And from what I can see, it's mostly a 1 entry array
+(for the NAND case) or a 2 entries array (for the NAND and NOR case).
+In that case, adding an MFD driver in the middle brings basically nothing but
+confusion and overhead (and 200+ lines of code).
+So unless someone explains to me how this is doing any good to the kernel in
+general, I'm not going to take this patchset.
 
-This irqdomain work takes advantage of Grant's patch series that is present
-in:
-git://git.secretlab.ca/git/linux-2.6 irqdomain/next
-And it will not compile without it. So, the inclusion of such work is needed
-before we can apply this series on mainline.
+Cheers,
+Samuel.
 
-On the other hand, I have not included Grant's branch in mine on purpose: All
-this simply goes on top of current AT91 material that is already in arm-soc
-(merge of all at91/* branches). You can find it in the AT91 git tree with
-at91-3.4-base2 branch name). I have made merge tests and all seems to integrate
-without conflicts.
-
-
-The following changes since commit 11a25ea7e4f870a37093258f577e11cec703e37e:
-
-  Merge remote-tracking branch 'armsoc/at91/9x5' into at91-3.4-base2 (2012-02-11 14:33:03 +0100)
-
-are available in the git repository at:
-
-
-  git://github.com/at91linux/linux-at91.git at91-3.4-base2+aic_gpio
-
-for you to fetch changes up to 29751864cc12425fe2b3a75658baea9ebe54609e:
-
-  ARM: at91: AIC and GPIO IRQ device tree initialization (2012-02-27 14:38:08 +0100)
-
-----------------------------------------------------------------
-Nicolas Ferre (10):
-      ARM: at91/aic: add irq domain and device tree support
-      ARM: at91/snapper9260: move gpio_to_irq out of structure initialization
-      ARM/USB: at91/ohci-at91: remove the use of irq_to_gpio
-      ARM: at91/gpio: change comments and one variable name
-      ARM: at91/gpio: add irqdomain and DT support
-      ARM: at91/gpio: non-DT builds do not have gpio_chip.of_node field
-      ARM: at91/gpio: add .to_irq gpio_chip handler
-      ARM: at91/gpio: remove the static specification of gpio_chip.base
-      ARM: at91/board-dt: remove AIC irq domain from board file
-      ARM: at91: AIC and GPIO IRQ device tree initialization
-
- .../devicetree/bindings/arm/atmel-aic.txt          |   38 ++
- .../devicetree/bindings/gpio/gpio_atmel.txt        |   20 +
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/at91sam9g20.dtsi                 |   48 ++-
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   66 +++-
- arch/arm/boot/dts/at91sam9x5.dtsi                  |    4 +
- arch/arm/mach-at91/board-dt.c                      |   13 +-
- arch/arm/mach-at91/board-snapper9260.c             |   10 +-
- arch/arm/mach-at91/generic.h                       |    6 +
- arch/arm/mach-at91/gpio.c                          |  363 ++++++++++++++++----
- arch/arm/mach-at91/include/mach/gpio.h             |   12 -
- arch/arm/mach-at91/irq.c                           |  132 ++++++--
- drivers/usb/host/ohci-at91.c                       |    5 +-
- 13 files changed, 581 insertions(+), 137 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/atmel-aic.txt
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio_atmel.txt
-
-Thanks a lot, best regards,
 -- 
-Nicolas Ferre
+Intel Open Source Technology Centre
+http://oss.intel.com/
