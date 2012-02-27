@@ -1,51 +1,50 @@
-From: rlove@google.com (Robert Love)
-Date: Mon, 27 Feb 2012 10:20:23 -0500
-Subject: elf_set_personality()
-In-Reply-To: <20120227150300.GF12917@tbergstrom-lnx.Nvidia.com>
-References: <20120227123612.GD12917@tbergstrom-lnx.Nvidia.com>
- <20120227130453.GV22562@n2100.arm.linux.org.uk>
- <20120227150300.GF12917@tbergstrom-lnx.Nvidia.com>
-Message-ID: <CAG6tG3y6+B8Si8bUFLK5aGmG2sed6y39V7XMcKZNDJuUbWCCjQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Feb 2012 16:29:58 +0100
+Subject: [PATCH] ARM/sp810: introduce API to change system mode
+In-Reply-To: <20120227105506.GS22562@n2100.arm.linux.org.uk>
+References: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
+ <CACRpkdaG2e12fdCFDUoQ_n71VcqU3ZpkH0raHW+EAZg==JOxrg@mail.gmail.com>
+ <20120227105506.GS22562@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZgVSibWugOXcPU7Ai7zjGJMp0BMuKhjs-h0Y=Xee868g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 10:03 AM, Peter De Schrijver
-<pdeschrijver@nvidia.com> wrote:
-> On Mon, Feb 27, 2012 at 02:04:53PM +0100, Russell King - ARM Linux wrote:
-> > This sounds like a problem. ?If you have two applications trying to use
-> > the ashmem driver, one without READ_IMPLIES_EXEC and one with
-> > READ_IMPLIES_EXEC, then it seems that ashmem will prevent the
-> > READ_IMPLIES_EXEC one from using such regions. ?That sounds like a
-> > (different) bug to me.
+On Mon, Feb 27, 2012 at 11:55 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Feb 27, 2012 at 11:38:14AM +0100, Linus Walleij wrote:
+>> Maybe I'm delusional but I think this could help centralizing the use
+>> of the SP* cells, since they're obviously used in both SPEAr and
+>> versatile express.
 >
-> Good point. I don't know anything about the design ideas behind ashmem
-> though.
-> Can anyone from android comment on this?
+> They can be used in any PrimeXsys based system, and I don't see that
+> there's anything which guarantees having both a SP810 and SP804
+> together.
+>
+> There are platforms which have SP804 without SP810 - Integrator CP
+> and bcmring seem to fall into that category.
 
-The problem is this code snippet:
+I was more thinking the other way around - I think that all systems
+with an SP810 also have an SP804.
 
-    /* requested protection bits must match our allowed protection mask */
-    if (unlikely((vma->vm_flags & ~asma->prot_mask) & PROT_MASK)) {
-            ret = -EPERM;
-	    goto out;
-    }
+I'm led to thinking this because of these registers:
 
-Coupled with this snippet:
+#define SCCTRL_TIMEREN0SEL_REFCLK       (0 << 15)
+#define SCCTRL_TIMEREN0SEL_TIMCLK       (1 << 15)
+#define SCCTRL_TIMEREN1SEL_REFCLK       (0 << 17)
+#define SCCTRL_TIMEREN1SEL_TIMCLK       (1 << 17)
 
-    /* does the application expect PROT_READ to imply PROT_EXEC? */
-    if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
-            prot |= PROT_EXEC;
+TIMER0 and TIMER1 seems to indicate TIMER0 and TIMER1
+of the SP804 block.
 
-One fix is to remove the second snippet altogether. I added it to be
-diligent; Android doesn't have a specific use for it afaik.
+In any case it seems to depend on CONFIG_ARM_TIMER_SP804.
 
-An alternative is to keep the code as-is. Note the bug isn't quite as
-described: It isn't the case that two processes, one with
-READ_IMPLIES_EXEC and one without, will always fail to both map an
-ashmem region. The failure case is when a process creates a region
-PROT_READ & ~PROT_EXEC and then a second process with
-READ_IMPLIES_EXEC tries to map the region PROT_READ with the implicit
-PROT_EXEC. I'm not sure what to do here. This seems like a legit
-reason to fail.
+> But... the register concerned does a whole load of other things, and
+> I'm not sure we want to have accesses to it de-centralized.
 
-          Robert
+Sure, just arch/arm/common/sc-810.c works fine as well.
+
+Now I got incentive to finally write that letter to Greg about what
+to do with system controllers.
+
+Yours,
+Linus Walleij
