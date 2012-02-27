@@ -1,33 +1,39 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 27 Feb 2012 23:04:02 +0100
-Subject: [PATCH v3] ARM: LPC32xx: Ethernet support
-In-Reply-To: <20120227180814.GB21386@pengutronix.de>
-References: <1330364762-23203-1-git-send-email-stigge@antcom.de>
- <20120227180814.GB21386@pengutronix.de>
-Message-ID: <4F4BFDD2.8060007@antcom.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 27 Feb 2012 15:17:21 -0700
+Subject: [PATCH v3 0/2] Device tree support for TWL regulators
+In-Reply-To: <4F4B8A85.7060603@ti.com>
+References: <1330338961-31765-1-git-send-email-rnayak@ti.com>
+ <4F4B73C8.8070807@ti.com> <4F4B7798.6000300@ti.com>
+ <20120227134112.GB3191@opensource.wolfsonmicro.com>
+ <4F4B8A85.7060603@ti.com>
+Message-ID: <CACxGe6vU2dSpRrqd2y=ssgVsWuwpuvFtja9YcUAQA_ETWcwCYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/02/12 19:08, Wolfram Sang wrote:
-> On Mon, Feb 27, 2012 at 06:46:02PM +0100, Roland Stigge wrote:
->> This patch adds ethernet support to the LPC32xx ARM architecture.
->> The actual driver in drivers/net is contained in a separate
->> patch.
->> 
->> Signed-off-by: Roland Stigge <stigge@antcom.de>
->> 
->> ---
-> 
-> Please add below this dashed line what changed since the last
-> version. This makes reviewing easier.
+On Mon, Feb 27, 2012 at 6:52 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Mark,
+>
+>
+> On 2/27/2012 2:41 PM, Mark Brown wrote:
+>>
+>> On Mon, Feb 27, 2012 at 06:01:20PM +0530, Rajendra Nayak wrote:
+>>
+>>> Depending on what order Mark happens to pull them in, I am fine
+>>> re-sending adding support for the 2 twl6030 fixed regulators.
+>>
+>>
+>> Please can you guys come up with a single unified series for this stuff
+>> - I'll hold off on applying anything to allow you to do this.
+>
+>
+> The issue is that the initial TWL regulator series from Rajendra will depend
+> on the twl core DT support I have that depends on the irq_domain series from
+> Grant...
 
-OK, will do next time.
+If it depends on the irqdomain tree, then just merge that tree into
+yours.  That tree is stable now for exactly that reason.  You can rely
+on it.
 
-For the driver, some style fixes were applied, and the cmdline
-"ethaddr" was removed, relying on the bootloader to set it correctly
-(and it actually does, it actually needs to prepare TFTP booting).
+git://git.secretlab.ca/git/linux-2.6 irqdomain/next
 
-The platform-support patch just adjusted to the small driver change:
-driver name adjustment ("lpc-eth") for consistency.
-
-Roland
+g.
