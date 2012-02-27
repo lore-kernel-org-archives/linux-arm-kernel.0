@@ -1,81 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Feb 2012 14:03:16 +0000
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <Pine.LNX.4.44L0.1202261040020.22970-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1202261040020.22970-100000@netrider.rowland.org>
-Message-ID: <201202271403.16893.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Feb 2012 14:03:56 +0000
+Subject: [PATCH v3 0/2] Device tree support for TWL regulators
+In-Reply-To: <4F4B8A85.7060603@ti.com>
+References: <1330338961-31765-1-git-send-email-rnayak@ti.com>
+ <4F4B73C8.8070807@ti.com> <4F4B7798.6000300@ti.com>
+ <20120227134112.GB3191@opensource.wolfsonmicro.com>
+ <4F4B8A85.7060603@ti.com>
+Message-ID: <20120227140356.GF3191@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 26 February 2012, Alan Stern wrote:
-> On Sun, 26 Feb 2012, Arnd Bergmann wrote:
-> 
-> > We are doing a major rework of the ARM architecture tree right now
-> > to allow building multiple SoC platforms together, which has not
-> > been possible traditionally. The "PLATFORM_DRIVER" macro in ohci
-> > and ehci is one of many things standing in the way still and will have
-> > to be dealt with at some point.
-> 
-> Is there anybody in particular who is going to attack this issue?
+On Mon, Feb 27, 2012 at 02:52:05PM +0100, Cousson, Benoit wrote:
+> On 2/27/2012 2:41 PM, Mark Brown wrote:
+> >On Mon, Feb 27, 2012 at 06:01:20PM +0530, Rajendra Nayak wrote:
 
-Not the USB portion, we're still busy with more fundamental issues like
-conflicting header files between the various subarchitectures.
+> >Please can you guys come up with a single unified series for this stuff
+> >- I'll hold off on applying anything to allow you to do this.
 
-> > > A little progress has been made already.  We just received a submission
-> > > for a "generic" platform bus glue file that will be able to take over
-> > > the jobs of several of the existiing files.  If anyone wants to take
-> > > this further I won't object, but I don't plan to work on it myself
-> > > soon.
-> > 
-> > Ok, good to know. The approach of a generic glue is exactly what I
-> > was going to suggest. As we get to ARM platforms that are currently
-> > using PLATFORM_DRIVER, I will then ask people to convert the ohci
-> > glue to use that generic glue instead of adding another *_DRIVER
-> > macro to ohci/ehci.
-> 
-> The problem is that several platforms have highly specialized needs
-> that can't sanely be handled in a single generic driver.  Although a
-> lot of drivers can be converted over, not all of them will.
+> The issue is that the initial TWL regulator series from Rajendra
+> will depend on the twl core DT support I have that depends on the
+> irq_domain series from Grant...
 
-Can you give an example? We have recently converted the sdhci mmc drivers
-in a similar way, and we have the libata drivers that have always worked
-in this manner.
+Really?  That's the first I've heard of any such dependency here.  Is it
+a build time dependency or is it just something that's required to make
+the code actually spring into life?  It looks like it's the latter but
+you're saying there's an actual dependency.
 
-> > I'm not sure about what we should do for lpc32xx. Is that
-> > generic glue going into v3.4?
-> 
-> That's up to Greg.  At the moment it isn't used by anything, and unless
-> an existing driver can be converted over I'd guess it's not likely to
-> get merged right away.
+There's also more than that, there's also at least Tero submitting some
+other stuff separately (and his stuff won't play with DT...) and I think
+Peter also.  It really fees like there's a bunch of people working on
+different things without talking to each other here.
 
-Where is that patch? Maybe I can help out by converting the PCI
-variants of ohci and ehci to the generic glue, because they are
-easy to test.
+> So I guess, it will be easy for us to split the regulator patches
+> from the DTS ones to have at least the driver changes merged by you.
+> Then Tony might be able to pull all the DTS in one series and thus
+> avoid the various merge conflict that will happen since most OMAP
+> drivers are hacking the same DTS files.
 
-> >  If so, we could convert the
-> > pnx4008 driver to use that and abstract it in a way that works
-> > nicely for pnx4008 and lpc32xx. OTOH, we might just let this
-> > one go in as before and ask people to do it right for the next
-> > one.
-> 
-> I don't know anything about these two platforms.  If they are
-> sufficiently similar then it does make sense to combine the drivers
-> into a single file, with various platform-specific decisions made at
-> runtime.  These decisions don't necessarily have to use a machine_is_*
-> kind of test (although they can); it might be simpler to do such a
-> test once during probe and store the result in a flag for later reuse.
-> Or then again, it might not since there's no obvious place to keep 
-> such a flag...
-> 
-> At the moment, switching the pnx4008 driver to use the generic bus glue
-> doesn't look easy.  The generic code doesn't know anything about i2c.
+> Does that make sense? Or do you think it will be even worst
+> separating the patches?
 
-Maybe I misunderstood what the generic bus glue does then, because I
-would not expect that it should know about i2c ;-)
-
-I would think the generic bus glue would be a very simple library that
-just exports the various symbols that are defined in ohci-hcd.c and
-used in the bus specific driver so that the driver can be a separate
-module. Is it something different from that?
-
-	Arnd
+Unless there's a compile time dependency I don't think we need to
+refactor anything here, what I'm seeing at the minute looks OK from a
+merge point of view except that there appears to be a lack of
+coordination between the various serieses.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120227/edc21336/attachment.sig>
