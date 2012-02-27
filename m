@@ -1,38 +1,61 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Mon, 27 Feb 2012 12:15:29 -0600
-Subject: [PATCH 4/6] ASoC: fsl: create fsl_utils to accommodate the common
- functions
-In-Reply-To: <1330092582-21180-5-git-send-email-shawn.guo@linaro.org>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F4BC841.7000407@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Feb 2012 18:17:43 +0000
+Subject: [PATCH v3] ARM: LPC32xx: Ethernet support
+In-Reply-To: <1330364762-23203-1-git-send-email-stigge@antcom.de>
+References: <1330364762-23203-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120227181742.GD2440@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> There are some amount of code duplication between mpc8610_hpcd and
-> p1022_ds machine drivers, and the same code will be duplicated again
-> when another new machine driver is added.  The patch creates fsl_utils
-> to accommodate the common functions to stop the code duplication.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
+On Mon, Feb 27, 2012 at 06:46:02PM +0100, Roland Stigge wrote:
+> +menu "LPC32XX chip components"
+> +
+> +config ARCH_LPC32XX_IRAM_FOR_NET
+> +	bool "Use IRAM for network buffers"
+> +	default n
 
-What repository is this for?  When I apply it to Mark's for-next branch, I
-get this:
+n is the default.
 
-Applying: ASoC: fsl: create fsl_utils to accommodate the common functions
-error: patch failed: sound/soc/fsl/Kconfig:1
-error: sound/soc/fsl/Kconfig: patch does not apply
-error: patch failed: sound/soc/fsl/Makefile:8
-error: sound/soc/fsl/Makefile: patch does not apply
-Patch failed at 0004 ASoC: fsl: create fsl_utils to accommodate the common
-functions
-When you have resolved this problem run "git am --resolved".
-If you would prefer to skip this patch, instead run "git am --skip".
-To restore the original branch and stop patching run "git am --abort".
+> +	help
+> +	  Say Y here to use the LPC internal fast IRAM (i.e. 256KB SRAM) as
+> +	  network buffer.  If the total combined required buffer sizes is
+> +	  larger than the size of IRAM, then SDRAM will be used instead.
+> +
+> +	  This can be enabled safely if the IRAM is not intended for other
+> +	  uses.
+> +
+> +config ARCH_LPC32XX_MII_SUPPORT
+> +	bool "Check to enable MII support or leave disabled for RMII support"
+> +	default n
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+Ditto.
+
+> --- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
+> +++ linux-2.6/arch/arm/mach-lpc32xx/common.c
+> @@ -186,6 +186,40 @@ struct platform_device lpc32xx_ohci_devi
+>  };
+>  
+>  /*
+> + * Network Support
+> + */
+> +static struct lpc_net_cfg lpc32xx_netdata = {
+> +	.phy_irq = -1,
+> +	.phy_mask = 0xFFFFFFF0,
+> +};
+> +
+> +static struct resource net_resources[] = {
+> +	[0] = {
+> +		.start = LPC32XX_ETHERNET_BASE,
+> +		.end = LPC32XX_ETHERNET_BASE + SZ_4K - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+
+DEFINE_RES_MEM() ?
+
+> +	[1] = {
+> +		.start = IRQ_LPC32XX_ETHERNET,
+> +		.end = IRQ_LPC32XX_ETHERNET,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+
+DEFINE_RES_IRQ() ?
