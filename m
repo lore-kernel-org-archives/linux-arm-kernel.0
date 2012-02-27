@@ -1,119 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Feb 2012 15:06:04 +0800
-Subject: [PATCH] ARM: dts: imx51-babbage: update mc13892 device
-Message-ID: <1330326364-726-1-git-send-email-shawn.guo@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 27 Feb 2012 09:00:51 +0200
+Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
+ omap3isp
+In-Reply-To: <35010303.ArkW8BdIu6@avalon>
+References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
+ <3215700.hj2jFm3b0A@avalon>
+ <CAK=WgbYkVALqrVMVv1ma3WzN5dYriM8X0MfwH4knwWwojB6hjg@mail.gmail.com>
+ <35010303.ArkW8BdIu6@avalon>
+Message-ID: <CAK=WgbZRjGEyx0mKmgoWYiOnuvUAka0kTzpLAYbra94Mfpp6qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds regulators, removes invalid property fsl,mc13xxx-uses-regulator,
-and fixes interrupt for mc13892.
+Hi Laurent,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx51-babbage.dts |   91 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 89 insertions(+), 2 deletions(-)
+On Mon, Feb 27, 2012 at 12:47 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> I'm asking about the probe deferral mechanism. The omap3-isp driver will still
+> call iommu_attach_device() in its probe function. What will happen then ? Will
+> it return an error ? On what basis will it do so ?
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 564cb8c..9949e60 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -56,8 +56,95 @@
- 						compatible = "fsl,mc13892";
- 						spi-max-frequency = <6000000>;
- 						reg = <0>;
--						mc13xxx-irq-gpios = <&gpio1 8 0>;
--						fsl,mc13xxx-uses-regulator;
-+						interrupt-parent = <&gpio1>;
-+						interrupts = <8>;
-+
-+						regulators {
-+							sw1_reg: sw1 {
-+								regulator-min-microvolt = <600000>;
-+								regulator-max-microvolt = <1375000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw2_reg: sw2 {
-+								regulator-min-microvolt = <900000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw3_reg: sw3 {
-+								regulator-min-microvolt = <1100000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							sw4_reg: sw4 {
-+								regulator-min-microvolt = <1100000>;
-+								regulator-max-microvolt = <1850000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vpll_reg: vpll {
-+								regulator-min-microvolt = <1050000>;
-+								regulator-max-microvolt = <1800000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vdig_reg: vdig {
-+								regulator-min-microvolt = <1650000>;
-+								regulator-max-microvolt = <1650000>;
-+								regulator-boot-on;
-+							};
-+
-+							vsd_reg: vsd {
-+								regulator-min-microvolt = <1800000>;
-+								regulator-max-microvolt = <3150000>;
-+							};
-+
-+							vusb2_reg: vusb2 {
-+								regulator-min-microvolt = <2400000>;
-+								regulator-max-microvolt = <2775000>;
-+								regulator-boot-on;
-+								regulator-always-on;
-+							};
-+
-+							vvideo_reg: vvideo {
-+								regulator-min-microvolt = <2775000>;
-+								regulator-max-microvolt = <2775000>;
-+							};
-+
-+							vaudio_reg: vaudio {
-+								regulator-min-microvolt = <2300000>;
-+								regulator-max-microvolt = <3000000>;
-+							};
-+
-+							vcam_reg: vcam {
-+								regulator-min-microvolt = <2500000>;
-+								regulator-max-microvolt = <3000000>;
-+							};
-+
-+							vgen1_reg: vgen1 {
-+								regulator-min-microvolt = <1200000>;
-+								regulator-max-microvolt = <1200000>;
-+							};
-+
-+							vgen2_reg: vgen2 {
-+								regulator-min-microvolt = <1200000>;
-+								regulator-max-microvolt = <3150000>;
-+								regulator-always-on;
-+							};
-+
-+							vgen3_reg: vgen3 {
-+								regulator-min-microvolt = <1800000>;
-+								regulator-max-microvolt = <2900000>;
-+								regulator-always-on;
-+							};
-+						};
- 					};
- 
- 					flash: at45db321d at 1 {
--- 
-1.7.5.4
+Yes, iommu_attach_device() will fail, and omap3isp's probe function
+will then need to return -EAGAIN to request that its probe function
+will be invoked again later on.
+
+> That's what the comment in the Makefile is for ;-) I don't think it's a
+> perfect solution either, but it avoids playing with the various initcalls. The
+> OMAP3 IOMMU isn't a subsystem, subsys_initcall() looks a bit like an API abuse
+> to me.
+
+Yes, it's dirty.
+
+But it's explicit and consistent across build system changes (without
+imposing anything on the build system). We do it all the time with
+other subsystems. We don't like it, but luckily Grant came up with the
+deferred probing mechanism, which will fix this all very nicely.
+
+> Are drivers supposed to call iommu_attach_device() in their probe() function
+> or later on ?
+
+If you can defer attaching to a later point, most commonly to a point
+where the device is opened by the user, it's better - less power will
+be consumed.
+
+Thanks,
+Ohad.
