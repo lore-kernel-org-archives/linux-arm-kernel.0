@@ -1,62 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Feb 2012 19:36:35 +0000
-Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU
- IRQ handlers
-In-Reply-To: <20120227175646.7c39e542@tom-ThinkPad-T410>
-References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
- <1330012696-13472-4-git-send-email-will.deacon@arm.com>
- <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
- <20120224101130.GB13504@mudshark.cambridge.arm.com>
- <20120227175646.7c39e542@tom-ThinkPad-T410>
-Message-ID: <20120227193635.GC24605@mudshark.cambridge.arm.com>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Mon, 27 Feb 2012 20:42:07 +0100
+Subject: [PATCH v3] lpc32xx: Added ethernet driver
+In-Reply-To: <1330364539-23152-1-git-send-email-stigge@antcom.de>
+References: <1330364539-23152-1-git-send-email-stigge@antcom.de>
+Message-ID: <083DF309106F364B939360100EC290F81F365B2AE1@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 09:56:46AM +0000, Ming Lei wrote:
-> Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Feb 24, 2012 at 01:34:32AM +0000, Ming Lei wrote:
-> > > 
-> > > I think we should check it via test_bit(idx, cpuc->used_mask) because
-> > > 'hw_events->events[idx] = val' is not atomic operation and it is read here
-> > > in irq context.
-> > 
-> > I dunno, that code is compiled to:
-> > 
-> > e5973000        ldr     r3, [r7]
-> > e7834106        str     r4, [r3, r6, lsl #2]
-> > 
-> > so you should either see the new value or the old one - you can't see half a
-> > pointer in there since it's a single 32-bit store.
-> 
-> Firstly the code above is only generated from one of many existing compile
-> options, for example, maybe storing to 32bit variable involves two instructions
-> in thumb mode, so are you sure it is always OK for all cases?
+>This patch adds an ethernet driver for the LPC32xx ARM SoC.
+>
+>Signed-off-by: Roland Stigge <stigge@antcom.de>
+>
+>---
+> drivers/net/ethernet/Kconfig       |    1 
+> drivers/net/ethernet/Makefile      |    1 
+> drivers/net/ethernet/nxp/Kconfig   |    8 
+> drivers/net/ethernet/nxp/Makefile  |    1 
+> drivers/net/ethernet/nxp/lpc_eth.c | 1311 +++++++++++++++++++++++++++++++++++++
+> drivers/net/ethernet/nxp/lpc_eth.h |  336 +++++++++
+> 6 files changed, 1658 insertions(+)
 
-I'll check with the compiler guys if the tools ever do this. It would seem a
-bit weird given that we may have things like memory type, alignment and
-endianness coming into play that would make splitting up 32-bit stores a
-really bad idea.
+...
 
-> Secondly, I am even not sure if ARM irq handler is always triggered in instruction
-> boundary, maybe the irq handler is started during execution of the store instruction.
-> In fact, I can find the sentence below in 'B1.6.16 IRQ exception' of ARMv7 manual:
-> 
-> 	This relaxation of the normal definition of a precise asynchronous exception
-> 	permits interrupts to occur during the execution of instructions that change register
-> 	or memory values, while only requiring the implementation to restore those register
-> 	values that are needed to correctly re-execute the instruction after the preferred
-> 	exception return. LDM and STM are examples of such instructions.
+>+#define ENET_MAXF_SIZE 1536
+>+#define ENET_RX_DESC 48
+>+#define ENET_TX_DESC 16
+>+
+>+/*
+>+ * FIXME
+>+ * Dynamic buffer allocation as needed
+>+ * Check/fix ethtool support
+>+ * Better MAC address support
+>+ * Better DMA allocation support (dma pool)
+>+ */
 
-A single 32-bit store is not interruptible in the same way as load/store
-multiple instructions are, so this isn't a problem.
+Although the packet buffers are handled correctly, the
+number of MAC DMA descriptors are hard coded to the
+ENET_RX_DESC and ENET_TX_DESC size values. There is
+also a 'funky' scheme for doing virt<>phy address
+translation for the descriptors.
 
-> So suggest to take the correct way in theory, IMO.
-
-I don't like checking the used_mask, because then we have to throw in some
-barriers to ensure ordering between updates of the event arrays and the
-mask. If we do have to change something, I think putting ACCESS_ONCE around
-updates to the event array should do the trick.
-
-Cheers,
-
-Will
+I'm ok with releasing this driver "as is" with its
+current quirks, but I do think these fixmes need to be
+fixed at some time.
