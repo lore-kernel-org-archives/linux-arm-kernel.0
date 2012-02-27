@@ -1,90 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Feb 2012 16:41:30 +0000
-Subject: elf_set_personality()
-In-Reply-To: <CAG6tG3y6+B8Si8bUFLK5aGmG2sed6y39V7XMcKZNDJuUbWCCjQ@mail.gmail.com>
-References: <20120227123612.GD12917@tbergstrom-lnx.Nvidia.com>
- <20120227130453.GV22562@n2100.arm.linux.org.uk>
- <20120227150300.GF12917@tbergstrom-lnx.Nvidia.com>
- <CAG6tG3y6+B8Si8bUFLK5aGmG2sed6y39V7XMcKZNDJuUbWCCjQ@mail.gmail.com>
-Message-ID: <20120227164130.GB2440@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 27 Feb 2012 11:42:52 -0500 (EST)
+Subject: [PATCH v2] USB: Support for LPC32xx SoC
+In-Reply-To: <201202271403.16893.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1202271131070.1539-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 10:20:23AM -0500, Robert Love wrote:
-> On Mon, Feb 27, 2012 at 10:03 AM, Peter De Schrijver
-> <pdeschrijver@nvidia.com> wrote:
-> > On Mon, Feb 27, 2012 at 02:04:53PM +0100, Russell King - ARM Linux wrote:
-> > > This sounds like a problem. ?If you have two applications trying to use
-> > > the ashmem driver, one without READ_IMPLIES_EXEC and one with
-> > > READ_IMPLIES_EXEC, then it seems that ashmem will prevent the
-> > > READ_IMPLIES_EXEC one from using such regions. ?That sounds like a
-> > > (different) bug to me.
-> >
-> > Good point. I don't know anything about the design ideas behind ashmem
-> > though.
-> > Can anyone from android comment on this?
+On Mon, 27 Feb 2012, Arnd Bergmann wrote:
+
+> > > > A little progress has been made already.  We just received a submission
+> > > > for a "generic" platform bus glue file that will be able to take over
+> > > > the jobs of several of the existiing files.  If anyone wants to take
+> > > > this further I won't object, but I don't plan to work on it myself
+> > > > soon.
+> > > 
+> > > Ok, good to know. The approach of a generic glue is exactly what I
+> > > was going to suggest. As we get to ARM platforms that are currently
+> > > using PLATFORM_DRIVER, I will then ask people to convert the ohci
+> > > glue to use that generic glue instead of adding another *_DRIVER
+> > > macro to ohci/ehci.
+> > 
+> > The problem is that several platforms have highly specialized needs
+> > that can't sanely be handled in a single generic driver.  Although a
+> > lot of drivers can be converted over, not all of them will.
 > 
-> The problem is this code snippet:
+> Can you give an example? We have recently converted the sdhci mmc drivers
+> in a similar way, and we have the libata drivers that have always worked
+> in this manner.
+
+Look at ehci-tegra.c.  It has numerous non-generic overrides, such as
+tegra_ehci_hub_control().  It also has support for two clocks and a 
+transceiver.
+
+> > > I'm not sure about what we should do for lpc32xx. Is that
+> > > generic glue going into v3.4?
+> > 
+> > That's up to Greg.  At the moment it isn't used by anything, and unless
+> > an existing driver can be converted over I'd guess it's not likely to
+> > get merged right away.
 > 
->     /* requested protection bits must match our allowed protection mask */
->     if (unlikely((vma->vm_flags & ~asma->prot_mask) & PROT_MASK)) {
->             ret = -EPERM;
-> 	    goto out;
->     }
+> Where is that patch? Maybe I can help out by converting the PCI
+> variants of ohci and ehci to the generic glue, because they are
+> easy to test.
+
+	http://marc.info/?l=linux-usb&m=132986573930143&w=2
+
+and the following two messages in the linux-usb mailing list.
+
+> > At the moment, switching the pnx4008 driver to use the generic bus glue
+> > doesn't look easy.  The generic code doesn't know anything about i2c.
 > 
-> Coupled with this snippet:
+> Maybe I misunderstood what the generic bus glue does then, because I
+> would not expect that it should know about i2c ;-)
 > 
->     /* does the application expect PROT_READ to imply PROT_EXEC? */
->     if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
->             prot |= PROT_EXEC;
+> I would think the generic bus glue would be a very simple library that
+> just exports the various symbols that are defined in ohci-hcd.c and
+> used in the bus specific driver so that the driver can be a separate
+> module. Is it something different from that?
 
-You're missing another place - mm/mmap.c:
+Quite different.  What you just described is ohci-hcd.c itself -- 
+except that it doesn't export the necessary symbols.
 
-        /*
-         * Does the application expect PROT_READ to imply PROT_EXEC?
-         *
-         * (the exception is when the underlying filesystem is noexec
-         *  mounted, in which case we dont add PROT_EXEC.)
-         */
-        if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
-                if (!(file && (file->f_path.mnt->mnt_flags & MNT_NOEXEC)))
-                        prot |= PROT_EXEC;
+The generic driver, as you'll see when you read the patch, includes 
+generic versions of the various routines that a bus glue file has to 
+provide (probe, remove, initialize, and so on).
 
-So, a thread with READ_IMPLIES_EXEC with a mmap() containing PROT_READ
-will always appear with PROT_READ | PROT_EXEC, which then gets
-translated to VM_READ | VM_EXEC.
-
-> One fix is to remove the second snippet altogether. I added it to be
-> diligent; Android doesn't have a specific use for it afaik.
-> 
-> An alternative is to keep the code as-is. Note the bug isn't quite as
-> described: It isn't the case that two processes, one with
-> READ_IMPLIES_EXEC and one without, will always fail to both map an
-> ashmem region. The failure case is when a process creates a region
-> PROT_READ & ~PROT_EXEC and then a second process with
-> READ_IMPLIES_EXEC tries to map the region PROT_READ with the implicit
-> PROT_EXEC. I'm not sure what to do here. This seems like a legit
-> reason to fail.
-
-It seems that vanilla mmap() of a file does not deny a mapping containing
-PROT_EXEC of a file with read-write-noexec permissions - it permits it,
-but it does fail mapping a file PROT_WRITE which wasn't opened for write.
-
-Moreover, it's not actually possible to prevent execution of code if
-you have read permission - if you can read a mapping, you can copy it
-into an executable mapping and then execute copied code.
-
-So, I don't think there's any reason to prevent PROT_EXEC in a hard and
-fast manner.  If you don't want to go that far, what about:
-
-	prot_mask = PROT_MASK;
-	if (current->personality & READ_IMPLIES_EXEC)
-		prot_mask &= ~PROT_EXEC;
-	if (vma->vm_flags & ~asma->prot_mask & prot_mask) {
-		ret = -EPERM;
-		goto out;
-	}
-
-which would mean !READ_IMPLIES_EXEC threads would get the full permission
-checking, but a READ_IMPLIES_EXEC thread would still be able to attach
-to a r/w only shared mapping.
+Alan Stern
