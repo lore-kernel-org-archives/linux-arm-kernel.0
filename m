@@ -1,71 +1,77 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 27 Feb 2012 14:07:00 +0100
-Subject: [PATCH 3/4] at91 : remove wait_for_interrupt definition
-In-Reply-To: <20120227125034.GU22562@n2100.arm.linux.org.uk>
-References: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
- <1327449368-29917-3-git-send-email-daniel.lezcano@linaro.org>
- <20120125001858.GD12326@n2100.arm.linux.org.uk> <4F201435.7030402@linaro.org>
- <20120227125034.GU22562@n2100.arm.linux.org.uk>
-Message-ID: <4F4B7FF4.80402@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 27 Feb 2012 14:09:41 +0100
+Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4F4661DE.90704@ti.com>
+References: <4F22DEF2.5000807@ti.com> <4F44CA82.9060906@atmel.com>
+ <4F460EF2.9010000@ti.com> <4F46609C.8080907@atmel.com>
+ <4F4661DE.90704@ti.com>
+Message-ID: <4F4B8095.9010005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2012 01:50 PM, Russell King - ARM Linux wrote:
-> On Wed, Jan 25, 2012 at 03:39:49PM +0100, Daniel Lezcano wrote:
->> On 01/25/2012 01:18 AM, Russell King - ARM Linux wrote:
->>> On Wed, Jan 25, 2012 at 12:56:07AM +0100, Daniel Lezcano wrote:
->>>> All the "wait_for_interrupt" definition are aliases to cpu_do_idle.
->>>> Only the rm9200 has an asm routine to switch to wfi. But the cpu_do_idle
->>>> for this platform has exactly the same asm routine.
+On 02/23/2012 04:57 PM, Cousson, Benoit :
+> On 2/23/2012 4:51 PM, Nicolas Ferre wrote:
+>> On 02/23/2012 11:03 AM, Cousson, Benoit :
+>>> Salut Nico,
+>>
+>> Coucou Benoit ;-)
+>>
+>>> On 2/22/2012 11:59 AM, Nicolas Ferre wrote:
+>>>> On 01/27/2012 06:29 PM, Cousson, Benoit :
+>>>>> Add some basic helpers to retrieve a DMA controller device_node
+>>>>> and the DMA request line number.
+>>>>>
+>>>>> For legacy reason another API will export the DMA request number
+>>>>> into a Linux resource of type IORESOURCE_DMA.
+>>>>> This API is usable only on system with an unique DMA controller.
 >>>>
->>>> arch/arm/mm/proc-arm920.S
->>>> ...
->>>> ENTRY(cpu_arm920_do_idle)
->>>>           mcr     p15, 0, r0, c7, c0, 4           @ Wait for interrupt
->>>> ...
+>>>> Hi,
 >>>>
->>>> Then it is safe to invoke cpu_do_idle for this platform.
+>>>> I followed that discussion and I like very much the biding that Benoit
+>>>> is proposing. It will help me a lot with my current work on Atmel DMA
+>>>> controller.
+>>>>
+>>>> If I understand correctly, some rework is needed before it can be
+>>>> integrated in a stable git tree (I mean before we can base our work on
+>>>> top of it). So, in the meantime, what should I do to help and make
+>>>> things go forward? to be quite frank, I would be interested to have a
+>>>> working DMA enabled device soon ;-)
 >>>
->>> No it is not.
->>>
->>> Please read Nicolas' post:
->>>
->>> http://lists.arm.linux.org.uk/lurker/message/20120112.144129.827ae490.en.html
->>>
->>> and think about what "DWB is needed before putting SDRAM into self-refresh
->>> because any subsequent access to SDRAM will force it to resume from
->>> self-refresh state" means.
->>>
->>> Consider that if you _branch_ somewhere else, you _could_ cause a cache
->>> line fetch, which will have to come from SDRAM.
+>>> Me too, but unfortunately, I was busy trying to add irq_domain and
+>>> fixing issues with SPARSE_IRQ on OMAP :-(
 >>
->> Oh, right. I am not familiar with this part, thanks for the clarification.
+>> Been there, loved that ;-)
 >>
->>>    From Nicolas' post, it's pretty clear to me that the AT91RM9200 requires
->>> carefully crafted assembly which can't be separated in this way to work,
->>> which I mostly supplied in this mail:
+>>>> Do you think that 3.4 is out of reach?
 >>>
->>> http://lists.arm.linux.org.uk/lurker/message/20120109.144443.3626e5a6.en.html
+>>> Maybe not, from the comments, it looks like we should add a .xlate
+>>> callback to allow any custom parsing of the DMA nodes attributes.
+>>>
+>>> I'll be more than happy, if you can finalize that patch :-)
 >>
->> Ok, this is what does the patch 4/4, it changes the self-refresh and wfi
->> into an asm routine where cpu_do_idle call is removed. Can I consider by
->> folding 3/4 and 4/4 ? So the buggy cpu_do_idle change won't appear...
->
-> So I see your patch is in arm-soc now, inspite of my note that it's
-> probably broken.
->
-> If it's been tested, then all the asm() stuff in arch/arm/mach-at91/pm.c
-> along with the sdram crap can be removed.
+>> I will try to figure out what I can understand from the irq mechanism of
+>> .xlate and try to see if I can implement it on top of your patch.
+> 
+> In fact that dma code is a big copy/paste of the of/gpio one and gpio
+> was already managing .xlate function.
+> I removed it because I thought it was useless for the DMA :-)
+> 
+> You might just have to copy the original code...
 
-Yes, this is what the patch 4/4 does right after, also removing the 
-cpu_do_idle. There no more asm routine in pm.c now.
+The thing is that with gpio, we can rely on the gpio_chip structure for
+having a common storage location of such .xlate callbacks.
+In our DMA case, I guess that we should not cling to dmaengine
+infrastructure because not all of us are using it right now.
 
-Thanks
-   -- Daniel
+So, maybe we should provide some simple "xlate" helpers like the
+irqdomain ones. But I fear that a "callback" directly called from the
+of_get_dma_request() function is not possible (the gpio code model).
 
+On the other hand, the "cookie" based infrastructure seems a little
+overkill to me. It seems that, in this case, we must establish a
+relation between the DMA controller code and the device tree DMA
+helpers. Please correct me if I am wrong.
+
+Best regards,
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Nicolas Ferre
