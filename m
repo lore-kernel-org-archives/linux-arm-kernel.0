@@ -1,68 +1,47 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 27 Feb 2012 11:42:52 -0500 (EST)
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <201202271403.16893.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1202271131070.1539-100000@iolanthe.rowland.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Feb 2012 16:45:02 +0000
+Subject: [GIT PULL] ARM: Remove the __ARCH_WANT_INTERRUPTS_ON_CTXSW definition
+Message-ID: <20120227164502.GF14234@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Feb 2012, Arnd Bergmann wrote:
+Hi Russell,
 
-> > > > A little progress has been made already.  We just received a submission
-> > > > for a "generic" platform bus glue file that will be able to take over
-> > > > the jobs of several of the existiing files.  If anyone wants to take
-> > > > this further I won't object, but I don't plan to work on it myself
-> > > > soon.
-> > > 
-> > > Ok, good to know. The approach of a generic glue is exactly what I
-> > > was going to suggest. As we get to ARM platforms that are currently
-> > > using PLATFORM_DRIVER, I will then ask people to convert the ohci
-> > > glue to use that generic glue instead of adding another *_DRIVER
-> > > macro to ohci/ehci.
-> > 
-> > The problem is that several platforms have highly specialized needs
-> > that can't sanely be handled in a single generic driver.  Although a
-> > lot of drivers can be converted over, not all of them will.
-> 
-> Can you give an example? We have recently converted the sdhci mmc drivers
-> in a similar way, and we have the libata drivers that have always worked
-> in this manner.
+Could you please pull the context switching patches for ARM, together
+with a generic hook acked by PeterZ?
 
-Look at ehci-tegra.c.  It has numerous non-generic overrides, such as
-tegra_ehci_hub_control().  It also has support for two clocks and a 
-transceiver.
+Thanks,
 
-> > > I'm not sure about what we should do for lpc32xx. Is that
-> > > generic glue going into v3.4?
-> > 
-> > That's up to Greg.  At the moment it isn't used by anything, and unless
-> > an existing driver can be converted over I'd guess it's not likely to
-> > get merged right away.
-> 
-> Where is that patch? Maybe I can help out by converting the PCI
-> variants of ohci and ehci to the generic glue, because they are
-> easy to test.
+Catalin
 
-	http://marc.info/?l=linux-usb&m=132986573930143&w=2
 
-and the following two messages in the linux-usb mailing list.
+The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
 
-> > At the moment, switching the pnx4008 driver to use the generic bus glue
-> > doesn't look easy.  The generic code doesn't know anything about i2c.
-> 
-> Maybe I misunderstood what the generic bus glue does then, because I
-> would not expect that it should know about i2c ;-)
-> 
-> I would think the generic bus glue would be a very simple library that
-> just exports the various symbols that are defined in ohci-hcd.c and
-> used in the bus specific driver so that the driver can be a separate
-> module. Is it something different from that?
+  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
 
-Quite different.  What you just described is ohci-hcd.c itself -- 
-except that it doesn't export the necessary symbols.
+are available in the git repository at:
 
-The generic driver, as you'll see when you read the patch, includes 
-generic versions of the various routines that a bus glue file has to 
-provide (probe, remove, initialize, and so on).
+  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux.git intr-ctxsw
 
-Alan Stern
+for you to fetch changes up to 8cee1aabfcee0b0c8041bce04bbac0d22cd24cae:
+
+  ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6 CPUs (2012-02-27 16:19:28 +0000)
+
+----------------------------------------------------------------
+Catalin Marinas (4):
+      sched: Introduce the finish_arch_post_lock_switch() scheduler hook
+      ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on ASID-capable CPUs
+      ARM: Remove current_mm per-cpu variable
+      ARM: Remove __ARCH_WANT_INTERRUPTS_ON_CTXSW on pre-ARMv6 CPUs
+
+Will Deacon (1):
+      ARM: Use TTBR1 instead of reserved context ID
+
+ arch/arm/include/asm/mmu_context.h |  104 +++++++++++++++++++++++++++---------
+ arch/arm/include/asm/system.h      |    7 ---
+ arch/arm/include/asm/thread_info.h |    1 +
+ arch/arm/mm/context.c              |   57 ++++++++++----------
+ arch/arm/mm/proc-v7-2level.S       |    9 +---
+ kernel/sched/core.c                |    1 +
+ kernel/sched/sched.h               |    3 +
+ 7 files changed, 114 insertions(+), 68 deletions(-)
