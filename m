@@ -1,46 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Feb 2012 11:38:14 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Feb 2012 10:55:06 +0000
 Subject: [PATCH] ARM/sp810: introduce API to change system mode
-In-Reply-To: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
+In-Reply-To: <CACRpkdaG2e12fdCFDUoQ_n71VcqU3ZpkH0raHW+EAZg==JOxrg@mail.gmail.com>
 References: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
-Message-ID: <CACRpkdaG2e12fdCFDUoQ_n71VcqU3ZpkH0raHW+EAZg==JOxrg@mail.gmail.com>
+ <CACRpkdaG2e12fdCFDUoQ_n71VcqU3ZpkH0raHW+EAZg==JOxrg@mail.gmail.com>
+Message-ID: <20120227105506.GS22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2012 at 10:13 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
+On Mon, Feb 27, 2012 at 11:38:14AM +0100, Linus Walleij wrote:
+> Maybe I'm delusional but I think this could help centralizing the use
+> of the SP* cells, since they're obviously used in both SPEAr and
+> versatile express.
 
-> sp810 controller can change system's working mode to various power save
-> states. Introduce an API to accomplish the same.
+They can be used in any PrimeXsys based system, and I don't see that
+there's anything which guarantees having both a SP810 and SP804
+together.
 
-OK...
+There are platforms which have SP804 without SP810 - Integrator CP
+and bcmring seem to fall into that category.
 
-> +static inline int sysctl_change_mode(void __iomem *base, int mode)
-
-Why do you make this a static inline?
-
-And why is the present soft reset code also static inlined?
-
-When I look at how this is used in arch/arm/mach-vexpress/v2m.c
-it's apparently glued back-to-back with the SP804
-so I think it should be some CONFIG_HAS_SP810
-and put directly into common/timer-sp.c.
-
-#ifdef CONFIG_HAS_SP810
-
-/* Put SP810 specific support functions here */
-
-void __init sp810_clockevents_init(void __iomem *sp804_base, void
-__iomem *sp810_base, unsigned int irq, const char *name)
-{
-  /* Do some SP810 magic stuff */
-  /* Calls sp804_clockevents_init() */
-}
-
-#endif
-
-Maybe I'm delusional but I think this could help centralizing the use
-of the SP* cells, since they're obviously used in both SPEAr and
-versatile express.
-
-Yours,
-Linus Walleij
+But... the register concerned does a whole load of other things, and
+I'm not sure we want to have accesses to it de-centralized.
