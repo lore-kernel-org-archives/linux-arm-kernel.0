@@ -1,45 +1,67 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Mon, 27 Feb 2012 20:42:07 +0100
-Subject: [PATCH v3] lpc32xx: Added ethernet driver
-In-Reply-To: <1330364539-23152-1-git-send-email-stigge@antcom.de>
-References: <1330364539-23152-1-git-send-email-stigge@antcom.de>
-Message-ID: <083DF309106F364B939360100EC290F81F365B2AE1@eu1rdcrdc1wx030.exi.nxp.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 27 Feb 2012 19:48:45 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <20120227175327.GA2023@linaro.org>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120227175327.GA2023@linaro.org>
+Message-ID: <1330372125.10008.47.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->This patch adds an ethernet driver for the LPC32xx ARM SoC.
+On Mon, 2012-02-27 at 17:53 +0000, Dave Martin wrote:
+> On Thu, Feb 23, 2012 at 05:48:22PM +0000, Stefano Stabellini wrote:
+> > We need a register to pass the hypercall number because we might not
+> > know it at compile time and HVC only takes an immediate argument.
+> > 
+> > Among the available registers r12 seems to be the best choice because it
+> > is defined as "intra-procedure call scratch register".
+> 
+> This would be massively simplified if you didn't try to inline the HVC.
+> Does it really need to be inline?
 >
->Signed-off-by: Roland Stigge <stigge@antcom.de>
->
->---
-> drivers/net/ethernet/Kconfig       |    1 
-> drivers/net/ethernet/Makefile      |    1 
-> drivers/net/ethernet/nxp/Kconfig   |    8 
-> drivers/net/ethernet/nxp/Makefile  |    1 
-> drivers/net/ethernet/nxp/lpc_eth.c | 1311 +++++++++++++++++++++++++++++++++++++
-> drivers/net/ethernet/nxp/lpc_eth.h |  336 +++++++++
-> 6 files changed, 1658 insertions(+)
+> > +#define __HYPERCALL ".word 0xe1400070 + " __HVC_IMM(XEN_HYPERCALL_TAG)
+> 
+> Please, do not do this.  It won't work in Thumb, where the encodings are
+> different.
+> 
+> It is reasonable to expect anyone building Xen to have reasonably new
+> tools, you you can justifiably use
+> 
+> AFLAGS_thisfile.o := -Wa,-march=armv7-a+virt
+> 
+> in the Makefile and just use the hvc instruction directly.
 
-...
+Our aim is for guest kernel binaries not to be specific to Xen -- i.e.
+they should be able to run on baremetal and other hypervisors as well.
+The differences should only be in the device-tree passed to the kernel.
 
->+#define ENET_MAXF_SIZE 1536
->+#define ENET_RX_DESC 48
->+#define ENET_TX_DESC 16
->+
->+/*
->+ * FIXME
->+ * Dynamic buffer allocation as needed
->+ * Check/fix ethtool support
->+ * Better MAC address support
->+ * Better DMA allocation support (dma pool)
->+ */
+> Of course, this is only practical if the HVC invocation is not inlined.
 
-Although the packet buffers are handled correctly, the
-number of MAC DMA descriptors are hard coded to the
-ENET_RX_DESC and ENET_TX_DESC size values. There is
-also a 'funky' scheme for doing virt<>phy address
-translation for the descriptors.
+I suppose we could make the stub functions out of line, we just copied
+what Xen does on x86.
 
-I'm ok with releasing this driver "as is" with its
-current quirks, but I do think these fixmes need to be
-fixed at some time.
+The only thing which springs to mind is that 5 argument hypercalls will
+end up pushing the fifth argument to the stack only to pop it back into
+r4 for the hypercall and IIRC it also needs to preserve r4 (callee saved
+reg) which is going to involve some small amount of code to move stuff
+around too.
+
+So by inlining the functions we avoid some thunking because the compiler
+would know exactly what was happening at the hypercall site.
+
+We don't currently have any 6 argument hypercalls but the same would
+extend there.
+
+> If we can't avoid macro-ising HVC, we should do it globally, not locally
+> to the Xen code.  That way we at least keep all the horror in one place.
+
+That sounds like a good idea to me.
+
+Given that Stefano is proposing to make the ISS a (per-hypervisor)
+constant we could consider just defining the Thumb and non-Thumb
+constants instead of doing all the construction with the __HVC_IMM stuff
+-- that would remove a big bit of the macroization.
+
+Ian.
