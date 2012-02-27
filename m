@@ -1,42 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Feb 2012 08:44:09 +0100
-Subject: [PATCH] ARM: integrator: convert to sparse irqs
-In-Reply-To: <4F4AFB95.9040204@gmail.com>
-References: <1330104737-22782-1-git-send-email-linus.walleij@linaro.org>
- <20120224191541.GB21556@game.jcrosoft.org>
- <CACRpkdbjeAmD=AsybOEkYFMUEyvfwONawdDGtfwMhBhrKyg2hQ@mail.gmail.com>
- <4F4AFB95.9040204@gmail.com>
-Message-ID: <CACRpkdag3BsubBgTiNM35e97OmjHpzAseEz0WK3oo5rQ5i8S_g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 Feb 2012 15:59:02 +0800
+Subject: [PATCH v2 0/9] imx patches when I enable imx6q sabrelite audio
+In-Reply-To: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
+References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <20120227075858.GA31207@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 4:42 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 02/26/2012 03:45 AM, Linus Walleij wrote:
->> On Fri, Feb 24, 2012 at 8:15 PM, Jean-Christophe PLAGNIOL-VILLARD
->> <plagnioj@jcrosoft.com> wrote:
->>> On 18:32 Fri 24 Feb ? ? , Linus Walleij wrote:
->>
->>>> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? 47
->>>> +#define NR_IRQS_INTEGRATOR_AP ? ? ? ? ? ? ? ?34
->>>> +#define NR_IRQS_INTEGRATOR_CP ? ? ? ? ? ? ? ?47
->>>
->>> why do you need to specified both?
->>
->> They are two totally different machines and should never have had that
->> common roof of NR_IRQS = max(AP,CP), it's just not elegant.
->>
->> Maybe I'm a bit pedantic but I want to set the .nr_irqs for each machine so that
->> it corresponds exactly to what it actually has, instead of using a roof value.
->> I think it improves readability and understanding.
->
-> Really, you want to get rid of the value altogether. Each irq_chip
-> should allocate its irq_descs and then you don't need to set .nr_irqs.
+On Thu, Feb 02, 2012 at 10:11:59AM +0800, Richard Zhao wrote:
+> Changes in v2:
+> 
+>  - change dt peroperty/label to lower case as much as possible
+>    keep XXX-supply property upper case.
+>  - convert audmux-v2 to platform device driver
+>  - move audmux-v2 driver to sound/soc/imx
+> 
+> [PATCH v2 1/9] ARM: mxc: make imx_dma_is_general_purpose more
+> [PATCH v2 2/9] ARM: imx6q: add cko1 clock
+> [PATCH v2 3/9] ARM: dts: imx6q-sabrelite: add 2p5v and 3p3v
+> [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
 
-OK can you point to a machine that does it the right way and
-I'll fix.
+I applied patch 1 ~ 4.  Thanks.
 
-Or do I need the irq domains lib to go in first to do that in a
-good/non-awkward way?
+Regards,
+Shawn
 
-Yours,
-Linus Walleij
+> [PATCH v2 5/9] ARM: mxc: convert audmux-v2 to a platform driver
+> [PATCH v2 6/9] ARM: mx31ads: add audmux device
+> [PATCH v2 7/9] ARM: mxc: move audmux-v2 to sound/soc/imx
+> [PATCH v2 8/9] ASoC: imx: add dt support for audmux-v2
+> [PATCH v2 9/9] ARM: imx6q-sabrelite: add audmux support
