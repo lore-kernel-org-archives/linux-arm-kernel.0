@@ -1,37 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Feb 2012 13:39:47 +0000
-Subject: [GIT PULL] i.MX fixes
-In-Reply-To: <20120227093354.GY3852@pengutronix.de>
-References: <20120227093354.GY3852@pengutronix.de>
-Message-ID: <201202271339.48141.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 27 Feb 2012 13:41:12 +0000
+Subject: [PATCH v3 0/2] Device tree support for TWL regulators
+In-Reply-To: <4F4B7798.6000300@ti.com>
+References: <1330338961-31765-1-git-send-email-rnayak@ti.com>
+ <4F4B73C8.8070807@ti.com> <4F4B7798.6000300@ti.com>
+Message-ID: <20120227134112.GB3191@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 February 2012, Sascha Hauer wrote:
-> 
-> Hi Arnd,
-> 
-> Please pull the following for -rc. Note that this partly replaces the
-> previous i.MX branch you pulled as suggested.
-> 
-> Sascha
-> 
-> The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-> 
->   Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes
-> 
-> for you to fetch changes up to 9418ba306688c0b77a8548b3281ba3d130036516:
-> 
->   ARM: mach-imx: mx3: Fix section mismatch in imx3_init_l2x0() (2012-02-27 10:15:27 +0100)
-> 
+On Mon, Feb 27, 2012 at 06:01:20PM +0530, Rajendra Nayak wrote:
 
+> Depending on what order Mark happens to pull them in, I am fine
+> re-sending adding support for the 2 twl6030 fixed regulators.
 
-Applied to next/fixes-non-critical
-
-Thanks for splitting the branches out,
-
-	Arnd
+Please can you guys come up with a single unified series for this stuff
+- I'll hold off on applying anything to allow you to do this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120227/b24942a0/attachment.sig>
