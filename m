@@ -1,108 +1,47 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 27 Feb 2012 17:48:37 +0800
-Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
-In-Reply-To: <1330328554.2778.20.camel@flow>
-References: <E1QHn5f-0004Rb-6j@outmx07.plus.net> <1330253328.3673.4.camel@flow>
- <CAN1soZwMPpL1nbewjxTmmc_fewm=6xU6wgNgbauC05ZGEHCmAw@mail.gmail.com>
- <1330328554.2778.20.camel@flow>
-Message-ID: <CAN1soZy4V++oGi9ZuLsC=FS3MaSLRkBRAoQHqAd=3enyNY5WQg@mail.gmail.com>
+Date: Mon, 27 Feb 2012 17:54:47 +0800
+Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
+In-Reply-To: <20120227090447.GQ22562@n2100.arm.linux.org.uk>
+References: <E1QKFPN-0003xV-Sf@outmx07.plus.net> <1330253653.3673.8.camel@flow>
+ <20120227090447.GQ22562@n2100.arm.linux.org.uk>
+Message-ID: <CAN1soZzpJtuQygJeD4fyW-DQGwCDyBa9QO0k+0CG2BOW=+k=aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 3:42 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> Am Montag, den 27.02.2012, 10:00 +0800 schrieb Haojian Zhuang:
->> On Sun, Feb 26, 2012 at 6:48 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
->> > On my hx4700 iPAQ running Windows Mobile 5, gpio button wakeup is
->> > configurable under "Start -> Settings -> Personal -> Buttons -> Lock".
->> > There is a checkbox "Disable all buttons except power button" which
->> > enables/disables the keypad and ASIC3 GPIO buttons as wakeup sources.
+On Mon, Feb 27, 2012 at 5:04 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Feb 26, 2012 at 11:54:13AM +0100, Philipp Zabel wrote:
+>> Am Mittwoch, den 11.05.2011, 19:49 +0000 schrieb Paul Parsons:
+>> > Basic suspend/resume is fixed by ensuring that the PGSR registers are set correctly before sleep mode is entered. In particular four of the active low resets need to be driven high while in sleep mode, otherwise the unit resets itself instead of suspending. Another problem was that the PCFR_GPROD bit is apparently set by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail immediately after returning from sleep mode.
 >> >
->> > To achieve the same functionality on linux, we could split the power
->> > button and the other buttons into separate gpio_keys devices and let
->> > userspace disable the other buttons as wakeup sources via the device's
->> > pm_wakeup interface.
+>> > Driver-specific bugs still remain. In particular the mmc driver does not resume properly after returning from sleep mode, thus preventing sleep mode from being entered a second time.
+>> >
+>> > Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+>> > ---
+>> > --- clean-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c ? ? 2011-05-11 00:54:10.787247169 +0100
+>> > +++ linux-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c ? ? 2011-05-11 20:21:54.026109594 +0100
+>> > @@ -120,7 +120,11 @@ static unsigned long hx4700_pin_config[]
+>> > ? ? GPIO19_SSP2_SCLK,
+>> > ? ? GPIO86_SSP2_RXD,
+>> > ? ? GPIO87_SSP2_TXD,
+>> > - ? GPIO88_GPIO,
+>> > + ? MFP_CFG_OUT(GPIO88, AF0, KEEP_OUTPUT), ?/* TSC2046_CS */
 >>
->> It seems that this patch is only enable powerup key as wakeup source.
+>> What you want here is to keep the SPI chip select deasserted (high)
+>> during suspend, so I think that should be DRIVE_HIGH instead.
 >
-> Yes. This is temporary until ASIC3 GPIO wakeup support is in place.
+> And I don't think we allowed folk to use MFP_CFG_xxx() macros in their
+> board support code. ?Is there something wrong with:
 >
->> Other gpio keys could be configured as wakeup source in user space. So could
->> you help to figure out the interface of configuring gpio key as wakeup source
->> in user space?
+> ? ? ? ?GPIO88_GPIO | MFP_LPM_KEEP_OUTPUT
 >
-> I was thinking of the /sys/devices/.../power/wakeup interface, as
-> documented in Documentation/ABI/testing/sysfs-devices-power.
->
-> Put the power button into its own gpio-keys device:
->
-> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-> index 06ec926..21d26a3 100644
-> --- a/arch/arm/mach-pxa/hx4700.c
-> +++ b/arch/arm/mach-pxa/hx4700.c
-> @@ -166,11 +166,26 @@ static struct pxaficp_platform_data ficp_info = {
-> ? ? ? ? ? ? ? ?.active_low = _active_low, ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?.desc ? ? ? = _desc, ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?.type ? ? ? = EV_KEY, ? ? ? ? ? ? ? ? ? \
-> - ? ? ? ? ? ? ? .wakeup ? ? = KEY_##_code == KEY_POWER, \
-> + ? ? ? ? ? ? ? .wakeup ? ? = 1, ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?}
->
-> +static struct gpio_keys_button gpio_keys_power_button =
-> + ? ? ? INIT_KEY(POWER, ? ? ? GPIO0_HX4700_nKEY_POWER, ? 1, "Power button");
-> +
-> +static struct gpio_keys_platform_data gpio_keys_power_data = {
-> + ? ? ? .buttons = gpio_keys_power_button,
-> + ? ? ? .nbuttons = 1,
-> +};
-> +
-> +static struct platform_device gpio_keys_power = {
-> + ? ? ? .name = "gpio-keys",
-> + ? ? ? .dev ?= {
-> + ? ? ? ? ? ? ? .platform_data = &gpio_keys_power_data,
-> + ? ? ? },
-> + ? ? ? .id ? = 0,
-> +};
-> +
-> ?static struct gpio_keys_button gpio_keys_buttons[] = {
-> - ? ? ? INIT_KEY(POWER, ? ? ? GPIO0_HX4700_nKEY_POWER, ? 1, "Power button"),
-> ? ? ? ?INIT_KEY(MAIL, ? ? ? ?GPIO94_HX4700_KEY_MAIL, ? ?0, "Mail button"),
-> ? ? ? ?INIT_KEY(ADDRESSBOOK, GPIO99_HX4700_KEY_CONTACTS,0, "Contacts button"),
-> ? ? ? ?INIT_KEY(RECORD, ? ? ?GPIOD6_nKEY_RECORD, ? ? ? ?1, "Record button"),
-> @@ -188,7 +203,7 @@ static struct platform_device gpio_keys = {
-> ? ? ? ?.dev ?= {
-> ? ? ? ? ? ? ? ?.platform_data = &gpio_keys_data,
-> ? ? ? ?},
-> - ? ? ? .id ? = -1,
-> + ? ? ? .id ? = 1,
-> ?};
->
-> ?/*
-> @@ -836,6 +851,7 @@ static struct platform_device audio = {
->
-> ?static struct platform_device *devices[] __initdata = {
-> ? ? ? ?&asic3,
-> + ? ? ? &gpio_keys_power,
-> ? ? ? ?&gpio_keys,
-> ? ? ? ?&navpoint,
-> ? ? ? ?&backlight,
->
-> And then let userspace disable wakeup for the other keys via
-> echo disabled > /sys/devices/platform/gpio-keys.1/power/wakeup
->
-> The gpio-keys driver will check this setting with device_may_wakeup()
-> during gpio_keys_suspend() and decide whether to call enable_irq_wake()
-> for its button GPIOs.
->
-> regards
-> Philipp
->
->
-If one of gpio keys wakeup is enabled, every gpio keys in this device can
-wakeup system. So your patch is better than original one that only keeping
-power key as wakeup source.
 
-You overwrite Paul's patch. I think that you can format a new patch that is
-based on current code base not Paul's patch.
+Yes, it should be MFPR_LPM_DRIVE_HIGH or MFPR_LPM_PULL_HIGH.
+Thanks for your reminder.
 
-Thanks
+Paul,
+
+Could you help to format the patch again?
+
+Best Regards
 Haojian
