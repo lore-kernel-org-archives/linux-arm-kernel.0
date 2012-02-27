@@ -1,32 +1,90 @@
-From: rlove@google.com (Robert Love)
-Date: Mon, 27 Feb 2012 12:18:09 -0500
-Subject: elf_set_personality()
-In-Reply-To: <20120227171634.GC2440@n2100.arm.linux.org.uk>
-References: <20120227123612.GD12917@tbergstrom-lnx.Nvidia.com>
- <20120227130453.GV22562@n2100.arm.linux.org.uk>
- <20120227150300.GF12917@tbergstrom-lnx.Nvidia.com>
- <CAG6tG3y6+B8Si8bUFLK5aGmG2sed6y39V7XMcKZNDJuUbWCCjQ@mail.gmail.com>
- <20120227164130.GB2440@n2100.arm.linux.org.uk>
- <CAG6tG3zwfhZXw5M_kk4ry4H6NhTuKyenP-6UUm+XwyxbBbcG9g@mail.gmail.com>
- <20120227171634.GC2440@n2100.arm.linux.org.uk>
-Message-ID: <CAG6tG3xu5RKRmdn+vEkhFjh3nT7N9MuHMowgJHgWGKX51RmS9A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 27 Feb 2012 18:20:20 +0100
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120227132908.GA3191@opensource.wolfsonmicro.com>
+References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
+ <20120213082741.GN3852@pengutronix.de>
+ <20120213144820.GA3494@opensource.wolfsonmicro.com>
+ <20120214105823.GS3852@pengutronix.de>
+ <20120214172902.GB3916@opensource.wolfsonmicro.com>
+ <20120216073236.GE3852@pengutronix.de>
+ <20120216075825.GA11631@opensource.wolfsonmicro.com>
+ <20120227090453.GE26642@pengutronix.de>
+ <20120227132908.GA3191@opensource.wolfsonmicro.com>
+Message-ID: <20120227172020.GC3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 12:16 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->> There is no reason to be different and I'd prefer to consolidate or at
->> least copy the code.
->>
->> It is unfortunate that each implementer of fops->mmap needs to
->> manually handle the READ_IMPLIES_EXEC case.
->
-> That would mean ignoring PROT_EXEC entirely.
+On Mon, Feb 27, 2012 at 01:29:08PM +0000, Mark Brown wrote:
+> On Mon, Feb 27, 2012 at 10:04:53AM +0100, Sascha Hauer wrote:
+> 
+> > If I drop the microvolts parameter what microvolts should I assume? I
+> > tried 0 but the regulator core does not like it:
+> 
+> > machine_constraints_voltage: dummy: unsupportable voltage constraints
+> 
+> > (with max: -2147483648 min: 2147483647)
+> 
+> I'd expect zero to work, unless something wants a particular voltage in
+> which case you really should be filling things in properly.  The fact
+> that the fixed voltage regulator supports get_voltage() might be
+> confusing things.
+> 
+> Like I say if people can be bothered filling voltages in I suspect
+> they're not your target audience for this.
 
-Right. I was agreeing with your first suggestion.
+The culprit is in machine_constraints_voltage:
 
-As goes vanilla mmap, so goes ashmem.
+> 
+> 	int     min_uV = INT_MAX;
+>         int     max_uV = INT_MIN;
+> 
+> 	...
+> 
+> 	/* initial: [cmin..cmax] valid, [min_uV..max_uV] not */
+> 	for (i = 0; i < count; i++) {
+> 		int     value;
+> 
+> 		value = ops->list_voltage(rdev, i);
+> 		if (value <= 0)
+> 			continue;
 
-I no longer work on Android, but I can put together a patch.
+list_voltage returns 0 if the fixed regulator is initialized to 0
+microvolts, so...
 
-      Robert
+> 
+> 		/* maybe adjust [min_uV..max_uV] */
+> 		if (value >= cmin && value < min_uV)
+> 			min_uV = value;
+> 		if (value <= cmax && value > max_uV)
+> 			max_uV = value;
+
+max_uV/min_uV are not initialized...
+
+> 	}
+> 
+> 	/* final: [min_uV..max_uV] valid iff constraints valid */
+> 	if (max_uV < min_uV) {
+> 		rdev_err(rdev, "unsupportable voltage constraints\n");
+> 		return -EINVAL;
+> 	}
+
+And we end here.
+
+I don't know what to do here. Probably the check for value <= 0 should
+be removed, but then again the description shows:
+
+ * @list_voltage: Return one of the supported voltages, in microvolts; zero
+ *      if the selector indicates a voltage that is unusable on this system;
+ *      or negative errno.  Selectors range from zero to one less than
+ *      regulator_desc.n_voltages.  Voltages may be reported in any order.
+
+(I wonder if negative voltages are intentionally not supported)
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
