@@ -1,70 +1,62 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Mon, 27 Feb 2012 19:33:39 +0000
-Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
- to the hypervisor
-In-Reply-To: <20120227180355.GB2023@linaro.org>
-References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
- <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1330360043.8557.302.camel@zakaz.uk.xensource.com>
- <20120227180355.GB2023@linaro.org>
-Message-ID: <1330371219.10008.34.camel@dagon.hellion.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Feb 2012 19:36:35 +0000
+Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU
+ IRQ handlers
+In-Reply-To: <20120227175646.7c39e542@tom-ThinkPad-T410>
+References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
+ <1330012696-13472-4-git-send-email-will.deacon@arm.com>
+ <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
+ <20120224101130.GB13504@mudshark.cambridge.arm.com>
+ <20120227175646.7c39e542@tom-ThinkPad-T410>
+Message-ID: <20120227193635.GC24605@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-02-27 at 18:03 +0000, Dave Martin wrote:
-> On Mon, Feb 27, 2012 at 04:27:23PM +0000, Ian Campbell wrote:
-> > On Thu, 2012-02-23 at 17:48 +0000, Stefano Stabellini wrote:
-> > > We need a register to pass the hypercall number because we might not
-> > > know it at compile time and HVC only takes an immediate argument.
+On Mon, Feb 27, 2012 at 09:56:46AM +0000, Ming Lei wrote:
+> Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Feb 24, 2012 at 01:34:32AM +0000, Ming Lei wrote:
 > > > 
-> > > Among the available registers r12 seems to be the best choice because it
-> > > is defined as "intra-procedure call scratch register".
+> > > I think we should check it via test_bit(idx, cpuc->used_mask) because
+> > > 'hw_events->events[idx] = val' is not atomic operation and it is read here
+> > > in irq context.
 > > 
-> > R12 is not accessible from the 16 bit "T1" Thumb encoding of mov
-> > immediate (which can only target r0..r7).
-> 
-> This is untrue.  The important instructions, like MOV Rd, Rn can access
-> all the regs.  But anyway, there is no such thing as a Thumb-1 kernel,
-> so we won't really care.
-
-I did say "mov immediate", which is the one which matters when loading a
-constant hypercall number (the common case). AFAIK the "mov Rd, #imm" T1
-encoding cannot access all registers.
-
-The "mov rd,rn" form only helps for syscall(2) like functions, which are
-unusual, at least for Xen, although as Stefano says, they do exist.
-
-> > Since we support only ARMv7+ there are "T2" and "T3" encodings available
-> > which do allow direct mov of an immediate into R12, but are 32 bit Thumb
-> > instructions.
+> > I dunno, that code is compiled to:
 > > 
-> > Should we use r7 instead to maximise instruction density for Thumb code?
+> > e5973000        ldr     r3, [r7]
+> > e7834106        str     r4, [r3, r6, lsl #2]
+> > 
+> > so you should either see the new value or the old one - you can't see half a
+> > pointer in there since it's a single 32-bit store.
 > 
-> The difference seems trivial when put into context, even if you code a
-> special Thumb version of the code to maximise density (the Thumb-2 code
-> which gets built from assembler in the kernel is very suboptimal in
-> size, but there simply isn't a high proportion of asm code in the kernel
-> anyway.)  I wouldn't consider the ARM/Thumb differences as an important
-> factor when deciding on a register.
+> Firstly the code above is only generated from one of many existing compile
+> options, for example, maybe storing to 32bit variable involves two instructions
+> in thumb mode, so are you sure it is always OK for all cases?
 
-OK, that's useful information. thanks.
+I'll check with the compiler guys if the tools ever do this. It would seem a
+bit weird given that we may have things like memory type, alignment and
+endianness coming into play that would make splitting up 32-bit stores a
+really bad idea.
 
-> One argument for _not_ using r12 for this purpose is that it is then
-> harder to put a generic "HVC" function (analogous to the "syscall"
-> syscall) out-of-line, since r12 could get destroyed by the call.
+> Secondly, I am even not sure if ARM irq handler is always triggered in instruction
+> boundary, maybe the irq handler is started during execution of the store instruction.
+> In fact, I can find the sentence below in 'B1.6.16 IRQ exception' of ARMv7 manual:
+> 
+> 	This relaxation of the normal definition of a precise asynchronous exception
+> 	permits interrupts to occur during the execution of instructions that change register
+> 	or memory values, while only requiring the implementation to restore those register
+> 	values that are needed to correctly re-execute the instruction after the preferred
+> 	exception return. LDM and STM are examples of such instructions.
 
-For an out of line syscall(2) wouldn't the syscall number either be in a
-standard C calling convention argument register or on the stack when the
-function was called, since it is just a normal argument at that point?
-As you point out it cannot be passed in r12 (and could never be, due to
-the clobbering).
+A single 32-bit store is not interruptible in the same way as load/store
+multiple instructions are, so this isn't a problem.
 
-The syscall function itself would have to move the arguments and syscall
-nr etc around before issuing the syscall.
+> So suggest to take the correct way in theory, IMO.
 
-I think the same is true of a similar hypercall(2)
+I don't like checking the used_mask, because then we have to throw in some
+barriers to ensure ordering between updates of the event arrays and the
+mask. If we do have to change something, I think putting ACCESS_ONCE around
+updates to the event array should do the trick.
 
-> If you don't think you will ever care about putting HVC out of line
-> though, it may not matter.
+Cheers,
 
-Ian.
+Will
