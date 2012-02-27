@@ -1,53 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Feb 2012 14:03:56 +0000
-Subject: [PATCH v3 0/2] Device tree support for TWL regulators
-In-Reply-To: <4F4B8A85.7060603@ti.com>
-References: <1330338961-31765-1-git-send-email-rnayak@ti.com>
- <4F4B73C8.8070807@ti.com> <4F4B7798.6000300@ti.com>
- <20120227134112.GB3191@opensource.wolfsonmicro.com>
- <4F4B8A85.7060603@ti.com>
-Message-ID: <20120227140356.GF3191@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Feb 2012 14:09:52 +0000
+Subject: [GIT PULL] LPC32xx fixes for v3.3-rc4
+In-Reply-To: <4F490CC0.5050303@antcom.de>
+References: <4F490CC0.5050303@antcom.de>
+Message-ID: <201202271409.52470.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 02:52:05PM +0100, Cousson, Benoit wrote:
-> On 2/27/2012 2:41 PM, Mark Brown wrote:
-> >On Mon, Feb 27, 2012 at 06:01:20PM +0530, Rajendra Nayak wrote:
+On Saturday 25 February 2012, Roland Stigge wrote:
+> the fixes for LPC32xx that I just posted as patches are also available as a
+> git branch to pull from as described below.
+> 
+> The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+> 
+>   Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.antcom.de/linux-2.6.git lpc32xx-fixes
+> 
+> for you to fetch changes up to 3eddb16b7b275162c62f67bb75cc6bbe0ef8c075:
+> 
+>   ARM: LPC32xx: serial.c: Fixed loop limit (2012-02-25 16:32:44 +0100)
 
-> >Please can you guys come up with a single unified series for this stuff
-> >- I'll hold off on applying anything to allow you to do this.
+Hi Roland,
 
-> The issue is that the initial TWL regulator series from Rajendra
-> will depend on the twl core DT support I have that depends on the
-> irq_domain series from Grant...
+The patch look all good, but it's not clear where you would like to
+see them applied. The largest one "ARM: LPC32xx: Fix missing and bad
+LPC32XX macros" looks like it is only of cosmetic nature and should
+go into the next/fixes-non-critical branch for v3.4, while the
+others look like they are requried for v3.3, some of them
+also for earlier versions. Remember that any bug fix that applies
+to older kernels should have a "Cc: stable at vger.kernel.org" tag
+so that Greg can automatically pick up the fixes and port them
+to the stable and longterm releases.
 
-Really?  That's the first I've heard of any such dependency here.  Is it
-a build time dependency or is it just something that's required to make
-the code actually spring into life?  It looks like it's the latter but
-you're saying there's an actual dependency.
-
-There's also more than that, there's also at least Tero submitting some
-other stuff separately (and his stuff won't play with DT...) and I think
-Peter also.  It really fees like there's a bunch of people working on
-different things without talking to each other here.
-
-> So I guess, it will be easy for us to split the regulator patches
-> from the DTS ones to have at least the driver changes merged by you.
-> Then Tony might be able to pull all the DTS in one series and thus
-> avoid the various merge conflict that will happen since most OMAP
-> drivers are hacking the same DTS files.
-
-> Does that make sense? Or do you think it will be even worst
-> separating the patches?
-
-Unless there's a compile time dependency I don't think we need to
-refactor anything here, what I'm seeing at the minute looks OK from a
-merge point of view except that there appears to be a lack of
-coordination between the various serieses.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120227/edc21336/attachment.sig>
+	Arnd
