@@ -1,37 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Feb 2012 09:44:42 +0100
-Subject: [GIT PULL] One more =?UTF-8?Q?sched=5Fclock=28=29=20patch?=
-Message-ID: <322c288d3ad6aecc8014e0a3582c8527@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Feb 2012 09:04:47 +0000
+Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
+In-Reply-To: <1330253653.3673.8.camel@flow>
+References: <E1QKFPN-0003xV-Sf@outmx07.plus.net> <1330253653.3673.8.camel@flow>
+Message-ID: <20120227090447.GQ22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Feb 26, 2012 at 11:54:13AM +0100, Philipp Zabel wrote:
+> Am Mittwoch, den 11.05.2011, 19:49 +0000 schrieb Paul Parsons:
+> > Basic suspend/resume is fixed by ensuring that the PGSR registers are set correctly before sleep mode is entered. In particular four of the active low resets need to be driven high while in sleep mode, otherwise the unit resets itself instead of suspending. Another problem was that the PCFR_GPROD bit is apparently set by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail immediately after returning from sleep mode.
+> > 
+> > Driver-specific bugs still remain. In particular the mmc driver does not resume properly after returning from sleep mode, thus preventing sleep mode from being entered a second time.
+> > 
+> > Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> > ---
+> > --- clean-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c	2011-05-11 00:54:10.787247169 +0100
+> > +++ linux-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c	2011-05-11 20:21:54.026109594 +0100
+> > @@ -120,7 +120,11 @@ static unsigned long hx4700_pin_config[]
+> >  	GPIO19_SSP2_SCLK,
+> >  	GPIO86_SSP2_RXD,
+> >  	GPIO87_SSP2_TXD,
+> > -	GPIO88_GPIO,
+> > +	MFP_CFG_OUT(GPIO88, AF0, KEEP_OUTPUT),	/* TSC2046_CS */
+> 
+> What you want here is to keep the SPI chip select deasserted (high)
+> during suspend, so I think that should be DRIVE_HIGH instead.
 
-Russell,
+And I don't think we allowed folk to use MFP_CFG_xxx() macros in their
+board support code.  Is there something wrong with:
 
-Could you please pull from my sched_clock-for-rmk branch again?
-It contains a single additional patch. courtesy of Stephen Boyd, that
-contains support for sched_clock() on msm. The rest of the branch is
-unchanged.
+	GPIO88_GPIO | MFP_LPM_KEEP_OUTPUT
 
-Thanks,
-
-        M.
-
-The following changes since commit
-6905a65879b51d326396e63dfea40861a30bc17f:
-
-  ARM: Make the sched_clock framework mandatory (2012-02-03 11:34:27
-+0000)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-sched_clock-for-rmk
-
-Stephen Boyd (1):
-      msm: timer: Support sched_clock()
-
- arch/arm/mach-msm/timer.c |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
-
--- 
-Fast, cheap, reliable. Pick two.
+?
