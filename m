@@ -1,112 +1,119 @@
-From: rob.lee@linaro.org (Robert Lee)
-Date: Sun, 26 Feb 2012 22:47:43 -0600
-Subject: [PATCH v5 9/9] ARM: at91: Consolidate cpuidle functionality
-In-Reply-To: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
-References: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1330318063-25460-10-git-send-email-rob.lee@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 Feb 2012 15:06:04 +0800
+Subject: [PATCH] ARM: dts: imx51-babbage: update mc13892 device
+Message-ID: <1330326364-726-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added core cpuidle functionality and remove this duplicated
-code from the platform cpuidle.
+It adds regulators, removes invalid property fsl,mc13xxx-uses-regulator,
+and fixes interrupt for mc13892.
 
-Signed-off-by: Robert Lee <rob.lee@linaro.org>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-at91/cpuidle.c |   64 ++++++++++++++---------------------------
- 1 files changed, 22 insertions(+), 42 deletions(-)
+ arch/arm/boot/dts/imx51-babbage.dts |   91 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 89 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-at91/cpuidle.c b/arch/arm/mach-at91/cpuidle.c
-index a851e6c..10c1564 100644
---- a/arch/arm/mach-at91/cpuidle.c
-+++ b/arch/arm/mach-at91/cpuidle.c
-@@ -27,66 +27,46 @@
- 
- static DEFINE_PER_CPU(struct cpuidle_device, at91_cpuidle_device);
- 
--static struct cpuidle_driver at91_idle_driver = {
--	.name =         "at91_idle",
--	.owner =        THIS_MODULE,
--};
--
- /* Actual code that puts the SoC in different idle states */
- static int at91_enter_idle(struct cpuidle_device *dev,
- 			struct cpuidle_driver *drv,
- 			       int index)
- {
--	struct timeval before, after;
--	int idle_time;
- 	u32 saved_lpr;
- 
--	local_irq_disable();
--	do_gettimeofday(&before);
--	if (index == 0)
--		/* Wait for interrupt state */
--		cpu_do_idle();
--	else if (index == 1) {
--		asm("b 1f; .align 5; 1:");
--		asm("mcr p15, 0, r0, c7, c10, 4");	/* drain write buffer */
--		saved_lpr = sdram_selfrefresh_enable();
--		cpu_do_idle();
--		sdram_selfrefresh_disable(saved_lpr);
--	}
--	do_gettimeofday(&after);
--	local_irq_enable();
--	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
--			(after.tv_usec - before.tv_usec);
-+	__asm__("b 1f; .align 5; 1:\n"
-+	"	mcr p15, 0, r0, c7, c10, 4");	/* drain write buffer */
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 564cb8c..9949e60 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -56,8 +56,95 @@
+ 						compatible = "fsl,mc13892";
+ 						spi-max-frequency = <6000000>;
+ 						reg = <0>;
+-						mc13xxx-irq-gpios = <&gpio1 8 0>;
+-						fsl,mc13xxx-uses-regulator;
++						interrupt-parent = <&gpio1>;
++						interrupts = <8>;
 +
-+	saved_lpr = sdram_selfrefresh_enable();
-+	cpu_do_idle();
-+	sdram_selfrefresh_disable(saved_lpr);
- 
--	dev->last_residency = idle_time;
- 	return index;
- }
- 
-+static struct cpuidle_driver at91_idle_driver = {
-+	.name			= "at91_idle",
-+	.owner			= THIS_MODULE,
-+	.en_core_tk_irqen	= 1,
-+	.states[0] = CPUIDLE_ARM_WFI_STATE,
-+	.states[1] = {
-+		.enter			= at91_enter_idle,
-+		.exit_latency		= 10,
-+		.target_residency	= 100000,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "RAM_SR",
-+		.desc			= "WFI and DDR Self Refresh",
-+	},
-+	.state_count = AT91_MAX_STATES,
-+};
++						regulators {
++							sw1_reg: sw1 {
++								regulator-min-microvolt = <600000>;
++								regulator-max-microvolt = <1375000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
 +
- /* Initialize CPU idle by registering the idle states */
- static int at91_init_cpuidle(void)
- {
- 	struct cpuidle_device *device;
--	struct cpuidle_driver *driver = &at91_idle_driver;
++							sw2_reg: sw2 {
++								regulator-min-microvolt = <900000>;
++								regulator-max-microvolt = <1850000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							sw3_reg: sw3 {
++								regulator-min-microvolt = <1100000>;
++								regulator-max-microvolt = <1850000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							sw4_reg: sw4 {
++								regulator-min-microvolt = <1100000>;
++								regulator-max-microvolt = <1850000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							vpll_reg: vpll {
++								regulator-min-microvolt = <1050000>;
++								regulator-max-microvolt = <1800000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							vdig_reg: vdig {
++								regulator-min-microvolt = <1650000>;
++								regulator-max-microvolt = <1650000>;
++								regulator-boot-on;
++							};
++
++							vsd_reg: vsd {
++								regulator-min-microvolt = <1800000>;
++								regulator-max-microvolt = <3150000>;
++							};
++
++							vusb2_reg: vusb2 {
++								regulator-min-microvolt = <2400000>;
++								regulator-max-microvolt = <2775000>;
++								regulator-boot-on;
++								regulator-always-on;
++							};
++
++							vvideo_reg: vvideo {
++								regulator-min-microvolt = <2775000>;
++								regulator-max-microvolt = <2775000>;
++							};
++
++							vaudio_reg: vaudio {
++								regulator-min-microvolt = <2300000>;
++								regulator-max-microvolt = <3000000>;
++							};
++
++							vcam_reg: vcam {
++								regulator-min-microvolt = <2500000>;
++								regulator-max-microvolt = <3000000>;
++							};
++
++							vgen1_reg: vgen1 {
++								regulator-min-microvolt = <1200000>;
++								regulator-max-microvolt = <1200000>;
++							};
++
++							vgen2_reg: vgen2 {
++								regulator-min-microvolt = <1200000>;
++								regulator-max-microvolt = <3150000>;
++								regulator-always-on;
++							};
++
++							vgen3_reg: vgen3 {
++								regulator-min-microvolt = <1800000>;
++								regulator-max-microvolt = <2900000>;
++								regulator-always-on;
++							};
++						};
+ 					};
  
- 	device = &per_cpu(at91_cpuidle_device, smp_processor_id());
- 	device->state_count = AT91_MAX_STATES;
--	driver->state_count = AT91_MAX_STATES;
--
--	/* Wait for interrupt state */
--	driver->states[0].enter = at91_enter_idle;
--	driver->states[0].exit_latency = 1;
--	driver->states[0].target_residency = 10000;
--	driver->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
--	strcpy(driver->states[0].name, "WFI");
--	strcpy(driver->states[0].desc, "Wait for interrupt");
--
--	/* Wait for interrupt and RAM self refresh state */
--	driver->states[1].enter = at91_enter_idle;
--	driver->states[1].exit_latency = 10;
--	driver->states[1].target_residency = 10000;
--	driver->states[1].flags = CPUIDLE_FLAG_TIME_VALID;
--	strcpy(driver->states[1].name, "RAM_SR");
--	strcpy(driver->states[1].desc, "WFI and RAM Self Refresh");
- 
- 	cpuidle_register_driver(&at91_idle_driver);
- 
+ 					flash: at45db321d at 1 {
 -- 
-1.7.1
+1.7.5.4
