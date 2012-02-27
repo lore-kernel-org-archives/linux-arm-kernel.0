@@ -1,19 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Feb 2012 11:21:20 +0000
-Subject: [PATCHv2 1/6] ARM: ftrace: remove useless memory checks
-In-Reply-To: <20120224164821.GA22856@debian>
-References: <1327757725-10114-1-git-send-email-rabin@rab.in>
- <1327757725-10114-2-git-send-email-rabin@rab.in>
- <20120220161601.GH26840@n2100.arm.linux.org.uk>
- <20120222141317.GB9031@debian> <20120222212821.GE7041@n2100.arm.linux.org.uk>
- <20120224164821.GA22856@debian>
-Message-ID: <20120227112119.GT22562@n2100.arm.linux.org.uk>
+From: Joerg.Roedel@amd.com (Joerg Roedel)
+Date: Mon, 27 Feb 2012 13:02:57 +0100
+Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
+ omap3isp
+In-Reply-To: <CAK=WgbZRjGEyx0mKmgoWYiOnuvUAka0kTzpLAYbra94Mfpp6qg@mail.gmail.com>
+References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
+ <3215700.hj2jFm3b0A@avalon>
+ <CAK=WgbYkVALqrVMVv1ma3WzN5dYriM8X0MfwH4knwWwojB6hjg@mail.gmail.com>
+ <35010303.ArkW8BdIu6@avalon>
+ <CAK=WgbZRjGEyx0mKmgoWYiOnuvUAka0kTzpLAYbra94Mfpp6qg@mail.gmail.com>
+Message-ID: <20120227120257.GB7905@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 10:18:21PM +0530, Rabin Vincent wrote:
-> Replacing the original is OK with me, new patch below.  Note that "ARM:
-> ftrace: use canonical Thumb-2 wide instruction format" will need to be
-> manually rebased on top of it since there is a change in the context.
+On Mon, Feb 27, 2012 at 09:00:51AM +0200, Ohad Ben-Cohen wrote:
+> On Mon, Feb 27, 2012 at 12:47 AM, Laurent Pinchart
+> > That's what the comment in the Makefile is for ;-) I don't think it's a
+> > perfect solution either, but it avoids playing with the various initcalls. The
+> > OMAP3 IOMMU isn't a subsystem, subsys_initcall() looks a bit like an API abuse
+> > to me.
+> 
+> Yes, it's dirty.
+> 
+> But it's explicit and consistent across build system changes (without
+> imposing anything on the build system). We do it all the time with
+> other subsystems. We don't like it, but luckily Grant came up with the
+> deferred probing mechanism, which will fix this all very nicely.
 
-Ok, please put this in the patch system, thanks.
+Agreed. It is not the best fix, but at least more reliable then the
+Makefile change.
+
+
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
