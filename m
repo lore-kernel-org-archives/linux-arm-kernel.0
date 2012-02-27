@@ -1,95 +1,42 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Mon, 27 Feb 2012 08:42:34 +0100
-Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
-In-Reply-To: <CAN1soZwMPpL1nbewjxTmmc_fewm=6xU6wgNgbauC05ZGEHCmAw@mail.gmail.com>
-References: <E1QHn5f-0004Rb-6j@outmx07.plus.net> <1330253328.3673.4.camel@flow>
- <CAN1soZwMPpL1nbewjxTmmc_fewm=6xU6wgNgbauC05ZGEHCmAw@mail.gmail.com>
-Message-ID: <1330328554.2778.20.camel@flow>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Feb 2012 08:44:09 +0100
+Subject: [PATCH] ARM: integrator: convert to sparse irqs
+In-Reply-To: <4F4AFB95.9040204@gmail.com>
+References: <1330104737-22782-1-git-send-email-linus.walleij@linaro.org>
+ <20120224191541.GB21556@game.jcrosoft.org>
+ <CACRpkdbjeAmD=AsybOEkYFMUEyvfwONawdDGtfwMhBhrKyg2hQ@mail.gmail.com>
+ <4F4AFB95.9040204@gmail.com>
+Message-ID: <CACRpkdag3BsubBgTiNM35e97OmjHpzAseEz0WK3oo5rQ5i8S_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 27.02.2012, 10:00 +0800 schrieb Haojian Zhuang:
-> On Sun, Feb 26, 2012 at 6:48 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> > On my hx4700 iPAQ running Windows Mobile 5, gpio button wakeup is
-> > configurable under "Start -> Settings -> Personal -> Buttons -> Lock".
-> > There is a checkbox "Disable all buttons except power button" which
-> > enables/disables the keypad and ASIC3 GPIO buttons as wakeup sources.
-> >
-> > To achieve the same functionality on linux, we could split the power
-> > button and the other buttons into separate gpio_keys devices and let
-> > userspace disable the other buttons as wakeup sources via the device's
-> > pm_wakeup interface. 
+On Mon, Feb 27, 2012 at 4:42 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 02/26/2012 03:45 AM, Linus Walleij wrote:
+>> On Fri, Feb 24, 2012 at 8:15 PM, Jean-Christophe PLAGNIOL-VILLARD
+>> <plagnioj@jcrosoft.com> wrote:
+>>> On 18:32 Fri 24 Feb ? ? , Linus Walleij wrote:
+>>
+>>>> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ? ? 47
+>>>> +#define NR_IRQS_INTEGRATOR_AP ? ? ? ? ? ? ? ?34
+>>>> +#define NR_IRQS_INTEGRATOR_CP ? ? ? ? ? ? ? ?47
+>>>
+>>> why do you need to specified both?
+>>
+>> They are two totally different machines and should never have had that
+>> common roof of NR_IRQS = max(AP,CP), it's just not elegant.
+>>
+>> Maybe I'm a bit pedantic but I want to set the .nr_irqs for each machine so that
+>> it corresponds exactly to what it actually has, instead of using a roof value.
+>> I think it improves readability and understanding.
 >
-> It seems that this patch is only enable powerup key as wakeup source.
+> Really, you want to get rid of the value altogether. Each irq_chip
+> should allocate its irq_descs and then you don't need to set .nr_irqs.
 
-Yes. This is temporary until ASIC3 GPIO wakeup support is in place.
+OK can you point to a machine that does it the right way and
+I'll fix.
 
-> Other gpio keys could be configured as wakeup source in user space. So could
-> you help to figure out the interface of configuring gpio key as wakeup source
-> in user space?
+Or do I need the irq domains lib to go in first to do that in a
+good/non-awkward way?
 
-I was thinking of the /sys/devices/.../power/wakeup interface, as
-documented in Documentation/ABI/testing/sysfs-devices-power.
-
-Put the power button into its own gpio-keys device:
-
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index 06ec926..21d26a3 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -166,11 +166,26 @@ static struct pxaficp_platform_data ficp_info = {
- 		.active_low = _active_low,		\
- 		.desc       = _desc,			\
- 		.type       = EV_KEY,			\
--		.wakeup     = KEY_##_code == KEY_POWER,	\
-+		.wakeup     = 1,			\
- 	}
- 
-+static struct gpio_keys_button gpio_keys_power_button =
-+	INIT_KEY(POWER,       GPIO0_HX4700_nKEY_POWER,   1, "Power button");
-+
-+static struct gpio_keys_platform_data gpio_keys_power_data = {
-+	.buttons = gpio_keys_power_button,
-+	.nbuttons = 1,
-+};
-+
-+static struct platform_device gpio_keys_power = {
-+	.name = "gpio-keys",
-+	.dev  = {
-+		.platform_data = &gpio_keys_power_data,
-+	},
-+	.id   = 0,
-+};
-+
- static struct gpio_keys_button gpio_keys_buttons[] = {
--	INIT_KEY(POWER,       GPIO0_HX4700_nKEY_POWER,   1, "Power button"),
- 	INIT_KEY(MAIL,        GPIO94_HX4700_KEY_MAIL,    0, "Mail button"),
- 	INIT_KEY(ADDRESSBOOK, GPIO99_HX4700_KEY_CONTACTS,0, "Contacts button"),
- 	INIT_KEY(RECORD,      GPIOD6_nKEY_RECORD,        1, "Record button"),
-@@ -188,7 +203,7 @@ static struct platform_device gpio_keys = {
- 	.dev  = {
- 		.platform_data = &gpio_keys_data,
- 	},
--	.id   = -1,
-+	.id   = 1,
- };
- 
- /*
-@@ -836,6 +851,7 @@ static struct platform_device audio = {
- 
- static struct platform_device *devices[] __initdata = {
- 	&asic3,
-+	&gpio_keys_power,
- 	&gpio_keys,
- 	&navpoint,
- 	&backlight,
-
-And then let userspace disable wakeup for the other keys via
-echo disabled > /sys/devices/platform/gpio-keys.1/power/wakeup
-
-The gpio-keys driver will check this setting with device_may_wakeup()
-during gpio_keys_suspend() and decide whether to call enable_irq_wake()
-for its button GPIOs.
-
-regards
-Philipp
+Yours,
+Linus Walleij
