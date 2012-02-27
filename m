@@ -1,38 +1,53 @@
-From: kevin.wells@nxp.com (Kevin Wells)
-Date: Tue, 28 Feb 2012 00:10:38 +0100
-Subject: [PATCH v3] ARM: LPC32xx: Ethernet support
-In-Reply-To: <4F4BFDD2.8060007@antcom.de>
-References: <1330364762-23203-1-git-send-email-stigge@antcom.de>
- <20120227180814.GB21386@pengutronix.de> <4F4BFDD2.8060007@antcom.de>
-Message-ID: <083DF309106F364B939360100EC290F81F365B2B2A@eu1rdcrdc1wx030.exi.nxp.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 27 Feb 2012 15:50:24 -0800
+Subject: [PATCH 2/6] gpio/omap: remove saved_wakeup field from struct
+ gpio_bank
+In-Reply-To: <1329999031-6914-3-git-send-email-tarun.kanti@ti.com> (Tarun
+ Kanti DebBarma's message of "Thu, 23 Feb 2012 17:40:27 +0530")
+References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
+ <1329999031-6914-3-git-send-email-tarun.kanti@ti.com>
+Message-ID: <87aa43vnsv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> This patch adds ethernet support to the LPC32xx ARM architecture.
->>> The actual driver in drivers/net is contained in a separate
->>> patch.
->>> 
->>> Signed-off-by: Roland Stigge <stigge@antcom.de>
->>> 
->>> ---
->> 
->> Please add below this dashed line what changed since the last
->> version. This makes reviewing easier. 
->
->OK, will do next time.
->
->For the driver, some style fixes were applied, and the cmdline
->"ethaddr" was removed, relying on the bootloader to set it correctly
-> (and it actually does, it actually needs to prepare TFTP booting).
+Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
-I'm not sure I'd trust the bootloader to always set the MAC address
-in hardware prior to calling the kernel. A lot of u-boot MAC drivers,
-including the 32x0's, only set the MAC address on the call to
-eth_init(), which is only called when the network interface is used.
-If you do a MTD based kernel boot, the MAC address will probably be
-invalid if you try to do a NFS mount for the filesystem.
-
->The platform-support patch just adjusted to the small driver change:
->driver name adjustment ("lpc-eth") for consistency.
+> There is no more need to have saved_wakeup. Instead we can use
+> context.wake_en which holds the current wakeup enable register
+> context. This also means that the read from wakeup enable register
+> is not needed.
 >
->Roland
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+
+Looks right, but one question below...
+
+> ---
+>  drivers/gpio/gpio-omap.c |   13 ++++---------
+>  1 files changed, 4 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 40a1fb2..64f15d5 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -54,7 +54,6 @@ struct gpio_bank {
+>  	u16 irq;
+>  	u16 virtual_irq_start;
+>  	u32 suspend_wakeup;
+> -	u32 saved_wakeup;
+>  	u32 non_wakeup_gpios;
+>  	u32 enabled_non_wakeup_gpios;
+>  	struct gpio_regs context;
+> @@ -772,7 +771,7 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
+>  	unsigned long		flags;
+>  
+>  	spin_lock_irqsave(&bank->lock, flags);
+> -	bank->saved_wakeup = __raw_readl(mask_reg);
+> +	bank->context.wake_en = __raw_readl(mask_reg);
+
+Why is this read needed?
+
+Kevin
+
+>  	__raw_writel(0xffff & ~bank->suspend_wakeup, mask_reg);
+>  	spin_unlock_irqrestore(&bank->lock, flags);
+>  
