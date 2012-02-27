@@ -1,28 +1,54 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Mon, 27 Feb 2012 01:58:45 +0000 (GMT)
-Subject: [PATCH v3 REPOST] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
-Message-ID: <1330307925.11845.YahooMailClassic@web29010.mail.ird.yahoo.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 27 Feb 2012 10:00:35 +0800
+Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
+In-Reply-To: <1330253328.3673.4.camel@flow>
+References: <E1QHn5f-0004Rb-6j@outmx07.plus.net> <1330253328.3673.4.camel@flow>
+Message-ID: <CAN1soZwMPpL1nbewjxTmmc_fewm=6xU6wgNgbauC05ZGEHCmAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hx4700 platform has 72 board gpios: 64 ASIC3 gpios numbered 192..255, and
-8 EGPIO gpios numbered 256..263 (plus a 9th which is not used).
-Thus the new CONFIG_ARCH_NR_GPIO config option must be set to 264.
+On Sun, Feb 26, 2012 at 6:48 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+> Am Donnerstag, den 05.05.2011, 01:10 +0000 schrieb Paul Parsons:
+>> Resuming a suspended hx4700 results in Unbalanced IRQ warnings:
+>>
+>> WARNING: at kernel/irq/manage.c:507 irq_set_irq_wake+0xe0/0xec()
+>> Unbalanced IRQ 246 wake disable
+>> ..
+>>
+>> Likewise for IRQ 241 and IRQ 243. The 3 ASIC3 GPIO buttons - RECORD/CALENDAR/HOME - each fail in a call to enable_irq_wake() in gpio_keys_suspend() because of an absent irq_set_wake() handler in the asic3_gpio_irq_chip structure. Matching calls to disable_irq_wake() in gpio_keys_resume() then print the warnings. Since we should never need to resume via the 3 ASIC3 GPIO buttons, nor 2 of the 3 builtin GPIO buttons - MAIL/CONTACTS, the simplest remedy for the warnings is to enable irq wakeup on the POWER button only.
+>>
+>> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+>> ---
+>> --- clean-2.6.39-rc6/arch/arm/mach-pxa/hx4700.c ? ? ? 2011-05-04 12:09:06.298511475 +0100
+>> +++ linux-2.6.39-rc6/arch/arm/mach-pxa/hx4700.c ? ? ? 2011-05-05 00:07:57.034493981 +0100
+>> @@ -191,7 +191,7 @@ static struct pxaficp_platform_data ficp
+>> ? ? ? ? ? ? ? .active_low = _active_low, ? ? ? ? ? ? ?\
+>> ? ? ? ? ? ? ? .desc ? ? ? = _desc, ? ? ? ? ? ? ? ? ? ?\
+>> ? ? ? ? ? ? ? .type ? ? ? = EV_KEY, ? ? ? ? ? ? ? ? ? \
+>> - ? ? ? ? ? ? .wakeup ? ? = 1, ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .wakeup ? ? = KEY_##_code == KEY_POWER, \
+>> ? ? ? }
+>>
+>> ?static struct gpio_keys_button gpio_keys_buttons[] = {
+>>
+>
+> On my hx4700 iPAQ running Windows Mobile 5, gpio button wakeup is
+> configurable under "Start -> Settings -> Personal -> Buttons -> Lock".
+> There is a checkbox "Disable all buttons except power button" which
+> enables/disables the keypad and ASIC3 GPIO buttons as wakeup sources.
+>
+> To achieve the same functionality on linux, we could split the power
+> button and the other buttons into separate gpio_keys devices and let
+> userspace disable the other buttons as wakeup sources via the device's
+> pm_wakeup interface. For that we need
+>
+> Given that ASIC3 doesn't support irq_set_wake for now,
+> Acked-By: Philipp Zabel <philipp.zabel@gmail.com>
+>
+It seems that this patch is only enable powerup key as wakeup source.
+Other gpio keys could be configured as wakeup source in user space. So could
+you help to figure out the interface of configuring gpio key as wakeup source
+in user space?
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
-
-V3:
-Description change: 64 ASIC3 gpios + 8 EGPIO gpios = 72 board gpios, not 70.
-
-diff -ru clean-3.3-rc1/arch/arm/Kconfig linux-3.3-rc1/arch/arm/Kconfig
---- clean-3.3-rc1/arch/arm/Kconfig	2012-01-19 23:04:48.000000000 +0000
-+++ linux-3.3-rc1/arch/arm/Kconfig	2012-01-30 17:11:35.897518763 +0000
-@@ -1580,6 +1580,7 @@
- 	int
- 	default 1024 if ARCH_SHMOBILE || ARCH_TEGRA
- 	default 350 if ARCH_U8500
-+	default 264 if MACH_H4700
- 	default 0
- 	help
- 	  Maximum number of GPIOs in the system.
+Thanks
+Haojian
