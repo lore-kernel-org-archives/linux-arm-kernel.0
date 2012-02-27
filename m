@@ -1,59 +1,64 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 27 Feb 2012 17:03:00 +0200
-Subject: elf_set_personality()
-In-Reply-To: <20120227130453.GV22562@n2100.arm.linux.org.uk>
-References: <20120227123612.GD12917@tbergstrom-lnx.Nvidia.com>
- <20120227130453.GV22562@n2100.arm.linux.org.uk>
-Message-ID: <20120227150300.GF12917@tbergstrom-lnx.Nvidia.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Mon, 27 Feb 2012 09:13:59 -0600
+Subject: [PATCH v5 2/9] SH: shmobile: cpuidle consolidation
+In-Reply-To: <1330318063-25460-3-git-send-email-rob.lee@linaro.org>
+References: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
+ <1330318063-25460-3-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAMXH7KHZH5wMHLOvhQe22K8+7s+yvCVtOvrNw0-ogjFArt-ZNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 02:04:53PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Feb 27, 2012 at 02:36:12PM +0200, Peter De Schrijver wrote:
-> > Commit ID 5e143436d04465c937c1a242808a99c46393af3e
-> > (fix personality flag propagation across an exec) makes a child process
-> > inherit a number of personality flags from its parent. This includes the
-> > READ_IMPLIES_EXEC flag.
-> 
-> So, READ_IMPLIES_EXEC will only be leaked if it's already set.
-> 
-> > Unfortunately this causes problems when debugging
-> > android applications using gdbserver. It appears that gdbserver on android
-> > has an executable stack. This causes the kernel to set the READ_IMPLIES_EXEC
-> > flag on the gdbserver process.
-> 
-> Ok.
-> 
-> > So the child android process will also get this flag.
-> 
-> And that means that attempting to mmap() stuff will also get executable
-> protections in addition.
-> 
-> > As soon as the android tries to mmap a readonly android shmem segment
-> > (using the ashmem driver), ashmem will return EPERM, because the segment has
-> > been exposed as readonly without exec permissions and the kernel will modify
-> > any readonly mmap request into read and execute.
-> 
-> This sounds like a problem.  If you have two applications trying to use
-> the ashmem driver, one without READ_IMPLIES_EXEC and one with
-> READ_IMPLIES_EXEC, then it seems that ashmem will prevent the
-> READ_IMPLIES_EXEC one from using such regions.  That sounds like a
-> (different) bug to me.
-> 
+Adding sh mailing list and sh contributors I missed on the original
+submission.  SH folks, full patchset submission can be found here:
+http://www.spinics.net/lists/arm-kernel/msg161596.html
 
-Good point. I don't know anything about the design ideas behind ashmem though.
-Can anyone from android comment on this?
+Best Regards,
+Rob
 
-> > Why does the READ_IMPLIES_EXEC flag need to be propagated? Would it be
-> > acceptable to not propagate it to child processes?
-> 
-> It shouldn't propagate.  But I think it's uncovered a separate problem
-
-Ok. Should I write a patch for this? Seems easy enough to also clear the
-READ_IMPLIES_EXEC bit when copying the child personality from the parent?
-
-> in the ashmem driver.
-
-Cheers,
-
-Peter.
+On Sun, Feb 26, 2012 at 10:47 PM, Robert Lee <rob.lee@linaro.org> wrote:
+> Enable core cpuidle timekeeping and irq enabling and remove that
+> handling from this code.
+>
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+> ?arch/sh/kernel/cpu/shmobile/cpuidle.c | ? 10 +++-------
+> ?1 files changed, 3 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/sh/kernel/cpu/shmobile/cpuidle.c b/arch/sh/kernel/cpu/shmobile/cpuidle.c
+> index 6d62eb4..1ddc876 100644
+> --- a/arch/sh/kernel/cpu/shmobile/cpuidle.c
+> +++ b/arch/sh/kernel/cpu/shmobile/cpuidle.c
+> @@ -29,7 +29,6 @@ static int cpuidle_sleep_enter(struct cpuidle_device *dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index)
+> ?{
+> ? ? ? ?unsigned long allowed_mode = SUSP_SH_SLEEP;
+> - ? ? ? ktime_t before, after;
+> ? ? ? ?int requested_state = index;
+> ? ? ? ?int allowed_state;
+> ? ? ? ?int k;
+> @@ -47,19 +46,16 @@ static int cpuidle_sleep_enter(struct cpuidle_device *dev,
+> ? ? ? ? */
+> ? ? ? ?k = min_t(int, allowed_state, requested_state);
+>
+> - ? ? ? before = ktime_get();
+> ? ? ? ?sh_mobile_call_standby(cpuidle_mode[k]);
+> - ? ? ? after = ktime_get();
+> -
+> - ? ? ? dev->last_residency = (int)ktime_to_ns(ktime_sub(after, before)) >> 10;
+>
+> ? ? ? ?return k;
+> ?}
+>
+> ?static struct cpuidle_device cpuidle_dev;
+> ?static struct cpuidle_driver cpuidle_driver = {
+> - ? ? ? .name = ? ? ? ? "sh_idle",
+> - ? ? ? .owner = ? ? ? ?THIS_MODULE,
+> + ? ? ? .name ? ? ? ? ? ? ? ? ? = "sh_idle",
+> + ? ? ? .owner ? ? ? ? ? ? ? ? ?= THIS_MODULE,
+> + ? ? ? .en_core_tk_irqen ? ? ? = 1,
+> ?};
+>
+> ?void sh_mobile_setup_cpuidle(void)
+> --
+> 1.7.1
+>
