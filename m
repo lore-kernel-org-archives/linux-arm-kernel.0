@@ -1,134 +1,84 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 27 Feb 2012 01:40:47 +0100
-Subject: [PATCH 2/3] ARM: PXA27x: save/restore PWER on suspend/resume
-In-Reply-To: <20120227001838.GE4706@n2100.arm.linux.org.uk>
-References: <1330264062-5750-1-git-send-email-anarsoul@gmail.com>
- <201202270047.01509.marek.vasut@gmail.com>
- <20120227001838.GE4706@n2100.arm.linux.org.uk>
-Message-ID: <201202270140.47236.marek.vasut@gmail.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Mon, 27 Feb 2012 00:45:06 +0000 (GMT)
+Subject: [PATCH] pxa/hx4700: Correct StrataFlash block size discovery
+Message-ID: <1330303506.37736.YahooMailClassic@web29015.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, Feb 27, 2012 at 12:47:01AM +0100, Marek Vasut wrote:
-> > > On Sun, Feb 26, 2012 at 11:20:27PM +0100, Marek Vasut wrote:
-> > > > > On Sun, Feb 26, 2012 at 04:47:41PM +0300, Vasily Khoruzhick wrote:
-> > > > > > Bootloader can clobber PWER value, so save it state on suspend.
-> > > > > 
-> > > > > What boot loader is this,
-> > > > 
-> > > > U-Boot, patched, not mainline.
-> > > > 
-> > > > > and why is it being so idiotic?
-> > > > 
-> > > > Mainline doesn't touch PWER, so please be careful about your
-> > > > accusations.
-> > > > 
-> > > > > Why can't it
-> > > > > be fixed?
-> > > > 
-> > > > Yes, either by using mainline uboot (to rule out the bootloader
-> > > > problem), finding bug in linux kernel or reading the CPU manual.
-> > > 
-> > > Was there supposed to be any useful information in your reply, or are
-> > > you just trying to be your usual antagonistic self?
-> > 
-> > Um ...
-> > 
-> > 1) PWER isn't reconfigured by uboot (see above)
-> 
-> Given that virtually everyone seems to use a modified version of uboot,
-> how can you be so sure?
+The HP iPAQ hx4700 has 128Mb of flash provided by two Intel StrataFlash devices.
+The hx4700 platform configuration defines a single 128Mb flash resource,
+resulting in the MTD physmap-flash driver probing the first device only and
+presuming the second device is identical:
 
-It's impossible to support every single version of some bootloader patched in 
-various obscure ways, sorry.
+physmap platform flash device: 08000000 at 00000000
+physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008816
+physmap-flash: Found 2 x16 devices at 0x4000000 in 32-bit bank
+<snip>
+erase region 0: offset=0x0,size=0x10000,blocks=4
+erase region 1: offset=0x40000,size=0x40000,blocks=255
+erase region 2: offset=0x4000000,size=0x10000,blocks=4
+erase region 3: offset=0x4040000,size=0x40000,blocks=255
+physmap-flash: 2 set(s) of 2 interleaved chips --> 32 partitions of 4096 KiB
 
-> 
-> > 2) That you should try mainline uboot to avoid debugging problems with
-> > not- mainlined patches
-> 
-> Why should _I_ try anything with uboot?  I'm not the one experiencing
-> problems.
-> 
-> I'll point out that Vasily is reporting that _his_ boot loader, whatever
-> it is, is clobbering the PWER register.  That's *his* statement in the
-> commit log, and I have no reason *not* to think that he's put in the
-> research to confirm that.  Otherwise, why make such a positive statement
-> about where the problem lies?
+Unfortunately the two devices are not identical. The first has a device ID of
+0x8816, identifying a bottom parameter device. The second has a device ID of
+0x8813, identifying a top parameter device. By not probing the second device,
+physmap-flash does not discover the correct block sizes.
 
-Well if it does clober the register, he should use bootloader that's not broken.
+This patch splits the configuration into two 64Mb flash resources, forcing
+physmap-flash to probe both devices and thus discover the correct block sizes:
 
-> 
-> > 3) That the bug with PWER is likely in kernel, since there's an issue
-> > with gpio_set_wake() on PXA
-> 
-> I've reviewed this function and its associated data, and can't see
-> anything wrong with it (see below).
-> 
-> > 4) That the CPU might not preserve PWER throughout the suspend and that
-> > this information might be found in the CPU manual
-> 
-> No.  The PXA270 manual says that this register is preserved on exit from
-> deep sleep and sleep modes.  It appends a note against each bit in the
-> reset status for the PWER register which says "Exit from sleep or
-> deep sleep mode does not clear or set this bit".
-> 
-> The setup for GPIO0 is:
-> 
->         for (i = 0; i <= 15; i++) {
->                 /* skip GPIO2, 5, 6, 7, 8 */
->                 if (GPIO_bit(i) & 0x1e4)
->                         continue;
-> 
->                 gpio_desc[i].can_wakeup = 1;
->                 gpio_desc[i].mask = GPIO_bit(i);
->         }
-> 
-> So, gpio_desc[0].can_wakeup = 1 and gpio_desc[0].mask is the bitmask for
-> GPIO0.
-> 
-> gpio_set_wake() does this:
-> 
->         d = &gpio_desc[gpio];
->         c = d->config;
-> 
->         if (!d->valid)
->                 return -EINVAL;
-> 
-> well, that's already been set valid by pxa27x_mfp_init().
-> 
->         if (d->keypad_gpio && (MFP_AF(d->config) == 0) &&
-> 
-> it's not a keypad gpio...
-> 
->         mux_taken = (PWER & d->mux_mask) & (~d->mask);
->         if (on && mux_taken)
->                 return -EBUSY;
-> 
-> well, d->mux_mask is zero, so this check fails.
-> 
->         if (d->can_wakeup && (c & MFP_LPM_CAN_WAKEUP)) {
->                 if (on) {
->                         PWER = (PWER & ~d->mux_mask) | d->mask;
-> 
-> Now, we know d->can_wakeup is true.  However, what about the MFP
-> configuration?
-> 
-> Well, that depends on the platform.  I suspect that's where the problem
-> with wakeup sources not working is located, because the MFP configuration
-> hasn't been properly set, and that comes from platform code.
+physmap platform flash device: 04000000 at 00000000
+physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008816
+<snip>
+erase region 0: offset=0x0,size=0x10000,blocks=4
+erase region 1: offset=0x40000,size=0x40000,blocks=255
+physmap-flash: 1 set(s) of 2 interleaved chips --> 16 partitions of 4096 KiB
+physmap platform flash device: 04000000 at 04000000
+physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008813
+<snip>
+erase region 0: offset=0x0,size=0x40000,blocks=255
+erase region 1: offset=0x3fc0000,size=0x10000,blocks=4
+physmap-flash: 1 set(s) of 2 interleaved chips --> 16 partitions of 4096 KiB
+Concatenating MTD devices:
+(0): "physmap-flash"
+(1): "physmap-flash"
+into device "physmap-flash"
 
-Ok, agreed.
-> 
-> So please, stop blaming PXA code without full and proper analysis of
-> bugs.
-
-I said in kernel, not in PXA code.
-
-> It's a waste of everyone's time, and it hurts proper kernel
-> maintenance if these ill-researched 'workarounds' get merged instead
-> of proper fixes.
-
-Agreed. So this all boils down to the point where Vasily should check his MFP 
-settings.
-
-M
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+---
+--- clean-3.3-rc5/arch/arm/mach-pxa/hx4700.c	2012-02-25 20:18:16.000000000 +0000
++++ linux-3.3-rc5/arch/arm/mach-pxa/hx4700.c	2012-02-27 00:02:55.530072120 +0000
+@@ -704,10 +704,17 @@ static void hx4700_set_vpp(struct platfo
+ 	gpio_set_value(GPIO91_HX4700_FLASH_VPEN, vpp);
+ }
+ 
+-static struct resource strataflash_resource = {
+-	.start = PXA_CS0_PHYS,
+-	.end   = PXA_CS0_PHYS + SZ_128M - 1,
+-	.flags = IORESOURCE_MEM,
++static struct resource strataflash_resource[] = {
++	[0] = {
++		.start = PXA_CS0_PHYS,
++		.end   = PXA_CS0_PHYS + SZ_64M - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = PXA_CS0_PHYS + SZ_64M,
++		.end   = PXA_CS0_PHYS + SZ_128M - 1,
++		.flags = IORESOURCE_MEM,
++	},
+ };
+ 
+ static struct physmap_flash_data strataflash_data = {
+@@ -718,8 +725,8 @@ static struct physmap_flash_data strataf
+ static struct platform_device strataflash = {
+ 	.name          = "physmap-flash",
+ 	.id            = -1,
+-	.resource      = &strataflash_resource,
+-	.num_resources = 1,
++	.resource      = strataflash_resource,
++	.num_resources = ARRAY_SIZE(strataflash_resource),
+ 	.dev = {
+ 		.platform_data = &strataflash_data,
+ 	},
