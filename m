@@ -1,46 +1,39 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 27 Feb 2012 09:00:51 +0200
-Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
- omap3isp
-In-Reply-To: <35010303.ArkW8BdIu6@avalon>
-References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
- <3215700.hj2jFm3b0A@avalon>
- <CAK=WgbYkVALqrVMVv1ma3WzN5dYriM8X0MfwH4knwWwojB6hjg@mail.gmail.com>
- <35010303.ArkW8BdIu6@avalon>
-Message-ID: <CAK=WgbZRjGEyx0mKmgoWYiOnuvUAka0kTzpLAYbra94Mfpp6qg@mail.gmail.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Mon, 27 Feb 2012 12:57:06 +0530
+Subject: [PATCH] arch/arm/mach-ux500/board-mop500-u8500uib.c: included
+ linux/gpio.h twice
+In-Reply-To: <1329333578-31773-1-git-send-email-danny.kukawka@bisect.de>
+References: <1329333578-31773-1-git-send-email-danny.kukawka@bisect.de>
+Message-ID: <20120227072705.GA19429@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Mon, Feb 27, 2012 at 12:47 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> I'm asking about the probe deferral mechanism. The omap3-isp driver will still
-> call iommu_attach_device() in its probe function. What will happen then ? Will
-> it return an error ? On what basis will it do so ?
-
-Yes, iommu_attach_device() will fail, and omap3isp's probe function
-will then need to return -EAGAIN to request that its probe function
-will be invoked again later on.
-
-> That's what the comment in the Makefile is for ;-) I don't think it's a
-> perfect solution either, but it avoids playing with the various initcalls. The
-> OMAP3 IOMMU isn't a subsystem, subsys_initcall() looks a bit like an API abuse
-> to me.
-
-Yes, it's dirty.
-
-But it's explicit and consistent across build system changes (without
-imposing anything on the build system). We do it all the time with
-other subsystems. We don't like it, but luckily Grant came up with the
-deferred probing mechanism, which will fix this all very nicely.
-
-> Are drivers supposed to call iommu_attach_device() in their probe() function
-> or later on ?
-
-If you can defer attaching to a later point, most commonly to a point
-where the device is opened by the user, it's better - less power will
-be consumed.
+On Wed, Feb 15, 2012 at 20:19:38 +0100, Danny Kukawka wrote:
+> arch/arm/mach-ux500/board-mop500-u8500uib.c included 'linux/gpio.h'
+> remove the duplicate.
+> 
+> Signed-off-by: Danny Kukawka <danny.kukawka@bisect.de>
+> ---
+>  arch/arm/mach-ux500/board-mop500-u8500uib.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ux500/board-mop500-u8500uib.c b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+> index feb5744..ead91c9 100644
+> --- a/arch/arm/mach-ux500/board-mop500-u8500uib.c
+> +++ b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+> @@ -8,7 +8,6 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/i2c.h>
+> -#include <linux/gpio.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/mfd/tc3589x.h>
+>  #include <linux/input/matrix_keypad.h>
 
 Thanks,
-Ohad.
+
+Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+
+Linus W, would you please pick if you have not noticed this.
+
+srinidhi
