@@ -1,44 +1,22 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 27 Feb 2012 09:57:29 -0800
-Subject: [PATCH v3] lpc32xx: Added ethernet driver
-In-Reply-To: <1330364539-23152-1-git-send-email-stigge@antcom.de>
-References: <1330364539-23152-1-git-send-email-stigge@antcom.de>
-Message-ID: <1330365449.9942.26.camel@joe2Laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Feb 2012 18:00:54 +0000
+Subject: [GIT PULL] LPC32xx fixes-non-critical for v3.3-rc5
+In-Reply-To: <4F4BB7E8.1040606@antcom.de>
+References: <4F490CC0.5050303@antcom.de> <201202271409.52470.arnd@arndb.de>
+ <4F4BB7E8.1040606@antcom.de>
+Message-ID: <201202271800.55145.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-02-27 at 18:42 +0100, Roland Stigge wrote:
-> This patch adds an ethernet driver for the LPC32xx ARM SoC.
+On Monday 27 February 2012, Roland Stigge wrote:
+> Hi Arnd and Olof,
+> 
+> this is the singled out separate fix, as discussed.
+> 
+> It applies cleanly to v3.3-rc5 and is intended for
+> next/fixes-non-critical for v3.4.
+> 
 
-This looks nicer to me, thanks.
-Just a few more trivial comments.
+Ok, pulled into next/fixes-non-critical now. Thanks,
 
-[]
-> +++ linux-2.6/drivers/net/ethernet/nxp/lpc_eth.c
-[]
-> +static int lpc_mdio_read(struct mii_bus *bus, int phy_id, int phyreg)
-> +{
-> +	struct netdata_local *pldat = bus->priv;
-> +	unsigned long timeout = jiffies + ((HZ * 100) / 1000); /* 100mS */
-
-msecs_to_jiffies?
-
-> +static void __lpc_handle_xmit(struct net_device *ndev)
-> +{
-[]
-> +		/* Any errors occurred? */
-> +		if (txstat & 0x80000000) {
-> +			if (txstat & 0x20000000) {
-
-It might be clearer to use #defines
-
-> +				/* FIFO underrun */
-> +				ndev->stats.tx_fifo_errors++;
-> +				ndev->stats.tx_errors++;
-> +			}
-> +			if (txstat & 0x10000000) {
-> +				/* Late collision */
-> +				ndev->stats.tx_aborted_errors++;
-> +				ndev->stats.tx_errors++;
-
-double counting tx_errors?
+	Arnd
