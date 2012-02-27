@@ -1,35 +1,56 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 27 Feb 2012 11:15:06 +0800
-Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
-In-Reply-To: <1330309969.41933.YahooMailClassic@web29005.mail.ird.yahoo.com>
-References: <CAN1soZwTEppNZNHs5-_ORrNEt9x2rtV1omd6JGH_N4mzSSLD0w@mail.gmail.com>
- <1330309969.41933.YahooMailClassic@web29005.mail.ird.yahoo.com>
-Message-ID: <CAN1soZzA9KMR2Y_WihT-xj2Ovyqtcc+Y-j2seia1=8ZHkEjGBQ@mail.gmail.com>
+Date: Mon, 27 Feb 2012 11:18:28 +0800
+Subject: [GIT PULL] [for 3.4] git pull request for arch-pxa
+Message-ID: <CAN1soZzkih_N9eB6+9F3j0QDbbhQ0wLMP2TkVoqMQ7UijEYCew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 10:32 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> Hello Haojian,
->
->> > What you want here is to keep the SPI chip select
->> deasserted (high)
->> > during suspend, so I think that should be DRIVE_HIGH
->> instead.
->> >
->> > Otherwise,
->> > Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
->> >
->> This patch keeps a lot of devices in power-on mode (not
->> reset mode).
->> Is it necessary?
->
-> No, of course not. This patch is just a first step to get hx4700 suspend
-> mode working; currently it does not work at all.
->
-> The suspend mode disposition of devices and GPIOs still needs to be
-> reviewed at some point. For example, someone else discovered that the two
-> Bluetooth outputs (GPIO43, GPIO45) account for approximately one third of
-> the suspend mode power consumption! Correcting that will be my next patch.
->
+Hi Arnd,
 
-Applied.
+Please help to pull these patches for v3.4.
+
+The following changes since commit c38e23456278e967f094b08247ffc3711b1029b2:
+
+  i387: fix sense of sanity check (2012-02-15 08:05:18 -0800)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git for-next
+
+Haojian Zhuang (7):
+      rtc: sa1100: remove periodic code
+      rtc: sa1100: remove verification code of alarm
+      rtc: sa1100: declare irq in resource
+      ARM: pxa: add rtc dummy clock
+      rtc: sa1100: enable clk support
+      ARM: mmp: enable rtc in pxa910
+      ARM: mmp: append irq name of gpio device
+
+Jett.Zhou (1):
+      ARM: sa1100: clean up clock support
+
+Paul Parsons (4):
+      pxa/hx4700: Correct StrataFlash block size discovery
+      pxa/hx4700: Add ASIC3 LED support
+      pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
+      pxa/hx4700: Fix basic suspend/resume
+
+ arch/arm/Kconfig                           |    3 +-
+ arch/arm/mach-mmp/include/mach/pxa910.h    |    1 +
+ arch/arm/mach-mmp/include/mach/regs-apbc.h |    1 +
+ arch/arm/mach-mmp/include/mach/regs-rtc.h  |   23 ++++
+ arch/arm/mach-mmp/mmp2.c                   |    1 +
+ arch/arm/mach-mmp/pxa168.c                 |    1 +
+ arch/arm/mach-mmp/pxa910.c                 |   28 ++++
+ arch/arm/mach-mmp/ttc_dkb.c                |    1 +
+ arch/arm/mach-pxa/devices.c                |   28 ++++-
+ arch/arm/mach-pxa/hx4700.c                 |   40 +++++-
+ arch/arm/mach-pxa/pxa25x.c                 |    1 +
+ arch/arm/mach-pxa/pxa27x.c                 |    1 +
+ arch/arm/mach-pxa/pxa3xx.c                 |    1 +
+ arch/arm/mach-pxa/pxa95x.c                 |    1 +
+ arch/arm/mach-sa1100/clock.c               |   82 +++++++-----
+ arch/arm/mach-sa1100/generic.c             |    8 +
+ drivers/rtc/Kconfig                        |    4 +-
+ drivers/rtc/rtc-sa1100.c                   |  198 ++++++++++++++--------------
+ 18 files changed, 271 insertions(+), 152 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/include/mach/regs-rtc.h
