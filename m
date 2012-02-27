@@ -1,42 +1,61 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 27 Feb 2012 09:32:30 +0800
-Subject: [PATCH v3] pxa/hx4700: Fix PXA_GPIO_IRQ_BASE/IRQ_NUM values
-In-Reply-To: <CA+gwMccFY1KLn4=cHPkO-dOHz1+8EdPcc=FaCJ0hL5+uMYVEew@mail.gmail.com>
-References: <1327967449.72659.YahooMailClassic@web29002.mail.ird.yahoo.com>
- <CA+gwMccFY1KLn4=cHPkO-dOHz1+8EdPcc=FaCJ0hL5+uMYVEew@mail.gmail.com>
-Message-ID: <CAN1soZzXuDd0uU=1WYrgPkQ5hXhgrv-Kzq-_Yct7-XcKG35Z4w@mail.gmail.com>
+Date: Mon, 27 Feb 2012 09:50:03 +0800
+Subject: [PATCH REPOST] pxa/hx4700: Add ASIC3 LED support
+In-Reply-To: <1330253736.3673.9.camel@flow>
+References: <E1QZT9S-0004Vb-Hv@outmx03.plus.net> <1330253736.3673.9.camel@flow>
+Message-ID: <CAN1soZzPGjq7irFS-CsvOtAKSCwKG6TS6ph+tVf5urLed6-Wxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2012 at 7:04 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> On Tue, Jan 31, 2012 at 12:50 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
->> The hx4700 platform has 72 board gpios: 64 ASIC3 gpios numbered 192..255, and
->> 8 EGPIO gpios numbered 256..263 (plus a 9th which is not used).
->> Thus the new CONFIG_ARCH_NR_GPIO config option must be set to 264.
+On Sun, Feb 26, 2012 at 6:55 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+> Am Mittwoch, den 22.06.2011, 19:31 +0000 schrieb Paul Parsons:
+>> Add LED support for the HTC ASIC3. Underlying support is provided by the mfd/asic3 and leds/leds-asic3 drivers. An example configuration is provided by the pxa/hx4700 platform.
 >>
 >> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+>> ---
+>>
+>> This part of the HTC ASIC3 LED driver patch set was seemingly dropped, hence repost.
+>>
+>> --- clean-3.0-rc4/arch/arm/mach-pxa/hx4700.c ?2011-06-21 04:25:46.000000000 +0100
+>> +++ linux-3.0-rc4/arch/arm/mach-pxa/hx4700.c ?2011-06-22 10:43:18.986382990 +0100
+>> @@ -280,6 +280,21 @@ static u16 asic3_gpio_config[] = {
+>> ? ? ? ASIC3_GPIOD15_nPIOW,
+>> ?};
+>>
+>> +static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
+>> + ? ? [0] = {
+>> + ? ? ? ? ? ? .name = "hx4700:amber",
+>> + ? ? ? ? ? ? .default_trigger = "ds2760-battery.0-charging-blink-full-solid",
+>> + ? ? },
+>> + ? ? [1] = {
+>> + ? ? ? ? ? ? .name = "hx4700:green",
+>> + ? ? ? ? ? ? .default_trigger = "unused",
+>> + ? ? },
+>> + ? ? [2] = {
+>> + ? ? ? ? ? ? .name = "hx4700:blue",
+>> + ? ? ? ? ? ? .default_trigger = "hx4700-radio",
+>> + ? ? },
+>> +};
+>> +
+>> ?static struct resource asic3_resources[] = {
+>> ? ? ? /* GPIO part */
+>> ? ? ? [0] = {
+>> @@ -310,6 +325,7 @@ static struct asic3_platform_data asic3_
+>> ? ? ? .gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
+>> ? ? ? .irq_base ? ? ? ?= IRQ_BOARD_START,
+>> ? ? ? .gpio_base ? ? ? = HX4700_ASIC3_GPIO_BASE,
+>> + ? ? .leds ? ? ? ? ? ?= asic3_leds,
+>> ?};
+>>
+>> ?static struct platform_device asic3 = {
+>>
 >
 > Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
 >
 > regards
 > Philipp
-
-Hi Paul,
-
-I found this patch is broken. I failed to apply it. You can check it
-in below. Could you help to format and paste it again?
+>
+Applied.
 
 Thanks
 Haojian
-
-The hx4700 platform has 72 board gpios: 64 ASIC3 gpios numbered 192..255, a=
-nd=0A8 EGPIO gpios numbered 256..263 (plus a 9th which is not used).=0AThus=
- the new CONFIG_ARCH_NR_GPIO config option must be set to 264.=0A=0ASigned-=
-off-by: Paul Parsons <lost.distance@yahoo.com>=0A---=0A=0AV3:=0ADescription=
- change: 64 ASIC3 gpios + 8 EGPIO gpios =3D 72 board gpios, not 70.=0A=0Adi=
-ff -ru clean-3.3-rc1/arch/arm/Kconfig linux-3.3-rc1/arch/arm/Kconfig=0A--- =
-clean-3.3-rc1/arch/arm/Kconfig=092012-01-19 23:04:48.000000000 +0000=0A+++ =
-linux-3.3-rc1/arch/arm/Kconfig=092012-01-30 17:11:35.897518763 +0000=0A@@ -=
-1580,6 +1580,7 @@=0A =09int=0A =09default 1024 if ARCH_SHMOBILE || ARCH_TEG=
-RA=0A =09default 350 if ARCH_U8500=0A+=09default 264 if MACH_H4700=0A =09de=
-fault 0=0A =09help=0A =09  Maximum number of GPIOs in the system.=0A
