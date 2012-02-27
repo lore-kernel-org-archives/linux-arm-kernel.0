@@ -1,61 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Feb 2012 14:59:52 +0000
-Subject: [GIT PULL] DaVinci cleanups for v3.4
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317D2DB9@DBDE01.ent.ti.com>
-References: <DF0F476B391FA8409C78302C7BA518B6317D2DB9@DBDE01.ent.ti.com>
-Message-ID: <201202271459.52216.arnd@arndb.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 27 Feb 2012 17:03:00 +0200
+Subject: elf_set_personality()
+In-Reply-To: <20120227130453.GV22562@n2100.arm.linux.org.uk>
+References: <20120227123612.GD12917@tbergstrom-lnx.Nvidia.com>
+ <20120227130453.GV22562@n2100.arm.linux.org.uk>
+Message-ID: <20120227150300.GF12917@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 February 2012, Nori, Sekhar wrote:
-> Hi Arnd, Olof,
+On Mon, Feb 27, 2012 at 02:04:53PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Feb 27, 2012 at 02:36:12PM +0200, Peter De Schrijver wrote:
+> > Commit ID 5e143436d04465c937c1a242808a99c46393af3e
+> > (fix personality flag propagation across an exec) makes a child process
+> > inherit a number of personality flags from its parent. This includes the
+> > READ_IMPLIES_EXEC flag.
 > 
-> Can you please pull these DaVinci clean-up patches for
-> the v3.4 merge window? I have made sure that these don't
-> have any conflicts with the rmk/for-armsoc branch of
-> the arm-soc tree.
+> So, READ_IMPLIES_EXEC will only be leaked if it's already set.
 > 
-> These patches need the following two commits from linux-next
-> (next-20120224) to keep the VPIF and CQ93VC drivers building.
+> > Unfortunately this causes problems when debugging
+> > android applications using gdbserver. It appears that gdbserver on android
+> > has an executable stack. This causes the kernel to set the READ_IMPLIES_EXEC
+> > flag on the gdbserver process.
 > 
-> 2e932f2  ASoC: CQ93VC: remove machine specific header file inclusion from codec
-> db38951  [media] davinci: vpif: remove machine specific header file includes
+> Ok.
+> 
+> > So the child android process will also get this flag.
+> 
+> And that means that attempting to mmap() stuff will also get executable
+> protections in addition.
+> 
+> > As soon as the android tries to mmap a readonly android shmem segment
+> > (using the ashmem driver), ashmem will return EPERM, because the segment has
+> > been exposed as readonly without exec permissions and the kernel will modify
+> > any readonly mmap request into read and execute.
+> 
+> This sounds like a problem.  If you have two applications trying to use
+> the ashmem driver, one without READ_IMPLIES_EXEC and one with
+> READ_IMPLIES_EXEC, then it seems that ashmem will prevent the
+> READ_IMPLIES_EXEC one from using such regions.  That sounds like a
+> (different) bug to me.
+> 
 
-In general, don't worry too much about conflicts that are easy to
-resolve. However, having these extra dependencies is not good,
-because it means that we cannot easily build-test the arm-soc
-tree by itself and it breaks bisection through the git history.
+Good point. I don't know anything about the design ideas behind ashmem though.
+Can anyone from android comment on this?
 
-In the future, please make sure that dependent commits show up
-in the right order. For now, I've added the patch below on top
-of your series.
+> > Why does the READ_IMPLIES_EXEC flag need to be propagated? Would it be
+> > acceptable to not propagate it to child processes?
+> 
+> It shouldn't propagate.  But I think it's uncovered a separate problem
 
-	Arnd
+Ok. Should I write a patch for this? Seems easy enough to also clear the
+READ_IMPLIES_EXEC bit when copying the child personality from the parent?
 
-commit 6ea96e111e6a7f06ef62227bf64e8cd65bd705b3
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Mon Feb 27 14:55:22 2012 +0000
+> in the ashmem driver.
 
-    ARM: davinci: add back dummy header files
-    
-    The mach/dm365.h and mach/dm646xh headers are currently being included
-    in some device drivers. The removal of those includes is already merged
-    in some subsystem trees, but adding the dummy files ensures that this
-    branch can be built standalone.
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cheers,
 
-diff --git a/arch/arm/mach-davinci/include/mach/dm365.h b/arch/arm/mach-davinci/include/mach/dm365.h
-new file mode 100644
-index 0000000..b9bf3d6
---- /dev/null
-+++ b/arch/arm/mach-davinci/include/mach/dm365.h
-@@ -0,0 +1 @@
-+/* empty, remove once unused */
-diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
-new file mode 100644
-index 0000000..b9bf3d6
---- /dev/null
-+++ b/arch/arm/mach-davinci/include/mach/dm646x.h
-@@ -0,0 +1 @@
-+/* empty, remove once unused */
+Peter.
