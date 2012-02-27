@@ -1,27 +1,36 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 27 Feb 2012 14:36:12 +0200
-Subject: elf_set_personality()
-Message-ID: <20120227123612.GD12917@tbergstrom-lnx.Nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Feb 2012 09:02:29 +0000
+Subject: [GIT PULL] ux500 patches for v3.4 take 2
+In-Reply-To: <CACRpkdaH+frxrYTrcnRNuNps3RDqBC6GTaKYYz30kEODnxUO8g@mail.gmail.com>
+References: <1330099642-6265-1-git-send-email-linus.walleij@linaro.org>
+ <201202241639.56474.arnd@arndb.de>
+ <CACRpkdaH+frxrYTrcnRNuNps3RDqBC6GTaKYYz30kEODnxUO8g@mail.gmail.com>
+Message-ID: <201202270902.29490.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 27 February 2012, Linus Walleij wrote:
+> On Fri, Feb 24, 2012 at 5:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 24 February 2012, Linus Walleij wrote:
+> >> are available in the git repository at:
+> >>   git://git.linaro.org/people/triad/linux-stericsson.git/ ..BRANCH.NOT.VERIFIED..
+> >
+> > Something wrong on your end apparently.
+> 
+> Hm :-( I'll check it by pulling it back myself next time.
 
-Commit ID 5e143436d04465c937c1a242808a99c46393af3e
-(fix personality flag propagation across an exec) makes a child process
-inherit a number of personality flags from its parent. This includes the
-READ_IMPLIES_EXEC flag. Unfortunately this causes problems when debugging
-android applications using gdbserver. It appears that gdbserver on android
-has an executable stack. This causes the kernel to set the READ_IMPLIES_EXEC
-flag on the gdbserver process. So the child android process will also get this
-flag. As soon as the android tries to mmap a readonly android shmem segment
-(using the ashmem driver), ashmem will return EPERM, because the segment has
-been exposed as readonly without exec permissions and the kernel will modify
-any readonly mmap request into read and execute.
+git request-pull checks this already, you just have to make sure that the right
+branch or tag shows up in the pull URL.
 
-Why does the READ_IMPLIES_EXEC flag need to be propagated? Would it be
-acceptable to not propagate it to child processes?
+> > I've also followed up on the discussion, so let's find a conclusion on
+> > the ux500_read_asicid first.
+> 
+> Sure I think I have a solution for that, or I'll just strip off the
+> U9540 support and save that for the next merge window or
+> a later pull request no big deal.
+
+Right, either way is fine for me.
 
 Thanks,
 
-Peter.
+	Arnd
