@@ -1,43 +1,108 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 27 Feb 2012 10:35:59 +0100
-Subject: [GIT PULL] i.MX driver patches
-Message-ID: <20120227093559.GA3852@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 27 Feb 2012 17:48:37 +0800
+Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
+In-Reply-To: <1330328554.2778.20.camel@flow>
+References: <E1QHn5f-0004Rb-6j@outmx07.plus.net> <1330253328.3673.4.camel@flow>
+ <CAN1soZwMPpL1nbewjxTmmc_fewm=6xU6wgNgbauC05ZGEHCmAw@mail.gmail.com>
+ <1330328554.2778.20.camel@flow>
+Message-ID: <CAN1soZy4V++oGi9ZuLsC=FS3MaSLRkBRAoQHqAd=3enyNY5WQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, Feb 27, 2012 at 3:42 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+> Am Montag, den 27.02.2012, 10:00 +0800 schrieb Haojian Zhuang:
+>> On Sun, Feb 26, 2012 at 6:48 PM, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+>> > On my hx4700 iPAQ running Windows Mobile 5, gpio button wakeup is
+>> > configurable under "Start -> Settings -> Personal -> Buttons -> Lock".
+>> > There is a checkbox "Disable all buttons except power button" which
+>> > enables/disables the keypad and ASIC3 GPIO buttons as wakeup sources.
+>> >
+>> > To achieve the same functionality on linux, we could split the power
+>> > button and the other buttons into separate gpio_keys devices and let
+>> > userspace disable the other buttons as wakeup sources via the device's
+>> > pm_wakeup interface.
+>>
+>> It seems that this patch is only enable powerup key as wakeup source.
+>
+> Yes. This is temporary until ASIC3 GPIO wakeup support is in place.
+>
+>> Other gpio keys could be configured as wakeup source in user space. So could
+>> you help to figure out the interface of configuring gpio key as wakeup source
+>> in user space?
+>
+> I was thinking of the /sys/devices/.../power/wakeup interface, as
+> documented in Documentation/ABI/testing/sysfs-devices-power.
+>
+> Put the power button into its own gpio-keys device:
+>
+> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+> index 06ec926..21d26a3 100644
+> --- a/arch/arm/mach-pxa/hx4700.c
+> +++ b/arch/arm/mach-pxa/hx4700.c
+> @@ -166,11 +166,26 @@ static struct pxaficp_platform_data ficp_info = {
+> ? ? ? ? ? ? ? ?.active_low = _active_low, ? ? ? ? ? ? ?\
+> ? ? ? ? ? ? ? ?.desc ? ? ? = _desc, ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ? ? ? ? ?.type ? ? ? = EV_KEY, ? ? ? ? ? ? ? ? ? \
+> - ? ? ? ? ? ? ? .wakeup ? ? = KEY_##_code == KEY_POWER, \
+> + ? ? ? ? ? ? ? .wakeup ? ? = 1, ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?}
+>
+> +static struct gpio_keys_button gpio_keys_power_button =
+> + ? ? ? INIT_KEY(POWER, ? ? ? GPIO0_HX4700_nKEY_POWER, ? 1, "Power button");
+> +
+> +static struct gpio_keys_platform_data gpio_keys_power_data = {
+> + ? ? ? .buttons = gpio_keys_power_button,
+> + ? ? ? .nbuttons = 1,
+> +};
+> +
+> +static struct platform_device gpio_keys_power = {
+> + ? ? ? .name = "gpio-keys",
+> + ? ? ? .dev ?= {
+> + ? ? ? ? ? ? ? .platform_data = &gpio_keys_power_data,
+> + ? ? ? },
+> + ? ? ? .id ? = 0,
+> +};
+> +
+> ?static struct gpio_keys_button gpio_keys_buttons[] = {
+> - ? ? ? INIT_KEY(POWER, ? ? ? GPIO0_HX4700_nKEY_POWER, ? 1, "Power button"),
+> ? ? ? ?INIT_KEY(MAIL, ? ? ? ?GPIO94_HX4700_KEY_MAIL, ? ?0, "Mail button"),
+> ? ? ? ?INIT_KEY(ADDRESSBOOK, GPIO99_HX4700_KEY_CONTACTS,0, "Contacts button"),
+> ? ? ? ?INIT_KEY(RECORD, ? ? ?GPIOD6_nKEY_RECORD, ? ? ? ?1, "Record button"),
+> @@ -188,7 +203,7 @@ static struct platform_device gpio_keys = {
+> ? ? ? ?.dev ?= {
+> ? ? ? ? ? ? ? ?.platform_data = &gpio_keys_data,
+> ? ? ? ?},
+> - ? ? ? .id ? = -1,
+> + ? ? ? .id ? = 1,
+> ?};
+>
+> ?/*
+> @@ -836,6 +851,7 @@ static struct platform_device audio = {
+>
+> ?static struct platform_device *devices[] __initdata = {
+> ? ? ? ?&asic3,
+> + ? ? ? &gpio_keys_power,
+> ? ? ? ?&gpio_keys,
+> ? ? ? ?&navpoint,
+> ? ? ? ?&backlight,
+>
+> And then let userspace disable wakeup for the other keys via
+> echo disabled > /sys/devices/platform/gpio-keys.1/power/wakeup
+>
+> The gpio-keys driver will check this setting with device_may_wakeup()
+> during gpio_keys_suspend() and decide whether to call enable_irq_wake()
+> for its button GPIOs.
+>
+> regards
+> Philipp
+>
+>
+If one of gpio keys wakeup is enabled, every gpio keys in this device can
+wakeup system. So your patch is better than original one that only keeping
+power key as wakeup source.
 
-Please pull the following for -next. Note that this partly replaces the
-previous i.MX branch you pulled as suggested.
+You overwrite Paul's patch. I think that you can format a new patch that is
+based on current code base not Paul's patch.
 
-Sascha
-
-
-The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-
-  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-drivers
-
-for you to fetch changes up to 15cc1b1c1e8848ffa711f4ea24c919627a1159da:
-
-  ARM: imx_v4_v5_defconfig: Update defconfig (2012-02-27 10:14:15 +0100)
-
-----------------------------------------------------------------
-Fabio Estevam (3):
-      ARM: imx_v6_v7_defconfig: Add support for framebuffer and camera on mx31
-      ARM: mx27_3ds: Add camera support
-      ARM: imx_v4_v5_defconfig: Update defconfig
-
- arch/arm/configs/imx_v4_v5_defconfig |   16 +++++
- arch/arm/configs/imx_v6_v7_defconfig |   32 ++++++++++
- arch/arm/mach-imx/Kconfig            |    1 +
- arch/arm/mach-imx/mach-mx27_3ds.c    |  108 ++++++++++++++++++++++++++++++++++
- 4 files changed, 157 insertions(+), 0 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks
+Haojian
