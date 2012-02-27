@@ -1,30 +1,28 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 27 Feb 2012 13:27:31 -0800
-Subject: ARM: OMAP: patches for stable
-In-Reply-To: <20120227211906.GA2460@n2100.arm.linux.org.uk>
-References: <4F474DAD.1030302@compulab.co.il>
- <20120227211414.GA16071@kroah.com>
- <20120227211906.GA2460@n2100.arm.linux.org.uk>
-Message-ID: <20120227212731.GA17081@kroah.com>
+From: timur@freescale.com (Timur Tabi)
+Date: Mon, 27 Feb 2012 15:39:04 -0600
+Subject: [PATCH 5/6] ASoC: fsl: use platform_device_id table to match
+ p1022_ds device
+In-Reply-To: <1330092582-21180-6-git-send-email-shawn.guo@linaro.org>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F4BF7F8.8030008@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 09:19:06PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 27, 2012 at 01:14:14PM -0800, Greg Kroah-Hartman wrote:
-> > On Fri, Feb 24, 2012 at 10:43:25AM +0200, Igor Grinberg wrote:
-> > > Hi Greg,
-> > > 
-> > > There are several patches already in mainline, that should be also applied to stable:
-> > > 
-> > > 40410715 (ARM: omap: fix oops in drivers/video/omap2/dss/dpi.c)				[3.2-stable]
-> > > d980e0f8 (ARM: omap: fix oops in arch/arm/mach-omap2/vp.c when pmic is not found)	[3.2-stable]
-> > > 
-> > > Can these, please be applied to stable?
-> > 
-> > I need an ack from Russell before I can do so.
-> 
-> Fine by me - I should've added the Cc myself...
+Shawn Guo wrote:
 
-Ok, now queued up, thanks.
+> -
+> -	/*
+> -	 * Check if we're actually running on a P1022DS.  Older device trees
+> -	 * have a model of "fsl,P1022" and newer ones use "fsl,P1022DS", so we
+> -	 * need to support both.  The SSI driver uses that property to link to
+> -	 * the machine driver, so have to match it.
+> -	 */
 
-greg k-h
+Please retain this paragraph somewhere.  It's important to explain why
+we're checking for both strings.
+
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
