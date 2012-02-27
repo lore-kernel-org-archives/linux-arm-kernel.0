@@ -1,36 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Feb 2012 09:02:29 +0000
-Subject: [GIT PULL] ux500 patches for v3.4 take 2
-In-Reply-To: <CACRpkdaH+frxrYTrcnRNuNps3RDqBC6GTaKYYz30kEODnxUO8g@mail.gmail.com>
-References: <1330099642-6265-1-git-send-email-linus.walleij@linaro.org>
- <201202241639.56474.arnd@arndb.de>
- <CACRpkdaH+frxrYTrcnRNuNps3RDqBC6GTaKYYz30kEODnxUO8g@mail.gmail.com>
-Message-ID: <201202270902.29490.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Feb 2012 12:50:34 +0000
+Subject: [PATCH 3/4] at91 : remove wait_for_interrupt definition
+In-Reply-To: <4F201435.7030402@linaro.org>
+References: <1327449368-29917-1-git-send-email-daniel.lezcano@linaro.org>
+ <1327449368-29917-3-git-send-email-daniel.lezcano@linaro.org>
+ <20120125001858.GD12326@n2100.arm.linux.org.uk> <4F201435.7030402@linaro.org>
+Message-ID: <20120227125034.GU22562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 February 2012, Linus Walleij wrote:
-> On Fri, Feb 24, 2012 at 5:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 24 February 2012, Linus Walleij wrote:
-> >> are available in the git repository at:
-> >>   git://git.linaro.org/people/triad/linux-stericsson.git/ ..BRANCH.NOT.VERIFIED..
-> >
-> > Something wrong on your end apparently.
-> 
-> Hm :-( I'll check it by pulling it back myself next time.
+On Wed, Jan 25, 2012 at 03:39:49PM +0100, Daniel Lezcano wrote:
+> On 01/25/2012 01:18 AM, Russell King - ARM Linux wrote:
+>> On Wed, Jan 25, 2012 at 12:56:07AM +0100, Daniel Lezcano wrote:
+>>> All the "wait_for_interrupt" definition are aliases to cpu_do_idle.
+>>> Only the rm9200 has an asm routine to switch to wfi. But the cpu_do_idle
+>>> for this platform has exactly the same asm routine.
+>>>
+>>> arch/arm/mm/proc-arm920.S
+>>> ...
+>>> ENTRY(cpu_arm920_do_idle)
+>>>          mcr     p15, 0, r0, c7, c0, 4           @ Wait for interrupt
+>>> ...
+>>>
+>>> Then it is safe to invoke cpu_do_idle for this platform.
+>>
+>> No it is not.
+>>
+>> Please read Nicolas' post:
+>>
+>> http://lists.arm.linux.org.uk/lurker/message/20120112.144129.827ae490.en.html
+>>
+>> and think about what "DWB is needed before putting SDRAM into self-refresh
+>> because any subsequent access to SDRAM will force it to resume from
+>> self-refresh state" means.
+>>
+>> Consider that if you _branch_ somewhere else, you _could_ cause a cache
+>> line fetch, which will have to come from SDRAM.
+>
+> Oh, right. I am not familiar with this part, thanks for the clarification.
+>
+>>  From Nicolas' post, it's pretty clear to me that the AT91RM9200 requires
+>> carefully crafted assembly which can't be separated in this way to work,
+>> which I mostly supplied in this mail:
+>>
+>> http://lists.arm.linux.org.uk/lurker/message/20120109.144443.3626e5a6.en.html
+>
+> Ok, this is what does the patch 4/4, it changes the self-refresh and wfi  
+> into an asm routine where cpu_do_idle call is removed. Can I consider by  
+> folding 3/4 and 4/4 ? So the buggy cpu_do_idle change won't appear...
 
-git request-pull checks this already, you just have to make sure that the right
-branch or tag shows up in the pull URL.
+So I see your patch is in arm-soc now, inspite of my note that it's
+probably broken.
 
-> > I've also followed up on the discussion, so let's find a conclusion on
-> > the ux500_read_asicid first.
-> 
-> Sure I think I have a solution for that, or I'll just strip off the
-> U9540 support and save that for the next merge window or
-> a later pull request no big deal.
-
-Right, either way is fine for me.
-
-Thanks,
-
-	Arnd
+If it's been tested, then all the asm() stuff in arch/arm/mach-at91/pm.c
+along with the sdram crap can be removed.
