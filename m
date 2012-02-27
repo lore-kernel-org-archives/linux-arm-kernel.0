@@ -1,26 +1,26 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Mon, 27 Feb 2012 14:31:01 -0600
-Subject: [PATCH 2/6] ASoC: fsl: align mpc8610_hpcd with p1022_ds on getting
- codec node
-In-Reply-To: <1330092582-21180-3-git-send-email-shawn.guo@linaro.org>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F4BE805.1070208@freescale.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 27 Feb 2012 21:05:08 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <1330360043.8557.302.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1330360043.8557.302.camel@zakaz.uk.xensource.com>
+Message-ID: <CAFEAcA8PzT9mfnEz60CYvwQWX1OEvejrZvkpuPL2LpTPosp8cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> Align mpc8610_hpcd with p1022_ds on getting codec node by just calling
-> of_parse_phandle.  The bonus point of doing that is we can save
-> exporting get_node_by_phandle_name() when we consolidate the common
-> bits between mpc8610_hpcd and p1022_ds into a module, which can be
-> shared by more machine drivers added later.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On 27 February 2012 16:27, Ian Campbell <Ian.Campbell@citrix.com> wrote:
+> R12 is not accessible from the 16 bit "T1" Thumb encoding of mov
+> immediate (which can only target r0..r7).
+>
+> Since we support only ARMv7+ there are "T2" and "T3" encodings available
+> which do allow direct mov of an immediate into R12, but are 32 bit Thumb
+> instructions.
+>
+> Should we use r7 instead to maximise instruction density for Thumb code?
 
-Acked-by: Timur Tabi <timur@freescale.com>
+r7 is (used by gcc as) the Thumb frame pointer; I don't know if this
+makes it worth avoiding in this context.
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+-- PMM
