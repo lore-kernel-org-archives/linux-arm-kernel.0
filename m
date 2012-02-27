@@ -1,39 +1,41 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Tue, 28 Feb 2012 01:04:25 +0900
-Subject: [PATCH v8 0/2] ommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <000701ccf567$b9dee150$2d9ca3f0$%szyprowski@samsung.com>
-References: <000e01ccc624$c9349310$5b9db930$%cho@samsung.com>
- <014601ccf2fa$a25c8560$e7159020$%szyprowski@samsung.com>
- <CAHQjnOPE5X=dn+8D348OruLqoYNGZwZk3eLtLRSERce-eTzXDg@mail.gmail.com>
- <000701ccf567$b9dee150$2d9ca3f0$%szyprowski@samsung.com>
-Message-ID: <CAHQjnON=Q9oR5s1geO_MWeG0aKKrNkyqbS2RAD1deH22fj5T0A@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 27 Feb 2012 16:07:12 +0000
+Subject: [PATCH 0/2 v6] arm: kirkwood: add dreamplug/devicetree support
+In-Reply-To: <cover.1312906908.git.jason@lakedaemon.net>
+References: <cover.1312906908.git.jason@lakedaemon.net>
+Message-ID: <cover.1330358323.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 12:51 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+This patch series provides initial support for devicetree on kirkwood for the
+dreamplug platform.  After discussing the approach with Arnd Bergman last week
+at ELC, we decided to take an incremental approach to the conversion.  First, I
+would detect that we were on the dreamplug via the devicetree blob.  Then,
+configure uart0 via devicetree.  We chose the uart since it is already well
+supported under devicetree.
 
->> The next patch will be submitted by 2/28.
->
-> Ok, I will check it soon then.
+This patch series has been boot-tested on the dreamplug.
 
-Thank you a lot.
+In a future patch series, I plan to migrate spi/flash/partitions over to
+devicetree.
 
->> The next IOMMU driver defines just one platform device for a H/W device.
->> Thus, it defines just one SYSMMU_MFC platform device, for example.
->> (the previous one defines 2 platform devices for SYSMMU_MFC)
->
-> Exynos4210 has 2 iommu controllers for MFC device - one for each memory bus.
-> Each MFC bus can address 128MiB of IO address space. Do you mean that the new driver
-> will merge these 2 controllers into one? This way we will lose half of address space
-> for MFC device.
+When the migration is complete, board-dt.c will not be specific to the
+dreamplug, and dts files can be written for all of the other kirkwood boards.
 
-The situation seems somewhat different from our use of MFC. I also
-heard from Jungtae Park
-that it is better to define separate platform devices for the system
-MMUs of MFC.
+Jason Cooper (2):
+  arm: kirkwood: add dreamplug (fdt) support.
+  arm: kirkwood: convert uart0 to devicetree.
 
-Regards,
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   25 ++++
+ arch/arm/boot/dts/kirkwood.dtsi          |    6 +
+ arch/arm/mach-kirkwood/Kconfig           |   14 +++
+ arch/arm/mach-kirkwood/Makefile          |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot     |    2 +
+ arch/arm/mach-kirkwood/board-dt.c        |  180 ++++++++++++++++++++++++++++++
+ 6 files changed, 228 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-dreamplug.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-dt.c
 
-Cho KyongHo.
+-- 
+1.7.3.4
