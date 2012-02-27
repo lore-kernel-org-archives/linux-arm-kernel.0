@@ -1,49 +1,30 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 27 Feb 2012 14:27:19 -0700
-Subject: [PATCH] ARM: tegra: uncompress.h: Don't depend on kernel headers
-Message-ID: <1330378039-21030-1-git-send-email-swarren@nvidia.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 27 Feb 2012 13:27:31 -0800
+Subject: ARM: OMAP: patches for stable
+In-Reply-To: <20120227211906.GA2460@n2100.arm.linux.org.uk>
+References: <4F474DAD.1030302@compulab.co.il>
+ <20120227211414.GA16071@kroah.com>
+ <20120227211906.GA2460@n2100.arm.linux.org.uk>
+Message-ID: <20120227212731.GA17081@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following compile error:
+On Mon, Feb 27, 2012 at 09:19:06PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 27, 2012 at 01:14:14PM -0800, Greg Kroah-Hartman wrote:
+> > On Fri, Feb 24, 2012 at 10:43:25AM +0200, Igor Grinberg wrote:
+> > > Hi Greg,
+> > > 
+> > > There are several patches already in mainline, that should be also applied to stable:
+> > > 
+> > > 40410715 (ARM: omap: fix oops in drivers/video/omap2/dss/dpi.c)				[3.2-stable]
+> > > d980e0f8 (ARM: omap: fix oops in arch/arm/mach-omap2/vp.c when pmic is not found)	[3.2-stable]
+> > > 
+> > > Can these, please be applied to stable?
+> > 
+> > I need an ack from Russell before I can do so.
+> 
+> Fine by me - I should've added the Cc myself...
 
-  CC      arch/arm/boot/compressed/misc.o
-In file included from arch/arm/boot/compressed/misc.c:28:0:
-arch/arm/mach-tegra/include/mach/uncompress.h: In function 'arch_decomp_setup':
-arch/arm/mach-tegra/include/mach/uncompress.h:125:2: error: implicit declaration of function 'BUILD_BUG_ON_ZERO' [-Werror=implicit-function-declaration]
-cc1: some warnings being treated as errors
+Ok, now queued up, thanks.
 
-This is due to use of the ARRAY_SIZE() macro. Typically, this would be
-solved by including <linux/bug.h>, but the compressor code isn't part of
-the kernel, and so should not include kernel headers. Instead, define
-the few macros the code uses directly, and in a way that doesn't depend
-on <linux/bug.h>.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/include/mach/uncompress.h |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
-index b066ba0..5a440f3 100644
---- a/arch/arm/mach-tegra/include/mach/uncompress.h
-+++ b/arch/arm/mach-tegra/include/mach/uncompress.h
-@@ -25,13 +25,15 @@
- #ifndef __MACH_TEGRA_UNCOMPRESS_H
- #define __MACH_TEGRA_UNCOMPRESS_H
- 
--#include <linux/kernel.h>
- #include <linux/types.h>
- #include <linux/serial_reg.h>
- 
- #include <mach/iomap.h>
- #include <mach/irammap.h>
- 
-+#define BIT(x) (1 << (x))
-+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-+
- #define DEBUG_UART_SHIFT 2
- 
- volatile u8 *uart;
--- 
-1.7.0.4
+greg k-h
