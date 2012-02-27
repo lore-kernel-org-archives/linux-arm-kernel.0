@@ -1,95 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 27 Feb 2012 18:28:02 +0100
-Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
-In-Reply-To: <4F4B91B8.8000805@ti.com>
-References: <4F22DEF2.5000807@ti.com> <4F44CA82.9060906@atmel.com>
- <4F460EF2.9010000@ti.com> <4F46609C.8080907@atmel.com>
- <4F4661DE.90704@ti.com> <4F4B8095.9010005@atmel.com>
- <4F4B91B8.8000805@ti.com>
-Message-ID: <4F4BBD22.6090104@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Feb 2012 17:31:02 +0000
+Subject: [GIT PULL] at91 first cleanup series for 3.4
+In-Reply-To: <4F4674F2.8090603@atmel.com>
+References: <4F4674F2.8090603@atmel.com>
+Message-ID: <201202271731.03230.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2012 03:22 PM, Cousson, Benoit :
-> On 2/27/2012 2:09 PM, Nicolas Ferre wrote:
->> On 02/23/2012 04:57 PM, Cousson, Benoit :
->>> On 2/23/2012 4:51 PM, Nicolas Ferre wrote:
->>>> On 02/23/2012 11:03 AM, Cousson, Benoit :
->>>>> Salut Nico,
->>>>
->>>> Coucou Benoit ;-)
->>>>
->>>>> On 2/22/2012 11:59 AM, Nicolas Ferre wrote:
->>>>>> On 01/27/2012 06:29 PM, Cousson, Benoit :
->>>>>>> Add some basic helpers to retrieve a DMA controller device_node
->>>>>>> and the DMA request line number.
->>>>>>>
->>>>>>> For legacy reason another API will export the DMA request number
->>>>>>> into a Linux resource of type IORESOURCE_DMA.
->>>>>>> This API is usable only on system with an unique DMA controller.
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>> I followed that discussion and I like very much the biding that
->>>>>> Benoit
->>>>>> is proposing. It will help me a lot with my current work on Atmel DMA
->>>>>> controller.
->>>>>>
->>>>>> If I understand correctly, some rework is needed before it can be
->>>>>> integrated in a stable git tree (I mean before we can base our
->>>>>> work on
->>>>>> top of it). So, in the meantime, what should I do to help and make
->>>>>> things go forward? to be quite frank, I would be interested to have a
->>>>>> working DMA enabled device soon ;-)
->>>>>
->>>>> Me too, but unfortunately, I was busy trying to add irq_domain and
->>>>> fixing issues with SPARSE_IRQ on OMAP :-(
->>>>
->>>> Been there, loved that ;-)
->>>>
->>>>>> Do you think that 3.4 is out of reach?
->>>>>
->>>>> Maybe not, from the comments, it looks like we should add a .xlate
->>>>> callback to allow any custom parsing of the DMA nodes attributes.
->>>>>
->>>>> I'll be more than happy, if you can finalize that patch :-)
->>>>
->>>> I will try to figure out what I can understand from the irq
->>>> mechanism of
->>>> .xlate and try to see if I can implement it on top of your patch.
->>>
->>> In fact that dma code is a big copy/paste of the of/gpio one and gpio
->>> was already managing .xlate function.
->>> I removed it because I thought it was useless for the DMA :-)
->>>
->>> You might just have to copy the original code...
->>
->> The thing is that with gpio, we can rely on the gpio_chip structure for
->> having a common storage location of such .xlate callbacks.
->> In our DMA case, I guess that we should not cling to dmaengine
->> infrastructure because not all of us are using it right now.
+On Thursday 23 February 2012, Nicolas Ferre wrote:
+> This series removes the at91_sys_read/write() functions that where
+> used for all System Controller devices. The static offsets that were
+> used prevented us from compiling several AT91 SoC support in a single
+> zImage.
 > 
-> Yep, that's the main issue compared to GPIO or IRQ.
+> The other cleanup is the move of some early console initialization. In
+> addition, some Makefile.boot modifications have been performed to be
+> able to make .dtb files.
 > 
->> So, maybe we should provide some simple "xlate" helpers like the
->> irqdomain ones. But I fear that a "callback" directly called from the
->> of_get_dma_request() function is not possible (the gpio code model).
+> All this goes on top of current material that is already in arm-soc
+> git tree (merge of all at91/* branches. You can find it in the same git
+> tree with at91-3.4-base2 branch name).
 > 
-> I think a well that we cannot much but a simple very abstract callback
-> since we do not have any formal DMA representation?
 > 
-> I'm not sure to understand you concern?
+> The following changes since commit 11a25ea7e4f870a37093258f577e11cec703e37e:
+> 
+>   Merge remote-tracking branch 'armsoc/at91/9x5' into at91-3.4-base2 (2012-02-11 14:33:03 +0100)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://github.com/at91linux/linux-at91.git at91-3.4-base2+cleanup
 
-Well, in fact I cannot find a place where to store a "xlate" callback:
-- it have to be provided by the DMA controller (the one pointed out by
-the phandle) and not the caller of the of_get_dma_request() funtion
-- it has to be generic enough to match the dmaengine/non-dmaengine cases
-(so it cannot be stored in the dmaengine "struct dma_device").
+Hi Nicolas,
 
-So I guess that the very basic idea of returning the full DMA specifier
-(struct of_phandle_args) is the best... My only concern is that the
-"helper" becomes very short and empty in this case...
+I cannot merge this into the next/cleanup branch because you have based it
+on top of a non-cleanup branch. There are three ways out of this:
 
-Bye,
--- 
-Nicolas Ferre
+1. rebase the entire branch on a changeset that only contains upstream and
+cleanup branches, and let me deal with merge conflicts against the at91/9x5
+branch.
+
+2. Split this series into two parts, with the simple cleanups going directly
+in as in 1, but cleanups on top of the at91/9x5 branch get applied to that
+branch only.
+
+3. Create a new next/cleanup2 branch with this pull request that I submit
+to Linus separately from the other cleanups.
+
+Which one should it be?
+
+I'm also still not entirely happy with the contents because the newly
+introduced macros all still use __raw_readl() instead of readl_relaxed(),
+and because the rtt setup appears unnecessarily complex while at the same
+time still not sufficient for a combined at91 kernel. It would be nice
+if those could be fixed, but I would still take the series without changing
+the rtt code because we have not really come to a conclusion otherwise
+and the series generally moves things into the right direction.
+
+I've applied your series to the staging/cleanup branch for now, which
+means it gets into linux-next but I won't send to Linus unless I get
+an update.
+
+	Arnd
