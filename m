@@ -1,135 +1,46 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 27 Feb 2012 16:06:01 +0530
-Subject: [PATCH v3 2/2] arm/dts: twl: Pass regulator data from dt
-In-Reply-To: <1330338961-31765-1-git-send-email-rnayak@ti.com>
-References: <1330338961-31765-1-git-send-email-rnayak@ti.com>
-Message-ID: <1330338961-31765-3-git-send-email-rnayak@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Feb 2012 11:38:14 +0100
+Subject: [PATCH] ARM/sp810: introduce API to change system mode
+In-Reply-To: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
+References: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
+Message-ID: <CACRpkdaG2e12fdCFDUoQ_n71VcqU3ZpkH0raHW+EAZg==JOxrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass all the voltage regulator information for
-twl6030/twl4030 PMIC from device tree.
+On Thu, Feb 23, 2012 at 10:13 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
----
- arch/arm/boot/dts/omap3-beagle.dts |    6 +++
- arch/arm/boot/dts/twl4030.dtsi     |   18 +++++++++++
- arch/arm/boot/dts/twl6030.dtsi     |   60 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 84 insertions(+), 0 deletions(-)
+> sp810 controller can change system's working mode to various power save
+> states. Introduce an API to accomplish the same.
 
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index 714ba5d..54556b1 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -26,6 +26,12 @@
- 		reg = <0x48>;
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
- 		interrupt-parent = <&intc>;
-+
-+		vsim: regulator at 10 {
-+			compatible = "ti,twl4030-vsim";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3000000>;
-+		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
-index 8be5223..a94654c 100644
---- a/arch/arm/boot/dts/twl4030.dtsi
-+++ b/arch/arm/boot/dts/twl4030.dtsi
-@@ -18,4 +18,22 @@
- 		compatible = "ti,twl4030-rtc";
- 		interrupts = <11>;
- 	};
-+
-+	vdac: regulator at 0 {
-+		compatible = "ti,twl4030-vdac";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vpll2: regulator at 1 {
-+		compatible = "ti,twl4030-vpll2";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vmmc1: regulator at 2 {
-+		compatible = "ti,twl4030-vmmc1";
-+		regulator-min-microvolt = <1850000>;
-+		regulator-max-microvolt = <3150000>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/twl6030.dtsi b/arch/arm/boot/dts/twl6030.dtsi
-index b7b4e5e..efa19e8 100644
---- a/arch/arm/boot/dts/twl6030.dtsi
-+++ b/arch/arm/boot/dts/twl6030.dtsi
-@@ -19,4 +19,64 @@
- 		compatible = "ti,twl4030-rtc";
- 		interrupts = <11>;
- 	};
-+
-+	vaux1: regulator at 0 {
-+		compatible = "ti,twl6030-vaux1";
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <3000000>;
-+	};
-+
-+	vaux2: regulator at 1 {
-+		compatible = "ti,twl6030-vaux2";
-+		regulator-min-microvolt = <1200000>;
-+		regulator-max-microvolt = <2800000>;
-+	};
-+
-+	vaux3: regulator at 2 {
-+		compatible = "ti,twl6030-vaux3";
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <3000000>;
-+	};
-+
-+	vmmc: regulator at 3 {
-+		compatible = "ti,twl6030-vmmc";
-+		regulator-min-microvolt = <1200000>;
-+		regulator-max-microvolt = <3000000>;
-+	};
-+
-+	vpp: regulator at 4 {
-+		compatible = "ti,twl6030-vpp";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <2500000>;
-+	};
-+
-+	vusim: regulator at 5 {
-+		compatible = "ti,twl6030-vusim";
-+		regulator-min-microvolt = <1200000>;
-+		regulator-max-microvolt = <2900000>;
-+	};
-+
-+	vdac: regulator at 6 {
-+		compatible = "ti,twl6030-vdac";
-+	};
-+
-+	vana: regulator at 7 {
-+		compatible = "ti,twl6030-vana";
-+	};
-+
-+	vcxio: regulator at 8 {
-+		compatible = "ti,twl6030-vcxio";
-+	};
-+
-+	vusb: regulator at 9 {
-+		compatible = "ti,twl6030-vusb";
-+	};
-+
-+	vusb: regulator at 9 {
-+		compatible = "ti,twl6030-vusb";
-+	};
-+
-+	clk32kg: regulator at 10 {
-+		compatible = "ti,twl6030-clk32kg";
-+	};
- };
--- 
-1.7.1
+OK...
+
+> +static inline int sysctl_change_mode(void __iomem *base, int mode)
+
+Why do you make this a static inline?
+
+And why is the present soft reset code also static inlined?
+
+When I look at how this is used in arch/arm/mach-vexpress/v2m.c
+it's apparently glued back-to-back with the SP804
+so I think it should be some CONFIG_HAS_SP810
+and put directly into common/timer-sp.c.
+
+#ifdef CONFIG_HAS_SP810
+
+/* Put SP810 specific support functions here */
+
+void __init sp810_clockevents_init(void __iomem *sp804_base, void
+__iomem *sp810_base, unsigned int irq, const char *name)
+{
+  /* Do some SP810 magic stuff */
+  /* Calls sp804_clockevents_init() */
+}
+
+#endif
+
+Maybe I'm delusional but I think this could help centralizing the use
+of the SP* cells, since they're obviously used in both SPEAr and
+versatile express.
+
+Yours,
+Linus Walleij
