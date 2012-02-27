@@ -1,90 +1,95 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 27 Feb 2012 18:20:20 +0100
-Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
-In-Reply-To: <20120227132908.GA3191@opensource.wolfsonmicro.com>
-References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
- <20120213082741.GN3852@pengutronix.de>
- <20120213144820.GA3494@opensource.wolfsonmicro.com>
- <20120214105823.GS3852@pengutronix.de>
- <20120214172902.GB3916@opensource.wolfsonmicro.com>
- <20120216073236.GE3852@pengutronix.de>
- <20120216075825.GA11631@opensource.wolfsonmicro.com>
- <20120227090453.GE26642@pengutronix.de>
- <20120227132908.GA3191@opensource.wolfsonmicro.com>
-Message-ID: <20120227172020.GC3852@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 27 Feb 2012 18:28:02 +0100
+Subject: [RFC PATCH 1/2] of: Add generic device tree DMA helpers
+In-Reply-To: <4F4B91B8.8000805@ti.com>
+References: <4F22DEF2.5000807@ti.com> <4F44CA82.9060906@atmel.com>
+ <4F460EF2.9010000@ti.com> <4F46609C.8080907@atmel.com>
+ <4F4661DE.90704@ti.com> <4F4B8095.9010005@atmel.com>
+ <4F4B91B8.8000805@ti.com>
+Message-ID: <4F4BBD22.6090104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 01:29:08PM +0000, Mark Brown wrote:
-> On Mon, Feb 27, 2012 at 10:04:53AM +0100, Sascha Hauer wrote:
+On 02/27/2012 03:22 PM, Cousson, Benoit :
+> On 2/27/2012 2:09 PM, Nicolas Ferre wrote:
+>> On 02/23/2012 04:57 PM, Cousson, Benoit :
+>>> On 2/23/2012 4:51 PM, Nicolas Ferre wrote:
+>>>> On 02/23/2012 11:03 AM, Cousson, Benoit :
+>>>>> Salut Nico,
+>>>>
+>>>> Coucou Benoit ;-)
+>>>>
+>>>>> On 2/22/2012 11:59 AM, Nicolas Ferre wrote:
+>>>>>> On 01/27/2012 06:29 PM, Cousson, Benoit :
+>>>>>>> Add some basic helpers to retrieve a DMA controller device_node
+>>>>>>> and the DMA request line number.
+>>>>>>>
+>>>>>>> For legacy reason another API will export the DMA request number
+>>>>>>> into a Linux resource of type IORESOURCE_DMA.
+>>>>>>> This API is usable only on system with an unique DMA controller.
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> I followed that discussion and I like very much the biding that
+>>>>>> Benoit
+>>>>>> is proposing. It will help me a lot with my current work on Atmel DMA
+>>>>>> controller.
+>>>>>>
+>>>>>> If I understand correctly, some rework is needed before it can be
+>>>>>> integrated in a stable git tree (I mean before we can base our
+>>>>>> work on
+>>>>>> top of it). So, in the meantime, what should I do to help and make
+>>>>>> things go forward? to be quite frank, I would be interested to have a
+>>>>>> working DMA enabled device soon ;-)
+>>>>>
+>>>>> Me too, but unfortunately, I was busy trying to add irq_domain and
+>>>>> fixing issues with SPARSE_IRQ on OMAP :-(
+>>>>
+>>>> Been there, loved that ;-)
+>>>>
+>>>>>> Do you think that 3.4 is out of reach?
+>>>>>
+>>>>> Maybe not, from the comments, it looks like we should add a .xlate
+>>>>> callback to allow any custom parsing of the DMA nodes attributes.
+>>>>>
+>>>>> I'll be more than happy, if you can finalize that patch :-)
+>>>>
+>>>> I will try to figure out what I can understand from the irq
+>>>> mechanism of
+>>>> .xlate and try to see if I can implement it on top of your patch.
+>>>
+>>> In fact that dma code is a big copy/paste of the of/gpio one and gpio
+>>> was already managing .xlate function.
+>>> I removed it because I thought it was useless for the DMA :-)
+>>>
+>>> You might just have to copy the original code...
+>>
+>> The thing is that with gpio, we can rely on the gpio_chip structure for
+>> having a common storage location of such .xlate callbacks.
+>> In our DMA case, I guess that we should not cling to dmaengine
+>> infrastructure because not all of us are using it right now.
 > 
-> > If I drop the microvolts parameter what microvolts should I assume? I
-> > tried 0 but the regulator core does not like it:
+> Yep, that's the main issue compared to GPIO or IRQ.
 > 
-> > machine_constraints_voltage: dummy: unsupportable voltage constraints
+>> So, maybe we should provide some simple "xlate" helpers like the
+>> irqdomain ones. But I fear that a "callback" directly called from the
+>> of_get_dma_request() function is not possible (the gpio code model).
 > 
-> > (with max: -2147483648 min: 2147483647)
+> I think a well that we cannot much but a simple very abstract callback
+> since we do not have any formal DMA representation?
 > 
-> I'd expect zero to work, unless something wants a particular voltage in
-> which case you really should be filling things in properly.  The fact
-> that the fixed voltage regulator supports get_voltage() might be
-> confusing things.
-> 
-> Like I say if people can be bothered filling voltages in I suspect
-> they're not your target audience for this.
+> I'm not sure to understand you concern?
 
-The culprit is in machine_constraints_voltage:
+Well, in fact I cannot find a place where to store a "xlate" callback:
+- it have to be provided by the DMA controller (the one pointed out by
+the phandle) and not the caller of the of_get_dma_request() funtion
+- it has to be generic enough to match the dmaengine/non-dmaengine cases
+(so it cannot be stored in the dmaengine "struct dma_device").
 
-> 
-> 	int     min_uV = INT_MAX;
->         int     max_uV = INT_MIN;
-> 
-> 	...
-> 
-> 	/* initial: [cmin..cmax] valid, [min_uV..max_uV] not */
-> 	for (i = 0; i < count; i++) {
-> 		int     value;
-> 
-> 		value = ops->list_voltage(rdev, i);
-> 		if (value <= 0)
-> 			continue;
+So I guess that the very basic idea of returning the full DMA specifier
+(struct of_phandle_args) is the best... My only concern is that the
+"helper" becomes very short and empty in this case...
 
-list_voltage returns 0 if the fixed regulator is initialized to 0
-microvolts, so...
-
-> 
-> 		/* maybe adjust [min_uV..max_uV] */
-> 		if (value >= cmin && value < min_uV)
-> 			min_uV = value;
-> 		if (value <= cmax && value > max_uV)
-> 			max_uV = value;
-
-max_uV/min_uV are not initialized...
-
-> 	}
-> 
-> 	/* final: [min_uV..max_uV] valid iff constraints valid */
-> 	if (max_uV < min_uV) {
-> 		rdev_err(rdev, "unsupportable voltage constraints\n");
-> 		return -EINVAL;
-> 	}
-
-And we end here.
-
-I don't know what to do here. Probably the check for value <= 0 should
-be removed, but then again the description shows:
-
- * @list_voltage: Return one of the supported voltages, in microvolts; zero
- *      if the selector indicates a voltage that is unusable on this system;
- *      or negative errno.  Selectors range from zero to one less than
- *      regulator_desc.n_voltages.  Voltages may be reported in any order.
-
-(I wonder if negative voltages are intentionally not supported)
-
-Sascha
-
+Bye,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
