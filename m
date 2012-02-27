@@ -1,150 +1,305 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 27 Feb 2012 16:31:24 -0600
-Subject: [PATCH 13/15] ARM: make mach/io.h include optional
-In-Reply-To: <201202140804.49026.arnd@arndb.de>
-References: <1329169408-17253-1-git-send-email-robherring2@gmail.com>
- <201202140203.15360.arnd@arndb.de> <4F39CCE0.200@gmail.com>
- <201202140804.49026.arnd@arndb.de>
-Message-ID: <4F4C043C.3030407@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 27 Feb 2012 22:31:32 +0000
+Subject: [PATCH WIP] ARM: kirkwood: covert orion-spi to fdt.
+Message-ID: <4a9b37f69d6cec5049627b8afa777bb010af05f6.1330381705.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2012 02:04 AM, Arnd Bergmann wrote:
-> On Tuesday 14 February 2012, Rob Herring wrote:
->> Arnd,
->>
->> On 02/13/2012 08:03 PM, Arnd Bergmann wrote:
->>> On Monday 13 February 2012, Russell King - ARM Linux wrote:
->>>> On Mon, Feb 13, 2012 at 03:43:26PM -0600, Rob Herring wrote:
->>>>> From: Rob Herring <rob.herring@calxeda.com>
->>>>>
->>>>> Add a kconfig option NEED_MACH_IO_H to conditionally include mach/io.h.
->>>>>
->>>>> Basing this on CONFIG_PCI and CONFIG_ISA doesn't quite work. Most ISA
->>>>> platforms don't need mach/io.h, but ebsa110 does.
->>>>
->>>> This is architecturally wrong.  If you have ISA, and your __io() macro
->>>> is essentially a 1:1 translation, you're asking for ISA drivers to
->>>> scribble on whatever is at virtual address 0-64K.  Too bad if that
->>>> happens to be where your CPU vectors are stored, you'll lose control
->>>> of the CPU in that case.
->>>
->>> Right. I still think it should be conditional on PCI || ISA || PCMCIA,
->>> not introducing a new kconfig symbol, and the next step should be to
->>> unify the __io() implementations for the platforms that need them.
->>
->> As we discussed at Connect, that was my original intent. However, there
->> are a couple of issues as NEED_MACH_IO_H is not exactly equivalent to
->> PCI || ISA || PCMCIA.
->>
->> There are a few platforms which still need io.h for custom accessor
->> functions: rpc, ixp4xx, s3c2410, and ebsa110.
-> 
-> I've tried to interpret what is there, please correct me if this is wrong:
-> 
-> RPC and ebsa110 have ISA, or some twisted version of that. I believe
-> RPC doesn't select CONFIG_ISA because it has no actual ISA slots but
-> it still uses legacy ISA I/O and we might just select it anyway.
-> 
-> s3c24xx seems to have ISA in a similar way on the "bast" machine,
-> while the setup code for that got copied into some platforms that
-> don't really require it.
-> 
-> ixp4xx has PCI, but does not always use direct MMIO to access the
-> memory or I/O spaces.
-> 
-> I guess the only way we can ever make these ones use a common header
-> file (in case we care) by letting them go through an indirect
-> struct io_ops { u8 (*inb)(int); void (*outb)(u8, int); ... };,
-> but we might not care enough.
-> 
->> Also, a few platforms that
->> only select ISA don't do any translation in __io(). These are sa1100,
->> clps711x, and pxa. My understanding is that is wrong.
-> 
-> sa1100 has pcmcia slots that use their own method (setting io_offset)
-> of redirecting the i/o space into the right location. As Russell
-> mentioned, this is broken if you load an ISA device driver that
-> uses hardcoded port numbers, or as I might add when you use /dev/port.
-> 
-> pxa seems to do the same as sa1100 for PCMCIA and PCI, but I can't figure
-> out what they do for ISA. I suspect they only enable that in order to
-> get ISA device drivers for PCMCIA based add-on cards.
-> 
-> clps711x for all I can tell is broken as you say.
-> 
-> I think omap1 and at91 fit into the same category as sa1100 and pxa
-> regarding pcmcia. All four can in theory be converted to use a
-> common virtual mapping as we want to have for PCI.
-> 
->> If we use CONFIG_PCI, then we have to move over all PCI enabled
->> platforms at once. With a separate kconfig option, then we can move
->> platforms one by one. Some are legacy and we may not want to move. This
->> also helped with omap, but Tony has now fixed it.
-> 
-> We could also generalize the implementation from tegra, which seems
-> reasonable as a start:
-> 
-> 
-> #define IO_SPACE_LIMIT 0xffff
-> 
-> #if defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-> #include <mach/io.h>
-> #elif defined(CONFIG_PCI)
-> extern void __iomem *pci_io_base;
-> 
-> static inline void __iomem *__io(unsigned long addr)
-> {
->         return pci_io_base + (addr & IO_SPACE_LIMIT);
-> }
-> #else
-> static inline void __iomem *__io(unsigned long addr)
-> {
->         return NULL;
-> }
-> #endif
-> #define __io(a) __io(a)
-> 
-> Out of the platforms supporting PCI right now, we currently have these three classes:
-> 
-> 1. portable, but using different virtual addresses:
-> arch/arm/mach-integrator/include/mach/io.h:#define __io(a)                      ((void __iomem *)(PCI_IO_VADDR + (a)))
-> arch/arm/mach-ixp23xx/include/mach/io.h:#define __io(p)         ((void __iomem*)((p) + IXP23XX_PCI_IO_VIRT))
-> arch/arm/mach-ixp2000/include/mach/io.h:#define __io(p)                 ((void __iomem *)((p)+IXP2000_PCI_IO_VIRT_BASE))
-> arch/arm/mach-shark/include/mach/io.h:#define __io(a)                 ((void __iomem *)(0xe0000000 + (a)))
-> arch/arm/mach-footbridge/include/mach/io.h:#define __io(a)                      ((void __iomem *)(PCIO_BASE + (a)))
-> arch/arm/mach-tegra/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
-> arch/arm/mach-kirkwood/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
-> arch/arm/mach-dove/include/mach/io.h:#define __io(a)    ((void __iomem *)(((a) - DOVE_PCIE0_IO_BUS_BASE) + \
-> 
-> 2. Does not map the I/O space, or does not use it -- I cannot see how
->    any of these use PIO based PCI devices at all, probably broken already:
-> arch/arm/mach-cns3xxx/include/mach/io.h:#define __io(a)                 __typesafe_io(a)
-> arch/arm/mach-ixp4xx/include/mach/io.h:#define  __io(v)         __typesafe_io(v)
-> arch/arm/mach-ks8695/include/mach/io.h:#define __io(a)          __typesafe_io(a)
-> arch/arm/mach-orion5x/include/mach/io.h:#define __io(a)                 __typesafe_io(a)
-> arch/arm/mach-sa1100/include/mach/io.h:#define __io(a)          __typesafe_io(a)
-> arch/arm/mach-pxa/include/mach/io.h:#define __io(a)             __typesafe_io(a)
-> arch/arm/mach-versatile/include/mach/io.h:#define __io(a)               __typesafe_io(a)
-> 
-> 3. scary multi-way translation, needs someone to really understand (Nico?, Lennert?)
-> arch/arm/mach-iop32x/include/mach/io.h:#define __io(p)          ((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
-> arch/arm/mach-iop33x/include/mach/io.h:#define __io(p)          ((void __iomem *)IOP3XX_PCI_IO_PHYS_TO_VIRT(p))
-> arch/arm/mach-iop13xx/include/mach/io.h:#define __io(a) __iop13xx_io(a)
-> arch/arm/mach-mv78xx0/include/mach/io.h:static inline void __iomem *__io(unsigned long addr)
+On the Globalscale Dreamplug (Marvell Kirkwood Development Platform),
+2MB of NOR flash are used to hold the bootloader, bootloader
+environment, and devicetree blob.  It is connected via spi.
 
-It seems iop3xx and mv78xx0 are just setting the PCI bus address to the
-local bus address. The OIOWTVR register controls local bus to PCI
-address translation. It is set to 0x90000000 which is effectively no
-translation. But don't we really want 0x9000xxxx local bus translated to
-0x0000xxxx PCI bus? Then the io resource region is setup for 0x9000xxxx
-as well. If both the PCI bus address and i/o resources are moved to 0x0
-that should make these category 1.
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+Notes:
+    - checkpatch clean.
+    - compiles, boots, registers partitions correctly.
 
-Also, you've left off ixp4xx from this list. It has PCI and needs io.h,
-so fixing all the PCI platforms above will not make using CONFIG_PCI,
-ISA or PCMCIA to include mach/io.h or not work. However, if indirect io
-is all that io.h is needed for then perhaps a config option called
-NEEDS_INDIRECT_IO would be a better name.
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   34 +++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c        |   40 ----------------
+ arch/arm/mach-kirkwood/common.c          |   11 ++++
+ drivers/spi/spi-orion.c                  |   75 ++++++++++++++++++++++++++----
+ 4 files changed, 111 insertions(+), 49 deletions(-)
 
-Rob
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 8a5dff8..bdf2ddc 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -22,4 +22,38 @@
+ 		interrupts = <33>;
+ 		clock-frequency = <200000000>;
+ 	};
++
++	spi at f1010600 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		compatible = "marvell,orion-spi";
++		reg = <0xf1010600 0x1ff>;
++		clock-frequency = <200000000>;
++
++		flash at 0 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			compatible = "macronix,mx25l1606e", "jedec-flash";
++
++			spi-max-frequency = <50000000>;
++			reg = <0>;
++
++			partition at 0 {
++				label = "U-Boot";
++				reg = <0x0 0x100000>;
++			};
++
++			partition at 100000 {
++				label = "U-Boot Environment";
++				reg = <0x100000 0x080000>;
++			};
++
++			partition at 180000 {
++				label = "Flattened Device Tree";
++				reg = <0x180000 0x080000>;
++			};
++		};
++	};
+ };
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index fbe6405..4960e63 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -39,42 +39,6 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+ 	{ }
+ };
+ 
+-struct mtd_partition dreamplug_partitions[] = {
+-	{
+-		.name	= "u-boot",
+-		.size	= SZ_512K,
+-		.offset = 0,
+-	},
+-	{
+-		.name	= "u-boot env",
+-		.size	= SZ_64K,
+-		.offset = SZ_512K + SZ_512K,
+-	},
+-	{
+-		.name	= "dtb",
+-		.size	= SZ_64K,
+-		.offset = SZ_512K + SZ_512K + SZ_512K,
+-	},
+-};
+-
+-static const struct flash_platform_data dreamplug_spi_slave_data = {
+-	.type		= "mx25l1606e",
+-	.name		= "spi_flash",
+-	.parts		= dreamplug_partitions,
+-	.nr_parts	= ARRAY_SIZE(dreamplug_partitions),
+-};
+-
+-static struct spi_board_info __initdata dreamplug_spi_slave_info[] = {
+-	{
+-		.modalias	= "m25p80",
+-		.platform_data	= &dreamplug_spi_slave_data,
+-		.irq		= -1,
+-		.max_speed_hz	= 50000000,
+-		.bus_num	= 0,
+-		.chip_select	= 0,
+-	},
+-};
+-
+ static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ };
+@@ -140,10 +104,6 @@ static void __init dreamplug_init(void)
+ 	 */
+ 	kirkwood_mpp_conf(dreamplug_mpp_config);
+ 
+-	spi_register_board_info(dreamplug_spi_slave_info,
+-				ARRAY_SIZE(dreamplug_spi_slave_info));
+-	kirkwood_spi_init();
+-
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&dreamplug_ge00_data);
+ 	kirkwood_ge01_init(&dreamplug_ge01_data);
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index cc15426..b041af3 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -15,6 +15,7 @@
+ #include <linux/ata_platform.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/dma-mapping.h>
++#include <linux/of.h>
+ #include <net/dsa.h>
+ #include <asm/page.h>
+ #include <asm/timex.h>
+@@ -481,6 +482,9 @@ static int __init kirkwood_clock_gate(void)
+ {
+ 	unsigned int curr = readl(CLOCK_GATING_CTRL);
+ 	u32 dev, rev;
++#ifdef CONFIG_OF
++	struct device_node *dp;
++#endif
+ 
+ 	kirkwood_pcie_id(&dev, &rev);
+ 	printk(KERN_DEBUG "Gating clock of unused units\n");
+@@ -524,6 +528,13 @@ static int __init kirkwood_clock_gate(void)
+ 	} else  /* keep this bit set for devices that don't have PCIe1 */
+ 		kirkwood_clk_ctrl |= CGC_PEX1;
+ 
++#ifdef CONFIG_OF
++	dp = of_find_node_by_path("/");
++	if (of_device_is_available(of_find_compatible_node(dp, NULL,
++							  "marvell,orion-spi")))
++		kirkwood_clk_ctrl |= CGC_RUNIT;
++#endif
++
+ 	/* Now gate clock the required units */
+ 	writel(kirkwood_clk_ctrl, CLOCK_GATING_CTRL);
+ 	printk(KERN_DEBUG " after: 0x%08x\n", readl(CLOCK_GATING_CTRL));
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index 13448c8..2ee5e16 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -18,6 +18,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/spi/orion_spi.h>
+ #include <linux/module.h>
++#include <linux/of_device.h>
+ #include <asm/unaligned.h>
+ 
+ #define DRIVER_NAME			"orion_spi"
+@@ -101,10 +102,24 @@ static int orion_spi_baudrate_set(struct spi_device *spi, unsigned int speed)
+ 	u32 prescale;
+ 	u32 reg;
+ 	struct orion_spi *orion_spi;
++#ifdef CONFIG_OF
++	const __be32 *prop;
++	int len;
++#endif
+ 
+ 	orion_spi = spi_master_get_devdata(spi->master);
+ 
++#ifdef CONFIG_OF
++	prop = of_get_property(spi->master->dev.of_node, "clock-frequency",
++				&len);
++	if (!prop || len < sizeof(*prop)) {
++		pr_debug("fdt missing 'clock-frequency' property.\n");
++		return -EINVAL;
++	}
++	tclk_hz = be32_to_cpup(prop);
++#else
+ 	tclk_hz = orion_spi->spi_info->tclk;
++#endif
+ 
+ 	/*
+ 	 * the supported rates are: 4,6,8...30
+@@ -360,7 +375,11 @@ static int orion_spi_setup(struct spi_device *spi)
+ 	orion_spi = spi_master_get_devdata(spi->master);
+ 
+ 	/* Fix ac timing if required.   */
++#ifdef CONFIG_OF
++	if (of_find_property(spi->master->dev.of_node, "spi-clock-fix", NULL))
++#else
+ 	if (orion_spi->spi_info->enable_clock_fix)
++#endif
+ 		orion_spi_setbits(orion_spi, ORION_SPI_IF_CONFIG_REG,
+ 				  (1 << 14));
+ 
+@@ -449,15 +468,47 @@ msg_rejected:
+ 	return -EINVAL;
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id spi_orion_of_match_table[] __devinitdata = {
++	{ .compatible = "marvell,orion-spi", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, spi_orion_of_match_table);
++#else /* CONFIG_OF */
++#define spi_orion_of_match_table NULL
++#endif /* CONFIG_OF */
++
++static struct platform_driver orion_spi_driver = {
++	.driver = {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++		.of_match_table = spi_orion_of_match_table,
++	},
++	.remove		= __exit_p(orion_spi_remove),
++};
++
+ static int __init orion_spi_probe(struct platform_device *pdev)
+ {
+ 	struct spi_master *master;
+ 	struct orion_spi *spi;
+ 	struct resource *r;
+-	struct orion_spi_info *spi_info;
+ 	int status = 0;
++#ifdef CONFIG_OF
++	const __be32 *prop;
++	int tclk;
++	int len;
++#else
++	struct orion_spi_info *spi_info;
+ 
+ 	spi_info = pdev->dev.platform_data;
++#endif
++
++#ifdef CONFIG_OF
++	orion_spi_wq = create_singlethread_workqueue(
++				orion_spi_driver.driver.name);
++	if (orion_spi_wq == NULL)
++		return -ENOMEM;
++#endif
+ 
+ 	master = spi_alloc_master(&pdev->dev, sizeof *spi);
+ 	if (master == NULL) {
+@@ -474,15 +525,29 @@ static int __init orion_spi_probe(struct platform_device *pdev)
+ 	master->setup = orion_spi_setup;
+ 	master->transfer = orion_spi_transfer;
+ 	master->num_chipselect = ORION_NUM_CHIPSELECTS;
++	master->dev.of_node = pdev->dev.of_node;
+ 
+ 	dev_set_drvdata(&pdev->dev, master);
+ 
+ 	spi = spi_master_get_devdata(master);
+ 	spi->master = master;
++#ifdef CONFIG_OF
++	prop = of_get_property(master->dev.of_node, "clock-frequency", &len);
++	if (!prop || len < sizeof(*prop)) {
++		pr_debug("fdt missing 'clock-frequency' property.\n");
++		status = -EINVAL;
++		goto out;
++	}
++	tclk = be32_to_cpup(prop);
++
++	spi->max_speed = DIV_ROUND_UP(tclk, 4);
++	spi->min_speed = DIV_ROUND_UP(tclk, 30);
++#else
+ 	spi->spi_info = spi_info;
+ 
+ 	spi->max_speed = DIV_ROUND_UP(spi_info->tclk, 4);
+ 	spi->min_speed = DIV_ROUND_UP(spi_info->tclk, 30);
++#endif
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+@@ -541,14 +606,6 @@ static int __exit orion_spi_remove(struct platform_device *pdev)
+ 
+ MODULE_ALIAS("platform:" DRIVER_NAME);
+ 
+-static struct platform_driver orion_spi_driver = {
+-	.driver = {
+-		.name	= DRIVER_NAME,
+-		.owner	= THIS_MODULE,
+-	},
+-	.remove		= __exit_p(orion_spi_remove),
+-};
+-
+ static int __init orion_spi_init(void)
+ {
+ 	orion_spi_wq = create_singlethread_workqueue(
+-- 
+1.7.3.4
