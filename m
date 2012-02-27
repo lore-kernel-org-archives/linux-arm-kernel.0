@@ -1,35 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Feb 2012 09:04:47 +0000
-Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
-In-Reply-To: <1330253653.3673.8.camel@flow>
-References: <E1QKFPN-0003xV-Sf@outmx07.plus.net> <1330253653.3673.8.camel@flow>
-Message-ID: <20120227090447.GQ22562@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 27 Feb 2012 10:04:53 +0100
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120216075825.GA11631@opensource.wolfsonmicro.com>
+References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
+ <20120213082741.GN3852@pengutronix.de>
+ <20120213144820.GA3494@opensource.wolfsonmicro.com>
+ <20120214105823.GS3852@pengutronix.de>
+ <20120214172902.GB3916@opensource.wolfsonmicro.com>
+ <20120216073236.GE3852@pengutronix.de>
+ <20120216075825.GA11631@opensource.wolfsonmicro.com>
+Message-ID: <20120227090453.GE26642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2012 at 11:54:13AM +0100, Philipp Zabel wrote:
-> Am Mittwoch, den 11.05.2011, 19:49 +0000 schrieb Paul Parsons:
-> > Basic suspend/resume is fixed by ensuring that the PGSR registers are set correctly before sleep mode is entered. In particular four of the active low resets need to be driven high while in sleep mode, otherwise the unit resets itself instead of suspending. Another problem was that the PCFR_GPROD bit is apparently set by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail immediately after returning from sleep mode.
-> > 
-> > Driver-specific bugs still remain. In particular the mmc driver does not resume properly after returning from sleep mode, thus preventing sleep mode from being entered a second time.
-> > 
-> > Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> > ---
-> > --- clean-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c	2011-05-11 00:54:10.787247169 +0100
-> > +++ linux-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c	2011-05-11 20:21:54.026109594 +0100
-> > @@ -120,7 +120,11 @@ static unsigned long hx4700_pin_config[]
-> >  	GPIO19_SSP2_SCLK,
-> >  	GPIO86_SSP2_RXD,
-> >  	GPIO87_SSP2_TXD,
-> > -	GPIO88_GPIO,
-> > +	MFP_CFG_OUT(GPIO88, AF0, KEEP_OUTPUT),	/* TSC2046_CS */
+On Wed, Feb 15, 2012 at 11:58:26PM -0800, Mark Brown wrote:
+> On Thu, Feb 16, 2012 at 08:32:36AM +0100, Sascha Hauer wrote:
+> > On Tue, Feb 14, 2012 at 09:29:04AM -0800, Mark Brown wrote:
 > 
-> What you want here is to keep the SPI chip select deasserted (high)
-> during suspend, so I think that should be DRIVE_HIGH instead.
+> > > The main thing here is to avoid these driver specific bodges that people
+> > > keep churning out again and again, it's quite depressing really.
+> 
+> > I think this churning will continue until we either make the dummy
+> > regulator non optional and drop this warning that gets printed each
+> > time it is used, or we at least provide a way to easily add a fixed
+> 
+> That's obviously not a good idea, if we do that we may as well just drop
+> all error checking from the API.
+> 
+> > dummy regulator without adding >20 lines of code to each board just
+> > for saying that we don't have a regulator for this particular device.
+> 
+> It's not per device, of course - there's an overhead from putting a
+> fixed regulator in but then per supply it's just a line.
+> 
+> > +#if IS_ENABLED(CONFIG_REGULATOR_FIXED_VOLTAGE)
+> > +struct platform_device *regulator_register_fixed(const char *name, int id,
+> > +		int microvolts, struct regulator_consumer_supply *supplies,
+> > +		int num_supplies);
+> > +#else
+> > +static struct platform_device *regulator_register_fixed(const char *name, int id,
+> > +		int microvolts, struct regulator_consumer_supply *supplies,
+> > +		int num_supplies)
+> > +{
+> > +	return NULL;
+> > +}
+> > +#endif
+> 
+> This is obviously not good for users, they'd still have to do error
+> checking to determine if the device was created or not and then manually
+> register the device with the driver core and ideally also care if that
+> worked or not.  I'm not sure something like this will really save enough
+> unless the device actually gets registered by the function, otherwise
+> it's going to be converting data to code.
+> 
+> I'd also drop the microvolts and name parameters, if people are going to
+> be doing enough work to describe the individual rails on the board
+> they're probably not going to be put off by having to register a
+> platform device.
 
-And I don't think we allowed folk to use MFP_CFG_xxx() macros in their
-board support code.  Is there something wrong with:
+If I drop the microvolts parameter what microvolts should I assume? I
+tried 0 but the regulator core does not like it:
 
-	GPIO88_GPIO | MFP_LPM_KEEP_OUTPUT
+machine_constraints_voltage: dummy: unsupportable voltage constraints
 
-?
+(with max: -2147483648 min: 2147483647)
+
+Sascha
+
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
