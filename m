@@ -1,47 +1,47 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 27 Feb 2012 10:24:05 +0100
-Subject: [PATCH] ARM: mach-imx: mx3: Fix section mismatch in
- imx3_init_l2x0()
-In-Reply-To: <1330273624-5757-1-git-send-email-festevam@gmail.com>
-References: <1330273624-5757-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120227092405.GW3852@pengutronix.de>
+Date: Mon, 27 Feb 2012 10:24:21 +0100
+Subject: [PATCH][trivial] ARM: Remove redundant ';' from
+ avic_irq_set_priority()
+In-Reply-To: <alpine.LNX.2.00.1202262307210.6089@swampdragon.chaosbits.net>
+References: <alpine.LNX.2.00.1202262307210.6089@swampdragon.chaosbits.net>
+Message-ID: <20120227092421.GX3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2012 at 01:27:04PM -0300, Fabio Estevam wrote:
-> Fix the following section mismatch:
+On Sun, Feb 26, 2012 at 11:09:40PM +0100, Jesper Juhl wrote:
+> One semi-colon at the end of the return statement is sufficient.
 > 
-> WARNING: vmlinux.o(.text+0x11be8): Section mismatch in reference from the function imx3_init_l2x0() to the function .init.text:l2x0_init()
-> The function imx3_init_l2x0() references
-> the function __init l2x0_init().
-> This is often because imx3_init_l2x0 lacks a __init 
-> annotation or the annotation of l2x0_init is wrong.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Jesper Juhl <jj@chaosbits.net>
 
 Applied
 
 Sascha
 
 > ---
->  arch/arm/mach-imx/mm-imx3.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/plat-mxc/avic.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-> index 8404ee7..6222151 100644
-> --- a/arch/arm/mach-imx/mm-imx3.c
-> +++ b/arch/arm/mach-imx/mm-imx3.c
-> @@ -76,7 +76,7 @@ static void __iomem *imx3_ioremap(unsigned long phys_addr, size_t size,
->  	return __arm_ioremap(phys_addr, size, mtype);
->  }
+> diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
+> index 55f1569..689f81f 100644
+> --- a/arch/arm/plat-mxc/avic.c
+> +++ b/arch/arm/plat-mxc/avic.c
+> @@ -60,7 +60,7 @@ static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
+>  	unsigned int mask = 0x0F << irq % 8 * 4;
 >  
-> -void imx3_init_l2x0(void)
-> +void __init imx3_init_l2x0(void)
->  {
->  	void __iomem *l2x0_base;
->  	void __iomem *clkctl_base;
+>  	if (irq >= AVIC_NUM_IRQS)
+> -		return -EINVAL;;
+> +		return -EINVAL;
+>  
+>  	temp = __raw_readl(avic_base + AVIC_NIPRIORITY(irq / 8));
+>  	temp &= ~mask;
 > -- 
-> 1.7.1
+> 1.7.9.2
+> 
+> 
+> -- 
+> Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
+> Don't top-post http://www.catb.org/jargon/html/T/top-post.html
+> Plain text mails only, please.
 > 
 > 
 
