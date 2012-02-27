@@ -1,203 +1,257 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 27 Feb 2012 18:46:02 +0100
-Subject: [PATCH v3] ARM: LPC32xx: Ethernet support
-Message-ID: <1330364762-23203-1-git-send-email-stigge@antcom.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 27 Feb 2012 17:53:27 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20120227175327.GA2023@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds ethernet support to the LPC32xx ARM architecture. The actual
-driver in drivers/net is contained in a separate patch.
+On Thu, Feb 23, 2012 at 05:48:22PM +0000, Stefano Stabellini wrote:
+> We need a register to pass the hypercall number because we might not
+> know it at compile time and HVC only takes an immediate argument.
+> 
+> Among the available registers r12 seems to be the best choice because it
+> is defined as "intra-procedure call scratch register".
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+This would be massively simplified if you didn't try to inline the HVC.
+Does it really need to be inline?
 
----
- arch/arm/mach-lpc32xx/Kconfig              |   26 ++++++++++++++++++++++
- arch/arm/mach-lpc32xx/clock.c              |    2 -
- arch/arm/mach-lpc32xx/common.c             |   34 +++++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.h             |    4 +--
- arch/arm/mach-lpc32xx/include/mach/board.h |   32 +++++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/irq.c                |    4 +++
- arch/arm/mach-lpc32xx/phy3250.c            |    2 +
- 7 files changed, 101 insertions(+), 3 deletions(-)
+> 
+> Use the ISS to pass an hypervisor specific tag.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: kvm at vger.kernel.org
+> ---
+>  arch/arm/include/asm/xen/hypercall.h |   87 +++++++++++++++++++---------------
+>  1 files changed, 48 insertions(+), 39 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
+> index 404e63f0..04eba1c 100644
+> --- a/arch/arm/include/asm/xen/hypercall.h
+> +++ b/arch/arm/include/asm/xen/hypercall.h
+> @@ -33,13 +33,17 @@
+>  #ifndef _ASM_ARM_XEN_HYPERCALL_H
+>  #define _ASM_ARM_XEN_HYPERCALL_H
+>  
+> -#define __HVC_IMM(name)	"( " #name " & 0xf) + "	  \
+> -			    "((" #name " << 4) & 0xfff00)"
+> +#include <xen/interface/xen.h>
+> +#include <asm/errno.h>
+>  
+> -#define ____HYPERCALL(name) ".word 0xe1400070 + " __HVC_IMM(name)
+> -#define __HYPERCALL(name) ____HYPERCALL(__HYPERVISOR_##name)
+> +#define XEN_HYPERCALL_TAG  "0XEA1"
+> +
+> +#define __HVC_IMM(tag)	"( " tag " & 0xf) + "	  \
+> +			    "((" tag " << 4) & 0xfff00)"
+> +#define __HYPERCALL ".word 0xe1400070 + " __HVC_IMM(XEN_HYPERCALL_TAG)
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/Kconfig
-+++ linux-2.6/arch/arm/mach-lpc32xx/Kconfig
-@@ -29,5 +29,31 @@ config ARCH_LPC32XX_UART6_SELECT
- 
- endmenu
- 
-+menu "LPC32XX chip components"
-+
-+config ARCH_LPC32XX_IRAM_FOR_NET
-+	bool "Use IRAM for network buffers"
-+	default n
-+	help
-+	  Say Y here to use the LPC internal fast IRAM (i.e. 256KB SRAM) as
-+	  network buffer.  If the total combined required buffer sizes is
-+	  larger than the size of IRAM, then SDRAM will be used instead.
-+
-+	  This can be enabled safely if the IRAM is not intended for other
-+	  uses.
-+
-+config ARCH_LPC32XX_MII_SUPPORT
-+	bool "Check to enable MII support or leave disabled for RMII support"
-+	default n
-+	help
-+	  Say Y here to enable MII support, or N for RMII support. Regardless of
-+	  which support is selected, the ethernet interface driver needs to be
-+	  selected in the device driver networking section.
-+
-+	  The PHY3250 reference board uses RMII, so users of this board should
-+	  say N.
-+
-+endmenu
-+
- endif
- 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -1134,7 +1134,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK(NULL, "i2s1_ck", clk_i2s1)
- 	_REGISTER_CLOCK("ts-lpc32xx", NULL, clk_tsc)
- 	_REGISTER_CLOCK("dev:mmc0", NULL, clk_mmc)
--	_REGISTER_CLOCK("lpc-net.0", NULL, clk_net)
-+	_REGISTER_CLOCK("lpc-eth.0", NULL, clk_net)
- 	_REGISTER_CLOCK("dev:clcd", NULL, clk_lcd)
- 	_REGISTER_CLOCK("lpc32xx_udc", "ck_usbd", clk_usbd)
- 	_REGISTER_CLOCK("lpc32xx_rtc", NULL, clk_rtc)
---- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/common.c
-@@ -186,6 +186,40 @@ struct platform_device lpc32xx_ohci_devi
- };
- 
- /*
-+ * Network Support
-+ */
-+static struct lpc_net_cfg lpc32xx_netdata = {
-+	.phy_irq = -1,
-+	.phy_mask = 0xFFFFFFF0,
-+};
-+
-+static struct resource net_resources[] = {
-+	[0] = {
-+		.start = LPC32XX_ETHERNET_BASE,
-+		.end = LPC32XX_ETHERNET_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start = IRQ_LPC32XX_ETHERNET,
-+		.end = IRQ_LPC32XX_ETHERNET,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static u64 lpc32xx_mac_dma_mask = 0xffffffffUL;
-+struct platform_device lpc32xx_net_device = {
-+	.name = "lpc-eth",
-+	.id = 0,
-+	.dev = {
-+		.dma_mask = &lpc32xx_mac_dma_mask,
-+		.coherent_dma_mask = 0xffffffffUL,
-+		.platform_data = &lpc32xx_netdata,
-+	},
-+	.num_resources = ARRAY_SIZE(net_resources),
-+	.resource = net_resources,
-+};
-+
-+/*
-  * Returns the unique ID for the device
-  */
- void lpc32xx_get_uid(u32 devid[4])
---- linux-2.6.orig/arch/arm/mach-lpc32xx/common.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/common.h
-@@ -19,6 +19,7 @@
- #ifndef __LPC32XX_COMMON_H
- #define __LPC32XX_COMMON_H
- 
-+#include <mach/board.h>
- #include <linux/platform_device.h>
- 
- /*
-@@ -32,6 +33,7 @@ extern struct platform_device lpc32xx_ts
- extern struct platform_device lpc32xx_adc_device;
- extern struct platform_device lpc32xx_rtc_device;
- extern struct platform_device lpc32xx_ohci_device;
-+extern struct platform_device lpc32xx_net_device;
- 
- /*
-  * Other arch specific structures and functions
-@@ -67,8 +69,6 @@ extern u32 clk_get_pclk_div(void);
-  */
- extern void lpc32xx_get_uid(u32 devid[4]);
- 
--extern u32 lpc32xx_return_iram_size(void);
--
- /*
-  * Pointers used for sizing and copying suspend function data
-  */
---- /dev/null
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/board.h
-@@ -0,0 +1,32 @@
-+/*
-+ * arm/arch/mach-lpc32xx/include/mach/board.h
-+ *
-+ * Author: Kevin Wells <kevin.wells@nxp.com>
-+ *
-+ * Copyright (C) 2010 NXP Semiconductors
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __ASM_ARCH_BOARD_H
-+#define __ASM_ARCH_BOARD_H
-+
-+/*
-+ * Network configuration structure
-+ */
-+struct lpc_net_cfg {
-+	int	phy_irq;        /* PHY IRQ number, or -1 for polling */
-+	u32	phy_mask;       /* PHY mask value */
-+};
-+
-+extern u32 lpc32xx_return_iram_size(void);
-+
-+#endif  /* __ASM_ARCH_BOARD_H */
---- linux-2.6.orig/arch/arm/mach-lpc32xx/irq.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/irq.c
-@@ -150,6 +150,10 @@ static const struct lpc32xx_event_info l
- 		.event_group = &lpc32xx_event_int_regs,
- 		.mask = LPC32XX_CLKPWR_INTSRC_KEY_BIT,
- 	},
-+	[IRQ_LPC32XX_ETHERNET] = {
-+		.event_group = &lpc32xx_event_int_regs,
-+		.mask = LPC32XX_CLKPWR_INTSRC_MAC_BIT,
-+	},
- 	[IRQ_LPC32XX_USB_OTG_ATX] = {
- 		.event_group = &lpc32xx_event_int_regs,
- 		.mask = LPC32XX_CLKPWR_INTSRC_USBATXINT_BIT,
---- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-@@ -37,6 +37,7 @@
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-+#include <mach/board.h>
- #include <mach/gpio-lpc32xx.h>
- #include "common.h"
- 
-@@ -278,6 +279,7 @@ static struct platform_device *phy3250_d
- 	&lpc32xx_gpio_led_device,
- 	&lpc32xx_adc_device,
- 	&lpc32xx_ohci_device,
-+	&lpc32xx_net_device,
- };
- 
- static struct amba_device *amba_devs[] __initdata = {
+Please, do not do this.  It won't work in Thumb, where the encodings are
+different.
+
+It is reasonable to expect anyone building Xen to have reasonably new
+tools, you you can justifiably use
+
+AFLAGS_thisfile.o := -Wa,-march=armv7-a+virt
+
+in the Makefile and just use the hvc instruction directly.
+
+
+Of course, this is only practical if the HVC invocation is not inlined.
+If we can't avoid macro-ising HVC, we should do it globally, not locally
+to the Xen code.  That way we at least keep all the horror in one place.
+
+Cheers
+---Dave
+
+>  
+>  #define __HYPERCALL_RETREG	"r0"
+> +#define __HYPERCALL_NUMBER	"r12"
+>  #define __HYPERCALL_ARG1REG	"r0"
+>  #define __HYPERCALL_ARG2REG	"r1"
+>  #define __HYPERCALL_ARG3REG	"r2"
+> @@ -48,30 +52,32 @@
+>  
+>  #define __HYPERCALL_DECLS						\
+>  	register unsigned long __res  asm(__HYPERCALL_RETREG);		\
+> +	register unsigned long __num  asm(__HYPERCALL_NUMBER) = __num; \
+>  	register unsigned long __arg1 asm(__HYPERCALL_ARG1REG) = __arg1; \
+>  	register unsigned long __arg2 asm(__HYPERCALL_ARG2REG) = __arg2; \
+>  	register unsigned long __arg3 asm(__HYPERCALL_ARG3REG) = __arg3; \
+>  	register unsigned long __arg4 asm(__HYPERCALL_ARG4REG) = __arg4; \
+>  	register unsigned long __arg5 asm(__HYPERCALL_ARG5REG) = __arg5;
+>  
+> -#define __HYPERCALL_0PARAM	"=r" (__res)
+> +#define __HYPERCALL_0PARAM	"=r" (__res), "+r" (__num)
+>  #define __HYPERCALL_1PARAM	__HYPERCALL_0PARAM, "+r" (__arg1)
+>  #define __HYPERCALL_2PARAM	__HYPERCALL_1PARAM, "+r" (__arg2)
+>  #define __HYPERCALL_3PARAM	__HYPERCALL_2PARAM, "+r" (__arg3)
+>  #define __HYPERCALL_4PARAM	__HYPERCALL_3PARAM, "+r" (__arg4)
+>  #define __HYPERCALL_5PARAM	__HYPERCALL_4PARAM, "+r" (__arg5)
+>  
+> -#define __HYPERCALL_0ARG()
+> -#define __HYPERCALL_1ARG(a1)						\
+> -	__HYPERCALL_0ARG()		__arg1 = (unsigned long)(a1);
+> -#define __HYPERCALL_2ARG(a1,a2)						\
+> -	__HYPERCALL_1ARG(a1)		__arg2 = (unsigned long)(a2);
+> -#define __HYPERCALL_3ARG(a1,a2,a3)					\
+> -	__HYPERCALL_2ARG(a1,a2)		__arg3 = (unsigned long)(a3);
+> -#define __HYPERCALL_4ARG(a1,a2,a3,a4)					\
+> -	__HYPERCALL_3ARG(a1,a2,a3)	__arg4 = (unsigned long)(a4);
+> -#define __HYPERCALL_5ARG(a1,a2,a3,a4,a5)				\
+> -	__HYPERCALL_4ARG(a1,a2,a3,a4)	__arg5 = (unsigned long)(a5);
+> +#define __HYPERCALL_0ARG(hypercall)						\
+> +	__num = (unsigned long)hypercall;
+> +#define __HYPERCALL_1ARG(hypercall,a1)						\
+> +	__HYPERCALL_0ARG(hypercall)		__arg1 = (unsigned long)(a1);
+> +#define __HYPERCALL_2ARG(hypercall,a1,a2)						\
+> +	__HYPERCALL_1ARG(hypercall,a1)		__arg2 = (unsigned long)(a2);
+> +#define __HYPERCALL_3ARG(hypercall,a1,a2,a3)					\
+> +	__HYPERCALL_2ARG(hypercall,a1,a2)		__arg3 = (unsigned long)(a3);
+> +#define __HYPERCALL_4ARG(hypercall,a1,a2,a3,a4)					\
+> +	__HYPERCALL_3ARG(hypercall,a1,a2,a3)	__arg4 = (unsigned long)(a4);
+> +#define __HYPERCALL_5ARG(hypercall,a1,a2,a3,a4,a5)				\
+> +	__HYPERCALL_4ARG(hypercall,a1,a2,a3,a4)	__arg5 = (unsigned long)(a5);
+>  
+>  #define __HYPERCALL_CLOBBER5	"memory"
+>  #define __HYPERCALL_CLOBBER4	__HYPERCALL_CLOBBER5, __HYPERCALL_ARG5REG
+> @@ -80,102 +86,105 @@
+>  #define __HYPERCALL_CLOBBER1	__HYPERCALL_CLOBBER2, __HYPERCALL_ARG2REG
+>  #define __HYPERCALL_CLOBBER0	__HYPERCALL_CLOBBER1, __HYPERCALL_ARG1REG
+>  
+> -#define _hypercall0(type, name)						\
+> +#define _hypercall0(type, hypercall)						\
+>  ({									\
+>  	__HYPERCALL_DECLS;						\
+> -	__HYPERCALL_0ARG();						\
+> -	asm volatile (__HYPERCALL(name)					\
+> +	__HYPERCALL_0ARG(hypercall);						\
+> +	asm volatile (__HYPERCALL					\
+>  		      : __HYPERCALL_0PARAM				\
+>  		      : 						\
+>  		      : __HYPERCALL_CLOBBER0);				\
+>  	(type)__res;							\
+>  })
+>  
+> -#define _hypercall1(type, name, a1)					\
+> +#define _hypercall1(type, hypercall, a1)					\
+>  ({									\
+>  	__HYPERCALL_DECLS;						\
+> -	__HYPERCALL_1ARG(a1);						\
+> -	asm volatile (__HYPERCALL(name)					\
+> +	__HYPERCALL_1ARG(hypercall, a1);						\
+> +	asm volatile (__HYPERCALL					\
+>  		      : __HYPERCALL_1PARAM				\
+>  		      : 						\
+>  		      : __HYPERCALL_CLOBBER1);				\
+>  	(type)__res;							\
+>  })
+>  
+> -#define _hypercall2(type, name, a1, a2)					\
+> +#define _hypercall2(type, hypercall, a1, a2)					\
+>  ({									\
+>  	__HYPERCALL_DECLS;						\
+> -	__HYPERCALL_2ARG(a1, a2);					\
+> -	asm volatile (__HYPERCALL(name)					\
+> +	__HYPERCALL_2ARG(hypercall, a1, a2);					\
+> +	asm volatile (__HYPERCALL					\
+>  		      : __HYPERCALL_2PARAM				\
+>  		      : 						\
+>  		      : __HYPERCALL_CLOBBER2);				\
+>  	(type)__res;							\
+>  })
+>  
+> -#define _hypercall3(type, name, a1, a2, a3)				\
+> +#define _hypercall3(type, hypercall, a1, a2, a3)				\
+>  ({									\
+>  	__HYPERCALL_DECLS;						\
+> -	__HYPERCALL_3ARG(a1, a2, a3);					\
+> -	asm volatile (__HYPERCALL(name)					\
+> +	__HYPERCALL_3ARG(hypercall, a1, a2, a3);					\
+> +	asm volatile (__HYPERCALL					\
+>  		      : __HYPERCALL_3PARAM				\
+>  		      : 						\
+>  		      : __HYPERCALL_CLOBBER3);				\
+>  	(type)__res;							\
+>  })
+>  
+> -#define _hypercall4(type, name, a1, a2, a3, a4)				\
+> +#define _hypercall4(type, hypercall, a1, a2, a3, a4)				\
+>  ({									\
+>  	__HYPERCALL_DECLS;						\
+> -	__HYPERCALL_4ARG(a1, a2, a3, a4);				\
+> -	asm volatile (__HYPERCALL(name)					\
+> +	__HYPERCALL_4ARG(hypercall, a1, a2, a3, a4);				\
+> +	asm volatile (__HYPERCALL					\
+>  		      : __HYPERCALL_4PARAM				\
+>  		      : 						\
+>  		      : __HYPERCALL_CLOBBER4);				\
+>  	(type)__res;							\
+>  })
+>  
+> -#define _hypercall5(type, name, a1, a2, a3, a4, a5)			\
+> +#define _hypercall5(type, hypercall, a1, a2, a3, a4, a5)			\
+>  ({									\
+>  	__HYPERCALL_DECLS;						\
+> -	__HYPERCALL_5ARG(a1, a2, a3, a4, a5);				\
+> -	asm volatile (__HYPERCALL(name)					\
+> +	__HYPERCALL_5ARG(hypercall, a1, a2, a3, a4, a5);				\
+> +	asm volatile (__HYPERCALL					\
+>  		      : __HYPERCALL_5PARAM				\
+>  		      : 						\
+>  		      : __HYPERCALL_CLOBBER5);				\
+>  	(type)__res;							\
+>  })
+>  
+> +#define HYPERCALL(name) \
+> +	(__HYPERVISOR_##name)
+> +
+>  /* -- Hypercall definitions go below -- */
+>  
+>  static inline int
+>  HYPERVISOR_xen_version(int cmd, void *arg)
+>  {
+> -	return _hypercall2(int, xen_version, cmd, arg);
+> +	return _hypercall2(int, HYPERCALL(xen_version), cmd, arg);
+>  }
+>  
+>  static inline int
+>  HYPERVISOR_console_io(int cmd, int count, char *str)
+>  {
+> -	return _hypercall3(int, console_io, cmd, count, str);
+> +	return _hypercall3(int, HYPERCALL(console_io), cmd, count, str);
+>  }
+>  
+>  static inline int
+>  HYPERVISOR_grant_table_op(unsigned int cmd, void *uop, unsigned int count)
+>  {
+> -	return _hypercall3(int, grant_table_op, cmd, uop, count);
+> +	return _hypercall3(int, HYPERCALL(grant_table_op), cmd, uop, count);
+>  }
+>  
+>  static inline int
+>  HYPERVISOR_sched_op(int cmd, void *arg)
+>  {
+> -	return _hypercall2(int, sched_op, cmd, arg);
+> +	return _hypercall2(int, HYPERCALL(sched_op), cmd, arg);
+>  }
+>  
+>  static inline int
+>  HYPERVISOR_event_channel_op(int cmd, void *arg)
+>  {
+> -	return _hypercall2(int, event_channel_op, cmd, arg);
+> +	return _hypercall2(int, HYPERCALL(event_channel_op), cmd, arg);
+>  }
+>  
+>  #endif /* _ASM_ARM_XEN_HYPERCALL_H */
+> -- 
+> 1.7.2.5
+> 
+> 
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
