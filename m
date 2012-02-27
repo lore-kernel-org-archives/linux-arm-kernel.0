@@ -1,56 +1,99 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 27 Feb 2012 15:48:13 +0100
-Subject: [PATCH v3 1/6] sched: Introduce the
- finish_arch_post_lock_switch() scheduler hook
-In-Reply-To: <1327081352-13178-2-git-send-email-catalin.marinas@arm.com>
-References: <1327081352-13178-1-git-send-email-catalin.marinas@arm.com>
- <1327081352-13178-2-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1330354093.11248.71.camel@twins>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 27 Feb 2012 15:49:42 +0100
+Subject: [PATCH] gic : check if there are pending interrupts
+In-Reply-To: <4F47BF7E.5020707@gmail.com>
+References: <1330091148-15291-1-git-send-email-daniel.lezcano@linaro.org>
+ <4F47BF7E.5020707@gmail.com>
+Message-ID: <4F4B9806.60601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-01-20 at 17:42 +0000, Catalin Marinas wrote:
-> This hook is called by the scheduler after rq->lock has been released
-> and interrupts enabled. It will be used in subsequent patches on the ARM
-> architecture.
-> 
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Reviewed-by: Frank Rowand <frank.rowand@am.sony.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Ingo Molnar <mingo@elte.hu>
+On 02/24/2012 05:49 PM, Rob Herring wrote:
+> On 02/24/2012 07:45 AM, Daniel Lezcano wrote:
+>> The following patch checks if there are pending interrupts on the gic.
+>>
+>> This function is needed for example for the ux500 cpuidle driver.
+>> When the A9 cores and the gic are decoupled from the PRCMU, the idle
+>> routine has to check if an interrupt is pending on the gic before entering
+>> in retention mode.
+>
+> That sounds racy. Soon as you check an interrupt can assert.
 
-Acked-by: Peter Zijlstra <peterz@infradead.org>
+Yes it sounds racy but not for the ux500 where the gic can be decoupled 
+and the irq are catched by the PRCMU to wake up the core A9.
 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  kernel/sched/core.c  |    1 +
->  kernel/sched/sched.h |    3 +++
->  2 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-> index df00cb0..f1db6d8 100644
-> --- a/kernel/sched/core.c
-> +++ b/kernel/sched/core.c
-> @@ -1937,6 +1937,7 @@ static void finish_task_switch(struct rq *rq, struct task_struct *prev)
->  	local_irq_enable();
->  #endif /* __ARCH_WANT_INTERRUPTS_ON_CTXSW */
->  	finish_lock_switch(rq, prev);
-> +	finish_arch_post_lock_switch();
->  	trace_sched_stat_sleeptime(current, rq->clock);
->  
->  	fire_sched_in_preempt_notifiers(current);
-> diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-> index 98c0c26..d72483d 100644
-> --- a/kernel/sched/sched.h
-> +++ b/kernel/sched/sched.h
-> @@ -692,6 +692,9 @@ static inline int task_running(struct rq *rq, struct task_struct *p)
->  #ifndef finish_arch_switch
->  # define finish_arch_switch(prev)	do { } while (0)
->  #endif
-> +#ifndef finish_arch_post_lock_switch
-> +# define finish_arch_post_lock_switch()	do { } while (0)
-> +#endif
->  
->  #ifndef __ARCH_WANT_UNLOCKED_CTXSW
->  static inline void prepare_lock_switch(struct rq *rq, struct task_struct *next)
-> 
+>> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
+>> ---
+>>   arch/arm/common/gic.c               |   37 +++++++++++++++++++++++++++++++++++
+>>   arch/arm/include/asm/hardware/gic.h |    2 +-
+>>   2 files changed, 38 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>> index aa52699..2528094 100644
+>> --- a/arch/arm/common/gic.c
+>> +++ b/arch/arm/common/gic.c
+>> @@ -750,6 +750,43 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>   }
+>>   #endif
+>>
+>> +/*
+>> + * gic_pending_irq - checks if there are pending interrupts on the gic
+>> + *
+>> + * Disabling an interrupt only disables the forwarding of the
+>> + * interrupt to any CPU interface. It does not prevent the interrupt
+>> + * from changing state, for example becoming pending, or active and
+>> + * pending if it is already active. For this reason, we have to check
+>> + * the interrupt is pending *and* is enabled.
+>> + *
+>> + * Returns true if there are pending and enabled interrupts, false
+>> + * otherwise.
+>> + */
+>> +bool gic_pending_irq(unsigned int gic_nr)
+>
+> Seems like this should be solved with a generic interface and not gic
+> specific.
+
+
+> Would we ever need this for a secondary gic (gic_nr != 0)?
+
+I don't think so for this specific routine which will be used by the 
+ux500 for the moment.
+
+>> +{
+>> +	u32 pr; /* Pending register */
+>> +	u32 er; /* Enable register */
+>> +	void __iomem *dist_base;
+>> +	int gic_irqs;
+>> +	int i;
+>> +
+>> +	BUG_ON(gic_nr>= MAX_GIC_NR);
+>> +
+>> +	gic_irqs = gic_data[gic_nr].gic_irqs;
+>> +	dist_base = gic_data_dist_base(&gic_data[gic_nr]);
+>> +
+>> +	for (i = 0; i<  DIV_ROUND_UP(gic_irqs, 32); i++) {
+>
+> Wouldn't you want to skip PPIs if the CPU interface is disabled?
+>
+>> +
+>> +		pr = readl_relaxed(dist_base + GIC_DIST_PENDING_SET + i * 4);
+>> +		er = readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
+>> +
+>
+> What if an interrupt is pending, but routed to a core which is not
+> getting put into low power state?
+
+Hmm, right. That does not happen with the ux500 because the gic is 
+decoupled from the cores. Checking if some irq are pending on the gic 
+makes sense only on this case which is very specific to the ux500 SoC.
+I am wondering if that would not make sense to move this routine to the 
+mfd's prcmu.c file, no ?
+
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
