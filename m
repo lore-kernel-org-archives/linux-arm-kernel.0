@@ -1,30 +1,38 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 27 Feb 2012 19:08:14 +0100
-Subject: [PATCH v3] ARM: LPC32xx: Ethernet support
-In-Reply-To: <1330364762-23203-1-git-send-email-stigge@antcom.de>
-References: <1330364762-23203-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120227180814.GB21386@pengutronix.de>
+From: timur@freescale.com (Timur Tabi)
+Date: Mon, 27 Feb 2012 12:15:29 -0600
+Subject: [PATCH 4/6] ASoC: fsl: create fsl_utils to accommodate the common
+ functions
+In-Reply-To: <1330092582-21180-5-git-send-email-shawn.guo@linaro.org>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F4BC841.7000407@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 06:46:02PM +0100, Roland Stigge wrote:
-> This patch adds ethernet support to the LPC32xx ARM architecture. The actual
-> driver in drivers/net is contained in a separate patch.
+Shawn Guo wrote:
+> There are some amount of code duplication between mpc8610_hpcd and
+> p1022_ds machine drivers, and the same code will be duplicated again
+> when another new machine driver is added.  The patch creates fsl_utils
+> to accommodate the common functions to stop the code duplication.
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
 
-Please add below this dashed line what changed since the last version. This
-makes reviewing easier.
+What repository is this for?  When I apply it to Mark's for-next branch, I
+get this:
+
+Applying: ASoC: fsl: create fsl_utils to accommodate the common functions
+error: patch failed: sound/soc/fsl/Kconfig:1
+error: sound/soc/fsl/Kconfig: patch does not apply
+error: patch failed: sound/soc/fsl/Makefile:8
+error: sound/soc/fsl/Makefile: patch does not apply
+Patch failed at 0004 ASoC: fsl: create fsl_utils to accommodate the common
+functions
+When you have resolved this problem run "git am --resolved".
+If you would prefer to skip this patch, instead run "git am --skip".
+To restore the original branch and stop patching run "git am --abort".
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120227/6203f004/attachment.sig>
+Timur Tabi
+Linux kernel developer at Freescale
