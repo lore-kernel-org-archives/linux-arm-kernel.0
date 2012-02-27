@@ -1,28 +1,35 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Mon, 27 Feb 2012 15:39:04 -0600
-Subject: [PATCH 5/6] ASoC: fsl: use platform_device_id table to match
- p1022_ds device
-In-Reply-To: <1330092582-21180-6-git-send-email-shawn.guo@linaro.org>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F4BF7F8.8030008@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 27 Feb 2012 13:48:12 -0800
+Subject: [PATCH] ARM: tegra: uncompress.h: Don't depend on kernel headers
+In-Reply-To: <1330378039-21030-1-git-send-email-swarren@nvidia.com>
+References: <1330378039-21030-1-git-send-email-swarren@nvidia.com>
+Message-ID: <CAOesGMj7Cz-44Z2C6ZA4RwdFFKLXLornuN368Y9XjCLFCs07eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
+On Mon, Feb 27, 2012 at 1:27 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> This fixes the following compile error:
+>
+> ?CC ? ? ?arch/arm/boot/compressed/misc.o
+> In file included from arch/arm/boot/compressed/misc.c:28:0:
+> arch/arm/mach-tegra/include/mach/uncompress.h: In function 'arch_decomp_setup':
+> arch/arm/mach-tegra/include/mach/uncompress.h:125:2: error: implicit declaration of function 'BUILD_BUG_ON_ZERO' [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+>
+> This is due to use of the ARRAY_SIZE() macro. Typically, this would be
+> solved by including <linux/bug.h>, but the compressor code isn't part of
+> the kernel, and so should not include kernel headers. Instead, define
+> the few macros the code uses directly, and in a way that doesn't depend
+> on <linux/bug.h>.
+>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-> -
-> -	/*
-> -	 * Check if we're actually running on a P1022DS.  Older device trees
-> -	 * have a model of "fsl,P1022" and newer ones use "fsl,P1022DS", so we
-> -	 * need to support both.  The SSI driver uses that property to link to
-> -	 * the machine driver, so have to match it.
-> -	 */
+Thanks, applied on for-3.4/soc-drivers, since that's the branch the
+linux/kernel.h include was introduced on.
 
-Please retain this paragraph somewhere.  It's important to explain why
-we're checking for both strings.
+We're losing bisectability over about 9 commits unless I rebase the
+branch to squash it in, but there might be downstream users of it so I
+don't want to do that.
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+
+-Olof
