@@ -1,80 +1,61 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Mon, 27 Feb 2012 01:17:19 +0000 (GMT)
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 27 Feb 2012 09:22:44 +0800
 Subject: [PATCH v2] pxa/hx4700: Correct StrataFlash block size discovery
-Message-ID: <1330305439.53059.YahooMailClassic@web29015.mail.ird.yahoo.com>
+In-Reply-To: <1330305439.53059.YahooMailClassic@web29015.mail.ird.yahoo.com>
+References: <1330305439.53059.YahooMailClassic@web29015.mail.ird.yahoo.com>
+Message-ID: <CAN1soZwCBLLxb35jFvh=8sKq1+tyq5uCLfwZ=qxekrTmifsg6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HP iPAQ hx4700 has 128Mb of flash provided by two Intel StrataFlash devices.
-The hx4700 platform configuration defines a single 128Mb flash resource,
-resulting in the MTD physmap-flash driver probing the first device only and
-presuming the second device is identical:
+On Mon, Feb 27, 2012 at 9:17 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> The HP iPAQ hx4700 has 128Mb of flash provided by two Intel StrataFlash devices.
+> The hx4700 platform configuration defines a single 128Mb flash resource,
+> resulting in the MTD physmap-flash driver probing the first device only and
+> presuming the second device is identical:
+>
+> physmap platform flash device: 08000000 at 00000000
+> physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008816
+> physmap-flash: Found 2 x16 devices at 0x4000000 in 32-bit bank
+> <snip>
+> erase region 0: offset=0x0,size=0x10000,blocks=4
+> erase region 1: offset=0x40000,size=0x40000,blocks=255
+> erase region 2: offset=0x4000000,size=0x10000,blocks=4
+> erase region 3: offset=0x4040000,size=0x40000,blocks=255
+> physmap-flash: 2 set(s) of 2 interleaved chips --> 32 partitions of 4096 KiB
+>
+> Unfortunately the two devices are not identical. The first has a device ID of
+> 0x8816, identifying a bottom parameter device. The second has a device ID of
+> 0x8813, identifying a top parameter device. By not probing the second device,
+> physmap-flash does not discover the correct block sizes.
+>
+> This patch splits the configuration into two 64Mb flash resources, forcing
+> physmap-flash to probe both devices and thus discover the correct block sizes:
+>
+> physmap platform flash device: 04000000 at 00000000
+> physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008816
+> <snip>
+> erase region 0: offset=0x0,size=0x10000,blocks=4
+> erase region 1: offset=0x40000,size=0x40000,blocks=255
+> physmap-flash: 1 set(s) of 2 interleaved chips --> 16 partitions of 4096 KiB
+> physmap platform flash device: 04000000 at 04000000
+> physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008813
+> <snip>
+> erase region 0: offset=0x0,size=0x40000,blocks=255
+> erase region 1: offset=0x3fc0000,size=0x10000,blocks=4
+> physmap-flash: 1 set(s) of 2 interleaved chips --> 16 partitions of 4096 KiB
+> Concatenating MTD devices:
+> (0): "physmap-flash"
+> (1): "physmap-flash"
+> into device "physmap-flash"
+>
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> ---
+>
+> V2:
+> Use DEFINE_RES_MEM().
+>
 
-physmap platform flash device: 08000000 at 00000000
-physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008816
-physmap-flash: Found 2 x16 devices at 0x4000000 in 32-bit bank
-<snip>
-erase region 0: offset=0x0,size=0x10000,blocks=4
-erase region 1: offset=0x40000,size=0x40000,blocks=255
-erase region 2: offset=0x4000000,size=0x10000,blocks=4
-erase region 3: offset=0x4040000,size=0x40000,blocks=255
-physmap-flash: 2 set(s) of 2 interleaved chips --> 32 partitions of 4096 KiB
+Applied
 
-Unfortunately the two devices are not identical. The first has a device ID of
-0x8816, identifying a bottom parameter device. The second has a device ID of
-0x8813, identifying a top parameter device. By not probing the second device,
-physmap-flash does not discover the correct block sizes.
-
-This patch splits the configuration into two 64Mb flash resources, forcing
-physmap-flash to probe both devices and thus discover the correct block sizes:
-
-physmap platform flash device: 04000000 at 00000000
-physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008816
-<snip>
-erase region 0: offset=0x0,size=0x10000,blocks=4
-erase region 1: offset=0x40000,size=0x40000,blocks=255
-physmap-flash: 1 set(s) of 2 interleaved chips --> 16 partitions of 4096 KiB
-physmap platform flash device: 04000000 at 04000000
-physmap-flash: Found 2 x16 devices at 0x0 in 32-bit bank. Manufacturer ID 0x000089 Chip ID 0x008813
-<snip>
-erase region 0: offset=0x0,size=0x40000,blocks=255
-erase region 1: offset=0x3fc0000,size=0x10000,blocks=4
-physmap-flash: 1 set(s) of 2 interleaved chips --> 16 partitions of 4096 KiB
-Concatenating MTD devices:
-(0): "physmap-flash"
-(1): "physmap-flash"
-into device "physmap-flash"
-
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
-
-V2:
-Use DEFINE_RES_MEM().
-
---- clean-3.3-rc5/arch/arm/mach-pxa/hx4700.c	2012-02-25 20:18:16.000000000 +0000
-+++ linux-3.3-rc5/arch/arm/mach-pxa/hx4700.c	2012-02-27 01:10:30.731227774 +0000
-@@ -704,10 +704,9 @@ static void hx4700_set_vpp(struct platfo
- 	gpio_set_value(GPIO91_HX4700_FLASH_VPEN, vpp);
- }
- 
--static struct resource strataflash_resource = {
--	.start = PXA_CS0_PHYS,
--	.end   = PXA_CS0_PHYS + SZ_128M - 1,
--	.flags = IORESOURCE_MEM,
-+static struct resource strataflash_resource[] = {
-+	[0] = DEFINE_RES_MEM(PXA_CS0_PHYS, SZ_64M),
-+	[1] = DEFINE_RES_MEM(PXA_CS0_PHYS + SZ_64M, SZ_64M),
- };
- 
- static struct physmap_flash_data strataflash_data = {
-@@ -718,8 +717,8 @@ static struct physmap_flash_data strataf
- static struct platform_device strataflash = {
- 	.name          = "physmap-flash",
- 	.id            = -1,
--	.resource      = &strataflash_resource,
--	.num_resources = 1,
-+	.resource      = strataflash_resource,
-+	.num_resources = ARRAY_SIZE(strataflash_resource),
- 	.dev = {
- 		.platform_data = &strataflash_data,
- 	},
+Thanks
+Haojian
