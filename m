@@ -1,370 +1,237 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 27 Feb 2012 21:15:39 +0900
-Subject: [PATCH v6 5/5] Extcon: support mutually exclusive relation between
- cables.
+Date: Mon, 27 Feb 2012 21:15:37 +0900
+Subject: [PATCH v6 3/5] Extcon: support notification based on the state
+ changes.
 In-Reply-To: <1330344939-18394-1-git-send-email-myungjoo.ham@samsung.com>
 References: <1328856038-21912-1-git-send-email-myungjoo.ham@samsung.com>
  <1330344939-18394-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1330344939-18394-6-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1330344939-18394-4-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There could be cables that t recannot be attaches simulatenously. Extcon
-device drivers may express such information via mutually_exclusive in
-struct extcon_dev.
+From: Donggeun Kim <dg77.kim@samsung.com>
 
-For example, for an extcon device with 16 cables (bits 0 to 15 are
-available), if mutually_exclusive = { 0x7, 0xC0, 0x81, 0 }, then, the
-following attachments are prohibitted.
-{0, 1}
-{0, 2}
-{1, 2}
-{6, 7}
-{0, 7}
-and every attachment set that are superset of one of the above.
-For the detail, please refer to linux/include/linux/extcon.h.
+State changes of extcon devices have been notified via kobjet_uevent.
+This patch adds notifier interfaces in order to allow device drivers to
+get notified easily. Along with notifier interface,
+extcon_get_extcon_dev() function is added so that device drivers may
+discover a extcon_dev easily.
 
-The concept is suggested by NeilBrown <neilb@suse.de>
-
+Signed-off-by: Donggeun Kim <dg77.kim@samsung.com>
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Reviewed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
 --
-Changes from V5:
-- Updated sysfs format
+Changes from RFC
+- Renamed switch to extcon
+- Bugfix: extcon_dev_unregister()
+- Bugfix: "edev->dev" is "internal" data.
+- Added kerneldoc comments.
+- Reworded comments.
 ---
- Documentation/ABI/testing/sysfs-class-extcon |   22 +++++
- drivers/extcon/extcon_class.c                |  123 ++++++++++++++++++++++++--
- include/linux/extcon.h                       |   28 +++++-
- 3 files changed, 160 insertions(+), 13 deletions(-)
+ drivers/extcon/extcon_class.c |   66 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/extcon.h        |   38 +++++++++++++++++++++++
+ 2 files changed, 104 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/ABI/testing/sysfs-class-extcon b/Documentation/ABI/testing/sysfs-class-extcon
-index 19b18e9..20ab361 100644
---- a/Documentation/ABI/testing/sysfs-class-extcon
-+++ b/Documentation/ABI/testing/sysfs-class-extcon
-@@ -15,6 +15,10 @@ Description:
- 		may have both HDMI and Charger attached, or analog audio,
- 		video, and USB cables attached simulteneously.
- 
-+		If there are cables mutually exclusive with each other,
-+		such binary relations may be expressed with extcon_dev's
-+		mutually_exclusive array.
-+
- What:		/sys/class/extcon/.../name
- Date:		February 2012
- Contact:	MyungJoo Ham <myungjoo.ham@samsung.com>
-@@ -73,3 +77,21 @@ Description:
- 		state of cable "x" (integer between 0 and 31) of an extcon
- 		device. The state value is either 0 (detached) or 1
- 		(attached).
-+
-+What:		/sys/class/extcon/.../mutually_exclusive/...
-+Date:		December 2011
-+Contact:	MyungJoo Ham <myungjoo.ham@samsung.com>
-+Description:
-+		Shows the relations of mutually exclusiveness. For example,
-+		if the mutually_exclusive array of extcon_dev is
-+		{0x3, 0x5, 0xC, 0x0}, the, the output is:
-+		# ls mutually_exclusive/
-+		0x3
-+		0x5
-+		0xc
-+		#
-+
-+		Note that mutually_exclusive is a sub-directory of the extcon
-+		device and the file names under the mutually_exclusive
-+		directory show the mutually-exclusive sets, not the contents
-+		of the files.
 diff --git a/drivers/extcon/extcon_class.c b/drivers/extcon/extcon_class.c
-index 55f19c2..fb8d3a4 100644
+index 9bc062b..51b14bd 100644
 --- a/drivers/extcon/extcon_class.c
 +++ b/drivers/extcon/extcon_class.c
-@@ -69,6 +69,39 @@ struct class *extcon_class;
- static LIST_HEAD(extcon_dev_list);
- static DEFINE_MUTEX(extcon_dev_list_lock);
+@@ -33,6 +33,9 @@
  
-+/**
-+ * check_mutually_exclusive - Check if new_state violates mutually_exclusive
-+ *			    condition.
-+ * @edev:	the extcon device
-+ * @new_state:	new cable attach status for @edev
-+ *
-+ * Returns 0 if nothing violates. Returns the index + 1 for the first
-+ * violated condition.
-+ */
-+static int check_mutually_exclusive(struct extcon_dev *edev, u32 new_state)
-+{
-+	int i = 0;
-+
-+	if (!edev->mutually_exclusive)
-+		return 0;
-+
-+	for (i = 0; edev->mutually_exclusive[i]; i++) {
-+		int count = 0, j;
-+		u32 correspondants = new_state & edev->mutually_exclusive[i];
-+		u32 exp = 1;
-+
-+		for (j = 0; j < 32; j++) {
-+			if (exp & correspondants)
-+				count++;
-+			if (count > 1)
-+				return i + 1;
-+			exp <<= 1;
-+		}
-+	}
-+
-+	return 0;
-+}
+ struct class *extcon_class;
+ 
++static LIST_HEAD(extcon_dev_list);
++static DEFINE_MUTEX(extcon_dev_list_lock);
 +
  static ssize_t state_show(struct device *dev, struct device_attribute *attr,
  			  char *buf)
  {
-@@ -97,7 +130,7 @@ static ssize_t state_show(struct device *dev, struct device_attribute *attr,
- 	return count;
- }
- 
--void extcon_set_state(struct extcon_dev *edev, u32 state);
-+int extcon_set_state(struct extcon_dev *edev, u32 state);
- static ssize_t state_store(struct device *dev, struct device_attribute *attr,
- 			   const char *buf, size_t count)
- {
-@@ -109,7 +142,7 @@ static ssize_t state_store(struct device *dev, struct device_attribute *attr,
- 	if (ret == 0)
- 		ret = -EINVAL;
- 	else
--		extcon_set_state(edev, state);
-+		ret = extcon_set_state(edev, state);
- 
- 	if (ret < 0)
- 		return ret;
-@@ -188,7 +221,7 @@ static ssize_t cable_state_store(struct device *dev,
-  * Note that the notifier provides which bits are changed in the state
-  * variable with the val parameter (second) to the callback.
+@@ -72,6 +75,9 @@ static ssize_t name_show(struct device *dev, struct device_attribute *attr,
+  * the name of extcon device (envp[0]) and the state output (envp[1]).
+  * Tizen uses this format for extcon device to get events from ports.
+  * Android uses this format as well.
++ *
++ * Note that notifier provides the which bits are changes in the state
++ * variable with "val" to the callback.
   */
--void extcon_update_state(struct extcon_dev *edev, u32 mask, u32 state)
-+int extcon_update_state(struct extcon_dev *edev, u32 mask, u32 state)
+ void extcon_set_state(struct extcon_dev *edev, u32 state)
  {
- 	char name_buf[120];
- 	char state_buf[120];
-@@ -203,6 +236,12 @@ void extcon_update_state(struct extcon_dev *edev, u32 mask, u32 state)
- 	if (edev->state != ((edev->state & ~mask) | (state & mask))) {
- 		u32 old_state = edev->state;
+@@ -81,10 +87,14 @@ void extcon_set_state(struct extcon_dev *edev, u32 state)
+ 	char *envp[3];
+ 	int env_offset = 0;
+ 	int length;
++	u32 old_state = edev->state;
  
-+		if (check_mutually_exclusive(edev, (edev->state & ~mask) |
-+						   (state & mask))) {
-+			spin_unlock_irqrestore(&edev->lock, flags);
-+			return -EPERM;
-+		}
+ 	if (edev->state != state) {
+ 		edev->state = state;
+ 
++		raw_notifier_call_chain(&edev->nh, old_state ^ edev->state,
++					edev);
 +
- 		edev->state &= ~mask;
- 		edev->state |= state & mask;
- 
-@@ -244,6 +283,8 @@ void extcon_update_state(struct extcon_dev *edev, u32 mask, u32 state)
- 		/* No changes */
- 		spin_unlock_irqrestore(&edev->lock, flags);
- 	}
-+
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(extcon_update_state);
- 
-@@ -255,9 +296,9 @@ EXPORT_SYMBOL_GPL(extcon_update_state);
-  * Note that notifier provides which bits are changed in the state
-  * variable with the val parameter (second) to the callback.
-  */
--void extcon_set_state(struct extcon_dev *edev, u32 state)
-+int extcon_set_state(struct extcon_dev *edev, u32 state)
- {
--	extcon_update_state(edev, 0xffffffff, state);
-+	return extcon_update_state(edev, 0xffffffff, state);
+ 		prop_buf = (char *)get_zeroed_page(GFP_KERNEL);
+ 		if (prop_buf) {
+ 			length = name_show(edev->dev, NULL, prop_buf);
+@@ -114,6 +124,51 @@ void extcon_set_state(struct extcon_dev *edev, u32 state)
  }
  EXPORT_SYMBOL_GPL(extcon_set_state);
  
-@@ -331,8 +372,7 @@ int extcon_set_cable_state_(struct extcon_dev *edev,
- 		return -EINVAL;
- 
- 	state = cable_state ? (1 << index) : 0;
--	extcon_update_state(edev, 1 << index, state);
--	return 0;
-+	return extcon_update_state(edev, 1 << index, state);
- }
- EXPORT_SYMBOL_GPL(extcon_set_cable_state_);
- 
-@@ -506,6 +546,14 @@ static void extcon_cleanup(struct extcon_dev *edev, bool skip)
- 	if (!skip && get_device(edev->dev)) {
- 		int index;
- 
-+		if (edev->mutually_exclusive && edev->max_supported) {
-+			for (index = 0; edev->mutually_exclusive[index];
-+			     index++)
-+				kfree(edev->d_attrs_muex[index].attr.name);
-+			kfree(edev->d_attrs_muex);
-+			kfree(edev->attrs_muex);
-+		}
++/**
++ * extcon_get_extcon_dev() - Get the extcon device instance from the name
++ * @extcon_name:	The extcon name provided with extcon_dev_register()
++ */
++struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
++{
++	struct extcon_dev *sd;
 +
- 		for (index = 0; index < edev->max_supported; index++)
- 			kfree(edev->cables[index].attr_g.name);
++	mutex_lock(&extcon_dev_list_lock);
++	list_for_each_entry(sd, &extcon_dev_list, entry) {
++		if (!strcmp(sd->name, extcon_name))
++			goto out;
++	}
++	sd = NULL;
++out:
++	mutex_unlock(&extcon_dev_list_lock);
++	return sd;
++}
++EXPORT_SYMBOL_GPL(extcon_get_extcon_dev);
++
++/**
++ * extcon_register_notifier() - Register a notifee to get notified by
++ *			      any attach status changes from the extcon.
++ * @edev:	the extcon device.
++ * @nb:		a notifier block to be registered.
++ */
++int extcon_register_notifier(struct extcon_dev *edev,
++			struct notifier_block *nb)
++{
++	return raw_notifier_chain_register(&edev->nh, nb);
++}
++EXPORT_SYMBOL_GPL(extcon_register_notifier);
++
++/**
++ * extcon_unregister_notifier() - Unregister a notifee from the extcon device.
++ * @edev:	the extcon device.
++ * @nb:		a registered notifier block to be unregistered.
++ */
++int extcon_unregister_notifier(struct extcon_dev *edev,
++			struct notifier_block *nb)
++{
++	return raw_notifier_chain_unregister(&edev->nh, nb);
++}
++EXPORT_SYMBOL_GPL(extcon_unregister_notifier);
++
+ static struct device_attribute extcon_attrs[] = {
+ 	__ATTR_RO(state),
+ 	__ATTR_RO(name),
+@@ -137,6 +192,10 @@ static int create_extcon_class(void)
  
-@@ -528,6 +576,7 @@ static void extcon_dev_release(struct device *dev)
- 	extcon_cleanup(edev, true);
- }
- 
-+static const char *muex_name = "mutually_exclusive";
- static void dummy_sysfs_dev_release(struct device *dev)
+ static void extcon_cleanup(struct extcon_dev *edev, bool skip)
  {
- }
-@@ -620,10 +669,58 @@ int extcon_dev_register(struct extcon_dev *edev, struct device *dev)
- 		}
++	mutex_lock(&extcon_dev_list_lock);
++	list_del(&edev->entry);
++	mutex_unlock(&extcon_dev_list_lock);
++
+ 	if (!skip && get_device(edev->dev)) {
+ 		device_unregister(edev->dev);
+ 		put_device(edev->dev);
+@@ -184,8 +243,15 @@ int extcon_dev_register(struct extcon_dev *edev, struct device *dev)
+ 		goto err_dev;
  	}
  
-+	if (edev->max_supported && edev->mutually_exclusive) {
-+		char buf[80];
-+		char *name;
++	RAW_INIT_NOTIFIER_HEAD(&edev->nh);
 +
-+		/* Count the size of mutually_exclusive array */
-+		for (index = 0; edev->mutually_exclusive[index]; index++)
-+			;
+ 	dev_set_drvdata(edev->dev, edev);
+ 	edev->state = 0;
 +
-+		edev->attrs_muex = kzalloc(sizeof(struct attribute *) *
-+					   (index + 1), GFP_KERNEL);
-+		if (!edev->attrs_muex) {
-+			ret = -ENOMEM;
-+			goto err_muex;
-+		}
++	mutex_lock(&extcon_dev_list_lock);
++	list_add(&edev->entry, &extcon_dev_list);
++	mutex_unlock(&extcon_dev_list_lock);
 +
-+		edev->d_attrs_muex = kzalloc(sizeof(struct device_attribute) *
-+					     index, GFP_KERNEL);
-+		if (!edev->d_attrs_muex) {
-+			ret = -ENOMEM;
-+			kfree(edev->attrs_muex);
-+			goto err_muex;
-+		}
-+
-+		for (index = 0; edev->mutually_exclusive[index]; index++) {
-+			sprintf(buf, "0x%x", edev->mutually_exclusive[index]);
-+			name = kzalloc(sizeof(char) * (strlen(buf) + 1),
-+				       GFP_KERNEL);
-+			if (!name) {
-+				for (index--; index >= 0; index--) {
-+					kfree(edev->d_attrs_muex[index].attr.
-+					      name);
-+				}
-+				kfree(edev->d_attrs_muex);
-+				kfree(edev->attrs_muex);
-+				ret = -ENOMEM;
-+				goto err_muex;
-+			}
-+			strcpy(name, buf);
-+			edev->d_attrs_muex[index].attr.name = name;
-+			edev->d_attrs_muex[index].attr.mode = 0000;
-+			edev->attrs_muex[index] = &edev->d_attrs_muex[index]
-+							.attr;
-+		}
-+		edev->attr_g_muex.name = muex_name;
-+		edev->attr_g_muex.attrs = edev->attrs_muex;
-+
-+	}
-+
- 	if (edev->max_supported) {
- 		edev->extcon_dev_type.groups =
- 			kzalloc(sizeof(struct attribute_group *) *
--				(edev->max_supported + 1), GFP_KERNEL);
-+				(edev->max_supported + 2), GFP_KERNEL);
- 		if (!edev->extcon_dev_type.groups) {
- 			ret = -ENOMEM;
- 			goto err_alloc_groups;
-@@ -635,6 +732,9 @@ int extcon_dev_register(struct extcon_dev *edev, struct device *dev)
- 		for (index = 0; index < edev->max_supported; index++)
- 			edev->extcon_dev_type.groups[index] =
- 				&edev->cables[index].attr_g;
-+		if (edev->mutually_exclusive)
-+			edev->extcon_dev_type.groups[index] =
-+				&edev->attr_g_muex;
+ 	return 0;
  
- 		edev->dev->type = &edev->extcon_dev_type;
- 	}
-@@ -662,6 +762,13 @@ err_dev:
- 	if (edev->max_supported)
- 		kfree(edev->extcon_dev_type.groups);
- err_alloc_groups:
-+	if (edev->max_supported && edev->mutually_exclusive) {
-+		for (index = 0; edev->mutually_exclusive[index]; index++)
-+			kfree(edev->d_attrs_muex[index].attr.name);
-+		kfree(edev->d_attrs_muex);
-+		kfree(edev->attrs_muex);
-+	}
-+err_muex:
- 	for (index = 0; index < edev->max_supported; index++)
- 		kfree(edev->cables[index].attr_g.name);
- err_alloc_cables:
+ err_dev:
 diff --git a/include/linux/extcon.h b/include/linux/extcon.h
-index 99ff60e..c9e2de8 100644
+index cd732ab..50be845 100644
 --- a/include/linux/extcon.h
 +++ b/include/linux/extcon.h
-@@ -78,6 +78,14 @@ struct extcon_cable;
-  * @supported_cable	Array of supported cable name ending with NULL.
-  *			If supported_cable is NULL, cable name related APIs
-  *			are disabled.
-+ * @mutually_exclusive	Array of mutually exclusive set of cables that cannot
-+ *			be attached simultaneously. The array should be
-+ *			ending with NULL or be NULL (no mutually exclusive
-+ *			cables). For example, if it is { 0x7, 0x30, 0}, then,
-+ *			{0, 1}, {0, 1, 2}, {0, 2}, {1, 2}, or {4, 5} cannot
-+ *			be attached simulataneously. {0x7, 0} is equivalent to
-+ *			{0x3, 0x6, 0x5, 0}. If it is {0xFFFFFFFF, 0}, there
-+ *			can be no simultaneous connections.
-  * @print_name	An optional callback to override the method to print the
-  *		name of the extcon device.
-  * @print_state	An optional callback to override the method to print the
-@@ -103,6 +111,7 @@ struct extcon_dev {
- 	/* --- Optional user initializing data --- */
- 	const char	*name;
- 	const char **supported_cable;
-+	const u32	*mutually_exclusive;
+@@ -23,6 +23,7 @@
+ #ifndef __LINUX_EXTCON_H__
+ #define __LINUX_EXTCON_H__
  
- 	/* --- Optional callbacks to override class functions --- */
- 	ssize_t	(*print_name)(struct extcon_dev *edev, char *buf);
-@@ -119,6 +128,10 @@ struct extcon_dev {
- 	/* /sys/class/extcon/.../cable.n/... */
- 	struct device_type extcon_dev_type;
- 	struct extcon_cable *cables;
-+	/* /sys/class/extcon/.../mutually_exclusive/... */
-+	struct attribute_group attr_g_muex;
-+	struct attribute **attrs_muex;
-+	struct device_attribute *d_attrs_muex;
++#include <linux/notifier.h>
+ /**
+  * struct extcon_dev - An extcon device represents one external connector.
+  * @name	The name of this extcon device. Parent device name is used
+@@ -34,6 +35,9 @@
+  * @dev		Device of this extcon. Do not provide at register-time.
+  * @state	Attach/detach state of this extcon. Do not provide at
+  *		register-time
++ * @nh	Notifier for the state change events from this extcon
++ * @entry	To support list of extcon devices so that uses can search
++ *		for extcon devices based on the extcon name.
+  *
+  * In most cases, users only need to provide "User initializing data" of
+  * this struct when registering an extcon. In some exceptional cases,
+@@ -51,11 +55,19 @@ struct extcon_dev {
+ 	/* --- Internal data. Please do not set. --- */
+ 	struct device	*dev;
+ 	u32		state;
++	struct raw_notifier_head nh;
++	struct list_head entry;
  };
  
- /**
-@@ -179,8 +192,8 @@ static inline u32 extcon_get_state(struct extcon_dev *edev)
- 	return edev->state;
+ #ifdef CONFIG_EXTCON
++
++/*
++ * Following APIs are for notifiers or configurations.
++ * Notifiers are the external port and connection devices.
++ */
+ extern int extcon_dev_register(struct extcon_dev *edev, struct device *dev);
+ extern void extcon_dev_unregister(struct extcon_dev *edev);
++extern struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
+ 
+ static inline u32 extcon_get_state(struct extcon_dev *edev)
+ {
+@@ -63,6 +75,15 @@ static inline u32 extcon_get_state(struct extcon_dev *edev)
  }
  
--extern void extcon_set_state(struct extcon_dev *edev, u32 state);
--extern void extcon_update_state(struct extcon_dev *edev, u32 mask, u32 state);
-+extern int extcon_set_state(struct extcon_dev *edev, u32 state);
-+extern int extcon_update_state(struct extcon_dev *edev, u32 mask, u32 state);
- 
- /*
-  * get/set_cable_state access each bit of the 32b encoded state value.
-@@ -235,11 +248,16 @@ static inline u32 extcon_get_state(struct extcon_dev *edev)
- 	return 0;
+ extern void extcon_set_state(struct extcon_dev *edev, u32 state);
++
++/*
++ * Following APIs are to monitor every action of a notifier.
++ * Registerer gets notified for every external port of a connection device.
++ */
++extern int extcon_register_notifier(struct extcon_dev *edev,
++				    struct notifier_block *nb);
++extern int extcon_unregister_notifier(struct extcon_dev *edev,
++				      struct notifier_block *nb);
+ #else /* CONFIG_EXTCON */
+ static inline int extcon_dev_register(struct extcon_dev *edev,
+ 				      struct device *dev)
+@@ -78,5 +99,22 @@ static inline u32 extcon_get_state(struct extcon_dev *edev)
  }
  
--static inline void extcon_set_state(struct extcon_dev *edev, u32 state) { }
-+static inline int extcon_set_state(struct extcon_dev *edev, u32 state)
+ static inline void extcon_set_state(struct extcon_dev *edev, u32 state) { }
++static inline struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
++{
++	return NULL;
++}
++
++static inline int extcon_register_notifier(struct extcon_dev *edev,
++					   struct notifier_block *nb)
 +{
 +	return 0;
 +}
- 
--static inline void extcon_update_state(struct extcon_dev *edev, u32 mask,
-+static inline int extcon_update_state(struct extcon_dev *edev, u32 mask,
- 				       u32 state)
--{ }
++
++static inline int extcon_unregister_notifier(struct extcon_dev *edev,
++					     struct notifier_block *nb)
 +{
 +	return 0;
 +}
- 
- static inline int extcon_find_cable_index(struct extcon_dev *edev,
- 					  const char *cable_name)
++
+ #endif /* CONFIG_EXTCON */
+ #endif /* __LINUX_EXTCON_H__ */
 -- 
 1.7.4.1
