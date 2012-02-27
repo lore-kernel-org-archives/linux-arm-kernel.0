@@ -1,29 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Feb 2012 15:44:09 +0800
-Subject: [PATCH] ARM: defconfig: imx_v6_v7: build in REGULATOR_FIXED_VOLTAGE
-Message-ID: <1330328649-2174-1-git-send-email-shawn.guo@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Feb 2012 08:42:18 +0100
+Subject: [GIT PULL] ux500 patches for v3.4 take 2
+In-Reply-To: <201202241639.56474.arnd@arndb.de>
+References: <1330099642-6265-1-git-send-email-linus.walleij@linaro.org>
+ <201202241639.56474.arnd@arndb.de>
+Message-ID: <CACRpkdaH+frxrYTrcnRNuNps3RDqBC6GTaKYYz30kEODnxUO8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices on some imx boards are supplied by fixed voltage, so
-build REGULATOR_FIXED_VOLTAGE support in.
+On Fri, Feb 24, 2012 at 5:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 24 February 2012, Linus Walleij wrote:
+>> are available in the git repository at:
+>> ? git://git.linaro.org/people/triad/linux-stericsson.git/ ..BRANCH.NOT.VERIFIED..
+>
+> Something wrong on your end apparently.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Hm :-( I'll check it by pulling it back myself next time.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index fa236a2..3cd6069 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -124,6 +124,7 @@ CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_MC13XXX=y
- CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_MC13892=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
--- 
-1.7.5.4
+> I've also followed up on the discussion, so let's find a conclusion on
+> the ux500_read_asicid first.
+
+Sure I think I have a solution for that, or I'll just strip off the
+U9540 support and save that for the next merge window or
+a later pull request no big deal.
+
+Thanks,
+Linus Walleij
