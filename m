@@ -1,67 +1,28 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 27 Feb 2012 17:26:12 +0100
-Subject: [PATCH v5 3/9] ARM: omap: Consolidate OMAP3 cpuidle time keeping
- and irq enable
-In-Reply-To: <1330318063-25460-4-git-send-email-rob.lee@linaro.org>
-References: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
- <1330318063-25460-4-git-send-email-rob.lee@linaro.org>
-Message-ID: <CAORVsuVCdFQUJC_cVngwUa-7faQiyT+3KrsbOmXbBjWsknFBZQ@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 27 Feb 2012 16:27:23 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1330360043.8557.302.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 5:47 AM, Robert Lee <rob.lee@linaro.org> wrote:
-> Use core cpuidle timekeeping and irqen wrapper and remove that
-> handling from this code.
->
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
-> ?arch/arm/mach-omap2/cpuidle34xx.c | ? 43 +++++++++++++++---------------------
-> ?1 files changed, 18 insertions(+), 25 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-> index 464cffd..1f6123f 100644
-> --- a/arch/arm/mach-omap2/cpuidle34xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-...
+On Thu, 2012-02-23 at 17:48 +0000, Stefano Stabellini wrote:
+> We need a register to pass the hypercall number because we might not
+> know it at compile time and HVC only takes an immediate argument.
+> 
+> Among the available registers r12 seems to be the best choice because it
+> is defined as "intra-procedure call scratch register".
 
-> ?/**
-> + * omap3_enter_idle - Programs OMAP3 to enter the specified state
-> + * @dev: cpuidle device
-> + * @drv: cpuidle driver
-> + * @index: the index of state to be entered
-> + *
-> + * Called from the CPUidle framework to program the device to the
-> + * specified target state selected by the governor.
-> + */
-> +static int omap3_enter_idle(struct cpuidle_device *dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
-> +{
-> + ? ? ? return cpuidle_wrap_enter(dev, drv, index, __omap3_enter_idle);
-Is it the intention to call cpuidle_wrap_enter from the non-common
-code? Could the driver set en_core_tk_irqen to 1 and so let the core
-call the idle function? Is it to have the time measurement code closer
-to the low level idle code in  __omap3_enter_idle?
+R12 is not accessible from the 16 bit "T1" Thumb encoding of mov
+immediate (which can only target r0..r7).
 
-> +}
-> +
-> +/**
-> ?* next_valid_state - Find next valid C-state
-> ?* @dev: cpuidle device
-> ?* @drv: cpuidle driver
-> @@ -295,6 +287,7 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
-> ? ? ? ?new_state_idx = next_valid_state(dev, drv, index);
->
-> ?select_state:
-> +
-Stray change
+Since we support only ARMv7+ there are "T2" and "T3" encodings available
+which do allow direct mov of an immediate into R12, but are 32 bit Thumb
+instructions.
 
-> ? ? ? ?ret = omap3_enter_idle(dev, drv, new_state_idx);
->
-> ? ? ? ?/* Restore original PER state if it was modified */
-> --
-> 1.7.1
->
+Should we use r7 instead to maximise instruction density for Thumb code?
 
-Regards,
-Jean
+Ian.
