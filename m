@@ -1,40 +1,37 @@
 From: kevin.wells@nxp.com (Kevin Wells)
-Date: Mon, 27 Feb 2012 20:02:21 +0100
-Subject: [PATCH v2 5/6] ARM: LPC32xx: serial.c: HW bug workaround
-In-Reply-To: <4F4BA31F.8040201@antcom.de>
+Date: Mon, 27 Feb 2012 20:16:45 +0100
+Subject: [PATCH v2 0/6] ARM: LPC32xx: Patch set with further fixes for
+ LPC32xx
+In-Reply-To: <1330184118-10270-1-git-send-email-stigge@antcom.de>
 References: <1330184118-10270-1-git-send-email-stigge@antcom.de>
- <1330184118-10270-6-git-send-email-stigge@antcom.de>
- <20120227141430.GB3550@pengutronix.de> <4F4BA31F.8040201@antcom.de>
-Message-ID: <083DF309106F364B939360100EC290F81F365B2AD1@eu1rdcrdc1wx030.exi.nxp.com>
+Message-ID: <083DF309106F364B939360100EC290F81F365B2AD8@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->> If you have a reference (errata ID or similar) it would be nice to
->> have it in the comment and description.
+>This is another bundle of patches for LPC32xx, fixing bugs and completing
+>support for drivers using the LPC32xx base port.
 >
->Can you please help out with this one?
+>It synchronizes changes from lpclinux.com to the mainline kernel and applies
+>cleanly to 3.3-rc4.
 >
->In the LPC32xx errata, there is a note about a similar HS UART issue,
->but this one here (Standard UART) must be a different one (or it's a
->bug and the fix is actually targeted at HS UART).
+>Signed-off-by: Roland Stigge <stigge@antcom.de>
+
+Acked-by: Kevin Wells <Kevin.wells@nxp.com>
+
+>---
 >
->I actually just ported this code from lpclinux.com and assumed that
->NXP knows best about LPC HW bugs. ;-)
-
-There isn't any errata related to this, but something strange was
-happening with the serial ports (only in Linux) if I didn't do this.
-I stumbled across a 'bug' comment in the pnx4008 port related to
-serial, tried the same fix, and the problem went away, so I
-(incorrectly) keyed in the errata wording.
-
-Here's the original comment from the ARM pnx4008 port (serial.c):
-  48         /* Send a NULL to fix the UART HW bug */
-  49         __raw_writel(0x00, UART5_BASE_VA);
-  50         __raw_writel(0x00, UART3_BASE_VA);
-
-The HSUART errata is not related to this.
-
->Thanks in advance,
+>Roland Stigge (6):
+>  ARM: LPC32xx: Fix irq on GPI_28
+>  ARM: LPC32xx: Fix missing and bad LPC32XX macros
+>  ARM: LPC32xx: Fix interrupt controller init
+>  ARM: LPC32xx: irq.c: Clear latched event
+>  ARM: LPC32xx: serial.c: HW bug workaround
+>  ARM: LPC32xx: serial.c: Fixed loop limit
 >
->Roland
+> arch/arm/mach-lpc32xx/include/mach/irqs.h     |    2 -
+> arch/arm/mach-lpc32xx/include/mach/platform.h |   51 +++++++++++++-------------
+> arch/arm/mach-lpc32xx/irq.c                   |   25 ++++++++++--
+> arch/arm/mach-lpc32xx/pm.c                    |    2 -
+> arch/arm/mach-lpc32xx/serial.c                |   20 +++++++++-
+> arch/arm/mach-lpc32xx/timer.c                 |   46 +++++++++++------------
+> 6 files changed, 91 insertions(+), 55 deletions(-)
