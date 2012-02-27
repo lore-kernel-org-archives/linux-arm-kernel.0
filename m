@@ -1,40 +1,59 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Mon, 27 Feb 2012 13:02:57 +0100
-Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
- omap3isp
-In-Reply-To: <CAK=WgbZRjGEyx0mKmgoWYiOnuvUAka0kTzpLAYbra94Mfpp6qg@mail.gmail.com>
-References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
- <3215700.hj2jFm3b0A@avalon>
- <CAK=WgbYkVALqrVMVv1ma3WzN5dYriM8X0MfwH4knwWwojB6hjg@mail.gmail.com>
- <35010303.ArkW8BdIu6@avalon>
- <CAK=WgbZRjGEyx0mKmgoWYiOnuvUAka0kTzpLAYbra94Mfpp6qg@mail.gmail.com>
-Message-ID: <20120227120257.GB7905@amd.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 27 Feb 2012 14:15:04 +0200
+Subject: [PATCH v3 0/2] Device tree support for TWL regulators
+In-Reply-To: <1330338961-31765-1-git-send-email-rnayak@ti.com>
+References: <1330338961-31765-1-git-send-email-rnayak@ti.com>
+Message-ID: <4F4B73C8.8070807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 09:00:51AM +0200, Ohad Ben-Cohen wrote:
-> On Mon, Feb 27, 2012 at 12:47 AM, Laurent Pinchart
-> > That's what the comment in the Makefile is for ;-) I don't think it's a
-> > perfect solution either, but it avoids playing with the various initcalls. The
-> > OMAP3 IOMMU isn't a subsystem, subsys_initcall() looks a bit like an API abuse
-> > to me.
+Hi Rajendra,
+
+
+On 02/27/2012 12:35 PM, Rajendra Nayak wrote:
+> Re-sending on top of Tero's changes which are already
+> in -next and the one which adds support for twl6030 
+> vdd1/2/3 SMPS [1].
+
+Would you be able to add support for V1V8, V2V1 SMPS supplies in
+twl6030? These regulators are need on SDP4430, and PandaBoards for the
+twl6040 audio codec.
+I have sent a series to add this support:
+http://marc.info/?l=linux-omap&m=132886849202915&w=2
+
+Thanks,
+P?ter
+
+
+> v3 has mainly 2 differences from v2
+> -1- TWL driver now uses just one table for both dt and
+> non-dt based lookup for driver data.
+> -2- All common regulator nodes for twl4030 and twl6030 are
+> now defined in the twl4030.dtsi and twl6030.dtsi instead of
+> repeating the nodes in all board files, which also means
+> the patch ('arm/dts: twl: Pass regulator data from dt')
+> has a dependency with the series from Benoit which adds the
+> twl4030.dtsi and twl6030.dtsi files[2].
 > 
-> Yes, it's dirty.
+> I have tested the patches on omap4panda and omap3beagle boards.
 > 
-> But it's explicit and consistent across build system changes (without
-> imposing anything on the build system). We do it all the time with
-> other subsystems. We don't like it, but luckily Grant came up with the
-> deferred probing mechanism, which will fix this all very nicely.
-
-Agreed. It is not the best fix, but at least more reliable then the
-Makefile change.
-
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+> [1] http://marc.info/?l=linux-omap&m=133009693905864&w=2
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+> 	for_3.4/dt_i2c_twl
+> 
+> Rajendra Nayak (2):
+>   regulator: twl: adapt twl-regulator driver to dt
+>   arm/dts: twl: Pass regulator data from dt
+> 
+>  .../bindings/regulator/twl-regulator.txt           |   66 +++++
+>  arch/arm/boot/dts/omap3-beagle.dts                 |    6 +
+>  arch/arm/boot/dts/twl4030.dtsi                     |   18 ++
+>  arch/arm/boot/dts/twl6030.dtsi                     |   60 +++++
+>  drivers/regulator/twl-regulator.c                  |  259 +++++++++++++-------
+>  5 files changed, 322 insertions(+), 87 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
