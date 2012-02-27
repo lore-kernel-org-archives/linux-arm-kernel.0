@@ -1,39 +1,37 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Feb 2012 13:29:08 +0000
-Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
-In-Reply-To: <20120227090453.GE26642@pengutronix.de>
-References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
- <20120213082741.GN3852@pengutronix.de>
- <20120213144820.GA3494@opensource.wolfsonmicro.com>
- <20120214105823.GS3852@pengutronix.de>
- <20120214172902.GB3916@opensource.wolfsonmicro.com>
- <20120216073236.GE3852@pengutronix.de>
- <20120216075825.GA11631@opensource.wolfsonmicro.com>
- <20120227090453.GE26642@pengutronix.de>
-Message-ID: <20120227132908.GA3191@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Feb 2012 13:39:47 +0000
+Subject: [GIT PULL] i.MX fixes
+In-Reply-To: <20120227093354.GY3852@pengutronix.de>
+References: <20120227093354.GY3852@pengutronix.de>
+Message-ID: <201202271339.48141.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 10:04:53AM +0100, Sascha Hauer wrote:
+On Monday 27 February 2012, Sascha Hauer wrote:
+> 
+> Hi Arnd,
+> 
+> Please pull the following for -rc. Note that this partly replaces the
+> previous i.MX branch you pulled as suggested.
+> 
+> Sascha
+> 
+> The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
+> 
+>   Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/imx/linux-2.6.git imx-fixes
+> 
+> for you to fetch changes up to 9418ba306688c0b77a8548b3281ba3d130036516:
+> 
+>   ARM: mach-imx: mx3: Fix section mismatch in imx3_init_l2x0() (2012-02-27 10:15:27 +0100)
+> 
 
-> If I drop the microvolts parameter what microvolts should I assume? I
-> tried 0 but the regulator core does not like it:
 
-> machine_constraints_voltage: dummy: unsupportable voltage constraints
+Applied to next/fixes-non-critical
 
-> (with max: -2147483648 min: 2147483647)
+Thanks for splitting the branches out,
 
-I'd expect zero to work, unless something wants a particular voltage in
-which case you really should be filling things in properly.  The fact
-that the fixed voltage regulator supports get_voltage() might be
-confusing things.
-
-Like I say if people can be bothered filling voltages in I suspect
-they're not your target audience for this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120227/2d1c2e04/attachment.sig>
+	Arnd
