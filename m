@@ -1,30 +1,34 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 27 Feb 2012 09:41:56 -0800
-Subject: What's in tegra.git for 3.4
-In-Reply-To: <CAOesGMjnWPgSa44hgRu+d0jrQLm9KuOcuufg9V8fYZ8TytsbPw@mail.gmail.com>
-References: <CAOesGMjnWPgSa44hgRu+d0jrQLm9KuOcuufg9V8fYZ8TytsbPw@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BCF6A@HQMAIL01.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Feb 2012 17:43:03 +0000
+Subject: [GIT PULL] LPC32xx fixes for v3.3-rc4
+In-Reply-To: <4F4BB380.30803@antcom.de>
+References: <4F490CC0.5050303@antcom.de> <201202271409.52470.arnd@arndb.de>
+ <4F4BB380.30803@antcom.de>
+Message-ID: <201202271743.03673.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Sunday, February 26, 2012 3:51 PM:
-> We're closing in on when things need to be in the sub-arch trees in
-> time to get merged for the next merge window. The shortlog below is
-> what i have queued up today.
+On Monday 27 February 2012, Roland Stigge wrote:
+> Right. I replaced the mentioned branch with
+> 
+> * lpc32xx/fixes-non-critical (singled out the macros fixes, for next)
+> * lpc32xx/fixes (the remaining 5 patches as immediate fixes)
+> 
+> Please note that although it's a typo fix in the macros, it's also an
+> internal API change.
 
-The following are in patchwork and should probably be picked up:
-http://patchwork.ozlabs.org/patch/139197/
-http://patchwork.ozlabs.org/patch/142663/ (should be merged elsewhere?)
+I would not regard that patch any different because it changes
+symbol names in the header file: The kernel internal API has absolutely
+no relevance and can be changed in any (helpful) way as long as you
+change all the in-kernel users at the same time.
 
-Are these still relevant?
-http://patchwork.ozlabs.org/patch/132936/
-http://patchwork.ozlabs.org/patch/132919/
+> I also added the stable-CC to the "lpc32xx/fixes" and added the note
+> about NXP's HW bugfix as suggested by Wolfram.
+> 
+> I'll regenerate the pull request. Please tell me if you also like to
+> have the patches re-posted.
 
-Should you ping Dmitry on?
-http://patchwork.ozlabs.org/patch/134093/
+Ok, thanks a lot! There is no need to resend the patches, since they
+have not changed.
 
-I need to ping Ben on:
-http://patchwork.ozlabs.org/patch/139494/
-
--- 
-nvpublic
+	Arnd
