@@ -1,46 +1,45 @@
-From: rlove@google.com (Robert Love)
-Date: Mon, 27 Feb 2012 12:09:00 -0500
-Subject: elf_set_personality()
-In-Reply-To: <20120227164130.GB2440@n2100.arm.linux.org.uk>
-References: <20120227123612.GD12917@tbergstrom-lnx.Nvidia.com>
- <20120227130453.GV22562@n2100.arm.linux.org.uk>
- <20120227150300.GF12917@tbergstrom-lnx.Nvidia.com>
- <CAG6tG3y6+B8Si8bUFLK5aGmG2sed6y39V7XMcKZNDJuUbWCCjQ@mail.gmail.com>
- <20120227164130.GB2440@n2100.arm.linux.org.uk>
-Message-ID: <CAG6tG3zwfhZXw5M_kk4ry4H6NhTuKyenP-6UUm+XwyxbBbcG9g@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 27 Feb 2012 09:14:06 -0800
+Subject: [PATCH V2 1/2] ARM: tegra: Add pinmux board file for Cardhu
+In-Reply-To: <CAOesGMj4BHL6A1Ej4nQpTkjAY3Z=MKfncc5H8DFwh4TTvPixnw@mail.gmail.com>
+References: <1328138997-25665-1-git-send-email-swarren@nvidia.com>
+ <20120226215141.GA11189@quad.lixom.net>
+ <CAOesGMj4BHL6A1Ej4nQpTkjAY3Z=MKfncc5H8DFwh4TTvPixnw@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BCF4A@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 11:41 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> It seems that vanilla mmap() of a file does not deny a mapping containing
-> PROT_EXEC of a file with read-write-noexec permissions - it permits it,
-> but it does fail mapping a file PROT_WRITE which wasn't opened for write.
->
-> Moreover, it's not actually possible to prevent execution of code if
-> you have read permission - if you can read a mapping, you can copy it
-> into an executable mapping and then execute copied code.
->
-> So, I don't think there's any reason to prevent PROT_EXEC in a hard and
-> fast manner. ?If you don't want to go that far, what about:
->
-> ? ? ? ?prot_mask = PROT_MASK;
-> ? ? ? ?if (current->personality & READ_IMPLIES_EXEC)
-> ? ? ? ? ? ? ? ?prot_mask &= ~PROT_EXEC;
-> ? ? ? ?if (vma->vm_flags & ~asma->prot_mask & prot_mask) {
-> ? ? ? ? ? ? ? ?ret = -EPERM;
-> ? ? ? ? ? ? ? ?goto out;
-> ? ? ? ?}
->
-> which would mean !READ_IMPLIES_EXEC threads would get the full permission
-> checking, but a READ_IMPLIES_EXEC thread would still be able to attach
-> to a r/w only shared mapping.
+Olof Johansson wrote at Sunday, February 26, 2012 3:14 PM:
+> On Sun, Feb 26, 2012 at 1:51 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Wed, Feb 01, 2012 at 04:29:56PM -0700, Stephen Warren wrote:
+> >> For now, this just sets up the pinmux and GPIOs required for the SD
+> >> card slot.
+> >>
+> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >> ---
+> >> v2:
+> >> * Set PULL_UP for CMD and DATA pins on SD interface
+> >> * Add power GPIO for SDMMC1
+> >> * Add pinmux configuration for SDMMC4
+> >>
+> >> This will hopefully be replaced by the pinmux DT binding in the near
+> >> future, but until that happens, Tegra30 pinmux functionality needs to
+> >> be exposed somehow to unblock getting drivers tested on Tegra30.
+> >
+> > Thanks, applied to for-3.4/boards.
+> 
+> ...and I'm two for two on sending the apply email before I have
+> checked dependencies.
+> 
+> This doesn't build, so I dropped it again. Probably a missing
+> dependency on pinctrl changes but please revisit on top of just the
+> tegra code and let me know.
 
-ashmem should behave however vanilla mmap behaves. There is no reason
-to be different and I'd prefer to consolidate or at least copy the
-code.
+Yes, that's expected. I should have mentioned that this patch depends on
+changes in the new series that added the new Tegra pinctrl driver, but
+that hasn't been applied to the Tegra branches since I need to rework the
+Tegra board files for changes in the pinctrl API etc. I'll repost patches
+once all the pinctrl rework is finalized.
 
-It is unfortunate that each implementer of fops->mmap needs to
-manually handle the READ_IMPLIES_EXEC case.
-
-        Robert
+-- 
+nvpublic
