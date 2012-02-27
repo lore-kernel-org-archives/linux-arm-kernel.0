@@ -1,305 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 27 Feb 2012 22:31:32 +0000
-Subject: [PATCH WIP] ARM: kirkwood: covert orion-spi to fdt.
-Message-ID: <4a9b37f69d6cec5049627b8afa777bb010af05f6.1330381705.git.jason@lakedaemon.net>
+From: kevin.wells@nxp.com (Kevin Wells)
+Date: Tue, 28 Feb 2012 00:10:38 +0100
+Subject: [PATCH v3] ARM: LPC32xx: Ethernet support
+In-Reply-To: <4F4BFDD2.8060007@antcom.de>
+References: <1330364762-23203-1-git-send-email-stigge@antcom.de>
+ <20120227180814.GB21386@pengutronix.de> <4F4BFDD2.8060007@antcom.de>
+Message-ID: <083DF309106F364B939360100EC290F81F365B2B2A@eu1rdcrdc1wx030.exi.nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Globalscale Dreamplug (Marvell Kirkwood Development Platform),
-2MB of NOR flash are used to hold the bootloader, bootloader
-environment, and devicetree blob.  It is connected via spi.
+>>> This patch adds ethernet support to the LPC32xx ARM architecture.
+>>> The actual driver in drivers/net is contained in a separate
+>>> patch.
+>>> 
+>>> Signed-off-by: Roland Stigge <stigge@antcom.de>
+>>> 
+>>> ---
+>> 
+>> Please add below this dashed line what changed since the last
+>> version. This makes reviewing easier. 
+>
+>OK, will do next time.
+>
+>For the driver, some style fixes were applied, and the cmdline
+>"ethaddr" was removed, relying on the bootloader to set it correctly
+> (and it actually does, it actually needs to prepare TFTP booting).
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
----
-Notes:
-    - checkpatch clean.
-    - compiles, boots, registers partitions correctly.
+I'm not sure I'd trust the bootloader to always set the MAC address
+in hardware prior to calling the kernel. A lot of u-boot MAC drivers,
+including the 32x0's, only set the MAC address on the call to
+eth_init(), which is only called when the network interface is used.
+If you do a MTD based kernel boot, the MAC address will probably be
+invalid if you try to do a NFS mount for the filesystem.
 
- arch/arm/boot/dts/kirkwood-dreamplug.dts |   34 +++++++++++++
- arch/arm/mach-kirkwood/board-dt.c        |   40 ----------------
- arch/arm/mach-kirkwood/common.c          |   11 ++++
- drivers/spi/spi-orion.c                  |   75 ++++++++++++++++++++++++++----
- 4 files changed, 111 insertions(+), 49 deletions(-)
-
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index 8a5dff8..bdf2ddc 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -22,4 +22,38 @@
- 		interrupts = <33>;
- 		clock-frequency = <200000000>;
- 	};
-+
-+	spi at f1010600 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		compatible = "marvell,orion-spi";
-+		reg = <0xf1010600 0x1ff>;
-+		clock-frequency = <200000000>;
-+
-+		flash at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			compatible = "macronix,mx25l1606e", "jedec-flash";
-+
-+			spi-max-frequency = <50000000>;
-+			reg = <0>;
-+
-+			partition at 0 {
-+				label = "U-Boot";
-+				reg = <0x0 0x100000>;
-+			};
-+
-+			partition at 100000 {
-+				label = "U-Boot Environment";
-+				reg = <0x100000 0x080000>;
-+			};
-+
-+			partition at 180000 {
-+				label = "Flattened Device Tree";
-+				reg = <0x180000 0x080000>;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index fbe6405..4960e63 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -39,42 +39,6 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
- 	{ }
- };
- 
--struct mtd_partition dreamplug_partitions[] = {
--	{
--		.name	= "u-boot",
--		.size	= SZ_512K,
--		.offset = 0,
--	},
--	{
--		.name	= "u-boot env",
--		.size	= SZ_64K,
--		.offset = SZ_512K + SZ_512K,
--	},
--	{
--		.name	= "dtb",
--		.size	= SZ_64K,
--		.offset = SZ_512K + SZ_512K + SZ_512K,
--	},
--};
--
--static const struct flash_platform_data dreamplug_spi_slave_data = {
--	.type		= "mx25l1606e",
--	.name		= "spi_flash",
--	.parts		= dreamplug_partitions,
--	.nr_parts	= ARRAY_SIZE(dreamplug_partitions),
--};
--
--static struct spi_board_info __initdata dreamplug_spi_slave_info[] = {
--	{
--		.modalias	= "m25p80",
--		.platform_data	= &dreamplug_spi_slave_data,
--		.irq		= -1,
--		.max_speed_hz	= 50000000,
--		.bus_num	= 0,
--		.chip_select	= 0,
--	},
--};
--
- static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
- };
-@@ -140,10 +104,6 @@ static void __init dreamplug_init(void)
- 	 */
- 	kirkwood_mpp_conf(dreamplug_mpp_config);
- 
--	spi_register_board_info(dreamplug_spi_slave_info,
--				ARRAY_SIZE(dreamplug_spi_slave_info));
--	kirkwood_spi_init();
--
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dreamplug_ge00_data);
- 	kirkwood_ge01_init(&dreamplug_ge01_data);
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index cc15426..b041af3 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -15,6 +15,7 @@
- #include <linux/ata_platform.h>
- #include <linux/mtd/nand.h>
- #include <linux/dma-mapping.h>
-+#include <linux/of.h>
- #include <net/dsa.h>
- #include <asm/page.h>
- #include <asm/timex.h>
-@@ -481,6 +482,9 @@ static int __init kirkwood_clock_gate(void)
- {
- 	unsigned int curr = readl(CLOCK_GATING_CTRL);
- 	u32 dev, rev;
-+#ifdef CONFIG_OF
-+	struct device_node *dp;
-+#endif
- 
- 	kirkwood_pcie_id(&dev, &rev);
- 	printk(KERN_DEBUG "Gating clock of unused units\n");
-@@ -524,6 +528,13 @@ static int __init kirkwood_clock_gate(void)
- 	} else  /* keep this bit set for devices that don't have PCIe1 */
- 		kirkwood_clk_ctrl |= CGC_PEX1;
- 
-+#ifdef CONFIG_OF
-+	dp = of_find_node_by_path("/");
-+	if (of_device_is_available(of_find_compatible_node(dp, NULL,
-+							  "marvell,orion-spi")))
-+		kirkwood_clk_ctrl |= CGC_RUNIT;
-+#endif
-+
- 	/* Now gate clock the required units */
- 	writel(kirkwood_clk_ctrl, CLOCK_GATING_CTRL);
- 	printk(KERN_DEBUG " after: 0x%08x\n", readl(CLOCK_GATING_CTRL));
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index 13448c8..2ee5e16 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -18,6 +18,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/orion_spi.h>
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <asm/unaligned.h>
- 
- #define DRIVER_NAME			"orion_spi"
-@@ -101,10 +102,24 @@ static int orion_spi_baudrate_set(struct spi_device *spi, unsigned int speed)
- 	u32 prescale;
- 	u32 reg;
- 	struct orion_spi *orion_spi;
-+#ifdef CONFIG_OF
-+	const __be32 *prop;
-+	int len;
-+#endif
- 
- 	orion_spi = spi_master_get_devdata(spi->master);
- 
-+#ifdef CONFIG_OF
-+	prop = of_get_property(spi->master->dev.of_node, "clock-frequency",
-+				&len);
-+	if (!prop || len < sizeof(*prop)) {
-+		pr_debug("fdt missing 'clock-frequency' property.\n");
-+		return -EINVAL;
-+	}
-+	tclk_hz = be32_to_cpup(prop);
-+#else
- 	tclk_hz = orion_spi->spi_info->tclk;
-+#endif
- 
- 	/*
- 	 * the supported rates are: 4,6,8...30
-@@ -360,7 +375,11 @@ static int orion_spi_setup(struct spi_device *spi)
- 	orion_spi = spi_master_get_devdata(spi->master);
- 
- 	/* Fix ac timing if required.   */
-+#ifdef CONFIG_OF
-+	if (of_find_property(spi->master->dev.of_node, "spi-clock-fix", NULL))
-+#else
- 	if (orion_spi->spi_info->enable_clock_fix)
-+#endif
- 		orion_spi_setbits(orion_spi, ORION_SPI_IF_CONFIG_REG,
- 				  (1 << 14));
- 
-@@ -449,15 +468,47 @@ msg_rejected:
- 	return -EINVAL;
- }
- 
-+#ifdef CONFIG_OF
-+static struct of_device_id spi_orion_of_match_table[] __devinitdata = {
-+	{ .compatible = "marvell,orion-spi", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, spi_orion_of_match_table);
-+#else /* CONFIG_OF */
-+#define spi_orion_of_match_table NULL
-+#endif /* CONFIG_OF */
-+
-+static struct platform_driver orion_spi_driver = {
-+	.driver = {
-+		.name	= DRIVER_NAME,
-+		.owner	= THIS_MODULE,
-+		.of_match_table = spi_orion_of_match_table,
-+	},
-+	.remove		= __exit_p(orion_spi_remove),
-+};
-+
- static int __init orion_spi_probe(struct platform_device *pdev)
- {
- 	struct spi_master *master;
- 	struct orion_spi *spi;
- 	struct resource *r;
--	struct orion_spi_info *spi_info;
- 	int status = 0;
-+#ifdef CONFIG_OF
-+	const __be32 *prop;
-+	int tclk;
-+	int len;
-+#else
-+	struct orion_spi_info *spi_info;
- 
- 	spi_info = pdev->dev.platform_data;
-+#endif
-+
-+#ifdef CONFIG_OF
-+	orion_spi_wq = create_singlethread_workqueue(
-+				orion_spi_driver.driver.name);
-+	if (orion_spi_wq == NULL)
-+		return -ENOMEM;
-+#endif
- 
- 	master = spi_alloc_master(&pdev->dev, sizeof *spi);
- 	if (master == NULL) {
-@@ -474,15 +525,29 @@ static int __init orion_spi_probe(struct platform_device *pdev)
- 	master->setup = orion_spi_setup;
- 	master->transfer = orion_spi_transfer;
- 	master->num_chipselect = ORION_NUM_CHIPSELECTS;
-+	master->dev.of_node = pdev->dev.of_node;
- 
- 	dev_set_drvdata(&pdev->dev, master);
- 
- 	spi = spi_master_get_devdata(master);
- 	spi->master = master;
-+#ifdef CONFIG_OF
-+	prop = of_get_property(master->dev.of_node, "clock-frequency", &len);
-+	if (!prop || len < sizeof(*prop)) {
-+		pr_debug("fdt missing 'clock-frequency' property.\n");
-+		status = -EINVAL;
-+		goto out;
-+	}
-+	tclk = be32_to_cpup(prop);
-+
-+	spi->max_speed = DIV_ROUND_UP(tclk, 4);
-+	spi->min_speed = DIV_ROUND_UP(tclk, 30);
-+#else
- 	spi->spi_info = spi_info;
- 
- 	spi->max_speed = DIV_ROUND_UP(spi_info->tclk, 4);
- 	spi->min_speed = DIV_ROUND_UP(spi_info->tclk, 30);
-+#endif
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
-@@ -541,14 +606,6 @@ static int __exit orion_spi_remove(struct platform_device *pdev)
- 
- MODULE_ALIAS("platform:" DRIVER_NAME);
- 
--static struct platform_driver orion_spi_driver = {
--	.driver = {
--		.name	= DRIVER_NAME,
--		.owner	= THIS_MODULE,
--	},
--	.remove		= __exit_p(orion_spi_remove),
--};
--
- static int __init orion_spi_init(void)
- {
- 	orion_spi_wq = create_singlethread_workqueue(
--- 
-1.7.3.4
+>The platform-support patch just adjusted to the small driver change:
+>driver name adjustment ("lpc-eth") for consistency.
+>
+>Roland
