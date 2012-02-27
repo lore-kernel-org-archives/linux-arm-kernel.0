@@ -1,32 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 Feb 2012 15:59:02 +0800
-Subject: [PATCH v2 0/9] imx patches when I enable imx6q sabrelite audio
-In-Reply-To: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
-References: <1328148728-32258-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <20120227075858.GA31207@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Feb 2012 09:12:41 +0100
+Subject: [PATCH] arch/arm/mach-ux500/board-mop500-u8500uib.c: included
+ linux/gpio.h twice
+In-Reply-To: <20120227072705.GA19429@bnru02>
+References: <1329333578-31773-1-git-send-email-danny.kukawka@bisect.de>
+ <20120227072705.GA19429@bnru02>
+Message-ID: <CACRpkdYV-EoJNPei9JbM=xmF8i8J5sd33uE70cAMF7p-h42Zzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2012 at 10:11:59AM +0800, Richard Zhao wrote:
-> Changes in v2:
-> 
->  - change dt peroperty/label to lower case as much as possible
->    keep XXX-supply property upper case.
->  - convert audmux-v2 to platform device driver
->  - move audmux-v2 driver to sound/soc/imx
-> 
-> [PATCH v2 1/9] ARM: mxc: make imx_dma_is_general_purpose more
-> [PATCH v2 2/9] ARM: imx6q: add cko1 clock
-> [PATCH v2 3/9] ARM: dts: imx6q-sabrelite: add 2p5v and 3p3v
-> [PATCH v2 4/9] ARM: dts: imx6q-sabrelite: add sgtl5000 audio codec
+On Mon, Feb 27, 2012 at 8:27 AM, Srinidhi Kasagar
+<srinidhi.kasagar@stericsson.com> wrote:
+> On Wed, Feb 15, 2012 at 20:19:38 +0100, Danny Kukawka wrote:
+>> arch/arm/mach-ux500/board-mop500-u8500uib.c included 'linux/gpio.h'
+>> remove the duplicate.
+>>
+>> Signed-off-by: Danny Kukawka <danny.kukawka@bisect.de>
+>> ---
+>> ?arch/arm/mach-ux500/board-mop500-u8500uib.c | ? ?1 -
+>> ?1 files changed, 0 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-ux500/board-mop500-u8500uib.c b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+>> index feb5744..ead91c9 100644
+>> --- a/arch/arm/mach-ux500/board-mop500-u8500uib.c
+>> +++ b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+>> @@ -8,7 +8,6 @@
+>> ?#include <linux/kernel.h>
+>> ?#include <linux/init.h>
+>> ?#include <linux/i2c.h>
+>> -#include <linux/gpio.h>
+>> ?#include <linux/interrupt.h>
+>> ?#include <linux/mfd/tc3589x.h>
+>> ?#include <linux/input/matrix_keypad.h>
+>
+> Thanks,
+>
+> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+>
+> Linus W, would you please pick if you have not noticed this.
 
-I applied patch 1 ~ 4.  Thanks.
+Thanks for the reminder, I've picked it up and merged
+to my ux500-core branch.
 
-Regards,
-Shawn
-
-> [PATCH v2 5/9] ARM: mxc: convert audmux-v2 to a platform driver
-> [PATCH v2 6/9] ARM: mx31ads: add audmux device
-> [PATCH v2 7/9] ARM: mxc: move audmux-v2 to sound/soc/imx
-> [PATCH v2 8/9] ASoC: imx: add dt support for audmux-v2
-> [PATCH v2 9/9] ARM: imx6q-sabrelite: add audmux support
+Yours,
+Linus Walleij
