@@ -1,47 +1,59 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 27 Feb 2012 17:54:47 +0800
-Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
-In-Reply-To: <20120227090447.GQ22562@n2100.arm.linux.org.uk>
-References: <E1QKFPN-0003xV-Sf@outmx07.plus.net> <1330253653.3673.8.camel@flow>
- <20120227090447.GQ22562@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZzpJtuQygJeD4fyW-DQGwCDyBa9QO0k+0CG2BOW=+k=aQ@mail.gmail.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 27 Feb 2012 17:56:46 +0800
+Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU
+ IRQ handlers
+In-Reply-To: <20120224101130.GB13504@mudshark.cambridge.arm.com>
+References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
+ <1330012696-13472-4-git-send-email-will.deacon@arm.com>
+ <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
+ <20120224101130.GB13504@mudshark.cambridge.arm.com>
+Message-ID: <20120227175646.7c39e542@tom-ThinkPad-T410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 5:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Feb 26, 2012 at 11:54:13AM +0100, Philipp Zabel wrote:
->> Am Mittwoch, den 11.05.2011, 19:49 +0000 schrieb Paul Parsons:
->> > Basic suspend/resume is fixed by ensuring that the PGSR registers are set correctly before sleep mode is entered. In particular four of the active low resets need to be driven high while in sleep mode, otherwise the unit resets itself instead of suspending. Another problem was that the PCFR_GPROD bit is apparently set by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail immediately after returning from sleep mode.
->> >
->> > Driver-specific bugs still remain. In particular the mmc driver does not resume properly after returning from sleep mode, thus preventing sleep mode from being entered a second time.
->> >
->> > Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
->> > ---
->> > --- clean-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c ? ? 2011-05-11 00:54:10.787247169 +0100
->> > +++ linux-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c ? ? 2011-05-11 20:21:54.026109594 +0100
->> > @@ -120,7 +120,11 @@ static unsigned long hx4700_pin_config[]
->> > ? ? GPIO19_SSP2_SCLK,
->> > ? ? GPIO86_SSP2_RXD,
->> > ? ? GPIO87_SSP2_TXD,
->> > - ? GPIO88_GPIO,
->> > + ? MFP_CFG_OUT(GPIO88, AF0, KEEP_OUTPUT), ?/* TSC2046_CS */
->>
->> What you want here is to keep the SPI chip select deasserted (high)
->> during suspend, so I think that should be DRIVE_HIGH instead.
->
-> And I don't think we allowed folk to use MFP_CFG_xxx() macros in their
-> board support code. ?Is there something wrong with:
->
-> ? ? ? ?GPIO88_GPIO | MFP_LPM_KEEP_OUTPUT
->
+Hi,
 
-Yes, it should be MFPR_LPM_DRIVE_HIGH or MFPR_LPM_PULL_HIGH.
-Thanks for your reminder.
+On Fri, 24 Feb 2012 10:11:30 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-Paul,
+> On Fri, Feb 24, 2012 at 01:34:32AM +0000, Ming Lei wrote:
+> > On Thu, Feb 23, 2012 at 11:58 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > @@ -513,7 +496,8 @@ armv6pmu_handle_irq(int irq_num,
+> > > ? ? ? ? ? ? ? ?struct perf_event *event = cpuc->events[idx];
+> > > ? ? ? ? ? ? ? ?struct hw_perf_event *hwc;
+> > >
+> > > - ? ? ? ? ? ? ? if (!counter_is_active(pmcr, idx))
+> > > + ? ? ? ? ? ? ? /* Ignore if we don't have an event. */
+> > > + ? ? ? ? ? ? ? if (!event)
+> > 
+> > I think we should check it via test_bit(idx, cpuc->used_mask) because
+> > 'hw_events->events[idx] = val' is not atomic operation and it is read here
+> > in irq context.
+> 
+> I dunno, that code is compiled to:
+> 
+> e5973000        ldr     r3, [r7]
+> e7834106        str     r4, [r3, r6, lsl #2]
+> 
+> so you should either see the new value or the old one - you can't see half a
+> pointer in there since it's a single 32-bit store.
 
-Could you help to format the patch again?
+Firstly the code above is only generated from one of many existing compile
+options, for example, maybe storing to 32bit variable involves two instructions
+in thumb mode, so are you sure it is always OK for all cases?
 
-Best Regards
-Haojian
+Secondly, I am even not sure if ARM irq handler is always triggered in instruction
+boundary, maybe the irq handler is started during execution of the store instruction.
+In fact, I can find the sentence below in 'B1.6.16 IRQ exception' of ARMv7 manual:
+
+	This relaxation of the normal definition of a precise asynchronous exception
+	permits interrupts to occur during the execution of instructions that change register
+	or memory values, while only requiring the implementation to restore those register
+	values that are needed to correctly re-execute the instruction after the preferred
+	exception return. LDM and STM are examples of such instructions.
+
+So suggest to take the correct way in theory, IMO.
+
+thanks,
+-- 
+Ming Lei
