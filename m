@@ -1,55 +1,61 @@
-From: jason@lakedaemon.net (Jason)
-Date: Mon, 27 Feb 2012 09:57:24 -0500
-Subject: [PATCH 0/2 v5] arm: kirkwood: add dreamplug/devicetree support
-In-Reply-To: <1330254038.10008.24.camel@dagon.hellion.org.uk>
-References: <cover.1312906908.git.jason@lakedaemon.net>
- <cover.1330025976.git.jason@lakedaemon.net>
- <1330254038.10008.24.camel@dagon.hellion.org.uk>
-Message-ID: <20120227145724.GU23524@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Feb 2012 14:59:52 +0000
+Subject: [GIT PULL] DaVinci cleanups for v3.4
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317D2DB9@DBDE01.ent.ti.com>
+References: <DF0F476B391FA8409C78302C7BA518B6317D2DB9@DBDE01.ent.ti.com>
+Message-ID: <201202271459.52216.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2012 at 11:00:38AM +0000, Ian Campbell wrote:
-> On Thu, 2012-02-23 at 19:52 +0000, Jason Cooper wrote:
-> > This patch series provides initial support for devicetree on kirkwood for the
-> > dreamplug platform.  After discussing the approach with Arnd Bergman last week
-> > at ELC, we decided to take an incremental approach to the conversion.  First, I
-> > would detect that we were on the dreamplug via the devicetree blob.  Then,
-> > configure uart0 via devicetree.  We chose the uart since it is already well
-> > supported under devicetree.
-> > 
-> > This patch series has been boot-tested on the dreamplug.
+On Friday 24 February 2012, Nori, Sekhar wrote:
+> Hi Arnd, Olof,
 > 
-> Tested-by: Ian Campbell <ijc@hellion.org.uk>
-
-thanks!
-
-> I needed the following (obvious) patch against u-boot:
-
-yes, I forgot to mention that.  By any chance, have you tested booting
-non-fdt kernels from u-boot with this option enabled?  I'm fairly sure
-it will work, but I haven't tested it myself.
-
-If you can boot both fdt and non-fdt kernels with this enabled, submit
-it to u-boot, CC: Prafulla, and I'll ack it.
-
-thx,
-
-Jason.
-
-> diff --git a/include/configs/dreamplug.h b/include/configs/dreamplug.h
-> index 0f2f9a2..76f9eea 100644
-> --- a/include/configs/dreamplug.h
-> +++ b/include/configs/dreamplug.h
-> @@ -148,4 +148,6 @@
->   */
->  #define CONFIG_DISPLAY_CPUINFO
->  
-> +#define CONFIG_OF_LIBFDT
-> +
->  #endif /* _CONFIG_DREAMPLUG_H */
+> Can you please pull these DaVinci clean-up patches for
+> the v3.4 merge window? I have made sure that these don't
+> have any conflicts with the rmk/for-armsoc branch of
+> the arm-soc tree.
 > 
+> These patches need the following two commits from linux-next
+> (next-20120224) to keep the VPIF and CQ93VC drivers building.
 > 
-> Ian.
-> 
-> 
+> 2e932f2  ASoC: CQ93VC: remove machine specific header file inclusion from codec
+> db38951  [media] davinci: vpif: remove machine specific header file includes
+
+In general, don't worry too much about conflicts that are easy to
+resolve. However, having these extra dependencies is not good,
+because it means that we cannot easily build-test the arm-soc
+tree by itself and it breaks bisection through the git history.
+
+In the future, please make sure that dependent commits show up
+in the right order. For now, I've added the patch below on top
+of your series.
+
+	Arnd
+
+commit 6ea96e111e6a7f06ef62227bf64e8cd65bd705b3
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Mon Feb 27 14:55:22 2012 +0000
+
+    ARM: davinci: add back dummy header files
+    
+    The mach/dm365.h and mach/dm646xh headers are currently being included
+    in some device drivers. The removal of those includes is already merged
+    in some subsystem trees, but adding the dummy files ensures that this
+    branch can be built standalone.
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-davinci/include/mach/dm365.h b/arch/arm/mach-davinci/include/mach/dm365.h
+new file mode 100644
+index 0000000..b9bf3d6
+--- /dev/null
++++ b/arch/arm/mach-davinci/include/mach/dm365.h
+@@ -0,0 +1 @@
++/* empty, remove once unused */
+diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
+new file mode 100644
+index 0000000..b9bf3d6
+--- /dev/null
++++ b/arch/arm/mach-davinci/include/mach/dm646x.h
+@@ -0,0 +1 @@
++/* empty, remove once unused */
