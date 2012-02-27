@@ -1,23 +1,25 @@
 From: timur@freescale.com (Timur Tabi)
-Date: Mon, 27 Feb 2012 14:28:43 -0600
-Subject: [PATCH 0/6] ASoC: a few cleanups on sound/soc/fsl
-In-Reply-To: <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 27 Feb 2012 14:31:01 -0600
+Subject: [PATCH 2/6] ASoC: fsl: align mpc8610_hpcd with p1022_ds on getting
+ codec node
+In-Reply-To: <1330092582-21180-3-git-send-email-shawn.guo@linaro.org>
 References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
  <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F4BE77B.2040802@freescale.com>
+ <1330092582-21180-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F4BE805.1070208@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Shawn Guo wrote:
-> This is the third series towards reusing fsl_ssi driver on device tree
-> based IMX platforms.  It makes a few cleanups on existing PowerPC code
-> to ease the later addition of an IMX machine driver that works on
-> fsl_ssi.
+> Align mpc8610_hpcd with p1022_ds on getting codec node by just calling
+> of_parse_phandle.  The bonus point of doing that is we can save
+> exporting get_node_by_phandle_name() when we consolidate the common
+> bits between mpc8610_hpcd and p1022_ds into a module, which can be
+> shared by more machine drivers added later.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-These patches don't apply 100% cleanly, and there are some issues that
-need to be resolved, but I'll review each one and ACK those that I think
-are okay.  It would probably be better if none were applied until the
-whole patchset is okay, though.
+Acked-by: Timur Tabi <timur@freescale.com>
 
 -- 
 Timur Tabi
