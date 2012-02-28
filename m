@@ -1,35 +1,39 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 28 Feb 2012 10:01:29 -0500 (EST)
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <201202272201.14665.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1202280951440.1456-100000@iolanthe.rowland.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 28 Feb 2012 17:05:28 +0200
+Subject: [PATCHv2 5/6] ARM: OMAP4: hwmod_data: Do not get DSP out of
+ reset at boot time
+In-Reply-To: <alpine.DEB.2.00.1202280330140.11716@utopia.booyaka.com>
+References: <1330096546-20477-1-git-send-email-t-kristo@ti.com>
+ <1330096546-20477-6-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1202280330140.11716@utopia.booyaka.com>
+Message-ID: <1330441528.2116.46.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Feb 2012, Arnd Bergmann wrote:
-
-> > The generic driver, as you'll see when you read the patch, includes 
-> > generic versions of the various routines that a bus glue file has to 
-> > provide (probe, remove, initialize, and so on).
+On Tue, 2012-02-28 at 03:31 -0700, Paul Walmsley wrote:
+> Hi
 > 
-> Ok, I see. Nevermind then, I don't think this will help to solve
-> the problem of building multiple ARM platforms together when they
-> provide conflicting bus glues, although it seems generally to be
-> a good idea in order to reduce the number of platform glues that there
-> are
+> On Fri, 24 Feb 2012, Tero Kristo wrote:
 > 
-> What do you think about an approach like below?
+> > From: Rajendra Nayak <rnayak@ti.com>
+> > 
+> > With no driver handling DSP, if brought out of reset, it stays
+> > active and does not assert standby. This leads to IVAHD powerdomain not
+> > transitioning and hence preventing chip retention.
+> > 
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> 
+> Please test this series:
+> 
+>    http://marc.info/?l=linux-omap&m=133040749621183&w=2
+> 
+> in lieu of this patch.
+> 
+> 
+> - Paul
 
-It's heading in the intended direction, although the details might not 
-all be quite right -- I didn't check them very closely.
+Just tried the CSWR set on top of your branch with this patch reverted
+and it works nicely. I'll drop this patch out from the next version.
 
-One big thing about it is wrong: Many or most of the functions you
-exported don't really need to be.  Instead, ohci-hcd.c should define
-ohci_driver (a bus-agnostic hc_driver structure) and export that.  
-Then the bus-glue files can copy the structure for their own use during
-initialization (rather than duplicating the definition all over the
-place) and override individual methods as needed.
-
-It's a more "object-oriented" approach.  :-)
-
-Alan Stern
+-Tero
