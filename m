@@ -1,59 +1,64 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Tue, 28 Feb 2012 10:58:42 +0800
-Subject: [V4 2/4] mfd: code clean for pm8606 sub-dev initialization
-Message-ID: <1330397922-31739-1-git-send-email-jtzhou@marvell.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 28 Feb 2012 00:15:01 -0300
+Subject: [PATCH] ARM: mx3: Setup AIPS registers
+Message-ID: <1330398901-20211-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Collect all the sub-devices of pm8606 initialization into
-device_pm8606_init() for code clean up.
+It was observed on a mx31pdk board that audio playback only worked when the bootloader was Redboot, and 
+did not work when U-boot was used. 
 
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+Comparing the sources of these bootloaders showed that the AIPS registers were not setup in U-boot.
+
+Instead of relying on the bootloader to setup the AIPS registers, do it in the kernel so that audio
+playback can work independantly of the bootloader being used.
+
+Copied the AIPS settings from Redboot to the kernel.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/mfd/88pm860x-core.c |   17 +++++++++++------
- 1 files changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/mach-imx/cpu-imx31.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
-index 78c3a9e..6ed8de7 100644
---- a/drivers/mfd/88pm860x-core.c
-+++ b/drivers/mfd/88pm860x-core.c
-@@ -860,6 +860,15 @@ out:
- 	return;
+diff --git a/arch/arm/mach-imx/cpu-imx31.c b/arch/arm/mach-imx/cpu-imx31.c
+index 3f2345f..c309d51 100644
+--- a/arch/arm/mach-imx/cpu-imx31.c
++++ b/arch/arm/mach-imx/cpu-imx31.c
+@@ -60,3 +60,35 @@ int mx31_revision(void)
+ 	return mx31_cpu_rev;
  }
- 
-+static void __devinit device_8606_init(struct pm860x_chip *chip,
-+				       struct i2c_client *i2c,
-+				       struct pm860x_platform_data *pdata)
+ EXPORT_SYMBOL(mx31_revision);
++
++static void __init imx_set_aips(void __iomem *base)
 +{
-+	device_osc_init(i2c);
-+	device_bk_init(chip, pdata);
-+	device_led_init(chip, pdata);
++	unsigned int reg;
++/*
++ * Set all MPROTx to be non-bufferable, trusted for R/W,
++ * not forced to user-mode.
++ */
++	__raw_writel(0x77777777, base + 0x0);
++	__raw_writel(0x77777777, base + 0x4);
++
++/*
++ * Clear the on and off peripheral modules Supervisor Protect bit
++ * for SDMA to access them. Did not change the AIPS control registers
++ * (offset 0x20) access type
++ */
++	__raw_writel(0x0, base + 0x40);
++	__raw_writel(0x0, base + 0x44);
++	__raw_writel(0x0, base + 0x48);
++	__raw_writel(0x0, base + 0x4C);
++	reg = __raw_readl(base + 0x50) & 0x00FFFFFF;
++	__raw_writel(reg, base + 0x50);
 +}
 +
- int __devinit pm860x_device_init(struct pm860x_chip *chip,
- 		       struct pm860x_platform_data *pdata)
- {
-@@ -867,9 +876,7 @@ int __devinit pm860x_device_init(struct pm860x_chip *chip,
- 
- 	switch (chip->id) {
- 	case CHIP_PM8606:
--		device_osc_init(chip->client);
--		device_bk_init(chip, pdata);
--		device_led_init(chip, pdata);
-+		device_8606_init(chip, chip->client, pdata);
- 		break;
- 	case CHIP_PM8607:
- 		device_8607_init(chip, chip->client, pdata);
-@@ -879,9 +886,7 @@ int __devinit pm860x_device_init(struct pm860x_chip *chip,
- 	if (chip->companion) {
- 		switch (chip->id) {
- 		case CHIP_PM8607:
--			device_osc_init(chip->companion);
--			device_bk_init(chip, pdata);
--			device_led_init(chip, pdata);
-+			device_8606_init(chip, chip->companion, pdata);
- 			break;
- 		case CHIP_PM8606:
- 			device_8607_init(chip, chip->companion, pdata);
++static int __init post_cpu_init(void)
++{
++	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS1_BASE_ADDR));
++	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS2_BASE_ADDR));
++
++	return 0;
++}
++postcore_initcall(post_cpu_init);
 -- 
-1.7.0.4
+1.7.1
