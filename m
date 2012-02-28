@@ -1,11 +1,13 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 28 Feb 2012 19:21:06 +0200
+Date: Tue, 28 Feb 2012 19:21:07 +0200
 Subject: [PATCH 0/5] trivial remoteproc/rpmsg fixes
-Message-ID: <1330449672-18191-1-git-send-email-ohad@wizery.com>
+In-Reply-To: <1330449672-18191-1-git-send-email-ohad@wizery.com>
+References: <1330449672-18191-1-git-send-email-ohad@wizery.com>
+Message-ID: <1330449672-18191-2-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Five remoteproc/rpmsg fixes.
+Five trivial remoteproc/rpmsg fixes.
 
 One was reported by Russell (the Kconfig fixes) and one by Omar (the endpoint
 leak).
