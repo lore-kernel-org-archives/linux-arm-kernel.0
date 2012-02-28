@@ -1,85 +1,124 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 28 Feb 2012 04:10:54 -0700
-Subject: [PATCH 4/9] ARM: OMAP3: hwmod data: GPTIMER12 is attached to a
- separate interconnect
+Date: Tue, 28 Feb 2012 04:10:51 -0700
+Subject: [PATCH 1/9] ARM: OMAP2/3: hwmod data: update old names
 In-Reply-To: <20120228110943.808.73639.stgit@dusk>
 References: <20120228110943.808.73639.stgit@dusk>
-Message-ID: <20120228111053.808.87403.stgit@dusk>
+Message-ID: <20120228111048.808.23906.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPTIMER12 is attached to the L4 SEC interconnect, not directly to L4 WKUP.
-Add the L4 SEC interconnect and attach GPTIMER12 to it.
+Some of the 2xxx and 3xxx hwmod data files use the old naming style
+for hwmods, ending in a "_hwmod".  These names are used by the OMAP
+integration code to map hwmods to platform_devices, so they need to be
+consistent, or the platform_devices won't be created.  Remove the
+_hwmod suffix to conform with the rest of the OMAP SoC data.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   28 +++++++++++++++++++++++++---
- 1 files changed, 25 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    4 ++--
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    6 +++---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   10 +++++-----
+ 3 files changed, 10 insertions(+), 10 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index a5409ce..02a8b39 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -1376,7 +1376,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
+ };
+ 
+ static struct omap_hwmod omap2420_mcspi1_hwmod = {
+-	.name		= "mcspi1_hwmod",
++	.name		= "mcspi1",
+ 	.mpu_irqs	= omap2_mcspi1_mpu_irqs,
+ 	.sdma_reqs	= omap2_mcspi1_sdma_reqs,
+ 	.main_clk	= "mcspi1_fck",
+@@ -1405,7 +1405,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
+ };
+ 
+ static struct omap_hwmod omap2420_mcspi2_hwmod = {
+-	.name		= "mcspi2_hwmod",
++	.name		= "mcspi2",
+ 	.mpu_irqs	= omap2_mcspi2_mpu_irqs,
+ 	.sdma_reqs	= omap2_mcspi2_sdma_reqs,
+ 	.main_clk	= "mcspi2_fck",
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index c4f56cb..e260ad7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -1481,7 +1481,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
+ };
+ 
+ static struct omap_hwmod omap2430_mcspi1_hwmod = {
+-	.name		= "mcspi1_hwmod",
++	.name		= "mcspi1",
+ 	.mpu_irqs	= omap2_mcspi1_mpu_irqs,
+ 	.sdma_reqs	= omap2_mcspi1_sdma_reqs,
+ 	.main_clk	= "mcspi1_fck",
+@@ -1510,7 +1510,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
+ };
+ 
+ static struct omap_hwmod omap2430_mcspi2_hwmod = {
+-	.name		= "mcspi2_hwmod",
++	.name		= "mcspi2",
+ 	.mpu_irqs	= omap2_mcspi2_mpu_irqs,
+ 	.sdma_reqs	= omap2_mcspi2_sdma_reqs,
+ 	.main_clk	= "mcspi2_fck",
+@@ -1552,7 +1552,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi3_dev_attr = {
+ };
+ 
+ static struct omap_hwmod omap2430_mcspi3_hwmod = {
+-	.name		= "mcspi3_hwmod",
++	.name		= "mcspi3",
+ 	.mpu_irqs	= omap2430_mcspi3_mpu_irqs,
+ 	.sdma_reqs	= omap2430_mcspi3_sdma_reqs,
+ 	.main_clk	= "mcspi3_fck",
 diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 48b6a88..417a007 100644
+index 3c8dd92..536d0c6 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -170,6 +170,7 @@ static struct omap_hwmod omap3xxx_l3_main_hwmod = {
+@@ -1087,7 +1087,7 @@ static struct omap_hwmod omap3xxx_timer11_hwmod = {
+ 	.class		= &omap3xxx_timer_hwmod_class,
  };
  
- static struct omap_hwmod omap3xxx_l4_wkup_hwmod;
-+static struct omap_hwmod omap3xxx_l4_sec_hwmod;
- static struct omap_hwmod omap3xxx_uart1_hwmod;
- static struct omap_hwmod omap3xxx_uart2_hwmod;
- static struct omap_hwmod omap3xxx_uart3_hwmod;
-@@ -521,6 +522,13 @@ static struct omap_hwmod omap3xxx_l4_per_hwmod = {
- 	.flags		= HWMOD_NO_IDLEST,
+-/* timer12*/
++/* timer12 */
+ static struct omap_hwmod omap3xxx_timer12_hwmod;
+ static struct omap_hwmod_irq_info omap3xxx_timer12_mpu_irqs[] = {
+ 	{ .irq = 95, },
+@@ -2669,7 +2669,7 @@ static struct omap_hwmod_ocp_if *omap3_sr1_slaves[] = {
  };
  
-+/* L4_WKUP -> L4_SEC interface */
-+static struct omap_hwmod_ocp_if omap3xxx_l4_wkup__l4_sec = {
-+	.master = &omap3xxx_l4_wkup_hwmod,
-+	.slave	= &omap3xxx_l4_sec_hwmod,
-+	.user	= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* Slave interfaces on the L4_WKUP interconnect */
- static struct omap_hwmod_ocp_if *omap3xxx_l4_wkup_slaves[] = {
- 	&omap3xxx_l4_core__l4_wkup,
-@@ -535,6 +543,20 @@ static struct omap_hwmod omap3xxx_l4_wkup_hwmod = {
- 	.flags		= HWMOD_NO_IDLEST,
+ static struct omap_hwmod omap34xx_sr1_hwmod = {
+-	.name		= "sr1_hwmod",
++	.name		= "sr1",
+ 	.class		= &omap34xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr1_fck",
+ 	.vdd_name	= "mpu_iva",
+@@ -2688,7 +2688,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
  };
  
-+/* Slave interfaces on the L4_SEC interconnect */
-+static struct omap_hwmod_ocp_if *omap3xxx_l4_sec_slaves[] = {
-+	&omap3xxx_l4_wkup__l4_sec,
-+};
-+
-+/* L4 SEC */
-+static struct omap_hwmod omap3xxx_l4_sec_hwmod = {
-+	.name		= "l4_sec",
-+	.class		= &l4_hwmod_class,
-+	.slaves		= omap3xxx_l4_sec_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap3xxx_l4_sec_slaves),
-+	.flags		= HWMOD_NO_IDLEST,
-+};
-+
- /* Master interfaces on the MPU device */
- static struct omap_hwmod_ocp_if *omap3xxx_mpu_masters[] = {
- 	&omap3xxx_mpu__l3_main,
-@@ -1130,8 +1152,8 @@ static struct omap_hwmod_addr_space omap3xxx_timer12_addrs[] = {
+ static struct omap_hwmod omap36xx_sr1_hwmod = {
+-	.name		= "sr1_hwmod",
++	.name		= "sr1",
+ 	.class		= &omap36xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr1_fck",
+ 	.vdd_name	= "mpu_iva",
+@@ -2711,7 +2711,7 @@ static struct omap_hwmod_ocp_if *omap3_sr2_slaves[] = {
  };
  
- /* l4_core -> timer12 */
--static struct omap_hwmod_ocp_if omap3xxx_l4_core__timer12 = {
--	.master		= &omap3xxx_l4_core_hwmod,
-+static struct omap_hwmod_ocp_if omap3xxx_l4_sec__timer12 = {
-+	.master		= &omap3xxx_l4_sec_hwmod,
- 	.slave		= &omap3xxx_timer12_hwmod,
- 	.clk		= "gpt12_ick",
- 	.addr		= omap3xxx_timer12_addrs,
-@@ -1140,7 +1162,7 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__timer12 = {
- 
- /* timer12 slave port */
- static struct omap_hwmod_ocp_if *omap3xxx_timer12_slaves[] = {
--	&omap3xxx_l4_core__timer12,
-+	&omap3xxx_l4_sec__timer12,
+ static struct omap_hwmod omap34xx_sr2_hwmod = {
+-	.name		= "sr2_hwmod",
++	.name		= "sr2",
+ 	.class		= &omap34xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr2_fck",
+ 	.vdd_name	= "core",
+@@ -2730,7 +2730,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
  };
  
- /* timer12 hwmod */
+ static struct omap_hwmod omap36xx_sr2_hwmod = {
+-	.name		= "sr2_hwmod",
++	.name		= "sr2",
+ 	.class		= &omap36xx_smartreflex_hwmod_class,
+ 	.main_clk	= "sr2_fck",
+ 	.vdd_name	= "core",
