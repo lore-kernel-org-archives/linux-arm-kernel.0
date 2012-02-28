@@ -1,45 +1,56 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 28 Feb 2012 19:21:12 +0200
-Subject: [PATCH 5/5] rpmsg: fix published buffer length in rpmsg_recv_done
-In-Reply-To: <1330449672-18191-1-git-send-email-ohad@wizery.com>
-References: <1330449672-18191-1-git-send-email-ohad@wizery.com>
-Message-ID: <1330449672-18191-7-git-send-email-ohad@wizery.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 28 Feb 2012 18:22:12 +0100
+Subject: [PATCH] tty: serial: OMAP: Fix oops due to NULL pdata in DT boot
+In-Reply-To: <20120126025036.31613.67819.stgit@dusk>
+References: <20120126024903.31613.24730.stgit@dusk>
+ <20120126025036.31613.67819.stgit@dusk>
+Message-ID: <4F4D0D44.3010604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After processing an incoming message, always publish the real size
-of its containing buffer when putting it back on the available rx ring.
+The following commit: be4b0281956c5cae4f63f31f11d07625a6988766
+(tty: serial: OMAP: block idle while the UART is transferring data in PIO mode),
+is introducing an oops if OMAP is booted using device tree blob because
+the pdata will not be initialized.
 
-Using any different value might erroneously limit the remote processor
-(leading it to think the buffer is smaller than it really is).
+Check if pdata is set before de-referencing it.
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Mark Grosen <mgrosen@ti.com>
-Cc: Suman Anna <s-anna@ti.com>
-Cc: Fernando Guzman Lugo <fernando.lugo@ti.com>
-Cc: Rob Clark <rob@ti.com>
-Cc: Ludovic BARRE <ludovic.barre@stericsson.com>
-Cc: Loic PALLARDY <loic.pallardy@stericsson.com>
-Cc: Omar Ramirez Luna <omar.luna@linaro.org>
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
 ---
- drivers/rpmsg/virtio_rpmsg_bus.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/tty/serial/omap-serial.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index 1e8b8b6..f93ca3b 100644
---- a/drivers/rpmsg/virtio_rpmsg_bus.c
-+++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -798,7 +798,8 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
- 	else
- 		dev_warn(dev, "msg received with no recepient\n");
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index f809041..0121486 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -159,7 +159,7 @@ static void serial_omap_stop_tx(struct uart_port *port)
+ 		serial_out(up, UART_IER, up->ier);
+ 	}
  
--	sg_init_one(&sg, msg, sizeof(*msg) + len);
-+	/* publish the real size of the buffer */
-+	sg_init_one(&sg, msg, RPMSG_BUF_SIZE);
+-	if (!up->use_dma && pdata->set_forceidle)
++	if (!up->use_dma && pdata && pdata->set_forceidle)
+ 		pdata->set_forceidle(up->pdev);
  
- 	/* add the buffer back to the remote processor's virtqueue */
- 	err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
+ 	pm_runtime_mark_last_busy(&up->pdev->dev);
+@@ -298,7 +298,7 @@ static void serial_omap_start_tx(struct uart_port *port)
+ 	if (!up->use_dma) {
+ 		pm_runtime_get_sync(&up->pdev->dev);
+ 		serial_omap_enable_ier_thri(up);
+-		if (pdata->set_noidle)
++		if (pdata && pdata->set_noidle)
+ 			pdata->set_noidle(up->pdev);
+ 		pm_runtime_mark_last_busy(&up->pdev->dev);
+ 		pm_runtime_put_autosuspend(&up->pdev->dev);
+@@ -1613,7 +1613,7 @@ static int serial_omap_runtime_resume(struct device *dev)
+ 	struct uart_omap_port *up = dev_get_drvdata(dev);
+ 	struct omap_uart_port_info *pdata = dev->platform_data;
+ 
+-	if (up) {
++	if (up && pdata) {
+ 		if (pdata->get_context_loss_count) {
+ 			u32 loss_cnt = pdata->get_context_loss_count(dev);
+ 
 -- 
-1.7.5.4
+1.7.0.4
