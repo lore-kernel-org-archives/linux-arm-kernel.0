@@ -1,31 +1,56 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Feb 2012 13:35:39 +0800
-Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <4F4C4D3F.3070907@freescale.com>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
- <4F4BFB79.30801@freescale.com>
- <20120228015012.GA13886@S2101-09.ap.freescale.net>
- <4F4C3824.90306@freescale.com>
- <20120228031308.GI13886@S2101-09.ap.freescale.net>
- <4F4C4D3F.3070907@freescale.com>
-Message-ID: <20120228053537.GJ13886@S2101-09.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 28 Feb 2012 11:04:51 +0530
+Subject: [PATCH 5/6] ARM: OMAP4: suspend: Do not get dsp/tesla out of reset
+In-Reply-To: <87ehtfssx7.fsf@ti.com>
+References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>	<1330003320-17400-6-git-send-email-t-kristo@ti.com>
+ <87ehtfssx7.fsf@ti.com>
+Message-ID: <4F4C677B.4020501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 03:42:57AM +0000, Tabi Timur-B04825 wrote:
-> Shawn Guo wrote:
-> > Are you saying that both older and new P1022 device trees have
-> > compatible = "fsl,P1022DS", so that changing to check /compatible
-> > could save the check on /model of P1022 device tree?
-> 
-> Yes, that's what I'm saying.
-> 
-Ok, I will drop "[PATCH 5/6] ASoC: fsl: use platform_device_id table
-to match p1022_ds device" and move to this then.
+Hi Kevin,
 
--- 
-Regards,
-Shawn
+On Tuesday 28 February 2012 05:58 AM, Kevin Hilman wrote:
+> Tero Kristo<t-kristo@ti.com>  writes:
+>
+>> From: Rajendra Nayak<rnayak@ti.com>
+>>
+>> With no driver handling DSP/TESLA, if brought out of reset, it stays
+>> active and does not assert standby.
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+>
+> Subject says 'OMAP4: suspend'.  How does HWMOD_INIT_NO_RESET affect
+> suspend?
+
+The v2 of this patch posted by Tero has a better $subject as suggested
+by Benoit which says 'ARM: OMAP4: hwmod_data: Do not get DSP out of
+reset at boot time'
+
+The intention of this patch is to *not* get DSP out of reset at boot,
+because once out of reset DSP needs some code that executes a 'wfi'
+equivalent for it to assert a standby and allow suspend to sleep.
+
+regards,
+Rajendra
+
+>
+> Kevin
+>
+>> ---
+>>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
+>>   1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> index ef0524c..81d90da 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> @@ -1160,6 +1160,7 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
+>>   	.name		= "dsp",
+>>   	.class		=&omap44xx_dsp_hwmod_class,
+>>   	.clkdm_name	= "tesla_clkdm",
+>> +	.flags		= HWMOD_INIT_NO_RESET,
+>>   	.mpu_irqs	= omap44xx_dsp_irqs,
+>>   	.rst_lines	= omap44xx_dsp_resets,
+>>   	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_dsp_resets),
