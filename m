@@ -1,68 +1,80 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 28 Feb 2012 23:19:10 +0100
-Subject: [PATCH v2 5/5] arm/dts: omap4-sdp: Add ks8851 ethernet SPI device
+Date: Tue, 28 Feb 2012 23:19:08 +0100
+Subject: [PATCH v2 3/5] arm/dts: OMAP4: Add SPI controller nodes
 In-Reply-To: <1330467550-20474-1-git-send-email-b-cousson@ti.com>
 References: <1330467550-20474-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1330467550-20474-6-git-send-email-b-cousson@ti.com>
+Message-ID: <1330467550-20474-4-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an ethernet SPI chip in the OMAP4 SDP/Blaze board DTS file.
+Add the 4 McSPI controller nodes present in an OMAP4 device.
 
-Add a fixed regulator node controlled by a GPIO line to supply
-the ethernet chip.
-
-Based on original code from Rajendra.
+Remove SPI static device initialisation if DT is populated.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
 Acked-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/boot/dts/omap4-sdp.dts |   30 +++++++++++++++++++++---------
- 1 files changed, 21 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/omap4.dtsi  |   32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/devices.c |    4 +++-
+ 2 files changed, 35 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 066e28c..6584109 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -13,17 +13,29 @@
- 	model = "TI OMAP4 SDP board";
- 	compatible = "ti,omap4-sdp", "ti,omap4430", "ti,omap4";
- 
--	/*
--	 * Since the initial device tree board file does not create any
--	 * devices (MMC, network...), the only way to boot is to provide a
--	 * ramdisk.
--	 */
--	chosen {
--		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
--	};
--
- 	memory {
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index e8fe75f..82830f5 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -127,5 +127,37 @@
+ 			ti,hwmods = "uart4";
+ 			clock-frequency = <48000000>;
+ 		};
++
++		mcspi1: spi at 48098000 {
++			compatible = "ti,omap4-mcspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi1";
++			ti,spi-num-cs = <4>;
++		};
++
++		mcspi2: spi at 4809a000 {
++			compatible = "ti,omap4-mcspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi2";
++			ti,spi-num-cs = <2>;
++		};
++
++		mcspi3: spi at 480b8000 {
++			compatible = "ti,omap4-mcspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi3";
++			ti,spi-num-cs = <2>;
++		};
++
++		mcspi4: spi at 480ba000 {
++			compatible = "ti,omap4-mcspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			ti,hwmods = "mcspi4";
++			ti,spi-num-cs = <1>;
++		};
  	};
-+
-+	vdd_eth: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDD_ETH";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 16 0>;  /* gpio line 48 */
-+		enable-active-high;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&mcspi1 {
-+	eth at 0 {
-+		compatible = "ks8851";
-+		spi-max-frequency = <24000000>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <2>; /* gpio line 34 */
-+		vdd-supply = <&vdd_eth>;
-+	};
  };
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 283d11e..8a489ba 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -725,7 +725,9 @@ static int __init omap2_init_devices(void)
+ 	omap_init_dmic();
+ 	omap_init_camera();
+ 	omap_init_mbox();
+-	omap_init_mcspi();
++	/* If dtb is there, the devices will be created dynamically */
++	if (!of_have_populated_dt())
++		omap_init_mcspi();
+ 	omap_init_pmu();
+ 	omap_hdq_init();
+ 	omap_init_sti();
 -- 
 1.7.0.4
