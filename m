@@ -1,39 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 28 Feb 2012 10:52:22 +0000
-Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
-In-Reply-To: <20120228082715.GK3852@pengutronix.de>
-References: <20120213144820.GA3494@opensource.wolfsonmicro.com>
- <20120214105823.GS3852@pengutronix.de>
- <20120214172902.GB3916@opensource.wolfsonmicro.com>
- <20120216073236.GE3852@pengutronix.de>
- <20120216075825.GA11631@opensource.wolfsonmicro.com>
- <20120227090453.GE26642@pengutronix.de>
- <20120227132908.GA3191@opensource.wolfsonmicro.com>
- <20120227172020.GC3852@pengutronix.de>
- <20120227235359.GA23230@opensource.wolfsonmicro.com>
- <20120228082715.GK3852@pengutronix.de>
-Message-ID: <20120228105222.GB3683@opensource.wolfsonmicro.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Feb 2012 10:55:14 +0000
+Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU
+ IRQ handlers
+In-Reply-To: <CACVXFVNVhd_65Kr7h6KEtaOvZ6GmZhA9wz9Xe8z-O2EET=SEGw@mail.gmail.com>
+References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
+ <1330012696-13472-4-git-send-email-will.deacon@arm.com>
+ <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
+ <20120224101130.GB13504@mudshark.cambridge.arm.com>
+ <20120227175646.7c39e542@tom-ThinkPad-T410>
+ <20120227193635.GC24605@mudshark.cambridge.arm.com>
+ <CACVXFVNVhd_65Kr7h6KEtaOvZ6GmZhA9wz9Xe8z-O2EET=SEGw@mail.gmail.com>
+Message-ID: <20120228105514.GG25625@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 09:27:15AM +0100, Sascha Hauer wrote:
-> On Mon, Feb 27, 2012 at 11:54:00PM +0000, Mark Brown wrote:
+On Tue, Feb 28, 2012 at 12:53:28AM +0000, Ming Lei wrote:
+> On Tue, Feb 28, 2012 at 3:36 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > A single 32-bit store is not interruptible in the same way as load/store
+> > multiple instructions are, so this isn't a problem.
+> 
+> In fact, I have tried to look for the similar description in ARMv7 manual, but
+> didn't find it unfortunately, so could you point out where it is
+> stated explicitly?
 
-> > No, zero is intentionally a valid response - it means that the selector
-> > is invalid (for example, due to being documented as a reserved value)
-> > allowing a non-error return that doesn't provide a voltage.  The fixed
-> > regulator should be fixed to return an error if it hasn't got a voltage
-> > configured.
+It's the section about Single-copy atomicity (3.5.3 in revision C). All word
+accesses to word-aligned locations are single-copy atomic. We rely on this
+for our atomic_{read,set} implementations.
 
-> Hm, you asked me to drop the voltage parameter from the helper function
-> registering a fixed regulator as dummy. When the fixed regulator bails
-> out in this case I can't see how this can be done.
+> >
+> >> So suggest to take the correct way in theory, IMO.
+> >
+> > I don't like checking the used_mask, because then we have to throw in some
+> > barriers to ensure ordering between updates of the event arrays and the
+> > mask. If we do have to change something, I think putting ACCESS_ONCE around
+> 
+> Both used_mask and event arrays are defined as percpu variables, so are you sure
+> barriers are required for it?
 
-Can you be more specific about what you think would break here please?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120228/7a5d4350/attachment.sig>
+I expect the compiler could still re-order the statements.
+
+I heard back from the tools guys and they say that the store will not be
+split up, but may be coalesced with others in the form of a store-multiple.
+Referring back to the ARM ARM, that's ok since `each 32-bit word access is
+guaranteed to be single-copy atomic'.
+
+So I'm still in favour of the original patch. It's easy to read, fairly minimal
+and will work correctly.
+
+Will
