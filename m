@@ -1,35 +1,94 @@
 From: zhaoy@marvell.com (zhaoy)
-Date: Tue, 28 Feb 2012 15:27:39 +0800
-Subject: [PATCH 07/13] DMA:mmp:remove redundant dma drivers
+Date: Tue, 28 Feb 2012 15:27:41 +0800
+Subject: [PATCH 09/13] DMA:remove unnecessary dma configurations
 In-Reply-To: <Y>
 References: <Y>
-Message-ID: <1330414065-2949-8-git-send-email-zhaoy@marvell.com>
+Message-ID: <1330414065-2949-10-git-send-email-zhaoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	1.remove old dma drivers
+	1.remove old unnecessary dma configurations
 
-Change-Id: I96ffed95012a4f3e855c2f6c184646a798a0ee7d
+Change-Id: I3741d39ba643d7a6b95341e0ba695a689d18e147
 Signed-off-by: zhaoy <zhaoy@marvell.com>
 ---
- arch/arm/mach-mmp/Makefile |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/pxa/mmp2-sspa.c |   28 ++++++++++++++--------------
+ 1 files changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-index a5d5ba7..d06adcb 100644
---- a/arch/arm/mach-mmp/Makefile
-+++ b/arch/arm/mach-mmp/Makefile
-@@ -9,9 +9,9 @@ obj-$(CONFIG_FB_PXA168)		+= onboard/
- obj-$(CONFIG_CPU_PXA168)	+= pxa168.o irq-pxa168.o
- obj-$(CONFIG_CPU_PXA910)	+= pxa910.o irq-pxa168.o sram.o pxa910-squ.o \
- clock.o
--obj-$(CONFIG_CPU_MMP2)		+= mmp2.o irq-mmp2.o clock.o mmp_dma.o \
-+obj-$(CONFIG_CPU_MMP2)		+= mmp2.o irq-mmp2.o clock.o \
- sram.o mmp2_sspa.o mmp2_fuse.o clock-audio.o
--obj-$(CONFIG_CPU_MMP3)		+= mmp3.o irq-mmp3.o mmp_dma.o mmp2_sspa.o \
-+obj-$(CONFIG_CPU_MMP3)		+= mmp3.o irq-mmp3.o mmp2_sspa.o \
- sram.o delay-mmp3.o clock-mmp3.o dvfs-mmp3.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+diff --git a/sound/soc/pxa/mmp2-sspa.c b/sound/soc/pxa/mmp2-sspa.c
+index de3a45f..76e57c7 100644
+--- a/sound/soc/pxa/mmp2-sspa.c
++++ b/sound/soc/pxa/mmp2-sspa.c
+@@ -259,9 +259,6 @@ mmp2_sspa_get_dma_params(int id, struct ssp_device *sspa, int width, int out)
+ 		return NULL;
+ 
+ 	dma = &mmp2_pcm_adma_params[index];
+-	dma->dcmd = (out ? (TDCR_DSTDIR_ADDR_HOLD | TDCR_SRCDIR_ADDR_INC) :
+-			   (TDCR_SRCDIR_ADDR_HOLD | TDCR_DSTDIR_ADDR_INC)) |
+-		    TDCR_PACKMOD | TDCR_BURSTSZ_4B | TDCR_FETCHND | width;
+ 	dma->dma_ch = out ? sspa->drcmr_tx : sspa->drcmr_rx;
+ 	dma->dev_addr = out ? (sspa->phys_base + SSPA_TXD) :
+ 			      (sspa->phys_base + SSPA_RXD);
+@@ -629,20 +626,24 @@ static int mmp3_sspa_hw_params(struct snd_pcm_substream *substream,
+ 
+ 	switch (params_format(params)) {
+ 	case SNDRV_PCM_FORMAT_S8:
+-		word_size = SSPA_CTL_8_BITS;
++		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_8_BITS);
++		word_size = SSPA_CTL_16_BITS;
+ 		bits_per_frame = 16;
+ 		as_width = TDCR_SSZ_8_BITS;
+ 	case SNDRV_PCM_FORMAT_S16_LE:
++		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_16_BITS);
+ 		word_size = SSPA_CTL_32_BITS;
+ 		bits_per_frame = 32;
+ 		as_width = TDCR_SSZ_16_BITS;
+ 		break;
+ 	case SNDRV_PCM_FORMAT_S24_LE:
++		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_24_BITS);
+ 		word_size = SSPA_CTL_24_BITS;
+ 		bits_per_frame = 48;
+ 		as_width = TDCR_SSZ_24_BITS;
+ 		break;
+ 	case SNDRV_PCM_FORMAT_S32_LE:
++		sspa_ctrl |= SSPA_CTL_XSSZ1(SSPA_CTL_32_BITS);
+ 		word_size = SSPA_CTL_32_BITS;
+ 		bits_per_frame = 64;
+ 		as_width = TDCR_SSZ_32_BITS;
+@@ -655,8 +656,7 @@ static int mmp3_sspa_hw_params(struct snd_pcm_substream *substream,
+ 	 * that word_size bit can be sent out. the word_size - 1 length of
+ 	 * 0 would be ignored in codec. it should be also appiled to other
+ 	 * formats besides S16_LE */
+-	sspa_ctrl |= SSPA_CTL_XSSZ1(word_size) |
+-		     SSPA_CTL_XWDLEN1(word_size);
++	sspa_ctrl |= SSPA_CTL_XWDLEN1(word_size);
+ 	sspa_sp |= SSPA_SP_FPER((bits_per_frame << 1) - 1) |
+ 		     SSPA_SP_FWID(bits_per_frame - 1);
+ 
+@@ -670,16 +670,16 @@ static int mmp3_sspa_hw_params(struct snd_pcm_substream *substream,
+ 		mmp2_sspa_write_reg(sspa, SSPA_RXCTL, sspa_ctrl);
+ 		mmp2_sspa_write_reg(sspa, SSPA_RXFIFO_UL, 0x0);
+ 		mmp2_sspa_write_reg(sspa, SSPA_RXSP, sspa_sp);
+-#ifdef CONFIG_CPU_MMP3
++
+ 		if (sspa_sp & SSPA_SP_MSL) {
+-		/* FIXME: hw issue, for the rx port, can not config the
+-		 * master mode in TXSP register. and must clear this bit
+-		 * in TXSP register */
+-		sspa_sp = mmp2_sspa_read_reg(sspa, SSPA_TXSP);
+-		sspa_sp |= SSPA_SP_WEN;
+-		mmp2_sspa_write_reg(sspa, SSPA_TXSP, sspa_sp & ~SSPA_SP_MSL);
++			/* FIXME: hw issue, for the rx port, can not config the
++			 * master mode in TXSP register. and must clear this bit
++			 * in TXSP register */
++			sspa_sp = mmp2_sspa_read_reg(sspa, SSPA_TXSP);
++			sspa_sp |= SSPA_SP_WEN;
++			mmp2_sspa_write_reg(sspa, SSPA_TXSP,
++						sspa_sp & ~SSPA_SP_MSL);
+ 		}
+-#endif
+ 	}
+ 
+ 	mmp2_sspa_dump_reg(sspa);
 -- 
 1.7.0.4
