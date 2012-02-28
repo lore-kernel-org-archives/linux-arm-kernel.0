@@ -1,17 +1,22 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 28 Feb 2012 19:21:08 +0200
-Subject: [PATCH 1/5] remoteproc: make sure we're parsing a 32bit firmware
+Date: Tue, 28 Feb 2012 19:21:10 +0200
+Subject: [PATCH 3/5] rpmsg: fix name service endpoint leak
 In-Reply-To: <1330449672-18191-1-git-send-email-ohad@wizery.com>
 References: <1330449672-18191-1-git-send-email-ohad@wizery.com>
-Message-ID: <1330449672-18191-3-git-send-email-ohad@wizery.com>
+Message-ID: <1330449672-18191-5-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure we're parsing a 32bit image, since we only support
-the ELF32 binary format at this point.
+The name service endpoint wasn't destroyed, so fix it.
 
-This should prevent unexpected behavior with non 32bit binaries.
+This is achieved by introducing an internal __rpmsg_destroy_ept
+function which doesn't assume the given ept is bound to an rpmsg
+channel (much like the existing __rpmsg_create_ept).
 
+This is needed because the name service ept belongs to the rpmsg bus,
+and is never bound with a specific rpdev.
+
+Reported-by: Omar Ramirez Luna <omar.ramirez@ti.com>
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -21,36 +26,67 @@ Cc: Fernando Guzman Lugo <fernando.lugo@ti.com>
 Cc: Rob Clark <rob@ti.com>
 Cc: Ludovic BARRE <ludovic.barre@stericsson.com>
 Cc: Loic PALLARDY <loic.pallardy@stericsson.com>
-Cc: Omar Ramirez Luna <omar.luna@linaro.org>
+Cc: Omar Ramirez Luna <omar.ramirez@ti.com>
 ---
- drivers/remoteproc/remoteproc_core.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/rpmsg/virtio_rpmsg_bus.c |   29 +++++++++++++++++++++++------
+ 1 files changed, 23 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 729911b..8990c51 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -840,6 +840,7 @@ static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
- 	const char *name = rproc->firmware;
- 	struct device *dev = rproc->dev;
- 	struct elf32_hdr *ehdr;
-+	char class;
+diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
+index 8980ac2..4db9cf8 100644
+--- a/drivers/rpmsg/virtio_rpmsg_bus.c
++++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -290,22 +290,36 @@ struct rpmsg_endpoint *rpmsg_create_ept(struct rpmsg_channel *rpdev,
+ EXPORT_SYMBOL(rpmsg_create_ept);
  
- 	if (!fw) {
- 		dev_err(dev, "failed to load %s\n", name);
-@@ -853,6 +854,13 @@ static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
+ /**
+- * rpmsg_destroy_ept() - destroy an existing rpmsg endpoint
++ * __rpmsg_destroy_ept() - destroy an existing rpmsg endpoint
++ * @vrp: virtproc which owns this ept
+  * @ept: endpoing to destroy
+  *
+- * Should be used by drivers to destroy an rpmsg endpoint previously
+- * created with rpmsg_create_ept().
++ * An internal function which destroy an ept without assuming it is
++ * bound to an rpmsg channel. This is needed for handling the internal
++ * name service endpoint, which isn't bound to an rpmsg channel.
++ * See also __rpmsg_create_ept().
+  */
+-void rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
++static void
++__rpmsg_destroy_ept(struct virtproc_info *vrp, struct rpmsg_endpoint *ept)
+ {
+-	struct virtproc_info *vrp = ept->rpdev->vrp;
+-
+ 	mutex_lock(&vrp->endpoints_lock);
+ 	idr_remove(&vrp->endpoints, ept->addr);
+ 	mutex_unlock(&vrp->endpoints_lock);
  
- 	ehdr = (struct elf32_hdr *)fw->data;
- 
-+	/* We only support ELF32 at this point */
-+	class = ehdr->e_ident[EI_CLASS];
-+	if (class != ELFCLASS32) {
-+		dev_err(dev, "Unsupported class: %d\n", class);
-+		return -EINVAL;
-+	}
+ 	kfree(ept);
+ }
 +
- 	/* We assume the firmware has the same endianess as the host */
- # ifdef __LITTLE_ENDIAN
- 	if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
++/**
++ * rpmsg_destroy_ept() - destroy an existing rpmsg endpoint
++ * @ept: endpoing to destroy
++ *
++ * Should be used by drivers to destroy an rpmsg endpoint previously
++ * created with rpmsg_create_ept().
++ */
++void rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
++{
++	__rpmsg_destroy_ept(ept->rpdev->vrp, ept);
++}
+ EXPORT_SYMBOL(rpmsg_destroy_ept);
+ 
+ /*
+@@ -964,6 +978,9 @@ static void __devexit rpmsg_remove(struct virtio_device *vdev)
+ 	if (ret)
+ 		dev_warn(&vdev->dev, "can't remove rpmsg device: %d\n", ret);
+ 
++	if (vrp->ns_ept)
++		__rpmsg_destroy_ept(vrp, vrp->ns_ept);
++
+ 	idr_remove_all(&vrp->endpoints);
+ 	idr_destroy(&vrp->endpoints);
+ 
 -- 
 1.7.5.4
