@@ -1,60 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Feb 2012 14:36:14 +0000
-Subject: [PATCH] ARM: OMAP: irqs: Fix NR_IRQS value to handle PRCM
- interrupts
-In-Reply-To: <4F4CD231.4030709@ti.com>
-References: <4F4CD231.4030709@ti.com>
-Message-ID: <20120228143614.GA5627@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 28 Feb 2012 10:01:29 -0500 (EST)
+Subject: [PATCH v2] USB: Support for LPC32xx SoC
+In-Reply-To: <201202272201.14665.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1202280951440.1456-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 02:10:09PM +0100, Cousson, Benoit wrote:
-> The following commit: 2f31b51659c2d8315ea2888ba5b93076febe672b
-> Author: Tero Kristo <t-kristo@ti.com>
-> Date:   Fri Dec 16 14:37:00 2011 -0700
+On Mon, 27 Feb 2012, Arnd Bergmann wrote:
+
+> > The generic driver, as you'll see when you read the patch, includes 
+> > generic versions of the various routines that a bus glue file has to 
+> > provide (probe, remove, initialize, and so on).
 > 
->     ARM: OMAP4: PRM: use PRCM interrupt handler
+> Ok, I see. Nevermind then, I don't think this will help to solve
+> the problem of building multiple ARM platforms together when they
+> provide conflicting bus glues, although it seems generally to be
+> a good idea in order to reduce the number of platform glues that there
+> are
 > 
-> introduced the PRCM interrupt handler and thus the need
-> for 64 more interrupts. Since SPARSE_IRQ is still not fully
-> functional on OMAP, the NR_IRQS needs to be updated to avoid
-> the failure that happen during irq_alloc_descs call inside
-> the PRCM driver:
-> 
-> [    0.208221] PRCM: failed to allocate irq descs: -12
-> 
-> Later the mux framework is then unable to request an IRQ from
-> the PRCM interrupt handler.
-> 
-> [    1.802795] mux: Failed to setup hwmod io irq -22
+> What do you think about an approach like below?
 
-This is fine for rc, but longer term...
+It's heading in the intended direction, although the details might not 
+all be quite right -- I didn't check them very closely.
 
-Do any of these have hard-coded interrupt numbers associated with them?
-If not, just enabling sparse IRQ will sort this out.
+One big thing about it is wrong: Many or most of the functions you
+exported don't really need to be.  Instead, ohci-hcd.c should define
+ohci_driver (a bus-agnostic hc_driver structure) and export that.  
+Then the bus-glue files can copy the structure for their own use during
+initialization (rather than duplicating the definition all over the
+place) and override individual methods as needed.
 
-As I tried to explain yesterday, there are two modes for IRQ allocation:
+It's a more "object-oriented" approach.  :-)
 
-1. Without sparse IRQ enabled, irq_alloc_descs(-1, from, num, -1) will
-   allocate IRQs _within_ the existing from..NR_IRQS range, and will fail
-   if there is insufficient IRQs available.
-
-2. With sparse IRQs enabled, irq_alloc_descs(-1, from, num, -1) will
-   allocate IRQs starting at max(from, NR_IRQS) and working upwards.
-
-In either case, irq_alloc_descs(start, 0, num, -1) will allocate 'num'
-IRQs at 'start' or fail if the range is already in use (and 0..NR_IRQS
-is defined as 'being in use' when sparse IRQs are enabled.)
-
-So, if the PRCM interrupts aren't statically assigned (the code suggests
-that they aren't) then it's already sparse-IRQ compliant, and enabling
-sparse IRQ support will mean that they will be allocated above NR_IRQS.
-
-Therefore, I suggest rather than raising NR_IRQS, you instead enable
-SPARSE_IRQ now so that anyone using the dynamic IRQ allocation can
-benefit from sparse IRQ support without having to have a large NR_IRQS.
-
-So, you don't have to wait until everything is converted to use
-sparse IRQ.  You just need to make sure that nothing uses
-irq_alloc_descs(start, from, num, ...) where start < NR_IRQS, and
-nothing using that requires statically defined IRQ numbering.
+Alan Stern
