@@ -1,33 +1,134 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Feb 2012 06:38:04 +0000
-Subject: [PATCH v3] ARM: LPC32xx: Ethernet support
-In-Reply-To: <083DF309106F364B939360100EC290F81F365B2B2A@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1330364762-23203-1-git-send-email-stigge@antcom.de>
- <4F4BFDD2.8060007@antcom.de>
- <083DF309106F364B939360100EC290F81F365B2B2A@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <201202280638.04634.arnd@arndb.de>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Tue, 28 Feb 2012 16:01:21 +0900
+Subject: [PATCH v9 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <001801ccf5e3$69d79860$3d86c920$%cho@samsung.com>
+References: <001801ccf5e3$69d79860$3d86c920$%cho@samsung.com>
+Message-ID: <CAH9JG2Vg8o_mm0gM042T0-kjMUoAdLzF+DeGErD7R86H0xqXZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 February 2012, Kevin Wells wrote:
-> >
-> >For the driver, some style fixes were applied, and the cmdline
-> >"ethaddr" was removed, relying on the bootloader to set it correctly
-> > (and it actually does, it actually needs to prepare TFTP booting).
-> 
-> I'm not sure I'd trust the bootloader to always set the MAC address
-> in hardware prior to calling the kernel. A lot of u-boot MAC drivers,
-> including the 32x0's, only set the MAC address on the call to
-> eth_init(), which is only called when the network interface is used.
-> If you do a MTD based kernel boot, the MAC address will probably be
-> invalid if you try to do a NFS mount for the filesystem.
+Hi,
 
-In the long run, the MAC address should probably be set by the boot
-loader through the device tree that is passed to the kernel, overriding
-the one in the registers when set.
+Some comments.
+1. It's not same patch series. since it has additional feature,
+exynos5 series support which don't covered at previous time.
+2. It assumes that name conversion is based on exynos5 as default. now
+you use gsc at exynos4 even though there's no gsc block. It should be
+fimc.
 
-When we do that, we won't need the command line argument any more.
-Some drivers have it anyway, but IMHO the cleaner approach would
-be having fewer methods to pass it.
+So I suggest to send exynos4 series patch as before and send
+additional exynos5 patch series next.
 
-	Arnd
+Thank you,
+Kyungmin Park
+
+On 2/28/12, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> Changes since v8:
+> - exynos_iommu_map/unmap() just works for the page sizes
+>    that System MMU supports. (Joerg's comment)
+> - 1 platform device for 1 H/W though a multimedia accelerator
+>    with several System MMUs attached.
+>    This make controlling System MMU simpler.
+> - Information between System MMU and the accelerators:
+>    Shifted to accelerator's device structure from System MMU's
+>
+> Changes since v7:
+> - Rebased with the recent commits of the following git branches
+>   * git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git/next
+>   * git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/for-next
+> - Changed magic numbers into macros
+> - Setting owner of a System MMU in 'iommu' field of dev_archdata
+> - Verbose message in the default fault handler
+> - Some bug fixes.
+>
+> Changes since v6:
+> - Totally rewrite exynos_iommu_map() and exynos_iommu_unmap() according
+>   to the change in iommu_map() and iommu_unmap().
+> - Change special slab for Lv2 page table to kmalloc().
+>
+> Changes since v5:
+> - Relation between device and a domain become n:1 (Joerg's comment)
+> - Implements iommu_commit(). --> Removed
+>
+> Changes since v4:
+> - exynos_iommu_unmap()returns unmapped size in page order
+>   (Ohad Ben-Cohen's comment)
+> - Fixed typo error of resource names
+> - Fixed missing #include<mach/sysmmu.h>
+>   in arch/arm/mach-exynos4/mach-armlex4210.c
+>
+> Changes since v3:
+> - Used DEFINE_RES_MEM and DEFINE_RES_IRQ macros
+>   to define resources of System MMU (Russell King's comment)
+> - Fixed removal of CONFIG_S5P_SLEEP definition
+>  (Sylwester Nawrocki's comment)
+>
+> Changes since v2:
+> - Add lock for System MMU private data.
+>   And fixes the following problems pointed by Joerg Rodel:
+> - Fix wrong argument to kmalloc() and get_free_pages()
+> - Merged patches into 2 due to bisectability
+>
+> Changes since v1:
+> Fixes of the following problems pointed by Russell King.:
+>  - Missing unlocking a spinlock in exynos_iommu_attach_dev().
+>  - atomic_t -> int in sysmmu_drvdata.activations
+>  - sysmmu_platdata -> sysmmu_drvdata
+>  - Change in error messages in irq handler
+>  - Removed casting in format of error message
+>  - omap_iommu_ops -> exynos_iommu_ops in the last patch
+>
+> Patch Summary:
+> [PATCH v8 1/2] ARM: EXYNOS: Change System MMU platform device definitions
+> [PATCH v8 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
+>
+> The first patche enhances System MMU platform device definition:
+>  - Removed System MMU for MDMA0 in TOP block because it is not
+>    used. Use MDMA2 in LCD block.
+>  - Removed System MMU ID. Instead, a System MMU is bound to a device
+>    that the System MMU is dedicated during machin initialization.
+>    If a device driver wants to handle System MMU, it must bind its
+>    device with System MMU with sysmmu_set_owner().
+>  - clkdev
+>
+> The last patch implements IOMMU API:
+>  - System MMU device driver is removed from arch/arm/plat-s5p
+>     to move it to driver/iommu directory.
+>  - Implements IOMMU API and System MMU driver that is moved from
+>     arch/arm/plat-s5p.
+>
+> Diffstats:
+> arch/arm/mach-exynos/Kconfig                    |   11 +-
+>  arch/arm/mach-exynos/Makefile                   |    2 +-
+>  arch/arm/mach-exynos/clock-exynos4.c            |   74 +-
+>  arch/arm/mach-exynos/clock-exynos4.h            |    2 +
+>  arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
+>  arch/arm/mach-exynos/clock-exynos4212.c         |   28 +-
+>  arch/arm/mach-exynos/clock-exynos5.c            |   85 ++
+>  arch/arm/mach-exynos/dev-sysmmu.c               |  454 ++++++-----
+>  arch/arm/mach-exynos/include/mach/irqs.h        |  179 ++--
+>  arch/arm/mach-exynos/include/mach/map.h         |   38 +
+>  arch/arm/mach-exynos/include/mach/memory.h      |    1 +
+>  arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
+>  arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 -
+>  arch/arm/mach-exynos/include/mach/sysmmu.h      |   83 +-
+>  arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
+>  arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
+>  arch/arm/plat-s5p/Kconfig                       |    8 -
+>  arch/arm/plat-s5p/Makefile                      |    1 -
+>  arch/arm/plat-s5p/sysmmu.c                      |  313 -------
+>  arch/arm/plat-samsung/include/plat/devs.h       |    1 -
+>  arch/arm/plat-samsung/include/plat/sysmmu.h     |   95 --
+>  drivers/iommu/Kconfig                           |   22 +
+>  drivers/iommu/Makefile                          |    1 +
+>  drivers/iommu/exynos-iommu.c                    | 1076
+> +++++++++++++++++++++++
+>  24 files changed, 1698 insertions(+), 822 deletions(-)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
