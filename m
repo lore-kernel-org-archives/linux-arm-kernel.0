@@ -1,25 +1,24 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 28 Feb 2012 12:35:51 +0000
-Subject: [PATCH 3/6] ASoC: Remove unnecessary -codec from cs4270 driver
- name
-In-Reply-To: <1330092582-21180-4-git-send-email-shawn.guo@linaro.org>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120228123551.GG3683@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Feb 2012 12:39:15 +0000
+Subject: [GIT PULL][v3.4] pull request of rtc-sa1100 branch in pxa git tree
+In-Reply-To: <CAN1soZyJGbFVVaXEbsXk=kansWsXjnFZ9m=_yWoNFLWiZwMjXw@mail.gmail.com>
+References: <CAN1soZyJGbFVVaXEbsXk=kansWsXjnFZ9m=_yWoNFLWiZwMjXw@mail.gmail.com>
+Message-ID: <201202281239.15189.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 10:09:38PM +0800, Shawn Guo wrote:
-> Similar to what commit 1e3ad57 (ASoC: Remove redundant -codec from
-> WM8776 driver name) does for wm8776 driver, this patch does the same
-> thing for cs4270 driver.
+On Tuesday 28 February 2012, Haojian Zhuang wrote:
+> Please help to pull rtc-sa1100 changes.
+> 
+> The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
+> 
+>   Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
+> 
+> are available in the git repository at:
+>   git://github.com/hzhuang1/linux.git rtc-sa1100
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120228/cdbc41cc/attachment.sig>
+Pulled into next/drivers.
+
+Thanks for the quick update!
+
+	Arnd
