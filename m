@@ -1,46 +1,62 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 28 Feb 2012 14:23:14 +0000
-Subject: [GIT PULL] DaVinci cleanups for v3.4
-In-Reply-To: <201202271459.52216.arnd@arndb.de>
-References: <DF0F476B391FA8409C78302C7BA518B6317D2DB9@DBDE01.ent.ti.com>
- <201202271459.52216.arnd@arndb.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6317D6BF8@DBDE01.ent.ti.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Tue, 28 Feb 2012 22:28:44 +0800
+Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU IRQ
+ handlers
+In-Reply-To: <20120228105514.GG25625@mudshark.cambridge.arm.com>
+References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
+ <1330012696-13472-4-git-send-email-will.deacon@arm.com>
+ <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
+ <20120224101130.GB13504@mudshark.cambridge.arm.com>
+ <20120227175646.7c39e542@tom-ThinkPad-T410>
+ <20120227193635.GC24605@mudshark.cambridge.arm.com>
+ <CACVXFVNVhd_65Kr7h6KEtaOvZ6GmZhA9wz9Xe8z-O2EET=SEGw@mail.gmail.com>
+ <20120228105514.GG25625@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVMkHhXcAMKEuMqOSMVBrvviTURZDQ0n1u6peC9BqoTvjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Feb 28, 2012 at 6:55 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Feb 28, 2012 at 12:53:28AM +0000, Ming Lei wrote:
+>> On Tue, Feb 28, 2012 at 3:36 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > A single 32-bit store is not interruptible in the same way as load/store
+>> > multiple instructions are, so this isn't a problem.
+>>
+>> In fact, I have tried to look for the similar description in ARMv7 manual, but
+>> didn't find it unfortunately, so could you point out where it is
+>> stated explicitly?
+>
+> It's the section about Single-copy atomicity (3.5.3 in revision C). All word
+> accesses to word-aligned locations are single-copy atomic. We rely on this
+> for our atomic_{read,set} implementations.
 
-On Mon, Feb 27, 2012 at 20:29:52, Arnd Bergmann wrote:
-> On Friday 24 February 2012, Nori, Sekhar wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Can you please pull these DaVinci clean-up patches for
-> > the v3.4 merge window? I have made sure that these don't
-> > have any conflicts with the rmk/for-armsoc branch of
-> > the arm-soc tree.
-> > 
-> > These patches need the following two commits from linux-next
-> > (next-20120224) to keep the VPIF and CQ93VC drivers building.
-> > 
-> > 2e932f2  ASoC: CQ93VC: remove machine specific header file inclusion from codec
-> > db38951  [media] davinci: vpif: remove machine specific header file includes
-> 
-> In general, don't worry too much about conflicts that are easy to
-> resolve. However, having these extra dependencies is not good,
-> because it means that we cannot easily build-test the arm-soc
-> tree by itself and it breaks bisection through the git history.
-> 
-> In the future, please make sure that dependent commits show up
-> in the right order. For now, I've added the patch below on top
-> of your series.
+Got it.
 
-I guess the cleanest way to do that would have been to let
-these patches go through my tree with appropriate maintainer
-acks (but that obviously didn't happen - will try and fix
-that for future). Per my understanding, it is encouraged that
-a patch should get applied only through one tree, so I was
-reluctant to apply them to any of the branches I send to you
-after they were already in linux-next through other trees.
+>
+>> >
+>> >> So suggest to take the correct way in theory, IMO.
+>> >
+>> > I don't like checking the used_mask, because then we have to throw in some
+>> > barriers to ensure ordering between updates of the event arrays and the
+>> > mask. If we do have to change something, I think putting ACCESS_ONCE around
+>>
+>> Both used_mask and event arrays are defined as percpu variables, so are you sure
+>> barriers are required for it?
+>
+> I expect the compiler could still re-order the statements.
 
-Thanks,
-Sekhar
+Yes, looks compiler barrier is required if checking with usage_mask.
+
+> I heard back from the tools guys and they say that the store will not be
+> split up, but may be coalesced with others in the form of a store-multiple.
+> Referring back to the ARM ARM, that's ok since `each 32-bit word access is
+> guaranteed to be single-copy atomic'.
+>
+> So I'm still in favour of the original patch. It's easy to read, fairly minimal
+> and will work correctly.
+
+OK, thanks for your detailed explanation.
+
+
+thanks,
+-- 
+Ming Lei
