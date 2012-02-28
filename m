@@ -1,66 +1,59 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Tue, 28 Feb 2012 10:59:29 +0800
-Subject: [V4 4/4] led: modified power control of pm860x led
-Message-ID: <1330397969-31824-1-git-send-email-jtzhou@marvell.com>
+Date: Tue, 28 Feb 2012 10:58:42 +0800
+Subject: [V4 2/4] mfd: code clean for pm8606 sub-dev initialization
+Message-ID: <1330397922-31739-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since several sub modules such as backlight, leds and vibrator depend
-on the refernce group and internal oscillator in pm8606, so modified
-the power control of led in pm8606 by unified interface.
+Collect all the sub-devices of pm8606 initialization into
+device_pm8606_init() for code clean up.
 
 Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 ---
- drivers/leds/leds-88pm860x.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+ drivers/mfd/88pm860x-core.c |   17 +++++++++++------
+ 1 files changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/leds/leds-88pm860x.c b/drivers/leds/leds-88pm860x.c
-index 4ca0062..5b61aaf 100644
---- a/drivers/leds/leds-88pm860x.c
-+++ b/drivers/leds/leds-88pm860x.c
-@@ -114,6 +114,27 @@ static inline int __blink_ctl_mask(int port)
- 	return ret;
+diff --git a/drivers/mfd/88pm860x-core.c b/drivers/mfd/88pm860x-core.c
+index 78c3a9e..6ed8de7 100644
+--- a/drivers/mfd/88pm860x-core.c
++++ b/drivers/mfd/88pm860x-core.c
+@@ -860,6 +860,15 @@ out:
+ 	return;
  }
  
-+static int led_power_set(struct pm860x_chip *chip, int port, int on)
++static void __devinit device_8606_init(struct pm860x_chip *chip,
++				       struct i2c_client *i2c,
++				       struct pm860x_platform_data *pdata)
 +{
-+	int ret = -EINVAL;
-+
-+	switch (port) {
-+	case PM8606_LED1_RED:
-+	case PM8606_LED1_GREEN:
-+	case PM8606_LED1_BLUE:
-+		ret = on ? pm8606_osc_enable(chip, RGB1_ENABLE) :
-+			pm8606_osc_disable(chip, RGB1_ENABLE);
-+		break;
-+	case PM8606_LED2_RED:
-+	case PM8606_LED2_GREEN:
-+	case PM8606_LED2_BLUE:
-+		ret = on ? pm8606_osc_enable(chip, RGB2_ENABLE) :
-+			pm8606_osc_disable(chip, RGB2_ENABLE);
-+		break;
-+	}
-+	return ret;
++	device_osc_init(i2c);
++	device_bk_init(chip, pdata);
++	device_led_init(chip, pdata);
 +}
 +
- static void pm860x_led_work(struct work_struct *work)
+ int __devinit pm860x_device_init(struct pm860x_chip *chip,
+ 		       struct pm860x_platform_data *pdata)
  {
+@@ -867,9 +876,7 @@ int __devinit pm860x_device_init(struct pm860x_chip *chip,
  
-@@ -126,6 +147,7 @@ static void pm860x_led_work(struct work_struct *work)
- 	chip = led->chip;
- 	mutex_lock(&led->lock);
- 	if ((led->current_brightness == 0) && led->brightness) {
-+		led_power_set(chip, led->port, 1);
- 		if (led->iset) {
- 			pm860x_set_bits(led->i2c, __led_off(led->port),
- 					LED_CURRENT_MASK, led->iset);
-@@ -149,6 +171,7 @@ static void pm860x_led_work(struct work_struct *work)
- 					LED_CURRENT_MASK, 0);
- 			mask = __blink_ctl_mask(led->port);
- 			pm860x_set_bits(led->i2c, PM8606_WLED3B, mask, 0);
-+			led_power_set(chip, led->port, 0);
- 		}
- 	}
- 	led->current_brightness = led->brightness;
+ 	switch (chip->id) {
+ 	case CHIP_PM8606:
+-		device_osc_init(chip->client);
+-		device_bk_init(chip, pdata);
+-		device_led_init(chip, pdata);
++		device_8606_init(chip, chip->client, pdata);
+ 		break;
+ 	case CHIP_PM8607:
+ 		device_8607_init(chip, chip->client, pdata);
+@@ -879,9 +886,7 @@ int __devinit pm860x_device_init(struct pm860x_chip *chip,
+ 	if (chip->companion) {
+ 		switch (chip->id) {
+ 		case CHIP_PM8607:
+-			device_osc_init(chip->companion);
+-			device_bk_init(chip, pdata);
+-			device_led_init(chip, pdata);
++			device_8606_init(chip, chip->companion, pdata);
+ 			break;
+ 		case CHIP_PM8606:
+ 			device_8607_init(chip, chip->companion, pdata);
 -- 
 1.7.0.4
