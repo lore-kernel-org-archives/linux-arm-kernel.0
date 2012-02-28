@@ -1,29 +1,28 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 28 Feb 2012 19:19:36 +0100
-Subject: [PATCH v3] ARM: LPC32xx: USB Support
-In-Reply-To: <20120228175735.GB14290@kroah.com>
-References: <1330178224-24999-1-git-send-email-stigge@antcom.de>
- <1330178224-24999-2-git-send-email-stigge@antcom.de>
- <20120228175735.GB14290@kroah.com>
-Message-ID: <4F4D1AB8.9060307@antcom.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 28 Feb 2012 10:23:45 -0800
+Subject: [PATCH] tty: serial: OMAP: Fix oops due to NULL pdata in DT boot
+In-Reply-To: <20120228172851.GA13653@kroah.com> (Greg KH's message of "Tue, 28
+ Feb 2012 09:28:51 -0800")
+References: <20120126024903.31613.24730.stgit@dusk>
+ <20120126025036.31613.67819.stgit@dusk> <4F4D0D44.3010604@ti.com>
+ <20120228172851.GA13653@kroah.com>
+Message-ID: <87y5rmyfym.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Greg KH <gregkh@linuxfoundation.org> writes:
 
-On 02/28/2012 06:57 PM, Greg Kroah-Hartman wrote:
->> (This is the mach-lpc32xx specific part, the USB subsystem specific changes are
->> in a separate patch for the USB maintainers.)
-> 
-> Do you want/need me to take both of these?  Or just the first one?  Or,
-> just ack the first one so the arm maintainers can take this one?  It's
-> your choice...
+> On Tue, Feb 28, 2012 at 06:22:12PM +0100, Cousson, Benoit wrote:
+>> The following commit: be4b0281956c5cae4f63f31f11d07625a6988766
+>> (tty: serial: OMAP: block idle while the UART is transferring data in PIO mode),
+>> is introducing an oops if OMAP is booted using device tree blob because
+>> the pdata will not be initialized.
+>
+> Is that something that happens today on systems?  Does this need to go
+> in for 3.3-final, or can it wait for 3.4?
 
-The first one (actual driver) is for you to take as USB maintainer
-and/or ack.
+It is needed for 3.3-final.
 
-The other one is for arm-soc, and just for informational purposes for you.
+Thanks,
 
-Thanks in advance,
-
-Roland
+Kevin
