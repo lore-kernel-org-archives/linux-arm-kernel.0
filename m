@@ -1,16 +1,18 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 28 Feb 2012 19:21:11 +0200
-Subject: [PATCH 4/5] rpmsg: validate incoming message length before propagating
+Date: Tue, 28 Feb 2012 19:21:09 +0200
+Subject: [PATCH 2/5] remoteproc/omap: two Kconfig fixes
 In-Reply-To: <1330449672-18191-1-git-send-email-ohad@wizery.com>
 References: <1330449672-18191-1-git-send-email-ohad@wizery.com>
-Message-ID: <1330449672-18191-6-git-send-email-ohad@wizery.com>
+Message-ID: <1330449672-18191-4-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an inbound message arrives, validate its reported length before
-propagating it, otherwise buggy (or malicious) remote processors might
-trick us into accessing memory which we really shouldn't.
+1. Depend on OMAP_IOMMU instead of selecting it, to fix an unmet
+   direct dependency of it (and its imminent build error)
+2. Set default to 'no' (achieved implicitly by dropping the 'default'
+   line)
 
+Reported-by: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -21,30 +23,27 @@ Cc: Rob Clark <rob@ti.com>
 Cc: Ludovic BARRE <ludovic.barre@stericsson.com>
 Cc: Loic PALLARDY <loic.pallardy@stericsson.com>
 Cc: Omar Ramirez Luna <omar.luna@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- drivers/rpmsg/virtio_rpmsg_bus.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/remoteproc/Kconfig |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
-index 4db9cf8..1e8b8b6 100644
---- a/drivers/rpmsg/virtio_rpmsg_bus.c
-+++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-@@ -778,6 +778,16 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
- 	print_hex_dump(KERN_DEBUG, "rpmsg_virtio RX: ", DUMP_PREFIX_NONE, 16, 1,
- 					msg, sizeof(*msg) + msg->len, true);
- 
-+	/*
-+	 * We currently use fixed-sized buffers, so trivially sanitize
-+	 * the reported payload length.
-+	 */
-+	if (len > RPMSG_BUF_SIZE ||
-+		msg->len > (len - sizeof(struct rpmsg_hdr))) {
-+		dev_warn(dev, "inbound msg too big: (%d, %d)\n", len, msg->len);
-+		return;
-+	}
-+
- 	/* use the dst addr to fetch the callback of the appropriate user */
- 	mutex_lock(&vrp->endpoints_lock);
- 	ept = idr_find(&vrp->endpoints, msg->dst);
+diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+index 25fc4cc..24d880e 100644
+--- a/drivers/remoteproc/Kconfig
++++ b/drivers/remoteproc/Kconfig
+@@ -8,11 +8,10 @@ config REMOTEPROC
+ config OMAP_REMOTEPROC
+ 	tristate "OMAP remoteproc support"
+ 	depends on ARCH_OMAP4
+-	select OMAP_IOMMU
++	depends on OMAP_IOMMU
+ 	select REMOTEPROC
+ 	select OMAP_MBOX_FWK
+ 	select RPMSG
+-	default m
+ 	help
+ 	  Say y here to support OMAP's remote processors (dual M3
+ 	  and DSP on OMAP4) via the remote processor framework.
 -- 
 1.7.5.4
