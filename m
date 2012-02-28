@@ -1,22 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 28 Feb 2012 09:28:51 -0800
-Subject: [PATCH] tty: serial: OMAP: Fix oops due to NULL pdata in DT boot
-In-Reply-To: <4F4D0D44.3010604@ti.com>
-References: <20120126024903.31613.24730.stgit@dusk>
- <20120126025036.31613.67819.stgit@dusk> <4F4D0D44.3010604@ti.com>
-Message-ID: <20120228172851.GA13653@kroah.com>
+From: T.Mehnert@eckelmann.de (Mehnert, Torsten)
+Date: Tue, 28 Feb 2012 17:48:00 +0000
+Subject: [PATCH 0/2] mxc_ehci: expand usb_hwinit options from boardfile
+Message-ID: <3F263ABB4EDE344D974E1983B56807739E4BC6AC@EX-DAG02.eckelmann.group>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 06:22:12PM +0100, Cousson, Benoit wrote:
-> The following commit: be4b0281956c5cae4f63f31f11d07625a6988766
-> (tty: serial: OMAP: block idle while the UART is transferring data in PIO mode),
-> is introducing an oops if OMAP is booted using device tree blob because
-> the pdata will not be initialized.
+This patch series is about to expand the possibilities to configure mxc USB hardware initialization from boardfile.
+The expansions, defined in mxc_ehci.h, are implemented for the mx25.
 
-Is that something that happens today on systems?  Does this need to go
-in for 3.3-final, or can it wait for 3.4?
+Best regards,
 
-thanks,
+Torsten
 
-greg k-h
+---
+Torsten Mehnert
+K?lte- und Geb?udeleittechnik (KGL)
+?
+ECKELMANN AG
+Berliner Stra?e 161
+D - 65205 Wiesbaden
+?
+Phone:	+49 (0) 611 / 7103 - 370
+Fax:	+49 (0) 611 / 7103 - 133
+
+e-Mail:	mailto:t.mehnert at eckelmann.de
+Web:	http://www.eckelmann.de
