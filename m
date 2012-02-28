@@ -1,45 +1,67 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Tue, 28 Feb 2012 07:20:49 +0000
-Subject: [PATCH 0/2 v5] arm: kirkwood: add dreamplug/devicetree support
-In-Reply-To: <20120227145724.GU23524@titan.lakedaemon.net>
-References: <cover.1312906908.git.jason@lakedaemon.net>
- <cover.1330025976.git.jason@lakedaemon.net>
- <1330254038.10008.24.camel@dagon.hellion.org.uk>
- <20120227145724.GU23524@titan.lakedaemon.net>
-Message-ID: <1330413649.10008.50.camel@dagon.hellion.org.uk>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 28 Feb 2012 09:24:15 +0200
+Subject: [PATCH 0/6] ARM: OMAP4: core retention support
+In-Reply-To: <87d38zrboc.fsf@ti.com>
+References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
+ <87d38zrboc.fsf@ti.com>
+Message-ID: <1330413855.2116.29.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-02-27 at 09:57 -0500, Jason wrote:
-> On Sun, Feb 26, 2012 at 11:00:38AM +0000, Ian Campbell wrote:
-> > On Thu, 2012-02-23 at 19:52 +0000, Jason Cooper wrote:
-> > > This patch series provides initial support for devicetree on kirkwood for the
-> > > dreamplug platform.  After discussing the approach with Arnd Bergman last week
-> > > at ELC, we decided to take an incremental approach to the conversion.  First, I
-> > > would detect that we were on the dreamplug via the devicetree blob.  Then,
-> > > configure uart0 via devicetree.  We chose the uart since it is already well
-> > > supported under devicetree.
-> > > 
-> > > This patch series has been boot-tested on the dreamplug.
-> > 
-> > Tested-by: Ian Campbell <ijc@hellion.org.uk>
+On Mon, 2012-02-27 at 17:25 -0800, Kevin Hilman wrote:
+> Tero Kristo <t-kristo@ti.com> writes:
 > 
-> thanks!
+> > This set adds core retention support on top of mainline. The set
+> > also adds IO CHAIN wakeup capability for OMAP4, which is a nice feature
+> > to have while trying suspend / resume with CSWR as it is quite difficult
+> > to wake up the device without this.
+> >
+> > Patch 6 might cause some stir, but this is needed as omap4 PRCM chain
+> > handler currently does not work without SPARSE_IRQ. Enabling the
+> > SPARSE_IRQ causes a WARN from gic during boot for omap4, and attempting
+> > to fix this creates some spam from interrupt handling code which seems to
+> > originate from GPMC/GPIO. Also, omap3 boot breaks completely,
+> > thus it is impossible to enable this option as of now.
+> >
+> > Tested on OMAP4 blaze board, with OMAP4430 EMU chip. Suspend / resume
+> > works nicely, and wakeup with UART3 works. The powerdomain state info
+> > under pm-debug appears to be somewhat bogus right after boot, but fixes
+> > itself during suspend. This should be addressed separately. Also
+> > verified that suspend / resume with OMAP3 beagle is okay.
 > 
-> > I needed the following (obvious) patch against u-boot:
+> Please separate out the IO daisy chain stuff as a separate series.
+
+Okay, will do that. Based on your next comment it makes sense. I'll
+double check from Vishwa how we handle the IO chain set.
+
 > 
-> yes, I forgot to mention that.  By any chance, have you tested booting
-> non-fdt kernels from u-boot with this option enabled?  I'm fairly sure
-> it will work, but I haven't tested it myself.
+> Vishwa had a multiple patch series that cleaned some of this up and
+> also made it common for OMAP3 and 4.
+> 
+>    http://marc.info/?l=linux-omap&m=132387916807059&w=2
+> 
+> I had several review comments on that series that were never responded
+> to, 
+> 
+>    http://marc.info/?l=linux-omap&w=2&r=1&s=DaisyChain&q=b
+> 
 
-I hadn't but I have now, it worked fine booting my existing kernel
-(which uses v3 of your previous non-FDT dreamplug patches) with the
-updated u-boot.
+Oh okay, sorry about that. I just checked your comments and most of them
+appear valid. One of the major complaints you had was for the IO chain
+to be enabled all the time now, this appears to be based on design. IO
+chain can now generate wake-ups for idle modules even if the CPU is not
+idle. It means that the IO chain must be re-armed every time the IO
+config (mux / wakeup setup) changes. The wakeup triggering logic should
+be moved to the mux code probably.
 
-> If you can boot both fdt and non-fdt kernels with this enabled, submit
-> it to u-boot, CC: Prafulla, and I'll ack it.
+> so I'd first like to understand why that series was dropped and only
+> selected parts were taken for $SUBJECT series, and what is the plan for
+> the IO daisy chain series.
 
-Done.
+I dropped part of the patches (mainly the ones that touch OMAP3), as I
+wasn't quite certain whether they are needed or not, and/or whether they
+work on omap3 properly (mainly the above io chain arming logic.) I
+wanted to keep this separate from the CSWR set itself as it should be
+touching only omap4.
 
-Thanks,
-Ian.
+-Tero
