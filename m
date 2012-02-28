@@ -1,82 +1,80 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 28 Feb 2012 09:46:16 +0000
-Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
- to the hypervisor
-In-Reply-To: <1330372125.10008.47.camel@dagon.hellion.org.uk>
-References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
- <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20120227175327.GA2023@linaro.org>
- <1330372125.10008.47.camel@dagon.hellion.org.uk>
-Message-ID: <20120228094616.GA2063@linaro.org>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Tue, 28 Feb 2012 10:47:34 +0100
+Subject: [PATCH] ARM: mx3: Setup AIPS registers
+In-Reply-To: <1330398901-20211-1-git-send-email-festevam@gmail.com>
+References: <1330398901-20211-1-git-send-email-festevam@gmail.com>
+Message-ID: <4F4CA2B6.3080108@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 07:48:45PM +0000, Ian Campbell wrote:
-> On Mon, 2012-02-27 at 17:53 +0000, Dave Martin wrote:
-> > On Thu, Feb 23, 2012 at 05:48:22PM +0000, Stefano Stabellini wrote:
-> > > We need a register to pass the hypercall number because we might not
-> > > know it at compile time and HVC only takes an immediate argument.
-> > > 
-> > > Among the available registers r12 seems to be the best choice because it
-> > > is defined as "intra-procedure call scratch register".
-> > 
-> > This would be massively simplified if you didn't try to inline the HVC.
-> > Does it really need to be inline?
-> >
-> > > +#define __HYPERCALL ".word 0xe1400070 + " __HVC_IMM(XEN_HYPERCALL_TAG)
-> > 
-> > Please, do not do this.  It won't work in Thumb, where the encodings are
-> > different.
-> > 
-> > It is reasonable to expect anyone building Xen to have reasonably new
-> > tools, you you can justifiably use
-> > 
-> > AFLAGS_thisfile.o := -Wa,-march=armv7-a+virt
-> > 
-> > in the Makefile and just use the hvc instruction directly.
+On 28.02.2012 04:15, Fabio Estevam wrote:
+> It was observed on a mx31pdk board that audio playback only worked when the bootloader was Redboot, and 
+> did not work when U-boot was used. 
 > 
-> Our aim is for guest kernel binaries not to be specific to Xen -- i.e.
-> they should be able to run on baremetal and other hypervisors as well.
-> The differences should only be in the device-tree passed to the kernel.
+> Comparing the sources of these bootloaders showed that the AIPS registers were not setup in U-boot.
 > 
-> > Of course, this is only practical if the HVC invocation is not inlined.
+> Instead of relying on the bootloader to setup the AIPS registers, do it in the kernel so that audio
+> playback can work independantly of the bootloader being used.
 > 
-> I suppose we could make the stub functions out of line, we just copied
-> what Xen does on x86.
+> Copied the AIPS settings from Redboot to the kernel.
 > 
-> The only thing which springs to mind is that 5 argument hypercalls will
-> end up pushing the fifth argument to the stack only to pop it back into
-> r4 for the hypercall and IIRC it also needs to preserve r4 (callee saved
-> reg) which is going to involve some small amount of code to move stuff
-> around too.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/cpu-imx31.c |   32 ++++++++++++++++++++++++++++++++
+>  1 files changed, 32 insertions(+), 0 deletions(-)
 > 
-> So by inlining the functions we avoid some thunking because the compiler
-> would know exactly what was happening at the hypercall site.
+> diff --git a/arch/arm/mach-imx/cpu-imx31.c b/arch/arm/mach-imx/cpu-imx31.c
+> index 3f2345f..c309d51 100644
+> --- a/arch/arm/mach-imx/cpu-imx31.c
+> +++ b/arch/arm/mach-imx/cpu-imx31.c
+> @@ -60,3 +60,35 @@ int mx31_revision(void)
+>  	return mx31_cpu_rev;
+>  }
+>  EXPORT_SYMBOL(mx31_revision);
+> +
+> +static void __init imx_set_aips(void __iomem *base)
+> +{
+> +	unsigned int reg;
+> +/*
+> + * Set all MPROTx to be non-bufferable, trusted for R/W,
+> + * not forced to user-mode.
+> + */
+> +	__raw_writel(0x77777777, base + 0x0);
+> +	__raw_writel(0x77777777, base + 0x4);
+> +
+> +/*
+> + * Clear the on and off peripheral modules Supervisor Protect bit
+> + * for SDMA to access them. Did not change the AIPS control registers
+> + * (offset 0x20) access type
+> + */
+> +	__raw_writel(0x0, base + 0x40);
+> +	__raw_writel(0x0, base + 0x44);
+> +	__raw_writel(0x0, base + 0x48);
+> +	__raw_writel(0x0, base + 0x4C);
+> +	reg = __raw_readl(base + 0x50) & 0x00FFFFFF;
+> +	__raw_writel(reg, base + 0x50);
+> +}
+> +
+> +static int __init post_cpu_init(void)
+> +{
+> +	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS1_BASE_ADDR));
+> +	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS2_BASE_ADDR));
+> +
+> +	return 0;
+> +}
+> +postcore_initcall(post_cpu_init);
 
-True ...
+Hmm, I'm not totally sure if we talk about the same thing, but at least 
+it looks somehow similar:
 
-> 
-> We don't currently have any 6 argument hypercalls but the same would
-> extend there.
-> 
-> > If we can't avoid macro-ising HVC, we should do it globally, not locally
-> > to the Xen code.  That way we at least keep all the horror in one place.
-> 
-> That sounds like a good idea to me.
-> 
-> Given that Stefano is proposing to make the ISS a (per-hypervisor)
-> constant we could consider just defining the Thumb and non-Thumb
-> constants instead of doing all the construction with the __HVC_IMM stuff
-> -- that would remove a big bit of the macroization.
+For i.MX6 we have the following patch in U-Boot:
 
-It's not quite as simple as that -- emitting instructions using data
-directives is not endianness safe, and even in the cases where .long gives
-the right result for ARM, it gives the wrong result for 32-bit Thumb
-instructions if the opcode is given in human-readable order.
+http://git.denx.de/cgi-bin/gitweb.cgi?p=u-boot.git;a=commitdiff;h=f2f7745825ee5f6bae5b480c8e9c6641a7ffa73b
 
-I was trying to solve the same problem for the kvm guys with some global
-macros -- I'm aiming to get a patch posted soon, so I'll make sure
-you're on CC.
+If this is the same, maybe we should discuss about (a) where to do this 
+(boot loader or kernel) and (b) if we could create a common function for 
+this?
 
-Cheers
----Dave
+Best regards
+
+Dirk
