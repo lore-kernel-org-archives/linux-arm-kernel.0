@@ -1,42 +1,61 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Feb 2012 16:28:04 -0800
-Subject: [PATCH 5/6] ARM: OMAP4: suspend: Do not get dsp/tesla out of reset
-In-Reply-To: <1330003320-17400-6-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Thu, 23 Feb 2012 15:21:59 +0200")
-References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
- <1330003320-17400-6-git-send-email-t-kristo@ti.com>
-Message-ID: <87ehtfssx7.fsf@ti.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 27 Feb 2012 16:49:32 -0800
+Subject: [PATCH v5 1/9] cpuidle: Add commonly used functionality for
+ consolidation
+In-Reply-To: <1330318063-25460-2-git-send-email-rob.lee@linaro.org>
+References: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
+ <1330318063-25460-2-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAJOA=zNZ2xh34DTZc1gJwy0O6d=E=wdP4_sq_zrj3qjLcbj0kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+On Sun, Feb 26, 2012 at 8:47 PM, Robert Lee <rob.lee@linaro.org> wrote:
+> +/**
+> + * cpuidle_enter_wrap - performing timekeeping and irq around enter function
+> + * @dev: pointer to a valid cpuidle_device object
+> + * @drv: pointer to a valid cpuidle_driver object
+> + * @index: index of the target cpuidle state.
+> + */
+> +static inline int cpuidle_wrap_enter(struct cpuidle_device *dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv, int index,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int (*enter)(struct cpuidle_device *dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv, int index))
+> +{
+> + ? ? ? ktime_t time_start, time_end;
+> + ? ? ? s64 diff;
+> +
+> + ? ? ? time_start = ktime_get();
+> +
+> + ? ? ? index = enter(dev, drv, index);
+> +
+> + ? ? ? time_end = ktime_get();
+> +
+> + ? ? ? local_irq_enable();
+> +
+> + ? ? ? diff = ktime_to_us(ktime_sub(time_end, time_start));
+> + ? ? ? if (diff > INT_MAX)
+> + ? ? ? ? ? ? ? diff = INT_MAX;
+> +
+> + ? ? ? dev->last_residency = (int) diff;
+> +
+> + ? ? ? return index;
+> +}
 
-> From: Rajendra Nayak <rnayak@ti.com>
->
-> With no driver handling DSP/TESLA, if brought out of reset, it stays
-> active and does not assert standby.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Hi Rob,
 
-Subject says 'OMAP4: suspend'.  How does HWMOD_INIT_NO_RESET affect
-suspend?
+In a previous series I brought up the idea of not accounting for time
+if a C-state transition fails.  My post on that thread can be found
+here:
+http://article.gmane.org/gmane.linux.ports.arm.kernel/149293/
 
-Kevin
+How do you feel about adding something like the following?
 
-> ---
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index ef0524c..81d90da 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -1160,6 +1160,7 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
->  	.name		= "dsp",
->  	.class		= &omap44xx_dsp_hwmod_class,
->  	.clkdm_name	= "tesla_clkdm",
-> +	.flags		= HWMOD_INIT_NO_RESET,
->  	.mpu_irqs	= omap44xx_dsp_irqs,
->  	.rst_lines	= omap44xx_dsp_resets,
->  	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_dsp_resets),
+if (IS_ERR(index))
+        dev->last_residency = 0;
+        return index;
+
+Obviously it will up to the platforms to figure out how to propagate
+that error up from their respective low power code.
+
+Regards,
+Mike
