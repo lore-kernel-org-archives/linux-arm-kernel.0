@@ -1,39 +1,35 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 28 Feb 2012 17:05:28 +0200
-Subject: [PATCHv2 5/6] ARM: OMAP4: hwmod_data: Do not get DSP out of
- reset at boot time
-In-Reply-To: <alpine.DEB.2.00.1202280330140.11716@utopia.booyaka.com>
-References: <1330096546-20477-1-git-send-email-t-kristo@ti.com>
- <1330096546-20477-6-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1202280330140.11716@utopia.booyaka.com>
-Message-ID: <1330441528.2116.46.camel@sokoban>
+From: jason@lakedaemon.net (Jason)
+Date: Tue, 28 Feb 2012 10:06:03 -0500
+Subject: [PATCH WIP] ARM: kirkwood: covert orion-spi to fdt.
+In-Reply-To: <201202281004.14366.arnd@arndb.de>
+References: <20120228094059.GA27255@lunn.ch> <201202281004.14366.arnd@arndb.de>
+Message-ID: <20120228150603.GY23524@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-02-28 at 03:31 -0700, Paul Walmsley wrote:
-> Hi
+On Tue, Feb 28, 2012 at 10:04:14AM +0000, Arnd Bergmann wrote:
+> On Tuesday 28 February 2012, Andrew Lunn wrote:
+> > I think this code belongs on the board-dts.c file. kirkwood_clk_ctrl
+> > is a global so can be set from anywhere. It is also set in other files
+> > than common.c, eg pcie.c.
 > 
-> On Fri, 24 Feb 2012, Tero Kristo wrote:
-> 
-> > From: Rajendra Nayak <rnayak@ti.com>
-> > 
-> > With no driver handling DSP, if brought out of reset, it stays
-> > active and does not assert standby. This leads to IVAHD powerdomain not
-> > transitioning and hence preventing chip retention.
-> > 
-> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> 
-> Please test this series:
-> 
->    http://marc.info/?l=linux-omap&m=133040749621183&w=2
-> 
-> in lieu of this patch.
-> 
-> 
-> - Paul
+> Ok, that makes sense.
 
-Just tried the CSWR set on top of your branch with this patch reverted
-and it works nicely. I'll drop this patch out from the next version.
+Yes, my goal is to eventually eliminate common.c, pcie.c, etc.  If we do
+it right, kirkwood_clock_gate() won't be necessary.
 
--Tero
+> > In the end, i hope this all goes away. I have patches based on Mike's
+> > generic clk infrastructure, which adds clk/clkdev to all orion based
+> > machines. So the SPI driver, in its probe function will get its clock,
+> > enable it, and also find out the speed of it. The release function
+> > also disables the clock, turning it off if nobody else is using it. 
+> > 
+> > I just hope the generic clk does not take too long to land.
+> 
+> Excellent, that will of course be the best solution in the long run.
+
+Agreed.
+
+thx,
+
+Jason.
