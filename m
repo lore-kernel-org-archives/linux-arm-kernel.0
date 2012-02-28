@@ -1,28 +1,36 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 28 Feb 2012 11:11:48 +0530
-Subject: [PATCH v3 0/2] Device tree support for TWL regulators
-In-Reply-To: <20120227145345.GJ3191@opensource.wolfsonmicro.com>
-References: <1330338961-31765-1-git-send-email-rnayak@ti.com>
- <4F4B73C8.8070807@ti.com> <4F4B7798.6000300@ti.com>
- <20120227134112.GB3191@opensource.wolfsonmicro.com> <4F4B8A85.7060603@ti.com>
- <20120227140356.GF3191@opensource.wolfsonmicro.com> <4F4B9166.7020909@ti.com>
- <20120227145345.GJ3191@opensource.wolfsonmicro.com>
-Message-ID: <4F4C691C.2000600@ti.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Tue, 28 Feb 2012 05:44:39 +0000
+Subject: [PATCH v5 2/3] arm:davinci: move emif driver to mfd framework
+In-Reply-To: <20120227142638.GN27687@sortiz-mobl>
+References: <y> <1330005504-25321-3-git-send-email-prakash.pm@ti.com>
+ <20120227142638.GN27687@sortiz-mobl>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3176D103@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 February 2012 08:23 PM, Mark Brown wrote:
-> If adding device tree support breaks existing platforms something is
-> going wrong, while you're pulling things together device tree might not
-> work until all the support makes it in but the old non-DT code should
-> continue to function.
+Hi Samuel,
 
-Adding device tree support will not break existing platforms. The
-non-DT code will function as expected. The dependencies I mentioned
-were only with the dtsi/dts files that patch 2 was updating. The driver
-changes have no dependencies with any other DT series. I will repost
-all of Tero/Peter and my changes (to add DT support to the driver) as
-one single series and drop the dts file updates, which I guess can go
-via Tony/OMAP tree.
-
+On Mon, Feb 27, 2012 at 19:56:38, Samuel Ortiz wrote:
+[snip]
+> So it seems you're passing a platform devices array through your mfd aemif
+> platform data pointer. And from what I can see, it's mostly a 1 entry array
+> (for the NAND case) or a 2 entries array (for the NAND and NOR case).
+> In that case, adding an MFD driver in the middle brings basically nothing but
+> confusion and overhead (and 200+ lines of code).
+> So unless someone explains to me how this is doing any good to the kernel in
+> general, I'm not going to take this patchset.
+> 
+> Cheers,
+> Samuel.
 >
+
+In this way we trying to isolate future modification of aemif driver not to depict
+as platform code change, the need for this is based on discussion in below thread
+http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
+
+Earlier also concern was expressed to move aemif driver out of arch/arm to drivers folder.
+Here is the link for the same: http://lists.infradead.org/pipermail/linux-mtd/2011-August/037308.html
+Since aemif driver supports NAND/NOR devices, we feel MFD is the place holder.
+
+Thanks,
+Prakash
