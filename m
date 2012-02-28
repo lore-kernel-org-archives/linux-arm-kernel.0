@@ -1,24 +1,33 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Tue, 28 Feb 2012 16:30:38 +0400
-Subject: [PATCH 07/13] DMA:mmp:remove redundant dma drivers
-In-Reply-To: <1330414065-2949-8-git-send-email-zhaoy@marvell.com>
-References: <Y> <1330414065-2949-8-git-send-email-zhaoy@marvell.com>
-Message-ID: <4F4CC8EE.7070704@ru.mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Feb 2012 12:32:31 +0000
+Subject: [GIT PULL] MAINTAINERS IMX update for v3.4
+In-Reply-To: <20120228024323.GH13886@S2101-09.ap.freescale.net>
+References: <20120228024323.GH13886@S2101-09.ap.freescale.net>
+Message-ID: <201202281232.31818.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tuesday 28 February 2012, Shawn Guo wrote:
+> Please pull the patch below updating MAINTAINERS IMX entry for v3.4.
+> 
+> Regards,
+> Shawn
+> 
+> The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
+> 
+>   Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/maintainers
+> 
 
-On 28-02-2012 11:27, zhaoy wrote:
+I've added a new next/maintainers branch for this, I think we will see
+a few more other changes like this, otherwise I would have put it into
+next/soc.
 
-> 	1.remove old dma drivers
+The changes will of course all be tiny, but I guess it makes sense
+to submit them to Linus separately.
 
-> Change-Id: I96ffed95012a4f3e855c2f6c184646a798a0ee7d
+Thanks,
 
-    This line shouldn't be in the upstream patch.
-
-> Signed-off-by: zhaoy <zhaoy@marvell.com>
-
-    Real name required here.
-
-WBR, Sergei
+	Arnd
