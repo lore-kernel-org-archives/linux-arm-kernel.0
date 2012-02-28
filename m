@@ -1,67 +1,56 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 28 Feb 2012 09:24:15 +0200
-Subject: [PATCH 0/6] ARM: OMAP4: core retention support
-In-Reply-To: <87d38zrboc.fsf@ti.com>
-References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
- <87d38zrboc.fsf@ti.com>
-Message-ID: <1330413855.2116.29.camel@sokoban>
+From: zhaoy@marvell.com (zhaoy)
+Date: Tue, 28 Feb 2012 15:27:32 +0800
+Subject: [PATCH 00/13] Enable DMA engine for mmp2 and mmp3
+In-Reply-To: <Y>
+References: <Y>
+Message-ID: <1330414065-2949-1-git-send-email-zhaoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-02-27 at 17:25 -0800, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
-> 
-> > This set adds core retention support on top of mainline. The set
-> > also adds IO CHAIN wakeup capability for OMAP4, which is a nice feature
-> > to have while trying suspend / resume with CSWR as it is quite difficult
-> > to wake up the device without this.
-> >
-> > Patch 6 might cause some stir, but this is needed as omap4 PRCM chain
-> > handler currently does not work without SPARSE_IRQ. Enabling the
-> > SPARSE_IRQ causes a WARN from gic during boot for omap4, and attempting
-> > to fix this creates some spam from interrupt handling code which seems to
-> > originate from GPMC/GPIO. Also, omap3 boot breaks completely,
-> > thus it is impossible to enable this option as of now.
-> >
-> > Tested on OMAP4 blaze board, with OMAP4430 EMU chip. Suspend / resume
-> > works nicely, and wakeup with UART3 works. The powerdomain state info
-> > under pm-debug appears to be somewhat bogus right after boot, but fixes
-> > itself during suspend. This should be addressed separately. Also
-> > verified that suspend / resume with OMAP3 beagle is okay.
-> 
-> Please separate out the IO daisy chain stuff as a separate series.
+These patch is for marvell mmp2 and mmp3 platform to enable
+dmaengine, use dmaengine to manage the audio dma, video dma 
+and peripheral device dma together. 
 
-Okay, will do that. Based on your next comment it makes sense. I'll
-double check from Vishwa how we handle the IO chain set.
+zhaoy (13):
+  DMA:define second level irq definition
+  dmaengine:open dmac and tdma support
+  dmaengine: mmp: add two-channel dma driver
+  dmaengine:mmp add peripheral dma driver
+  mmp2:register dma devices for mmp2 platform
+  mmp3:register dma devices for mmp3 platform
+  DMA:mmp:remove redundant dma drivers
+  DMAC:tty serial pxa use generic dma engine APIs
+  DMA:remove unnecessary dma configurations
+  dmaengine:audio:mmp audio use generic dma engine APIs
+  DMA:update defconfig for mmp3
+  mdma:dmaengine:update mdma for tdma
+  DMA:update defconfig for mmp2
 
-> 
-> Vishwa had a multiple patch series that cleaned some of this up and
-> also made it common for OMAP3 and 4.
-> 
->    http://marc.info/?l=linux-omap&m=132387916807059&w=2
-> 
-> I had several review comments on that series that were never responded
-> to, 
-> 
->    http://marc.info/?l=linux-omap&w=2&r=1&s=DaisyChain&q=b
-> 
-
-Oh okay, sorry about that. I just checked your comments and most of them
-appear valid. One of the major complaints you had was for the IO chain
-to be enabled all the time now, this appears to be based on design. IO
-chain can now generate wake-ups for idle modules even if the CPU is not
-idle. It means that the IO chain must be re-armed every time the IO
-config (mux / wakeup setup) changes. The wakeup triggering logic should
-be moved to the mux code probably.
-
-> so I'd first like to understand why that series was dropped and only
-> selected parts were taken for $SUBJECT series, and what is the plan for
-> the IO daisy chain series.
-
-I dropped part of the patches (mainly the ones that touch OMAP3), as I
-wasn't quite certain whether they are needed or not, and/or whether they
-work on omap3 properly (mainly the above io chain arming logic.) I
-wanted to keep this separate from the CSWR set itself as it should be
-touching only omap4.
-
--Tero
+ arch/arm/configs/mmp2_defconfig           |   23 +-
+ arch/arm/configs/mmp3_defconfig           |   21 +-
+ arch/arm/mach-mmp/Makefile                |    4 +-
+ arch/arm/mach-mmp/include/mach/irqs.h     |   18 +-
+ arch/arm/mach-mmp/include/mach/mmp_dma.h  |   89 ++-
+ arch/arm/mach-mmp/include/mach/regs-icu.h |   12 +-
+ arch/arm/mach-mmp/irq-mmp2.c              |    4 +
+ arch/arm/mach-mmp/irq-mmp3.c              |    3 +
+ arch/arm/mach-mmp/mmp2.c                  |  122 ++-
+ arch/arm/mach-mmp/mmp3.c                  |   78 ++-
+ arch/arm/plat-pxa/include/plat/dma.h      |   33 +-
+ drivers/char/mmp2_mdma.c                  |  273 ++----
+ drivers/dma/Kconfig                       |   19 +
+ drivers/dma/Makefile                      |    2 +
+ drivers/dma/mmp_tdma.c                    |  858 +++++++++++++++
+ drivers/dma/pxa_dmac.c                    | 1077 ++++++++++++++++++
+ drivers/tty/serial/Kconfig                |   12 +-
+ drivers/tty/serial/Makefile               |    1 +
+ drivers/tty/serial/mmp_pxa.c              | 1698 +++++++++++++++++++++++++++++
+ sound/soc/pxa/mmp-pcm.c                   |  232 ++--
+ sound/soc/pxa/mmp-pcm.h                   |    4 +-
+ sound/soc/pxa/mmp2-squ.c                  |  192 ++--
+ sound/soc/pxa/mmp2-squ.h                  |    8 +-
+ sound/soc/pxa/mmp2-sspa.c                 |   28 +-
+ 24 files changed, 4361 insertions(+), 450 deletions(-)
+ create mode 100644 drivers/dma/mmp_tdma.c
+ create mode 100644 drivers/dma/pxa_dmac.c
+ create mode 100644 drivers/tty/serial/mmp_pxa.c
