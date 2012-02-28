@@ -1,32 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Feb 2012 12:35:50 +0000
-Subject: [GIT PULL] imx_v6_v7_defconfig updates for v3.4
-In-Reply-To: <20120228023846.GG13886@S2101-09.ap.freescale.net>
-References: <20120228023846.GG13886@S2101-09.ap.freescale.net>
-Message-ID: <201202281235.50844.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 28 Feb 2012 12:35:51 +0000
+Subject: [PATCH 3/6] ASoC: Remove unnecessary -codec from cs4270 driver
+ name
+In-Reply-To: <1330092582-21180-4-git-send-email-shawn.guo@linaro.org>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120228123551.GG3683@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 February 2012, Shawn Guo wrote:
-> Please pull the following imx_v6_v7_defconfig updates for v3.4.  The
-> first patch was generated some time ago, so it looks not so consistent
-> with another one on subject.  Will try to make it better in the future.
-> 
-> Regards,
-> Shawn
-> 
-> The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
-> 
->   Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
-> 
-> are available in the git repository at:
->   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/defconfig
+On Fri, Feb 24, 2012 at 10:09:38PM +0800, Shawn Guo wrote:
+> Similar to what commit 1e3ad57 (ASoC: Remove redundant -codec from
+> WM8776 driver name) does for wm8776 driver, this patch does the same
+> thing for cs4270 driver.
 
-I've put it into the next/soc branch because the changes are for the
-global defconfig. We could theoretically have an overall branch for
-defconfig updates, but most of these tend to be related to some other
-changes, so I'm leaving that for now.
-
-Thanks,
-
-	Arnd
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120228/cdbc41cc/attachment.sig>
