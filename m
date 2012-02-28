@@ -1,54 +1,47 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Feb 2012 17:22:59 -0800
-Subject: [PATCH v2 0/6] gpio/omap: Cleanup and adaptation to Device Tree
-In-Reply-To: <1330122091-28113-1-git-send-email-b-cousson@ti.com> (Benoit
- Cousson's message of "Fri, 24 Feb 2012 23:21:25 +0100")
-References: <1330122091-28113-1-git-send-email-b-cousson@ti.com>
-Message-ID: <87linnrbt8.fsf@ti.com>
+Date: Mon, 27 Feb 2012 17:25:55 -0800
+Subject: [PATCH 0/6] ARM: OMAP4: core retention support
+In-Reply-To: <1330003320-17400-1-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Thu, 23 Feb 2012 15:21:54 +0200")
+References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
+Message-ID: <87d38zrboc.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit Cousson <b-cousson@ti.com> writes:
+Tero Kristo <t-kristo@ti.com> writes:
 
-> Hi Grant,
+> This set adds core retention support on top of mainline. The set
+> also adds IO CHAIN wakeup capability for OMAP4, which is a nice feature
+> to have while trying suspend / resume with CSWR as it is quite difficult
+> to wake up the device without this.
 >
-> Here are a couple of GPIO cleanup + the DT adaptation patches.
-> This update (compared to v1 [1]) is adding an extra fix for SPARSE_IRQ support
-> and add the second cell in the binding for GPIO IRQ type that was missing
-> previously whereas the driver does support it.
-
-For the OMAP GPIO changes,
-
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-
-However, I had some problems trying to merge this to test it.
-
-I'm also curious how/who we should merge this.  Since it depends on
-stuff that Grant is queueing (or has queued), I suppose it should go
-through his tree.
-
-> This series is based on 3.3-rc4 + for_3.4/dt_base branch to get
-> the needed cleanup and fixes for OMAP.
+> Patch 6 might cause some stir, but this is needed as omap4 PRCM chain
+> handler currently does not work without SPARSE_IRQ. Enabling the
+> SPARSE_IRQ causes a WARN from gic during boot for omap4, and attempting
+> to fix this creates some spam from interrupt handling code which seems to
+> originate from GPMC/GPIO. Also, omap3 boot breaks completely,
+> thus it is impossible to enable this option as of now.
 >
-> The interrupt controller support is using irq_domain_add_legacy for
-> the moment and will be updated next to use irqchip irq_domain.
+> Tested on OMAP4 blaze board, with OMAP4430 EMU chip. Suspend / resume
+> works nicely, and wakeup with UART3 works. The powerdomain state info
+> under pm-debug appears to be somewhat bogus right after boot, but fixes
+> itself during suspend. This should be addressed separately. Also
+> verified that suspend / resume with OMAP3 beagle is okay.
 
-It appears your current dt_gpio branch is based on some older version of
-your dt_irq_domain branch than the one you just submitted for a pull request.
+Please separate out the IO daisy chain stuff as a separate series.
 
-> It requires the irq_domain generalization and refinement series
-> available at:
->   git://git.secretlab.ca/git/linux-2.6 irqdomain/next
->   
-> It requires as well Tarun's GPIO cleanup series available at:
->   git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_cleanup_fixes_v9
+Vishwa had a multiple patch series that cleaned some of this up and
+also made it common for OMAP3 and 4.
 
-Rather than Tarun's branch, can you use Grant's GPIO branch, which has
-the final version he pulled from my for_3.4/gpio/runtime-pm-cleanup
-branch.  Tarun's branch causes some merge conflicts with what Grant has
-already merged.
+   http://marc.info/?l=linux-omap&m=132387916807059&w=2
+
+I had several review comments on that series that were never responded
+to, 
+
+   http://marc.info/?l=linux-omap&w=2&r=1&s=DaisyChain&q=b
+
+so I'd first like to understand why that series was dropped and only
+selected parts were taken for $SUBJECT series, and what is the plan for
+the IO daisy chain series.
 
 Kevin
-
-> This series is available here for reference:
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_gpio
