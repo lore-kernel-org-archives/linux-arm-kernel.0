@@ -1,50 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Feb 2012 10:55:14 +0000
-Subject: [PATCH 3/4] ARM: perf: check that we have an event in the PMU
- IRQ handlers
-In-Reply-To: <CACVXFVNVhd_65Kr7h6KEtaOvZ6GmZhA9wz9Xe8z-O2EET=SEGw@mail.gmail.com>
-References: <1330012696-13472-1-git-send-email-will.deacon@arm.com>
- <1330012696-13472-4-git-send-email-will.deacon@arm.com>
- <CACVXFVM6HOMeJCMznLqO6-jMT8owoK65Ap6c_CNCJbwWxphCBA@mail.gmail.com>
- <20120224101130.GB13504@mudshark.cambridge.arm.com>
- <20120227175646.7c39e542@tom-ThinkPad-T410>
- <20120227193635.GC24605@mudshark.cambridge.arm.com>
- <CACVXFVNVhd_65Kr7h6KEtaOvZ6GmZhA9wz9Xe8z-O2EET=SEGw@mail.gmail.com>
-Message-ID: <20120228105514.GG25625@mudshark.cambridge.arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 28 Feb 2012 04:10:54 -0700
+Subject: [PATCH 4/9] ARM: OMAP3: hwmod data: GPTIMER12 is attached to a
+ separate interconnect
+In-Reply-To: <20120228110943.808.73639.stgit@dusk>
+References: <20120228110943.808.73639.stgit@dusk>
+Message-ID: <20120228111053.808.87403.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 12:53:28AM +0000, Ming Lei wrote:
-> On Tue, Feb 28, 2012 at 3:36 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > A single 32-bit store is not interruptible in the same way as load/store
-> > multiple instructions are, so this isn't a problem.
-> 
-> In fact, I have tried to look for the similar description in ARMv7 manual, but
-> didn't find it unfortunately, so could you point out where it is
-> stated explicitly?
+GPTIMER12 is attached to the L4 SEC interconnect, not directly to L4 WKUP.
+Add the L4 SEC interconnect and attach GPTIMER12 to it.
 
-It's the section about Single-copy atomicity (3.5.3 in revision C). All word
-accesses to word-aligned locations are single-copy atomic. We rely on this
-for our atomic_{read,set} implementations.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   28 +++++++++++++++++++++++++---
+ 1 files changed, 25 insertions(+), 3 deletions(-)
 
-> >
-> >> So suggest to take the correct way in theory, IMO.
-> >
-> > I don't like checking the used_mask, because then we have to throw in some
-> > barriers to ensure ordering between updates of the event arrays and the
-> > mask. If we do have to change something, I think putting ACCESS_ONCE around
-> 
-> Both used_mask and event arrays are defined as percpu variables, so are you sure
-> barriers are required for it?
-
-I expect the compiler could still re-order the statements.
-
-I heard back from the tools guys and they say that the store will not be
-split up, but may be coalesced with others in the form of a store-multiple.
-Referring back to the ARM ARM, that's ok since `each 32-bit word access is
-guaranteed to be single-copy atomic'.
-
-So I'm still in favour of the original patch. It's easy to read, fairly minimal
-and will work correctly.
-
-Will
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 48b6a88..417a007 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -170,6 +170,7 @@ static struct omap_hwmod omap3xxx_l3_main_hwmod = {
+ };
+ 
+ static struct omap_hwmod omap3xxx_l4_wkup_hwmod;
++static struct omap_hwmod omap3xxx_l4_sec_hwmod;
+ static struct omap_hwmod omap3xxx_uart1_hwmod;
+ static struct omap_hwmod omap3xxx_uart2_hwmod;
+ static struct omap_hwmod omap3xxx_uart3_hwmod;
+@@ -521,6 +522,13 @@ static struct omap_hwmod omap3xxx_l4_per_hwmod = {
+ 	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
++/* L4_WKUP -> L4_SEC interface */
++static struct omap_hwmod_ocp_if omap3xxx_l4_wkup__l4_sec = {
++	.master = &omap3xxx_l4_wkup_hwmod,
++	.slave	= &omap3xxx_l4_sec_hwmod,
++	.user	= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ /* Slave interfaces on the L4_WKUP interconnect */
+ static struct omap_hwmod_ocp_if *omap3xxx_l4_wkup_slaves[] = {
+ 	&omap3xxx_l4_core__l4_wkup,
+@@ -535,6 +543,20 @@ static struct omap_hwmod omap3xxx_l4_wkup_hwmod = {
+ 	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
++/* Slave interfaces on the L4_SEC interconnect */
++static struct omap_hwmod_ocp_if *omap3xxx_l4_sec_slaves[] = {
++	&omap3xxx_l4_wkup__l4_sec,
++};
++
++/* L4 SEC */
++static struct omap_hwmod omap3xxx_l4_sec_hwmod = {
++	.name		= "l4_sec",
++	.class		= &l4_hwmod_class,
++	.slaves		= omap3xxx_l4_sec_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap3xxx_l4_sec_slaves),
++	.flags		= HWMOD_NO_IDLEST,
++};
++
+ /* Master interfaces on the MPU device */
+ static struct omap_hwmod_ocp_if *omap3xxx_mpu_masters[] = {
+ 	&omap3xxx_mpu__l3_main,
+@@ -1130,8 +1152,8 @@ static struct omap_hwmod_addr_space omap3xxx_timer12_addrs[] = {
+ };
+ 
+ /* l4_core -> timer12 */
+-static struct omap_hwmod_ocp_if omap3xxx_l4_core__timer12 = {
+-	.master		= &omap3xxx_l4_core_hwmod,
++static struct omap_hwmod_ocp_if omap3xxx_l4_sec__timer12 = {
++	.master		= &omap3xxx_l4_sec_hwmod,
+ 	.slave		= &omap3xxx_timer12_hwmod,
+ 	.clk		= "gpt12_ick",
+ 	.addr		= omap3xxx_timer12_addrs,
+@@ -1140,7 +1162,7 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__timer12 = {
+ 
+ /* timer12 slave port */
+ static struct omap_hwmod_ocp_if *omap3xxx_timer12_slaves[] = {
+-	&omap3xxx_l4_core__timer12,
++	&omap3xxx_l4_sec__timer12,
+ };
+ 
+ /* timer12 hwmod */
