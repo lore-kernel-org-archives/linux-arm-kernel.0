@@ -1,68 +1,38 @@
 From: T.Mehnert@eckelmann.de (Mehnert, Torsten)
-Date: Tue, 28 Feb 2012 17:48:04 +0000
-Subject: [PATCH 2/2] ehci-imx25.c: use new flags from mxc_ehci.h in usb_hwinit
-Message-ID: <3F263ABB4EDE344D974E1983B56807739E4BC6BA@EX-DAG02.eckelmann.group>
+Date: Tue, 28 Feb 2012 17:48:02 +0000
+Subject: [PATCH 1/2] mxc_ehci.h: add flags for usb hwinit
+Message-ID: <3F263ABB4EDE344D974E1983B56807739E4BC6B3@EX-DAG02.eckelmann.group>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: T. Mehnert <t.mehnert@eckelmann.de>
-Date: Thu, 16 Feb 2012 14:39:20 +0100
-Subject: [PATCH] ehci-imx25.c adding support of options in mxc_ehci.h
+Date: Thu, 16 Feb 2012 14:10:20 +0100
+Subject: [PATCH] mxc_ehci.h extending flags for hwinit
 
-This Patch implements the new options in mxc_ehci.h for the
-hardware initialisation.
+This Patch adds defines for the flags field. This flags
+are used for usb hw initialisation. The new flags will give
+more options to configure the usb hardware from the board
+file.
 ---
- arch/arm/mach-imx/ehci-imx25.c |   17 +++++++++++++++++
- 1 files changed, 17 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-imx/ehci-imx25.c b/arch/arm/mach-imx/ehci-imx25.c
-index 865daf0..17f7267 100644
---- a/arch/arm/mach-imx/ehci-imx25.c
-+++ b/arch/arm/mach-imx/ehci-imx25.c
-@@ -24,9 +24,14 @@
- #define MX25_OTG_SIC_SHIFT	29
- #define MX25_OTG_SIC_MASK	(0x3 << MX25_OTG_SIC_SHIFT)
- #define MX25_OTG_PM_BIT		(1 << 24)
-+#define MX25_OTG_PP_BIT		(1 << 11)
-+#define MX25_OTG_XCSO_BIT	(1 << 10)
+diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+index 2c159dc..5edbb95 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
++++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
+@@ -27,6 +27,9 @@
+ #define MXC_EHCI_IPPUE_UP		(1 << 9)
+ #define MXC_EHCI_WAKEUP_ENABLED	(1 << 10)
+ #define MXC_EHCI_ITC_NO_THRESHOLD	(1 << 11)
++#define MXC_EHCI_AHB_LOCK_ENABLE	(1 << 12)
++#define MXC_EHCI_POWER_POLARITY_HIGH	(1 << 13)
++#define MXC_EHCI_XCVR_FORCED_INTERNAL	(1 << 14)
  
- #define MX25_H1_SIC_SHIFT	21
- #define MX25_H1_SIC_MASK	(0x3 << MX25_H1_SIC_SHIFT)
-+#define MX25_H1_PP_BIT		(1 << 18)
-+#define MX25_H1_HLKEN_BIT	(1 << 12)
-+#define MX25_H1_XCSH_BIT	(1 << 9)
- #define MX25_H1_PM_BIT		(1 << 8)
- #define MX25_H1_IPPUE_UP_BIT	(1 << 7)
- #define MX25_H1_IPPUE_DOWN_BIT	(1 << 6)
-@@ -47,6 +52,9 @@ int mx25_initialize_usb_hw(int port, unsigned int flags)
- 		if (!(flags & MXC_EHCI_POWER_PINS_ENABLED))
- 			v |= MX25_OTG_PM_BIT;
- 
-+		if (flags & MXC_EHCI_XCVR_FORCED_INTERNAL)
-+			v |= MX25_OTG_XCSO_BIT;
-+
- 		break;
- 	case 1: /* H1 port */
- 		v &= ~(MX25_H1_SIC_MASK | MX25_H1_PM_BIT | MX25_H1_TLL_BIT |
-@@ -68,6 +76,15 @@ int mx25_initialize_usb_hw(int port, unsigned int flags)
- 		if (flags & MXC_EHCI_IPPUE_UP)
- 			v |= MX25_H1_IPPUE_UP_BIT;
- 
-+		if (flags & MXC_EHCI_AHB_LOCK_ENABLE)
-+			v |= MX25_H1_HLKEN_BIT;
-+
-+		if (flags & MXC_EHCI_POWER_POLARITY_HIGH)
-+			v |= MX25_H1_PP_BIT;
-+
-+		if (flags & MXC_EHCI_XCVR_FORCED_INTERNAL)
-+			v |= MX25_H1_XCSH_BIT;
-+
- 		break;
- 	default:
- 		return -EINVAL;
+ #define MXC_USBCTRL_OFFSET		0
+ #define MXC_USB_PHY_CTR_FUNC_OFFSET	0x8
 -- 
 1.7.0.4
-
 ---
 Torsten Mehnert
 K?lte- und Geb?udeleittechnik (KGL)
