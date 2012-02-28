@@ -1,33 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Feb 2012 12:32:31 +0000
-Subject: [GIT PULL] MAINTAINERS IMX update for v3.4
-In-Reply-To: <20120228024323.GH13886@S2101-09.ap.freescale.net>
-References: <20120228024323.GH13886@S2101-09.ap.freescale.net>
-Message-ID: <201202281232.31818.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 28 Feb 2012 12:34:49 +0000
+Subject: [PATCH 1/6] ASoC: fsl: correct get_dma_channel parameter name
+In-Reply-To: <1330092582-21180-2-git-send-email-shawn.guo@linaro.org>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120228123449.GE3683@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 February 2012, Shawn Guo wrote:
-> Please pull the patch below updating MAINTAINERS IMX entry for v3.4.
-> 
-> Regards,
-> Shawn
-> 
-> The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
-> 
->   Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
-> 
-> are available in the git repository at:
->   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/maintainers
-> 
+On Fri, Feb 24, 2012 at 10:09:36PM +0800, Shawn Guo wrote:
+> The second parameter of function get_dma_channel is actually a property
+> name rather than a compatible string, so rename it for less confusing.
 
-I've added a new next/maintainers branch for this, I think we will see
-a few more other changes like this, otherwise I would have put it into
-next/soc.
-
-The changes will of course all be tiny, but I guess it makes sense
-to submit them to Linus separately.
-
-Thanks,
-
-	Arnd
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120228/6998310a/attachment.sig>
