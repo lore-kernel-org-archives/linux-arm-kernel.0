@@ -1,112 +1,41 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Tue, 28 Feb 2012 15:09:05 +0530
-Subject: [PATCH 3/6] gpio/omap: remove suspend_wakeup field from struct
- gpio_bank
-In-Reply-To: <87ty2bu91e.fsf@ti.com>
-References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
- <1329999031-6914-4-git-send-email-tarun.kanti@ti.com>
- <87ty2bu91e.fsf@ti.com>
-Message-ID: <CAC83ZvJ97uRSLU-JmO2mnaOuziU=SotghASSJjPvESWL+eATuQ@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 28 Feb 2012 15:09:09 +0530
+Subject: [PATCH 0/4] twl-regulator DT adaptation and updates to add new
+ regulators
+Message-ID: <1330421953-29517-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 5:24 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->
->> Since we already have bank->context.wake_en to keep track
->> of gpios which are wakeup enabled, there is no need to have
->> this field any more.
->>
->> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->
-> I'm not crazy about this change...
->
->> ---
->> ?drivers/gpio/gpio-omap.c | ? 11 +++++------
->> ?1 files changed, 5 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index 64f15d5..b62e861 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -53,7 +53,6 @@ struct gpio_bank {
->> ? ? ? void __iomem *base;
->> ? ? ? u16 irq;
->> ? ? ? u16 virtual_irq_start;
->> - ? ? u32 suspend_wakeup;
->> ? ? ? u32 non_wakeup_gpios;
->> ? ? ? u32 enabled_non_wakeup_gpios;
->> ? ? ? struct gpio_regs context;
->> @@ -497,9 +496,9 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
->>
->> ? ? ? spin_lock_irqsave(&bank->lock, flags);
->> ? ? ? if (enable)
->> - ? ? ? ? ? ? bank->suspend_wakeup |= gpio_bit;
->> + ? ? ? ? ? ? bank->context.wake_en |= gpio_bit;
->> ? ? ? else
->> - ? ? ? ? ? ? bank->suspend_wakeup &= ~gpio_bit;
->> + ? ? ? ? ? ? bank->context.wake_en &= ~gpio_bit;
->
-> The bank->context values are expected to be copies of the actual
-> register contents, and here that is clearly not the case.
-Right, it should have been this:
+Hi Mark,
 
-        if (enable)
--               bank->suspend_wakeup |= gpio_bit;
-+               bank->context.wake_en |= gpio_bit;
-        else
--               bank->suspend_wakeup &= ~gpio_bit;
-+               bank->context.wake_en &= ~gpio_bit;
-+
-+       __raw_writel(bank->context.wake_en, bank->base + bank->regs->wkup_en);
+Here is a consolidated series which adds DT support for twl regulator
+driver and adds support for VDD1/2/3 regulator and support for
+fixed LDO V1V8 and V2V1. The patches are based on -next and tested
+on omap3 beagle and omap4 panda boards.
 
->
-> With this change, you're using the context register to track changes
-> that you *might* eventually write to the register.
-The above change ensures that bank->context.wake_en reflects the
-latest register value.
-There are two distinct paths through which bank->context.wake_en is
-updated now, viz:
-Path1:-
-chip.irq_set_type() --> gpio_irq_type() --> _set_gpio_triggering() -->
-set_gpio_trigger()
+I have dropped the patch updating the dts entries for twl4030 and
+twl6030 because of other dependencies and will submit them via
+the OMAP tree. The driver DT changes however do not have any dependency
+on the dts file updates (except that regulator support will not work with DT,
+but will not break DT build or boot) and no functionality would change
+in the non-DT case.
 
-Path2:-
-chip.irq_set_wake() --> gpio_wake_enable() --> irq_set_wake()
+regards,
+Rajendra
 
->
-> IMO, this is more confusing than having a separate field to track this.
-So, there is no need have a separate field to keep track of this.
-I hope my understanding is right.
---
-Tarun
+Peter Ujfalusi (2):
+  regulator: twl-regulator: Add fixed LDO for V1V8, V2V1 supply
+  MFD: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS
 
->
-> Kevin
->
->> ? ? ? spin_unlock_irqrestore(&bank->lock, flags);
->>
->> @@ -772,7 +771,7 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
->>
->> ? ? ? spin_lock_irqsave(&bank->lock, flags);
->> ? ? ? bank->context.wake_en = __raw_readl(mask_reg);
->> - ? ? __raw_writel(0xffff & ~bank->suspend_wakeup, mask_reg);
->> + ? ? __raw_writel(0xffff & ~bank->context.wake_en, mask_reg);
->> ? ? ? spin_unlock_irqrestore(&bank->lock, flags);
->>
->> ? ? ? return 0;
->> @@ -1137,12 +1136,12 @@ static int omap_gpio_suspend(struct device *dev)
->> ? ? ? if (!bank->mod_usage || !bank->loses_context)
->> ? ? ? ? ? ? ? return 0;
->>
->> - ? ? if (!bank->regs->wkup_en || !bank->suspend_wakeup)
->> + ? ? if (!bank->regs->wkup_en || !bank->context.wake_en)
->> ? ? ? ? ? ? ? return 0;
->>
->> ? ? ? spin_lock_irqsave(&bank->lock, flags);
->> ? ? ? _gpio_rmw(base, bank->regs->wkup_en, 0xffffffff, 0);
->> - ? ? _gpio_rmw(base, bank->regs->wkup_en, bank->suspend_wakeup, 1);
->> + ? ? _gpio_rmw(base, bank->regs->wkup_en, bank->context.wake_en, 1);
->> ? ? ? spin_unlock_irqrestore(&bank->lock, flags);
->>
->> ? ? ? return 0;
+Rajendra Nayak (1):
+  regulator: twl: adapt twl-regulator driver to dt
+
+Tero Kristo (1):
+  regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators
+
+ .../bindings/regulator/twl-regulator.txt           |   68 +++++
+ drivers/mfd/twl-core.c                             |   25 ++
+ drivers/regulator/twl-regulator.c                  |  294 ++++++++++++++------
+ include/linux/i2c/twl.h                            |    7 +-
+ 4 files changed, 309 insertions(+), 85 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
