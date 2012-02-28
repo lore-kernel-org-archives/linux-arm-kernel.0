@@ -1,11 +1,32 @@
-From: hzhuang1@marvell.com (Haojian Zhuang)
-Date: Tue, 28 Feb 2012 00:41:57 -0800
+From: zhaoy@marvell.com (Zhao Ye)
+Date: Tue, 28 Feb 2012 00:49:24 -0800
 Subject: [PATCH 00/13] Enable DMA engine for mmp2 and mmp3
-In-Reply-To: <1330414065-2949-1-git-send-email-zhaoy@marvell.com>
+In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C060A87D776@SC-VEXCH1.marvell.com>
 References: <Y>,<1330414065-2949-1-git-send-email-zhaoy@marvell.com>
-Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C060A87D776@SC-VEXCH1.marvell.com>
+ <25B60CDC2F704E4E9D88FFD52780CB4C060A87D776@SC-VEXCH1.marvell.com>
+Message-ID: <A63A0DC671D719488CD1A6CD8BDC16CF1A0E9EA199@SC-VEXCH4.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+I am sorry these patches is based on kernel 3.0, and based on our company's
+Branch. 
+
+Please ignore these patches, I will move them to kernel v3.3-rc5.
+And later I will send a new version out.
+
+Sorry!
+
+Zhao Ye
++61942433
+Marvell Tech (SH) Co. Ltd.
+
+
+-----Original Message-----
+From: Haojian Zhuang 
+Sent: 2012?2?28? 16:42
+To: Zhao Ye; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; nicolas.pitre at linaro.org; linux at arm.linux.org.uk; Chao Xie; Leo Yan
+Cc: Zhao Ye
+Subject: RE: [PATCH 00/13] Enable DMA engine for mmp2 and mmp3
 
 Hi Zhao,
 
