@@ -1,133 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Feb 2012 06:48:12 +0100
-Subject: RFC: what do we do with system controllers?
-Message-ID: <CACRpkdY1W-RGE0JL4Sx5UcPY-EGieu8vo7H0fp9xyXtegpaaKw@mail.gmail.com>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Tue, 28 Feb 2012 11:20:38 +0530
+Subject: [PATCH v3 0/1] Add support for GPIO IR receiver driver 
+Message-ID: <1330408238-21880-1-git-send-email-kumarrav@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mainly addressed to Greg but anyone is welcome to join the
-discussion...
+This driver is for GPIO based IR receivers, it can listen only to IR receiver
+modules which gives demodulated signal as output, this driver only passes the
+interrupt events to rc framework where pulse and space widths are calculated
+and input to decoders avaliable.
 
-Several ARM platforms have system controllers. In this I
-include all custom terminology such as:
+Ravi Kumar V (1):
+  rc: Add support for GPIO based IR Receiver driver.
 
-- System Control
-- Chip Controller
-- Core Module control registers
-- Power Reset Control Management Units
-- Multimedia Communications Port
-- ASIC control of "stuff"
+ drivers/media/rc/Kconfig        |    9 ++
+ drivers/media/rc/Makefile       |    1 +
+ drivers/media/rc/gpio-ir-recv.c |  205 +++++++++++++++++++++++++++++++++++++++
+ include/media/gpio-ir-recv.h    |   22 ++++
+ 4 files changed, 237 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/media/rc/gpio-ir-recv.c
+ create mode 100644 include/media/gpio-ir-recv.h
 
-These are register-mapped ranges controlling "various" or
-"misc" parts of the system. The registers you find there can
-do e.g.:
-
-* Reset or shut down the system
-   arch/arm/mach-integrator/core.c
-   arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
-
-* Reset individual ASIC blocks
-  drivers/mfd/db8500-prcmu.c
-  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
-
-* Control some core voltage domains
-  drivers/mfd/db8500-prcmu.c
-
-* Control system frequency
-   arch/arm/mach-integrator/cpu.c
-   drivers/mfd/db8500-prcmu.c
-
-* Select clocking of indvidual ASIC IP blocks:
-  drivers/mfd/db8500-prcmu.c
-  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
-
-* Provide some versioning numbers for the entire system
-  drivers/misc/atmel-ssc.c
-  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
-  (Integrator, Versatile, RealView, Versatile Express)
-
-* Enable and reset external buses such as PCI
-  arch/arm/mach-integrator/pci_v3.c
-
-* (De)protect flash memory
-  arch/arm/mach-integrator/integrator_cp.c
-
-* Provide a communication channel to another control unit
-  drivers/mfd/mcp-core.c
-  drivers/mfd/db8500-prcmu.c
-
-* Set some clock divisors for misc units
-  drivers/mfd/mcp-core.c
-  (also PL810 as discussed recently)
-
-* LEDs, GPIO etc communication channel
-  drivers/mfd/asic3.c
-
-* USB transciever control:
-  arch/arm/mach-omap2/omap_phy_internal.c
-
-* Get OTP (one-time-programmable) bits:
-  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
-  arch/powerpc/platforms/ps3/os-area.c
-  arch/powerpc/platforms/chrp/nvram.c
-
-* Set up DDR control registers:
-  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
-
-* Pin control:
-  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
-
-(Some non-ARM examples included for fun.)
-
-As can be seen from the diverse examples there is a fit
-to various extent to existing subsystems, and often mfd is
-increasingly used as an arbitration point for other
-subsystems.
-
-The current way to split this problem is to:
-
-- Push each subfunctionality into a specialized subsystem
-  PLL and clocks to drivers/clk using the new framework
-  RealSoonNow for example, pin control we have in place
-  regulators can handle domain switches...
-
-- Put in place an arbitration hub-like mechanism using MFD
-
-This can be done in two ways:
-
-- Permanently map the register range and let subdrivers
-  poke directly into the registers they're interested in.
-
-- Map the register range in a hub driver (often MFD) and
-  write accessor functions for all subfunctionality.
-
-As far as the drivers are small and nice the heterogeneous
-character of these device register ranges are not much
-of a problem. Some will argue to not fix what ain't broken
-and not move these out of arch/arm/* at all.
-
-What we need to discuss is if this is how we go about
-taking care of these devices going forward - what shall be
-the preferred design pattern?
-
-My current assumption is that we need to get these things
-out of arch/arm/* and into proper subsystems, using
-drivers/mfd/* as an arbitration point. However I am not
-sure that everyone really agrees on this. Right now it's
-more a modus operandi and following what someone else
-does than a conscious decision to do this.
-
-We have discussed creating drivers/scm/* (system controller
-modules) but I'm pretty unsure of what the definition of
-such creatures would be, and the border toward MFD
-would be pretty blurred.
-
-x86 have conveniently put some of their equivalents under
-drivers/platform/x86 but if I understood Arnd correctly
-creating drivers/platform/arm would break the intentions
-of that directory.
-
-Thoughts, ideas?
-
-Yours,
-Linus Walleij
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
