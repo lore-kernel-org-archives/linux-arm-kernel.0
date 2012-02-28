@@ -1,27 +1,35 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Tue, 28 Feb 2012 10:51:09 -0600
-Subject: [PATCH 4/6] ASoC: fsl: create fsl_utils to accommodate the common
- functions
-In-Reply-To: <1330092582-21180-5-git-send-email-shawn.guo@linaro.org>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F4D05FD.5000401@freescale.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 28 Feb 2012 10:13:43 -0700 (MST)
+Subject: [PATCH 2/3] tty: serial: OMAP: block idle while the UART is
+ transferring data in PIO mode
+In-Reply-To: <4F47A040.6030502@ti.com>
+References: <20120126024903.31613.24730.stgit@dusk>
+ <20120126025036.31613.67819.stgit@dusk> <4F423E28.3040404@ti.com>
+ <alpine.DEB.2.00.1202211456160.25023@utopia.booyaka.com>
+ <4F47A040.6030502@ti.com>
+Message-ID: <alpine.DEB.2.00.1202281012130.11716@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
+Hi
 
-> +EXPORT_SYMBOL_GPL(fsl_asoc_get_codec_dev_name);
+On Fri, 24 Feb 2012, Cousson, Benoit wrote:
 
-Please use EXPORT_SYMBOL() instead of EXPORT_SYMBOL_GPL().  Freescale does
-not want to impose license restrictions on its customers.
+> On 2/21/2012 11:02 PM, Paul Walmsley wrote:
+>
+> > Looks fine to me, although I'd suggest fixing the DMA workaround path as
+> > well.
+> 
+> Mmm, I've tried to fix every instances of pdata in the code, you think I
+> missed some?
+> 
+> I'll check again.
+> 
+> > Reviewed-by: Paul Walmsley<paul@pwsan.com>
 
-Also, I think there's a bug in this function that I never got around to
-fixing.  I think you need to call put_device() somewhere.
-of_find_i2c_device_by_node() calls bus_find_device(), which calls
-get_device(), which increments the reference count.
+I just doublechecked the code paths and looks like you covered them all.  
+Sorry about the confusion.
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
+
+- Paul
