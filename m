@@ -1,36 +1,133 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 28 Feb 2012 05:44:39 +0000
-Subject: [PATCH v5 2/3] arm:davinci: move emif driver to mfd framework
-In-Reply-To: <20120227142638.GN27687@sortiz-mobl>
-References: <y> <1330005504-25321-3-git-send-email-prakash.pm@ti.com>
- <20120227142638.GN27687@sortiz-mobl>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3176D103@DBDE01.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Feb 2012 06:48:12 +0100
+Subject: RFC: what do we do with system controllers?
+Message-ID: <CACRpkdY1W-RGE0JL4Sx5UcPY-EGieu8vo7H0fp9xyXtegpaaKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+Mainly addressed to Greg but anyone is welcome to join the
+discussion...
 
-On Mon, Feb 27, 2012 at 19:56:38, Samuel Ortiz wrote:
-[snip]
-> So it seems you're passing a platform devices array through your mfd aemif
-> platform data pointer. And from what I can see, it's mostly a 1 entry array
-> (for the NAND case) or a 2 entries array (for the NAND and NOR case).
-> In that case, adding an MFD driver in the middle brings basically nothing but
-> confusion and overhead (and 200+ lines of code).
-> So unless someone explains to me how this is doing any good to the kernel in
-> general, I'm not going to take this patchset.
-> 
-> Cheers,
-> Samuel.
->
+Several ARM platforms have system controllers. In this I
+include all custom terminology such as:
 
-In this way we trying to isolate future modification of aemif driver not to depict
-as platform code change, the need for this is based on discussion in below thread
-http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
+- System Control
+- Chip Controller
+- Core Module control registers
+- Power Reset Control Management Units
+- Multimedia Communications Port
+- ASIC control of "stuff"
 
-Earlier also concern was expressed to move aemif driver out of arch/arm to drivers folder.
-Here is the link for the same: http://lists.infradead.org/pipermail/linux-mtd/2011-August/037308.html
-Since aemif driver supports NAND/NOR devices, we feel MFD is the place holder.
+These are register-mapped ranges controlling "various" or
+"misc" parts of the system. The registers you find there can
+do e.g.:
 
-Thanks,
-Prakash
+* Reset or shut down the system
+   arch/arm/mach-integrator/core.c
+   arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
+
+* Reset individual ASIC blocks
+  drivers/mfd/db8500-prcmu.c
+  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
+
+* Control some core voltage domains
+  drivers/mfd/db8500-prcmu.c
+
+* Control system frequency
+   arch/arm/mach-integrator/cpu.c
+   drivers/mfd/db8500-prcmu.c
+
+* Select clocking of indvidual ASIC IP blocks:
+  drivers/mfd/db8500-prcmu.c
+  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
+
+* Provide some versioning numbers for the entire system
+  drivers/misc/atmel-ssc.c
+  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
+  (Integrator, Versatile, RealView, Versatile Express)
+
+* Enable and reset external buses such as PCI
+  arch/arm/mach-integrator/pci_v3.c
+
+* (De)protect flash memory
+  arch/arm/mach-integrator/integrator_cp.c
+
+* Provide a communication channel to another control unit
+  drivers/mfd/mcp-core.c
+  drivers/mfd/db8500-prcmu.c
+
+* Set some clock divisors for misc units
+  drivers/mfd/mcp-core.c
+  (also PL810 as discussed recently)
+
+* LEDs, GPIO etc communication channel
+  drivers/mfd/asic3.c
+
+* USB transciever control:
+  arch/arm/mach-omap2/omap_phy_internal.c
+
+* Get OTP (one-time-programmable) bits:
+  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
+  arch/powerpc/platforms/ps3/os-area.c
+  arch/powerpc/platforms/chrp/nvram.c
+
+* Set up DDR control registers:
+  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
+
+* Pin control:
+  arch/arm/mach-bcmring/include/mach/csp/chipcHw_inline.h
+
+(Some non-ARM examples included for fun.)
+
+As can be seen from the diverse examples there is a fit
+to various extent to existing subsystems, and often mfd is
+increasingly used as an arbitration point for other
+subsystems.
+
+The current way to split this problem is to:
+
+- Push each subfunctionality into a specialized subsystem
+  PLL and clocks to drivers/clk using the new framework
+  RealSoonNow for example, pin control we have in place
+  regulators can handle domain switches...
+
+- Put in place an arbitration hub-like mechanism using MFD
+
+This can be done in two ways:
+
+- Permanently map the register range and let subdrivers
+  poke directly into the registers they're interested in.
+
+- Map the register range in a hub driver (often MFD) and
+  write accessor functions for all subfunctionality.
+
+As far as the drivers are small and nice the heterogeneous
+character of these device register ranges are not much
+of a problem. Some will argue to not fix what ain't broken
+and not move these out of arch/arm/* at all.
+
+What we need to discuss is if this is how we go about
+taking care of these devices going forward - what shall be
+the preferred design pattern?
+
+My current assumption is that we need to get these things
+out of arch/arm/* and into proper subsystems, using
+drivers/mfd/* as an arbitration point. However I am not
+sure that everyone really agrees on this. Right now it's
+more a modus operandi and following what someone else
+does than a conscious decision to do this.
+
+We have discussed creating drivers/scm/* (system controller
+modules) but I'm pretty unsure of what the definition of
+such creatures would be, and the border toward MFD
+would be pretty blurred.
+
+x86 have conveniently put some of their equivalents under
+drivers/platform/x86 but if I understood Arnd correctly
+creating drivers/platform/arm would break the intentions
+of that directory.
+
+Thoughts, ideas?
+
+Yours,
+Linus Walleij
