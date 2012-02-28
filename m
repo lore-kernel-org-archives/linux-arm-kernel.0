@@ -1,52 +1,57 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Feb 2012 16:11:31 -0800
-Subject: [PATCH 6/6] gpio/omap: fix _set_gpio_irqenable implementation
-In-Reply-To: <1329999031-6914-7-git-send-email-tarun.kanti@ti.com> (Tarun
- Kanti DebBarma's message of "Thu, 23 Feb 2012 17:40:31 +0530")
-References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
- <1329999031-6914-7-git-send-email-tarun.kanti@ti.com>
-Message-ID: <877gz7u898.fsf@ti.com>
+Date: Mon, 27 Feb 2012 16:24:06 -0800
+Subject: [PATCH 3/6] ARM: OMAP3PLUS PM: Add IO Daisychain support via
+ hwmod mux
+In-Reply-To: <1330003320-17400-4-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Thu, 23 Feb 2012 15:21:57 +0200")
+References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
+ <1330003320-17400-4-git-send-email-t-kristo@ti.com>
+Message-ID: <87pqczst3t.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+Tero Kristo <t-kristo@ti.com> writes:
 
-> This function should be capable of both enabling and disabling interrupts
-> based upon the *enable* parameter. Right now the function only enables
-> the interrupt and *enable* is not used at all. So add the interrupt
-> disable capability also using the parameter.
+> From: Vishwanath BS <vishwanath.bs@ti.com>
 >
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-
-Hmm, interesting.
-
-This means that the IRQ mask/unmask stuff is not actually doing anything
-since it's always leaving the IRQ enabled.  Curious that we haven't seen
-side effects of that.  Maybe since the trigger type is none, the
-interrupts won't fire.
-
-In any case, this is a good fix.
-
-Kevin
-
-
-> ---
->  drivers/gpio/gpio-omap.c |    5 ++++-
->  1 files changed, 4 insertions(+), 1 deletions(-)
+> IO Daisychain feature has to be triggered whenever there is a change in
+> device's mux configuration (See section 3.9.4 in OMAP4 Public TRM vP).
 >
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 67535c8..acc71a0 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -473,7 +473,10 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
->  
->  static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int enable)
->  {
-> -	_enable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
-> +	if (enable)
-> +		_enable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
-> +	else
-> +		_disable_gpio_irqbank(bank, GPIO_BIT(bank, gpio));
+> Now devices can idle independent of the powerdomain, there can be a
+> window where device is idled and corresponding powerdomain can be
+> ON/INACTIVE state. In such situations, since both module wake up is
+> enabled at padlevel as well as io daisychain sequence is triggered,
+> there will be 2 PRCM interrupts (Module async wake up via swakeup and
+> IO Pad interrupt). But as PRCM Interrupt handler clears the Module
+> Padlevel WKST bit in the first interrupt, module specific interrupt
+> handler will not triggered for the second time
+>
+> Also look at detailed explanation given by Rajendra at
+> http://www.spinics.net/lists/linux-serial/msg04480.html
+>
+> Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+
+My review comments from the last version of this patch were not
+answered/addressed:
+
+   http://marc.info/?l=linux-omap&m=132621832120535&w=2
+
+[...]
+
+> @@ -64,6 +65,12 @@ static void omap2_init_processor_devices(void)
+>  	}
 >  }
 >  
->  /*
+> +void omap_trigger_wuclk_ctrl(void)
+> +{
+> +	if (cpu_is_omap44xx())
+> +		omap4_trigger_wuclk_ctrl();
+> +}
+
+Subject says OMAP3+, but clearly this only works on OMAP4.
+
+Also, no cpu_is* checks at runtime please.  Instead, at init time, use
+cpu_is_* to initialize a function pointer.
+
+Kevin
