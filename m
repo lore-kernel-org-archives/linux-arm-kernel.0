@@ -1,100 +1,49 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 28 Feb 2012 04:10:52 -0700
-Subject: [PATCH 2/9] ARM: OMAP3: hwmod data: fix interfaces for the MMC hwmods
+Date: Tue, 28 Feb 2012 04:10:56 -0700
+Subject: [PATCH 7/9] ARM: OMAP4: hwmod data: add OCP_USER_DSP;
+ mark omap44xx_dsp__iva appropriately
 In-Reply-To: <20120228110943.808.73639.stgit@dusk>
 References: <20120228110943.808.73639.stgit@dusk>
-Message-ID: <20120228111051.808.77655.stgit@dusk>
+Message-ID: <20120228111055.808.79928.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a52e2ab66d4a9305e1ba64d9b9d25754b6c70895 ("ARM: OMAP3: hwmod
-data: disable multiblock reads on MMC1/2 on OMAP34xx/35xx <= ES2.1")
-didn't link the MMC hwmods to the interconnects correctly.  Future
-patches will register hwmods by interface, so if this is not fixed,
-the MMC IP blocks won't be registered.  Update the interface data
-records to point to the correct IP blocks.
+One of the OMAP4 links was missing OCP_USER flags, since it was only
+used by the DSP initiator, and we did not have an OCP_USER_DSP flag.
+Future patches will switch the hwmod code and data to register
+interfaces, rather than hwmods, and it will be mandatory for all
+interfaces to have at least one user bit set.  This patch resolves the
+issue by adding OCP_USER_DSP and marking the DSP-IVA interface
+appropriately.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   38 ++++++++++++++++++++++------
- 1 files changed, 30 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |    1 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 536d0c6..a432618 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -70,8 +70,10 @@ static struct omap_hwmod omap34xx_mcspi1;
- static struct omap_hwmod omap34xx_mcspi2;
- static struct omap_hwmod omap34xx_mcspi3;
- static struct omap_hwmod omap34xx_mcspi4;
--static struct omap_hwmod omap3xxx_mmc1_hwmod;
--static struct omap_hwmod omap3xxx_mmc2_hwmod;
-+static struct omap_hwmod omap3xxx_pre_es3_mmc1_hwmod;
-+static struct omap_hwmod omap3xxx_es3plus_mmc1_hwmod;
-+static struct omap_hwmod omap3xxx_pre_es3_mmc2_hwmod;
-+static struct omap_hwmod omap3xxx_es3plus_mmc2_hwmod;
- static struct omap_hwmod omap3xxx_mmc3_hwmod;
- static struct omap_hwmod am35xx_usbhsotg_hwmod;
- 
-@@ -192,9 +194,18 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__l4_wkup = {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 8dfed19..f3fd64d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -1089,6 +1089,7 @@ static struct omap_hwmod_ocp_if omap44xx_dsp__iva = {
+ 	.master		= &omap44xx_dsp_hwmod,
+ 	.slave		= &omap44xx_iva_hwmod,
+ 	.clk		= "dpll_iva_m5x2_ck",
++	.user		= OCP_USER_DSP,
  };
  
- /* L4 CORE -> MMC1 interface */
--static struct omap_hwmod_ocp_if omap3xxx_l4_core__mmc1 = {
-+static struct omap_hwmod_ocp_if omap3xxx_l4_core__pre_es3_mmc1 = {
- 	.master		= &omap3xxx_l4_core_hwmod,
--	.slave		= &omap3xxx_mmc1_hwmod,
-+	.slave		= &omap3xxx_pre_es3_mmc1_hwmod,
-+	.clk		= "mmchs1_ick",
-+	.addr		= omap2430_mmc1_addr_space,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+	.flags		= OMAP_FIREWALL_L4
-+};
-+
-+static struct omap_hwmod_ocp_if omap3xxx_l4_core__es3plus_mmc1 = {
-+	.master		= &omap3xxx_l4_core_hwmod,
-+	.slave		= &omap3xxx_es3plus_mmc1_hwmod,
- 	.clk		= "mmchs1_ick",
- 	.addr		= omap2430_mmc1_addr_space,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -202,9 +213,18 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__mmc1 = {
- };
+ /* dsp master ports */
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 8814365..f0a0711 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -213,6 +213,7 @@ struct omap_hwmod_addr_space {
+  */
+ #define OCP_USER_MPU			(1 << 0)
+ #define OCP_USER_SDMA			(1 << 1)
++#define OCP_USER_DSP			(1 << 2)
  
- /* L4 CORE -> MMC2 interface */
--static struct omap_hwmod_ocp_if omap3xxx_l4_core__mmc2 = {
-+static struct omap_hwmod_ocp_if omap3xxx_l4_core__pre_es3_mmc2 = {
-+	.master		= &omap3xxx_l4_core_hwmod,
-+	.slave		= &omap3xxx_pre_es3_mmc2_hwmod,
-+	.clk		= "mmchs2_ick",
-+	.addr		= omap2430_mmc2_addr_space,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+	.flags		= OMAP_FIREWALL_L4
-+};
-+
-+static struct omap_hwmod_ocp_if omap3xxx_l4_core__es3plus_mmc2 = {
- 	.master		= &omap3xxx_l4_core_hwmod,
--	.slave		= &omap3xxx_mmc2_hwmod,
-+	.slave		= &omap3xxx_es3plus_mmc2_hwmod,
- 	.clk		= "mmchs2_ick",
- 	.addr		= omap2430_mmc2_addr_space,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-@@ -3141,7 +3161,8 @@ static struct omap_hwmod_opt_clk omap34xx_mmc1_opt_clks[] = {
- };
- 
- static struct omap_hwmod_ocp_if *omap3xxx_mmc1_slaves[] = {
--	&omap3xxx_l4_core__mmc1,
-+	&omap3xxx_l4_core__pre_es3_mmc1,
-+	&omap3xxx_l4_core__es3plus_mmc1,
- };
- 
- static struct omap_mmc_dev_attr mmc1_dev_attr = {
-@@ -3216,7 +3237,8 @@ static struct omap_hwmod_opt_clk omap34xx_mmc2_opt_clks[] = {
- };
- 
- static struct omap_hwmod_ocp_if *omap3xxx_mmc2_slaves[] = {
--	&omap3xxx_l4_core__mmc2,
-+	&omap3xxx_l4_core__pre_es3_mmc2,
-+	&omap3xxx_l4_core__es3plus_mmc2,
- };
- 
- /* See 35xx errata 2.1.1.128 in SPRZ278F */
+ /* omap_hwmod_ocp_if.flags bits */
+ #define OCPIF_SWSUP_IDLE		(1 << 0)
