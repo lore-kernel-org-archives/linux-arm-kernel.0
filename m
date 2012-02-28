@@ -1,34 +1,30 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 28 Feb 2012 09:11:50 -0300
-Subject: [PATCH] ARM: mx51: Fix build error due to missing include of
- <linux/bug.h>
-Message-ID: <1330431110-22020-1-git-send-email-fabio.estevam@freescale.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 28 Feb 2012 12:21:37 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <20120228094616.GA2063@linaro.org>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20120227175327.GA2023@linaro.org>
+ <1330372125.10008.47.camel@dagon.hellion.org.uk>
+ <20120228094616.GA2063@linaro.org>
+Message-ID: <alpine.DEB.2.00.1202281131550.23091@kaball-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build error:
-
-arch/arm/mach-imx/cpu_op-mx51.c: In function 'mx51_get_cpu_op':
-arch/arm/mach-imx/cpu_op-mx51.c:27: error: implicit declaration of function 'BUILD_BUG_ON_ZERO'
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-This applies against linux-next
-
- arch/arm/mach-imx/cpu_op-mx51.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-imx/cpu_op-mx51.c b/arch/arm/mach-imx/cpu_op-mx51.c
-index 9d34c3d..9a4f77a 100644
---- a/arch/arm/mach-imx/cpu_op-mx51.c
-+++ b/arch/arm/mach-imx/cpu_op-mx51.c
-@@ -14,6 +14,7 @@
- #include <linux/types.h>
- #include <mach/hardware.h>
- #include <linux/kernel.h>
-+#include <linux/bug.h>
+On Tue, 28 Feb 2012, Dave Martin wrote:
+> > Given that Stefano is proposing to make the ISS a (per-hypervisor)
+> > constant we could consider just defining the Thumb and non-Thumb
+> > constants instead of doing all the construction with the __HVC_IMM stuff
+> > -- that would remove a big bit of the macroization.
+> 
+> It's not quite as simple as that -- emitting instructions using data
+> directives is not endianness safe, and even in the cases where .long gives
+> the right result for ARM, it gives the wrong result for 32-bit Thumb
+> instructions if the opcode is given in human-readable order.
+> 
+> I was trying to solve the same problem for the kvm guys with some global
+> macros -- I'm aiming to get a patch posted soon, so I'll make sure
+> you're on CC.
  
- static struct cpu_op mx51_cpu_op[] = {
- 	{
--- 
-1.7.1
+That would be great, thanks!
