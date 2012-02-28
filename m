@@ -1,48 +1,25 @@
-From: T.Mehnert@eckelmann.de (Mehnert, Torsten)
-Date: Tue, 28 Feb 2012 17:48:02 +0000
-Subject: [PATCH 1/2] mxc_ehci.h: add flags for usb hwinit
-Message-ID: <3F263ABB4EDE344D974E1983B56807739E4BC6B3@EX-DAG02.eckelmann.group>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 28 Feb 2012 09:57:35 -0800
+Subject: [PATCH v3] ARM: LPC32xx: USB Support
+In-Reply-To: <1330178224-24999-2-git-send-email-stigge@antcom.de>
+References: <1330178224-24999-1-git-send-email-stigge@antcom.de>
+ <1330178224-24999-2-git-send-email-stigge@antcom.de>
+Message-ID: <20120228175735.GB14290@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: T. Mehnert <t.mehnert@eckelmann.de>
-Date: Thu, 16 Feb 2012 14:10:20 +0100
-Subject: [PATCH] mxc_ehci.h extending flags for hwinit
+On Sat, Feb 25, 2012 at 02:57:04PM +0100, Roland Stigge wrote:
+> This patch adds OHCI support to the LPC32xx ARM platform. Besides the trivial
+> addition of platform "usb-ohci" support, fixes for the USB PLL have been added
+> to arch/arm/mach-lpc32xx/clock.c, ported from NXP's lpclinux.com.
+> 
+> (This is the mach-lpc32xx specific part, the USB subsystem specific changes are
+> in a separate patch for the USB maintainers.)
 
-This Patch adds defines for the flags field. This flags
-are used for usb hw initialisation. The new flags will give
-more options to configure the usb hardware from the board
-file.
----
- arch/arm/plat-mxc/include/mach/mxc_ehci.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Do you want/need me to take both of these?  Or just the first one?  Or,
+just ack the first one so the arm maintainers can take this one?  It's
+your choice...
 
-diff --git a/arch/arm/plat-mxc/include/mach/mxc_ehci.h b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-index 2c159dc..5edbb95 100644
---- a/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc_ehci.h
-@@ -27,6 +27,9 @@
- #define MXC_EHCI_IPPUE_UP		(1 << 9)
- #define MXC_EHCI_WAKEUP_ENABLED	(1 << 10)
- #define MXC_EHCI_ITC_NO_THRESHOLD	(1 << 11)
-+#define MXC_EHCI_AHB_LOCK_ENABLE	(1 << 12)
-+#define MXC_EHCI_POWER_POLARITY_HIGH	(1 << 13)
-+#define MXC_EHCI_XCVR_FORCED_INTERNAL	(1 << 14)
- 
- #define MXC_USBCTRL_OFFSET		0
- #define MXC_USB_PHY_CTR_FUNC_OFFSET	0x8
--- 
-1.7.0.4
----
-Torsten Mehnert
-K?lte- und Geb?udeleittechnik (KGL)
-?
-ECKELMANN AG
-Berliner Stra?e 161
-D - 65205 Wiesbaden
-?
-Phone:	+49 (0) 611 / 7103 - 370
-Fax:	+49 (0) 611 / 7103 - 133
+thanks,
 
-e-Mail:	mailto:t.mehnert@eckelmann.de
-Web:	http://www.eckelmann.de
+greg k-h
