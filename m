@@ -1,56 +1,60 @@
 From: zhaoy@marvell.com (zhaoy)
-Date: Tue, 28 Feb 2012 15:27:32 +0800
-Subject: [PATCH 00/13] Enable DMA engine for mmp2 and mmp3
+Date: Tue, 28 Feb 2012 15:27:34 +0800
+Subject: [PATCH 02/13] dmaengine:open dmac and tdma support
 In-Reply-To: <Y>
 References: <Y>
-Message-ID: <1330414065-2949-1-git-send-email-zhaoy@marvell.com>
+Message-ID: <1330414065-2949-3-git-send-email-zhaoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patch is for marvell mmp2 and mmp3 platform to enable
-dmaengine, use dmaengine to manage the audio dma, video dma 
-and peripheral device dma together. 
+	1.open dmaengine for tdma and dmac support
 
-zhaoy (13):
-  DMA:define second level irq definition
-  dmaengine:open dmac and tdma support
-  dmaengine: mmp: add two-channel dma driver
-  dmaengine:mmp add peripheral dma driver
-  mmp2:register dma devices for mmp2 platform
-  mmp3:register dma devices for mmp3 platform
-  DMA:mmp:remove redundant dma drivers
-  DMAC:tty serial pxa use generic dma engine APIs
-  DMA:remove unnecessary dma configurations
-  dmaengine:audio:mmp audio use generic dma engine APIs
-  DMA:update defconfig for mmp3
-  mdma:dmaengine:update mdma for tdma
-  DMA:update defconfig for mmp2
+Change-Id: I3251daa57cf15fc96e90fbe8be3a1ee303629bcc
+Signed-off-by: zhaoy <zhaoy@marvell.com>
+---
+ drivers/dma/Kconfig  |   19 +++++++++++++++++++
+ drivers/dma/Makefile |    2 ++
+ 2 files changed, 21 insertions(+), 0 deletions(-)
 
- arch/arm/configs/mmp2_defconfig           |   23 +-
- arch/arm/configs/mmp3_defconfig           |   21 +-
- arch/arm/mach-mmp/Makefile                |    4 +-
- arch/arm/mach-mmp/include/mach/irqs.h     |   18 +-
- arch/arm/mach-mmp/include/mach/mmp_dma.h  |   89 ++-
- arch/arm/mach-mmp/include/mach/regs-icu.h |   12 +-
- arch/arm/mach-mmp/irq-mmp2.c              |    4 +
- arch/arm/mach-mmp/irq-mmp3.c              |    3 +
- arch/arm/mach-mmp/mmp2.c                  |  122 ++-
- arch/arm/mach-mmp/mmp3.c                  |   78 ++-
- arch/arm/plat-pxa/include/plat/dma.h      |   33 +-
- drivers/char/mmp2_mdma.c                  |  273 ++----
- drivers/dma/Kconfig                       |   19 +
- drivers/dma/Makefile                      |    2 +
- drivers/dma/mmp_tdma.c                    |  858 +++++++++++++++
- drivers/dma/pxa_dmac.c                    | 1077 ++++++++++++++++++
- drivers/tty/serial/Kconfig                |   12 +-
- drivers/tty/serial/Makefile               |    1 +
- drivers/tty/serial/mmp_pxa.c              | 1698 +++++++++++++++++++++++++++++
- sound/soc/pxa/mmp-pcm.c                   |  232 ++--
- sound/soc/pxa/mmp-pcm.h                   |    4 +-
- sound/soc/pxa/mmp2-squ.c                  |  192 ++--
- sound/soc/pxa/mmp2-squ.h                  |    8 +-
- sound/soc/pxa/mmp2-sspa.c                 |   28 +-
- 24 files changed, 4361 insertions(+), 450 deletions(-)
- create mode 100644 drivers/dma/mmp_tdma.c
- create mode 100644 drivers/dma/pxa_dmac.c
- create mode 100644 drivers/tty/serial/mmp_pxa.c
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 25cf327..483b782 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -237,6 +237,25 @@ config MXS_DMA
+ 	  Support the MXS DMA engine. This engine including APBH-DMA
+ 	  and APBX-DMA is integrated into Freescale i.MX23/28 chips.
+ 
++config PXA_DMAC
++	bool "PXA DMAC support"
++	depends on ARCH_PXA || ARCH_MMP
++	select DMA_ENGINE
++	help
++	  Support the PXA DMAC engine. This engine mainly used for PXA DMAC,
++	  also is integrated into Marvell MMP chips for peripheral DMA engine.
++
++config MMP_TDMA
++	bool "MMP Two-Channel DMA support"
++	depends on ARCH_MMP
++	select DMA_ENGINE
++	help
++	  Support the MMP Two-Channel DMA engine. This engine mainly used for
++	  Audio DMA and Memory DMA, now is integrated into Marvell MMP chips.
++
++	  Say Y here if you want to use tdma to manage the adma and mdma,
++	  otherwise say N.
++
+ config DMA_ENGINE
+ 	bool
+ 
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 836095a..ba8e79c 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -25,3 +25,5 @@ obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
+ obj-$(CONFIG_PL330_DMA) += pl330.o
+ obj-$(CONFIG_PCH_DMA) += pch_dma.o
+ obj-$(CONFIG_AMBA_PL08X) += amba-pl08x.o
++obj-$(CONFIG_PXA_DMAC) += pxa_dmac.o
++obj-$(CONFIG_MMP_TDMA) += mmp_tdma.o
+-- 
+1.7.0.4
