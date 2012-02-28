@@ -1,44 +1,58 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Tue, 28 Feb 2012 15:53:30 +0000
-Subject: [PATCH v2] ARM: LPC32xx: Ethernet driver
-In-Reply-To: <201202281341.01690.arnd@arndb.de>
-References: <AE90C24D6B3A694183C094C60CF0A2F6026B6E83@saturn3.aculab.com>
- <4F4CD781.2090802@antcom.de> <201202281341.01690.arnd@arndb.de>
-Message-ID: <1330444410.8460.160.camel@deadeye>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Feb 2012 15:53:41 +0000
+Subject: [PATCH v2] USB: Support for LPC32xx SoC
+In-Reply-To: <Pine.LNX.4.44L0.1202280951440.1456-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1202280951440.1456-100000@iolanthe.rowland.org>
+Message-ID: <201202281553.41332.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-02-28 at 13:41 +0000, Arnd Bergmann wrote:
-> On Tuesday 28 February 2012, Roland Stigge wrote:
-> > Yes, that's why we previously had a cmdline param for it (but removed it
-> > upon request from the netdev maintainer).
-> > 
-> > So if the hardware defaults to 00:00:00:00:00:00, what is the
-> > "consistent policy we want to enforce in all drivers"?
-> > 
-> > A link or hint would be sufficient.
+On Tuesday 28 February 2012, Alan Stern wrote:
+> It's heading in the intended direction, although the details might not 
+> all be quite right -- I didn't check them very closely.
 > 
-> I think the most common strategy for platform drivers these days is
+> One big thing about it is wrong: Many or most of the functions you
+> exported don't really need to be.  Instead, ohci-hcd.c should define
+> ohci_driver (a bus-agnostic hc_driver structure) and export that.  
+> Then the bus-glue files can copy the structure for their own use during
+> initialization (rather than duplicating the definition all over the
+> place) and override individual methods as needed.
 > 
-> 1. use what the hardware provides
-> 2. call of_get_mac_address(dev->of_node, ...)
-> 3. use random_ether_addr
+> It's a more "object-oriented" approach.  :-)
 
-The 3rd option should now be eth_hw_addr_random().
+Yes, that makes sense. I did not try to actually understand how the
+driver works internally, just tried the mechanical conversion in a way
+that did not require changing any code besides the sb800_prefetch
+function that had to be moved.
 
-Ben.
+There are still a few symbols that are used by most or all hw specific
+drivers and that will have to remain exported:
 
-> in that order. of_get_mac_address just returns NULL when there
-> is no device tree or no local-mac-address property, so you can
-> put it into the driver right away.
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+ohci_init, ohci_run, ohci_stop, ohci_finish_controller_resume, and
+ohci_hcd_init
 
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+And then there are a few symbols that are only used by one or two
+drivers, possibly correctly or not:
+
+ohci_dump (spear)
+ohci_usb_reset (at91, pci)
+ohci_shutdown (ps3)
+ohci_restart (pci)
+ohci_hub_control (da8xx)
+
+These ones do not need to get exported following your suggestion:
+
+ohci_urb_enqueue, ohci_urb_dequeue, ohci_endpoint_disable,
+ohci_get_frame, ohci_irq, ohci_bus_suspend, ohci_bus_resume,
+ohci_hub_status_data, and ohci_start_port_reset
+
+I would do implementation the other way round and let the bus specific
+driver provide a sparsely populated version of struct hc_driver
+that is completed by a function in the common ohci parts. That would
+keep the logicto combine the two in one place rather than duplicating
+it everywhere, but it's a bit more overhead in the case where you
+build only a single bus glue.
+
+Certainly either way is possible, whichever you prefer.
+
+	Arnd
