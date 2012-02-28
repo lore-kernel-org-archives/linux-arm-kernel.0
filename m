@@ -1,46 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 Feb 2012 09:52:50 +0800
-Subject: [PATCH 5/6] ASoC: fsl: use platform_device_id table to match
- p1022_ds device
-In-Reply-To: <4F4BF805.60807@freescale.com>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-6-git-send-email-shawn.guo@linaro.org>
- <4F4BF805.60807@freescale.com>
-Message-ID: <20120228015248.GB13886@S2101-09.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 28 Feb 2012 09:56:38 +0800
+Subject: [PATCH 02/11] Revert "ARM: pxa: add dummy clock for sa1100-rtc"
+In-Reply-To: <1330367087.26671.YahooMailClassic@web29007.mail.ird.yahoo.com>
+References: <CAN1soZxbju453j01g73E69UjzgY=9AKQ8_ct7oXaY1_+XE3=Cw@mail.gmail.com>
+ <1330367087.26671.YahooMailClassic@web29007.mail.ird.yahoo.com>
+Message-ID: <CAN1soZzZsiNjGeNGz7JYZe5v3rQAY9N+XKmniPMN78SqMH0bhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 03:39:17PM -0600, Timur Tabi wrote:
-> Shawn Guo wrote:
-> 
-> > -
-> > -	/*
-> > -	 * Check if we're actually running on a P1022DS.  Older device trees
-> > -	 * have a model of "fsl,P1022" and newer ones use "fsl,P1022DS", so we
-> > -	 * need to support both.  The SSI driver uses that property to link to
-> > -	 * the machine driver, so have to match it.
-> > -	 */
-> 
-> Please retain this paragraph somewhere.  It's important to explain why
-> we're checking for both strings.
-> 
+On Tue, Feb 28, 2012 at 2:24 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
+>> >> > This reverts commit
+>> 7557c175f60d8d40baf16b22caf79beadef8f081.
+>> >> >
+>> >> > This revert is necessary to revert the broken
+>> "RTC: sa1100:
+>> >> > support sa1100, pxa and mmp soc families"
+>> change.
+>> >>
+>> >> Taking out the lines concerning the dummy clk for
+>> pxa-gpio is
+>> >> causing stargate2's smc91x driver to fail to find
+>> the part.
+>> >>
+>> >> So reverting the regression cause caused a
+>> different regression.
+>> >>
+>> >> Something 'unusual' occured with the commit you
+>> reference above.
+>> >> The gpio line was added in
+>> 389eda15e0f41112d7c44213b3c4f8bd1c9398bc
+>> >
+>> > Sigh. ?I give up with this issue, people are obviously
+>> useless at
+>> > properly separating their changes. ?Someone else can
+>> sort out this
+>> > bloody mess.
+>> >
+>> Sure. I'll try to fix this issue in this week.
+>
+> Removing the pxa-gpio dummy clk also broke the hx4700.
 
-Ok, it will be something like the following.
-
-/*
- * Check if we're actually running on a P1022DS.  Older device trees
- * have a model of "fsl,P1022" and newer ones use "fsl,P1022DS", so we
- * need to support both.  The SSI driver uses that property to link to
- * the machine driver, so have to match it.
- */
-static struct platform_device_id p1022_ds_ids[] = {
-	{ .name = "snd-soc-p1022ds", },
-	{ .name = "snd-soc-p1022", },
-	{ /* sentinel */ }
-};
-MODULE_DEVICE_TABLE(platform, p1022_ds_ids);
-
--- 
-Regards,
-Shawn
+Thanks. I'll append it for pxa27x again.
