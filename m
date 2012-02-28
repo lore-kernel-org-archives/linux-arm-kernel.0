@@ -1,18 +1,16 @@
 From: rob.lee@linaro.org (Rob Lee)
-Date: Tue, 28 Feb 2012 09:45:10 -0600
+Date: Tue, 28 Feb 2012 09:50:56 -0600
 Subject: [PATCH v5 1/9] cpuidle: Add commonly used functionality for
  consolidation
-In-Reply-To: <CAJOA=zOmUTqXdMDcY6Bbs51SsRmTJMMu9xtbPxsyq4oNgSdNjg@mail.gmail.com>
+In-Reply-To: <CAJOA=zNZ2xh34DTZc1gJwy0O6d=E=wdP4_sq_zrj3qjLcbj0kw@mail.gmail.com>
 References: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
  <1330318063-25460-2-git-send-email-rob.lee@linaro.org>
- <CAJOA=zOmUTqXdMDcY6Bbs51SsRmTJMMu9xtbPxsyq4oNgSdNjg@mail.gmail.com>
-Message-ID: <CAMXH7KEBggsYEq9irMoEG-fZEjgEFACFhZZ+-JQj0uvwpGsZHA@mail.gmail.com>
+ <CAJOA=zNZ2xh34DTZc1gJwy0O6d=E=wdP4_sq_zrj3qjLcbj0kw@mail.gmail.com>
+Message-ID: <CAMXH7KFbH2HFwFgMu+XfrFKSEGTvD_H09EN2atHUJa9pz7ESYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Mike,
-
-On Mon, Feb 27, 2012 at 6:06 PM, Turquette, Mike <mturquette@ti.com> wrote:
+On Mon, Feb 27, 2012 at 6:49 PM, Turquette, Mike <mturquette@ti.com> wrote:
 > On Sun, Feb 26, 2012 at 8:47 PM, Robert Lee <rob.lee@linaro.org> wrote:
 >> +/**
 >> + * cpuidle_enter_wrap - performing timekeeping and irq around enter function
@@ -45,23 +43,62 @@ On Mon, Feb 27, 2012 at 6:06 PM, Turquette, Mike <mturquette@ti.com> wrote:
 >> + ? ? ? return index;
 >> +}
 >
-> Any reason that this code is in the header? ?Why not in cpuidle.c?
+> Hi Rob,
 >
+> In a previous series I brought up the idea of not accounting for time
+> if a C-state transition fails. ?My post on that thread can be found
+> here:
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/149293/
+>
+> How do you feel about adding something like the following?
+>
+> if (IS_ERR(index))
+> ? ? ? ?dev->last_residency = 0;
+> ? ? ? ?return index;
+>
+> Obviously it will up to the platforms to figure out how to propagate
+> that error up from their respective low power code.
 
-Not a strong reason.  I thought making it an inline would introduce
-slightly less new execution when adding this code (realizing that
-there are function calls immediately after, so the only benefit is the
-reduce popping and pushing).  But it does require an extra copy of
-this code for any platform driver that does not enable
-en_core_tk_irqen and instead makes calls to it directly (like omap3).
-For this case, I don't think the inline implementation should add
-extra code from what exists today as it should simply replace the
-existing platform time keeping calls to a standard one defined by the
-core cpuidle.
+To be completely clear on what you're asking for, from
+cpuidle_idle_call in drivers/cpuidle/cpuidle.c:
 
-I don't have a strong preference with using the inline so if you or
-others can give your opinion on which method to use and why, I'd be
-glad to read it.
+...
+	target_state = &drv->states[next_state];
 
+	trace_power_start(POWER_CSTATE, next_state, dev->cpu);
+	trace_cpu_idle(next_state, dev->cpu);
+
+	entered_state = target_state->enter(dev, drv, next_state);
+
+	trace_power_end(dev->cpu);
+	trace_cpu_idle(PWR_EVENT_EXIT, dev->cpu);
+
+	if (entered_state >= 0) {
+		/* Update cpuidle counters */
+		/* This can be moved to within driver enter routine
+		 * but that results in multiple copies of same code.
+		 */
+		dev->states_usage[entered_state].time +=
+				(unsigned long long)dev->last_residency;
+		dev->states_usage[entered_state].usage++;
+	}
+...
+
+Note the "if (entered_state >= 0)".  This ultimately prevents the
+cpuidle device time accounting upon an negative value being returned.
+So are you asking for the if(IS_ERR(index)) check to prevent the
+unnecessary last_residency time calculation in the wrapper, or to make
+sure a last_residency is zero upon failure?  (or both?)
+
+It seems like a bug (or lack or documentation at best) in the code
+that exists today to not zero out dev->last_residency upon a negative
+return value as this value is used by the governors upon the next
+idle.  So to ensure last_residency is 0 upon failure, I think it'd be
+best to add that to an new else statement immediately following the
+"if (entered_state >=))" so that any platform cpuidle driver that
+returns a negative will have the last_residency zeroed out, not just
+those that use en_core_tk_irqen.
+
+>
 > Regards,
 > Mike
