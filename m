@@ -1,369 +1,135 @@
-From: zhaoy@marvell.com (zhaoy)
-Date: Tue, 28 Feb 2012 15:27:44 +0800
-Subject: [PATCH 12/13] mdma:dmaengine:update mdma for tdma
-In-Reply-To: <Y>
-References: <Y>
-Message-ID: <1330414065-2949-13-git-send-email-zhaoy@marvell.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Feb 2012 07:39:24 +0000
+Subject: [PATCH WIP] ARM: kirkwood: covert orion-spi to fdt.
+In-Reply-To: <4a9b37f69d6cec5049627b8afa777bb010af05f6.1330381705.git.jason@lakedaemon.net>
+References: <4a9b37f69d6cec5049627b8afa777bb010af05f6.1330381705.git.jason@lakedaemon.net>
+Message-ID: <201202280739.24399.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	1, do some update to add mdma to the
-	dma engine as adma
+On Monday 27 February 2012, Jason Cooper wrote:
+> On the Globalscale Dreamplug (Marvell Kirkwood Development Platform),
+> 2MB of NOR flash are used to hold the bootloader, bootloader
+> environment, and devicetree blob.  It is connected via spi.
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+> Notes:
+>     - checkpatch clean.
+>     - compiles, boots, registers partitions correctly.
 
-Change-Id: I514b247e0c2301fc48b1f1980562f3c50d6a6455
-Signed-off-by: zhaoy <zhaoy@marvell.com>
----
- drivers/char/mmp2_mdma.c |  273 ++++++++++++++--------------------------------
- 1 files changed, 84 insertions(+), 189 deletions(-)
+Nice, it seem that it was simpler than I first thought. I think you should
+lose some of the #ifdef statements, especially those where no extra
+object code gets added because the of_* function calls compile to
+empty inline functions.
 
-diff --git a/drivers/char/mmp2_mdma.c b/drivers/char/mmp2_mdma.c
-index c16b94a..72fee88 100644
---- a/drivers/char/mmp2_mdma.c
-+++ b/drivers/char/mmp2_mdma.c
-@@ -37,8 +37,8 @@ static void *dma_desc_array_ch1 = NULL;
- static void *dma_desc_array_ch2 = NULL;
- static dma_addr_t dma_desc_array_phys_ch1;
- static dma_addr_t dma_desc_array_phys_ch2;
--static struct completion complete_ch1;
--static struct completion complete_ch2;
-+static struct completion complete_memcpy;
-+static struct completion complete_memset;
- 
- static unsigned long uva_to_pa(struct mm_struct *mm, unsigned long addr)
- {
-@@ -68,43 +68,41 @@ static unsigned long uva_to_pa(struct mm_struct *mm, unsigned long addr)
- 	return ret;
- }
- 
--static void mdma_irq(int channel, void *data)
-+static void mdma_irq(void *data)
- {
--	unsigned int base_register = mmp_get_dma_reg_base(channel);
--
--	if(base_register){
--		if (TDISR(base_register) & 0x1) {
--			if(channel == MDMA1_CH0)
--				complete(&complete_ch1);
--			else
--				complete(&complete_ch2);
--			if(TDISR(base_register) & 0xc)
--				printk(KERN_ERR "MDMA error 0x%x on channel %d \n",
--					TDISR(base_register), channel);
--		} else {
--			printk(KERN_ERR "MDMA error on channel %d \n", channel);
--		}
--		TDISR(base_register) = 0;
--	}
-+	struct completion *mdma_complete = data;
-+
-+	complete(mdma_complete);
- 
- 	return;
- }
- 
-+static bool filter(struct dma_chan *chan, void *param)
-+{
-+	struct mmp_tdma_data *tdma_data = param;
-+
-+	if (!mmp_mdma_is_this_type(chan))
-+		return false;
-+
-+	chan->private = tdma_data;
-+
-+	return true;
-+}
- /*
-  * len requires at least 8bytes alignment. 128bytes alignment will get better performance.
-  * Alignment: 8, 16, 32, 64, 128. The bigger, the better.
-  * source and destination address aslo need alignment with burst size.
-  */
-+struct mmp_tdma_data tdma_data_pmemcpy;
- unsigned long mdma_pmemcpy(unsigned long pdst, unsigned long psrc, unsigned int len)
- {
--	int ret, dma_ch;
--	unsigned int base_register;
--	unsigned int dcmd, mdma_dcr;
-+	int ret;
- 	unsigned long len_tmp, len_total;
--	struct pxa910_squ_desc *dma_desc_tmp;
--	dma_addr_t dma_desc_p_tmp;
- 	unsigned long srcphyaddr = psrc;
- 	unsigned long dstphyaddr = pdst;
-+	struct dma_chan *dma_chan;
-+	dma_cap_mask_t mask;
-+	struct dma_async_tx_descriptor *desc;
- 
- 	if (srcphyaddr == 0 || dstphyaddr == 0)
- 		return -1;
-@@ -124,95 +122,44 @@ unsigned long mdma_pmemcpy(unsigned long pdst, unsigned long psrc, unsigned int
- 		return -1;
- 	}
- 
--	ret = mmp_request_dma("mdma_memcpy", MDMA1_CH0,
--					mdma_irq, NULL);
--	if (ret < 0){
--		ret = mmp_request_dma("mdma_memcpy", MDMA1_CH1,
--						mdma_irq, NULL);
--		if (ret < 0){
--			printk(KERN_ERR	"Can't request MDMA for memcpy\n");
--			return -ENODEV;
--		}else{
--			dma_ch = MDMA1_CH1;
--		}
--	}else{
--		dma_ch = MDMA1_CH0;
--	}
--
--	if(dma_ch == MDMA1_CH0){
--		dma_desc_tmp = dma_desc_array_ch1;
--		dma_desc_p_tmp = dma_desc_array_phys_ch1;
--	}else{
--		dma_desc_tmp = dma_desc_array_ch2;
--		dma_desc_p_tmp = dma_desc_array_phys_ch2;
--	}
--
--	len_total = len;
--	while(len_total) {
--		len_tmp = len_total>SINGLE_DESC_TRANS_MAX ?
--				SINGLE_DESC_TRANS_MAX : len_total;
--		dma_desc_tmp->nxt_desc = dma_desc_p_tmp + sizeof(struct pxa910_squ_desc);
--		dma_desc_tmp->src_addr = srcphyaddr;
--		dma_desc_tmp->dst_addr = dstphyaddr;
--		dma_desc_tmp->byte_cnt = len_tmp;
--		if (len_total <= SINGLE_DESC_TRANS_MAX) {
--			dma_desc_tmp->nxt_desc = 0;
--			break;
--		}
--		len_total -= len_tmp;
--		dma_desc_tmp ++;
--		dma_desc_p_tmp += sizeof(struct pxa910_squ_desc);
--		srcphyaddr += len_tmp;
--		dstphyaddr += len_tmp;
--	}
--
- 	if (!((len & 0x7f) || (srcphyaddr & 0x7f) || (dstphyaddr & 0x7f)))
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_INC | MDCR_TRANSMOD |
--			MDCR_DMA_BURST_128B | SDCR_FETCHND;
-+		tdma_data_pmemcpy.bus_size = MDCR_DMA_BURST_128B;
- 	else if (!((len & 0x3f) || (srcphyaddr & 0x3f) || (dstphyaddr & 0x3f)))
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_INC | MDCR_TRANSMOD |
--			MDCR_DMA_BURST_64B | SDCR_FETCHND;
-+		tdma_data_pmemcpy.bus_size = MDCR_DMA_BURST_64B;
- 	else if (!((len & 0x1f) || (srcphyaddr & 0x1f) || (dstphyaddr & 0x1f)))
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_INC | MDCR_TRANSMOD |
--			MDCR_DMA_BURST_32B | SDCR_FETCHND;
-+		tdma_data_pmemcpy.bus_size = MDCR_DMA_BURST_32B;
- 	else if (!((len & 0xf) || (srcphyaddr & 0xf) || (dstphyaddr & 0xf)))
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_INC | MDCR_TRANSMOD |
--			MDCR_DMA_BURST_16B | SDCR_FETCHND;
--	else
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_INC | MDCR_TRANSMOD |
--			MDCR_DMA_BURST_8B | SDCR_FETCHND;
--
--	base_register = mmp_get_dma_reg_base(dma_ch);
--	TDCR(base_register)= (dcmd) & (~MDCR_CHANEN);
--	TDIMR(base_register) = MDIMR_COMP;
--	if(dma_ch == MDMA1_CH0)
--		TDNDPR(base_register) = dma_desc_array_phys_ch1;
-+		tdma_data_pmemcpy.bus_size = MDCR_DMA_BURST_16B;
- 	else
--		TDNDPR(base_register) = dma_desc_array_phys_ch2;
--	if(dma_ch == MDMA1_CH0){
--		init_completion(&complete_ch1);
--	}else{
--		init_completion(&complete_ch2);
--	}
-+		tdma_data_pmemcpy.bus_size = MDCR_DMA_BURST_8B;
- 
-+	/* Try to grab a DMA channel */
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_MEMCPY, mask);
-+	dma_chan = dma_request_channel(mask, filter, &tdma_data_pmemcpy);
- 
--	TDCR(base_register)= dcmd | MDCR_CHANEN;
-+	len_total = len;
-+	len_tmp = len_total > SINGLE_DESC_TRANS_MAX ?
-+				SINGLE_DESC_TRANS_MAX : len_total;
- 
--	if(dma_ch == MDMA1_CH0){
--		ret = wait_for_completion_timeout(&complete_ch1, 10*HZ);
--	}else{
--		ret = wait_for_completion_timeout(&complete_ch2, 10*HZ);
--	}
-+	desc = dma_chan->device->device_prep_dma_memcpy(
-+			dma_chan, dstphyaddr, srcphyaddr, len_total,
-+			DMA_BIDIRECTIONAL);
- 
--	TDIMR(base_register) = 0;
--	mdma_dcr = TDCR(base_register);
--	if (mdma_dcr & TDCR_CHANACT) {
--		TDCR(base_register) = mdma_dcr | TDCR_ABR;
--	}
--	while (mdma_dcr & TDCR_CHANACT) {
--		mdma_dcr = TDCR(base_register);
--	}
--	mmp_free_dma(dma_ch);
-+	/* this completion will be finished after mdma irq */
-+	init_completion(&complete_memcpy);
-+
-+	desc->callback = mdma_irq;
-+	desc->callback_param = &complete_memcpy;
-+
-+	/* start dma transfer */
-+	dmaengine_submit(desc);
-+
-+	ret = wait_for_completion_timeout(&complete_memcpy, 10*HZ);
-+
-+	/* release dma channel */
-+	dma_release_channel(dma_chan);
-+	dma_chan = NULL;
- 
- 	if (ret)
- 		return len;
-@@ -227,15 +174,15 @@ EXPORT_SYMBOL(mdma_pmemcpy);
-  * destination address aslo need alignment with burst size.
-  * data requires 32bits.
-  */
-+struct mmp_tdma_data tdma_data_pmemset;
- unsigned long mdma_pmemset(unsigned long paddr, unsigned long c, unsigned int len)
- {
--	int ret, dma_ch;
--	unsigned int base_register;
--	unsigned int dcmd, mdma_dcr;
-+	int ret;
- 	unsigned long len_tmp, len_total;
--	struct pxa910_squ_desc *dma_desc_tmp;
--	dma_addr_t dma_desc_p_tmp;
- 	unsigned long dstphyaddr = paddr;
-+	struct dma_chan *dma_chan;
-+	dma_cap_mask_t mask;
-+	struct dma_async_tx_descriptor *desc;
- 
- 	if (dstphyaddr == 0)
- 		return -1;
-@@ -250,95 +197,43 @@ unsigned long mdma_pmemset(unsigned long paddr, unsigned long c, unsigned int le
- 		return -1;
- 	}
- 
--	ret = mmp_request_dma("mdma_memcpy", MDMA1_CH0,
--					mdma_irq, NULL);
--	if (ret < 0){
--		ret = mmp_request_dma("mdma_memcpy", MDMA1_CH1,
--						mdma_irq, NULL);
--		if (ret < 0){
--			printk(KERN_ERR	"Can't request MDMA for memcpy\n");
--			return -ENODEV;
--		}else{
--			dma_ch = MDMA1_CH1;
--		}
--	}else{
--		dma_ch = MDMA1_CH0;
--	}
--
--	if(dma_ch == MDMA1_CH0){
--		dma_desc_tmp = dma_desc_array_ch1;
--		dma_desc_p_tmp = dma_desc_array_phys_ch1;
--	}else{
--		dma_desc_tmp = dma_desc_array_ch2;
--		dma_desc_p_tmp = dma_desc_array_phys_ch2;
--	}
--
--	len_total = len;
--	while(len_total) {
--		len_tmp = len_total>SINGLE_DESC_TRANS_MAX ?
--				SINGLE_DESC_TRANS_MAX : len_total;
--		dma_desc_tmp->nxt_desc = dma_desc_p_tmp + sizeof(struct pxa910_squ_desc);
--		dma_desc_tmp->src_addr = 0;
--		dma_desc_tmp->dst_addr = dstphyaddr;
--		dma_desc_tmp->byte_cnt = len_tmp;
--		if (len_total <= SINGLE_DESC_TRANS_MAX) {
--			dma_desc_tmp->nxt_desc = 0;
--			break;
--		}
--		len_total -= len_tmp;
--		dma_desc_tmp ++;
--		dma_desc_p_tmp += sizeof(struct pxa910_squ_desc);
--		dstphyaddr += len_tmp;
--	}
--
- 	if (!((len & 0x7f) || (dstphyaddr & 0x7f)))
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_HOLD | MDCR_TRANSMOD |
--			MDCR_FILLMOD | MDCR_DMA_BURST_128B | SDCR_FETCHND;
-+		tdma_data_pmemset.bus_size = MDCR_FILLMOD | MDCR_DMA_BURST_128B;
- 	else if (!((len & 0x3f) || (dstphyaddr & 0x3f)))
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_HOLD | MDCR_TRANSMOD |
--			MDCR_FILLMOD | MDCR_DMA_BURST_64B | SDCR_FETCHND;
-+		tdma_data_pmemset.bus_size = MDCR_FILLMOD | MDCR_DMA_BURST_64B;
- 	else if (!((len & 0x1f) || (dstphyaddr & 0x1f)))
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_HOLD | MDCR_TRANSMOD |
--			MDCR_FILLMOD | MDCR_DMA_BURST_32B | SDCR_FETCHND;
-+		tdma_data_pmemset.bus_size = MDCR_FILLMOD | MDCR_DMA_BURST_32B;
- 	else if (!((len & 0xf) || (dstphyaddr & 0xf)))
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_HOLD | MDCR_TRANSMOD |
--			MDCR_FILLMOD | MDCR_DMA_BURST_16B | SDCR_FETCHND;
--	else
--		dcmd = MDCR_DST_ADDR_INC | MDCR_SRC_ADDR_HOLD | MDCR_TRANSMOD |
--			MDCR_FILLMOD | MDCR_DMA_BURST_8B | SDCR_FETCHND;
--
--	base_register = mmp_get_dma_reg_base(dma_ch);
--	TDCR(base_register)= (dcmd) & (~MDCR_CHANEN);
--	TDIMR(base_register) = MDIMR_COMP;
--	if(dma_ch == MDMA1_CH0)
--		TDNDPR(base_register) = dma_desc_array_phys_ch1;
-+		tdma_data_pmemset.bus_size = MDCR_FILLMOD | MDCR_DMA_BURST_16B;
- 	else
--		TDNDPR(base_register) = dma_desc_array_phys_ch2;
--	MMP2_FILL_DATA(base_register) = c;
-+		tdma_data_pmemset.bus_size = MDCR_FILLMOD | MDCR_DMA_BURST_8B;
- 
--	if(dma_ch == MDMA1_CH0){
--		init_completion(&complete_ch1);
--	}else{
--		init_completion(&complete_ch2);
--	}
-+	/* Try to grab a DMA channel */
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_MEMSET, mask);
-+	dma_chan = dma_request_channel(mask, filter, &tdma_data_pmemset);
- 
--	TDCR(base_register)= dcmd | MDCR_CHANEN;
-+	len_total = len;
-+	len_tmp = len_total > SINGLE_DESC_TRANS_MAX ?
-+				SINGLE_DESC_TRANS_MAX : len_total;
-+	desc = dma_chan->device->device_prep_dma_memset(
-+			dma_chan, dstphyaddr, c, len_total,
-+			DMA_BIDIRECTIONAL);
- 
--	if(dma_ch == MDMA1_CH0){
--		ret = wait_for_completion_timeout(&complete_ch1, 10*HZ);
--	}else{
--		ret = wait_for_completion_timeout(&complete_ch2, 10*HZ);
--	}
-+	/* this completion will be finished after mdma irq */
-+	init_completion(&complete_memset);
- 
--	TDIMR(base_register) = 0;
--	mdma_dcr = TDCR(base_register);
--	if (mdma_dcr & TDCR_CHANACT) {
--		TDCR(base_register) = mdma_dcr | TDCR_ABR;
--	}
--	while (mdma_dcr & TDCR_CHANACT) {
--		mdma_dcr = TDCR(base_register);
--	}
--	mmp_free_dma(dma_ch);
-+	desc->callback = mdma_irq;
-+	desc->callback_param = &complete_memset;
-+
-+	/* start dma transfer */
-+	dmaengine_submit(desc);
-+
-+	ret = wait_for_completion_timeout(&complete_memset, 10*HZ);
-+
-+	/* release dma channel */
-+	dma_release_channel(dma_chan);
-+	dma_chan = NULL;
- 
- 	if (ret)
- 		return len;
--- 
-1.7.0.4
+More importantly, you should not treat CONFIG_OF as an exclusive option:
+It should be possible to build a kernel that has CONFIG_OF enabled but
+still comes with legacy board files that work like before.
+
+> @@ -524,6 +528,13 @@ static int __init kirkwood_clock_gate(void)
+>  	} else  /* keep this bit set for devices that don't have PCIe1 */
+>  		kirkwood_clk_ctrl |= CGC_PEX1;
+>  
+> +#ifdef CONFIG_OF
+> +	dp = of_find_node_by_path("/");
+> +	if (of_device_is_available(of_find_compatible_node(dp, NULL,
+> +							  "marvell,orion-spi")))
+> +		kirkwood_clk_ctrl |= CGC_RUNIT;
+> +#endif
+> +
+>  	/* Now gate clock the required units */
+>  	writel(kirkwood_clk_ctrl, CLOCK_GATING_CTRL);
+>  	printk(KERN_DEBUG " after: 0x%08x\n", readl(CLOCK_GATING_CTRL));
+
+This looks like it could be improved by only enabling the clock
+if we actually start using the device from the spi driver, in its
+probe function. Not sure if that's worth it.
+
+> @@ -101,10 +102,24 @@ static int orion_spi_baudrate_set(struct spi_device *spi, unsigned int speed)
+>  	u32 prescale;
+>  	u32 reg;
+>  	struct orion_spi *orion_spi;
+> +#ifdef CONFIG_OF
+> +	const __be32 *prop;
+> +	int len;
+> +#endif
+>  
+>  	orion_spi = spi_master_get_devdata(spi->master);
+>  
+> +#ifdef CONFIG_OF
+> +	prop = of_get_property(spi->master->dev.of_node, "clock-frequency",
+> +				&len);
+> +	if (!prop || len < sizeof(*prop)) {
+> +		pr_debug("fdt missing 'clock-frequency' property.\n");
+> +		return -EINVAL;
+> +	}
+> +	tclk_hz = be32_to_cpup(prop);
+> +#else
+>  	tclk_hz = orion_spi->spi_info->tclk;
+> +#endif
+
+of_get_property returns NULL when CONFIG_OF is disabled, so you can turn
+this all into a run-time logic:
+
+	if (orion_spi->spi_info)
+		tclk_hz = orion_spi->spi_info->tclk;
+
+	of_property_read_u32(spi->master->dev.of_node, 
+					"clock-frequency", &tclk_hz);
+
+	if (!tclk_hz) {
+		dev_error(&spi->dev, "cannot set clock rate\n");
+		return -EINVAL;
+	}
+
+>  	/*
+>  	 * the supported rates are: 4,6,8...30
+> @@ -360,7 +375,11 @@ static int orion_spi_setup(struct spi_device *spi)
+>  	orion_spi = spi_master_get_devdata(spi->master);
+>  
+>  	/* Fix ac timing if required.   */
+> +#ifdef CONFIG_OF
+> +	if (of_find_property(spi->master->dev.of_node, "spi-clock-fix", NULL))
+> +#else
+>  	if (orion_spi->spi_info->enable_clock_fix)
+> +#endif
+>  		orion_spi_setbits(orion_spi, ORION_SPI_IF_CONFIG_REG,
+>  				  (1 << 14));
+
+Same thing here:
+
+	if (of_find_property(spi->master->dev.of_node, "spi-clock-fix", NULL) ||
+		(orion_spi->spi_info && orion_spi->spi_info->enable_clock_fix))
+
+> +#ifdef CONFIG_OF
+> +	orion_spi_wq = create_singlethread_workqueue(
+> +				orion_spi_driver.driver.name);
+> +	if (orion_spi_wq == NULL)
+> +		return -ENOMEM;
+> +#endif
+
+This seems wrong: why do you have to create the workqueue again here?
+
+> +#ifdef CONFIG_OF
+> +	prop = of_get_property(master->dev.of_node, "clock-frequency", &len);
+> +	if (!prop || len < sizeof(*prop)) {
+> +		pr_debug("fdt missing 'clock-frequency' property.\n");
+> +		status = -EINVAL;
+> +		goto out;
+> +	}
+> +	tclk = be32_to_cpup(prop);
+> +
+> +	spi->max_speed = DIV_ROUND_UP(tclk, 4);
+> +	spi->min_speed = DIV_ROUND_UP(tclk, 30);
+> +#else
+>  	spi->spi_info = spi_info;
+>  
+>  	spi->max_speed = DIV_ROUND_UP(spi_info->tclk, 4);
+>  	spi->min_speed = DIV_ROUND_UP(spi_info->tclk, 30);
+> +#endif
+
+Same code as above? Just find the clock frequency once and store it in  
+spi->tclk.
+
+	Arnd
