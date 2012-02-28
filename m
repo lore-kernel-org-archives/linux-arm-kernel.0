@@ -1,22 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 28 Feb 2012 14:13:34 -0500 (EST)
-Subject: [PATCH v2] ARM: LPC32xx: Ethernet driver
-In-Reply-To: <4F4CD1D8.8030102@antcom.de>
-References: <4F4CD1D8.8030102@antcom.de>
-Message-ID: <20120228.141334.569125676685228205.davem@davemloft.net>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 28 Feb 2012 10:49:29 -0800
+Subject: [PATCH trivial next 0/9] treewide: Use vsprintf extention %pf
+Message-ID: <cover.1330454853.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roland Stigge <stigge@antcom.de>
-Date: Tue, 28 Feb 2012 14:08:40 +0100
+Emit the actual function name when possible
 
-> For the case that it _isn't_ initialized already, is it the right thing
-> to use a hard coded default MAC address to be replaced by the final one
-> in userspace? (I found such examples in some current micrel/ and amd/
-> drivers.)
+Joe Perches (9):
+  sparc: Use vsprintf extention %pf with builtin_return_address
+  alpha: Use vsprintf extention %pf with builtin_return_address
+  arm: Use vsprintf extention %pf with builtin_return_address
+  microblaze: Use vsprintf extention %pf with builtin_return_address
+  powerpc: Use vsprintf extention %pf with builtin_return_address
+  parisc: Use vsprintf extention %pf with builtin_return_address
+  scsi: Use vsprintf extention %pf with builtin_return_address
+  staging: ramster: Use vsprintf extention %pf with builtin_return_address
+  gadget: Use vsprintf extention %pf with builtin_return_address
 
-You use a randomized ethernet address which can subsequently be fixed up
-by userspace, and we have very specific interfaces to make this very
-easy for you.  It even sets an attribute which userland can query to see
-that the device has a randomized ethernet address rathern than a true
-assigned permanent one.
+ arch/alpha/kernel/pci_iommu.c               |   20 ++++++++++----------
+ arch/arm/nwfpe/fpmodule.c                   |    2 +-
+ arch/microblaze/mm/pgtable.c                |    2 +-
+ arch/powerpc/mm/pgtable_32.c                |    2 +-
+ arch/sparc/kernel/ds.c                      |    2 +-
+ arch/sparc/mm/srmmu.c                       |    2 +-
+ drivers/parisc/superio.c                    |    2 +-
+ drivers/scsi/esp_scsi.c                     |    2 +-
+ drivers/staging/ramster/cluster/heartbeat.c |    4 ++--
+ drivers/usb/gadget/u_serial.c               |    2 +-
+ 10 files changed, 20 insertions(+), 20 deletions(-)
+
+-- 
+1.7.8.111.gad25c.dirty
