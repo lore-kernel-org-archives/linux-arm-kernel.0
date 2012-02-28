@@ -1,83 +1,65 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 28 Feb 2012 09:58:54 -0600
-Subject: [PATCH v5 1/9] cpuidle: Add commonly used functionality for
- consolidation
-In-Reply-To: <CAMXH7KEBggsYEq9irMoEG-fZEjgEFACFhZZ+-JQj0uvwpGsZHA@mail.gmail.com>
-References: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
- <1330318063-25460-2-git-send-email-rob.lee@linaro.org>
- <CAJOA=zOmUTqXdMDcY6Bbs51SsRmTJMMu9xtbPxsyq4oNgSdNjg@mail.gmail.com>
- <CAMXH7KEBggsYEq9irMoEG-fZEjgEFACFhZZ+-JQj0uvwpGsZHA@mail.gmail.com>
-Message-ID: <4F4CF9BE.1000203@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Feb 2012 16:07:26 +0000
+Subject: [PATCH WIP] ARM: kirkwood: covert orion-spi to fdt.
+In-Reply-To: <20120228152553.GZ23524@titan.lakedaemon.net>
+References: <4a9b37f69d6cec5049627b8afa777bb010af05f6.1330381705.git.jason@lakedaemon.net>
+ <201202280739.24399.arnd@arndb.de>
+ <20120228152553.GZ23524@titan.lakedaemon.net>
+Message-ID: <201202281607.27027.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2012 09:45 AM, Rob Lee wrote:
-> Hey Mike,
+On Tuesday 28 February 2012, Jason wrote:
+> On Tue, Feb 28, 2012 at 07:39:24AM +0000, Arnd Bergmann wrote:
+> > Same thing here:
+> > 
+> > 	if (of_find_property(spi->master->dev.of_node, "spi-clock-fix", NULL) ||
+> > 		(orion_spi->spi_info && orion_spi->spi_info->enable_clock_fix))
 > 
-> On Mon, Feb 27, 2012 at 6:06 PM, Turquette, Mike <mturquette@ti.com> wrote:
->> On Sun, Feb 26, 2012 at 8:47 PM, Robert Lee <rob.lee@linaro.org> wrote:
->>> +/**
->>> + * cpuidle_enter_wrap - performing timekeeping and irq around enter function
->>> + * @dev: pointer to a valid cpuidle_device object
->>> + * @drv: pointer to a valid cpuidle_driver object
->>> + * @index: index of the target cpuidle state.
->>> + */
->>> +static inline int cpuidle_wrap_enter(struct cpuidle_device *dev,
->>> +                               struct cpuidle_driver *drv, int index,
->>> +                               int (*enter)(struct cpuidle_device *dev,
->>> +                                       struct cpuidle_driver *drv, int index))
->>> +{
->>> +       ktime_t time_start, time_end;
->>> +       s64 diff;
->>> +
->>> +       time_start = ktime_get();
->>> +
->>> +       index = enter(dev, drv, index);
->>> +
->>> +       time_end = ktime_get();
->>> +
->>> +       local_irq_enable();
->>> +
->>> +       diff = ktime_to_us(ktime_sub(time_end, time_start));
->>> +       if (diff > INT_MAX)
->>> +               diff = INT_MAX;
->>> +
->>> +       dev->last_residency = (int) diff;
->>> +
->>> +       return index;
->>> +}
->>
->> Any reason that this code is in the header?  Why not in cpuidle.c?
->>
-> 
-> Not a strong reason.  I thought making it an inline would introduce
-> slightly less new execution when adding this code (realizing that
-> there are function calls immediately after, so the only benefit is the
-> reduce popping and pushing).  But it does require an extra copy of
-> this code for any platform driver that does not enable
-> en_core_tk_irqen and instead makes calls to it directly (like omap3).
-> For this case, I don't think the inline implementation should add
-> extra code from what exists today as it should simply replace the
-> existing platform time keeping calls to a standard one defined by the
-> core cpuidle.
-> 
-But you will have multiple copies of the inlined code if platforms do
-use it. Or is it used only by the core cpuidle code? In that case, gcc
-can automatically inline static functions.
+> Also, should this be "mv,spi-clock-fix" like I've seen for some ti
+> custom dt bindings?
 
-It seems a bit long to inline and this isn't performance critical (at
-least for the enter side).
+I'm never sure about this either. Maybe Grant can comment on this.
 
-Rob
+> > > +#ifdef CONFIG_OF
+> > > +	orion_spi_wq = create_singlethread_workqueue(
+> > > +				orion_spi_driver.driver.name);
+> > > +	if (orion_spi_wq == NULL)
+> > > +		return -ENOMEM;
+> > > +#endif
+> > 
+> > This seems wrong: why do you have to create the workqueue again here?
+> 
+> Gah!  Originally, I was trying to mirror spi-tegra.c, which uses
+> module_platform_driver().  So, I was moving code out of orion_spi_init()
+> into orion_spi_probe() and setting .probe = orion_spi_probe().  I forgot
+> to undo this when I backed away from that approach (to get it working
+> first).
+> 
+> Should I go ahead and convert it to module_platform_driver()?
 
-> I don't have a strong preference with using the inline so if you or
-> others can give your opinion on which method to use and why, I'd be
-> glad to read it.
+You can do that if you like, but it's not required here. If you do,
+best send that conversion as a separate patch in a series before this
+one.
+
+> > > +
+> > > +	spi->max_speed = DIV_ROUND_UP(tclk, 4);
+> > > +	spi->min_speed = DIV_ROUND_UP(tclk, 30);
+> > > +#else
+> > >  	spi->spi_info = spi_info;
+> > >  
+> > >  	spi->max_speed = DIV_ROUND_UP(spi_info->tclk, 4);
+> > >  	spi->min_speed = DIV_ROUND_UP(spi_info->tclk, 30);
+> > > +#endif
+> > 
+> > Same code as above? Just find the clock frequency once and store it in  
+> > spi->tclk.
 > 
->> Regards,
->> Mike
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Do you mean spi_info->tclk?  If so, spi_info is NULL when using device
+> tree because orion_spi_init() in plat-orion/common.c never gets called,
+> so the platform data isn't set.
+
+I meant you should add a new "tclk" member to struct orion_spi and set
+that to spi_info->tclk or the value from the device tree.
+
+	Arnd
