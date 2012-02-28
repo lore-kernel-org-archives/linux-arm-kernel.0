@@ -1,47 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Feb 2012 17:25:55 -0800
-Subject: [PATCH 0/6] ARM: OMAP4: core retention support
-In-Reply-To: <1330003320-17400-1-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Thu, 23 Feb 2012 15:21:54 +0200")
-References: <1330003320-17400-1-git-send-email-t-kristo@ti.com>
-Message-ID: <87d38zrboc.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 27 Feb 2012 18:26:16 -0700
+Subject: [PATCH] ARM: tegra: match SoC name not board name in DT board files
+Message-ID: <1330392376-7884-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+board-dt-tegra*.c should support any board using Tegra when booted using
+device tree. Instead of explicitly listing all the supported boards,
+which requires a kernel change for each new board, list the supported SoC
+model instead.
 
-> This set adds core retention support on top of mainline. The set
-> also adds IO CHAIN wakeup capability for OMAP4, which is a nice feature
-> to have while trying suspend / resume with CSWR as it is quite difficult
-> to wake up the device without this.
->
-> Patch 6 might cause some stir, but this is needed as omap4 PRCM chain
-> handler currently does not work without SPARSE_IRQ. Enabling the
-> SPARSE_IRQ causes a WARN from gic during boot for omap4, and attempting
-> to fix this creates some spam from interrupt handling code which seems to
-> originate from GPMC/GPIO. Also, omap3 boot breaks completely,
-> thus it is impossible to enable this option as of now.
->
-> Tested on OMAP4 blaze board, with OMAP4430 EMU chip. Suspend / resume
-> works nicely, and wakeup with UART3 works. The powerdomain state info
-> under pm-debug appears to be somewhat bogus right after boot, but fixes
-> itself during suspend. This should be addressed separately. Also
-> verified that suspend / resume with OMAP3 beagle is okay.
+Note that the board files do currently have explicit support for setting
+up each board's pinmux. However, it's fairly likely that at least the
+basic devices on any new board will work just fine as set up by the boot-
+loader, and the pinmux data should be moving into device tree soon anyway.
 
-Please separate out the IO daisy chain stuff as a separate series.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/board-dt-tegra20.c |    6 +-----
+ arch/arm/mach-tegra/board-dt-tegra30.c |    2 +-
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-Vishwa had a multiple patch series that cleaned some of this up and
-also made it common for OMAP3 and 4.
-
-   http://marc.info/?l=linux-omap&m=132387916807059&w=2
-
-I had several review comments on that series that were never responded
-to, 
-
-   http://marc.info/?l=linux-omap&w=2&r=1&s=DaisyChain&q=b
-
-so I'd first like to understand why that series was dropped and only
-selected parts were taken for $SUBJECT series, and what is the plan for
-the IO daisy chain series.
-
-Kevin
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index 6d1dd19..89adbb8 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -130,11 +130,7 @@ static void __init tegra_dt_init(void)
+ }
+ 
+ static const char *tegra20_dt_board_compat[] = {
+-	"compulab,trimslice",
+-	"nvidia,harmony",
+-	"compal,paz00",
+-	"nvidia,seaboard",
+-	"nvidia,ventana",
++	"nvidia,tegra20",
+ 	NULL
+ };
+ 
+diff --git a/arch/arm/mach-tegra/board-dt-tegra30.c b/arch/arm/mach-tegra/board-dt-tegra30.c
+index 1401cf3..fd04757 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra30.c
++++ b/arch/arm/mach-tegra/board-dt-tegra30.c
+@@ -91,7 +91,7 @@ static void __init tegra30_dt_init(void)
+ }
+ 
+ static const char *tegra30_dt_board_compat[] = {
+-	"nvidia,cardhu",
++	"nvidia,tegra30",
+ 	NULL
+ };
+ 
+-- 
+1.7.0.4
