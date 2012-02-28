@@ -1,58 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Feb 2012 15:53:41 +0000
-Subject: [PATCH v2] USB: Support for LPC32xx SoC
-In-Reply-To: <Pine.LNX.4.44L0.1202280951440.1456-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1202280951440.1456-100000@iolanthe.rowland.org>
-Message-ID: <201202281553.41332.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 28 Feb 2012 09:58:54 -0600
+Subject: [PATCH v5 1/9] cpuidle: Add commonly used functionality for
+ consolidation
+In-Reply-To: <CAMXH7KEBggsYEq9irMoEG-fZEjgEFACFhZZ+-JQj0uvwpGsZHA@mail.gmail.com>
+References: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
+ <1330318063-25460-2-git-send-email-rob.lee@linaro.org>
+ <CAJOA=zOmUTqXdMDcY6Bbs51SsRmTJMMu9xtbPxsyq4oNgSdNjg@mail.gmail.com>
+ <CAMXH7KEBggsYEq9irMoEG-fZEjgEFACFhZZ+-JQj0uvwpGsZHA@mail.gmail.com>
+Message-ID: <4F4CF9BE.1000203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 February 2012, Alan Stern wrote:
-> It's heading in the intended direction, although the details might not 
-> all be quite right -- I didn't check them very closely.
+On 02/28/2012 09:45 AM, Rob Lee wrote:
+> Hey Mike,
 > 
-> One big thing about it is wrong: Many or most of the functions you
-> exported don't really need to be.  Instead, ohci-hcd.c should define
-> ohci_driver (a bus-agnostic hc_driver structure) and export that.  
-> Then the bus-glue files can copy the structure for their own use during
-> initialization (rather than duplicating the definition all over the
-> place) and override individual methods as needed.
+> On Mon, Feb 27, 2012 at 6:06 PM, Turquette, Mike <mturquette@ti.com> wrote:
+>> On Sun, Feb 26, 2012 at 8:47 PM, Robert Lee <rob.lee@linaro.org> wrote:
+>>> +/**
+>>> + * cpuidle_enter_wrap - performing timekeeping and irq around enter function
+>>> + * @dev: pointer to a valid cpuidle_device object
+>>> + * @drv: pointer to a valid cpuidle_driver object
+>>> + * @index: index of the target cpuidle state.
+>>> + */
+>>> +static inline int cpuidle_wrap_enter(struct cpuidle_device *dev,
+>>> +                               struct cpuidle_driver *drv, int index,
+>>> +                               int (*enter)(struct cpuidle_device *dev,
+>>> +                                       struct cpuidle_driver *drv, int index))
+>>> +{
+>>> +       ktime_t time_start, time_end;
+>>> +       s64 diff;
+>>> +
+>>> +       time_start = ktime_get();
+>>> +
+>>> +       index = enter(dev, drv, index);
+>>> +
+>>> +       time_end = ktime_get();
+>>> +
+>>> +       local_irq_enable();
+>>> +
+>>> +       diff = ktime_to_us(ktime_sub(time_end, time_start));
+>>> +       if (diff > INT_MAX)
+>>> +               diff = INT_MAX;
+>>> +
+>>> +       dev->last_residency = (int) diff;
+>>> +
+>>> +       return index;
+>>> +}
+>>
+>> Any reason that this code is in the header?  Why not in cpuidle.c?
+>>
 > 
-> It's a more "object-oriented" approach.  :-)
+> Not a strong reason.  I thought making it an inline would introduce
+> slightly less new execution when adding this code (realizing that
+> there are function calls immediately after, so the only benefit is the
+> reduce popping and pushing).  But it does require an extra copy of
+> this code for any platform driver that does not enable
+> en_core_tk_irqen and instead makes calls to it directly (like omap3).
+> For this case, I don't think the inline implementation should add
+> extra code from what exists today as it should simply replace the
+> existing platform time keeping calls to a standard one defined by the
+> core cpuidle.
+> 
+But you will have multiple copies of the inlined code if platforms do
+use it. Or is it used only by the core cpuidle code? In that case, gcc
+can automatically inline static functions.
 
-Yes, that makes sense. I did not try to actually understand how the
-driver works internally, just tried the mechanical conversion in a way
-that did not require changing any code besides the sb800_prefetch
-function that had to be moved.
+It seems a bit long to inline and this isn't performance critical (at
+least for the enter side).
 
-There are still a few symbols that are used by most or all hw specific
-drivers and that will have to remain exported:
+Rob
 
-ohci_init, ohci_run, ohci_stop, ohci_finish_controller_resume, and
-ohci_hcd_init
-
-And then there are a few symbols that are only used by one or two
-drivers, possibly correctly or not:
-
-ohci_dump (spear)
-ohci_usb_reset (at91, pci)
-ohci_shutdown (ps3)
-ohci_restart (pci)
-ohci_hub_control (da8xx)
-
-These ones do not need to get exported following your suggestion:
-
-ohci_urb_enqueue, ohci_urb_dequeue, ohci_endpoint_disable,
-ohci_get_frame, ohci_irq, ohci_bus_suspend, ohci_bus_resume,
-ohci_hub_status_data, and ohci_start_port_reset
-
-I would do implementation the other way round and let the bus specific
-driver provide a sparsely populated version of struct hc_driver
-that is completed by a function in the common ohci parts. That would
-keep the logicto combine the two in one place rather than duplicating
-it everywhere, but it's a bit more overhead in the case where you
-build only a single bus glue.
-
-Certainly either way is possible, whichever you prefer.
-
-	Arnd
+> I don't have a strong preference with using the inline so if you or
+> others can give your opinion on which method to use and why, I'd be
+> glad to read it.
+> 
+>> Regards,
+>> Mike
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
