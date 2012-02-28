@@ -1,56 +1,41 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 28 Feb 2012 18:22:12 +0100
-Subject: [PATCH] tty: serial: OMAP: Fix oops due to NULL pdata in DT boot
-In-Reply-To: <20120126025036.31613.67819.stgit@dusk>
-References: <20120126024903.31613.24730.stgit@dusk>
- <20120126025036.31613.67819.stgit@dusk>
-Message-ID: <4F4D0D44.3010604@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 28 Feb 2012 17:30:27 +0000
+Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
+In-Reply-To: <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
+References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
+ <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
+Message-ID: <20120228173027.GB22082@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following commit: be4b0281956c5cae4f63f31f11d07625a6988766
-(tty: serial: OMAP: block idle while the UART is transferring data in PIO mode),
-is introducing an oops if OMAP is booted using device tree blob because
-the pdata will not be initialized.
+On Mon, Feb 13, 2012 at 09:44:22AM +0000, Bill Carson wrote:
+> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+> index 97b440c..3e6769a 100644
+> --- a/arch/arm/include/asm/page.h
+> +++ b/arch/arm/include/asm/page.h
+> @@ -15,6 +15,21 @@
+>  #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+>  #define PAGE_MASK		(~(PAGE_SIZE-1))
+>  
+> +#ifdef CONFIG_HUGEPAGE_SIZE_2MB
+> +/* we have 2MB hugepage for two 1MB section mapping */
+> +#define HPAGE_SHIFT		(SECTION_SHIFT + 1)
+> +#define HPAGE_SIZE		(_AC(1, UL) << HPAGE_SHIFT)
+> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
+> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+> +#endif
+> +
+> +#ifdef CONFIG_HUGEPAGE_SIZE_16MB
+> +#define HPAGE_SHIFT		SUPERSECTION_SHIFT
+> +#define HPAGE_SIZE		(_AC(1, UL) << HPAGE_SHIFT)
+> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
+> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+> +#endif
 
-Check if pdata is set before de-referencing it.
+Ah, you still have these just config time options. Can you not make an
+hpage_shift variable like PowerPC or IA-64?
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Reviewed-by: Paul Walmsley <paul@pwsan.com>
----
- drivers/tty/serial/omap-serial.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+(I haven't yet reviewed the rest of the code)
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index f809041..0121486 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -159,7 +159,7 @@ static void serial_omap_stop_tx(struct uart_port *port)
- 		serial_out(up, UART_IER, up->ier);
- 	}
- 
--	if (!up->use_dma && pdata->set_forceidle)
-+	if (!up->use_dma && pdata && pdata->set_forceidle)
- 		pdata->set_forceidle(up->pdev);
- 
- 	pm_runtime_mark_last_busy(&up->pdev->dev);
-@@ -298,7 +298,7 @@ static void serial_omap_start_tx(struct uart_port *port)
- 	if (!up->use_dma) {
- 		pm_runtime_get_sync(&up->pdev->dev);
- 		serial_omap_enable_ier_thri(up);
--		if (pdata->set_noidle)
-+		if (pdata && pdata->set_noidle)
- 			pdata->set_noidle(up->pdev);
- 		pm_runtime_mark_last_busy(&up->pdev->dev);
- 		pm_runtime_put_autosuspend(&up->pdev->dev);
-@@ -1613,7 +1613,7 @@ static int serial_omap_runtime_resume(struct device *dev)
- 	struct uart_omap_port *up = dev_get_drvdata(dev);
- 	struct omap_uart_port_info *pdata = dev->platform_data;
- 
--	if (up) {
-+	if (up && pdata) {
- 		if (pdata->get_context_loss_count) {
- 			u32 loss_cnt = pdata->get_context_loss_count(dev);
- 
 -- 
-1.7.0.4
+Catalin
