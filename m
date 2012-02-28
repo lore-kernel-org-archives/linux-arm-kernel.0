@@ -1,28 +1,46 @@
-From: B04825@freescale.com (Tabi Timur-B04825)
-Date: Tue, 28 Feb 2012 03:42:57 +0000
-Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <20120228031308.GI13886@S2101-09.ap.freescale.net>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
- <4F4BFB79.30801@freescale.com>
- <20120228015012.GA13886@S2101-09.ap.freescale.net>
- <4F4C3824.90306@freescale.com>
- <20120228031308.GI13886@S2101-09.ap.freescale.net>
-Message-ID: <4F4C4D3F.3070907@freescale.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 28 Feb 2012 12:15:19 +0800
+Subject: [GIT PULL][v3.4] pull request of rtc-sa1100 branch in pxa git tree
+Message-ID: <CAN1soZyJGbFVVaXEbsXk=kansWsXjnFZ9m=_yWoNFLWiZwMjXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> Are you saying that both older and new P1022 device trees have
-> compatible = "fsl,P1022DS", so that changing to check /compatible
-> could save the check on /model of P1022 device tree?
+Hi Arnd,
 
-Yes, that's what I'm saying.
+Please help to pull rtc-sa1100 changes.
 
-You can verify for yourself by looking at the git history of the device trees.
+The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+  Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git rtc-sa1100
+
+Haojian Zhuang (6):
+      rtc: sa1100: remove periodic code
+      rtc: sa1100: remove verification code of alarm
+      rtc: sa1100: declare irq in resource
+      ARM: pxa: add rtc dummy clock
+      rtc: sa1100: enable clk support
+      ARM: mmp: enable rtc in pxa910
+
+Jett.Zhou (1):
+      ARM: sa1100: clean up clock support
+
+ arch/arm/Kconfig                           |    2 +-
+ arch/arm/mach-mmp/include/mach/pxa910.h    |    1 +
+ arch/arm/mach-mmp/include/mach/regs-apbc.h |    1 +
+ arch/arm/mach-mmp/include/mach/regs-rtc.h  |   23 ++++
+ arch/arm/mach-mmp/pxa910.c                 |   27 ++++
+ arch/arm/mach-mmp/ttc_dkb.c                |    1 +
+ arch/arm/mach-pxa/devices.c                |   28 ++++-
+ arch/arm/mach-pxa/pxa25x.c                 |    1 +
+ arch/arm/mach-pxa/pxa27x.c                 |    1 +
+ arch/arm/mach-pxa/pxa3xx.c                 |    1 +
+ arch/arm/mach-pxa/pxa95x.c                 |    1 +
+ arch/arm/mach-sa1100/clock.c               |   82 +++++++-----
+ arch/arm/mach-sa1100/generic.c             |    8 +
+ drivers/rtc/Kconfig                        |    4 +-
+ drivers/rtc/rtc-sa1100.c                   |  198 ++++++++++++++--------------
+ 15 files changed, 234 insertions(+), 145 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/include/mach/regs-rtc.h
