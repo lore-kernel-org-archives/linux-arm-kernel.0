@@ -1,124 +1,100 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 28 Feb 2012 04:10:51 -0700
-Subject: [PATCH 1/9] ARM: OMAP2/3: hwmod data: update old names
+Date: Tue, 28 Feb 2012 04:10:52 -0700
+Subject: [PATCH 2/9] ARM: OMAP3: hwmod data: fix interfaces for the MMC hwmods
 In-Reply-To: <20120228110943.808.73639.stgit@dusk>
 References: <20120228110943.808.73639.stgit@dusk>
-Message-ID: <20120228111048.808.23906.stgit@dusk>
+Message-ID: <20120228111051.808.77655.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the 2xxx and 3xxx hwmod data files use the old naming style
-for hwmods, ending in a "_hwmod".  These names are used by the OMAP
-integration code to map hwmods to platform_devices, so they need to be
-consistent, or the platform_devices won't be created.  Remove the
-_hwmod suffix to conform with the rest of the OMAP SoC data.
+Commit a52e2ab66d4a9305e1ba64d9b9d25754b6c70895 ("ARM: OMAP3: hwmod
+data: disable multiblock reads on MMC1/2 on OMAP34xx/35xx <= ES2.1")
+didn't link the MMC hwmods to the interconnects correctly.  Future
+patches will register hwmods by interface, so if this is not fixed,
+the MMC IP blocks won't be registered.  Update the interface data
+records to point to the correct IP blocks.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    4 ++--
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    6 +++---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   10 +++++-----
- 3 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   38 ++++++++++++++++++++++------
+ 1 files changed, 30 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index a5409ce..02a8b39 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -1376,7 +1376,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
- };
- 
- static struct omap_hwmod omap2420_mcspi1_hwmod = {
--	.name		= "mcspi1_hwmod",
-+	.name		= "mcspi1",
- 	.mpu_irqs	= omap2_mcspi1_mpu_irqs,
- 	.sdma_reqs	= omap2_mcspi1_sdma_reqs,
- 	.main_clk	= "mcspi1_fck",
-@@ -1405,7 +1405,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
- };
- 
- static struct omap_hwmod omap2420_mcspi2_hwmod = {
--	.name		= "mcspi2_hwmod",
-+	.name		= "mcspi2",
- 	.mpu_irqs	= omap2_mcspi2_mpu_irqs,
- 	.sdma_reqs	= omap2_mcspi2_sdma_reqs,
- 	.main_clk	= "mcspi2_fck",
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index c4f56cb..e260ad7 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -1481,7 +1481,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
- };
- 
- static struct omap_hwmod omap2430_mcspi1_hwmod = {
--	.name		= "mcspi1_hwmod",
-+	.name		= "mcspi1",
- 	.mpu_irqs	= omap2_mcspi1_mpu_irqs,
- 	.sdma_reqs	= omap2_mcspi1_sdma_reqs,
- 	.main_clk	= "mcspi1_fck",
-@@ -1510,7 +1510,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
- };
- 
- static struct omap_hwmod omap2430_mcspi2_hwmod = {
--	.name		= "mcspi2_hwmod",
-+	.name		= "mcspi2",
- 	.mpu_irqs	= omap2_mcspi2_mpu_irqs,
- 	.sdma_reqs	= omap2_mcspi2_sdma_reqs,
- 	.main_clk	= "mcspi2_fck",
-@@ -1552,7 +1552,7 @@ static struct omap2_mcspi_dev_attr omap_mcspi3_dev_attr = {
- };
- 
- static struct omap_hwmod omap2430_mcspi3_hwmod = {
--	.name		= "mcspi3_hwmod",
-+	.name		= "mcspi3",
- 	.mpu_irqs	= omap2430_mcspi3_mpu_irqs,
- 	.sdma_reqs	= omap2430_mcspi3_sdma_reqs,
- 	.main_clk	= "mcspi3_fck",
 diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 3c8dd92..536d0c6 100644
+index 536d0c6..a432618 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1087,7 +1087,7 @@ static struct omap_hwmod omap3xxx_timer11_hwmod = {
- 	.class		= &omap3xxx_timer_hwmod_class,
+@@ -70,8 +70,10 @@ static struct omap_hwmod omap34xx_mcspi1;
+ static struct omap_hwmod omap34xx_mcspi2;
+ static struct omap_hwmod omap34xx_mcspi3;
+ static struct omap_hwmod omap34xx_mcspi4;
+-static struct omap_hwmod omap3xxx_mmc1_hwmod;
+-static struct omap_hwmod omap3xxx_mmc2_hwmod;
++static struct omap_hwmod omap3xxx_pre_es3_mmc1_hwmod;
++static struct omap_hwmod omap3xxx_es3plus_mmc1_hwmod;
++static struct omap_hwmod omap3xxx_pre_es3_mmc2_hwmod;
++static struct omap_hwmod omap3xxx_es3plus_mmc2_hwmod;
+ static struct omap_hwmod omap3xxx_mmc3_hwmod;
+ static struct omap_hwmod am35xx_usbhsotg_hwmod;
+ 
+@@ -192,9 +194,18 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__l4_wkup = {
  };
  
--/* timer12*/
-+/* timer12 */
- static struct omap_hwmod omap3xxx_timer12_hwmod;
- static struct omap_hwmod_irq_info omap3xxx_timer12_mpu_irqs[] = {
- 	{ .irq = 95, },
-@@ -2669,7 +2669,7 @@ static struct omap_hwmod_ocp_if *omap3_sr1_slaves[] = {
+ /* L4 CORE -> MMC1 interface */
+-static struct omap_hwmod_ocp_if omap3xxx_l4_core__mmc1 = {
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__pre_es3_mmc1 = {
+ 	.master		= &omap3xxx_l4_core_hwmod,
+-	.slave		= &omap3xxx_mmc1_hwmod,
++	.slave		= &omap3xxx_pre_es3_mmc1_hwmod,
++	.clk		= "mmchs1_ick",
++	.addr		= omap2430_mmc1_addr_space,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++	.flags		= OMAP_FIREWALL_L4
++};
++
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__es3plus_mmc1 = {
++	.master		= &omap3xxx_l4_core_hwmod,
++	.slave		= &omap3xxx_es3plus_mmc1_hwmod,
+ 	.clk		= "mmchs1_ick",
+ 	.addr		= omap2430_mmc1_addr_space,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+@@ -202,9 +213,18 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__mmc1 = {
  };
  
- static struct omap_hwmod omap34xx_sr1_hwmod = {
--	.name		= "sr1_hwmod",
-+	.name		= "sr1",
- 	.class		= &omap34xx_smartreflex_hwmod_class,
- 	.main_clk	= "sr1_fck",
- 	.vdd_name	= "mpu_iva",
-@@ -2688,7 +2688,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
+ /* L4 CORE -> MMC2 interface */
+-static struct omap_hwmod_ocp_if omap3xxx_l4_core__mmc2 = {
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__pre_es3_mmc2 = {
++	.master		= &omap3xxx_l4_core_hwmod,
++	.slave		= &omap3xxx_pre_es3_mmc2_hwmod,
++	.clk		= "mmchs2_ick",
++	.addr		= omap2430_mmc2_addr_space,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++	.flags		= OMAP_FIREWALL_L4
++};
++
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__es3plus_mmc2 = {
+ 	.master		= &omap3xxx_l4_core_hwmod,
+-	.slave		= &omap3xxx_mmc2_hwmod,
++	.slave		= &omap3xxx_es3plus_mmc2_hwmod,
+ 	.clk		= "mmchs2_ick",
+ 	.addr		= omap2430_mmc2_addr_space,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+@@ -3141,7 +3161,8 @@ static struct omap_hwmod_opt_clk omap34xx_mmc1_opt_clks[] = {
  };
  
- static struct omap_hwmod omap36xx_sr1_hwmod = {
--	.name		= "sr1_hwmod",
-+	.name		= "sr1",
- 	.class		= &omap36xx_smartreflex_hwmod_class,
- 	.main_clk	= "sr1_fck",
- 	.vdd_name	= "mpu_iva",
-@@ -2711,7 +2711,7 @@ static struct omap_hwmod_ocp_if *omap3_sr2_slaves[] = {
+ static struct omap_hwmod_ocp_if *omap3xxx_mmc1_slaves[] = {
+-	&omap3xxx_l4_core__mmc1,
++	&omap3xxx_l4_core__pre_es3_mmc1,
++	&omap3xxx_l4_core__es3plus_mmc1,
  };
  
- static struct omap_hwmod omap34xx_sr2_hwmod = {
--	.name		= "sr2_hwmod",
-+	.name		= "sr2",
- 	.class		= &omap34xx_smartreflex_hwmod_class,
- 	.main_clk	= "sr2_fck",
- 	.vdd_name	= "core",
-@@ -2730,7 +2730,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
+ static struct omap_mmc_dev_attr mmc1_dev_attr = {
+@@ -3216,7 +3237,8 @@ static struct omap_hwmod_opt_clk omap34xx_mmc2_opt_clks[] = {
  };
  
- static struct omap_hwmod omap36xx_sr2_hwmod = {
--	.name		= "sr2_hwmod",
-+	.name		= "sr2",
- 	.class		= &omap36xx_smartreflex_hwmod_class,
- 	.main_clk	= "sr2_fck",
- 	.vdd_name	= "core",
+ static struct omap_hwmod_ocp_if *omap3xxx_mmc2_slaves[] = {
+-	&omap3xxx_l4_core__mmc2,
++	&omap3xxx_l4_core__pre_es3_mmc2,
++	&omap3xxx_l4_core__es3plus_mmc2,
+ };
+ 
+ /* See 35xx errata 2.1.1.128 in SPRZ278F */
