@@ -1,48 +1,45 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 28 Feb 2012 04:10:48 -0700
-Subject: [PATCH 0/9] ARM: OMAP2+: hwmod data: cleanup in preparation for link
- array removal
-Message-ID: <20120228110943.808.73639.stgit@dusk>
+Date: Tue, 28 Feb 2012 04:10:53 -0700
+Subject: [PATCH 3/9] ARM: OMAP3: hwmod data: add DSS->L3 interconnect for
+ 3430ES1
+In-Reply-To: <20120228110943.808.73639.stgit@dusk>
+References: <20120228110943.808.73639.stgit@dusk>
+Message-ID: <20120228111052.808.13430.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+The OMAP3 hwmod data was missing a DSS->L3 interconnect link for the
+OMAP3430 ES1 DSS hwmod.  Since the hwmod code and data is being modified
+to register interfaces rather than hwmods, this would result in the DSS hwmod
+not being registered correctly on OMAP3430ES1.
 
-This series cleans up some hwmod data problems.  Some of these are
-necessary prerequisites for the forthcoming link array removal series.
-
-This series is intended to apply on the 'hwmod_code_cleanup_3.4' branch
-posted earlier.
-
-This series is available via git at git://git.pwsan.com/linux-2.6 in the
-'hwmod_data_cleanup_3.4' branch.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-hwmod_data_cleanup_3.4
-   text	   data	    bss	    dec	    hex	filename
-6591935	 679436	5593756	12865127	 c44e67	vmlinux.omap2plus_defconfig.orig
-6591935	 680332	5593436	12865703	 c450a7	vmlinux.omap2plus_defconfig
-
-
-Paul Walmsley (9):
-      ARM: OMAP2/3: hwmod data: update old names
-      ARM: OMAP3: hwmod data: fix interfaces for the MMC hwmods
-      ARM: OMAP3: hwmod data: add DSS->L3 interconnect for 3430ES1
-      ARM: OMAP3: hwmod data: GPTIMER12 is attached to a separate interconnect
-      ARM: OMAP36xx: hwmod data: fix SmartReflex interface data
-      ARM: OMAP4: hwmod data: remove bandgap hwmod
-      ARM: OMAP4: hwmod data: add OCP_USER_DSP; mark omap44xx_dsp__iva appropriately
-      ARM: OMAP4: hwmod data: uncomment some "excluded" hwmods
-      ARM: OMAP2+: hwmod: extend OCP_* register offsets from 16 to 32 bits
-
-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    4 -
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    6 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |  137 ++++++++++++++++++++------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   39 +------
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    7 +
- 5 files changed, 121 insertions(+), 72 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index a432618..48b6a88 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -133,6 +133,12 @@ static struct omap_hwmod_ocp_if *omap3xxx_l3_main_slaves[] = {
+ };
+ 
+ /* DSS -> l3 */
++static struct omap_hwmod_ocp_if omap3430es1_dss__l3 = {
++	.master		= &omap3430es1_dss_core_hwmod,
++	.slave		= &omap3xxx_l3_main_hwmod,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if omap3xxx_dss__l3 = {
+ 	.master		= &omap3xxx_dss_core_hwmod,
+ 	.slave		= &omap3xxx_l3_main_hwmod,
+@@ -1400,6 +1406,7 @@ static struct omap_hwmod_dma_info omap3xxx_dss_sdma_chs[] = {
+ /* dss master ports */
+ static struct omap_hwmod_ocp_if *omap3xxx_dss_masters[] = {
+ 	&omap3xxx_dss__l3,
++	&omap3430es1_dss__l3,
+ };
+ 
+ /* l4_core -> dss */
