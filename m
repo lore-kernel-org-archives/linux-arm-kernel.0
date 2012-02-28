@@ -1,115 +1,100 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 28 Feb 2012 12:28:29 +0000
-Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
- to the hypervisor
-In-Reply-To: <1330426133.31269.70.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
- <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1330360043.8557.302.camel@zakaz.uk.xensource.com>
- <20120227180355.GB2023@linaro.org>
- <1330371219.10008.34.camel@dagon.hellion.org.uk>
- <20120228102040.GB2063@linaro.org>
- <1330426133.31269.70.camel@zakaz.uk.xensource.com>
-Message-ID: <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 28 Feb 2012 09:23:46 -0300
+Subject: [PATCH v2] ARM: mx3: Setup AIPS registers
+Message-ID: <1330431826-29217-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Feb 2012, Ian Campbell wrote:
-> On Tue, 2012-02-28 at 10:20 +0000, Dave Martin wrote:
-> > On Mon, Feb 27, 2012 at 07:33:39PM +0000, Ian Campbell wrote:
-> > > On Mon, 2012-02-27 at 18:03 +0000, Dave Martin wrote:
-> > > > > Since we support only ARMv7+ there are "T2" and "T3" encodings available
-> > > > > which do allow direct mov of an immediate into R12, but are 32 bit Thumb
-> > > > > instructions.
-> > > > > 
-> > > > > Should we use r7 instead to maximise instruction density for Thumb code?
-> > > > 
-> > > > The difference seems trivial when put into context, even if you code a
-> > > > special Thumb version of the code to maximise density (the Thumb-2 code
-> > > > which gets built from assembler in the kernel is very suboptimal in
-> > > > size, but there simply isn't a high proportion of asm code in the kernel
-> > > > anyway.)  I wouldn't consider the ARM/Thumb differences as an important
-> > > > factor when deciding on a register.
-> > > 
-> > > OK, that's useful information. thanks.
-> > > 
-> > > > One argument for _not_ using r12 for this purpose is that it is then
-> > > > harder to put a generic "HVC" function (analogous to the "syscall"
-> > > > syscall) out-of-line, since r12 could get destroyed by the call.
-> > > 
-> > > For an out of line syscall(2) wouldn't the syscall number either be in a
-> > > standard C calling convention argument register or on the stack when the
-> > > function was called, since it is just a normal argument at that point?
-> > > As you point out it cannot be passed in r12 (and could never be, due to
-> > > the clobbering).
-> > > 
-> > > The syscall function itself would have to move the arguments and syscall
-> > > nr etc around before issuing the syscall.
-> > > 
-> > > I think the same is true of a similar hypercall(2)
-> > > 
-> > > > If you don't think you will ever care about putting HVC out of line
-> > > > though, it may not matter.
-> > 
-> > If you have both inline and out-of-line hypercalls, it's hard to ensure
-> > that you never have to shuffle the registers in either case.
-> 
-> Agreed.
-> 
-> I think we want to optimise for the inline case since those are the
-> majority.
+It was observed on a mx31pdk board that audio playback only worked when the bootloader was Redboot, and 
+did not work when U-boot was used. 
 
-They are not just the majority, all of them are static inline at the
-moment, even on x86 (where the number of hypercalls is much higher).
+Comparing the sources of these bootloaders showed that the AIPS registers were not setup in U-boot.
 
-So yes, we should optimize for the inline case.
+Instead of relying on the bootloader to setup the AIPS registers, do it in the kernel so that audio
+playback can work independantly of the bootloader being used.
 
+Copied the AIPS settings from Redboot to the kernel.
 
-> The only non-inline case is the special "privcmd ioctl" which is the
-> mechanism that allows the Xen toolstack to make hypercalls. It's
-> somewhat akin to syscall(2). By the time you get to it you will already
-> have done a system call for the ioctl, pulled the arguments from the
-> ioctl argument structure etc, plus such hypercalls are not really
-> performance critical.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Make sure post_cpu_init() only runs on mx31
+- Place imx_set_aips() in a common location so that other SoCs can use it.
+- Improve comments about OPACRx
 
-Even the privcmd hypercall (privcmd_call) is a static inline function,
-it is just that at the moment there is only one caller :)
+ arch/arm/mach-imx/cpu-imx31.c           |   11 +++++++++++
+ arch/arm/plat-mxc/cpu.c                 |   24 ++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h |    1 +
+ 3 files changed, 36 insertions(+), 0 deletions(-)
 
-
-> > Shuffling can be reduced but only at the expense of strange argument
-> > ordering in some cases when calling from C -- the complexity is probably
-> > not worth it.  Linux doesn't bother for its own syscalls.
-> > 
-> > Note that even in assembler, a branch from one section to a label in
-> > another section may cause r12 to get destroyed, so you will need to be
-> > careful about how you code the hypervisor trap handler.  However, this
-> > is not different from coding exception handlers in general, so I don't
-> > know that it constitutes a conclusive argument on its own.
-> 
-> We are happy to arrange that this doesn't occur on our trap entry paths,
-> at least until the guest register state has been saved. Currently the
-> hypercall dispatcher is in C and gets r12 from the on-stack saved state.
-> We will likely eventually optimise the hypercall path directly in ASM
-> and in that case we are happy to take steps to ensure we don't clobber
-> r12 before we need it.
-
-Yes, I don't think this should be an issue.
-
-
-> > My instinctive preference would therefore be for r7 (which also seems to
-> > be good enough for Linux syscalls) -- but it really depends how many
-> > arguments you expect to need to support.
-> 
-> Apparently r7 is the frame pointer for gcc in thumb mode which I think
-> is a good reason to avoid it.
-> 
-> We currently have some 5 argument hypercalls and there have been
-> occasional suggestions for interfaces which use 6 -- although none of
-> them have come to reality.
+diff --git a/arch/arm/mach-imx/cpu-imx31.c b/arch/arm/mach-imx/cpu-imx31.c
+index 3f2345f..8841039 100644
+--- a/arch/arm/mach-imx/cpu-imx31.c
++++ b/arch/arm/mach-imx/cpu-imx31.c
+@@ -60,3 +60,14 @@ int mx31_revision(void)
+ 	return mx31_cpu_rev;
+ }
+ EXPORT_SYMBOL(mx31_revision);
++
++static int __init post_cpu_init(void)
++{
++	if (cpu_is_mx31()) {
++		imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS1_BASE_ADDR));
++		imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS2_BASE_ADDR));
++	}
++
++	return 0;
++}
++postcore_initcall(post_cpu_init);
+diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
+index f5b7e0f..a20a131 100644
+--- a/arch/arm/plat-mxc/cpu.c
++++ b/arch/arm/plat-mxc/cpu.c
+@@ -1,5 +1,6 @@
  
-I don't have a very strong opinion on which register we should use, but
-I would like to avoid r7 if it is already actively used by gcc.
-
-The fact that r12 can be destroyed so easily is actually a good argument
-for using it because it means it is less likely to contain useful data
-that needs to be saved/restored by gcc.
+ #include <linux/module.h>
++#include <linux/io.h>
+ #include <mach/hardware.h>
+ 
+ unsigned int __mxc_cpu_type;
+@@ -18,3 +19,26 @@ void imx_print_silicon_rev(const char *cpu, int srev)
+ 		pr_info("CPU identified as %s, silicon rev %d.%d\n",
+ 				cpu, (srev >> 4) & 0xf, srev & 0xf);
+ }
++
++void __init imx_set_aips(void __iomem *base)
++{
++	unsigned int reg;
++/*
++ * Set all MPROTx to be non-bufferable, trusted for R/W,
++ * not forced to user-mode.
++ */
++	__raw_writel(0x77777777, base + 0x0);
++	__raw_writel(0x77777777, base + 0x4);
++
++/*
++ * Set all OPACRx to be non-bufferable, to not require
++ * supervisor privilege level for access, allow for
++ * write access and untrusted master access.
++ */
++	__raw_writel(0x0, base + 0x40);
++	__raw_writel(0x0, base + 0x44);
++	__raw_writel(0x0, base + 0x48);
++	__raw_writel(0x0, base + 0x4C);
++	reg = __raw_readl(base + 0x50) & 0x00FFFFFF;
++	__raw_writel(reg, base + 0x50);
++}
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 1bf0df8..16c3864 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -75,6 +75,7 @@ extern void mxc_restart(char, const char *);
+ extern void mxc_arch_reset_init(void __iomem *);
+ extern int mx53_revision(void);
+ extern int mx53_display_revision(void);
++extern void imx_set_aips(void __iomem *);
+ 
+ enum mxc_cpu_pwr_mode {
+ 	WAIT_CLOCKED,		/* wfi only */
+-- 
+1.7.1
