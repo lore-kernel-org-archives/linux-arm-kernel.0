@@ -1,27 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 28 Feb 2012 12:35:24 +0000
-Subject: [PATCH 2/6] ASoC: fsl: align mpc8610_hpcd with p1022_ds on
- getting codec node
-In-Reply-To: <1330092582-21180-3-git-send-email-shawn.guo@linaro.org>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120228123524.GF3683@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Feb 2012 12:35:50 +0000
+Subject: [GIT PULL] imx_v6_v7_defconfig updates for v3.4
+In-Reply-To: <20120228023846.GG13886@S2101-09.ap.freescale.net>
+References: <20120228023846.GG13886@S2101-09.ap.freescale.net>
+Message-ID: <201202281235.50844.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 10:09:37PM +0800, Shawn Guo wrote:
-> Align mpc8610_hpcd with p1022_ds on getting codec node by just calling
-> of_parse_phandle.  The bonus point of doing that is we can save
-> exporting get_node_by_phandle_name() when we consolidate the common
-> bits between mpc8610_hpcd and p1022_ds into a module, which can be
-> shared by more machine drivers added later.
+On Tuesday 28 February 2012, Shawn Guo wrote:
+> Please pull the following imx_v6_v7_defconfig updates for v3.4.  The
+> first patch was generated some time ago, so it looks not so consistent
+> with another one on subject.  Will try to make it better in the future.
+> 
+> Regards,
+> Shawn
+> 
+> The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
+> 
+>   Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
+> 
+> are available in the git repository at:
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git imx/defconfig
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120228/f1a4631b/attachment.sig>
+I've put it into the next/soc branch because the changes are for the
+global defconfig. We could theoretically have an overall branch for
+defconfig updates, but most of these tend to be related to some other
+changes, so I'm leaving that for now.
+
+Thanks,
+
+	Arnd
