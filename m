@@ -1,29 +1,46 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 28 Feb 2012 14:49:56 +0100
-Subject: [PATCH v2] ARM: LPC32xx: Ethernet driver
-In-Reply-To: <201202281341.01690.arnd@arndb.de>
-References: <AE90C24D6B3A694183C094C60CF0A2F6026B6E83@saturn3.aculab.com>
- <4F4CD781.2090802@antcom.de> <201202281341.01690.arnd@arndb.de>
-Message-ID: <4F4CDB84.7070502@antcom.de>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 28 Feb 2012 14:23:14 +0000
+Subject: [GIT PULL] DaVinci cleanups for v3.4
+In-Reply-To: <201202271459.52216.arnd@arndb.de>
+References: <DF0F476B391FA8409C78302C7BA518B6317D2DB9@DBDE01.ent.ti.com>
+ <201202271459.52216.arnd@arndb.de>
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317D6BF8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2012 02:41 PM, Arnd Bergmann wrote:
->> So if the hardware defaults to 00:00:00:00:00:00, what is the
->> "consistent policy we want to enforce in all drivers"?
->>
->> A link or hint would be sufficient.
-> 
-> I think the most common strategy for platform drivers these days is
-> 
-> 1. use what the hardware provides
-> 2. call of_get_mac_address(dev->of_node, ...)
-> 3. use random_ether_addr
-> 
-> in that order. of_get_mac_address just returns NULL when there
-> is no device tree or no local-mac-address property, so you can
-> put it into the driver right away.
+Hi Arnd,
 
-Cool, thanks - will do!
+On Mon, Feb 27, 2012 at 20:29:52, Arnd Bergmann wrote:
+> On Friday 24 February 2012, Nori, Sekhar wrote:
+> > Hi Arnd, Olof,
+> > 
+> > Can you please pull these DaVinci clean-up patches for
+> > the v3.4 merge window? I have made sure that these don't
+> > have any conflicts with the rmk/for-armsoc branch of
+> > the arm-soc tree.
+> > 
+> > These patches need the following two commits from linux-next
+> > (next-20120224) to keep the VPIF and CQ93VC drivers building.
+> > 
+> > 2e932f2  ASoC: CQ93VC: remove machine specific header file inclusion from codec
+> > db38951  [media] davinci: vpif: remove machine specific header file includes
+> 
+> In general, don't worry too much about conflicts that are easy to
+> resolve. However, having these extra dependencies is not good,
+> because it means that we cannot easily build-test the arm-soc
+> tree by itself and it breaks bisection through the git history.
+> 
+> In the future, please make sure that dependent commits show up
+> in the right order. For now, I've added the patch below on top
+> of your series.
 
-Roland
+I guess the cleanest way to do that would have been to let
+these patches go through my tree with appropriate maintainer
+acks (but that obviously didn't happen - will try and fix
+that for future). Per my understanding, it is encouraged that
+a patch should get applied only through one tree, so I was
+reluctant to apply them to any of the branches I send to you
+after they were already in linux-next through other trees.
+
+Thanks,
+Sekhar
