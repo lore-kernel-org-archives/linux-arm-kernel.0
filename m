@@ -1,26 +1,34 @@
-From: B04825@freescale.com (Tabi Timur-B04825)
-Date: Tue, 28 Feb 2012 02:12:53 +0000
-Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <20120228015012.GA13886@S2101-09.ap.freescale.net>
-References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
- <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
- <4F4BFB79.30801@freescale.com>
- <20120228015012.GA13886@S2101-09.ap.freescale.net>
-Message-ID: <4F4C3824.90306@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 28 Feb 2012 10:28:24 +0800
+Subject: [GIT PULL] imx driver for v3.4
+Message-ID: <20120228022822.GE13886@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> Since I was asked by Mark to use new binding for new machine driver,
-> I would drop this patch and keep PowerPC machine drivers working with
-> /model property.
+Hi Arnd, Olof,
 
-I think Mark is only concerned with not breaking compatibility with 
-existing device trees.  Both the P1022 and MPC8610 device trees have had 
-this compatible property.
+Please pull the following imx driver changes for v3.4.
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+Regards,
+Shawn
+
+The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
+
+  Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
+
+are available in the git repository at:
+  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/driver
+
+Dirk Behme (1):
+      ARM: imx6: Rename DEBUG_IMX6Q_UART to UART4
+
+Richard Zhao (2):
+      ARM: mxc: make imx_dma_is_general_purpose more generic for sdma
+      ARM: imx6q: add cko1 clock
+
+ arch/arm/Kconfig.debug                       |    6 +-
+ arch/arm/mach-imx/clock-imx6q.c              |   74 +++++++++++++++++++++++++-
+ arch/arm/mach-imx/lluart.c                   |    2 +-
+ arch/arm/plat-mxc/include/mach/debug-macro.S |    2 +-
+ arch/arm/plat-mxc/include/mach/dma.h         |    3 +-
+ 5 files changed, 79 insertions(+), 8 deletions(-)
