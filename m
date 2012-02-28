@@ -1,78 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Feb 2012 20:43:20 +0000
-Subject: [PATCH] ARM: OMAP: irqs: Fix NR_IRQS value to handle PRCM
- interrupts
-In-Reply-To: <4F4D39DC.9020800@ti.com>
-References: <4F4CD231.4030709@ti.com>
- <20120228143614.GA5627@n2100.arm.linux.org.uk> <4F4D39DC.9020800@ti.com>
-Message-ID: <20120228204320.GB5627@n2100.arm.linux.org.uk>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Tue, 28 Feb 2012 14:49:53 -0600
+Subject: [PATCH v5 1/9] cpuidle: Add commonly used functionality for
+ consolidation
+In-Reply-To: <4F4CF9BE.1000203@gmail.com>
+References: <1330318063-25460-1-git-send-email-rob.lee@linaro.org>
+ <1330318063-25460-2-git-send-email-rob.lee@linaro.org>
+ <CAJOA=zOmUTqXdMDcY6Bbs51SsRmTJMMu9xtbPxsyq4oNgSdNjg@mail.gmail.com>
+ <CAMXH7KEBggsYEq9irMoEG-fZEjgEFACFhZZ+-JQj0uvwpGsZHA@mail.gmail.com>
+ <4F4CF9BE.1000203@gmail.com>
+Message-ID: <CAMXH7KEjHRGa-sOYFZhcg8u3bO_rD02JyGbkFoH=TQoZk+vc-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 09:32:28PM +0100, Cousson, Benoit wrote:
-> Hi Russell,
->
-> On 2/28/2012 3:36 PM, Russell King - ARM Linux wrote:
->> On Tue, Feb 28, 2012 at 02:10:09PM +0100, Cousson, Benoit wrote:
->>> The following commit: 2f31b51659c2d8315ea2888ba5b93076febe672b
->>> Author: Tero Kristo<t-kristo@ti.com>
->>> Date:   Fri Dec 16 14:37:00 2011 -0700
+>>> Any reason that this code is in the header? ?Why not in cpuidle.c?
 >>>
->>>      ARM: OMAP4: PRM: use PRCM interrupt handler
->>>
->>> introduced the PRCM interrupt handler and thus the need
->>> for 64 more interrupts. Since SPARSE_IRQ is still not fully
->>> functional on OMAP, the NR_IRQS needs to be updated to avoid
->>> the failure that happen during irq_alloc_descs call inside
->>> the PRCM driver:
->>>
->>> [    0.208221] PRCM: failed to allocate irq descs: -12
->>>
->>> Later the mux framework is then unable to request an IRQ from
->>> the PRCM interrupt handler.
->>>
->>> [    1.802795] mux: Failed to setup hwmod io irq -22
 >>
->> This is fine for rc, but longer term...
+>> Not a strong reason. ?I thought making it an inline would introduce
+>> slightly less new execution when adding this code (realizing that
+>> there are function calls immediately after, so the only benefit is the
+>> reduce popping and pushing). ?But it does require an extra copy of
+>> this code for any platform driver that does not enable
+>> en_core_tk_irqen and instead makes calls to it directly (like omap3).
+>> For this case, I don't think the inline implementation should add
+>> extra code from what exists today as it should simply replace the
+>> existing platform time keeping calls to a standard one defined by the
+>> core cpuidle.
 >>
->> Do any of these have hard-coded interrupt numbers associated with them?
->> If not, just enabling sparse IRQ will sort this out.
->
-> You're right, in that case, it does not depend on any hard-coded number.
->
->> As I tried to explain yesterday, there are two modes for IRQ allocation:
->>
->> 1. Without sparse IRQ enabled, irq_alloc_descs(-1, from, num, -1) will
->>     allocate IRQs _within_ the existing from..NR_IRQS range, and will fail
->>     if there is insufficient IRQs available.
->>
->> 2. With sparse IRQs enabled, irq_alloc_descs(-1, from, num, -1) will
->>     allocate IRQs starting at max(from, NR_IRQS) and working upwards.
->>
->> In either case, irq_alloc_descs(start, 0, num, -1) will allocate 'num'
->> IRQs at 'start' or fail if the range is already in use (and 0..NR_IRQS
->> is defined as 'being in use' when sparse IRQs are enabled.)
->>
->> So, if the PRCM interrupts aren't statically assigned (the code suggests
->> that they aren't) then it's already sparse-IRQ compliant, and enabling
->> sparse IRQ support will mean that they will be allocated above NR_IRQS.
->>
->> Therefore, I suggest rather than raising NR_IRQS, you instead enable
->> SPARSE_IRQ now so that anyone using the dynamic IRQ allocation can
->> benefit from sparse IRQ support without having to have a large NR_IRQS.
->>
->> So, you don't have to wait until everything is converted to use
->> sparse IRQ.  You just need to make sure that nothing uses
->> irq_alloc_descs(start, from, num, ...) where start<  NR_IRQS, and
->> nothing using that requires statically defined IRQ numbering.
->
-> Yes, I fully agree, and that's still the plan. That's why I started  
-> sending last week a bunch of cleanup for SPARSE_IRQ support.  
-> Unfortunately, they might not be ready for 3.4 either, but I'm still  
-> working on it.
+> But you will have multiple copies of the inlined code if platforms do
+> use it. Or is it used only by the core cpuidle code? In that case, gcc
+> can automatically inline static functions.
 
-One thing I didn't consider is that the GIC has been converted to
-sparse IRQ support, so enabling it on OMAP will make the irq_alloc_descs()
-in there to fail if you try and keep it below NR_IRQS.
+Used by some platforms as well.
 
-That rules out a piecemeal conversion, which rather sucks.
+>
+> It seems a bit long to inline and this isn't performance critical (at
+> least for the enter side).
+
+Ok.  Unless there are further comments supporting the inline method,
+I'll switch to non-inline for next version.  Thanks Mike and Rob for
+the feedback.
+
+>
+> Rob
+>
+>> I don't have a strong preference with using the inline so if you or
+>> others can give your opinion on which method to use and why, I'd be
+>> glad to read it.
+>>
+>>> Regards,
+>>> Mike
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
