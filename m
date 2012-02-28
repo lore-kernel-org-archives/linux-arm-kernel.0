@@ -1,36 +1,40 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 28 Feb 2012 10:49:32 -0800
-Subject: [PATCH trivial next 3/9] arm: Use vsprintf extention %pf with
- builtin_return_address
-In-Reply-To: <cover.1330454853.git.joe@perches.com>
-References: <cover.1330454853.git.joe@perches.com>
-Message-ID: <367cf464b8ffed274c51573e195da7bb41b6889c.1330454853.git.joe@perches.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Feb 2012 19:22:11 +0000
+Subject: [PATCH v2] ARM: kirkwood: covert orion-spi to fdt.
+In-Reply-To: <10078cadd3ab4e8f2a0a642f810be6adbec4d477.1330454040.git.jason@lakedaemon.net>
+References: <4a9b37f69d6cec5049627b8afa777bb010af05f6.1330381705.git.jason@lakedaemon.net>
+ <10078cadd3ab4e8f2a0a642f810be6adbec4d477.1330454040.git.jason@lakedaemon.net>
+Message-ID: <201202281922.12084.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emit the function name not the address when possible.
+On Tuesday 28 February 2012, Jason Cooper wrote:
+> On the Globalscale Dreamplug (Marvell Kirkwood Development Platform),
+> 2MB of NOR flash are used to hold the bootloader, bootloader
+> environment, and devicetree blob.  It is connected via spi.
+> 
+> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> index cc15426..4868dbd 100644
+> --- a/arch/arm/mach-kirkwood/common.c
+> +++ b/arch/arm/mach-kirkwood/common.c
+> @@ -524,6 +526,11 @@ static int __init kirkwood_clock_gate(void)
+>  	} else  /* keep this bit set for devices that don't have PCIe1 */
+>  		kirkwood_clk_ctrl |= CGC_PEX1;
+>  
+> +	dp = of_find_node_by_path("/");
+> +	if (dp && of_device_is_available(of_find_compatible_node(dp, NULL,
+> +							  "marvell,orion-spi")))
+> +		kirkwood_clk_ctrl |= CGC_RUNIT;
+> +
+>  	/* Now gate clock the required units */
+>  	writel(kirkwood_clk_ctrl, CLOCK_GATING_CTRL);
+>  	printk(KERN_DEBUG " after: 0x%08x\n", readl(CLOCK_GATING_CTRL));
 
-builtin_return_address() gives an address.  When building
-a kernel with CONFIG_KALLSYMS, emit the actual function
-name not the address.
+I think this needs to move to the board-dt.c file as Andrew suggested,
+or you have to put the #ifdef back, otherwise you get a link error
+because of_find_node_by_path does not have a fallback with CONFIG_OF
+not set.
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/nwfpe/fpmodule.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Everything else looks good to me now.
 
-diff --git a/arch/arm/nwfpe/fpmodule.c b/arch/arm/nwfpe/fpmodule.c
-index cb7658e..4e729f0 100644
---- a/arch/arm/nwfpe/fpmodule.c
-+++ b/arch/arm/nwfpe/fpmodule.c
-@@ -147,7 +147,7 @@ void float_raise(signed char flags)
- #ifdef CONFIG_DEBUG_USER
- 	if (flags & debug)
-  		printk(KERN_DEBUG
--		       "NWFPE: %s[%d] takes exception %08x at %p from %08lx\n",
-+		       "NWFPE: %s[%d] takes exception %08x at %pf from %08lx\n",
- 		       current->comm, current->pid, flags,
- 		       __builtin_return_address(0), GET_USERREG()->ARM_pc);
- #endif
--- 
-1.7.8.111.gad25c.dirty
+	Arnd
