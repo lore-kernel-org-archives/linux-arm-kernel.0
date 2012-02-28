@@ -1,61 +1,31 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Tue, 28 Feb 2012 10:41:47 +0530
-Subject: [PATCH 4/6] gpio/omap: get rid of retrigger variable in
- gpio_irq_handler
-In-Reply-To: <87linnu8o8.fsf@ti.com>
-References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
- <1329999031-6914-5-git-send-email-tarun.kanti@ti.com>
- <87linnu8o8.fsf@ti.com>
-Message-ID: <CAC83Zv+qGD-60=hmd=7rgxqSiw2yHe78C6TyO1pj+qe3UPtcEQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 28 Feb 2012 13:35:39 +0800
+Subject: [PATCH 6/6] ASoC: fsl: check property 'compatible' for the
+ machine name
+In-Reply-To: <4F4C4D3F.3070907@freescale.com>
+References: <1329979644-31046-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-1-git-send-email-shawn.guo@linaro.org>
+ <1330092582-21180-7-git-send-email-shawn.guo@linaro.org>
+ <4F4BFB79.30801@freescale.com>
+ <20120228015012.GA13886@S2101-09.ap.freescale.net>
+ <4F4C3824.90306@freescale.com>
+ <20120228031308.GI13886@S2101-09.ap.freescale.net>
+ <4F4C4D3F.3070907@freescale.com>
+Message-ID: <20120228053537.GJ13886@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 5:32 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->
->> This local variable is just assigned zero and then OR'ed
->> with isr. It does not appear to serve any purpose and so
->> removing it.
->>
->> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->
-> Looks like the use of this was removed when I moved things over to using
-> the generic IRQ framework, but I didn't fully clean up.
->
-> Can you update the changelog to something along the lines of:
->
-> "commit 672e302e3c (ARM: OMAP: use edge/level handlers from generic IRQ
-> framework) removed retrigger support in favor of using generic IRQ
-> framework. ?This patch cleans up some unused remnants of that removal.
-Yes, sure.
---
-Tarun
->
-> Thanks,
->
-> Kevin
->
->> ---
->> ?drivers/gpio/gpio-omap.c | ? ?3 ---
->> ?1 files changed, 0 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index b62e861..3dd4b3a 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -623,7 +623,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
->> ? ? ? u32 isr;
->> ? ? ? unsigned int gpio_irq, gpio_index;
->> ? ? ? struct gpio_bank *bank;
->> - ? ? u32 retrigger = 0;
->> ? ? ? int unmasked = 0;
->> ? ? ? struct irq_chip *chip = irq_desc_get_chip(desc);
->>
->> @@ -660,8 +659,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
->> ? ? ? ? ? ? ? ? ? ? ? chained_irq_exit(chip, desc);
->> ? ? ? ? ? ? ? }
->>
->> - ? ? ? ? ? ? isr |= retrigger;
->> - ? ? ? ? ? ? retrigger = 0;
->> ? ? ? ? ? ? ? if (!isr)
->> ? ? ? ? ? ? ? ? ? ? ? break;
+On Tue, Feb 28, 2012 at 03:42:57AM +0000, Tabi Timur-B04825 wrote:
+> Shawn Guo wrote:
+> > Are you saying that both older and new P1022 device trees have
+> > compatible = "fsl,P1022DS", so that changing to check /compatible
+> > could save the check on /model of P1022 device tree?
+> 
+> Yes, that's what I'm saying.
+> 
+Ok, I will drop "[PATCH 5/6] ASoC: fsl: use platform_device_id table
+to match p1022_ds device" and move to this then.
+
+-- 
+Regards,
+Shawn
