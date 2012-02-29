@@ -1,81 +1,88 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 29 Feb 2012 16:04:13 +0100
-Subject: [PATCHv7 0/9] ARM: DMA-mapping framework redesign
-Message-ID: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+Date: Wed, 29 Feb 2012 16:04:14 +0100
+Subject: [PATCHv7 1/9] ARM: dma-mapping: introduce ARM_DMA_ERROR constant
+In-Reply-To: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1330527862-16234-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Replace all uses of ~0 with ARM_DMA_ERROR, what should make the code
+easier to read.
 
-This is yet another update on my works DMA-mapping framework redesign
-for ARM architecture. It includes a few minor cleanup and fixes reported
-by Konrad Rzeszutek Wilk and Krishna Reddy.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/common/dmabounce.c        |    6 +++---
+ arch/arm/include/asm/dma-mapping.h |    4 +++-
+ arch/arm/mm/dma-mapping.c          |    2 +-
+ 3 files changed, 7 insertions(+), 5 deletions(-)
 
-This version uses vmalloc for allocating page pointers array if it is
-larger than PAGE_SIZE. The chained allocation which fits inside a set of
-PAGE_SIZE units will be added later, once the base patches are merged.
-
-Like the previous version, this patchset is also based on the generic,
-cross-arch dma-mapping redesign patches posted in the "[PATCH 00/14]
-DMA-mapping framework redesign preparation" thread:
-http://www.spinics.net/lists/linux-sh/msg09777.html
-
-All patches have been now rebased onto v3.3-rc5 kernel.
-
-All the code has been tested on Samsung Exynos4 'UniversalC210' board
-with IOMMU driver posted by KyongHo Cho.
-
-
-History of the development:
-
-v1: (initial version of the DMA-mapping redesign patches):
-http://www.spinics.net/lists/linux-mm/msg21241.html
-
-v2:
-http://lists.linaro.org/pipermail/linaro-mm-sig/2011-September/000571.html
-http://lists.linaro.org/pipermail/linaro-mm-sig/2011-September/000577.html
-
-v3:
-http://www.spinics.net/lists/linux-mm/msg25490.html
-
-v4 and v5:
-http://www.spinics.net/lists/arm-kernel/msg151147.html
-http://www.spinics.net/lists/arm-kernel/msg154889.html
-
-v6:
-http://www.spinics.net/lists/linux-mm/msg29903.html
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
-
-
-Patch summary:
-
-Marek Szyprowski (9):
-  ARM: dma-mapping: introduce ARM_DMA_ERROR constant
-  ARM: dma-mapping: use pr_* instread of printk
-  ARM: dma-mapping: remove offset parameter to prepare for generic
-    dma_ops
-  ARM: dma-mapping: use asm-generic/dma-mapping-common.h
-  ARM: dma-mapping: implement dma sg methods on top of any generic dma
-    ops
-  ARM: dma-mapping: move all dma bounce code to separate dma ops
-    structure
-  ARM: dma-mapping: remove redundant code and cleanup
-  ARM: dma-mapping: use alloc, mmap, free from dma_ops
-  ARM: dma-mapping: add support for IOMMU mapper
-
- arch/arm/Kconfig                   |    9 +
- arch/arm/common/dmabounce.c        |   84 +++-
- arch/arm/include/asm/device.h      |    4 +
- arch/arm/include/asm/dma-iommu.h   |   34 ++
- arch/arm/include/asm/dma-mapping.h |  407 ++++-----------
- arch/arm/mm/dma-mapping.c          | 1013 ++++++++++++++++++++++++++++++------
- arch/arm/mm/vmregion.h             |    2 +-
- 7 files changed, 1088 insertions(+), 465 deletions(-)
- create mode 100644 arch/arm/include/asm/dma-iommu.h
-
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 595ecd29..a1abdc9 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -254,7 +254,7 @@ static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
+ 	if (buf == NULL) {
+ 		dev_err(dev, "%s: unable to map unsafe buffer %p!\n",
+ 		       __func__, ptr);
+-		return ~0;
++		return ARM_DMA_ERROR;
+ 	}
+ 
+ 	dev_dbg(dev, "%s: unsafe buffer %p (dma=%#x) mapped to %p (dma=%#x)\n",
+@@ -320,7 +320,7 @@ dma_addr_t __dma_map_page(struct device *dev, struct page *page,
+ 
+ 	ret = needs_bounce(dev, dma_addr, size);
+ 	if (ret < 0)
+-		return ~0;
++		return ARM_DMA_ERROR;
+ 
+ 	if (ret == 0) {
+ 		__dma_page_cpu_to_dev(page, offset, size, dir);
+@@ -329,7 +329,7 @@ dma_addr_t __dma_map_page(struct device *dev, struct page *page,
+ 
+ 	if (PageHighMem(page)) {
+ 		dev_err(dev, "DMA buffer bouncing of HIGHMEM pages is not supported\n");
+-		return ~0;
++		return ARM_DMA_ERROR;
+ 	}
+ 
+ 	return map_single(dev, page_address(page) + offset, size, dir);
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index cb3b7c9..6ba92f9 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -10,6 +10,8 @@
+ #include <asm-generic/dma-coherent.h>
+ #include <asm/memory.h>
+ 
++#define ARM_DMA_ERROR	~0
++
+ #ifdef __arch_page_to_dma
+ #error Please update to __arch_pfn_to_dma
+ #endif
+@@ -123,7 +125,7 @@ extern int dma_set_mask(struct device *, u64);
+  */
+ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ {
+-	return dma_addr == ~0;
++	return dma_addr == ARM_DMA_ERROR;
+ }
+ 
+ /*
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 1aa664a..496b453 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -341,7 +341,7 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
+ 	 */
+ 	gfp &= ~(__GFP_COMP);
+ 
+-	*handle = ~0;
++	*handle = ARM_DMA_ERROR;
+ 	size = PAGE_ALIGN(size);
+ 
+ 	page = __dma_alloc_buffer(dev, size, gfp);
 -- 
 1.7.1.569.g6f426
