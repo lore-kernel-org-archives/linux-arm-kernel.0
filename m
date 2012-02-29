@@ -1,76 +1,111 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 29 Feb 2012 09:27:22 -0800
-Subject: [PATCH] pinctrl: make the pinmux-pins more helpful
-In-Reply-To: <CACRpkdZ-a+kyknb-q+_=TLGcNshwkLAY4918bwD7e6LzL3sWbg@mail.gmail.com>
-References: <1330062969-25016-1-git-send-email-linus.walleij@stericsson.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BCC79@HQMAIL01.nvidia.com>
- <CACRpkdZ-a+kyknb-q+_=TLGcNshwkLAY4918bwD7e6LzL3sWbg@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2083@HQMAIL01.nvidia.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 29 Feb 2012 18:28:29 +0100
+Subject: [PATCH] ARM: ux500: solve some Kconfig mess
+Message-ID: <1330536509-13590-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Wednesday, February 29, 2012 2:39 AM:
-> On Fri, Feb 24, 2012 at 5:44 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> 
-> > If we do make a change like this, I'd prefer the format to be:
-> >
-> > UNCLAIMED
-> > "%s (HOG)", desc->owner
-> > desc->owner
-> 
-> I don't see the point, the debugfs files are supposed to be
-> human-readable, a human is not interested in the fact that
-> the pinctrl device itself is owning the pin, what is interesting is
-> that it is hogged.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Well, I'm a human and I care far more that the pin controller device is
-what owns the configuration rather than some artificial "hog" concept
-is present...
+First rename the config option MACH_U8500 to MACH_MOP500
+because that is what it's obviously all about, this has
+confused me for the last time. Fix some whitespace in the
+process.
 
-> >> I somewhat mourn the loss of being able to tell from the debugfs
-> >> which function is using a certain pin, does anyone have ideas on
-> >> how to go about fixing this properly? The root file
-> >> pinctrl-handles does tell it, but requires cross-referencing
-> >> which isn't helpful.
-> >
-> > This doesn't seem like a big deal to me; it's very easy to cross-
-> > reference.
-> 
-> Not to me it isn't, looks like I would have to create scripts to
-> do that for a large pin controller and that's less helpful than
-> just having the information there.
-> 
-> > That said, we could either:
-> >
-> > a) Add a field to pin_desc which indicates current usage. This would be
-> > set whenever the pin's mux function was set, i.e. in pinctrl_select_state()
-> > or pinctrl_request_gpio().
-> 
-> That's like re-introducing the former "function" field I guess.
-> 
-> Simple if I just also #ifdef CONFIG_DEBUGFS... so I'd go
-> for this.
-> 
-> > b) Add a pinctrl driver ops function which reads and prints the current
-> > state from HW.
-> >
-> > (and note the fact that having the debug file list the current mux
-> > function per pin doesn't really make sense on HW where the muxing is
-> > per group...)
-> 
-> On U300 it makes a lot of sense even thogh it is essentially
-> group based. When sitting with the datasheet with the pin names
-> and use groups it's simple to see exactly how any one pin is muxed
-> for the moment and troubleshoot from there.
+Since the machine descriptors for HREFv60 and snowball
+are clearly in the file board-mop500.c which only
+compiles if MACH_MOP500 (former MACH_U8500) is set,
+select this for the board variants and nothing else.
 
-If the HW muxes per group, then there's no concept of "which function is
-selected for a pin", since functions are selected for a group not for a
-pin.
+For the MOP500 variants the UIB (user interface board)
+is probed using I2C so select I2C and I2C_NOMADIK so
+we know that this probe will always be successful.
 
-So, the datasheet will be written in terms of "group X supports functions
-A, B, C, D", not pins P, Q, R support functions "A, B, C, D". So,
-representing mux function in debugfs at the group level would make a lot
-more sense given that HW design.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/Kconfig             |   23 +++++++++++++----------
+ arch/arm/mach-ux500/Makefile            |    2 +-
+ arch/arm/mach-ux500/include/mach/irqs.h |    2 +-
+ 3 files changed, 15 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index d008812..d205de4 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -22,21 +22,24 @@ config UX500_SOC_DB8500
+ 
+ menu "Ux500 target platform (boards)"
+ 
+-config MACH_U8500
+-	bool "U8500 Development platform"
++config MACH_MOP500
++	bool "U8500 Development platform, MOP500 versions"
+ 	select UX500_SOC_DB8500
++	select I2C
++	select I2C_NOMADIK
+ 	help
+-	  Include support for the mop500 development platform.
++	  Include support for the MOP500 development platform.
+ 
+ config MACH_HREFV60
+-       bool "U85000 Development platform, HREFv60 version"
+-       select UX500_SOC_DB8500
+-       help
+-         Include support for the HREFv60 new development platform.
++	bool "U8500 Development platform, HREFv60 version"
++	select MACH_MOP500
++	help
++	  Include support for the HREFv60 new development platform.
++	  Includes HREFv70, v71 etc.
+ 
+ config MACH_SNOWBALL
+ 	bool "U8500 Snowball platform"
+-	select MACH_U8500
++	select MACH_MOP500
+ 	help
+ 	  Include support for the snowball development platform.
+ 
+@@ -49,11 +52,11 @@ config MACH_U5500
+ config UX500_AUTO_PLATFORM
+ 	def_bool y
+ 	depends on !MACH_U5500
+-	select MACH_U8500
++	select MACH_MOP500
+ 	help
+ 	  At least one platform needs to be selected in order to build
+ 	  a working kernel. If everything else is disabled, this
+-	  automatically enables MACH_U8500.
++	  automatically enables MACH_MOP500.
+ endmenu
+ 
+ config UX500_DEBUG_UART
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 6bd2f45..8dd75f2 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -7,7 +7,7 @@ obj-y				:= clock.o cpu.o devices.o devices-common.o \
+ obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
+ obj-$(CONFIG_UX500_SOC_DB5500)	+= cpu-db5500.o dma-db5500.o
+ obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o
+-obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
++obj-$(CONFIG_MACH_MOP500)	+= board-mop500.o board-mop500-sdi.o \
+ 				board-mop500-regulators.o \
+ 				board-mop500-uib.o board-mop500-stuib.o \
+ 				board-mop500-u8500uib.o \
+diff --git a/arch/arm/mach-ux500/include/mach/irqs.h b/arch/arm/mach-ux500/include/mach/irqs.h
+index c4e3beb..7da9ec5 100644
+--- a/arch/arm/mach-ux500/include/mach/irqs.h
++++ b/arch/arm/mach-ux500/include/mach/irqs.h
+@@ -43,7 +43,7 @@
+ /* This will be overridden by board-specific irq headers */
+ #define IRQ_BOARD_END		IRQ_BOARD_START
+ 
+-#ifdef CONFIG_MACH_U8500
++#ifdef CONFIG_MACH_MOP500
+ #include <mach/irqs-board-mop500.h>
+ #endif
+ 
 -- 
-nvpublic
+1.7.8
