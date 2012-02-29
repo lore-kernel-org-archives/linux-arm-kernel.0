@@ -1,40 +1,82 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 29 Feb 2012 17:25:03 +0200
-Subject: [PATCHv3 1/4] ARM: OMAP4: suspend: Program all domains to retention
+Date: Wed, 29 Feb 2012 17:25:04 +0200
+Subject: [PATCHv3 2/4] ARM: OMAP4: prm: fix interrupt register offsets
 In-Reply-To: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
 References: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1330529106-10423-2-git-send-email-t-kristo@ti.com>
+Message-ID: <1330529106-10423-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+Previous code used wrong instance for the interrupt register access.
+Use the right one which is OCP_SOCKET.
 
-Remove the FIXME's in the suspend sequence since
-we now intend to support system level RET support.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/pm44xx.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/prm44xx.c |   21 +++++++++++----------
+ 1 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index c264ef7..1ab30a3 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -151,12 +151,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	if (!strncmp(pwrdm->name, "cpu", 3))
- 		return 0;
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index a931f8f..caa5e0f 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -145,8 +145,9 @@ static inline u32 _read_pending_irq_reg(u16 irqen_offs, u16 irqst_offs)
+ 	u32 mask, st;
  
--	/*
--	 * FIXME: Remove this check when core retention is supported
--	 * Only MPUSS power domain is added in the list.
--	 */
--	if (strcmp(pwrdm->name, "mpu_pwrdm"))
--		return 0;
+ 	/* XXX read mask from RAM? */
+-	mask = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST, irqen_offs);
+-	st = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST, irqst_offs);
++	mask = omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
++				       irqen_offs);
++	st = omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST, irqst_offs);
  
- 	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
- 	if (!pwrst)
+ 	return mask & st;
+ }
+@@ -178,7 +179,7 @@ void omap44xx_prm_read_pending_irqs(unsigned long *events)
+  */
+ void omap44xx_prm_ocp_barrier(void)
+ {
+-	omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++	omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
+ 				OMAP4_REVISION_PRM_OFFSET);
+ }
+ 
+@@ -196,19 +197,19 @@ void omap44xx_prm_ocp_barrier(void)
+ void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask)
+ {
+ 	saved_mask[0] =
+-		omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++		omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
+ 					OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
+ 	saved_mask[1] =
+-		omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++		omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
+ 					OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET);
+ 
+-	omap4_prm_write_inst_reg(0, OMAP4430_PRM_DEVICE_INST,
++	omap4_prm_write_inst_reg(0, OMAP4430_PRM_OCP_SOCKET_INST,
+ 				 OMAP4_PRM_IRQENABLE_MPU_OFFSET);
+-	omap4_prm_write_inst_reg(0, OMAP4430_PRM_DEVICE_INST,
++	omap4_prm_write_inst_reg(0, OMAP4430_PRM_OCP_SOCKET_INST,
+ 				 OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
+ 
+ 	/* OCP barrier */
+-	omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++	omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
+ 				OMAP4_REVISION_PRM_OFFSET);
+ }
+ 
+@@ -224,9 +225,9 @@ void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask)
+  */
+ void omap44xx_prm_restore_irqen(u32 *saved_mask)
+ {
+-	omap4_prm_write_inst_reg(saved_mask[0], OMAP4430_PRM_DEVICE_INST,
++	omap4_prm_write_inst_reg(saved_mask[0], OMAP4430_PRM_OCP_SOCKET_INST,
+ 				 OMAP4_PRM_IRQENABLE_MPU_OFFSET);
+-	omap4_prm_write_inst_reg(saved_mask[1], OMAP4430_PRM_DEVICE_INST,
++	omap4_prm_write_inst_reg(saved_mask[1], OMAP4430_PRM_OCP_SOCKET_INST,
+ 				 OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
+ }
+ 
 -- 
 1.7.4.1
