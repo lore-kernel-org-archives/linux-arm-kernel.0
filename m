@@ -1,30 +1,30 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 29 Feb 2012 13:29:42 +0100
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
-References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120229122942.GF3318@game.jcrosoft.org>
+From: sangwook.lee@linaro.org (Sangwook Lee)
+Date: Wed, 29 Feb 2012 12:41:21 +0000
+Subject: [PATCH 0/2] add ehci-s5p AHB burst function
+Message-ID: <1330519283-4722-1-git-send-email-sangwook.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:03 Tue 28 Feb     , Stephen Warren wrote:
-> uImage files typically encode a single absolute load and entry address.
-> This is inconvenient when attempting to share that uImage across multiple
-> SoCs with different physical RAM addresses. Recent versions of mkimage
-> implement a "kernel_noload" image type which encodes no absolute load
-> address, and a relative entry address. This works well for uImage-wrapped
-> ARM zImages, since they are relocatable.
-> 
-> This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
-> "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> I assume I should put this into the ARM patch tracker if it's OK?
-Again a new option for uImage no why not just boot the zImage
+Enable burst transfer from AHB for EHCI.
+This fixes data transfer issue of USB Ethernet with EHCI.
+Without this patch, ping works and network utilities such as scp hardly works.
 
-in this case the uImage is useless
+It was tested on Origen board with the following configs.
+root at linaro-alip:~# lsusb -t
+/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=s5p-ehci/3p, 480M
+   |__ Port 1: Dev 2, If 0, Class=vend., Driver=MOSCHIP usb-ethernet driver, 480M
 
-Best Regards,
-J.
+
+Sangwook Lee (2):
+  ARM: EXYNOS: Add EHCI AHB burst function
+  USB: ehci-s5p: add function for burst
+
+ arch/arm/mach-exynos/setup-usb-phy.c      |    6 ++++++
+ arch/arm/plat-samsung/devs.c              |    2 ++
+ arch/arm/plat-samsung/include/plat/ehci.h |   19 +++++++++++++++++++
+ drivers/usb/host/ehci-s5p.c               |    3 +++
+ 4 files changed, 30 insertions(+), 0 deletions(-)
+
+-- 
+1.7.4.1
