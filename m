@@ -1,36 +1,44 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 29 Feb 2012 13:27:31 -0800
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <20120229204527.GD16999@n2100.arm.linux.org.uk>
-References: <20120229181430.GI3318@game.jcrosoft.org>
- <4F4E6F96.8080907@am.sony.com> <20120229191209.GN14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2122@HQMAIL01.nvidia.com>
- <20120229194409.GO14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2155@HQMAIL01.nvidia.com>
- <4F4E86A1.8010506@bluewatersys.com>
- <20120229201938.GB16999@n2100.arm.linux.org.uk>
- <4F4E89A8.4080909@bluewatersys.com> <20120229203958.GQ14173@pengutronix.de>
- <20120229204527.GD16999@n2100.arm.linux.org.uk>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21A1@HQMAIL01.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Feb 2012 13:42:55 -0800
+Subject: [GIT PULL] ARM: OMAP: IRQ domain support for INTC
+In-Reply-To: <4F4E4F1D.7020109@ti.com>
+References: <4F4BB0FB.3040308@ti.com> <20120228234837.GH18901@atomide.com>
+ <4F4E4F1D.7020109@ti.com>
+Message-ID: <20120229214255.GR18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote at Wednesday, February 29, 2012 1:45 PM:
-...
-> So, really, comparing a standard uImage produced by the standard kernel
-> with gzipped Image is far from a fair comparison.  And that's actually
-> another argument for getting rid of the uImage target... it may make
-> people think a bit about what they're doing rather than accepting
-> whatever default location someone else chose for their kernel.
+* Cousson, Benoit <b-cousson@ti.com> [120229 07:43]:
+> On 2/29/2012 12:48 AM, Tony Lindgren wrote:
+> > 
+> > Hmm, looks like this now produces the following warning at least on omap3:
+> 
+> Yes, Rajendra has just reported that issue with linux-next.
+> 
+> It is not due to that series but to the increase of TWL irq_desc I did for Grant to fix a warning with irq_domain in the DT boot.
+> Unfortunately due the lack of NR_IRQS we already have becasue of PRCM handler we exceed the actual NR_IRQS that is set to 410 for the moment.
+> 
+> > [    0.290832] WARNING: at drivers/mfd/twl4030-irq.c:645 twl4030_sih_setup+0x258/0x298()
+> > [    0.290832] irq 428 for gpio too big
 
-That seems like more of an argument for making the uImage target use
--T kernel_noload unconditionally, rather than removing the target.
-Since doing so would solve the issue about the kernel picking a load
-address.
+OK. I've pulled this into dt-part2 branch.
+ 
+> After applying the NR_IRQS fix, we still have a warning but a different one in that case:
+> 
+> [    0.303771] twl4030: PIH (irq 7) chaining IRQs 368..401
+> [    0.304473] twl4030: power (irq 373) chaining IRQs 402..409
+> [    0.307159] twl4030: gpio (irq 368) chaining IRQs 410..427
+> [    0.307189] ------------[ cut here ]------------
+> [    0.307220] WARNING: at drivers/gpio/gpio-twl4030.c:410 gpio_twl4030_probe+0x44/0x214()
+> 
+> This one is due to a "WARN_ON(ret != pdata->irq_base)" that is checking that the board irq_base is the same as the one from the twl4030_sih_setup. This kind of test are not SPARSE_IRQ friendly at all and should be removed anyway. I've attached a patch to fix the GPIO warning.
 
-That is, ignoring any arguments about breaking existing workflows at
-least...
+OK, maybe post that separately so Samuel can queue it?
 
--- 
-nvpublic
+> Felipe has started a twl4030 IRQ cleanup series to make that driver SPARSE_IRQ enabled. That's will fix properly the actual hack in the twl-core IRQ management. On top of that we can fix the twl-gpio warning.
+
+Great, good to hear.
+
+Regards,
+
+Tony
