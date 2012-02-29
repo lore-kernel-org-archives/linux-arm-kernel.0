@@ -1,44 +1,100 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 1 Mar 2012 04:14:25 +0530
-Subject: [PATCH v2 5/9] gpio/omap: get rid of retrigger variable in
- gpio_irq_handler
+Date: Thu, 1 Mar 2012 04:14:29 +0530
+Subject: [PATCH v2 9/9] gpio/omap: remove suspend/resume callbacks
 In-Reply-To: <1330555469-21260-1-git-send-email-tarun.kanti@ti.com>
 References: <1330555469-21260-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1330555469-21260-6-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1330555469-21260-10-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This local variable is just assigned zero and then OR'ed
-with isr. It does not appear to serve any purpose and so
-removing it.
+Both omap_gpio_suspend() and omap_gpio_resume() does programming
+of wakeup_en register.
+_gpio_rmw(base, bank->regs->wkup_en, 0xffffffff, 0);
+_gpio_rmw(base, bank->regs->wkup_en, bank->context.wake_en, 1);
+
+This is redundant in omap_gpio_suspend() because wakeup_en
+register automatically gets initialized in _set_gpio_wakeup()
+and set_gpio_trigger() while being called either from
+chip.irq_set_wake() or chip.irq_set_type().
+
+This is redundant in omap_gpio_resume() because wakeup_en
+register is programmed in omap_gpio_restore_context() called
+which is called from runtime resume callback.
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ drivers/gpio/gpio-omap.c |   47 ----------------------------------------------
+ 1 files changed, 0 insertions(+), 47 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 3765654..de5fe8f 100644
+index 186ce92..8b4a7ba 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -626,7 +626,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	u32 isr;
- 	unsigned int gpio_irq, gpio_index;
- 	struct gpio_bank *bank;
--	u32 retrigger = 0;
- 	int unmasked = 0;
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
+@@ -1132,50 +1132,6 @@ err_exit:
  
-@@ -663,8 +662,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			chained_irq_exit(chip, desc);
- 		}
+ #ifdef CONFIG_ARCH_OMAP2PLUS
  
--		isr |= retrigger;
--		retrigger = 0;
- 		if (!isr)
- 			break;
+-#if defined(CONFIG_PM_SLEEP)
+-static int omap_gpio_suspend(struct device *dev)
+-{
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct gpio_bank *bank = platform_get_drvdata(pdev);
+-	void __iomem *base = bank->base;
+-	unsigned long flags;
+-
+-	if (!bank->mod_usage || !bank->loses_context)
+-		return 0;
+-
+-	if (!bank->regs->wkup_en || !bank->context.wake_en)
+-		return 0;
+-
+-	spin_lock_irqsave(&bank->lock, flags);
+-	_gpio_rmw(base, bank->regs->wkup_en, 0xffffffff, 0);
+-	_gpio_rmw(base, bank->regs->wkup_en, bank->context.wake_en, 1);
+-	spin_unlock_irqrestore(&bank->lock, flags);
+-
+-	return 0;
+-}
+-
+-static int omap_gpio_resume(struct device *dev)
+-{
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct gpio_bank *bank = platform_get_drvdata(pdev);
+-	void __iomem *base = bank->base;
+-	unsigned long flags;
+-
+-	if (!bank->mod_usage || !bank->loses_context)
+-		return 0;
+-
+-	if (!bank->regs->wkup_en || !bank->context.wake_en)
+-		return 0;
+-
+-	spin_lock_irqsave(&bank->lock, flags);
+-	_gpio_rmw(base, bank->regs->wkup_en, 0xffffffff, 0);
+-	_gpio_rmw(base, bank->regs->wkup_en, bank->context.wake_en, 1);
+-	spin_unlock_irqrestore(&bank->lock, flags);
+-
+-	return 0;
+-}
+-#endif /* CONFIG_PM_SLEEP */
+-
+ #if defined(CONFIG_PM_RUNTIME)
+ static void omap_gpio_restore_context(struct gpio_bank *bank);
  
+@@ -1407,14 +1363,11 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+ }
+ #endif /* CONFIG_PM_RUNTIME */
+ #else
+-#define omap_gpio_suspend NULL
+-#define omap_gpio_resume NULL
+ #define omap_gpio_runtime_suspend NULL
+ #define omap_gpio_runtime_resume NULL
+ #endif
+ 
+ static const struct dev_pm_ops gpio_pm_ops = {
+-	SET_SYSTEM_SLEEP_PM_OPS(omap_gpio_suspend, omap_gpio_resume)
+ 	SET_RUNTIME_PM_OPS(omap_gpio_runtime_suspend, omap_gpio_runtime_resume,
+ 									NULL)
+ };
 -- 
 1.7.0.4
