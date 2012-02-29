@@ -1,85 +1,76 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 29 Feb 2012 23:33:42 +0100
-Subject: [PATCH 06/13] ARM: OMAP3+: SmartReflex: clear ERRCONFIG_VPBOUNDINTST
- only on a need
+Date: Wed, 29 Feb 2012 23:33:43 +0100
+Subject: [PATCH 07/13] ARM: OMAP3+: hwmod: add SmartReflex IRQs
 In-Reply-To: <1330554829-11347-1-git-send-email-j-pihet@ti.com>
 References: <1330554829-11347-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1330554829-11347-7-git-send-email-j-pihet@ti.com>
+Message-ID: <1330554829-11347-8-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-The VPBOUNDINTST field of the ERRCONFIG register has an additional
-functional meaning of force clearing the SR internal signal with VP
-(sr_interruptz).
-This can result in scenarios where the VP->SR protocol is violated
-because the SR internal signal with VP is already high and VP will
-never clear the vpirqclr signal.
-Therefore during the next force update to reset to nominal voltage,
-VP cannot pulse vpirqclr, so the PRCM HW cannot generate the tranxdone
-IRQ and the situation is not recoverable until a cold reset is invoked.
+Add OMAP3 SmartReflex IRQs in hwmod structures. Without these IRQs
+being registered the SmartReflex driver will be unable to get the
+IRQ numbers to handle notifications.
 
-To prevent this situation, check if status is set before clearing it
-as this needs to be done only on a need basis.
-
-Reported-by: Vincent Bour <v-bour@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |   22 ++++++++++++++++------
- 1 files changed, 16 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 1c385b0..40a85e3 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -289,6 +289,8 @@ error:
- static void sr_v1_disable(struct omap_sr *sr)
- {
- 	int timeout = 0;
-+	int errconf_val = ERRCONFIG_MCUACCUMINTST | ERRCONFIG_MCUVALIDINTST |
-+			ERRCONFIG_MCUBOUNDINTST;
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 8688960..34b9766d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -377,6 +377,16 @@ static struct omap_hwmod_ocp_if omap3_l4_core__i2c3 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
  
- 	/* Enable MCUDisableAcknowledge interrupt */
- 	sr_modify_reg(sr, ERRCONFIG_V1,
-@@ -297,13 +299,13 @@ static void sr_v1_disable(struct omap_sr *sr)
- 	/* SRCONFIG - disable SR */
- 	sr_modify_reg(sr, SRCONFIG, SRCONFIG_SRENABLE, 0x0);
++static struct omap_hwmod_irq_info omap3_smartreflex_mpu_irqs[] = {
++	{ .irq = 18},
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_irq_info omap3_smartreflex_core_irqs[] = {
++	{ .irq = 19},
++	{ .irq = -1 }
++};
++
+ /* L4 CORE -> SR1 interface */
+ static struct omap_hwmod_addr_space omap3_sr1_addr_space[] = {
+ 	{
+@@ -2689,6 +2699,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
+ 	.slaves		= omap3_sr1_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3_sr1_slaves),
+ 	.dev_attr	= &sr1_dev_attr,
++	.mpu_irqs	= omap3_smartreflex_mpu_irqs,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+ };
  
--	/* Disable all other SR interrupts and clear the status */
-+	/* Disable all other SR interrupts and clear the status as needed */
-+	if (sr_read_reg(sr, ERRCONFIG_V1) & ERRCONFIG_VPBOUNDINTST_V1)
-+		errconf_val |= ERRCONFIG_VPBOUNDINTST_V1;
- 	sr_modify_reg(sr, ERRCONFIG_V1,
- 			(ERRCONFIG_MCUACCUMINTEN | ERRCONFIG_MCUVALIDINTEN |
- 			ERRCONFIG_MCUBOUNDINTEN | ERRCONFIG_VPBOUNDINTEN_V1),
--			(ERRCONFIG_MCUACCUMINTST | ERRCONFIG_MCUVALIDINTST |
--			ERRCONFIG_MCUBOUNDINTST |
--			ERRCONFIG_VPBOUNDINTST_V1));
-+			errconf_val);
+@@ -2708,6 +2719,7 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
+ 	.slaves		= omap3_sr1_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3_sr1_slaves),
+ 	.dev_attr	= &sr1_dev_attr,
++	.mpu_irqs	= omap3_smartreflex_mpu_irqs,
+ };
  
- 	/*
- 	 * Wait for SR to be disabled.
-@@ -332,9 +334,17 @@ static void sr_v2_disable(struct omap_sr *sr)
- 	/* SRCONFIG - disable SR */
- 	sr_modify_reg(sr, SRCONFIG, SRCONFIG_SRENABLE, 0x0);
+ /* SR2 */
+@@ -2735,6 +2747,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
+ 	.slaves		= omap3_sr2_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3_sr2_slaves),
+ 	.dev_attr	= &sr2_dev_attr,
++	.mpu_irqs	= omap3_smartreflex_core_irqs,
+ 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+ };
  
--	/* Disable all other SR interrupts and clear the status */
--	sr_modify_reg(sr, ERRCONFIG_V2, ERRCONFIG_VPBOUNDINTEN_V2,
-+	/*
-+	 * Disable all other SR interrupts and clear the status
-+	 * write to status register ONLY on need basis - only if status
-+	 * is set.
-+	 */
-+	if (sr_read_reg(sr, ERRCONFIG_V2) & ERRCONFIG_VPBOUNDINTST_V2)
-+		sr_modify_reg(sr, ERRCONFIG_V2, ERRCONFIG_VPBOUNDINTEN_V2,
- 			ERRCONFIG_VPBOUNDINTST_V2);
-+	else
-+		sr_modify_reg(sr, ERRCONFIG_V2, ERRCONFIG_VPBOUNDINTEN_V2,
-+				0x0);
- 	sr_write_reg(sr, IRQENABLE_CLR, (IRQENABLE_MCUACCUMINT |
- 			IRQENABLE_MCUVALIDINT |
- 			IRQENABLE_MCUBOUNDSINT));
+@@ -2754,6 +2767,7 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
+ 	.slaves		= omap3_sr2_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3_sr2_slaves),
+ 	.dev_attr	= &sr2_dev_attr,
++	.mpu_irqs	= omap3_smartreflex_core_irqs,
+ };
+ 
+ /*
 -- 
 1.7.5.4
