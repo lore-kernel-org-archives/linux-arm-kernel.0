@@ -1,60 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Feb 2012 10:38:46 +0100
-Subject: [PATCH] pinctrl: make the pinmux-pins more helpful
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BD8BCC79@HQMAIL01.nvidia.com>
-References: <1330062969-25016-1-git-send-email-linus.walleij@stericsson.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BCC79@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdZ-a+kyknb-q+_=TLGcNshwkLAY4918bwD7e6LzL3sWbg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 Feb 2012 09:39:05 +0000
+Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
+In-Reply-To: <4F4D8EBA.90406@gmail.com>
+References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
+ <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
+ <20120228173027.GB22082@arm.com> <4F4D8EBA.90406@gmail.com>
+Message-ID: <20120229093905.GA17745@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2012 at 5:44 PM, Stephen Warren <swarren@nvidia.com> wrote:
+On Wed, Feb 29, 2012 at 02:34:34AM +0000, bill4carson wrote:
+> On 2012?02?29? 01:30, Catalin Marinas wrote:
+> > On Mon, Feb 13, 2012 at 09:44:22AM +0000, Bill Carson wrote:
+> >> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+> >> index 97b440c..3e6769a 100644
+> >> --- a/arch/arm/include/asm/page.h
+> >> +++ b/arch/arm/include/asm/page.h
+> >> @@ -15,6 +15,21 @@
+> >>   #define PAGE_SIZE		(_AC(1,UL)<<  PAGE_SHIFT)
+> >>   #define PAGE_MASK		(~(PAGE_SIZE-1))
+> >>
+> >> +#ifdef CONFIG_HUGEPAGE_SIZE_2MB
+> >> +/* we have 2MB hugepage for two 1MB section mapping */
+> >> +#define HPAGE_SHIFT		(SECTION_SHIFT + 1)
+> >> +#define HPAGE_SIZE		(_AC(1, UL)<<  HPAGE_SHIFT)
+> >> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
+> >> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+> >> +#endif
+> >> +
+> >> +#ifdef CONFIG_HUGEPAGE_SIZE_16MB
+> >> +#define HPAGE_SHIFT		SUPERSECTION_SHIFT
+> >> +#define HPAGE_SIZE		(_AC(1, UL)<<  HPAGE_SHIFT)
+> >> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
+> >> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+> >> +#endif
+> >
+> > Ah, you still have these just config time options. Can you not make an
+> > hpage_shift variable like PowerPC or IA-64?
+> 
+> Thank you for reviewing this patch.
 
-> If we do make a change like this, I'd prefer the format to be:
->
-> UNCLAIMED
-> "%s (HOG)", desc->owner
-> desc->owner
+I haven't finished yet (another email to come :)).
 
-I don't see the point, the debugfs files are supposed to be
-human-readable, a human is not interested in the fact that
-the pinctrl device itself is owning the pin, what is interesting is
-that it is hogged.
+> unsigned int hpage_shift = SECTION_SHIFT + 1; /* default to 2MB page */
+> #define HPAGE_SHIFT hpage_shift
 
->> I somewhat mourn the loss of being able to tell from the debugfs
->> which function is using a certain pin, does anyone have ideas on
->> how to go about fixing this properly? The root file
->> pinctrl-handles does tell it, but requires cross-referencing
->> which isn't helpful.
->
-> This doesn't seem like a big deal to me; it's very easy to cross-
-> reference.
+Something like that. You could even use PMD_SHIFT which is 21 already
+and it makes it clearer that we use huge pages at the pmd level.
 
-Not to me it isn't, looks like I would have to create scripts to
-do that for a large pin controller and that's less helpful than
-just having the information there.
+> So, should I send another version now, or wait until you walk through
+> the reset of patch set?
 
-> That said, we could either:
->
-> a) Add a field to pin_desc which indicates current usage. This would be
-> set whenever the pin's mux function was set, i.e. in pinctrl_select_state()
-> or pinctrl_request_gpio().
+Just wait, I'll have a look through all the patches.
 
-That's like re-introducing the former "function" field I guess.
+BTW, there are several coding style issues, I won't go through them but
+it would help if you have a look at Documentation/CodingStyle
+(especially comment style, if/else brackets).
 
-Simple if I just also #ifdef CONFIG_DEBUGFS... so I'd go
-for this.
+Thanks.
 
-> b) Add a pinctrl driver ops function which reads and prints the current
-> state from HW.
->
-> (and note the fact that having the debug file list the current mux
-> function per pin doesn't really make sense on HW where the muxing is
-> per group...)
-
-On U300 it makes a lot of sense even thogh it is essentially
-group based. When sitting with the datasheet with the pin names
-and use groups it's simple to see exactly how any one pin is muxed
-for the moment and troubleshoot from there.
-
-Linus Walleij
+-- 
+Catalin
