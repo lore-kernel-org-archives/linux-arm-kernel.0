@@ -1,36 +1,40 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 29 Feb 2012 09:56:02 +0000
-Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
- to the hypervisor
-In-Reply-To: <20120229093436.GA2077@linaro.org>
-References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
- <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1330360043.8557.302.camel@zakaz.uk.xensource.com>
- <20120227180355.GB2023@linaro.org>
- <1330371219.10008.34.camel@dagon.hellion.org.uk>
- <20120228102040.GB2063@linaro.org>
- <1330426133.31269.70.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
- <20120229093436.GA2077@linaro.org>
-Message-ID: <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Feb 2012 10:59:23 +0100
+Subject: RFC: what do we do with system controllers?
+In-Reply-To: <20120228083833.GB18045@n2100.arm.linux.org.uk>
+References: <CACRpkdY1W-RGE0JL4Sx5UcPY-EGieu8vo7H0fp9xyXtegpaaKw@mail.gmail.com>
+ <20120228083833.GB18045@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdaTJFL0A3caA4mNjxHTuXLC5u87OZ2yR=1ChiCFQL7c2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-29 at 09:34 +0000, Dave Martin wrote:
-> On Tue, Feb 28, 2012 at 12:28:29PM +0000, Stefano Stabellini wrote:
+On Tue, Feb 28, 2012 at 9:38 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 28, 2012 at 06:48:12AM +0100, Linus Walleij wrote:
+>> Mainly addressed to Greg but anyone is welcome to join the
+>> discussion...
+>>
+>> Several ARM platforms have system controllers. In this I
+>> include all custom terminology such as:
+>>
+>> - System Control
+>> - Chip Controller
+>> - Core Module control registers
+>> - Power Reset Control Management Units
+>> - Multimedia Communications Port
+>
+> Why do you include this? ?If you include this, you should include things
+> like SSP/SPI ports, I2C and other such buses.
 
-> > I don't have a very strong opinion on which register we should use, but
-> > I would like to avoid r7 if it is already actively used by gcc.
-> 
-> But there is no framepointer for Thumb-2 code (?)
+Mainly because it has these specific MCP controller oddity
+functions:
 
-Peter Maydell suggested there was:
-> r7 is (used by gcc as) the Thumb frame pointer; I don't know if this
-> makes it worth avoiding in this context.
+mcp_set_telecom_divisor()
+mcp_set_audio_divisor()
 
-Sounds like it might be a gcc-ism, possibly a non-default option?
+i.e. it has some "strangeness" of system controller type
+(telecom? que?) But it's quite little and no big deal, drop
+it off the list.
 
-Anyway, I think r12 will be fine for our purposes so the point is rather
-moot.
-
-Ian.
+Thanks,
+Linus Walleij
