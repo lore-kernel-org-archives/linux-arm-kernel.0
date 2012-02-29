@@ -1,62 +1,66 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 29 Feb 2012 17:21:27 +1100
-Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
-Message-ID: <20120229172127.7b430cecc7ab2350d4e4a1b8@canb.auug.org.au>
+From: sthumma@codeaurora.org (Sujit Reddy Thumma)
+Date: Wed, 29 Feb 2012 11:58:45 +0530
+Subject: [PATCH] mmc: start removing enable / disable API
+In-Reply-To: <1330080561-7256-1-git-send-email-adrian.hunter@intel.com>
+References: <1330080561-7256-1-git-send-email-adrian.hunter@intel.com>
+Message-ID: <4F4DC59D.70903@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi Adrian,
 
-Today's linux-next merge of the akpm tree got a conflict in
-drivers/rtc/rtc-sa1100.c between commit 3888c09074db ("rtc: sa1100:
-declare irq in resource") from the arm-soc tree and commit "drivers/rtc:
-remove IRQF_DISABLED" from the akpm tree.
+On 2/24/2012 4:19 PM, Adrian Hunter wrote:
+> Most parts of the enable / disable API are no longer used and
+> can be removed.
+>
+> Cc: Rajendra Nayak<rnayak@ti.com>
+> Cc: Venkatraman S<svenkatr@ti.com>
+> Cc: Kukjin Kim<kgene.kim@samsung.com>
+> Cc: Thomas Abraham<thomas.abraham@linaro.org>
+> Cc: Kyungmin Park<kyungmin.park@samsung.com>
+> Cc: Sekhar Nori<nsekhar@ti.com>
+> Cc: Kevin Hilman<khilman@ti.com>
+> Signed-off-by: Adrian Hunter<adrian.hunter@intel.com>
+> ---
+>   arch/arm/mach-exynos/mach-nuri.c           |    5 +-
+>   arch/arm/mach-exynos/mach-universal_c210.c |    9 +-
+>   drivers/mmc/core/core.c                    |  185 ++--------------------------
+>   drivers/mmc/core/host.c                    |    1 -
+>   drivers/mmc/core/host.h                    |    1 -
+>   drivers/mmc/host/davinci_mmc.c             |    4 -
+>   drivers/mmc/host/omap_hsmmc.c              |   15 +--
+>   include/linux/mmc/core.h                   |    1 -
+>   include/linux/mmc/host.h                   |   46 +-------
+>   9 files changed, 25 insertions(+), 242 deletions(-)
+>
 
-I fixed it up (see below) and can carry the fix as necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+> -	if (host->caps&  MMC_CAP_DISABLE)
+> -		cancel_delayed_work(&host->disable);
+>   	cancel_delayed_work_sync(&host->detect);
+>   	mmc_flush_scheduled_work();
+>
+> @@ -2402,13 +2245,11 @@ int mmc_suspend_host(struct mmc_host *host)
+>   {
+>   	int err = 0;
+>
+> -	if (host->caps&  MMC_CAP_DISABLE)
+> -		cancel_delayed_work(&host->disable);
+>   	cancel_delayed_work(&host->detect);
+>   	mmc_flush_scheduled_work();
+>   	if (mmc_try_claim_host(host)) {
+>   		err = mmc_cache_ctrl(host, 0);
+> -		mmc_do_release_host(host);
+> +		mmc_release_host(host);
 
-diff --cc drivers/rtc/rtc-sa1100.c
-index c105774,e70b4e6..0000000
---- a/drivers/rtc/rtc-sa1100.c
-+++ b/drivers/rtc/rtc-sa1100.c
-@@@ -102,23 -156,20 +102,23 @@@ static irqreturn_t sa1100_rtc_interrupt
-  
-  static int sa1100_rtc_open(struct device *dev)
-  {
- +	struct sa1100_rtc *info = dev_get_drvdata(dev);
- +	struct rtc_device *rtc = info->rtc;
-  	int ret;
- -	struct platform_device *plat_dev = to_platform_device(dev);
- -	struct rtc_device *rtc = platform_get_drvdata(plat_dev);
-  
- -	ret = request_irq(IRQ_RTC1Hz, sa1100_rtc_interrupt, 0,
- +	ret = clk_prepare_enable(info->clk);
- +	if (ret)
- +		goto fail_clk;
-- 	ret = request_irq(info->irq_1hz, sa1100_rtc_interrupt, IRQF_DISABLED,
-++	ret = request_irq(info->irq_1hz, sa1100_rtc_interrupt, 0,
-  		"rtc 1Hz", dev);
-  	if (ret) {
- -		dev_err(dev, "IRQ %d already in use.\n", IRQ_RTC1Hz);
- +		dev_err(dev, "IRQ %d already in use.\n", info->irq_1hz);
-  		goto fail_ui;
-  	}
-- 	ret = request_irq(info->irq_alarm, sa1100_rtc_interrupt, IRQF_DISABLED,
- -	ret = request_irq(IRQ_RTCAlrm, sa1100_rtc_interrupt, 0,
-++	ret = request_irq(info->irq_alarm, sa1100_rtc_interrupt, 0,
-  		"rtc Alrm", dev);
-  	if (ret) {
- -		dev_err(dev, "IRQ %d already in use.\n", IRQ_RTCAlrm);
- +		dev_err(dev, "IRQ %d already in use.\n", info->irq_alarm);
-  		goto fail_ai;
-  	}
-  	rtc->max_user_freq = RTC_FREQ;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120229/0cf92356/attachment-0001.sig>
+mmc_try_claim_host does not call host->ops->enable(), but 
+mmc_release_host call host->ops->disable(), is there any reason for 
+this? For example: If host controller disable method internally calls 
+clk_disable() then that would cause reference count warnings.
+
+>   	} else {
+>   		err = -EBUSY;
+>   	}
+> @@ -2429,7 +2270,7 @@ int mmc_suspend_host(struct mmc_host *host)
+
+Thanks,
+Sujit
