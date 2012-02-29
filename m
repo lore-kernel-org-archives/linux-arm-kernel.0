@@ -1,90 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Feb 2012 12:15:32 +0000
-Subject: [GIT PULL] at91 first cleanup series for 3.4
-In-Reply-To: <4F4DF2AB.6060403@atmel.com>
-References: <4F4674F2.8090603@atmel.com> <201202281218.39428.arnd@arndb.de>
- <4F4DF2AB.6060403@atmel.com>
-Message-ID: <201202291215.32801.arnd@arndb.de>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Wed, 29 Feb 2012 13:17:33 +0100
+Subject: [PATCH] i.MX27: visstrim_m10: Add led support.
+Message-ID: <1330517853-30870-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 February 2012, Nicolas Ferre wrote:
-> On 02/28/2012 01:18 PM, Arnd Bergmann :
-> > On Tuesday 28 February 2012, Nicolas Ferre wrote:
+Vista Silicon Visstrim_m10 board has 4
+leds to signal several working conditions.
 
-> > Hmm I think I missed that part. My point was that we try to reduce the number
-> > of instances of __raw_readl. These patches spread them to more places that
-> > will require cleaning up later. I can see how you want to keep the two changes
-> > (__raw_readl -> readl_relaxed and at91_sys_xxx -> at91_yyy_xxx) separate, but
-> > it would be less churn to add one patch first that converts at91_sys_xxx
-> > to use readl_relaxed and then spread that out than converting them all after
-> > the fact.
-> 
-> Yes, indeed that would have been a good way to proceed but
-> unfortunately, this at91_sys_xxx() removal action has begun a while ago
-> (mainline patches that I can link to this action are from Sept. 2011).
-> We did not have in mind this move from __raw_xxxx() to xxxx_relaxed() at
-> that time. Jean-Christophe wanted and still want to finish this action
-> before switching to those new functions and I agree with him.
-> 
-> We discussed together and decided to move to xxxx_relaxed() in the core
-> AT91 for early 3.5 development cycle. There will be more to convert, but
-> it will be safer at that time.
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ This patch has to be applied on top of the following series:
+   [PATCH 0/4] i.MX27: visstrim_m10: Add several peripherals.
 
-Ok, sounds good.
+---
+ arch/arm/mach-imx/Kconfig                   |    1 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   31 +++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 0 deletions(-)
 
-> > These can no longer get reordered when I do that, but any other branches are
-> > still independent of these and can be arbitrarily moved around anywhere after
-> > next/cleanup2.
-> 
-> Ok, I understand your point and all the implications. But the problem
-> with at91/9x5 branch is that it is a product introduction and it is our
-> responsibility to no leave it on the side. This material represents in
-> fact a kind of "base" for our 3.4 development (second step "base" actually).
-> 
-> So if you can create this next/cleanup2, please do: it will help us a
-> lot. I have created a rebased branch which only relies on
-> at91/pm_cleanup and at91/9x5 here:
-> 
-> git://github.com/at91linux/linux-at91.git at91-3.4-for_cleanup2
-
-Ok.
-
-> (do you want me to send you another pull request?)
-
-No, I'll just upgrade the staging branch into a proper one.
-
-> > We can easily put the irqdomain tree into one of the next/* branches as a
-> > dependency, which causes that particular branch to get delayed until Grant
-> > has got his patches upstream. If you send me a series for next/boards that
-> > depend on irqdomain, I would probably put that into a next/boards2 branch
-> > or into a next/irqdomain branch in case I get similar things from multiple
-> > people. If Grant's patches are already upstream by the time I get to send
-> > out the next/boards branch to Linus, I would probably merge next/boards2
-> > into next/boards and send all of it together.
-> 
-> Ok, we will be able to give you AT91 subsequent development based on
-> both next/cleanup2 and the future next/irqdomain. So you can forget the
-> other pull request I have sent some days ago:
-> "[GIT PULL] at91: irqdomain and device tree for AIC and GPIO"
-> I will rebase it once you will publish the two branches cited above.
-
-Hmm, incidentally I had already forgotten about that one ;-)
-
-FWIW, I think it's better not to pull the branches from arm-soc.git
-back into your own tree, just base your future pull requests on the
-branches that you sent me earlier. Otherwise we just get extra
-merge commits into the history that don't add any information like you
-have here:
-
-11a25ea Merge remote-tracking branch 'armsoc/at91/9x5' into at91-3.4-base2
-9acacb1 Merge remote-tracking branch 'armsoc/at91/device-board' into at91-3.4-base2
-76e8057 Merge branch 'at91-3.4-base+9x5' of git://github.com/at91linux/linux-at91 into at91/9x5
-018b5e1 Merge branch 'at91-3.4-base+pm_cleanup' of git://github.com/at91linux/linux-at91 into at91/pm_cleanup
-92b0b63 Merge branch 'at91-3.4-base+device_board' of git://github.com/at91linux/linux-at91 into at91/device-board
-6848523 Merge branch 'at91-3.4-base' of git://github.com/at91linux/linux-at91 into at91/base
-
-The lower four merges may or may not make sense for the branch, but the
-most recent two are rather pointless here.
-
-	Arnd
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 8102e7f..a3125ac 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -323,6 +323,7 @@ config MACH_IMX27_VISSTRIM_M10
+ 	select IMX_HAVE_PLATFORM_MX2_CAMERA
+ 	select IMX_HAVE_PLATFORM_MXC_EHCI
+ 	select IMX_HAVE_PLATFORM_MXC_MMC
++	select LEDS_GPIO_REGISTER
+ 	help
+ 	  Include support for Visstrim_m10 platform and its different variants.
+ 	  This includes specific configurations for the board and its
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index 7208a9e..0a1643c 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -31,6 +31,7 @@
+ #include <linux/gpio.h>
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
++#include <linux/leds.h>
+ #include <linux/memblock.h>
+ #include <media/soc_camera.h>
+ #include <sound/tlv320aic32x4.h>
+@@ -232,6 +233,35 @@ static const struct gpio_keys_platform_data
+ 	.nbuttons	= ARRAY_SIZE(visstrim_gpio_keys),
+ };
+ 
++/* led */
++static const struct gpio_led visstrim_m10_leds[] __initconst = {
++	{
++		.name = "visstrim:ld0",
++		.default_trigger = "nand-disk",
++		.gpio = (GPIO_PORTC + 29),
++	},
++	{
++		.name = "visstrim:ld1",
++		.default_trigger = "nand-disk",
++		.gpio = (GPIO_PORTC + 24),
++	},
++	{
++		.name = "visstrim:ld2",
++		.default_trigger = "nand-disk",
++		.gpio = (GPIO_PORTC + 28),
++	},
++	{
++		.name = "visstrim:ld3",
++		.default_trigger = "nand-disk",
++		.gpio = (GPIO_PORTC + 25),
++	},
++};
++
++static const struct gpio_led_platform_data visstrim_m10_led_data __initconst = {
++	.leds = visstrim_m10_leds,
++	.num_leds = ARRAY_SIZE(visstrim_m10_leds),
++};
++
+ /* Visstrim_SM10 has a microSD slot connected to sdhc1 */
+ static int visstrim_m10_sdhc1_init(struct device *dev,
+ 		irq_handler_t detect_irq, void *data)
+@@ -365,6 +395,7 @@ static void __init visstrim_m10_board_init(void)
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+ 	platform_device_register_resndata(NULL, "soc-camera-pdrv", 0, NULL, 0,
+ 				      &iclink_tvp5150, sizeof(iclink_tvp5150));
++	gpio_led_register_device(0, &visstrim_m10_led_data);
+ 	visstrim_camera_init();
+ }
+ 
+-- 
+1.7.0.4
