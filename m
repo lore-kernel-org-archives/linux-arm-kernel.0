@@ -1,70 +1,36 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 29 Feb 2012 15:20:21 +0100
-Subject: [PATCH 5/5 v2] ARM: at91: sam9x5 add i2c DT support
-In-Reply-To: <1330525221-25651-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1330525221-25651-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1330525221-25651-5-git-send-email-plagnioj@jcrosoft.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 29 Feb 2012 15:32:06 +0100
+Subject: IIO irq allocation fails on AT91SAM9G45
+Message-ID: <4F4E36E6.1010704@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For now on use i2c-gpio driver on the same pin as the hardware IP.
+Hi everyone,
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: devicetree-discuss at lists.ozlabs.org
----
- arch/arm/boot/dts/at91sam9x5.dtsi |   39 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 39 insertions(+), 0 deletions(-)
+I'm working on adding the support for the AT91SAM9M10G45-EK board from
+Atmel for the at91_adc driver I previously posted, and I encounter some
+weird issue here.
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index cbf331f..d71bc30 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -186,6 +186,45 @@
- 					>;
- 				status = "disabled";
- 			};
-+
-+			i2c-gpio at 0 {
-+				compatible = "i2c-gpio";
-+				gpios = <&pioA 30 0 /* sda */
-+					 &pioA 31 0 /* scl */
-+					>;
-+				i2c-gpio,sda-open-drain;
-+				i2c-gpio,scl-open-drain;
-+				udelay = <2>;		/* ~100 kHz */
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+			i2c-gpio at 1 {
-+				compatible = "i2c-gpio";
-+				gpios = <&pioC 0 0 /* sda */
-+					 &pioC 1 0 /* scl */
-+					>;
-+				i2c-gpio,sda-open-drain;
-+				i2c-gpio,scl-open-drain;
-+				udelay = <2>;		/* ~100 kHz */
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+			i2c-gpio at 2 {
-+				compatible = "i2c-gpio";
-+				gpios = <&pioB 4 0 /* sda */
-+					 &pioB 5 0 /* scl */
-+					>;
-+				i2c-gpio,sda-open-drain;
-+				i2c-gpio,scl-open-drain;
-+				udelay = <2>;		/* ~100 kHz */
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
+When calling the iio_allocate_trigger
+(http://lxr.free-electrons.com/source/drivers/staging/iio/industrialio-trigger.c?a=arm#L421)
+from my driver on the G45, it returns ENOMEM, while on the
+AT91SAM9G20-EK board, it works perfectly.
+
+Digging a bit into it, it seems that the call to irq_alloc_descs is
+returning the error (the value of CONFIG_IIO_CONSUMERS_PER_TRIGGER is 2
+in my configuration, which seems pretty reasonable and is the default
+value anyway), which is itself getting that return value from
+irq_expand_nr_irqs.
+
+Here, I'm left confused, I don't know this part of the kernel anymore,
+and most importantly, it seems to be pretty-much arch-independant, while
+the nature of my issue seems really platform-dependant.
+
+Do you have any clue of what's going on here ?
+
+Thanks,
 -- 
-1.7.7
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
