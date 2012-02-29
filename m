@@ -1,57 +1,21 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 29 Feb 2012 21:43:49 +0800
-Subject: [Linaro-mm-sig] [PATCHv23 00/16] Contiguous Memory Allocator
-In-Reply-To: <op.wafz3gv53l0zgt@mpn-glaptop>
-References: <1329929337-16648-1-git-send-email-m.szyprowski@samsung.com>
- <CAGsJ_4wgVcVjtAa6Qpki=8jSON7MfwJ8yumJ1YXE5p8L3PqUzw@mail.gmail.com>
- <op.wafuu3kr3l0zgt@mpn-glaptop>
- <CAGsJ_4yk+Ca4RDP=sYaXvEKuJzYNhyZWQ7jfKnpR+zCm=3Dq6Q@mail.gmail.com>
- <op.wafz3gv53l0zgt@mpn-glaptop>
-Message-ID: <CAGsJ_4zYttky4+FbzmmaPzQ4b3HwjnpwhX_vE7My9J=ytm20RA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Feb 2012 14:10:51 +0000
+Subject: Question: how to make one page readonly on ARM
+In-Reply-To: <CAADzPW34kLSCHrHiGkEY-erB01Sh_F-zPBSJafJXz+K2BWfjkw@mail.gmail.com>
+References: <CAADzPW2bW8Rx+V726L+Mfji+-+rFxwwYO0nkKtgMTM0XtQ7BpQ@mail.gmail.com>
+ <alpine.LFD.2.02.1202161329460.24536@xanadu.home>
+ <CAADzPW34kLSCHrHiGkEY-erB01Sh_F-zPBSJafJXz+K2BWfjkw@mail.gmail.com>
+Message-ID: <201202291410.51655.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/2/29 Michal Nazarewicz <mina86@mina86.com>:
-> On Wed, 29 Feb 2012 14:34:02 +0100, Barry Song <21cnbao@gmail.com> wrote:
->
->> 2012/2/29 Michal Nazarewicz <mina86@mina86.com>:
->>>
->>> On Wed, 29 Feb 2012 10:35:42 +0100, Barry Song <21cnbao@gmail.com> wrote:
->>>>
->>>> and i also write a simple kernel helper to test the CMA:
->
->
->>> Would it make sense to make a patch out of it putting it to tools/cma (or
->>> similar)?
->
->
->> i can send a patch for this. i am just thinking, should it be placed
->> in tools/ as a test utility or Documents/ as an example to explain CMA
->> to users who want to use cma.
->
->
-> I'd put it in tools/.
+On Friday 17 February 2012, ??? wrote:
+> I just want to alloc some readonly pages to detect memory corruption.
+> is it workable?
 
-ok. i will handle this.
+You could add a set_memory_ro function, but that will depend on another
+patch to change the kernel mapping to 4k pages.
 
->
->
->> i also think we should have a seperate document to explain cma in details
->> in documents/, and my helper program can be placed there.
->
->
-> I'm currently writing an article for LWN which I hope will also lead to
-> something
-> worth putting in Documentation/.
->
+It's certainly possible to do, but will be a significant amount of work.
 
-fine.
-
->
-> --
-> Best regards, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? _ ? ? _
-> .o. | Liege of Serenely Enlightened Majesty of ? ? ?o' \,=./ `o
-> ..o | Computer Science, ?Micha? ?mina86? Nazarewicz ? ?(o o)
-> ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
-
--barry
+	Arnd
