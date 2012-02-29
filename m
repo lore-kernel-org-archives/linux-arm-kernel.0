@@ -1,31 +1,23 @@
-From: tsoni@codeaurora.org (Trilok Soni)
-Date: Wed, 29 Feb 2012 17:54:49 +0530
-Subject: [PATCH v3 1/1] rc: Add support for GPIO based IR Receiver driver.
-In-Reply-To: <20120228202944.GA9373@balrog>
-References: <1330408300-21939-1-git-send-email-kumarrav@codeaurora.org>
- <20120228202944.GA9373@balrog>
-Message-ID: <4F4E1911.5050208@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Feb 2012 12:31:51 +0000
+Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
+In-Reply-To: <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
+References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
+ <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
+Message-ID: <201202291231.52151.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro/Wilson,
+On Monday 13 February 2012, Bill Carson wrote:
+> +
+> +/* 2M and 16M hugepage linux ptes are stored in mmu_context_t->huge_linux_pte
+> + *
+> + * 2M hugepage
+> + * ===========
+> + * one huge linux pte caters to two HW ptes,
+> + *
 
-On 2/29/2012 1:59 AM, James Hogan wrote:
-> On Tue, Feb 28, 2012 at 11:21:40AM +0530, Ravi Kumar V wrote:
->> Adds GPIO based IR Receiver driver. It decodes signals using decoders
->> available in rc framework.
->>
->> Signed-off-by: Ravi Kumar V<kumarrav@codeaurora.org>
->
-> Looks good to me (but I'm no expert).
->
+I think this needs more explanation. Why do you use a 2MB hugepage with two ptes here?
+Wouldn't it be more logical to use 1MB hugepages?
 
-Please review this patch.
-
-Thank you James for the review comments.
-
----Trilok Soni
-
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+	Arnd
