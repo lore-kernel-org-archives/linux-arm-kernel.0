@@ -1,38 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Feb 2012 20:13:26 +0000
-Subject: [PATCH] ARM: ux500: solve some Kconfig mess
-In-Reply-To: <CACRpkdaqdmB0_Z9FYC97FWZ2+RBSMfErUa62y0icqSOqAo8o1g@mail.gmail.com>
-References: <1330536509-13590-1-git-send-email-linus.walleij@stericsson.com>
- <201202291928.49516.arnd@arndb.de>
- <CACRpkdaqdmB0_Z9FYC97FWZ2+RBSMfErUa62y0icqSOqAo8o1g@mail.gmail.com>
-Message-ID: <201202292013.26661.arnd@arndb.de>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 29 Feb 2012 13:12:20 -0700
+Subject: ARM: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
+Message-ID: <201202291312.21318.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 February 2012, Linus Walleij wrote:
-> On Wed, Feb 29, 2012 at 8:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > Looks good to me. One thing I still wonder about is whether
-> > we should leave the UX500_SOC_DB5500 and UX500_SOC_DB8500
-> > options user-visible. It would probably be simpler to just
-> > select these whenever a board using them is enabled.
-> 
-> They are invisible to me atleast?
-> 
-> config UX500_SOC_DB5500
->         bool
->         select MFD_DB5500_PRCMU
-> 
-> config UX500_SOC_DB8500
->         bool
->         select MFD_DB8500_PRCMU
->         select REGULATOR_DB8500_PRCMU
->         select CPU_FREQ_TABLE if CPU_FREQ
-> 
+As done for the other ep93xx machines in:
 
-Ah, I forgot that I had actually done that patch myself and
-Mathieu sent it last week, so now it's in your tree but not mine.
+commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
+ARM: ep93xx: convert to MULTI_IRQ_HANDLER
 
-Nevermind then.
+Now that there is a generic IRQ handler for multiple VIC devices use it
+for vision_ep9307 to help building multi platform kernels.
 
-	Arnd
+Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Jamie Iles <jamie@jamieiles.com>
+
+---
+
+diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+index d5fb44f..d67d0b4 100644
+--- a/arch/arm/mach-ep93xx/vision_ep9307.c
++++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+@@ -34,6 +34,7 @@
+ #include <mach/ep93xx_spi.h>
+ #include <mach/gpio-ep93xx.h>
+ 
++#include <asm/hardware/vic.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/arch.h>
+@@ -361,6 +362,7 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= vision_map_io,
+ 	.init_irq	= ep93xx_init_irq,
++	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= vision_init_machine,
+ 	.restart	= ep93xx_restart,
