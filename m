@@ -1,19 +1,21 @@
 From: artem.bityutskiy@intel.com (Bityutskiy, Artem)
-Date: Wed, 29 Feb 2012 07:52:27 +0000
-Subject: [PATCH v6 0/2] patch set about the MXS-DMA
-In-Reply-To: <4F4D9725.3090100@freescale.com>
-References: <1329373053-19494-1-git-send-email-b32955@freescale.com>
- <4F4D9725.3090100@freescale.com>
-Message-ID: <1330502098.3545.78.camel@sauron.fi.intel.com>
+Date: Wed, 29 Feb 2012 07:58:20 +0000
+Subject: [PATCH] mtd/gpmi : fix compiler warning
+In-Reply-To: <1329189724-26100-1-git-send-email-b32955@freescale.com>
+References: <1329189724-26100-1-git-send-email-b32955@freescale.com>
+Message-ID: <1330502452.3545.81.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-02-29 at 11:10 +0800, Huang Shijie wrote:
-> Hi:
+On Tue, 2012-02-14 at 11:22 +0800, Huang Shijie wrote:
+> The gpmi driver selects the MTD_CMDLINE_PARTS directly.
+> But we should not select a visible symbol.
 > 
-> ping.
+> Just remove the select.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 
-Is this patch-set independent or requires something like gpma patches?
+Pushed to l2-mtd.git, thanks!
 
 -- 
 Best Regards,
@@ -24,7 +26,7 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120229/24af524a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120229/1dc613fc/attachment.sig>
 -------------- next part --------------
 ---------------------------------------------------------------------
 Intel Finland Oy
