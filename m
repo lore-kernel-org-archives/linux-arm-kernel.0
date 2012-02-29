@@ -1,37 +1,50 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 29 Feb 2012 23:39:27 +0100
-Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
-In-Reply-To: <20120229223114.GS18901@atomide.com>
-References: <1324019153-13316-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A80719AC@DBDE01.ent.ti.com>
- <20120229223114.GS18901@atomide.com>
-Message-ID: <4F4EA91F.1030305@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Feb 2012 14:42:50 -0800
+Subject: [PATCH] ARM: OMAP: id: Add missing break statement in
+ omap3xxx_check_revision
+In-Reply-To: <79CD15C6BA57404B839C016229A409A8317B7282@DBDE01.ent.ti.com>
+References: <1327305407-19914-1-git-send-email-hvaibhav@ti.com>
+ <20120127002543.GG29812@atomide.com>
+ <79CD15C6BA57404B839C016229A409A8317B530C@DBDE01.ent.ti.com>
+ <79CD15C6BA57404B839C016229A409A8317B7282@DBDE01.ent.ti.com>
+Message-ID: <20120229224250.GT18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/29/2012 11:31 PM, Tony Lindgren wrote:
-> * Hiremath, Vaibhav<hvaibhav@ti.com>  [120105 02:46]:
-...
->> Can this merged? OR anybody has any comments here?
->
-> For reference, looks like this one is queued up as
-> commit f0e15e2b0c6b3e89daade25a1e9a2d80136c14c3.
+* Hiremath, Vaibhav <hvaibhav@ti.com> [120129 23:59]:
+> On Fri, Jan 27, 2012 at 11:02:01, Hiremath, Vaibhav wrote:
+> > On Fri, Jan 27, 2012 at 05:55:43, Tony Lindgren wrote:
+> > > * Vaibhav Hiremath <hvaibhav@ti.com> [120122 23:26]:
+> > > > Add missing break statement in the function omap3xxx_check_revision.
+> > > > 
+> > > > The commit id 4390f5b2cb1f56 [ARM: OMAP: TI814X: Add cpu type macros
+> > > > and detection support], removed the 'break' statement from the function
+> > > > omap3xxx_check_revision(), resulting into wrong omap/cpu_revision
+> > > > initialization for AM335x devices.
+> > > 
+> > > Looks like this is already fixed, can you please verify with
+> > > v3.3-rc1?
+> > > 
+> > Tony,
+> > 
+> > I just looked at your linux-omap/master branch and 'break' statement is missing. So this patch is still required.
+> > 
+> > I can still see,
+> > 
+> > 394                 }
+> > 395                 break;
+> > 396         case 0xb944:
+> > 397                 omap_revision = AM335X_REV_ES1_0;
+> > 398                 cpu_rev = "1.0";
+> > 399         case 0xb8f2:
+> > 400                 switch (rev) {
+> > 
+> > 
+> Tony,
+> 
+> Can this be merged? I can still see "break" statement missing in the latest
+> linux-omap/master branch.
 
-Yes, it is, I included it in my DTS pull-request because it was the only 
-one with Grant's ack.
+OK thanks applying into fixes for the -rc cycle.
 
-I have the whole series ready to be pulled but was waiting for DT 
-maintainers acked-by.
-
-I still have these four ones in my branch.
-
-d5c9442 arm/dts: Add support for TI AM3517/05 EVM board
-3b5fa9a arm/dts: omap3-evm: Add i2c and twl4030 support
-7f4ca5f arm/dts: Add support for TI AM335x EVM board
-d0c3aca ARM: OMAP2+: board-generic: Add DT support for AM33xx devices
-
-In fact the board one already has the proper ack, only the DTS are 
-missing it.
-
-Regards,
-Benoit
+Tony
