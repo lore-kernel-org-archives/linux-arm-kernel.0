@@ -1,23 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 29 Feb 2012 10:21:19 -0800
-Subject: [PATCH 0/2] change lpj in arm smp common code
-In-Reply-To: <1330499895-12364-1-git-send-email-richard.zhao@linaro.org>
- (Richard Zhao's message of "Wed, 29 Feb 2012 15:18:13 +0800")
-References: <1330499895-12364-1-git-send-email-richard.zhao@linaro.org>
-Message-ID: <87sjhtec0w.fsf@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 29 Feb 2012 19:14:30 +0100
+Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
+ kernel_noload
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
+References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
+ <20120229122942.GF3318@game.jcrosoft.org>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
+Message-ID: <20120229181430.GI3318@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhao <richard.zhao@linaro.org> writes:
+On 08:58 Wed 29 Feb     , Stephen Warren wrote:
+> Jean-Christophe PLAGNIOL-VILLARD wrote at Wednesday, February 29, 2012 5:30 AM:
+> > On 17:03 Tue 28 Feb     , Stephen Warren wrote:
+> > > uImage files typically encode a single absolute load and entry address.
+> > > This is inconvenient when attempting to share that uImage across multiple
+> > > SoCs with different physical RAM addresses. Recent versions of mkimage
+> > > implement a "kernel_noload" image type which encodes no absolute load
+> > > address, and a relative entry address. This works well for uImage-wrapped
+> > > ARM zImages, since they are relocatable.
+> > >
+> > > This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
+> > > "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
+> > >
+> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > > ---
+> > > I assume I should put this into the ARM patch tracker if it's OK?
+> >
+> > Again a new option for uImage no why not just boot the zImage
+> > 
+> > in this case the uImage is useless
+> 
+> U-Boot doesn't support zImage at present.
+> 
+> A patch was posted to support it at least for ARM, but needed a little
+> work before it could be committed.
+Sorry I see no advantage to have the uImage build by the kernel anymore as
+we have a relocatable zImage
 
-> The two patches were originally in [PATCH V6 0/7] add a generic cpufreq driver.
-> I seperated them and hope they can go to upstream earlier.
->
-> Richard Zhao (2):
->   ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp
->   cpufreq: OMAP: remove loops_per_jiffy recalculate for smp
+I'll even drop its support
 
-The first one should go into Russell's patch system.  Once he queues
-that, I can queue the OMAP one for the CPUfreq maintainer.
-
-Kevin
+Best Regards,
+J.
