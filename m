@@ -1,51 +1,33 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 29 Feb 2012 19:28:19 +0000
-Subject: [RFC PATCH 0/2] ARM: assembler: Add uniform assembler framework
-In-Reply-To: <20120228194403.GC2063@linaro.org>
-References: <1330455586-10353-1-git-send-email-dave.martin@linaro.org>
- <20120228192458.GC3617@n2100.arm.linux.org.uk>
- <20120228194403.GC2063@linaro.org>
-Message-ID: <20120229192819.GD2077@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Feb 2012 19:28:49 +0000
+Subject: [PATCH] ARM: ux500: solve some Kconfig mess
+In-Reply-To: <1330536509-13590-1-git-send-email-linus.walleij@stericsson.com>
+References: <1330536509-13590-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201202291928.49516.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 07:44:03PM +0000, Dave Martin wrote:
-> On Tue, Feb 28, 2012 at 07:24:59PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 28, 2012 at 06:59:44PM +0000, Dave Martin wrote:
-> > > #ifdef __ASSEMBLY__
-> > > stuff
-> > > for
-> > > the
-> > > assembler
-> > > #else
-> > > asm("stuff");
-> > > asm("for");
-> > > asm("the");
-> > > asm("assembler");
-> > 
-> > That's invalid - nothing guarantees that the compiler won't place
-> > anything in between these asm statements in the output assembly
-> > file.
+On Wednesday 29 February 2012, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Within a function that would be certainly true -- at the top-level, I'm
-> less sure.  Since there is no sequential code at the top level, only
-> declarations, it's hard to see why the compiler would ever consider
-> pasting something in the middle of that block or reordering it.
-> Without constraints, the compiler simply has no idea what's there
-> (such asms are implicitly "volatile", though that could be added
-> for clarity).  You're right that all this may amount to less than a
-> guarantee, though...
+> First rename the config option MACH_U8500 to MACH_MOP500
+> because that is what it's obviously all about, this has
+> confused me for the last time. Fix some whitespace in the
+> process.
+> 
+> Since the machine descriptors for HREFv60 and snowball
+> are clearly in the file board-mop500.c which only
+> compiles if MACH_MOP500 (former MACH_U8500) is set,
+> select this for the board variants and nothing else.
+> 
+> For the MOP500 variants the UIB (user interface board)
+> is probed using I2C so select I2C and I2C_NOMADIK so
+> we know that this probe will always be successful.
 
-A quick follow up on this -- having chatted to tools guys, it sounds
-like you're quite right on this: it is indeed unsafe, without
--fno-toplevel-reorder (which would impair some optimisations)
-
-Of course, this also means that unified.h is unsafe for the same
-reasons -- there is no guarantee that the big asm block containing
-all the IT macro definitions will precede compiler-generated code in
-the input to the assembler (and, presumably, inline asms embedded in it)
-in the compiler output...
+Looks good to me. One thing I still wonder about is whether
+we should leave the UX500_SOC_DB5500 and UX500_SOC_DB8500
+options user-visible. It would probably be simpler to just
+select these whenever a board using them is enabled.
 
 
-Cheers
----Dave
+	Arnd
