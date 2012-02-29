@@ -1,41 +1,41 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 29 Feb 2012 15:14:41 +0100
-Subject: [PATCH 1/1] ARM: at91: at91sam9x5cm/dt: add leds support
-Message-ID: <1330524881-24668-1-git-send-email-plagnioj@jcrosoft.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 29 Feb 2012 16:26:55 +0200
+Subject: [PATCHv3 0/6] ARM: OMAP3PLUS: IO daisychain support fixes
+Message-ID: <1330525621-29836-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9x5cm.dtsi |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+Hi,
 
-diff --git a/arch/arm/boot/dts/at91sam9x5cm.dtsi b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-index f4adba4..c0afd5e 100644
---- a/arch/arm/boot/dts/at91sam9x5cm.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-@@ -45,6 +45,21 @@
- 					reg = <0x800000 0x1f800000>;
- 				};
- 			};
-+
-+			leds {
-+				compatible = "gpio-leds";
-+
-+				pb18 {
-+					label = "pb18";
-+					gpios = <&pioB 18 1>;
-+					linux,default-trigger = "heartbeat";
-+				};
-+
-+				pd21 {
-+					label = "pd21";
-+					gpios = <&pioD 21 0>;
-+				};
-+			};
- 		};
- 	};
- };
--- 
-1.7.7
+The previous version of this set was sent by Vishwanath BS, but as he
+is busy with other stuff, I am taking over.
+
+Some basic info about this set based on comments received on set v2.
+IO chain is now enabled always, and a re-trigger for the chain is
+done during hwmod enable / disable. This means that IO chain is always
+armed according to the latest pad specific WAKE_ENABLE setting, and
+if it is modified, the IO chain needs to be re-armed (thus the hooks
+within omap_hwmod code.) Having IO chain armed all the time allows us
+to receive IO event interrupts even during non-sleep states if the
+corresponding hardware module is disabled, and is unable to detect any
+IO activity itself.
+
+Version 3 contains the following changes:
+
+- global: renamed *_trigger_wuclk_ctrl funcs as *_trigger_io_chain
+- patch 3: added trigger WUCLKIN disable at the end of omap4_trigger_io_chain
+  (fix pulled from the omap4 core retention set)
+- patch 5: added function pointer for using machine specific io_chain trigger
+  function, initialized during boot
+- patch 7 dropped as the support capability for omap3 is now handled as
+  part of patch 5 init
+
+Tested on omap3 beagle + omap4 blaze boards. Suspend / resume works, and
+hwmod_io interrupts are generated. Omap4 was tested with the core retention
+support set.
+
+PS: Vishwa / Rajendra, let me know if you are unhappy with me keeping
+your signed-off-by tags in place, I did some minor changes to the patches
+from you.
+
+-Tero
