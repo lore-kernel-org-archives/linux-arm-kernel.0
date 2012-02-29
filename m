@@ -1,64 +1,25 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 29 Feb 2012 14:22:27 +0400
-Subject: [PATCH v2 1/7] ARM: davinci, intc: Add OF support for TI interrupt
- controller
-In-Reply-To: <4F4DC8EB.7010201@denx.de>
-References: <1329893410-24413-1-git-send-email-hs@denx.de>
- <1329893410-24413-2-git-send-email-hs@denx.de> <4F44DE24.30606@mvista.com>
- <4F4DC8EB.7010201@denx.de>
-Message-ID: <4F4DFC63.9060509@mvista.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 Feb 2012 10:23:50 +0000
+Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
+In-Reply-To: <4F4DFC3E.2080208@gmail.com>
+References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
+ <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
+ <20120228173027.GB22082@arm.com>
+ <4F4D8EBA.90406@gmail.com> <20120229093905.GA17745@arm.com>
+ <4F4DFC3E.2080208@gmail.com>
+Message-ID: <CAHkRjk6s1HDQi317TMEVgGv-XpRmvqpdMv0LebGnL-F3TaMtig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 29 February 2012 10:21, bill4carson <bill4carson@gmail.com> wrote:
+> On 2012?02?29? 17:39, Catalin Marinas wrote:
+>> BTW, there are several coding style issues, I won't go through them but
+>> it would help if you have a look at Documentation/CodingStyle
+>> (especially comment style, if/else brackets).
+>
+> Yes, I forgot to run checkpatch.pl to sanitize this patch set.
 
-On 29-02-2012 10:42, Heiko Schocher wrote:
+Don't just rely on checkpatch.pl, have a look at the CodingStyle doc :)
 
->>> Add a function to initialize the davinci interrupt controller (INTC)
->>> using a device tree node.
-
->>     cp_intc is not DaVinci interrupt controller, it's only used in
->> OMAP-L1x SoCs. cp_intc stands for Common Platform Interrupt Controller.
-
-> Ah, Ok! Thanks for the explanation.
-
->> I don't see where you are initializiing the DaVinci interrupt controller
->> itself. You should understand that there are two disctinct types of
->> interrupt controllers used in the SoCs supported by arch/arm/mach-davinci/.
-
-> board code:
-
-> MACHINE_START(ENBW_CMC, "EnBW CMC")
-> [...]
->          .init_irq       = davinci_init_irq,
-
-> and in arch/arm/mach-davinci/cp_intc.c
-
-> for the of case:
-
-> void __init davinci_init_irq(void)
-> {
->          of_irq_init(irq_match);
-> }
-
-> in drivers/of/irq.c:
-
-> /**
->   * of_irq_init - Scan and init matching interrupt controllers in DT
->   * @matches: 0 terminated array of nodes to match and init function to call
->   *
->   * This function scans the device tree for matching interrupt controller nodes,
->   * and calls their initialization functions in order with parents first.
->   */
-> void __init of_irq_init(const struct of_device_id *matches)
-
-> Ok, the name of davinci_init_irq() is missleading ...
-
-> Should I name it "cp_intc_of_init" ?
-
-    Probably. At least something with "cp_intc" in the name...
-
-> bye,
-> Heiko
-
-WBR, Sergei
+-- 
+Catalin
