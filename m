@@ -1,44 +1,42 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 29 Feb 2012 19:14:30 +0100
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
-References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
- <20120229122942.GF3318@game.jcrosoft.org>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
-Message-ID: <20120229181430.GI3318@game.jcrosoft.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 Feb 2012 18:29:38 +0000
+Subject: [PATCH v2 0/3] ARM support for syscall tracing
+In-Reply-To: <4F4E3780.4060904@mentor.com>
+References: <4F44FF58.3060907@mentor.com>
+ <4F4E3780.4060904@mentor.com>
+Message-ID: <20120229182937.GM2983@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:58 Wed 29 Feb     , Stephen Warren wrote:
-> Jean-Christophe PLAGNIOL-VILLARD wrote at Wednesday, February 29, 2012 5:30 AM:
-> > On 17:03 Tue 28 Feb     , Stephen Warren wrote:
-> > > uImage files typically encode a single absolute load and entry address.
-> > > This is inconvenient when attempting to share that uImage across multiple
-> > > SoCs with different physical RAM addresses. Recent versions of mkimage
-> > > implement a "kernel_noload" image type which encodes no absolute load
-> > > address, and a relative entry address. This works well for uImage-wrapped
-> > > ARM zImages, since they are relocatable.
-> > >
-> > > This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
-> > > "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
-> > >
-> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > ---
-> > > I assume I should put this into the ARM patch tracker if it's OK?
-> >
-> > Again a new option for uImage no why not just boot the zImage
-> > 
-> > in this case the uImage is useless
-> 
-> U-Boot doesn't support zImage at present.
-> 
-> A patch was posted to support it at least for ARM, but needed a little
-> work before it could be committed.
-Sorry I see no advantage to have the uImage build by the kernel anymore as
-we have a relocatable zImage
+Hi Wade,
 
-I'll even drop its support
+On Wed, Feb 29, 2012 at 02:34:40PM +0000, Wade Farnsworth wrote:
+> This is a rework of Steven Walter's syscall tracing patches first
+> posted here:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074454.html
+> 
+> I've rebased the patches against the current mainline master branch, as well
+> as implemented several changes based on feedback from Will Deacon and
+> Russel King.
+> 
+> v2: - Tested on EABI and OABI.
+>     - Removed an instance of the ?: operator in syscall_set_return_value()
+>     - Moved #define of NR_syscalls to syscall.h
+>     - Changed the test of NR_syscalls vs __NR_syscalls in entry-common.S
+>       to .ifne
+> 
+> Wade Farnsworth (3):
+>   ARM: add support for the generic syscall.h interface
+>   ARM: add TRACEHOOK support
+>   ARM: support syscall tracing
 
-Best Regards,
-J.
+I'm pretty happy with these three patches now, so feel free to add:
+
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+
+Once Russell is ok with them you can put them in the patch system.
+
+Cheers,
+
+Will
