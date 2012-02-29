@@ -1,168 +1,310 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 29 Feb 2012 14:25:45 +0900
-Subject: [PATCH v9 2/2] iommu/exynos: Add iommu driver for Exynos Platforms
-In-Reply-To: <CAH9JG2UDXdDwfsynPEZ8rN9_Wbw4axYDWnMHEU5GoHPFJvZ_Rg@mail.gmail.com>
-References: <001a01ccf5e3$74a0d360$5de27a20$%cho@samsung.com>
- <CAH9JG2UDXdDwfsynPEZ8rN9_Wbw4axYDWnMHEU5GoHPFJvZ_Rg@mail.gmail.com>
-Message-ID: <CAHQjnOOy__H8C0YAJq5TOD0Tv-18LRwaTosqp+pc9L8-Dq9TYw@mail.gmail.com>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Wed, 29 Feb 2012 11:27:08 +0530
+Subject: [PATCH v3 1/1] rc: Add support for GPIO based IR Receiver driver.
+In-Reply-To: <20120228202944.GA9373@balrog>
+References: <1330408300-21939-1-git-send-email-kumarrav@codeaurora.org>
+ <20120228202944.GA9373@balrog>
+Message-ID: <4F4DBE34.4000808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 4:53 PM, Kyungmin Park
-<kyungmin.park@samsung.com> wrote:
->> +void exynos_sysmmu_set_prefbuf(struct device *owner,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long base0, unsigned long size0,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long base1, unsigned long size1)
+On 2/29/2012 1:59 AM, James Hogan wrote:
+> On Tue, Feb 28, 2012 at 11:21:40AM +0530, Ravi Kumar V wrote:
+>> Adds GPIO based IR Receiver driver. It decodes signals using decoders
+>> available in rc framework.
+>>
+>> Signed-off-by: Ravi Kumar V<kumarrav@codeaurora.org>
+>
+> Looks good to me (but I'm no expert).
+>
+> Cheers
+> James
+>
+Thanks for review and good suggestions
+
+>>
+>> diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+>> index aeb7f43..6f63ded 100644
+>> --- a/drivers/media/rc/Kconfig
+>> +++ b/drivers/media/rc/Kconfig
+>> @@ -256,4 +256,13 @@ config RC_LOOPBACK
+>>   	   To compile this driver as a module, choose M here: the module will
+>>   	   be called rc_loopback.
+>>
+>> +config IR_GPIO_CIR
+>> +	tristate "GPIO IR remote control"
+>> +	depends on RC_CORE
+>> +	---help---
+>> +	   Say Y if you want to use GPIO based IR Receiver.
+>> +
+>> +	   To compile this driver as a module, choose M here: the module will
+>> +	   be called gpio-ir-recv.
+>> +
+>>   endif #RC_CORE
+>> diff --git a/drivers/media/rc/Makefile b/drivers/media/rc/Makefile
+>> index 2156e78..9b3568e 100644
+>> --- a/drivers/media/rc/Makefile
+>> +++ b/drivers/media/rc/Makefile
+>> @@ -25,3 +25,4 @@ obj-$(CONFIG_IR_REDRAT3) += redrat3.o
+>>   obj-$(CONFIG_IR_STREAMZAP) += streamzap.o
+>>   obj-$(CONFIG_IR_WINBOND_CIR) += winbond-cir.o
+>>   obj-$(CONFIG_RC_LOOPBACK) += rc-loopback.o
+>> +obj-$(CONFIG_IR_GPIO_CIR) += gpio-ir-recv.o
+>> diff --git a/drivers/media/rc/gpio-ir-recv.c b/drivers/media/rc/gpio-ir-recv.c
+>> new file mode 100644
+>> index 0000000..6744479
+>> --- /dev/null
+>> +++ b/drivers/media/rc/gpio-ir-recv.c
+>> @@ -0,0 +1,205 @@
+>> +/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include<linux/kernel.h>
+>> +#include<linux/init.h>
+>> +#include<linux/module.h>
+>> +#include<linux/interrupt.h>
+>> +#include<linux/gpio.h>
+>> +#include<linux/slab.h>
+>> +#include<linux/platform_device.h>
+>> +#include<linux/irq.h>
+>> +#include<media/rc-core.h>
+>> +#include<media/gpio-ir-recv.h>
+>> +
+>> +#define GPIO_IR_DRIVER_NAME	"gpio-rc-recv"
+>> +#define GPIO_IR_DEVICE_NAME	"gpio_ir_recv"
+>> +
+>> +struct gpio_rc_dev {
+>> +	struct rc_dev *rcdev;
+>> +	unsigned int gpio_nr;
+>> +	bool active_low;
+>> +};
+>> +
+>> +static irqreturn_t gpio_ir_recv_irq(int irq, void *dev_id)
 >> +{
->> + ? ? struct sysmmu_drvdata *data = dev_get_drvdata(owner->archdata.iommu);
->> + ? ? unsigned long flags;
->> + ? ? int i;
+>> +	struct gpio_rc_dev *gpio_dev = dev_id;
+>> +	unsigned int gval;
+>> +	int rc = 0;
+>> +	enum raw_event_type type = IR_SPACE;
 >> +
->> + ? ? BUG_ON((base0 + (size0 - 1)) <= base0);
->> + ? ? BUG_ON((base1 + (size1 - 1)) <= base1);
-> Do you want to check size? BUG_ON(size <= 1);?
-
-My mistake. :)
-Thank you.
-
+>> +	gval = gpio_get_value_cansleep(gpio_dev->gpio_nr);
 >> +
->> + ? ? read_lock_irqsave(&data->lock, flags);
->> + ? ? if (!is_sysmmu_active(data))
->> + ? ? ? ? ? ? goto finish;
+>> +	if (gval<  0)
+>> +		goto err_get_value;
 >> +
->> + ? ? for (i = 0; i < data->nsfrs; i++) {
->> + ? ? ? ? ? ? if ((readl(data->sfrbases[i] + S5P_MMU_VERSION) >> 28) == 3) {
->> + ? ? ? ? ? ? ? ? ? ? sysmmu_block(data->sfrbases[i]);
+>> +	if (gpio_dev->active_low)
+>> +		gval = !gval;
 >> +
->> + ? ? ? ? ? ? ? ? ? ? if (size1 == 0) {
-> Is it possible? if size1 is '0', it can't pass the BUG_ON condition.
-Although the above BUG_ON condition is incorrect, it can pass if size1
-and base1 are 0
-because the type of them is unsigned.
-
+>> +	if (gval == 1)
+>> +		type = IR_PULSE;
 >> +
->> + ? ? for (i = 0; i < data->nsfrs; i++) {
->> + ? ? ? ? ? ? __sysmmu_set_ptbase(data->sfrbases[i], pgtable);
+>> +	rc = ir_raw_event_store_edge(gpio_dev->rcdev, type);
+>> +	if (rc<  0)
+>> +		goto err_get_value;
 >> +
->> + ? ? ? ? ? ? if ((readl(data->sfrbases[i] + S5P_MMU_VERSION) >> 28) == 3) {
->> + ? ? ? ? ? ? ? ? ? ? /* System MMU version is 3.x */
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel((1 << 12) | (2 << 28),
-> Can you use the DEFINE instead of hard-code?
-
-Do you think it is required even though it is used nowhere else here?
-
->> +static int exynos_iommu_attach_device(struct iommu_domain *domain,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct device *dev)
->> +{
->> + ? ? int ret;
->> + ? ? struct exynos_iommu_domain *priv = domain->priv;
->> + ? ? struct iommu_client *client = NULL;
->> + ? ? struct list_head *pos;
->> + ? ? unsigned long flags;
+>> +	ir_raw_event_handle(gpio_dev->rcdev);
 >> +
->> + ? ? spin_lock_irqsave(&priv->lock, flags);
->> +
->> + ? ? list_for_each(pos, &priv->clients) {
-> Simply list_for_each_entry.
-
-Variable 'client' must not be used as a loop cursor
-because its value must not be changed unless a condition meets.
-
->> + ? ? ? ? ? ? struct iommu_client *cur;
->> +
->> + ? ? ? ? ? ? cur = list_entry(pos, struct iommu_client, node);
->> + ? ? ? ? ? ? if (cur->dev == dev) {
->> + ? ? ? ? ? ? ? ? ? ? client = cur;
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? }
->> + ? ? }
->> +
->> + ? ? if (client != NULL) {
->> + ? ? ? ? ? ? dev_dbg(dev, "%s: IOMMU with pgtable 0x%lx already attached\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, __pa(priv->pgtable));
->> + ? ? ? ? ? ? client->refcnt++;
->> + ? ? }
->> +
->> + ? ? spin_unlock_irqrestore(&priv->lock, flags);
->> +
->> + ? ? if (client != NULL)
->> + ? ? ? ? ? ? return 0;
->> +
->> + ? ? client = kmalloc(sizeof(*client), GFP_KERNEL);
-> Maybe attach called frequently. how about to use kmem_cache-*?
-Thank you for advice.
-
->> + ? ? if (!client)
->> + ? ? ? ? ? ? return -ENOMEM;
->> +
->> + ? ? INIT_LIST_HEAD(&client->node);
->> + ? ? client->dev = dev;
->> + ? ? client->refcnt = 1;
-> Dose it possible attach more than one? OMAP has multiple attach codes.
-Yes. This function returns earlier than this if client->refcnt is larger than 1.
-Please check "if (client != NULL) return 0;" statement in this function.
-
->> + ? ? ret = __exynos_sysmmu_enable(dev, __pa(priv->pgtable), domain);
->> + ? ? if (ret) {
->> + ? ? ? ? ? ? kfree(client);
->> + ? ? ? ? ? ? return ret;
->> + ? ? }
->> +
->> + ? ? spin_lock_irqsave(&priv->lock, flags);
->> + ? ? list_add_tail(&client->node, &priv->clients);
->> + ? ? spin_unlock_irqrestore(&priv->lock, flags);
->> +
->> + ? ? dev_dbg(dev, "%s: Attached new IOMMU with pgtable 0x%lx\n", __func__,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __pa(priv->pgtable));
->> + ? ? return 0;
+>> +err_get_value:
+>> +	return IRQ_HANDLED;
 >> +}
 >> +
->> +static void exynos_iommu_detach_device(struct iommu_domain *domain,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device *dev)
+>> +static int __devinit gpio_ir_recv_probe(struct platform_device *pdev)
 >> +{
->> + ? ? struct exynos_iommu_domain *priv = domain->priv;
->> + ? ? struct iommu_client *client = NULL;
->> + ? ? struct list_head *pos;
->> + ? ? unsigned long flags;
+>> +	struct gpio_rc_dev *gpio_dev;
+>> +	struct rc_dev *rcdev;
+>> +	const struct gpio_ir_recv_platform_data *pdata =
+>> +					pdev->dev.platform_data;
+>> +	int rc;
 >> +
->> + ? ? spin_lock_irqsave(&priv->lock, flags);
+>> +	if (!pdata)
+>> +		return -EINVAL;
 >> +
->> + ? ? list_for_each(pos, &priv->clients) {
->> + ? ? ? ? ? ? struct iommu_client *cur;
+>> +	if (pdata->gpio_nr<  0)
+>> +		return -EINVAL;
 >> +
->> + ? ? ? ? ? ? cur = list_entry(pos, struct iommu_client, node);
->> + ? ? ? ? ? ? if (cur->dev == dev) {
->> + ? ? ? ? ? ? ? ? ? ? cur->refcnt--;
->> + ? ? ? ? ? ? ? ? ? ? client = cur;
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? }
->> + ? ? }
+>> +	gpio_dev = kzalloc(sizeof(struct gpio_rc_dev), GFP_KERNEL);
+>> +	if (!gpio_dev)
+>> +		return -ENOMEM;
 >> +
->> + ? ? spin_unlock_irqrestore(&priv->lock, flags);
+>> +	rcdev = rc_allocate_device();
+>> +	if (!rcdev) {
+>> +		rc = -ENOMEM;
+>> +		goto err_allocate_device;
+>> +	}
 >> +
->> + ? ? if (WARN_ON(client == NULL))
->> + ? ? ? ? ? ? return;
+>> +	rcdev->driver_type = RC_DRIVER_IR_RAW;
+>> +	rcdev->allowed_protos = RC_TYPE_ALL;
+>> +	rcdev->input_name = GPIO_IR_DEVICE_NAME;
+>> +	rcdev->input_id.bustype = BUS_HOST;
+>> +	rcdev->driver_name = GPIO_IR_DRIVER_NAME;
+>> +	rcdev->map_name = RC_MAP_EMPTY;
 >> +
->> + ? ? if (client->refcnt > 0) {
-> It never triggered. as you use true/false scheme. I remember you said
-> previous patch. use the refcount but actual meaning is true/false.
+>> +	gpio_dev->rcdev = rcdev;
+>> +	gpio_dev->gpio_nr = pdata->gpio_nr;
+>> +	gpio_dev->active_low = pdata->active_low;
+>> +
+>> +	rc = gpio_request(pdata->gpio_nr, "gpio-ir-recv");
+>> +	if (rc<  0)
+>> +		goto err_gpio_request;
+>> +	rc  = gpio_direction_input(pdata->gpio_nr);
+>> +	if (rc<  0)
+>> +		goto err_gpio_direction_input;
+>> +
+>> +	rc = rc_register_device(rcdev);
+>> +	if (rc<  0) {
+>> +		dev_err(&pdev->dev, "failed to register rc device\n");
+>> +		goto err_register_rc_device;
+>> +	}
+>> +
+>> +	platform_set_drvdata(pdev, gpio_dev);
+>> +
+>> +	rc = request_any_context_irq(gpio_to_irq(pdata->gpio_nr),
+>> +				gpio_ir_recv_irq,
+>> +			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+>> +					"gpio-ir-recv-irq", gpio_dev);
+>> +	if (rc<  0)
+>> +		goto err_request_irq;
+>> +
+>> +	return 0;
+>> +
+>> +err_request_irq:
+>> +	platform_set_drvdata(pdev, NULL);
+>> +	rc_unregister_device(rcdev);
+>> +err_register_rc_device:
+>> +err_gpio_direction_input:
+>> +	gpio_free(pdata->gpio_nr);
+>> +err_gpio_request:
+>> +	rc_free_device(rcdev);
+>> +	rcdev = NULL;
+>> +err_allocate_device:
+>> +	kfree(gpio_dev);
+>> +	return rc;
+>> +}
+>> +
+>> +static int __devexit gpio_ir_recv_remove(struct platform_device *pdev)
+>> +{
+>> +	struct gpio_rc_dev *gpio_dev = platform_get_drvdata(pdev);
+>> +
+>> +	free_irq(gpio_to_irq(gpio_dev->gpio_nr), gpio_dev);
+>> +	platform_set_drvdata(pdev, NULL);
+>> +	rc_unregister_device(gpio_dev->rcdev);
+>> +	gpio_free(gpio_dev->gpio_nr);
+>> +	rc_free_device(gpio_dev->rcdev);
+>> +	kfree(gpio_dev);
+>> +	return 0;
+>> +}
+>> +
+>> +#ifdef CONFIG_PM
+>> +static int gpio_ir_recv_suspend(struct device *dev)
+>> +{
+>> +	struct platform_device *pdev = to_platform_device(dev);
+>> +	struct gpio_rc_dev *gpio_dev = platform_get_drvdata(pdev);
+>> +
+>> +	if (device_may_wakeup(dev))
+>> +		enable_irq_wake(gpio_to_irq(gpio_dev->gpio_nr));
+>> +	else
+>> +		disable_irq(gpio_to_irq(gpio_dev->gpio_nr));
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int gpio_ir_recv_resume(struct device *dev)
+>> +{
+>> +	struct platform_device *pdev = to_platform_device(dev);
+>> +	struct gpio_rc_dev *gpio_dev = platform_get_drvdata(pdev);
+>> +
+>> +	if (device_may_wakeup(dev))
+>> +		disable_irq_wake(gpio_to_irq(gpio_dev->gpio_nr));
+>> +	else
+>> +		enable_irq(gpio_to_irq(gpio_dev->gpio_nr));
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct dev_pm_ops gpio_ir_recv_pm_ops = {
+>> +	.suspend        = gpio_ir_recv_suspend,
+>> +	.resume         = gpio_ir_recv_resume,
+>> +};
+>> +#endif
+>> +
+>> +static struct platform_driver gpio_ir_recv_driver = {
+>> +	.probe  = gpio_ir_recv_probe,
+>> +	.remove = __devexit_p(gpio_ir_recv_remove),
+>> +	.driver = {
+>> +		.name   = GPIO_IR_DRIVER_NAME,
+>> +		.owner  = THIS_MODULE,
+>> +#ifdef CONFIG_PM
+>> +		.pm	=&gpio_ir_recv_pm_ops,
+>> +#endif
+>> +	},
+>> +};
+>> +
+>> +static int __init gpio_ir_recv_init(void)
+>> +{
+>> +	return platform_driver_register(&gpio_ir_recv_driver);
+>> +}
+>> +module_init(gpio_ir_recv_init);
+>> +
+>> +static void __exit gpio_ir_recv_exit(void)
+>> +{
+>> +	platform_driver_unregister(&gpio_ir_recv_driver);
+>> +}
+>> +module_exit(gpio_ir_recv_exit);
+>> +
+>> +MODULE_DESCRIPTION("GPIO IR Receiver driver");
+>> +MODULE_LICENSE("GPL v2");
+>> diff --git a/include/media/gpio-ir-recv.h b/include/media/gpio-ir-recv.h
+>> new file mode 100644
+>> index 0000000..61a7fbb
+>> --- /dev/null
+>> +++ b/include/media/gpio-ir-recv.h
+>> @@ -0,0 +1,22 @@
+>> +/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#ifndef __GPIO_IR_RECV_H__
+>> +#define __GPIO_IR_RECV_H__
+>> +
+>> +struct gpio_ir_recv_platform_data {
+>> +	unsigned int gpio_nr;
+>> +	bool active_low;
+>> +};
+>> +
+>> +#endif /* __GPIO_IR_RECV_H__ */
+>> +
+>> --
+>> Sent by a consultant of the Qualcomm Innovation Center, Inc.
+>> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I think you are talking about the conversations about v6 patchset.
-client->refcnt is really a reference counter.
 
->> + ? ? ? ? ? ? dev_dbg(dev, "%s: Detaching IOMMU with pgtable 0x%lx delayed\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, __pa(priv->pgtable));
->> + ? ? ? ? ? ? return;
->> + ? ? }
->> +
->> + ? ? BUG_ON(client->refcnt != 0);
-> Do you think "minus value"?
-
-Yes. but I think it never be happened logically.
-It is just "assert(client->refcnt == 0)".
-May it is better to remove the BUG_ON.
-
-
-Thank you for kind review.
-
-Cho KyongHo.
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
