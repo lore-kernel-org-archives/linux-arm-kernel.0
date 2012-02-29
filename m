@@ -1,31 +1,26 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 29 Feb 2012 20:54:06 +0530
-Subject: [PATCHv3] ARM: add jump label support
-In-Reply-To: <1329325244-16289-1-git-send-email-rabin@rab.in>
-References: <1327757725-10114-7-git-send-email-rabin@rab.in>
- <1329325244-16289-1-git-send-email-rabin@rab.in>
-Message-ID: <20120229152320.GA6337@debian>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 29 Feb 2012 21:04:02 +0530
+Subject: [PATCHv3 0/4] ARM: OMAP4: core retention support
+In-Reply-To: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
+References: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
+Message-ID: <CAMQu2gwHrqxZtij2mO3fgh7e8Hqr7ZTMzLxEboeT0pGK2siMOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 10:30:44PM +0530, Rabin Vincent wrote:
-> Add the arch-specific code to support jump labels for ARM and Thumb-2.
-> 
-> This code will only be activated on compilers that are capable of
-> building it.  It has been tested with GCC 4.6 patched with the patch
-> from GCC bug 48637.
-> 
-> Cc: Jason Baron <jbaron@redhat.com>
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
-...
-> +static __always_inline bool arch_static_branch(struct jump_label_key *key)
+On Wed, Feb 29, 2012 at 8:55 PM, Tero Kristo <t-kristo@ti.com> wrote:
+> Hi,
+>
+> Changes compared to previous version:
+>
+> - split out the io_chain set as a separate set
+> - marked patch 3 as TEMP, this is only needed until Paul's pwrdm fixes
+> ?get merged (http://marc.info/?l=linux-omap&m=133040749621183&w=2)
+>
+> Depends on the io_chain set to provide wakeup capability from
+> retention.
+>
+> Tested with omap4430 blaze : suspend / resume works okay.
 
-Hmm, there's now a patch in linux-next ("static keys: Introduce 'struct
-static_key', static_key_true()/false() and static_key_slow_[inc|dec]()")
-via the -tip tree which would cause this not to build anymore since
-struct jump_label_key was renamed to struct static_key.
-
-I'm not sure how this could be handled to keep this compiling both in
-the arm tree separately and in linux-next.  I guess the easiest is to
-delay this until the next cycle, since it's not applied yet.
+Thanks for fixing answering the comments on last version.
+For entire series you can add
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
