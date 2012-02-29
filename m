@@ -1,58 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Feb 2012 20:48:53 +0000
-Subject: IIO irq allocation fails on AT91SAM9G45
-In-Reply-To: <4F4E8C0F.5090104@kernel.org>
-References: <4F4E36E6.1010704@free-electrons.com> <4F4E8C0F.5090104@kernel.org>
-Message-ID: <20120229204853.GE16999@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 29 Feb 2012 12:54:15 -0800
+Subject: [RFC PATCH] of: DMA helpers: manage generic requests specification
+In-Reply-To: <1330527248-4350-1-git-send-email-nicolas.ferre@atmel.com>
+References: <4F22DEF2.5000807@ti.com>
+ <1330527248-4350-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF217B@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 08:35:27PM +0000, Jonathan Cameron wrote:
-> On 02/29/2012 02:32 PM, Maxime Ripard wrote:
-> > Hi everyone,
-> > 
-> > I'm working on adding the support for the AT91SAM9M10G45-EK board from
-> > Atmel for the at91_adc driver I previously posted, and I encounter some
-> > weird issue here.
-> > 
-> > When calling the iio_allocate_trigger
-> > (http://lxr.free-electrons.com/source/drivers/staging/iio/industrialio-trigger.c?a=arm#L421)
-> > from my driver on the G45, it returns ENOMEM, while on the
-> > AT91SAM9G20-EK board, it works perfectly.
-> > 
-> > Digging a bit into it, it seems that the call to irq_alloc_descs is
-> > returning the error (the value of CONFIG_IIO_CONSUMERS_PER_TRIGGER is 2
-> > in my configuration, which seems pretty reasonable and is the default
-> > value anyway), which is itself getting that return value from
-> > irq_expand_nr_irqs.
-> > 
-> > Here, I'm left confused, I don't know this part of the kernel anymore,
-> > and most importantly, it seems to be pretty-much arch-independant, while
-> > the nature of my issue seems really platform-dependant.
-> > 
-> > Do you have any clue of what's going on here ?
-> We ran into this originally on the pxa as well.   My guess is that
-> nr_irqs is not set high enough for that particular board.
+Nicolas Ferre wrote at Wednesday, February 29, 2012 7:54 AM:
+> By making DMA controllers register a generic translation
+> function, we allow the management of any type of DMA requests
+> specification.
+> The void * output of an of_dma_xlate() function that will be implemented
+> by the DMA controller can carry any type of "dma-request" argument.
 > 
-> Looking back I can find some mention of a nasty bit of code that
-> just adds a bit of padding but I can't find it now.
+> The DMA client will search its associated DMA controller in the list
+> and call the registered of_dam_xlate() function to retrieve the
+> request values.
 > 
-> Anyhow, you probably have a line somewhere in the kernel log
-> saying something like:
+> One simple xlate function is provided for the "single number" type
+> of request biding.
 > 
-> [    0.000000] NR_IRQS:288 nr_irqs:296 296
-> 
-> NR_IRQS is typically the number of the SoC
-> nr_irqs should be large enough to accomodate those provided by
-> other peripherals.
-> 
-> I also have a vague recollection that the problem goes away entirely
-> with sparse irqs?
+> This implementation is independent from dmaengine so it can also be
+> used by legacy drivers.
 
-Yes, because IRQs will be allocated above the last figure on that
-line, up to IRQ_BITMAP_BITS which happens to be 8192 above NR_IRQS.
+At a high level this seems along the right lines.
 
-There's an issue though: if your on-SoC IRQ controller is already
-using irq_alloc_descs(), it will fail if you want it to grab IRQs
-below the last figure on that line, because those will have already
-been allocated for you.
+The big issue I see is the lack of type-safety in of_get_dma_request()'s
+out_data pointer: The DMA xlate function will assume it points at some
+particular type, and the client is responsible for allocating that
+correct type. However, it's "user"-supplied device tree data that hooks
+the two together, and there could easily be mismatches, thus causing
+the xlate function to trash memory.
+
+Could each DMA controller (or type of out_data) have some enum in the
+kernel that the client passes in, and the DMA engine validates matches
+its expectations, to prevent this kind of thing?
+
+enum DMA_PARAMS_TYPE {
+    FOO_DMA_PARAMS,
+    BAR_DMA_PARAMS,
+    ...
+};
+
+struct foo_dma_params { ... };
+
+struct foo_dma_params params;
+
+of_get_dma_request(np, 0, &params, FOO_DMA_PARAMS);
+
+and inside xlate():
+
+if (params_type != FOO_DMA_PARAMS)
+    return -EINVAL;
+
+For the dmaengine case, I assume there'd be a single DMA_PARAMS_TYPE
+value for the dmaengine specifier type, and the dmaengine core would
+take care of making sure everything matched somehow.
+
+-- 
+nvpublic
