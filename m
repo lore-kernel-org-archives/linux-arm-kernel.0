@@ -1,69 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Feb 2012 17:49:08 -0800
-Subject: [PATCH 7/8] ARM: OMAP: Remove plat/io.h by moving it into
- mach/io.h
-In-Reply-To: <20120229014719.GK18901@atomide.com>
-References: <20120221233619.18709.87982.stgit@kaulin.local>
- <20120221234049.18709.28987.stgit@kaulin.local>
- <4F4451FB.7070007@gmail.com> <20120224000657.GJ18185@atomide.com>
- <20120224182246.GL18185@atomide.com> <4F4AFCC7.3020509@gmail.com>
- <20120229014719.GK18901@atomide.com>
-Message-ID: <20120229014906.GL18901@atomide.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Wed, 29 Feb 2012 10:34:34 +0800
+Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
+In-Reply-To: <20120228173027.GB22082@arm.com>
+References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
+ <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
+ <20120228173027.GB22082@arm.com>
+Message-ID: <4F4D8EBA.90406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120228 17:15]:
-> * Rob Herring <robherring2@gmail.com> [120226 19:15]:
-> > On 02/24/2012 12:22 PM, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [120223 15:36]:
-> > >> * Rob Herring <robherring2@gmail.com> [120221 17:53]:
-> > >>> On 02/21/2012 05:40 PM, Tony Lindgren wrote:
-> > >>>> +
-> > >>>> +/*
-> > >>>> + * NOTE: Please use ioremap + __raw_read/write where possible instead of these
-> > >>>> + */
-> > >>>> +
-> > >>>> +extern u8 omap_readb(u32 pa);
-> > >>>> +extern u16 omap_readw(u32 pa);
-> > >>>> +extern u32 omap_readl(u32 pa);
-> > >>>> +extern void omap_writeb(u8 v, u32 pa);
-> > >>>> +extern void omap_writew(u16 v, u32 pa);
-> > >>>> +extern void omap_writel(u32 v, u32 pa);
-> > >>>
-> > >>> These can't be moved to common.h like omap2?
-> > >>
-> > >> Not for omap1 currently because a bunch of legacy drivers are
-> > >> using them :(
-> > > 
-> > > Looks like we can have them in mach-omap1/include/mach/hardware.h.
-> > > 
-> > > Eventually the SoC specific hardware.h files could be renamed to
-> > > just something like omap1.h, omap2plus.h and so. And then they
-> > > could be included in the common hardware.h.
-> > > 
-> > > Updated patch below, now io.h for both omap1 and omap2+ are
-> > > minimized, and turns out only minimal driver changes were needed.
-> > > 
-> > 
-> > Looks good to me. Do you have a branch for this that I can base on?
-> 
-> Yes it's now in iomap branch that merged into my cleanup branch that
-> I'll ask Arnd and Olof to pull tomorrow.
-> 
-> So take your pick out of the following two:
-> 
-> 1. iomap branch based on v3.3-rc4 that you probably want to use
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap iomap
 
-Correction: #1 above is based on v3.3-rc3, not -rc4. 
 
- 
-> 2. cleanup branch based on RMK's commit 61b80086a525c8a6081257ae40da5dee2bcaee16
->    (Merge branch 'entry-macro-cleanup' of git://sources.calxeda.com/kernel/linux into for-armsoc)
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap cleanup
+On 2012?02?29? 01:30, Catalin Marinas wrote:
+> On Mon, Feb 13, 2012 at 09:44:22AM +0000, Bill Carson wrote:
+>> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+>> index 97b440c..3e6769a 100644
+>> --- a/arch/arm/include/asm/page.h
+>> +++ b/arch/arm/include/asm/page.h
+>> @@ -15,6 +15,21 @@
+>>   #define PAGE_SIZE		(_AC(1,UL)<<  PAGE_SHIFT)
+>>   #define PAGE_MASK		(~(PAGE_SIZE-1))
+>>
+>> +#ifdef CONFIG_HUGEPAGE_SIZE_2MB
+>> +/* we have 2MB hugepage for two 1MB section mapping */
+>> +#define HPAGE_SHIFT		(SECTION_SHIFT + 1)
+>> +#define HPAGE_SIZE		(_AC(1, UL)<<  HPAGE_SHIFT)
+>> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
+>> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+>> +#endif
+>> +
+>> +#ifdef CONFIG_HUGEPAGE_SIZE_16MB
+>> +#define HPAGE_SHIFT		SUPERSECTION_SHIFT
+>> +#define HPAGE_SIZE		(_AC(1, UL)<<  HPAGE_SHIFT)
+>> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
+>> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+>> +#endif
+>
+> Ah, you still have these just config time options. Can you not make an
+> hpage_shift variable like PowerPC or IA-64?
+>
+Hi, Catalin
 
-Regards,
+Thank you for reviewing this patch.
 
-Tony
+
+unsigned int hpage_shift = SECTION_SHIFT + 1; /* default to 2MB page */
+#define HPAGE_SHIFT hpage_shift
+
+then user could configure hpage_shift through "hugepagesz" parameter.
+I think this is what I am supposed to do,
+If so, hugepage_setup_sz/cpu_v7_set_hugepte_ext needs modification
+
+
+> (I haven't yet reviewed the rest of the code)
+>
+
+
+So, should I send another version now, or wait until you walk through
+the reset of patch set?
+
+And again, thanks for the patch reviewing:)
+
+
+-- 
+I am a slow learner
+but I will keep trying to fight for my dreams!
+
+--bill
