@@ -1,50 +1,63 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 29 Feb 2012 21:34:02 +0800
-Subject: [Linaro-mm-sig] [PATCHv23 00/16] Contiguous Memory Allocator
-In-Reply-To: <op.wafuu3kr3l0zgt@mpn-glaptop>
-References: <1329929337-16648-1-git-send-email-m.szyprowski@samsung.com>
- <CAGsJ_4wgVcVjtAa6Qpki=8jSON7MfwJ8yumJ1YXE5p8L3PqUzw@mail.gmail.com>
- <op.wafuu3kr3l0zgt@mpn-glaptop>
-Message-ID: <CAGsJ_4yk+Ca4RDP=sYaXvEKuJzYNhyZWQ7jfKnpR+zCm=3Dq6Q@mail.gmail.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Wed, 29 Feb 2012 07:36:35 -0600
+Subject: [PATCH v6 5/9] ARM: davinci: Consolidate time keeping and irq
+ enable
+In-Reply-To: <CAORVsuUyOz3ZDr7iR50Qi-TiT+Ng_fUBJGJU19JpQsfe6ZpwHw@mail.gmail.com>
+References: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
+ <1330485109-7327-6-git-send-email-rob.lee@linaro.org>
+ <CAORVsuUyOz3ZDr7iR50Qi-TiT+Ng_fUBJGJU19JpQsfe6ZpwHw@mail.gmail.com>
+Message-ID: <CAMXH7KF2gBM7_b6gF6hNt94rhRHcxr2+RAdvZfdvq2K0bC9o-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal,
-
-2012/2/29 Michal Nazarewicz <mina86@mina86.com>:
-> On Wed, 29 Feb 2012 10:35:42 +0100, Barry Song <21cnbao@gmail.com> wrote:
+On Wed, Feb 29, 2012 at 2:36 AM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Rob,
 >
->> 2012/2/23 Marek Szyprowski <m.szyprowski@samsung.com>:
+> On Wed, Feb 29, 2012 at 4:11 AM, Robert Lee <rob.lee@linaro.org> wrote:
+>> Enable core cpuidle timekeeping and irq enabling and remove that
+>> handling from this code.
 >>
->>> This is (yet another) quick update of CMA patches. I've rebased them
->>> onto next-20120222 tree from
->>> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git and
->>> fixed the bug pointed by Aaro Koskinen.
+>> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+>> ---
+>> ?arch/arm/mach-davinci/cpuidle.c | ? 78 +++++++++++++++-----------------------
+>> ?1 files changed, 31 insertions(+), 47 deletions(-)
 >>
->>
->> For the whole series:
->>
->> Tested-by: Barry Song <Baohua.Song@csr.com>
->>
->> and i also write a simple kernel helper to test the CMA:
+>> diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
+>> index a30c7c5..6f457f1 100644
+>> --- a/arch/arm/mach-davinci/cpuidle.c
+>> +++ b/arch/arm/mach-davinci/cpuidle.c
+> ...
 >
+>> @@ -30,12 +31,42 @@ struct davinci_ops {
+>> ? ? ? ?u32 flags;
+>> ?};
+>>
+>> +/* Actual code that puts the SoC in different idle states */
+>> +static int davinci_enter_idle(struct cpuidle_device *dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
+>> +{
+>> + ? ? ? struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
+>> + ? ? ? struct davinci_ops *ops = cpuidle_get_statedata(state_usage);
+>> +
+>> + ? ? ? if (ops && ops->enter)
+>> + ? ? ? ? ? ? ? ops->enter(ops->flags);
+>> +
+>> + ? ? ? return cpuidle_wrap_enter(dev, ?drv, index,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cpuidle_simple_enter);
+> This does not look right since ops->exit will never be called.
 >
-> Would it make sense to make a patch out of it putting it to tools/cma (or
-> similar)?
 
-i can send a patch for this. i am just thinking, should it be placed
-in tools/ as a test utility or Documents/ as an example to explain CMA
-to users who want to use cma. i also think we should have a seperate
-document to explain cma in details in documents/, and my helper
-program can be placed there.
+Yes, thanks.  The 'return' should be 'index ='
 
-how do you think?
+>> +
+>> + ? ? ? if (ops && ops->exit)
+>> + ? ? ? ? ? ? ? ops->exit(ops->flags);
+>> +
+>> + ? ? ? return index;
+>> +}
+>> +
+> ...
 >
-> --
-> Best regards, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? _ ? ? _
-> .o. | Liege of Serenely Enlightened Majesty of ? ? ?o' \,=./ `o
-> ..o | Computer Science, ?Micha? ?mina86? Nazarewicz ? ?(o o)
-> ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
-
-thanks
-barry
+> Regards,
+> Jean
