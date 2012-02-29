@@ -1,42 +1,89 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 28 Feb 2012 17:03:24 -0700
-Subject: [PATCH 2/2] ARM: tegra: Add zreladdr etc to Makefile.boot for Tegra30
-In-Reply-To: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
-References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1330473804-23348-2-git-send-email-swarren@nvidia.com>
+Date: Tue, 28 Feb 2012 17:03:23 -0700
+Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T kernel_noload
+Message-ID: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These previously weren't present, because they're different for Tegra20
-and Tegra30, which forced one to specify LOADADDR= when building uImages
-for kernels with both Tegra20 and Tegra30 support enabled.
+uImage files typically encode a single absolute load and entry address.
+This is inconvenient when attempting to share that uImage across multiple
+SoCs with different physical RAM addresses. Recent versions of mkimage
+implement a "kernel_noload" image type which encodes no absolute load
+address, and a relative entry address. This works well for uImage-wrapped
+ARM zImages, since they are relocatable.
 
-My expectation now is that everyone will turn on CONFIG_UIMAGE_NOLOAD and
-hence not be inconvenienced by having this information present.
+This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
+"image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-This somewhat depends on the previous patch or it'll be annoying to build
-multi-SoC Tegra kernels, so I guess it should get merged through the same
-tree.
+I assume I should put this into the ARM patch tracker if it's OK?
 
- arch/arm/mach-tegra/Makefile.boot |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig       |   15 +++++++++++++++
+ arch/arm/boot/Makefile |   15 ++++++++++++++-
+ 2 files changed, 29 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
-index 9a82094..b6101f8 100644
---- a/arch/arm/mach-tegra/Makefile.boot
-+++ b/arch/arm/mach-tegra/Makefile.boot
-@@ -2,6 +2,10 @@ zreladdr-$(CONFIG_ARCH_TEGRA_2x_SOC)	+= 0x00008000
- params_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00000100
- initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0884b67..27e7672 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2066,6 +2066,21 @@ config AUTO_ZRELADDR
+ 	  0xf8000000. This assumes the zImage being placed in the first 128MB
+ 	  from start of memory.
  
-+zreladdr-$(CONFIG_ARCH_TEGRA_3x_SOC)	+= 0x80008000
-+params_phys-$(CONFIG_ARCH_TEGRA_3x_SOC)	:= 0x80000100
-+initrd_phys-$(CONFIG_ARCH_TEGRA_3x_SOC)	:= 0x80800000
++config UIMAGE_NOLOAD
++	bool "Using mkimage's kernel_noload image type"
++	depends on AUTO_ZRELADDR
++	help
++	  Say Y here to build a uImage using type "kernel_noload" instead of
++	  "kernel".
 +
- dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
- dtb-$(CONFIG_MACH_PAZ00) += tegra-paz00.dtb
- dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
++	  uImage files typically encode a single absolute load and entry
++	  address. This is inconvenient when attempting to share that uImage
++	  across multiple SoCs with different physical RAM addresses. Recent
++	  versions of mkimage implement a "kernel_noload" image type which
++	  encodes no absolute load address, and a relative entry address.
++	  This works well for uImage-wrapped ARM zImages, since they are
++	  relocatable.
++
+ endmenu
+ 
+ menu "CPU Power Management"
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index fc871e7..45c3cbe 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -70,10 +70,21 @@ $(obj)/dtbs: $(addprefix $(obj)/, $(dtb-y))
+ clean-files := *.dtb
+ 
+ quiet_cmd_uimage = UIMAGE  $@
+-      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
++      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux \
++		   -T $(UIMAGE_TYPE) \
+ 		   -C none -a $(LOADADDR) -e $(STARTADDR) \
+ 		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
+ 
++ifeq ($(CONFIG_UIMAGE_NOLOAD),y)
++
++$(obj)/uImage: UIMAGE_TYPE := kernel_noload
++$(obj)/uImage: override LOADADDR := 0
++$(obj)/uImage: STARTADDR := 0 # Relative to load address
++
++else
++
++$(obj)/uImage: UIMAGE_TYPE := kernel
++
+ ifeq ($(CONFIG_ZBOOT_ROM),y)
+ $(obj)/uImage: LOADADDR=$(CONFIG_ZBOOT_ROM_TEXT)
+ else
+@@ -82,6 +93,8 @@ endif
+ 
+ $(obj)/uImage: STARTADDR=$(LOADADDR)
+ 
++endif
++
+ check_for_multiple_loadaddr = \
+ if [ $(words $(LOADADDR)) -gt 1 ]; then \
+ 	echo 'multiple load addresses: $(LOADADDR)'; \
 -- 
 1.7.0.4
