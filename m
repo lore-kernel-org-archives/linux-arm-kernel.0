@@ -1,61 +1,32 @@
 From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 29 Feb 2012 09:15:48 +0200
-Subject: [PATCH] mmc: start removing enable / disable API
-In-Reply-To: <4F4DC59D.70903@codeaurora.org>
-References: <1330080561-7256-1-git-send-email-adrian.hunter@intel.com>
- <4F4DC59D.70903@codeaurora.org>
-Message-ID: <4F4DD0A4.2080802@intel.com>
+Date: Wed, 29 Feb 2012 09:17:20 +0200
+Subject: [PATCH V2 0/1] mmc: start removing enable / disable API
+Message-ID: <1330499841-6879-1-git-send-email-adrian.hunter@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/02/12 08:28, Sujit Reddy Thumma wrote:
-> Hi Adrian,
-> 
-> On 2/24/2012 4:19 PM, Adrian Hunter wrote:
->> Most parts of the enable / disable API are no longer used and
->> can be removed.
->>
->> Cc: Rajendra Nayak<rnayak@ti.com>
->> Cc: Venkatraman S<svenkatr@ti.com>
->> Cc: Kukjin Kim<kgene.kim@samsung.com>
->> Cc: Thomas Abraham<thomas.abraham@linaro.org>
->> Cc: Kyungmin Park<kyungmin.park@samsung.com>
->> Cc: Sekhar Nori<nsekhar@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
->> Signed-off-by: Adrian Hunter<adrian.hunter@intel.com>
->> ---
->>   arch/arm/mach-exynos/mach-nuri.c           |    5 +-
->>   arch/arm/mach-exynos/mach-universal_c210.c |    9 +-
->>   drivers/mmc/core/core.c                    |  185
->> ++--------------------------
->>   drivers/mmc/core/host.c                    |    1 -
->>   drivers/mmc/core/host.h                    |    1 -
->>   drivers/mmc/host/davinci_mmc.c             |    4 -
->>   drivers/mmc/host/omap_hsmmc.c              |   15 +--
->>   include/linux/mmc/core.h                   |    1 -
->>   include/linux/mmc/host.h                   |   46 +-------
->>   9 files changed, 25 insertions(+), 242 deletions(-)
->>
-> 
->> -    if (host->caps&  MMC_CAP_DISABLE)
->> -        cancel_delayed_work(&host->disable);
->>       cancel_delayed_work_sync(&host->detect);
->>       mmc_flush_scheduled_work();
->>
->> @@ -2402,13 +2245,11 @@ int mmc_suspend_host(struct mmc_host *host)
->>   {
->>       int err = 0;
->>
->> -    if (host->caps&  MMC_CAP_DISABLE)
->> -        cancel_delayed_work(&host->disable);
->>       cancel_delayed_work(&host->detect);
->>       mmc_flush_scheduled_work();
->>       if (mmc_try_claim_host(host)) {
->>           err = mmc_cache_ctrl(host, 0);
->> -        mmc_do_release_host(host);
->> +        mmc_release_host(host);
-> 
-> mmc_try_claim_host does not call host->ops->enable(), but mmc_release_host
-> call host->ops->disable(), is there any reason for this?
+Hi
 
-No, it is an oversight.  I will send V2.
+Most parts of the enable / disable API are no longer used and
+can be removed.
+
+V2: fix missing enable in mmc_try_claim_host as per Sujit Reddy Thumma
+
+
+Adrian Hunter (1):
+      mmc: start removing enable / disable API
+
+ arch/arm/mach-exynos/mach-nuri.c           |    5 +-
+ arch/arm/mach-exynos/mach-universal_c210.c |    9 +-
+ drivers/mmc/core/core.c                    |  187 +++-------------------------
+ drivers/mmc/core/host.c                    |    1 -
+ drivers/mmc/core/host.h                    |    1 -
+ drivers/mmc/host/davinci_mmc.c             |    4 -
+ drivers/mmc/host/omap_hsmmc.c              |   15 +--
+ include/linux/mmc/core.h                   |    1 -
+ include/linux/mmc/host.h                   |   46 +------
+ 9 files changed, 27 insertions(+), 242 deletions(-)
+
+
+Regards
+Adrian
