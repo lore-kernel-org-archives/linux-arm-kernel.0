@@ -1,77 +1,70 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 1 Mar 2012 04:14:23 +0530
-Subject: [PATCH v2 3/9] gpio/omap: remove suspend_wakeup field from struct
- gpio_bank
-In-Reply-To: <1330555469-21260-1-git-send-email-tarun.kanti@ti.com>
-References: <1330555469-21260-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1330555469-21260-4-git-send-email-tarun.kanti@ti.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu,  1 Mar 2012 00:29:44 +0100
+Subject: [PATCH 04/13] ARM: OMAP3+: SmartReflex: Add a shutdown hook
+In-Reply-To: <1330554829-11347-5-git-send-email-j-pihet@ti.com>
+References: <1330554829-11347-5-git-send-email-j-pihet@ti.com>
+Message-ID: <1330558184-11734-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we already have bank->context.wake_en to keep track
-of gpios which are wakeup enabled, there is no need to have
-this field any more.
+From: Nishanth Menon <nm@ti.com>
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
+SmartReflex fix for erratum ID i724.
+
+Since OMAP's VP and PRM modules do not get reset by warm reset,
+we should ensure that proper shutdown procedure is followed prior
+to allowing the kernel to reboot back up.
+
+Without this, Smartreflex module might be left active or
+system might be caught in an indeterminate sequence when
+software controlled reboot is triggered, leaving the next
+reboot behavior to be unpredictable.
+
+In the case of hardware controlled warm reset such as that
+by watchdog timer, prevention of this scenario is not possible.
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   13 ++++++-------
- 1 files changed, 6 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 895df7f..14c61e2 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -54,7 +54,6 @@ struct gpio_bank {
- 	void __iomem *base;
- 	u16 irq;
- 	u16 virtual_irq_start;
--	u32 suspend_wakeup;
- 	u32 saved_wakeup;
- 	u32 non_wakeup_gpios;
- 	u32 enabled_non_wakeup_gpios;
-@@ -500,11 +499,11 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
- 
- 	spin_lock_irqsave(&bank->lock, flags);
- 	if (enable)
--		bank->suspend_wakeup |= gpio_bit;
-+		bank->context.wake_en |= gpio_bit;
- 	else
--		bank->suspend_wakeup &= ~gpio_bit;
-+		bank->context.wake_en &= ~gpio_bit;
- 
--	__raw_writel(bank->suspend_wakeup, bank->base + bank->regs->wkup_en);
-+	__raw_writel(bank->context.wake_en, bank->base + bank->regs->wkup_en);
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index ec2b0e7..9c39484 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -1055,8 +1055,32 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
  	return 0;
-@@ -776,7 +775,7 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
+ }
  
- 	spin_lock_irqsave(&bank->lock, flags);
- 	bank->saved_wakeup = __raw_readl(mask_reg);
--	__raw_writel(0xffff & ~bank->suspend_wakeup, mask_reg);
-+	__raw_writel(0xffff & ~bank->context.wake_en, mask_reg);
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
- 	return 0;
-@@ -1150,7 +1149,7 @@ static int omap_gpio_suspend(struct device *dev)
- 	if (!bank->mod_usage || !bank->loses_context)
- 		return 0;
- 
--	if (!bank->regs->wkup_en || !bank->suspend_wakeup)
-+	if (!bank->regs->wkup_en || !bank->context.wake_en)
- 		return 0;
- 
- 	wakeup_enable = bank->base + bank->regs->wkup_en;
-@@ -1158,7 +1157,7 @@ static int omap_gpio_suspend(struct device *dev)
- 	spin_lock_irqsave(&bank->lock, flags);
- 	bank->saved_wakeup = __raw_readl(wakeup_enable);
- 	_gpio_rmw(base, bank->regs->wkup_en, 0xffffffff, 0);
--	_gpio_rmw(base, bank->regs->wkup_en, bank->suspend_wakeup, 1);
-+	_gpio_rmw(base, bank->regs->wkup_en, bank->context.wake_en, 1);
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
- 	return 0;
++static void __devexit omap_sr_shutdown(struct platform_device *pdev)
++{
++	struct omap_sr_data *pdata = pdev->dev.platform_data;
++	struct omap_sr *sr_info;
++
++	if (!pdata) {
++		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
++		return;
++	}
++
++	sr_info = _sr_lookup(pdata->voltdm);
++	if (IS_ERR(sr_info)) {
++		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
++			__func__);
++		return;
++	}
++
++	if (sr_info->autocomp_active)
++		sr_stop_vddautocomp(sr_info);
++
++	return;
++}
++
+ static struct platform_driver smartreflex_driver = {
+ 	.remove         = omap_sr_remove,
++	.shutdown	= __devexit_p(omap_sr_shutdown),
+ 	.driver		= {
+ 		.name	= "smartreflex",
+ 	},
 -- 
-1.7.0.4
+1.7.5.4
