@@ -1,42 +1,37 @@
-From: andre@bluewatersys.com (Andre Renaud)
-Date: Thu, 01 Mar 2012 11:28:33 +1300
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21A1@HQMAIL01.nvidia.com>
-References: <20120229181430.GI3318@game.jcrosoft.org>
- <4F4E6F96.8080907@am.sony.com> <20120229191209.GN14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2122@HQMAIL01.nvidia.com>
- <20120229194409.GO14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2155@HQMAIL01.nvidia.com>
- <4F4E86A1.8010506@bluewatersys.com>
- <20120229201938.GB16999@n2100.arm.linux.org.uk>
- <4F4E89A8.4080909@bluewatersys.com> <20120229203958.GQ14173@pengutronix.de>
- <20120229204527.GD16999@n2100.arm.linux.org.uk>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21A1@HQMAIL01.nvidia.com>
-Message-ID: <4F4EA691.9040406@bluewatersys.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Thu, 1 Mar 2012 04:14:22 +0530
+Subject: [PATCH v2 2/9] gpio/omap: fix wakeup_en register update in
+ _set_gpio_wakeup()
+In-Reply-To: <1330555469-21260-1-git-send-email-tarun.kanti@ti.com>
+References: <1330555469-21260-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1330555469-21260-3-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/12 10:27, Stephen Warren wrote:
-> Russell King wrote at Wednesday, February 29, 2012 1:45 PM:
-> ...
->> So, really, comparing a standard uImage produced by the standard kernel
->> with gzipped Image is far from a fair comparison.  And that's actually
->> another argument for getting rid of the uImage target... it may make
->> people think a bit about what they're doing rather than accepting
->> whatever default location someone else chose for their kernel.
-> 
-> That seems like more of an argument for making the uImage target use
-> -T kernel_noload unconditionally, rather than removing the target.
-> Since doing so would solve the issue about the kernel picking a load
-> address.
-> 
-> That is, ignoring any arguments about breaking existing workflows at
-> least...
+There are two ways through which wakeup_en register can be programmed
+using gpiolib APIs as shown below. It is seen that in the second case
+in _set_gpio_wakeup(), even though bank->suspend_wakeup is updated
+correctly, its value is not programmed in wakeup_en register. Fix this.
 
-I think this is the case that I was seeing - the current behaviour of
-the uImage target, of using the zreladdr as the load/start addresses
-essentially guarantees the worst case relocation behaviour.
+chip.irq_set_type()->gpio_irq_type()->_set_gpio_triggering()->set_gpio_trigger()
+chip.irq_set_wake()->gpio_wake_enable()->_set_gpio_wakeup()
 
-Regards,
-Andre
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+---
+ drivers/gpio/gpio-omap.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index c9369d2..895df7f 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -504,6 +504,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+ 	else
+ 		bank->suspend_wakeup &= ~gpio_bit;
+ 
++	__raw_writel(bank->suspend_wakeup, bank->base + bank->regs->wkup_en);
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+ 	return 0;
+-- 
+1.7.0.4
