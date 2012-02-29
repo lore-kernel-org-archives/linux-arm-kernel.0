@@ -1,55 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Feb 2012 18:47:42 +0100
-Subject: [PATCH] pinctrl: make the pinmux-pins more helpful
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2083@HQMAIL01.nvidia.com>
-References: <1330062969-25016-1-git-send-email-linus.walleij@stericsson.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BD8BCC79@HQMAIL01.nvidia.com>
- <CACRpkdZ-a+kyknb-q+_=TLGcNshwkLAY4918bwD7e6LzL3sWbg@mail.gmail.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2083@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdZX+=9m-b+y9+tk0GQ+0TKmKasez+c=yY89ofkompf=bA@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 29 Feb 2012 18:58:52 +0100
+Subject: [PATCH v2] pinctrl: make the pinmux-pins more helpful
+Message-ID: <1330538332-16088-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 6:27 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Linus Walleij wrote at Wednesday, February 29, 2012 2:39 AM:
->> On Fri, Feb 24, 2012 at 5:44 PM, Stephen Warren <swarren@nvidia.com> wrote:
->>
->> > If we do make a change like this, I'd prefer the format to be:
->> >
->> > UNCLAIMED
->> > "%s (HOG)", desc->owner
->> > desc->owner
->>
->> I don't see the point, the debugfs files are supposed to be
->> human-readable, a human is not interested in the fact that
->> the pinctrl device itself is owning the pin, what is interesting is
->> that it is hogged.
->
-> Well, I'm a human and I care far more that the pin controller device is
-> what owns the configuration rather than some artificial "hog" concept
-> is present...
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Yeah OK I'll try to add both then to please both instances of
-human...
+The debugfs file pinmux-pins used to tell which function was
+enabled but now states simply which device owns the pin. Being
+owned by the pinctrl driver itself means just that it's hogged
+so be a bit more helpful by printing that.
 
->> On U300 it makes a lot of sense even thogh it is essentially
->> group based. When sitting with the datasheet with the pin names
->> and use groups it's simple to see exactly how any one pin is muxed
->> for the moment and troubleshoot from there.
->
-> If the HW muxes per group, then there's no concept of "which function is
-> selected for a pin", since functions are selected for a group not for a
-> pin.
->
-> So, the datasheet will be written in terms of "group X supports functions
-> A, B, C, D", not pins P, Q, R support functions "A, B, C, D". So,
-> representing mux function in debugfs at the group level would make a lot
-> more sense given that HW design.
+ChangeLog v1->v2:
+- Preserve the self-referential owner field, just clarify that
+  when the pin controller states itself as owner this means
+  that it's hogged.
 
-I think we're talking past each other, it's that old thing with group
-concepts again. I'd just say that for debugging
-and understanding the muxing on U300 style hardware this
-is very useful. It may be pointless in Tegra style HW.
+Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinmux.c |   11 ++++++++---
+ 1 files changed, 8 insertions(+), 3 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index 98b89d6..2a40561 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -626,8 +626,8 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
+ 
+ 	/* The pin number can be retrived from the pin controller descriptor */
+ 	for (i = 0; i < pctldev->desc->npins; i++) {
+-
+ 		struct pin_desc *desc;
++		bool is_hog = false;
+ 
+ 		pin = pctldev->desc->pins[i].number;
+ 		desc = pin_desc_get(pctldev, pin);
+@@ -635,9 +635,14 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
+ 		if (desc == NULL)
+ 			continue;
+ 
+-		seq_printf(s, "pin %d (%s): %s\n", pin,
++		if (desc->owner &&
++		    !strcmp(desc->owner, pinctrl_dev_get_name(pctldev)))
++			is_hog = true;
++
++		seq_printf(s, "pin %d (%s): %s%s\n", pin,
+ 			   desc->name ? desc->name : "unnamed",
+-			   desc->owner ? desc->owner : "UNCLAIMED");
++			   desc->owner ? desc->owner : "UNCLAIMED",
++			   is_hog ? " (HOG)" : "");
+ 	}
+ 
+ 	return 0;
+-- 
+1.7.8
