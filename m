@@ -1,30 +1,38 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 29 Feb 2012 11:59:42 -0800
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <20120229194409.GO14173@pengutronix.de>
-References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
- <20120229122942.GF3318@game.jcrosoft.org>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
- <20120229181430.GI3318@game.jcrosoft.org> <4F4E6F96.8080907@am.sony.com>
- <20120229191209.GN14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2122@HQMAIL01.nvidia.com>
- <20120229194409.GO14173@pengutronix.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2155@HQMAIL01.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Feb 2012 20:13:26 +0000
+Subject: [PATCH] ARM: ux500: solve some Kconfig mess
+In-Reply-To: <CACRpkdaqdmB0_Z9FYC97FWZ2+RBSMfErUa62y0icqSOqAo8o1g@mail.gmail.com>
+References: <1330536509-13590-1-git-send-email-linus.walleij@stericsson.com>
+ <201202291928.49516.arnd@arndb.de>
+ <CACRpkdaqdmB0_Z9FYC97FWZ2+RBSMfErUa62y0icqSOqAo8o1g@mail.gmail.com>
+Message-ID: <201202292013.26661.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig wrote at Wednesday, February 29, 2012 12:44 PM:
-...
-> If you want to give incentive for U-Boot to improve, drop the target
-> today. And note that at least people caring about boot time must not use
-> the kernel's uImage target anyhow.
+On Wednesday 29 February 2012, Linus Walleij wrote:
+> On Wed, Feb 29, 2012 at 8:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > Looks good to me. One thing I still wonder about is whether
+> > we should leave the UX500_SOC_DB5500 and UX500_SOC_DB8500
+> > options user-visible. It would probably be simpler to just
+> > select these whenever a board using them is enabled.
+> 
+> They are invisible to me atleast?
+> 
+> config UX500_SOC_DB5500
+>         bool
+>         select MFD_DB5500_PRCMU
+> 
+> config UX500_SOC_DB8500
+>         bool
+>         select MFD_DB8500_PRCMU
+>         select REGULATOR_DB8500_PRCMU
+>         select CPU_FREQ_TABLE if CPU_FREQ
+> 
 
-If you enable the new config option in this patch, then the performance
-issue is solved; U-Boot doesn't copy the kernel image any more, and the
-kernel decompressor can write directly to the appropriate location without
-moving the image first (assuming your board boot script loads the uImage
-to a non-conflicting address).
+Ah, I forgot that I had actually done that patch myself and
+Mathieu sent it last week, so now it's in your tree but not mine.
 
---
-nvpublic
+Nevermind then.
+
+	Arnd
