@@ -1,44 +1,37 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 1 Mar 2012 00:33:32 +0100
-Subject: [PATCH 04/14] ARM: OMAP3+: SmartReflex: Add a shutdown hook
-In-Reply-To: <878vjlfr8z.fsf@ti.com>
-References: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
- <1328723039-15952-5-git-send-email-j-pihet@ti.com>
- <87d38yk2e1.fsf@ti.com>
- <CAOMWX4dbufbEJpr0nTmwTHR1xz9diMBbO=khKxvMZLWrKesJRw@mail.gmail.com>
- <878vjlfr8z.fsf@ti.com>
-Message-ID: <CAORVsuVG-wovojojETMuPrvaFvL-fb0-t6Je+jJ8CUFn-95wig@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 1 Mar 2012 00:53:26 +0100
+Subject: [PATCH 2/3 v4] arm: kirkwood: add dreamplug (fdt) support.
+In-Reply-To: <20120229144450.GB23524@titan.lakedaemon.net>
+References: <20120224075753.GA24858@lunn.ch>
+ <20120229144450.GB23524@titan.lakedaemon.net>
+Message-ID: <20120229235326.GA3207@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 7:07 PM, Kevin Hilman <khilman@ti.com> wrote:
-> "Menon, Nishanth" <nm@ti.com> writes:
->
->> On Tue, Feb 28, 2012 at 16:40, Kevin Hilman <khilman@ti.com> wrote:
->>> Jean Pihet <jean.pihet@newoldbits.com> writes:
->>>
->>>> From: Nishanth Menon <nm@ti.com>
->>>>
->>>> SmartReflex fix for erratum ID i724.
->>>>
->>>> Since OMAP's VP and PRM modules do not get reset by warm reset,
->>>> we should ensure that proper shutdown procedure is followed prior
->>>> to allowing the kernel to reboot back up.
->>>
->>> prior to reboot? ?how?
->>>
->>> This patch only ensures a proper shutdown if the kernel goes down
->>> cleanly.
->>>
->>> How is this handled on reboot?
->> There is no known solution for watchdog resets(part of the errata WA
->> limitation) :( - the best we could do was to make shutdown path safe -
->> this includes s/w (userspace triggered) reboots.
->
-> OK, then the changelog needs an update to reflect that.
-Just resent patch 04/13 with the update changelog.
+On Wed, Feb 29, 2012 at 09:44:50AM -0500, Jason wrote:
+> Andrew,
+> 
+> On Fri, Feb 24, 2012 at 08:57:53AM +0100, Andrew Lunn wrote:
+> > I have some patches under development which will help.
+> 
+> Any chance you could shoot those to me?  (on-list preferable)  I'm
+> thinking we could convert it to an interim solution eg
+> kirkwood_{get,put}_clock() that would be easy to migrate to generic
+> CLK/clkdev once it lands.
 
->
-> Kevin
+Hi Jason
 
-Jean
+It is not that easy. It is not kirkwood, but all platform orion, so
+includes dove, orion5x, mv78xx0 and kirkwood. All these share the same
+device drivers, since they all share the same SoC peripheral
+cores. However, only kirkwood has per peripheral gated clocks and all
+the others share tclk.
+
+I've also broke orion5x twice so far with my patches, since i don't
+have any hardware with that SoC. So this time i was hoping to ask for
+testing on orion5x before submitting to mainline.
+
+Mike did say he hoped the generic clk would be ready last week. Maybe
+we should ping him and ask for a new ETA?
+
+	Andrew
