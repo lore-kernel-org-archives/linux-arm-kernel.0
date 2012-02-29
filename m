@@ -1,53 +1,64 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 29 Feb 2012 20:35:27 +0000
-Subject: IIO irq allocation fails on AT91SAM9G45
-In-Reply-To: <4F4E36E6.1010704@free-electrons.com>
-References: <4F4E36E6.1010704@free-electrons.com>
-Message-ID: <4F4E8C0F.5090104@kernel.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 29 Feb 2012 21:39:58 +0100
+Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
+ kernel_noload
+In-Reply-To: <4F4E89A8.4080909@bluewatersys.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
+ <20120229181430.GI3318@game.jcrosoft.org>
+ <4F4E6F96.8080907@am.sony.com>
+ <20120229191209.GN14173@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2122@HQMAIL01.nvidia.com>
+ <20120229194409.GO14173@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2155@HQMAIL01.nvidia.com>
+ <4F4E86A1.8010506@bluewatersys.com>
+ <20120229201938.GB16999@n2100.arm.linux.org.uk>
+ <4F4E89A8.4080909@bluewatersys.com>
+Message-ID: <20120229203958.GQ14173@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2012 02:32 PM, Maxime Ripard wrote:
-> Hi everyone,
+On Thu, Mar 01, 2012 at 09:25:12AM +1300, Andre Renaud wrote:
+> Hi Russell,
+> >> I may have missed part of this, but isn't one of the points regarding
+> >> this that the zImage decompressor always runs with data cache disabled,
+> > 
+> > Most certainly not.  We've had the data cache enabled for years and
+> > years.  And I mean 10+ years.  We may have been lacking support on
+> > some CPUs, but that was because of lack of contributions.
+> > 
+> >> resulting in a slow decompress, where as if the U-Boot decompressor is
+> >> used (ie, gzipping the Image, and telling U-Boot to decompress), then it
+> >> can run with caches enabled, improving boot speed?
+> > 
+> > That's pure FUD.
 > 
-> I'm working on adding the support for the AT91SAM9M10G45-EK board from
-> Atmel for the at91_adc driver I previously posted, and I encounter some
-> weird issue here.
-> 
-> When calling the iio_allocate_trigger
-> (http://lxr.free-electrons.com/source/drivers/staging/iio/industrialio-trigger.c?a=arm#L421)
-> from my driver on the G45, it returns ENOMEM, while on the
-> AT91SAM9G20-EK board, it works perfectly.
-> 
-> Digging a bit into it, it seems that the call to irq_alloc_descs is
-> returning the error (the value of CONFIG_IIO_CONSUMERS_PER_TRIGGER is 2
-> in my configuration, which seems pretty reasonable and is the default
-> value anyway), which is itself getting that return value from
-> irq_expand_nr_irqs.
-> 
-> Here, I'm left confused, I don't know this part of the kernel anymore,
-> and most importantly, it seems to be pretty-much arch-independant, while
-> the nature of my issue seems really platform-dependant.
-> 
-> Do you have any clue of what's going on here ?
-We ran into this originally on the pxa as well.   My guess is that
-nr_irqs is not set high enough for that particular board.
+> I don't want to open a can of worms on this, and I certainly haven't
+> looked into the image decompressor within the Linux kernel, but from a
+> boot speed point of view we certainly see a significant speed
+> improvement switching from zImage to gzipped-Image. Do you know which
+> platforms include the data-cache support in the decompressor?
+I'd bet your platform has cache support in the decompressor without
+knowing which platform you use. I suggest commenting out
 
-Looking back I can find some mention of a nasty bit of code that
-just adds a bit of padding but I can't find it now.
+	bl	cache_on
 
-Anyhow, you probably have a line somewhere in the kernel log
-saying something like:
+in arch/arm/boot/compressed/head.S to see the difference.
 
-[    0.000000] NR_IRQS:288 nr_irqs:296 296
+How do you build the uImage containing the zImage? If you use the
+in-kernel uImage target booting that usually means:
 
-NR_IRQS is typically the number of the SoC
-nr_irqs should be large enough to accomodate those provided by
-other peripherals.
+	- move the zImage to ZRELADDR
+	- jump into zImage
+	- decompress zImage to somewhere else
+	- move decompressed image to ZRELADDR
+	- jump to ZRELADDR
 
-I also have a vague recollection that the problem goes away entirely
-with sparse irqs?
+That is you have two relocations because the first location for sure
+conflicts with the decompressed image.
 
-Michael, you commented on this issue originally, can you remember
-any more details than me? (It seemed like I wrote plenty at the
-time but I can't for the life of me fill in the missing details!)
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
