@@ -1,54 +1,42 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 01 Mar 2012 08:45:20 +1100
-Subject: ARM: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
-In-Reply-To: <201202291312.21318.hartleys@visionengravers.com>
-References: <201202291312.21318.hartleys@visionengravers.com>
-Message-ID: <4F4E9C70.70602@gmail.com>
+From: andre@bluewatersys.com (Andre Renaud)
+Date: Thu, 01 Mar 2012 11:28:33 +1300
+Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
+ kernel_noload
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21A1@HQMAIL01.nvidia.com>
+References: <20120229181430.GI3318@game.jcrosoft.org>
+ <4F4E6F96.8080907@am.sony.com> <20120229191209.GN14173@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2122@HQMAIL01.nvidia.com>
+ <20120229194409.GO14173@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2155@HQMAIL01.nvidia.com>
+ <4F4E86A1.8010506@bluewatersys.com>
+ <20120229201938.GB16999@n2100.arm.linux.org.uk>
+ <4F4E89A8.4080909@bluewatersys.com> <20120229203958.GQ14173@pengutronix.de>
+ <20120229204527.GD16999@n2100.arm.linux.org.uk>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21A1@HQMAIL01.nvidia.com>
+Message-ID: <4F4EA691.9040406@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/12 07:12, H Hartley Sweeten wrote:
+On 01/03/12 10:27, Stephen Warren wrote:
+> Russell King wrote at Wednesday, February 29, 2012 1:45 PM:
+> ...
+>> So, really, comparing a standard uImage produced by the standard kernel
+>> with gzipped Image is far from a fair comparison.  And that's actually
+>> another argument for getting rid of the uImage target... it may make
+>> people think a bit about what they're doing rather than accepting
+>> whatever default location someone else chose for their kernel.
+> 
+> That seems like more of an argument for making the uImage target use
+> -T kernel_noload unconditionally, rather than removing the target.
+> Since doing so would solve the issue about the kernel picking a load
+> address.
+> 
+> That is, ignoring any arguments about breaking existing workflows at
+> least...
 
-> As done for the other ep93xx machines in:
-> 
-> commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
-> ARM: ep93xx: convert to MULTI_IRQ_HANDLER
-> 
-> Now that there is a generic IRQ handler for multiple VIC devices use it
-> for vision_ep9307 to help building multi platform kernels.
-> 
-> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Jamie Iles <jamie@jamieiles.com>
+I think this is the case that I was seeing - the current behaviour of
+the uImage target, of using the zreladdr as the load/start addresses
+essentially guarantees the worst case relocation behaviour.
 
-
-Acked-by: Ryan Mallon <rmallon@gmail.com>
-
-> 
-> ---
-> 
-> diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-> index d5fb44f..d67d0b4 100644
-> --- a/arch/arm/mach-ep93xx/vision_ep9307.c
-> +++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-> @@ -34,6 +34,7 @@
->  #include <mach/ep93xx_spi.h>
->  #include <mach/gpio-ep93xx.h>
->  
-> +#include <asm/hardware/vic.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/arch.h>
-> @@ -361,6 +362,7 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
->  	.atag_offset	= 0x100,
->  	.map_io		= vision_map_io,
->  	.init_irq	= ep93xx_init_irq,
-> +	.handle_irq	= vic_handle_irq,
->  	.timer		= &ep93xx_timer,
->  	.init_machine	= vision_init_machine,
->  	.restart	= ep93xx_restart,
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+Andre
