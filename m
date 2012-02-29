@@ -1,47 +1,53 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 29 Feb 2012 09:30:59 +0100
-Subject: [PATCH v6 1/9] cpuidle: Add common time keeping and irq enabling
-In-Reply-To: <1330485109-7327-2-git-send-email-rob.lee@linaro.org>
-References: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
- <1330485109-7327-2-git-send-email-rob.lee@linaro.org>
-Message-ID: <CAORVsuX3nJAgbDY+oNQ+OD6xeZt=OkhK4n769Y+xJb0NXcrBmw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 29 Feb 2012 09:33:17 +0100
+Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
+In-Reply-To: <20120228105222.GB3683@opensource.wolfsonmicro.com>
+References: <20120214105823.GS3852@pengutronix.de>
+ <20120214172902.GB3916@opensource.wolfsonmicro.com>
+ <20120216073236.GE3852@pengutronix.de>
+ <20120216075825.GA11631@opensource.wolfsonmicro.com>
+ <20120227090453.GE26642@pengutronix.de>
+ <20120227132908.GA3191@opensource.wolfsonmicro.com>
+ <20120227172020.GC3852@pengutronix.de>
+ <20120227235359.GA23230@opensource.wolfsonmicro.com>
+ <20120228082715.GK3852@pengutronix.de>
+ <20120228105222.GB3683@opensource.wolfsonmicro.com>
+Message-ID: <20120229083317.GT3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, Feb 28, 2012 at 10:52:22AM +0000, Mark Brown wrote:
+> On Tue, Feb 28, 2012 at 09:27:15AM +0100, Sascha Hauer wrote:
+> > On Mon, Feb 27, 2012 at 11:54:00PM +0000, Mark Brown wrote:
+> 
+> > > No, zero is intentionally a valid response - it means that the selector
+> > > is invalid (for example, due to being documented as a reserved value)
+> > > allowing a non-error return that doesn't provide a voltage.  The fixed
+> > > regulator should be fixed to return an error if it hasn't got a voltage
+> > > configured.
+> 
+> > Hm, you asked me to drop the voltage parameter from the helper function
+> > registering a fixed regulator as dummy. When the fixed regulator bails
+> > out in this case I can't see how this can be done.
+> 
+> Can you be more specific about what you think would break here please?
 
-On Wed, Feb 29, 2012 at 4:11 AM, Robert Lee <rob.lee@linaro.org> wrote:
-> Make necessary changes to implement time keeping and irq enabling
-> in the core cpuidle code. ?This will allow the removal of these
-> functionalities from various platform cpuidle implementations whose
-> timekeeping and irq enabling follows the form in this common code.
->
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
-> ?arch/arm/include/asm/cpuidle.h | ? 14 ++++++
-> ?drivers/cpuidle/cpuidle.c ? ? ?| ? 90 ++++++++++++++++++++++++++++++++--------
-> ?include/linux/cpuidle.h ? ? ? ?| ? 13 ++++++
-> ?3 files changed, 99 insertions(+), 18 deletions(-)
-> ?create mode 100644 arch/arm/include/asm/cpuidle.h
->
-...
+We started this discussion with a patch of mine in which I wanted to add
+a helper function to register a fixed regulator. You asked me to drop
+the voltage parameter in the helper function as this is mainly used as
+a dummy regulator. I then tried to remove the voltage parameter and it
+turned out that the regulator core needs a voltage because otherwise it
+bails out in machine_constraints_voltage(), more specifically in
+ops->list_voltage(rdev, i) returing 0 for a dummy fixed regulator. You
+then answered that the fixed regulator should be fixed to return an error
+if it hasn't got a voltage configured. At this point the circle is
+complete and we can start the discussion again.
 
-> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
-> index 59f4261..00b02f5 100644
-> --- a/drivers/cpuidle/cpuidle.c
-> +++ b/drivers/cpuidle/cpuidle.c
-...
+Sascha
 
-> @@ -110,7 +126,8 @@ int cpuidle_idle_call(void)
-> ? ? ? ? ? ? ? ?dev->states_usage[entered_state].time +=
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(unsigned long long)dev->last_residency;
-> ? ? ? ? ? ? ? ?dev->states_usage[entered_state].usage++;
-> - ? ? ? }
-> + ? ? ? } else
-> + ? ? ? ? ? ? ? dev->last_residency = 0;
-Braces are required here, according to the coding style doc.
 
-...
-
-Regards,
-Jean
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
