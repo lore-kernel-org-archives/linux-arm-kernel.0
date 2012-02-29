@@ -1,32 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Feb 2012 20:55:19 +0000
-Subject: [GIT PULL 1/5] non-critical fixes for v3.4 merge window
-In-Reply-To: <pull-1330546506-268554>
-References: <pull-1330546506-268554>
-Message-ID: <201202292055.19803.arnd@arndb.de>
+Date: Wed, 29 Feb 2012 20:57:13 +0000
+Subject: [GIT PULL 2/5] First set of omap SoC related changes
+In-Reply-To: <0M7a7T-1SNOx730KN-00wuBW@mx.kundenserver.de>
+References: <0M7a7T-1SNOx730KN-00wuBW@mx.kundenserver.de>
+Message-ID: <201202292057.13430.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 29 February 2012, Tony Lindgren wrote:
-> This contains fixes for MMC platform init to allow marking
-> functions that should be __init as __init. Also included are
-> some randconfig fixes.
 > 
-> Regards,
-> 
-> Tony
-> 
-> 
-> The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
->   Linus Torvalds (1):
->         Linux 3.3-rc5
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical
+> This contains two changes that were too late
+> for the previous merge window so let's get these
+> out of the way first.
 > 
 
-Applied to next/fixes-non-critical
+Pulled into next/soc
 
 Thanks,
 
