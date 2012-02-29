@@ -1,9 +1,9 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Tue, 28 Feb 2012 21:11:44 -0600
-Subject: [PATCH v6 4/9] ARM: kirkwood: Consolidate time keeping and irq enable
+Date: Tue, 28 Feb 2012 21:11:43 -0600
+Subject: [PATCH v6 3/9] ARM: exynos: Consolidate time keeping and irq enable
 In-Reply-To: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
 References: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1330485109-7327-5-git-send-email-rob.lee@linaro.org>
+Message-ID: <1330485109-7327-4-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,111 +12,114 @@ handling from this code.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/mach-kirkwood/cpuidle.c |   72 +++++++++++---------------------------
- 1 files changed, 21 insertions(+), 51 deletions(-)
+ arch/arm/mach-exynos/cpuidle.c |   53 ++++-----------------------------------
+ 1 files changed, 6 insertions(+), 47 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/cpuidle.c b/arch/arm/mach-kirkwood/cpuidle.c
-index 7088180..7fd1f88 100644
---- a/arch/arm/mach-kirkwood/cpuidle.c
-+++ b/arch/arm/mach-kirkwood/cpuidle.c
-@@ -20,77 +20,47 @@
- #include <linux/io.h>
- #include <linux/export.h>
- #include <asm/proc-fns.h>
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index 9bf6743..75bb88b 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -20,6 +20,7 @@
+ #include <asm/smp_scu.h>
+ #include <asm/suspend.h>
+ #include <asm/unified.h>
 +#include <asm/cpuidle.h>
- #include <mach/kirkwood.h>
+ #include <mach/regs-pmu.h>
+ #include <mach/pmu.h>
  
- #define KIRKWOOD_MAX_STATES	2
+@@ -34,22 +35,12 @@
  
--static struct cpuidle_driver kirkwood_idle_driver = {
--	.name =         "kirkwood_idle",
--	.owner =        THIS_MODULE,
--};
--
--static DEFINE_PER_CPU(struct cpuidle_device, kirkwood_cpuidle_device);
--
- /* Actual code that puts the SoC in different idle states */
- static int kirkwood_enter_idle(struct cpuidle_device *dev,
+ #define S5P_CHECK_AFTR		0xFCBA0D10
+ 
+-static int exynos4_enter_idle(struct cpuidle_device *dev,
+-			struct cpuidle_driver *drv,
+-			      int index);
+ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
  				struct cpuidle_driver *drv,
- 			       int index)
+ 				int index);
+ 
+ static struct cpuidle_state exynos4_cpuidle_set[] = {
+-	[0] = {
+-		.enter			= exynos4_enter_idle,
+-		.exit_latency		= 1,
+-		.target_residency	= 100000,
+-		.flags			= CPUIDLE_FLAG_TIME_VALID,
+-		.name			= "C0",
+-		.desc			= "ARM clock gating(WFI)",
+-	},
++	[0] = CPUIDLE_ARM_WFI_STATE,
+ 	[1] = {
+ 		.enter			= exynos4_enter_lowpower,
+ 		.exit_latency		= 300,
+@@ -63,8 +54,9 @@ static struct cpuidle_state exynos4_cpuidle_set[] = {
+ static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+ 
+ static struct cpuidle_driver exynos4_idle_driver = {
+-	.name		= "exynos4_idle",
+-	.owner		= THIS_MODULE,
++	.name			= "exynos4_idle",
++	.owner			= THIS_MODULE,
++	.en_core_tk_irqen	= 1,
+ };
+ 
+ /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+@@ -103,13 +95,8 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv,
+ 				int index)
  {
+-	struct timeval before, after;
+-	int idle_time;
+ 	unsigned long tmp;
+ 
+-	local_irq_disable();
+-	do_gettimeofday(&before);
+-
+ 	exynos4_set_wakeupmask();
+ 
+ 	/* Set value of power down register for aftr mode */
+@@ -148,34 +135,6 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+ 	/* Clear wakeup state register */
+ 	__raw_writel(0x0, S5P_WAKEUP_STAT);
+ 
+-	do_gettimeofday(&after);
+-
+-	local_irq_enable();
+-	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+-		    (after.tv_usec - before.tv_usec);
+-
+-	dev->last_residency = idle_time;
+-	return index;
+-}
+-
+-static int exynos4_enter_idle(struct cpuidle_device *dev,
+-				struct cpuidle_driver *drv,
+-				int index)
+-{
 -	struct timeval before, after;
 -	int idle_time;
 -
 -	local_irq_disable();
 -	do_gettimeofday(&before);
--	if (index == 0)
--		/* Wait for interrupt state */
--		cpu_do_idle();
--	else if (index == 1) {
--		/*
--		 * Following write will put DDR in self refresh.
--		 * Note that we have 256 cycles before DDR puts it
--		 * self in self-refresh, so the wait-for-interrupt
--		 * call afterwards won't get the DDR from self refresh
--		 * mode.
--		 */
--		writel(0x7, DDR_OPERATION_BASE);
--		cpu_do_idle();
--	}
+-
+-	cpu_do_idle();
+-
 -	do_gettimeofday(&after);
 -	local_irq_enable();
 -	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
--			(after.tv_usec - before.tv_usec);
+-		    (after.tv_usec - before.tv_usec);
 -
--	/* Update last residency */
 -	dev->last_residency = idle_time;
-+	writel(0x7, DDR_OPERATION_BASE);
-+	cpu_do_idle();
- 
  	return index;
  }
  
-+static struct cpuidle_driver kirkwood_idle_driver = {
-+	.name			= "kirkwood_idle",
-+	.owner			= THIS_MODULE,
-+	.en_core_tk_irqen	= 1,
-+	.states[0] = CPUIDLE_ARM_WFI_STATE,
-+	.states[1] = {
-+		.enter			= kirkwood_enter_idle,
-+		.exit_latency		= 10,
-+		.target_residency	= 100000,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "DDR SR",
-+		.desc			= "WFI and DDR Self Refresh",
-+	},
-+	.state_count = KIRKWOOD_MAX_STATES,
-+};
-+
-+static DEFINE_PER_CPU(struct cpuidle_device, kirkwood_cpuidle_device);
-+
- /* Initialize CPU idle by registering the idle states */
- static int kirkwood_init_cpuidle(void)
- {
- 	struct cpuidle_device *device;
--	struct cpuidle_driver *driver = &kirkwood_idle_driver;
+@@ -190,7 +149,7 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+ 		new_index = drv->safe_state_index;
  
- 	device = &per_cpu(kirkwood_cpuidle_device, smp_processor_id());
- 	device->state_count = KIRKWOOD_MAX_STATES;
--	driver->state_count = KIRKWOOD_MAX_STATES;
--
--	/* Wait for interrupt state */
--	driver->states[0].enter = kirkwood_enter_idle;
--	driver->states[0].exit_latency = 1;
--	driver->states[0].target_residency = 10000;
--	driver->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
--	strcpy(driver->states[0].name, "WFI");
--	strcpy(driver->states[0].desc, "Wait for interrupt");
--
--	/* Wait for interrupt and DDR self refresh state */
--	driver->states[1].enter = kirkwood_enter_idle;
--	driver->states[1].exit_latency = 10;
--	driver->states[1].target_residency = 10000;
--	driver->states[1].flags = CPUIDLE_FLAG_TIME_VALID;
--	strcpy(driver->states[1].name, "DDR SR");
--	strcpy(driver->states[1].desc, "WFI and DDR Self Refresh");
- 
- 	cpuidle_register_driver(&kirkwood_idle_driver);
- 	if (cpuidle_register_device(device)) {
+ 	if (new_index == 0)
+-		return exynos4_enter_idle(dev, drv, new_index);
++		return cpuidle_simple_enter(dev, drv, new_index);
+ 	else
+ 		return exynos4_enter_core0_aftr(dev, drv, new_index);
+ }
 -- 
 1.7.1
