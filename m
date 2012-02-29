@@ -1,5 +1,5 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 29 Feb 2012 19:50:13 +0100
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 29 Feb 2012 20:12:10 +0100
 Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
  kernel_noload
 In-Reply-To: <4F4E6F96.8080907@am.sony.com>
@@ -8,11 +8,11 @@ References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
  <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
  <20120229181430.GI3318@game.jcrosoft.org>
  <4F4E6F96.8080907@am.sony.com>
-Message-ID: <20120229185013.GJ3318@game.jcrosoft.org>
+Message-ID: <20120229191209.GN14173@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:33 Wed 29 Feb     , Tim Bird wrote:
+On Wed, Feb 29, 2012 at 10:33:58AM -0800, Tim Bird wrote:
 > On 02/29/2012 10:14 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > > On 08:58 Wed 29 Feb     , Stephen Warren wrote:
 > >> Jean-Christophe PLAGNIOL-VILLARD wrote at Wednesday, February 29, 2012 5:30 AM:
@@ -52,18 +52,12 @@ On 10:33 Wed 29 Feb     , Tim Bird wrote:
 > Could you wait to drop uImage build support in the kernel until
 > U-Boot supports zImage, and has worked it's way into the field
 > for a few years?
-I'm fine to keep for now on but not to add new feature
+I admit I didn't check for a few years, but regarding that the values
+used to build the uImage from a zImage are (or at least were) quite bad,
+I'd say deprecate the uImage target today.
 
-Barebox (former U-Boot v2) support zImage for quite a while and
-relocable one for too.
+Uwe
 
-Best Regards,
-J.
->  -- Tim
-> 
-> =============================
-> Tim Bird
-> Architecture Group Chair, CE Workgroup of the Linux Foundation
-> Senior Staff Engineer, Sony Network Entertainment
-> =============================
-> 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
