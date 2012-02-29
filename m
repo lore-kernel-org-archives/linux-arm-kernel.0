@@ -1,76 +1,30 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 29 Feb 2012 10:42:07 +0100
-Subject: [PATCH v9 1/2] ARM: EXYNOS: Change System MMU platform device
- definitions
-In-Reply-To: <CAHQjnOO1aADVQWxNt-J3nb0bgJvc2dfk+6qTWKWx7w+-LUVSmw@mail.gmail.com>
-References: <001901ccf5e3$6a363320$3ea29960$%cho@samsung.com>
- <CAH9JG2Uvh=_GWFWyBrE-hfGTvrwvs6n37bmKaHbCovJ++EeJ7g@mail.gmail.com>
- <CAHQjnOO1aADVQWxNt-J3nb0bgJvc2dfk+6qTWKWx7w+-LUVSmw@mail.gmail.com>
-Message-ID: <4F4DF2EF.1090505@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Feb 2012 10:45:46 +0100
+Subject: [GIT PULL] ux500 patches for v3.4 take 2
+In-Reply-To: <201202270902.29490.arnd@arndb.de>
+References: <1330099642-6265-1-git-send-email-linus.walleij@linaro.org>
+ <201202241639.56474.arnd@arndb.de>
+ <CACRpkdaH+frxrYTrcnRNuNps3RDqBC6GTaKYYz30kEODnxUO8g@mail.gmail.com>
+ <201202270902.29490.arnd@arndb.de>
+Message-ID: <CACRpkdbr5X8KLiragbpk0VH5s+uo5T3C+e6AsNHk+x6s80YJ4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Feb 27, 2012 at 10:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 27 February 2012, Linus Walleij wrote:
+>> On Fri, Feb 24, 2012 at 5:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 24 February 2012, Linus Walleij wrote:
+>> >> are available in the git repository at:
+>> >> ? git://git.linaro.org/people/triad/linux-stericsson.git/ ..BRANCH.NOT.VERIFIED..
+>> >
+>> > Something wrong on your end apparently.
+>>
+>> Hm :-( I'll check it by pulling it back myself next time.
+>
+> git request-pull checks this already, you just have to make sure that the right
+> branch or tag shows up in the pull URL.
 
-On 02/29/2012 01:25 AM, KyongHo Cho wrote:
->>>  static int exynos4_clk_hdmiphy_ctrl(struct clk *clk, int enable)
->>>  {
->>>       return s5p_gatectrl(S5P_HDMI_PHY_CONTROL, clk, enable);
->>> @@ -679,61 +684,55 @@ static struct clk exynos4_init_clocks_off[] = {
->>>               .enable         = exynos4_clk_ip_peril_ctrl,
->>>               .ctrlbit        = (1 << 14),
->>>       }, {
->>> -             .name           = "SYSMMU_MDMA",
->>> +             .name           = SYSMMU_CLOCK_NAME,
->>> +             .devname        = SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
->>> +             .enable         = exynos4_clk_ip_mfc_ctrl,
->>> +             .ctrlbit        = (1 << 1),
->>> +     }, {
->>> +             .name           = SYSMMU_CLOCK_NAME,
->>> +             .devname        = SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
->>> +             .enable         = exynos4_clk_ip_mfc_ctrl,
->>> +             .ctrlbit        = (1 << 2),
->>> +     }, {
->>> +             .name           = SYSMMU_CLOCK_NAME,
->>> +             .devname        = SYSMMU_CLOCK_DEVNAME(tv, 2),
->>> +             .enable         = exynos4_clk_ip_tv_ctrl,
->>> +             .ctrlbit        = (1 << 4),
->>> +     }, {
->>> +             .name           = SYSMMU_CLOCK_NAME,
->>> +             .devname        = SYSMMU_CLOCK_DEVNAME(jpeg, 3),
->>> +             .enable         = exynos4_clk_ip_cam_ctrl,
->>> +             .ctrlbit        = (1 << 11),
->>> +     }, {
->>> +             .name           = SYSMMU_CLOCK_NAME,
->>> +             .devname        = SYSMMU_CLOCK_DEVNAME(rot, 4),
->>>               .enable         = exynos4_clk_ip_image_ctrl,
->>> -             .ctrlbit        = (1 << 5),
->>> +             .ctrlbit        = (1 << 4),
->>>       }, {
->>> -             .name           = "SYSMMU_FIMC0",
->>> +             .name           = SYSMMU_CLOCK_NAME,
->>> +             .devname        = SYSMMU_CLOCK_DEVNAME(gsc0, 5),
->> It's exynos4 series clock and don't have gsc name. I don't know LSI
->> decides to use gsc instead of fimc for both exynos4 and exynos5. but
->> there's no name gsc at Spec..
-> 
-> gsc0 is just a name of the platform device of FIMC0 in Exynos4.
+Hm I think we simply hit "propagated to some mirrors but not all"
+so I saw the branch on my mirror but it wasn't yet up on yours :-/
 
-I think it's not right what you're saying. Gscalers first appeared only
-in exynos5 (at least according to all specifications I have) and you already
-have the corresponding change for clock-exynos5.c. FIMCs in exynos 4210, 4212
-and 4412 are almost not changed, so please don't rename like this, which is 
-confusing. If you need common clkdev entries for the exynos4 and exynos5 
-devices, then the "devname"s above might need to be removed and required 
-clock entries should be created through the CLKDEV_INIT() macro.
-
-> It is also used for GSclaler0 in Exynos5.
-> I wanted to reduce waste of platform device definitions that do not exist
-> in an application processor.
-> 
-> If it looks confused, I will find another way.
-
-Thanks,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+Linus
