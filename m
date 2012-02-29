@@ -1,69 +1,77 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Wed, 29 Feb 2012 10:34:34 +0800
-Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
-In-Reply-To: <20120228173027.GB22082@arm.com>
-References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
- <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
- <20120228173027.GB22082@arm.com>
-Message-ID: <4F4D8EBA.90406@gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 29 Feb 2012 11:10:29 +0800
+Subject: [PATCH v6 0/2] patch set about the MXS-DMA
+In-Reply-To: <1329373053-19494-1-git-send-email-b32955@freescale.com>
+References: <1329373053-19494-1-git-send-email-b32955@freescale.com>
+Message-ID: <4F4D9725.3090100@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi:
 
+ping.
 
-On 2012?02?29? 01:30, Catalin Marinas wrote:
-> On Mon, Feb 13, 2012 at 09:44:22AM +0000, Bill Carson wrote:
->> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
->> index 97b440c..3e6769a 100644
->> --- a/arch/arm/include/asm/page.h
->> +++ b/arch/arm/include/asm/page.h
->> @@ -15,6 +15,21 @@
->>   #define PAGE_SIZE		(_AC(1,UL)<<  PAGE_SHIFT)
->>   #define PAGE_MASK		(~(PAGE_SIZE-1))
->>
->> +#ifdef CONFIG_HUGEPAGE_SIZE_2MB
->> +/* we have 2MB hugepage for two 1MB section mapping */
->> +#define HPAGE_SHIFT		(SECTION_SHIFT + 1)
->> +#define HPAGE_SIZE		(_AC(1, UL)<<  HPAGE_SHIFT)
->> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
->> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
->> +#endif
->> +
->> +#ifdef CONFIG_HUGEPAGE_SIZE_16MB
->> +#define HPAGE_SHIFT		SUPERSECTION_SHIFT
->> +#define HPAGE_SIZE		(_AC(1, UL)<<  HPAGE_SHIFT)
->> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
->> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
->> +#endif
+Any comment about this patch set?
+
+thanks
+Huang Shijie
+> patch 1: move the mxs dma header to a more common place.
+> 	Beside the mx23/mx28, the apbh-dma is also used by MX50 and MX6Q.
+> 	So move the mxs dma header file to a more common place, and rename
+> 	it to mxs-dma.h
 >
-> Ah, you still have these just config time options. Can you not make an
-> hpage_shift variable like PowerPC or IA-64?
+> patch 2: rewrite the last parameter of mxs_dma_prep_slave_sg().
+> 	In the new GPMI version, some hardware behavior changes.
+> 	The WAIT4END bit should be set in the middle one of the ECC READ page DMA chain.
+> 	The DMA chain should be set like this:
 >
-Hi, Catalin
-
-Thank you for reviewing this patch.
-
-
-unsigned int hpage_shift = SECTION_SHIFT + 1; /* default to 2MB page */
-#define HPAGE_SHIFT hpage_shift
-
-then user could configure hpage_shift through "hugepagesz" parameter.
-I think this is what I am supposed to do,
-If so, hugepage_setup_sz/cpu_v7_set_hugepte_ext needs modification
-
-
-> (I haven't yet reviewed the rest of the code)
+>           +-----+               +-----+                      +-----+
+>           | cmd | ------------> | cmd | ------------------>  | cmd |
+>           +-----+               +-----+                      +-----+
+>                                    ^                            ^
+>                                    |                            |
+>                                    |                            |
+>                               set WAIT4END here too        set WAIT4END here
 >
-
-
-So, should I send another version now, or wait until you walk through
-the reset of patch set?
-
-And again, thanks for the patch reviewing:)
-
-
--- 
-I am a slow learner
-but I will keep trying to fight for my dreams!
-
---bill
+>         So rewrite the last parameter of mxs_dma_prep_slave_sg(), use the
+> 	dma_ctrl_flags to set the proper DMA bit for DMA Command Structure.
+> 	And change the relative drivers with the dma_ctrl_flags.
+>
+> TEST:
+> 	Tested the mxs-mmc driver and gpmi-nand drive with the two patches
+> 	in MX28 board.
+>
+> v5 --> v6:
+> 	[1] create this patch set based on the mainline.
+>
+> v4 --> v5:
+> 	[1] remove GPMI_IS_MX6Q(), make the mxs and mx6q use the same code.
+> 		
+> v3 --> v4:
+> 	[1] create a new folder include/linux/fsl/ for store the Freescale's
+> 	    header files.
+> 	[2] add more CCs.
+>
+> v2 --> v3:
+> 	[1] remove field gpmi_version, use GPMI_IS_MX6Q() instead.
+>
+> v1 --> v2:
+> 	[1] squash the trial patches into single patch.
+> 	[2] use the dma_ctrl_flags.
+>
+>
+> Huang Shijie (2):
+>   mxs-dma : move the mxs dma.h to a more common place
+>   mxs-dma : rewrite the last parameter of mxs_dma_prep_slave_sg()
+>
+>  drivers/dma/mxs-dma.c                              |   34 +++++++++++++++++---
+>  drivers/mmc/host/mxs-mmc.c                         |   12 +++---
+>  drivers/mtd/nand/gpmi-nand/gpmi-lib.c              |   19 +++++++---
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |    2 +-
+>  .../mach/dma.h => include/linux/fsl/mxs-dma.h      |    0
+>  sound/soc/mxs/mxs-pcm.c                            |    2 +-
+>  sound/soc/mxs/mxs-pcm.h                            |    2 +-
+>  sound/soc/mxs/mxs-saif.c                           |    2 +-
+>  8 files changed, 52 insertions(+), 21 deletions(-)
+>  rename arch/arm/mach-mxs/include/mach/dma.h => include/linux/fsl/mxs-dma.h (100%)
+>
