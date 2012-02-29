@@ -1,63 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 29 Feb 2012 09:39:05 +0000
-Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
-In-Reply-To: <4F4D8EBA.90406@gmail.com>
-References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
- <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
- <20120228173027.GB22082@arm.com> <4F4D8EBA.90406@gmail.com>
-Message-ID: <20120229093905.GA17745@arm.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 29 Feb 2012 10:40:28 +0100
+Subject: [PATCH v6 0/9] Consolidate cpuidle functionality
+In-Reply-To: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
+References: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAORVsuXvv+1r0rz=AMSNxWoKfGi+k_6=OXRFxbA=ST-M4vCeRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 02:34:34AM +0000, bill4carson wrote:
-> On 2012?02?29? 01:30, Catalin Marinas wrote:
-> > On Mon, Feb 13, 2012 at 09:44:22AM +0000, Bill Carson wrote:
-> >> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-> >> index 97b440c..3e6769a 100644
-> >> --- a/arch/arm/include/asm/page.h
-> >> +++ b/arch/arm/include/asm/page.h
-> >> @@ -15,6 +15,21 @@
-> >>   #define PAGE_SIZE		(_AC(1,UL)<<  PAGE_SHIFT)
-> >>   #define PAGE_MASK		(~(PAGE_SIZE-1))
-> >>
-> >> +#ifdef CONFIG_HUGEPAGE_SIZE_2MB
-> >> +/* we have 2MB hugepage for two 1MB section mapping */
-> >> +#define HPAGE_SHIFT		(SECTION_SHIFT + 1)
-> >> +#define HPAGE_SIZE		(_AC(1, UL)<<  HPAGE_SHIFT)
-> >> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
-> >> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
-> >> +#endif
-> >> +
-> >> +#ifdef CONFIG_HUGEPAGE_SIZE_16MB
-> >> +#define HPAGE_SHIFT		SUPERSECTION_SHIFT
-> >> +#define HPAGE_SIZE		(_AC(1, UL)<<  HPAGE_SHIFT)
-> >> +#define HPAGE_MASK		(~(HPAGE_SIZE - 1))
-> >> +#define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
-> >> +#endif
-> >
-> > Ah, you still have these just config time options. Can you not make an
-> > hpage_shift variable like PowerPC or IA-64?
-> 
-> Thank you for reviewing this patch.
+Rob,
 
-I haven't finished yet (another email to come :)).
+On Wed, Feb 29, 2012 at 4:11 AM, Robert Lee <rob.lee@linaro.org> wrote:
+> This patch series moves various functionality duplicated in platform
+> cpuidle drivers to the core cpuidle driver. Also, the platform irq
+> disabling was removed as it appears that all calls into
+> cpuidle_call_idle will have already called local_irq_disable().
+>
+> NOTE to Maintainers: Platform code changes are not required due to patch 1/9
+> but please review and push these platform changes as possible to allow
+> this consolidation to occur.
+>
+> Based on 3.3-rc5 plus recent exynos cpuidle patch (affect exynos cpuidle only):
+> http://www.spinics.net/lists/linux-samsung-soc/msg09467.html
+>
+> v5 submission can be found here:
+> http://www.spinics.net/lists/arm-kernel/msg161596.html
+> Changes since v5:
+> * Fixed mindless bug in CONFIG_ARCH_HAS_RELAX code in drivers/cpuidle/cpuidle.c
+> * Removed inline from wrapper function (thanks Mike Turquette and Rob Herring)
+> * Add zeroing out of last_residency if error value is returned (thanks Mike)
+> * Made drivers/cpuidle/cpuidle.c more intelligently handle en_core_tk_irqen
+> flag allowing removal of the if (en_core_tk_irqen) in cpuidle_idle_call (thanks
+> Daniel Lezcano)
+> * Moved CPUIDLE_ARM_WFI_STATE macro to arch/arm/include/asm/cpuidle.h (thanks
+> Jean Pihet)
+> * Cleaned up some comments and a stray change (thanks Jean)
 
-> unsigned int hpage_shift = SECTION_SHIFT + 1; /* default to 2MB page */
-> #define HPAGE_SHIFT hpage_shift
+Except the comments I sent to the list, this version looks good:
+Acked-by: Jean Pihet <j-pihet@ti.com>
 
-Something like that. You could even use PMD_SHIFT which is 21 already
-and it makes it clearer that we use huge pages at the pmd level.
+Tested OK using cpuidle in RETention and OFF modes on Beagleboard
+(OMAP3530 ES2.1):
+Tested-by: Jean Pihet <j-pihet@ti.com>
 
-> So, should I send another version now, or wait until you walk through
-> the reset of patch set?
-
-Just wait, I'll have a look through all the patches.
-
-BTW, there are several coding style issues, I won't go through them but
-it would help if you have a look at Documentation/CodingStyle
-(especially comment style, if/else brackets).
-
-Thanks.
-
--- 
-Catalin
+Thanks & regards,
+Jean
