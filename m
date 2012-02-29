@@ -1,29 +1,39 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 29 Feb 2012 10:03:57 -0800
-Subject: [PATCH v2] pinctrl: make the pinmux-pins more helpful
-In-Reply-To: <1330538332-16088-1-git-send-email-linus.walleij@stericsson.com>
-References: <1330538332-16088-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF20C2@HQMAIL01.nvidia.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 29 Feb 2012 10:07:08 -0800
+Subject: [PATCH 04/14] ARM: OMAP3+: SmartReflex: Add a shutdown hook
+In-Reply-To: <CAOMWX4dbufbEJpr0nTmwTHR1xz9diMBbO=khKxvMZLWrKesJRw@mail.gmail.com>
+ (Nishanth Menon's message of "Tue, 28 Feb 2012 16:59:14 -0600")
+References: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
+ <1328723039-15952-5-git-send-email-j-pihet@ti.com>
+ <87d38yk2e1.fsf@ti.com>
+ <CAOMWX4dbufbEJpr0nTmwTHR1xz9diMBbO=khKxvMZLWrKesJRw@mail.gmail.com>
+Message-ID: <878vjlfr8z.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Wednesday, February 29, 2012 10:59 AM:
-> The debugfs file pinmux-pins used to tell which function was
-> enabled but now states simply which device owns the pin. Being
-> owned by the pinctrl driver itself means just that it's hogged
-> so be a bit more helpful by printing that.
-> 
-> ChangeLog v1->v2:
-> - Preserve the self-referential owner field, just clarify that
->   when the pin controller states itself as owner this means
->   that it's hogged.
-> 
-> Acked-by: Dong Aisheng <dong.aisheng@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+"Menon, Nishanth" <nm@ti.com> writes:
 
-Exactly what I want, thanks.
+> On Tue, Feb 28, 2012 at 16:40, Kevin Hilman <khilman@ti.com> wrote:
+>> Jean Pihet <jean.pihet@newoldbits.com> writes:
+>>
+>>> From: Nishanth Menon <nm@ti.com>
+>>>
+>>> SmartReflex fix for erratum ID i724.
+>>>
+>>> Since OMAP's VP and PRM modules do not get reset by warm reset,
+>>> we should ensure that proper shutdown procedure is followed prior
+>>> to allowing the kernel to reboot back up.
+>>
+>> prior to reboot? ?how?
+>>
+>> This patch only ensures a proper shutdown if the kernel goes down
+>> cleanly.
+>>
+>> How is this handled on reboot?
+> There is no known solution for watchdog resets(part of the errata WA
+> limitation) :( - the best we could do was to make shutdown path safe -
+> this includes s/w (userspace triggered) reboots.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+OK, then the changelog needs an update to reflect that.
 
--- 
-nvpublic
+Kevin
