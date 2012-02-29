@@ -1,34 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Feb 2012 18:06:46 +0100
-Subject: [PATCH 6/6] ARM: ux500: select I2C for U8500
-In-Reply-To: <201202291703.33907.arnd@arndb.de>
-References: <1330199334-5133-1-git-send-email-mathieu.poirier@linaro.org>
- <201202291634.41686.arnd@arndb.de>
- <CACRpkdaYmScZKq9rT1z1MEQ4WwJC8Ow7vyS8zBB4r5Q7o6YJTQ@mail.gmail.com>
- <201202291703.33907.arnd@arndb.de>
-Message-ID: <CACRpkda8P5pv4m2hwP8fWNnpmZb-cBJBhkyYEtzet69vBpVJvg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 29 Feb 2012 10:22:30 -0700 (MST)
+Subject: [PATCHv3 4/6] ARM: OMAP3 PM: Enable IO Wake up
+In-Reply-To: <1330525621-29836-5-git-send-email-t-kristo@ti.com>
+References: <1330525621-29836-1-git-send-email-t-kristo@ti.com>
+ <1330525621-29836-5-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1202291009500.12752@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 6:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi
 
-> I got one more build error when actually disabling CONFIG_I2C on ux500:
->
-> arnd at klappe2:~/linux-arm$ make O=obj-arm/ ?ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -s ?-j3 -k
-> /git/arnd/linux-arm/arch/arm/mach-ux500/board-mop500-uib.c: In function 'mop500_uib_i2c_add':
-> /git/arnd/linux-arm/arch/arm/mach-ux500/board-mop500-uib.c:74:2: error: implicit declaration of function 'i2c_get_adapter' [-Werror=implicit-function-declaration]
-> /git/arnd/linux-arm/arch/arm/mach-ux500/board-mop500-uib.c:81:3: error: implicit declaration of function 'i2c_new_device' [-Werror=implicit-function-declaration]
-> /git/arnd/linux-arm/arch/arm/mach-ux500/board-mop500-uib.c:121:2: error: implicit declaration of function 'i2c_smbus_xfer' [-Werror=implicit-function-declaration]
->
-> I guess those need to be fixed, too. Ideally the API could just
-> get stubbed out for !CONFIG_I2C, but it might be easier to
-> conditionally build the code using it.
+a quick comment on this one
 
-Hm in this case it's the code probing the board using I2C to figure out if it's
-this or that variant.
+On Wed, 29 Feb 2012, Tero Kristo wrote:
 
-So selecting this board needs to select I2C and I2C_NOMADIK to work
-properly, I'll see if I can reproduce and think of something.
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index e97ec3f..e6c2d39 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -793,6 +793,10 @@ static int __init omap3_pm_init(void)
+>  		goto err1;
+>  	}
+>  
+> +	if (omap3_has_io_wakeup())
+> +		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD,
+> +					   PM_WKEN);
+> +
 
-Yours,
-Linus Walleij
+Let's avoid adding any more direct PRM or CM register accesses to code 
+outside the PRM & CM files.  Instead let's use higher-level interfaces 
+that are independent of the underlying OMAP SoC.  There are two 
+motivations.  The first is to make the PM code as OMAP SoC-independent as 
+possible, and low-level register manipulations are SoC-dependent.  The 
+second motivation is that we eventually want to move the PRM and CM code 
+(and ultimately the PM code) out of arch/arm/mach-omap2 into drivers/.
+
+So for this we'd need some code to control the WKEN bits.  Maybe 
+omap_prm_{disable,enable}_wakeup_from_module() or 
+pwrdm_{enable,disable}_wakeup_from_module() ?
+
+
+- Paul
