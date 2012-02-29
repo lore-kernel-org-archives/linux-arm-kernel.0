@@ -1,30 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Feb 2012 13:24:55 -0800
-Subject: [GIT PULL 5/5] Clean-up for omap
-In-Reply-To: <201202292120.07286.arnd@arndb.de>
-References: <0M0SaL-1SHLTi0asf-00u7ia@mx.kundenserver.de>
- <201202292120.07286.arnd@arndb.de>
-Message-ID: <20120229212455.GQ18901@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 29 Feb 2012 13:27:31 -0800
+Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
+ kernel_noload
+In-Reply-To: <20120229204527.GD16999@n2100.arm.linux.org.uk>
+References: <20120229181430.GI3318@game.jcrosoft.org>
+ <4F4E6F96.8080907@am.sony.com> <20120229191209.GN14173@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2122@HQMAIL01.nvidia.com>
+ <20120229194409.GO14173@pengutronix.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2155@HQMAIL01.nvidia.com>
+ <4F4E86A1.8010506@bluewatersys.com>
+ <20120229201938.GB16999@n2100.arm.linux.org.uk>
+ <4F4E89A8.4080909@bluewatersys.com> <20120229203958.GQ14173@pengutronix.de>
+ <20120229204527.GD16999@n2100.arm.linux.org.uk>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21A1@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [120229 12:48]:
-> On Wednesday 29 February 2012, Tony Lindgren wrote:
-> > This is mostly changes needed for io.h removal, and one
-> > patch to remove unused flag for McSPI. Note that these
-> > are based on RMK's for-armsoc.
-> > 
-> > Also, these cause a minor merge conflict for mach-omap2/Kconfig
-> > with the fixes-non-critical posted in this series of pull
-> > requests.
-> 
-> Hmm, I did not see the conflict in this one, but I saw one in the
-> dt branch that I fixed.
+Russell King wrote at Wednesday, February 29, 2012 1:45 PM:
+...
+> So, really, comparing a standard uImage produced by the standard kernel
+> with gzipped Image is far from a fair comparison.  And that's actually
+> another argument for getting rid of the uImage target... it may make
+> people think a bit about what they're doing rather than accepting
+> whatever default location someone else chose for their kernel.
 
-OK sounds like I did not remember correctly where the conflict was.
- 
-> I pulled this one into next/cleanup.
+That seems like more of an argument for making the uImage target use
+-T kernel_noload unconditionally, rather than removing the target.
+Since doing so would solve the issue about the kernel picking a load
+address.
 
-Thanks.
+That is, ignoring any arguments about breaking existing workflows at
+least...
 
-Tony
+-- 
+nvpublic
