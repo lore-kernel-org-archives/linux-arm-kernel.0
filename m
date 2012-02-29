@@ -1,138 +1,96 @@
-From: amit.kachhap@linaro.org (Amit Kachhap)
-Date: Wed, 29 Feb 2012 12:11:04 +0530
-Subject: [PATCH v6 3/9] ARM: exynos: Consolidate time keeping and irq
- enable
-In-Reply-To: <1330485109-7327-4-git-send-email-rob.lee@linaro.org>
-References: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
- <1330485109-7327-4-git-send-email-rob.lee@linaro.org>
-Message-ID: <CAK44p224NL6+UuLKZ2vrP=CnBOARPBxj5f_+SNX_4j3RfBesEg@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Wed, 29 Feb 2012 07:42:51 +0100
+Subject: [PATCH v2 1/7] ARM: davinci,
+ intc: Add OF support for TI interrupt controller
+In-Reply-To: <4F44DE24.30606@mvista.com>
+References: <1329893410-24413-1-git-send-email-hs@denx.de>
+ <1329893410-24413-2-git-send-email-hs@denx.de> <4F44DE24.30606@mvista.com>
+Message-ID: <4F4DC8EB.7010201@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Sergei,
 
-I verified this patch on exynos4 based origen board.
+Sergei Shtylyov wrote:
+> On 22-02-2012 10:50, Heiko Schocher wrote:
+> 
+>> Add a function to initialize the davinci interrupt controller (INTC)
+>> using a device tree node.
+> 
+>    cp_intc is not DaVinci interrupt controller, it's only used in
+> OMAP-L1x SoCs. cp_intc stands for Common Platform Interrupt Controller.
 
-Tested-by: Amit Daniel <amit.kachhap@linaro.org>
+Ah, Ok! Thanks for the explanation.
 
-Thanks,
-Amit D
+> I don't see where you are initializiing the DaVinci interrupt controller
+> itself. You should understand that there are two disctinct types of
+> interrupt controllers used in the SoCs supported by arch/arm/mach-davinci/.
 
-On 29 February 2012 08:41, Robert Lee <rob.lee@linaro.org> wrote:
-> Enable core cpuidle timekeeping and irq enabling and remove that
-> handling from this code.
->
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
-> ?arch/arm/mach-exynos/cpuidle.c | ? 53 ++++-----------------------------------
-> ?1 files changed, 6 insertions(+), 47 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-> index 9bf6743..75bb88b 100644
-> --- a/arch/arm/mach-exynos/cpuidle.c
-> +++ b/arch/arm/mach-exynos/cpuidle.c
-> @@ -20,6 +20,7 @@
-> ?#include <asm/smp_scu.h>
-> ?#include <asm/suspend.h>
-> ?#include <asm/unified.h>
-> +#include <asm/cpuidle.h>
-> ?#include <mach/regs-pmu.h>
-> ?#include <mach/pmu.h>
->
-> @@ -34,22 +35,12 @@
->
-> ?#define S5P_CHECK_AFTR ? ? ? ? 0xFCBA0D10
->
-> -static int exynos4_enter_idle(struct cpuidle_device *dev,
-> - ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index);
-> ?static int exynos4_enter_lowpower(struct cpuidle_device *dev,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index);
->
-> ?static struct cpuidle_state exynos4_cpuidle_set[] = {
-> - ? ? ? [0] = {
-> - ? ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= exynos4_enter_idle,
-> - ? ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 1,
-> - ? ? ? ? ? ? ? .target_residency ? ? ? = 100000,
-> - ? ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
-> - ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "C0",
-> - ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "ARM clock gating(WFI)",
-> - ? ? ? },
-> + ? ? ? [0] = CPUIDLE_ARM_WFI_STATE,
-> ? ? ? ?[1] = {
-> ? ? ? ? ? ? ? ?.enter ? ? ? ? ? ? ? ? ?= exynos4_enter_lowpower,
-> ? ? ? ? ? ? ? ?.exit_latency ? ? ? ? ? = 300,
-> @@ -63,8 +54,9 @@ static struct cpuidle_state exynos4_cpuidle_set[] = {
-> ?static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
->
-> ?static struct cpuidle_driver exynos4_idle_driver = {
-> - ? ? ? .name ? ? ? ? ? = "exynos4_idle",
-> - ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
-> + ? ? ? .name ? ? ? ? ? ? ? ? ? = "exynos4_idle",
-> + ? ? ? .owner ? ? ? ? ? ? ? ? ?= THIS_MODULE,
-> + ? ? ? .en_core_tk_irqen ? ? ? = 1,
-> ?};
->
-> ?/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
-> @@ -103,13 +95,8 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index)
-> ?{
-> - ? ? ? struct timeval before, after;
-> - ? ? ? int idle_time;
-> ? ? ? ?unsigned long tmp;
->
-> - ? ? ? local_irq_disable();
-> - ? ? ? do_gettimeofday(&before);
-> -
-> ? ? ? ?exynos4_set_wakeupmask();
->
-> ? ? ? ?/* Set value of power down register for aftr mode */
-> @@ -148,34 +135,6 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
-> ? ? ? ?/* Clear wakeup state register */
-> ? ? ? ?__raw_writel(0x0, S5P_WAKEUP_STAT);
->
-> - ? ? ? do_gettimeofday(&after);
-> -
-> - ? ? ? local_irq_enable();
-> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> - ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
-> -
-> - ? ? ? dev->last_residency = idle_time;
-> - ? ? ? return index;
-> -}
-> -
-> -static int exynos4_enter_idle(struct cpuidle_device *dev,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
-> -{
-> - ? ? ? struct timeval before, after;
-> - ? ? ? int idle_time;
-> -
-> - ? ? ? local_irq_disable();
-> - ? ? ? do_gettimeofday(&before);
-> -
-> - ? ? ? cpu_do_idle();
-> -
-> - ? ? ? do_gettimeofday(&after);
-> - ? ? ? local_irq_enable();
-> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> - ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
-> -
-> - ? ? ? dev->last_residency = idle_time;
-> ? ? ? ?return index;
-> ?}
->
-> @@ -190,7 +149,7 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
-> ? ? ? ? ? ? ? ?new_index = drv->safe_state_index;
->
-> ? ? ? ?if (new_index == 0)
-> - ? ? ? ? ? ? ? return exynos4_enter_idle(dev, drv, new_index);
-> + ? ? ? ? ? ? ? return cpuidle_simple_enter(dev, drv, new_index);
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?return exynos4_enter_core0_aftr(dev, drv, new_index);
-> ?}
-> --
-> 1.7.1
->
+board code:
+
+MACHINE_START(ENBW_CMC, "EnBW CMC")
+[...]
+        .init_irq       = davinci_init_irq,
+
+and in arch/arm/mach-davinci/cp_intc.c
+
+for the of case:
+
+void __init davinci_init_irq(void)
+{
+        of_irq_init(irq_match);
+}
+
+in drivers/of/irq.c:
+
+/**
+ * of_irq_init - Scan and init matching interrupt controllers in DT
+ * @matches: 0 terminated array of nodes to match and init function to call
+ *
+ * This function scans the device tree for matching interrupt controller nodes,
+ * and calls their initialization functions in order with parents first.
+ */
+void __init of_irq_init(const struct of_device_id *matches)
+
+Ok, the name of davinci_init_irq() is missleading ...
+
+Should I name it "cp_intc_of_init" ?
+
+>> Signed-off-by: Heiko Schocher<hs@denx.de>
+>> Cc: davinci-linux-open-source at linux.davincidsp.com
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Cc: Sekhar Nori<nsekhar@ti.com>
+>> Cc: Wolfgang Denk<wd@denx.de>
+> 
+> [...]
+> 
+>> diff --git a/Documentation/devicetree/bindings/arm/davinci/intc.txt
+>> b/Documentation/devicetree/bindings/arm/davinci/intc.txt
+>> new file mode 100644
+>> index 0000000..dac2f69
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/davinci/intc.txt
+>> @@ -0,0 +1,26 @@
+>> +* TI Davinci Interrupt Controller
+>> +
+>> +davinci are using a TI interrupt controller that can support several
+>> +configurable number of interrupts.
+>> +
+>> +Main node required properties:
+>> +
+>> +- compatible : should be:
+>> +    "ti,davinci-intc"
+> 
+>    The right "compatible" prop would be "ti,cp_intc" in this case.
+
+Ok, change this.
+
+Thanks for the review!
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
