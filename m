@@ -1,41 +1,54 @@
-From: andre@bluewatersys.com (Andre Renaud)
-Date: Thu, 01 Mar 2012 09:25:12 +1300
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <20120229201938.GB16999@n2100.arm.linux.org.uk>
-References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
- <20120229122942.GF3318@game.jcrosoft.org>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
- <20120229181430.GI3318@game.jcrosoft.org> <4F4E6F96.8080907@am.sony.com>
- <20120229191209.GN14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2122@HQMAIL01.nvidia.com>
- <20120229194409.GO14173@pengutronix.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF2155@HQMAIL01.nvidia.com>
- <4F4E86A1.8010506@bluewatersys.com>
- <20120229201938.GB16999@n2100.arm.linux.org.uk>
-Message-ID: <4F4E89A8.4080909@bluewatersys.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 01 Mar 2012 08:45:20 +1100
+Subject: ARM: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
+In-Reply-To: <201202291312.21318.hartleys@visionengravers.com>
+References: <201202291312.21318.hartleys@visionengravers.com>
+Message-ID: <4F4E9C70.70602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
->> I may have missed part of this, but isn't one of the points regarding
->> this that the zImage decompressor always runs with data cache disabled,
-> 
-> Most certainly not.  We've had the data cache enabled for years and
-> years.  And I mean 10+ years.  We may have been lacking support on
-> some CPUs, but that was because of lack of contributions.
-> 
->> resulting in a slow decompress, where as if the U-Boot decompressor is
->> used (ie, gzipping the Image, and telling U-Boot to decompress), then it
->> can run with caches enabled, improving boot speed?
-> 
-> That's pure FUD.
+On 01/03/12 07:12, H Hartley Sweeten wrote:
 
-I don't want to open a can of worms on this, and I certainly haven't
-looked into the image decompressor within the Linux kernel, but from a
-boot speed point of view we certainly see a significant speed
-improvement switching from zImage to gzipped-Image. Do you know which
-platforms include the data-cache support in the decompressor?
+> As done for the other ep93xx machines in:
+> 
+> commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
+> ARM: ep93xx: convert to MULTI_IRQ_HANDLER
+> 
+> Now that there is a generic IRQ handler for multiple VIC devices use it
+> for vision_ep9307 to help building multi platform kernels.
+> 
+> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Jamie Iles <jamie@jamieiles.com>
 
-Regards,
-Andre
+
+Acked-by: Ryan Mallon <rmallon@gmail.com>
+
+> 
+> ---
+> 
+> diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+> index d5fb44f..d67d0b4 100644
+> --- a/arch/arm/mach-ep93xx/vision_ep9307.c
+> +++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+> @@ -34,6 +34,7 @@
+>  #include <mach/ep93xx_spi.h>
+>  #include <mach/gpio-ep93xx.h>
+>  
+> +#include <asm/hardware/vic.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/arch.h>
+> @@ -361,6 +362,7 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
+>  	.atag_offset	= 0x100,
+>  	.map_io		= vision_map_io,
+>  	.init_irq	= ep93xx_init_irq,
+> +	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= vision_init_machine,
+>  	.restart	= ep93xx_restart,
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
