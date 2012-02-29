@@ -1,32 +1,37 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 29 Feb 2012 14:38:16 -0800
-Subject: [PATCH v3 00/10] Add tegra30 support for secondary cores
-In-Reply-To: <20120229154229.GL12917@tbergstrom-lnx.Nvidia.com>
-References: <1328831277-21002-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178FACB954@HQMAIL01.nvidia.com>
- <20120229154229.GL12917@tbergstrom-lnx.Nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21F3@HQMAIL01.nvidia.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 29 Feb 2012 23:39:27 +0100
+Subject: [PATCH-V1] arm/dts: Add support for TI OMAP3 EVM board
+In-Reply-To: <20120229223114.GS18901@atomide.com>
+References: <1324019153-13316-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A80719AC@DBDE01.ent.ti.com>
+ <20120229223114.GS18901@atomide.com>
+Message-ID: <4F4EA91F.1030305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Wednesday, February 29, 2012 8:42 AM:
-> On Wed, Feb 15, 2012 at 10:27:43PM +0100, Stephen Warren wrote:
-> > Peter De Schrijver wrote at Thursday, February 09, 2012 4:48 PM:
-> > > This patchset introduces support for secondary cores on tegra30. It also
-> > > introduces some functions for the flowcontroller and adds basic support for
-> > > tegra30 powerdomains.
-> >
-> > The code looks fine to me. I do notice the following when running
-> > "shutdown -h now":
-> >
-> > [   27.762124] SMP: failed to stop secondary CPUs
+On 2/29/2012 11:31 PM, Tony Lindgren wrote:
+> * Hiremath, Vaibhav<hvaibhav@ti.com>  [120105 02:46]:
+...
+>> Can this merged? OR anybody has any comments here?
+>
+> For reference, looks like this one is queued up as
+> commit f0e15e2b0c6b3e89daade25a1e9a2d80136c14c3.
 
-I can't seem to reproduce this at all on next-20120229 anymore. What
-kind of repro frequency are you seeing, and does it get fixed if you
-update to that baseline?
+Yes, it is, I included it in my DTS pull-request because it was the only 
+one with Grant's ack.
 
-(I tried 20 times with shutdown, and 15 of them I reverted all the CPU
-and cache errata in case they affected the issue at all)
+I have the whole series ready to be pulled but was waiting for DT 
+maintainers acked-by.
 
--- 
-nvpublic
+I still have these four ones in my branch.
+
+d5c9442 arm/dts: Add support for TI AM3517/05 EVM board
+3b5fa9a arm/dts: omap3-evm: Add i2c and twl4030 support
+7f4ca5f arm/dts: Add support for TI AM335x EVM board
+d0c3aca ARM: OMAP2+: board-generic: Add DT support for AM33xx devices
+
+In fact the board one already has the proper ack, only the DTS are 
+missing it.
+
+Regards,
+Benoit
