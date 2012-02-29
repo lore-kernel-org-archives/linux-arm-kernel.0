@@ -1,38 +1,60 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 29 Feb 2012 08:58:49 -0800
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <20120229122942.GF3318@game.jcrosoft.org>
-References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
- <20120229122942.GF3318@game.jcrosoft.org>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Feb 2012 18:00:15 +0100
+Subject: [PATCH 6/6] ARM: ux500: select I2C for U8500
+In-Reply-To: <201202291634.41686.arnd@arndb.de>
+References: <1330199334-5133-1-git-send-email-mathieu.poirier@linaro.org>
+ <1330199334-5133-6-git-send-email-mathieu.poirier@linaro.org>
+ <CACRpkdbGAhwdxE6tYdib0Aiw=9qScmV507npzDU1hkH1xXgxRQ@mail.gmail.com>
+ <201202291634.41686.arnd@arndb.de>
+Message-ID: <CACRpkdaYmScZKq9rT1z1MEQ4WwJC8Ow7vyS8zBB4r5Q7o6YJTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean-Christophe PLAGNIOL-VILLARD wrote at Wednesday, February 29, 2012 5:30 AM:
-> On 17:03 Tue 28 Feb     , Stephen Warren wrote:
-> > uImage files typically encode a single absolute load and entry address.
-> > This is inconvenient when attempting to share that uImage across multiple
-> > SoCs with different physical RAM addresses. Recent versions of mkimage
-> > implement a "kernel_noload" image type which encodes no absolute load
-> > address, and a relative entry address. This works well for uImage-wrapped
-> > ARM zImages, since they are relocatable.
-> >
-> > This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
-> > "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
-> >
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > ---
-> > I assume I should put this into the ARM patch tracker if it's OK?
+On Wed, Feb 29, 2012 at 5:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 29 February 2012, Linus Walleij wrote:
+>> On Sat, Feb 25, 2012 at 8:48 PM, ?<mathieu.poirier@linaro.org> wrote:
+>>
+>> > From: Arnd Bergmann <arnd@arndb.de>
+>> >
+>> > The U8500 platform selects the TPS6105X, so also select the I2C
+>> > layer that this driver depends on.
+>> >
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> > ---
+>> > ?arch/arm/mach-ux500/Kconfig | ? ?1 +
+>> > ?1 files changed, 1 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+>> > index c7d1fb5..f0f6199 100644
+>> > --- a/arch/arm/mach-ux500/Kconfig
+>> > +++ b/arch/arm/mach-ux500/Kconfig
+>> > @@ -29,6 +29,7 @@ config MACH_U8500
+>> > ? ? ? ?select UX500_SOC_DB8500
+>> > ? ? ? ?select TPS6105X
+>> > ? ? ? ?select SOC_BUS
+>> > + ? ? ? select I2C
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> But should it not also select I2C_NOMADIK, which is surely
+>> required too.
 >
-> Again a new option for uImage no why not just boot the zImage
-> 
-> in this case the uImage is useless
+> That's a different question: I2C is needed to build the kernel
+> successfully, while I2C_NOMADIK is (probably) needed to actually
+> run on a given hardware.
+>
+> We normally don't prevent people from selecting silly combinations
+> of config options, but we do try to make sure that any random
+> configuration actually builds.
+>
+> Maybe the answer is instead to remove the 'select TPS6105X'
+> and make sure the platform actually builds without I2C
 
-U-Boot doesn't support zImage at present.
+Oh yeah wait that's the proper solution. Instead I get to update
+the defconfig to include necessary drivers.
 
-A patch was posted to support it at least for ARM, but needed a little
-work before it could be committed.
+I'll post a patch for this instead.
 
--- 
-nvpublic
+Thanks,
+Linus Walleij
