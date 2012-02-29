@@ -1,32 +1,61 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 29 Feb 2012 18:11:03 +1100
-Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
-In-Reply-To: <25B60CDC2F704E4E9D88FFD52780CB4C060A87D777@SC-VEXCH1.marvell.com>
-References: <20120229172127.7b430cecc7ab2350d4e4a1b8@canb.auug.org.au>
- <20120229063217.GA13386@zhy>
- <25B60CDC2F704E4E9D88FFD52780CB4C060A87D777@SC-VEXCH1.marvell.com>
-Message-ID: <20120229181103.e05c55bafd959f739d6a336b@canb.auug.org.au>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 29 Feb 2012 09:15:48 +0200
+Subject: [PATCH] mmc: start removing enable / disable API
+In-Reply-To: <4F4DC59D.70903@codeaurora.org>
+References: <1330080561-7256-1-git-send-email-adrian.hunter@intel.com>
+ <4F4DC59D.70903@codeaurora.org>
+Message-ID: <4F4DD0A4.2080802@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 29/02/12 08:28, Sujit Reddy Thumma wrote:
+> Hi Adrian,
+> 
+> On 2/24/2012 4:19 PM, Adrian Hunter wrote:
+>> Most parts of the enable / disable API are no longer used and
+>> can be removed.
+>>
+>> Cc: Rajendra Nayak<rnayak@ti.com>
+>> Cc: Venkatraman S<svenkatr@ti.com>
+>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>> Cc: Thomas Abraham<thomas.abraham@linaro.org>
+>> Cc: Kyungmin Park<kyungmin.park@samsung.com>
+>> Cc: Sekhar Nori<nsekhar@ti.com>
+>> Cc: Kevin Hilman<khilman@ti.com>
+>> Signed-off-by: Adrian Hunter<adrian.hunter@intel.com>
+>> ---
+>>   arch/arm/mach-exynos/mach-nuri.c           |    5 +-
+>>   arch/arm/mach-exynos/mach-universal_c210.c |    9 +-
+>>   drivers/mmc/core/core.c                    |  185
+>> ++--------------------------
+>>   drivers/mmc/core/host.c                    |    1 -
+>>   drivers/mmc/core/host.h                    |    1 -
+>>   drivers/mmc/host/davinci_mmc.c             |    4 -
+>>   drivers/mmc/host/omap_hsmmc.c              |   15 +--
+>>   include/linux/mmc/core.h                   |    1 -
+>>   include/linux/mmc/host.h                   |   46 +-------
+>>   9 files changed, 25 insertions(+), 242 deletions(-)
+>>
+> 
+>> -    if (host->caps&  MMC_CAP_DISABLE)
+>> -        cancel_delayed_work(&host->disable);
+>>       cancel_delayed_work_sync(&host->detect);
+>>       mmc_flush_scheduled_work();
+>>
+>> @@ -2402,13 +2245,11 @@ int mmc_suspend_host(struct mmc_host *host)
+>>   {
+>>       int err = 0;
+>>
+>> -    if (host->caps&  MMC_CAP_DISABLE)
+>> -        cancel_delayed_work(&host->disable);
+>>       cancel_delayed_work(&host->detect);
+>>       mmc_flush_scheduled_work();
+>>       if (mmc_try_claim_host(host)) {
+>>           err = mmc_cache_ctrl(host, 0);
+>> -        mmc_do_release_host(host);
+>> +        mmc_release_host(host);
+> 
+> mmc_try_claim_host does not call host->ops->enable(), but mmc_release_host
+> call host->ops->disable(), is there any reason for this?
 
-On Tue, 28 Feb 2012 22:54:06 -0800 Haojian Zhuang <hzhuang1@marvell.com> wrote:
->
-> Since there's the conflict on code. Does it mean that I need to re-submit
-> those patches in arm-soc that should be based on commit "drivers/rtc:
-> remove IRQF_DISABLED" from the akpm tree?
-
-No, that conflict can be resolved by Linus during the next merge window
-(unless someone else wants to do something about it).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120229/f24b067e/attachment.sig>
+No, it is an oversight.  I will send V2.
