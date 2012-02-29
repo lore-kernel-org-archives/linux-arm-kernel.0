@@ -1,40 +1,127 @@
-From: jbaron@redhat.com (Jason Baron)
-Date: Wed, 29 Feb 2012 10:47:04 -0500
-Subject: [PATCHv3] ARM: add jump label support
-In-Reply-To: <20120229152320.GA6337@debian>
-References: <1327757725-10114-7-git-send-email-rabin@rab.in>
- <1329325244-16289-1-git-send-email-rabin@rab.in>
- <20120229152320.GA6337@debian>
-Message-ID: <20120229154704.GA2372@redhat.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 29 Feb 2012 17:15:25 +0100
+Subject: [GIT PULL] ARM: OMAP: IRQ domain support for INTC
+In-Reply-To: <20120228234837.GH18901@atomide.com>
+References: <4F4BB0FB.3040308@ti.com> <20120228234837.GH18901@atomide.com>
+Message-ID: <4F4E4F1D.7020109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 08:54:06PM +0530, Rabin Vincent wrote:
-> On Wed, Feb 15, 2012 at 10:30:44PM +0530, Rabin Vincent wrote:
-> > Add the arch-specific code to support jump labels for ARM and Thumb-2.
-> > 
-> > This code will only be activated on compilers that are capable of
-> > building it.  It has been tested with GCC 4.6 patched with the patch
-> > from GCC bug 48637.
-> > 
-> > Cc: Jason Baron <jbaron@redhat.com>
-> > Signed-off-by: Rabin Vincent <rabin@rab.in>
-> > ---
-> ...
-> > +static __always_inline bool arch_static_branch(struct jump_label_key *key)
+Hi Tony,
+
+On 2/29/2012 12:48 AM, Tony Lindgren wrote:
+> Hi,
 > 
-> Hmm, there's now a patch in linux-next ("static keys: Introduce 'struct
-> static_key', static_key_true()/false() and static_key_slow_[inc|dec]()")
-> via the -tip tree which would cause this not to build anymore since
-> struct jump_label_key was renamed to struct static_key.
+> * Cousson, Benoit<b-cousson@ti.com>  [120227 08:04]:
+>> Hi Tony
+>>
+>> This series is based on the lo/dt + the irqdomain/next branch merged on top of it.
+>>
+>> Grant confirmed that the irqdomain/next is a stable branch and thus can be referenced for dependency.
+>>
+>> Please note that I will need that branch to base all the remaining OMAP DT stuff.
+>>
+>> Thanks,
+>> Benoit
+>>
+>>
+>> The following changes since commit 1f52299ec000e2161635b263d81ab92ea7f1f0a7:
+>>    Benoit Cousson (1):
+>>          Merge branch 'irqdomain/next' of git://git.secretlab.ca/git/linux-2.6 into for_3.4/dt_irq_domain2
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_irq_domain
+>>
+>> Benoit Cousson (3):
+>>        ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
+>>        arm/dts: OMAP3: Add interrupt-controller bindings for INTC
+>>        ARM: OMAP2+: board-generic: Use of_irq_init API
+>>
+>>   .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++
+>>   arch/arm/boot/dts/omap3.dtsi                       |    6 +-
+>>   arch/arm/mach-omap2/board-generic.c                |   30 +++++-----
+>>   arch/arm/mach-omap2/common.h                       |   12 ++++
+>>   arch/arm/mach-omap2/irq.c                          |   60 ++++++++++++++++---
+>>   5 files changed, 109 insertions(+), 26 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
 > 
-> I'm not sure how this could be handled to keep this compiling both in
-> the arm tree separately and in linux-next.  I guess the easiest is to
-> delay this until the next cycle, since it's not applied yet.
+> Hmm, looks like this now produces the following warning at least on omap3:
 
-hmm...Maybe the rename patches could be pulled into the arm tree
-somehow? Waiting a cycle works too...
+Yes, Rajendra has just reported that issue with linux-next.
 
-Thanks,
+It is not due to that series but to the increase of TWL irq_desc I did for Grant to fix a warning with irq_domain in the DT boot.
+Unfortunately due the lack of NR_IRQS we already have becasue of PRCM handler we exceed the actual NR_IRQS that is set to 410 for the moment.
 
--Jason
+> [    0.290832] WARNING: at drivers/mfd/twl4030-irq.c:645 twl4030_sih_setup+0x258/0x298()
+> [    0.290832] irq 428 for gpio too big
+
+After applying the NR_IRQS fix, we still have a warning but a different one in that case:
+
+[    0.303771] twl4030: PIH (irq 7) chaining IRQs 368..401
+[    0.304473] twl4030: power (irq 373) chaining IRQs 402..409
+[    0.307159] twl4030: gpio (irq 368) chaining IRQs 410..427
+[    0.307189] ------------[ cut here ]------------
+[    0.307220] WARNING: at drivers/gpio/gpio-twl4030.c:410 gpio_twl4030_probe+0x44/0x214()
+
+This one is due to a "WARN_ON(ret != pdata->irq_base)" that is checking that the board irq_base is the same as the one from the twl4030_sih_setup. This kind of test are not SPARSE_IRQ friendly at all and should be removed anyway. I've attached a patch to fix the GPIO warning.
+
+Felipe has started a twl4030 IRQ cleanup series to make that driver SPARSE_IRQ enabled. That's will fix properly the actual hack in the twl-core IRQ management. On top of that we can fix the twl-gpio warning.
+
+Regards,
+Benoit
+
+---
+>From 13bf5df12ea6dd0dded45bd4ee4d2508f5f2712c Mon Sep 17 00:00:00 2001
+From: Benoit Cousson <b-cousson@ti.com>
+Date: Tue, 28 Feb 2012 21:51:59 +0100
+Subject: [PATCH] gpio/twl: Fix IRQ setup to be SPARSE_IRQ friendly
+
+Since the SIH handler is allocating irq_descs dynamically, the
+irq_base cannot be defined anymore by the board through pdata.
+
+Remove the test to setup IRQ only in case of valid pdata.
+Remove the check to ensure irq_base is the one from pdata.
+
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+---
+ drivers/gpio/gpio-twl4030.c |   21 ++++++++++-----------
+ 1 files changed, 10 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+index b8b4f22..0f7d29c 100644
+--- a/drivers/gpio/gpio-twl4030.c
++++ b/drivers/gpio/gpio-twl4030.c
+@@ -398,19 +398,18 @@ static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+ 	int ret;
+ 
+ 	/* maybe setup IRQs */
+-	if (pdata->irq_base) {
+-		if (is_module()) {
+-			dev_err(&pdev->dev,
+-				"can't dispatch IRQs from modules\n");
+-			goto no_irqs;
+-		}
+-		ret = twl4030_sih_setup(TWL4030_MODULE_GPIO);
+-		if (ret < 0)
+-			return ret;
+-		WARN_ON(ret != pdata->irq_base);
+-		twl4030_gpio_irq_base = ret;
++	if (is_module()) {
++		dev_err(&pdev->dev,
++			"can't dispatch IRQs from modules\n");
++		goto no_irqs;
+ 	}
+ 
++	ret = twl4030_sih_setup(TWL4030_MODULE_GPIO);
++	if (ret < 0)
++		return ret;
++
++	twl4030_gpio_irq_base = ret;
++
+ no_irqs:
+ 	/*
+ 	 * NOTE:  boards may waste power if they don't set pullups
+-- 
+1.7.0.4
