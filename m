@@ -1,214 +1,78 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 29 Feb 2012 09:25:54 +0900
-Subject: [PATCH v9 1/2] ARM: EXYNOS: Change System MMU platform device
- definitions
-In-Reply-To: <CAH9JG2Uvh=_GWFWyBrE-hfGTvrwvs6n37bmKaHbCovJ++EeJ7g@mail.gmail.com>
-References: <001901ccf5e3$6a363320$3ea29960$%cho@samsung.com>
- <CAH9JG2Uvh=_GWFWyBrE-hfGTvrwvs6n37bmKaHbCovJ++EeJ7g@mail.gmail.com>
-Message-ID: <CAHQjnOO1aADVQWxNt-J3nb0bgJvc2dfk+6qTWKWx7w+-LUVSmw@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 28 Feb 2012 20:26:44 -0500
+Subject: [PATCH] ARM: boot/compressed/misc.s: Include <linux/bug.h> to
+ fix build break
+In-Reply-To: <1330372350-6432-1-git-send-email-swarren@nvidia.com>
+References: <1330372350-6432-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20120229012644.GA4265@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 4:20 PM, Kyungmin Park
-<kyungmin.park@samsung.com> wrote:
-> Hi,
->
-> On 2/28/12, KyongHo Cho <pullip.cho@samsung.com> wrote:
->> Handling System MMUs with an identifier is not flexible to manage
->> System MMU platform devices because of the following reasons:
->> 1. A device driver which needs to handle System MMU must know the ID.
->> 2. A System MMU may not present in some implementations of Exynos family.
->> 3. Handling System MMU with IOMMU API does not require an ID.
->>
->> This patch is the result of removing ID of System MMUs.
->> Instead, a device driver that needs to handle its System MMU must
->> use IOMMU API while its descriptor of platform device is given.
->>
->> This patch also includes the following enhancements:
->> - A System MMU device becomes a child if its power domain device.
->> - clkdev
->>
->> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
->> ---
->> ?arch/arm/mach-exynos/Kconfig ? ? ? ? ? ? ? ? ? ?| ? 11 +-
->> ?arch/arm/mach-exynos/Makefile ? ? ? ? ? ? ? ? ? | ? ?2 +-
->> ?arch/arm/mach-exynos/clock-exynos4.c ? ? ? ? ? ?| ? 79 ++--
->> ?arch/arm/mach-exynos/clock-exynos4.h ? ? ? ? ? ?| ? ?2 +
->> ?arch/arm/mach-exynos/clock-exynos4210.c ? ? ? ? | ? 11 +
->> ?arch/arm/mach-exynos/clock-exynos4212.c ? ? ? ? | ? 28 ++-
->> ?arch/arm/mach-exynos/clock-exynos5.c ? ? ? ? ? ?| ? 90 +++++
->> ?arch/arm/mach-exynos/dev-sysmmu.c ? ? ? ? ? ? ? | ?451
->> ++++++++++++-----------
->> ?arch/arm/mach-exynos/include/mach/irqs.h ? ? ? ?| ?179 +++++-----
->> ?arch/arm/mach-exynos/include/mach/map.h ? ? ? ? | ? 38 ++
->> ?arch/arm/mach-exynos/include/mach/regs-clock.h ?| ? ?5 +
->> ?arch/arm/mach-exynos/include/mach/regs-sysmmu.h | ? 28 --
->> ?arch/arm/mach-exynos/include/mach/sysmmu.h ? ? ?| ? 84 +++--
->> ?arch/arm/mach-exynos/mach-armlex4210.c ? ? ? ? ?| ? ?1 -
->> ?arch/arm/mach-exynos/mach-smdkv310.c ? ? ? ? ? ?| ? ?1 -
->> ?arch/arm/plat-s5p/sysmmu.c ? ? ? ? ? ? ? ? ? ? ?| ? 13 +-
->> ?arch/arm/plat-samsung/include/plat/devs.h ? ? ? | ? ?1 -
->> ?17 files changed, 618 insertions(+), 406 deletions(-)
-> It's too big to cover these changes. Can you make it more small changes.
-> 1. Remove existing ones since no user at this time.
-> 2. Add new define and data structures.
-> 3. Support new system mmu features based on generic iommu.
->
+[[PATCH] ARM: boot/compressed/misc.s: Include <linux/bug.h> to fix build break] On 27/02/2012 (Mon 12:52) Stephen Warren wrote:
 
-Your suggestion sounds good. Thank you.
+> Commmit cf86c17 "kernel.h: doesn't explicitly use bug.h, so don't include
+> it." caused the following build failure on ARM:
+> 
+>   CC      arch/arm/boot/compressed/misc.o
+> In file included from arch/arm/boot/compressed/misc.c:28:0:
+> arch/arm/mach-tegra/include/mach/uncompress.h: In function 'arch_decomp_setup':
+> arch/arm/mach-tegra/include/mach/uncompress.h:125:2: error: implicit declaration of function 'BUILD_BUG_ON_ZERO' [-Werror=implicit-function-declaration]
+> cc2: some warnings being treated as errors
+> 
+> Include <linux/bug.h> to fix that.
 
->> ?static int exynos4_clk_hdmiphy_ctrl(struct clk *clk, int enable)
->> ?{
->> ? ? ? return s5p_gatectrl(S5P_HDMI_PHY_CONTROL, clk, enable);
->> @@ -679,61 +684,55 @@ static struct clk exynos4_init_clocks_off[] = {
->> ? ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_peril_ctrl,
->> ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 14),
->> ? ? ? }, {
->> - ? ? ? ? ? ? .name ? ? ? ? ? = "SYSMMU_MDMA",
->> + ? ? ? ? ? ? .name ? ? ? ? ? = SYSMMU_CLOCK_NAME,
->> + ? ? ? ? ? ? .devname ? ? ? ?= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
->> + ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_mfc_ctrl,
->> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 1),
->> + ? ? }, {
->> + ? ? ? ? ? ? .name ? ? ? ? ? = SYSMMU_CLOCK_NAME,
->> + ? ? ? ? ? ? .devname ? ? ? ?= SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
->> + ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_mfc_ctrl,
->> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 2),
->> + ? ? }, {
->> + ? ? ? ? ? ? .name ? ? ? ? ? = SYSMMU_CLOCK_NAME,
->> + ? ? ? ? ? ? .devname ? ? ? ?= SYSMMU_CLOCK_DEVNAME(tv, 2),
->> + ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_tv_ctrl,
->> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 4),
->> + ? ? }, {
->> + ? ? ? ? ? ? .name ? ? ? ? ? = SYSMMU_CLOCK_NAME,
->> + ? ? ? ? ? ? .devname ? ? ? ?= SYSMMU_CLOCK_DEVNAME(jpeg, 3),
->> + ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_cam_ctrl,
->> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 11),
->> + ? ? }, {
->> + ? ? ? ? ? ? .name ? ? ? ? ? = SYSMMU_CLOCK_NAME,
->> + ? ? ? ? ? ? .devname ? ? ? ?= SYSMMU_CLOCK_DEVNAME(rot, 4),
->> ? ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_image_ctrl,
->> - ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 5),
->> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 4),
->> ? ? ? }, {
->> - ? ? ? ? ? ? .name ? ? ? ? ? = "SYSMMU_FIMC0",
->> + ? ? ? ? ? ? .name ? ? ? ? ? = SYSMMU_CLOCK_NAME,
->> + ? ? ? ? ? ? .devname ? ? ? ?= SYSMMU_CLOCK_DEVNAME(gsc0, 5),
-> It's exynos4 series clock and don't have gsc name. I don't know LSI
-> decides to use gsc instead of fimc for both exynos4 and exynos5. but
-> there's no name gsc at Spec..
+Hi Stephen,
 
-gsc0 is just a name of the platform device of FIMC0 in Exynos4.
-It is also used for GSclaler0 in Exynos5.
-I wanted to reduce waste of platform device definitions that do not exist
-in an application processor.
+I wouldn't want to put bug.h in arm/boot/compressed/misc.c simply
+because I've built all the arm configs and I don't see this on
+running any of the existing arch/arm/config builds.
 
-If it looks confused, I will find another way.
->> +#define SYSMMU_RESOURCE_NAME(core, ipname) sysmmures_##core##_##ipname
->> +
->> +#define SYSMMU_RESOURCE(core, ipname) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? static struct resource SYSMMU_RESOURCE_NAME(core, ipname)[] __initdata =
->> +
->> +#define DEFINE_SYSMMU_RESOURCE(core, mem, irq) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? DEFINE_RES_MEM_NAMED(core##_PA_SYSMMU_##mem, SZ_4K, #mem), ? ? ?\
->> + ? ? DEFINE_RES_IRQ_NAMED(core##_IRQ_SYSMMU_##irq##_0, #mem)
->> +
->> +#define SYSMMU_RESOURCE_DEFINE(core, ipname, mem, irq) ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? SYSMMU_RESOURCE(core, ipname) { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? ? ? ? ? DEFINE_SYSMMU_RESOURCE(core, mem, irq) ? ? ? ? ? ? ? ? ?\
->> + ? ? }
->>
->> -struct platform_device exynos4_device_sysmmu = {
->> - ? ? .name ? ? ? ? ? = "s5p-sysmmu",
->> - ? ? .id ? ? ? ? ? ? = 32,
->> - ? ? .num_resources ?= ARRAY_SIZE(exynos4_sysmmu_resource),
->> - ? ? .resource ? ? ? = exynos4_sysmmu_resource,
->> +struct sysmmu_resource_map {
->> + ? ? struct platform_device *pdev;
->> + ? ? struct resource *res;
->> + ? ? u32 rnum;
->> + ? ? struct device *pdd;
->> + ? ? char *clocknames;
->> ?};
->> -EXPORT_SYMBOL(exynos4_device_sysmmu);
->>
->> -static struct clk *sysmmu_clk[S5P_SYSMMU_TOTAL_IPNUM];
->> -void sysmmu_clk_init(struct device *dev, sysmmu_ips ips)
->> -{
->> - ? ? sysmmu_clk[ips] = clk_get(dev, sysmmu_ips_name[ips]);
->> - ? ? if (IS_ERR(sysmmu_clk[ips]))
->> - ? ? ? ? ? ? sysmmu_clk[ips] = NULL;
->> - ? ? else
->> - ? ? ? ? ? ? clk_put(sysmmu_clk[ips]);
->> +#define SYSMMU_RESOURCE_MAPPING(core, ipname, resname) { ? ? ? ? ? ? \
->> + ? ? .pdev = &SYSMMU_PLATDEV(ipname), ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? .res = SYSMMU_RESOURCE_NAME(EXYNOS##core, resname), ? ? ? ? ? ? \
->> + ? ? .rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
->> + ? ? .clocknames = SYSMMU_CLOCK_NAME, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> ?}
->>
->> -void sysmmu_clk_enable(sysmmu_ips ips)
->> -{
->> - ? ? if (sysmmu_clk[ips])
->> - ? ? ? ? ? ? clk_enable(sysmmu_clk[ips]);
->> +#define SYSMMU_RESOURCE_MAPPING_MC(core, ipname, resname, pdata) { ? \
->> + ? ? .pdev = &SYSMMU_PLATDEV(ipname), ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? .res = SYSMMU_RESOURCE_NAME(EXYNOS##core, resname), ? ? ? ? ? ? \
->> + ? ? .rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
->> + ? ? .clocknames = SYSMMU_CLOCK_NAME "," SYSMMU_CLOCK_NAME2, ? ? ? ? \
->> +}
->> +
->> +#ifdef CONFIG_EXYNOS_DEV_PD
->> +#define SYSMMU_RESOURCE_MAPPING_PD(core, ipname, resname, pd) { ? ? ? ? ? ? ?\
->> + ? ? .pdev = &SYSMMU_PLATDEV(ipname), ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? .res = &SYSMMU_RESOURCE_NAME(EXYNOS##core, resname), ? ? ? ? ? ?\
->> + ? ? .rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
->> + ? ? .clocknames = SYSMMU_CLOCK_NAME, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? .pdd = &exynos##core##_device_pd[pd].dev, ? ? ? ? ? ? ? ? ? ? ? \
->> +}
->> +
->> +#define SYSMMU_RESOURCE_MAPPING_MCPD(core, ipname, resname, pd, pdata) {\
->> + ? ? .pdev = &SYSMMU_PLATDEV(ipname), ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> + ? ? .res = &SYSMMU_RESOURCE_NAME(EXYNOS##core, resname), ? ? ? ? ? ?\
->> + ? ? .rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
->> + ? ? .clocknames = SYSMMU_CLOCK_NAME "," SYSMMU_CLOCK_NAME2, ? ? ? ? \
->> + ? ? .pdd = &exynos##core##_device_pd[pd].dev, ? ? ? ? ? ? ? ? ? ? ? \
->> ?}
->> +#else
->> +#define SYSMMU_RESOURCE_MAPPING_PD(core, ipname, resname, pd) ? ? ? ? ? ? ? ?\
->> + ? ? ? ? ? ? SYSMMU_RESOURCE_MAPPING(core, ipname, resname)
->> +#define SYSMMU_RESOURCE_MAPPING_MCPD(core, ipname, resname, pd, pdata) ? ? ? \
->> + ? ? ? ? ? ? SYSMMU_RESOURCE_MAPPING_MC(core, ipname, resname, pdata)
->> +
->> +#endif /* CONFIG_EXYNOS_DEV_PD */
->> +
->> +#ifdef CONFIG_ARCH_EXYNOS4
-> Below definitions are almost __initdata. So don't need to use ARCH_EXYNOS4.
-> and another reason is that it can detect the duplicated entry if it's
-> used both exynos4 and exynos5.
+However, if arch/arm/mach-tegra/include/mach/uncompress.h is using
+things from it, then perhaps it needs to include bug.h I think.
 
-True. I agree.
-Thank you.
+Russell is totally correct in saying that uncompress has no business in
+calling/linking generic infrastructure functions, but your error message
+is a use of _BUILD_ bug stuff.  The early init code clearly can't do
+printk or similar, but should still be able to use BUILD_BUG type stuff
+that is meant to blow up on the x-compile host and not the target.  Use
+of BUILD_BUG is different from use of (runtime) BUG.  Does it warrant a
+separate header though?  It could, but I don't think we want to go there.
 
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc0, ? ? ? FIMC0, ?FIMC0);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc1, ? ? ? FIMC1, ?FIMC1);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc2, ? ? ? FIMC2, ?FIMC2);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc3, ? ? ? FIMC3, ?FIMC3);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, jpeg, ? ? ? ?JPEG, ? JPEG);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, 2d, ?G2D, ? ?2D);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, tv, ?TV, ? ? TV_M0);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, 2d_acp, ? ? ?2D_ACP, 2D);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, rot, ROTATOR, ROTATOR);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimd0, ? ? ? FIMD0, ?LCD0_M0);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimd1, ? ? ? FIMD1, ?LCD1_M1);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, flite0, ? ? ?FIMC_LITE0, FIMC_LITE0);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, flite1, ? ? ?FIMC_LITE1, FIMC_LITE1);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, mfc_r, ? ? ? MFC_R, ?MFC_M0);
->> +SYSMMU_RESOURCE_DEFINE(EXYNOS4, mfc_l, ? ? ? MFC_L, ?MFC_M1);
->> +SYSMMU_RESOURCE(EXYNOS4, isp) {
->> + ? ? DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_ISP, FIMC_ISP),
->> + ? ? DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_DRC, FIMC_DRC),
->> + ? ? DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_FD, FIMC_FD),
->> + ? ? DEFINE_SYSMMU_RESOURCE(EXYNOS4, ISPCPU, FIMC_CX),
->> +};
->> +
+The other interesting thing here, is that you see this when the kernel.h
+stops including bug.h -- so that means you've got an implicit presence
+of kernel.h -- which means you can legally (but incorrectly) link to
+things like printk() which simply dont make sense at this early stage of
+boot.  So I have to think that the exclusion of headers like bug.h to
+protect yourself from hurting yourself was already non-functional before
+you start.  The way things are currently requires the author to really
+think about the context they are operating in regardless.
+
+Using BUG in this context is wrong.  Using BUILD_BUG seems OK to me.
+
+Paul.
+--
+
+> 
+> This should probably be squashed into commit a3a3a1a "bug.h: add include
+> of it to various implicit C users".
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/boot/compressed/misc.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> index 8e2a8fc..30055be 100644
+> --- a/arch/arm/boot/compressed/misc.c
+> +++ b/arch/arm/boot/compressed/misc.c
+> @@ -18,6 +18,7 @@
+>  
+>  unsigned int __machine_arch_type;
+>  
+> +#include <linux/bug.h>
+>  #include <linux/compiler.h>	/* for inline */
+>  #include <linux/types.h>
+>  #include <linux/linkage.h>
+> -- 
+> 1.7.0.4
+> 
