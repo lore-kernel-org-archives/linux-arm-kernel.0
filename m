@@ -1,59 +1,77 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Thu, 1 Mar 2012 04:14:26 +0530
-Subject: [PATCH v2 6/9] gpio/omap: fix trigger type to unsigned
+Date: Thu, 1 Mar 2012 04:14:23 +0530
+Subject: [PATCH v2 3/9] gpio/omap: remove suspend_wakeup field from struct
+ gpio_bank
 In-Reply-To: <1330555469-21260-1-git-send-email-tarun.kanti@ti.com>
 References: <1330555469-21260-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1330555469-21260-7-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1330555469-21260-4-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO trigger parameter is of type unsigned.
-enum {
-        IRQ_TYPE_NONE           = 0x00000000,
-        IRQ_TYPE_EDGE_RISING    = 0x00000001,
-        IRQ_TYPE_EDGE_FALLING   = 0x00000002,
-        IRQ_TYPE_EDGE_BOTH      = (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING),
-        IRQ_TYPE_LEVEL_HIGH     = 0x00000004,
-        IRQ_TYPE_LEVEL_LOW      = 0x00000008,
-        IRQ_TYPE_LEVEL_MASK     = (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH),
-        IRQ_TYPE_SENSE_MASK     = 0x0000000f,
-
-        IRQ_TYPE_PROBE          = 0x00000010,
-...
-};
-Even though gpio_irq_type(struct irq_data *d, unsigned type) has the right type
-of parameter, the subsequent called functions set_gpio_triggering() and
-set_gpio_trigger() wrongly makes it signed integer. Fix this.
+Since we already have bank->context.wake_en to keep track
+of gpios which are wakeup enabled, there is no need to have
+this field any more.
 
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ drivers/gpio/gpio-omap.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index de5fe8f..bb994db 100644
+index 895df7f..14c61e2 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -234,7 +234,7 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
- }
+@@ -54,7 +54,6 @@ struct gpio_bank {
+ 	void __iomem *base;
+ 	u16 irq;
+ 	u16 virtual_irq_start;
+-	u32 suspend_wakeup;
+ 	u32 saved_wakeup;
+ 	u32 non_wakeup_gpios;
+ 	u32 enabled_non_wakeup_gpios;
+@@ -500,11 +499,11 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
  
- static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
--						int trigger)
-+						unsigned trigger)
- {
- 	void __iomem *base = bank->base;
- 	u32 gpio_bit = 1 << gpio;
-@@ -316,7 +316,8 @@ static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio)
- static void _toggle_gpio_edge_triggering(struct gpio_bank *bank, int gpio) {}
- #endif
+ 	spin_lock_irqsave(&bank->lock, flags);
+ 	if (enable)
+-		bank->suspend_wakeup |= gpio_bit;
++		bank->context.wake_en |= gpio_bit;
+ 	else
+-		bank->suspend_wakeup &= ~gpio_bit;
++		bank->context.wake_en &= ~gpio_bit;
  
--static int _set_gpio_triggering(struct gpio_bank *bank, int gpio, int trigger)
-+static int _set_gpio_triggering(struct gpio_bank *bank, int gpio,
-+							unsigned trigger)
- {
- 	void __iomem *reg = bank->base;
- 	void __iomem *base = bank->base;
+-	__raw_writel(bank->suspend_wakeup, bank->base + bank->regs->wkup_en);
++	__raw_writel(bank->context.wake_en, bank->base + bank->regs->wkup_en);
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+ 	return 0;
+@@ -776,7 +775,7 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
+ 
+ 	spin_lock_irqsave(&bank->lock, flags);
+ 	bank->saved_wakeup = __raw_readl(mask_reg);
+-	__raw_writel(0xffff & ~bank->suspend_wakeup, mask_reg);
++	__raw_writel(0xffff & ~bank->context.wake_en, mask_reg);
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+ 	return 0;
+@@ -1150,7 +1149,7 @@ static int omap_gpio_suspend(struct device *dev)
+ 	if (!bank->mod_usage || !bank->loses_context)
+ 		return 0;
+ 
+-	if (!bank->regs->wkup_en || !bank->suspend_wakeup)
++	if (!bank->regs->wkup_en || !bank->context.wake_en)
+ 		return 0;
+ 
+ 	wakeup_enable = bank->base + bank->regs->wkup_en;
+@@ -1158,7 +1157,7 @@ static int omap_gpio_suspend(struct device *dev)
+ 	spin_lock_irqsave(&bank->lock, flags);
+ 	bank->saved_wakeup = __raw_readl(wakeup_enable);
+ 	_gpio_rmw(base, bank->regs->wkup_en, 0xffffffff, 0);
+-	_gpio_rmw(base, bank->regs->wkup_en, bank->suspend_wakeup, 1);
++	_gpio_rmw(base, bank->regs->wkup_en, bank->context.wake_en, 1);
+ 	spin_unlock_irqrestore(&bank->lock, flags);
+ 
+ 	return 0;
 -- 
 1.7.0.4
