@@ -1,78 +1,96 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 28 Feb 2012 20:26:44 -0500
-Subject: [PATCH] ARM: boot/compressed/misc.s: Include <linux/bug.h> to
- fix build break
-In-Reply-To: <1330372350-6432-1-git-send-email-swarren@nvidia.com>
-References: <1330372350-6432-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120229012644.GA4265@windriver.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Feb 2012 17:47:19 -0800
+Subject: [PATCH 7/8] ARM: OMAP: Remove plat/io.h by moving it into
+ mach/io.h
+In-Reply-To: <4F4AFCC7.3020509@gmail.com>
+References: <20120221233619.18709.87982.stgit@kaulin.local>
+ <20120221234049.18709.28987.stgit@kaulin.local>
+ <4F4451FB.7070007@gmail.com> <20120224000657.GJ18185@atomide.com>
+ <20120224182246.GL18185@atomide.com> <4F4AFCC7.3020509@gmail.com>
+Message-ID: <20120229014719.GK18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[[PATCH] ARM: boot/compressed/misc.s: Include <linux/bug.h> to fix build break] On 27/02/2012 (Mon 12:52) Stephen Warren wrote:
-
-> Commmit cf86c17 "kernel.h: doesn't explicitly use bug.h, so don't include
-> it." caused the following build failure on ARM:
+* Rob Herring <robherring2@gmail.com> [120226 19:15]:
+> On 02/24/2012 12:22 PM, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [120223 15:36]:
+> >> * Rob Herring <robherring2@gmail.com> [120221 17:53]:
+> >>> On 02/21/2012 05:40 PM, Tony Lindgren wrote:
+> >>>> +
+> >>>> +/*
+> >>>> + * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+> >>>> + */
+> >>>> +
+> >>>> +extern u8 omap_readb(u32 pa);
+> >>>> +extern u16 omap_readw(u32 pa);
+> >>>> +extern u32 omap_readl(u32 pa);
+> >>>> +extern void omap_writeb(u8 v, u32 pa);
+> >>>> +extern void omap_writew(u16 v, u32 pa);
+> >>>> +extern void omap_writel(u32 v, u32 pa);
+> >>>
+> >>> These can't be moved to common.h like omap2?
+> >>
+> >> Not for omap1 currently because a bunch of legacy drivers are
+> >> using them :(
+> > 
+> > Looks like we can have them in mach-omap1/include/mach/hardware.h.
+> > 
+> > Eventually the SoC specific hardware.h files could be renamed to
+> > just something like omap1.h, omap2plus.h and so. And then they
+> > could be included in the common hardware.h.
+> > 
+> > Updated patch below, now io.h for both omap1 and omap2+ are
+> > minimized, and turns out only minimal driver changes were needed.
+> > 
 > 
->   CC      arch/arm/boot/compressed/misc.o
-> In file included from arch/arm/boot/compressed/misc.c:28:0:
-> arch/arm/mach-tegra/include/mach/uncompress.h: In function 'arch_decomp_setup':
-> arch/arm/mach-tegra/include/mach/uncompress.h:125:2: error: implicit declaration of function 'BUILD_BUG_ON_ZERO' [-Werror=implicit-function-declaration]
-> cc2: some warnings being treated as errors
-> 
-> Include <linux/bug.h> to fix that.
+> Looks good to me. Do you have a branch for this that I can base on?
 
-Hi Stephen,
+Yes it's now in iomap branch that merged into my cleanup branch that
+I'll ask Arnd and Olof to pull tomorrow.
 
-I wouldn't want to put bug.h in arm/boot/compressed/misc.c simply
-because I've built all the arm configs and I don't see this on
-running any of the existing arch/arm/config builds.
+So take your pick out of the following two:
 
-However, if arch/arm/mach-tegra/include/mach/uncompress.h is using
-things from it, then perhaps it needs to include bug.h I think.
+1. iomap branch based on v3.3-rc4 that you probably want to use
 
-Russell is totally correct in saying that uncompress has no business in
-calling/linking generic infrastructure functions, but your error message
-is a use of _BUILD_ bug stuff.  The early init code clearly can't do
-printk or similar, but should still be able to use BUILD_BUG type stuff
-that is meant to blow up on the x-compile host and not the target.  Use
-of BUILD_BUG is different from use of (runtime) BUG.  Does it warrant a
-separate header though?  It could, but I don't think we want to go there.
+   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap iomap
 
-The other interesting thing here, is that you see this when the kernel.h
-stops including bug.h -- so that means you've got an implicit presence
-of kernel.h -- which means you can legally (but incorrectly) link to
-things like printk() which simply dont make sense at this early stage of
-boot.  So I have to think that the exclusion of headers like bug.h to
-protect yourself from hurting yourself was already non-functional before
-you start.  The way things are currently requires the author to really
-think about the context they are operating in regardless.
 
-Using BUG in this context is wrong.  Using BUILD_BUG seems OK to me.
+2. cleanup branch based on RMK's commit 61b80086a525c8a6081257ae40da5dee2bcaee16
+   (Merge branch 'entry-macro-cleanup' of git://sources.calxeda.com/kernel/linux into for-armsoc)
 
-Paul.
---
+   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap cleanup
 
-> 
-> This should probably be squashed into commit a3a3a1a "bug.h: add include
-> of it to various implicit C users".
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/arm/boot/compressed/misc.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-> index 8e2a8fc..30055be 100644
-> --- a/arch/arm/boot/compressed/misc.c
-> +++ b/arch/arm/boot/compressed/misc.c
-> @@ -18,6 +18,7 @@
->  
->  unsigned int __machine_arch_type;
->  
-> +#include <linux/bug.h>
->  #include <linux/compiler.h>	/* for inline */
->  #include <linux/types.h>
->  #include <linux/linkage.h>
-> -- 
-> 1.7.0.4
-> 
+
+BTW, I noticed the following fix is needed for some .configs that
+I found with randconfig builds, that's only in the cleanup branch
+as I already merged in iomap and pushed it out. Should not affect
+your patches though.
+
+Regards,
+
+Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 28 Feb 2012 17:28:09 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix L4_EMU_34XX_BASE error after iomap changes
+
+With the introduction of iomap changes platform init code
+fails for emu.c if CONFIG_OMAP3_EMU is selected:
+
+arch/arm/mach-omap2/emu.c:35:8: error:
+'L4_EMU_34XX_BASE' undeclared here (not in a function)
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/emu.c
++++ b/arch/arm/mach-omap2/emu.c
+@@ -21,6 +21,8 @@
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ 
++#include <mach/hardware.h>
++
+ #include "iomap.h"
+ 
+ MODULE_LICENSE("GPL");
