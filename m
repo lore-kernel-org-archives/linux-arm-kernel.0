@@ -1,70 +1,44 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu,  1 Mar 2012 00:29:44 +0100
-Subject: [PATCH 04/13] ARM: OMAP3+: SmartReflex: Add a shutdown hook
-In-Reply-To: <1330554829-11347-5-git-send-email-j-pihet@ti.com>
-References: <1330554829-11347-5-git-send-email-j-pihet@ti.com>
-Message-ID: <1330558184-11734-1-git-send-email-j-pihet@ti.com>
+Date: Thu, 1 Mar 2012 00:33:32 +0100
+Subject: [PATCH 04/14] ARM: OMAP3+: SmartReflex: Add a shutdown hook
+In-Reply-To: <878vjlfr8z.fsf@ti.com>
+References: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
+ <1328723039-15952-5-git-send-email-j-pihet@ti.com>
+ <87d38yk2e1.fsf@ti.com>
+ <CAOMWX4dbufbEJpr0nTmwTHR1xz9diMBbO=khKxvMZLWrKesJRw@mail.gmail.com>
+ <878vjlfr8z.fsf@ti.com>
+Message-ID: <CAORVsuVG-wovojojETMuPrvaFvL-fb0-t6Je+jJ8CUFn-95wig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+On Wed, Feb 29, 2012 at 7:07 PM, Kevin Hilman <khilman@ti.com> wrote:
+> "Menon, Nishanth" <nm@ti.com> writes:
+>
+>> On Tue, Feb 28, 2012 at 16:40, Kevin Hilman <khilman@ti.com> wrote:
+>>> Jean Pihet <jean.pihet@newoldbits.com> writes:
+>>>
+>>>> From: Nishanth Menon <nm@ti.com>
+>>>>
+>>>> SmartReflex fix for erratum ID i724.
+>>>>
+>>>> Since OMAP's VP and PRM modules do not get reset by warm reset,
+>>>> we should ensure that proper shutdown procedure is followed prior
+>>>> to allowing the kernel to reboot back up.
+>>>
+>>> prior to reboot? ?how?
+>>>
+>>> This patch only ensures a proper shutdown if the kernel goes down
+>>> cleanly.
+>>>
+>>> How is this handled on reboot?
+>> There is no known solution for watchdog resets(part of the errata WA
+>> limitation) :( - the best we could do was to make shutdown path safe -
+>> this includes s/w (userspace triggered) reboots.
+>
+> OK, then the changelog needs an update to reflect that.
+Just resent patch 04/13 with the update changelog.
 
-SmartReflex fix for erratum ID i724.
+>
+> Kevin
 
-Since OMAP's VP and PRM modules do not get reset by warm reset,
-we should ensure that proper shutdown procedure is followed prior
-to allowing the kernel to reboot back up.
-
-Without this, Smartreflex module might be left active or
-system might be caught in an indeterminate sequence when
-software controlled reboot is triggered, leaving the next
-reboot behavior to be unpredictable.
-
-In the case of hardware controlled warm reset such as that
-by watchdog timer, prevention of this scenario is not possible.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/smartreflex.c |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index ec2b0e7..9c39484 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -1055,8 +1055,32 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static void __devexit omap_sr_shutdown(struct platform_device *pdev)
-+{
-+	struct omap_sr_data *pdata = pdev->dev.platform_data;
-+	struct omap_sr *sr_info;
-+
-+	if (!pdata) {
-+		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
-+		return;
-+	}
-+
-+	sr_info = _sr_lookup(pdata->voltdm);
-+	if (IS_ERR(sr_info)) {
-+		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
-+			__func__);
-+		return;
-+	}
-+
-+	if (sr_info->autocomp_active)
-+		sr_stop_vddautocomp(sr_info);
-+
-+	return;
-+}
-+
- static struct platform_driver smartreflex_driver = {
- 	.remove         = omap_sr_remove,
-+	.shutdown	= __devexit_p(omap_sr_shutdown),
- 	.driver		= {
- 		.name	= "smartreflex",
- 	},
--- 
-1.7.5.4
+Jean
