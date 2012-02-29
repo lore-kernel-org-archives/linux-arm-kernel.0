@@ -1,56 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Feb 2012 18:52:37 +0000
-Subject: [PATCH] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
- platforms
-In-Reply-To: <20120224181621.GH22562@n2100.arm.linux.org.uk>
-References: <20120220194634.GK26840@n2100.arm.linux.org.uk>
- <201202210124.23028.paul@codesourcery.com>
- <20120221083612.GG22562@n2100.arm.linux.org.uk>
- <20120221100041.GA19696@mudshark.cambridge.arm.com>
- <20120221101052.GH22562@n2100.arm.linux.org.uk>
- <20120221105250.GC19696@mudshark.cambridge.arm.com>
- <20120221113548.GK22562@n2100.arm.linux.org.uk>
- <20120221132216.GJ19696@mudshark.cambridge.arm.com>
- <20120224143655.GH13504@mudshark.cambridge.arm.com>
- <20120224181621.GH22562@n2100.arm.linux.org.uk>
-Message-ID: <20120229185237.GO2983@mudshark.cambridge.arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 29 Feb 2012 19:50:13 +0100
+Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
+ kernel_noload
+In-Reply-To: <4F4E6F96.8080907@am.sony.com>
+References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
+ <20120229122942.GF3318@game.jcrosoft.org>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF206A@HQMAIL01.nvidia.com>
+ <20120229181430.GI3318@game.jcrosoft.org>
+ <4F4E6F96.8080907@am.sony.com>
+Message-ID: <20120229185013.GJ3318@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Fri, Feb 24, 2012 at 06:16:21PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 24, 2012 at 02:36:55PM +0000, Will Deacon wrote:
-> > It seems as though my ptrace patch makes *no difference* because these
-> > tools don't even use the PT_ADDR_TEXT etc magic offsets! As a result,
-> > trying to set a breakpoint by symbol fails miserably because it tries to
-> > poke the symbol offset directly, without adding on the base address of the
-> > text.
+On 10:33 Wed 29 Feb     , Tim Bird wrote:
+> On 02/29/2012 10:14 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 08:58 Wed 29 Feb     , Stephen Warren wrote:
+> >> Jean-Christophe PLAGNIOL-VILLARD wrote at Wednesday, February 29, 2012 5:30 AM:
+> >>> On 17:03 Tue 28 Feb     , Stephen Warren wrote:
+> >>>> uImage files typically encode a single absolute load and entry address.
+> >>>> This is inconvenient when attempting to share that uImage across multiple
+> >>>> SoCs with different physical RAM addresses. Recent versions of mkimage
+> >>>> implement a "kernel_noload" image type which encodes no absolute load
+> >>>> address, and a relative entry address. This works well for uImage-wrapped
+> >>>> ARM zImages, since they are relocatable.
+> >>>>
+> >>>> This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
+> >>>> "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
+> >>>>
+> >>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> >>>> ---
+> >>>> I assume I should put this into the ARM patch tracker if it's OK?
+> >>>
+> >>> Again a new option for uImage no why not just boot the zImage
+> >>>
+> >>> in this case the uImage is useless
+> >>
+> >> U-Boot doesn't support zImage at present.
+> >>
+> >> A patch was posted to support it at least for ARM, but needed a little
+> >> work before it could be committed.
+> > Sorry I see no advantage to have the uImage build by the kernel anymore as
+> > we have a relocatable zImage
 > > 
-> > Are there any tools available that use these magic numbers or are mine just
-> > too old? Given that the whole thing dies after a while with:
-> > 
-> > [  909.062821] [430] gdbserver: obsolete system call 02b37558.
-> > 
-> > I'm not entirely convinced by the stability of what I'm using (that syscall
-> > number looks like an address to me).
+> > I'll even drop its support
 > 
-> That suggests that this stuff definitely hasn't been tested, and there's
-> no users of it (if there were I'm sure someone - either gdb folk or
-> some kernel people) would've seen a bug report.
+> This seems at least premature, and possibly ill-advised in general.
+> There are lots of U-Boot images out in the field, many of which that
+> are rarely updated. A lot of workflow will be disrupted unnecessarily
+> by a change like this.
+> 
+> Could you wait to drop uImage build support in the kernel until
+> U-Boot supports zImage, and has worked it's way into the field
+> for a few years?
+I'm fine to keep for now on but not to add new feature
 
-My glancing at the latest GDB sources does suggest that this stuff ought to
-be getting used, so I should probably try building a nommu configuration
-from a more recent codebase. It seems that you're right that nobody is using
-this stuff though.
+Barebox (former U-Boot v2) support zImage for quite a while and
+relocable one for too.
 
-> Therefore, I propose that we remove this code from the kernel unless
-> there's someone out there who can positively test this stuff as definitely
-> working.
-
-I started looking at nommu recently and I've got a few fixes for the kernel
-(I'll post them once it's all tidied up). Let's leave this in until I've
-either (a) validated that recent GDB builds work or (b) lost the will to
-live and come crawling back to my beloved MMU.
-
-Will
+Best Regards,
+J.
+>  -- Tim
+> 
+> =============================
+> Tim Bird
+> Architecture Group Chair, CE Workgroup of the Linux Foundation
+> Senior Staff Engineer, Sony Network Entertainment
+> =============================
+> 
