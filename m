@@ -1,73 +1,41 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 29 Feb 2012 22:13:31 +0900
-Subject: [PATCH 1/2] ARM: EXYNOS: Add EHCI AHB burst function
-In-Reply-To: <CAJuYYwTW6rBiSJdeFYMui96t6nszjADW4t+14XakRkc=_4DbBA@mail.gmail.com>
-References: <1330519283-4722-1-git-send-email-sangwook.lee@linaro.org>
- <1330519283-4722-2-git-send-email-sangwook.lee@linaro.org>
- <CAJuYYwTW6rBiSJdeFYMui96t6nszjADW4t+14XakRkc=_4DbBA@mail.gmail.com>
-Message-ID: <000101ccf6e3$ef27bdf0$cd7739d0$%han@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Feb 2012 13:14:35 +0000
+Subject: [GIT PULL] ux500 patches for v3.4 take 2
+In-Reply-To: <CACRpkdbr5X8KLiragbpk0VH5s+uo5T3C+e6AsNHk+x6s80YJ4w@mail.gmail.com>
+References: <1330099642-6265-1-git-send-email-linus.walleij@linaro.org>
+ <201202270902.29490.arnd@arndb.de>
+ <CACRpkdbr5X8KLiragbpk0VH5s+uo5T3C+e6AsNHk+x6s80YJ4w@mail.gmail.com>
+Message-ID: <201202291314.36196.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 29 February 2012, Linus Walleij wrote:
+> On Mon, Feb 27, 2012 at 10:02 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 27 February 2012, Linus Walleij wrote:
+> >> On Fri, Feb 24, 2012 at 5:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Friday 24 February 2012, Linus Walleij wrote:
+> >> >> are available in the git repository at:
+> >> >>   / ..BRANCH.NOT.VERIFIED..
+> >> >
+> >> > Something wrong on your end apparently.
+> >>
+> >> Hm :-( I'll check it by pulling it back myself next time.
+> >
+> > git request-pull checks this already, you just have to make sure that the right
+> > branch or tag shows up in the pull URL.
+> 
+> Hm I think we simply hit "propagated to some mirrors but not all"
+> so I saw the branch on my mirror but it wasn't yet up on yours :-/
 
-Hi,
-> -----Original Message-----
-> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
-> Sent: Wednesday, February 29, 2012 10:02 PM
-> To: Sangwook Lee
-> Cc: linux-samsung-soc at vger.kernel.org; linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> ben-linux at fluff.org; gregkh at suse.de; kgene.kim at samsung.com; stern at rowland.harvard.edu;
-> jg1.han at samsung.com; jy0922.shim at samsung.com; patches at linaro.org; linaro-dev at lists.linaro.org;
-> linux at arm.linux.org.uk
-> Subject: Re: [PATCH 1/2] ARM: EXYNOS: Add EHCI AHB burst function
-> 
-> Hi Sangwook,
-> 
-> On 29 February 2012 18:11, Sangwook Lee <sangwook.lee@linaro.org> wrote:
-> > Enable burst transfer from AHB for EHCI.
-> > This fixes data transfer of USB Ethernet with EHCI.
-> > Without this patch, scp hardly works.
-> >
-> > Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
-> > ---
-> > ?arch/arm/mach-exynos/setup-usb-phy.c ? ? ?| ? ?6 ++++++
-> > ?arch/arm/plat-samsung/devs.c ? ? ? ? ? ? ?| ? ?2 ++
-> > ?arch/arm/plat-samsung/include/plat/ehci.h | ? 19 +++++++++++++++++++
-> > ?3 files changed, 27 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
-> > index 41743d2..5a20460 100644
-> > --- a/arch/arm/mach-exynos/setup-usb-phy.c
-> > +++ b/arch/arm/mach-exynos/setup-usb-phy.c
-> > @@ -18,6 +18,7 @@
-> > ?#include <mach/regs-usb-phy.h>
-> > ?#include <plat/cpu.h>
-> > ?#include <plat/usb-phy.h>
-> > +#include <plat/ehci.h>
-> >
-> > ?static atomic_t host_usage;
-> >
-> > @@ -149,3 +150,8 @@ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
-> >
-> > ? ? ? ?return -EINVAL;
-> > ?}
-> > +
-> > +void s5p_ehci_burst_enable(struct platform_device *pdev, void __iomem *base)
-> > +{
-> > + ? ? ? writel(EHCI_INSNREG00_ENABLE_BURST, base + EHCI_INSNREG00);
-> > +}
-> 
-> This functionality can be added in ehci-s5p itself and avoid adding a
-> new platform callback in platform data. If this is specific to exynos,
-> driver data could be added in ehci-s5p to indicate platforms that need
-> this to be enabled.
+I'm not convinced we're talking about the same thing here. I'm pretty sure
+it was visible on my mirror, but not on yours, hence the
+'..BRANCH.NOT.VERIFIED..'.
 
-I agree with Thomas's opinion.
-Sangwook, please don't call s5p_ehci_burst_enable using platform callback.
-It can be added to ehci-s5p itself.
+As I said, git request-pull will look at the remote to figure out which
+branch name to put into the text, but it could not find the commit id on
+the server when you ran it.
+I could of course try to guess which branch you want me to pull, but
+I'd rather hear it from you ;-)
 
-> 
-> Thanks,
-> Thomas.
-> 
-> [...]
+
+	Arnd
