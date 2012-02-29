@@ -1,33 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Feb 2012 19:28:49 +0000
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Feb 2012 20:43:56 +0100
 Subject: [PATCH] ARM: ux500: solve some Kconfig mess
-In-Reply-To: <1330536509-13590-1-git-send-email-linus.walleij@stericsson.com>
+In-Reply-To: <201202291928.49516.arnd@arndb.de>
 References: <1330536509-13590-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201202291928.49516.arnd@arndb.de>
+ <201202291928.49516.arnd@arndb.de>
+Message-ID: <CACRpkdaqdmB0_Z9FYC97FWZ2+RBSMfErUa62y0icqSOqAo8o1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 February 2012, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> First rename the config option MACH_U8500 to MACH_MOP500
-> because that is what it's obviously all about, this has
-> confused me for the last time. Fix some whitespace in the
-> process.
-> 
-> Since the machine descriptors for HREFv60 and snowball
-> are clearly in the file board-mop500.c which only
-> compiles if MACH_MOP500 (former MACH_U8500) is set,
-> select this for the board variants and nothing else.
-> 
-> For the MOP500 variants the UIB (user interface board)
-> is probed using I2C so select I2C and I2C_NOMADIK so
-> we know that this probe will always be successful.
+On Wed, Feb 29, 2012 at 8:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Looks good to me. One thing I still wonder about is whether
-we should leave the UX500_SOC_DB5500 and UX500_SOC_DB8500
-options user-visible. It would probably be simpler to just
-select these whenever a board using them is enabled.
+> Looks good to me. One thing I still wonder about is whether
+> we should leave the UX500_SOC_DB5500 and UX500_SOC_DB8500
+> options user-visible. It would probably be simpler to just
+> select these whenever a board using them is enabled.
+
+They are invisible to me atleast?
+
+config UX500_SOC_DB5500
+        bool
+        select MFD_DB5500_PRCMU
+
+config UX500_SOC_DB8500
+        bool
+        select MFD_DB8500_PRCMU
+        select REGULATOR_DB8500_PRCMU
+        select CPU_FREQ_TABLE if CPU_FREQ
 
 
-	Arnd
+Yours,
+Linus Walleij
