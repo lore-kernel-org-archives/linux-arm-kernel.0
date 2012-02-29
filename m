@@ -1,71 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Feb 2012 23:21:54 +0000
-Subject: [PATCH v2 19/28] ARM: Add fixed PCI i/o mapping
-In-Reply-To: <201202292243.13923.arnd@arndb.de>
-References: <1330547147-22867-1-git-send-email-robherring2@gmail.com>
- <201202292153.03056.arnd@arndb.de> <4F4EA694.5060003@gmail.com>
- <201202292243.13923.arnd@arndb.de>
-Message-ID: <20120229232154.GG16999@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 29 Feb 2012 17:59:27 -0600
+Subject: [PATCH 7/8] ARM: OMAP: Remove plat/io.h by moving it into
+ mach/io.h
+In-Reply-To: <20120229014719.GK18901@atomide.com>
+References: <20120221233619.18709.87982.stgit@kaulin.local>
+ <20120221234049.18709.28987.stgit@kaulin.local> <4F4451FB.7070007@gmail.com>
+ <20120224000657.GJ18185@atomide.com> <20120224182246.GL18185@atomide.com>
+ <4F4AFCC7.3020509@gmail.com> <20120229014719.GK18901@atomide.com>
+Message-ID: <4F4EBBDF.9090806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 10:43:13PM +0000, Arnd Bergmann wrote:
-> On Wednesday 29 February 2012, Rob Herring wrote:
-> > No, then the mapping will fail. I do need to double check all the
-> > mappings and make sure there is no overlap but we only care on the PCI
-> > platforms I converted.
-> > 
-> > Also, it should be noted this shrinks the i/o space on some platforms.
-> > dove and kirkwood had 1MB x 2 buses and now have 64KB per bus. ixp2000 I
-> > think has 32MB with a note saying they need "a lot". Is there really a
-> > use for lots of i/o space?
+On 02/28/2012 07:47 PM, Tony Lindgren wrote:
+> * Rob Herring <robherring2@gmail.com> [120226 19:15]:
+>> On 02/24/2012 12:22 PM, Tony Lindgren wrote:
+>>> * Tony Lindgren <tony@atomide.com> [120223 15:36]:
+>>>> * Rob Herring <robherring2@gmail.com> [120221 17:53]:
+>>>>> On 02/21/2012 05:40 PM, Tony Lindgren wrote:
+>>>>>> +
+>>>>>> +/*
+>>>>>> + * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+>>>>>> + */
+>>>>>> +
+>>>>>> +extern u8 omap_readb(u32 pa);
+>>>>>> +extern u16 omap_readw(u32 pa);
+>>>>>> +extern u32 omap_readl(u32 pa);
+>>>>>> +extern void omap_writeb(u8 v, u32 pa);
+>>>>>> +extern void omap_writew(u16 v, u32 pa);
+>>>>>> +extern void omap_writel(u32 v, u32 pa);
+>>>>>
+>>>>> These can't be moved to common.h like omap2?
+>>>>
+>>>> Not for omap1 currently because a bunch of legacy drivers are
+>>>> using them :(
+>>>
+>>> Looks like we can have them in mach-omap1/include/mach/hardware.h.
+>>>
+>>> Eventually the SoC specific hardware.h files could be renamed to
+>>> just something like omap1.h, omap2plus.h and so. And then they
+>>> could be included in the common hardware.h.
+>>>
+>>> Updated patch below, now io.h for both omap1 and omap2+ are
+>>> minimized, and turns out only minimal driver changes were needed.
+>>>
+>>
+>> Looks good to me. Do you have a branch for this that I can base on?
 > 
-> Given that each PCI bus only wires up the lower 64k, I'd say no ;-)
+> Yes it's now in iomap branch that merged into my cleanup branch that
+> I'll ask Arnd and Olof to pull tomorrow.
+> 
+> So take your pick out of the following two:
+> 
+> 1. iomap branch based on v3.3-rc4 that you probably want to use
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap iomap
+> 
+> 
+> 2. cleanup branch based on RMK's commit 61b80086a525c8a6081257ae40da5dee2bcaee16
+>    (Merge branch 'entry-macro-cleanup' of git://sources.calxeda.com/kernel/linux into for-armsoc)
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap cleanup
+> 
+> 
+> BTW, I noticed the following fix is needed for some .configs that
+> I found with randconfig builds, that's only in the cleanup branch
+> as I already merged in iomap and pushed it out. Should not affect
+> your patches though.
+> 
 
-That's incorrect.  There's no "wires up" option there.  Addresses and
-data are transferred over a common set of 32 wires on 32-bit PCI, and
-the bus has separate 'address' and 'data' phases.  If you only wire up
-16 of those lines, then things aren't going to work (because you won't
-be able to access bytes 2,3 of each word.)
+BTW, all these includes need to get removed. I'll add a fix to my series
+unless you already have fixes:
 
-However, there's a separate issue here:
-(1) do peripherals decode the upper 16 bits programmed into their IO BARs?
-    Some do.
-(2) are host PCI controllers capable of generating IO accesses in the
-    lower 64k bus address region?
+arch/arm/mach-omap1/sleep.S:#include <mach/io.h>
+arch/arm/mach-omap1/sram.S:#include <mach/io.h>
+arch/arm/plat-omap/include/plat/sdrc.h:#include <mach/io.h>
+drivers/media/video/davinci/vpbe_osd.c:#include <mach/io.h>
+drivers/media/video/davinci/vpbe_venc.c:#include <mach/io.h>
+drivers/video/omap2/vrfb.c:#include <mach/io.h>
 
-I think while I was fiddling with an IOP platform years ago that it did
-not work with PCI setup to only use the lower 64k bus address region
-for IO accesses.  So I'd suggest a certain amount of care is required
-here.
+Rob
 
-> My guess is that they used 1MB ranges in order to benefit from section
-> mapping. In case of ixp2000, I only see 64k in the resource:
+> Regards,
 > 
-> static struct resource ixp2000_pci_io_space = {
->         .start  = 0x00010000,
->         .end    = 0x0001ffff,
->         .flags  = IORESOURCE_IO,
->         .name   = "PCI I/O Space"
-> };
+> Tony
 > 
-> The part that I don't understand here is why the resource starts at
-> 64k and is another 64k in size. I think we need to double-check this
-> in order to be sure whether we have to put the pci io space into the
-> first or the second 64k chunk of the new mapping area.
 > 
-> Hmm, I guess you meant ixp23xx, not ixp2000, which indeed has
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Tue, 28 Feb 2012 17:28:09 -0800
+> Subject: [PATCH] ARM: OMAP2+: Fix L4_EMU_34XX_BASE error after iomap changes
 > 
-> static struct resource ixp23xx_pci_io_space = {
->         .start  = 0x00000100,
->         .end    = 0x01ffffff,
->         .flags  = IORESOURCE_IO,
->         .name   = "PCI I/O Space"
-> };
+> With the introduction of iomap changes platform init code
+> fails for emu.c if CONFIG_OMAP3_EMU is selected:
 > 
-> This seems to be done just for simplicity in the implementation,
-> to keep all parts of the PCI controller 32MB aligned, I can't
-> see any real technical reason why it would be useful othewise.
-
-It's certainly a weird way to avoid ISA addresses.  Note that these
-will control the set of bus addresses which get assigned within PCI.
+> arch/arm/mach-omap2/emu.c:35:8: error:
+> 'L4_EMU_34XX_BASE' undeclared here (not in a function)
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> --- a/arch/arm/mach-omap2/emu.c
+> +++ b/arch/arm/mach-omap2/emu.c
+> @@ -21,6 +21,8 @@
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+>  
+> +#include <mach/hardware.h>
+> +
+>  #include "iomap.h"
+>  
+>  MODULE_LICENSE("GPL");
