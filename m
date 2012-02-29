@@ -1,77 +1,31 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 29 Feb 2012 17:25:06 +0200
-Subject: [PATCHv3 4/4] ARM: OMAP3+: add prcm chain interrupts to the interrupt
- list
-In-Reply-To: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
-References: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1330529106-10423-5-git-send-email-t-kristo@ti.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 29 Feb 2012 20:54:06 +0530
+Subject: [PATCHv3] ARM: add jump label support
+In-Reply-To: <1329325244-16289-1-git-send-email-rabin@rab.in>
+References: <1327757725-10114-7-git-send-email-rabin@rab.in>
+ <1329325244-16289-1-git-send-email-rabin@rab.in>
+Message-ID: <20120229152320.GA6337@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently PRCM chain handler for OMAP4 requires SPARSE_IRQ to be enabled
-from kernel config, however enabling this option breaks the OMAP kernel
-completely and it can't be used. Thus, OMAP_PRCM_IRQ_BASE was added
-to the end of the irq list, and the prm_common code was changed to use
-this instead of irq_desc allocation scheme.
+On Wed, Feb 15, 2012 at 10:30:44PM +0530, Rabin Vincent wrote:
+> Add the arch-specific code to support jump labels for ARM and Thumb-2.
+> 
+> This code will only be activated on compilers that are capable of
+> building it.  It has been tested with GCC 4.6 patched with the patch
+> from GCC bug 48637.
+> 
+> Cc: Jason Baron <jbaron@redhat.com>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+...
+> +static __always_inline bool arch_static_branch(struct jump_label_key *key)
 
-Once SPARSE_IRQ is enabled for OMAP kernel, this patch can be reverted.
+Hmm, there's now a patch in linux-next ("static keys: Introduce 'struct
+static_key', static_key_true()/false() and static_key_slow_[inc|dec]()")
+via the -tip tree which would cause this not to build anymore since
+struct jump_label_key was renamed to struct static_key.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/prm_common.c       |   14 +-------------
- arch/arm/plat-omap/include/plat/irqs.h |    6 +++++-
- 2 files changed, 6 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 860118a..9ca829f 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -196,11 +196,6 @@ void omap_prcm_irq_cleanup(void)
- 	prcm_irq_setup->priority_mask = NULL;
- 
- 	irq_set_chained_handler(prcm_irq_setup->irq, NULL);
--
--	if (prcm_irq_setup->base_irq > 0)
--		irq_free_descs(prcm_irq_setup->base_irq,
--			prcm_irq_setup->nr_regs * 32);
--	prcm_irq_setup->base_irq = 0;
- }
- 
- void omap_prcm_irq_prepare(void)
-@@ -282,14 +277,7 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
- 
- 	irq_set_chained_handler(irq_setup->irq, omap_prcm_irq_handler);
- 
--	irq_setup->base_irq = irq_alloc_descs(-1, 0, irq_setup->nr_regs * 32,
--		0);
--
--	if (irq_setup->base_irq < 0) {
--		pr_err("PRCM: failed to allocate irq descs: %d\n",
--			irq_setup->base_irq);
--		goto err;
--	}
-+	irq_setup->base_irq = OMAP_PRCM_IRQ_BASE;
- 
- 	for (i = 0; i <= irq_setup->nr_regs; i++) {
- 		gc = irq_alloc_generic_chip("PRCM", 1,
-diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
-index 2efd645..fe1be1d 100644
---- a/arch/arm/plat-omap/include/plat/irqs.h
-+++ b/arch/arm/plat-omap/include/plat/irqs.h
-@@ -428,8 +428,12 @@
- #define OMAP_GPMC_NR_IRQS	8
- #define OMAP_GPMC_IRQ_END	(OMAP_GPMC_IRQ_BASE + OMAP_GPMC_NR_IRQS)
- 
-+/* PRCM chain handler */
-+#define OMAP_PRCM_IRQ_BASE	(OMAP_GPMC_IRQ_END)
-+#define OMAP_PRCM_NR_IRQS	64
-+#define OMAP_PRCM_IRQ_END	(OMAP_PRCM_IRQ_BASE + OMAP_PRCM_NR_IRQS)
- 
--#define NR_IRQS			OMAP_GPMC_IRQ_END
-+#define NR_IRQS			OMAP_PRCM_IRQ_END
- 
- #define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
- 
--- 
-1.7.4.1
+I'm not sure how this could be handled to keep this compiling both in
+the arm tree separately and in linux-next.  I guess the easiest is to
+delay this until the next cycle, since it's not applied yet.
