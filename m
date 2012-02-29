@@ -1,31 +1,108 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 29 Feb 2012 14:53:05 +0200
-Subject: iMX53 quick start board and SD/MMC
-In-Reply-To: <4F4E1E00.6070406@linuxtv.org>
-References: <4F4E119D.7020104@linuxtv.org>
- <20120229122217.GC4649@sapphire.tkos.co.il>
- <4F4E1E00.6070406@linuxtv.org>
-Message-ID: <20120229125305.GD4649@sapphire.tkos.co.il>
+From: joancarles@fqingenieria.es (joancarles at fqingenieria.es)
+Date: Wed, 29 Feb 2012 13:55:25 +0100 (CET)
+Subject: [MX25][MMC] mmc esdhc failure in 3.3-rc5
+Message-ID: <7243.46.253.46.24.1330520125.squirrel@mail.fqingenieria.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael
+Hi
 
-On Wed, Feb 29, 2012 at 01:45:52PM +0100, Michael Hunold wrote:
-> on 29.02.2012 13:22 Baruch Siach said the following:
-> > You should probably consider using imx_v6_v7_defconfig, since i.MX53 is based 
-> > on ARMv7.
-> 
-> thank you very much. That was a hint in the right direction.
-> 
-> I had to choose "mx5_defconfig" instead.
+I have the following error when trying to access the SD-card on my MX25
+device:
 
-Note that mx5_defconfig is removed since commit 3f07f3557 (ARM i.MX: Update 
-defconfig), which is present in v3.3-rc2.
+root at mx25-noah:~$> mount /media/card/
+root at mx25-noah:~$> df -kh /media/card
+Filesystem                Size      Used Available Use% Mounted on
+/dev/mmcblk0p1          123.6M      2.7M    120.9M   2% /media/card
+root at mx25-noah:~$> touch /media/card/file
+[   82.982920] mmcblk0: error -110 transferring data, sector 559, nr 1,
+cmd response 0x900, card status 0x0
+[   82.993544] end_request: I/O error, dev mmcblk0, sector 559
+[   82.999169] Buffer I/O error on device mmcblk0p1, logical block 497
+[   83.005458] lost page write due to I/O error on mmcblk0p1
+[   83.013922] mmcblk0: error -84 transferring data, sector 559, nr 1, cmd
+response 0x900, card status 0x0
+[   83.024114] end_request: I/O error, dev mmcblk0, sector 559
+[   83.029965] FAT-fs (mmcblk0p1): Directory bread(block 497) failed
+[   83.038051] mmcblk0: error -84 transferring data, sector 560, nr 1, cmd
+response 0x900, card status 0x0
+[   83.048579] end_request: I/O error, dev mmcblk0, sector 560
+[   83.054205] Buffer I/O error on device mmcblk0p1, logical block 498
+[   83.060494] lost page write due to I/O error on mmcblk0p1
+touch: /media/card/file: Input/output error
 
-baruch
+I have compiled the kernel 3.3-rc5 with driver core debug support and I
+get the following information:
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+root at mx25-noah:~$> dmesg | grep -i mmc
+[    0.228098] bus: 'mmc': registered
+[    0.228139] device class 'mmc_host': registering
+[    1.405180] bus: 'mmc': add driver mmcblk
+[    1.429969] device: 'mmc0::': device_add
+[    1.430249] PM: Adding info for No Bus:mmc0::
+[    1.430837] Registered led device: mmc0::
+[    1.430884] device: 'mmc0': device_add
+[    1.431114] PM: Adding info for No Bus:mmc0
+[    1.432953] mmc0: SDHCI controller on sdhci-esdhc-imx25.0
+[sdhci-esdhc-imx25.0] using DMA
+[    1.771322] mmc0: host does not support reading read-only switch.
+assuming write-enable.
+[    1.798584] mmc0: new high speed SD card at address 0002
+[    1.804018] device: 'mmc0:0002': device_add
+[    1.804283] bus: 'mmc': add device mmc0:0002
+[    1.804445] PM: Adding info for mmc:mmc0:0002
+[    1.815198] bus: 'mmc': driver_probe_device: matched device mmc0:0002
+with driver mmcblk
+[    1.815256] bus: 'mmc': really_probe: probing driver mmcblk with device
+mmc0:0002
+[    1.825154] mmcblk0: mmc0:0002 00000 1.86 GiB
+[    1.835076] device: 'mmcblk0': device_add
+[    1.835680] PM: Adding info for No Bus:mmcblk0
+[    1.849286]  mmcblk0: p1 p2
+[    1.852252] device: 'mmcblk0p1': device_add
+[    1.855232] PM: Adding info for No Bus:mmcblk0p1
+[    1.855371] device: 'mmcblk0p2': device_add
+[    1.855874] PM: Adding info for No Bus:mmcblk0p2
+[    1.866667] driver: 'mmc0:0002': driver_bound: bound to device 'mmcblk'
+[    1.866720] bus: 'mmc': really_probe: bound device mmc0:0002 to driver
+mmcblk
+[   82.982920] mmcblk0: error -110 transferring data, sector 559, nr 1,
+cmd response 0x900, card status 0x0
+[   82.993544] end_request: I/O error, dev mmcblk0, sector 559
+[   82.999169] Buffer I/O error on device mmcblk0p1, logical block 497
+[   83.005458] lost page write due to I/O error on mmcblk0p1
+[   83.013922] mmcblk0: error -84 transferring data, sector 559, nr 1, cmd
+response 0x900, card status 0x0
+[   83.024114] end_request: I/O error, dev mmcblk0, sector 559
+[   83.029965] FAT-fs (mmcblk0p1): Directory bread(block 497) failed
+[   83.038051] mmcblk0: error -84 transferring data, sector 560, nr 1, cmd
+response 0x900, card status 0x0
+[   83.048579] end_request: I/O error, dev mmcblk0, sector 560
+[   83.054205] Buffer I/O error on device mmcblk0p1, logical block 498
+[   83.060494] lost page write due to I/O error on mmcblk0p1
+
+The same device booted into a 2.6.39.3 kernel works just fine. The
+initialization of the esdhc driver in the device section is as follows:
+
+imx25_add_sdhci_esdhc_imx(0, NULL);
+
+Changing it to a pdata init as shown below does not change anything with
+regard to the failure:
+
+imx25_add_sdhci_esdhc_imx(0, &noah_esdhc_pdata);
+static const struct esdhc_platform_data noah_esdhc_pdata __initconst = {
+        .wp_gpio = -EINVAL,
+        .cd_gpio = -EINVAL,
+        .wp_type = ESDHC_WP_NONE,
+        .cd_type = ESDHC_CD_NONE,
+};
+
+What could have changed between 2.6.39.3 and 3.3-rc5 to trigger this
+behaviour? A quick look at
+
+git diff v2.6.39 drivers/mmc/host/sdhci-esdhc-imx.c
+
+only confuses me with regard to this issue.
+
+Regards
+Joan Carles
