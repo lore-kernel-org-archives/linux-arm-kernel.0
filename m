@@ -1,66 +1,138 @@
-From: sthumma@codeaurora.org (Sujit Reddy Thumma)
-Date: Wed, 29 Feb 2012 11:58:45 +0530
-Subject: [PATCH] mmc: start removing enable / disable API
-In-Reply-To: <1330080561-7256-1-git-send-email-adrian.hunter@intel.com>
-References: <1330080561-7256-1-git-send-email-adrian.hunter@intel.com>
-Message-ID: <4F4DC59D.70903@codeaurora.org>
+From: amit.kachhap@linaro.org (Amit Kachhap)
+Date: Wed, 29 Feb 2012 12:11:04 +0530
+Subject: [PATCH v6 3/9] ARM: exynos: Consolidate time keeping and irq
+ enable
+In-Reply-To: <1330485109-7327-4-git-send-email-rob.lee@linaro.org>
+References: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
+ <1330485109-7327-4-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAK44p224NL6+UuLKZ2vrP=CnBOARPBxj5f_+SNX_4j3RfBesEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
+Hi,
 
-On 2/24/2012 4:19 PM, Adrian Hunter wrote:
-> Most parts of the enable / disable API are no longer used and
-> can be removed.
->
-> Cc: Rajendra Nayak<rnayak@ti.com>
-> Cc: Venkatraman S<svenkatr@ti.com>
-> Cc: Kukjin Kim<kgene.kim@samsung.com>
-> Cc: Thomas Abraham<thomas.abraham@linaro.org>
-> Cc: Kyungmin Park<kyungmin.park@samsung.com>
-> Cc: Sekhar Nori<nsekhar@ti.com>
-> Cc: Kevin Hilman<khilman@ti.com>
-> Signed-off-by: Adrian Hunter<adrian.hunter@intel.com>
-> ---
->   arch/arm/mach-exynos/mach-nuri.c           |    5 +-
->   arch/arm/mach-exynos/mach-universal_c210.c |    9 +-
->   drivers/mmc/core/core.c                    |  185 ++--------------------------
->   drivers/mmc/core/host.c                    |    1 -
->   drivers/mmc/core/host.h                    |    1 -
->   drivers/mmc/host/davinci_mmc.c             |    4 -
->   drivers/mmc/host/omap_hsmmc.c              |   15 +--
->   include/linux/mmc/core.h                   |    1 -
->   include/linux/mmc/host.h                   |   46 +-------
->   9 files changed, 25 insertions(+), 242 deletions(-)
->
+I verified this patch on exynos4 based origen board.
 
-> -	if (host->caps&  MMC_CAP_DISABLE)
-> -		cancel_delayed_work(&host->disable);
->   	cancel_delayed_work_sync(&host->detect);
->   	mmc_flush_scheduled_work();
->
-> @@ -2402,13 +2245,11 @@ int mmc_suspend_host(struct mmc_host *host)
->   {
->   	int err = 0;
->
-> -	if (host->caps&  MMC_CAP_DISABLE)
-> -		cancel_delayed_work(&host->disable);
->   	cancel_delayed_work(&host->detect);
->   	mmc_flush_scheduled_work();
->   	if (mmc_try_claim_host(host)) {
->   		err = mmc_cache_ctrl(host, 0);
-> -		mmc_do_release_host(host);
-> +		mmc_release_host(host);
-
-mmc_try_claim_host does not call host->ops->enable(), but 
-mmc_release_host call host->ops->disable(), is there any reason for 
-this? For example: If host controller disable method internally calls 
-clk_disable() then that would cause reference count warnings.
-
->   	} else {
->   		err = -EBUSY;
->   	}
-> @@ -2429,7 +2270,7 @@ int mmc_suspend_host(struct mmc_host *host)
+Tested-by: Amit Daniel <amit.kachhap@linaro.org>
 
 Thanks,
-Sujit
+Amit D
+
+On 29 February 2012 08:41, Robert Lee <rob.lee@linaro.org> wrote:
+> Enable core cpuidle timekeeping and irq enabling and remove that
+> handling from this code.
+>
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+> ?arch/arm/mach-exynos/cpuidle.c | ? 53 ++++-----------------------------------
+> ?1 files changed, 6 insertions(+), 47 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index 9bf6743..75bb88b 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -20,6 +20,7 @@
+> ?#include <asm/smp_scu.h>
+> ?#include <asm/suspend.h>
+> ?#include <asm/unified.h>
+> +#include <asm/cpuidle.h>
+> ?#include <mach/regs-pmu.h>
+> ?#include <mach/pmu.h>
+>
+> @@ -34,22 +35,12 @@
+>
+> ?#define S5P_CHECK_AFTR ? ? ? ? 0xFCBA0D10
+>
+> -static int exynos4_enter_idle(struct cpuidle_device *dev,
+> - ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index);
+> ?static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index);
+>
+> ?static struct cpuidle_state exynos4_cpuidle_set[] = {
+> - ? ? ? [0] = {
+> - ? ? ? ? ? ? ? .enter ? ? ? ? ? ? ? ? ?= exynos4_enter_idle,
+> - ? ? ? ? ? ? ? .exit_latency ? ? ? ? ? = 1,
+> - ? ? ? ? ? ? ? .target_residency ? ? ? = 100000,
+> - ? ? ? ? ? ? ? .flags ? ? ? ? ? ? ? ? ?= CPUIDLE_FLAG_TIME_VALID,
+> - ? ? ? ? ? ? ? .name ? ? ? ? ? ? ? ? ? = "C0",
+> - ? ? ? ? ? ? ? .desc ? ? ? ? ? ? ? ? ? = "ARM clock gating(WFI)",
+> - ? ? ? },
+> + ? ? ? [0] = CPUIDLE_ARM_WFI_STATE,
+> ? ? ? ?[1] = {
+> ? ? ? ? ? ? ? ?.enter ? ? ? ? ? ? ? ? ?= exynos4_enter_lowpower,
+> ? ? ? ? ? ? ? ?.exit_latency ? ? ? ? ? = 300,
+> @@ -63,8 +54,9 @@ static struct cpuidle_state exynos4_cpuidle_set[] = {
+> ?static DEFINE_PER_CPU(struct cpuidle_device, exynos4_cpuidle_device);
+>
+> ?static struct cpuidle_driver exynos4_idle_driver = {
+> - ? ? ? .name ? ? ? ? ? = "exynos4_idle",
+> - ? ? ? .owner ? ? ? ? ?= THIS_MODULE,
+> + ? ? ? .name ? ? ? ? ? ? ? ? ? = "exynos4_idle",
+> + ? ? ? .owner ? ? ? ? ? ? ? ? ?= THIS_MODULE,
+> + ? ? ? .en_core_tk_irqen ? ? ? = 1,
+> ?};
+>
+> ?/* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+> @@ -103,13 +95,8 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int index)
+> ?{
+> - ? ? ? struct timeval before, after;
+> - ? ? ? int idle_time;
+> ? ? ? ?unsigned long tmp;
+>
+> - ? ? ? local_irq_disable();
+> - ? ? ? do_gettimeofday(&before);
+> -
+> ? ? ? ?exynos4_set_wakeupmask();
+>
+> ? ? ? ?/* Set value of power down register for aftr mode */
+> @@ -148,34 +135,6 @@ static int exynos4_enter_core0_aftr(struct cpuidle_device *dev,
+> ? ? ? ?/* Clear wakeup state register */
+> ? ? ? ?__raw_writel(0x0, S5P_WAKEUP_STAT);
+>
+> - ? ? ? do_gettimeofday(&after);
+> -
+> - ? ? ? local_irq_enable();
+> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+> - ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
+> -
+> - ? ? ? dev->last_residency = idle_time;
+> - ? ? ? return index;
+> -}
+> -
+> -static int exynos4_enter_idle(struct cpuidle_device *dev,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct cpuidle_driver *drv,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
+> -{
+> - ? ? ? struct timeval before, after;
+> - ? ? ? int idle_time;
+> -
+> - ? ? ? local_irq_disable();
+> - ? ? ? do_gettimeofday(&before);
+> -
+> - ? ? ? cpu_do_idle();
+> -
+> - ? ? ? do_gettimeofday(&after);
+> - ? ? ? local_irq_enable();
+> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
+> - ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
+> -
+> - ? ? ? dev->last_residency = idle_time;
+> ? ? ? ?return index;
+> ?}
+>
+> @@ -190,7 +149,7 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+> ? ? ? ? ? ? ? ?new_index = drv->safe_state_index;
+>
+> ? ? ? ?if (new_index == 0)
+> - ? ? ? ? ? ? ? return exynos4_enter_idle(dev, drv, new_index);
+> + ? ? ? ? ? ? ? return cpuidle_simple_enter(dev, drv, new_index);
+> ? ? ? ?else
+> ? ? ? ? ? ? ? ?return exynos4_enter_core0_aftr(dev, drv, new_index);
+> ?}
+> --
+> 1.7.1
+>
