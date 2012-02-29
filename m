@@ -1,28 +1,47 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 29 Feb 2012 16:25:09 +0800
-Subject: [PATCH v6 0/2] patch set about the MXS-DMA
-In-Reply-To: <1330502098.3545.78.camel@sauron.fi.intel.com>
-References: <1329373053-19494-1-git-send-email-b32955@freescale.com>	
- <4F4D9725.3090100@freescale.com>
- <1330502098.3545.78.camel@sauron.fi.intel.com>
-Message-ID: <4F4DE0E5.8070808@freescale.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 29 Feb 2012 09:30:59 +0100
+Subject: [PATCH v6 1/9] cpuidle: Add common time keeping and irq enabling
+In-Reply-To: <1330485109-7327-2-git-send-email-rob.lee@linaro.org>
+References: <1330485109-7327-1-git-send-email-rob.lee@linaro.org>
+ <1330485109-7327-2-git-send-email-rob.lee@linaro.org>
+Message-ID: <CAORVsuX3nJAgbDY+oNQ+OD6xeZt=OkhK4n769Y+xJb0NXcrBmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem:
-> On Wed, 2012-02-29 at 11:10 +0800, Huang Shijie wrote:
->> Hi:
->>
->> ping.
-> Is this patch-set independent or requires something like gpma patches?
+Hi Rob,
+
+On Wed, Feb 29, 2012 at 4:11 AM, Robert Lee <rob.lee@linaro.org> wrote:
+> Make necessary changes to implement time keeping and irq enabling
+> in the core cpuidle code. ?This will allow the removal of these
+> functionalities from various platform cpuidle implementations whose
+> timekeeping and irq enabling follows the form in this common code.
 >
-This patch set is independent, and it does not depend upon any other 
-patches.
+> Signed-off-by: Robert Lee <rob.lee@linaro.org>
+> ---
+> ?arch/arm/include/asm/cpuidle.h | ? 14 ++++++
+> ?drivers/cpuidle/cpuidle.c ? ? ?| ? 90 ++++++++++++++++++++++++++++++++--------
+> ?include/linux/cpuidle.h ? ? ? ?| ? 13 ++++++
+> ?3 files changed, 99 insertions(+), 18 deletions(-)
+> ?create mode 100644 arch/arm/include/asm/cpuidle.h
+>
+...
 
-I will sent out the new GPMI patches (with DT enable) after this 
-patch-set is merged.
+> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
+> index 59f4261..00b02f5 100644
+> --- a/drivers/cpuidle/cpuidle.c
+> +++ b/drivers/cpuidle/cpuidle.c
+...
 
-thanks
+> @@ -110,7 +126,8 @@ int cpuidle_idle_call(void)
+> ? ? ? ? ? ? ? ?dev->states_usage[entered_state].time +=
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(unsigned long long)dev->last_residency;
+> ? ? ? ? ? ? ? ?dev->states_usage[entered_state].usage++;
+> - ? ? ? }
+> + ? ? ? } else
+> + ? ? ? ? ? ? ? dev->last_residency = 0;
+Braces are required here, according to the coding style doc.
 
-BR
-Huang Shijie
+...
+
+Regards,
+Jean
