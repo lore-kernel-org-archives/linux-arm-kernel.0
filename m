@@ -1,39 +1,23 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 29 Feb 2012 10:07:08 -0800
-Subject: [PATCH 04/14] ARM: OMAP3+: SmartReflex: Add a shutdown hook
-In-Reply-To: <CAOMWX4dbufbEJpr0nTmwTHR1xz9diMBbO=khKxvMZLWrKesJRw@mail.gmail.com>
- (Nishanth Menon's message of "Tue, 28 Feb 2012 16:59:14 -0600")
-References: <1328723039-15952-1-git-send-email-j-pihet@ti.com>
- <1328723039-15952-5-git-send-email-j-pihet@ti.com>
- <87d38yk2e1.fsf@ti.com>
- <CAOMWX4dbufbEJpr0nTmwTHR1xz9diMBbO=khKxvMZLWrKesJRw@mail.gmail.com>
-Message-ID: <878vjlfr8z.fsf@ti.com>
+Date: Wed, 29 Feb 2012 10:21:19 -0800
+Subject: [PATCH 0/2] change lpj in arm smp common code
+In-Reply-To: <1330499895-12364-1-git-send-email-richard.zhao@linaro.org>
+ (Richard Zhao's message of "Wed, 29 Feb 2012 15:18:13 +0800")
+References: <1330499895-12364-1-git-send-email-richard.zhao@linaro.org>
+Message-ID: <87sjhtec0w.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Menon, Nishanth" <nm@ti.com> writes:
+Richard Zhao <richard.zhao@linaro.org> writes:
 
-> On Tue, Feb 28, 2012 at 16:40, Kevin Hilman <khilman@ti.com> wrote:
->> Jean Pihet <jean.pihet@newoldbits.com> writes:
->>
->>> From: Nishanth Menon <nm@ti.com>
->>>
->>> SmartReflex fix for erratum ID i724.
->>>
->>> Since OMAP's VP and PRM modules do not get reset by warm reset,
->>> we should ensure that proper shutdown procedure is followed prior
->>> to allowing the kernel to reboot back up.
->>
->> prior to reboot? ?how?
->>
->> This patch only ensures a proper shutdown if the kernel goes down
->> cleanly.
->>
->> How is this handled on reboot?
-> There is no known solution for watchdog resets(part of the errata WA
-> limitation) :( - the best we could do was to make shutdown path safe -
-> this includes s/w (userspace triggered) reboots.
+> The two patches were originally in [PATCH V6 0/7] add a generic cpufreq driver.
+> I seperated them and hope they can go to upstream earlier.
+>
+> Richard Zhao (2):
+>   ARM: add cpufreq transiton notifier to adjust loops_per_jiffy for smp
+>   cpufreq: OMAP: remove loops_per_jiffy recalculate for smp
 
-OK, then the changelog needs an update to reflect that.
+The first one should go into Russell's patch system.  Once he queues
+that, I can queue the OMAP one for the CPUfreq maintainer.
 
 Kevin
