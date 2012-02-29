@@ -1,96 +1,69 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Wed, 29 Feb 2012 07:42:51 +0100
-Subject: [PATCH v2 1/7] ARM: davinci,
- intc: Add OF support for TI interrupt controller
-In-Reply-To: <4F44DE24.30606@mvista.com>
-References: <1329893410-24413-1-git-send-email-hs@denx.de>
- <1329893410-24413-2-git-send-email-hs@denx.de> <4F44DE24.30606@mvista.com>
-Message-ID: <4F4DC8EB.7010201@denx.de>
+From: yong.zhang0@gmail.com (Yong Zhang)
+Date: Wed, 29 Feb 2012 14:32:17 +0800
+Subject: linux-next: manual merge of the akpm tree with the arm-soc tree
+In-Reply-To: <20120229172127.7b430cecc7ab2350d4e4a1b8@canb.auug.org.au>
+References: <20120229172127.7b430cecc7ab2350d4e4a1b8@canb.auug.org.au>
+Message-ID: <20120229063217.GA13386@zhy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
-
-Sergei Shtylyov wrote:
-> On 22-02-2012 10:50, Heiko Schocher wrote:
+On Wed, Feb 29, 2012 at 05:21:27PM +1100, Stephen Rothwell wrote:
+> Hi Andrew,
 > 
->> Add a function to initialize the davinci interrupt controller (INTC)
->> using a device tree node.
+> Today's linux-next merge of the akpm tree got a conflict in
+> drivers/rtc/rtc-sa1100.c between commit 3888c09074db ("rtc: sa1100:
+> declare irq in resource") from the arm-soc tree and commit "drivers/rtc:
+> remove IRQF_DISABLED" from the akpm tree.
 > 
->    cp_intc is not DaVinci interrupt controller, it's only used in
-> OMAP-L1x SoCs. cp_intc stands for Common Platform Interrupt Controller.
+> I fixed it up (see below) and can carry the fix as necessary.
 
-Ah, Ok! Thanks for the explanation.
+Your fix looks good to me.
 
-> I don't see where you are initializiing the DaVinci interrupt controller
-> itself. You should understand that there are two disctinct types of
-> interrupt controllers used in the SoCs supported by arch/arm/mach-davinci/.
+Thanks,
+Yong
 
-board code:
-
-MACHINE_START(ENBW_CMC, "EnBW CMC")
-[...]
-        .init_irq       = davinci_init_irq,
-
-and in arch/arm/mach-davinci/cp_intc.c
-
-for the of case:
-
-void __init davinci_init_irq(void)
-{
-        of_irq_init(irq_match);
-}
-
-in drivers/of/irq.c:
-
-/**
- * of_irq_init - Scan and init matching interrupt controllers in DT
- * @matches: 0 terminated array of nodes to match and init function to call
- *
- * This function scans the device tree for matching interrupt controller nodes,
- * and calls their initialization functions in order with parents first.
- */
-void __init of_irq_init(const struct of_device_id *matches)
-
-Ok, the name of davinci_init_irq() is missleading ...
-
-Should I name it "cp_intc_of_init" ?
-
->> Signed-off-by: Heiko Schocher<hs@denx.de>
->> Cc: davinci-linux-open-source at linux.davincidsp.com
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: Grant Likely<grant.likely@secretlab.ca>
->> Cc: Sekhar Nori<nsekhar@ti.com>
->> Cc: Wolfgang Denk<wd@denx.de>
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
 > 
-> [...]
-> 
->> diff --git a/Documentation/devicetree/bindings/arm/davinci/intc.txt
->> b/Documentation/devicetree/bindings/arm/davinci/intc.txt
->> new file mode 100644
->> index 0000000..dac2f69
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/davinci/intc.txt
->> @@ -0,0 +1,26 @@
->> +* TI Davinci Interrupt Controller
->> +
->> +davinci are using a TI interrupt controller that can support several
->> +configurable number of interrupts.
->> +
->> +Main node required properties:
->> +
->> +- compatible : should be:
->> +    "ti,davinci-intc"
-> 
->    The right "compatible" prop would be "ti,cp_intc" in this case.
+> diff --cc drivers/rtc/rtc-sa1100.c
+> index c105774,e70b4e6..0000000
+> --- a/drivers/rtc/rtc-sa1100.c
+> +++ b/drivers/rtc/rtc-sa1100.c
+> @@@ -102,23 -156,20 +102,23 @@@ static irqreturn_t sa1100_rtc_interrupt
+>   
+>   static int sa1100_rtc_open(struct device *dev)
+>   {
+>  +	struct sa1100_rtc *info = dev_get_drvdata(dev);
+>  +	struct rtc_device *rtc = info->rtc;
+>   	int ret;
+>  -	struct platform_device *plat_dev = to_platform_device(dev);
+>  -	struct rtc_device *rtc = platform_get_drvdata(plat_dev);
+>   
+>  -	ret = request_irq(IRQ_RTC1Hz, sa1100_rtc_interrupt, 0,
+>  +	ret = clk_prepare_enable(info->clk);
+>  +	if (ret)
+>  +		goto fail_clk;
+> - 	ret = request_irq(info->irq_1hz, sa1100_rtc_interrupt, IRQF_DISABLED,
+> ++	ret = request_irq(info->irq_1hz, sa1100_rtc_interrupt, 0,
+>   		"rtc 1Hz", dev);
+>   	if (ret) {
+>  -		dev_err(dev, "IRQ %d already in use.\n", IRQ_RTC1Hz);
+>  +		dev_err(dev, "IRQ %d already in use.\n", info->irq_1hz);
+>   		goto fail_ui;
+>   	}
+> - 	ret = request_irq(info->irq_alarm, sa1100_rtc_interrupt, IRQF_DISABLED,
+>  -	ret = request_irq(IRQ_RTCAlrm, sa1100_rtc_interrupt, 0,
+> ++	ret = request_irq(info->irq_alarm, sa1100_rtc_interrupt, 0,
+>   		"rtc Alrm", dev);
+>   	if (ret) {
+>  -		dev_err(dev, "IRQ %d already in use.\n", IRQ_RTCAlrm);
+>  +		dev_err(dev, "IRQ %d already in use.\n", info->irq_alarm);
+>   		goto fail_ai;
+>   	}
+>   	rtc->max_user_freq = RTC_FREQ;
 
-Ok, change this.
 
-Thanks for the review!
 
-bye,
-Heiko
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Only stand for myself
