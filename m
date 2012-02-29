@@ -1,36 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 29 Feb 2012 15:32:06 +0100
-Subject: IIO irq allocation fails on AT91SAM9G45
-Message-ID: <4F4E36E6.1010704@free-electrons.com>
+From: wade_farnsworth@mentor.com (Wade Farnsworth)
+Date: Wed, 29 Feb 2012 07:34:40 -0700
+Subject: [PATCH v2 0/3] ARM support for syscall tracing
+In-Reply-To: <4F44FF58.3060907@mentor.com>
+References: <4F44FF58.3060907@mentor.com>
+Message-ID: <4F4E3780.4060904@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+This is a rework of Steven Walter's syscall tracing patches first
+posted here:
 
-I'm working on adding the support for the AT91SAM9M10G45-EK board from
-Atmel for the at91_adc driver I previously posted, and I encounter some
-weird issue here.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074454.html
 
-When calling the iio_allocate_trigger
-(http://lxr.free-electrons.com/source/drivers/staging/iio/industrialio-trigger.c?a=arm#L421)
-from my driver on the G45, it returns ENOMEM, while on the
-AT91SAM9G20-EK board, it works perfectly.
+I've rebased the patches against the current mainline master branch, as well
+as implemented several changes based on feedback from Will Deacon and
+Russel King.
 
-Digging a bit into it, it seems that the call to irq_alloc_descs is
-returning the error (the value of CONFIG_IIO_CONSUMERS_PER_TRIGGER is 2
-in my configuration, which seems pretty reasonable and is the default
-value anyway), which is itself getting that return value from
-irq_expand_nr_irqs.
+v2: - Tested on EABI and OABI.
+    - Removed an instance of the ?: operator in syscall_set_return_value()
+    - Moved #define of NR_syscalls to syscall.h
+    - Changed the test of NR_syscalls vs __NR_syscalls in entry-common.S
+      to .ifne
 
-Here, I'm left confused, I don't know this part of the kernel anymore,
-and most importantly, it seems to be pretty-much arch-independant, while
-the nature of my issue seems really platform-dependant.
+Wade Farnsworth (3):
+  ARM: add support for the generic syscall.h interface
+  ARM: add TRACEHOOK support
+  ARM: support syscall tracing
 
-Do you have any clue of what's going on here ?
-
-Thanks,
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ arch/arm/Kconfig                   |    2 +
+ arch/arm/include/asm/ptrace.h      |    5 ++
+ arch/arm/include/asm/syscall.h     |   97 ++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/thread_info.h |    2 +
+ arch/arm/include/asm/unistd.h      |    8 +++
+ arch/arm/kernel/entry-common.S     |   16 +++++-
+ arch/arm/kernel/ptrace.c           |   34 +++++++------
+ arch/arm/kernel/signal.c           |    2 +
+ 8 files changed, 149 insertions(+), 17 deletions(-)
+ create mode 100644 arch/arm/include/asm/syscall.h
