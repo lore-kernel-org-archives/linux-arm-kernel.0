@@ -1,36 +1,48 @@
-From: hunold@linuxtv.org (Michael Hunold)
-Date: Wed, 29 Feb 2012 12:53:01 +0100
-Subject: iMX53 quick start board and SD/MMC
-Message-ID: <4F4E119D.7020104@linuxtv.org>
+From: artem.bityutskiy@intel.com (Bityutskiy, Artem)
+Date: Wed, 29 Feb 2012 12:00:24 +0000
+Subject: [PATCH v6 0/2] patch set about the MXS-DMA
+In-Reply-To: <4F4DE0E5.8070808@freescale.com>
+References: <1329373053-19494-1-git-send-email-b32955@freescale.com>
+ <4F4D9725.3090100@freescale.com>
+ <1330502098.3545.78.camel@sauron.fi.intel.com>
+ <4F4DE0E5.8070808@freescale.com>
+Message-ID: <1330516974.3545.104.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On Wed, 2012-02-29 at 16:25 +0800, Huang Shijie wrote:
+> Hi Artem:
+> > On Wed, 2012-02-29 at 11:10 +0800, Huang Shijie wrote:
+> >> Hi:
+> >>
+> >> ping.
+> > Is this patch-set independent or requires something like gpma patches?
+> >
+> This patch set is independent, and it does not depend upon any other 
+> patches.
 
-I am trying to setup a iMX53 quick start board. This is my first
-encounter with Freescale, so please bear with me.
+Pushed both to l2-mtd.git tree, thanks. I am worried that it touches
+other subsystems like dma, sound, and mmc and there are no acks for
+those. Would be nice to get them somehow.
 
-I used the Code Sourcery arm-2011.03 toolchain and a stock Linux 3.2.8
-kernel. I used "imx_v4_v5_defconfig" and selected support for the "LOCO"
-board, nothing more.
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120229/fea79fec/attachment.sig>
+-------------- next part --------------
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
 
-For the root filesystem I used a stock buildroot-2011.11. For the
-beginning, I boot the system using NFS root filesystem.
-
-The board boots just fine, but the SD/MMC card slot(s) are not
-recognised by the kernel.
-
-I see mxcmci_init() is getting called, but not the probe routine. Did I
-miss anything important?
-
-Can somebody confirm that the board works with stock Linux 3.2.8 kernel
-at all?
-
-I noticed that "imx-sdma imx35-sdma: firmware not found" is printed on
-the console. I understand that the iMX53 has a special DMA engine, but
-is it necessary for the SD/MMC card slots to function?
-
-If so, where is the official source for the necessary firmware?
-
-Thanks and best regards
-Michael.
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
