@@ -1,92 +1,24 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 1 Mar 2012 10:54:41 +0000
-Subject: [PATCH-V2 2/2] arm:omap:am33xx: Add power domain data
-In-Reply-To: <alpine.DEB.2.00.1202291839130.12752@utopia.booyaka.com>
-References: <1324803628-16790-1-git-send-email-hvaibhav@ti.com>
- <1324803628-16790-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1202291839130.12752@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317E515D@DBDE01.ent.ti.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 1 Mar 2012 12:01:46 +0100
+Subject: [V4 0/4] patches for power control on pm8606 oscillator
+In-Reply-To: <1330397869-31644-1-git-send-email-jtzhou@marvell.com>
+References: <1330397869-31644-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20120301110146.GG9008@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2012 at 07:14:24, Paul Walmsley wrote:
-> Hi
-> 
-> some other observations:
-> 
-> On Sun, 25 Dec 2011, Vaibhav Hiremath wrote:
-> 
-> > +static struct powerdomain per_33xx_pwrdm = {
-> > +	.name			= "per_pwrdm",
-> > +	.voltdm			= { .name = "core" },
-> > +	.prcm_partition		= AM33XX_PRM_PARTITION,
-> > +	.prcm_offs		= AM33XX_PRM_PER_MOD,
-> > +	.pwrsts			= PWRSTS_OFF_RET_ON,
-> > +	.pwrsts_logic_ret	= PWRSTS_OFF_RET,
-> > +	.pwrstctrl_offs		= AM33XX_PM_PER_PWRSTCTRL_OFFSET,
-> > +	.pwrstst_offs		= AM33XX_PM_PER_PWRSTST_OFFSET,
-> > +	.flags			= PWRDM_HAS_LOWPOWERSTATECHANGE,
-> > +	.banks			= 3,
-> > +	.pwrsts_mem_ret		= {
-> > +		[0]	= PWRSTS_OFF_RET,	/* icss_mem */
-> > +		[1]	= PWRSTS_OFF_RET,	/* per_mem */
-> > +		[2]	= PWRSTS_OFF_RET,	/* ram_mem */
-> > +	},
-> > +	.pwrsts_mem_on		= {
-> > +		[0]	= PWRSTS_ON,		/* icss_mem */
-> > +		[1]	= PWRSTS_ON,		/* per_mem */
-> > +		[2]	= PWRSTS_ON,		/* ram_mem */
-> > +	},
-> > +};
-> 
-> According to SPRUH73C Table 8-184 "PM_PER_PWRSTCTRL Register Field 
-> Descriptions" the pwrsts_mem_on field for RAM_MEM should be 
-> PWRSTS_OFF_RET_ON.
-> 
-> > +static struct powerdomain mpu_33xx_pwrdm = {
-> > +     .name                   = "mpu_pwrdm",
-> > +     .voltdm                 = { .name = "mpu" },
-> > +     .prcm_partition         = AM33XX_PRM_PARTITION,
-> > +     .prcm_offs              = AM33XX_PRM_MPU_MOD,
-> > +     .pwrsts                 = PWRSTS_OFF_RET_ON,
-> > +     .pwrsts_logic_ret       = PWRSTS_OFF_RET,
-> > +     .pwrstctrl_offs         = AM33XX_PM_MPU_PWRSTCTRL_OFFSET,
-> > +     .pwrstst_offs           = AM33XX_PM_MPU_PWRSTST_OFFSET,
-> > +     .flags                  = PWRDM_HAS_LOWPOWERSTATECHANGE,
-> > +     .banks                  = 3,
-> > +     .pwrsts_mem_ret         = {
-> > +             [0]     = PWRSTS_OFF_RET,       /* mpu_l1 */
-> > +             [1]     = PWRSTS_OFF_RET,       /* mpu_l2 */
-> > +             [2]     = PWRSTS_OFF_RET,       /* mpu_ram */
-> > +     },
-> 
-> Again SPRUH73C Table 8-191 "PM_MPU_PWRSTCTRL Register Field Descriptions" 
-> claims these should simply by PWRSTS_RET.
-> 
-> > +     .pwrsts_mem_on          = {
-> > +             [0]     = PWRSTS_ON,            /* mpu_l1 */
-> > +             [1]     = PWRSTS_ON,            /* mpu_l2 */
-> > +             [2]     = PWRSTS_ON,            /* mpu_ram */
-> > +     },
-> > +};
-> 
-> And the same table claims the MPU_RAM pwrsts_mem_on field should be 
-> PWRSTS_OFF_ON.
-> 
-> Can you please reconcile these differences and let us know which values 
-> should be correct?
-> 
+Hi Jett,
 
-Paul,
+On Tue, Feb 28, 2012 at 10:57:49AM +0800, Jett.Zhou wrote:
+> change log:
+> V4:
+> 1 seperated the mfd power control osc patch for more clear.
 
-The initialization used in the patch is correct. Unfortunately, the TRM is 
-incorrect here. I have already raised this issue with respective folks and soon it will get corrected.
+All 4 patches applied now, thanks.
 
-Thanks,
-Vaibhav
+Cheers,
+Samuel.
 
-> thanks
-> 
-> 
-> - Paul
-> 
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
