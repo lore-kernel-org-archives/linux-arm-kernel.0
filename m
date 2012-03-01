@@ -1,42 +1,51 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 1 Feb 2012 13:21:29 +0900
-Subject: [PATCH 6/9] serial: samsung: Add support for EXYNOS5250
-In-Reply-To: <1328024354-4277-7-git-send-email-kgene.kim@samsung.com>
-References: <1328024354-4277-1-git-send-email-kgene.kim@samsung.com>
- <1328024354-4277-7-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CAH9JG2XE7nj1je9SYQ=zJKo0_P5Sx_ruZrDjtpnsL0Qtvzb+_Q@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 01 Mar 2012 14:12:56 +0900
+Subject: [GIT PULL] merge PL330 DMAC driver
+Message-ID: <077301ccf769$f6ac3750$e404a5f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/12, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@suse.de>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  drivers/tty/serial/samsung.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index 3b07fb9..c55e5fb 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -1594,7 +1594,7 @@ static struct s3c24xx_serial_drv_data
-> s5pv210_serial_drv_data = {
->  #endif
->
->  #if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) || \
-> -	defined(CONFIG_SOC_EXYNOS4412)
-> +	defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250)
-I think you can make it simple just use "#ifdef CONFIG_ARCH_EXYNOS "
->  static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
->  	.info = &(struct s3c24xx_uart_info) {
->  		.name		= "Samsung Exynos4 UART",
-> --
-> 1.7.4.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Hi Russell and Vinod,
+
+Please pull merging dma pl330 driver into drivers/dma/.
+It's time to send this to you, and I think that should be sent to upstream
+via rmk and dma tree together.
+
+If any problems, please kindly let me know.
+
+As a note, since there is no regarding samsung stuff here, I don't merge
+this into samsung tree.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+
+  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+v3.4-for-vkoul-v3
+
+Boojin Kim (3):
+      DMA: PL330: Merge PL330 driver into drivers/dma/
+      DMA: PL330: Removes useless function
+      DMA: PL330: Support MEMTOMEM transmit w/o RMB, WMB
+
+ arch/arm/common/Kconfig               |    3 -
+ arch/arm/common/Makefile              |    1 -
+ arch/arm/common/pl330.c               | 1959
+-------------------------------
+ arch/arm/include/asm/hardware/pl330.h |  217 ----
+ drivers/dma/Kconfig                   |    1 -
+ drivers/dma/pl330.c                   | 2089
+++++++++++++++++++++++++++++++++-
+ include/linux/amba/pl330.h            |    1 -
+ 7 files changed, 2088 insertions(+), 2183 deletions(-)
+ delete mode 100644 arch/arm/common/pl330.c
+ delete mode 100644 arch/arm/include/asm/hardware/pl330.h
