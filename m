@@ -1,17 +1,19 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu,  1 Mar 2012 10:11:35 +0200
-Subject: [PATCH 5/7] remoteproc/omap: remove the mbox_callback limitation
+Date: Thu,  1 Mar 2012 10:11:36 +0200
+Subject: [PATCH 6/7] remoteproc: remove the hardcoded vring alignment
 In-Reply-To: <1330589497-4139-1-git-send-email-ohad@wizery.com>
 References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
-Message-ID: <1330589497-4139-6-git-send-email-ohad@wizery.com>
+Message-ID: <1330589497-4139-7-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that remoteproc supports any number of virtio devices,
-the previous sanity check in omap_rproc_mbox_callback
-doesn't make sense anymore.
+Remove the hardcoded vring alignment of 4096 bytes,
+and instead utilize tha vring alignment as specified in
+the resource table.
 
-Remove that so we can start supporting multiple vdevs.
+This is needed for remote processors that have rigid
+memory requirement, and which have found the alignment of
+4096 bytes to be excessively big.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 Cc: Brian Swetland <swetland@google.com>
@@ -34,30 +36,98 @@ Cc: David Brown <davidb@codeaurora.org>
 Cc: Kieran Bingham <kieranbingham@gmail.com>
 Cc: Tony Lindgren <tony@atomide.com>
 ---
- drivers/remoteproc/omap_remoteproc.c |   11 +----------
- 1 files changed, 1 insertions(+), 10 deletions(-)
+ drivers/remoteproc/remoteproc_core.c   |   12 +++++++-----
+ drivers/remoteproc/remoteproc_virtio.c |    2 +-
+ include/linux/remoteproc.h             |    9 ++-------
+ 3 files changed, 10 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/remoteproc/omap_remoteproc.c b/drivers/remoteproc/omap_remoteproc.c
-index aa3ce52..69425c4 100644
---- a/drivers/remoteproc/omap_remoteproc.c
-+++ b/drivers/remoteproc/omap_remoteproc.c
-@@ -80,16 +80,7 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
- 		dev_info(dev, "received echo reply from %s\n", name);
- 		break;
- 	default:
--		/* ignore vq indices which are too large to be valid */
--		if (msg >= 2) {
--			dev_warn(dev, "invalid mbox msg: 0x%x\n", msg);
--			break;
--		}
--
--		/*
--		 * At this point, 'msg' contains the index of the vring
--		 * which was just triggered.
--		 */
-+		/* msg contains the index of the triggered vring */
- 		if (rproc_vq_interrupt(oproc->rproc, msg) == IRQ_NONE)
- 			dev_dbg(dev, "no message was found in vqid %d\n", msg);
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index ca02f12..9be5dad 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -298,14 +298,15 @@ __rproc_handle_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
+ 		return -EINVAL;
  	}
+ 
+-	/* the firmware must provide the expected queue size */
+-	if (!vring->num) {
+-		dev_err(dev, "invalid qsz (%d)\n", vring->num);
++	/* verify queue size and vring alignment are sane */
++	if (!vring->num || !vring->align) {
++		dev_err(dev, "invalid qsz (%d) or alignment (%d)\n",
++						vring->num, vring->align);
+ 		return -EINVAL;
+ 	}
+ 
+ 	/* actual size of vring (in bytes) */
+-	size = PAGE_ALIGN(vring_size(vring->num, AMP_VRING_ALIGN));
++	size = PAGE_ALIGN(vring_size(vring->num, vring->align));
+ 
+ 	if (!idr_pre_get(&rproc->notifyids, GFP_KERNEL)) {
+ 		dev_err(dev, "idr_pre_get failed\n");
+@@ -340,6 +341,7 @@ __rproc_handle_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
+ 					dma, size, notifyid);
+ 
+ 	rvdev->vring[i].len = vring->num;
++	rvdev->vring[i].align = vring->align;
+ 	rvdev->vring[i].va = va;
+ 	rvdev->vring[i].dma = dma;
+ 	rvdev->vring[i].notifyid = notifyid;
+@@ -354,7 +356,7 @@ static void __rproc_free_vrings(struct rproc_vdev *rvdev, int i)
+ 
+ 	for (i--; i > 0; i--) {
+ 		struct rproc_vring *rvring = &rvdev->vring[i];
+-		int size = PAGE_ALIGN(vring_size(rvring->len, AMP_VRING_ALIGN));
++		int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
+ 
+ 		dma_free_coherent(rproc->dev, size, rvring->va, rvring->dma);
+ 		idr_remove(&rproc->notifyids, rvring->notifyid);
+diff --git a/drivers/remoteproc/remoteproc_virtio.c b/drivers/remoteproc/remoteproc_virtio.c
+index 0700410..ecf6121 100644
+--- a/drivers/remoteproc/remoteproc_virtio.c
++++ b/drivers/remoteproc/remoteproc_virtio.c
+@@ -99,7 +99,7 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
+ 	 * Create the new vq, and tell virtio we're not interested in
+ 	 * the 'weak' smp barriers, since we're talking with a real device.
+ 	 */
+-	vq = vring_new_virtqueue(len, AMP_VRING_ALIGN, vdev, false, addr,
++	vq = vring_new_virtqueue(len, rvring->align, vdev, false, addr,
+ 					rproc_virtio_notify, callback, name);
+ 	if (!vq) {
+ 		dev_err(rproc->dev, "vring_new_virtqueue %s failed\n", name);
+diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
+index 7750d8a..f1ffabb 100644
+--- a/include/linux/remoteproc.h
++++ b/include/linux/remoteproc.h
+@@ -43,13 +43,6 @@
+ #include <linux/completion.h>
+ #include <linux/idr.h>
+ 
+-/*
+- * The alignment between the consumer and producer parts of the vring.
+- * Note: this is part of the "wire" protocol. If you change this, you need
+- * to update your peers too.
+- */
+-#define AMP_VRING_ALIGN	(4096)
+-
+ /**
+  * struct resource_table - firmware resource table header
+  * @ver: version number
+@@ -423,6 +416,7 @@ struct rproc {
+  * @dma: dma address
+  * @len: length, in bytes
+  * @da: device address
++ * @align: vring alignment
+  * @notifyid: rproc-specific unique vring index
+  * @rvdev: remote vdev
+  * @vq: the virtqueue of this vring
+@@ -432,6 +426,7 @@ struct rproc_vring {
+ 	dma_addr_t dma;
+ 	int len;
+ 	u32 da;
++	u32 align;
+ 	int notifyid;
+ 	struct rproc_vdev *rvdev;
+ 	struct virtqueue *vq;
 -- 
 1.7.5.4
