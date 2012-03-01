@@ -1,33 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 1 Mar 2012 19:50:51 +0000
-Subject: [PATCH 0/4] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
-In-Reply-To: <cover.1330625877.git.jason@lakedaemon.net>
-References: <cover.1330625877.git.jason@lakedaemon.net>
-Message-ID: <201203011950.51210.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 1 Mar 2012 11:59:21 -0800
+Subject: [PATCH 1/8] ARM: tegra: export tegra_gpio_{en,dis}able
+In-Reply-To: <1330630010-11241-2-git-send-email-alan@signal11.us>
+References: <1330630010-11241-1-git-send-email-alan@signal11.us>
+ <1330630010-11241-2-git-send-email-alan@signal11.us>
+Message-ID: <CAOesGMhom2ybsKKgezPKkrhH9NniZu+FMprQhibHwEX92MNtEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 March 2012, Jason Cooper wrote:
-> This series begins the process of converting all of the drivers initialized
-> from kirkwood_init() to devicetree.
-> 
-> The first patch cleans up kirkwood_init() by moving a flag setting to it's
-> appropriate location.  This will help later when converting the audio driver.
-> 
-> Next, I pull the functionality of kirkwood_init() into kirkwood_dt_init() in
-> board-dt.c  This way, as drivers are converted, their init calls can be removed
-> from kirkwood_dt_init() and non-fdt users won't be affected (they call
-> kirkwood_init()).
-> 
-> Last, I converted the two easiest drivers, rtc and wdt.  The xor and crypto
-> drivers remain for a later patch series.
+Hi,
 
-Hi Jason,
+On Thu, Mar 1, 2012 at 11:26 AM, Alan Ott <alan@signal11.us> wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+>
+> These two functions are used in drivers that can be
+> modules, so they need to be exported.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Nice patch series! I've commented on a few details that need improving, but
-it seems you're making good progress overall. Note that in other platforms,
-we typically focus on converting all the devices outside of the soc first,
-because that lets us get away from board files faster, but there is nothing
-wrong in principle in converting the devices on the soc as well.
+With some of the pinmux changes going in this will no longer be
+needed, but it is for now so:
 
-	Arnd
+Acked-by: Olof Johansson <olof@lixom.net>
