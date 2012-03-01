@@ -1,199 +1,223 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu,  1 Mar 2012 10:11:37 +0200
-Subject: [PATCH 7/7] remoteproc: cleanup resource table parsing paths
-In-Reply-To: <1330589497-4139-1-git-send-email-ohad@wizery.com>
-References: <1330589497-4139-1-git-send-email-ohad@wizery.com>
-Message-ID: <1330589497-4139-8-git-send-email-ohad@wizery.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 01 Mar 2012 10:21:59 +0200
+Subject: [PATCH V2 1/1] mmc: start removing enable / disable API
+In-Reply-To: <4F4F2E93.1090109@codeaurora.org>
+References: <1330499841-6879-1-git-send-email-adrian.hunter@intel.com>
+ <1330499841-6879-2-git-send-email-adrian.hunter@intel.com>
+ <4F4F2E93.1090109@codeaurora.org>
+Message-ID: <4F4F31A7.3060307@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rproc_handle_resources() looks for the resource table and then
-invokes a resource handler function which it took as a parameter.
+On 01/03/12 10:08, Subhash Jadavani wrote:
+> On 2/29/2012 12:47 PM, Adrian Hunter wrote:
+>> Most parts of the enable / disable API are no longer used and
+>> can be removed.
+>>
+>> Cc: Rajendra Nayak<rnayak@ti.com>
+>> Cc: Venkatraman S<svenkatr@ti.com>
+>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>> Cc: Thomas Abraham<thomas.abraham@linaro.org>
+>> Cc: Kyungmin Park<kyungmin.park@samsung.com>
+>> Cc: Sekhar Nori<nsekhar@ti.com>
+>> Cc: Kevin Hilman<khilman@ti.com>
+>> Signed-off-by: Adrian Hunter<adrian.hunter@intel.com>
+>> ---
+>>   arch/arm/mach-exynos/mach-nuri.c           |    5 +-
+>>   arch/arm/mach-exynos/mach-universal_c210.c |    9 +-
+>>   drivers/mmc/core/core.c                    |  187
+>> +++-------------------------
+>>   drivers/mmc/core/host.c                    |    1 -
+>>   drivers/mmc/core/host.h                    |    1 -
+>>   drivers/mmc/host/davinci_mmc.c             |    4 -
+>>   drivers/mmc/host/omap_hsmmc.c              |   15 +--
+>>   include/linux/mmc/core.h                   |    1 -
+>>   include/linux/mmc/host.h                   |   46 +------
+>>   9 files changed, 27 insertions(+), 242 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/mach-nuri.c
+>> b/arch/arm/mach-exynos/mach-nuri.c
+>> index 644af11..de68248 100644
+>> --- a/arch/arm/mach-exynos/mach-nuri.c
+>> +++ b/arch/arm/mach-exynos/mach-nuri.c
+>> @@ -109,7 +109,7 @@ static struct s3c_sdhci_platdata nuri_hsmmc0_data
+>> __initdata = {
+>>       .max_width        = 8,
+>>       .host_caps        = (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
+>>                   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+>> -                MMC_CAP_DISABLE | MMC_CAP_ERASE),
+>> +                MMC_CAP_ERASE),
+>>       .cd_type        = S3C_SDHCI_CD_PERMANENT,
+>>   };
+>>
+>> @@ -147,8 +147,7 @@ static struct platform_device emmc_fixed_voltage = {
+>>   static struct s3c_sdhci_platdata nuri_hsmmc2_data __initdata = {
+>>       .max_width        = 4,
+>>       .host_caps        = MMC_CAP_4_BIT_DATA |
+>> -                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+>> -                MMC_CAP_DISABLE,
+>> +                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
+>>       .ext_cd_gpio        = EXYNOS4_GPX3(3),    /* XEINT_27 */
+>>       .ext_cd_gpio_invert    = 1,
+>>       .cd_type        = S3C_SDHCI_CD_GPIO,
+>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
+>> b/arch/arm/mach-exynos/mach-universal_c210.c
+>> index 9b3fbae..57cfe61 100644
+>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
+>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
+>> @@ -734,8 +734,7 @@ static struct platform_device universal_gpio_keys = {
+>>   static struct s3c_sdhci_platdata universal_hsmmc0_data __initdata = {
+>>       .max_width        = 8,
+>>       .host_caps        = (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
+>> -                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+>> -                MMC_CAP_DISABLE),
+>> +                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
+>>       .cd_type        = S3C_SDHCI_CD_PERMANENT,
+>>   };
+>>
+>> @@ -772,8 +771,7 @@ static struct platform_device mmc0_fixed_voltage = {
+>>   static struct s3c_sdhci_platdata universal_hsmmc2_data __initdata = {
+>>       .max_width        = 4,
+>>       .host_caps        = MMC_CAP_4_BIT_DATA |
+>> -                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+>> -                MMC_CAP_DISABLE,
+>> +                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
+>>       .ext_cd_gpio        = EXYNOS4_GPX3(4),      /* XEINT_28 */
+>>       .ext_cd_gpio_invert    = 1,
+>>       .cd_type        = S3C_SDHCI_CD_GPIO,
+>> @@ -783,8 +781,7 @@ static struct s3c_sdhci_platdata universal_hsmmc2_data
+>> __initdata = {
+>>   static struct s3c_sdhci_platdata universal_hsmmc3_data __initdata = {
+>>       .max_width        = 4,
+>>       .host_caps        = MMC_CAP_4_BIT_DATA |
+>> -                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+>> -                MMC_CAP_DISABLE,
+>> +                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
+>>       .cd_type        = S3C_SDHCI_CD_EXTERNAL,
+>>   };
+>>
+>> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+>> index 0b317f0..44dd013 100644
+>> --- a/drivers/mmc/core/core.c
+>> +++ b/drivers/mmc/core/core.c
+>> @@ -605,105 +605,6 @@ unsigned int mmc_align_data_size(struct mmc_card
+>> *card, unsigned int sz)
+>>   EXPORT_SYMBOL(mmc_align_data_size);
+>>
+>>   /**
+>> - *    mmc_host_enable - enable a host.
+>> - *    @host: mmc host to enable
+>> - *
+>> - *    Hosts that support power saving can use the 'enable' and 'disable'
+>> - *    methods to exit and enter power saving states. For more information
+>> - *    see comments for struct mmc_host_ops.
+>> - */
+>> -int mmc_host_enable(struct mmc_host *host)
+>> -{
+>> -    if (!(host->caps&  MMC_CAP_DISABLE))
+>> -        return 0;
+>> -
+>> -    if (host->en_dis_recurs)
+>> -        return 0;
+>> -
+>> -    if (host->nesting_cnt++)
+>> -        return 0;
+>> -
+>> -    cancel_delayed_work_sync(&host->disable);
+>> -
+>> -    if (host->enabled)
+>> -        return 0;
+>> -
+>> -    if (host->ops->enable) {
+>> -        int err;
+>> -
+>> -        host->en_dis_recurs = 1;
+>> -        mmc_host_clk_hold(host);
+>> -        err = host->ops->enable(host);
+>> -        mmc_host_clk_release(host);
+>> -        host->en_dis_recurs = 0;
+>> -
+>> -        if (err) {
+>> -            pr_debug("%s: enable error %d\n",
+>> -                 mmc_hostname(host), err);
+>> -            return err;
+>> -        }
+>> -    }
+>> -    host->enabled = 1;
+>> -    return 0;
+>> -}
+>> -EXPORT_SYMBOL(mmc_host_enable);
+>> -
+>> -static int mmc_host_do_disable(struct mmc_host *host, int lazy)
+>> -{
+>> -    if (host->ops->disable) {
+>> -        int err;
+>> -
+>> -        host->en_dis_recurs = 1;
+>> -        mmc_host_clk_hold(host);
+>> -        err = host->ops->disable(host, lazy);
+>> -        mmc_host_clk_release(host);
+>> -        host->en_dis_recurs = 0;
+>> -
+>> -        if (err<  0) {
+>> -            pr_debug("%s: disable error %d\n",
+>> -                 mmc_hostname(host), err);
+>> -            return err;
+>> -        }
+>> -        if (err>  0) {
+>> -            unsigned long delay = msecs_to_jiffies(err);
+>> -
+>> -            mmc_schedule_delayed_work(&host->disable, delay);
+>> -        }
+>> -    }
+>> -    host->enabled = 0;
+>> -    return 0;
+>> -}
+>> -
+>> -/**
+>> - *    mmc_host_disable - disable a host.
+>> - *    @host: mmc host to disable
+>> - *
+>> - *    Hosts that support power saving can use the 'enable' and 'disable'
+>> - *    methods to exit and enter power saving states. For more information
+>> - *    see comments for struct mmc_host_ops.
+>> - */
+>> -int mmc_host_disable(struct mmc_host *host)
+>> -{
+>> -    int err;
+>> -
+>> -    if (!(host->caps&  MMC_CAP_DISABLE))
+>> -        return 0;
+>> -
+>> -    if (host->en_dis_recurs)
+>> -        return 0;
+>> -
+>> -    if (--host->nesting_cnt)
+>> -        return 0;
+>> -
+>> -    if (!host->enabled)
+>> -        return 0;
+>> -
+>> -    err = mmc_host_do_disable(host, 0);
+>> -    return err;
+>> -}
+>> -EXPORT_SYMBOL(mmc_host_disable);
+>> -
+>> -/**
+>>    *    __mmc_claim_host - exclusively claim a host
+>>    *    @host: mmc host to claim
+>>    *    @abort: whether or not the operation should be aborted
+>> @@ -741,8 +642,8 @@ int __mmc_claim_host(struct mmc_host *host, atomic_t
+>> *abort)
+>>           wake_up(&host->wq);
+>>       spin_unlock_irqrestore(&host->lock, flags);
+>>       remove_wait_queue(&host->wq,&wait);
+>> -    if (!stop)
+>> -        mmc_host_enable(host);
+>> +    if (host->ops->enable&&  !stop&&  host->claim_cnt == 1)
+> Shouldn't we still make sure that clocks are hold (by calling
+> mmc_host_clk_hold() ) before calling enable?
 
-This works, but it's a bit unintuitive to follow.
-
-Instead of passing around function pointers, this patch changes
-rproc_handle_resource() to just find and return the resource table,
-and then the calling sites of rproc_handle_resource() invoke their
-resource handlers directly.
-
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Brian Swetland <swetland@google.com>
-Cc: Iliyan Malchev <malchev@google.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Mark Grosen <mgrosen@ti.com>
-Cc: John Williams <john.williams@petalogix.com>
-Cc: Michal Simek <monstr@monstr.eu>
-Cc: Loic PALLARDY <loic.pallardy@stericsson.com>
-Cc: Ludovic BARRE <ludovic.barre@stericsson.com>
-Cc: Omar Ramirez Luna <omar.luna@linaro.org>
-Cc: Guzman Lugo Fernando <fernando.lugo@ti.com>
-Cc: Anna Suman <s-anna@ti.com>
-Cc: Clark Rob <rob@ti.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Saravana Kannan <skannan@codeaurora.org>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Kieran Bingham <kieranbingham@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- drivers/remoteproc/remoteproc_core.c |   70 ++++++++++++++++++---------------
- 1 files changed, 38 insertions(+), 32 deletions(-)
-
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 9be5dad..ee15c68 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -822,32 +822,31 @@ rproc_handle_virtio_rsc(struct rproc *rproc, struct resource_table *table, int l
- }
- 
- /**
-- * rproc_handle_resources() - find and handle the resource table
-+ * rproc_find_rsc_table() - find the resource table
-  * @rproc: the rproc handle
-  * @elf_data: the content of the ELF firmware image
-  * @len: firmware size (in bytes)
-- * @handler: function that should be used to handle the resource table
-+ * @tablesz: place holder for providing back the table size
-  *
-  * This function finds the resource table inside the remote processor's
-- * firmware, and invoke a user-supplied handler with it (we have two
-- * possible handlers: one is invoked upon registration of @rproc,
-- * in order to register the supported virito devices, and the other is
-- * invoked when @rproc is actually booted).
-- *
-- * Currently this function fails if a resource table doesn't exist.
-- * This restriction will be removed when we'll start supporting remote
-- * processors that don't need a resource table.
-+ * firmware. It is used both upon the registration of @rproc (in order
-+ * to look for and register the supported virito devices), and when the
-+ * @rproc is booted.
-+ *
-+ * Returns the pointer to the resource table if it is found, and write its
-+ * size into @tablesz. If a valid table isn't found, NULL is returned
-+ * (and @tablesz isn't set).
-  */
--static int rproc_handle_resources(struct rproc *rproc, const u8 *elf_data,
--				size_t len, rproc_handle_resources_t handler)
--
-+static struct resource_table *
-+rproc_find_rsc_table(struct rproc *rproc, const u8 *elf_data, size_t len,
-+							int *tablesz)
- {
- 	struct elf32_hdr *ehdr;
- 	struct elf32_shdr *shdr;
- 	const char *name_table;
- 	struct device *dev = rproc->dev;
--	int i, ret = -EINVAL;
--	struct resource_table *table;
-+	struct resource_table *table = NULL;
-+	int i;
- 
- 	ehdr = (struct elf32_hdr *)elf_data;
- 	shdr = (struct elf32_shdr *)(elf_data + ehdr->e_shoff);
-@@ -866,39 +865,39 @@ static int rproc_handle_resources(struct rproc *rproc, const u8 *elf_data,
- 		/* make sure we have the entire table */
- 		if (offset + size > len) {
- 			dev_err(dev, "resource table truncated\n");
--			return -EINVAL;
-+			return NULL;
- 		}
- 
- 		/* make sure table has at least the header */
- 		if (sizeof(struct resource_table) > size) {
- 			dev_err(dev, "header-less resource table\n");
--			return -EINVAL;
-+			return NULL;
- 		}
- 
- 		/* we don't support any version beyond the first */
- 		if (table->ver != 1) {
- 			dev_err(dev, "unsupported fw ver: %d\n", table->ver);
--			return -EINVAL;
-+			return NULL;
- 		}
- 
- 		/* make sure reserved bytes are zeroes */
- 		if (table->reserved[0] || table->reserved[1]) {
- 			dev_err(dev, "non zero reserved bytes\n");
--			return -EINVAL;
-+			return NULL;
- 		}
- 
- 		/* make sure the offsets array isn't truncated */
- 		if (table->num * sizeof(table->offset[0]) +
- 				sizeof(struct resource_table) > size) {
- 			dev_err(dev, "resource table incomplete\n");
--			return -EINVAL;
-+			return NULL;
- 		}
- 
--		ret = handler(rproc, table, shdr->sh_size);
-+		*tablesz = shdr->sh_size;
- 		break;
- 	}
- 
--	return ret;
-+	return table;
- }
- 
- /**
-@@ -1012,7 +1011,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
- 	struct device *dev = rproc->dev;
- 	const char *name = rproc->firmware;
- 	struct elf32_hdr *ehdr;
--	int ret;
-+	struct resource_table *table;
-+	int ret, tablesz;
- 
- 	ret = rproc_fw_sanity_check(rproc, fw);
- 	if (ret)
-@@ -1039,9 +1039,13 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
- 	 */
- 	rproc->bootaddr = ehdr->e_entry;
- 
-+	/* look for the resource table */
-+	table = rproc_find_rsc_table(rproc, fw->data, fw->size, &tablesz);
-+	if (!table)
-+		goto clean_up;
-+
- 	/* handle fw resources which are required to boot rproc */
--	ret = rproc_handle_resources(rproc, fw->data, fw->size,
--						rproc_handle_boot_rsc);
-+	ret = rproc_handle_boot_rsc(rproc, table, tablesz);
- 	if (ret) {
- 		dev_err(dev, "Failed to process resources: %d\n", ret);
- 		goto clean_up;
-@@ -1084,19 +1088,21 @@ clean_up:
- static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
- {
- 	struct rproc *rproc = context;
--	struct device *dev = rproc->dev;
--	int ret;
-+	struct resource_table *table;
-+	int ret, tablesz;
- 
- 	if (rproc_fw_sanity_check(rproc, fw) < 0)
- 		goto out;
- 
--	/* does the fw support any virtio devices ? */
--	ret = rproc_handle_resources(rproc, fw->data, fw->size,
--						rproc_handle_virtio_rsc);
--	if (ret) {
--		dev_info(dev, "No fw virtio device was found\n");
-+	/* look for the resource table */
-+	table = rproc_find_rsc_table(rproc, fw->data, fw->size, &tablesz);
-+	if (!table)
-+		goto out;
-+
-+	/* look for virtio devices and register them */
-+	ret = rproc_handle_virtio_rsc(rproc, table, tablesz);
-+	if (ret)
- 		goto out;
--	}
- 
- out:
- 	if (fw)
--- 
-1.7.5.4
+The only enable / disable user is omap_hsmmc which uses it to get
+and put runtime pm, so there is no reason to hold / release clock
+gating - since that path will also get / put runtime pm which is synchronized.
