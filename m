@@ -1,66 +1,48 @@
-From: bill4carson@gmail.com (carson bill)
-Date: Thu, 1 Mar 2012 20:42:37 +0800
-Subject: [PATCH 7/7] Minor compiling fix
-In-Reply-To: <201203011140.44364.arnd@arndb.de>
-References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
- <201202291235.04113.arnd@arndb.de> <4F4F36DD.3020005@gmail.com>
- <201203011140.44364.arnd@arndb.de>
-Message-ID: <CAOMgcGK4h1CtyF=F5_u17NmF54Rvvj31P-=LXhpKeM4JqmuC1A@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 1 Mar 2012 20:52:56 +0800
+Subject: [PATCH 3/8] rtc: sa1100: add OF support
+In-Reply-To: <201203010951.12405.arnd@arndb.de>
+References: <1330582228-12424-1-git-send-email-haojian.zhuang@marvell.com>
+ <1330582228-12424-4-git-send-email-haojian.zhuang@marvell.com>
+ <201203010951.12405.arnd@arndb.de>
+Message-ID: <CAN1soZwe+NRaf--SKupqtTnJ=YExT9LYBx+R9jUV3aA0ecbkbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/1 Arnd Bergmann <arnd@arndb.de>
+On Thu, Mar 1, 2012 at 5:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 01 March 2012, Haojian Zhuang wrote:
+>> +#ifdef CONFIG_OF
+>> +static int sa1100_rtc_probe_dt(struct platform_device *pdev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct sa1100_rtc *info)
+>> +{
+>> + ? ? ? info->irq_alarm = platform_get_irq(pdev, 0);
+>> + ? ? ? info->irq_1hz = platform_get_irq(pdev, 1);
+>> + ? ? ? if (info->irq_1hz < 0 || info->irq_alarm < 0)
+>> + ? ? ? ? ? ? ? return -ENODEV;
+>> + ? ? ? return 0;
+>> +}
+>> +#else
+>> +static int sa1100_rtc_probe_dt(struct platform_device *pdev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct sa1100_rtc *info)
+>> +{
+>> + ? ? ? return 1;
+>> +}
+>> +#endif
+>> +
+>> +static int sa1100_rtc_probe_irq(struct platform_device *pdev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct sa1100_rtc *info)
+>> +{
+>> + ? ? ? info->irq_1hz = platform_get_irq_byname(pdev, "rtc 1Hz");
+>> + ? ? ? info->irq_alarm = platform_get_irq_byname(pdev, "rtc alarm");
+>> + ? ? ? if (info->irq_1hz < 0 || info->irq_alarm < 0)
+>> + ? ? ? ? ? ? ? return -ENODEV;
+>> + ? ? ? return 0;
+>> +}
 >
-> On Thursday 01 March 2012, bill4carson wrote:
-> > On 2012?02?29? 20:35, Arnd Bergmann wrote:
-> > > On Monday 13 February 2012, Bill Carson wrote:
-> > >> --- a/arch/arm/mm/dma-mapping.c
-> > >> +++ b/arch/arm/mm/dma-mapping.c
-> > >> @@ -152,9 +152,6 @@ static struct arm_vmregion_head consistent_head = {
-> > >>          .vm_end         = CONSISTENT_END,
-> > >>   };
-> > >>
-> > >> -#ifdef CONFIG_HUGETLB_PAGE
-> > >> -#error ARM Coherent DMA allocator does not (yet) support huge TLB
-> > >> -#endif
-> > >
-> > > This one needs an explanation, too. What has changed that now allows
-> > > dma_alloc_coherent to work with CONFIG_HUGETLB_PAGE set that did not
-> > > work before?
-> > >
-> >
-> > AFAIK, __dma_alloc has the finest granularity at 4k page size even when
-> > user requests 1M bytes memory.
-> >
-> > but current hugetlb low level set_hugepte_at *ONLY*/*MUST* support 2M
-> > page mapping, so it can't be used to create huge dma mapping in a more
-> > general way.
-> >
-> > comments this error out doesn't mean that it could support huge page dma
-> > mapping now with this patch, just shut up gcc when compiling.
-> >
-> > Adding a single low level hook to create 1M page mapping can satisfy
-> > the needs, but apparently that's out of hugetlb scope.
-> > And it's on my TODO list :)
->
-> Hmm, I'm still not sure I'm following. The coherent DMA area is currently
-> limited to 2MB or a small multiple of that, so you would not be able
-> to allocate coherent hugepages anyway.
->
->
-> Further, I don't think there are any device drivers that call
-> dma_alloc_coherent and expect to map the resulting page into
-> user space, or that we even have an interface for that.
+> This should not be necessary. I thought we had already added support
+> for named irq resources coming from the device tree. If not, why not
+> just make the other ones anonymous as well and just use platform_get_irq()?
 >
 
-This "ifdef" is used to remind dma implementation should use hugetlb low
-API to set up huge page mappings one day hugetlb is supported, just it!
-
-For now, I don't see any direct relationship dma alloc has to do with hugetlb
-in a more general way other than both could share low level page table
-management.
-
-
-> This entire chunk of code is also getting changed with the addition of CMA.
->
->        Arnd
+Yes, platform_get_irq() is better. I'll append the two irqs into
+interrupts property.
