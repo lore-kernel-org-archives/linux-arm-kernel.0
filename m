@@ -1,229 +1,107 @@
-From: subhashj@codeaurora.org (Subhash Jadavani)
-Date: Thu, 01 Mar 2012 15:51:02 +0530
-Subject: [PATCH V2 1/1] mmc: start removing enable / disable API
-In-Reply-To: <4F4F31A7.3060307@intel.com>
-References: <1330499841-6879-1-git-send-email-adrian.hunter@intel.com>
- <1330499841-6879-2-git-send-email-adrian.hunter@intel.com>
- <4F4F2E93.1090109@codeaurora.org> <4F4F31A7.3060307@intel.com>
-Message-ID: <4F4F4D8E.5030305@codeaurora.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 1 Mar 2012 10:27:02 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <20120301101029.GB7363@n2100.arm.linux.org.uk>
+References: <1330360043.8557.302.camel@zakaz.uk.xensource.com>
+ <20120227180355.GB2023@linaro.org>
+ <1330371219.10008.34.camel@dagon.hellion.org.uk>
+ <20120228102040.GB2063@linaro.org>
+ <1330426133.31269.70.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+ <20120229093436.GA2077@linaro.org>
+ <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+ <20120229125826.GC2077@linaro.org>
+ <20120301101029.GB7363@n2100.arm.linux.org.uk>
+Message-ID: <20120301102702.GD2034@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/1/2012 1:51 PM, Adrian Hunter wrote:
-> On 01/03/12 10:08, Subhash Jadavani wrote:
->> On 2/29/2012 12:47 PM, Adrian Hunter wrote:
->>> Most parts of the enable / disable API are no longer used and
->>> can be removed.
->>>
->>> Cc: Rajendra Nayak<rnayak@ti.com>
->>> Cc: Venkatraman S<svenkatr@ti.com>
->>> Cc: Kukjin Kim<kgene.kim@samsung.com>
->>> Cc: Thomas Abraham<thomas.abraham@linaro.org>
->>> Cc: Kyungmin Park<kyungmin.park@samsung.com>
->>> Cc: Sekhar Nori<nsekhar@ti.com>
->>> Cc: Kevin Hilman<khilman@ti.com>
->>> Signed-off-by: Adrian Hunter<adrian.hunter@intel.com>
->>> ---
->>>    arch/arm/mach-exynos/mach-nuri.c           |    5 +-
->>>    arch/arm/mach-exynos/mach-universal_c210.c |    9 +-
->>>    drivers/mmc/core/core.c                    |  187
->>> +++-------------------------
->>>    drivers/mmc/core/host.c                    |    1 -
->>>    drivers/mmc/core/host.h                    |    1 -
->>>    drivers/mmc/host/davinci_mmc.c             |    4 -
->>>    drivers/mmc/host/omap_hsmmc.c              |   15 +--
->>>    include/linux/mmc/core.h                   |    1 -
->>>    include/linux/mmc/host.h                   |   46 +------
->>>    9 files changed, 27 insertions(+), 242 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/mach-nuri.c
->>> b/arch/arm/mach-exynos/mach-nuri.c
->>> index 644af11..de68248 100644
->>> --- a/arch/arm/mach-exynos/mach-nuri.c
->>> +++ b/arch/arm/mach-exynos/mach-nuri.c
->>> @@ -109,7 +109,7 @@ static struct s3c_sdhci_platdata nuri_hsmmc0_data
->>> __initdata = {
->>>        .max_width        = 8,
->>>        .host_caps        = (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
->>>                    MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
->>> -                MMC_CAP_DISABLE | MMC_CAP_ERASE),
->>> +                MMC_CAP_ERASE),
->>>        .cd_type        = S3C_SDHCI_CD_PERMANENT,
->>>    };
->>>
->>> @@ -147,8 +147,7 @@ static struct platform_device emmc_fixed_voltage = {
->>>    static struct s3c_sdhci_platdata nuri_hsmmc2_data __initdata = {
->>>        .max_width        = 4,
->>>        .host_caps        = MMC_CAP_4_BIT_DATA |
->>> -                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
->>> -                MMC_CAP_DISABLE,
->>> +                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
->>>        .ext_cd_gpio        = EXYNOS4_GPX3(3),    /* XEINT_27 */
->>>        .ext_cd_gpio_invert    = 1,
->>>        .cd_type        = S3C_SDHCI_CD_GPIO,
->>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
->>> b/arch/arm/mach-exynos/mach-universal_c210.c
->>> index 9b3fbae..57cfe61 100644
->>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
->>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
->>> @@ -734,8 +734,7 @@ static struct platform_device universal_gpio_keys = {
->>>    static struct s3c_sdhci_platdata universal_hsmmc0_data __initdata = {
->>>        .max_width        = 8,
->>>        .host_caps        = (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
->>> -                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
->>> -                MMC_CAP_DISABLE),
->>> +                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
->>>        .cd_type        = S3C_SDHCI_CD_PERMANENT,
->>>    };
->>>
->>> @@ -772,8 +771,7 @@ static struct platform_device mmc0_fixed_voltage = {
->>>    static struct s3c_sdhci_platdata universal_hsmmc2_data __initdata = {
->>>        .max_width        = 4,
->>>        .host_caps        = MMC_CAP_4_BIT_DATA |
->>> -                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
->>> -                MMC_CAP_DISABLE,
->>> +                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
->>>        .ext_cd_gpio        = EXYNOS4_GPX3(4),      /* XEINT_28 */
->>>        .ext_cd_gpio_invert    = 1,
->>>        .cd_type        = S3C_SDHCI_CD_GPIO,
->>> @@ -783,8 +781,7 @@ static struct s3c_sdhci_platdata universal_hsmmc2_data
->>> __initdata = {
->>>    static struct s3c_sdhci_platdata universal_hsmmc3_data __initdata = {
->>>        .max_width        = 4,
->>>        .host_caps        = MMC_CAP_4_BIT_DATA |
->>> -                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
->>> -                MMC_CAP_DISABLE,
->>> +                MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
->>>        .cd_type        = S3C_SDHCI_CD_EXTERNAL,
->>>    };
->>>
->>> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
->>> index 0b317f0..44dd013 100644
->>> --- a/drivers/mmc/core/core.c
->>> +++ b/drivers/mmc/core/core.c
->>> @@ -605,105 +605,6 @@ unsigned int mmc_align_data_size(struct mmc_card
->>> *card, unsigned int sz)
->>>    EXPORT_SYMBOL(mmc_align_data_size);
->>>
->>>    /**
->>> - *    mmc_host_enable - enable a host.
->>> - *    @host: mmc host to enable
->>> - *
->>> - *    Hosts that support power saving can use the 'enable' and 'disable'
->>> - *    methods to exit and enter power saving states. For more information
->>> - *    see comments for struct mmc_host_ops.
->>> - */
->>> -int mmc_host_enable(struct mmc_host *host)
->>> -{
->>> -    if (!(host->caps&   MMC_CAP_DISABLE))
->>> -        return 0;
->>> -
->>> -    if (host->en_dis_recurs)
->>> -        return 0;
->>> -
->>> -    if (host->nesting_cnt++)
->>> -        return 0;
->>> -
->>> -    cancel_delayed_work_sync(&host->disable);
->>> -
->>> -    if (host->enabled)
->>> -        return 0;
->>> -
->>> -    if (host->ops->enable) {
->>> -        int err;
->>> -
->>> -        host->en_dis_recurs = 1;
->>> -        mmc_host_clk_hold(host);
->>> -        err = host->ops->enable(host);
->>> -        mmc_host_clk_release(host);
->>> -        host->en_dis_recurs = 0;
->>> -
->>> -        if (err) {
->>> -            pr_debug("%s: enable error %d\n",
->>> -                 mmc_hostname(host), err);
->>> -            return err;
->>> -        }
->>> -    }
->>> -    host->enabled = 1;
->>> -    return 0;
->>> -}
->>> -EXPORT_SYMBOL(mmc_host_enable);
->>> -
->>> -static int mmc_host_do_disable(struct mmc_host *host, int lazy)
->>> -{
->>> -    if (host->ops->disable) {
->>> -        int err;
->>> -
->>> -        host->en_dis_recurs = 1;
->>> -        mmc_host_clk_hold(host);
->>> -        err = host->ops->disable(host, lazy);
->>> -        mmc_host_clk_release(host);
->>> -        host->en_dis_recurs = 0;
->>> -
->>> -        if (err<   0) {
->>> -            pr_debug("%s: disable error %d\n",
->>> -                 mmc_hostname(host), err);
->>> -            return err;
->>> -        }
->>> -        if (err>   0) {
->>> -            unsigned long delay = msecs_to_jiffies(err);
->>> -
->>> -            mmc_schedule_delayed_work(&host->disable, delay);
->>> -        }
->>> -    }
->>> -    host->enabled = 0;
->>> -    return 0;
->>> -}
->>> -
->>> -/**
->>> - *    mmc_host_disable - disable a host.
->>> - *    @host: mmc host to disable
->>> - *
->>> - *    Hosts that support power saving can use the 'enable' and 'disable'
->>> - *    methods to exit and enter power saving states. For more information
->>> - *    see comments for struct mmc_host_ops.
->>> - */
->>> -int mmc_host_disable(struct mmc_host *host)
->>> -{
->>> -    int err;
->>> -
->>> -    if (!(host->caps&   MMC_CAP_DISABLE))
->>> -        return 0;
->>> -
->>> -    if (host->en_dis_recurs)
->>> -        return 0;
->>> -
->>> -    if (--host->nesting_cnt)
->>> -        return 0;
->>> -
->>> -    if (!host->enabled)
->>> -        return 0;
->>> -
->>> -    err = mmc_host_do_disable(host, 0);
->>> -    return err;
->>> -}
->>> -EXPORT_SYMBOL(mmc_host_disable);
->>> -
->>> -/**
->>>     *    __mmc_claim_host - exclusively claim a host
->>>     *    @host: mmc host to claim
->>>     *    @abort: whether or not the operation should be aborted
->>> @@ -741,8 +642,8 @@ int __mmc_claim_host(struct mmc_host *host, atomic_t
->>> *abort)
->>>            wake_up(&host->wq);
->>>        spin_unlock_irqrestore(&host->lock, flags);
->>>        remove_wait_queue(&host->wq,&wait);
->>> -    if (!stop)
->>> -        mmc_host_enable(host);
->>> +    if (host->ops->enable&&   !stop&&   host->claim_cnt == 1)
->> Shouldn't we still make sure that clocks are hold (by calling
->> mmc_host_clk_hold() ) before calling enable?
-> The only enable / disable user is omap_hsmmc which uses it to get
-> and put runtime pm, so there is no reason to hold / release clock
-> gating - since that path will also get / put runtime pm which is synchronized.
-Ok.
+On Thu, Mar 01, 2012 at 10:10:29AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 29, 2012 at 12:58:26PM +0000, Dave Martin wrote:
+> > On Wed, Feb 29, 2012 at 09:56:02AM +0000, Ian Campbell wrote:
+> > > On Wed, 2012-02-29 at 09:34 +0000, Dave Martin wrote:
+> > > > On Tue, Feb 28, 2012 at 12:28:29PM +0000, Stefano Stabellini wrote:
+> > > 
+> > > > > I don't have a very strong opinion on which register we should use, but
+> > > > > I would like to avoid r7 if it is already actively used by gcc.
+> > > > 
+> > > > But there is no framepointer for Thumb-2 code (?)
+> > > 
+> > > Peter Maydell suggested there was:
+> > > > r7 is (used by gcc as) the Thumb frame pointer; I don't know if this
+> > > > makes it worth avoiding in this context.
+> > > 
+> > > Sounds like it might be a gcc-ism, possibly a non-default option?
+> > > 
+> > > Anyway, I think r12 will be fine for our purposes so the point is rather
+> > > moot.
+> > 
+> > Just had a chat with some tools guys -- apparently, when passing register
+> > arguments to gcc inline asms there really isn't a guarantee that those
+> > variables will be in the expected registers on entry to the inline asm.
+> 
+> The best you can do is:
+> 
+> 	register unsigned int foo asm("r7") = value;
+> 
+> 	asm("blah %0" : : "r" (foo));
+> 
+> and ensure that your assembly checks that %0 _is_ r7 and produces a build
+> error if not.  See the __asmeq() macro in asm/system.h to find out how to
+> do that.
+> 
+> This feature has been missing from ARM GCC for quite a long time - it's
+> used extensively on x86 GCC, where they have one register class per
+> register, so they can do stuff like:
+> 
+> 	asm("blah %0" : : "a" (value));
+> 
+> and be guaranteed that %0 will be eax.
+> 
+> > If you need a specific register, this means that you must set up that
+> > register explicitly inside the asm if you want a guarantee that the
+> > code will work:
+> > 
+> > 	asm volatile (
+> > 		"movw	r12, %[hvc_num]\n\t"
+> > 		...
+> > 		"hvc	#0"
+> > 		:: [hvc_num] "i" (NUMBER) : "r12"
+> > 	);
+> > 
+> > Of course, if you need to set up more than about 5 or 6 registers in
+> > this way, the doubled register footprint means that the compiler will
+> > have to start spilling stuff to the stack.
+> 
+> No it won't - it will barf instead - think about it.  If you're clobbering
+> r0 - r5, but need to pass in six values in registers, gcc can't use r0-r5
+> for that, so it must use the remaining registers.  It gets rather unhappy
+> with that, and starts erroring out (iirc 'too many reloads' or some similar
+> error.)  I've been there.
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+You're right about that -- I didn't pursue my line of thought to the end,
+there.  I have see the behaviour you describe.
+
+> If you want to do it that way, your only option is to store them to memory
+> and pass the address of the block into the assembly, and reload them there.
+> Which is extremely sucky and inefficient.
+> 
+> Practically, the register variable plus asm() does seem to work, and seems
+> to work for virtually all gcc versions out there (there have been the odd
+> buggy version, but those bugs appear to get fixed.)
+
+That is inconvenient for us, but it's a not a bug.  The ability for asm
+contraints to be able to gcc to put things in specific registers (as with
+the gcc "abcd" constraints for i386) would be nice, but as you point out,
+this capability is simply not supported by gcc right now for ARM -- the
+compiler guys seem to be pretty opposed to it, so I can't say I anticiapte
+this being supported in the near future.
+
+So, where there's a compelling reason to inline these things, we can use
+the existing techniques if we're alert to the risks.  But in cases where
+there isn't a compelling reason, aren't we just inviting fragility
+unnecessarily?
+
+Cheers
+---Dave
