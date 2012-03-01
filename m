@@ -1,50 +1,56 @@
 From: jason@lakedaemon.net (Jason)
-Date: Thu, 1 Mar 2012 16:23:53 -0500
-Subject: [PATCH 0/4] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
-In-Reply-To: <201203012028.04773.arnd@arndb.de>
+Date: Thu, 1 Mar 2012 16:26:20 -0500
+Subject: [PATCH 3/4] ARM: kirkwood: convert rtc-mv to fdt.
+In-Reply-To: <201203011935.58503.arnd@arndb.de>
 References: <cover.1330625877.git.jason@lakedaemon.net>
- <201203011950.51210.arnd@arndb.de>
- <20120301200136.GA11986@titan.lakedaemon.net>
- <201203012028.04773.arnd@arndb.de>
-Message-ID: <20120301212353.GC11986@titan.lakedaemon.net>
+ <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
+ <201203011935.58503.arnd@arndb.de>
+Message-ID: <20120301212620.GD11986@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2012 at 08:28:04PM +0000, Arnd Bergmann wrote:
-> On Thursday 01 March 2012, Jason wrote:
-> > Thanks for the feedback.  I'll redo this series and resubmit.  Did you
-> > catch my patch from yesterday?
-> > 
-> > [PATCH v3] ARM: kirkwood: covert orion-spi to fdt. [1]
+On Thu, Mar 01, 2012 at 07:35:58PM +0000, Arnd Bergmann wrote:
+> On Thursday 01 March 2012, Jason Cooper wrote:
+> > The comment at mach-kirkwood/common.c:469, says this device is in every
+> > kirkwood board.  So, it is placed in kirkwood.dtsi.
+> >
+> > @@ -218,10 +220,15 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
+> >  {
+> >  	struct resource *res;
+> >  	struct rtc_plat_data *pdata;
+> > +	struct device_node *np = pdev->dev.of_node;
+> >  	resource_size_t size;
+> >  	u32 rtc_time;
+> >  
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +
+> > +	if (np)
+> > +		of_address_to_resource(np, 0, res);
+> > +
+> >  	if (!res)
+> >  		return -ENODEV;
+> >  
+> > @@ -257,6 +264,8 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
+> >  
+> >  	pdata->irq = platform_get_irq(pdev, 0);
+> >  
+> > +	of_property_read_u32(np, "interrupts", &pdata->irq);
+> > +
+> >  	platform_set_drvdata(pdev, pdata);
+> >  
+> >  	if (pdata->irq >= 0) {
 > 
-> Yes, I saw that. It looks good and I was just waiting if other people
-> have comments on it. Maybe you can put it into the same git tree as
-> these ones when they are ready and you send a pull request.
+> The two additions here don't seem necessary, the second one not even
+> correct: Any interrupts and register properties automatically get
+> turned into platform resources when the device is instatiated.
+> 
+> The interrupt number should not be taken verbatim from the device tree
+> because it is always local to the "interrupt-parent" node, so you would
+> have to use irq_of_parse_and map rather than reading the property
+> directly, but as I said you don't even need to do that for platform
+> devices.
 
-Okay, I have a local branch, 'dreamplug_dt' based at v3.3-rc3.  It
-includes the two patches you've already merged into your tree:
-
-c9780e7 ARM: kirkwood: add dreamplug (fdt) support.
-dbc3c26 ARM: kirkwood: convert uart0 to devicetree.
-
-Plus the spi/flash/partitions, and the most recent series.
-
-Can I just do:
-
-git push linux-kirkwood dreamplug_dt:kirkwood_dt
-
-Then, issue a pull request for
-
-git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt
-
-and reference the first uncommitted patch?
-
-Most of the googlings for 'pull request' yield github's "click the
-button", yuck.
-
-Also, is there an equivalent to 'git format-patch/send-email' for pull
-requests?  The pull requests I've looked at seem awfully consistent in
-formatting.
+Learning everyday... :-)
 
 thx,
 
