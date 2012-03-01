@@ -1,43 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 1 Mar 2012 10:58:54 -0800
-Subject: [PATCH 5/6] ARM: OMAP3: Modify omap_hsmmc_late_init to handle
- deleting mmc devices
-In-Reply-To: <4F48677E.30803@ti.com>
-References: <1330077537-19618-1-git-send-email-rnayak@ti.com>
- <1330077537-19618-6-git-send-email-rnayak@ti.com>
- <20120225003352.GC18901@atomide.com> <4F48677E.30803@ti.com>
-Message-ID: <20120301185854.GA18901@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Mar 2012 18:25:43 +0000
+Subject: [PATCH v2 19/28] ARM: Add fixed PCI i/o mapping
+In-Reply-To: <20120301140817.GG7363@n2100.arm.linux.org.uk>
+References: <1330547147-22867-1-git-send-email-robherring2@gmail.com>
+ <201203011352.36067.arnd@arndb.de>
+ <20120301140817.GG7363@n2100.arm.linux.org.uk>
+Message-ID: <201203011825.44049.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [120224 20:14]:
-> On Saturday 25 February 2012 06:03 AM, Tony Lindgren wrote:
-> >Hi,
-> >
-> >* Rajendra Nayak<rnayak@ti.com>  [120224 01:27]:
-> >>omap_hsmmc_late_init() adds deferred (if any) mmc devices which are
-> >>dependent on twl4030-gpio device to be available.
-> >>If twl4030-gpio is built as a module and inserted and deleted multiple
-> >>times, the mmc devices also should be added and deleted accordingly.
-> >>Split omap_hsmmc_late_init() into omap_hsmmc_deferred_add() and
-> >>omap_hsmmc_deferred_del() to handle this.
-> >>The .setup board hook for twl4030-gpio handles the runtime adding
-> >>on deferred mmc devices. Similarly a .teardown board hook for twl4030-gpio
-> >>should handle the runtime deletion by calling omap_hsmmc_deferred_del().
-> >>This is done for all existing omap3 boards in subsequent patches.
-> >
-> >This gets complex.. But I think I've found a simpler way where we
-> >can use the twl gpio offsets and let the drivers take care of the rest.
-> >I'll post some patches hopefully on Monday.
+On Thursday 01 March 2012, Russell King - ARM Linux wrote:
+> On Thu, Mar 01, 2012 at 01:52:35PM +0000, Arnd Bergmann wrote:
+> > Ok. I've looked up the manual for IOP134x and it's very clear there that
+> > it has only two 64k I/O windows but no more (developer manual, sections
+> > 2.2.2.1 and 3.3.2.1). Limiting the virtual space to 64k would result in
+> > seeing only one of the buses, but 1 MB is enough if we map both buses
+> > in there.
 > 
-> I agree it gets complex. If you have a simpler way to handle this, that
-> would be great.
+> I think it was the 80312, and the manual does limit the window to 64k.
 
-Posted now, sorry it too a bit longer, I got distracted with other
-stuff. The thread is "[PATCH 0/4] Start getting rid of pdata callbacks
-with gpio_find_by_chip_name()". Some further testing would be
-appreciated.
+I can't see where we suport that one in Linux, was it removed at some
+point? I also can't find any documentation for it on the web.
 
-Regards,
+This makes it hard to figure out now what exactly the problem was,
+but at least we don't have to worry about breaking that machine now.
 
-Tony
+The iop variants in the kernel today only map 64kb of I/O window
+today, so I can't see how we would regress.
+That leaves us still with Kirkwood/Dove and ixp2000 to figure out.
+
+I can imagine that ixp2000 has a similar problem to the one you describe
+because of the way it uses the second 64kb in the resource instead of
+the first 64kb. I would suggest that for ixp2000 we just make the first
+1MB of of the 32MB window, which covers the 64kb resource and more.
+I've checked that none of the ixp2000 specific drivers use PC-style
+I/O anywhere outside of PCI and that the only IO resource that is
+registered is the one for the PCI bus, so I'm rather optimistic about this
+one.
+
+For Kirkwood and Dove, an easy way out would be to extend the I/O
+space window to 2MB right away and just map both as before, but we
+can also try just using the two lower 64k windows in each and see what
+breaks, as those seem to be widely available for testing still.
+
+	Arnd
