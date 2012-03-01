@@ -1,38 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 1 Mar 2012 11:17:45 +0000
-Subject: [PATCH v5 2/2] Regulator: Add Anatop regulator driver
-In-Reply-To: <1330593052-15184-2-git-send-email-paul.liu@linaro.org>
-References: <1328734286-30091-1-git-send-email-paul.liu@linaro.org>
- <1330593052-15184-1-git-send-email-paul.liu@linaro.org>
- <1330593052-15184-2-git-send-email-paul.liu@linaro.org>
-Message-ID: <20120301111744.GC3124@opensource.wolfsonmicro.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Thu, 1 Mar 2012 12:39:44 +0100
+Subject: [PATCH 1/5] mfd : ux500 - Cleanup duplicate definitions
+In-Reply-To: <1330465569-567-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1330465569-567-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20120301113944.GJ9008@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2012 at 05:10:52PM +0800, Ying-Chun Liu (PaulLiu) wrote:
+Hi Daniel,
 
-> +	if (IS_ERR(rdev)) {
-> +		dev_err(&pdev->dev, "failed to register %s\n",
-> +			rdesc->name);
-> +		kfree(rdesc->name);
-> +		return PTR_ERR(rdev);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +int anatop_regulator_remove(struct platform_device *pdev)
-> +{
-> +	struct regulator_dev *rdev = platform_get_drvdata(pdev);
-> +	regulator_unregister(rdev);
-> +	return 0;
+On Tue, Feb 28, 2012 at 10:46:05PM +0100, daniel.lezcano at linaro.org wrote:
+> From: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> I missed in my previous patch the A9_MASK_REQ[_MASK] were
+> already defined. Let's remove the duplicate definitions.
+> 
+> The PRCMU_GIC_DELAY macro could be removed as it is not
+> really useful here.
+This one and the 4 other patches applied. Thanks.
 
-Looks mostly good but this leaks rdesc->name which was allocated with
-kstrdup() in the probe() function.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120301/dbd214a6/attachment.sig>
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
