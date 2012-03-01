@@ -1,43 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 1 Mar 2012 20:46:17 +0000
-Subject: [PATCH 5/8] ARM: tegra: work around tegra THUMB2_KERNEL bug
-In-Reply-To: <20120301204203.GA19274@n2100.arm.linux.org.uk>
-References: <1330630010-11241-1-git-send-email-alan@signal11.us>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861726@HQMAIL01.nvidia.com>
- <20120301204203.GA19274@n2100.arm.linux.org.uk>
-Message-ID: <201203012046.17768.arnd@arndb.de>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Thu, 01 Mar 2012 12:46:57 -0800
+Subject: [PATCH] mm: module_alloc: check if size is 0
+In-Reply-To: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+References: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+Message-ID: <4F4FE041.1000507@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 March 2012, Russell King - ARM Linux wrote:
-> On Thu, Mar 01, 2012 at 12:02:42PM -0800, Stephen Warren wrote:
-> > Alan Ott wrote at Thursday, March 01, 2012 12:27 PM:
-> > > From: Arnd Bergmann <arnd@arndb.de>
-> > > 
-> > > The tegra smp code cannot currently be built for t2, so
-> > > disable that combination for now, as a workaround.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > At least in next-20120229 with the .config I'm using, everything appears
-> > to compile fine. The link step does fail, but the error messages I get
-> > don't appear to be Tegra specific:
-> > 
-> > xxx/kernel/sched/clock.c:334: relocation truncated to fit: R_ARM_THM_JUMP11 against symbol `sched_clock' defined in .text section in arch/arm/kernel/built-in.o
-> > kernel/built-in.o: In function `post_relocation':
-> > xxx/kernel/module.c:2860: relocation truncated to fit: R_ARM_THM_JUMP11 against symbol `module_finalize' defined in .text section in arch/arm/kernel/built-in.o
-> > kernel/built-in.o: In function `show_interrupts':
-> > xxx/kernel/irq/proc.c:431: relocation truncated to fit: R_ARM_THM_JUMP11 against symbol `arch_show_interrupts' defined in .text section in arch/arm/kernel/built-in.o
-> > drivers/built-in.o: In function `pci_set_master':
-> > xxx/drivers/pci/pci.c:2674: relocation truncated to fit: R_ARM_THM_JUMP11 against symbol `pcibios_set_master' defined in .text section in arch/arm/kernel/built-in.o
-> 
-> At a guess, it suggests your kernel image is too big for the relocations
-> contained within the code.  That's something for Thumb people to look
-> into and solve.
+On 03/01/2012 11:45 AM, Veli-Pekka Peltola wrote:
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index 1e9be5d..d44d212 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -39,8 +39,8 @@
+>  #ifdef CONFIG_MMU
+>  void *module_alloc(unsigned long size)
+>  {
+> -	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+> -				GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
+> +	return size == 0 ? NULL : __vmalloc_node_range(size, 1, MODULES_VADDR,
+> +				MODULES_END, GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
+>  				__builtin_return_address(0));
+>  }
+>  #endif
+> diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
+> index a5066b1..cd768e9 100644
+> --- a/arch/mips/kernel/module.c
+> +++ b/arch/mips/kernel/module.c
+> @@ -47,8 +47,8 @@ static DEFINE_SPINLOCK(dbe_lock);
+>  #ifdef MODULE_START
+>  void *module_alloc(unsigned long size)
+>  {
+> -	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
+> -				GFP_KERNEL, PAGE_KERNEL, -1,
+> +	return size == 0 ? NULL : __vmalloc_node_range(size, 1, MODULE_START,
+> +				MODULE_END, GFP_KERNEL, PAGE_KERNEL, -1,
+>  				__builtin_return_address(0));
+>  }
+>  #endif
+> diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
+> index 925179f..bff6118 100644
+> --- a/arch/x86/kernel/module.c
+> +++ b/arch/x86/kernel/module.c
+> @@ -38,7 +38,7 @@
+>  
+>  void *module_alloc(unsigned long size)
+>  {
+> -	if (PAGE_ALIGN(size) > MODULES_LEN)
+> +	if (size == 0 || PAGE_ALIGN(size) > MODULES_LEN)
+>  		return NULL;
+>  	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+>  				GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL_EXEC,
 
-IIRC, that was not the issue I was trying to fix when I originally made the
-patch. It's quite likely that the original bug was fixed already, so I'd suggest
-we drop the patch for now and see if the problem comes back when all other
-randconfig problems have been resolved on Tegra.
+Looks good stylistically but really awkward technically.
 
-	Arnd
+I would like to suggest using the idiom:
+
+	if (!size)
+		return NULL;
+
+... consistently; combined with the PAGE_ALIGN() clause for x86 is fine too.
+
+	-hpa
+
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
