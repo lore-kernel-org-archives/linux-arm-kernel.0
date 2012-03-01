@@ -1,77 +1,41 @@
-From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
-Date: Thu,  1 Mar 2012 21:45:19 +0200
-Subject: [PATCH] mm: module_alloc: check if size is 0
-Message-ID: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Mar 2012 19:48:51 +0000
+Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
+In-Reply-To: <2f29e88b98b2bcff0c241996e6d7216a60995d2d.1330625878.git.jason@lakedaemon.net>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <2f29e88b98b2bcff0c241996e6d7216a60995d2d.1330625878.git.jason@lakedaemon.net>
+Message-ID: <201203011948.51642.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit de7d2b567d040e3b67fe7121945982f14343213d (mm/vmalloc.c: report
-more vmalloc failures) users will get a warning if vmalloc_node_range() is
-called with size 0. This happens if module's init size equals to 0. This
-patch changes ARM, MIPS and x86 module_alloc() to return NULL before calling
-vmalloc_node_range() that would also return NULL and print a warning.
+On Thursday 01 March 2012, Jason Cooper wrote:
+>  static int heartbeat = -1;             /* module parameter (seconds) */
+>  static unsigned int wdt_max_duration;  /* (seconds) */
+>  static unsigned int wdt_tclk;
+> +static unsigned int wdt_reg;
+>  static unsigned long wdt_status;
+> static DEFINE_SPINLOCK(wdt_lock);
 
-Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
----
-I found this with ARM but after checking out various implementations of
-module_alloc() I thought it would be better to fix all at once.
+This variable needs to be a 'void __iomem *', not an int.
 
-One way to replicate the warning:
-compile kernel with CONFIG_KALLSYMS=n
-insmod module without init, I used usb-common.ko
+> +       wdt_reg = TIMER_VIRT_BASE;
+> +
+> +       of_property_read_u32(np, "reg", &wdt_reg);
+> +
+>         if (orion_wdt_miscdev.parent)
+>                 return -EBUSY;
+>         orion_wdt_miscdev.parent = &pdev->dev;
 
- arch/arm/kernel/module.c  |    4 ++--
- arch/mips/kernel/module.c |    4 ++--
- arch/x86/kernel/module.c  |    2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+Don't just read a reg property, but use the resource instead and ioremap it.
 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 1e9be5d..d44d212 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -39,8 +39,8 @@
- #ifdef CONFIG_MMU
- void *module_alloc(unsigned long size)
- {
--	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
--				GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
-+	return size == 0 ? NULL : __vmalloc_node_range(size, 1, MODULES_VADDR,
-+				MODULES_END, GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
- 				__builtin_return_address(0));
- }
- #endif
-diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
-index a5066b1..cd768e9 100644
---- a/arch/mips/kernel/module.c
-+++ b/arch/mips/kernel/module.c
-@@ -47,8 +47,8 @@ static DEFINE_SPINLOCK(dbe_lock);
- #ifdef MODULE_START
- void *module_alloc(unsigned long size)
- {
--	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
--				GFP_KERNEL, PAGE_KERNEL, -1,
-+	return size == 0 ? NULL : __vmalloc_node_range(size, 1, MODULE_START,
-+				MODULE_END, GFP_KERNEL, PAGE_KERNEL, -1,
- 				__builtin_return_address(0));
- }
- #endif
-diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
-index 925179f..bff6118 100644
---- a/arch/x86/kernel/module.c
-+++ b/arch/x86/kernel/module.c
-@@ -38,7 +38,7 @@
- 
- void *module_alloc(unsigned long size)
- {
--	if (PAGE_ALIGN(size) > MODULES_LEN)
-+	if (size == 0 || PAGE_ALIGN(size) > MODULES_LEN)
- 		return NULL;
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
- 				GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL_EXEC,
--- 
-1.7.5.4
+This driver still uses hardcoded virtual addresses for its registers, which
+we're trying to get rid of. The best solution would be to always put the
+register address into the platform device resources, either hardcoded for
+classic boards or automatic through the device tree.
+
+A reg property is special in that it's not just a number but is relative
+to the "ranges" property of the parent device and can be multiple 32 bit
+values for the address, which get turned into a CPU physical address using
+of_translate_address().
+
+	Arnd
