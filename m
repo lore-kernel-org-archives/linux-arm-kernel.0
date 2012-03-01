@@ -1,55 +1,31 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 01 Mar 2012 14:40:03 +0900
-Subject: [PATCH v2 2/2] USB: ehci-s5p: add DMA burst support
-Message-ID: <000801ccf76d$c01e2a00$405a7e00$%han@samsung.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 1 Mar 2012 16:40:01 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the gpio tree
+Message-ID: <20120301164001.77a063ceed2deaf37cf68e3c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA burst support is added to improve performance in EHCI data
-transfer. The USB EHCI controller on Exynos SoCs can use INCR16,
-INCR8, and INCR4 mode. These modes of INSNREG00 register should
-be set in order to enable DMA burst transfer. This feature is
-also related to AHB spec.
+Hi all,
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Cc: Sangwook Lee <sangwook.lee@linaro.org>
----
-v2: change the definition name from EHCI_ENA_xxx to EHCI_INSNREG00_ENA_xxx.
+Today's linux-next merge of the arm-soc tree got conflicts in
+arch/arm/mach-omap1/gpio16xx.c between commit ab985f0f7c2c ("gpio/omap:
+cleanup omap_gpio_mod_init function") from the gpio tree and commit
+63325ff235de ("ARM: OMAP1: Move 16xx GPIO system clock to platform init
+code") from the arm-soc tree.
 
-drivers/usb/host/ehci-s5p.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+OK, I can't decide which is correct here - the former adds this code
+inside the loop (even though it seems to not depend on anything in the
+loop) and the latter adds it before.  I have used the former (but am
+happy to be corrected).  And both commits remove the code in
+drivers/gpio/gpio-omap.c.
 
-diff --git a/drivers/usb/host/ehci-s5p.c b/drivers/usb/host/ehci-s5p.c
-index 293f741..b337f72 100644
---- a/drivers/usb/host/ehci-s5p.c
-+++ b/drivers/usb/host/ehci-s5p.c
-@@ -16,6 +16,7 @@
- #include <linux/platform_device.h>
- #include <plat/ehci.h>
- #include <plat/usb-phy.h>
-+#include <mach/regs-usb-host.h>
- 
- struct s5p_ehci_hcd {
- 	struct device *dev;
-@@ -128,6 +129,9 @@ static int __devinit s5p_ehci_probe(struct platform_device *pdev)
- 	ehci->regs = hcd->regs +
- 		HC_LENGTH(ehci, readl(&ehci->caps->hc_capbase));
- 
-+	/* DMA burst Enable */
-+	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
-+
- 	dbg_hcs_params(ehci, "reset");
- 	dbg_hcc_params(ehci, "reset");
- 
-@@ -234,6 +238,9 @@ static int s5p_ehci_resume(struct device *dev)
- 	if (pdata && pdata->phy_init)
- 		pdata->phy_init(pdev, S5P_USB_PHY_HOST);
- 
-+	/* DMA burst Enable */
-+	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
-+
- 	if (time_before(jiffies, ehci->next_statechange))
- 		msleep(100);
- 
 -- 
-1.7.1
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120301/65462ffa/attachment.sig>
