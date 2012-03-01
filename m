@@ -1,43 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Mar 2012 10:35:20 +0000
-Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall
- number to the hypervisor
-In-Reply-To: <20120301102702.GD2034@linaro.org>
-References: <20120227180355.GB2023@linaro.org>
- <1330371219.10008.34.camel@dagon.hellion.org.uk>
- <20120228102040.GB2063@linaro.org>
- <1330426133.31269.70.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
- <20120229093436.GA2077@linaro.org>
- <1330509362.4270.20.camel@zakaz.uk.xensource.com>
- <20120229125826.GC2077@linaro.org>
- <20120301101029.GB7363@n2100.arm.linux.org.uk>
- <20120301102702.GD2034@linaro.org>
-Message-ID: <20120301103520.GD7363@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 01 Mar 2012 11:40:27 +0100
+Subject: [PATCH v9 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <001801ccf5e3$69d79860$3d86c920$%cho@samsung.com>
+References: <001801ccf5e3$69d79860$3d86c920$%cho@samsung.com>
+Message-ID: <00fe01ccf797$b7ced690$276c83b0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2012 at 10:27:02AM +0000, Dave Martin wrote:
-> So, where there's a compelling reason to inline these things, we can use
-> the existing techniques if we're alert to the risks.  But in cases where
-> there isn't a compelling reason, aren't we just inviting fragility
-> unnecessarily?
+Hi,
 
-The practical experience from the kernel suggests that there isn't a
-problem - that's not to say that future versions of gcc won't become
-a problem, and that the compiler guys may refuse to fix it.
+On Tuesday, February 28, 2012 7:37 AM KyongHo Cho wrote:
 
-I think it's a feature that we should be pressing gcc guys for - it's
-fairly fundamental to any programming which requires interfaces that
-require certain args in certain registers, or receive results in
-certain registers.
+> Changes since v8:
+> - exynos_iommu_map/unmap() just works for the page sizes
+>    that System MMU supports. (Joerg's comment)
+> - 1 platform device for 1 H/W though a multimedia accelerator
+>    with several System MMUs attached.
+>    This make controlling System MMU simpler.
+> - Information between System MMU and the accelerators:
+>    Shifted to accelerator's device structure from System MMU's
 
-The options over this are basically:
-1. refusing to upgrade to any version of gcc which does not allow
-   registers-in-asm
-2. doing the store-to-memory reload-in-asm thing
-3. hand-coding veneers for every call to marshall the registers
+Could you tell which kernel tree did you use as a base for this patch? 
 
-Each of those has its down sides, but I suspect with (1), it may be
-possible to have enough people applying pressure to the compiler guys
-that they finally see sense on this matter.
+It doesn't apply onto any of the known kernel trees (I've tried v3.2, v3.3-rc5 and
+kgene/for-next). It looks that you have used some internal tree because cannot 
+find arch/arm/mach-exynos/clock-exynos5.c or arch/arm/mach-exynos/clock-exynos4212.c
+files in any of the public git repositories. 
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
