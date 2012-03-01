@@ -1,33 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Mar 2012 13:00:51 +0000
-Subject: [RFC PATCH 0/2] ARM: assembler: Add uniform assembler framework
-In-Reply-To: <20120301114942.GA2040@linaro.org>
-References: <1330455586-10353-1-git-send-email-dave.martin@linaro.org>
- <20120228192458.GC3617@n2100.arm.linux.org.uk>
- <20120301114942.GA2040@linaro.org>
-Message-ID: <20120301130051.GE7363@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason)
+Date: Thu, 1 Mar 2012 07:20:00 -0500
+Subject: [PATCH 2/3 v4] arm: kirkwood: add dreamplug (fdt) support.
+In-Reply-To: <20120229235326.GA3207@lunn.ch>
+References: <20120224075753.GA24858@lunn.ch>
+ <20120229144450.GB23524@titan.lakedaemon.net>
+ <20120229235326.GA3207@lunn.ch>
+Message-ID: <20120301122000.GA6276@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2012 at 11:49:42AM +0000, Dave Martin wrote:
-> Are you still interested in this series?
+On Thu, Mar 01, 2012 at 12:53:26AM +0100, Andrew Lunn wrote:
+> On Wed, Feb 29, 2012 at 09:44:50AM -0500, Jason wrote:
+> > On Fri, Feb 24, 2012 at 08:57:53AM +0100, Andrew Lunn wrote:
+> > > I have some patches under development which will help.
+> > 
+> > Any chance you could shoot those to me?  (on-list preferable)  I'm
+> > thinking we could convert it to an interim solution eg
+> > kirkwood_{get,put}_clock() that would be easy to migrate to generic
+> > CLK/clkdev once it lands.
 > 
-> I have a workaround for the above now, but it's not pretty -- I seem to
-> have opened a can of worms here.
+> It is not that easy. It is not kirkwood, but all platform orion, so
+> includes dove, orion5x, mv78xx0 and kirkwood. All these share the same
+> device drivers, since they all share the same SoC peripheral
+> cores. However, only kirkwood has per peripheral gated clocks and all
+> the others share tclk.
 > 
+> I've also broke orion5x twice so far with my patches, since i don't
+> have any hardware with that SoC. So this time i was hoping to ask for
+> testing on orion5x before submitting to mainline.
 > 
-> We would need something like
-> 
-> #define EXTENDED_ASM(stuff) asm ( ".include \"macros.inc\"\n\t" stuff )
-> #define EXTENDED_VASM(stuff) asm volatile ( ".include \"macros.inc\"\n\t" stuff )
-> 
-> ...where macros.inc includes some logic to protect against multiple
-> inclusion.
-> 
-> This would avoid problems caused by reordering done by the compiler.
-> 
-> I think this can work, but it may be a step too far...
+> Mike did say he hoped the generic clk would be ready last week. Maybe
+> we should ping him and ask for a new ETA?
 
-I'm fairly tempted to say: "if it ain't broke, don't fix".  AFAIK no one
-has reported problems here, so lets not hastily try to fix something that
-will error out if it does go wrong.
+Nah, it'll be ready when it's ready.  I'll keep things the way they are
+and gut through the conversion once his stuff is in mainline.
+
+thx,
+
+Jason.
