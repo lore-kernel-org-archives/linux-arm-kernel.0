@@ -1,28 +1,52 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 1 Mar 2012 11:07:05 +0530
-Subject: [GIT PULL] merge PL330 DMAC driver
-In-Reply-To: <077301ccf769$f6ac3750$e404a5f0$%kim@samsung.com>
-References: <077301ccf769$f6ac3750$e404a5f0$%kim@samsung.com>
-Message-ID: <CABb+yY2hxuxMKsN0gHKwwoVtnHJ+z-gANtsMXA+tKsmk+MRzew@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 01 Mar 2012 14:38:20 +0900
+Subject: [PATCH v2 1/2] ARM: EXYNOS: Add USB HOST register definitions
+Message-ID: <000701ccf76d$8316b0a0$894411e0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 1, 2012 at 10:42 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->
-> Boojin Kim (3):
-> ? ? ?DMA: PL330: Merge PL330 driver into drivers/dma/
->
-You didn't check if upstream has moved since you first prepared your
-patchset.
-This patch doesn't account for
-    ARM: 7326/2: PL330: fix null pointer dereference in pl330_chan_ctrl()
-    ARM: 7164/3: PL330: Fix the size of the dst_cache_ctrl field
+This patch adds USB HOST register definitions. The definition for
+EHCI INSNREG00 regiser and corresponding bit field definitions are
+added.
 
-Btw, adding new copyright notice every year, rather than updating the existing
-one isn't very cool. Other than that it looks ok finally.
+Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+---
+v2: change the definition name from EHCI_ENA_xxx to EHCI_INSNREG00_ENA_xxx.
 
+arch/arm/mach-exynos/include/mach/regs-usb-host.h |   24 +++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-host.h
 
-> ? ? ?DMA: PL330: Removes useless function
-> ? ? ?DMA: PL330: Support MEMTOMEM transmit w/o RMB, WMB
-Look OK.
-      Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+diff --git a/arch/arm/mach-exynos/include/mach/regs-usb-host.h b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
+new file mode 100644
+index 0000000..572b7d4
+--- /dev/null
++++ b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
+@@ -0,0 +1,24 @@
++/*
++ * Copyright (C) 2012 Samsung Electronics Co.Ltd
++ *		http://www.samsung.com
++ *
++ * EXYNOS - USB HOST register definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __REGS_USB_HOST_H
++#define __REGS_USB_HOST_H __FILE__
++
++#define EHCI_INSNREG00(base)			(base + 0x90)
++#define EHCI_INSNREG00_ENA_INCR16		(0x1 << 25)
++#define EHCI_INSNREG00_ENA_INCR8		(0x1 << 24)
++#define EHCI_INSNREG00_ENA_INCR4		(0x1 << 23)
++#define EHCI_INSNREG00_ENA_INCRX_ALIGN		(0x1 << 22)
++#define EHCI_INSNREG00_ENABLE_DMA_BURST	\
++	(EHCI_INSNREG00_ENA_INCR16 | EHCI_INSNREG00_ENA_INCR8 |	\
++	 EHCI_INSNREG00_ENA_INCR4 | EHCI_INSNREG00_ENA_INCRX_ALIGN)
++
++#endif /* __REGS_USB_HOST_H */
+-- 
+1.7.1
