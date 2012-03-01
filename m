@@ -1,110 +1,174 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Feb 2012 17:59:27 -0600
-Subject: [PATCH 7/8] ARM: OMAP: Remove plat/io.h by moving it into
- mach/io.h
-In-Reply-To: <20120229014719.GK18901@atomide.com>
-References: <20120221233619.18709.87982.stgit@kaulin.local>
- <20120221234049.18709.28987.stgit@kaulin.local> <4F4451FB.7070007@gmail.com>
- <20120224000657.GJ18185@atomide.com> <20120224182246.GL18185@atomide.com>
- <4F4AFCC7.3020509@gmail.com> <20120229014719.GK18901@atomide.com>
-Message-ID: <4F4EBBDF.9090806@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 29 Feb 2012 16:39:22 -0800
+Subject: [GIT PULL 5/5] Clean-up for omap
+In-Reply-To: <E1S2pwp-0004tL-BA@merlin.infradead.org> (Tony Lindgren's message
+ of "Wed, 29 Feb 2012 12:15:06 -0800")
+References: <E1S2pwp-0004tL-BA@merlin.infradead.org>
+Message-ID: <874nu9cfyd.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2012 07:47 PM, Tony Lindgren wrote:
-> * Rob Herring <robherring2@gmail.com> [120226 19:15]:
->> On 02/24/2012 12:22 PM, Tony Lindgren wrote:
->>> * Tony Lindgren <tony@atomide.com> [120223 15:36]:
->>>> * Rob Herring <robherring2@gmail.com> [120221 17:53]:
->>>>> On 02/21/2012 05:40 PM, Tony Lindgren wrote:
->>>>>> +
->>>>>> +/*
->>>>>> + * NOTE: Please use ioremap + __raw_read/write where possible instead of these
->>>>>> + */
->>>>>> +
->>>>>> +extern u8 omap_readb(u32 pa);
->>>>>> +extern u16 omap_readw(u32 pa);
->>>>>> +extern u32 omap_readl(u32 pa);
->>>>>> +extern void omap_writeb(u8 v, u32 pa);
->>>>>> +extern void omap_writew(u16 v, u32 pa);
->>>>>> +extern void omap_writel(u32 v, u32 pa);
->>>>>
->>>>> These can't be moved to common.h like omap2?
->>>>
->>>> Not for omap1 currently because a bunch of legacy drivers are
->>>> using them :(
->>>
->>> Looks like we can have them in mach-omap1/include/mach/hardware.h.
->>>
->>> Eventually the SoC specific hardware.h files could be renamed to
->>> just something like omap1.h, omap2plus.h and so. And then they
->>> could be included in the common hardware.h.
->>>
->>> Updated patch below, now io.h for both omap1 and omap2+ are
->>> minimized, and turns out only minimal driver changes were needed.
->>>
->>
->> Looks good to me. Do you have a branch for this that I can base on?
-> 
-> Yes it's now in iomap branch that merged into my cleanup branch that
-> I'll ask Arnd and Olof to pull tomorrow.
-> 
-> So take your pick out of the following two:
-> 
-> 1. iomap branch based on v3.3-rc4 that you probably want to use
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap iomap
-> 
-> 
-> 2. cleanup branch based on RMK's commit 61b80086a525c8a6081257ae40da5dee2bcaee16
->    (Merge branch 'entry-macro-cleanup' of git://sources.calxeda.com/kernel/linux into for-armsoc)
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap cleanup
-> 
-> 
-> BTW, I noticed the following fix is needed for some .configs that
-> I found with randconfig builds, that's only in the cleanup branch
-> as I already merged in iomap and pushed it out. Should not affect
-> your patches though.
-> 
++Grant (for conflict w/GPIO series already queued)
 
-BTW, all these includes need to get removed. I'll add a fix to my series
-unless you already have fixes:
+Tony Lindgren <tony@atomide.com> writes:
 
-arch/arm/mach-omap1/sleep.S:#include <mach/io.h>
-arch/arm/mach-omap1/sram.S:#include <mach/io.h>
-arch/arm/plat-omap/include/plat/sdrc.h:#include <mach/io.h>
-drivers/media/video/davinci/vpbe_osd.c:#include <mach/io.h>
-drivers/media/video/davinci/vpbe_venc.c:#include <mach/io.h>
-drivers/video/omap2/vrfb.c:#include <mach/io.h>
+> This is mostly changes needed for io.h removal, and one
+> patch to remove unused flag for McSPI. Note that these
+> are based on RMK's for-armsoc.
+>
+> Also, these cause a minor merge conflict for mach-omap2/Kconfig
+> with the fixes-non-critical posted in this series of pull
+> requests.
 
-Rob
+Grant, FYI... this series will cause a minor conflict with the GPIO
+runtime PM cleanup you've already pulled from me.
+
+Basically, this patch from $SUBJECT series by Tony:
+
+  ARM: OMAP1: Move 16xx GPIO system clock to platform init code
+
+duplicates work already done in the branch you've pulled.
+
+Not sure how you want to handle this, but maybe you want to merge this
+cleanup branch as well.  If so, the fix is to resolve in favor of the
+GPIO branch you've already pulled from me.
+
+Kevin
 
 > Regards,
-> 
+>
 > Tony
-> 
-> 
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 28 Feb 2012 17:28:09 -0800
-> Subject: [PATCH] ARM: OMAP2+: Fix L4_EMU_34XX_BASE error after iomap changes
-> 
-> With the introduction of iomap changes platform init code
-> fails for emu.c if CONFIG_OMAP3_EMU is selected:
-> 
-> arch/arm/mach-omap2/emu.c:35:8: error:
-> 'L4_EMU_34XX_BASE' undeclared here (not in a function)
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/arch/arm/mach-omap2/emu.c
-> +++ b/arch/arm/mach-omap2/emu.c
-> @@ -21,6 +21,8 @@
->  #include <linux/clk.h>
->  #include <linux/err.h>
->  
-> +#include <mach/hardware.h>
-> +
->  #include "iomap.h"
->  
->  MODULE_LICENSE("GPL");
+>
+> The following changes since commit 61b80086a525c8a6081257ae40da5dee2bcaee16:
+>   Russell King (1):
+>         Merge branch 'entry-macro-cleanup' of git://sources.calxeda.com/kernel/linux into for-armsoc
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap cleanup
+>
+> Jarkko Nikula (1):
+>       ARM: OMAP: McSPI: Remove unused flag from struct omap2_mcspi_device_config
+>
+> Paul Walmsley (1):
+>       ARM: OMAP2xxx: PM: remove obsolete timer disable code in the suspend path
+>
+> Tony Lindgren (10):
+>       ARM: OMAP2+: Drop DISPC L3 firewall code
+>       ARM: OMAP2+: Move SDRC related functions from io.h into local common.h
+>       ARM: OMAP: Move omap_init_consistent_dma_size() to local common.h
+>       ARM: OMAP1: Move 16xx GPIO system clock to platform init code
+>       ARM: OMAP1: Move most of plat/io.h into local iomap.h
+>       ARM: OMAP2+: Move most of plat/io.h into local iomap.h
+>       ARM: OMAP: Remove plat/io.h by splitting it into mach/io.h and mach/hardware.h
+>       ARM: OMAP2+: Limit omap_read/write usage to legacy USB drivers
+>       Merge branch 'iomap' into cleanup
+>       ARM: OMAP2+: Fix L4_EMU_34XX_BASE error after iomap changes
+>
+>  arch/arm/mach-omap1/ams-delta-fiq-handler.S        |    3 +-
+>  arch/arm/mach-omap1/ams-delta-fiq.c                |    1 +
+>  arch/arm/mach-omap1/board-ams-delta.c              |   10 ++-
+>  arch/arm/mach-omap1/board-fsample.c                |    7 +-
+>  arch/arm/mach-omap1/board-h2.c                     |    6 +-
+>  arch/arm/mach-omap1/board-h3.c                     |    8 +-
+>  arch/arm/mach-omap1/board-htcherald.c              |    5 +-
+>  arch/arm/mach-omap1/board-innovator.c              |    7 +-
+>  arch/arm/mach-omap1/board-nokia770.c               |    6 +-
+>  arch/arm/mach-omap1/board-osk.c                    |    7 +-
+>  arch/arm/mach-omap1/board-palmte.c                 |    4 +-
+>  arch/arm/mach-omap1/board-palmtt.c                 |    9 +-
+>  arch/arm/mach-omap1/board-palmz71.c                |    9 +-
+>  arch/arm/mach-omap1/board-perseus2.c               |    7 +-
+>  arch/arm/mach-omap1/board-sx1.c                    |    6 +-
+>  arch/arm/mach-omap1/board-voiceblue.c              |    6 +-
+>  arch/arm/mach-omap1/clock.c                        |    5 +-
+>  arch/arm/mach-omap1/clock_data.c                   |    5 +-
+>  arch/arm/mach-omap1/common.h                       |    1 +
+>  arch/arm/mach-omap1/devices.c                      |    8 +-
+>  arch/arm/mach-omap1/dma.c                          |    2 +-
+>  arch/arm/mach-omap1/flash.c                        |    4 +-
+>  arch/arm/mach-omap1/fpga.c                         |    5 +-
+>  arch/arm/mach-omap1/gpio16xx.c                     |    7 ++
+>  arch/arm/mach-omap1/id.c                           |    3 +
+>  arch/arm/mach-omap1/include/mach/entry-macro.S     |    4 +-
+>  arch/arm/mach-omap1/include/mach/hardware.h        |   36 +++++++++
+>  arch/arm/mach-omap1/include/mach/io.h              |   43 ++++++++++-
+>  arch/arm/mach-omap1/include/mach/memory.h          |    3 +-
+>  arch/arm/mach-omap1/io.c                           |    3 +
+>  arch/arm/mach-omap1/iomap.h                        |   42 ++++++++++
+>  arch/arm/mach-omap1/irq.c                          |    4 +-
+>  arch/arm/mach-omap1/lcd_dma.c                      |    3 +-
+>  arch/arm/mach-omap1/mcbsp.c                        |    5 +-
+>  arch/arm/mach-omap1/pm.c                           |    4 +-
+>  arch/arm/mach-omap1/reset.c                        |    3 +-
+>  arch/arm/mach-omap1/sleep.S                        |    4 +
+>  arch/arm/mach-omap1/sram.S                         |    4 +
+>  arch/arm/mach-omap1/time.c                         |    3 +-
+>  arch/arm/mach-omap1/timer32k.c                     |    7 +-
+>  arch/arm/mach-omap2/board-cm-t35.c                 |    1 -
+>  arch/arm/mach-omap2/board-n8x0.c                   |    1 -
+>  arch/arm/mach-omap2/board-rx51-peripherals.c       |    3 -
+>  arch/arm/mach-omap2/board-zoom-display.c           |    1 -
+>  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c       |    1 +
+>  arch/arm/mach-omap2/clkt_dpll.c                    |    1 +
+>  arch/arm/mach-omap2/clock2420_data.c               |    3 +
+>  arch/arm/mach-omap2/clock2430.c                    |    2 +
+>  arch/arm/mach-omap2/clock2430_data.c               |    2 +
+>  arch/arm/mach-omap2/clock2xxx.c                    |    1 +
+>  arch/arm/mach-omap2/clock3xxx.c                    |    1 +
+>  arch/arm/mach-omap2/clock3xxx_data.c               |    3 +-
+>  arch/arm/mach-omap2/clock44xx_data.c               |    3 +
+>  arch/arm/mach-omap2/cm2xxx_3xxx.c                  |    2 +-
+>  arch/arm/mach-omap2/cm44xx.c                       |    2 +-
+>  arch/arm/mach-omap2/cminst44xx.c                   |    2 +-
+>  arch/arm/mach-omap2/common-board-devices.c         |    1 -
+>  arch/arm/mach-omap2/common.c                       |    4 +-
+>  arch/arm/mach-omap2/common.h                       |    7 ++
+>  arch/arm/mach-omap2/control.c                      |    3 +-
+>  arch/arm/mach-omap2/control.h                      |    1 -
+>  arch/arm/mach-omap2/devices.c                      |    2 +-
+>  arch/arm/mach-omap2/display.c                      |    1 +
+>  arch/arm/mach-omap2/emu.c                          |    4 +
+>  arch/arm/mach-omap2/gpmc-nand.c                    |    1 +
+>  arch/arm/mach-omap2/gpmc-onenand.c                 |    1 +
+>  arch/arm/mach-omap2/include/mach/io.h              |   46 +++++++++++-
+>  arch/arm/mach-omap2/io.c                           |   57 ++------------
+>  .../include/plat/io.h => mach-omap2/iomap.h}       |   80 +-------------------
+>  arch/arm/mach-omap2/irq.c                          |    5 +-
+>  arch/arm/mach-omap2/omap-smp.c                     |    3 +-
+>  arch/arm/mach-omap2/opp2420_data.c                 |    2 +
+>  arch/arm/mach-omap2/opp2430_data.c                 |    2 +
+>  arch/arm/mach-omap2/pm24xx.c                       |   27 +------
+>  arch/arm/mach-omap2/prcm_mpu44xx.c                 |    2 +-
+>  arch/arm/mach-omap2/prm44xx.c                      |    3 +-
+>  arch/arm/mach-omap2/prminst44xx.c                  |    2 +-
+>  arch/arm/mach-omap2/sdram-nokia.c                  |    1 -
+>  arch/arm/mach-omap2/sdrc2xxx.c                     |    5 +-
+>  arch/arm/mach-omap2/sleep24xx.S                    |    1 -
+>  arch/arm/mach-omap2/sleep34xx.S                    |    5 +-
+>  arch/arm/mach-omap2/sram242x.S                     |    4 +-
+>  arch/arm/mach-omap2/sram243x.S                     |    4 +-
+>  arch/arm/mach-omap2/sram34xx.S                     |    5 +-
+>  arch/arm/plat-omap/counter_32k.c                   |    1 +
+>  arch/arm/plat-omap/dma.c                           |    2 +
+>  arch/arm/plat-omap/dmtimer.c                       |    2 +
+>  arch/arm/plat-omap/include/plat/hardware.h         |    6 ++
+>  arch/arm/plat-omap/include/plat/keypad.h           |    2 +
+>  arch/arm/plat-omap/include/plat/mcspi.h            |    3 -
+>  arch/arm/plat-omap/include/plat/tc.h               |   17 ----
+>  arch/arm/plat-omap/include/plat/usb.h              |   41 ++++++++++
+>  arch/arm/plat-omap/mux.c                           |    5 +-
+>  arch/arm/plat-omap/sram.c                          |    9 +-
+>  arch/arm/plat-omap/usb.c                           |    4 +
+>  drivers/char/hw_random/omap-rng.c                  |    2 +
+>  drivers/gpio/gpio-omap.c                           |    7 --
+>  drivers/video/omap2/dss/dispc.c                    |    5 -
+>  drivers/video/omap2/dss/dss.c                      |    3 +
+>  99 files changed, 446 insertions(+), 280 deletions(-)
+>  create mode 100644 arch/arm/mach-omap1/iomap.h
+>  rename arch/arm/{plat-omap/include/plat/io.h => mach-omap2/iomap.h} (77%)
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
