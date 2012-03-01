@@ -1,35 +1,112 @@
 From: rubini@gnudd.com (Alessandro Rubini)
-Date: Thu, 1 Mar 2012 14:28:36 +0100
-Subject: [PATCH 1/4] x86: add NO_IRQ macro
+Date: Thu, 1 Mar 2012 14:29:08 +0100
+Subject: [PATCH 4/4] ARM: use the new linux/sizes.h
 In-Reply-To: <cover.1330607068.git.rubini@gnudd.com>
 References: <cover.1330607068.git.rubini@gnudd.com>
-Message-ID: <6bda7538144dce0bf5780df3d0601147dae753b5.1330607068.git.rubini@gnudd.com>
+Message-ID: <2ec6cf32ff4e5dbdf7fa6ad58bac5dc959d0c875.1330607068.git.rubini@gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This is needed to compile AMBA drivers. Most architectures define
-NO_IRQ as -1, and this does the same for the PC.
 
 Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
 Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Alan Cox <alan@linux.intel.com>
 ---
- arch/x86/include/asm/irq.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/memory.h |    2 +-
+ arch/arm/mm/dma-mapping.c     |    2 +-
+ arch/arm/mm/init.c            |    2 +-
+ arch/arm/mm/ioremap.c         |    2 +-
+ arch/arm/mm/mmu.c             |    2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/include/asm/irq.h b/arch/x86/include/asm/irq.h
-index ba870bb..c9072f5 100644
---- a/arch/x86/include/asm/irq.h
-+++ b/arch/x86/include/asm/irq.h
-@@ -10,6 +10,8 @@
- #include <asm/apicdef.h>
- #include <asm/irq_vectors.h>
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index a8997d7..5848eba 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -16,7 +16,7 @@
+ #include <linux/compiler.h>
+ #include <linux/const.h>
+ #include <linux/types.h>
+-#include <asm/sizes.h>
++#include <linux/sizes.h>
  
-+#define NO_IRQ	(-1)
-+
- static inline int irq_canonicalize(int irq)
- {
- 	return ((irq == 2) ? 9 : irq);
+ #ifdef CONFIG_NEED_MACH_MEMORY_H
+ #include <mach/memory.h>
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index db23ae4..364defd 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -19,12 +19,12 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/highmem.h>
+ #include <linux/slab.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/memory.h>
+ #include <asm/highmem.h>
+ #include <asm/cacheflush.h>
+ #include <asm/tlbflush.h>
+-#include <asm/sizes.h>
+ #include <asm/mach/arch.h>
+ 
+ #include "mm.h"
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 595079f..288b77d 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -20,13 +20,13 @@
+ #include <linux/highmem.h>
+ #include <linux/gfp.h>
+ #include <linux/memblock.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/memblock.h>
+ #include <asm/prom.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+-#include <asm/sizes.h>
+ #include <asm/tlb.h>
+ #include <asm/fixmap.h>
+ 
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index 66daf17..1d24bef 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -25,6 +25,7 @@
+ #include <linux/mm.h>
+ #include <linux/vmalloc.h>
+ #include <linux/io.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+@@ -32,7 +33,6 @@
+ #include <asm/mmu_context.h>
+ #include <asm/pgalloc.h>
+ #include <asm/tlbflush.h>
+-#include <asm/sizes.h>
+ 
+ #include <asm/mach/map.h>
+ #include "mm.h"
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index f77f1db..f3ee2b8 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -16,13 +16,13 @@
+ #include <linux/memblock.h>
+ #include <linux/fs.h>
+ #include <linux/vmalloc.h>
++#include <linux/sizes.h>
+ 
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+ #include <asm/cachetype.h>
+ #include <asm/setup.h>
+-#include <asm/sizes.h>
+ #include <asm/smp_plat.h>
+ #include <asm/tlb.h>
+ #include <asm/highmem.h>
 -- 
 1.7.7.2
