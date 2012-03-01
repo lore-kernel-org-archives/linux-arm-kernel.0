@@ -1,62 +1,40 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 01 Mar 2012 09:00:10 +0530
-Subject: [PATCH 1/2] ARM: EXYNOS: Add USB HOST register definitions
-In-Reply-To: <000101ccf6ef$f4efbab0$decf3010$%han@samsung.com>
-References: <000101ccf6ef$f4efbab0$decf3010$%han@samsung.com>
-Message-ID: <4F4EED42.2010700@linaro.org>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 1 Mar 2012 09:21:15 +0530
+Subject: [PATCH] ARM/sp810: introduce API to change system mode
+In-Reply-To: <20120229201413.GA16999@n2100.arm.linux.org.uk>
+References: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
+ <20120229201413.GA16999@n2100.arm.linux.org.uk>
+Message-ID: <4F4EF233.70405@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2012 08:09 PM, Jingoo Han wrote:
-> This patch adds USB HOST register definitions. The definition for
-> EHCI INSNREG00 regiser and corresponding bit field definitions are
-> added.
+On 3/1/2012 1:44 AM, Russell King - ARM Linux wrote:
+>> >  #define SCCTRL			0x000
+>> > +	#define SYS_MODE_STS_MASK		(0xF << 3)
+>> > +	#define SYS_MODE_STS_SLEEP		(0x0 << 3)
+>> > +	#define SYS_MODE_STS_DOZE		(0x1 << 3)
+>> > +	#define SYS_MODE_STS_SLOW		(0x2 << 3)
+>> > +	#define SYS_MODE_STS_NORMAL		(0x4 << 3)
+>> > +
+>> > +	#define SYS_MODE_MASK			(0x7 << 0)
+>> > +	#define SYS_MODE_SLEEP			(0x0 << 0)
+>> > +	#define SYS_MODE_DOZE			(0x1 << 0)
+>> > +	#define SYS_MODE_SLOW			(0x2 << 0)
+>> > +	#define SYS_MODE_NORMAL			(0x4 << 0)
+> Please don't indent #defines like this, I find it abhorrent that, at least,
+> the '#' is not in column 1.
 > 
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> ---
->  arch/arm/mach-exynos/include/mach/regs-usb-host.h |   23 +++++++++++++++++++++
->  1 files changed, 23 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-host.h
+
+I will change it if you want, but this one looked more readable to me.
+
+> Also, please name these constants SCCTRL_xxx so that the prefix matches
+> the register which they're related to.
 > 
-> diff --git a/arch/arm/mach-exynos/include/mach/regs-usb-host.h b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
-> new file mode 100644
-> index 0000000..1a60f27
-> --- /dev/null
-> +++ b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + * Copyright (C) 2012 Samsung Electronics Co.Ltd
-> + *		http://www.samsung.com
-> + *
-> + * EXYNOS - USB HOST register definitions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __REGS_USB_HOST_H
-> +#define __REGS_USB_HOST_H __FILE__
-> +
-> +#define EHCI_INSNREG00(base)		(base + 0x90)
-> +#define EHCI_ENA_INCR16			(0x1 << 25)
-> +#define EHCI_ENA_INCR8			(0x1 << 24)
-> +#define EHCI_ENA_INCR4			(0x1 << 23)
-> +#define EHCI_ENA_INCRX_ALIGN		(0x1 << 22)
-> +#define EHCI_ENABLE_DMA_INCR		(EHCI_ENA_INCR16 | EHCI_ENA_INCR8| \
-> +					 EHCI_ENA_INCR4 | EHCI_ENA_INCRX_ALIGN)
-> +
-As per the definition of bit-fields in other registers, it would be good
-to prepend the complete register name before the bit-field defines.
+> So, I'd much prefer these to be:
+> 
+> #define SCCTRL_MODE_STS_MASK			(0xf << 3)
 
-EHCI_INSNREG00_ENA_INCR16 ...
-
-Considering the similarity of this patchset with the earlier patchset
-from Sangwook, IMO, it would be appropriate to give him due credit in
-both these patches.
-
-> +#endif /* __REGS_USB_HOST_H */
-
+Sure.
 
 -- 
-Tushar Behera
+viresh
