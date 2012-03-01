@@ -1,27 +1,29 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 1 Mar 2012 19:12:40 +0200
-Subject: [PATCH] ARM: OMAP: make iommu subsys_initcall to fix builtin
- omap3isp
-In-Reply-To: <6354375.6C9sXAHKbF@avalon>
-References: <1330251254-14693-1-git-send-email-ohad@wizery.com>
- <35010303.ArkW8BdIu6@avalon>
- <CAK=WgbZRjGEyx0mKmgoWYiOnuvUAka0kTzpLAYbra94Mfpp6qg@mail.gmail.com>
- <6354375.6C9sXAHKbF@avalon>
-Message-ID: <CAK=WgbariR4w_w3tzZtWdoMfxtzvNEJpcdh2VMFUWDUnfCqirA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 01 Mar 2012 09:42:12 -0800
+Subject: [PATCH 0/2] Few more omap DT patches for next merge window
+Message-ID: <20120301174037.12471.72457.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi all,
 
-On Thu, Mar 1, 2012 at 6:37 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> I'll try that then. How expensive is the iommu_attach_device() (and detach)
-> operation in terms of CPU time ?
+Looks like we need one fix to what's currently queued up in
+dt-part2 branch for omaps. And we can make board-generic more
+readable by cutting down the ifdefs.
 
-omap_iommu_attach() basically enables the iommu clock and configures
-that IP block.
+Regards,
 
-I suspect it's negligible but I didn't really measure it...
+Tony
 
-Thanks,
-Ohad.
+---
+
+Tony Lindgren (2):
+      ARM: OMAP2+: Fix build error when only ARCH_OMAP2/3 or 4 is selected
+      ARM: OMAP2+: Remove extra ifdefs for board-generic
+
+
+ arch/arm/mach-omap2/board-generic.c |   83 ++++++++++++++++-------------------
+ 1 files changed, 39 insertions(+), 44 deletions(-)
+
+-- 
+Signature
