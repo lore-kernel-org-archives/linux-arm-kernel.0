@@ -1,76 +1,63 @@
-From: linux-arm@overkiz.com (Boris BREZILLON)
-Date: Thu, 01 Mar 2012 16:14:39 +0100
-Subject: [PATCH] ARM: at91: Add support for configurable main clock frequency.
-Message-ID: <4F4F925F.2020405@overkiz.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 1 Mar 2012 16:24:03 +0100
+Subject: [PATCH v2 1/2] ARM: EXYNOS: Add USB HOST register definitions
+In-Reply-To: <000701ccf76d$8316b0a0$894411e0$%han@samsung.com>
+References: <000701ccf76d$8316b0a0$894411e0$%han@samsung.com>
+Message-ID: <201203011624.04551.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides main clock frequency configuration from device tree
-definition.
+Am Donnerstag, 1. M?rz 2012, 06:38:20 schrieb Jingoo Han:
+> This patch adds USB HOST register definitions. The definition for
+> EHCI INSNREG00 regiser and corresponding bit field definitions are
+> added.
+> 
+> Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+> v2: change the definition name from EHCI_ENA_xxx to EHCI_INSNREG00_ENA_xxx.
+> 
+> arch/arm/mach-exynos/include/mach/regs-usb-host.h |   24
+> +++++++++++++++++++++ 1 files changed, 24 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-host.h
+Isn't the general idea to depopulate the mach directories and make drivers 
+buildable across architectures?
 
-If the "main-clock" attribute of pmc node is not specified it takes
-12MHz as default value.
+The definitions are only used in drivers/usb/host/ehci-s5p.c [in the second 
+patch], so there should be no need to add another arch-header and they could 
+simply be included in the driver itself or if necessary a 
+drivers/usb/host/ehci-s5p.h .
 
-With this patch we can add board support using a different main clock
-frequency (our custom board is using a 18,432MHz main clock).
 
----
- arch/arm/boot/dts/at91sam9g20.dtsi |    5 +++++
- arch/arm/mach-at91/board-dt.c      |   21 ++++++++++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletions(-)
+Heiko
 
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi
-b/arch/arm/boot/dts/at91sam9g20.dtsi
-index 07603b8..da253b2 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -46,6 +46,11 @@
- 			#size-cells = <1>;
- 			ranges;
-
-+			pmc {
-+				compatible = "atmel,at91-pmc";
-+				reg = <0xfffffc00 0x100>;
-+			};
-+
- 			aic: interrupt-controller at fffff000 {
- 				#interrupt-cells = <1>;
- 				compatible = "atmel,at91rm9200-aic";
-diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-index bb6b434..c64a3b0 100644
---- a/arch/arm/mach-at91/board-dt.c
-+++ b/arch/arm/mach-at91/board-dt.c
-@@ -33,11 +33,30 @@
- #include "sam9_smc.h"
- #include "generic.h"
-
-+static const struct of_device_id pmc_of_match[] __initconst = {
-+	{ .compatible = "atmel,at91-pmc" },
-+	{},
-+};
-
- static void __init ek_init_early(void)
- {
-+	struct device_node *node;
-+	unsigned long main_clock = 12000000;
-+
-+	node = of_find_matching_node(NULL, pmc_of_match);
-+
-+	if (node) {
-+		const __be32 *ip;
-+		ip = of_get_property(node, "main-clock", NULL);
-+		if (ip) {
-+			main_clock = be32_to_cpup(ip);
-+		}
-+		of_node_put(node);
-+	}
-+
-+
- 	/* Initialize processor: 12.000 MHz crystal */
--	at91_initialize(12000000);
-+	at91_initialize(main_clock);
-
- 	/* DGBU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
--- 
-1.7.0.4
+> diff --git a/arch/arm/mach-exynos/include/mach/regs-usb-host.h
+> b/arch/arm/mach-exynos/include/mach/regs-usb-host.h new file mode 100644
+> index 0000000..572b7d4
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
+> @@ -0,0 +1,24 @@
+> +/*
+> + * Copyright (C) 2012 Samsung Electronics Co.Ltd
+> + *		http://www.samsung.com
+> + *
+> + * EXYNOS - USB HOST register definitions
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __REGS_USB_HOST_H
+> +#define __REGS_USB_HOST_H __FILE__
+> +
+> +#define EHCI_INSNREG00(base)			(base + 0x90)
+> +#define EHCI_INSNREG00_ENA_INCR16		(0x1 << 25)
+> +#define EHCI_INSNREG00_ENA_INCR8		(0x1 << 24)
+> +#define EHCI_INSNREG00_ENA_INCR4		(0x1 << 23)
+> +#define EHCI_INSNREG00_ENA_INCRX_ALIGN		(0x1 << 22)
+> +#define EHCI_INSNREG00_ENABLE_DMA_BURST	\
+> +	(EHCI_INSNREG00_ENA_INCR16 | EHCI_INSNREG00_ENA_INCR8 |	\
+> +	 EHCI_INSNREG00_ENA_INCR4 | EHCI_INSNREG00_ENA_INCRX_ALIGN)
+> +
+> +#endif /* __REGS_USB_HOST_H */
