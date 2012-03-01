@@ -1,64 +1,34 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 1 Mar 2012 19:17:54 +0530
-Subject: [PATCH] ARM: OMAP: hwmod: Use sysc_fields->srst_shift and get rid of
- hardcoded SYSC_TYPE2_SOFTRESET_MASK
-Message-ID: <1330609674-20826-1-git-send-email-rnayak@ti.com>
+From: dron0gus@gmail.com (Gusakov Andrey)
+Date: Thu,  1 Mar 2012 17:53:51 +0400
+Subject: [PATCH v3] ARM: S3C24XX DMA resume regression fix
+In-Reply-To: <077201ccf767c6d1ec05475c40$%kim@samsung.com>
+References: <077201ccf767c6d1ec05475c40$%kim@samsung.com>
+Message-ID: <1330610031-2237-1-git-send-email-dron0gus@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is useful when we have broken type2 compliant IPs' where
-the softreset shift is not the same as SYSC_TYPE2_SOFTRESET_SHIFT
-and hence is overridden using sysc_fields->srst_shift.
+s3c2410_dma_suspend suspends channels from 0 to dma_channels.
+s3c2410_dma_resume resumes channels in reverse order. So
+pointer should be decremented instead of being incremented.
 
-We have atleast one such instance now with onchip keypad on OMAP5
-which has a different softreset shift as compared to other type2
-IPs'.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Balaji TK  <balajitk@ti.com>
-Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Gusakov Andrey <dron0gus@gmail.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 ---
-Paul,
+ arch/arm/plat-s3c24xx/dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I based the patch on top of your reset/data cleanup series
-for hwmod. So its based on 'hwmod_data_cleanup_3.4' branch.
-
-regards,
-Rajendra
-
- arch/arm/mach-omap2/omap_hwmod.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 3462dc5..6aadba2 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1524,7 +1524,7 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
-  */
- static int _ocp_softreset(struct omap_hwmod *oh)
- {
--	u32 v;
-+	u32 v, softrst_mask;
- 	int c = 0;
- 	int ret = 0;
+diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+index 57abec9..16510d5 100644
+--- a/arch/arm/plat-s3c24xx/dma.c
++++ b/arch/arm/plat-s3c24xx/dma.c
+@@ -1249,7 +1249,7 @@ static void s3c2410_dma_resume(void)
+ 	struct s3c2410_dma_chan *cp = s3c2410_chans + dma_channels - 1;
+ 	int channel;
  
-@@ -1559,11 +1559,13 @@ static int _ocp_softreset(struct omap_hwmod *oh)
- 						    oh->class->sysc->syss_offs)
- 				   & SYSS_RESETDONE_MASK),
- 				  MAX_MODULE_SOFTRESET_WAIT, c);
--	else if (oh->class->sysc->sysc_flags & SYSC_HAS_RESET_STATUS)
-+	else if (oh->class->sysc->sysc_flags & SYSC_HAS_RESET_STATUS) {
-+		softrst_mask = (0x1 << oh->class->sysc->sysc_fields->srst_shift);
- 		omap_test_timeout(!(omap_hwmod_read(oh,
- 						     oh->class->sysc->sysc_offs)
--				   & SYSC_TYPE2_SOFTRESET_MASK),
-+				   & softrst_mask),
- 				  MAX_MODULE_SOFTRESET_WAIT, c);
-+	}
+-	for (channel = dma_channels - 1; channel >= 0; cp++, channel--)
++	for (channel = dma_channels - 1; channel >= 0; cp--, channel--)
+ 		s3c2410_dma_resume_chan(cp);
+ }
  
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
- 		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
 -- 
-1.7.1
+1.7.0.4
