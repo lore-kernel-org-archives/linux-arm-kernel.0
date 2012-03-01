@@ -1,118 +1,51 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 01 Mar 2012 12:19:33 +0530
-Subject: [PATCHv3 2/6] ARM: OMAP3 PM: Move IO Daisychain function to omap3
- prm file
-In-Reply-To: <1330525621-29836-3-git-send-email-t-kristo@ti.com>
+Date: Thu, 01 Mar 2012 12:22:42 +0530
+Subject: [PATCHv3 4/6] ARM: OMAP3 PM: Enable IO Wake up
+In-Reply-To: <1330525621-29836-5-git-send-email-t-kristo@ti.com>
 References: <1330525621-29836-1-git-send-email-t-kristo@ti.com>
- <1330525621-29836-3-git-send-email-t-kristo@ti.com>
-Message-ID: <4F4F1BFD.4020903@ti.com>
+ <1330525621-29836-5-git-send-email-t-kristo@ti.com>
+Message-ID: <4F4F1CBA.7040502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 29 February 2012 07:56 PM, Tero Kristo wrote:
 > From: Vishwanath BS<vishwanath.bs@ti.com>
 >
-> Since IO Daisychain modifies only PRM registers, it makes sense to move
-> it to PRM File.
+> Enable IO Wake up for OMAP3 as part of PM Init. Currently this has been
+> managed in cpuidle path which is not the right place. Subsequent patch
+> will remove IO Daisy chain handling in cpuidle path once daisy chain is
+> handled as part of hwmod mux.
 >
 > Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com>
 > Tested-by: Govindraj.R<govindraj.raja@ti.com>
 > Signed-off-by: Tero Kristo<t-kristo@ti.com>
 > ---
->   arch/arm/mach-omap2/pm34xx.c       |   30 +-----------------------------
->   arch/arm/mach-omap2/prm2xxx_3xxx.c |   32 ++++++++++++++++++++++++++++++++
->   arch/arm/mach-omap2/prm2xxx_3xxx.h |   14 ++++++++++++++
->   3 files changed, 47 insertions(+), 29 deletions(-)
+>   arch/arm/mach-omap2/pm34xx.c |    4 ++++
+>   1 files changed, 4 insertions(+), 0 deletions(-)
 >
 > diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index b0821a8..e97ec3f 100644
+> index e97ec3f..e6c2d39 100644
 > --- a/arch/arm/mach-omap2/pm34xx.c
 > +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -85,34 +85,6 @@ static inline void omap3_per_restore_context(void)
->   	omap_gpio_restore_context();
->   }
->
-> -static void omap3_enable_io_chain(void)
-> -{
-> -	int timeout = 0;
-> -
-> -	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> -				   PM_WKEN);
-> -	/* Do a readback to assure write has been done */
-> -	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
-> -
-> -	while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST)&
-> -		 OMAP3430_ST_IO_CHAIN_MASK)) {
-> -		timeout++;
-> -		if (timeout>  1000) {
-> -			pr_err("Wake up daisy chain activation failed.\n");
-> -			return;
-> -		}
-> -	}
-> -	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> -			PM_WKEN);
-> -
-> -}
-> -
-> -static void omap3_disable_io_chain(void)
-> -{
-> -	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> -				     PM_WKEN);
-> -}
-> -
->   static void omap3_core_save_context(void)
->   {
->   	omap3_ctrl_save_padconf();
-> @@ -324,7 +296,7 @@ void omap_sram_idle(void)
->   	     core_next_state<  PWRDM_POWER_ON)) {
->   		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
->   		if (omap3_has_io_chain_ctrl())
-> -			omap3_enable_io_chain();
-> +			omap3_trigger_io_chain();
+> @@ -793,6 +793,10 @@ static int __init omap3_pm_init(void)
+>   		goto err1;
 >   	}
 >
->   	pwrdm_pre_transition();
-> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> index 9ce7654..fc98781 100644
-> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> @@ -301,6 +301,38 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
->   				OMAP3_PRM_IRQENABLE_MPU_OFFSET);
->   }
->
-> +/**
-> + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
-> + * the I/O ring after asserting WUCLKIN high
-> + */
-> +#define MAX_IOPAD_LATCH_TIME 1000
+> +	if (omap3_has_io_wakeup())
+> +		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD,
+> +					   PM_WKEN);
 
-Since we are changing the implementation to use omap_test_timeout()
-in this patch, it makes sense to make this 100 so we have a max 100us
-delay, similar to what we did on OMAP4.
-
-> +
-> +/* OMAP3 Daisychain enable sequence */
-> +void omap3_trigger_io_chain(void)
-> +{
-> +	int i = 0;
-> +
-> +	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> +				   PM_WKEN);
-> +	/* Do a readback to assure write has been done */
-> +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
-> +
-> +	omap_test_timeout(((omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST)&
-> +			    OMAP3430_ST_IO_CHAIN_MASK) == 1),
-> +			  MAX_IOPAD_LATCH_TIME, i);
-> +
-> +	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> +				     PM_WKEN);
-
-The comment from Djamil should hold good here too. We should wait for
-IO chain status to show 0 here.
-
-> +}
-> +
+On OMAP4 this GLOBAL IO chain enable happens as part of the trigger
+function itself, it might make sense to do that for OMAP3 too to avoid
+similar issues as seen on OMAP4 when the GLOBAL switch is enabled too
+late in boot. The best however would be to get rid of it in the trigger
+function and enable this early during PM init, but I am not sure whats
+a good place to do this 'early' enough.
 
 regards,
 Rajendra
+
+> +
+>   	ret = pwrdm_for_each(pwrdms_setup, NULL);
+>   	if (ret) {
+>   		printk(KERN_ERR "Failed to setup powerdomains\n");
