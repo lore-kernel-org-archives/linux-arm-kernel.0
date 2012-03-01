@@ -1,74 +1,88 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 1 Mar 2012 11:08:47 +0100
-Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
-In-Reply-To: <20120216075825.GA11631@opensource.wolfsonmicro.com>
-References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
- <20120213082741.GN3852@pengutronix.de>
- <20120213144820.GA3494@opensource.wolfsonmicro.com>
- <20120214105823.GS3852@pengutronix.de>
- <20120214172902.GB3916@opensource.wolfsonmicro.com>
- <20120216073236.GE3852@pengutronix.de>
- <20120216075825.GA11631@opensource.wolfsonmicro.com>
-Message-ID: <20120301100847.GF26642@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Mar 2012 10:10:29 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall
+ number to the hypervisor
+In-Reply-To: <20120229125826.GC2077@linaro.org>
+References: <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1330360043.8557.302.camel@zakaz.uk.xensource.com>
+ <20120227180355.GB2023@linaro.org>
+ <1330371219.10008.34.camel@dagon.hellion.org.uk>
+ <20120228102040.GB2063@linaro.org>
+ <1330426133.31269.70.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+ <20120229093436.GA2077@linaro.org>
+ <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+ <20120229125826.GC2077@linaro.org>
+Message-ID: <20120301101029.GB7363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2012 at 11:58:26PM -0800, Mark Brown wrote:
-> On Thu, Feb 16, 2012 at 08:32:36AM +0100, Sascha Hauer wrote:
-> > On Tue, Feb 14, 2012 at 09:29:04AM -0800, Mark Brown wrote:
+On Wed, Feb 29, 2012 at 12:58:26PM +0000, Dave Martin wrote:
+> On Wed, Feb 29, 2012 at 09:56:02AM +0000, Ian Campbell wrote:
+> > On Wed, 2012-02-29 at 09:34 +0000, Dave Martin wrote:
+> > > On Tue, Feb 28, 2012 at 12:28:29PM +0000, Stefano Stabellini wrote:
+> > 
+> > > > I don't have a very strong opinion on which register we should use, but
+> > > > I would like to avoid r7 if it is already actively used by gcc.
+> > > 
+> > > But there is no framepointer for Thumb-2 code (?)
+> > 
+> > Peter Maydell suggested there was:
+> > > r7 is (used by gcc as) the Thumb frame pointer; I don't know if this
+> > > makes it worth avoiding in this context.
+> > 
+> > Sounds like it might be a gcc-ism, possibly a non-default option?
+> > 
+> > Anyway, I think r12 will be fine for our purposes so the point is rather
+> > moot.
 > 
-> > > The main thing here is to avoid these driver specific bodges that people
-> > > keep churning out again and again, it's quite depressing really.
-> 
-> > I think this churning will continue until we either make the dummy
-> > regulator non optional and drop this warning that gets printed each
-> > time it is used, or we at least provide a way to easily add a fixed
-> 
-> That's obviously not a good idea, if we do that we may as well just drop
-> all error checking from the API.
-> 
-> > dummy regulator without adding >20 lines of code to each board just
-> > for saying that we don't have a regulator for this particular device.
-> 
-> It's not per device, of course - there's an overhead from putting a
-> fixed regulator in but then per supply it's just a line.
-> 
-> > +#if IS_ENABLED(CONFIG_REGULATOR_FIXED_VOLTAGE)
-> > +struct platform_device *regulator_register_fixed(const char *name, int id,
-> > +		int microvolts, struct regulator_consumer_supply *supplies,
-> > +		int num_supplies);
-> > +#else
-> > +static struct platform_device *regulator_register_fixed(const char *name, int id,
-> > +		int microvolts, struct regulator_consumer_supply *supplies,
-> > +		int num_supplies)
-> > +{
-> > +	return NULL;
-> > +}
-> > +#endif
-> 
-> This is obviously not good for users, they'd still have to do error
-> checking to determine if the device was created or not and then manually
-> register the device with the driver core and ideally also care if that
-> worked or not.  I'm not sure something like this will really save enough
-> unless the device actually gets registered by the function, otherwise
-> it's going to be converting data to code.
-> 
-> I'd also drop the microvolts and name parameters,
+> Just had a chat with some tools guys -- apparently, when passing register
+> arguments to gcc inline asms there really isn't a guarantee that those
+> variables will be in the expected registers on entry to the inline asm.
 
-Ok, I tried to do this. I Changed the function to:
+The best you can do is:
 
-static struct platform_device *regulator_register_fixed(int id,
-		struct regulator_consumer_supply *supplies, int num_supplies)
+	register unsigned int foo asm("r7") = value;
 
-Now I have to register a fixed regulator with some invented value
-for microvolts. What value should I choose? I tried 0 but the core
-won't accept this as explained earlier, in short regulator_register()
-returns with an error.
+	asm("blah %0" : : "r" (foo));
 
-Sascha
+and ensure that your assembly checks that %0 _is_ r7 and produces a build
+error if not.  See the __asmeq() macro in asm/system.h to find out how to
+do that.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This feature has been missing from ARM GCC for quite a long time - it's
+used extensively on x86 GCC, where they have one register class per
+register, so they can do stuff like:
+
+	asm("blah %0" : : "a" (value));
+
+and be guaranteed that %0 will be eax.
+
+> If you need a specific register, this means that you must set up that
+> register explicitly inside the asm if you want a guarantee that the
+> code will work:
+> 
+> 	asm volatile (
+> 		"movw	r12, %[hvc_num]\n\t"
+> 		...
+> 		"hvc	#0"
+> 		:: [hvc_num] "i" (NUMBER) : "r12"
+> 	);
+> 
+> Of course, if you need to set up more than about 5 or 6 registers in
+> this way, the doubled register footprint means that the compiler will
+> have to start spilling stuff to the stack.
+
+No it won't - it will barf instead - think about it.  If you're clobbering
+r0 - r5, but need to pass in six values in registers, gcc can't use r0-r5
+for that, so it must use the remaining registers.  It gets rather unhappy
+with that, and starts erroring out (iirc 'too many reloads' or some similar
+error.)  I've been there.
+
+If you want to do it that way, your only option is to store them to memory
+and pass the address of the block into the assembly, and reload them there.
+Which is extremely sucky and inefficient.
+
+Practically, the register variable plus asm() does seem to work, and seems
+to work for virtually all gcc versions out there (there have been the odd
+buggy version, but those bugs appear to get fixed.)
