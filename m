@@ -1,71 +1,61 @@
 From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 01 Mar 2012 08:54:54 +0530
-Subject: [PATCH 1/2] ARM: EXYNOS: Add EHCI AHB burst function
-In-Reply-To: <CAJuYYwTW6rBiSJdeFYMui96t6nszjADW4t+14XakRkc=_4DbBA@mail.gmail.com>
-References: <1330519283-4722-1-git-send-email-sangwook.lee@linaro.org>
- <1330519283-4722-2-git-send-email-sangwook.lee@linaro.org>
- <CAJuYYwTW6rBiSJdeFYMui96t6nszjADW4t+14XakRkc=_4DbBA@mail.gmail.com>
-Message-ID: <4F4EEC06.8010400@linaro.org>
+Date: Thu, 01 Mar 2012 09:00:10 +0530
+Subject: [PATCH 1/2] ARM: EXYNOS: Add USB HOST register definitions
+In-Reply-To: <000101ccf6ef$f4efbab0$decf3010$%han@samsung.com>
+References: <000101ccf6ef$f4efbab0$decf3010$%han@samsung.com>
+Message-ID: <4F4EED42.2010700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2012 06:31 PM, Thomas Abraham wrote:
-> Hi Sangwook,
+On 02/29/2012 08:09 PM, Jingoo Han wrote:
+> This patch adds USB HOST register definitions. The definition for
+> EHCI INSNREG00 regiser and corresponding bit field definitions are
+> added.
 > 
-> On 29 February 2012 18:11, Sangwook Lee <sangwook.lee@linaro.org> wrote:
->> Enable burst transfer from AHB for EHCI.
->> This fixes data transfer of USB Ethernet with EHCI.
->> Without this patch, scp hardly works.
->>
->> Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
->> ---
->>  arch/arm/mach-exynos/setup-usb-phy.c      |    6 ++++++
->>  arch/arm/plat-samsung/devs.c              |    2 ++
->>  arch/arm/plat-samsung/include/plat/ehci.h |   19 +++++++++++++++++++
->>  3 files changed, 27 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
->> index 41743d2..5a20460 100644
->> --- a/arch/arm/mach-exynos/setup-usb-phy.c
->> +++ b/arch/arm/mach-exynos/setup-usb-phy.c
->> @@ -18,6 +18,7 @@
->>  #include <mach/regs-usb-phy.h>
->>  #include <plat/cpu.h>
->>  #include <plat/usb-phy.h>
->> +#include <plat/ehci.h>
->>
->>  static atomic_t host_usage;
->>
->> @@ -149,3 +150,8 @@ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
->>
->>        return -EINVAL;
->>  }
->> +
->> +void s5p_ehci_burst_enable(struct platform_device *pdev, void __iomem *base)
->> +{
->> +       writel(EHCI_INSNREG00_ENABLE_BURST, base + EHCI_INSNREG00);
->> +}
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+>  arch/arm/mach-exynos/include/mach/regs-usb-host.h |   23 +++++++++++++++++++++
+>  1 files changed, 23 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-host.h
 > 
-> This functionality can be added in ehci-s5p itself and avoid adding a
-> new platform callback in platform data. If this is specific to exynos,
-> driver data could be added in ehci-s5p to indicate platforms that need
-> this to be enabled.
-> 
-Am I right in assuming that ehci-s5p driver can also be used for
-mach-s5pv210?
+> diff --git a/arch/arm/mach-exynos/include/mach/regs-usb-host.h b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
+> new file mode 100644
+> index 0000000..1a60f27
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
+> @@ -0,0 +1,23 @@
+> +/*
+> + * Copyright (C) 2012 Samsung Electronics Co.Ltd
+> + *		http://www.samsung.com
+> + *
+> + * EXYNOS - USB HOST register definitions
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __REGS_USB_HOST_H
+> +#define __REGS_USB_HOST_H __FILE__
+> +
+> +#define EHCI_INSNREG00(base)		(base + 0x90)
+> +#define EHCI_ENA_INCR16			(0x1 << 25)
+> +#define EHCI_ENA_INCR8			(0x1 << 24)
+> +#define EHCI_ENA_INCR4			(0x1 << 23)
+> +#define EHCI_ENA_INCRX_ALIGN		(0x1 << 22)
+> +#define EHCI_ENABLE_DMA_INCR		(EHCI_ENA_INCR16 | EHCI_ENA_INCR8| \
+> +					 EHCI_ENA_INCR4 | EHCI_ENA_INCRX_ALIGN)
+> +
+As per the definition of bit-fields in other registers, it would be good
+to prepend the complete register name before the bit-field defines.
 
-The related bit-fields are reserved in S5PV210. So, won't it cause any
-side-effects?
+EHCI_INSNREG00_ENA_INCR16 ...
 
+Considering the similarity of this patchset with the earlier patchset
+from Sangwook, IMO, it would be appropriate to give him due credit in
+both these patches.
 
-> Thanks,
-> Thomas.
-> 
-> [...]
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +#endif /* __REGS_USB_HOST_H */
 
 
 -- 
