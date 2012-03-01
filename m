@@ -1,34 +1,27 @@
-From: dron0gus@gmail.com (Gusakov Andrey)
-Date: Thu,  1 Mar 2012 17:53:51 +0400
-Subject: [PATCH v3] ARM: S3C24XX DMA resume regression fix
-In-Reply-To: <077201ccf767c6d1ec05475c40$%kim@samsung.com>
-References: <077201ccf767c6d1ec05475c40$%kim@samsung.com>
-Message-ID: <1330610031-2237-1-git-send-email-dron0gus@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Mar 2012 13:55:56 +0000
+Subject: [PATCH 2/4] sizes.h: move from asm-generic to <linux/sizes.h>
+In-Reply-To: <7bbc4b3dc5a9fadfe7d8ce3f9846b03ada68424e.1330607068.git.rubini@gnudd.com>
+References: <cover.1330607068.git.rubini@gnudd.com>
+ <7bbc4b3dc5a9fadfe7d8ce3f9846b03ada68424e.1330607068.git.rubini@gnudd.com>
+Message-ID: <201203011355.57356.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c2410_dma_suspend suspends channels from 0 to dma_channels.
-s3c2410_dma_resume resumes channels in reverse order. So
-pointer should be decremented instead of being incremented.
+On Thursday 01 March 2012, Alessandro Rubini wrote:
+> sizes.h is used throughout the AMBA code and drivers, so the header
+> should be available to everyone in order to driver AMBA/PrimeCell
+> peripherals behind a PCI bridge where the host can be any platform
+> (I'm doing it under x86).
+> 
+> At this step <asm-generic/sizes.h> includes <linux/sizes.h>,
+> to allow a grace period for both in-tree and out-of-tree drivers.
+> 
+> Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
+> Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Alan Cox <alan@linux.intel.com>
 
-Signed-off-by: Gusakov Andrey <dron0gus@gmail.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/plat-s3c24xx/dma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-index 57abec9..16510d5 100644
---- a/arch/arm/plat-s3c24xx/dma.c
-+++ b/arch/arm/plat-s3c24xx/dma.c
-@@ -1249,7 +1249,7 @@ static void s3c2410_dma_resume(void)
- 	struct s3c2410_dma_chan *cp = s3c2410_chans + dma_channels - 1;
- 	int channel;
- 
--	for (channel = dma_channels - 1; channel >= 0; cp++, channel--)
-+	for (channel = dma_channels - 1; channel >= 0; cp--, channel--)
- 		s3c2410_dma_resume_chan(cp);
- }
- 
--- 
-1.7.0.4
+For the asm-generic part of this.
