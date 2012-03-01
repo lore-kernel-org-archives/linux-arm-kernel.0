@@ -1,98 +1,50 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 01 Mar 2012 12:36:57 -0800
-Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <1330006564-13290-1-git-send-email-mporter@ti.com> (Matt Porter's
- message of "Thu, 23 Feb 2012 09:16:04 -0500")
-References: <1330006564-13290-1-git-send-email-mporter@ti.com>
-Message-ID: <87wr74gis6.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 1 Mar 2012 12:36:58 -0800
+Subject: [PATCH 6/8] ARM: tegra: USB_ULPI needs USB
+In-Reply-To: <201203012025.53560.arnd@arndb.de>
+References: <1330630010-11241-1-git-send-email-alan@signal11.us>
+ <1330630010-11241-7-git-send-email-alan@signal11.us>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BE86172C@HQMAIL01.nvidia.com>
+ <201203012025.53560.arnd@arndb.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861741@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Porter <mporter@ti.com> writes:
+Arnd Bergmann wrote at Thursday, March 01, 2012 1:26 PM:
+> On Thursday 01 March 2012, Stephen Warren wrote:
+> > Alan Ott wrote at Thursday, March 01, 2012 12:27 PM:
+> > > From: Arnd Bergmann <arnd@arndb.de>
+> > >
+> > > The USB_ULPI driver is selected by tegra, but can only be
+> > > built if at least one of USB or USB_GADGET is enabled.
+> > > The kernel fails to link if both are off.
+> >
+> > > diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> > ...
+> > > @@ -10,6 +10,7 @@ config ARCH_TEGRA_2x_SOC
+> > ...
+> > > +	select USB_GADGET if USB_SUPPORT && !USB
+> >
+> > I don't believe the Tegra USB driver supports gadget mode at present.
+> 
+> ok.
+> 
+> > Would the above be better written as:
+> >
+> >     select USB if USB_SUPPORT
+> 
+> That does not look correct either. There is no reason why USB
+> can't be disabled with USB_SUPPORT enabled on other platforms.
+> 
+> Maybe it's better to change the 'select USB_ULPI if USB_SUPPORT'
+> into 'select USB_ULPI if USB' instead?
 
-> This fixes smsc911x support on platforms using gpmc_smsc911x_init().
->
-> Commit c7e963f6888816 (net/smsc911x: Add regulator support) added
-> the requirement that platforms provide vdd33a and vddvario supplies.
->
-> Signed-off-by: Matt Porter <mporter@ti.com>
+That sounds reasonable.
 
-[...]
+> Or maybe just don't select
+> USB_ULPI to start with and put it into the defconfig instead.
 
->  /*
->   * Initialize smsc911x device connected to the GPMC. Note that we
->   * assume that pin multiplexing is done in the board-*.c file,
-> @@ -55,6 +101,12 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->  
->  	gpmc_cfg = board_data;
->  
-> +	ret = platform_device_register(&gpmc_smsc911x_regulator);
-> +	if (ret < 0) {
-> +		pr_err("Unable to register smsc911x regulators: %d\n", ret);
-> +		return;
-> +	}
-> +
+Perhaps USB_EHCI_TEGRA should depend on USB, and select USB_EHCI?
 
-Boards that have more than one instance of the smsc911x (OMAP3/Overo)
-barf here because of trying to register the same device twice.
-
-We need something like the patch below to make Overo boot again.
-
-Kevin
-
-
-
->From 4114dea2fb897ab75d05eaa943d29454034fc025 Mon Sep 17 00:00:00 2001
-From: Kevin Hilman <khilman@ti.com>
-Date: Thu, 1 Mar 2012 12:30:42 -0800
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulators once
-
-commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
-regulators) added regulators which are registered during
-gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
-than one instance of the SMSC911x and result in attempting to register
-the same regulator more than once which causes a panic().  Fix this by
-tracking the regulator registration ensuring only a single device is
-registered.
-
-Cc: Matt Porter <mporter@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/gpmc-smsc911x.c |   14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-index bbb870c..95e6c7d 100644
---- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-@@ -88,6 +88,8 @@ static struct platform_device gpmc_smsc911x_regulator = {
- 	},
- };
- 
-+static bool regulator_registered;
-+
- /*
-  * Initialize smsc911x device connected to the GPMC. Note that we
-  * assume that pin multiplexing is done in the board-*.c file,
-@@ -101,10 +103,14 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
- 
- 	gpmc_cfg = board_data;
- 
--	ret = platform_device_register(&gpmc_smsc911x_regulator);
--	if (ret < 0) {
--		pr_err("Unable to register smsc911x regulators: %d\n", ret);
--		return;
-+	if (!regulator_registered) {
-+		ret = platform_device_register(&gpmc_smsc911x_regulator);
-+		if (ret < 0) {
-+			pr_err("Unable to register smsc911x regulators: %d\n",
-+			       ret);
-+			return;
-+		}
-+		regulator_registered = true;
- 	}
- 
- 	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
 -- 
-1.7.9.2
+nvpublic
