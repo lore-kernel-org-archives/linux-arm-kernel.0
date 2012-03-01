@@ -1,50 +1,56 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 1 Mar 2012 12:36:58 -0800
-Subject: [PATCH 6/8] ARM: tegra: USB_ULPI needs USB
-In-Reply-To: <201203012025.53560.arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Mar 2012 20:38:27 +0000
+Subject: [PATCH 8/8] ARM: tegra: HACK: remove set_irq_flags() from driver
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE86173C@HQMAIL01.nvidia.com>
 References: <1330630010-11241-1-git-send-email-alan@signal11.us>
- <1330630010-11241-7-git-send-email-alan@signal11.us>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE86172C@HQMAIL01.nvidia.com>
- <201203012025.53560.arnd@arndb.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861741@HQMAIL01.nvidia.com>
+ <1330630010-11241-9-git-send-email-alan@signal11.us>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BE86173C@HQMAIL01.nvidia.com>
+Message-ID: <201203012038.28062.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote at Thursday, March 01, 2012 1:26 PM:
-> On Thursday 01 March 2012, Stephen Warren wrote:
-> > Alan Ott wrote at Thursday, March 01, 2012 12:27 PM:
-> > > From: Arnd Bergmann <arnd@arndb.de>
-> > >
-> > > The USB_ULPI driver is selected by tegra, but can only be
-> > > built if at least one of USB or USB_GADGET is enabled.
-> > > The kernel fails to link if both are off.
-> >
-> > > diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> > ...
-> > > @@ -10,6 +10,7 @@ config ARCH_TEGRA_2x_SOC
-> > ...
-> > > +	select USB_GADGET if USB_SUPPORT && !USB
-> >
-> > I don't believe the Tegra USB driver supports gadget mode at present.
+On Thursday 01 March 2012, Stephen Warren wrote:
 > 
-> ok.
+> Alan Ott wrote at Thursday, March 01, 2012 12:27 PM:
+> > From: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > The driver should not call set_irq_flags itself, and
 > 
-> > Would the above be better written as:
-> >
-> >     select USB if USB_SUPPORT
+> Probably true in this case.
 > 
-> That does not look correct either. There is no reason why USB
-> can't be disabled with USB_SUPPORT enabled on other platforms.
+> > cannot do this from a loadable module.
 > 
-> Maybe it's better to change the 'select USB_ULPI if USB_SUPPORT'
-> into 'select USB_ULPI if USB' instead?
+> I hope that's not true; grep'ing the entire of drivers/ shows a bunch
+> of drivers calling this function, and many look like they'd be reasonable
+> as module.
 
-That sounds reasonable.
+The drivers that I can see using it are for the most part implementing
+irq controllers by themselves, which is different from merely using an
+interrupt.
 
-> Or maybe just don't select
-> USB_ULPI to start with and put it into the defconfig instead.
+There are three exceptions today:
 
-Perhaps USB_EHCI_TEGRA should depend on USB, and select USB_EHCI?
+arnd at klappe2:~/linux-arm$ git grep -l set_irq_flags  drivers/ | xargs grep -L irq_chip
+drivers/tty/serial/serial_ks8695.c
+drivers/tty/serial/sirfsoc_uart.c
+drivers/usb/host/ehci-tegra.c
 
--- 
-nvpublic
+> From what little I understand of this, any irq_chip is going to call
+> that function after setting up any child/cascaded IRQs, and I assume
+> that irq_chips can be in modules.
+
+But the function is not exported. I guess if we want to allow
+irq_chips in loadable modules, we could export it, but I don't see
+how it could ever have worked so far.
+ 
+> > Remove the call for now, which might break the driver
+> > but at least lets the kernel link again.
+> 
+> The driver appears to work fine with this removed. At least, on Tegra20
+> Harmony, I was able to modprobe ehci-hcd and then use the USB Ethernet
+> controller for DHCP and SSH.
+
+Ok, maybe it was the right fix after all then and it just needs a proper
+change description ;-)
+
+	Arnd
