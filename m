@@ -1,68 +1,57 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Thu, 01 Mar 2012 12:46:57 -0800
-Subject: [PATCH] mm: module_alloc: check if size is 0
-In-Reply-To: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
-References: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
-Message-ID: <4F4FE041.1000507@zytor.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Mar 2012 20:54:08 +0000
+Subject: [PATCH 8/8] ARM: tegra: HACK: remove set_irq_flags() from driver
+In-Reply-To: <CACRpkdZK+9gF7N2akyWw=tvcBS2X2FmSd2-SiNKiuRgUCYXx7w@mail.gmail.com>
+References: <1330630010-11241-1-git-send-email-alan@signal11.us>
+ <1330630010-11241-9-git-send-email-alan@signal11.us>
+ <CACRpkdZK+9gF7N2akyWw=tvcBS2X2FmSd2-SiNKiuRgUCYXx7w@mail.gmail.com>
+Message-ID: <20120301205408.GB19274@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2012 11:45 AM, Veli-Pekka Peltola wrote:
-> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-> index 1e9be5d..d44d212 100644
-> --- a/arch/arm/kernel/module.c
-> +++ b/arch/arm/kernel/module.c
-> @@ -39,8 +39,8 @@
->  #ifdef CONFIG_MMU
->  void *module_alloc(unsigned long size)
->  {
-> -	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
-> -				GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
-> +	return size == 0 ? NULL : __vmalloc_node_range(size, 1, MODULES_VADDR,
-> +				MODULES_END, GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
->  				__builtin_return_address(0));
->  }
->  #endif
-> diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
-> index a5066b1..cd768e9 100644
-> --- a/arch/mips/kernel/module.c
-> +++ b/arch/mips/kernel/module.c
-> @@ -47,8 +47,8 @@ static DEFINE_SPINLOCK(dbe_lock);
->  #ifdef MODULE_START
->  void *module_alloc(unsigned long size)
->  {
-> -	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
-> -				GFP_KERNEL, PAGE_KERNEL, -1,
-> +	return size == 0 ? NULL : __vmalloc_node_range(size, 1, MODULE_START,
-> +				MODULE_END, GFP_KERNEL, PAGE_KERNEL, -1,
->  				__builtin_return_address(0));
->  }
->  #endif
-> diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
-> index 925179f..bff6118 100644
-> --- a/arch/x86/kernel/module.c
-> +++ b/arch/x86/kernel/module.c
-> @@ -38,7 +38,7 @@
->  
->  void *module_alloc(unsigned long size)
->  {
-> -	if (PAGE_ALIGN(size) > MODULES_LEN)
-> +	if (size == 0 || PAGE_ALIGN(size) > MODULES_LEN)
->  		return NULL;
->  	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
->  				GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL_EXEC,
+On Thu, Mar 01, 2012 at 09:33:03PM +0100, Linus Walleij wrote:
+> On Thu, Mar 1, 2012 at 8:26 PM, Alan Ott <alan@signal11.us> wrote:
+> 
+> > From: Arnd Bergmann <arnd@arndb.de>
+> >
+> > The driver should not call set_irq_flags itself, and
+> > cannot do this from a loadable module.
+> >
+> > Remove the call for now, which might break the driver
+> > but at least lets the kernel link again.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > ?drivers/usb/host/ehci-tegra.c | ? ?1 -
+> > ?1 files changed, 0 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+> > index dbc7fe8..ab91f26 100644
+> > --- a/drivers/usb/host/ehci-tegra.c
+> > +++ b/drivers/usb/host/ehci-tegra.c
+> > @@ -729,7 +729,6 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+> > ? ? ? ? ? ? ? ?err = -ENODEV;
+> > ? ? ? ? ? ? ? ?goto fail;
+> > ? ? ? ?}
+> > - ? ? ? set_irq_flags(irq, IRQF_VALID);
+> 
+> The kernel is full of this kind of stuff (drivers/mfd/twl4030-irq.c):
+> 
+> #ifdef CONFIG_ARM
+>         /* ARM requires an extra step to clear IRQ_NOREQUEST, which it
+>          * sets on behalf of every irq_chip.  Also sets IRQ_NOPROBE.
+>          */
+>         set_irq_flags(irq, IRQF_VALID);
+> #else
+>         /* same effect on other architectures */
+>         irq_set_noprobe(irq);
+> #endif
+> 
+> Can't we try to fix this for real instead of breaking the universe,
+> hehe :-)
 
-Looks good stylistically but really awkward technically.
+That depends whether you want 0..NR_IRQS to all be request-able before
+they've been setup with their irq chips and handlers etc.
 
-I would like to suggest using the idiom:
-
-	if (!size)
-		return NULL;
-
-... consistently; combined with the PAGE_ALIGN() clause for x86 is fine too.
-
-	-hpa
-
--- 
-H. Peter Anvin, Intel Open Source Technology Center
-I work for Intel.  I don't speak on their behalf.
+Unfortunately, genirq doesn't provide a standard helper to clear
+IRQ_NOREQUEST, and that's why this pain persists.
