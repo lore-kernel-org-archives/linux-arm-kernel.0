@@ -1,24 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Mar 2012 11:59:21 -0800
-Subject: [PATCH 1/8] ARM: tegra: export tegra_gpio_{en,dis}able
-In-Reply-To: <1330630010-11241-2-git-send-email-alan@signal11.us>
-References: <1330630010-11241-1-git-send-email-alan@signal11.us>
- <1330630010-11241-2-git-send-email-alan@signal11.us>
-Message-ID: <CAOesGMhom2ybsKKgezPKkrhH9NniZu+FMprQhibHwEX92MNtEQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason)
+Date: Thu, 1 Mar 2012 15:01:36 -0500
+Subject: [PATCH 0/4] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
+In-Reply-To: <201203011950.51210.arnd@arndb.de>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <201203011950.51210.arnd@arndb.de>
+Message-ID: <20120301200136.GA11986@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 01, 2012 at 07:50:51PM +0000, Arnd Bergmann wrote:
+> On Thursday 01 March 2012, Jason Cooper wrote:
+> > This series begins the process of converting all of the drivers initialized
+> > from kirkwood_init() to devicetree.
+> > 
+> > The first patch cleans up kirkwood_init() by moving a flag setting to it's
+> > appropriate location.  This will help later when converting the audio driver.
+> > 
+> > Next, I pull the functionality of kirkwood_init() into kirkwood_dt_init() in
+> > board-dt.c  This way, as drivers are converted, their init calls can be removed
+> > from kirkwood_dt_init() and non-fdt users won't be affected (they call
+> > kirkwood_init()).
+> > 
+> > Last, I converted the two easiest drivers, rtc and wdt.  The xor and crypto
+> > drivers remain for a later patch series.
+> 
+> Hi Jason,
+> 
+> Nice patch series! I've commented on a few details that need improving, but
+> it seems you're making good progress overall. Note that in other platforms,
+> we typically focus on converting all the devices outside of the soc first,
+> because that lets us get away from board files faster, but there is nothing
+> wrong in principle in converting the devices on the soc as well.
 
-On Thu, Mar 1, 2012 at 11:26 AM, Alan Ott <alan@signal11.us> wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> These two functions are used in drivers that can be
-> modules, so they need to be exported.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Thanks for the feedback.  I'll redo this series and resubmit.  Did you
+catch my patch from yesterday?
 
-With some of the pinmux changes going in this will no longer be
-needed, but it is for now so:
+[PATCH v3] ARM: kirkwood: covert orion-spi to fdt. [1]
 
-Acked-by: Olof Johansson <olof@lixom.net>
+thx,
+
+Jason.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg161975.html
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
