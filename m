@@ -1,22 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 1 Mar 2012 20:28:04 +0000
-Subject: [PATCH 0/4] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
-In-Reply-To: <20120301200136.GA11986@titan.lakedaemon.net>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <201203011950.51210.arnd@arndb.de>
- <20120301200136.GA11986@titan.lakedaemon.net>
-Message-ID: <201203012028.04773.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Mar 2012 21:33:03 +0100
+Subject: [PATCH 8/8] ARM: tegra: HACK: remove set_irq_flags() from driver
+In-Reply-To: <1330630010-11241-9-git-send-email-alan@signal11.us>
+References: <1330630010-11241-1-git-send-email-alan@signal11.us>
+ <1330630010-11241-9-git-send-email-alan@signal11.us>
+Message-ID: <CACRpkdZK+9gF7N2akyWw=tvcBS2X2FmSd2-SiNKiuRgUCYXx7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 March 2012, Jason wrote:
-> Thanks for the feedback.  I'll redo this series and resubmit.  Did you
-> catch my patch from yesterday?
-> 
-> [PATCH v3] ARM: kirkwood: covert orion-spi to fdt. [1]
+On Thu, Mar 1, 2012 at 8:26 PM, Alan Ott <alan@signal11.us> wrote:
 
-Yes, I saw that. It looks good and I was just waiting if other people
-have comments on it. Maybe you can put it into the same git tree as
-these ones when they are ready and you send a pull request.
+> From: Arnd Bergmann <arnd@arndb.de>
+>
+> The driver should not call set_irq_flags itself, and
+> cannot do this from a loadable module.
+>
+> Remove the call for now, which might break the driver
+> but at least lets the kernel link again.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> ?drivers/usb/host/ehci-tegra.c | ? ?1 -
+> ?1 files changed, 0 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
+> index dbc7fe8..ab91f26 100644
+> --- a/drivers/usb/host/ehci-tegra.c
+> +++ b/drivers/usb/host/ehci-tegra.c
+> @@ -729,7 +729,6 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?err = -ENODEV;
+> ? ? ? ? ? ? ? ?goto fail;
+> ? ? ? ?}
+> - ? ? ? set_irq_flags(irq, IRQF_VALID);
 
-	Arnd
+The kernel is full of this kind of stuff (drivers/mfd/twl4030-irq.c):
+
+#ifdef CONFIG_ARM
+        /* ARM requires an extra step to clear IRQ_NOREQUEST, which it
+         * sets on behalf of every irq_chip.  Also sets IRQ_NOPROBE.
+         */
+        set_irq_flags(irq, IRQF_VALID);
+#else
+        /* same effect on other architectures */
+        irq_set_noprobe(irq);
+#endif
+
+Can't we try to fix this for real instead of breaking the universe,
+hehe :-)
+
+Yours,
+Linus Walleij
