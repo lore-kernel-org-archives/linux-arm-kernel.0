@@ -1,45 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 1 Mar 2012 09:40:36 +0000
-Subject: [PATCH 1/8] gpio: pxa: add OF support
-In-Reply-To: <1330582228-12424-2-git-send-email-haojian.zhuang@marvell.com>
-References: <1330582228-12424-1-git-send-email-haojian.zhuang@marvell.com>
- <1330582228-12424-2-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <201203010940.37123.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Mar 2012 09:46:53 +0000
+Subject: [PATCHv3 4/4] ARM: OMAP3+: add prcm chain interrupts to the
+ interrupt list
+In-Reply-To: <1330529106-10423-5-git-send-email-t-kristo@ti.com>
+References: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
+ <1330529106-10423-5-git-send-email-t-kristo@ti.com>
+Message-ID: <20120301094653.GA7413@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 March 2012, Haojian Zhuang wrote:
-> +#ifdef CONFIG_OF
-> +static int __devinit pxa_gpio_probe_dt(struct platform_device *pdev,
-> +                                      int *irq0, int *irq1, int *irq_mux)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       const __be32 *irq;
-> +
-> +       irq = of_get_property(np, "mrvl,gpio-irq0", NULL);
-> +       if (irq)
-> +               *irq0 = be32_to_cpup(irq);
-> +       irq = of_get_property(np, "mrvl,gpio-irq1", NULL);
-> +       if (irq)
-> +               *irq1 = be32_to_cpup(irq);
-> +       *irq_mux = platform_get_irq(pdev, 0);
-> +       return 0;
-> +}
-> +#else
-> +static int __devinit pxa_gpio_probe_dt(struct platform_device *pdev,
-> +                                      int *irq0, int *irq1, int *irq_mux)
-> +{
-> +       return 1;
-> +}
-> +#endif
-> +
+On Wed, Feb 29, 2012 at 05:25:06PM +0200, Tero Kristo wrote:
+> Currently PRCM chain handler for OMAP4 requires SPARSE_IRQ to be enabled
+> from kernel config, however enabling this option breaks the OMAP kernel
+> completely and it can't be used.
 
-It seems that you are not following the regular IRQ binding. This should
-probably use irq_of_parse_and_map().
+No it does not.  Look:
 
-For other code like the one above, I suggest you use
-of_property_read_u32_array(), which will already compile to nothing
-if CONFIG_OF is not set, so you don't have to provide two versions of
-the fucntion.
+	irq_alloc_descs(start, from, num, -1)
 
-	Arnd
+will allocate num interrupt descriptors from within from..NR_IRQS if
+sparse IRQ is disabled.  So, provided there is sufficient space within
+the available NR_IRQS, irq_alloc_descs() works for non-sparse IRQ.
+There is no need to get rid of it at all.
+
+If start is -1, then it will allocate from where-ever it can in the
+range from..NR_IRQS.  Otherwise, it will fail if it can't get an
+allocation starting at 'start'.
+
+If sparse IRQ is enabled, then it will start allocating from whatever
+the last figure output from the:
+
+	NR_IRQS:%d nr_irqs:%d %d
+
+line.
