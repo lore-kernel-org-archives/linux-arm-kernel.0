@@ -1,52 +1,48 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 1 Mar 2012 11:49:42 +0000
-Subject: [RFC PATCH 0/2] ARM: assembler: Add uniform assembler framework
-In-Reply-To: <20120228192458.GC3617@n2100.arm.linux.org.uk>
-References: <1330455586-10353-1-git-send-email-dave.martin@linaro.org>
- <20120228192458.GC3617@n2100.arm.linux.org.uk>
-Message-ID: <20120301114942.GA2040@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 1 Mar 2012 12:12:25 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <20120301103520.GD7363@n2100.arm.linux.org.uk>
+References: <20120227180355.GB2023@linaro.org>
+ <1330371219.10008.34.camel@dagon.hellion.org.uk>
+ <20120228102040.GB2063@linaro.org>
+ <1330426133.31269.70.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+ <20120229093436.GA2077@linaro.org>
+ <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+ <20120229125826.GC2077@linaro.org>
+ <20120301101029.GB7363@n2100.arm.linux.org.uk>
+ <20120301102702.GD2034@linaro.org>
+ <20120301103520.GD7363@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1203011209580.923@kaball-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 07:24:59PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 28, 2012 at 06:59:44PM +0000, Dave Martin wrote:
-> > #ifdef __ASSEMBLY__
-> > stuff
-> > for
-> > the
-> > assembler
-> > #else
-> > asm("stuff");
-> > asm("for");
-> > asm("the");
-> > asm("assembler");
+On Thu, 1 Mar 2012, Russell King - ARM Linux wrote:
+> On Thu, Mar 01, 2012 at 10:27:02AM +0000, Dave Martin wrote:
+> > So, where there's a compelling reason to inline these things, we can use
+> > the existing techniques if we're alert to the risks.  But in cases where
+> > there isn't a compelling reason, aren't we just inviting fragility
+> > unnecessarily?
 > 
-> That's invalid - nothing guarantees that the compiler won't place
-> anything in between these asm statements in the output assembly
-> file.
+> The practical experience from the kernel suggests that there isn't a
+> problem - that's not to say that future versions of gcc won't become
+> a problem, and that the compiler guys may refuse to fix it.
+> 
+> I think it's a feature that we should be pressing gcc guys for - it's
+> fairly fundamental to any programming which requires interfaces that
+> require certain args in certain registers, or receive results in
+> certain registers.
+> 
+> The options over this are basically:
+> 1. refusing to upgrade to any version of gcc which does not allow
+>    registers-in-asm
+> 2. doing the store-to-memory reload-in-asm thing
+> 3. hand-coding veneers for every call to marshall the registers
+> 
+> Each of those has its down sides, but I suspect with (1), it may be
+> possible to have enough people applying pressure to the compiler guys
+> that they finally see sense on this matter.
 
-Are you still interested in this series?
-
-I have a workaround for the above now, but it's not pretty -- I seem to
-have opened a can of worms here.
-
-
-We would need something like
-
-#define EXTENDED_ASM(stuff) asm ( ".include \"macros.inc\"\n\t" stuff )
-#define EXTENDED_VASM(stuff) asm volatile ( ".include \"macros.inc\"\n\t" stuff )
-
-...where macros.inc includes some logic to protect against multiple
-inclusion.
-
-This would avoid problems caused by reordering done by the compiler.
-
-I think this can work, but it may be a step too far...
-
-
-The above could help fix the incorrect way that asm/unified.h defines
-the it* macros (though admittedly that does not seem to have caused
-problems for anyone so far...)
-
-Cheers
----Dave
+I tend to have a very practical approach about this sort of issues, so I
+am tempted to go with 1) if you agree.
