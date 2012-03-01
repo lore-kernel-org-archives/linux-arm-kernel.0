@@ -1,27 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Mar 2012 00:11:40 +0000
-Subject: [PATCH 7/8] ARM: OMAP: Remove plat/io.h by moving it into
- mach/io.h
-In-Reply-To: <4F4EBBDF.9090806@gmail.com>
-References: <20120221233619.18709.87982.stgit@kaulin.local>
- <20120221234049.18709.28987.stgit@kaulin.local> <4F4451FB.7070007@gmail.com>
- <20120224000657.GJ18185@atomide.com> <20120224182246.GL18185@atomide.com>
- <4F4AFCC7.3020509@gmail.com> <20120229014719.GK18901@atomide.com>
- <4F4EBBDF.9090806@gmail.com>
-Message-ID: <20120301001140.GA18438@n2100.arm.linux.org.uk>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Thu, 1 Mar 2012 01:23:56 +0000 (GMT)
+Subject: Linux 3.3-rc5 and pxa-gpio possible regression
+In-Reply-To: <87wr75tghv.fsf@free.fr>
+Message-ID: <1330565036.86950.YahooMailClassic@web29009.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 05:59:27PM -0600, Rob Herring wrote:
-> BTW, all these includes need to get removed. I'll add a fix to my series
-> unless you already have fixes:
-> 
-> arch/arm/mach-omap1/sleep.S:#include <mach/io.h>
-> arch/arm/mach-omap1/sram.S:#include <mach/io.h>
-> arch/arm/plat-omap/include/plat/sdrc.h:#include <mach/io.h>
-> drivers/media/video/davinci/vpbe_osd.c:#include <mach/io.h>
-> drivers/media/video/davinci/vpbe_venc.c:#include <mach/io.h>
-> drivers/video/omap2/vrfb.c:#include <mach/io.h>
+> I've tried the 3.3-rc5 kernel and my boot hangs (PXA270
+> platform).
 
-All the ones included from .h and .c files should be using linux/io.h
-and not some other derivative.
+Same here. Your problem may be the same as this:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/084307.html
+
+Does the patch below fix your problem?
+
+diff -uprN clean-3.3-rc5/arch/arm/mach-pxa/pxa25x.c linux-3.3-rc5/arch/arm/mach-pxa/pxa25x.c
+--- clean-3.3-rc5/arch/arm/mach-pxa/pxa25x.c	2012-02-25 20:18:16.000000000 +0000
++++ linux-3.3-rc5/arch/arm/mach-pxa/pxa25x.c	2012-02-26 04:21:58.754346549 +0000
+@@ -209,6 +209,7 @@ static struct clk_lookup pxa25x_clkregs[
+ 	INIT_CLKREG(&clk_pxa25x_gpio11, NULL, "GPIO11_CLK"),
+ 	INIT_CLKREG(&clk_pxa25x_gpio12, NULL, "GPIO12_CLK"),
+ 	INIT_CLKREG(&clk_pxa25x_mem, "pxa2xx-pcmcia", NULL),
++	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
+ };
+ 
+ static struct clk_lookup pxa25x_hwuart_clkreg =
+diff -uprN clean-3.3-rc5/arch/arm/mach-pxa/pxa27x.c linux-3.3-rc5/arch/arm/mach-pxa/pxa27x.c
+--- clean-3.3-rc5/arch/arm/mach-pxa/pxa27x.c	2012-02-25 20:18:16.000000000 +0000
++++ linux-3.3-rc5/arch/arm/mach-pxa/pxa27x.c	2012-02-26 04:21:58.754346549 +0000
+@@ -230,6 +230,7 @@ static struct clk_lookup pxa27x_clkregs[
+ 	INIT_CLKREG(&clk_pxa27x_im, NULL, "IMCLK"),
+ 	INIT_CLKREG(&clk_pxa27x_memc, NULL, "MEMCLK"),
+ 	INIT_CLKREG(&clk_pxa27x_mem, "pxa2xx-pcmcia", NULL),
++	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
+ };
+ 
+ #ifdef CONFIG_PM
