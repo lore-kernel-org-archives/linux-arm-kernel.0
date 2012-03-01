@@ -1,113 +1,134 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Thu,  1 Mar 2012 14:10:23 +0800
-Subject: [PATCH 3/8] rtc: sa1100: add OF support
+Date: Thu,  1 Mar 2012 14:10:26 +0800
+Subject: [PATCH 6/8] ARM: mmp: append OF support on pxa168
 In-Reply-To: <1330582228-12424-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1330582228-12424-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1330582228-12424-4-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1330582228-12424-7-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There're two interrupts are used in rtc-sa1100 devices. The RTC-alarm
-interrupt is specified as default interrupt. The RTC-1Hz interrupt is
-specified as "mrvl,rtc-irqhz" property in DTS file.
+Enable PXA168 and aspenite support.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/rtc/rtc-sa1100.c |   54 +++++++++++++++++++++++++++++++++++++++------
- 1 files changed, 46 insertions(+), 8 deletions(-)
+ arch/arm/mach-mmp/Kconfig  |   10 ++++++
+ arch/arm/mach-mmp/Makefile |    1 +
+ arch/arm/mach-mmp/mmp-dt.c |   75 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 86 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/mmp-dt.c
 
-diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
-index 962510c..09f05d5 100644
---- a/drivers/rtc/rtc-sa1100.c
-+++ b/drivers/rtc/rtc-sa1100.c
-@@ -30,6 +30,7 @@
- #include <linux/interrupt.h>
- #include <linux/slab.h>
- #include <linux/string.h>
-+#include <linux/of.h>
- #include <linux/pm.h>
- #include <linux/bitops.h>
+diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+index 323d4c9..5a90b9a 100644
+--- a/arch/arm/mach-mmp/Kconfig
++++ b/arch/arm/mach-mmp/Kconfig
+@@ -2,6 +2,16 @@ if ARCH_MMP
  
-@@ -228,28 +229,64 @@ static const struct rtc_class_ops sa1100_rtc_ops = {
- 	.alarm_irq_enable = sa1100_rtc_alarm_irq_enable,
- };
+ menu "Marvell PXA168/910/MMP2 Implmentations"
  
-+static struct of_device_id sa1100_rtc_dt_ids[] = {
-+	{ .compatible = "mrvl,sa1100-rtc", },
-+	{ .compatible = "mrvl,mmp-rtc", },
++config MACH_MMP_DT
++	bool "Support MMP2 platforms from device tree"
++	select CPU_PXA168
++	select CPU_PXA910
++	select USE_OF
++	help
++	  Include support for Marvell MMP2 based platforms using
++	  the device tree. Needn't select any other machine while
++	  MACH_MMP_DT is enabled.
++
+ config MACH_ASPENITE
+ 	bool "Marvell's PXA168 Aspenite Development Board"
+ 	select CPU_PXA168
+diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+index ba254a7..4fc0ff5 100644
+--- a/arch/arm/mach-mmp/Makefile
++++ b/arch/arm/mach-mmp/Makefile
+@@ -18,5 +18,6 @@ obj-$(CONFIG_MACH_TTC_DKB)	+= ttc_dkb.o
+ obj-$(CONFIG_MACH_BROWNSTONE)	+= brownstone.o
+ obj-$(CONFIG_MACH_FLINT)	+= flint.o
+ obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
++obj-$(CONFIG_MACH_MMP_DT)	+= mmp-dt.o
+ obj-$(CONFIG_MACH_TETON_BGA)	+= teton_bga.o
+ obj-$(CONFIG_MACH_GPLUGD)	+= gplugd.o
+diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
+new file mode 100644
+index 0000000..6707539
+--- /dev/null
++++ b/arch/arm/mach-mmp/mmp-dt.c
+@@ -0,0 +1,75 @@
++/*
++ *  linux/arch/arm/mach-mmp/mmp-dt.c
++ *
++ *  Copyright (C) 2012 Marvell Technology Group Ltd.
++ *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  publishhed by the Free Software Foundation.
++ */
++
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <mach/irqs.h>
++
++#include "common.h"
++
++extern struct sys_timer pxa168_timer;
++extern void __init icu_init_irq(void);
++
++static const struct of_dev_auxdata mmp_auxdata_lookup[] __initconst = {
++	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
++	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
++	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4026000, "pxa2xx-uart.2", NULL),
++	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0", NULL),
++	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4025000, "pxa2xx-i2c.1", NULL),
++	OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
++	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
 +	{}
 +};
-+MODULE_DEVICE_TABLE(of, sa1100_rtc_dt_ids);
 +
-+#ifdef CONFIG_OF
-+static int sa1100_rtc_probe_dt(struct platform_device *pdev,
-+			       struct sa1100_rtc *info)
++static int __init mmp_intc_add_irq_domain(struct device_node *np,
++					   struct device_node *parent)
 +{
-+	info->irq_alarm = platform_get_irq(pdev, 0);
-+	info->irq_1hz = platform_get_irq(pdev, 1);
-+	if (info->irq_1hz < 0 || info->irq_alarm < 0)
-+		return -ENODEV;
-+	return 0;
-+}
-+#else
-+static int sa1100_rtc_probe_dt(struct platform_device *pdev,
-+			       struct sa1100_rtc *info)
-+{
-+	return 1;
-+}
-+#endif
-+
-+static int sa1100_rtc_probe_irq(struct platform_device *pdev,
-+				struct sa1100_rtc *info)
-+{
-+	info->irq_1hz = platform_get_irq_byname(pdev, "rtc 1Hz");
-+	info->irq_alarm = platform_get_irq_byname(pdev, "rtc alarm");
-+	if (info->irq_1hz < 0 || info->irq_alarm < 0)
-+		return -ENODEV;
++	irq_domain_add_simple(np, 0);
 +	return 0;
 +}
 +
- static int sa1100_rtc_probe(struct platform_device *pdev)
- {
- 	struct rtc_device *rtc;
- 	struct sa1100_rtc *info;
--	int irq_1hz, irq_alarm, ret = 0;
--
--	irq_1hz = platform_get_irq_byname(pdev, "rtc 1Hz");
--	irq_alarm = platform_get_irq_byname(pdev, "rtc alarm");
--	if (irq_1hz < 0 || irq_alarm < 0)
--		return -ENODEV;
-+	int ret = 0;
- 
- 	info = kzalloc(sizeof(struct sa1100_rtc), GFP_KERNEL);
- 	if (!info)
- 		return -ENOMEM;
-+	ret = sa1100_rtc_probe_dt(pdev, info);
-+	if (ret > 0)
-+		ret = sa1100_rtc_probe_irq(pdev, info);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to get rtc irq\n");
-+		goto err_clk;
-+	}
++static int __init mmp_gpio_add_irq_domain(struct device_node *np,
++					   struct device_node *parent)
++{
++	irq_domain_add_simple(np, IRQ_GPIO_START);
++	return 0;
++}
 +
- 	info->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(info->clk)) {
- 		dev_err(&pdev->dev, "failed to find rtc clock source\n");
- 		ret = PTR_ERR(info->clk);
- 		goto err_clk;
- 	}
--	info->irq_1hz = irq_1hz;
--	info->irq_alarm = irq_alarm;
- 	spin_lock_init(&info->lock);
- 	platform_set_drvdata(pdev, info);
- 
-@@ -357,6 +394,7 @@ static struct platform_driver sa1100_rtc_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &sa1100_rtc_pm_ops,
- #endif
-+		.of_match_table = sa1100_rtc_dt_ids,
- 	},
- };
- 
++static const struct of_device_id mmp_irq_match[] __initconst = {
++	{ .compatible = "mrvl,mmp-intc", .data = mmp_intc_add_irq_domain, },
++	{ .compatible = "mrvl,mmp-gpio", .data = mmp_gpio_add_irq_domain, },
++	{}
++};
++
++static void __init mmp_dt_init(void)
++{
++
++	of_irq_init(mmp_irq_match);
++
++	of_platform_populate(NULL, of_default_bus_match_table,
++			     mmp_auxdata_lookup, NULL);
++}
++
++static const char *pxa168_dt_board_compat[] __initdata = {
++	"mrvl,pxa168-aspenite",
++	NULL,
++};
++
++DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
++	.map_io		= mmp_map_io,
++	.init_irq	= icu_init_irq,
++	.timer		= &pxa168_timer,
++	.init_machine	= mmp_dt_init,
++	.dt_compat	= pxa168_dt_board_compat,
++MACHINE_END
 -- 
 1.7.0.4
