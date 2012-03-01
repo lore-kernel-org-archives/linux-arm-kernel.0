@@ -1,52 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Mar 2012 21:33:03 +0100
-Subject: [PATCH 8/8] ARM: tegra: HACK: remove set_irq_flags() from driver
-In-Reply-To: <1330630010-11241-9-git-send-email-alan@signal11.us>
-References: <1330630010-11241-1-git-send-email-alan@signal11.us>
- <1330630010-11241-9-git-send-email-alan@signal11.us>
-Message-ID: <CACRpkdZK+9gF7N2akyWw=tvcBS2X2FmSd2-SiNKiuRgUCYXx7w@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 1 Mar 2012 21:32:39 +0100
+Subject: [PATCH v2 19/28] ARM: Add fixed PCI i/o mapping
+In-Reply-To: <201203011825.44049.arnd@arndb.de>
+References: <1330547147-22867-1-git-send-email-robherring2@gmail.com>
+ <201203011352.36067.arnd@arndb.de>
+ <20120301140817.GG7363@n2100.arm.linux.org.uk>
+ <201203011825.44049.arnd@arndb.de>
+Message-ID: <20120301203239.GA10854@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 1, 2012 at 8:26 PM, Alan Ott <alan@signal11.us> wrote:
+> That leaves us still with Kirkwood/Dove and ixp2000 to figure out.
+> 
+...
+> 
+> For Kirkwood and Dove, an easy way out would be to extend the I/O
+> space window to 2MB right away and just map both as before, but we
+> can also try just using the two lower 64k windows in each and see what
+> breaks, as those seem to be widely available for testing still.
 
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> The driver should not call set_irq_flags itself, and
-> cannot do this from a loadable module.
->
-> Remove the call for now, which might break the driver
-> but at least lets the kernel link again.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> ?drivers/usb/host/ehci-tegra.c | ? ?1 -
-> ?1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/usb/host/ehci-tegra.c b/drivers/usb/host/ehci-tegra.c
-> index dbc7fe8..ab91f26 100644
-> --- a/drivers/usb/host/ehci-tegra.c
-> +++ b/drivers/usb/host/ehci-tegra.c
-> @@ -729,7 +729,6 @@ static int tegra_ehci_probe(struct platform_device *pdev)
-> ? ? ? ? ? ? ? ?err = -ENODEV;
-> ? ? ? ? ? ? ? ?goto fail;
-> ? ? ? ?}
-> - ? ? ? set_irq_flags(irq, IRQF_VALID);
+I have two different kirkwood devices i can test with. Unfortunately,
+only one has a pcie devices, an Atheros wireless card. I might be able
+to test the machine without any pcie devices tomorrow, but the
+interesting device will have to wait until next week.
 
-The kernel is full of this kind of stuff (drivers/mfd/twl4030-irq.c):
-
-#ifdef CONFIG_ARM
-        /* ARM requires an extra step to clear IRQ_NOREQUEST, which it
-         * sets on behalf of every irq_chip.  Also sets IRQ_NOPROBE.
-         */
-        set_irq_flags(irq, IRQF_VALID);
-#else
-        /* same effect on other architectures */
-        irq_set_noprobe(irq);
-#endif
-
-Can't we try to fix this for real instead of breaking the universe,
-hehe :-)
-
-Yours,
-Linus Walleij
+	    Andrew
