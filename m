@@ -1,40 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 1 Mar 2012 12:05:37 -0800
-Subject: [PATCH 3/8] ARM: tegra: select CPU_FREQ_TABLE
-In-Reply-To: <1330630010-11241-4-git-send-email-alan@signal11.us>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 1 Mar 2012 12:05:34 -0800
+Subject: [PATCH 6/8] ARM: tegra: USB_ULPI needs USB
+In-Reply-To: <1330630010-11241-7-git-send-email-alan@signal11.us>
 References: <1330630010-11241-1-git-send-email-alan@signal11.us>
- <1330630010-11241-4-git-send-email-alan@signal11.us>
-Message-ID: <CAOesGMiFbggUz6_GH-5htzFJuaXzeYhXpTfHafy-LSPAEmkQnw@mail.gmail.com>
+ <1330630010-11241-7-git-send-email-alan@signal11.us>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE86172C@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 1, 2012 at 11:26 AM, Alan Ott <alan@signal11.us> wrote:
+Alan Ott wrote at Thursday, March 01, 2012 12:27 PM:
 > From: Arnd Bergmann <arnd@arndb.de>
->
-> The tegra cpufreq implementation relies on the cpu_freq_table
-> code, so make sure that this is always there when needed.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> ?arch/arm/mach-tegra/Kconfig | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
+> 
+> The USB_ULPI driver is selected by tegra, but can only be
+> built if at least one of USB or USB_GADGET is enabled.
+> The kernel fails to link if both are off.
+
 > diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> index 373652d..b2a038e 100644
-> --- a/arch/arm/mach-tegra/Kconfig
-> +++ b/arch/arm/mach-tegra/Kconfig
+...
 > @@ -10,6 +10,7 @@ config ARCH_TEGRA_2x_SOC
-> ? ? ? ?select USB_ARCH_HAS_EHCI if USB_SUPPORT
-> ? ? ? ?select USB_ULPI if USB_SUPPORT
-> ? ? ? ?select USB_ULPI_VIEWPORT if USB_SUPPORT
-> + ? ? ? select CPU_FREQ_TABLE if CPU_FREQ
+...
+> +	select USB_GADGET if USB_SUPPORT && !USB
 
-The corresponding chance is needed for T30 as well.
+I don't believe the Tegra USB driver supports gadget mode at present.
+Would the above be better written as:
 
-(the cpufreq driver should probably be moved out to drivers/cpufreq
-and given its own but that's a separate issue)
+    select USB if USB_SUPPORT
 
+And I wonder if the Tegra EHCI driver shouldn't be doing some of these
+selects, not the ARCH_TEGRA_* option.
 
--Olof
+And this is probably required for Tegra30 too not just Tegra20.
+
+-- 
+nvpublic
