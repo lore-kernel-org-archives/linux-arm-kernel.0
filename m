@@ -1,55 +1,46 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 01 Mar 2012 14:37:09 -0800
-Subject: [PATCHv3 4/6] ARM: OMAP3 PM: Enable IO Wake up
-In-Reply-To: <4F4F1CBA.7040502@ti.com> (Rajendra Nayak's message of "Thu, 01
- Mar 2012 12:22:42 +0530")
-References: <1330525621-29836-1-git-send-email-t-kristo@ti.com>
- <1330525621-29836-5-git-send-email-t-kristo@ti.com>
- <4F4F1CBA.7040502@ti.com>
-Message-ID: <87sjhsdk2y.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 1 Mar 2012 15:31:01 -0800
+Subject: [GIT PULL 3/5] First set of omap1 related changes
+In-Reply-To: <3378572.m1z82NvySs@acer>
+References: <0Mfo5g-1RocQt3wlY-00NttP@mx.kundenserver.de>
+ <201202292106.40731.arnd@arndb.de>
+ <20120229211331.GP18901@atomide.com> <3378572.m1z82NvySs@acer>
+Message-ID: <20120301233101.GC18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [120301 13:56]:
+> 
+> Any chance for the continuation series [1] as well as two section 
+> mismatch related fixes [2] [3] getting your attention? NB, that 
+> continuation series needs another section mismatch fix, which I was 
+> planing to submit once there was a stable base for it.
+> 
+> [1] http://www.spinics.net/lists/linux-omap/msg64146.html
+> [2] http://www.spinics.net/lists/linux-omap/msg64441.html
+> [3] http://www.spinics.net/lists/linux-omap/msg64442.html
 
-> On Wednesday 29 February 2012 07:56 PM, Tero Kristo wrote:
->> From: Vishwanath BS<vishwanath.bs@ti.com>
->>
->> Enable IO Wake up for OMAP3 as part of PM Init. Currently this has been
->> managed in cpuidle path which is not the right place. Subsequent patch
->> will remove IO Daisy chain handling in cpuidle path once daisy chain is
->> handled as part of hwmod mux.
->>
->> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com>
->> Tested-by: Govindraj.R<govindraj.raja@ti.com>
->> Signed-off-by: Tero Kristo<t-kristo@ti.com>
->> ---
->>   arch/arm/mach-omap2/pm34xx.c |    4 ++++
->>   1 files changed, 4 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->> index e97ec3f..e6c2d39 100644
->> --- a/arch/arm/mach-omap2/pm34xx.c
->> +++ b/arch/arm/mach-omap2/pm34xx.c
->> @@ -793,6 +793,10 @@ static int __init omap3_pm_init(void)
->>   		goto err1;
->>   	}
->>
->> +	if (omap3_has_io_wakeup())
->> +		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD,
->> +					   PM_WKEN);
->
-> On OMAP4 this GLOBAL IO chain enable happens as part of the trigger
-> function itself, it might make sense to do that for OMAP3 too to avoid
-> similar issues as seen on OMAP4 when the GLOBAL switch is enabled too
-> late in boot. The best however would be to get rid of it in the trigger
-> function and enable this early during PM init, but I am not sure whats
-> a good place to do this 'early' enough.
+Hmm sorry I guess I was waiting for the missing section
+mismatch patch.
 
-What about the subsys_initcall() that's already in the prm*.c files?
+I've pushed ams-delta branch that's based on -rc5 merged
+with what Arnd pulled yesterday as -rc1 has i2c-omap.c
+a compile bug for omap1. I've applied these two patches
+there as the second one depends on what got pulled:
 
-IMO, the global one-time init doesn't belong in the trigger function
-because there's no need to do the extra PRM read/write when it should be
-a one-shot init.
+ARM: OMAP1: ams-delta: clean up init data section assignments
+ARM: OMAP1: ams-delta: fix incorrect section tags
 
-Kevin
+Looks like your patch "ARM: OMAP1: ams-delta: set up regulator
+over modem reset GPIO pin" causes the following error with
+CONFIG_DEBUG_SECTION_MISMATCH=y:
+
+arch/arm/mach-omap1/board-ams-delta.c:273:36: error:
+modem_nreset_config causes a section type conflict
+
+So care to update and repost that (and possibly the following
+two patches) with your missing fixes?
+
+Regards,
+
+Tony
