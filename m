@@ -1,152 +1,136 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu,  1 Mar 2012 18:20:53 +0000
-Subject: [PATCH 2/4] ARM: kirkwood: fdt: absorb kirkwood_init()
+Date: Thu,  1 Mar 2012 18:20:54 +0000
+Subject: [PATCH 3/4] ARM: kirkwood: convert rtc-mv to fdt.
 In-Reply-To: <cover.1330625877.git.jason@lakedaemon.net>
 References: <cover.1330625877.git.jason@lakedaemon.net>
-Message-ID: <9d9a87361c05b8b85e1ee2cdabb46a365c7abca8.1330625877.git.jason@lakedaemon.net>
+Message-ID: <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to absorb kirkwood_init() into kirkwood_dt_init() so that as we
-convert drivers, we can remove the platform call, eg
-kirkwood_rtc_init().  This maintains compatibility with non-fdt
-configurations because they still call kirkwood_init() in common.c.
-
-As drivers are converted, we will reinstate the 'static' qualifier in
-common.c.
+The comment at mach-kirkwood/common.c:469, says this device is in every
+kirkwood board.  So, it is placed in kirkwood.dtsi.
 
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/mach-kirkwood/board-dt.c |   30 +++++++++++++++++++++++++++++-
- arch/arm/mach-kirkwood/common.c   |   12 ++++++------
- arch/arm/mach-kirkwood/common.h   |    8 ++++++++
- 3 files changed, 43 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi   |    6 ++++++
+ arch/arm/mach-kirkwood/board-dt.c |    1 -
+ arch/arm/mach-kirkwood/common.c   |    2 +-
+ arch/arm/mach-kirkwood/common.h   |    1 -
+ drivers/rtc/rtc-mv.c              |   19 +++++++++++++++++++
+ 5 files changed, 26 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 771c6bb..5fb185c 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -2,5 +2,11 @@
+ 
+ / {
+ 	compatible = "marvell,kirkwood";
++
++	rtc at f1010300 {
++		compatible = "marvell,rtc";
++		reg = <0xf1010300 0x1f>;
++		interrupts = <53>;
++	};
+ };
+ 
 diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 4960e63..a0cc28b 100644
+index a0cc28b..6fc41ae 100644
 --- a/arch/arm/mach-kirkwood/board-dt.c
 +++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -29,7 +29,9 @@
- #include <linux/spi/orion_spi.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
- #include <mach/kirkwood.h>
-+#include <mach/bridge-regs.h>
- #include <plat/mvsdio.h>
- #include "common.h"
- #include "mpp.h"
-@@ -115,7 +117,33 @@ static void __init dreamplug_init(void)
+@@ -135,7 +135,6 @@ static void __init kirkwood_dt_init(void)
+ #endif
  
- static void __init kirkwood_dt_init(void)
- {
--	kirkwood_init();
-+	printk(KERN_INFO "Kirkwood: %s, TCLK=%d.\n",
-+		kirkwood_id(), kirkwood_tclk);
-+
-+	/*
-+	 * Disable propagation of mbus errors to the CPU local bus,
-+	 * as this causes mbus errors (which can occur for example
-+	 * for PCI aborts) to throw CPU aborts, which we're not set
-+	 * up to deal with.
-+	 */
-+	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
-+
-+	kirkwood_setup_cpu_mbus();
-+
-+#ifdef CONFIG_CACHE_FEROCEON_L2
-+	kirkwood_l2_init();
-+#endif
-+
-+	/* internal devices that every board has */
-+	kirkwood_rtc_init();
-+	kirkwood_wdt_init();
-+	kirkwood_xor0_init();
-+	kirkwood_xor1_init();
-+	kirkwood_crypto_init();
-+
-+#ifdef CONFIG_KEXEC
-+	kexec_reinit = kirkwood_enable_pcie;
-+#endif
- 
- 	if (of_machine_is_compatible("globalscale,dreamplug"))
- 		dreamplug_init();
+ 	/* internal devices that every board has */
+-	kirkwood_rtc_init();
+ 	kirkwood_wdt_init();
+ 	kirkwood_xor0_init();
+ 	kirkwood_xor1_init();
 diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index d9e4d99..167b6c8 100644
+index 167b6c8..0c0375f 100644
 --- a/arch/arm/mach-kirkwood/common.c
 +++ b/arch/arm/mach-kirkwood/common.c
 @@ -163,7 +163,7 @@ void __init kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
  /*****************************************************************************
   * SoC RTC
   ****************************************************************************/
--static void __init kirkwood_rtc_init(void)
-+void __init kirkwood_rtc_init(void)
+-void __init kirkwood_rtc_init(void)
++static void __init kirkwood_rtc_init(void)
  {
  	orion_rtc_init(RTC_PHYS_BASE, IRQ_KIRKWOOD_RTC);
  }
-@@ -279,7 +279,7 @@ void __init kirkwood_crypto_init(void)
- /*****************************************************************************
-  * XOR0
-  ****************************************************************************/
--static void __init kirkwood_xor0_init(void)
-+void __init kirkwood_xor0_init(void)
- {
- 	kirkwood_clk_ctrl |= CGC_XOR0;
- 
-@@ -291,7 +291,7 @@ static void __init kirkwood_xor0_init(void)
- /*****************************************************************************
-  * XOR1
-  ****************************************************************************/
--static void __init kirkwood_xor1_init(void)
-+void __init kirkwood_xor1_init(void)
- {
- 	kirkwood_clk_ctrl |= CGC_XOR1;
- 
-@@ -303,7 +303,7 @@ static void __init kirkwood_xor1_init(void)
- /*****************************************************************************
-  * Watchdog
-  ****************************************************************************/
--static void __init kirkwood_wdt_init(void)
-+void __init kirkwood_wdt_init(void)
- {
- 	orion_wdt_init(kirkwood_tclk);
- }
-@@ -393,7 +393,7 @@ void __init kirkwood_audio_init(void)
- /*
-  * Identify device ID and revision.
-  */
--static char * __init kirkwood_id(void)
-+char * __init kirkwood_id(void)
- {
- 	u32 dev, rev;
- 
-@@ -436,7 +436,7 @@ static char * __init kirkwood_id(void)
- 	}
- }
- 
--static void __init kirkwood_l2_init(void)
-+void __init kirkwood_l2_init(void)
- {
- #ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
- 	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
 diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 9071a39..c382447 100644
+index c382447..ca08826 100644
 --- a/arch/arm/mach-kirkwood/common.h
 +++ b/arch/arm/mach-kirkwood/common.h
-@@ -51,6 +51,14 @@ void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts, int (*dev
- void kirkwood_audio_init(void);
- void kirkwood_restart(char, const char *);
+@@ -53,7 +53,6 @@ void kirkwood_restart(char, const char *);
  
-+char *kirkwood_id(void);
-+void kirkwood_l2_init(void);
-+void kirkwood_rtc_init(void);
-+void kirkwood_wdt_init(void);
-+void kirkwood_xor0_init(void);
-+void kirkwood_xor1_init(void);
-+void kirkwood_crypto_init(void);
+ char *kirkwood_id(void);
+ void kirkwood_l2_init(void);
+-void kirkwood_rtc_init(void);
+ void kirkwood_wdt_init(void);
+ void kirkwood_xor0_init(void);
+ void kirkwood_xor1_init(void);
+diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+index 768e2ed..38abbf7 100644
+--- a/drivers/rtc/rtc-mv.c
++++ b/drivers/rtc/rtc-mv.c
+@@ -12,6 +12,8 @@
+ #include <linux/bcd.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/of_address.h>
++#include <linux/of.h>
+ #include <linux/delay.h>
+ #include <linux/gfp.h>
+ #include <linux/module.h>
+@@ -218,10 +220,15 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+ 	struct rtc_plat_data *pdata;
++	struct device_node *np = pdev->dev.of_node;
+ 	resource_size_t size;
+ 	u32 rtc_time;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +
- extern int kirkwood_tclk;
- extern struct sys_timer kirkwood_timer;
++	if (np)
++		of_address_to_resource(np, 0, res);
++
+ 	if (!res)
+ 		return -ENODEV;
+ 
+@@ -257,6 +264,8 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
+ 
+ 	pdata->irq = platform_get_irq(pdev, 0);
+ 
++	of_property_read_u32(np, "interrupts", &pdata->irq);
++
+ 	platform_set_drvdata(pdev, pdata);
+ 
+ 	if (pdata->irq >= 0) {
+@@ -294,11 +303,21 @@ static int __exit mv_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static struct of_device_id rtc_mv_of_match_table[] = {
++	{ .compatible = "marvell,rtc", },
++	{}
++};
++#else
++#define rtc_mv_of_match_table NULL
++#endif
++
+ static struct platform_driver mv_rtc_driver = {
+ 	.remove		= __exit_p(mv_rtc_remove),
+ 	.driver		= {
+ 		.name	= "rtc-mv",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = rtc_mv_of_match_table,
+ 	},
+ };
  
 -- 
 1.7.3.4
