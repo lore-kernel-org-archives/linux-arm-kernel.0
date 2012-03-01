@@ -1,39 +1,49 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 1 Mar 2012 13:42:11 +0200
-Subject: [PATCH v3 00/10] Add tegra30 support for secondary cores
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21F3@HQMAIL01.nvidia.com>
-References: <1328831277-21002-1-git-send-email-pdeschrijver@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF178FACB954@HQMAIL01.nvidia.com>
- <20120229154229.GL12917@tbergstrom-lnx.Nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF21F3@HQMAIL01.nvidia.com>
-Message-ID: <20120301114211.GP12917@tbergstrom-lnx.Nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Mar 2012 11:49:42 +0000
+Subject: at91: Error while registering DMA controller in 3.3-rc
+In-Reply-To: <4F4F49E1.4020902@atmel.com>
+References: <4F4F49E1.4020902@atmel.com>
+Message-ID: <201203011149.42948.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 11:38:16PM +0100, Stephen Warren wrote:
-> Peter De Schrijver wrote at Wednesday, February 29, 2012 8:42 AM:
-> > On Wed, Feb 15, 2012 at 10:27:43PM +0100, Stephen Warren wrote:
-> > > Peter De Schrijver wrote at Thursday, February 09, 2012 4:48 PM:
-> > > > This patchset introduces support for secondary cores on tegra30. It also
-> > > > introduces some functions for the flowcontroller and adds basic support for
-> > > > tegra30 powerdomains.
-> > >
-> > > The code looks fine to me. I do notice the following when running
-> > > "shutdown -h now":
-> > >
-> > > [   27.762124] SMP: failed to stop secondary CPUs
+On Thursday 01 March 2012, Nicolas Ferre wrote:
+> We currently have a regression on 3.3-rc kernels about the DMA
+> controller registration.
 > 
-> I can't seem to reproduce this at all on next-20120229 anymore. What
-> kind of repro frequency are you seeing, and does it get fixed if you
-> update to that baseline?
+> http://article.gmane.org/gmane.linux.kernel.mmc/13014
 > 
+> This is due to the DMA driver having seen an update during the 3.3 merge
+> window  but the AT91 device files not having the corresponding
+> modifications.
+> 
+> Maybe you remember, those modifications where part of the famous AT91
+> board/device series that was postponed to 3.4 due to a flood of issues...
+> 
+> So now, I would like to know if it is possible to resolve this problem
+> by queuing the DMA related patches that we have already in
+> at91/device-board branch to mainline before 3.3-final?
 
-I see it abount once every 3 reboots. I have a an expect script which
-automates the test. I haven't tried with next-20120229 yet.
+Yes, that should be possible. We try not have the same patches in multiple
+branches, but since this is a regression, I think we should do it anyway.
 
-> (I tried 20 times with shutdown, and 15 of them I reverted all the CPU
-> and cache errata in case they affected the issue at all)
+> The patches that I am talking about are:
+> 
+> bdad0b9 ARM: at91/dma: remove platform data from DMA controller
+> and
+> 2756bf5 ARM: at91/dma: DMA controller registering with DT support
+> 
+> I do think it is pretty silly to try to resolve this issue by not taking
+> those two little patches and modifying source code to workaround this
+> issue. If we do this, we will get conflicts and need to rework the
+> already queued 3.4 material.
+> 
+> Do you want me to prepare a new at91-fixes branch with those two patches
+> or you can take them yourself?
 
-Cheers,
+Better send me a pull request so that you can do some testing on the
+exact branch that you send me. I would probably end up with the
+same tree and I'm not worried about doing it, but we should make sure
+that it actually works.
 
-Peter.
+	Arnd
