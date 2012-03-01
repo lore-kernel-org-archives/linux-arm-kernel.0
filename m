@@ -1,40 +1,52 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 1 Mar 2012 09:21:15 +0530
-Subject: [PATCH] ARM/sp810: introduce API to change system mode
-In-Reply-To: <20120229201413.GA16999@n2100.arm.linux.org.uk>
-References: <bd90082f199c9bd0e48e0177ced627a50d5f850e.1329988357.git.viresh.kumar@st.com>
- <20120229201413.GA16999@n2100.arm.linux.org.uk>
-Message-ID: <4F4EF233.70405@st.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 01 Mar 2012 12:51:49 +0900
+Subject: [PATCH 00/12] ARM: S3C24XX: create mach-s3c24xx/ for S3C24XX SoCs
+ - WIP
+In-Reply-To: <201202282239.17107.heiko@sntech.de>
+References: <1329346545-16373-1-git-send-email-kgene.kim@samsung.com>
+ <201202282239.17107.heiko@sntech.de>
+Message-ID: <076601ccf75e$a19450a0$e4bcf1e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/1/2012 1:44 AM, Russell King - ARM Linux wrote:
->> >  #define SCCTRL			0x000
->> > +	#define SYS_MODE_STS_MASK		(0xF << 3)
->> > +	#define SYS_MODE_STS_SLEEP		(0x0 << 3)
->> > +	#define SYS_MODE_STS_DOZE		(0x1 << 3)
->> > +	#define SYS_MODE_STS_SLOW		(0x2 << 3)
->> > +	#define SYS_MODE_STS_NORMAL		(0x4 << 3)
->> > +
->> > +	#define SYS_MODE_MASK			(0x7 << 0)
->> > +	#define SYS_MODE_SLEEP			(0x0 << 0)
->> > +	#define SYS_MODE_DOZE			(0x1 << 0)
->> > +	#define SYS_MODE_SLOW			(0x2 << 0)
->> > +	#define SYS_MODE_NORMAL			(0x4 << 0)
-> Please don't indent #defines like this, I find it abhorrent that, at least,
-> the '#' is not in column 1.
+Heiko St?bner wrote:
 > 
-
-I will change it if you want, but this one looked more readable to me.
-
-> Also, please name these constants SCCTRL_xxx so that the prefix matches
-> the register which they're related to.
+> Am Mittwoch 15 Februar 2012, 23:55:34 schrieb Kukjin Kim:
+> > This patch aims to make a one mach- directory for S3C24XX SoCs
+> > and now not finished yet such as moving cpufreq and merging
+> > plat-s3c24xx/. I think it will be done maybe in a week.
+> >
+> > [PATCH 01/12] ARM: S3C24XX: remove unused spi gpio setup functions
+> > [PATCH 02/12] ARM: S3C24XX: move spi-s3c24xx platdata out of mach
+> > [PATCH 03/12] ARM: S3C24XX: Remove extern declaration of clk_msysclk
+> > [PATCH 04/12] ARM: S3C24XX: move common S3C2443 clock definitions to
+> > [PATCH 05/12] ARM: S3C2410: move s3c2410_baseclk_add to clock.h
+> > [PATCH 06/12] ARM: S3C24XX: change the ARCH_S3C2410 to ARCH_S3C24XX
+> > [PATCH 07/12] ARM: S3C2410: move mach-s3c2410/* into mach-s3c24xx/
+> > [PATCH 08/12] ARM: S3C2412: move mach-s3c2412/* into mach-s3c24xx/
+> > [PATCH 09/12] ARM: S3C2416: move mach-s3c2416/* into mach-s3c24xx/
+> > [PATCH 10/12] ARM: S3C2440: move mach-s3c2440/* into mach-s3c24xx/
+> > [PATCH 11/12] ARM: S3C2443: move mach-s3c2443/* into mach-s3c24xx/
+> could we move this forward please? :-)
 > 
-> So, I'd much prefer these to be:
+> As indicated by Olof's mail for tegra, we are near the 3.4 merge window
+> and as
+> is known everything must be in linux-next beforehand.
 > 
-> #define SCCTRL_MODE_STS_MASK			(0xf << 3)
+> In my opinion it should also be possible to postpone the plat-s3c24xx
+> cleanup
+> for now and just bring this set on the road to reach 3.4.
+> 
+OK, I agree and let me move this into my -next, I think plat-s3c24xx cleanup
+can be done soon though.
 
-Sure.
+As a note, I will send this to arm-soc tree after couple of days for testing
+this in linux-next.
 
--- 
-viresh
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
