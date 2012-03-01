@@ -1,39 +1,72 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Thu, 1 Mar 2012 01:23:56 +0000 (GMT)
-Subject: Linux 3.3-rc5 and pxa-gpio possible regression
-In-Reply-To: <87wr75tghv.fsf@free.fr>
-Message-ID: <1330565036.86950.YahooMailClassic@web29009.mail.ird.yahoo.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 01 Mar 2012 08:54:54 +0530
+Subject: [PATCH 1/2] ARM: EXYNOS: Add EHCI AHB burst function
+In-Reply-To: <CAJuYYwTW6rBiSJdeFYMui96t6nszjADW4t+14XakRkc=_4DbBA@mail.gmail.com>
+References: <1330519283-4722-1-git-send-email-sangwook.lee@linaro.org>
+ <1330519283-4722-2-git-send-email-sangwook.lee@linaro.org>
+ <CAJuYYwTW6rBiSJdeFYMui96t6nszjADW4t+14XakRkc=_4DbBA@mail.gmail.com>
+Message-ID: <4F4EEC06.8010400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I've tried the 3.3-rc5 kernel and my boot hangs (PXA270
-> platform).
+On 02/29/2012 06:31 PM, Thomas Abraham wrote:
+> Hi Sangwook,
+> 
+> On 29 February 2012 18:11, Sangwook Lee <sangwook.lee@linaro.org> wrote:
+>> Enable burst transfer from AHB for EHCI.
+>> This fixes data transfer of USB Ethernet with EHCI.
+>> Without this patch, scp hardly works.
+>>
+>> Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/setup-usb-phy.c      |    6 ++++++
+>>  arch/arm/plat-samsung/devs.c              |    2 ++
+>>  arch/arm/plat-samsung/include/plat/ehci.h |   19 +++++++++++++++++++
+>>  3 files changed, 27 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
+>> index 41743d2..5a20460 100644
+>> --- a/arch/arm/mach-exynos/setup-usb-phy.c
+>> +++ b/arch/arm/mach-exynos/setup-usb-phy.c
+>> @@ -18,6 +18,7 @@
+>>  #include <mach/regs-usb-phy.h>
+>>  #include <plat/cpu.h>
+>>  #include <plat/usb-phy.h>
+>> +#include <plat/ehci.h>
+>>
+>>  static atomic_t host_usage;
+>>
+>> @@ -149,3 +150,8 @@ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+>>
+>>        return -EINVAL;
+>>  }
+>> +
+>> +void s5p_ehci_burst_enable(struct platform_device *pdev, void __iomem *base)
+>> +{
+>> +       writel(EHCI_INSNREG00_ENABLE_BURST, base + EHCI_INSNREG00);
+>> +}
+> 
+> This functionality can be added in ehci-s5p itself and avoid adding a
+> new platform callback in platform data. If this is specific to exynos,
+> driver data could be added in ehci-s5p to indicate platforms that need
+> this to be enabled.
+> 
+Am I right in assuming that ehci-s5p driver can also be used for
+mach-s5pv210?
 
-Same here. Your problem may be the same as this:
+The related bit-fields are reserved in S5PV210. So, won't it cause any
+side-effects?
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/084307.html
 
-Does the patch below fix your problem?
+> Thanks,
+> Thomas.
+> 
+> [...]
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-diff -uprN clean-3.3-rc5/arch/arm/mach-pxa/pxa25x.c linux-3.3-rc5/arch/arm/mach-pxa/pxa25x.c
---- clean-3.3-rc5/arch/arm/mach-pxa/pxa25x.c	2012-02-25 20:18:16.000000000 +0000
-+++ linux-3.3-rc5/arch/arm/mach-pxa/pxa25x.c	2012-02-26 04:21:58.754346549 +0000
-@@ -209,6 +209,7 @@ static struct clk_lookup pxa25x_clkregs[
- 	INIT_CLKREG(&clk_pxa25x_gpio11, NULL, "GPIO11_CLK"),
- 	INIT_CLKREG(&clk_pxa25x_gpio12, NULL, "GPIO12_CLK"),
- 	INIT_CLKREG(&clk_pxa25x_mem, "pxa2xx-pcmcia", NULL),
-+	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
- };
- 
- static struct clk_lookup pxa25x_hwuart_clkreg =
-diff -uprN clean-3.3-rc5/arch/arm/mach-pxa/pxa27x.c linux-3.3-rc5/arch/arm/mach-pxa/pxa27x.c
---- clean-3.3-rc5/arch/arm/mach-pxa/pxa27x.c	2012-02-25 20:18:16.000000000 +0000
-+++ linux-3.3-rc5/arch/arm/mach-pxa/pxa27x.c	2012-02-26 04:21:58.754346549 +0000
-@@ -230,6 +230,7 @@ static struct clk_lookup pxa27x_clkregs[
- 	INIT_CLKREG(&clk_pxa27x_im, NULL, "IMCLK"),
- 	INIT_CLKREG(&clk_pxa27x_memc, NULL, "MEMCLK"),
- 	INIT_CLKREG(&clk_pxa27x_mem, "pxa2xx-pcmcia", NULL),
-+	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
- };
- 
- #ifdef CONFIG_PM
+
+-- 
+Tushar Behera
