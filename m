@@ -1,68 +1,43 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Thu, 1 Mar 2012 11:28:18 +0100
-Subject: [PATCH v2 2/2] dmaengine: Add support for multiple descriptors
- for imx-dma.
-In-Reply-To: <20120301101904.GA3852@pengutronix.de>
-References: <1330445298-3522-1-git-send-email-javier.martin@vista-silicon.com>
- <1330445298-3522-3-git-send-email-javier.martin@vista-silicon.com>
- <20120301101904.GA3852@pengutronix.de>
-Message-ID: <CACKLOr2bFgSUW+oXgFReHt6ZS+t7atMJ6nzDgF4-e9cRyOYX4w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Mar 2012 10:35:20 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall
+ number to the hypervisor
+In-Reply-To: <20120301102702.GD2034@linaro.org>
+References: <20120227180355.GB2023@linaro.org>
+ <1330371219.10008.34.camel@dagon.hellion.org.uk>
+ <20120228102040.GB2063@linaro.org>
+ <1330426133.31269.70.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+ <20120229093436.GA2077@linaro.org>
+ <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+ <20120229125826.GC2077@linaro.org>
+ <20120301101029.GB7363@n2100.arm.linux.org.uk>
+ <20120301102702.GD2034@linaro.org>
+Message-ID: <20120301103520.GD7363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Thu, Mar 01, 2012 at 10:27:02AM +0000, Dave Martin wrote:
+> So, where there's a compelling reason to inline these things, we can use
+> the existing techniques if we're alert to the risks.  But in cases where
+> there isn't a compelling reason, aren't we just inviting fragility
+> unnecessarily?
 
-On 1 March 2012 11:19, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Tue, Feb 28, 2012 at 05:08:18PM +0100, Javier Martin wrote:
->> dmaengine specifies the possibility that several descriptors
->> can be queued for transfer. It also indicates that tasklets
->> must be used for DMA callbacks.
->>
->> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
->
-> Have you tested this patch with audio?
+The practical experience from the kernel suggests that there isn't a
+problem - that's not to say that future versions of gcc won't become
+a problem, and that the compiler guys may refuse to fix it.
 
-Yes,
-I have a test battery which tests audio, mmc, runs dmatest module and
-a custom mem2mem video device I'm developing.
+I think it's a feature that we should be pressing gcc guys for - it's
+fairly fundamental to any programming which requires interfaces that
+require certain args in certain registers, or receive results in
+certain registers.
 
->
->> +static int imxdma_xfer_desc(struct imxdma_desc *d)
->> +{
->> + ? ? struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
->> + ? ? int ret;
->> +
->> + ? ? /* Configure and enable */
->> + ? ? switch (d->type) {
->> + ? ? case IMXDMA_DESC_MEMCPY:
->> + ? ? ? ? ? ? ret = imx_dma_config_channel(imxdmac->imxdma_channel,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? d->config_port, d->config_mem, 0, 0);
->> + ? ? ? ? ? ? if (ret < 0)
->> + ? ? ? ? ? ? ? ? ? ? return ret;
->> + ? ? ? ? ? ? ret = imx_dma_setup_single(imxdmac->imxdma_channel, d->src,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?d->len, d->dest, d->dmamode);
->> + ? ? ? ? ? ? if (ret < 0)
->> + ? ? ? ? ? ? ? ? ? ? return ret;
->> + ? ? ? ? ? ? break;
->> + ? ? case IMXDMA_DESC_CYCLIC:
->> + ? ? ? ? ? ? ret = imx_dma_setup_progression_handler(imxdmac->imxdma_channel,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? imxdma_progression);
->> + ? ? ? ? ? ? if (ret < 0)
->> + ? ? ? ? ? ? ? ? ? ? return ret;
->
-> You fall through here. Is this intended? If yes, a comment would be good
-> here.
+The options over this are basically:
+1. refusing to upgrade to any version of gcc which does not allow
+   registers-in-asm
+2. doing the store-to-memory reload-in-asm thing
+3. hand-coding veneers for every call to marshall the registers
 
-Yes it is. cyclic is the same as slave_sg with the add-on of the
-progression handler and a specific configuration of the sglist which
-is done in 'imxdma_prep_dma_cyclic'.
-Do you want me to send a new version with a comment on the matter?
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Each of those has its down sides, but I suspect with (1), it may be
+possible to have enough people applying pressure to the compiler guys
+that they finally see sense on this matter.
