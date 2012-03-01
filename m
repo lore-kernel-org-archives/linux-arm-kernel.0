@@ -1,327 +1,297 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 01 Mar 2012 10:55:32 -0800
-Subject: [PATCH 3/4] mmc: omap_hsmmc: Use GPIO offset for external GPIO chips
+Date: Thu, 01 Mar 2012 10:55:28 -0800
+Subject: [PATCH 2/4] mmc: omap_hsmmc: Use gpio_find_by_chip_name() for
+ omap_hsmmc_gpio_init()
 In-Reply-To: <20120301185044.29210.44521.stgit@kaulin.local>
 References: <20120301185044.29210.44521.stgit@kaulin.local>
-Message-ID: <20120301185532.29210.32421.stgit@kaulin.local>
+Message-ID: <20120301185528.29210.85854.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now remove the setting of GPIO pins with callbacks
-as the drivers can access a GPIO offset on a named gpio_chip
-directly with gpio_find_by_chip_name().
+Use gpio_find_by_chip_name() to find the GPIO pins as they can
+be dynamically allocated on various gpio_chips.
 
+Note that we don't want to touch the platform data as it can
+now specify the GPIO offset on a named gpio_chip.
+
+This removes the need to use callbacks to set the GPIO pins
+in platform data.
+
+Cc: Chris Ball <cjb@laptop.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-3430sdp.c          |   13 ++++---------
- arch/arm/mach-omap2/board-cm-t35.c           |    8 ++------
- arch/arm/mach-omap2/board-devkit8000.c       |    7 ++-----
- arch/arm/mach-omap2/board-igep0020.c         |    8 ++------
- arch/arm/mach-omap2/board-omap3beagle.c      |    9 +++------
- arch/arm/mach-omap2/board-omap3evm.c         |    8 ++------
- arch/arm/mach-omap2/board-omap3pandora.c     |   13 ++++---------
- arch/arm/mach-omap2/board-omap3stalker.c     |    8 ++------
- arch/arm/mach-omap2/board-omap3touchbook.c   |    7 ++-----
- arch/arm/mach-omap2/board-zoom-peripherals.c |    7 ++-----
- 10 files changed, 25 insertions(+), 63 deletions(-)
+ arch/arm/mach-omap2/hsmmc.c           |    3 +
+ arch/arm/mach-omap2/hsmmc.h           |    5 ++
+ arch/arm/plat-omap/include/plat/mmc.h |    3 +
+ drivers/gpio/gpio-twl4030.c           |    2 +
+ drivers/mmc/host/omap_hsmmc.c         |  109 +++++++++++++++++++++------------
+ 5 files changed, 82 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index da75f23..238b95a 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -231,14 +231,16 @@ static struct omap2_hsmmc_info mmc[] = {
- 		 * so the SIM card isn't used; else 4 bits.
- 		 */
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= 4,
--		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 2,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 1,	/* mmc1_cd offset in twl4030 */
- 		.gpio_wp	= 7,
--		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -246,13 +248,6 @@ static struct omap2_hsmmc_info mmc[] = {
- static int sdp3430_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
- {
--	/* gpio + 0 is "mmc0_cd" (input/IRQ),
--	 * gpio + 1 is "mmc1_cd" (input/IRQ)
--	 */
--	mmc[0].gpio_cd = gpio + 0;
--	mmc[1].gpio_cd = gpio + 1;
--	omap_hsmmc_late_init(mmc);
--
- 	/* gpio + 7 is "sub_lcd_en_bkl" (output/PWM1) */
- 	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "sub_lcd_en_bkl");
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index a97876d..dda88f7 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -323,7 +323,10 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
  
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 49e6405..26466f3 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -411,9 +411,9 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA,
--		.gpio_cd	= -EINVAL,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= -EINVAL,
--		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 2,
-@@ -469,10 +469,6 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
- 		pr_err("CM-T35: could not obtain gpio for WiFi reset\n");
- 	}
+ 	mmc->get_context_loss_count = hsmmc_get_context_loss;
  
--	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
--	mmc[0].gpio_cd = gpio + 0;
--	omap_hsmmc_late_init(mmc);
--
- 	return 0;
++	mmc->slots[0].gpiochip_cd = c->gpiochip_cd;
+ 	mmc->slots[0].switch_pin = c->gpio_cd;
++
++	mmc->slots[0].gpiochip_wp = c->gpiochip_wp;
+ 	mmc->slots[0].gpio_wp = c->gpio_wp;
+ 
+ 	mmc->slots[0].remux = c->remux;
+diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+index 07831cc..ffbb78d 100644
+--- a/arch/arm/mach-omap2/hsmmc.h
++++ b/arch/arm/mach-omap2/hsmmc.h
+@@ -22,8 +22,13 @@ struct omap2_hsmmc_info {
+ 	bool	no_off_init;	/* no power off when not in MMC sleep state */
+ 	bool	vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
+ 	bool	deferred;	/* mmc needs a deferred probe */
++
++	char	*gpiochip_cd;	/* Optional gpiochip for gpio_cd */
+ 	int	gpio_cd;	/* or -EINVAL */
++
++	char	*gpiochip_wp;	/* Optional gpiochip for gpio_wp */
+ 	int	gpio_wp;	/* or -EINVAL */
++
+ 	char	*name;		/* or NULL for default */
+ 	struct platform_device *pdev;	/* mmc controller instance */
+ 	int	ocr_mask;	/* temporary HACK */
+diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
+index f75946c..cbfbdc3 100644
+--- a/arch/arm/plat-omap/include/plat/mmc.h
++++ b/arch/arm/plat-omap/include/plat/mmc.h
+@@ -130,7 +130,10 @@ struct omap_mmc_platform_data {
+ #define HSMMC_HAS_UPDATED_RESET	(1 << 1)
+ 		unsigned features;
+ 
++		char *gpiochip_cd;		/* optional gpiochip for card detect */
+ 		int switch_pin;			/* gpio (card detect) */
++
++		char *gpiochip_wp;		/* optional gpiochip for write protect */
+ 		int gpio_wp;			/* gpio (write protect) */
+ 
+ 		int (*set_bus_mode)(struct device *dev, int slot, int bus_mode);
+diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+index b8b4f22..d0f266c 100644
+--- a/drivers/gpio/gpio-twl4030.c
++++ b/drivers/gpio/gpio-twl4030.c
+@@ -391,6 +391,7 @@ static int __devinit gpio_twl4030_debounce(u32 debounce, u8 mmc_cd)
  }
  
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 11cd2a8..b250999 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -99,8 +99,9 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= 29,
--		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -227,10 +228,6 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
+ static int gpio_twl4030_remove(struct platform_device *pdev);
++static struct platform_driver gpio_twl4030_driver;
+ 
+ static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
  {
- 	int ret;
+@@ -430,6 +431,7 @@ no_irqs:
+ 				pdata->debounce, pdata->mmc_cd,
+ 				ret);
  
--	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
--	mmc[0].gpio_cd = gpio + 0;
--	omap_hsmmc_late_init(mmc);
--
- 	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
- 	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
++	twl_gpiochip.label = gpio_twl4030_driver.driver.name;
+ 	twl_gpiochip.base = pdata->gpio_base;
+ 	twl_gpiochip.ngpio = TWL4030_GPIO_MAX;
+ 	twl_gpiochip.dev = &pdev->dev;
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index fd0c661..1aa2420 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -176,6 +176,8 @@ struct omap_hsmmc_host {
+ 	int			use_dma, dma_ch;
+ 	int			dma_line_tx, dma_line_rx;
+ 	int			slot_id;
++	int			gpio_cd;
++	int			gpio_wp;
+ 	int			got_dbclk;
+ 	int			response_busy;
+ 	int			context_loss;
+@@ -192,26 +194,29 @@ struct omap_hsmmc_host {
  
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index e558800..d39f016 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -293,9 +293,9 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA,
--		.gpio_cd	= -EINVAL,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= -EINVAL,
--		.deferred	= true,
- 	},
- #if defined(CONFIG_LIBERTAS_SDIO) || defined(CONFIG_LIBERTAS_SDIO_MODULE)
- 	{
-@@ -401,10 +401,6 @@ static int igep_twl_gpio_setup(struct device *dev,
+ static int omap_hsmmc_card_detect(struct device *dev, int slot)
  {
- 	int ret;
+-	struct omap_mmc_platform_data *mmc = dev->platform_data;
++	struct omap_hsmmc_host *host =
++		platform_get_drvdata(to_platform_device(dev));
  
--	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
--	mmc[0].gpio_cd = gpio + 0;
--	omap_hsmmc_late_init(mmc);
--
- 	/* TWL4030_GPIO_MAX + 1 == ledB (out, active low LED) */
- #if !defined(CONFIG_LEDS_GPIO) && !defined(CONFIG_LEDS_GPIO_MODULE)
- 	ret = gpio_request_one(gpio + TWL4030_GPIO_MAX + 1, GPIOF_OUT_INIT_HIGH,
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 7be8d65..bbb3234 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -252,8 +252,9 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= -EINVAL,
--		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -273,11 +274,6 @@ static int beagle_twl_gpio_setup(struct device *dev,
+ 	/* NOTE: assumes card detect signal is active-low */
+-	return !gpio_get_value_cansleep(mmc->slots[0].switch_pin);
++	return !gpio_get_value_cansleep(host->gpio_cd);
+ }
+ 
+ static int omap_hsmmc_get_wp(struct device *dev, int slot)
  {
- 	int r;
+-	struct omap_mmc_platform_data *mmc = dev->platform_data;
++	struct omap_hsmmc_host *host =
++		platform_get_drvdata(to_platform_device(dev));
  
--	mmc[0].gpio_wp = beagle_config.mmc1_gpio_wp;
--	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
--	mmc[0].gpio_cd = gpio + 0;
--	omap_hsmmc_late_init(mmc);
+ 	/* NOTE: assumes write protect signal is active-high */
+-	return gpio_get_value_cansleep(mmc->slots[0].gpio_wp);
++	return gpio_get_value_cansleep(host->gpio_wp);
+ }
+ 
+ static int omap_hsmmc_get_cover_state(struct device *dev, int slot)
+ {
+-	struct omap_mmc_platform_data *mmc = dev->platform_data;
++	struct omap_hsmmc_host *host =
++		platform_get_drvdata(to_platform_device(dev));
+ 
+ 	/* NOTE: assumes card detect signal is active-low */
+-	return !gpio_get_value_cansleep(mmc->slots[0].switch_pin);
++	return !gpio_get_value_cansleep(host->gpio_cd);
+ }
+ 
+ #ifdef CONFIG_PM
+@@ -497,55 +502,80 @@ static inline int omap_hsmmc_have_reg(void)
+ 
+ #endif
+ 
+-static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
++static int omap_hsmmc_gpio_init(struct omap_hsmmc_host *host)
+ {
+-	int ret;
 -
+-	if (gpio_is_valid(pdata->slots[0].switch_pin)) {
+-		if (pdata->slots[0].cover)
+-			pdata->slots[0].get_cover_state =
++	struct omap_mmc_platform_data *pdata = host->pdata;
++	struct omap_mmc_slot_data *slot = &pdata->slots[0];
++	int gpio, ret;
++
++	gpio = slot->switch_pin;
++	if (slot->gpiochip_cd)
++		gpio = gpio_find_by_chip_name(slot->gpiochip_cd, gpio);
++	if (gpio_is_valid(gpio)) {
++		if (slot->cover)
++			slot->get_cover_state =
+ 					omap_hsmmc_get_cover_state;
+ 		else
+-			pdata->slots[0].card_detect = omap_hsmmc_card_detect;
+-		pdata->slots[0].card_detect_irq =
+-				gpio_to_irq(pdata->slots[0].switch_pin);
+-		ret = gpio_request(pdata->slots[0].switch_pin, "mmc_cd");
++			slot->card_detect = omap_hsmmc_card_detect;
++		slot->card_detect_irq =
++				gpio_to_irq(gpio);
++		ret = gpio_request(gpio, "mmc_cd");
+ 		if (ret)
+ 			return ret;
+-		ret = gpio_direction_input(pdata->slots[0].switch_pin);
++		ret = gpio_direction_input(gpio);
+ 		if (ret)
+ 			goto err_free_sp;
+-	} else
+-		pdata->slots[0].switch_pin = -EINVAL;
++		host->gpio_cd = gpio;
++	} else {
++		if (slot->gpiochip_cd) {
++			pr_warning("MMC %s card detect GPIO chip %s unavailable\n",
++				slot->name, slot->gpiochip_cd);
++			ret = -ENODEV;
++			goto err_free_sp;
++		}
++		host->gpio_cd = -EINVAL;
++	}
+ 
+-	if (gpio_is_valid(pdata->slots[0].gpio_wp)) {
+-		pdata->slots[0].get_ro = omap_hsmmc_get_wp;
+-		ret = gpio_request(pdata->slots[0].gpio_wp, "mmc_wp");
++	gpio = slot->gpio_wp;
++	if (slot->gpiochip_wp)
++		gpio = gpio_find_by_chip_name(slot->gpiochip_wp, gpio);
++	if (gpio_is_valid(gpio)) {
++		slot->get_ro = omap_hsmmc_get_wp;
++		ret = gpio_request(gpio, "mmc_wp");
+ 		if (ret)
+ 			goto err_free_cd;
+-		ret = gpio_direction_input(pdata->slots[0].gpio_wp);
++		ret = gpio_direction_input(gpio);
+ 		if (ret)
+ 			goto err_free_wp;
+-	} else
+-		pdata->slots[0].gpio_wp = -EINVAL;
++		host->gpio_wp = gpio;
++	} else {
++		if (slot->gpiochip_wp) {
++			pr_warning("MMC %s write protect GPIO chip %s unavailable\n",
++				slot->name, slot->gpiochip_wp);
++			ret = -ENODEV;
++			goto err_free_wp;
++		}
++		host->gpio_wp = -EINVAL;
++	}
+ 
+ 	return 0;
+ 
+ err_free_wp:
+-	gpio_free(pdata->slots[0].gpio_wp);
++	if (gpio_is_valid(host->gpio_wp))
++		gpio_free(host->gpio_wp);
+ err_free_cd:
+-	if (gpio_is_valid(pdata->slots[0].switch_pin))
++	if (gpio_is_valid(host->gpio_cd))
+ err_free_sp:
+-		gpio_free(pdata->slots[0].switch_pin);
++		gpio_free(host->gpio_cd);
+ 	return ret;
+ }
+ 
+-static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
++static void omap_hsmmc_gpio_free(struct omap_hsmmc_host *host)
+ {
+-	if (gpio_is_valid(pdata->slots[0].gpio_wp))
+-		gpio_free(pdata->slots[0].gpio_wp);
+-	if (gpio_is_valid(pdata->slots[0].switch_pin))
+-		gpio_free(pdata->slots[0].switch_pin);
++	if (gpio_is_valid(host->gpio_wp))
++		gpio_free(host->gpio_wp);
++	if (gpio_is_valid(host->gpio_cd))
++		gpio_free(host->gpio_cd);
+ }
+ 
+ /*
+@@ -1876,10 +1906,6 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+ 	if (res == NULL)
+ 		return -EBUSY;
+ 
+-	ret = omap_hsmmc_gpio_init(pdata);
+-	if (ret)
+-		goto err;
+-
+ 	mmc = mmc_alloc_host(sizeof(struct omap_hsmmc_host), &pdev->dev);
+ 	if (!mmc) {
+ 		ret = -ENOMEM;
+@@ -1903,6 +1929,10 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, host);
+ 
++	ret = omap_hsmmc_gpio_init(host);
++	if (ret)
++		goto err1;
++
+ 	mmc->ops	= &omap_hsmmc_ops;
+ 
  	/*
- 	 * TWL4030_GPIO_MAX + 0 == ledA, EHCI nEN_USB_PWR (out, XM active
- 	 * high / others active low)
-@@ -523,6 +519,7 @@ static void __init omap3_beagle_init(void)
+@@ -2093,8 +2123,7 @@ err1:
+ 	platform_set_drvdata(pdev, NULL);
+ 	mmc_free_host(mmc);
+ err_alloc:
+-	omap_hsmmc_gpio_free(pdata);
+-err:
++	omap_hsmmc_gpio_free(host);
+ 	release_mem_region(res->start, resource_size(res));
+ 	return ret;
+ }
+@@ -2125,7 +2154,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
  
- 	if (beagle_config.mmc1_gpio_wp != -EINVAL)
- 		omap_mux_init_gpio(beagle_config.mmc1_gpio_wp, OMAP_PIN_INPUT);
-+	mmc[0].gpio_wp = beagle_config.mmc1_gpio_wp;
- 	omap_hsmmc_init(mmc);
+ 		mmc_free_host(host->mmc);
+ 		iounmap(host->base);
+-		omap_hsmmc_gpio_free(pdev->dev.platform_data);
++		omap_hsmmc_gpio_free(host);
+ 	}
  
- 	omap3_beagle_i2c_init();
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 6b77ad9..4bc86d9 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -315,9 +315,9 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA,
--		.gpio_cd	= -EINVAL,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= 63,
--		.deferred	= true,
- 	},
- #ifdef CONFIG_WL12XX_PLATFORM_DATA
- 	{
-@@ -361,10 +361,6 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
- {
- 	int r, lcd_bl_en;
- 
--	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
--	mmc[0].gpio_cd = gpio + 0;
--	omap_hsmmc_late_init(mmc);
--
- 	/*
- 	 * Most GPIOs are for USB OTG.  Some are mostly sent to
- 	 * the P2 connector; notably LEDA for the LCD backlight.
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index ace466b..b387264 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -270,19 +270,19 @@ static struct omap2_hsmmc_info omap3pandora_mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA,
--		.gpio_cd	= -EINVAL,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= 126,
- 		.ext_clock	= 0,
--		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 2,
- 		.caps		= MMC_CAP_4_BIT_DATA,
--		.gpio_cd	= -EINVAL,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= 127,
- 		.ext_clock	= 1,
- 		.transceiver	= true,
--		.deferred	= true,
- 	},
- 	{
- 		.mmc		= 3,
-@@ -299,11 +299,6 @@ static int omap3pandora_twl_gpio_setup(struct device *dev,
- {
- 	int ret, gpio_32khz;
- 
--	/* gpio + {0,1} is "mmc{0,1}_cd" (input/IRQ) */
--	omap3pandora_mmc[0].gpio_cd = gpio + 0;
--	omap3pandora_mmc[1].gpio_cd = gpio + 1;
--	omap_hsmmc_late_init(omap3pandora_mmc);
--
- 	/* gpio + 13 drives 32kHz buffer for wifi module */
- 	gpio_32khz = gpio + 13;
- 	ret = gpio_request_one(gpio_32khz, GPIOF_OUT_INIT_HIGH, "wifi 32kHz");
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index 6410043..6d0deb9 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -211,9 +211,9 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA,
--		.gpio_cd	= -EINVAL,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= 23,
--		.deferred	= true,
- 	 },
- 	{}			/* Terminator */
- };
-@@ -282,10 +282,6 @@ static int
- omap3stalker_twl_gpio_setup(struct device *dev,
- 			    unsigned gpio, unsigned ngpio)
- {
--	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
--	mmc[0].gpio_cd = gpio + 0;
--	omap_hsmmc_late_init(mmc);
--
- 	/*
- 	 * Most GPIOs are for USB OTG.  Some are mostly sent to
- 	 * the P2 connector; notably LEDA for the LCD backlight.
-diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
-index 8842e04..cf270b8 100644
---- a/arch/arm/mach-omap2/board-omap3touchbook.c
-+++ b/arch/arm/mach-omap2/board-omap3touchbook.c
-@@ -99,8 +99,9 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= 29,
--		.deferred	= true,
- 	},
- 	{}	/* Terminator */
- };
-@@ -118,10 +119,6 @@ static struct gpio_led gpio_leds[];
- static int touchbook_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
- {
--	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
--	mmc[0].gpio_cd = gpio + 0;
--	omap_hsmmc_late_init(mmc);
--
- 	/* REVISIT: need ehci-omap hooks for external VBUS
- 	 * power switch and overcurrent detect
- 	 */
-diff --git a/arch/arm/mach-omap2/board-zoom-peripherals.c b/arch/arm/mach-omap2/board-zoom-peripherals.c
-index 3d39cdb..604df86 100644
---- a/arch/arm/mach-omap2/board-zoom-peripherals.c
-+++ b/arch/arm/mach-omap2/board-zoom-peripherals.c
-@@ -203,9 +203,10 @@ static struct omap2_hsmmc_info mmc[] = {
- 		.name		= "external",
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA,
-+		.gpiochip_cd	= "twl4030_gpio",
-+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
- 		.gpio_wp	= -EINVAL,
- 		.power_saving	= true,
--		.deferred	= true,
- 	},
- 	{
- 		.name		= "internal",
-@@ -232,10 +233,6 @@ static int zoom_twl_gpio_setup(struct device *dev,
- {
- 	int ret;
- 
--	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
--	mmc[0].gpio_cd = gpio + 0;
--	omap_hsmmc_late_init(mmc);
--
- 	ret = gpio_request_one(LCD_PANEL_ENABLE_GPIO, GPIOF_OUT_INIT_LOW,
- 			       "lcd enable");
- 	if (ret)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
