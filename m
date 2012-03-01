@@ -1,39 +1,92 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 1 Mar 2012 10:52:40 +0000
-Subject: [PATCH] ARM: 3ds_debugboard: Let ethernet be functional again
-In-Reply-To: <20120301100847.GF26642@pengutronix.de>
-References: <1328646473-11828-1-git-send-email-festevam@gmail.com>
- <20120213082741.GN3852@pengutronix.de>
- <20120213144820.GA3494@opensource.wolfsonmicro.com>
- <20120214105823.GS3852@pengutronix.de>
- <20120214172902.GB3916@opensource.wolfsonmicro.com>
- <20120216073236.GE3852@pengutronix.de>
- <20120216075825.GA11631@opensource.wolfsonmicro.com>
- <20120301100847.GF26642@pengutronix.de>
-Message-ID: <20120301105239.GA3124@opensource.wolfsonmicro.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 1 Mar 2012 10:54:41 +0000
+Subject: [PATCH-V2 2/2] arm:omap:am33xx: Add power domain data
+In-Reply-To: <alpine.DEB.2.00.1202291839130.12752@utopia.booyaka.com>
+References: <1324803628-16790-1-git-send-email-hvaibhav@ti.com>
+ <1324803628-16790-3-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1202291839130.12752@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A8317E515D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2012 at 11:08:47AM +0100, Sascha Hauer wrote:
+On Thu, Mar 01, 2012 at 07:14:24, Paul Walmsley wrote:
+> Hi
+> 
+> some other observations:
+> 
+> On Sun, 25 Dec 2011, Vaibhav Hiremath wrote:
+> 
+> > +static struct powerdomain per_33xx_pwrdm = {
+> > +	.name			= "per_pwrdm",
+> > +	.voltdm			= { .name = "core" },
+> > +	.prcm_partition		= AM33XX_PRM_PARTITION,
+> > +	.prcm_offs		= AM33XX_PRM_PER_MOD,
+> > +	.pwrsts			= PWRSTS_OFF_RET_ON,
+> > +	.pwrsts_logic_ret	= PWRSTS_OFF_RET,
+> > +	.pwrstctrl_offs		= AM33XX_PM_PER_PWRSTCTRL_OFFSET,
+> > +	.pwrstst_offs		= AM33XX_PM_PER_PWRSTST_OFFSET,
+> > +	.flags			= PWRDM_HAS_LOWPOWERSTATECHANGE,
+> > +	.banks			= 3,
+> > +	.pwrsts_mem_ret		= {
+> > +		[0]	= PWRSTS_OFF_RET,	/* icss_mem */
+> > +		[1]	= PWRSTS_OFF_RET,	/* per_mem */
+> > +		[2]	= PWRSTS_OFF_RET,	/* ram_mem */
+> > +	},
+> > +	.pwrsts_mem_on		= {
+> > +		[0]	= PWRSTS_ON,		/* icss_mem */
+> > +		[1]	= PWRSTS_ON,		/* per_mem */
+> > +		[2]	= PWRSTS_ON,		/* ram_mem */
+> > +	},
+> > +};
+> 
+> According to SPRUH73C Table 8-184 "PM_PER_PWRSTCTRL Register Field 
+> Descriptions" the pwrsts_mem_on field for RAM_MEM should be 
+> PWRSTS_OFF_RET_ON.
+> 
+> > +static struct powerdomain mpu_33xx_pwrdm = {
+> > +     .name                   = "mpu_pwrdm",
+> > +     .voltdm                 = { .name = "mpu" },
+> > +     .prcm_partition         = AM33XX_PRM_PARTITION,
+> > +     .prcm_offs              = AM33XX_PRM_MPU_MOD,
+> > +     .pwrsts                 = PWRSTS_OFF_RET_ON,
+> > +     .pwrsts_logic_ret       = PWRSTS_OFF_RET,
+> > +     .pwrstctrl_offs         = AM33XX_PM_MPU_PWRSTCTRL_OFFSET,
+> > +     .pwrstst_offs           = AM33XX_PM_MPU_PWRSTST_OFFSET,
+> > +     .flags                  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+> > +     .banks                  = 3,
+> > +     .pwrsts_mem_ret         = {
+> > +             [0]     = PWRSTS_OFF_RET,       /* mpu_l1 */
+> > +             [1]     = PWRSTS_OFF_RET,       /* mpu_l2 */
+> > +             [2]     = PWRSTS_OFF_RET,       /* mpu_ram */
+> > +     },
+> 
+> Again SPRUH73C Table 8-191 "PM_MPU_PWRSTCTRL Register Field Descriptions" 
+> claims these should simply by PWRSTS_RET.
+> 
+> > +     .pwrsts_mem_on          = {
+> > +             [0]     = PWRSTS_ON,            /* mpu_l1 */
+> > +             [1]     = PWRSTS_ON,            /* mpu_l2 */
+> > +             [2]     = PWRSTS_ON,            /* mpu_ram */
+> > +     },
+> > +};
+> 
+> And the same table claims the MPU_RAM pwrsts_mem_on field should be 
+> PWRSTS_OFF_ON.
+> 
+> Can you please reconcile these differences and let us know which values 
+> should be correct?
+> 
 
-> Ok, I tried to do this. I Changed the function to:
+Paul,
 
-> static struct platform_device *regulator_register_fixed(int id,
-> 		struct regulator_consumer_supply *supplies, int num_supplies)
+The initialization used in the patch is correct. Unfortunately, the TRM is 
+incorrect here. I have already raised this issue with respective folks and soon it will get corrected.
 
-> Now I have to register a fixed regulator with some invented value
-> for microvolts. What value should I choose? I tried 0 but the core
-> won't accept this as explained earlier, in short regulator_register()
-> returns with an error.
+Thanks,
+Vaibhav
 
-I've already suggested just fixing the fixed voltage regulator to be
-more sensible when it doesn't have a voltage but you say that won't work
-without explaining why you think that is the case and are still ignoring
-my repeated queries about that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120301/17298457/attachment.sig>
+> thanks
+> 
+> 
+> - Paul
+> 
