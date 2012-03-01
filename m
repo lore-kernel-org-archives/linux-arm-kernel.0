@@ -1,167 +1,134 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Thu,  1 Mar 2012 14:10:27 +0800
-Subject: [PATCH 7/8] ARM: dts: append DTS file of pxa168
+Date: Thu,  1 Mar 2012 14:10:28 +0800
+Subject: [PATCH 8/8] Document: devicetree: add OF documents for arch-mmp
 In-Reply-To: <1330582228-12424-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1330582228-12424-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1330582228-12424-8-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1330582228-12424-9-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DTS files of both PXA168 and aspenite are appended.
+Add OF support in Document/devicetree directory.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/boot/dts/pxa168-aspenite.dts |   38 +++++++++++++
- arch/arm/boot/dts/pxa168.dtsi         |   96 +++++++++++++++++++++++++++++++++
- 2 files changed, 134 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/pxa168-aspenite.dts
- create mode 100644 arch/arm/boot/dts/pxa168.dtsi
+ Documentation/devicetree/bindings/arm/mrvl.txt     |    6 +++
+ .../devicetree/bindings/gpio/mrvl-gpio.txt         |   27 ++++++++++++++
+ Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   37 ++++++++++++++++++++
+ .../devicetree/bindings/rtc/sa1100-rtc.txt         |   15 ++++++++
+ 4 files changed, 85 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mrvl.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
 
-diff --git a/arch/arm/boot/dts/pxa168-aspenite.dts b/arch/arm/boot/dts/pxa168-aspenite.dts
+diff --git a/Documentation/devicetree/bindings/arm/mrvl.txt b/Documentation/devicetree/bindings/arm/mrvl.txt
 new file mode 100644
-index 0000000..e762fac
+index 0000000..d8de933
 --- /dev/null
-+++ b/arch/arm/boot/dts/pxa168-aspenite.dts
-@@ -0,0 +1,38 @@
-+/*
-+ *  Copyright (C) 2012 Marvell Technology Group Ltd.
-+ *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
++++ b/Documentation/devicetree/bindings/arm/mrvl.txt
+@@ -0,0 +1,6 @@
++Marvell Platforms Device Tree Bindings
++----------------------------------------------------
 +
-+/dts-v1/;
-+/include/ "pxa168.dtsi"
-+
-+/ {
-+	model = "Marvell PXA168 Aspenite Development Board";
-+	compatible = "mrvl,pxa168-aspenite", "mrvl,pxa168";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x04000000>;
-+	};
-+
-+	soc {
-+		apb at d4000000 {
-+			uart1: uart at d4017000 {
-+				status = "okay";
-+			};
-+			twsi1: i2c at d4011000 {
-+				status = "okay";
-+			};
-+			rtc: rtc at d4010000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/pxa168.dtsi b/arch/arm/boot/dts/pxa168.dtsi
++PXA168 Aspenite Board
++Required root node properties:
++	- compatible = "mrvl,pxa168-aspenite", "mrvl,pxa168";
+diff --git a/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
 new file mode 100644
-index 0000000..e624c10
+index 0000000..c2c7995
 --- /dev/null
-+++ b/arch/arm/boot/dts/pxa168.dtsi
-@@ -0,0 +1,96 @@
-+/*
-+ *  Copyright (C) 2012 Marvell Technology Group Ltd.
-+ *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  publishhed by the Free Software Foundation.
-+ */
++++ b/Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+@@ -0,0 +1,27 @@
++* Marvell PXA GPIO controller
 +
-+/include/ "skeleton.dtsi"
++Required properties:
++- compatible : Should be "mrvl,pxa-gpio" or "mrvl,mmp-gpio"
++- reg : Address and length of the register set for the device
++- interrupts : Should be the port interrupt shared by all gpio pins, if
++  one number.
++- gpio-controller : Marks the device node as a gpio controller.
++- #gpio-cells : Should be one.  It is the pin number.
 +
-+/ {
-+	aliases {
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+	};
++Recommended properties:
++- mrvl,gpio-irq0: Should be interrupt number of gpio0 in pxa2xx/pxa3xx/pxa95x.
++- mrvl,gpio-irq1: should be interrupt number of gpio1 in pxa2xx/pxa3xx/pxa95x.
 +
-+	intc: intc-interrupt-controller at d4282000 {
-+		compatible = "mrvl,mmp-intc", "mrvl,intc";
++Example:
++
++	gpio: gpio at d4019000 {
++		compatible = "mrvl,mmp-gpio", "mrvl,pxa-gpio";
++		reg = <0xd4019000 0x1000>;
++		interrupts = <49>;
++		gpio-controller;
++		#gpio-cells = <1>;
 +		interrupt-controller;
 +		#interrupt-cells = <1>;
-+		reg = <0xd4282000 0x1000>;
++		mrvl,gpio-irq0 = <17>;
++		mrvl,gpio-irq1 = <18>;
++	};
+diff --git a/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+new file mode 100644
+index 0000000..699c7ce
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+@@ -0,0 +1,37 @@
++* I2C
++
++Required properties :
++
++ - reg : Offset and length of the register set for the device
++ - compatible : should be "mrvl,mmp-twsi" where CHIP is the name of a
++   compatible processor, e.g. pxa168, pxa910, mmp2, mmp3.
++   For the pxa2xx/pxa3xx, an additional node "mrvl,pxa-i2c" is required
++   as shown in the example below.
++
++Recommended properties :
++
++ - interrupts : <a b> where a is the interrupt number and b is a
++   field that represents an encoding of the sense and level
++   information for the interrupt.  This should be encoded based on
++   the information in section 2) depending on the type of interrupt
++   controller you have.
++ - interrupt-parent : the phandle for the interrupt controller that
++   services interrupts for this device.
++ - mrvl,i2c-polling : Disable interrupt of i2c controller. Polling
++   status register of i2c controller instead.
++ - mrvl,i2c-mode : "fast" means fast mode of i2c controller.
++
++Examples:
++	twsi1: i2c at d4011000 {
++		compatible = "mrvl,mmp-twsi", "mrvl,pxa-i2c";
++		reg = <0xd4011000 0x1000>;
++		interrupts = <7>;
++		mrvl,i2c-mode = "fast";
++	};
++	
++	twsi2: i2c at d4025000 {
++		compatible = "mrvl,mmp-twsi", "mrvl,pxa-i2c";
++		reg = <0xd4025000 0x1000>;
++		interrupts = <58>;
 +	};
 +
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&intc>;
-+		ranges;
+diff --git a/Documentation/devicetree/bindings/rtc/sa1100-rtc.txt b/Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
+new file mode 100644
+index 0000000..f3a0118
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
+@@ -0,0 +1,15 @@
++* Marvell Real Time Clock controller
 +
-+		apb at d4000000 {	/* APB */
-+			compatible = "mrvl,apb-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0xd4000000 0x00200000>;
-+			ranges;
++Required properties:
++- compatible: should be "mrvl,sa1100-rtc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: Should be two. The first interrupt number is the rtc alarm
++  interrupt and the second interrupt number is the rtc hz interrupt.
 +
-+			uart1: uart at d4017000 {
-+				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
-+				reg = <0xd4017000 0x1000>;
-+				interrupts = <27>;
-+				status = "disabled";
-+			};
-+
-+			uart2: uart at d4018000 {
-+				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
-+				reg = <0xd4018000 0x1000>;
-+				interrupts = <28>;
-+				status = "disabled";
-+			};
-+
-+			uart3: uart at d4026000 {
-+				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
-+				reg = <0xd4026000 0x1000>;
-+				interrupts = <29>;
-+				status = "disabled";
-+			};
-+
-+			gpio: gpio at d4019000 {
-+				compatible = "mrvl,mmp-gpio", "mrvl,pxa-gpio";
-+				reg = <0xd4019000 0x1000>;
-+				interrupts = <49>;
-+				gpio-controller;
-+				#gpio-cells = <1>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				mrvl,gpio-irq0 = <17>;
-+				mrvl,gpio-irq1 = <18>;
-+			};
-+
-+			twsi1: i2c at d4011000 {
-+				compatible = "mrvl,mmp-twsi", "mrvl,pxa-i2c";
-+				reg = <0xd4011000 0x1000>;
-+				interrupts = <7>;
-+				mrvl,i2c-mode = "fast";
-+				status = "disabled";
-+			};
-+
-+			twsi2: i2c at d4025000 {
-+				compatible = "mrvl,mmp-twsi", "mrvl,pxa-i2c";
-+				reg = <0xd4025000 0x1000>;
-+				interrupts = <58>;
-+				status = "disabled";
-+			};
-+
-+			rtc: rtc at d4010000 {
-+				compatible = "mrvl,mmp-rtc";
-+				reg = <0xd4010000 0x1000>;
-+				interrupts = <6 5>;
-+				status = "disabled";
-+			};
-+		};
++Example:
++	rtc: rtc at d4010000 {
++		compatible = "mrvl,mmp-rtc";
++		reg = <0xd4010000 0x1000>;
++		interrupts = <6 5>;
 +	};
-+};
 -- 
 1.7.0.4
