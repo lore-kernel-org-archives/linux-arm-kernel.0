@@ -1,89 +1,64 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Thu, 1 Mar 2012 14:57:54 -0600
-Subject: [PATCH v7 0/9] Consolidate cpuidle functionality
-In-Reply-To: <1330562578-3410-1-git-send-email-rob.lee@linaro.org>
-References: <1330562578-3410-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <CAMXH7KGJtSyeGwEN4jz9TRPxHUjtreMHRG-4WDChB0BC88P=OA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Mar 2012 21:00:20 +0000
+Subject: [PATCH 8/8] ARM: tegra: HACK: remove set_irq_flags() from driver
+In-Reply-To: <201203012038.28062.arnd@arndb.de>
+References: <1330630010-11241-1-git-send-email-alan@signal11.us>
+ <1330630010-11241-9-git-send-email-alan@signal11.us>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BE86173C@HQMAIL01.nvidia.com>
+ <201203012038.28062.arnd@arndb.de>
+Message-ID: <20120301210020.GC19274@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 6:42 PM, Robert Lee <rob.lee@linaro.org> wrote:
-> This patch series moves various functionality duplicated in platform
-> cpuidle drivers to the core cpuidle driver. Also, the platform irq
-> disabling was removed as it appears that all calls into
-> cpuidle_call_idle will have already called local_irq_disable().
->
+On Thu, Mar 01, 2012 at 08:38:27PM +0000, Arnd Bergmann wrote:
+> On Thursday 01 March 2012, Stephen Warren wrote:
+> > 
+> > Alan Ott wrote at Thursday, March 01, 2012 12:27 PM:
+> > > From: Arnd Bergmann <arnd@arndb.de>
+> > > 
+> > > The driver should not call set_irq_flags itself, and
+> > 
+> > Probably true in this case.
+> > 
+> > > cannot do this from a loadable module.
+> > 
+> > I hope that's not true; grep'ing the entire of drivers/ shows a bunch
+> > of drivers calling this function, and many look like they'd be reasonable
+> > as module.
+> 
+> The drivers that I can see using it are for the most part implementing
+> irq controllers by themselves, which is different from merely using an
+> interrupt.
+> 
+> There are three exceptions today:
+> 
+> arnd at klappe2:~/linux-arm$ git grep -l set_irq_flags  drivers/ | xargs grep -L irq_chip
+> drivers/tty/serial/serial_ks8695.c
 
-I'm told that I forgot to add the Acks from the previous v6 to this version:
+Setting NOAUTOEN should be done elsewhere (in platform code.)  Better
+still, fixing genirq to allow request_irq() to permit the interrupt
+to be requested *without enabling it* would be a step forwards.  I
+thought my original ARM IRQ code did that.
 
-Acked-by: Jean Pihet <j-pihet@ti.com> (v6)
-Tested-by: Jean Pihet <j-pihet@ti.com> (v6, omap3)
-Tested-by: Amit Daniel <amit.kachhap@linaro.org> (v6, Exynos4)
-For the generic cpuidle changes:
-Reviewed-by: Deepthi Dharwar <deepthi@linux.vnet.ibm.com>
+> drivers/tty/serial/sirfsoc_uart.c
 
-If anyone sees other omissions or has any suggested changes or
-improvements in my patch submissions semantics, please let me know.
+Same issue, so same comments.
 
-Thanks,
-Rob
+> drivers/usb/host/ehci-tegra.c
 
-> Rafael,
->
-> Could you review this patchset and merge patch 1/9 once its ready? ?It
-> seems pretty close to being acceptable. ?The get_maintainer script shows
-> Len Brown as the cpuidle maintainer but I've been unable to get a response
-> from him so far. ?If you are not the right person, could you suggest
-> who I can make this request to? ?Thanks.
->
-> Note to platform maintainers:
->
-> Platform patches (2/9 to 9/9) in this patchset are not required to work
-> with patch 1/9 but please review and push these platform changes as possible
-> to allow this consolidation to occur.
->
-> Based on 3.3-rc5 plus recent exynos cpuidle patch (affects exynos cpuidle only):
-> http://www.spinics.net/lists/linux-samsung-soc/msg09467.html
->
-> v6 submission tested successfully on Exynos (thanks Amit Kacchap) and OMAP3
-> (thanks Jean Pihet) platforms.
->
-> v6 submission can be found here:
-> http://www.spinics.net/lists/arm-kernel/msg162018.html
-> Changes since v6:
-> * Made some ?struct whitespace alignment changes.
-> * Fixed a coding style violation (thanks Jean Pihet)
-> * Fixed a bug in davinci cpuidle (thanks Jean Pihet)
-> * Corrected the common ARM cpuidle WFI state description to be ARM platform
-> ?agnostic (thanks Kevin Hilman)
-> * Fixed the problem causing x86 and PPC builds to fail (thanks Deepthi)
-> * Re-added a line of code that was mistakenly removed (thanks Deepthi)
->
-> Robert Lee (9):
-> ?cpuidle: Add common time keeping and irq enabling
-> ?ARM: at91: Consolidate time keeping and irq enable
-> ?ARM: exynos: Consolidate time keeping and irq enable
-> ?ARM: kirkwood: Consolidate time keeping and irq enable
-> ?ARM: davinci: Consolidate time keeping and irq enable
-> ?ARM: omap: Consolidate OMAP3 time keeping and irq enable
-> ?ARM: omap: Consolidate OMAP4 time keeping and irq enable
-> ?ARM: shmobile: Consolidate time keeping and irq enable
-> ?SH: shmobile: Consolidate time keeping and irq enable
->
-> ?arch/arm/include/asm/cpuidle.h ? ? ? ?| ? 22 +++++++++
-> ?arch/arm/kernel/Makefile ? ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/kernel/cpuidle.c ? ? ? ? ? ? | ? 21 ++++++++
-> ?arch/arm/mach-at91/cpuidle.c ? ? ? ? ?| ? 67 ++++++++++-----------------
-> ?arch/arm/mach-davinci/cpuidle.c ? ? ? | ? 82 +++++++++++++-------------------
-> ?arch/arm/mach-exynos/cpuidle.c ? ? ? ?| ? 53 ++-------------------
-> ?arch/arm/mach-kirkwood/cpuidle.c ? ? ?| ? 72 ++++++++--------------------
-> ?arch/arm/mach-omap2/cpuidle34xx.c ? ? | ? 42 +++++++----------
-> ?arch/arm/mach-omap2/cpuidle44xx.c ? ? | ? 21 +-------
-> ?arch/arm/mach-shmobile/cpuidle.c ? ? ?| ? 31 +++----------
-> ?arch/sh/kernel/cpu/shmobile/cpuidle.c | ? 10 +---
-> ?drivers/cpuidle/cpuidle.c ? ? ? ? ? ? | ? 79 +++++++++++++++++++++++++------
-> ?include/linux/cpuidle.h ? ? ? ? ? ? ? | ? 13 +++++-
-> ?13 files changed, 233 insertions(+), 282 deletions(-)
-> ?create mode 100644 arch/arm/include/asm/cpuidle.h
-> ?create mode 100644 arch/arm/kernel/cpuidle.c
->
+This one should not be there.  Having drivers mark IRQs as being
+requestable when the whole point of the flag is to stop request_irq()
+being used on non-initialized interrupts is just plain stupid.
+
+> > From what little I understand of this, any irq_chip is going to call
+> > that function after setting up any child/cascaded IRQs, and I assume
+> > that irq_chips can be in modules.
+> 
+> But the function is not exported. I guess if we want to allow
+> irq_chips in loadable modules, we could export it, but I don't see
+> how it could ever have worked so far.
+
+genirq does not permit flow handlers in modules - I suspect that's
+because it's pretty hard to remove them safely from the system without
+a lot of effort.  Certainly, a whole bunch of genirq functions which
+are required to implement external flow handlers etc aren't exported.
