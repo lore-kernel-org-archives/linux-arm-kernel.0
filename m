@@ -1,20 +1,47 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 1 Mar 2012 12:01:46 +0100
-Subject: [V4 0/4] patches for power control on pm8606 oscillator
-In-Reply-To: <1330397869-31644-1-git-send-email-jtzhou@marvell.com>
-References: <1330397869-31644-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20120301110146.GG9008@sortiz-mobl>
+Date: Thu, 1 Mar 2012 12:23:29 +0100
+Subject: [PATCH v5 2/3] arm:davinci: move emif driver to mfd framework
+In-Reply-To: <A73F36158E33644199EB82C5EC81C7BC3176D103@DBDE01.ent.ti.com>
+References: <y> <1330005504-25321-3-git-send-email-prakash.pm@ti.com>
+ <20120227142638.GN27687@sortiz-mobl>
+ <A73F36158E33644199EB82C5EC81C7BC3176D103@DBDE01.ent.ti.com>
+Message-ID: <20120301112329.GI9008@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jett,
+Hi Prakash,
 
-On Tue, Feb 28, 2012 at 10:57:49AM +0800, Jett.Zhou wrote:
-> change log:
-> V4:
-> 1 seperated the mfd power control osc patch for more clear.
+On Tue, Feb 28, 2012 at 05:44:39AM +0000, Manjunathappa, Prakash wrote:
+> Hi Samuel,
+> 
+> On Mon, Feb 27, 2012 at 19:56:38, Samuel Ortiz wrote:
+> [snip]
+> > So it seems you're passing a platform devices array through your mfd aemif
+> > platform data pointer. And from what I can see, it's mostly a 1 entry array
+> > (for the NAND case) or a 2 entries array (for the NAND and NOR case).
+> > In that case, adding an MFD driver in the middle brings basically nothing but
+> > confusion and overhead (and 200+ lines of code).
+> > So unless someone explains to me how this is doing any good to the kernel in
+> > general, I'm not going to take this patchset.
+> > 
+> > Cheers,
+> > Samuel.
+> >
+> 
+> In this way we trying to isolate future modification of aemif driver not to depict
+> as platform code change, the need for this is based on discussion in below thread
+> http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-tt7059739.html#none
+> 
+I fail to see how you're going to achieve that with adding an MFD platform
+device registration in the middle.
 
-All 4 patches applied now, thanks.
+
+> Earlier also concern was expressed to move aemif driver out of arch/arm to drivers folder.
+> Here is the link for the same: http://lists.infradead.org/pipermail/linux-mtd/2011-August/037308.html
+> Since aemif driver supports NAND/NOR devices, we feel MFD is the place holder.
+I would disagree with that. And it certainly makes sense to move many drivers
+out of arch/arm into a more appropriate place but I'd like to keep mfd as
+something else than yet another misc.
 
 Cheers,
 Samuel.
