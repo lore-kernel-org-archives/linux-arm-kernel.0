@@ -1,131 +1,40 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 1 Mar 2012 10:28:04 +0200
-Subject: [PATCHv3 2/6] ARM: OMAP3 PM: Move IO Daisychain function to
- omap3 prm file
-In-Reply-To: <4F4F1BFD.4020903@ti.com>
-References: <1330525621-29836-1-git-send-email-t-kristo@ti.com>
- <1330525621-29836-3-git-send-email-t-kristo@ti.com>
- <4F4F1BFD.4020903@ti.com>
-Message-ID: <1330590484.2116.76.camel@sokoban>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Thu, 1 Mar 2012 09:37:54 +0100
+Subject: [RFC] Merge 'arch/arm/mach-imx/dma-v1.c' into 'drivers/dma/imx-dma.c'
+Message-ID: <CACKLOr0gR12p0i7nVeyLiMn3Bay01tj+5QTqV2QAcYeX+fxu=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-03-01 at 12:19 +0530, Rajendra Nayak wrote:
-> On Wednesday 29 February 2012 07:56 PM, Tero Kristo wrote:
-> > From: Vishwanath BS<vishwanath.bs@ti.com>
-> >
-> > Since IO Daisychain modifies only PRM registers, it makes sense to move
-> > it to PRM File.
-> >
-> > Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com>
-> > Tested-by: Govindraj.R<govindraj.raja@ti.com>
-> > Signed-off-by: Tero Kristo<t-kristo@ti.com>
-> > ---
-> >   arch/arm/mach-omap2/pm34xx.c       |   30 +-----------------------------
-> >   arch/arm/mach-omap2/prm2xxx_3xxx.c |   32 ++++++++++++++++++++++++++++++++
-> >   arch/arm/mach-omap2/prm2xxx_3xxx.h |   14 ++++++++++++++
-> >   3 files changed, 47 insertions(+), 29 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> > index b0821a8..e97ec3f 100644
-> > --- a/arch/arm/mach-omap2/pm34xx.c
-> > +++ b/arch/arm/mach-omap2/pm34xx.c
-> > @@ -85,34 +85,6 @@ static inline void omap3_per_restore_context(void)
-> >   	omap_gpio_restore_context();
-> >   }
-> >
-> > -static void omap3_enable_io_chain(void)
-> > -{
-> > -	int timeout = 0;
-> > -
-> > -	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> > -				   PM_WKEN);
-> > -	/* Do a readback to assure write has been done */
-> > -	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
-> > -
-> > -	while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST)&
-> > -		 OMAP3430_ST_IO_CHAIN_MASK)) {
-> > -		timeout++;
-> > -		if (timeout>  1000) {
-> > -			pr_err("Wake up daisy chain activation failed.\n");
-> > -			return;
-> > -		}
-> > -	}
-> > -	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> > -			PM_WKEN);
-> > -
-> > -}
-> > -
-> > -static void omap3_disable_io_chain(void)
-> > -{
-> > -	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> > -				     PM_WKEN);
-> > -}
-> > -
-> >   static void omap3_core_save_context(void)
-> >   {
-> >   	omap3_ctrl_save_padconf();
-> > @@ -324,7 +296,7 @@ void omap_sram_idle(void)
-> >   	     core_next_state<  PWRDM_POWER_ON)) {
-> >   		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
-> >   		if (omap3_has_io_chain_ctrl())
-> > -			omap3_enable_io_chain();
-> > +			omap3_trigger_io_chain();
-> >   	}
-> >
-> >   	pwrdm_pre_transition();
-> > diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> > index 9ce7654..fc98781 100644
-> > --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> > +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> > @@ -301,6 +301,38 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
-> >   				OMAP3_PRM_IRQENABLE_MPU_OFFSET);
-> >   }
-> >
-> > +/**
-> > + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
-> > + * the I/O ring after asserting WUCLKIN high
-> > + */
-> > +#define MAX_IOPAD_LATCH_TIME 1000
-> 
-> Since we are changing the implementation to use omap_test_timeout()
-> in this patch, it makes sense to make this 100 so we have a max 100us
-> delay, similar to what we did on OMAP4.
+Hi,
+as you know my goal is implementing dma interleave support to imx-dma.
+I tried this (among other things) with the following series:
+[PATCH 0/4] dmaengine: i.MX DMA series.
 
-I didn't change this timeout as I wasn't quite sure what is a safe value
-for it. Do you know if 100us is safe for omap3 also in all possible
-scenarios?
+However, patches 2 an 3 of the series modified 'drivers/dma/imx-dma.c'
+file. So, Sascha and Vinod were quite reluctant to merge the series
+just for that reason arguing that this file was meant to be removed.
 
-> 
-> > +
-> > +/* OMAP3 Daisychain enable sequence */
-> > +void omap3_trigger_io_chain(void)
-> > +{
-> > +	int i = 0;
-> > +
-> > +	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> > +				   PM_WKEN);
-> > +	/* Do a readback to assure write has been done */
-> > +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
-> > +
-> > +	omap_test_timeout(((omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST)&
-> > +			    OMAP3430_ST_IO_CHAIN_MASK) == 1),
-> > +			  MAX_IOPAD_LATCH_TIME, i);
-> > +
-> > +	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> > +				     PM_WKEN);
-> 
-> The comment from Djamil should hold good here too. We should wait for
-> IO chain status to show 0 here.
+Then I sent a v2 version of my series dropping the problematic patches:
+[PATCH v2 0/2] dmaengine: i.MX DMA series.
 
-Hmm okay, I'll address this also for next version.
+I'm still encouraged to achieve my original goal of adding interleave
+support but I don't want my work to be blocked again. For this purpose
+I want to inform you previously that I will prepare another series
+with the following patches:
 
--Tero
+1. Merge 'arch/arm/mach-imx/dma-v1.c' into 'drivers/dma/imx-dma.c'
+2. Provide support for dma interleaved.
 
+I will develop this on top of my previous series, so it would be great
+if you could merge it as soon as possible in order to have a decent
+base to work on.
 
-> 
-> > +}
-> > +
-> 
-> regards,
-> Rajendra
+Regards.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
