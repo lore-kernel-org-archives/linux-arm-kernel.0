@@ -1,18 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 1 Mar 2012 09:51:46 +0000
-Subject: [PATCH 1/8] gpio: pxa: add OF support
-In-Reply-To: <201203010940.37123.arnd@arndb.de>
-References: <1330582228-12424-1-git-send-email-haojian.zhuang@marvell.com>
- <1330582228-12424-2-git-send-email-haojian.zhuang@marvell.com>
- <201203010940.37123.arnd@arndb.de>
-Message-ID: <201203010951.46871.arnd@arndb.de>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 1 Mar 2012 09:53:09 +0000
+Subject: ARM: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
+In-Reply-To: <201202291312.21318.hartleys@visionengravers.com>
+References: <201202291312.21318.hartleys@visionengravers.com>
+Message-ID: <CACb=_tQP8ex7haOAuhMXFghDgscN6QU7YT5+m5fXbdtOas66RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 March 2012, Arnd Bergmann wrote:
-> It seems that you are not following the regular IRQ binding. This should
-> probably use irq_of_parse_and_map().
+On 29 February 2012 20:12, H Hartley Sweeten
+<hartleys@visionengravers.com> wrote:
+> As done for the other ep93xx machines in:
+>
+> commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
+> ARM: ep93xx: convert to MULTI_IRQ_HANDLER
+>
+> Now that there is a generic IRQ handler for multiple VIC devices use it
+> for vision_ep9307 to help building multi platform kernels.
+>
+> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Jamie Iles <jamie@jamieiles.com>
 
-Or better platform_get_irq, see comment on rtc driver.
-
-	Arnd
+Reviewed-by: Jamie Iles <jamie@jamieiles.com>
