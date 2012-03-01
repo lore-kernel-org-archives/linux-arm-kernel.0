@@ -1,9 +1,9 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Wed, 29 Feb 2012 18:42:54 -0600
-Subject: [PATCH v7 5/9] ARM: davinci: Consolidate time keeping and irq enable
+Date: Wed, 29 Feb 2012 18:42:57 -0600
+Subject: [PATCH v7 8/9] ARM: shmobile: Consolidate time keeping and irq enable
 In-Reply-To: <1330562578-3410-1-git-send-email-rob.lee@linaro.org>
 References: <1330562578-3410-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1330562578-3410-6-git-send-email-rob.lee@linaro.org>
+Message-ID: <1330562578-3410-9-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,135 +12,64 @@ handling from this code.
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/mach-davinci/cpuidle.c |   82 ++++++++++++++++-----------------------
- 1 files changed, 33 insertions(+), 49 deletions(-)
+ arch/arm/mach-shmobile/cpuidle.c |   31 +++++++------------------------
+ 1 files changed, 7 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
-index a30c7c5..93ae096 100644
---- a/arch/arm/mach-davinci/cpuidle.c
-+++ b/arch/arm/mach-davinci/cpuidle.c
-@@ -18,6 +18,7 @@
- #include <linux/io.h>
- #include <linux/export.h>
- #include <asm/proc-fns.h>
+diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
+index 1b23342..ca23b20 100644
+--- a/arch/arm/mach-shmobile/cpuidle.c
++++ b/arch/arm/mach-shmobile/cpuidle.c
+@@ -14,6 +14,7 @@
+ #include <linux/module.h>
+ #include <linux/err.h>
+ #include <asm/system.h>
 +#include <asm/cpuidle.h>
+ #include <asm/io.h>
  
- #include <mach/cpuidle.h>
- #include <mach/ddr2.h>
-@@ -30,12 +31,42 @@ struct davinci_ops {
- 	u32 flags;
- };
- 
-+/* Actual code that puts the SoC in different idle states */
-+static int davinci_enter_idle(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv,
-+						int index)
-+{
-+	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
-+	struct davinci_ops *ops = cpuidle_get_statedata(state_usage);
-+
-+	if (ops && ops->enter)
-+		ops->enter(ops->flags);
-+
-+	index = cpuidle_wrap_enter(dev,	drv, index,
-+				arm_cpuidle_simple_enter);
-+
-+	if (ops && ops->exit)
-+		ops->exit(ops->flags);
-+
-+	return index;
-+}
-+
- /* fields in davinci_ops.flags */
- #define DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN	BIT(0)
- 
- static struct cpuidle_driver davinci_idle_driver = {
--	.name	= "cpuidle-davinci",
--	.owner	= THIS_MODULE,
-+	.name		= "cpuidle-davinci",
-+	.owner		= THIS_MODULE,
-+	.states[0]	= ARM_CPUIDLE_WFI_STATE,
-+	.states[1]	= {
-+		.enter			= davinci_enter_idle,
-+		.exit_latency		= 10,
-+		.target_residency	= 100000,
-+		.flags			= CPUIDLE_FLAG_TIME_VALID,
-+		.name			= "DDR SR",
-+		.desc			= "WFI and DDR Self Refresh",
-+	},
-+	.state_count = DAVINCI_CPUIDLE_MAX_STATES,
- };
- 
- static DEFINE_PER_CPU(struct cpuidle_device, davinci_cpuidle_device);
-@@ -77,41 +108,10 @@ static struct davinci_ops davinci_states[DAVINCI_CPUIDLE_MAX_STATES] = {
- 	},
- };
- 
--/* Actual code that puts the SoC in different idle states */
--static int davinci_enter_idle(struct cpuidle_device *dev,
--				struct cpuidle_driver *drv,
--						int index)
--{
--	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
--	struct davinci_ops *ops = cpuidle_get_statedata(state_usage);
--	struct timeval before, after;
--	int idle_time;
+ static void shmobile_enter_wfi(void)
+@@ -29,37 +30,19 @@ static int shmobile_cpuidle_enter(struct cpuidle_device *dev,
+ 				  struct cpuidle_driver *drv,
+ 				  int index)
+ {
+-	ktime_t before, after;
+-
+-	before = ktime_get();
 -
 -	local_irq_disable();
--	do_gettimeofday(&before);
+-	local_fiq_disable();
 -
--	if (ops && ops->enter)
--		ops->enter(ops->flags);
--	/* Wait for interrupt state */
--	cpu_do_idle();
--	if (ops && ops->exit)
--		ops->exit(ops->flags);
--
--	do_gettimeofday(&after);
+ 	shmobile_cpuidle_modes[index]();
+ 
 -	local_irq_enable();
--	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
--			(after.tv_usec - before.tv_usec);
+-	local_fiq_enable();
 -
--	dev->last_residency = idle_time;
+-	after = ktime_get();
+-	dev->last_residency = ktime_to_ns(ktime_sub(after, before)) >> 10;
 -
--	return index;
--}
--
- static int __init davinci_cpuidle_probe(struct platform_device *pdev)
- {
- 	int ret;
- 	struct cpuidle_device *device;
--	struct cpuidle_driver *driver = &davinci_idle_driver;
- 	struct davinci_cpuidle_config *pdata = pdev->dev.platform_data;
+ 	return index;
+ }
  
- 	device = &per_cpu(davinci_cpuidle_device, smp_processor_id());
-@@ -123,27 +123,11 @@ static int __init davinci_cpuidle_probe(struct platform_device *pdev)
+ static struct cpuidle_device shmobile_cpuidle_dev;
+ static struct cpuidle_driver shmobile_cpuidle_driver = {
+-	.name =		"shmobile_cpuidle",
+-	.owner =	THIS_MODULE,
+-	.states[0] = {
+-		.name = "C1",
+-		.desc = "WFI",
+-		.exit_latency = 1,
+-		.target_residency = 1 * 2,
+-		.flags = CPUIDLE_FLAG_TIME_VALID,
+-	},
+-	.safe_state_index = 0, /* C1 */
+-	.state_count = 1,
++	.name			= "shmobile_cpuidle",
++	.owner			= THIS_MODULE,
++	.en_core_tk_irqen	= 1,
++	.states[0]		= ARM_CPUIDLE_WFI_STATE,
++	.safe_state_index	= 0, /* C1 */
++	.state_count		= 1,
+ };
  
- 	ddr2_reg_base = pdata->ddr2_ctlr_base;
- 
--	/* Wait for interrupt state */
--	driver->states[0].enter = davinci_enter_idle;
--	driver->states[0].exit_latency = 1;
--	driver->states[0].target_residency = 10000;
--	driver->states[0].flags = CPUIDLE_FLAG_TIME_VALID;
--	strcpy(driver->states[0].name, "WFI");
--	strcpy(driver->states[0].desc, "Wait for interrupt");
--
--	/* Wait for interrupt and DDR self refresh state */
--	driver->states[1].enter = davinci_enter_idle;
--	driver->states[1].exit_latency = 10;
--	driver->states[1].target_residency = 10000;
--	driver->states[1].flags = CPUIDLE_FLAG_TIME_VALID;
--	strcpy(driver->states[1].name, "DDR SR");
--	strcpy(driver->states[1].desc, "WFI and DDR Self Refresh");
- 	if (pdata->ddr2_pdown)
- 		davinci_states[1].flags |= DAVINCI_CPUIDLE_FLAGS_DDR2_PWDN;
- 	cpuidle_set_statedata(&device->states_usage[1], &davinci_states[1]);
- 
- 	device->state_count = DAVINCI_CPUIDLE_MAX_STATES;
--	driver->state_count = DAVINCI_CPUIDLE_MAX_STATES;
- 
- 	ret = cpuidle_register_driver(&davinci_idle_driver);
- 	if (ret) {
+ void (*shmobile_cpuidle_setup)(struct cpuidle_driver *drv);
 -- 
 1.7.1
