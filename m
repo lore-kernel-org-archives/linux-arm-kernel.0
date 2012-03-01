@@ -1,48 +1,78 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 1 Mar 2012 12:12:25 +0000
-Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
- to the hypervisor
-In-Reply-To: <20120301103520.GD7363@n2100.arm.linux.org.uk>
-References: <20120227180355.GB2023@linaro.org>
- <1330371219.10008.34.camel@dagon.hellion.org.uk>
- <20120228102040.GB2063@linaro.org>
- <1330426133.31269.70.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
- <20120229093436.GA2077@linaro.org>
- <1330509362.4270.20.camel@zakaz.uk.xensource.com>
- <20120229125826.GC2077@linaro.org>
- <20120301101029.GB7363@n2100.arm.linux.org.uk>
- <20120301102702.GD2034@linaro.org>
- <20120301103520.GD7363@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1203011209580.923@kaball-desktop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Mar 2012 12:28:33 +0000
+Subject: linux-next: manual merge of the arm-soc tree with the gpio tree
+In-Reply-To: <20120301164001.77a063ceed2deaf37cf68e3c@canb.auug.org.au>
+References: <20120301164001.77a063ceed2deaf37cf68e3c@canb.auug.org.au>
+Message-ID: <201203011228.33983.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Mar 2012, Russell King - ARM Linux wrote:
-> On Thu, Mar 01, 2012 at 10:27:02AM +0000, Dave Martin wrote:
-> > So, where there's a compelling reason to inline these things, we can use
-> > the existing techniques if we're alert to the risks.  But in cases where
-> > there isn't a compelling reason, aren't we just inviting fragility
-> > unnecessarily?
+On Thursday 01 March 2012, Stephen Rothwell wrote:
+> Today's linux-next merge of the arm-soc tree got conflicts in
+> arch/arm/mach-omap1/gpio16xx.c between commit ab985f0f7c2c ("gpio/omap:
+> cleanup omap_gpio_mod_init function") from the gpio tree and commit
+> 63325ff235de ("ARM: OMAP1: Move 16xx GPIO system clock to platform init
+> code") from the arm-soc tree.
 > 
-> The practical experience from the kernel suggests that there isn't a
-> problem - that's not to say that future versions of gcc won't become
-> a problem, and that the compiler guys may refuse to fix it.
-> 
-> I think it's a feature that we should be pressing gcc guys for - it's
-> fairly fundamental to any programming which requires interfaces that
-> require certain args in certain registers, or receive results in
-> certain registers.
-> 
-> The options over this are basically:
-> 1. refusing to upgrade to any version of gcc which does not allow
->    registers-in-asm
-> 2. doing the store-to-memory reload-in-asm thing
-> 3. hand-coding veneers for every call to marshall the registers
-> 
-> Each of those has its down sides, but I suspect with (1), it may be
-> possible to have enough people applying pressure to the compiler guys
-> that they finally see sense on this matter.
+> OK, I can't decide which is correct here - the former adds this code
+> inside the loop (even though it seems to not depend on anything in the
+> loop) and the latter adds it before.  I have used the former (but am
+> happy to be corrected).  And both commits remove the code in
+> drivers/gpio/gpio-omap.c.
 
-I tend to have a very practical approach about this sort of issues, so I
-am tempted to go with 1) if you agree.
+Right, having the code outside of the loop seems correct to me, too.
+
+Grant, I would suggest that I resolve this by merging the the
+omap/gpio/runtime-pm-cleanup branch (f86bcc3) that is in your
+tree into the arm-soc tree as a dependency for the omap1 stuff,
+with the resolution below.
+
+	Arnd
+
+--- a/arch/arm/mach-omap1/gpio16xx.c
++++ b/arch/arm/mach-omap1/gpio16xx.c
+@@@ -218,17 -225,34 +225,34 @@@ static int __init omap16xx_gpio_init(vo
+  	if (!cpu_is_omap16xx())
+  		return -EINVAL;
+  
+ +	/*
+ +	 * Enable system clock for GPIO module.
+ +	 * The CAM_CLK_CTRL *is* really the right place.
+ +	 */
+ +	omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
+ +					ULPD_CAM_CLK_CTRL);
+ +
+- 	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
+- 		platform_device_register(omap16xx_gpio_dev[i]);
++ 	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++) {
++ 		pdev = omap16xx_gpio_dev[i];
++ 		pdata = pdev->dev.platform_data;
++ 
++ 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++ 		if (unlikely(!res)) {
++ 			dev_err(&pdev->dev, "Invalid mem resource.\n");
++ 			return -ENODEV;
++ 		}
+  
+- 	gpio_bank_count = ARRAY_SIZE(omap16xx_gpio_dev);
++ 		base = ioremap(res->start, resource_size(res));
++ 		if (unlikely(!base)) {
++ 			dev_err(&pdev->dev, "ioremap failed.\n");
++ 			return -ENOMEM;
++ 		}
++ 
++ 		__raw_writel(SYSCONFIG_WORD, base + OMAP1610_GPIO_SYSCONFIG);
++ 		iounmap(base);
++ 
+ -		/*
+ -		 * Enable system clock for GPIO module.
+ -		 * The CAM_CLK_CTRL *is* really the right place.
+ -		 */
+ -		omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
+ -					ULPD_CAM_CLK_CTRL);
+ -
++ 		platform_device_register(omap16xx_gpio_dev[i]);
++ 	}
+  
+  	return 0;
+  }
