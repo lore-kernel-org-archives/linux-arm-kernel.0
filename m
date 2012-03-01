@@ -1,44 +1,30 @@
-From: don.morris@hp.com (Don Morris)
-Date: Thu,  1 Mar 2012 07:48:37 -0800
-Subject: [PATCH V2] iop-adma: Corrected array overflow in RAID6 Xscale(R) test.
-Message-ID: <1330616917-5198-1-git-send-email-don.morris@hp.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 1 Mar 2012 17:02:27 +0100
+Subject: [PATCH] ARM: at91: Add support for configurable main clock
+ frequency.
+In-Reply-To: <4F4F925F.2020405@overkiz.com>
+References: <4F4F925F.2020405@overkiz.com>
+Message-ID: <20120301160227.GB31766@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bug: cppcheck reported overflow in array assignment (for loop walks
-0 to IOP_ADMA_NUM_SRC_TEST+2, array size is IOP_ADMA_NUM_SRC_TEST).
+On 16:14 Thu 01 Mar     , Boris BREZILLON wrote:
+> This patch provides main clock frequency configuration from device tree
+> definition.
+> 
+> If the "main-clock" attribute of pmc node is not specified it takes
+> 12MHz as default value.
+> 
+> With this patch we can add board support using a different main clock
+> frequency (our custom board is using a 18,432MHz main clock).
+> 
+This is not the right way you need to define a fixed clock
 
-Reported as: https://bugzilla.kernel.org/show_bug.cgi?id=42677
+and the pmc is at91rm9200 compatible
 
-Test code pq_src array was grown by two elements to correspond with actual
-usage (IOP_ADMA_NUM_SRC_TEST+2), stack consumption was kept constant by
-modifying the pq_dest two element array which is only used when pq_src
-is referenced up to IOP_ADMA_NUM_SRC_TEST elements into the address
-of the new last two elements of the pq_src array. This is presumed to
-be the original intent but would be reliant on compilers always having
-pq_dest contiguous with the final element of pq_src.
+You did do the Documentation either
 
-Updated per review comments of Sergei Shtylyov <sshtylyov@mvista.com>
+wait a few I'll send it's support
 
-Signed-off-by: Don Morris <don.morris@hp.com>
----
- drivers/dma/iop-adma.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/dma/iop-adma.c b/drivers/dma/iop-adma.c
-index 04be90b..9b1951d 100644
---- a/drivers/dma/iop-adma.c
-+++ b/drivers/dma/iop-adma.c
-@@ -1271,8 +1271,8 @@ iop_adma_pq_zero_sum_self_test(struct iop_adma_device *device)
- 	struct page **pq_hw = &pq[IOP_ADMA_NUM_SRC_TEST+2];
- 	/* address conversion buffers (dma_map / page_address) */
- 	void *pq_sw[IOP_ADMA_NUM_SRC_TEST+2];
--	dma_addr_t pq_src[IOP_ADMA_NUM_SRC_TEST];
--	dma_addr_t pq_dest[2];
-+	dma_addr_t pq_src[IOP_ADMA_NUM_SRC_TEST+2];
-+	dma_addr_t *pq_dest = &pq_src[IOP_ADMA_NUM_SRC_TEST];
- 
- 	int i;
- 	struct dma_async_tx_descriptor *tx;
--- 
-1.7.9.111.gf3fb0
+Best Regards,
+J.
