@@ -1,52 +1,55 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 01 Mar 2012 14:38:20 +0900
-Subject: [PATCH v2 1/2] ARM: EXYNOS: Add USB HOST register definitions
-Message-ID: <000701ccf76d$8316b0a0$894411e0$%han@samsung.com>
+Date: Thu, 01 Mar 2012 14:40:03 +0900
+Subject: [PATCH v2 2/2] USB: ehci-s5p: add DMA burst support
+Message-ID: <000801ccf76d$c01e2a00$405a7e00$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds USB HOST register definitions. The definition for
-EHCI INSNREG00 regiser and corresponding bit field definitions are
-added.
+DMA burst support is added to improve performance in EHCI data
+transfer. The USB EHCI controller on Exynos SoCs can use INCR16,
+INCR8, and INCR4 mode. These modes of INSNREG00 register should
+be set in order to enable DMA burst transfer. This feature is
+also related to AHB spec.
 
-Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
 Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Cc: Sangwook Lee <sangwook.lee@linaro.org>
 ---
 v2: change the definition name from EHCI_ENA_xxx to EHCI_INSNREG00_ENA_xxx.
 
-arch/arm/mach-exynos/include/mach/regs-usb-host.h |   24 +++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-host.h
+drivers/usb/host/ehci-s5p.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/regs-usb-host.h b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
-new file mode 100644
-index 0000000..572b7d4
---- /dev/null
-+++ b/arch/arm/mach-exynos/include/mach/regs-usb-host.h
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright (C) 2012 Samsung Electronics Co.Ltd
-+ *		http://www.samsung.com
-+ *
-+ * EXYNOS - USB HOST register definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/drivers/usb/host/ehci-s5p.c b/drivers/usb/host/ehci-s5p.c
+index 293f741..b337f72 100644
+--- a/drivers/usb/host/ehci-s5p.c
++++ b/drivers/usb/host/ehci-s5p.c
+@@ -16,6 +16,7 @@
+ #include <linux/platform_device.h>
+ #include <plat/ehci.h>
+ #include <plat/usb-phy.h>
++#include <mach/regs-usb-host.h>
+ 
+ struct s5p_ehci_hcd {
+ 	struct device *dev;
+@@ -128,6 +129,9 @@ static int __devinit s5p_ehci_probe(struct platform_device *pdev)
+ 	ehci->regs = hcd->regs +
+ 		HC_LENGTH(ehci, readl(&ehci->caps->hc_capbase));
+ 
++	/* DMA burst Enable */
++	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
 +
-+#ifndef __REGS_USB_HOST_H
-+#define __REGS_USB_HOST_H __FILE__
+ 	dbg_hcs_params(ehci, "reset");
+ 	dbg_hcc_params(ehci, "reset");
+ 
+@@ -234,6 +238,9 @@ static int s5p_ehci_resume(struct device *dev)
+ 	if (pdata && pdata->phy_init)
+ 		pdata->phy_init(pdev, S5P_USB_PHY_HOST);
+ 
++	/* DMA burst Enable */
++	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
 +
-+#define EHCI_INSNREG00(base)			(base + 0x90)
-+#define EHCI_INSNREG00_ENA_INCR16		(0x1 << 25)
-+#define EHCI_INSNREG00_ENA_INCR8		(0x1 << 24)
-+#define EHCI_INSNREG00_ENA_INCR4		(0x1 << 23)
-+#define EHCI_INSNREG00_ENA_INCRX_ALIGN		(0x1 << 22)
-+#define EHCI_INSNREG00_ENABLE_DMA_BURST	\
-+	(EHCI_INSNREG00_ENA_INCR16 | EHCI_INSNREG00_ENA_INCR8 |	\
-+	 EHCI_INSNREG00_ENA_INCR4 | EHCI_INSNREG00_ENA_INCRX_ALIGN)
-+
-+#endif /* __REGS_USB_HOST_H */
+ 	if (time_before(jiffies, ehci->next_statechange))
+ 		msleep(100);
+ 
 -- 
 1.7.1
