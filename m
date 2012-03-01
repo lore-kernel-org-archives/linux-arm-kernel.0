@@ -1,136 +1,162 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Feb 2012 22:11:35 -0600
-Subject: [PATCH v2 19/28] ARM: Add fixed PCI i/o mapping
-In-Reply-To: <20120229221341.GF16999@n2100.arm.linux.org.uk>
-References: <1330547147-22867-1-git-send-email-robherring2@gmail.com>
- <1330547147-22867-20-git-send-email-robherring2@gmail.com>
- <20120229221341.GF16999@n2100.arm.linux.org.uk>
-Message-ID: <4F4EF6F7.3000702@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 29 Feb 2012 21:23:50 -0700 (MST)
+Subject: [PATCH] ARM: OMAP2+: powerdomain: unwrap and simplify logging strings
+Message-ID: <alpine.DEB.2.00.1202292122560.12752@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/29/2012 04:13 PM, Russell King - ARM Linux wrote:
-> On Wed, Feb 29, 2012 at 02:25:38PM -0600, Rob Herring wrote:
->> diff --git a/arch/arm/common/pci.c b/arch/arm/common/pci.c
->> new file mode 100644
->> index 0000000..d255e85
->> --- /dev/null
->> +++ b/arch/arm/common/pci.c
->> @@ -0,0 +1,46 @@
->> +/*
->> + * Copyright 2012 Calxeda, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#include <linux/init.h>
->> +#include <linux/io.h>
->> +#include <asm/sizes.h>
->> +#include <asm/mach/map.h>
-> 
-> I assume you've not tried building this with sparse, because it probably
-> complains that these functions aren't static and are missing extern
-> declarations (you're missing an include file.)
-> 
 
-No, fixed now. BTW, you can add this particular check with newer
-versions gcc.
+The current kernel doctrine is to not break printk() strings that
+cross the 80-column boundary into multiple strings.  This is intended
+to ease grepping.  This patch unwraps and simplifies many strings in
+the OMAP powerdomain implementation code, standardizing the format as
+it does so.
 
->> +
->> +static struct map_desc pci_io_desc __initdata = {
->> +	.virtual	= PCI_IO_VIRT_BASE,
->> +	.pfn		= 0,
->> +	.length		= SZ_1M,
->> +	.type		= MT_DEVICE,
->> +};
->> +
->> +void __init pci_map_io(unsigned long paddr[], int nr)
->> +{
->> +	int i;
->> +
->> +	if (nr > 1)
->> +		pci_io_desc.length = SZ_64K;
->> +
->> +	for (i = 0; i < nr; i++) {
->> +		pci_io_desc.pfn = __phys_to_pfn(paddr[i]);
->> +		iotable_init(&pci_io_desc, 1);
->> +
->> +		pci_io_desc.virtual += SZ_64K;
->> +	}
->> +}
->> +
->> +void __init pci_map_io_single(unsigned long paddr)
->> +{
->> +	pci_map_io(&paddr, 1);
->> +}
-> 
-> Is there a reason this can't live in arch/arm/kernel/bios32.c or
-> arch/arm/kernel/isa.c ?
-> 
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/powerdomain.c          |   30 ++++++++++++++--------------
+ arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |    7 +++--
+ arch/arm/mach-omap2/powerdomain44xx.c      |    7 +++--
+ 3 files changed, 23 insertions(+), 21 deletions(-)
 
-No, I've moved it to bios32.c.
-
->> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
->> index d7861b9..f0af548 100644
->> --- a/arch/arm/include/asm/io.h
->> +++ b/arch/arm/include/asm/io.h
->> @@ -111,6 +111,10 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
->>   */
->>  #ifdef CONFIG_NEED_MACH_IO_H
->>  #include <mach/io.h>
->> +#elif defined(CONFIG_PCI)
->> +#define PCI_IO_VIRT_BASE 0xfef00000
->> +#define IO_SPACE_LIMIT ((resource_size_t)0xfffff)
-> 
-> So what's wrong with the standard definition of IO_SPACE_LIMIT below
-> this place?
->
-
-It's a 1MB region rather than 64K to support multiple buses. I can
-increase the existing one instead.
-
->> +#define __io(a)		__typesafe_io(PCI_IO_VIRT_BASE + ((a) & IO_SPACE_LIMIT))
-> 
-> Why do you want ISA/PCI io port addresses to wrap?
-> 
->>  #else
->>  #define __io(a)		({ (void)(a); __typesafe_io(0); })
->>  #endif
->> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
->> index d943b7d..b6d6f8c 100644
->> --- a/arch/arm/include/asm/mach/pci.h
->> +++ b/arch/arm/include/asm/mach/pci.h
->> @@ -60,6 +60,19 @@ struct pci_sys_data {
->>  void pci_common_init(struct hw_pci *);
->>  
->>  /*
->> + * Setup fixed I/O mapping. Must be called from .map_io function.
->> + */
->> +#ifdef CONFIG_PCI
->> +extern void pci_map_io(unsigned long paddr[], int nr);
->> +#else
->> +static inline void pci_map_io(unsigned long paddr[], int nr) {}
->> +#endif
->> +static inline void __init pci_map_io_single(unsigned long paddr)
->> +{
->> +	pci_map_io(&paddr, 1);
->> +}
-> 
-> What's the reason for having this as an inline function, and as a
-> separate global function in pci.c ?
-
-Because I forgot to remove the non-inline version...
-
-I've changed this some to use pfn directly rather than physaddr as
-iop13xx has 64-bit phys addresses.
-
-Rob
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 8a18d1b..89000d3 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -339,8 +339,8 @@ int pwrdm_add_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm)
+ 	if (!pwrdm || !clkdm)
+ 		return -EINVAL;
+ 
+-	pr_debug("powerdomain: associating clockdomain %s with powerdomain "
+-		 "%s\n", clkdm->name, pwrdm->name);
++	pr_debug("powerdomain: %s: associating clockdomain %s\n",
++		 clkdm->name, pwrdm->name);
+ 
+ 	for (i = 0; i < PWRDM_MAX_CLKDMS; i++) {
+ 		if (!pwrdm->pwrdm_clkdms[i])
+@@ -354,8 +354,8 @@ int pwrdm_add_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm)
+ 	}
+ 
+ 	if (i == PWRDM_MAX_CLKDMS) {
+-		pr_debug("powerdomain: increase PWRDM_MAX_CLKDMS for "
+-			 "pwrdm %s clkdm %s\n", pwrdm->name, clkdm->name);
++		pr_debug("powerdomain: %s: increase PWRDM_MAX_CLKDMS (%s)\n",
++			 pwrdm->name, clkdm->name);
+ 		WARN_ON(1);
+ 		ret = -ENOMEM;
+ 		goto pac_exit;
+@@ -387,16 +387,16 @@ int pwrdm_del_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm)
+ 	if (!pwrdm || !clkdm)
+ 		return -EINVAL;
+ 
+-	pr_debug("powerdomain: dissociating clockdomain %s from powerdomain "
+-		 "%s\n", clkdm->name, pwrdm->name);
++	pr_debug("powerdomain: %s: dissociating clockdomain %s\n",
++		 clkdm->name, pwrdm->name);
+ 
+ 	for (i = 0; i < PWRDM_MAX_CLKDMS; i++)
+ 		if (pwrdm->pwrdm_clkdms[i] == clkdm)
+ 			break;
+ 
+ 	if (i == PWRDM_MAX_CLKDMS) {
+-		pr_debug("powerdomain: clkdm %s not associated with pwrdm "
+-			 "%s ?!\n", clkdm->name, pwrdm->name);
++		pr_debug("powerdomain: %s: clkdm %s not associated ?!\n",
++			 clkdm->name, pwrdm->name);
+ 		ret = -ENOENT;
+ 		goto pdc_exit;
+ 	}
+@@ -485,7 +485,7 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ 	if (!(pwrdm->pwrsts & (1 << pwrst)))
+ 		return -EINVAL;
+ 
+-	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
++	pr_debug("powerdomain: %s: setting next powerstate to %0x\n",
+ 		 pwrdm->name, pwrst);
+ 
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+@@ -583,7 +583,7 @@ int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
+ 	if (!(pwrdm->pwrsts_logic_ret & (1 << pwrst)))
+ 		return -EINVAL;
+ 
+-	pr_debug("powerdomain: setting next logic powerstate for %s to %0x\n",
++	pr_debug("powerdomain: %s: setting next logic powerstate to %0x\n",
+ 		 pwrdm->name, pwrst);
+ 
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_logic_retst)
+@@ -620,8 +620,8 @@ int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
+ 	if (!(pwrdm->pwrsts_mem_on[bank] & (1 << pwrst)))
+ 		return -EINVAL;
+ 
+-	pr_debug("powerdomain: setting next memory powerstate for domain %s "
+-		 "bank %0x while pwrdm-ON to %0x\n", pwrdm->name, bank, pwrst);
++	pr_debug("powerdomain: %s: setting next memory powerstate for bank %0x while pwrdm-%s to %0x\n",
++		 pwrdm->name, bank, "ON", pwrst);
+ 
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_onst)
+ 		ret = arch_pwrdm->pwrdm_set_mem_onst(pwrdm, bank, pwrst);
+@@ -658,8 +658,8 @@ int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
+ 	if (!(pwrdm->pwrsts_mem_ret[bank] & (1 << pwrst)))
+ 		return -EINVAL;
+ 
+-	pr_debug("powerdomain: setting next memory powerstate for domain %s "
+-		 "bank %0x while pwrdm-RET to %0x\n", pwrdm->name, bank, pwrst);
++	pr_debug("powerdomain: %s: setting next memory powerstate for bank %0x while pwrdm-%s to %0x\n",
++		 pwrdm->name, bank, "RET", pwrst);
+ 
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_retst)
+ 		ret = arch_pwrdm->pwrdm_set_mem_retst(pwrdm, bank, pwrst);
+@@ -837,7 +837,7 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
+ 	 * warn & fail if it is not ON.
+ 	 */
+ 
+-	pr_debug("powerdomain: clearing previous power state reg for %s\n",
++	pr_debug("powerdomain: %s: clearing previous power state reg\n",
+ 		 pwrdm->name);
+ 
+ 	if (arch_pwrdm && arch_pwrdm->pwrdm_clear_all_prev_pwrst)
+diff --git a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
+index 6a17e4c..c2cb416 100644
+--- a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
+@@ -121,12 +121,13 @@ static int omap2_pwrdm_wait_transition(struct powerdomain *pwrdm)
+ 			udelay(1);
+ 
+ 	if (c > PWRDM_TRANSITION_BAILOUT) {
+-		printk(KERN_ERR "powerdomain: waited too long for "
+-			"powerdomain %s to complete transition\n", pwrdm->name);
++		pr_err("powerdomain: %s: waited too long to complete transition\n",
++		       pwrdm->name);
+ 		return -EAGAIN;
+ 	}
+ 
+-	pr_debug("powerdomain: completed transition in %d loops\n", c);
++	pr_debug("powerdomain: %s: completed transition in %d loops\n",
++		 pwrdm->name, c);
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-omap2/powerdomain44xx.c b/arch/arm/mach-omap2/powerdomain44xx.c
+index a7880af..2db97a9 100644
+--- a/arch/arm/mach-omap2/powerdomain44xx.c
++++ b/arch/arm/mach-omap2/powerdomain44xx.c
+@@ -197,12 +197,13 @@ static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
+ 		udelay(1);
+ 
+ 	if (c > PWRDM_TRANSITION_BAILOUT) {
+-		printk(KERN_ERR "powerdomain: waited too long for "
+-		       "powerdomain %s to complete transition\n", pwrdm->name);
++		pr_err("powerdomain: %s: waited too long to complete transition\n",
++		       pwrdm->name);
+ 		return -EAGAIN;
+ 	}
+ 
+-	pr_debug("powerdomain: completed transition in %d loops\n", c);
++	pr_debug("powerdomain: %s: completed transition in %d loops\n",
++		 pwrdm->name, c);
+ 
+ 	return 0;
+ }
+-- 
+1.7.9.1
