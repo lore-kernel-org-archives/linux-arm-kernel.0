@@ -1,30 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 1 Mar 2012 14:03:11 +0000
-Subject: [GIT PULL] at91: fixes for DMA registration (3.3-rc)
-In-Reply-To: <4F4F7254.9060306@atmel.com>
-References: <4F4F49E1.4020902@atmel.com> <201203011149.42948.arnd@arndb.de>
- <4F4F7254.9060306@atmel.com>
-Message-ID: <201203011403.11369.arnd@arndb.de>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Thu, 1 Mar 2012 14:07:53 +0000
+Subject: [PATCH 1/4] x86: add NO_IRQ macro
+In-Reply-To: <6bda7538144dce0bf5780df3d0601147dae753b5.1330607068.git.rubini@gnudd.com>
+References: <cover.1330607068.git.rubini@gnudd.com>
+ <6bda7538144dce0bf5780df3d0601147dae753b5.1330607068.git.rubini@gnudd.com>
+Message-ID: <20120301140753.5c44e27e@pyramind.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 March 2012, Nicolas Ferre wrote:
-> As discussed on the mailing-list, we experience an out-of-sync situation
-> between the DMA controller driver and the related code in AT91 devices files.
-> 
-> Those two patches already queued for 3.4 are correcting the problem that we found on
-> the current 3.3-rc kernels. I have tested that the DMA driver is registering well
-> with those fixes applied.
-> 
-> Can you please pull them in a "fixes" branch and send them to Linus before 3.3-final?
+On Thu, 1 Mar 2012 14:28:36 +0100
+Alessandro Rubini <rubini@gnudd.com> wrote:
 
-Hi Nicolas,
+> This is needed to compile AMBA drivers. Most architectures define
+> NO_IRQ as -1, and this does the same for the PC.
 
-I've just sent a pull request for bug fixes yesterday, so I'll wait
-until Linus has pulled that one and probably a few days before I
-send another one.
+NAK
 
-I have applied it to the fixes branch now but not updated the
-tag that I sent him.
+"No IRQ" is 0. There are a few platforms which incorrectly still define it
+as -1 but they are broken and in fact many drivers won't work with
+platforms that still incorrectly use -1. Nothing should be using a
+NO_IRQ define.
 
-	Arnd
+Fix the users.
+
+
+Alan
