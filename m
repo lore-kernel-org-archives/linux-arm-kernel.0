@@ -1,34 +1,39 @@
 From: alan@signal11.us (Alan Ott)
-Date: Thu,  1 Mar 2012 14:26:42 -0500
-Subject: [PATCH 0/8] ARM: Tegra: cleanup patches from Arnd Bergmann
-Message-ID: <1330630010-11241-1-git-send-email-alan@signal11.us>
+Date: Thu,  1 Mar 2012 14:26:43 -0500
+Subject: [PATCH 1/8] ARM: tegra: export tegra_gpio_{en,dis}able
+In-Reply-To: <1330630010-11241-1-git-send-email-alan@signal11.us>
+References: <1330630010-11241-1-git-send-email-alan@signal11.us>
+Message-ID: <1330630010-11241-2-git-send-email-alan@signal11.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Arnd Bergmann <arnd@arndb.de>
 
-I'm helping Arnd Bergmann get some of his cleanup patches upstream. This
-set covers the Tegra.
+These two functions are used in drivers that can be
+modules, so they need to be exported.
 
-Thanks,
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/gpio/gpio-tegra.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Alan.
-
-Arnd Bergmann (8):
-  ARM: tegra: export tegra_gpio_{en,dis}able
-  ARM: tegra: do not hide dma declarations
-  ARM: tegra: select CPU_FREQ_TABLE
-  ARM: tegra: build localtimer support only when needed
-  ARM: tegra: work around tegra THUMB2_KERNEL bug
-  ARM: tegra: USB_ULPI needs USB
-  ARM: tegra: export usb phy symbols
-  ARM: tegra: HACK: remove set_irq_flags() from driver
-
- arch/arm/Kconfig                       |    1 +
- arch/arm/mach-tegra/Kconfig            |    2 ++
- arch/arm/mach-tegra/Makefile           |    3 ++-
- arch/arm/mach-tegra/include/mach/dma.h |    4 ----
- arch/arm/mach-tegra/usb_phy.c          |   10 ++++++++++
- drivers/gpio/gpio-tegra.c              |    2 ++
- drivers/usb/host/ehci-tegra.c          |    1 -
- 7 files changed, 17 insertions(+), 6 deletions(-)
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index bdc2937..96662cc 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -107,11 +107,13 @@ void tegra_gpio_enable(int gpio)
+ {
+ 	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 1);
+ }
++EXPORT_SYMBOL_GPL(tegra_gpio_enable);
+ 
+ void tegra_gpio_disable(int gpio)
+ {
+ 	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
+ }
++EXPORT_SYMBOL_GPL(tegra_gpio_disable);
+ 
+ static void tegra_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ {
+-- 
+1.7.0.4
