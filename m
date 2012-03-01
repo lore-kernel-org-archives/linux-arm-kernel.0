@@ -1,62 +1,29 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Mar 2012 13:10:30 +0900
-Subject: [PATCH] Move S3C2412_PM_SLEEP to common platform code
-In-Reply-To: <201202282234.17056.heiko@sntech.de>
+Date: Thu, 01 Mar 2012 13:11:55 +0900
+Subject: [PATCH 09/12] ARM: S3C2416: move mach-s3c2416/* into mach-s3c24xx/
+In-Reply-To: <201202282218.09602.heiko@sntech.de>
 References: <1329346545-16373-1-git-send-email-kgene.kim@samsung.com>
- <1329346545-16373-9-git-send-email-kgene.kim@samsung.com>
- <201202282234.17056.heiko@sntech.de>
-Message-ID: <076c01ccf761$3d92a1d0$b8b7e570$%kim@samsung.com>
+ <1329346545-16373-10-git-send-email-kgene.kim@samsung.com>
+ <201202282218.09602.heiko@sntech.de>
+Message-ID: <076d01ccf761$709e6960$51db3c20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Heiko St?bner wrote:
 > 
-> S3C2412_PM_SLEEP is also used by the S3C2416, so move it out of the
-> if CPU_S3C2412 block to the common platform code to prevent warnings
-> when S3C2416_PM is selected but not CPU_S3C2412.
+> Am Mittwoch 15 Februar 2012, 23:55:43 schrieb Kukjin Kim:
+> > This patch moves S3C2416 stuff into mach-s3c24xx/ directory
+> > so that we can merge the s3c24 series' directories to the
+> > just one mach-s3c24xx/ directory.
+> >
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> this should probably be folded into the S3C2412 move patch
+> On S3C2416 hardware
 > 
->  arch/arm/mach-s3c24xx/Kconfig |   12 ++++++------
->  1 files changed, 6 insertions(+), 6 deletions(-)
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
 > 
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index 599e025..158958c 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -83,6 +83,12 @@ config CPU_S3C2443
-> 
->  comment "S3C24XX base platform code"
-> 
-> +config S3C2412_PM_SLEEP
-> +	bool
-> +	help
-> +	  Internal config node to apply sleep for S3C2412 power management.
-> +	  Can be selected by another SoCs with similar sleep procedure.
-> +
->  config S3C24XX_DMA
->  	bool "S3C2410 DMA support"
->  	depends on ARCH_S3C24XX
-> @@ -253,12 +259,6 @@ config S3C2412_PM
->  	help
->  	  Internal config node to apply S3C2412 power management
-> 
-> -config S3C2412_PM_SLEEP
-> -	bool
-> -	help
-> -	  Internal config node to apply sleep for S3C2412 power management.
-> -	  Can be selected by another SoCs with similar sleep procedure.
-> -
->  comment "S3C2412 Boards"
-> 
->  #
-> --
-> 1.7.2.3
-
-Looks good to me and will apply.
-Thanks.
+Thank you for your testing and will amend this commit.
 
 Best regards,
 Kgene.
