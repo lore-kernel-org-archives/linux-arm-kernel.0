@@ -1,48 +1,61 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Mar 2012 12:51:49 +0900
-Subject: [PATCH 00/12] ARM: S3C24XX: create mach-s3c24xx/ for S3C24XX SoCs
- - WIP
-In-Reply-To: <201202282239.17107.heiko@sntech.de>
+Date: Thu, 01 Mar 2012 13:10:30 +0900
+Subject: [PATCH] Move S3C2412_PM_SLEEP to common platform code
+In-Reply-To: <201202282234.17056.heiko@sntech.de>
 References: <1329346545-16373-1-git-send-email-kgene.kim@samsung.com>
- <201202282239.17107.heiko@sntech.de>
-Message-ID: <076601ccf75e$a19450a0$e4bcf1e0$%kim@samsung.com>
+ <1329346545-16373-9-git-send-email-kgene.kim@samsung.com>
+ <201202282234.17056.heiko@sntech.de>
+Message-ID: <076c01ccf761$3d92a1d0$b8b7e570$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Heiko St?bner wrote:
 > 
-> Am Mittwoch 15 Februar 2012, 23:55:34 schrieb Kukjin Kim:
-> > This patch aims to make a one mach- directory for S3C24XX SoCs
-> > and now not finished yet such as moving cpufreq and merging
-> > plat-s3c24xx/. I think it will be done maybe in a week.
-> >
-> > [PATCH 01/12] ARM: S3C24XX: remove unused spi gpio setup functions
-> > [PATCH 02/12] ARM: S3C24XX: move spi-s3c24xx platdata out of mach
-> > [PATCH 03/12] ARM: S3C24XX: Remove extern declaration of clk_msysclk
-> > [PATCH 04/12] ARM: S3C24XX: move common S3C2443 clock definitions to
-> > [PATCH 05/12] ARM: S3C2410: move s3c2410_baseclk_add to clock.h
-> > [PATCH 06/12] ARM: S3C24XX: change the ARCH_S3C2410 to ARCH_S3C24XX
-> > [PATCH 07/12] ARM: S3C2410: move mach-s3c2410/* into mach-s3c24xx/
-> > [PATCH 08/12] ARM: S3C2412: move mach-s3c2412/* into mach-s3c24xx/
-> > [PATCH 09/12] ARM: S3C2416: move mach-s3c2416/* into mach-s3c24xx/
-> > [PATCH 10/12] ARM: S3C2440: move mach-s3c2440/* into mach-s3c24xx/
-> > [PATCH 11/12] ARM: S3C2443: move mach-s3c2443/* into mach-s3c24xx/
-> could we move this forward please? :-)
+> S3C2412_PM_SLEEP is also used by the S3C2416, so move it out of the
+> if CPU_S3C2412 block to the common platform code to prevent warnings
+> when S3C2416_PM is selected but not CPU_S3C2412.
 > 
-> As indicated by Olof's mail for tegra, we are near the 3.4 merge window
-> and as
-> is known everything must be in linux-next beforehand.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> this should probably be folded into the S3C2412 move patch
 > 
-> In my opinion it should also be possible to postpone the plat-s3c24xx
-> cleanup
-> for now and just bring this set on the road to reach 3.4.
+>  arch/arm/mach-s3c24xx/Kconfig |   12 ++++++------
+>  1 files changed, 6 insertions(+), 6 deletions(-)
 > 
-OK, I agree and let me move this into my -next, I think plat-s3c24xx cleanup
-can be done soon though.
+> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+> index 599e025..158958c 100644
+> --- a/arch/arm/mach-s3c24xx/Kconfig
+> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> @@ -83,6 +83,12 @@ config CPU_S3C2443
+> 
+>  comment "S3C24XX base platform code"
+> 
+> +config S3C2412_PM_SLEEP
+> +	bool
+> +	help
+> +	  Internal config node to apply sleep for S3C2412 power management.
+> +	  Can be selected by another SoCs with similar sleep procedure.
+> +
+>  config S3C24XX_DMA
+>  	bool "S3C2410 DMA support"
+>  	depends on ARCH_S3C24XX
+> @@ -253,12 +259,6 @@ config S3C2412_PM
+>  	help
+>  	  Internal config node to apply S3C2412 power management
+> 
+> -config S3C2412_PM_SLEEP
+> -	bool
+> -	help
+> -	  Internal config node to apply sleep for S3C2412 power management.
+> -	  Can be selected by another SoCs with similar sleep procedure.
+> -
+>  comment "S3C2412 Boards"
+> 
+>  #
+> --
+> 1.7.2.3
 
-As a note, I will send this to arm-soc tree after couple of days for testing
-this in linux-next.
-
+Looks good to me and will apply.
 Thanks.
 
 Best regards,
