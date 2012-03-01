@@ -1,41 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 1 Mar 2012 19:48:51 +0000
-Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
-In-Reply-To: <2f29e88b98b2bcff0c241996e6d7216a60995d2d.1330625878.git.jason@lakedaemon.net>
+Date: Thu, 1 Mar 2012 19:50:51 +0000
+Subject: [PATCH 0/4] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
+In-Reply-To: <cover.1330625877.git.jason@lakedaemon.net>
 References: <cover.1330625877.git.jason@lakedaemon.net>
- <2f29e88b98b2bcff0c241996e6d7216a60995d2d.1330625878.git.jason@lakedaemon.net>
-Message-ID: <201203011948.51642.arnd@arndb.de>
+Message-ID: <201203011950.51210.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 01 March 2012, Jason Cooper wrote:
->  static int heartbeat = -1;             /* module parameter (seconds) */
->  static unsigned int wdt_max_duration;  /* (seconds) */
->  static unsigned int wdt_tclk;
-> +static unsigned int wdt_reg;
->  static unsigned long wdt_status;
-> static DEFINE_SPINLOCK(wdt_lock);
+> This series begins the process of converting all of the drivers initialized
+> from kirkwood_init() to devicetree.
+> 
+> The first patch cleans up kirkwood_init() by moving a flag setting to it's
+> appropriate location.  This will help later when converting the audio driver.
+> 
+> Next, I pull the functionality of kirkwood_init() into kirkwood_dt_init() in
+> board-dt.c  This way, as drivers are converted, their init calls can be removed
+> from kirkwood_dt_init() and non-fdt users won't be affected (they call
+> kirkwood_init()).
+> 
+> Last, I converted the two easiest drivers, rtc and wdt.  The xor and crypto
+> drivers remain for a later patch series.
 
-This variable needs to be a 'void __iomem *', not an int.
+Hi Jason,
 
-> +       wdt_reg = TIMER_VIRT_BASE;
-> +
-> +       of_property_read_u32(np, "reg", &wdt_reg);
-> +
->         if (orion_wdt_miscdev.parent)
->                 return -EBUSY;
->         orion_wdt_miscdev.parent = &pdev->dev;
-
-Don't just read a reg property, but use the resource instead and ioremap it.
-
-This driver still uses hardcoded virtual addresses for its registers, which
-we're trying to get rid of. The best solution would be to always put the
-register address into the platform device resources, either hardcoded for
-classic boards or automatic through the device tree.
-
-A reg property is special in that it's not just a number but is relative
-to the "ranges" property of the parent device and can be multiple 32 bit
-values for the address, which get turned into a CPU physical address using
-of_translate_address().
+Nice patch series! I've commented on a few details that need improving, but
+it seems you're making good progress overall. Note that in other platforms,
+we typically focus on converting all the devices outside of the soc first,
+because that lets us get away from board files faster, but there is nothing
+wrong in principle in converting the devices on the soc as well.
 
 	Arnd
