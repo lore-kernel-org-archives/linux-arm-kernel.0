@@ -1,112 +1,64 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Thu, 1 Mar 2012 14:29:08 +0100
-Subject: [PATCH 4/4] ARM: use the new linux/sizes.h
-In-Reply-To: <cover.1330607068.git.rubini@gnudd.com>
-References: <cover.1330607068.git.rubini@gnudd.com>
-Message-ID: <2ec6cf32ff4e5dbdf7fa6ad58bac5dc959d0c875.1330607068.git.rubini@gnudd.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 1 Mar 2012 19:17:54 +0530
+Subject: [PATCH] ARM: OMAP: hwmod: Use sysc_fields->srst_shift and get rid of
+ hardcoded SYSC_TYPE2_SOFTRESET_MASK
+Message-ID: <1330609674-20826-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alessandro Rubini <rubini@gnudd.com>
-Acked-by: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Alan Cox <alan@linux.intel.com>
----
- arch/arm/include/asm/memory.h |    2 +-
- arch/arm/mm/dma-mapping.c     |    2 +-
- arch/arm/mm/init.c            |    2 +-
- arch/arm/mm/ioremap.c         |    2 +-
- arch/arm/mm/mmu.c             |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+This is useful when we have broken type2 compliant IPs' where
+the softreset shift is not the same as SYSC_TYPE2_SOFTRESET_SHIFT
+and hence is overridden using sysc_fields->srst_shift.
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index a8997d7..5848eba 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -16,7 +16,7 @@
- #include <linux/compiler.h>
- #include <linux/const.h>
- #include <linux/types.h>
--#include <asm/sizes.h>
-+#include <linux/sizes.h>
+We have atleast one such instance now with onchip keypad on OMAP5
+which has a different softreset shift as compared to other type2
+IPs'.
+
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Balaji TK  <balajitk@ti.com>
+Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+---
+Paul,
+
+I based the patch on top of your reset/data cleanup series
+for hwmod. So its based on 'hwmod_data_cleanup_3.4' branch.
+
+regards,
+Rajendra
+
+ arch/arm/mach-omap2/omap_hwmod.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 3462dc5..6aadba2 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1524,7 +1524,7 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+  */
+ static int _ocp_softreset(struct omap_hwmod *oh)
+ {
+-	u32 v;
++	u32 v, softrst_mask;
+ 	int c = 0;
+ 	int ret = 0;
  
- #ifdef CONFIG_NEED_MACH_MEMORY_H
- #include <mach/memory.h>
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index db23ae4..364defd 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -19,12 +19,12 @@
- #include <linux/dma-mapping.h>
- #include <linux/highmem.h>
- #include <linux/slab.h>
-+#include <linux/sizes.h>
+@@ -1559,11 +1559,13 @@ static int _ocp_softreset(struct omap_hwmod *oh)
+ 						    oh->class->sysc->syss_offs)
+ 				   & SYSS_RESETDONE_MASK),
+ 				  MAX_MODULE_SOFTRESET_WAIT, c);
+-	else if (oh->class->sysc->sysc_flags & SYSC_HAS_RESET_STATUS)
++	else if (oh->class->sysc->sysc_flags & SYSC_HAS_RESET_STATUS) {
++		softrst_mask = (0x1 << oh->class->sysc->sysc_fields->srst_shift);
+ 		omap_test_timeout(!(omap_hwmod_read(oh,
+ 						     oh->class->sysc->sysc_offs)
+-				   & SYSC_TYPE2_SOFTRESET_MASK),
++				   & softrst_mask),
+ 				  MAX_MODULE_SOFTRESET_WAIT, c);
++	}
  
- #include <asm/memory.h>
- #include <asm/highmem.h>
- #include <asm/cacheflush.h>
- #include <asm/tlbflush.h>
--#include <asm/sizes.h>
- #include <asm/mach/arch.h>
- 
- #include "mm.h"
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 595079f..288b77d 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -20,13 +20,13 @@
- #include <linux/highmem.h>
- #include <linux/gfp.h>
- #include <linux/memblock.h>
-+#include <linux/sizes.h>
- 
- #include <asm/mach-types.h>
- #include <asm/memblock.h>
- #include <asm/prom.h>
- #include <asm/sections.h>
- #include <asm/setup.h>
--#include <asm/sizes.h>
- #include <asm/tlb.h>
- #include <asm/fixmap.h>
- 
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 66daf17..1d24bef 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -25,6 +25,7 @@
- #include <linux/mm.h>
- #include <linux/vmalloc.h>
- #include <linux/io.h>
-+#include <linux/sizes.h>
- 
- #include <asm/cp15.h>
- #include <asm/cputype.h>
-@@ -32,7 +33,6 @@
- #include <asm/mmu_context.h>
- #include <asm/pgalloc.h>
- #include <asm/tlbflush.h>
--#include <asm/sizes.h>
- 
- #include <asm/mach/map.h>
- #include "mm.h"
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index f77f1db..f3ee2b8 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -16,13 +16,13 @@
- #include <linux/memblock.h>
- #include <linux/fs.h>
- #include <linux/vmalloc.h>
-+#include <linux/sizes.h>
- 
- #include <asm/cp15.h>
- #include <asm/cputype.h>
- #include <asm/sections.h>
- #include <asm/cachetype.h>
- #include <asm/setup.h>
--#include <asm/sizes.h>
- #include <asm/smp_plat.h>
- #include <asm/tlb.h>
- #include <asm/highmem.h>
+ 	if (c == MAX_MODULE_SOFTRESET_WAIT)
+ 		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
 -- 
-1.7.7.2
+1.7.1
