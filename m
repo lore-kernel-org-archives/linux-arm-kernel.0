@@ -1,160 +1,126 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 02 Mar 2012 01:19:39 -0600
-Subject: [PATCH 3/4] ARM: kirkwood: convert rtc-mv to fdt.
-In-Reply-To: <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
-Message-ID: <20120302071939.A1BE83E2D8A@localhost>
+Date: Fri, 02 Mar 2012 00:58:04 -0700
+Subject: [PATCH 1/4] gpiolib: Add gpiochip_find_by_name() and
+ gpio_find_by_chip_name()
+In-Reply-To: <20120301185524.29210.60381.stgit@kaulin.local>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+ <20120301185524.29210.60381.stgit@kaulin.local>
+Message-ID: <20120302075804.F28DB3E2DB4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  1 Mar 2012 18:20:54 +0000, Jason Cooper <jason@lakedaemon.net> wrote:
-> The comment at mach-kirkwood/common.c:469, says this device is in every
-> kirkwood board.  So, it is placed in kirkwood.dtsi.
+On Thu, 01 Mar 2012 10:55:24 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> Currently there is no way for drivers to request a GPIO on a particular
+> gpio chip. This makes it hard to support multiple GPIO controllers
+> with dynamic GPIO and interrupt numbering, such as with CONFIG_SPARSE_IRQ.
 > 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> Make it easier for device drivers to find GPIOs on a specific gpio_chip
+> by adding two functions: gpiochip_find_by_name() and gpio_find_by_chip_name().
+> 
+> Note that as gpiochip_find() is already exported, we may as well
+> export gpiochip_find_by_name() too.
+
+How is the device going to know the name of the gpio controller?  I
+don't particularly like interfaces that find devices by-names since
+I don't think device names can be relied to be stable when devices
+are instantiated from device tree data.
+
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  arch/arm/boot/dts/kirkwood.dtsi   |    6 ++++++
->  arch/arm/mach-kirkwood/board-dt.c |    1 -
->  arch/arm/mach-kirkwood/common.c   |    2 +-
->  arch/arm/mach-kirkwood/common.h   |    1 -
->  drivers/rtc/rtc-mv.c              |   19 +++++++++++++++++++
->  5 files changed, 26 insertions(+), 3 deletions(-)
+>  drivers/gpio/gpiolib.c     |   47 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/asm-generic/gpio.h |    3 ++-
+>  2 files changed, 49 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 771c6bb..5fb185c 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -2,5 +2,11 @@
->  
->  / {
->  	compatible = "marvell,kirkwood";
-> +
-> +	rtc at f1010300 {
-> +		compatible = "marvell,rtc";
-> +		reg = <0xf1010300 0x1f>;
-> +		interrupts = <53>;
-> +	};
->  };
->  
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index a0cc28b..6fc41ae 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -135,7 +135,6 @@ static void __init kirkwood_dt_init(void)
->  #endif
->  
->  	/* internal devices that every board has */
-> -	kirkwood_rtc_init();
->  	kirkwood_wdt_init();
->  	kirkwood_xor0_init();
->  	kirkwood_xor1_init();
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index 167b6c8..0c0375f 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -163,7 +163,7 @@ void __init kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
->  /*****************************************************************************
->   * SoC RTC
->   ****************************************************************************/
-> -void __init kirkwood_rtc_init(void)
-> +static void __init kirkwood_rtc_init(void)
-
-This undoes the code changed in the previous patch.  If you reorder the patches then
-this change goes away in both.
-
->  {
->  	orion_rtc_init(RTC_PHYS_BASE, IRQ_KIRKWOOD_RTC);
+> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> index 17fdf4b..0e5bf55 100644
+> --- a/drivers/gpio/gpiolib.c
+> +++ b/drivers/gpio/gpiolib.c
+> @@ -1173,6 +1173,53 @@ struct gpio_chip *gpiochip_find(void *data,
 >  }
-> diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-> index c382447..ca08826 100644
-> --- a/arch/arm/mach-kirkwood/common.h
-> +++ b/arch/arm/mach-kirkwood/common.h
-> @@ -53,7 +53,6 @@ void kirkwood_restart(char, const char *);
+>  EXPORT_SYMBOL_GPL(gpiochip_find);
 >  
->  char *kirkwood_id(void);
->  void kirkwood_l2_init(void);
-> -void kirkwood_rtc_init(void);
->  void kirkwood_wdt_init(void);
->  void kirkwood_xor0_init(void);
->  void kirkwood_xor1_init(void);
-> diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
-> index 768e2ed..38abbf7 100644
-> --- a/drivers/rtc/rtc-mv.c
-> +++ b/drivers/rtc/rtc-mv.c
-> @@ -12,6 +12,8 @@
->  #include <linux/bcd.h>
->  #include <linux/io.h>
->  #include <linux/platform_device.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of.h>
->  #include <linux/delay.h>
->  #include <linux/gfp.h>
->  #include <linux/module.h>
-> @@ -218,10 +220,15 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
->  {
->  	struct resource *res;
->  	struct rtc_plat_data *pdata;
-> +	struct device_node *np = pdev->dev.of_node;
->  	resource_size_t size;
->  	u32 rtc_time;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +static int match_name(struct gpio_chip *chip, void *data)
+
+Even though this is a static, please keep the prefix to avoid
+namespace conflicts.  gpiochip_match_name()
+
+> +{
+> +	const char *name = data;
+
+This is unnecessary; the void* can be passed directly to sysfs_streq...
+but why is sysfs_streq being used here instead of strcmp?  This is 
+not sysfs related code.
+
 > +
-> +	if (np)
-> +		of_address_to_resource(np, 0, res);
+> +	return sysfs_streq(name, chip->label);
+> +}
 > +
-
-This should not be needed.  The of_platform_populate() code should have
-filled the platform_device with mem resources.
-
->  	if (!res)
->  		return -ENODEV;
->  
-> @@ -257,6 +264,8 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
->  
->  	pdata->irq = platform_get_irq(pdev, 0);
->  
-> +	of_property_read_u32(np, "interrupts", &pdata->irq);
+> +/**
+> + * gpiochip_find_by_name() - iterator for locating a gpio_chip by name
+> + * @name: name of the gpio_chip
+> + *
+> + * Similar to bus_find_device_by_name. It returns a reference to the
+> + * first gpio_chip with matching name. It ignores NULL and empty names.
+> + * If you need to do something more complex, then use gpiochip_find.
+> + */
+> +struct gpio_chip *gpiochip_find_by_name(const char *name)
+> +{
+> +	if (!name || !strcmp(name, ""))
+> +		return NULL;
 > +
+> +	return gpiochip_find((void *)name, match_name);
 
-Definitely don't do this.  Same as with memory regions, the irq will be
-pre-populated in the platform device resource table.  platform_get_irq()
-should already work.
+Nasty cast.  Can the signature for gpiochip_find be changed to accept
+a (const void *)?
 
->  	platform_set_drvdata(pdev, pdata);
->  
->  	if (pdata->irq >= 0) {
-> @@ -294,11 +303,21 @@ static int __exit mv_rtc_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_OF
-> +static struct of_device_id rtc_mv_of_match_table[] = {
-> +	{ .compatible = "marvell,rtc", },
-> +	{}
-> +};
-> +#else
-> +#define rtc_mv_of_match_table NULL
-> +#endif
+> +}
+> +EXPORT_SYMBOL_GPL(gpiochip_find_by_name);
 > +
->  static struct platform_driver mv_rtc_driver = {
->  	.remove		= __exit_p(mv_rtc_remove),
->  	.driver		= {
->  		.name	= "rtc-mv",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table = rtc_mv_of_match_table,
-
-should be:
-		.of_match_table = of_match_ptr(rtc_mv_of_match_table),
-
-that would get rid of the #else clause above.
-
->  	},
->  };
+> +/**
+> + * gpio_find_by_chip_name() - find a gpio on a specific gpio_chip
+> + * @chip_name: name of the gpio_chip
+> + * @gpio_offset: offset of the gpio on the gpio_chip
+> + *
+> + * Note that gpiochip_find_by_name returns the first matching
+> + * gpio_chip name. For more complex matching, see gpio_find.
+> + */
+> +int gpio_find_by_chip_name(const char *chip_name, unsigned gpio_offset)
+> +{
+> +	struct gpio_chip *chip;
+> +	int gpio, res;
+> +
+> +	chip = gpiochip_find_by_name(chip_name);
+> +	if (!chip)
+> +		return -ENODEV;
+> +
+> +	gpio = chip->base + gpio_offset;
+> +
+> +	return gpio;
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_find_by_chip_name);
+> +
+>  /* These "optional" allocation calls help prevent drivers from stomping
+>   * on each other, and help provide better diagnostics in debugfs.
+>   * They're called even less than the "set direction" calls.
+> diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+> index 1ff4e22..d7a2100 100644
+> --- a/include/asm-generic/gpio.h
+> +++ b/include/asm-generic/gpio.h
+> @@ -145,7 +145,8 @@ extern int __must_check gpiochip_remove(struct gpio_chip *chip);
+>  extern struct gpio_chip *gpiochip_find(void *data,
+>  					int (*match)(struct gpio_chip *chip,
+>  						     void *data));
+> -
+> +extern struct gpio_chip *gpiochip_find_by_name(const char *name);
+> +extern int gpio_find_by_chip_name(const char *chip_name, unsigned gpio_offset);
 >  
-> -- 
-> 1.7.3.4
+>  /* Always use the library code for GPIO management calls,
+>   * or when sleeping may be involved.
 > 
 
 -- 
