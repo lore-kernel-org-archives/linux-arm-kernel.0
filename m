@@ -1,41 +1,38 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 1 Mar 2012 17:13:59 -0700
-Subject: ARM: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
-Message-ID: <201203011713.59663.hartleys@visionengravers.com>
+From: nm@ti.com (Menon, Nishanth)
+Date: Thu, 1 Mar 2012 18:36:01 -0600
+Subject: [PATCH] ARM: OMAP2+: powerdomain: unwrap and simplify logging
+ strings
+In-Reply-To: <alpine.DEB.2.00.1202292122560.12752@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1202292122560.12752@utopia.booyaka.com>
+Message-ID: <CAOMWX4cAABO8jUCi8g_vbv6SnU3vPcqOULV6ui2jV7E2Nt8g0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As done for the other ep93xx machines in:
+On Wed, Feb 29, 2012 at 22:23, Paul Walmsley <paul@pwsan.com> wrote:
+> b/arch/arm/mach-omap2/powerdomain.c
+> index 8a18d1b..89000d3 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -339,8 +339,8 @@ int pwrdm_add_clkdm(struct powerdomain *pwrdm, struct
+> clockdomain *clkdm)
+> ? ? ? ?if (!pwrdm || !clkdm)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> - ? ? ? pr_debug("powerdomain: associating clockdomain %s with powerdomain
+> "
+> - ? ? ? ? ? ? ? ?"%s\n", clkdm->name, pwrdm->name);
+> + ? ? ? pr_debug("powerdomain: %s: associating clockdomain %s\n",
+> + ? ? ? ? ? ? ? ?clkdm->name, pwrdm->name);
 
-commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
-ARM: ep93xx: convert to MULTI_IRQ_HANDLER
+while at this, could i suggest having instead:
+pr_debug("%s: %s: associating clockdomain %s\n", __func__,
+                clkdm->name, pwrdm->name);
+since the function name helps associate the message back in, wont it
+be a bit of a dual edged information as well?
 
-Now that there is a generic IRQ handler for multiple VIC devices use it
-for vision_ep9307 to help building multi platform kernels.
+or even simplify it further with
 
-Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-Acked-by: Ryan Mallon <rmallon@gmail.com>
-Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-
----
-
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index d5fb44f..d67d0b4 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -34,6 +34,7 @@
- #include <mach/ep93xx_spi.h>
- #include <mach/gpio-ep93xx.h>
- 
-+#include <asm/hardware/vic.h>
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
-@@ -361,6 +362,7 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
- 	.atag_offset	= 0x100,
- 	.map_io		= vision_map_io,
- 	.init_irq	= ep93xx_init_irq,
-+	.handle_irq	= vic_handle_irq,
- 	.timer		= &ep93xx_timer,
- 	.init_machine	= vision_init_machine,
- 	.restart	= ep93xx_restart,
+#define pr_fmt(fmt)  "%s:%s: " fmt, "powerdomain", __func__
+?
+Regards,
+Nishanth Menon
