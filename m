@@ -1,37 +1,49 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 2 Mar 2012 14:53:35 +0100
-Subject: [PATCH 1/4] regulator: twl6030: add support for vdd1, vdd2 and
- vdd3 regulators
-In-Reply-To: <1330421953-29517-2-git-send-email-rnayak@ti.com>
-References: <1330421953-29517-1-git-send-email-rnayak@ti.com>
- <1330421953-29517-2-git-send-email-rnayak@ti.com>
-Message-ID: <20120302135335.GS9008@sortiz-mobl>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Fri, 02 Mar 2012 15:00:04 +0100
+Subject: [PATCH v6 1/2] mfd: Add anatop mfd driver
+In-Reply-To: <1330671641-6439-1-git-send-email-paul.liu@linaro.org> (Ying-Chun
+ Liu's message of "Fri, 2 Mar 2012 15:00:40 +0800")
+References: <1330593052-15184-1-git-send-email-paul.liu@linaro.org>
+ <1330671641-6439-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <87fwdrhzmj.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>>>>> "Y" == Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org> writes:
+
 Hi,
 
-On Tue, Feb 28, 2012 at 03:09:10PM +0530, Rajendra Nayak wrote:
-> From: Tero Kristo <t-kristo@ti.com>
-> 
-> vdd1 and vdd2 are now common regulators for twl4030 and twl6030. Also
-> added vdd3 as a new regulator for twl6030. twl6030 vdd1...vdd3 smps
-> regulator voltages can only be controlled through the smartreflex
-> voltage channel, thus the support for the voltage_get and set is
-> minimal and requires external controller.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+ Y> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+ Y> Anatop is a mfd chip embedded in Freescale i.MX6Q SoC.
+ Y> Anatop provides regulators and thermal.
+ Y> This driver handles the address space and the operation of the mfd device.
 
-Mark, Liam, are you guys taking this one ?
+ Y> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+ Y> Cc: Samuel Ortiz <sameo@linux.intel.com>
+ Y> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+ Y> Cc: Shawn Guo <shawn.guo@linaro.org>
+ Y> ---
+ Y>  drivers/mfd/Kconfig        |    6 ++
+ Y>  drivers/mfd/Makefile       |    1 +
+ Y>  drivers/mfd/anatop-mfd.c   |  142 ++++++++++++++++++++++++++++++++++++++++++++
+ Y>  include/linux/mfd/anatop.h |   40 ++++++++++++
+ Y>  4 files changed, 189 insertions(+), 0 deletions(-)
+ Y>  create mode 100644 drivers/mfd/anatop-mfd.c
+ Y>  create mode 100644 include/linux/mfd/anatop.h
 
-Cheers,
-Samuel.
+ Y> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+ Y> index f147395..f787d17 100644
+ Y> --- a/drivers/mfd/Kconfig
+ Y> +++ b/drivers/mfd/Kconfig
+ Y> @@ -830,6 +830,12 @@ config MFD_INTEL_MSIC
+ Y>  	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
+ Y>  	  devices used in Intel Medfield platforms.
+ 
+ Y> +config MFD_ANATOP
+ Y> +        bool "Support for Anatop"
+ Y> +	depends on SOC_IMX6Q
+
+The bool line should be indented with a <tab>, not spaces.
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Bye, Peter Korsgaard
