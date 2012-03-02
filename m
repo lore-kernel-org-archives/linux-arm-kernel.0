@@ -1,45 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  2 Mar 2012 11:07:35 +0100
-Subject: [PATCH 2/2] ARM: versatile: add some auxdata for device trees
-Message-ID: <1330682855-21199-1-git-send-email-linus.walleij@linaro.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri,  2 Mar 2012 11:03:07 +0100
+Subject: [PATCH 3/3 v3] spi/atmel: add DT support
+In-Reply-To: <1330682587-20636-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1330682587-20636-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1330682587-20636-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMCI and PL022 SPI drivers sure need their platform data to
-work on the Versatile as well. (This does not fix the auxdata for
-MMCI instance mmc1 on the Versatile PB though.)
+The atmel_spi use only gpio for chip select.
 
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Niklas Hernaeus <niklas.hernaeus@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: spi-devel-general at lists.sourceforge.net
 ---
- arch/arm/mach-versatile/core.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/spi/spi_atmel.txt          |    6 ++++++
+ drivers/spi/spi-atmel.c                            |   12 +++++++++++-
+ 2 files changed, 17 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 02b7b93..d72c8ad 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -664,17 +664,18 @@ static struct amba_device *amba_devs[] __initdata = {
-  * having a specific name.
-  */
- struct of_dev_auxdata versatile_auxdata_lookup[] __initdata = {
--	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI0_BASE, "fpga:05", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI0_BASE, "fpga:05", &mmc0_plat_data),
- 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_KMI0_BASE, "fpga:06", NULL),
- 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_KMI1_BASE, "fpga:07", NULL),
- 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART3_BASE, "fpga:09", NULL),
-+	/* FIXME: this is buggy, the platform data is needed for this MMC instance too */
- 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI1_BASE, "fpga:0b", NULL),
+diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+new file mode 100644
+index 0000000..7ec3d8d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+@@ -0,0 +1,6 @@
++Atmel SPI device
++
++Required properties:
++- compatible : should be "atmel,at91rm9200-spi".
++- reg: Address and length of the register set for the device
++- interrupts: Should contain macb interrupt
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 16d6a83..7bcd11f 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -19,6 +19,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/spi/spi.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
  
- 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_CLCD_BASE, "dev:20", &clcd_plat_data),
- 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART0_BASE, "dev:f1", NULL),
- 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART1_BASE, "dev:f2", NULL),
- 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART2_BASE, "dev:f3", NULL),
--	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SSP_BASE, "dev:f4", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SSP_BASE, "dev:f4", &ssp0_plat_data),
+ #include <asm/io.h>
+ #include <mach/board.h>
+@@ -938,7 +939,7 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
+ 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
  
- #if 0
- 	/*
+ 	master->bus_num = pdev->id;
+-	master->num_chipselect = 4;
++	master->num_chipselect = master->dev.of_node ? 0 : 4;
+ 	master->setup = atmel_spi_setup;
+ 	master->transfer = atmel_spi_transfer;
+ 	master->cleanup = atmel_spi_cleanup;
+@@ -1064,11 +1065,20 @@ static int atmel_spi_resume(struct platform_device *pdev)
+ #define	atmel_spi_resume	NULL
+ #endif
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id atmel_spi_dt_ids[] = {
++	{ .compatible = "atmel,at91rm9200-spi" },
++	{ /* sentinel */ }
++};
++
++MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
++#endif
+ 
+ static struct platform_driver atmel_spi_driver = {
+ 	.driver		= {
+ 		.name	= "atmel_spi",
+ 		.owner	= THIS_MODULE,
++		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
+ 	},
+ 	.suspend	= atmel_spi_suspend,
+ 	.resume		= atmel_spi_resume,
 -- 
-1.7.7.6
+1.7.7
