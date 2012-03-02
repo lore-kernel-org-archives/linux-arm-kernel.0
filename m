@@ -1,27 +1,72 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 2 Mar 2012 23:36:29 +0100
-Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
-In-Reply-To: <20120302170252.GJ11986@titan.lakedaemon.net>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <201203021456.47896.arnd@arndb.de>
- <20120302153614.GG11986@titan.lakedaemon.net>
- <201203021648.52523.arnd@arndb.de>
- <20120302170252.GJ11986@titan.lakedaemon.net>
-Message-ID: <20120302223629.GA21080@lunn.ch>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri,  2 Mar 2012 14:42:01 -0800
+Subject: [PATCH] ARM: OMAP2+: voltage: ensure voltage used is exact voltage
+ from OPP table
+Message-ID: <1330728121-26664-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Andrew Lunn said that he has a patch for plat-orion to use the generic
-> > clock framework. I think we should look at that before introducing
-> > a hack that will have to be removed again very soon.
-> 
-> I asked him for it earlier [1], apparently it's a very invasive patch
-> series which breaks things.  I would like to look at it as a reference,
-> even if applying it isn't a good idea.
+When using the SMPS regulators to scale voltages, the regulator
+framework may pass a minimum voltage that is not an exact OPP voltage.
+For the VC/VP controlled voltage domains, we must ensure that the
+voltage requested is the exact voltage from the OPP table.  This is
+especially critical when using SR.
 
-I did not say it breaks things. I said i have a habit of breaking
-orion5x, because i cannot test it.
+To fix, voltdm_scale() uses the target voltage passed to walk through
+the OPP voltages until it finds a voltage that is >= one of the OPP
+voltages.
 
-I will send the patches as RFC on Sunday. I'm traveling at the moment.
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Nishanth Menon <nm@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Unless there are any objections, this will be queued along with the
+rest of the SMPS regulator series from Tero.  Currently availble in
+my for_3.4/pm/smps-regulator branch at
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
 
-  Andrew
+ arch/arm/mach-omap2/voltage.c |   21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+index 8a36342..4dc60e8 100644
+--- a/arch/arm/mach-omap2/voltage.c
++++ b/arch/arm/mach-omap2/voltage.c
+@@ -73,7 +73,8 @@ unsigned long voltdm_get_voltage(struct voltagedomain *voltdm)
+ int voltdm_scale(struct voltagedomain *voltdm,
+ 		 unsigned long target_volt)
+ {
+-	int ret;
++	int ret, i;
++	unsigned long volt = 0;
+ 
+ 	if (!voltdm || IS_ERR(voltdm)) {
+ 		pr_warning("%s: VDD specified does not exist!\n", __func__);
+@@ -86,9 +87,23 @@ int voltdm_scale(struct voltagedomain *voltdm,
+ 		return -ENODATA;
+ 	}
+ 
+-	ret = voltdm->scale(voltdm, target_volt);
++	/* Adjust voltage to the exact voltage from the OPP table */
++	for (i = 0; voltdm->volt_data[i].volt_nominal != 0; i++) {
++		if (voltdm->volt_data[i].volt_nominal >= target_volt) {
++			volt = voltdm->volt_data[i].volt_nominal;
++			break;
++		}
++	}
++
++	if (!volt) {
++		pr_warning("%s: not scaling. OPP voltage for %lu, not found.\n",
++			   __func__, target_volt);
++		return -EINVAL;
++	}
++
++	ret = voltdm->scale(voltdm, volt);
+ 	if (!ret)
+-		voltdm->nominal_volt = target_volt;
++		voltdm->nominal_volt = volt;
+ 
+ 	return ret;
+ }
+-- 
+1.7.9.2
