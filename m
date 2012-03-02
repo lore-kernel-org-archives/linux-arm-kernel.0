@@ -1,85 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Mar 2012 09:38:12 -0800
-Subject: Randconfig module build error with OMAP4_ERRATA_I688
-In-Reply-To: <CAMQu2gy9XksJ+8Q_Ygwtx7n2tVfd2KCu0o54SisuV8_QUX_rUQ@mail.gmail.com>
-References: <20120229173719.GN18901@atomide.com>
- <CAMQu2gxg_57AVW+MT_Sgi+gr2OUge-YPdSUxoG+z-zQth=4-UA@mail.gmail.com>
- <20120301162556.GY18901@atomide.com>
- <CAMQu2gy9XksJ+8Q_Ygwtx7n2tVfd2KCu0o54SisuV8_QUX_rUQ@mail.gmail.com>
-Message-ID: <20120302173811.GL18901@atomide.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri,  2 Mar 2012 17:37:34 +0000
+Subject: [PATCH 1/2] ARM: ThumbEE: Disable userspace TEEHBR access for
+ !CONFIG_ARM_THUMBEE
+Message-ID: <1330709855-4793-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shilimkar, Santosh <santosh.shilimkar@ti.com> [120302 03:15]:
-> On Thu, Mar 1, 2012 at 9:55 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120301 00:38]:
-> >> On Wed, Feb 29, 2012 at 11:07 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >> > Hi Santosh,
-> >> >
-> >> > Looks like OMAP4_ERRATA_I688 still has one more issue:
-> >> > Modules won't build at least with the attached randconfig
-> >> > generated file.
-> >> >
-> >> > Can you please take a look at how to deal with it?
-> >> >
-> >> > Maybe omap_bus_sync should be an inline function with some
-> >> > wrapper for the sleep44xx.S to call?
-> >> >
-> >> > I already posted a fix for the GPMC related error with the
-> >> > same .config file.
-> >> >
-> >> This one builds for me against 'Linux 3.3-rc5,
-> >> Ofocurse I got below error with the attached .config which
-> >> I bypassed to see the Errata build failure.
-> >>
-> >> arch/arm/mach-omap2/built-in.o: In function `n8x0_mmc_callback':
-> >> linux-2.6/arch/arm/mach-omap2/board-n8x0.c:374: undefined reference to
-> >> `omap_mmc_notify_cover_event'
-> >> make: *** [.tmp_vmlinux1] Error 1
-> >
-> > Yes a fix for that has been queued already.
-> >
-> >> I build this with below toolchain...
-> >> $arm-none-linux-gnueabi-gcc --version
-> >> arm-none-linux-gnueabi-gcc (Sourcery G++ Lite 2011.03-41) 4.5.2
-> >> Copyright (C) 2010 Free Software Foundation, Inc.
-> >>
-> >> Am I missing anything ?
-> >
-> > I think you're missing your commit 2ec1fc4e169acc0b8d6733ff028fd52e766773d9
-> > (ARM: OMAP4: Move the barrier memboclk_steal() as part of reserve callback)
-> > thats' queued up in fixes, and CONFIG_OMAP4_ERRATA_I688=y.
-> >
-> > Then with -rc5 + 2ec1fc4e when you build modules you'll get this:
-> >
-> > ERROR: "omap_bus_sync" [drivers/watchdog/sp805_wdt.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/watchdog/dw_wdt.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/virtio/virtio_ring.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/video/sm501fb.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/usb/mon/usbmon.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/usb/host/sl811-hcd.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/usb/host/ohci-hcd.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/usb/host/isp1760.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/usb/host/isp1362-hcd.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/usb/host/isp116x-hcd.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/usb/core/usbcore.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/tty/serial/altera_uart.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/tty/serial/altera_jtaguart.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/tty/serial/8250/8250_dw.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/ssb/ssb.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/rtc/rtc-cmos.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/rtc/rtc-bq4802.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/mtd/nand/tmio_nand.ko] undefined!
-> > ERROR: "omap_bus_sync" [drivers/mtd/nand/omap2.ko] undefined!
-> >
-> Sricharan has posted a fix for it. [1]
-> The sleep code stuff is just dummy function for the cases when the errata
-> is not defined. When Errata is defined the generic barriers too get impacted
-> and hence the function needs to be exported.
+Currently when ThumbEE is not enabled (!CONFIG_ARM_THUMBEE) the ThumbEE
+register states are not saved/restored at context switch. The default state
+of the ThumbEE Ctrl register (TEECR) allows userspace accesses to the
+ThumbEE Base Handler register (TEEHBR). This can cause unexpected behaviour
+when people use ThumbEE on !CONFIG_ARM_THUMBEE kernels, as well as allowing
+covert communication - eg between userspace tasks running inside chroot
+jails.
 
-OK thanks,
+This patch sets up TEECR in order to prevent user-space access to TEEHBR
+when !CONFIG_ARM_THUMBEE. In this case, tasks are sent SIGILL if they try to
+access TEEHBR.
 
-Tony
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+---
+ arch/arm/mm/proc-v7.S |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
- 
-> [1] http://www.spinics.net/lists/arm-kernel/msg162608.html
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 0404ccb..9a05e7f 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -257,6 +257,18 @@ __v7_setup:
+ 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
+ 	mcr	p15, 0, r6, c10, c2, 1		@ write NMRR
+ #endif
++#ifndef CONFIG_ARM_THUMBEE
++	mrc	p15, 0, r0, c0, c1, 0		@ read ID_PFR0 for ThumbEE
++	and	r0, r0, #(0xf << 12)		@ ThumbEE enabled field
++	teq	r0, #(1 << 12)			@ check if ThumbEE is present
++	bne	1f
++	mov	r5, #0
++	mcr	p14, 6, r5, c1, c0, 0		@ Initialize TEEHBR to 0
++	mrc	p14, 6, r0, c0, c0, 0		@ load TEECR
++	orr	r0, r0, #1			@ set the 1st bit in order to
++	mcr	p14, 6, r0, c0, c0, 0		@ stop userspace TEEHBR access
++1:
++#endif
+ 	adr	r5, v7_crval
+ 	ldmia	r5, {r5, r6}
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+-- 
+1.7.1
