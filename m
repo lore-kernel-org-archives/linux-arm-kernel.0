@@ -1,36 +1,69 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 2 Mar 2012 09:22:14 -0800
-Subject: [PATCH] pinctrl: resurrect verbose pinmux-pins
-In-Reply-To: <1330705873-10798-1-git-send-email-linus.walleij@stericsson.com>
-References: <1330705873-10798-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861978@HQMAIL01.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Mar 2012 09:22:51 -0800
+Subject: [PATCH 4/4] mmc: omap_hsmmc: Simplify init for twl6030 MMC
+ card detect
+In-Reply-To: <4F50643B.9050500@ti.com>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+ <20120301185535.29210.71546.stgit@kaulin.local>
+ <4F50643B.9050500@ti.com>
+Message-ID: <20120302172251.GJ18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at riday, March 02, 2012 9:31 AM:
-> From: Linus Walleij <linus.walleij@linaro.org>
+* Rajendra Nayak <rnayak@ti.com> [120301 21:38]:
+> On Friday 02 March 2012 12:25 AM, Tony Lindgren wrote:
+> >--- a/arch/arm/mach-omap2/board-omap4panda.c
+> >+++ b/arch/arm/mach-omap2/board-omap4panda.c
+> >@@ -153,8 +153,8 @@ static struct omap2_hsmmc_info mmc[] = {
+> >  	{
+> >  		.mmc		= 1,
+> >  		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+> >-		.gpio_wp	= -EINVAL,
+> >  		.gpio_cd	= -EINVAL,
+> >+		.gpio_wp	= -EINVAL,
 > 
-> This reintroduces the verbosity in the pinmux-pins file, now this
-> file will list all pins, their names, owning device (and if it's
-> a hog) and also in applicable cases the function and group making
-> use of that pin right now.
+> stray change.
+
+Hmm I'd like to keep this change before this ordering gets copied
+to ten other board files that we may have in testing-board for a while..
+I'll add a comment to the patch description about that.
+
+> >--- a/drivers/mmc/host/omap_hsmmc.c
+> >+++ b/drivers/mmc/host/omap_hsmmc.c
+> >@@ -34,6 +34,7 @@
+> >  #include<linux/gpio.h>
+> >  #include<linux/regulator/consumer.h>
+> >  #include<linux/pm_runtime.h>
+> >+#include<linux/i2c/twl.h>
+> >  #include<plat/dma.h>
+> >  #include<mach/hardware.h>
+> >  #include<plat/board.h>
+> >@@ -578,6 +579,32 @@ static void omap_hsmmc_gpio_free(struct omap_hsmmc_host *host)
+> >  		gpio_free(host->gpio_cd);
+> >  }
+> >
+> >+#ifdef CONFIG_TWL4030_CORE
+> >+static int omap_hsmmc_init_twl6030(struct omap_hsmmc_host *host)
+> >+{
+> >+	struct omap_mmc_platform_data *pdata = host->pdata;
+> >+	struct omap_mmc_slot_data *slot =&pdata->slots[0];
+> >+	int irq;
+> >+
+> >+	if (gpio_is_valid(host->gpio_cd) || host->id)
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> I have a series, which I am asking Chris to pull, which completely
+> gets rid of all host->id based hard-codings' in the driver.
+> Isn't there a better way to do this than rely on the device instance?
 
-It'd be nice if we could defer this fix until after all the API rework,
-because it'll cause all kinds of conflicts otherwise.
+Yes I was thinking about that too. I guess we need to pass some
+flag in pdata for twl6030 card detect. I was thinking about using
+the gpiochip_cd, but twl6030 is not gpio based card detect, so
+a separate flag is better.
 
-The type "struct pinmux_group" you added to struct pin_desc is removed by
-patches in my series. If this patch goes in before my series, it'd be best
-if it just stored the char* for the function instead of that type, so the
-rework by my patche series will be smaller.
+BTW, with -rc5, looks like re-inserting omap_hsmmc on omap4 fails
+to detect any cards, and then fails to unload. This works on omap3
+just fine. Any ideas why that would be?
 
-I don't think it make sense to store a "group" as owning a pin; each pin
-should be part of one muxing group as defined by the hardware so there isn't
-a concept of "which group acquired the pin", just "which function is
-programmed on the pin". Even if multiple "virtual groups" contain a pin
-(which I think would be a bad idea) then the important information from a
-HW perspective is the function and not the arbitrary group name.
+Regards,
 
--- 
-nvpublic
+Tony
