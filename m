@@ -1,25 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 2 Mar 2012 22:09:04 +0000
-Subject: [PATCH v2 0/6] ARM: Tegra: cleanup patches from Arnd Bergmann
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE861A73@HQMAIL01.nvidia.com>
+From: alan@signal11.us (Alan Ott)
+Date: Fri,  2 Mar 2012 17:24:35 -0500
+Subject: [PATCH v3 0/5] ARM: Tegra: cleanup patches from Arnd Bergmann
+In-Reply-To: <1330721884-8495-1-git-send-email-alan@signal11.us>
 References: <1330721884-8495-1-git-send-email-alan@signal11.us>
- <4F513DE3.9020707@signal11.us>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861A73@HQMAIL01.nvidia.com>
-Message-ID: <201203022209.04419.arnd@arndb.de>
+Message-ID: <1330727075-10974-1-git-send-email-alan@signal11.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 March 2012, Stephen Warren wrote:
-> > For patch #5 (ARM: tegra: USB_ULPI needs USB), it didn't look to me like
-> > there was a resolution on that thread yesterday. On reading it again, if
-> > we change
-> >     select USB_ULPI if USB_SUPPORT
-> > to:
-> >     select USB_ULPI if USB
-> > for both Tegra 2 and 3, does that satisfy you and Arnd?
-> 
-> I believe so yes. Thanks.
+Version 3 of the patch set.
 
-Agreed.
+Changes:
+	* change of logic (and commit message change) for
+	  "select USB_ULPI if USB is selected"
+	* dropped THUMB2 patch
 
-	Arnd
+Arnd Bergmann (5):
+  ARM: tegra: do not hide dma declarations
+  ARM: tegra: select CPU_FREQ_TABLE
+  ARM: tegra: build localtimer support only when needed
+  ARM: tegra: select USB_ULPI if USB is selected
+  ARM: tegra: export usb phy symbols
+
+ arch/arm/mach-tegra/Kconfig            |    6 ++++--
+ arch/arm/mach-tegra/Makefile           |    3 ++-
+ arch/arm/mach-tegra/include/mach/dma.h |    4 ----
+ arch/arm/mach-tegra/usb_phy.c          |   11 +++++++++++
+ 4 files changed, 17 insertions(+), 7 deletions(-)
