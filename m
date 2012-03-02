@@ -1,41 +1,37 @@
-From: jason@lakedaemon.net (Jason)
-Date: Fri, 2 Mar 2012 12:04:41 -0500
-Subject: [PATCH 0/4] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
-In-Reply-To: <201203021658.12047.arnd@arndb.de>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <201203012214.07019.arnd@arndb.de>
- <20120302163121.GI11986@titan.lakedaemon.net>
- <201203021658.12047.arnd@arndb.de>
-Message-ID: <20120302170441.GK11986@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Mar 2012 09:06:01 -0800
+Subject: [PATCH 2/4] mmc: omap_hsmmc: Use gpio_find_by_chip_name() for
+ omap_hsmmc_gpio_init()
+In-Reply-To: <4F5060B0.7010703@ti.com>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+ <20120301185528.29210.85854.stgit@kaulin.local>
+ <4F5060B0.7010703@ti.com>
+Message-ID: <20120302170600.GG18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2012 at 04:58:11PM +0000, Arnd Bergmann wrote:
-> On Friday 02 March 2012, Jason wrote:
-> > > 
-> > > I have other commit IDs for the two patches that I took from your
-> > > emails, so you should rebase the other patches on top of the
-> > > version that I have in the arm-soc/kirkwood/board branch, otherwise
-> > > we end up with duplicate commits my tree when I pull them again.
-> > 
-> > Got it, I cherry-picked the series over and incorporated Grant's
-> > suggestions.
-> > 
+* Rajendra Nayak <rnayak@ti.com> [120301 21:23]:
+> On Friday 02 March 2012 12:25 AM, Tony Lindgren wrote:
+> >Use gpio_find_by_chip_name() to find the GPIO pins as they can
+> >be dynamically allocated on various gpio_chips.
+> >
+> >Note that we don't want to touch the platform data as it can
+> >now specify the GPIO offset on a named gpio_chip.
+> >
+> >This removes the need to use callbacks to set the GPIO pins
+> >in platform data.
 > 
-> Just making sure you know about this one:
-> 
-> git rebase -i --onto arm-soc/kirkwood/board torvalds/master
-> 
-> The '-i' lets you pick which ones you want to move over, then it
-> applies all patches from the current branch that are not on
-> torvalds/master on top of the last commit from arm-soc/kirkwood/board.
-> 
-> If you don't know it yet, I suggest you play with this for an hour
-> or so that will be very well invested time. If you knew this, then nevermind.
+> While one of the reasons for those callbacks was to set the GPIO
+> pins in platform data, I guess the other and more important one
+> was to make sure the init sequencing between twl4030-gpio and the
+> mmc device depending on it was done rightly. Doesn't this patch now
+> leave the sequencing to work by luck (in the absence of something
+> like deferred probe being in place) like is the case of twl6030 and
+> mmc init sequence on OMAP4 already?
 
-I use the daylights out of git rebase -i, but hadn't made use of --onto
-yet.  Thanks for the tip.
+Nope :) The difference is that  we can exit and produce a sensible
+error to the user about the particular gpio_chip not being available.
 
-thx,
+Regards,
 
-Jason.
+Tony
