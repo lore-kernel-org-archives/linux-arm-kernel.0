@@ -1,67 +1,66 @@
-From: jason@lakedaemon.net (Jason)
-Date: Fri, 2 Mar 2012 11:31:21 -0500
-Subject: [PATCH 0/4] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
-In-Reply-To: <201203012214.07019.arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 2 Mar 2012 16:48:51 +0000
+Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
+In-Reply-To: <20120302153614.GG11986@titan.lakedaemon.net>
 References: <cover.1330625877.git.jason@lakedaemon.net>
- <201203012028.04773.arnd@arndb.de>
- <20120301212353.GC11986@titan.lakedaemon.net>
- <201203012214.07019.arnd@arndb.de>
-Message-ID: <20120302163121.GI11986@titan.lakedaemon.net>
+ <201203021456.47896.arnd@arndb.de>
+ <20120302153614.GG11986@titan.lakedaemon.net>
+Message-ID: <201203021648.52523.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2012 at 10:14:06PM +0000, Arnd Bergmann wrote:
-> On Thursday 01 March 2012, Jason wrote:
-> > On Thu, Mar 01, 2012 at 08:28:04PM +0000, Arnd Bergmann wrote:
-> > > On Thursday 01 March 2012, Jason wrote:
-> > > > Thanks for the feedback.  I'll redo this series and resubmit.  Did you
-> > > > catch my patch from yesterday?
-> > > > 
-> > > > [PATCH v3] ARM: kirkwood: covert orion-spi to fdt. [1]
-> > > 
-> > > Yes, I saw that. It looks good and I was just waiting if other people
-> > > have comments on it. Maybe you can put it into the same git tree as
-> > > these ones when they are ready and you send a pull request.
+On Friday 02 March 2012, Jason wrote:
 > > 
-> > Okay, I have a local branch, 'dreamplug_dt' based at v3.3-rc3.  It
-> > includes the two patches you've already merged into your tree:
-> > 
-> > c9780e7 ARM: kirkwood: add dreamplug (fdt) support.
-> > dbc3c26 ARM: kirkwood: convert uart0 to devicetree.
-> > 
-> > Plus the spi/flash/partitions, and the most recent series.
-> > 
-> > Can I just do:
-> > 
-> > git push linux-kirkwood dreamplug_dt:kirkwood_dt
-> > 
-> > Then, issue a pull request for
-> > 
-> > git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt
-> > 
-> > and reference the first uncommitted patch?
+> > That would make wdt at fed20300/clock-frequency a phandle pointing to the
+> > root property, which is not what we want here.
 > 
-> I have other commit IDs for the two patches that I took from your
-> emails, so you should rebase the other patches on top of the
-> version that I have in the arm-soc/kirkwood/board branch, otherwise
-> we end up with duplicate commits my tree when I pull them again.
+> The 200000000 value is not the actual value used in most drivers [1],
+> but rather the speed of the system clock [2] (hence, my inclination to
+> make it a root property), the drivers have been pulling this number from
+> a global variable [3] and dividing/rounding it as needed for their own needs
+> [1].
 
-Got it, I cherry-picked the series over and incorporated Grant's
-suggestions.
+Ah, I see. If you put a "clock-frequency" property into a device node,
+it should definitely be the frequency used by that device, not the system
+clock that it is derived from.
 
-> > Most of the googlings for 'pull request' yield github's "click the
-> > button", yuck.
+> Since it's derived from the SoC core [2], it would seem to make sense to
+> have a root "clock-frequency" in the board dts.  Am I missing something?
+> Is there a better way to do this?
+
+The correct solution would be to use the clock binding, but I'm not sure
+how far we are in making that final or usable.
+
+> > > In any case, the simplest answer is to set clock-frequency in
+> > > kirkwood-dreamplug.dts as a root node property, and then each driver
+> > > that needs tclk, requests the clock-frequency from the root node.
+> > > Hopefully, Grant can chime in on this one.
 > > 
-> > Also, is there an equivalent to 'git format-patch/send-email' for pull
-> > requests?  The pull requests I've looked at seem awfully consistent in
-> > formatting.
+> > I think you can just pick a reasonable default value for
+> > wdt at fed20300/clock-frequency, and let the board override that
+> > by setting it to something else if necessary.
 > 
-> It's "git request-pull".
+> True, for now, I can just set clock-frequency for each device to the
+> exact same value and we'll polish later once we have a better idea of
+> the pattern it's following.
+> 
+> > I suppose this will also change a bit when kirkwood gets moved over to
+> > generic clk support in the future and starts using the clk binding
+> > instead of what you do now.
+> 
+> Yes, I don't want to over-think it, but I would like to make sure it's
+> in the correct place, since it is a global property of the board.
 
-Of course it is.  :-)  duh.  Thanks.  I'm pushing to my tree now.  I'll
-probably submit the series attached to the pull request just so it's
-easy to review and easy to pull (hopefully).
+Andrew Lunn said that he has a patch for plat-orion to use the generic
+clock framework. I think we should look at that before introducing
+a hack that will have to be removed again very soon.
 
-Thanks for all the help.
+Kirkwood/orion is probably not a bad platform to add to the initial
+set of platforms for which we use the common clk infrastructure,
+so maybe the best way forward for you is to take Andrews patches
+and build on top of that. It might mean that your follow-on patches
+get delayed until v3.5 instead of going into v3.4, but the initial
+code you have in arm-soc is working already and you can work on
+getting it the clock code right in the initial code.
 
-Jason.
+	Arnd
