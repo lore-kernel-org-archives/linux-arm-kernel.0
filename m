@@ -1,45 +1,42 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 2 Mar 2012 06:37:58 +0000
-Subject: [PATCH-V2 2/2] arm:omap:am33xx: Add power domain data
-In-Reply-To: <alpine.DEB.2.00.1203012330490.22980@utopia.booyaka.com>
-References: <1324803628-16790-1-git-send-email-hvaibhav@ti.com>
- <1324803628-16790-3-git-send-email-hvaibhav@ti.com>
- <alpine.DEB.2.00.1202291839130.12752@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A8317E515D@DBDE01.ent.ti.com>
- <alpine.DEB.2.00.1203012330490.22980@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A8317E6763@DBDE01.ent.ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 2 Mar 2012 07:59:20 +0100
+Subject: [PATCH v3 22/30] ARM: tegra: use fixed PCI i/o mapping
+In-Reply-To: <1330658022-14559-23-git-send-email-robherring2@gmail.com>
+References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
+ <1330658022-14559-23-git-send-email-robherring2@gmail.com>
+Message-ID: <20120302065920.GA441@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2012 at 12:02:31, Paul Walmsley wrote:
-> Hi,
+* Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> On Thu, 1 Mar 2012, Hiremath, Vaibhav wrote:
-> 
-> > The initialization used in the patch is correct. Unfortunately, the TRM 
-> > is incorrect here. I have already raised this issue with respective 
-> > folks and soon it will get corrected.
-> 
-> thanks for looking into this.  Could you add a brief comment or comments 
-> in this file to indicate that the TRM Rev C is incorrect about those?  
-> That will help others who may be reviewing this code as they track down 
-> bugs.
-> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/Kconfig                         |    1 -
+>  arch/arm/mach-tegra/include/mach/io.h    |   46 ------------------------------
+>  arch/arm/mach-tegra/include/mach/iomap.h |    3 ++
+>  arch/arm/mach-tegra/io.c                 |    2 +
+>  arch/arm/mach-tegra/pcie.c               |   41 ++------------------------
+>  5 files changed, 9 insertions(+), 84 deletions(-)
+>  delete mode 100644 arch/arm/mach-tegra/include/mach/io.h
+[...]
 
-Good point. I will certainly add it in the next version of patch-sets.
+This looks good to me. Moreover this gets rid of some of the ugly globals
+initialized by the PCI support and should fit in nicely with the work I'm
+doing to rewrite it as a driver and add device tree support.
 
-Paul,
-Thanks for your review comments, can we also align on the approach, 
-Whether to merge am33xx powerdomain with omap4 (same direction we are now)
-OR
-Have separate implementation (my original approach).
+Unfortunately I'm unable to test actual accesses because none of the PCI
+devices that I use have I/O regions.
 
-
-Thanks,
-Vaibhav
-> 
-> thanks
-> 
-> 
-> - Paul
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120302/04cf7d86/attachment-0001.sig>
