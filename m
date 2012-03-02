@@ -1,44 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Mar 2012 10:08:48 -0800
-Subject: [PATCH 1/4] gpiolib: Add gpiochip_find_by_name() and
- gpio_find_by_chip_name()
-In-Reply-To: <20120302170327.GF18901@atomide.com>
-References: <20120301185044.29210.44521.stgit@kaulin.local>
- <20120301185524.29210.60381.stgit@kaulin.local>
- <20120302075804.F28DB3E2DB4@localhost>
- <20120302170327.GF18901@atomide.com>
-Message-ID: <20120302180848.GM18901@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 2 Mar 2012 20:15:23 +0200
+Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
+ IRQ for board setup
+In-Reply-To: <1330707024-23730-12-git-send-email-b-cousson@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-12-git-send-email-b-cousson@ti.com>
+Message-ID: <20120302181522.GC13967@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120302 08:31]:
-> * Grant Likely <grant.likely@secretlab.ca> [120302 01:00]:
-> > On Thu, 01 Mar 2012 10:55:24 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > > +
-> > > +/**
-> > > + * gpiochip_find_by_name() - iterator for locating a gpio_chip by name
-> > > + * @name: name of the gpio_chip
-> > > + *
-> > > + * Similar to bus_find_device_by_name. It returns a reference to the
-> > > + * first gpio_chip with matching name. It ignores NULL and empty names.
-> > > + * If you need to do something more complex, then use gpiochip_find.
-> > > + */
-> > > +struct gpio_chip *gpiochip_find_by_name(const char *name)
-> > > +{
-> > > +	if (!name || !strcmp(name, ""))
-> > > +		return NULL;
-> > > +
-> > > +	return gpiochip_find((void *)name, match_name);
-> > 
-> > Nasty cast.  Can the signature for gpiochip_find be changed to accept
-> > a (const void *)?
+Hi,
+
+On Fri, Mar 02, 2012 at 05:50:23PM +0100, Benoit Cousson wrote:
+> Card detect IRQ from the TWL6030 used to be provided to the MMC
+> controller code using a statically allocated IRQ scheme:
 > 
-> I think so, this too comes from the bus code.
+>   card_detect_irq = TWL6030_IRQ_BASE + MMCDETECT_INTR_OFFSET;
+> 
+> This is no longer valid in a SPARSE_IRQ context since there is no more
+> pre-defined TWL6030_IRQ_BASE.
+> 
+> Return the proper card detect IRQ value in the twl6030_mmc_card_detect_config
+> that will be called from the MMC controller.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
 
-Looks like it can't be const as of_node_to_gpiochip uses it with
-a struct device_node * that for of_get_named_gpio_flags comes from
-of_parse_phandle_with_args.
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Regards,
+> ---
+>  drivers/mfd/twl6030-irq.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
+> index a1c7183..4a63de2 100644
+> --- a/drivers/mfd/twl6030-irq.c
+> +++ b/drivers/mfd/twl6030-irq.c
+> @@ -308,7 +308,8 @@ int twl6030_mmc_card_detect_config(void)
+>  									ret);
+>  		return ret;
+>  	}
+> -	return 0;
+> +
+> +	return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
+>  }
+>  EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
 
-Tony
+At some point this twl6030_mmc_card_detect_config() needs to vanish in
+favor of a better mechanism. Maybe passing the GPIO number an requiring
+the driver to request the GPIO, set its direction and use it as IRQ
+line.
+
+the only problem would arise if we end up hooking the Card Detect pin to
+a real IRQ line, but then we can use a flag to differentiate.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120302/6c7941be/attachment.sig>
