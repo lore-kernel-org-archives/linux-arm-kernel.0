@@ -1,22 +1,84 @@
-From: vbyravarasu@nvidia.com (Venu Byravarasu)
-Date: Fri, 2 Mar 2012 13:32:34 +0530
-Subject: [PATCH v6 1/2] mfd: Add anatop mfd driver
-In-Reply-To: <4F507C1B.1050909@linaro.org>
-References: <1330593052-15184-1-git-send-email-paul.liu@linaro.org>
- <1330671641-6439-1-git-send-email-paul.liu@linaro.org>
- <D958900912E20642BCBC71664EFECE3E6DD2912252@BGMAIL02.nvidia.com>
- <4F507C1B.1050909@linaro.org>
-Message-ID: <D958900912E20642BCBC71664EFECE3E6DD2912265@BGMAIL02.nvidia.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Fri, 2 Mar 2012 17:05:30 +0900
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I cannot fully understand. Anatop is not SPI or I2C device. It is
-> internally embedded into the SoC. It is directly accessed by memory I/O.
+On Thu, Mar 1, 2012 at 12:04 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> +/**
+> + * arm_iommu_map_sg - map a set of SG buffers for streaming mode DMA
+> + * @dev: valid struct device pointer
+> + * @sg: list of buffers
+> + * @nents: number of buffers to map
+> + * @dir: DMA transfer direction
+> + *
+> + * Map a set of buffers described by scatterlist in streaming mode for DMA.
+> + * The scatter gather list elements are merged together (if possible) and
+> + * tagged with the appropriate dma address and length. They are obtained via
+> + * sg_dma_{address,length}.
+> + */
+> +int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+> + ? ? ? ? ? ? ? ? ? ?enum dma_data_direction dir, struct dma_attrs *attrs)
+> +{
+> + ? ? ? struct scatterlist *s = sg, *dma = sg, *start = sg;
+> + ? ? ? int i, count = 0;
+> + ? ? ? unsigned int offset = s->offset;
+> + ? ? ? unsigned int size = s->offset + s->length;
+> + ? ? ? unsigned int max = dma_get_max_seg_size(dev);
+> +
+> + ? ? ? for (i = 1; i < nents; i++) {
+> + ? ? ? ? ? ? ? s->dma_address = ARM_DMA_ERROR;
+> + ? ? ? ? ? ? ? s->dma_length = 0;
+> +
+> + ? ? ? ? ? ? ? s = sg_next(s);
+> +
+> + ? ? ? ? ? ? ? if (s->offset || (size & ~PAGE_MASK) || size + s->length > max) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (__map_sg_chunk(dev, start, size, &dma->dma_address,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? dir) < 0)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto bad_mapping;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? dma->dma_address += offset;
+> + ? ? ? ? ? ? ? ? ? ? ? dma->dma_length = size - offset;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? size = offset = s->offset;
+> + ? ? ? ? ? ? ? ? ? ? ? start = s;
+> + ? ? ? ? ? ? ? ? ? ? ? dma = sg_next(dma);
+> + ? ? ? ? ? ? ? ? ? ? ? count += 1;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? ? ? ? ? size += s->length;
+> + ? ? ? }
+> + ? ? ? if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir) < 0)
+> + ? ? ? ? ? ? ? goto bad_mapping;
+> +
+> + ? ? ? dma->dma_address += offset;
+> + ? ? ? dma->dma_length = size - offset;
+> +
+> + ? ? ? return count+1;
+> +
+> +bad_mapping:
+> + ? ? ? for_each_sg(sg, s, count, i)
+> + ? ? ? ? ? ? ? __iommu_remove_mapping(dev, sg_dma_address(s), sg_dma_len(s));
+> + ? ? ? return 0;
+> +}
+> +
+This looks that the given sg list specifies the list of physical
+memory chunks and
+the list of IO virtual memory chunks at the same time after calling
+arm_dma_map_sg().
+It can happen that dma_address and dma_length of a sg entry does not
+correspond to
+physical memory information of the sg entry.
 
-Sorry, I missed this.
+I think it is beneficial for handling IO virtual memory.
 
-> Do you mean I should implement a regmap_bus which uses memory I/O and
-> then use regmap?
-> 
-> Regards,
-> Paul
+However, I worry about any other problems caused by a single sg entry contains
+information from 2 different context.
+
+Regards,
+
+Cho KyongHo.
