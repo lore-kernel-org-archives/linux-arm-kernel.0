@@ -1,51 +1,75 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 2 Mar 2012 20:28:44 +0100
-Subject: [PATCH 0/6] AT91 more DT bindings
-Message-ID: <20120302192844.GB21255@game.jcrosoft.org>
+From: jason@lakedaemon.net (Jason)
+Date: Fri, 2 Mar 2012 14:57:10 -0500
+Subject: [PATCH 5/5 v2] ARM: kirkwood: convert orion-wdt to fdt.
+In-Reply-To: <201203021832.34901.arnd@arndb.de>
+References: <cover.1330709314.git.jason@lakedaemon.net>
+ <e2fe5e97a83fc753559bbb18d5d111ed01b89034.1330709314.git.jason@lakedaemon.net>
+ <201203021832.34901.arnd@arndb.de>
+Message-ID: <20120302195710.GP11986@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+On Fri, Mar 02, 2012 at 06:32:33PM +0000, Arnd Bergmann wrote:
+> On Friday 02 March 2012, Jason Cooper wrote:
+> > +       wdt_reg = (void __iomem *)TIMER_VIRT_BASE;
+> > +
+> > +       ret = of_address_to_resource(np, 0, &res);
+> > +       if (ret) {
+> > +               printk(KERN_ERR "invalid address\n");
+> > +               return ret;
+> > +       }
+> > +
+> > +       wdt_reg = ioremap(res.start, res.end - res.start);
+> > +
+> 
+> This will break non-dt uses because you overwrite the wdt_reg value.
 
-	The following patch series add the bindings for:
-	 - PMC
-	 - SDRAM/DDR Controller
-	 - Reset Controller
-	 - Shutdown Controller
+I thought for non-dt configurations of_.*() zeroed out.  No problem, I
+must've misunderstood something from earlier.
 
-The following changes since commit c5ec01650adb1976f928177cd7e71afcb82026c5:
+> As I commented before, I think the best approach would be to
+> provide a hardcoded resource for the device in the legacy case
+> and just use platform_get_resource() to get the resource
+> and ioremap it in either case.
 
-  ARM: at91: dt: enable usb ehci for sam9g45 and sam9x5 (2012-03-02 00:46:37 +0800)
+Sorry, my denseness got in the way.  When you said hardcoded, I thought
+you meant #define TIMER_VIRT_BASE .
 
-are available in the git repository at:
-  git://github.com/at91linux/linux-at91.git ..BRANCH.NOT.VERIFIED..
+> of_address_to_resource() works only for the DT case, while
+> platform_get_resource() works in either case.
+> 
+> You need to add something like
 
-Jean-Christophe PLAGNIOL-VILLARD (6):
-      ARM: at91/dt: add specific DT soc init
-      ARM: at91: add pmc DT support
-      ARM: at91: always enable sam9 restart
-      ARM: at91: add RSTC (Reset Controller) dt support
-      ARM: at91: add ram controller DT support
-      ARM: at91: add Shutdown Controller (SHDWC) DT support
+Ahh... now *that* makes sense.
 
- .../devicetree/bindings/arm/atmel-at91.txt         |   60 ++++++++
- .../devicetree/bindings/arm/atmel-pmc.txt          |   11 ++
- arch/arm/boot/dts/at91sam9g20.dtsi                 |   20 +++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   21 +++
- arch/arm/boot/dts/at91sam9m10g45ek.dts             |   11 ++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |   20 +++
- arch/arm/boot/dts/at91sam9x5cm.dtsi                |   11 ++
- arch/arm/boot/dts/usb_a9g20.dts                    |   11 ++
- arch/arm/mach-at91/Kconfig                         |   10 +-
- arch/arm/mach-at91/at91sam9x5.c                    |    7 -
- arch/arm/mach-at91/board-dt.c                      |    8 +-
- arch/arm/mach-at91/clock.c                         |   54 ++++++-
- arch/arm/mach-at91/generic.h                       |    2 +
- arch/arm/mach-at91/include/mach/at91_shdwc.h       |    4 +-
- arch/arm/mach-at91/include/mach/at91sam9x5.h       |    5 -
- arch/arm/mach-at91/setup.c                         |  158 ++++++++++++++++++++
- 16 files changed, 380 insertions(+), 33 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/atmel-pmc.txt
+> 8<---
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 089899a..d16f43f 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -568,13 +568,17 @@ void __init orion_spi_1_init(unsigned long mapbase,
+>   ****************************************************************************/
+>  static struct orion_wdt_platform_data orion_wdt_data;
+>  
+> +static struct resource orion_wdt_resource =
+> +               DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x28);
+> +
+>  static struct platform_device orion_wdt_device = {
+>         .name           = "orion_wdt",
+>         .id             = -1,
+>         .dev            = {
+>                 .platform_data  = &orion_wdt_data,
+>         },
+> -       .num_resources  = 0,
+> +       .resources      = &orion_wdt_resource,
+> +       .num_resources  = 1,
+>  };
+>  
+>  void __init orion_wdt_init(unsigned long tclk)
+> ---->8
+> 
+> and an appropriate definition for TIMER_PHYS_BASE.
 
-Best Regards,
-J.
+thx,
+
+Jason.
