@@ -1,64 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  1 Mar 2012 21:13:42 -0600
-Subject: [PATCH v3 30/30] ARM: orion5x: use fixed PCI i/o mapping
-In-Reply-To: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
-References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1330658022-14559-31-git-send-email-robherring2@gmail.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Fri, 2 Mar 2012 14:45:43 +0900
+Subject: [PATCH v9 0/2] iommu/exynos: Add IOMMU/System MMU driver for
+ Samsung Exynos
+In-Reply-To: <CAH9JG2Vg8o_mm0gM042T0-kjMUoAdLzF+DeGErD7R86H0xqXZQ@mail.gmail.com>
+References: <001801ccf5e3$69d79860$3d86c920$%cho@samsung.com>
+ <CAH9JG2Vg8o_mm0gM042T0-kjMUoAdLzF+DeGErD7R86H0xqXZQ@mail.gmail.com>
+Message-ID: <CAHQjnONxO32WP40sJz80=rjv3kqxmx55MUvjvhhO_mo3DNH8-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Tue, Feb 28, 2012 at 4:01 PM, Kyungmin Park
+<kyungmin.park@samsung.com> wrote:
+> Hi,
+>
+> Some comments.
+> 1. It's not same patch series. since it has additional feature,
+> exynos5 series support which don't covered at previous time.
+> 2. It assumes that name conversion is based on exynos5 as default. now
+> you use gsc at exynos4 even though there's no gsc block. It should be
+> fimc.
 
-orion5x i/o handling must have been broken as it had no __io()
-translation. It may actually work now.
+Thanks. I agree about the second and applied it in the next patchset.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Nicolas Pitre <nico@fluxnic.net>
----
- arch/arm/mach-orion5x/common.c |   16 ++++++----------
- 1 files changed, 6 insertions(+), 10 deletions(-)
+>
+> So I suggest to send exynos4 series patch as before and send
+> additional exynos5 patch series next.
+>
 
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 0e28bae..9bab4cb 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -24,6 +24,7 @@
- #include <asm/timex.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-+#include <asm/mach/pci.h>
- #include <asm/mach/time.h>
- #include <mach/bridge-regs.h>
- #include <mach/hardware.h>
-@@ -44,16 +45,6 @@ static struct map_desc orion5x_io_desc[] __initdata = {
- 		.length		= ORION5X_REGS_SIZE,
- 		.type		= MT_DEVICE,
- 	}, {
--		.virtual	= ORION5X_PCIE_IO_VIRT_BASE,
--		.pfn		= __phys_to_pfn(ORION5X_PCIE_IO_PHYS_BASE),
--		.length		= ORION5X_PCIE_IO_SIZE,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= ORION5X_PCI_IO_VIRT_BASE,
--		.pfn		= __phys_to_pfn(ORION5X_PCI_IO_PHYS_BASE),
--		.length		= ORION5X_PCI_IO_SIZE,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= ORION5X_PCIE_WA_VIRT_BASE,
- 		.pfn		= __phys_to_pfn(ORION5X_PCIE_WA_PHYS_BASE),
- 		.length		= ORION5X_PCIE_WA_SIZE,
-@@ -63,6 +54,11 @@ static struct map_desc orion5x_io_desc[] __initdata = {
- 
- void __init orion5x_map_io(void)
- {
-+	unsigned long pci_io_pfn[] = {
-+		__phys_to_pfn(ORION5X_PCI_IO_PHYS_BASE),
-+		__phys_to_pfn(ORION5X_PCIE_IO_PHYS_BASE),
-+	};
-+	pci_map_io_pfn(pci_io_pfn, ARRAY_SIZE(pci_io_pfn));
- 	iotable_init(orion5x_io_desc, ARRAY_SIZE(orion5x_io_desc));
- }
- 
--- 
-1.7.5.4
+I will just extract a new patch that removes existing system MMU driver from
+the previous 2 patches and the patchset will consist of 3 patches.
