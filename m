@@ -1,44 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 2 Mar 2012 16:42:36 -0500 (EST)
-Subject: [RFC PATCH 0/2] ARM: assembler: Add uniform assembler
- framework
-In-Reply-To: <20120301130051.GE7363@n2100.arm.linux.org.uk>
-References: <1330455586-10353-1-git-send-email-dave.martin@linaro.org>
- <20120228192458.GC3617@n2100.arm.linux.org.uk>
- <20120301114942.GA2040@linaro.org>
- <20120301130051.GE7363@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1203021641340.31242@xanadu.home>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 2 Mar 2012 13:43:23 -0800
+Subject: [PATCH v2 0/6] ARM: Tegra: cleanup patches from Arnd Bergmann
+In-Reply-To: <4F513DE3.9020707@signal11.us>
+References: <1330721884-8495-1-git-send-email-alan@signal11.us>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BE861A54@HQMAIL01.nvidia.com>
+ <4F513DE3.9020707@signal11.us>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861A73@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Mar 2012, Russell King - ARM Linux wrote:
+Alan Ott wrote at Friday, March 02, 2012 2:39 PM:
+> On 03/02/2012 04:04 PM, Stephen Warren wrote:
+> > Alan Ott wrote at Friday, March 02, 2012 1:58 PM:
+> >> Sorry for the mess yesterday....
+> >> This is V2 of Arnd's Patch series from yesterday. Hopefully this one will be
+> >> smoother.
+> > There was feedback on at least patches 4 and 5 that doesn't appear to
+> > have been incorporated into this updated version.
+...
+> For patch #5 (ARM: tegra: USB_ULPI needs USB), it didn't look to me like
+> there was a resolution on that thread yesterday. On reading it again, if
+> we change
+>     select USB_ULPI if USB_SUPPORT
+> to:
+>     select USB_ULPI if USB
+> for both Tegra 2 and 3, does that satisfy you and Arnd?
 
-> On Thu, Mar 01, 2012 at 11:49:42AM +0000, Dave Martin wrote:
-> > Are you still interested in this series?
-> > 
-> > I have a workaround for the above now, but it's not pretty -- I seem to
-> > have opened a can of worms here.
-> > 
-> > 
-> > We would need something like
-> > 
-> > #define EXTENDED_ASM(stuff) asm ( ".include \"macros.inc\"\n\t" stuff )
-> > #define EXTENDED_VASM(stuff) asm volatile ( ".include \"macros.inc\"\n\t" stuff )
-> > 
-> > ...where macros.inc includes some logic to protect against multiple
-> > inclusion.
-> > 
-> > This would avoid problems caused by reordering done by the compiler.
-> > 
-> > I think this can work, but it may be a step too far...
-> 
-> I'm fairly tempted to say: "if it ain't broke, don't fix".  AFAIK no one
-> has reported problems here, so lets not hastily try to fix something that
-> will error out if it does go wrong.
+I believe so yes. Thanks.
 
-OK, exactly what I said.
-
-(I should have read further down the thread before replying)
-
-
-Nicolas
+-- 
+nvpublic
