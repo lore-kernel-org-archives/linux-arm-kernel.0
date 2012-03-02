@@ -1,33 +1,27 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 2 Mar 2012 14:30:14 -0800
-Subject: [PATCH v3 0/5] ARM: Tegra: cleanup patches from Arnd Bergmann
-In-Reply-To: <1330727075-10974-1-git-send-email-alan@signal11.us>
-References: <1330721884-8495-1-git-send-email-alan@signal11.us>
- <1330727075-10974-1-git-send-email-alan@signal11.us>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861AAB@HQMAIL01.nvidia.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 2 Mar 2012 23:36:29 +0100
+Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
+In-Reply-To: <20120302170252.GJ11986@titan.lakedaemon.net>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <201203021456.47896.arnd@arndb.de>
+ <20120302153614.GG11986@titan.lakedaemon.net>
+ <201203021648.52523.arnd@arndb.de>
+ <20120302170252.GJ11986@titan.lakedaemon.net>
+Message-ID: <20120302223629.GA21080@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alan Ott wrote at Friday, March 02, 2012 3:25 PM:
-> Version 3 of the patch set.
+> > Andrew Lunn said that he has a patch for plat-orion to use the generic
+> > clock framework. I think we should look at that before introducing
+> > a hack that will have to be removed again very soon.
 > 
-> Changes:
-> 	* change of logic (and commit message change) for
-> 	  "select USB_ULPI if USB is selected"
-> 	* dropped THUMB2 patch
-> 
-> Arnd Bergmann (5):
->   ARM: tegra: do not hide dma declarations
->   ARM: tegra: select CPU_FREQ_TABLE
->   ARM: tegra: build localtimer support only when needed
->   ARM: tegra: select USB_ULPI if USB is selected
->   ARM: tegra: export usb phy symbols
+> I asked him for it earlier [1], apparently it's a very invasive patch
+> series which breaks things.  I would like to look at it as a reference,
+> even if applying it isn't a good idea.
 
-The series,
+I did not say it breaks things. I said i have a habit of breaking
+orion5x, because i cannot test it.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+I will send the patches as RFC on Sunday. I'm traveling at the moment.
 
-Thanks Arnd and Alan for cleaning Tegra up!
-
--- 
-nvpublic
+  Andrew
