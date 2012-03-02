@@ -1,32 +1,36 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 2 Mar 2012 13:43:23 -0800
-Subject: [PATCH v2 0/6] ARM: Tegra: cleanup patches from Arnd Bergmann
-In-Reply-To: <4F513DE3.9020707@signal11.us>
-References: <1330721884-8495-1-git-send-email-alan@signal11.us>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861A54@HQMAIL01.nvidia.com>
- <4F513DE3.9020707@signal11.us>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861A73@HQMAIL01.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Mar 2012 13:44:17 -0800
+Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
+ IRQ for board setup
+In-Reply-To: <4F513DCA.1070301@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-12-git-send-email-b-cousson@ti.com>
+ <20120302181522.GC13967@legolas.emea.dhcp.ti.com>
+ <20120302192058.GP18901@atomide.com> <4F512D72.1090002@ti.com>
+ <4F513DCA.1070301@ti.com>
+Message-ID: <20120302214416.GQ18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alan Ott wrote at Friday, March 02, 2012 2:39 PM:
-> On 03/02/2012 04:04 PM, Stephen Warren wrote:
-> > Alan Ott wrote at Friday, March 02, 2012 1:58 PM:
-> >> Sorry for the mess yesterday....
-> >> This is V2 of Arnd's Patch series from yesterday. Hopefully this one will be
-> >> smoother.
-> > There was feedback on at least patches 4 and 5 that doesn't appear to
-> > have been incorporated into this updated version.
-...
-> For patch #5 (ARM: tegra: USB_ULPI needs USB), it didn't look to me like
-> there was a resolution on that thread yesterday. On reading it again, if
-> we change
->     select USB_ULPI if USB_SUPPORT
-> to:
->     select USB_ULPI if USB
-> for both Tegra 2 and 3, does that satisfy you and Arnd?
+* Cousson, Benoit <b-cousson@ti.com> [120302 13:06]:
+> 
+> I created a for_3.4/twl_irq_gpio_fix branch based on irqdomain/next
+> with all the TWL + GPIO patches except the DTS and without the MMC
+> hacks.
+> 
+> And I merged it into your hsmmc-gpio branch. There is a small
+> conflict in gpio-twl4030 but otherwise it works on the SDP4430.
 
-I believe so yes. Thanks.
+OK cool.
+ 
+> I cannot test remotely with Panda or Beagle, the animals are already
+> sleeping.
+> 
+> The branch is there if you want to check for OMAP3 as well.
+> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
+> for_3.4/twl_irq_gpio_fix
 
--- 
-nvpublic
+I'll give it a try at some point, looks like there's few more
+hsmmc fixes needed first..
+
+Tony
