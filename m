@@ -1,49 +1,64 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 2 Mar 2012 10:24:34 -0800
-Subject: [PATCH] pinctrl: resurrect verbose pinmux-pins
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE861991@HQMAIL01.nvidia.com>
-References: <1330705873-10798-1-git-send-email-linus.walleij@stericsson.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861978@HQMAIL01.nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861991@HQMAIL01.nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE8619C2@HQMAIL01.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 2 Mar 2012 18:32:33 +0000
+Subject: [PATCH 5/5 v2] ARM: kirkwood: convert orion-wdt to fdt.
+In-Reply-To: <e2fe5e97a83fc753559bbb18d5d111ed01b89034.1330709314.git.jason@lakedaemon.net>
+References: <cover.1330709314.git.jason@lakedaemon.net>
+ <e2fe5e97a83fc753559bbb18d5d111ed01b89034.1330709314.git.jason@lakedaemon.net>
+Message-ID: <201203021832.34901.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Friday, March 02, 2012 10:41 AM:
-> Stephen Warren wrote at Friday, March 02, 2012 10:22 AM:
-> > Linus Walleij wrote at riday, March 02, 2012 9:31 AM:
-> > > From: Linus Walleij <linus.walleij@linaro.org>
-> > >
-> > > This reintroduces the verbosity in the pinmux-pins file, now this
-> > > file will list all pins, their names, owning device (and if it's
-> > > a hog) and also in applicable cases the function and group making
-> > > use of that pin right now.
-> > >
-> > > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > It'd be nice if we could defer this fix until after all the API rework,
-> > because it'll cause all kinds of conflicts otherwise.
-> 
-> Oh, I see this patch is in your for-next branch already before I had a chance
-> to comment on it. I guess I'll have write a patch to convert the removed struct
-> type to char*s and rebase on top of it:-(
+On Friday 02 March 2012, Jason Cooper wrote:
+> +       wdt_reg = (void __iomem *)TIMER_VIRT_BASE;
+> +
+> +       ret = of_address_to_resource(np, 0, &res);
+> +       if (ret) {
+> +               printk(KERN_ERR "invalid address\n");
+> +               return ret;
+> +       }
+> +
+> +       wdt_reg = ioremap(res.start, res.end - res.start);
+> +
 
-I take that back. Can we please drop this patch and I'll provide an
-equivalent in my API rework series?
+This will break non-dt uses because you overwrite the wdt_reg value.
 
-The main reason is that before the API rework (i.e. what's currently in
-pinctrl's for-next branch where the patch was written), the function/group
-are set during pinctrl_get(state), whereas after the API rework they aren't
-known or set until pinctrl_select_state(state). This is exactly why I
-removed the code that saved the function value in the per-pin data-structure
-from pinctrl_get() in the first place.
+As I commented before, I think the best approach would be to
+provide a hardcoded resource for the device in the legacy case
+and just use platform_get_resource() to get the resource
+and ioremap it in either case.
 
-If we don't drop the patch, once of my patches is going to have to
-basically include a revert of it, and then a reimplementation of this
-patch in the correct place anyway, so we may as well just not apply it
-in the first place.
+of_address_to_resource() works only for the DT case, while
+platform_get_resource() works in either case.
 
-Thanks.
+You need to add something like
 
--- 
-nvpublic
+8<---
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 089899a..d16f43f 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -568,13 +568,17 @@ void __init orion_spi_1_init(unsigned long mapbase,
+  ****************************************************************************/
+ static struct orion_wdt_platform_data orion_wdt_data;
+ 
++static struct resource orion_wdt_resource =
++               DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x28);
++
+ static struct platform_device orion_wdt_device = {
+        .name           = "orion_wdt",
+        .id             = -1,
+        .dev            = {
+                .platform_data  = &orion_wdt_data,
+        },
+-       .num_resources  = 0,
++       .resources      = &orion_wdt_resource,
++       .num_resources  = 1,
+ };
+ 
+ void __init orion_wdt_init(unsigned long tclk)
+---->8
+
+and an appropriate definition for TIMER_PHYS_BASE.
+
+
+	Arnd
