@@ -1,76 +1,46 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  1 Mar 2012 21:13:20 -0600
-Subject: [PATCH v3 08/30] ARM: OMAP: Remove remaining includes for mach/io.h
+Date: Thu,  1 Mar 2012 21:13:21 -0600
+Subject: [PATCH v3 09/30] [media] davinci: remove includes of mach/io.h
 In-Reply-To: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
 References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1330658022-14559-9-git-send-email-robherring2@gmail.com>
+Message-ID: <1330658022-14559-10-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tony Lindgren <tony@atomide.com>
+From: Rob Herring <rob.herring@calxeda.com>
 
-These are no longer needed with the recent iomap.h
-changes.
+Remove a few remaining includes of mach/io.h.
 
-Reported-by: Rob Herring <robherring2@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
 ---
- arch/arm/mach-omap1/include/mach/entry-macro.S |    1 -
- arch/arm/mach-omap1/sram.S                     |    1 -
- arch/arm/plat-omap/include/plat/sdrc.h         |    1 -
- drivers/video/omap2/vrfb.c                     |    1 -
- 4 files changed, 0 insertions(+), 4 deletions(-)
+ drivers/media/video/davinci/vpbe_osd.c  |    1 -
+ drivers/media/video/davinci/vpbe_venc.c |    1 -
+ 2 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/include/mach/entry-macro.S b/arch/arm/mach-omap1/include/mach/entry-macro.S
-index 68d2679..d0b18b5 100644
---- a/arch/arm/mach-omap1/include/mach/entry-macro.S
-+++ b/arch/arm/mach-omap1/include/mach/entry-macro.S
-@@ -11,7 +11,6 @@
-  */
- 
- #include <mach/hardware.h>
--#include <mach/io.h>
- #include <mach/irqs.h>
- 
- #include "../../iomap.h"
-diff --git a/arch/arm/mach-omap1/sram.S b/arch/arm/mach-omap1/sram.S
-index 2ce0b9a..00e9d9e 100644
---- a/arch/arm/mach-omap1/sram.S
-+++ b/arch/arm/mach-omap1/sram.S
-@@ -12,7 +12,6 @@
- 
- #include <asm/assembler.h>
+diff --git a/drivers/media/video/davinci/vpbe_osd.c b/drivers/media/video/davinci/vpbe_osd.c
+index d6488b7..bba299d 100644
+--- a/drivers/media/video/davinci/vpbe_osd.c
++++ b/drivers/media/video/davinci/vpbe_osd.c
+@@ -28,7 +28,6 @@
+ #include <linux/clk.h>
+ #include <linux/slab.h>
  
 -#include <mach/io.h>
+ #include <mach/cputype.h>
  #include <mach/hardware.h>
  
- #include "iomap.h"
-diff --git a/arch/arm/plat-omap/include/plat/sdrc.h b/arch/arm/plat-omap/include/plat/sdrc.h
-index 925b12b..9bb978e 100644
---- a/arch/arm/plat-omap/include/plat/sdrc.h
-+++ b/arch/arm/plat-omap/include/plat/sdrc.h
-@@ -16,7 +16,6 @@
-  * published by the Free Software Foundation.
-  */
- 
--#include <mach/io.h>
- 
- /* SDRC register offsets - read/write with sdrc_{read,write}_reg() */
- 
-diff --git a/drivers/video/omap2/vrfb.c b/drivers/video/omap2/vrfb.c
-index fd22716..4e5b960 100644
---- a/drivers/video/omap2/vrfb.c
-+++ b/drivers/video/omap2/vrfb.c
+diff --git a/drivers/media/video/davinci/vpbe_venc.c b/drivers/media/video/davinci/vpbe_venc.c
+index 00e80f5..b21ecc8 100644
+--- a/drivers/media/video/davinci/vpbe_venc.c
++++ b/drivers/media/video/davinci/vpbe_venc.c
 @@ -27,7 +27,6 @@
- #include <linux/bitops.h>
- #include <linux/mutex.h>
  
+ #include <mach/hardware.h>
+ #include <mach/mux.h>
 -#include <mach/io.h>
- #include <plat/vrfb.h>
- #include <plat/sdrc.h>
+ #include <mach/i2c.h>
  
+ #include <linux/io.h>
 -- 
 1.7.5.4
