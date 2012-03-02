@@ -1,245 +1,77 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Fri, 2 Mar 2012 10:15:11 +0100
-Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
-In-Reply-To: <2f29e88b98b2bcff0c241996e6d7216a60995d2d.1330625878.git.jason@lakedaemon.net>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <2f29e88b98b2bcff0c241996e6d7216a60995d2d.1330625878.git.jason@lakedaemon.net>
-Message-ID: <20120302091510.GC29461@kw.sim.vm.gnt>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 02 Mar 2012 10:03:12 +0100
+Subject: IIO irq allocation fails on AT91SAM9G45
+In-Reply-To: <20120229204853.GE16999@n2100.arm.linux.org.uk>
+References: <4F4E36E6.1010704@free-electrons.com>
+ <4F4E8C0F.5090104@kernel.org> <20120229204853.GE16999@n2100.arm.linux.org.uk>
+Message-ID: <4F508CD0.20906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Thu, Mar 01, 2012 at 06:20:55PM +0000, Jason Cooper wrote:
-> Converted register address to a variable so that it could be set from
-> fdt.  Also, pull clock frequency from fdt and clean up failure logic a
-> bit.
+Le 29/02/2012 21:48, Russell King - ARM Linux a ?crit :
+> On Wed, Feb 29, 2012 at 08:35:27PM +0000, Jonathan Cameron wrote:
+>> On 02/29/2012 02:32 PM, Maxime Ripard wrote:
+>>> Hi everyone,
+>>>
+>>> I'm working on adding the support for the AT91SAM9M10G45-EK board from
+>>> Atmel for the at91_adc driver I previously posted, and I encounter some
+>>> weird issue here.
+>>>
+>>> When calling the iio_allocate_trigger
+>>> (http://lxr.free-electrons.com/source/drivers/staging/iio/industrialio-trigger.c?a=arm#L421)
+>>> from my driver on the G45, it returns ENOMEM, while on the
+>>> AT91SAM9G20-EK board, it works perfectly.
+>>>
+>>> Digging a bit into it, it seems that the call to irq_alloc_descs is
+>>> returning the error (the value of CONFIG_IIO_CONSUMERS_PER_TRIGGER is 2
+>>> in my configuration, which seems pretty reasonable and is the default
+>>> value anyway), which is itself getting that return value from
+>>> irq_expand_nr_irqs.
+>>>
+>>> Here, I'm left confused, I don't know this part of the kernel anymore,
+>>> and most importantly, it seems to be pretty-much arch-independant, while
+>>> the nature of my issue seems really platform-dependant.
+>>>
+>>> Do you have any clue of what's going on here ?
+>> We ran into this originally on the pxa as well.   My guess is that
+>> nr_irqs is not set high enough for that particular board.
+>>
+>> Looking back I can find some mention of a nasty bit of code that
+>> just adds a bit of padding but I can't find it now.
+>>
+>> Anyhow, you probably have a line somewhere in the kernel log
+>> saying something like:
+>>
+>> [    0.000000] NR_IRQS:288 nr_irqs:296 296
+>>
+>> NR_IRQS is typically the number of the SoC
+>> nr_irqs should be large enough to accomodate those provided by
+>> other peripherals.
+>>
+>> I also have a vague recollection that the problem goes away entirely
+>> with sparse irqs?
 > 
-> Same as rtc-mv, this device is used in all kirkwood boards.  So, it is
-> placed in kirkwood.dtsi.
+> Yes, because IRQs will be allocated above the last figure on that
+> line, up to IRQ_BITMAP_BITS which happens to be 8192 above NR_IRQS.
 > 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/boot/dts/kirkwood.dtsi   |    6 +++++
->  arch/arm/mach-kirkwood/board-dt.c |    1 -
->  arch/arm/mach-kirkwood/common.c   |    2 +-
->  arch/arm/mach-kirkwood/common.h   |    1 -
->  drivers/watchdog/orion_wdt.c      |   44 ++++++++++++++++++++++++++----------
->  5 files changed, 39 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 5fb185c..bf28424 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -8,5 +8,11 @@
->  		reg = <0xf1010300 0x1f>;
->  		interrupts = <53>;
->  	};
-> +
-> +	wdt at fed20300 {
-> +		compatible = "marvell,orion-wdt";
-> +		reg = <0xfed20300 0x28>;
-> +		clock-frequency = <200000000>;
-> +	};
+> There's an issue though: if your on-SoC IRQ controller is already
+> using irq_alloc_descs(), it will fail if you want it to grab IRQs
+> below the last figure on that line, because those will have already
+> been allocated for you.
 
-How this will work for boards using a different clock frequency (TCLK) ?
-Here, we could have 166MHz for example.
+Ok, so using either the sparse irqs or changing the definition of
+NR_IRQS from 192 to 224 makes the problem go away.
 
-Can this node be updated during the board initialization with a detected
-TCLK value ?
+I guess the reason because I was not seeing this issue with the G20 is
+because it has less interrupt sources.
 
-Or maybe this clock-frequency can reference a TCLK frequency defined in
-a board specific dts (I don't know if the DT format allow such things) ?
+Anyway, I'm not sure about the augmenting the NR_IRQS fix. It seems to
+work pretty well, but might it have some weird side-effects ?
 
-Regards,
+Should I send a patch for it, or should I find another way to fix this ?
 
-Simon
-
->  };
->  
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 6fc41ae..7ef5fb7 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -135,7 +135,6 @@ static void __init kirkwood_dt_init(void)
->  #endif
->  
->  	/* internal devices that every board has */
-> -	kirkwood_wdt_init();
->  	kirkwood_xor0_init();
->  	kirkwood_xor1_init();
->  	kirkwood_crypto_init();
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index 0c0375f..35dc40b 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -303,7 +303,7 @@ void __init kirkwood_xor1_init(void)
->  /*****************************************************************************
->   * Watchdog
->   ****************************************************************************/
-> -void __init kirkwood_wdt_init(void)
-> +static void __init kirkwood_wdt_init(void)
->  {
->  	orion_wdt_init(kirkwood_tclk);
->  }
-> diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-> index ca08826..ac4b2fb 100644
-> --- a/arch/arm/mach-kirkwood/common.h
-> +++ b/arch/arm/mach-kirkwood/common.h
-> @@ -53,7 +53,6 @@ void kirkwood_restart(char, const char *);
->  
->  char *kirkwood_id(void);
->  void kirkwood_l2_init(void);
-> -void kirkwood_wdt_init(void);
->  void kirkwood_xor0_init(void);
->  void kirkwood_xor1_init(void);
->  void kirkwood_crypto_init(void);
-> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> index 4ad78f8..4be76ca 100644
-> --- a/drivers/watchdog/orion_wdt.c
-> +++ b/drivers/watchdog/orion_wdt.c
-> @@ -17,6 +17,7 @@
->  #include <linux/fs.h>
->  #include <linux/miscdevice.h>
->  #include <linux/platform_device.h>
-> +#include <linux/of.h>
->  #include <linux/watchdog.h>
->  #include <linux/init.h>
->  #include <linux/uaccess.h>
-> @@ -28,9 +29,9 @@
->  /*
->   * Watchdog timer block registers.
->   */
-> -#define TIMER_CTRL		(TIMER_VIRT_BASE + 0x0000)
-> +#define TIMER_CTRL		0x0000
->  #define  WDT_EN			0x0010
-> -#define WDT_VAL			(TIMER_VIRT_BASE + 0x0024)
-> +#define WDT_VAL			0x0024
->  
->  #define WDT_MAX_CYCLE_COUNT	0xffffffff
->  #define WDT_IN_USE		0
-> @@ -40,6 +41,7 @@ static int nowayout = WATCHDOG_NOWAYOUT;
->  static int heartbeat = -1;		/* module parameter (seconds) */
->  static unsigned int wdt_max_duration;	/* (seconds) */
->  static unsigned int wdt_tclk;
-> +static unsigned int wdt_reg;
->  static unsigned long wdt_status;
->  static DEFINE_SPINLOCK(wdt_lock);
->  
-> @@ -48,7 +50,7 @@ static void orion_wdt_ping(void)
->  	spin_lock(&wdt_lock);
->  
->  	/* Reload watchdog duration */
-> -	writel(wdt_tclk * heartbeat, WDT_VAL);
-> +	writel(wdt_tclk * heartbeat, wdt_reg + WDT_VAL);
->  
->  	spin_unlock(&wdt_lock);
->  }
-> @@ -60,7 +62,7 @@ static void orion_wdt_enable(void)
->  	spin_lock(&wdt_lock);
->  
->  	/* Set watchdog duration */
-> -	writel(wdt_tclk * heartbeat, WDT_VAL);
-> +	writel(wdt_tclk * heartbeat, wdt_reg + WDT_VAL);
->  
->  	/* Clear watchdog timer interrupt */
->  	reg = readl(BRIDGE_CAUSE);
-> @@ -68,9 +70,9 @@ static void orion_wdt_enable(void)
->  	writel(reg, BRIDGE_CAUSE);
->  
->  	/* Enable watchdog timer */
-> -	reg = readl(TIMER_CTRL);
-> +	reg = readl(wdt_reg + TIMER_CTRL);
->  	reg |= WDT_EN;
-> -	writel(reg, TIMER_CTRL);
-> +	writel(reg, wdt_reg + TIMER_CTRL);
->  
->  	/* Enable reset on watchdog */
->  	reg = readl(RSTOUTn_MASK);
-> @@ -92,9 +94,9 @@ static void orion_wdt_disable(void)
->  	writel(reg, RSTOUTn_MASK);
->  
->  	/* Disable watchdog timer */
-> -	reg = readl(TIMER_CTRL);
-> +	reg = readl(wdt_reg + TIMER_CTRL);
->  	reg &= ~WDT_EN;
-> -	writel(reg, TIMER_CTRL);
-> +	writel(reg, wdt_reg + TIMER_CTRL);
->  
->  	spin_unlock(&wdt_lock);
->  }
-> @@ -102,7 +104,7 @@ static void orion_wdt_disable(void)
->  static int orion_wdt_get_timeleft(int *time_left)
->  {
->  	spin_lock(&wdt_lock);
-> -	*time_left = readl(WDT_VAL) / wdt_tclk;
-> +	*time_left = readl(wdt_reg + WDT_VAL) / wdt_tclk;
->  	spin_unlock(&wdt_lock);
->  	return 0;
->  }
-> @@ -236,15 +238,23 @@ static struct miscdevice orion_wdt_miscdev = {
->  static int __devinit orion_wdt_probe(struct platform_device *pdev)
->  {
->  	struct orion_wdt_platform_data *pdata = pdev->dev.platform_data;
-> +	struct device_node *np = pdev->dev.of_node;
->  	int ret;
->  
-> -	if (pdata) {
-> +	if (pdata)
->  		wdt_tclk = pdata->tclk;
-> -	} else {
-> -		printk(KERN_ERR "Orion Watchdog misses platform data\n");
-> +
-> +	of_property_read_u32(np, "clock-frequency", &wdt_tclk);
-> +
-> +	if (!wdt_tclk) {
-> +		printk(KERN_ERR "Orion Watchdog can't get clock freq\n");
->  		return -ENODEV;
->  	}
->  
-> +	wdt_reg = TIMER_VIRT_BASE;
-> +
-> +	of_property_read_u32(np, "reg", &wdt_reg);
-> +
->  	if (orion_wdt_miscdev.parent)
->  		return -EBUSY;
->  	orion_wdt_miscdev.parent = &pdev->dev;
-> @@ -284,6 +294,15 @@ static void orion_wdt_shutdown(struct platform_device *pdev)
->  		orion_wdt_disable();
->  }
->  
-> +#ifdef CONFIG_OF
-> +static struct of_device_id orion_wdt_of_match_table[] = {
-> +	{ .compatible = "marvell,orion-wdt", },
-> +	{},
-> +};
-> +#else
-> +#define orion_wdt_of_match_table NULL
-> +#endif
-> +
->  static struct platform_driver orion_wdt_driver = {
->  	.probe		= orion_wdt_probe,
->  	.remove		= __devexit_p(orion_wdt_remove),
-> @@ -291,6 +310,7 @@ static struct platform_driver orion_wdt_driver = {
->  	.driver		= {
->  		.owner	= THIS_MODULE,
->  		.name	= "orion_wdt",
-> +		.of_match_table = orion_wdt_of_match_table,
->  	},
->  };
->  
-> -- 
-> 1.7.3.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120302/8a34daf6/attachment.sig>
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
