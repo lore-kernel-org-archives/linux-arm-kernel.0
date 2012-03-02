@@ -1,43 +1,57 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 2 Mar 2012 03:52:17 -0700 (MST)
-Subject: [PATCH-V3 2/3] ARM: OMAP4: prminst: Add boot time __init function
- for prminst
-In-Reply-To: <1328269436-18668-3-git-send-email-hvaibhav@ti.com>
-References: <1328269436-18668-1-git-send-email-hvaibhav@ti.com>
- <1328269436-18668-3-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.00.1203020348460.15424@utopia.booyaka.com>
+From: r.sricharan@ti.com (R Sricharan)
+Date: Fri, 2 Mar 2012 16:31:18 +0530
+Subject: [PATCH] ARM: OMAP2+: Fix module build errors with
+ CONFIG_OMAP4_ERRATA_I688
+Message-ID: <1330686078-9478-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+While building modules with randconfig the below errors are observed.
 
-On Fri, 3 Feb 2012, Vaibhav Hiremath wrote:
+ERROR: "omap_bus_sync" [drivers/watchdog/sp805_wdt.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/watchdog/dw_wdt.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/virtio/virtio_ring.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/video/sm501fb.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/usb/mon/usbmon.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/usb/host/sl811-hcd.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/usb/host/ohci-hcd.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/usb/host/isp1760.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/usb/host/isp1362-hcd.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/usb/host/isp116x-hcd.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/usb/core/usbcore.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/tty/serial/altera_uart.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/tty/serial/altera_jtaguart.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/tty/serial/8250/8250_dw.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/ssb/ssb.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/rtc/rtc-cmos.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/rtc/rtc-bq4802.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/mtd/nand/tmio_nand.ko] undefined!
+ERROR: "omap_bus_sync" [drivers/mtd/nand/omap2.ko] undefined!
 
-> AM33xx PRM module is closer to OMAP4 PRM module, and
-> in order to reuse prminst api's we have to address
-> some of the differences like, base addresses and partitions.
-> Unlike OMAP4 PRM, AM33xx doesn't have any partitions and
-> maintains single partition.
-> 
-> So, in order to reuse the existing OMAP4 prminst code
-> for AM33xx this patch adds,
-> 
->   - Boot time __init function, to initialize _prm_bases
->     based on cpu_is_xxx
->   - Instead of maintaining phy addr for PRM partition
->     in _prm_bases[] table and then changing it to virt addr,
->     directly maintain respective virt addr.
+Signed-off-by: R Sricharan <r.sricharan@ti.com>
+---
+ arch/arm/mach-omap2/omap4-common.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-So as was mentioned in another thread, the prminst code is really for 
-cases where there are PRM registers split across multiple IP blocks.  So 
-far this doesn't appear to the case with AM33xx.  A better approach is 
-probably to create a prm33xx.c, as was done in the branch that was 
-mentioned in my last message.
-
-Another problem with this patch is that it causes a large number of 
-warnings from sparse -- the type casts aren't right or are missing. Please 
-make sure that your patches don't add any sparse warnings before posting.  
-You can do this with 'make C=2' assuming that you have sparse installed.
-
-
-- Paul
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index ebc5950..70de277 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -31,6 +31,7 @@
+ 
+ #include "common.h"
+ #include "omap4-sar-layout.h"
++#include <linux/export.h>
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ static void __iomem *l2cache_base;
+@@ -55,6 +56,7 @@ void omap_bus_sync(void)
+ 		isb();
+ 	}
+ }
++EXPORT_SYMBOL(omap_bus_sync);
+ 
+ /* Steal one page physical memory for barrier implementation */
+ int __init omap_barrier_reserve_memblock(void)
+-- 
+1.7.1
