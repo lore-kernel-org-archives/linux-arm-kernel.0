@@ -1,49 +1,45 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  2 Mar 2012 11:07:23 +0100
-Subject: [PATCH 1/2] ARM: dts: versatile-pb/ab fix MMC IRQs
-Message-ID: <1330682843-21163-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri,  2 Mar 2012 11:07:35 +0100
+Subject: [PATCH 2/2] ARM: versatile: add some auxdata for device trees
+Message-ID: <1330682855-21199-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMCI driver will not work without two IRQs since this is not
-flagged as a single-irq variant. Looking through the complex IRQ
-definition for the MMCI on the versatile (including an #if 1
-statement forcing MMCI IRQ0 to the VIC) this appears to the the
-correct IRQ number for both models.
+The MMCI and PL022 SPI drivers sure need their platform data to
+work on the Versatile as well. (This does not fix the auxdata for
+MMCI instance mmc1 on the Versatile PB though.)
 
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Cc: Niklas Hernaeus <niklas.hernaeus@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/versatile-ab.dts |    2 +-
- arch/arm/boot/dts/versatile-pb.dts |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-versatile/core.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
-index 0b32925..e2fe319 100644
---- a/arch/arm/boot/dts/versatile-ab.dts
-+++ b/arch/arm/boot/dts/versatile-ab.dts
-@@ -173,7 +173,7 @@
- 			mmc at 5000 {
- 				compatible = "arm,primecell";
- 				reg = < 0x5000 0x1000>;
--				interrupts = <22>;
-+				interrupts = <22 34>;
- 			};
- 			kmi at 6000 {
- 				compatible = "arm,pl050", "arm,primecell";
-diff --git a/arch/arm/boot/dts/versatile-pb.dts b/arch/arm/boot/dts/versatile-pb.dts
-index 1664610..7e81752 100644
---- a/arch/arm/boot/dts/versatile-pb.dts
-+++ b/arch/arm/boot/dts/versatile-pb.dts
-@@ -41,7 +41,7 @@
- 			mmc at b000 {
- 				compatible = "arm,primecell";
- 				reg = <0xb000 0x1000>;
--				interrupts = <23>;
-+				interrupts = <23 34>;
- 			};
- 		};
- 	};
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index 02b7b93..d72c8ad 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -664,17 +664,18 @@ static struct amba_device *amba_devs[] __initdata = {
+  * having a specific name.
+  */
+ struct of_dev_auxdata versatile_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI0_BASE, "fpga:05", NULL),
++	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI0_BASE, "fpga:05", &mmc0_plat_data),
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_KMI0_BASE, "fpga:06", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_KMI1_BASE, "fpga:07", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART3_BASE, "fpga:09", NULL),
++	/* FIXME: this is buggy, the platform data is needed for this MMC instance too */
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI1_BASE, "fpga:0b", NULL),
+ 
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_CLCD_BASE, "dev:20", &clcd_plat_data),
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART0_BASE, "dev:f1", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART1_BASE, "dev:f2", NULL),
+ 	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART2_BASE, "dev:f3", NULL),
+-	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SSP_BASE, "dev:f4", NULL),
++	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SSP_BASE, "dev:f4", &ssp0_plat_data),
+ 
+ #if 0
+ 	/*
 -- 
 1.7.7.6
