@@ -1,106 +1,327 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 2 Mar 2012 17:17:55 +0200
-Subject: [PATCHv4 6/6] ARM: OMAP3 PM: Remove IO Daisychain control from cpuidle
-In-Reply-To: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
-References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1330701475-22576-7-git-send-email-t-kristo@ti.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Fri, 02 Mar 2012 16:26:39 +0100
+Subject: [PATCH] MM: CMA: add a simple kernel module as the helper to test
+ CMA
+In-Reply-To: <1330656742-5233-1-git-send-email-Barry.Song@csr.com>
+References: <1330656742-5233-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <op.wajuip2a3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vishwanath BS <vishwanath.bs@ti.com>
+On Fri, 02 Mar 2012 03:52:22 +0100, Barry Song <Barry.Song@csr.com> wrote:
 
-As IO Daisy chain sequence is triggered via hwmod mux, there is no need to
-control it from cpuidle path for OMAP3.
+> From: Barry Song <Baohua.Song@csr.com>
+>
+> Any write request to /dev/cma_test will let the module to allocate memory from
+> CMA, for example:
+>
+> 1st time
+> $ echo 0 > /dev/cma_test
+> will require cma_test to request 1MB
+> 2nd time
+> $ echo 0 > /dev/cma_test
+> will require cma_test to request 2MB
+>
+> Any read request to /dev/cma_test will let the module to free memory from CMA,
+> for example:
+>
+> 1st time
+> $ cat /dev/cma_test
+> will require cma_test to free the 1MB allocated in the first write request
+> 2nd time
+> $ echo 0 > /dev/cma_test
+> will require cma_test to free the 2MB allocated in the second write request
 
-Also as omap3_disable_io_chain is no longer being used, just remove the
-function.
+Looks quite all right.  It has a race condition but I guess for a test device it's
+not that big of a deal (I think the race cannot cause panic).  Either way, would be
+nice if one could specify how much memory device should allocate.  How about those
+changes:
 
-Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c       |   17 -----------------
- arch/arm/mach-omap2/prm2xxx_3xxx.c |    8 --------
- arch/arm/mach-omap2/prm2xxx_3xxx.h |    7 -------
- 3 files changed, 0 insertions(+), 32 deletions(-)
+diff --git a/tools/cma/cma_test.c b/tools/cma/cma_test.c
+index 3ee89f3..3d3b074 100644
+--- a/tools/cma/cma_test.c
++++ b/tools/cma/cma_test.c
+@@ -6,66 +6,96 @@
+   * Licensed under GPLv2 or later.
+   */
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index e97ec3f..ed12bb4 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -291,13 +291,6 @@ void omap_sram_idle(void)
- 	/* Enable IO-PAD and IO-CHAIN wakeups */
- 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
- 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
--	if (omap3_has_io_wakeup() &&
--	    (per_next_state < PWRDM_POWER_ON ||
--	     core_next_state < PWRDM_POWER_ON)) {
--		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
--		if (omap3_has_io_chain_ctrl())
--			omap3_trigger_io_chain();
--	}
- 
- 	pwrdm_pre_transition();
- 
-@@ -376,16 +369,6 @@ void omap_sram_idle(void)
- 			omap3_per_restore_context();
- 	}
- 
--	/* Disable IO-PAD and IO-CHAIN wakeup */
--	if (omap3_has_io_wakeup() &&
--	    (per_next_state < PWRDM_POWER_ON ||
--	     core_next_state < PWRDM_POWER_ON)) {
--		omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD,
--					     PM_WKEN);
--		if (omap3_has_io_chain_ctrl())
--			omap3_disable_io_chain();
--	}
+-#include <linux/module.h>
+  #include <linux/device.h>
++#include <linux/dma-mapping.h>
+  #include <linux/fs.h>
++#include <linux/list.h>
+  #include <linux/miscdevice.h>
+-#include <linux/dma-mapping.h>
++#include <linux/module.h>
++#include <linux/spinlock.h>
++
++struct cma_allocation {
++	struct list_head list;
++	unsigned long size;
++	dma_addr_t dma;
++	void *virt;
++};
+
+-#define CMA_NUM  10
+  static struct device *cma_dev;
+-static dma_addr_t dma_phys[CMA_NUM];
+-static void *dma_virt[CMA_NUM];
++static LIST_HEAD(cma_allocations);
++static DEFINE_SPINLOCK(cma_lock);
+
+-/* any read request will free coherent memory, eg.
++/*
++ * Any read request will free a single coherent memory, eg.
+   * cat /dev/cma_test
+   */
+  static ssize_t
+  cma_test_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+  {
+-	int i;
 -
- 	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
- }
- 
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-index f681628..31a7c27 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-@@ -329,14 +329,6 @@ void omap3_trigger_io_chain(void)
- 			  MAX_IOPAD_LATCH_TIME, i);
- }
- 
--/* OMAP3 Daisychain disable sequence */
--void omap3_disable_io_chain(void)
--{
--	if (omap_rev() >= OMAP3430_REV_ES3_1)
--		omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK,
--					     WKUP_MOD, PM_WKEN);
--}
+-	for (i = 0; i < CMA_NUM; i++) {
+-		if (dma_virt[i]) {
+-			dma_free_coherent(cma_dev, (i + 1) * SZ_1M, dma_virt[i], dma_phys[i]);
+-			_dev_info(cma_dev, "free virt: %p phys: %p\n", dma_virt[i], (void *)dma_phys[i]);
+-			dma_virt[i] = NULL;
+-			break;
+-		}
++	struct cma_allocation *alloc = NULL;
++
++	spin_lock(&cma_lock);
++	if (!list_empty(&cma_allocations)) {
++		alloc = list_first_entry(&cma_allocations,
++					 struct cma_allocation, list);
++		list_del(&alloc->list);
+  	}
++	spin_unlock(&cma_lock);
++
++	if (alloc) {
++		dma_free_coherent(cma_dev, alloc->size, alloc->virt,
++				  alloc->dma);
++		_dev_info(cma_dev, "free virt: %p phys: %p\n",
++			  alloc->phys, (void *)alloc->dma);
++		kfree(alloc);
++	}
++
+  	return 0;
+  }
+
+  /*
+- * any write request will alloc coherent memory, eg.
+- * echo 0 > /dev/cma_test
++ * Writes request specified number of pages, eg.
++ * echo 1024 > /dev/cma_test
+   */
+  static ssize_t
+-cma_test_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
++cma_test_write(struct file *file, const char __user *buf, size_t count,
++	       loff_t *ppos)
+  {
+-	int i;
++	struct cma_allocation *alloc;
+  	int ret;
+
+-	for (i = 0; i < CMA_NUM; i++) {
+-		if (!dma_virt[i]) {
+-			dma_virt[i] = dma_alloc_coherent(cma_dev, (i + 1) * SZ_1M, &dma_phys[i], GFP_KERNEL);
 -
- static void __init omap3_enable_io_wakeup(void)
- {
- 	if (omap3_has_io_wakeup())
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
-index 15973aa..391b844 100644
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
-@@ -295,12 +295,6 @@ static inline void omap3_trigger_io_chain(void)
- 		"not suppose to be used on omap4\n");
- 	return 0;
- }
--static inline void omap3_disable_io_chain(void)
--{
--	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
--		"not suppose to be used on omap4\n");
--	return 0;
--}
- #else
- /* Power/reset management domain register get/set */
- extern u32 omap2_prm_read_mod_reg(s16 module, u16 idx);
-@@ -315,7 +309,6 @@ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
- extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
- extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
- extern void omap3_trigger_io_chain(void);
--extern void omap3_disable_io_chain(void);
- 
- /* OMAP3-specific VP functions */
- u32 omap3_prm_vp_check_txdone(u8 vp_id);
+-			if (dma_virt[i]) {
+-				void *p;
+-				/* touch every page in the allocated memory */
+-				for (p = dma_virt[i]; p <  dma_virt[i] + (i + 1) * SZ_1M; p += PAGE_SIZE)
+-					*(u32 *)p = 0;
+-
+-				_dev_info(cma_dev, "alloc virt: %p phys: %p\n", dma_virt[i], (void *)dma_phys[i]);
+-			} else {
+-				dev_err(cma_dev, "no mem in CMA area\n");
+-				ret = -ENOMEM;
+-			}
+-			break;
+-		}
+-	}
++	alloc = kmalloc(sizeof *alloc, GFP_KERNEL);
++	if (!alloc)
++		return -ENOMEM;
++
++	ret = kstrtouint_from_user(buf, count, 0, &alloc->size);
++	if (ret)
++		return ret;
++
++	if (!alloc->size)
++		return -EINVAL;
++
++	if (alloc->size > (ULONG_MAX << PAGE_SHIFT))
++		return -EOVERFLOW;
+
+-	return count;
++	alloc->size >>= PAGE_SHIFT;
++	alloc->virt = dma_alloc_coherent(cma_dev, alloc->size,
++					 &alloc->dma, GFP_KERNEL);
++
++	if (alloc->virt) {
++		_dev_info(cma_dev, "alloc virt: %p phys: %p\n", alloc->virt,
++			  (void *)alloc->dma);
++
++		spin_lock(&cma_lock);
++		list_add_tail(&alloc->list, &cma_allocations);
++		spin_unlock(&cma_lock);
++
++		return count;
++	} else {
++		dev_err(cma_dev, "no mem in CMA area\n");
++		kfree(alloc);
++		return -ENOSPC;
++	}
+  }
+
+  static const struct file_operations cma_test_fops = {
+
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  tools/cma/Makefile   |   13 ++++++
+>  tools/cma/cma_test.c |  108 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 121 insertions(+), 0 deletions(-)
+>  create mode 100644 tools/cma/Makefile
+>  create mode 100644 tools/cma/cma_test.c
+>
+> diff --git a/tools/cma/Makefile b/tools/cma/Makefile
+> new file mode 100644
+> index 0000000..d15c2c0
+> --- /dev/null
+> +++ b/tools/cma/Makefile
+> @@ -0,0 +1,13 @@
+> +# Kernel modules
+> +#
+> +# To compile for ARM:
+> +# make ARCH=arm CC=arm-none-linux-gnueabi-gcc
+> +#
+> +obj-m	+= cma_test.o
+> +
+> +build: kernel_modules
+> +
+> +kernel_modules:
+> +	${MAKE} -C $(CURDIR)/../.. M=$(CURDIR)
+> +clean:
+> +	${MAKE} -C $(CURDIR)/../.. M=$(CURDIR) clean
+> diff --git a/tools/cma/cma_test.c b/tools/cma/cma_test.c
+> new file mode 100644
+> index 0000000..3ee89f3
+> --- /dev/null
+> +++ b/tools/cma/cma_test.c
+> @@ -0,0 +1,108 @@
+> +/*
+> + * kernel module helper for testing CMA
+> + *
+> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/device.h>
+> +#include <linux/fs.h>
+> +#include <linux/miscdevice.h>
+> +#include <linux/dma-mapping.h>
+> +
+> +#define CMA_NUM  10
+> +static struct device *cma_dev;
+> +static dma_addr_t dma_phys[CMA_NUM];
+> +static void *dma_virt[CMA_NUM];
+> +
+> +/* any read request will free coherent memory, eg.
+> + * cat /dev/cma_test
+> + */
+> +static ssize_t
+> +cma_test_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < CMA_NUM; i++) {
+> +		if (dma_virt[i]) {
+> +			dma_free_coherent(cma_dev, (i + 1) * SZ_1M, dma_virt[i], dma_phys[i]);
+> +			_dev_info(cma_dev, "free virt: %p phys: %p\n", dma_virt[i], (void *)dma_phys[i]);
+> +			dma_virt[i] = NULL;
+> +			break;
+> +		}
+> +	}
+> +	return 0;
+> +}
+> +
+> +/*
+> + * any write request will alloc coherent memory, eg.
+> + * echo 0 > /dev/cma_test
+> + */
+> +static ssize_t
+> +cma_test_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+> +{
+> +	int i;
+> +	int ret;
+> +
+> +	for (i = 0; i < CMA_NUM; i++) {
+> +		if (!dma_virt[i]) {
+> +			dma_virt[i] = dma_alloc_coherent(cma_dev, (i + 1) * SZ_1M, &dma_phys[i], GFP_KERNEL);
+> +
+> +			if (dma_virt[i]) {
+> +				void *p;
+> +				/* touch every page in the allocated memory */
+> +				for (p = dma_virt[i]; p <  dma_virt[i] + (i + 1) * SZ_1M; p += PAGE_SIZE)
+> +					*(u32 *)p = 0;
+> +
+> +				_dev_info(cma_dev, "alloc virt: %p phys: %p\n", dma_virt[i], (void *)dma_phys[i]);
+> +			} else {
+> +				dev_err(cma_dev, "no mem in CMA area\n");
+> +				ret = -ENOMEM;
+> +			}
+> +			break;
+> +		}
+> +	}
+> +
+> +	return count;
+> +}
+> +
+> +static const struct file_operations cma_test_fops = {
+> +	.owner =    THIS_MODULE,
+> +	.read  =    cma_test_read,
+> +	.write =    cma_test_write,
+> +};
+> +
+> +static struct miscdevice cma_test_misc = {
+> +	.name = "cma_test",
+> +	.fops = &cma_test_fops,
+> +};
+> +
+> +static int __init cma_test_init(void)
+> +{
+> +	int ret = 0;
+> +
+> +	ret = misc_register(&cma_test_misc);
+> +	if (unlikely(ret)) {
+> +		pr_err("failed to register cma test misc device!\n");
+> +		return ret;
+> +	}
+> +	cma_dev = cma_test_misc.this_device;
+> +	cma_dev->coherent_dma_mask = ~0;
+> +	_dev_info(cma_dev, "registered.\n");
+> +
+> +	return ret;
+> +}
+> +module_init(cma_test_init);
+> +
+> +static void __exit cma_test_exit(void)
+> +{
+> +	misc_deregister(&cma_test_misc);
+> +}
+> +module_exit(cma_test_exit);
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Barry Song <Baohua.Song@csr.com>");
+> +MODULE_DESCRIPTION("kernel module to help the test of CMA");
+> +MODULE_ALIAS("CMA test");
+
+
 -- 
-1.7.4.1
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
