@@ -1,65 +1,48 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 02 Mar 2012 14:53:45 +0530
-Subject: [PATCHv3 4/6] ARM: OMAP3 PM: Enable IO Wake up
-In-Reply-To: <1330679940.2116.95.camel@sokoban>
-References: <1330525621-29836-1-git-send-email-t-kristo@ti.com>	
- <1330525621-29836-5-git-send-email-t-kristo@ti.com>	
- <4F4F1CBA.7040502@ti.com> <87sjhsdk2y.fsf@ti.com>
- <1330679940.2116.95.camel@sokoban>
-Message-ID: <4F5091A1.3030802@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 02 Mar 2012 01:24:05 -0600
+Subject: [PATCH 1/8] ARM: tegra: export tegra_gpio_{en,dis}able
+In-Reply-To: <1330630010-11241-2-git-send-email-alan@signal11.us>
+References: <1330630010-11241-1-git-send-email-alan@signal11.us>
+ <1330630010-11241-2-git-send-email-alan@signal11.us>
+Message-ID: <20120302072405.C11743E2D96@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 March 2012 02:49 PM, Tero Kristo wrote:
-> On Thu, 2012-03-01 at 14:37 -0800, Kevin Hilman wrote:
->> Rajendra Nayak<rnayak@ti.com>  writes:
->>
->>> On Wednesday 29 February 2012 07:56 PM, Tero Kristo wrote:
->>>> From: Vishwanath BS<vishwanath.bs@ti.com>
->>>>
->>>> Enable IO Wake up for OMAP3 as part of PM Init. Currently this has been
->>>> managed in cpuidle path which is not the right place. Subsequent patch
->>>> will remove IO Daisy chain handling in cpuidle path once daisy chain is
->>>> handled as part of hwmod mux.
->>>>
->>>> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com>
->>>> Tested-by: Govindraj.R<govindraj.raja@ti.com>
->>>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
->>>> ---
->>>>    arch/arm/mach-omap2/pm34xx.c |    4 ++++
->>>>    1 files changed, 4 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->>>> index e97ec3f..e6c2d39 100644
->>>> --- a/arch/arm/mach-omap2/pm34xx.c
->>>> +++ b/arch/arm/mach-omap2/pm34xx.c
->>>> @@ -793,6 +793,10 @@ static int __init omap3_pm_init(void)
->>>>    		goto err1;
->>>>    	}
->>>>
->>>> +	if (omap3_has_io_wakeup())
->>>> +		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD,
->>>> +					   PM_WKEN);
->>>
->>> On OMAP4 this GLOBAL IO chain enable happens as part of the trigger
->>> function itself, it might make sense to do that for OMAP3 too to avoid
->>> similar issues as seen on OMAP4 when the GLOBAL switch is enabled too
->>> late in boot. The best however would be to get rid of it in the trigger
->>> function and enable this early during PM init, but I am not sure whats
->>> a good place to do this 'early' enough.
->>
->> What about the subsys_initcall() that's already in the prm*.c files?
->>
->> IMO, the global one-time init doesn't belong in the trigger function
->> because there's no need to do the extra PRM read/write when it should be
->> a one-shot init.
->
-> This sounds good to me at least, I can change the patches to work like
-> this, Rajendra?
+On Thu,  1 Mar 2012 14:26:43 -0500, Alan Ott <alan@signal11.us> wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> These two functions are used in drivers that can be
+> modules, so they need to be exported.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Yup, sounds good to me too. The extra PRM read/write is really an
-overhead when done for every trigger. Thanks Kevin.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
->
-> -Tero
->
+> ---
+>  drivers/gpio/gpio-tegra.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+> index bdc2937..96662cc 100644
+> --- a/drivers/gpio/gpio-tegra.c
+> +++ b/drivers/gpio/gpio-tegra.c
+> @@ -107,11 +107,13 @@ void tegra_gpio_enable(int gpio)
+>  {
+>  	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 1);
+>  }
+> +EXPORT_SYMBOL_GPL(tegra_gpio_enable);
+>  
+>  void tegra_gpio_disable(int gpio)
+>  {
+>  	tegra_gpio_mask_write(GPIO_MSK_CNF(gpio), gpio, 0);
+>  }
+> +EXPORT_SYMBOL_GPL(tegra_gpio_disable);
+>  
+>  static void tegra_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>  {
+> -- 
+> 1.7.0.4
+> 
+
+-- 
+email sent from notmuch.vim plugin
