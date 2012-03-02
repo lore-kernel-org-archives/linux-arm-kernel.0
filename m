@@ -1,37 +1,110 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 2 Mar 2012 08:42:58 +0100
-Subject: [GIT PULL] i.MX31 Moboard updates
-Message-ID: <20120302074258.GG3852@pengutronix.de>
+Date: Fri, 2 Mar 2012 08:50:04 +0100
+Subject: [PATCH v3] ARM: mx3: Setup AIPS registers
+In-Reply-To: <1330522088-20357-1-git-send-email-festevam@gmail.com>
+References: <1330522088-20357-1-git-send-email-festevam@gmail.com>
+Message-ID: <20120302075004.GH3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Feb 29, 2012 at 10:28:08AM -0300, Fabio Estevam wrote:
+> It was observed on a mx31pdk board that audio playback only worked when the bootloader was Redboot, and 
+> did not work when U-boot was used. 
+> 
+> Comparing the sources of these bootloaders showed that the AIPS registers were not setup in U-boot.
+> 
+> Instead of relying on the bootloader to setup the AIPS registers, do it in the kernel so that audio
+> playback can work independantly of the bootloader being used.
+> 
+> Copied the AIPS settings from Redboot to the kernel.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Please pull the following i.MX31 Moboard specific updates for -next
+Applied, thanks.
 
 Sascha
 
+> ---
+> Changes since v2:
+> - Place mx_set_aips inside imx31_soc_init
+> Changes since v1:
+> - Make sure post_cpu_init() only runs on mx31
+> - Place imx_set_aips() in a common location so that other SoCs can use it.
+> - Improve comments about OPACRx
+>  arch/arm/mach-imx/mm-imx3.c             |    3 +++
+>  arch/arm/plat-mxc/cpu.c                 |   24 ++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h |    1 +
+>  3 files changed, 28 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+> index 6222151..77cf553 100644
+> --- a/arch/arm/mach-imx/mm-imx3.c
+> +++ b/arch/arm/mach-imx/mm-imx3.c
+> @@ -173,6 +173,9 @@ void __init imx31_soc_init(void)
+>  	}
+>  
+>  	imx_add_imx_sdma("imx31-sdma", MX31_SDMA_BASE_ADDR, MX31_INT_SDMA, &imx31_sdma_pdata);
+> +
+> +	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS1_BASE_ADDR));
+> +	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS2_BASE_ADDR));
+>  }
+>  #endif /* ifdef CONFIG_SOC_IMX31 */
+>  
+> diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
+> index f5b7e0f..220dd6f 100644
+> --- a/arch/arm/plat-mxc/cpu.c
+> +++ b/arch/arm/plat-mxc/cpu.c
+> @@ -1,5 +1,6 @@
+>  
+>  #include <linux/module.h>
+> +#include <linux/io.h>
+>  #include <mach/hardware.h>
+>  
+>  unsigned int __mxc_cpu_type;
+> @@ -18,3 +19,26 @@ void imx_print_silicon_rev(const char *cpu, int srev)
+>  		pr_info("CPU identified as %s, silicon rev %d.%d\n",
+>  				cpu, (srev >> 4) & 0xf, srev & 0xf);
+>  }
+> +
+> +void __init imx_set_aips(void __iomem *base)
+> +{
+> +	unsigned int reg;
+> +/*
+> + * Set all MPROTx to be non-bufferable, trusted for R/W,
+> + * not forced to user-mode.
+> + */
+> +	__raw_writel(0x77777777, base + 0x0);
+> +	__raw_writel(0x77777777, base + 0x4);
+> +
+> +/*
+> + * Set all OPACRx to be non-bufferable, to not require
+> + * supervisor privilege level for access, allow for
+> + * write access and untrusted master access.
+> + */
+> +	__raw_writel(0x0, base + 0x40);
+> +	__raw_writel(0x0, base + 0x44);
+> +	__raw_writel(0x0, base + 0x48);
+> +	__raw_writel(0x0, base + 0x4C);
+> +	reg = __raw_readl(base + 0x50) & 0x00FFFFFF;
+> +	__raw_writel(reg, base + 0x50);
+> +}
+> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+> index 1bf0df8..16c3864 100644
+> --- a/arch/arm/plat-mxc/include/mach/common.h
+> +++ b/arch/arm/plat-mxc/include/mach/common.h
+> @@ -75,6 +75,7 @@ extern void mxc_restart(char, const char *);
+>  extern void mxc_arch_reset_init(void __iomem *);
+>  extern int mx53_revision(void);
+>  extern int mx53_display_revision(void);
+> +extern void imx_set_aips(void __iomem *);
+>  
+>  enum mxc_cpu_pwr_mode {
+>  	WAIT_CLOCKED,		/* wfi only */
+> -- 
+> 1.7.1
+> 
+> 
 
-The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
-
-  Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git features/imx31-moboard
-
-for you to fetch changes up to 31776fbc66fef50cad30dc65404145d254646172:
-
-  mx31moboard: Add watchdog support (2012-03-02 08:38:44 +0100)
-
-----------------------------------------------------------------
-Philippe R?tornaz (2):
-      mx31moboard: update maintainer
-      mx31moboard: Add watchdog support
-
- arch/arm/mach-imx/Kconfig            |    1 +
- arch/arm/mach-imx/mach-mx31moboard.c |    4 +++-
- 2 files changed, 4 insertions(+), 1 deletions(-)
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
