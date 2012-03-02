@@ -1,66 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Mar 2012 11:20:58 -0800
-Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
- IRQ for board setup
-In-Reply-To: <20120302181522.GC13967@legolas.emea.dhcp.ti.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-12-git-send-email-b-cousson@ti.com>
- <20120302181522.GC13967@legolas.emea.dhcp.ti.com>
-Message-ID: <20120302192058.GP18901@atomide.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 2 Mar 2012 20:28:44 +0100
+Subject: [PATCH 0/6] AT91 more DT bindings
+Message-ID: <20120302192844.GB21255@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [120302 09:43]:
-> Hi,
-> 
-> On Fri, Mar 02, 2012 at 05:50:23PM +0100, Benoit Cousson wrote:
-> > Card detect IRQ from the TWL6030 used to be provided to the MMC
-> > controller code using a statically allocated IRQ scheme:
-> > 
-> >   card_detect_irq = TWL6030_IRQ_BASE + MMCDETECT_INTR_OFFSET;
-> > 
-> > This is no longer valid in a SPARSE_IRQ context since there is no more
-> > pre-defined TWL6030_IRQ_BASE.
-> > 
-> > Return the proper card detect IRQ value in the twl6030_mmc_card_detect_config
-> > that will be called from the MMC controller.
-> > 
-> > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Rajendra Nayak <rnayak@ti.com>
-> 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> 
-> > ---
-> >  drivers/mfd/twl6030-irq.c |    3 ++-
-> >  1 files changed, 2 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
-> > index a1c7183..4a63de2 100644
-> > --- a/drivers/mfd/twl6030-irq.c
-> > +++ b/drivers/mfd/twl6030-irq.c
-> > @@ -308,7 +308,8 @@ int twl6030_mmc_card_detect_config(void)
-> >  									ret);
-> >  		return ret;
-> >  	}
-> > -	return 0;
-> > +
-> > +	return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
-> >  }
-> >  EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
-> 
-> At some point this twl6030_mmc_card_detect_config() needs to vanish in
-> favor of a better mechanism. Maybe passing the GPIO number an requiring
-> the driver to request the GPIO, set its direction and use it as IRQ
-> line.
-> 
-> the only problem would arise if we end up hooking the Card Detect pin to
-> a real IRQ line, but then we can use a flag to differentiate.
+HI,
 
-I'm trying to leave out the need for this callback to pdata..
-See mmc: omap_hsmmc: Simplify init for twl6030 MMC card detect
-that does pretty much the same as Benoit's patch plus removes
-the need for the callback.
+	The following patch series add the bindings for:
+	 - PMC
+	 - SDRAM/DDR Controller
+	 - Reset Controller
+	 - Shutdown Controller
 
-Tony
+The following changes since commit c5ec01650adb1976f928177cd7e71afcb82026c5:
+
+  ARM: at91: dt: enable usb ehci for sam9g45 and sam9x5 (2012-03-02 00:46:37 +0800)
+
+are available in the git repository at:
+  git://github.com/at91linux/linux-at91.git ..BRANCH.NOT.VERIFIED..
+
+Jean-Christophe PLAGNIOL-VILLARD (6):
+      ARM: at91/dt: add specific DT soc init
+      ARM: at91: add pmc DT support
+      ARM: at91: always enable sam9 restart
+      ARM: at91: add RSTC (Reset Controller) dt support
+      ARM: at91: add ram controller DT support
+      ARM: at91: add Shutdown Controller (SHDWC) DT support
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |   60 ++++++++
+ .../devicetree/bindings/arm/atmel-pmc.txt          |   11 ++
+ arch/arm/boot/dts/at91sam9g20.dtsi                 |   20 +++
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   21 +++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts             |   11 ++
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   20 +++
+ arch/arm/boot/dts/at91sam9x5cm.dtsi                |   11 ++
+ arch/arm/boot/dts/usb_a9g20.dts                    |   11 ++
+ arch/arm/mach-at91/Kconfig                         |   10 +-
+ arch/arm/mach-at91/at91sam9x5.c                    |    7 -
+ arch/arm/mach-at91/board-dt.c                      |    8 +-
+ arch/arm/mach-at91/clock.c                         |   54 ++++++-
+ arch/arm/mach-at91/generic.h                       |    2 +
+ arch/arm/mach-at91/include/mach/at91_shdwc.h       |    4 +-
+ arch/arm/mach-at91/include/mach/at91sam9x5.h       |    5 -
+ arch/arm/mach-at91/setup.c                         |  158 ++++++++++++++++++++
+ 16 files changed, 380 insertions(+), 33 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/atmel-pmc.txt
+
+Best Regards,
+J.
