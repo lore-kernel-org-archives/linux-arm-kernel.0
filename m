@@ -1,102 +1,119 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Mar 2012 11:06:15 -0800
-Subject: [PATCH 1/4] gpiolib: Add gpiochip_find_by_name() and
- gpio_find_by_chip_name()
-In-Reply-To: <20120302184833.C296A3E1C63@localhost>
-References: <20120301185044.29210.44521.stgit@kaulin.local>
- <20120301185524.29210.60381.stgit@kaulin.local>
- <20120302075804.F28DB3E2DB4@localhost>
- <20120302170327.GF18901@atomide.com>
- <20120302180848.GM18901@atomide.com>
- <20120302184833.C296A3E1C63@localhost>
-Message-ID: <20120302190614.GO18901@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 02 Mar 2012 12:14:53 -0700
+Subject: [PATCH] Initial Device Tree system for Snowball
+In-Reply-To: <1330703567-17925-1-git-send-email-niklas.hernaeus@stericsson.com>
+References: <1330703567-17925-1-git-send-email-niklas.hernaeus@stericsson.com>
+Message-ID: <20120302191453.C972F3E1C63@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@secretlab.ca> [120302 10:16]:
-> On Fri, 2 Mar 2012 10:08:48 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > * Tony Lindgren <tony@atomide.com> [120302 08:31]:
-> > > * Grant Likely <grant.likely@secretlab.ca> [120302 01:00]:
-> > > > On Thu, 01 Mar 2012 10:55:24 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > > > > +
-> > > > > +/**
-> > > > > + * gpiochip_find_by_name() - iterator for locating a gpio_chip by name
-> > > > > + * @name: name of the gpio_chip
-> > > > > + *
-> > > > > + * Similar to bus_find_device_by_name. It returns a reference to the
-> > > > > + * first gpio_chip with matching name. It ignores NULL and empty names.
-> > > > > + * If you need to do something more complex, then use gpiochip_find.
-> > > > > + */
-> > > > > +struct gpio_chip *gpiochip_find_by_name(const char *name)
-> > > > > +{
-> > > > > +	if (!name || !strcmp(name, ""))
-> > > > > +		return NULL;
-> > > > > +
-> > > > > +	return gpiochip_find((void *)name, match_name);
-> > > > 
-> > > > Nasty cast.  Can the signature for gpiochip_find be changed to accept
-> > > > a (const void *)?
-> > > 
-> > > I think so, this too comes from the bus code.
-> > 
-> > Looks like it can't be const as of_node_to_gpiochip uses it with
-> > a struct device_node * that for of_get_named_gpio_flags comes from
-> > of_parse_phandle_with_args.
+On Fri, 2 Mar 2012 16:52:47 +0100, Niklas Hernaeus <niklas.hernaeus@stericsson.com> wrote:
+> From: Niklas Hernaeus <niklas.hernaeus@linaro.org>
 > 
-> Really? It sees to work fine here:
-
-Hmm right you are. I must have missed adding the const to
-of_gpiochip_is_match, that's good news :)
-
-Want to do that as a separate patch or want me to fold it in?
-
-Tony
- 
+> This is the base system for using Device Tree for Snowball.
+> The new boardfile is a slightly modified copy of the original board file,
+> so new Device Tree stuff can simply be added and code removed, while
+> functionality stays the same.
+> 
+> Signed-off-by: Niklas Hernaeus <niklas.hernaeus@linaro.org>
 > ---
+>  arch/arm/boot/dts/snowball.dts          |   32 ++
+>  arch/arm/mach-ux500/Kconfig             |   17 +-
+>  arch/arm/mach-ux500/Makefile            |    5 +-
+>  arch/arm/mach-ux500/board-mop500-dt.c   |  729 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-ux500/include/mach/irqs.h |    2 +-
+>  5 files changed, 779 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/snowball.dts
+>  create mode 100644 arch/arm/mach-ux500/board-mop500-dt.c
 > 
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index d773540..e633a2a 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -1152,8 +1152,9 @@ EXPORT_SYMBOL_GPL(gpiochip_remove);
->   * non-zero, this function will return to the caller and not iterate over any
->   * more gpio_chips.
->   */
-> -struct gpio_chip *gpiochip_find(void *data,
-> -				int (*match)(struct gpio_chip *chip, void *data))
-> +struct gpio_chip *gpiochip_find(const void *data,
-> +				int (*match)(struct gpio_chip *chip,
-> +					     const void *data))
->  {
->  	struct gpio_chip *chip = NULL;
->  	unsigned long flags;
-> diff --git a/drivers/of/gpio.c b/drivers/of/gpio.c
-> index e034b38..bba8121 100644
-> --- a/drivers/of/gpio.c
-> +++ b/drivers/of/gpio.c
-> @@ -229,7 +229,7 @@ void of_gpiochip_remove(struct gpio_chip *chip)
->  }
+> diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+> new file mode 100644
+> index 0000000..02305fb
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/snowball.dts
+> @@ -0,0 +1,32 @@
+> +/*
+> + * Copyright 2011 ST-Ericsson AB
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/ {
+> +	model = "Calao Systems Snowball platform with device tree";
+> +	compatible = "calaosystems,snowball-a9500";
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x20000000>;
+> +	};
+> +
+> +	soc-u9500 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		ranges;
+> +	};
+> +};
+> diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+> index 52af004..be7e4fe 100644
+> --- a/arch/arm/mach-ux500/Kconfig
+> +++ b/arch/arm/mach-ux500/Kconfig
+> @@ -27,19 +27,22 @@ menu "Ux500 target platform (boards)"
+>  config MACH_U8500
+>  	bool "U8500 Development platform"
+>  	depends on UX500_SOC_DB8500
+> +	depends on !USE_OF
+
+Hi Niklas,
+
+Don't make any configurations depend on !USE_OF.  Turning on device
+tree support must not disable non-DT booting.  This is a policy
+decision made a while ago.  You'll need to ensure the code is
+structured so that the DT and non-DT code paths can co-exist.
+
+>  	select TPS6105X
+>  	help
+>  	  Include support for the mop500 development platform.
 >  
->  /* Private function for resolving node pointer to gpio_chip */
-> -static int of_gpiochip_is_match(struct gpio_chip *chip, void *data)
-> +static int of_gpiochip_is_match(struct gpio_chip *chip, const void *data)
->  {
->  	return chip->of_node == data;
->  }
-> diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-> index 1ff4e22..5f52690 100644
-> --- a/include/asm-generic/gpio.h
-> +++ b/include/asm-generic/gpio.h
-> @@ -142,9 +142,9 @@ extern int __must_check gpiochip_reserve(int start, int ngpio);
->  /* add/remove chips */
->  extern int gpiochip_add(struct gpio_chip *chip);
->  extern int __must_check gpiochip_remove(struct gpio_chip *chip);
-> -extern struct gpio_chip *gpiochip_find(void *data,
-> +extern struct gpio_chip *gpiochip_find(const void *data,
->  					int (*match)(struct gpio_chip *chip,
-> -						     void *data));
-> +						     const void *data));
+>  config MACH_HREFV60
+> -       bool "U85000 Development platform, HREFv60 version"
+> -       depends on UX500_SOC_DB8500
+> -       help
+> -         Include support for the HREFv60 new development platform.
+> +	bool "U85000 Development platform, HREFv60 version"
+> +	depends on UX500_SOC_DB8500
+> +	depends on !USE_OF
+
+Ditto here.
+
+> +	help
+> +	  Include support for the HREFv60 new development platform.
 >  
->  
->  /* Always use the library code for GPIO management calls,
-> 
+>  config MACH_SNOWBALL
+>  	bool "U8500 Snowball platform"
+>  	depends on UX500_SOC_DB8500
+> +	depends on !USE_OF
+>  	select MACH_U8500
+>  	help
+>  	  Include support for the snowball development platform.
+> @@ -49,6 +52,12 @@ config MACH_U5500
+>  	depends on UX500_SOC_DB5500
+>  	help
+>  	  Include support for the U5500 development platform.
+> +config MACH_UX500_DT
+> +	def_bool y if USE_OF
+> +	depends on UX500_SOC_DB8500 || UX500_SOC_DB5500
+> +
+> +config MACH_MOP500
+> +	def_bool y if MACH_U8500 || MACH_UX500_DT
+>  endmenu
