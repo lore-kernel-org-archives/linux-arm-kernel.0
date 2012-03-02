@@ -1,69 +1,95 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 2 Mar 2012 16:19:35 -0500 (EST)
-Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
- to the hypervisor
-In-Reply-To: <1330526664.4270.128.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
- <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1330360043.8557.302.camel@zakaz.uk.xensource.com>
- <20120227180355.GB2023@linaro.org>
- <1330371219.10008.34.camel@dagon.hellion.org.uk>
- <20120228102040.GB2063@linaro.org>
- <1330426133.31269.70.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
- <20120229093436.GA2077@linaro.org>
- <1330509362.4270.20.camel@zakaz.uk.xensource.com>
- <20120229125826.GC2077@linaro.org>
- <1330526664.4270.128.camel@zakaz.uk.xensource.com>
-Message-ID: <alpine.LFD.2.02.1203021615350.31242@xanadu.home>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 2 Mar 2012 22:38:18 +0100
+Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
+ IRQ for board setup
+In-Reply-To: <4F512D72.1090002@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-12-git-send-email-b-cousson@ti.com>
+ <20120302181522.GC13967@legolas.emea.dhcp.ti.com>
+ <20120302192058.GP18901@atomide.com> <4F512D72.1090002@ti.com>
+Message-ID: <4F513DCA.1070301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Feb 2012, Ian Campbell wrote:
+On 3/2/2012 9:28 PM, Cousson, Benoit wrote:
+> Hi Tony,
+>
+> On 3/2/2012 8:20 PM, Tony Lindgren wrote:
+>> * Felipe Balbi<balbi@ti.com> [120302 09:43]:
+>>> Hi,
+>>>
+>>> On Fri, Mar 02, 2012 at 05:50:23PM +0100, Benoit Cousson wrote:
+>>>> Card detect IRQ from the TWL6030 used to be provided to the MMC
+>>>> controller code using a statically allocated IRQ scheme:
+>>>>
+>>>> card_detect_irq = TWL6030_IRQ_BASE + MMCDETECT_INTR_OFFSET;
+>>>>
+>>>> This is no longer valid in a SPARSE_IRQ context since there is no more
+>>>> pre-defined TWL6030_IRQ_BASE.
+>>>>
+>>>> Return the proper card detect IRQ value in the
+>>>> twl6030_mmc_card_detect_config
+>>>> that will be called from the MMC controller.
+>>>>
+>>>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>>>> Cc: Felipe Balbi<balbi@ti.com>
+>>>> Cc: Tony Lindgren<tony@atomide.com>
+>>>> Cc: Rajendra Nayak<rnayak@ti.com>
+>>>
+>>> Reviewed-by: Felipe Balbi<balbi@ti.com>
+>>>
+>>>> ---
+>>>> drivers/mfd/twl6030-irq.c | 3 ++-
+>>>> 1 files changed, 2 insertions(+), 1 deletions(-)
+>>>>
+>>>> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
+>>>> index a1c7183..4a63de2 100644
+>>>> --- a/drivers/mfd/twl6030-irq.c
+>>>> +++ b/drivers/mfd/twl6030-irq.c
+>>>> @@ -308,7 +308,8 @@ int twl6030_mmc_card_detect_config(void)
+>>>> ret);
+>>>> return ret;
+>>>> }
+>>>> - return 0;
+>>>> +
+>>>> + return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
+>>>> }
+>>>> EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
+>>>
+>>> At some point this twl6030_mmc_card_detect_config() needs to vanish in
+>>> favor of a better mechanism. Maybe passing the GPIO number an requiring
+>>> the driver to request the GPIO, set its direction and use it as IRQ
+>>> line.
+>>>
+>>> the only problem would arise if we end up hooking the Card Detect pin to
+>>> a real IRQ line, but then we can use a flag to differentiate.
+>>
+>> I'm trying to leave out the need for this callback to pdata..
+>> See mmc: omap_hsmmc: Simplify init for twl6030 MMC card detect
+>> that does pretty much the same as Benoit's patch plus removes
+>> the need for the callback.
+>
+> That's cool. I did that patch to still have a working MMC after my TWL
+> series because I missed your MMC series :-(.
+>
+> The patch #4 "mmc: omap_hsmmc: Simplify init for twl6030 MMC card
+> detect" is indeed simplifying a lot that IRQ mess.
+>
+> I will check with that TWL series, but since you are already using the
+> twl6030_irq_base it should work without any trouble.
 
-> On Wed, 2012-02-29 at 12:58 +0000, Dave Martin wrote:
-> > On Wed, Feb 29, 2012 at 09:56:02AM +0000, Ian Campbell wrote:
-> > > On Wed, 2012-02-29 at 09:34 +0000, Dave Martin wrote:
-> > > > On Tue, Feb 28, 2012 at 12:28:29PM +0000, Stefano Stabellini wrote:
-> > > 
-> > > > > I don't have a very strong opinion on which register we should use, but
-> > > > > I would like to avoid r7 if it is already actively used by gcc.
-> > > > 
-> > > > But there is no framepointer for Thumb-2 code (?)
-> > > 
-> > > Peter Maydell suggested there was:
-> > > > r7 is (used by gcc as) the Thumb frame pointer; I don't know if this
-> > > > makes it worth avoiding in this context.
-> > > 
-> > > Sounds like it might be a gcc-ism, possibly a non-default option?
-> > > 
-> > > Anyway, I think r12 will be fine for our purposes so the point is rather
-> > > moot.
-> > 
-> > Just had a chat with some tools guys -- apparently, when passing register
-> > arguments to gcc inline asms there really isn't a guarantee that those
-> > variables will be in the expected registers on entry to the inline asm.
-> > 
-> > If gcc reorders other function calls or other code around the inline asm
-> > (which it can do, except under certain controlled situations), then
-> > intervening code can clobber any registers in general.
-> > 
-> > Or, to summarise another way, there is no way to control which register
-> > is used to pass something to an inline asm in general (often we get away
-> > with this, and there are a lot of inline asms in the kernel that assume
-> > it works, but the more you inline the more likely you are to get nasty
-> > surprises).  There is no workaroud, except on some architectures where
-> > special asm constraints allow specific individual registers to be
-> > specified for operands (i386 for example).
-> 
-> I had assumed I just couldn't find the right syntax. Useful to know that
-> I couldn't find it because it doesn't exist!
+I created a for_3.4/twl_irq_gpio_fix branch based on irqdomain/next with 
+all the TWL + GPIO patches except the DTS and without the MMC hacks.
 
-It does exist.  See my previous reply to this thread.
+And I merged it into your hsmmc-gpio branch. There is a small conflict 
+in gpio-twl4030 but otherwise it works on the SDP4430.
 
-You can find this syntax described in section 6.44.2 "Specifying 
-Registers for Local Variables" in gcc v4.6.1 (possibly another section 
-number in the documentation for a different gcc version).
+I cannot test remotely with Panda or Beagle, the animals are already 
+sleeping.
 
+The branch is there if you want to check for OMAP3 as well.
+git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git 
+for_3.4/twl_irq_gpio_fix
 
-Nicolas
+Regards,
+Benoit
