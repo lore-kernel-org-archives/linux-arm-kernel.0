@@ -1,95 +1,103 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  1 Mar 2012 21:13:17 -0600
-Subject: [PATCH v3 05/30] ARM: msm: clean-up mach/io.h
+Date: Thu,  1 Mar 2012 21:13:18 -0600
+Subject: [PATCH v3 06/30] ARM: iop13xx: use runtime ioremap hook
 In-Reply-To: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
 References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1330658022-14559-6-git-send-email-robherring2@gmail.com>
+Message-ID: <1330658022-14559-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move msm specifics in mach/io.h to respective msm_iomap-*.h headers.
+Convert iop13xx platforms to use run-time ioremap hook instead of the
+compile time hook. The custom ioremap is still needed for 64-bit address
+handling.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-msm/include/mach/io.h             |    7 -------
- arch/arm/mach-msm/include/mach/msm_iomap-7x30.h |    4 ++++
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h |    4 ++++
- arch/arm/mach-msm/include/mach/msm_iomap-8x50.h |    4 ++++
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h |    4 ++++
- 5 files changed, 16 insertions(+), 7 deletions(-)
+ arch/arm/mach-iop13xx/include/mach/io.h |    7 -------
+ arch/arm/mach-iop13xx/io.c              |   10 ++++++++--
+ arch/arm/mach-iop13xx/iq81340mc.c       |    1 +
+ arch/arm/mach-iop13xx/iq81340sc.c       |    1 +
+ 4 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-msm/include/mach/io.h b/arch/arm/mach-msm/include/mach/io.h
-index c6ff9bb..1071f98 100644
---- a/arch/arm/mach-msm/include/mach/io.h
-+++ b/arch/arm/mach-msm/include/mach/io.h
-@@ -21,11 +21,4 @@
- #define __io(a)		__typesafe_io(a)
- #define __mem_pci(a)    (a)
+diff --git a/arch/arm/mach-iop13xx/include/mach/io.h b/arch/arm/mach-iop13xx/include/mach/io.h
+index dffb234..2a69fc0 100644
+--- a/arch/arm/mach-iop13xx/include/mach/io.h
++++ b/arch/arm/mach-iop13xx/include/mach/io.h
+@@ -26,16 +26,9 @@
+ #define __mem_isa(a) (a)
  
--void msm_map_qsd8x50_io(void);
--void msm_map_msm7x30_io(void);
--void msm_map_msm8x60_io(void);
--void msm_map_msm8960_io(void);
+ extern void __iomem * __iop13xx_io(unsigned long io_addr);
+-extern void __iomem *__iop13xx_ioremap(unsigned long cookie, size_t size,
+-	unsigned int mtype);
+-extern void __iop13xx_iounmap(void __iomem *addr);
 -
--extern unsigned int msm_shared_ram_phys;
+ extern u32 iop13xx_atue_mem_base;
+ extern u32 iop13xx_atux_mem_base;
+ extern size_t iop13xx_atue_mem_size;
+ extern size_t iop13xx_atux_mem_size;
+ 
+-#define __arch_ioremap	__iop13xx_ioremap
+-#define __arch_iounmap	__iop13xx_iounmap
 -
  #endif
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
-index 198202c..f944fe6 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
-@@ -100,4 +100,8 @@
- #define MSM_HSUSB_PHYS        0xA3600000
- #define MSM_HSUSB_SIZE        SZ_1K
+diff --git a/arch/arm/mach-iop13xx/io.c b/arch/arm/mach-iop13xx/io.c
+index 48642e6..d63585e 100644
+--- a/arch/arm/mach-iop13xx/io.c
++++ b/arch/arm/mach-iop13xx/io.c
+@@ -40,7 +40,7 @@ void * __iomem __iop13xx_io(unsigned long io_addr)
+ }
+ EXPORT_SYMBOL(__iop13xx_io);
  
-+#ifndef __ASSEMBLY__
-+extern void msm_map_msm7x30_io(void);
-+#endif
-+
- #endif
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8960.h b/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-index 800b557..a1752c0 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-@@ -50,4 +50,8 @@
- #define MSM_DEBUG_UART_PHYS	0x16440000
- #endif
+-void * __iomem __iop13xx_ioremap(unsigned long cookie, size_t size,
++void __iomem * __iop13xx_ioremap(unsigned long cookie, size_t size,
+ 	unsigned int mtype)
+ {
+ 	void __iomem * retval;
+@@ -83,7 +83,7 @@ void * __iomem __iop13xx_ioremap(unsigned long cookie, size_t size,
+ }
+ EXPORT_SYMBOL(__iop13xx_ioremap);
  
-+#ifndef __ASSEMBLY__
-+extern void msm_map_msm8960_io(void);
-+#endif
-+
- #endif
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
-index 0faa894..da77cc1 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
-@@ -122,4 +122,8 @@
- #define MSM_SDC4_PHYS          0xA0600000
- #define MSM_SDC4_SIZE          SZ_4K
+-void __iop13xx_iounmap(void __iomem *addr)
++void __iop13xx_iounmap(volatile void __iomem *addr)
+ {
+ 	extern void __iounmap(volatile void __iomem *addr);
  
-+#ifndef __ASSEMBLY__
-+extern void msm_map_qsd8x50_io(void);
-+#endif
+@@ -111,3 +111,9 @@ skip:
+ 	return;
+ }
+ EXPORT_SYMBOL(__iop13xx_iounmap);
 +
- #endif
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-index 54e12ca..5aed57d 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x60.h
-@@ -67,4 +67,8 @@
- #define MSM_DEBUG_UART_PHYS	0x19C40000
- #endif
- 
-+#ifndef __ASSEMBLY__
-+extern void msm_map_msm8x60_io(void);
-+#endif
-+
- #endif
++void __init iop13xx_init_early(void)
++{
++	arch_ioremap = __iop13xx_ioremap;
++	arch_iounmap = __iop13xx_iounmap;
++}
+diff --git a/arch/arm/mach-iop13xx/iq81340mc.c b/arch/arm/mach-iop13xx/iq81340mc.c
+index abaee88..5c96b73 100644
+--- a/arch/arm/mach-iop13xx/iq81340mc.c
++++ b/arch/arm/mach-iop13xx/iq81340mc.c
+@@ -92,6 +92,7 @@ static struct sys_timer iq81340mc_timer = {
+ MACHINE_START(IQ81340MC, "Intel IQ81340MC")
+ 	/* Maintainer: Dan Williams <dan.j.williams@intel.com> */
+ 	.atag_offset    = 0x100,
++	.init_early     = iop13xx_init_early,
+ 	.map_io         = iop13xx_map_io,
+ 	.init_irq       = iop13xx_init_irq,
+ 	.timer          = &iq81340mc_timer,
+diff --git a/arch/arm/mach-iop13xx/iq81340sc.c b/arch/arm/mach-iop13xx/iq81340sc.c
+index 690916a..aa4dd75 100644
+--- a/arch/arm/mach-iop13xx/iq81340sc.c
++++ b/arch/arm/mach-iop13xx/iq81340sc.c
+@@ -94,6 +94,7 @@ static struct sys_timer iq81340sc_timer = {
+ MACHINE_START(IQ81340SC, "Intel IQ81340SC")
+ 	/* Maintainer: Dan Williams <dan.j.williams@intel.com> */
+ 	.atag_offset    = 0x100,
++	.init_early     = iop13xx_init_early,
+ 	.map_io         = iop13xx_map_io,
+ 	.init_irq       = iop13xx_init_irq,
+ 	.timer          = &iq81340sc_timer,
 -- 
 1.7.5.4
