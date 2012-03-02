@@ -1,108 +1,41 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 02 Mar 2012 12:07:59 +0100
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
-References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
- <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
- <CAHQjnOO5DLOj8Fw=ZriSnXg8W3k7y8Dnu--Peqe6JJX0xGMhoQ@mail.gmail.com>
-Message-ID: <015101ccf864$bacb1070$30613150$%szyprowski@samsung.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 02 Mar 2012 15:40:23 +0400
+Subject: [PATCH 4/8] ARM: tegra: build localtimer support only when needed
+In-Reply-To: <1330630010-11241-5-git-send-email-alan@signal11.us>
+References: <1330630010-11241-1-git-send-email-alan@signal11.us>
+ <1330630010-11241-5-git-send-email-alan@signal11.us>
+Message-ID: <4F50B1A7.60207@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello.
 
-On Friday, March 02, 2012 9:06 AM KyongHo Cho wrote:
+On 01-03-2012 23:26, Alan Ott wrote:
 
-> On Thu, Mar 1, 2012 at 12:04 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> > +/**
-> > + * arm_iommu_map_sg - map a set of SG buffers for streaming mode DMA
-> > + * @dev: valid struct device pointer
-> > + * @sg: list of buffers
-> > + * @nents: number of buffers to map
-> > + * @dir: DMA transfer direction
-> > + *
-> > + * Map a set of buffers described by scatterlist in streaming mode for DMA.
-> > + * The scatter gather list elements are merged together (if possible) and
-> > + * tagged with the appropriate dma address and length. They are obtained via
-> > + * sg_dma_{address,length}.
-> > + */
-> > +int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
-> > + ? ? ? ? ? ? ? ? ? ?enum dma_data_direction dir, struct dma_attrs *attrs)
-> > +{
-> > + ? ? ? struct scatterlist *s = sg, *dma = sg, *start = sg;
-> > + ? ? ? int i, count = 0;
-> > + ? ? ? unsigned int offset = s->offset;
-> > + ? ? ? unsigned int size = s->offset + s->length;
-> > + ? ? ? unsigned int max = dma_get_max_seg_size(dev);
-> > +
-> > + ? ? ? for (i = 1; i < nents; i++) {
-> > + ? ? ? ? ? ? ? s->dma_address = ARM_DMA_ERROR;
-> > + ? ? ? ? ? ? ? s->dma_length = 0;
-> > +
-> > + ? ? ? ? ? ? ? s = sg_next(s);
-> > +
-> > + ? ? ? ? ? ? ? if (s->offset || (size & ~PAGE_MASK) || size + s->length > max) {
-> > + ? ? ? ? ? ? ? ? ? ? ? if (__map_sg_chunk(dev, start, size, &dma->dma_address,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? dir) < 0)
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto bad_mapping;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? dma->dma_address += offset;
-> > + ? ? ? ? ? ? ? ? ? ? ? dma->dma_length = size - offset;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? size = offset = s->offset;
-> > + ? ? ? ? ? ? ? ? ? ? ? start = s;
-> > + ? ? ? ? ? ? ? ? ? ? ? dma = sg_next(dma);
-> > + ? ? ? ? ? ? ? ? ? ? ? count += 1;
-> > + ? ? ? ? ? ? ? }
-> > + ? ? ? ? ? ? ? size += s->length;
-> > + ? ? ? }
-> > + ? ? ? if (__map_sg_chunk(dev, start, size, &dma->dma_address, dir) < 0)
-> > + ? ? ? ? ? ? ? goto bad_mapping;
-> > +
-> > + ? ? ? dma->dma_address += offset;
-> > + ? ? ? dma->dma_length = size - offset;
-> > +
-> > + ? ? ? return count+1;
-> > +
-> > +bad_mapping:
-> > + ? ? ? for_each_sg(sg, s, count, i)
-> > + ? ? ? ? ? ? ? __iommu_remove_mapping(dev, sg_dma_address(s), sg_dma_len(s));
-> > + ? ? ? return 0;
-> > +}
-> > +
-> This looks that the given sg list specifies the list of physical
-> memory chunks and
-> the list of IO virtual memory chunks at the same time after calling
-> arm_dma_map_sg().
-> It can happen that dma_address and dma_length of a sg entry does not
-> correspond to
-> physical memory information of the sg entry.
+> From: Arnd Bergmann<arnd@arndb.de>
 
-Right, that's how it is designed. If fact sg entries describes 2 independent 
-lists - one for physical memory chunks and one for virtual memory chunks. 
-It might happen that the whole scattered physical memory can be mapped into
-contiguous virtual memory chunk, what result in only one element describing
-the io dma addresses. Here is the respective paragraph from 
-Documentation/DMA-API-HOWTO.txt (lines 511-517):
+> It is possible to build a tegra kernel without localtimer
+> support, so the tegra specific parts should only be built
+> when that is indeed enabled.
 
-'The implementation is free to merge several consecutive sglist entries
-into one (e.g. if DMA mapping is done with PAGE_SIZE granularity, any
-consecutive sglist entries can be merged into one provided the first one
-ends and the second one starts on a page boundary - in fact this is a huge
-advantage for cards which either cannot do scatter-gather or have very
-limited number of scatter-gather entries) and returns the actual number
-of sg entries it mapped them to. On failure 0 is returned.'
+> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
+> ---
+>   arch/arm/mach-tegra/Makefile |    3 ++-
+>   1 files changed, 2 insertions(+), 1 deletions(-)
 
-> I think it is beneficial for handling IO virtual memory.
-> 
-> However, I worry about any other problems caused by a single sg entry contains
-> information from 2 different context.
+> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+> index e120ff5..a956df8 100644
+> --- a/arch/arm/mach-tegra/Makefile
+> +++ b/arch/arm/mach-tegra/Makefile
+> @@ -13,7 +13,8 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
+>   obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-tegra20-tables.o
+>   obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= pinmux-tegra30-tables.o
+>   obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
+> -obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
+> +obj-$(CONFIG_SMP)                       += platsmp.o headsmp.o
 
-What do you mean by the 'context'. DMA mapping assumes that a single call to 
-dma_map_sg maps a single memory buffer.
+   Could use the chance to indent here with tabs instead of spaces, like below.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> +obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+
+WBR, Sergei
