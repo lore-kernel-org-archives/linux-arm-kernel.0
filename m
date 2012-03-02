@@ -1,873 +1,167 @@
-From: niklas.hernaeus@stericsson.com (Niklas Hernaeus)
-Date: Fri, 2 Mar 2012 16:52:47 +0100
-Subject: [PATCH] Initial Device Tree system for Snowball
-Message-ID: <1330703567-17925-1-git-send-email-niklas.hernaeus@stericsson.com>
+From: jason@lakedaemon.net (Jason)
+Date: Fri, 2 Mar 2012 11:27:38 -0500
+Subject: [PATCH 3/4] ARM: kirkwood: convert rtc-mv to fdt.
+In-Reply-To: <20120302071939.A1BE83E2D8A@localhost>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
+ <20120302071939.A1BE83E2D8A@localhost>
+Message-ID: <20120302162738.GH11986@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Niklas Hernaeus <niklas.hernaeus@linaro.org>
+On Fri, Mar 02, 2012 at 01:19:39AM -0600, Grant Likely wrote:
+> On Thu,  1 Mar 2012 18:20:54 +0000, Jason Cooper <jason@lakedaemon.net> wrote:
+> > The comment at mach-kirkwood/common.c:469, says this device is in every
+> > kirkwood board.  So, it is placed in kirkwood.dtsi.
+> > 
+> > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> > ---
+> >  arch/arm/boot/dts/kirkwood.dtsi   |    6 ++++++
+> >  arch/arm/mach-kirkwood/board-dt.c |    1 -
+> >  arch/arm/mach-kirkwood/common.c   |    2 +-
+> >  arch/arm/mach-kirkwood/common.h   |    1 -
+> >  drivers/rtc/rtc-mv.c              |   19 +++++++++++++++++++
+> >  5 files changed, 26 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> > index 771c6bb..5fb185c 100644
+> > --- a/arch/arm/boot/dts/kirkwood.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> > @@ -2,5 +2,11 @@
+> >  
+> >  / {
+> >  	compatible = "marvell,kirkwood";
+> > +
+> > +	rtc at f1010300 {
+> > +		compatible = "marvell,rtc";
+> > +		reg = <0xf1010300 0x1f>;
+> > +		interrupts = <53>;
+> > +	};
+> >  };
+> >  
+> > diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> > index a0cc28b..6fc41ae 100644
+> > --- a/arch/arm/mach-kirkwood/board-dt.c
+> > +++ b/arch/arm/mach-kirkwood/board-dt.c
+> > @@ -135,7 +135,6 @@ static void __init kirkwood_dt_init(void)
+> >  #endif
+> >  
+> >  	/* internal devices that every board has */
+> > -	kirkwood_rtc_init();
+> >  	kirkwood_wdt_init();
+> >  	kirkwood_xor0_init();
+> >  	kirkwood_xor1_init();
+> > diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> > index 167b6c8..0c0375f 100644
+> > --- a/arch/arm/mach-kirkwood/common.c
+> > +++ b/arch/arm/mach-kirkwood/common.c
+> > @@ -163,7 +163,7 @@ void __init kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
+> >  /*****************************************************************************
+> >   * SoC RTC
+> >   ****************************************************************************/
+> > -void __init kirkwood_rtc_init(void)
+> > +static void __init kirkwood_rtc_init(void)
+> 
+> This undoes the code changed in the previous patch.  If you reorder the patches then
+> this change goes away in both.
 
-This is the base system for using Device Tree for Snowball.
-The new boardfile is a slightly modified copy of the original board file,
-so new Device Tree stuff can simply be added and code removed, while
-functionality stays the same.
+My goal was to make sure the series could compile with and without fdt
+no matter where a bisect might land in the series.  What would cause a
+reorder?
 
-Signed-off-by: Niklas Hernaeus <niklas.hernaeus@linaro.org>
----
- arch/arm/boot/dts/snowball.dts          |   32 ++
- arch/arm/mach-ux500/Kconfig             |   17 +-
- arch/arm/mach-ux500/Makefile            |    5 +-
- arch/arm/mach-ux500/board-mop500-dt.c   |  729 +++++++++++++++++++++++++++++++
- arch/arm/mach-ux500/include/mach/irqs.h |    2 +-
- 5 files changed, 779 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/snowball.dts
- create mode 100644 arch/arm/mach-ux500/board-mop500-dt.c
+> >  {
+> >  	orion_rtc_init(RTC_PHYS_BASE, IRQ_KIRKWOOD_RTC);
+> >  }
+> > diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+> > index c382447..ca08826 100644
+> > --- a/arch/arm/mach-kirkwood/common.h
+> > +++ b/arch/arm/mach-kirkwood/common.h
+> > @@ -53,7 +53,6 @@ void kirkwood_restart(char, const char *);
+> >  
+> >  char *kirkwood_id(void);
+> >  void kirkwood_l2_init(void);
+> > -void kirkwood_rtc_init(void);
+> >  void kirkwood_wdt_init(void);
+> >  void kirkwood_xor0_init(void);
+> >  void kirkwood_xor1_init(void);
+> > diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+> > index 768e2ed..38abbf7 100644
+> > --- a/drivers/rtc/rtc-mv.c
+> > +++ b/drivers/rtc/rtc-mv.c
+> > @@ -12,6 +12,8 @@
+> >  #include <linux/bcd.h>
+> >  #include <linux/io.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of.h>
+> >  #include <linux/delay.h>
+> >  #include <linux/gfp.h>
+> >  #include <linux/module.h>
+> > @@ -218,10 +220,15 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
+> >  {
+> >  	struct resource *res;
+> >  	struct rtc_plat_data *pdata;
+> > +	struct device_node *np = pdev->dev.of_node;
+> >  	resource_size_t size;
+> >  	u32 rtc_time;
+> >  
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +
+> > +	if (np)
+> > +		of_address_to_resource(np, 0, res);
+> > +
+> 
+> This should not be needed.  The of_platform_populate() code should have
+> filled the platform_device with mem resources.
 
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-new file mode 100644
-index 0000000..02305fb
---- /dev/null
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright 2011 ST-Ericsson AB
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+
-+/ {
-+	model = "Calao Systems Snowball platform with device tree";
-+	compatible = "calaosystems,snowball-a9500";
-+
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	soc-u9500 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+	};
-+};
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 52af004..be7e4fe 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -27,19 +27,22 @@ menu "Ux500 target platform (boards)"
- config MACH_U8500
- 	bool "U8500 Development platform"
- 	depends on UX500_SOC_DB8500
-+	depends on !USE_OF
- 	select TPS6105X
- 	help
- 	  Include support for the mop500 development platform.
- 
- config MACH_HREFV60
--       bool "U85000 Development platform, HREFv60 version"
--       depends on UX500_SOC_DB8500
--       help
--         Include support for the HREFv60 new development platform.
-+	bool "U85000 Development platform, HREFv60 version"
-+	depends on UX500_SOC_DB8500
-+	depends on !USE_OF
-+	help
-+	  Include support for the HREFv60 new development platform.
- 
- config MACH_SNOWBALL
- 	bool "U8500 Snowball platform"
- 	depends on UX500_SOC_DB8500
-+	depends on !USE_OF
- 	select MACH_U8500
- 	help
- 	  Include support for the snowball development platform.
-@@ -49,6 +52,12 @@ config MACH_U5500
- 	depends on UX500_SOC_DB5500
- 	help
- 	  Include support for the U5500 development platform.
-+config MACH_UX500_DT
-+	def_bool y if USE_OF
-+	depends on UX500_SOC_DB8500 || UX500_SOC_DB5500
-+
-+config MACH_MOP500
-+	def_bool y if MACH_U8500 || MACH_UX500_DT
- endmenu
- 
- config UX500_DEBUG_UART
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index 6bd2f45..05bee25 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -7,7 +7,10 @@ obj-y				:= clock.o cpu.o devices.o devices-common.o \
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_UX500_SOC_DB5500)	+= cpu-db5500.o dma-db5500.o
- obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o
--obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
-+
-+obj-$(CONFIG_MACH_UX500_DT)    += board-mop500-dt.o
-+obj-$(CONFIG_MACH_U8500)       += board-mop500.o
-+obj-$(CONFIG_MACH_MOP500)      += board-mop500-sdi.o \
- 				board-mop500-regulators.o \
- 				board-mop500-uib.o board-mop500-stuib.o \
- 				board-mop500-u8500uib.o \
-diff --git a/arch/arm/mach-ux500/board-mop500-dt.c b/arch/arm/mach-ux500/board-mop500-dt.c
-new file mode 100644
-index 0000000..33f4a83
---- /dev/null
-+++ b/arch/arm/mach-ux500/board-mop500-dt.c
-@@ -0,0 +1,729 @@
-+/*
-+ * Copyright (C) 2008-2009 ST-Ericsson
-+ *
-+ * Author: Srinidhi KASAGAR <srinidhi.kasagar@stericsson.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/i2c.h>
-+#include <linux/gpio.h>
-+#include <linux/amba/bus.h>
-+#include <linux/amba/pl022.h>
-+#include <linux/amba/serial.h>
-+#include <linux/spi/spi.h>
-+#include <linux/mfd/abx500/ab8500.h>
-+#include <linux/regulator/ab8500.h>
-+#include <linux/mfd/tc3589x.h>
-+#include <linux/mfd/tps6105x.h>
-+#include <linux/mfd/abx500/ab8500-gpio.h>
-+#include <linux/leds-lp5521.h>
-+#include <linux/input.h>
-+#include <linux/smsc911x.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/delay.h>
-+
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+
-+#include <linux/leds.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/hardware/gic.h>
-+
-+#include <plat/i2c.h>
-+#include <plat/ste_dma40.h>
-+#include <plat/pincfg.h>
-+#include <plat/gpio-nomadik.h>
-+
-+#include <mach/hardware.h>
-+#include <mach/setup.h>
-+#include <mach/devices.h>
-+#include <mach/irqs.h>
-+
-+#include "pins-db8500.h"
-+#include "ste-dma40-db8500.h"
-+#include "devices-db8500.h"
-+#include "board-mop500.h"
-+#include "board-mop500-regulators.h"
-+
-+static struct gpio_led snowball_led_array[] = {
-+	{
-+		.name = "user_led",
-+		.default_trigger = "none",
-+		.gpio = 142,
-+	},
-+};
-+
-+static struct gpio_led_platform_data snowball_led_data = {
-+	.leds = snowball_led_array,
-+	.num_leds = ARRAY_SIZE(snowball_led_array),
-+};
-+
-+static struct platform_device snowball_led_dev = {
-+	.name = "leds-gpio",
-+	.dev = {
-+		.platform_data = &snowball_led_data,
-+	},
-+};
-+
-+static struct ab8500_gpio_platform_data ab8500_gpio_pdata = {
-+	.gpio_base		= MOP500_AB8500_GPIO(0),
-+	.irq_base		= MOP500_AB8500_VIR_GPIO_IRQ_BASE,
-+	/* config_reg is the initial configuration of ab8500 pins.
-+	 * The pins can be configured as GPIO or alt functions based
-+	 * on value present in GpioSel1 to GpioSel6 and AlternatFunction
-+	 * register. This is the array of 7 configuration settings.
-+	 * One has to compile time decide these settings. Below is the
-+	 * explanation of these setting
-+	 * GpioSel1 = 0x00 => Pins GPIO1 to GPIO8 are not used as GPIO
-+	 * GpioSel2 = 0x1E => Pins GPIO10 to GPIO13 are configured as GPIO
-+	 * GpioSel3 = 0x80 => Pin GPIO24 is configured as GPIO
-+	 * GpioSel4 = 0x01 => Pin GPIo25 is configured as GPIO
-+	 * GpioSel5 = 0x7A => Pins GPIO34, GPIO36 to GPIO39 are conf as GPIO
-+	 * GpioSel6 = 0x00 => Pins GPIO41 & GPIo42 are not configured as GPIO
-+	 * AlternaFunction = 0x00 => If Pins GPIO10 to 13 are not configured
-+	 * as GPIO then this register selectes the alternate fucntions
-+	 */
-+	.config_reg		= {0x00, 0x1E, 0x80, 0x01,
-+					0x7A, 0x00, 0x00},
-+};
-+
-+static struct gpio_keys_button snowball_key_array[] = {
-+	{
-+		.gpio           = 32,
-+		.type           = EV_KEY,
-+		.code           = KEY_1,
-+		.desc           = "userpb",
-+		.active_low     = 1,
-+		.debounce_interval = 50,
-+		.wakeup         = 1,
-+	},
-+	{
-+		.gpio           = 151,
-+		.type           = EV_KEY,
-+		.code           = KEY_2,
-+		.desc           = "extkb1",
-+		.active_low     = 1,
-+		.debounce_interval = 50,
-+		.wakeup         = 1,
-+	},
-+	{
-+		.gpio           = 152,
-+		.type           = EV_KEY,
-+		.code           = KEY_3,
-+		.desc           = "extkb2",
-+		.active_low     = 1,
-+		.debounce_interval = 50,
-+		.wakeup         = 1,
-+	},
-+	{
-+		.gpio           = 161,
-+		.type           = EV_KEY,
-+		.code           = KEY_4,
-+		.desc           = "extkb3",
-+		.active_low     = 1,
-+		.debounce_interval = 50,
-+		.wakeup         = 1,
-+	},
-+	{
-+		.gpio           = 162,
-+		.type           = EV_KEY,
-+		.code           = KEY_5,
-+		.desc           = "extkb4",
-+		.active_low     = 1,
-+		.debounce_interval = 50,
-+		.wakeup         = 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data snowball_key_data = {
-+	.buttons        = snowball_key_array,
-+	.nbuttons       = ARRAY_SIZE(snowball_key_array),
-+};
-+
-+static struct platform_device snowball_key_dev = {
-+	.name           = "gpio-keys",
-+	.id             = -1,
-+	.dev            = {
-+		.platform_data  = &snowball_key_data,
-+	}
-+};
-+
-+static struct smsc911x_platform_config snowball_sbnet_cfg = {
-+	.irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH,
-+	.irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL,
-+	.flags = SMSC911X_USE_16BIT | SMSC911X_FORCE_INTERNAL_PHY,
-+	.shift = 1,
-+};
-+
-+static struct resource sbnet_res[] = {
-+	{
-+		.name = "smsc911x-memory",
-+		.start = (0x5000 << 16),
-+		.end  =  (0x5000 << 16) + 0xffff,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	{
-+		.start = NOMADIK_GPIO_TO_IRQ(140),
-+		.end = NOMADIK_GPIO_TO_IRQ(140),
-+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
-+	},
-+};
-+
-+static struct platform_device snowball_sbnet_dev = {
-+	.name           = "smsc911x",
-+	.num_resources  = ARRAY_SIZE(sbnet_res),
-+	.resource       = sbnet_res,
-+	.dev            = {
-+		.platform_data = &snowball_sbnet_cfg,
-+	},
-+};
-+
-+static struct ab8500_platform_data ab8500_platdata = {
-+	.irq_base	= MOP500_AB8500_IRQ_BASE,
-+	.regulator_reg_init = ab8500_regulator_reg_init,
-+	.num_regulator_reg_init	= ARRAY_SIZE(ab8500_regulator_reg_init),
-+	.regulator	= ab8500_regulators,
-+	.num_regulator	= ARRAY_SIZE(ab8500_regulators),
-+	.gpio		= &ab8500_gpio_pdata,
-+};
-+
-+static struct resource ab8500_resources[] = {
-+	[0] = {
-+		.start	= IRQ_DB8500_AB8500,
-+		.end	= IRQ_DB8500_AB8500,
-+		.flags	= IORESOURCE_IRQ
-+	}
-+};
-+
-+struct platform_device ab8500_device = {
-+	.name = "ab8500-i2c",
-+	.id = 0,
-+	.dev = {
-+		.platform_data = &ab8500_platdata,
-+	},
-+	.num_resources = 1,
-+	.resource = ab8500_resources,
-+};
-+
-+/*
-+ * TPS61052
-+ */
-+
-+static struct tps6105x_platform_data mop500_tps61052_data = {
-+	.mode = TPS6105X_MODE_VOLTAGE,
-+	.regulator_data = &tps61052_regulator,
-+};
-+
-+/*
-+ * TC35892
-+ */
-+
-+static void mop500_tc35892_init(struct tc3589x *tc3589x, unsigned int base)
-+{
-+	mop500_sdi_tc35892_init();
-+}
-+
-+static struct tc3589x_gpio_platform_data mop500_tc35892_gpio_data = {
-+	.gpio_base	= MOP500_EGPIO(0),
-+	.setup		= mop500_tc35892_init,
-+};
-+
-+static struct tc3589x_platform_data mop500_tc35892_data = {
-+	.block		= TC3589x_BLOCK_GPIO,
-+	.gpio		= &mop500_tc35892_gpio_data,
-+	.irq_base	= MOP500_EGPIO_IRQ_BASE,
-+};
-+
-+static struct lp5521_led_config lp5521_pri_led[] = {
-+       [0] = {
-+	       .chan_nr = 0,
-+	       .led_current = 0x2f,
-+	       .max_current = 0x5f,
-+       },
-+       [1] = {
-+	       .chan_nr = 1,
-+	       .led_current = 0x2f,
-+	       .max_current = 0x5f,
-+       },
-+       [2] = {
-+	       .chan_nr = 2,
-+	       .led_current = 0x2f,
-+	       .max_current = 0x5f,
-+       },
-+};
-+
-+static struct lp5521_platform_data __initdata lp5521_pri_data = {
-+       .label = "lp5521_pri",
-+       .led_config     = &lp5521_pri_led[0],
-+       .num_channels   = 3,
-+       .clock_mode     = LP5521_CLOCK_EXT,
-+};
-+
-+static struct lp5521_led_config lp5521_sec_led[] = {
-+       [0] = {
-+	       .chan_nr = 0,
-+	       .led_current = 0x2f,
-+	       .max_current = 0x5f,
-+       },
-+       [1] = {
-+	       .chan_nr = 1,
-+	       .led_current = 0x2f,
-+	       .max_current = 0x5f,
-+       },
-+       [2] = {
-+	       .chan_nr = 2,
-+	       .led_current = 0x2f,
-+	       .max_current = 0x5f,
-+       },
-+};
-+
-+static struct lp5521_platform_data __initdata lp5521_sec_data = {
-+       .label = "lp5521_sec",
-+       .led_config     = &lp5521_sec_led[0],
-+       .num_channels   = 3,
-+       .clock_mode     = LP5521_CLOCK_EXT,
-+};
-+
-+static struct i2c_board_info __initdata mop500_i2c0_devices[] = {
-+	{
-+		I2C_BOARD_INFO("tc3589x", 0x42),
-+		.irq		= NOMADIK_GPIO_TO_IRQ(217),
-+		.platform_data  = &mop500_tc35892_data,
-+	},
-+	/* I2C0 devices only available prior to HREFv60 */
-+	{
-+		I2C_BOARD_INFO("tps61052", 0x33),
-+		.platform_data  = &mop500_tps61052_data,
-+	},
-+};
-+
-+#define NUM_PRE_V60_I2C0_DEVICES 1
-+
-+static struct i2c_board_info __initdata mop500_i2c2_devices[] = {
-+	{
-+		/* lp5521 LED driver, 1st device */
-+		I2C_BOARD_INFO("lp5521", 0x33),
-+		.platform_data = &lp5521_pri_data,
-+	},
-+	{
-+		/* lp5521 LED driver, 2st device */
-+		I2C_BOARD_INFO("lp5521", 0x34),
-+		.platform_data = &lp5521_sec_data,
-+	},
-+	{
-+		/* Light sensor Rohm BH1780GLI */
-+		I2C_BOARD_INFO("bh1780", 0x29),
-+	},
-+};
-+
-+#define U8500_I2C_CONTROLLER(id, _slsu, _tft, _rft, clk, t_out, _sm)	\
-+static struct nmk_i2c_controller u8500_i2c##id##_data = { \
-+	/*				\
-+	 * slave data setup time, which is	\
-+	 * 250 ns,100ns,10ns which is 14,6,2	\
-+	 * respectively for a 48 Mhz	\
-+	 * i2c clock			\
-+	 */				\
-+	.slsu		= _slsu,	\
-+	/* Tx FIFO threshold */		\
-+	.tft		= _tft,		\
-+	/* Rx FIFO threshold */		\
-+	.rft		= _rft,		\
-+	/* std. mode operation */	\
-+	.clk_freq	= clk,		\
-+	/* Slave response timeout(ms) */\
-+	.timeout	= t_out,	\
-+	.sm		= _sm,		\
-+}
-+
-+/*
-+ * The board uses 4 i2c controllers, initialize all of
-+ * them with slave data setup time of 250 ns,
-+ * Tx & Rx FIFO threshold values as 8 and standard
-+ * mode of operation
-+ */
-+U8500_I2C_CONTROLLER(0, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(1, 0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(2,	0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
-+U8500_I2C_CONTROLLER(3,	0xe, 1, 8, 100000, 200, I2C_FREQ_MODE_FAST);
-+
-+static void __init mop500_i2c_init(void)
-+{
-+	db8500_add_i2c0(&u8500_i2c0_data);
-+	db8500_add_i2c1(&u8500_i2c1_data);
-+	db8500_add_i2c2(&u8500_i2c2_data);
-+	db8500_add_i2c3(&u8500_i2c3_data);
-+}
-+
-+static struct gpio_keys_button mop500_gpio_keys[] = {
-+	{
-+		.desc			= "SFH7741 Proximity Sensor",
-+		.type			= EV_SW,
-+		.code			= SW_FRONT_PROXIMITY,
-+		.active_low		= 0,
-+		.can_disable		= 1,
-+	}
-+};
-+
-+static struct regulator *prox_regulator;
-+static int mop500_prox_activate(struct device *dev);
-+static void mop500_prox_deactivate(struct device *dev);
-+
-+static struct gpio_keys_platform_data mop500_gpio_keys_data = {
-+	.buttons	= mop500_gpio_keys,
-+	.nbuttons	= ARRAY_SIZE(mop500_gpio_keys),
-+	.enable		= mop500_prox_activate,
-+	.disable	= mop500_prox_deactivate,
-+};
-+
-+static struct platform_device mop500_gpio_keys_device = {
-+	.name	= "gpio-keys",
-+	.id	= 0,
-+	.dev	= {
-+		.platform_data	= &mop500_gpio_keys_data,
-+	},
-+};
-+
-+static int mop500_prox_activate(struct device *dev)
-+{
-+	prox_regulator = regulator_get(&mop500_gpio_keys_device.dev,
-+						"vcc");
-+	if (IS_ERR(prox_regulator)) {
-+		dev_err(&mop500_gpio_keys_device.dev,
-+			"no regulator\n");
-+		return PTR_ERR(prox_regulator);
-+	}
-+	regulator_enable(prox_regulator);
-+	return 0;
-+}
-+
-+static void mop500_prox_deactivate(struct device *dev)
-+{
-+	regulator_disable(prox_regulator);
-+	regulator_put(prox_regulator);
-+}
-+
-+/* add any platform devices here - TODO */
-+static struct platform_device *mop500_platform_devs[] __initdata = {
-+	&mop500_gpio_keys_device,
-+	&ab8500_device,
-+};
-+
-+#ifdef CONFIG_STE_DMA40
-+static struct stedma40_chan_cfg ssp0_dma_cfg_rx = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_PERIPH_TO_MEM,
-+	.src_dev_type =  DB8500_DMA_DEV8_SSP0_RX,
-+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+};
-+
-+static struct stedma40_chan_cfg ssp0_dma_cfg_tx = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_MEM_TO_PERIPH,
-+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
-+	.dst_dev_type = DB8500_DMA_DEV8_SSP0_TX,
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+};
-+#endif
-+
-+static struct pl022_ssp_controller ssp0_platform_data = {
-+	.bus_id = 0,
-+#ifdef CONFIG_STE_DMA40
-+	.enable_dma = 1,
-+	.dma_filter = stedma40_filter,
-+	.dma_rx_param = &ssp0_dma_cfg_rx,
-+	.dma_tx_param = &ssp0_dma_cfg_tx,
-+#else
-+	.enable_dma = 0,
-+#endif
-+	/* on this platform, gpio 31,142,144,214 &
-+	 * 224 are connected as chip selects
-+	 */
-+	.num_chipselect = 5,
-+};
-+
-+static void __init mop500_spi_init(void)
-+{
-+	db8500_add_ssp0(&ssp0_platform_data);
-+}
-+
-+#ifdef CONFIG_STE_DMA40
-+static struct stedma40_chan_cfg uart0_dma_cfg_rx = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_PERIPH_TO_MEM,
-+	.src_dev_type =  DB8500_DMA_DEV13_UART0_RX,
-+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+};
-+
-+static struct stedma40_chan_cfg uart0_dma_cfg_tx = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_MEM_TO_PERIPH,
-+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
-+	.dst_dev_type = DB8500_DMA_DEV13_UART0_TX,
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+};
-+
-+static struct stedma40_chan_cfg uart1_dma_cfg_rx = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_PERIPH_TO_MEM,
-+	.src_dev_type =  DB8500_DMA_DEV12_UART1_RX,
-+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+};
-+
-+static struct stedma40_chan_cfg uart1_dma_cfg_tx = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_MEM_TO_PERIPH,
-+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
-+	.dst_dev_type = DB8500_DMA_DEV12_UART1_TX,
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+};
-+
-+static struct stedma40_chan_cfg uart2_dma_cfg_rx = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_PERIPH_TO_MEM,
-+	.src_dev_type =  DB8500_DMA_DEV11_UART2_RX,
-+	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+};
-+
-+static struct stedma40_chan_cfg uart2_dma_cfg_tx = {
-+	.mode = STEDMA40_MODE_LOGICAL,
-+	.dir = STEDMA40_MEM_TO_PERIPH,
-+	.src_dev_type = STEDMA40_DEV_SRC_MEMORY,
-+	.dst_dev_type = DB8500_DMA_DEV11_UART2_TX,
-+	.src_info.data_width = STEDMA40_BYTE_WIDTH,
-+	.dst_info.data_width = STEDMA40_BYTE_WIDTH,
-+};
-+#endif
-+
-+
-+static pin_cfg_t mop500_pins_uart0[] = {
-+	GPIO0_U0_CTSn   | PIN_INPUT_PULLUP,
-+	GPIO1_U0_RTSn   | PIN_OUTPUT_HIGH,
-+	GPIO2_U0_RXD    | PIN_INPUT_PULLUP,
-+	GPIO3_U0_TXD    | PIN_OUTPUT_HIGH,
-+};
-+
-+#define PRCC_K_SOFTRST_SET      0x18
-+#define PRCC_K_SOFTRST_CLEAR    0x1C
-+static void ux500_uart0_reset(void)
-+{
-+	void __iomem *prcc_rst_set, *prcc_rst_clr;
-+
-+	prcc_rst_set = (void __iomem *)IO_ADDRESS(U8500_CLKRST1_BASE +
-+			PRCC_K_SOFTRST_SET);
-+	prcc_rst_clr = (void __iomem *)IO_ADDRESS(U8500_CLKRST1_BASE +
-+			PRCC_K_SOFTRST_CLEAR);
-+
-+	/* Activate soft reset PRCC_K_SOFTRST_CLEAR */
-+	writel((readl(prcc_rst_clr) | 0x1), prcc_rst_clr);
-+	udelay(1);
-+
-+	/* Release soft reset PRCC_K_SOFTRST_SET */
-+	writel((readl(prcc_rst_set) | 0x1), prcc_rst_set);
-+	udelay(1);
-+}
-+
-+static void ux500_uart0_init(void)
-+{
-+	int ret;
-+
-+	ret = nmk_config_pins(mop500_pins_uart0,
-+			ARRAY_SIZE(mop500_pins_uart0));
-+	if (ret < 0)
-+		pr_err("pl011: uart pins_enable failed\n");
-+}
-+
-+static void ux500_uart0_exit(void)
-+{
-+	int ret;
-+
-+	ret = nmk_config_pins_sleep(mop500_pins_uart0,
-+			ARRAY_SIZE(mop500_pins_uart0));
-+	if (ret < 0)
-+		pr_err("pl011: uart pins_disable failed\n");
-+}
-+
-+static struct amba_pl011_data uart0_plat = {
-+#ifdef CONFIG_STE_DMA40
-+	.dma_filter = stedma40_filter,
-+	.dma_rx_param = &uart0_dma_cfg_rx,
-+	.dma_tx_param = &uart0_dma_cfg_tx,
-+#endif
-+	.init = ux500_uart0_init,
-+	.exit = ux500_uart0_exit,
-+	.reset = ux500_uart0_reset,
-+};
-+
-+static struct amba_pl011_data uart1_plat = {
-+#ifdef CONFIG_STE_DMA40
-+	.dma_filter = stedma40_filter,
-+	.dma_rx_param = &uart1_dma_cfg_rx,
-+	.dma_tx_param = &uart1_dma_cfg_tx,
-+#endif
-+};
-+
-+static struct amba_pl011_data uart2_plat = {
-+#ifdef CONFIG_STE_DMA40
-+	.dma_filter = stedma40_filter,
-+	.dma_rx_param = &uart2_dma_cfg_rx,
-+	.dma_tx_param = &uart2_dma_cfg_tx,
-+#endif
-+};
-+
-+static void __init mop500_uart_init(void)
-+{
-+	db8500_add_uart0(&uart0_plat);
-+	db8500_add_uart1(&uart1_plat);
-+	db8500_add_uart2(&uart2_plat);
-+}
-+
-+static struct platform_device *snowball_platform_devs[] __initdata = {
-+	&snowball_led_dev,
-+	&snowball_key_dev,
-+	&snowball_sbnet_dev,
-+	&ab8500_device,
-+};
-+
-+static void __init mop500_init_machine(void)
-+{
-+	int i2c0_devs;
-+
-+	mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
-+
-+	u8500_init_devices();
-+
-+	mop500_pins_init();
-+
-+	platform_add_devices(mop500_platform_devs,
-+			ARRAY_SIZE(mop500_platform_devs));
-+
-+	mop500_i2c_init();
-+	mop500_sdi_init();
-+	mop500_spi_init();
-+	mop500_uart_init();
-+
-+	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-+
-+	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
-+	i2c_register_board_info(2, mop500_i2c2_devices,
-+				ARRAY_SIZE(mop500_i2c2_devices));
-+
-+	/* This board has full regulator constraints */
-+	regulator_has_full_constraints();
-+}
-+
-+static void __init snowball_init_machine(void)
-+{
-+	int i2c0_devs;
-+
-+	u8500_init_devices();
-+
-+	snowball_pins_init();
-+
-+	platform_add_devices(snowball_platform_devs,
-+			ARRAY_SIZE(snowball_platform_devs));
-+
-+	mop500_i2c_init();
-+	snowball_sdi_init();
-+	mop500_spi_init();
-+	mop500_uart_init();
-+
-+	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-+	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
-+	i2c_register_board_info(2, mop500_i2c2_devices,
-+				ARRAY_SIZE(mop500_i2c2_devices));
-+
-+	/* This board has full regulator constraints */
-+	regulator_has_full_constraints();
-+}
-+
-+static void __init hrefv60_init_machine(void)
-+{
-+	int i2c0_devs;
-+
-+	/*
-+	 * The HREFv60 board removed a GPIO expander and routed
-+	 * all these GPIO pins to the internal GPIO controller
-+	 * instead.
-+	 */
-+	mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
-+
-+	u8500_init_devices();
-+
-+	hrefv60_pins_init();
-+
-+	platform_add_devices(mop500_platform_devs,
-+			ARRAY_SIZE(mop500_platform_devs));
-+
-+	mop500_i2c_init();
-+	hrefv60_sdi_init();
-+	mop500_spi_init();
-+	mop500_uart_init();
-+
-+	i2c0_devs = ARRAY_SIZE(mop500_i2c0_devices);
-+
-+	i2c0_devs -= NUM_PRE_V60_I2C0_DEVICES;
-+
-+	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
-+	i2c_register_board_info(2, mop500_i2c2_devices,
-+				ARRAY_SIZE(mop500_i2c2_devices));
-+
-+	/* This board has full regulator constraints */
-+	regulator_has_full_constraints();
-+}
-+
-+static const char * snowball_dt_board_compat[] = {
-+	"calaosystems,snowball-a9500",
-+	NULL
-+};
-+
-+MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
-+	/* Maintainer: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> */
-+	.atag_offset	= 0x100,
-+	.map_io		= u8500_map_io,
-+	.init_irq	= ux500_init_irq,
-+	/* we re-use nomadik timer here */
-+	.timer		= &ux500_timer,
-+	.handle_irq	= gic_handle_irq,
-+	.init_machine	= mop500_init_machine,
-+MACHINE_END
-+
-+MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
-+	.atag_offset	= 0x100,
-+	.map_io		= u8500_map_io,
-+	.init_irq	= ux500_init_irq,
-+	.timer		= &ux500_timer,
-+	.handle_irq	= gic_handle_irq,
-+	.init_machine	= hrefv60_init_machine,
-+MACHINE_END
-+
-+DT_MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
-+	.atag_offset	= 0x100,
-+	.map_io		= u8500_map_io,
-+	.init_irq	= ux500_init_irq,
-+	/* we re-use nomadik timer here */
-+	.timer		= &ux500_timer,
-+	.handle_irq	= gic_handle_irq,
-+	.init_machine	= snowball_init_machine,
-+	.dt_compat      = snowball_dt_board_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-ux500/include/mach/irqs.h b/arch/arm/mach-ux500/include/mach/irqs.h
-index 9db68d2..11e15d4 100644
---- a/arch/arm/mach-ux500/include/mach/irqs.h
-+++ b/arch/arm/mach-ux500/include/mach/irqs.h
-@@ -43,7 +43,7 @@
- /* This will be overridden by board-specific irq headers */
- #define IRQ_BOARD_END		IRQ_BOARD_START
- 
--#ifdef CONFIG_MACH_U8500
-+#if defined(CONFIG_MACH_U8500) || defined(CONFIG_MACH_MOP500)
- #include <mach/irqs-board-mop500.h>
- #endif
- 
--- 
-1.7.5.4
+fixed in next version.
+
+> >  	if (!res)
+> >  		return -ENODEV;
+> >  
+> > @@ -257,6 +264,8 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
+> >  
+> >  	pdata->irq = platform_get_irq(pdev, 0);
+> >  
+> > +	of_property_read_u32(np, "interrupts", &pdata->irq);
+> > +
+> 
+> Definitely don't do this.  Same as with memory regions, the irq will be
+> pre-populated in the platform device resource table.  platform_get_irq()
+> should already work.
+
+Same.
+
+> >  	platform_set_drvdata(pdev, pdata);
+> >  
+> >  	if (pdata->irq >= 0) {
+> > @@ -294,11 +303,21 @@ static int __exit mv_rtc_remove(struct platform_device *pdev)
+> >  	return 0;
+> >  }
+> >  
+> > +#ifdef CONFIG_OF
+> > +static struct of_device_id rtc_mv_of_match_table[] = {
+> > +	{ .compatible = "marvell,rtc", },
+> > +	{}
+> > +};
+> > +#else
+> > +#define rtc_mv_of_match_table NULL
+> > +#endif
+> > +
+> >  static struct platform_driver mv_rtc_driver = {
+> >  	.remove		= __exit_p(mv_rtc_remove),
+> >  	.driver		= {
+> >  		.name	= "rtc-mv",
+> >  		.owner	= THIS_MODULE,
+> > +		.of_match_table = rtc_mv_of_match_table,
+> 
+> should be:
+> 		.of_match_table = of_match_ptr(rtc_mv_of_match_table),
+> 
+> that would get rid of the #else clause above.
+
+fixed across kirkwood patches so far.
+
+Thanks for the review.
+
+Jason.
