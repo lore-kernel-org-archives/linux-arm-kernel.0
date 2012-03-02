@@ -1,78 +1,52 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 2 Mar 2012 17:50:20 +0100
-Subject: [PATCH 08/12] gpio/twl: Allocate irq_desc dynamically for SPARSE_IRQ
- support
+Date: Fri, 2 Mar 2012 17:50:18 +0100
+Subject: [PATCH 06/12] mfd: twl4030-irq: micro-optimization on IRQ handler
 In-Reply-To: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
 References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1330707024-23730-9-git-send-email-b-cousson@ti.com>
+Message-ID: <1330707024-23730-7-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not use the board pdata for irq_base, but allocate them dynamically
-to allow a proper support of SPARSE_IRQ.
+From: Felipe Balbi <balbi@ti.com>
 
-Fix an unneeded line wrap.
+__ffs() will be far faster than the for loop used.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/gpio/gpio-twl4030.c |   33 +++++++++++++++++----------------
- 1 files changed, 17 insertions(+), 16 deletions(-)
+ drivers/mfd/twl4030-irq.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
-index 697396c..49e5c6e 100644
---- a/drivers/gpio/gpio-twl4030.c
-+++ b/drivers/gpio/gpio-twl4030.c
-@@ -395,23 +395,26 @@ static int gpio_twl4030_remove(struct platform_device *pdev);
- static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+diff --git a/drivers/mfd/twl4030-irq.c b/drivers/mfd/twl4030-irq.c
+index faf3318..e6dc8f9 100644
+--- a/drivers/mfd/twl4030-irq.c
++++ b/drivers/mfd/twl4030-irq.c
+@@ -293,7 +293,6 @@ static unsigned twl4030_irq_base;
+  */
+ static irqreturn_t handle_twl4030_pih(int irq, void *devid)
  {
- 	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
--	int ret;
-+	int ret, irq_base;
+-	int		module_irq;
+ 	irqreturn_t	ret;
+ 	u8		pih_isr;
  
- 	/* maybe setup IRQs */
--	if (pdata->irq_base) {
--		if (is_module()) {
--			dev_err(&pdev->dev,
--				"can't dispatch IRQs from modules\n");
--			goto no_irqs;
--		}
--		ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO,
--					pdata->irq_base);
--		if (ret < 0)
--			return ret;
--		WARN_ON(ret != pdata->irq_base);
--		twl4030_gpio_irq_base = ret;
-+	if (is_module()) {
-+		dev_err(&pdev->dev, "can't dispatch IRQs from modules\n");
-+		goto no_irqs;
-+	}
-+
-+	irq_base = irq_alloc_descs(-1, 0, TWL4030_GPIO_MAX, 0);
-+	if (irq_base < 0) {
-+		dev_err(&pdev->dev, "Failed to alloc irq_descs\n");
-+		return irq_base;
+@@ -304,12 +303,13 @@ static irqreturn_t handle_twl4030_pih(int irq, void *devid)
+ 		return IRQ_NONE;
  	}
  
-+	ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO, irq_base);
-+	if (ret < 0)
-+		return ret;
+-	/* these handlers deal with the relevant SIH irq status */
+-	for (module_irq = twl4030_irq_base;
+-			pih_isr;
+-			pih_isr >>= 1, module_irq++) {
+-		if (pih_isr & 0x1)
+-			handle_nested_irq(module_irq);
++	while (pih_isr) {
++		unsigned long	pending = __ffs(pih_isr);
++		unsigned int	irq;
 +
-+	twl4030_gpio_irq_base = irq_base;
-+
- no_irqs:
- 	/*
- 	 * NOTE:  boards may waste power if they don't set pullups
-@@ -443,9 +446,7 @@ no_irqs:
++		pih_isr &= ~BIT(pending);
++		irq = pending + twl4030_irq_base;
++		handle_nested_irq(irq);
+ 	}
  
- 	ret = gpiochip_add(&twl_gpiochip);
- 	if (ret < 0) {
--		dev_err(&pdev->dev,
--				"could not register gpiochip, %d\n",
--				ret);
-+		dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
- 		twl_gpiochip.ngpio = 0;
- 		gpio_twl4030_remove(pdev);
- 	} else if (pdata->setup) {
+ 	return IRQ_HANDLED;
 -- 
 1.7.0.4
