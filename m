@@ -1,50 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 1 Mar 2012 16:11:21 -0800
-Subject: [PATCH] ARM: OMAP: hsmmc: add max_freq field
-In-Reply-To: <CACTFLAMCoKfQbTe2RLTvi1_CH0nKzAOthAwrifNe2+F2sf3uPA@mail.gmail.com>
-References: <1323868927-3738-1-git-send-email-zonque@gmail.com>
- <CANrkHUY3Zf4a2K5769Z=7Wng339zB6+z_Tgd4mOPChZ1RvZ=Kw@mail.gmail.com>
- <4EFC6992.4020501@gmail.com>
- <CACTFLAMCoKfQbTe2RLTvi1_CH0nKzAOthAwrifNe2+F2sf3uPA@mail.gmail.com>
-Message-ID: <20120302001121.GE18901@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 1 Mar 2012 17:13:59 -0700
+Subject: ARM: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
+Message-ID: <201203011713.59663.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As done for the other ep93xx machines in:
 
-* Daniel Mack <zonque@gmail.com> [120217 05:13]:
-> ping? Could anyone care for queueing this please?
+commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
+ARM: ep93xx: convert to MULTI_IRQ_HANDLER
+
+Now that there is a generic IRQ handler for multiple VIC devices use it
+for vision_ep9307 to help building multi platform kernels.
+
+Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: Ryan Mallon <rmallon@gmail.com>
+Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+
+---
+
+diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+index d5fb44f..d67d0b4 100644
+--- a/arch/arm/mach-ep93xx/vision_ep9307.c
++++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+@@ -34,6 +34,7 @@
+ #include <mach/ep93xx_spi.h>
+ #include <mach/gpio-ep93xx.h>
  
-I suggest Rajendra queue up omap_hsmmc.c patches as he's already
-patching it.
-
-Regards,
-
-Tony
-
- 
-> On Thu, Dec 29, 2011 at 2:22 PM, Daniel Mack <zonque@gmail.com> wrote:
-> > On 12/23/2011 04:40 PM, T Krishnamoorthy, Balaji wrote:
-> >> On Wed, Dec 14, 2011 at 6:52 PM, Daniel Mack <zonque@gmail.com> wrote:
-> >>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> >>> index 101cd31..8215ef9 100644
-> >>> --- a/drivers/mmc/host/omap_hsmmc.c
-> >>> +++ b/drivers/mmc/host/omap_hsmmc.c
-> >>> @@ -1927,8 +1927,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
-> >>> ? ? ? ?if (mmc_slot(host).vcc_aux_disable_is_sleep)
-> >>> ? ? ? ? ? ? ? ?mmc_slot(host).no_off = 1;
-> >>>
-> >>> - ? ? ? mmc->f_min ? ? ?= OMAP_MMC_MIN_CLOCK;
-> >>> - ? ? ? mmc->f_max ? ? ?= OMAP_MMC_MAX_CLOCK;
-> >>> + ? ? ? mmc->f_min = OMAP_MMC_MIN_CLOCK;
-> >>
-> >> Stray change for f_min ?
-> >
-> > No, this was intended. The indentation doesn't make sense anymore when
-> > not grouped with the f_max assignment.
-> >
-> > Other than that, what is necessary to get this picked? Tony? :)
-> >
-> >
-> > Thanks,
-> > Daniel
++#include <asm/hardware/vic.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/arch.h>
+@@ -361,6 +362,7 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= vision_map_io,
+ 	.init_irq	= ep93xx_init_irq,
++	.handle_irq	= vic_handle_irq,
+ 	.timer		= &ep93xx_timer,
+ 	.init_machine	= vision_init_machine,
+ 	.restart	= ep93xx_restart,
