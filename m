@@ -1,77 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 02 Mar 2012 10:03:12 +0100
-Subject: IIO irq allocation fails on AT91SAM9G45
-In-Reply-To: <20120229204853.GE16999@n2100.arm.linux.org.uk>
-References: <4F4E36E6.1010704@free-electrons.com>
- <4F4E8C0F.5090104@kernel.org> <20120229204853.GE16999@n2100.arm.linux.org.uk>
-Message-ID: <4F508CD0.20906@free-electrons.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 02 Mar 2012 14:36:54 +0530
+Subject: [PATCH 0/4] Start getting rid of pdata callbacks with
+ gpio_find_by_chip_name()
+In-Reply-To: <20120301185044.29210.44521.stgit@kaulin.local>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+Message-ID: <4F508DAE.9000005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/02/2012 21:48, Russell King - ARM Linux a ?crit :
-> On Wed, Feb 29, 2012 at 08:35:27PM +0000, Jonathan Cameron wrote:
->> On 02/29/2012 02:32 PM, Maxime Ripard wrote:
->>> Hi everyone,
->>>
->>> I'm working on adding the support for the AT91SAM9M10G45-EK board from
->>> Atmel for the at91_adc driver I previously posted, and I encounter some
->>> weird issue here.
->>>
->>> When calling the iio_allocate_trigger
->>> (http://lxr.free-electrons.com/source/drivers/staging/iio/industrialio-trigger.c?a=arm#L421)
->>> from my driver on the G45, it returns ENOMEM, while on the
->>> AT91SAM9G20-EK board, it works perfectly.
->>>
->>> Digging a bit into it, it seems that the call to irq_alloc_descs is
->>> returning the error (the value of CONFIG_IIO_CONSUMERS_PER_TRIGGER is 2
->>> in my configuration, which seems pretty reasonable and is the default
->>> value anyway), which is itself getting that return value from
->>> irq_expand_nr_irqs.
->>>
->>> Here, I'm left confused, I don't know this part of the kernel anymore,
->>> and most importantly, it seems to be pretty-much arch-independant, while
->>> the nature of my issue seems really platform-dependant.
->>>
->>> Do you have any clue of what's going on here ?
->> We ran into this originally on the pxa as well.   My guess is that
->> nr_irqs is not set high enough for that particular board.
->>
->> Looking back I can find some mention of a nasty bit of code that
->> just adds a bit of padding but I can't find it now.
->>
->> Anyhow, you probably have a line somewhere in the kernel log
->> saying something like:
->>
->> [    0.000000] NR_IRQS:288 nr_irqs:296 296
->>
->> NR_IRQS is typically the number of the SoC
->> nr_irqs should be large enough to accomodate those provided by
->> other peripherals.
->>
->> I also have a vague recollection that the problem goes away entirely
->> with sparse irqs?
-> 
-> Yes, because IRQs will be allocated above the last figure on that
-> line, up to IRQ_BITMAP_BITS which happens to be 8192 above NR_IRQS.
-> 
-> There's an issue though: if your on-SoC IRQ controller is already
-> using irq_alloc_descs(), it will fail if you want it to grab IRQs
-> below the last figure on that line, because those will have already
-> been allocated for you.
+Hi Tony,
 
-Ok, so using either the sparse irqs or changing the definition of
-NR_IRQS from 192 to 224 makes the problem go away.
+On Friday 02 March 2012 12:25 AM, Tony Lindgren wrote:
+> Hi all,
+>
+> This series adds gpio_find_by_name() that allows finding
+> GPIOs on specific gpio_chips. As the GPIO numbers can be
+> dynamic, it's hard to find the GPIO numbers from drivers
+> using them directly.
+>
+> So far we've dealt with this using platform specific callbacks,
+> but that is messy. This series removes the needs for these
+> callbacks for omap hsmmc driver. Further callbacks can be
+> removed people are OK with adding gpio_find_by_name().
+>
+> This series is based on the omap fixes-non-critical that's
+> needed for the arch/arm/mach-omap2 parts of this series.
 
-I guess the reason because I was not seeing this issue with the G20 is
-because it has less interrupt sources.
+I tested these on my beagle/panda/omap4sdp and they seem to
+work fine, also fixing the broken panda card detect (due to
+missing card_detect_irq in the board file). There are still
+issues however when I build twl4030-gpio as a module, which I
+already commented on, and the fact that the init sequence now
+works by luck :)
+The other issue also is that the multiple insmod/rmmod test
+suggested by Russell still fails, since the second time around
+the gpio_requests in the board callback fail because they are
+not freed when you do a module unload/unbind.
+That would need this patch from me to add the .teardown
+hooks
+http://marc.info/?l=linux-omap&m=133007767831297&w=2
 
-Anyway, I'm not sure about the augmenting the NR_IRQS fix. It seems to
-work pretty well, but might it have some weird side-effects ?
+regards,
+Rajendra
 
-Should I send a patch for it, or should I find another way to fix this ?
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>
+> Regards,
+>
+> Tony
+>
+> ---
+>
+> Tony Lindgren (4):
+>        gpiolib: Add gpiochip_find_by_name() and gpio_find_by_chip_name()
+>        mmc: omap_hsmmc: Use gpio_find_by_chip_name() for omap_hsmmc_gpio_init()
+>        mmc: omap_hsmmc: Use GPIO offset for external GPIO chips
+>        mmc: omap_hsmmc: Simplify init for twl6030 MMC card detect
+>
+>
+>   arch/arm/mach-omap2/board-3430sdp.c          |   13 +-
+>   arch/arm/mach-omap2/board-4430sdp.c          |   45 --------
+>   arch/arm/mach-omap2/board-cm-t35.c           |    8 -
+>   arch/arm/mach-omap2/board-devkit8000.c       |    7 -
+>   arch/arm/mach-omap2/board-igep0020.c         |    8 -
+>   arch/arm/mach-omap2/board-omap3beagle.c      |    9 +-
+>   arch/arm/mach-omap2/board-omap3evm.c         |    8 -
+>   arch/arm/mach-omap2/board-omap3pandora.c     |   13 +-
+>   arch/arm/mach-omap2/board-omap3stalker.c     |    8 -
+>   arch/arm/mach-omap2/board-omap3touchbook.c   |    7 -
+>   arch/arm/mach-omap2/board-omap4panda.c       |   52 ----------
+>   arch/arm/mach-omap2/board-zoom-peripherals.c |    7 -
+>   arch/arm/mach-omap2/hsmmc.c                  |    3 +
+>   arch/arm/mach-omap2/hsmmc.h                  |    5 +
+>   arch/arm/plat-omap/include/plat/mmc.h        |    3 +
+>   drivers/gpio/gpio-twl4030.c                  |    2
+>   drivers/gpio/gpiolib.c                       |   47 +++++++++
+>   drivers/mfd/twl6030-irq.c                    |   33 +++---
+>   drivers/mmc/host/omap_hsmmc.c                |  140 +++++++++++++++++++-------
+>   include/asm-generic/gpio.h                   |    3 -
+>   20 files changed, 204 insertions(+), 217 deletions(-)
+>
