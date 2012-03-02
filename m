@@ -1,170 +1,89 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 2 Mar 2012 17:31:13 +0100
-Subject: [PATCH] pinctrl: resurrect verbose pinmux-pins
-Message-ID: <1330705873-10798-1-git-send-email-linus.walleij@stericsson.com>
+From: jason@lakedaemon.net (Jason)
+Date: Fri, 2 Mar 2012 12:02:52 -0500
+Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
+In-Reply-To: <201203021648.52523.arnd@arndb.de>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <201203021456.47896.arnd@arndb.de>
+ <20120302153614.GG11986@titan.lakedaemon.net>
+ <201203021648.52523.arnd@arndb.de>
+Message-ID: <20120302170252.GJ11986@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Mar 02, 2012 at 04:48:51PM +0000, Arnd Bergmann wrote:
+> On Friday 02 March 2012, Jason wrote:
+> > > 
+> > > That would make wdt at fed20300/clock-frequency a phandle pointing to the
+> > > root property, which is not what we want here.
+> > 
+> > The 200000000 value is not the actual value used in most drivers [1],
+> > but rather the speed of the system clock [2] (hence, my inclination to
+> > make it a root property), the drivers have been pulling this number from
+> > a global variable [3] and dividing/rounding it as needed for their own needs
+> > [1].
+> 
+> Ah, I see. If you put a "clock-frequency" property into a device node,
+> it should definitely be the frequency used by that device, not the system
+> clock that it is derived from.
 
-This reintroduces the verbosity in the pinmux-pins file, now this
-file will list all pins, their names, owning device (and if it's
-a hog) and also in applicable cases the function and group making
-use of that pin right now.
+Whew, glad to know I'm not crazy.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/core.h   |    4 ++++
- drivers/pinctrl/pinmux.c |   34 +++++++++++++++++++++++++++++-----
- 2 files changed, 33 insertions(+), 5 deletions(-)
+> > Since it's derived from the SoC core [2], it would seem to make sense to
+> > have a root "clock-frequency" in the board dts.  Am I missing something?
+> > Is there a better way to do this?
+> 
+> The correct solution would be to use the clock binding, but I'm not sure
+> how far we are in making that final or usable.
+> 
+> > > > In any case, the simplest answer is to set clock-frequency in
+> > > > kirkwood-dreamplug.dts as a root node property, and then each driver
+> > > > that needs tclk, requests the clock-frequency from the root node.
+> > > > Hopefully, Grant can chime in on this one.
+> > > 
+> > > I think you can just pick a reasonable default value for
+> > > wdt at fed20300/clock-frequency, and let the board override that
+> > > by setting it to something else if necessary.
+> > 
+> > True, for now, I can just set clock-frequency for each device to the
+> > exact same value and we'll polish later once we have a better idea of
+> > the pattern it's following.
+> > 
+> > > I suppose this will also change a bit when kirkwood gets moved over to
+> > > generic clk support in the future and starts using the clk binding
+> > > instead of what you do now.
+> > 
+> > Yes, I don't want to over-think it, but I would like to make sure it's
+> > in the correct place, since it is a global property of the board.
+> 
+> Andrew Lunn said that he has a patch for plat-orion to use the generic
+> clock framework. I think we should look at that before introducing
+> a hack that will have to be removed again very soon.
 
-diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
-index e1dfdb3..0a52e39 100644
---- a/drivers/pinctrl/core.h
-+++ b/drivers/pinctrl/core.h
-@@ -12,6 +12,7 @@
- #include <linux/pinctrl/pinconf.h>
- 
- struct pinctrl_gpio_range;
-+struct pinmux_group;
- 
- /**
-  * struct pinctrl_dev - pin control class device
-@@ -77,6 +78,8 @@ struct pinctrl {
-  * @dynamic_name: if the name of this pin was dynamically allocated
-  * @lock: a lock to protect the descriptor structure
-  * @owner: the device holding this pin or NULL of no device has claimed it
-+ * @grp: the pinmux group used for this pin if it is used by a pin group
-+ *	or NULL
-  */
- struct pin_desc {
- 	struct pinctrl_dev *pctldev;
-@@ -86,6 +89,7 @@ struct pin_desc {
- 	/* These fields only added when supporting pinmux drivers */
- #ifdef CONFIG_PINMUX
- 	const char *owner;
-+	struct pinmux_group *grp;
- #endif
- };
- 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index f409f16..5785b09 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -76,11 +76,14 @@ int pinmux_check_ops(struct pinctrl_dev *pctldev)
-  * @pin: the pin number in the global pin space
-  * @owner: a representation of the owner of this pin; typically the device
-  *	name that controls its mux function, or the requested GPIO name
-+ * @grp: the pinmux group used for this pin or NULL of it is requested as
-+ *	a GPIO pin
-  * @gpio_range: the range matching the GPIO pin if this is a request for a
-  *	single GPIO pin
-  */
- static int pin_request(struct pinctrl_dev *pctldev,
- 		       int pin, const char *owner,
-+		       struct pinmux_group *grp,
- 		       struct pinctrl_gpio_range *gpio_range)
- {
- 	struct pin_desc *desc;
-@@ -104,6 +107,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
- 		goto out;
- 	}
- 	desc->owner = owner;
-+	desc->grp = grp;
- 	spin_unlock(&desc->lock);
- 
- 	/* Let each pin increase references to this module */
-@@ -181,6 +185,7 @@ static const char *pin_free(struct pinctrl_dev *pctldev, int pin,
- 	spin_lock(&desc->lock);
- 	owner = desc->owner;
- 	desc->owner = NULL;
-+	desc->grp = NULL;
- 	spin_unlock(&desc->lock);
- 	module_put(pctldev->owner);
- 
-@@ -208,7 +213,7 @@ int pinmux_request_gpio(struct pinctrl_dev *pctldev,
- 	if (!owner)
- 		return -EINVAL;
- 
--	ret = pin_request(pctldev, pin, owner, range);
-+	ret = pin_request(pctldev, pin, owner, NULL, range);
- 	if (ret < 0)
- 		kfree(owner);
- 
-@@ -259,10 +264,12 @@ int pinmux_gpio_direction(struct pinctrl_dev *pctldev,
-  * @pctldev: the device to take the pins on
-  * @owner: a representation of the owner of this pin; typically the device
-  *	name that controls its mux function
-+ * @grp: the pinmux group that will use the pins
-  * @group_selector: the group selector containing the pins to acquire
-  */
- static int acquire_pins(struct pinctrl_dev *pctldev,
- 			const char *owner,
-+			struct pinmux_group *grp,
- 			unsigned group_selector)
- {
- 	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
-@@ -281,7 +288,7 @@ static int acquire_pins(struct pinctrl_dev *pctldev,
- 
- 	/* Try to allocate all pins in this group, one by one */
- 	for (i = 0; i < num_pins; i++) {
--		ret = pin_request(pctldev, pins[i], owner, NULL);
-+		ret = pin_request(pctldev, pins[i], owner, grp, NULL);
- 		if (ret) {
- 			dev_err(pctldev->dev,
- 				"could not get request pin %d on device %s - conflicting mux mappings?\n",
-@@ -485,7 +492,7 @@ static int pinmux_enable_muxmap(struct pinctrl_dev *pctldev,
- 		return -ENOMEM;
- 	grp->func_selector = func_selector;
- 	grp->group_selector = group_selector;
--	ret = acquire_pins(pctldev, devname, group_selector);
-+	ret = acquire_pins(pctldev, devname, grp, group_selector);
- 	if (ret) {
- 		kfree(grp);
- 		return ret;
-@@ -606,13 +613,25 @@ static int pinmux_functions_show(struct seq_file *s, void *what)
- 	return 0;
- }
- 
-+static void pinmux_pins_show_groupinfo(struct seq_file *s,
-+				       struct pinctrl_dev *pctldev,
-+				       struct pinmux_group *grp)
-+{
-+	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
-+	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
-+
-+	seq_printf(s, " function: \"%s\" group: \"%s\"\n",
-+		   pmxops->get_function_name(pctldev, grp->func_selector),
-+		   pctlops->get_group_name(pctldev, grp->group_selector));
-+}
-+
- static int pinmux_pins_show(struct seq_file *s, void *what)
- {
- 	struct pinctrl_dev *pctldev = s->private;
- 	unsigned i, pin;
- 
- 	seq_puts(s, "Pinmux settings per pin\n");
--	seq_puts(s, "Format: pin (name): owner\n");
-+	seq_puts(s, "Format: pin (name): owner [function]\n");
- 
- 	/* The pin number can be retrived from the pin controller descriptor */
- 	for (i = 0; i < pctldev->desc->npins; i++) {
-@@ -629,10 +648,15 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
- 		    !strcmp(desc->owner, pinctrl_dev_get_name(pctldev)))
- 			is_hog = true;
- 
--		seq_printf(s, "pin %d (%s): %s%s\n", pin,
-+		seq_printf(s, "pin %d (%s): %s%s", pin,
- 			   desc->name ? desc->name : "unnamed",
- 			   desc->owner ? desc->owner : "UNCLAIMED",
- 			   is_hog ? " (HOG)" : "");
-+
-+		if (desc->grp)
-+			pinmux_pins_show_groupinfo(s, pctldev, desc->grp);
-+		else
-+			seq_printf(s, "\n");
- 	}
- 
- 	return 0;
--- 
-1.7.8
+I asked him for it earlier [1], apparently it's a very invasive patch
+series which breaks things.  I would like to look at it as a reference,
+even if applying it isn't a good idea.
+
+How about it, Andrew?
+
+> Kirkwood/orion is probably not a bad platform to add to the initial
+> set of platforms for which we use the common clk infrastructure,
+> so maybe the best way forward for you is to take Andrews patches
+> and build on top of that.
+
+Agreed.
+
+> It might mean that your follow-on patches get delayed until v3.5
+> instead of going into v3.4, but the initial code you have in arm-soc
+> is working already and you can work on getting it the clock code right
+> in the initial code.
+
+In [1] I was trying to setup a stand-in, eg kirkwood_get_clock() and
+kirkwood_put_clock() that could be replaced once the clock code lands.
+That way, we're on the right path, but not blocked waiting for the clock
+code.
+
+thx,
+
+Jason.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg162284.html
