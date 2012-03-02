@@ -1,95 +1,34 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 2 Mar 2012 22:38:18 +0100
-Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
- IRQ for board setup
-In-Reply-To: <4F512D72.1090002@ti.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-12-git-send-email-b-cousson@ti.com>
- <20120302181522.GC13967@legolas.emea.dhcp.ti.com>
- <20120302192058.GP18901@atomide.com> <4F512D72.1090002@ti.com>
-Message-ID: <4F513DCA.1070301@ti.com>
+From: alan@signal11.us (Alan Ott)
+Date: Fri, 02 Mar 2012 16:38:43 -0500
+Subject: [PATCH v2 0/6] ARM: Tegra: cleanup patches from Arnd Bergmann
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE861A54@HQMAIL01.nvidia.com>
+References: <1330721884-8495-1-git-send-email-alan@signal11.us>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BE861A54@HQMAIL01.nvidia.com>
+Message-ID: <4F513DE3.9020707@signal11.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/2/2012 9:28 PM, Cousson, Benoit wrote:
-> Hi Tony,
->
-> On 3/2/2012 8:20 PM, Tony Lindgren wrote:
->> * Felipe Balbi<balbi@ti.com> [120302 09:43]:
->>> Hi,
->>>
->>> On Fri, Mar 02, 2012 at 05:50:23PM +0100, Benoit Cousson wrote:
->>>> Card detect IRQ from the TWL6030 used to be provided to the MMC
->>>> controller code using a statically allocated IRQ scheme:
->>>>
->>>> card_detect_irq = TWL6030_IRQ_BASE + MMCDETECT_INTR_OFFSET;
->>>>
->>>> This is no longer valid in a SPARSE_IRQ context since there is no more
->>>> pre-defined TWL6030_IRQ_BASE.
->>>>
->>>> Return the proper card detect IRQ value in the
->>>> twl6030_mmc_card_detect_config
->>>> that will be called from the MMC controller.
->>>>
->>>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->>>> Cc: Felipe Balbi<balbi@ti.com>
->>>> Cc: Tony Lindgren<tony@atomide.com>
->>>> Cc: Rajendra Nayak<rnayak@ti.com>
->>>
->>> Reviewed-by: Felipe Balbi<balbi@ti.com>
->>>
->>>> ---
->>>> drivers/mfd/twl6030-irq.c | 3 ++-
->>>> 1 files changed, 2 insertions(+), 1 deletions(-)
->>>>
->>>> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
->>>> index a1c7183..4a63de2 100644
->>>> --- a/drivers/mfd/twl6030-irq.c
->>>> +++ b/drivers/mfd/twl6030-irq.c
->>>> @@ -308,7 +308,8 @@ int twl6030_mmc_card_detect_config(void)
->>>> ret);
->>>> return ret;
->>>> }
->>>> - return 0;
->>>> +
->>>> + return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
->>>> }
->>>> EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
->>>
->>> At some point this twl6030_mmc_card_detect_config() needs to vanish in
->>> favor of a better mechanism. Maybe passing the GPIO number an requiring
->>> the driver to request the GPIO, set its direction and use it as IRQ
->>> line.
->>>
->>> the only problem would arise if we end up hooking the Card Detect pin to
->>> a real IRQ line, but then we can use a flag to differentiate.
->>
->> I'm trying to leave out the need for this callback to pdata..
->> See mmc: omap_hsmmc: Simplify init for twl6030 MMC card detect
->> that does pretty much the same as Benoit's patch plus removes
->> the need for the callback.
->
-> That's cool. I did that patch to still have a working MMC after my TWL
-> series because I missed your MMC series :-(.
->
-> The patch #4 "mmc: omap_hsmmc: Simplify init for twl6030 MMC card
-> detect" is indeed simplifying a lot that IRQ mess.
->
-> I will check with that TWL series, but since you are already using the
-> twl6030_irq_base it should work without any trouble.
+On 03/02/2012 04:04 PM, Stephen Warren wrote:
+> Alan Ott wrote at Friday, March 02, 2012 1:58 PM:
+>> Sorry for the mess yesterday....
+>> This is V2 of Arnd's Patch series from yesterday. Hopefully this one will be
+>> smoother.
+> There was feedback on at least patches 4 and 5 that doesn't appear to
+> have been incorporated into this updated version.
 
-I created a for_3.4/twl_irq_gpio_fix branch based on irqdomain/next with 
-all the TWL + GPIO patches except the DTS and without the MMC hacks.
+Hi Stephen,
 
-And I merged it into your hsmmc-gpio branch. There is a small conflict 
-in gpio-twl4030 but otherwise it works on the SDP4430.
+For patch #4 (ARM: tegra: work around tegra THUMB2_KERNEL bug) I missed
+the last email in that series. I'm sorry, I'll drop this patch from v3.
 
-I cannot test remotely with Panda or Beagle, the animals are already 
-sleeping.
+For patch #5 (ARM: tegra: USB_ULPI needs USB), it didn't look to me like
+there was a resolution on that thread yesterday. On reading it again, if
+we change
+    select USB_ULPI if USB_SUPPORT
+to:
+    select USB_ULPI if USB
+for both Tegra 2 and 3, does that satisfy you and Arnd?
 
-The branch is there if you want to check for OMAP3 as well.
-git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git 
-for_3.4/twl_irq_gpio_fix
+Thanks for catching these Stephen.
 
-Regards,
-Benoit
+Alan.
