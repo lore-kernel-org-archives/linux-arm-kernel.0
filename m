@@ -1,42 +1,24 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 2 Mar 2012 16:11:52 +0100
-Subject: [GIT PULL] i.MX3 patches
-In-Reply-To: <201203021507.57409.arnd@arndb.de>
-References: <20120302080105.GJ3852@pengutronix.de>
- <201203021507.57409.arnd@arndb.de>
-Message-ID: <20120302151152.GO3852@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 2 Mar 2012 15:15:58 +0000
+Subject: [PATCH 1/4] regulator: twl6030: add support for vdd1, vdd2 and
+ vdd3 regulators
+In-Reply-To: <20120302135335.GS9008@sortiz-mobl>
+References: <1330421953-29517-1-git-send-email-rnayak@ti.com>
+ <1330421953-29517-2-git-send-email-rnayak@ti.com>
+ <20120302135335.GS9008@sortiz-mobl>
+Message-ID: <20120302151558.GH3230@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2012 at 03:07:56PM +0000, Arnd Bergmann wrote:
-> On Friday 02 March 2012, Sascha Hauer wrote:
-> > Hi Arnd,
-> > 
-> > Please pull the following i.MX3 specific patches for -next. Note
-> > that 1/2 depends on your imx/cleanup branch since it includes
-> > crmregs-imx3.h which is created in this branch.
-> > 
-> > The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
-> > 
-> >   Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.pengutronix.de/git/imx/linux-2.6.git features/imx3
-> 
-> Pulled into next/soc. 
-> 
-> I got a merge conflict against Nico's 4a3ea244 "ARM: plat-mxc: hook special idle
-> handlers to arm_pm_idle" and did the obvious merge below. Please complain
-> if this needs some other resolution.
+On Fri, Mar 02, 2012 at 02:53:35PM +0100, Samuel Ortiz wrote:
 
-Looks good.
+> Mark, Liam, are you guys taking this one ?
 
-Thanks
- Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120302/3b73f11f/attachment.sig>
