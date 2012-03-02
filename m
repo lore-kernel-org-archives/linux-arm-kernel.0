@@ -1,51 +1,88 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 02 Mar 2012 01:09:41 -0600
-Subject: [PATCH 2/4] ARM: kirkwood: fdt: absorb kirkwood_init()
-In-Reply-To: <9d9a87361c05b8b85e1ee2cdabb46a365c7abca8.1330625877.git.jason@lakedaemon.net>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <9d9a87361c05b8b85e1ee2cdabb46a365c7abca8.1330625877.git.jason@lakedaemon.net>
-Message-ID: <20120302070941.851923E2D7B@localhost>
+Date: Fri, 02 Mar 2012 00:48:43 -0700
+Subject: linux-next: manual merge of the arm-soc tree with the gpio tree
+In-Reply-To: <201203011228.33983.arnd@arndb.de>
+References: <20120301164001.77a063ceed2deaf37cf68e3c@canb.auug.org.au>
+ <201203011228.33983.arnd@arndb.de>
+Message-ID: <20120302074843.2E45A3E2DAC@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  1 Mar 2012 18:20:53 +0000, Jason Cooper <jason@lakedaemon.net> wrote:
-> We need to absorb kirkwood_init() into kirkwood_dt_init() so that as we
-> convert drivers, we can remove the platform call, eg
-> kirkwood_rtc_init().  This maintains compatibility with non-fdt
-> configurations because they still call kirkwood_init() in common.c.
+On Thu, 1 Mar 2012 12:28:33 +0000, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 01 March 2012, Stephen Rothwell wrote:
+> > Today's linux-next merge of the arm-soc tree got conflicts in
+> > arch/arm/mach-omap1/gpio16xx.c between commit ab985f0f7c2c ("gpio/omap:
+> > cleanup omap_gpio_mod_init function") from the gpio tree and commit
+> > 63325ff235de ("ARM: OMAP1: Move 16xx GPIO system clock to platform init
+> > code") from the arm-soc tree.
+> > 
+> > OK, I can't decide which is correct here - the former adds this code
+> > inside the loop (even though it seems to not depend on anything in the
+> > loop) and the latter adds it before.  I have used the former (but am
+> > happy to be corrected).  And both commits remove the code in
+> > drivers/gpio/gpio-omap.c.
 > 
-> As drivers are converted, we will reinstate the 'static' qualifier in
-> common.c.
+> Right, having the code outside of the loop seems correct to me, too.
 > 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/mach-kirkwood/board-dt.c |   30 +++++++++++++++++++++++++++++-
->  arch/arm/mach-kirkwood/common.c   |   12 ++++++------
->  arch/arm/mach-kirkwood/common.h   |    8 ++++++++
->  3 files changed, 43 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-> index 4960e63..a0cc28b 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -29,7 +29,9 @@
->  #include <linux/spi/orion_spi.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
->  #include <mach/kirkwood.h>
-> +#include <mach/bridge-regs.h>
->  #include <plat/mvsdio.h>
->  #include "common.h"
->  #include "mpp.h"
-> @@ -115,7 +117,33 @@ static void __init dreamplug_init(void)
->  
->  static void __init kirkwood_dt_init(void)
->  {
-> -	kirkwood_init();
-> +	printk(KERN_INFO "Kirkwood: %s, TCLK=%d.\n",
-> +		kirkwood_id(), kirkwood_tclk);
+> Grant, I would suggest that I resolve this by merging the the
+> omap/gpio/runtime-pm-cleanup branch (f86bcc3) that is in your
+> tree into the arm-soc tree as a dependency for the omap1 stuff,
+> with the resolution below.
 
-Nit: pr_info()
+Okay by me.
 
 g.
+
+> 
+> 	Arnd
+> 
+> --- a/arch/arm/mach-omap1/gpio16xx.c
+> +++ b/arch/arm/mach-omap1/gpio16xx.c
+> @@@ -218,17 -225,34 +225,34 @@@ static int __init omap16xx_gpio_init(vo
+>   	if (!cpu_is_omap16xx())
+>   		return -EINVAL;
+>   
+>  +	/*
+>  +	 * Enable system clock for GPIO module.
+>  +	 * The CAM_CLK_CTRL *is* really the right place.
+>  +	 */
+>  +	omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
+>  +					ULPD_CAM_CLK_CTRL);
+>  +
+> - 	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
+> - 		platform_device_register(omap16xx_gpio_dev[i]);
+> + 	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++) {
+> + 		pdev = omap16xx_gpio_dev[i];
+> + 		pdata = pdev->dev.platform_data;
+> + 
+> + 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + 		if (unlikely(!res)) {
+> + 			dev_err(&pdev->dev, "Invalid mem resource.\n");
+> + 			return -ENODEV;
+> + 		}
+>   
+> - 	gpio_bank_count = ARRAY_SIZE(omap16xx_gpio_dev);
+> + 		base = ioremap(res->start, resource_size(res));
+> + 		if (unlikely(!base)) {
+> + 			dev_err(&pdev->dev, "ioremap failed.\n");
+> + 			return -ENOMEM;
+> + 		}
+> + 
+> + 		__raw_writel(SYSCONFIG_WORD, base + OMAP1610_GPIO_SYSCONFIG);
+> + 		iounmap(base);
+> + 
+>  -		/*
+>  -		 * Enable system clock for GPIO module.
+>  -		 * The CAM_CLK_CTRL *is* really the right place.
+>  -		 */
+>  -		omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
+>  -					ULPD_CAM_CLK_CTRL);
+>  -
+> + 		platform_device_register(omap16xx_gpio_dev[i]);
+> + 	}
+>   
+>   	return 0;
+>   }
+
+-- 
+email sent from notmuch.vim plugin
