@@ -1,63 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Mar 2012 09:16:46 -0800
-Subject: [PATCH 3/4] mmc: omap_hsmmc: Use GPIO offset for external GPIO
- chips
-In-Reply-To: <4F50628C.9080706@ti.com>
-References: <20120301185044.29210.44521.stgit@kaulin.local>
- <20120301185532.29210.32421.stgit@kaulin.local>
- <4F50628C.9080706@ti.com>
-Message-ID: <20120302171646.GI18901@atomide.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 2 Mar 2012 09:17:17 -0800
+Subject: [PATCH] pinctrl: fix the pin descriptor kerneldoc
+In-Reply-To: <1330703621-4044-1-git-send-email-linus.walleij@stericsson.com>
+References: <1330703621-4044-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861969@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [120301 21:31]:
-> On Friday 02 March 2012 12:25 AM, Tony Lindgren wrote:
-> >--- a/arch/arm/mach-omap2/board-3430sdp.c
-> >+++ b/arch/arm/mach-omap2/board-3430sdp.c
-> >@@ -231,14 +231,16 @@ static struct omap2_hsmmc_info mmc[] = {
-> >  		 * so the SIM card isn't used; else 4 bits.
-> >  		 */
-> >  		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-> >+		.gpiochip_cd	= "twl4030_gpio",
-> >+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
-> >  		.gpio_wp	= 4,
-> >-		.deferred	= true,
+Linus Walleij wrote at Friday, March 02, 2012 8:54 AM:
+> The introduction of the owner field on the pin descriptor was not
+> properly documented so fix this up.
 > 
-> Shouldn't this patch completely get rid of all the 'deferred'
-> infrastructure that was put in place, including the
-> omap_hsmmc_late_init() function, since there is no need for it
-> anymore?
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yes, that was needed as a fix so unfortunately there's a little
-bit going back and forth. But now we can get rid of other stuff
-too in addition to deferred omap_hsmmc_late_init(), we can remove
-init and cleanup callbacks for hsmmc. I'll do another patch for
-that.
+I did have this fix buried later in my patch series, but it's probably a
+good idea to patch it separately before then.
 
-> >--- a/arch/arm/mach-omap2/board-omap3pandora.c
-> >+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-> >@@ -270,19 +270,19 @@ static struct omap2_hsmmc_info omap3pandora_mmc[] = {
-> >  	{
-> >  		.mmc		= 1,
-> >  		.caps		= MMC_CAP_4_BIT_DATA,
-> >-		.gpio_cd	= -EINVAL,
-> >+		.gpiochip_cd	= "twl4030_gpio",
-> >+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
-> >  		.gpio_wp	= 126,
-> >  		.ext_clock	= 0,
-> >-		.deferred	= true,
-> >  	},
-> >  	{
-> >  		.mmc		= 2,
-> >  		.caps		= MMC_CAP_4_BIT_DATA,
-> >-		.gpio_cd	= -EINVAL,
-> >+		.gpiochip_cd	= "twl4030_gpio",
-> >+		.gpio_cd	= 0,	/* mmc0_cd offset in twl4030 */
-> 
-> This one should be gpio_cd = 1,
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Thanks, will correct.
-
-Regards,
-
-Tony 
+-- 
+nvpublic
