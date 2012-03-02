@@ -1,39 +1,34 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 02 Mar 2012 15:50:25 -0500
-Subject: [PATCH v6 0/2] patch set about the MXS-DMA
-In-Reply-To: <CAMiH66HmV+58w36DGCt+e=ihTrYUwXf1Cur+678YX2GKcB1-jA@mail.gmail.com>
- (Huang Shijie's message of "Wed, 29 Feb 2012 08:13:15 -0500")
-References: <1329373053-19494-1-git-send-email-b32955@freescale.com>
- <4F4D9725.3090100@freescale.com>
- <1330502098.3545.78.camel@sauron.fi.intel.com>
- <4F4DE0E5.8070808@freescale.com>
- <1330516974.3545.104.camel@sauron.fi.intel.com>
- <CAMiH66HmV+58w36DGCt+e=ihTrYUwXf1Cur+678YX2GKcB1-jA@mail.gmail.com>
-Message-ID: <m2mx7yn2we.fsf@bob.laptop.org>
+From: alan@signal11.us (Alan Ott)
+Date: Fri,  2 Mar 2012 15:58:04 -0500
+Subject: [PATCH v2 0/6] ARM: Tegra: cleanup patches from Arnd Bergmann
+Message-ID: <1330721884-8495-1-git-send-email-alan@signal11.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Sorry for the mess yesterday....
+This is V2 of Arnd's Patch series from yesterday. Hopefully this one will be
+smoother.
 
-On Wed, Feb 29 2012, Huang Shijie wrote:
->> Pushed both to l2-mtd.git tree, thanks. I am worried that it touches
->> other subsystems like dma, sound, and mmc and there are no acks for
->> those. Would be nice to get them somehow.
->
-> I ever thought Vinod could accept this patch set.
->
-> To Vinod & Chris:
->       Could you give the ack to the first patch?
+Changes:
+	* set_irq_flags() removal patch is out
+	* driver-only patch has been moved to another set
+	* Distribution list should be cleaner
+	* Added proper sign-off
+	* Select CPU_FREQ_TABLE for ARCH_TEGRA_3x_SOC as well
+	* Fixed spacing on the localtimer patch
+	* added linux/export.h to the export usb phy symbols patch
 
-Yes -- for the first patch:
+Arnd Bergmann (6):
+  ARM: tegra: do not hide dma declarations
+  ARM: tegra: select CPU_FREQ_TABLE
+  ARM: tegra: build localtimer support only when needed
+  ARM: tegra: work around tegra THUMB2_KERNEL bug
+  ARM: tegra: USB_ULPI needs USB
+  ARM: tegra: export usb phy symbols
 
-Acked-by: Chris Ball <cjb@laptop.org>
-
-(I think Shawn's ACK is sufficient for the second patch.)
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+ arch/arm/Kconfig                       |    1 +
+ arch/arm/mach-tegra/Kconfig            |    3 +++
+ arch/arm/mach-tegra/Makefile           |    3 ++-
+ arch/arm/mach-tegra/include/mach/dma.h |    4 ----
+ arch/arm/mach-tegra/usb_phy.c          |   11 +++++++++++
+ 5 files changed, 17 insertions(+), 5 deletions(-)
