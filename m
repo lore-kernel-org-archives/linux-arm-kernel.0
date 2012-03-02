@@ -1,72 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri,  2 Mar 2012 14:42:01 -0800
-Subject: [PATCH] ARM: OMAP2+: voltage: ensure voltage used is exact voltage
- from OPP table
-Message-ID: <1330728121-26664-1-git-send-email-khilman@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 03 Mar 2012 08:57:27 +0900
+Subject: [PATCH v3] ARM: S3C24XX DMA resume regression fix
+In-Reply-To: <1330610031-2237-1-git-send-email-dron0gus@gmail.com>
+References: <077201ccf767c6d1ec05475c40$%kim@samsung.com>
+ <1330610031-2237-1-git-send-email-dron0gus@gmail.com>
+Message-ID: <4F515E67.20500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using the SMPS regulators to scale voltages, the regulator
-framework may pass a minimum voltage that is not an exact OPP voltage.
-For the VC/VP controlled voltage domains, we must ensure that the
-voltage requested is the exact voltage from the OPP table.  This is
-especially critical when using SR.
+On 03/01/12 22:53, Gusakov Andrey wrote:
+> s3c2410_dma_suspend suspends channels from 0 to dma_channels.
+> s3c2410_dma_resume resumes channels in reverse order. So
+> pointer should be decremented instead of being incremented.
+>
+> Signed-off-by: Gusakov Andrey<dron0gus@gmail.com>
+> Reviewed-by: Heiko Stuebner<heiko@sntech.de>
+> ---
+>   arch/arm/plat-s3c24xx/dma.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+> index 57abec9..16510d5 100644
+> --- a/arch/arm/plat-s3c24xx/dma.c
+> +++ b/arch/arm/plat-s3c24xx/dma.c
+> @@ -1249,7 +1249,7 @@ static void s3c2410_dma_resume(void)
+>   	struct s3c2410_dma_chan *cp = s3c2410_chans + dma_channels - 1;
+>   	int channel;
+>
+> -	for (channel = dma_channels - 1; channel>= 0; cp++, channel--)
+> +	for (channel = dma_channels - 1; channel>= 0; cp--, channel--)
+>   		s3c2410_dma_resume_chan(cp);
+>   }
+>
 
-To fix, voltdm_scale() uses the target voltage passed to walk through
-the OPP voltages until it finds a voltage that is >= one of the OPP
-voltages.
+Applied, thanks.
 
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Unless there are any objections, this will be queued along with the
-rest of the SMPS regulator series from Tero.  Currently availble in
-my for_3.4/pm/smps-regulator branch at
-git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
-
- arch/arm/mach-omap2/voltage.c |   21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 8a36342..4dc60e8 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -73,7 +73,8 @@ unsigned long voltdm_get_voltage(struct voltagedomain *voltdm)
- int voltdm_scale(struct voltagedomain *voltdm,
- 		 unsigned long target_volt)
- {
--	int ret;
-+	int ret, i;
-+	unsigned long volt = 0;
- 
- 	if (!voltdm || IS_ERR(voltdm)) {
- 		pr_warning("%s: VDD specified does not exist!\n", __func__);
-@@ -86,9 +87,23 @@ int voltdm_scale(struct voltagedomain *voltdm,
- 		return -ENODATA;
- 	}
- 
--	ret = voltdm->scale(voltdm, target_volt);
-+	/* Adjust voltage to the exact voltage from the OPP table */
-+	for (i = 0; voltdm->volt_data[i].volt_nominal != 0; i++) {
-+		if (voltdm->volt_data[i].volt_nominal >= target_volt) {
-+			volt = voltdm->volt_data[i].volt_nominal;
-+			break;
-+		}
-+	}
-+
-+	if (!volt) {
-+		pr_warning("%s: not scaling. OPP voltage for %lu, not found.\n",
-+			   __func__, target_volt);
-+		return -EINVAL;
-+	}
-+
-+	ret = voltdm->scale(voltdm, volt);
- 	if (!ret)
--		voltdm->nominal_volt = target_volt;
-+		voltdm->nominal_volt = volt;
- 
- 	return ret;
- }
--- 
-1.7.9.2
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
