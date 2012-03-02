@@ -1,41 +1,80 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 02 Mar 2012 15:40:23 +0400
-Subject: [PATCH 4/8] ARM: tegra: build localtimer support only when needed
-In-Reply-To: <1330630010-11241-5-git-send-email-alan@signal11.us>
-References: <1330630010-11241-1-git-send-email-alan@signal11.us>
- <1330630010-11241-5-git-send-email-alan@signal11.us>
-Message-ID: <4F50B1A7.60207@ru.mvista.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 2 Mar 2012 17:16:29 +0530
+Subject: Randconfig module build error with OMAP4_ERRATA_I688
+In-Reply-To: <20120301162556.GY18901@atomide.com>
+References: <20120229173719.GN18901@atomide.com>
+ <CAMQu2gxg_57AVW+MT_Sgi+gr2OUge-YPdSUxoG+z-zQth=4-UA@mail.gmail.com>
+ <20120301162556.GY18901@atomide.com>
+Message-ID: <CAMQu2gy9XksJ+8Q_Ygwtx7n2tVfd2KCu0o54SisuV8_QUX_rUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Mar 1, 2012 at 9:55 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [120301 00:38]:
+>> On Wed, Feb 29, 2012 at 11:07 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> > Hi Santosh,
+>> >
+>> > Looks like OMAP4_ERRATA_I688 still has one more issue:
+>> > Modules won't build at least with the attached randconfig
+>> > generated file.
+>> >
+>> > Can you please take a look at how to deal with it?
+>> >
+>> > Maybe omap_bus_sync should be an inline function with some
+>> > wrapper for the sleep44xx.S to call?
+>> >
+>> > I already posted a fix for the GPMC related error with the
+>> > same .config file.
+>> >
+>> This one builds for me against 'Linux 3.3-rc5,
+>> Ofocurse I got below error with the attached .config which
+>> I bypassed to see the Errata build failure.
+>>
+>> arch/arm/mach-omap2/built-in.o: In function `n8x0_mmc_callback':
+>> linux-2.6/arch/arm/mach-omap2/board-n8x0.c:374: undefined reference to
+>> `omap_mmc_notify_cover_event'
+>> make: *** [.tmp_vmlinux1] Error 1
+>
+> Yes a fix for that has been queued already.
+>
+>> I build this with below toolchain...
+>> $arm-none-linux-gnueabi-gcc --version
+>> arm-none-linux-gnueabi-gcc (Sourcery G++ Lite 2011.03-41) 4.5.2
+>> Copyright (C) 2010 Free Software Foundation, Inc.
+>>
+>> Am I missing anything ?
+>
+> I think you're missing your commit 2ec1fc4e169acc0b8d6733ff028fd52e766773d9
+> (ARM: OMAP4: Move the barrier memboclk_steal() as part of reserve callback)
+> thats' queued up in fixes, and CONFIG_OMAP4_ERRATA_I688=y.
+>
+> Then with -rc5 + 2ec1fc4e when you build modules you'll get this:
+>
+> ERROR: "omap_bus_sync" [drivers/watchdog/sp805_wdt.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/watchdog/dw_wdt.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/virtio/virtio_ring.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/video/sm501fb.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/usb/mon/usbmon.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/usb/host/sl811-hcd.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/usb/host/ohci-hcd.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/usb/host/isp1760.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/usb/host/isp1362-hcd.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/usb/host/isp116x-hcd.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/usb/core/usbcore.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/tty/serial/altera_uart.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/tty/serial/altera_jtaguart.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/tty/serial/8250/8250_dw.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/ssb/ssb.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/rtc/rtc-cmos.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/rtc/rtc-bq4802.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/mtd/nand/tmio_nand.ko] undefined!
+> ERROR: "omap_bus_sync" [drivers/mtd/nand/omap2.ko] undefined!
+>
+Sricharan has posted a fix for it. [1]
+The sleep code stuff is just dummy function for the cases when the errata
+is not defined. When Errata is defined the generic barriers too get impacted
+and hence the function needs to be exported.
 
-On 01-03-2012 23:26, Alan Ott wrote:
-
-> From: Arnd Bergmann<arnd@arndb.de>
-
-> It is possible to build a tegra kernel without localtimer
-> support, so the tegra specific parts should only be built
-> when that is indeed enabled.
-
-> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
-> ---
->   arch/arm/mach-tegra/Makefile |    3 ++-
->   1 files changed, 2 insertions(+), 1 deletions(-)
-
-> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-> index e120ff5..a956df8 100644
-> --- a/arch/arm/mach-tegra/Makefile
-> +++ b/arch/arm/mach-tegra/Makefile
-> @@ -13,7 +13,8 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
->   obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-tegra20-tables.o
->   obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= pinmux-tegra30-tables.o
->   obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= board-dt-tegra30.o
-> -obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
-> +obj-$(CONFIG_SMP)                       += platsmp.o headsmp.o
-
-   Could use the chance to indent here with tabs instead of spaces, like below.
-
-> +obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
-
-WBR, Sergei
+Regards
+Santosh
+[1] http://www.spinics.net/lists/arm-kernel/msg162608.html
