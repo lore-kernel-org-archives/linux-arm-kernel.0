@@ -1,552 +1,245 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Fri,  2 Mar 2012 09:28:47 +0100
-Subject: [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for
- imx-dma.
-Message-ID: <1330676927-7330-1-git-send-email-javier.martin@vista-silicon.com>
+From: simon@sequanux.org (Simon Guinot)
+Date: Fri, 2 Mar 2012 10:15:11 +0100
+Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
+In-Reply-To: <2f29e88b98b2bcff0c241996e6d7216a60995d2d.1330625878.git.jason@lakedaemon.net>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <2f29e88b98b2bcff0c241996e6d7216a60995d2d.1330625878.git.jason@lakedaemon.net>
+Message-ID: <20120302091510.GC29461@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dmaengine specifies the possibility that several descriptors
-can be queued for transfer. It also indicates that tasklets
-must be used for DMA callbacks.
+Hi Jason,
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- Added comment explaining fall through in 'imxdma_xfer_desc'.
+On Thu, Mar 01, 2012 at 06:20:55PM +0000, Jason Cooper wrote:
+> Converted register address to a variable so that it could be set from
+> fdt.  Also, pull clock frequency from fdt and clean up failure logic a
+> bit.
+> 
+> Same as rtc-mv, this device is used in all kirkwood boards.  So, it is
+> placed in kirkwood.dtsi.
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  arch/arm/boot/dts/kirkwood.dtsi   |    6 +++++
+>  arch/arm/mach-kirkwood/board-dt.c |    1 -
+>  arch/arm/mach-kirkwood/common.c   |    2 +-
+>  arch/arm/mach-kirkwood/common.h   |    1 -
+>  drivers/watchdog/orion_wdt.c      |   44 ++++++++++++++++++++++++++----------
+>  5 files changed, 39 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 5fb185c..bf28424 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -8,5 +8,11 @@
+>  		reg = <0xf1010300 0x1f>;
+>  		interrupts = <53>;
+>  	};
+> +
+> +	wdt at fed20300 {
+> +		compatible = "marvell,orion-wdt";
+> +		reg = <0xfed20300 0x28>;
+> +		clock-frequency = <200000000>;
+> +	};
 
----
- drivers/dma/imx-dma.c |  332 ++++++++++++++++++++++++++++++++++++++-----------
- 1 files changed, 258 insertions(+), 74 deletions(-)
+How this will work for boards using a different clock frequency (TCLK) ?
+Here, we could have 166MHz for example.
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 9aa6e85..c32103f 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -5,6 +5,7 @@
-  * found on i.MX1/21/27
-  *
-  * Copyright 2010 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-+ * Copyright 2012 Javier Martin, Vista Silicon <javier.martin@vista-silicon.com>
-  *
-  * The code contained herein is licensed under the GNU General Public
-  * License. You may obtain a copy of the GNU General Public License
-@@ -13,6 +14,7 @@
-  * http://www.opensource.org/licenses/gpl-license.html
-  * http://www.gnu.org/copyleft/gpl.html
-  */
-+
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/types.h>
-@@ -30,19 +32,52 @@
- #include <mach/dma-v1.h>
- #include <mach/hardware.h>
- 
-+#define IMXDMA_MAX_CHAN_DESCRIPTORS	16
-+
-+enum  imxdma_prep_type {
-+	IMXDMA_DESC_MEMCPY,
-+	IMXDMA_DESC_INTERLEAVED,
-+	IMXDMA_DESC_SLAVE_SG,
-+	IMXDMA_DESC_CYCLIC,
-+};
-+
-+struct imxdma_desc {
-+	struct list_head		node;
-+	struct dma_async_tx_descriptor	desc;
-+	enum dma_status			status;
-+	dma_addr_t			src;
-+	dma_addr_t			dest;
-+	size_t				len;
-+	unsigned int			dmamode;
-+	enum imxdma_prep_type		type;
-+	/* For memcpy and interleaved */
-+	unsigned int			config_port;
-+	unsigned int			config_mem;
-+	/* For interleaved transfers */
-+	unsigned int			x;
-+	unsigned int			y;
-+	unsigned int			w;
-+	/* For slave sg and cyclic */
-+	struct scatterlist		*sg;
-+	unsigned int			sgcount;
-+};
-+
- struct imxdma_channel {
- 	struct imxdma_engine		*imxdma;
- 	unsigned int			channel;
- 	unsigned int			imxdma_channel;
- 
-+	struct tasklet_struct		dma_tasklet;
-+	struct list_head		ld_free;
-+	struct list_head		ld_queue;
-+	struct list_head		ld_active;
-+	int				descs_allocated;
- 	enum dma_slave_buswidth		word_size;
- 	dma_addr_t			per_address;
- 	u32				watermark_level;
- 	struct dma_chan			chan;
- 	spinlock_t			lock;
--	struct dma_async_tx_descriptor	desc;
- 	dma_cookie_t			last_completed;
--	enum dma_status			status;
- 	int				dma_request;
- 	struct scatterlist		*sg_list;
- };
-@@ -61,27 +96,31 @@ static struct imxdma_channel *to_imxdma_chan(struct dma_chan *chan)
- 	return container_of(chan, struct imxdma_channel, chan);
- }
- 
--static void imxdma_handle(struct imxdma_channel *imxdmac)
-+static inline bool imxdma_chan_is_doing_cyclic(struct imxdma_channel *imxdmac)
- {
--	if (imxdmac->desc.callback)
--		imxdmac->desc.callback(imxdmac->desc.callback_param);
--	imxdmac->last_completed = imxdmac->desc.cookie;
-+	struct imxdma_desc *desc;
-+
-+	if (!list_empty(&imxdmac->ld_active)) {
-+		desc = list_first_entry(&imxdmac->ld_active, struct imxdma_desc,
-+					node);
-+		if (desc->type == IMXDMA_DESC_CYCLIC)
-+			return true;
-+	}
-+	return false;
- }
- 
- static void imxdma_irq_handler(int channel, void *data)
- {
- 	struct imxdma_channel *imxdmac = data;
- 
--	imxdmac->status = DMA_SUCCESS;
--	imxdma_handle(imxdmac);
-+	tasklet_schedule(&imxdmac->dma_tasklet);
- }
- 
- static void imxdma_err_handler(int channel, void *data, int error)
- {
- 	struct imxdma_channel *imxdmac = data;
- 
--	imxdmac->status = DMA_ERROR;
--	imxdma_handle(imxdmac);
-+	tasklet_schedule(&imxdmac->dma_tasklet);
- }
- 
- static void imxdma_progression(int channel, void *data,
-@@ -89,8 +128,88 @@ static void imxdma_progression(int channel, void *data,
- {
- 	struct imxdma_channel *imxdmac = data;
- 
--	imxdmac->status = DMA_SUCCESS;
--	imxdma_handle(imxdmac);
-+	tasklet_schedule(&imxdmac->dma_tasklet);
-+}
-+
-+static int imxdma_xfer_desc(struct imxdma_desc *d)
-+{
-+	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
-+	int ret;
-+
-+	/* Configure and enable */
-+	switch (d->type) {
-+	case IMXDMA_DESC_MEMCPY:
-+		ret = imx_dma_config_channel(imxdmac->imxdma_channel,
-+					  d->config_port, d->config_mem, 0, 0);
-+		if (ret < 0)
-+			return ret;
-+		ret = imx_dma_setup_single(imxdmac->imxdma_channel, d->src,
-+					   d->len, d->dest, d->dmamode);
-+		if (ret < 0)
-+			return ret;
-+		break;
-+	case IMXDMA_DESC_CYCLIC:
-+		ret = imx_dma_setup_progression_handler(imxdmac->imxdma_channel,
-+							imxdma_progression);
-+		if (ret < 0)
-+			return ret;
-+		/*
-+		 * We fall through here since cyclic transfer is the same as
-+		 * slave_sg adding a progression handler and a specific sg
-+		 * configuration which is done in 'imxdma_prep_dma_cyclic'.
-+		 */
-+	case IMXDMA_DESC_SLAVE_SG:
-+		if (d->dmamode == DMA_MODE_READ)
-+			ret = imx_dma_setup_sg(imxdmac->imxdma_channel, d->sg,
-+				       d->sgcount, d->len, d->src, d->dmamode);
-+		else
-+			ret = imx_dma_setup_sg(imxdmac->imxdma_channel, d->sg,
-+				      d->sgcount, d->len, d->dest, d->dmamode);
-+		if (ret < 0)
-+			return ret;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	imx_dma_enable(imxdmac->imxdma_channel);
-+	return 0;
-+}
-+
-+static void imxdma_tasklet(unsigned long data)
-+{
-+	struct imxdma_channel *imxdmac = (void *)data;
-+	struct imxdma_engine *imxdma = imxdmac->imxdma;
-+	struct imxdma_desc *desc;
-+
-+	spin_lock(&imxdmac->lock);
-+
-+	if (list_empty(&imxdmac->ld_active)) {
-+		/* Someone might have called terminate all */
-+		goto out;
-+	}
-+	desc = list_first_entry(&imxdmac->ld_active, struct imxdma_desc, node);
-+
-+	if (desc->desc.callback)
-+		desc->desc.callback(desc->desc.callback_param);
-+
-+	imxdmac->last_completed = desc->desc.cookie;
-+
-+	/* If we are dealing with a cyclic descriptor keep it on ld_active */
-+	if (imxdma_chan_is_doing_cyclic(imxdmac))
-+		goto out;
-+
-+	list_move_tail(imxdmac->ld_active.next, &imxdmac->ld_free);
-+
-+	if (!list_empty(&imxdmac->ld_queue)) {
-+		desc = list_first_entry(&imxdmac->ld_queue, struct imxdma_desc,
-+					node);
-+		list_move_tail(imxdmac->ld_queue.next, &imxdmac->ld_active);
-+		if (imxdma_xfer_desc(desc) < 0)
-+			dev_warn(imxdma->dev, "%s: channel: %d couldn't xfer desc\n",
-+				 __func__, imxdmac->channel);
-+	}
-+out:
-+	spin_unlock(&imxdmac->lock);
- }
- 
- static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-@@ -99,12 +218,17 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
- 	struct dma_slave_config *dmaengine_cfg = (void *)arg;
- 	int ret;
-+	unsigned long flags;
- 	unsigned int mode = 0;
- 
- 	switch (cmd) {
- 	case DMA_TERMINATE_ALL:
--		imxdmac->status = DMA_ERROR;
- 		imx_dma_disable(imxdmac->imxdma_channel);
-+
-+		spin_lock_irqsave(&imxdmac->lock, flags);
-+		list_splice_tail_init(&imxdmac->ld_active, &imxdmac->ld_free);
-+		list_splice_tail_init(&imxdmac->ld_queue, &imxdmac->ld_free);
-+		spin_unlock_irqrestore(&imxdmac->lock, flags);
- 		return 0;
- 	case DMA_SLAVE_CONFIG:
- 		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
-@@ -155,11 +279,14 @@ static enum dma_status imxdma_tx_status(struct dma_chan *chan,
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
- 	dma_cookie_t last_used;
- 	enum dma_status ret;
-+	unsigned long flags;
- 
-+	spin_lock_irqsave(&imxdmac->lock, flags);
- 	last_used = chan->cookie;
- 
- 	ret = dma_async_is_complete(cookie, imxdmac->last_completed, last_used);
- 	dma_set_tx_state(txstate, imxdmac->last_completed, last_used, 0);
-+	spin_unlock_irqrestore(&imxdmac->lock, flags);
- 
- 	return ret;
- }
-@@ -172,7 +299,6 @@ static dma_cookie_t imxdma_assign_cookie(struct imxdma_channel *imxdma)
- 		cookie = 1;
- 
- 	imxdma->chan.cookie = cookie;
--	imxdma->desc.cookie = cookie;
- 
- 	return cookie;
- }
-@@ -181,12 +307,15 @@ static dma_cookie_t imxdma_tx_submit(struct dma_async_tx_descriptor *tx)
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(tx->chan);
- 	dma_cookie_t cookie;
-+	unsigned long flags;
- 
--	spin_lock_irq(&imxdmac->lock);
-+	spin_lock_irqsave(&imxdmac->lock, flags);
- 
-+	list_move_tail(imxdmac->ld_free.next, &imxdmac->ld_queue);
- 	cookie = imxdma_assign_cookie(imxdmac);
-+	tx->cookie = cookie;
- 
--	spin_unlock_irq(&imxdmac->lock);
-+	spin_unlock_irqrestore(&imxdmac->lock, flags);
- 
- 	return cookie;
- }
-@@ -199,21 +328,48 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
- 	if (data != NULL)
- 		imxdmac->dma_request = data->dma_request;
- 
--	dma_async_tx_descriptor_init(&imxdmac->desc, chan);
--	imxdmac->desc.tx_submit = imxdma_tx_submit;
--	/* txd.flags will be overwritten in prep funcs */
--	imxdmac->desc.flags = DMA_CTRL_ACK;
-+	while (imxdmac->descs_allocated < IMXDMA_MAX_CHAN_DESCRIPTORS) {
-+		struct imxdma_desc *desc;
- 
--	imxdmac->status = DMA_SUCCESS;
-+		desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-+		if (!desc)
-+			break;
-+		__memzero(&desc->desc, sizeof(struct dma_async_tx_descriptor));
-+		dma_async_tx_descriptor_init(&desc->desc, chan);
-+		desc->desc.tx_submit = imxdma_tx_submit;
-+		/* txd.flags will be overwritten in prep funcs */
-+		desc->desc.flags = DMA_CTRL_ACK;
-+		desc->status = DMA_SUCCESS;
-+
-+		list_add_tail(&desc->node, &imxdmac->ld_free);
-+		imxdmac->descs_allocated++;
-+	}
- 
--	return 0;
-+	if (!imxdmac->descs_allocated)
-+		return -ENOMEM;
-+
-+	return imxdmac->descs_allocated;
- }
- 
- static void imxdma_free_chan_resources(struct dma_chan *chan)
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
-+	struct imxdma_desc *desc, *_desc;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&imxdmac->lock, flags);
- 
- 	imx_dma_disable(imxdmac->imxdma_channel);
-+	list_splice_tail_init(&imxdmac->ld_active, &imxdmac->ld_free);
-+	list_splice_tail_init(&imxdmac->ld_queue, &imxdmac->ld_free);
-+
-+	spin_unlock_irqrestore(&imxdmac->lock, flags);
-+
-+	list_for_each_entry_safe(desc, _desc, &imxdmac->ld_free, node) {
-+		kfree(desc);
-+		imxdmac->descs_allocated--;
-+	}
-+	INIT_LIST_HEAD(&imxdmac->ld_free);
- 
- 	if (imxdmac->sg_list) {
- 		kfree(imxdmac->sg_list);
-@@ -228,23 +384,19 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
- 	struct scatterlist *sg;
--	int i, ret, dma_length = 0;
--	unsigned int dmamode;
-+	int i, dma_length = 0;
-+	struct imxdma_desc *desc;
- 
--	if (imxdmac->status == DMA_IN_PROGRESS)
-+	if (list_empty(&imxdmac->ld_free) ||
-+	    imxdma_chan_is_doing_cyclic(imxdmac))
- 		return NULL;
- 
--	imxdmac->status = DMA_IN_PROGRESS;
-+	desc = list_first_entry(&imxdmac->ld_free, struct imxdma_desc, node);
- 
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		dma_length += sg->length;
- 	}
- 
--	if (direction == DMA_DEV_TO_MEM)
--		dmamode = DMA_MODE_READ;
--	else
--		dmamode = DMA_MODE_WRITE;
--
- 	switch (imxdmac->word_size) {
- 	case DMA_SLAVE_BUSWIDTH_4_BYTES:
- 		if (sgl->length & 3 || sgl->dma_address & 3)
-@@ -260,12 +412,21 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
- 		return NULL;
- 	}
- 
--	ret = imx_dma_setup_sg(imxdmac->imxdma_channel, sgl, sg_len,
--		 dma_length, imxdmac->per_address, dmamode);
--	if (ret)
--		return NULL;
-+	desc->type = IMXDMA_DESC_SLAVE_SG;
-+	desc->sg = sgl;
-+	desc->sgcount = sg_len;
-+	desc->len = dma_length;
-+	if (direction == DMA_DEV_TO_MEM) {
-+		desc->dmamode = DMA_MODE_READ;
-+		desc->src = imxdmac->per_address;
-+	} else {
-+		desc->dmamode = DMA_MODE_WRITE;
-+		desc->dest = imxdmac->per_address;
-+	}
-+	desc->desc.callback = NULL;
-+	desc->desc.callback_param = NULL;
- 
--	return &imxdmac->desc;
-+	return &desc->desc;
- }
- 
- static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
-@@ -274,23 +435,18 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
- 	struct imxdma_engine *imxdma = imxdmac->imxdma;
--	int i, ret;
-+	struct imxdma_desc *desc;
-+	int i;
- 	unsigned int periods = buf_len / period_len;
--	unsigned int dmamode;
- 
- 	dev_dbg(imxdma->dev, "%s channel: %d buf_len=%d period_len=%d\n",
- 			__func__, imxdmac->channel, buf_len, period_len);
- 
--	if (imxdmac->status == DMA_IN_PROGRESS)
-+	if (list_empty(&imxdmac->ld_free) ||
-+	    imxdma_chan_is_doing_cyclic(imxdmac))
- 		return NULL;
--	imxdmac->status = DMA_IN_PROGRESS;
- 
--	ret = imx_dma_setup_progression_handler(imxdmac->imxdma_channel,
--			imxdma_progression);
--	if (ret) {
--		dev_err(imxdma->dev, "Failed to setup the DMA handler\n");
--		return NULL;
--	}
-+	desc = list_first_entry(&imxdmac->ld_free, struct imxdma_desc, node);
- 
- 	if (imxdmac->sg_list)
- 		kfree(imxdmac->sg_list);
-@@ -316,17 +472,21 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
- 	imxdmac->sg_list[periods].page_link =
- 		((unsigned long)imxdmac->sg_list | 0x01) & ~0x02;
- 
--	if (direction == DMA_DEV_TO_MEM)
--		dmamode = DMA_MODE_READ;
--	else
--		dmamode = DMA_MODE_WRITE;
--
--	ret = imx_dma_setup_sg(imxdmac->imxdma_channel, imxdmac->sg_list, periods,
--		 IMX_DMA_LENGTH_LOOP, imxdmac->per_address, dmamode);
--	if (ret)
--		return NULL;
-+	desc->type = IMXDMA_DESC_CYCLIC;
-+	desc->sg = imxdmac->sg_list;
-+	desc->sgcount = periods;
-+	desc->len = IMX_DMA_LENGTH_LOOP;
-+	if (direction == DMA_DEV_TO_MEM) {
-+		desc->dmamode = DMA_MODE_READ;
-+		desc->src = imxdmac->per_address;
-+	} else {
-+		desc->dmamode = DMA_MODE_WRITE;
-+		desc->dest = imxdmac->per_address;
-+	}
-+	desc->desc.callback = NULL;
-+	desc->desc.callback_param = NULL;
- 
--	return &imxdmac->desc;
-+	return &desc->desc;
- }
- 
- static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
-@@ -335,36 +495,53 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
- 	struct imxdma_engine *imxdma = imxdmac->imxdma;
--	int ret;
-+	struct imxdma_desc *desc;
- 
- 	dev_dbg(imxdma->dev, "%s channel: %d src=0x%x dst=0x%x len=%d\n",
- 			__func__, imxdmac->channel, src, dest, len);
- 
--	if (imxdmac->status == DMA_IN_PROGRESS)
-+	if (list_empty(&imxdmac->ld_free) ||
-+	    imxdma_chan_is_doing_cyclic(imxdmac))
- 		return NULL;
--	imxdmac->status = DMA_IN_PROGRESS;
- 
--	ret = imx_dma_config_channel(imxdmac->imxdma_channel,
--			       IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
--			       IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
--			       0, 0);
--	if (ret)
--		return NULL;
-+	desc = list_first_entry(&imxdmac->ld_free, struct imxdma_desc, node);
- 
--	ret = imx_dma_setup_single(imxdmac->imxdma_channel, src, len,
--				   dest, DMA_MODE_WRITE);
--	if (ret)
--		return NULL;
-+	desc->type = IMXDMA_DESC_MEMCPY;
-+	desc->src = src;
-+	desc->dest = dest;
-+	desc->len = len;
-+	desc->dmamode = DMA_MODE_WRITE;
-+	desc->config_port = IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR;
-+	desc->config_mem = IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR;
-+	desc->desc.callback = NULL;
-+	desc->desc.callback_param = NULL;
- 
--	return &imxdmac->desc;
-+	return &desc->desc;
- }
- 
- static void imxdma_issue_pending(struct dma_chan *chan)
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
--
--	if (imxdmac->status == DMA_IN_PROGRESS)
--		imx_dma_enable(imxdmac->imxdma_channel);
-+	struct imxdma_engine *imxdma = imxdmac->imxdma;
-+	struct imxdma_desc *desc;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&imxdmac->lock, flags);
-+	if (list_empty(&imxdmac->ld_active) &&
-+	    !list_empty(&imxdmac->ld_queue)) {
-+		desc = list_first_entry(&imxdmac->ld_queue,
-+					struct imxdma_desc, node);
-+
-+		if (imxdma_xfer_desc(desc) < 0) {
-+			dev_warn(imxdma->dev,
-+				 "%s: channel: %d couldn't issue DMA xfer\n",
-+				 __func__, imxdmac->channel);
-+		} else {
-+			list_move_tail(imxdmac->ld_queue.next,
-+				       &imxdmac->ld_active);
-+		}
-+	}
-+	spin_unlock_irqrestore(&imxdmac->lock, flags);
- }
- 
- static int __init imxdma_probe(struct platform_device *pdev)
-@@ -399,11 +576,18 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 		imxdmac->imxdma = imxdma;
- 		spin_lock_init(&imxdmac->lock);
- 
-+		INIT_LIST_HEAD(&imxdmac->ld_queue);
-+		INIT_LIST_HEAD(&imxdmac->ld_free);
-+		INIT_LIST_HEAD(&imxdmac->ld_active);
-+
-+		tasklet_init(&imxdmac->dma_tasklet, imxdma_tasklet,
-+			     (unsigned long)imxdmac);
- 		imxdmac->chan.device = &imxdma->dma_device;
- 		imxdmac->channel = i;
- 
- 		/* Add the channel to the DMAC list */
--		list_add_tail(&imxdmac->chan.device_node, &imxdma->dma_device.channels);
-+		list_add_tail(&imxdmac->chan.device_node,
-+			      &imxdma->dma_device.channels);
- 	}
- 
- 	imxdma->dev = &pdev->dev;
--- 
-1.7.0.4
+Can this node be updated during the board initialization with a detected
+TCLK value ?
+
+Or maybe this clock-frequency can reference a TCLK frequency defined in
+a board specific dts (I don't know if the DT format allow such things) ?
+
+Regards,
+
+Simon
+
+>  };
+>  
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index 6fc41ae..7ef5fb7 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -135,7 +135,6 @@ static void __init kirkwood_dt_init(void)
+>  #endif
+>  
+>  	/* internal devices that every board has */
+> -	kirkwood_wdt_init();
+>  	kirkwood_xor0_init();
+>  	kirkwood_xor1_init();
+>  	kirkwood_crypto_init();
+> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> index 0c0375f..35dc40b 100644
+> --- a/arch/arm/mach-kirkwood/common.c
+> +++ b/arch/arm/mach-kirkwood/common.c
+> @@ -303,7 +303,7 @@ void __init kirkwood_xor1_init(void)
+>  /*****************************************************************************
+>   * Watchdog
+>   ****************************************************************************/
+> -void __init kirkwood_wdt_init(void)
+> +static void __init kirkwood_wdt_init(void)
+>  {
+>  	orion_wdt_init(kirkwood_tclk);
+>  }
+> diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+> index ca08826..ac4b2fb 100644
+> --- a/arch/arm/mach-kirkwood/common.h
+> +++ b/arch/arm/mach-kirkwood/common.h
+> @@ -53,7 +53,6 @@ void kirkwood_restart(char, const char *);
+>  
+>  char *kirkwood_id(void);
+>  void kirkwood_l2_init(void);
+> -void kirkwood_wdt_init(void);
+>  void kirkwood_xor0_init(void);
+>  void kirkwood_xor1_init(void);
+>  void kirkwood_crypto_init(void);
+> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> index 4ad78f8..4be76ca 100644
+> --- a/drivers/watchdog/orion_wdt.c
+> +++ b/drivers/watchdog/orion_wdt.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/fs.h>
+>  #include <linux/miscdevice.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of.h>
+>  #include <linux/watchdog.h>
+>  #include <linux/init.h>
+>  #include <linux/uaccess.h>
+> @@ -28,9 +29,9 @@
+>  /*
+>   * Watchdog timer block registers.
+>   */
+> -#define TIMER_CTRL		(TIMER_VIRT_BASE + 0x0000)
+> +#define TIMER_CTRL		0x0000
+>  #define  WDT_EN			0x0010
+> -#define WDT_VAL			(TIMER_VIRT_BASE + 0x0024)
+> +#define WDT_VAL			0x0024
+>  
+>  #define WDT_MAX_CYCLE_COUNT	0xffffffff
+>  #define WDT_IN_USE		0
+> @@ -40,6 +41,7 @@ static int nowayout = WATCHDOG_NOWAYOUT;
+>  static int heartbeat = -1;		/* module parameter (seconds) */
+>  static unsigned int wdt_max_duration;	/* (seconds) */
+>  static unsigned int wdt_tclk;
+> +static unsigned int wdt_reg;
+>  static unsigned long wdt_status;
+>  static DEFINE_SPINLOCK(wdt_lock);
+>  
+> @@ -48,7 +50,7 @@ static void orion_wdt_ping(void)
+>  	spin_lock(&wdt_lock);
+>  
+>  	/* Reload watchdog duration */
+> -	writel(wdt_tclk * heartbeat, WDT_VAL);
+> +	writel(wdt_tclk * heartbeat, wdt_reg + WDT_VAL);
+>  
+>  	spin_unlock(&wdt_lock);
+>  }
+> @@ -60,7 +62,7 @@ static void orion_wdt_enable(void)
+>  	spin_lock(&wdt_lock);
+>  
+>  	/* Set watchdog duration */
+> -	writel(wdt_tclk * heartbeat, WDT_VAL);
+> +	writel(wdt_tclk * heartbeat, wdt_reg + WDT_VAL);
+>  
+>  	/* Clear watchdog timer interrupt */
+>  	reg = readl(BRIDGE_CAUSE);
+> @@ -68,9 +70,9 @@ static void orion_wdt_enable(void)
+>  	writel(reg, BRIDGE_CAUSE);
+>  
+>  	/* Enable watchdog timer */
+> -	reg = readl(TIMER_CTRL);
+> +	reg = readl(wdt_reg + TIMER_CTRL);
+>  	reg |= WDT_EN;
+> -	writel(reg, TIMER_CTRL);
+> +	writel(reg, wdt_reg + TIMER_CTRL);
+>  
+>  	/* Enable reset on watchdog */
+>  	reg = readl(RSTOUTn_MASK);
+> @@ -92,9 +94,9 @@ static void orion_wdt_disable(void)
+>  	writel(reg, RSTOUTn_MASK);
+>  
+>  	/* Disable watchdog timer */
+> -	reg = readl(TIMER_CTRL);
+> +	reg = readl(wdt_reg + TIMER_CTRL);
+>  	reg &= ~WDT_EN;
+> -	writel(reg, TIMER_CTRL);
+> +	writel(reg, wdt_reg + TIMER_CTRL);
+>  
+>  	spin_unlock(&wdt_lock);
+>  }
+> @@ -102,7 +104,7 @@ static void orion_wdt_disable(void)
+>  static int orion_wdt_get_timeleft(int *time_left)
+>  {
+>  	spin_lock(&wdt_lock);
+> -	*time_left = readl(WDT_VAL) / wdt_tclk;
+> +	*time_left = readl(wdt_reg + WDT_VAL) / wdt_tclk;
+>  	spin_unlock(&wdt_lock);
+>  	return 0;
+>  }
+> @@ -236,15 +238,23 @@ static struct miscdevice orion_wdt_miscdev = {
+>  static int __devinit orion_wdt_probe(struct platform_device *pdev)
+>  {
+>  	struct orion_wdt_platform_data *pdata = pdev->dev.platform_data;
+> +	struct device_node *np = pdev->dev.of_node;
+>  	int ret;
+>  
+> -	if (pdata) {
+> +	if (pdata)
+>  		wdt_tclk = pdata->tclk;
+> -	} else {
+> -		printk(KERN_ERR "Orion Watchdog misses platform data\n");
+> +
+> +	of_property_read_u32(np, "clock-frequency", &wdt_tclk);
+> +
+> +	if (!wdt_tclk) {
+> +		printk(KERN_ERR "Orion Watchdog can't get clock freq\n");
+>  		return -ENODEV;
+>  	}
+>  
+> +	wdt_reg = TIMER_VIRT_BASE;
+> +
+> +	of_property_read_u32(np, "reg", &wdt_reg);
+> +
+>  	if (orion_wdt_miscdev.parent)
+>  		return -EBUSY;
+>  	orion_wdt_miscdev.parent = &pdev->dev;
+> @@ -284,6 +294,15 @@ static void orion_wdt_shutdown(struct platform_device *pdev)
+>  		orion_wdt_disable();
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static struct of_device_id orion_wdt_of_match_table[] = {
+> +	{ .compatible = "marvell,orion-wdt", },
+> +	{},
+> +};
+> +#else
+> +#define orion_wdt_of_match_table NULL
+> +#endif
+> +
+>  static struct platform_driver orion_wdt_driver = {
+>  	.probe		= orion_wdt_probe,
+>  	.remove		= __devexit_p(orion_wdt_remove),
+> @@ -291,6 +310,7 @@ static struct platform_driver orion_wdt_driver = {
+>  	.driver		= {
+>  		.owner	= THIS_MODULE,
+>  		.name	= "orion_wdt",
+> +		.of_match_table = orion_wdt_of_match_table,
+>  	},
+>  };
+>  
+> -- 
+> 1.7.3.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120302/8a34daf6/attachment.sig>
