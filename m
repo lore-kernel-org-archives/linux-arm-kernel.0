@@ -1,31 +1,56 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Fri, 2 Mar 2012 14:45:43 +0900
-Subject: [PATCH v9 0/2] iommu/exynos: Add IOMMU/System MMU driver for
- Samsung Exynos
-In-Reply-To: <CAH9JG2Vg8o_mm0gM042T0-kjMUoAdLzF+DeGErD7R86H0xqXZQ@mail.gmail.com>
-References: <001801ccf5e3$69d79860$3d86c920$%cho@samsung.com>
- <CAH9JG2Vg8o_mm0gM042T0-kjMUoAdLzF+DeGErD7R86H0xqXZQ@mail.gmail.com>
-Message-ID: <CAHQjnONxO32WP40sJz80=rjv3kqxmx55MUvjvhhO_mo3DNH8-A@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 1 Mar 2012 22:49:40 -0700 (MST)
+Subject: [PATCH-V2 2/2] arm:omap:am33xx: Add power domain data
+In-Reply-To: <79CD15C6BA57404B839C016229A409A8317E5134@DBDE01.ent.ti.com>
+References: <1324803628-16790-1-git-send-email-hvaibhav@ti.com>
+ <1324803628-16790-3-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1202291810230.12752@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A8317E5134@DBDE01.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1203011847480.22980@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2012 at 4:01 PM, Kyungmin Park
-<kyungmin.park@samsung.com> wrote:
-> Hi,
->
-> Some comments.
-> 1. It's not same patch series. since it has additional feature,
-> exynos5 series support which don't covered at previous time.
-> 2. It assumes that name conversion is based on exynos5 as default. now
-> you use gsc at exynos4 even though there's no gsc block. It should be
-> fimc.
+Hi
 
-Thanks. I agree about the second and applied it in the next patchset.
+On Thu, 1 Mar 2012, Hiremath, Vaibhav wrote:
 
->
-> So I suggest to send exynos4 series patch as before and send
-> additional exynos5 patch series next.
->
+> I am not sure whether we access these bits explicitly. If I understand 
+> correctly, API's which access these bits are not being called from 
+> anywhere, For example,
+> 
+> 	omap4_pwrdm_read_mem_retst
+> 	omap4_pwrdm_set_mem_retst
+> 	omap4_pwrdm_set_mem_onst
 
-I will just extract a new patch that removes existing system MMU driver from
-the previous 2 patches and the patchset will consist of 3 patches.
+They'll be needed for the functional powerstate code, device PM QoS, and 
+OSWR.
+
+> Currently the major issue would be, for PM_PER_PWRSTCTRL, where 
+> LogicRETState bit has been moved to offset 3. This is being used in 
+> omap4_pwrdm_set_logic_retst() api.
+> 
+> And in order to support weird/non-standard bit-offsets, we have to clean 
+> omap2_pwrdm_get_mem_bank_onstate/retst/_mask() api and have bitshift 
+> field in struct powerdomain, as you have rightly pointed out.
+
+As you work on this, I have a request.  Please place the AM33xx 
+powerdomain implementation functions into a separate file, 
+powerdomain33xx.c perhaps, rather than trying to merge them with the OMAP4 
+powerdomain implementation functions.
+
+Some functions can be shared -- maybe place those into a separate file, 
+powerdomain33xx_44xx.c perhaps?
+
+> Is my all understanding correct?
+> 
+> If yes, do you think this patch should get blocked for above cleanup? I feel
+> Cleanup can still follow, since this won't impact the AM33xx boot.
+> 
+> What's your opinion on this??
+
+We can't merge patches which are known to be broken.  That's a rule from 
+Linus (and a good one).  Better to try to get it right the first time it 
+hits mainline.
+
+
+- Paul
