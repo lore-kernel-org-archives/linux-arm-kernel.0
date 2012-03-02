@@ -1,122 +1,371 @@
-From: jason@lakedaemon.net (Jason)
-Date: Fri, 2 Mar 2012 10:36:14 -0500
-Subject: [PATCH 4/4] ARM: kirkwood: convert orion-wdt to fdt.
-In-Reply-To: <201203021456.47896.arnd@arndb.de>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <20120302091510.GC29461@kw.sim.vm.gnt>
- <20120302141541.GE11986@titan.lakedaemon.net>
- <201203021456.47896.arnd@arndb.de>
-Message-ID: <20120302153614.GG11986@titan.lakedaemon.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 2 Mar 2012 23:37:46 +0800
+Subject: [PATCH] MM: CMA: add a simple kernel module as the helper to test
+ CMA
+In-Reply-To: <op.wajuip2a3l0zgt@mpn-glaptop>
+References: <1330656742-5233-1-git-send-email-Barry.Song@csr.com>
+ <op.wajuip2a3l0zgt@mpn-glaptop>
+Message-ID: <CAGsJ_4zz=C2k3pvc=1_=iviSUkz78QCF+yumEEMaknysLHFxag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2012 at 02:56:47PM +0000, Arnd Bergmann wrote:
-> On Friday 02 March 2012, Jason wrote:
-> > Grr... good catch.  I originally had this in kirkwood-dreamplug.dts,
-> > which is always 200000000.  That's not the case in kirkwood.dtsi.  What
-> > I would like to do, and I haven't had time to look into it (I thought I
-> > would tackle it later as a refinement :-( ), is a reference of some
-> > sort, eg:
-> > 
-> > in kirkwood.dtsi:
-> > 
-> > / {
-> >         compatible = "marvell,kirkwood";
-> >         tclk:clock-frequency = <200000000>;
-> > 
-> >         wdt at fed20300 {
-> >                 compatible = "marvell,orion-wdt";
-> >                 reg = <0xfed20300 0x28>;
-> >                 clock-frequency = &tclk;
-> >         };
-> > };
-> > 
-> > then, in kirkwood-foobar.dts
-> > 
-> > include "kirkwood.dtsi"
-> > 
-> > / {
-> >         model = "foobar";
-> >         compatible = "...";
-> >         tclk:clock-frequency = <166000000>;
-> > };
-> > 
-> > but I'm not sure if that would work.
-> 
-> That would make wdt at fed20300/clock-frequency a phandle pointing to the
-> root property, which is not what we want here.
+2012/3/2 Michal Nazarewicz <mina86@mina86.com>:
+> On Fri, 02 Mar 2012 03:52:22 +0100, Barry Song <Barry.Song@csr.com> wrote:
+>
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> Any write request to /dev/cma_test will let the module to allocate memory
+>> from
+>> CMA, for example:
+>>
+>> 1st time
+>> $ echo 0 > /dev/cma_test
+>> will require cma_test to request 1MB
+>> 2nd time
+>> $ echo 0 > /dev/cma_test
+>> will require cma_test to request 2MB
+>>
+>> Any read request to /dev/cma_test will let the module to free memory from
+>> CMA,
+>> for example:
+>>
+>> 1st time
+>> $ cat /dev/cma_test
+>> will require cma_test to free the 1MB allocated in the first write request
+>> 2nd time
+>> $ echo 0 > /dev/cma_test
+>> will require cma_test to free the 2MB allocated in the second write
+>> request
+>
+>
+> Looks quite all right. ?It has a race condition but I guess for a test
+> device it's
+> not that big of a deal (I think the race cannot cause panic). ?Either way,
+> would be
+> nice if one could specify how much memory device should allocate. ?How about
+> those
+> changes:
 
-The 200000000 value is not the actual value used in most drivers [1],
-but rather the speed of the system clock [2] (hence, my inclination to
-make it a root property), the drivers have been pulling this number from
-a global variable [3] and dividing/rounding it as needed for their own needs
-[1].
+Michal, i think these improvements have maken the cma_test much more
+useful and flexible.
 
-Since it's derived from the SoC core [2], it would seem to make sense to
-have a root "clock-frequency" in the board dts.  Am I missing something?
-Is there a better way to do this?
+>
+> diff --git a/tools/cma/cma_test.c b/tools/cma/cma_test.c
+> index 3ee89f3..3d3b074 100644
+> --- a/tools/cma/cma_test.c
+> +++ b/tools/cma/cma_test.c
+> @@ -6,66 +6,96 @@
+>
+> ?* Licensed under GPLv2 or later.
+> ?*/
+>
+> -#include <linux/module.h>
+> ?#include <linux/device.h>
+> +#include <linux/dma-mapping.h>
+> ?#include <linux/fs.h>
+> +#include <linux/list.h>
+> ?#include <linux/miscdevice.h>
+> -#include <linux/dma-mapping.h>
+> +#include <linux/module.h>
+> +#include <linux/spinlock.h>
+> +
+> +struct cma_allocation {
+> + ? ? ? struct list_head list;
+> + ? ? ? unsigned long size;
+> + ? ? ? dma_addr_t dma;
+> + ? ? ? void *virt;
+> +};
+>
+> -#define CMA_NUM ?10
+> ?static struct device *cma_dev;
+> -static dma_addr_t dma_phys[CMA_NUM];
+> -static void *dma_virt[CMA_NUM];
+> +static LIST_HEAD(cma_allocations);
+> +static DEFINE_SPINLOCK(cma_lock);
+>
+>
+> -/* any read request will free coherent memory, eg.
+> +/*
+> + * Any read request will free a single coherent memory, eg.
+> ?* cat /dev/cma_test
+> ?*/
+> ?static ssize_t
+>
+> ?cma_test_read(struct file *file, char __user *buf, size_t count, loff_t
+> *ppos)
+> ?{
+> - ? ? ? int i;
+> -
+> - ? ? ? for (i = 0; i < CMA_NUM; i++) {
+> - ? ? ? ? ? ? ? if (dma_virt[i]) {
+> - ? ? ? ? ? ? ? ? ? ? ? dma_free_coherent(cma_dev, (i + 1) * SZ_1M,
+> dma_virt[i], dma_phys[i]);
+> - ? ? ? ? ? ? ? ? ? ? ? _dev_info(cma_dev, "free virt: %p phys: %p\n",
+> dma_virt[i], (void *)dma_phys[i]);
+> - ? ? ? ? ? ? ? ? ? ? ? dma_virt[i] = NULL;
+> - ? ? ? ? ? ? ? ? ? ? ? break;
+> - ? ? ? ? ? ? ? }
+> + ? ? ? struct cma_allocation *alloc = NULL;
+> +
+> + ? ? ? spin_lock(&cma_lock);
+> + ? ? ? if (!list_empty(&cma_allocations)) {
+> + ? ? ? ? ? ? ? alloc = list_first_entry(&cma_allocations,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cma_allocation, list);
+> + ? ? ? ? ? ? ? list_del(&alloc->list);
+> ? ? ? ?}
+> + ? ? ? spin_unlock(&cma_lock);
+> +
+> + ? ? ? if (alloc) {
+> + ? ? ? ? ? ? ? dma_free_coherent(cma_dev, alloc->size, alloc->virt,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? alloc->dma);
+>
+> + ? ? ? ? ? ? ? _dev_info(cma_dev, "free virt: %p phys: %p\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? alloc->phys, (void *)alloc->dma);
+> + ? ? ? ? ? ? ? kfree(alloc);
+> + ? ? ? }
+> +
+> ? ? ? ?return 0;
+>
+> ?}
+>
+> ?/*
+> - * any write request will alloc coherent memory, eg.
+> - * echo 0 > /dev/cma_test
+> + * Writes request specified number of pages, eg.
+> + * echo 1024 > /dev/cma_test
+> ?*/
+>
+> ?static ssize_t
+> -cma_test_write(struct file *file, const char __user *buf, size_t count,
+> loff_t *ppos)
+> +cma_test_write(struct file *file, const char __user *buf, size_t count,
+> + ? ? ? ? ? ? ?loff_t *ppos)
+> ?{
+> - ? ? ? int i;
+> + ? ? ? struct cma_allocation *alloc;
+> ? ? ? ?int ret;
+>
+> - ? ? ? for (i = 0; i < CMA_NUM; i++) {
+> - ? ? ? ? ? ? ? if (!dma_virt[i]) {
+> - ? ? ? ? ? ? ? ? ? ? ? dma_virt[i] = dma_alloc_coherent(cma_dev, (i + 1) *
+> SZ_1M, &dma_phys[i], GFP_KERNEL);
+> -
+> - ? ? ? ? ? ? ? ? ? ? ? if (dma_virt[i]) {
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *p;
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* touch every page in the allocated memory
+> */
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? for (p = dma_virt[i]; p < ?dma_virt[i] + (i
+> + 1) * SZ_1M; p += PAGE_SIZE)
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *(u32 *)p = 0;
+> -
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? _dev_info(cma_dev, "alloc virt: %p phys:
+> %p\n", dma_virt[i], (void *)dma_phys[i]);
+> - ? ? ? ? ? ? ? ? ? ? ? } else {
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_err(cma_dev, "no mem in CMA area\n");
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret = -ENOMEM;
+> - ? ? ? ? ? ? ? ? ? ? ? }
+> - ? ? ? ? ? ? ? ? ? ? ? break;
+> - ? ? ? ? ? ? ? }
+> - ? ? ? }
+> + ? ? ? alloc = kmalloc(sizeof *alloc, GFP_KERNEL);
+> + ? ? ? if (!alloc)
+> + ? ? ? ? ? ? ? return -ENOMEM;
+> +
+> + ? ? ? ret = kstrtouint_from_user(buf, count, 0, &alloc->size);
+> + ? ? ? if (ret)
+> + ? ? ? ? ? ? ? return ret;
+> +
+> + ? ? ? if (!alloc->size)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? if (alloc->size > (ULONG_MAX << PAGE_SHIFT))
+> + ? ? ? ? ? ? ? return -EOVERFLOW;
+>
+> - ? ? ? return count;
+> + ? ? ? alloc->size >>= PAGE_SHIFT;
+> + ? ? ? alloc->virt = dma_alloc_coherent(cma_dev, alloc->size,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&alloc->dma, GFP_KERNEL);
+> +
+> + ? ? ? if (alloc->virt) {
+> + ? ? ? ? ? ? ? _dev_info(cma_dev, "alloc virt: %p phys: %p\n", alloc->virt,
+> + ? ? ? ? ? ? ? ? ? ? ? ? (void *)alloc->dma);
+> +
+> + ? ? ? ? ? ? ? spin_lock(&cma_lock);
+> + ? ? ? ? ? ? ? list_add_tail(&alloc->list, &cma_allocations);
+> + ? ? ? ? ? ? ? spin_unlock(&cma_lock);
+> +
+> + ? ? ? ? ? ? ? return count;
+> + ? ? ? } else {
+>
+> + ? ? ? ? ? ? ? dev_err(cma_dev, "no mem in CMA area\n");
+> + ? ? ? ? ? ? ? kfree(alloc);
+> + ? ? ? ? ? ? ? return -ENOSPC;
+> + ? ? ? }
+>
+> ?}
+>
+> ?static const struct file_operations cma_test_fops = {
+>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>> ?tools/cma/Makefile ? | ? 13 ++++++
+>> ?tools/cma/cma_test.c | ?108
+>> ++++++++++++++++++++++++++++++++++++++++++++++++++
+>> ?2 files changed, 121 insertions(+), 0 deletions(-)
+>> ?create mode 100644 tools/cma/Makefile
+>> ?create mode 100644 tools/cma/cma_test.c
+>>
+>> diff --git a/tools/cma/Makefile b/tools/cma/Makefile
+>> new file mode 100644
+>> index 0000000..d15c2c0
+>> --- /dev/null
+>> +++ b/tools/cma/Makefile
+>> @@ -0,0 +1,13 @@
+>> +# Kernel modules
+>> +#
+>> +# To compile for ARM:
+>> +# make ARCH=arm CC=arm-none-linux-gnueabi-gcc
+>> +#
+>> +obj-m ?+= cma_test.o
+>> +
+>> +build: kernel_modules
+>> +
+>> +kernel_modules:
+>> + ? ? ? ${MAKE} -C $(CURDIR)/../.. M=$(CURDIR)
+>> +clean:
+>> + ? ? ? ${MAKE} -C $(CURDIR)/../.. M=$(CURDIR) clean
+>> diff --git a/tools/cma/cma_test.c b/tools/cma/cma_test.c
+>> new file mode 100644
+>> index 0000000..3ee89f3
+>> --- /dev/null
+>> +++ b/tools/cma/cma_test.c
+>> @@ -0,0 +1,108 @@
+>> +/*
+>> + * kernel module helper for testing CMA
+>> + *
+>> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group
+>> company.
+>> + *
+>> + * Licensed under GPLv2 or later.
+>> + */
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/device.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/miscdevice.h>
+>> +#include <linux/dma-mapping.h>
+>> +
+>> +#define CMA_NUM ?10
+>> +static struct device *cma_dev;
+>> +static dma_addr_t dma_phys[CMA_NUM];
+>> +static void *dma_virt[CMA_NUM];
+>> +
+>> +/* any read request will free coherent memory, eg.
+>> + * cat /dev/cma_test
+>> + */
+>> +static ssize_t
+>> +cma_test_read(struct file *file, char __user *buf, size_t count, loff_t
+>> *ppos)
+>> +{
+>> + ? ? ? int i;
+>> +
+>> + ? ? ? for (i = 0; i < CMA_NUM; i++) {
+>> + ? ? ? ? ? ? ? if (dma_virt[i]) {
+>> + ? ? ? ? ? ? ? ? ? ? ? dma_free_coherent(cma_dev, (i + 1) * SZ_1M,
+>> dma_virt[i], dma_phys[i]);
+>> + ? ? ? ? ? ? ? ? ? ? ? _dev_info(cma_dev, "free virt: %p phys: %p\n",
+>> dma_virt[i], (void *)dma_phys[i]);
+>> + ? ? ? ? ? ? ? ? ? ? ? dma_virt[i] = NULL;
+>> + ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? ? }
+>> + ? ? ? }
+>> + ? ? ? return 0;
+>> +}
+>> +
+>> +/*
+>> + * any write request will alloc coherent memory, eg.
+>> + * echo 0 > /dev/cma_test
+>> + */
+>> +static ssize_t
+>> +cma_test_write(struct file *file, const char __user *buf, size_t count,
+>> loff_t *ppos)
+>> +{
+>> + ? ? ? int i;
+>> + ? ? ? int ret;
+>> +
+>> + ? ? ? for (i = 0; i < CMA_NUM; i++) {
+>> + ? ? ? ? ? ? ? if (!dma_virt[i]) {
+>> + ? ? ? ? ? ? ? ? ? ? ? dma_virt[i] = dma_alloc_coherent(cma_dev, (i + 1)
+>> * SZ_1M, &dma_phys[i], GFP_KERNEL);
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? ? if (dma_virt[i]) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *p;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* touch every page in the allocated
+>> memory */
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? for (p = dma_virt[i]; p < ?dma_virt[i] +
+>> (i + 1) * SZ_1M; p += PAGE_SIZE)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? *(u32 *)p = 0;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? _dev_info(cma_dev, "alloc virt: %p phys:
+>> %p\n", dma_virt[i], (void *)dma_phys[i]);
+>> + ? ? ? ? ? ? ? ? ? ? ? } else {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_err(cma_dev, "no mem in CMA area\n");
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret = -ENOMEM;
+>> + ? ? ? ? ? ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? ? }
+>> + ? ? ? }
+>> +
+>> + ? ? ? return count;
+>> +}
+>> +
+>> +static const struct file_operations cma_test_fops = {
+>> + ? ? ? .owner = ? ?THIS_MODULE,
+>> + ? ? ? .read ?= ? ?cma_test_read,
+>> + ? ? ? .write = ? ?cma_test_write,
+>> +};
+>> +
+>> +static struct miscdevice cma_test_misc = {
+>> + ? ? ? .name = "cma_test",
+>> + ? ? ? .fops = &cma_test_fops,
+>> +};
+>> +
+>> +static int __init cma_test_init(void)
+>> +{
+>> + ? ? ? int ret = 0;
+>> +
+>> + ? ? ? ret = misc_register(&cma_test_misc);
+>> + ? ? ? if (unlikely(ret)) {
+>> + ? ? ? ? ? ? ? pr_err("failed to register cma test misc device!\n");
+>> + ? ? ? ? ? ? ? return ret;
+>> + ? ? ? }
+>> + ? ? ? cma_dev = cma_test_misc.this_device;
+>> + ? ? ? cma_dev->coherent_dma_mask = ~0;
+>> + ? ? ? _dev_info(cma_dev, "registered.\n");
+>> +
+>> + ? ? ? return ret;
+>> +}
+>> +module_init(cma_test_init);
+>> +
+>> +static void __exit cma_test_exit(void)
+>> +{
+>> + ? ? ? misc_deregister(&cma_test_misc);
+>> +}
+>> +module_exit(cma_test_exit);
+>> +
+>> +MODULE_LICENSE("GPL");
+>> +MODULE_AUTHOR("Barry Song <Baohua.Song@csr.com>");
+>> +MODULE_DESCRIPTION("kernel module to help the test of CMA");
+>> +MODULE_ALIAS("CMA test");
+>
+>
+>
+> --
+> Best regards, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? _ ? ? _
+> .o. | Liege of Serenely Enlightened Majesty of ? ? ?o' \,=./ `o
+> ..o | Computer Science, ?Micha? ?mina86? Nazarewicz ? ?(o o)
+> ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+>
+>
 
-> > In any case, the simplest answer is to set clock-frequency in
-> > kirkwood-dreamplug.dts as a root node property, and then each driver
-> > that needs tclk, requests the clock-frequency from the root node.
-> > Hopefully, Grant can chime in on this one.
-> 
-> I think you can just pick a reasonable default value for
-> wdt at fed20300/clock-frequency, and let the board override that
-> by setting it to something else if necessary.
-
-True, for now, I can just set clock-frequency for each device to the
-exact same value and we'll polish later once we have a better idea of
-the pattern it's following.
-
-> I suppose this will also change a bit when kirkwood gets moved over to
-> generic clk support in the future and starts using the clk binding
-> instead of what you do now.
-
-Yes, I don't want to over-think it, but I would like to make sure it's
-in the correct place, since it is a global property of the board.
-
-thanks for the review,
-
-Jason.
-
-[1] drivers/spi/spi-orion.c:110-117,500,501
-
-# 110-117 ### orion_spi_baudrate_set()
-        tclk_hz = orion_spi->tclk;
-
-        /*
-         * the supported rates are: 4,6,8...30
-         * round up as we look for equal or less speed
-         */
-        rate = DIV_ROUND_UP(tclk_hz, speed);
-        rate = roundup(rate, 2);
-# 500-501 ### orion_spi_probe()
-        spi->max_speed = DIV_ROUND_UP(spi->tclk, 4);
-        spi->min_speed = DIV_ROUND_UP(spi->tclk, 30);
-#############
-
-[2] arch/arm/mach-kirkwood/common.c:320-332
-
-# 320-332 ###
-int kirkwood_tclk;
-
-static int __init kirkwood_find_tclk(void)
-{
-        u32 dev, rev;
-
-        kirkwood_pcie_id(&dev, &rev);
-
-        if (dev == MV88F6281_DEV_ID || dev == MV88F6282_DEV_ID)
-                if (((readl(SAMPLE_AT_RESET) >> 21) & 1) == 0)
-                        return 200000000;
-
-        return 166666667;
-}
-#############
-
-[3] arch/arm/mach-kirkwood/common.c:235
-
-# 235 ####### kirkwood_spi_init()
-        orion_spi_init(SPI_PHYS_BASE, kirkwood_tclk);
-#############
+-barry
