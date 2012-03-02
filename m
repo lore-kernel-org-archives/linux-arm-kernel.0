@@ -1,32 +1,33 @@
 From: alan@signal11.us (Alan Ott)
-Date: Fri,  2 Mar 2012 15:58:35 -0500
-Subject: [PATCH v2 4/6] ARM: tegra: work around tegra THUMB2_KERNEL bug
-Message-ID: <1330721915-8739-1-git-send-email-alan@signal11.us>
+Date: Fri,  2 Mar 2012 15:58:39 -0500
+Subject: [PATCH v2 5/6] ARM: tegra: USB_ULPI needs USB
+Message-ID: <1330721919-8800-1-git-send-email-alan@signal11.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Arnd Bergmann <arnd@arndb.de>
 
-The tegra smp code cannot currently be built for t2, so
-disable that combination for now, as a workaround.
+The USB_ULPI driver is selected by tegra, but can only be
+built if at least one of USB or USB_GADGET is enabled.
+The kernel fails to link if both are off.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Alan Ott <alan@signal11.us>
 ---
- arch/arm/Kconfig |    1 +
+ arch/arm/mach-tegra/Kconfig |    1 +
  1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a48aecc..ea1d59b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1598,6 +1598,7 @@ config HZ
- config THUMB2_KERNEL
- 	bool "Compile the kernel in Thumb-2 mode (EXPERIMENTAL)"
- 	depends on CPU_V7 && !CPU_V6 && !CPU_V6K && EXPERIMENTAL
-+	depends on !SMP || !ARCH_TEGRA
- 	select AEABI
- 	select ARM_ASM_UNIFIED
- 	select ARM_UNWIND
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 60f3e4b..9bb8a37 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -10,6 +10,7 @@ config ARCH_TEGRA_2x_SOC
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB_SUPPORT
+ 	select USB_ULPI_VIEWPORT if USB_SUPPORT
++	select USB_GADGET if USB_SUPPORT && !USB
+ 	select CPU_FREQ_TABLE if CPU_FREQ
+ 	help
+ 	  Support for NVIDIA Tegra AP20 and T20 processors, based on the
 -- 
 1.7.0.4
