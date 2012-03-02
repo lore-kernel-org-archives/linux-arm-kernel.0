@@ -1,64 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 2 Mar 2012 18:32:33 +0000
-Subject: [PATCH 5/5 v2] ARM: kirkwood: convert orion-wdt to fdt.
-In-Reply-To: <e2fe5e97a83fc753559bbb18d5d111ed01b89034.1330709314.git.jason@lakedaemon.net>
-References: <cover.1330709314.git.jason@lakedaemon.net>
- <e2fe5e97a83fc753559bbb18d5d111ed01b89034.1330709314.git.jason@lakedaemon.net>
-Message-ID: <201203021832.34901.arnd@arndb.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 02 Mar 2012 11:48:33 -0700
+Subject: [PATCH 1/4] gpiolib: Add gpiochip_find_by_name() and
+ gpio_find_by_chip_name()
+In-Reply-To: <20120302180848.GM18901@atomide.com>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+ <20120301185524.29210.60381.stgit@kaulin.local>
+ <20120302075804.F28DB3E2DB4@localhost> <20120302170327.GF18901@atomide.com>
+ <20120302180848.GM18901@atomide.com>
+Message-ID: <20120302184833.C296A3E1C63@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 March 2012, Jason Cooper wrote:
-> +       wdt_reg = (void __iomem *)TIMER_VIRT_BASE;
-> +
-> +       ret = of_address_to_resource(np, 0, &res);
-> +       if (ret) {
-> +               printk(KERN_ERR "invalid address\n");
-> +               return ret;
-> +       }
-> +
-> +       wdt_reg = ioremap(res.start, res.end - res.start);
-> +
+On Fri, 2 Mar 2012 10:08:48 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [120302 08:31]:
+> > * Grant Likely <grant.likely@secretlab.ca> [120302 01:00]:
+> > > On Thu, 01 Mar 2012 10:55:24 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> > > > +
+> > > > +/**
+> > > > + * gpiochip_find_by_name() - iterator for locating a gpio_chip by name
+> > > > + * @name: name of the gpio_chip
+> > > > + *
+> > > > + * Similar to bus_find_device_by_name. It returns a reference to the
+> > > > + * first gpio_chip with matching name. It ignores NULL and empty names.
+> > > > + * If you need to do something more complex, then use gpiochip_find.
+> > > > + */
+> > > > +struct gpio_chip *gpiochip_find_by_name(const char *name)
+> > > > +{
+> > > > +	if (!name || !strcmp(name, ""))
+> > > > +		return NULL;
+> > > > +
+> > > > +	return gpiochip_find((void *)name, match_name);
+> > > 
+> > > Nasty cast.  Can the signature for gpiochip_find be changed to accept
+> > > a (const void *)?
+> > 
+> > I think so, this too comes from the bus code.
+> 
+> Looks like it can't be const as of_node_to_gpiochip uses it with
+> a struct device_node * that for of_get_named_gpio_flags comes from
+> of_parse_phandle_with_args.
 
-This will break non-dt uses because you overwrite the wdt_reg value.
+Really? It sees to work fine here:
 
-As I commented before, I think the best approach would be to
-provide a hardcoded resource for the device in the legacy case
-and just use platform_get_resource() to get the resource
-and ioremap it in either case.
+---
 
-of_address_to_resource() works only for the DT case, while
-platform_get_resource() works in either case.
-
-You need to add something like
-
-8<---
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 089899a..d16f43f 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -568,13 +568,17 @@ void __init orion_spi_1_init(unsigned long mapbase,
-  ****************************************************************************/
- static struct orion_wdt_platform_data orion_wdt_data;
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index d773540..e633a2a 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1152,8 +1152,9 @@ EXPORT_SYMBOL_GPL(gpiochip_remove);
+  * non-zero, this function will return to the caller and not iterate over any
+  * more gpio_chips.
+  */
+-struct gpio_chip *gpiochip_find(void *data,
+-				int (*match)(struct gpio_chip *chip, void *data))
++struct gpio_chip *gpiochip_find(const void *data,
++				int (*match)(struct gpio_chip *chip,
++					     const void *data))
+ {
+ 	struct gpio_chip *chip = NULL;
+ 	unsigned long flags;
+diff --git a/drivers/of/gpio.c b/drivers/of/gpio.c
+index e034b38..bba8121 100644
+--- a/drivers/of/gpio.c
++++ b/drivers/of/gpio.c
+@@ -229,7 +229,7 @@ void of_gpiochip_remove(struct gpio_chip *chip)
+ }
  
-+static struct resource orion_wdt_resource =
-+               DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x28);
-+
- static struct platform_device orion_wdt_device = {
-        .name           = "orion_wdt",
-        .id             = -1,
-        .dev            = {
-                .platform_data  = &orion_wdt_data,
-        },
--       .num_resources  = 0,
-+       .resources      = &orion_wdt_resource,
-+       .num_resources  = 1,
- };
+ /* Private function for resolving node pointer to gpio_chip */
+-static int of_gpiochip_is_match(struct gpio_chip *chip, void *data)
++static int of_gpiochip_is_match(struct gpio_chip *chip, const void *data)
+ {
+ 	return chip->of_node == data;
+ }
+diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+index 1ff4e22..5f52690 100644
+--- a/include/asm-generic/gpio.h
++++ b/include/asm-generic/gpio.h
+@@ -142,9 +142,9 @@ extern int __must_check gpiochip_reserve(int start, int ngpio);
+ /* add/remove chips */
+ extern int gpiochip_add(struct gpio_chip *chip);
+ extern int __must_check gpiochip_remove(struct gpio_chip *chip);
+-extern struct gpio_chip *gpiochip_find(void *data,
++extern struct gpio_chip *gpiochip_find(const void *data,
+ 					int (*match)(struct gpio_chip *chip,
+-						     void *data));
++						     const void *data));
  
- void __init orion_wdt_init(unsigned long tclk)
----->8
-
-and an appropriate definition for TIMER_PHYS_BASE.
-
-
-	Arnd
+ 
+ /* Always use the library code for GPIO management calls,
