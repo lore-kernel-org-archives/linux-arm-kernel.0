@@ -1,43 +1,44 @@
-From: jason@lakedaemon.net (Jason)
-Date: Fri, 2 Mar 2012 12:56:18 -0500
-Subject: [PULL REQUEST] ARM: kirkwood: fdt: convert kirkwood init funcs
- to fdt
-In-Reply-To: <20120302175233.GM11986@titan.lakedaemon.net>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <cover.1330709314.git.jason@lakedaemon.net>
- <20120302175233.GM11986@titan.lakedaemon.net>
-Message-ID: <20120302175618.GN11986@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Mar 2012 10:08:48 -0800
+Subject: [PATCH 1/4] gpiolib: Add gpiochip_find_by_name() and
+ gpio_find_by_chip_name()
+In-Reply-To: <20120302170327.GF18901@atomide.com>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+ <20120301185524.29210.60381.stgit@kaulin.local>
+ <20120302075804.F28DB3E2DB4@localhost>
+ <20120302170327.GF18901@atomide.com>
+Message-ID: <20120302180848.GM18901@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops, forgot to remove the Re:...
+* Tony Lindgren <tony@atomide.com> [120302 08:31]:
+> * Grant Likely <grant.likely@secretlab.ca> [120302 01:00]:
+> > On Thu, 01 Mar 2012 10:55:24 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> > > +
+> > > +/**
+> > > + * gpiochip_find_by_name() - iterator for locating a gpio_chip by name
+> > > + * @name: name of the gpio_chip
+> > > + *
+> > > + * Similar to bus_find_device_by_name. It returns a reference to the
+> > > + * first gpio_chip with matching name. It ignores NULL and empty names.
+> > > + * If you need to do something more complex, then use gpiochip_find.
+> > > + */
+> > > +struct gpio_chip *gpiochip_find_by_name(const char *name)
+> > > +{
+> > > +	if (!name || !strcmp(name, ""))
+> > > +		return NULL;
+> > > +
+> > > +	return gpiochip_find((void *)name, match_name);
+> > 
+> > Nasty cast.  Can the signature for gpiochip_find be changed to accept
+> > a (const void *)?
+> 
+> I think so, this too comes from the bus code.
 
-On Fri, Mar 02, 2012 at 12:52:33PM -0500, Jason wrote:
-> The following changes since commit 759a45185ac0e4dfaf8bbfcb390ec73aca4b7a34:
-> 
->   ARM: kirkwood: convert uart0 to devicetree. (2012-02-27 16:21:44 +0000)
-> 
-> are available in the git repository at:
->   git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt_test
-> 
-> Jason Cooper (5):
->       ARM: kirkwood: covert orion-spi to fdt.
->       ARM: kirkwood: move var setting to correct location.
->       ARM: kirkwood: fdt: absorb kirkwood_init()
->       ARM: kirkwood: convert rtc-mv to fdt.
->       ARM: kirkwood: convert orion-wdt to fdt.
-> 
->  arch/arm/boot/dts/kirkwood-dreamplug.dts |   34 +++++++++++++++
->  arch/arm/boot/dts/kirkwood.dtsi          |   12 +++++
->  arch/arm/mach-kirkwood/board-dt.c        |   67 +++++++++++------------------
->  arch/arm/mach-kirkwood/common.c          |   21 +++++++--
->  arch/arm/mach-kirkwood/common.h          |    6 +++
->  drivers/rtc/rtc-mv.c                     |    7 +++
->  drivers/spi/spi-orion.c                  |   37 +++++++++++++++--
->  drivers/watchdog/orion_wdt.c             |   48 ++++++++++++++++-----
->  8 files changed, 170 insertions(+), 62 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Looks like it can't be const as of_node_to_gpiochip uses it with
+a struct device_node * that for of_get_named_gpio_flags comes from
+of_parse_phandle_with_args.
+
+Regards,
+
+Tony
