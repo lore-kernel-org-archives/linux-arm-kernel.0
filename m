@@ -1,30 +1,34 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Fri, 02 Mar 2012 16:44:48 +0100
-Subject: [PATCH] MM: CMA: add a simple kernel module as the helper to test
- CMA
-In-Reply-To: <CAGsJ_4zz=C2k3pvc=1_=iviSUkz78QCF+yumEEMaknysLHFxag@mail.gmail.com>
-References: <1330656742-5233-1-git-send-email-Barry.Song@csr.com>
- <op.wajuip2a3l0zgt@mpn-glaptop>
- <CAGsJ_4zz=C2k3pvc=1_=iviSUkz78QCF+yumEEMaknysLHFxag@mail.gmail.com>
-Message-ID: <op.wajvcyle3l0zgt@mpn-glaptop>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 2 Mar 2012 16:53:41 +0100
+Subject: [PATCH] pinctrl: fix the pin descriptor kerneldoc
+Message-ID: <1330703621-4044-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 2012/3/2 Michal Nazarewicz <mina86@mina86.com>:
->> Looks quite all right.  It has a race condition but I guess for a test
->> device it's not that big of a deal (I think the race cannot cause
->> panic).  Either way, would be nice if one could specify how much memory
->> device should allocate.  How about those changes: [...]
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On Fri, 02 Mar 2012 16:37:46 +0100, Barry Song <21cnbao@gmail.com> wrote:
-> Michal, I think these improvements have maken the cma_test much more
-> useful and flexible.
+The introduction of the owner field on the pin descriptor was not
+properly documented so fix this up.
 
-Sure, no problem, just squash it and resend the patch and I'll take one more
-look at the result. :)
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/core.h |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
+index 97f8124..e1dfdb3 100644
+--- a/drivers/pinctrl/core.h
++++ b/drivers/pinctrl/core.h
+@@ -76,9 +76,7 @@ struct pinctrl {
+  *	datasheet or such
+  * @dynamic_name: if the name of this pin was dynamically allocated
+  * @lock: a lock to protect the descriptor structure
+- * @mux_requested: whether the pin is already requested by pinmux or not
+- * @mux_function: a named muxing function for the pin that will be passed to
+- *	subdrivers and shown in debugfs etc
++ * @owner: the device holding this pin or NULL of no device has claimed it
+  */
+ struct pin_desc {
+ 	struct pinctrl_dev *pctldev;
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+1.7.8
