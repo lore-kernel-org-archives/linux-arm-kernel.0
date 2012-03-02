@@ -1,112 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 2 Mar 2012 08:50:04 +0100
-Subject: [PATCH v3] ARM: mx3: Setup AIPS registers
-In-Reply-To: <1330522088-20357-1-git-send-email-festevam@gmail.com>
-References: <1330522088-20357-1-git-send-email-festevam@gmail.com>
-Message-ID: <20120302075004.GH3852@pengutronix.de>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Fri, 02 Mar 2012 15:51:55 +0800
+Subject: [PATCH v6 1/2] mfd: Add anatop mfd driver
+In-Reply-To: <D958900912E20642BCBC71664EFECE3E6DD2912252@BGMAIL02.nvidia.com>
+References: <1330593052-15184-1-git-send-email-paul.liu@linaro.org>
+ <1330671641-6439-1-git-send-email-paul.liu@linaro.org>
+ <D958900912E20642BCBC71664EFECE3E6DD2912252@BGMAIL02.nvidia.com>
+Message-ID: <4F507C1B.1050909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 10:28:08AM -0300, Fabio Estevam wrote:
-> It was observed on a mx31pdk board that audio playback only worked when the bootloader was Redboot, and 
-> did not work when U-boot was used. 
-> 
-> Comparing the sources of these bootloaders showed that the AIPS registers were not setup in U-boot.
-> 
-> Instead of relying on the bootloader to setup the AIPS registers, do it in the kernel so that audio
-> playback can work independantly of the bootloader being used.
-> 
-> Copied the AIPS settings from Redboot to the kernel.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-Applied, thanks.
-
-Sascha
-
-> ---
-> Changes since v2:
-> - Place mx_set_aips inside imx31_soc_init
-> Changes since v1:
-> - Make sure post_cpu_init() only runs on mx31
-> - Place imx_set_aips() in a common location so that other SoCs can use it.
-> - Improve comments about OPACRx
->  arch/arm/mach-imx/mm-imx3.c             |    3 +++
->  arch/arm/plat-mxc/cpu.c                 |   24 ++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/common.h |    1 +
->  3 files changed, 28 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-> index 6222151..77cf553 100644
-> --- a/arch/arm/mach-imx/mm-imx3.c
-> +++ b/arch/arm/mach-imx/mm-imx3.c
-> @@ -173,6 +173,9 @@ void __init imx31_soc_init(void)
->  	}
->  
->  	imx_add_imx_sdma("imx31-sdma", MX31_SDMA_BASE_ADDR, MX31_INT_SDMA, &imx31_sdma_pdata);
-> +
-> +	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS1_BASE_ADDR));
-> +	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS2_BASE_ADDR));
->  }
->  #endif /* ifdef CONFIG_SOC_IMX31 */
->  
-> diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
-> index f5b7e0f..220dd6f 100644
-> --- a/arch/arm/plat-mxc/cpu.c
-> +++ b/arch/arm/plat-mxc/cpu.c
-> @@ -1,5 +1,6 @@
->  
->  #include <linux/module.h>
-> +#include <linux/io.h>
->  #include <mach/hardware.h>
->  
->  unsigned int __mxc_cpu_type;
-> @@ -18,3 +19,26 @@ void imx_print_silicon_rev(const char *cpu, int srev)
->  		pr_info("CPU identified as %s, silicon rev %d.%d\n",
->  				cpu, (srev >> 4) & 0xf, srev & 0xf);
->  }
-> +
-> +void __init imx_set_aips(void __iomem *base)
-> +{
-> +	unsigned int reg;
-> +/*
-> + * Set all MPROTx to be non-bufferable, trusted for R/W,
-> + * not forced to user-mode.
-> + */
-> +	__raw_writel(0x77777777, base + 0x0);
-> +	__raw_writel(0x77777777, base + 0x4);
-> +
-> +/*
-> + * Set all OPACRx to be non-bufferable, to not require
-> + * supervisor privilege level for access, allow for
-> + * write access and untrusted master access.
-> + */
-> +	__raw_writel(0x0, base + 0x40);
-> +	__raw_writel(0x0, base + 0x44);
-> +	__raw_writel(0x0, base + 0x48);
-> +	__raw_writel(0x0, base + 0x4C);
-> +	reg = __raw_readl(base + 0x50) & 0x00FFFFFF;
-> +	__raw_writel(reg, base + 0x50);
-> +}
-> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-> index 1bf0df8..16c3864 100644
-> --- a/arch/arm/plat-mxc/include/mach/common.h
-> +++ b/arch/arm/plat-mxc/include/mach/common.h
-> @@ -75,6 +75,7 @@ extern void mxc_restart(char, const char *);
->  extern void mxc_arch_reset_init(void __iomem *);
->  extern int mx53_revision(void);
->  extern int mx53_display_revision(void);
-> +extern void imx_set_aips(void __iomem *);
->  
->  enum mxc_cpu_pwr_mode {
->  	WAIT_CLOCKED,		/* wfi only */
-> -- 
-> 1.7.1
-> 
+(2012?03?02? 15:07), Venu Byravarasu wrote:
+> Why you did not made use of regmap?
 > 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Hi Venu,
+
+I cannot fully understand. Anatop is not SPI or I2C device. It is
+internally embedded into the SoC. It is directly accessed by memory I/O.
+
+Do you mean I should implement a regmap_bus which uses memory I/O and
+then use regmap?
+
+Regards,
+Paul
+
+>> -----Original Message-----
+>> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+>> owner at vger.kernel.org] On Behalf Of Ying-Chun Liu (PaulLiu)
+>> Sent: Friday, March 02, 2012 12:31 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org; linaro-dev at lists.linaro.org;
+>> patches at linaro.org; Ying-Chun Liu (PaulLiu); Samuel Ortiz; Mark Brown; Shawn
+>> Guo
+>> Subject: [PATCH v6 1/2] mfd: Add anatop mfd driver
+>>
+>> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+>>
+>> Anatop is a mfd chip embedded in Freescale i.MX6Q SoC.
+>> Anatop provides regulators and thermal.
+>> This driver handles the address space and the operation of the mfd device.
+>>
+>> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+>> Cc: Samuel Ortiz <sameo@linux.intel.com>
+>> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> ---
+>>  drivers/mfd/Kconfig        |    6 ++
