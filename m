@@ -1,89 +1,169 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu,  1 Mar 2012 21:13:23 -0600
-Subject: [PATCH v3 11/30] ARM: orion5x: clean-up mach/io.h
+Date: Thu,  1 Mar 2012 21:13:24 -0600
+Subject: [PATCH v3 12/30] ARM: tegra: clean-up mach/io.h
 In-Reply-To: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
 References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1330658022-14559-12-git-send-email-robherring2@gmail.com>
+Message-ID: <1330658022-14559-13-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move orion5x specific mach/io.h parts into common.h.
+Move tegra specific mach/io.h parts into iomap.h.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Nicolas Pitre <nico@fluxnic.net>
+Tested-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Cc: Colin Cross <ccross@android.com>
+Cc: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mach-orion5x/common.h          |    9 +++++++++
- arch/arm/mach-orion5x/include/mach/io.h |   12 ------------
- arch/arm/mach-orion5x/pci.c             |    1 +
- arch/arm/mach-orion5x/tsx09-common.c    |    1 +
- 4 files changed, 11 insertions(+), 12 deletions(-)
+ arch/arm/mach-tegra/include/mach/debug-macro.S |    1 -
+ arch/arm/mach-tegra/include/mach/io.h          |   48 ------------------------
+ arch/arm/mach-tegra/include/mach/iomap.h       |   48 ++++++++++++++++++++++++
+ arch/arm/mach-tegra/io.c                       |    1 +
+ 4 files changed, 49 insertions(+), 49 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
-index d2513ac..2e6454c 100644
---- a/arch/arm/mach-orion5x/common.h
-+++ b/arch/arm/mach-orion5x/common.h
-@@ -57,5 +57,14 @@ struct meminfo;
- struct tag;
- extern void __init tag_fixup_mem32(struct tag *, char **, struct meminfo *);
+diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/mach-tegra/include/mach/debug-macro.S
+index 619abc6..e28ce16 100644
+--- a/arch/arm/mach-tegra/include/mach/debug-macro.S
++++ b/arch/arm/mach-tegra/include/mach/debug-macro.S
+@@ -18,7 +18,6 @@
+  *
+  */
  
-+/*****************************************************************************
-+ * Helpers to access Orion registers
-+ ****************************************************************************/
-+/*
-+ * These are not preempt-safe.  Locks, if needed, must be taken
-+ * care of by the caller.
-+ */
-+#define orion5x_setbits(r, mask)	writel(readl(r) | (mask), (r))
-+#define orion5x_clrbits(r, mask)	writel(readl(r) & ~(mask), (r))
+-#include <mach/io.h>
+ #include <mach/iomap.h>
  
- #endif
-diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
-index e9d9afd..444136d 100644
---- a/arch/arm/mach-orion5x/include/mach/io.h
-+++ b/arch/arm/mach-orion5x/include/mach/io.h
-@@ -18,16 +18,4 @@
- #define __io(a)			__typesafe_io(a)
- #define __mem_pci(a)		(a)
+ 	.macro  addruart, rp, rv, tmp
+diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
+index f15deff..47b4b61 100644
+--- a/arch/arm/mach-tegra/include/mach/io.h
++++ b/arch/arm/mach-tegra/include/mach/io.h
+@@ -23,56 +23,8 @@
  
--
--/*****************************************************************************
-- * Helpers to access Orion registers
-- ****************************************************************************/
--/*
-- * These are not preempt-safe.  Locks, if needed, must be taken
-- * care of by the caller.
+ #define IO_SPACE_LIMIT 0xffff
+ 
+-/* On TEGRA, many peripherals are very closely packed in
+- * two 256MB io windows (that actually only use about 64KB
+- * at the start of each).
+- *
+- * We will just map the first 1MB of each window (to minimize
+- * pt entries needed) and provide a macro to transform physical
+- * io addresses to an appropriate void __iomem *.
+- *
 - */
--#define orion5x_setbits(r, mask)	writel(readl(r) | (mask), (r))
--#define orion5x_clrbits(r, mask)	writel(readl(r) & ~(mask), (r))
 -
+-#ifdef __ASSEMBLY__
+-#define IOMEM(x)	(x)
+-#else
+-#define IOMEM(x)	((void __force __iomem *)(x))
+-#endif
 -
- #endif
-diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
-index 09a045f..a9d2151 100644
---- a/arch/arm/mach-orion5x/pci.c
-+++ b/arch/arm/mach-orion5x/pci.c
-@@ -19,6 +19,7 @@
- #include <asm/mach/pci.h>
- #include <plat/pcie.h>
- #include <plat/addr-map.h>
-+#include <mach/orion5x.h>
- #include "common.h"
+-#define IO_IRAM_PHYS	0x40000000
+-#define IO_IRAM_VIRT	IOMEM(0xFE400000)
+-#define IO_IRAM_SIZE	SZ_256K
+-
+-#define IO_CPU_PHYS     0x50040000
+-#define IO_CPU_VIRT     IOMEM(0xFE000000)
+-#define IO_CPU_SIZE	SZ_16K
+-
+-#define IO_PPSB_PHYS	0x60000000
+-#define IO_PPSB_VIRT	IOMEM(0xFE200000)
+-#define IO_PPSB_SIZE	SZ_1M
+-
+-#define IO_APB_PHYS	0x70000000
+-#define IO_APB_VIRT	IOMEM(0xFE300000)
+-#define IO_APB_SIZE	SZ_1M
+-
+-#define IO_TO_VIRT_BETWEEN(p, st, sz)	((p) >= (st) && (p) < ((st) + (sz)))
+-#define IO_TO_VIRT_XLATE(p, pst, vst)	(((p) - (pst) + (vst)))
+-
+-#define IO_TO_VIRT(n) ( \
+-	IO_TO_VIRT_BETWEEN((n), IO_PPSB_PHYS, IO_PPSB_SIZE) ?		\
+-		IO_TO_VIRT_XLATE((n), IO_PPSB_PHYS, IO_PPSB_VIRT) :	\
+-	IO_TO_VIRT_BETWEEN((n), IO_APB_PHYS, IO_APB_SIZE) ?		\
+-		IO_TO_VIRT_XLATE((n), IO_APB_PHYS, IO_APB_VIRT) :	\
+-	IO_TO_VIRT_BETWEEN((n), IO_CPU_PHYS, IO_CPU_SIZE) ?		\
+-		IO_TO_VIRT_XLATE((n), IO_CPU_PHYS, IO_CPU_VIRT) :	\
+-	IO_TO_VIRT_BETWEEN((n), IO_IRAM_PHYS, IO_IRAM_SIZE) ?		\
+-		IO_TO_VIRT_XLATE((n), IO_IRAM_PHYS, IO_IRAM_VIRT) :	\
+-	NULL)
+-
+ #ifndef __ASSEMBLER__
  
- /*****************************************************************************
-diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
-index c9abb8f..7189827 100644
---- a/arch/arm/mach-orion5x/tsx09-common.c
-+++ b/arch/arm/mach-orion5x/tsx09-common.c
-@@ -15,6 +15,7 @@
- #include <linux/mv643xx_eth.h>
- #include <linux/timex.h>
- #include <linux/serial_reg.h>
-+#include <mach/orion5x.h>
- #include "tsx09-common.h"
- #include "common.h"
+-#define IO_ADDRESS(n) (IO_TO_VIRT(n))
+-
+ #ifdef CONFIG_TEGRA_PCI
+ extern void __iomem *tegra_pcie_io_base;
+ 
+diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+index 19dec3a..082b4d1 100644
+--- a/arch/arm/mach-tegra/include/mach/iomap.h
++++ b/arch/arm/mach-tegra/include/mach/iomap.h
+@@ -271,4 +271,52 @@
+ # define TEGRA_DEBUG_UART_BASE TEGRA_UARTE_BASE
+ #endif
+ 
++/* On TEGRA, many peripherals are very closely packed in
++ * two 256MB io windows (that actually only use about 64KB
++ *@the start of each).
++ *
++ * We will just map the first 1MB of each window (to minimize
++ * pt entries needed) and provide a macro to transform physical
++ * io addresses to an appropriate void __iomem *.
++ *
++ */
++
++#ifdef __ASSEMBLY__
++#define IOMEM(x)	(x)
++#else
++#define IOMEM(x)	((void __force __iomem *)(x))
++#endif
++
++#define IO_IRAM_PHYS	0x40000000
++#define IO_IRAM_VIRT	IOMEM(0xFE400000)
++#define IO_IRAM_SIZE	SZ_256K
++
++#define IO_CPU_PHYS     0x50040000
++#define IO_CPU_VIRT     IOMEM(0xFE000000)
++#define IO_CPU_SIZE	SZ_16K
++
++#define IO_PPSB_PHYS	0x60000000
++#define IO_PPSB_VIRT	IOMEM(0xFE200000)
++#define IO_PPSB_SIZE	SZ_1M
++
++#define IO_APB_PHYS	0x70000000
++#define IO_APB_VIRT	IOMEM(0xFE300000)
++#define IO_APB_SIZE	SZ_1M
++
++#define IO_TO_VIRT_BETWEEN(p, st, sz)	((p) >= (st) && (p) < ((st) + (sz)))
++#define IO_TO_VIRT_XLATE(p, pst, vst)	(((p) - (pst) + (vst)))
++
++#define IO_TO_VIRT(n) ( \
++	IO_TO_VIRT_BETWEEN((n), IO_PPSB_PHYS, IO_PPSB_SIZE) ?		\
++		IO_TO_VIRT_XLATE((n), IO_PPSB_PHYS, IO_PPSB_VIRT) :	\
++	IO_TO_VIRT_BETWEEN((n), IO_APB_PHYS, IO_APB_SIZE) ?		\
++		IO_TO_VIRT_XLATE((n), IO_APB_PHYS, IO_APB_VIRT) :	\
++	IO_TO_VIRT_BETWEEN((n), IO_CPU_PHYS, IO_CPU_SIZE) ?		\
++		IO_TO_VIRT_XLATE((n), IO_CPU_PHYS, IO_CPU_VIRT) :	\
++	IO_TO_VIRT_BETWEEN((n), IO_IRAM_PHYS, IO_IRAM_SIZE) ?		\
++		IO_TO_VIRT_XLATE((n), IO_IRAM_PHYS, IO_IRAM_VIRT) :	\
++	NULL)
++
++#define IO_ADDRESS(n) (IO_TO_VIRT(n))
++
+ #endif
+diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
+index d23ee2d..58b4baf 100644
+--- a/arch/arm/mach-tegra/io.c
++++ b/arch/arm/mach-tegra/io.c
+@@ -26,6 +26,7 @@
+ 
+ #include <asm/page.h>
+ #include <asm/mach/map.h>
++#include <mach/iomap.h>
+ 
+ #include "board.h"
  
 -- 
 1.7.5.4
