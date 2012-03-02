@@ -1,172 +1,222 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri,  2 Mar 2012 20:54:07 +0100
-Subject: [PATCH 5/6] ARM: at91: add ram controller DT support
+Date: Fri,  2 Mar 2012 20:54:08 +0100
+Subject: [PATCH 6/6] ARM: at91: add Shutdown Controller (SHDWC) DT support
 In-Reply-To: <20120302192844.GB21255@game.jcrosoft.org>
 References: <20120302192844.GB21255@game.jcrosoft.org>
-Message-ID: <1330718048-9314-5-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1330718048-9314-6-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now drop the call to ioremap_registers() as we have the binding for the
-SDRAM/DDR Controller.
+Use a string to specific the wakeup mode to make it more readable.
 
-Drop ioremap_registers() for sam9x5 too.
+Add the Real-time Clock Wake-up support too for sam9g45 and sam9x5.
+Add AT91_SHDW_CPTWK0_MAX to specific the Max of the Wakeup Counter.
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- .../devicetree/bindings/arm/atmel-at91.txt         |   19 ++++++++++++++
- arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 +++
- arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++++
- arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +++
- arch/arm/mach-at91/at91sam9x5.c                    |    6 ----
- arch/arm/mach-at91/include/mach/at91sam9x5.h       |    5 ---
- arch/arm/mach-at91/setup.c                         |   27 +++++++++++++++++--
- 7 files changed, 59 insertions(+), 14 deletions(-)
+ .../devicetree/bindings/arm/atmel-at91.txt         |   29 +++++++
+ arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +
+ arch/arm/mach-at91/include/mach/at91_shdwc.h       |    4 +-
+ arch/arm/mach-at91/setup.c                         |   89 ++++++++++++++++++++
+ 6 files changed, 136 insertions(+), 1 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index a64f867..1f87820 100644
+index 1f87820..ecc81e3 100644
 --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
 +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -42,3 +42,22 @@ Example:
- 		compatible = "atmel,at91sam9260-rstc";
- 		reg = <0xfffffd00 0x10>;
+@@ -61,3 +61,32 @@ Examples:
+ 		reg = <0xffffe400 0x200
+ 		       0xffffe600 0x200>;
  	};
 +
-+RAMC SDRAM/DDR Controller required properties:
-+- compatible: Should be "atmel,at91sam9260-sdramc",
-+			"atmel,at91sam9g45-ddramc",
++SHDWC Shutdown Controller
++
++required properties:
++- compatible: Should be "atmel,<chip>-shdwc".
++  <chip> can be "at91sam9260", "at91sam9rl" or "at91sam9x5".
 +- reg: Should contain registers location and length
-+  For at91sam9263 and at91sam9g45 you must specify 2 entries.
 +
-+Examples:
++optional properties:
++- atmel,wakeup-mode: String, operation mode of the wakeup mode.
++  Supported values are: "none", "high", "low", "any".
++- atmel,wakeup-counter: Counter on Wake-up 0 (between 0x0 and 0xf).
 +
-+	ramc0: ramc at ffffe800 {
-+		compatible = "atmel,at91sam9g45-ddramc";
-+		reg = <0xffffe800 0x200>;
-+	};
++optional at91sam9260 properties:
++- atmel,wakeup-rtt-timer: boolean to enable Real-time Timer Wake-up.
 +
-+	ramc0: ramc at ffffe400 {
-+		compatible = "atmel,at91sam9g45-ddramc";
-+		reg = <0xffffe400 0x200
-+		       0xffffe600 0x200>;
++optional at91sam9rl properties:
++- atmel,wakeup-rtc-timer: boolean to enable Real-time Clock Wake-up.
++- atmel,wakeup-rtt-timer: boolean to enable Real-time Timer Wake-up.
++
++optional at91sam9x5 properties:
++- atmel,wakeup-rtc-timer: boolean to enable Real-time Clock Wake-up.
++
++Example:
++
++	rstc at fffffd00 {
++		compatible = "atmel,at91sam9260-rstc";
++		reg = <0xfffffd00 0x10>;
 +	};
 diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index 5414347..573ac5a 100644
+index 573ac5a..62c85ac 100644
 --- a/arch/arm/boot/dts/at91sam9g20.dtsi
 +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -59,6 +59,11 @@
- 				reg = <0xfffff000 0x200>;
+@@ -74,6 +74,11 @@
+ 				reg = <0xfffffd00 0x10>;
  			};
  
-+			ramc0: ramc at ffffea00 {
-+				compatible = "atmel,at91sam9260-sdramc";
-+				reg = <0xffffea00 0x200>;
++			shdwc at fffffd10 {
++				compatible = "atmel,at91sam9260-shdwc";
++				reg = <0xfffffd10 0x10>;
 +			};
 +
- 			pmc: pmc at fffffc00 {
- 				compatible = "atmel,at91rm9200-pmc";
- 				reg = <0xfffffc00 0x100>;
+ 			pit: timer at fffffd30 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffd30 0xf>;
 diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index e2ccba5..6da07a9 100644
+index 6da07a9..e655d01 100644
 --- a/arch/arm/boot/dts/at91sam9g45.dtsi
 +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -60,6 +60,12 @@
- 				reg = <0xfffff000 0x200>;
+@@ -83,6 +83,11 @@
  			};
  
-+			ramc0: ramc at ffffe400 {
-+				compatible = "atmel,at91sam9g45-ddramc";
-+				reg = <0xffffe400 0x200
-+				       0xffffe600 0x200>;
+ 
++			shdwc at fffffd10 {
++				compatible = "atmel,at91sam9rl-shdwc";
++				reg = <0xfffffd10 0x10>;
 +			};
 +
- 			pmc: pmc at fffffc00 {
- 				compatible = "atmel,at91rm9200-pmc";
- 				reg = <0xfffffc00 0x100>;
+ 			tcb0: timer at fff7c000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfff7c000 0x100>;
 diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 54e3030..09bc806 100644
+index 09bc806..8a68f33 100644
 --- a/arch/arm/boot/dts/at91sam9x5.dtsi
 +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -58,6 +58,11 @@
- 				reg = <0xfffff000 0x200>;
+@@ -73,6 +73,11 @@
+ 				reg = <0xfffffe00 0x10>;
  			};
  
-+			ramc0: ramc at ffffe800 {
-+				compatible = "atmel,at91sam9g45-ddramc";
-+				reg = <0xffffe800 0x200>;
++			shdwc at fffffe10 {
++				compatible = "atmel,at91sam9x5-shdwc";
++				reg = <0xfffffe10 0x10>;
 +			};
 +
- 			pmc: pmc at fffffc00 {
- 				compatible = "atmel,at91rm9200-pmc";
- 				reg = <0xfffffc00 0x100>;
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 0b82c34..b6831ee 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -302,11 +302,6 @@ static void __init at91sam9x5_map_io(void)
- 	at91_init_sram(0, AT91SAM9X5_SRAM_BASE, AT91SAM9X5_SRAM_SIZE);
- }
+ 			pit: timer at fffffe30 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffe30 0xf>;
+diff --git a/arch/arm/mach-at91/include/mach/at91_shdwc.h b/arch/arm/mach-at91/include/mach/at91_shdwc.h
+index 1d4fe82..60478ea 100644
+--- a/arch/arm/mach-at91/include/mach/at91_shdwc.h
++++ b/arch/arm/mach-at91/include/mach/at91_shdwc.h
+@@ -36,9 +36,11 @@ extern void __iomem *at91_shdwc_base;
+ #define			AT91_SHDW_WKMODE0_HIGH		1
+ #define			AT91_SHDW_WKMODE0_LOW		2
+ #define			AT91_SHDW_WKMODE0_ANYLEVEL	3
+-#define		AT91_SHDW_CPTWK0	(0xf << 4)		/* Counter On Wake Up 0 */
++#define		AT91_SHDW_CPTWK0_MAX	0xf			/* Maximum Counter On Wake Up 0 */
++#define		AT91_SHDW_CPTWK0	(AT91_SHDW_CPTWK0_MAX << 4) /* Counter On Wake Up 0 */
+ #define			AT91_SHDW_CPTWK0_(x)	((x) << 4)
+ #define		AT91_SHDW_RTTWKEN	(1   << 16)		/* Real Time Timer Wake-up Enable */
++#define		AT91_SHDW_RTCWKEN	(1   << 17)		/* Real Time Clock Wake-up Enable */
  
--static void __init at91sam9x5_ioremap_registers(void)
--{
--	at91_ioremap_ramc(0, AT91SAM9X5_BASE_DDRSDRC0, 512);
--}
--
- void __init at91sam9x5_initialize(void)
- {
- 	at91_extern_irq = (1 << AT91SAM9X5_ID_IRQ0);
-@@ -359,7 +354,6 @@ static unsigned int at91sam9x5_default_irq_priority[NR_AIC_IRQS] __initdata = {
- struct at91_init_soc __initdata at91sam9x5_soc = {
- 	.map_io = at91sam9x5_map_io,
- 	.default_irq_priority = at91sam9x5_default_irq_priority,
--	.ioremap_registers = at91sam9x5_ioremap_registers,
- 	.register_clocks = at91sam9x5_register_clocks,
- 	.init = at91sam9x5_initialize,
- };
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9x5.h b/arch/arm/mach-at91/include/mach/at91sam9x5.h
-index a297a77..88e43d5 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9x5.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9x5.h
-@@ -55,11 +55,6 @@
- #define AT91SAM9X5_BASE_USART2	0xf8024000
- 
- /*
-- * System Peripherals
-- */
--#define AT91SAM9X5_BASE_DDRSDRC0	0xffffe800
--
--/*
-  * Base addresses for early serial code (uncompress.h)
-  */
- #define AT91_DBGU	AT91_BASE_DBGU0
+ #define AT91_SHDW_SR		0x08			/* Shut Down Status Register */
+ #define		AT91_SHDW_WAKEUP0	(1 <<  0)		/* Wake-up 0 Status */
 diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 3e48b59..f86450d 100644
+index f86450d..9206a67 100644
 --- a/arch/arm/mach-at91/setup.c
 +++ b/arch/arm/mach-at91/setup.c
-@@ -315,12 +315,33 @@ static void at91_dt_rstc(void)
+@@ -338,10 +338,99 @@ static void at91_dt_ramc(void)
  	of_node_put(np);
  }
  
-+static struct of_device_id ramc_ids[] = {
-+	{ .compatible = "atmel,at91sam9260-sdramc" },
-+	{ .compatible = "atmel,at91sam9g45-ddramc" },
++static struct of_device_id shdwc_ids[] = {
++	{ .compatible = "atmel,at91sam9260-shdwc", },
++	{ .compatible = "atmel,at91sam9rl-shdwc", },
++	{ .compatible = "atmel,at91sam9x5-shdwc", },
 +	{ /*sentinel*/ }
 +};
 +
-+static void at91_dt_ramc(void)
++static const char *shdwc_wakeup_modes[] = {
++	[AT91_SHDW_WKMODE0_NONE]	= "none",
++	[AT91_SHDW_WKMODE0_HIGH]	= "high",
++	[AT91_SHDW_WKMODE0_LOW]		= "low",
++	[AT91_SHDW_WKMODE0_ANYLEVEL]	= "any",
++};
++
++const int at91_dtget_shdwc_wakeup_mode(struct device_node *np)
++{
++	const char *pm;
++	int err, i;
++
++	err = of_property_read_string(np, "atmel,wakeup-mode", &pm);
++	if (err < 0)
++		return AT91_SHDW_WKMODE0_ANYLEVEL;
++
++	for (i = 0; i < ARRAY_SIZE(shdwc_wakeup_modes); i++)
++		if (!strcasecmp(pm, shdwc_wakeup_modes[i]))
++			return i;
++
++	return -ENODEV;
++}
++
++static void at91_dt_shdwc(void)
 +{
 +	struct device_node *np;
++	int wakeup_mode;
++	bool have_rtt, have_rtc;
++	u32 reg;
++	u32 mode = 0;
 +
-+	np = of_find_matching_node(NULL, ramc_ids);
-+	if (!np)
-+		panic("unable to find compatible ram conroller node in dtb\n");
++	np = of_find_matching_node(NULL, shdwc_ids);
++	if (!np) {
++		pr_debug("AT91: unable to find compatible shutdown (shdwc) conroller node in dtb\n");
++		return;
++	}
 +
-+	at91_ramc_base[0] = of_iomap(np, 0);
-+	if (!at91_ramc_base[0])
-+		panic("unable to map ramc[0] cpu registers\n");
-+	/* the controller may have 2 banks */
-+	at91_ramc_base[1] = of_iomap(np, 1);
++	at91_shdwc_base = of_iomap(np, 0);
++	if (!at91_shdwc_base)
++		panic("AT91: unable to map shdwc cpu registers\n");
++
++	wakeup_mode = at91_dtget_shdwc_wakeup_mode(np);
++	if (wakeup_mode < 0) {
++		pr_warn("AT91: shdwc unknown wakeup mode\n");
++		goto end;
++	}
++
++	if (!of_property_read_u32(np, "atmel,wakeup-counter", &reg)) {
++		if (reg > AT91_SHDW_CPTWK0_MAX) {
++			pr_warn("AT91: shdwc wakeup conter 0x%x > 0x%x reduce it to 0x%x\n",
++				reg, AT91_SHDW_CPTWK0_MAX, AT91_SHDW_CPTWK0_MAX);
++			reg = AT91_SHDW_CPTWK0_MAX;
++		}
++		mode |= AT91_SHDW_CPTWK0_(reg);
++	}
++
++	if (of_device_is_compatible(np, "atmel,at91sam9x5-shdwc")) {
++		have_rtt = false;
++		have_rtc = true;
++	} else if (of_device_is_compatible(np, "atmel,at91sam9rl-shdwc")) {
++		have_rtt = true;
++		have_rtc = true;
++	} else {
++		have_rtt = true;
++		have_rtc = false;
++	}
++
++	if (have_rtc && of_property_read_bool(np, "atmel,wakeup-rtc-timer"))
++			mode |= AT91_SHDW_RTCWKEN;
++
++	if (have_rtt && of_property_read_bool(np, "atmel,wakeup-rtt-timer"))
++			mode |= AT91_SHDW_RTTWKEN;
++
++	at91_shdwc_write(AT91_SHDW_MR, wakeup_mode | mode);
++
++end:
++	pm_power_off = at91sam9_poweroff;
 +
 +	of_node_put(np);
 +}
@@ -174,10 +224,8 @@ index 3e48b59..f86450d 100644
  void __init at91_dt_initialize(void)
  {
  	at91_dt_rstc();
--
--	/* temporary until have the ramc binding*/
--	at91_boot_soc.ioremap_registers();
-+	at91_dt_ramc();
+ 	at91_dt_ramc();
++	at91_dt_shdwc();
  
  	/* Init clock subsystem */
  	at91_dt_clock_init();
