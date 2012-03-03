@@ -1,38 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 3 Mar 2012 19:14:37 +0100
-Subject: [PATCH 4/4] ARM i.MX 3ds debugboard: register a dummy regulator
- for the smsc911x device
-In-Reply-To: <20120303163733.GC3071@opensource.wolfsonmicro.com>
-References: <1330774804-7310-1-git-send-email-s.hauer@pengutronix.de>
- <1330774804-7310-5-git-send-email-s.hauer@pengutronix.de>
- <20120303163733.GC3071@opensource.wolfsonmicro.com>
-Message-ID: <20120303181437.GJ26642@pengutronix.de>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sat, 3 Mar 2012 20:32:49 +0100
+Subject: [PATCH v3 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <20120223160420.GA9899@avionic-0098.mockup.avionic-design.de>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <201202221634.45159.arnd@arndb.de>
+ <20120223081235.GC8621@avionic-0098.mockup.avionic-design.de>
+ <201202231407.12981.arnd@arndb.de>
+ <20120223160420.GA9899@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120303193249.GA22021@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 03, 2012 at 04:37:34PM +0000, Mark Brown wrote:
-> On Sat, Mar 03, 2012 at 12:40:04PM +0100, Sascha Hauer wrote:
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  arch/arm/plat-mxc/3ds_debugboard.c |    9 +++++++++
-> >  1 files changed, 9 insertions(+), 0 deletions(-)
+* Thierry Reding wrote:
+> * Arnd Bergmann wrote:
+> > On Thursday 23 February 2012, Thierry Reding wrote:
+> > > > Is this only used for the device tree functions? If so, I would recommend
+> > > > making it less generic and always search for a device node.
+> > > 
+> > > It is currently only used to look up a struct pwm_chip for a given struct
+> > > device_node, yes. But I can see other uses for this. For instance this could
+> > > be useful if we ever want to provide an alternative way of requesting a PWM
+> > > on a per-chip basis.
+> > 
+> > Nah, just keep it simple for now. If we need it later, we can still
+> > add something like this back, but for now it's just a source of
+> > confusion and possible bugs.
 > 
-> applied, though with at least this board you clearly do have a sensible
-> regulator setup already and are just adding in a few extra regulators to
-> fill out things which for some reason aren't supplied by the PMIC.  It's
-> quite surprising that things like what look like the I/O reference
-> voltage are supplied elsewhere.
+> Will do.
 
-This debug board is used with four different baseboards and one of them
-indeed has regulator support in mainline. The regulator for the smsc911x
-though is not software controllable on any of these boards. In the end
-it's a debug board, energy efficiency might not be really important in
-such a case.
+I turns out that this is not as easy to do as I thought. The problem is that
+if I remove the pwmchip_find() from the core and move the lookup
+functionality into the OF support code I no longer have access to the list of
+PWM chips. So I guess it will have to stay in to keep things encapsulated
+properly.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120303/fe4881d7/attachment-0001.sig>
