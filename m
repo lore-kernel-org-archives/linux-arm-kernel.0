@@ -1,54 +1,43 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 2 Mar 2012 18:08:23 -0600
-Subject: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
-In-Reply-To: <201203011713.59663.hartleys@visionengravers.com>
-References: <201203011713.59663.hartleys@visionengravers.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF55112@AUSP01VMBX24.collaborationhost.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 03 Mar 2012 09:44:44 +0900
+Subject: [PATCH v3 0/6] mmc: sdhci-s3c: Rework platform data and add device
+ tree support
+In-Reply-To: <m2ty26n3dm.fsf@bob.laptop.org>
+References: <1328032576-9269-1-git-send-email-thomas.abraham@linaro.org>	<003401cce730$baf979a0$30ec6ce0$%kim@samsung.com>	<m2aa4pkq5g.fsf@bob.laptop.org>
+ <4F3CFEED.6060206@samsung.com>	<m239abgc32.fsf@bob.laptop.org>	<00b901ccf08d$2fc18b50$8f44a1f0$%kim@samsung.com>	<m2vcn0496y.fsf@bob.laptop.org>
+ <20120222125823.GA14463@sirena.org.uk> <m2ty26n3dm.fsf@bob.laptop.org>
+Message-ID: <4F51697C.40408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 01, 2012 5:14 PM, H Hartley Sweeten wrote:
-> As done for the other ep93xx machines in:
+On 03/03/12 05:40, Chris Ball wrote:
+> Hi,
 >
-> commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
-> ARM: ep93xx: convert to MULTI_IRQ_HANDLER
+> On Wed, Feb 22 2012, Mark Brown wrote:
+>> On Tue, Feb 21, 2012 at 08:17:41AM -0500, Chris Ball wrote:
+>>
+>>> Pushed to mmc-next, thanks.  (I'm expecting that you'll do the merge
+>>> to Linus.)
+>>
+>> I've been sending patches adding runtime PM support to this driver for a
+>> while with no response - are there any issues with those?
 >
-> Now that there is a generic IRQ handler for multiple VIC devices use it
-> for vision_ep9307 to help building multi platform kernels.
+> I don't have s3c hardware, so I've been waiting for a Tested-by or ACK
+> from someone who does -- Kukjin, any objection if I take this into
+> mmc-next with a plan to merge it, to provoke some testing?  Is it
+> possible for you to test/review the patch?
 >
-> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
-> Acked-by: Ryan Mallon <rmallon@gmail.com>
-> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+Hi Chris,
 
-Arnd,
+Maybe I lost Mark's runtime PM supporting patches. I couldn't find it in 
+my mail box. Sorry for that :(
 
-Could you merge this into linux-next?
+Mark, could you please send it to me again?
 
-It needs to go in when commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
-is merged into mainline. Otherwise the vision_ep9307 machine will not work.
+Thanks.
 
-Thanks,
-Hartley
-
-> ---
->
-> diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-> index d5fb44f..d67d0b4 100644
-> --- a/arch/arm/mach-ep93xx/vision_ep9307.c
-> +++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-> @@ -34,6 +34,7 @@
->  #include <mach/ep93xx_spi.h>
->  #include <mach/gpio-ep93xx.h>
->  
-> +#include <asm/hardware/vic.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/arch.h>
-> @@ -361,6 +362,7 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
->  	.atag_offset	= 0x100,
->  	.map_io		= vision_map_io,
->  	.init_irq	= ep93xx_init_irq,
-> +	.handle_irq	= vic_handle_irq,
->  	.timer		= &ep93xx_timer,
->  	.init_machine	= vision_init_machine,
->  	.restart	= ep93xx_restart,
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
