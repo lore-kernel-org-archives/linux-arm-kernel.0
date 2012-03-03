@@ -1,37 +1,30 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Sat, 03 Mar 2012 19:09:13 +0400
-Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
- IRQ for board setup
-In-Reply-To: <1330707024-23730-12-git-send-email-b-cousson@ti.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-12-git-send-email-b-cousson@ti.com>
-Message-ID: <4F523419.3080100@ru.mvista.com>
+From: zsadecki@itwatchdogs.com (Zach Sadecki)
+Date: Sat, 3 Mar 2012 10:00:25 -0600
+Subject: mxs auart driver problems
+Message-ID: <4F524019.5070306@itwatchdogs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+I am having some problems with the mxs-auart driver in the mainline 
+kernel on my mx28 board.  If I use minicom to access the port 
+(/dev/ttyAPP1) it seems to behave.  If I just send it some characters 
+using 'echo -n " " > /dev/ttyAPP1'  it appears to work the first time, 
+then if I repeat the same command it hangs until I kill it with ^C.
 
-On 02-03-2012 20:50, Benoit Cousson wrote:
+After some experimentation it seems that it only works if I'm actively 
+reading characters out of it 'cat /dev/ttyAPP1' (in background or a 2nd 
+terminal) and if I have turned off 'echo' using 'stty -F /dev/ttyAPP1 
+-echo'.  Without the '-echo' option the serial port spews random 
+characters after sending it something.
 
-> Card detect IRQ from the TWL6030 used to be provided to the MMC
+Also, when it's in the hanging state, other ttys don't behave either 
+(the AMBA serial console can't respawn the login process and I can't ssh 
+into the system either).  Once I ^C the hanging 'echo' command 
+immediately the console login respawns and ssh login works again.
 
-> controller code using a statically allocated IRQ scheme:
->
->    card_detect_irq = TWL6030_IRQ_BASE + MMCDETECT_INTR_OFFSET;
->
-> This is no longer valid in a SPARSE_IRQ context since there is no more
-> pre-defined TWL6030_IRQ_BASE.
->
-> Return the proper card detect IRQ value in the twl6030_mmc_card_detect_config
-> that will be called from the MMC controller.
->
-> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> Cc: Felipe Balbi<balbi@ti.com>
-> Cc: Tony Lindgren<tony@atomide.com>
-> Cc: Rajendra Nayak<rnayak@ti.com>
-> ---
->   drivers/mfd/twl6030-irq.c |    3 ++-
+Anybody else have this problem?  The Freescale kernel (driver with DMA) 
+doesn't seem to have this issue (but it still suffers from the '-echo' 
+problem described above).  Any ideas on what may be going on here?
 
-     Subject talks about twl4030-irq.
-
-WBR, Sergei
+Thanks,
+   Zach
