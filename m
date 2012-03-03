@@ -1,48 +1,28 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Sat, 3 Mar 2012 09:54:05 +0800
-Subject: [PATCH v6 0/2] patch set about the MXS-DMA
-In-Reply-To: <m2mx7yn2we.fsf@bob.laptop.org>
-References: <1329373053-19494-1-git-send-email-b32955@freescale.com>
- <4F4D9725.3090100@freescale.com>
- <1330502098.3545.78.camel@sauron.fi.intel.com>
- <4F4DE0E5.8070808@freescale.com>
- <1330516974.3545.104.camel@sauron.fi.intel.com>
- <CAMiH66HmV+58w36DGCt+e=ihTrYUwXf1Cur+678YX2GKcB1-jA@mail.gmail.com>
- <m2mx7yn2we.fsf@bob.laptop.org>
-Message-ID: <CAMiH66G54BCoMrSTqnXyJy=C8w4RqVkv_qvQosUHWj4qd+Xh=Q@mail.gmail.com>
+From: arnd.bergmann@linaro.org (Arnd Bergmann)
+Date: Sat, 3 Mar 2012 02:09:51 +0000
+Subject: [PATCH] Initial Device Tree system for Snowball
+In-Reply-To: <1330703567-17925-1-git-send-email-niklas.hernaeus@stericsson.com>
+References: <1330703567-17925-1-git-send-email-niklas.hernaeus@stericsson.com>
+Message-ID: <201203030209.51767.arnd.bergmann@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Friday 02 March 2012, Niklas Hernaeus wrote:
+> 
+> From: Niklas Hernaeus <niklas.hernaeus@linaro.org>
+> 
+> This is the base system for using Device Tree for Snowball.
+> The new boardfile is a slightly modified copy of the original board file,
+> so new Device Tree stuff can simply be added and code removed, while
+> functionality stays the same.
 
-On Sat, Mar 3, 2012 at 4:50 AM, Chris Ball <cjb@laptop.org> wrote:
-> Hi,
->
-> On Wed, Feb 29 2012, Huang Shijie wrote:
->>> Pushed both to l2-mtd.git tree, thanks. I am worried that it touches
->>> other subsystems like dma, sound, and mmc and there are no acks for
->>> those. Would be nice to get them somehow.
->>
->> I ever thought Vinod could accept this patch set.
->>
->> To Vinod & Chris:
->> ? ? ? Could you give the ack to the first patch?
->
-> Yes -- for the first patch:
->
-> Acked-by: Chris Ball <cjb@laptop.org>
->
+I realized that this series is based on a version before Lee's patches
+to add the soc information, and things have changed quite a bit with that.
 
-thanks a lot.
+I've played a bit more with this and tried to merge the two, the result
+is a series in the testing/ux500/dt branch of arm-soc.git. I'm sure it's not
+actually all correct, but I've tried my best there and also added quite
+a bit of device tree source for illustration. Maybe the two of you can
+have a look there and see what you can make of it.
 
-Huang Shijie
-
-
-> (I think Shawn's ACK is sufficient for the second patch.)
->
-> Thanks,
->
-> - Chris.
-> --
-> Chris Ball ? <cjb@laptop.org> ? <http://printf.net/>
-> One Laptop Per Child
+	Arnd
