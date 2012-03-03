@@ -1,231 +1,42 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat,  3 Mar 2012 23:19:56 +0800
-Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+Date: Sat,  3 Mar 2012 23:19:57 +0800
+Subject: [PATCH 16/20] ASoC: fsl: remove the fatal error checking on
+ codec-handle
 In-Reply-To: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
 References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330788001-10158-17-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide different pair of accessors for accessing SSI registers on
-PowerPC and ARM/IMX, so that fsl_ssi driver can be built on both
-architectures.
+As Documentation/devicetree/bindings/powerpc/fsl/ssi.txt documented,
+codec-handle is an optional property, so missing it should not be a
+fatal error.
+
+More importantly, the imx machine drivers to be added working with
+fsl_ssi will not have this property, as they use new ASoC machine
+driver binding mechanism.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- sound/soc/fsl/fsl_ssi.c |   83 ++++++++++++++++++++++++++++++----------------
- 1 files changed, 54 insertions(+), 29 deletions(-)
+ sound/soc/fsl/fsl_ssi.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
 diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 2eb407f..0b53682 100644
+index 0b53682..9846091 100644
 --- a/sound/soc/fsl/fsl_ssi.c
 +++ b/sound/soc/fsl/fsl_ssi.c
-@@ -11,11 +11,14 @@
-  */
+@@ -647,12 +647,6 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
+ 	if (!of_device_is_available(np))
+ 		return -ENODEV;
  
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/device.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- 
- #include <sound/core.h>
-@@ -26,6 +29,14 @@
- 
- #include "fsl_ssi.h"
- 
-+#ifdef PPC
-+#define read_ssi(addr)		in_be32(addr)
-+#define write_ssi(val, addr)	out_be32(addr, val)
-+#elif defined ARM
-+#define read_ssi(addr)		readl(addr)
-+#define write_ssi(val, addr)	writel(val, addr)
-+#endif
-+
- /**
-  * FSLSSI_I2S_RATES: sample rates supported by the I2S
-  *
-@@ -145,7 +156,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 	   were interrupted for.  We mask it with the Interrupt Enable register
- 	   so that we only check for events that we're interested in.
- 	 */
--	sisr = in_be32(&ssi->sisr) & SIER_FLAGS;
-+	sisr = read_ssi(&ssi->sisr) & SIER_FLAGS;
- 
- 	if (sisr & CCSR_SSI_SISR_RFRC) {
- 		ssi_private->stats.rfrc++;
-@@ -260,7 +271,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 
- 	/* Clear the bits that we set */
- 	if (sisr2)
--		out_be32(&ssi->sisr, sisr2);
-+		write_ssi(sisr2, &ssi->sisr);
- 
- 	return ret;
- }
-@@ -280,6 +291,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 	struct fsl_ssi_private *ssi_private =
- 		snd_soc_dai_get_drvdata(rtd->cpu_dai);
- 	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates;
-+	u32 val;
- 
- 	/*
- 	 * If this is the first stream opened, then request the IRQ
-@@ -295,7 +307,9 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 * SSI needs to be disabled before updating the registers we set
- 		 * here.
- 		 */
--		clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
-+		val = read_ssi(&ssi->scr);
-+		val &= ~CCSR_SSI_SCR_SSIEN;
-+		write_ssi(val, &ssi->scr);
- 
- 		/*
- 		 * Program the SSI into I2S Slave Non-Network Synchronous mode.
-@@ -303,20 +317,19 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 *
- 		 * FIXME: Little-endian samples require a different shift dir
- 		 */
--		clrsetbits_be32(&ssi->scr,
--			CCSR_SSI_SCR_I2S_MODE_MASK | CCSR_SSI_SCR_SYN,
--			CCSR_SSI_SCR_TFR_CLK_DIS | CCSR_SSI_SCR_I2S_MODE_SLAVE
--			| (synchronous ? CCSR_SSI_SCR_SYN : 0));
-+		val = read_ssi(&ssi->scr);
-+		val &= ~(CCSR_SSI_SCR_I2S_MODE_MASK | CCSR_SSI_SCR_SYN);
-+		val |= CCSR_SSI_SCR_TFR_CLK_DIS | CCSR_SSI_SCR_I2S_MODE_SLAVE |
-+		       (synchronous ? CCSR_SSI_SCR_SYN : 0);
-+		write_ssi(val, &ssi->scr);
- 
--		out_be32(&ssi->stcr,
--			 CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
-+		write_ssi(CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
- 			 CCSR_SSI_STCR_TFSI | CCSR_SSI_STCR_TEFS |
--			 CCSR_SSI_STCR_TSCKP);
-+			 CCSR_SSI_STCR_TSCKP, &ssi->stcr);
- 
--		out_be32(&ssi->srcr,
--			 CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
-+		write_ssi(CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
- 			 CCSR_SSI_SRCR_RFSI | CCSR_SSI_SRCR_REFS |
--			 CCSR_SSI_SRCR_RSCKP);
-+			 CCSR_SSI_SRCR_RSCKP, &ssi->srcr);
- 
- 		/*
- 		 * The DC and PM bits are only used if the SSI is the clock
-@@ -324,7 +337,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 */
- 
- 		/* Enable the interrupts and DMA requests */
--		out_be32(&ssi->sier, SIER_FLAGS);
-+		write_ssi(SIER_FLAGS, &ssi->sier);
- 
- 		/*
- 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
-@@ -339,9 +352,9 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 * make this value larger (and maybe we should), but this way
- 		 * data will be written to memory as soon as it's available.
- 		 */
--		out_be32(&ssi->sfcsr,
--			CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
--			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2));
-+		write_ssi(CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
-+			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2),
-+			&ssi->sfcsr);
- 
- 		/*
- 		 * We keep the SSI disabled because if we enable it, then the
-@@ -417,7 +430,8 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
- 	unsigned int sample_size =
- 		snd_pcm_format_width(params_format(hw_params));
- 	u32 wl = CCSR_SSI_SxCCR_WL(sample_size);
--	int enabled = in_be32(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
-+	int enabled = read_ssi(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
-+	u32 val;
- 
- 	/*
- 	 * If we're in synchronous mode, and the SSI is already enabled,
-@@ -438,10 +452,17 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
- 
- 	/* In synchronous mode, the SSI uses STCCR for capture */
- 	if ((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ||
--	    ssi_private->cpu_dai_drv.symmetric_rates)
--		clrsetbits_be32(&ssi->stccr, CCSR_SSI_SxCCR_WL_MASK, wl);
--	else
--		clrsetbits_be32(&ssi->srccr, CCSR_SSI_SxCCR_WL_MASK, wl);
-+	    ssi_private->cpu_dai_drv.symmetric_rates) {
-+		val = read_ssi(&ssi->stccr);
-+		val &= CCSR_SSI_SxCCR_WL_MASK;
-+		val |= wl;
-+		write_ssi(val, &ssi->stccr);
-+	} else {
-+		val = read_ssi(&ssi->srccr);
-+		val &= CCSR_SSI_SxCCR_WL_MASK;
-+		val |= wl;
-+		write_ssi(val, &ssi->srccr);
-+	}
- 
- 	return 0;
- }
-@@ -461,29 +482,30 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
- 	struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
-+	u32 val;
- 
-+	val = read_ssi(&ssi->scr);
- 	switch (cmd) {
- 	case SNDRV_PCM_TRIGGER_START:
- 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			setbits32(&ssi->scr,
--				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE);
-+			val |= CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE;
- 		else
--			setbits32(&ssi->scr,
--				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE);
-+			val |= CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE;
- 		break;
- 
- 	case SNDRV_PCM_TRIGGER_STOP:
- 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			clrbits32(&ssi->scr, CCSR_SSI_SCR_TE);
-+			val &= ~CCSR_SSI_SCR_TE;
- 		else
--			clrbits32(&ssi->scr, CCSR_SSI_SCR_RE);
-+			val &= ~CCSR_SSI_SCR_RE;
- 		break;
- 
- 	default:
- 		return -EINVAL;
- 	}
-+	write_ssi(val, &ssi->scr);
- 
- 	return 0;
- }
-@@ -498,6 +520,7 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
- {
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
-+	u32 val;
- 
- 	if (ssi_private->first_stream == substream)
- 		ssi_private->first_stream = ssi_private->second_stream;
-@@ -510,7 +533,9 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
- 	if (!ssi_private->first_stream) {
- 		struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
- 
--		clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
-+		val = read_ssi(&ssi->scr);
-+		val &= ~CCSR_SSI_SCR_SSIEN;
-+		write_ssi(val, &ssi->scr);
- 	}
- }
- 
+-	/* Check for a codec-handle property. */
+-	if (!of_get_property(np, "codec-handle", NULL)) {
+-		dev_err(&pdev->dev, "missing codec-handle property\n");
+-		return -ENODEV;
+-	}
+-
+ 	/* We only support the SSI in "I2S Slave" mode */
+ 	sprop = of_get_property(np, "fsl,mode", NULL);
+ 	if (!sprop || strcmp(sprop, "i2s-slave")) {
 -- 
 1.7.5.4
