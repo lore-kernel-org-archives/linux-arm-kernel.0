@@ -1,42 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 03 Mar 2012 08:57:27 +0900
-Subject: [PATCH v3] ARM: S3C24XX DMA resume regression fix
-In-Reply-To: <1330610031-2237-1-git-send-email-dron0gus@gmail.com>
-References: <077201ccf767c6d1ec05475c40$%kim@samsung.com>
- <1330610031-2237-1-git-send-email-dron0gus@gmail.com>
-Message-ID: <4F515E67.20500@samsung.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 2 Mar 2012 18:08:23 -0600
+Subject: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
+In-Reply-To: <201203011713.59663.hartleys@visionengravers.com>
+References: <201203011713.59663.hartleys@visionengravers.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF55112@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/12 22:53, Gusakov Andrey wrote:
-> s3c2410_dma_suspend suspends channels from 0 to dma_channels.
-> s3c2410_dma_resume resumes channels in reverse order. So
-> pointer should be decremented instead of being incremented.
+On Thursday, March 01, 2012 5:14 PM, H Hartley Sweeten wrote:
+> As done for the other ep93xx machines in:
 >
-> Signed-off-by: Gusakov Andrey<dron0gus@gmail.com>
-> Reviewed-by: Heiko Stuebner<heiko@sntech.de>
+> commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
+> ARM: ep93xx: convert to MULTI_IRQ_HANDLER
+>
+> Now that there is a generic IRQ handler for multiple VIC devices use it
+> for vision_ep9307 to help building multi platform kernels.
+>
+> Signed-off-by: Hartley Sweeten <hsweeten@visionengravers.com>
+> Acked-by: Ryan Mallon <rmallon@gmail.com>
+> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+
+Arnd,
+
+Could you merge this into linux-next?
+
+It needs to go in when commit 9a6879bd902e2ec605fff4d9fb3247b440a1f66a
+is merged into mainline. Otherwise the vision_ep9307 machine will not work.
+
+Thanks,
+Hartley
+
 > ---
->   arch/arm/plat-s3c24xx/dma.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
 >
-> diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-> index 57abec9..16510d5 100644
-> --- a/arch/arm/plat-s3c24xx/dma.c
-> +++ b/arch/arm/plat-s3c24xx/dma.c
-> @@ -1249,7 +1249,7 @@ static void s3c2410_dma_resume(void)
->   	struct s3c2410_dma_chan *cp = s3c2410_chans + dma_channels - 1;
->   	int channel;
->
-> -	for (channel = dma_channels - 1; channel>= 0; cp++, channel--)
-> +	for (channel = dma_channels - 1; channel>= 0; cp--, channel--)
->   		s3c2410_dma_resume_chan(cp);
->   }
->
-
-Applied, thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+> index d5fb44f..d67d0b4 100644
+> --- a/arch/arm/mach-ep93xx/vision_ep9307.c
+> +++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+> @@ -34,6 +34,7 @@
+>  #include <mach/ep93xx_spi.h>
+>  #include <mach/gpio-ep93xx.h>
+>  
+> +#include <asm/hardware/vic.h>
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/arch.h>
+> @@ -361,6 +362,7 @@ MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
+>  	.atag_offset	= 0x100,
+>  	.map_io		= vision_map_io,
+>  	.init_irq	= ep93xx_init_irq,
+> +	.handle_irq	= vic_handle_irq,
+>  	.timer		= &ep93xx_timer,
+>  	.init_machine	= vision_init_machine,
+>  	.restart	= ep93xx_restart,
