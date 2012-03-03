@@ -1,21 +1,53 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 03 Mar 2012 22:34:26 +0100
-Subject: Status of gpio-pxa driver and dummy clock
-Message-ID: <87eht9tllp.fsf@free.fr>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Sat, 3 Mar 2012 23:42:12 +0100
+Subject: [PATCH v3 06/10] pwm: Add NVIDIA Tegra SoC support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF1E63@HQMAIL01.nvidia.com>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <1329923841-32017-7-git-send-email-thierry.reding@avionic-design.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF1E63@HQMAIL01.nvidia.com>
+Message-ID: <20120303224212.GA6661@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian,
+* Stephen Warren wrote:
+> Thierry Reding wrote at Wednesday, February 22, 2012 8:17 AM:
+> > This commit adds a generic PWM framework driver for the PWFM controller
+> > found on NVIDIA Tegra SoCs. The driver is based on code from the
+> > Chromium kernel tree and was originally written by Gary King (NVIDIA)
+> > and later modified by Simon Que (Chromium).
+> 
+> > diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
+> 
+> > +static int tegra_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> 
+> > +	/*
+> > +	 * Convert from duty_ns / period_ns to a fixed number of duty
+> > +	 * ticks per (1 << PWM_DUTY_WIDTH) cycles.
+> > +	 */
+> > +	c = duty_ns * ((1 << PWM_DUTY_WIDTH) - 1);
+> 
+> The driver in ChromeOS has the following extra line here:
+> 
+>     c += (period_ns / 2);
+> 
+> and the following extra line in the comment above:
+> 
+>     Also, make sure to round to the nearest integer during division.
+> 
+> I don't know the HW well enough to know if that line should be present?
+> 
+> Otherwise, this looks similar enough to the ChromeOS driver, so:
+> 
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-As you certainly know, Russell reverted the patch "ARM: pxa: add dummy clock for
-sa1100-rtc", id a55b5adaf403c4d032e0871ad4ee3367782f4db6. As a consequence, the
-dummy clock for gpio-pxa was removed, causing breakage of gpio-pxa driver.
+Those probably weren't there yet when I prepared the first series. I'll have
+another look will sync up with it after testing that it still works.
 
-I wonder if you (or somebody through you) sent an update to fix the gpio-pxa by
-either fixing gpio-pxa or adding back "pxa-gpio" clock. As of today, I see no
-fix in 3.3-rc free (Linus tree).
-
-Cheers.
-
--- 
-Robert
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120303/ab9fcace/attachment.sig>
