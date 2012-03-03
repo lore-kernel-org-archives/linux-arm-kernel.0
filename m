@@ -1,89 +1,193 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat,  3 Mar 2012 23:19:41 +0800
-Subject: [PATCH 00/20] ASoC: add imx-sgtl5000 machine driver working with
- fsl_ssi
-Message-ID: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
+Date: Sat,  3 Mar 2012 23:19:42 +0800
+Subject: [PATCH 01/20] ASoC: imx: move eukrea audmux call into ASoC machine
+ driver
+In-Reply-To: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
+References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330788001-10158-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's the full series adding imx-sgtl5000 machine driver which works
-with fsl_ssi driver on DT based imx platforms.
- - Patches 1 ~ 5: Convert audmux driver to a platform driver and move
-   it into ASoC folder.
- - Patches 6 ~ 12: Merge ASoC imx and fsl folders.
- - Patches 13 ~17: Make fsl_ssi work for imx.
- - Patches 18 ~ 20: Add imx-sgtl5000 machine driver which supports
-   DT only.
+It moves eukrea audmux configuration call from board file into ASoC
+machine driver eukrea-tlv320, so that it gets aligned wm1133-ev1 and
+mx27vis-aic32x4, and more importantly it will ease the moving of audmux
+into sound/soc/imx as a platform driver later.
 
-It's based on sound/for-next and tested on imx51-babbage board with
-necessary platform/dts changes, which will be posted separately after
-the ASoC changes get merged.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c   |   20 ------------
+ arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |   17 ----------
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |   17 ----------
+ sound/soc/imx/eukrea-tlv320.c                  |   40 +++++++++++++++++++++--
+ 4 files changed, 36 insertions(+), 58 deletions(-)
 
-Regards,
-Shawn
-
-Richard Zhao (2):
-      ARM: imx: convert audmux to a platform driver
-      ASoC: fsl: add dt support for imx-audmux
-
-Shawn Guo (18):
-      ASoC: imx: move eukrea audmux call into ASoC machine driver
-      ASoC: imx: move phycore audmux call into ASoC machine driver
-      ARM: imx: merge audmux-v1 and audmux-v2
-      ASoC: imx: move audmux driver into sound/soc/imx
-      ASoC: imx: rename audmux prefix mxc to imx
-      ASoC: imx: move SND_SOC_AC97_BUS selection down to machine driver
-      ASoC: imx: initialize dma_params burstsize just in imx-ssi
-      ASoC: imx: separate imx-pcm bits from imx-ssi driver
-      ASoC: imx: add an explicit Kconfig option for imx-ssi driver
-      ASoC: fsl: separate SSI and DMA Kconfig options
-      ASoC: imx: merge sound/soc/imx into sound/soc/fsl
-      ASoC: fsl: create fsl_utils to accommodate the common functions
-      ASoC: fsl: check property 'compatible' for the machine name
-      ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-      ASoC: fsl: remove the fatal error checking on codec-handle
-      ASoC: fsl: let fsl_ssi work with imx pcm and machine drivers
-      ASoC: rename sgtl5000 device tree binding document
-      ASoC: fsl: add imx-sgtl5000 machine driver
-
- .../bindings/sound/imx-audio-sgtl5000.txt          |   24 +++
- .../devicetree/bindings/sound/imx-audmux.txt       |   13 ++
- .../{soc/codecs/fsl-sgtl5000.txt => sgtl5000.txt}  |    0
- arch/arm/mach-imx/Kconfig                          |    6 -
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c       |   27 +--
- arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c       |    1 -
- arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c     |   24 +--
- arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c     |   24 +--
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c        |    7 +
- arch/arm/mach-imx/mach-mx31ads.c                   |    6 +
- arch/arm/mach-imx/mach-pca100.c                    |   20 +--
- arch/arm/mach-imx/mach-pcm043.c                    |   20 +--
- arch/arm/plat-mxc/Kconfig                          |    6 -
- arch/arm/plat-mxc/Makefile                         |    2 -
- arch/arm/plat-mxc/audmux-v1.c                      |   64 ------
- arch/arm/plat-mxc/include/mach/audmux.h            |   60 ------
- sound/soc/Kconfig                                  |    1 -
- sound/soc/Makefile                                 |    1 -
- sound/soc/fsl/Kconfig                              |  124 +++++++++++-
- sound/soc/fsl/Makefile                             |   29 +++-
- sound/soc/{imx => fsl}/eukrea-tlv320.c             |   42 ++++-
- sound/soc/fsl/fsl_ssi.c                            |  146 ++++++++++----
- sound/soc/fsl/fsl_utils.c                          |  135 +++++++++++++
- sound/soc/fsl/fsl_utils.h                          |   27 +++
- .../audmux-v2.c => sound/soc/fsl/imx-audmux.c      |  185 +++++++++++++-----
- sound/soc/fsl/imx-audmux.h                         |   60 ++++++
- sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c           |    7 +-
- sound/soc/{imx => fsl}/imx-pcm-fiq.c               |    0
- sound/soc/fsl/imx-pcm.c                            |  105 ++++++++++
- sound/soc/fsl/imx-pcm.h                            |   32 +++
- sound/soc/fsl/imx-sgtl5000.c                       |  210 ++++++++++++++++++++
- sound/soc/{imx => fsl}/imx-ssi.c                   |   92 +---------
- sound/soc/{imx => fsl}/imx-ssi.h                   |   16 +--
- sound/soc/fsl/mpc8610_hpcd.c                       |  159 ++--------------
- sound/soc/{imx => fsl}/mx27vis-aic32x4.c           |   20 +-
- sound/soc/fsl/p1022_ds.c                           |  181 ++----------------
- sound/soc/{imx => fsl}/phycore-ac97.c              |   27 +++-
- sound/soc/{imx => fsl}/wm1133-ev1.c                |   25 ++--
- sound/soc/imx/Kconfig                              |   60 ------
- sound/soc/imx/Makefile                             |   19 --
- 40 files changed, 1163 insertions(+), 844 deletions(-)
+diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+index 5db3e14..5f2f91d 100644
+--- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+@@ -32,7 +32,6 @@
+ #include <mach/common.h>
+ #include <mach/iomux-mx27.h>
+ #include <mach/hardware.h>
+-#include <mach/audmux.h>
+ 
+ #include "devices-imx27.h"
+ 
+@@ -306,25 +305,6 @@ void __init eukrea_mbimx27_baseboard_init(void)
+ 	mxc_gpio_setup_multiple_pins(eukrea_mbimx27_pins,
+ 		ARRAY_SIZE(eukrea_mbimx27_pins), "MBIMX27");
+ 
+-#if defined(CONFIG_SND_SOC_EUKREA_TLV320) \
+-	|| defined(CONFIG_SND_SOC_EUKREA_TLV320_MODULE)
+-	/* SSI unit master I2S codec connected to SSI_PINS_4*/
+-	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
+-			MXC_AUDMUX_V1_PCR_SYN |
+-			MXC_AUDMUX_V1_PCR_TFSDIR |
+-			MXC_AUDMUX_V1_PCR_TCLKDIR |
+-			MXC_AUDMUX_V1_PCR_RFSDIR |
+-			MXC_AUDMUX_V1_PCR_RCLKDIR |
+-			MXC_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
+-			MXC_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
+-			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4)
+-	);
+-	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR3_SSI_PINS_4,
+-			MXC_AUDMUX_V1_PCR_SYN |
+-			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
+-	);
+-#endif
+-
+ 	imx27_add_imx_uart1(&uart_pdata);
+ 	imx27_add_imx_uart2(&uart_pdata);
+ #if !defined(MACH_EUKREA_CPUIMX27_USEUART4)
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+index 66e8726..2cf603e 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+@@ -31,7 +31,6 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/mx25.h>
+-#include <mach/audmux.h>
+ 
+ #include "devices-imx25.h"
+ 
+@@ -241,22 +240,6 @@ void __init eukrea_mbimxsd25_baseboard_init(void)
+ 			ARRAY_SIZE(eukrea_mbimxsd_pads)))
+ 		printk(KERN_ERR "error setting mbimxsd pads !\n");
+ 
+-#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
+-	/* SSI unit master I2S codec connected to SSI_AUD5*/
+-	mxc_audmux_v2_configure_port(0,
+-			MXC_AUDMUX_V2_PTCR_SYN |
+-			MXC_AUDMUX_V2_PTCR_TFSDIR |
+-			MXC_AUDMUX_V2_PTCR_TFSEL(4) |
+-			MXC_AUDMUX_V2_PTCR_TCLKDIR |
+-			MXC_AUDMUX_V2_PTCR_TCSEL(4),
+-			MXC_AUDMUX_V2_PDCR_RXDSEL(4)
+-	);
+-	mxc_audmux_v2_configure_port(4,
+-			MXC_AUDMUX_V2_PTCR_SYN,
+-			MXC_AUDMUX_V2_PDCR_RXDSEL(0)
+-	);
+-#endif
+-
+ 	imx25_add_imx_uart1(&uart_pdata);
+ 	imx25_add_imx_fb(&eukrea_mximxsd_fb_pdata);
+ 	imx25_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+index 0f0af02..fd8bf8a 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+@@ -38,7 +38,6 @@
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+ #include <mach/iomux-mx35.h>
+-#include <mach/audmux.h>
+ 
+ #include "devices-imx35.h"
+ 
+@@ -252,22 +251,6 @@ void __init eukrea_mbimxsd35_baseboard_init(void)
+ 			ARRAY_SIZE(eukrea_mbimxsd_pads)))
+ 		printk(KERN_ERR "error setting mbimxsd pads !\n");
+ 
+-#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
+-	/* SSI unit master I2S codec connected to SSI_AUD4 */
+-	mxc_audmux_v2_configure_port(0,
+-			MXC_AUDMUX_V2_PTCR_SYN |
+-			MXC_AUDMUX_V2_PTCR_TFSDIR |
+-			MXC_AUDMUX_V2_PTCR_TFSEL(3) |
+-			MXC_AUDMUX_V2_PTCR_TCLKDIR |
+-			MXC_AUDMUX_V2_PTCR_TCSEL(3),
+-			MXC_AUDMUX_V2_PDCR_RXDSEL(3)
+-	);
+-	mxc_audmux_v2_configure_port(3,
+-			MXC_AUDMUX_V2_PTCR_SYN,
+-			MXC_AUDMUX_V2_PDCR_RXDSEL(0)
+-	);
+-#endif
+-
+ 	imx35_add_imx_uart1(&uart_pdata);
+ 	imx35_add_ipu_core(&mx3_ipu_data);
+ 	imx35_add_mx3_sdc_fb(&mx3fb_pdata);
+diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/imx/eukrea-tlv320.c
+index 1c1fdd1..bfcb6d9 100644
+--- a/sound/soc/imx/eukrea-tlv320.c
++++ b/sound/soc/imx/eukrea-tlv320.c
+@@ -23,6 +23,7 @@
+ #include <sound/pcm.h>
+ #include <sound/soc.h>
+ #include <asm/mach-types.h>
++#include <mach/audmux.h>
+ 
+ #include "../codecs/tlv320aic23.h"
+ #include "imx-ssi.h"
+@@ -97,12 +98,43 @@ static struct platform_device *eukrea_tlv320_snd_device;
+ static int __init eukrea_tlv320_init(void)
+ {
+ 	int ret;
+-
+-	if (!machine_is_eukrea_cpuimx27() && !machine_is_eukrea_cpuimx25sd()
+-		&& !machine_is_eukrea_cpuimx35sd()
+-		&& !machine_is_eukrea_cpuimx51sd())
++	int int_port = 0, ext_port;
++
++	if (machine_is_eukrea_cpuimx27()) {
++		mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++			MXC_AUDMUX_V1_PCR_SYN |
++			MXC_AUDMUX_V1_PCR_TFSDIR |
++			MXC_AUDMUX_V1_PCR_TCLKDIR |
++			MXC_AUDMUX_V1_PCR_RFSDIR |
++			MXC_AUDMUX_V1_PCR_RCLKDIR |
++			MXC_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			MXC_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4)
++		);
++		mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR3_SSI_PINS_4,
++			MXC_AUDMUX_V1_PCR_SYN |
++			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
++		);
++	} else if (machine_is_eukrea_cpuimx25sd() ||
++		   machine_is_eukrea_cpuimx35sd() ||
++		   machine_is_eukrea_cpuimx51sd()) {
++		ext_port = machine_is_eukrea_cpuimx25sd() ? 4 : 3;
++		mxc_audmux_v2_configure_port(int_port,
++			MXC_AUDMUX_V2_PTCR_SYN |
++			MXC_AUDMUX_V2_PTCR_TFSDIR |
++			MXC_AUDMUX_V2_PTCR_TFSEL(ext_port) |
++			MXC_AUDMUX_V2_PTCR_TCLKDIR |
++			MXC_AUDMUX_V2_PTCR_TCSEL(ext_port),
++			MXC_AUDMUX_V2_PDCR_RXDSEL(ext_port)
++		);
++		mxc_audmux_v2_configure_port(ext_port,
++			MXC_AUDMUX_V2_PTCR_SYN,
++			MXC_AUDMUX_V2_PDCR_RXDSEL(int_port)
++		);
++	} else {
+ 		/* return happy. We might run on a totally different machine */
+ 		return 0;
++	}
+ 
+ 	eukrea_tlv320_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!eukrea_tlv320_snd_device)
+-- 
+1.7.5.4
