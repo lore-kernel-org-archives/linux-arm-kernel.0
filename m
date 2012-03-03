@@ -1,26 +1,36 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 3 Mar 2012 04:46:34 +0100
-Subject: [PATCH 3/3] spi/atmel: add DT support
-In-Reply-To: <20120303023929.BE8F93E2D8D@localhost>
-References: <1328804077-6121-1-git-send-email-plagnioj@jcrosoft.com>
- <1328804077-6121-3-git-send-email-plagnioj@jcrosoft.com>
- <20120303023929.BE8F93E2D8D@localhost>
-Message-ID: <20120303034634.GD21255@game.jcrosoft.org>
+Date: Sat,  3 Mar 2012 07:47:25 +0100
+Subject: [PATCH 1/1] mtd: ofpart Kconfig fix typo
+Message-ID: <1330757245-8691-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:39 Fri 02 Mar     , Grant Likely wrote:
-> On Thu,  9 Feb 2012 17:14:37 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > the atmel_spi use only gpio for chip select
-> > 
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > Cc: spi-devel-general at lists.sourceforge.net
-> 
-> Looks good to me; applied.
-please wait it's need to patch that manage the cs-gpio
+it's "default y" not "default Y"
 
-will resend a new version soon
+The typo was introduced in 3.1 by
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+since commit
+d6137badeff1ef64b4e0092ec249ebdeaeb3ff37
 
-Best Regards,
-J.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: stable at vger.kernel.org
+---
+ drivers/mtd/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mtd/Kconfig b/drivers/mtd/Kconfig
+index 1be6218..5e78236 100644
+--- a/drivers/mtd/Kconfig
++++ b/drivers/mtd/Kconfig
+@@ -128,7 +128,7 @@ config MTD_AFS_PARTS
+ 
+ config MTD_OF_PARTS
+ 	tristate "OpenFirmware partitioning information support"
+-	default Y
++	default y
+ 	depends on OF
+ 	help
+ 	  This provides a partition parsing function which derives
+-- 
+1.7.7
