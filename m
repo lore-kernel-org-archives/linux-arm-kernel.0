@@ -1,114 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 3 Mar 2012 13:15:33 -0700 (MST)
-Subject: [PATCH] ARM: OMAP2+: omap_device: call all suspend, resume callbacks
- when OMAP_DEVICE_NO_IDLE_ON_SUSPEND is set
-Message-ID: <alpine.DEB.2.00.1203031314050.10611@utopia.booyaka.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sat, 3 Mar 2012 22:14:36 +0100
+Subject: [PATCH 0/4] Use clock functions also for clk_h and clk_p on
+ S3C2443/2416
+Message-ID: <201203032214.36820.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series modifies the clock init in common-s3c2443 to use the
+struct clk operations also for clk_p and clk_h whose values were until
+now set statically in s3c24xx_setup_clocks - a function more suited to
+the earlier S3C-SoCs.
 
-During system suspend, when OMAP_DEVICE_NO_IDLE_ON_SUSPEND is set on
-an omap_device, call the corresponding driver's ->suspend() and
-->suspend_noirq() callbacks (if present).  Similarly, during resume,
-the driver's ->resume() and ->resume_noirq() callbacks must both be
-called, if present.  (The previous code only called ->suspend_noirq()
-and ->resume_noirq().)
+In the end it makes the code (hopefully) easier to read, as strange
+divisions through register values get replaced by simply clk_get_rate
+calls.
 
-If all of these callbacks aren't called, some important driver
-suspend/resume code may not get executed.
+To apply on top of the current s3c24xx consolidation.
 
-In current mainline, the bug fixed by this patch is only a problem
-under the following conditions:
+Heiko Stuebner (4):
+  ARM: S3C24XX: remove XXX_setup_clocks method from S3C2443
+  ARM: S3C24XX: add get_rate for clk_h on S3C2416/2443
+  ARM: S3C24XX: add get_rate for clk_p on S3C2416/2443
+  ARM: S3C24XX: remove call to s3c24xx_setup_clocks
 
-- the kernel is running on an OMAP4
+ arch/arm/mach-s3c24xx/clock-s3c2443.c      |    7 ---
+ arch/arm/mach-s3c24xx/common-s3c2443.c     |   70 +++++++++++++++++++---------
+ arch/arm/plat-samsung/include/plat/clock.h |    1 -
+ 3 files changed, 48 insertions(+), 30 deletions(-)
 
-- an OMAP UART is used as a console
-
-- the kernel command line parameter 'no_console_suspend' is specified
-
-- and the system enters suspend ("echo mem > /sys/power/state").
-
-Under this combined circumstance, the system cannot be awakened via
-the serial port after commit be4b0281956c5cae4f63f31f11d07625a6988766c
-("tty: serial: OMAP: block idle while the UART is transferring data in
-PIO mode").  This is because the OMAP UART driver's ->suspend()
-callback is never called.  The ->suspend() callback would have called
-uart_suspend_port() which in turn would call enable_irq_wake().  Since
-enable_irq_wake() isn't called for the UART's IRQ, check_wakeup_irqs()
-would mask off the UART IRQ in the GIC.
-
-On v3.3 kernels prior to the above commit, serial resume from suspend
-presumably occurred via the PRCM interrupt.  The UART was in
-smart-idle mode, so it was able to send a PRCM wakeup which in turn
-would be converted into a PRCM interrupt to the GIC, waking up the
-kernel.  But after the above commit, when the system is suspended in
-the middle of a UART transmit, the UART IP block would be in no-idle
-mode.  In no-idle mode, the UART won't generate wakeups to the PRCM
-when incoming characters are received; only GIC interrupts.  But since
-the UART driver's ->suspend() callback is never called,
-uart_suspend_port() and enable_irq_wake() is never called; so the UART
-interrupt is masked by check_wakeup_irqs() and the UART can't wake up
-the MPU.
-
-The remaining mechanism that could have awakened the system would have
-been I/O chain wakeups.  These wouldn't be active because the console
-UART's clocks are never disabled when no_console_suspend is used,
-preventing the full chip from idling.  Also, current mainline doesn't
-yet support full chip idle states for OMAP4, so I/O chain wakeups are
-not enabled.
-
-This patch is the result of a collaboration.  John Stultz
-<johnstul@us.ibm.com> and Andy Green <andy.green@linaro.org> reported
-the serial wakeup problem that led to the discovery of this problem.
-Kevin Hilman <khilman@ti.com> narrowed the problem down to the use of
-no_console_suspend.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: John Stultz <johnstul@us.ibm.com>
-Cc: Andy Green <andy.green@linaro.org>
-Cc: Kevin Hilman <khilman@ti.com>
----
-Targeted for 3.4.
-
- arch/arm/plat-omap/omap_device.c |   12 ++++--------
- 1 files changed, 4 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index e8d9869..4988a78 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -762,14 +762,12 @@ static int _od_suspend_noirq(struct device *dev)
- 	struct omap_device *od = to_omap_device(pdev);
- 	int ret;
- 
--	if (od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND)
--		return pm_generic_suspend_noirq(dev);
--
- 	ret = pm_generic_suspend_noirq(dev);
- 
- 	if (!ret && !pm_runtime_status_suspended(dev)) {
- 		if (pm_generic_runtime_suspend(dev) == 0) {
--			omap_device_idle(pdev);
-+			if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+				omap_device_idle(pdev);
- 			od->flags |= OMAP_DEVICE_SUSPENDED;
- 		}
- 	}
-@@ -782,13 +780,11 @@ static int _od_resume_noirq(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct omap_device *od = to_omap_device(pdev);
- 
--	if (od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND)
--		return pm_generic_resume_noirq(dev);
--
- 	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
- 	    !pm_runtime_status_suspended(dev)) {
- 		od->flags &= ~OMAP_DEVICE_SUSPENDED;
--		omap_device_enable(pdev);
-+		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+			omap_device_enable(pdev);
- 		pm_generic_runtime_resume(dev);
- 	}
- 
 -- 
-1.7.9.1
+1.7.2.3
