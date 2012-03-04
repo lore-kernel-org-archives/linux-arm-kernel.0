@@ -1,36 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 4 Mar 2012 21:27:52 +0000
-Subject: [GIT PULL 0/6] Tegra branches for 3.4
-In-Reply-To: <1330892042-32065-1-git-send-email-olof@lixom.net>
-References: <1330892042-32065-1-git-send-email-olof@lixom.net>
-Message-ID: <201203042127.53017.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason)
+Date: Sun, 4 Mar 2012 17:27:10 -0500
+Subject: [PATCH 3/4] ARM: kirkwood: convert rtc-mv to fdt.
+In-Reply-To: <201203041648.17428.arnd@arndb.de>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
+ <201203041559.23810.michael@walle.cc>
+ <201203041648.17428.arnd@arndb.de>
+Message-ID: <20120304222710.GT11986@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 04 March 2012, Olof Johansson wrote:
-> Hi Arnd,
+On Sun, Mar 04, 2012 at 04:48:17PM +0000, Arnd Bergmann wrote:
+> On Sunday 04 March 2012, Michael Walle wrote:
+> > in my older patch series i flagged all converted devices with two 
+> > compatibility names. Eg:
+> > 
+> >        { .compatible = "marvell,orion5x-rtc", },
+> >        { .compatible = "marvell,kirkwood-rtc", },
+> > 
+> > IMHO marvell,rtc is i little too general, i guess marvell won't have only one 
+> > rtc ;)
+> > 
+> > Other opinions?
 > 
-> Below are the 6 pull requests for Tegra platforms for 3.4. This is also
-> likely my last merge request for tegra material (besides possibly some
-> stray patches between now and the merge window), since I am handing off
-> main maintainership to Stephen Warren for the next merge window.
+> Being specific is certainly good, and it may also be a good idea to
+> list the first one it's compatible with in the device tree source.
 > 
-> Each branch is documented in the tag (they are all tag pull requests), as
-> well as in the emails below. Nothing too controversial.
+> So the device tree for a 88F6281 soc could list
 > 
-> There are a handful of trivial merge conflicts between the branches,
-> mostly to the Makefile due to context chances. I also had a local
-> issue where git auto-resolved the merge of the T30 SMP branch into
-> my for-next branch, and did NOT remove the mach/system.h include at
-> arch/arm/mach-tegra/common.c. This results in a build break since it
-> has been removed in rmk/for-armsoc. So just a heads up in case you see
-> the same thing.
+> 	compatible = "marvell,88f6281-rtc", "marvell,kirkwood-rtc", "marvell,orion-rtc";
 
-Hi Olof,
+I'll go ahead and make this style of change throughout.  I assume
+"marvell,88f6281-rtc" would only be for SoC internal devices?  eg, the spi
+driver wouldn't follow that convention.  I'll see if I can dig up a part
+number on it.
 
-I've pulled them all into the respective branches. I'll send out a
-status of all the stuff (and missing stuff) in arm-soc.git tomorrow
-and then hand back over to you for a while until you need to shift
-your own focus again.
+> This would give the device driver the option which one to bind to. Anything that
+> has an rtc compatible with the one in orion should list that one, so that the driver
+> only has to list that one if they are truely identical, but if the driver has to
+> get modified later to know the difference between orion and kirkwood rtcs, it can
+> check the more specific value.
+> 
+> 	Arnd
 
-	Arnd
+thx,
+
+Jason.
