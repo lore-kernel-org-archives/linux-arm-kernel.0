@@ -1,41 +1,27 @@
-From: jason@lakedaemon.net (Jason)
-Date: Sat, 3 Mar 2012 18:05:11 -0500
-Subject: [PATCH 5/5 v2] ARM: kirkwood: convert orion-wdt to fdt.
-In-Reply-To: <20120303100853.GK7363@n2100.arm.linux.org.uk>
-References: <cover.1330709314.git.jason@lakedaemon.net>
- <e2fe5e97a83fc753559bbb18d5d111ed01b89034.1330709314.git.jason@lakedaemon.net>
- <201203021832.34901.arnd@arndb.de>
- <20120303100853.GK7363@n2100.arm.linux.org.uk>
-Message-ID: <20120303230511.GS11986@titan.lakedaemon.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 4 Mar 2012 09:05:47 +0800
+Subject: Status of gpio-pxa driver and dummy clock
+In-Reply-To: <87eht9tllp.fsf@free.fr>
+References: <87eht9tllp.fsf@free.fr>
+Message-ID: <CAN1soZwtVm=qBw97AeeysfTXhCQg7XonKkHAE_dn6EYbLHnKBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 03, 2012 at 10:08:53AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Mar 02, 2012 at 06:32:33PM +0000, Arnd Bergmann wrote:
-> > On Friday 02 March 2012, Jason Cooper wrote:
-> > > +       wdt_reg = (void __iomem *)TIMER_VIRT_BASE;
-> > > +
-> > > +       ret = of_address_to_resource(np, 0, &res);
-> > > +       if (ret) {
-> > > +               printk(KERN_ERR "invalid address\n");
-> > > +               return ret;
-> > > +       }
-> > > +
-> > > +       wdt_reg = ioremap(res.start, res.end - res.start);
-> > > +
-> > 
-> > This will break non-dt uses because you overwrite the wdt_reg value.
-> 
-> Don't also forget that "res.end - res.start" is also not correct, and
-> resource_size() should be used to prevent that kind of error.
+On Sun, Mar 4, 2012 at 5:34 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Hi Haojian,
+>
+> As you certainly know, Russell reverted the patch "ARM: pxa: add dummy clock for
+> sa1100-rtc", id a55b5adaf403c4d032e0871ad4ee3367782f4db6. As a consequence, the
+> dummy clock for gpio-pxa was removed, causing breakage of gpio-pxa driver.
+>
+> I wonder if you (or somebody through you) sent an update to fix the gpio-pxa by
+> either fixing gpio-pxa or adding back "pxa-gpio" clock. As of today, I see no
+> fix in 3.3-rc free (Linus tree).
+>
 
-Russell, thanks for the review.  I'll redo this one and resubmit my
-pull-request to Arnd.  I assume that we don't won't this to be a
-separate patch as a future bisect could land inbetween this patch and
-the fix.
+This patch is already merged into arm-soc tree for v3.4. I don't have
+a plan to push it into
+v3.3.
 
-Sorry for the extra work Arnd.
-
-thx,
-
-Jason.
+Thanks
+Haojian
