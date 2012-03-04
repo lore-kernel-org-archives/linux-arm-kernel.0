@@ -1,31 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 4 Mar 2012 16:50:52 +0000
-Subject: [PATCH 4/5 v2] ARM: kirkwood: convert rtc-mv to fdt.
-In-Reply-To: <201203041612.44966.michael@walle.cc>
-References: <cover.1330709314.git.jason@lakedaemon.net>
- <4de611961e8210a0a2c3b56fe72b40dba638752a.1330709314.git.jason@lakedaemon.net>
- <201203041612.44966.michael@walle.cc>
-Message-ID: <201203041650.52217.arnd@arndb.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 4 Mar 2012 18:42:35 +0100
+Subject: [PATCH 0/3] S3C24XX: Enable DMA on S3C2416 by sharing S3C2443-DMA
+Message-ID: <201203041842.35420.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 04 March 2012, Michael Walle wrote:
-> > @@ -294,11 +295,17 @@ static int __exit mv_rtc_remove(struct
-> > platform_device *pdev) return 0;
-> >  }
-> > 
-> > +static struct of_device_id rtc_mv_of_match_table[] = {
-> > +     { .compatible = "marvell,rtc", },
-> > +     {}
-> > +};
-> > +
-> Isn't here an ifdef CONFIG_OF missing to prevent compiler warnings?
-> 
+The S3C2416/2450 contains the same DMA register layout as the S3C2443.
+Therefore it can simply share this dma selection definition.
 
-Yes, I guess so. I keep thinking that an __unused attribute would
-actually be more helpful here because it lets the compiler automatically
-discard the symbol when it's not used, but we still get potential
-compiler errors and warnings if something inside of the unused data
-is broken.
+As we use the S3C2443_DMA the S3C2416_DMA is no longer necessary. The
+third patch removes this remnant of the S3C24XX merge.
 
-	Arnd
+The whole series was made on top of the recent S3C24XX merge.
+
+Heiko Stuebner (3):
+  ARM: S3C24XX: Fix indentation of dma-s3c2443
+  ARM: S3C24XX: Reuse S3C2443 dma for S3C2416
+  ARM: S3C24XX: remove obsolete S3C2416_DMA option
+
+ arch/arm/Kconfig                              |    1 -
+ arch/arm/mach-s3c2416/Kconfig                 |   14 -----------
+ arch/arm/mach-s3c2416/Makefile                |   12 ----------
+ arch/arm/mach-s3c24xx/Kconfig                 |   10 ++++----
+ arch/arm/mach-s3c24xx/Makefile                |    2 +-
+ arch/arm/mach-s3c24xx/dma-s3c2443.c           |   30 ++++++++++++++++++++-----
+ arch/arm/plat-samsung/include/plat/regs-dma.h |    2 +-
+ 7 files changed, 31 insertions(+), 40 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2416/Kconfig
+ delete mode 100644 arch/arm/mach-s3c2416/Makefile
+
+-- 
+1.7.2.3
