@@ -1,26 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 4 Mar 2012 13:41:35 +0000
-Subject: [PATCH 09/20] ASoC: imx: separate imx-pcm bits from imx-ssi driver
-In-Reply-To: <1330788001-10158-10-git-send-email-shawn.guo@linaro.org>
-References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-10-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120304134135.GG3083@opensource.wolfsonmicro.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 4 Mar 2012 15:26:48 +0100
+Subject: [PATCH v5 4/4] clk: basic clock hardware types
+In-Reply-To: <1330763341-3437-5-git-send-email-mturquette@linaro.org>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-5-git-send-email-mturquette@linaro.org>
+Message-ID: <20120304142648.GB11546@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 03, 2012 at 11:19:50PM +0800, Shawn Guo wrote:
-> Currently the imx-ssi.c[h] accommodates the imx-pcm common bits which
-> are shared between imx-pcm-dma-mx2 and imx-pcm-fiq drivers.  It assumes
-> that imx-pcm-dma-mx2 and imx-pcm-fiq will always be used together with
-> imx-ssi driver.  However this becomes untrue when we see that driver
-> sound/soc/fsl/fsl_ssi could possibly work with imx-pcm-dma-mx2 too.
+> +#define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr,	\
+> +				_flags, _reg, _bit_idx,		\
+> +				_gate_flags, _lock)		\
+> +	static struct clk _name;				\
+> +	static char *_name##_parent_names[] = {			\
+> +		_parent_name,					\
+> +	};							\
+> +	static struct clk *_name##_parents[] = {		\
+> +		_parent_ptr,					\
+> +	};							\
+> +	static struct clk_gate _name##_hw = {			\
+> +		.hw = {						\
+> +			.clk = &_name,				\
+> +		},						\
+> +		.reg = _reg,					\
+> +		.bit_idx = _bit_idx,				\
+> +		.flags = _gate_flags				\
 
-I was going to apply this and the next patch but they depend on the
-audmux stuff so they'll at least have to wait until that gets applied.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120304/8b06decc/attachment.sig>
+Hi Mike
+
+Looks like a , is missing here after _gate_flags.
+
+      Andrew
