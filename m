@@ -1,10 +1,10 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 4 Mar 2012 15:26:48 +0100
+Date: Sun, 4 Mar 2012 15:35:02 +0100
 Subject: [PATCH v5 4/4] clk: basic clock hardware types
 In-Reply-To: <1330763341-3437-5-git-send-email-mturquette@linaro.org>
 References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
  <1330763341-3437-5-git-send-email-mturquette@linaro.org>
-Message-ID: <20120304142648.GB11546@lunn.ch>
+Message-ID: <20120304143502.GC11546@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,9 +25,21 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > +		.reg = _reg,					\
 > +		.bit_idx = _bit_idx,				\
 > +		.flags = _gate_flags				\
+> +		.lock = _lock,					\
+> +	};							\
+> +	static struct clk _name = {				\
+> +		.name = #_name,					\
+> +		.ops = &clk_gate_ops,				\
+> +		.hw = &_name##_hw.hw,				\
+> +		.parent_names = _name##_parent_names,		\
+> +		.num_parents =					\
+> +			ARRAY_SIZE(_name##parent_names),	\
 
 Hi Mike
 
-Looks like a , is missing here after _gate_flags.
+This should be _name##_parent_names, i.e. you are missing a _.
 
-      Andrew
+With this and the previous change, i get something which at least
+compiles...
+
+	Andrew
