@@ -1,53 +1,43 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun,  4 Mar 2012 12:01:11 +0200
-Subject: [PATCH] ARM: OMAP: fix iommu, not mailbox
-Message-ID: <1330855271-28820-1-git-send-email-ohad@wizery.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 04 Mar 2012 11:25:06 +0100
+Subject: Status of gpio-pxa driver and dummy clock
+In-Reply-To: <CAN1soZwtVm=qBw97AeeysfTXhCQg7XonKkHAE_dn6EYbLHnKBw@mail.gmail.com>
+ (Haojian Zhuang's message of "Sun, 4 Mar 2012 09:05:47 +0800")
+References: <87eht9tllp.fsf@free.fr>
+ <CAN1soZwtVm=qBw97AeeysfTXhCQg7XonKkHAE_dn6EYbLHnKBw@mail.gmail.com>
+Message-ID: <87aa3wu0hp.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some weird (freudian?) reason, commit 435792d "ARM: OMAP: make
-iommu subsys_initcall to fix builtin omap3isp" unintentionally changed
-the mailbox's initcall instead of the iommu's.
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
 
-Fix that.
+> On Sun, Mar 4, 2012 at 5:34 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>> Hi Haojian,
+>>
+>> As you certainly know, Russell reverted the patch "ARM: pxa: add dummy clock for
+>> sa1100-rtc", id a55b5adaf403c4d032e0871ad4ee3367782f4db6. As a consequence, the
+>> dummy clock for gpio-pxa was removed, causing breakage of gpio-pxa driver.
+>>
+>> I wonder if you (or somebody through you) sent an update to fix the gpio-pxa by
+>> either fixing gpio-pxa or adding back "pxa-gpio" clock. As of today, I see no
+>> fix in 3.3-rc free (Linus tree).
+>>
+>
+> This patch is already merged into arm-soc tree for v3.4. I don't have
+> a plan to push it into
+> v3.3.
 
-Reported-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Joerg Roedel <Joerg.Roedel@amd.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/mailbox.c    |    3 +--
- arch/arm/mach-omap2/omap-iommu.c |    3 ++-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Oh, you should push it to 3.3. It's a fix, and the mioa701 board is broken (and
+probably many others PXA based boards too) because no GPIO is available (as
+probe function of pxa-gpio always fail on clk_get()).
 
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index a6db1e4..609ea2d 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -412,8 +412,7 @@ static void __exit omap2_mbox_exit(void)
- 	platform_driver_unregister(&omap2_mbox_driver);
- }
- 
--/* must be ready before omap3isp is probed */
--subsys_initcall(omap2_mbox_init);
-+module_init(omap2_mbox_init);
- module_exit(omap2_mbox_exit);
- 
- MODULE_LICENSE("GPL v2");
-diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
-index b882204..ac49384 100644
---- a/arch/arm/mach-omap2/omap-iommu.c
-+++ b/arch/arm/mach-omap2/omap-iommu.c
-@@ -150,7 +150,8 @@ err_out:
- 		platform_device_put(omap_iommu_pdev[i]);
- 	return err;
- }
--module_init(omap_iommu_init);
-+/* must be ready before omap3isp is probed */
-+subsys_initcall(omap_iommu_init);
- 
- static void __exit omap_iommu_exit(void)
- {
+If you don't want to push it to 3.3, I'll have to send a fix to Arnd to fix the
+breakage.
+
+Without it, a PXA based kernel (pxa2xx) will hang in its boot phase, on the
+first gpio_get_* or gpio_set_*, which is called by many drivers.
+
+Cheers.
+
 -- 
-1.7.5.4
+Robert
