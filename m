@@ -1,275 +1,66 @@
-From: michael@walle.cc (Michael Walle)
-Date: Sun, 4 Mar 2012 19:12:20 +0100
-Subject: [PATCH 1/5 v2] ARM: kirkwood: covert orion-spi to fdt.
-In-Reply-To: <a3c65ac8146eab1796dec771c1ddfe403d1471a9.1330709314.git.jason@lakedaemon.net>
-References: <cover.1330709314.git.jason@lakedaemon.net>
- <a3c65ac8146eab1796dec771c1ddfe403d1471a9.1330709314.git.jason@lakedaemon.net>
-Message-ID: <201203041912.21137.michael@walle.cc>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sun, 4 Mar 2012 18:26:11 +0000 (GMT)
+Subject: Status of gpio-pxa driver and dummy clock
+In-Reply-To: <87aa3wu0hp.fsf@free.fr>
+Message-ID: <1330885571.28077.YahooMailClassic@web29015.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag 02 M?rz 2012, 18:50:18 schrieb Jason Cooper:
-> On the Globalscale Dreamplug (Marvell Kirkwood Development Platform),
-> 2MB of NOR flash are used to hold the bootloader, bootloader
-> environment, and devicetree blob.  It is connected via spi.
+--- On Sun, 4/3/12, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> From: Robert Jarzmik <robert.jarzmik@free.fr>
+> Subject: Re: Status of gpio-pxa driver and dummy clock
+> To: "Haojian Zhuang" <haojian.zhuang@gmail.com>
+> Cc: "Arnd Bergmann" <arnd@arndb.de>, linux-arm-kernel at lists.infradead.org
+> Date: Sunday, 4 March, 2012, 10:25
+> Haojian Zhuang <haojian.zhuang@gmail.com>
+> writes:
 > 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
+> > On Sun, Mar 4, 2012 at 5:34 AM, Robert Jarzmik <robert.jarzmik@free.fr>
+> wrote:
+> >> Hi Haojian,
+> >>
+> >> As you certainly know, Russell reverted the patch
+> "ARM: pxa: add dummy clock for
+> >> sa1100-rtc", id
+> a55b5adaf403c4d032e0871ad4ee3367782f4db6. As a consequence,
+> the
+> >> dummy clock for gpio-pxa was removed, causing
+> breakage of gpio-pxa driver.
+> >>
+> >> I wonder if you (or somebody through you) sent an
+> update to fix the gpio-pxa by
+> >> either fixing gpio-pxa or adding back "pxa-gpio"
+> clock. As of today, I see no
+> >> fix in 3.3-rc free (Linus tree).
+> >>
+> >
+> > This patch is already merged into arm-soc tree for
+> v3.4. I don't have
+> > a plan to push it into
+> > v3.3.
 > 
-> Changes from v1:
+> Oh, you should push it to 3.3. It's a fix, and the mioa701
+> board is broken (and
+> probably many others PXA based boards too) because no GPIO
+> is available (as
+> probe function of pxa-gpio always fail on clk_get()).
 > 
->     - used of_match_ptr() as suggested by Grant Likely
+> If you don't want to push it to 3.3, I'll have to send a fix
+> to Arnd to fix the
+> breakage.
 > 
->  arch/arm/boot/dts/kirkwood-dreamplug.dts |   34 +++++++++++++++++++++++++
->  arch/arm/mach-kirkwood/board-dt.c        |   40
-> ------------------------------ arch/arm/mach-kirkwood/common.c          | 
->  11 ++++++++
->  drivers/spi/spi-orion.c                  |   37
-> ++++++++++++++++++++++++--- 4 files changed, 78 insertions(+), 44
-> deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> b/arch/arm/boot/dts/kirkwood-dreamplug.dts index 8a5dff8..bdf2ddc 100644
-> --- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> +++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> @@ -22,4 +22,38 @@
->  		interrupts = <33>;
->  		clock-frequency = <200000000>;
->  	};
-> +
-> +	spi at f1010600 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		compatible = "marvell,orion-spi";
-> +		reg = <0xf1010600 0x1ff>;
-> +		clock-frequency = <200000000>;
-> +
-> +		flash at 0 {
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			compatible = "macronix,mx25l1606e", "jedec-flash";
-> +
-> +			spi-max-frequency = <50000000>;
-> +			reg = <0>;
-> +
-> +			partition at 0 {
-> +				label = "U-Boot";
-> +				reg = <0x0 0x100000>;
-> +			};
-> +
-> +			partition at 100000 {
-> +				label = "U-Boot Environment";
-> +				reg = <0x100000 0x080000>;
-> +			};
-> +
-> +			partition at 180000 {
-> +				label = "Flattened Device Tree";
-> +				reg = <0x180000 0x080000>;
-> +			};
-> +		};
-> +	};
->  };
-> diff --git a/arch/arm/mach-kirkwood/board-dt.c
-> b/arch/arm/mach-kirkwood/board-dt.c index fbe6405..4960e63 100644
-> --- a/arch/arm/mach-kirkwood/board-dt.c
-> +++ b/arch/arm/mach-kirkwood/board-dt.c
-> @@ -39,42 +39,6 @@ static struct of_device_id kirkwood_dt_match_table[]
-> __initdata = { { }
->  };
-> 
-> -struct mtd_partition dreamplug_partitions[] = {
-> -	{
-> -		.name	= "u-boot",
-> -		.size	= SZ_512K,
-> -		.offset = 0,
-> -	},
-> -	{
-> -		.name	= "u-boot env",
-> -		.size	= SZ_64K,
-> -		.offset = SZ_512K + SZ_512K,
-> -	},
-> -	{
-> -		.name	= "dtb",
-> -		.size	= SZ_64K,
-> -		.offset = SZ_512K + SZ_512K + SZ_512K,
-> -	},
-> -};
-> -
-> -static const struct flash_platform_data dreamplug_spi_slave_data = {
-> -	.type		= "mx25l1606e",
-> -	.name		= "spi_flash",
-> -	.parts		= dreamplug_partitions,
-> -	.nr_parts	= ARRAY_SIZE(dreamplug_partitions),
-> -};
-> -
-> -static struct spi_board_info __initdata dreamplug_spi_slave_info[] = {
-> -	{
-> -		.modalias	= "m25p80",
-> -		.platform_data	= &dreamplug_spi_slave_data,
-> -		.irq		= -1,
-> -		.max_speed_hz	= 50000000,
-> -		.bus_num	= 0,
-> -		.chip_select	= 0,
-> -	},
-> -};
-> -
->  static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
->  	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
->  };
-> @@ -140,10 +104,6 @@ static void __init dreamplug_init(void)
->  	 */
->  	kirkwood_mpp_conf(dreamplug_mpp_config);
-> 
-> -	spi_register_board_info(dreamplug_spi_slave_info,
-> -				ARRAY_SIZE(dreamplug_spi_slave_info));
-> -	kirkwood_spi_init();
-> -
->  	kirkwood_ehci_init();
->  	kirkwood_ge00_init(&dreamplug_ge00_data);
->  	kirkwood_ge01_init(&dreamplug_ge01_data);
-> diff --git a/arch/arm/mach-kirkwood/common.c
-> b/arch/arm/mach-kirkwood/common.c index cc15426..357fcde 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -15,6 +15,7 @@
->  #include <linux/ata_platform.h>
->  #include <linux/mtd/nand.h>
->  #include <linux/dma-mapping.h>
-> +#include <linux/of.h>
->  #include <net/dsa.h>
->  #include <asm/page.h>
->  #include <asm/timex.h>
-> @@ -481,6 +482,9 @@ static int __init kirkwood_clock_gate(void)
->  {
->  	unsigned int curr = readl(CLOCK_GATING_CTRL);
->  	u32 dev, rev;
-> +#ifdef CONFIG_OF
-> +	struct device_node *dp;
-> +#endif
-> 
->  	kirkwood_pcie_id(&dev, &rev);
->  	printk(KERN_DEBUG "Gating clock of unused units\n");
-> @@ -524,6 +528,13 @@ static int __init kirkwood_clock_gate(void)
->  	} else  /* keep this bit set for devices that don't have PCIe1 */
->  		kirkwood_clk_ctrl |= CGC_PEX1;
-> 
-> +#ifdef CONFIG_OF
-> +	dp = of_find_node_by_path("/");
-> +	if (dp && of_device_is_available(of_find_compatible_node(dp, NULL,
-> +							  "marvell,orion-
-spi")))
-> +		kirkwood_clk_ctrl |= CGC_RUNIT;
-> +#endif
-> +
->  	/* Now gate clock the required units */
->  	writel(kirkwood_clk_ctrl, CLOCK_GATING_CTRL);
->  	printk(KERN_DEBUG " after: 0x%08x\n", readl(CLOCK_GATING_CTRL));
-> diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-> index 13448c8..acfb240 100644
-> --- a/drivers/spi/spi-orion.c
-> +++ b/drivers/spi/spi-orion.c
-> @@ -18,6 +18,7 @@
->  #include <linux/spi/spi.h>
->  #include <linux/spi/orion_spi.h>
->  #include <linux/module.h>
-> +#include <linux/of_device.h>
->  #include <asm/unaligned.h>
-> 
->  #define DRIVER_NAME			"orion_spi"
-> @@ -45,6 +46,8 @@ struct orion_spi {
->  	void __iomem		*base;
->  	unsigned int		max_speed;
->  	unsigned int		min_speed;
-> +	unsigned int		tclk;
-> +	unsigned int		clock_fix;
->  	struct orion_spi_info	*spi_info;
->  };
-> 
-> @@ -104,7 +107,7 @@ static int orion_spi_baudrate_set(struct spi_device
-> *spi, unsigned int speed)
-> 
->  	orion_spi = spi_master_get_devdata(spi->master);
-> 
-> -	tclk_hz = orion_spi->spi_info->tclk;
-> +	tclk_hz = orion_spi->tclk;
-> 
->  	/*
->  	 * the supported rates are: 4,6,8...30
-> @@ -360,7 +363,7 @@ static int orion_spi_setup(struct spi_device *spi)
->  	orion_spi = spi_master_get_devdata(spi->master);
-> 
->  	/* Fix ac timing if required.   */
-> -	if (orion_spi->spi_info->enable_clock_fix)
-> +	if (orion_spi->clock_fix)
->  		orion_spi_setbits(orion_spi, ORION_SPI_IF_CONFIG_REG,
->  				  (1 << 14));
-> 
-> @@ -474,6 +477,7 @@ static int __init orion_spi_probe(struct
-> platform_device *pdev) master->setup = orion_spi_setup;
->  	master->transfer = orion_spi_transfer;
->  	master->num_chipselect = ORION_NUM_CHIPSELECTS;
-> +	master->dev.of_node = pdev->dev.of_node;
-> 
->  	dev_set_drvdata(&pdev->dev, master);
-> 
-> @@ -481,8 +485,26 @@ static int __init orion_spi_probe(struct
-> platform_device *pdev) spi->master = master;
->  	spi->spi_info = spi_info;
-> 
-> -	spi->max_speed = DIV_ROUND_UP(spi_info->tclk, 4);
-> -	spi->min_speed = DIV_ROUND_UP(spi_info->tclk, 30);
-> +	if (spi_info)
-> +		spi->tclk = spi_info->tclk;
-> +
-> +	of_property_read_u32(master->dev.of_node,
-> +				"clock-frequency", &spi->tclk);
-> +
-> +	if (!spi->tclk) {
-> +		dev_err(&pdev->dev, "cannot set clock rate\n");
-shouldn't you check the return value of of_property_read_u32 instead? and 
-report a more meaningful error message, eg no valid clock-frequency property 
-in the OF case?
+> Without it, a PXA based kernel (pxa2xx) will hang in its
+> boot phase, on the
+> first gpio_get_* or gpio_set_*, which is called by many
+> drivers.
 
-> +		status = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	spi->max_speed = DIV_ROUND_UP(spi->tclk, 4);
-> +	spi->min_speed = DIV_ROUND_UP(spi->tclk, 30);
-> +
-> +	if (spi_info)
-> +		spi->clock_fix = spi_info->enable_clock_fix;
-> +
-> +	if (of_find_property(master->dev.of_node, "spi-clock-fix", NULL))
-> +		spi->clock_fix = 1;
-> 
->  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (r == NULL) {
-> @@ -541,10 +563,17 @@ static int __exit orion_spi_remove(struct
-> platform_device *pdev)
-> 
->  MODULE_ALIAS("platform:" DRIVER_NAME);
-> 
+There are two further pxa gpio regressions still present in
+linux-3.3-rc5:
 
-#ifdef CONFIG_OF
-> +static struct of_device_id spi_orion_of_match_table[] __devinitdata = {
-> +	{ .compatible = "marvell,orion-spi", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, spi_orion_of_match_table);
-#endif
+mfp/gpio regression: pxa_last_gpio used before initialized
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082624.html
 
->  static struct platform_driver orion_spi_driver = {
->  	.driver = {
->  		.name	= DRIVER_NAME,
->  		.owner	= THIS_MODULE,
-> +		.of_match_table = of_match_ptr(spi_orion_of_match_table),
->  	},
->  	.remove		= __exit_p(orion_spi_remove),
->  };
-
-
--- 
-Michael
+reboot/suspend regression: hx4700 freezes under linux-3.3-rc1
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/082873.html
+(2 regressions are reported here; the reboot regression is still present in
+linux-3.3-rc5 while the suspend regression has now been fixed).
