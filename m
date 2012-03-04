@@ -1,27 +1,63 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 4 Mar 2012 09:05:47 +0800
-Subject: Status of gpio-pxa driver and dummy clock
-In-Reply-To: <87eht9tllp.fsf@free.fr>
-References: <87eht9tllp.fsf@free.fr>
-Message-ID: <CAN1soZwtVm=qBw97AeeysfTXhCQg7XonKkHAE_dn6EYbLHnKBw@mail.gmail.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 3 Mar 2012 20:11:18 -0500
+Subject: [PATCH] mtd/gpmi : move the __mxs_setl()/__mxs_clrl() to
+ gpmi-lib.c
+In-Reply-To: <1330807232-5616-1-git-send-email-shijie8@gmail.com>
+References: <1330807232-5616-1-git-send-email-shijie8@gmail.com>
+Message-ID: <CAMiH66E9Hr5oeNCk1cAQJKO-qtc8a=mHxNgDGgGwXC95XWhGMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 4, 2012 at 5:34 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Hi Haojian,
->
-> As you certainly know, Russell reverted the patch "ARM: pxa: add dummy clock for
-> sa1100-rtc", id a55b5adaf403c4d032e0871ad4ee3367782f4db6. As a consequence, the
-> dummy clock for gpio-pxa was removed, causing breakage of gpio-pxa driver.
->
-> I wonder if you (or somebody through you) sent an update to fix the gpio-pxa by
-> either fixing gpio-pxa or adding back "pxa-gpio" clock. As of today, I see no
-> fix in 3.3-rc free (Linus tree).
->
+please ignore this patch.
 
-This patch is already merged into arm-soc tree for v3.4. I don't have
-a plan to push it into
-v3.3.
+mxs-dma and some other module also have the same problem.
+A more powerful patch is needed.
 
-Thanks
-Haojian
+BR
+Huang Shijie
+
+
+On Sat, Mar 3, 2012 at 3:40 PM, Huang Shijie <shijie8@gmail.com> wrote:
+> We will meet the compiler error in mx6q, since there is no mxs.h header anymore.
+> So move these two helper functions to gpmi-lib.c.
+>
+> Signed-off-by: Huang Shijie <shijie8@gmail.com>
+> ---
+> ?drivers/mtd/nand/gpmi-nand/gpmi-lib.c | ? 14 +++++++++++++-
+> ?1 files changed, 13 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> index 5e3c505..9a208cb 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> @@ -21,7 +21,6 @@
+> ?#include <linux/mtd/gpmi-nand.h>
+> ?#include <linux/delay.h>
+> ?#include <linux/clk.h>
+> -#include <mach/mxs.h>
+>
+> ?#include "gpmi-nand.h"
+> ?#include "gpmi-regs.h"
+> @@ -37,6 +36,19 @@ struct timing_threshod timing_default_threshold = {
+> ? ? ? ?.max_dll_delay_in_ns ? ? ? ? = 16,
+> ?};
+>
+> +#define MXS_SET_ADDR ? ? ? ? ? 0x4
+> +#define MXS_CLR_ADDR ? ? ? ? ? 0x8
+> +
+> +static inline void __mxs_setl(u32 mask, void __iomem *reg)
+> +{
+> + ? ? ? writel(mask, reg + MXS_SET_ADDR);
+> +}
+> +
+> +static inline void __mxs_clrl(u32 mask, void __iomem *reg)
+> +{
+> + ? ? ? writel(mask, reg + MXS_CLR_ADDR);
+> +}
+> +
+> ?/*
+> ?* Clear the bit and poll it cleared. ?This is usually called with
+> ?* a reset address and mask being either SFTRST(bit 31) or CLKGATE
+> --
+> 1.7.4
+>
