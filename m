@@ -1,40 +1,45 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 4 Mar 2012 19:02:38 +0100
-Subject: [PATCH 0/6] S3C24XX: Add support for HSSPI on S3C2416/S3C2443
-Message-ID: <201203041902.38318.heiko@sntech.de>
+Date: Sun, 4 Mar 2012 19:03:22 +0100
+Subject: [PATCH 1/6] ARM: S3C24XX: Add forgotten clock lookup table to S3C2443
+In-Reply-To: <201203041902.38318.heiko@sntech.de>
+References: <201203041902.38318.heiko@sntech.de>
+Message-ID: <201203041903.22607.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S3C2416/S3C2443/S3C2450 SoCs contain HSSPI controllers compatible
-with the ones in the S3C64xx and later.
+When the hsmmc clock lookup was changed to be lookup tables based,
+it seems the S3C2443 was forgotten.
 
-The second patch modifying the dma selection depends on the series
-enabling the dma support on the S3C2416, but as the whole s3c64xx-spi
-driver needs dma support this should be ok.
+As subsequent patches will want to add more lookups to it, this
+patch adds the base table with missing hsmmc lookup.
 
-Tested on an Asus DR-900 ebook reader with a Marvell MR8686 using the
-libertas driver.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/clock-s3c2443.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Heiko Stuebner (6):
-  ARM: S3C24XX: Add forgotten clock lookup table to S3C2443
-  ARM: S3C24XX: claim spi channels for hsspi in dma-s3c2443
-  ARM: S3C24XX: Add map entries needed by the s3c64xx-spi devices
-  ARM: S3C24XX: Add clock-lookup entries required by s3c64xx-spi
-  ARM: S3C24XX: Add HSSPI setup callback for s3c64xx-spi driver
-  spi/s3c64xx: Allow usage for ARCH_S3C24XX
-
- arch/arm/mach-s3c24xx/Kconfig            |    5 ++++
- arch/arm/mach-s3c24xx/Makefile           |    1 +
- arch/arm/mach-s3c24xx/clock-s3c2416.c    |    1 +
- arch/arm/mach-s3c24xx/clock-s3c2443.c    |    6 ++++
- arch/arm/mach-s3c24xx/common-s3c2443.c   |   15 +++++++----
- arch/arm/mach-s3c24xx/dma-s3c2443.c      |   16 +++++++++---
- arch/arm/mach-s3c24xx/include/mach/dma.h |    4 +++
- arch/arm/mach-s3c24xx/include/mach/map.h |    5 ++++
- arch/arm/mach-s3c24xx/setup-spi.c        |   39 ++++++++++++++++++++++++++++++
- drivers/spi/Kconfig                      |    2 +-
- 10 files changed, 84 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/mach-s3c24xx/setup-spi.c
-
+diff --git a/arch/arm/mach-s3c24xx/clock-s3c2443.c b/arch/arm/mach-s3c24xx/clock-s3c2443.c
+index efb3ac3..bce1cd3 100644
+--- a/arch/arm/mach-s3c24xx/clock-s3c2443.c
++++ b/arch/arm/mach-s3c24xx/clock-s3c2443.c
+@@ -179,6 +179,10 @@ static struct clk *clks[] __initdata = {
+ 	&clk_hsmmc,
+ };
+ 
++static struct clk_lookup s3c2443_clk_lookup[] = {
++	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &clk_hsmmc),
++};
++
+ void __init s3c2443_init_clocks(int xtal)
+ {
+ 	unsigned long epllcon = __raw_readl(S3C2443_EPLLCON);
+@@ -210,6 +214,7 @@ void __init s3c2443_init_clocks(int xtal)
+ 
+ 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+ 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
++	clkdev_add_table(s3c2443_clk_lookup, ARRAY_SIZE(s3c2443_clk_lookup));
+ 
+ 	s3c_pwmclk_init();
+ }
 -- 
 1.7.2.3
