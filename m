@@ -1,37 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 4 Mar 2012 16:48:17 +0000
-Subject: [PATCH 3/4] ARM: kirkwood: convert rtc-mv to fdt.
-In-Reply-To: <201203041559.23810.michael@walle.cc>
-References: <cover.1330625877.git.jason@lakedaemon.net>
- <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
- <201203041559.23810.michael@walle.cc>
-Message-ID: <201203041648.17428.arnd@arndb.de>
+Date: Sun, 4 Mar 2012 16:50:52 +0000
+Subject: [PATCH 4/5 v2] ARM: kirkwood: convert rtc-mv to fdt.
+In-Reply-To: <201203041612.44966.michael@walle.cc>
+References: <cover.1330709314.git.jason@lakedaemon.net>
+ <4de611961e8210a0a2c3b56fe72b40dba638752a.1330709314.git.jason@lakedaemon.net>
+ <201203041612.44966.michael@walle.cc>
+Message-ID: <201203041650.52217.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sunday 04 March 2012, Michael Walle wrote:
-> in my older patch series i flagged all converted devices with two 
-> compatibility names. Eg:
+> > @@ -294,11 +295,17 @@ static int __exit mv_rtc_remove(struct
+> > platform_device *pdev) return 0;
+> >  }
+> > 
+> > +static struct of_device_id rtc_mv_of_match_table[] = {
+> > +     { .compatible = "marvell,rtc", },
+> > +     {}
+> > +};
+> > +
+> Isn't here an ifdef CONFIG_OF missing to prevent compiler warnings?
 > 
->        { .compatible = "marvell,orion5x-rtc", },
->        { .compatible = "marvell,kirkwood-rtc", },
-> 
-> IMHO marvell,rtc is i little too general, i guess marvell won't have only one 
-> rtc ;)
-> 
-> Other opinions?
 
-Being specific is certainly good, and it may also be a good idea to
-list the first one it's compatible with in the device tree source.
-
-So the device tree for a 88F6281 soc could list
-
-	compatible = "marvell,88f6281-rtc", "marvell,kirkwood-rtc", "marvell,orion-rtc";
-
-This would give the device driver the option which one to bind to. Anything that
-has an rtc compatible with the one in orion should list that one, so that the driver
-only has to list that one if they are truely identical, but if the driver has to
-get modified later to know the difference between orion and kirkwood rtcs, it can
-check the more specific value.
+Yes, I guess so. I keep thinking that an __unused attribute would
+actually be more helpful here because it lets the compiler automatically
+discard the symbol when it's not used, but we still get potential
+compiler errors and warnings if something inside of the unused data
+is broken.
 
 	Arnd
