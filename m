@@ -1,45 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 4 Mar 2012 15:35:02 +0100
-Subject: [PATCH v5 4/4] clk: basic clock hardware types
-In-Reply-To: <1330763341-3437-5-git-send-email-mturquette@linaro.org>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-5-git-send-email-mturquette@linaro.org>
-Message-ID: <20120304143502.GC11546@lunn.ch>
+From: michael@walle.cc (Michael Walle)
+Date: Sun, 4 Mar 2012 15:59:23 +0100
+Subject: [PATCH 3/4] ARM: kirkwood: convert rtc-mv to fdt.
+In-Reply-To: <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <2c985a303f3b9b0cfcead25634b7e1db68d34ee3.1330625878.git.jason@lakedaemon.net>
+Message-ID: <201203041559.23810.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +#define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr,	\
-> +				_flags, _reg, _bit_idx,		\
-> +				_gate_flags, _lock)		\
-> +	static struct clk _name;				\
-> +	static char *_name##_parent_names[] = {			\
-> +		_parent_name,					\
-> +	};							\
-> +	static struct clk *_name##_parents[] = {		\
-> +		_parent_ptr,					\
-> +	};							\
-> +	static struct clk_gate _name##_hw = {			\
-> +		.hw = {						\
-> +			.clk = &_name,				\
-> +		},						\
-> +		.reg = _reg,					\
-> +		.bit_idx = _bit_idx,				\
-> +		.flags = _gate_flags				\
-> +		.lock = _lock,					\
-> +	};							\
-> +	static struct clk _name = {				\
-> +		.name = #_name,					\
-> +		.ops = &clk_gate_ops,				\
-> +		.hw = &_name##_hw.hw,				\
-> +		.parent_names = _name##_parent_names,		\
-> +		.num_parents =					\
-> +			ARRAY_SIZE(_name##parent_names),	\
+Am Donnerstag 01 M?rz 2012, 19:20:54 schrieb Jason Cooper:
+> The comment at mach-kirkwood/common.c:469, says this device is in every
+> kirkwood board.  So, it is placed in kirkwood.dtsi.
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  arch/arm/boot/dts/kirkwood.dtsi   |    6 ++++++
+>  arch/arm/mach-kirkwood/board-dt.c |    1 -
+>  arch/arm/mach-kirkwood/common.c   |    2 +-
+>  arch/arm/mach-kirkwood/common.h   |    1 -
+>  drivers/rtc/rtc-mv.c              |   19 +++++++++++++++++++
+>  5 files changed, 26 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi
+> b/arch/arm/boot/dts/kirkwood.dtsi index 771c6bb..5fb185c 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -2,5 +2,11 @@
+> 
+>  / {
+>  	compatible = "marvell,kirkwood";
+> +
+> +	rtc at f1010300 {
+> +		compatible = "marvell,rtc";
+what about the names used here?
 
-Hi Mike
+in my older patch series i flagged all converted devices with two 
+compatibility names. Eg:
 
-This should be _name##_parent_names, i.e. you are missing a _.
+       { .compatible = "marvell,orion5x-rtc", },
+       { .compatible = "marvell,kirkwood-rtc", },
 
-With this and the previous change, i get something which at least
-compiles...
+IMHO marvell,rtc is i little too general, i guess marvell won't have only one 
+rtc ;)
 
-	Andrew
+Other opinions?
+
+-- 
+Michael
