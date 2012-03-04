@@ -1,33 +1,36 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 4 Mar 2012 18:42:35 +0100
-Subject: [PATCH 0/3] S3C24XX: Enable DMA on S3C2416 by sharing S3C2443-DMA
-Message-ID: <201203041842.35420.heiko@sntech.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 4 Mar 2012 18:42:29 +0100
+Subject: [PATCH v5 4/4] clk: basic clock hardware types
+In-Reply-To: <1330763341-3437-5-git-send-email-mturquette@linaro.org>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-5-git-send-email-mturquette@linaro.org>
+Message-ID: <20120304174229.GD11546@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S3C2416/2450 contains the same DMA register layout as the S3C2443.
-Therefore it can simply share this dma selection definition.
+On Sat, Mar 03, 2012 at 12:29:01AM -0800, Mike Turquette wrote:
+> Many platforms support simple gateable clocks, fixed-rate clocks,
+> adjustable divider clocks and multi-parent multiplexer clocks.
+> 
+> This patch introduces basic clock types for the above-mentioned hardware
+> which share some common characteristics.
 
-As we use the S3C2443_DMA the S3C2416_DMA is no longer necessary. The
-third patch removes this remnant of the S3C24XX merge.
+Hi Mike
 
-The whole series was made on top of the recent S3C24XX merge.
+These basic clocks don't allow the use of prepare/unprepare, from the
+side of the clock provider. I think i need this.
 
-Heiko Stuebner (3):
-  ARM: S3C24XX: Fix indentation of dma-s3c2443
-  ARM: S3C24XX: Reuse S3C2443 dma for S3C2416
-  ARM: S3C24XX: remove obsolete S3C2416_DMA option
+The Orion Kirkwood SoC has clock gating for most of its on chip
+peripherals, which the other older Orion devices don't have. The SATA
+and PCIe also allows the PHY to be shut down, again which older Orion
+devices don't have. The current code links the clock and the PHY
+together, shutting both down are the same time. So i would like to
+perform the PHY shutdown in the unprepare() function of the clk
+driver.
 
- arch/arm/Kconfig                              |    1 -
- arch/arm/mach-s3c2416/Kconfig                 |   14 -----------
- arch/arm/mach-s3c2416/Makefile                |   12 ----------
- arch/arm/mach-s3c24xx/Kconfig                 |   10 ++++----
- arch/arm/mach-s3c24xx/Makefile                |    2 +-
- arch/arm/mach-s3c24xx/dma-s3c2443.c           |   30 ++++++++++++++++++++-----
- arch/arm/plat-samsung/include/plat/regs-dma.h |    2 +-
- 7 files changed, 31 insertions(+), 40 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2416/Kconfig
- delete mode 100644 arch/arm/mach-s3c2416/Makefile
+Is allowing to pass prepare/unprepare functions to basic clocks
+something you want to support? If i prepare a patch would you consider
+it?
 
--- 
-1.7.2.3
+	Thanks
+		Andrew
