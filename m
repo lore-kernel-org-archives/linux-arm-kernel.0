@@ -1,38 +1,42 @@
-From: B04825@freescale.com (Tabi Timur-B04825)
-Date: Sun, 4 Mar 2012 23:13:09 +0000
-Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-In-Reply-To: <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
-References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F53F704.8080703@freescale.com>
+From: michael@walle.cc (Michael Walle)
+Date: Mon, 5 Mar 2012 00:22:11 +0100
+Subject: [PATCH 3/4] ARM: kirkwood: convert rtc-mv to fdt.
+In-Reply-To: <20120304222710.GT11986@titan.lakedaemon.net>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <201203041648.17428.arnd@arndb.de>
+ <20120304222710.GT11986@titan.lakedaemon.net>
+Message-ID: <201203050022.12085.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> +#ifdef PPC
-> +#define read_ssi(addr)		in_be32(addr)
-> +#define write_ssi(val, addr)	out_be32(addr, val)
-> +#elif defined ARM
-> +#define read_ssi(addr)		readl(addr)
-> +#define write_ssi(val, addr)	writel(val, addr)
-> +#endif
+Am Sonntag 04 M?rz 2012, 23:27:10 schrieb Jason:
+> On Sun, Mar 04, 2012 at 04:48:17PM +0000, Arnd Bergmann wrote:
+> > On Sunday 04 March 2012, Michael Walle wrote:
+> > > in my older patch series i flagged all converted devices with two
+> > > 
+> > > compatibility names. Eg:
+> > >        { .compatible = "marvell,orion5x-rtc", },
+> > >        { .compatible = "marvell,kirkwood-rtc", },
+> > > 
+> > > IMHO marvell,rtc is i little too general, i guess marvell won't have
+> > > only one rtc ;)
+> > > 
+> > > Other opinions?
+> > 
+> > Being specific is certainly good, and it may also be a good idea to
+> > list the first one it's compatible with in the device tree source.
+> > 
+> > So the device tree for a 88F6281 soc could list
+> > 
+> > 	compatible = "marvell,88f6281-rtc", "marvell,kirkwood-rtc",
+> > 	"marvell,orion-rtc";
+> 
+> I'll go ahead and make this style of change throughout.  I assume
+> "marvell,88f6281-rtc" would only be for SoC internal devices?  eg, the spi
+> driver wouldn't follow that convention.  I'll see if I can dig up a part
+> number on it.
 
-Can you also add an ARM version of clrsetbits_be32()?  Something like this:
-
-#ifdef PPC
-#define read_ssi(addr)		in_be32(addr)
-#define write_ssi(val, addr)	out_be32(addr, val)
-#define write_ssi_mask(addr, clear, set)	clrsetbits_be32(addr, clear, set)
-#elif defined ARM
-#define read_ssi(addr)		readl(addr)
-#define write_ssi(val, addr)	writel(val, addr)
-#define write_ssi_mask(addr, clear, set) \
-	{ u32 __val; \
-	val = readl(&ssi->scr); \
-	val = (val & ~(clear) | (set); \
-	writel(val, addr)
-#endif
+following the filename spi-orion.c i guess it should use 'marvell,orion-spi'.
 
 -- 
-Timur Tabi
-Linux kernel developer at Freescale
+Michael
