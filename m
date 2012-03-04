@@ -1,92 +1,96 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 4 Mar 2012 19:05:40 +0100
-Subject: [PATCH 4/6] ARM: S3C24XX: Add clock-lookup entries required by
- s3c64xx-spi
+Date: Sun, 4 Mar 2012 19:06:19 +0100
+Subject: [PATCH 5/6] ARM: S3C24XX: Add HSSPI setup callback for s3c64xx-spi
+ driver
 In-Reply-To: <201203041902.38318.heiko@sntech.de>
 References: <201203041902.38318.heiko@sntech.de>
-Message-ID: <201203041905.41146.heiko@sntech.de>
+Message-ID: <201203041906.20249.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently usable are busclk0 and busclk2.
+This lets the s3c64xx-spi driver know the specifics of the controller-
+variant and also setups the gpios and the misccr bit.
+
+This setup is valid for all S3C24XX SoCs containing a HSSPI controller
+(i.e. S3C2416/2450 and S3C2443)
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/mach-s3c24xx/clock-s3c2416.c  |    1 +
- arch/arm/mach-s3c24xx/clock-s3c2443.c  |    1 +
- arch/arm/mach-s3c24xx/common-s3c2443.c |   15 ++++++++++-----
- 3 files changed, 12 insertions(+), 5 deletions(-)
+ arch/arm/mach-s3c24xx/Kconfig     |    5 ++++
+ arch/arm/mach-s3c24xx/Makefile    |    1 +
+ arch/arm/mach-s3c24xx/setup-spi.c |   39 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 45 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s3c24xx/setup-spi.c
 
-diff --git a/arch/arm/mach-s3c24xx/clock-s3c2416.c b/arch/arm/mach-s3c24xx/clock-s3c2416.c
-index dbc9ab4..8702ecf 100644
---- a/arch/arm/mach-s3c24xx/clock-s3c2416.c
-+++ b/arch/arm/mach-s3c24xx/clock-s3c2416.c
-@@ -144,6 +144,7 @@ static struct clk_lookup s3c2416_clk_lookup[] = {
- 	CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.0", &hsmmc0_clk),
- 	CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.2", &hsmmc_mux0.clk),
- 	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &hsmmc_mux1.clk),
-+	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk2", &hsspi_mux.clk),
- };
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index 5ebd150..bc6758a 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -484,6 +484,11 @@ config S3C2443_DMA
+ 	help
+ 	  Internal config node for S3C2443 DMA support
  
- void __init s3c2416_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s3c24xx/clock-s3c2443.c b/arch/arm/mach-s3c24xx/clock-s3c2443.c
-index bce1cd3..bb3231d 100644
---- a/arch/arm/mach-s3c24xx/clock-s3c2443.c
-+++ b/arch/arm/mach-s3c24xx/clock-s3c2443.c
-@@ -181,6 +181,7 @@ static struct clk *clks[] __initdata = {
++config S3C2443_SETUP_SPI
++	bool
++	help
++	  Common setup code for SPI GPIO configurations
++
+ endif	# CPU_S3C2443 || CPU_S3C2416
  
- static struct clk_lookup s3c2443_clk_lookup[] = {
- 	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &clk_hsmmc),
-+	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk2", &clk_hsspi),
- };
+ if CPU_S3C2443
+diff --git a/arch/arm/mach-s3c24xx/Makefile b/arch/arm/mach-s3c24xx/Makefile
+index 1909d66..0f5d2dd 100644
+--- a/arch/arm/mach-s3c24xx/Makefile
++++ b/arch/arm/mach-s3c24xx/Makefile
+@@ -87,3 +87,4 @@ obj-$(CONFIG_MACH_OSIRIS_DVS)		+= mach-osiris-dvs.o
+ # device setup
  
- void __init s3c2443_init_clocks(int xtal)
-diff --git a/arch/arm/mach-s3c24xx/common-s3c2443.c b/arch/arm/mach-s3c24xx/common-s3c2443.c
-index 4604315..aeeb2be 100644
---- a/arch/arm/mach-s3c24xx/common-s3c2443.c
-+++ b/arch/arm/mach-s3c24xx/common-s3c2443.c
-@@ -424,11 +424,6 @@ static struct clk init_clocks_off[] = {
- 		.enable		= s3c2443_clkcon_enable_p,
- 		.ctrlbit	= S3C2443_PCLKCON_IIS,
- 	}, {
--		.name		= "hsspi",
--		.parent		= &clk_p,
--		.enable		= s3c2443_clkcon_enable_p,
--		.ctrlbit	= S3C2443_PCLKCON_HSSPI,
--	}, {
- 		.name		= "adc",
- 		.parent		= &clk_p,
- 		.enable		= s3c2443_clkcon_enable_p,
-@@ -562,6 +557,14 @@ static struct clk hsmmc1_clk = {
- 	.ctrlbit	= S3C2443_HCLKCON_HSMMC,
- };
- 
-+static struct clk hsspi_clk = {
-+	.name		= "spi",
-+	.devname	= "s3c64xx-spi.0",
-+	.parent		= &clk_p,
-+	.enable		= s3c2443_clkcon_enable_p,
-+	.ctrlbit	= S3C2443_PCLKCON_HSSPI,
+ obj-$(CONFIG_S3C2416_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
++obj-$(CONFIG_S3C2443_SETUP_SPI)		+= setup-spi.o
+diff --git a/arch/arm/mach-s3c24xx/setup-spi.c b/arch/arm/mach-s3c24xx/setup-spi.c
+new file mode 100644
+index 0000000..5712c85
+--- /dev/null
++++ b/arch/arm/mach-s3c24xx/setup-spi.c
+@@ -0,0 +1,39 @@
++/*
++ * HS-SPI device setup for S3C2443/S3C2416
++ *
++ * Copyright (C) 2011 Samsung Electronics Ltd.
++ *		http://www.samsung.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/gpio.h>
++#include <linux/platform_device.h>
++
++#include <plat/gpio-cfg.h>
++#include <plat/s3c64xx-spi.h>
++
++#include <mach/hardware.h>
++#include <mach/regs-gpio.h>
++
++#ifdef CONFIG_S3C64XX_DEV_SPI0
++struct s3c64xx_spi_info s3c64xx_spi0_pdata __initdata = {
++	.fifo_lvl_mask	= 0x7f,
++	.rx_lvl_offset	= 13,
++	.tx_st_done	= 21,
++	.high_speed	= 1,
 +};
 +
- /* EPLLCON compatible enough to get on/off information */
- 
- void __init_or_cpufreq s3c2443_common_setup_clocks(pll_fn get_mpll)
-@@ -612,6 +615,7 @@ static struct clk *clks[] __initdata = {
- 	&clk_usb_bus,
- 	&clk_armdiv,
- 	&hsmmc1_clk,
-+	&hsspi_clk,
- };
- 
- static struct clksrc_clk *clksrcs[] __initdata = {
-@@ -629,6 +633,7 @@ static struct clk_lookup s3c2443_clk_lookup[] = {
- 	CLKDEV_INIT(NULL, "clk_uart_baud2", &clk_p),
- 	CLKDEV_INIT(NULL, "clk_uart_baud3", &clk_esys_uart.clk),
- 	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.0", &hsmmc1_clk),
-+	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk0", &hsspi_clk),
- };
- 
- void __init s3c2443_common_init_clocks(int xtal, pll_fn get_mpll,
++int s3c64xx_spi0_cfg_gpio(struct platform_device *pdev)
++{
++	/* enable hsspi bit in misccr */
++	s3c2410_modify_misccr(S3C2416_MISCCR_HSSPI_EN2, 1);
++
++	s3c_gpio_cfgall_range(S3C2410_GPE(11), 3,
++			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
++
++	return 0;
++}
++#endif
 -- 
 1.7.2.3
