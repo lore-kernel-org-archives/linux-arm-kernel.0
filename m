@@ -1,38 +1,27 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun,  4 Mar 2012 13:05:29 +0200
-Subject: [PATCH] ARM: OMAP: don't build hwspinlock in vain
-Message-ID: <1330859129-354-1-git-send-email-ohad@wizery.com>
+Date: Sun, 4 Mar 2012 13:47:16 +0200
+Subject: [PATCH V2] rpmsg: fix build warning when dma_addr_t is 64-bit
+In-Reply-To: <1330530066-17461-1-git-send-email-mark.asselstine@windriver.com>
+References: <201202291455.20688.arnd@arndb.de>
+ <1330530066-17461-1-git-send-email-mark.asselstine@windriver.com>
+Message-ID: <CAK=WgbbjaQm6R3FL-dzpyZtu17Xq28_L6xvOu_tm5PEzm3ESqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup: don't build mach-omap2/hwspinlock.c if the OMAP hwspinlock
-driver isn't configured.
+On Wed, Feb 29, 2012 at 5:41 PM, Mark Asselstine
+<mark.asselstine@windriver.com> wrote:
+> dev_dbg() in rpmsg_probe() made use of the %x formatting that
+> expects an 'unsigned int' which dma_addr_t is not in cases where
+> dma_addr_t is 64-bit (CONFIG_ARCH_DMA_ADDR_T_64BIT). Casting to
+> a 'unsigned long long' and using %llx will avoid this.
+>
+> Signed-off-by: Mark Asselstine <mark.asselstine@windriver.com>
+> CC: Ohad Ben-Cohen <ohad@wizery.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
 
-This will both shorten build time and avoid registering a device
-which isn't needed.
+Thanks, Mark !
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
-Tony, it's probably better if you take it, to minimize omap merge conflicts.
-Thanks!
+I'll send this to Arnd later this week together with the other
+remoteproc/rpmsg patches.
 
- arch/arm/mach-omap2/Makefile |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 00d7025..5bce3bd 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -268,7 +268,9 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
- 
- smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
- obj-y					+= $(smsc911x-m) $(smsc911x-y)
--obj-$(CONFIG_ARCH_OMAP4)		+= hwspinlock.o
-+ifneq ($(CONFIG_HWSPINLOCK_OMAP),)
-+obj-y					+= hwspinlock.o
-+endif
- 
- obj-y					+= common-board-devices.o twl-common.o
- 
--- 
-1.7.5.4
+Ohad.
