@@ -1,37 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 4 Mar 2012 20:29:59 +0000
-Subject: [PATCH 1/5 v2] ARM: kirkwood: covert orion-spi to fdt.
-In-Reply-To: <201203041912.21137.michael@walle.cc>
-References: <cover.1330709314.git.jason@lakedaemon.net>
- <a3c65ac8146eab1796dec771c1ddfe403d1471a9.1330709314.git.jason@lakedaemon.net>
- <201203041912.21137.michael@walle.cc>
-Message-ID: <201203042030.00064.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 4 Mar 2012 21:33:59 +0100
+Subject: [PATCH] clk: Fix compile errors in DEFINE_CLK_GATE
+In-Reply-To: <1330763341-3437-5-git-send-email-mturquette@linaro.org>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-5-git-send-email-mturquette@linaro.org>
+Message-ID: <20120304203359.GE11546@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 04 March 2012, Michael Walle wrote:
-> > @@ -481,8 +485,26 @@ static int __init orion_spi_probe(struct
-> > platform_device *pdev) spi->master = master;
-> >       spi->spi_info = spi_info;
-> > 
-> > -     spi->max_speed = DIV_ROUND_UP(spi_info->tclk, 4);
-> > -     spi->min_speed = DIV_ROUND_UP(spi_info->tclk, 30);
-> > +     if (spi_info)
-> > +             spi->tclk = spi_info->tclk;
-> > +
-> > +     of_property_read_u32(master->dev.of_node,
-> > +                             "clock-frequency", &spi->tclk);
-> > +
-> > +     if (!spi->tclk) {
-> > +             dev_err(&pdev->dev, "cannot set clock rate\n");
-> shouldn't you check the return value of of_property_read_u32 instead? and 
-> report a more meaningful error message, eg no valid clock-frequency property 
-> in the OF case?
+>From 71e9a676b2b2f0dc2bb0cc395e8325cf38f4808b Mon Sep 17 00:00:00 2001
+From: Andrew Lunn <andrew@lunn.ch>
+Date: Sun, 4 Mar 2012 16:31:14 +0100
+Subject: [PATCH] [clk] Fix compile errors in DEFINE_CLK_GATE()
 
-I suggested this version, because it keeps the code very simple. Checking
-the return value would of course be correct, but I don't think we
-need any extra information here: there are only a few ways how this can
-go wrong and it will be pretty obvious from the device tree when you
-see the message.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ include/linux/clk-private.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-	Arnd
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index d06e6fb..9d5c4b1 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -95,7 +95,7 @@ extern struct clk_ops clk_gate_ops;
+ 		},						\
+ 		.reg = _reg,					\
+ 		.bit_idx = _bit_idx,				\
+-		.flags = _gate_flags				\
++		.flags = _gate_flags,				\
+ 		.lock = _lock,					\
+ 	};							\
+ 	static struct clk _name = {				\
+@@ -104,7 +104,7 @@ extern struct clk_ops clk_gate_ops;
+ 		.hw = &_name##_hw.hw,				\
+ 		.parent_names = _name##_parent_names,		\
+ 		.num_parents =					\
+-			ARRAY_SIZE(_name##parent_names),	\
++			ARRAY_SIZE(_name##_parent_names),	\
+ 		.parents = _name##_parents,			\
+ 		.flags = _flags,				\
+ 	};
+-- 
+1.7.2.5
