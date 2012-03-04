@@ -1,27 +1,27 @@
-From: alan@signal11.us (Alan Ott)
-Date: Sun, 04 Mar 2012 14:47:31 -0500
-Subject: [PATCH v2 2/6] ARM: tegra: select CPU_FREQ_TABLE
-In-Reply-To: <20120304183710.GB31064@quad.lixom.net>
-References: <1330721908-8633-1-git-send-email-alan@signal11.us>
- <20120304183710.GB31064@quad.lixom.net>
-Message-ID: <4F53C6D3.2060404@signal11.us>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun,  4 Mar 2012 12:13:56 -0800
+Subject: [GIT PULL 0/6] Tegra branches for 3.4
+Message-ID: <1330892042-32065-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/4/12 1:37 PM, Olof Johansson wrote:
-> On Fri, Mar 02, 2012 at 03:58:28PM -0500, Alan Ott wrote:
->> From: Arnd Bergmann<arnd@arndb.de>
->>
->> The tegra cpufreq implementation relies on the cpu_freq_table
->> code, so make sure that this is always there when needed.
->>
->> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
->> Signed-off-by: Alan Ott<alan@signal11.us>
->
-> This didn't apply cleanly to the tegra tree (what was it based on?), but
-> I fixed it up manually and applied to for-3.4/cleanups-and-fixes.
->
+Hi Arnd,
 
-These were based on mainline.
+Below are the 6 pull requests for Tegra platforms for 3.4. This is also
+likely my last merge request for tegra material (besides possibly some
+stray patches between now and the merge window), since I am handing off
+main maintainership to Stephen Warren for the next merge window.
 
-Alan.
+Each branch is documented in the tag (they are all tag pull requests), as
+well as in the emails below. Nothing too controversial.
+
+There are a handful of trivial merge conflicts between the branches,
+mostly to the Makefile due to context chances. I also had a local
+issue where git auto-resolved the merge of the T30 SMP branch into
+my for-next branch, and did NOT remove the mach/system.h include at
+arch/arm/mach-tegra/common.c. This results in a build break since it
+has been removed in rmk/for-armsoc. So just a heads up in case you see
+the same thing.
+
+
+-Olof
