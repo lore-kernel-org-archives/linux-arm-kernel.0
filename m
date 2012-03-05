@@ -1,40 +1,55 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Mar 2012 14:26:33 -0500 (EST)
-Subject: [PATCH v3 15/30] ARM: dove: add explicit include of dove.h to
- addr-map.c
-In-Reply-To: <1330658022-14559-16-git-send-email-robherring2@gmail.com>
-References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
- <1330658022-14559-16-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1203051426110.31242@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Mar 2012 11:27:43 -0800
+Subject: [PATCH v3 1/3] ARM: OMAP1: ams-delta: set up regulator over
+ modem reset GPIO pin
+In-Reply-To: <1330963512-20413-2-git-send-email-jkrzyszt@tis.icnet.pl>
+References: <1330963512-20413-1-git-send-email-jkrzyszt@tis.icnet.pl>
+ <1330963512-20413-2-git-send-email-jkrzyszt@tis.icnet.pl>
+Message-ID: <20120305192742.GK12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Mar 2012, Rob Herring wrote:
-
-> From: Rob Herring <rob.herring@calxeda.com>
+* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [120305 07:35]:
+> The Amstrad Delta on-board latch2 bit named MODEM_NRESET, now available
+> as a GPIO pin AMS_DELTA_GPIO_PIN_NMODEM_RESET, is used to power up/down
+> (bring into/out of a reset state) two distinct on-board devices
+> simultaneously: the modem, and the voice codec. As a consequence, that
+> bit is, or can be, manipulated concurrently by two drivers, or their
+> platform provided hooks.
 > 
-> In preparation to remove mach/io.h, add explicit include of mach/dove.h
+> Instead of updating those drivers to use the gpiolib API as a new method
+> of controlling the MODEM_NRESET pin state, like it was done to other
+> drivers accessing latch2 pins, and still being vulnerable to potential
+> concurrency conflicts, or trying to solve that sharing issue with a
+> custom piece of code, set up a fixed regulator device on top of that
+> GPIO pin, with the intention of updating both drivers to manipulate that
+> regulator, not the GPIO pin directly.
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
+> Before the ASoC driver is updated and the modem platform data expanded
+> with a power management callback for switching its power, the
+> ams_delta_latch_write() function, which still provides the old API for
+> accessing latch2 functionality from not updated drivers, is modified to
+> toggle the regulator instead of the MODEM_NRESET GPIO pin.  A helper
+> function provided for balancing the regulator enable/disable operations,
+> together with the consumer data needed for tracking the regulator state,
+> will be removed once the drivers are updated.
+> 
+> Depends on patch series "ARM: OMAP1: ams-delta: replace custom I/O with
+> GPIO".
+> 
+> Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 > ---
->  arch/arm/mach-dove/addr-map.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> v2 -> v3 changes:
+> * fix section mismatch isue.
 > 
-> diff --git a/arch/arm/mach-dove/addr-map.c b/arch/arm/mach-dove/addr-map.c
-> index 98b8c83..2a06c01 100644
-> --- a/arch/arm/mach-dove/addr-map.c
-> +++ b/arch/arm/mach-dove/addr-map.c
-> @@ -14,6 +14,7 @@
->  #include <linux/io.h>
->  #include <asm/mach/arch.h>
->  #include <asm/setup.h>
-> +#include <mach/dove.h>
->  #include <plat/addr-map.h>
->  #include "common.h"
->  
-> -- 
-> 1.7.5.4
-> 
+> Changes against initial version:
+> * rename consumer setup elements to match their final, modem only
+>   related purpose,
+> * initialize the regulator pointer and mutex before first use, then
+>   omit testing that pointer against NULL value
+
+Thanks, applying all three into ams-delta branch.
+
+Regards,
+
+Tony
