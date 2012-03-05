@@ -1,33 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 5 Mar 2012 14:15:01 -0700 (MST)
-Subject: [PATCH] ARM: OMAP2+: omap_device: call all suspend, resume
- callbacks when OMAP_DEVICE_NO_IDLE_ON_SUSPEND is set
-In-Reply-To: <20120305205233.GT12083@atomide.com>
-References: <alpine.DEB.2.00.1203031314050.10611@utopia.booyaka.com>
- <877gyzoyyk.fsf@ti.com>
- <alpine.DEB.2.00.1203051312390.1430@utopia.booyaka.com>
- <20120305205233.GT12083@atomide.com>
-Message-ID: <alpine.DEB.2.00.1203051414340.1430@utopia.booyaka.com>
+From: jason@lakedaemon.net (Jason)
+Date: Mon, 5 Mar 2012 16:17:37 -0500
+Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init
+ funcs to fdt
+In-Reply-To: <alpine.LFD.2.02.1203051542190.31242@xanadu.home>
+References: <cover.1330709314.git.jason@lakedaemon.net>
+ <alpine.LFD.2.02.1203051344130.31242@xanadu.home>
+ <20120305191546.GK5050@titan.lakedaemon.net>
+ <201203052016.26949.arnd@arndb.de>
+ <20120305202941.GN5050@titan.lakedaemon.net>
+ <alpine.LFD.2.02.1203051542190.31242@xanadu.home>
+Message-ID: <20120305211737.GO5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Mar 2012, Tony Lindgren wrote:
-
-> * Paul Walmsley <paul@pwsan.com> [120305 11:44]:
-> > On Mon, 5 Mar 2012, Kevin Hilman wrote:
-> > 
-> > > Tony, this fix is needed for v3.3.
-> > 
-> > Of course, I don't have any objection to this patch going into the v3.3-rc 
-> > kernels.  But given that some maintainers seem to be pushing back against 
-> > late -rc patches, this one could probably be delayed to 3.4 if required.  
-> > no_console_suspend is a debugging-only option and bugs involving it are 
-> > unlikely to affect most users.
+On Mon, Mar 05, 2012 at 03:43:42PM -0500, Nicolas Pitre wrote:
+> On Mon, 5 Mar 2012, Jason wrote:
 > 
-> I'm fine with your queueing it for v3.4 merge window.
+> > On Mon, Mar 05, 2012 at 08:16:26PM +0000, Arnd Bergmann wrote:
+> > > On Monday 05 March 2012, Jason wrote:
+> > > > > 
+> > > > > The clock frequency part being hardcoded to 200000 in the common .dtsi 
+> > > > > file looks wrong.  The clock may differ, and it used to (and should) be 
+> > > > > probed at run time, please see kirkwood_find_tclk().
+> > > > 
+> > > > So, should I EXPORT_SYMBOL_GPL(kirkwood_find_tclk); and have each driver
+> > > > call it?
+> > > 
+> > > If the drivers want to use it, I think it has to be orion_find_tclk for
+> > > drivers that are shared between multiple plat-orion platforms.
+> > 
+> > That's pretty much all of them  :-)
+> > 
+> > I'll rename it and move it to plat-orion/common.c.  This'll be fun.
+> 
+> No no...  This is not a function which is generic at all.  The _result_ 
+> i.e. core clock frequency value is a generic thing, not the method to 
+> determine it.
 
-Just chatted with Kevin, he's going to take this one for 3.4 with some 
-other omap_device patches he's got queued.
+How about this?  Export a global variable, orion_tclk, and a function to
+read it.  Then, make sure each sub arch sets the global.  Does this
+sound viable until common clk lands?
 
+thx,
 
-- Paul
+Jason.
+
+btw - when I received your email I was in the middle of convincing
+myself that I could hack together a common orion_find_tclk().  It was
+rapidly becoming a bad idea.  :-)
