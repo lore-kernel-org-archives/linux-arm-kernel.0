@@ -1,32 +1,39 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 5 Mar 2012 20:36:32 +0000
-Subject: [PATCH v2 01/17] ASoC: imx: move eukrea audmux call into ASoC
- machine driver
-In-Reply-To: <CAKGA1b=4X+ccQXjZVa1DYpRYC0NT0A9AqwgG-ApkzboRkC3sJg@mail.gmail.com>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-2-git-send-email-shawn.guo@linaro.org>
- <20120305174612.GY3224@opensource.wolfsonmicro.com>
- <CAKGA1b=4X+ccQXjZVa1DYpRYC0NT0A9AqwgG-ApkzboRkC3sJg@mail.gmail.com>
-Message-ID: <20120305203631.GB3224@opensource.wolfsonmicro.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 5 Mar 2012 15:43:42 -0500 (EST)
+Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init
+ funcs to fdt
+In-Reply-To: <20120305202941.GN5050@titan.lakedaemon.net>
+References: <cover.1330709314.git.jason@lakedaemon.net>
+ <alpine.LFD.2.02.1203051344130.31242@xanadu.home>
+ <20120305191546.GK5050@titan.lakedaemon.net>
+ <201203052016.26949.arnd@arndb.de>
+ <20120305202941.GN5050@titan.lakedaemon.net>
+Message-ID: <alpine.LFD.2.02.1203051542190.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 11:55:07AM -0600, Matt Sealey wrote:
-> How will this stand up to an machine audio fabric that, like
+On Mon, 5 Mar 2012, Jason wrote:
 
-"This" would be a lot more meaningful if you'd included some context
-in your reply so the reader could tell what you were talking about.
+> On Mon, Mar 05, 2012 at 08:16:26PM +0000, Arnd Bergmann wrote:
+> > On Monday 05 March 2012, Jason wrote:
+> > > > 
+> > > > The clock frequency part being hardcoded to 200000 in the common .dtsi 
+> > > > file looks wrong.  The clock may differ, and it used to (and should) be 
+> > > > probed at run time, please see kirkwood_find_tclk().
+> > > 
+> > > So, should I EXPORT_SYMBOL_GPL(kirkwood_find_tclk); and have each driver
+> > > call it?
+> > 
+> > If the drivers want to use it, I think it has to be orion_find_tclk for
+> > drivers that are shared between multiple plat-orion platforms.
+> 
+> That's pretty much all of them  :-)
+> 
+> I'll rename it and move it to plat-orion/common.c.  This'll be fun.
 
-> imx-sgtl5000 going around BSPs and Linaro and so on since the dawn of
-> time, supports multiple boards but very different audmux
-> configurations? Is this just a stopgap until the DT properly describes
-> it?
+No no...  This is not a function which is generic at all.  The _result_ 
+i.e. core clock frequency value is a generic thing, not the method to 
+determine it.
 
-What are the limitations which you see in the new code?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120305/d8fa7ac1/attachment.sig>
+
+Nicolas
