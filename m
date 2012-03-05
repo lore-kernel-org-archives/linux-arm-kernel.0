@@ -1,76 +1,398 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  5 Mar 2012 22:30:57 +0800
-Subject: [PATCH v2 09/17] ASoC: fsl: separate SSI and DMA Kconfig options
+Date: Mon,  5 Mar 2012 22:30:58 +0800
+Subject: [PATCH v2 10/17] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
 In-Reply-To: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
 References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1330957865-19085-10-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330957865-19085-11-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fsl_ssi driver will possibly be shared between Freescale PowerPC
-and ARM/IMX families, so give it a separate Kconfig option.  Then
-fsl_ssi driver can possibly be selected independently from selecting
-PowerPC DMA based PCM driver.
+Freescale PowerPC and ARM/IMX families share the same SSI IP block.
+The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
+code sharing and consolidation can happen.
+
+This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
+in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
+IMX platform.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- sound/soc/fsl/Kconfig  |   15 +++++++++------
- sound/soc/fsl/Makefile |    3 ++-
- 2 files changed, 11 insertions(+), 7 deletions(-)
+ sound/soc/Kconfig                        |    1 -
+ sound/soc/Makefile                       |    1 -
+ sound/soc/fsl/Kconfig                    |   92 ++++++++++++++++++++++++++++++
+ sound/soc/fsl/Makefile                   |   22 +++++++
+ sound/soc/{imx => fsl}/eukrea-tlv320.c   |    2 +-
+ sound/soc/{imx => fsl}/imx-audmux.c      |    0
+ sound/soc/{imx => fsl}/imx-audmux.h      |    0
+ sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c |    0
+ sound/soc/{imx => fsl}/imx-pcm-fiq.c     |    0
+ sound/soc/{imx => fsl}/imx-pcm.c         |    0
+ sound/soc/{imx => fsl}/imx-pcm.h         |    0
+ sound/soc/{imx => fsl}/imx-ssi.c         |    2 +-
+ sound/soc/{imx => fsl}/imx-ssi.h         |    0
+ sound/soc/{imx => fsl}/mx27vis-aic32x4.c |    0
+ sound/soc/{imx => fsl}/phycore-ac97.c    |    0
+ sound/soc/{imx => fsl}/wm1133-ev1.c      |    0
+ sound/soc/imx/Kconfig                    |   79 -------------------------
+ sound/soc/imx/Makefile                   |   22 -------
+ 18 files changed, 116 insertions(+), 105 deletions(-)
+ rename sound/soc/{imx => fsl}/eukrea-tlv320.c (99%)
+ rename sound/soc/{imx => fsl}/imx-audmux.c (100%)
+ rename sound/soc/{imx => fsl}/imx-audmux.h (100%)
+ rename sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c (100%)
+ rename sound/soc/{imx => fsl}/imx-pcm-fiq.c (100%)
+ rename sound/soc/{imx => fsl}/imx-pcm.c (100%)
+ rename sound/soc/{imx => fsl}/imx-pcm.h (100%)
+ rename sound/soc/{imx => fsl}/imx-ssi.c (99%)
+ rename sound/soc/{imx => fsl}/imx-ssi.h (100%)
+ rename sound/soc/{imx => fsl}/mx27vis-aic32x4.c (100%)
+ rename sound/soc/{imx => fsl}/phycore-ac97.c (100%)
+ rename sound/soc/{imx => fsl}/wm1133-ev1.c (100%)
+ delete mode 100644 sound/soc/imx/Kconfig
+ delete mode 100644 sound/soc/imx/Makefile
 
+diff --git a/sound/soc/Kconfig b/sound/soc/Kconfig
+index 91c9855..0f85f6d 100644
+--- a/sound/soc/Kconfig
++++ b/sound/soc/Kconfig
+@@ -35,7 +35,6 @@ source "sound/soc/blackfin/Kconfig"
+ source "sound/soc/davinci/Kconfig"
+ source "sound/soc/ep93xx/Kconfig"
+ source "sound/soc/fsl/Kconfig"
+-source "sound/soc/imx/Kconfig"
+ source "sound/soc/jz4740/Kconfig"
+ source "sound/soc/nuc900/Kconfig"
+ source "sound/soc/omap/Kconfig"
+diff --git a/sound/soc/Makefile b/sound/soc/Makefile
+index 2feaf37..363dfd6 100644
+--- a/sound/soc/Makefile
++++ b/sound/soc/Makefile
+@@ -12,7 +12,6 @@ obj-$(CONFIG_SND_SOC)	+= blackfin/
+ obj-$(CONFIG_SND_SOC)	+= davinci/
+ obj-$(CONFIG_SND_SOC)	+= ep93xx/
+ obj-$(CONFIG_SND_SOC)	+= fsl/
+-obj-$(CONFIG_SND_SOC)   += imx/
+ obj-$(CONFIG_SND_SOC)	+= jz4740/
+ obj-$(CONFIG_SND_SOC)	+= mid-x86/
+ obj-$(CONFIG_SND_SOC)	+= mxs/
 diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index d754d34..ca693b2 100644
+index ca693b2..19856a0 100644
 --- a/sound/soc/fsl/Kconfig
 +++ b/sound/soc/fsl/Kconfig
-@@ -1,10 +1,11 @@
+@@ -1,3 +1,15 @@
++config SND_SOC_FSL_SSI
++	tristate
++
++menuconfig SND_POWERPC_SOC
++	tristate "SoC Audio for Freescale PowerPC CPUs"
++	depends on FSL_SOC
++	help
++	  Say Y or M if you want to add support for codecs attached to
++	  the PowerPC CPUs.
++
++if SND_POWERPC_SOC
++
  config SND_MPC52xx_DMA
  	tristate
  
--# ASoC platform support for the Freescale PowerPC SOCs that have an SSI and
--# an Elo DMA controller, such as the MPC8610 and P1022.  You will still need to
--# select a platform driver and a codec driver.
--config SND_SOC_POWERPC_SSI
-+config SND_SOC_FSL_SSI
-+	tristate
-+	depends on FSL_SOC
-+
-+config SND_SOC_POWERPC_DMA
- 	tristate
- 	depends on FSL_SOC
- 
-@@ -12,7 +13,8 @@ config SND_SOC_MPC8610_HPCD
- 	tristate "ALSA SoC support for the Freescale MPC8610 HPCD board"
- 	# I2C is necessary for the CS4270 driver
- 	depends on MPC8610_HPCD && I2C
--	select SND_SOC_POWERPC_SSI
-+	select SND_SOC_FSL_SSI
-+	select SND_SOC_POWERPC_DMA
- 	select SND_SOC_CS4270
- 	select SND_SOC_CS4270_VD33_ERRATA
- 	default y if MPC8610_HPCD
-@@ -23,7 +25,8 @@ config SND_SOC_P1022_DS
- 	tristate "ALSA SoC support for the Freescale P1022 DS board"
- 	# I2C is necessary for the WM8776 driver
- 	depends on P1022_DS && I2C
--	select SND_SOC_POWERPC_SSI
-+	select SND_SOC_FSL_SSI
-+	select SND_SOC_POWERPC_DMA
- 	select SND_SOC_WM8776
- 	default y if P1022_DS
+@@ -68,3 +80,83 @@ config SND_MPC52xx_SOC_EFIKA
  	help
+ 	  Say Y if you want to add support for sound on the Efika.
+ 
++endif # SND_POWERPC_SOC
++
++menuconfig SND_IMX_SOC
++	tristate "SoC Audio for Freescale i.MX CPUs"
++	depends on ARCH_MXC
++	help
++	  Say Y or M if you want to add support for codecs attached to
++	  the i.MX CPUs.
++
++if SND_IMX_SOC
++
++config SND_SOC_IMX_SSI
++	tristate
++
++config SND_SOC_IMX_PCM
++	tristate
++
++config SND_MXC_SOC_FIQ
++	tristate
++	select FIQ
++	select SND_SOC_IMX_PCM
++
++config SND_MXC_SOC_MX2
++	tristate
++	select SND_SOC_DMAENGINE_PCM
++	select SND_SOC_IMX_PCM
++
++config SND_SOC_IMX_AUDMUX
++	tristate
++
++config SND_MXC_SOC_WM1133_EV1
++	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
++	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
++	select SND_SOC_WM8350
++	select SND_MXC_SOC_FIQ
++	select SND_SOC_IMX_AUDMUX
++	select SND_SOC_IMX_SSI
++	help
++	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
++	  PMIC board with WM8835x fitted.
++
++config SND_SOC_MX27VIS_AIC32X4
++	tristate "SoC audio support for Visstrim M10 boards"
++	depends on MACH_IMX27_VISSTRIM_M10 && I2C
++	select SND_SOC_TLV320AIC32X4
++	select SND_MXC_SOC_MX2
++	select SND_SOC_IMX_AUDMUX
++	select SND_SOC_IMX_SSI
++	help
++	  Say Y if you want to add support for SoC audio on Visstrim SM10
++	  board with TLV320AIC32X4 codec.
++
++config SND_SOC_PHYCORE_AC97
++	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
++	depends on MACH_PCM043 || MACH_PCA100
++	select SND_SOC_AC97_BUS
++	select SND_SOC_WM9712
++	select SND_MXC_SOC_FIQ
++	select SND_SOC_IMX_AUDMUX
++	select SND_SOC_IMX_SSI
++	help
++	  Say Y if you want to add support for SoC audio on Phytec phyCORE
++	  and phyCARD boards in AC97 mode
++
++config SND_SOC_EUKREA_TLV320
++	tristate "Eukrea TLV320"
++	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
++		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
++		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
++		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
++	depends on I2C
++	select SND_SOC_TLV320AIC23
++	select SND_MXC_SOC_FIQ
++	select SND_SOC_IMX_AUDMUX
++	select SND_SOC_IMX_SSI
++	help
++	  Enable I2S based access to the TLV320AIC23B codec attached
++	  to the SSI interface
++
++endif # SND_IMX_SOC
 diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
-index b4a38c0..95d483f 100644
+index 95d483f..36c257f 100644
 --- a/sound/soc/fsl/Makefile
 +++ b/sound/soc/fsl/Makefile
-@@ -9,7 +9,8 @@ obj-$(CONFIG_SND_SOC_P1022_DS) += snd-soc-p1022-ds.o
- # Freescale PowerPC SSI/DMA Platform Support
- snd-soc-fsl-ssi-objs := fsl_ssi.o
- snd-soc-fsl-dma-objs := fsl_dma.o
--obj-$(CONFIG_SND_SOC_POWERPC_SSI) += snd-soc-fsl-ssi.o snd-soc-fsl-dma.o
-+obj-$(CONFIG_SND_SOC_FSL_SSI) += snd-soc-fsl-ssi.o
-+obj-$(CONFIG_SND_SOC_POWERPC_DMA) += snd-soc-fsl-dma.o
+@@ -21,3 +21,25 @@ obj-$(CONFIG_SND_SOC_MPC5200_AC97) += mpc5200_psc_ac97.o
+ obj-$(CONFIG_SND_MPC52xx_SOC_PCM030) += pcm030-audio-fabric.o
+ obj-$(CONFIG_SND_MPC52xx_SOC_EFIKA) += efika-audio-fabric.o
  
- # MPC5200 Platform Support
- obj-$(CONFIG_SND_MPC52xx_DMA) += mpc5200_dma.o
++# i.MX Platform Support
++snd-soc-imx-ssi-objs := imx-ssi.o
++snd-soc-imx-audmux-objs := imx-audmux.o
++
++obj-$(CONFIG_SND_SOC_IMX_SSI) += snd-soc-imx-ssi.o
++obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
++
++obj-$(CONFIG_SND_SOC_IMX_PCM) += snd-soc-imx-pcm.o
++snd-soc-imx-pcm-y := imx-pcm.o
++snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_FIQ) += imx-pcm-fiq.o
++snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_MX2) += imx-pcm-dma-mx2.o
++
++# i.MX Machine Support
++snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
++snd-soc-phycore-ac97-objs := phycore-ac97.o
++snd-soc-mx27vis-aic32x4-objs := mx27vis-aic32x4.o
++snd-soc-wm1133-ev1-objs := wm1133-ev1.o
++
++obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
++obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
++obj-$(CONFIG_SND_SOC_MX27VIS_AIC32X4) += snd-soc-mx27vis-aic32x4.o
++obj-$(CONFIG_SND_MXC_SOC_WM1133_EV1) += snd-soc-wm1133-ev1.o
+diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/fsl/eukrea-tlv320.c
+similarity index 99%
+rename from sound/soc/imx/eukrea-tlv320.c
+rename to sound/soc/fsl/eukrea-tlv320.c
+index 7d4475c..efb9ede 100644
+--- a/sound/soc/imx/eukrea-tlv320.c
++++ b/sound/soc/fsl/eukrea-tlv320.c
+@@ -7,7 +7,7 @@
+  * which is Copyright 2009 Simtec Electronics
+  * and on sound/soc/imx/phycore-ac97.c which is
+  * Copyright 2009 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+- * 
++ *
+  *  This program is free software; you can redistribute  it and/or modify it
+  *  under  the terms of  the GNU General  Public License as published by the
+  *  Free Software Foundation;  either version 2 of the  License, or (at your
+diff --git a/sound/soc/imx/imx-audmux.c b/sound/soc/fsl/imx-audmux.c
+similarity index 100%
+rename from sound/soc/imx/imx-audmux.c
+rename to sound/soc/fsl/imx-audmux.c
+diff --git a/sound/soc/imx/imx-audmux.h b/sound/soc/fsl/imx-audmux.h
+similarity index 100%
+rename from sound/soc/imx/imx-audmux.h
+rename to sound/soc/fsl/imx-audmux.h
+diff --git a/sound/soc/imx/imx-pcm-dma-mx2.c b/sound/soc/fsl/imx-pcm-dma-mx2.c
+similarity index 100%
+rename from sound/soc/imx/imx-pcm-dma-mx2.c
+rename to sound/soc/fsl/imx-pcm-dma-mx2.c
+diff --git a/sound/soc/imx/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
+similarity index 100%
+rename from sound/soc/imx/imx-pcm-fiq.c
+rename to sound/soc/fsl/imx-pcm-fiq.c
+diff --git a/sound/soc/imx/imx-pcm.c b/sound/soc/fsl/imx-pcm.c
+similarity index 100%
+rename from sound/soc/imx/imx-pcm.c
+rename to sound/soc/fsl/imx-pcm.c
+diff --git a/sound/soc/imx/imx-pcm.h b/sound/soc/fsl/imx-pcm.h
+similarity index 100%
+rename from sound/soc/imx/imx-pcm.h
+rename to sound/soc/fsl/imx-pcm.h
+diff --git a/sound/soc/imx/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
+similarity index 99%
+rename from sound/soc/imx/imx-ssi.c
+rename to sound/soc/fsl/imx-ssi.c
+index 4f81ed4..cf3ed03 100644
+--- a/sound/soc/imx/imx-ssi.c
++++ b/sound/soc/fsl/imx-ssi.c
+@@ -28,7 +28,7 @@
+  * value. When we read the same register two times (and the register still
+  * contains the same value) these status bits are not set. We work
+  * around this by not polling these bits but only wait a fixed delay.
+- * 
++ *
+  */
+ 
+ #include <linux/clk.h>
+diff --git a/sound/soc/imx/imx-ssi.h b/sound/soc/fsl/imx-ssi.h
+similarity index 100%
+rename from sound/soc/imx/imx-ssi.h
+rename to sound/soc/fsl/imx-ssi.h
+diff --git a/sound/soc/imx/mx27vis-aic32x4.c b/sound/soc/fsl/mx27vis-aic32x4.c
+similarity index 100%
+rename from sound/soc/imx/mx27vis-aic32x4.c
+rename to sound/soc/fsl/mx27vis-aic32x4.c
+diff --git a/sound/soc/imx/phycore-ac97.c b/sound/soc/fsl/phycore-ac97.c
+similarity index 100%
+rename from sound/soc/imx/phycore-ac97.c
+rename to sound/soc/fsl/phycore-ac97.c
+diff --git a/sound/soc/imx/wm1133-ev1.c b/sound/soc/fsl/wm1133-ev1.c
+similarity index 100%
+rename from sound/soc/imx/wm1133-ev1.c
+rename to sound/soc/fsl/wm1133-ev1.c
+diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
+deleted file mode 100644
+index 810acaa..0000000
+--- a/sound/soc/imx/Kconfig
++++ /dev/null
+@@ -1,79 +0,0 @@
+-menuconfig SND_IMX_SOC
+-	tristate "SoC Audio for Freescale i.MX CPUs"
+-	depends on ARCH_MXC
+-	help
+-	  Say Y or M if you want to add support for codecs attached to
+-	  the i.MX SSI interface.
+-
+-
+-if SND_IMX_SOC
+-
+-config SND_SOC_IMX_SSI
+-	tristate
+-
+-config SND_SOC_IMX_PCM
+-	tristate
+-
+-config SND_MXC_SOC_FIQ
+-	tristate
+-	select FIQ
+-	select SND_SOC_IMX_PCM
+-
+-config SND_MXC_SOC_MX2
+-	select SND_SOC_DMAENGINE_PCM
+-	tristate
+-	select SND_SOC_IMX_PCM
+-
+-config SND_SOC_IMX_AUDMUX
+-	tristate
+-
+-config SND_MXC_SOC_WM1133_EV1
+-	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
+-	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
+-	select SND_SOC_WM8350
+-	select SND_MXC_SOC_FIQ
+-	select SND_SOC_IMX_AUDMUX
+-	select SND_SOC_IMX_SSI
+-	help
+-	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
+-	  PMIC board with WM8835x fitted.
+-
+-config SND_SOC_MX27VIS_AIC32X4
+-	tristate "SoC audio support for Visstrim M10 boards"
+-	depends on MACH_IMX27_VISSTRIM_M10 && I2C
+-	select SND_SOC_TLV320AIC32X4
+-	select SND_MXC_SOC_MX2
+-	select SND_SOC_IMX_AUDMUX
+-	select SND_SOC_IMX_SSI
+-	help
+-	  Say Y if you want to add support for SoC audio on Visstrim SM10
+-	  board with TLV320AIC32X4 codec.
+-
+-config SND_SOC_PHYCORE_AC97
+-	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
+-	depends on MACH_PCM043 || MACH_PCA100
+-	select SND_SOC_AC97_BUS
+-	select SND_SOC_WM9712
+-	select SND_MXC_SOC_FIQ
+-	select SND_SOC_IMX_AUDMUX
+-	select SND_SOC_IMX_SSI
+-	help
+-	  Say Y if you want to add support for SoC audio on Phytec phyCORE
+-	  and phyCARD boards in AC97 mode
+-
+-config SND_SOC_EUKREA_TLV320
+-	tristate "Eukrea TLV320"
+-	depends on MACH_EUKREA_MBIMX27_BASEBOARD \
+-		|| MACH_EUKREA_MBIMXSD25_BASEBOARD \
+-		|| MACH_EUKREA_MBIMXSD35_BASEBOARD \
+-		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
+-	depends on I2C
+-	select SND_SOC_TLV320AIC23
+-	select SND_MXC_SOC_FIQ
+-	select SND_SOC_IMX_AUDMUX
+-	select SND_SOC_IMX_SSI
+-	help
+-	  Enable I2S based access to the TLV320AIC23B codec attached
+-	  to the SSI interface
+-
+-endif	# SND_IMX_SOC
+diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
+deleted file mode 100644
+index f5db3e9..0000000
+--- a/sound/soc/imx/Makefile
++++ /dev/null
+@@ -1,22 +0,0 @@
+-# i.MX Platform Support
+-snd-soc-imx-ssi-objs := imx-ssi.o
+-snd-soc-imx-audmux-objs := imx-audmux.o
+-
+-obj-$(CONFIG_SND_SOC_IMX_SSI) += snd-soc-imx-ssi.o
+-obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
+-
+-obj-$(CONFIG_SND_SOC_IMX_PCM) += snd-soc-imx-pcm.o
+-snd-soc-imx-pcm-y := imx-pcm.o
+-snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_FIQ) += imx-pcm-fiq.o
+-snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_MX2) += imx-pcm-dma-mx2.o
+-
+-# i.MX Machine Support
+-snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
+-snd-soc-phycore-ac97-objs := phycore-ac97.o
+-snd-soc-mx27vis-aic32x4-objs := mx27vis-aic32x4.o
+-snd-soc-wm1133-ev1-objs := wm1133-ev1.o
+-
+-obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
+-obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
+-obj-$(CONFIG_SND_SOC_MX27VIS_AIC32X4) += snd-soc-mx27vis-aic32x4.o
+-obj-$(CONFIG_SND_MXC_SOC_WM1133_EV1) += snd-soc-wm1133-ev1.o
 -- 
 1.7.5.4
