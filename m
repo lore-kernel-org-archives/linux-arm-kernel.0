@@ -1,38 +1,167 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon,  5 Mar 2012 20:21:48 +0800
-Subject: [PATCH v2 4/7] ARM: mmp: enable rtc clk in pxa168
+Date: Mon,  5 Mar 2012 20:21:47 +0800
+Subject: [PATCH v2 3/7] i2c: pxa: add OF support
 In-Reply-To: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1330950111-30797-5-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1330950111-30797-4-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable clk of rtc-sa1100 device in pxa168.
+Append these properties in below.
+mrvl,i2c-polling
+mrvl,i2c-fast-mode
+
+Still keep slave, slave_addr and class in platform data.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/mach-mmp/pxa168.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-pxa.c |   95 ++++++++++++++++++++++++++++++++---------
+ 1 files changed, 74 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 9f61256..aa62d0c 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -65,6 +65,7 @@ static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
- static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
- static APBC_CLK(gpio, PXA168_GPIO, 0, 13000000);
- static APBC_CLK(keypad, PXA168_KPC, 0, 32000);
-+static APBC_CLK(rtc, PXA168_RTC, 8, 32768);
- 
- static APMU_CLK(nand, NAND, 0x19b, 156000000);
- static APMU_CLK(lcd, LCD, 0x7f, 312000000);
-@@ -93,6 +94,7 @@ static struct clk_lookup pxa168_clkregs[] = {
- 	INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
- 	INIT_CLKREG(&clk_eth, "pxa168-eth", "MFUCLK"),
- 	INIT_CLKREG(&clk_usb, "pxa168-ehci", "PXA168-USBCLK"),
-+	INIT_CLKREG(&clk_rtc, "sa1100-rtc", NULL),
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index d603646..f673326 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -29,6 +29,8 @@
+ #include <linux/errno.h>
+ #include <linux/interrupt.h>
+ #include <linux/i2c-pxa.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/of_i2c.h>
+ #include <linux/platform_device.h>
+ #include <linux/err.h>
+@@ -1044,23 +1046,60 @@ static const struct i2c_algorithm i2c_pxa_pio_algorithm = {
+ 	.functionality	= i2c_pxa_functionality,
  };
  
- static int __init pxa168_init(void)
+-static int i2c_pxa_probe(struct platform_device *dev)
++static struct of_device_id i2c_pxa_dt_ids[] = {
++	{ .compatible = "mrvl,pxa-i2c", .data = (void *)REGS_PXA2XX },
++	{ .compatible = "mrvl,pwri2c", .data = (void *)REGS_PXA3XX },
++	{ .compatible = "mrvl,mmp-twsi", .data = (void *)REGS_PXA2XX },
++	{}
++};
++MODULE_DEVICE_TABLE(of, i2c_pxa_dt_ids);
++
++static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
++			    enum pxa_i2c_types *i2c_types)
+ {
+-	struct pxa_i2c *i2c;
+-	struct resource *res;
+-	struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
+-	const struct platform_device_id *id = platform_get_device_id(dev);
+-	enum pxa_i2c_types i2c_type = id->driver_data;
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *of_id =
++			of_match_device(i2c_pxa_dt_ids, &pdev->dev);
+ 	int ret;
+-	int irq;
+ 
+-	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+-	irq = platform_get_irq(dev, 0);
+-	if (res == NULL || irq < 0)
+-		return -ENODEV;
++	if (!of_id)
++		return 1;
++	ret = of_alias_get_id(np, "i2c");
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
++		return ret;
++	}
++	pdev->id = ret;
++	if (of_get_property(np, "mrvl,i2c-polling", NULL))
++		i2c->use_pio = 1;
++	if (of_get_property(np, "mrvl,i2c-fast-mode", NULL))
++		i2c->fast_mode = 1;
++	*i2c_types = (u32)(of_id->data);
++	return 0;
++}
+ 
+-	if (!request_mem_region(res->start, resource_size(res), res->name))
+-		return -ENOMEM;
++static int i2c_pxa_probe_pdata(struct platform_device *pdev,
++			       struct pxa_i2c *i2c,
++			       enum pxa_i2c_types *i2c_types)
++{
++	struct i2c_pxa_platform_data *plat = pdev->dev.platform_data;
++	const struct platform_device_id *id = platform_get_device_id(pdev);
++
++	*i2c_types = id->driver_data;
++	if (plat) {
++		i2c->use_pio = plat->use_pio;
++		i2c->fast_mode = plat->fast_mode;
++	}
++	return 0;
++}
++
++static int i2c_pxa_probe(struct platform_device *dev)
++{
++	struct i2c_pxa_platform_data *plat = dev->dev.platform_data;
++	enum pxa_i2c_types i2c_type;
++	struct pxa_i2c *i2c;
++	struct resource *res = NULL;
++	int ret, irq;
+ 
+ 	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
+ 	if (!i2c) {
+@@ -1068,6 +1107,24 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 		goto emalloc;
+ 	}
+ 
++	ret = i2c_pxa_probe_dt(dev, i2c, &i2c_type);
++	if (ret > 0)
++		ret = i2c_pxa_probe_pdata(dev, i2c, &i2c_type);
++	if (ret < 0)
++		goto eclk;
++
++	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
++	irq = platform_get_irq(dev, 0);
++	if (res == NULL || irq < 0) {
++		ret = -ENODEV;
++		goto eclk;
++	}
++
++	if (!request_mem_region(res->start, resource_size(res), res->name)) {
++		ret = -ENOMEM;
++		goto eclk;
++	}
++
+ 	i2c->adap.owner   = THIS_MODULE;
+ 	i2c->adap.retries = 5;
+ 
+@@ -1109,21 +1166,16 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 
+ 	i2c->slave_addr = I2C_PXA_SLAVE_ADDR;
+ 
+-#ifdef CONFIG_I2C_PXA_SLAVE
+ 	if (plat) {
++#ifdef CONFIG_I2C_PXA_SLAVE
+ 		i2c->slave_addr = plat->slave_addr;
+ 		i2c->slave = plat->slave;
+-	}
+ #endif
+-
+-	clk_enable(i2c->clk);
+-
+-	if (plat) {
+ 		i2c->adap.class = plat->class;
+-		i2c->use_pio = plat->use_pio;
+-		i2c->fast_mode = plat->fast_mode;
+ 	}
+ 
++	clk_enable(i2c->clk);
++
+ 	if (i2c->use_pio) {
+ 		i2c->adap.algo = &i2c_pxa_pio_algorithm;
+ 	} else {
+@@ -1234,6 +1286,7 @@ static struct platform_driver i2c_pxa_driver = {
+ 		.name	= "pxa2xx-i2c",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= I2C_PXA_DEV_PM_OPS,
++		.of_match_table = i2c_pxa_dt_ids,
+ 	},
+ 	.id_table	= i2c_pxa_id_table,
+ };
 -- 
 1.7.0.4
