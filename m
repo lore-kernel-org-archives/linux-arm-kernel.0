@@ -1,66 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 5 Mar 2012 14:46:01 +0000
-Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
-In-Reply-To: <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20120305144601.GQ3224@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Mar 2012 14:46:14 +0000
+Subject: [PATCH v2 7/7] Document: devicetree: add OF documents for arch-mmp
+In-Reply-To: <1330950111-30797-8-git-send-email-haojian.zhuang@marvell.com>
+References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
+ <1330950111-30797-8-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <201203051446.14600.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 10:31:05PM +0800, Shawn Guo wrote:
+On Monday 05 March 2012, Haojian Zhuang wrote:
+> Add OF support in Document/devicetree directory.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-> +	ret = snd_soc_dai_set_fmt(rtd->codec_dai, SND_SOC_DAIFMT_I2S |
-> +						  SND_SOC_DAIFMT_NB_NF |
-> +						  SND_SOC_DAIFMT_CBM_CFM);
-> +	if (ret) {
-> +		dev_err(dev, "could not set codec driver audio format\n");
-> +		return ret;
-> +	}
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-This you can just set in the card struct, no need for explicit code at
-all.
+One question for Benoit, Grant or Rob:
 
-> +	ret = of_property_read_u32(np, "fsl,mux-int-port", &int_port);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "mux-int-port missing or invalid\n");
-> +		return -EINVAL;
-> +	}
-> +	ret = of_property_read_u32(np, "fsl,mux-ext-port", &ext_port);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "mux-ext-port missing or invalid\n");
-> +		return -EINVAL;
-> +	}
+> +Required properties:
+> +- compatible: should be "mrvl,sa1100-rtc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: Should be two. The first interrupt number is the rtc alarm
+> +  interrupt and the second interrupt number is the rtc hz interrupt.
+> +- interrupt-names: Assign name of irq resource.
+> +
+> +Example:
+> +	rtc: rtc at d4010000 {
+> +		compatible = "mrvl,mmp-rtc";
+> +		reg = <0xd4010000 0x1000>;
+> +		interrupts = <5>, <6>;
+> +		interrupt-name = "rtc 1Hz", "rtc alarm";
+> +	};
 
-It seems very odd to have namespacing on the individual property names.
-Why are you doing that?  The properties are already defined in terms of
-the device binding.  Though everyone else is doing it so not really a
-problem.
+When the binding for a device lists the interrupt-names property, should it
+also list the specific values for it? This one says that which ones they are,
+but I think we should actually mandate the exact string in the binding if
+we want to allow drivers to get the resource by its name.
 
-> +	/*
-> +	 * The port numbering in the hardware manual starts at 1, while
-> +	 * the audmux API expects it starts at 0.
-> +	 */
-> +	int_port--;
-> +	ext_port--;
-
-Should have error checking somewhere to make sure that the user
-remembered this.
-
-> +	imx_audmux_v2_configure_port(int_port,
-> +			IMX_AUDMUX_V2_PTCR_SYN |
-> +			IMX_AUDMUX_V2_PTCR_TFSEL(ext_port) |
-> +			IMX_AUDMUX_V2_PTCR_TCSEL(ext_port) |
-> +			IMX_AUDMUX_V2_PTCR_TFSDIR |
-> +			IMX_AUDMUX_V2_PTCR_TCLKDIR,
-> +			IMX_AUDMUX_V2_PDCR_RXDSEL(ext_port));
-
-I'm not sure we've really gained much from converting to a platform
-driver given that the device just registers something globally...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120305/1eb910df/attachment.sig>
+	Arnd
