@@ -1,76 +1,121 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 5 Mar 2012 19:15:55 +0100
-Subject: [PATCH v3 07/10] arm/tegra: Add PWFM controller device tree
- probing
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE861C46@HQMAIL01.nvidia.com>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <1329923841-32017-8-git-send-email-thierry.reding@avionic-design.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF1E67@HQMAIL01.nvidia.com>
- <20120303225404.GC6661@avionic-0098.mockup.avionic-design.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861C46@HQMAIL01.nvidia.com>
-Message-ID: <20120305181555.GA22459@avionic-0098.adnet.avionic-design.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 05 Mar 2012 10:18:13 -0800
+Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <20120301204553.GA21841@legolas.emea.dhcp.ti.com> (Felipe Balbi's
+ message of "Thu, 1 Mar 2012 22:45:54 +0200")
+References: <1330006564-13290-1-git-send-email-mporter@ti.com>
+ <87wr74gis6.fsf@ti.com>
+ <20120301204553.GA21841@legolas.emea.dhcp.ti.com>
+Message-ID: <87pqcqnc7u.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> Thierry Reding wrote at Saturday, March 03, 2012 3:54 PM:
-> > I'm confused. If I know exactly that the hardware is Tegra30 (which it
-> > definitely should be if I include tegra30.dtsi), then why list "tegra20-pwm"
-> > as compatible?
-> > 
-> > Or did you mean to list tegra30-pwm as compatible value in the PWM driver?
-> 
-> Standard practice is to list the exact model of the HW as the first entry
-> in compatible in the .dts file:
-> 
->     nvidia,tegra30-pwm
-> 
-> This is so that the DT always describes exactly which HW model is actually
-> present, so that if HW-model-specific WARs/... are required in the future,
-> the DT already lists that information up-front.
-> 
-> Then additionally list any older HW models that this HW is also compatible
-> with:
-> 
->     nvidia,tegra20-pwm
-> 
-> 
-> This allows the driver to list just nvidia,tegra20-pwm but still bind
-> to DT nodes that are for later HW.
-> 
-> So, in other words, you end up with the following in the .dts/.dtsi file:
-> 
->     compatible = "nvidia,tegra30-pwm", "nvidia,tegra20-pwm";
+Felipe Balbi <balbi@ti.com> writes:
 
-Okay, that makes sense now. For some reason I thought you were suggesting to
-put the same into tegra20.dtsi as well. I'll add nvidia,tegra30-pwm to the
-compatible list in the driver and list both values in the tegra30.dtsi.
-Thanks for explaining.
+> Hi,
+>
+> On Thu, Mar 01, 2012 at 12:36:57PM -0800, Kevin Hilman wrote:
+>> Matt Porter <mporter@ti.com> writes:
+>> 
+>> > This fixes smsc911x support on platforms using gpmc_smsc911x_init().
+>> >
+>> > Commit c7e963f6888816 (net/smsc911x: Add regulator support) added
+>> > the requirement that platforms provide vdd33a and vddvario supplies.
+>> >
+>> > Signed-off-by: Matt Porter <mporter@ti.com>
+>> 
+>> [...]
+>> 
+>> >  /*
+>> >   * Initialize smsc911x device connected to the GPMC. Note that we
+>> >   * assume that pin multiplexing is done in the board-*.c file,
+>> > @@ -55,6 +101,12 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+>> >  
+>> >  	gpmc_cfg = board_data;
+>> >  
+>> > +	ret = platform_device_register(&gpmc_smsc911x_regulator);
+>> > +	if (ret < 0) {
+>> > +		pr_err("Unable to register smsc911x regulators: %d\n", ret);
+>> > +		return;
+>> > +	}
+>> > +
+>> 
+>> Boards that have more than one instance of the smsc911x (OMAP3/Overo)
+>> barf here because of trying to register the same device twice.
+>> 
+>> We need something like the patch below to make Overo boot again.
+>> 
+>> Kevin
+>> 
+>> 
+>> 
+>> From 4114dea2fb897ab75d05eaa943d29454034fc025 Mon Sep 17 00:00:00 2001
+>> From: Kevin Hilman <khilman@ti.com>
+>> Date: Thu, 1 Mar 2012 12:30:42 -0800
+>> Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulators once
+>> 
+>> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+>> regulators) added regulators which are registered during
+>> gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
+>> than one instance of the SMSC911x and result in attempting to register
+>> the same regulator more than once which causes a panic().  Fix this by
+>> tracking the regulator registration ensuring only a single device is
+>> registered.
+>> 
+>> Cc: Matt Porter <mporter@ti.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/gpmc-smsc911x.c |   14 ++++++++++----
+>>  1 file changed, 10 insertions(+), 4 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+>> index bbb870c..95e6c7d 100644
+>> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
+>> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+>> @@ -88,6 +88,8 @@ static struct platform_device gpmc_smsc911x_regulator = {
+>>  	},
+>>  };
+>>  
+>> +static bool regulator_registered;
+>> +
+>>  /*
+>>   * Initialize smsc911x device connected to the GPMC. Note that we
+>>   * assume that pin multiplexing is done in the board-*.c file,
+>> @@ -101,10 +103,14 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+>>  
+>>  	gpmc_cfg = board_data;
+>>  
+>> -	ret = platform_device_register(&gpmc_smsc911x_regulator);
+>> -	if (ret < 0) {
+>> -		pr_err("Unable to register smsc911x regulators: %d\n", ret);
+>> -		return;
+>> +	if (!regulator_registered) {
+>> +		ret = platform_device_register(&gpmc_smsc911x_regulator);
+>> +		if (ret < 0) {
+>> +			pr_err("Unable to register smsc911x regulators: %d\n",
+>> +			       ret);
+>> +			return;
+>> +		}
+>> +		regulator_registered = true;
+>
+> Wow, this is quite a hack. Is the regulator part of the SMSC911x
+> device or is it outside ? If it's outside the SMSC91xx (which I
+> believe it is) there should be a regulator driver instead of this
+> hack.  For boards which don't provide such a regulator (and tie the
+> supply pin to some constant voltage source) there should be a constant
+> regulator supplying the pin. But this patch is quite hacky.
 
-> > > Could you also write binding documentation, in particular explaining
-> > > what the two pwm-cells are specifically for Tegra:
-> > >
-> > > Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
-> > >
-> > > (although perhaps that'd be part of the previous patch which implements
-> > > the driver)
-> > 
-> > Actually for Tegra the values would be those documented in the generic
-> > binding because Tegra uses of_pwm_simple_xlate(). Does it still make sense to
-> > add a Tegra-specific binding?
-> 
-> There should still be a Tegra-specific binding. Without it, there's no
-> definite way to know whether the "standard" properties actually apply,
-> or someone simply forgot to document it.
+Are you referring to my patch or to the original $SUBJECT patch?  It's
+not terribly clear.
 
-Understood. I assume that both the Tegra20 and Tegra30 variants should have
-explicit bindings then as well, right?
+My patch doesn't add any regulators, it just fixes a bug when this init
+function is called more than once.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120305/e22d2f46/attachment.sig>
+The addition of the regulators was done in $SUBJECT patch, not my fix.
+
+In either case $SUBJECT patch is already in Tony's fixes queue, so if it
+is going be merged, then my fix above is needed also to not break
+Overo and any other platform that has more than one smsc911x instance.
+
+Kevin
