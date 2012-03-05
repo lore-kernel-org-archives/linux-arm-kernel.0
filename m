@@ -1,69 +1,26 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Mar 2012 14:14:22 +0100
-Subject: [RFC PATCH] of: DMA helpers: manage generic requests specification
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BDDF217B@HQMAIL01.nvidia.com>
-References: <4F22DEF2.5000807@ti.com>
- <1330527248-4350-1-git-send-email-nicolas.ferre@atmel.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF217B@HQMAIL01.nvidia.com>
-Message-ID: <4F54BC2E.3040702@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 5 Mar 2012 21:40:51 +0800
+Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <4F54B183.4080607@freescale.com>
+References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
+ <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
+ <4F53F704.8080703@freescale.com>
+ <20120305073930.GC16232@S2101-09.ap.freescale.net>
+ <4F54B183.4080607@freescale.com>
+Message-ID: <20120305134048.GG16232@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/29/2012 9:54 PM, Stephen Warren wrote:
-> Nicolas Ferre wrote at Wednesday, February 29, 2012 7:54 AM:
->> By making DMA controllers register a generic translation
->> function, we allow the management of any type of DMA requests
->> specification.
->> The void * output of an of_dma_xlate() function that will be implemented
->> by the DMA controller can carry any type of "dma-request" argument.
->>
->> The DMA client will search its associated DMA controller in the list
->> and call the registered of_dam_xlate() function to retrieve the
->> request values.
->>
->> One simple xlate function is provided for the "single number" type
->> of request biding.
->>
->> This implementation is independent from dmaengine so it can also be
->> used by legacy drivers.
->
-> At a high level this seems along the right lines.
->
-> The big issue I see is the lack of type-safety in of_get_dma_request()'s
-> out_data pointer: The DMA xlate function will assume it points at some
-> particular type, and the client is responsible for allocating that
-> correct type. However, it's "user"-supplied device tree data that hooks
-> the two together, and there could easily be mismatches, thus causing
-> the xlate function to trash memory.
->
-> Could each DMA controller (or type of out_data) have some enum in the
-> kernel that the client passes in, and the DMA engine validates matches
-> its expectations, to prevent this kind of thing?
+On Mon, Mar 05, 2012 at 12:28:52PM +0000, Tabi Timur-B04825 wrote:
+> Shawn Guo wrote:
+> > Yeah, it makes the diff neat.  However I would make it an inline
+> > function which is easier to play.
+> 
+> However you want to do it is fine with me, although I would use "u32 
+> __iomem *addr" instead of "void __iomem *addr".
+> 
+Right, will make the change. 
 
-Beside u32 and string, do we know what kind of parameters we can expect 
-to retrieve?
-Because we can potentially reduce the scope to these two types only.
-
-> enum DMA_PARAMS_TYPE {
->      FOO_DMA_PARAMS,
->      BAR_DMA_PARAMS,
->      ...
-> };
->
-> struct foo_dma_params { ... };
->
-> struct foo_dma_params params;
->
-> of_get_dma_request(np, 0,&params, FOO_DMA_PARAMS);
->
-> and inside xlate():
->
-> if (params_type != FOO_DMA_PARAMS)
->      return -EINVAL;
->
-> For the dmaengine case, I assume there'd be a single DMA_PARAMS_TYPE
-> value for the dmaengine specifier type, and the dmaengine core would
-> take care of making sure everything matched somehow.
-
+-- 
 Regards,
-Benoit
+Shawn
