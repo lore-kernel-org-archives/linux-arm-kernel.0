@@ -1,18 +1,33 @@
-From: B04825@freescale.com (Tabi Timur-B04825)
-Date: Sun, 4 Mar 2012 23:34:31 +0000
-Subject: [PATCH 20/20] ASoC: fsl: add imx-sgtl5000 machine driver
-In-Reply-To: <1330788001-10158-21-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Mar 2012 00:04:11 +0000
+Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <4F53FBA1.8090200@freescale.com>
 References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-21-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F53FC06.1020805@freescale.com>
+ <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
+ <4F53F704.8080703@freescale.com>
+ <20120304232817.GA13516@n2100.arm.linux.org.uk>
+ <4F53FBA1.8090200@freescale.com>
+Message-ID: <20120305000411.GL7363@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
+On Sun, Mar 04, 2012 at 11:32:50PM +0000, Tabi Timur-B04825 wrote:
+> Russell King - ARM Linux wrote:
+> > Is the SCR shared between capture and playback?  In that case, what
+> > makes this read-modify-write thread safe?
+> 
+> What's "SCR"?
 
-I encourage developers to put their own name in the MODULE_AUTHOR macro.
+I assumed you knew the code you were commenting on.
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+                clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
+
+The register these functions seem to be used on appears to be called
+'SCR'.
+
+> It's not thread-safe on PPC, but then neither is the entire function.  You 
+> can't have two threads attempt to initialize the hardware at the same 
+> time.
+
+Why do you say "can't" - what prevents it?  If nothing, then this stuff
+is buggy when preempt is enabled, or you're running on SMP.
