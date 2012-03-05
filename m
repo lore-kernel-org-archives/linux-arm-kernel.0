@@ -1,75 +1,22 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 5 Mar 2012 20:22:41 +0800
-Subject: Status of gpio-pxa driver and dummy clock
-In-Reply-To: <1330885571.28077.YahooMailClassic@web29015.mail.ird.yahoo.com>
-References: <87aa3wu0hp.fsf@free.fr>
- <1330885571.28077.YahooMailClassic@web29015.mail.ird.yahoo.com>
-Message-ID: <CAN1soZxkVSFbNG4QaCxxxbNMB255JeNCK+=YqBzvmAAXdCRYyQ@mail.gmail.com>
+From: B04825@freescale.com (Tabi Timur-B04825)
+Date: Mon, 5 Mar 2012 12:28:52 +0000
+Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <20120305073930.GC16232@S2101-09.ap.freescale.net>
+References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
+ <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
+ <4F53F704.8080703@freescale.com>
+ <20120305073930.GC16232@S2101-09.ap.freescale.net>
+Message-ID: <4F54B183.4080607@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2012 at 2:26 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> --- On Sun, 4/3/12, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->> From: Robert Jarzmik <robert.jarzmik@free.fr>
->> Subject: Re: Status of gpio-pxa driver and dummy clock
->> To: "Haojian Zhuang" <haojian.zhuang@gmail.com>
->> Cc: "Arnd Bergmann" <arnd@arndb.de>, linux-arm-kernel at lists.infradead.org
->> Date: Sunday, 4 March, 2012, 10:25
->> Haojian Zhuang <haojian.zhuang@gmail.com>
->> writes:
->>
->> > On Sun, Mar 4, 2012 at 5:34 AM, Robert Jarzmik <robert.jarzmik@free.fr>
->> wrote:
->> >> Hi Haojian,
->> >>
->> >> As you certainly know, Russell reverted the patch
->> "ARM: pxa: add dummy clock for
->> >> sa1100-rtc", id
->> a55b5adaf403c4d032e0871ad4ee3367782f4db6. As a consequence,
->> the
->> >> dummy clock for gpio-pxa was removed, causing
->> breakage of gpio-pxa driver.
->> >>
->> >> I wonder if you (or somebody through you) sent an
->> update to fix the gpio-pxa by
->> >> either fixing gpio-pxa or adding back "pxa-gpio"
->> clock. As of today, I see no
->> >> fix in 3.3-rc free (Linus tree).
->> >>
->> >
->> > This patch is already merged into arm-soc tree for
->> v3.4. I don't have
->> > a plan to push it into
->> > v3.3.
->>
->> Oh, you should push it to 3.3. It's a fix, and the mioa701
->> board is broken (and
->> probably many others PXA based boards too) because no GPIO
->> is available (as
->> probe function of pxa-gpio always fail on clk_get()).
->>
->> If you don't want to push it to 3.3, I'll have to send a fix
->> to Arnd to fix the
->> breakage.
->>
->> Without it, a PXA based kernel (pxa2xx) will hang in its
->> boot phase, on the
->> first gpio_get_* or gpio_set_*, which is called by many
->> drivers.
->
-> There are two further pxa gpio regressions still present in
-> linux-3.3-rc5:
->
-> mfp/gpio regression: pxa_last_gpio used before initialized
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-January/082624.html
->
-> reboot/suspend regression: hx4700 freezes under linux-3.3-rc1
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/082873.html
-> (2 regressions are reported here; the reboot regression is still present in
-> linux-3.3-rc5 while the suspend regression has now been fixed).
+Shawn Guo wrote:
+> Yeah, it makes the diff neat.  However I would make it an inline
+> function which is easier to play.
 
-I missed them. Maybe I was not in the Cc list. I'll append the patches
-to fix them.
+However you want to do it is fine with me, although I would use "u32 
+__iomem *addr" instead of "void __iomem *addr".
 
-Best Regards
-Haojian
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
