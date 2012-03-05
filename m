@@ -1,290 +1,379 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  5 Mar 2012 22:30:53 +0800
-Subject: [PATCH v2 05/17] ASoC: imx: move audmux driver into sound/soc/imx
+Date: Mon,  5 Mar 2012 22:30:54 +0800
+Subject: [PATCH v2 06/17] ASoC: imx: rename audmux prefix mxc to imx
 In-Reply-To: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
 References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1330957865-19085-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330957865-19085-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As audmux becomes a platform driver and its callers are all ASoC
-machine drivers, there is no reason to keep it in arch folder, so
-move it to sound/soc/imx.
-
-One bonus point would be those ASoC machine drivers stop including
-mach/audmux.h, since it's been moved to sound/soc/imx/imx-audmux.h.
-This should be a move to the right direction in terms of single kernel
-image goal.
+It renames the legacy name mxc used in audmux function and macro
+to imx.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/Kconfig                          |    6 ------
- arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c       |    1 -
- arch/arm/plat-mxc/Kconfig                          |    3 ---
- arch/arm/plat-mxc/Makefile                         |    1 -
- sound/soc/imx/Kconfig                              |    7 +++++++
- sound/soc/imx/Makefile                             |    2 ++
- sound/soc/imx/eukrea-tlv320.c                      |    2 +-
- .../audmux.c => sound/soc/imx/imx-audmux.c         |    3 ++-
- .../mach/audmux.h => sound/soc/imx/imx-audmux.h    |    6 +++---
- sound/soc/imx/mx27vis-aic32x4.c                    |    2 +-
- sound/soc/imx/phycore-ac97.c                       |    3 ++-
- sound/soc/imx/wm1133-ev1.c                         |    3 +--
- 12 files changed, 19 insertions(+), 20 deletions(-)
- rename arch/arm/plat-mxc/audmux.c => sound/soc/imx/imx-audmux.c (99%)
- rename arch/arm/plat-mxc/include/mach/audmux.h => sound/soc/imx/imx-audmux.h (96%)
+ sound/soc/imx/eukrea-tlv320.c   |   44 +++++++++++++++---------------
+ sound/soc/imx/imx-audmux.c      |   30 ++++++++++----------
+ sound/soc/imx/imx-audmux.h      |   58 +++++++++++++++++++-------------------
+ sound/soc/imx/mx27vis-aic32x4.c |   18 ++++++------
+ sound/soc/imx/phycore-ac97.c    |   40 +++++++++++++-------------
+ sound/soc/imx/wm1133-ev1.c      |   22 +++++++-------
+ 6 files changed, 106 insertions(+), 106 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 495a854..3919fba 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -46,7 +46,6 @@ config SOC_IMX21
- 	bool
- 	select MACH_MX21
- 	select CPU_ARM926T
--	select ARCH_MXC_AUDMUX
- 	select IMX_HAVE_DMA_V1
- 	select IMX_HAVE_IOMUX_V1
- 	select MXC_AVIC
-@@ -55,7 +54,6 @@ config SOC_IMX25
- 	bool
- 	select ARCH_MX25
- 	select CPU_ARM926T
--	select ARCH_MXC_AUDMUX
- 	select ARCH_MXC_IOMUX_V3
- 	select MXC_AVIC
- 
-@@ -63,7 +61,6 @@ config SOC_IMX27
- 	bool
- 	select MACH_MX27
- 	select CPU_ARM926T
--	select ARCH_MXC_AUDMUX
- 	select IMX_HAVE_DMA_V1
- 	select IMX_HAVE_IOMUX_V1
- 	select MXC_AVIC
-@@ -72,7 +69,6 @@ config SOC_IMX31
- 	bool
- 	select CPU_V6
- 	select IMX_HAVE_PLATFORM_MXC_RNGA
--	select ARCH_MXC_AUDMUX
- 	select MXC_AVIC
- 	select SMP_ON_UP if SMP
- 
-@@ -80,7 +76,6 @@ config SOC_IMX35
- 	bool
- 	select CPU_V6
- 	select ARCH_MXC_IOMUX_V3
--	select ARCH_MXC_AUDMUX
- 	select HAVE_EPIT
- 	select MXC_AVIC
- 	select SMP_ON_UP if SMP
-@@ -89,7 +84,6 @@ config SOC_IMX5
- 	select CPU_V7
- 	select MXC_TZIC
- 	select ARCH_MXC_IOMUX_V3
--	select ARCH_MXC_AUDMUX
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_MX5
- 	bool
-diff --git a/arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c
-index d817fc8..aaa592f 100644
---- a/arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c
-@@ -37,7 +37,6 @@
- #include <mach/hardware.h>
- #include <mach/common.h>
- #include <mach/iomux-mx51.h>
--#include <mach/audmux.h>
- 
- #include "devices-imx51.h"
- 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 0461d16..c722f9c 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -88,9 +88,6 @@ config IMX_HAVE_IOMUX_V1
- config ARCH_MXC_IOMUX_V3
- 	bool
- 
--config ARCH_MXC_AUDMUX
--	bool
--
- config IRAM_ALLOC
- 	bool
- 	select GENERIC_ALLOCATOR
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index 530c81d..e81290c 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -14,7 +14,6 @@ obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
- obj-$(CONFIG_MXC_PWM)  += pwm.o
- obj-$(CONFIG_MXC_ULPI) += ulpi.o
- obj-$(CONFIG_MXC_USE_EPIT) += epit.o
--obj-$(CONFIG_ARCH_MXC_AUDMUX) += audmux.o
- obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
- ifdef CONFIG_SND_IMX_SOC
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index aa4294b..d3b7166 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -16,11 +16,15 @@ config SND_MXC_SOC_MX2
- 	select SND_SOC_DMAENGINE_PCM
- 	tristate
- 
-+config SND_SOC_IMX_AUDMUX
-+	tristate
-+
- config SND_MXC_SOC_WM1133_EV1
- 	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
- 	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
- 	select SND_SOC_WM8350
- 	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_AUDMUX
- 	help
- 	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
- 	  PMIC board with WM8835x fitted.
-@@ -30,6 +34,7 @@ config SND_SOC_MX27VIS_AIC32X4
- 	depends on MACH_IMX27_VISSTRIM_M10 && I2C
- 	select SND_SOC_TLV320AIC32X4
- 	select SND_MXC_SOC_MX2
-+	select SND_SOC_IMX_AUDMUX
- 	help
- 	  Say Y if you want to add support for SoC audio on Visstrim SM10
- 	  board with TLV320AIC32X4 codec.
-@@ -40,6 +45,7 @@ config SND_SOC_PHYCORE_AC97
- 	select SND_SOC_AC97_BUS
- 	select SND_SOC_WM9712
- 	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_AUDMUX
- 	help
- 	  Say Y if you want to add support for SoC audio on Phytec phyCORE
- 	  and phyCARD boards in AC97 mode
-@@ -53,6 +59,7 @@ config SND_SOC_EUKREA_TLV320
- 	depends on I2C
- 	select SND_SOC_TLV320AIC23
- 	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_AUDMUX
- 	help
- 	  Enable I2S based access to the TLV320AIC23B codec attached
- 	  to the SSI interface
-diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
-index d6d609b..5c40541 100644
---- a/sound/soc/imx/Makefile
-+++ b/sound/soc/imx/Makefile
-@@ -2,10 +2,12 @@
- snd-soc-imx-objs := imx-ssi.o
- snd-soc-imx-fiq-objs := imx-pcm-fiq.o
- snd-soc-imx-mx2-objs := imx-pcm-dma-mx2.o
-+snd-soc-imx-audmux-objs := imx-audmux.o
- 
- obj-$(CONFIG_SND_IMX_SOC) += snd-soc-imx.o
- obj-$(CONFIG_SND_MXC_SOC_FIQ) += snd-soc-imx-fiq.o
- obj-$(CONFIG_SND_MXC_SOC_MX2) += snd-soc-imx-mx2.o
-+obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
- 
- # i.MX Machine Support
- snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
 diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/imx/eukrea-tlv320.c
-index bfcb6d9..b375ed4 100644
+index b375ed4..7d4475c 100644
 --- a/sound/soc/imx/eukrea-tlv320.c
 +++ b/sound/soc/imx/eukrea-tlv320.c
-@@ -23,10 +23,10 @@
- #include <sound/pcm.h>
- #include <sound/soc.h>
- #include <asm/mach-types.h>
--#include <mach/audmux.h>
+@@ -101,35 +101,35 @@ static int __init eukrea_tlv320_init(void)
+ 	int int_port = 0, ext_port;
  
- #include "../codecs/tlv320aic23.h"
- #include "imx-ssi.h"
-+#include "imx-audmux.h"
- 
- #define CODEC_CLOCK 12000000
- 
-diff --git a/arch/arm/plat-mxc/audmux.c b/sound/soc/imx/imx-audmux.c
-similarity index 99%
-rename from arch/arm/plat-mxc/audmux.c
-rename to sound/soc/imx/imx-audmux.c
-index a8c9e04..7b16266 100644
---- a/arch/arm/plat-mxc/audmux.c
+ 	if (machine_is_eukrea_cpuimx27()) {
+-		mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
+-			MXC_AUDMUX_V1_PCR_SYN |
+-			MXC_AUDMUX_V1_PCR_TFSDIR |
+-			MXC_AUDMUX_V1_PCR_TCLKDIR |
+-			MXC_AUDMUX_V1_PCR_RFSDIR |
+-			MXC_AUDMUX_V1_PCR_RCLKDIR |
+-			MXC_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
+-			MXC_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
+-			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4)
++		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++			IMX_AUDMUX_V1_PCR_SYN |
++			IMX_AUDMUX_V1_PCR_TFSDIR |
++			IMX_AUDMUX_V1_PCR_TCLKDIR |
++			IMX_AUDMUX_V1_PCR_RFSDIR |
++			IMX_AUDMUX_V1_PCR_RCLKDIR |
++			IMX_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			IMX_AUDMUX_V1_PCR_RFCSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4) |
++			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR3_SSI_PINS_4)
+ 		);
+-		mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR3_SSI_PINS_4,
+-			MXC_AUDMUX_V1_PCR_SYN |
+-			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
++		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR3_SSI_PINS_4,
++			IMX_AUDMUX_V1_PCR_SYN |
++			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
+ 		);
+ 	} else if (machine_is_eukrea_cpuimx25sd() ||
+ 		   machine_is_eukrea_cpuimx35sd() ||
+ 		   machine_is_eukrea_cpuimx51sd()) {
+ 		ext_port = machine_is_eukrea_cpuimx25sd() ? 4 : 3;
+-		mxc_audmux_v2_configure_port(int_port,
+-			MXC_AUDMUX_V2_PTCR_SYN |
+-			MXC_AUDMUX_V2_PTCR_TFSDIR |
+-			MXC_AUDMUX_V2_PTCR_TFSEL(ext_port) |
+-			MXC_AUDMUX_V2_PTCR_TCLKDIR |
+-			MXC_AUDMUX_V2_PTCR_TCSEL(ext_port),
+-			MXC_AUDMUX_V2_PDCR_RXDSEL(ext_port)
++		imx_audmux_v2_configure_port(int_port,
++			IMX_AUDMUX_V2_PTCR_SYN |
++			IMX_AUDMUX_V2_PTCR_TFSDIR |
++			IMX_AUDMUX_V2_PTCR_TFSEL(ext_port) |
++			IMX_AUDMUX_V2_PTCR_TCLKDIR |
++			IMX_AUDMUX_V2_PTCR_TCSEL(ext_port),
++			IMX_AUDMUX_V2_PDCR_RXDSEL(ext_port)
+ 		);
+-		mxc_audmux_v2_configure_port(ext_port,
+-			MXC_AUDMUX_V2_PTCR_SYN,
+-			MXC_AUDMUX_V2_PDCR_RXDSEL(int_port)
++		imx_audmux_v2_configure_port(ext_port,
++			IMX_AUDMUX_V2_PTCR_SYN,
++			IMX_AUDMUX_V2_PDCR_RXDSEL(int_port)
+ 		);
+ 	} else {
+ 		/* return happy. We might run on a totally different machine */
+diff --git a/sound/soc/imx/imx-audmux.c b/sound/soc/imx/imx-audmux.c
+index 7b16266..87f8768 100644
+--- a/sound/soc/imx/imx-audmux.c
 +++ b/sound/soc/imx/imx-audmux.c
-@@ -24,7 +24,8 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
--#include <mach/audmux.h>
-+
-+#include "imx-audmux.h"
+@@ -32,8 +32,8 @@
+ static struct clk *audmux_clk;
+ static void __iomem *audmux_base;
  
- #define DRIVER_NAME "imx-audmux"
+-#define MXC_AUDMUX_V2_PTCR(x)		((x) * 8)
+-#define MXC_AUDMUX_V2_PDCR(x)		((x) * 8 + 4)
++#define IMX_AUDMUX_V2_PTCR(x)		((x) * 8)
++#define IMX_AUDMUX_V2_PDCR(x)		((x) * 8 + 4)
  
-diff --git a/arch/arm/plat-mxc/include/mach/audmux.h b/sound/soc/imx/imx-audmux.h
-similarity index 96%
-rename from arch/arm/plat-mxc/include/mach/audmux.h
-rename to sound/soc/imx/imx-audmux.h
-index 6fda788..5136d948 100644
---- a/arch/arm/plat-mxc/include/mach/audmux.h
+ #ifdef CONFIG_DEBUG_FS
+ static struct dentry *audmux_debugfs_root;
+@@ -80,8 +80,8 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
+ 	if (audmux_clk)
+ 		clk_enable(audmux_clk);
+ 
+-	ptcr = readl(audmux_base + MXC_AUDMUX_V2_PTCR(port));
+-	pdcr = readl(audmux_base + MXC_AUDMUX_V2_PDCR(port));
++	ptcr = readl(audmux_base + IMX_AUDMUX_V2_PTCR(port));
++	pdcr = readl(audmux_base + IMX_AUDMUX_V2_PDCR(port));
+ 
+ 	if (audmux_clk)
+ 		clk_disable(audmux_clk);
+@@ -89,7 +89,7 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
+ 	ret = snprintf(buf, PAGE_SIZE, "PDCR: %08x\nPTCR: %08x\n",
+ 		       pdcr, ptcr);
+ 
+-	if (ptcr & MXC_AUDMUX_V2_PTCR_TFSDIR)
++	if (ptcr & IMX_AUDMUX_V2_PTCR_TFSDIR)
+ 		ret += snprintf(buf + ret, PAGE_SIZE - ret,
+ 				"TxFS output from %s, ",
+ 				audmux_port_string((ptcr >> 27) & 0x7));
+@@ -97,7 +97,7 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
+ 		ret += snprintf(buf + ret, PAGE_SIZE - ret,
+ 				"TxFS input, ");
+ 
+-	if (ptcr & MXC_AUDMUX_V2_PTCR_TCLKDIR)
++	if (ptcr & IMX_AUDMUX_V2_PTCR_TCLKDIR)
+ 		ret += snprintf(buf + ret, PAGE_SIZE - ret,
+ 				"TxClk output from %s",
+ 				audmux_port_string((ptcr >> 22) & 0x7));
+@@ -107,11 +107,11 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
+ 
+ 	ret += snprintf(buf + ret, PAGE_SIZE - ret, "\n");
+ 
+-	if (ptcr & MXC_AUDMUX_V2_PTCR_SYN) {
++	if (ptcr & IMX_AUDMUX_V2_PTCR_SYN) {
+ 		ret += snprintf(buf + ret, PAGE_SIZE - ret,
+ 				"Port is symmetric");
+ 	} else {
+-		if (ptcr & MXC_AUDMUX_V2_PTCR_RFSDIR)
++		if (ptcr & IMX_AUDMUX_V2_PTCR_RFSDIR)
+ 			ret += snprintf(buf + ret, PAGE_SIZE - ret,
+ 					"RxFS output from %s, ",
+ 					audmux_port_string((ptcr >> 17) & 0x7));
+@@ -119,7 +119,7 @@ static ssize_t audmux_read_file(struct file *file, char __user *user_buf,
+ 			ret += snprintf(buf + ret, PAGE_SIZE - ret,
+ 					"RxFS input, ");
+ 
+-		if (ptcr & MXC_AUDMUX_V2_PTCR_RCLKDIR)
++		if (ptcr & IMX_AUDMUX_V2_PTCR_RCLKDIR)
+ 			ret += snprintf(buf + ret, PAGE_SIZE - ret,
+ 					"RxClk output from %s",
+ 					audmux_port_string((ptcr >> 12) & 0x7));
+@@ -201,7 +201,7 @@ static const uint8_t port_mapping[] = {
+ 	0x0, 0x4, 0x8, 0x10, 0x14, 0x1c,
+ };
+ 
+-int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
++int imx_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
+ {
+ 	if (audmux_type != IMX21_AUDMUX)
+ 		return -EINVAL;
+@@ -216,9 +216,9 @@ int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(mxc_audmux_v1_configure_port);
++EXPORT_SYMBOL_GPL(imx_audmux_v1_configure_port);
+ 
+-int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
++int imx_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
+ 		unsigned int pdcr)
+ {
+ 	if (audmux_type != IMX31_AUDMUX)
+@@ -230,15 +230,15 @@ int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
+ 	if (audmux_clk)
+ 		clk_enable(audmux_clk);
+ 
+-	writel(ptcr, audmux_base + MXC_AUDMUX_V2_PTCR(port));
+-	writel(pdcr, audmux_base + MXC_AUDMUX_V2_PDCR(port));
++	writel(ptcr, audmux_base + IMX_AUDMUX_V2_PTCR(port));
++	writel(pdcr, audmux_base + IMX_AUDMUX_V2_PDCR(port));
+ 
+ 	if (audmux_clk)
+ 		clk_disable(audmux_clk);
+ 
+ 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(mxc_audmux_v2_configure_port);
++EXPORT_SYMBOL_GPL(imx_audmux_v2_configure_port);
+ 
+ static int __init imx_audmux_probe(struct platform_device *pdev)
+ {
+diff --git a/sound/soc/imx/imx-audmux.h b/sound/soc/imx/imx-audmux.h
+index 5136d948..04ebbab 100644
+--- a/sound/soc/imx/imx-audmux.h
 +++ b/sound/soc/imx/imx-audmux.h
-@@ -1,5 +1,5 @@
--#ifndef __MACH_AUDMUX_H
--#define __MACH_AUDMUX_H
-+#ifndef __IMX_AUDMUX_H
-+#define __IMX_AUDMUX_H
+@@ -24,37 +24,37 @@
+ #define MX51_AUDMUX_PORT7		6
  
- #define MX27_AUDMUX_HPCR1_SSI0		0
- #define MX27_AUDMUX_HPCR2_SSI1		1
-@@ -57,4 +57,4 @@ int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr);
- int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
+ /* Register definitions for the i.MX21/27 Digital Audio Multiplexer */
+-#define MXC_AUDMUX_V1_PCR_INMMASK(x)	((x) & 0xff)
+-#define MXC_AUDMUX_V1_PCR_INMEN		(1 << 8)
+-#define MXC_AUDMUX_V1_PCR_TXRXEN	(1 << 10)
+-#define MXC_AUDMUX_V1_PCR_SYN		(1 << 12)
+-#define MXC_AUDMUX_V1_PCR_RXDSEL(x)	(((x) & 0x7) << 13)
+-#define MXC_AUDMUX_V1_PCR_RFCSEL(x)	(((x) & 0xf) << 20)
+-#define MXC_AUDMUX_V1_PCR_RCLKDIR	(1 << 24)
+-#define MXC_AUDMUX_V1_PCR_RFSDIR	(1 << 25)
+-#define MXC_AUDMUX_V1_PCR_TFCSEL(x)	(((x) & 0xf) << 26)
+-#define MXC_AUDMUX_V1_PCR_TCLKDIR	(1 << 30)
+-#define MXC_AUDMUX_V1_PCR_TFSDIR	(1 << 31)
++#define IMX_AUDMUX_V1_PCR_INMMASK(x)	((x) & 0xff)
++#define IMX_AUDMUX_V1_PCR_INMEN		(1 << 8)
++#define IMX_AUDMUX_V1_PCR_TXRXEN	(1 << 10)
++#define IMX_AUDMUX_V1_PCR_SYN		(1 << 12)
++#define IMX_AUDMUX_V1_PCR_RXDSEL(x)	(((x) & 0x7) << 13)
++#define IMX_AUDMUX_V1_PCR_RFCSEL(x)	(((x) & 0xf) << 20)
++#define IMX_AUDMUX_V1_PCR_RCLKDIR	(1 << 24)
++#define IMX_AUDMUX_V1_PCR_RFSDIR	(1 << 25)
++#define IMX_AUDMUX_V1_PCR_TFCSEL(x)	(((x) & 0xf) << 26)
++#define IMX_AUDMUX_V1_PCR_TCLKDIR	(1 << 30)
++#define IMX_AUDMUX_V1_PCR_TFSDIR	(1 << 31)
+ 
+ /* Register definitions for the i.MX25/31/35/51 Digital Audio Multiplexer */
+-#define MXC_AUDMUX_V2_PTCR_TFSDIR	(1 << 31)
+-#define MXC_AUDMUX_V2_PTCR_TFSEL(x)	(((x) & 0xf) << 27)
+-#define MXC_AUDMUX_V2_PTCR_TCLKDIR	(1 << 26)
+-#define MXC_AUDMUX_V2_PTCR_TCSEL(x)	(((x) & 0xf) << 22)
+-#define MXC_AUDMUX_V2_PTCR_RFSDIR	(1 << 21)
+-#define MXC_AUDMUX_V2_PTCR_RFSEL(x)	(((x) & 0xf) << 17)
+-#define MXC_AUDMUX_V2_PTCR_RCLKDIR	(1 << 16)
+-#define MXC_AUDMUX_V2_PTCR_RCSEL(x)	(((x) & 0xf) << 12)
+-#define MXC_AUDMUX_V2_PTCR_SYN		(1 << 11)
+-
+-#define MXC_AUDMUX_V2_PDCR_RXDSEL(x)	(((x) & 0x7) << 13)
+-#define MXC_AUDMUX_V2_PDCR_TXRXEN	(1 << 12)
+-#define MXC_AUDMUX_V2_PDCR_MODE(x)	(((x) & 0x3) << 8)
+-#define MXC_AUDMUX_V2_PDCR_INMMASK(x)	((x) & 0xff)
+-
+-int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr);
+-
+-int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
++#define IMX_AUDMUX_V2_PTCR_TFSDIR	(1 << 31)
++#define IMX_AUDMUX_V2_PTCR_TFSEL(x)	(((x) & 0xf) << 27)
++#define IMX_AUDMUX_V2_PTCR_TCLKDIR	(1 << 26)
++#define IMX_AUDMUX_V2_PTCR_TCSEL(x)	(((x) & 0xf) << 22)
++#define IMX_AUDMUX_V2_PTCR_RFSDIR	(1 << 21)
++#define IMX_AUDMUX_V2_PTCR_RFSEL(x)	(((x) & 0xf) << 17)
++#define IMX_AUDMUX_V2_PTCR_RCLKDIR	(1 << 16)
++#define IMX_AUDMUX_V2_PTCR_RCSEL(x)	(((x) & 0xf) << 12)
++#define IMX_AUDMUX_V2_PTCR_SYN		(1 << 11)
++
++#define IMX_AUDMUX_V2_PDCR_RXDSEL(x)	(((x) & 0x7) << 13)
++#define IMX_AUDMUX_V2_PDCR_TXRXEN	(1 << 12)
++#define IMX_AUDMUX_V2_PDCR_MODE(x)	(((x) & 0x3) << 8)
++#define IMX_AUDMUX_V2_PDCR_INMMASK(x)	((x) & 0xff)
++
++int imx_audmux_v1_configure_port(unsigned int port, unsigned int pcr);
++
++int imx_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
  		unsigned int pdcr);
  
--#endif /* __MACH_AUDMUX_H */
-+#endif /* __IMX_AUDMUX_H */
+ #endif /* __IMX_AUDMUX_H */
 diff --git a/sound/soc/imx/mx27vis-aic32x4.c b/sound/soc/imx/mx27vis-aic32x4.c
-index 155899c..dbfad0f 100644
+index dbfad0f..976f857 100644
 --- a/sound/soc/imx/mx27vis-aic32x4.c
 +++ b/sound/soc/imx/mx27vis-aic32x4.c
-@@ -32,11 +32,11 @@
- #include <sound/soc-dapm.h>
- #include <sound/tlv.h>
- #include <asm/mach-types.h>
--#include <mach/audmux.h>
- #include <mach/iomux-mx27.h>
+@@ -207,16 +207,16 @@ static int __init mx27vis_aic32x4_init(void)
+ 	}
  
- #include "../codecs/tlv320aic32x4.h"
- #include "imx-ssi.h"
-+#include "imx-audmux.h"
+ 	/* Connect SSI0 as clock slave to SSI1 external pins */
+-	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
+-			MXC_AUDMUX_V1_PCR_SYN |
+-			MXC_AUDMUX_V1_PCR_TFSDIR |
+-			MXC_AUDMUX_V1_PCR_TCLKDIR |
+-			MXC_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_PPCR1_SSI_PINS_1) |
+-			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_PPCR1_SSI_PINS_1)
++	imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++			IMX_AUDMUX_V1_PCR_SYN |
++			IMX_AUDMUX_V1_PCR_TFSDIR |
++			IMX_AUDMUX_V1_PCR_TCLKDIR |
++			IMX_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_PPCR1_SSI_PINS_1) |
++			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_PPCR1_SSI_PINS_1)
+ 	);
+-	mxc_audmux_v1_configure_port(MX27_AUDMUX_PPCR1_SSI_PINS_1,
+-			MXC_AUDMUX_V1_PCR_SYN |
+-			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
++	imx_audmux_v1_configure_port(MX27_AUDMUX_PPCR1_SSI_PINS_1,
++			IMX_AUDMUX_V1_PCR_SYN |
++			IMX_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
+ 	);
  
- #define MX27VIS_AMP_GAIN	0
- #define MX27VIS_AMP_MUTE	1
+ 	ret = mxc_gpio_setup_multiple_pins(mx27vis_amp_pins,
 diff --git a/sound/soc/imx/phycore-ac97.c b/sound/soc/imx/phycore-ac97.c
-index a59692e..7dab077 100644
+index 7dab077..f8da6dd 100644
 --- a/sound/soc/imx/phycore-ac97.c
 +++ b/sound/soc/imx/phycore-ac97.c
-@@ -18,7 +18,8 @@
- #include <sound/pcm.h>
- #include <sound/soc.h>
- #include <asm/mach-types.h>
--#include <mach/audmux.h>
-+
-+#include "imx-audmux.h"
+@@ -53,27 +53,27 @@ static int __init imx_phycore_init(void)
+ 	int ret;
  
- static struct snd_soc_card imx_phycore;
- 
+ 	if (machine_is_pca100()) {
+-		mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
+-			MXC_AUDMUX_V1_PCR_SYN | /* 4wire mode */
+-			MXC_AUDMUX_V1_PCR_TFCSEL(3) |
+-			MXC_AUDMUX_V1_PCR_TCLKDIR | /* clock is output */
+-			MXC_AUDMUX_V1_PCR_RXDSEL(3));
+-		mxc_audmux_v1_configure_port(3,
+-			MXC_AUDMUX_V1_PCR_SYN | /* 4wire mode */
+-			MXC_AUDMUX_V1_PCR_TFCSEL(0) |
+-			MXC_AUDMUX_V1_PCR_TFSDIR |
+-			MXC_AUDMUX_V1_PCR_RXDSEL(0));
++		imx_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
++			IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
++			IMX_AUDMUX_V1_PCR_TFCSEL(3) |
++			IMX_AUDMUX_V1_PCR_TCLKDIR | /* clock is output */
++			IMX_AUDMUX_V1_PCR_RXDSEL(3));
++		imx_audmux_v1_configure_port(3,
++			IMX_AUDMUX_V1_PCR_SYN | /* 4wire mode */
++			IMX_AUDMUX_V1_PCR_TFCSEL(0) |
++			IMX_AUDMUX_V1_PCR_TFSDIR |
++			IMX_AUDMUX_V1_PCR_RXDSEL(0));
+ 	} else if (machine_is_pcm043()) {
+-		mxc_audmux_v2_configure_port(3,
+-			MXC_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
+-			MXC_AUDMUX_V2_PTCR_TFSEL(0) |
+-			MXC_AUDMUX_V2_PTCR_TFSDIR,
+-			MXC_AUDMUX_V2_PDCR_RXDSEL(0));
+-		mxc_audmux_v2_configure_port(0,
+-			MXC_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
+-			MXC_AUDMUX_V2_PTCR_TCSEL(3) |
+-			MXC_AUDMUX_V2_PTCR_TCLKDIR, /* clock is output */
+-			MXC_AUDMUX_V2_PDCR_RXDSEL(3));
++		imx_audmux_v2_configure_port(3,
++			IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
++			IMX_AUDMUX_V2_PTCR_TFSEL(0) |
++			IMX_AUDMUX_V2_PTCR_TFSDIR,
++			IMX_AUDMUX_V2_PDCR_RXDSEL(0));
++		imx_audmux_v2_configure_port(0,
++			IMX_AUDMUX_V2_PTCR_SYN | /* 4wire mode */
++			IMX_AUDMUX_V2_PTCR_TCSEL(3) |
++			IMX_AUDMUX_V2_PTCR_TCLKDIR, /* clock is output */
++			IMX_AUDMUX_V2_PDCR_RXDSEL(3));
+ 	} else {
+ 		/* return happy. We might run on a totally different machine */
+ 		return 0;
 diff --git a/sound/soc/imx/wm1133-ev1.c b/sound/soc/imx/wm1133-ev1.c
-index 37480c9..15056d6 100644
+index 15056d6..fe54a69 100644
 --- a/sound/soc/imx/wm1133-ev1.c
 +++ b/sound/soc/imx/wm1133-ev1.c
-@@ -21,10 +21,9 @@
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
+@@ -267,17 +267,17 @@ static int __init wm1133_ev1_audio_init(void)
+ 	unsigned int ptcr, pdcr;
  
--#include <mach/audmux.h>
+ 	/* SSI0 mastered by port 5 */
+-	ptcr = MXC_AUDMUX_V2_PTCR_SYN |
+-		MXC_AUDMUX_V2_PTCR_TFSDIR |
+-		MXC_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT5_SSI_PINS_5) |
+-		MXC_AUDMUX_V2_PTCR_TCLKDIR |
+-		MXC_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT5_SSI_PINS_5);
+-	pdcr = MXC_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT5_SSI_PINS_5);
+-	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0, ptcr, pdcr);
 -
- #include "imx-ssi.h"
- #include "../codecs/wm8350.h"
-+#include "imx-audmux.h"
+-	ptcr = MXC_AUDMUX_V2_PTCR_SYN;
+-	pdcr = MXC_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT1_SSI0);
+-	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT5_SSI_PINS_5, ptcr, pdcr);
++	ptcr = IMX_AUDMUX_V2_PTCR_SYN |
++		IMX_AUDMUX_V2_PTCR_TFSDIR |
++		IMX_AUDMUX_V2_PTCR_TFSEL(MX31_AUDMUX_PORT5_SSI_PINS_5) |
++		IMX_AUDMUX_V2_PTCR_TCLKDIR |
++		IMX_AUDMUX_V2_PTCR_TCSEL(MX31_AUDMUX_PORT5_SSI_PINS_5);
++	pdcr = IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT5_SSI_PINS_5);
++	imx_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0, ptcr, pdcr);
++
++	ptcr = IMX_AUDMUX_V2_PTCR_SYN;
++	pdcr = IMX_AUDMUX_V2_PDCR_RXDSEL(MX31_AUDMUX_PORT1_SSI0);
++	imx_audmux_v2_configure_port(MX31_AUDMUX_PORT5_SSI_PINS_5, ptcr, pdcr);
  
- /* There is a silicon mic on the board optionally connected via a solder pad
-  * SP1.  Define this to enable it.
+ 	wm1133_ev1_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!wm1133_ev1_snd_device)
 -- 
 1.7.5.4
