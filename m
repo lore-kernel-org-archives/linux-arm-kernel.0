@@ -1,27 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 4 Mar 2012 19:39:35 -0800
-Subject: [PATCH v3 06/10] pwm: Add NVIDIA Tegra SoC support
-In-Reply-To: <20120303224212.GA6661@avionic-0098.mockup.avionic-design.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <1329923841-32017-7-git-send-email-thierry.reding@avionic-design.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF1E63@HQMAIL01.nvidia.com>
- <20120303224212.GA6661@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120305033935.GA32675@quad.lixom.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 4 Mar 2012 22:41:13 -0500
+Subject: [GIT PULL v3] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
+Message-ID: <20120305034113.GB5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 03, 2012 at 11:42:12PM +0100, Thierry Reding wrote:
+The following changes since commit 759a45185ac0e4dfaf8bbfcb390ec73aca4b7a34:
 
-> Those probably weren't there yet when I prepared the first series. I'll have
-> another look will sync up with it after testing that it still works.
+  ARM: kirkwood: convert uart0 to devicetree. (2012-02-27 16:21:44 +0000)
 
+are available in the git repository at:
+  git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt
 
-Yep, the patch in question is from Simon, and it's at:
+Arnd,
 
-http://git.chromium.org/gitweb/?p=chromiumos/third_party/kernel.git;a=commitdiff;h=7778c724bf3211c534f9bcef7b26afc6cb067a82
+Sorry for the redo, here's what changed:
+	orion-spi: put #ifdef CONFIG_OF around of_device_id
+	rtc-mv: put #ifdef CONFIG_OF around of_device_id
+	rtc-mv: more accurate compatible strings
+	orion-wdt: put #ifdef CONFIG_OF around of_device_id
+	orion-wdt: more accurate compatible strings
 
-Essentially, the driver accidentally rounded down a backlight setting of
-'1' which is how it was found.
+Jason Cooper (5):
+      ARM: kirkwood: covert orion-spi to fdt.
+      ARM: kirkwood: move var setting to correct location.
+      ARM: kirkwood: fdt: absorb kirkwood_init()
+      ARM: kirkwood: convert rtc-mv to fdt.
+      ARM: kirkwood: convert orion-wdt to fdt.
 
-
--Olof
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   34 +++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi          |   12 +++++
+ arch/arm/mach-kirkwood/board-dt.c        |   67 +++++++++++------------------
+ arch/arm/mach-kirkwood/common.c          |   21 +++++++--
+ arch/arm/mach-kirkwood/common.h          |    6 +++
+ arch/arm/plat-orion/common.c             |    7 +++-
+ drivers/rtc/rtc-mv.c                     |   10 ++++
+ drivers/spi/spi-orion.c                  |   39 +++++++++++++++--
+ drivers/watchdog/orion_wdt.c             |   49 ++++++++++++++++-----
+ 9 files changed, 182 insertions(+), 63 deletions(-)
