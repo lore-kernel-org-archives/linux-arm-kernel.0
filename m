@@ -1,48 +1,38 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Mar 2012 16:08:37 +0100
-Subject: [PATCH v2 7/7] Document: devicetree: add OF documents for arch-mmp
-In-Reply-To: <201203051446.14600.arnd@arndb.de>
-References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
- <1330950111-30797-8-git-send-email-haojian.zhuang@marvell.com>
- <201203051446.14600.arnd@arndb.de>
-Message-ID: <4F54D6F5.8050805@ti.com>
+Date: Mon, 5 Mar 2012 16:19:26 +0100
+Subject: [GIT PULL] ARM: OMAP: IRQ domain support for INTC
+In-Reply-To: <20120305150351.GB2108@localhost>
+References: <4F4BB0FB.3040308@ti.com> <20120228234837.GH18901@atomide.com>
+ <4F4E4F1D.7020109@ti.com> <20120305135838.GA2108@localhost>
+ <4F54CCBD.2080802@ti.com> <20120305150351.GB2108@localhost>
+Message-ID: <4F54D97E.4070805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/5/2012 3:46 PM, Arnd Bergmann wrote:
-> On Monday 05 March 2012, Haojian Zhuang wrote:
->> Add OF support in Document/devicetree directory.
+On 3/5/2012 4:03 PM, Johan Hovold wrote:
+> On Mon, Mar 05, 2012 at 03:25:01PM +0100, Cousson, Benoit wrote:
+>> On 3/5/2012 2:58 PM, Johan Hovold wrote:
+>>> On Wed, Feb 29, 2012 at 05:15:25PM +0100, Cousson, Benoit wrote:
+>>>> On 2/29/2012 12:48 AM, Tony Lindgren wrote:
+>>>>> * Cousson, Benoit<b-cousson@ti.com>    [120227 08:04]:
+>>>>> Hmm, looks like this now produces the following warning at least on omap3:
+>>>>
+>>>> Yes, Rajendra has just reported that issue with linux-next.
+>>>
+>>> I'm getting the same warning and initialisation failure with 3.3-rc6 on
+>>> overo. Are these fixes queued up for 3.3 (and not just 3.4) somewhere?
 >>
->> Signed-off-by: Haojian Zhuang<haojian.zhuang@marvell.com>
+>> It is under review, I posted the series last Friday:
+>> mfd: twl: Fix for irqdomain/next + SPARSE_IRQ + MMC card detect
+>>
+>> It will be anyway material for 3.4 since it is in linux-next.
 >
-> Acked-by: Arnd Bergmann<arnd@arndb.de>
+> Yes, I noted that there was a fix against linux-next. My question was
+> whether any fix is planned for 3.3 as twl4030 is broken with SPARSE_IRQ
+> enabled.
 >
-> One question for Benoit, Grant or Rob:
->
->> +Required properties:
->> +- compatible: should be "mrvl,sa1100-rtc"
->> +- reg: physical base address of the controller and length of memory mapped
->> +  region.
->> +- interrupts: Should be two. The first interrupt number is the rtc alarm
->> +  interrupt and the second interrupt number is the rtc hz interrupt.
->> +- interrupt-names: Assign name of irq resource.
->> +
->> +Example:
->> +	rtc: rtc at d4010000 {
->> +		compatible = "mrvl,mmp-rtc";
->> +		reg =<0xd4010000 0x1000>;
->> +		interrupts =<5>,<6>;
->> +		interrupt-name = "rtc 1Hz", "rtc alarm";
->> +	};
->
-> When the binding for a device lists the interrupt-names property, should it
-> also list the specific values for it? This one says that which ones they are,
-> but I think we should actually mandate the exact string in the binding if
-> we want to allow drivers to get the resource by its name.
+> Disabling SPARSE_IRQ will be the only workaround until 3.4 is out then?
 
-Yes, indeed. The names are not some random strings, the driver will use 
-get_resource_by_name and expect the name to be aligned with HW 
-documentation and thus should be well documented in the binding.
+Mmm, but is SPARSE_IRQ used to work before on OMAP3?
 
-Regards,
 Benoit
