@@ -1,90 +1,76 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  5 Mar 2012 22:30:56 +0800
-Subject: [PATCH v2 08/17] ASoC: imx: add an explicit Kconfig option for
- imx-ssi driver
+Date: Mon,  5 Mar 2012 22:30:57 +0800
+Subject: [PATCH v2 09/17] ASoC: fsl: separate SSI and DMA Kconfig options
 In-Reply-To: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
 References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1330957865-19085-9-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330957865-19085-10-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently ASoC:imx uses menuconfig option SND_IMX_SOC selects imx-ssi
-driver, and it works because all the machine driver covered by the
-menuconfig need to build imx-ssi driver in.  However, it will not work
-any more if we have a imx based machine driver going into the menuconfig
-while working with fsl_ssi driver (sound/soc/fsl/fsl_ssi.c) rather than
-imx-ssi one.
-
-The patch adds an explicit Kconfig option SND_SOC_IMX_SSI for imx-ssi
-driver, so that it can be selected independently from the menuconfig
-option SND_IMX_SOC.
+The fsl_ssi driver will possibly be shared between Freescale PowerPC
+and ARM/IMX families, so give it a separate Kconfig option.  Then
+fsl_ssi driver can possibly be selected independently from selecting
+PowerPC DMA based PCM driver.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- sound/soc/imx/Kconfig  |    7 +++++++
- sound/soc/imx/Makefile |    4 ++--
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ sound/soc/fsl/Kconfig  |   15 +++++++++------
+ sound/soc/fsl/Makefile |    3 ++-
+ 2 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index 2566032..810acaa 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -8,6 +8,9 @@ menuconfig SND_IMX_SOC
- 
- if SND_IMX_SOC
- 
-+config SND_SOC_IMX_SSI
-+	tristate
-+
- config SND_SOC_IMX_PCM
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index d754d34..ca693b2 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -1,10 +1,11 @@
+ config SND_MPC52xx_DMA
  	tristate
  
-@@ -30,6 +33,7 @@ config SND_MXC_SOC_WM1133_EV1
- 	select SND_SOC_WM8350
- 	select SND_MXC_SOC_FIQ
- 	select SND_SOC_IMX_AUDMUX
-+	select SND_SOC_IMX_SSI
- 	help
- 	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
- 	  PMIC board with WM8835x fitted.
-@@ -40,6 +44,7 @@ config SND_SOC_MX27VIS_AIC32X4
- 	select SND_SOC_TLV320AIC32X4
- 	select SND_MXC_SOC_MX2
- 	select SND_SOC_IMX_AUDMUX
-+	select SND_SOC_IMX_SSI
- 	help
- 	  Say Y if you want to add support for SoC audio on Visstrim SM10
- 	  board with TLV320AIC32X4 codec.
-@@ -51,6 +56,7 @@ config SND_SOC_PHYCORE_AC97
- 	select SND_SOC_WM9712
- 	select SND_MXC_SOC_FIQ
- 	select SND_SOC_IMX_AUDMUX
-+	select SND_SOC_IMX_SSI
- 	help
- 	  Say Y if you want to add support for SoC audio on Phytec phyCORE
- 	  and phyCARD boards in AC97 mode
-@@ -65,6 +71,7 @@ config SND_SOC_EUKREA_TLV320
- 	select SND_SOC_TLV320AIC23
- 	select SND_MXC_SOC_FIQ
- 	select SND_SOC_IMX_AUDMUX
-+	select SND_SOC_IMX_SSI
- 	help
- 	  Enable I2S based access to the TLV320AIC23B codec attached
- 	  to the SSI interface
-diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
-index e9ed362..f5db3e9 100644
---- a/sound/soc/imx/Makefile
-+++ b/sound/soc/imx/Makefile
-@@ -1,8 +1,8 @@
- # i.MX Platform Support
--snd-soc-imx-objs := imx-ssi.o
-+snd-soc-imx-ssi-objs := imx-ssi.o
- snd-soc-imx-audmux-objs := imx-audmux.o
+-# ASoC platform support for the Freescale PowerPC SOCs that have an SSI and
+-# an Elo DMA controller, such as the MPC8610 and P1022.  You will still need to
+-# select a platform driver and a codec driver.
+-config SND_SOC_POWERPC_SSI
++config SND_SOC_FSL_SSI
++	tristate
++	depends on FSL_SOC
++
++config SND_SOC_POWERPC_DMA
+ 	tristate
+ 	depends on FSL_SOC
  
--obj-$(CONFIG_SND_IMX_SOC) += snd-soc-imx.o
-+obj-$(CONFIG_SND_SOC_IMX_SSI) += snd-soc-imx-ssi.o
- obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
+@@ -12,7 +13,8 @@ config SND_SOC_MPC8610_HPCD
+ 	tristate "ALSA SoC support for the Freescale MPC8610 HPCD board"
+ 	# I2C is necessary for the CS4270 driver
+ 	depends on MPC8610_HPCD && I2C
+-	select SND_SOC_POWERPC_SSI
++	select SND_SOC_FSL_SSI
++	select SND_SOC_POWERPC_DMA
+ 	select SND_SOC_CS4270
+ 	select SND_SOC_CS4270_VD33_ERRATA
+ 	default y if MPC8610_HPCD
+@@ -23,7 +25,8 @@ config SND_SOC_P1022_DS
+ 	tristate "ALSA SoC support for the Freescale P1022 DS board"
+ 	# I2C is necessary for the WM8776 driver
+ 	depends on P1022_DS && I2C
+-	select SND_SOC_POWERPC_SSI
++	select SND_SOC_FSL_SSI
++	select SND_SOC_POWERPC_DMA
+ 	select SND_SOC_WM8776
+ 	default y if P1022_DS
+ 	help
+diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
+index b4a38c0..95d483f 100644
+--- a/sound/soc/fsl/Makefile
++++ b/sound/soc/fsl/Makefile
+@@ -9,7 +9,8 @@ obj-$(CONFIG_SND_SOC_P1022_DS) += snd-soc-p1022-ds.o
+ # Freescale PowerPC SSI/DMA Platform Support
+ snd-soc-fsl-ssi-objs := fsl_ssi.o
+ snd-soc-fsl-dma-objs := fsl_dma.o
+-obj-$(CONFIG_SND_SOC_POWERPC_SSI) += snd-soc-fsl-ssi.o snd-soc-fsl-dma.o
++obj-$(CONFIG_SND_SOC_FSL_SSI) += snd-soc-fsl-ssi.o
++obj-$(CONFIG_SND_SOC_POWERPC_DMA) += snd-soc-fsl-dma.o
  
- obj-$(CONFIG_SND_SOC_IMX_PCM) += snd-soc-imx-pcm.o
+ # MPC5200 Platform Support
+ obj-$(CONFIG_SND_MPC52xx_DMA) += mpc5200_dma.o
 -- 
 1.7.5.4
