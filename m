@@ -1,40 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 6 Mar 2012 07:46:27 +0800
-Subject: [PATCH v2 10/17] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
-In-Reply-To: <20120305173910.GZ3852@pengutronix.de>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-11-git-send-email-shawn.guo@linaro.org>
- <20120305173910.GZ3852@pengutronix.de>
-Message-ID: <20120305234626.GK16232@S2101-09.ap.freescale.net>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 5 Mar 2012 17:35:53 -0600
+Subject: [PATCH 6/9] dmaengine: consolidate tx_status functions
+In-Reply-To: <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
+References: <20120305201411.GA17791@n2100.arm.linux.org.uk>
+ <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF555AF@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 06:39:10PM +0100, Sascha Hauer wrote:
-> On Mon, Mar 05, 2012 at 10:30:58PM +0800, Shawn Guo wrote:
-> > Freescale PowerPC and ARM/IMX families share the same SSI IP block.
-> > The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
-> > code sharing and consolidation can happen.
-> > 
-> > This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
-> > in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
-> > IMX platform.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  sound/soc/Kconfig                        |    1 -
-> >  sound/soc/Makefile                       |    1 -
-> >  sound/soc/fsl/Kconfig                    |   92 ++++++++++++++++++++++++++++++
-> >  sound/soc/fsl/Makefile                   |   22 +++++++
-> >  sound/soc/{imx => fsl}/eukrea-tlv320.c   |    2 +-
-> >  sound/soc/{imx => fsl}/imx-audmux.c      |    0
-> >  sound/soc/{imx => fsl}/imx-audmux.h      |    0
-> >  sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c |    0
-> 
-> Maybe this is the right time to rename this file to something like
-> imx-pcm-dma.c since it has nothing to do with mx2 anymore.
-> 
-Ok, will do.
+On Monday, March 05, 2012 1:17 PM, Russell King wrote:
+>
+> Now that we have the completed cookie in the dma_chan structure, we
+> can consolidate the tx_status functions by providing a function to set
+> the txstate structure and returning the DMA status.  We also provide
+> a separate helper to set the residue for cookies which are still in
+> progress.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
--- 
+<snip>
+
+> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
+> index 47e0997..244a2c5 100644
+> --- a/drivers/dma/dmaengine.h
+> +++ b/drivers/dma/dmaengine.h
+> @@ -45,4 +45,35 @@ static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
+>  	tx->cookie = 0;
+>  }
+>  
+> +/**
+> + * dma_cookie_status - report cookie status
+> + * @chan: dma channel
+> + * @cookie: cookie we are interested in
+> + * @state: dma_tx_state structure to return last/used cookies
+> + *
+> + * Report the status of the cookie, filling in the state structure if
+> + * non-NULL.  No locking is required.
+> + */
+> +static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
+> +	dma_cookie_t cookie, struct dma_tx_state *state)
+> +{
+> +	dma_cookie_t used, complete;
+> +
+> +	used = chan->cookie;
+> +	complete = chan->complete;
+
+Is this supposed to be:
+
+	complete = chan->completed_cookie;
+
 Regards,
-Shawn
+Hartley
