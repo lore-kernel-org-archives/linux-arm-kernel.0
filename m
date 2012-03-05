@@ -1,212 +1,169 @@
 From: hs@denx.de (Heiko Schocher)
-Date: Mon,  5 Mar 2012 12:10:00 +0100
-Subject: [PATCH v3 3/7] ARM: davinci: mux: add OF support
+Date: Mon,  5 Mar 2012 12:10:02 +0100
+Subject: [PATCH v3 5/7] ARM: davinci: i2c: add OF support
 In-Reply-To: <1330945804-3379-1-git-send-email-hs@denx.de>
 References: <1330945804-3379-1-git-send-email-hs@denx.de>
-Message-ID: <1330945804-3379-4-git-send-email-hs@denx.de>
+Message-ID: <1330945804-3379-6-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add support for configuring the pinmux on davinci SoC
-through OF.
+add of support for the davinci i2c driver.
 
 Signed-off-by: Heiko Schocher <hs@denx.de>
 Cc: davinci-linux-open-source at linux.davincidsp.com
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-i2c at vger.kernel.org
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Sekhar Nori <nsekhar@ti.com>
 Cc: Wolfgang Denk <wd@denx.de>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
 ---
-This patch is just a RFC, as I want to get rid of the pin
-setup code in board code ... This patch introduces a
-davinci_cfg_reg_of() function, which davinci drivers can call,
-if they found a pinmux-handle, so used in the following
-drivers in this patchserie:
-
-drivers/net/ethernet/ti/davinci_emac
-drivers/i2c/busses/i2c-davinci.c
-drivers/mtd/nand/davinci_nand.c
-
-Comments are welcome.
-
-- no changes for v2
+- changes for v2:
+- add comments from Sylwester Nawrocki <s.nawrocki@samsung.com>:
+  - use "cell-index" instead "id"
+  - OF_DEV_AUXDATA in the machine code, instead pre-define platform
+    device name
+- add comment from Grant Likely:
+  - removed "id" resp. "cell-index" completely
+  - fixed documentation
+  - use of_match_ptr()
+  - use devm_kzalloc() for allocating plattform data mem
+  - fixed a whitespace issue
 - no changes for v3
 
- .../devicetree/bindings/arm/davinci/mux.txt        |   40 +++++++++++
- arch/arm/mach-davinci/include/mach/mux.h           |    2 +
- arch/arm/mach-davinci/mux.c                        |   73 +++++++++++++++++++-
- 3 files changed, 114 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/davinci/mux.txt
+ .../devicetree/bindings/arm/davinci/i2c.txt        |   33 +++++++++++++++++
+ drivers/i2c/busses/i2c-davinci.c                   |   37 ++++++++++++++++++++
+ 2 files changed, 70 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/davinci/mux.txt b/Documentation/devicetree/bindings/arm/davinci/mux.txt
+diff --git a/Documentation/devicetree/bindings/arm/davinci/i2c.txt b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
 new file mode 100644
-index 0000000..ecb026a
+index 0000000..ba00d7b
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/davinci/mux.txt
-@@ -0,0 +1,40 @@
-+* Texas Instruments Davinci pinmux
++++ b/Documentation/devicetree/bindings/arm/davinci/i2c.txt
+@@ -0,0 +1,33 @@
++* Texas Instruments Davinci I2C
 +
 +This file provides information, what the device node for the
-+davinci pinmux interface contain.
++davinci i2c interface contain.
 +
 +Required properties:
-+- compatible: "ti,davinci-pinmux";
-+- pins : contains a table with the following colums:
-+   mux register: pinmux register
-+   register offset: offset in register, which to change
-+   mode mask: mode mask
-+   mode value: mode value
++- compatible: "ti,davinci-i2c";
++- reg : Offset and length of the register set for the device
++
++Recommended properties :
++- interrupts : <a> standard interrupt property.
++- clock-frequency : desired I2C bus clock frequency in Hz.
 +
 +Optional properties:
-+- none
++- bus-delay: bus delay in usec
++- pinmux-handle: Contains a handle to configure the pinmux settings.
 +
 +Example (enbw_cmc board):
-+	emac_pins: pinmux at 1c14120 {
-+		compatible = "ti,davinci-pinmux";
-+		reg = <0x14120 0x1000>;
-+		pins = < /*	muxreg	maskoff	modemsk muxmode */
-+				2	4	15	8 /* MII TXEN */
-+				2	8	15	8 /* MII TXCLK */
-+				2	12	15	8 /* MII COL */
-+				2	16	15	8 /* MII TXD_3 */
-+				2	20	15	8 /* MII TXD_2 */
-+				2	24	15	8 /* MII TXD_1 */
-+				2	28	15	8 /* MII TXD_0 */
-+				3	8	15	8 /* MII RXER */
-+				3	12	15	8 /* MII CRS */
-+				3	0	15	8 /* MII RXCLK */
-+				3	4	15	8 /* MII RXDV */
-+				3	16	15	8 /* MII RXD_3 */
-+				3	20	15	8 /* MII RXD_2 */
-+				3	24	15	8 /* MII RXD_1 */
-+				3	28	15	8 /* MII RXD_0 */
-+				4	0	15	8 /* MDIO CLK */
-+				4	4	15	8 /* MDIO D */
-+			>;
++	i2c at 1c22000 {
++		compatible = "ti,davinci-i2c";
++		reg = <0x22000 0x1000>;
++		clock-frequency = <100000>;
++		interrupts = <15>;
++		interrupt-parent = <&intc>;
++		pinmux-handle = <&i2c1_pins>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		dtt at 48 {
++				compatible = "national,lm75";
++				reg = <0x48>;
++			};
 +	};
-diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
-index a7e92fc..3a62857 100644
---- a/arch/arm/mach-davinci/include/mach/mux.h
-+++ b/arch/arm/mach-davinci/include/mach/mux.h
-@@ -1205,6 +1205,7 @@ enum davinci_tnetv107x_index {
- /* setup pin muxing */
- extern int davinci_cfg_reg(unsigned long reg_cfg);
- extern int davinci_cfg_reg_list(const short pins[]);
-+extern int davinci_cfg_reg_of(struct device_node *);
- #else
- /* boot loader does it all (no warnings from CONFIG_DAVINCI_MUX_WARNINGS) */
- static inline int davinci_cfg_reg(unsigned long reg_cfg) { return 0; }
-@@ -1212,6 +1213,7 @@ static inline int davinci_cfg_reg_list(const short pins[])
+diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+index a76d85f..0d07d02 100644
+--- a/drivers/i2c/busses/i2c-davinci.c
++++ b/drivers/i2c/busses/i2c-davinci.c
+@@ -38,9 +38,12 @@
+ #include <linux/slab.h>
+ #include <linux/cpufreq.h>
+ #include <linux/gpio.h>
++#include <linux/of_i2c.h>
++#include <linux/of_device.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/i2c.h>
++#include <mach/mux.h>
+ 
+ /* ----- global defines ----------------------------------------------- */
+ 
+@@ -635,6 +638,12 @@ static struct i2c_algorithm i2c_davinci_algo = {
+ 	.functionality	= i2c_davinci_func,
+ };
+ 
++static const struct of_device_id davinci_i2c_of_match[] = {
++	{.compatible = "ti,davinci-i2c", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, davinci_i2c_of_match);
++
+ static int davinci_i2c_probe(struct platform_device *pdev)
  {
- 	return 0;
- }
-+static int davinci_cfg_reg_of(struct device_node *) { return 0; };
- #endif
+ 	struct davinci_i2c_dev *dev;
+@@ -676,6 +685,31 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	dev->irq = irq->start;
+ 	platform_set_drvdata(pdev, dev);
  
- #endif /* __INC_MACH_MUX_H */
-diff --git a/arch/arm/mach-davinci/mux.c b/arch/arm/mach-davinci/mux.c
-index f34a8dc..6b38072 100644
---- a/arch/arm/mach-davinci/mux.c
-+++ b/arch/arm/mach-davinci/mux.c
-@@ -18,18 +18,21 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/spinlock.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
- 
- #include <mach/mux.h>
- #include <mach/common.h>
- 
- static void __iomem *pinmux_base;
-+static DEFINE_SPINLOCK(mux_spin_lock);
- 
- /*
-  * Sets the DAVINCI MUX register based on the table
-  */
- int __init_or_module davinci_cfg_reg(const unsigned long index)
- {
--	static DEFINE_SPINLOCK(mux_spin_lock);
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 	unsigned long flags;
- 	const struct mux_config *cfg;
-@@ -98,6 +101,74 @@ int __init_or_module davinci_cfg_reg(const unsigned long index)
- }
- EXPORT_SYMBOL(davinci_cfg_reg);
- 
-+#ifdef CONFIG_OF
-+int davinci_cfg_reg_of(struct device_node *np)
-+{
-+	unsigned long flags;
-+	int pinmux_map_len;
-+	const unsigned int *pinmux_map;
-+	u32 muxreg, maskoff, modemsk, muxmode;
-+	unsigned int reg_orig = 0, reg = 0;
-+	unsigned int mask, warn = 0;
++	if ((dev->dev->platform_data == NULL) &&
++		(pdev->dev.of_node)) {
++		struct device_node *pinmux_np;
++		struct davinci_i2c_platform_data *pdata;
++		u32 prop;
 +
-+	pinmux_map = of_get_property(np, "pins", &pinmux_map_len);
-+	if (pinmux_map == NULL) {
-+		printk(KERN_ERR "pins is not set!\n");
-+		return -EINVAL;
-+	}
-+
-+	pinmux_map_len /= sizeof(unsigned int);
-+	if ((pinmux_map_len % 4) != 0) {
-+		printk(KERN_ERR "pins format wrong!\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!pinmux_base) {
-+		pinmux_base = of_iomap(np, 0);
-+		if (WARN_ON(!pinmux_base))
-+			return -ENOMEM;
-+	}
-+
-+	while (pinmux_map_len > 0) {
-+		muxreg = be32_to_cpu(pinmux_map[0]);
-+		maskoff = be32_to_cpu(pinmux_map[1]);
-+		modemsk = be32_to_cpu(pinmux_map[2]);
-+		muxmode = be32_to_cpu(pinmux_map[3]);
-+
-+		/* Update the mux register in question */
-+		if (modemsk) {
-+			unsigned	tmp1, tmp2;
-+
-+			spin_lock_irqsave(&mux_spin_lock, flags);
-+			reg_orig = __raw_readl(pinmux_base + muxreg);
-+
-+			mask = (modemsk << maskoff);
-+			tmp1 = reg_orig & mask;
-+			reg = reg_orig & ~mask;
-+
-+			tmp2 = (muxmode << maskoff);
-+			reg |= tmp2;
-+
-+			if (tmp1 != tmp2)
-+				warn = 1;
-+
-+			__raw_writel(reg, pinmux_base + muxreg);
-+			spin_unlock_irqrestore(&mux_spin_lock, flags);
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata) {
++			r = -ENOMEM;
++			goto err_free_mem;
 +		}
-+		pinmux_map += 4;
-+		pinmux_map_len -= 4;
++		memcpy(pdata, &davinci_i2c_platform_data_default,
++			sizeof(*pdata));
++		dev->dev->platform_data = pdata;
++		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
++			&prop))
++			pdata->bus_freq = prop / 1000;
++		if (!of_property_read_u32(pdev->dev.of_node, "bus-delay",
++			&prop))
++			pdata->bus_delay = prop;
++		pinmux_np = of_parse_phandle(pdev->dev.of_node,
++				"pinmux-handle", 0);
++		if (pinmux_np)
++			davinci_cfg_reg_of(pinmux_np);
 +	}
-+
-+	return 0;
-+}
-+#else
-+int davinci_cfg_reg_of(struct device_node *np)
-+{
-+	return 0;
-+}
-+#endif
-+EXPORT_SYMBOL(davinci_cfg_reg_of);
-+
- int __init_or_module davinci_cfg_reg_list(const short pins[])
- {
- 	int i, error = -EINVAL;
+ 	dev->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(dev->clk)) {
+ 		r = -ENODEV;
+@@ -711,6 +745,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 	adap->algo = &i2c_davinci_algo;
+ 	adap->dev.parent = &pdev->dev;
+ 	adap->timeout = DAVINCI_I2C_TIMEOUT;
++	adap->dev.of_node = pdev->dev.of_node;
+ 
+ 	adap->nr = pdev->id;
+ 	r = i2c_add_numbered_adapter(adap);
+@@ -718,6 +753,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "failure adding adapter\n");
+ 		goto err_free_irq;
+ 	}
++	of_i2c_register_devices(adap);
+ 
+ 	return 0;
+ 
+@@ -809,6 +845,7 @@ static struct platform_driver davinci_i2c_driver = {
+ 		.name	= "i2c_davinci",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= davinci_i2c_pm_ops,
++		.of_match_table = of_match_ptr(davinci_i2c_of_match),
+ 	},
+ };
+ 
 -- 
 1.7.7.6
