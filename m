@@ -1,81 +1,63 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon,  5 Mar 2012 23:01:11 +0100
-Subject: [PATCH RESEND v3 2/2] GPIO: LPC32xx: Add output reading to GPO P3
-In-Reply-To: <1330984871-411-1-git-send-email-stigge@antcom.de>
-References: <1330984871-411-1-git-send-email-stigge@antcom.de>
-Message-ID: <1330984871-411-2-git-send-email-stigge@antcom.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 05 Mar 2012 14:02:08 -0800
+Subject: [GIT PULL] ARM: OMAP: SR cleanups for v3.4
+Message-ID: <87wr6yiu5b.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip offers the function to detect the current state of output of the GPO
-P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
-sysfs.
+Hi Tony,
 
-Please note that this only reads back the currently programmed output state,
-not the actual electrical level in terms of a GPI function. Finally, GPO3 is
-still just an output.
+Please pull the SmartReflex cleanups for v3.4.
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Due to a minor conflict with the devexit patches in your randconfig
+branch, this is based there (actually randconfig~2 which is the actual
+dependency.)
 
----
- drivers/gpio/gpio-lpc32xx.c |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Special thanks to Jean Pihet for collecting and coordinating all these
+fixups.
 
---- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-+++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-@@ -62,9 +62,11 @@
- #define GPIO3_PIN_IN_SEL(x, y)			(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
- #define GPIO3_PIN5_IN_SEL(x)			(((x) >> 24) & 1)
- #define GPI3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
-+#define GPO3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
- 
- struct gpio_regs {
- 	void __iomem *inp_state;
-+	void __iomem *outp_state;
- 	void __iomem *outp_set;
- 	void __iomem *outp_clr;
- 	void __iomem *dir_set;
-@@ -145,6 +147,7 @@ static struct gpio_regs gpio_grp_regs_p2
- 
- static struct gpio_regs gpio_grp_regs_p3 = {
- 	.inp_state	= LPC32XX_GPIO_P3_INP_STATE,
-+	.outp_state	= LPC32XX_GPIO_P3_OUTP_STATE,
- 	.outp_set	= LPC32XX_GPIO_P3_OUTP_SET,
- 	.outp_clr	= LPC32XX_GPIO_P3_OUTP_CLR,
- 	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
-@@ -240,6 +243,12 @@ static int __get_gpi_state_p3(struct lpc
- 	return GPI3_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state), pin);
- }
- 
-+static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
-+	unsigned pin)
-+{
-+	return GPO3_PIN_IN_SEL(__raw_readl(group->gpio_grp->outp_state), pin);
-+}
-+
- /*
-  * GENERIC_GPIO primitives.
-  */
-@@ -340,6 +349,13 @@ static void lpc32xx_gpo_set_value(struct
- 	__set_gpo_level_p3(group, pin, value);
- }
- 
-+static int lpc32xx_gpo_get_value(struct gpio_chip *chip, unsigned pin)
-+{
-+	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
-+
-+	return __get_gpo_state_p3(group, pin);
-+}
-+
- static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
- {
- 	if (pin < chip->ngpio)
-@@ -427,6 +443,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
- 			.label			= "gpo_p3",
- 			.direction_output	= lpc32xx_gpio_dir_out_always,
- 			.set			= lpc32xx_gpo_set_value,
-+			.get			= lpc32xx_gpo_get_value,
- 			.request		= lpc32xx_gpio_request,
- 			.base			= LPC32XX_GPO_P3_GRP,
- 			.ngpio			= LPC32XX_GPO_P3_MAX,
+Kevin
+
+
+The following changes since commit 149f1d5c8d2fd6879cdf93ca70f1cb745e698a1e:
+
+  ARM: OMAP2+: Fix devexit for smartreflex when CONFIG_HOTPLUG is not set (2012-02-24 08:24:46 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/cleanup/sr
+
+for you to fetch changes up to 63371faf9198302c7ebd41e7fbe78eb6b57bba86:
+
+  ARM: OMAP3+: SmartReflex: fix error handling (2012-03-05 11:29:27 -0800)
+
+----------------------------------------------------------------
+Felipe Balbi (4):
+      ARM: OMAP3+: SmartReflex: add missing platform_set_drvdata()
+      ARM: OMAP3+: SmartReflex: move late_initcall() closer to its argument
+      ARM: OMAP3+: SmartReflex: misc cleanups
+      ARM: OMAP3+: SmartReflex: micro-optimization for sanity check
+
+Jean Pihet (2):
+      ARM: OMAP3+: SmartReflex: fix the use of debugfs_create_* API
+      ARM: OMAP3+: SmartReflex: fix error handling
+
+Nishanth Menon (6):
+      ARM: OMAP3+: SmartReflex: fix err interrupt disable sequence
+      ARM: OMAP3+: SmartReflex Class3: disable errorgen before disable VP
+      ARM: OMAP3+: SmartReflex: Add a shutdown hook
+      ARM: OMAP3+: SmartReflex: Fix status masking in ERRCONFIG register
+      ARM: OMAP3+: SmartReflex: clear ERRCONFIG_VPBOUNDINTST only on a need
+      ARM: OMAP3+: hwmod: add SmartReflex IRQs
+
+Shweta Gulati (1):
+      ARM: OMAP3+: SmartReflex: use voltage domain name in device attributes
+
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   31 +++-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   19 ++-
+ arch/arm/mach-omap2/smartreflex-class3.c     |    1 +
+ arch/arm/mach-omap2/smartreflex.c            |  227 +++++++++++++++++++-------
+ arch/arm/mach-omap2/smartreflex.h            |   10 ++
+ arch/arm/mach-omap2/sr_device.c              |   11 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 -
+ 7 files changed, 229 insertions(+), 72 deletions(-)
