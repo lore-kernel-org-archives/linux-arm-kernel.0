@@ -1,97 +1,51 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Mon, 5 Mar 2012 16:42:32 +0530
-Subject: [PATCH] omap3_beagle: Init only uart3 used for console
-Message-ID: <1330945952-14714-1-git-send-email-govindraj.raja@ti.com>
+From: hunold@linuxtv.org (Michael Hunold)
+Date: Mon, 05 Mar 2012 12:34:09 +0100
+Subject: iMX53 quick start board and SATA
+In-Reply-To: <20120304083258.GE10743@S2101-09.ap.freescale.net>
+References: <4F50C734.90302@linuxtv.org>
+ <20120304083258.GE10743@S2101-09.ap.freescale.net>
+Message-ID: <4F54A4B1.5000807@linuxtv.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
+Hello Shawn,
 
-On beagle some of uart mux lines are used for other
-purpose so init only uart3.
+on 04.03.2012 09:33 Shawn Guo said the following:
+> I think with the following patches in Linux 3.2, the i.MX53 SATA
+> support should be there, though I never played with it.
 
-Uart2 rx line clashes with gpio_147 used for usb ehci
-phy reset. Initializing uart2 pad_mux lines can break
-ehci module on beagle xm.
-(gpio_147 is available on uart2_rx in mode4 reference 
-mux34xx.c -> uart2_rx.gpio_147)
+> 904c04f [libata] ahci_platform: Add the board_ids and pi refer to different features
+> d870ea1 MX53 Enable the AHCI SATA on MX53 SMD board
+> 0661b82 MX53 Enable the AHCI SATA on MX53 LOCO board
+> e97e303 MX53 Enable the AHCI SATA on MX53 ARD board
+> 97915bd AHCI Add the AHCI SATA feature on the MX53 platforms
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Tested-by: Robert Nelson <robertcnelson@gmail.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/board-omap3beagle.c |   50 ++++++++++++++++++++++++++++++-
- 1 files changed, 49 insertions(+), 1 deletions(-)
+thank you very much for your answer.
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 817be06..a2e0052 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -493,6 +493,54 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
- static struct omap_board_mux board_mux[] __initdata = {
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
- };
-+
-+static struct omap_device_pad uart3_pads[] __initdata = {
-+	{
-+		.name	= "uart3_cts_rctx.uart3_cts_rctx",
-+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-+	},
-+	{
-+		.name	= "uart3_rts_sd.uart3_rts_sd",
-+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-+	},
-+	{
-+		.name	= "uart3_tx_irtx.uart3_tx_irtx",
-+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
-+	},
-+	{
-+		.name	= "uart3_rx_irrx.uart3_rx_irrx",
-+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-+		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-+		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
-+	},
-+};
-+
-+static inline void board_serial_init(void)
-+{
-+	struct omap_board_data uart3_bdata;
-+	uart3_bdata.flags     = 0;
-+	uart3_bdata.pads      = uart3_pads;
-+	uart3_bdata.pads_cnt  = ARRAY_SIZE(uart3_pads);
-+	uart3_bdata.id        = 2;
-+
-+	/*
-+	 * Init only uart3 used as console
-+	 * don't init other uarts as uart mux lines
-+	 * might be used for other purpose on beagle board
-+	 * ex: uart2_rx used by gpio_147 for usb_ehci phy reset.
-+	 */
-+	omap_serial_init_port(&uart3_bdata, NULL);
-+}
-+#else
-+
-+/*
-+ * If mux is disabled from kernel probably we
-+ * are relying on boot-loaders so we init all uarts
-+ */
-+static inline void board_serial_init(void)
-+{
-+	omap_serial_init();
-+}
- #endif
- 
- static void __init beagle_opp_init(void)
-@@ -549,7 +597,7 @@ static void __init omap3_beagle_init(void)
- 	platform_add_devices(omap3_beagle_devices,
- 			ARRAY_SIZE(omap3_beagle_devices));
- 	omap_display_init(&beagle_dss_data);
--	omap_serial_init();
-+	board_serial_init();
- 	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
- 				  mt46h32m32lf6_sdrc_params);
- 
--- 
-1.7.5.4
+I checked that the code is present in the kernel tree that I have used
+and indeed it is.
+
+After further investigation, I could see that imx53_add_ahci_imx() is
+called correctly, but then imx_sata_init() was not called. This means
+that the platform driver was not present.
+
+I noticed that the AHCI platform driver in drivers/ata/ahci_platform.c
+is only compiled when CONFIG_SATA_AHCI_PLATFORM=y is set and this was
+not the case when the default config was used.
+
+After enabling the necessary config option, the SATA port is now found
+correctly:
+
+ahci: SSS flag set, parallel bus scan disabled
+ahci imx53-ahci.0: AHCI 0001.0100 32 slots 1 ports 3 Gbps 0x1 impl
+platform mode
+ahci imx53-ahci.0: flags: ncq sntf stag pm led clo only pmp pio slum
+part ccc
+scsi0 : ahci_platform
+ata1: SATA max UDMA/133 mmio [mem 0x10000000-0x10000fff] port 0x100 irq 28
+
+Probably it would be a good idea to unconditionally select
+CONFIG_SATA_AHCI_PLATFORM when MACH_MX53_LOCO is selected.
+
+Best regards
+Michael.
