@@ -1,34 +1,20 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Mar 2012 10:19:32 -0800
-Subject: [PATCH v3 1/2] ARM: OMAP: move generic EMAC init to separate file
-In-Reply-To: <1330593544-25411-1-git-send-email-grinberg@compulab.co.il>
-References: <1324423590-32489-1-git-send-email-yanok@emcraft.com>
- <1330593544-25411-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <20120305181932.GC12083@atomide.com>
+Date: Mon, 5 Mar 2012 10:23:11 -0800
+Subject: [PATCH] RM: OMAP4: board-4430sdp: don't initialize value that
+ is never used
+In-Reply-To: <1328823034-9668-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1328823034-9668-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120305182311.GD12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [120301 00:47]:
-> From: Ilya Yanok <yanok@emcraft.com>
-> 
-> AM35xx SoCs include DaVinci EMAC IP. Initialization code in
-> board-am3517evm.c is pretty board independent and will work for any
-> AM35xx based board so move this code to it's own file to be reused by
-> other boards.
-> 
-> Signed-off-by: Ilya Yanok <yanok@emcraft.com>
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
-> v3:	- use DEFINE_RES_* macros
-> 	- check error of platform_device_register()
-> 	- introduce a default MDIO bus frequency define
-> 
-> Tony, this patch has been floating for about two months:
-> http://www.spinics.net/lists/linux-omap/msg62160.html
-> can it be applied for 3.4?
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [120209 13:00]:
+> sdp4430_spi_board_info.irq was initialized to ETH_KS8851_IRQ and in
+> omap_4430sdp_init() overwritten with gpio_to_irq(ETH_KS8851_IRQ) before
+> sdp4430_spi_board_info was registered. This is a bit confusing, so
+> better don't initialize .irq and document that it is set later.
 
-Yes sorry for the delays, applying this and the related
-cm-t3517 patch to board branch.
+Thanks applying into board branch.
 
 Regards,
 
