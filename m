@@ -1,48 +1,34 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Mar 2012 09:29:54 +0100
-Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
- IRQ for board setup
-In-Reply-To: <4F523419.3080100@ru.mvista.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-12-git-send-email-b-cousson@ti.com>
- <4F523419.3080100@ru.mvista.com>
-Message-ID: <4F547982.9040900@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 5 Mar 2012 09:33:13 +0100
+Subject: [PATCH] ARM: ux500: wake secondary cpu via resched
+Message-ID: <1330936393-14105-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+From: Jonas Aaberg <jonas.aberg@stericsson.com>
 
-On 3/3/2012 4:09 PM, Sergei Shtylyov wrote:
-> Hello.
->
-> On 02-03-2012 20:50, Benoit Cousson wrote:
->
->> Card detect IRQ from the TWL6030 used to be provided to the MMC
->
->> controller code using a statically allocated IRQ scheme:
->>
->> card_detect_irq = TWL6030_IRQ_BASE + MMCDETECT_INTR_OFFSET;
->>
->> This is no longer valid in a SPARSE_IRQ context since there is no more
->> pre-defined TWL6030_IRQ_BASE.
->>
->> Return the proper card detect IRQ value in the
->> twl6030_mmc_card_detect_config
->> that will be called from the MMC controller.
->>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Felipe Balbi<balbi@ti.com>
->> Cc: Tony Lindgren<tony@atomide.com>
->> Cc: Rajendra Nayak<rnayak@ti.com>
->> ---
->> drivers/mfd/twl6030-irq.c | 3 ++-
->
-> Subject talks about twl4030-irq.
+Wake secondary cpu via resched instead of
+"Unknown IPI message 0x1"
 
-Oops, good catch. thanks.
+Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+Reviewed-by: Rickard Andersson <rickard.andersson@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/platsmp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I guess that Tony's patch (mmc: omap_hsmmc: Simplify init for twl6030 
-MMC card detect) will supersede that one.
-
-Thanks,
-Benoit
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index d2058ef..eff5842 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -99,7 +99,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	 */
+ 	write_pen_release(cpu_logical_map(cpu));
+ 
+-	gic_raise_softirq(cpumask_of(cpu), 1);
++	smp_send_reschedule(cpu);
+ 
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
+-- 
+1.7.8
