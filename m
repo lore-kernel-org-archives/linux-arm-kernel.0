@@ -1,23 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 5 Mar 2012 13:16:23 -0700 (MST)
-Subject: [PATCH] ARM: OMAP2+: omap_device: call all suspend, resume
- callbacks when OMAP_DEVICE_NO_IDLE_ON_SUSPEND is set
-In-Reply-To: <877gyzoyyk.fsf@ti.com>
-References: <alpine.DEB.2.00.1203031314050.10611@utopia.booyaka.com>
- <877gyzoyyk.fsf@ti.com>
-Message-ID: <alpine.DEB.2.00.1203051312390.1430@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Mar 2012 20:16:26 +0000
+Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init funcs
+ to fdt
+In-Reply-To: <20120305191546.GK5050@titan.lakedaemon.net>
+References: <cover.1330709314.git.jason@lakedaemon.net>
+ <alpine.LFD.2.02.1203051344130.31242@xanadu.home>
+ <20120305191546.GK5050@titan.lakedaemon.net>
+Message-ID: <201203052016.26949.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Mar 2012, Kevin Hilman wrote:
+On Monday 05 March 2012, Jason wrote:
+> > 
+> > The clock frequency part being hardcoded to 200000 in the common .dtsi 
+> > file looks wrong.  The clock may differ, and it used to (and should) be 
+> > probed at run time, please see kirkwood_find_tclk().
+> 
+> So, should I EXPORT_SYMBOL_GPL(kirkwood_find_tclk); and have each driver
+> call it?
 
-> Tony, this fix is needed for v3.3.
+If the drivers want to use it, I think it has to be orion_find_tclk for
+drivers that are shared between multiple plat-orion platforms.
 
-Of course, I don't have any objection to this patch going into the v3.3-rc 
-kernels.  But given that some maintainers seem to be pushing back against 
-late -rc patches, this one could probably be delayed to 3.4 if required.  
-no_console_suspend is a debugging-only option and bugs involving it are 
-unlikely to affect most users.
+> One alternate idea I had was to have kirkwood-dreamplug.dts root hold
+> 
+> tclk: clock-frequency = <200000000>;
+> 
+> and then have the drivers ask for it.  afaict, tclk is constant per
+> board.
+> 
+> I'm fine with either way, but I'd rather have it in the dt.
 
+IMHO it's best to leave any such hacks out of the device tree for
+now, until we have the proper clk bindings in place for kirkwood,
+and then we can just use those.
 
-- Paul
+	Arnd
