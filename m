@@ -1,27 +1,30 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Mon, 5 Mar 2012 10:58:54 -0600
-Subject: [PATCH 20/20] ASoC: fsl: add imx-sgtl5000 machine driver
-In-Reply-To: <20120305131332.GM3224@opensource.wolfsonmicro.com>
-References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-21-git-send-email-shawn.guo@linaro.org>
- <20120304133818.GE3083@opensource.wolfsonmicro.com>
- <20120305080623.GD16232@S2101-09.ap.freescale.net>
- <20120305115612.GB3224@opensource.wolfsonmicro.com>
- <20120305130707.GF16232@S2101-09.ap.freescale.net>
- <20120305131332.GM3224@opensource.wolfsonmicro.com>
-Message-ID: <4F54F0CE.60706@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Mar 2012 17:02:37 +0000
+Subject: [GIT PULL 0/6] Tegra branches for 3.4
+In-Reply-To: <CAOesGMgahK_wkM1PGb55D1gEzbYfJVQKO_XSqMPbw5wTP09Fag@mail.gmail.com>
+References: <1330892042-32065-1-git-send-email-olof@lixom.net>
+ <CAOesGMgahK_wkM1PGb55D1gEzbYfJVQKO_XSqMPbw5wTP09Fag@mail.gmail.com>
+Message-ID: <201203051702.38188.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> The DMA and SSI drivers should have some relationship with each other if
-> they're the same piece of hardware.  
+On Sunday 04 March 2012, Olof Johansson wrote:
+> On Sun, Mar 4, 2012 at 12:13 PM, Olof Johansson <olof@lixom.net> wrote:
+> > Hi Arnd,
+> >
+> > Below are the 6 pull requests for Tegra platforms for 3.4. This is also
+> > likely my last merge request for tegra material (besides possibly some
+> > stray patches between now and the merge window), since I am handing off
+> > main maintainership to Stephen Warren for the next merge window.
+> >
+> > Each branch is documented in the tag (they are all tag pull requests), as
+> > well as in the emails below. Nothing too controversial.
+> 
+> Oh, I did forget to mention one added dependency: The soc-drivers
+> branch has a dependency on Grant's irq_domain branch -- not for
+> merging but for building.
 
-The DMA and SSI are completely separate blocks in the SOC.  On PowerPC,
-the P1022 SOC has an SSI and the standard FSL PPC DMA controller (we call
-it the Elo controller).  On i.MX, there is a completely different DMA
-controller (I'm not familiar with it), but the same exact SSI.
+Yes, I saw that in the tag description. I had included it in the tegra/soc-drivers
+branch, but not in the next/drivers branch, which I did now.
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+	Arnd
