@@ -1,68 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  5 Mar 2012 16:54:05 +0000
-Subject: [PATCH v2] ARM: perf: add PMU hotplug notifier
-Message-ID: <1330966445-4703-1-git-send-email-will.deacon@arm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 5 Mar 2012 08:55:22 -0800
+Subject: [alsa-devel] [PATCH 20/20] ASoC: fsl: add imx-sgtl5000 machine
+ driver
+In-Reply-To: <20120305131332.GM3224@opensource.wolfsonmicro.com>
+References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
+ <1330788001-10158-21-git-send-email-shawn.guo@linaro.org>
+ <20120304133818.GE3083@opensource.wolfsonmicro.com>
+ <20120305080623.GD16232@S2101-09.ap.freescale.net>
+ <20120305115612.GB3224@opensource.wolfsonmicro.com>
+ <20120305130707.GF16232@S2101-09.ap.freescale.net>
+ <20120305131332.GM3224@opensource.wolfsonmicro.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861C14@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+Mark Brown wrote at Monday, March 05, 2012 6:14 AM:
+> On Mon, Mar 05, 2012 at 09:07:09PM +0800, Shawn Guo wrote:
+> > On Mon, Mar 05, 2012 at 11:56:12AM +0000, Mark Brown wrote:
+> 
+> > > In that
+> > > case they should either both be using the same device or should have
+> > > some sort of parent/child/sibling relationship.
+> 
+> > Sorry, I do not understand it.  Can you elaborate it a little bit?
+> 
+> The DMA and SSI drivers should have some relationship with each other if
+> they're the same piece of hardware.  The machine driver certainly
+> shouldn't be creating either of them.
 
-When a CPU is taken out of reset, either cold booted or hotplugged in,
-some of its PMU registers can contain UNKNOWN values.
+Note that in Tegra's case, the DMA HW and the DAI (I2S/SPDIF) HW are
+entirely separate HW blocks and have entirely separate drivers. The DMA
+engine is generic and not audio specific, so has a node that instantiates
+just a standalone DMA device which has its own API. This doesn't
+instantiate any kind of ALSA PCM driver. It doesn't make sense to have a
+DT node to instantiate the ALSA PCM driver since the PCM driver is more
+of an API bridge to the real DMA HW, and certainly not an actual HW
+module. It doesn't make sense to have either the I2S or SPDIF DAI drivers
+instantiate the PCM driver, since they both share the same one. Hence,
+the machine driver instantiates the PCM driver.
 
-This patch adds a hotplug notifier to ARM core perf code so that upon
-CPU restart the PMU unit is reset and becomes ready to use again.
+Perhaps our regular DMA module driver should expose both its custom
+interface for other clients, and register an ASoC PCM driver? That way
+we could remove the PCM device registration from the ASoC machine
+drivers.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+> > > Either way the machine
+> > > driver really shouldn't be involved in instantiating things, perhaps
+> > > arch/arm but not the audio machine driver.
+> 
+> > So you are saying neither what tegra_wm8903 and tegra_alc5632 are doing
+> > (registering pcm device in machine driver) nor what imx-ssi is doing
+> > (registering pcm device in DAI driver) is correct?  Can you please make
+> > it clear what's the right thing to do?
+> 
+> The above.
 
-v2: Use CPU_STARTING instead of CPU_UP_PREPARE, since the latter does
-    not run on the CPU coming up.
-
- arch/arm/kernel/perf_event.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index ab59c3b..5300537 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -680,6 +680,28 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
- }
- 
- /*
-+ * PMU hardware loses all context when a CPU goes offline.
-+ * When a CPU is hotplugged back in, since some hardware registers are
-+ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-+ * junk values out of them.
-+ */
-+static int __cpuinit pmu_cpu_notify(struct notifier_block *b,
-+					unsigned long action, void *hcpu)
-+{
-+	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
-+		return NOTIFY_DONE;
-+
-+	if (cpu_pmu && cpu_pmu->reset)
-+		cpu_pmu->reset(NULL);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block __cpuinitdata pmu_cpu_notifier = {
-+	.notifier_call = pmu_cpu_notify,
-+};
-+
-+/*
-  * CPU PMU identification and registration.
-  */
- static int __init
-@@ -733,6 +755,7 @@ init_hw_perf_events(void)
- 		pr_info("enabled with %s PMU driver, %d counters available\n",
- 			cpu_pmu->name, cpu_pmu->num_events);
- 		cpu_pmu_init(cpu_pmu);
-+		register_cpu_notifier(&pmu_cpu_notifier);
- 		armpmu_register(cpu_pmu, "cpu", PERF_TYPE_RAW);
- 	} else {
- 		pr_info("no hardware support available\n");
 -- 
-1.7.4.1
+nvpublic
