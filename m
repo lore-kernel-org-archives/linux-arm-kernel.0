@@ -1,53 +1,62 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 5 Mar 2012 17:35:53 -0600
-Subject: [PATCH 6/9] dmaengine: consolidate tx_status functions
-In-Reply-To: <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
-References: <20120305201411.GA17791@n2100.arm.linux.org.uk>
- <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF555AF@AUSP01VMBX24.collaborationhost.net>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 5 Mar 2012 18:38:58 -0500
+Subject: [PATCH] arm: fix unresolved restart build failure in
+ plat-iop/restart.c
+In-Reply-To: <1327288578-30852-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1327288578-30852-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CAP=VYLrEvqdL+S3a_XVQoHbAGJXS_sfQzxLs52YcresmGKOOXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 05, 2012 1:17 PM, Russell King wrote:
+On Sun, Jan 22, 2012 at 10:16 PM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
+> Upstream commit bec92b1ec67b4998b6a3bad7c2f03c846cbac71e
 >
-> Now that we have the completed cookie in the dma_chan structure, we
-> can consolidate the tx_status functions by providing a function to set
-> the txstate structure and returning the DMA status.  We also provide
-> a separate helper to set the residue for cookies which are still in
-> progress.
+> ?"ARM: restart: iop3xx: use new restart hook"
 >
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> created this file, but it needs asm/system.h since upstream
+> commit e879c862fb81b986095ae7a4676b2281c2f97957
+>
+> ?"ARM: restart: only perform setup for restart when soft-restarting"
+>
+> added the soft_restart() entry. ?Add in that header to resolve
+> the below build failure:
 
-<snip>
+Just checking that this didn't fall through the cracks, as I don't
+see it in linux-next yet.  I just re-tested on today's linux-next and
+it still fixes these defconfig build failures:
 
-> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
-> index 47e0997..244a2c5 100644
-> --- a/drivers/dma/dmaengine.h
-> +++ b/drivers/dma/dmaengine.h
-> @@ -45,4 +45,35 @@ static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
->  	tx->cookie = 0;
->  }
->  
-> +/**
-> + * dma_cookie_status - report cookie status
-> + * @chan: dma channel
-> + * @cookie: cookie we are interested in
-> + * @state: dma_tx_state structure to return last/used cookies
-> + *
-> + * Report the status of the cookie, filling in the state structure if
-> + * non-NULL.  No locking is required.
-> + */
-> +static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
-> +	dma_cookie_t cookie, struct dma_tx_state *state)
-> +{
-> +	dma_cookie_t used, complete;
-> +
-> +	used = chan->cookie;
-> +	complete = chan->complete;
+http://kisskb.ellerman.id.au/kisskb/target/1257/
 
-Is this supposed to be:
+Thanks,
+Paul.
+--
 
-	complete = chan->completed_cookie;
-
-Regards,
-Hartley
+>
+> ?CC ? ? ?arch/arm/plat-iop/restart.o
+> ?arch/arm/plat-iop/restart.c: In function 'iop3xx_restart':
+> ?arch/arm/plat-iop/restart.c:18: error: implicit declaration of function 'soft_restart'
+> ?make[3]: *** [arch/arm/plat-iop/restart.o] Error 1
+>
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>
+> diff --git a/arch/arm/plat-iop/restart.c b/arch/arm/plat-iop/restart.c
+> index 6a85a0c..728b5c7 100644
+> --- a/arch/arm/plat-iop/restart.c
+> +++ b/arch/arm/plat-iop/restart.c
+> @@ -7,6 +7,7 @@
+> ?* it under the terms of the GNU General Public License version 2 as
+> ?* published by the Free Software Foundation.
+> ?*/
+> +#include <asm/system.h>
+> ?#include <asm/hardware/iop3xx.h>
+> ?#include <mach/hardware.h>
+>
+> --
+> 1.7.7.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
