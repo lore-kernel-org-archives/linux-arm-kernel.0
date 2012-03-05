@@ -1,31 +1,66 @@
-From: jason@lakedaemon.net (Jason)
-Date: Mon, 5 Mar 2012 17:25:36 -0500
-Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init
- funcs to fdt
-In-Reply-To: <20120305214126.GA18513@lunn.ch>
-References: <20120305214126.GA18513@lunn.ch>
-Message-ID: <20120305222536.GP5050@titan.lakedaemon.net>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 5 Mar 2012 23:33:32 +0100
+Subject: [PATCH v2 0/6] gpio/omap: Cleanup and adaptation to Device Tree
+In-Reply-To: <1330122091-28113-1-git-send-email-b-cousson@ti.com>
+References: <1330122091-28113-1-git-send-email-b-cousson@ti.com>
+Message-ID: <4F553F3C.4030909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 10:41:26PM +0100, Andrew Lunn wrote:
-> > > If the drivers want to use it, I think it has to be orion_find_tclk for
-> > > drivers that are shared between multiple plat-orion platforms.
-> > 
-> > That's pretty much all of them  :-)
-> > 
-> > I'll rename it and move it to plat-orion/common.c.  This'll be fun.
+Hi Grant,
 
-This is old, see Nico's reply and my response.
+Do you have any comment on this latest update?
 
-> We have overlapping work going on. My adoption of Mike's generic clk
-> framework overlaps a lot with your DT tclk problems. If you introduce
-> orion_find_tclk() into all the drivers, we are probably going to rip
-> it all out again once my patches go in. Plus we are going to have
-> horrible merging conflicts between your code and my code
+I've just seen your that your gpio/next includes irqdomain/next, so I 
+guess that I can base my pull request on it directly.
 
-I'd love to deconflict but I haven't seen your RFC patches, yet.
+Thanks,
+Benoit
 
-thx,
-
-Jason.
+On 2/24/2012 11:21 PM, Benoit Cousson wrote:
+> Hi Grant,
+>
+> Here are a couple of GPIO cleanup + the DT adaptation patches.
+> This update (compared to v1 [1]) is adding an extra fix for SPARSE_IRQ support
+> and add the second cell in the binding for GPIO IRQ type that was missing
+> previously whereas the driver does support it.
+>
+> This series is based on 3.3-rc4 + for_3.4/dt_base branch to get
+> the needed cleanup and fixes for OMAP.
+>
+> The interrupt controller support is using irq_domain_add_legacy for
+> the moment and will be updated next to use irqchip irq_domain.
+>
+> It requires the irq_domain generalization and refinement series
+> available at:
+>    git://git.secretlab.ca/git/linux-2.6 irqdomain/next
+>
+> It requires as well Tarun's GPIO cleanup series available at:
+>    git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_cleanup_fixes_v9
+>
+> This series is available here for reference:
+>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_gpio
+>
+> Regards,
+> Benoit
+>
+> [1] http://www.spinics.net/lists/linux-omap/msg64694.html
+>
+>
+> Benoit Cousson (6):
+>    gpio/omap: Remove bank->id information and misc cleanup
+>    gpio/omap: Use devm_ API and add request_mem_region
+>    gpio/omap: Add DT support to GPIO driver
+>    gpio/omap: Fix IRQ handling for SPARSE_IRQ
+>    arm/dts: OMAP4: Add gpio nodes
+>    arm/dts: OMAP3: Add gpio nodes
+>
+>   .../devicetree/bindings/gpio/gpio-omap.txt         |   36 ++++
+>   arch/arm/boot/dts/omap3.dtsi                       |   54 +++++
+>   arch/arm/boot/dts/omap4.dtsi                       |   54 +++++
+>   arch/arm/mach-omap2/gpio.c                         |    8 +-
+>   arch/arm/plat-omap/include/plat/gpio.h             |   22 +--
+>   drivers/gpio/gpio-omap.c                           |  208 ++++++++++++++------
+>   6 files changed, 304 insertions(+), 78 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>
