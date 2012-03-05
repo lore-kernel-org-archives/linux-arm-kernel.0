@@ -1,42 +1,55 @@
-From: jason@lakedaemon.net (Jason)
-Date: Mon, 5 Mar 2012 08:32:42 -0500
-Subject: [GIT PULL v3] ARM: kirkwood: fdt: convert kirkwood init funcs
- to fdt
-In-Reply-To: <20120305034113.GB5050@titan.lakedaemon.net>
-References: <20120305034113.GB5050@titan.lakedaemon.net>
-Message-ID: <20120305133242.GD5050@titan.lakedaemon.net>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Mon, 5 Mar 2012 14:58:38 +0100
+Subject: [GIT PULL] ARM: OMAP: IRQ domain support for INTC
+In-Reply-To: <4F4E4F1D.7020109@ti.com>
+References: <4F4BB0FB.3040308@ti.com> <20120228234837.GH18901@atomide.com>
+ <4F4E4F1D.7020109@ti.com>
+Message-ID: <20120305135838.GA2108@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 04, 2012 at 10:41:13PM -0500, Jason Cooper wrote:
-> 	rtc-mv: more accurate compatible strings
-> 	orion-wdt: more accurate compatible strings
-...
->  arch/arm/boot/dts/kirkwood-dreamplug.dts |   34 +++++++++++++++
->  arch/arm/boot/dts/kirkwood.dtsi          |   12 +++++
+On Wed, Feb 29, 2012 at 05:15:25PM +0100, Cousson, Benoit wrote:
+> On 2/29/2012 12:48 AM, Tony Lindgren wrote:
+> > * Cousson, Benoit<b-cousson@ti.com>  [120227 08:04]:
+> >> Hi Tony
+> >>
+> >> This series is based on the lo/dt + the irqdomain/next branch merged on top of it.
+> >>
+> >> Grant confirmed that the irqdomain/next is a stable branch and thus can be referenced for dependency.
+> >>
+> >> Please note that I will need that branch to base all the remaining OMAP DT stuff.
+> >>
+> >> Thanks,
+> >> Benoit
+> >>
+> >>
+> >> The following changes since commit 1f52299ec000e2161635b263d81ab92ea7f1f0a7:
+> >>    Benoit Cousson (1):
+> >>          Merge branch 'irqdomain/next' of git://git.secretlab.ca/git/linux-2.6 into for_3.4/dt_irq_domain2
+> >>
+> >> are available in the git repository at:
+> >>
+> >>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_irq_domain
+> >>
+> >> Benoit Cousson (3):
+> >>        ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
+> >>        arm/dts: OMAP3: Add interrupt-controller bindings for INTC
+> >>        ARM: OMAP2+: board-generic: Use of_irq_init API
+> >>
+> >>   .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++
+> >>   arch/arm/boot/dts/omap3.dtsi                       |    6 +-
+> >>   arch/arm/mach-omap2/board-generic.c                |   30 +++++-----
+> >>   arch/arm/mach-omap2/common.h                       |   12 ++++
+> >>   arch/arm/mach-omap2/irq.c                          |   60 ++++++++++++++++---
+> >>   5 files changed, 109 insertions(+), 26 deletions(-)
+> >>   create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
+> > 
+> > Hmm, looks like this now produces the following warning at least on omap3:
+> 
+> Yes, Rajendra has just reported that issue with linux-next.
 
-This is still bugging me.  If, say, orion_wdt.c is common to all of
-plat-orion/ shouldn't it be in an 'orion.dtsi'?  With compatible =
-"marvell,orion-wdt"?  Then, if hypothetically, kirkwood used the same
-driver but had a small tweak, then kirkwood.dtsi would have
-"marvell,kirkwood-wdt"?  Which would let the driver know that it needed
-to apply the tweak because it was kirkwood.
+I'm getting the same warning and initialisation failure with 3.3-rc6 on
+overo. Are these fixes queued up for 3.3 (and not just 3.4) somewhere?
 
-In this scenario, since kirkwood and dreamplug currently need no
-modifications to the default wdt driver, they would just inherit
-orion.dtsi's "marvell,orion-wdt", right?
-
-On the driver side, since it currently has no subarch or board specific
-tweaks, then it is *only* good for the generic case,
-"marvell,orion-wdt", and thus should only match it for now.
-
-If the above is correct, then I should create orion.dtsi, which is
-included by kirkwood.dtsi.  orion.dtsi should hold "marvell,orion-wdt"
-and "marvell,orion-rtc".  The corresponding drivers should only match
-those generic strings, since there are no specific tweaks.
-
-I hate to keep kicking this horse, but I want to make sure I grok it.
-
-thx,
-
-Jason.
+Thanks,
+Johan
