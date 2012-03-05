@@ -1,24 +1,30 @@
-From: Joerg.Roedel@amd.com (Joerg Roedel)
-Date: Mon, 5 Mar 2012 15:39:58 +0100
-Subject: [PATCH] ARM: OMAP: fix iommu, not mailbox
-In-Reply-To: <1330855271-28820-1-git-send-email-ohad@wizery.com>
-References: <1330855271-28820-1-git-send-email-ohad@wizery.com>
-Message-ID: <20120305143957.GK10684@amd.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Mar 2012 14:41:26 +0000
+Subject: [PATCH v2 3/7] i2c: pxa: add OF support
+In-Reply-To: <1330950111-30797-4-git-send-email-haojian.zhuang@marvell.com>
+References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
+ <1330950111-30797-4-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <201203051441.26774.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 04, 2012 at 12:01:11PM +0200, Ohad Ben-Cohen wrote:
-> For some weird (freudian?) reason, commit 435792d "ARM: OMAP: make
-> iommu subsys_initcall to fix builtin omap3isp" unintentionally changed
-> the mailbox's initcall instead of the iommu's.
+On Monday 05 March 2012, Haojian Zhuang wrote:
+> Append these properties in below.
+> mrvl,i2c-polling
+> mrvl,i2c-fast-mode
 > 
-> Fix that.
+> Still keep slave, slave_addr and class in platform data.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-Applied, thanks.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
--- 
-AMD Operating System Research Center
+Just one tiny detail:
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+> +       *i2c_types = (u32)(of_id->data);
+
+By convention, please use (unsigned long) as the cast from pointer to an
+integer type. While this doesn't make any difference on 32 bit systems,
+it's better to always write code that is 64-bit clean.
+
+	Arnd
