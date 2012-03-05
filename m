@@ -1,91 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 5 Mar 2012 09:48:23 +0100
-Subject: [PATCH v5 4/4] clk: basic clock hardware types
-In-Reply-To: <CAJOA=zNWN6L+-YEkNKoQnjnrrswNpCBmtnhKBm04HekWP46i5w@mail.gmail.com>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-5-git-send-email-mturquette@linaro.org>
- <20120304174229.GD11546@lunn.ch>
- <CAJOA=zNWN6L+-YEkNKoQnjnrrswNpCBmtnhKBm04HekWP46i5w@mail.gmail.com>
-Message-ID: <20120305084823.GD24858@lunn.ch>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 5 Mar 2012 09:58:37 +0100
+Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
+ IRQ for board setup
+In-Reply-To: <4F547721.4010107@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-12-git-send-email-b-cousson@ti.com>
+ <20120302181522.GC13967@legolas.emea.dhcp.ti.com> <4F547721.4010107@ti.com>
+Message-ID: <4F54803D.3010102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 04, 2012 at 04:30:08PM -0800, Turquette, Mike wrote:
-> On Sun, Mar 4, 2012 at 9:42 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> > On Sat, Mar 03, 2012 at 12:29:01AM -0800, Mike Turquette wrote:
-> >> Many platforms support simple gateable clocks, fixed-rate clocks,
-> >> adjustable divider clocks and multi-parent multiplexer clocks.
-> >>
-> >> This patch introduces basic clock types for the above-mentioned hardware
-> >> which share some common characteristics.
-> >
-> > Hi Mike
-> >
-> > These basic clocks don't allow the use of prepare/unprepare, from the
-> > side of the clock provider. I think i need this.
-> 
-> This is an interesting point and might help us nail down exactly what
-> we expect from clk_prepare/clk_unprepare.
-> 
-> >
-> > The Orion Kirkwood SoC has clock gating for most of its on chip
-> > peripherals, which the other older Orion devices don't have. The SATA
-> > and PCIe also allows the PHY to be shut down, again which older Orion
-> > devices don't have. The current code links the clock and the PHY
-> > together, shutting both down are the same time. So i would like to
-> > perform the PHY shutdown in the unprepare() function of the clk
-> > driver.
-> 
-> Do you feel it is The Right Thing to enable/disable the phy from
-> clk_prepare/clk_unprepare?  
+On 3/5/2012 9:19 AM, Rajendra Nayak wrote:
+> On Friday 02 March 2012 11:45 PM, Felipe Balbi wrote:
+>> Hi,
+>>
+>> On Fri, Mar 02, 2012 at 05:50:23PM +0100, Benoit Cousson wrote:
+>>> Card detect IRQ from the TWL6030 used to be provided to the MMC
+>>> controller code using a statically allocated IRQ scheme:
+>>>
+>>> card_detect_irq = TWL6030_IRQ_BASE + MMCDETECT_INTR_OFFSET;
+>>>
+>>> This is no longer valid in a SPARSE_IRQ context since there is no more
+>>> pre-defined TWL6030_IRQ_BASE.
+>>>
+>>> Return the proper card detect IRQ value in the
+>>> twl6030_mmc_card_detect_config
+>>> that will be called from the MMC controller.
+>>>
+>>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>>> Cc: Felipe Balbi<balbi@ti.com>
+>>> Cc: Tony Lindgren<tony@atomide.com>
+>>> Cc: Rajendra Nayak<rnayak@ti.com>
+>>
+>> Reviewed-by: Felipe Balbi<balbi@ti.com>
+>>
+>>> ---
+>>> drivers/mfd/twl6030-irq.c | 3 ++-
+>>> 1 files changed, 2 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
+>>> index a1c7183..4a63de2 100644
+>>> --- a/drivers/mfd/twl6030-irq.c
+>>> +++ b/drivers/mfd/twl6030-irq.c
+>>> @@ -308,7 +308,8 @@ int twl6030_mmc_card_detect_config(void)
+>>> ret);
+>>> return ret;
+>>> }
+>>> - return 0;
+>>> +
+>>> + return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
+>>> }
+>>> EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
+>>
+>> At some point this twl6030_mmc_card_detect_config() needs to vanish in
+>> favor of a better mechanism. Maybe passing the GPIO number an requiring
+>> the driver to request the GPIO, set its direction and use it as IRQ
+>> line.
+>>
+>> the only problem would arise if we end up hooking the Card Detect pin to
+>> a real IRQ line, but then we can use a flag to differentiate.
+>
+> Shouldn't this be hidden from the driver completely if the card detect
+> pin is a GPIO or connected to a real IRQ line? And the board/DT handle
+> this instead of the driver knowing when to do a gpio_to_irq()?
 
-Humm, not sure yet. I don't know all the different possibilities,
-which is why i tried to describe my use case, rather than just assume
-i need prepare/unprepare.
+It work fine for a pure GPIO, but in this case, this is an IRQ handled 
+by twl6030. So I'm not sure we have any API for the non-DT case.
 
-I also realized i did not explain my use case properly. 
+DT will clearly help getting rid of such hacks.
 
-At boot, uboot is turning on various clocks and SATA/PCIe PHYs etc, in
-order to get the device booted. Linux takes over, and the
-Orion/kirkwood board files, ask the kirkwood or generic Orion code to
-create platform_data structures for the different devices that the
-board uses. The kirkwood code keeps a bitmap of devices for which it
-creates platform data for which there is a gated clock. Then in a
-lateinit call, it turns on clocks which are needed, and also turns off
-clocks which are no longer needed, because the board did not ask for a
-driver binding for that device. If it turns off a SATA or PCIe clock,
-it also turns off the PHY associated with it.
-
-So we are talking about turning off hardware for which there is no
-driver. This seems to exclude pm_runtime_get(_sync), which is about
-hardware with drivers.
-
-We touched on this subject a couple of months ago, at least with
-respect to clocks. You said that is what the flag CLK_IGNORE_UNUSED
-will be used for. In a lateinit call, you plan to iterate over all
-clocks and turn off any which don't have CLK_IGNORE_UNUSED and have
-not been enabled. I assume you will call both disable() and
-unprepare(), and if i've can put code into the unprepare to turn the
-PHY off, all is good.
-
-> > Is allowing to pass prepare/unprepare functions to basic clocks
-> > something you want to support? If i prepare a patch would you consider
-> > it?
-> 
-> My original instinct was "no".  The simple gate clock was always
-> supposed to be "simple" and if you need more than it provides then it
-> might be best for your platform to implement a specific clock type.
-> Especially since the purpose of clk_prepare is still up in the air.
-
-I think i can wrap your simple gate clock, to make my "complex" gate
-clock. What would help is if you would EXPORT_SYMBOL_GPL
-clk_gate_enable() and clk_gate_disable(), since they do exactly what i
-want. I can then build my own clk_ops structure, with my own
-unprepare() function. I would probably use DEFINE_CLK_GATE as is, and
-then at run time, before calling __clk_init() overwrite the .ops with
-my own version.
-
-However, if others have the need for {un}prepare(), it would be good
-to have a generic solution.
-
-   Andrew
+Regards,
+Benoit
