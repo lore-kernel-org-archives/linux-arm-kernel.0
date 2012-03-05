@@ -1,98 +1,23 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Mar 2012 14:14:46 -0500 (EST)
-Subject: [PATCH v3 11/30] ARM: orion5x: clean-up mach/io.h
-In-Reply-To: <1330658022-14559-12-git-send-email-robherring2@gmail.com>
-References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
- <1330658022-14559-12-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1203051414240.31242@xanadu.home>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 5 Mar 2012 13:16:23 -0700 (MST)
+Subject: [PATCH] ARM: OMAP2+: omap_device: call all suspend, resume
+ callbacks when OMAP_DEVICE_NO_IDLE_ON_SUSPEND is set
+In-Reply-To: <877gyzoyyk.fsf@ti.com>
+References: <alpine.DEB.2.00.1203031314050.10611@utopia.booyaka.com>
+ <877gyzoyyk.fsf@ti.com>
+Message-ID: <alpine.DEB.2.00.1203051312390.1430@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Mar 2012, Rob Herring wrote:
+On Mon, 5 Mar 2012, Kevin Hilman wrote:
 
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Move orion5x specific mach/io.h parts into common.h.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Lennert Buytenhek <kernel@wantstofly.org>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Tony, this fix is needed for v3.3.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Of course, I don't have any objection to this patch going into the v3.3-rc 
+kernels.  But given that some maintainers seem to be pushing back against 
+late -rc patches, this one could probably be delayed to 3.4 if required.  
+no_console_suspend is a debugging-only option and bugs involving it are 
+unlikely to affect most users.
 
 
-
-> ---
->  arch/arm/mach-orion5x/common.h          |    9 +++++++++
->  arch/arm/mach-orion5x/include/mach/io.h |   12 ------------
->  arch/arm/mach-orion5x/pci.c             |    1 +
->  arch/arm/mach-orion5x/tsx09-common.c    |    1 +
->  4 files changed, 11 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
-> index d2513ac..2e6454c 100644
-> --- a/arch/arm/mach-orion5x/common.h
-> +++ b/arch/arm/mach-orion5x/common.h
-> @@ -57,5 +57,14 @@ struct meminfo;
->  struct tag;
->  extern void __init tag_fixup_mem32(struct tag *, char **, struct meminfo *);
->  
-> +/*****************************************************************************
-> + * Helpers to access Orion registers
-> + ****************************************************************************/
-> +/*
-> + * These are not preempt-safe.  Locks, if needed, must be taken
-> + * care of by the caller.
-> + */
-> +#define orion5x_setbits(r, mask)	writel(readl(r) | (mask), (r))
-> +#define orion5x_clrbits(r, mask)	writel(readl(r) & ~(mask), (r))
->  
->  #endif
-> diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
-> index e9d9afd..444136d 100644
-> --- a/arch/arm/mach-orion5x/include/mach/io.h
-> +++ b/arch/arm/mach-orion5x/include/mach/io.h
-> @@ -18,16 +18,4 @@
->  #define __io(a)			__typesafe_io(a)
->  #define __mem_pci(a)		(a)
->  
-> -
-> -/*****************************************************************************
-> - * Helpers to access Orion registers
-> - ****************************************************************************/
-> -/*
-> - * These are not preempt-safe.  Locks, if needed, must be taken
-> - * care of by the caller.
-> - */
-> -#define orion5x_setbits(r, mask)	writel(readl(r) | (mask), (r))
-> -#define orion5x_clrbits(r, mask)	writel(readl(r) & ~(mask), (r))
-> -
-> -
->  #endif
-> diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
-> index 09a045f..a9d2151 100644
-> --- a/arch/arm/mach-orion5x/pci.c
-> +++ b/arch/arm/mach-orion5x/pci.c
-> @@ -19,6 +19,7 @@
->  #include <asm/mach/pci.h>
->  #include <plat/pcie.h>
->  #include <plat/addr-map.h>
-> +#include <mach/orion5x.h>
->  #include "common.h"
->  
->  /*****************************************************************************
-> diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
-> index c9abb8f..7189827 100644
-> --- a/arch/arm/mach-orion5x/tsx09-common.c
-> +++ b/arch/arm/mach-orion5x/tsx09-common.c
-> @@ -15,6 +15,7 @@
->  #include <linux/mv643xx_eth.h>
->  #include <linux/timex.h>
->  #include <linux/serial_reg.h>
-> +#include <mach/orion5x.h>
->  #include "tsx09-common.h"
->  #include "common.h"
->  
-> -- 
-> 1.7.5.4
-> 
+- Paul
