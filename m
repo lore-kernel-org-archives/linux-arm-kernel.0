@@ -1,70 +1,50 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 04 Mar 2012 21:50:22 -0600
-Subject: [PULL] generic irq chip and pl061 irqdomain support
-In-Reply-To: <4F3ADFE7.4090409@gmail.com>
-References: <4F3ADFE7.4090409@gmail.com>
-Message-ID: <4F5437FE.2000306@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 4 Mar 2012 20:21:07 -0800
+Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
+ kernel_noload
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE861683@HQMAIL01.nvidia.com>
+References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BE861683@HQMAIL01.nvidia.com>
+Message-ID: <20120305042107.GA31142@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
-
-On 02/14/2012 04:27 PM, Rob Herring wrote:
-> Grant,
+On Thu, Mar 01, 2012 at 09:01:04AM -0800, Stephen Warren wrote:
+> Stephen Warren wrote at Tuesday, February 28, 2012 5:03 PM:
+> > uImage files typically encode a single absolute load and entry address.
+> > This is inconvenient when attempting to share that uImage across multiple
+> > SoCs with different physical RAM addresses. Recent versions of mkimage
+> > implement a "kernel_noload" image type which encodes no absolute load
+> > address, and a relative entry address. This works well for uImage-wrapped
+> > ARM zImages, since they are relocatable.
+> > 
+> > This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
+> > "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
 > 
-> Please pull. This is based on your current branch which you have said
-> you plan to rebase, so feel free to rebase these as you need to. This
-> has been tested on highbank and i.MX5.
+> So Russell, are you NAKing this patch then?
 > 
+> If so, I guess I'll just go and add more cruft to my copy-a-kernel-to-
+> an-sd-card script. Which is a pity since every other person will have
+> to do the same, but oh well.
 
-Ping.
+I'd say send them on to his patch tracker and he can decide from there?
 
-I've rebased onto your current tree. Updated pull request:
+Feel free to add:
 
-The following changes since commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e:
+Acked-by: Olof Johansson <olof@lixom.net>
 
-  mfd: twl-core: Add IRQ_DOMAIN dependency (2012-02-26 16:48:06 -0700)
+Some people seem to have a bone to pick with u-boot, and apparantly want us to
+make it harder to use the kernel with the firmware that is already out there.
+I personally disagree, but as you said, I'll just add my own wrapper script if
+it comes to it. So will everyone else though, and that just seems wasteful.
 
-are available in the git repository at:
-  git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
+There hasn't been much churn lately around boot images (unlike the situation
+back 5 years ago in the thread that was referenced earlier in this thread, as
+far as I can tell).
 
-Rob Herring (3):
-      ARM: kconfig: always select IRQ_DOMAIN
-      irq: add irq_domain support to generic-chip
-      gpio: pl061: enable interrupts with DT style binding
+So while the churn in this case is compensated by added convenience
+and productivity for me personally, it's up to Russell to decide if it
+goes in.
 
- .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
- arch/arm/Kconfig                                   |    2 +-
- arch/arm/common/Kconfig                            |    2 -
- drivers/gpio/gpio-pl061.c                          |   48 ++++---
- include/linux/irq.h                                |   15 ++
- kernel/irq/generic-chip.c                          |  152
-+++++++++++++++++---
- 6 files changed, 186 insertions(+), 48 deletions(-)
 
-Rob
-
-> 
-> The following changes since commit 98ecf5260207e45ad587a5dc16c39f5ede467a45:
-> 
->   irq_domain/microblaze: Convert microblaze to use irq_domains
-> (2012-02-05 23:02:26 -0700)
-> 
-> are available in the git repository at:
->   git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
-> 
-> Rob Herring (3):
->       ARM: kconfig: always select IRQ_DOMAIN
->       irq: add irq_domain support to generic-chip
->       gpio: pl061: enable interrupts with DT style binding
-> 
->  .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
->  arch/arm/Kconfig                                   |    2 +-
->  arch/arm/common/Kconfig                            |    2 -
->  drivers/gpio/gpio-pl061.c                          |   48 ++++---
->  include/linux/irq.h                                |   15 ++
->  kernel/irq/generic-chip.c                          |  152
-> +++++++++++++++++---
->  6 files changed, 186 insertions(+), 48 deletions(-)
-> 
-> Rob
+-Olof
