@@ -1,65 +1,28 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 5 Mar 2012 22:03:49 +0800
-Subject: [PATCH v2 1/7] serial: pxa: add OF support
-In-Reply-To: <201203051255.37311.arnd@arndb.de>
-References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
- <1330950111-30797-2-git-send-email-haojian.zhuang@marvell.com>
- <201203051255.37311.arnd@arndb.de>
-Message-ID: <CAN1soZwHr50+F7-hO=U24U=zrv9C7gxnhzSYgrziaeMYuqRVXA@mail.gmail.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Mon, 5 Mar 2012 15:06:19 +0100
+Subject: [PATCH] omap3_beagle: Init only uart3 used for console
+In-Reply-To: <1330945952-14714-1-git-send-email-govindraj.raja@ti.com>
+References: <1330945952-14714-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <12976EFB-912D-44E2-825C-63034F117635@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2012 at 8:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 05 March 2012, Haojian Zhuang wrote:
->
->>
->> +#define PXA_NAME_LEN ? ? ? ? 8
->> +
->> ?struct uart_pxa_port {
->> ? ? ? struct uart_port ? ? ? ?port;
->> ? ? ? unsigned char ? ? ? ? ? ier;
->
-> Why didn't you just add a field here with that length?
->
->> @@ -781,6 +784,39 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
->> ?};
->> ?#endif
->>
->> +static struct of_device_id serial_pxa_dt_ids[] = {
->> + ? ? { .compatible = "mrvl,pxa-uart", },
->> + ? ? { .compatible = "mrvl,mmp-uart", },
->> + ? ? {}
->> +};
->> +MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
->
-> This one should have an #ifdef CONFIG_OF
->
->> +#ifdef CONFIG_OF
->> +static int serial_pxa_probe_dt(struct platform_device *pdev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct uart_pxa_port *sport)
->> +{
->
-> While this one does not need it: it will already compile to nothing
-> if you check the error value correctly.
->
->> + ? ? sport->name = kzalloc(PXA_NAME_LEN, GFP_KERNEL);
->> + ? ? if (!sport->name) {
->> + ? ? ? ? ? ? ret = -ENOMEM;
->> + ? ? ? ? ? ? goto err_clk;
->> ? ? ? }
->
-> No need for this allocation if you put the name into uart_pxa_port
-> as a member instead of a pointer.
->
->> + ? ? ? ? ? ? .of_match_table = serial_pxa_dt_ids,
->> ? ? ? },
->> ?};
->
-> ? ? ? ? ? ? ? ?.of_match_table = of_match_ptr(serial_pxa_dt_ids),
->
-> ? ? ? ?Arnd
->
-Thanks. I'll update it.
 
-Best Regards
-Haojian
+Op 5 mrt. 2012, om 12:12 heeft Govindraj.R het volgende geschreven:
+
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+> 
+> On beagle some of uart mux lines are used for other
+> purpose so init only uart3.
+> 
+> Uart2 rx line clashes with gpio_147 used for usb ehci
+> phy reset. Initializing uart2 pad_mux lines can break
+> ehci module on beagle xm.
+> (gpio_147 is available on uart2_rx in mode4 reference 
+> mux34xx.c -> uart2_rx.gpio_147)
+
+That's only on xM revision C, right?
+
+regards,
+
+Koen
