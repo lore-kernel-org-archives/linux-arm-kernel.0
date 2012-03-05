@@ -1,52 +1,38 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon,  5 Mar 2012 20:21:46 +0800
-Subject: [PATCH v2 2/7] rtc: sa1100: add OF support
+Date: Mon,  5 Mar 2012 20:21:48 +0800
+Subject: [PATCH v2 4/7] ARM: mmp: enable rtc clk in pxa168
 In-Reply-To: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1330950111-30797-3-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1330950111-30797-5-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OF support on rtc-sa1100.
+Enable clk of rtc-sa1100 device in pxa168.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- drivers/rtc/rtc-sa1100.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/pxa168.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
-index 962510c..e443b78 100644
---- a/drivers/rtc/rtc-sa1100.c
-+++ b/drivers/rtc/rtc-sa1100.c
-@@ -30,6 +30,7 @@
- #include <linux/interrupt.h>
- #include <linux/slab.h>
- #include <linux/string.h>
-+#include <linux/of.h>
- #include <linux/pm.h>
- #include <linux/bitops.h>
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index 9f61256..aa62d0c 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -65,6 +65,7 @@ static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
+ static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
+ static APBC_CLK(gpio, PXA168_GPIO, 0, 13000000);
+ static APBC_CLK(keypad, PXA168_KPC, 0, 32000);
++static APBC_CLK(rtc, PXA168_RTC, 8, 32768);
  
-@@ -349,6 +350,13 @@ static const struct dev_pm_ops sa1100_rtc_pm_ops = {
- };
- #endif
- 
-+static struct of_device_id sa1100_rtc_dt_ids[] = {
-+	{ .compatible = "mrvl,sa1100-rtc", },
-+	{ .compatible = "mrvl,mmp-rtc", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, sa1100_rtc_dt_ids);
-+
- static struct platform_driver sa1100_rtc_driver = {
- 	.probe		= sa1100_rtc_probe,
- 	.remove		= sa1100_rtc_remove,
-@@ -357,6 +365,7 @@ static struct platform_driver sa1100_rtc_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &sa1100_rtc_pm_ops,
- #endif
-+		.of_match_table = sa1100_rtc_dt_ids,
- 	},
+ static APMU_CLK(nand, NAND, 0x19b, 156000000);
+ static APMU_CLK(lcd, LCD, 0x7f, 312000000);
+@@ -93,6 +94,7 @@ static struct clk_lookup pxa168_clkregs[] = {
+ 	INIT_CLKREG(&clk_keypad, "pxa27x-keypad", NULL),
+ 	INIT_CLKREG(&clk_eth, "pxa168-eth", "MFUCLK"),
+ 	INIT_CLKREG(&clk_usb, "pxa168-ehci", "PXA168-USBCLK"),
++	INIT_CLKREG(&clk_rtc, "sa1100-rtc", NULL),
  };
  
+ static int __init pxa168_init(void)
 -- 
 1.7.0.4
