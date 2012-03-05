@@ -1,19 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Mar 2012 14:23:38 -0800
-Subject: [PATCH] ARM: OMAP: don't build hwspinlock in vain
-In-Reply-To: <1330859129-354-1-git-send-email-ohad@wizery.com>
-References: <1330859129-354-1-git-send-email-ohad@wizery.com>
-Message-ID: <20120305222337.GD12083@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 Mar 2012 14:25:21 -0800
+Subject: [PATCH] ARM: tegra: update defconfig
+In-Reply-To: <1330983838-25327-1-git-send-email-swarren@nvidia.com>
+References: <1330983838-25327-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20120305222521.GA30240@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [120304 02:34]:
-> Cleanup: don't build mach-omap2/hwspinlock.c if the OMAP hwspinlock
-> driver isn't configured.
+On Mon, Mar 05, 2012 at 02:43:58PM -0700, Stephen Warren wrote:
+> Refresh tegra_defconfig:
 > 
-> This will both shorten build time and avoid registering a device
-> which isn't needed.
+> New options enabled:
+> * PERF_EVENTS
+> * Tegra EMC scaling
+> * Support for all 4 CPUs on Tegra30
+> * AUTO_ZRELADDR for unified Tegra20+Tegra30 images
+> * CPU_FREQ/CPU_IDLE
+> * BLK_DEV_SR
+> * INPUT_EVDEV
+> * Regulators, including fixed, GPIO, TPS6586x
+> * Audio for Tegra+ALC5632 (for Paz00/Toshiba AC100)
+> * NVEC (staging, for Paz00/Toshiba AC100)
+> * IOMMU for Tegra20's GART and Tegra30's SMMU
+> * TEGRA_AES
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> This is slightly late for 3.4, but hopefully can just squeak in.
 
-Thanks applying into fixes-non-critical-part2.
+Yeah, timing is OK for this, no worries.
 
-Tony
+I was planning on doing one patch as well, since I want to turn on EXT4 (for
+eMMC/SD it's a good idea to use trim). Care to do that in your patch instead so
+we only have one update?
+
+
+Thanks,
+
+-Olof
