@@ -1,73 +1,54 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Mar 2012 09:58:37 +0100
-Subject: [PATCH 11/12] mfd: twl4030-irq: Return twl6030_mmc_card_detect
- IRQ for board setup
-In-Reply-To: <4F547721.4010107@ti.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-12-git-send-email-b-cousson@ti.com>
- <20120302181522.GC13967@legolas.emea.dhcp.ti.com> <4F547721.4010107@ti.com>
-Message-ID: <4F54803D.3010102@ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 05 Mar 2012 14:46:07 +0530
+Subject: [PATCH 4/4] mmc: omap_hsmmc: Simplify init for twl6030 MMC card
+ detect
+In-Reply-To: <20120302172251.GJ18901@atomide.com>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+ <20120301185535.29210.71546.stgit@kaulin.local> <4F50643B.9050500@ti.com>
+ <20120302172251.GJ18901@atomide.com>
+Message-ID: <4F548457.5050205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/5/2012 9:19 AM, Rajendra Nayak wrote:
-> On Friday 02 March 2012 11:45 PM, Felipe Balbi wrote:
->> Hi,
->>
->> On Fri, Mar 02, 2012 at 05:50:23PM +0100, Benoit Cousson wrote:
->>> Card detect IRQ from the TWL6030 used to be provided to the MMC
->>> controller code using a statically allocated IRQ scheme:
->>>
->>> card_detect_irq = TWL6030_IRQ_BASE + MMCDETECT_INTR_OFFSET;
->>>
->>> This is no longer valid in a SPARSE_IRQ context since there is no more
->>> pre-defined TWL6030_IRQ_BASE.
->>>
->>> Return the proper card detect IRQ value in the
->>> twl6030_mmc_card_detect_config
->>> that will be called from the MMC controller.
->>>
->>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->>> Cc: Felipe Balbi<balbi@ti.com>
->>> Cc: Tony Lindgren<tony@atomide.com>
->>> Cc: Rajendra Nayak<rnayak@ti.com>
->>
->> Reviewed-by: Felipe Balbi<balbi@ti.com>
->>
->>> ---
->>> drivers/mfd/twl6030-irq.c | 3 ++-
->>> 1 files changed, 2 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/drivers/mfd/twl6030-irq.c b/drivers/mfd/twl6030-irq.c
->>> index a1c7183..4a63de2 100644
->>> --- a/drivers/mfd/twl6030-irq.c
->>> +++ b/drivers/mfd/twl6030-irq.c
->>> @@ -308,7 +308,8 @@ int twl6030_mmc_card_detect_config(void)
->>> ret);
->>> return ret;
->>> }
->>> - return 0;
->>> +
->>> + return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
->>> }
->>> EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
->>
->> At some point this twl6030_mmc_card_detect_config() needs to vanish in
->> favor of a better mechanism. Maybe passing the GPIO number an requiring
->> the driver to request the GPIO, set its direction and use it as IRQ
->> line.
->>
->> the only problem would arise if we end up hooking the Card Detect pin to
->> a real IRQ line, but then we can use a flag to differentiate.
->
-> Shouldn't this be hidden from the driver completely if the card detect
-> pin is a GPIO or connected to a real IRQ line? And the board/DT handle
-> this instead of the driver knowing when to do a gpio_to_irq()?
+On Friday 02 March 2012 10:52 PM, Tony Lindgren wrote:
+> BTW, with -rc5, looks like re-inserting omap_hsmmc on omap4 fails
+> to detect any cards, and then fails to unload. This works on omap3
+> just fine. Any ideas why that would be?
 
-It work fine for a pure GPIO, but in this case, this is an IRQ handled 
-by twl6030. So I'm not sure we have any API for the non-DT case.
+Yeah, looks like thats broken. I am not sure whats going wrong though.
+I just enabled CONFIG_MMC_DEBUG and saw these logs below.
 
-DT will clearly help getting rid of such hacks.
+Venkat/Balaji, care to look at this one?
 
-Regards,
-Benoit
+# insmod omap_hsmmc.ko
+[   43.358398] omap_hsmmc omap_hsmmc.0: context was not lost
+[   43.364105] omap_hsmmc omap_hsmmc.0: enabled
+[   44.434661] mmc0: clock 0Hz busmode 1 powermode 0 cs 0 Vdd 0 width 0 
+timing 0
+[   44.442352] omap_hsmmc omap_hsmmc.0: Set clock to 0Hz
+[   44.474365] omap_hsmmc omap_hsmmc.0: disabled
+[   44.482208] omap_hsmmc omap_hsmmc.4: context was not lost
+[   44.482208] omap_hsmmc omap_hsmmc.4: enabled
+[   44.546600] omap_hsmmc omap_hsmmc.0: context was not lost
+[   44.552276] omap_hsmmc omap_hsmmc.0: enabled
+[   44.552276] mmc0: mmc_rescan_try_freq: trying to init card at 400000 Hz
+[   44.563720] mmc0: clock 0Hz busmode 2 powermode 1 cs 0 Vdd 18 width 0 
+timing 0
+[   44.572174] omap_hsmmc omap_hsmmc.0: Set clock to 0Hz
+[   44.613800] mmc0: clock 400000Hz busmode 2 powermode 2 cs 0 Vdd 18 
+width 0 timing 0
+[   44.621887] omap_hsmmc omap_hsmmc.0: Set clock to 400000Hz
+[   44.735290] mmc0: starting CMD52 arg 00000c00 flags 00000195
+[   44.741271] omap_hsmmc omap_hsmmc.0: mmc0: CMD52, argument 0x00000c00
+[   45.560241] mmc1: clock 0Hz busmode 1 powermode 0 cs 0 Vdd 0 width 0 
+timing 0
+[   45.567871] omap_hsmmc omap_hsmmc.4: Set clock to 0Hz
+[   45.591491] omap_hsmmc omap_hsmmc.4: disabled
+#
+#
+# rmmod omap_hsmmc
+[  607.302307] omap_hsmmc omap_hsmmc.4: context was not lost
+[  607.308044] omap_hsmmc omap_hsmmc.4: enabled
+[  607.312591] omap_hsmmc omap_hsmmc.4: disabled
+[  607.317199] omap_hsmmc omap_hsmmc.4: context was not lost
+[  607.322875] omap_hsmmc omap_hsmmc.4: enabled
