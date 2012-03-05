@@ -1,34 +1,55 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Mon, 5 Mar 2012 15:08:06 -0600
-Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
-In-Reply-To: <20120305204456.GC3224@opensource.wolfsonmicro.com>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
- <20120305174232.GA3852@pengutronix.de>
- <CAKGA1bn7y8xQn-o=8CZj5nwcvaBvHwxqM0Q2wzFAwJsSgi1sfA@mail.gmail.com>
- <20120305204456.GC3224@opensource.wolfsonmicro.com>
-Message-ID: <4F552B36.9020708@freescale.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 05 Mar 2012 16:11:56 -0500 (EST)
+Subject: [PATCH v3 02/30] ARM: provide runtime hook for ioremap/iounmap
+In-Reply-To: <201203052013.26688.arnd@arndb.de>
+References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
+ <1330658022-14559-3-git-send-email-robherring2@gmail.com>
+ <alpine.LFD.2.02.1203051415150.31242@xanadu.home>
+ <201203052013.26688.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+On Mon, 5 Mar 2012, Arnd Bergmann wrote:
 
-> That would be *really* bad, simultaneous playback and record is very
-> widely used.
+> On Monday 05 March 2012, Nicolas Pitre wrote:
+> > Given that the majority of existing platforms don't need the 
+> > indirection, should we make this indirection conditional on 
+> > CONFIG_NEED_IOREMAP_HOOK and let those who need it select it?  Or maybe 
+> > this isn't performance critical and we just don't care?  In any case I'd 
+> > like to see such reasoning captured in the commit log.
+> 
+> It's certainly not performance critical, but there may be some space overhead
+> in the .text section of the kernel that we could avoid by adding another
+> indirection.
 
-Especially since I already have that working on PowerPC.  I went through
-great lengths to get the device tree binding and the code working in this
-regard.
+Of course the size issue can be mitigated significantly by replacing:
 
-> If the hardware has constraints on the sample rates the driver should be
-> telling the application about this.  For the very common case where you
-> need the same rate for playback and record there's framework support for
-> doing this, the relevant driver just needs to set the symmetric_rates
-> flag and the core will do everything.  
+extern void __iomem * (*arch_ioremap)(unsigned long, size_t, unsigned int);
+extern void (*arch_iounmap)(volatile void __iomem *);
 
-And my driver currently does this.  If the SSI is wired up in synchronous
-mode, sample rate/size locking is enabled.
+#define __arch_ioremap                 arch_ioremap
+#define __arch_iounmap                 arch_iounmap
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+by:
+
+extern void __iomem * (*arch_ioremap)(unsigned long, size_t, unsigned int);
+extern void (*arch_iounmap)(volatile void __iomem *);
+
+extern void __iomem * __arch_ioremap(unsigned long, size_t, unsigned int);
+extern void __arch_iounmap(volatile void __iomem *);
+
+and out of line:
+
+void __iomem *__arch_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+{
+	return arch_ioremap(phys_addr, size, mtype);
+}
+
+void __arch_iounmap(volatile void __iomem *io_addr)
+{
+	arch_iounmap(io_addr);
+}
+
+
+Nicolas
