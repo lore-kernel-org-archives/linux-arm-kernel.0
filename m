@@ -1,31 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Mar 2012 10:41:42 -0800
-Subject: [PATCH] ARM: OMAP4: Add support for Variscite OMAP4460
- System-On-Module
-In-Reply-To: <1326898096-4899-1-git-send-email-uri.y@variscite.com>
-References: <1326898096-4899-1-git-send-email-uri.y@variscite.com>
-Message-ID: <20120305184142.GI12083@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 5 Mar 2012 13:49:35 -0500 (EST)
+Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init
+ funcs to fdt
+In-Reply-To: <201203022118.05796.arnd@arndb.de>
+References: <cover.1330709314.git.jason@lakedaemon.net>
+ <20120302200034.GQ11986@titan.lakedaemon.net>
+ <201203022035.44672.arnd@arndb.de> <201203022118.05796.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1203051344130.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 2 Mar 2012, Arnd Bergmann wrote:
 
-* Uri Yosef <uri.y@variscite.com> [120118 06:13]:
-> From: Uri Yosef <uri@embedox.com>
+> On Friday 02 March 2012, Arnd Bergmann wrote:
+> > On Friday 02 March 2012, Jason wrote:
+> > > The following changes since commit 759a45185ac0e4dfaf8bbfcb390ec73aca4b7a34:
+> > > 
+> > >   ARM: kirkwood: convert uart0 to devicetree. (2012-02-27 16:21:44 +0000)
+> > > 
+> > > are available in the git repository at:
+> > >   git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt_test
+> > > 
+> > 
+> > Applied to next/dt branch.
 > 
-> Add support for Variscite OMAP4460 System-On-Module and development kit board.
-> Working: LCD, HDMI, USB, UART, Ethernet.
+> On second thought, I should probably wait for the maintainer to comment
+> as well ;-)
+> 
+> Nico, does this look ok to you?
 
-For reference, we're trying to remove board-*.c files by
-changing over to device tree. So new board-*.c files will
-be merged. You might want to look at booting your board
-using board-generic.c and a related .dts file.
+The clock frequency part being hardcoded to 200000 in the common .dtsi 
+file looks wrong.  The clock may differ, and it used to (and should) be 
+probed at run time, please see kirkwood_find_tclk().
 
-While this transition is happening, I can carry some
-board-*.c files in the testing-board branch until devices
-start working sufficiently for board-generic.c to be
-usable.
 
-Regards,
-
-Tony
+Nicolas
