@@ -1,59 +1,78 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 5 Mar 2012 08:55:22 -0800
-Subject: [alsa-devel] [PATCH 20/20] ASoC: fsl: add imx-sgtl5000 machine
- driver
-In-Reply-To: <20120305131332.GM3224@opensource.wolfsonmicro.com>
-References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-21-git-send-email-shawn.guo@linaro.org>
- <20120304133818.GE3083@opensource.wolfsonmicro.com>
- <20120305080623.GD16232@S2101-09.ap.freescale.net>
- <20120305115612.GB3224@opensource.wolfsonmicro.com>
- <20120305130707.GF16232@S2101-09.ap.freescale.net>
- <20120305131332.GM3224@opensource.wolfsonmicro.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861C14@HQMAIL01.nvidia.com>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Mon,  5 Mar 2012 19:08:57 +0200
+Subject: [PATCH] arm: omap: add minimal support for Nokia RM-696
+Message-ID: <1330967337-9634-1-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote at Monday, March 05, 2012 6:14 AM:
-> On Mon, Mar 05, 2012 at 09:07:09PM +0800, Shawn Guo wrote:
-> > On Mon, Mar 05, 2012 at 11:56:12AM +0000, Mark Brown wrote:
-> 
-> > > In that
-> > > case they should either both be using the same device or should have
-> > > some sort of parent/child/sibling relationship.
-> 
-> > Sorry, I do not understand it.  Can you elaborate it a little bit?
-> 
-> The DMA and SSI drivers should have some relationship with each other if
-> they're the same piece of hardware.  The machine driver certainly
-> shouldn't be creating either of them.
+Add minimal support for Nokia RM-696 board.
 
-Note that in Tegra's case, the DMA HW and the DAI (I2S/SPDIF) HW are
-entirely separate HW blocks and have entirely separate drivers. The DMA
-engine is generic and not audio specific, so has a node that instantiates
-just a standalone DMA device which has its own API. This doesn't
-instantiate any kind of ALSA PCM driver. It doesn't make sense to have a
-DT node to instantiate the ALSA PCM driver since the PCM driver is more
-of an API bridge to the real DMA HW, and certainly not an actual HW
-module. It doesn't make sense to have either the I2S or SPDIF DAI drivers
-instantiate the PCM driver, since they both share the same one. Hence,
-the machine driver instantiates the PCM driver.
+Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+---
 
-Perhaps our regular DMA module driver should expose both its custom
-interface for other clients, and register an ASoC PCM driver? That way
-we could remove the PCM device registration from the ASoC machine
-drivers.
+	The patch is based & boot-tested with 3.3-rc6.
 
-> > > Either way the machine
-> > > driver really shouldn't be involved in instantiating things, perhaps
-> > > arch/arm but not the audio machine driver.
-> 
-> > So you are saying neither what tegra_wm8903 and tegra_alc5632 are doing
-> > (registering pcm device in machine driver) nor what imx-ssi is doing
-> > (registering pcm device in DAI driver) is correct?  Can you please make
-> > it clear what's the right thing to do?
-> 
-> The above.
 
+ arch/arm/mach-omap2/Kconfig                  |    3 ++-
+ arch/arm/mach-omap2/board-rm680.c            |   14 +++++++++++++-
+ arch/arm/plat-omap/include/plat/uncompress.h |    1 +
+ 3 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index e20c8ab..b740c2e 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -245,10 +245,11 @@ config MACH_NOKIA_N8X0
+ 	select MACH_NOKIA_N810_WIMAX
+ 
+ config MACH_NOKIA_RM680
+-	bool "Nokia RM-680 board"
++	bool "Nokia RM-680/696 board"
+ 	depends on ARCH_OMAP3
+ 	default y
+ 	select OMAP_PACKAGE_CBB
++	select MACH_NOKIA_RM696
+ 
+ config MACH_NOKIA_RX51
+ 	bool "Nokia RX-51 board"
+diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+index 8678b38..094473e 100644
+--- a/arch/arm/mach-omap2/board-rm680.c
++++ b/arch/arm/mach-omap2/board-rm680.c
+@@ -1,5 +1,5 @@
+ /*
+- * Board support file for Nokia RM-680.
++ * Board support file for Nokia RM-680/696.
+  *
+  * Copyright (C) 2010 Nokia
+  *
+@@ -154,3 +154,15 @@ MACHINE_START(NOKIA_RM680, "Nokia RM-680 board")
+ 	.timer		= &omap3_timer,
+ 	.restart	= omap_prcm_restart,
+ MACHINE_END
++
++MACHINE_START(NOKIA_RM696, "Nokia RM-696 board")
++	.atag_offset	= 0x100,
++	.reserve	= omap_reserve,
++	.map_io		= omap3_map_io,
++	.init_early	= omap3630_init_early,
++	.init_irq	= omap3_init_irq,
++	.handle_irq	= omap3_intc_handle_irq,
++	.init_machine	= rm680_init,
++	.timer		= &omap3_timer,
++	.restart	= omap_prcm_restart,
++MACHINE_END
+diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
+index 6ee9049..cc3f11b 100644
+--- a/arch/arm/plat-omap/include/plat/uncompress.h
++++ b/arch/arm/plat-omap/include/plat/uncompress.h
+@@ -160,6 +160,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		DEBUG_LL_OMAP3(3, igep0020);
+ 		DEBUG_LL_OMAP3(3, igep0030);
+ 		DEBUG_LL_OMAP3(3, nokia_rm680);
++		DEBUG_LL_OMAP3(3, nokia_rm696);
+ 		DEBUG_LL_OMAP3(3, nokia_rx51);
+ 		DEBUG_LL_OMAP3(3, omap3517evm);
+ 		DEBUG_LL_OMAP3(3, omap3_beagle);
 -- 
-nvpublic
+1.7.2.5
