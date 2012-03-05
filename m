@@ -1,53 +1,82 @@
-From: jason@lakedaemon.net (Jason)
-Date: Mon, 5 Mar 2012 14:15:46 -0500
-Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init
- funcs to fdt
-In-Reply-To: <alpine.LFD.2.02.1203051344130.31242@xanadu.home>
-References: <cover.1330709314.git.jason@lakedaemon.net>
- <20120302200034.GQ11986@titan.lakedaemon.net>
- <201203022035.44672.arnd@arndb.de>
- <201203022118.05796.arnd@arndb.de>
- <alpine.LFD.2.02.1203051344130.31242@xanadu.home>
-Message-ID: <20120305191546.GK5050@titan.lakedaemon.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 05 Mar 2012 14:21:47 -0500 (EST)
+Subject: [PATCH v3 02/30] ARM: provide runtime hook for ioremap/iounmap
+In-Reply-To: <1330658022-14559-3-git-send-email-robherring2@gmail.com>
+References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
+ <1330658022-14559-3-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1203051415150.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 01:49:35PM -0500, Nicolas Pitre wrote:
-> On Fri, 2 Mar 2012, Arnd Bergmann wrote:
+On Thu, 1 Mar 2012, Rob Herring wrote:
+
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> > On Friday 02 March 2012, Arnd Bergmann wrote:
-> > > On Friday 02 March 2012, Jason wrote:
-> > > > The following changes since commit 759a45185ac0e4dfaf8bbfcb390ec73aca4b7a34:
-> > > > 
-> > > >   ARM: kirkwood: convert uart0 to devicetree. (2012-02-27 16:21:44 +0000)
-> > > > 
-> > > > are available in the git repository at:
-> > > >   git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt_test
-> > > > 
-> > > 
-> > > Applied to next/dt branch.
-> > 
-> > On second thought, I should probably wait for the maintainer to comment
-> > as well ;-)
-> > 
-> > Nico, does this look ok to you?
+> We have compile time over-ride of ioremap and iounmap, but an run-time
+> override is needed for multi-platform builds.
 > 
-> The clock frequency part being hardcoded to 200000 in the common .dtsi 
-> file looks wrong.  The clock may differ, and it used to (and should) be 
-> probed at run time, please see kirkwood_find_tclk().
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-So, should I EXPORT_SYMBOL_GPL(kirkwood_find_tclk); and have each driver
-call it?
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-One alternate idea I had was to have kirkwood-dreamplug.dts root hold
+I was hoping that the number of platform requiring this would have been 
+small enough to just leave them with a compile time override and simply 
+keep them out of a multi-SOC kernel.  But it looks like even some modern 
+architectures require this.
 
-tclk: clock-frequency = <200000000>;
+Given that the majority of existing platforms don't need the 
+indirection, should we make this indirection conditional on 
+CONFIG_NEED_IOREMAP_HOOK and let those who need it select it?  Or maybe 
+this isn't performance critical and we just don't care?  In any case I'd 
+like to see such reasoning captured in the commit log.
 
-and then have the drivers ask for it.  afaict, tclk is constant per
-board.
-
-I'm fine with either way, but I'd rather have it in the dt.
-
-thx,
-
-Jason.
+> ---
+>  arch/arm/include/asm/io.h |    8 ++++++--
+>  arch/arm/mm/ioremap.c     |    6 ++++++
+>  2 files changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 9275828..9bf9d00 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -264,9 +264,13 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>   * Documentation/io-mapping.txt.
+>   *
+>   */
+> +
+> +extern void __iomem * (*arch_ioremap)(unsigned long, size_t, unsigned int);
+> +extern void (*arch_iounmap)(volatile void __iomem *);
+> +
+>  #ifndef __arch_ioremap
+> -#define __arch_ioremap			__arm_ioremap
+> -#define __arch_iounmap			__iounmap
+> +#define __arch_ioremap			arch_ioremap
+> +#define __arch_iounmap			arch_iounmap
+>  #endif
+>  
+>  #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
+> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> index 80632e8..d164dea 100644
+> --- a/arch/arm/mm/ioremap.c
+> +++ b/arch/arm/mm/ioremap.c
+> @@ -314,6 +314,9 @@ __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+>  }
+>  EXPORT_SYMBOL(__arm_ioremap);
+>  
+> +void __iomem * (*arch_ioremap)(unsigned long , size_t , unsigned int ) = __arm_ioremap;
+> +EXPORT_SYMBOL(arch_ioremap);
+> +
+>  /*
+>   * Remap an arbitrary physical address space into the kernel virtual
+>   * address space as memory. Needed when the kernel wants to execute
+> @@ -370,3 +373,6 @@ void __iounmap(volatile void __iomem *io_addr)
+>  	vunmap(addr);
+>  }
+>  EXPORT_SYMBOL(__iounmap);
+> +
+> +void (*arch_iounmap)(volatile void __iomem *) = __iounmap;
+> +EXPORT_SYMBOL(arch_iounmap);
+> -- 
+> 1.7.5.4
+> 
