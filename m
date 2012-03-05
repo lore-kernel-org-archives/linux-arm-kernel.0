@@ -1,10 +1,11 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Mar 2012 14:21:47 -0500 (EST)
-Subject: [PATCH v3 02/30] ARM: provide runtime hook for ioremap/iounmap
-In-Reply-To: <1330658022-14559-3-git-send-email-robherring2@gmail.com>
+Date: Mon, 05 Mar 2012 14:26:33 -0500 (EST)
+Subject: [PATCH v3 15/30] ARM: dove: add explicit include of dove.h to
+ addr-map.c
+In-Reply-To: <1330658022-14559-16-git-send-email-robherring2@gmail.com>
 References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
- <1330658022-14559-3-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1203051415150.31242@xanadu.home>
+ <1330658022-14559-16-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1203051426110.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,71 +13,28 @@ On Thu, 1 Mar 2012, Rob Herring wrote:
 
 > From: Rob Herring <rob.herring@calxeda.com>
 > 
-> We have compile time over-ride of ioremap and iounmap, but an run-time
-> override is needed for multi-platform builds.
+> In preparation to remove mach/io.h, add explicit include of mach/dove.h
 > 
 > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 
-I was hoping that the number of platform requiring this would have been 
-small enough to just leave them with a compile time override and simply 
-keep them out of a multi-SOC kernel.  But it looks like even some modern 
-architectures require this.
-
-Given that the majority of existing platforms don't need the 
-indirection, should we make this indirection conditional on 
-CONFIG_NEED_IOREMAP_HOOK and let those who need it select it?  Or maybe 
-this isn't performance critical and we just don't care?  In any case I'd 
-like to see such reasoning captured in the commit log.
-
 > ---
->  arch/arm/include/asm/io.h |    8 ++++++--
->  arch/arm/mm/ioremap.c     |    6 ++++++
->  2 files changed, 12 insertions(+), 2 deletions(-)
+>  arch/arm/mach-dove/addr-map.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index 9275828..9bf9d00 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -264,9 +264,13 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->   * Documentation/io-mapping.txt.
->   *
->   */
-> +
-> +extern void __iomem * (*arch_ioremap)(unsigned long, size_t, unsigned int);
-> +extern void (*arch_iounmap)(volatile void __iomem *);
-> +
->  #ifndef __arch_ioremap
-> -#define __arch_ioremap			__arm_ioremap
-> -#define __arch_iounmap			__iounmap
-> +#define __arch_ioremap			arch_ioremap
-> +#define __arch_iounmap			arch_iounmap
->  #endif
+> diff --git a/arch/arm/mach-dove/addr-map.c b/arch/arm/mach-dove/addr-map.c
+> index 98b8c83..2a06c01 100644
+> --- a/arch/arm/mach-dove/addr-map.c
+> +++ b/arch/arm/mach-dove/addr-map.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/io.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/setup.h>
+> +#include <mach/dove.h>
+>  #include <plat/addr-map.h>
+>  #include "common.h"
 >  
->  #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index 80632e8..d164dea 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -314,6 +314,9 @@ __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
->  }
->  EXPORT_SYMBOL(__arm_ioremap);
->  
-> +void __iomem * (*arch_ioremap)(unsigned long , size_t , unsigned int ) = __arm_ioremap;
-> +EXPORT_SYMBOL(arch_ioremap);
-> +
->  /*
->   * Remap an arbitrary physical address space into the kernel virtual
->   * address space as memory. Needed when the kernel wants to execute
-> @@ -370,3 +373,6 @@ void __iounmap(volatile void __iomem *io_addr)
->  	vunmap(addr);
->  }
->  EXPORT_SYMBOL(__iounmap);
-> +
-> +void (*arch_iounmap)(volatile void __iomem *) = __iounmap;
-> +EXPORT_SYMBOL(arch_iounmap);
 > -- 
 > 1.7.5.4
 > 
