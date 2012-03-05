@@ -1,57 +1,56 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Tue,  6 Mar 2012 00:07:16 -0500
-Subject: [PATCH] ARM: move mem_type's real definition to asm/mach/map.h
-Message-ID: <1331010436-31576-1-git-send-email-shijie8@gmail.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Mon,  5 Mar 2012 17:05:09 +0100
+Subject: [PATCH v3 0/3] Amstrad Delta: access MODEM_RESET GPIO pin over a
+ regulator
+Message-ID: <1330963512-20413-1-git-send-email-jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we use the mem_type in the driver. We will meet the compiler error:
-"error: dereferencing pointer to incomplete type"
+The Amstrad Delta on-board latch2 bit named MODEM_NRESET, now available
+as a GPIO pin AMS_DELTA_GPIO_PIN_NMODEM_RESET, is used to power up/down
+(bring into/out of a reset state) two distinct on-board devices
+simultaneously: the modem, and the voice codec. As a consequence, that
+bit is, or can be, manipulated concurrently by two drivers, or their
+platform provided hooks.
 
-Move mem_type's real definition to asm/mach/map.h to fix it.
+Instead of updating those drivers to use the gpiolib API as a new method
+of controlling the MODEM_NRESET pin state, like it was done to other
+drivers accessing latch2 pins, and still being vulnerable to potential
+concurrency conflicts, or trying to solve that sharing issue with a
+custom piece of code, set up a fixed regulator device on top of that
+GPIO pin and update both drivers to manipulate that regulator, not the
+GPIO pin directly.
 
-Signed-off-by: Huang Shijie <shijie8@gmail.com>
----
- arch/arm/include/asm/mach/map.h |    8 +++++++-
- arch/arm/mm/mm.h                |    7 +------
- 2 files changed, 8 insertions(+), 7 deletions(-)
+This is v3 of this series, with Mark's Ack for ASoC subtree touching
+changes already collected, rebased on top of linux-omap/ams-delta tip,
+commit da564a05b3aefe403062411b67d64b7e992718f7.
 
-diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-index b36f365..a5ee07d 100644
---- a/arch/arm/include/asm/mach/map.h
-+++ b/arch/arm/include/asm/mach/map.h
-@@ -34,7 +34,13 @@ struct map_desc {
- #ifdef CONFIG_MMU
- extern void iotable_init(struct map_desc *, int);
- 
--struct mem_type;
-+struct mem_type {
-+	pteval_t prot_pte;
-+	pmdval_t prot_l1;
-+	pmdval_t prot_sect;
-+	unsigned int domain;
-+};
-+
- extern const struct mem_type *get_mem_type(unsigned int type);
- /*
-  * external interface to remap single page with appropriate type
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index 70f6d3ea..1930bc9 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -10,12 +10,7 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
- 	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
- }
- 
--struct mem_type {
--	pteval_t prot_pte;
--	pmdval_t prot_l1;
--	pmdval_t prot_sect;
--	unsigned int domain;
--};
-+struct mem_type;
- 
- const struct mem_type *get_mem_type(unsigned int type);
- 
+There were initially 4 patches in the series, but patch 2/4, "ASoC:
+cx20442: add bias control over a platform provided regulator", has been
+since then applied by Liam to the ASoC tree (thanks!) and is already
+present in mainline (commit f75a8ff67d161b5166a2c2360bb2ffaefd5eb853),
+hence omitted from this submission.
+
+v2 -> v3 changes:
+* fix section mismatch issue present in previous versions of patch 1/3.
+
+v2 changes against initial version:
+* in both the codec and the modem callbacks, don't track the regulator
+  enable/disable state, compare new target bias level (the codec case)
+  or power state (the modem case) with the old value instead; thanks to
+  Mark Brown who suggested this solution,
+* a few other minor changes, mostly stylistic.
+
+Janusz Krzysztofik (3):
+  ARM: OMAP1: ams-delta: set up regulator over modem reset GPIO pin
+  ARM: OMAP1: ams-delta: update the modem to use regulator API
+  ASoC: OMAP: ams-delta: drop .set_bias_level callback
+
+ arch/arm/mach-omap1/Kconfig                       |    2 +
+ arch/arm/mach-omap1/board-ams-delta.c             |   94 +++++++++++++++++++--
+ arch/arm/plat-omap/include/plat/board-ams-delta.h |    1 -
+ sound/soc/omap/ams-delta.c                        |   32 -------
+ 4 files changed, 87 insertions(+), 42 deletions(-)
+
 -- 
-1.7.4.4
+1.7.3.4
