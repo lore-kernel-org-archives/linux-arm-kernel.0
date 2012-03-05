@@ -1,63 +1,76 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 05 Mar 2012 14:02:08 -0800
-Subject: [GIT PULL] ARM: OMAP: SR cleanups for v3.4
-Message-ID: <87wr6yiu5b.fsf@ti.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 05 Mar 2012 23:08:52 +0100
+Subject: Status of gpio-pxa driver and dummy clock
+In-Reply-To: <CAN1soZxkVSFbNG4QaCxxxbNMB255JeNCK+=YqBzvmAAXdCRYyQ@mail.gmail.com>
+ (Haojian Zhuang's message of "Mon, 5 Mar 2012 20:22:41 +0800")
+References: <87aa3wu0hp.fsf@free.fr>
+ <1330885571.28077.YahooMailClassic@web29015.mail.ird.yahoo.com>
+ <CAN1soZxkVSFbNG4QaCxxxbNMB255JeNCK+=YqBzvmAAXdCRYyQ@mail.gmail.com>
+Message-ID: <87399mu2dn.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Haojian Zhuang <haojian.zhuang@gmail.com> writes:
 
-Please pull the SmartReflex cleanups for v3.4.
+> I missed them. Maybe I was not in the Cc list. I'll append the patches
+> to fix them.
 
-Due to a minor conflict with the devexit patches in your randconfig
-branch, this is based there (actually randconfig~2 which is the actual
-dependency.)
+Just to be sure, this is the patch which is missing for the dummy clock, which
+was not submitted before AFAIK (Jonathan, Paul, please confirm).
 
-Special thanks to Jean Pihet for collecting and coordinating all these
-fixups.
+I added the commit text to Paul's patch, and authored it as Paul's with
+Jonathan's report. Again, Jonathan, Paul, I'd like to have your agreement here.
 
-Kevin
+Haojian, if you have another patch ready, don't hesitate to drop this patch and
+take your own, as long as gpio-pxa is fixed, I'll be happy.
 
+Cheers.
 
-The following changes since commit 149f1d5c8d2fd6879cdf93ca70f1cb745e698a1e:
+--
+Robert
 
-  ARM: OMAP2+: Fix devexit for smartreflex when CONFIG_HOTPLUG is not set (2012-02-24 08:24:46 -0800)
+8>----
+>From 505a23475843a8fbac077e789d911ee07e1ae9cc Mon Sep 17 00:00:00 2001
+From: Paul Parsons <lost.distance@yahoo.com>
+Date: Sat, 3 Mar 2012 21:10:09 +0100
+Subject: [PATCH] arch/arm: pxa add dummy clocks for gpio driver
 
-are available in the git repository at:
+Fix gpio driver by providing it a dummy clock. This
+regression was introduced by the commit "ARM: pxa: add dummy
+clock for sa1100-rtc", id
+a55b5adaf403c4d032e0871ad4ee3367782f4db6.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/cleanup/sr
+Reported-by: Jonathan Cameron <jic23@cam.ac.uk>
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/pxa25x.c |    1 +
+ arch/arm/mach-pxa/pxa27x.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-for you to fetch changes up to 63371faf9198302c7ebd41e7fbe78eb6b57bba86:
-
-  ARM: OMAP3+: SmartReflex: fix error handling (2012-03-05 11:29:27 -0800)
-
-----------------------------------------------------------------
-Felipe Balbi (4):
-      ARM: OMAP3+: SmartReflex: add missing platform_set_drvdata()
-      ARM: OMAP3+: SmartReflex: move late_initcall() closer to its argument
-      ARM: OMAP3+: SmartReflex: misc cleanups
-      ARM: OMAP3+: SmartReflex: micro-optimization for sanity check
-
-Jean Pihet (2):
-      ARM: OMAP3+: SmartReflex: fix the use of debugfs_create_* API
-      ARM: OMAP3+: SmartReflex: fix error handling
-
-Nishanth Menon (6):
-      ARM: OMAP3+: SmartReflex: fix err interrupt disable sequence
-      ARM: OMAP3+: SmartReflex Class3: disable errorgen before disable VP
-      ARM: OMAP3+: SmartReflex: Add a shutdown hook
-      ARM: OMAP3+: SmartReflex: Fix status masking in ERRCONFIG register
-      ARM: OMAP3+: SmartReflex: clear ERRCONFIG_VPBOUNDINTST only on a need
-      ARM: OMAP3+: hwmod: add SmartReflex IRQs
-
-Shweta Gulati (1):
-      ARM: OMAP3+: SmartReflex: use voltage domain name in device attributes
-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   31 +++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   19 ++-
- arch/arm/mach-omap2/smartreflex-class3.c     |    1 +
- arch/arm/mach-omap2/smartreflex.c            |  227 +++++++++++++++++++-------
- arch/arm/mach-omap2/smartreflex.h            |   10 ++
- arch/arm/mach-omap2/sr_device.c              |   11 +-
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 -
- 7 files changed, 229 insertions(+), 72 deletions(-)
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index 00d6eac..d8de3e5 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -208,6 +208,7 @@ static struct clk_lookup pxa25x_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa25x_gpio11, NULL, "GPIO11_CLK"),
+ 	INIT_CLKREG(&clk_pxa25x_gpio12, NULL, "GPIO12_CLK"),
+ 	INIT_CLKREG(&clk_pxa25x_mem, "pxa2xx-pcmcia", NULL),
++	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
+ };
+ 
+ static struct clk_lookup pxa25x_hwuart_clkreg =
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index c1673b3..a3fabc9 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -229,6 +229,7 @@ static struct clk_lookup pxa27x_clkregs[] = {
+ 	INIT_CLKREG(&clk_pxa27x_im, NULL, "IMCLK"),
+ 	INIT_CLKREG(&clk_pxa27x_memc, NULL, "MEMCLK"),
+ 	INIT_CLKREG(&clk_pxa27x_mem, "pxa2xx-pcmcia", NULL),
++	INIT_CLKREG(&clk_dummy, "pxa-gpio", NULL),
+ };
+ 
+ #ifdef CONFIG_PM
+-- 
+1.7.5.4
