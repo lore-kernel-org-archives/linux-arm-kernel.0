@@ -1,164 +1,54 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 5 Mar 2012 14:43:58 -0700
-Subject: [PATCH] ARM: tegra: update defconfig
-Message-ID: <1330983838-25327-1-git-send-email-swarren@nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Mar 2012 13:46:41 -0800
+Subject: [PATCH V2] mt_ventoux: support for TeeJet Mt.Ventoux board
+In-Reply-To: <4F291924.50702@denx.de>
+References: <1324940912-18164-3-git-send-email-yanok@emcraft.com>
+ <1325027377-13484-1-git-send-email-yanok@emcraft.com>
+ <4F291924.50702@denx.de>
+Message-ID: <20120305214641.GV12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refresh tegra_defconfig:
+* Stefano Babic <sbabic@denx.de> [120201 02:20]:
+> On 28/12/2011 00:09, Ilya Yanok wrote:
+> > This patch adds support for TeeJet Mt.Ventoux board based on TAM3517
+> > SOM. Supported devices:
+> >  - Serial
+> >  - Ethernet
+> >  - NAND
+> >  - USB host
+> >  - LCD
+> >  - Touchscreen
+> >  - CAN controller
+> >  - ADC128S converter
+> > 
+> > Signed-off-by: Ilya Yanok <yanok@emcraft.com>
+> > ---
+> > 
+> > Changes from V1:
+> > 
+> >  - Fixed indentation (use tabs not spaces)
+> >  - Fixed over 80 characters lines
+> >  - Added #if defined(CONFIG_SENSORS_ADCXX_MODULE) to allow adcxx to be a
+> >    module.
+> >  - Fixes for compilation with CONFIG_TOUCHSCREEN_ADS7846!=y
+> >   - Added defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+> >   - Moved call to omap_ads7846_init to separate small function
+> >   - Register fixed regulator used for touchscreen only if the driver is
+> >     enabled
+> >  - Changed board name (MT_VENTOUX -> Mt.Ventoux)
+> 
+> Hi Tony,
+> 
+> can I ask you about the status of these patches ? I have not seen open
+> comments, do you think they can be merged in your tree ?
 
-New options enabled:
-* PERF_EVENTS
-* Tegra EMC scaling
-* Support for all 4 CPUs on Tegra30
-* AUTO_ZRELADDR for unified Tegra20+Tegra30 images
-* CPU_FREQ/CPU_IDLE
-* BLK_DEV_SR
-* INPUT_EVDEV
-* Regulators, including fixed, GPIO, TPS6586x
-* Audio for Tegra+ALC5632 (for Paz00/Toshiba AC100)
-* NVEC (staging, for Paz00/Toshiba AC100)
-* IOMMU for Tegra20's GART and Tegra30's SMMU
-* TEGRA_AES
+Yes I can carry some board-*.c files until device tree is
+usable for basic features. There's still some hsmmc changes
+pending that I'd like to get out of the way before adding
+new ones as then it means I have to keep updating those
+board files separately.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This is slightly late for 3.4, but hopefully can just squeak in.
+Regards,
 
- arch/arm/configs/tegra_defconfig |   31 +++++++++++++++++++++----------
- 1 files changed, 21 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index fd5d304..e7f5241 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -11,11 +11,14 @@ CONFIG_RT_GROUP_SCHED=y
- CONFIG_BLK_DEV_INITRD=y
- # CONFIG_ELF_CORE is not set
- CONFIG_EMBEDDED=y
-+CONFIG_PERF_EVENTS=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_EFI_PARTITION=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_TEGRA=y
-@@ -27,18 +30,20 @@ CONFIG_MACH_PAZ00=y
- CONFIG_MACH_TRIMSLICE=y
- CONFIG_MACH_WARIO=y
- CONFIG_MACH_VENTANA=y
--CONFIG_TEGRA_DEBUG_UARTD=y
--CONFIG_ARM_ERRATA_742230=y
-+CONFIG_TEGRA_EMC_SCALING_ENABLE=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
--CONFIG_NR_CPUS=2
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
- CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_AUTO_ZRELADDR=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -68,7 +73,6 @@ CONFIG_IPV6_MULTIPLE_TABLES=y
- # CONFIG_FIRMWARE_IN_KERNEL is not set
- CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
--CONFIG_MISC_DEVICES=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
- CONFIG_ICS932S401=y
-@@ -76,6 +80,7 @@ CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
-+CONFIG_BLK_DEV_SR=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_DUMMY=y
-@@ -85,8 +90,7 @@ CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
- # CONFIG_WLAN is not set
--# CONFIG_INPUT is not set
--# CONFIG_SERIO is not set
-+CONFIG_INPUT_EVDEV=y
- # CONFIG_VT is not set
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_DEVKMEM is not set
-@@ -96,13 +100,15 @@ CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
--# CONFIG_I2C_HELPER_AUTO is not set
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
- CONFIG_SPI_TEGRA=y
- CONFIG_SENSORS_LM90=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
-+CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_TPS6586X=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-@@ -116,11 +122,13 @@ CONFIG_SND_SOC=y
- CONFIG_SND_SOC_TEGRA=y
- CONFIG_SND_SOC_TEGRA_WM8903=y
- CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
-+CONFIG_SND_SOC_TEGRA_ALC5632=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
-+CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_TEGRA=y
-@@ -130,6 +138,11 @@ CONFIG_STAGING=y
- CONFIG_IIO=y
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_AK8975=y
-+CONFIG_MFD_NVEC=y
-+CONFIG_KEYBOARD_NVEC=y
-+CONFIG_SERIO_NVEC_PS2=y
-+CONFIG_TEGRA_IOMMU_GART=y
-+CONFIG_TEGRA_IOMMU_SMMU=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
-@@ -143,8 +156,6 @@ CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_NFS_FS=y
- CONFIG_ROOT_NFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_EFI_PARTITION=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
-@@ -162,9 +173,9 @@ CONFIG_DEBUG_SG=y
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
- CONFIG_CRYPTO_ECB=y
--CONFIG_CRYPTO_AES=y
- CONFIG_CRYPTO_ARC4=y
- CONFIG_CRYPTO_TWOFISH=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_CRYPTO_DEV_TEGRA_AES=y
- CONFIG_CRC_CCITT=y
- CONFIG_CRC16=y
--- 
-1.7.0.4
+Tony
