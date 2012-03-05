@@ -1,40 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 Mar 2012 14:25:21 -0800
-Subject: [PATCH] ARM: tegra: update defconfig
-In-Reply-To: <1330983838-25327-1-git-send-email-swarren@nvidia.com>
-References: <1330983838-25327-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120305222521.GA30240@quad.lixom.net>
+From: jason@lakedaemon.net (Jason)
+Date: Mon, 5 Mar 2012 17:25:36 -0500
+Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init
+ funcs to fdt
+In-Reply-To: <20120305214126.GA18513@lunn.ch>
+References: <20120305214126.GA18513@lunn.ch>
+Message-ID: <20120305222536.GP5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 02:43:58PM -0700, Stephen Warren wrote:
-> Refresh tegra_defconfig:
-> 
-> New options enabled:
-> * PERF_EVENTS
-> * Tegra EMC scaling
-> * Support for all 4 CPUs on Tegra30
-> * AUTO_ZRELADDR for unified Tegra20+Tegra30 images
-> * CPU_FREQ/CPU_IDLE
-> * BLK_DEV_SR
-> * INPUT_EVDEV
-> * Regulators, including fixed, GPIO, TPS6586x
-> * Audio for Tegra+ALC5632 (for Paz00/Toshiba AC100)
-> * NVEC (staging, for Paz00/Toshiba AC100)
-> * IOMMU for Tegra20's GART and Tegra30's SMMU
-> * TEGRA_AES
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> This is slightly late for 3.4, but hopefully can just squeak in.
+On Mon, Mar 05, 2012 at 10:41:26PM +0100, Andrew Lunn wrote:
+> > > If the drivers want to use it, I think it has to be orion_find_tclk for
+> > > drivers that are shared between multiple plat-orion platforms.
+> > 
+> > That's pretty much all of them  :-)
+> > 
+> > I'll rename it and move it to plat-orion/common.c.  This'll be fun.
 
-Yeah, timing is OK for this, no worries.
+This is old, see Nico's reply and my response.
 
-I was planning on doing one patch as well, since I want to turn on EXT4 (for
-eMMC/SD it's a good idea to use trim). Care to do that in your patch instead so
-we only have one update?
+> We have overlapping work going on. My adoption of Mike's generic clk
+> framework overlaps a lot with your DT tclk problems. If you introduce
+> orion_find_tclk() into all the drivers, we are probably going to rip
+> it all out again once my patches go in. Plus we are going to have
+> horrible merging conflicts between your code and my code
 
+I'd love to deconflict but I haven't seen your RFC patches, yet.
 
-Thanks,
+thx,
 
--Olof
+Jason.
