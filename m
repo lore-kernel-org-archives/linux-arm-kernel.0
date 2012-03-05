@@ -1,32 +1,26 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Mon, 5 Mar 2012 19:39:57 +0200
-Subject: 0001-i.MX35-PDK-Chunghwa-CLAA070VC01-7-WVGA-TFT-Display-s.patch
-In-Reply-To: <CAOMZO5Bdq_LuwUtsuv2kWrdGPHB3Q9hqvj3JyP0q53BLwZD3FQ@mail.gmail.com>
-References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8904@MEP-EXCH.meprolight.com>,
- <CAOMZO5Bdq_LuwUtsuv2kWrdGPHB3Q9hqvj3JyP0q53BLwZD3FQ@mail.gmail.com>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8905@MEP-EXCH.meprolight.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 5 Mar 2012 18:42:32 +0100
+Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
+In-Reply-To: <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120305174232.GA3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 05, 2012 at 10:31:05PM +0800, Shawn Guo wrote:
+> This is the initial imx-sgtl5000 machine driver support with only
+> playback dai link implemented.  More features can be added on top
+> of it later.
 
-Hi Fabio,
+Are there problems with capturing? It should be trivial to add and
+it would be much more confident that this series as a whole works as
+expected.
 
-Thanks for you comment.
+Sascha
 
->Thanks for your patch.
-
->This has already been submitted previously:
->http://patchwork.ozlabs.org/patch/123404/
-
->Also, please read Documentation/SubmittingPatches and do not attach
->your patch next time.
-
->You can use "git send-email" for example.
-
-I always used git send-email, my problem is the SMTP server does not exit out.
-I think it will be solved by tomorrow.
-
-Thanks,
-Alex Gershgorin 
-
- 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
