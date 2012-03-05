@@ -1,23 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 5 Mar 2012 20:13:26 +0000
-Subject: [PATCH v3 02/30] ARM: provide runtime hook for ioremap/iounmap
-In-Reply-To: <alpine.LFD.2.02.1203051415150.31242@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 05 Mar 2012 15:13:53 -0500 (EST)
+Subject: [PATCH v3 30/30] ARM: orion5x: use fixed PCI i/o mapping
+In-Reply-To: <1330658022-14559-31-git-send-email-robherring2@gmail.com>
 References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
- <1330658022-14559-3-git-send-email-robherring2@gmail.com>
- <alpine.LFD.2.02.1203051415150.31242@xanadu.home>
-Message-ID: <201203052013.26688.arnd@arndb.de>
+ <1330658022-14559-31-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1203051513210.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 March 2012, Nicolas Pitre wrote:
-> Given that the majority of existing platforms don't need the 
-> indirection, should we make this indirection conditional on 
-> CONFIG_NEED_IOREMAP_HOOK and let those who need it select it?  Or maybe 
-> this isn't performance critical and we just don't care?  In any case I'd 
-> like to see such reasoning captured in the commit log.
+On Thu, 1 Mar 2012, Rob Herring wrote:
 
-It's certainly not performance critical, but there may be some space overhead
-in the .text section of the kernel that we could avoid by adding another
-indirection.
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> orion5x i/o handling must have been broken as it had no __io()
+> translation. It may actually work now.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
 
-	Arnd
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+>  arch/arm/mach-orion5x/common.c |   16 ++++++----------
+>  1 files changed, 6 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+> index 0e28bae..9bab4cb 100644
+> --- a/arch/arm/mach-orion5x/common.c
+> +++ b/arch/arm/mach-orion5x/common.c
+> @@ -24,6 +24,7 @@
+>  #include <asm/timex.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> +#include <asm/mach/pci.h>
+>  #include <asm/mach/time.h>
+>  #include <mach/bridge-regs.h>
+>  #include <mach/hardware.h>
+> @@ -44,16 +45,6 @@ static struct map_desc orion5x_io_desc[] __initdata = {
+>  		.length		= ORION5X_REGS_SIZE,
+>  		.type		= MT_DEVICE,
+>  	}, {
+> -		.virtual	= ORION5X_PCIE_IO_VIRT_BASE,
+> -		.pfn		= __phys_to_pfn(ORION5X_PCIE_IO_PHYS_BASE),
+> -		.length		= ORION5X_PCIE_IO_SIZE,
+> -		.type		= MT_DEVICE,
+> -	}, {
+> -		.virtual	= ORION5X_PCI_IO_VIRT_BASE,
+> -		.pfn		= __phys_to_pfn(ORION5X_PCI_IO_PHYS_BASE),
+> -		.length		= ORION5X_PCI_IO_SIZE,
+> -		.type		= MT_DEVICE,
+> -	}, {
+>  		.virtual	= ORION5X_PCIE_WA_VIRT_BASE,
+>  		.pfn		= __phys_to_pfn(ORION5X_PCIE_WA_PHYS_BASE),
+>  		.length		= ORION5X_PCIE_WA_SIZE,
+> @@ -63,6 +54,11 @@ static struct map_desc orion5x_io_desc[] __initdata = {
+>  
+>  void __init orion5x_map_io(void)
+>  {
+> +	unsigned long pci_io_pfn[] = {
+> +		__phys_to_pfn(ORION5X_PCI_IO_PHYS_BASE),
+> +		__phys_to_pfn(ORION5X_PCIE_IO_PHYS_BASE),
+> +	};
+> +	pci_map_io_pfn(pci_io_pfn, ARRAY_SIZE(pci_io_pfn));
+>  	iotable_init(orion5x_io_desc, ARRAY_SIZE(orion5x_io_desc));
+>  }
+>  
+> -- 
+> 1.7.5.4
+> 
