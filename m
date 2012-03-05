@@ -1,38 +1,76 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 05 Mar 2012 10:12:15 -0800
-Subject: [PATCH] ARM: OMAP2+: voltage: ensure voltage used is exact
- voltage from OPP table
-In-Reply-To: <1330940487.2116.119.camel@sokoban> (Tero Kristo's message of
- "Mon, 5 Mar 2012 11:41:27 +0200")
-References: <1330728121-26664-1-git-send-email-khilman@ti.com>
- <1330940487.2116.119.camel@sokoban>
-Message-ID: <877gyyor28.fsf@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 5 Mar 2012 19:15:55 +0100
+Subject: [PATCH v3 07/10] arm/tegra: Add PWFM controller device tree
+ probing
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE861C46@HQMAIL01.nvidia.com>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <1329923841-32017-8-git-send-email-thierry.reding@avionic-design.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BDDF1E67@HQMAIL01.nvidia.com>
+ <20120303225404.GC6661@avionic-0098.mockup.avionic-design.de>
+ <74CDBE0F657A3D45AFBB94109FB122FF17BE861C46@HQMAIL01.nvidia.com>
+Message-ID: <20120305181555.GA22459@avionic-0098.adnet.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+* Stephen Warren wrote:
+> Thierry Reding wrote at Saturday, March 03, 2012 3:54 PM:
+> > I'm confused. If I know exactly that the hardware is Tegra30 (which it
+> > definitely should be if I include tegra30.dtsi), then why list "tegra20-pwm"
+> > as compatible?
+> > 
+> > Or did you mean to list tegra30-pwm as compatible value in the PWM driver?
+> 
+> Standard practice is to list the exact model of the HW as the first entry
+> in compatible in the .dts file:
+> 
+>     nvidia,tegra30-pwm
+> 
+> This is so that the DT always describes exactly which HW model is actually
+> present, so that if HW-model-specific WARs/... are required in the future,
+> the DT already lists that information up-front.
+> 
+> Then additionally list any older HW models that this HW is also compatible
+> with:
+> 
+>     nvidia,tegra20-pwm
+> 
+> 
+> This allows the driver to list just nvidia,tegra20-pwm but still bind
+> to DT nodes that are for later HW.
+> 
+> So, in other words, you end up with the following in the .dts/.dtsi file:
+> 
+>     compatible = "nvidia,tegra30-pwm", "nvidia,tegra20-pwm";
 
-> On Fri, 2012-03-02 at 14:42 -0800, Kevin Hilman wrote:
->> When using the SMPS regulators to scale voltages, the regulator
->> framework may pass a minimum voltage that is not an exact OPP voltage.
->> For the VC/VP controlled voltage domains, we must ensure that the
->> voltage requested is the exact voltage from the OPP table.  This is
->> especially critical when using SR.
->> 
->> To fix, voltdm_scale() uses the target voltage passed to walk through
->> the OPP voltages until it finds a voltage that is >= one of the OPP
->> voltages.
->
-> I have just one question to this, how about smartreflex class1p5? Do we
-> have any plans for that one? The old implementation at least was using
-> voltdm_scale, so if we modify this function, smartreflex class1p5
-> doesn't work anymore.
+Okay, that makes sense now. For some reason I thought you were suggesting to
+put the same into tegra20.dtsi as well. I'll add nvidia,tegra30-pwm to the
+compatible list in the driver and list both values in the tegra30.dtsi.
+Thanks for explaining.
 
-Since it's not in mainline, that is not my concern at the moment.  We
-can worry about SR1.5 when I someone is motivated to push it upstream.
+> > > Could you also write binding documentation, in particular explaining
+> > > what the two pwm-cells are specifically for Tegra:
+> > >
+> > > Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
+> > >
+> > > (although perhaps that'd be part of the previous patch which implements
+> > > the driver)
+> > 
+> > Actually for Tegra the values would be those documented in the generic
+> > binding because Tegra uses of_pwm_simple_xlate(). Does it still make sense to
+> > add a Tegra-specific binding?
+> 
+> There should still be a Tegra-specific binding. Without it, there's no
+> definite way to know whether the "standard" properties actually apply,
+> or someone simply forgot to document it.
 
-> Otherwise this patch looks good to me.
+Understood. I assume that both the Tegra20 and Tegra30 variants should have
+explicit bindings then as well, right?
 
-Thanks for looking.
-
-Kevin
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120305/e22d2f46/attachment.sig>
