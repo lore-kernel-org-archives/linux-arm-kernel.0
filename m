@@ -1,23 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Mar 2012 20:58:41 +0000
-Subject: [PATCH 0/9] DMA engine cookie handling cleanups
-In-Reply-To: <CACRpkda9R3c0dt95w0N7Fe5es16CqbWtsCKMaFq-nwSYV4bk-w@mail.gmail.com>
-References: <20120305201411.GA17791@n2100.arm.linux.org.uk>
- <CACRpkda9R3c0dt95w0N7Fe5es16CqbWtsCKMaFq-nwSYV4bk-w@mail.gmail.com>
-Message-ID: <20120305205841.GB17791@n2100.arm.linux.org.uk>
+From: timur@freescale.com (Timur Tabi)
+Date: Mon, 5 Mar 2012 15:08:06 -0600
+Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
+In-Reply-To: <20120305204456.GC3224@opensource.wolfsonmicro.com>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
+ <20120305174232.GA3852@pengutronix.de>
+ <CAKGA1bn7y8xQn-o=8CZj5nwcvaBvHwxqM0Q2wzFAwJsSgi1sfA@mail.gmail.com>
+ <20120305204456.GC3224@opensource.wolfsonmicro.com>
+Message-ID: <4F552B36.9020708@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 09:50:51PM +0100, Linus Walleij wrote:
-> On Mon, Mar 5, 2012 at 9:14 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> > This patch series cleans up the handling of cookies in DMA engine drivers.
-> > This is done by providing a set of inline library functions for common
-> > tasks:
-> 
-> Overall this looks good, but I have a problem:
-> patch [1/9] does not appear in any subscribed accounts (it may be on
-> my @stericsson.com address, will check tomorrow)
+Mark Brown wrote:
 
-Patch 1 is just a couple of line changes to mv_xor.[ch]
+> That would be *really* bad, simultaneous playback and record is very
+> widely used.
+
+Especially since I already have that working on PowerPC.  I went through
+great lengths to get the device tree binding and the code working in this
+regard.
+
+> If the hardware has constraints on the sample rates the driver should be
+> telling the application about this.  For the very common case where you
+> need the same rate for playback and record there's framework support for
+> doing this, the relevant driver just needs to set the symmetric_rates
+> flag and the core will do everything.  
+
+And my driver currently does this.  If the SSI is wired up in synchronous
+mode, sample rate/size locking is enabled.
+
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
