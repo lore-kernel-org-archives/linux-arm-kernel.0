@@ -1,10 +1,10 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Mar 2012 15:13:53 -0500 (EST)
-Subject: [PATCH v3 30/30] ARM: orion5x: use fixed PCI i/o mapping
-In-Reply-To: <1330658022-14559-31-git-send-email-robherring2@gmail.com>
+Date: Mon, 05 Mar 2012 14:14:46 -0500 (EST)
+Subject: [PATCH v3 11/30] ARM: orion5x: clean-up mach/io.h
+In-Reply-To: <1330658022-14559-12-git-send-email-robherring2@gmail.com>
 References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
- <1330658022-14559-31-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1203051513210.31242@xanadu.home>
+ <1330658022-14559-12-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1203051414240.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,8 +12,7 @@ On Thu, 1 Mar 2012, Rob Herring wrote:
 
 > From: Rob Herring <rob.herring@calxeda.com>
 > 
-> orion5x i/o handling must have been broken as it had no __io()
-> translation. It may actually work now.
+> Move orion5x specific mach/io.h parts into common.h.
 > 
 > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > Cc: Lennert Buytenhek <kernel@wantstofly.org>
@@ -21,50 +20,78 @@ On Thu, 1 Mar 2012, Rob Herring wrote:
 
 Acked-by: Nicolas Pitre <nico@linaro.org>
 
+
+
 > ---
->  arch/arm/mach-orion5x/common.c |   16 ++++++----------
->  1 files changed, 6 insertions(+), 10 deletions(-)
+>  arch/arm/mach-orion5x/common.h          |    9 +++++++++
+>  arch/arm/mach-orion5x/include/mach/io.h |   12 ------------
+>  arch/arm/mach-orion5x/pci.c             |    1 +
+>  arch/arm/mach-orion5x/tsx09-common.c    |    1 +
+>  4 files changed, 11 insertions(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-> index 0e28bae..9bab4cb 100644
-> --- a/arch/arm/mach-orion5x/common.c
-> +++ b/arch/arm/mach-orion5x/common.c
-> @@ -24,6 +24,7 @@
->  #include <asm/timex.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> +#include <asm/mach/pci.h>
->  #include <asm/mach/time.h>
->  #include <mach/bridge-regs.h>
->  #include <mach/hardware.h>
-> @@ -44,16 +45,6 @@ static struct map_desc orion5x_io_desc[] __initdata = {
->  		.length		= ORION5X_REGS_SIZE,
->  		.type		= MT_DEVICE,
->  	}, {
-> -		.virtual	= ORION5X_PCIE_IO_VIRT_BASE,
-> -		.pfn		= __phys_to_pfn(ORION5X_PCIE_IO_PHYS_BASE),
-> -		.length		= ORION5X_PCIE_IO_SIZE,
-> -		.type		= MT_DEVICE,
-> -	}, {
-> -		.virtual	= ORION5X_PCI_IO_VIRT_BASE,
-> -		.pfn		= __phys_to_pfn(ORION5X_PCI_IO_PHYS_BASE),
-> -		.length		= ORION5X_PCI_IO_SIZE,
-> -		.type		= MT_DEVICE,
-> -	}, {
->  		.virtual	= ORION5X_PCIE_WA_VIRT_BASE,
->  		.pfn		= __phys_to_pfn(ORION5X_PCIE_WA_PHYS_BASE),
->  		.length		= ORION5X_PCIE_WA_SIZE,
-> @@ -63,6 +54,11 @@ static struct map_desc orion5x_io_desc[] __initdata = {
+> diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
+> index d2513ac..2e6454c 100644
+> --- a/arch/arm/mach-orion5x/common.h
+> +++ b/arch/arm/mach-orion5x/common.h
+> @@ -57,5 +57,14 @@ struct meminfo;
+>  struct tag;
+>  extern void __init tag_fixup_mem32(struct tag *, char **, struct meminfo *);
 >  
->  void __init orion5x_map_io(void)
->  {
-> +	unsigned long pci_io_pfn[] = {
-> +		__phys_to_pfn(ORION5X_PCI_IO_PHYS_BASE),
-> +		__phys_to_pfn(ORION5X_PCIE_IO_PHYS_BASE),
-> +	};
-> +	pci_map_io_pfn(pci_io_pfn, ARRAY_SIZE(pci_io_pfn));
->  	iotable_init(orion5x_io_desc, ARRAY_SIZE(orion5x_io_desc));
->  }
+> +/*****************************************************************************
+> + * Helpers to access Orion registers
+> + ****************************************************************************/
+> +/*
+> + * These are not preempt-safe.  Locks, if needed, must be taken
+> + * care of by the caller.
+> + */
+> +#define orion5x_setbits(r, mask)	writel(readl(r) | (mask), (r))
+> +#define orion5x_clrbits(r, mask)	writel(readl(r) & ~(mask), (r))
+>  
+>  #endif
+> diff --git a/arch/arm/mach-orion5x/include/mach/io.h b/arch/arm/mach-orion5x/include/mach/io.h
+> index e9d9afd..444136d 100644
+> --- a/arch/arm/mach-orion5x/include/mach/io.h
+> +++ b/arch/arm/mach-orion5x/include/mach/io.h
+> @@ -18,16 +18,4 @@
+>  #define __io(a)			__typesafe_io(a)
+>  #define __mem_pci(a)		(a)
+>  
+> -
+> -/*****************************************************************************
+> - * Helpers to access Orion registers
+> - ****************************************************************************/
+> -/*
+> - * These are not preempt-safe.  Locks, if needed, must be taken
+> - * care of by the caller.
+> - */
+> -#define orion5x_setbits(r, mask)	writel(readl(r) | (mask), (r))
+> -#define orion5x_clrbits(r, mask)	writel(readl(r) & ~(mask), (r))
+> -
+> -
+>  #endif
+> diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
+> index 09a045f..a9d2151 100644
+> --- a/arch/arm/mach-orion5x/pci.c
+> +++ b/arch/arm/mach-orion5x/pci.c
+> @@ -19,6 +19,7 @@
+>  #include <asm/mach/pci.h>
+>  #include <plat/pcie.h>
+>  #include <plat/addr-map.h>
+> +#include <mach/orion5x.h>
+>  #include "common.h"
+>  
+>  /*****************************************************************************
+> diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
+> index c9abb8f..7189827 100644
+> --- a/arch/arm/mach-orion5x/tsx09-common.c
+> +++ b/arch/arm/mach-orion5x/tsx09-common.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/mv643xx_eth.h>
+>  #include <linux/timex.h>
+>  #include <linux/serial_reg.h>
+> +#include <mach/orion5x.h>
+>  #include "tsx09-common.h"
+>  #include "common.h"
 >  
 > -- 
 > 1.7.5.4
