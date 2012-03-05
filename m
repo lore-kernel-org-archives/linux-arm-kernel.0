@@ -1,53 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Mar 2012 15:14:13 -0800
-Subject: [PATCH v2 2/2] ARM: OMAP: sram: Add am33xx SRAM support (minimal)
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433179FC35@DBDE01.ent.ti.com>
-References: <1329113715-7634-1-git-send-email-afzal@ti.com>
- <87fweeyfp6.fsf@macbook.be.48ers.dk>
- <B5906170F1614E41A8A28DE3B8D121433179FC35@DBDE01.ent.ti.com>
-Message-ID: <20120305231413.GP12083@atomide.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 6 Mar 2012 07:45:33 +0800
+Subject: [PATCH v2 01/17] ASoC: imx: move eukrea audmux call into ASoC
+ machine driver
+In-Reply-To: <20120305192759.GB3852@pengutronix.de>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-2-git-send-email-shawn.guo@linaro.org>
+ <20120305174612.GY3224@opensource.wolfsonmicro.com>
+ <20120305192759.GB3852@pengutronix.de>
+Message-ID: <20120305234531.GJ16232@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Bedia, Vaibhav <vaibhav.bedia@ti.com> [120213 07:36]:
-> On Mon, Feb 13, 2012 at 19:54:05, Peter Korsgaard wrote:
-> > >>>>> "Afzal" == Afzal Mohammed <afzal@ti.com> writes:
-> > 
-> >  Afzal> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> >  Afzal> Update SRAM start & size for am33xx SoC's.
-> > 
+On Mon, Mar 05, 2012 at 08:27:59PM +0100, Sascha Hauer wrote:
+...
+> For patches 01-08 I can give my:
 > 
-> This is a really awkward quoting style :|
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> > 
-> > I don't particular know the omap sram stuff, but doesn't the 33xx have
-> > 2x 64K blocks of SRAM?
-> > 
+> The rest I would like to test. Shawn, on what is this series based? It
+> neither applies on v3.3-rc6 nor on arm-soc/for-next.
 > 
-> Yes, but since the lower 64KB will not be available on non-GP device and
-> only A8 can access it, for now we make use of the higher 64KB which is referred
-> to as the OCMC RAM in the TRM. This will also enable SRAM usage by other drivers
-> like PRU and McASP.
-> 
-> >  
-> >  Afzal> +static inline int am33xx_sram_init(void)
-> >  Afzal> +{
-> >  Afzal> +	return 0;
-> > 
-> > 
-> > I know you mentioned it in the commit message, but it might be good with
-> > a comment here as well that this dummy function is needed to not get the 34xx
-> > init function called for 33xx, so it doesn't get removed when somebody
-> > decides to cleanup.
-> 
-> You are right in saying that the dummy function is needed to avoid 34xx SRAM init.
-> We'll have some PM related code coming in soon and hopefully the SRAM code won't change
-> Without us noticing ;)
+As I intend to have the series go through Mark's tree, I based it on
+sound/for-next.
 
-OK, applying into fixes-non-critical-part2. Our sram.c should get turned
-into a device driver, there's been already similar sram driver posted
-to LAKML. So that should allow us to remove the cpu_is_xxxx checks.
-
+-- 
 Regards,
-
-Tony
+Shawn
