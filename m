@@ -1,40 +1,59 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 5 Mar 2012 11:17:08 +0100
-Subject: [PATCH v5 4/4] clk: basic clock hardware types
-In-Reply-To: <20120305092948.GV3852@pengutronix.de>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-5-git-send-email-mturquette@linaro.org>
- <20120304174229.GD11546@lunn.ch>
- <CAJOA=zNWN6L+-YEkNKoQnjnrrswNpCBmtnhKBm04HekWP46i5w@mail.gmail.com>
- <20120305084823.GD24858@lunn.ch>
- <20120305092948.GV3852@pengutronix.de>
-Message-ID: <20120305101708.GF24858@lunn.ch>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 05 Mar 2012 19:24:38 +0900
+Subject: [PATCH 1/2] mmc: sdhci-s3c: Use CONFIG_PM_SLEEP to ifdef system
+ suspend
+In-Reply-To: <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <4F51697C.40408@samsung.com>
+ <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <4F549466.5090708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I think i can wrap your simple gate clock, to make my "complex" gate
-> > clock. What would help is if you would EXPORT_SYMBOL_GPL
-> > clk_gate_enable() and clk_gate_disable(), since they do exactly what i
-> > want. I can then build my own clk_ops structure, with my own
-> > unprepare() function. I would probably use DEFINE_CLK_GATE as is, and
-> > then at run time, before calling __clk_init() overwrite the .ops with
-> > my own version.
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+
+On 03/03/2012 09:46 AM, Mark Brown wrote:
+
+> This matches current best practice as one can have runtime PM enabled
+> without system sleep and CONFIG_PM is defined for both.
 > 
-> Maybe I don't get your point, but clk_unprepare should be used when
-> you have to sleep to disable your clock. When clk_gate_disable() is
-> exactly why do you want to use clk_unprepare instead of clk_disable?
-
-I'm trying to avoid having to implement a new clock provider. The
-whole point of the generic clk code is to consolidate code. It seems
-silly to create a new clk provider which is 95% identical to Mike's
-gated provider, if i can avoid it.
-
-If i stuff it into clk_disable(), it means i cannot use the basic gate
-clock Mike provides in the generic clock framework. Which is a shame,
-since it does exactly what i want in terms of gating the clock.
-
-If i can use unprepare(), which basic gate does not use, i can use
-Mikes code, and just extend it. It is there, it is unused, so why not
-use it?
-
-    Andrew
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |    9 +++++----
+>  1 files changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index ea0767e..46152d6 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_gpio.h>
+> +#include <linux/pm.h>
+>  
+>  #include <linux/mmc/host.h>
+>  
+> @@ -807,8 +808,7 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_PM
+> -
+> +#ifdef CONFIG_PM_SLEEP
+>  static int sdhci_s3c_suspend(struct device *dev)
+>  {
+>  	struct sdhci_host *host = dev_get_drvdata(dev);
+> @@ -822,10 +822,11 @@ static int sdhci_s3c_resume(struct device *dev)
+>  
+>  	return sdhci_resume_host(host);
+>  }
+> +#endif
+>  
+> +#ifdef CONFIG_PM
+>  static const struct dev_pm_ops sdhci_s3c_pmops = {
+> -	.suspend	= sdhci_s3c_suspend,
+> -	.resume		= sdhci_s3c_resume,
+> +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_s3c_suspend, sdhci_s3c_resume)
+>  };
+>  
+>  #define SDHCI_S3C_PMOPS (&sdhci_s3c_pmops)
