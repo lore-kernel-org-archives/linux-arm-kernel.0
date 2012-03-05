@@ -1,22 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 5 Mar 2012 16:07:59 +0800
-Subject: [PATCH 20/20] ASoC: fsl: add imx-sgtl5000 machine driver
-In-Reply-To: <4F53FC06.1020805@freescale.com>
-References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-21-git-send-email-shawn.guo@linaro.org>
- <4F53FC06.1020805@freescale.com>
-Message-ID: <20120305080757.GE16232@S2101-09.ap.freescale.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 05 Mar 2012 13:24:54 +0530
+Subject: [PATCH v2 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
+In-Reply-To: <4F476228.7060607@ti.com>
+References: <1329996409-26861-1-git-send-email-rnayak@ti.com>
+ <4F476228.7060607@ti.com>
+Message-ID: <4F54714E.6080805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 04, 2012 at 11:34:31PM +0000, Tabi Timur-B04825 wrote:
-> Shawn Guo wrote:
-> > +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
-> 
-> I encourage developers to put their own name in the MODULE_AUTHOR macro.
-> 
-Seems you get a strong opinion on this.  Okay, will put my name there.
+On Friday 24 February 2012 03:40 PM, Rajendra Nayak wrote:
+> Chris,
+>
+> On Thursday 23 February 2012 04:56 PM, Rajendra Nayak wrote:
+>> Re-sending as these patches did not make it to the lists due to
+>> issues with my 'git send-email'
+>>
+>> This series mainly cleans up all instances of hardcoding's in
+>> the driver based on pdev->id. This is cleanup leading to the
+>> DT adaptation of omap_hsmmc driver.
+>>
+>> v2 mainly has some minor changes to get rid of a debug print
+>> which was still using host->id and getting rid of 'id' field
+>> entirely from omap_hsmmc_host struct.
+>>
+>> The series is tested on OMAP4SDP, OMAP4panda, OMAP3beagle and OMAP2430SDP
+>> boards.
+>
+> This series is reviewed/tested and acked by Balaji and Venkat.
+> Care to pull this in for 3.4?
+>
+> I have one other cleanup patch on top of this series to make all
+> remaining pr_* prints in the driver to dev_* [1].
+> It would be great if you could pick that up as well.
+>
+> These patches are cleanups leading to the DT conversion of omap_hsmmc
+> driver.
 
--- 
-Regards,
-Shawn
+Chris, Ping. I am basing my DT support patches on top of these cleanups.
+Would be great if you can have a look and pull them in.
+
+>
+> regards,
+> Rajendra
+>
+> [1] http://marc.info/?l=linux-mmc&m=132999677405098&w=3
+>
+>>
+>> regards,
+>> Rajendra
+>>
+>> Balaji T K (3):
+>> mmc: omap_hsmmc: use platform_get_resource_byname for tx/rx DMA
+>> channels
+>> mmc: omap_hsmmc: remove unused .set_sleep function
+>> mmc: omap_hsmmc: Use OMAP_HSMMC_SUPPORTS_DUAL_VOLT flag to remove
+>> host->id based hardcoding
+>>
+>> Rajendra Nayak (3):
+>> mmc: omap_hsmmc: Get rid of omap_hsmmc_1_set_power function
+>> mmc: omap_hsmmc: Get rid of omap_hsmmc_4_set_power function
+>> mmc: omap_hsmmc: Don't expect MMC1 to always have vmmc supply
+>>
+>> arch/arm/plat-omap/include/plat/mmc.h | 2 -
+>> drivers/mmc/host/omap_hsmmc.c | 175 +++------------------------------
+>> 2 files changed, 16 insertions(+), 161 deletions(-)
+>>
+>
