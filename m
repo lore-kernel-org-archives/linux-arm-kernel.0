@@ -1,383 +1,290 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  5 Mar 2012 22:30:52 +0800
-Subject: [PATCH v2 04/17] ARM: imx: convert audmux to a platform driver
+Date: Mon,  5 Mar 2012 22:30:53 +0800
+Subject: [PATCH v2 05/17] ASoC: imx: move audmux driver into sound/soc/imx
 In-Reply-To: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
 References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1330957865-19085-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1330957865-19085-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Zhao <richard.zhao@linaro.org>
+As audmux becomes a platform driver and its callers are all ASoC
+machine drivers, there is no reason to keep it in arch folder, so
+move it to sound/soc/imx.
 
-It coverts audmux to a platform driver, so that it can be moved into
-sound/soc/imx and adopt device tree support later.
+One bonus point would be those ASoC machine drivers stop including
+mach/audmux.h, since it's been moved to sound/soc/imx/imx-audmux.h.
+This should be a move to the right direction in terms of single kernel
+image goal.
 
-Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/mm-imx21.c |    6 ++
- arch/arm/mach-imx/mm-imx25.c |    7 ++
- arch/arm/mach-imx/mm-imx27.c |    7 ++
- arch/arm/mach-imx/mm-imx3.c  |   13 ++++
- arch/arm/mach-imx/mm-imx5.c  |   22 +++++++
- arch/arm/plat-mxc/audmux.c   |  127 ++++++++++++++++++++++++++++++------------
- 6 files changed, 147 insertions(+), 35 deletions(-)
+ arch/arm/mach-imx/Kconfig                          |    6 ------
+ arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c       |    1 -
+ arch/arm/plat-mxc/Kconfig                          |    3 ---
+ arch/arm/plat-mxc/Makefile                         |    1 -
+ sound/soc/imx/Kconfig                              |    7 +++++++
+ sound/soc/imx/Makefile                             |    2 ++
+ sound/soc/imx/eukrea-tlv320.c                      |    2 +-
+ .../audmux.c => sound/soc/imx/imx-audmux.c         |    3 ++-
+ .../mach/audmux.h => sound/soc/imx/imx-audmux.h    |    6 +++---
+ sound/soc/imx/mx27vis-aic32x4.c                    |    2 +-
+ sound/soc/imx/phycore-ac97.c                       |    3 ++-
+ sound/soc/imx/wm1133-ev1.c                         |    3 +--
+ 12 files changed, 19 insertions(+), 20 deletions(-)
+ rename arch/arm/plat-mxc/audmux.c => sound/soc/imx/imx-audmux.c (99%)
+ rename arch/arm/plat-mxc/include/mach/audmux.h => sound/soc/imx/imx-audmux.h (96%)
 
-diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
-index 3f05dfe..14d540e 100644
---- a/arch/arm/mach-imx/mm-imx21.c
-+++ b/arch/arm/mach-imx/mm-imx21.c
-@@ -75,6 +75,10 @@ void __init mx21_init_irq(void)
- 	mxc_init_irq(MX21_IO_ADDRESS(MX21_AVIC_BASE_ADDR));
- }
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 495a854..3919fba 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -46,7 +46,6 @@ config SOC_IMX21
+ 	bool
+ 	select MACH_MX21
+ 	select CPU_ARM926T
+-	select ARCH_MXC_AUDMUX
+ 	select IMX_HAVE_DMA_V1
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MXC_AVIC
+@@ -55,7 +54,6 @@ config SOC_IMX25
+ 	bool
+ 	select ARCH_MX25
+ 	select CPU_ARM926T
+-	select ARCH_MXC_AUDMUX
+ 	select ARCH_MXC_IOMUX_V3
+ 	select MXC_AVIC
  
-+static const struct resource imx21_audmux_res[] __initconst = {
-+	DEFINE_RES_MEM(MX21_AUDMUX_BASE_ADDR, SZ_4K),
-+};
+@@ -63,7 +61,6 @@ config SOC_IMX27
+ 	bool
+ 	select MACH_MX27
+ 	select CPU_ARM926T
+-	select ARCH_MXC_AUDMUX
+ 	select IMX_HAVE_DMA_V1
+ 	select IMX_HAVE_IOMUX_V1
+ 	select MXC_AVIC
+@@ -72,7 +69,6 @@ config SOC_IMX31
+ 	bool
+ 	select CPU_V6
+ 	select IMX_HAVE_PLATFORM_MXC_RNGA
+-	select ARCH_MXC_AUDMUX
+ 	select MXC_AVIC
+ 	select SMP_ON_UP if SMP
+ 
+@@ -80,7 +76,6 @@ config SOC_IMX35
+ 	bool
+ 	select CPU_V6
+ 	select ARCH_MXC_IOMUX_V3
+-	select ARCH_MXC_AUDMUX
+ 	select HAVE_EPIT
+ 	select MXC_AVIC
+ 	select SMP_ON_UP if SMP
+@@ -89,7 +84,6 @@ config SOC_IMX5
+ 	select CPU_V7
+ 	select MXC_TZIC
+ 	select ARCH_MXC_IOMUX_V3
+-	select ARCH_MXC_AUDMUX
+ 	select ARCH_HAS_CPUFREQ
+ 	select ARCH_MX5
+ 	bool
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c
+index d817fc8..aaa592f 100644
+--- a/arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimxsd-baseboard.c
+@@ -37,7 +37,6 @@
+ #include <mach/hardware.h>
+ #include <mach/common.h>
+ #include <mach/iomux-mx51.h>
+-#include <mach/audmux.h>
+ 
+ #include "devices-imx51.h"
+ 
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index 0461d16..c722f9c 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -88,9 +88,6 @@ config IMX_HAVE_IOMUX_V1
+ config ARCH_MXC_IOMUX_V3
+ 	bool
+ 
+-config ARCH_MXC_AUDMUX
+-	bool
+-
+ config IRAM_ALLOC
+ 	bool
+ 	select GENERIC_ALLOCATOR
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index 530c81d..e81290c 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -14,7 +14,6 @@ obj-$(CONFIG_IRAM_ALLOC) += iram_alloc.o
+ obj-$(CONFIG_MXC_PWM)  += pwm.o
+ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+ obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+-obj-$(CONFIG_ARCH_MXC_AUDMUX) += audmux.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
+ ifdef CONFIG_SND_IMX_SOC
+diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
+index aa4294b..d3b7166 100644
+--- a/sound/soc/imx/Kconfig
++++ b/sound/soc/imx/Kconfig
+@@ -16,11 +16,15 @@ config SND_MXC_SOC_MX2
+ 	select SND_SOC_DMAENGINE_PCM
+ 	tristate
+ 
++config SND_SOC_IMX_AUDMUX
++	tristate
 +
- void __init imx21_soc_init(void)
- {
- 	mxc_register_gpio("imx21-gpio", 0, MX21_GPIO1_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
-@@ -85,4 +89,6 @@ void __init imx21_soc_init(void)
- 	mxc_register_gpio("imx21-gpio", 5, MX21_GPIO6_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+ config SND_MXC_SOC_WM1133_EV1
+ 	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
+ 	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
+ 	select SND_SOC_WM8350
+ 	select SND_MXC_SOC_FIQ
++	select SND_SOC_IMX_AUDMUX
+ 	help
+ 	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
+ 	  PMIC board with WM8835x fitted.
+@@ -30,6 +34,7 @@ config SND_SOC_MX27VIS_AIC32X4
+ 	depends on MACH_IMX27_VISSTRIM_M10 && I2C
+ 	select SND_SOC_TLV320AIC32X4
+ 	select SND_MXC_SOC_MX2
++	select SND_SOC_IMX_AUDMUX
+ 	help
+ 	  Say Y if you want to add support for SoC audio on Visstrim SM10
+ 	  board with TLV320AIC32X4 codec.
+@@ -40,6 +45,7 @@ config SND_SOC_PHYCORE_AC97
+ 	select SND_SOC_AC97_BUS
+ 	select SND_SOC_WM9712
+ 	select SND_MXC_SOC_FIQ
++	select SND_SOC_IMX_AUDMUX
+ 	help
+ 	  Say Y if you want to add support for SoC audio on Phytec phyCORE
+ 	  and phyCARD boards in AC97 mode
+@@ -53,6 +59,7 @@ config SND_SOC_EUKREA_TLV320
+ 	depends on I2C
+ 	select SND_SOC_TLV320AIC23
+ 	select SND_MXC_SOC_FIQ
++	select SND_SOC_IMX_AUDMUX
+ 	help
+ 	  Enable I2S based access to the TLV320AIC23B codec attached
+ 	  to the SSI interface
+diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
+index d6d609b..5c40541 100644
+--- a/sound/soc/imx/Makefile
++++ b/sound/soc/imx/Makefile
+@@ -2,10 +2,12 @@
+ snd-soc-imx-objs := imx-ssi.o
+ snd-soc-imx-fiq-objs := imx-pcm-fiq.o
+ snd-soc-imx-mx2-objs := imx-pcm-dma-mx2.o
++snd-soc-imx-audmux-objs := imx-audmux.o
  
- 	imx_add_imx_dma();
-+	platform_device_register_simple("imx21-audmux", 0, imx21_audmux_res,
-+					ARRAY_SIZE(imx21_audmux_res));
- }
-diff --git a/arch/arm/mach-imx/mm-imx25.c b/arch/arm/mach-imx/mm-imx25.c
-index cc4d152..153b457 100644
---- a/arch/arm/mach-imx/mm-imx25.c
-+++ b/arch/arm/mach-imx/mm-imx25.c
-@@ -83,6 +83,10 @@ static struct sdma_platform_data imx25_sdma_pdata __initdata = {
- 	.script_addrs = &imx25_sdma_script,
- };
+ obj-$(CONFIG_SND_IMX_SOC) += snd-soc-imx.o
+ obj-$(CONFIG_SND_MXC_SOC_FIQ) += snd-soc-imx-fiq.o
+ obj-$(CONFIG_SND_MXC_SOC_MX2) += snd-soc-imx-mx2.o
++obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
  
-+static const struct resource imx25_audmux_res[] __initconst = {
-+	DEFINE_RES_MEM(MX25_AUDMUX_BASE_ADDR, SZ_16K),
-+};
-+
- void __init imx25_soc_init(void)
- {
- 	/* i.mx25 has the i.mx31 type gpio */
-@@ -93,4 +97,7 @@ void __init imx25_soc_init(void)
+ # i.MX Machine Support
+ snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
+diff --git a/sound/soc/imx/eukrea-tlv320.c b/sound/soc/imx/eukrea-tlv320.c
+index bfcb6d9..b375ed4 100644
+--- a/sound/soc/imx/eukrea-tlv320.c
++++ b/sound/soc/imx/eukrea-tlv320.c
+@@ -23,10 +23,10 @@
+ #include <sound/pcm.h>
+ #include <sound/soc.h>
+ #include <asm/mach-types.h>
+-#include <mach/audmux.h>
  
- 	/* i.mx25 has the i.mx35 type sdma */
- 	imx_add_imx_sdma("imx35-sdma", MX25_SDMA_BASE_ADDR, MX25_INT_SDMA, &imx25_sdma_pdata);
-+	/* i.mx25 has the i.mx31 type audmux */
-+	platform_device_register_simple("imx31-audmux", 0, imx25_audmux_res,
-+					ARRAY_SIZE(imx25_audmux_res));
- }
-diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-index 96dd1f5..8cb3f5e 100644
---- a/arch/arm/mach-imx/mm-imx27.c
-+++ b/arch/arm/mach-imx/mm-imx27.c
-@@ -75,6 +75,10 @@ void __init mx27_init_irq(void)
- 	mxc_init_irq(MX27_IO_ADDRESS(MX27_AVIC_BASE_ADDR));
- }
+ #include "../codecs/tlv320aic23.h"
+ #include "imx-ssi.h"
++#include "imx-audmux.h"
  
-+static const struct resource imx27_audmux_res[] __initconst = {
-+	DEFINE_RES_MEM(MX27_AUDMUX_BASE_ADDR, SZ_4K),
-+};
-+
- void __init imx27_soc_init(void)
- {
- 	/* i.mx27 has the i.mx21 type gpio */
-@@ -86,4 +90,7 @@ void __init imx27_soc_init(void)
- 	mxc_register_gpio("imx21-gpio", 5, MX27_GPIO6_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+ #define CODEC_CLOCK 12000000
  
- 	imx_add_imx_dma();
-+	/* imx27 has the imx21 type audmux */
-+	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
-+					ARRAY_SIZE(imx27_audmux_res));
- }
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index 31807d2..2530c15 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -158,6 +158,10 @@ static struct sdma_platform_data imx31_sdma_pdata __initdata = {
- 	.script_addrs = &imx31_to2_sdma_script,
- };
- 
-+static const struct resource imx31_audmux_res[] __initconst = {
-+	DEFINE_RES_MEM(MX31_AUDMUX_BASE_ADDR, SZ_16K),
-+};
-+
- void __init imx31_soc_init(void)
- {
- 	int to_version = mx31_revision() >> 4;
-@@ -175,6 +179,8 @@ void __init imx31_soc_init(void)
- 	}
- 
- 	imx_add_imx_sdma("imx31-sdma", MX31_SDMA_BASE_ADDR, MX31_INT_SDMA, &imx31_sdma_pdata);
-+	platform_device_register_simple("imx31-audmux", 0, imx31_audmux_res,
-+					ARRAY_SIZE(imx31_audmux_res));
- }
- #endif /* ifdef CONFIG_SOC_IMX31 */
- 
-@@ -241,6 +247,10 @@ static struct sdma_platform_data imx35_sdma_pdata __initdata = {
- 	.script_addrs = &imx35_to2_sdma_script,
- };
- 
-+static const struct resource imx35_audmux_res[] __initconst = {
-+	DEFINE_RES_MEM(MX35_AUDMUX_BASE_ADDR, SZ_16K),
-+};
-+
- void __init imx35_soc_init(void)
- {
- 	int to_version = mx35_revision() >> 4;
-@@ -259,5 +269,8 @@ void __init imx35_soc_init(void)
- 	}
- 
- 	imx_add_imx_sdma("imx35-sdma", MX35_SDMA_BASE_ADDR, MX35_INT_SDMA, &imx35_sdma_pdata);
-+	/* i.mx35 has the i.mx31 type audmux */
-+	platform_device_register_simple("imx31-audmux", 0, imx35_audmux_res,
-+					ARRAY_SIZE(imx35_audmux_res));
- }
- #endif /* ifdef CONFIG_SOC_IMX35 */
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index bc17dfe..90d7880 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -170,6 +170,18 @@ static struct sdma_platform_data imx53_sdma_pdata __initdata = {
- 	.script_addrs = &imx53_sdma_script,
- };
- 
-+static const struct resource imx50_audmux_res[] __initconst = {
-+	DEFINE_RES_MEM(MX50_AUDMUX_BASE_ADDR, SZ_16K),
-+};
-+
-+static const struct resource imx51_audmux_res[] __initconst = {
-+	DEFINE_RES_MEM(MX51_AUDMUX_BASE_ADDR, SZ_16K),
-+};
-+
-+static const struct resource imx53_audmux_res[] __initconst = {
-+	DEFINE_RES_MEM(MX53_AUDMUX_BASE_ADDR, SZ_16K),
-+};
-+
- void __init imx50_soc_init(void)
- {
- 	/* i.mx50 has the i.mx31 type gpio */
-@@ -179,6 +191,10 @@ void __init imx50_soc_init(void)
- 	mxc_register_gpio("imx31-gpio", 3, MX50_GPIO4_BASE_ADDR, SZ_16K, MX50_INT_GPIO4_LOW, MX50_INT_GPIO4_HIGH);
- 	mxc_register_gpio("imx31-gpio", 4, MX50_GPIO5_BASE_ADDR, SZ_16K, MX50_INT_GPIO5_LOW, MX50_INT_GPIO5_HIGH);
- 	mxc_register_gpio("imx31-gpio", 5, MX50_GPIO6_BASE_ADDR, SZ_16K, MX50_INT_GPIO6_LOW, MX50_INT_GPIO6_HIGH);
-+
-+	/* i.mx50 has the i.mx31 type audmux */
-+	platform_device_register_simple("imx31-audmux", 0, imx50_audmux_res,
-+					ARRAY_SIZE(imx50_audmux_res));
- }
- 
- void __init imx51_soc_init(void)
-@@ -191,6 +207,9 @@ void __init imx51_soc_init(void)
- 
- 	/* i.mx51 has the i.mx35 type sdma */
- 	imx_add_imx_sdma("imx35-sdma", MX51_SDMA_BASE_ADDR, MX51_INT_SDMA, &imx51_sdma_pdata);
-+	/* i.mx51 has the i.mx31 type audmux */
-+	platform_device_register_simple("imx31-audmux", 0, imx51_audmux_res,
-+					ARRAY_SIZE(imx51_audmux_res));
- }
- 
- void __init imx53_soc_init(void)
-@@ -206,4 +225,7 @@ void __init imx53_soc_init(void)
- 
- 	/* i.mx53 has the i.mx35 type sdma */
- 	imx_add_imx_sdma("imx35-sdma", MX53_SDMA_BASE_ADDR, MX53_INT_SDMA, &imx53_sdma_pdata);
-+	/* i.mx53 has the i.mx31 type audmux */
-+	platform_device_register_simple("imx31-audmux", 0, imx53_audmux_res,
-+					ARRAY_SIZE(imx53_audmux_res));
- }
-diff --git a/arch/arm/plat-mxc/audmux.c b/arch/arm/plat-mxc/audmux.c
-index b49a39f..a8c9e04 100644
+diff --git a/arch/arm/plat-mxc/audmux.c b/sound/soc/imx/imx-audmux.c
+similarity index 99%
+rename from arch/arm/plat-mxc/audmux.c
+rename to sound/soc/imx/imx-audmux.c
+index a8c9e04..7b16266 100644
 --- a/arch/arm/plat-mxc/audmux.c
-+++ b/arch/arm/plat-mxc/audmux.c
-@@ -1,4 +1,6 @@
- /*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2012 Linaro Ltd.
-  * Copyright 2009 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
-  *
-  * Initial development of this code was funded by
-@@ -15,14 +17,16 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/module.h>
--#include <linux/err.h>
--#include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/debugfs.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
++++ b/sound/soc/imx/imx-audmux.c
+@@ -24,7 +24,8 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
  #include <linux/slab.h>
- #include <mach/audmux.h>
--#include <mach/hardware.h>
+-#include <mach/audmux.h>
 +
-+#define DRIVER_NAME "imx-audmux"
++#include "imx-audmux.h"
  
- static struct clk *audmux_clk;
- static void __iomem *audmux_base;
-@@ -140,7 +144,7 @@ static const struct file_operations audmux_debugfs_fops = {
- 	.llseek = default_llseek,
- };
+ #define DRIVER_NAME "imx-audmux"
  
--static void audmux_debugfs_init(void)
-+static void __init audmux_debugfs_init(void)
- {
- 	int i;
- 	char buf[20];
-@@ -159,18 +163,48 @@ static void audmux_debugfs_init(void)
- 				   i);
- 	}
- }
-+
-+static void __exit audmux_debugfs_remove(void)
-+{
-+	debugfs_remove_recursive(audmux_debugfs_root);
-+}
- #else
- static inline void audmux_debugfs_init(void)
- {
- }
-+
-+static inline void audmux_debugfs_remove(void)
-+{
-+}
- #endif
+diff --git a/arch/arm/plat-mxc/include/mach/audmux.h b/sound/soc/imx/imx-audmux.h
+similarity index 96%
+rename from arch/arm/plat-mxc/include/mach/audmux.h
+rename to sound/soc/imx/imx-audmux.h
+index 6fda788..5136d948 100644
+--- a/arch/arm/plat-mxc/include/mach/audmux.h
++++ b/sound/soc/imx/imx-audmux.h
+@@ -1,5 +1,5 @@
+-#ifndef __MACH_AUDMUX_H
+-#define __MACH_AUDMUX_H
++#ifndef __IMX_AUDMUX_H
++#define __IMX_AUDMUX_H
  
-+enum imx_audmux_type {
-+	IMX21_AUDMUX,
-+	IMX31_AUDMUX,
-+} audmux_type;
-+
-+static struct platform_device_id imx_audmux_ids[] = {
-+	{
-+		.name = "imx21-audmux",
-+		.driver_data = IMX21_AUDMUX,
-+	}, {
-+		.name = "imx31-audmux",
-+		.driver_data = IMX31_AUDMUX,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(platform, imx_audmux_ids);
-+
- static const uint8_t port_mapping[] = {
- 	0x0, 0x4, 0x8, 0x10, 0x14, 0x1c,
- };
- 
- int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr)
- {
-+	if (audmux_type != IMX21_AUDMUX)
-+		return -EINVAL;
-+
- 	if (!audmux_base)
- 		return -ENOSYS;
- 
-@@ -186,6 +220,9 @@ EXPORT_SYMBOL_GPL(mxc_audmux_v1_configure_port);
+ #define MX27_AUDMUX_HPCR1_SSI0		0
+ #define MX27_AUDMUX_HPCR2_SSI1		1
+@@ -57,4 +57,4 @@ int mxc_audmux_v1_configure_port(unsigned int port, unsigned int pcr);
  int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
- 		unsigned int pdcr)
- {
-+	if (audmux_type != IMX31_AUDMUX)
-+		return -EINVAL;
-+
- 	if (!audmux_base)
- 		return -ENOSYS;
+ 		unsigned int pdcr);
  
-@@ -202,41 +239,61 @@ int mxc_audmux_v2_configure_port(unsigned int port, unsigned int ptcr,
- }
- EXPORT_SYMBOL_GPL(mxc_audmux_v2_configure_port);
+-#endif /* __MACH_AUDMUX_H */
++#endif /* __IMX_AUDMUX_H */
+diff --git a/sound/soc/imx/mx27vis-aic32x4.c b/sound/soc/imx/mx27vis-aic32x4.c
+index 155899c..dbfad0f 100644
+--- a/sound/soc/imx/mx27vis-aic32x4.c
++++ b/sound/soc/imx/mx27vis-aic32x4.c
+@@ -32,11 +32,11 @@
+ #include <sound/soc-dapm.h>
+ #include <sound/tlv.h>
+ #include <asm/mach-types.h>
+-#include <mach/audmux.h>
+ #include <mach/iomux-mx27.h>
  
--static int mxc_audmux_init(void)
-+static int __init imx_audmux_probe(struct platform_device *pdev)
- {
--	int ret;
--	if (cpu_is_mx51()) {
--		audmux_base = MX51_IO_ADDRESS(MX51_AUDMUX_BASE_ADDR);
--	} else if (cpu_is_mx31()) {
--		audmux_base = MX31_IO_ADDRESS(MX31_AUDMUX_BASE_ADDR);
--	} else if (cpu_is_mx35()) {
--		audmux_clk = clk_get(NULL, "audmux");
--		if (IS_ERR(audmux_clk)) {
--			ret = PTR_ERR(audmux_clk);
--			printk(KERN_ERR "%s: cannot get clock: %d\n", __func__,
--					ret);
--			return ret;
--		}
--		audmux_base = MX35_IO_ADDRESS(MX35_AUDMUX_BASE_ADDR);
--	} else if (cpu_is_mx25()) {
--		audmux_clk = clk_get(NULL, "audmux");
--		if (IS_ERR(audmux_clk)) {
--			ret = PTR_ERR(audmux_clk);
--			printk(KERN_ERR "%s: cannot get clock: %d\n", __func__,
--					ret);
--			return ret;
--		}
--		audmux_base = MX25_IO_ADDRESS(MX25_AUDMUX_BASE_ADDR);
--	} else if (cpu_is_mx27()) {
--		audmux_base = MX27_IO_ADDRESS(MX27_AUDMUX_BASE_ADDR);
--	} else if (cpu_is_mx21()) {
--		audmux_base = MX21_IO_ADDRESS(MX21_AUDMUX_BASE_ADDR);
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	audmux_base = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!audmux_base)
-+		return -EADDRNOTAVAIL;
-+
-+	audmux_clk = clk_get(&pdev->dev, "audmux");
-+	if (IS_ERR(audmux_clk)) {
-+		dev_dbg(&pdev->dev, "cannot get clock: %ld\n",
-+				PTR_ERR(audmux_clk));
-+		audmux_clk = NULL;
- 	}
+ #include "../codecs/tlv320aic32x4.h"
+ #include "imx-ssi.h"
++#include "imx-audmux.h"
  
--	if (!cpu_is_mx2())
-+	audmux_type = pdev->id_entry->driver_data;
-+	if (audmux_type == IMX31_AUDMUX)
- 		audmux_debugfs_init();
+ #define MX27VIS_AMP_GAIN	0
+ #define MX27VIS_AMP_MUTE	1
+diff --git a/sound/soc/imx/phycore-ac97.c b/sound/soc/imx/phycore-ac97.c
+index a59692e..7dab077 100644
+--- a/sound/soc/imx/phycore-ac97.c
++++ b/sound/soc/imx/phycore-ac97.c
+@@ -18,7 +18,8 @@
+ #include <sound/pcm.h>
+ #include <sound/soc.h>
+ #include <asm/mach-types.h>
+-#include <mach/audmux.h>
++
++#include "imx-audmux.h"
  
- 	return 0;
- }
+ static struct snd_soc_card imx_phycore;
  
--postcore_initcall(mxc_audmux_init);
-+static int __exit imx_audmux_remove(struct platform_device *pdev)
-+{
-+	if (audmux_type == IMX31_AUDMUX)
-+		audmux_debugfs_remove();
-+	clk_put(audmux_clk);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver imx_audmux_driver = {
-+	.probe		= imx_audmux_probe,
-+	.remove		= __exit_p(imx_audmux_remove),
-+	.id_table	= imx_audmux_ids,
-+	.driver	= {
-+		.name	= DRIVER_NAME,
-+		.owner	= THIS_MODULE,
-+	}
-+};
-+
-+static int __init imx_audmux_init(void)
-+{
-+	return platform_driver_register(&imx_audmux_driver);
-+}
-+subsys_initcall(imx_audmux_init);
-+
-+static void __exit imx_audmux_exit(void)
-+{
-+	platform_driver_unregister(&imx_audmux_driver);
-+}
-+module_exit(imx_audmux_exit);
-+
-+MODULE_DESCRIPTION("Freescale i.MX AUDMUX driver");
-+MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:" DRIVER_NAME);
+diff --git a/sound/soc/imx/wm1133-ev1.c b/sound/soc/imx/wm1133-ev1.c
+index 37480c9..15056d6 100644
+--- a/sound/soc/imx/wm1133-ev1.c
++++ b/sound/soc/imx/wm1133-ev1.c
+@@ -21,10 +21,9 @@
+ #include <sound/pcm_params.h>
+ #include <sound/soc.h>
+ 
+-#include <mach/audmux.h>
+-
+ #include "imx-ssi.h"
+ #include "../codecs/wm8350.h"
++#include "imx-audmux.h"
+ 
+ /* There is a silicon mic on the board optionally connected via a solder pad
+  * SP1.  Define this to enable it.
 -- 
 1.7.5.4
