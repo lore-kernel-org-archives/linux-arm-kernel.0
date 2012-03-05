@@ -1,63 +1,29 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Mon,  5 Mar 2012 20:21:49 +0800
-Subject: [PATCH v2 5/7] ARM: mmp: append OF support on pxa168
+Date: Mon,  5 Mar 2012 20:21:50 +0800
+Subject: [PATCH v2 6/7] ARM: dts: append DTS file of pxa168
 In-Reply-To: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1330950111-30797-6-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1330950111-30797-7-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PXA168 and aspenite support.
+DTS files of both PXA168 and aspenite are appended.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/mach-mmp/Kconfig  |   10 ++++++
- arch/arm/mach-mmp/Makefile |    1 +
- arch/arm/mach-mmp/mmp-dt.c |   75 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 86 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mmp/mmp-dt.c
+ arch/arm/boot/dts/pxa168-aspenite.dts |   38 +++++++++++++
+ arch/arm/boot/dts/pxa168.dtsi         |   98 +++++++++++++++++++++++++++++++++
+ 2 files changed, 136 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/pxa168-aspenite.dts
+ create mode 100644 arch/arm/boot/dts/pxa168.dtsi
 
-diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-index 323d4c9..5a90b9a 100644
---- a/arch/arm/mach-mmp/Kconfig
-+++ b/arch/arm/mach-mmp/Kconfig
-@@ -2,6 +2,16 @@ if ARCH_MMP
- 
- menu "Marvell PXA168/910/MMP2 Implmentations"
- 
-+config MACH_MMP_DT
-+	bool "Support MMP2 platforms from device tree"
-+	select CPU_PXA168
-+	select CPU_PXA910
-+	select USE_OF
-+	help
-+	  Include support for Marvell MMP2 based platforms using
-+	  the device tree. Needn't select any other machine while
-+	  MACH_MMP_DT is enabled.
-+
- config MACH_ASPENITE
- 	bool "Marvell's PXA168 Aspenite Development Board"
- 	select CPU_PXA168
-diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-index ba254a7..4fc0ff5 100644
---- a/arch/arm/mach-mmp/Makefile
-+++ b/arch/arm/mach-mmp/Makefile
-@@ -18,5 +18,6 @@ obj-$(CONFIG_MACH_TTC_DKB)	+= ttc_dkb.o
- obj-$(CONFIG_MACH_BROWNSTONE)	+= brownstone.o
- obj-$(CONFIG_MACH_FLINT)	+= flint.o
- obj-$(CONFIG_MACH_MARVELL_JASPER) += jasper.o
-+obj-$(CONFIG_MACH_MMP_DT)	+= mmp-dt.o
- obj-$(CONFIG_MACH_TETON_BGA)	+= teton_bga.o
- obj-$(CONFIG_MACH_GPLUGD)	+= gplugd.o
-diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
+diff --git a/arch/arm/boot/dts/pxa168-aspenite.dts b/arch/arm/boot/dts/pxa168-aspenite.dts
 new file mode 100644
-index 0000000..6707539
+index 0000000..e762fac
 --- /dev/null
-+++ b/arch/arm/mach-mmp/mmp-dt.c
-@@ -0,0 +1,75 @@
++++ b/arch/arm/boot/dts/pxa168-aspenite.dts
+@@ -0,0 +1,38 @@
 +/*
-+ *  linux/arch/arm/mach-mmp/mmp-dt.c
-+ *
 + *  Copyright (C) 2012 Marvell Technology Group Ltd.
 + *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
 + *
@@ -66,69 +32,138 @@ index 0000000..6707539
 + *  publishhed by the Free Software Foundation.
 + */
 +
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+#include <mach/irqs.h>
++/dts-v1/;
++/include/ "pxa168.dtsi"
 +
-+#include "common.h"
++/ {
++	model = "Marvell PXA168 Aspenite Development Board";
++	compatible = "mrvl,pxa168-aspenite", "mrvl,pxa168";
 +
-+extern struct sys_timer pxa168_timer;
-+extern void __init icu_init_irq(void);
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/nfs nfsroot=192.168.1.100:/nfsroot/ ip=192.168.1.101:192.168.1.100::255.255.255.0::eth0:on";
++	};
 +
-+static const struct of_dev_auxdata mmp_auxdata_lookup[] __initconst = {
-+	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4026000, "pxa2xx-uart.2", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4025000, "pxa2xx-i2c.1", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
-+	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
-+	{}
++	memory {
++		reg = <0x00000000 0x04000000>;
++	};
++
++	soc {
++		apb at d4000000 {
++			uart1: uart at d4017000 {
++				status = "okay";
++			};
++			twsi1: i2c at d4011000 {
++				status = "okay";
++			};
++			rtc: rtc at d4010000 {
++				status = "okay";
++			};
++		};
++	};
 +};
+diff --git a/arch/arm/boot/dts/pxa168.dtsi b/arch/arm/boot/dts/pxa168.dtsi
+new file mode 100644
+index 0000000..d32d512
+--- /dev/null
++++ b/arch/arm/boot/dts/pxa168.dtsi
+@@ -0,0 +1,98 @@
++/*
++ *  Copyright (C) 2012 Marvell Technology Group Ltd.
++ *  Author: Haojian Zhuang <haojian.zhuang@marvell.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  publishhed by the Free Software Foundation.
++ */
 +
-+static int __init mmp_intc_add_irq_domain(struct device_node *np,
-+					   struct device_node *parent)
-+{
-+	irq_domain_add_simple(np, 0);
-+	return 0;
-+}
++/include/ "skeleton.dtsi"
 +
-+static int __init mmp_gpio_add_irq_domain(struct device_node *np,
-+					   struct device_node *parent)
-+{
-+	irq_domain_add_simple(np, IRQ_GPIO_START);
-+	return 0;
-+}
++/ {
++	aliases {
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		i2c0 = &twsi1;
++		i2c1 = &twsi2;
++	};
 +
-+static const struct of_device_id mmp_irq_match[] __initconst = {
-+	{ .compatible = "mrvl,mmp-intc", .data = mmp_intc_add_irq_domain, },
-+	{ .compatible = "mrvl,mmp-gpio", .data = mmp_gpio_add_irq_domain, },
-+	{}
++	intc: intc-interrupt-controller at d4282000 {
++		compatible = "mrvl,mmp-intc", "mrvl,intc";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		reg = <0xd4282000 0x1000>;
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&intc>;
++		ranges;
++
++		apb at d4000000 {	/* APB */
++			compatible = "mrvl,apb-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0xd4000000 0x00200000>;
++			ranges;
++
++			uart1: uart at d4017000 {
++				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
++				reg = <0xd4017000 0x1000>;
++				interrupts = <27>;
++				status = "disabled";
++			};
++
++			uart2: uart at d4018000 {
++				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
++				reg = <0xd4018000 0x1000>;
++				interrupts = <28>;
++				status = "disabled";
++			};
++
++			uart3: uart at d4026000 {
++				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
++				reg = <0xd4026000 0x1000>;
++				interrupts = <29>;
++				status = "disabled";
++			};
++
++			gpio: gpio at d4019000 {
++				compatible = "mrvl,mmp-gpio", "mrvl,pxa-gpio";
++				reg = <0xd4019000 0x1000>;
++				interrupts = <49>;
++				interrupt-names = "gpio_mux";
++				gpio-controller;
++				#gpio-cells = <1>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++			};
++
++			twsi1: i2c at d4011000 {
++				compatible = "mrvl,mmp-twsi", "mrvl,pxa-i2c";
++				reg = <0xd4011000 0x1000>;
++				interrupts = <7>;
++				mrvl,i2c-fast-mode;
++				status = "disabled";
++			};
++
++			twsi2: i2c at d4025000 {
++				compatible = "mrvl,mmp-twsi", "mrvl,pxa-i2c";
++				reg = <0xd4025000 0x1000>;
++				interrupts = <58>;
++				status = "disabled";
++			};
++
++			rtc: rtc at d4010000 {
++				compatible = "mrvl,mmp-rtc";
++				reg = <0xd4010000 0x1000>;
++				interrupts = <5 6>;
++				interrupt-names = "rtc 1Hz", "rtc alarm";
++				status = "disabled";
++			};
++		};
++	};
 +};
-+
-+static void __init mmp_dt_init(void)
-+{
-+
-+	of_irq_init(mmp_irq_match);
-+
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     mmp_auxdata_lookup, NULL);
-+}
-+
-+static const char *pxa168_dt_board_compat[] __initdata = {
-+	"mrvl,pxa168-aspenite",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
-+	.map_io		= mmp_map_io,
-+	.init_irq	= icu_init_irq,
-+	.timer		= &pxa168_timer,
-+	.init_machine	= mmp_dt_init,
-+	.dt_compat	= pxa168_dt_board_compat,
-+MACHINE_END
 -- 
 1.7.0.4
