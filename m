@@ -1,50 +1,18 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 5 Mar 2012 16:27:27 -0500 (EST)
-Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init
- funcs to fdt
-In-Reply-To: <20120305211737.GO5050@titan.lakedaemon.net>
-References: <cover.1330709314.git.jason@lakedaemon.net>
- <alpine.LFD.2.02.1203051344130.31242@xanadu.home>
- <20120305191546.GK5050@titan.lakedaemon.net>
- <201203052016.26949.arnd@arndb.de>
- <20120305202941.GN5050@titan.lakedaemon.net>
- <alpine.LFD.2.02.1203051542190.31242@xanadu.home>
- <20120305211737.GO5050@titan.lakedaemon.net>
-Message-ID: <alpine.LFD.2.02.1203051626370.31242@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 05 Mar 2012 13:33:20 -0800
+Subject: [PATCH v7 0/9] Consolidate cpuidle functionality
+In-Reply-To: <1330562578-3410-1-git-send-email-rob.lee@linaro.org> (Robert
+ Lee's message of "Wed, 29 Feb 2012 18:42:49 -0600")
+References: <1330562578-3410-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <87y5reivhb.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Mar 2012, Jason wrote:
+Robert Lee <rob.lee@linaro.org> writes:
 
-> On Mon, Mar 05, 2012 at 03:43:42PM -0500, Nicolas Pitre wrote:
-> > On Mon, 5 Mar 2012, Jason wrote:
-> > 
-> > > On Mon, Mar 05, 2012 at 08:16:26PM +0000, Arnd Bergmann wrote:
-> > > > On Monday 05 March 2012, Jason wrote:
-> > > > > > 
-> > > > > > The clock frequency part being hardcoded to 200000 in the common .dtsi 
-> > > > > > file looks wrong.  The clock may differ, and it used to (and should) be 
-> > > > > > probed at run time, please see kirkwood_find_tclk().
-> > > > > 
-> > > > > So, should I EXPORT_SYMBOL_GPL(kirkwood_find_tclk); and have each driver
-> > > > > call it?
-> > > > 
-> > > > If the drivers want to use it, I think it has to be orion_find_tclk for
-> > > > drivers that are shared between multiple plat-orion platforms.
-> > > 
-> > > That's pretty much all of them  :-)
-> > > 
-> > > I'll rename it and move it to plat-orion/common.c.  This'll be fun.
-> > 
-> > No no...  This is not a function which is generic at all.  The _result_ 
-> > i.e. core clock frequency value is a generic thing, not the method to 
-> > determine it.
-> 
-> How about this?  Export a global variable, orion_tclk, and a function to
-> read it.  Then, make sure each sub arch sets the global.  Does this
-> sound viable until common clk lands?
+> This patch series moves various functionality duplicated in platform 
+> cpuidle drivers to the core cpuidle driver. Also, the platform irq
+> disabling was removed as it appears that all calls into 
+> cpuidle_call_idle will have already called local_irq_disable().
 
-Yep, looks fine.
-
-
-Nicolas
+Reviewed-by: Kevin Hilman <khilman@ti.com>
