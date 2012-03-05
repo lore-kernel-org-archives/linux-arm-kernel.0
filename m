@@ -1,40 +1,70 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 4 Mar 2012 22:41:13 -0500
-Subject: [GIT PULL v3] ARM: kirkwood: fdt: convert kirkwood init funcs to fdt
-Message-ID: <20120305034113.GB5050@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 04 Mar 2012 21:50:22 -0600
+Subject: [PULL] generic irq chip and pl061 irqdomain support
+In-Reply-To: <4F3ADFE7.4090409@gmail.com>
+References: <4F3ADFE7.4090409@gmail.com>
+Message-ID: <4F5437FE.2000306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 759a45185ac0e4dfaf8bbfcb390ec73aca4b7a34:
+Grant,
 
-  ARM: kirkwood: convert uart0 to devicetree. (2012-02-27 16:21:44 +0000)
+On 02/14/2012 04:27 PM, Rob Herring wrote:
+> Grant,
+> 
+> Please pull. This is based on your current branch which you have said
+> you plan to rebase, so feel free to rebase these as you need to. This
+> has been tested on highbank and i.MX5.
+> 
+
+Ping.
+
+I've rebased onto your current tree. Updated pull request:
+
+The following changes since commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e:
+
+  mfd: twl-core: Add IRQ_DOMAIN dependency (2012-02-26 16:48:06 -0700)
 
 are available in the git repository at:
-  git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt
+  git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
 
-Arnd,
+Rob Herring (3):
+      ARM: kconfig: always select IRQ_DOMAIN
+      irq: add irq_domain support to generic-chip
+      gpio: pl061: enable interrupts with DT style binding
 
-Sorry for the redo, here's what changed:
-	orion-spi: put #ifdef CONFIG_OF around of_device_id
-	rtc-mv: put #ifdef CONFIG_OF around of_device_id
-	rtc-mv: more accurate compatible strings
-	orion-wdt: put #ifdef CONFIG_OF around of_device_id
-	orion-wdt: more accurate compatible strings
+ .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/common/Kconfig                            |    2 -
+ drivers/gpio/gpio-pl061.c                          |   48 ++++---
+ include/linux/irq.h                                |   15 ++
+ kernel/irq/generic-chip.c                          |  152
++++++++++++++++++---
+ 6 files changed, 186 insertions(+), 48 deletions(-)
 
-Jason Cooper (5):
-      ARM: kirkwood: covert orion-spi to fdt.
-      ARM: kirkwood: move var setting to correct location.
-      ARM: kirkwood: fdt: absorb kirkwood_init()
-      ARM: kirkwood: convert rtc-mv to fdt.
-      ARM: kirkwood: convert orion-wdt to fdt.
+Rob
 
- arch/arm/boot/dts/kirkwood-dreamplug.dts |   34 +++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi          |   12 +++++
- arch/arm/mach-kirkwood/board-dt.c        |   67 +++++++++++------------------
- arch/arm/mach-kirkwood/common.c          |   21 +++++++--
- arch/arm/mach-kirkwood/common.h          |    6 +++
- arch/arm/plat-orion/common.c             |    7 +++-
- drivers/rtc/rtc-mv.c                     |   10 ++++
- drivers/spi/spi-orion.c                  |   39 +++++++++++++++--
- drivers/watchdog/orion_wdt.c             |   49 ++++++++++++++++-----
- 9 files changed, 182 insertions(+), 63 deletions(-)
+> 
+> The following changes since commit 98ecf5260207e45ad587a5dc16c39f5ede467a45:
+> 
+>   irq_domain/microblaze: Convert microblaze to use irq_domains
+> (2012-02-05 23:02:26 -0700)
+> 
+> are available in the git repository at:
+>   git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
+> 
+> Rob Herring (3):
+>       ARM: kconfig: always select IRQ_DOMAIN
+>       irq: add irq_domain support to generic-chip
+>       gpio: pl061: enable interrupts with DT style binding
+> 
+>  .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
+>  arch/arm/Kconfig                                   |    2 +-
+>  arch/arm/common/Kconfig                            |    2 -
+>  drivers/gpio/gpio-pl061.c                          |   48 ++++---
+>  include/linux/irq.h                                |   15 ++
+>  kernel/irq/generic-chip.c                          |  152
+> +++++++++++++++++---
+>  6 files changed, 186 insertions(+), 48 deletions(-)
+> 
+> Rob
