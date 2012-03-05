@@ -1,36 +1,48 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Mar 2012 15:29:30 -0500 (EST)
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE861683@HQMAIL01.nvidia.com>
-References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861683@HQMAIL01.nvidia.com>
-Message-ID: <alpine.LFD.2.02.1203051525490.31242@xanadu.home>
+From: jason@lakedaemon.net (Jason)
+Date: Mon, 5 Mar 2012 15:29:41 -0500
+Subject: [PULL REQUEST v2] ARM: kirkwood: fdt: convert kirkwood init
+ funcs to fdt
+In-Reply-To: <201203052016.26949.arnd@arndb.de>
+References: <cover.1330709314.git.jason@lakedaemon.net>
+ <alpine.LFD.2.02.1203051344130.31242@xanadu.home>
+ <20120305191546.GK5050@titan.lakedaemon.net>
+ <201203052016.26949.arnd@arndb.de>
+Message-ID: <20120305202941.GN5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Mar 2012, Stephen Warren wrote:
-
-> Stephen Warren wrote at Tuesday, February 28, 2012 5:03 PM:
-> > uImage files typically encode a single absolute load and entry address.
-> > This is inconvenient when attempting to share that uImage across multiple
-> > SoCs with different physical RAM addresses. Recent versions of mkimage
-> > implement a "kernel_noload" image type which encodes no absolute load
-> > address, and a relative entry address. This works well for uImage-wrapped
-> > ARM zImages, since they are relocatable.
+On Mon, Mar 05, 2012 at 08:16:26PM +0000, Arnd Bergmann wrote:
+> On Monday 05 March 2012, Jason wrote:
+> > > 
+> > > The clock frequency part being hardcoded to 200000 in the common .dtsi 
+> > > file looks wrong.  The clock may differ, and it used to (and should) be 
+> > > probed at run time, please see kirkwood_find_tclk().
 > > 
-> > This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
-> > "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
+> > So, should I EXPORT_SYMBOL_GPL(kirkwood_find_tclk); and have each driver
+> > call it?
 > 
-> So Russell, are you NAKing this patch then?
+> If the drivers want to use it, I think it has to be orion_find_tclk for
+> drivers that are shared between multiple plat-orion platforms.
+
+That's pretty much all of them  :-)
+
+I'll rename it and move it to plat-orion/common.c.  This'll be fun.
+
+> > One alternate idea I had was to have kirkwood-dreamplug.dts root hold
+> > 
+> > tclk: clock-frequency = <200000000>;
+> > 
+> > and then have the drivers ask for it.  afaict, tclk is constant per
+> > board.
+> > 
+> > I'm fine with either way, but I'd rather have it in the dt.
 > 
-> If so, I guess I'll just go and add more cruft to my copy-a-kernel-to-
-> an-sd-card script. Which is a pity since every other person will have
-> to do the same, but oh well.
+> IMHO it's best to leave any such hacks out of the device tree for
+> now, until we have the proper clk bindings in place for kirkwood,
+> and then we can just use those.
 
-What about moving all the u-Boot bells and whistles to a generic 
-top-level Kconfig+Makefile to be shared with all architectures?  Really, 
-there is nothing very ARM specific here.
+Ok.
 
+thx,
 
-Nicolas
+Jason.
