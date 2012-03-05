@@ -1,187 +1,164 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon,  5 Mar 2012 22:41:27 +0100
-Subject: [PATCH v4] ARM: LPC32xx: Ethernet support
-Message-ID: <1330983687-32678-1-git-send-email-stigge@antcom.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 5 Mar 2012 14:43:58 -0700
+Subject: [PATCH] ARM: tegra: update defconfig
+Message-ID: <1330983838-25327-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds ethernet support to the LPC32xx ARM architecture. The actual
-driver in drivers/net is contained in a separate patch.
+Refresh tegra_defconfig:
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+New options enabled:
+* PERF_EVENTS
+* Tegra EMC scaling
+* Support for all 4 CPUs on Tegra30
+* AUTO_ZRELADDR for unified Tegra20+Tegra30 images
+* CPU_FREQ/CPU_IDLE
+* BLK_DEV_SR
+* INPUT_EVDEV
+* Regulators, including fixed, GPIO, TPS6586x
+* Audio for Tegra+ALC5632 (for Paz00/Toshiba AC100)
+* NVEC (staging, for Paz00/Toshiba AC100)
+* IOMMU for Tegra20's GART and Tegra30's SMMU
+* TEGRA_AES
 
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
+This is slightly late for 3.4, but hopefully can just squeak in.
 
-Changes from v3:
-  * Kconfig default settings adjustment (n is default)
-  * Use DEFINE_RES_MEM() and DEFINE_RES_IRQ()
-  * Removed platform_data to be presented to the driver (unused anyway)
+ arch/arm/configs/tegra_defconfig |   31 +++++++++++++++++++++----------
+ 1 files changed, 21 insertions(+), 10 deletions(-)
 
- arch/arm/mach-lpc32xx/Kconfig              |   25 +++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/clock.c              |    2 +-
- arch/arm/mach-lpc32xx/common.c             |   21 +++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.h             |    4 ++--
- arch/arm/mach-lpc32xx/include/mach/board.h |   24 ++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/irq.c                |    4 ++++
- arch/arm/mach-lpc32xx/phy3250.c            |    2 ++
- 7 files changed, 79 insertions(+), 3 deletions(-)
-
---- linux-2.6.orig/arch/arm/mach-lpc32xx/Kconfig
-+++ linux-2.6/arch/arm/mach-lpc32xx/Kconfig
-@@ -29,5 +29,30 @@ config ARCH_LPC32XX_UART6_SELECT
- 
- endmenu
- 
-+menu "LPC32XX chip components"
-+
-+config ARCH_LPC32XX_IRAM_FOR_NET
-+	bool "Use IRAM for network buffers"
-+	default y
-+	help
-+	  Say Y here to use the LPC internal fast IRAM (i.e. 256KB SRAM) as
-+	  network buffer.  If the total combined required buffer sizes is
-+	  larger than the size of IRAM, then SDRAM will be used instead.
-+
-+	  This can be enabled safely if the IRAM is not intended for other
-+	  uses.
-+
-+config ARCH_LPC32XX_MII_SUPPORT
-+	bool "Check to enable MII support or leave disabled for RMII support"
-+	help
-+	  Say Y here to enable MII support, or N for RMII support. Regardless of
-+	  which support is selected, the ethernet interface driver needs to be
-+	  selected in the device driver networking section.
-+
-+	  The PHY3250 reference board uses RMII, so users of this board should
-+	  say N.
-+
-+endmenu
-+
- endif
- 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/clock.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/clock.c
-@@ -1134,7 +1134,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK(NULL, "i2s1_ck", clk_i2s1)
- 	_REGISTER_CLOCK("ts-lpc32xx", NULL, clk_tsc)
- 	_REGISTER_CLOCK("dev:mmc0", NULL, clk_mmc)
--	_REGISTER_CLOCK("lpc-net.0", NULL, clk_net)
-+	_REGISTER_CLOCK("lpc-eth.0", NULL, clk_net)
- 	_REGISTER_CLOCK("dev:clcd", NULL, clk_lcd)
- 	_REGISTER_CLOCK("lpc32xx_udc", "ck_usbd", clk_usbd)
- 	_REGISTER_CLOCK("lpc32xx_rtc", NULL, clk_rtc)
---- linux-2.6.orig/arch/arm/mach-lpc32xx/common.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/common.c
-@@ -186,6 +186,27 @@ struct platform_device lpc32xx_ohci_devi
- };
- 
- /*
-+ * Network Support
-+ */
-+static struct resource net_resources[] = {
-+	[0] = DEFINE_RES_MEM(LPC32XX_ETHERNET_BASE, SZ_4K),
-+	[1] = DEFINE_RES_MEM(LPC32XX_IRAM_BASE, SZ_128K),
-+	[2] = DEFINE_RES_IRQ(IRQ_LPC32XX_ETHERNET),
-+};
-+
-+static u64 lpc32xx_mac_dma_mask = 0xffffffffUL;
-+struct platform_device lpc32xx_net_device = {
-+	.name = "lpc-eth",
-+	.id = 0,
-+	.dev = {
-+		.dma_mask = &lpc32xx_mac_dma_mask,
-+		.coherent_dma_mask = 0xffffffffUL,
-+	},
-+	.num_resources = ARRAY_SIZE(net_resources),
-+	.resource = net_resources,
-+};
-+
-+/*
-  * Returns the unique ID for the device
-  */
- void lpc32xx_get_uid(u32 devid[4])
---- linux-2.6.orig/arch/arm/mach-lpc32xx/common.h
-+++ linux-2.6/arch/arm/mach-lpc32xx/common.h
-@@ -19,6 +19,7 @@
- #ifndef __LPC32XX_COMMON_H
- #define __LPC32XX_COMMON_H
- 
-+#include <mach/board.h>
- #include <linux/platform_device.h>
- 
- /*
-@@ -32,6 +33,7 @@ extern struct platform_device lpc32xx_ts
- extern struct platform_device lpc32xx_adc_device;
- extern struct platform_device lpc32xx_rtc_device;
- extern struct platform_device lpc32xx_ohci_device;
-+extern struct platform_device lpc32xx_net_device;
- 
- /*
-  * Other arch specific structures and functions
-@@ -67,8 +69,6 @@ extern u32 clk_get_pclk_div(void);
-  */
- extern void lpc32xx_get_uid(u32 devid[4]);
- 
--extern u32 lpc32xx_return_iram_size(void);
--
- /*
-  * Pointers used for sizing and copying suspend function data
-  */
---- /dev/null
-+++ linux-2.6/arch/arm/mach-lpc32xx/include/mach/board.h
-@@ -0,0 +1,24 @@
-+/*
-+ * arm/arch/mach-lpc32xx/include/mach/board.h
-+ *
-+ * Author: Kevin Wells <kevin.wells@nxp.com>
-+ *
-+ * Copyright (C) 2010 NXP Semiconductors
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __ASM_ARCH_BOARD_H
-+#define __ASM_ARCH_BOARD_H
-+
-+extern u32 lpc32xx_return_iram_size(void);
-+
-+#endif  /* __ASM_ARCH_BOARD_H */
---- linux-2.6.orig/arch/arm/mach-lpc32xx/irq.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/irq.c
-@@ -150,6 +150,10 @@ static const struct lpc32xx_event_info l
- 		.event_group = &lpc32xx_event_int_regs,
- 		.mask = LPC32XX_CLKPWR_INTSRC_KEY_BIT,
- 	},
-+	[IRQ_LPC32XX_ETHERNET] = {
-+		.event_group = &lpc32xx_event_int_regs,
-+		.mask = LPC32XX_CLKPWR_INTSRC_MAC_BIT,
-+	},
- 	[IRQ_LPC32XX_USB_OTG_ATX] = {
- 		.event_group = &lpc32xx_event_int_regs,
- 		.mask = LPC32XX_CLKPWR_INTSRC_USBATXINT_BIT,
---- linux-2.6.orig/arch/arm/mach-lpc32xx/phy3250.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/phy3250.c
-@@ -37,6 +37,7 @@
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-+#include <mach/board.h>
- #include <mach/gpio-lpc32xx.h>
- #include "common.h"
- 
-@@ -278,6 +279,7 @@ static struct platform_device *phy3250_d
- 	&lpc32xx_gpio_led_device,
- 	&lpc32xx_adc_device,
- 	&lpc32xx_ohci_device,
-+	&lpc32xx_net_device,
- };
- 
- static struct amba_device *amba_devs[] __initdata = {
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index fd5d304..e7f5241 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -11,11 +11,14 @@ CONFIG_RT_GROUP_SCHED=y
+ CONFIG_BLK_DEV_INITRD=y
+ # CONFIG_ELF_CORE is not set
+ CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODULE_FORCE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_EFI_PARTITION=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_TEGRA=y
+@@ -27,18 +30,20 @@ CONFIG_MACH_PAZ00=y
+ CONFIG_MACH_TRIMSLICE=y
+ CONFIG_MACH_WARIO=y
+ CONFIG_MACH_VENTANA=y
+-CONFIG_TEGRA_DEBUG_UARTD=y
+-CONFIG_ARM_ERRATA_742230=y
++CONFIG_TEGRA_EMC_SCALING_ENABLE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_SMP=y
+-CONFIG_NR_CPUS=2
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ # CONFIG_OABI_COMPAT is not set
+ CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_AUTO_ZRELADDR=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPU_IDLE=y
+ CONFIG_VFP=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -68,7 +73,6 @@ CONFIG_IPV6_MULTIPLE_TABLES=y
+ # CONFIG_FIRMWARE_IN_KERNEL is not set
+ CONFIG_PROC_DEVICETREE=y
+ CONFIG_BLK_DEV_LOOP=y
+-CONFIG_MISC_DEVICES=y
+ CONFIG_AD525X_DPOT=y
+ CONFIG_AD525X_DPOT_I2C=y
+ CONFIG_ICS932S401=y
+@@ -76,6 +80,7 @@ CONFIG_APDS9802ALS=y
+ CONFIG_ISL29003=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
++CONFIG_BLK_DEV_SR=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_NETDEVICES=y
+ CONFIG_DUMMY=y
+@@ -85,8 +90,7 @@ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_SMSC75XX=y
+ CONFIG_USB_NET_SMSC95XX=y
+ # CONFIG_WLAN is not set
+-# CONFIG_INPUT is not set
+-# CONFIG_SERIO is not set
++CONFIG_INPUT_EVDEV=y
+ # CONFIG_VT is not set
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+@@ -96,13 +100,15 @@ CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ # CONFIG_I2C_COMPAT is not set
+-# CONFIG_I2C_HELPER_AUTO is not set
+ CONFIG_I2C_TEGRA=y
+ CONFIG_SPI=y
+ CONFIG_SPI_TEGRA=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_MFD_TPS6586X=y
+ CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
++CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_TPS6586X=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+@@ -116,11 +122,13 @@ CONFIG_SND_SOC=y
+ CONFIG_SND_SOC_TEGRA=y
+ CONFIG_SND_SOC_TEGRA_WM8903=y
+ CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
++CONFIG_SND_SOC_TEGRA_ALC5632=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_TEGRA=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
++CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+@@ -130,6 +138,11 @@ CONFIG_STAGING=y
+ CONFIG_IIO=y
+ CONFIG_SENSORS_ISL29018=y
+ CONFIG_SENSORS_AK8975=y
++CONFIG_MFD_NVEC=y
++CONFIG_KEYBOARD_NVEC=y
++CONFIG_SERIO_NVEC_PS2=y
++CONFIG_TEGRA_IOMMU_GART=y
++CONFIG_TEGRA_IOMMU_SMMU=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+@@ -143,8 +156,6 @@ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_NFS_FS=y
+ CONFIG_ROOT_NFS=y
+-CONFIG_PARTITION_ADVANCED=y
+-CONFIG_EFI_PARTITION=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
+@@ -162,9 +173,9 @@ CONFIG_DEBUG_SG=y
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+ CONFIG_CRYPTO_ECB=y
+-CONFIG_CRYPTO_AES=y
+ CONFIG_CRYPTO_ARC4=y
+ CONFIG_CRYPTO_TWOFISH=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
++CONFIG_CRYPTO_DEV_TEGRA_AES=y
+ CONFIG_CRC_CCITT=y
+ CONFIG_CRC16=y
+-- 
+1.7.0.4
