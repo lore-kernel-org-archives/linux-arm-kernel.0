@@ -1,198 +1,66 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Mar 2012 14:31:00 -0500 (EST)
-Subject: [PATCH v3 17/30] ARM: make mach/io.h include optional
-In-Reply-To: <1330658022-14559-18-git-send-email-robherring2@gmail.com>
-References: <1330658022-14559-1-git-send-email-robherring2@gmail.com>
- <1330658022-14559-18-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1203051428220.31242@xanadu.home>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 5 Mar 2012 20:32:10 +0100
+Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
+In-Reply-To: <CAKGA1bn7y8xQn-o=8CZj5nwcvaBvHwxqM0Q2wzFAwJsSgi1sfA@mail.gmail.com>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
+ <20120305174232.GA3852@pengutronix.de>
+ <CAKGA1bn7y8xQn-o=8CZj5nwcvaBvHwxqM0Q2wzFAwJsSgi1sfA@mail.gmail.com>
+Message-ID: <20120305193210.GC3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Mar 2012, Rob Herring wrote:
+On Mon, Mar 05, 2012 at 12:09:13PM -0600, Matt Sealey wrote:
+> There is in the BSP but the BSP driver is trying to be way too fancy
+> with I2S settings on the imx-ssi driver you wrote (it works well for
+> AC97, but for SSI in I2S slave mode there are so many hacks upon hacks
+> "they" have presented, it'd never mainline)
+> 
+> Having the codec provide clocks in slave mode works great in fsl-ssi
+> because it doesn't set the chip up any other way, but I've had serious
+> problems here whereby playing back a 48khz, 16-bit audio stream and
+> recording in ANYTHING else seems to make the playback stream slow
+> motion, but I can't trace whether it's the SSI config (seems unlikely
+> as the only valid STXCCR bit in slave mode is the word length) or the
+> codec config. In theory the playback and capture should be serialized
+> by the driver, though, right? It wouldn't be possible to be a slave to
+> the codec if it had to run the clock two different rates at the same
+> time.. app1 sends a sample buffer, codec does dma, app2 requests
+> capture buffer, codec does dma, they can't happen at the same time,
+> maybe we are missing an important mutex or spinlock here that would
+> enforce this and stop the configuration changing mid-stream.. I'm far
+> from the ALSA expert though)
+> 
+> If adding capture support means having to make the SSI driver work in
+> I2S master mode and do the laborious work of actually dividing the SSI
+> clock, configuring the external PLL etc. so it can clock the codec
+> appropriately for this mode then that's what will have to be done, and
+> I agree with Sascha, whatever the solution it should be something that
+> gets done now (not least because I kind of want audio here.. :) along
+> with quite possibly adapting the current imx-ssi driver (as opposed to
+> the fsl-ssi driver) to be fsl-ssi-ac97 vs fsl-ssi-imx so we have
+> dedicated operation (which will make the AC97/FIQ select much easier
+> to determine).
 
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Add a kconfig option NEED_MACH_IO_H to conditionally include mach/io.h.
-> 
-> Basing this on CONFIG_PCI and CONFIG_ISA doesn't quite work. Most ISA
-> platforms don't need mach/io.h, but ebsa110 does. Most PCI platforms need
-> mach/io.h for now, but ks8695 doesn't which means it's broken? omap has a
-> lot of other stuff in its io.h, so it also needs io.h until it is cleaned
-> up.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> ---
->  arch/arm/Kconfig          |   19 +++++++++++++++++++
->  arch/arm/include/asm/io.h |    5 +++++
->  2 files changed, 24 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 92c9c79..ae016cd 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -186,6 +186,9 @@ config GENERIC_ISA_DMA
->  config FIQ
->  	bool
->  
-> +config NEED_MACH_IO_H
-> +	bool
-> +
->  config ARCH_MTD_XIP
->  	bool
->  
+master mode shouldn't be necessary to get the sgtl5000 work with both
+recording and playback. I have seen it working on the babbage board in
+slave mode on some internal branch. I never got the sgtl5000 mainline
+driver to work though.
 
-I'd locate this next to the NEED_MACH_MEMORY_H definition as they have 
-identical purposes.  Other than that:
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-> @@ -265,6 +268,7 @@ config ARCH_INTEGRATOR
->  	select GENERIC_CLOCKEVENTS
->  	select PLAT_VERSATILE
->  	select PLAT_VERSATILE_FPGA_IRQ
-> +	select NEED_MACH_IO_H
->  	select NEED_MACH_MEMORY_H
->  	help
->  	  Support for ARM's Integrator platform.
-> @@ -400,6 +404,7 @@ config ARCH_EBSA110
->  	select ISA
->  	select NO_IOPORT
->  	select ARCH_USES_GETTIMEOFFSET
-> +	select NEED_MACH_IO_H
->  	select NEED_MACH_MEMORY_H
->  	help
->  	  This is an evaluation board for the StrongARM processor available
-> @@ -426,6 +431,7 @@ config ARCH_FOOTBRIDGE
->  	select FOOTBRIDGE
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_IDE
-> +	select NEED_MACH_IO_H
->  	select NEED_MACH_MEMORY_H
->  	help
->  	  Support for systems based on the DC21285 companion chip
-> @@ -478,6 +484,7 @@ config ARCH_IOP13XX
->  	select PCI
->  	select ARCH_SUPPORTS_MSI
->  	select VMSPLIT_1G
-> +	select NEED_MACH_IO_H
->  	select NEED_MACH_MEMORY_H
->  	help
->  	  Support for Intel's IOP13XX (XScale) family of processors.
-> @@ -486,6 +493,7 @@ config ARCH_IOP32X
->  	bool "IOP32x-based"
->  	depends on MMU
->  	select CPU_XSCALE
-> +	select NEED_MACH_IO_H
->  	select PLAT_IOP
->  	select PCI
->  	select ARCH_REQUIRE_GPIOLIB
-> @@ -497,6 +505,7 @@ config ARCH_IOP33X
->  	bool "IOP33x-based"
->  	depends on MMU
->  	select CPU_XSCALE
-> +	select NEED_MACH_IO_H
->  	select PLAT_IOP
->  	select PCI
->  	select ARCH_REQUIRE_GPIOLIB
-> @@ -509,6 +518,7 @@ config ARCH_IXP23XX
->  	select CPU_XSC3
->   	select PCI
->  	select ARCH_USES_GETTIMEOFFSET
-> +	select NEED_MACH_IO_H
->  	select NEED_MACH_MEMORY_H
->  	help
->  	  Support for Intel's IXP23xx (XScale) family of processors.
-> @@ -519,6 +529,7 @@ config ARCH_IXP2000
->  	select CPU_XSCALE
->  	select PCI
->  	select ARCH_USES_GETTIMEOFFSET
-> +	select NEED_MACH_IO_H
->  	select NEED_MACH_MEMORY_H
->  	help
->  	  Support for Intel's IXP2400/2800 (XScale) family of processors.
-> @@ -532,6 +543,7 @@ config ARCH_IXP4XX
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_SCHED_CLOCK
->  	select MIGHT_HAVE_PCI
-> +	select NEED_MACH_IO_H
->  	select DMABOUNCE if PCI
->  	help
->  	  Support for Intel's IXP4XX (XScale) family of processors.
-> @@ -542,6 +554,7 @@ config ARCH_DOVE
->  	select PCI
->  	select ARCH_REQUIRE_GPIOLIB
->  	select GENERIC_CLOCKEVENTS
-> +	select NEED_MACH_IO_H
->  	select PLAT_ORION
->  	help
->  	  Support for the Marvell Dove SoC 88AP510
-> @@ -552,6 +565,7 @@ config ARCH_KIRKWOOD
->  	select PCI
->  	select ARCH_REQUIRE_GPIOLIB
->  	select GENERIC_CLOCKEVENTS
-> +	select NEED_MACH_IO_H
->  	select PLAT_ORION
->  	help
->  	  Support for the following Marvell Kirkwood series SoCs:
-> @@ -576,6 +590,7 @@ config ARCH_MV78XX0
->  	select PCI
->  	select ARCH_REQUIRE_GPIOLIB
->  	select GENERIC_CLOCKEVENTS
-> +	select NEED_MACH_IO_H
->  	select PLAT_ORION
->  	help
->  	  Support for the following Marvell MV78xx0 series SoCs:
-> @@ -645,6 +660,7 @@ config ARCH_TEGRA
->  	select HAVE_SCHED_CLOCK
->  	select HAVE_SMP
->  	select MIGHT_HAVE_CACHE_L2X0
-> +	select NEED_MACH_IO_H if PCI
->  	select ARCH_HAS_CPUFREQ
->  	help
->  	  This enables support for NVIDIA Tegra based systems (Tegra APX,
-> @@ -739,6 +755,7 @@ config ARCH_RPC
->  	select ARCH_SPARSEMEM_ENABLE
->  	select ARCH_USES_GETTIMEOFFSET
->  	select HAVE_IDE
-> +	select NEED_MACH_IO_H
->  	select NEED_MACH_MEMORY_H
->  	help
->  	  On the Acorn Risc-PC, Linux can support the internal IDE disk and
-> @@ -771,6 +788,7 @@ config ARCH_S3C2410
->  	select CLKDEV_LOOKUP
->  	select ARCH_USES_GETTIMEOFFSET
->  	select HAVE_S3C2410_I2C if I2C
-> +	select NEED_MACH_IO_H
->  	help
->  	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
->  	  BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or
-> @@ -877,6 +895,7 @@ config ARCH_SHARK
->  	select PCI
->  	select ARCH_USES_GETTIMEOFFSET
->  	select NEED_MACH_MEMORY_H
-> +	select NEED_MACH_IO_H
->  	help
->  	  Support for the StrongARM based Digital DNARD machine, also known
->  	  as "Shark" (<http://www.shark-linux.de/shark.html>).
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index 9bf9d00..cd8c125 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -109,7 +109,12 @@ static inline void __iomem *__typesafe_io(unsigned long addr)
->  /*
->   * Now, pick up the machine-defined IO definitions
->   */
-> +#ifdef CONFIG_NEED_MACH_IO_H
->  #include <mach/io.h>
-> +#else
-> +#define __io(a)		({ (void)(a); __typesafe_io(0); })
-> +#define __mem_pci(a)	(a)
-> +#endif
->  
->  /*
->   * This is the limit of PC card/PCI/ISA IO space, which is by default
-> -- 
-> 1.7.5.4
 > 
+> While we're at it; did anyone patch arch/arm/mach-imx/ssi-fiq.S to be
+> compiled in .arm mode yet? I can't find it in a tree or the list but I
+> could be wrong. I am sure we mutually agreed (or at least Russell
+> decided) on this to get thumb kernels to build again since none of the
+> dependent processors/config selections are M-profile?
+
+I think we agreed on compiliing this in arm mode but nobody has sent a
+patch yet.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
