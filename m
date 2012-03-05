@@ -1,36 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 5 Mar 2012 16:15:20 +0000
-Subject: [PATCH v2 11/17] ASoC: fsl: create fsl_utils to accommodate the
- common functions
-In-Reply-To: <4F54E065.8060905@freescale.com>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-12-git-send-email-shawn.guo@linaro.org>
- <20120305144920.GR3224@opensource.wolfsonmicro.com>
- <4F54E065.8060905@freescale.com>
-Message-ID: <20120305161520.GT3224@opensource.wolfsonmicro.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Mon,  5 Mar 2012 17:16:22 +0100
+Subject: [PATCH 00/14] dmaengine: imx-dma: merge dma arch code into dmaengine.
+Message-ID: <1330964196-32623-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 09:48:53AM -0600, Timur Tabi wrote:
-> Mark Brown wrote:
+The following series have to be applied on top of the following patches:
+[PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+[PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
 
-> > This doesn't seem at all Freescale specific, it should be a generic
-> > helper, and in fact there already is one - the machine driver can set
-> > codec_of_node in the card structure to point to the device node and then
-> > the core should figure out binding to the device for you.  If it doesn't
-> > we should fix the core.
+As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+is deprecated and no new patches are accepted for it.
 
-> Can we do that in another patch set, so that it doesn't hold up Shawn's
-> work?  All this patch does is move the code from one file to another, so
-> it's not like he's adding a feature incorrectly.
+This series merges this code into the imx-dma.c dmaengine driver.
 
-Well, it shouldn't be much effort - instead of removing the code just
-delete it mostly - and there's other issues that need to be looked at
-anyway.  There's also the arch/arm stuff that needs review...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120305/614b0279/attachment.sig>
+[PATCH 01/14] dmaengine: imx-dma: merge old dma-v1.c with imx-dma.c
+[PATCH 02/14] dmaengine: imx-dma: remove data member form internal structure.
+[PATCH 03/14] dmaengine: imx-dma: remove dma_mode member of internal structure.
+[PATCH 04/14] dmaengine: imx-dma: remove 'imxdma_setup_mem2mem_hw' function.
+[PATCH 05/14] dmaengine: imx-dma: remove 'imxdma_config_channel_hw' function.
+[PATCH 06/14] dmaengine: imx-dma: remove 'imxdma_setup_sg_hw' function.
+[PATCH 07/14] dmaengine: imx-dma: remove sg member from internal structure.
+[PATCH 08/14] dmaengine: imx-dma: remove in_use field of internal structure.
+[PATCH 09/14] dmaengine: imx-dma: remove resbytes field of internal structure.
+[PATCH 10/14] dmaengine: imx-dma: remove internal structure.
+[PATCH 11/14] dmaengine: imx-dma: remove unused arg of imxdma_sg_next.
+[PATCH 12/14] dmaengine: imx-dma: integrate 'imx_dmav1_baseaddr' and 'dma_clk' inside dmaengine structure.
+[PATCH 13/14] dmaengine: imx-dma: use dev_dbg and dev_warn for messages.
+[PATCH 14/14] dmaengine: imx-dma: remove  dma-v1.c and dma-v1.h
