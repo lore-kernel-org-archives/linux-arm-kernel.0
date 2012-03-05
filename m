@@ -1,44 +1,47 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon,  5 Mar 2012 17:41:47 -0500
-Subject: [PATCH 0/3] arm: fix build breakage in omap2plus_defconfig
- (linux-next)
-Message-ID: <1330987310-8108-1-git-send-email-paul.gortmaker@windriver.com>
+Date: Mon,  5 Mar 2012 17:41:49 -0500
+Subject: [PATCH 2/3] arm: fix compile error in mach-omap2/board-omap4panda.c
+In-Reply-To: <1330987310-8108-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1330987310-8108-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1330987310-8108-3-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I decided to look at why this thing was dying in linux-next for
-over two weeks now:
+The commit 3c90c98a1ebbb08d95700ce8a3b7bce6286607bd (linux-next)
 
-http://kisskb.ellerman.id.au/kisskb/target/5581/
+    "OMAP4: omap4panda: Enable audio support"
 
-The git bisect led me to sfr's merge (661a40a5c8 in March5th tree)
-of 'arm-soc/for-next' but there was nothing suspicious there, and
-the fix (commit #1) was reasonably obvious, so I didn't investigate
-the root cause further.  But that wasn't where the breakage ended...
+introduced population of a new struct, but chose the wrong (but
+similarly named) struct that has none of the named fields.
 
-Commit #2, and especially commit #3 need to be looked at by those
-who know the platform.  It looks like some sort of conversion to
-better share code was done, but the omap4panda part didn't get
-the full attention it needed.  I did what I think looks right,
-based on what was done for the other board, but I've no knowledge
-of the platform whatsoever, and hence no confidence it would
-work as desired.  I've hopefully put the right people on the CC
-list for those.
+Change it to the struct with those fields, to fix:
 
-Paul.
+arch/arm/mach-omap2/board-omap4panda.c:284: error: unknown field 'hs_left_step' specified in initializer
+arch/arm/mach-omap2/board-omap4panda.c:285: error: unknown field 'hs_right_step' specified in initializer
+arch/arm/mach-omap2/board-omap4panda.c:286: error: unknown field 'hf_left_step' specified in initializer
+arch/arm/mach-omap2/board-omap4panda.c:287: error: unknown field 'hf_right_step' specified in initializer
+arch/arm/mach-omap2/board-omap4panda.c:287: warning: large integer implicitly truncated to unsigned type
+
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+CC: Peter Ujfalusi <peter.ujfalusi@ti.com>
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+CC: Tony Lindgren <tony@atomide.com>
 ---
+ arch/arm/mach-omap2/board-omap4panda.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Paul Gortmaker (3):
-  arm: anticipate build breakages due in pending merge
-  arm: fix compile error in mach-omap2/board-omap4panda.c
-  arm: more fallout from i2c conversions in board-omap4panda.c
-
- arch/arm/mach-omap2/board-omap4panda.c |    7 +++----
- arch/arm/mach-omap2/cm2xxx_3xxx.c      |    2 ++
- arch/arm/mach-omap2/common.c           |    1 +
- arch/arm/mach-omap2/control.c          |    1 +
- arch/arm/mach-omap2/sdrc2xxx.c         |    1 +
- 5 files changed, 8 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index c1a852d..e919153 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -279,7 +279,7 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
+ 	return 0;
+ }
+ 
+-static struct twl4030_codec_data twl6040_codec = {
++static struct twl6040_codec_data twl6040_codec = {
+ 	/* single-step ramp for headset and handsfree */
+ 	.hs_left_step	= 0x0f,
+ 	.hs_right_step	= 0x0f,
 -- 
 1.7.9.1
