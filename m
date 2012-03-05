@@ -1,52 +1,53 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon,  5 Mar 2012 18:12:02 -0500
-Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
- em-x270.c
-Message-ID: <1330989122-6323-1-git-send-email-paul.gortmaker@windriver.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Mar 2012 15:14:13 -0800
+Subject: [PATCH v2 2/2] ARM: OMAP: sram: Add am33xx SRAM support (minimal)
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433179FC35@DBDE01.ent.ti.com>
+References: <1329113715-7634-1-git-send-email-afzal@ti.com>
+ <87fweeyfp6.fsf@macbook.be.48ers.dk>
+ <B5906170F1614E41A8A28DE3B8D121433179FC35@DBDE01.ent.ti.com>
+Message-ID: <20120305231413.GP12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0 (linux-next)
+* Bedia, Vaibhav <vaibhav.bedia@ti.com> [120213 07:36]:
+> On Mon, Feb 13, 2012 at 19:54:05, Peter Korsgaard wrote:
+> > >>>>> "Afzal" == Afzal Mohammed <afzal@ti.com> writes:
+> > 
+> >  Afzal> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> >  Afzal> Update SRAM start & size for am33xx SoC's.
+> > 
+> 
+> This is a really awkward quoting style :|
+> 
+> > 
+> > I don't particular know the omap sram stuff, but doesn't the 33xx have
+> > 2x 64K blocks of SRAM?
+> > 
+> 
+> Yes, but since the lower 64KB will not be available on non-GP device and
+> only A8 can access it, for now we make use of the higher 64KB which is referred
+> to as the OCMC RAM in the TRM. This will also enable SRAM usage by other drivers
+> like PRU and McASP.
+> 
+> >  
+> >  Afzal> +static inline int am33xx_sram_init(void)
+> >  Afzal> +{
+> >  Afzal> +	return 0;
+> > 
+> > 
+> > I know you mentioned it in the commit message, but it might be good with
+> > a comment here as well that this dummy function is needed to not get the 34xx
+> > init function called for 33xx, so it doesn't get removed when somebody
+> > decides to cleanup.
+> 
+> You are right in saying that the dummy function is needed to avoid 34xx SRAM init.
+> We'll have some PM related code coming in soon and hopefully the SRAM code won't change
+> Without us noticing ;)
 
-  "regulator: Remove support for supplies specified by struct device"
+OK, applying into fixes-non-critical-part2. Our sram.c should get turned
+into a device driver, there's been already similar sram driver posted
+to LAKML. So that should allow us to remove the cpu_is_xxxx checks.
 
-caused this file to break, since it was still relying on the
-device field to be present.  Strip them out here too.
+Regards,
 
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index d80c0ba..c8f3293 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -1083,20 +1083,19 @@ static void __init em_x270_userspace_consumers_init(void)
- }
- 
- /* DA9030 related initializations */
--#define REGULATOR_CONSUMER(_name, _dev, _supply)			       \
-+#define REGULATOR_CONSUMER(_name, _supply)			       \
- 	static struct regulator_consumer_supply _name##_consumers[] = {	\
- 		{							\
--			.dev = _dev,					\
- 			.supply = _supply,				\
- 		},							\
- 	}
- 
--REGULATOR_CONSUMER(ldo3, &em_x270_gps_userspace_consumer.dev, "vcc gps");
--REGULATOR_CONSUMER(ldo5, NULL, "vcc cam");
--REGULATOR_CONSUMER(ldo10, &pxa_device_mci.dev, "vcc sdio");
--REGULATOR_CONSUMER(ldo12, NULL, "vcc usb");
--REGULATOR_CONSUMER(ldo19, &em_x270_gprs_userspace_consumer.dev, "vcc gprs");
--REGULATOR_CONSUMER(buck2, NULL, "vcc_core");
-+REGULATOR_CONSUMER(ldo3, "vcc gps");
-+REGULATOR_CONSUMER(ldo5, "vcc cam");
-+REGULATOR_CONSUMER(ldo10, "vcc sdio");
-+REGULATOR_CONSUMER(ldo12, "vcc usb");
-+REGULATOR_CONSUMER(ldo19, "vcc gprs");
-+REGULATOR_CONSUMER(buck2, "vcc_core");
- 
- #define REGULATOR_INIT(_ldo, _min_uV, _max_uV, _ops_mask)		\
- 	static struct regulator_init_data _ldo##_data = {		\
--- 
-1.7.9.1
+Tony
