@@ -1,79 +1,40 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 5 Mar 2012 09:51:15 -0800
-Subject: [PATCH v3 07/10] arm/tegra: Add PWFM controller device tree
- probing
-In-Reply-To: <20120303225404.GC6661@avionic-0098.mockup.avionic-design.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <1329923841-32017-8-git-send-email-thierry.reding@avionic-design.de>
- <74CDBE0F657A3D45AFBB94109FB122FF17BDDF1E67@HQMAIL01.nvidia.com>
- <20120303225404.GC6661@avionic-0098.mockup.avionic-design.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF17BE861C46@HQMAIL01.nvidia.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Mon, 5 Mar 2012 11:55:07 -0600
+Subject: [PATCH v2 01/17] ASoC: imx: move eukrea audmux call into ASoC
+ machine driver
+In-Reply-To: <20120305174612.GY3224@opensource.wolfsonmicro.com>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-2-git-send-email-shawn.guo@linaro.org>
+ <20120305174612.GY3224@opensource.wolfsonmicro.com>
+Message-ID: <CAKGA1b=4X+ccQXjZVa1DYpRYC0NT0A9AqwgG-ApkzboRkC3sJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding wrote at Saturday, March 03, 2012 3:54 PM:
-> * Stephen Warren wrote:
-> > Thierry Reding wrote at Wednesday, February 22, 2012 8:17 AM:
-> > > Add auxdata to instantiate a device tree for the PWFM controller and
-> > > include a corresponding node in the device tree.
-> >
-> > > diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> >
-> > > +	pwm: pwm at 7000a000 {
-> > > +		compatible = "nvidia,tegra20-pwm";
-> > > +		reg = <0x7000a000 0x100>;
-> > > +		#pwm-cells = <2>;
-> > > +	};
-> >
-> > The compatible value probably should list both Tegra30 and Tegra20, so
-> > we can know exactly which HW is present, just in case we need to turn
-> > on some bug-fix only for one of the variants:
-> >
-> >     compatible = "nvidia,tegra30-pwm", "nvidia,tegra20-pwm";
-> 
-> I'm confused. If I know exactly that the hardware is Tegra30 (which it
-> definitely should be if I include tegra30.dtsi), then why list "tegra20-pwm"
-> as compatible?
-> 
-> Or did you mean to list tegra30-pwm as compatible value in the PWM driver?
-
-Standard practice is to list the exact model of the HW as the first entry
-in compatible in the .dts file:
-
-    nvidia,tegra30-pwm
-
-This is so that the DT always describes exactly which HW model is actually
-present, so that if HW-model-specific WARs/... are required in the future,
-the DT already lists that information up-front.
-
-Then additionally list any older HW models that this HW is also compatible
-with:
-
-    nvidia,tegra20-pwm
-
-
-This allows the driver to list just nvidia,tegra20-pwm but still bind
-to DT nodes that are for later HW.
-
-So, in other words, you end up with the following in the .dts/.dtsi file:
-
-    compatible = "nvidia,tegra30-pwm", "nvidia,tegra20-pwm";
-
-> > Could you also write binding documentation, in particular explaining
-> > what the two pwm-cells are specifically for Tegra:
-> >
-> > Documentation/devicetree/bindings/pwm/nvidia,tegra20-pwm.txt
-> >
-> > (although perhaps that'd be part of the previous patch which implements
-> > the driver)
-> 
-> Actually for Tegra the values would be those documented in the generic
-> binding because Tegra uses of_pwm_simple_xlate(). Does it still make sense to
-> add a Tegra-specific binding?
-
-There should still be a Tegra-specific binding. Without it, there's no
-definite way to know whether the "standard" properties actually apply,
-or someone simply forgot to document it.
+How will this stand up to an machine audio fabric that, like
+imx-sgtl5000 going around BSPs and Linaro and so on since the dawn of
+time, supports multiple boards but very different audmux
+configurations? Is this just a stopgap until the DT properly describes
+it?
 
 -- 
-nvpublic
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
+
+
+
+On Mon, Mar 5, 2012 at 11:46 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Mar 05, 2012 at 10:30:49PM +0800, Shawn Guo wrote:
+>> It moves eukrea audmux configuration call from board file into ASoC
+>> machine driver eukrea-tlv320, so that it gets aligned wm1133-ev1 and
+>> mx27vis-aic32x4, and more importantly it will ease the moving of audmux
+>> into sound/soc/imx as a platform driver later.
+>
+> Sascha, this and the second patch look totally uncontroversial - can we
+> just apply them now so we don't need to keep reviewing them?
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
