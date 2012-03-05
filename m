@@ -1,16 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 5 Mar 2012 14:41:46 +0000
-Subject: [PATCH v2 2/7] rtc: sa1100: add OF support
-In-Reply-To: <1330950111-30797-3-git-send-email-haojian.zhuang@marvell.com>
-References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
- <1330950111-30797-3-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <201203051441.47062.arnd@arndb.de>
+From: wade_farnsworth@mentor.com (Wade Farnsworth)
+Date: Mon, 5 Mar 2012 07:42:28 -0700
+Subject: [PATCH v3 0/3] ARM support for syscall tracing
+In-Reply-To: <4F4E3780.4060904@mentor.com>
+References: <4F44FF58.3060907@mentor.com> <4F4E3780.4060904@mentor.com>
+Message-ID: <4F54D0D4.7070905@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 March 2012, Haojian Zhuang wrote:
-> Add OF support on rtc-sa1100.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+This is a rework of Steven Walter's syscall tracing patches first
+posted here:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-November/074454.html
+
+I've rebased the patches against the current mainline master branch, as well
+as implemented several changes based on feedback from Will Deacon and
+Russell King.
+
+v2: - Tested on EABI and OABI.
+    - Removed an instance of the ?: operator in syscall_set_return_value()
+    - Moved #define of NR_syscalls to syscall.h
+    - Changed the test of NR_syscalls vs __NR_syscalls in entry-common.S
+      to .ifne
+v3: - Added Will Deacon's Reviewed-by line.  Code is identical to v2.
+
+Wade Farnsworth (3):
+  ARM: add support for the generic syscall.h interface
+  ARM: add TRACEHOOK support
+  ARM: support syscall tracing
+
+ arch/arm/Kconfig                   |    2 +
+ arch/arm/include/asm/ptrace.h      |    5 ++
+ arch/arm/include/asm/syscall.h     |   97 ++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/thread_info.h |    2 +
+ arch/arm/include/asm/unistd.h      |    8 +++
+ arch/arm/kernel/entry-common.S     |   16 +++++-
+ arch/arm/kernel/ptrace.c           |   34 +++++++------
+ arch/arm/kernel/signal.c           |    2 +
+ 8 files changed, 149 insertions(+), 17 deletions(-)
+ create mode 100644 arch/arm/include/asm/syscall.h
