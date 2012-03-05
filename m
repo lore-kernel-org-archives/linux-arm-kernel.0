@@ -1,38 +1,81 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Mar 2012 16:19:26 +0100
-Subject: [GIT PULL] ARM: OMAP: IRQ domain support for INTC
-In-Reply-To: <20120305150351.GB2108@localhost>
-References: <4F4BB0FB.3040308@ti.com> <20120228234837.GH18901@atomide.com>
- <4F4E4F1D.7020109@ti.com> <20120305135838.GA2108@localhost>
- <4F54CCBD.2080802@ti.com> <20120305150351.GB2108@localhost>
-Message-ID: <4F54D97E.4070805@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 05 Mar 2012 07:21:39 -0800
+Subject: [PATCH] ARM: OMAP2+: omap_device: call all suspend,
+ resume callbacks when OMAP_DEVICE_NO_IDLE_ON_SUSPEND is set
+In-Reply-To: <alpine.DEB.2.00.1203031314050.10611@utopia.booyaka.com> (Paul
+ Walmsley's message of "Sat, 3 Mar 2012 13:15:33 -0700 (MST)")
+References: <alpine.DEB.2.00.1203031314050.10611@utopia.booyaka.com>
+Message-ID: <877gyzoyyk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/5/2012 4:03 PM, Johan Hovold wrote:
-> On Mon, Mar 05, 2012 at 03:25:01PM +0100, Cousson, Benoit wrote:
->> On 3/5/2012 2:58 PM, Johan Hovold wrote:
->>> On Wed, Feb 29, 2012 at 05:15:25PM +0100, Cousson, Benoit wrote:
->>>> On 2/29/2012 12:48 AM, Tony Lindgren wrote:
->>>>> * Cousson, Benoit<b-cousson@ti.com>    [120227 08:04]:
->>>>> Hmm, looks like this now produces the following warning at least on omap3:
->>>>
->>>> Yes, Rajendra has just reported that issue with linux-next.
->>>
->>> I'm getting the same warning and initialisation failure with 3.3-rc6 on
->>> overo. Are these fixes queued up for 3.3 (and not just 3.4) somewhere?
->>
->> It is under review, I posted the series last Friday:
->> mfd: twl: Fix for irqdomain/next + SPARSE_IRQ + MMC card detect
->>
->> It will be anyway material for 3.4 since it is in linux-next.
->
-> Yes, I noted that there was a fix against linux-next. My question was
-> whether any fix is planned for 3.3 as twl4030 is broken with SPARSE_IRQ
-> enabled.
->
-> Disabling SPARSE_IRQ will be the only workaround until 3.4 is out then?
+Paul Walmsley <paul@pwsan.com> writes:
 
-Mmm, but is SPARSE_IRQ used to work before on OMAP3?
+> During system suspend, when OMAP_DEVICE_NO_IDLE_ON_SUSPEND is set on
+> an omap_device, call the corresponding driver's ->suspend() and
+> ->suspend_noirq() callbacks (if present).  Similarly, during resume,
+> the driver's ->resume() and ->resume_noirq() callbacks must both be
+> called, if present.  (The previous code only called ->suspend_noirq()
+> and ->resume_noirq().)
+>
+> If all of these callbacks aren't called, some important driver
+> suspend/resume code may not get executed.
+>
+> In current mainline, the bug fixed by this patch is only a problem
+> under the following conditions:
+>
+> - the kernel is running on an OMAP4
+>
+> - an OMAP UART is used as a console
+>
+> - the kernel command line parameter 'no_console_suspend' is specified
+>
+> - and the system enters suspend ("echo mem > /sys/power/state").
+>
+> Under this combined circumstance, the system cannot be awakened via
+> the serial port after commit be4b0281956c5cae4f63f31f11d07625a6988766c
+> ("tty: serial: OMAP: block idle while the UART is transferring data in
+> PIO mode").  This is because the OMAP UART driver's ->suspend()
+> callback is never called.  The ->suspend() callback would have called
+> uart_suspend_port() which in turn would call enable_irq_wake().  Since
+> enable_irq_wake() isn't called for the UART's IRQ, check_wakeup_irqs()
+> would mask off the UART IRQ in the GIC.
+>
+> On v3.3 kernels prior to the above commit, serial resume from suspend
+> presumably occurred via the PRCM interrupt.  The UART was in
+> smart-idle mode, so it was able to send a PRCM wakeup which in turn
+> would be converted into a PRCM interrupt to the GIC, waking up the
+> kernel.  But after the above commit, when the system is suspended in
+> the middle of a UART transmit, the UART IP block would be in no-idle
+> mode.  In no-idle mode, the UART won't generate wakeups to the PRCM
+> when incoming characters are received; only GIC interrupts.  But since
+> the UART driver's ->suspend() callback is never called,
+> uart_suspend_port() and enable_irq_wake() is never called; so the UART
+> interrupt is masked by check_wakeup_irqs() and the UART can't wake up
+> the MPU.
+>
+> The remaining mechanism that could have awakened the system would have
+> been I/O chain wakeups.  These wouldn't be active because the console
+> UART's clocks are never disabled when no_console_suspend is used,
+> preventing the full chip from idling.  Also, current mainline doesn't
+> yet support full chip idle states for OMAP4, so I/O chain wakeups are
+> not enabled.
+>
+> This patch is the result of a collaboration.  John Stultz
+> <johnstul@us.ibm.com> and Andy Green <andy.green@linaro.org> reported
+> the serial wakeup problem that led to the discovery of this problem.
+> Kevin Hilman <khilman@ti.com> narrowed the problem down to the use of
+> no_console_suspend.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: John Stultz <johnstul@us.ibm.com>
+> Cc: Andy Green <andy.green@linaro.org>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-Benoit
+Looks right.
+
+Acked-by: Kevin Hilman <khilman@ti.com>
+
+Tony, this fix is needed for v3.3.
+
+Kevin
