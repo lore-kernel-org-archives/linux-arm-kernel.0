@@ -1,402 +1,138 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Mar 2012 11:55:13 +0100
-Subject: [RFC PATCH] of: DMA helpers: manage generic requests specification
-In-Reply-To: <1330527248-4350-1-git-send-email-nicolas.ferre@atmel.com>
-References: <4F22DEF2.5000807@ti.com>
- <1330527248-4350-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4F549B91.4080601@ti.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Mon,  5 Mar 2012 12:09:57 +0100
+Subject: [PATCH v3 0/7] ARM: davinci: add support for the am1808 based
+ enbw_cmc board
+Message-ID: <1330945804-3379-1-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nico,
+This patchserie add support for the davinci am1808 based
+enbw_cmc board.
 
-On 2/29/2012 3:54 PM, Nicolas Ferre wrote:
-> By making DMA controllers register a generic translation
-> function, we allow the management of any type of DMA requests
-> specification.
-> The void * output of an of_dma_xlate() function that will be implemented
-> by the DMA controller can carry any type of "dma-request" argument.
->
-> The DMA client will search its associated DMA controller in the list
-> and call the registered of_dam_xlate() function to retrieve the
-> request values.
->
-> One simple xlate function is provided for the "single number" type
-> of request biding.
->
-> This implementation is independent from dmaengine so it can also be
-> used by legacy drivers.
->
-> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-> Cc: Benoit Cousson<b-cousson@ti.com>
-> Cc: Stephen Warren<swarren@nvidia.com>
-> Cc: Grant Likely<grant.likely@secretlab.ca>
-> Cc: Russell King<linux@arm.linux.org.uk>
-> Cc: Rob Herring<rob.herring@calxeda.com>
-> ---
-> Hi all,
->
-> Here are my thoughts about the DMA helpers for device tree.
-> This patch goes on top of Benoit's ones. My goal was to keep this separated
-> from any DMA infrastructure (dmaengine not needed, nor any other DMA
-> implementation).
+Important: I rebased this patchserie against the irqdomain/next
+branch from grant likely, as he suggested to rework the OF
+intcontroller changes to the irqdomain work, branch found here:
 
-Thanks for taking the ball on that.
+http://git.secretlab.ca/?p=linux-2.6.git;a=shortlog;h=refs/heads/irqdomain/next
 
-> It is to keep the ball rolling, so do not hesitate to comment.
+    git://git.secretlab.ca/git/linux-2.6.git irqdomain/next
 
-That looks pretty good.
+    commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e
+    Author: Grant Likely <grant.likely@secretlab.ca>
+    Date:   Fri Feb 24 14:58:54 2012 -0700
 
-My only question to the whole audience who care about that is:
-Do we want to enforce the usage of dmaengine and thus add the DT support 
-into dmaengine or do we want to go add some infrastructure in DT core 
-like it is done here?
+    mfd: twl-core: Add IRQ_DOMAIN dependency
 
-To be honest, I'm fine with that approach because OMAP DMA is still not 
-using dmaengine. But potentially I can easily add a dummy dmaengine into 
-the OMAP DMA driver just to support the OF code if needed.
+changes for v2:
+Post this patchserie now as v2, as reworked in the
+comments I got for the RFC serie.
 
->   Documentation/devicetree/bindings/dma/dma.txt |   29 +++--
->   drivers/of/dma.c                              |  161 ++++++++++++++++++++++---
->   include/linux/of_dma.h                        |   33 +++++-
->   3 files changed, 186 insertions(+), 37 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/dma.txt b/Documentation/devicetree/bindings/dma/dma.txt
-> index 7f2a301..c49e98d 100644
-> --- a/Documentation/devicetree/bindings/dma/dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/dma.txt
-> @@ -6,9 +6,8 @@ DMA request line that goes from an IP to a DMA controller.
->
->   * DMA controller
->
-> -Required properties:
-> -    - dma-controller: Mark the device as a DMA controller
-> -    - #dma-cells: Number of cell for each DMA line, must be one.
-> +Required property:
-> +    - #dma-cells: Number of cells for each DMA line.
->
->
->   Example:
-> @@ -17,7 +16,6 @@ Example:
->   		compatible = "ti,sdma-omap4"
->   		reg =<0x48000000 0x1000>;
->   		interrupts =<12>;
-> -        dma-controller;
->   		#dma-cells =<1>;
->   	};
->
-> @@ -25,20 +23,23 @@ Example:
->
->   * DMA client
->
-> -Client drivers should specify the DMA request numbers using a phandle to
-> -the controller + the DMA request number on that controller.
-> +Client drivers should specify the DMA request property using a phandle to
-> +the controller. If needed, the DMA request identity on that controller is then
-> +added followed by optional request specifications.
->
-> -Required properties:
-> -    - dma-request: List of pair phandle + dma-request per line
-> +Required property:
-> +    - dma-request: List of phandle + dma-request + request specifications,
-> +      one group per request "line".
-> +Optional property:
->       - dma-request-names: list of strings in the same order as the dma-request
->         in the dma-request property.
->
->
->   Example:
->
-> -    i2c1: i2c at 1 {
-> -        ...
-> -        dma-request =<&sdma 2&sdma 3>;
-> -        dma-request-names = "tx", "rx";
-> -        ...
-> -    };
-> +	i2c1: i2c at 1 {
-> +		...
-> +		dma-request =<&sdma 2&sdma 3>;
-> +		dma-request-names = "tx", "rx";
-> +		...
-> +	};
-> diff --git a/drivers/of/dma.c b/drivers/of/dma.c
-> index d4927e2..e0c6fd9 100644
-> --- a/drivers/of/dma.c
-> +++ b/drivers/of/dma.c
-> @@ -13,41 +13,145 @@
->   #include<linux/device.h>
->   #include<linux/err.h>
->   #include<linux/module.h>
-> +#include<linux/rculist.h>
-> +#include<linux/slab.h>
->   #include<linux/of.h>
->   #include<linux/of_dma.h>
->
-> +static LIST_HEAD(of_dma_list);
-> +
-> +/**
-> + * of_dma_find_controller() - Find a DMA controller in DT DMA helpers list
-> + * @np:		device node of DMA controller
-> + */
-> +static struct of_dma *of_dma_find_controller(struct device_node *np)
-> +{
-> +	struct of_dma	*ofdma;
-> +
-> +	list_for_each_entry_rcu(ofdma,&of_dma_list, of_dma_controllers) {
-> +		if (ofdma->of_node == np)
-> +			return ofdma;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
->   /**
-> - * of_get_dma_request() - Get a DMA request number and dma-controller node
-> + * of_dma_controller_register() - Register a DMA controller to DT DMA helpers
-> + * @np:			device node of DMA controller
-> + * @of_dma_xlate:	generic translation function which converts a phandle
-> + *			arguments list into a generic output value
-> + *
-> + * Returns 0 on success or appropriate errno value on error.
-> + *
-> + * If #dma-cells is not specified in DMA controller device tree node, we assume
-> + * that the DMA controller phandle will come without argument.
-> + *
-> + * Allocated memory sould be freed with apropriate of_dma_controller_free()
+changes for v3:
+- Interrupt Controller:
+  - comment from Sergei Shtylyov:
+    - rename compatible" prop to "ti,cp_intc"
+    - cp_intc_init() is now also for the of case
+      the name of the init function (it calls the
+      "new" __cp_intc_init() function, which was
+      the "old" cp_intc_init()). Through this
+      rework the changes for OF is better visible.
+      As the OF case uses the irq_domain rework from
+      Grant Likely, maybe the none OF case can use
+      this also, but this should be tested on a hw ...
+ 
+Got no comments to the following points, I noted in the
+RFC series, so posting this patchseries with them:
 
-Nit: typos:            should              appropriate
+- ARM: davinci: configure davinci aemif chipselects through OF
+  not moved to mfd, as mentioned in this discussion:
+  http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-arm-davinci-configure-davinci-aemif-chipselects-through-OF-td7059739.html
+  instead use a phandle in the DTS, so drivers which
+  uses the davinci aemif, can call davinci_aemif_setup_timing_of()
 
-> + * call.
-> + */
-> +int of_dma_controller_register(struct device_node *np,
-> +			int (*of_dma_xlate)(struct of_phandle_args *, void *))
-> +{
-> +	struct of_dma	*ofdma;
-> +	int		*nbcells;
-> +
-> +	if (!np || !of_dma_xlate) {
-> +		pr_err("%s: not enouth information provided\n", __func__);
+  This is just thought as an RFC ... The enbw_cmc board
+  support not really need to setup this bus timings, as
+  they are setup in U-Boot ... but I want to post this,
+  as I think, it is a nice to have, and I am not really
+  sure, if this has to be a MFD device (If so, all bus
+  interfaces for other SoCs should be converted also to
+  MFD devices) ... as an example how this can be used
+  I add this to the davinci nand controller OF support
+  patch, in this patchserie.
 
-Nit: typo:                      enough
+- ARM: davinci: mux: add OF support
+  I want to get rid of the pin setup code in board code ...
+  This patch introduces a davinci_cfg_reg_of() function,
+  which davinci drivers can call, if they found a
+  "pinmux-handle", so used in the following drivers in
+  this patchserie:
 
-> +		return -EINVAL;
-> +	}
-> +
-> +	ofdma = kzalloc(sizeof(*ofdma), GFP_KERNEL);
-> +	if (!ofdma)
-> +		return -ENOMEM;
-> +
-> +	nbcells = (int *)of_get_property(np, "#dma-cells", NULL);
-> +	if (!nbcells)
-> +		/*
-> +		 * no #dma-cells properties: assume no argument to
-> +		 * dma-request property on slave side
-> +		 */
-> +		ofdma->of_dma_n_cells = 0;
-> +	else
-> +		ofdma->of_dma_n_cells = be32_to_cpup(nbcells);
-> +
-> +	ofdma->of_node = np;
-> +	ofdma->of_dma_xlate = of_dma_xlate;
-> +
-> +	/* Now queue of_dma controller structure in list */
-> +	list_add_tail_rcu(&ofdma->of_dma_controllers,&of_dma_list);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(of_dma_controller_register);
-> +
-> +/**
-> + * of_dma_controller_free() - Remove a DMA controller from DT DMA helpers list
-> + * @np:		device node of DMA controller
-> + *
-> + * Memory allocated by of_dma_controller_register() is freed here.
-> + */
-> +void of_dma_controller_free(struct device_node *np)
-> +{
-> +	struct of_dma	*ofdma;
-> +
-> +	ofdma = of_dma_find_controller(np);
-> +	if (ofdma) {
-> +		list_del_rcu(&ofdma->of_dma_controllers);
-> +		kfree(ofdma);
-> +	}
-> +}
-> +EXPORT_SYMBOL(of_dma_controller_free);
-> +
-> +/**
-> + * of_get_dma_request() - Get the associated DMA request data
->    * @np:		device node to get DMA request from
-> - * @propname:	property name containing DMA specifier(s)
->    * @index:	index of the DMA request
-> - * @ctrl_np:	a device_node pointer to fill in
-> + * @out_data:	a output that can be filled in by the of_dma_xlate() function
->    *
-> - * Returns DMA number along to the dma controller node, or one of the errno
-> - * value on the error condition. If @ctrl_np is not NULL the function also
-> - * fills in the DMA controller device_node pointer.
-> + * Returns return value of of_dma_xlate() and fills out_data (if provided).
-> + * On error returns the appropriate errno value.
->    */
->   int of_get_dma_request(struct device_node *np, int index,
-> -		       struct device_node **ctrl_np)
-> +		       void *out_data)
->   {
-> -	int ret = -EINVAL;
-> -	struct of_phandle_args dma_spec;
-> +	struct of_phandle_args	dma_spec;
-> +	struct of_dma		*ofdma;
-> +	int			ret;
->
->   	ret = of_parse_phandle_with_args(np, "dma-request", "#dma-cells",
->   					 index,&dma_spec);
->   	if (ret) {
-> -		pr_debug("%s: can't parse dma property\n", __func__);
-> +		pr_err("%s: can't parse dma property\n", np->full_name);
->   		goto err0;
->   	}
->
-> -	if (dma_spec.args_count>  0)
-> -		ret = dma_spec.args[0];
-> +	if (list_empty(&of_dma_list)) {
-> +		pr_debug("%s: empty DMA controller list\n",
-> +			 np->full_name);
-> +		ret = -ENOENT;
-> +		goto err1;
-> +	}
->
-> -	if (ctrl_np)
-> -		*ctrl_np = dma_spec.np;
-> -	else
-> -		of_node_put(dma_spec.np);
-> +	ofdma = of_dma_find_controller(dma_spec.np);
-> +	if (!ofdma) {
-> +		pr_debug("%s: DMA controller %s isn't registered\n",
-> +			 np->full_name, dma_spec.np->full_name);
-> +		ret = -ENODEV;
-> +		goto err1;
-> +	}
->
-> +	if (dma_spec.args_count != ofdma->of_dma_n_cells) {
-> +		pr_debug("%s: wrong #dma-cells for %s\n",
-> +			 np->full_name, dma_spec.np->full_name);
-> +		ret = -EINVAL;
-> +		goto err1;
-> +	}
-> +
-> +	ret = ofdma->of_dma_xlate(&dma_spec, out_data);
-> +
-> +err1:
-> +	of_node_put(dma_spec.np);
->   err0:
->   	pr_debug("%s exited with status %d\n", __func__, ret);
->   	return ret;
-> @@ -55,6 +159,24 @@ err0:
->   EXPORT_SYMBOL(of_get_dma_request);
->
->   /**
-> + * of_dma_xlate_onenumbercell() - Generic DMA xlate for direct one cell bindings
-> + *
-> + * Device Tree DMA translation function which works with one cell bindings
-> + * where the cell values map directly to the hardware request number understood
-> + * by the DMA controller.
-> + */
-> +int of_dma_xlate_onenumbercell(struct of_phandle_args *dma_spec, void *req_nbr)
+  drivers/net/ethernet/ti/davinci_emac
+  drivers/i2c/busses/i2c-davinci.c
+  drivers/mtd/nand/davinci_nand.c
 
-Nit: I'd rather use dma_req instead of req_nbr that can be understood as 
-number of request lines.
+- post this board support with USB support, even though
+  USB is only working with the 10 ms "workaround", posted here:
+  http://comments.gmane.org/gmane.linux.usb.general/54505
+  I see this issue also on the AM1808 TMDXEXP1808L evalboard.
 
-> +{
-> +	if (!dma_spec)
-> +		return -EINVAL;
-> +	if (WARN_ON(dma_spec->args_count != 1))
-> +		return -EINVAL;
-> +	*(int *)req_nbr = dma_spec->args[0];
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(of_dma_xlate_onenumbercell);
-> +
-> +/**
->    * of_dma_count - Count DMA requests for a device
->    * @np:		device node to count DMAs for
->    *
-> @@ -105,13 +227,14 @@ int of_dma_to_resource(struct device_node *dev, int index, struct resource *r)
->   {
->   	const char *name = NULL;
->   	int dma;
-> +	int ret;
->
->   	if (!r)
->   		return -EINVAL;
->
-> -	dma = of_get_dma_request(dev, index, NULL);
-> -	if (dma<  0)
-> -		return dma;
-> +	ret = of_get_dma_request(dev, index,&dma);
-> +	if (ret<  0)
-> +		return ret;
->
->   	/*
->   	 * Get optional "dma-request-names" property to add a name
-> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-> index 575163d..fbf98de 100644
-> --- a/include/linux/of_dma.h
-> +++ b/include/linux/of_dma.h
-> @@ -17,18 +17,38 @@
->
->   struct device_node;
->
-> -#ifdef CONFIG_OF_GPIO
-> +#ifdef CONFIG_OF_DMA
->
-> +struct of_dma {
-> +	struct list_head of_dma_controllers;
-> +	struct device_node *of_node;
-> +	int of_dma_n_cells;
-> +	int (*of_dma_xlate)(struct of_phandle_args *dma_spec, void *data);
-> +};
-> +
-> +extern int of_dma_controller_register(struct device_node *np,
-> +			int (*of_dma_xlate)(struct of_phandle_args *, void *));
-> +extern void of_dma_controller_free(struct device_node *np);
->   extern int of_get_dma_request(struct device_node *np, int index,
-> -		       struct device_node **ctrl_np);
-> +			      void *out_data);
->   extern unsigned int of_dma_count(struct device_node *np);
->   extern int of_dma_to_resource(struct device_node *dev, int index,
->   			      struct resource *r);
->
-> +extern int of_dma_xlate_onenumbercell(struct of_phandle_args *dma_spec,
-> +				      void *req_nbr);
->   #else /* CONFIG_OF_DMA */
->
-> -static int of_get_dma_request(struct device_node *np, int index,
-> -			      struct device_node **ctrl_np);
-> +static int of_dma_controller_register(struct device_node *np,
-> +			int (*of_dma_xlate)(struct of_phandle_args *, void *))
-> +{
-> +	return -ENOSYS;
-> +}
-> +
-> +static void of_dma_controller_free(struct device_node *np) {}
-> +
-> +extern int of_get_dma_request(struct device_node *np, int index,
-> +			      void *out_data)
->   {
->   	return -ENOSYS;
->   }
-> @@ -44,6 +64,11 @@ static int of_dma_to_resource(struct device_node *dev, int index,
->   	return -ENOSYS;
->   }
->
-> +static int of_dma_xlate_onenumbercell(struct of_phandle_args *dma_spec,
-> +				      void *req_nbr)
-> +{
-> +	return -ENOSYS;
-> +}
->   #endif /* CONFIG_OF_DMA */
->
->   #endif /* __LINUX_OF_DMA_H */
+- MMC and USB are not using OF support yet, ideas how to port
+  this are welcome. I need for USB and MMC board specific
+  callbacks, how to solve this with OF support?
 
-Regards,
-Benoit
+Signed-off-by: Heiko Schocher <hs@denx.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: linux-mtd at lists.infradead.org
+Cc: linux-i2c at vger.kernel.org
+Cc: netdev at vger.kernel.org
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Wolfgang Denk <wd@denx.de>
+Cc: Sergei Shtylyov <sshtylyov@mvista.com>
+
+Heiko Schocher (7):
+  ARM: davinci, intc: Add OF support for TI interrupt controller
+  ARM: davinci: configure davinci aemif chipselects through OF
+  ARM: davinci: mux: add OF support
+  ARM: davinci: net: davinci_emac: add OF support
+  ARM: davinci: i2c: add OF support
+  ARM: mtd: nand: davinci: add OF support for davinci nand controller
+  ARM: davinci: add support for the am1808 based enbw_cmc board
+
+ .../devicetree/bindings/arm/davinci/aemif.txt      |  119 ++++++
+ .../bindings/arm/davinci/davinci_emac.txt          |   43 +++
+ .../devicetree/bindings/arm/davinci/i2c.txt        |   33 ++
+ .../devicetree/bindings/arm/davinci/intc.txt       |   27 ++
+ .../devicetree/bindings/arm/davinci/mux.txt        |   40 ++
+ .../devicetree/bindings/arm/davinci/nand.txt       |   74 ++++
+ arch/arm/boot/dts/enbw_cmc.dts                     |  268 ++++++++++++++
+ arch/arm/configs/enbw_cmc_defconfig                |  123 +++++++
+ arch/arm/mach-davinci/Kconfig                      |    9 +
+ arch/arm/mach-davinci/Makefile                     |    1 +
+ arch/arm/mach-davinci/aemif.c                      |   86 +++++-
+ arch/arm/mach-davinci/board-enbw-cmc.c             |  380 ++++++++++++++++++++
+ arch/arm/mach-davinci/cp_intc.c                    |   87 ++++-
+ arch/arm/mach-davinci/include/mach/aemif.h         |    1 +
+ arch/arm/mach-davinci/include/mach/mux.h           |    2 +
+ arch/arm/mach-davinci/include/mach/uncompress.h    |    1 +
+ arch/arm/mach-davinci/mux.c                        |   73 ++++-
+ drivers/i2c/busses/i2c-davinci.c                   |   37 ++
+ drivers/mtd/nand/davinci_nand.c                    |   85 +++++-
+ drivers/net/ethernet/ti/davinci_emac.c             |   94 +++++-
+ 20 files changed, 1569 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/aemif.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/davinci_emac.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/i2c.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/intc.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/mux.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/davinci/nand.txt
+ create mode 100644 arch/arm/boot/dts/enbw_cmc.dts
+ create mode 100644 arch/arm/configs/enbw_cmc_defconfig
+ create mode 100644 arch/arm/mach-davinci/board-enbw-cmc.c
+
+-- 
+1.7.7.6
