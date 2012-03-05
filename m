@@ -1,66 +1,44 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Mar 2012 23:33:32 +0100
-Subject: [PATCH v2 0/6] gpio/omap: Cleanup and adaptation to Device Tree
-In-Reply-To: <1330122091-28113-1-git-send-email-b-cousson@ti.com>
-References: <1330122091-28113-1-git-send-email-b-cousson@ti.com>
-Message-ID: <4F553F3C.4030909@ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon,  5 Mar 2012 17:41:47 -0500
+Subject: [PATCH 0/3] arm: fix build breakage in omap2plus_defconfig
+ (linux-next)
+Message-ID: <1330987310-8108-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+I decided to look at why this thing was dying in linux-next for
+over two weeks now:
 
-Do you have any comment on this latest update?
+http://kisskb.ellerman.id.au/kisskb/target/5581/
 
-I've just seen your that your gpio/next includes irqdomain/next, so I 
-guess that I can base my pull request on it directly.
+The git bisect led me to sfr's merge (661a40a5c8 in March5th tree)
+of 'arm-soc/for-next' but there was nothing suspicious there, and
+the fix (commit #1) was reasonably obvious, so I didn't investigate
+the root cause further.  But that wasn't where the breakage ended...
 
-Thanks,
-Benoit
+Commit #2, and especially commit #3 need to be looked at by those
+who know the platform.  It looks like some sort of conversion to
+better share code was done, but the omap4panda part didn't get
+the full attention it needed.  I did what I think looks right,
+based on what was done for the other board, but I've no knowledge
+of the platform whatsoever, and hence no confidence it would
+work as desired.  I've hopefully put the right people on the CC
+list for those.
 
-On 2/24/2012 11:21 PM, Benoit Cousson wrote:
-> Hi Grant,
->
-> Here are a couple of GPIO cleanup + the DT adaptation patches.
-> This update (compared to v1 [1]) is adding an extra fix for SPARSE_IRQ support
-> and add the second cell in the binding for GPIO IRQ type that was missing
-> previously whereas the driver does support it.
->
-> This series is based on 3.3-rc4 + for_3.4/dt_base branch to get
-> the needed cleanup and fixes for OMAP.
->
-> The interrupt controller support is using irq_domain_add_legacy for
-> the moment and will be updated next to use irqchip irq_domain.
->
-> It requires the irq_domain generalization and refinement series
-> available at:
->    git://git.secretlab.ca/git/linux-2.6 irqdomain/next
->
-> It requires as well Tarun's GPIO cleanup series available at:
->    git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_cleanup_fixes_v9
->
-> This series is available here for reference:
->    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_gpio
->
-> Regards,
-> Benoit
->
-> [1] http://www.spinics.net/lists/linux-omap/msg64694.html
->
->
-> Benoit Cousson (6):
->    gpio/omap: Remove bank->id information and misc cleanup
->    gpio/omap: Use devm_ API and add request_mem_region
->    gpio/omap: Add DT support to GPIO driver
->    gpio/omap: Fix IRQ handling for SPARSE_IRQ
->    arm/dts: OMAP4: Add gpio nodes
->    arm/dts: OMAP3: Add gpio nodes
->
->   .../devicetree/bindings/gpio/gpio-omap.txt         |   36 ++++
->   arch/arm/boot/dts/omap3.dtsi                       |   54 +++++
->   arch/arm/boot/dts/omap4.dtsi                       |   54 +++++
->   arch/arm/mach-omap2/gpio.c                         |    8 +-
->   arch/arm/plat-omap/include/plat/gpio.h             |   22 +--
->   drivers/gpio/gpio-omap.c                           |  208 ++++++++++++++------
->   6 files changed, 304 insertions(+), 78 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
->
+Paul.
+---
+
+Paul Gortmaker (3):
+  arm: anticipate build breakages due in pending merge
+  arm: fix compile error in mach-omap2/board-omap4panda.c
+  arm: more fallout from i2c conversions in board-omap4panda.c
+
+ arch/arm/mach-omap2/board-omap4panda.c |    7 +++----
+ arch/arm/mach-omap2/cm2xxx_3xxx.c      |    2 ++
+ arch/arm/mach-omap2/common.c           |    1 +
+ arch/arm/mach-omap2/control.c          |    1 +
+ arch/arm/mach-omap2/sdrc2xxx.c         |    1 +
+ 5 files changed, 8 insertions(+), 4 deletions(-)
+
+-- 
+1.7.9.1
