@@ -1,50 +1,57 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 4 Mar 2012 20:21:07 -0800
-Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
- kernel_noload
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF17BE861683@HQMAIL01.nvidia.com>
-References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861683@HQMAIL01.nvidia.com>
-Message-ID: <20120305042107.GA31142@quad.lixom.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 05 Mar 2012 10:17:10 +0530
+Subject: [PATCH v6 0/2] patch set about the MXS-DMA
+In-Reply-To: <CAMiH66HmV+58w36DGCt+e=ihTrYUwXf1Cur+678YX2GKcB1-jA@mail.gmail.com>
+References: <1329373053-19494-1-git-send-email-b32955@freescale.com>
+ <4F4D9725.3090100@freescale.com>
+ <1330502098.3545.78.camel@sauron.fi.intel.com>
+ <4F4DE0E5.8070808@freescale.com>
+ <1330516974.3545.104.camel@sauron.fi.intel.com>
+ <CAMiH66HmV+58w36DGCt+e=ihTrYUwXf1Cur+678YX2GKcB1-jA@mail.gmail.com>
+Message-ID: <1330922830.24656.137.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2012 at 09:01:04AM -0800, Stephen Warren wrote:
-> Stephen Warren wrote at Tuesday, February 28, 2012 5:03 PM:
-> > uImage files typically encode a single absolute load and entry address.
-> > This is inconvenient when attempting to share that uImage across multiple
-> > SoCs with different physical RAM addresses. Recent versions of mkimage
-> > implement a "kernel_noload" image type which encodes no absolute load
-> > address, and a relative entry address. This works well for uImage-wrapped
-> > ARM zImages, since they are relocatable.
-> > 
-> > This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
-> > "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
+On Wed, 2012-02-29 at 08:13 -0500, Huang Shijie wrote:
+> Hi Artem:
 > 
-> So Russell, are you NAKing this patch then?
+> On Wed, Feb 29, 2012 at 7:00 AM, Bityutskiy, Artem
+> <artem.bityutskiy@intel.com> wrote:
+> > On Wed, 2012-02-29 at 16:25 +0800, Huang Shijie wrote:
+> >> Hi Artem:
+> >> > On Wed, 2012-02-29 at 11:10 +0800, Huang Shijie wrote:
+> >> >> Hi:
+> >> >>
+> >> >> ping.
+> >> > Is this patch-set independent or requires something like gpma patches?
+> >> >
+> >> This patch set is independent, and it does not depend upon any other
+> >> patches.
+> >
+> > Pushed both to l2-mtd.git tree, thanks. I am worried that it touches
+> > other subsystems like dma, sound, and mmc and there are no acks for
+> > those. Would be nice to get them somehow.
+> >
 > 
-> If so, I guess I'll just go and add more cruft to my copy-a-kernel-to-
-> an-sd-card script. Which is a pity since every other person will have
-> to do the same, but oh well.
-
-I'd say send them on to his patch tracker and he can decide from there?
-
-Feel free to add:
-
-Acked-by: Olof Johansson <olof@lixom.net>
-
-Some people seem to have a bone to pick with u-boot, and apparantly want us to
-make it harder to use the kernel with the firmware that is already out there.
-I personally disagree, but as you said, I'll just add my own wrapper script if
-it comes to it. So will everyone else though, and that just seems wasteful.
-
-There hasn't been much churn lately around boot images (unlike the situation
-back 5 years ago in the thread that was referenced earlier in this thread, as
-far as I can tell).
-
-So while the churn in this case is compensated by added convenience
-and productivity for me personally, it's up to Russell to decide if it
-goes in.
+> I ever thought Vinod could accept this patch set.
+> 
+> To Vinod & Chris:
+>       Could you give the ack to the first patch?
+Both,
+Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
+Although the second patch overloads the dmaengine flags but for lack of
+any other suitable alternative, this looks okay...
+> 
+> Does the second patch need  extra acks beside Shawn's?
+> 
+> BR
+> Huang Shijie
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
 
--Olof
+-- 
+~Vinod
