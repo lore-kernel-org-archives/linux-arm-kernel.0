@@ -1,64 +1,61 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 05 Mar 2012 10:40:14 +0900
-Subject: [PATCH v3] USB: ehci-s5p: add DMA burst support
-Message-ID: <006101ccfa70$e94e5d90$bbeb18b0$%han@samsung.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 5 Mar 2012 10:04:11 +0800
+Subject: [PATCH v5 2/4] clk: Kconfig: add entry for HAVE_CLK_PREPARE
+In-Reply-To: <1330763341-3437-3-git-send-email-mturquette@linaro.org>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-3-git-send-email-mturquette@linaro.org>
+Message-ID: <20120305020410.GB3261@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA burst support is added to improve performance in EHCI data
-transfer. The USB EHCI controller on Exynos SoCs can use INCR16,
-INCR8, and INCR4 mode. These modes of INSNREG00 register should
-be set in order to enable DMA burst transfer. This feature is
-also related to AHB spec.
+On Sat, Mar 03, 2012 at 12:28:59AM -0800, Mike Turquette wrote:
+> The common clk framework provides clk_prepare and clk_unprepare
+> implementations.  Create an entry for HAVE_CLK_PREPARE so that
+> COMMON_CLK can select it.
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Mike Turquette <mturquette@ti.com>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Richard Zhao <richard.zhao@linaro.org>
+> Cc: Saravana Kannan <skannan@codeaurora.org>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Amit Kucheria <amit.kucheria@linaro.org>
+> Cc: Deepak Saxena <dsaxena@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  drivers/clk/Kconfig |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 9b3cd08..3912576 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -8,3 +8,6 @@ config HAVE_CLK_PREPARE
+>  
+>  config HAVE_MACH_CLKDEV
+>  	bool
+> +
+> +config HAVE_CLK_PREPARE
+> +	bool
+We've already had it. redundant?
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
----
-v3: move the register definitions to ehci-s5p.c
-v2: change the definition name from EHCI_ENA_xxx to EHCI_INSNREG00_ENA_xxx.
-
- drivers/usb/host/ehci-s5p.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/usb/host/ehci-s5p.c b/drivers/usb/host/ehci-s5p.c
-index 293f741..f098e2a 100644
---- a/drivers/usb/host/ehci-s5p.c
-+++ b/drivers/usb/host/ehci-s5p.c
-@@ -17,6 +17,15 @@
- #include <plat/ehci.h>
- #include <plat/usb-phy.h>
- 
-+#define EHCI_INSNREG00(base)			(base + 0x90)
-+#define EHCI_INSNREG00_ENA_INCR16		(0x1 << 25)
-+#define EHCI_INSNREG00_ENA_INCR8		(0x1 << 24)
-+#define EHCI_INSNREG00_ENA_INCR4		(0x1 << 23)
-+#define EHCI_INSNREG00_ENA_INCRX_ALIGN		(0x1 << 22)
-+#define EHCI_INSNREG00_ENABLE_DMA_BURST	\
-+	(EHCI_INSNREG00_ENA_INCR16 | EHCI_INSNREG00_ENA_INCR8 |	\
-+	 EHCI_INSNREG00_ENA_INCR4 | EHCI_INSNREG00_ENA_INCRX_ALIGN)
-+
- struct s5p_ehci_hcd {
- 	struct device *dev;
- 	struct usb_hcd *hcd;
-@@ -128,6 +137,9 @@ static int __devinit s5p_ehci_probe(struct platform_device *pdev)
- 	ehci->regs = hcd->regs +
- 		HC_LENGTH(ehci, readl(&ehci->caps->hc_capbase));
- 
-+	/* DMA burst Enable */
-+	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
-+
- 	dbg_hcs_params(ehci, "reset");
- 	dbg_hcc_params(ehci, "reset");
- 
-@@ -234,6 +246,9 @@ static int s5p_ehci_resume(struct device *dev)
- 	if (pdata && pdata->phy_init)
- 		pdata->phy_init(pdev, S5P_USB_PHY_HOST);
- 
-+	/* DMA burst Enable */
-+	writel(EHCI_INSNREG00_ENABLE_DMA_BURST, EHCI_INSNREG00(hcd->regs));
-+
- 	if (time_before(jiffies, ehci->next_statechange))
- 		msleep(100);
- 
--- 
-1.7.1
+Thanks
+Richard
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
