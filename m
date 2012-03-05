@@ -1,55 +1,65 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Mon, 5 Mar 2012 14:58:38 +0100
-Subject: [GIT PULL] ARM: OMAP: IRQ domain support for INTC
-In-Reply-To: <4F4E4F1D.7020109@ti.com>
-References: <4F4BB0FB.3040308@ti.com> <20120228234837.GH18901@atomide.com>
- <4F4E4F1D.7020109@ti.com>
-Message-ID: <20120305135838.GA2108@localhost>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 5 Mar 2012 22:03:49 +0800
+Subject: [PATCH v2 1/7] serial: pxa: add OF support
+In-Reply-To: <201203051255.37311.arnd@arndb.de>
+References: <1330950111-30797-1-git-send-email-haojian.zhuang@marvell.com>
+ <1330950111-30797-2-git-send-email-haojian.zhuang@marvell.com>
+ <201203051255.37311.arnd@arndb.de>
+Message-ID: <CAN1soZwHr50+F7-hO=U24U=zrv9C7gxnhzSYgrziaeMYuqRVXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 29, 2012 at 05:15:25PM +0100, Cousson, Benoit wrote:
-> On 2/29/2012 12:48 AM, Tony Lindgren wrote:
-> > * Cousson, Benoit<b-cousson@ti.com>  [120227 08:04]:
-> >> Hi Tony
-> >>
-> >> This series is based on the lo/dt + the irqdomain/next branch merged on top of it.
-> >>
-> >> Grant confirmed that the irqdomain/next is a stable branch and thus can be referenced for dependency.
-> >>
-> >> Please note that I will need that branch to base all the remaining OMAP DT stuff.
-> >>
-> >> Thanks,
-> >> Benoit
-> >>
-> >>
-> >> The following changes since commit 1f52299ec000e2161635b263d81ab92ea7f1f0a7:
-> >>    Benoit Cousson (1):
-> >>          Merge branch 'irqdomain/next' of git://git.secretlab.ca/git/linux-2.6 into for_3.4/dt_irq_domain2
-> >>
-> >> are available in the git repository at:
-> >>
-> >>    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_irq_domain
-> >>
-> >> Benoit Cousson (3):
-> >>        ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
-> >>        arm/dts: OMAP3: Add interrupt-controller bindings for INTC
-> >>        ARM: OMAP2+: board-generic: Use of_irq_init API
-> >>
-> >>   .../devicetree/bindings/arm/omap/intc.txt          |   27 +++++++++
-> >>   arch/arm/boot/dts/omap3.dtsi                       |    6 +-
-> >>   arch/arm/mach-omap2/board-generic.c                |   30 +++++-----
-> >>   arch/arm/mach-omap2/common.h                       |   12 ++++
-> >>   arch/arm/mach-omap2/irq.c                          |   60 ++++++++++++++++---
-> >>   5 files changed, 109 insertions(+), 26 deletions(-)
-> >>   create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
-> > 
-> > Hmm, looks like this now produces the following warning at least on omap3:
-> 
-> Yes, Rajendra has just reported that issue with linux-next.
+On Mon, Mar 5, 2012 at 8:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 05 March 2012, Haojian Zhuang wrote:
+>
+>>
+>> +#define PXA_NAME_LEN ? ? ? ? 8
+>> +
+>> ?struct uart_pxa_port {
+>> ? ? ? struct uart_port ? ? ? ?port;
+>> ? ? ? unsigned char ? ? ? ? ? ier;
+>
+> Why didn't you just add a field here with that length?
+>
+>> @@ -781,6 +784,39 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
+>> ?};
+>> ?#endif
+>>
+>> +static struct of_device_id serial_pxa_dt_ids[] = {
+>> + ? ? { .compatible = "mrvl,pxa-uart", },
+>> + ? ? { .compatible = "mrvl,mmp-uart", },
+>> + ? ? {}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
+>
+> This one should have an #ifdef CONFIG_OF
+>
+>> +#ifdef CONFIG_OF
+>> +static int serial_pxa_probe_dt(struct platform_device *pdev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct uart_pxa_port *sport)
+>> +{
+>
+> While this one does not need it: it will already compile to nothing
+> if you check the error value correctly.
+>
+>> + ? ? sport->name = kzalloc(PXA_NAME_LEN, GFP_KERNEL);
+>> + ? ? if (!sport->name) {
+>> + ? ? ? ? ? ? ret = -ENOMEM;
+>> + ? ? ? ? ? ? goto err_clk;
+>> ? ? ? }
+>
+> No need for this allocation if you put the name into uart_pxa_port
+> as a member instead of a pointer.
+>
+>> + ? ? ? ? ? ? .of_match_table = serial_pxa_dt_ids,
+>> ? ? ? },
+>> ?};
+>
+> ? ? ? ? ? ? ? ?.of_match_table = of_match_ptr(serial_pxa_dt_ids),
+>
+> ? ? ? ?Arnd
+>
+Thanks. I'll update it.
 
-I'm getting the same warning and initialisation failure with 3.3-rc6 on
-overo. Are these fixes queued up for 3.3 (and not just 3.4) somewhere?
-
-Thanks,
-Johan
+Best Regards
+Haojian
