@@ -1,41 +1,20 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Mar 2012 15:05:34 -0800
-Subject: [PATCH 2/2] omap: build am3517crane board support by default
-In-Reply-To: <1328818586-7104-3-git-send-email-mporter@ti.com>
-References: <1328818586-7104-1-git-send-email-mporter@ti.com>
- <1328818586-7104-3-git-send-email-mporter@ti.com>
-Message-ID: <20120305230534.GN12083@atomide.com>
+Date: Mon, 5 Mar 2012 15:08:13 -0800
+Subject: [PATCH v2 1/2] ARM: OMAP2+: id: Add am33xx SoC type detection
+In-Reply-To: <1329113685-7500-1-git-send-email-afzal@ti.com>
+References: <1329113685-7500-1-git-send-email-afzal@ti.com>
+Message-ID: <20120305230812.GO12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@ti.com> [120209 11:49]:
-> Set default to include support for the craneboard when
-> using the omap2plus_defconfig.
+* Afzal Mohammed <afzal@ti.com> [120212 22:00]:
+> Determine SoC type, i.e. whether GP or HS
 > 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  arch/arm/mach-omap2/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index d965da4..678b8ac 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -206,6 +206,7 @@ config MACH_OMAP3517EVM
->  config MACH_CRANEBOARD
->  	bool "AM3517/05 CRANE board"
->  	depends on ARCH_OMAP3
-> +	default y
->  	select OMAP_PACKAGE_CBB
->  
->  config MACH_OMAP3_PANDORA
+> Note: cpu_is_34xx() is true for am33xx also. Doing
+> cpu_is_am33xx() check after cpu_is_34xx() will not
+> achieve what we want due to the above reason.
+> Hence cpu_is_am33xx() is done before cpu_is_34xx()
 
-As you may have read, we should remove the "default y"
-from Kconfig. So can you please update your first patch in this
-series to set CONFIG_MACH_CRANEBOARD=y in omap2plus_defconfig?
-
-Thanks,
-
-Regards,
+Thanks, applying into fixes-non-critical-part2.
 
 Tony
