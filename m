@@ -1,62 +1,43 @@
-From: balajitk@ti.com (T Krishnamoorthy, Balaji)
-Date: Mon, 5 Mar 2012 15:55:56 +0530
-Subject: [PATCH 4/4] mmc: omap_hsmmc: Simplify init for twl6030 MMC card
- detect
-In-Reply-To: <4F548457.5050205@ti.com>
-References: <20120301185044.29210.44521.stgit@kaulin.local>
- <20120301185535.29210.71546.stgit@kaulin.local>
- <4F50643B.9050500@ti.com> <20120302172251.GJ18901@atomide.com>
- <4F548457.5050205@ti.com>
-Message-ID: <CANrkHUZysOnHKKUuLm0Vbo1KsNp0yUd=udjGvQ43=gTTXbWeCw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Mar 2012 10:32:45 +0000
+Subject: [PATCH] Add the Performance Monitoring Unit to the Trimslice
+ device tree
+In-Reply-To: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
+References: <1330740413-29260-1-git-send-email-wcohen@redhat.com>
+Message-ID: <20120305103245.GC31189@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2012 at 2:46 PM, Rajendra Nayak <rnayak@ti.com> wrote:
-> On Friday 02 March 2012 10:52 PM, Tony Lindgren wrote:
->>
->> BTW, with -rc5, looks like re-inserting omap_hsmmc on omap4 fails
->> to detect any cards, and then fails to unload. This works on omap3
->> just fine. Any ideas why that would be?
->
->
-> Yeah, looks like thats broken. I am not sure whats going wrong though.
-> I just enabled CONFIG_MMC_DEBUG and saw these logs below.
->
-> Venkat/Balaji, care to look at this one?
->
+On Sat, Mar 03, 2012 at 02:06:53AM +0000, William Cohen wrote:
+> The tegra processor has a performance monitoring unit. However, this
+> was not listed on the board-trimslice.c devices. This patch adds
+> it to the list of devices and allows one to use hardware performance
+> monitoring events on the trimslice machine.
+> 
+> Signed-off-by: William Cohen <wcohen@redhat.com>
+> ---
+>  arch/arm/mach-tegra/board-trimslice.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+> index cd52820..0484903 100644
+> --- a/arch/arm/mach-tegra/board-trimslice.c
+> +++ b/arch/arm/mach-tegra/board-trimslice.c
+> @@ -82,6 +82,7 @@ static struct platform_device trimslice_audio_device = {
+>  
+>  static struct platform_device *trimslice_devices[] __initdata = {
+>  	&debug_uart,
+> +	&tegra_pmu_device,
+>  	&tegra_sdhci_device1,
+>  	&tegra_sdhci_device4,
+>  	&tegra_i2s_device1,
+> -- 
+> 1.7.5.2
 
-Let me check this
+Olof - would you be able to pick this up please? I've not been able to test
+it, but since the device is already defined I'm assuming the IRQ numbers are
+correct.
 
-> # insmod omap_hsmmc.ko
-> [ ? 43.358398] omap_hsmmc omap_hsmmc.0: context was not lost
-> [ ? 43.364105] omap_hsmmc omap_hsmmc.0: enabled
-> [ ? 44.434661] mmc0: clock 0Hz busmode 1 powermode 0 cs 0 Vdd 0 width 0
-> timing 0
-> [ ? 44.442352] omap_hsmmc omap_hsmmc.0: Set clock to 0Hz
-> [ ? 44.474365] omap_hsmmc omap_hsmmc.0: disabled
-> [ ? 44.482208] omap_hsmmc omap_hsmmc.4: context was not lost
-> [ ? 44.482208] omap_hsmmc omap_hsmmc.4: enabled
-> [ ? 44.546600] omap_hsmmc omap_hsmmc.0: context was not lost
-> [ ? 44.552276] omap_hsmmc omap_hsmmc.0: enabled
-> [ ? 44.552276] mmc0: mmc_rescan_try_freq: trying to init card at 400000 Hz
-> [ ? 44.563720] mmc0: clock 0Hz busmode 2 powermode 1 cs 0 Vdd 18 width 0
-> timing 0
-> [ ? 44.572174] omap_hsmmc omap_hsmmc.0: Set clock to 0Hz
-> [ ? 44.613800] mmc0: clock 400000Hz busmode 2 powermode 2 cs 0 Vdd 18 width
-> 0 timing 0
-> [ ? 44.621887] omap_hsmmc omap_hsmmc.0: Set clock to 400000Hz
-> [ ? 44.735290] mmc0: starting CMD52 arg 00000c00 flags 00000195
-> [ ? 44.741271] omap_hsmmc omap_hsmmc.0: mmc0: CMD52, argument 0x00000c00
-> [ ? 45.560241] mmc1: clock 0Hz busmode 1 powermode 0 cs 0 Vdd 0 width 0
-> timing 0
-> [ ? 45.567871] omap_hsmmc omap_hsmmc.4: Set clock to 0Hz
-> [ ? 45.591491] omap_hsmmc omap_hsmmc.4: disabled
-> #
-> #
-> # rmmod omap_hsmmc
-> [ ?607.302307] omap_hsmmc omap_hsmmc.4: context was not lost
-> [ ?607.308044] omap_hsmmc omap_hsmmc.4: enabled
-> [ ?607.312591] omap_hsmmc omap_hsmmc.4: disabled
-> [ ?607.317199] omap_hsmmc omap_hsmmc.4: context was not lost
-> [ ?607.322875] omap_hsmmc omap_hsmmc.4: enabled
->
+Cheers,
+
+Will
