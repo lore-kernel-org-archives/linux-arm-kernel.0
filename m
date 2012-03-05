@@ -1,28 +1,91 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Mar 2012 14:57:52 -0800
-Subject: [PATCH 0/3] ARM: OMAP1/2+: 32k-timer: Add hwmod lookup for
- 32k-timer
-In-Reply-To: <79CD15C6BA57404B839C016229A409A8317AF2D2@DBDE01.ent.ti.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A8317AF2D2@DBDE01.ent.ti.com>
-Message-ID: <20120305225751.GL12083@atomide.com>
+Date: Mon, 5 Mar 2012 15:03:34 -0800
+Subject: [PATCH] GPMC: add ECC control definitions
+In-Reply-To: <4F1D4CB3.5080803@visionsystems.de>
+References: <4F1D4CB3.5080803@visionsystems.de>
+Message-ID: <20120305230334.GM12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiremath, Vaibhav <hvaibhav@ti.com> [120123 00:16]:
-> On Thu, Jan 19, 2012 at 19:58:21, Hiremath, Vaibhav wrote:
-> > This patch series cleans up the existing 32k-sync timer implementation
-> > without any major code change and adds hwmod lookup for omap2+ devices,
-> > if lookup fails then fall back to gp-timer.
-...
- 
-> Tony,
+* Yegor Yefremov <yegor_sub1@visionsystems.de> [120123 03:33]:
+> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> ---
+>  arch/arm/mach-omap2/gpmc.c |   30 +++++++++++++++++++++++++-----
+>  1 file changed, 25 insertions(+), 5 deletions(-)
 > 
-> If there are no review comments, can this be merged?
+> Index: b/arch/arm/mach-omap2/gpmc.c
+> ===================================================================
+> --- a/arch/arm/mach-omap2/gpmc.c
+> +++ b/arch/arm/mach-omap2/gpmc.c
+> @@ -50,6 +50,19 @@
+>  #define GPMC_ECC_SIZE_CONFIG	0x1fc
+>  #define GPMC_ECC1_RESULT        0x200
+>  
+> +/* GPMC ECC control settings */
+> +#define GPMC_ECC_CTRL_ECCCLEAR		0x100
+> +#define GPMC_ECC_CTRL_ECCDISABLE	0x000
+> +#define GPMC_ECC_CTRL_ECCREG1		0x001
+> +#define GPMC_ECC_CTRL_ECCREG2		0x002
+> +#define GPMC_ECC_CTRL_ECCREG3		0x003
+> +#define GPMC_ECC_CTRL_ECCREG4		0x004
+> +#define GPMC_ECC_CTRL_ECCREG5		0x005
+> +#define GPMC_ECC_CTRL_ECCREG6		0x006
+> +#define GPMC_ECC_CTRL_ECCREG7		0x007
+> +#define GPMC_ECC_CTRL_ECCREG8		0x008
+> +#define GPMC_ECC_CTRL_ECCREG9		0x009
+> +
+>  #define GPMC_CS0_OFFSET		0x60
+>  #define GPMC_CS_SIZE		0x30
+>  
+> @@ -855,8 +868,9 @@
+>  	gpmc_ecc_used = cs;
+>  
+>  	/* clear ecc and enable bits */
+> -	val = ((0x00000001<<8) | 0x00000001);
+> -	gpmc_write_reg(GPMC_ECC_CONTROL, val);
+> +	gpmc_write_reg(GPMC_ECC_CONTROL,
+> +			GPMC_ECC_CTRL_ECCCLEAR |
+> +			GPMC_ECC_CTRL_ECCREG1);
+>  
+>  	/* program ecc and result sizes */
+>  	val = ((((ecc_size >> 1) - 1) << 22) | (0x0000000F));
+> @@ -864,13 +878,19 @@
+>  
+>  	switch (mode) {
+>  	case GPMC_ECC_READ:
+> -		gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
+> +		gpmc_write_reg(GPMC_ECC_CONTROL,
+> +				GPMC_ECC_CTRL_ECCCLEAR |
+> +				GPMC_ECC_CTRL_ECCREG1);
+>  		break;
+>  	case GPMC_ECC_READSYN:
+> -		 gpmc_write_reg(GPMC_ECC_CONTROL, 0x100);
+> +		gpmc_write_reg(GPMC_ECC_CONTROL,
+> +				GPMC_ECC_CTRL_ECCCLEAR |
+> +				GPMC_ECC_CTRL_ECCDISABLE);
+>  		break;
+>  	case GPMC_ECC_WRITE:
+> -		gpmc_write_reg(GPMC_ECC_CONTROL, 0x101);
+> +		gpmc_write_reg(GPMC_ECC_CONTROL,
+> +				GPMC_ECC_CTRL_ECCCLEAR |
+> +				GPMC_ECC_CTRL_ECCREG1);
+>  		break;
+>  	default:
+>  		printk(KERN_INFO "Error: Unrecognized Mode[%d]!\n", mode);
+> 
 
-Made a minor comment on the first patch, it would be nice to get
-that clean-up merged. The other two depend on some some hwmod
-data shrinkage by Paul..
+No functional changes here, right?
+
+Can GPMC_ECC_READ and GPMC_ECC_WRITE case be combined:
+
+	switch (mode) {
+	case GPMC_ECC_READ:
+	case GPMC_ECC_WRITE:
+		gpmc_write_reg(GPMC_ECC_CONTROL,
+			GPMC_ECC_CTRL_ECCCLEAR |
+			GPMC_ECC_CTRL_ECCREG1);
+	break;
+	...
 
 Regards,
 
