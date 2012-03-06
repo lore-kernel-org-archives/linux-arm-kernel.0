@@ -1,40 +1,46 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 6 Mar 2012 13:46:49 +0800
-Subject: [PATCH v2 10/17] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
-In-Reply-To: <20120305173910.GZ3852@pengutronix.de>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-11-git-send-email-shawn.guo@linaro.org>
- <20120305173910.GZ3852@pengutronix.de>
-Message-ID: <20120306054648.GN16232@S2101-09.ap.freescale.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 5 Mar 2012 23:44:44 -0600
+Subject: [PATCHv4 2/6] ARM: OMAP3 PM: Move IO Daisychain function to
+ omap3 prm file
+In-Reply-To: <1330701475-22576-3-git-send-email-t-kristo@ti.com>
+References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
+ <1330701475-22576-3-git-send-email-t-kristo@ti.com>
+Message-ID: <20120306054443.GA5670@kobold>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 06:39:10PM +0100, Sascha Hauer wrote:
-> On Mon, Mar 05, 2012 at 10:30:58PM +0800, Shawn Guo wrote:
-> > Freescale PowerPC and ARM/IMX families share the same SSI IP block.
-> > The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
-> > code sharing and consolidation can happen.
-> > 
-> > This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
-> > in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
-> > IMX platform.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  sound/soc/Kconfig                        |    1 -
-> >  sound/soc/Makefile                       |    1 -
-> >  sound/soc/fsl/Kconfig                    |   92 ++++++++++++++++++++++++++++++
-> >  sound/soc/fsl/Makefile                   |   22 +++++++
-> >  sound/soc/{imx => fsl}/eukrea-tlv320.c   |    2 +-
-> >  sound/soc/{imx => fsl}/imx-audmux.c      |    0
-> >  sound/soc/{imx => fsl}/imx-audmux.h      |    0
-> >  sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c |    0
+On 17:17-20120302, Tero Kristo wrote:
+> From: Vishwanath BS <vishwanath.bs@ti.com>
 > 
-> Maybe this is the right time to rename this file to something like
-> imx-pcm-dma.c since it has nothing to do with mx2 anymore.
+> Since IO Daisychain modifies only PRM registers, it makes sense to move
+> it to PRM File. Also changed the timeout value for IO chain enable to
+> 100us and added a wait for status disable at the end.
 > 
-Ok, will change it in the next post.
+[...]
+> +/*
+> + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
+> + * the I/O ring after asserting WUCLKIN high
+> + */
+> +#define MAX_IOPAD_LATCH_TIME 100
+> +
+> +/* OMAP3 Daisychain enable sequence */
+> +void omap3_trigger_io_chain(void)
+> +{
+> +	int i = 0;
+> +
+> +	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
+> +				   PM_WKEN);
+> +	/* Do a readback to assure write has been done */
+> +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+> +
+> +	omap_test_timeout(((omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
+> +			    OMAP3430_ST_IO_CHAIN_MASK) == 1),
+umm
+arch/arm/mach-omap2/prm-regbits-34xx.h:#define OMAP3430_ST_IO_CHAIN_MASK
+(1 << 16)
+(reg & (1 << 16)) == 1
+will ever be true?
 
 -- 
 Regards,
-Shawn
+Nishanth Menon
