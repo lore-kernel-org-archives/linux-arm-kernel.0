@@ -1,96 +1,47 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 6 Mar 2012 10:44:16 +0200
-Subject: [PATCHv4 4/6] ARM: OMAP3+: PRM: Enable IO wake up
-In-Reply-To: <4F5598E3.4050506@ti.com>
-References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
- <1330701475-22576-5-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1203052001240.6649@utopia.booyaka.com>
- <4F55978C.7030407@ti.com>  <4F5598E3.4050506@ti.com>
-Message-ID: <1331023456.2116.148.camel@sokoban>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Tue,  6 Mar 2012 12:45:42 +0400
+Subject: [PATCH/RFC 1/2] arm/tegra: fix harmony pinmux for PCIe
+In-Reply-To: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
+References: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <1331023544-6439-2-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-03-06 at 10:26 +0530, Rajendra Nayak wrote:
-> On Tuesday 06 March 2012 10:20 AM, Rajendra Nayak wrote:
-> > On Tuesday 06 March 2012 09:51 AM, Paul Walmsley wrote:
-> >> added Rajendra, Nilesh, Vishwa, Mohan
-> >>
-> >> Hi
-> >>
-> >> On Fri, 2 Mar 2012, Tero Kristo wrote:
-> >>
-> >>> Enable IO Wake up for OMAP3/4 as part of PRM Init. Currently this has
-> >>> been
-> >>> managed in cpuidle path which is not the right place. Subsequent patch
-> >>> will remove IO Daisy chain handling in cpuidle path once daisy chain is
-> >>> handled as part of hwmod mux. This patch also moves the OMAP4 IO wakeup
-> >>> enable code from the trigger function to init time setup.
-> >>>
-> >>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
-> >>
-> >> Should we keep the I/O wakeups enabled all the time?
-> >>
-> >> Seems like that could result in at least one spurious wake-up event --
-> >> and
-> >> thus a PRCM interrupt -- for each I/O pad that has WAKEUPENABLE set.
-> >> Seems like these interrupts could recur every time the I/O chain is
-> >> reset.
-> >> And that the I/O chain is now reset in every hwmod idle and enable
-> >> operation for an IP block that contains dynamic mux data?
-> >>
-> >> Thinking about the problem na?vely... maybe you all can think through
-> >> this
-> >> with me:
-> >>
-> >> Consider an IP block 'A' that has a signal (like the UART rx_irrx signal)
-> >> that's mux'ed to a pad with WAKEUPENABLE set. (Some examples of 'A' might
-> >> include a UART, a GPIO, or a McBSP.)
-> >>
-> >> Shouldn't we enable I/O wakeups (by setting EN_IO/GLOBAL_WUEN) only
-> >> immediately before the powerdomain containing IP block 'A' is going to
-> >> transition into RETENTION or OFF?
-> >
-> > Hi Paul,
-> >
-> > I completely agree with your observations and we knew we would have
-> > additional wakeups with this design. Like I mentioned in the other
-> > thread, we went ahead with this approach knowing we need to optimize
-> > with some kind of powerdomain level usecounting in the future, because
-> > it didn't exist back then when we did it this way.
-> > But now that we already have it, maybe we can fix this and do
-> > it such that we completely avoid an additional wakeup interrupt.
-> >
-> >>
-> >> If we do that, then we can avoid needlessly resetting the I/O chain
-> >> when a
-> >> powerdomain is not going to go into a low-power state.
-> >>
-> >> I haven't measured the time it takes for the I/O chain to be reset.
-> >> Maybe one of you have. But that 100 microsecond timeout that was
-> >> specified in two of the other patches in this series has me a little
-> >> worried.
-> >
-> > I haven't profiled it myself but I am guessing the delay isn't much.
-> 
-> Having said that, I do agree with you that, however small the delay,
-> we end up doing needless IO trigger when the powerdomain isn't
-> really entering a low power state.
+Commit 6e96aca397 (arm/tegra: Harmony PCIe: Don't touch pinmux)
+removed runtime tri-state toggling for PCIe related pinmux groups,
+but it seems that the fact that all of them are tri-state by default
+has been overlooked. Change defaults for these groups to TEGRA_TRI_NORMAL.
 
-I did some measurements on this a while back and the delay was around a
-few microseconds. I can redo this while doing version 5.
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+---
+ arch/arm/mach-tegra/board-harmony-pinmux.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
--Tero
-
-> 
-> > The 100us comes from the fact that there is no documentation on the
-> > exact delay, so went around asking whats the *real worst case* delay,
-> > and we got an answer, 100us should be really big enough :)
-> >
-> > regards,
-> > Rajendra
-> >
-> >>
-> >>
-> >> - Paul
-> >
-> 
+diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
+index 465808c..1af85bccc 100644
+--- a/arch/arm/mach-tegra/board-harmony-pinmux.c
++++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
+@@ -53,7 +53,7 @@ static struct tegra_pingroup_config harmony_pinmux[] = {
+ 	{TEGRA_PINGROUP_GME,   TEGRA_MUX_SDIO4,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_GPU,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_GPU7,  TEGRA_MUX_RTCK,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+-	{TEGRA_PINGROUP_GPV,   TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_GPV,   TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_HDINT, TEGRA_MUX_HDMI,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_I2CP,  TEGRA_MUX_I2C,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_IRRX,  TEGRA_MUX_UARTA,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
+@@ -112,10 +112,10 @@ static struct tegra_pingroup_config harmony_pinmux[] = {
+ 	{TEGRA_PINGROUP_SDC,   TEGRA_MUX_PWM,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_SDD,   TEGRA_MUX_PWM,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_SDIO1, TEGRA_MUX_SDIO1,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+-	{TEGRA_PINGROUP_SLXA,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SLXA,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_SLXC,  TEGRA_MUX_SPDIF,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_SLXD,  TEGRA_MUX_SPDIF,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+-	{TEGRA_PINGROUP_SLXK,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
++	{TEGRA_PINGROUP_SLXK,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+ 	{TEGRA_PINGROUP_SPDI,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_SPDO,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
+ 	{TEGRA_PINGROUP_SPIA,  TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
+-- 
+1.7.5.1.300.gc565c
