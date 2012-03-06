@@ -1,33 +1,75 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 06 Mar 2012 11:43:57 +0100
-Subject: [PATCH v4] lpc32xx: Added ethernet driver: smp_wmb()
-In-Reply-To: <1330987524.2538.61.camel@bwh-desktop>
-References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
- <1330987524.2538.61.camel@bwh-desktop>
-Message-ID: <4F55EA6D.3070602@antcom.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Mar 2012 02:47:08 -0800
+Subject: [GIT PULL] Samsung fixes-4 for v3.3
+In-Reply-To: <4F55E6D1.4080703@samsung.com>
+References: <4F55E6D1.4080703@samsung.com>
+Message-ID: <4F55EB2C.6090807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2012 11:45 PM, Ben Hutchings wrote:
->> +	/* Clear and enable interrupts */
->> +	writel(0xFFFF, LPC_ENET_INTCLEAR(pldat->net_base));
->> +	lpc_eth_enable_int(pldat->net_base);
->> +
->> +	/* Get the next TX buffer output index */
->> +	pldat->num_used_tx_buffs = 0;
->> +	pldat->last_tx_idx =
->> +		readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
-> 
-> Doesn't this need to be done *before* enabling interrupts?  Also, I
-> think you need an smp_wmb() so that the interrupt handler is guaranteed
-> to see all these writes.
+On 03/06/12 02:28, Kukjin Kim wrote:
+> Hi Arnd, Olof
+>
+> Please pull Samsung fixes for v3.3.
+>
+> If any problems, please kindly let me know.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> The following changes since commit
+> 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
+>
+> Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
+>
+> are available in the git repository at:
+>
+> ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> v3.3-samsung-fixes-4
 
-Do you mean _one_ smp_wmb() directly after lpc_eth_enable_int() (which
-I'm moving behind the above code?
+Oops, should be...
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 
-Note that there is no SMP in LPCs and NXP is not planning to build one
-AFAIK. However, I'm fine with including smp_wmb() anyway for completeness.
+>
+> Bartlomiej Zolnierkiewicz (1):
+> ARM: EXYNOS: fix touchscreen IRQ setup on Universal C210 board
+>
+> Gusakov Andrey (1):
+> ARM: S3C24XX: DMA resume regression fix
+>
+> Heiko Stuebner (1):
+> ARM: S3C24XX: Fix restart on S3C2442
+>
+> Joonyoung Shim (1):
+> ARM: SAMSUNG: Fix memory size for hsotg
+>
+> arch/arm/mach-exynos/mach-universal_c210.c | 2 ++
+> arch/arm/mach-s3c2440/common.h | 2 +-
+> arch/arm/mach-s3c2440/mach-anubis.c | 2 +-
+> arch/arm/mach-s3c2440/mach-at2440evb.c | 2 +-
+> arch/arm/mach-s3c2440/mach-gta02.c | 2 +-
+> arch/arm/mach-s3c2440/mach-mini2440.c | 2 +-
+> arch/arm/mach-s3c2440/mach-nexcoder.c | 2 +-
+> arch/arm/mach-s3c2440/mach-osiris.c | 2 +-
+> arch/arm/mach-s3c2440/mach-rx1950.c | 2 +-
+> arch/arm/mach-s3c2440/mach-rx3715.c | 2 +-
+> arch/arm/mach-s3c2440/mach-smdk2440.c | 2 +-
+> arch/arm/mach-s3c2440/s3c2440.c | 13 -------------
+> arch/arm/mach-s3c2440/s3c244x.c | 11 +++++++++++
+> arch/arm/plat-s3c24xx/dma.c | 2 +-
+> arch/arm/plat-samsung/devs.c | 2 +-
+> 15 files changed, 25 insertions(+), 25 deletions(-)
 
-Thanks in advance,
+-- 
+Thanks.
 
-Roland
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
