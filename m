@@ -1,70 +1,65 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 6 Mar 2012 18:05:37 +0200
-Subject: [PATCHv5 2/6] ARM: OMAP3 PM: Move IO Daisychain function to
- omap3 prm file
-In-Reply-To: <20120306155725.GA30895@senorita.am.dhcp.ti.com>
-References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
- <1331046702-2472-3-git-send-email-t-kristo@ti.com>
- <20120306155725.GA30895@senorita.am.dhcp.ti.com>
-Message-ID: <1331049937.2116.168.camel@sokoban>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 6 Mar 2012 17:17:43 +0100
+Subject: [RFC 00/14] Generic clk for Orion platforms.
+In-Reply-To: <20120306155840.GS5050@titan.lakedaemon.net>
+References: <1331015471-28872-1-git-send-email-andrew@lunn.ch>
+ <20120306155840.GS5050@titan.lakedaemon.net>
+Message-ID: <20120306161743.GI24858@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-03-06 at 09:57 -0600, Nishanth Menon wrote:
-> On 17:11-20120306, Tero Kristo wrote:
-> > From: Vishwanath BS <vishwanath.bs@ti.com>
+On Tue, Mar 06, 2012 at 10:58:40AM -0500, Jason wrote:
+> On Tue, Mar 06, 2012 at 07:30:56AM +0100, Andrew Lunn wrote:
+> > This patch set starts the process of changing Orion based platforms to
+> > use the generic clk framework. The first patch fixes compile problems
+> > with the framework, and is expected to be dropped once fixed upstream.
+> > Then clks are added. This is a fixed rate clk for tclk and for
+> > kirkwood, most of the gated clocks also get a clk. The following
+> > patches then modified the drivers to make use of these clocks,
+> > getting, prepareing, enabling at probe time, and disableing,
+> > unprepareing, and putting at remove time. Rather than pass the clock
+> > frequency as platform_data, the driver now uses clk_get_rate(). This
+> > results in some platform_data structures becoming redundant, and so
+> > are removed.
+> 
+> Awesome, thanks for posting!
+> 
+> > TODO:
 > > 
-> > Since IO Daisychain modifies only PRM registers, it makes sense to move
-> > it to PRM File. Also changed the timeout value for IO chain enable to
-> > 100us and added a wait for status disable at the end.
-> [...]
-> > diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> > index 9ce7654..2f45b96 100644
-> > --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> > +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> > @@ -301,6 +301,43 @@ void omap3xxx_prm_restore_irqen(u32 *saved_mask)
-> >  				OMAP3_PRM_IRQENABLE_MPU_OFFSET);
-> >  }
-> >  
-> > +/*
-> > + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
-> > + * the I/O ring after asserting WUCLKIN high
-> > + */
-> > +#define MAX_IOPAD_LATCH_TIME 100
-> > +
-> > +/* OMAP3 Daisychain enable sequence */
-> > +void omap3_trigger_io_chain(void)
-> > +{
-> > +	int i = 0;
-> > +
-> > +	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> > +				   PM_WKEN);
-> > +	/* Do a readback to assure write has been done */
-> > +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
-> > +
-> > +	omap_test_timeout(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
-> > +			  OMAP3430_ST_IO_CHAIN_MASK,
-> > +			  MAX_IOPAD_LATCH_TIME, i);
-> probably a nitpick, but would'nt you like to keep the OMAP3 and OMAP4
-> style consistent?
-> > +
-> > +	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> > +				     PM_WKEN);
-> > +
-> > +	omap2_prm_set_mod_reg_bits(OMAP3430_ST_IO_CHAIN_MASK, WKUP_MOD,
-> > +				     PM_WKST);
-> > +
-> > +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST);
-> in the previous iteration it had:
-> omap_test_timeout(((omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
-> OMAP3430_ST_IO_CHAIN_MASK) == 0),
-> MAX_IOPAD_LATCH_TIME,
-> i);
-> gone now?
+> >  0) Cleanup the white space changes, and hunks in the wrong patches.
+> 
+> It would be helpful to break out code cleanup as well.  eg spi_clock_fix
+> removal, sound platform data removal, and anything else I didn't see on
+> initial read through.
 
-Yea, according to TRM this is not what should be done on omap3,
-apparently one of the comments I received was in error for one of the
-previous versions. Also, the implementation in patch 1 is closer to what
-is here now.
+I could move these out, but they actually help you. It means there is
+less for you to add DT support for. If they are left in, you need to
+add a DT property for spi_clock_fix, etc.
+ 
+> >  1) PCIe needs adopting to use clks.
+> >  2) Strip out all references to kirkwood_clk_ctrl
+> >  3) Find a solution for turning off unused clks - Probably needs
+> >     framework support, which Mike has already suggested.
+> 
+> I'm assuming the driver(s) will increment a reference, so when it
+> reaches zero, the framework would call a clk_gate hook.
 
--Tero
+You missed an important point. No driver has claimed these, but u-boot
+has turned them on. So we want linux to turn off all clocks for which
+there is no driver using them, in order to save power.
+kirkwood_clk_ctrl is dual purpose. It turns on needed clocks, but it
+also turns off unneeded clocks.
+ 
+> >  4) Find a solution for tuning off unused SATA and PCIe PHYs. Maybe
+> >     use the unprepare() method, but the current basic clk providers 
+> >     don't support this.
+> 
+> It looks like each SATA and PCIe PHY has it's own clock and it's own
+> shutdown (kirkwood_clock_gate()).  If the return value of unprepare
+> indicated a clock was gated (all references gone), then the driver could
+> shut down the PHY.  Or, am I missing something?
+
+Yes, same comment as above. We want to turn off PHYs which don't have
+a driver.
+
+  Andrew
