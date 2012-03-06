@@ -1,38 +1,34 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  6 Mar 2012 16:54:02 +0000
-Subject: [PATCH 2/6] kexec: crash: don't save swapper_pg_dir for !CONFIG_MMU
- configurations
+Date: Tue,  6 Mar 2012 16:54:03 +0000
+Subject: [PATCH 3/6] ARM: nommu: fix typo in mm/Kconfig
 In-Reply-To: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
 References: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1331052846-19144-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1331052846-19144-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nommu platforms don't have very interesting swapper_pg_dir pointers and
-usually just #define them to NULL, meaning that we can't include them in
-the vmcoreinfo on the kexec crash path.
+The description for the CPU_HIGH_VECTOR Kconfig option for nommu builds
+doesn't make any sense.
 
-This patch only saves the swapper_pg_dir if we have an MMU.
+This patch fixes up the trivial grammatical error.
 
-Reviewed-by: Simon Horman <horms@verge.net.au>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/kexec.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mm/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/kernel/kexec.c b/kernel/kexec.c
-index 7b08867..cb5d13c 100644
---- a/kernel/kexec.c
-+++ b/kernel/kexec.c
-@@ -1462,7 +1462,9 @@ static int __init crash_save_vmcoreinfo_init(void)
- 
- 	VMCOREINFO_SYMBOL(init_uts_ns);
- 	VMCOREINFO_SYMBOL(node_online_map);
-+#ifdef CONFIG_MMU
- 	VMCOREINFO_SYMBOL(swapper_pg_dir);
-+#endif
- 	VMCOREINFO_SYMBOL(_stext);
- 	VMCOREINFO_SYMBOL(vmlist);
- 
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 7edef91..7c8a7d8 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -723,7 +723,7 @@ config CPU_HIGH_VECTOR
+ 	bool "Select the High exception vector"
+ 	help
+ 	  Say Y here to select high exception vector(0xFFFF0000~).
+-	  The exception vector can be vary depending on the platform
++	  The exception vector can vary depending on the platform
+ 	  design in nommu mode. If your platform needs to select
+ 	  high exception vector, say Y.
+ 	  Otherwise or if you are unsure, say N, and the low exception
 -- 
 1.7.4.1
