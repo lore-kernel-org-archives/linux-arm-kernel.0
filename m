@@ -1,32 +1,58 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Mon, 05 Mar 2012 16:49:18 -0800
-Subject: [PATCH v4] lpc32xx: Added ethernet driver
-In-Reply-To: <1330987524.2538.61.camel@bwh-desktop>
-References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
- <1330987524.2538.61.camel@bwh-desktop>
-Message-ID: <1330994958.9504.2.camel@edumazet-glaptop>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 05 Mar 2012 16:53:29 -0800
+Subject: [GIT PULL] ARM: OMAP: PM cleanups for v3.4
+Message-ID: <87mx7uh7na.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-03-05 at 22:45 +0000, Ben Hutchings wrote:
-> On Mon, 2012-03-05 at 22:40 +0100, Roland Stigge wrote:
-> [...]
+Tony,
 
-...
+Please pull the following PM related cleanups for v3.4.
 
-> > +				/* Copy packet from buffer */
-> > +				memcpy(prdbuf,
-> > +					pldat->rx_buff_v[rxconsidx], len);
-> > +
-> > +				/* Pass to upper layer */
-> > +				skb->protocol = eth_type_trans(skb, ndev);
-> > +				netif_rx(skb);
-> > +				ndev->last_rx = jiffies;
-> 
-> Drivers don't need to set last_rx any more.
+Note that due to conflicts with changes from both your cleanup branch
+and your hsmmc branch, I created a merge base by starting at 'cleanup'
+and merging hsmmc, and basing this series on top.
 
-Also, a NAPI driver should call netif_receive_skb() instead of
-netif_rx()
+Let me know if you want some other baseline for this series.
 
-netif_rx() is more expensive because of additional queue, while
-netif_receive_skb() directly calls the upper stacks.
+Kevin
+
+
+The following changes since commit 015f1e4297ad32f83251f3f4cee2389ce5516e9e:
+
+  Merge remote-tracking branch 'omap/hsmmc' into for_3.4/cleanup/pm-base (2012-03-05 15:37:04 -0800)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/cleanup/pm
+
+for you to fetch changes up to 1416408d31236dc2a80d269aa23ffa93aa01e833:
+
+  ARM: OMAP2+: PM: share some suspend-related functions across OMAP2, 3, 4 (2012-03-05 16:01:19 -0800)
+
+----------------------------------------------------------------
+Jean Pihet (1):
+      ARM: OMAP2+: PM debug: fix the use of debugfs_create_* API
+
+Kevin Hilman (1):
+      ARM: OMAP: omap_device: remove omap_device_parent
+
+Paul Walmsley (5):
+      ARM: OMAP3: PM: remove superfluous calls to pwrdm_clear_all_prev_pwrst()
+      ARM: OMAP2+: PM: clean up omap_set_pwrdm_state()
+      ARM: OMAP2+: PM: share clkdms_setup() across OMAP2, 3, 4
+      ARM: OMAP2+: omap_device: call all suspend, resume callbacks when OMAP_DEVICE_NO_IDLE_ON_SUSPEND is set
+      ARM: OMAP2+: PM: share some suspend-related functions across OMAP2, 3, 4
+
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c     |    2 -
+ arch/arm/mach-omap2/pm-debug.c                |    6 +-
+ arch/arm/mach-omap2/pm.c                      |  113 ++++++++++++++++++++-----
+ arch/arm/mach-omap2/pm.h                      |    2 +
+ arch/arm/mach-omap2/pm24xx.c                  |   75 ++--------------
+ arch/arm/mach-omap2/pm34xx.c                  |   74 +---------------
+ arch/arm/mach-omap2/pm44xx.c                  |   57 +------------
+ arch/arm/plat-omap/include/plat/omap_device.h |    2 +-
+ arch/arm/plat-omap/omap-pm-noop.c             |    2 +-
+ arch/arm/plat-omap/omap_device.c              |   24 ++----
+ 10 files changed, 118 insertions(+), 239 deletions(-)
