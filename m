@@ -1,55 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Mar 2012 13:52:59 +0000
-Subject: [alsa-devel] [PATCH 15/20] ASoC: fsl: make fsl_ssi driver
- compilable on ARM/IMX
-In-Reply-To: <20120306133818.GV19635@opensource.wolfsonmicro.com>
-References: <4F53FBA1.8090200@freescale.com>
- <20120305000411.GL7363@n2100.arm.linux.org.uk>
- <4F54053F.9070502@freescale.com>
- <20120305002635.GA23798@opensource.wolfsonmicro.com>
- <20120306104015.GF17370@n2100.arm.linux.org.uk>
- <20120306120646.GH19635@opensource.wolfsonmicro.com>
- <20120306122516.GH17370@n2100.arm.linux.org.uk>
- <20120306123322.GP19635@opensource.wolfsonmicro.com>
- <s5h4nu17tdn.wl%tiwai@suse.de>
- <20120306133818.GV19635@opensource.wolfsonmicro.com>
-Message-ID: <20120306135259.GJ17370@n2100.arm.linux.org.uk>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Tue, 6 Mar 2012 14:03:28 +0000
+Subject: [PATCH v4] lpc32xx: Added ethernet driver: smp_wmb()
+In-Reply-To: <4F55EA6D.3070602@antcom.de>
+References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
+ <1330987524.2538.61.camel@bwh-desktop> <4F55EA6D.3070602@antcom.de>
+Message-ID: <1331042608.2347.1.camel@bwh-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 01:38:18PM +0000, Mark Brown wrote:
-> On Tue, Mar 06, 2012 at 02:26:28PM +0100, Takashi Iwai wrote:
-> > Mark Brown wrote:
-> > > On Tue, Mar 06, 2012 at 12:25:16PM +0000, Russell King - ARM Linux wrote:
+On Tue, 2012-03-06 at 11:43 +0100, Roland Stigge wrote:
+> On 03/05/2012 11:45 PM, Ben Hutchings wrote:
+> >> +	/* Clear and enable interrupts */
+> >> +	writel(0xFFFF, LPC_ENET_INTCLEAR(pldat->net_base));
+> >> +	lpc_eth_enable_int(pldat->net_base);
+> >> +
+> >> +	/* Get the next TX buffer output index */
+> >> +	pldat->num_used_tx_buffs = 0;
+> >> +	pldat->last_tx_idx =
+> >> +		readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
+> > 
+> > Doesn't this need to be done *before* enabling interrupts?  Also, I
+> > think you need an smp_wmb() so that the interrupt handler is guaranteed
+> > to see all these writes.
 > 
-> > > whenever you need to call back into the ALSA APIs.  Though of course I'm
-> > > pretty sure there's a bunch of uniprocessor assumptions through the body
-> > > of driver code anyway...
-> 
-> > Not that much actually.  On the contrary, because of the current
-> > design allowing concurrent accesses, many codes have been written
-> > rather in too complex and messy ways.  It could have been much
-> > simplified if we didn't consider the concurrent accesses to each
-> > substream.
-> 
-> Right, but I'm fairly sure that at least some of the driver code is
-> relying on uniprocessor assumptions for what it's doing
+> Do you mean _one_ smp_wmb() directly after lpc_eth_enable_int() (which
+> I'm moving behind the above code?
 
-Mark,
+The sequence should be
 
-Stop using the term "uniprocessor assmptions".
+	pldat->state = values...;
+	smp_wmb();
+	enable_interrupts();
 
-Thinking that something is safe because you're running on a uniprocessor
-system is total bollocks at every level.
+> Note that there is no SMP in LPCs and NXP is not planning to build one
+> AFAIK.
 
-You can get other threads scheduled on a uniprocessor system because you
-happen to have called a function which has slept beneath you.  As you
-later mention in your reply, preempt.  Preempt will effectively turn a
-UP system into an effective SMP system as far as proper locking goes.
+Never say never!
 
-So, to talk about "uniprocessor assumptions" is at best misleading, but
-is totally and utterly wrong.  Please stop mudding the issue with your
-system programming misunderstandings.
+> However, I'm fine with including smp_wmb() anyway for completeness.
 
-What you mean is "single threaded assumptions".  Please use this term
-instead - it's what you actually mean.
+Ben.
+
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
