@@ -1,58 +1,96 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 06 Mar 2012 09:53:45 +0100
-Subject: [PATCH v4] lpc32xx: Added ethernet driver
-In-Reply-To: <1330987524.2538.61.camel@bwh-desktop>
-References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
- <1330987524.2538.61.camel@bwh-desktop>
-Message-ID: <4F55D099.5070006@antcom.de>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 6 Mar 2012 10:54:08 +0200
+Subject: [PATCHv3 1/4] ARM: OMAP4: suspend: Program all domains to
+ retention
+In-Reply-To: <4F55CE19.7000309@ti.com>
+References: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
+ <1330529106-10423-2-git-send-email-t-kristo@ti.com> <871up6in50.fsf@ti.com>
+ <1331022713.2116.144.camel@sokoban> <4F55CE19.7000309@ti.com>
+Message-ID: <1331024048.2116.157.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+On Tue, 2012-03-06 at 14:13 +0530, Rajendra Nayak wrote:
+> On Tuesday 06 March 2012 02:01 PM, Tero Kristo wrote:
+> > On Mon, 2012-03-05 at 16:33 -0800, Kevin Hilman wrote:
+> >> Tero Kristo<t-kristo@ti.com>  writes:
+> >>
+> >>> From: Rajendra Nayak<rnayak@ti.com>
+> >>>
+> >>> Remove the FIXME's in the suspend sequence since
+> >>> we now intend to support system level RET support.
+> >>>
+> >>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+> >>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> >>> Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> >>
+> >> So this is the only patch in this series that is still needed.  However...
+> >>
+> >> It doesn't seem like this all by itself is ready for mainline as we'll
+> >> suddenly start putting all powerdomains in retention without any
+> >> additional support.
+> >>
+> >> I guess at a minimum it needs working IO wakeup support from the IO
+> >> daisy chain series.  Are there other dependencies here?
+> >
+> > Only IO chain is needed for wakeup capability. Actually even with the
+> > current mainline kernel, I am unable to wake-up the device from MPU
+> > retention, as there are no wakeup sources. So this patch doesn't really
+> 
+> Why?, doesn't debug console wakeup work?
 
-thank you for your review!
+At least I couldn't get it to work. I tried with no_console_suspend
+kernel param to no avail. Don't know if I was missing something else.
 
-On 03/05/2012 11:45 PM, Ben Hutchings wrote:
-> [...]
->> +static int lpc_eth_poll(struct napi_struct *napi, int budget)
->> +{
->> +	struct netdata_local *pldat = container_of(napi,
->> +			struct netdata_local, napi);
->> +	struct net_device *ndev = pldat->ndev;
->> +	unsigned long flags;
->> +	int rx_done = 0;
->> +
->> +	spin_lock_irqsave(&pldat->lock, flags);
->> +
->> +	__lpc_handle_xmit(ndev);
->> +	rx_done = __lpc_handle_recv(ndev, budget);
->> +
->> +	if (rx_done < budget) {
->> +		napi_complete(napi);
->> +		lpc_eth_enable_int(pldat->net_base);
->> +	}
->> +
->> +	spin_unlock_irqrestore(&pldat->lock, flags);
->
-> This is really sad.  You implement NAPI but then take away most of the
-> benefits of that by disabling interrupts.
->
-> It looks like you could safely unlock pldat->lock before calling
-> __lpc_handle_recv - nothing else manipulates RX queue state so no lock
-> is required.
->
-> As for the TX side, you can probably use the TX queue lock
-> (__netif_tx_lock, __netif_tx_unlock) to serialise with
-> lpc_eth_hard_start_xmit() and avoid taking pldat->lock in either
-> __lpc_handle_xmit() or here.
+-Tero
 
-Sounds reasonable, and will do it.
-
-However, I implemented it from the example of
-drivers/net/ethernet/via/via-velocity.c:velocity_poll() - is there a
-good reason for doing it that way in the velocity driver or is it done
-incorrectly there, also?
-
-Thanks,
-
-Roland
+> 
+> > change the behavior to worse even without any additional patches. :) But
+> > yea, good to wait until IO chain is in.
+> 
+> IO chain, according to documentation :) should be needed only if you
+> hit OSWR or OFF, async wakeups should be functional as long as you
+> only hit CSWR.
+> 
+> >
+> > The other dependencies are that the stuff handled by patches 2,3 and 4
+> > have to be handled somehow:
+> >
+> > -patch2: must be in (this patch is queued by Paul)
+> > -patch3: will be taken care of by Paul's pwrdm fixes (I guess this is
+> > queued by Paul himself already)
+> > -patch4: OMAP interrupt count must be increased (this is handled by
+> > Benoit's patch, which is queued by Tony)
+> >
+> > -Tero
+> >
+> >>
+> >> If not, I can queue this when Paul is ready to merge the IO wakeup
+> >> stuff.
+> >>
+> >> Kevin
+> >>
+> >>> ---
+> >>>   arch/arm/mach-omap2/pm44xx.c |    6 ------
+> >>>   1 files changed, 0 insertions(+), 6 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> >>> index c264ef7..1ab30a3 100644
+> >>> --- a/arch/arm/mach-omap2/pm44xx.c
+> >>> +++ b/arch/arm/mach-omap2/pm44xx.c
+> >>> @@ -151,12 +151,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+> >>>   	if (!strncmp(pwrdm->name, "cpu", 3))
+> >>>   		return 0;
+> >>>
+> >>> -	/*
+> >>> -	 * FIXME: Remove this check when core retention is supported
+> >>> -	 * Only MPUSS power domain is added in the list.
+> >>> -	 */
+> >>> -	if (strcmp(pwrdm->name, "mpu_pwrdm"))
+> >>> -		return 0;
+> >>>
+> >>>   	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
+> >>>   	if (!pwrst)
+> >
+> >
+> 
