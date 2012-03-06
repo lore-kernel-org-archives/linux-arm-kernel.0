@@ -1,53 +1,40 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Tue, 6 Mar 2012 15:37:37 +0000
-Subject: [PATCH v4] lpc32xx: Added ethernet driver: smp_wmb()
-In-Reply-To: <20120306141745.GA15201@n2100.arm.linux.org.uk>
-References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
- <1330987524.2538.61.camel@bwh-desktop> <4F55EA6D.3070602@antcom.de>
- <1331042608.2347.1.camel@bwh-desktop>
- <20120306141745.GA15201@n2100.arm.linux.org.uk>
-Message-ID: <1331048257.2333.4.camel@bwh-desktop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Mar 2012 15:38:11 +0000
+Subject: [PATCH v3 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <20120303193249.GA22021@avionic-0098.mockup.avionic-design.de>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <20120223160420.GA9899@avionic-0098.mockup.avionic-design.de>
+ <20120303193249.GA22021@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201203061538.11709.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-03-06 at 14:17 +0000, Russell King - ARM Linux wrote:
-> On Tue, Mar 06, 2012 at 02:03:28PM +0000, Ben Hutchings wrote:
-> > On Tue, 2012-03-06 at 11:43 +0100, Roland Stigge wrote:
-> > > On 03/05/2012 11:45 PM, Ben Hutchings wrote:
-> > > >> +	/* Clear and enable interrupts */
-> > > >> +	writel(0xFFFF, LPC_ENET_INTCLEAR(pldat->net_base));
-> > > >> +	lpc_eth_enable_int(pldat->net_base);
-> > > >> +
-> > > >> +	/* Get the next TX buffer output index */
-> > > >> +	pldat->num_used_tx_buffs = 0;
-> > > >> +	pldat->last_tx_idx =
-> > > >> +		readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
+On Saturday 03 March 2012, Thierry Reding wrote:
+>   * Thierry Reding wrote:
+> > * Arnd Bergmann wrote:
+> > > On Thursday 23 February 2012, Thierry Reding wrote:
+> > > > > Is this only used for the device tree functions? If so, I would recommend
+> > > > > making it less generic and always search for a device node.
 > > > > 
-> > > > Doesn't this need to be done *before* enabling interrupts?  Also, I
-> > > > think you need an smp_wmb() so that the interrupt handler is guaranteed
-> > > > to see all these writes.
+> > > > It is currently only used to look up a struct pwm_chip for a given struct
+> > > > device_node, yes. But I can see other uses for this. For instance this could
+> > > > be useful if we ever want to provide an alternative way of requesting a PWM
+> > > > on a per-chip basis.
 > > > 
-> > > Do you mean _one_ smp_wmb() directly after lpc_eth_enable_int() (which
-> > > I'm moving behind the above code?
+> > > Nah, just keep it simple for now. If we need it later, we can still
+> > > add something like this back, but for now it's just a source of
+> > > confusion and possible bugs.
 > > 
-> > The sequence should be
-> > 
-> > 	pldat->state = values...;
-> > 	smp_wmb();
-> > 	enable_interrupts();
+> > Will do.
 > 
-> Is this correct?
-> 
-> "SMP BARRIER PAIRING" and "EXAMPLES OF MEMORY BARRIER SEQUENCES" in
-> Documentation/memory-barriers.txt suggest that there should be some kind
-> of pairing with smp_wmb() to ensure correctness.
+> I turns out that this is not as easy to do as I thought. The problem is that
+> if I remove the pwmchip_find() from the core and move the lookup
+> functionality into the OF support code I no longer have access to the list of
+> PWM chips. So I guess it will have to stay in to keep things encapsulated
+> properly.
 
-The thread we're synchronising with (the interrupt handler) starts
-*after* the smp_wmb().  Therefore there is no need for a second barrier.
+Well, or you move everything into the one file. If you have the device tree
+support function in the same file as everything else, you no longer need
+the additional complexity.
 
-Ben.
-
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+	Arnd
