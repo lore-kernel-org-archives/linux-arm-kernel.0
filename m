@@ -1,61 +1,40 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue,  6 Mar 2012 13:30:08 +0800
-Subject: [PATCH] mfd: pcap: depend on arch-pxa
-Message-ID: <1331011808-28307-1-git-send-email-haojian.zhuang@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 6 Mar 2012 13:46:49 +0800
+Subject: [PATCH v2 10/17] ASoC: imx: merge sound/soc/imx into sound/soc/fsl
+In-Reply-To: <20120305173910.GZ3852@pengutronix.de>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-11-git-send-email-shawn.guo@linaro.org>
+ <20120305173910.GZ3852@pengutronix.de>
+Message-ID: <20120306054648.GN16232@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/mfd/ezx-pcap.c: In function ?pcap_isr_work?:
-drivers/mfd/ezx-pcap.c:206:2: error: implicit declaration of function
-?pxa_irq_to_gpio?
-make[2]: *** [drivers/mfd/ezx-pcap.o] Error 1
+On Mon, Mar 05, 2012 at 06:39:10PM +0100, Sascha Hauer wrote:
+> On Mon, Mar 05, 2012 at 10:30:58PM +0800, Shawn Guo wrote:
+> > Freescale PowerPC and ARM/IMX families share the same SSI IP block.
+> > The patch merges sound/soc/imx into sound/soc/fsl, so that the possible
+> > code sharing and consolidation can happen.
+> > 
+> > This is a plain merge, except that menuconfig SND_POWERPC_SOC is added
+> > in Kconfig for PowerPC platform as a correspondence to SND_IMX_SOC for
+> > IMX platform.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  sound/soc/Kconfig                        |    1 -
+> >  sound/soc/Makefile                       |    1 -
+> >  sound/soc/fsl/Kconfig                    |   92 ++++++++++++++++++++++++++++++
+> >  sound/soc/fsl/Makefile                   |   22 +++++++
+> >  sound/soc/{imx => fsl}/eukrea-tlv320.c   |    2 +-
+> >  sound/soc/{imx => fsl}/imx-audmux.c      |    0
+> >  sound/soc/{imx => fsl}/imx-audmux.h      |    0
+> >  sound/soc/{imx => fsl}/imx-pcm-dma-mx2.c |    0
+> 
+> Maybe this is the right time to rename this file to something like
+> imx-pcm-dma.c since it has nothing to do with mx2 anymore.
+> 
+Ok, will change it in the next post.
 
-PCAP driver invokes irq_to_gpio() directly. This function isn't common
-function in most silicons. PCAP driver is enabled for EZX machine with
-arch-pxa. Now use pxa_irq_to_gpio() instead.
-
-It's only a workaround for this issue. Acutally the best solution is
-using thread irq to fix this issue.
-
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- drivers/mfd/Kconfig    |    2 +-
- drivers/mfd/ezx-pcap.c |    3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index f147395..e88d315 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -619,7 +619,7 @@ config AB3100_OTP
- 
- config EZX_PCAP
- 	bool "PCAP Support"
--	depends on GENERIC_HARDIRQS && SPI_MASTER
-+	depends on GENERIC_HARDIRQS && SPI_MASTER && ARCH_PXA
- 	help
- 	  This enables the PCAP ASIC present on EZX Phones. This is
- 	  needed for MMC, TouchScreen, Sound, USB, etc..
-diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
-index 43a76c4..e9320e2 100644
---- a/drivers/mfd/ezx-pcap.c
-+++ b/drivers/mfd/ezx-pcap.c
-@@ -18,6 +18,7 @@
- #include <linux/mfd/ezx-pcap.h>
- #include <linux/spi/spi.h>
- #include <linux/gpio.h>
-+#include <linux/gpio-pxa.h>
- #include <linux/slab.h>
- 
- #define PCAP_ADC_MAXQ		8
-@@ -202,7 +203,7 @@ static void pcap_isr_work(struct work_struct *work)
- 		}
- 		local_irq_enable();
- 		ezx_pcap_write(pcap, PCAP_REG_MSR, pcap->msr);
--	} while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
-+	} while (gpio_get_value(pxa_irq_to_gpio(pcap->spi->irq)));
- }
- 
- static void pcap_irq_handler(unsigned int irq, struct irq_desc *desc)
 -- 
-1.7.5.4
+Regards,
+Shawn
