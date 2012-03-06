@@ -1,48 +1,78 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  6 Mar 2012 19:33:33 -0300
-Subject: [PATCH] ARM: mach-versatile: Fix PCI build error
-Message-ID: <1331073213-16502-1-git-send-email-festevam@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Mar 2012 22:33:21 +0000
+Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
+Message-ID: <20120306223321.GD15201@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build error that happened on a "make randconfig":
+[v2 - more or less same description.  Including lakml in cc for the full
+set]
 
-arch/arm/mach-versatile/pci.c: In function 'pci_versatile_setup_resources':
-arch/arm/mach-versatile/pci.c:222: error: 'sys' undeclared (first use in this function)
+This patch series cleans up the handling of cookies in DMA engine drivers.
+This is done by providing a set of inline library functions for common
+tasks:
 
-since commit 9f786d033d (arm/PCI: get rid of device resource fixups)
-pci_add_resource_offset() has an extra parameter.
+- moving the 'last completed cookie' into struct dma_chan - everyone
+  has this in their driver private channel data structure
 
-Pass the sys struct parameter to pci_versatile_setup_resources() in order to fix
-the build.
+- consolidate allocation of cookies to DMA descriptors
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-versatile/pci.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+- common way to update 'last completed cookie' value
 
-diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
-index 51733b0..4f41cb8 100644
---- a/arch/arm/mach-versatile/pci.c
-+++ b/arch/arm/mach-versatile/pci.c
-@@ -191,7 +191,8 @@ static struct resource pre_mem = {
- 	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
- };
- 
--static int __init pci_versatile_setup_resources(struct list_head *resources)
-+static int __init pci_versatile_setup_resources(struct list_head *resources,
-+						struct pci_sys_data *sys)
- {
- 	int ret = 0;
- 
-@@ -250,7 +251,7 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
- 
- 	if (nr == 0) {
- 		sys->mem_offset = 0;
--		ret = pci_versatile_setup_resources(&sys->resources);
-+		ret = pci_versatile_setup_resources(&sys->resources, sys);
- 		if (ret < 0) {
- 			printk("pci_versatile_setup: resources... oops?\n");
- 			goto out;
--- 
-1.7.1
+- standard way to implement tx_status callback and update the residue
+
+- consolidate initialization of cookies
+
+- update implementations differing from the majority of DMA engine drivers
+  to behave the same as the majority implementation in respect of cookies
+
+What this means is that we get to the point where all DMA engine drivers
+will hand out cookie value '2' as the first, and incrementing cookie
+values up to INT_MAX, returning to cookie '1' as the next cookie.
+
+Think of this patch series as round 1...  I am hoping over time that more
+code can be consolidated between the DMA engine drivers and end up with a
+consistent way to handle various common themes in DMA engine hardware
+(like physical channel<->peripheral request signal selection.)
+
+Overall, the diffstat looks like this:
+
+ arch/arm/include/asm/hardware/iop_adma.h |    2 -
+ drivers/dma/amba-pl08x.c                 |   38 ++++---------
+ drivers/dma/at_hdmac.c                   |   48 ++++------------
+ drivers/dma/at_hdmac_regs.h              |    2 -
+ drivers/dma/coh901318.c                  |   39 +++----------
+ drivers/dma/dmaengine.h                  |   89 ++++++++++++++++++++++++++++++
+ drivers/dma/dw_dmac.c                    |   43 +++-----------
+ drivers/dma/dw_dmac_regs.h               |    1 -
+ drivers/dma/ep93xx_dma.c                 |   25 ++------
+ drivers/dma/fsldma.c                     |   24 ++------
+ drivers/dma/fsldma.h                     |    1 -
+ drivers/dma/imx-dma.c                    |   32 ++---------
+ drivers/dma/imx-sdma.c                   |   23 ++------
+ drivers/dma/intel_mid_dma.c              |   37 +++---------
+ drivers/dma/intel_mid_dma_regs.h         |    2 -
+ drivers/dma/ioat/dma.c                   |   21 +++----
+ drivers/dma/ioat/dma.h                   |   23 --------
+ drivers/dma/ioat/dma_v2.c                |   13 ++---
+ drivers/dma/ioat/dma_v3.c                |   11 ++--
+ drivers/dma/iop-adma.c                   |   51 ++++-------------
+ drivers/dma/ipu/ipu_idmac.c              |   22 ++-----
+ drivers/dma/mpc512x_dma.c                |   25 +++------
+ drivers/dma/mv_xor.c                     |   34 ++---------
+ drivers/dma/mv_xor.h                     |    3 -
+ drivers/dma/mxs-dma.c                    |   23 ++------
+ drivers/dma/pch_dma.c                    |   34 ++---------
+ drivers/dma/pl330.c                      |   36 ++----------
+ drivers/dma/ppc4xx/adma.c                |   49 +++-------------
+ drivers/dma/ppc4xx/adma.h                |    2 -
+ drivers/dma/shdma.c                      |   30 +++-------
+ drivers/dma/shdma.h                      |    1 -
+ drivers/dma/sirf-dma.c                   |   23 ++------
+ drivers/dma/ste_dma40.c                  |   36 +++---------
+ drivers/dma/timb_dma.c                   |   28 +++-------
+ drivers/dma/txx9dmac.c                   |   41 +++-----------
+ drivers/dma/txx9dmac.h                   |    1 -
+ include/linux/amba/pl08x.h               |    2 -
+ include/linux/dmaengine.h                |    6 +-
+ 38 files changed, 293 insertions(+), 628 deletions(-)
