@@ -1,44 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Mar 2012 11:10:59 -0800
-Subject: [PATCH] ARM: OMAP2: Fix section warning for n8x0 when
- CONFIG_MMC_OMAP is not set
-Message-ID: <20120306191059.GT12083@atomide.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Tue, 6 Mar 2012 20:17:12 +0100
+Subject: [PATCH v3 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <201203061538.11709.arnd@arndb.de>
+References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
+ <20120223160420.GA9899@avionic-0098.mockup.avionic-design.de>
+ <20120303193249.GA22021@avionic-0098.mockup.avionic-design.de>
+ <201203061538.11709.arnd@arndb.de>
+Message-ID: <20120306191712.GB13882@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise we get:
+* Arnd Bergmann wrote:
+> On Saturday 03 March 2012, Thierry Reding wrote:
+> > I turns out that this is not as easy to do as I thought. The problem is that
+> > if I remove the pwmchip_find() from the core and move the lookup
+> > functionality into the OF support code I no longer have access to the list of
+> > PWM chips. So I guess it will have to stay in to keep things encapsulated
+> > properly.
+> 
+> Well, or you move everything into the one file. If you have the device tree
+> support function in the same file as everything else, you no longer need
+> the additional complexity.
 
-arch/arm/mach-omap2/board-n8x0.c:39:12: warning:
-'slot1_cover_open' defined but not used [-Wunused-variable]
-arch/arm/mach-omap2/board-n8x0.c:40:12: warning:
-'slot2_cover_open' defined but not used [-Wunused-variable]
-arch/arm/mach-omap2/board-n8x0.c:41:23: warning:
-'mmc_device' defined but not used [-Wunused-variable]
+Okay, I think it makes the most sense to move all of the OF support code into
+drivers/pwm/core.c. That way we can also check off the discussion about the
+OF support code's location.
 
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/board-n8x0.c
-+++ b/arch/arm/mach-omap2/board-n8x0.c
-@@ -36,10 +36,6 @@
- 
- #include "mux.h"
- 
--static int slot1_cover_open;
--static int slot2_cover_open;
--static struct device *mmc_device;
--
- #define TUSB6010_ASYNC_CS	1
- #define TUSB6010_SYNC_CS	4
- #define TUSB6010_GPIO_INT	58
-@@ -211,6 +207,10 @@ static struct omap_onenand_platform_data board_onenand_data[] = {
- #define N810_EMMC_VSD_GPIO	23
- #define N810_EMMC_VIO_GPIO	9
- 
-+static int slot1_cover_open;
-+static int slot2_cover_open;
-+static struct device *mmc_device;
-+
- static int n8x0_mmc_switch_slot(struct device *dev, int slot)
- {
- #ifdef CONFIG_MMC_DEBUG
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/09ec7a2e/attachment.sig>
