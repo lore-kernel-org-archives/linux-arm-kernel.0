@@ -1,42 +1,77 @@
-From: jason@lakedaemon.net (Jason)
-Date: Tue, 6 Mar 2012 11:29:47 -0500
-Subject: revert merge commit de68f28 in for-next?
-In-Reply-To: <201203061604.53412.arnd@arndb.de>
-References: <20120306144415.GR5050@titan.lakedaemon.net>
- <201203061604.53412.arnd@arndb.de>
-Message-ID: <20120306162947.GT5050@titan.lakedaemon.net>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue,  6 Mar 2012 11:31:42 -0500
+Subject: [PATCH] ARM: fix lcd power build failure in collie_defconfig
+Message-ID: <1331051502-22361-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 04:04:53PM +0000, Arnd Bergmann wrote:
-> On Tuesday 06 March 2012, Jason wrote:
-> > As much as I'd love to see this go in right now, I don't think it's the
-> > correct version (from Mar 2).  This is the merge commit in question:
-> > 
-> > de68f2847fa759df54e9d8eb0013a0f8ea959c22
-> > 
-> > It's missing several fixes, #ifdef CONFIG_OF around struct of_device_id,
-> > marvell -> mrvl in compatible properties, etc.
-> > 
-> > Would you like me to submit a new pull request, or base my fixes off of
-> > this and submit new patches?
-> > 
-> > Thanks and sorry for the confusion,
-> > 
-> 
-> I've marked that branch a 'staging/' branch, which means that it's not
-> intended for being sent to Linus. Please send a replacement branch instead.
-> 
-> Once something is merged into a next/* branch instead of staging/*, you
-> should send further patches on top.
+Commit 086ada54abaa4316e8603f02410fe8ebc9ba2de1 (linux-next)
 
-Thanks for the clarification, I was fired up and crapping my pants at
-the same time.
+  "FB: sa1100: remove global sa1100fb_.*_power function pointers"
 
-I'll put together a new pull request.
+got rid of all instances but one in locomolcd.c -- which was
+conditional on CONFIG_SA1100_COLLIE.  The associated .power
+field which replaces the global is populated in mach-sa1100/collie.c
+so move the assignment there, but make it conditional on the
+locomolcd support, so use CONFIG_BACKLIGHT_LOCOMO in that file.
 
-thx,
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-Jason.
-> 
-> 	Arnd
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index 48885b7..c7f418b 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -313,6 +313,10 @@ static struct sa1100fb_mach_info collie_lcd_info = {
+ 
+ 	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+ 	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
++
++#ifdef CONFIG_BACKLIGHT_LOCOMO
++	.lcd_power	= locomolcd_power
++#endif
+ };
+ 
+ static void __init collie_init(void)
+diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
+index 52acda7..f33679d 100644
+--- a/arch/arm/mach-sa1100/include/mach/collie.h
++++ b/arch/arm/mach-sa1100/include/mach/collie.h
+@@ -1,7 +1,7 @@
+ /*
+  * arch/arm/mach-sa1100/include/mach/collie.h
+  *
+- * This file contains the hardware specific definitions for Assabet
++ * This file contains the hardware specific definitions for Collie
+  * Only include this file from SA1100-specific files.
+  *
+  * ChangeLog:
+@@ -13,6 +13,7 @@
+ #ifndef __ASM_ARCH_COLLIE_H
+ #define __ASM_ARCH_COLLIE_H
+ 
++extern void locomolcd_power(int on);
+ 
+ #define COLLIE_SCOOP_GPIO_BASE	(GPIO_MAX + 1)
+ #define COLLIE_GPIO_CHARGE_ON	(COLLIE_SCOOP_GPIO_BASE + 0)
+diff --git a/drivers/video/backlight/locomolcd.c b/drivers/video/backlight/locomolcd.c
+index be20b5c..3a6d541 100644
+--- a/drivers/video/backlight/locomolcd.c
++++ b/drivers/video/backlight/locomolcd.c
+@@ -229,14 +229,7 @@ static struct locomo_driver poodle_lcd_driver = {
+ 
+ static int __init locomolcd_init(void)
+ {
+-	int ret = locomo_driver_register(&poodle_lcd_driver);
+-	if (ret)
+-		return ret;
+-
+-#ifdef CONFIG_SA1100_COLLIE
+-	sa1100fb_lcd_power = locomolcd_power;
+-#endif
+-	return 0;
++	return locomo_driver_register(&poodle_lcd_driver);
+ }
+ 
+ static void __exit locomolcd_exit(void)
+-- 
+1.7.9.1
