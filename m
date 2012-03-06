@@ -1,58 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Mar 2012 02:28:33 -0800
-Subject: [GIT PULL] Samsung fixes-4 for v3.3
-Message-ID: <4F55E6D1.4080703@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Mar 2012 10:39:16 +0000
+Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <4F54053F.9070502@freescale.com>
+References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
+ <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
+ <4F53F704.8080703@freescale.com>
+ <20120304232817.GA13516@n2100.arm.linux.org.uk>
+ <4F53FBA1.8090200@freescale.com>
+ <20120305000411.GL7363@n2100.arm.linux.org.uk>
+ <4F54053F.9070502@freescale.com>
+Message-ID: <20120306103916.GE17370@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+On Mon, Mar 05, 2012 at 12:13:52AM +0000, Tabi Timur-B04825 wrote:
+> Russell King - ARM Linux wrote:
+> > On Sun, Mar 04, 2012 at 11:32:50PM +0000, Tabi Timur-B04825 wrote:
+> >> Russell King - ARM Linux wrote:
+> >>> Is the SCR shared between capture and playback?  In that case, what
+> >>> makes this read-modify-write thread safe?
+> >>
+> >> What's "SCR"?
+> >
+> > I assumed you knew the code you were commenting on.
+> >
+> >                  clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
+> >
+> > The register these functions seem to be used on appears to be called
+> > 'SCR'.
+> 
+> Oh, I didn't know you were referencing a specific register on the part. 
+> There are multiple uses of clrsetbits_be32 (and its variants) in the function.
+> 
+> To answer your question: I was lead to believe that the individual ALSA 
+> callback functions are atomic.  So one thread should not be trying to 
+> start playback while another thread is simultaneously trying to stop it.
 
-Please pull Samsung fixes for v3.3.
+Atomic with respect to what though?  The substream?  The PCM?  All PCMs?
+Reading through the code, it turns out that the answer is the PCM, so
+calls into the low level driver are serialized by a per-PCM mutex.
 
-If any problems, please kindly let me know.
+However, this is not true of the trigger callback - the trigger callback
+does not take this mutex, but instead takes a spinlock (or two.)  Whether
+this is enough to stop the capture and playback substream triggers being
+called simultaneously seems to depend on whether the substreams are part
+of the same group (which they probably aren't.)
 
-Thanks.
+So, in theory you could have the trigger method being called for the
+capture device while the playback device is in the middle of being opened.
+Luckily, for this case, the startup method only touches the hardware if
+its the first substream being opened, and shutdown only touches the
+hardware if its the last substream being closed.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 6b21d18ed50c7d145220b0724ea7f2613abf0f95:
-
-   Linux 3.3-rc5 (2012-02-25 12:18:16 -0800)
-
-are available in the git repository at:
- 
-ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-v3.3-samsung-fixes-4
-
-Bartlomiej Zolnierkiewicz (1):
-       ARM: EXYNOS: fix touchscreen IRQ setup on Universal C210 board
-
-Gusakov Andrey (1):
-       ARM: S3C24XX: DMA resume regression fix
-
-Heiko Stuebner (1):
-       ARM: S3C24XX: Fix restart on S3C2442
-
-Joonyoung Shim (1):
-       ARM: SAMSUNG: Fix memory size for hsotg
-
-  arch/arm/mach-exynos/mach-universal_c210.c |    2 ++
-  arch/arm/mach-s3c2440/common.h             |    2 +-
-  arch/arm/mach-s3c2440/mach-anubis.c        |    2 +-
-  arch/arm/mach-s3c2440/mach-at2440evb.c     |    2 +-
-  arch/arm/mach-s3c2440/mach-gta02.c         |    2 +-
-  arch/arm/mach-s3c2440/mach-mini2440.c      |    2 +-
-  arch/arm/mach-s3c2440/mach-nexcoder.c      |    2 +-
-  arch/arm/mach-s3c2440/mach-osiris.c        |    2 +-
-  arch/arm/mach-s3c2440/mach-rx1950.c        |    2 +-
-  arch/arm/mach-s3c2440/mach-rx3715.c        |    2 +-
-  arch/arm/mach-s3c2440/mach-smdk2440.c      |    2 +-
-  arch/arm/mach-s3c2440/s3c2440.c            |   13 -------------
-  arch/arm/mach-s3c2440/s3c244x.c            |   11 +++++++++++
-  arch/arm/plat-s3c24xx/dma.c                |    2 +-
-  arch/arm/plat-samsung/devs.c               |    2 +-
-  15 files changed, 25 insertions(+), 25 deletions(-)
+However, I'm left wondering whether two trigger callbacks, one for the
+playback substream and one for the capture substream could be called
+simultaneously on two different CPUs.  I see nothing which prevents
+this happening.
