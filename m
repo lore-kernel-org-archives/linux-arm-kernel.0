@@ -1,41 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 6 Mar 2012 20:11:53 +0000
-Subject: [alsa-devel] [PATCH 20/20] ASoC: fsl: add imx-sgtl5000 machine
- driver
-In-Reply-To: <4F565528.1090505@wwwdotorg.org>
-References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-21-git-send-email-shawn.guo@linaro.org>
- <20120304133818.GE3083@opensource.wolfsonmicro.com>
- <20120305080623.GD16232@S2101-09.ap.freescale.net>
- <20120305115612.GB3224@opensource.wolfsonmicro.com>
- <20120305130707.GF16232@S2101-09.ap.freescale.net>
- <20120305131332.GM3224@opensource.wolfsonmicro.com>
- <74CDBE0F657A3D45AFBB94109FB122FF17BE861C14@HQMAIL01.nvidia.com>
- <20120305170317.GV3224@opensource.wolfsonmicro.com>
- <4F565528.1090505@wwwdotorg.org>
-Message-ID: <20120306201153.GF19635@opensource.wolfsonmicro.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Wed, 7 Mar 2012 00:15:38 +0400
+Subject: [PATCH/RFC 2/2] arm/tegra: add timeout to PCIe PLL lock
+ detection loop
+In-Reply-To: <4F56424A.3020305@wwwdotorg.org>
+References: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
+ <1331023544-6439-3-git-send-email-mad_soft@inbox.ru>
+ <4F56424A.3020305@wwwdotorg.org>
+Message-ID: <20120306201538.GA14350@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 11:19:20AM -0700, Stephen Warren wrote:
-
-> > In this case (and probably in the i.MX case, at a guess the structure is
-> > the same) I'd just have the DAI drivers kick off registration of the
-> > ASoC DMA stuff, it's all part of the ASoC driver for the hardware really.
+On 09:58 Tue 06 Mar     , Stephen Warren wrote:
+> On 03/06/2012 01:45 AM, Dmitry Artamonow wrote:
+> > Tegra PCIe driver waits for PLL to lock using busy loop.
+> > If PLL fails to lock for some reason, this leads to silent lockup
+> > while booting (as PCIe code is not modular).
+> > 
+> > Fix by adding timeout, so if PLL doesn't lock in a couple
+> > of seconds, just PCIe driver fails and machine continues to boot.
+> > 
+> > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 > 
-> How would that work when there are multiple DAIs, e.g. on a system with
-> 2 I2S and 1 SPDIF DAI and they all want to register the PCM driver? I
-> guess I could just add some utility function in the PCM driver file to
-> ensure that the platform device only gets created once, and probably
-> would also need to refcount it for when the DAIs get unloaded etc.
+> That seems reasonable. So once the mdelay discussion is resolved,
+> 
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> 
+> Any idea why the PLL doesn't lock sometimes?
 
-You could just create a DMA device per DAI since it's just a wrapper,
-you shouldn't even need to allocate a new struct device but just use the
-DAI device when registering the ASoC DMA driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/6289f0aa/attachment.sig>
+
+Please dismiss this patch - I forgot to turn 'return' to 'return 0' at
+the end of the function, while converting it's type from void to int,
+and it causes driver to fail always now. I'll send updated version shortly.
+
+Also I've managed to get another Harmony board today, and it doesn't have
+problems with PLL locking (PLL locks on it in about 2ms), so probably the
+issue I've seen is caused by some hardware fault on the first board,
+or is specific to some particular revision of the board and/or Tegra2 chip.
+
+I'll do more testing tomorrow and re-spin the patches.
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
