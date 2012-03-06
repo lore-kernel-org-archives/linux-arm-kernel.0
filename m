@@ -1,76 +1,51 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 6 Mar 2012 23:05:47 +0100
-Subject: [PATCH 4/4] ARM: u300: configure some pins as an example
-Message-ID: <1331071547-25109-1-git-send-email-linus.walleij@stericsson.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 06 Mar 2012 17:06:34 -0500 (EST)
+Subject: [PATCH v5 6/7] ARM: ebsa110: use runtime ioremap hook
+In-Reply-To: <1331070317-9598-6-git-send-email-robherring2@gmail.com>
+References: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
+ <1331070317-9598-1-git-send-email-robherring2@gmail.com>
+ <1331070317-9598-6-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1203061704180.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, 6 Mar 2012, Rob Herring wrote:
 
-To show how the pin configuration is used on the U300, let's
-include some configs for two GPIO pins.
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Convert ebsa110 platforms to use run-time ioremap hook instead of the
+> compile time hook.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-ebsa110/core.c            |   15 +++++++++++++++
+>  arch/arm/mach-ebsa110/include/mach/io.h |    9 ---------
+>  2 files changed, 15 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
+> index 804c912..e0b831e 100644
+> --- a/arch/arm/mach-ebsa110/core.c
+> +++ b/arch/arm/mach-ebsa110/core.c
+> @@ -119,6 +119,20 @@ static void __init ebsa110_map_io(void)
+>  	iotable_init(ebsa110_io_desc, ARRAY_SIZE(ebsa110_io_desc));
+>  }
+>  
+> +static void __iomem *ebsa110_ioremap(unsigned long cookie, size_t size,
+> +				     unsigned int flags)
+> +{
+> +	return (void __iomem *)cookie;
+> +}
+> +
+> +static void ebsa110_iounmap(volatile void __iomem *io_addr)
+> +{}
+> +
+> +static void __init ebsa110_init_early(void)
+> +{
+> +	arch_ioremap_caller = ebsa110_ioremap;
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-u300/core.c |   25 +++++++++++++++++++++++--
- 1 files changed, 23 insertions(+), 2 deletions(-)
+ebsa110_ioremap() appears to lack the caller argument, so this will 
+generate a pointer mismatch error.
 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index f326d31..ab48547 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -27,6 +27,7 @@
- #include <linux/mtd/fsmc.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/dma-mapping.h>
- 
- #include <asm/types.h>
-@@ -1605,7 +1606,23 @@ static struct platform_device dma_device = {
- 	},
- };
- 
--/* Pinmux settings */
-+static unsigned long g0d_conf[] = {
-+	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
-+};
-+
-+static unsigned long g1d_conf[] = {
-+	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
-+};
-+
-+static unsigned long g0i_conf[] = {
-+	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
-+};
-+
-+static unsigned long g1i_conf[] = {
-+	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
-+};
-+
-+/* Pin control settings */
- static struct pinctrl_map __initdata u300_pinmux_map[] = {
- 	/* anonymous maps for chip power and EMIFs */
- 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-u300", NULL, "power"),
-@@ -1615,6 +1632,11 @@ static struct pinctrl_map __initdata u300_pinmux_map[] = {
- 	PIN_MAP_MUX_GROUP_DEFAULT("mmci",  "pinctrl-u300", NULL, "mmc0"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("pl022", "pinctrl-u300", NULL, "spi0"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("uart0", "pinctrl-u300", NULL, "uart0"),
-+	/* some pin configurations */
-+	PIN_MAP_CONFIGS_PIN_DEFAULT("mmci", "pinctrl-u300", "GPIO0", g0d_conf),
-+	PIN_MAP_CONFIGS_PIN_DEFAULT("mmci", "pinctrl-u300", "GPIO1", g1d_conf),
-+	PIN_MAP_CONFIGS_PIN("mmci", "idle", "pinctrl-u300", "GPIO0", g0i_conf),
-+	PIN_MAP_CONFIGS_PIN("mmci", "idle", "pinctrl-u300", "GPIO1", g1i_conf),
- };
- 
- struct u300_mux_hog {
-@@ -1640,7 +1662,6 @@ static int __init u300_pinctrl_fetch(void)
- 
- 	for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
- 		struct pinctrl *p;
--		int ret;
- 
- 		p = pinctrl_get_select_default(u300_mux_hogs[i].dev);
- 		if (IS_ERR(p)) {
--- 
-1.7.8
+
+Nicolas
