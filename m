@@ -1,40 +1,40 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 05 Mar 2012 20:44:07 -0600
-Subject: [PATCH] ARM: remove ixp2000 platform
-In-Reply-To: <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
-References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
- <201202281945.39419.arnd@arndb.de>
- <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
-Message-ID: <4F5579F7.7040603@gmail.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Tue, 06 Mar 2012 11:44:58 +0900
+Subject: [PATCH] MAINTAINERS: add entry for exynos mipi display drivers
+Message-ID: <4F557A2A.2080108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2012 07:41 PM, Nicolas Pitre wrote:
-> On Tue, 28 Feb 2012, Arnd Bergmann wrote:
-> 
->> On Tuesday 28 February 2012, Rob Herring wrote:
->>> ixp2000 has no commits other than tree-wide changes or refactoring since
->>> 2006. No maintainer is listed for ixp2000 either.
->>
->> I have this in my copy of the MAINTAINERS file:
->>
->> ARM/INTEL IXP2000 ARM ARCHITECTURE
->> M:      Lennert Buytenhek <kernel@wantstofly.org>
->> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> S:      Maintained
->>
->> It's missing an F: line, otherwise it suggests that the platform is still
->> maintained by Lennert and it certainly builds just fine. Unfortunately he
->> seems to have fallen off the edge of the planet at the end of last year.
-> 
-> FYI, here's a snippet of a conversation I just had with Lennert on IRC 
-> today:
-> 
-> 13:05 < nico> do you still care about ixp2000?
-> 13:22 < lennert> not really, no
-> 13:58 < nico> do you think we could remove it from the kernel tree?
-> 14:01 < lennert> go for it, and remove ixp23xx too while you're at it
+Hi, I'd like to add Inki Dae, Donghwa Lee and Kyungmin Park as 
+maintainers who developers for exynos mipi display drivers for
+video/driver/exynos/exynos_mipi* and include/video/exynos_mipi*.
 
-So, can we do this for 3.4 or should wait for 3.5?
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ MAINTAINERS |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-Rob
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b087b3bc..eb5fbcb 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2351,6 +2351,15 @@ S:	Supported
+ F:	drivers/gpu/drm/exynos
+ F:	include/drm/exynos*
+ 
++EXYNOS MIPI DISPLAY DRIVERS
++M:	Inki Dae <inki.dae@samsung.com>
++M:	Donghwa Lee <dh09.lee@samsung.com>
++M:	Kyungmin Park <kyungmin.park@samsung.com>
++L:	linux-fbdev at vger.kernel.org
++S:	Maintained
++F:	drivers/video/exynos/exynos_mipi*
++F:	include/video/exynos_mipi*
++
+ DSCC4 DRIVER
+ M:	Francois Romieu <romieu@fr.zoreil.com>
+ L:	netdev at vger.kernel.org
+-- 
+1.7.4.1
