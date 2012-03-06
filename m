@@ -1,77 +1,77 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue,  6 Mar 2012 11:31:42 -0500
-Subject: [PATCH] ARM: fix lcd power build failure in collie_defconfig
-Message-ID: <1331051502-22361-1-git-send-email-paul.gortmaker@windriver.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Mar 2012 16:37:44 +0000
+Subject: [GIT PULL] arm-soc bug fixes
+Message-ID: <201203061637.45150.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 086ada54abaa4316e8603f02410fe8ebc9ba2de1 (linux-next)
+Hi Linus,
 
-  "FB: sa1100: remove global sa1100fb_.*_power function pointers"
+Here are all the fixes I got after sending the last pull request.
+These fix mostly regressions on exynos, at91, pxa and ep93xx.
+They are available in the 'fixes' branch or the 'fixes-3.3-rc7'
+tag.
 
-got rid of all instances but one in locomolcd.c -- which was
-conditional on CONFIG_SA1100_COLLIE.  The associated .power
-field which replaces the global is populated in mach-sa1100/collie.c
-so move the assignment there, but make it conditional on the
-locomolcd support, so use CONFIG_BACKLIGHT_LOCOMO in that file.
+	Arnd
 
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
 
-diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index 48885b7..c7f418b 100644
---- a/arch/arm/mach-sa1100/collie.c
-+++ b/arch/arm/mach-sa1100/collie.c
-@@ -313,6 +313,10 @@ static struct sa1100fb_mach_info collie_lcd_info = {
- 
- 	.lccr0		= LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
- 	.lccr3		= LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
-+
-+#ifdef CONFIG_BACKLIGHT_LOCOMO
-+	.lcd_power	= locomolcd_power
-+#endif
- };
- 
- static void __init collie_init(void)
-diff --git a/arch/arm/mach-sa1100/include/mach/collie.h b/arch/arm/mach-sa1100/include/mach/collie.h
-index 52acda7..f33679d 100644
---- a/arch/arm/mach-sa1100/include/mach/collie.h
-+++ b/arch/arm/mach-sa1100/include/mach/collie.h
-@@ -1,7 +1,7 @@
- /*
-  * arch/arm/mach-sa1100/include/mach/collie.h
-  *
-- * This file contains the hardware specific definitions for Assabet
-+ * This file contains the hardware specific definitions for Collie
-  * Only include this file from SA1100-specific files.
-  *
-  * ChangeLog:
-@@ -13,6 +13,7 @@
- #ifndef __ASM_ARCH_COLLIE_H
- #define __ASM_ARCH_COLLIE_H
- 
-+extern void locomolcd_power(int on);
- 
- #define COLLIE_SCOOP_GPIO_BASE	(GPIO_MAX + 1)
- #define COLLIE_GPIO_CHARGE_ON	(COLLIE_SCOOP_GPIO_BASE + 0)
-diff --git a/drivers/video/backlight/locomolcd.c b/drivers/video/backlight/locomolcd.c
-index be20b5c..3a6d541 100644
---- a/drivers/video/backlight/locomolcd.c
-+++ b/drivers/video/backlight/locomolcd.c
-@@ -229,14 +229,7 @@ static struct locomo_driver poodle_lcd_driver = {
- 
- static int __init locomolcd_init(void)
- {
--	int ret = locomo_driver_register(&poodle_lcd_driver);
--	if (ret)
--		return ret;
--
--#ifdef CONFIG_SA1100_COLLIE
--	sa1100fb_lcd_power = locomolcd_power;
--#endif
--	return 0;
-+	return locomo_driver_register(&poodle_lcd_driver);
- }
- 
- static void __exit locomolcd_exit(void)
--- 
-1.7.9.1
+  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-3.3-rc7
+
+Arnd Bergmann (3):
+      Merge branch 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
+      Merge branch 'v3.3-samsung-fixes-4' of git://git.kernel.org/.../kgene/linux-samsung into fixes
+      Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
+
+Bartlomiej Zolnierkiewicz (1):
+      ARM: EXYNOS: fix touchscreen IRQ setup on Universal C210 board
+
+Gusakov Andrey (1):
+      ARM: S3C24XX: DMA resume regression fix
+
+H Hartley Sweeten (1):
+      ARM: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
+
+Haojian Zhuang (3):
+      ARM: pxa: add dummy clock for pxa25x and pxa27x
+      ARM: pxa: remove duplicated registeration on pxa-gpio
+      ARM: pxa: fix invalid mfp pin issue
+
+Heiko Stuebner (1):
+      ARM: S3C24XX: Fix restart on S3C2442
+
+Joonyoung Shim (1):
+      ARM: SAMSUNG: Fix memory size for hsotg
+
+Nicolas Ferre (2):
+      ARM: at91/dma: remove platform data from DMA controller
+      ARM: at91/dma: DMA controller registering with DT support
+
+ arch/arm/mach-at91/at91sam9g45_devices.c   |   19 ++++++++++---------
+ arch/arm/mach-at91/at91sam9rl_devices.c    |    8 +-------
+ arch/arm/mach-ep93xx/vision_ep9307.c       |    2 ++
+ arch/arm/mach-exynos/mach-universal_c210.c |    2 ++
+ arch/arm/mach-pxa/generic.h                |    1 -
+ arch/arm/mach-pxa/mfp-pxa2xx.c             |    7 +++++++
+ arch/arm/mach-pxa/pxa25x.c                 |    2 +-
+ arch/arm/mach-pxa/pxa27x.c                 |    2 +-
+ arch/arm/mach-pxa/pxa3xx.c                 |    1 -
+ arch/arm/mach-pxa/pxa95x.c                 |    1 -
+ arch/arm/mach-s3c2440/common.h             |    2 +-
+ arch/arm/mach-s3c2440/mach-anubis.c        |    2 +-
+ arch/arm/mach-s3c2440/mach-at2440evb.c     |    2 +-
+ arch/arm/mach-s3c2440/mach-gta02.c         |    2 +-
+ arch/arm/mach-s3c2440/mach-mini2440.c      |    2 +-
+ arch/arm/mach-s3c2440/mach-nexcoder.c      |    2 +-
+ arch/arm/mach-s3c2440/mach-osiris.c        |    2 +-
+ arch/arm/mach-s3c2440/mach-rx1950.c        |    2 +-
+ arch/arm/mach-s3c2440/mach-rx3715.c        |    2 +-
+ arch/arm/mach-s3c2440/mach-smdk2440.c      |    2 +-
+ arch/arm/mach-s3c2440/s3c2440.c            |   13 -------------
+ arch/arm/mach-s3c2440/s3c244x.c            |   11 +++++++++++
+ arch/arm/plat-s3c24xx/dma.c                |    2 +-
+ arch/arm/plat-samsung/devs.c               |    2 +-
+ 24 files changed, 47 insertions(+), 46 deletions(-)
