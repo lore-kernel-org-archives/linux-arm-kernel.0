@@ -1,26 +1,57 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Mon, 5 Mar 2012 09:48:53 -0600
-Subject: [PATCH v2 11/17] ASoC: fsl: create fsl_utils to accommodate the
- common functions
-In-Reply-To: <20120305144920.GR3224@opensource.wolfsonmicro.com>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-12-git-send-email-shawn.guo@linaro.org>
- <20120305144920.GR3224@opensource.wolfsonmicro.com>
-Message-ID: <4F54E065.8060905@freescale.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Tue,  6 Mar 2012 00:07:16 -0500
+Subject: [PATCH] ARM: move mem_type's real definition to asm/mach/map.h
+Message-ID: <1331010436-31576-1-git-send-email-shijie8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> This doesn't seem at all Freescale specific, it should be a generic
-> helper, and in fact there already is one - the machine driver can set
-> codec_of_node in the card structure to point to the device node and then
-> the core should figure out binding to the device for you.  If it doesn't
-> we should fix the core.
+If we use the mem_type in the driver. We will meet the compiler error:
+"error: dereferencing pointer to incomplete type"
 
-Can we do that in another patch set, so that it doesn't hold up Shawn's
-work?  All this patch does is move the code from one file to another, so
-it's not like he's adding a feature incorrectly.
+Move mem_type's real definition to asm/mach/map.h to fix it.
 
+Signed-off-by: Huang Shijie <shijie8@gmail.com>
+---
+ arch/arm/include/asm/mach/map.h |    8 +++++++-
+ arch/arm/mm/mm.h                |    7 +------
+ 2 files changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index b36f365..a5ee07d 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -34,7 +34,13 @@ struct map_desc {
+ #ifdef CONFIG_MMU
+ extern void iotable_init(struct map_desc *, int);
+ 
+-struct mem_type;
++struct mem_type {
++	pteval_t prot_pte;
++	pmdval_t prot_l1;
++	pmdval_t prot_sect;
++	unsigned int domain;
++};
++
+ extern const struct mem_type *get_mem_type(unsigned int type);
+ /*
+  * external interface to remap single page with appropriate type
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index 70f6d3ea..1930bc9 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -10,12 +10,7 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
+ 	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
+ }
+ 
+-struct mem_type {
+-	pteval_t prot_pte;
+-	pmdval_t prot_l1;
+-	pmdval_t prot_sect;
+-	unsigned int domain;
+-};
++struct mem_type;
+ 
+ const struct mem_type *get_mem_type(unsigned int type);
+ 
 -- 
-Timur Tabi
-Linux kernel developer at Freescale
+1.7.4.4
