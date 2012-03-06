@@ -1,55 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Mar 2012 08:59:39 +0000
-Subject: [PATCH 6/9] dmaengine: consolidate tx_status functions
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F41FF555BD@AUSP01VMBX24.collaborationhost.net>
-References: <20120305201411.GA17791@n2100.arm.linux.org.uk>
- <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
- <ADE657CA350FB648AAC2C43247A983F001F41FF555BD@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20120306085939.GC17370@n2100.arm.linux.org.uk>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Tue, 6 Mar 2012 14:33:16 +0530
+Subject: [PATCH] omap3_beagle: Init only uart3 used for console
+In-Reply-To: <12976EFB-912D-44E2-825C-63034F117635@dominion.thruhere.net>
+References: <1330945952-14714-1-git-send-email-govindraj.raja@ti.com>
+ <12976EFB-912D-44E2-825C-63034F117635@dominion.thruhere.net>
+Message-ID: <CAMrsUdJfSeu8W+gS+HfDKw5WFXvaVK2TzXhqhr6tdRhujU18uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 06:12:50PM -0600, H Hartley Sweeten wrote:
-> On Monday, March 05, 2012 1:17 PM, Russell King wrote:
-> > diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
-> > index 47e0997..244a2c5 100644
-> > --- a/drivers/dma/dmaengine.h
-> > +++ b/drivers/dma/dmaengine.h
-> > @@ -45,4 +45,35 @@ static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
-> >  	tx->cookie = 0;
-> >  }
-> >  
-> > +/**
-> > + * dma_cookie_status - report cookie status
-> > + * @chan: dma channel
-> > + * @cookie: cookie we are interested in
-> > + * @state: dma_tx_state structure to return last/used cookies
-> > + *
-> > + * Report the status of the cookie, filling in the state structure if
-> > + * non-NULL.  No locking is required.
-> > + */
-> > +static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
-> > +	dma_cookie_t cookie, struct dma_tx_state *state)
-> > +{
-> > +	dma_cookie_t used, complete;
-> > +
-> > +	used = chan->cookie;
-> > +	complete = chan->complete;
-> > +	barrier();
-> > +	if (state) {
-> > +		state->last = complete;
-> > +		state->used = used;
-> > +		state->residue = 0;
-> > +	}
-> 
-> Isn't this dma_set_tx_state()?
+On Mon, Mar 5, 2012 at 7:36 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
+>
+> Op 5 mrt. 2012, om 12:12 heeft Govindraj.R het volgende geschreven:
+>
+>> From: "Govindraj.R" <govindraj.raja@ti.com>
+>>
+>> On beagle some of uart mux lines are used for other
+>> purpose so init only uart3.
+>>
+>> Uart2 rx line clashes with gpio_147 used for usb ehci
+>> phy reset. Initializing uart2 pad_mux lines can break
+>> ehci module on beagle xm.
+>> (gpio_147 is available on uart2_rx in mode4 reference
+>> mux34xx.c -> uart2_rx.gpio_147)
+>
+> That's only on xM revision C, right?
 
-It's more than dma_set_tx_state().  It is my intention to get rid of
-dma_set_tx_state() in favour of these implementations.
+Applicable to all beagle boards having external usb
+hub (USB2HS_nRST will require uart2_rx.gpio_147)
 
-> > +	return dma_async_is_complete(cookie, complete, used);
-> > +}
-> 
-> Regards,
-> Hartley
-> 
+Beagle Rev Ax/Bx doesn't seem to have external hub
+module so not applicable for those boards
+
+Will modify and post a new patch.
+
+--
+Thanks,
+Govindraj.R
