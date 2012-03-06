@@ -1,151 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Mar 2012 13:38:59 -0800
-Subject: [PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only
-In-Reply-To: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
-References: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <20120306213859.GA12083@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue,  6 Mar 2012 15:45:11 -0600
+Subject: [PATCH v5 1/7] ARM: provide runtime hook for ioremap/iounmap
+In-Reply-To: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
+References: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
+Message-ID: <1331070317-9598-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Govindraj.R <govindraj.raja@ti.com> [120306 00:34]:
-> From: "Govindraj.R" <govindraj.raja@ti.com>
-> 
-> All beagle boards rev > AX/BX have external usb hubs connected to ehci
-> interface, external hub/peripheral uses a nreset sequence for which
-> uart2_rx.gpio_147 pin in mux mode4(USB2HS_nRST) is used on all beagle
-> boards expect rev Ax/BX.
-> (Reference to all beagle boards rev schematics:
-> http://beagleboard.org/hardware/design)
-> 
-> Initialising uart2 will lead to serial init taking over uart2_rx pin
-> so init uart2_rx pin mux only for Beagle AX/BX rev boards.
-> Dont init uart2 for all other boards allowing usb_ehci functionality.
-> 
-> To initialise individual uart port by id utilise and modify the existing
-> available func. omap_serial_board_init.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Koen Kooi <koen@dominion.thruhere.net>
-> Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Tested-by: Robert Nelson <robertcnelson@gmail.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+From: Rob Herring <rob.herring@calxeda.com>
 
-Can somebody please test this on non-xm beagle too and
-reply with a Tested-by?
+We have compile time over-ride of ioremap and iounmap, but an run-time
+override is needed for multi-platform builds. This adds an extra function
+pointer check, but ioremap is not peformance critical. The option for
+compile time selection remains.
 
-Thanks,
+The caller variant is used here to provide correct caller information as
+ARM can only support level 0 for __builtin_return_address.
 
-Tony
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+ arch/arm/include/asm/io.h |    7 ++++++-
+ arch/arm/mm/ioremap.c     |   17 ++++++++++++++---
+ 2 files changed, 20 insertions(+), 4 deletions(-)
 
-> ---
->  arch/arm/mach-omap2/board-omap3beagle.c  |    6 +++-
->  arch/arm/mach-omap2/serial.c             |   41 ++++++++++++++++-------------
->  arch/arm/plat-omap/include/plat/serial.h |    3 +-
->  3 files changed, 30 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-> index 7ffcd28..19d6fb5 100644
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -126,6 +126,7 @@ static void __init omap3_beagle_init_rev(void)
->  		beagle_config.mmc1_gpio_wp = 29;
->  		beagle_config.reset_gpio = 170;
->  		beagle_config.usr_button_gpio = 7;
-> +		omap_serial_board_init(NULL, 1);
->  		break;
->  	case 6:
->  		printk(KERN_INFO "OMAP3 Beagle Rev: C1/C2/C3\n");
-> @@ -528,7 +529,10 @@ static void __init omap3_beagle_init(void)
->  	platform_add_devices(omap3_beagle_devices,
->  			ARRAY_SIZE(omap3_beagle_devices));
->  	omap_display_init(&beagle_dss_data);
-> -	omap_serial_init();
-> +	omap_serial_board_init(NULL, 0);
-> +	omap_serial_board_init(NULL, 2);
-> +	omap_serial_board_init(NULL, 3);
-> +
->  	omap_sdrc_init(mt46h32m32lf6_sdrc_params,
->  				  mt46h32m32lf6_sdrc_params);
->  
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index f590afc..e7c0462 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -393,30 +393,32 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->  /**
->   * omap_serial_board_init() - initialize all supported serial ports
->   * @info: platform specific data pointer
-> + * @port_id: uart port number to be initialised
->   *
-> - * Initializes all available UARTs as serial ports. Platforms
-> + * Initializes individual UARTs as serial ports. Platforms
->   * can call this function when they want to have default behaviour
-> - * for serial ports (e.g initialize them all as serial ports).
-> + * for serial ports (e.g initialize individual serial ports based on port id).
->   */
-> -void __init omap_serial_board_init(struct omap_uart_port_info *info)
-> +void __init omap_serial_board_init(struct omap_uart_port_info *info, u8 port_id)
->  {
->  	struct omap_uart_state *uart;
->  	struct omap_board_data bdata;
->  
-> -	list_for_each_entry(uart, &uart_list, node) {
-> -		bdata.id = uart->num;
-> -		bdata.flags = 0;
-> -		bdata.pads = NULL;
-> -		bdata.pads_cnt = 0;
-> -
-> -		if (cpu_is_omap44xx() || cpu_is_omap34xx())
-> -			omap_serial_fill_default_pads(&bdata);
-> -
-> -		if (!info)
-> -			omap_serial_init_port(&bdata, NULL);
-> -		else
-> -			omap_serial_init_port(&bdata, &info[uart->num]);
-> -	}
-> +	list_for_each_entry(uart, &uart_list, node)
-> +		if (uart->num == port_id) {
-> +			bdata.id = uart->num;
-> +			bdata.flags = 0;
-> +			bdata.pads = NULL;
-> +			bdata.pads_cnt = 0;
-> +
-> +			if (!cpu_is_omap24xx())
-> +				omap_serial_fill_default_pads(&bdata);
-> +
-> +			if (!info)
-> +				omap_serial_init_port(&bdata, NULL);
-> +			else
-> +				omap_serial_init_port(&bdata, info);
-> +		}
->  }
->  
->  /**
-> @@ -428,5 +430,8 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
->   */
->  void __init omap_serial_init(void)
->  {
-> -	omap_serial_board_init(NULL);
-> +	struct omap_uart_state *uart;
-> +
-> +	list_for_each_entry(uart, &uart_list, node)
-> +		omap_serial_board_init(NULL, uart->num);
->  }
-> diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-> index 198d1e6..043b251 100644
-> --- a/arch/arm/plat-omap/include/plat/serial.h
-> +++ b/arch/arm/plat-omap/include/plat/serial.h
-> @@ -111,7 +111,8 @@ struct omap_uart_port_info;
->  
->  extern void omap_serial_init(void);
->  extern int omap_uart_can_sleep(void);
-> -extern void omap_serial_board_init(struct omap_uart_port_info *platform_data);
-> +extern void omap_serial_board_init(struct omap_uart_port_info *platform_data,
-> +		u8 port_id);
->  extern void omap_serial_init_port(struct omap_board_data *bdata,
->  		struct omap_uart_port_info *platform_data);
->  #endif
-> -- 
-> 1.7.5.4
-> 
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 9275828..6c363c1 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -83,6 +83,11 @@ extern void __iomem *__arm_ioremap_pfn(unsigned long, unsigned long, size_t, uns
+ extern void __iomem *__arm_ioremap(unsigned long, size_t, unsigned int);
+ extern void __iomem *__arm_ioremap_exec(unsigned long, size_t, bool cached);
+ extern void __iounmap(volatile void __iomem *addr);
++extern void __arm_iounmap(volatile void __iomem *addr);
++
++extern void __iomem * (*arch_ioremap_caller)(unsigned long, size_t,
++	unsigned int, void *);
++extern void (*arch_iounmap)(volatile void __iomem *);
+ 
+ /*
+  * Bad read/write accesses...
+@@ -266,7 +271,7 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+  */
+ #ifndef __arch_ioremap
+ #define __arch_ioremap			__arm_ioremap
+-#define __arch_iounmap			__iounmap
++#define __arch_iounmap			__arm_iounmap
+ #endif
+ 
+ #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index 80632e8..0246290 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -306,11 +306,15 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
+ }
+ EXPORT_SYMBOL(__arm_ioremap_pfn);
+ 
++void __iomem * (*arch_ioremap_caller)(unsigned long, size_t,
++				      unsigned int, void *) =
++	__arm_ioremap_caller;
++
+ void __iomem *
+ __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+ {
+-	return __arm_ioremap_caller(phys_addr, size, mtype,
+-			__builtin_return_address(0));
++	return arch_ioremap_caller(phys_addr, size, mtype,
++		__builtin_return_address(0));
+ }
+ EXPORT_SYMBOL(__arm_ioremap);
+ 
+@@ -369,4 +373,11 @@ void __iounmap(volatile void __iomem *io_addr)
+ 
+ 	vunmap(addr);
+ }
+-EXPORT_SYMBOL(__iounmap);
++
++void (*arch_iounmap)(volatile void __iomem *) = __iounmap;
++
++void __arm_iounmap(volatile void __iomem *io_addr)
++{
++	arch_iounmap(io_addr);
++}
++EXPORT_SYMBOL(__arm_iounmap);
+-- 
+1.7.5.4
