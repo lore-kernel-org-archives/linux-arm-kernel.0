@@ -1,149 +1,48 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 6 Mar 2012 23:05:25 +0100
-Subject: [PATCH 2/4] pinctrl/coh901: use generic pinconf enums and parameters
-Message-ID: <1331071525-24699-1-git-send-email-linus.walleij@stericsson.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue,  6 Mar 2012 19:33:33 -0300
+Subject: [PATCH] ARM: mach-versatile: Fix PCI build error
+Message-ID: <1331073213-16502-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Fix the following build error that happened on a "make randconfig":
 
-Adjust the COH 901 driver to use the standard enums for
-biasing and driving pins, alter signature of config function
-to suit the framework.
+arch/arm/mach-versatile/pci.c: In function 'pci_versatile_setup_resources':
+arch/arm/mach-versatile/pci.c:222: error: 'sys' undeclared (first use in this function)
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+since commit 9f786d033d (arm/PCI: get rid of device resource fixups)
+pci_add_resource_offset() has an extra parameter.
+
+Pass the sys struct parameter to pci_versatile_setup_resources() in order to fix
+the build.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/pinctrl/pinctrl-coh901.c |   56 +++++++++-----------------------------
- 1 files changed, 13 insertions(+), 43 deletions(-)
+ arch/arm/mach-versatile/pci.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
-index b90c011..724234c 100644
---- a/drivers/pinctrl/pinctrl-coh901.c
-+++ b/drivers/pinctrl/pinctrl-coh901.c
-@@ -26,36 +26,6 @@
- #include <mach/gpio-u300.h>
+diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
+index 51733b0..4f41cb8 100644
+--- a/arch/arm/mach-versatile/pci.c
++++ b/arch/arm/mach-versatile/pci.c
+@@ -191,7 +191,8 @@ static struct resource pre_mem = {
+ 	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
+ };
  
- /*
-- * Bias modes for U300 GPIOs
-- *
-- * GPIO_U300_CONFIG_BIAS_UNKNOWN: this bias mode is not known to us
-- * GPIO_U300_CONFIG_BIAS_FLOAT: no specific bias, the GPIO will float or state
-- *	is not controlled by software
-- * GPIO_U300_CONFIG_BIAS_PULL_UP: the GPIO will be pulled up (usually with high
-- *	impedance to VDD)
-- */
--#define GPIO_U300_CONFIG_BIAS_UNKNOWN	0x1000
--#define GPIO_U300_CONFIG_BIAS_FLOAT	0x1001
--#define GPIO_U300_CONFIG_BIAS_PULL_UP	0x1002
--
--/*
-- * Drive modes for U300 GPIOs (output)
-- *
-- * GPIO_U300_CONFIG_DRIVE_PUSH_PULL: the GPIO will be driven actively high and
-- *	low, this is the most typical case and is typically achieved with two
-- *	active transistors on the output
-- * GPIO_U300_CONFIG_DRIVE_OPEN_DRAIN: the GPIO will be driven with open drain
-- *	(open collector) which means it is usually wired with other output
-- *	ports which are then pulled up with an external resistor
-- * GPIO_U300_CONFIG_DRIVE_OPEN_SOURCE: the GPIO will be driven with open drain
-- *	(open emitter) which is the same as open drain mutatis mutandis but
-- *	pulled to ground
-- */
--#define GPIO_U300_CONFIG_DRIVE_PUSH_PULL	0x2000
--#define GPIO_U300_CONFIG_DRIVE_OPEN_DRAIN	0x2001
--#define GPIO_U300_CONFIG_DRIVE_OPEN_SOURCE	0x2002
--
--/*
-  * Register definitions for COH 901 335 variant
-  */
- #define U300_335_PORT_STRIDE				(0x1C)
-@@ -181,12 +151,12 @@ struct u300_gpio_confdata {
- #define BS365_GPIO_NUM_PORTS 5
- 
- #define U300_FLOATING_INPUT { \
--	.bias_mode = GPIO_U300_CONFIG_BIAS_FLOAT, \
-+	.bias_mode = PIN_CONFIG_BIAS_HIGH_IMPEDANCE, \
- 	.output = false, \
- }
- 
- #define U300_PULL_UP_INPUT { \
--	.bias_mode = GPIO_U300_CONFIG_BIAS_PULL_UP, \
-+	.bias_mode = PIN_CONFIG_BIAS_PULL_UP, \
- 	.output = false, \
- }
- 
-@@ -449,7 +419,7 @@ static int u300_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- }
- 
- static int u300_gpio_config(struct gpio_chip *chip, unsigned offset,
--		     u16 param, unsigned long *data)
-+			    enum pin_config_param param, unsigned long data)
+-static int __init pci_versatile_setup_resources(struct list_head *resources)
++static int __init pci_versatile_setup_resources(struct list_head *resources,
++						struct pci_sys_data *sys)
  {
- 	struct u300_gpio *gpio = to_u300_gpio(chip);
- 	unsigned long flags;
-@@ -457,16 +427,16 @@ static int u300_gpio_config(struct gpio_chip *chip, unsigned offset,
+ 	int ret = 0;
  
- 	local_irq_save(flags);
- 	switch (param) {
--	case GPIO_U300_CONFIG_BIAS_UNKNOWN:
--	case GPIO_U300_CONFIG_BIAS_FLOAT:
-+	case PIN_CONFIG_BIAS_DISABLE:
-+	case PIN_CONFIG_BIAS_HIGH_IMPEDANCE:
- 		val = readl(U300_PIN_REG(offset, per));
- 		writel(val | U300_PIN_BIT(offset), U300_PIN_REG(offset, per));
- 		break;
--	case GPIO_U300_CONFIG_BIAS_PULL_UP:
-+	case PIN_CONFIG_BIAS_PULL_UP:
- 		val = readl(U300_PIN_REG(offset, per));
- 		writel(val & ~U300_PIN_BIT(offset), U300_PIN_REG(offset, per));
- 		break;
--	case GPIO_U300_CONFIG_DRIVE_PUSH_PULL:
-+	case PIN_CONFIG_DRIVE_PUSH_PULL:
- 		val = readl(U300_PIN_REG(offset, pcr));
- 		val &= ~(U300_GPIO_PXPCR_PIN_MODE_MASK
- 			 << ((offset & 0x07) << 1));
-@@ -474,7 +444,7 @@ static int u300_gpio_config(struct gpio_chip *chip, unsigned offset,
- 			<< ((offset & 0x07) << 1));
- 		writel(val, U300_PIN_REG(offset, pcr));
- 		break;
--	case GPIO_U300_CONFIG_DRIVE_OPEN_DRAIN:
-+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
- 		val = readl(U300_PIN_REG(offset, pcr));
- 		val &= ~(U300_GPIO_PXPCR_PIN_MODE_MASK
- 			 << ((offset & 0x07) << 1));
-@@ -482,7 +452,7 @@ static int u300_gpio_config(struct gpio_chip *chip, unsigned offset,
- 			<< ((offset & 0x07) << 1));
- 		writel(val, U300_PIN_REG(offset, pcr));
- 		break;
--	case GPIO_U300_CONFIG_DRIVE_OPEN_SOURCE:
-+	case PIN_CONFIG_DRIVE_OPEN_SOURCE:
- 		val = readl(U300_PIN_REG(offset, pcr));
- 		val &= ~(U300_GPIO_PXPCR_PIN_MODE_MASK
- 			 << ((offset & 0x07) << 1));
-@@ -651,12 +621,12 @@ static void __init u300_gpio_init_pin(struct u300_gpio *gpio,
+@@ -250,7 +251,7 @@ int __init pci_versatile_setup(int nr, struct pci_sys_data *sys)
  
- 		/* Deactivate bias mode for output */
- 		u300_gpio_config(&gpio->chip, offset,
--				 GPIO_U300_CONFIG_BIAS_FLOAT,
--				 NULL);
-+				 PIN_CONFIG_BIAS_HIGH_IMPEDANCE,
-+				 0);
- 
- 		/* Set drive mode for output */
- 		u300_gpio_config(&gpio->chip, offset,
--				 GPIO_U300_CONFIG_DRIVE_PUSH_PULL, NULL);
-+				 PIN_CONFIG_DRIVE_PUSH_PULL, 0);
- 
- 		dev_dbg(gpio->dev, "set up pin %d as output, value: %d\n",
- 			offset, conf->outval);
-@@ -667,7 +637,7 @@ static void __init u300_gpio_init_pin(struct u300_gpio *gpio,
- 		u300_gpio_set(&gpio->chip, offset, 0);
- 
- 		/* Set bias mode for input */
--		u300_gpio_config(&gpio->chip, offset, conf->bias_mode, NULL);
-+		u300_gpio_config(&gpio->chip, offset, conf->bias_mode, 0);
- 
- 		dev_dbg(gpio->dev, "set up pin %d as input, bias: %04x\n",
- 			offset, conf->bias_mode);
+ 	if (nr == 0) {
+ 		sys->mem_offset = 0;
+-		ret = pci_versatile_setup_resources(&sys->resources);
++		ret = pci_versatile_setup_resources(&sys->resources, sys);
+ 		if (ret < 0) {
+ 			printk("pci_versatile_setup: resources... oops?\n");
+ 			goto out;
 -- 
-1.7.8
+1.7.1
