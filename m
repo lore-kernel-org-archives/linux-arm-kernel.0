@@ -1,27 +1,57 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 6 Mar 2012 00:06:45 +0000
-Subject: [PATCH v2 01/17] ASoC: imx: move eukrea audmux call into ASoC
- machine driver
-In-Reply-To: <20120305192759.GB3852@pengutronix.de>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-2-git-send-email-shawn.guo@linaro.org>
- <20120305174612.GY3224@opensource.wolfsonmicro.com>
- <20120305192759.GB3852@pengutronix.de>
-Message-ID: <20120306000644.GA3201@opensource.wolfsonmicro.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 05 Mar 2012 16:09:28 -0800
+Subject: [PATCH] mmc: omap_hsmmc: Fix Unbalanced pm_runtime_enable warning
+In-Reply-To: <20120305234240.GQ12083@atomide.com> (Tony Lindgren's message of
+ "Mon, 5 Mar 2012 15:42:41 -0800")
+References: <20120305234240.GQ12083@atomide.com>
+Message-ID: <87obsaio93.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 08:27:59PM +0100, Sascha Hauer wrote:
+Tony Lindgren <tony@atomide.com> writes:
 
-> For patches 01-08 I can give my:
+> mmc: omap_hsmmc: Fix Unbalanced pm_runtime_enable warning
+>
+> Otherwise we can get following warning when re-loading the
+> omap_hsmmc driver module when gpio_twl4030 module is not
+> loaded:
+>
+> omap_hsmmc omap_hsmmc.0: Unbalanced pm_runtime_enable!
+> omap_hsmmc omap_hsmmc.0: Unable to grab MMC CD IRQ
+> omap_hsmmc: probe of omap_hsmmc.0 failed with error -22
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>
+> Kevin, maybe take a look and see if this is correct and
+> fits into your PM branches?
 
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Looks right to me:
 
-Great, applied all those - thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/5bddbc7e/attachment.sig>
+Acked-by: Kevin Hilman <khilman@ti.com>
+
+But this is a fix to the driver itself, so Chris should queue this in
+mmc-next.
+
+Chris, can you take this one?
+
+Kevin
+
+
+>
+> Tony
+>
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -2146,6 +2146,7 @@ err_irq_cd_init:
+>  err_irq:
+>  	pm_runtime_mark_last_busy(host->dev);
+>  	pm_runtime_put_autosuspend(host->dev);
+> +	pm_runtime_disable(host->dev);
+>  	clk_put(host->fclk);
+>  	if (host->got_dbclk) {
+>  		clk_disable(host->dbclk);
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
