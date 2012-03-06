@@ -1,56 +1,113 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Tue, 6 Mar 2012 12:29:34 +0100
-Subject: Problems with "[PATCH 0/9] DMA engine cookie handling cleanups"
-In-Reply-To: <20120306110753.GG17370@n2100.arm.linux.org.uk>
-References: <CACKLOr3zFmNXYV6MW01uykp7geG=1gAkWcxYoMgLdqfzhMD9fw@mail.gmail.com>
- <20120306110753.GG17370@n2100.arm.linux.org.uk>
-Message-ID: <CACKLOr2vi4HtwZKz9GXLxU7pfntPk-HLqu0mQrF7csq20a3SaA@mail.gmail.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Tue, 06 Mar 2012 11:48:32 +0000
+Subject: Status of gpio-pxa driver and dummy clock
+In-Reply-To: <1330987717.23600.YahooMailClassic@web29008.mail.ird.yahoo.com>
+References: <1330987717.23600.YahooMailClassic@web29008.mail.ird.yahoo.com>
+Message-ID: <4F55F990.4040203@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2012 12:07, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Tue, Mar 06, 2012 at 12:03:54PM +0100, javier Martin wrote:
->> Hi Russell,
->> I've just seen this series in the mailing list archives:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/087917.html
+On 3/5/2012 10:48 PM, Paul Parsons wrote:
+> --- On Mon, 5/3/12, Robert Jarzmik<robert.jarzmik@free.fr>  wrote:
+>> Date: Monday, 5 March, 2012, 22:08
+>> Haojian Zhuang<haojian.zhuang@gmail.com>
+>> writes:
 >>
->> As some people already stated, patch 1/9 is missing.
+>>> I missed them. Maybe I was not in the Cc list. I'll
+>> append the patches
+>>> to fix them.
+>> Just to be sure, this is the patch which is missing for the
+>> dummy clock, which
+>> was not submitted before AFAIK (Jonathan, Paul, please
+>> confirm).
+>>
+>> I added the commit text to Paul's patch, and authored it as
+>> Paul's with
+>> Jonathan's report. Again, Jonathan, Paul, I'd like to have
+>> your agreement here.
+>>
+>> Haojian, if you have another patch ready, don't hesitate to
+>> drop this patch and
+>> take your own, as long as gpio-pxa is fixed, I'll be happy.
+> I created this patch without waiting for an official fix purely to solve
+> the problem for myself. I then posted it in case it would be useful to
+> others. By all means use it or, if a better patch exists, drop it.
+I'm carrying the exact same thing in my local tree for pxa27x so for 
+that at least
+I've stuck a tested-by below.  (going to loose the cam address at 
+somepoint soonish
+hence the kernel.org one. Really don't care though!)
 >
-> They weren't all sent to linux-arm-kernel - they were only sent to the
-> appropriate people listed in MAINTAINERS. ?So if you didn't receive them,
-> either the patch was not touching a driver you maintain or your entries
-> in MAINTAINERS is incomplete.
-
-I'd like to have access to the patches in order to test them for the
-imx and give you my tested-by.
-
->> In my case it is even worse: I didn't received any of the patches in
->> my mail-box despite being subscribed to the list.
+>> Cheers.
 >>
->> As you'll probably have noticed, I'm doing some deep cleanup on
->> 'imx-dma.c' file as you can see in the following patches:
+>> --
+>> Robert
 >>
->> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
->> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
->> [PATCH 00/14] dmaengine: imx-dma: merge dma arch code into dmaengine.
+>> 8>----
+>>  From 505a23475843a8fbac077e789d911ee07e1ae9cc Mon Sep 17
+>> 00:00:00 2001
+>> From: Paul Parsons<lost.distance@yahoo.com>
+>> Date: Sat, 3 Mar 2012 21:10:09 +0100
+>> Subject: [PATCH] arch/arm: pxa add dummy clocks for gpio
+>> driver
 >>
->> Currently, I'm waiting for Sascha and Vinod to confirm that they are
->> fine and merge them. However, your series seems to conflict with those
->> patches as it modifies imx-dma.
->
-> I expect that whenever these patches get posted, there will be some kind
-> of conflict with some work going on somewhere else. ?There's not much
-> which can be done to get away from that.
-
-Who would be in charge of solving the merge issues that may arise?
-Would it be Vinod Koul, the dmaengine maintainer?
-
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+>> Fix gpio driver by providing it a dummy clock. This
+>> regression was introduced by the commit "ARM: pxa: add
+>> dummy
+>> clock for sa1100-rtc", id
+>> a55b5adaf403c4d032e0871ad4ee3367782f4db6.
+>>
+>> Reported-by: Jonathan Cameron<jic23@cam.ac.uk>
+>> Signed-off-by: Paul Parsons<lost.distance@yahoo.com>
+>> Tested-by: Robert Jarzmik<robert.jarzmik@free.fr>
+Tested-by: Jonathan Cameron <jic23@kernel.org>
+>> ---
+>>   arch/arm/mach-pxa/pxa25x.c |    1 +
+>>   arch/arm/mach-pxa/pxa27x.c |    1 +
+>>   2 files changed, 2 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/pxa25x.c
+>> b/arch/arm/mach-pxa/pxa25x.c
+>> index 00d6eac..d8de3e5 100644
+>> --- a/arch/arm/mach-pxa/pxa25x.c
+>> +++ b/arch/arm/mach-pxa/pxa25x.c
+>> @@ -208,6 +208,7 @@ static struct clk_lookup
+>> pxa25x_clkregs[] = {
+>>       INIT_CLKREG(&clk_pxa25x_gpio11,
+>> NULL, "GPIO11_CLK"),
+>>       INIT_CLKREG(&clk_pxa25x_gpio12,
+>> NULL, "GPIO12_CLK"),
+>>       INIT_CLKREG(&clk_pxa25x_mem,
+>> "pxa2xx-pcmcia", NULL),
+>> +    INIT_CLKREG(&clk_dummy, "pxa-gpio",
+>> NULL),
+>>   };
+>>
+>>   static struct clk_lookup pxa25x_hwuart_clkreg =
+>> diff --git a/arch/arm/mach-pxa/pxa27x.c
+>> b/arch/arm/mach-pxa/pxa27x.c
+>> index c1673b3..a3fabc9 100644
+>> --- a/arch/arm/mach-pxa/pxa27x.c
+>> +++ b/arch/arm/mach-pxa/pxa27x.c
+>> @@ -229,6 +229,7 @@ static struct clk_lookup
+>> pxa27x_clkregs[] = {
+>>       INIT_CLKREG(&clk_pxa27x_im, NULL,
+>> "IMCLK"),
+>>       INIT_CLKREG(&clk_pxa27x_memc, NULL,
+>> "MEMCLK"),
+>>       INIT_CLKREG(&clk_pxa27x_mem,
+>> "pxa2xx-pcmcia", NULL),
+>> +    INIT_CLKREG(&clk_dummy, "pxa-gpio",
+>> NULL),
+>>   };
+>>
+>>   #ifdef CONFIG_PM
+>> -- 
+>> 1.7.5.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
