@@ -1,41 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Mar 2012 21:34:37 +0000
-Subject: [PATCH v5] lpc32xx: Added ethernet driver
-In-Reply-To: <1331067664-9124-1-git-send-email-stigge@antcom.de>
-References: <1331067664-9124-1-git-send-email-stigge@antcom.de>
-Message-ID: <201203062134.38077.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Mar 2012 13:38:00 -0800
+Subject: [PATCH] ARM: OMAP: WiLink platform data for the PandaBoard
+In-Reply-To: <1330994797-17298-1-git-send-email-mgherzan@gmail.com>
+References: <1330994797-17298-1-git-send-email-mgherzan@gmail.com>
+Message-ID: <20120306213800.GZ12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roland,
+Hi,
 
-One more thing I noticed this time:
-
-On Tuesday 06 March 2012, Roland Stigge wrote:
-> +static inline phy_interface_t lpc_phy_interface_mode(void)
-> +{
-> +#ifdef CONFIG_ARCH_LPC32XX_MII_SUPPORT
-> +       return PHY_INTERFACE_MODE_MII;
-> +#else
-> +       return PHY_INTERFACE_MODE_RMII;
-> +#endif
-> +}
+* Mircea Gherzan <mgherzan@gmail.com> [120305 16:15]:
+> The "uim" deamon requires sysfs entries that are filled in using
+> this platform data.
+> 
+> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+> ---
+>  arch/arm/mach-omap2/board-omap4panda.c |   23 +++++++++++++++++------
+>  include/linux/ti_wilink_st.h           |    2 ++
+>  2 files changed, 19 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> index b1d74d6..37b437f 100644
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/i2c/twl.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/regulator/fixed.h>
+> +#include <linux/ti_wilink_st.h>
+>  #include <linux/wl12xx.h>
+>  
+>  #include <mach/hardware.h>
+> @@ -56,15 +57,29 @@
+>  #define HDMI_GPIO_HPD  63 /* Hotplug detect */
+>  
+>  /* wl127x BT, FM, GPS connectivity chip */
+> -static int wl1271_gpios[] = {46, -1, -1};
+> +static struct ti_st_plat_data wilink_platform_data = {
+> +        .nshutdown_gpio	= 46,
+> +        .dev_name	= "/dev/ttyO1",
+> +        .flow_cntrl	= 1,
+> +        .baud_rate	= 3000000,
+> +	.chip_enable	= NULL,
+> +        .suspend	= NULL,
+> +        .resume		= NULL,
+> +};
 > +
-> +static inline int use_iram_for_net(void)
-> +{
-> +#ifdef CONFIG_ARCH_LPC32XX_IRAM_FOR_NET
-> +       return 1;
-> +#else
-> +       return 0;
-> +#endif
-> +}
 
-This should eventually both become run-time options based on the device tree.
-I don't know if you planned to do that anyway, but if you want the same kernel
-binary to be used for systems in different configurations, you cannot have
-compile-time decisions that are exclusive-or. Since you don't support device
-tree yet but plan to do that in the future, you could add a comment here
-about it, or you could even prepare it for that case already by passing the
-device into the functions that will be required for reading the properties.
+Please use tabs above before .xxx instead of spaces.
 
-	Arnd
+> +static struct platform_device btwilink_device = {
+> +	.name	= "btwilink",
+> +	.id	= -1,
+> +};
+> +
+>  static struct gpio_led gpio_leds[] = {
+>  	{
+>  		.name			= "pandaboard::status1",
+> @@ -91,10 +106,6 @@ static struct platform_device leds_gpio = {
+>  	},
+>  };
+>  
+> -static struct platform_device btwilink_device = {
+> -	.name	= "btwilink",
+> -	.id	= -1,
+> -};
+
+This change is probably not needed, right?
+
+Regards,
+
+Tony
