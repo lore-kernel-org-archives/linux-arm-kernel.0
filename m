@@ -1,76 +1,64 @@
-From: jason@lakedaemon.net (Jason)
-Date: Tue, 6 Mar 2012 13:22:33 -0500
-Subject: [RFC 00/14] Generic clk for Orion platforms.
-In-Reply-To: <20120306175333.GA16608@lunn.ch>
-References: <1331015471-28872-1-git-send-email-andrew@lunn.ch>
- <20120306155840.GS5050@titan.lakedaemon.net>
- <20120306161743.GI24858@lunn.ch>
- <20120306172341.GU5050@titan.lakedaemon.net>
- <20120306175333.GA16608@lunn.ch>
-Message-ID: <20120306182233.GV5050@titan.lakedaemon.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue,  6 Mar 2012 12:32:47 -0600
+Subject: [PATCH] OMAP3+: PM: VP: fix integer truncation error
+Message-ID: <1331058767-28933-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 06:53:33PM +0100, Andrew Lunn wrote:
-> > > You missed an important point. No driver has claimed these, but u-boot
-> > > has turned them on.
-> > 
-> > This sounds like a bug in u-boot.
-> 
-> Is it? Even if it is, we have to live with it. Otherwise we introduce
-> a regression, which is a big no-no. Also, how many users know how to
-> upgrade u-boot? I don't have the necessary JTAG setup for my boxes, so
-> i'm not going to risk bricking them by trying to upgrade u-boot.
+From: Yuan Jiangli <jlyuan@motorola.com>
 
-Wrong is wrong.  if u-boot is enabling things that aren't needed
-immediately after handoff, that needs to be fixed.  If the kernel is
-depending on that error and not checking the state of the clocks before
-performing actions, that also is broken.
+commit 2f34ce81b8c05c900e45bd88595cc154f7bb5957
+(OMAP3: PM: Adding voltage driver support.)
+introduced runtime computation of waittime to handle all potential
+sys clocks available.
 
-Upgrading u-boot is necessary to support devicetree on kirkwood.  At
-least, in any real fashion.  You could append the blob, but that is
-Discouraged. ;-)
+In the voltage processor, the SPMSUpdateWait is calculated based on
+the slew rate and the voltage step (SMPSUpdateWait = slew rate *
+Voltage Step). After the voltage processor receives the SMPS_Ack
+signal, the Voltage Controller will wait for SMPSUpdateWait clock
+cycles for the voltage to settle to the new value. For all
+practical purposes, the waittime parameter is the OMAP hardware
+translation of what the slew rate on the PMIC is.
 
-What kirkwood boards do you have?
+As an example, with TPS62361 on OMAP4460,
+step_size = 10000
+slew_rate = 32000
+sys_clk_rate = 38400
 
-> > Until that happens, could we walk across kirkwood_clks[] in
-> > kirkwood_clock_gate() to determine what is in use?  eg:
-> > 
-> > #########
-> > curr = readl(CLOCK_GATING_CTRL);
-> > ...
-> > used = CGC_DUNIT | CGC_RESERVED;
-> > 
-> > for (i = 0; i < ARRAY_SIZE(kirkwood_clks); i++) {
-> > 	if (kirkwood_clks[i]->enable_count)
-> > 		used |= kirkwood_clks[i]->/*PFM*/->mask;
-> > }
-> > 
-> > /* disable anything in curr, but not in used */
-> > if (CGC_SATA0 & (curr & ~used)) {
-> > 	/* disable sata0 logic */
-> > }
-> > 
-> > ...
-> > #########
-> 
-> NO! clk is opaque. You should not be accessing members inside it. The
-> clk struct members are not even declared when using the normal include
-> files.
+Our current computation results in the following:
+ = ((step_size / slew_rate) * sys_clk_rate) / 1000
+ = ((10000 / 32000) * 38400 / 1000
+ = 0
 
-Ok, then how about:
+Fix the same using DIV_ROUND_UP as an extra wait clock cycle
+is better than lesser clock cycle. For the above example, this
+translates to:
+ = (10000 * 38400) / (1000 * 32000)
+ = 12
 
-	if (clk_is_enabled(kirkwood_clks[i])
-		used |= 1 << clk_gate_bit_idx(kirkwood_clks[i]);
+Change-Id: I0ee22e60555e1cfd6cc3dea7ee44d0584ce182b6
+Acked-by: Jon Hunter <jon-hunter@ti.com>
+[nm at ti.com: slightly better implementation]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Yuan Jiangli <jlyuan@motorola.com>
+---
+ arch/arm/mach-omap2/vp.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-> Probably the short term solution is to simply add a deliberate
-> regression, and not turn them off. Then help Mike implement generic
-> code to handle this. We probably have three months to do this, since i
-> doubt the clock code is going to be part of the next merge.
-
-Good point.  I'd like to get it stabilized sooner rather than later,
-though.
-
-thx,
-
-Jason.
+diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
+index 0df8882..f95c1ba 100644
+--- a/arch/arm/mach-omap2/vp.c
++++ b/arch/arm/mach-omap2/vp.c
+@@ -61,8 +61,8 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
+ 	vddmin = voltdm->pmic->vp_vddmin;
+ 	vddmax = voltdm->pmic->vp_vddmax;
+ 
+-	waittime = ((voltdm->pmic->step_size / voltdm->pmic->slew_rate) *
+-		    sys_clk_rate) / 1000;
++	waittime = DIV_ROUND_UP(voltdm->pmic->step_size * sys_clk_rate,
++				1000 * voltdm->pmic->slew_rate);
+ 	vstepmin = voltdm->pmic->vp_vstepmin;
+ 	vstepmax = voltdm->pmic->vp_vstepmax;
+ 
+-- 
+1.7.5.4
