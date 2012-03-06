@@ -1,66 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Mar 2012 16:53:10 +0000
-Subject: [PATCH v4 1/4] ARM: provide runtime hook for ioremap/iounmap
-In-Reply-To: <1331006580-3579-1-git-send-email-robherring2@gmail.com>
-References: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
- <1331006580-3579-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201203061653.11049.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  6 Mar 2012 16:54:00 +0000
+Subject: [PATCH 0/6] Miscellaneous nommu fixes
+Message-ID: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 March 2012, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> We have compile time over-ride of ioremap and iounmap, but an run-time
-> override is needed for multi-platform builds. This adds an extra function
-> pointer check, but ioremap is not peformance critical. The option for
-> compile time selection remains.
-> 
-> The caller variant is used here to provide correct caller information as
-> ARM can only support level 0 for __builtin_return_address.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
+Hello,
 
-Very nice!
+This set of patches is a series of fixes for kernels built without
+CONFIG_MMU selected. It seems that this isn't a particularly popular
+choice amongst users of mainline kernels, but I was feeling brave and
+gave it a go.
 
-Just one small comment:
+The first patch is already in the patch system as 7337/1 but is unlikely
+to be merged unless it can be shown to work correctly. I tried the latest
+Codesourcery / Mentor uclinux GDB but that doesn't appear to issue the
+relevant ptrace requests:
 
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -306,9 +306,16 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
->  }
->  EXPORT_SYMBOL(__arm_ioremap_pfn);
->  
-> +void __iomem * (*arch_ioremap_caller)(unsigned long, size_t, unsigned int, void *);
-> +EXPORT_SYMBOL(arch_ioremap_caller);
-> +
->  void __iomem *
->  __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
->  {
-> +	if (arch_ioremap_caller)
-> +		return arch_ioremap_caller(phys_addr, size, mtype,
-> +			__builtin_return_address(0));
-> +
->  	return __arm_ioremap_caller(phys_addr, size, mtype,
->  			__builtin_return_address(0));
->  }
-> @@ -370,3 +377,12 @@ void __iounmap(volatile void __iomem *io_addr)
->  	vunmap(addr);
->  }
->  EXPORT_SYMBOL(__iounmap);
-> +
-> +void (*arch_iounmap)(volatile void __iomem *) = __iounmap;
-> +EXPORT_SYMBOL(arch_iounmap);
-> +
-> +void __arm_iounmap(volatile void __iomem *io_addr)
-> +{
-> +	arch_iounmap(io_addr);
-> +}
-> +EXPORT_SYMBOL(__arm_iounmap);
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086219.html
 
-The EXPORT_SYMBOL() statements for arch_ioremap_caller and arch_iounmap
-seem to be leftover from a previous version of this patch and can be removed
-now. Other than that:
+If anybody has a working uclinux environment, it would *make my day* if
+they could take GDB for a spin.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+The second patch has been picked up by Andrew Morton from the kexec list.
+
+The remaining patches are largely straightforward with the exception of
+the CPU suspend changes. I actually managed to test this with a rather
+weird and wonderful configuration, although this was using software
+models which tend to hide some of the issues you may experience with
+real hardware.
+
+All feedback welcome.
+
+Will
+
+
+Jonathan Austin (1):
+  ARM: nommu: Use VECTORS_BASE for vector copying with !MMU
+
+Will Deacon (5):
+  ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU platforms
+  kexec: crash: don't save swapper_pg_dir for !CONFIG_MMU
+    configurations
+  ARM: nommu: fix typo in mm/Kconfig
+  ARM: suspend: fix CPU suspend code for !CONFIG_MMU configurations
+  ARM: mm: truncate memory banks to fit in 4GB space for classic MMU
+
+ arch/arm/kernel/ptrace.c  |    4 ++-
+ arch/arm/kernel/setup.c   |   11 ++++++++-
+ arch/arm/kernel/suspend.c |   52 ++++++++++++++++++++++++++-------------------
+ arch/arm/kernel/traps.c   |    2 +-
+ arch/arm/mm/Kconfig       |    2 +-
+ arch/arm/mm/proc-v6.S     |    6 ++++-
+ arch/arm/mm/proc-v7.S     |   14 +++++++----
+ kernel/kexec.c            |    2 +
+ 8 files changed, 61 insertions(+), 32 deletions(-)
+
+-- 
+1.7.4.1
