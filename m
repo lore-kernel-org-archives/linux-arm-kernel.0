@@ -1,41 +1,34 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 06 Mar 2012 15:40:07 +0900
-Subject: [PATCH 2/2] mmc: sdhci-s3c: Enable runtime power management
-In-Reply-To: <20120305115209.GA3224@opensource.wolfsonmicro.com>
-References: <4F51697C.40408@samsung.com>
- <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1330735602-22409-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <4F549A0A.5020402@samsung.com>
- <20120305115209.GA3224@opensource.wolfsonmicro.com>
-Message-ID: <4F55B147.6010304@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 6 Mar 2012 15:01:58 +0800
+Subject: [GIT PULL][v3.3] pull request on arch-pxa tree with fix branch
+Message-ID: <CAN1soZzkb9qWmBRsv_wEwHwiRUW+q7zaehxnMifgEhsoXV4BZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
- 
-On 03/05/2012 08:52 PM, Mark Brown wrote:
+Hi Arnd,
 
-> On Mon, Mar 05, 2012 at 07:48:42PM +0900, Jaehoon Chung wrote:
->> On 03/03/2012 09:46 AM, Mark Brown wrote:
-> 
->>> +	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-> 
->> Could you explain why use 50ms? 
-> 
-> It's essentially a random number, some other devices use the same one.
-> We're just trying to avoid suspending between back to back requests.
-> 
->>> +	pm_runtime_use_autosuspend(&pdev->dev);
->>> +	pm_suspend_ignore_children(&pdev->dev, 1);
-> 
->> Is there reason that ignore_children use to set the true?
-> 
-> So that we can suspend the host without having to have the MMC card
-> suspended (the host suspend is not visible to the card).
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Please help to pull these patch in fixes branch of arch-pxa tree.
+
+Best Regards
+Haojian
+
+The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+
+  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git fixes
+
+Haojian Zhuang (3):
+      ARM: pxa: add dummy clock for pxa25x and pxa27x
+      ARM: pxa: remove duplicated registeration on pxa-gpio
+      ARM: pxa: fix invalid mfp pin issue
+
+ arch/arm/mach-pxa/generic.h    |    1 -
+ arch/arm/mach-pxa/mfp-pxa2xx.c |    7 +++++++
+ arch/arm/mach-pxa/pxa25x.c     |    2 +-
+ arch/arm/mach-pxa/pxa27x.c     |    2 +-
+ arch/arm/mach-pxa/pxa3xx.c     |    1 -
+ arch/arm/mach-pxa/pxa95x.c     |    1 -
+ 6 files changed, 9 insertions(+), 5 deletions(-)
+You have new mail in /var/spool/mail/hzhuang1
