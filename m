@@ -1,39 +1,47 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Tue, 6 Mar 2012 10:10:13 +0100
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Tue, 6 Mar 2012 14:40:57 +0530
 Subject: [PATCH] omap3_beagle: Init only uart3 used for console
-In-Reply-To: <CAMrsUdJfSeu8W+gS+HfDKw5WFXvaVK2TzXhqhr6tdRhujU18uQ@mail.gmail.com>
+In-Reply-To: <87399mkecv.fsf@ti.com>
 References: <1330945952-14714-1-git-send-email-govindraj.raja@ti.com>
- <12976EFB-912D-44E2-825C-63034F117635@dominion.thruhere.net>
- <CAMrsUdJfSeu8W+gS+HfDKw5WFXvaVK2TzXhqhr6tdRhujU18uQ@mail.gmail.com>
-Message-ID: <C67C8239-2E17-42E5-BEB4-2B7F623515B8@dominion.thruhere.net>
+ <87399mkecv.fsf@ti.com>
+Message-ID: <CAMrsUdLWaLqSr-PCmmGxrp0qZSojr5EWAUYmuk6v2pHiVdf9kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Mar 6, 2012 at 1:30 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> From: "Govindraj.R" <govindraj.raja@ti.com>
+>>
+>> On beagle some of uart mux lines are used for other
+>> purpose so init only uart3.
+>
+> OK, but you should also be clear that this patch is effectively
+> disabling all UARTS (except UART3) by defatul, which I'm not sure all
+> Beagle users will be happy about.
+>
 
-Op 6 mrt. 2012, om 10:03 heeft Raja, Govindraj het volgende geschreven:
+Okay, I have posted new version of the patch
+"[PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only"
 
-> On Mon, Mar 5, 2012 at 7:36 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
->> 
->> Op 5 mrt. 2012, om 12:12 heeft Govindraj.R het volgende geschreven:
->> 
->>> From: "Govindraj.R" <govindraj.raja@ti.com>
->>> 
->>> On beagle some of uart mux lines are used for other
->>> purpose so init only uart3.
->>> 
->>> Uart2 rx line clashes with gpio_147 used for usb ehci
->>> phy reset. Initializing uart2 pad_mux lines can break
->>> ehci module on beagle xm.
->>> (gpio_147 is available on uart2_rx in mode4 reference
->>> mux34xx.c -> uart2_rx.gpio_147)
->> 
->> That's only on xM revision C, right?
-> 
-> Applicable to all beagle boards having external usb
-> hub (USB2HS_nRST will require uart2_rx.gpio_147)
+which initialises uart1/3/4 on all beagle boards
 
-My apologies, I was confusing it with the DVI reset GPIO (which changed in between revisions) and the polarity of the USB pin (which changed during xM A -> C).
+and uart2 init is done for only beagle rev ax/bx
+which doesn't seem to have external usb module.
 
-regards,
 
-Koen
+>> Uart2 rx line clashes with gpio_147 used for usb ehci
+>> phy reset. Initializing uart2 pad_mux lines can break
+>> ehci module on beagle xm.
+>> (gpio_147 is available on uart2_rx in mode4 reference
+>> mux34xx.c -> uart2_rx.gpio_147)
+>
+> As Koen mentioned, this conflict only exists on certain boards, so
+> you should be clear that this is just an example.
+>
+
+conflict exists all beagle rev's expect rev ax/bx.
+
+--
+Thanks,
+Govindraj.R
