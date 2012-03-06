@@ -1,40 +1,44 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 6 Mar 2012 20:09:12 +0100
-Subject: [PATCH/RFC 2/2] arm/tegra: add timeout to PCIe PLL lock
- detection loop
-In-Reply-To: <4F56424A.3020305@wwwdotorg.org>
-References: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
- <1331023544-6439-3-git-send-email-mad_soft@inbox.ru>
- <4F56424A.3020305@wwwdotorg.org>
-Message-ID: <20120306190912.GA13882@avionic-0098.mockup.avionic-design.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Mar 2012 11:10:59 -0800
+Subject: [PATCH] ARM: OMAP2: Fix section warning for n8x0 when
+ CONFIG_MMC_OMAP is not set
+Message-ID: <20120306191059.GT12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 03/06/2012 01:45 AM, Dmitry Artamonow wrote:
-> > Tegra PCIe driver waits for PLL to lock using busy loop.
-> > If PLL fails to lock for some reason, this leads to silent lockup
-> > while booting (as PCIe code is not modular).
-> > 
-> > Fix by adding timeout, so if PLL doesn't lock in a couple
-> > of seconds, just PCIe driver fails and machine continues to boot.
-> > 
-> > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> 
-> That seems reasonable. So once the mdelay discussion is resolved,
-> 
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> 
-> Any idea why the PLL doesn't lock sometimes?
+Otherwise we get:
 
-I've seen this happen when the 1.05V regulator (GPIO#2 of the PMU on Harmony)
-isn't enabled.
+arch/arm/mach-omap2/board-n8x0.c:39:12: warning:
+'slot1_cover_open' defined but not used [-Wunused-variable]
+arch/arm/mach-omap2/board-n8x0.c:40:12: warning:
+'slot2_cover_open' defined but not used [-Wunused-variable]
+arch/arm/mach-omap2/board-n8x0.c:41:23: warning:
+'mmc_device' defined but not used [-Wunused-variable]
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/187b2856/attachment.sig>
+Reported-by: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -36,10 +36,6 @@
+ 
+ #include "mux.h"
+ 
+-static int slot1_cover_open;
+-static int slot2_cover_open;
+-static struct device *mmc_device;
+-
+ #define TUSB6010_ASYNC_CS	1
+ #define TUSB6010_SYNC_CS	4
+ #define TUSB6010_GPIO_INT	58
+@@ -211,6 +207,10 @@ static struct omap_onenand_platform_data board_onenand_data[] = {
+ #define N810_EMMC_VSD_GPIO	23
+ #define N810_EMMC_VIO_GPIO	9
+ 
++static int slot1_cover_open;
++static int slot2_cover_open;
++static struct device *mmc_device;
++
+ static int n8x0_mmc_switch_slot(struct device *dev, int slot)
+ {
+ #ifdef CONFIG_MMC_DEBUG
