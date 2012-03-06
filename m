@@ -1,37 +1,77 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Mar 2012 20:41:51 -0500 (EST)
-Subject: [PATCH] ARM: remove ixp2000 platform
-In-Reply-To: <201202281945.39419.arnd@arndb.de>
-References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
- <201202281945.39419.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 06 Mar 2012 11:29:38 +0900
+Subject: [PATCH] ARM: SAMSUNG: change the name from s3c-sdhci to
+ exynos4-sdhci
+In-Reply-To: <CAJuYYwTh8tVdA0X-TLEU-9O_M0_PmJR=i3WYAQXsaRcPF3MbJA@mail.gmail.com>
+References: <4F45D343.6020409@samsung.com>
+ <CAJuYYwTh8tVdA0X-TLEU-9O_M0_PmJR=i3WYAQXsaRcPF3MbJA@mail.gmail.com>
+Message-ID: <4F557692.8090102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Feb 2012, Arnd Bergmann wrote:
+Hi Kukjin.
 
-> On Tuesday 28 February 2012, Rob Herring wrote:
-> > ixp2000 has no commits other than tree-wide changes or refactoring since
-> > 2006. No maintainer is listed for ixp2000 either.
+Is it merged?
+
+Best Regards,
+Jaehoon Chung
+
+On 02/24/2012 06:56 PM, Thomas Abraham wrote:
+
+> On 23 February 2012 11:18, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> Thomas Arbrahams's patchset have changed the device name in sdhci-s3c.c
+>> (mmc: sdhci-s3c: Rework platform data and add device tree support)
+>> But didn't change the regulator_consumer name.
+>> So maybe didn't initialize the mmc/sd card for exynos4.
+>>
+>> This patch is fixed that (based-on linux-samsung for-next branch)
+>>
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> Signed-off-by: kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/mach-nuri.c           |    4 ++--
+>>  arch/arm/mach-exynos/mach-universal_c210.c |    2 +-
+>>  2 files changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+>> index a6b9162..251dd7a 100644
+>> --- a/arch/arm/mach-exynos/mach-nuri.c
+>> +++ b/arch/arm/mach-exynos/mach-nuri.c
+>> @@ -116,7 +116,7 @@ static struct s3c_sdhci_platdata nuri_hsmmc0_data __initdata = {
+>>  };
+>>
+>>  static struct regulator_consumer_supply emmc_supplies[] = {
+>> -       REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+>> +       REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
+>>        REGULATOR_SUPPLY("vmmc", "dw_mmc"),
+>>  };
+>>
+>> @@ -415,7 +415,7 @@ static struct regulator_consumer_supply __initdata max8997_ldo12_[] = {
+>>        REGULATOR_SUPPLY("vddio", "6-003c"), /* HDC802 */
+>>  };
+>>  static struct regulator_consumer_supply __initdata max8997_ldo13_[] = {
+>> -       REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"), /* TFLASH */
+>> +       REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.2"), /* TFLASH */
+>>  };
+>>  static struct regulator_consumer_supply __initdata max8997_ldo14_[] = {
+>>        REGULATOR_SUPPLY("inmotor", "max8997-haptic"),
+>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
+>> index 6017a21..320cb1d 100644
+>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
+>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
+>> @@ -749,7 +749,7 @@ static struct s3c_sdhci_platdata universal_hsmmc0_data __initdata = {
+>>  };
+>>
+>>  static struct regulator_consumer_supply mmc0_supplies[] = {
+>> -       REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+>> +       REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
+>>  };
+>>
+>>  static struct regulator_init_data mmc0_fixed_voltage_init_data = {
 > 
-> I have this in my copy of the MAINTAINERS file:
+> Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> ARM/INTEL IXP2000 ARM ARCHITECTURE
-> M:      Lennert Buytenhek <kernel@wantstofly.org>
-> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> S:      Maintained
-> 
-> It's missing an F: line, otherwise it suggests that the platform is still
-> maintained by Lennert and it certainly builds just fine. Unfortunately he
-> seems to have fallen off the edge of the planet at the end of last year.
-
-FYI, here's a snippet of a conversation I just had with Lennert on IRC 
-today:
-
-13:05 < nico> do you still care about ixp2000?
-13:22 < lennert> not really, no
-13:58 < nico> do you think we could remove it from the kernel tree?
-14:01 < lennert> go for it, and remove ixp23xx too while you're at it
-
-
-Nicolas
