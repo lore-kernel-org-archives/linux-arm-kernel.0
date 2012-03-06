@@ -1,51 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  6 Mar 2012 16:54:01 +0000
-Subject: [PATCH 1/6] ARM: ptrace: fix ptrace_read_user for !CONFIG_MMU
- platforms
+Date: Tue,  6 Mar 2012 16:54:02 +0000
+Subject: [PATCH 2/6] kexec: crash: don't save swapper_pg_dir for !CONFIG_MMU
+ configurations
 In-Reply-To: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
 References: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1331052846-19144-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1331052846-19144-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68b7f715 ("nommu: ptrace support") added definitions for
-PT_TEXT_ADDR and friends, as well as adding ptrace support for reading
-from these magic offsets.
+nommu platforms don't have very interesting swapper_pg_dir pointers and
+usually just #define them to NULL, meaning that we can't include them in
+the vmcoreinfo on the kexec crash path.
 
-Unfortunately, this has probably never worked, since ptrace_read_user
-predicates reading on off < sizeof(struct user), returning -EIO
-otherwise.
+This patch only saves the swapper_pg_dir if we have an MMU.
 
-This patch moves the offset size check until after we have tried to
-match it against either a magic value or an offset into pt_regs.
-
-Cc: Paul Brook <paul@codesourcery.com>
+Reviewed-by: Simon Horman <horms@verge.net.au>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/ptrace.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ kernel/kexec.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index ede6443..4fe2d598 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -257,7 +257,7 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
- {
- 	unsigned long tmp;
+diff --git a/kernel/kexec.c b/kernel/kexec.c
+index 7b08867..cb5d13c 100644
+--- a/kernel/kexec.c
++++ b/kernel/kexec.c
+@@ -1462,7 +1462,9 @@ static int __init crash_save_vmcoreinfo_init(void)
  
--	if (off & 3 || off >= sizeof(struct user))
-+	if (off & 3)
- 		return -EIO;
+ 	VMCOREINFO_SYMBOL(init_uts_ns);
+ 	VMCOREINFO_SYMBOL(node_online_map);
++#ifdef CONFIG_MMU
+ 	VMCOREINFO_SYMBOL(swapper_pg_dir);
++#endif
+ 	VMCOREINFO_SYMBOL(_stext);
+ 	VMCOREINFO_SYMBOL(vmlist);
  
- 	tmp = 0;
-@@ -269,6 +269,8 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
- 		tmp = tsk->mm->end_code;
- 	else if (off < sizeof(struct pt_regs))
- 		tmp = get_user_reg(tsk, off >> 2);
-+	else if (off >= sizeof(struct user))
-+		return -EIO;
- 
- 	return put_user(tmp, ret);
- }
 -- 
 1.7.4.1
