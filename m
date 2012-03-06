@@ -1,52 +1,58 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 05 Mar 2012 16:32:21 -0800
-Subject: [PATCHv3 0/6] ARM: OMAP3PLUS: IO daisychain support fixes
-In-Reply-To: <1330525621-29836-1-git-send-email-t-kristo@ti.com> (Tero
- Kristo's message of "Wed, 29 Feb 2012 16:26:55 +0200")
-References: <1330525621-29836-1-git-send-email-t-kristo@ti.com>
-Message-ID: <877gyyin6y.fsf@ti.com>
+Date: Mon, 05 Mar 2012 16:33:31 -0800
+Subject: [PATCHv3 1/4] ARM: OMAP4: suspend: Program all domains to
+ retention
+In-Reply-To: <1330529106-10423-2-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Wed, 29 Feb 2012 17:25:03 +0200")
+References: <1330529106-10423-1-git-send-email-t-kristo@ti.com>
+ <1330529106-10423-2-git-send-email-t-kristo@ti.com>
+Message-ID: <871up6in50.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tero Kristo <t-kristo@ti.com> writes:
 
-> Hi,
+> From: Rajendra Nayak <rnayak@ti.com>
 >
-> The previous version of this set was sent by Vishwanath BS, but as he
-> is busy with other stuff, I am taking over.
+> Remove the FIXME's in the suspend sequence since
+> we now intend to support system level RET support.
 >
-> Some basic info about this set based on comments received on set v2.
-> IO chain is now enabled always, and a re-trigger for the chain is
-> done during hwmod enable / disable. This means that IO chain is always
-> armed according to the latest pad specific WAKE_ENABLE setting, and
-> if it is modified, the IO chain needs to be re-armed (thus the hooks
-> within omap_hwmod code.) Having IO chain armed all the time allows us
-> to receive IO event interrupts even during non-sleep states if the
-> corresponding hardware module is disabled, and is unable to detect any
-> IO activity itself.
->
-> Version 3 contains the following changes:
->
-> - global: renamed *_trigger_wuclk_ctrl funcs as *_trigger_io_chain
-> - patch 3: added trigger WUCLKIN disable at the end of omap4_trigger_io_chain
->   (fix pulled from the omap4 core retention set)
-> - patch 5: added function pointer for using machine specific io_chain trigger
->   function, initialized during boot
-> - patch 7 dropped as the support capability for omap3 is now handled as
->   part of patch 5 init
->
-> Tested on omap3 beagle + omap4 blaze boards. Suspend / resume works, and
-> hwmod_io interrupts are generated. Omap4 was tested with the core retention
-> support set.
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
+So this is the only patch in this series that is still needed.  However...
 
-I also tested this on 3430/n900 and verified IO wakeups are working as
-expected.
+It doesn't seem like this all by itself is ready for mainline as we'll
+suddenly start putting all powerdomains in retention without any
+additional support.
 
-Tested-by: Kevin Hilman <khilman@ti.com>
+I guess at a minimum it needs working IO wakeup support from the IO
+daisy chain series.  Are there other dependencies here?
 
-Paul, as discussed on IRC, when you're OK with it, this can go through
-your queue since it's mostly PRM core code.
+If not, I can queue this when Paul is ready to merge the IO wakeup
+stuff.
 
 Kevin
+
+> ---
+>  arch/arm/mach-omap2/pm44xx.c |    6 ------
+>  1 files changed, 0 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index c264ef7..1ab30a3 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -151,12 +151,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+>  	if (!strncmp(pwrdm->name, "cpu", 3))
+>  		return 0;
+>  
+> -	/*
+> -	 * FIXME: Remove this check when core retention is supported
+> -	 * Only MPUSS power domain is added in the list.
+> -	 */
+> -	if (strcmp(pwrdm->name, "mpu_pwrdm"))
+> -		return 0;
+>  
+>  	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
+>  	if (!pwrst)
