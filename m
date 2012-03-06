@@ -1,26 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 6 Mar 2012 11:18:46 -0300
-Subject: [PATCH v3] ARM : mx35: 3ds-board: add framebuffer device
-In-Reply-To: <1320401632-21444-1-git-send-email-b39297@freescale.com>
-References: <1320401632-21444-1-git-send-email-b39297@freescale.com>
-Message-ID: <CAOMZO5DYO2xCeHTAr=rVtO2PD8VhxQm2u5TtWUU2fBdB5K5NxA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Mar 2012 14:17:45 +0000
+Subject: [PATCH v4] lpc32xx: Added ethernet driver: smp_wmb()
+In-Reply-To: <1331042608.2347.1.camel@bwh-desktop>
+References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
+ <1330987524.2538.61.camel@bwh-desktop> <4F55EA6D.3070602@antcom.de>
+ <1331042608.2347.1.camel@bwh-desktop>
+Message-ID: <20120306141745.GA15201@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Tue, Mar 06, 2012 at 02:03:28PM +0000, Ben Hutchings wrote:
+> On Tue, 2012-03-06 at 11:43 +0100, Roland Stigge wrote:
+> > On 03/05/2012 11:45 PM, Ben Hutchings wrote:
+> > >> +	/* Clear and enable interrupts */
+> > >> +	writel(0xFFFF, LPC_ENET_INTCLEAR(pldat->net_base));
+> > >> +	lpc_eth_enable_int(pldat->net_base);
+> > >> +
+> > >> +	/* Get the next TX buffer output index */
+> > >> +	pldat->num_used_tx_buffs = 0;
+> > >> +	pldat->last_tx_idx =
+> > >> +		readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
+> > > 
+> > > Doesn't this need to be done *before* enabling interrupts?  Also, I
+> > > think you need an smp_wmb() so that the interrupt handler is guaranteed
+> > > to see all these writes.
+> > 
+> > Do you mean _one_ smp_wmb() directly after lpc_eth_enable_int() (which
+> > I'm moving behind the above code?
+> 
+> The sequence should be
+> 
+> 	pldat->state = values...;
+> 	smp_wmb();
+> 	enable_interrupts();
 
-On Fri, Nov 4, 2011 at 8:13 AM, wu guoxing <b39297@freescale.com> wrote:
-> This patch adds framebuffer support for freescale mx35 3ds board
->
-> Signed-off-by: Wu Guoxing <b39297@freescale.com>
-> ---
-> Changes since v2:
-> ? ? ? ?1. use gpio_set_value_cansleep instead of gpio_set_value
-> Changes since v1:
-> ? ? ? ?1. use gpio driver for mc9s08dz60
+Is this correct?
 
-Could this one be applied now?
-
-Regards,
-
-Fabio Estevam
+"SMP BARRIER PAIRING" and "EXAMPLES OF MEMORY BARRIER SEQUENCES" in
+Documentation/memory-barriers.txt suggest that there should be some kind
+of pairing with smp_wmb() to ensure correctness.
