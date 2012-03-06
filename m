@@ -1,77 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Mar 2012 16:37:44 +0000
-Subject: [GIT PULL] arm-soc bug fixes
-Message-ID: <201203061637.45150.arnd@arndb.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 06 Mar 2012 11:51:07 -0500 (EST)
+Subject: [PATCH] ARM: remove ixp2000 platform
+In-Reply-To: <201203061412.00073.arnd@arndb.de>
+References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
+ <201202281945.39419.arnd@arndb.de>
+ <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
+ <201203061412.00073.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, 6 Mar 2012, Arnd Bergmann wrote:
 
-Here are all the fixes I got after sending the last pull request.
-These fix mostly regressions on exynos, at91, pxa and ep93xx.
-They are available in the 'fixes' branch or the 'fixes-3.3-rc7'
-tag.
+> On Tuesday 06 March 2012, Nicolas Pitre wrote:
+> > FYI, here's a snippet of a conversation I just had with Lennert on IRC 
+> > today:
+> > 
+> > 13:05 < nico> do you still care about ixp2000?
+> > 13:22 < lennert> not really, no
+> > 13:58 < nico> do you think we could remove it from the kernel tree?
+> > 14:01 < lennert> go for it, and remove ixp23xx too while you're at it
+> 
+> Ah, good to know that Lennert is actually still alive somewhere.
+> 
+> And removing ixp2xxx in 3.5 will certainly help us, too. 
+> 
+> Interestingly, that leaves ixp4xx as the only big-endian ARM platform.
+> I believe that ixp4xx is still being actively used quite a bit, but does
+> that include the big-endian ones? There is no immediate reason why we
+> would want to drop support for big-endian, but if it's not used at all,
+> that would be an interesting cleanup opportunity.
 
-	Arnd
+The NSLU2 is (was) a quite popular NAS device and it is used in big 
+endian by default.
 
-The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+The BE support isn't getting in the way of anything, so there is no 
+reason to remove it, even if it isn't being used much.
 
-  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-3.3-rc7
-
-Arnd Bergmann (3):
-      Merge branch 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
-      Merge branch 'v3.3-samsung-fixes-4' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-      Merge branch 'fixes' of git://github.com/hzhuang1/linux into fixes
-
-Bartlomiej Zolnierkiewicz (1):
-      ARM: EXYNOS: fix touchscreen IRQ setup on Universal C210 board
-
-Gusakov Andrey (1):
-      ARM: S3C24XX: DMA resume regression fix
-
-H Hartley Sweeten (1):
-      ARM: ep93xx: convert vision_ep9307 to MULTI_IRQ_HANDLER
-
-Haojian Zhuang (3):
-      ARM: pxa: add dummy clock for pxa25x and pxa27x
-      ARM: pxa: remove duplicated registeration on pxa-gpio
-      ARM: pxa: fix invalid mfp pin issue
-
-Heiko Stuebner (1):
-      ARM: S3C24XX: Fix restart on S3C2442
-
-Joonyoung Shim (1):
-      ARM: SAMSUNG: Fix memory size for hsotg
-
-Nicolas Ferre (2):
-      ARM: at91/dma: remove platform data from DMA controller
-      ARM: at91/dma: DMA controller registering with DT support
-
- arch/arm/mach-at91/at91sam9g45_devices.c   |   19 ++++++++++---------
- arch/arm/mach-at91/at91sam9rl_devices.c    |    8 +-------
- arch/arm/mach-ep93xx/vision_ep9307.c       |    2 ++
- arch/arm/mach-exynos/mach-universal_c210.c |    2 ++
- arch/arm/mach-pxa/generic.h                |    1 -
- arch/arm/mach-pxa/mfp-pxa2xx.c             |    7 +++++++
- arch/arm/mach-pxa/pxa25x.c                 |    2 +-
- arch/arm/mach-pxa/pxa27x.c                 |    2 +-
- arch/arm/mach-pxa/pxa3xx.c                 |    1 -
- arch/arm/mach-pxa/pxa95x.c                 |    1 -
- arch/arm/mach-s3c2440/common.h             |    2 +-
- arch/arm/mach-s3c2440/mach-anubis.c        |    2 +-
- arch/arm/mach-s3c2440/mach-at2440evb.c     |    2 +-
- arch/arm/mach-s3c2440/mach-gta02.c         |    2 +-
- arch/arm/mach-s3c2440/mach-mini2440.c      |    2 +-
- arch/arm/mach-s3c2440/mach-nexcoder.c      |    2 +-
- arch/arm/mach-s3c2440/mach-osiris.c        |    2 +-
- arch/arm/mach-s3c2440/mach-rx1950.c        |    2 +-
- arch/arm/mach-s3c2440/mach-rx3715.c        |    2 +-
- arch/arm/mach-s3c2440/mach-smdk2440.c      |    2 +-
- arch/arm/mach-s3c2440/s3c2440.c            |   13 -------------
- arch/arm/mach-s3c2440/s3c244x.c            |   11 +++++++++++
- arch/arm/plat-s3c24xx/dma.c                |    2 +-
- arch/arm/plat-samsung/devs.c               |    2 +-
- 24 files changed, 47 insertions(+), 46 deletions(-)
+Nicolas
