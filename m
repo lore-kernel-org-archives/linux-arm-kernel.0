@@ -1,32 +1,27 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 6 Mar 2012 14:08:12 +0800
-Subject: [GIT PULL][v3.4] pull request on arch-pxa for regulator branch
-Message-ID: <CAN1soZxJO8sGZwq5LhuEOxt3uEN=s1cAOSXfbR8L5r8Hpc+t-w@mail.gmail.com>
+Date: Tue, 6 Mar 2012 14:10:57 +0800
+Subject: [GIT revert][v3.4] revert 43de6a7dd in pxa/board branch
+Message-ID: <CAN1soZzOSXbWMcJLGPyTqz1+BHHP9V=TjkM9z5+Vu75+BfwwqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-Please help to pull these from arch-pxa tree.
+Could you help to revert this commit in your pxa/board branch? I
+attach the log information in below. Without this patch, gpio function
+can't work in PXA25x/PXA27x. So I need to move them into fixes branch.
 
-The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+Best Regards
+Haojian
 
-  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+commit 43de6a7dda6e9a7345e218e688f2092f991126f0
+Author: Haojian Zhuang <haojian.zhuang@marvell.com>
+Date:   Tue Feb 28 10:57:48 2012 +0800
 
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git regulator
+    ARM: pxa: add dummy clock for pxa25x and pxa27x
 
-Heiko St?bner (2):
-      pxa: magician/hx4700: Convert to gpio-regulator from bq24022
-      regulator: Remove bq24022 regulator driver
+    gpio-pxa driver is shared among arch-pxa and arch-mmp. Clock is the
+    essential component on pxa3xx/pxa95x and arch-mmp. So we need to
+    define dummy clock in pxa25x/pxa27x instead.
 
- arch/arm/configs/magician_defconfig |    2 +-
- arch/arm/mach-pxa/hx4700.c          |   33 ++++++--
- arch/arm/mach-pxa/magician.c        |   33 ++++++--
- drivers/regulator/Kconfig           |    8 --
- drivers/regulator/Makefile          |    1 -
- drivers/regulator/bq24022.c         |  162 -----------------------------------
- include/linux/regulator/bq24022.h   |   24 -----
- 7 files changed, 55 insertions(+), 208 deletions(-)
- delete mode 100644 drivers/regulator/bq24022.c
- delete mode 100644 include/linux/regulator/bq24022.h
+    Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
