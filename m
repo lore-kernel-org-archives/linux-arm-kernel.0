@@ -1,53 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 6 Mar 2012 18:53:33 +0100
-Subject: [RFC 00/14] Generic clk for Orion platforms.
-In-Reply-To: <20120306172341.GU5050@titan.lakedaemon.net>
-References: <1331015471-28872-1-git-send-email-andrew@lunn.ch>
- <20120306155840.GS5050@titan.lakedaemon.net>
- <20120306161743.GI24858@lunn.ch>
- <20120306172341.GU5050@titan.lakedaemon.net>
-Message-ID: <20120306175333.GA16608@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Mar 2012 17:58:53 +0000
+Subject: [PATCH 6/6] ARM: mm: truncate memory banks to fit in 4GB space
+ for classic MMU
+In-Reply-To: <4F565230.6030800@ru.mvista.com>
+References: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
+ <1331052846-19144-7-git-send-email-will.deacon@arm.com>
+ <4F565230.6030800@ru.mvista.com>
+Message-ID: <20120306175853.GB17518@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > You missed an important point. No driver has claimed these, but u-boot
-> > has turned them on.
-> 
-> This sounds like a bug in u-boot.
+On Tue, Mar 06, 2012 at 06:06:40PM +0000, Sergei Shtylyov wrote:
+> Hello.
 
-Is it? Even if it is, we have to live with it. Otherwise we introduce
-a regression, which is a big no-no. Also, how many users know how to
-upgrade u-boot? I don't have the necessary JTAG setup for my boxes, so
-i'm not going to risk bricking them by trying to upgrade u-boot.
+Hi Sergei,
 
-> Until that happens, could we walk across kirkwood_clks[] in
-> kirkwood_clock_gate() to determine what is in use?  eg:
+> On 03/06/2012 07:54 PM, Will Deacon wrote:
 > 
-> #########
-> curr = readl(CLOCK_GATING_CTRL);
-> ...
-> used = CGC_DUNIT | CGC_RESERVED;
+> > If a bank of memory spanning the 4GB boundary is added on a !CONFIG_LPAE
+> > kernel then we will hang early during boot since the memory bank will
+> > have wrapped around to zero.
 > 
-> for (i = 0; i < ARRAY_SIZE(kirkwood_clks); i++) {
-> 	if (kirkwood_clks[i]->enable_count)
-> 		used |= kirkwood_clks[i]->/*PFM*/->mask;
-> }
+> > This patch truncates memory banks for !LPAE configurations when the end
+> > address is not representable in 32 bits.
 > 
-> /* disable anything in curr, but not in used */
-> if (CGC_SATA0 & (curr & ~used)) {
-> 	/* disable sata0 logic */
-> }
+> > Signed-off-by: Will Deacon<will.deacon@arm.com>
+> > ---
+> >   arch/arm/kernel/setup.c |   11 ++++++++++-
+> >   1 files changed, 10 insertions(+), 1 deletions(-)
 > 
-> ...
-> #########
+> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > index a255c39..aeaa048 100644
+> > --- a/arch/arm/kernel/setup.c
+> > +++ b/arch/arm/kernel/setup.c
+> > @@ -521,7 +521,16 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
+> >   	 */
+> >   	size -= start&  ~PAGE_MASK;
+> >   	bank->start = PAGE_ALIGN(start);
+> > -	bank->size  = size&  PAGE_MASK;
+> > +
+> > +#ifndef CONFIG_LPAE
+> > +	if (bank->start + size<  bank->start) {
+> > +		printk(KERN_CRIT "Truncating memory at 0x%08llx to fit in "
+> > +			"32-bit physical address space\n", (long long)start);
+> > +		size = ULONG_MAX - bank->start;
+> 
+>     I think you forgot to add one here.
 
-NO! clk is opaque. You should not be accessing members inside it. The
-clk struct members are not even declared when using the normal include
-files.
+No, I deliberately omit the last page because otherwise we end up with the
+end address of the bank being calculated as 0, which leads to boot failure.
 
-Probably the short term solution is to simply add a deliberate
-regression, and not turn them off. Then help Mike implement generic
-code to handle this. We probably have three months to do this, since i
-doubt the clock code is going to be part of the next merge.
-
-      Andrew
+Will
