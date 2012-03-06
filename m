@@ -1,23 +1,52 @@
-From: jason@lakedaemon.net (Jason)
-Date: Tue, 6 Mar 2012 09:44:15 -0500
-Subject: revert merge commit de68f28 in for-next?
-Message-ID: <20120306144415.GR5050@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Mar 2012 15:02:07 +0000
+Subject: [PATCH v3 1/7] serial: pxa: add OF support
+In-Reply-To: <1331001730-13429-1-git-send-email-haojian.zhuang@marvell.com>
+References: <201203051255.37311.arnd@arndb.de>
+ <1331001730-13429-1-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <201203061502.08097.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Tuesday 06 March 2012, Haojian Zhuang wrote:
 
-As much as I'd love to see this go in right now, I don't think it's the
-correct version (from Mar 2).  This is the merge commit in question:
+> @@ -51,7 +54,7 @@ struct uart_pxa_port {
+>  	unsigned char           mcr;
+>  	unsigned int            lsr_break_flag;
+>  	struct clk		*clk;
+> -	char			*name;
+> +	char			name[PXA_NAME_LEN];
+>  };
 
-de68f2847fa759df54e9d8eb0013a0f8ea959c22
+This looks better now
 
-It's missing several fixes, #ifdef CONFIG_OF around struct of_device_id,
-marvell -> mrvl in compatible properties, etc.
+>  static inline unsigned int serial_in(struct uart_pxa_port *up, int offset)
+> @@ -781,6 +784,33 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
+>  };
+>  #endif
+>  
+> +#ifdef CONFIG_OF
+> +static struct of_device_id serial_pxa_dt_ids[] = {
+> +	{ .compatible = "mrvl,pxa-uart", },
+> +	{ .compatible = "mrvl,mmp-uart", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
+> +#endif
 
-Would you like me to submit a new pull request, or base my fixes off of
-this and submit new patches?
+If you do this, you have to use of_match_ptr for referencing
+serial_pxa_dt_ids or you will get a link error when CONFIG_OF is
+disabled.
 
-Thanks and sorry for the confusion,
+> @@ -850,6 +876,7 @@ static int serial_pxa_remove(struct platform_device *dev)
+>  	platform_set_drvdata(dev, NULL);
+>  
+>  	uart_remove_one_port(&serial_pxa_reg, &sport->port);
+> +	kfree(sport->name);
+>  	clk_put(sport->clk);
+>  	kfree(sport);
+>  
 
-Jason.
+And this must be removed now that sport->name is allocated as part of sport.
+
+	Arnd
