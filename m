@@ -1,67 +1,101 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Tue,  6 Mar 2012 23:55:04 +0100
-Subject: [PATCH v2] ARM: OMAP: WiLink platform data for the PandaBoard
-Message-ID: <1331074504-22683-1-git-send-email-mgherzan@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Mar 2012 23:21:38 +0000
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20120306232138.GF15201@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "uim" deamon requires sysfs entries that are filled in using
-this platform data.
+On Wed, Feb 29, 2012 at 04:04:22PM +0100, Marek Szyprowski wrote:
+> +static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+> +		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +		    struct dma_attrs *attrs)
+> +{
+> +	struct arm_vmregion *c;
+> +
+> +	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
+> +	c = arm_vmregion_find(&consistent_head, (unsigned long)cpu_addr);
 
-Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
----
- arch/arm/mach-omap2/board-omap4panda.c |   14 ++++++++++++--
- include/linux/ti_wilink_st.h           |    2 ++
- 2 files changed, 14 insertions(+), 2 deletions(-)
+What protects this against other insertions/removals from the list?
 
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index b1d74d6..339e781 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -27,6 +27,7 @@
- #include <linux/i2c/twl.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
-+#include <linux/ti_wilink_st.h>
- #include <linux/wl12xx.h>
- 
- #include <mach/hardware.h>
-@@ -56,12 +57,21 @@
- #define HDMI_GPIO_HPD  63 /* Hotplug detect */
- 
- /* wl127x BT, FM, GPS connectivity chip */
--static int wl1271_gpios[] = {46, -1, -1};
-+static struct ti_st_plat_data wilink_platform_data = {
-+	.nshutdown_gpio	= 46,
-+	.dev_name	= "/dev/ttyO1",
-+	.flow_cntrl	= 1,
-+	.baud_rate	= 3000000,
-+	.chip_enable	= NULL,
-+	.suspend	= NULL,
-+	.resume		= NULL,
-+};
-+
- static struct platform_device wl1271_device = {
- 	.name	= "kim",
- 	.id	= -1,
- 	.dev	= {
--		.platform_data	= &wl1271_gpios,
-+		.platform_data	= &wilink_platform_data,
- 	},
- };
- 
-diff --git a/include/linux/ti_wilink_st.h b/include/linux/ti_wilink_st.h
-index 2ef4385..3ca0269 100644
---- a/include/linux/ti_wilink_st.h
-+++ b/include/linux/ti_wilink_st.h
-@@ -25,6 +25,8 @@
- #ifndef TI_WILINK_ST_H
- #define TI_WILINK_ST_H
- 
-+#include <linux/skbuff.h>
-+
- /**
-  * enum proto-type - The protocol on WiLink chips which share a
-  *	common physical interface like UART.
--- 
-1.7.9.1
+> +
+> +	if (c) {
+> +		struct page **pages = c->priv;
+> +
+> +		unsigned long uaddr = vma->vm_start;
+> +		unsigned long usize = vma->vm_end - vma->vm_start;
+> +		int i = 0;
+> +
+> +		do {
+> +			int ret;
+> +
+> +			ret = vm_insert_page(vma, uaddr, pages[i++]);
+> +			if (ret) {
+> +				pr_err("Remapping memory, error: %d\n", ret);
+> +				return ret;
+> +			}
+> +
+> +			uaddr += PAGE_SIZE;
+> +			usize -= PAGE_SIZE;
+> +		} while (usize > 0);
+> +	}
+> +	return 0;
+> +}
+> +
+> +/*
+> + * free a page as defined by the above mapping.
+> + * Must not be called with IRQs disabled.
+> + */
+> +void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+> +			  dma_addr_t handle, struct dma_attrs *attrs)
+> +{
+> +	struct arm_vmregion *c;
+> +	size = PAGE_ALIGN(size);
+> +
+> +	c = arm_vmregion_find(&consistent_head, (unsigned long)cpu_addr);
+
+What protects this against other insertions/removals from the list?
+
+> +	if (c) {
+> +		struct page **pages = c->priv;
+> +		__dma_free_remap(cpu_addr, size);
+> +		__iommu_remove_mapping(dev, handle, size);
+> +		__iommu_free_buffer(dev, pages, size);
+> +	}
+> +}
+> +
+> +/*
+> + * Map a part of the scatter-gather list into contiguous io address space
+> + */
+> +static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+> +			  size_t size, dma_addr_t *handle,
+> +			  enum dma_data_direction dir)
+> +{
+> +	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+> +	dma_addr_t iova, iova_base;
+> +	int ret = 0;
+> +	unsigned int count;
+> +	struct scatterlist *s;
+> +
+> +	size = PAGE_ALIGN(size);
+> +	*handle = ARM_DMA_ERROR;
+> +
+> +	iova_base = iova = __alloc_iova(mapping, size);
+> +	if (iova == ARM_DMA_ERROR)
+> +		return -ENOMEM;
+> +
+> +	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s))
+> +	{
+> +		phys_addr_t phys = page_to_phys(sg_page(s));
+> +		unsigned int len = PAGE_ALIGN(s->offset + s->length);
+> +
+> +		if (!arch_is_coherent())
+> +			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
+> +
+> +		ret = iommu_map(mapping->domain, iova, phys, len, 0);
+
+Dealing with phys addresses on one part and pages + offset + length
+in a different part doesn't look like a good idea.  Why can't there
+be some consistency?
