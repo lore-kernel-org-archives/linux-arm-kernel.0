@@ -1,36 +1,45 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 6 Mar 2012 20:17:12 +0100
-Subject: [PATCH v3 02/10] pwm: Allow chips to support multiple PWMs.
-In-Reply-To: <201203061538.11709.arnd@arndb.de>
-References: <1329923841-32017-1-git-send-email-thierry.reding@avionic-design.de>
- <20120223160420.GA9899@avionic-0098.mockup.avionic-design.de>
- <20120303193249.GA22021@avionic-0098.mockup.avionic-design.de>
- <201203061538.11709.arnd@arndb.de>
-Message-ID: <20120306191712.GB13882@avionic-0098.mockup.avionic-design.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 06 Mar 2012 14:45:23 -0500 (EST)
+Subject: [RFC 00/14] Generic clk for Orion platforms.
+In-Reply-To: <20120306172341.GU5050@titan.lakedaemon.net>
+References: <1331015471-28872-1-git-send-email-andrew@lunn.ch>
+ <20120306155840.GS5050@titan.lakedaemon.net> <20120306161743.GI24858@lunn.ch>
+ <20120306172341.GU5050@titan.lakedaemon.net>
+Message-ID: <alpine.LFD.2.02.1203061439190.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann wrote:
-> On Saturday 03 March 2012, Thierry Reding wrote:
-> > I turns out that this is not as easy to do as I thought. The problem is that
-> > if I remove the pwmchip_find() from the core and move the lookup
-> > functionality into the OF support code I no longer have access to the list of
-> > PWM chips. So I guess it will have to stay in to keep things encapsulated
-> > properly.
+On Tue, 6 Mar 2012, Jason wrote:
+> On Tue, Mar 06, 2012 at 05:17:43PM +0100, Andrew Lunn wrote:
+> > On Tue, Mar 06, 2012 at 10:58:40AM -0500, Jason wrote:
+> > > I'm assuming the driver(s) will increment a reference, so when it
+> > > reaches zero, the framework would call a clk_gate hook.
+> > 
+> > You missed an important point. No driver has claimed these, but u-boot
+> > has turned them on.
 > 
-> Well, or you move everything into the one file. If you have the device tree
-> support function in the same file as everything else, you no longer need
-> the additional complexity.
+> This sounds like a bug in u-boot.
+> 
+> > So we want linux to turn off all clocks for which
+> > there is no driver using them, in order to save power.
+> > kirkwood_clk_ctrl is dual purpose. It turns on needed clocks, but it
+> > also turns off unneeded clocks.
+> 
+> This is creating a lot of complexity where the real answer seems to be
+> to get u-boot to shutoff all peripheral clocks before handing over
+> control to linux.
 
-Okay, I think it makes the most sense to move all of the OF support code into
-drivers/pwm/core.c. That way we can also check off the discussion about the
-OF support code's location.
+No.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/09ec7a2e/attachment.sig>
+Yes, u-Boot might be wrong.  But the kernel should always distrust as 
+much as possible from the bootloader.  Instead of presuming some initial 
+state from the bootloader, it is best to simply set that state up front.
+
+The fewer ties you have with any bootloaders, the fewer bugs you'll have 
+in the end.  Otherwise you might enter into a game of requiring a 
+specific version of a specific bootloader to go with a given kernel, and 
+that is far more complex to deal with than the complexity you are 
+referring to above.
+
+
+Nicolas
