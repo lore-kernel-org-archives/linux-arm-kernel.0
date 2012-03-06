@@ -1,32 +1,24 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Tue, 06 Mar 2012 04:13:50 -0800
-Subject: [PATCH v4] lpc32xx: Added ethernet driver
-In-Reply-To: <4F55D099.5070006@antcom.de>
-References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
- <1330987524.2538.61.camel@bwh-desktop> <4F55D099.5070006@antcom.de>
-Message-ID: <1331036030.2474.40.camel@edumazet-laptop>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 6 Mar 2012 12:14:30 +0000
+Subject: [PATCH 2/2] regulator: Remove bq24022 regulator driver
+In-Reply-To: <201203021357.44770.heiko@sntech.de>
+References: <201203021355.21669.heiko@sntech.de>
+ <201203021357.44770.heiko@sntech.de>
+Message-ID: <20120306121429.GL19635@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 06 mars 2012 ? 09:53 +0100, Roland Stigge a ?crit :
-
-> Sounds reasonable, and will do it.
+On Fri, Mar 02, 2012 at 01:57:44PM +0100, Heiko St?bner wrote:
+> The bq24022 driver is just a specialised form of a gpio-regulator.
 > 
-> However, I implemented it from the example of
-> drivers/net/ethernet/via/via-velocity.c:velocity_poll() - is there a
-> good reason for doing it that way in the velocity driver or is it done
-> incorrectly there, also?
-> 
+> As all former users of it now use the gpio-regulator directly, there
+> is no need to keep it around.
 
-Its done in a non efficient way.
-
-It works as is, but its not the right thing to do.
-The NAPI port was very minimal on via-velocity it seems.
-
-A better way is to hold no locks in the RX handler, allowing calls to
-netif_receive_skb() [ and potential calls to xmit while handling this
-incoming skbs ]
-
-Problem of saying "we dont expect to be SMP anyway", is that this let
-reference material for future drivers that will copy/paste the code,
-then experience performance problems.
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/46fc976f/attachment.sig>
