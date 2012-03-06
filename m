@@ -1,91 +1,124 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 6 Mar 2012 15:39:02 +0800
-Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
-In-Reply-To: <20120305144601.GQ3224@opensource.wolfsonmicro.com>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
- <20120305144601.GQ3224@opensource.wolfsonmicro.com>
-Message-ID: <20120306073900.GP16232@S2101-09.ap.freescale.net>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Tue, 06 Mar 2012 17:31:24 +0900
+Subject: [PATCH v10 0/3] iommu/exynos: Add IOMMU/System MMU driver for Samsung
+ Exynos
+Message-ID: <001f01ccfb73$84a2bbd0$8de83370$%cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 02:46:01PM +0000, Mark Brown wrote:
-> On Mon, Mar 05, 2012 at 10:31:05PM +0800, Shawn Guo wrote:
-> 
-> > +	ret = snd_soc_dai_set_fmt(rtd->codec_dai, SND_SOC_DAIFMT_I2S |
-> > +						  SND_SOC_DAIFMT_NB_NF |
-> > +						  SND_SOC_DAIFMT_CBM_CFM);
-> > +	if (ret) {
-> > +		dev_err(dev, "could not set codec driver audio format\n");
-> > +		return ret;
-> > +	}
-> 
-> This you can just set in the card struct, no need for explicit code at
-> all.
-> 
-Yes, I just tried.  It also works but a little bit differently.  We
-only set_fmt for codec_dai here, while ASoC core will set_fmt for both
-codec_dai and cpu_dai if dai_link->dai_fmt is set.  However, the
-fsl_ssi does not provide .set_fmt implementation, and consequently we
-will see error message below, which does not impact functionality
-though.
+These patches are successfully compiled
+in linux-samsung.git/for-next branch
+You can find  the git repo. In
+http://git.kernel.org/?p=linux/kernel/git/kgene/linux-samsung.git;a=summary
 
-  fsl-ssi-dai 83fcc000.ssi: Failed to set DAI format: -22
+Changes since v9:
+- Split the first patch into 2 patches.
+   One removes System MMU driver from arch/arm/plat- tree and
+   the other modifies and adds platform device definitions in
+   arch/arm/mach tree
+- Some bug fixes
+- Change "gsc" for Exynos4 to "fimc"
 
-I hope we keep the code as it is now and improve later when fsl_ssi
-gets improved.
+Changes since v8:
+- exynos_iommu_map/unmap() just works for the page sizes
+   that System MMU supports. (Joerg's comment)
+- 1 platform device for 1 H/W though a multimedia accelerator
+   with several System MMUs attached.
+   This make controlling System MMU simpler.
+- Information between System MMU and the accelerators:
+   Shifted to accelerator's device structure from System MMU's
 
-> > +	ret = of_property_read_u32(np, "fsl,mux-int-port", &int_port);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "mux-int-port missing or invalid\n");
-> > +		return -EINVAL;
-> > +	}
-> > +	ret = of_property_read_u32(np, "fsl,mux-ext-port", &ext_port);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "mux-ext-port missing or invalid\n");
-> > +		return -EINVAL;
-> > +	}
-> 
-> It seems very odd to have namespacing on the individual property names.
-> Why are you doing that?  The properties are already defined in terms of
-> the device binding.  Though everyone else is doing it so not really a
-> problem.
-> 
-The general device tree binding practice is we'd better have a vendor
-prefix on the property name, if the property applies on specific vendor
-drivers instead of common ones across different vendors.
+Changes since v7:
+- Rebased with the recent commits of the following git branches
+  * git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git/next
+  * git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git/for-next
+- Changed magic numbers into macros
+- Setting owner of a System MMU in 'iommu' field of dev_archdata
+- Verbose message in the default fault handler
+- Some bug fixes.
 
-> > +	/*
-> > +	 * The port numbering in the hardware manual starts at 1, while
-> > +	 * the audmux API expects it starts at 0.
-> > +	 */
-> > +	int_port--;
-> > +	ext_port--;
-> 
-> Should have error checking somewhere to make sure that the user
-> remembered this.
-> 
-Because different i.MX SoC may have different internal and external
-port number, I do not think of a way to check that.  And I would not
-worry about it that much, since all the hardware documents number the
-port from 1, while device tree user/author will have to look at those
-documents for the data.
+Changes since v6:
+- Totally rewrite exynos_iommu_map() and exynos_iommu_unmap() according
+  to the change in iommu_map() and iommu_unmap().
+- Change special slab for Lv2 page table to kmalloc().
 
-> > +	imx_audmux_v2_configure_port(int_port,
-> > +			IMX_AUDMUX_V2_PTCR_SYN |
-> > +			IMX_AUDMUX_V2_PTCR_TFSEL(ext_port) |
-> > +			IMX_AUDMUX_V2_PTCR_TCSEL(ext_port) |
-> > +			IMX_AUDMUX_V2_PTCR_TFSDIR |
-> > +			IMX_AUDMUX_V2_PTCR_TCLKDIR,
-> > +			IMX_AUDMUX_V2_PDCR_RXDSEL(ext_port));
-> 
-> I'm not sure we've really gained much from converting to a platform
-> driver given that the device just registers something globally...
+Changes since v5:
+- Relation between device and a domain become n:1 (Joerg's comment)
+- Implements iommu_commit(). --> Removed
 
-Converting audmux to a platform driver does not change anything about
-that.  It makes device tree support easier, and gets the audmux users
-(imx machine drivers) stay away from including <mach/audmux.h>.
+Changes since v4:
+- exynos_iommu_unmap()returns unmapped size in page order
+  (Ohad Ben-Cohen's comment)
+- Fixed typo error of resource names
+- Fixed missing #include<mach/sysmmu.h>
+  in arch/arm/mach-exynos4/mach-armlex4210.c
 
--- 
-Regards,
-Shawn
+Changes since v3:
+- Used DEFINE_RES_MEM and DEFINE_RES_IRQ macros
+  to define resources of System MMU (Russell King's comment)
+- Fixed removal of CONFIG_S5P_SLEEP definition
+ (Sylwester Nawrocki's comment)
+
+Changes since v2:
+- Add lock for System MMU private data.
+  And fixes the following problems pointed by Joerg Rodel:
+- Fix wrong argument to kmalloc() and get_free_pages()
+- Merged patches into 2 due to bisectability
+
+Changes since v1:
+Fixes of the following problems pointed by Russell King.:
+ - Missing unlocking a spinlock in exynos_iommu_attach_dev().
+ - atomic_t -> int in sysmmu_drvdata.activations
+ - sysmmu_platdata -> sysmmu_drvdata
+ - Change in error messages in irq handler
+ - Removed casting in format of error message
+ - omap_iommu_ops -> exynos_iommu_ops in the last patch
+
+Patch Summary:
+[PATCH v10 1/3] S5P: SYSMMU: Remove System MMU device driver definitions
+[PATCH v10 2/3] ARM: EXYNOS: Change System MMU platform device definitions
+[PATCH v10 3/3] iommu/exynos: Add iommu driver for Exynos Platforms
+
+The first patch removes the existing System MMU device driver
+which does not conform to IOMMU API set prepared in the kernel.
+ 
+The second patch enhances System MMU platform device definition:
+ - Removed System MMU for MDMA0 in TOP block because it is not
+   used. Use MDMA2 in LCD block.
+ - Removed System MMU ID. Instead, a System MMU is bound to a device
+   that the System MMU is dedicated during machin initialization.
+   If a device driver wants to handle System MMU, it must bind its
+   device with System MMU with sysmmu_set_owner().
+ - clkdev
+ - Added support for Exynos5
+
+The last patch implements IOMMU API:
+- New System MMU device driver that fully implements IOMMU API.
+
+Thanks to Kyungmin Park and Marek Szyprowski for kind review.
+
+Diffstats:
+ arch/arm/mach-exynos/Kconfig                    |   11 +-
+ arch/arm/mach-exynos/Makefile                   |    2 +-
+ arch/arm/mach-exynos/clock-exynos4.c            |   87 +-
+ arch/arm/mach-exynos/clock-exynos4.h            |    2 +
+ arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
+ arch/arm/mach-exynos/clock-exynos4212.c         |   28 +-
+ arch/arm/mach-exynos/clock-exynos5.c            |   90 ++
+ arch/arm/mach-exynos/dev-sysmmu.c               |  457 ++++++-----
+ arch/arm/mach-exynos/include/mach/irqs.h        |  179 ++--
+ arch/arm/mach-exynos/include/mach/map.h         |   38 +
+ arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
+ arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 -
+ arch/arm/mach-exynos/include/mach/sysmmu.h      |   84 +-
+ arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
+ arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
+ arch/arm/plat-s5p/Kconfig                       |    8 -
+ arch/arm/plat-s5p/Makefile                      |    1 -
+ arch/arm/plat-s5p/sysmmu.c                      |  313 -------
+ arch/arm/plat-samsung/include/plat/devs.h       |    1 -
+ arch/arm/plat-samsung/include/plat/sysmmu.h     |   95 --
+ drivers/iommu/Kconfig                           |   21 +
+ drivers/iommu/Makefile                          |    1 +
+ drivers/iommu/exynos-iommu.c                    | 1088 +++++++++++++++++++++++
+ 23 files changed, 1726 insertions(+), 826 deletions(-)
