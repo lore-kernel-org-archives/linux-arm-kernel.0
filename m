@@ -1,136 +1,118 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  5 Mar 2012 22:02:59 -0600
-Subject: [PATCH v4 3/4] ARM: msm: use runtime ioremap hook
+Date: Mon,  5 Mar 2012 22:03:00 -0600
+Subject: [PATCH v4 4/4] ARM: iop13xx: use runtime ioremap hook
 In-Reply-To: <1331006580-3579-1-git-send-email-robherring2@gmail.com>
 References: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
  <1331006580-3579-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1331006580-3579-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1331006580-3579-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Convert msm platforms to use run-time ioremap hook instead of the compile
-time hook.
-
-According to David Brown, only the msm7201 needed the ioremap hook.
+Convert iop13xx platforms to use run-time ioremap hook instead of the
+compile time hook. The custom ioremap is still needed for 64-bit address
+handling.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Tested-by: David Brown <davidb@codeaurora.org>
-Acked-by: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-msm/board-halibut.c               |    6 ++++++
- arch/arm/mach-msm/board-trout.c                 |    6 ++++++
- arch/arm/mach-msm/include/mach/io.h             |    5 -----
- arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ++++++
- arch/arm/mach-msm/io.c                          |    8 +++-----
- 5 files changed, 21 insertions(+), 10 deletions(-)
+ arch/arm/mach-iop13xx/include/mach/io.h |    7 -------
+ arch/arm/mach-iop13xx/io.c              |   18 ++++++++++--------
+ arch/arm/mach-iop13xx/iq81340mc.c       |    1 +
+ arch/arm/mach-iop13xx/iq81340sc.c       |    1 +
+ 4 files changed, 12 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-halibut.c b/arch/arm/mach-msm/board-halibut.c
-index a60ab6d..3698a37 100644
---- a/arch/arm/mach-msm/board-halibut.c
-+++ b/arch/arm/mach-msm/board-halibut.c
-@@ -68,6 +68,11 @@ static struct platform_device *devices[] __initdata = {
+diff --git a/arch/arm/mach-iop13xx/include/mach/io.h b/arch/arm/mach-iop13xx/include/mach/io.h
+index dffb234..2a69fc0 100644
+--- a/arch/arm/mach-iop13xx/include/mach/io.h
++++ b/arch/arm/mach-iop13xx/include/mach/io.h
+@@ -26,16 +26,9 @@
+ #define __mem_isa(a) (a)
  
- extern struct sys_timer msm_timer;
- 
-+static void __init halibut_init_early(void)
-+{
-+	arch_ioremap_caller = __msm_ioremap_caller;
-+}
-+
- static void __init halibut_init_irq(void)
- {
- 	msm_init_irq();
-@@ -96,6 +101,7 @@ MACHINE_START(HALIBUT, "Halibut Board (QCT SURF7200A)")
- 	.atag_offset	= 0x100,
- 	.fixup		= halibut_fixup,
- 	.map_io		= halibut_map_io,
-+	.init_early	= halibut_init_early,
- 	.init_irq	= halibut_init_irq,
- 	.init_machine	= halibut_init,
- 	.timer		= &msm_timer,
-diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
-index 6b9b227..5414f76 100644
---- a/arch/arm/mach-msm/board-trout.c
-+++ b/arch/arm/mach-msm/board-trout.c
-@@ -43,6 +43,11 @@ static struct platform_device *devices[] __initdata = {
- 
- extern struct sys_timer msm_timer;
- 
-+static void __init trout_init_early(void)
-+{
-+	arch_ioremap_caller = __msm_ioremap_caller;
-+}
-+
- static void __init trout_init_irq(void)
- {
- 	msm_init_irq();
-@@ -96,6 +101,7 @@ MACHINE_START(TROUT, "HTC Dream")
- 	.atag_offset	= 0x100,
- 	.fixup		= trout_fixup,
- 	.map_io		= trout_map_io,
-+	.init_early	= trout_init_early,
- 	.init_irq	= trout_init_irq,
- 	.init_machine	= trout_init,
- 	.timer		= &msm_timer,
-diff --git a/arch/arm/mach-msm/include/mach/io.h b/arch/arm/mach-msm/include/mach/io.h
-index dc1b928..c6ff9bb 100644
---- a/arch/arm/mach-msm/include/mach/io.h
-+++ b/arch/arm/mach-msm/include/mach/io.h
-@@ -18,11 +18,6 @@
- 
- #define IO_SPACE_LIMIT 0xffffffff
- 
--#define __arch_ioremap __msm_ioremap
--#define __arch_iounmap __iounmap
+ extern void __iomem * __iop13xx_io(unsigned long io_addr);
+-extern void __iomem *__iop13xx_ioremap(unsigned long cookie, size_t size,
+-	unsigned int mtype);
+-extern void __iop13xx_iounmap(void __iomem *addr);
 -
--void __iomem *__msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype);
+ extern u32 iop13xx_atue_mem_base;
+ extern u32 iop13xx_atux_mem_base;
+ extern size_t iop13xx_atue_mem_size;
+ extern size_t iop13xx_atux_mem_size;
+ 
+-#define __arch_ioremap	__iop13xx_ioremap
+-#define __arch_iounmap	__iop13xx_iounmap
 -
- #define __io(a)		__typesafe_io(a)
- #define __mem_pci(a)    (a)
- 
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
-index 8af4612..152b3b7 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
-@@ -111,5 +111,11 @@
- #define MSM_AD5_PHYS          0xAC000000
- #define MSM_AD5_SIZE          (SZ_1M*13)
- 
-+#ifndef __ASSEMBLY__
-+
-+extern void __iomem *__msm_ioremap_caller(unsigned long phys_addr, size_t size,
-+					  unsigned int mtype, void *caller);
-+
-+#endif
- 
  #endif
-diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-index 578b04e..a1e7b11 100644
---- a/arch/arm/mach-msm/io.c
-+++ b/arch/arm/mach-msm/io.c
-@@ -172,8 +172,8 @@ void __init msm_map_msm7x30_io(void)
+diff --git a/arch/arm/mach-iop13xx/io.c b/arch/arm/mach-iop13xx/io.c
+index 48642e6..6dd5b49 100644
+--- a/arch/arm/mach-iop13xx/io.c
++++ b/arch/arm/mach-iop13xx/io.c
+@@ -40,8 +40,8 @@ void * __iomem __iop13xx_io(unsigned long io_addr)
  }
- #endif /* CONFIG_ARCH_MSM7X30 */
+ EXPORT_SYMBOL(__iop13xx_io);
  
--void __iomem *
--__msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
-+void __iomem *__msm_ioremap_caller(unsigned long phys_addr, size_t size,
-+				   unsigned int mtype, void *caller)
+-void * __iomem __iop13xx_ioremap(unsigned long cookie, size_t size,
+-	unsigned int mtype)
++static void __iomem *__iop13xx_ioremap_caller(unsigned long cookie,
++	size_t size, unsigned int mtype, void *caller)
  {
- 	if (mtype == MT_DEVICE) {
- 		/* The peripherals in the 88000000 - D0000000 range
-@@ -184,7 +184,5 @@ __msm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
- 			mtype = MT_DEVICE_NONSHARED;
+ 	void __iomem * retval;
+ 
+@@ -76,17 +76,14 @@ void * __iomem __iop13xx_ioremap(unsigned long cookie, size_t size,
+ 		break;
+ 	default:
+ 		retval = __arm_ioremap_caller(cookie, size, mtype,
+-				__builtin_return_address(0));
++				caller);
  	}
  
--	return __arm_ioremap_caller(phys_addr, size, mtype,
--		__builtin_return_address(0));
-+	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
+ 	return retval;
  }
--EXPORT_SYMBOL(__msm_ioremap);
+-EXPORT_SYMBOL(__iop13xx_ioremap);
+ 
+-void __iop13xx_iounmap(void __iomem *addr)
++static void __iop13xx_iounmap(volatile void __iomem *addr)
+ {
+-	extern void __iounmap(volatile void __iomem *addr);
+-
+ 	if (iop13xx_atue_mem_base)
+ 		if (addr >= (void __iomem *) iop13xx_atue_mem_base &&
+ 	 	    addr < (void __iomem *) (iop13xx_atue_mem_base +
+@@ -110,4 +107,9 @@ void __iop13xx_iounmap(void __iomem *addr)
+ skip:
+ 	return;
+ }
+-EXPORT_SYMBOL(__iop13xx_iounmap);
++
++void __init iop13xx_init_early(void)
++{
++	arch_ioremap_caller = __iop13xx_ioremap_caller;
++	arch_iounmap = __iop13xx_iounmap;
++}
+diff --git a/arch/arm/mach-iop13xx/iq81340mc.c b/arch/arm/mach-iop13xx/iq81340mc.c
+index abaee88..5c96b73 100644
+--- a/arch/arm/mach-iop13xx/iq81340mc.c
++++ b/arch/arm/mach-iop13xx/iq81340mc.c
+@@ -92,6 +92,7 @@ static struct sys_timer iq81340mc_timer = {
+ MACHINE_START(IQ81340MC, "Intel IQ81340MC")
+ 	/* Maintainer: Dan Williams <dan.j.williams@intel.com> */
+ 	.atag_offset    = 0x100,
++	.init_early     = iop13xx_init_early,
+ 	.map_io         = iop13xx_map_io,
+ 	.init_irq       = iop13xx_init_irq,
+ 	.timer          = &iq81340mc_timer,
+diff --git a/arch/arm/mach-iop13xx/iq81340sc.c b/arch/arm/mach-iop13xx/iq81340sc.c
+index 690916a..aa4dd75 100644
+--- a/arch/arm/mach-iop13xx/iq81340sc.c
++++ b/arch/arm/mach-iop13xx/iq81340sc.c
+@@ -94,6 +94,7 @@ static struct sys_timer iq81340sc_timer = {
+ MACHINE_START(IQ81340SC, "Intel IQ81340SC")
+ 	/* Maintainer: Dan Williams <dan.j.williams@intel.com> */
+ 	.atag_offset    = 0x100,
++	.init_early     = iop13xx_init_early,
+ 	.map_io         = iop13xx_map_io,
+ 	.init_irq       = iop13xx_init_irq,
+ 	.timer          = &iq81340sc_timer,
 -- 
 1.7.5.4
