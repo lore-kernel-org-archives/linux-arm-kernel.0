@@ -1,53 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Mar 2012 17:58:53 +0000
-Subject: [PATCH 6/6] ARM: mm: truncate memory banks to fit in 4GB space
- for classic MMU
-In-Reply-To: <4F565230.6030800@ru.mvista.com>
-References: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
- <1331052846-19144-7-git-send-email-will.deacon@arm.com>
- <4F565230.6030800@ru.mvista.com>
-Message-ID: <20120306175853.GB17518@mudshark.cambridge.arm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 6 Mar 2012 20:09:38 +0200
+Subject: [GIT PULL] fixing and cleaning up rpmsg/remoteproc for 3.4
+Message-ID: <CAK=WgbYsZUzTos_sXd+ZayKfPc=sxL7v0Q_==bTMh-_4XiMWiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 06:06:40PM +0000, Sergei Shtylyov wrote:
-> Hello.
+Hi Arnd,
 
-Hi Sergei,
+Please pull:
 
-> On 03/06/2012 07:54 PM, Will Deacon wrote:
-> 
-> > If a bank of memory spanning the 4GB boundary is added on a !CONFIG_LPAE
-> > kernel then we will hang early during boot since the memory bank will
-> > have wrapped around to zero.
-> 
-> > This patch truncates memory banks for !LPAE configurations when the end
-> > address is not representable in 32 bits.
-> 
-> > Signed-off-by: Will Deacon<will.deacon@arm.com>
-> > ---
-> >   arch/arm/kernel/setup.c |   11 ++++++++++-
-> >   1 files changed, 10 insertions(+), 1 deletions(-)
-> 
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index a255c39..aeaa048 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -521,7 +521,16 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
-> >   	 */
-> >   	size -= start&  ~PAGE_MASK;
-> >   	bank->start = PAGE_ALIGN(start);
-> > -	bank->size  = size&  PAGE_MASK;
-> > +
-> > +#ifndef CONFIG_LPAE
-> > +	if (bank->start + size<  bank->start) {
-> > +		printk(KERN_CRIT "Truncating memory at 0x%08llx to fit in "
-> > +			"32-bit physical address space\n", (long long)start);
-> > +		size = ULONG_MAX - bank->start;
-> 
->     I think you forgot to add one here.
+git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+rpmsg-fixes-and-more-for-3.4
 
-No, I deliberately omit the last page because otherwise we end up with the
-end address of the bank being calculated as 0, which leads to boot failure.
+To get a few rpmsg/remoteproc fixes, cleanups and some generalization
+work for 3.4.
 
-Will
+Again, I should have sent the Kconfig patch earlier in a separate pull
+request. Sorry about that.
+
+Thanks!
+Ohad.
+
+The following changes since commit e12bc14b88d44e5c1456dccb59ff58103f6c6edc:
+
+  remoteproc: s/big switch/lookup table/ (2012-02-22 18:28:49 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+rpmsg-fixes-and-more-for-3.4
+
+for you to fetch changes up to 1e3e2c7c46b2e6e90f3a26ba9be6326c00ca31e4:
+
+  remoteproc: cleanup resource table parsing paths (2012-03-06 19:14:44 +0200)
+
+----------------------------------------------------------------
+Fixing and cleaning up several remoteproc and rpmsg issues.
+
+In addition, remoteproc's resource table is converted to a collection
+of type-value members, instead of a rigid array of homogeneous structs.
+
+This enables remoteproc to support registration of generic virtio devices,
+and not only a single VIRTIO_ID_RPMSG virtio device.
+
+But perhaps more importantly, the resource table overhaul makes it possible
+to easily extend it in the future without breaking older images (simply by
+defining a new member type, while continuing to support older types).
+
+----------------------------------------------------------------
+Mark Asselstine (1):
+      rpmsg: fix build warning when dma_addr_t is 64-bit
+
+Ohad Ben-Cohen (12):
+      remoteproc: make sure we're parsing a 32bit firmware
+      remoteproc/omap: two Kconfig fixes
+      rpmsg: fix name service endpoint leak
+      rpmsg: validate incoming message length before propagating
+      rpmsg: fix published buffer length in rpmsg_recv_done
+      remoteproc: resource table overhaul
+      remoteproc: remoteproc_rpmsg -> remoteproc_virtio
+      remoteproc: safer boot/shutdown order
+      remoteproc: remove the single rpmsg vdev limitation
+      remoteproc/omap: remove the mbox_callback limitation
+      remoteproc: remove the hardcoded vring alignment
+      remoteproc: cleanup resource table parsing paths
+
+ Documentation/remoteproc.txt                       |  136 +++---
+ drivers/remoteproc/Kconfig                         |    3 +-
+ drivers/remoteproc/Makefile                        |    2 +-
+ drivers/remoteproc/omap_remoteproc.c               |   11 +-
+ drivers/remoteproc/remoteproc_core.c               |  532 ++++++++++++--------
+ drivers/remoteproc/remoteproc_internal.h           |    6 +-
+ .../{remoteproc_rpmsg.c => remoteproc_virtio.c}    |  162 +++----
+ drivers/rpmsg/virtio_rpmsg_bus.c                   |   46 ++-
+ include/linux/remoteproc.h                         |  339 ++++++++++---
+ 9 files changed, 793 insertions(+), 444 deletions(-)
+ rename drivers/remoteproc/{remoteproc_rpmsg.c => remoteproc_virtio.c} (65%)
