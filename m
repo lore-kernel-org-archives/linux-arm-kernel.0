@@ -1,61 +1,70 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 5 Mar 2012 18:12:50 -0600
-Subject: [PATCH 6/9] dmaengine: consolidate tx_status functions
-In-Reply-To: <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
-References: <20120305201411.GA17791@n2100.arm.linux.org.uk>
- <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF555BD@AUSP01VMBX24.collaborationhost.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 5 Mar 2012 17:22:14 -0700
+Subject: [PATCH V2 1/3] Documentation/gpio.txt: Explain expected pinctrl
+ interaction
+Message-ID: <1330993336-9538-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 05, 2012 1:17 PM, Russell King wrote:
-> 
-> Now that we have the completed cookie in the dma_chan structure, we
-> can consolidate the tx_status functions by providing a function to set
-> the txstate structure and returning the DMA status.  We also provide
-> a separate helper to set the residue for cookies which are still in
-> progress.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
+Update gpio.txt based on recent discussions regarding interaction with the
+pinctrl subsystem.
 
-<snip>
+Previously, gpio_request() was described as explicitly not performing any
+required mux setup operations etc.
 
-> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
-> index 47e0997..244a2c5 100644
-> --- a/drivers/dma/dmaengine.h
-> +++ b/drivers/dma/dmaengine.h
-> @@ -45,4 +45,35 @@ static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
->  	tx->cookie = 0;
->  }
->  
-> +/**
-> + * dma_cookie_status - report cookie status
-> + * @chan: dma channel
-> + * @cookie: cookie we are interested in
-> + * @state: dma_tx_state structure to return last/used cookies
-> + *
-> + * Report the status of the cookie, filling in the state structure if
-> + * non-NULL.  No locking is required.
-> + */
-> +static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
-> +	dma_cookie_t cookie, struct dma_tx_state *state)
-> +{
-> +	dma_cookie_t used, complete;
-> +
-> +	used = chan->cookie;
-> +	complete = chan->complete;
-> +	barrier();
-> +	if (state) {
-> +		state->last = complete;
-> +		state->used = used;
-> +		state->residue = 0;
-> +	}
+Now, gpio_request() is explicitly as explicitly performing any required mux
+setup operations where possible. In the case it isn't, platform code is
+required to have set up any required muxing or other configuration prior to
+gpio_request() being called, in order to maintain the same semantics.
 
-Isn't this dma_set_tx_state()?
+This is achieved by gpiolib drivers calling e.g. pinctrl_request_gpio() in
+their .request() operation.
 
-> +	return dma_async_is_complete(cookie, complete, used);
-> +}
+Cc: Randy Dunlap <rdunlap@xenotime.net>
+Cc: linux-doc at vger.kernel.org
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2: Modified to state that pin multiplexing should be performed within
+direction_input()/output() rather than request(), to address Russell King's
+need for glitchless transition between special function and GPIO usage of
+a pin. Various rewording and cleanup due to this.
+---
+ Documentation/gpio.txt |   23 ++++++++++++++++++++---
+ 1 files changed, 20 insertions(+), 3 deletions(-)
 
-Regards,
-Hartley
+diff --git a/Documentation/gpio.txt b/Documentation/gpio.txt
+index 792faa3..e0f8799 100644
+--- a/Documentation/gpio.txt
++++ b/Documentation/gpio.txt
+@@ -271,9 +271,26 @@ Some platforms may also use knowledge about what GPIOs are active for
+ power management, such as by powering down unused chip sectors and, more
+ easily, gating off unused clocks.
+ 
+-Note that requesting a GPIO does NOT cause it to be configured in any
+-way; it just marks that GPIO as in use.  Separate code must handle any
+-pin setup (e.g. controlling which pin the GPIO uses, pullup/pulldown).
++For GPIOs that use pins known to the pinctrl subsystem, that subsystem should
++be informed of their use; a gpiolib driver's .request() operation may call
++pinctrl_request_gpio(), and a gpiolib driver's .free() operation may call
++pinctrl_free_gpio(). The pinctrl subsystem allows a pinctrl_request_gpio()
++to succeed concurrently with a pin or pingroup being "owned" by a device for
++pin multiplexing.
++
++Any programming of pin multiplexing hardware that is needed to route the
++GPIO signal to the appropriate pin should occur within a GPIO driver's
++.direction_input() or .direction_output() operations, and occur after any
++setup of an output GPIO's value. This allows a glitch-free migration from a
++pin's special function to GPIO. This is sometimes required when using a GPIO
++to implement a workaround on signals typically driven by a non-GPIO HW block.
++
++Some platforms allow some or all GPIO signals to be routed to different pins.
++Similarly, other aspects of the GPIO or pin may need to be configured, such as
++pullup/pulldown. Platform software should arrange that any such details are
++configured prior to gpio_request() being called for those GPIOs, e.g. using
++the pinctrl subsystem's mapping table, so that GPIO users need not be aware
++of these details.
+ 
+ Also note that it's your responsibility to have stopped using a GPIO
+ before you free it.
+-- 
+1.7.0.4
