@@ -1,50 +1,46 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 06 Mar 2012 11:30:46 +0530
-Subject: [PATCHv4 2/6] ARM: OMAP3 PM: Move IO Daisychain function to omap3
- prm file
-In-Reply-To: <20120306054443.GA5670@kobold>
-References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
- <1330701475-22576-3-git-send-email-t-kristo@ti.com>
- <20120306054443.GA5670@kobold>
-Message-ID: <4F55A80E.3090606@ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 6 Mar 2012 14:04:46 +0800
+Subject: [PATCH 0/2] Remove bq24022 driver superseeded by gpio-regulator
+In-Reply-To: <201203021355.21669.heiko@sntech.de>
+References: <201203021355.21669.heiko@sntech.de>
+Message-ID: <CAN1soZwTR=j6=Xi-WKSTQwkGu+58pePb1syD+2q0UhHUJnfg_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 March 2012 11:14 AM, Nishanth Menon wrote:
-> On 17:17-20120302, Tero Kristo wrote:
->> From: Vishwanath BS<vishwanath.bs@ti.com>
->>
->> Since IO Daisychain modifies only PRM registers, it makes sense to move
->> it to PRM File. Also changed the timeout value for IO chain enable to
->> 100us and added a wait for status disable at the end.
->>
-> [...]
->> +/*
->> + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
->> + * the I/O ring after asserting WUCLKIN high
->> + */
->> +#define MAX_IOPAD_LATCH_TIME 100
->> +
->> +/* OMAP3 Daisychain enable sequence */
->> +void omap3_trigger_io_chain(void)
->> +{
->> +	int i = 0;
->> +
->> +	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
->> +				   PM_WKEN);
->> +	/* Do a readback to assure write has been done */
->> +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
->> +
->> +	omap_test_timeout(((omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST)&
->> +			    OMAP3430_ST_IO_CHAIN_MASK) == 1),
-> umm
-> arch/arm/mach-omap2/prm-regbits-34xx.h:#define OMAP3430_ST_IO_CHAIN_MASK
-> (1<<  16)
-> (reg&  (1<<  16)) == 1
-> will ever be true?
-
-good catch. Its should actually be '((reg & (1 << 16)) >> 16) == 1'
-This is fixed in the omap4_trigger_io() function, looks like is missed
-here.
-
+On Fri, Mar 2, 2012 at 8:55 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> The bq24022 regulator is simply a more specialised variant of the now
+> present gpio-regulator. Therefore it probably shouldn't stay around.
 >
+> This series converts the two users of bq24022 pxa/hx4700 and
+> pxa/magician to use the gpio-regulator instead, and after this removes
+> the then unused bq24022 driver.
+>
+> The series was compile-tested only, but the gpio-regulator itself is
+> sucessfully used on my platform for the dcdc3 of a tps650240 (voltage
+> regulator with one gpio) and for a bq24075 (current regulator with two
+> gpios). So I'm quite sure it should work correctly but would welcome
+> testers :-) .
+>
+> Heiko Stuebner (2):
+> ?pxa: magician/hx4700: Convert to gpio-regulator from bq24022
+> ?regulator: Remove bq24022 regulator driver
+>
+> ?arch/arm/configs/magician_defconfig | ? ?2 +-
+> ?arch/arm/mach-pxa/hx4700.c ? ? ? ? ?| ? 33 ++++++--
+> ?arch/arm/mach-pxa/magician.c ? ? ? ?| ? 33 ++++++--
+> ?drivers/regulator/Kconfig ? ? ? ? ? | ? ?8 --
+> ?drivers/regulator/Makefile ? ? ? ? ?| ? ?1 -
+> ?drivers/regulator/bq24022.c ? ? ? ? | ?162 -----------------------------------
+> ?include/linux/regulator/bq24022.h ? | ? 24 -----
+> ?7 files changed, 55 insertions(+), 208 deletions(-)
+> ?delete mode 100644 drivers/regulator/bq24022.c
+> ?delete mode 100644 include/linux/regulator/bq24022.h
+>
+> --
+Hi Mark,
+
+I'm planning to merge this patch into arch-pxa tree since some changes
+on hx4700.c and magician.c. Is it ok fot you?
+
+Best Regards
+Haojian
