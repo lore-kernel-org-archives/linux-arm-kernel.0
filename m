@@ -1,21 +1,26 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 06 Mar 2012 09:55:12 -0700
-Subject: [PATCH/RFC 1/2] arm/tegra: fix harmony pinmux for PCIe
-In-Reply-To: <1331023544-6439-2-git-send-email-mad_soft@inbox.ru>
+Date: Tue, 06 Mar 2012 09:58:50 -0700
+Subject: [PATCH/RFC 2/2] arm/tegra: add timeout to PCIe PLL lock detection
+ loop
+In-Reply-To: <1331023544-6439-3-git-send-email-mad_soft@inbox.ru>
 References: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
- <1331023544-6439-2-git-send-email-mad_soft@inbox.ru>
-Message-ID: <4F564170.7000209@wwwdotorg.org>
+ <1331023544-6439-3-git-send-email-mad_soft@inbox.ru>
+Message-ID: <4F56424A.3020305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/06/2012 01:45 AM, Dmitry Artamonow wrote:
-> Commit 6e96aca397 (arm/tegra: Harmony PCIe: Don't touch pinmux)
-> removed runtime tri-state toggling for PCIe related pinmux groups,
-> but it seems that the fact that all of them are tri-state by default
-> has been overlooked. Change defaults for these groups to TEGRA_TRI_NORMAL.
+> Tegra PCIe driver waits for PLL to lock using busy loop.
+> If PLL fails to lock for some reason, this leads to silent lockup
+> while booting (as PCIe code is not modular).
+> 
+> Fix by adding timeout, so if PLL doesn't lock in a couple
+> of seconds, just PCIe driver fails and machine continues to boot.
 > 
 > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 
-Crap, why didn't I check that? Anyway,
+That seems reasonable. So once the mdelay discussion is resolved,
 
 Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+Any idea why the PLL doesn't lock sometimes?
