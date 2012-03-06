@@ -1,40 +1,32 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 6 Mar 2012 12:06:47 +0000
-Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-In-Reply-To: <20120306104015.GF17370@n2100.arm.linux.org.uk>
-References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
- <4F53F704.8080703@freescale.com>
- <20120304232817.GA13516@n2100.arm.linux.org.uk>
- <4F53FBA1.8090200@freescale.com>
- <20120305000411.GL7363@n2100.arm.linux.org.uk>
- <4F54053F.9070502@freescale.com>
- <20120305002635.GA23798@opensource.wolfsonmicro.com>
- <20120306104015.GF17370@n2100.arm.linux.org.uk>
-Message-ID: <20120306120646.GH19635@opensource.wolfsonmicro.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Tue, 06 Mar 2012 04:13:50 -0800
+Subject: [PATCH v4] lpc32xx: Added ethernet driver
+In-Reply-To: <4F55D099.5070006@antcom.de>
+References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
+ <1330987524.2538.61.camel@bwh-desktop> <4F55D099.5070006@antcom.de>
+Message-ID: <1331036030.2474.40.camel@edumazet-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 10:40:15AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 05, 2012 at 12:26:36AM +0000, Mark Brown wrote:
-> > On Mon, Mar 05, 2012 at 12:13:52AM +0000, Tabi Timur-B04825 wrote:
+Le mardi 06 mars 2012 ? 09:53 +0100, Roland Stigge a ?crit :
 
-> > > To answer your question: I was lead to believe that the individual ALSA 
-> > > callback functions are atomic.  So one thread should not be trying to 
-> > > start playback while another thread is simultaneously trying to stop it.
+> Sounds reasonable, and will do it.
+> 
+> However, I implemented it from the example of
+> drivers/net/ethernet/via/via-velocity.c:velocity_poll() - is there a
+> good reason for doing it that way in the velocity driver or is it done
+> incorrectly there, also?
+> 
 
-> > That's correct, there's ALSA level locking.
+Its done in a non efficient way.
 
-> Please explain which lock prevents the capture substream trigger callback
-> occuring simultaneously with a playback substream trigger callback on a
-> SMP system.
+It works as is, but its not the right thing to do.
+The NAPI port was very minimal on via-velocity it seems.
 
-Oh, bother - that one is per substream not per stream.  Which isn't
-terribly helpful.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/4cb0f073/attachment.sig>
+A better way is to hold no locks in the RX handler, allowing calls to
+netif_receive_skb() [ and potential calls to xmit while handling this
+incoming skbs ]
+
+Problem of saying "we dont expect to be SMP anyway", is that this let
+reference material for future drivers that will copy/paste the code,
+then experience performance problems.
