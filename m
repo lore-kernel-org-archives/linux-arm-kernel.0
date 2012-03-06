@@ -1,43 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 6 Mar 2012 14:27:45 +0800
-Subject: [PATCH v2 11/17] ASoC: fsl: create fsl_utils to accommodate the
- common functions
-In-Reply-To: <20120305144920.GR3224@opensource.wolfsonmicro.com>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-12-git-send-email-shawn.guo@linaro.org>
- <20120305144920.GR3224@opensource.wolfsonmicro.com>
-Message-ID: <20120306062742.GO16232@S2101-09.ap.freescale.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 6 Mar 2012 17:21:30 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the sound-asoc tree
+Message-ID: <20120306172130.f5b7aae24600cbbbaf7e84e9@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 02:49:20PM +0000, Mark Brown wrote:
-> On Mon, Mar 05, 2012 at 10:30:59PM +0800, Shawn Guo wrote:
-> 
-> > +/**
-> > + * fsl_asoc_get_codec_dev_name - determine the dev_name for a codec node
-> > + *
-> > + * @np: pointer to the I2C device tree node
-> > + * @buf: buffer to be filled with the dev_name of the I2C device
-> > + * @len: the length of the buffer
-> > + *
-> > + * This function determines the dev_name for an I2C node.  This is the name
-> > + * that would be returned by dev_name() if this device_node were part of a
-> > + * 'struct device'  It's ugly and hackish, but it works.
-> > + *
-> > + * The dev_name for such devices include the bus number and I2C address. For
-> > + * example, "cs4270.0-004f".
-> > + */
-> > +int fsl_asoc_get_codec_dev_name(struct device_node *np, char *buf, size_t len)
-> 
-> This doesn't seem at all Freescale specific, it should be a generic
-> helper, and in fact there already is one - the machine driver can set
-> codec_of_node in the card structure to point to the device node and then
-> the core should figure out binding to the device for you.  If it doesn't
-> we should fix the core.
+Hi all,
 
-Yeah, the core support works, so will remove the function here and use
-the core support.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-imx/mm-imx3.c between commit 3bc34a614335 ("ARM: imx:
+convert audmux to a platform driver") from the sound-asoc tree and commit
+bb07d7511e08 ("ARM: mx3: Setup AIPS registers") from the arm-soc tree.
 
+Just context changes.  I fixed it up (see below) and can carry the fix as
+necessary.
 -- 
-Regards,
-Shawn
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-imx/mm-imx3.c
+index 9c9b7f9,17963e0..0000000
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@@ -177,8 -175,9 +179,12 @@@ void __init imx31_soc_init(void
+  	}
+  
+  	imx_add_imx_sdma("imx31-sdma", MX31_SDMA_BASE_ADDR, MX31_INT_SDMA, &imx31_sdma_pdata);
++ 
++ 	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS1_BASE_ADDR));
++ 	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS2_BASE_ADDR));
+++
+ +	platform_device_register_simple("imx31-audmux", 0, imx31_audmux_res,
+ +					ARRAY_SIZE(imx31_audmux_res));
+  }
+  #endif /* ifdef CONFIG_SOC_IMX31 */
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/b39c2029/attachment.sig>
