@@ -1,41 +1,66 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 06 Mar 2012 11:51:07 -0500 (EST)
-Subject: [PATCH] ARM: remove ixp2000 platform
-In-Reply-To: <201203061412.00073.arnd@arndb.de>
-References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
- <201202281945.39419.arnd@arndb.de>
- <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
- <201203061412.00073.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Mar 2012 16:53:10 +0000
+Subject: [PATCH v4 1/4] ARM: provide runtime hook for ioremap/iounmap
+In-Reply-To: <1331006580-3579-1-git-send-email-robherring2@gmail.com>
+References: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
+ <1331006580-3579-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201203061653.11049.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Mar 2012, Arnd Bergmann wrote:
-
-> On Tuesday 06 March 2012, Nicolas Pitre wrote:
-> > FYI, here's a snippet of a conversation I just had with Lennert on IRC 
-> > today:
-> > 
-> > 13:05 < nico> do you still care about ixp2000?
-> > 13:22 < lennert> not really, no
-> > 13:58 < nico> do you think we could remove it from the kernel tree?
-> > 14:01 < lennert> go for it, and remove ixp23xx too while you're at it
+On Tuesday 06 March 2012, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Ah, good to know that Lennert is actually still alive somewhere.
+> We have compile time over-ride of ioremap and iounmap, but an run-time
+> override is needed for multi-platform builds. This adds an extra function
+> pointer check, but ioremap is not peformance critical. The option for
+> compile time selection remains.
 > 
-> And removing ixp2xxx in 3.5 will certainly help us, too. 
+> The caller variant is used here to provide correct caller information as
+> ARM can only support level 0 for __builtin_return_address.
 > 
-> Interestingly, that leaves ixp4xx as the only big-endian ARM platform.
-> I believe that ixp4xx is still being actively used quite a bit, but does
-> that include the big-endian ones? There is no immediate reason why we
-> would want to drop support for big-endian, but if it's not used at all,
-> that would be an interesting cleanup opportunity.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-The NSLU2 is (was) a quite popular NAS device and it is used in big 
-endian by default.
+Very nice!
 
-The BE support isn't getting in the way of anything, so there is no 
-reason to remove it, even if it isn't being used much.
+Just one small comment:
 
+> --- a/arch/arm/mm/ioremap.c
+> +++ b/arch/arm/mm/ioremap.c
+> @@ -306,9 +306,16 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
+>  }
+>  EXPORT_SYMBOL(__arm_ioremap_pfn);
+>  
+> +void __iomem * (*arch_ioremap_caller)(unsigned long, size_t, unsigned int, void *);
+> +EXPORT_SYMBOL(arch_ioremap_caller);
+> +
+>  void __iomem *
+>  __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+>  {
+> +	if (arch_ioremap_caller)
+> +		return arch_ioremap_caller(phys_addr, size, mtype,
+> +			__builtin_return_address(0));
+> +
+>  	return __arm_ioremap_caller(phys_addr, size, mtype,
+>  			__builtin_return_address(0));
+>  }
+> @@ -370,3 +377,12 @@ void __iounmap(volatile void __iomem *io_addr)
+>  	vunmap(addr);
+>  }
+>  EXPORT_SYMBOL(__iounmap);
+> +
+> +void (*arch_iounmap)(volatile void __iomem *) = __iounmap;
+> +EXPORT_SYMBOL(arch_iounmap);
+> +
+> +void __arm_iounmap(volatile void __iomem *io_addr)
+> +{
+> +	arch_iounmap(io_addr);
+> +}
+> +EXPORT_SYMBOL(__arm_iounmap);
 
-Nicolas
+The EXPORT_SYMBOL() statements for arch_ioremap_caller and arch_iounmap
+seem to be leftover from a previous version of this patch and can be removed
+now. Other than that:
+
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
