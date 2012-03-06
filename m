@@ -1,34 +1,29 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 6 Mar 2012 15:01:58 +0800
-Subject: [GIT PULL][v3.3] pull request on arch-pxa tree with fix branch
-Message-ID: <CAN1soZzkb9qWmBRsv_wEwHwiRUW+q7zaehxnMifgEhsoXV4BZA@mail.gmail.com>
+Date: Tue, 6 Mar 2012 15:06:57 +0800
+Subject: [GIT PULL][for v3.4]pull request from arch-pxa tree with rtc branch
+Message-ID: <CAN1soZxSpnDJCiz-5_PiHcb+zoR+X0b2VLyANLY0om0MDo+YYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-Please help to pull these patch in fixes branch of arch-pxa tree.
+Please help to pull this patch from arch-pxa git with rtc branch. I
+have to put it into rtc branch since I met patch conflict on v3.3-rc6.
+It seems that putting it into rtc branch with previous rtc patches is
+a better choice.
 
 Best Regards
 Haojian
 
-The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+The following changes since commit 4128e27584f58bce9f56a9a0346650c94a651332:
 
-  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+  ARM: mmp: enable rtc in pxa910 (2012-02-28 11:23:09 +0800)
 
 are available in the git repository at:
-  git://github.com/hzhuang1/linux.git fixes
+  git://github.com/hzhuang1/linux.git rtc
 
-Haojian Zhuang (3):
-      ARM: pxa: add dummy clock for pxa25x and pxa27x
-      ARM: pxa: remove duplicated registeration on pxa-gpio
-      ARM: pxa: fix invalid mfp pin issue
+Haojian Zhuang (1):
+      rtc: sa1100: add OF support
 
- arch/arm/mach-pxa/generic.h    |    1 -
- arch/arm/mach-pxa/mfp-pxa2xx.c |    7 +++++++
- arch/arm/mach-pxa/pxa25x.c     |    2 +-
- arch/arm/mach-pxa/pxa27x.c     |    2 +-
- arch/arm/mach-pxa/pxa3xx.c     |    1 -
- arch/arm/mach-pxa/pxa95x.c     |    1 -
- 6 files changed, 9 insertions(+), 5 deletions(-)
-You have new mail in /var/spool/mail/hzhuang1
+ drivers/rtc/rtc-sa1100.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
