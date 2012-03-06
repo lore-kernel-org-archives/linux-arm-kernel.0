@@ -1,70 +1,193 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 5 Mar 2012 17:22:14 -0700
-Subject: [PATCH V2 1/3] Documentation/gpio.txt: Explain expected pinctrl
- interaction
-Message-ID: <1330993336-9538-1-git-send-email-swarren@nvidia.com>
+Date: Mon, 5 Mar 2012 17:22:15 -0700
+Subject: [PATCH V2 2/3] pinctrl: allow concurrent gpio and mux function
+ ownership of pins
+In-Reply-To: <1330993336-9538-1-git-send-email-swarren@nvidia.com>
+References: <1330993336-9538-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1330993336-9538-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update gpio.txt based on recent discussions regarding interaction with the
-pinctrl subsystem.
+Per recent updates to Documentation/gpio.txt, gpiolib drivers should
+inform pinctrl when a GPIO is requested. pinctrl then marks that pin as
+in-use for that GPIO function.
 
-Previously, gpio_request() was described as explicitly not performing any
-required mux setup operations etc.
+When an SoC muxes pins in a group, it's quite possible for the group to
+contain e.g. 6 pins, but only 4 of them actually be needed by the HW
+module that's mux'd to them. In this case, the other 2 pins could be
+used as GPIOs. However, pinctrl marks all the pins within the group as
+in-use by the selected mux function. To allow the expected gpiolib
+interaction, separate the concepts of pin ownership into two parts: One
+for the mux function and one for GPIO usage. Finally, allow those two
+ownerships to exist in parallel.
 
-Now, gpio_request() is explicitly as explicitly performing any required mux
-setup operations where possible. In the case it isn't, platform code is
-required to have set up any required muxing or other configuration prior to
-gpio_request() being called, in order to maintain the same semantics.
-
-This is achieved by gpiolib drivers calling e.g. pinctrl_request_gpio() in
-their .request() operation.
-
-Cc: Randy Dunlap <rdunlap@xenotime.net>
-Cc: linux-doc at vger.kernel.org
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-v2: Modified to state that pin multiplexing should be performed within
-direction_input()/output() rather than request(), to address Russell King's
-need for glitchless transition between special function and GPIO usage of
-a pin. Various rewording and cleanup due to this.
+v2: New patch.
 ---
- Documentation/gpio.txt |   23 ++++++++++++++++++++---
- 1 files changed, 20 insertions(+), 3 deletions(-)
+ drivers/pinctrl/core.h   |   13 ++++----
+ drivers/pinctrl/pinmux.c |   72 +++++++++++++++++++++++++++++++--------------
+ 2 files changed, 56 insertions(+), 29 deletions(-)
 
-diff --git a/Documentation/gpio.txt b/Documentation/gpio.txt
-index 792faa3..e0f8799 100644
---- a/Documentation/gpio.txt
-+++ b/Documentation/gpio.txt
-@@ -271,9 +271,26 @@ Some platforms may also use knowledge about what GPIOs are active for
- power management, such as by powering down unused chip sectors and, more
- easily, gating off unused clocks.
+diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
+index 5b3ff13..2d365a3 100644
+--- a/drivers/pinctrl/core.h
++++ b/drivers/pinctrl/core.h
+@@ -118,15 +118,15 @@ struct pinctrl_setting {
+  * @name: a name for the pin, e.g. the name of the pin/pad/finger on a
+  *	datasheet or such
+  * @dynamic_name: if the name of this pin was dynamically allocated
+- * @usecount: If zero, the pin is not claimed, and @owner should be NULL.
++ * @mux_usecount: If zero, the pin is not claimed, and @owner should be NULL.
+  *	If non-zero, this pin is claimed by @owner. This field is an integer
+  *	rather than a boolean, since pinctrl_get() might process multiple
+  *	mapping table entries that refer to, and hence claim, the same group
+  *	or pin, and each of these will increment the @usecount.
+- * @owner: The name of the entity owning the pin. Typically, this is the name
+- *	of the device that called pinctrl_get(). Alternatively, it may be the
+- *	name of the GPIO passed to pinctrl_request_gpio().
++ * @mux_owner: The name of device that called pinctrl_get().
+  * @mux_setting: The most recent selected mux setting for this pin, if any.
++ * @gpio_owner: If pinctrl_request_gpio() was called for this pin, this is
++ *	the name of the GPIO that "owns" this pin.
+  */
+ struct pin_desc {
+ 	struct pinctrl_dev *pctldev;
+@@ -134,9 +134,10 @@ struct pin_desc {
+ 	bool dynamic_name;
+ 	/* These fields only added when supporting pinmux drivers */
+ #ifdef CONFIG_PINMUX
+-	unsigned usecount;
+-	const char *owner;
++	unsigned mux_usecount;
++	const char *mux_owner;
+ 	const struct pinctrl_setting_mux *mux_setting;
++	const char *gpio_owner;
+ #endif
+ };
  
--Note that requesting a GPIO does NOT cause it to be configured in any
--way; it just marks that GPIO as in use.  Separate code must handle any
--pin setup (e.g. controlling which pin the GPIO uses, pullup/pulldown).
-+For GPIOs that use pins known to the pinctrl subsystem, that subsystem should
-+be informed of their use; a gpiolib driver's .request() operation may call
-+pinctrl_request_gpio(), and a gpiolib driver's .free() operation may call
-+pinctrl_free_gpio(). The pinctrl subsystem allows a pinctrl_request_gpio()
-+to succeed concurrently with a pin or pingroup being "owned" by a device for
-+pin multiplexing.
-+
-+Any programming of pin multiplexing hardware that is needed to route the
-+GPIO signal to the appropriate pin should occur within a GPIO driver's
-+.direction_input() or .direction_output() operations, and occur after any
-+setup of an output GPIO's value. This allows a glitch-free migration from a
-+pin's special function to GPIO. This is sometimes required when using a GPIO
-+to implement a workaround on signals typically driven by a non-GPIO HW block.
-+
-+Some platforms allow some or all GPIO signals to be routed to different pins.
-+Similarly, other aspects of the GPIO or pin may need to be configured, such as
-+pullup/pulldown. Platform software should arrange that any such details are
-+configured prior to gpio_request() being called for those GPIOs, e.g. using
-+the pinctrl subsystem's mapping table, so that GPIO users need not be aware
-+of these details.
+diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+index 86e4017..4e62783 100644
+--- a/drivers/pinctrl/pinmux.c
++++ b/drivers/pinctrl/pinmux.c
+@@ -94,17 +94,28 @@ static int pin_request(struct pinctrl_dev *pctldev,
+ 		goto out;
+ 	}
  
- Also note that it's your responsibility to have stopped using a GPIO
- before you free it.
+-	if (desc->usecount && strcmp(desc->owner, owner)) {
+-		dev_err(pctldev->dev,
+-			"pin already requested\n");
+-		goto out;
+-	}
++	if (gpio_range) {
++		/* There's no need to support multiple GPIO requests */
++		if (desc->gpio_owner) {
++			dev_err(pctldev->dev,
++				"pin already requested\n");
++			goto out;
++		}
+ 
+-	desc->usecount++;
+-	if (desc->usecount > 1)
+-		return 0;
++		desc->gpio_owner = owner;
++	} else {
++		if (desc->mux_usecount && strcmp(desc->mux_owner, owner)) {
++			dev_err(pctldev->dev,
++				"pin already requested\n");
++			goto out;
++		}
+ 
+-	desc->owner = owner;
++		desc->mux_usecount++;
++		if (desc->mux_usecount > 1)
++			return 0;
++
++		desc->mux_owner = owner;
++	}
+ 
+ 	/* Let each pin increase references to this module */
+ 	if (!try_module_get(pctldev->owner)) {
+@@ -135,9 +146,13 @@ static int pin_request(struct pinctrl_dev *pctldev,
+ 
+ out_free_pin:
+ 	if (status) {
+-		desc->usecount--;
+-		if (!desc->usecount)
+-			desc->owner = NULL;
++		if (gpio_range) {
++			desc->gpio_owner = NULL;
++		} else {
++			desc->mux_usecount--;
++			if (!desc->mux_usecount)
++				desc->mux_owner = NULL;
++		}
+ 	}
+ out:
+ 	if (status)
+@@ -172,9 +187,11 @@ static const char *pin_free(struct pinctrl_dev *pctldev, int pin,
+ 		return NULL;
+ 	}
+ 
+-	desc->usecount--;
+-	if (desc->usecount)
+-		return NULL;
++	if (!gpio_range) {
++		desc->mux_usecount--;
++		if (desc->mux_usecount)
++			return NULL;
++	}
+ 
+ 	/*
+ 	 * If there is no kind of request function for the pin we just assume
+@@ -185,9 +202,15 @@ static const char *pin_free(struct pinctrl_dev *pctldev, int pin,
+ 	else if (ops->free)
+ 		ops->free(pctldev, pin);
+ 
+-	owner = desc->owner;
+-	desc->owner = NULL;
+-	desc->mux_setting = NULL;
++	if (gpio_range) {
++		owner = desc->gpio_owner;
++		desc->gpio_owner = NULL;
++	} else {
++		owner = desc->mux_owner;
++		desc->mux_owner = NULL;
++		desc->mux_setting = NULL;
++	}
++
+ 	module_put(pctldev->owner);
+ 
+ 	return owner;
+@@ -493,7 +516,7 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
+ 	unsigned i, pin;
+ 
+ 	seq_puts(s, "Pinmux settings per pin\n");
+-	seq_puts(s, "Format: pin (name): owner\n");
++	seq_puts(s, "Format: pin (name): mux_owner gpio_owner hog?\n");
+ 
+ 	mutex_lock(&pinctrl_mutex);
+ 
+@@ -508,13 +531,16 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
+ 		if (desc == NULL)
+ 			continue;
+ 
+-		if (desc->owner &&
+-		    !strcmp(desc->owner, pinctrl_dev_get_name(pctldev)))
++		if (desc->mux_owner &&
++		    !strcmp(desc->mux_owner, pinctrl_dev_get_name(pctldev)))
+ 			is_hog = true;
+ 
+-		seq_printf(s, "pin %d (%s): %s%s", pin,
++		seq_printf(s, "pin %d (%s): %s %s%s", pin,
+ 			   desc->name ? desc->name : "unnamed",
+-			   desc->owner ? desc->owner : "UNCLAIMED",
++			   desc->mux_owner ? desc->mux_owner
++				: "(MUX UNCLAIMED)",
++			   desc->gpio_owner ? desc->gpio_owner
++				: "(GPIO UNCLAIMED)",
+ 			   is_hog ? " (HOG)" : "");
+ 
+ 		if (desc->mux_setting)
 -- 
 1.7.0.4
