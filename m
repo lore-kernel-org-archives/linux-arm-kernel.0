@@ -1,84 +1,24 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Mar 2012 01:51:27 -0800
-Subject: [PATCH] ARM: SAMSUNG: change the name from s3c-sdhci to
- exynos4-sdhci
-In-Reply-To: <4F557692.8090102@samsung.com>
-References: <4F45D343.6020409@samsung.com>
- <CAJuYYwTh8tVdA0X-TLEU-9O_M0_PmJR=i3WYAQXsaRcPF3MbJA@mail.gmail.com>
- <4F557692.8090102@samsung.com>
-Message-ID: <4F55DE1F.9010405@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 6 Mar 2012 09:52:26 +0000
+Subject: [GIT PULL][v3.4] pull request on arch-pxa for regulator branch
+In-Reply-To: <CAN1soZxJO8sGZwq5LhuEOxt3uEN=s1cAOSXfbR8L5r8Hpc+t-w@mail.gmail.com>
+References: <CAN1soZxJO8sGZwq5LhuEOxt3uEN=s1cAOSXfbR8L5r8Hpc+t-w@mail.gmail.com>
+Message-ID: <20120306095226.GB19635@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/12 18:29, Jaehoon Chung wrote:
-> Hi Kukjin.
->
-> Is it merged?
->
-> Best Regards,
-> Jaehoon Chung
->
-> On 02/24/2012 06:56 PM, Thomas Abraham wrote:
->
->> On 23 February 2012 11:18, Jaehoon Chung<jh80.chung@samsung.com>  wrote:
->>> Thomas Arbrahams's patchset have changed the device name in sdhci-s3c.c
->>> (mmc: sdhci-s3c: Rework platform data and add device tree support)
->>> But didn't change the regulator_consumer name.
->>> So maybe didn't initialize the mmc/sd card for exynos4.
->>>
->>> This patch is fixed that (based-on linux-samsung for-next branch)
->>>
->>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
->>> Signed-off-by: kyungmin Park<kyungmin.park@samsung.com>
->>> ---
->>>   arch/arm/mach-exynos/mach-nuri.c           |    4 ++--
->>>   arch/arm/mach-exynos/mach-universal_c210.c |    2 +-
->>>   2 files changed, 3 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
->>> index a6b9162..251dd7a 100644
->>> --- a/arch/arm/mach-exynos/mach-nuri.c
->>> +++ b/arch/arm/mach-exynos/mach-nuri.c
->>> @@ -116,7 +116,7 @@ static struct s3c_sdhci_platdata nuri_hsmmc0_data __initdata = {
->>>   };
->>>
->>>   static struct regulator_consumer_supply emmc_supplies[] = {
->>> -       REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
->>> +       REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
->>>         REGULATOR_SUPPLY("vmmc", "dw_mmc"),
->>>   };
->>>
->>> @@ -415,7 +415,7 @@ static struct regulator_consumer_supply __initdata max8997_ldo12_[] = {
->>>         REGULATOR_SUPPLY("vddio", "6-003c"), /* HDC802 */
->>>   };
->>>   static struct regulator_consumer_supply __initdata max8997_ldo13_[] = {
->>> -       REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"), /* TFLASH */
->>> +       REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.2"), /* TFLASH */
->>>   };
->>>   static struct regulator_consumer_supply __initdata max8997_ldo14_[] = {
->>>         REGULATOR_SUPPLY("inmotor", "max8997-haptic"),
->>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
->>> index 6017a21..320cb1d 100644
->>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
->>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
->>> @@ -749,7 +749,7 @@ static struct s3c_sdhci_platdata universal_hsmmc0_data __initdata = {
->>>   };
->>>
->>>   static struct regulator_consumer_supply mmc0_supplies[] = {
->>> -       REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
->>> +       REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
->>>   };
->>>
->>>   static struct regulator_init_data mmc0_fixed_voltage_init_data = {
->>
->> Reviewed-by: Thomas Abraham<thomas.abraham@linaro.org>
+On Tue, Mar 06, 2012 at 02:08:12PM +0800, Haojian Zhuang wrote:
 
-Looks OK, will apply.
+> Heiko St?bner (2):
+>       pxa: magician/hx4700: Convert to gpio-regulator from bq24022
+>       regulator: Remove bq24022 regulator driver
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Please wait for some confirmation before you go deleting drivers from
+other subsystems!  I don't recall replying to this thread at all...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/7619492c/attachment.sig>
