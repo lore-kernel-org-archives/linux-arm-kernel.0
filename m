@@ -1,57 +1,61 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 05 Mar 2012 16:09:28 -0800
-Subject: [PATCH] mmc: omap_hsmmc: Fix Unbalanced pm_runtime_enable warning
-In-Reply-To: <20120305234240.GQ12083@atomide.com> (Tony Lindgren's message of
- "Mon, 5 Mar 2012 15:42:41 -0800")
-References: <20120305234240.GQ12083@atomide.com>
-Message-ID: <87obsaio93.fsf@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 5 Mar 2012 18:12:50 -0600
+Subject: [PATCH 6/9] dmaengine: consolidate tx_status functions
+In-Reply-To: <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
+References: <20120305201411.GA17791@n2100.arm.linux.org.uk>
+ <E1S4eKz-0000tE-FB@rmk-PC.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF555BD@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
-
-> mmc: omap_hsmmc: Fix Unbalanced pm_runtime_enable warning
+On Monday, March 05, 2012 1:17 PM, Russell King wrote:
+> 
+> Now that we have the completed cookie in the dma_chan structure, we
+> can consolidate the tx_status functions by providing a function to set
+> the txstate structure and returning the DMA status.  We also provide
+> a separate helper to set the residue for cookies which are still in
+> progress.
 >
-> Otherwise we can get following warning when re-loading the
-> omap_hsmmc driver module when gpio_twl4030 module is not
-> loaded:
->
-> omap_hsmmc omap_hsmmc.0: Unbalanced pm_runtime_enable!
-> omap_hsmmc omap_hsmmc.0: Unable to grab MMC CD IRQ
-> omap_hsmmc: probe of omap_hsmmc.0 failed with error -22
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->
-> Kevin, maybe take a look and see if this is correct and
-> fits into your PM branches?
 
-Looks right to me:
+<snip>
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
+> index 47e0997..244a2c5 100644
+> --- a/drivers/dma/dmaengine.h
+> +++ b/drivers/dma/dmaengine.h
+> @@ -45,4 +45,35 @@ static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
+>  	tx->cookie = 0;
+>  }
+>  
+> +/**
+> + * dma_cookie_status - report cookie status
+> + * @chan: dma channel
+> + * @cookie: cookie we are interested in
+> + * @state: dma_tx_state structure to return last/used cookies
+> + *
+> + * Report the status of the cookie, filling in the state structure if
+> + * non-NULL.  No locking is required.
+> + */
+> +static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
+> +	dma_cookie_t cookie, struct dma_tx_state *state)
+> +{
+> +	dma_cookie_t used, complete;
+> +
+> +	used = chan->cookie;
+> +	complete = chan->complete;
+> +	barrier();
+> +	if (state) {
+> +		state->last = complete;
+> +		state->used = used;
+> +		state->residue = 0;
+> +	}
 
-But this is a fix to the driver itself, so Chris should queue this in
-mmc-next.
+Isn't this dma_set_tx_state()?
 
-Chris, can you take this one?
+> +	return dma_async_is_complete(cookie, complete, used);
+> +}
 
-Kevin
-
-
->
-> Tony
->
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -2146,6 +2146,7 @@ err_irq_cd_init:
->  err_irq:
->  	pm_runtime_mark_last_busy(host->dev);
->  	pm_runtime_put_autosuspend(host->dev);
-> +	pm_runtime_disable(host->dev);
->  	clk_put(host->fclk);
->  	if (host->got_dbclk) {
->  		clk_disable(host->dbclk);
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Hartley
