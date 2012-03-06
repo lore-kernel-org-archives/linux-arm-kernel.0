@@ -1,30 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Mar 2012 10:40:15 +0000
-Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-In-Reply-To: <20120305002635.GA23798@opensource.wolfsonmicro.com>
-References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
- <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
- <4F53F704.8080703@freescale.com>
- <20120304232817.GA13516@n2100.arm.linux.org.uk>
- <4F53FBA1.8090200@freescale.com>
- <20120305000411.GL7363@n2100.arm.linux.org.uk>
- <4F54053F.9070502@freescale.com>
- <20120305002635.GA23798@opensource.wolfsonmicro.com>
-Message-ID: <20120306104015.GF17370@n2100.arm.linux.org.uk>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 06 Mar 2012 11:43:57 +0100
+Subject: [PATCH v4] lpc32xx: Added ethernet driver: smp_wmb()
+In-Reply-To: <1330987524.2538.61.camel@bwh-desktop>
+References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
+ <1330987524.2538.61.camel@bwh-desktop>
+Message-ID: <4F55EA6D.3070602@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 12:26:36AM +0000, Mark Brown wrote:
-> On Mon, Mar 05, 2012 at 12:13:52AM +0000, Tabi Timur-B04825 wrote:
+On 03/05/2012 11:45 PM, Ben Hutchings wrote:
+>> +	/* Clear and enable interrupts */
+>> +	writel(0xFFFF, LPC_ENET_INTCLEAR(pldat->net_base));
+>> +	lpc_eth_enable_int(pldat->net_base);
+>> +
+>> +	/* Get the next TX buffer output index */
+>> +	pldat->num_used_tx_buffs = 0;
+>> +	pldat->last_tx_idx =
+>> +		readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
 > 
-> > To answer your question: I was lead to believe that the individual ALSA 
-> > callback functions are atomic.  So one thread should not be trying to 
-> > start playback while another thread is simultaneously trying to stop it.
-> 
-> That's correct, there's ALSA level locking.
+> Doesn't this need to be done *before* enabling interrupts?  Also, I
+> think you need an smp_wmb() so that the interrupt handler is guaranteed
+> to see all these writes.
 
-Please explain which lock prevents the capture substream trigger callback
-occuring simultaneously with a playback substream trigger callback on a
-SMP system.
+Do you mean _one_ smp_wmb() directly after lpc_eth_enable_int() (which
+I'm moving behind the above code?
 
-Thanks.
+Note that there is no SMP in LPCs and NXP is not planning to build one
+AFAIK. However, I'm fine with including smp_wmb() anyway for completeness.
+
+Thanks in advance,
+
+Roland
