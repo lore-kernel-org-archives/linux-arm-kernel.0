@@ -1,40 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 6 Mar 2012 12:33:22 +0000
-Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-In-Reply-To: <20120306122516.GH17370@n2100.arm.linux.org.uk>
-References: <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
- <4F53F704.8080703@freescale.com>
- <20120304232817.GA13516@n2100.arm.linux.org.uk>
- <4F53FBA1.8090200@freescale.com>
- <20120305000411.GL7363@n2100.arm.linux.org.uk>
- <4F54053F.9070502@freescale.com>
- <20120305002635.GA23798@opensource.wolfsonmicro.com>
- <20120306104015.GF17370@n2100.arm.linux.org.uk>
- <20120306120646.GH19635@opensource.wolfsonmicro.com>
- <20120306122516.GH17370@n2100.arm.linux.org.uk>
-Message-ID: <20120306123322.GP19635@opensource.wolfsonmicro.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue,  6 Mar 2012 14:35:11 +0200
+Subject: [PATCH 0/5] MFD: Reverting twl6040 patches going for 3.4
+Message-ID: <1331037316-7375-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 12:25:16PM +0000, Russell King - ARM Linux wrote:
+Hello Samuel,
 
-> Please also note that in ALSA documentation, an 'atomic' callback means
-> little with respect to race conditions.  All it means is that the callback
-> is called from a context where sleeping in the callback is not permitted.
-> The documentation does not say what is protected by the ALSA spinlocks and
-> mutexes, so without reviewing the ALSA code, driver writters have little
-> idea whether they need their own locks or not.
+this series reverts the twl6040 related patches aimed for 3.4 merge window from
+MFD for-next branch.
+As we already discussed the relevant patches will be going through audio since
+we have some dependencies going via that route.
 
-Well, who reads the documentation to get this stuff anyway?  As you
-observe it's far from complete about what's what locked when and how so
-you need to go to the code to see what's actually going on, especially
-whenever you need to call back into the ALSA APIs.  Though of course I'm
-pretty sure there's a bunch of uniprocessor assumptions through the body
-of driver code anyway...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/43dc86f1/attachment.sig>
+With this series we also fix the build breakage with omap2plus_defconfig, and
+also we can make sure that the OMAP4 audio is working in linux-next.
+
+Could you apply this series so we can push forward these changes via audio?
+
+Thank you,
+Peter
+---
+Peter Ujfalusi (5):
+  Revert "mfd/Input/ASoC: twl6040 kconfig fixes"
+  Revert "mfd: Add regulator support for twl6040 VIO, V2V1 supplies"
+  Revert "ASoC: Remove twl6040 dependency on twl4030 from Kconfig"
+  Revert "mfd: Convert twl6040 to an i2c driver, and separate it from
+    twl core"
+  Revert "mfd: Detach twl6040 from the pmic mfd driver"
+
+ arch/arm/mach-omap2/board-4430sdp.c    |   12 ++--
+ arch/arm/mach-omap2/board-generic.c    |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c |    4 +-
+ arch/arm/mach-omap2/twl-common.c       |   37 +-------
+ arch/arm/mach-omap2/twl-common.h       |   10 ++-
+ drivers/input/misc/Kconfig             |    3 +-
+ drivers/input/misc/twl6040-vibra.c     |    4 +-
+ drivers/mfd/Kconfig                    |   11 +--
+ drivers/mfd/twl-core.c                 |   58 +++++-------
+ drivers/mfd/twl6040-core.c             |  155 ++++++++++---------------------
+ include/linux/i2c/twl.h                |   12 +++
+ include/linux/mfd/twl6040.h            |   29 ------
+ sound/soc/codecs/Kconfig               |    3 +-
+ sound/soc/codecs/twl6040.c             |    3 +-
+ 14 files changed, 116 insertions(+), 227 deletions(-)
+
+-- 
+1.7.8.5
