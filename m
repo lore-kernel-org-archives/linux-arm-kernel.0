@@ -1,88 +1,61 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 06 Mar 2012 10:26:03 +0530
-Subject: [PATCHv4 4/6] ARM: OMAP3+: PRM: Enable IO wake up
-In-Reply-To: <4F55978C.7030407@ti.com>
-References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
- <1330701475-22576-5-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1203052001240.6649@utopia.booyaka.com>
- <4F55978C.7030407@ti.com>
-Message-ID: <4F5598E3.4050506@ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue,  6 Mar 2012 13:30:08 +0800
+Subject: [PATCH] mfd: pcap: depend on arch-pxa
+Message-ID: <1331011808-28307-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 March 2012 10:20 AM, Rajendra Nayak wrote:
-> On Tuesday 06 March 2012 09:51 AM, Paul Walmsley wrote:
->> added Rajendra, Nilesh, Vishwa, Mohan
->>
->> Hi
->>
->> On Fri, 2 Mar 2012, Tero Kristo wrote:
->>
->>> Enable IO Wake up for OMAP3/4 as part of PRM Init. Currently this has
->>> been
->>> managed in cpuidle path which is not the right place. Subsequent patch
->>> will remove IO Daisy chain handling in cpuidle path once daisy chain is
->>> handled as part of hwmod mux. This patch also moves the OMAP4 IO wakeup
->>> enable code from the trigger function to init time setup.
->>>
->>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
->>
->> Should we keep the I/O wakeups enabled all the time?
->>
->> Seems like that could result in at least one spurious wake-up event --
->> and
->> thus a PRCM interrupt -- for each I/O pad that has WAKEUPENABLE set.
->> Seems like these interrupts could recur every time the I/O chain is
->> reset.
->> And that the I/O chain is now reset in every hwmod idle and enable
->> operation for an IP block that contains dynamic mux data?
->>
->> Thinking about the problem na?vely... maybe you all can think through
->> this
->> with me:
->>
->> Consider an IP block 'A' that has a signal (like the UART rx_irrx signal)
->> that's mux'ed to a pad with WAKEUPENABLE set. (Some examples of 'A' might
->> include a UART, a GPIO, or a McBSP.)
->>
->> Shouldn't we enable I/O wakeups (by setting EN_IO/GLOBAL_WUEN) only
->> immediately before the powerdomain containing IP block 'A' is going to
->> transition into RETENTION or OFF?
->
-> Hi Paul,
->
-> I completely agree with your observations and we knew we would have
-> additional wakeups with this design. Like I mentioned in the other
-> thread, we went ahead with this approach knowing we need to optimize
-> with some kind of powerdomain level usecounting in the future, because
-> it didn't exist back then when we did it this way.
-> But now that we already have it, maybe we can fix this and do
-> it such that we completely avoid an additional wakeup interrupt.
->
->>
->> If we do that, then we can avoid needlessly resetting the I/O chain
->> when a
->> powerdomain is not going to go into a low-power state.
->>
->> I haven't measured the time it takes for the I/O chain to be reset.
->> Maybe one of you have. But that 100 microsecond timeout that was
->> specified in two of the other patches in this series has me a little
->> worried.
->
-> I haven't profiled it myself but I am guessing the delay isn't much.
+drivers/mfd/ezx-pcap.c: In function ?pcap_isr_work?:
+drivers/mfd/ezx-pcap.c:206:2: error: implicit declaration of function
+?pxa_irq_to_gpio?
+make[2]: *** [drivers/mfd/ezx-pcap.o] Error 1
 
-Having said that, I do agree with you that, however small the delay,
-we end up doing needless IO trigger when the powerdomain isn't
-really entering a low power state.
+PCAP driver invokes irq_to_gpio() directly. This function isn't common
+function in most silicons. PCAP driver is enabled for EZX machine with
+arch-pxa. Now use pxa_irq_to_gpio() instead.
 
-> The 100us comes from the fact that there is no documentation on the
-> exact delay, so went around asking whats the *real worst case* delay,
-> and we got an answer, 100us should be really big enough :)
->
-> regards,
-> Rajendra
->
->>
->>
->> - Paul
->
+It's only a workaround for this issue. Acutally the best solution is
+using thread irq to fix this issue.
+
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+---
+ drivers/mfd/Kconfig    |    2 +-
+ drivers/mfd/ezx-pcap.c |    3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index f147395..e88d315 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -619,7 +619,7 @@ config AB3100_OTP
+ 
+ config EZX_PCAP
+ 	bool "PCAP Support"
+-	depends on GENERIC_HARDIRQS && SPI_MASTER
++	depends on GENERIC_HARDIRQS && SPI_MASTER && ARCH_PXA
+ 	help
+ 	  This enables the PCAP ASIC present on EZX Phones. This is
+ 	  needed for MMC, TouchScreen, Sound, USB, etc..
+diff --git a/drivers/mfd/ezx-pcap.c b/drivers/mfd/ezx-pcap.c
+index 43a76c4..e9320e2 100644
+--- a/drivers/mfd/ezx-pcap.c
++++ b/drivers/mfd/ezx-pcap.c
+@@ -18,6 +18,7 @@
+ #include <linux/mfd/ezx-pcap.h>
+ #include <linux/spi/spi.h>
+ #include <linux/gpio.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/slab.h>
+ 
+ #define PCAP_ADC_MAXQ		8
+@@ -202,7 +203,7 @@ static void pcap_isr_work(struct work_struct *work)
+ 		}
+ 		local_irq_enable();
+ 		ezx_pcap_write(pcap, PCAP_REG_MSR, pcap->msr);
+-	} while (gpio_get_value(irq_to_gpio(pcap->spi->irq)));
++	} while (gpio_get_value(pxa_irq_to_gpio(pcap->spi->irq)));
+ }
+ 
+ static void pcap_irq_handler(unsigned int irq, struct irq_desc *desc)
+-- 
+1.7.5.4
