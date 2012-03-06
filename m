@@ -1,28 +1,67 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 6 Mar 2012 17:11:36 +0200
-Subject: [PATCHv5 0/6] ARM: OMAP3+: IO daisy chain support fixes
-Message-ID: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+Date: Tue, 6 Mar 2012 17:11:37 +0200
+Subject: [PATCHv5 1/6] ARM: OMAP3 PM: correct enable/disable of daisy io chain
+In-Reply-To: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1331046702-2472-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Mohan V <mohanv@ti.com>
 
-Changes compared to previous version:
+Currently the enabling and disabling of IO Daisy chain is not
+according to the TRM. The below steps are followed to enable/
+disable the IO chain according to the "Sec 3.5.7.2.2
+I/O Wake-Up Mechanism" in OMAP3630 Public TRM[1].
 
-- patch2:
-  * fixed the timeout for waiting for ST_IO_CHAIN == 1
-  * added clear for ST_IO_CHAIN bit (as per spec + implementation in patch 1)
-  * replaced the timeout at the end of function with a simple register
-    readback (timing out on a register value that we are clearing does
-    not make that much sense, the bit is cleared the very first time CPU
-    manages to read it)
-- patch5:
-  * added spinlock for protecting io_chain_trigger operation
+Steps to enable IO chain:
+[a] Set PM_WKEN_WKUP.EN_IO bit
+[b] Set the PM_WKEN_WKUP.EN_IO_CHAIN bit
+[c] Poll for PM_WKST_WKUP.ST_IO_CHAIN.
+[d] When ST_IO_CHAIN bit set to 1, clear PM_WKEN_WKUP.EN_IO_CHAIN
+[e] Clear ST_IO_CHAIN bit.
 
-Tested on omap3 beagle + omap4 blaze. Also did measurements for the
-cost of IO chain trigger operation with ARM performance counters:
+Steps to disable IO chain:
+[a] Clear PM_WKEN_WKUP.EN_IO_CHAIN bit
+[b] Clear PM_WKEN_WKUP.EN_IO bit
+[c] Clear PM_WKST_WKUP.ST_IO bit by writing 1 to it.
 
-- omap3 approx 7...8us
-- omap4 approx 2...4us
+Step [e] & [c] in each case can be skipped, as these are handled
+by the PRCM interrupt handler later.
 
--Tero
+[1] http://focus.ti.com/pdfs/wtbu/OMAP36xx_ES1.x_PUBLIC_TRM_vV.zip
+
+Signed-off-by: Mohan V <mohanv@ti.com>
+Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+Reviewed-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index fc69875..b0821a8 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -94,16 +94,17 @@ static void omap3_enable_io_chain(void)
+ 	/* Do a readback to assure write has been done */
+ 	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+ 
+-	while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN) &
++	while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
+ 		 OMAP3430_ST_IO_CHAIN_MASK)) {
+ 		timeout++;
+ 		if (timeout > 1000) {
+ 			pr_err("Wake up daisy chain activation failed.\n");
+ 			return;
+ 		}
+-		omap2_prm_set_mod_reg_bits(OMAP3430_ST_IO_CHAIN_MASK,
+-					   WKUP_MOD, PM_WKEN);
+ 	}
++	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
++			PM_WKEN);
++
+ }
+ 
+ static void omap3_disable_io_chain(void)
+-- 
+1.7.4.1
