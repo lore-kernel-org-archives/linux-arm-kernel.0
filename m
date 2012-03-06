@@ -1,32 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 6 Mar 2012 23:50:57 +0800
-Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
-In-Reply-To: <20120305174232.GA3852@pengutronix.de>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
- <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
- <20120305174232.GA3852@pengutronix.de>
-Message-ID: <20120306155055.GA13802@S2101-09.ap.freescale.net>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Tue, 6 Mar 2012 15:37:37 +0000
+Subject: [PATCH v4] lpc32xx: Added ethernet driver: smp_wmb()
+In-Reply-To: <20120306141745.GA15201@n2100.arm.linux.org.uk>
+References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
+ <1330987524.2538.61.camel@bwh-desktop> <4F55EA6D.3070602@antcom.de>
+ <1331042608.2347.1.camel@bwh-desktop>
+ <20120306141745.GA15201@n2100.arm.linux.org.uk>
+Message-ID: <1331048257.2333.4.camel@bwh-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 06:42:32PM +0100, Sascha Hauer wrote:
-> On Mon, Mar 05, 2012 at 10:31:05PM +0800, Shawn Guo wrote:
-> > This is the initial imx-sgtl5000 machine driver support with only
-> > playback dai link implemented.  More features can be added on top
-> > of it later.
+On Tue, 2012-03-06 at 14:17 +0000, Russell King - ARM Linux wrote:
+> On Tue, Mar 06, 2012 at 02:03:28PM +0000, Ben Hutchings wrote:
+> > On Tue, 2012-03-06 at 11:43 +0100, Roland Stigge wrote:
+> > > On 03/05/2012 11:45 PM, Ben Hutchings wrote:
+> > > >> +	/* Clear and enable interrupts */
+> > > >> +	writel(0xFFFF, LPC_ENET_INTCLEAR(pldat->net_base));
+> > > >> +	lpc_eth_enable_int(pldat->net_base);
+> > > >> +
+> > > >> +	/* Get the next TX buffer output index */
+> > > >> +	pldat->num_used_tx_buffs = 0;
+> > > >> +	pldat->last_tx_idx =
+> > > >> +		readl(LPC_ENET_TXCONSUMEINDEX(pldat->net_base));
+> > > > 
+> > > > Doesn't this need to be done *before* enabling interrupts?  Also, I
+> > > > think you need an smp_wmb() so that the interrupt handler is guaranteed
+> > > > to see all these writes.
+> > > 
+> > > Do you mean _one_ smp_wmb() directly after lpc_eth_enable_int() (which
+> > > I'm moving behind the above code?
+> > 
+> > The sequence should be
+> > 
+> > 	pldat->state = values...;
+> > 	smp_wmb();
+> > 	enable_interrupts();
 > 
-> Are there problems with capturing? It should be trivial to add and
-> it would be much more confident that this series as a whole works as
-> expected.
+> Is this correct?
 > 
-I worked all day long to try to give that answer.  Here it is.
+> "SMP BARRIER PAIRING" and "EXAMPLES OF MEMORY BARRIER SEQUENCES" in
+> Documentation/memory-barriers.txt suggest that there should be some kind
+> of pairing with smp_wmb() to ensure correctness.
 
-No, there is no problem with capturing on fsl_ssi + imx_pcm_dma +
-imx_sgtl5000 side.  But there is a problem with sgtl5000 codec driver.
-With that problem fixed in sgtl5000, this series works just fine with
-capturing.  (I'm not sure I want to fix it within this series though,
-as it's already big enough.)
+The thread we're synchronising with (the interrupt handler) starts
+*after* the smp_wmb().  Therefore there is no need for a second barrier.
+
+Ben.
 
 -- 
-Regards,
-Shawn
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
