@@ -1,28 +1,47 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 6 Mar 2012 20:22:29 +0800
-Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
- em-x270.c
-In-Reply-To: <20120306121627.GM19635@opensource.wolfsonmicro.com>
-References: <1330989122-6323-1-git-send-email-paul.gortmaker@windriver.com>
- <4F55CEDB.90909@compulab.co.il>
- <CAN1soZxdT=N1BtK5Jf4+Qu3GGCHPuKK1BqgfEV-D7QorjnsLpg@mail.gmail.com>
- <20120306121627.GM19635@opensource.wolfsonmicro.com>
-Message-ID: <CAN1soZyZwi5O089WedOzX-1h4SFKHF9kf=cBxM+3J08FA1RBvA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Mar 2012 12:25:16 +0000
+Subject: [PATCH 15/20] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+In-Reply-To: <20120306120646.GH19635@opensource.wolfsonmicro.com>
+References: <1330788001-10158-1-git-send-email-shawn.guo@linaro.org>
+ <1330788001-10158-16-git-send-email-shawn.guo@linaro.org>
+ <4F53F704.8080703@freescale.com>
+ <20120304232817.GA13516@n2100.arm.linux.org.uk>
+ <4F53FBA1.8090200@freescale.com>
+ <20120305000411.GL7363@n2100.arm.linux.org.uk>
+ <4F54053F.9070502@freescale.com>
+ <20120305002635.GA23798@opensource.wolfsonmicro.com>
+ <20120306104015.GF17370@n2100.arm.linux.org.uk>
+ <20120306120646.GH19635@opensource.wolfsonmicro.com>
+Message-ID: <20120306122516.GH17370@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2012 at 8:16 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Mar 06, 2012 at 05:12:18PM +0800, Haojian Zhuang wrote:
->
->> Could you pick up this patch since it's depend on latest change on regulator?
->
-> There's no direct dependency, there's been no need to use that struct
-> member for years - should be safe to just apply via the PXA tree. ?If
-> you do want it to go via regulator please resend, I didn't keep a copy
-> of the patch.
+On Tue, Mar 06, 2012 at 12:06:47PM +0000, Mark Brown wrote:
+> On Tue, Mar 06, 2012 at 10:40:15AM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Mar 05, 2012 at 12:26:36AM +0000, Mark Brown wrote:
+> > > On Mon, Mar 05, 2012 at 12:13:52AM +0000, Tabi Timur-B04825 wrote:
+> 
+> > > > To answer your question: I was lead to believe that the individual ALSA 
+> > > > callback functions are atomic.  So one thread should not be trying to 
+> > > > start playback while another thread is simultaneously trying to stop it.
+> 
+> > > That's correct, there's ALSA level locking.
+> 
+> > Please explain which lock prevents the capture substream trigger callback
+> > occuring simultaneously with a playback substream trigger callback on a
+> > SMP system.
+> 
+> Oh, bother - that one is per substream not per stream.  Which isn't
+> terribly helpful.
 
-OK. Let me merge this patch.
+It's actually entirely right that the core shouldn't take care of this:
+it's entirely possible that drivers do not have any dependencies between
+the two substreams and so they should not be exposed to enforced exclusivity
+between the actions of two substreams in multiprocessor systems.
 
-Best Regards
-Haojian
+Please also note that in ALSA documentation, an 'atomic' callback means
+little with respect to race conditions.  All it means is that the callback
+is called from a context where sleeping in the callback is not permitted.
+The documentation does not say what is protected by the ALSA spinlocks and
+mutexes, so without reviewing the ALSA code, driver writters have little
+idea whether they need their own locks or not.
