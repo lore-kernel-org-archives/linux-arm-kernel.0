@@ -1,87 +1,111 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon,  5 Mar 2012 22:02:57 -0600
-Subject: [PATCH v4 1/4] ARM: provide runtime hook for ioremap/iounmap
-In-Reply-To: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
+Date: Mon,  5 Mar 2012 22:02:58 -0600
+Subject: [PATCH v4 2/4] ARM: imx: convert to common runtime ioremap hook
+In-Reply-To: <1331006580-3579-1-git-send-email-robherring2@gmail.com>
 References: <alpine.LFD.2.02.1203051545200.31242@xanadu.home>
-Message-ID: <1331006580-3579-1-git-send-email-robherring2@gmail.com>
+ <1331006580-3579-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1331006580-3579-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-We have compile time over-ride of ioremap and iounmap, but an run-time
-override is needed for multi-platform builds. This adds an extra function
-pointer check, but ioremap is not peformance critical. The option for
-compile time selection remains.
+Convert i.MX platforms to use the common run-time ioremap hook instead of
+the imx specific hook.
 
-The caller variant is used here to provide correct caller information as
-ARM can only support level 0 for __builtin_return_address.
+Also, move addr_in_module out of io.h.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 ---
- arch/arm/include/asm/io.h |    7 ++++++-
- arch/arm/mm/ioremap.c     |   16 ++++++++++++++++
- 2 files changed, 22 insertions(+), 1 deletions(-)
+ arch/arm/mach-imx/mm-imx3.c               |   10 +++++-----
+ arch/arm/plat-mxc/include/mach/hardware.h |    3 +++
+ arch/arm/plat-mxc/include/mach/io.h       |   17 -----------------
+ 3 files changed, 8 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 9275828..6c363c1 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -83,6 +83,11 @@ extern void __iomem *__arm_ioremap_pfn(unsigned long, unsigned long, size_t, uns
- extern void __iomem *__arm_ioremap(unsigned long, size_t, unsigned int);
- extern void __iomem *__arm_ioremap_exec(unsigned long, size_t, bool cached);
- extern void __iounmap(volatile void __iomem *addr);
-+extern void __arm_iounmap(volatile void __iomem *addr);
-+
-+extern void __iomem * (*arch_ioremap_caller)(unsigned long, size_t,
-+	unsigned int, void *);
-+extern void (*arch_iounmap)(volatile void __iomem *);
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index 8404ee7..04be18d 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -59,8 +59,8 @@ static void imx3_idle(void)
+ 		: "=r" (reg));
+ }
  
- /*
-  * Bad read/write accesses...
-@@ -266,7 +271,7 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
-  */
- #ifndef __arch_ioremap
- #define __arch_ioremap			__arm_ioremap
--#define __arch_iounmap			__iounmap
-+#define __arch_iounmap			__arm_iounmap
+-static void __iomem *imx3_ioremap(unsigned long phys_addr, size_t size,
+-				  unsigned int mtype)
++static void __iomem *imx3_ioremap_caller(unsigned long phys_addr, size_t size,
++					 unsigned int mtype, void *caller)
+ {
+ 	if (mtype == MT_DEVICE) {
+ 		/*
+@@ -73,7 +73,7 @@ static void __iomem *imx3_ioremap(unsigned long phys_addr, size_t size,
+ 			mtype = MT_DEVICE_NONSHARED;
+ 	}
+ 
+-	return __arm_ioremap(phys_addr, size, mtype);
++	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
+ }
+ 
+ void imx3_init_l2x0(void)
+@@ -132,7 +132,7 @@ void __init imx31_init_early(void)
+ {
+ 	mxc_set_cpu_type(MXC_CPU_MX31);
+ 	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
+-	imx_ioremap = imx3_ioremap;
++	arch_ioremap_caller = imx3_ioremap_caller;
+ 	arm_pm_idle = imx3_idle;
+ }
+ 
+@@ -196,7 +196,7 @@ void __init imx35_init_early(void)
+ 	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
+ 	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
+ 	arm_pm_idle = imx3_idle;
+-	imx_ioremap = imx3_ioremap;
++	arch_ioremap_caller = imx3_ioremap_caller;
+ }
+ 
+ void __init mx35_init_irq(void)
+diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
+index a599f01..ca06a68 100644
+--- a/arch/arm/plat-mxc/include/mach/hardware.h
++++ b/arch/arm/plat-mxc/include/mach/hardware.h
+@@ -28,6 +28,9 @@
+ #define IOMEM(addr)	((void __force __iomem *)(addr))
  #endif
  
- #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 80632e8..c37c67a 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -306,9 +306,16 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
- }
- EXPORT_SYMBOL(__arm_ioremap_pfn);
++#define addr_in_module(addr, mod) \
++	((unsigned long)(addr) - mod ## _BASE_ADDR < mod ## _SIZE)
++
+ #define IMX_IO_P2V_MODULE(addr, module)					\
+ 	(((addr) - module ## _BASE_ADDR) < module ## _SIZE ?		\
+ 	 (addr) - (module ## _BASE_ADDR) + (module ## _BASE_ADDR_VIRT) : 0)
+diff --git a/arch/arm/plat-mxc/include/mach/io.h b/arch/arm/plat-mxc/include/mach/io.h
+index 338300b..ea9d95e 100644
+--- a/arch/arm/plat-mxc/include/mach/io.h
++++ b/arch/arm/plat-mxc/include/mach/io.h
+@@ -14,23 +14,6 @@
+ /* Allow IO space to be anywhere in the memory */
+ #define IO_SPACE_LIMIT 0xffffffff
  
-+void __iomem * (*arch_ioremap_caller)(unsigned long, size_t, unsigned int, void *);
-+EXPORT_SYMBOL(arch_ioremap_caller);
-+
- void __iomem *
- __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
- {
-+	if (arch_ioremap_caller)
-+		return arch_ioremap_caller(phys_addr, size, mtype,
-+			__builtin_return_address(0));
-+
- 	return __arm_ioremap_caller(phys_addr, size, mtype,
- 			__builtin_return_address(0));
- }
-@@ -370,3 +377,12 @@ void __iounmap(volatile void __iomem *io_addr)
- 	vunmap(addr);
- }
- EXPORT_SYMBOL(__iounmap);
-+
-+void (*arch_iounmap)(volatile void __iomem *) = __iounmap;
-+EXPORT_SYMBOL(arch_iounmap);
-+
-+void __arm_iounmap(volatile void __iomem *io_addr)
-+{
-+	arch_iounmap(io_addr);
-+}
-+EXPORT_SYMBOL(__arm_iounmap);
+-#define __arch_ioremap __imx_ioremap
+-#define __arch_iounmap __iounmap
+-
+-#define addr_in_module(addr, mod) \
+-	((unsigned long)(addr) - mod ## _BASE_ADDR < mod ## _SIZE)
+-
+-extern void __iomem *(*imx_ioremap)(unsigned long, size_t, unsigned int);
+-
+-static inline void __iomem *
+-__imx_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+-{
+-	if (imx_ioremap != NULL)
+-		return imx_ioremap(phys_addr, size, mtype);
+-	else
+-		return __arm_ioremap(phys_addr, size, mtype);
+-}
+-
+ /* io address mapping macro */
+ #define __io(a)		__typesafe_io(a)
+ 
 -- 
 1.7.5.4
