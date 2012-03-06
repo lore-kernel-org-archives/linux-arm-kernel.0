@@ -1,133 +1,30 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 6 Mar 2012 17:11:41 +0200
-Subject: [PATCHv5 5/6] ARM: OMAP3PLUS PM: Add IO Daisychain support via hwmod
- mux
-In-Reply-To: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
-References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1331046702-2472-6-git-send-email-t-kristo@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 6 Mar 2012 12:26:08 -0300
+Subject: I.MX35 PDK
+In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A26@MEP-EXCH.meprolight.com>
+References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A26@MEP-EXCH.meprolight.com>
+Message-ID: <4F562C90.6090103@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vishwanath BS <vishwanath.bs@ti.com>
+Alex Gershgorin wrote:
+> Hi Fabio,
+> 
+>  
+> 
+> How I can get information about accesses to CMOS_RST_B and CSI_PWDN bits
+> of MC9S08DZ60 processor.
+> 
+> I need address of this register and bits mapping in this register.  
 
-IO Daisychain feature has to be triggered whenever there is a change in
-device's mux configuration (See section 3.9.4 in OMAP4 Public TRM vP).
+You can check Freescale kernel to get this information:
+http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=shortlog;h=refs/heads/imx_2.6.31
 
-Now devices can idle independent of the powerdomain, there can be a
-window where device is idled and corresponding powerdomain can be
-ON/INACTIVE state. In such situations, since both module wake up is
-enabled at padlevel as well as io daisychain sequence is triggered,
-there will be 2 PRCM interrupts (Module async wake up via swakeup and
-IO Pad interrupt). But as PRCM Interrupt handler clears the Module
-Padlevel WKST bit in the first interrupt, module specific interrupt
-handler will not triggered for the second time
+Search for "pmic_gpio_set_bit_val"
 
-Also look at detailed explanation given by Rajendra at
-http://www.spinics.net/lists/linux-serial/msg04480.html
+Wu Guoxing submitted the mc9s08dz60 driver patch to mainline:
+drivers/gpio/gpio-mc9s08dz60.c
 
-Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |    9 +++++++--
- arch/arm/mach-omap2/pm.c         |   21 +++++++++++++++++++++
- arch/arm/mach-omap2/pm.h         |    1 +
- 3 files changed, 29 insertions(+), 2 deletions(-)
+Regards,
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 5192cab..56adbfb 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -152,6 +152,7 @@
- #include "prm44xx.h"
- #include "prminst44xx.h"
- #include "mux.h"
-+#include "pm.h"
- 
- /* Maximum microseconds to wait for OMAP module to softreset */
- #define MAX_MODULE_SOFTRESET_WAIT	10000
-@@ -1535,8 +1536,10 @@ static int _enable(struct omap_hwmod *oh)
- 	/* Mux pins for device runtime if populated */
- 	if (oh->mux && (!oh->mux->enabled ||
- 			((oh->_state == _HWMOD_STATE_IDLE) &&
--			 oh->mux->pads_dynamic)))
-+			 oh->mux->pads_dynamic))) {
- 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
-+		omap_trigger_io_chain();
-+	}
- 
- 	_add_initiator_dep(oh, mpu_oh);
- 
-@@ -1622,8 +1625,10 @@ static int _idle(struct omap_hwmod *oh)
- 		clkdm_hwmod_disable(oh->clkdm, oh);
- 
- 	/* Mux pins for device idle if populated */
--	if (oh->mux && oh->mux->pads_dynamic)
-+	if (oh->mux && oh->mux->pads_dynamic) {
- 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
-+		omap_trigger_io_chain();
-+	}
- 
- 	oh->_state = _HWMOD_STATE_IDLE;
- 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 1881fe9..b7ac0f4 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -25,8 +25,12 @@
- #include "clockdomain.h"
- #include "pm.h"
- #include "twl-common.h"
-+#include "prm2xxx_3xxx.h"
-+#include "prm44xx.h"
- 
- static struct omap_device_pm_latency *pm_lats;
-+static void (*io_chain_trigger_func) (void);
-+static DEFINE_SPINLOCK(io_chain_lock);
- 
- static int _init_omap_device(char *name)
- {
-@@ -64,6 +68,17 @@ static void omap2_init_processor_devices(void)
- 	}
- }
- 
-+void omap_trigger_io_chain(void)
-+{
-+	unsigned long flags;
-+
-+	if (io_chain_trigger_func) {
-+		spin_lock_irqsave(&io_chain_lock, flags);
-+		io_chain_trigger_func();
-+		spin_unlock_irqrestore(&io_chain_lock, flags);
-+	}
-+}
-+
- /* Types of sleep_switch used in omap_set_pwrdm_state */
- #define FORCEWAKEUP_SWITCH	0
- #define LOWPOWERSTATE_SWITCH	1
-@@ -221,6 +236,12 @@ static int __init omap2_common_pm_init(void)
- 		omap2_init_processor_devices();
- 	omap_pm_if_init();
- 
-+	if (cpu_is_omap34xx() && omap3_has_io_chain_ctrl())
-+		io_chain_trigger_func = omap3_trigger_io_chain;
-+
-+	if (cpu_is_omap44xx())
-+		io_chain_trigger_func = omap4_trigger_io_chain;
-+
- 	return 0;
- }
- postcore_initcall(omap2_common_pm_init);
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index b737b11..f9dac40 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -22,6 +22,7 @@ extern int omap3_can_sleep(void);
- extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
- extern int omap3_idle_init(void);
- extern int omap4_idle_init(void);
-+extern void omap_trigger_io_chain(void);
- 
- #if defined(CONFIG_PM_OPP)
- extern int omap3_opp_init(void);
--- 
-1.7.4.1
+Fabio Estevam
