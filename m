@@ -1,50 +1,53 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 5 Mar 2012 21:13:15 -0700 (MST)
-Subject: [PATCHv4 1/6] ARM: OMAP3 PM: correct enable/disable of daisy io
- chain
-In-Reply-To: <4F558A42.1020503@ti.com>
+Date: Mon, 5 Mar 2012 21:21:46 -0700 (MST)
+Subject: [PATCHv4 4/6] ARM: OMAP3+: PRM: Enable IO wake up
+In-Reply-To: <1330701475-22576-5-git-send-email-t-kristo@ti.com>
 References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
- <1330701475-22576-2-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1203051953580.6649@utopia.booyaka.com>
- <4F558A42.1020503@ti.com>
-Message-ID: <alpine.DEB.2.00.1203052103440.6649@utopia.booyaka.com>
+ <1330701475-22576-5-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1203052001240.6649@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra
+added Rajendra, Nilesh, Vishwa, Mohan
 
-(thanks for adding in Nilesh, added him again here)
+Hi
 
-On Tue, 6 Mar 2012, Rajendra Nayak wrote:
+On Fri, 2 Mar 2012, Tero Kristo wrote:
 
-> Yes, thats my understanding too, again based on taking to people like
-> Nilesh, because the documentation just doesn't mention this clearly.
-> The 4430 TRM is a tad bit better like you said.
+> Enable IO Wake up for OMAP3/4 as part of PRM Init. Currently this has been
+> managed in cpuidle path which is not the right place. Subsequent patch
+> will remove IO Daisy chain handling in cpuidle path once daisy chain is
+> handled as part of hwmod mux. This patch also moves the OMAP4 IO wakeup
+> enable code from the trigger function to init time setup.
 > 
-> I guess your confusion of IO wakeups working with EN_IO_CHAIN set to '0'
-> is also probably coming from the fact that the bit itself is called
-> *EN_IO_CHAIN* which is a completely *wrong* name for the bit, as
-> compared to what it does.
-> That bit is actually used to send a WUCLK pulse through the chain, so
-> you set it to '1' and wait for it to propagate through the chain, then
-> you set it to '0' and again wait for it to propagate through.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-Okay.  So to confirm: EN_IO_CHAIN doesn't enable a continuous clock, it 
-just controls the WUCLKIN line directly?
+Should we keep the I/O wakeups enabled all the time?
 
-> The control to enable/disable is at 2 levels, a global switch which is
-> 'EN_IO' in case of OMAP3 and the one at the individual pad level.
+Seems like that could result in at least one spurious wake-up event -- and 
+thus a PRCM interrupt -- for each I/O pad that has WAKEUPENABLE set.  
+Seems like these interrupts could recur every time the I/O chain is reset.  
+And that the I/O chain is now reset in every hwmod idle and enable 
+operation for an IP block that contains dynamic mux data?
 
-Do you happen to know what EN_IO/GLOBAL_WUEN does?  For example, if it's 
-0, will the I/O chain not latch in wakeup events occuring on the pads?  
-Or does it just cause the PRCM to ignore any PRCM wakeups coming from the 
-I/O chain?  (Or something else, heh)
+Thinking about the problem na?vely... maybe you all can think through this 
+with me:
 
-> You can also read this thread which has some more explanation based on
-> my understanding of how this works
-> http://www.spinics.net/lists/linux-serial/msg04480.html
+Consider an IP block 'A' that has a signal (like the UART rx_irrx signal) 
+that's mux'ed to a pad with WAKEUPENABLE set.  (Some examples of 'A' might 
+include a UART, a GPIO, or a McBSP.)  
 
-I've been reading that post; it's been quite helpful.
+Shouldn't we enable I/O wakeups (by setting EN_IO/GLOBAL_WUEN) only 
+immediately before the powerdomain containing IP block 'A' is going to 
+transition into RETENTION or OFF?
+
+If we do that, then we can avoid needlessly resetting the I/O chain when a 
+powerdomain is not going to go into a low-power state.
+
+I haven't measured the time it takes for the I/O chain to be reset.  
+Maybe one of you have.  But that 100 microsecond timeout that was 
+specified in two of the other patches in this series has me a little 
+worried.
 
 
 - Paul
