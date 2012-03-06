@@ -1,42 +1,145 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 6 Mar 2012 18:05:43 +0800
-Subject: [GIT PULL][v3.4] pull request on arch-pxa for regulator branch
-In-Reply-To: <CAN1soZxJO8sGZwq5LhuEOxt3uEN=s1cAOSXfbR8L5r8Hpc+t-w@mail.gmail.com>
-References: <CAN1soZxJO8sGZwq5LhuEOxt3uEN=s1cAOSXfbR8L5r8Hpc+t-w@mail.gmail.com>
-Message-ID: <CAN1soZxrEm+7wvNmS8s0HSu6VYqmK1bkvGBXzWjk8E8_27ozpQ@mail.gmail.com>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Tue, 6 Mar 2012 15:35:59 +0530
+Subject: [RFC PATCH] OMAP: UART: Enable tx wakeup bit in wer
+In-Reply-To: <alpine.DEB.2.00.1203051321580.1430@utopia.booyaka.com>
+References: <1327412249-31575-1-git-send-email-govindraj.raja@ti.com>
+ <alpine.DEB.2.00.1201251217120.5324@utopia.booyaka.com>
+ <alpine.DEB.2.00.1203051321580.1430@utopia.booyaka.com>
+Message-ID: <CAMrsUdJqmJ75=X_Qg3vQCr7zezs0jOK8L1ri8p5K=+6ZKsRFcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2012 at 2:08 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> Hi Arnd,
+On Tue, Mar 6, 2012 at 1:53 AM, Paul Walmsley <paul@pwsan.com> wrote:
 >
-> Please help to pull these from arch-pxa tree.
+> Hello Govindraj
 >
-> The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
->
-> ?Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
->
-> are available in the git repository at:
-> ?git://github.com/hzhuang1/linux.git regulator
->
-> Heiko St?bner (2):
-> ? ? ?pxa: magician/hx4700: Convert to gpio-regulator from bq24022
-> ? ? ?regulator: Remove bq24022 regulator driver
->
-> ?arch/arm/configs/magician_defconfig | ? ?2 +-
-> ?arch/arm/mach-pxa/hx4700.c ? ? ? ? ?| ? 33 ++++++--
-> ?arch/arm/mach-pxa/magician.c ? ? ? ?| ? 33 ++++++--
-> ?drivers/regulator/Kconfig ? ? ? ? ? | ? ?8 --
-> ?drivers/regulator/Makefile ? ? ? ? ?| ? ?1 -
-> ?drivers/regulator/bq24022.c ? ? ? ? | ?162 -----------------------------------
-> ?include/linux/regulator/bq24022.h ? | ? 24 -----
-> ?7 files changed, 55 insertions(+), 208 deletions(-)
-> ?delete mode 100644 drivers/regulator/bq24022.c
-> ?delete mode 100644 include/linux/regulator/bq24022.h
+> Do you intend to update and repost this serial patch? ?Or should someone
+> else deal with it? ?It would be good to get support for this additional
+> wakeup bit.
 
-Hi Arnd,
+Thanks for reminding.
+(I had got preempted with other activities, apologies for the delay)
 
-Please ignore this pull request. I'm sorry on this.
+I see two ways of adding this tx wake-up flag.
 
-Best Regards
-Haojian
+1.) passing a feature flag from pdata and populating the feature value to wer.
+
+2.) Duplicating the uart1/2/3 hwmod for omap3430 without dev attrib
+and uart1/2/3/4
+     hwmod for omap3630 with dev attribs.
+
+Approach-2 adds unnecessary code duplication in hwmod file with and without
+dev_attribs, So right now here is the patch to follow approach [1],
+
+If its strongly recommended to use approach-2 will add it.
+(My concern is the diffstat it might produce with approach-2)
+
+--
+Thanks,
+Govindraj.R
+
+
+[1]:
+
+>From 867dfa7328b4219be259a204555a6baae82ec4df Mon Sep 17 00:00:00 2001
+From: "Govindraj.R" <govindraj.raja@ti.com>
+Date: Tue, 6 Mar 2012 15:04:47 +0530
+Subject: [PATCH] OMAP: UART: enable tx wake up capability for 3630 above socs
+
+>From omap3630 above UART wer(wakeup enable reg) has TX
+wakeup capability, enable the tx wakeup bit by passing
+the required feature flag from pdata.
+Also add missing wer reg restore from context restore function.
+
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/serial.c                  |    3 +++
+ arch/arm/plat-omap/include/plat/omap-serial.h |    7 +++++++
+ drivers/tty/serial/omap-serial.c              |    8 +++++++-
+ 3 files changed, 17 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index f590afc..eb43996 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -357,6 +357,9 @@ void __init omap_serial_init_port(struct
+omap_board_data *bdata,
+ 	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
+ 	omap_up.autosuspend_timeout = info->autosuspend_timeout;
+
++	if (!cpu_is_omap24xx() && !cpu_is_omap3430())
++		omap_up.has_feature = UART_FEATURE_TX_WAKEUP_EN;
++
+ 	/* Enable the MDR1 Errata i202 for OMAP2430/3xxx/44xx */
+ 	if (!cpu_is_omap2420() && !cpu_is_ti816x())
+ 		omap_up.errata |= UART_ERRATA_i202_MDR1_ACCESS;
+diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h
+b/arch/arm/plat-omap/include/plat/omap-serial.h
+index 9ff4444..b4f42dc 100644
+--- a/arch/arm/plat-omap/include/plat/omap-serial.h
++++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+@@ -61,6 +61,11 @@
+ #define UART_ERRATA_i202_MDR1_ACCESS	BIT(0)
+ #define UART_ERRATA_i291_DMA_FORCEIDLE	BIT(1)
+
++#define OMAP_UART_TX_WAKEUP_EN		BIT(7)
++
++/* Feature flags */
++#define UART_FEATURE_TX_WAKEUP_EN	BIT(0)
++
+ struct omap_uart_port_info {
+ 	bool			dma_enabled;	/* To specify DMA Mode */
+ 	unsigned int		uartclk;	/* UART clock rate */
+@@ -70,6 +75,7 @@ struct omap_uart_port_info {
+ 	unsigned int		dma_rx_timeout;
+ 	unsigned int		autosuspend_timeout;
+ 	unsigned int		dma_rx_poll_rate;
++	unsigned int		has_feature;
+
+ 	int (*get_context_loss_count)(struct device *);
+ 	void (*set_forceidle)(struct platform_device *);
+@@ -117,6 +123,7 @@ struct uart_omap_port {
+ 	unsigned char		dlh;
+ 	unsigned char		mdr1;
+ 	unsigned char		scr;
++	unsigned char		wer;
+
+ 	int			use_dma;
+ 	/*
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index f809041..5d7330f 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -577,8 +577,10 @@ static int serial_omap_startup(struct uart_port *port)
+ 	up->ier = UART_IER_RLSI | UART_IER_RDI;
+ 	serial_out(up, UART_IER, up->ier);
+
++	up->wer |= OMAP_UART_WER_MOD_WKUP;
++
+ 	/* Enable module level wake up */
+-	serial_out(up, UART_OMAP_WER, OMAP_UART_WER_MOD_WKUP);
++	serial_out(up, UART_OMAP_WER, up->wer);
+
+ 	pm_runtime_mark_last_busy(&up->pdev->dev);
+ 	pm_runtime_put_autosuspend(&up->pdev->dev);
+@@ -1444,6 +1446,8 @@ static int serial_omap_probe(struct platform_device *pdev)
+ 	}
+ 	up->uart_dma.uart_base = mem->start;
+ 	up->errata = omap_up_info->errata;
++	if (omap_up_info->has_feature & UART_FEATURE_TX_WAKEUP_EN)
++		up->wer |= OMAP_UART_TX_WAKEUP_EN;
+
+ 	if (omap_up_info->dma_enabled) {
+ 		up->uart_dma.uart_dma_tx = dma_tx->start;
+@@ -1569,6 +1573,8 @@ static void serial_omap_restore_context(struct
+uart_omap_port *up)
+ 		serial_omap_mdr1_errataset(up, up->mdr1);
+ 	else
+ 		serial_out(up, UART_OMAP_MDR1, up->mdr1);
++
++	serial_out(up, UART_OMAP_WER, up->wer);
+ }
+
+ static int serial_omap_runtime_suspend(struct device *dev)
+-- 
+1.7.5.4
