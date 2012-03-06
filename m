@@ -1,43 +1,37 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 7 Mar 2012 00:15:38 +0400
-Subject: [PATCH/RFC 2/2] arm/tegra: add timeout to PCIe PLL lock
- detection loop
-In-Reply-To: <4F56424A.3020305@wwwdotorg.org>
-References: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
- <1331023544-6439-3-git-send-email-mad_soft@inbox.ru>
- <4F56424A.3020305@wwwdotorg.org>
-Message-ID: <20120306201538.GA14350@rainbow>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Mar 2012 20:17:52 +0000
+Subject: [PATCH 6/6] ARM: mm: truncate memory banks to fit in 4GB space
+ for classic MMU
+In-Reply-To: <alpine.LFD.2.02.1203061448540.31242@xanadu.home>
+References: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
+ <1331052846-19144-7-git-send-email-will.deacon@arm.com>
+ <4F565230.6030800@ru.mvista.com>
+ <20120306175853.GB17518@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1203061448540.31242@xanadu.home>
+Message-ID: <20120306201752.GA18151@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:58 Tue 06 Mar     , Stephen Warren wrote:
-> On 03/06/2012 01:45 AM, Dmitry Artamonow wrote:
-> > Tegra PCIe driver waits for PLL to lock using busy loop.
-> > If PLL fails to lock for some reason, this leads to silent lockup
-> > while booting (as PCIe code is not modular).
+Hi Nicolas,
+
+On Tue, Mar 06, 2012 at 07:49:43PM +0000, Nicolas Pitre wrote:
+> On Tue, 6 Mar 2012, Will Deacon wrote:
+> > On Tue, Mar 06, 2012 at 06:06:40PM +0000, Sergei Shtylyov wrote:
+> > > On 03/06/2012 07:54 PM, Will Deacon wrote:
+> > > 
+> > > > +#ifndef CONFIG_LPAE
+> > > > +	if (bank->start + size<  bank->start) {
+> > > > +		printk(KERN_CRIT "Truncating memory at 0x%08llx to fit in "
+> > > > +			"32-bit physical address space\n", (long long)start);
+> > > > +		size = ULONG_MAX - bank->start;
+> > > 
+> > >     I think you forgot to add one here.
 > > 
-> > Fix by adding timeout, so if PLL doesn't lock in a couple
-> > of seconds, just PCIe driver fails and machine continues to boot.
-> > 
-> > Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+> > No, I deliberately omit the last page because otherwise we end up with the
+> > end address of the bank being calculated as 0, which leads to boot failure.
 > 
-> That seems reasonable. So once the mdelay discussion is resolved,
-> 
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> 
-> Any idea why the PLL doesn't lock sometimes?
+> What this mentioned in the code, or at least in the patch log?
 
+Good idea - I'll add a comment to the code when we assign size.
 
-Please dismiss this patch - I forgot to turn 'return' to 'return 0' at
-the end of the function, while converting it's type from void to int,
-and it causes driver to fail always now. I'll send updated version shortly.
-
-Also I've managed to get another Harmony board today, and it doesn't have
-problems with PLL locking (PLL locks on it in about 2ms), so probably the
-issue I've seen is caused by some hardware fault on the first board,
-or is specific to some particular revision of the board and/or Tegra2 chip.
-
-I'll do more testing tomorrow and re-spin the patches.
--- 
-Best regards,
-Dmitry "MAD" Artamonow
+Will
