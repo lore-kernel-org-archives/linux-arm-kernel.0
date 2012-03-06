@@ -1,38 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Mar 2012 11:07:53 +0000
-Subject: Problems with "[PATCH 0/9] DMA engine cookie handling cleanups"
-In-Reply-To: <CACKLOr3zFmNXYV6MW01uykp7geG=1gAkWcxYoMgLdqfzhMD9fw@mail.gmail.com>
-References: <CACKLOr3zFmNXYV6MW01uykp7geG=1gAkWcxYoMgLdqfzhMD9fw@mail.gmail.com>
-Message-ID: <20120306110753.GG17370@n2100.arm.linux.org.uk>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Tue, 6 Mar 2012 15:19:51 +0400
+Subject: [PATCH/RFC 2/2] arm/tegra: add timeout to PCIe PLL lock
+ detection loop
+In-Reply-To: <CANndwHav6JcqNOuOXcD1dSNUmVYAV=MJ+y+ud6202q6Dh42Vgw@mail.gmail.com>
+References: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
+ <1331023544-6439-3-git-send-email-mad_soft@inbox.ru>
+ <CANndwHav6JcqNOuOXcD1dSNUmVYAV=MJ+y+ud6202q6Dh42Vgw@mail.gmail.com>
+Message-ID: <20120306111951.GA8494@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 12:03:54PM +0100, javier Martin wrote:
-> Hi Russell,
-> I've just seen this series in the mailing list archives:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/087917.html
+On 10:38 Tue 06 Mar     , Andi wrote:
+> Hi,
 > 
-> As some people already stated, patch 1/9 is missing.
+> On Tue, Mar 6, 2012 at 9:45 AM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+> > ? ? ? ?/* Wait for the PLL to lock */
+> > + ? ? ? timeout = 2000;
+> > ? ? ? ?do {
+> > ? ? ? ? ? ? ? ?val = pads_readl(PADS_PLL_CTL);
+> > + ? ? ? ? ? ? ? mdelay(1);
+> 
+> why are you using an mdelay? If you need to sleep 1ms just use
+> usleep_range or similar
 
-They weren't all sent to linux-arm-kernel - they were only sent to the
-appropriate people listed in MAINTAINERS.  So if you didn't receive them,
-either the patch was not touching a driver you maintain or your entries
-in MAINTAINERS is incomplete.
+This driver uses mdelay(1) in other places, so I just used it for the sake
+of consistency. And as this code runs just one time on boot, there's not
+really much harm in doing delay with busy loop instead of sleeping.
 
-> In my case it is even worse: I didn't received any of the patches in
-> my mail-box despite being subscribed to the list.
-> 
-> As you'll probably have noticed, I'm doing some deep cleanup on
-> 'imx-dma.c' file as you can see in the following patches:
-> 
-> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
-> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
-> [PATCH 00/14] dmaengine: imx-dma: merge dma arch code into dmaengine.
-> 
-> Currently, I'm waiting for Sascha and Vinod to confirm that they are
-> fine and merge them. However, your series seems to conflict with those
-> patches as it modifies imx-dma.
+Anyway, I agree that sleeping is better than busy waiting in general, so
+I can respin this patch using usleep_range, or else prepare incremental
+patch on top of this, which will change all mdelay in driver to usleep_range.
 
-I expect that whenever these patches get posted, there will be some kind
-of conflict with some work going on somewhere else.  There's not much
-which can be done to get away from that.
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
