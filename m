@@ -1,171 +1,27 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 5 Mar 2012 17:03:53 -0700
-Subject: [PATCH V2] ARM: tegra: update defconfig
-Message-ID: <1330992233-8493-1-git-send-email-swarren@nvidia.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 6 Mar 2012 00:06:45 +0000
+Subject: [PATCH v2 01/17] ASoC: imx: move eukrea audmux call into ASoC
+ machine driver
+In-Reply-To: <20120305192759.GB3852@pengutronix.de>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-2-git-send-email-shawn.guo@linaro.org>
+ <20120305174612.GY3224@opensource.wolfsonmicro.com>
+ <20120305192759.GB3852@pengutronix.de>
+Message-ID: <20120306000644.GA3201@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refresh tegra_defconfig:
+On Mon, Mar 05, 2012 at 08:27:59PM +0100, Sascha Hauer wrote:
 
-New options enabled:
-* PERF_EVENTS
-* Tegra EMC scaling
-* Support for all 4 CPUs on Tegra30
-* AUTO_ZRELADDR for unified Tegra20+Tegra30 images
-* CPU_FREQ/CPU_IDLE
-* BLK_DEV_SR
-* INPUT_EVDEV
-* Regulators, including fixed, GPIO, TPS6586x
-* Audio for Tegra+ALC5632 (for Paz00/Toshiba AC100)
-* NVEC (staging, for Paz00/Toshiba AC100)
-* IOMMU for Tegra20's GART and Tegra30's SMMU
-* TEGRA_AES
-* ext4, for trim support on SD/eMMC
+> For patches 01-08 I can give my:
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2: Added ext4 support per request from Olof
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
- arch/arm/configs/tegra_defconfig |   33 ++++++++++++++++++++++-----------
- 1 files changed, 22 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index fd5d304..351d670 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -11,11 +11,14 @@ CONFIG_RT_GROUP_SCHED=y
- CONFIG_BLK_DEV_INITRD=y
- # CONFIG_ELF_CORE is not set
- CONFIG_EMBEDDED=y
-+CONFIG_PERF_EVENTS=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_EFI_PARTITION=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_TEGRA=y
-@@ -27,18 +30,20 @@ CONFIG_MACH_PAZ00=y
- CONFIG_MACH_TRIMSLICE=y
- CONFIG_MACH_WARIO=y
- CONFIG_MACH_VENTANA=y
--CONFIG_TEGRA_DEBUG_UARTD=y
--CONFIG_ARM_ERRATA_742230=y
-+CONFIG_TEGRA_EMC_SCALING_ENABLE=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
--CONFIG_NR_CPUS=2
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
- CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_AUTO_ZRELADDR=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -68,7 +73,6 @@ CONFIG_IPV6_MULTIPLE_TABLES=y
- # CONFIG_FIRMWARE_IN_KERNEL is not set
- CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
--CONFIG_MISC_DEVICES=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
- CONFIG_ICS932S401=y
-@@ -76,6 +80,7 @@ CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
-+CONFIG_BLK_DEV_SR=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_DUMMY=y
-@@ -85,8 +90,7 @@ CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
- # CONFIG_WLAN is not set
--# CONFIG_INPUT is not set
--# CONFIG_SERIO is not set
-+CONFIG_INPUT_EVDEV=y
- # CONFIG_VT is not set
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_DEVKMEM is not set
-@@ -96,13 +100,15 @@ CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
--# CONFIG_I2C_HELPER_AUTO is not set
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
- CONFIG_SPI_TEGRA=y
- CONFIG_SENSORS_LM90=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
-+CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_TPS6586X=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-@@ -116,11 +122,13 @@ CONFIG_SND_SOC=y
- CONFIG_SND_SOC_TEGRA=y
- CONFIG_SND_SOC_TEGRA_WM8903=y
- CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
-+CONFIG_SND_SOC_TEGRA_ALC5632=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
-+CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_TEGRA=y
-@@ -130,6 +138,11 @@ CONFIG_STAGING=y
- CONFIG_IIO=y
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_AK8975=y
-+CONFIG_MFD_NVEC=y
-+CONFIG_KEYBOARD_NVEC=y
-+CONFIG_SERIO_NVEC_PS2=y
-+CONFIG_TEGRA_IOMMU_GART=y
-+CONFIG_TEGRA_IOMMU_SMMU=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
-@@ -138,13 +151,12 @@ CONFIG_EXT3_FS=y
- # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
- CONFIG_EXT3_FS_POSIX_ACL=y
- CONFIG_EXT3_FS_SECURITY=y
-+CONFIG_EXT4_FS=y
- # CONFIG_DNOTIFY is not set
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_NFS_FS=y
- CONFIG_ROOT_NFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_EFI_PARTITION=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
-@@ -162,9 +174,8 @@ CONFIG_DEBUG_SG=y
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
- CONFIG_CRYPTO_ECB=y
--CONFIG_CRYPTO_AES=y
- CONFIG_CRYPTO_ARC4=y
- CONFIG_CRYPTO_TWOFISH=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_CRYPTO_DEV_TEGRA_AES=y
- CONFIG_CRC_CCITT=y
--CONFIG_CRC16=y
--- 
-1.7.0.4
+Great, applied all those - thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120306/5bddbc7e/attachment.sig>
