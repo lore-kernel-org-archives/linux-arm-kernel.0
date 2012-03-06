@@ -1,46 +1,48 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 5 Mar 2012 23:44:44 -0600
-Subject: [PATCHv4 2/6] ARM: OMAP3 PM: Move IO Daisychain function to
- omap3 prm file
-In-Reply-To: <1330701475-22576-3-git-send-email-t-kristo@ti.com>
-References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
- <1330701475-22576-3-git-send-email-t-kristo@ti.com>
-Message-ID: <20120306054443.GA5670@kobold>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 6 Mar 2012 13:51:11 +0800
+Subject: [GIT PULL][v3.4] pull request on pxa tree for DT branch
+Message-ID: <CAN1soZyA8iYJjcWRQoPEP=ksCwVfP6JYqcAdVh_qYjg2oc5XqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:17-20120302, Tero Kristo wrote:
-> From: Vishwanath BS <vishwanath.bs@ti.com>
-> 
-> Since IO Daisychain modifies only PRM registers, it makes sense to move
-> it to PRM File. Also changed the timeout value for IO chain enable to
-> 100us and added a wait for status disable at the end.
-> 
-[...]
-> +/*
-> + * Maximum time(us) it takes to output the signal WUCLKOUT of the last pad of
-> + * the I/O ring after asserting WUCLKIN high
-> + */
-> +#define MAX_IOPAD_LATCH_TIME 100
-> +
-> +/* OMAP3 Daisychain enable sequence */
-> +void omap3_trigger_io_chain(void)
-> +{
-> +	int i = 0;
-> +
-> +	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> +				   PM_WKEN);
-> +	/* Do a readback to assure write has been done */
-> +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
-> +
-> +	omap_test_timeout(((omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
-> +			    OMAP3430_ST_IO_CHAIN_MASK) == 1),
-umm
-arch/arm/mach-omap2/prm-regbits-34xx.h:#define OMAP3430_ST_IO_CHAIN_MASK
-(1 << 16)
-(reg & (1 << 16)) == 1
-will ever be true?
+Hi Arnd,
 
--- 
-Regards,
-Nishanth Menon
+Please help to pull DT patches on pxa tree. I based it on v3.3-rc6.
+
+The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+
+  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git dt
+
+Haojian Zhuang (6):
+      serial: pxa: add OF support
+      i2c: pxa: add OF support
+      ARM: mmp: enable rtc clk in pxa168
+      ARM: mmp: append OF support on pxa168
+      ARM: dts: append DTS file of pxa168
+      Document: devicetree: add OF documents for arch-mmp
+
+ Documentation/devicetree/bindings/arm/mrvl.txt     |    6 +
+ .../devicetree/bindings/gpio/mrvl-gpio.txt         |   23 +++++
+ Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   37 ++++++++
+ .../devicetree/bindings/rtc/sa1100-rtc.txt         |   17 ++++
+ .../devicetree/bindings/serial/mrvl-serial.txt     |    4 +
+ arch/arm/boot/dts/pxa168-aspenite.dts              |   38 ++++++++
+ arch/arm/boot/dts/pxa168.dtsi                      |   98 ++++++++++++++++++++
+ arch/arm/mach-mmp/Kconfig                          |   10 ++
+ arch/arm/mach-mmp/Makefile                         |    1 +
+ arch/arm/mach-mmp/mmp-dt.c                         |   75 +++++++++++++++
+ arch/arm/mach-mmp/pxa168.c                         |    2 +
+ drivers/i2c/busses/i2c-pxa.c                       |   95 +++++++++++++++----
+ drivers/tty/serial/pxa.c                           |   52 ++++++++---
+ 13 files changed, 425 insertions(+), 33 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mrvl.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/mrvl-serial.txt
+ create mode 100644 arch/arm/boot/dts/pxa168-aspenite.dts
+ create mode 100644 arch/arm/boot/dts/pxa168.dtsi
+ create mode 100644 arch/arm/mach-mmp/mmp-dt.c
