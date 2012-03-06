@@ -1,199 +1,175 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 6 Mar 2012 20:00:39 +0100
-Subject: [PATCH v5 3/4] clk: introduce the common clock framework
-In-Reply-To: <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-4-git-send-email-mturquette@linaro.org>
- <20120303133158.GA26882@pengutronix.de>
- <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
- <20120304115201.GB26882@pengutronix.de>
- <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
- <20120305073836.GU3852@pengutronix.de>
- <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
-Message-ID: <20120306190039.GJ3852@pengutronix.de>
+From: jason@lakedaemon.net (Jason)
+Date: Tue, 6 Mar 2012 14:01:39 -0500
+Subject: [RFC 09/14] MV SATA: Add per channel clk/clkdev support.
+In-Reply-To: <1331015471-28872-10-git-send-email-andrew@lunn.ch>
+References: <1331015471-28872-1-git-send-email-andrew@lunn.ch>
+ <1331015471-28872-10-git-send-email-andrew@lunn.ch>
+Message-ID: <20120306190139.GW5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 12:03:15PM -0800, Turquette, Mike wrote:
-> On Sun, Mar 4, 2012 at 11:38 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Sun, Mar 04, 2012 at 04:12:21PM -0800, Turquette, Mike wrote:
-> >> >>
-> >> >> I believe this patch already does what you suggest, but I might be
-> >> >> missing your point.
-> >> >
-> >> > In include/linux/clk-private.h you expose struct clk outside the core.
-> >> > This has to be done to make static initializers possible. There is a big
-> >> > warning in this file that it must not be included from files implementing
-> >> > struct clk_ops. You can simply avoid this warning by declaring struct clk
-> >> > with only a single member:
-> >> >
-> >> > include/linux/clk.h:
-> >> >
-> >> > struct clk {
-> >> > ? ? ? ?struct clk_internal *internal;
-> >> > };
-> >> >
-> >> > This way everybody knows struct clk (thus can embed it in their static
-> >> > initializers), but doesn't know anything about the internal members. Now
-> >> > in drivers/clk/clk.c you declare struct clk_internal exactly like struct
-> >> > clk was declared before:
-> >> >
-> >> > struct clk_internal {
-> >> > ? ? ? ?const char ? ? ? ? ? ? ?*name;
-> >> > ? ? ? ?const struct clk_ops ? ?*ops;
-> >> > ? ? ? ?struct clk_hw ? ? ? ? ? *hw;
-> >> > ? ? ? ?struct clk ? ? ? ? ? ? ?*parent;
-> >> > ? ? ? ?char ? ? ? ? ? ? ? ? ? ?**parent_names;
-> >> > ? ? ? ?struct clk ? ? ? ? ? ? ?**parents;
-> >> > ? ? ? ?u8 ? ? ? ? ? ? ? ? ? ? ?num_parents;
-> >> > ? ? ? ?unsigned long ? ? ? ? ? rate;
-> >> > ? ? ? ?unsigned long ? ? ? ? ? flags;
-> >> > ? ? ? ?unsigned int ? ? ? ? ? ?enable_count;
-> >> > ? ? ? ?unsigned int ? ? ? ? ? ?prepare_count;
-> >> > ? ? ? ?struct hlist_head ? ? ? children;
-> >> > ? ? ? ?struct hlist_node ? ? ? child_node;
-> >> > ? ? ? ?unsigned int ? ? ? ? ? ?notifier_count;
-> >> > #ifdef CONFIG_COMMON_CLK_DEBUG
-> >> > ? ? ? ?struct dentry ? ? ? ? ? *dentry;
-> >> > #endif
-> >> > };
-> >> >
-> >> > An instance of struct clk_internal will be allocated in
-> >> > __clk_init/clk_register. Now the private data stays completely inside
-> >> > the core and noone can abuse it.
-> >>
-> >> Hi Sascha,
-> >>
-> >> I see the disconnect here. ?For OMAP (and possibly other platforms) at
-> >> least some clock data is necessary during early boot, before the
-> >> regular allocation methods are available (timers for instance).
-> >
-> > We had this problem on i.MX aswell. It turned out that the timer clock
-> > is the only clock that is needed so early. We solved this by moving the
-> > clock init to the system timer init function.
+On Tue, Mar 06, 2012 at 07:31:05AM +0100, Andrew Lunn wrote:
+> The Orion kirkwood chips have a gatable clock per SATA channel. Add
+> code to get and enable this clk if it exists.
 > 
-> When you say "mov[ed] the clock init to the system timer init
-> function" do you mean that you statically allocated struct clk and
-> used the clk framework api, or instead you just did some direct
-> register writes to initialize things properly?
-
-I meant that on i.MX we do the clock tree initialization when kmalloc is
-available, see the attached patch for omap4 based on your branch which
-does the same for Omap. The first clock you need is the one for the
-timer, so you can initialize the clocktree at the beginning of
-time_init() and don't need statically initialized clocks anymore.
-
-> >
-> > Well, the file is work in progress, you probably fix this before sending
-> > it out, but I bet people will include clk-private.h and nobody else
-> > notices it.
+> Signed-of-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/mach-kirkwood/common.c           |    3 ++
+>  arch/arm/plat-orion/common.c              |    4 +-
+>  arch/arm/plat-orion/include/plat/common.h |    3 ++
+>  drivers/ata/sata_mv.c                     |   43 +++++++++++++++++++++++++---
+>  4 files changed, 46 insertions(+), 7 deletions(-)
 > 
-> clock44xx_data.c does not violate that rule.  None of the logic that
-> implements ops for those clocks is present clock44xx_data.c.
+> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> index 7588812..855540a 100644
+> --- a/arch/arm/mach-kirkwood/common.c
+> +++ b/arch/arm/mach-kirkwood/common.c
+> @@ -244,6 +244,9 @@ void __init kirkwood_sata_init(struct mv_sata_platform_data *sata_data)
+>  	if (sata_data->n_ports > 1)
+>  		kirkwood_clk_ctrl |= CGC_SATA1;
+>  
+> +	orion_clkdev_add("0", "sata_mv.0", &clk_sata0);
+> +	orion_clkdev_add("1", "sata_mv.0", &clk_sata1);
+> +
 
-Indeed, I missed that. It only has the ops but not the individual
-functions.
+This is a problem for devicetree.  With devicetree, neither
+kirkwood_sata_init(), nor orion_sata_init() are ever called.  The same
+is true for all the other drivers as well.
 
-> All of
-> the code in that file is simply initialization and registration of
-> OMAP4 clocks.  Many of the clocks are basic clock types (divider,
-> multiplexer and fixed-rate are used in that file) with protected code
-> drivers/clk/clk-*.c and the remaining clocks are of the struct
-> clk_hw_omap variety, which has code spread across several files:
+Could this be moved into the driver's _probe() function?
+
+thx,
+
+Jason.
+
+>  	orion_sata_init(sata_data, SATA_PHYS_BASE, IRQ_KIRKWOOD_SATA);
+>  }
+>  
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 05f078a..06f1e7a 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -23,8 +23,8 @@
+>  #include <plat/ehci-orion.h>
+>  
+>  /* Create a clkdev entry for a given device/clk */
+> -static void orion_clkdev_add(const char *con_id, const char *dev_id,
+> -			     struct clk *clk)
+> +void orion_clkdev_add(const char *con_id, const char *dev_id,
+> +		      struct clk *clk)
+>  {
+>  	struct clk_lookup *cl;
+>  
+> diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+> index a70976e..b739343 100644
+> --- a/arch/arm/plat-orion/include/plat/common.h
+> +++ b/arch/arm/plat-orion/include/plat/common.h
+> @@ -107,4 +107,7 @@ void __init orion_crypto_init(unsigned long mapbase,
+>  			      unsigned long srambase,
+>  			      unsigned long sram_size,
+>  			      unsigned long irq);
+> +
+> +void orion_clkdev_add(const char *con_id, const char *dev_id,
+> +		      struct clk *clk);
+>  #endif
+> diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+> index 38950ea..0f4a7e9 100644
+> --- a/drivers/ata/sata_mv.c
+> +++ b/drivers/ata/sata_mv.c
+> @@ -553,6 +553,7 @@ struct mv_host_priv {
+>  
+>  #if defined(CONFIG_HAVE_CLK)
+>  	struct clk		*clk;
+> +	struct clk              **port_clks;
+>  #endif
+>  	/*
+>  	 * These consistent DMA memory pools give us guaranteed
+> @@ -4026,6 +4027,9 @@ static int mv_platform_probe(struct platform_device *pdev)
+>  	struct mv_host_priv *hpriv;
+>  	struct resource *res;
+>  	int n_ports, rc;
+> +#if defined(CONFIG_HAVE_CLK)
+> +	int port;
+> +#endif
+>  
+>  	ata_print_version_once(&pdev->dev, DRV_VERSION);
+>  
+> @@ -4053,6 +4057,13 @@ static int mv_platform_probe(struct platform_device *pdev)
+>  
+>  	if (!host || !hpriv)
+>  		return -ENOMEM;
+> +#if defined(CONFIG_HAVE_CLK)
+> +	hpriv->port_clks = devm_kzalloc(&pdev->dev,
+> +					sizeof(struct clk *) * n_ports,
+> +					GFP_KERNEL);
+> +	if (!hpriv->port_clks)
+> +		return -ENOMEM;
+> +#endif
+>  	host->private_data = hpriv;
+>  	hpriv->n_ports = n_ports;
+>  	hpriv->board_idx = chip_soc;
+> @@ -4065,9 +4076,18 @@ static int mv_platform_probe(struct platform_device *pdev)
+>  #if defined(CONFIG_HAVE_CLK)
+>  	hpriv->clk = clk_get(&pdev->dev, NULL);
+>  	if (IS_ERR(hpriv->clk))
+> -		dev_notice(&pdev->dev, "cannot get clkdev\n");
+> -	else
+> -		clk_enable(hpriv->clk);
+> +		dev_notice(&pdev->dev, "cannot get optional clkdev\n");
+> +	else {
+> +		clk_prepare_enable(hpriv->clk);
+> +	}
+> +	for (port = 0; port < n_ports; port++) {
+> +		char port_number[16];
+> +		sprintf(port_number, "%d", port);
+> +		hpriv->port_clks[port] = clk_get(&pdev->dev, port_number);
+> +		if (!IS_ERR(hpriv->port_clks[port])) {
+> +			clk_prepare_enable(hpriv->port_clks[port]);
+> +		}
+> +	}
+>  #endif
+>  
+>  	/*
+> @@ -4097,9 +4117,15 @@ static int mv_platform_probe(struct platform_device *pdev)
+>  err:
+>  #if defined(CONFIG_HAVE_CLK)
+>  	if (!IS_ERR(hpriv->clk)) {
+> -		clk_disable(hpriv->clk);
+> +		clk_disable_unprepare(hpriv->clk);
+>  		clk_put(hpriv->clk);
+>  	}
+> +	for (port = 0; port < n_ports; port++) {
+> +		if (!IS_ERR(hpriv->port_clks[port])) {
+> +			clk_disable_unprepare(hpriv->port_clks[port]);
+> +			clk_put(hpriv->port_clks[port]);
+> +		}
+> +	}
+>  #endif
+>  
+>  	return rc;
+> @@ -4118,14 +4144,21 @@ static int __devexit mv_platform_remove(struct platform_device *pdev)
+>  	struct ata_host *host = platform_get_drvdata(pdev);
+>  #if defined(CONFIG_HAVE_CLK)
+>  	struct mv_host_priv *hpriv = host->private_data;
+> +	int port;
+>  #endif
+>  	ata_host_detach(host);
+>  
+>  #if defined(CONFIG_HAVE_CLK)
+>  	if (!IS_ERR(hpriv->clk)) {
+> -		clk_disable(hpriv->clk);
+> +		clk_disable_unprepare(hpriv->clk);
+>  		clk_put(hpriv->clk);
+>  	}
+> +	for (port = 0; port < host->n_ports; port++) {
+> +		if (!IS_ERR(hpriv->port_clks[port])) {
+> +			clk_disable_unprepare(hpriv->port_clks[port]);
+> +			clk_put(hpriv->port_clks[port]);
+> +		}
+> +	}
+>  #endif
+>  	return 0;
+>  }
+> -- 
+> 1.7.9.1
 > 
-> arch/arm/mach-omap2/clock.c
-> arch/arm/mach-omap2/clock.h
-> arch/arm/mach-omap2/clkt_dpll.c
-> arch/arm/mach-omap2/clkt_clksel.c
-> arch/arm/mach-omap2/dpll3xxx.c
-> arch/arm/mach-omap2/dpll4xxx.c
-> 
-> All of the above files include linux/clk-provider.h, not
-> linux/clk-private.h.  That code makes heavy use of the
-> __clk_get_whatever helpers and shows how a platform might honor the
-> layer of separation between struct clk and stuct clk_ops/struct
-> clk_foo.  You are correct that the code is a work-in-progress, but
-> there are no layering violations that I can see.
-> 
-> I also think we are talking past each other to some degree.  One point
-> I would like to make (and maybe you already know this from code
-> review) is that it is unnecessary to have pointers to your parent
-> struct clk*'s when either initializing or registering your clocks.  In
-> fact the existing clk_register_foo functions don't even allow you to
-> pass in parent pointers and rely wholly on string name matching.  I
-> just wanted to point that out in case it went unnoticed, as it is a
-> new way of doing things from the previous series and was born out of
-> Thomas' review of V4 and multi-parent handling.  This also keeps
-> device-tree in mind where we might not know the struct clk *pointer at
-> compile time for "connecting" discrete devices.
-
-Yes, I've seen this and I really like it. Also the change that
-multiplexers return an index to an array instead of the parent
-clock is very nice.
-
-Sascha
-
-
-8<-----------------------------------------------------
-
-ARM omap4: move clocktree init to timer init time so we don't need static clocks
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-omap2/clock44xx_data.c |    4 +++-
- arch/arm/mach-omap2/io.c             |    1 -
- arch/arm/mach-omap2/timer.c          |    3 +++
- 3 files changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index 7f833a7..5aa8dd2 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -6032,7 +6032,9 @@ int __init omap4xxx_clk_init(void)
- 		}
- # else
- 		clkdev_add(c);
--		__clk_init(NULL, c->clk);
-+
-+		clk_register(NULL, c->clk->name, c->clk->ops, c->clk->hw,
-+			c->clk->parent_names, c->clk->num_parents, c->clk->flags);
- #endif
- 	}
- 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index eb50c29..8db4380 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -476,7 +476,6 @@ void __init omap4430_init_early(void)
- 	omap44xx_clockdomains_init();
- 	omap44xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
--	omap4xxx_clk_init();
- }
- #endif
- 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 5c9acea..2cca796 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -323,9 +323,12 @@ OMAP_SYS_TIMER_INIT(3_secure, OMAP3_SECURE_TIMER, OMAP3_CLKEV_SOURCE,
- OMAP_SYS_TIMER(3_secure)
- #endif
- 
-+int __init omap4xxx_clk_init(void);
-+
- #ifdef CONFIG_ARCH_OMAP4
- static void __init omap4_timer_init(void)
- {
-+	omap4xxx_clk_init();
- #ifdef CONFIG_LOCAL_TIMERS
- 	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
- 	BUG_ON(!twd_base);
--- 
-1.7.9.1
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
