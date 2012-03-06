@@ -1,43 +1,37 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Tue, 6 Mar 2012 01:26:17 +0000
-Subject: [PATCH v4] lpc32xx: Added ethernet driver
-In-Reply-To: <1330994958.9504.2.camel@edumazet-glaptop>
-References: <1330983641-32622-1-git-send-email-stigge@antcom.de>
- <1330987524.2538.61.camel@bwh-desktop>
- <1330994958.9504.2.camel@edumazet-glaptop>
-Message-ID: <1330997177.3022.51.camel@deadeye>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 05 Mar 2012 20:41:51 -0500 (EST)
+Subject: [PATCH] ARM: remove ixp2000 platform
+In-Reply-To: <201202281945.39419.arnd@arndb.de>
+References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
+ <201202281945.39419.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-03-05 at 16:49 -0800, Eric Dumazet wrote:
-> On Mon, 2012-03-05 at 22:45 +0000, Ben Hutchings wrote:
-> > On Mon, 2012-03-05 at 22:40 +0100, Roland Stigge wrote:
-> > [...]
-> 
-> ...
-> 
-> > > +				/* Copy packet from buffer */
-> > > +				memcpy(prdbuf,
-> > > +					pldat->rx_buff_v[rxconsidx], len);
-> > > +
-> > > +				/* Pass to upper layer */
-> > > +				skb->protocol = eth_type_trans(skb, ndev);
-> > > +				netif_rx(skb);
-> > > +				ndev->last_rx = jiffies;
-> > 
-> > Drivers don't need to set last_rx any more.
-> 
-> Also, a NAPI driver should call netif_receive_skb() instead of
-> netif_rx()
-> 
-> netif_rx() is more expensive because of additional queue, while
-> netif_receive_skb() directly calls the upper stacks.
+On Tue, 28 Feb 2012, Arnd Bergmann wrote:
 
-Yes, but not until the poll function is changed to enable IRQs.
+> On Tuesday 28 February 2012, Rob Herring wrote:
+> > ixp2000 has no commits other than tree-wide changes or refactoring since
+> > 2006. No maintainer is listed for ixp2000 either.
+> 
+> I have this in my copy of the MAINTAINERS file:
+> 
+> ARM/INTEL IXP2000 ARM ARCHITECTURE
+> M:      Lennert Buytenhek <kernel@wantstofly.org>
+> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> S:      Maintained
+> 
+> It's missing an F: line, otherwise it suggests that the platform is still
+> maintained by Lennert and it certainly builds just fine. Unfortunately he
+> seems to have fallen off the edge of the planet at the end of last year.
 
-Ben.
+FYI, here's a snippet of a conversation I just had with Lennert on IRC 
+today:
 
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+13:05 < nico> do you still care about ixp2000?
+13:22 < lennert> not really, no
+13:58 < nico> do you think we could remove it from the kernel tree?
+14:01 < lennert> go for it, and remove ixp23xx too while you're at it
+
+
+Nicolas
