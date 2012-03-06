@@ -1,37 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Mar 2012 20:17:52 +0000
-Subject: [PATCH 6/6] ARM: mm: truncate memory banks to fit in 4GB space
- for classic MMU
-In-Reply-To: <alpine.LFD.2.02.1203061448540.31242@xanadu.home>
-References: <1331052846-19144-1-git-send-email-will.deacon@arm.com>
- <1331052846-19144-7-git-send-email-will.deacon@arm.com>
- <4F565230.6030800@ru.mvista.com>
- <20120306175853.GB17518@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1203061448540.31242@xanadu.home>
-Message-ID: <20120306201752.GA18151@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason)
+Date: Tue, 6 Mar 2012 15:32:22 -0500
+Subject: [RFC 00/14] Generic clk for Orion platforms.
+In-Reply-To: <alpine.LFD.2.02.1203061439190.31242@xanadu.home>
+References: <1331015471-28872-1-git-send-email-andrew@lunn.ch>
+ <20120306155840.GS5050@titan.lakedaemon.net>
+ <20120306161743.GI24858@lunn.ch>
+ <20120306172341.GU5050@titan.lakedaemon.net>
+ <alpine.LFD.2.02.1203061439190.31242@xanadu.home>
+Message-ID: <20120306203222.GX5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On Tue, Mar 06, 2012 at 07:49:43PM +0000, Nicolas Pitre wrote:
-> On Tue, 6 Mar 2012, Will Deacon wrote:
-> > On Tue, Mar 06, 2012 at 06:06:40PM +0000, Sergei Shtylyov wrote:
-> > > On 03/06/2012 07:54 PM, Will Deacon wrote:
+On Tue, Mar 06, 2012 at 02:45:23PM -0500, Nicolas Pitre wrote:
+> On Tue, 6 Mar 2012, Jason wrote:
+> > On Tue, Mar 06, 2012 at 05:17:43PM +0100, Andrew Lunn wrote:
+> > > On Tue, Mar 06, 2012 at 10:58:40AM -0500, Jason wrote:
+> > > > I'm assuming the driver(s) will increment a reference, so when it
+> > > > reaches zero, the framework would call a clk_gate hook.
 > > > 
-> > > > +#ifndef CONFIG_LPAE
-> > > > +	if (bank->start + size<  bank->start) {
-> > > > +		printk(KERN_CRIT "Truncating memory at 0x%08llx to fit in "
-> > > > +			"32-bit physical address space\n", (long long)start);
-> > > > +		size = ULONG_MAX - bank->start;
-> > > 
-> > >     I think you forgot to add one here.
+> > > You missed an important point. No driver has claimed these, but u-boot
+> > > has turned them on.
 > > 
-> > No, I deliberately omit the last page because otherwise we end up with the
-> > end address of the bank being calculated as 0, which leads to boot failure.
+> > This sounds like a bug in u-boot.
+> > 
+> > > So we want linux to turn off all clocks for which
+> > > there is no driver using them, in order to save power.
+> > > kirkwood_clk_ctrl is dual purpose. It turns on needed clocks, but it
+> > > also turns off unneeded clocks.
+> > 
+> > This is creating a lot of complexity where the real answer seems to be
+> > to get u-boot to shutoff all peripheral clocks before handing over
+> > control to linux.
 > 
-> What this mentioned in the code, or at least in the patch log?
+> No.
+> 
+> Yes, u-Boot might be wrong.  But the kernel should always distrust as 
+> much as possible from the bootloader.  Instead of presuming some initial 
+> state from the bootloader, it is best to simply set that state up front.
 
-Good idea - I'll add a comment to the code when we assign size.
+Yes, I clarified this in my response to Andrew:
 
-Will
+Wrong is wrong.  if u-boot is enabling things that aren't needed
+immediately after handoff, that needs to be fixed.  If the kernel is
+depending on that error and not checking the state of the clocks before
+performing actions, that also is broken.
+
+> The fewer ties you have with any bootloaders, the fewer bugs you'll have 
+> in the end.  Otherwise you might enter into a game of requiring a 
+> specific version of a specific bootloader to go with a given kernel, and 
+> that is far more complex to deal with than the complexity you are 
+> referring to above.
+
+Agreed.
+
+thx,
+
+Jason.
