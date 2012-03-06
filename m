@@ -1,53 +1,97 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 5 Mar 2012 21:21:46 -0700 (MST)
-Subject: [PATCHv4 4/6] ARM: OMAP3+: PRM: Enable IO wake up
-In-Reply-To: <1330701475-22576-5-git-send-email-t-kristo@ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 06 Mar 2012 09:51:42 +0530
+Subject: [PATCHv4 5/6] ARM: OMAP3PLUS PM: Add IO Daisychain support via
+ hwmod mux
+In-Reply-To: <alpine.DEB.2.00.1203052057050.6649@utopia.booyaka.com>
 References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
- <1330701475-22576-5-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1203052001240.6649@utopia.booyaka.com>
+ <1330701475-22576-6-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1203052057050.6649@utopia.booyaka.com>
+Message-ID: <4F5590D6.8030707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-added Rajendra, Nilesh, Vishwa, Mohan
+Hi Paul,
 
-Hi
+On Tuesday 06 March 2012 09:32 AM, Paul Walmsley wrote:
+> Hi
+>
+> a few comments:
+>
+> On Fri, 2 Mar 2012, Tero Kristo wrote:
+>
+>> From: Vishwanath BS<vishwanath.bs@ti.com>
+>>
+>> IO Daisychain feature has to be triggered whenever there is a change in
+>> device's mux configuration (See section 3.9.4 in OMAP4 Public TRM vP).
+>>
+>> Now devices can idle independent of the powerdomain, there can be a
+>> window where device is idled and corresponding powerdomain can be
+>> ON/INACTIVE state. In such situations, since both module wake up is
+>> enabled at padlevel as well as io daisychain sequence is triggered,
+>> there will be 2 PRCM interrupts (Module async wake up via swakeup and
+>> IO Pad interrupt). But as PRCM Interrupt handler clears the Module
+>> Padlevel WKST bit in the first interrupt, module specific interrupt
+>> handler will not triggered for the second time
+>>
+>> Also look at detailed explanation given by Rajendra at
+>> http://www.spinics.net/lists/linux-serial/msg04480.html
+>>
+>> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com>
+>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/omap_hwmod.c |    9 +++++++--
+>>   arch/arm/mach-omap2/pm.c         |   15 +++++++++++++++
+>>   arch/arm/mach-omap2/pm.h         |    1 +
+>>   3 files changed, 23 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>> index 5192cab..56adbfb 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>
+> ...
+>
+>> @@ -1535,8 +1536,10 @@ static int _enable(struct omap_hwmod *oh)
+>>   	/* Mux pins for device runtime if populated */
+>>   	if (oh->mux&&  (!oh->mux->enabled ||
+>>   			((oh->_state == _HWMOD_STATE_IDLE)&&
+>> -			 oh->mux->pads_dynamic)))
+>> +			 oh->mux->pads_dynamic))) {
+>>   		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
+>> +		omap_trigger_io_chain();
+>
+> Looks racy: if two hwmods with dynamic mux entries go idle at the same
+> time, or one goes idle while another one is enabled, won't the calls to
+> omap_trigger_io_chain() race?  Locking is per-hwmod and there's no locking
+> in omap_trigger_io_chain() or the functions it calls.
 
-On Fri, 2 Mar 2012, Tero Kristo wrote:
+I agree, this needs locking to avoid races.
 
-> Enable IO Wake up for OMAP3/4 as part of PRM Init. Currently this has been
-> managed in cpuidle path which is not the right place. Subsequent patch
-> will remove IO Daisy chain handling in cpuidle path once daisy chain is
-> handled as part of hwmod mux. This patch also moves the OMAP4 IO wakeup
-> enable code from the trigger function to init time setup.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>
+> Also, won't this result in needless resets of the I/O chain?  Seems like
+> we'd only need to do this when the next power state of the enclosing
+> powerdomain will enter either RETENTION or OFF.  And even then, it
+> presumably should only happen when the last active device in that
+> powerdomain is going idle?
 
-Should we keep the I/O wakeups enabled all the time?
+Yes, the module async wakeups will work as long as the power domain
+enclosing the module is not in OSWR or OFF, so ideally this trigger
+should happen only when all modules in the given powerdomain are
+disabled and we plan to program the Powerdomain down to OSWR or
+OFF state. With what we are doing today we end up with periods when we
+have multiple wakeups (a module wakeup as well as an IO wakeup).
+The last we discussed this with Kevin, there wasn't a better place where
+we could trigger this, with no usecounting at powerdomain level you
+didn't know when the last active device in the powerdomain was going
+idle.
+But now with Tero's series which adds usecounting at power/voltage
+domain level, maybe its possible, but I need to look more.
+Do you already have an idea on where this would fit better, so we
+avoid this multiple wakeup scenario?
 
-Seems like that could result in at least one spurious wake-up event -- and 
-thus a PRCM interrupt -- for each I/O pad that has WAKEUPENABLE set.  
-Seems like these interrupts could recur every time the I/O chain is reset.  
-And that the I/O chain is now reset in every hwmod idle and enable 
-operation for an IP block that contains dynamic mux data?
+regards,
+Rajendra
 
-Thinking about the problem na?vely... maybe you all can think through this 
-with me:
-
-Consider an IP block 'A' that has a signal (like the UART rx_irrx signal) 
-that's mux'ed to a pad with WAKEUPENABLE set.  (Some examples of 'A' might 
-include a UART, a GPIO, or a McBSP.)  
-
-Shouldn't we enable I/O wakeups (by setting EN_IO/GLOBAL_WUEN) only 
-immediately before the powerdomain containing IP block 'A' is going to 
-transition into RETENTION or OFF?
-
-If we do that, then we can avoid needlessly resetting the I/O chain when a 
-powerdomain is not going to go into a low-power state.
-
-I haven't measured the time it takes for the I/O chain to be reset.  
-Maybe one of you have.  But that 100 microsecond timeout that was 
-specified in two of the other patches in this series has me a little 
-worried.
-
-
-- Paul
+>
+>
+> - Paul
