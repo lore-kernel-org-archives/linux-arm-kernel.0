@@ -1,58 +1,78 @@
-From: jason@lakedaemon.net (Jason)
-Date: Tue, 6 Mar 2012 15:32:22 -0500
-Subject: [RFC 00/14] Generic clk for Orion platforms.
-In-Reply-To: <alpine.LFD.2.02.1203061439190.31242@xanadu.home>
-References: <1331015471-28872-1-git-send-email-andrew@lunn.ch>
- <20120306155840.GS5050@titan.lakedaemon.net>
- <20120306161743.GI24858@lunn.ch>
- <20120306172341.GU5050@titan.lakedaemon.net>
- <alpine.LFD.2.02.1203061439190.31242@xanadu.home>
-Message-ID: <20120306203222.GX5050@titan.lakedaemon.net>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue,  6 Mar 2012 15:49:38 -0500
+Subject: [PATCH v2] ARM: pxa: fix regulator related build fail in
+ magician_defconfig
+In-Reply-To: <20120306200156.GA19635@opensource.wolfsonmicro.com>
+References: <20120306200156.GA19635@opensource.wolfsonmicro.com>
+Message-ID: <1331066978-24774-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 02:45:23PM -0500, Nicolas Pitre wrote:
-> On Tue, 6 Mar 2012, Jason wrote:
-> > On Tue, Mar 06, 2012 at 05:17:43PM +0100, Andrew Lunn wrote:
-> > > On Tue, Mar 06, 2012 at 10:58:40AM -0500, Jason wrote:
-> > > > I'm assuming the driver(s) will increment a reference, so when it
-> > > > reaches zero, the framework would call a clk_gate hook.
-> > > 
-> > > You missed an important point. No driver has claimed these, but u-boot
-> > > has turned them on.
-> > 
-> > This sounds like a bug in u-boot.
-> > 
-> > > So we want linux to turn off all clocks for which
-> > > there is no driver using them, in order to save power.
-> > > kirkwood_clk_ctrl is dual purpose. It turns on needed clocks, but it
-> > > also turns off unneeded clocks.
-> > 
-> > This is creating a lot of complexity where the real answer seems to be
-> > to get u-boot to shutoff all peripheral clocks before handing over
-> > control to linux.
-> 
-> No.
-> 
-> Yes, u-Boot might be wrong.  But the kernel should always distrust as 
-> much as possible from the bootloader.  Instead of presuming some initial 
-> state from the bootloader, it is best to simply set that state up front.
+commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0 (linux-next)
 
-Yes, I clarified this in my response to Andrew:
+  "regulator: Remove support for supplies specified by struct device"
 
-Wrong is wrong.  if u-boot is enabling things that aren't needed
-immediately after handoff, that needs to be fixed.  If the kernel is
-depending on that error and not checking the state of the clocks before
-performing actions, that also is broken.
+deletes the field from the struct, but this platform was still trying
+to set those fields.  Convert them to use the REGULATOR_SUPPLY macro
+so as to fix this failure:
 
-> The fewer ties you have with any bootloaders, the fewer bugs you'll have 
-> in the end.  Otherwise you might enter into a game of requiring a 
-> specific version of a specific bootloader to go with a given kernel, and 
-> that is far more complex to deal with than the complexity you are 
-> referring to above.
+arch/arm/mach-pxa/magician.c:581: error: unknown field 'dev' specified in initializer
+arch/arm/mach-pxa/magician.c:581: warning: initialization from incompatible pointer type
+arch/arm/mach-pxa/magician.c:585: error: unknown field 'dev' specified in initializer
+arch/arm/mach-pxa/magician.c:585: warning: initialization from incompatible pointer type
 
-Agreed.
+arch/arm/mach-pxa/hx4700.c:683: error: unknown field 'dev' specified in initializer
+arch/arm/mach-pxa/hx4700.c:683: warning: initialization from incompatible pointer type
+arch/arm/mach-pxa/hx4700.c:687: error: unknown field 'dev' specified in initializer
+arch/arm/mach-pxa/hx4700.c:687: warning: initialization from incompatible pointer type
 
-thx,
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
 
-Jason.
+[v2: convert to using REGULATOR_SUPPLY instead of just deleting the
+ instances of setting the .dev field ]
+
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index f2c23ea..53c3366 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -679,14 +679,8 @@ static struct platform_device power_supply = {
+  */
+ 
+ static struct regulator_consumer_supply bq24022_consumers[] = {
+-	{
+-		.dev = &gpio_vbus.dev,
+-		.supply = "vbus_draw",
+-	},
+-	{
+-		.dev = &power_supply.dev,
+-		.supply = "ac_draw",
+-	},
++	REGULATOR_SUPPLY("vbus_draw", "gpio_vbus"),
++	REGULATOR_SUPPLY("ac_draw", "power_supply"),
+ };
+ 
+ static struct regulator_init_data bq24022_init_data = {
+diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+index 3d6baf9..71a3a3d 100644
+--- a/arch/arm/mach-pxa/magician.c
++++ b/arch/arm/mach-pxa/magician.c
+@@ -577,14 +577,8 @@ static struct platform_device power_supply = {
+  */
+ 
+ static struct regulator_consumer_supply bq24022_consumers[] = {
+-	{
+-		.dev = &gpio_vbus.dev,
+-		.supply = "vbus_draw",
+-	},
+-	{
+-		.dev = &power_supply.dev,
+-		.supply = "ac_draw",
+-	},
++	REGULATOR_SUPPLY("vbus_draw", "gpio_vbus"),
++	REGULATOR_SUPPLY("ac_draw", "power_supply"),
+ };
+ 
+ static struct regulator_init_data bq24022_init_data = {
+-- 
+1.7.9.1
