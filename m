@@ -1,38 +1,32 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Tue, 6 Mar 2012 17:35:51 +0200
-Subject: I.MX35 PDK
-In-Reply-To: <4F562C90.6090103@freescale.com>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A27@MEP-EXCH.meprolight.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 6 Mar 2012 23:50:57 +0800
+Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
+In-Reply-To: <20120305174232.GA3852@pengutronix.de>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
+ <20120305174232.GA3852@pengutronix.de>
+Message-ID: <20120306155055.GA13802@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Fabio :-) 
-
------Original Message-----
-From: Fabio Estevam [mailto:fabio.estevam at freescale.com] 
-Sent: Tuesday, March 06, 2012 5:26 PM
-To: Alex Gershgorin
-Cc: linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de; festevam at gmail.com
-Subject: Re: I.MX35 PDK
-
-Alex Gershgorin wrote:
-> Hi Fabio,
+On Mon, Mar 05, 2012 at 06:42:32PM +0100, Sascha Hauer wrote:
+> On Mon, Mar 05, 2012 at 10:31:05PM +0800, Shawn Guo wrote:
+> > This is the initial imx-sgtl5000 machine driver support with only
+> > playback dai link implemented.  More features can be added on top
+> > of it later.
 > 
->  
+> Are there problems with capturing? It should be trivial to add and
+> it would be much more confident that this series as a whole works as
+> expected.
 > 
-> How I can get information about accesses to CMOS_RST_B and CSI_PWDN bits
-> of MC9S08DZ60 processor.
-> 
-> I need address of this register and bits mapping in this register.  
+I worked all day long to try to give that answer.  Here it is.
 
-You can check Freescale kernel to get this information:
-http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=shortlog;h=refs/heads/imx_2.6.31
+No, there is no problem with capturing on fsl_ssi + imx_pcm_dma +
+imx_sgtl5000 side.  But there is a problem with sgtl5000 codec driver.
+With that problem fixed in sgtl5000, this series works just fine with
+capturing.  (I'm not sure I want to fix it within this series though,
+as it's already big enough.)
 
-Search for "pmic_gpio_set_bit_val"
-
-Wu Guoxing submitted the mc9s08dz60 driver patch to mainline:
-drivers/gpio/gpio-mc9s08dz60.c
-
+-- 
 Regards,
-
-Alex Gershgorin
+Shawn
