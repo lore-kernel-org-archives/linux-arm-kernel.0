@@ -1,43 +1,43 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 6 Mar 2012 00:12:35 -0600
-Subject: [PATCH] ARM: OMAP2+: voltage: ensure voltage used is exact
- voltage from OPP table
-In-Reply-To: <877gyyor28.fsf@ti.com>
-References: <1330728121-26664-1-git-send-email-khilman@ti.com>
- <1330940487.2116.119.camel@sokoban> <877gyyor28.fsf@ti.com>
-Message-ID: <20120306061233.GC5670@kobold>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 6 Mar 2012 14:27:45 +0800
+Subject: [PATCH v2 11/17] ASoC: fsl: create fsl_utils to accommodate the
+ common functions
+In-Reply-To: <20120305144920.GR3224@opensource.wolfsonmicro.com>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-12-git-send-email-shawn.guo@linaro.org>
+ <20120305144920.GR3224@opensource.wolfsonmicro.com>
+Message-ID: <20120306062742.GO16232@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:12-20120305, Kevin Hilman wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
+On Mon, Mar 05, 2012 at 02:49:20PM +0000, Mark Brown wrote:
+> On Mon, Mar 05, 2012 at 10:30:59PM +0800, Shawn Guo wrote:
 > 
-> > On Fri, 2012-03-02 at 14:42 -0800, Kevin Hilman wrote:
-> >> When using the SMPS regulators to scale voltages, the regulator
-> >> framework may pass a minimum voltage that is not an exact OPP voltage.
-> >> For the VC/VP controlled voltage domains, we must ensure that the
-> >> voltage requested is the exact voltage from the OPP table.  This is
-> >> especially critical when using SR.
-> >> 
-> >> To fix, voltdm_scale() uses the target voltage passed to walk through
-> >> the OPP voltages until it finds a voltage that is >= one of the OPP
-> >> voltages.
-> >
-> > I have just one question to this, how about smartreflex class1p5? Do we
-> > have any plans for that one? The old implementation at least was using
-> > voltdm_scale, so if we modify this function, smartreflex class1p5
-> > doesn't work anymore.
+> > +/**
+> > + * fsl_asoc_get_codec_dev_name - determine the dev_name for a codec node
+> > + *
+> > + * @np: pointer to the I2C device tree node
+> > + * @buf: buffer to be filled with the dev_name of the I2C device
+> > + * @len: the length of the buffer
+> > + *
+> > + * This function determines the dev_name for an I2C node.  This is the name
+> > + * that would be returned by dev_name() if this device_node were part of a
+> > + * 'struct device'  It's ugly and hackish, but it works.
+> > + *
+> > + * The dev_name for such devices include the bus number and I2C address. For
+> > + * example, "cs4270.0-004f".
+> > + */
+> > +int fsl_asoc_get_codec_dev_name(struct device_node *np, char *buf, size_t len)
 > 
-> Since it's not in mainline, that is not my concern at the moment.  We
-> can worry about SR1.5 when I someone is motivated to push it upstream.
-> 
-> > Otherwise this patch looks good to me.
+> This doesn't seem at all Freescale specific, it should be a generic
+> helper, and in fact there already is one - the machine driver can set
+> codec_of_node in the card structure to point to the device node and then
+> the core should figure out binding to the device for you.  If it doesn't
+> we should fix the core.
 
-Other than the minor misgiving of having to re-verify the voltage on
-every scale, I am OK with it as well.
-
-That said, I don't see why this should break class 1.5/3.5 support.
+Yeah, the core support works, so will remove the function here and use
+the core support.
 
 -- 
 Regards,
-Nishanth Menon
+Shawn
