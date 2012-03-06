@@ -1,88 +1,96 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 06 Mar 2012 14:13:05 +0530
-Subject: [PATCHv3 1/4] ARM: OMAP4: suspend: Program all domains to
- retention
-In-Reply-To: <1331022713.2116.144.camel@sokoban>
-References: <1330529106-10423-1-git-send-email-t-kristo@ti.com>	
- <1330529106-10423-2-git-send-email-t-kristo@ti.com> <871up6in50.fsf@ti.com>
- <1331022713.2116.144.camel@sokoban>
-Message-ID: <4F55CE19.7000309@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 6 Mar 2012 10:44:16 +0200
+Subject: [PATCHv4 4/6] ARM: OMAP3+: PRM: Enable IO wake up
+In-Reply-To: <4F5598E3.4050506@ti.com>
+References: <1330701475-22576-1-git-send-email-t-kristo@ti.com>
+ <1330701475-22576-5-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1203052001240.6649@utopia.booyaka.com>
+ <4F55978C.7030407@ti.com>  <4F5598E3.4050506@ti.com>
+Message-ID: <1331023456.2116.148.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 March 2012 02:01 PM, Tero Kristo wrote:
-> On Mon, 2012-03-05 at 16:33 -0800, Kevin Hilman wrote:
->> Tero Kristo<t-kristo@ti.com>  writes:
->>
->>> From: Rajendra Nayak<rnayak@ti.com>
->>>
->>> Remove the FIXME's in the suspend sequence since
->>> we now intend to support system level RET support.
->>>
->>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
->>> Reviewed-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>
->> So this is the only patch in this series that is still needed.  However...
->>
->> It doesn't seem like this all by itself is ready for mainline as we'll
->> suddenly start putting all powerdomains in retention without any
->> additional support.
->>
->> I guess at a minimum it needs working IO wakeup support from the IO
->> daisy chain series.  Are there other dependencies here?
->
-> Only IO chain is needed for wakeup capability. Actually even with the
-> current mainline kernel, I am unable to wake-up the device from MPU
-> retention, as there are no wakeup sources. So this patch doesn't really
+On Tue, 2012-03-06 at 10:26 +0530, Rajendra Nayak wrote:
+> On Tuesday 06 March 2012 10:20 AM, Rajendra Nayak wrote:
+> > On Tuesday 06 March 2012 09:51 AM, Paul Walmsley wrote:
+> >> added Rajendra, Nilesh, Vishwa, Mohan
+> >>
+> >> Hi
+> >>
+> >> On Fri, 2 Mar 2012, Tero Kristo wrote:
+> >>
+> >>> Enable IO Wake up for OMAP3/4 as part of PRM Init. Currently this has
+> >>> been
+> >>> managed in cpuidle path which is not the right place. Subsequent patch
+> >>> will remove IO Daisy chain handling in cpuidle path once daisy chain is
+> >>> handled as part of hwmod mux. This patch also moves the OMAP4 IO wakeup
+> >>> enable code from the trigger function to init time setup.
+> >>>
+> >>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> >>
+> >> Should we keep the I/O wakeups enabled all the time?
+> >>
+> >> Seems like that could result in at least one spurious wake-up event --
+> >> and
+> >> thus a PRCM interrupt -- for each I/O pad that has WAKEUPENABLE set.
+> >> Seems like these interrupts could recur every time the I/O chain is
+> >> reset.
+> >> And that the I/O chain is now reset in every hwmod idle and enable
+> >> operation for an IP block that contains dynamic mux data?
+> >>
+> >> Thinking about the problem na?vely... maybe you all can think through
+> >> this
+> >> with me:
+> >>
+> >> Consider an IP block 'A' that has a signal (like the UART rx_irrx signal)
+> >> that's mux'ed to a pad with WAKEUPENABLE set. (Some examples of 'A' might
+> >> include a UART, a GPIO, or a McBSP.)
+> >>
+> >> Shouldn't we enable I/O wakeups (by setting EN_IO/GLOBAL_WUEN) only
+> >> immediately before the powerdomain containing IP block 'A' is going to
+> >> transition into RETENTION or OFF?
+> >
+> > Hi Paul,
+> >
+> > I completely agree with your observations and we knew we would have
+> > additional wakeups with this design. Like I mentioned in the other
+> > thread, we went ahead with this approach knowing we need to optimize
+> > with some kind of powerdomain level usecounting in the future, because
+> > it didn't exist back then when we did it this way.
+> > But now that we already have it, maybe we can fix this and do
+> > it such that we completely avoid an additional wakeup interrupt.
+> >
+> >>
+> >> If we do that, then we can avoid needlessly resetting the I/O chain
+> >> when a
+> >> powerdomain is not going to go into a low-power state.
+> >>
+> >> I haven't measured the time it takes for the I/O chain to be reset.
+> >> Maybe one of you have. But that 100 microsecond timeout that was
+> >> specified in two of the other patches in this series has me a little
+> >> worried.
+> >
+> > I haven't profiled it myself but I am guessing the delay isn't much.
+> 
+> Having said that, I do agree with you that, however small the delay,
+> we end up doing needless IO trigger when the powerdomain isn't
+> really entering a low power state.
 
-Why?, doesn't debug console wakeup work?
+I did some measurements on this a while back and the delay was around a
+few microseconds. I can redo this while doing version 5.
 
-> change the behavior to worse even without any additional patches. :) But
-> yea, good to wait until IO chain is in.
+-Tero
 
-IO chain, according to documentation :) should be needed only if you
-hit OSWR or OFF, async wakeups should be functional as long as you
-only hit CSWR.
-
->
-> The other dependencies are that the stuff handled by patches 2,3 and 4
-> have to be handled somehow:
->
-> -patch2: must be in (this patch is queued by Paul)
-> -patch3: will be taken care of by Paul's pwrdm fixes (I guess this is
-> queued by Paul himself already)
-> -patch4: OMAP interrupt count must be increased (this is handled by
-> Benoit's patch, which is queued by Tony)
->
-> -Tero
->
->>
->> If not, I can queue this when Paul is ready to merge the IO wakeup
->> stuff.
->>
->> Kevin
->>
->>> ---
->>>   arch/arm/mach-omap2/pm44xx.c |    6 ------
->>>   1 files changed, 0 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->>> index c264ef7..1ab30a3 100644
->>> --- a/arch/arm/mach-omap2/pm44xx.c
->>> +++ b/arch/arm/mach-omap2/pm44xx.c
->>> @@ -151,12 +151,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->>>   	if (!strncmp(pwrdm->name, "cpu", 3))
->>>   		return 0;
->>>
->>> -	/*
->>> -	 * FIXME: Remove this check when core retention is supported
->>> -	 * Only MPUSS power domain is added in the list.
->>> -	 */
->>> -	if (strcmp(pwrdm->name, "mpu_pwrdm"))
->>> -		return 0;
->>>
->>>   	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
->>>   	if (!pwrst)
->
->
+> 
+> > The 100us comes from the fact that there is no documentation on the
+> > exact delay, so went around asking whats the *real worst case* delay,
+> > and we got an answer, 100us should be really big enough :)
+> >
+> > regards,
+> > Rajendra
+> >
+> >>
+> >>
+> >> - Paul
+> >
+> 
