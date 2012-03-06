@@ -1,47 +1,42 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Tue,  6 Mar 2012 12:45:42 +0400
-Subject: [PATCH/RFC 1/2] arm/tegra: fix harmony pinmux for PCIe
-In-Reply-To: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
-References: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <1331023544-6439-2-git-send-email-mad_soft@inbox.ru>
+Date: Tue,  6 Mar 2012 12:45:41 +0400
+Subject: [PATCH/RFC 0/2] Couple of Tegra2 PCIe fixes(?)
+Message-ID: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6e96aca397 (arm/tegra: Harmony PCIe: Don't touch pinmux)
-removed runtime tri-state toggling for PCIe related pinmux groups,
-but it seems that the fact that all of them are tri-state by default
-has been overlooked. Change defaults for these groups to TEGRA_TRI_NORMAL.
+These are more of RFC, because I can't test if 1/2 is really fixes anything,
+and not sure how much 2/2 is needed - maybe error it fixes happens just in
+my setup (and also I'm not sure if 2 seconds is a good value for timeout,
+because I have no idea, how much time it takes for PLL to lock when everything)
+But anyway...
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
+While trying to make PCIe work on Harmony board, I've noticed
+that pinmux groups for PCIe related signals are tristated, which 
+looked suspicious. So I fixed that - that's the patch 1/2.
+
+Sadly, even with this fix and 3.3v regulator patch[1] applied, PCIe still
+doesn't work for me. Usually driver just loops infinitely in PLL lock
+waiting code (that was the reason for writing patch 2/2 in this
+mini-series). Couple of times I observed that after about 20-30 seconds of
+waiting it passed PLL lock test and continue further, but then it failed to
+detect a link with PCIe card. And I can't even reproduce this anymore.
+
+Does anyone have working PCIe on Harmony? Can you please share the details
+of your setup - what bootloader are you using, which version of kernel,
+some additional patches maybe? Is there some secret tricks which are needed?
+I've tried several combinations of different kernels and bootloaders, but
+still can't find even a one which works.
+
+[1] http://www.spinics.net/lists/linux-tegra/msg04148.html
+
+Dmitry Artamonow (2):
+  arm/tegra: fix harmony pinmux for PCIe
+  arm/tegra: add timeout to PCIe PLL lock detection loop
+
  arch/arm/mach-tegra/board-harmony-pinmux.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-tegra/pcie.c                 |   14 +++++++++++---
+ 2 files changed, 14 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board-harmony-pinmux.c b/arch/arm/mach-tegra/board-harmony-pinmux.c
-index 465808c..1af85bccc 100644
---- a/arch/arm/mach-tegra/board-harmony-pinmux.c
-+++ b/arch/arm/mach-tegra/board-harmony-pinmux.c
-@@ -53,7 +53,7 @@ static struct tegra_pingroup_config harmony_pinmux[] = {
- 	{TEGRA_PINGROUP_GME,   TEGRA_MUX_SDIO4,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_GPU,   TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_GPU7,  TEGRA_MUX_RTCK,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
--	{TEGRA_PINGROUP_GPV,   TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
-+	{TEGRA_PINGROUP_GPV,   TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_HDINT, TEGRA_MUX_HDMI,          TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_I2CP,  TEGRA_MUX_I2C,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_IRRX,  TEGRA_MUX_UARTA,         TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
-@@ -112,10 +112,10 @@ static struct tegra_pingroup_config harmony_pinmux[] = {
- 	{TEGRA_PINGROUP_SDC,   TEGRA_MUX_PWM,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_SDD,   TEGRA_MUX_PWM,           TEGRA_PUPD_PULL_UP,   TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SDIO1, TEGRA_MUX_SDIO1,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
--	{TEGRA_PINGROUP_SLXA,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
-+	{TEGRA_PINGROUP_SLXA,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_SLXC,  TEGRA_MUX_SPDIF,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SLXD,  TEGRA_MUX_SPDIF,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
--	{TEGRA_PINGROUP_SLXK,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
-+	{TEGRA_PINGROUP_SLXK,  TEGRA_MUX_PCIE,          TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
- 	{TEGRA_PINGROUP_SPDI,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SPDO,  TEGRA_MUX_RSVD2,         TEGRA_PUPD_NORMAL,    TEGRA_TRI_TRISTATE},
- 	{TEGRA_PINGROUP_SPIA,  TEGRA_MUX_GMI,           TEGRA_PUPD_NORMAL,    TEGRA_TRI_NORMAL},
 -- 
 1.7.5.1.300.gc565c
