@@ -1,47 +1,41 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Tue, 6 Mar 2012 14:40:57 +0530
-Subject: [PATCH] omap3_beagle: Init only uart3 used for console
-In-Reply-To: <87399mkecv.fsf@ti.com>
-References: <1330945952-14714-1-git-send-email-govindraj.raja@ti.com>
- <87399mkecv.fsf@ti.com>
-Message-ID: <CAMrsUdLWaLqSr-PCmmGxrp0qZSojr5EWAUYmuk6v2pHiVdf9kA@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 6 Mar 2012 17:12:18 +0800
+Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
+ em-x270.c
+In-Reply-To: <4F55CEDB.90909@compulab.co.il>
+References: <1330989122-6323-1-git-send-email-paul.gortmaker@windriver.com>
+ <4F55CEDB.90909@compulab.co.il>
+Message-ID: <CAN1soZxdT=N1BtK5Jf4+Qu3GGCHPuKK1BqgfEV-D7QorjnsLpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2012 at 1:30 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
+On Tue, Mar 6, 2012 at 4:46 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> Also Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
 >
->> From: "Govindraj.R" <govindraj.raja@ti.com>
+> On 03/06/12 01:12, Paul Gortmaker wrote:
+>> Commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0 (linux-next)
 >>
->> On beagle some of uart mux lines are used for other
->> purpose so init only uart3.
+>> ? "regulator: Remove support for supplies specified by struct device"
+>>
+>> caused this file to break, since it was still relying on the
+>> device field to be present. ?Strip them out here too.
+>>
+>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
 >
-> OK, but you should also be clear that this patch is effectively
-> disabling all UARTS (except UART3) by defatul, which I'm not sure all
-> Beagle users will be happy about.
+> You've missed the scissors line:
+> ---
 >
-
-Okay, I have posted new version of the patch
-"[PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only"
-
-which initialises uart1/3/4 on all beagle boards
-
-and uart2 init is done for only beagle rev ax/bx
-which doesn't seem to have external usb module.
-
-
->> Uart2 rx line clashes with gpio_147 used for usb ehci
->> phy reset. Initializing uart2 pad_mux lines can break
->> ehci module on beagle xm.
->> (gpio_147 is available on uart2_rx in mode4 reference
->> mux34xx.c -> uart2_rx.gpio_147)
+> The patch itself:
 >
-> As Koen mentioned, this conflict only exists on certain boards, so
-> you should be clear that this is just an example.
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+>
+> Thanks
 >
 
-conflict exists all beagle rev's expect rev ax/bx.
+Mark,
 
---
-Thanks,
-Govindraj.R
+Could you pick up this patch since it's depend on latest change on regulator?
+
+Best Regards
+Haojian
