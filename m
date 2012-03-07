@@ -1,76 +1,63 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 06 Mar 2012 16:05:27 -0800
-Subject: [PATCH V2] OMAP3+: PM: VP: fix integer truncation error
-In-Reply-To: <1331059872-29011-1-git-send-email-nm@ti.com> (Nishanth Menon's
- message of "Tue, 6 Mar 2012 12:51:12 -0600")
-References: <1331059872-29011-1-git-send-email-nm@ti.com>
-Message-ID: <87hay1b7i0.fsf@ti.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 6 Mar 2012 19:10:23 -0500
+Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
+ em-x270.c
+In-Reply-To: <1330989122-6323-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1330989122-6323-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+On Mon, Mar 5, 2012 at 6:12 PM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
 
-> From: Yuan Jiangli <jlyuan@motorola.com>
->
-> commit 2f34ce81b8c05c900e45bd88595cc154f7bb5957
-> (OMAP3: PM: Adding voltage driver support.)
-> introduced runtime computation of waittime to handle all potential
-> sys clocks available.
->
-> In the voltage processor, the SPMSUpdateWait is calculated based on
-> the slew rate and the voltage step (SMPSUpdateWait = slew rate *
-> Voltage Step). After the voltage processor receives the SMPS_Ack
-> signal, the Voltage Controller will wait for SMPSUpdateWait clock
-> cycles for the voltage to settle to the new value. For all
-> practical purposes, the waittime parameter is the OMAP hardware
-> translation of what the slew rate on the PMIC is.
->
-> As an example, with TPS62361 on OMAP4460,
-> step_size = 10000
-> slew_rate = 32000
-> sys_clk_rate = 38400
->
-> Our current computation results in the following:
->  = ((step_size / slew_rate) * sys_clk_rate) / 1000
->  = ((10000 / 32000) * 38400 / 1000
->  = 0
->
-> Fix the same using DIV_ROUND_UP as an extra wait clock cycle
-> is better than lesser clock cycle. For the above example, this
-> translates to:
->  = (10000 * 38400) / (1000 * 32000)
->  = 12
->
-> Acked-by: Jon Hunter <jon-hunter@ti.com>
-> [nm at ti.com: slightly better implementation]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Yuan Jiangli <jlyuan@motorola.com>
+[...]
 
-Acked-by: Kevin Hilman <khilman@ti.com>
+> -REGULATOR_CONSUMER(ldo3, &em_x270_gps_userspace_consumer.dev, "vcc gps");
+> -REGULATOR_CONSUMER(ldo5, NULL, "vcc cam");
+> -REGULATOR_CONSUMER(ldo10, &pxa_device_mci.dev, "vcc sdio");
+> -REGULATOR_CONSUMER(ldo12, NULL, "vcc usb");
+> -REGULATOR_CONSUMER(ldo19, &em_x270_gprs_userspace_consumer.dev, "vcc gprs");
+> -REGULATOR_CONSUMER(buck2, NULL, "vcc_core");
+> +REGULATOR_CONSUMER(ldo3, "vcc gps");
+> +REGULATOR_CONSUMER(ldo5, "vcc cam");
+> +REGULATOR_CONSUMER(ldo10, "vcc sdio");
+> +REGULATOR_CONSUMER(ldo12, "vcc usb");
+> +REGULATOR_CONSUMER(ldo19, "vcc gprs");
+> +REGULATOR_CONSUMER(buck2, "vcc_core");
 
-Tony, I don't have any more PM fixes for this cycle, so feel free to add
-this to fixes-non-critical-part2.
+Based on today's discussions, I'm no longer convinced the above
+is right.  If I understand correctly, for the case of say the top one:
 
-This is an important fix, but since we're not doing active voltage
-scaling in mainline today, I don't think it's 3.3 material.
+      em_x270_gps_userspace_consumer
 
-Kevin
+I need to go find that struct, determine that it has a .name entry like:
 
-> ---
->  arch/arm/mach-omap2/vp.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+        .name           = "reg-userspace-consumer",
+
+and then use (for each case) something like:
+
+      REGULATOR_SUPPLY("vcc gps", "reg-userspace-consumer")
+
+The above wrapper for REGULATOR_CONSUMER would have
+to be changed to either use or inline the REGULATOR_SUPPLY.
+
+Let me know if I'm on the right track here.  This code is completely
+foreign to me.   As such, the naming in the magician_defconfig
+patch is also probably needing rework (i.e. it needs the corresponding
+value for .name, and not the name of the parent struct itself.)
+
+THanks,
+Paul.
+--
+
 >
-> diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-> index 0df8882..f95c1ba 100644
-> --- a/arch/arm/mach-omap2/vp.c
-> +++ b/arch/arm/mach-omap2/vp.c
-> @@ -61,8 +61,8 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
->  	vddmin = voltdm->pmic->vp_vddmin;
->  	vddmax = voltdm->pmic->vp_vddmax;
->  
-> -	waittime = ((voltdm->pmic->step_size / voltdm->pmic->slew_rate) *
-> -		    sys_clk_rate) / 1000;
-> +	waittime = DIV_ROUND_UP(voltdm->pmic->step_size * sys_clk_rate,
-> +				1000 * voltdm->pmic->slew_rate);
->  	vstepmin = voltdm->pmic->vp_vstepmin;
->  	vstepmax = voltdm->pmic->vp_vstepmax;
+> ?#define REGULATOR_INIT(_ldo, _min_uV, _max_uV, _ops_mask) ? ? ? ? ? ? ?\
+> ? ? ? ?static struct regulator_init_data _ldo##_data = { ? ? ? ? ? ? ? \
+> --
+> 1.7.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-next" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
