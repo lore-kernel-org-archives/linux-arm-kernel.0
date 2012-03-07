@@ -1,25 +1,27 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Wed, 7 Mar 2012 17:18:31 -0600
-Subject: [PATCH v2 00/17] ASoC: add imx-sgtl5000 machine driver working
- with fsl_ssi
-In-Reply-To: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
-References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F57ECC7.1040100@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Mar 2012 15:24:02 -0800
+Subject: [GIT PULL] fixing and cleaning up rpmsg/remoteproc for 3.4
+In-Reply-To: <CAK=WgbYsZUzTos_sXd+ZayKfPc=sxL7v0Q_==bTMh-_4XiMWiw@mail.gmail.com>
+References: <CAK=WgbYsZUzTos_sXd+ZayKfPc=sxL7v0Q_==bTMh-_4XiMWiw@mail.gmail.com>
+Message-ID: <CAOesGMgtK76q0KYM0SVMd1GSayUZ6WMOedrh3HM-x+WsXYj6PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> Changes since v1:
->  * Address comments from Mark, Timur, and Sascha (Thanks for review).
->  * Drop patches that have been applied by Mark.
+On Tue, Mar 6, 2012 at 10:09 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hi Arnd,
+>
+> Please pull:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+> rpmsg-fixes-and-more-for-3.4
+>
+> To get a few rpmsg/remoteproc fixes, cleanups and some generalization
+> work for 3.4.
+>
+> Again, I should have sent the Kconfig patch earlier in a separate pull
+> request. Sorry about that.
 
-I've tested this patchset, and after adding the changes that I pointed out
-in my previous email, audio still works on the P1022DS and MPC8610HPCD.
+Pulled, thanks.
 
-Therefore:
 
-Acked-by: Timur Tabi <timur@freescale.com>
-
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+-Olof
