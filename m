@@ -1,32 +1,50 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue,  6 Mar 2012 17:30:38 -0700
-Subject: [PATCH 3/3] ARM: Allow the user to enable UIMAGE_KERNEL_NOLOAD
-In-Reply-To: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1331080238-1524-3-git-send-email-swarren@wwwdotorg.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue,  6 Mar 2012 16:39:31 -0800
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator for first
+ instance
+Message-ID: <1331080771-30687-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When AUTO_ZRELADDR is enabled, ARM zImages are relocatable, and hence
-the user may use mkimage's -T kernel_noload option if their bootloader
-supports it.
+commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+regulators) added regulators which are registered during
+gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
+than one instance of the SMSC911x and result in attempting to register
+the same regulator more than once which causes a panic().
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+Fix this by only registering the regulator when the platform_data id
+field is zero, indicating its the first instance.
+
+Cc: Matt Porter <mporter@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Fix needed for v3.3.
+Applies on top of Tony's fixes branch.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4040796..5459b2e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2055,6 +2055,7 @@ config CRASH_DUMP
+ arch/arm/mach-omap2/gpmc-smsc911x.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+index bbb870c..4d6f1c6 100644
+--- a/arch/arm/mach-omap2/gpmc-smsc911x.c
++++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+@@ -101,10 +101,13 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
  
- config AUTO_ZRELADDR
- 	bool "Auto calculation of the decompressed kernel image address"
-+	select ALLOW_UIMAGE_KERNEL_NOLOAD
- 	depends on !ZBOOT_ROM && !ARCH_U300
- 	help
- 	  ZRELADDR is the physical address where the decompressed kernel
+ 	gpmc_cfg = board_data;
+ 
+-	ret = platform_device_register(&gpmc_smsc911x_regulator);
+-	if (ret < 0) {
+-		pr_err("Unable to register smsc911x regulators: %d\n", ret);
+-		return;
++	if (!gpmc_cfg) {
++		ret = platform_device_register(&gpmc_smsc911x_regulator);
++		if (ret < 0) {
++			pr_err("Unable to register smsc911x regulators: %d\n",
++			       ret);
++			return;
++		}
+ 	}
+ 
+ 	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
 -- 
-1.7.0.4
+1.7.9.2
