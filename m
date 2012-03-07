@@ -1,104 +1,32 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 07 Mar 2012 13:33:57 +0530
-Subject: [PATCH 04/14] dmaengine: imx-dma: remove
- 'imxdma_setup_mem2mem_hw' function.
-In-Reply-To: <1330964196-32623-5-git-send-email-javier.martin@vista-silicon.com>
-References: <1330964196-32623-1-git-send-email-javier.martin@vista-silicon.com>
- <1330964196-32623-5-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1331107437.24656.325.camel@vkoul-udesk3>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 7 Mar 2012 08:46:24 +0100
+Subject: Pre-merge-window status of the arm-soc tree
+In-Reply-To: <201203062054.55434.arnd@arndb.de>
+References: <201203062054.55434.arnd@arndb.de>
+Message-ID: <20120307074624.GH21255@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-03-05 at 17:16 +0100, Javier Martin wrote:
-will help to know in change log why you are doing this...
-
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
->  drivers/dma/imx-dma.c |   57 ++++++++++++-------------------------------------
->  1 files changed, 14 insertions(+), 43 deletions(-)
 > 
-> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-> index 2c524e1..8a0afb1 100644
-> --- a/drivers/dma/imx-dma.c
-> +++ b/drivers/dma/imx-dma.c
-> @@ -260,41 +260,6 @@ static inline int imxdma_sg_next(struct imxdma_desc *d, struct scatterlist *sg)
->  	return now;
->  }
->  
-> -static int
-> -imxdma_setup_mem2mem_hw(struct imxdma_channel *imxdmac, dma_addr_t dma_address,
-> -		     unsigned int dma_length, unsigned int dev_addr)
-> -{
-> -	int channel = imxdmac->channel;
-> -
-> -	imxdmac->internal.sg = NULL;
-> -
-> -	if (!dma_address) {
-> -		printk(KERN_ERR "imxdma%d: imx_dma_setup_single null address\n",
-> -		       channel);
-> -		return -EINVAL;
-> -	}
-> -
-> -	if (!dma_length) {
-> -		printk(KERN_ERR "imxdma%d: imx_dma_setup_single zero length\n",
-> -		       channel);
-> -		return -EINVAL;
-> -	}
-> -
-> -	pr_debug("imxdma%d: %s dma_addressg=0x%08x dma_length=%d "
-> -		"dev_addr=0x%08x for write\n",
-> -		channel, __func__, (unsigned int)dma_address,
-> -		dma_length, dev_addr);
-> -
-> -	imx_dmav1_writel(dma_address, DMA_SAR(channel));
-> -	imx_dmav1_writel(dev_addr, DMA_DAR(channel));
-> -	imx_dmav1_writel(imxdmac->internal.ccr_to_device,
-> -			 DMA_CCR(channel));
-> -
-> -	imx_dmav1_writel(dma_length, DMA_CNTR(channel));
-> -
-> -	return 0;
-> -}
-> -
->  static void imxdma_enable_hw(struct imxdma_desc *d)
->  {
->  	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
-> @@ -586,20 +551,26 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
->  static int imxdma_xfer_desc(struct imxdma_desc *d)
->  {
->  	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
-> +	struct imxdma_engine *imxdma = imxdmac->imxdma;
->  	int ret;
->  
->  	/* Configure and enable */
->  	switch (d->type) {
->  	case IMXDMA_DESC_MEMCPY:
-> -		ret = imxdma_config_channel_hw(imxdmac,
-> -					  d->config_port, d->config_mem, 0, 0);
-> -		if (ret < 0)
-> -			return ret;
-> -		ret = imxdma_setup_mem2mem_hw(imxdmac, d->src, d->len, d->dest);
-> -		if (ret < 0)
-> -			return ret;
-> -		break;
-> +		imxdmac->internal.sg = NULL;
-> +
-> +		imx_dmav1_writel(d->src, DMA_SAR(imxdmac->channel));
-> +		imx_dmav1_writel(d->dest, DMA_DAR(imxdmac->channel));
-> +		imx_dmav1_writel(d->config_mem | (d->config_port << 2),
-> +			 DMA_CCR(imxdmac->channel));
->  
-> +		imx_dmav1_writel(d->len, DMA_CNTR(imxdmac->channel));
-> +
-> +		dev_dbg(imxdma->dev, "%s channel: %d dest=0x%08x src=0x%08x "
-> +			"dma_length=%d\n", __func__, imxdmac->channel,
-> +			d->dest, d->src, d->len);
-> +
-> +		break;
->  	/* Cyclic transfer is the same as slave_sg with special sg configuration. */
->  	case IMXDMA_DESC_CYCLIC:
->  	case IMXDMA_DESC_SLAVE_SG:
+> Notably absent here are still mach-msm and mach-shmobile and some
+> platforms have more patches pending. If you have anything that you
+> want to get included in 3.4, then now would be a good time to send
+> that. Anything that is not in arm-soc by the time the merge window
+> opens is not going to make it into the release, and you should allow
+> a little bit of time to sort out any conflicts between sending pull
+> requests and having them in the branch.
+I've much more to send to pull for AT91 DT but all depends on 2 patches
+acked by not pulled so far for of
 
+Grant can I apply it via AT91 (of boolean support and nand generic binding)
+as I need them for
+NAND
+USB device
+I2C
+Shutdown Controller support
+RAM Controller
+Reset Controller
+USB Host
 
--- 
-~Vinod
+Best Regards,
+J.
