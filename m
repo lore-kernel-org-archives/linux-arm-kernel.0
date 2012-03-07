@@ -1,32 +1,47 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Mar 2012 08:46:24 +0100
-Subject: Pre-merge-window status of the arm-soc tree
-In-Reply-To: <201203062054.55434.arnd@arndb.de>
-References: <201203062054.55434.arnd@arndb.de>
-Message-ID: <20120307074624.GH21255@game.jcrosoft.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 07 Mar 2012 13:45:58 +0530
+Subject: [PATCH 01/14] dmaengine: imx-dma: merge old dma-v1.c with
+ imx-dma.c
+In-Reply-To: <CACKLOr0iBSMd8hNdmeAiMWgyyUb_b1=5n47N97hu9EP2Zu9OsQ@mail.gmail.com>
+References: <1330964196-32623-1-git-send-email-javier.martin@vista-silicon.com>
+ <1330964196-32623-2-git-send-email-javier.martin@vista-silicon.com>
+ <1331102571.24656.324.camel@vkoul-udesk3>
+ <CACKLOr0iBSMd8hNdmeAiMWgyyUb_b1=5n47N97hu9EP2Zu9OsQ@mail.gmail.com>
+Message-ID: <1331108158.24656.330.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2012-03-07 at 08:52 +0100, javier Martin wrote:
+> Hi Vinod,
 > 
-> Notably absent here are still mach-msm and mach-shmobile and some
-> platforms have more patches pending. If you have anything that you
-> want to get included in 3.4, then now would be a good time to send
-> that. Anything that is not in arm-soc by the time the merge window
-> opens is not going to make it into the release, and you should allow
-> a little bit of time to sort out any conflicts between sending pull
-> requests and having them in the branch.
-I've much more to send to pull for AT91 DT but all depends on 2 patches
-acked by not pulled so far for of
+> On 7 March 2012 07:42, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Mon, 2012-03-05 at 17:16 +0100, Javier Martin wrote:
+> > Sascha,
+> > Are there any more users of dmac in mach-imx?
+> 
+> No, there are no other users of mach-imx. In fact, it was Sascha's
+> idea to make this merge [1].
+Then please move the file in 1st patch, also it would be easily clear
+what parts are added, deleted and moved.
 
-Grant can I apply it via AT91 (of boolean support and nand generic binding)
-as I need them for
-NAND
-USB device
-I2C
-Shutdown Controller support
-RAM Controller
-Reset Controller
-USB Host
+Otherwise the series looks fine except that it needs to have a better
+changelog on why you are removing certain field/struct. It helps to
+document the motivation of doing certain change, you will find that you
+wont remember that six months down the line :)
 
-Best Regards,
-J.
+Also I am looking for Tested-By from people who have use imx-dma.
+
+> 
+> > If not then why not move the code, rather than copy.
+> > If yes can we move them as well?
+> 
+> I do remove the code in mach-imx in PATCH 14/14. I considered it was
+> better doing this in the last patch to keep the old code available
+> during the whole development process.
+> 
+> [1] https://lkml.org/lkml/2012/2/9/171
+> 
+
+
+-- 
+~Vinod
