@@ -1,63 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Mar 2012 13:32:09 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix build issues with missing include of
- linux/bug.h
-Message-ID: <20120307213209.GI12083@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 07 Mar 2012 13:32:23 -0800
+Subject: [GIT PULL] One more sched_clock() patch
+In-Reply-To: <322c288d3ad6aecc8014e0a3582c8527@localhost>
+References: <322c288d3ad6aecc8014e0a3582c8527@localhost>
+Message-ID: <4F57D3E7.6020605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise we can get the following for some .config files:
+On 02/27/12 00:44, Marc Zyngier wrote:
+> Russell,
+>
+> Could you please pull from my sched_clock-for-rmk branch again?
+> It contains a single additional patch. courtesy of Stephen Boyd, that
+> contains support for sched_clock() on msm. The rest of the branch is
+> unchanged.
 
-arch/arm/mach-omap2/powerdomain-common.c:
-In function 'omap2_pwrdm_get_mem_bank_onstate_mask':
-arch/arm/mach-omap2/powerdomain-common.c:64:3: error:
-implicit declaration of function 'WARN_ON' [-Werror=implicit-function-declaration]
-cc1: some warnings being treated as errors
+Has this been pulled? I don't see this showing up in linux-next as of
+20120307.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
----
-
-Looks like this is needed for some .config files with
-current for-next
-
---- a/arch/arm/mach-omap2/clkt_clksel.c
-+++ b/arch/arm/mach-omap2/clkt_clksel.c
-@@ -43,6 +43,7 @@
- #include <linux/errno.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/bug.h>
- 
- #include <plat/clock.h>
- 
---- a/arch/arm/mach-omap2/powerdomain-common.c
-+++ b/arch/arm/mach-omap2/powerdomain-common.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/errno.h>
- #include <linux/kernel.h>
-+#include <linux/bug.h>
- #include "pm.h"
- #include "cm.h"
- #include "cm-regbits-34xx.h"
---- a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
-@@ -15,6 +15,7 @@
- #include <linux/io.h>
- #include <linux/errno.h>
- #include <linux/delay.h>
-+#include <linux/bug.h>
- 
- #include <plat/prcm.h>
- 
---- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/bug.h>
- 
- #include <plat/cpu.h>
- 
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
