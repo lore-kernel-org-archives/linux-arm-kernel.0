@@ -1,27 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Mar 2012 21:38:04 +0000
-Subject: [GIT PULL] One more sched_clock() patch
-In-Reply-To: <4F57D3E7.6020605@codeaurora.org>
-References: <322c288d3ad6aecc8014e0a3582c8527@localhost>
- <4F57D3E7.6020605@codeaurora.org>
-Message-ID: <20120307213804.GG18787@n2100.arm.linux.org.uk>
+From: michael@walle.cc (Michael Walle)
+Date: Wed, 7 Mar 2012 22:47:09 +0100
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
+In-Reply-To: <20120307192723.GE5050@titan.lakedaemon.net>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <201203071831.31738.arnd@arndb.de>
+ <20120307192723.GE5050@titan.lakedaemon.net>
+Message-ID: <201203072247.10065.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 01:32:23PM -0800, Stephen Boyd wrote:
-> On 02/27/12 00:44, Marc Zyngier wrote:
-> > Russell,
-> >
-> > Could you please pull from my sched_clock-for-rmk branch again?
-> > It contains a single additional patch. courtesy of Stephen Boyd, that
-> > contains support for sched_clock() on msm. The rest of the branch is
-> > unchanged.
+Am Mittwoch 07 M?rz 2012, 20:27:23 schrieb Jason:
+> On Wed, Mar 07, 2012 at 06:31:31PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 07 March 2012, Jason Cooper wrote:
+> > > +       serial at f1012000 {
+> > > +               compatible = "ns16550a";
+> > > +               reg = <0xf1012000 0xff>;
+> > > +               reg-shift = <2>;
+> > > +               interrupts = <33>;
+> > > +               clock-frequency = <200000000>;
+> > > +       };
+> > 
+> > I just noticed that the length here should be inclusive, i.e. 0x100 not
+> > 0xff. This is different from the way we define resources in Linux.
 > 
-> Has this been pulled? I don't see this showing up in linux-next as of
-> 20120307.
+> Grrr.  Now I'm getting frustrated.  I'm trying to boot without
+> earlyprintk.  Evidently, something is wrong with the above, because the
+> device boots all the way up (blinky lights come on), but I get no
+> messages after the usual "Uncompressing Linux... done, booting the
+> kernel."
+> 
+> Here's my most recent attempt:
+> 
+>         serial at f1012000 {
+>                 device_type = "serial";
+>                 compatible = "ns16550a";
+>                 reg = <0xf1012000 0x100>; /*phys addr*/
+>                 virt-reg = <0xfed12000>;  /*virt addr*/
+>                 reg-shift = <2>;
+>                 reg-io-width = <1>;
+>                 interrupts = <33>;
+>                 current-speed = <115200>;
+>                 interrupt-parent = <&intc>;
+>                 clock-frequency = <200000000>;
+>         };
+> 
+> I've looked at what is done in the powerpc dt's, but, no luck.  When
+> earlyprintk is enabled, I see no error messages, just:
+> 
+> bootconsole [earlycon0] enabled
+> debug: skip boot console de-registration.
+> ...
+> Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+> 
+> Any pointers?
 
-Probably not yet, because I really don't like seeing a trickle of "some
-more to fix" pull request followed by "oh another one to fix" pull
-request, especially when they get pulled into devel-stable.
+dunno if that helps a lot but the following was working for me with my 
+linkstation:
 
-I'm waiting a bit to see if there's any more on their way. ;)
+        serial0: serial at f1012000 {
+                cell-index = <0>;
+                device_type = "serial";
+                compatible = "ns16550a";
+                reg = <0xf1012000 0x20>;
+                reg-shift = <2>;
+                clock-frequency = <200000000>;
+                interrupts = <33>;
+        };
+
+-- 
+michael
