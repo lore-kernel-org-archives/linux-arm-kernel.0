@@ -1,44 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 7 Mar 2012 21:54:29 +0100
-Subject: [GIT PULL] i.MX 35/5 AIPS Setup
-Message-ID: <20120307205429.GO3852@pengutronix.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 07 Mar 2012 16:03:04 -0500 (EST)
+Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
+In-Reply-To: <4F57C4C6.2070602@wwwdotorg.org>
+References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
+ <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
+ <20120307180815.GA27213@game.jcrosoft.org> <4F57AB92.6060907@wwwdotorg.org>
+ <20120307183633.GB27213@game.jcrosoft.org> <4F57C4C6.2070602@wwwdotorg.org>
+Message-ID: <alpine.LFD.2.02.1203071537130.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 7 Mar 2012, Stephen Warren wrote:
 
-Hi Arnd,
+> On 03/07/2012 11:36 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 11:40 Wed 07 Mar     , Stephen Warren wrote:
+> >> On 03/07/2012 11:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>> On 17:30 Tue 06 Mar     , Stephen Warren wrote:
+> >>>> This allows the user to use U-Boot's mkimage's -T kernel_noload option
+> >>>> if their arch Kconfig allows it, and they desire.
+> >>>>
+> >>>> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> >>>> ---
+> >>>> The next patch enables this new CONFIG_ALLOW_ option for ARM. I assume
+> >>>> that some other architectures will also be able to enable it, but I'm
+> >>>> not familiar enough with any to know which.
+> >>> I'm going to repeat. I don't think any impromevent here.
+> >>>
+> >>> with no specific kernel load address the uImage for is useless/
+> >>
+> >> No, the whole point of this type of kernel image is that it doesn't need
+> >> a specific load address; the kernel zImage can run from anywhere in RAM
+> >> (provided AUTO_ZRELADDR is enabled, subject to some slight
+> >> restrictions), and hence the uImage doesn't need to be loaded to or
+> >> moved to any particular location.
+> >>
+> >> The scripts that U-Boot runs determine where the image gets loaded into
+> >> memory.
+> >
+> > so instead of spending time on the uImage add simply the support the zImage to
+> > U-Boot as this AUTO_ZRELADDR have 0 advantage compare to the zImage
+> 
+> Thinking more about this, I guess the reliance on AUTO_ZRELADDR is wrong
+> here; Russell, Nico, is the ARM decompressor fully position-independent
+> irrespective of the AUTO_ZRELADDR setting.
 
-Please pull the following for -next. It contains Fabios Aips setup
-patches. They depend on your imx/soc branch.
+Absolutely.
 
-Sascha
+> That setting just determines where the decompressor writes its output, 
+> not what address the decompressor can run at, right?
 
-The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+Right.
 
-  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+> So, this KERNEL_NOLOAD feature could be
+> enabled in all cases on ARM, not only when AUTO_ZRELADDR is enabled.
 
-are available in the git repository at:
+Except when CONFIG_ZBOOT_ROM is selected (if the uImage format 
+allows it), or when the u-Boot environment doesn't know where to load 
+the uImage.
 
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx35-imx5-aips-setup
+FWIW, I really hate this confusing usage of "noload" imposed on us by
+we know who.  I thought better than contesting his definition though.
 
-for you to fetch changes up to 38bb3630bcba25f16106166a4aaf211c1d195863:
+But yes, AUTO_ZRELADDR has no effect on the location where the zImage 
+should be _loaded_, except for the 128MB restriction.
 
-  ARM: mx35: Setup the AIPS registers (2012-03-07 21:29:57 +0100)
+> As such to address Jean-Christophe's most recent comment above, this
+> patch isn't about adding support for AUTO_ZRELADDR, but for U-Boot's
+> kernel_noload feature, so comparisons should be drawn between
+> kernel_noload uImages and zImage, not between AUTO_ZRELADDR and zImage.
+> 
+> In other words:
+> 
+> We already have and need ZRELADDR no matter what, for reasons unrelated
+> to U-Boot/uImage.
 
-----------------------------------------------------------------
-i.MX35/5 AIPS setup
+Well, I do have a patch series getting rid of ZRELADDR entirely, and 
+AUTO_ZRELADDR would then become implicit, unless CONFIG_PHYS_OFFSET is 
+defined.
 
-----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: mx5: Use common function for configuring AIPS
-      ARM: mx35: Setup the AIPS registers
 
- arch/arm/mach-imx/cpu-imx5.c |   36 ------------------------------------
- arch/arm/mach-imx/mm-imx3.c  |    4 ++++
- arch/arm/mach-imx/mm-imx5.c  |    8 ++++++++
- 3 files changed, 12 insertions(+), 36 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas
