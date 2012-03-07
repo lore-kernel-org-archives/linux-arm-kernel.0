@@ -1,36 +1,37 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Wed, 7 Mar 2012 04:13:57 -0800
-Subject: [PATCH 14/15] watchdog/mpcore_wdt: Add clock framework support
-In-Reply-To: <20120307111711.GA31348@bnru02>
-References: <cover.1331115751.git.viresh.kumar@st.com>
- <9ec7141baa4b1c1a0503893749e7ce0e19bb5029.1331115752.git.viresh.kumar@st.com>
- <20120307111711.GA31348@bnru02>
-Message-ID: <CAOh2x=mcaiSqYW7+9dsNoEhOazrud7BHp5095iqmrgy6iZ4utw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Mar 2012 12:15:57 +0000
+Subject: [GIT PULL] fix to use static declarations for samsung stuff
+In-Reply-To: <4F574CAE.6030903@samsung.com>
+References: <013b01cce7f3$48c87e30$da597a90$%kim@samsung.com>
+ <4F574CAE.6030903@samsung.com>
+Message-ID: <201203071215.57828.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/7/12, Srinidhi Kasagar <srinidhi.kasagar@stericsson.com> wrote:
-> On Wed, Mar 07, 2012 at 11:27:55 +0100, Viresh KUMAR wrote:
->> +	wdt->boot_status = (readl(wdt->base + TWD_WDOG_RESETSTAT) &
->> +			TWD_WDOG_RESETSTAT_MASK) ? WDIOF_CARDRESET : 0;
->> +
->
-> I see that patch 12/15 does this, why are you doing it here again in clock
-> patch?
->
+On Wednesday 07 March 2012, Kukjin Kim wrote:
+> im wrote:
+> > Hi Russell, Arnd and Olof,
+> >
+> > Please pull following branch which is including fix to use static
+> > declarations for samsung stuff.
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> > next/cleanup-use-static
+> >
+> > I'm not sure it can be sent to upstream for v3.3 but if so, would be better.
+> >
+> Hi Arnd, Olof,
+> 
+> I can't see this series in arm-soc yet. If missed, please pull from:
+>   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+> next/cleanup-use-static
+> 
+> As a note, I rebased it on top of arm-soc/depends/rmk/for-armsoc because 
+> this touches same points(dma declaration part).
+> 
+> If any problems, please kindly let me know.
+> 
 
->>
->> -	wdt->boot_status = (readl(wdt->base + TWD_WDOG_RESETSTAT) &
->> -			TWD_WDOG_RESETSTAT_MASK) ? WDIOF_CARDRESET : 0;
->> -
->
-> oh, you delete this stuff here again.
->
-> something messy in patch creation?
+Sorry, I must have missed this request, I can't remember seeing it before.
+The patches all look good, Olof will take care of getting them in.
 
-Yes. It does look messy. But it was intentional to move this code up
-in the function.
-Will move clk patch before IOCTL addition patch to make it clean.
-
---
-viresh
+	Arnd
