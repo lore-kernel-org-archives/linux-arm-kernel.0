@@ -1,22 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Mar 2012 15:10:23 -0800
-Subject: [GIT PULL] Urgent pre-emptive fixes for next merge window
-In-Reply-To: <20120307225946.GK12083@atomide.com>
-References: <20120307225946.GK12083@atomide.com>
-Message-ID: <CAOesGMiHU81Y8yiD5rZT5v2SRR419LggUYBB8C_j1Vq2Ge_z6w@mail.gmail.com>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Wed, 7 Mar 2012 17:12:59 -0600
+Subject: [PATCH V6 1/5] ARM: exynos: Add support AFTR mode on EXYNOS4210
+In-Reply-To: <CAK44p22LOnJx=bZRfdzAHt7X_snhJGrNoBuXOfsgwBHLLuUziA@mail.gmail.com>
+References: <1329805190-8874-1-git-send-email-amit.kachhap@linaro.org>
+ <1329805190-8874-2-git-send-email-amit.kachhap@linaro.org>
+ <CAMXH7KHTgzY7XZ=4rOxsu-Ra8SRTOsCg=YWOLBD1QDTskRbygw@mail.gmail.com>
+ <CAK44p22LOnJx=bZRfdzAHt7X_snhJGrNoBuXOfsgwBHLLuUziA@mail.gmail.com>
+Message-ID: <CAMXH7KHtEcg5VSCNFarX9-GuKzWsh3k8Kz+bCu3ZtiqJpvWZZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2012 at 2:59 PM, Tony Lindgren <tony@atomide.com> wrote:
+Hello Kukjim and Amit,
 
-> The following changes since commit d82ba9954b6b2c4ac91ec6f6f42be8c5215d0619:
-> ?Peter Ujfalusi (1):
-> ? ? ? ?OMAP4: dma: Correct CPU version check for dma_common_ch_end
->
-> are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical-part2
+Can you tell me the status of this patch?  I based my core cpuidle
+consolidation patchset on these changes.  My patchset seems to be
+acceptable now and I would like to do a git pull-request for
+linux-next, but I see these Exynos cpuidle changes have not yet made
+it to linux-next.
 
-Pulled, thanks.
-
--Olof
+Thanks,
+Rob
