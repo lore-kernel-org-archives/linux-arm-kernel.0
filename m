@@ -1,120 +1,66 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 07 Mar 2012 13:41:20 -0600
-Subject: [PATCH 1/1] of: add dma-mask binding
-In-Reply-To: <20120307173437.GC17087@game.jcrosoft.org>
-References: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
- <4F5793E9.9010100@gmail.com> <20120307173437.GC17087@game.jcrosoft.org>
-Message-ID: <4F57B9E0.3030109@gmail.com>
+Date: Wed, 07 Mar 2012 13:54:44 -0600
+Subject: [PATCH 6/6] ARM: at91: add Shutdown Controller (SHDWC) DT support
+In-Reply-To: <201203071849.36867.arnd@arndb.de>
+References: <20120302192844.GB21255@game.jcrosoft.org>
+ <201203022024.19488.arnd@arndb.de> <20120307173828.GD17087@game.jcrosoft.org>
+ <201203071849.36867.arnd@arndb.de>
+Message-ID: <4F57BD04.5090002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2012 11:34 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 10:59 Wed 07 Mar     , Rob Herring wrote:
->> On 03/07/2012 05:26 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> This will allow each device to specify its dma-mask
->>> The microblaze architecture hook is keep temporary if no dma-mask is specified
->>> int the DT
+On 03/07/2012 12:49 PM, Arnd Bergmann wrote:
+> On Wednesday 07 March 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 20:24 Fri 02 Mar     , Arnd Bergmann wrote:
+>>> On Friday 02 March 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>> +       }
+>>>> +
+>>>> +       if (of_device_is_compatible(np, "atmel,at91sam9x5-shdwc")) {
+>>>> +               have_rtt = false;
+>>>> +               have_rtc = true;
+>>>> +       } else if (of_device_is_compatible(np, "atmel,at91sam9rl-shdwc")) {
+>>>> +               have_rtt = true;
+>>>> +               have_rtc = true;
+>>>> +       } else {
+>>>> +               have_rtt = true;
+>>>> +               have_rtc = false;
+>>>> +       }
+>>>> +
+>>>> +       if (have_rtc && of_property_read_bool(np, "atmel,wakeup-rtc-timer"))
+>>>> +                       mode |= AT91_SHDW_RTCWKEN;
+>>>> +
+>>>> +       if (have_rtt && of_property_read_bool(np, "atmel,wakeup-rtt-timer"))
+>>>> +                       mode |= AT91_SHDW_RTTWKEN;
+>>>> +
+>>>> +       at91_shdwc_write(AT91_SHDW_MR, wakeup_mode | mode);
+>>>> +
 >>>
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> ---
->>>  drivers/of/platform.c |   26 +++++++++++++++++++++++++-
->>>  1 files changed, 25 insertions(+), 1 deletions(-)
+>>> Hi Jean-Christophe,
 >>>
->>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->>> index cae9477..bb22194 100644
->>> --- a/drivers/of/platform.c
->>> +++ b/drivers/of/platform.c
->>> @@ -121,6 +121,26 @@ void of_device_make_bus_id(struct device *dev)
->>>  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
->>>  }
->>>  
->>> +static u64* of_get_dma_mask(struct device_node *np)
->>> +{
->>> +	const __be32 *prop;
->>> +	int len;
->>> +	u64 *dma_mask;
->>> +
->>> +	prop = of_get_property(np, "dma-mask", &len);
+>>> I don't understand why you check the specific part here. Isn't it enough to
+>>> check the property when you already mandate that they can only be present
+>>> on devices that support the specific wakeup?
+>>>
+>>> If there is a good explanation for that, maybe add a code comment why it's
+>>> required.
+>> some wake update source exist on few soc and we are not supposed to set the
+>> bit otherwise
 >>
->> This would need some documentation. There is already "dma-ranges"
->> defined for OF which nay do what's needed.
-> what is dma-ranges I see no doc about it
-> but I don't think it could be used for the dma mask
-
-See the ePAPR spec. It's a PowerPC doc, but parts still apply.
-
-https://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.1.pdf
-
-There may also be something in OpenFirmware specs.
-
->>
->>> +
->>> +	if (!prop)
->>> +		return NULL;
->>> +
->>> +	dma_mask = kzalloc(sizeof(u64), GFP_KERNEL);
->>
->> This seems kind of wasteful for 1 u64.
-> no choice dma_mask must be a pointer
->>
->>> +	if (!dma_mask)
->>> +		return NULL;
->>> +
->>> +	*dma_mask = of_read_number(prop, len / 4);
->>> +
->>> +	return dma_mask;
->>> +}
->>> +
->>>  /**
->>>   * of_device_alloc - Allocate and initialize an of_device
->>>   * @np: device node to assign to device
->>> @@ -161,10 +181,14 @@ struct platform_device *of_device_alloc(struct device_node *np,
->>>  		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
->>>  	}
->>>  
->>> +	dev->dev.dma_mask = of_get_dma_mask(np);
->>>  	dev->dev.of_node = of_node_get(np);
->>> +
->>>  #if defined(CONFIG_MICROBLAZE)
->>> -	dev->dev.dma_mask = &dev->archdata.dma_mask;
->>
->> And doing it this way for didn't get a warm reception either:
->>
->> http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-April/005285.html
->>
->> Do you really need this to be something other than ~0UL and if so does
->> it need to be per device or system wide?
->>
->> You can solve this with bus notifiers in your at91 code. Here's an
->> example which I did (but no longer need):
->>
->> static u64 highbank_dma_mask = DMA_BIT_MASK(32);
-> IIRC on at91 all of them that need it have a DMA_BIT_MASK(32)
 > 
+> I still don't understand: Doesn't the property already give the information?
+> In general, you should try to encode these things in specific properties instead of
+> checking the compatible property.
 > 
->>
->> static int highbank_platform_notifier(struct notifier_block *nb,
->> 				  unsigned long event, void *__dev)
->> {
->> 	struct device *dev = __dev;
->>
->> 	if (event != BUS_NOTIFY_ADD_DEVICE)
->> 		return NOTIFY_DONE;
->>
->> 	if (of_device_is_compatible(dev->of_node, "calxeda,hb-nfc"))
->> 		dev->dma_mask = &highbank_dma_mask;
-> execpt as example today I need it on 2 node (OHCI & EHCI)
 
-I don't think there is any reason you can't point to a single value if a
-system wide setting fits. If not, using a per device value here is
-easily doable.
-
-> 
-> and if more device need I don't want to end up with more fixup
-> 
-> I really prefer to set it via DT
-
-You don't have any h/w restrictions here and most ARM platforms don't,
-so really this doesn't need to be solved with DT for the default case.
+Or vice-versa, the compatible properties distinguish things enough that
+the property is not needed. If it is fixed in the SOC design, then you
+should distinguish things with the compatible property.
 
 Rob
+
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
