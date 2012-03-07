@@ -1,51 +1,38 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Wed, 07 Mar 2012 10:13:41 +0000
-Subject: [PATCH] MAINTAINERS: add entry for exynos mipi display drivers
-In-Reply-To: <4F557A2A.2080108@samsung.com>
-References: <4F557A2A.2080108@samsung.com>
-Message-ID: <4F5734D5.2030504@gmx.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 7 Mar 2012 15:57:41 +0530
+Subject: [PATCH 00/15] watchdog/mpcore: updates & fixes
+Message-ID: <cover.1331115751.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2012 02:44 AM, Donghwa Lee wrote:
-> Hi, I'd like to add Inki Dae, Donghwa Lee and Kyungmin Park as 
-> maintainers who developers for exynos mipi display drivers for
-> video/driver/exynos/exynos_mipi* and include/video/exynos_mipi*.
-> 
-> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Hello,
 
-Applied after moving it to keep alphabetical order in MAINTAINERS and
-amending the commit message like Andrew did with v1 of this patch
-(deleting "Hi, I'd like to").
+This patchset contains fixes and updates for ARM mpcore watchdog driver.
+Changes are mentioned in following patch list:
 
+Viresh Kumar (15):
+  watchdog/mpcore_wdt: Fix multiline comments
+  watchdog/mpcore_wdt: Add blank line after variable definitions in
+    routines
+  watchdog/mpcore_wdt: Arrange #includes in alphabetical order
+  watchdog/mpcore_wdt: remove multiple 'ret = 0' statements from ioctl
+    ops
+  watchdog/mpcore_wdt: Rename dev to pdev for pointing to struct
+    platform_device
+  watchdog/mpcore_wdt: do request_irq before registering misc device
+  watchdog/mpcore_wdt: Use devm routines
+  watchdog/mpcore_wdt: handle module param mpcore_margin in probe
+  watchdog/mpcore_wdt: convert to use module_platform_driver()
+  watchdog/mpcore_wdt: Add support for dev_pm_ops interface
+  watchdog/mpcore_wdt: disable wdt in suspend only if it is busy
+  watchdog/mpcore_wdt: Add support for WDIOF_CARDRESET
+  watchdog/mpcore_wdt: Allow platform_get_irq() to fail
+  watchdog/mpcore_wdt: Add clock framework support
+  watchdog/mpcore_wdt: use correct clk_rate to program timeout
 
-Thanks,
+ arch/arm/include/asm/smp_twd.h |   12 ++
+ drivers/watchdog/mpcore_wdt.c  |  409 ++++++++++++++++++++++++----------------
+ 2 files changed, 255 insertions(+), 166 deletions(-)
 
-Florian Tobias Schandinat
-
-> ---
->  MAINTAINERS |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index b087b3bc..eb5fbcb 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2351,6 +2351,15 @@ S:	Supported
->  F:	drivers/gpu/drm/exynos
->  F:	include/drm/exynos*
->  
-> +EXYNOS MIPI DISPLAY DRIVERS
-> +M:	Inki Dae <inki.dae@samsung.com>
-> +M:	Donghwa Lee <dh09.lee@samsung.com>
-> +M:	Kyungmin Park <kyungmin.park@samsung.com>
-> +L:	linux-fbdev at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/video/exynos/exynos_mipi*
-> +F:	include/video/exynos_mipi*
-> +
->  DSCC4 DRIVER
->  M:	Francois Romieu <romieu@fr.zoreil.com>
->  L:	netdev at vger.kernel.org
+-- 
+1.7.8.110.g4cb5d
