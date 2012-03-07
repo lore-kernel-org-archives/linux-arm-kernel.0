@@ -1,90 +1,78 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 7 Mar 2012 13:57:05 +0100
-Subject: [PATCH 08/12] gpio/twl: Allocate irq_desc dynamically for
- SPARSE_IRQ support
-In-Reply-To: <1330707024-23730-9-git-send-email-b-cousson@ti.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-9-git-send-email-b-cousson@ti.com>
-Message-ID: <4F575B21.30909@ti.com>
+From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
+Date: Wed,  7 Mar 2012 15:09:28 +0200
+Subject: [PATCH v2] mm: module_alloc: check if size is 0
+In-Reply-To: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+References: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+Message-ID: <1331125768-25454-1-git-send-email-veli-pekka.peltola@bluegiga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+After commit de7d2b567d040e3b67fe7121945982f14343213d (mm/vmalloc.c: report
+more vmalloc failures) users will get a warning if vmalloc_node_range() is
+called with size 0. This happens if module's init size equals to 0. This
+patch changes ARM, MIPS and x86 module_alloc() to return NULL before calling
+vmalloc_node_range() that would also return NULL and print a warning.
 
-That fix is tightly coupled with the previous twl4030-irq change, so it 
-will be good to pulled it with the twl series through MFD if you are OK 
-with that?
+Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
+---
+I found this with ARM but after checking out various implementations of
+module_alloc() I thought it would be better to fix all at once.
 
-Care to ack this one and the next one?
+One way to replicate the warning:
+compile kernel with CONFIG_KALLSYMS=n
+insmod a module without init, I used usb-common.ko
 
-Thanks,
-Benoit
+Changes since v1:
+ - changed style as hpa suggested
 
+ arch/arm/kernel/module.c  |    2 ++
+ arch/mips/kernel/module.c |    2 ++
+ arch/x86/kernel/module.c  |    2 +-
+ 3 files changed, 5 insertions(+), 1 deletions(-)
 
-On 3/2/2012 5:50 PM, Benoit Cousson wrote:
-> Do not use the board pdata for irq_base, but allocate them dynamically
-> to allow a proper support of SPARSE_IRQ.
->
-> Fix an unneeded line wrap.
->
-> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> Acked-by: Felipe Balbi<balbi@ti.com>
-> ---
->   drivers/gpio/gpio-twl4030.c |   33 +++++++++++++++++----------------
->   1 files changed, 17 insertions(+), 16 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
-> index 697396c..49e5c6e 100644
-> --- a/drivers/gpio/gpio-twl4030.c
-> +++ b/drivers/gpio/gpio-twl4030.c
-> @@ -395,23 +395,26 @@ static int gpio_twl4030_remove(struct platform_device *pdev);
->   static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
->   {
->   	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
-> -	int ret;
-> +	int ret, irq_base;
->
->   	/* maybe setup IRQs */
-> -	if (pdata->irq_base) {
-> -		if (is_module()) {
-> -			dev_err(&pdev->dev,
-> -				"can't dispatch IRQs from modules\n");
-> -			goto no_irqs;
-> -		}
-> -		ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO,
-> -					pdata->irq_base);
-> -		if (ret<  0)
-> -			return ret;
-> -		WARN_ON(ret != pdata->irq_base);
-> -		twl4030_gpio_irq_base = ret;
-> +	if (is_module()) {
-> +		dev_err(&pdev->dev, "can't dispatch IRQs from modules\n");
-> +		goto no_irqs;
-> +	}
-> +
-> +	irq_base = irq_alloc_descs(-1, 0, TWL4030_GPIO_MAX, 0);
-> +	if (irq_base<  0) {
-> +		dev_err(&pdev->dev, "Failed to alloc irq_descs\n");
-> +		return irq_base;
->   	}
->
-> +	ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO, irq_base);
-> +	if (ret<  0)
-> +		return ret;
-> +
-> +	twl4030_gpio_irq_base = irq_base;
-> +
->   no_irqs:
->   	/*
->   	 * NOTE:  boards may waste power if they don't set pullups
-> @@ -443,9 +446,7 @@ no_irqs:
->
->   	ret = gpiochip_add(&twl_gpiochip);
->   	if (ret<  0) {
-> -		dev_err(&pdev->dev,
-> -				"could not register gpiochip, %d\n",
-> -				ret);
-> +		dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
->   		twl_gpiochip.ngpio = 0;
->   		gpio_twl4030_remove(pdev);
->   	} else if (pdata->setup) {
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 1e9be5d..17648e2 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -39,6 +39,8 @@
+ #ifdef CONFIG_MMU
+ void *module_alloc(unsigned long size)
+ {
++	if (!size)
++		return NULL;
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+ 				GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
+ 				__builtin_return_address(0));
+diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
+index a5066b1..1a51de1 100644
+--- a/arch/mips/kernel/module.c
++++ b/arch/mips/kernel/module.c
+@@ -47,6 +47,8 @@ static DEFINE_SPINLOCK(dbe_lock);
+ #ifdef MODULE_START
+ void *module_alloc(unsigned long size)
+ {
++	if (!size)
++		return NULL;
+ 	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
+ 				GFP_KERNEL, PAGE_KERNEL, -1,
+ 				__builtin_return_address(0));
+diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
+index 925179f..fd44d69 100644
+--- a/arch/x86/kernel/module.c
++++ b/arch/x86/kernel/module.c
+@@ -38,7 +38,7 @@
+ 
+ void *module_alloc(unsigned long size)
+ {
+-	if (PAGE_ALIGN(size) > MODULES_LEN)
++	if (!size || PAGE_ALIGN(size) > MODULES_LEN)
+ 		return NULL;
+ 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+ 				GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL_EXEC,
+-- 
+1.7.5.4
