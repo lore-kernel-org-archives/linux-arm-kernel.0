@@ -1,101 +1,243 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Mar 2012 09:10:45 -0800
-Subject: Latest OMAP4 build errors
-In-Reply-To: <20120307100615.GA17404@n2100.arm.linux.org.uk>
-References: <20120228090209.GC18045@n2100.arm.linux.org.uk>
- <CAK=WgbZEDr_fYSonBQr3XNcTx5vefsH7LJfqycaxsqg-yechWQ@mail.gmail.com>
- <20120306165545.GB15392@n2100.arm.linux.org.uk>
- <201203061701.54141.arnd@arndb.de>
- <20120307100615.GA17404@n2100.arm.linux.org.uk>
-Message-ID: <20120307171044.GE12083@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 07 Mar 2012 11:16:36 -0600
+Subject: [PATCH 1/5 v2] i2c/gpio: add DT support
+In-Reply-To: <1330525221-25651-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1330525221-25651-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4F5797F4.2040104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Arnd & Olof, some urgent changes are needed, see below.
-
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [120307 01:34]:
-> On Tue, Mar 06, 2012 at 05:01:53PM +0000, Arnd Bergmann wrote:
-> > On Tuesday 06 March 2012, Russell King - ARM Linux wrote:
-> > > On Tue, Feb 28, 2012 at 12:11:37PM +0200, Ohad Ben-Cohen wrote:
-> > > > On Tue, Feb 28, 2012 at 12:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > > I think 'depends' would be better here, because selecting IOMMU_SUPPORT
-> > > > > has other side-effects that a user might not want. It's just as likely
-> > > > > that someone wants to disable IOMMU_SUPPORT and needs to find OMAP_REMOTEPROC
-> > > > > as wanting to enable OMAP_REMOTEPROC and having to find IOMMU_SUPPORT.
-> > > > >
-> > > > > In most cases, the defconfig should just set both.
-> > > > 
-> > > > Ok, 'depends on' it is.
-> > > 
-> > > We're a week on, which means I now have a full set of 7 builds on the
-> > > website for OMAP4430 all of which have failed in part due to this
-> > > as yet unresolved problem.
-> > > 
-> > > What's happening to get it fixed and those fixes into whatever tree is
-> > > necessary for them (presumably arm-soc)?
-> > 
-> > Ohad has sent a series of patches for review and there were no comments
-> > on those. The fix was part of it as far as I remember. I'm still waiting
-> > for a pull request from Ohad.
+On 02/29/2012 08:20 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: linux-i2c at vger.kernel.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> ---
+> v2:
 > 
-> Given that we're coming to the end of what could be the _final_ week
-> before the merge window opens, this is not good news.  Read: maybe
-> three days before final.
+> 	use devm_kzalloc
+> 	use i2c-gpio
+> 	use time name in the properties
 > 
-> The fact is that OMAP is - yet again - in a totally rotten state in terms
-> of what's queued up in the armsoc tree.  It is - yet again - completely
-> unbuildable for many configurations.  Just go and have a look at:
+> Best Regars,
+> J.
+>  .../devicetree/bindings/gpio/gpio_i2c.txt          |   32 +++++++
+>  drivers/i2c/busses/i2c-gpio.c                      |   95 +++++++++++++++----
+>  2 files changed, 107 insertions(+), 20 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_i2c.txt
 > 
-> 	http://www.arm.linux.org.uk/developer/build/
-> 
-> to see what an utterly crappy state OMAP is in again.  Last nights build
-> was my tree plus latest arm-soc.  Some of those issues have patches (I
-> had been applying one patch manually to the build tree) but that's not
-> the point - they're not in arm-soc, so the OMAP code in arm-soc is not
-> yet ready for mainline.
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio_i2c.txt b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
+> new file mode 100644
+> index 0000000..27e1b1a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
+> @@ -0,0 +1,32 @@
+> +Device-Tree bindings for i2c gpio driver
+> +
+> +Required properties:
+> +	- compatible = "i2c-gpio";
+> +	- gpios: sda and scl gpio
+> +
+> +
+> +Optional properties:
+> +	- i2c-gpio,sda-open-drain: sda as open drain
+> +	- i2c-gpio,scl-open-drain: scl as open drain
+> +	- i2c-gpio,scl-output-only: scl as output only
+> +	- udelay: delay between GPIO operations (may depend on each platform)
 
-Yes looks like there's an issue with getting urgent patches applied into
-the arm-soc tree.. The patches to fix these issues are known and
-other issues and warnings should be all sorted out now except for some
-MMC changes that are still being discussed.
- 
-> So, as OMAP is soo broken, and as promised after the last merge window -
-> I don't want any OMAP stuff going upstream from armsoc until we get error
-> free builds from the allno and old configs on the builder.
+i2c-gpio,delay-us
 
-What I got queued up in fixes-non-critical-part2 should fix all those
-errors and warnings.
+> +	- i2c-algo-bit,timeout-milliseconds: timeout to get data
 
-Arnd & Olof, I've posted one fix that should be applied to arm-soc tree
-at [1]. I've also posted a request to revert one commit in arm-soc tree
-at [2].
+i2c-gpio,timeout-ms
 
-As it seems that you did not apply those to arm-soc, please apply them,
-or repull the following two branches ASAP:
+> +
+> +Example nodes:
+> +
+> +i2c-gpio at 0 {
 
-Re-pull fixes-non-critical containing one revert:
+Should be "i2c at 0"
 
-Revert "ARM: OMAP2+: Fix multiple randconfig errors with SOC_OMAP and SOC_OMAP_NOOP"
+> +	compatible = "i2c-gpio";
+> +	gpios = <&pioA 23 0 /* sda */
+> +		 &pioA 24 0 /* scl */
+> +		>;
+> +	i2c-gpio,sda-open-drain;
+> +	i2c-gpio,scl-open-drain;
+> +	udelay = <2>;		/* ~100 kHz */
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	rv3029c2 at 56 {
+> +		compatible = "rv3029c2";
+> +		reg = <0x56>;
+> +	};
+> +};
+> diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
+> index a651779..71adba5 100644
+> --- a/drivers/i2c/busses/i2c-gpio.c
+> +++ b/drivers/i2c/busses/i2c-gpio.c
+> @@ -14,8 +14,15 @@
+>  #include <linux/module.h>
+>  #include <linux/slab.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/gpio.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/of_i2c.h>
+>  
+> -#include <asm/gpio.h>
+> +struct i2c_gpio_private_data {
+> +	struct i2c_adapter adap;
+> +	struct i2c_algo_bit_data bit_data;
+> +	struct i2c_gpio_platform_data pdata;
+> +};
+>  
+>  /* Toggle SDA by changing the direction of the pin */
+>  static void i2c_gpio_setsda_dir(void *data, int state)
+> @@ -78,24 +85,63 @@ static int i2c_gpio_getscl(void *data)
+>  	return gpio_get_value(pdata->scl_pin);
+>  }
+>  
+> +static int __devinit of_i2c_gpio_probe(struct device_node *np,
+> +			     struct i2c_gpio_platform_data *pdata)
+> +{
+> +	u32 reg;
+> +
+> +	if (of_gpio_count(np) < 2)
+> +		return -ENODEV;
+> +
+> +	pdata->sda_pin = of_get_gpio(np, 0);
+> +	pdata->scl_pin = of_get_gpio(np, 1);
+> +
+> +	if (pdata->sda_pin < 0 || pdata->scl_pin < 0) {
+> +		pr_err("%s: invalid GPIO pins, sda=%d/scl=%d\n",
+> +		       np->full_name, pdata->sda_pin, pdata->scl_pin);
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (of_property_read_u32(np, "udelay", &reg))
+> +		pdata->udelay = reg;
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical
+Why not of_property_read_u32(np, "udelay", &pdata->udelay)?
 
-Re-pull cleanup again containing one fix:
+Also, reg may not be initialized here.
 
-ARM: OMAP2+: Fix L4_EMU_34XX_BASE error after iomap changes
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap cleanup
-
-Note that the second one I just pushed, however the patch is known to
-work for the build errors after merging arm-soc with Russell's changes.
-
-Arnd & Olof, for future, how you want to handle urgent issues like this?
-
-Regards,
-
-Tony
-
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg64149.html
-[2] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg64151.html
+> +
+> +	if (of_property_read_u32(np, "i2c-algo-bit,timeout-milliseconds", &reg))
+> +		pdata->timeout = msecs_to_jiffies(reg);
+> +
+> +	pdata->sda_is_open_drain =
+> +		!!of_property_read_bool(np, "i2c-gpio,sda-open-drain");
+> +	pdata->scl_is_open_drain =
+> +		!!of_property_read_bool(np, "i2c-gpio,scl-open-drain");
+> +	pdata->scl_is_output_only =
+> +		!!of_property_read_bool(np, "i2c-gpio,scl-output-only");
+> +
+> +	return 0;
+> +}
+> +
+>  static int __devinit i2c_gpio_probe(struct platform_device *pdev)
+>  {
+> +	struct i2c_gpio_private_data *priv;
+>  	struct i2c_gpio_platform_data *pdata;
+>  	struct i2c_algo_bit_data *bit_data;
+>  	struct i2c_adapter *adap;
+>  	int ret;
+>  
+> -	pdata = pdev->dev.platform_data;
+> -	if (!pdata)
+> -		return -ENXIO;
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +	adap = &priv->adap;
+> +	bit_data = &priv->bit_data;
+> +	pdata = &priv->pdata;
+>  
+> -	ret = -ENOMEM;
+> -	adap = kzalloc(sizeof(struct i2c_adapter), GFP_KERNEL);
+> -	if (!adap)
+> -		goto err_alloc_adap;
+> -	bit_data = kzalloc(sizeof(struct i2c_algo_bit_data), GFP_KERNEL);
+> -	if (!bit_data)
+> -		goto err_alloc_bit_data;
+> +	if (pdev->dev.of_node) {
+> +		ret = of_i2c_gpio_probe(pdev->dev.of_node, pdata);
+> +		if (ret)
+> +			return ret;
+> +	} else {
+> +		if (!pdev->dev.platform_data)
+> +			return -ENXIO;
+> +		memcpy(pdata, pdev->dev.platform_data, sizeof(*pdata));
+> +	}
+>  
+>  	ret = gpio_request(pdata->sda_pin, "sda");
+>  	if (ret)
+> @@ -143,6 +189,7 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
+>  	adap->algo_data = bit_data;
+>  	adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
+>  	adap->dev.parent = &pdev->dev;
+> +	adap->dev.of_node = pdev->dev.of_node;
+>  
+>  	/*
+>  	 * If "dev->id" is negative we consider it as zero.
+> @@ -154,7 +201,9 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_add_bus;
+>  
+> -	platform_set_drvdata(pdev, adap);
+> +	of_i2c_register_devices(adap);
+> +
+> +	platform_set_drvdata(pdev, priv);
+>  
+>  	dev_info(&pdev->dev, "using pins %u (SDA) and %u (SCL%s)\n",
+>  		 pdata->sda_pin, pdata->scl_pin,
+> @@ -168,34 +217,40 @@ err_add_bus:
+>  err_request_scl:
+>  	gpio_free(pdata->sda_pin);
+>  err_request_sda:
+> -	kfree(bit_data);
+> -err_alloc_bit_data:
+> -	kfree(adap);
+> -err_alloc_adap:
+>  	return ret;
+>  }
+>  
+>  static int __devexit i2c_gpio_remove(struct platform_device *pdev)
+>  {
+> +	struct i2c_gpio_private_data *priv;
+>  	struct i2c_gpio_platform_data *pdata;
+>  	struct i2c_adapter *adap;
+>  
+> -	adap = platform_get_drvdata(pdev);
+> -	pdata = pdev->dev.platform_data;
+> +	priv = platform_get_drvdata(pdev);
+> +	adap = &priv->adap;
+> +	pdata = &priv->pdata;
+>  
+>  	i2c_del_adapter(adap);
+>  	gpio_free(pdata->scl_pin);
+>  	gpio_free(pdata->sda_pin);
+> -	kfree(adap->algo_data);
+> -	kfree(adap);
+>  
+>  	return 0;
+>  }
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id i2c_gpio_dt_ids[] = {
+> +	{ .compatible = "i2c-gpio", },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, i2c_gpio_dt_ids);
+> +#endif
+> +
+>  static struct platform_driver i2c_gpio_driver = {
+>  	.driver		= {
+>  		.name	= "i2c-gpio",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(i2c_gpio_dt_ids),
+>  	},
+>  	.probe		= i2c_gpio_probe,
+>  	.remove		= __devexit_p(i2c_gpio_remove),
