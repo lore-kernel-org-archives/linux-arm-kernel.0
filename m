@@ -1,69 +1,73 @@
-From: jason@lakedaemon.net (Jason)
-Date: Wed, 7 Mar 2012 15:55:31 -0500
-Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
-In-Reply-To: <20120307200515.GC18513@lunn.ch>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <80fb8cef577eee14364e95009f7a590fd9056ee3.1331090356.git.jason@lakedaemon.net>
- <201203071831.31738.arnd@arndb.de>
- <20120307192723.GE5050@titan.lakedaemon.net>
- <20120307200515.GC18513@lunn.ch>
-Message-ID: <20120307205531.GF5050@titan.lakedaemon.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 7 Mar 2012 17:10:12 -0500
+Subject: [GIT PULL v4] ARM: kirkwood: fdt conversion progress
+Message-ID: <20120307221012.GH5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 09:05:15PM +0100, Andrew Lunn wrote:
-> On Wed, Mar 07, 2012 at 02:27:23PM -0500, Jason wrote:
-> > On Wed, Mar 07, 2012 at 06:31:31PM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 07 March 2012, Jason Cooper wrote:
-> > > > +       serial at f1012000 {
-> > > > +               compatible = "ns16550a";
-> > > > +               reg = <0xf1012000 0xff>;
-> > > > +               reg-shift = <2>;
-> > > > +               interrupts = <33>;
-> > > > +               clock-frequency = <200000000>;
-> > > > +       };
-> > > 
-> > > I just noticed that the length here should be inclusive, i.e. 0x100 not 0xff.
-> > > This is different from the way we define resources in Linux.
-> > 
-> > Grrr.  Now I'm getting frustrated.  I'm trying to boot without
-> > earlyprintk.  Evidently, something is wrong with the above, because the
-> > device boots all the way up (blinky lights come on), but I get no
-> > messages after the usual "Uncompressing Linux... done, booting the
-> > kernel."
-> 
-> Hi Jason
-> 
-> What do you see in /proc/iomem?
-> 
-> You should expect:
-> 
-> f1012000-f10120ff : serial8250.0
->   f1012000-f101201f : serial
-> f1012100-f10121ff : serial8250.1
->   f1012100-f101211f : serial
-> 
-> or probably just the first, if your device only has one serial port.
-> 
-> How about /proc/interrupts?
-> 
->  33:        195  orion_irq  serial
-> 
-> 
-> Anything like this in dmesg?
-> 
-> [   17.189397] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
 
-> [   17.210023] serial8250.0: ttyS0 at MMIO 0xf1012000 (irq = 33) is a 16550A
-> [   17.624748] console [ttyS0] enabled
+  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
 
-These two lines ^^^^ are what I'm missing.  Some probe by printk shows
-it's getting all the way through tty/serial/8250/8250.c:3263
-serial8250_init() okay... then nothing.
+are available in the git repository at:
+  git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt
 
-> [   17.648555] serial8250.1: ttyS1 at MMIO 0xf1012100 (irq = 34) is a 16550A
-> 
-> Comparing your system to the above might help you track down which
-> property is wrong.
-> 
-> 	 Andrew
+---
+Arnd,
+
+My first two should match up with what you have already, the only
+outlier is that Jean-Christophe's patch is needed, but I don't think
+everyone agrees on it yet.
+
+thx,
+
+Jason.
+
+Andrew Lunn (2):
+      ARM: orion: spi: remove enable_clock_fix which is not used
+      ARM: Kirkwood: Remove tclk from kirkwood_asoc_platform_data.
+
+Jason Cooper (10):
+      ARM: kirkwood: add dreamplug (fdt) support.
+      ARM: kirkwood: convert uart0 to devicetree.
+      ARM: kirkwood: fdt: use mrvl ticker symbol
+      ARM: kirkwood: fdt: absorb kirkwood_init()
+      ARM: kirkwood: add interrupt controller to devicetree.
+      ARM: kirkwood: rtc-mv devicetree bindings
+      ARM: kirkwood: use devicetree for rtc-mv
+      ARM: kirkwood: mv_cesa devicetree support.
+      ARM: kirkwood: use devicetree for orion-ehci
+      ARM: kirkwood: use devicetree to init sata_mv
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      of: add dma-mask binding
+
+Michael Walle (3):
+      ARM: kirkwood: mv_cesa devicetree bindings
+      ARM: kirkwood: ehci-orion: add device tree binding
+      ARM: kirkwood: sata_mv: add device tree binding
+
+ .../devicetree/bindings/crypto/mv_cesa.txt         |   18 ++
+ .../devicetree/bindings/usb/ehci-orion.txt         |    5 +
+ arch/arm/boot/dts/kirkwood-dreamplug.dts           |   41 ++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |   26 +++
+ arch/arm/mach-kirkwood/Kconfig                     |   14 ++
+ arch/arm/mach-kirkwood/Makefile                    |    1 +
+ arch/arm/mach-kirkwood/Makefile.boot               |    2 +
+ arch/arm/mach-kirkwood/board-dt.c                  |  206 ++++++++++++++++++++
+ arch/arm/mach-kirkwood/common.c                    |   41 ++++-
+ arch/arm/mach-kirkwood/common.h                    |    6 +
+ arch/arm/plat-orion/include/plat/audio.h           |    1 -
+ drivers/ata/sata_mv.c                              |   18 ++-
+ drivers/crypto/mv_cesa.c                           |   13 ++
+ drivers/of/platform.c                              |   26 +++-
+ drivers/rtc/rtc-mv.c                               |    9 +
+ drivers/spi/spi-orion.c                            |    5 -
+ drivers/usb/host/ehci-orion.c                      |   50 +++++-
+ include/linux/spi/orion_spi.h                      |    1 -
+ 18 files changed, 464 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/crypto/mv_cesa.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
+ create mode 100644 arch/arm/boot/dts/kirkwood-dreamplug.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-dt.c
