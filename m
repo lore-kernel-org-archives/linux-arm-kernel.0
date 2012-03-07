@@ -1,33 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Mar 2012 19:00:47 +0000
-Subject: [PATCH 14/14] ARM: kirkwood: use devicetree to init sata_mv
-In-Reply-To: <20120307185204.GD5050@titan.lakedaemon.net>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <201203071840.09572.arnd@arndb.de>
- <20120307185204.GD5050@titan.lakedaemon.net>
-Message-ID: <201203071900.48096.arnd@arndb.de>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 7 Mar 2012 19:02:18 +0000
+Subject: [GIT PULL] maintainers file updates for DaVinci
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317ECFD3@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 March 2012, Jason wrote:
-> > Is it guaranteed that it's always the first port that gets used if there
-> > is only one? If not, this might turn on the wrong one.
-> 
-> This is the same logic as mach-kirkwood/common.c:176
-> 
-> void __init kirkwood_sata_init(struct mv_sata_platform_data *sata_data)
-> {
->         kirkwood_clk_ctrl |= CGC_SATA0;
->         if (sata_data->n_ports > 1)
->                 kirkwood_clk_ctrl |= CGC_SATA1;
-> 
->         orion_sata_init(sata_data, SATA_PHYS_BASE, IRQ_KIRKWOOD_SATA);
-> }
-> 
-> So, I don't think I'm introducing a regression.
+Hi Arnd, Olof,
 
-Ok, good point. I was wondering whether the individual ports should
-be modeled in the device tree, but I guess it's not necessary if nobody
-needed this so far.
+Can you please pull the following MAINTAINERS file
+updates for DaVinci for v3.4?
 
-	Arnd
+Thanks,
+Sekhar
+
+The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+  Linus Torvalds (1):
+        Linux 3.3-rc6
+
+are available in the git repository at:
+
+  git://gitorious.org/linux-davinci/linux-davinci.git maintainers
+
+Sekhar Nori (2):
+      MAINTAINERS: mark TI DaVinci list as "moderated"
+      MAINTAINERS: add TI DaVinci git tree information
+
+ MAINTAINERS |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
