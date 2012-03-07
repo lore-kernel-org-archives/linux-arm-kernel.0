@@ -1,34 +1,45 @@
-From: xiyou.wangcong@gmail.com (Cong Wang)
-Date: Wed, 07 Mar 2012 12:14:36 +0800
-Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper
- to test CMA
-In-Reply-To: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
-References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <4F56E0AC.8070501@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 6 Mar 2012 20:40:49 -0800
+Subject: [PATCH 0/3] arm: tegra: dts: USB Updates for Tegra legacy mode /
+ OTG
+In-Reply-To: <CAPnjgZ1rXEGbi3m3HeWiUxG_TbmUug0C0QZgb7_9Eiz-xPMHwg@mail.gmail.com>
+References: <1328288172-8059-1-git-send-email-sjg@chromium.org>
+ <74CDBE0F657A3D45AFBB94109FB122FF178E5D2FF5@HQMAIL01.nvidia.com>
+ <CAPnjgZ1rXEGbi3m3HeWiUxG_TbmUug0C0QZgb7_9Eiz-xPMHwg@mail.gmail.com>
+Message-ID: <CAOesGMjXkFOxfp9fnhwKFZSoUJmHObk7FaiaNNj2NSyyNMTjkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2012 11:14 AM, Barry Song wrote:
-> From: Barry Song<Baohua.Song@csr.com>
+On Tue, Mar 6, 2012 at 7:16 PM, Simon Glass <sjg@chromium.org> wrote:
+> +Olof
 >
-> Any write request to /dev/cma_test will let the module to allocate memory from
-> CMA, for example:
+> Hi,
 >
-> 1st time
-> $ echo 1024>  /dev/cma_test
-> will require cma_test to request 1MB(1024KB)
-> 2nd time
-> $ echo 2048>  /dev/cma_test
-> will require cma_test to request 2MB(2048KB)
+> On Fri, Feb 3, 2012 at 11:59 AM, Stephen Warren <swarren@nvidia.com> wrote:
+>> Simon Glass wrote at riday, February 03, 2012 9:56 AM:
+>>> This little series brings in some bindings that seem useful for U-Boot.
+>>>
+>>> I am working mostly in U-Boot, but since there is no shared .dts repo
+>>> I was asked to commit these changes to the kernel. I do not propose to
+>>> update the Linux USB drivers to match.
+>>
+>> I think the series looks reasonable, so:
+>>
+>> Acked-by: Stephen Warren <swarren@nvidia.com<>
+>>
+>> (I note that the kernel's USB driver for USB1 doesn't attempt to clear
+>> legacy mode; I wonder how we're getting away with that. Perhaps it's
+>> only been tested with a bootloader that's already cleared legacy mode)
+>>
 >
-> Any read request to /dev/cma_test will let the module to free the 1st valid
-> memory from CMA, for example:
->
-> 1st time
-> $ cat /dev/cma_test
-> will require cma_test to free the 1MB allocated in the first write request
-> 2nd time
-> $ cat /dev/cma_test
-> will require cma_test to free the 2MB allocated in the second write request
+> How does this series get picked up, please?
 
-Any reason why using /dev not /proc or /sys?
+It drowned in the patch floods you've been sending, and it wasn't
+addressed directly to me so I ignored it.
+
+Please resend and I'll apply.
+
+
+Thanks,
+
+-Olof
