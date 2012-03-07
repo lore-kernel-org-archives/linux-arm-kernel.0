@@ -1,105 +1,60 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 07 Mar 2012 15:01:41 +0100
-Subject: [PATCH] ARM: SAMSUNG: change the name from s3c-sdhci to
- exynos4-sdhci
-In-Reply-To: <4F576073.6010001@samsung.com>
-References: <4F45D343.6020409@samsung.com>
- <CAJuYYwTh8tVdA0X-TLEU-9O_M0_PmJR=i3WYAQXsaRcPF3MbJA@mail.gmail.com>
- <4F557692.8090102@samsung.com> <4F55DE1F.9010405@samsung.com>
- <4F576073.6010001@samsung.com>
-Message-ID: <00db01ccfc6a$d34c2ee0$79e48ca0$%szyprowski@samsung.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Wed, 7 Mar 2012 16:05:29 +0200
+Subject: I.MX35 PDK
+In-Reply-To: <CAOMZO5CyGazr1=kLF51W7S7ZpEy2Mg4k2n_ZHnGimSyu2oVcrA@mail.gmail.com>
+References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A26@MEP-EXCH.meprolight.com>
+ <4F562C90.6090103@freescale.com>,
+ <CAOMZO5CyGazr1=kLF51W7S7ZpEy2Mg4k2n_ZHnGimSyu2oVcrA@mail.gmail.com>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D890F@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Thanks Fabio,
 
-On Wednesday, March 07, 2012 2:20 PM Kukjin Kim wrote:
+ 
+________________________________________
+From: Fabio Estevam [festevam at gmail.com]
+Sent: Wednesday, March 07, 2012 2:18 PM
+To: Fabio Estevam
+Cc: Alex Gershgorin; linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de
+Subject: Re: I.MX35 PDK
 
-> On 03/06/12 01:51, Kukjin Kim wrote:
-> > On 03/05/12 18:29, Jaehoon Chung wrote:
-> >> Hi Kukjin.
-> >>
-> >> Is it merged?
-> >>
-> >> Best Regards,
-> >> Jaehoon Chung
-> >>
-> >> On 02/24/2012 06:56 PM, Thomas Abraham wrote:
-> >>
-> >>> On 23 February 2012 11:18, Jaehoon Chung<jh80.chung@samsung.com> wrote:
-> >>>> Thomas Arbrahams's patchset have changed the device name in sdhci-s3c.c
-> >>>> (mmc: sdhci-s3c: Rework platform data and add device tree support)
-> >>>> But didn't change the regulator_consumer name.
-> >>>> So maybe didn't initialize the mmc/sd card for exynos4.
-> >>>>
-> >>>> This patch is fixed that (based-on linux-samsung for-next branch)
-> >>>>
-> >>>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
-> >>>> Signed-off-by: kyungmin Park<kyungmin.park@samsung.com>
-> >>>> ---
-> >>>> arch/arm/mach-exynos/mach-nuri.c | 4 ++--
-> >>>> arch/arm/mach-exynos/mach-universal_c210.c | 2 +-
-> >>>> 2 files changed, 3 insertions(+), 3 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/mach-exynos/mach-nuri.c
-> >>>> b/arch/arm/mach-exynos/mach-nuri.c
-> >>>> index a6b9162..251dd7a 100644
-> >>>> --- a/arch/arm/mach-exynos/mach-nuri.c
-> >>>> +++ b/arch/arm/mach-exynos/mach-nuri.c
-> >>>> @@ -116,7 +116,7 @@ static struct s3c_sdhci_platdata
-> >>>> nuri_hsmmc0_data __initdata = {
-> >>>> };
-> >>>>
-> >>>> static struct regulator_consumer_supply emmc_supplies[] = {
-> >>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
-> >>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
-> >>>> REGULATOR_SUPPLY("vmmc", "dw_mmc"),
-> >>>> };
-> >>>>
-> >>>> @@ -415,7 +415,7 @@ static struct regulator_consumer_supply
-> >>>> __initdata max8997_ldo12_[] = {
-> >>>> REGULATOR_SUPPLY("vddio", "6-003c"), /* HDC802 */
-> >>>> };
-> >>>> static struct regulator_consumer_supply __initdata max8997_ldo13_[] = {
-> >>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"), /* TFLASH */
-> >>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.2"), /* TFLASH */
-> >>>> };
-> >>>> static struct regulator_consumer_supply __initdata max8997_ldo14_[] = {
-> >>>> REGULATOR_SUPPLY("inmotor", "max8997-haptic"),
-> >>>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
-> >>>> b/arch/arm/mach-exynos/mach-universal_c210.c
-> >>>> index 6017a21..320cb1d 100644
-> >>>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
-> >>>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
-> >>>> @@ -749,7 +749,7 @@ static struct s3c_sdhci_platdata
-> >>>> universal_hsmmc0_data __initdata = {
-> >>>> };
-> >>>>
-> >>>> static struct regulator_consumer_supply mmc0_supplies[] = {
-> >>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
-> >>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
-> >>>> };
-> >>>>
-> >>>> static struct regulator_init_data mmc0_fixed_voltage_init_data = {
-> >>>
-> >>> Reviewed-by: Thomas Abraham<thomas.abraham@linaro.org>
-> >
-> > Looks OK, will apply.
-> >
-> 
-> (Cc'ed Marek)
-> 
-> Hi Kyungmin, Marek and Jaehoon,
-> 
-> As you know, same patches have been submitted duplicated and this should
-> be fixed. Which one would be better to send upstream?
+On 3/6/12, Fabio Estevam <fabio.estevam@freescale.com> wrote:
+> Alex Gershgorin wrote:
+>> Hi Fabio,
+>>
+>>
+>>
+>> How I can get information about accesses to CMOS_RST_B and CSI_PWDN bits
+>> of MC9S08DZ60 processor.
+>>
+>> I need address of this register and bits mapping in this register.
 
-For me it doesn't matter, I just need this fix to get merged, because otherwise
-the Universal C210 and Nuri boards are dysfunctional. 
+CMOS_RESET: Bit 6 of register 0x1a
+CMOS_ENABLE: Bit 1 of register 0x20
 
-You can select the one prepared by Jaehoon if You like.
+>>>After the mx35pdk lcd support patch gets applied I will submit a patch
+>>>to adding support to all of the registers/bits definitions for
+>>>>mc9s08dz60 chip.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+I use a barebox boot loader which supported mc9s08dz60 driver :-)
+Currently this is working, without  driver in the Linux kernel, but I have other problem:
+In my I.MX35 pdk personality board on connector CN14 I measure signals CMOS_RST = 1, CSI_PWDN = 0 and all of the correct voltages,
+in spite of this I get from ov2640 driver error 
+Here Linux Kernel boot message:  
+
+"Linux video capture interface: v2.00
+soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+ov2640 0-0030: Product ID error fb:fb" 
+
+I cannot understand what the problem is, if someone tested this?
+
+Regards,
+Alex Gershgorin
+
+
+
+
+
+ 
