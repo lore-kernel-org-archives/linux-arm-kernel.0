@@ -1,32 +1,45 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 7 Mar 2012 13:05:56 +0800
-Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper to
- test CMA
-In-Reply-To: <4F56EBA6.6000704@gmail.com>
-References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
- <4F56E0AC.8070501@gmail.com>
- <CAGsJ_4x4CwD+WAE9d+Xob_tfwqmE6SdBdBd5EbC64XBi4Uzvgg@mail.gmail.com>
- <4F56EA49.8070808@gmail.com>
- <CAGsJ_4xJoKGt3+b_3bteoMyeO615pCxFpMpsH4LtvufFNDv6bA@mail.gmail.com>
- <4F56EBA6.6000704@gmail.com>
-Message-ID: <CAGsJ_4ypegMQVf0Xet1T5sLaaEDGh5s1Vi6w4t_UQSZp7nYQuQ@mail.gmail.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue,  6 Mar 2012 21:04:32 -0800
+Subject: [RESEND PATCH 1/3] arm: tegra: dts: Support host/device selection and
+ legacy mode
+In-Reply-To: <1331096674-8324-1-git-send-email-sjg@chromium.org>
+References: <1331096674-8324-1-git-send-email-sjg@chromium.org>
+Message-ID: <1331096674-8324-2-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/7 Cong Wang <xiyou.wangcong@gmail.com>:
-> On 03/07/2012 12:57 PM, Barry Song wrote:
->>
->>
->> if you think so, pls do that and send v4 with your s-o-b.
->>
->
-> This is not a good attitude, nor helps your patch to be merged...
->
-> Be collaborative.
+Some USB ports can support host and device operation. We add the dr_mode
+property (as found in Freescale) for this.
 
-some people like focusing on trivial things. i said i really didn't
-care about the details whether it is /dev, /proc, /sys.
-if you like a /proc, pls do it by yourself and i will agree. but i
-will not waste my time on that.
+One USB port has a 'legacy mode', left over from the days of pre-Tegra
+chips. I don't believe this is actually used, except that we must know
+to turn this off in the driver.
 
--barry
+Signed-off-by: Simon Glass <sjg@chromium.org>
+---
+ .../devicetree/bindings/usb/tegra-usb.txt          |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/usb/tegra-usb.txt b/Documentation/devicetree/bindings/usb/tegra-usb.txt
+index 035d63d..007005d 100644
+--- a/Documentation/devicetree/bindings/usb/tegra-usb.txt
++++ b/Documentation/devicetree/bindings/usb/tegra-usb.txt
+@@ -11,3 +11,16 @@ Required properties :
+  - phy_type : Should be one of "ulpi" or "utmi".
+  - nvidia,vbus-gpio : If present, specifies a gpio that needs to be
+    activated for the bus to be powered.
++
++Optional properties:
++  - dr_mode : dual role mode. Indicates the working mode for
++   nvidia,tegra20-ehci compatible controllers.  Can be "host", "peripheral",
++   or "otg".  Default to "host" if not defined for backward compatibility.
++      host means this is a host controller
++      peripheral means it is device controller
++      otg means it can operate as either ("on the go")
++  - nvidia,has-legacy-mode : boolean indicates whether this controller can
++    operate in legacy mode (as APX 2500 / 2600). In legacy mode some
++    registers are accessed through the APB_MISC base address instead of
++    the USB controller. Since this is a legacy issue it probably does not
++    warrant a compatible string of its own.
+-- 
+1.7.7.3
