@@ -1,47 +1,46 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Mar 2012 11:33:52 +0100
-Subject: [PATCH 1/9 v2] ARM: at91: usb ohci add dt support
-In-Reply-To: <20120307093446.GN17370@n2100.arm.linux.org.uk>
-References: <20120307084924.GK21255@game.jcrosoft.org>
- <1331111746-21393-1-git-send-email-plagnioj@jcrosoft.com>
- <20120307093446.GN17370@n2100.arm.linux.org.uk>
-Message-ID: <20120307103352.GA17745@game.jcrosoft.org>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Wed, 07 Mar 2012 11:48:24 +0100
+Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper to
+ test CMA
+In-Reply-To: <4F56E0AC.8070501@gmail.com>
+References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
+ <4F56E0AC.8070501@gmail.com>
+Message-ID: <op.wasqyyok3l0zgt@mpn-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:34 Wed 07 Mar     , Russell King - ARM Linux wrote:
-> On Wed, Mar 07, 2012 at 10:15:38AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > +static u64 at91_ohci_dma_mask = DMA_BIT_MASK(32);
-> > +
-> > +static int __devinit ohci_at91_of_init(struct platform_device *pdev)
-> > +{
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	int i, ret, gpio;
-> > +	enum of_gpio_flags flags;
-> > +	struct at91_usbh_data	*pdata;
-> > +	u32 ports;
-> > +
-> > +	if (!np)
-> > +		return 0;
-> > +
-> > +	/* Right now device-tree probed devices don't get dma_mask set.
-> > +	 * Since shared usb code relies on it, set it here for now.
-> > +	 * Once we have dma capability bindings this can go away.
-> > +	 */
-> > +	if (!pdev->dev.dma_mask)
-> > +		pdev->dev.dma_mask = &at91_ohci_dma_mask;
-> 
-> That sounds like a rather big omission from DT - what's happening to
-> address this (before we end up with lots of drivers with this).  Pretty
-> much any device which does DMA needs both this and the coherent DMA mask
-> set properly.
-> 
-> We really don't want this kind of workaround scattered in every driver
-> which has been converted to DT.
-Tegra do it also
-I do yet found a good generic way in DT
+> On 03/07/2012 11:14 AM, Barry Song wrote:
+>> Any write request to /dev/cma_test will let the module to allocate memory from
+>> CMA, for example:
+>>
+>> 1st time
+>> $ echo 1024>  /dev/cma_test
+>> will require cma_test to request 1MB(1024KB)
+>> 2nd time
+>> $ echo 2048>  /dev/cma_test
+>> will require cma_test to request 2MB(2048KB)
+>>
+>> Any read request to /dev/cma_test will let the module to free the 1st valid
+>> memory from CMA, for example:
+>>
+>> 1st time
+>> $ cat /dev/cma_test
+>> will require cma_test to free the 1MB allocated in the first write request
+>> 2nd time
+>> $ cat /dev/cma_test
+>> will require cma_test to free the 2MB allocated in the second write request
 
-Today only usb need I do plan to drop it for 3.5 can we have for 3.4
+On Wed, 07 Mar 2012 05:14:36 +0100, Cong Wang <xiyou.wangcong@gmail.com> wrote:
+> Any reason why using /dev not /proc or /sys?
 
-Best Regards,
-J.
+Because /proc is for processes and /sys is for stable, documented APIs.
+
+If anything, debugfs might make some sense, but since the module needs struct
+device anyway, it can just register a misc device, which is simpler and does
+not require debugfs to be compiled.
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
