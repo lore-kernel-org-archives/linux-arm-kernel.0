@@ -1,38 +1,71 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 07 Mar 2012 17:43:43 -0500 (EST)
-Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
-In-Reply-To: <20120307213009.GF18787@n2100.arm.linux.org.uk>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
- <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
- <20120307180815.GA27213@game.jcrosoft.org> <4F57AB92.6060907@wwwdotorg.org>
- <20120307183633.GB27213@game.jcrosoft.org> <4F57C4C6.2070602@wwwdotorg.org>
- <alpine.LFD.2.02.1203071537130.24151@xanadu.home>
- <20120307213009.GF18787@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1203071644180.24151@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Mar 2012 14:44:59 -0800
+Subject: Latest OMAP4 build errors
+In-Reply-To: <CAOesGMiNSyc9F+Wf5pXPG=hRAfnG6aMHtccLBwvekuB3HpyevQ@mail.gmail.com>
+References: <20120228090209.GC18045@n2100.arm.linux.org.uk>
+ <CAK=WgbZEDr_fYSonBQr3XNcTx5vefsH7LJfqycaxsqg-yechWQ@mail.gmail.com>
+ <20120306165545.GB15392@n2100.arm.linux.org.uk>
+ <201203061701.54141.arnd@arndb.de>
+ <20120307100615.GA17404@n2100.arm.linux.org.uk>
+ <20120307171044.GE12083@atomide.com>
+ <CAOesGMiNSyc9F+Wf5pXPG=hRAfnG6aMHtccLBwvekuB3HpyevQ@mail.gmail.com>
+Message-ID: <20120307224459.GJ12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Mar 2012, Russell King - ARM Linux wrote:
-
-> On Wed, Mar 07, 2012 at 04:03:04PM -0500, Nicolas Pitre wrote:
-> > Well, I do have a patch series getting rid of ZRELADDR entirely, and 
-> > AUTO_ZRELADDR would then become implicit, unless CONFIG_PHYS_OFFSET is 
-> > defined.
+* Olof Johansson <olof@lixom.net> [120307 13:46]:
+> On Wed, Mar 7, 2012 at 9:10 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > What I got queued up in fixes-non-critical-part2 should fix all those
+> > errors and warnings.
+> >
+> > Arnd & Olof, I've posted one fix that should be applied to arm-soc tree
+> > at [1]. I've also posted a request to revert one commit in arm-soc tree
+> > at [2].
+> >
+> > As it seems that you did not apply those to arm-soc, please apply them,
+> > or repull the following two branches ASAP:
 > 
-> Not possible, unless you're goign to also rip out uImage support.
+> Done (repulled the branches). Stephen Rothwell has not surfaced on irc
+> yet, so hopefully this means it'll make it into today's linux-next.
 
-I wish I could.  At least this new "noload" option would make uImage 
-compatible with this.  That won't help existing u-Boot installations 
-though, which is why I didn't post that patch series yet as I still 
-haven't found a good fallback.
+Thanks!
+ 
+> > Re-pull fixes-non-critical containing one revert:
+> >
+> > Revert "ARM: OMAP2+: Fix multiple randconfig errors with SOC_OMAP and SOC_OMAP_NOOP"
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical
+> >
+> > Re-pull cleanup again containing one fix:
+> >
+> > ARM: OMAP2+: Fix L4_EMU_34XX_BASE error after iomap changes
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap cleanup
+> >
+> > Note that the second one I just pushed, however the patch is known to
+> > work for the build errors after merging arm-soc with Russell's changes.
+> 
+> Looks like you pasted the wrong subject above -- the mail below
+> contains the patch that you added though so it looked OK to me (the
+> subject above was the previous top-of-branch before you added the last
+> one).
 
-> Otherwise, how do we deal with platforms like Versatile Express where
-> uboot does a funky relocation of data depending on whether the uImage
-> it's loading is for the low 256MB RAM mapping or the high 1GB RAM
-> mapping.
+Oops, sorry about that. The end result looks right.
+ 
+> > Arnd & Olof, for future, how you want to handle urgent issues like this?
+> 
+> Personally I missed the requests since they ended up in the chain of
+> replies and I didn't notice them, my mistake. A separate email
+> requesting pulls or patch application it to arm at kernel.org would
+> reduce the risk of that happening (Flagging the subject with [URGENT]
+> wouldn't hurt).
 
-Doesn't it use AUTO_ZRELADDR?  With the newer u-Boot, you'd just load 
-uImage to whatever address and u-Boot won't mess with it.
+OK thanks, will do that next time if there's something urgent.
 
+I'll send a pull request shortly for fixes-non-critical-part2 that
+should sort out the remaining issues.
 
-Nicolas
+Regards,
+
+Tony
