@@ -1,63 +1,45 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 6 Mar 2012 19:10:23 -0500
-Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
- em-x270.c
-In-Reply-To: <1330989122-6323-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1330989122-6323-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 7 Mar 2012 09:10:42 +0900
+Subject: [PATCH v10 2/3] ARM: EXYNOS: Change System MMU platform device
+ definitions
+In-Reply-To: <CAH9JG2Uvc27UMcsy_Apqo+Td_td_18C6i3vvC8aroBse2=+53w@mail.gmail.com>
+References: <002101ccfb73$8684c240$938e46c0$%cho@samsung.com>
+ <CAH9JG2Uvc27UMcsy_Apqo+Td_td_18C6i3vvC8aroBse2=+53w@mail.gmail.com>
+Message-ID: <CAHQjnOP_mEck35PwhDd7v=MKc+ONFRFxa7i=ro0iMxWy-fuFNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2012 at 6:12 PM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
+On Tue, Mar 6, 2012 at 7:03 PM, Kyungmin Park <kyungmin.park@samsung.com> wrote:
+>>
+>> -#define S5P_SYSMMU_TOTAL_IPNUM ? ? ? ? ? ? ? EXYNOS4_SYSMMU_TOTAL_IPNUM
+>> +#define SYSMMU_DEVNAME_BASE "exynos-sysmmu"
+>> +
+>> +#define SYSMMU_CLOCK_NAME "sysmmu"
+>> +#define SYSMMU_CLOCK_NAME2 "sysmmu_mc"
+> What's the meaning of "mc"?
+It stands for multi clock gating source.
+ISP block has a lot of System MMUs and I merged them in a single
+platform device to control them easier. However it is required to access
+2 control registers to gating  their clocks. "sysmmu_mc" is prepared for the
+case that requires 2 clock descriptors for clock gating.
 
-[...]
-
-> -REGULATOR_CONSUMER(ldo3, &em_x270_gps_userspace_consumer.dev, "vcc gps");
-> -REGULATOR_CONSUMER(ldo5, NULL, "vcc cam");
-> -REGULATOR_CONSUMER(ldo10, &pxa_device_mci.dev, "vcc sdio");
-> -REGULATOR_CONSUMER(ldo12, NULL, "vcc usb");
-> -REGULATOR_CONSUMER(ldo19, &em_x270_gprs_userspace_consumer.dev, "vcc gprs");
-> -REGULATOR_CONSUMER(buck2, NULL, "vcc_core");
-> +REGULATOR_CONSUMER(ldo3, "vcc gps");
-> +REGULATOR_CONSUMER(ldo5, "vcc cam");
-> +REGULATOR_CONSUMER(ldo10, "vcc sdio");
-> +REGULATOR_CONSUMER(ldo12, "vcc usb");
-> +REGULATOR_CONSUMER(ldo19, "vcc gprs");
-> +REGULATOR_CONSUMER(buck2, "vcc_core");
-
-Based on today's discussions, I'm no longer convinced the above
-is right.  If I understand correctly, for the case of say the top one:
-
-      em_x270_gps_userspace_consumer
-
-I need to go find that struct, determine that it has a .name entry like:
-
-        .name           = "reg-userspace-consumer",
-
-and then use (for each case) something like:
-
-      REGULATOR_SUPPLY("vcc gps", "reg-userspace-consumer")
-
-The above wrapper for REGULATOR_CONSUMER would have
-to be changed to either use or inline the REGULATOR_SUPPLY.
-
-Let me know if I'm on the right track here.  This code is completely
-foreign to me.   As such, the naming in the magician_defconfig
-patch is also probably needing rework (i.e. it needs the corresponding
-value for .name, and not the name of the parent struct itself.)
-
-THanks,
-Paul.
---
-
+>> +
+>> +#ifdef CONFIG_EXYNOS_DEV_SYSMMU
+>> +#include <linux/device.h>
+>> +struct platform_device;
+>> +
+>> +#define SYSMMU_PLATDEV(ipname) exynos_device_sysmmu_##ipname
+>> +
+>> +extern struct platform_device SYSMMU_PLATDEV(mfc_l);
+>> +extern struct platform_device SYSMMU_PLATDEV(mfc_r);
+>> +extern struct platform_device SYSMMU_PLATDEV(tv);
+>> +extern struct platform_device SYSMMU_PLATDEV(jpeg);
+>> +extern struct platform_device SYSMMU_PLATDEV(rot);
+> Where's the fimc platform_device?
 >
-> ?#define REGULATOR_INIT(_ldo, _min_uV, _max_uV, _ops_mask) ? ? ? ? ? ? ?\
-> ? ? ? ?static struct regulator_init_data _ldo##_data = { ? ? ? ? ? ? ? \
-> --
-> 1.7.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-next" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> I think you only tested it with exynos5.
+
+True. I am sorry that I have missed to define it externally.
+Thank you.
+
+Cho KyongHo.
