@@ -1,82 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 07 Mar 2012 17:17:25 +0100
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <20120306232138.GF15201@n2100.arm.linux.org.uk>
-References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
- <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
- <20120306232138.GF15201@n2100.arm.linux.org.uk>
-Message-ID: <00f801ccfc7d$c8da6810$5a8f3830$%szyprowski@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 7 Mar 2012 16:28:22 +0000
+Subject: [PATCH v9] Regulator: Add Anatop regulator driver
+In-Reply-To: <20120307153622.GC17745@game.jcrosoft.org>
+References: <1331126658-26926-1-git-send-email-paul.liu@linaro.org>
+ <20120307132225.GB17745@game.jcrosoft.org>
+ <20120307134551.GL3107@opensource.wolfsonmicro.com>
+ <20120307153622.GC17745@game.jcrosoft.org>
+Message-ID: <20120307162821.GP3107@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Mar 07, 2012 at 04:36:22PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-On Wednesday, March 07, 2012 12:22 AM Russell King - ARM Linux wrote:
+> > This really doesn't seem at all sane for a device which is already
+> > vendor specific, it's just noise in the bindings.
 
-> On Wed, Feb 29, 2012 at 04:04:22PM +0100, Marek Szyprowski wrote:
-> > +static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
-> > +		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
-> > +		    struct dma_attrs *attrs)
-> > +{
-> > +	struct arm_vmregion *c;
-> > +
-> > +	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
-> > +	c = arm_vmregion_find(&consistent_head, (unsigned long)cpu_addr);
-> 
-> What protects this against other insertions/removals from the list?
+> No it's
 
-arm_vmregion_* functions have their own spinlock.
+...?
 
-(snipped)
+> Here is a good example as we have regulator generic binding & vendor
+> specific bindig
 
-> > +	if (c) {
-> > +		struct page **pages = c->priv;
-> > +		__dma_free_remap(cpu_addr, size);
-> > +		__iommu_remove_mapping(dev, handle, size);
-> > +		__iommu_free_buffer(dev, pages, size);
-> > +	}
-> > +}
-> > +
-> > +/*
-> > + * Map a part of the scatter-gather list into contiguous io address space
-> > + */
-> > +static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
-> > +			  size_t size, dma_addr_t *handle,
-> > +			  enum dma_data_direction dir)
-> > +{
-> > +	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
-> > +	dma_addr_t iova, iova_base;
-> > +	int ret = 0;
-> > +	unsigned int count;
-> > +	struct scatterlist *s;
-> > +
-> > +	size = PAGE_ALIGN(size);
-> > +	*handle = ARM_DMA_ERROR;
-> > +
-> > +	iova_base = iova = __alloc_iova(mapping, size);
-> > +	if (iova == ARM_DMA_ERROR)
-> > +		return -ENOMEM;
-> > +
-> > +	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s))
-> > +	{
-> > +		phys_addr_t phys = page_to_phys(sg_page(s));
-> > +		unsigned int len = PAGE_ALIGN(s->offset + s->length);
-> > +
-> > +		if (!arch_is_coherent())
-> > +			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
-> > +
-> > +		ret = iommu_map(mapping->domain, iova, phys, len, 0);
-> 
-> Dealing with phys addresses on one part and pages + offset + length
-> in a different part doesn't look like a good idea.  Why can't there
-> be some consistency?
+It's not vendor specific, it's device specific and people are doing it
+even for devices with no generic bindings at all which is particularly
+silly.
 
-Well, I have no idea how to be more consistent here. scatter-lists operates on 
-pages + offsets + length parameters. iommu api operates on the whole pages, but
-they are referred with physical address. Right now I cannot change any of it, 
-at least not it the near future.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Device specific prefixes probably make sense, but vendor specific ones
+are just noise.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120307/19e1a699/attachment.sig>
