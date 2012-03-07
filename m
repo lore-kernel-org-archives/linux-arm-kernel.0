@@ -1,32 +1,37 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue,  6 Mar 2012 21:04:34 -0800
-Subject: [RESEND PATCH 3/3] arm: tegra: dts: Mark USB1 as an OTG port on
- Seaboard
-In-Reply-To: <1331096674-8324-1-git-send-email-sjg@chromium.org>
-References: <1331096674-8324-1-git-send-email-sjg@chromium.org>
-Message-ID: <1331096674-8324-4-git-send-email-sjg@chromium.org>
+From: xiyou.wangcong@gmail.com (Cong Wang)
+Date: Wed, 07 Mar 2012 13:09:49 +0800
+Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper
+ to test CMA
+In-Reply-To: <CAGsJ_4ypegMQVf0Xet1T5sLaaEDGh5s1Vi6w4t_UQSZp7nYQuQ@mail.gmail.com>
+References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
+ <4F56E0AC.8070501@gmail.com>
+ <CAGsJ_4x4CwD+WAE9d+Xob_tfwqmE6SdBdBd5EbC64XBi4Uzvgg@mail.gmail.com>
+ <4F56EA49.8070808@gmail.com>
+ <CAGsJ_4xJoKGt3+b_3bteoMyeO615pCxFpMpsH4LtvufFNDv6bA@mail.gmail.com>
+ <4F56EBA6.6000704@gmail.com>
+ <CAGsJ_4ypegMQVf0Xet1T5sLaaEDGh5s1Vi6w4t_UQSZp7nYQuQ@mail.gmail.com>
+Message-ID: <4F56ED9D.3000504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB1 port on Tegra2 supports operation in host or device modes. On
-Seaboard this is possible, so mark the port as OTG.
+On 03/07/2012 01:05 PM, Barry Song wrote:
+> 2012/3/7 Cong Wang<xiyou.wangcong@gmail.com>:
+>> On 03/07/2012 12:57 PM, Barry Song wrote:
+>>>
+>>>
+>>> if you think so, pls do that and send v4 with your s-o-b.
+>>>
+>>
+>> This is not a good attitude, nor helps your patch to be merged...
+>>
+>> Be collaborative.
+>
+> some people like focusing on trivial things. i said i really didn't
+> care about the details whether it is /dev, /proc, /sys.
+> if you like a /proc, pls do it by yourself and i will agree. but i
+> will not waste my time on that.
 
-Signed-off-by: Simon Glass <sjg@chromium.org>
----
- arch/arm/boot/dts/tegra-seaboard.dts |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+This is definitely not trivial... What's more, kernel developers *do* 
+care about trivial things (trivial at kernel.org).
 
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index 876d5c9..dbf1c5a 100644
---- a/arch/arm/boot/dts/tegra-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -112,6 +112,7 @@
- 
- 	usb at c5000000 {
- 		nvidia,vbus-gpio = <&gpio 24 0>; /* PD0 */
-+		dr_mode = "otg";
- 	};
- 
- 	gpio-keys {
--- 
-1.7.7.3
+We are trying to make your patch perfect, you just refused, sigh...
