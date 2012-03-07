@@ -1,40 +1,31 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 07 Mar 2012 10:42:18 -0500
-Subject: [PATCH 4/4] mmc: omap_hsmmc: Simplify init for twl6030 MMC card
- detect
-In-Reply-To: <CANrkHUaYDpv=p0p81oKWCoewyjheyZYkCqvZY7_ZQxWi_=8YFw@mail.gmail.com>
- (T. Krishnamoorthy's message of "Wed, 7 Mar 2012 21:06:42 +0530")
-References: <20120301185044.29210.44521.stgit@kaulin.local>
- <20120301185535.29210.71546.stgit@kaulin.local>
- <4F50643B.9050500@ti.com> <20120302172251.GJ18901@atomide.com>
- <4F548457.5050205@ti.com>
- <CANrkHUZysOnHKKUuLm0Vbo1KsNp0yUd=udjGvQ43=gTTXbWeCw@mail.gmail.com>
- <CANrkHUaYDpv=p0p81oKWCoewyjheyZYkCqvZY7_ZQxWi_=8YFw@mail.gmail.com>
-Message-ID: <m2lincifj9.fsf@bob.laptop.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 7 Mar 2012 16:36:22 +0100
+Subject: [PATCH v9] Regulator: Add Anatop regulator driver
+In-Reply-To: <20120307134551.GL3107@opensource.wolfsonmicro.com>
+References: <1331126658-26926-1-git-send-email-paul.liu@linaro.org>
+ <20120307132225.GB17745@game.jcrosoft.org>
+ <20120307134551.GL3107@opensource.wolfsonmicro.com>
+Message-ID: <20120307153622.GC17745@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Balaji,
+On 13:45 Wed 07 Mar     , Mark Brown wrote:
+> On Wed, Mar 07, 2012 at 02:22:25PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+> > > +- compatible: Must be "fsl,anatop-regulator"
+> > > +- vol-bit-shift: Bit shift for the register
+> > > +- vol-bit-width: Number of bits used in the register
+> > > +- min-bit-val: Minimum value of this register
+> > > +- min-voltage: Minimum voltage of this regulator
+> > > +- max-voltage: Maximum voltage of this regulator
+> 
+> > specific properites need to be prefix by the vendor
+> 
+> This really doesn't seem at all sane for a device which is already
+> vendor specific, it's just noise in the bindings.
+No it's
+Here is a good example as we have regulator generic binding & vendor
+specific bindig
 
-On Wed, Mar 07 2012, T Krishnamoorthy, Balaji wrote:
-> OMAP4 and OMAP3 HSMMC IP registers differ by 0x100 offset.
-> Addng the offset to platform_device resource structure
-> increments the start address for every insmod operation.
-> MMC command fails on re-insertion as module due incorrect register base.
-> Fix this by updating the ioremap base address only.
->
-> Signed-off-by: Balaji T K <balajitk@ti.com>
-
-Is this a regression, or has it never worked in mainline?
-
-> Note:  eMMC detection is still failing on resertion due to card vcc
-> power off on rmmod
-
-And this?
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Best Regards,
+J.
