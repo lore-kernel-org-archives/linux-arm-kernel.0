@@ -1,35 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Mar 2012 09:51:01 -0800
-Subject: Pre-merge-window status of the arm-soc tree
-In-Reply-To: <201203062054.55434.arnd@arndb.de>
-References: <201203062054.55434.arnd@arndb.de>
-Message-ID: <20120307175100.GH12083@atomide.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 7 Mar 2012 23:39:25 +0530
+Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
+In-Reply-To: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+Message-ID: <CABb+yY0A9=XKuw=N1fFXCB507zR3U=wofqATVcO_wtnnVrgXzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On Wed, Mar 7, 2012 at 4:03 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> [v2 - more or less same description. ?Including lakml in cc for the full
+> set]
+>
+> This patch series cleans up the handling of cookies in DMA engine drivers.
+> This is done by providing a set of inline library functions for common
+> tasks:
+>
+> - moving the 'last completed cookie' into struct dma_chan - everyone
+> ?has this in their driver private channel data structure
+>
+> - consolidate allocation of cookies to DMA descriptors
+>
+> - common way to update 'last completed cookie' value
+>
+> - standard way to implement tx_status callback and update the residue
+>
+> - consolidate initialization of cookies
+>
+> - update implementations differing from the majority of DMA engine drivers
+> ?to behave the same as the majority implementation in respect of cookies
+>
+> What this means is that we get to the point where all DMA engine drivers
+> will hand out cookie value '2' as the first, and incrementing cookie
+> values up to INT_MAX, returning to cookie '1' as the next cookie.
+>
+> Think of this patch series as round 1... ?I am hoping over time that more
+> code can be consolidated between the DMA engine drivers and end up with a
+> consistent way to handle various common themes in DMA engine hardware
+> (like physical channel<->peripheral request signal selection.)
+>
+Compilation is broken without the following minor fix.
+After that you may add
+       Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
 
-* Arnd Bergmann <arnd@arndb.de> [120306 12:26]:
-> 
-> * Russell now has a branch that contains patches from his tree that
-> directly impact stuff in arm-soc. We had a lot of nasty conflicts
-> the last time around, which resulted in some of the patches from
-> arm-soc not making it in during the merge window. Pulling the
-> rmk/for-armsoc branch into arm-soc hopefully lets us avoid this
-> situation in the future because we will fix the conflicts much
-> earlier.
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 49c123f..abf35a3 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -339,7 +339,6 @@ static int pl330_control(struct dma_chan *chan,
+enum dma_ctrl_cmd cmd, unsigned
+ 		/* Mark all desc done */
+ 		list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
+ 			desc->status = DONE;
+-			pch->completed = desc->txd.cookie;
+ 			list_move_tail(&desc->node, &list);
+ 		}
 
-There's also two urgent issues pending for omap in case you
-are filtering mails on keywords to make them safe to read :)
 
-See this:
-
-http://www.spinics.net/lists/arm-kernel/msg163661.html
-
-Also, after that is out of the way, I have two more pull request
-ready for fixes for various build and warning issues Russell
-has reported.
-
-Regards,
-
-Tony 
+Thanks.
