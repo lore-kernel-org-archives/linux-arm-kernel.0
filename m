@@ -1,54 +1,49 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed,  7 Mar 2012 03:44:48 +0000
-Subject: [PATCH 07/14] ARM: kirkwood: rtc-mv devicetree bindings
+Date: Wed,  7 Mar 2012 03:44:42 +0000
+Subject: [PATCH 01/14] ARM: orion: spi: remove enable_clock_fix which is not
+ used
 In-Reply-To: <cover.1331090356.git.jason@lakedaemon.net>
 References: <cover.1331090356.git.jason@lakedaemon.net>
-Message-ID: <bb4ab565bd8506f6ac126571f46fc3b26178821f.1331090356.git.jason@lakedaemon.net>
+Message-ID: <b0fe0cfb7e76a869a8ba7f7344de75eb122e206c.1331090356.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Andrew Lunn <andrew@lunn.ch>
+
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
+ drivers/spi/spi-orion.c       |    5 -----
+ include/linux/spi/orion_spi.h |    1 -
+ 2 files changed, 0 insertions(+), 6 deletions(-)
 
-Changes from previous version:
-
-* s/marvell,/mrvl,/g for compatible properties
-* split into binding patch and a use patch.
-
- drivers/rtc/rtc-mv.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
-index 768e2ed..0dd8421 100644
---- a/drivers/rtc/rtc-mv.c
-+++ b/drivers/rtc/rtc-mv.c
-@@ -12,6 +12,7 @@
- #include <linux/bcd.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/delay.h>
- #include <linux/gfp.h>
- #include <linux/module.h>
-@@ -294,11 +295,19 @@ static int __exit mv_rtc_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index 13448c8..e496f79 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -359,11 +359,6 @@ static int orion_spi_setup(struct spi_device *spi)
  
-+#ifdef CONFIG_OF
-+static struct of_device_id rtc_mv_of_match_table[] = {
-+	{ .compatible = "mrvl,orion-rtc", },
-+	{}
-+};
-+#endif
-+
- static struct platform_driver mv_rtc_driver = {
- 	.remove		= __exit_p(mv_rtc_remove),
- 	.driver		= {
- 		.name	= "rtc-mv",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(rtc_mv_of_match_table),
- 	},
+ 	orion_spi = spi_master_get_devdata(spi->master);
+ 
+-	/* Fix ac timing if required.   */
+-	if (orion_spi->spi_info->enable_clock_fix)
+-		orion_spi_setbits(orion_spi, ORION_SPI_IF_CONFIG_REG,
+-				  (1 << 14));
+-
+ 	if ((spi->max_speed_hz == 0)
+ 			|| (spi->max_speed_hz > orion_spi->max_speed))
+ 		spi->max_speed_hz = orion_spi->max_speed;
+diff --git a/include/linux/spi/orion_spi.h b/include/linux/spi/orion_spi.h
+index decf6d8..b4d9fa6 100644
+--- a/include/linux/spi/orion_spi.h
++++ b/include/linux/spi/orion_spi.h
+@@ -11,7 +11,6 @@
+ 
+ struct orion_spi_info {
+ 	u32	tclk;		/* no <linux/clk.h> support yet */
+-	u32	enable_clock_fix;
  };
+ 
  
 -- 
 1.7.3.4
