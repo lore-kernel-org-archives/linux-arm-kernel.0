@@ -1,84 +1,32 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 6 Mar 2012 18:56:45 -0600
-Subject: [PATCH 5/9] dmaengine: provide a common function for completing
- a dma descriptor
-In-Reply-To: <E1S52yJ-0002Mx-2e@rmk-PC.arm.linux.org.uk>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
- <E1S52yJ-0002Mx-2e@rmk-PC.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF559AD@AUSP01VMBX24.collaborationhost.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 06 Mar 2012 18:00:32 -0700
+Subject: [PATCH v1 5/9] arm/PCI: don't export pci_flags
+In-Reply-To: <20120307005905.27465.71131.stgit@bhelgaas.mtv.corp.google.com>
+References: <20120307005905.27465.71131.stgit@bhelgaas.mtv.corp.google.com>
+Message-ID: <20120307010032.27465.35675.stgit@bhelgaas.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 06, 2012 3:35 PM, Russell King wrote:
->
-> Provide a common function to do the cookie mechanics for completing
-> a DMA descriptor.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
+There's no need to export pci_flags; it's not exported by any other
+architecture, and no modules reference it.
 
-<snip>
+CC: Rob Herring <rob.herring@calxeda.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ arch/arm/kernel/bios32.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
->  drivers/dma/dmaengine.h     |   18 ++++++++++++++++++
-
-<snip>
-
->  drivers/dma/ep93xx_dma.c    |    2 +-
-
-<snip>
-
-> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
-> index 7692c86..47e0997 100644
-> --- a/drivers/dma/dmaengine.h
-> +++ b/drivers/dma/dmaengine.h
-> @@ -5,6 +5,7 @@
->  #ifndef DMAENGINE_H
->  #define DMAENGINE_H
->  
-> +#include <linux/bug.h>
->  #include <linux/dmaengine.h>
->  
->  /**
-> @@ -27,4 +28,21 @@ static inline dma_cookie_t dma_cookie_assign(struct dma_async_tx_descriptor *tx)
->  	return cookie;
->  }
->  
-> +/**
-> + * dma_cookie_complete - complete a descriptor
-> + * @tx: descriptor to complete
-> + *
-> + * Mark this descriptor complete by updating the channels completed
-> + * cookie marker.  Zero the descriptors cookie to prevent accidental
-> + * repeated completions.
-> + *
-> + * Note: caller is expected to hold a lock to prevent concurrency.
-> + */
-> +static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
-> +{
-> +	BUG_ON(tx->cookie < DMA_MIN_COOKIE);
-> +	tx->chan->completed_cookie = tx->cookie;
-> +	tx->cookie = 0;
-> +}
-> +
->  #endif
-
-<snip>
-
-> diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
-> index e5aaae8..1c56f75 100644
-> --- a/drivers/dma/ep93xx_dma.c
-> +++ b/drivers/dma/ep93xx_dma.c
-> @@ -703,7 +703,7 @@ static void ep93xx_dma_tasklet(unsigned long data)
->  	desc = ep93xx_dma_get_active(edmac);
->  	if (desc) {
->  		if (desc->complete) {
-> -			edmac->chan.completed_cookie = desc->txd.cookie;
-> +			dma_cookie_complete(&desc->txd);
->  			list_splice_init(&edmac->active, &list);
->  		}
->  		callback = desc->txd.callback;
-
-For ep93xx:
-
-Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index be5d3b2..632df9a 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -498,7 +498,6 @@ void __init pci_common_init(struct hw_pci *hw)
+ 		pci_bus_add_devices(bus);
+ 	}
+ }
+-EXPORT_SYMBOL(pci_flags);
+ 
+ #ifndef CONFIG_PCI_HOST_ITE8152
+ void pcibios_set_master(struct pci_dev *dev)
