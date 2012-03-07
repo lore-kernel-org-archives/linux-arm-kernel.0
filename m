@@ -1,34 +1,34 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 7 Mar 2012 14:30:30 +0000
-Subject: DaVinci unbanked GPIO IRQs broken
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317A6E2B@DBDE01.ent.ti.com>
-References: <70E876B0EA86DD4BAF101844BC814DFE0BF403DA89@Cloud.RL.local>
- <DF0F476B391FA8409C78302C7BA518B6317926BB@DBDE01.ent.ti.com>
- <DF0F476B391FA8409C78302C7BA518B6317A6E2B@DBDE01.ent.ti.com>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6317EC8CA@DBDE01.ent.ti.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Wed,  7 Mar 2012 15:33:32 +0100
+Subject: [PATCH v2 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+Message-ID: <1331130825-14947-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+The following series have to be applied on top of the following patches:
+[PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+[PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
 
-On Fri, Jan 27, 2012 at 18:49:42, Nori, Sekhar wrote:
-> Hi Jon,
-> 
-> On Tue, Jan 17, 2012 at 15:32:23, Nori, Sekhar wrote:
-> 
-> > I was able to reproduce this on the EVM using v2.6.38 (works)
-> > and v3.2 + my patch (doesn't work). I just started poking some
-> > registers to see what is happening. Will keep you updated
-> > on any progress.
-> > 
-> 
-> Following patch fixes the issue of interrupt handler not getting
-> called. I tested it using GPIO3 on DM365. On applying this, I
-> see a constant rate of 4-5 interrupts per second on that line.
-> Yet to figure out what is triggering those. Anyway I will wait for
-> you to test this after you are back before sending this to Grant.
+As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+is deprecated and no new patches are accepted for it.
 
-Are you back? Did you get a chance to test this?
+This series merges this code into the imx-dma.c dmaengine driver.
 
-Thanks,
-Sekhar
+Changes since v1:
+ - Merge patch 14 with 01.
+ - Add a proper changelog to each patch of the series.
+
+[PATCH v2 01/13] dmaengine: imx-dma: merge old dma-v1.c with imx-dma.c
+[PATCH v2 02/13] dmaengine: imx-dma: remove data member from internal structure.
+[PATCH v2 03/13] dmaengine: imx-dma: remove dma_mode member of internal structure.
+[PATCH v2 04/13] dmaengine: imx-dma: remove 'imxdma_setup_mem2mem_hw' function.
+[PATCH v2 05/13] dmaengine: imx-dma: remove 'imxdma_config_channel_hw' function.
+[PATCH v2 06/13] dmaengine: imx-dma: remove 'imxdma_setup_sg_hw' function.
+[PATCH v2 07/13] dmaengine: imx-dma: remove sg member from internal structure.
+[PATCH v2 08/13] dmaengine: imx-dma: remove 'in_use' field of 'internal' structure.
+[PATCH v2 09/13] dmaengine: imx-dma: remove 'resbytes' field of 'internal' structure.
+[PATCH v2 10/13] dmaengine: imx-dma: remove internal structure.
+[PATCH v2 11/13] dmaengine: imx-dma: remove unused arg of imxdma_sg_next.
+[PATCH v2 12/13] dmaengine: imx-dma: remove 'imx_dmav1_baseaddr' and 'dma_clk'.
+[PATCH v2 13/13] dmaengine: imx-dma: use 'dev_dbg' and 'dev_warn' for messages.
