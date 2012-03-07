@@ -1,52 +1,53 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Mar 2012 17:45:13 +0100
-Subject: [PATCH 1/9 v2] ARM: at91: usb ohci add dt support
-In-Reply-To: <20120307103352.GA17745@game.jcrosoft.org>
-References: <20120307084924.GK21255@game.jcrosoft.org>
- <1331111746-21393-1-git-send-email-plagnioj@jcrosoft.com>
- <20120307093446.GN17370@n2100.arm.linux.org.uk>
- <20120307103352.GA17745@game.jcrosoft.org>
-Message-ID: <20120307164513.GA17087@game.jcrosoft.org>
+Date: Wed,  7 Mar 2012 17:45:58 +0100
+Subject: [PATCH 1/1] of: add coherent dma-mask binding
+In-Reply-To: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1331138758-19480-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:33 Wed 07 Mar     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 09:34 Wed 07 Mar     , Russell King - ARM Linux wrote:
-> > On Wed, Mar 07, 2012 at 10:15:38AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > +static u64 at91_ohci_dma_mask = DMA_BIT_MASK(32);
-> > > +
-> > > +static int __devinit ohci_at91_of_init(struct platform_device *pdev)
-> > > +{
-> > > +	struct device_node *np = pdev->dev.of_node;
-> > > +	int i, ret, gpio;
-> > > +	enum of_gpio_flags flags;
-> > > +	struct at91_usbh_data	*pdata;
-> > > +	u32 ports;
-> > > +
-> > > +	if (!np)
-> > > +		return 0;
-> > > +
-> > > +	/* Right now device-tree probed devices don't get dma_mask set.
-> > > +	 * Since shared usb code relies on it, set it here for now.
-> > > +	 * Once we have dma capability bindings this can go away.
-> > > +	 */
-> > > +	if (!pdev->dev.dma_mask)
-> > > +		pdev->dev.dma_mask = &at91_ohci_dma_mask;
-> > 
-> > That sounds like a rather big omission from DT - what's happening to
-> > address this (before we end up with lots of drivers with this).  Pretty
-> > much any device which does DMA needs both this and the coherent DMA mask
-> > set properly.
-> > 
-> > We really don't want this kind of workaround scattered in every driver
-> > which has been converted to DT.
-> Tegra do it also
-> I do yet found a good generic way in DT
-> 
-> Today only usb need I do plan to drop it for 3.5 can we have for 3.4
-I send a patch to propose a binding for both dma-mask and coherent dma mask
+This will allow each device to specify its coherent-dma-mask
+The default behavior the set it to DMA_BIT_MASK(32) if none specified
+is keeped.
 
-If it does not got for 3.4 can this temporary fix up go?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/of/platform.c |   15 ++++++++++++++-
+ 1 files changed, 14 insertions(+), 1 deletions(-)
 
-Best Regards,
-J.
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index bb22194..d2a2ea02 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -141,6 +141,19 @@ static u64* of_get_dma_mask(struct device_node *np)
+ 	return dma_mask;
+ }
+ 
++static u64 of_get_coherent_dma_mask(struct device_node *np)
++{
++	const __be32 *prop;
++	int len;
++
++	prop = of_get_property(np, "coherent-dma-mask", &len);
++
++	if (!prop)
++		return DMA_BIT_MASK(32);
++
++	return of_read_number(prop, len / 4);
++}
++
+ /**
+  * of_device_alloc - Allocate and initialize an of_device
+  * @np: device node to assign to device
+@@ -228,7 +241,7 @@ struct platform_device *of_platform_device_create_pdata(
+ #if defined(CONFIG_MICROBLAZE)
+ 	dev->archdata.dma_mask = 0xffffffffUL;
+ #endif
+-	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++	dev->dev.coherent_dma_mask = of_get_coherent_dma_mask(np);
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 
+-- 
+1.7.7
