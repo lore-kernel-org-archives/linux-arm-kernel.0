@@ -1,98 +1,73 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Mar 2012 05:19:47 -0800
-Subject: [PATCH] ARM: SAMSUNG: change the name from s3c-sdhci to
- exynos4-sdhci
-In-Reply-To: <4F55DE1F.9010405@samsung.com>
-References: <4F45D343.6020409@samsung.com>
- <CAJuYYwTh8tVdA0X-TLEU-9O_M0_PmJR=i3WYAQXsaRcPF3MbJA@mail.gmail.com>
- <4F557692.8090102@samsung.com> <4F55DE1F.9010405@samsung.com>
-Message-ID: <4F576073.6010001@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 7 Mar 2012 14:21:06 +0100
+Subject: [RFC 09/14] MV SATA: Add per channel clk/clkdev support.
+In-Reply-To: <20120307131137.GY5050@titan.lakedaemon.net>
+References: <20120307063858.GA18792@lunn.ch>
+ <20120307131137.GY5050@titan.lakedaemon.net>
+Message-ID: <20120307132106.GA21349@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/12 01:51, Kukjin Kim wrote:
-> On 03/05/12 18:29, Jaehoon Chung wrote:
->> Hi Kukjin.
->>
->> Is it merged?
->>
->> Best Regards,
->> Jaehoon Chung
->>
->> On 02/24/2012 06:56 PM, Thomas Abraham wrote:
->>
->>> On 23 February 2012 11:18, Jaehoon Chung<jh80.chung@samsung.com> wrote:
->>>> Thomas Arbrahams's patchset have changed the device name in sdhci-s3c.c
->>>> (mmc: sdhci-s3c: Rework platform data and add device tree support)
->>>> But didn't change the regulator_consumer name.
->>>> So maybe didn't initialize the mmc/sd card for exynos4.
->>>>
->>>> This patch is fixed that (based-on linux-samsung for-next branch)
->>>>
->>>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
->>>> Signed-off-by: kyungmin Park<kyungmin.park@samsung.com>
->>>> ---
->>>> arch/arm/mach-exynos/mach-nuri.c | 4 ++--
->>>> arch/arm/mach-exynos/mach-universal_c210.c | 2 +-
->>>> 2 files changed, 3 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-exynos/mach-nuri.c
->>>> b/arch/arm/mach-exynos/mach-nuri.c
->>>> index a6b9162..251dd7a 100644
->>>> --- a/arch/arm/mach-exynos/mach-nuri.c
->>>> +++ b/arch/arm/mach-exynos/mach-nuri.c
->>>> @@ -116,7 +116,7 @@ static struct s3c_sdhci_platdata
->>>> nuri_hsmmc0_data __initdata = {
->>>> };
->>>>
->>>> static struct regulator_consumer_supply emmc_supplies[] = {
->>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
->>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
->>>> REGULATOR_SUPPLY("vmmc", "dw_mmc"),
->>>> };
->>>>
->>>> @@ -415,7 +415,7 @@ static struct regulator_consumer_supply
->>>> __initdata max8997_ldo12_[] = {
->>>> REGULATOR_SUPPLY("vddio", "6-003c"), /* HDC802 */
->>>> };
->>>> static struct regulator_consumer_supply __initdata max8997_ldo13_[] = {
->>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"), /* TFLASH */
->>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.2"), /* TFLASH */
->>>> };
->>>> static struct regulator_consumer_supply __initdata max8997_ldo14_[] = {
->>>> REGULATOR_SUPPLY("inmotor", "max8997-haptic"),
->>>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
->>>> b/arch/arm/mach-exynos/mach-universal_c210.c
->>>> index 6017a21..320cb1d 100644
->>>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
->>>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
->>>> @@ -749,7 +749,7 @@ static struct s3c_sdhci_platdata
->>>> universal_hsmmc0_data __initdata = {
->>>> };
->>>>
->>>> static struct regulator_consumer_supply mmc0_supplies[] = {
->>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
->>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
->>>> };
->>>>
->>>> static struct regulator_init_data mmc0_fixed_voltage_init_data = {
->>>
->>> Reviewed-by: Thomas Abraham<thomas.abraham@linaro.org>
->
-> Looks OK, will apply.
->
+On Wed, Mar 07, 2012 at 08:11:37AM -0500, Jason wrote:
+> On Wed, Mar 07, 2012 at 07:38:58AM +0100, Andrew Lunn wrote:
+> > > Date: Tue, 6 Mar 2012 14:01:39 -0500
+> > > From: Jason <jason@lakedaemon.net>
+> > > To: Andrew Lunn <andrew@lunn.ch>
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Subject: Re: [RFC 09/14] MV SATA: Add per channel clk/clkdev support.
+> > > Message-ID: <20120306190139.GW5050@titan.lakedaemon.net>
+> > > Content-Type: text/plain; charset=us-ascii
+> > > 
+> > > On Tue, Mar 06, 2012 at 07:31:05AM +0100, Andrew Lunn wrote:
+> > > > The Orion kirkwood chips have a gatable clock per SATA channel. Add
+> > > 
+> > > +mv_sata_platform_data *sata_data)
+> > > >       if (sata_data->n_ports > 1)
+> > > >               kirkwood_clk_ctrl |= CGC_SATA1;
+> > > >
+> > > > +     orion_clkdev_add("0", "sata_mv.0", &clk_sata0);
+> > > > +     orion_clkdev_add("1", "sata_mv.0", &clk_sata1);
+> > > > +
+> > > 
+> > > This is a problem for devicetree.  With devicetree, neither
+> > > kirkwood_sata_init(), nor orion_sata_init() are ever called.  The same
+> > > is true for all the other drivers as well.
+> > > 
+> > > Could this be moved into the driver's _probe() function?
+> > 
+> > No, this cannot be in the driver. This is setting up the mapping
+> > between the device name and the clk the device should use. dove,
+> > orion5x, mv78xx0 need a different clk to kirkwood and this is hidden
+> > by clkdev, so the driver does not have to care.
+> 
+> Thanks for the clarification.
+> 
+> > BTW: Not all drivers which orion uses are only used by orion. So we
+> > have to be careful not to add orion specific stuff into some of the
+> > drivers. This is particularly true for Ethernet and SATA.
+> > 
+> > There are two possible solutions to clkdev:
+> > 
+> > 1) Add DT bindings for clkdev. I don't know if this is currently
+> >    supported?
+> 
+> I came to the same conclusion late last night and started poking around.
+> I didn't see it in any of Mike's patches.
 
-(Cc'ed Marek)
+You are missing up clk and clkdev. Mike's patches are for clk. You
+need clkdev bindings.
 
-Hi Kyungmin, Marek and Jaehoon,
+> > 2) I can refactor the code. Currently i create the clkdev entries on
+> >    demand. However i could just create them all just after creating
+> >    the clocks.
 
-As you know, same patches have been submitted duplicated and this should 
-be fixed. Which one would be better to send upstream?
+> drivers/clk/of_clk.c ?  I'll start looking at it.
 
-Thanks.
+drivers/clk/of_clkdev.c, or maybe drivers/of/of_clkdev.c. You should
+probably run this by Grant before investing too much effort. It might
+be a stupid idea...
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Also, most of the refactoring is done. Needs some testing and then i
+can send RFCv2 patches.
+
+    Andrew
