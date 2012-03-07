@@ -1,31 +1,110 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Mar 2012 16:36:22 +0100
-Subject: [PATCH v9] Regulator: Add Anatop regulator driver
-In-Reply-To: <20120307134551.GL3107@opensource.wolfsonmicro.com>
-References: <1331126658-26926-1-git-send-email-paul.liu@linaro.org>
- <20120307132225.GB17745@game.jcrosoft.org>
- <20120307134551.GL3107@opensource.wolfsonmicro.com>
-Message-ID: <20120307153622.GC17745@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Mar 2012 07:54:09 -0800
+Subject: [PATCH] ARM: SAMSUNG: change the name from s3c-sdhci to
+ exynos4-sdhci
+In-Reply-To: <00db01ccfc6a$d34c2ee0$79e48ca0$%szyprowski@samsung.com>
+References: <4F45D343.6020409@samsung.com>
+ <CAJuYYwTh8tVdA0X-TLEU-9O_M0_PmJR=i3WYAQXsaRcPF3MbJA@mail.gmail.com>
+ <4F557692.8090102@samsung.com> <4F55DE1F.9010405@samsung.com>
+ <4F576073.6010001@samsung.com>
+ <00db01ccfc6a$d34c2ee0$79e48ca0$%szyprowski@samsung.com>
+Message-ID: <4F5784A1.1080903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:45 Wed 07 Mar     , Mark Brown wrote:
-> On Wed, Mar 07, 2012 at 02:22:25PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> > > +- compatible: Must be "fsl,anatop-regulator"
-> > > +- vol-bit-shift: Bit shift for the register
-> > > +- vol-bit-width: Number of bits used in the register
-> > > +- min-bit-val: Minimum value of this register
-> > > +- min-voltage: Minimum voltage of this regulator
-> > > +- max-voltage: Maximum voltage of this regulator
-> 
-> > specific properites need to be prefix by the vendor
-> 
-> This really doesn't seem at all sane for a device which is already
-> vendor specific, it's just noise in the bindings.
-No it's
-Here is a good example as we have regulator generic binding & vendor
-specific bindig
+On 03/07/12 06:01, Marek Szyprowski wrote:
+> Hello,
+>
+> On Wednesday, March 07, 2012 2:20 PM Kukjin Kim wrote:
+>
+>> On 03/06/12 01:51, Kukjin Kim wrote:
+>>> On 03/05/12 18:29, Jaehoon Chung wrote:
+>>>> Hi Kukjin.
+>>>>
+>>>> Is it merged?
+>>>>
+>>>> Best Regards,
+>>>> Jaehoon Chung
+>>>>
+>>>> On 02/24/2012 06:56 PM, Thomas Abraham wrote:
+>>>>
+>>>>> On 23 February 2012 11:18, Jaehoon Chung<jh80.chung@samsung.com>  wrote:
+>>>>>> Thomas Arbrahams's patchset have changed the device name in sdhci-s3c.c
+>>>>>> (mmc: sdhci-s3c: Rework platform data and add device tree support)
+>>>>>> But didn't change the regulator_consumer name.
+>>>>>> So maybe didn't initialize the mmc/sd card for exynos4.
+>>>>>>
+>>>>>> This patch is fixed that (based-on linux-samsung for-next branch)
+>>>>>>
+>>>>>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
+>>>>>> Signed-off-by: kyungmin Park<kyungmin.park@samsung.com>
+>>>>>> ---
+>>>>>> arch/arm/mach-exynos/mach-nuri.c | 4 ++--
+>>>>>> arch/arm/mach-exynos/mach-universal_c210.c | 2 +-
+>>>>>> 2 files changed, 3 insertions(+), 3 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/mach-exynos/mach-nuri.c
+>>>>>> b/arch/arm/mach-exynos/mach-nuri.c
+>>>>>> index a6b9162..251dd7a 100644
+>>>>>> --- a/arch/arm/mach-exynos/mach-nuri.c
+>>>>>> +++ b/arch/arm/mach-exynos/mach-nuri.c
+>>>>>> @@ -116,7 +116,7 @@ static struct s3c_sdhci_platdata
+>>>>>> nuri_hsmmc0_data __initdata = {
+>>>>>> };
+>>>>>>
+>>>>>> static struct regulator_consumer_supply emmc_supplies[] = {
+>>>>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+>>>>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
+>>>>>> REGULATOR_SUPPLY("vmmc", "dw_mmc"),
+>>>>>> };
+>>>>>>
+>>>>>> @@ -415,7 +415,7 @@ static struct regulator_consumer_supply
+>>>>>> __initdata max8997_ldo12_[] = {
+>>>>>> REGULATOR_SUPPLY("vddio", "6-003c"), /* HDC802 */
+>>>>>> };
+>>>>>> static struct regulator_consumer_supply __initdata max8997_ldo13_[] = {
+>>>>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"), /* TFLASH */
+>>>>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.2"), /* TFLASH */
+>>>>>> };
+>>>>>> static struct regulator_consumer_supply __initdata max8997_ldo14_[] = {
+>>>>>> REGULATOR_SUPPLY("inmotor", "max8997-haptic"),
+>>>>>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
+>>>>>> b/arch/arm/mach-exynos/mach-universal_c210.c
+>>>>>> index 6017a21..320cb1d 100644
+>>>>>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
+>>>>>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
+>>>>>> @@ -749,7 +749,7 @@ static struct s3c_sdhci_platdata
+>>>>>> universal_hsmmc0_data __initdata = {
+>>>>>> };
+>>>>>>
+>>>>>> static struct regulator_consumer_supply mmc0_supplies[] = {
+>>>>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+>>>>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
+>>>>>> };
+>>>>>>
+>>>>>> static struct regulator_init_data mmc0_fixed_voltage_init_data = {
+>>>>>
+>>>>> Reviewed-by: Thomas Abraham<thomas.abraham@linaro.org>
+>>>
+>>> Looks OK, will apply.
+>>>
+>>
+>> (Cc'ed Marek)
+>>
+>> Hi Kyungmin, Marek and Jaehoon,
+>>
+>> As you know, same patches have been submitted duplicated and this should
+>> be fixed. Which one would be better to send upstream?
+>
+> For me it doesn't matter, I just need this fix to get merged, because otherwise
+> the Universal C210 and Nuri boards are dysfunctional.
+>
+> You can select the one prepared by Jaehoon if You like.
 
-Best Regards,
-J.
+OK, thanks :)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
