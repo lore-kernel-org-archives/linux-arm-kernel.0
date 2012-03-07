@@ -1,78 +1,69 @@
-From: veli-pekka.peltola@bluegiga.com (Veli-Pekka Peltola)
-Date: Wed,  7 Mar 2012 15:09:28 +0200
-Subject: [PATCH v2] mm: module_alloc: check if size is 0
-In-Reply-To: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
-References: <1330631119-10059-1-git-send-email-veli-pekka.peltola@bluegiga.com>
-Message-ID: <1331125768-25454-1-git-send-email-veli-pekka.peltola@bluegiga.com>
+From: jason@lakedaemon.net (Jason)
+Date: Wed, 7 Mar 2012 08:11:37 -0500
+Subject: [RFC 09/14] MV SATA: Add per channel clk/clkdev support.
+In-Reply-To: <20120307063858.GA18792@lunn.ch>
+References: <20120307063858.GA18792@lunn.ch>
+Message-ID: <20120307131137.GY5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit de7d2b567d040e3b67fe7121945982f14343213d (mm/vmalloc.c: report
-more vmalloc failures) users will get a warning if vmalloc_node_range() is
-called with size 0. This happens if module's init size equals to 0. This
-patch changes ARM, MIPS and x86 module_alloc() to return NULL before calling
-vmalloc_node_range() that would also return NULL and print a warning.
+On Wed, Mar 07, 2012 at 07:38:58AM +0100, Andrew Lunn wrote:
+> > Date: Tue, 6 Mar 2012 14:01:39 -0500
+> > From: Jason <jason@lakedaemon.net>
+> > To: Andrew Lunn <andrew@lunn.ch>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [RFC 09/14] MV SATA: Add per channel clk/clkdev support.
+> > Message-ID: <20120306190139.GW5050@titan.lakedaemon.net>
+> > Content-Type: text/plain; charset=us-ascii
+> > 
+> > On Tue, Mar 06, 2012 at 07:31:05AM +0100, Andrew Lunn wrote:
+> > > The Orion kirkwood chips have a gatable clock per SATA channel. Add
+> > 
+> > +mv_sata_platform_data *sata_data)
+> > >       if (sata_data->n_ports > 1)
+> > >               kirkwood_clk_ctrl |= CGC_SATA1;
+> > >
+> > > +     orion_clkdev_add("0", "sata_mv.0", &clk_sata0);
+> > > +     orion_clkdev_add("1", "sata_mv.0", &clk_sata1);
+> > > +
+> > 
+> > This is a problem for devicetree.  With devicetree, neither
+> > kirkwood_sata_init(), nor orion_sata_init() are ever called.  The same
+> > is true for all the other drivers as well.
+> > 
+> > Could this be moved into the driver's _probe() function?
+> 
+> No, this cannot be in the driver. This is setting up the mapping
+> between the device name and the clk the device should use. dove,
+> orion5x, mv78xx0 need a different clk to kirkwood and this is hidden
+> by clkdev, so the driver does not have to care.
 
-Signed-off-by: Veli-Pekka Peltola <veli-pekka.peltola@bluegiga.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
----
-I found this with ARM but after checking out various implementations of
-module_alloc() I thought it would be better to fix all at once.
+Thanks for the clarification.
 
-One way to replicate the warning:
-compile kernel with CONFIG_KALLSYMS=n
-insmod a module without init, I used usb-common.ko
+> BTW: Not all drivers which orion uses are only used by orion. So we
+> have to be careful not to add orion specific stuff into some of the
+> drivers. This is particularly true for Ethernet and SATA.
+> 
+> There are two possible solutions to clkdev:
+> 
+> 1) Add DT bindings for clkdev. I don't know if this is currently
+>    supported?
 
-Changes since v1:
- - changed style as hpa suggested
+I came to the same conclusion late last night and started poking around.
+I didn't see it in any of Mike's patches.
 
- arch/arm/kernel/module.c  |    2 ++
- arch/mips/kernel/module.c |    2 ++
- arch/x86/kernel/module.c  |    2 +-
- 3 files changed, 5 insertions(+), 1 deletions(-)
+> 2) I can refactor the code. Currently i create the clkdev entries on
+>    demand. However i could just create them all just after creating
+>    the clocks.
 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 1e9be5d..17648e2 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -39,6 +39,8 @@
- #ifdef CONFIG_MMU
- void *module_alloc(unsigned long size)
- {
-+	if (!size)
-+		return NULL;
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
- 				GFP_KERNEL, PAGE_KERNEL_EXEC, -1,
- 				__builtin_return_address(0));
-diff --git a/arch/mips/kernel/module.c b/arch/mips/kernel/module.c
-index a5066b1..1a51de1 100644
---- a/arch/mips/kernel/module.c
-+++ b/arch/mips/kernel/module.c
-@@ -47,6 +47,8 @@ static DEFINE_SPINLOCK(dbe_lock);
- #ifdef MODULE_START
- void *module_alloc(unsigned long size)
- {
-+	if (!size)
-+		return NULL;
- 	return __vmalloc_node_range(size, 1, MODULE_START, MODULE_END,
- 				GFP_KERNEL, PAGE_KERNEL, -1,
- 				__builtin_return_address(0));
-diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
-index 925179f..fd44d69 100644
---- a/arch/x86/kernel/module.c
-+++ b/arch/x86/kernel/module.c
-@@ -38,7 +38,7 @@
- 
- void *module_alloc(unsigned long size)
- {
--	if (PAGE_ALIGN(size) > MODULES_LEN)
-+	if (!size || PAGE_ALIGN(size) > MODULES_LEN)
- 		return NULL;
- 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
- 				GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL_EXEC,
--- 
-1.7.5.4
+Hmmm, I wouldn't worry about it too much, absent == disabled.  Which is
+what I'm thinking for the dt bindings.
+
+> Maybe you can take a look at 1) and see if its possible, while i look
+> at refactoring the code.
+
+drivers/clk/of_clk.c ?  I'll start looking at it.
+
+thx,
+
+Jason.
