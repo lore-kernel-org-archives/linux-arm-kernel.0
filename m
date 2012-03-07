@@ -1,90 +1,56 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 6 Mar 2012 18:47:54 -0600
-Subject: [PATCH 3/9] dmaengine: add private header file
-In-Reply-To: <E1S52xe-0002Mn-Pn@rmk-PC.arm.linux.org.uk>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
- <E1S52xe-0002Mn-Pn@rmk-PC.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF559AA@AUSP01VMBX24.collaborationhost.net>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Wed, 7 Mar 2012 11:52:03 +1100
+Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
+In-Reply-To: <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
+References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
+ <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAGRGNgWHXrQgVobz+54sFBzj=bTHCKwg+H4_CY5JoGtmETw2yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 06, 2012 3:34 PM, Russell King wrote:
+Hi Stephen,
+
+On Wed, Mar 7, 2012 at 11:30, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> This allows the user to use U-Boot's mkimage's -T kernel_noload option
+> if their arch Kconfig allows it, and they desire.
 >
-> Add a local private header file to contain definitions and declarations
-> which should only be used by DMA engine drivers.
->
-> We also fix linux/dmaengine.h to use LINUX_DMAENGINE_H to guard against
-> multiple inclusion.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
 > ---
-
-<snip>
-
->  drivers/dma/dmaengine.h     |   10 ++++++++++
-
-<snip>
-
->  drivers/dma/ep93xx_dma.c    |    2 ++
-
-<snip>
-
->  include/linux/dmaengine.h   |    4 ++--
-
-<snip>
-
-> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
-> new file mode 100644
-> index 0000000..968570d
-> --- /dev/null
-> +++ b/drivers/dma/dmaengine.h
-> @@ -0,0 +1,10 @@
-> +/*
-> + * The contents of this file are private to DMA engine drivers, and is not
-> + * part of the API to be used by DMA engine users.
-> + */
-> +#ifndef DMAENGINE_H
-> +#define DMAENGINE_H
+> diff --git a/init/Kconfig b/init/Kconfig
+> index 6cfd71d..2035562 100644
+> --- a/init/Kconfig
+> +++ b/init/Kconfig
+> @@ -203,6 +203,21 @@ config KERNEL_LZO
+>
+> ?endchoice
+>
+> +config ALLOW_UIMAGE_KERNEL_NOLOAD
+> + ? ? ? bool
 > +
-> +#include <linux/dmaengine.h>
+> +config UIMAGE_KERNEL_NOLOAD
+> + ? ? ? bool "Use mkimage's -T kernel_noload instead of -T kernel"
+> + ? ? ? depends on ALLOW_UIMAGE_KERNEL_NOLOAD
+> + ? ? ? help
+> + ? ? ? ? uImage files of type "kernel" embed an absolute load and entry point
+> + ? ? ? ? address. If the uImage is loaded to a different address, then the
+> + ? ? ? ? image must be copied the uImage file to the specified load address.
+
+You seem to have an excess "the uImage file" in here.
+
+> + ? ? ? ? This copy is a waste of time if the uImage is in fact completely
+> + ? ? ? ? relocatable. If your kernel and bootloader support it, you can build
+> + ? ? ? ? a "kernel_noload" uImage rather than a "kernel" uImage, which
+> + ? ? ? ? prevents any such copying. If unsure say N.
 > +
-> +#endif
+> ?config DEFAULT_HOSTNAME
+> ? ? ? ?string "Default hostname"
+> ? ? ? ?default "(none)"
 
-<snip>
+Thanks,
 
-> diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
-> index bc45787..3260198 100644
-> --- a/drivers/dma/ep93xx_dma.c
-> +++ b/drivers/dma/ep93xx_dma.c
-> @@ -28,6 +28,8 @@
->  
->  #include <mach/dma.h>
->  
-> +#include "dmaengine.h"
-> +
->  /* M2P registers */
->  #define M2P_CONTROL			0x0000
->  #define M2P_CONTROL_STALLINT		BIT(0)
+-- 
+Julian Calaby
 
-<snip>
-
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index 41d0f92..4b17ca8 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -18,8 +18,8 @@
->   * The full GNU General Public License is included in this distribution in the
->   * file called COPYING.
->   */
-> -#ifndef DMAENGINE_H
-> -#define DMAENGINE_H
-> +#ifndef LINUX_DMAENGINE_H
-> +#define LINUX_DMAENGINE_H
->  
->  #include <linux/device.h>
->  #include <linux/uio.h>
-
-For ep93xx:
-
-Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
+.Plan: http://sites.google.com/site/juliancalaby/
