@@ -1,65 +1,58 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Mar 2012 20:08:20 +0100
-Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
-In-Reply-To: <alpine.LFD.2.02.1203071336210.24151@xanadu.home>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
- <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
- <20120307180815.GA27213@game.jcrosoft.org>
- <alpine.LFD.2.02.1203071336210.24151@xanadu.home>
-Message-ID: <20120307190820.GD27213@game.jcrosoft.org>
+From: jason@lakedaemon.net (Jason)
+Date: Wed, 7 Mar 2012 14:27:23 -0500
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
+In-Reply-To: <201203071831.31738.arnd@arndb.de>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <80fb8cef577eee14364e95009f7a590fd9056ee3.1331090356.git.jason@lakedaemon.net>
+ <201203071831.31738.arnd@arndb.de>
+Message-ID: <20120307192723.GE5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:50 Wed 07 Mar     , Nicolas Pitre wrote:
-> On Wed, 7 Mar 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Wed, Mar 07, 2012 at 06:31:31PM +0000, Arnd Bergmann wrote:
+> On Wednesday 07 March 2012, Jason Cooper wrote:
+> > +       serial at f1012000 {
+> > +               compatible = "ns16550a";
+> > +               reg = <0xf1012000 0xff>;
+> > +               reg-shift = <2>;
+> > +               interrupts = <33>;
+> > +               clock-frequency = <200000000>;
+> > +       };
 > 
-> > On 17:30 Tue 06 Mar     , Stephen Warren wrote:
-> > > This allows the user to use U-Boot's mkimage's -T kernel_noload option
-> > > if their arch Kconfig allows it, and they desire.
-> > > 
-> > > Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> > > ---
-> > > The next patch enables this new CONFIG_ALLOW_ option for ARM. I assume
-> > > that some other architectures will also be able to enable it, but I'm
-> > > not familiar enough with any to know which.
-> > I'm going to repeat. I don't think any impromevent here.
-> 
-> You know what?  I agree with you... on a conceptual level only though.
-> 
-> In reality, some people are are just too used to it, either for 
-> emotional reasons or simply because that's what was there before so they 
-> simply perpetuated it without thinking further, or whatever.  REmoving 
-> that support would just upset a lot of people.  And frankly we have 
-> better things to do than starting a flamewar over this.
-My concern is this new feature is available on new version of U-Boot only
-and people that does not have it and built the uImage are going to ask the
-question. Why bla bla bla....
+> I just noticed that the length here should be inclusive, i.e. 0x100 not 0xff.
+> This is different from the way we define resources in Linux.
 
-Where people are supposed to RTFM
+Grrr.  Now I'm getting frustrated.  I'm trying to boot without
+earlyprintk.  Evidently, something is wrong with the above, because the
+device boots all the way up (blinky lights come on), but I get no
+messages after the usual "Uncompressing Linux... done, booting the
+kernel."
 
-I do do not want to have the answer this and manage this.
-> 
-> So the next best thing is to make this u-Boot stuff well contained in a 
-> common place and make sure it doesn't spread incoherently over multiple 
-> architecture's directories and makefiles.  This way the u-Boot cruft 
-> won't be the ARM maintainer, or the PPC maintainer, or the SPARC 
-> maintainer, or any other architecture maintainer's business, but the 
-> responsibility of those who do care about it without affecting anyone 
-> else.
-Ditto here
+Here's my most recent attempt:
 
-People does not read the doc they as lazy and I do not want to manage this.
+        serial at f1012000 {
+                device_type = "serial";
+                compatible = "ns16550a";
+                reg = <0xf1012000 0x100>; /*phys addr*/
+                virt-reg = <0xfed12000>;  /*virt addr*/
+                reg-shift = <2>;
+                reg-io-width = <1>;
+                interrupts = <33>;
+                current-speed = <115200>;
+                interrupt-parent = <&intc>;
+                clock-frequency = <200000000>;
+        };
 
-> 
-> > And the uImage format here is called the legacy format where now U-Boot
-> > support a new format based on DT format.
-> > 
-> > Will you plan to add it too?
-> 
-> Why not if someone cares?  At least this will be done only 
-> once, centrally, without having to involve architecture maintainers.
-So you manage this because I will not answer one e-mail that ask for help
-Because for my point of view RTFM or boot the zImage
+I've looked at what is done in the powerpc dt's, but, no luck.  When
+earlyprintk is enabled, I see no error messages, just:
 
-Best Regards,
-J.
+bootconsole [earlycon0] enabled
+debug: skip boot console de-registration.
+...
+Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+
+Any pointers?
+
+thx,
+
+Jason.
