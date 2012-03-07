@@ -1,29 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Mar 2012 09:33:49 +0100
-Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
-In-Reply-To: <20120306223321.GD15201@n2100.arm.linux.org.uk>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdYry6G4gi7LdVM4gYOQBKZCoQxdzLAGg1WcjB6rVD-PPQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 7 Mar 2012 09:37:36 +0100
+Subject: [PATCH v2 17/17] ASoC: fsl: add imx-sgtl5000 machine driver
+In-Reply-To: <20120306155055.GA13802@S2101-09.ap.freescale.net>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-18-git-send-email-shawn.guo@linaro.org>
+ <20120305174232.GA3852@pengutronix.de>
+ <20120306155055.GA13802@S2101-09.ap.freescale.net>
+Message-ID: <20120307083736.GK3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2012 at 11:33 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Tue, Mar 06, 2012 at 11:50:57PM +0800, Shawn Guo wrote:
+> On Mon, Mar 05, 2012 at 06:42:32PM +0100, Sascha Hauer wrote:
+> > On Mon, Mar 05, 2012 at 10:31:05PM +0800, Shawn Guo wrote:
+> > > This is the initial imx-sgtl5000 machine driver support with only
+> > > playback dai link implemented.  More features can be added on top
+> > > of it later.
+> > 
+> > Are there problems with capturing? It should be trivial to add and
+> > it would be much more confident that this series as a whole works as
+> > expected.
+> > 
+> I worked all day long to try to give that answer.  Here it is.
+> 
+> No, there is no problem with capturing on fsl_ssi + imx_pcm_dma +
+> imx_sgtl5000 side.  But there is a problem with sgtl5000 codec driver.
+> With that problem fixed in sgtl5000, this series works just fine with
+> capturing.  (I'm not sure I want to fix it within this series though,
+> as it's already big enough.)
 
-> This patch series cleans up the handling of cookies in DMA engine drivers.
-> This is done by providing a set of inline library functions for common
-> tasks:
+Thanks a lot for testing this. In this case I'm fine with this series
+and can likely Ack your next iteration. You can skip capture support
+from this series as you said it's big enough. It's enough for me when
+you say it works on your branch.
 
-I just applied the latest patches right off and tested with some stressy
-MMC operations on the U300 and Ux500. (I had some minor hell
-since patch 8/9 and 9/9 were uuencoded but managed to fix it...)
+Sascha
 
-It works like a charm!
-
-The patches look good too.
-
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
