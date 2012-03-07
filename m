@@ -1,78 +1,61 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 7 Mar 2012 17:49:35 +0530
-Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
- modules.
-Message-ID: <1331122775-761-1-git-send-email-govindraj.raja@ti.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 7 Mar 2012 04:20:58 -0800
+Subject: [PATCH 14/15] watchdog/mpcore_wdt: Add clock framework support
+In-Reply-To: <20120307111833.GQ17370@n2100.arm.linux.org.uk>
+References: <cover.1331115751.git.viresh.kumar@st.com>
+ <9ec7141baa4b1c1a0503893749e7ce0e19bb5029.1331115752.git.viresh.kumar@st.com>
+ <20120307111833.GQ17370@n2100.arm.linux.org.uk>
+Message-ID: <CAOh2x==z1Mhc5k7qSJ++ix+TPaWcUfCKNdyfnzzZwiGO59Sudg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Govindraj.R" <govindraj.raja@ti.com>
+On 3/7/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Wed, Mar 07, 2012 at 03:57:55PM +0530, Viresh Kumar wrote:
+>> @@ -156,10 +159,22 @@ static int mpcore_wdt_open(struct inode *inode,
+>> struct file *file)
 
-Some modules doesn't have SYSC_HAS_ENAWAKEUP bit available
-(ex: usb host uhh module) in absence of this flag
-omap_hwmod_enable/disable_wakeup avoids configuring
-pad mux wakeup capability.
+>> +		ret = clk_enable(wdt->clk);
+>
+> What about preparing the clock?
+>
 
-Configure sysc if SYSC_HAS_ENAWAKEUP is available and for other cases
-try enabling/disabling wakeup from mux_pad pins.
+I missed that. Will update prepare/unprepare of clk across driver.
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   30 ++++++++++++++++--------------
- 1 files changed, 16 insertions(+), 14 deletions(-)
+>> +	wdt->clk = clk_get(&pdev->dev, NULL);
+>> +	if (IS_ERR(wdt->clk)) {
+>> +		dev_warn(&pdev->dev, "Clock not found\n");
+>> +		wdt->clk = NULL;
+>
+> Remove this line.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index eba6cd3..89582df 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2475,14 +2475,15 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- 	unsigned long flags;
- 	u32 v;
- 
--	if (!oh->class->sysc ||
--	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
--		return -EINVAL;
--
- 	spin_lock_irqsave(&oh->_lock, flags);
--	v = oh->_sysc_cache;
--	_enable_wakeup(oh, &v);
--	_write_sysconfig(v, oh);
-+
-+	if (oh->class->sysc &&
-+	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-+		v = oh->_sysc_cache;
-+		_enable_wakeup(oh, &v);
-+		_write_sysconfig(v, oh);
-+	}
-+
- 	_set_idle_ioring_wakeup(oh, true);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
-@@ -2506,14 +2507,15 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- 	unsigned long flags;
- 	u32 v;
- 
--	if (!oh->class->sysc ||
--	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
--		return -EINVAL;
--
- 	spin_lock_irqsave(&oh->_lock, flags);
--	v = oh->_sysc_cache;
--	_disable_wakeup(oh, &v);
--	_write_sysconfig(v, oh);
-+
-+	if (oh->class->sysc ||
-+	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-+		v = oh->_sysc_cache;
-+		_disable_wakeup(oh, &v);
-+		_write_sysconfig(v, oh);
-+	}
-+
- 	_set_idle_ioring_wakeup(oh, false);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
--- 
-1.7.5.4
+Actually this was very much intentional, so that i can do
+    if (wdt->clk).
+
+Also, this makes more sense as some platform doesn't support clk,
+so it is not an error for them if clk_get() fails. And thus the check
+
+    if (wdt->clk)                /* i.e. clock is supported or not */
+
+make more sense than
+
+    if (!IS_ERR(wdt->clk))             /* i.e. there is an error while
+getting clock */
+
+from readability point of view. So, i would like to keep it as it is.
+
+>> @@ -399,6 +446,9 @@ static int mpcore_wdt_suspend(struct device *dev)
+>>
+>>  	if (test_bit(0, &wdt->timer_alive))
+>>  		mpcore_wdt_stop(wdt);		/* Turn the WDT off */
+>> +
+>> +	if (wdt->clk)
+>> +		clk_disable(wdt->clk);
+>
+> Same comments...  And what if the watchdog is not open?  Doesn't this
+> disable an already disabled clock?
+>
+
+Yes, that'a a BUG. Will fix it.
+
+--
+viresh
