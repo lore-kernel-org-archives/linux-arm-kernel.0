@@ -1,31 +1,50 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 07 Mar 2012 12:53:28 +0100
-Subject: [PATCH v5] lpc32xx: Added ethernet driver
-In-Reply-To: <201203062134.38077.arnd@arndb.de>
-References: <1331067664-9124-1-git-send-email-stigge@antcom.de>
- <201203062134.38077.arnd@arndb.de>
-Message-ID: <4F574C38.4030006@antcom.de>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Wed, 7 Mar 2012 21:54:12 +1000
+Subject: [PATCH] ARM: remove ixp2000 platform
+In-Reply-To: <20120307091409.GL17370@n2100.arm.linux.org.uk>
+References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
+ <201202281945.39419.arnd@arndb.de>
+ <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
+ <201203061412.00073.arnd@arndb.de>
+ <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
+ <CACRpkdYQpnSMVWUizEYHTjx_AK5Ai7dos0SBd208Wf5ZJLdrCw@mail.gmail.com>
+ <20120307091409.GL17370@n2100.arm.linux.org.uk>
+Message-ID: <4F574C64.7010905@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 03/07/2012 07:14 PM, Russell King - ARM Linux wrote:
+> On Wed, Mar 07, 2012 at 09:40:31AM +0100, Linus Walleij wrote:
+>> Network equipment seems to like using BE.
+>>
+>> I have some vague idea that this is beacuse IP packets are big
+>> endian, and thus you can process them quickly by just casting fields
+>> to e.g. u32 pointers and read them.
+>>
+>> I don't know if this is true, but seems to much of a correlation to
+>> be pure coincidence. Thus a pretty interesting subject in
+>> embedded ARM not used for tablets/mobile/generic computing
+>> kind of stuff.
+>
+> ISTR Nicolas explained this to me as being an established thing in the
+> comms sector.  They expect BE and only understand BE.
+>
+> I did point out that you end up with many more endian conversions by
+> going to BE, mainly because PCI is LE and all your PCI accesses have
+> to be endian-swapped.  So in terms of bandwidth, I'd expect an ARM
+> PCI platform running in BE mode to have worse throughput than a LE
+> PCI platform.
 
-On 03/06/2012 10:34 PM, Arnd Bergmann wrote:
-> This should eventually both become run-time options based on the device tree.
-> I don't know if you planned to do that anyway, but if you want the same kernel
-> binary to be used for systems in different configurations, you cannot have
-> compile-time decisions that are exclusive-or. Since you don't support device
-> tree yet but plan to do that in the future, you could add a comment here
-> about it, or you could even prepare it for that case already by passing the
-> device into the functions that will be required for reading the properties.
+The built in ethernet interfaces on the ixp4xx family are not PCI
+based. So they at least do not suffer from the BE/LE conversions
+at the eth driver.
 
-Good point.
+Regards
+Greg
 
-I prefer putting a comment for now, because upon the planned device tree
-introduction in lpc32xx, an internal change in lpc_eth.c will be
-necessary anyway, so there is no need to already introduce unused
-parameters at this point.
 
-Thanks,
-
-Roland
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close,                            FAX:         +61 7 3891 3630
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
