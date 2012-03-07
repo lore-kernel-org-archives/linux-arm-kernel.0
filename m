@@ -1,31 +1,78 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 7 Mar 2012 09:18:55 -0300
-Subject: I.MX35 PDK
-In-Reply-To: <4F562C90.6090103@freescale.com>
-References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A26@MEP-EXCH.meprolight.com>
- <4F562C90.6090103@freescale.com>
-Message-ID: <CAOMZO5CyGazr1=kLF51W7S7ZpEy2Mg4k2n_ZHnGimSyu2oVcrA@mail.gmail.com>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Wed, 7 Mar 2012 17:49:35 +0530
+Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
+ modules.
+Message-ID: <1331122775-761-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/6/12, Fabio Estevam <fabio.estevam@freescale.com> wrote:
-> Alex Gershgorin wrote:
->> Hi Fabio,
->>
->>
->>
->> How I can get information about accesses to CMOS_RST_B and CSI_PWDN bits
->> of MC9S08DZ60 processor.
->>
->> I need address of this register and bits mapping in this register.
+From: "Govindraj.R" <govindraj.raja@ti.com>
 
-CMOS_RESET: Bit 6 of register 0x1a
-CMOS_ENABLE: Bit 1 of register 0x20
+Some modules doesn't have SYSC_HAS_ENAWAKEUP bit available
+(ex: usb host uhh module) in absence of this flag
+omap_hwmod_enable/disable_wakeup avoids configuring
+pad mux wakeup capability.
 
-After the mx35pdk lcd support patch gets applied I will submit a patch
-to adding support to all of the registers/bits definitions for
-mc9s08dz60 chip.
+Configure sysc if SYSC_HAS_ENAWAKEUP is available and for other cases
+try enabling/disabling wakeup from mux_pad pins.
 
-Regards,
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   30 ++++++++++++++++--------------
+ 1 files changed, 16 insertions(+), 14 deletions(-)
 
-Fabio Estevam
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index eba6cd3..89582df 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2475,14 +2475,15 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ 	unsigned long flags;
+ 	u32 v;
+ 
+-	if (!oh->class->sysc ||
+-	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+-		return -EINVAL;
+-
+ 	spin_lock_irqsave(&oh->_lock, flags);
+-	v = oh->_sysc_cache;
+-	_enable_wakeup(oh, &v);
+-	_write_sysconfig(v, oh);
++
++	if (oh->class->sysc &&
++	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
++		v = oh->_sysc_cache;
++		_enable_wakeup(oh, &v);
++		_write_sysconfig(v, oh);
++	}
++
+ 	_set_idle_ioring_wakeup(oh, true);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+@@ -2506,14 +2507,15 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ 	unsigned long flags;
+ 	u32 v;
+ 
+-	if (!oh->class->sysc ||
+-	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+-		return -EINVAL;
+-
+ 	spin_lock_irqsave(&oh->_lock, flags);
+-	v = oh->_sysc_cache;
+-	_disable_wakeup(oh, &v);
+-	_write_sysconfig(v, oh);
++
++	if (oh->class->sysc ||
++	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
++		v = oh->_sysc_cache;
++		_disable_wakeup(oh, &v);
++		_write_sysconfig(v, oh);
++	}
++
+ 	_set_idle_ioring_wakeup(oh, false);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+ 
+-- 
+1.7.5.4
