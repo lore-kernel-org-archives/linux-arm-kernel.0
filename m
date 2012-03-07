@@ -1,50 +1,50 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 07 Mar 2012 13:50:22 -0500 (EST)
-Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
-In-Reply-To: <20120307180815.GA27213@game.jcrosoft.org>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
- <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
- <20120307180815.GA27213@game.jcrosoft.org>
-Message-ID: <alpine.LFD.2.02.1203071336210.24151@xanadu.home>
+From: jason@lakedaemon.net (Jason)
+Date: Wed, 7 Mar 2012 13:52:04 -0500
+Subject: [PATCH 14/14] ARM: kirkwood: use devicetree to init sata_mv
+In-Reply-To: <201203071840.09572.arnd@arndb.de>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <8503a766f6f75c9acf49abd66d9cdce54807b2b2.1331090356.git.jason@lakedaemon.net>
+ <201203071840.09572.arnd@arndb.de>
+Message-ID: <20120307185204.GD5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Mar 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-
-> On 17:30 Tue 06 Mar     , Stephen Warren wrote:
-> > This allows the user to use U-Boot's mkimage's -T kernel_noload option
-> > if their arch Kconfig allows it, and they desire.
-> > 
-> > Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> > ---
-> > The next patch enables this new CONFIG_ALLOW_ option for ARM. I assume
-> > that some other architectures will also be able to enable it, but I'm
-> > not familiar enough with any to know which.
-> I'm going to repeat. I don't think any impromevent here.
-
-You know what?  I agree with you... on a conceptual level only though.
-
-In reality, some people are are just too used to it, either for 
-emotional reasons or simply because that's what was there before so they 
-simply perpetuated it without thinking further, or whatever.  REmoving 
-that support would just upset a lot of people.  And frankly we have 
-better things to do than starting a flamewar over this.
-
-So the next best thing is to make this u-Boot stuff well contained in a 
-common place and make sure it doesn't spread incoherently over multiple 
-architecture's directories and makefiles.  This way the u-Boot cruft 
-won't be the ARM maintainer, or the PPC maintainer, or the SPARC 
-maintainer, or any other architecture maintainer's business, but the 
-responsibility of those who do care about it without affecting anyone 
-else.
-
-> And the uImage format here is called the legacy format where now U-Boot
-> support a new format based on DT format.
+On Wed, Mar 07, 2012 at 06:40:09PM +0000, Arnd Bergmann wrote:
+> On Wednesday 07 March 2012, Jason Cooper wrote:
+> > @@ -504,6 +504,16 @@ static int __init kirkwood_clock_gate(void)
+> >                 kirkwood_clk_ctrl |= CGC_USB0;
+> >                 of_node_put(np);
+> >         }
+> > +
+> > +       np = of_find_compatible_node(NULL, NULL, "mrvl,orion-sata");
+> > +       if (np && of_device_is_available(np)) {
+> > +               int nr_ports;
+> > +               kirkwood_clk_ctrl |= CGC_SATA0;
+> > +               of_property_read_u32(np, "nr-ports", &nr_ports);
+> > +               if (nr_ports > 1)
+> > +                       kirkwood_clk_ctrl |= CGC_SATA1;
+> > +               of_node_put(np);
+> > +       }
+> >  #endif
+> >  
+> >         /* For SATA: first shutdown the phy */
 > 
-> Will you plan to add it too?
+> Is it guaranteed that it's always the first port that gets used if there
+> is only one? If not, this might turn on the wrong one.
 
-Why not if someone cares?  At least this will be done only 
-once, centrally, without having to involve architecture maintainers.
+This is the same logic as mach-kirkwood/common.c:176
 
+void __init kirkwood_sata_init(struct mv_sata_platform_data *sata_data)
+{
+        kirkwood_clk_ctrl |= CGC_SATA0;
+        if (sata_data->n_ports > 1)
+                kirkwood_clk_ctrl |= CGC_SATA1;
 
-Nicolas
+        orion_sata_init(sata_data, SATA_PHYS_BASE, IRQ_KIRKWOOD_SATA);
+}
+
+So, I don't think I'm introducing a regression.
+
+thx,
+
+Jason.
