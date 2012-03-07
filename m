@@ -1,25 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Mar 2012 09:06:40 +0000
-Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
-In-Reply-To: <CACRpkdYry6G4gi7LdVM4gYOQBKZCoQxdzLAGg1WcjB6rVD-PPQ@mail.gmail.com>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
- <CACRpkdYry6G4gi7LdVM4gYOQBKZCoQxdzLAGg1WcjB6rVD-PPQ@mail.gmail.com>
-Message-ID: <20120307090640.GK17370@n2100.arm.linux.org.uk>
+Date: Wed, 7 Mar 2012 09:14:09 +0000
+Subject: [PATCH] ARM: remove ixp2000 platform
+In-Reply-To: <CACRpkdYQpnSMVWUizEYHTjx_AK5Ai7dos0SBd208Wf5ZJLdrCw@mail.gmail.com>
+References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
+ <201202281945.39419.arnd@arndb.de>
+ <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
+ <201203061412.00073.arnd@arndb.de>
+ <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
+ <CACRpkdYQpnSMVWUizEYHTjx_AK5Ai7dos0SBd208Wf5ZJLdrCw@mail.gmail.com>
+Message-ID: <20120307091409.GL17370@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 09:33:49AM +0100, Linus Walleij wrote:
-> On Tue, Mar 6, 2012 at 11:33 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
+On Wed, Mar 07, 2012 at 09:40:31AM +0100, Linus Walleij wrote:
+> Network equipment seems to like using BE.
 > 
-> > This patch series cleans up the handling of cookies in DMA engine drivers.
-> > This is done by providing a set of inline library functions for common
-> > tasks:
+> I have some vague idea that this is beacuse IP packets are big
+> endian, and thus you can process them quickly by just casting fields
+> to e.g. u32 pointers and read them.
 > 
-> I just applied the latest patches right off and tested with some stressy
-> MMC operations on the U300 and Ux500. (I had some minor hell
-> since patch 8/9 and 9/9 were uuencoded but managed to fix it...)
+> I don't know if this is true, but seems to much of a correlation to
+> be pure coincidence. Thus a pretty interesting subject in
+> embedded ARM not used for tablets/mobile/generic computing
+> kind of stuff.
 
-That'll be some MTA deciding to change the encoding, probably because some
-MTA spotted UTF-8 characters in the description and decided to convert to
-base64.
+ISTR Nicolas explained this to me as being an established thing in the
+comms sector.  They expect BE and only understand BE.
+
+I did point out that you end up with many more endian conversions by
+going to BE, mainly because PCI is LE and all your PCI accesses have
+to be endian-swapped.  So in terms of bandwidth, I'd expect an ARM
+PCI platform running in BE mode to have worse throughput than a LE
+PCI platform.
+
+But... if BE allows the comms people to keep their warm fuzzy feeling
+who are we to argue.
