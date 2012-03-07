@@ -1,106 +1,88 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed,  7 Mar 2012 13:23:07 +0100
-Subject: [PATCH 2/4 v4] spi/atmel: add DT support
+Date: Wed,  7 Mar 2012 13:23:08 +0100
+Subject: [PATCH 3/4 v4] ARM: at91: sam9g20 add spi DT support
 In-Reply-To: <1331122989-14451-1-git-send-email-plagnioj@jcrosoft.com>
 References: <1331122989-14451-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1331122989-14451-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1331122989-14451-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atmel_spi use only gpio for chip select.
+usb_a9g20:
+	add mmc spi support
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: spi-devel-general at lists.sourceforge.net
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- .../devicetree/bindings/spi/spi_atmel.txt          |    6 +++++
- drivers/spi/spi-atmel.c                            |   21 ++++++++++++++++---
- 2 files changed, 23 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
+ arch/arm/boot/dts/at91sam9g20.dtsi |   18 ++++++++++++++++++
+ arch/arm/boot/dts/usb_a9g20.dts    |   13 +++++++++++++
+ arch/arm/mach-at91/at91sam9260.c   |    2 ++
+ 3 files changed, 33 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-new file mode 100644
-index 0000000..7ec3d8d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-@@ -0,0 +1,6 @@
-+Atmel SPI device
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 3cb4226..aef3d5be 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -203,6 +203,24 @@
+ 				interrupts = <10 4>;
+ 				status = "disabled";
+ 			};
 +
-+Required properties:
-+- compatible : should be "atmel,at91rm9200-spi".
-+- reg: Address and length of the register set for the device
-+- interrupts: Should contain macb interrupt
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 16d6a83..efbc5f8 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -19,6 +19,7 @@
- #include <linux/interrupt.h>
- #include <linux/spi/spi.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
- 
- #include <asm/io.h>
- #include <mach/board.h>
-@@ -695,7 +696,7 @@ static int atmel_spi_setup(struct spi_device *spi)
- 	u32			scbr, csr;
- 	unsigned int		bits = spi->bits_per_word;
- 	unsigned long		bus_hz;
--	unsigned int		npcs_pin;
-+	int			npcs_pin;
- 	int			ret;
- 
- 	as = spi_master_get_devdata(spi->master);
-@@ -767,7 +768,9 @@ static int atmel_spi_setup(struct spi_device *spi)
- 	csr |= SPI_BF(DLYBCT, 0);
- 
- 	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
--	npcs_pin = (unsigned int)spi->controller_data;
-+	if (!gpio_is_valid(spi->cs_gpio))
-+		spi->cs_gpio = (int)spi->controller_data;
-+	npcs_pin = spi->cs_gpio;
- 	asd = spi->controller_state;
- 	if (!asd) {
- 		asd = kzalloc(sizeof(struct atmel_spi_device), GFP_KERNEL);
-@@ -887,7 +890,7 @@ static void atmel_spi_cleanup(struct spi_device *spi)
- {
- 	struct atmel_spi	*as = spi_master_get_devdata(spi->master);
- 	struct atmel_spi_device	*asd = spi->controller_state;
--	unsigned		gpio = (unsigned) spi->controller_data;
-+	unsigned		gpio = spi->cs_gpio;
- 	unsigned long		flags;
- 
- 	if (!asd)
-@@ -938,7 +941,8 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
- 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
- 
- 	master->bus_num = pdev->id;
--	master->num_chipselect = 4;
-+	master->dev.of_node = pdev->dev.of_node;
-+	master->num_chipselect = master->dev.of_node ? 0 : 4;
- 	master->setup = atmel_spi_setup;
- 	master->transfer = atmel_spi_transfer;
- 	master->cleanup = atmel_spi_cleanup;
-@@ -1064,11 +1068,20 @@ static int atmel_spi_resume(struct platform_device *pdev)
- #define	atmel_spi_resume	NULL
- #endif
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_spi_dt_ids[] = {
-+	{ .compatible = "atmel,at91rm9200-spi" },
-+	{ /* sentinel */ }
-+};
++			spi0: spi at fffc8000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91rm9200-spi";
++				reg = <0xfffc8000 0x4000>;
++				interrupts = <12 4>;
++				status = "disabled";
++			};
 +
-+MODULE_DEVICE_TABLE(of, atmel_spi_dt_ids);
-+#endif
++			spi1: spi at fffcc000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91rm9200-spi";
++				reg = <0xfffcc000 0x4000>;
++				interrupts = <13 4>;
++				status = "disabled";
++			};
+ 		};
  
- static struct platform_driver atmel_spi_driver = {
- 	.driver		= {
- 		.name	= "atmel_spi",
- 		.owner	= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(atmel_spi_dt_ids),
- 	},
- 	.suspend	= atmel_spi_suspend,
- 	.resume		= atmel_spi_resume,
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/usb_a9g20.dts b/arch/arm/boot/dts/usb_a9g20.dts
+index 390c481..9efaff3 100644
+--- a/arch/arm/boot/dts/usb_a9g20.dts
++++ b/arch/arm/boot/dts/usb_a9g20.dts
+@@ -46,6 +46,19 @@
+ 				atmel,vbus-gpio = <&pioC 5 0>;
+ 				status = "okay";
+ 			};
++
++			spi1: spi at fffcc000 {
++				cs-gpios = <&pioB 3 0>;
++				status = "okay";
++				mmc-slot at 0 {
++					compatible = "mmc-spi-slot";
++					reg = <0>;
++					gpios = <&pioC 4 0   /* CD */
++						>;
++					voltage-ranges = <3200 3400>;
++					spi-max-frequency = <20000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index d1e5750..c6e5d0f 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -217,6 +217,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t1_clk", "fffdc000.timer", &tc4_clk),
+ 	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
+ 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
 -- 
 1.7.7
