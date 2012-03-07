@@ -1,55 +1,82 @@
-From: jp.francois@cynove.com (jean-philippe francois)
-Date: Wed, 7 Mar 2012 17:16:35 +0100
-Subject: soft lockup on omap3 (dm3730)
-Message-ID: <CAGGh5h3OQTniXbm8iUYGM+2oi+zzd1F6BxDKzN5epA89+i_7nQ@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 07 Mar 2012 17:17:25 +0100
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <20120306232138.GF15201@n2100.arm.linux.org.uk>
+References: <1330527862-16234-1-git-send-email-m.szyprowski@samsung.com>
+ <1330527862-16234-10-git-send-email-m.szyprowski@samsung.com>
+ <20120306232138.GF15201@n2100.arm.linux.org.uk>
+Message-ID: <00f801ccfc7d$c8da6810$5a8f3830$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-I have a custom board using a dm3730 processor, on which I
-am running a 3.2.0 kernel.
+On Wednesday, March 07, 2012 12:22 AM Russell King - ARM Linux wrote:
 
-There is also a cmos sensor (aptina MT9J). When I use yavta
-to capture video, it will always work on the first capture, but if
-yavta is stopped, and then restarted, it will often get stuck in the
-below function
+> On Wed, Feb 29, 2012 at 04:04:22PM +0100, Marek Szyprowski wrote:
+> > +static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+> > +		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> > +		    struct dma_attrs *attrs)
+> > +{
+> > +	struct arm_vmregion *c;
+> > +
+> > +	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
+> > +	c = arm_vmregion_find(&consistent_head, (unsigned long)cpu_addr);
+> 
+> What protects this against other insertions/removals from the list?
 
-spinlock, mutex and list manipulation debug options are on, but catch nothing.
-The printk get printed, and the number of step in the loop is equal to
-the number
-of queued buffer.
+arm_vmregion_* functions have their own spinlock.
 
-According to the offset in the backtrace, the soft_lockup is either
-in spin_unlock_irqrestore if spinlock debugging is activated, or
-on the "msr CPSR_c"  instruction if spinlock debugging is not activated.
+(snipped)
 
-Is the backtrace pointing to this offset because soft_lockup can only
-detect lockups at the output of critical sections ?
+> > +	if (c) {
+> > +		struct page **pages = c->priv;
+> > +		__dma_free_remap(cpu_addr, size);
+> > +		__iommu_remove_mapping(dev, handle, size);
+> > +		__iommu_free_buffer(dev, pages, size);
+> > +	}
+> > +}
+> > +
+> > +/*
+> > + * Map a part of the scatter-gather list into contiguous io address space
+> > + */
+> > +static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+> > +			  size_t size, dma_addr_t *handle,
+> > +			  enum dma_data_direction dir)
+> > +{
+> > +	struct dma_iommu_mapping *mapping = dev->archdata.mapping;
+> > +	dma_addr_t iova, iova_base;
+> > +	int ret = 0;
+> > +	unsigned int count;
+> > +	struct scatterlist *s;
+> > +
+> > +	size = PAGE_ALIGN(size);
+> > +	*handle = ARM_DMA_ERROR;
+> > +
+> > +	iova_base = iova = __alloc_iova(mapping, size);
+> > +	if (iova == ARM_DMA_ERROR)
+> > +		return -ENOMEM;
+> > +
+> > +	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s))
+> > +	{
+> > +		phys_addr_t phys = page_to_phys(sg_page(s));
+> > +		unsigned int len = PAGE_ALIGN(s->offset + s->length);
+> > +
+> > +		if (!arch_is_coherent())
+> > +			__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
+> > +
+> > +		ret = iommu_map(mapping->domain, iova, phys, len, 0);
+> 
+> Dealing with phys addresses on one part and pages + offset + length
+> in a different part doesn't look like a good idea.  Why can't there
+> be some consistency?
 
-I don't know how to progress on this problem, any hint is welcome.
+Well, I have no idea how to be more consistent here. scatter-lists operates on 
+pages + offsets + length parameters. iommu api operates on the whole pages, but
+they are referred with physical address. Right now I cannot change any of it, 
+at least not it the near future.
 
-int omap3isp_video_queue_streamon(struct isp_video_queue *queue)
-{
-       struct isp_video_buffer *buf;
-       unsigned long flags;
-
-       mutex_lock(&queue->lock);
-
-       if (queue->streaming)
-               goto done;
-
-       queue->streaming = 1;
-
-       spin_lock_irqsave(&queue->irqlock, flags);
-       list_for_each_entry(buf, &queue->queue, stream) {
-               printk(KERN_INFO "inside list_for_each\n");
-               queue->ops->buffer_queue(buf);
-       }
-       spin_unlock_irqrestore(&queue->irqlock, flags);  <---- soft lockup
-says this is the culprit.
-
-done:
-       mutex_unlock(&queue->lock);
-       return 0;
-}
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
