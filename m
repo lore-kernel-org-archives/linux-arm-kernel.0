@@ -1,38 +1,115 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  7 Mar 2012 23:03:56 +0100
-Subject: [PATCH] ARM: davinci: DA850: move da850_register_pm to .init.text
-Message-ID: <1331157836-30527-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 7 Mar 2012 14:18:19 -0800
+Subject: Latest OMAP4 build errors
+In-Reply-To: <20120307171044.GE12083@atomide.com>
+References: <20120228090209.GC18045@n2100.arm.linux.org.uk>
+ <CAK=WgbZEDr_fYSonBQr3XNcTx5vefsH7LJfqycaxsqg-yechWQ@mail.gmail.com>
+ <20120306165545.GB15392@n2100.arm.linux.org.uk>
+ <201203061701.54141.arnd@arndb.de>
+ <20120307100615.GA17404@n2100.arm.linux.org.uk>
+ <20120307171044.GE12083@atomide.com>
+Message-ID: <CAOesGMiNSyc9F+Wf5pXPG=hRAfnG6aMHtccLBwvekuB3HpyevQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All callers (board-mityomapl138.c and board-da850-evm.c) use it in
-__init functions only.
+Hi,
 
-This fixes:
+On Wed, Mar 7, 2012 at 9:10 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+> Arnd & Olof, some urgent changes are needed, see below.
+>
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [120307 01:34]:
+>> On Tue, Mar 06, 2012 at 05:01:53PM +0000, Arnd Bergmann wrote:
+>> > On Tuesday 06 March 2012, Russell King - ARM Linux wrote:
+>> > > On Tue, Feb 28, 2012 at 12:11:37PM +0200, Ohad Ben-Cohen wrote:
+>> > > > On Tue, Feb 28, 2012 at 12:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > > > > I think 'depends' would be better here, because selecting IOMMU_SUPPORT
+>> > > > > has other side-effects that a user might not want. It's just as likely
+>> > > > > that someone wants to disable IOMMU_SUPPORT and needs to find OMAP_REMOTEPROC
+>> > > > > as wanting to enable OMAP_REMOTEPROC and having to find IOMMU_SUPPORT.
+>> > > > >
+>> > > > > In most cases, the defconfig should just set both.
+>> > > >
+>> > > > Ok, 'depends on' it is.
+>> > >
+>> > > We're a week on, which means I now have a full set of 7 builds on the
+>> > > website for OMAP4430 all of which have failed in part due to this
+>> > > as yet unresolved problem.
+>> > >
+>> > > What's happening to get it fixed and those fixes into whatever tree is
+>> > > necessary for them (presumably arm-soc)?
+>> >
+>> > Ohad has sent a series of patches for review and there were no comments
+>> > on those. The fix was part of it as far as I remember. I'm still waiting
+>> > for a pull request from Ohad.
+>>
+>> Given that we're coming to the end of what could be the _final_ week
+>> before the merge window opens, this is not good news. ?Read: maybe
+>> three days before final.
+>>
+>> The fact is that OMAP is - yet again - in a totally rotten state in terms
+>> of what's queued up in the armsoc tree. ?It is - yet again - completely
+>> unbuildable for many configurations. ?Just go and have a look at:
+>>
+>> ? ? ? http://www.arm.linux.org.uk/developer/build/
+>>
+>> to see what an utterly crappy state OMAP is in again. ?Last nights build
+>> was my tree plus latest arm-soc. ?Some of those issues have patches (I
+>> had been applying one patch manually to the build tree) but that's not
+>> the point - they're not in arm-soc, so the OMAP code in arm-soc is not
+>> yet ready for mainline.
+>
+> Yes looks like there's an issue with getting urgent patches applied into
+> the arm-soc tree.. The patches to fix these issues are known and
+> other issues and warnings should be all sorted out now except for some
+> MMC changes that are still being discussed.
+>
+>> So, as OMAP is soo broken, and as promised after the last merge window -
+>> I don't want any OMAP stuff going upstream from armsoc until we get error
+>> free builds from the allno and old configs on the builder.
+>
+> What I got queued up in fixes-non-critical-part2 should fix all those
+> errors and warnings.
+>
+> Arnd & Olof, I've posted one fix that should be applied to arm-soc tree
+> at [1]. I've also posted a request to revert one commit in arm-soc tree
+> at [2].
+>
+> As it seems that you did not apply those to arm-soc, please apply them,
+> or repull the following two branches ASAP:
 
-	WARNING: vmlinux.o(.text+0xd664): Section mismatch in reference from the function da850_register_pm() to the function .init.text:da8xx_get_mem_ctlr()
-	The function da850_register_pm() references
-	the function __init da8xx_get_mem_ctlr().
-	This is often because da850_register_pm lacks a __init
-	annotation or the annotation of da8xx_get_mem_ctlr is wrong.
+Done (repulled the branches). Stephen Rothwell has not surfaced on irc
+yet, so hopefully this means it'll make it into today's linux-next.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-davinci/da850.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> Re-pull fixes-non-critical containing one revert:
+>
+> Revert "ARM: OMAP2+: Fix multiple randconfig errors with SOC_OMAP and SOC_OMAP_NOOP"
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical
+>
+> Re-pull cleanup again containing one fix:
+>
+> ARM: OMAP2+: Fix L4_EMU_34XX_BASE error after iomap changes
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap cleanup
+>
+> Note that the second one I just pushed, however the patch is known to
+> work for the build errors after merging arm-soc with Russell's changes.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 992c4c4..b44dc84 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1026,7 +1026,7 @@ static int da850_round_armrate(struct clk *clk, unsigned long rate)
- }
- #endif
- 
--int da850_register_pm(struct platform_device *pdev)
-+int __init da850_register_pm(struct platform_device *pdev)
- {
- 	int ret;
- 	struct davinci_pm_config *pdata = pdev->dev.platform_data;
--- 
-1.7.9.1
+Looks like you pasted the wrong subject above -- the mail below
+contains the patch that you added though so it looked OK to me (the
+subject above was the previous top-of-branch before you added the last
+one).
+
+> Arnd & Olof, for future, how you want to handle urgent issues like this?
+
+Personally I missed the requests since they ended up in the chain of
+replies and I didn't notice them, my mistake. A separate email
+requesting pulls or patch application it to arm at kernel.org would
+reduce the risk of that happening (Flagging the subject with [URGENT]
+wouldn't hurt).
+
+
+-Olof
