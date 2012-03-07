@@ -1,27 +1,56 @@
 From: sjg@chromium.org (Simon Glass)
-Date: Tue,  6 Mar 2012 21:04:31 -0800
-Subject: [RESEND PATCH 0/3] arm: tegra: dts: USB Updates for Tegra legacy mode
- / OTG
-Message-ID: <1331096674-8324-1-git-send-email-sjg@chromium.org>
+Date: Tue, 6 Mar 2012 21:06:10 -0800
+Subject: [PATCH 0/3] arm: tegra: dts: USB Updates for Tegra legacy mode /
+ OTG
+In-Reply-To: <CAOesGMjXkFOxfp9fnhwKFZSoUJmHObk7FaiaNNj2NSyyNMTjkw@mail.gmail.com>
+References: <1328288172-8059-1-git-send-email-sjg@chromium.org>
+ <74CDBE0F657A3D45AFBB94109FB122FF178E5D2FF5@HQMAIL01.nvidia.com>
+ <CAPnjgZ1rXEGbi3m3HeWiUxG_TbmUug0C0QZgb7_9Eiz-xPMHwg@mail.gmail.com>
+ <CAOesGMjXkFOxfp9fnhwKFZSoUJmHObk7FaiaNNj2NSyyNMTjkw@mail.gmail.com>
+Message-ID: <CAPnjgZ3gBQyZ3BMesN+2_8ytYEz-0XtYGQwyDL3bUAp+pLoxdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This little series brings in some bindings that seem useful for U-Boot.
+Hi Olof,
 
-I am working mostly in U-Boot, but since there is no shared .dts repo
-I was asked to commit these changes to the kernel. I do not propose to
-update the Linux USB drivers to match.
+On Tue, Mar 6, 2012 at 8:40 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Mar 6, 2012 at 7:16 PM, Simon Glass <sjg@chromium.org> wrote:
+>> +Olof
+>>
+>> Hi,
+>>
+>> On Fri, Feb 3, 2012 at 11:59 AM, Stephen Warren <swarren@nvidia.com> wrote:
+>>> Simon Glass wrote at riday, February 03, 2012 9:56 AM:
+>>>> This little series brings in some bindings that seem useful for U-Boot.
+>>>>
+>>>> I am working mostly in U-Boot, but since there is no shared .dts repo
+>>>> I was asked to commit these changes to the kernel. I do not propose to
+>>>> update the Linux USB drivers to match.
+>>>
+>>> I think the series looks reasonable, so:
+>>>
+>>> Acked-by: Stephen Warren <swarren@nvidia.com<>
+>>>
+>>> (I note that the kernel's USB driver for USB1 doesn't attempt to clear
+>>> legacy mode; I wonder how we're getting away with that. Perhaps it's
+>>> only been tested with a bootloader that's already cleared legacy mode)
+>>>
+>>
+>> How does this series get picked up, please?
+>
+> It drowned in the patch floods you've been sending, and it wasn't
+> addressed directly to me so I ignored it.
+>
+> Please resend and I'll apply.
 
+You'll be happy to hear that the flood is mostly over now. I have
+resent and copied you this time.
 
-Simon Glass (3):
-  arm: tegra: dts: Support host/device selection and legacy mode
-  arm: tegra: dts: Add legacy mode support to Tegra2x USB1 port
-  arm: tegra: dts: Mark USB1 as an OTG port on Seaboard
+Regards,
+Simon
 
- .../devicetree/bindings/usb/tegra-usb.txt          |   13 +++++++++++++
- arch/arm/boot/dts/tegra-seaboard.dts               |    1 +
- arch/arm/boot/dts/tegra20.dtsi                     |    1 +
- 3 files changed, 15 insertions(+), 0 deletions(-)
-
--- 
-1.7.7.3
+>
+>
+> Thanks,
+>
+> -Olof
