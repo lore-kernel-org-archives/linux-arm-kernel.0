@@ -1,81 +1,58 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue,  6 Mar 2012 21:36:22 -0600
-Subject: [PATCH] ARM: ebsa110: use runtime ioremap hook
-In-Reply-To: <alpine.LFD.2.02.1203061704180.31242@xanadu.home>
-References: <alpine.LFD.2.02.1203061704180.31242@xanadu.home>
-Message-ID: <1331091382-21149-1-git-send-email-robherring2@gmail.com>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Tue,  6 Mar 2012 21:42:18 -0600
+Subject: [RFC PATCH] cpuidle: avoid unnecessary expensive governor processing
+Message-ID: <1331091738-26322-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+There a few cases when a platform's cpuidle_device will only have one
+cpuidle state.  e.g., when a single idle state system uses cpuidle
+to provide sysfs staticstics for profiling (powertop, etc).  This can
+also be the case for coupled smp system implementations that keep
+all but one cpuidle_device at a state_count of 1, but they still want
+to export idle statistics for these states using cpuidle.
 
-Convert ebsa110 platforms to use run-time ioremap hook instead of the
-compile time hook.
-
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
+ drivers/cpuidle/governors/ladder.c |    7 +++++--
+ drivers/cpuidle/governors/menu.c   |    7 +++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-This fixes the missing caller ptr.
-
-Rob
-
- arch/arm/mach-ebsa110/core.c            |   15 +++++++++++++++
- arch/arm/mach-ebsa110/include/mach/io.h |    9 ---------
- 2 files changed, 15 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
-index 804c912..b049edb 100644
---- a/arch/arm/mach-ebsa110/core.c
-+++ b/arch/arm/mach-ebsa110/core.c
-@@ -119,6 +119,20 @@ static void __init ebsa110_map_io(void)
- 	iotable_init(ebsa110_io_desc, ARRAY_SIZE(ebsa110_io_desc));
- }
+diff --git a/drivers/cpuidle/governors/ladder.c b/drivers/cpuidle/governors/ladder.c
+index b6a09ea..13abdba 100644
+--- a/drivers/cpuidle/governors/ladder.c
++++ b/drivers/cpuidle/governors/ladder.c
+@@ -71,8 +71,11 @@ static int ladder_select_state(struct cpuidle_driver *drv,
+ 	int last_residency, last_idx = ldev->last_state_idx;
+ 	int latency_req = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
  
-+static void __iomem *ebsa110_ioremap_caller(unsigned long cookie, size_t size,
-+					    unsigned int flags, void *caller)
-+{
-+	return (void __iomem *)cookie;
-+}
-+
-+static void ebsa110_iounmap(volatile void __iomem *io_addr)
-+{}
-+
-+static void __init ebsa110_init_early(void)
-+{
-+	arch_ioremap_caller = ebsa110_ioremap_caller;
-+	arch_iounmap = ebsa110_iounmap;
-+}
+-	/* Special case when user has set very strict latency requirement */
+-	if (unlikely(latency_req == 0)) {
++	/*
++	 * Special case when user has set very strict latency requirement or
++	 * there is currently only one state for this device.
++	 */
++	if ((latency_req == 0) || (dev->state_count == 1)) {
+ 		ladder_do_selection(ldev, last_idx, 0);
+ 		return 0;
+ 	}
+diff --git a/drivers/cpuidle/governors/menu.c b/drivers/cpuidle/governors/menu.c
+index ad09526..80eb606 100644
+--- a/drivers/cpuidle/governors/menu.c
++++ b/drivers/cpuidle/governors/menu.c
+@@ -249,8 +249,11 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
+ 	data->last_state_idx = 0;
+ 	data->exit_us = 0;
  
- #define PIT_CTRL		(PIT_BASE + 0x0d)
- #define PIT_T2			(PIT_BASE + 0x09)
-@@ -315,6 +329,7 @@ MACHINE_START(EBSA110, "EBSA110")
- 	.reserve_lp2	= 1,
- 	.restart_mode	= 's',
- 	.map_io		= ebsa110_map_io,
-+	.init_early	= ebsa110_init_early,
- 	.init_irq	= ebsa110_init_irq,
- 	.timer		= &ebsa110_timer,
- 	.restart	= ebsa110_restart,
-diff --git a/arch/arm/mach-ebsa110/include/mach/io.h b/arch/arm/mach-ebsa110/include/mach/io.h
-index 44679db..11bb079 100644
---- a/arch/arm/mach-ebsa110/include/mach/io.h
-+++ b/arch/arm/mach-ebsa110/include/mach/io.h
-@@ -62,15 +62,6 @@ void __writel(u32 val, void __iomem *addr);
- #define writew(v,b)		__writew(v,b)
- #define writel(v,b)		__writel(v,b)
+-	/* Special case when user has set very strict latency requirement */
+-	if (unlikely(latency_req == 0))
++	/*
++	 * Special case when user has set very strict latency requirement or
++	 * there is currently only one state for this device.
++	 */
++	if ((latency_req == 0) || (dev->state_count == 1))
+ 		return 0;
  
--static inline void __iomem *__arch_ioremap(unsigned long cookie, size_t size,
--					   unsigned int flags)
--{
--	return (void __iomem *)cookie;
--}
--
--#define __arch_ioremap		__arch_ioremap
--#define __arch_iounmap(cookie)	do { } while (0)
--
- extern void insb(unsigned int port, void *buf, int sz);
- extern void insw(unsigned int port, void *buf, int sz);
- extern void insl(unsigned int port, void *buf, int sz);
+ 	/* determine the expected residency time, round up */
 -- 
-1.7.5.4
+1.7.1
