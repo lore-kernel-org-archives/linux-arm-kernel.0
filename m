@@ -1,39 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Mar 2012 04:06:37 -0800
-Subject: [PATCH v2 2/3] gpio/samsung: add support GPIOlib for EXYNOS5250
-In-Reply-To: <1329341829-14403-3-git-send-email-kgene.kim@samsung.com>
-References: <1329341829-14403-1-git-send-email-kgene.kim@samsung.com>
- <1329341829-14403-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4F574F4D.5000708@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 07 Mar 2012 13:07:49 +0100
+Subject: [PATCH v3 12/13] gpio/omap: fix incorrect context restore logic
+ in omap_gpio_runtime_resume
+In-Reply-To: <1331118963-26364-13-git-send-email-tarun.kanti@ti.com>
+References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
+ <1331118963-26364-13-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4F574F95.7090801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/12 13:37, Kukjin Kim wrote:
-> From: Sangsu Park<sangsu4u.park@samsung.com>
->
-> This patch adds gpio_chips for EXYNOS5250 and replaces
-> exynos4_xxx() with exynos_xxx() and variables to support
-> exynos4 and exynos5 together.
-> In addition, use ioreamp() for base address of gpios.
->
-> Signed-off-by: Sangsu Park<sangsu4u.park@samsung.com>
-> Cc: Grant Likely<grant.likely@secretlab.ca>
-
-Hi Grant,
-
-How about upstreaming this via samsung tree when sending EXYNOS5 stuff, 
-I think, gpio-samsung needs still cleanup though? If any comments, 
-please kindly let me know.
-
-> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+On Wednesday 07 March 2012 12:16 PM, Tarun Kanti DebBarma wrote:
+> In omap_gpio_runtime_resume() the context restore should be independent
+> of bank->enabled_non_wakeup_gpios. This was preventing context restore
+> of GPIO lines which are not wakeup enabled.
+> 
+> Reported-by: Govindraj Raja <govindraj.raja@ti.com>
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 > ---
->   drivers/gpio/gpio-samsung.c             |  439 +++++++++++++++++++++++++++++--
->   1 files changed, 411 insertions(+), 28 deletions(-)
+>  drivers/gpio/gpio-omap.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 2e8e476..ccfbae0 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1227,7 +1227,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
+>  	__raw_writel(bank->context.risingdetect,
+>  		     bank->base + bank->regs->risingdetect);
+>  
+> -	if (!bank->enabled_non_wakeup_gpios || !bank->workaround_enabled) {
+> +	if (!bank->workaround_enabled) {
+This doesn't seem to be right.
+Don't you want to avoid GPIO restore for banks which are in
+always on domain. Infact the purpose of "enabled_non_wakeup_gpios"
+is exactly that ? Isn't it.
 
-Thanks.
+What am I missing ?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards
+Santosh
