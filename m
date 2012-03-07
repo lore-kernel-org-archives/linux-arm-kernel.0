@@ -1,37 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 Mar 2012 15:40:18 -0700
-Subject: [PATCH 3/4] pinctrl: support pinconfig on the U300
-In-Reply-To: <1331071533-24789-1-git-send-email-linus.walleij@stericsson.com>
-References: <1331071533-24789-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4F57E3D2.40405@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 7 Mar 2012 19:40:22 -0300
+Subject: [PATCH 1/3] drivers: base: add support for stmp-style devices
+In-Reply-To: <1331159314-12022-2-git-send-email-w.sang@pengutronix.de>
+References: <1331159314-12022-1-git-send-email-w.sang@pengutronix.de>
+ <1331159314-12022-2-git-send-email-w.sang@pengutronix.de>
+Message-ID: <CAOMZO5C9EDi_Hy-8=iphr+154gyPgBLnjSVV0seLgi+HoK4zRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2012 03:05 PM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This adds pin configuration support for the U300 driver pair,
-> we can now read out the biasing and drive mode in debugfs and
-> configure it using the new configuration API.
-
-> +int u300_pin_config_set(struct pinctrl_dev *pctldev,
-> +			unsigned pin,
-> +			unsigned long config)
+On Wed, Mar 7, 2012 at 7:28 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+...
+> +static int stmp_clear_poll_bit(void __iomem *addr, u32 mask)
 > +{
-> +	struct pinctrl_gpio_range *range = u300_match_gpio_range(pin);
-> +	int ret;
-> +
-> +	if (!range)
-> +		return -EINVAL;
-> +
-> +	/* Note: none of these configurations take any argument */
-> +	ret = u300_gpio_config_set(range->gc,
-> +				   (pin - range->pin_base + range->base),
-> +				   to_config_param(config));
+> + ? ? ? int timeout = 0x400;
 
-I'm a little confused here; the documentation for most of the
-PIN_CONFIG_* parameters that this function is passed does explicitly
-document that there is an associated argument value. For example,
-IN_CONFIG_BIAS_PULL_UP is coupled with the pull up resistance in Ohms.
-Shouldn't this code extract the argument and validate that it's a
-supported value for the HW?
+Could you please add a proper timeout mechanism here?
+
+Something like: http://patchwork.ozlabs.org/patch/137365/
+
+,as you suggested in the first place ;-)
+
+> +
+> + ? ? ? writel(mask, addr + STMP_OFFSET_REG_CLR);
+> + ? ? ? udelay(1);
+> + ? ? ? while ((readl(addr) & mask) && --timeout)
+> + ? ? ? ? ? ? ? /* nothing */;
+> +
+> + ? ? ? return !timeout;
+> +}
+> +
+> +int stmp_reset_block(void __iomem *reset_addr)
+> +{
+> + ? ? ? int ret;
+> + ? ? ? int timeout = 0x400;
+
+Same here.
+
+Regards,
+
+Fabio Estevam
