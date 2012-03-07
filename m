@@ -1,38 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 7 Mar 2012 09:50:34 +0000
-Subject: [PATCH 0/3] ARM: OMAP1/2+: 32k-timer: Add hwmod lookup for
- 32k-timer
-In-Reply-To: <20120305225751.GL12083@atomide.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A8317AF2D2@DBDE01.ent.ti.com>
- <20120305225751.GL12083@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83180A03F@DBDE01.ent.ti.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Wed, 7 Mar 2012 15:02:42 +0530
+Subject: [PATCH 1/2] mach-ux500: cache operations are atomic on PL310
+In-Reply-To: <20120117133428.GB11581@mudshark.cambridge.arm.com>
+References: <1326346663-6112-1-git-send-email-srinidhi.kasagar@stericsson.com>
+ <20120113181422.GB24373@mudshark.cambridge.arm.com>
+ <20120116110528.GA24824@bnru02>
+ <20120116145008.GH9068@mudshark.cambridge.arm.com>
+ <20120117062224.GA26832@bnru02>
+ <20120117103023.GB9230@mudshark.cambridge.arm.com>
+ <20120117112741.GA14426@bnru02>
+ <20120117133428.GB11581@mudshark.cambridge.arm.com>
+Message-ID: <20120307093240.GA21265@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 04:27:52, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [120123 00:16]:
-> > On Thu, Jan 19, 2012 at 19:58:21, Hiremath, Vaibhav wrote:
-> > > This patch series cleans up the existing 32k-sync timer implementation
-> > > without any major code change and adds hwmod lookup for omap2+ devices,
-> > > if lookup fails then fall back to gp-timer.
-> ...
->  
-> > Tony,
+On Tue, Jan 17, 2012 at 14:34:28 +0100, Will Deacon wrote:
+> On Tue, Jan 17, 2012 at 11:27:43AM +0000, Srinidhi KASAGAR wrote:
+> > On Tue, Jan 17, 2012 at 11:30:23 +0100, Will Deacon wrote:
+> > > On Tue, Jan 17, 2012 at 06:22:26AM +0000, Srinidhi KASAGAR wrote:
+> > > > 
+> > > > Yes, we boot with L2 enabled.
+> > > 
+> > > Interesting. I'm surprised you don't have problems with stale data on the
+> > > D-side after the decompressor. Maybe you're lucky with the mappings being no
+> > > write allocate.
 > > 
-> > If there are no review comments, can this be merged?
+> > Actually the pre bootloader makes sure that L2 is clean before relinquishing
+> > the control to kernel decompressor.
 > 
-> Made a minor comment on the first patch, it would be nice to get
-> that clean-up merged. The other two depend on some some hwmod
-> data shrinkage by Paul..
-> 
+> I was thinking more of the decompressor populating the L2 and not flushing
+> it.
 
-Working on it, will be submitting next version soon.
+Perhaps, we are lucky because we lock down l2 in bootloader?
 
-Thanks,
-Vaibhav
-
-> Regards,
-> 
-> Tony
-> 
+srinidhi
