@@ -1,18 +1,24 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 07 Mar 2012 14:21:37 +0200
-Subject: [PATCH] plat-omap: mcbsp: Configure wakeup in later phase
-In-Reply-To: <20120305195032.GO12083@atomide.com>
-References: <1323941697-7902-1-git-send-email-peter.ujfalusi@ti.com>
- <20120305195032.GO12083@atomide.com>
-Message-ID: <4F5752D1.7030601@ti.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 7 Mar 2012 04:26:58 -0800
+Subject: [PATCH 00/15] watchdog/mpcore: updates & fixes
+In-Reply-To: <20120307103414.GA2568@pengutronix.de>
+References: <cover.1331115751.git.viresh.kumar@st.com>
+ <20120307103414.GA2568@pengutronix.de>
+Message-ID: <CAOh2x=n6Xx0r7OsTvYTY9d6V11WgGuruF9D3kGVb8DosqAtatw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2012 09:50 PM, Tony Lindgren wrote:
-> Just checking.. I assume this one is already taken care of with your
-> other McBSP changes?
+On 3/7/12, Wolfram Sang <w.sang@pengutronix.de> wrote:
+>
+>> This patchset contains fixes and updates for ARM mpcore watchdog driver.
+>
+> It probably makes sense to convert this to use the watchdog-core. See
+> Documentation/watchdog/convert_drivers_to_kernel_api.txt for some
+> guidance.
+>
 
-Yes it is. I just resent it against the moved McBSP driver for ASoC.
+Sorry for not checking that earlier.
+Will align my patchset to that.
 
--- 
-P?ter
+--
+viresh
