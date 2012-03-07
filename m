@@ -1,37 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Mar 2012 09:14:09 +0000
-Subject: [PATCH] ARM: remove ixp2000 platform
-In-Reply-To: <CACRpkdYQpnSMVWUizEYHTjx_AK5Ai7dos0SBd208Wf5ZJLdrCw@mail.gmail.com>
-References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
- <201202281945.39419.arnd@arndb.de>
- <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
- <201203061412.00073.arnd@arndb.de>
- <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
- <CACRpkdYQpnSMVWUizEYHTjx_AK5Ai7dos0SBd208Wf5ZJLdrCw@mail.gmail.com>
-Message-ID: <20120307091409.GL17370@n2100.arm.linux.org.uk>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 7 Mar 2012 10:25:19 +0100
+Subject: [PATCH 01/14] dmaengine: imx-dma: merge old dma-v1.c with
+ imx-dma.c
+In-Reply-To: <1331108158.24656.330.camel@vkoul-udesk3>
+References: <1330964196-32623-1-git-send-email-javier.martin@vista-silicon.com>
+ <1330964196-32623-2-git-send-email-javier.martin@vista-silicon.com>
+ <1331102571.24656.324.camel@vkoul-udesk3>
+ <CACKLOr0iBSMd8hNdmeAiMWgyyUb_b1=5n47N97hu9EP2Zu9OsQ@mail.gmail.com>
+ <1331108158.24656.330.camel@vkoul-udesk3>
+Message-ID: <CACKLOr1VHkLeCnUDcOEuBBjN5iY72ADvqXoNk0NR_N95fkd6Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 09:40:31AM +0100, Linus Walleij wrote:
-> Network equipment seems to like using BE.
-> 
-> I have some vague idea that this is beacuse IP packets are big
-> endian, and thus you can process them quickly by just casting fields
-> to e.g. u32 pointers and read them.
-> 
-> I don't know if this is true, but seems to much of a correlation to
-> be pure coincidence. Thus a pretty interesting subject in
-> embedded ARM not used for tablets/mobile/generic computing
-> kind of stuff.
+On 7 March 2012 09:15, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Wed, 2012-03-07 at 08:52 +0100, javier Martin wrote:
+>> Hi Vinod,
+>>
+>> On 7 March 2012 07:42, Vinod Koul <vinod.koul@intel.com> wrote:
+>> > On Mon, 2012-03-05 at 17:16 +0100, Javier Martin wrote:
+>> > Sascha,
+>> > Are there any more users of dmac in mach-imx?
+>>
+>> No, there are no other users of mach-imx. In fact, it was Sascha's
+>> idea to make this merge [1].
+> Then please move the file in 1st patch, also it would be easily clear
+> what parts are added, deleted and moved.
 
-ISTR Nicolas explained this to me as being an established thing in the
-comms sector.  They expect BE and only understand BE.
+All right, I will, but I'll wait for Sascha and others to comment on
+the series too.
 
-I did point out that you end up with many more endian conversions by
-going to BE, mainly because PCI is LE and all your PCI accesses have
-to be endian-swapped.  So in terms of bandwidth, I'd expect an ARM
-PCI platform running in BE mode to have worse throughput than a LE
-PCI platform.
+> Otherwise the series looks fine except that it needs to have a better
+> changelog on why you are removing certain field/struct. It helps to
+> document the motivation of doing certain change, you will find that you
+> wont remember that six months down the line :)
 
-But... if BE allows the comms people to keep their warm fuzzy feeling
-who are we to argue.
+Thanks for the suggestion, I'll rewrite my changelogs.
+
+> Also I am looking for Tested-By from people who have use imx-dma.
+
+That would be awesome. I've tested this series with a test battery which covers:
+- mxcmmc
+- audio
+- dmatest module
+
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
