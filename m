@@ -1,8 +1,8 @@
-From: xiyou.wangcong@gmail.com (Cong Wang)
-Date: Wed, 07 Mar 2012 13:09:49 +0800
-Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper
- to test CMA
-In-Reply-To: <CAGsJ_4ypegMQVf0Xet1T5sLaaEDGh5s1Vi6w4t_UQSZp7nYQuQ@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 7 Mar 2012 13:17:12 +0800
+Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper to
+ test CMA
+In-Reply-To: <4F56ED9D.3000504@gmail.com>
 References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
  <4F56E0AC.8070501@gmail.com>
  <CAGsJ_4x4CwD+WAE9d+Xob_tfwqmE6SdBdBd5EbC64XBi4Uzvgg@mail.gmail.com>
@@ -10,28 +10,47 @@ References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
  <CAGsJ_4xJoKGt3+b_3bteoMyeO615pCxFpMpsH4LtvufFNDv6bA@mail.gmail.com>
  <4F56EBA6.6000704@gmail.com>
  <CAGsJ_4ypegMQVf0Xet1T5sLaaEDGh5s1Vi6w4t_UQSZp7nYQuQ@mail.gmail.com>
-Message-ID: <4F56ED9D.3000504@gmail.com>
+ <4F56ED9D.3000504@gmail.com>
+Message-ID: <CAGsJ_4x9hGDh+PgrvtXqp-bdbPHABz1ErHGdvFQAr0m9RYM8Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2012 01:05 PM, Barry Song wrote:
-> 2012/3/7 Cong Wang<xiyou.wangcong@gmail.com>:
->> On 03/07/2012 12:57 PM, Barry Song wrote:
->>>
->>>
->>> if you think so, pls do that and send v4 with your s-o-b.
->>>
+2012/3/7 Cong Wang <xiyou.wangcong@gmail.com>:
+> On 03/07/2012 01:05 PM, Barry Song wrote:
 >>
->> This is not a good attitude, nor helps your patch to be merged...
+>> 2012/3/7 Cong Wang<xiyou.wangcong@gmail.com>:
+>>>
+>>> On 03/07/2012 12:57 PM, Barry Song wrote:
+>>>>
+>>>>
+>>>>
+>>>> if you think so, pls do that and send v4 with your s-o-b.
+>>>>
+>>>
+>>> This is not a good attitude, nor helps your patch to be merged...
+>>>
+>>> Be collaborative.
 >>
->> Be collaborative.
+>>
+>> some people like focusing on trivial things. i said i really didn't
+>> care about the details whether it is /dev, /proc, /sys.
+>> if you like a /proc, pls do it by yourself and i will agree. but i
+>> will not waste my time on that.
 >
-> some people like focusing on trivial things. i said i really didn't
-> care about the details whether it is /dev, /proc, /sys.
-> if you like a /proc, pls do it by yourself and i will agree. but i
-> will not waste my time on that.
+>
+> This is definitely not trivial... What's more, kernel developers *do* care
+> about trivial things (trivial at kernel.org).
 
-This is definitely not trivial... What's more, kernel developers *do* 
-care about trivial things (trivial at kernel.org).
+that is definitely trivial as we are talking about things in a test
+module. and we are not talking about any bug in the test module as
+well.
 
-We are trying to make your patch perfect, you just refused, sigh...
+>
+> We are trying to make your patch perfect, you just refused, sigh...
+
+pls note i just care about people have an easy way to test the newest
+contiguous memory allocator. pls be focusing on valuable things.
+
+i said if you like /proc, pls do and i agree.
+
+-barry
