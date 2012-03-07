@@ -1,59 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Mar 2012 11:22:19 +0000
-Subject: [PATCH] ARM: S3C24XX: Fix Section mismatch
-In-Reply-To: <1331116612-14491-1-git-send-email-kgene.kim@samsung.com>
-References: <1331116612-14491-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20120307112219.GR17370@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed,  7 Mar 2012 12:26:15 +0100
+Subject: [PATCH 1/1] of: add dma-mask binding
+Message-ID: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 02:36:52AM -0800, Kukjin Kim wrote:
-> WARNING: arch/arm/mach-s3c24xx/built-in.o(.data+0xf44): Section mismatch in reference
-> from the variable s3c2416_irq_interface to the function .init.text:s3c2416_irq_add()
-> The variable s3c2416_irq_interface references
-> the function __init s3c2416_irq_add()
-> If the reference is valid then annotate the
-> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
-> 
-> WARNING: arch/arm/mach-s3c24xx/built-in.o(.data+0x1b80): Section mismatch in reference
-> from the variable s3c2443_irq_interface to the function .init.text:s3c2443_irq_add()
-> The variable s3c2443_irq_interface references
-> the function __init s3c2443_irq_add()
-> If the reference is valid then annotate the
-> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+This will allow each device to specify its dma-mask
+The microblaze architecture hook is keep temporary if no dma-mask is specified
+int the DT
 
-> diff --git a/arch/arm/mach-s3c24xx/irq-s3c2416.c b/arch/arm/mach-s3c24xx/irq-s3c2416.c
-> index b8a5836..59b7632 100644
-> --- a/arch/arm/mach-s3c24xx/irq-s3c2416.c
-> +++ b/arch/arm/mach-s3c24xx/irq-s3c2416.c
-> @@ -310,7 +310,7 @@ static int __init s3c2416_irq_add(struct device *dev)
->  	return 0;
->  }
->  
-> -static struct subsys_interface s3c2416_irq_interface = {
-> +static struct subsys_interface s3c2416_irq_interface __initdata = {
->  	.name		= "s3c2416_irq",
->  	.subsys		= &s3c2416_subsys,
->  	.add_dev	= s3c2416_irq_add,
-> diff --git a/arch/arm/mach-s3c24xx/irq-s3c2443.c b/arch/arm/mach-s3c24xx/irq-s3c2443.c
-> index 35e4ff2..439f186 100644
-> --- a/arch/arm/mach-s3c24xx/irq-s3c2443.c
-> +++ b/arch/arm/mach-s3c24xx/irq-s3c2443.c
-> @@ -265,7 +265,7 @@ static int __init s3c2443_irq_add(struct device *dev)
->  	return 0;
->  }
->  
-> -static struct subsys_interface s3c2443_irq_interface = {
-> +static struct subsys_interface s3c2443_irq_interface __initdata = {
->  	.name		= "s3c2443_irq",
->  	.subsys		= &s3c2443_subsys,
->  	.add_dev	= s3c2443_irq_add,
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/of/platform.c |   26 +++++++++++++++++++++++++-
+ 1 files changed, 25 insertions(+), 1 deletions(-)
 
-You register these structures with some other bit of code.  That other
-bit of code adds these structures to a list. You then mark them as
-__initdata, which means they get freed and the memory reused.  That
-corrupts the list beneath the other code.
-
-So, clearly, both of these are wrong.
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index cae9477..bb22194 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -121,6 +121,26 @@ void of_device_make_bus_id(struct device *dev)
+ 	dev_set_name(dev, "%s.%d", node->name, magic - 1);
+ }
+ 
++static u64* of_get_dma_mask(struct device_node *np)
++{
++	const __be32 *prop;
++	int len;
++	u64 *dma_mask;
++
++	prop = of_get_property(np, "dma-mask", &len);
++
++	if (!prop)
++		return NULL;
++
++	dma_mask = kzalloc(sizeof(u64), GFP_KERNEL);
++	if (!dma_mask)
++		return NULL;
++
++	*dma_mask = of_read_number(prop, len / 4);
++
++	return dma_mask;
++}
++
+ /**
+  * of_device_alloc - Allocate and initialize an of_device
+  * @np: device node to assign to device
+@@ -161,10 +181,14 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+ 	}
+ 
++	dev->dev.dma_mask = of_get_dma_mask(np);
+ 	dev->dev.of_node = of_node_get(np);
++
+ #if defined(CONFIG_MICROBLAZE)
+-	dev->dev.dma_mask = &dev->archdata.dma_mask;
++	if (!dev->dev.dma_mask)
++		dev->dev.dma_mask = &dev->archdata.dma_mask;
+ #endif
++
+ 	dev->dev.parent = parent;
+ 
+ 	if (bus_id)
+-- 
+1.7.7
