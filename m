@@ -1,56 +1,89 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Wed, 7 Mar 2012 11:52:03 +1100
-Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
-In-Reply-To: <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
- <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAGRGNgWHXrQgVobz+54sFBzj=bTHCKwg+H4_CY5JoGtmETw2yA@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 6 Mar 2012 18:53:27 -0600
+Subject: [PATCH 4/9] dmaengine: consolidate assignment of DMA cookies
+In-Reply-To: <E1S52xy-0002Ms-Ud@rmk-PC.arm.linux.org.uk>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+ <E1S52xy-0002Ms-Ud@rmk-PC.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF559AB@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Wed, Mar 7, 2012 at 11:30, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> This allows the user to use U-Boot's mkimage's -T kernel_noload option
-> if their arch Kconfig allows it, and they desire.
+On Tuesday, March 06, 2012 3:35 PM, Russell King wrote:
 >
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> Everyone deals with assigning DMA cookies in the same way (it's part of
+> the API so they should be), so lets consolidate the common code into a
+> helper function to avoid this duplication.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
-> diff --git a/init/Kconfig b/init/Kconfig
-> index 6cfd71d..2035562 100644
-> --- a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -203,6 +203,21 @@ config KERNEL_LZO
->
-> ?endchoice
->
-> +config ALLOW_UIMAGE_KERNEL_NOLOAD
-> + ? ? ? bool
+
+<snip>
+
+>  drivers/dma/dmaengine.h     |   20 ++++++++++++++++++++
+
+<snip>
+
+>  drivers/dma/ep93xx_dma.c    |    9 +--------
+
+<snip>
+
+> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
+> index 968570d..7692c86 100644
+> --- a/drivers/dma/dmaengine.h
+> +++ b/drivers/dma/dmaengine.h
+> @@ -7,4 +7,24 @@
+>  
+>  #include <linux/dmaengine.h>
+>  
+> +/**
+> + * dma_cookie_assign - assign a DMA engine cookie to the descriptor
+> + * @tx: descriptor needing cookie
+> + *
+> + * Assign a unique non-zero per-channel cookie to the descriptor.
+> + * Note: caller is expected to hold a lock to prevent concurrency.
+> + */
+> +static inline dma_cookie_t dma_cookie_assign(struct dma_async_tx_descriptor *tx)
+> +{
+> +	struct dma_chan *chan = tx->chan;
+> +	dma_cookie_t cookie;
 > +
-> +config UIMAGE_KERNEL_NOLOAD
-> + ? ? ? bool "Use mkimage's -T kernel_noload instead of -T kernel"
-> + ? ? ? depends on ALLOW_UIMAGE_KERNEL_NOLOAD
-> + ? ? ? help
-> + ? ? ? ? uImage files of type "kernel" embed an absolute load and entry point
-> + ? ? ? ? address. If the uImage is loaded to a different address, then the
-> + ? ? ? ? image must be copied the uImage file to the specified load address.
-
-You seem to have an excess "the uImage file" in here.
-
-> + ? ? ? ? This copy is a waste of time if the uImage is in fact completely
-> + ? ? ? ? relocatable. If your kernel and bootloader support it, you can build
-> + ? ? ? ? a "kernel_noload" uImage rather than a "kernel" uImage, which
-> + ? ? ? ? prevents any such copying. If unsure say N.
+> +	cookie = chan->cookie + 1;
+> +	if (cookie < DMA_MIN_COOKIE)
+> +		cookie = DMA_MIN_COOKIE;
+> +	tx->cookie = chan->cookie = cookie;
 > +
-> ?config DEFAULT_HOSTNAME
-> ? ? ? ?string "Default hostname"
-> ? ? ? ?default "(none)"
+> +	return cookie;
+> +}
+> +
+>  #endif
 
-Thanks,
+<snip>
 
--- 
-Julian Calaby
+> diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
+> index 3260198..e5aaae8 100644
+> --- a/drivers/dma/ep93xx_dma.c
+> +++ b/drivers/dma/ep93xx_dma.c
+> @@ -783,17 +783,10 @@ static dma_cookie_t ep93xx_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&edmac->lock, flags);
+> -
+> -	cookie = edmac->chan.cookie;
+> -
+> -	if (++cookie < 0)
+> -		cookie = 1;
+> +	cookie = dma_cookie_assign(tx);
+>  
+>  	desc = container_of(tx, struct ep93xx_dma_desc, txd);
+>  
+> -	edmac->chan.cookie = cookie;
+> -	desc->txd.cookie = cookie;
+> -
+>  	/*
+>  	 * If nothing is currently prosessed, we push this descriptor
+>  	 * directly to the hardware. Otherwise we put the descriptor
 
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
-.Plan: http://sites.google.com/site/juliancalaby/
+For ep93xx:
+
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
