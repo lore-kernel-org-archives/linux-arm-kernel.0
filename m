@@ -1,36 +1,62 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Wed, 7 Mar 2012 15:02:42 +0530
-Subject: [PATCH 1/2] mach-ux500: cache operations are atomic on PL310
-In-Reply-To: <20120117133428.GB11581@mudshark.cambridge.arm.com>
-References: <1326346663-6112-1-git-send-email-srinidhi.kasagar@stericsson.com>
- <20120113181422.GB24373@mudshark.cambridge.arm.com>
- <20120116110528.GA24824@bnru02>
- <20120116145008.GH9068@mudshark.cambridge.arm.com>
- <20120117062224.GA26832@bnru02>
- <20120117103023.GB9230@mudshark.cambridge.arm.com>
- <20120117112741.GA14426@bnru02>
- <20120117133428.GB11581@mudshark.cambridge.arm.com>
-Message-ID: <20120307093240.GA21265@bnru02>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 7 Mar 2012 09:56:02 +0000
+Subject: [PATCH v2 2/2] ARM: OMAP: sram: Add am33xx SRAM support (minimal)
+In-Reply-To: <20120305231413.GP12083@atomide.com>
+References: <1329113715-7634-1-git-send-email-afzal@ti.com>
+ <87fweeyfp6.fsf@macbook.be.48ers.dk>
+ <B5906170F1614E41A8A28DE3B8D121433179FC35@DBDE01.ent.ti.com>
+ <20120305231413.GP12083@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83180A06D@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2012 at 14:34:28 +0100, Will Deacon wrote:
-> On Tue, Jan 17, 2012 at 11:27:43AM +0000, Srinidhi KASAGAR wrote:
-> > On Tue, Jan 17, 2012 at 11:30:23 +0100, Will Deacon wrote:
-> > > On Tue, Jan 17, 2012 at 06:22:26AM +0000, Srinidhi KASAGAR wrote:
-> > > > 
-> > > > Yes, we boot with L2 enabled.
+On Tue, Mar 06, 2012 at 04:44:13, Tony Lindgren wrote:
+> * Bedia, Vaibhav <vaibhav.bedia@ti.com> [120213 07:36]:
+> > On Mon, Feb 13, 2012 at 19:54:05, Peter Korsgaard wrote:
+> > > >>>>> "Afzal" == Afzal Mohammed <afzal@ti.com> writes:
 > > > 
-> > > Interesting. I'm surprised you don't have problems with stale data on the
-> > > D-side after the decompressor. Maybe you're lucky with the mappings being no
-> > > write allocate.
+> > >  Afzal> From: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> > >  Afzal> Update SRAM start & size for am33xx SoC's.
+> > > 
 > > 
-> > Actually the pre bootloader makes sure that L2 is clean before relinquishing
-> > the control to kernel decompressor.
+> > This is a really awkward quoting style :|
+> > 
+> > > 
+> > > I don't particular know the omap sram stuff, but doesn't the 33xx have
+> > > 2x 64K blocks of SRAM?
+> > > 
+> > 
+> > Yes, but since the lower 64KB will not be available on non-GP device and
+> > only A8 can access it, for now we make use of the higher 64KB which is referred
+> > to as the OCMC RAM in the TRM. This will also enable SRAM usage by other drivers
+> > like PRU and McASP.
+> > 
+> > >  
+> > >  Afzal> +static inline int am33xx_sram_init(void)
+> > >  Afzal> +{
+> > >  Afzal> +	return 0;
+> > > 
+> > > 
+> > > I know you mentioned it in the commit message, but it might be good with
+> > > a comment here as well that this dummy function is needed to not get the 34xx
+> > > init function called for 33xx, so it doesn't get removed when somebody
+> > > decides to cleanup.
+> > 
+> > You are right in saying that the dummy function is needed to avoid 34xx SRAM init.
+> > We'll have some PM related code coming in soon and hopefully the SRAM code won't change
+> > Without us noticing ;)
 > 
-> I was thinking more of the decompressor populating the L2 and not flushing
-> it.
+> OK, applying into fixes-non-critical-part2. Our sram.c should get turned
+> into a device driver, there's been already similar sram driver posted
+> to LAKML. So that should allow us to remove the cpu_is_xxxx checks.
+> 
 
-Perhaps, we are lucky because we lock down l2 in bootloader?
+I think I missed this, let me check the post.
 
-srinidhi
+Thanks,
+Vaibhav
+
+> Regards,
+> 
+> Tony
+> 
