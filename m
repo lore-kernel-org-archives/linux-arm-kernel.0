@@ -1,41 +1,29 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Mar 2012 19:08:15 +0100
-Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
-In-Reply-To: <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
- <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120307180815.GA27213@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Mar 2012 18:21:55 +0000
+Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
+In-Reply-To: <CABb+yY0A9=XKuw=N1fFXCB507zR3U=wofqATVcO_wtnnVrgXzQ@mail.gmail.com>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+ <CABb+yY0A9=XKuw=N1fFXCB507zR3U=wofqATVcO_wtnnVrgXzQ@mail.gmail.com>
+Message-ID: <20120307182155.GD18787@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:30 Tue 06 Mar     , Stephen Warren wrote:
-> This allows the user to use U-Boot's mkimage's -T kernel_noload option
-> if their arch Kconfig allows it, and they desire.
+On Wed, Mar 07, 2012 at 11:39:25PM +0530, Jassi Brar wrote:
+> Compilation is broken without the following minor fix.
+> After that you may add
+>        Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
 > 
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-> The next patch enables this new CONFIG_ALLOW_ option for ARM. I assume
-> that some other architectures will also be able to enable it, but I'm
-> not familiar enough with any to know which.
-I'm going to repeat. I don't think any impromevent here.
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 49c123f..abf35a3 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -339,7 +339,6 @@ static int pl330_control(struct dma_chan *chan,
+> enum dma_ctrl_cmd cmd, unsigned
+>  		/* Mark all desc done */
+>  		list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
+>  			desc->status = DONE;
+> -			pch->completed = desc->txd.cookie;
 
-with no specific kernel load address the uImage for is useless/
-
-And this no the job of the kernel to build a boot loader specific boot image
-format.
-
-And the uImage format here is called the legacy format where now U-Boot
-support a new format based on DT format.
-
-Will you plan to add it too?
-
-no sorry I don't think it's the right way to go.
-
-On X86 we boot zImage simply. The new uImage option to do not specify the load
-address add nothing more than just boot a zImage for kernel point of view.
-
-Further more on server the vendor will use grub mostly (even on ARM) and will
-expect to boot a zImage.
-
-Best Regards,,
-J.
+I'm not sure just removing this is sufficient.  Presumably it's
+there for some reason - maybe it needs replacing with a call to
+dma_cookie_complete() to preserve existing behaviour?
