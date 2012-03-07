@@ -1,31 +1,83 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 7 Mar 2012 07:38:29 +0100
-Subject: [PATCH/RFC 2/2] arm/tegra: add timeout to PCIe PLL lock
- detection loop
-In-Reply-To: <1331023544-6439-3-git-send-email-mad_soft@inbox.ru>
-References: <1331023544-6439-1-git-send-email-mad_soft@inbox.ru>
- <1331023544-6439-3-git-send-email-mad_soft@inbox.ru>
-Message-ID: <20120307063829.GA16359@avionic-0098.mockup.avionic-design.de>
+From: gxt@mprc.pku.edu.cn (Guan Xuetao)
+Date: Wed, 07 Mar 2012 14:52:43 +0800
+Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
+In-Reply-To: <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
+References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
+ <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1331103163.2048.33.camel@epip-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dmitry Artamonow wrote:
-[...]
-> diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-[...]
-> @@ -639,8 +639,14 @@ static void tegra_pcie_enable_controller(void)
->  	pads_writel(0xfa5cfa5c, 0xc8);
+On Tue, 2012-03-06 at 17:30 -0700, Stephen Warren wrote:
+> This allows the user to use U-Boot's mkimage's -T kernel_noload option
+> if their arch Kconfig allows it, and they desire.
+> 
+> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+> The next patch enables this new CONFIG_ALLOW_ option for ARM. I assume
+> that some other architectures will also be able to enable it, but I'm
+> not familiar enough with any to know which.
+> 
+>  init/Kconfig         |   15 +++++++++++++++
+>  scripts/Makefile.lib |   15 ++++++++++++---
+>  2 files changed, 27 insertions(+), 3 deletions(-)
+> 
+> diff --git a/init/Kconfig b/init/Kconfig
+> index 6cfd71d..2035562 100644
+> --- a/init/Kconfig
+> +++ b/init/Kconfig
+> @@ -203,6 +203,21 @@ config KERNEL_LZO
 >  
->  	/* Wait for the PLL to lock */
-> +	timeout = 2000;
+>  endchoice
+>  
+> +config ALLOW_UIMAGE_KERNEL_NOLOAD
+> +	bool
+> +
+> +config UIMAGE_KERNEL_NOLOAD
+> +	bool "Use mkimage's -T kernel_noload instead of -T kernel"
+> +	depends on ALLOW_UIMAGE_KERNEL_NOLOAD
+> +	help
+> +	  uImage files of type "kernel" embed an absolute load and entry point
+> +	  address. If the uImage is loaded to a different address, then the
+> +	  image must be copied the uImage file to the specified load address.
+> +	  This copy is a waste of time if the uImage is in fact completely
+> +	  relocatable. If your kernel and bootloader support it, you can build
+> +	  a "kernel_noload" uImage rather than a "kernel" uImage, which
+> +	  prevents any such copying. If unsure say N.
+> +
+>  config DEFAULT_HOSTNAME
+>  	string "Default hostname"
+>  	default "(none)"
+> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> index 7b0be18..d9c1c87 100644
+> --- a/scripts/Makefile.lib
+> +++ b/scripts/Makefile.lib
+> @@ -314,9 +314,18 @@ MKIMAGE := $(srctree)/scripts/mkuboot.sh
+>  UIMAGE_ARCH = $(SRCARCH)
+>  UIMAGE_COMPRESSION = $(if $(2),$(2),none)
+>  UIMAGE_OPTS-y =
+> -UIMAGE_TYPE = kernel
+> -UIMAGE_LOADADDR=arch_must_set_this
+> -UIMAGE_ENTRYADDR=$(UIMAGE_LOADADDR)
+> +ifeq ($(CONFIG_UIMAGE_KERNEL_NOLOAD),y)
+> +  UIMAGE_TYPE = kernel_noload
+> +  # Unused by bootloader:
+> +  UIMAGE_LOADADDR=0
+> +  # Entry point relative to actual load address:
+> +  UIMAGE_ENTRYADDR=0
+> +else
+> +  UIMAGE_TYPE = kernel
+> +  # Absolute addresses:
+> +  UIMAGE_LOADADDR=arch_must_set_this
+> +  UIMAGE_ENTRYADDR=$(UIMAGE_LOADADDR)
+> +endif
+>  UIMAGE_NAME = 'Linux-$(KERNELRELEASE)'
+>  UIMAGE_IN = $<
+>  UIMAGE_OUT = $@
+Hi, Stephen,
+It seems that UIMAGE_ARCH and UIMAGE_LOADADDR can't be modified from
+arch-Makefiles.
 
-FWIW, the Vibrante kernel uses 300 for the timeout value.
+Regards,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120307/0a7f99d6/attachment-0001.sig>
+Guan Xuetao
