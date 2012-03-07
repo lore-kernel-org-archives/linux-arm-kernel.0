@@ -1,37 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 7 Mar 2012 16:28:22 +0000
-Subject: [PATCH v9] Regulator: Add Anatop regulator driver
-In-Reply-To: <20120307153622.GC17745@game.jcrosoft.org>
-References: <1331126658-26926-1-git-send-email-paul.liu@linaro.org>
- <20120307132225.GB17745@game.jcrosoft.org>
- <20120307134551.GL3107@opensource.wolfsonmicro.com>
- <20120307153622.GC17745@game.jcrosoft.org>
-Message-ID: <20120307162821.GP3107@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Mar 2012 16:37:50 +0000
+Subject: soft lockup on omap3 (dm3730)
+In-Reply-To: <CAGGh5h3OQTniXbm8iUYGM+2oi+zzd1F6BxDKzN5epA89+i_7nQ@mail.gmail.com>
+References: <CAGGh5h3OQTniXbm8iUYGM+2oi+zzd1F6BxDKzN5epA89+i_7nQ@mail.gmail.com>
+Message-ID: <20120307163750.GC18787@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 04:36:22PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Wed, Mar 07, 2012 at 05:16:35PM +0100, jean-philippe francois wrote:
+> Is the backtrace pointing to this offset because soft_lockup can only
+> detect lockups at the output of critical sections ?
 
-> > This really doesn't seem at all sane for a device which is already
-> > vendor specific, it's just noise in the bindings.
+Correct - soft lockups on ARM can only be detected when hardware
+interrupts are enabled.  Any region which masks hard interrupts
+effectively prevents the soft lockup detector firing should
+execution get stuck inside such a region.
 
-> No it's
+> I don't know how to progress on this problem, any hint is welcome.
+> 
+> int omap3isp_video_queue_streamon(struct isp_video_queue *queue)
+> {
+>        struct isp_video_buffer *buf;
+>        unsigned long flags;
+> 
+>        mutex_lock(&queue->lock);
+> 
+>        if (queue->streaming)
+>                goto done;
+> 
+>        queue->streaming = 1;
+> 
+>        spin_lock_irqsave(&queue->irqlock, flags);
+>        list_for_each_entry(buf, &queue->queue, stream) {
+>                printk(KERN_INFO "inside list_for_each\n");
+>                queue->ops->buffer_queue(buf);
+>        }
+>        spin_unlock_irqrestore(&queue->irqlock, flags);  <---- soft lockup
+> says this is the culprit.
 
-...?
-
-> Here is a good example as we have regulator generic binding & vendor
-> specific bindig
-
-It's not vendor specific, it's device specific and people are doing it
-even for devices with no generic bindings at all which is particularly
-silly.
-
-Device specific prefixes probably make sense, but vendor specific ones
-are just noise.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120307/19e1a699/attachment.sig>
+My guess is something inside buffer_queue() is responsible.  If things
+get stuck for quite a period of time, the only thing I can suggest is
+using printk() based debugging to try and find where things get stuck.
