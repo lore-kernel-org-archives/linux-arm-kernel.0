@@ -1,60 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Mar 2012 16:44:05 -0800
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator
- for first instance
-In-Reply-To: <1331080771-30687-1-git-send-email-khilman@ti.com>
-References: <1331080771-30687-1-git-send-email-khilman@ti.com>
-Message-ID: <20120307004405.GC12083@atomide.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 6 Mar 2012 18:47:54 -0600
+Subject: [PATCH 3/9] dmaengine: add private header file
+In-Reply-To: <E1S52xe-0002Mn-Pn@rmk-PC.arm.linux.org.uk>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+ <E1S52xe-0002Mn-Pn@rmk-PC.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF559AA@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [120306 16:07]:
-> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
-> regulators) added regulators which are registered during
-> gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
-> than one instance of the SMSC911x and result in attempting to register
-> the same regulator more than once which causes a panic().
-> 
-> Fix this by only registering the regulator when the platform_data id
-> field is zero, indicating its the first instance.
-> 
-> Cc: Matt Porter <mporter@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+On Tuesday, March 06, 2012 3:34 PM, Russell King wrote:
+>
+> Add a local private header file to contain definitions and declarations
+> which should only be used by DMA engine drivers.
+>
+> We also fix linux/dmaengine.h to use LINUX_DMAENGINE_H to guard against
+> multiple inclusion.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
-> Fix needed for v3.3.
-> Applies on top of Tony's fixes branch.
-> 
->  arch/arm/mach-omap2/gpmc-smsc911x.c |   11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-> index bbb870c..4d6f1c6 100644
-> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-> @@ -101,10 +101,13 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+
+<snip>
+
+>  drivers/dma/dmaengine.h     |   10 ++++++++++
+
+<snip>
+
+>  drivers/dma/ep93xx_dma.c    |    2 ++
+
+<snip>
+
+>  include/linux/dmaengine.h   |    4 ++--
+
+<snip>
+
+> diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
+> new file mode 100644
+> index 0000000..968570d
+> --- /dev/null
+> +++ b/drivers/dma/dmaengine.h
+> @@ -0,0 +1,10 @@
+> +/*
+> + * The contents of this file are private to DMA engine drivers, and is not
+> + * part of the API to be used by DMA engine users.
+> + */
+> +#ifndef DMAENGINE_H
+> +#define DMAENGINE_H
+> +
+> +#include <linux/dmaengine.h>
+> +
+> +#endif
+
+<snip>
+
+> diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
+> index bc45787..3260198 100644
+> --- a/drivers/dma/ep93xx_dma.c
+> +++ b/drivers/dma/ep93xx_dma.c
+> @@ -28,6 +28,8 @@
 >  
->  	gpmc_cfg = board_data;
+>  #include <mach/dma.h>
 >  
-> -	ret = platform_device_register(&gpmc_smsc911x_regulator);
-> -	if (ret < 0) {
-> -		pr_err("Unable to register smsc911x regulators: %d\n", ret);
-> -		return;
-> +	if (!gpmc_cfg) {
+> +#include "dmaengine.h"
+> +
+>  /* M2P registers */
+>  #define M2P_CONTROL			0x0000
+>  #define M2P_CONTROL_STALLINT		BIT(0)
 
-Shouldn't this be !gpmc_cfg->id instead..
+<snip>
 
-> +		ret = platform_device_register(&gpmc_smsc911x_regulator);
-> +		if (ret < 0) {
-> +			pr_err("Unable to register smsc911x regulators: %d\n",
-> +			       ret);
-> +			return;
-> +		}
->  	}
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 41d0f92..4b17ca8 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -18,8 +18,8 @@
+>   * The full GNU General Public License is included in this distribution in the
+>   * file called COPYING.
+>   */
+> -#ifndef DMAENGINE_H
+> -#define DMAENGINE_H
+> +#ifndef LINUX_DMAENGINE_H
+> +#define LINUX_DMAENGINE_H
 >  
->  	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
+>  #include <linux/device.h>
+>  #include <linux/uio.h>
 
-..because we have gpmc_cfg always passed to gpmc_smsc911x_init().
+For ep93xx:
 
-Regards,
-
-Tony
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
