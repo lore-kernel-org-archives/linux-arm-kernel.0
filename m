@@ -1,39 +1,20 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 7 Mar 2012 08:52:40 +0100
-Subject: [PATCH 01/14] dmaengine: imx-dma: merge old dma-v1.c with
- imx-dma.c
-In-Reply-To: <1331102571.24656.324.camel@vkoul-udesk3>
-References: <1330964196-32623-1-git-send-email-javier.martin@vista-silicon.com>
- <1330964196-32623-2-git-send-email-javier.martin@vista-silicon.com>
- <1331102571.24656.324.camel@vkoul-udesk3>
-Message-ID: <CACKLOr0iBSMd8hNdmeAiMWgyyUb_b1=5n47N97hu9EP2Zu9OsQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Mar 2012 07:58:48 +0000
+Subject: [PATCH v3 1/6] serial: pxa: add OF support
+In-Reply-To: <1331084525-4638-1-git-send-email-haojian.zhuang@gmail.com>
+References: <201203061502.08097.arnd@arndb.de>
+ <1331084525-4638-1-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <201203070758.48948.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Wednesday 07 March 2012, Haojian Zhuang wrote:
+> From: Haojian Zhuang <haojian.zhuang@marvell.com>
+> 
+> Parse uart device id from alias in DTS file.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-On 7 March 2012 07:42, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Mon, 2012-03-05 at 17:16 +0100, Javier Martin wrote:
-> Sascha,
-> Are there any more users of dmac in mach-imx?
+Looks good now,
 
-No, there are no other users of mach-imx. In fact, it was Sascha's
-idea to make this merge [1].
-
-> If not then why not move the code, rather than copy.
-> If yes can we move them as well?
-
-I do remove the code in mach-imx in PATCH 14/14. I considered it was
-better doing this in the last patch to keep the old code available
-during the whole development process.
-
-[1] https://lkml.org/lkml/2012/2/9/171
-
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
