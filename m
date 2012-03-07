@@ -1,60 +1,142 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Wed, 7 Mar 2012 16:05:29 +0200
-Subject: I.MX35 PDK
-In-Reply-To: <CAOMZO5CyGazr1=kLF51W7S7ZpEy2Mg4k2n_ZHnGimSyu2oVcrA@mail.gmail.com>
-References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A26@MEP-EXCH.meprolight.com>
- <4F562C90.6090103@freescale.com>,
- <CAOMZO5CyGazr1=kLF51W7S7ZpEy2Mg4k2n_ZHnGimSyu2oVcrA@mail.gmail.com>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D890F@MEP-EXCH.meprolight.com>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Wed, 7 Mar 2012 19:40:07 +0530
+Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
+ modules.
+In-Reply-To: <1331122775-761-1-git-send-email-govindraj.raja@ti.com>
+References: <1331122775-761-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <CAMrsUdJq8J8dTnKcZmXgMucDX=dNXgR+9xFhYOdHvNDuw_=4Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Fabio,
+On Wed, Mar 7, 2012 at 5:49 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
+>
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+>
+> Some modules doesn't have SYSC_HAS_ENAWAKEUP bit available
+> (ex: usb host uhh module) in absence of this flag
+> omap_hwmod_enable/disable_wakeup avoids configuring
+> pad mux wakeup capability.
+>
+> Configure sysc if SYSC_HAS_ENAWAKEUP is available and for other cases
+> try enabling/disabling wakeup from mux_pad pins.
+>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> ---
+> ?arch/arm/mach-omap2/omap_hwmod.c | ? 30 ++++++++++++++++--------------
+> ?1 files changed, 16 insertions(+), 14 deletions(-)
 
- 
-________________________________________
-From: Fabio Estevam [festevam at gmail.com]
-Sent: Wednesday, March 07, 2012 2:18 PM
-To: Fabio Estevam
-Cc: Alex Gershgorin; linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de
-Subject: Re: I.MX35 PDK
+[...]
 
-On 3/6/12, Fabio Estevam <fabio.estevam@freescale.com> wrote:
-> Alex Gershgorin wrote:
->> Hi Fabio,
->>
->>
->>
->> How I can get information about accesses to CMOS_RST_B and CSI_PWDN bits
->> of MC9S08DZ60 processor.
->>
->> I need address of this register and bits mapping in this register.
-
-CMOS_RESET: Bit 6 of register 0x1a
-CMOS_ENABLE: Bit 1 of register 0x20
-
->>>After the mx35pdk lcd support patch gets applied I will submit a patch
->>>to adding support to all of the registers/bits definitions for
->>>>mc9s08dz60 chip.
-
-I use a barebox boot loader which supported mc9s08dz60 driver :-)
-Currently this is working, without  driver in the Linux kernel, but I have other problem:
-In my I.MX35 pdk personality board on connector CN14 I measure signals CMOS_RST = 1, CSI_PWDN = 0 and all of the correct voltages,
-in spite of this I get from ov2640 driver error 
-Here Linux Kernel boot message:  
-
-"Linux video capture interface: v2.00
-soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
-ov2640 0-0030: Product ID error fb:fb" 
-
-I cannot understand what the problem is, if someone tested this?
-
-Regards,
-Alex Gershgorin
+>
+> @@ -2506,14 +2507,15 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+> ? ? ? ?unsigned long flags;
+> ? ? ? ?u32 v;
+>
+> - ? ? ? if (!oh->class->sysc ||
+> - ? ? ? ? ? !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+> - ? ? ? ? ? ? ? return -EINVAL;
+> -
+> ? ? ? ?spin_lock_irqsave(&oh->_lock, flags);
+> - ? ? ? v = oh->_sysc_cache;
+> - ? ? ? _disable_wakeup(oh, &v);
+> - ? ? ? _write_sysconfig(v, oh);
+> +
+> + ? ? ? if (oh->class->sysc ||
+> + ? ? ? ? ? (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
 
 
+This condition check should have been _and_ (&&)
+sorry for the typo,
 
+Here [1] is the updated patch.
 
+--
+Thanks,
+Govindraj.R
 
- 
+[1]:
+
+>From b3aa1dac5909cad1b959f5b97bbf408b2f974060 Mon Sep 17 00:00:00 2001
+From: "Govindraj.R" <govindraj.raja@ti.com>
+Date: Wed, 7 Mar 2012 17:14:02 +0530
+Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
+ modules.
+
+Some modules doesn't have SYSC_HAS_ENAWAKEUP bit available
+(ex: usb host uhh module) in absence of this flag
+omap_hwmod_enable/disable_wakeup avoids configuring
+pad mux wakeup capability.
+
+Configure sysc if SYSC_HAS_ENAWAKEUP is available and for other cases
+try enabling/disabling wakeup from mux_pad pins.
+
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   30 ++++++++++++++++--------------
+ 1 files changed, 16 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index eba6cd3..9605fad 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2475,14 +2475,15 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+ 	unsigned long flags;
+ 	u32 v;
+
+-	if (!oh->class->sysc ||
+-	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+-		return -EINVAL;
+-
+ 	spin_lock_irqsave(&oh->_lock, flags);
+-	v = oh->_sysc_cache;
+-	_enable_wakeup(oh, &v);
+-	_write_sysconfig(v, oh);
++
++	if (oh->class->sysc &&
++	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
++		v = oh->_sysc_cache;
++		_enable_wakeup(oh, &v);
++		_write_sysconfig(v, oh);
++	}
++
+ 	_set_idle_ioring_wakeup(oh, true);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+
+@@ -2506,14 +2507,15 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+ 	unsigned long flags;
+ 	u32 v;
+
+-	if (!oh->class->sysc ||
+-	    !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+-		return -EINVAL;
+-
+ 	spin_lock_irqsave(&oh->_lock, flags);
+-	v = oh->_sysc_cache;
+-	_disable_wakeup(oh, &v);
+-	_write_sysconfig(v, oh);
++
++	if (oh->class->sysc &&
++	    (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
++		v = oh->_sysc_cache;
++		_disable_wakeup(oh, &v);
++		_write_sysconfig(v, oh);
++	}
++
+ 	_set_idle_ioring_wakeup(oh, false);
+ 	spin_unlock_irqrestore(&oh->_lock, flags);
+
+-- 
+1.7.5.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-omap_hwmod-Allow-io_ring-wakeup-configuration-for-al.patch
+Type: application/octet-stream
+Size: 2210 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120307/f68a01f4/attachment.obj>
