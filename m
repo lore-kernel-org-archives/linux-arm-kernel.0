@@ -1,22 +1,27 @@
-From: xiyou.wangcong@gmail.com (Cong Wang)
-Date: Wed, 07 Mar 2012 13:01:26 +0800
-Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper
- to test CMA
-In-Reply-To: <CAGsJ_4xJoKGt3+b_3bteoMyeO615pCxFpMpsH4LtvufFNDv6bA@mail.gmail.com>
-References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
- <4F56E0AC.8070501@gmail.com>
- <CAGsJ_4x4CwD+WAE9d+Xob_tfwqmE6SdBdBd5EbC64XBi4Uzvgg@mail.gmail.com>
- <4F56EA49.8070808@gmail.com>
- <CAGsJ_4xJoKGt3+b_3bteoMyeO615pCxFpMpsH4LtvufFNDv6bA@mail.gmail.com>
-Message-ID: <4F56EBA6.6000704@gmail.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue,  6 Mar 2012 21:04:31 -0800
+Subject: [RESEND PATCH 0/3] arm: tegra: dts: USB Updates for Tegra legacy mode
+ / OTG
+Message-ID: <1331096674-8324-1-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2012 12:57 PM, Barry Song wrote:
->
-> if you think so, pls do that and send v4 with your s-o-b.
->
+This little series brings in some bindings that seem useful for U-Boot.
 
-This is not a good attitude, nor helps your patch to be merged...
+I am working mostly in U-Boot, but since there is no shared .dts repo
+I was asked to commit these changes to the kernel. I do not propose to
+update the Linux USB drivers to match.
 
-Be collaborative.
+
+Simon Glass (3):
+  arm: tegra: dts: Support host/device selection and legacy mode
+  arm: tegra: dts: Add legacy mode support to Tegra2x USB1 port
+  arm: tegra: dts: Mark USB1 as an OTG port on Seaboard
+
+ .../devicetree/bindings/usb/tegra-usb.txt          |   13 +++++++++++++
+ arch/arm/boot/dts/tegra-seaboard.dts               |    1 +
+ arch/arm/boot/dts/tegra20.dtsi                     |    1 +
+ 3 files changed, 15 insertions(+), 0 deletions(-)
+
+-- 
+1.7.7.3
