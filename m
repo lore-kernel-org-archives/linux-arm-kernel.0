@@ -1,34 +1,213 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 7 Mar 2012 10:49:46 +0800
-Subject: oprofile and ARM A9 hardware counter
-In-Reply-To: <20120127155454.GH2347@mudshark.cambridge.arm.com>
-References: <CACVXFVPDdyKf5TffT4OMt+tKeB09TU2RcvcyBV45hAK0qw+GEg@mail.gmail.com>
- <CAMsRxfJK9kcFkV=itJHpzuOXoZQkmjj1wh8Y789D3iOVstPMyQ@mail.gmail.com>
- <CAMsRxfKPm0dEaKDeSZQ=6jkpo4MeS=0XF6TsCj+BV54WbW_LtA@mail.gmail.com>
- <CACVXFVMgk7ykSX3GjzCNvUU0zMzNvGGuZMBpxBf7NRVk9EM7ig@mail.gmail.com>
- <CAMsRxfJWjwznJYujSvr0DfhNxtnJDVdfjXXpx34HUDBRtMvjqw@mail.gmail.com>
- <20120127121311.GB2347@mudshark.cambridge.arm.com>
- <yw1x1uqlnw1o.fsf@unicorn.mansr.com>
- <20120127132826.GD2347@mudshark.cambridge.arm.com>
- <CACVXFVPHpmPX9OdeYzzWjQ-qqs=9oYbL_og-_xJA2ypYNu0nRA@mail.gmail.com>
- <CAMsRxfJOAh1V7sMWxqCXADDB_eSAuxop1iYAGqXvLC_74Pfz1A@mail.gmail.com>
- <20120127155454.GH2347@mudshark.cambridge.arm.com>
-Message-ID: <CACVXFVNExXcU473=m5QLZXAhpNsC3WZHrFa-=HzGdjMEy3seDg@mail.gmail.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Wed, 7 Mar 2012 11:14:58 +0800
+Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper to test
+ CMA
+Message-ID: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+From: Barry Song <Baohua.Song@csr.com>
 
-On Fri, Jan 27, 2012 at 11:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Ok. Note that on ARM the PMU generates a standard IRQ (i.e. not an NMI) so
-> you may miss samples if they occur during critical kernel sections (and if
-> you look at a profile, spin_unlock_irqrestore will be quite high).
+Any write request to /dev/cma_test will let the module to allocate memory from
+CMA, for example:
 
-Also looks no any irq handler functions can be observed at a profile even
-though they may be run at a very high frequency.
+1st time
+$ echo 1024 > /dev/cma_test
+will require cma_test to request 1MB(1024KB)
+2nd time
+$ echo 2048 > /dev/cma_test
+will require cma_test to request 2MB(2048KB)
 
-So could we configure ARM PMU interrupt as FIQ to address the above issues?
+Any read request to /dev/cma_test will let the module to free the 1st valid
+memory from CMA, for example:
 
-thanks
---
-Ming Lei
+1st time
+$ cat /dev/cma_test
+will require cma_test to free the 1MB allocated in the first write request
+2nd time
+$ cat /dev/cma_test
+will require cma_test to free the 2MB allocated in the second write request
+
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ -v2:
+ some minor cleanups by Michal Nazarewicz
+
+ tools/cma/Makefile   |   13 +++++
+ tools/cma/cma_test.c |  140 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 153 insertions(+), 0 deletions(-)
+ create mode 100644 tools/cma/Makefile
+ create mode 100644 tools/cma/cma_test.c
+
+diff --git a/tools/cma/Makefile b/tools/cma/Makefile
+new file mode 100644
+index 0000000..d15c2c0
+--- /dev/null
++++ b/tools/cma/Makefile
+@@ -0,0 +1,13 @@
++# Kernel modules
++#
++# To compile for ARM:
++# make ARCH=arm CC=arm-none-linux-gnueabi-gcc
++#
++obj-m	+= cma_test.o
++
++build: kernel_modules
++
++kernel_modules:
++	${MAKE} -C $(CURDIR)/../.. M=$(CURDIR)
++clean:
++	${MAKE} -C $(CURDIR)/../.. M=$(CURDIR) clean
+diff --git a/tools/cma/cma_test.c b/tools/cma/cma_test.c
+new file mode 100644
+index 0000000..40219ad
+--- /dev/null
++++ b/tools/cma/cma_test.c
+@@ -0,0 +1,140 @@
++/*
++ * kernel module helper for testing CMA
++ *
++ * Copyright (c) 2012 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <linux/device.h>
++#include <linux/dma-mapping.h>
++#include <linux/fs.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++
++struct cma_allocation {
++	struct list_head list;
++	size_t size;
++	dma_addr_t dma;
++	void *virt;
++};
++
++static struct device *cma_dev;
++static LIST_HEAD(cma_allocations);
++static DEFINE_SPINLOCK(cma_lock);
++
++/*
++ * any read request will free the 1st allocated coherent memory, eg.
++ * cat /dev/cma_test
++ */
++static ssize_t
++cma_test_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
++{
++	struct cma_allocation *alloc = NULL;
++
++	spin_lock(&cma_lock);
++	if (!list_empty(&cma_allocations)) {
++		alloc = list_first_entry(&cma_allocations,
++			struct cma_allocation, list);
++		list_del(&alloc->list);
++	}
++	spin_unlock(&cma_lock);
++
++	if (!alloc)
++		return -EIDRM;
++
++	dma_free_coherent(cma_dev, alloc->size, alloc->virt,
++		alloc->dma);
++
++	_dev_info(cma_dev, "free: CM virt: %p dma: %p size:%uK\n",
++		alloc->virt, (void *)alloc->dma, alloc->size / SZ_1K);
++	kfree(alloc);
++
++	return 0;
++}
++
++/*
++ * any write request will alloc a new coherent memory, eg.
++ * echo 1024 > /dev/cma_test
++ * will request 1024KiB by CMA
++ */
++static ssize_t
++cma_test_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
++{
++	struct cma_allocation *alloc;
++	size_t size;
++	int ret;
++
++	ret = kstrtouint_from_user(buf, count, 0, &size);
++	if (ret)
++		return ret;
++
++	if (!size)
++		return -EINVAL;
++
++	if (size > ~(size_t)0 / SZ_1K)
++		return -EOVERFLOW;
++
++	alloc = kmalloc(sizeof *alloc, GFP_KERNEL);
++	if (!alloc)
++		return -ENOMEM;
++
++	alloc->size = size * SZ_1K;
++	alloc->virt = dma_alloc_coherent(cma_dev, alloc->size,
++		&alloc->dma, GFP_KERNEL);
++
++	if (alloc->virt) {
++		_dev_info(cma_dev, "alloc: virt: %p dma: %p size: %uK\n",
++			alloc->virt, (void *)alloc->dma, size);
++
++		spin_lock(&cma_lock);
++		list_add_tail(&alloc->list, &cma_allocations);
++		spin_unlock(&cma_lock);
++
++		return count;
++	} else {
++		dev_err(cma_dev, "no mem in CMA area\n");
++		kfree(alloc);
++		return -ENOSPC;
++	}
++}
++
++static const struct file_operations cma_test_fops = {
++	.owner =    THIS_MODULE,
++	.read  =    cma_test_read,
++	.write =    cma_test_write,
++};
++
++static struct miscdevice cma_test_misc = {
++	.name = "cma_test",
++	.fops = &cma_test_fops,
++};
++
++static int __init cma_test_init(void)
++{
++	int ret = misc_register(&cma_test_misc);
++
++	if (unlikely(ret)) {
++		pr_err("failed to register cma test misc device!\n");
++		return ret;
++	}
++	cma_dev = cma_test_misc.this_device;
++	cma_dev->coherent_dma_mask = ~0;
++	_dev_info(cma_dev, "registered.\n");
++
++	return 0;
++}
++module_init(cma_test_init);
++
++static void __exit cma_test_exit(void)
++{
++	misc_deregister(&cma_test_misc);
++}
++module_exit(cma_test_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Barry Song <Baohua.Song@csr.com>");
++MODULE_DESCRIPTION("kernel module to help the test of CMA");
++MODULE_ALIAS("cma_test");
+-- 
+1.7.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
