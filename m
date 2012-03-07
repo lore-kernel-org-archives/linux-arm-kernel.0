@@ -1,40 +1,31 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Wed, 07 Mar 2012 13:11:13 +0100
-Subject: [PATCH v4] mm: cma: add a simple kernel module as the helper to
- test CMA
-In-Reply-To: <1331120259-30780-1-git-send-email-Barry.Song@csr.com>
-References: <1331120259-30780-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <op.wasuszai3l0zgt@mpn-glaptop>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 7 Mar 2012 04:11:27 -0800
+Subject: [PATCH 10/15] watchdog/mpcore_wdt: Add support for dev_pm_ops
+ interface
+In-Reply-To: <4F5748CC.9020601@ru.mvista.com>
+References: <cover.1331115751.git.viresh.kumar@st.com>
+ <b50542be97df8b90d3e7c696a8d13be707f581f9.1331115752.git.viresh.kumar@st.com>
+ <4F5748CC.9020601@ru.mvista.com>
+Message-ID: <CAOh2x=mvuFyG3Gg-rdU23hz2TyHNM=u2JWn2uiONuKUEUY3GnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 07 Mar 2012 12:37:39 +0100, Barry Song <Barry.Song@csr.com> wrote:
-> Any write request to /dev/cma_test will let the module to allocate memory from
-> CMA, for example:
->
-> 1st time
-> $ echo 1024 > /dev/cma_test
-> will require cma_test to request 1MB(1024KB)
-> 2nd time
-> $ echo 2048 > /dev/cma_test
-> will require cma_test to request 2MB(2048KB)
->
-> Any read request to /dev/cma_test will let the module to free the 1st valid
-> memory from CMA, for example:
->
-> 1st time
-> $ cat /dev/cma_test
-> will require cma_test to free the 1MB allocated in the first write request
-> 2nd time
-> $ cat /dev/cma_test
-> will require cma_test to free the 2MB allocated in the second write request
->
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+On 3/7/12, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+> On 07-03-2012 14:27, Viresh Kumar wrote:
 
-Reviewed-by: Michal Nazarewicz <mina86@mina86.com>
+>>   static struct platform_driver mpcore_wdt_driver = {
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
+>>   	.driver		= {
+>>   		.owner	= THIS_MODULE,
+>>   		.name	= "mpcore_wdt",
+>> +		.pm = &mpcore_wdt_dev_pm_ops,
+>
+>     Please align the right part of initializer like all above.
+>
+> WBR, Sergei
+>
+
+Sure.
+
+--
+viresh
