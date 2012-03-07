@@ -1,60 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 Mar 2012 11:40:18 -0700
-Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
-In-Reply-To: <20120307180815.GA27213@game.jcrosoft.org>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
- <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
- <20120307180815.GA27213@game.jcrosoft.org>
-Message-ID: <4F57AB92.6060907@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Mar 2012 18:40:09 +0000
+Subject: [PATCH 14/14] ARM: kirkwood: use devicetree to init sata_mv
+In-Reply-To: <8503a766f6f75c9acf49abd66d9cdce54807b2b2.1331090356.git.jason@lakedaemon.net>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <8503a766f6f75c9acf49abd66d9cdce54807b2b2.1331090356.git.jason@lakedaemon.net>
+Message-ID: <201203071840.09572.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2012 11:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:30 Tue 06 Mar     , Stephen Warren wrote:
->> This allows the user to use U-Boot's mkimage's -T kernel_noload option
->> if their arch Kconfig allows it, and they desire.
->>
->> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
->> ---
->> The next patch enables this new CONFIG_ALLOW_ option for ARM. I assume
->> that some other architectures will also be able to enable it, but I'm
->> not familiar enough with any to know which.
-> I'm going to repeat. I don't think any impromevent here.
-> 
-> with no specific kernel load address the uImage for is useless/
+On Wednesday 07 March 2012, Jason Cooper wrote:
+> @@ -504,6 +504,16 @@ static int __init kirkwood_clock_gate(void)
+>                 kirkwood_clk_ctrl |= CGC_USB0;
+>                 of_node_put(np);
+>         }
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "mrvl,orion-sata");
+> +       if (np && of_device_is_available(np)) {
+> +               int nr_ports;
+> +               kirkwood_clk_ctrl |= CGC_SATA0;
+> +               of_property_read_u32(np, "nr-ports", &nr_ports);
+> +               if (nr_ports > 1)
+> +                       kirkwood_clk_ctrl |= CGC_SATA1;
+> +               of_node_put(np);
+> +       }
+>  #endif
+>  
+>         /* For SATA: first shutdown the phy */
 
-No, the whole point of this type of kernel image is that it doesn't need
-a specific load address; the kernel zImage can run from anywhere in RAM
-(provided AUTO_ZRELADDR is enabled, subject to some slight
-restrictions), and hence the uImage doesn't need to be loaded to or
-moved to any particular location.
+Is it guaranteed that it's always the first port that gets used if there
+is only one? If not, this might turn on the wrong one.
 
-The scripts that U-Boot runs determine where the image gets loaded into
-memory.
-
-> And this no the job of the kernel to build a boot loader specific boot image
-> format.
-
-Not everyone agrees with this.
-
-> And the uImage format here is called the legacy format where now U-Boot
-> support a new format based on DT format.
-> 
-> Will you plan to add it too?
-
-No. The last time I heard anyone talk about that, it sounded like the
-adoption was basically zero, so it seems pointless. Personally, I find
-creating that kind of image more complex, and don't see any benefits in
-that format either.
-
-> no sorry I don't think it's the right way to go.
-> 
-> On X86 we boot zImage simply. The new uImage option to do not specify the load
-> address add nothing more than just boot a zImage for kernel point of view.
-
-U-Boot does not currently have the ability to boot zImage on ARM.
-
-> Further more on server the vendor will use grub mostly (even on ARM) and will
-> expect to boot a zImage.
-
-But that is irrelevant for the people who are using U-Boot not grub.
+	Arnd
