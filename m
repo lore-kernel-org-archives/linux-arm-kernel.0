@@ -1,106 +1,60 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 6 Mar 2012 18:38:11 -0600
-Subject: [PATCH 2/9] dmaengine: move last completed cookie into generic
- dma_chan structure
-In-Reply-To: <E1S52xK-0002Mj-Af@rmk-PC.arm.linux.org.uk>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
- <E1S52xK-0002Mj-Af@rmk-PC.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF559A5@AUSP01VMBX24.collaborationhost.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Mar 2012 16:44:05 -0800
+Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator
+ for first instance
+In-Reply-To: <1331080771-30687-1-git-send-email-khilman@ti.com>
+References: <1331080771-30687-1-git-send-email-khilman@ti.com>
+Message-ID: <20120307004405.GC12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 06, 2012 3:34 PM, Russell King wrote:
->
-> Every DMA engine implementation declares a last completed dma cookie
-> in their private dma channel structures.  This is pointless, and
-> forces driver specific code.  Move this out into the common dma_chan
-> structure.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+* Kevin Hilman <khilman@ti.com> [120306 16:07]:
+> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+> regulators) added regulators which are registered during
+> gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
+> than one instance of the SMSC911x and result in attempting to register
+> the same regulator more than once which causes a panic().
+> 
+> Fix this by only registering the regulator when the platform_data id
+> field is zero, indicating its the first instance.
+> 
+> Cc: Matt Porter <mporter@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 > ---
-
-<snip>
-
- drivers/dma/ep93xx_dma.c                 |    8 +++-----
-
-<snip>
-
- include/linux/dmaengine.h                |    2 ++
-
-<snip>
-
-> diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
-> index 59e7a96..bc45787 100644
-> --- a/drivers/dma/ep93xx_dma.c
-> +++ b/drivers/dma/ep93xx_dma.c
-> @@ -122,7 +122,6 @@ struct ep93xx_dma_desc {
->   * @lock: lock protecting the fields following
->   * @flags: flags for the channel
->   * @buffer: which buffer to use next (0/1)
-> - * @last_completed: last completed cookie value
->   * @active: flattened chain of descriptors currently being processed
->   * @queue: pending descriptors which are handled next
->   * @free_list: list of free descriptors which can be used
-> @@ -157,7 +156,6 @@ struct ep93xx_dma_chan {
->  #define EP93XX_DMA_IS_CYCLIC		0
+> Fix needed for v3.3.
+> Applies on top of Tony's fixes branch.
+> 
+>  arch/arm/mach-omap2/gpmc-smsc911x.c |   11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+> index bbb870c..4d6f1c6 100644
+> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
+> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+> @@ -101,10 +101,13 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
 >  
->  	int				buffer;
-> -	dma_cookie_t			last_completed;
->  	struct list_head		active;
->  	struct list_head		queue;
->  	struct list_head		free_list;
-> @@ -703,7 +701,7 @@ static void ep93xx_dma_tasklet(unsigned long data)
->  	desc = ep93xx_dma_get_active(edmac);
->  	if (desc) {
->  		if (desc->complete) {
-> -			edmac->last_completed = desc->txd.cookie;
-> +			edmac->chan.completed_cookie = desc->txd.cookie;
->  			list_splice_init(&edmac->active, &list);
->  		}
->  		callback = desc->txd.callback;
-> @@ -861,7 +859,7 @@ static int ep93xx_dma_alloc_chan_resources(struct dma_chan *chan)
->  		goto fail_clk_disable;
+>  	gpmc_cfg = board_data;
 >  
->  	spin_lock_irq(&edmac->lock);
-> -	edmac->last_completed = 1;
-> +	edmac->chan.completed_cookie = 1;
->  	edmac->chan.cookie = 1;
->  	ret = edmac->edma->hw_setup(edmac);
->  	spin_unlock_irq(&edmac->lock);
-> @@ -1254,7 +1252,7 @@ static enum dma_status ep93xx_dma_tx_status(struct dma_chan *chan,
+> -	ret = platform_device_register(&gpmc_smsc911x_regulator);
+> -	if (ret < 0) {
+> -		pr_err("Unable to register smsc911x regulators: %d\n", ret);
+> -		return;
+> +	if (!gpmc_cfg) {
+
+Shouldn't this be !gpmc_cfg->id instead..
+
+> +		ret = platform_device_register(&gpmc_smsc911x_regulator);
+> +		if (ret < 0) {
+> +			pr_err("Unable to register smsc911x regulators: %d\n",
+> +			       ret);
+> +			return;
+> +		}
+>  	}
 >  
->  	spin_lock_irqsave(&edmac->lock, flags);
->  	last_used = chan->cookie;
-> -	last_completed = edmac->last_completed;
-> +	last_completed = chan->completed_cookie;
->  	spin_unlock_irqrestore(&edmac->lock, flags);
->  
->  	ret = dma_async_is_complete(cookie, last_completed, last_used);
+>  	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
 
-<snip>
+..because we have gpmc_cfg always passed to gpmc_smsc911x_init().
 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index 679b349..41d0f92 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -257,6 +257,7 @@ struct dma_chan_percpu {
->   * struct dma_chan - devices supply DMA channels, clients use them
->   * @device: ptr to the dma device who supplies this channel, always !%NULL
->   * @cookie: last cookie value returned to client
-> + * @completed_cookie: last completed cookie for this channel
->   * @chan_id: channel ID for sysfs
->   * @dev: class device for sysfs
->   * @device_node: used to add this to the device chan list
-> @@ -268,6 +269,7 @@ struct dma_chan_percpu {
->  struct dma_chan {
->  	struct dma_device *device;
->  	dma_cookie_t cookie;
-> +	dma_cookie_t completed_cookie;
->  
->  	/* sysfs */
->  	int chan_id;
+Regards,
 
-For ep93xx:
-
-Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Tony
