@@ -1,40 +1,42 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Mar 2012 09:21:16 -0800
-Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <CA+Bv8XaJqL1L8F-n6skY7dHn1XAdDLRKaRjw0deLeoQ5Ao0Fhg@mail.gmail.com>
-References: <1330006564-13290-1-git-send-email-mporter@ti.com>
- <87wr74gis6.fsf@ti.com>
- <20120301204553.GA21841@legolas.emea.dhcp.ti.com>
- <87pqcqnc7u.fsf@ti.com>
- <CA+Bv8XaJqL1L8F-n6skY7dHn1XAdDLRKaRjw0deLeoQ5Ao0Fhg@mail.gmail.com>
-Message-ID: <20120307172116.GF12083@atomide.com>
+Date: Wed, 7 Mar 2012 09:31:52 -0800
+Subject: [PATCH 4/4] mmc: omap_hsmmc: Simplify init for twl6030 MMC
+ card detect
+In-Reply-To: <m2lincifj9.fsf@bob.laptop.org>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+ <20120301185535.29210.71546.stgit@kaulin.local>
+ <4F50643B.9050500@ti.com> <20120302172251.GJ18901@atomide.com>
+ <4F548457.5050205@ti.com>
+ <CANrkHUZysOnHKKUuLm0Vbo1KsNp0yUd=udjGvQ43=gTTXbWeCw@mail.gmail.com>
+ <CANrkHUaYDpv=p0p81oKWCoewyjheyZYkCqvZY7_ZQxWi_=8YFw@mail.gmail.com>
+ <m2lincifj9.fsf@bob.laptop.org>
+Message-ID: <20120307173152.GG12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russ Dill <Russ.Dill@ti.com> [120307 07:28]:
-> On Mon, Mar 5, 2012 at 12:18 PM, Kevin Hilman <khilman@ti.com> wrote:
+* Chris Ball <cjb@laptop.org> [120307 07:11]:
+> Hi Balaji,
+> 
+> On Wed, Mar 07 2012, T Krishnamoorthy, Balaji wrote:
+> > OMAP4 and OMAP3 HSMMC IP registers differ by 0x100 offset.
+> > Addng the offset to platform_device resource structure
+> > increments the start address for every insmod operation.
+> > MMC command fails on re-insertion as module due incorrect register base.
+> > Fix this by updating the ioremap base address only.
 > >
-> > In either case $SUBJECT patch is already in Tony's fixes queue, so if it
-> > is going be merged, then my fix above is needed also to not break
-> > Overo and any other platform that has more than one smsc911x instance.
-> >
-> > Kevin
+> > Signed-off-by: Balaji T K <balajitk@ti.com>
 > 
-> 
-> Have you tested this fix? The only regulator consumer supply would be:
-> 
-> static struct regulator_consumer_supply gpmc_smsc911x_supply[] = {
->         REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
->         REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
-> };
-> 
-> I don't think the second smsc911x on the Overo, "smsc911x.1", would
-> find it due to the dev_id.
+> Is this a regression, or has it never worked in mainline?
 
-Hmm yeah sounds like there's some further changes needed. Dropping
-the second version from fixes until we have somebody reply with
-tested-by using two smsc911x instances.
+"Features that never worked originally" so this can wait for the
+merge window. It happens on re-inserting of the card.
+ 
+> > Note:  eMMC detection is still failing on resertion due to card vcc
+> > power off on rmmod
+> 
+> And this?
+
+That sounds like a separate issue that needs to be fixed.
 
 Regards,
 
