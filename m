@@ -1,49 +1,69 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Thu, 08 Mar 2012 08:35:36 +0800
-Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
-In-Reply-To: <20120229153814.GK17745@arm.com>
-References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
- <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
- <20120229103207.GB17745@arm.com> <4F4E0BDE.6040708@gmail.com>
- <20120229153814.GK17745@arm.com>
-Message-ID: <4F57FED8.7050708@gmail.com>
+From: jason@lakedaemon.net (Jason)
+Date: Wed, 7 Mar 2012 15:55:31 -0500
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
+In-Reply-To: <20120307200515.GC18513@lunn.ch>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <80fb8cef577eee14364e95009f7a590fd9056ee3.1331090356.git.jason@lakedaemon.net>
+ <201203071831.31738.arnd@arndb.de>
+ <20120307192723.GE5050@titan.lakedaemon.net>
+ <20120307200515.GC18513@lunn.ch>
+Message-ID: <20120307205531.GF5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Mar 07, 2012 at 09:05:15PM +0100, Andrew Lunn wrote:
+> On Wed, Mar 07, 2012 at 02:27:23PM -0500, Jason wrote:
+> > On Wed, Mar 07, 2012 at 06:31:31PM +0000, Arnd Bergmann wrote:
+> > > On Wednesday 07 March 2012, Jason Cooper wrote:
+> > > > +       serial at f1012000 {
+> > > > +               compatible = "ns16550a";
+> > > > +               reg = <0xf1012000 0xff>;
+> > > > +               reg-shift = <2>;
+> > > > +               interrupts = <33>;
+> > > > +               clock-frequency = <200000000>;
+> > > > +       };
+> > > 
+> > > I just noticed that the length here should be inclusive, i.e. 0x100 not 0xff.
+> > > This is different from the way we define resources in Linux.
+> > 
+> > Grrr.  Now I'm getting frustrated.  I'm trying to boot without
+> > earlyprintk.  Evidently, something is wrong with the above, because the
+> > device boots all the way up (blinky lights come on), but I get no
+> > messages after the usual "Uncompressing Linux... done, booting the
+> > kernel."
+> 
+> Hi Jason
+> 
+> What do you see in /proc/iomem?
+> 
+> You should expect:
+> 
+> f1012000-f10120ff : serial8250.0
+>   f1012000-f101201f : serial
+> f1012100-f10121ff : serial8250.1
+>   f1012100-f101211f : serial
+> 
+> or probably just the first, if your device only has one serial port.
+> 
+> How about /proc/interrupts?
+> 
+>  33:        195  orion_irq  serial
+> 
+> 
+> Anything like this in dmesg?
+> 
+> [   17.189397] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
 
+> [   17.210023] serial8250.0: ttyS0 at MMIO 0xf1012000 (irq = 33) is a 16550A
+> [   17.624748] console [ttyS0] enabled
 
-On 2012?02?29? 23:38, Catalin Marinas wrote:
-> On Wed, Feb 29, 2012 at 11:28:30AM +0000, bill4carson wrote:
->> On 2012?02?29? 18:32, Catalin Marinas wrote:
->>> On Mon, Feb 13, 2012 at 09:44:22AM +0000, Bill Carson wrote:
->>>> +static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
->>>> +					   unsigned long addr, pte_t *ptep)
->>>> +{
->>>> +	pte_t old_pte = *ptep;
->>>> +	set_huge_pte_at(mm, addr, ptep, pte_wrprotect(old_pte));
->>>> +}
->>>
->>> You could use the generic ptep_set_wrprotect()
->>
->> I'm a bit of confused about this.
->>
->> generic ptep_set_wrprotect() can not set huge pte, that's why
->> set_huge_pte_at is used instead here.
->
-> Ah, the generic one can only work with with LPAE where set_huge_pte_at()
-> is just a set_pte_at(). So this part looks good.
->
-Hi, Catalin
+These two lines ^^^^ are what I'm missing.  Some probe by printk shows
+it's getting all the way through tty/serial/8250/8250.c:3263
+serial8250_init() okay... then nothing.
 
-Thanks for your time to review PATCH1/7 :)
-
-I'm wondering if reset of this patch set is ok,
-I would like to start working on V3 as per your comments.
-
-
-
--- 
-I am a slow learner
-but I will keep trying to fight for my dreams!
-
---bill
+> [   17.648555] serial8250.1: ttyS1 at MMIO 0xf1012100 (irq = 34) is a 16550A
+> 
+> Comparing your system to the above might help you track down which
+> property is wrong.
+> 
+> 	 Andrew
