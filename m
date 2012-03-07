@@ -1,44 +1,61 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 7 Mar 2012 07:09:52 +0100
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
-References: <20120305134721.0ab0d0e6de56fa30250059b1@nvidia.com><000001ccfaea$00c16f70$02444e50$%szyprowski@samsung.com><401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
-Message-ID: <20120307.080952.2152478004740487196.hdoyu@nvidia.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 7 Mar 2012 15:22:33 +0900
+Subject: [PATCH v10 3/3] iommu/exynos: Add iommu driver for Exynos
+ Platforms
+In-Reply-To: <CAAQKjZNJHeApuiyh467w8wGaY8VFb_PqLrvHGUxmE8-+a4yRTA@mail.gmail.com>
+References: <002201ccfb73$93311520$b9933f60$%cho@samsung.com>
+ <CAAQKjZNJHeApuiyh467w8wGaY8VFb_PqLrvHGUxmE8-+a4yRTA@mail.gmail.com>
+Message-ID: <CAHQjnOOQKS1EU-3zWDDq2sLxPucY9CRZyrnaT5cyyrSa9-k9Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krishna Reddy <vdumpa@nvidia.com>
-Subject: RE: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-Date: Tue, 6 Mar 2012 23:48:42 +0100
-Message-ID: <401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
+On Wed, Mar 7, 2012 at 2:28 PM, InKi Dae <daeinki@gmail.com> wrote:
+>> +static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+>> +{
+>> + ? ? ? /* SYSMMU is in blocked when interrupt occurred. */
+>> + ? ? ? struct sysmmu_drvdata *data = dev_id;
+>> + ? ? ? struct resource *irqres;
+>> + ? ? ? struct platform_device *pdev;
+>> + ? ? ? enum EXYNOS_SYSMMU_INTERRUPT_TYPE itype;
+>
+> how about to change EXYNOS_SYSMMU_INTERRUPT_TYPE to small letter? just
+> for code clean.
+>
+I will. please refer to the my reply to Kyungmin Park.
 
-> > > +struct dma_iommu_mapping *
-> > > +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
-> > > +                        int order)
-> > > +{
-> > > +       unsigned int count = (size >> PAGE_SHIFT) - order;
-> > > +       unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
-> 
-> The count calculation doesn't seem correct. "order" is log2 number and
->  size >> PAGE_SHIFT is number of pages. 
-> 
-> If size is passed as 64*4096(256KB) and order is 6(allocation granularity is 2^6 pages=256KB),
->  just 1 bit is enough to manage allocations.  So it should be 4 bytes or one long.
+>> + ? ? ? unsigned long addr = -1;
+>> +
+>> + ? ? ? int i, ret = -ENOSYS;
+>> +
+>> + ? ? ? read_lock(&data->lock);
+>> +
+>> + ? ? ? WARN_ON(!is_sysmmu_active(data));
+>> +
+>> + ? ? ? pdev = to_platform_device(data->sysmmu);
+>> + ? ? ? for (i = 0; i < pdev->num_resources; i++) {
+>> + ? ? ? ? ? ? ? irqres = platform_get_resource(pdev, IORESOURCE_IRQ, i);
+>> + ? ? ? ? ? ? ? if (irqres && ((int)irqres->start == irq))
+>> + ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? }
+>
+> is there any reason that it should get irq resources in interrupt
+> handler? if not so then how about to move it into probe()?
+>
+The platform device of ISP has a lot of IRQ sources.
+The above for clause determines which IRQ source (System MMU)
+generated the interrupt.
 
-Good catch!
+>> +
+>> + ? ? ? if (i == pdev->num_resources) {
+>> + ? ? ? ? ? ? ? itype = SYSMMU_FAULT_UNKNOWN;
+>> + ? ? ? } else {
+>> + ? ? ? ? ? ? ? i /= 2;
+>> +
+>> + ? ? ? ? ? ? ? itype = (enum EXYNOS_SYSMMU_INTERRUPT_TYPE)
+>
+> ditto.
+>
 
-> But the calculation gives count = 64 - 6 = 58 and 
-> Bitmap_size gets set to (58/(4*8)) * 4 = 8 bytes, which is incorrect.
+Thank you.
 
-"order" isn't the order of size passed, which is minimal *page*
-allocation order which client decides whatever, just in case.
-
-> It should be as follows.
-> unsigned int count = 1 << get_order(size) - order;
-> unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long) * BITS_PER_BYTE;
-> 
-> -KR
-> 
-> --nvpublic
-> 
-> 
+Cho KyongHo.
