@@ -1,46 +1,70 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 07 Mar 2012 15:38:52 +0400
-Subject: [PATCH 10/15] watchdog/mpcore_wdt: Add support for dev_pm_ops
- interface
-In-Reply-To: <b50542be97df8b90d3e7c696a8d13be707f581f9.1331115752.git.viresh.kumar@st.com>
-References: <cover.1331115751.git.viresh.kumar@st.com>
- <b50542be97df8b90d3e7c696a8d13be707f581f9.1331115752.git.viresh.kumar@st.com>
-Message-ID: <4F5748CC.9020601@ru.mvista.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Mar 2012 03:41:22 -0800
+Subject: [PATCH] ARM: S3C24XX: Fix Section mismatch
+In-Reply-To: <20120307112219.GR17370@n2100.arm.linux.org.uk>
+References: <1331116612-14491-1-git-send-email-kgene.kim@samsung.com>
+ <20120307112219.GR17370@n2100.arm.linux.org.uk>
+Message-ID: <4F574962.9020801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 07-03-2012 14:27, Viresh Kumar wrote:
-
-> This patch adds dev_pm_ops support for standby/slepp/hibernate.
-
-> Signed-off-by: Viresh Kumar<viresh.kumar@st.com>
-> ---
->   drivers/watchdog/mpcore_wdt.c |   18 +++++++++---------
->   1 files changed, 9 insertions(+), 9 deletions(-)
-
-> diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-> index e02c02b..a099418 100644
-> --- a/drivers/watchdog/mpcore_wdt.c
-> +++ b/drivers/watchdog/mpcore_wdt.c
-[...]
-> @@ -384,40 +385,39 @@ static int __devexit mpcore_wdt_remove(struct platform_device *pdev)
-[...]
->   /* work with hotplug and coldplug */
->   MODULE_ALIAS("platform:mpcore_wdt");
+On 03/07/12 03:22, Russell King - ARM Linux wrote:
+> On Wed, Mar 07, 2012 at 02:36:52AM -0800, Kukjin Kim wrote:
+>> WARNING: arch/arm/mach-s3c24xx/built-in.o(.data+0xf44): Section mismatch in reference
+>> from the variable s3c2416_irq_interface to the function .init.text:s3c2416_irq_add()
+>> The variable s3c2416_irq_interface references
+>> the function __init s3c2416_irq_add()
+>> If the reference is valid then annotate the
+>> variable with __init* or __refdata (see linux/init.h) or name the variable:
+>> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
+>>
+>> WARNING: arch/arm/mach-s3c24xx/built-in.o(.data+0x1b80): Section mismatch in reference
+>> from the variable s3c2443_irq_interface to the function .init.text:s3c2443_irq_add()
+>> The variable s3c2443_irq_interface references
+>> the function __init s3c2443_irq_add()
+>> If the reference is valid then annotate the
+>> variable with __init* or __refdata (see linux/init.h) or name the variable:
+>> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 >
->   static struct platform_driver mpcore_wdt_driver = {
->   	.probe		= mpcore_wdt_probe,
->   	.remove		= __devexit_p(mpcore_wdt_remove),
-> -	.suspend	= mpcore_wdt_suspend,
-> -	.resume		= mpcore_wdt_resume,
->   	.shutdown	= mpcore_wdt_shutdown,
->   	.driver		= {
->   		.owner	= THIS_MODULE,
->   		.name	= "mpcore_wdt",
-> +		.pm = &mpcore_wdt_dev_pm_ops,
+>> diff --git a/arch/arm/mach-s3c24xx/irq-s3c2416.c b/arch/arm/mach-s3c24xx/irq-s3c2416.c
+>> index b8a5836..59b7632 100644
+>> --- a/arch/arm/mach-s3c24xx/irq-s3c2416.c
+>> +++ b/arch/arm/mach-s3c24xx/irq-s3c2416.c
+>> @@ -310,7 +310,7 @@ static int __init s3c2416_irq_add(struct device *dev)
+>>   	return 0;
+>>   }
+>>
+>> -static struct subsys_interface s3c2416_irq_interface = {
+>> +static struct subsys_interface s3c2416_irq_interface __initdata = {
+>>   	.name		= "s3c2416_irq",
+>>   	.subsys		=&s3c2416_subsys,
+>>   	.add_dev	= s3c2416_irq_add,
+>> diff --git a/arch/arm/mach-s3c24xx/irq-s3c2443.c b/arch/arm/mach-s3c24xx/irq-s3c2443.c
+>> index 35e4ff2..439f186 100644
+>> --- a/arch/arm/mach-s3c24xx/irq-s3c2443.c
+>> +++ b/arch/arm/mach-s3c24xx/irq-s3c2443.c
+>> @@ -265,7 +265,7 @@ static int __init s3c2443_irq_add(struct device *dev)
+>>   	return 0;
+>>   }
+>>
+>> -static struct subsys_interface s3c2443_irq_interface = {
+>> +static struct subsys_interface s3c2443_irq_interface __initdata = {
+>>   	.name		= "s3c2443_irq",
+>>   	.subsys		=&s3c2443_subsys,
+>>   	.add_dev	= s3c2443_irq_add,
+>
+> You register these structures with some other bit of code.  That other
+> bit of code adds these structures to a list. You then mark them as
+> __initdata, which means they get freed and the memory reused.  That
+> corrupts the list beneath the other code.
+>
+> So, clearly, both of these are wrong.
 
-    Please align the right part of initializer like all above.
+Oops, I see. Let me check it again.
+Thanks for pointing out.
 
-WBR, Sergei
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
