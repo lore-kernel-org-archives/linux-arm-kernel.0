@@ -1,46 +1,61 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed,  7 Mar 2012 23:28:31 +0100
-Subject: [PATCH 0/3] introduce stmp-style devices
-Message-ID: <1331159314-12022-1-git-send-email-w.sang@pengutronix.de>
+Date: Wed,  7 Mar 2012 23:28:33 +0100
+Subject: [PATCH 2/3] i2c: mxs: use global reset function
+In-Reply-To: <1331159314-12022-1-git-send-email-w.sang@pengutronix.de>
+References: <1331159314-12022-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1331159314-12022-3-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series makes support for a certain type of devices mach independant. We
-want that because such devices (having a special register layout) have been
-found in mach-mxs and mach-mx6 meanwhile. Please refer to patch 1/3 for a more
-detailed description.
+The former mach specific reset_block function has been converted to a global
+one. Use the new one to remove mach dependency from the driver.
 
-Patch 1/3 adds the basic support and is of main interest to get upstream.
-Patches 2/3 and 3/3 are usage examples and will be send to the relevant
-subsystems once the basic support is accepted.
-
-Main changes since the RFC:
-
-* renamed the macros to STMP_OFFSET_*
-* rebased to 3.3-rc6
-
-Tested with a TX28 board.
-
-Thanks,
-
-   Wolfram
-
-Wolfram Sang (3):
-  drivers: base: add support for stmp-style devices
-  i2c: mxs: use global reset function
-  rtc: stmp3xxx: use global stmp_device functionality
-
- drivers/base/Kconfig         |    3 ++
- drivers/base/Makefile        |    1 +
- drivers/base/stmp_device.c   |   80 ++++++++++++++++++++++++++++++++++++++++++
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
  drivers/i2c/busses/Kconfig   |    1 +
- drivers/i2c/busses/i2c-mxs.c |    9 +----
- drivers/rtc/Kconfig          |    1 +
- drivers/rtc/rtc-stmp3xxx.c   |   29 +++++----------
- include/linux/stmp_device.h  |   19 ++++++++++
- 8 files changed, 117 insertions(+), 26 deletions(-)
- create mode 100644 drivers/base/stmp_device.c
- create mode 100644 include/linux/stmp_device.h
+ drivers/i2c/busses/i2c-mxs.c |    9 ++-------
+ 2 files changed, 3 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 3101dd5..d4378cf 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -467,6 +467,7 @@ config I2C_MV64XXX
+ config I2C_MXS
+ 	tristate "Freescale i.MX28 I2C interface"
+ 	depends on SOC_IMX28
++	select STMP_DEVICE
+ 	help
+ 	  Say Y here if you want to use the I2C bus controller on
+ 	  the Freescale i.MX28 processors.
+diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
+index 3d471d5..0834802 100644
+--- a/drivers/i2c/busses/i2c-mxs.c
++++ b/drivers/i2c/busses/i2c-mxs.c
+@@ -26,8 +26,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/jiffies.h>
+ #include <linux/io.h>
+-
+-#include <mach/common.h>
++#include <linux/stmp_device.h>
+ 
+ #define DRIVER_NAME "mxs-i2c"
+ 
+@@ -111,13 +110,9 @@ struct mxs_i2c_dev {
+ 	struct i2c_adapter adapter;
+ };
+ 
+-/*
+- * TODO: check if calls to here are really needed. If not, we could get rid of
+- * mxs_reset_block and the mach-dependency. Needs an I2C analyzer, probably.
+- */
+ static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
+ {
+-	mxs_reset_block(i2c->regs);
++	stmp_reset_block(i2c->regs);
+ 	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
+ 	writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
+ 			i2c->regs + MXS_I2C_QUEUECTRL_SET);
 -- 
 1.7.9.1
