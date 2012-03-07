@@ -1,25 +1,57 @@
-From: xiyou.wangcong@gmail.com (Cong Wang)
-Date: Wed, 07 Mar 2012 13:22:48 +0800
-Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper
- to test CMA
-In-Reply-To: <CAGsJ_4x9hGDh+PgrvtXqp-bdbPHABz1ErHGdvFQAr0m9RYM8Vw@mail.gmail.com>
-References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
- <4F56E0AC.8070501@gmail.com>
- <CAGsJ_4x4CwD+WAE9d+Xob_tfwqmE6SdBdBd5EbC64XBi4Uzvgg@mail.gmail.com>
- <4F56EA49.8070808@gmail.com>
- <CAGsJ_4xJoKGt3+b_3bteoMyeO615pCxFpMpsH4LtvufFNDv6bA@mail.gmail.com>
- <4F56EBA6.6000704@gmail.com>
- <CAGsJ_4ypegMQVf0Xet1T5sLaaEDGh5s1Vi6w4t_UQSZp7nYQuQ@mail.gmail.com>
- <4F56ED9D.3000504@gmail.com>
- <CAGsJ_4x9hGDh+PgrvtXqp-bdbPHABz1ErHGdvFQAr0m9RYM8Vw@mail.gmail.com>
-Message-ID: <4F56F0A8.1000600@gmail.com>
+From: daeinki@gmail.com (InKi Dae)
+Date: Wed, 7 Mar 2012 14:28:13 +0900
+Subject: [PATCH v10 3/3] iommu/exynos: Add iommu driver for Exynos
+ Platforms
+In-Reply-To: <002201ccfb73$93311520$b9933f60$%cho@samsung.com>
+References: <002201ccfb73$93311520$b9933f60$%cho@samsung.com>
+Message-ID: <CAAQKjZNJHeApuiyh467w8wGaY8VFb_PqLrvHGUxmE8-+a4yRTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2012 01:17 PM, Barry Song wrote:
-> that is definitely trivial as we are talking about things in a test
-> module. and we are not talking about any bug in the test module as
-> well.
+> +static irqreturn_t exynos_sysmmu_irq(int irq, void *dev_id)
+> +{
+> + ? ? ? /* SYSMMU is in blocked when interrupt occurred. */
+> + ? ? ? struct sysmmu_drvdata *data = dev_id;
+> + ? ? ? struct resource *irqres;
+> + ? ? ? struct platform_device *pdev;
+> + ? ? ? enum EXYNOS_SYSMMU_INTERRUPT_TYPE itype;
 
-I am quite sure *any* patches have bugs will not be merged, IOW, you 
-seem don't want your patch merged. :) Fine. That is all.
+how about to change EXYNOS_SYSMMU_INTERRUPT_TYPE to small letter? just
+for code clean.
+
+> + ? ? ? unsigned long addr = -1;
+> +
+> + ? ? ? int i, ret = -ENOSYS;
+> +
+> + ? ? ? read_lock(&data->lock);
+> +
+> + ? ? ? WARN_ON(!is_sysmmu_active(data));
+> +
+> + ? ? ? pdev = to_platform_device(data->sysmmu);
+> + ? ? ? for (i = 0; i < pdev->num_resources; i++) {
+> + ? ? ? ? ? ? ? irqres = platform_get_resource(pdev, IORESOURCE_IRQ, i);
+> + ? ? ? ? ? ? ? if (irqres && ((int)irqres->start == irq))
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? }
+
+is there any reason that it should get irq resources in interrupt
+handler? if not so then how about to move it into probe()?
+
+> +
+> + ? ? ? if (i == pdev->num_resources) {
+> + ? ? ? ? ? ? ? itype = SYSMMU_FAULT_UNKNOWN;
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? i /= 2;
+> +
+> + ? ? ? ? ? ? ? itype = (enum EXYNOS_SYSMMU_INTERRUPT_TYPE)
+
+ditto.
+
+> + ? ? ? ? ? ? ? ? ? ? ? __ffs(__raw_readl(data->sfrbases[i] + REG_INT_STATUS));
+> + ? ? ? ? ? ? ? if (WARN_ON(!((itype >= 0) && (itype < SYSMMU_FAULT_UNKNOWN))))
+> + ? ? ? ? ? ? ? ? ? ? ? itype = SYSMMU_FAULT_UNKNOWN;
+> + ? ? ? ? ? ? ? else
+> + ? ? ? ? ? ? ? ? ? ? ? addr = __raw_readl(
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? data->sfrbases[i] + fault_reg_offset[itype]);
+> + ? ? ? }
+> +
