@@ -1,70 +1,106 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Tue, 6 Mar 2012 18:39:34 -0600
-Subject: [PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only
-In-Reply-To: <20120306213859.GA12083@atomide.com>
-References: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
- <20120306213859.GA12083@atomide.com>
-Message-ID: <CAOCHtYiERN2VySbBb7BoJAa97P4z6=a094vUMmgej3JP5Cy25g@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 6 Mar 2012 18:38:11 -0600
+Subject: [PATCH 2/9] dmaengine: move last completed cookie into generic
+ dma_chan structure
+In-Reply-To: <E1S52xK-0002Mj-Af@rmk-PC.arm.linux.org.uk>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+ <E1S52xK-0002Mj-Af@rmk-PC.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F41FF559A5@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2012 at 3:38 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Govindraj.R <govindraj.raja@ti.com> [120306 00:34]:
->> From: "Govindraj.R" <govindraj.raja@ti.com>
->>
->> All beagle boards rev > AX/BX have external usb hubs connected to ehci
->> interface, external hub/peripheral uses a nreset sequence for which
->> uart2_rx.gpio_147 pin in mux mode4(USB2HS_nRST) is used on all beagle
->> boards expect rev Ax/BX.
->> (Reference to all beagle boards rev schematics:
->> http://beagleboard.org/hardware/design)
->>
->> Initialising uart2 will lead to serial init taking over uart2_rx pin
->> so init uart2_rx pin mux only for Beagle AX/BX rev boards.
->> Dont init uart2 for all other boards allowing usb_ehci functionality.
->>
->> To initialise individual uart port by id utilise and modify the existing
->> available func. omap_serial_board_init.
->>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> Cc: Koen Kooi <koen@dominion.thruhere.net>
->> Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Tested-by: Robert Nelson <robertcnelson@gmail.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+On Tuesday, March 06, 2012 3:34 PM, Russell King wrote:
 >
-> Can somebody please test this on non-xm beagle too and
-> reply with a Tested-by?
+> Every DMA engine implementation declares a last completed dma cookie
+> in their private dma channel structures.  This is pointless, and
+> forces driver specific code.  Move this out into the common dma_chan
+> structure.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
 
-Here's an update for my: Tested-by: Robert Nelson <robertcnelson@gmail.com>
+<snip>
 
-Just tested with one of my Beagle C4's, (and re-verified the new patch
-on a xM B) using usb flash drives on the ehci port...
+ drivers/dma/ep93xx_dma.c                 |    8 +++-----
 
-beagle c4:
-v3.2.9
-Bus 001 Device 002: ID 0457:0151 Silicon Integrated Systems Corp.
-Super Flash 1GB / GXT  64MB Flash Drive
+<snip>
 
-v3.3-rc6:
-ehci broken
+ include/linux/dmaengine.h                |    2 ++
 
-v3.3-rc6 + this patch:
-Bus 001 Device 002: ID 0457:0151 Silicon Integrated Systems Corp.
-Super Flash 1GB / GXT  64MB Flash Driv
+<snip>
 
-beagle xM B:
-v3.2.9
-Bus 001 Device 004: ID 1977:0824 T-Logic
+> diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
+> index 59e7a96..bc45787 100644
+> --- a/drivers/dma/ep93xx_dma.c
+> +++ b/drivers/dma/ep93xx_dma.c
+> @@ -122,7 +122,6 @@ struct ep93xx_dma_desc {
+>   * @lock: lock protecting the fields following
+>   * @flags: flags for the channel
+>   * @buffer: which buffer to use next (0/1)
+> - * @last_completed: last completed cookie value
+>   * @active: flattened chain of descriptors currently being processed
+>   * @queue: pending descriptors which are handled next
+>   * @free_list: list of free descriptors which can be used
+> @@ -157,7 +156,6 @@ struct ep93xx_dma_chan {
+>  #define EP93XX_DMA_IS_CYCLIC		0
+>  
+>  	int				buffer;
+> -	dma_cookie_t			last_completed;
+>  	struct list_head		active;
+>  	struct list_head		queue;
+>  	struct list_head		free_list;
+> @@ -703,7 +701,7 @@ static void ep93xx_dma_tasklet(unsigned long data)
+>  	desc = ep93xx_dma_get_active(edmac);
+>  	if (desc) {
+>  		if (desc->complete) {
+> -			edmac->last_completed = desc->txd.cookie;
+> +			edmac->chan.completed_cookie = desc->txd.cookie;
+>  			list_splice_init(&edmac->active, &list);
+>  		}
+>  		callback = desc->txd.callback;
+> @@ -861,7 +859,7 @@ static int ep93xx_dma_alloc_chan_resources(struct dma_chan *chan)
+>  		goto fail_clk_disable;
+>  
+>  	spin_lock_irq(&edmac->lock);
+> -	edmac->last_completed = 1;
+> +	edmac->chan.completed_cookie = 1;
+>  	edmac->chan.cookie = 1;
+>  	ret = edmac->edma->hw_setup(edmac);
+>  	spin_unlock_irq(&edmac->lock);
+> @@ -1254,7 +1252,7 @@ static enum dma_status ep93xx_dma_tx_status(struct dma_chan *chan,
+>  
+>  	spin_lock_irqsave(&edmac->lock, flags);
+>  	last_used = chan->cookie;
+> -	last_completed = edmac->last_completed;
+> +	last_completed = chan->completed_cookie;
+>  	spin_unlock_irqrestore(&edmac->lock, flags);
+>  
+>  	ret = dma_async_is_complete(cookie, last_completed, last_used);
 
-v3.3-rc6:
-ehci broken
+<snip>
 
-v3.3-rc6 + this patch:
-Bus 001 Device 004: ID 1977:0824 T-Logic
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 679b349..41d0f92 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -257,6 +257,7 @@ struct dma_chan_percpu {
+>   * struct dma_chan - devices supply DMA channels, clients use them
+>   * @device: ptr to the dma device who supplies this channel, always !%NULL
+>   * @cookie: last cookie value returned to client
+> + * @completed_cookie: last completed cookie for this channel
+>   * @chan_id: channel ID for sysfs
+>   * @dev: class device for sysfs
+>   * @device_node: used to add this to the device chan list
+> @@ -268,6 +269,7 @@ struct dma_chan_percpu {
+>  struct dma_chan {
+>  	struct dma_device *device;
+>  	dma_cookie_t cookie;
+> +	dma_cookie_t completed_cookie;
+>  
+>  	/* sysfs */
+>  	int chan_id;
 
-Regards,
+For ep93xx:
 
--- 
-Robert Nelson
-http://www.rcn-ee.com/
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
