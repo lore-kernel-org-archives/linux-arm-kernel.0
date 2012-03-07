@@ -1,34 +1,25 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Wed, 7 Mar 2012 10:00:17 +0100
-Subject: [PATCH 1/3] Kbuild: centralize MKIMAGE and cmd_uimage definitions
-In-Reply-To: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20120307090017.GB17076@samfundet.no>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Mar 2012 09:06:40 +0000
+Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
+In-Reply-To: <CACRpkdYry6G4gi7LdVM4gYOQBKZCoQxdzLAGg1WcjB6rVD-PPQ@mail.gmail.com>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+ <CACRpkdYry6G4gi7LdVM4gYOQBKZCoQxdzLAGg1WcjB6rVD-PPQ@mail.gmail.com>
+Message-ID: <20120307090640.GK17370@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Tue 06 Mar 2012 17:30:36 -0700 or thereabout, Stephen Warren wrote:
-> All ARCHs have the same definition of MKIMAGE. Move it to Makefile.lib
-> to avoid duplication.
+On Wed, Mar 07, 2012 at 09:33:49AM +0100, Linus Walleij wrote:
+> On Tue, Mar 6, 2012 at 11:33 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
 > 
-> All ARCHs have similar definitions of cmd_uimage. Place a sufficiently
-> parameterized version in Makefile.lib to avoid duplication.
+> > This patch series cleans up the handling of cookies in DMA engine drivers.
+> > This is done by providing a set of inline library functions for common
+> > tasks:
 > 
-> The centralized cmd_uimage definition will allow the future introduction
-> of a centralized Kconfig option to make cmd_uimage use -T kernel_noload
-> rather than -T kernel.
-> 
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-> NOTE: I have not tested this patch in any way at all for architectures
-> other than ARM.
-> 
->  arch/arm/boot/Makefile          |   23 +++++++++--------------
->  arch/avr32/boot/images/Makefile |    9 +++------
+> I just applied the latest patches right off and tested with some stressy
+> MMC operations on the U300 and Ux500. (I had some minor hell
+> since patch 8/9 and 9/9 were uuencoded but managed to fix it...)
 
-For the AVR32 related changes
-
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-
--- 
-Best regards, Hans-Christian Egtvedt
+That'll be some MTA deciding to change the encoding, probably because some
+MTA spotted UTF-8 characters in the description and decided to convert to
+base64.
