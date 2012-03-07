@@ -1,44 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 6 Mar 2012 22:57:22 -0700 (MST)
-Subject: [RFC PATCH] OMAP: UART: Enable tx wakeup bit in wer
-In-Reply-To: <CAMrsUdJqmJ75=X_Qg3vQCr7zezs0jOK8L1ri8p5K=+6ZKsRFcg@mail.gmail.com>
-References: <1327412249-31575-1-git-send-email-govindraj.raja@ti.com>
- <alpine.DEB.2.00.1201251217120.5324@utopia.booyaka.com>
- <alpine.DEB.2.00.1203051321580.1430@utopia.booyaka.com>
- <CAMrsUdJqmJ75=X_Qg3vQCr7zezs0jOK8L1ri8p5K=+6ZKsRFcg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1203062251270.23214@utopia.booyaka.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Wed, 7 Mar 2012 07:09:52 +0100
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
+References: <20120305134721.0ab0d0e6de56fa30250059b1@nvidia.com><000001ccfaea$00c16f70$02444e50$%szyprowski@samsung.com><401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
+Message-ID: <20120307.080952.2152478004740487196.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+From: Krishna Reddy <vdumpa@nvidia.com>
+Subject: RE: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+Date: Tue, 6 Mar 2012 23:48:42 +0100
+Message-ID: <401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
 
-On Tue, 6 Mar 2012, Raja, Govindraj wrote:
-
-> I see two ways of adding this tx wake-up flag.
+> > > +struct dma_iommu_mapping *
+> > > +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+> > > +                        int order)
+> > > +{
+> > > +       unsigned int count = (size >> PAGE_SHIFT) - order;
+> > > +       unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
 > 
-> 1.) passing a feature flag from pdata and populating the feature value to wer.
+> The count calculation doesn't seem correct. "order" is log2 number and
+>  size >> PAGE_SHIFT is number of pages. 
 > 
-> 2.) Duplicating the uart1/2/3 hwmod for omap3430 without dev attrib
-> and uart1/2/3/4
->      hwmod for omap3630 with dev attribs.
+> If size is passed as 64*4096(256KB) and order is 6(allocation granularity is 2^6 pages=256KB),
+>  just 1 bit is enough to manage allocations.  So it should be 4 bytes or one long.
+
+Good catch!
+
+> But the calculation gives count = 64 - 6 = 58 and 
+> Bitmap_size gets set to (58/(4*8)) * 4 = 8 bytes, which is incorrect.
+
+"order" isn't the order of size passed, which is minimal *page*
+allocation order which client decides whatever, just in case.
+
+> It should be as follows.
+> unsigned int count = 1 << get_order(size) - order;
+> unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long) * BITS_PER_BYTE;
 > 
-> Approach-2 adds unnecessary code duplication in hwmod file with and without
-> dev_attribs, So right now here is the patch to follow approach [1],
+> -KR
 > 
-> If its strongly recommended to use approach-2 will add it.
-> (My concern is the diffstat it might produce with approach-2)
-
-Both 1 and 2 are needed.
-
-The current way that errata are handled in arch/arm/mach-omap2/serial.c 
-needs to be changed.  Those should be flags that are passed from hwmod 
-dev_attr data.  The presence of the TX wakeup bit should simply be another 
-dev_attr flag.  These flags should be passed to the driver via the 
-omap_up.errata field for the time being.
-
-The exception to this is if the IP block's revision register was changed 
-when TX wakeups became possible.  If that's the case, then that mechanism 
-can be used in lieu of dev_attr and platform_data in this situation.
-
-
-- Paul
+> --nvpublic
+> 
+> 
