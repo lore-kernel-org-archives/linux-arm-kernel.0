@@ -1,56 +1,105 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 07 Mar 2012 19:24:26 +0530
-Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
-In-Reply-To: <20120306223321.GD15201@n2100.arm.linux.org.uk>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
-Message-ID: <1331128466.24656.421.camel@vkoul-udesk3>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 07 Mar 2012 15:01:41 +0100
+Subject: [PATCH] ARM: SAMSUNG: change the name from s3c-sdhci to
+ exynos4-sdhci
+In-Reply-To: <4F576073.6010001@samsung.com>
+References: <4F45D343.6020409@samsung.com>
+ <CAJuYYwTh8tVdA0X-TLEU-9O_M0_PmJR=i3WYAQXsaRcPF3MbJA@mail.gmail.com>
+ <4F557692.8090102@samsung.com> <4F55DE1F.9010405@samsung.com>
+ <4F576073.6010001@samsung.com>
+Message-ID: <00db01ccfc6a$d34c2ee0$79e48ca0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-03-06 at 22:33 +0000, Russell King - ARM Linux wrote:
-> [v2 - more or less same description.  Including lakml in cc for the full
-> set]
-> 
-> This patch series cleans up the handling of cookies in DMA engine drivers.
-> This is done by providing a set of inline library functions for common
-> tasks:
-> 
-> - moving the 'last completed cookie' into struct dma_chan - everyone
->   has this in their driver private channel data structure
-> 
-> - consolidate allocation of cookies to DMA descriptors
-> 
-> - common way to update 'last completed cookie' value
-> 
-> - standard way to implement tx_status callback and update the residue
-> 
-> - consolidate initialization of cookies
-> 
-> - update implementations differing from the majority of DMA engine drivers
->   to behave the same as the majority implementation in respect of cookies
-> 
-> What this means is that we get to the point where all DMA engine drivers
-> will hand out cookie value '2' as the first, and incrementing cookie
-> values up to INT_MAX, returning to cookie '1' as the next cookie.
-> 
-> Think of this patch series as round 1...  I am hoping over time that more
-> code can be consolidated between the DMA engine drivers and end up with a
-> consistent way to handle various common themes in DMA engine hardware
-> (like physical channel<->peripheral request signal selection.)
-Thanks Russell,
+Hello,
 
-I have tested this on atom today, and as expected works flawlessly :)
-After all acks, I can merge or these can go thru your tree with my Ack.
-Either way is okay.
+On Wednesday, March 07, 2012 2:20 PM Kukjin Kim wrote:
 
-I applied the v2 on a branch and also rebased on top of slave-dma.next.
-There were few conflicts in imx-dma.c. Sacha, Javier, pls see that merge
-is right.
+> On 03/06/12 01:51, Kukjin Kim wrote:
+> > On 03/05/12 18:29, Jaehoon Chung wrote:
+> >> Hi Kukjin.
+> >>
+> >> Is it merged?
+> >>
+> >> Best Regards,
+> >> Jaehoon Chung
+> >>
+> >> On 02/24/2012 06:56 PM, Thomas Abraham wrote:
+> >>
+> >>> On 23 February 2012 11:18, Jaehoon Chung<jh80.chung@samsung.com> wrote:
+> >>>> Thomas Arbrahams's patchset have changed the device name in sdhci-s3c.c
+> >>>> (mmc: sdhci-s3c: Rework platform data and add device tree support)
+> >>>> But didn't change the regulator_consumer name.
+> >>>> So maybe didn't initialize the mmc/sd card for exynos4.
+> >>>>
+> >>>> This patch is fixed that (based-on linux-samsung for-next branch)
+> >>>>
+> >>>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
+> >>>> Signed-off-by: kyungmin Park<kyungmin.park@samsung.com>
+> >>>> ---
+> >>>> arch/arm/mach-exynos/mach-nuri.c | 4 ++--
+> >>>> arch/arm/mach-exynos/mach-universal_c210.c | 2 +-
+> >>>> 2 files changed, 3 insertions(+), 3 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm/mach-exynos/mach-nuri.c
+> >>>> b/arch/arm/mach-exynos/mach-nuri.c
+> >>>> index a6b9162..251dd7a 100644
+> >>>> --- a/arch/arm/mach-exynos/mach-nuri.c
+> >>>> +++ b/arch/arm/mach-exynos/mach-nuri.c
+> >>>> @@ -116,7 +116,7 @@ static struct s3c_sdhci_platdata
+> >>>> nuri_hsmmc0_data __initdata = {
+> >>>> };
+> >>>>
+> >>>> static struct regulator_consumer_supply emmc_supplies[] = {
+> >>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+> >>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
+> >>>> REGULATOR_SUPPLY("vmmc", "dw_mmc"),
+> >>>> };
+> >>>>
+> >>>> @@ -415,7 +415,7 @@ static struct regulator_consumer_supply
+> >>>> __initdata max8997_ldo12_[] = {
+> >>>> REGULATOR_SUPPLY("vddio", "6-003c"), /* HDC802 */
+> >>>> };
+> >>>> static struct regulator_consumer_supply __initdata max8997_ldo13_[] = {
+> >>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"), /* TFLASH */
+> >>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.2"), /* TFLASH */
+> >>>> };
+> >>>> static struct regulator_consumer_supply __initdata max8997_ldo14_[] = {
+> >>>> REGULATOR_SUPPLY("inmotor", "max8997-haptic"),
+> >>>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
+> >>>> b/arch/arm/mach-exynos/mach-universal_c210.c
+> >>>> index 6017a21..320cb1d 100644
+> >>>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
+> >>>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
+> >>>> @@ -749,7 +749,7 @@ static struct s3c_sdhci_platdata
+> >>>> universal_hsmmc0_data __initdata = {
+> >>>> };
+> >>>>
+> >>>> static struct regulator_consumer_supply mmc0_supplies[] = {
+> >>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+> >>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
+> >>>> };
+> >>>>
+> >>>> static struct regulator_init_data mmc0_fixed_voltage_init_data = {
+> >>>
+> >>> Reviewed-by: Thomas Abraham<thomas.abraham@linaro.org>
+> >
+> > Looks OK, will apply.
+> >
+> 
+> (Cc'ed Marek)
+> 
+> Hi Kyungmin, Marek and Jaehoon,
+> 
+> As you know, same patches have been submitted duplicated and this should
+> be fixed. Which one would be better to send upstream?
 
-This branch (rmk_cookie_fixes2_rebased) is not yet pushed, as I am not
-able to connect to infradead.org, should be done when server is back.
+For me it doesn't matter, I just need this fix to get merged, because otherwise
+the Universal C210 and Nuri boards are dysfunctional. 
 
+You can select the one prepared by Jaehoon if You like.
 
-
+Best regards
 -- 
-~Vinod
+Marek Szyprowski
+Samsung Poland R&D Center
