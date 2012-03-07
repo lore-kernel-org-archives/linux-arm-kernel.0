@@ -1,223 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 7 Mar 2012 22:20:25 +0100
-Subject: [PATCH v5 4/4] clk: basic clock hardware types
-In-Reply-To: <1330763341-3437-5-git-send-email-mturquette@linaro.org>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-5-git-send-email-mturquette@linaro.org>
-Message-ID: <20120307212025.GC26882@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Mar 2012 13:32:09 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix build issues with missing include of
+ linux/bug.h
+Message-ID: <20120307213209.GI12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 03, 2012 at 12:29:01AM -0800, Mike Turquette wrote:
-> +struct clk *clk_register_divider(struct device *dev, const char *name,
-> +		const char *parent_name, unsigned long flags,
-> +		void __iomem *reg, u8 shift, u8 width,
-> +		u8 clk_divider_flags, spinlock_t *lock)
-> +{
-> +	struct clk_divider *div;
-> +	char **parent_names = NULL;
-> +	u8 len;
-> +
-> +	div = kmalloc(sizeof(struct clk_divider), GFP_KERNEL);
-> +
-> +	if (!div) {
-> +		pr_err("%s: could not allocate divider clk\n", __func__);
-> +		return ERR_PTR(-ENOMEM);
-> +	}
-> +
-> +	/* struct clk_divider assignments */
-> +	div->reg = reg;
-> +	div->shift = shift;
-> +	div->width = width;
-> +	div->flags = clk_divider_flags;
-> +	div->lock = lock;
-> +
-> +	if (parent_name) {
-> +		parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
-> +
-> +		if (! parent_names)
-> +			goto out;
-> +
-> +		len = sizeof(char) * strlen(parent_name);
-> +
-> +		parent_names[0] = kmalloc(len, GFP_KERNEL);
-> +
-> +		if (!parent_names[0])
-> +			goto out;
-> +
-> +		strncpy(parent_names[0], parent_name, len);
-> +	}
-> +
-> +out:
-> +	return clk_register(dev, name,
-> +			&clk_divider_ops, &div->hw,
-> +			parent_names,
-> +			(parent_name ? 1 : 0),
-> +			flags);
-> +}
+Otherwise we can get the following for some .config files:
 
-clk_register_divider and also clk_register_gate have some problems.
-First you allocate memory with exactly the string length without
-the terminating 0. Then the functions leak memory when clk_register
-fails. Could you fold in the following patch to fix this?
+arch/arm/mach-omap2/powerdomain-common.c:
+In function 'omap2_pwrdm_get_mem_bank_onstate_mask':
+arch/arm/mach-omap2/powerdomain-common.c:64:3: error:
+implicit declaration of function 'WARN_ON' [-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
 
-Sascha
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-8<--------------------------------------------------
-
-fix divider/gate registration
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/clk/clk-divider.c    |   34 +++++++++++++++-------------------
- drivers/clk/clk-gate.c       |   33 ++++++++++++++-------------------
- include/linux/clk-provider.h |    2 ++
- 3 files changed, 31 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 8f02930..99b6b55 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -156,14 +156,13 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
- 		u8 clk_divider_flags, spinlock_t *lock)
- {
- 	struct clk_divider *div;
--	char **parent_names = NULL;
--	u8 len;
-+	struct clk *clk;
- 
--	div = kmalloc(sizeof(struct clk_divider), GFP_KERNEL);
-+	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
- 
- 	if (!div) {
- 		pr_err("%s: could not allocate divider clk\n", __func__);
--		return ERR_PTR(-ENOMEM);
-+		return NULL;
- 	}
- 
- 	/* struct clk_divider assignments */
-@@ -174,25 +173,22 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
- 	div->lock = lock;
- 
- 	if (parent_name) {
--		parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
--
--		if (! parent_names)
--			goto out;
--
--		len = sizeof(char) * strlen(parent_name);
--
--		parent_names[0] = kmalloc(len, GFP_KERNEL);
--
--		if (!parent_names[0])
-+		div->parent[0] = kstrdup(parent_name, GFP_KERNEL);
-+		if (!div->parent[0])
- 			goto out;
--
--		strncpy(parent_names[0], parent_name, len);
- 	}
- 
--out:
--	return clk_register(dev, name,
-+	clk = clk_register(dev, name,
- 			&clk_divider_ops, &div->hw,
--			parent_names,
-+			div->parent,
- 			(parent_name ? 1 : 0),
- 			flags);
-+	if (clk)
-+		return clk;
-+
-+out:
-+	kfree(div->parent[0]);
-+	kfree(div);
-+
-+	return NULL;
- }
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index e831f7b..92c0489 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -80,14 +80,13 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 		u8 clk_gate_flags, spinlock_t *lock)
- {
- 	struct clk_gate *gate;
--	char **parent_names = NULL;
--	u8 len;
-+	struct clk *clk;
- 
--	gate = kmalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
- 
- 	if (!gate) {
- 		pr_err("%s: could not allocate gated clk\n", __func__);
--		return ERR_PTR(-ENOMEM);
-+		return NULL;
- 	}
- 
- 	/* struct clk_gate assignments */
-@@ -97,25 +96,21 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
- 	gate->lock = lock;
- 
- 	if (parent_name) {
--		parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
--
--		if (! parent_names)
--			goto out;
--
--		len = sizeof(char) * strlen(parent_name);
--
--		parent_names[0] = kmalloc(len, GFP_KERNEL);
--
--		if (!parent_names[0])
-+		gate->parent[0] = kstrdup(parent_name, GFP_KERNEL);
-+		if (!gate->parent[0])
- 			goto out;
--
--		strncpy(parent_names[0], parent_name, len);
- 	}
- 
--out:
--	return clk_register(dev, name,
-+	clk = clk_register(dev, name,
- 			&clk_gate_ops, &gate->hw,
--			parent_names,
-+			gate->parent,
- 			(parent_name ? 1 : 0),
- 			flags);
-+	if (clk)
-+		return clk;
-+out:
-+	kfree(gate->parent[0]);
-+	kfree(gate);
-+
-+	return NULL;
- }
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 9b7dd5e..ed1f918 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -174,6 +174,7 @@ struct clk_gate {
- 	u8		bit_idx;
- 	u8		flags;
- 	spinlock_t	*lock;
-+	char		*parent[1];
- };
- 
- #define CLK_GATE_SET_TO_DISABLE		BIT(0)
-@@ -210,6 +211,7 @@ struct clk_divider {
- 	u8		width;
- 	u8		flags;
- 	spinlock_t	*lock;
-+	char		*parent[1];
- };
- 
- #define CLK_DIVIDER_ONE_BASED		BIT(0)
--- 
-1.7.9.1
+Looks like this is needed for some .config files with
+current for-next
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--- a/arch/arm/mach-omap2/clkt_clksel.c
++++ b/arch/arm/mach-omap2/clkt_clksel.c
+@@ -43,6 +43,7 @@
+ #include <linux/errno.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
++#include <linux/bug.h>
+ 
+ #include <plat/clock.h>
+ 
+--- a/arch/arm/mach-omap2/powerdomain-common.c
++++ b/arch/arm/mach-omap2/powerdomain-common.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
++#include <linux/bug.h>
+ #include "pm.h"
+ #include "cm.h"
+ #include "cm-regbits-34xx.h"
+--- a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/errno.h>
+ #include <linux/delay.h>
++#include <linux/bug.h>
+ 
+ #include <plat/prcm.h>
+ 
+--- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/bug.h>
+ 
+ #include <plat/cpu.h>
+ 
