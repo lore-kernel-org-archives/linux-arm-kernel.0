@@ -1,56 +1,38 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 Mar 2012 15:42:55 -0700
-Subject: [PATCH 4/4] ARM: u300: configure some pins as an example
-In-Reply-To: <1331071547-25109-1-git-send-email-linus.walleij@stericsson.com>
-References: <1331071547-25109-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4F57E46F.6050505@wwwdotorg.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 07 Mar 2012 17:43:43 -0500 (EST)
+Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
+In-Reply-To: <20120307213009.GF18787@n2100.arm.linux.org.uk>
+References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
+ <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
+ <20120307180815.GA27213@game.jcrosoft.org> <4F57AB92.6060907@wwwdotorg.org>
+ <20120307183633.GB27213@game.jcrosoft.org> <4F57C4C6.2070602@wwwdotorg.org>
+ <alpine.LFD.2.02.1203071537130.24151@xanadu.home>
+ <20120307213009.GF18787@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1203071644180.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2012 03:05 PM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Wed, 7 Mar 2012, Russell King - ARM Linux wrote:
+
+> On Wed, Mar 07, 2012 at 04:03:04PM -0500, Nicolas Pitre wrote:
+> > Well, I do have a patch series getting rid of ZRELADDR entirely, and 
+> > AUTO_ZRELADDR would then become implicit, unless CONFIG_PHYS_OFFSET is 
+> > defined.
 > 
-> To show how the pin configuration is used on the U300, let's
-> include some configs for two GPIO pins.
+> Not possible, unless you're goign to also rip out uImage support.
 
-> -/* Pinmux settings */
-> +static unsigned long g0d_conf[] = {
-> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
-> +};
-> +
-> +static unsigned long g1d_conf[] = {
-> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
-> +};
-> +
-> +static unsigned long g0i_conf[] = {
-> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
-> +};
-> +
-> +static unsigned long g1i_conf[] = {
-> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
-> +};
+I wish I could.  At least this new "noload" option would make uImage 
+compatible with this.  That won't help existing u-Boot installations 
+though, which is why I didn't post that patch series yet as I still 
+haven't found a good fallback.
 
-Those are all the same, so you could just point all the mapping tables
-at the same config param array.
+> Otherwise, how do we deal with platforms like Versatile Express where
+> uboot does a funky relocation of data depending on whether the uImage
+> it's loading is for the low 256MB RAM mapping or the high 1GB RAM
+> mapping.
 
-> +
-> +/* Pin control settings */
->  static struct pinctrl_map __initdata u300_pinmux_map[] = {
->  	/* anonymous maps for chip power and EMIFs */
->  	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-u300", NULL, "power"),
-> @@ -1615,6 +1632,11 @@ static struct pinctrl_map __initdata u300_pinmux_map[] = {
->  	PIN_MAP_MUX_GROUP_DEFAULT("mmci",  "pinctrl-u300", NULL, "mmc0"),
->  	PIN_MAP_MUX_GROUP_DEFAULT("pl022", "pinctrl-u300", NULL, "spi0"),
->  	PIN_MAP_MUX_GROUP_DEFAULT("uart0", "pinctrl-u300", NULL, "uart0"),
-> +	/* some pin configurations */
-> +	PIN_MAP_CONFIGS_PIN_DEFAULT("mmci", "pinctrl-u300", "GPIO0", g0d_conf),
-> +	PIN_MAP_CONFIGS_PIN_DEFAULT("mmci", "pinctrl-u300", "GPIO1", g1d_conf),
-> +	PIN_MAP_CONFIGS_PIN("mmci", "idle", "pinctrl-u300", "GPIO0", g0i_conf),
-> +	PIN_MAP_CONFIGS_PIN("mmci", "idle", "pinctrl-u300", "GPIO1", g1i_conf),
->  };
+Doesn't it use AUTO_ZRELADDR?  With the newer u-Boot, you'd just load 
+uImage to whatever address and u-Boot won't mess with it.
 
-I'd assume though that the default and idle state should have different
-pin configurations?
 
-(and if this was stacked on top of your other patch, you could use
-PINCTRL_STATE_IDLE instead of "idle" for the last two entries)
+Nicolas
