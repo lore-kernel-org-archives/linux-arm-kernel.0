@@ -1,53 +1,119 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed,  7 Mar 2012 17:45:58 +0100
-Subject: [PATCH 1/1] of: add coherent dma-mask binding
-In-Reply-To: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1331138758-19480-1-git-send-email-plagnioj@jcrosoft.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 07 Mar 2012 17:58:07 +0100
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <20120307.091601.458605132780655792.hdoyu@nvidia.com>
+References: <401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
+ <20120307.080952.2152478004740487196.hdoyu@nvidia.com>
+ <20120307.083706.2087121294965856946.hdoyu@nvidia.com>
+ <20120307.091601.458605132780655792.hdoyu@nvidia.com>
+Message-ID: <011701ccfc83$78030180$68090480$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow each device to specify its coherent-dma-mask
-The default behavior the set it to DMA_BIT_MASK(32) if none specified
-is keeped.
+Hello,
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- drivers/of/platform.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
+On Wednesday, March 07, 2012 8:16 AM Hiroshi Doyu wrote:
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index bb22194..d2a2ea02 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -141,6 +141,19 @@ static u64* of_get_dma_mask(struct device_node *np)
- 	return dma_mask;
- }
- 
-+static u64 of_get_coherent_dma_mask(struct device_node *np)
-+{
-+	const __be32 *prop;
-+	int len;
-+
-+	prop = of_get_property(np, "coherent-dma-mask", &len);
-+
-+	if (!prop)
-+		return DMA_BIT_MASK(32);
-+
-+	return of_read_number(prop, len / 4);
-+}
-+
- /**
-  * of_device_alloc - Allocate and initialize an of_device
-  * @np: device node to assign to device
-@@ -228,7 +241,7 @@ struct platform_device *of_platform_device_create_pdata(
- #if defined(CONFIG_MICROBLAZE)
- 	dev->archdata.dma_mask = 0xffffffffUL;
- #endif
--	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+	dev->dev.coherent_dma_mask = of_get_coherent_dma_mask(np);
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
- 
+> From: Hiroshi DOYU <hdoyu@nvidia.com>
+> Subject: Re: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+> Date: Wed, 07 Mar 2012 08:37:06 +0200 (EET)
+> Message-ID: <20120307.083706.2087121294965856946.hdoyu@nvidia.com>
+> 
+> > From: Hiroshi DOYU <hdoyu@nvidia.com>
+> > Subject: Re: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+> > Date: Wed, 07 Mar 2012 08:09:52 +0200 (EET)
+> > Message-ID: <20120307.080952.2152478004740487196.hdoyu@nvidia.com>
+> >
+> > > From: Krishna Reddy <vdumpa@nvidia.com>
+> > > Subject: RE: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+> > > Date: Tue, 6 Mar 2012 23:48:42 +0100
+> > > Message-ID: <401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
+> > >
+> > > > > > +struct dma_iommu_mapping *
+> > > > > > +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+> > > > > > +                        int order)
+> > > > > > +{
+> > > > > > +       unsigned int count = (size >> PAGE_SHIFT) - order;
+> > > > > > +       unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
+> > > >
+> > > > The count calculation doesn't seem correct. "order" is log2 number and
+> > > >  size >> PAGE_SHIFT is number of pages.
+> > > >
+> > > > If size is passed as 64*4096(256KB) and order is 6(allocation granularity is 2^6
+> pages=256KB),
+> > > >  just 1 bit is enough to manage allocations.  So it should be 4 bytes or one long.
+> > >
+> > > Good catch!
+> > >
+> > > > But the calculation gives count = 64 - 6 = 58 and
+> > > > Bitmap_size gets set to (58/(4*8)) * 4 = 8 bytes, which is incorrect.
+> > >
+> > > "order" isn't the order of size passed, which is minimal *page*
+> > > allocation order which client decides whatever, just in case.
+> > >
+> > > > It should be as follows.
+> > > > unsigned int count = 1 << get_order(size) - order;
+> >
+> > To be precise, as below?
+> >
+> >  unsigned int count = 1 << (get_order(size) - order);
+> 
+> This could be:
+> 
+> From fd40740ef4bc4a3924fe1188ea6dd785be0fe859 Mon Sep 17 00:00:00 2001
+> From: Hiroshi DOYU <hdoyu@nvidia.com>
+> Date: Wed, 7 Mar 2012 08:14:38 +0200
+> Subject: [PATCH 1/1] dma-mapping: Fix count calculation of iova space
+> 
+> Fix count calculation of iova space.
+> Pointed by Krishna Reddy <vdumpa@nvidia.com>
+> 
+> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
+> ---
+>  arch/arm/mm/dma-mapping.c |   11 +++++++++--
+>  1 files changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 6c2f104..56f0af5 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1483,11 +1483,18 @@ struct dma_iommu_mapping *
+>  arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
+>  			 int order)
+>  {
+> -	unsigned int count = (size >> PAGE_SHIFT) - order;
+> -	unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
+> +	unsigned int n, count;
+> +	unsigned int bitmap_size;
+>  	struct dma_iommu_mapping *mapping;
+>  	int err = -ENOMEM;
+> 
+> +	n = get_order(size);
+> +	if (n < order)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	count = 1 << (n - order);
+> +	bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
+> +
+>  	mapping = kzalloc(sizeof(struct dma_iommu_mapping), GFP_KERNEL);
+>  	if (!mapping)
+>  		goto err;
+
+Thanks again for finding another bug. I thought that I've checked that code more
+than twice, but it looks that I've missed something again.
+
+IMHO the size of virtual memory area doesn't need to be aligned to the power of
+two, so I will simplify it to the following code:
+
+unsigned int count = size >> (PAGE_SHIFT + order);
+unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
+
+if (!count)
+	return ERR_PTR(-EINVAL);
+
+...
+
+Best regards
 -- 
-1.7.7
+Marek Szyprowski
+Samsung Poland R&D Center
