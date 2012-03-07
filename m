@@ -1,30 +1,56 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 7 Mar 2012 13:45:52 +0000
-Subject: [PATCH v9] Regulator: Add Anatop regulator driver
-In-Reply-To: <20120307132225.GB17745@game.jcrosoft.org>
-References: <1331126658-26926-1-git-send-email-paul.liu@linaro.org>
- <20120307132225.GB17745@game.jcrosoft.org>
-Message-ID: <20120307134551.GL3107@opensource.wolfsonmicro.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 07 Mar 2012 19:24:26 +0530
+Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
+In-Reply-To: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+Message-ID: <1331128466.24656.421.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 02:22:25PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Tue, 2012-03-06 at 22:33 +0000, Russell King - ARM Linux wrote:
+> [v2 - more or less same description.  Including lakml in cc for the full
+> set]
+> 
+> This patch series cleans up the handling of cookies in DMA engine drivers.
+> This is done by providing a set of inline library functions for common
+> tasks:
+> 
+> - moving the 'last completed cookie' into struct dma_chan - everyone
+>   has this in their driver private channel data structure
+> 
+> - consolidate allocation of cookies to DMA descriptors
+> 
+> - common way to update 'last completed cookie' value
+> 
+> - standard way to implement tx_status callback and update the residue
+> 
+> - consolidate initialization of cookies
+> 
+> - update implementations differing from the majority of DMA engine drivers
+>   to behave the same as the majority implementation in respect of cookies
+> 
+> What this means is that we get to the point where all DMA engine drivers
+> will hand out cookie value '2' as the first, and incrementing cookie
+> values up to INT_MAX, returning to cookie '1' as the next cookie.
+> 
+> Think of this patch series as round 1...  I am hoping over time that more
+> code can be consolidated between the DMA engine drivers and end up with a
+> consistent way to handle various common themes in DMA engine hardware
+> (like physical channel<->peripheral request signal selection.)
+Thanks Russell,
 
-> > +- compatible: Must be "fsl,anatop-regulator"
-> > +- vol-bit-shift: Bit shift for the register
-> > +- vol-bit-width: Number of bits used in the register
-> > +- min-bit-val: Minimum value of this register
-> > +- min-voltage: Minimum voltage of this regulator
-> > +- max-voltage: Maximum voltage of this regulator
+I have tested this on atom today, and as expected works flawlessly :)
+After all acks, I can merge or these can go thru your tree with my Ack.
+Either way is okay.
 
-> specific properites need to be prefix by the vendor
+I applied the v2 on a branch and also rebased on top of slave-dma.next.
+There were few conflicts in imx-dma.c. Sacha, Javier, pls see that merge
+is right.
 
-This really doesn't seem at all sane for a device which is already
-vendor specific, it's just noise in the bindings.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120307/0c5ee8b7/attachment.sig>
+This branch (rmk_cookie_fixes2_rebased) is not yet pushed, as I am not
+able to connect to infradead.org, should be done when server is back.
+
+
+
+-- 
+~Vinod
