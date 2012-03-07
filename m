@@ -1,98 +1,126 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 06 Mar 2012 17:39:33 -0800
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator for
- first instance
-In-Reply-To: <20120307004405.GC12083@atomide.com> (Tony Lindgren's message of
- "Tue, 6 Mar 2012 16:44:05 -0800")
-References: <1331080771-30687-1-git-send-email-khilman@ti.com>
- <20120307004405.GC12083@atomide.com>
-Message-ID: <87sjhlnq96.fsf@ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed,  7 Mar 2012 09:42:05 +0800
+Subject: [PATCH v3 1/6] serial: pxa: add OF support
+In-Reply-To: <201203061502.08097.arnd@arndb.de>
+References: <201203061502.08097.arnd@arndb.de>
+Message-ID: <1331084525-4638-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+From: Haojian Zhuang <haojian.zhuang@marvell.com>
 
-> * Kevin Hilman <khilman@ti.com> [120306 16:07]:
->> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
->> regulators) added regulators which are registered during
->> gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
->> than one instance of the SMSC911x and result in attempting to register
->> the same regulator more than once which causes a panic().
->> 
->> Fix this by only registering the regulator when the platform_data id
->> field is zero, indicating its the first instance.
->> 
->> Cc: Matt Porter <mporter@ti.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> Fix needed for v3.3.
->> Applies on top of Tony's fixes branch.
->> 
->>  arch/arm/mach-omap2/gpmc-smsc911x.c |   11 +++++++----
->>  1 file changed, 7 insertions(+), 4 deletions(-)
->> 
->> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
->> index bbb870c..4d6f1c6 100644
->> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
->> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
->> @@ -101,10 +101,13 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->>  
->>  	gpmc_cfg = board_data;
->>  
->> -	ret = platform_device_register(&gpmc_smsc911x_regulator);
->> -	if (ret < 0) {
->> -		pr_err("Unable to register smsc911x regulators: %d\n", ret);
->> -		return;
->> +	if (!gpmc_cfg) {
->
-> Shouldn't this be !gpmc_cfg->id instead..
+Parse uart device id from alias in DTS file.
 
-doh, of course.  Updated patch below.
-
-Kevin
-
->From 3c17a6fe6fdcc5e4e33f174c2b0982d71e759cf1 Mon Sep 17 00:00:00 2001
-From: Kevin Hilman <khilman@ti.com>
-Date: Thu, 1 Mar 2012 12:30:42 -0800
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator for
- first instance
-
-commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
-regulators) added regulators which are registered during
-gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
-than one instance of the SMSC911x and result in attempting to register
-the same regulator more than once which causes a panic().
-
-Fix this by only registering the regulator when the platform_data id
-field is zero, indicating its the first instance.
-
-Cc: Matt Porter <mporter@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/mach-omap2/gpmc-smsc911x.c |   11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/tty/serial/pxa.c |   49 ++++++++++++++++++++++++++++++++++-----------
+ 1 files changed, 37 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-index bbb870c..5e5880d 100644
---- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-@@ -101,10 +101,13 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
+index 5c8e3bb..cdf4b2b 100644
+--- a/drivers/tty/serial/pxa.c
++++ b/drivers/tty/serial/pxa.c
+@@ -36,6 +36,7 @@
+ #include <linux/circ_buf.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/tty.h>
+ #include <linux/tty_flip.h>
+@@ -44,6 +45,8 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
  
- 	gpmc_cfg = board_data;
++#define PXA_NAME_LEN		8
++
+ struct uart_pxa_port {
+ 	struct uart_port        port;
+ 	unsigned char           ier;
+@@ -51,7 +54,7 @@ struct uart_pxa_port {
+ 	unsigned char           mcr;
+ 	unsigned int            lsr_break_flag;
+ 	struct clk		*clk;
+-	char			*name;
++	char			name[PXA_NAME_LEN];
+ };
  
--	ret = platform_device_register(&gpmc_smsc911x_regulator);
--	if (ret < 0) {
--		pr_err("Unable to register smsc911x regulators: %d\n", ret);
--		return;
-+	if (!gpmc_cfg->id) {
-+		ret = platform_device_register(&gpmc_smsc911x_regulator);
-+		if (ret < 0) {
-+			pr_err("Unable to register smsc911x regulators: %d\n",
-+			       ret);
-+			return;
-+		}
+ static inline unsigned int serial_in(struct uart_pxa_port *up, int offset)
+@@ -781,6 +784,31 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
+ };
+ #endif
+ 
++static struct of_device_id serial_pxa_dt_ids[] = {
++	{ .compatible = "mrvl,pxa-uart", },
++	{ .compatible = "mrvl,mmp-uart", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
++
++static int serial_pxa_probe_dt(struct platform_device *pdev,
++			       struct uart_pxa_port *sport)
++{
++	struct device_node *np = pdev->dev.of_node;
++	int ret;
++
++	if (!np)
++		return 1;
++
++	ret = of_alias_get_id(np, "serial");
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
++		return ret;
++	}
++	sport->port.line = ret;
++	return 0;
++}
++
+ static int serial_pxa_probe(struct platform_device *dev)
+ {
+ 	struct uart_pxa_port *sport;
+@@ -808,20 +836,16 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 	sport->port.irq = irqres->start;
+ 	sport->port.fifosize = 64;
+ 	sport->port.ops = &serial_pxa_pops;
+-	sport->port.line = dev->id;
+ 	sport->port.dev = &dev->dev;
+ 	sport->port.flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
+ 	sport->port.uartclk = clk_get_rate(sport->clk);
+ 
+-	switch (dev->id) {
+-	case 0: sport->name = "FFUART"; break;
+-	case 1: sport->name = "BTUART"; break;
+-	case 2: sport->name = "STUART"; break;
+-	case 3: sport->name = "HWUART"; break;
+-	default:
+-		sport->name = "???";
+-		break;
+-	}
++	ret = serial_pxa_probe_dt(dev, sport);
++	if (ret > 0)
++		sport->port.line = dev->id;
++	else if (ret < 0)
++		goto err_clk;
++	snprintf(sport->name, PXA_NAME_LEN - 1, "UART%d", sport->port.line + 1);
+ 
+ 	sport->port.membase = ioremap(mmres->start, resource_size(mmres));
+ 	if (!sport->port.membase) {
+@@ -829,7 +853,7 @@ static int serial_pxa_probe(struct platform_device *dev)
+ 		goto err_clk;
  	}
  
- 	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
+-	serial_pxa_ports[dev->id] = sport;
++	serial_pxa_ports[sport->port.line] = sport;
+ 
+ 	uart_add_one_port(&serial_pxa_reg, &sport->port);
+ 	platform_set_drvdata(dev, sport);
+@@ -866,6 +890,7 @@ static struct platform_driver serial_pxa_driver = {
+ #ifdef CONFIG_PM
+ 		.pm	= &serial_pxa_pm_ops,
+ #endif
++		.of_match_table = serial_pxa_dt_ids,
+ 	},
+ };
+ 
 -- 
-1.7.9.2
+1.7.5.4
