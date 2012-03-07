@@ -1,80 +1,113 @@
-From: xiachendong@hotmail.com (Xiachen Dong)
-Date: Wed, 7 Mar 2012 11:59:13 -0500
-Subject: 2.6.36 and higher version kernel slower than 2.6.25.1 kernel?
-Message-ID: <BAY167-W497E8A13D4F2938D985CF6BD560@phx.gbl>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 07 Mar 2012 10:59:21 -0600
+Subject: [PATCH 1/1] of: add dma-mask binding
+In-Reply-To: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4F5793E9.9010100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/07/2012 05:26 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> This will allow each device to specify its dma-mask
+> The microblaze architecture hook is keep temporary if no dma-mask is specified
+> int the DT
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+>  drivers/of/platform.c |   26 +++++++++++++++++++++++++-
+>  1 files changed, 25 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index cae9477..bb22194 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -121,6 +121,26 @@ void of_device_make_bus_id(struct device *dev)
+>  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
+>  }
+>  
+> +static u64* of_get_dma_mask(struct device_node *np)
+> +{
+> +	const __be32 *prop;
+> +	int len;
+> +	u64 *dma_mask;
+> +
+> +	prop = of_get_property(np, "dma-mask", &len);
 
-Hi,
+This would need some documentation. There is already "dma-ranges"
+defined for OF which nay do what's needed.
 
-Recently we upgrade the OS for our AT91RM9200 platform from 2.6.25.1 to 2.6.36. We run the SQLITE3 database insertion tests for the new kernel. The test result shows that 2.6.36 kernel is around 10% slower than the 2.6.25.1.
+> +
+> +	if (!prop)
+> +		return NULL;
+> +
+> +	dma_mask = kzalloc(sizeof(u64), GFP_KERNEL);
 
-The sqlite3 database insertion test originates from http://www.phoronix-test-suite.com/?k=home. It is very simple: it creates a new database under current directory and simply keeps on inserting 2500 records into the new DB created. Then it calculates the time it takes to finish the task.
+This seems kind of wasteful for 1 u64.
 
-Here's how we run the test:
+> +	if (!dma_mask)
+> +		return NULL;
+> +
+> +	*dma_mask = of_read_number(prop, len / 4);
+> +
+> +	return dma_mask;
+> +}
+> +
+>  /**
+>   * of_device_alloc - Allocate and initialize an of_device
+>   * @np: device node to assign to device
+> @@ -161,10 +181,14 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+>  	}
+>  
+> +	dev->dev.dma_mask = of_get_dma_mask(np);
+>  	dev->dev.of_node = of_node_get(np);
+> +
+>  #if defined(CONFIG_MICROBLAZE)
+> -	dev->dev.dma_mask = &dev->archdata.dma_mask;
 
-1) Install or port sqlite3 to the platform;
-2) mke2fs /dev/ram0;
-3) mount -t ext2 /dev/ram0 /mnt/temp;
-4) cp sqliteInsertionTest.sh /mnt/temp;
-?? cp sqlite-insertions.txt /mnt/temp;
-5) cd /mnt/temp;
-6) ./sqliteInsertionTest.sh;
-7) repeat the test 10 times and take the average;
+And doing it this way for didn't get a warm reception either:
 
-To narrow down the problem. We also ran similar tests on a Pentium IV 1.7G laptop. Here is how the test was run:
+http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-April/005285.html
 
-a) install sqlite3 on the laptop
-b) compile the 2.6.25.1 and 2.6.36 kernel on the laptop, try to make the kernel config as similar as possible;
-c) boot into 2.6.25.1 and 2.6.36 kernel in single user mode ("single" in commandline argument);
-d) run same tests in step 2) to step 7) above
+Do you really need this to be something other than ~0UL and if so does
+it need to be per device or system wide?
 
-The P4 CPU is single core, no hyper-threading. We can still see the performance hit in the 2.6.36 kernel on the Pentium laptop.
+You can solve this with bus notifiers in your at91 code. Here's an
+example which I did (but no longer need):
 
-We may attach the kernel config files if needed. We choose CFQ for the scheduler for both kernels.
+static u64 highbank_dma_mask = DMA_BIT_MASK(32);
 
+static int highbank_platform_notifier(struct notifier_block *nb,
+				  unsigned long event, void *__dev)
+{
+	struct device *dev = __dev;
 
-Here is the content of sqliteInsertionTest.sh:
+	if (event != BUS_NOTIFY_ADD_DEVICE)
+		return NOTIFY_DONE;
 
-============ sqliteInsertionTest.sh ===========
-#!/bin/sh
+	if (of_device_is_compatible(dev->of_node, "calxeda,hb-nfc"))
+		dev->dma_mask = &highbank_dma_mask;
+	else
+		return NOTIFY_DONE;
 
-TEST_PATH=`pwd`
-rm -f $TEST_PATH/benchmark.db
+	return NOTIFY_OK;
+}
 
-echo "`date`, starting test ..."
+static struct notifier_block highbank_platform_nb = {
+	.notifier_call = highbank_platform_notifier,
+};
 
-sqlite3 $TEST_PATH/benchmark.db? "CREATE TABLE pts1 ('I' SMALLINT NOT NULL, 'DT' TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, 'F1' VARCHAR(4) NOT NULL, 'F2' VARCHAR(16) NOT NULL);"
+int highbank_devices_init(void)
+{
+	return bus_register_notifier(&platform_bus_type, &highbank_platform_nb);
+}
 
-cat $TEST_PATH/sqlite-insertions.txt | sqlite3 $TEST_PATH/benchmark.db
-...
-#cat $TEST_PATH/sqlite-insertions.txt | sqlite3 $TEST_PATH/benchmark.db
-#cat $TEST_PATH/sqlite-insertions.txt | sqlite3 $TEST_PATH/behchmark.db
+Rob
 
-echo "`date`, test done."
-============ end of sqliteInsertionTest.sh ===========
-
-sqlite-insertions.txt is very simple:
-
-INSERT INTO 'pts1' ('I', 'DT', 'F1', 'F2') VALUES ('1', CURRENT_TIMESTAMP, '6758', '9844343722998287');
-INSERT INTO 'pts1' ('I', 'DT', 'F1', 'F2') VALUES ('2', CURRENT_TIMESTAMP, '3733', '8925952369645997');
-...
-INSERT INTO 'pts1' ('I', 'DT', 'F1', 'F2') VALUES ('2499', CURRENT_TIMESTAMP, '5955', '1088209297553915');
-INSERT INTO 'pts1' ('I', 'DT', 'F1', 'F2') VALUES ('2500', CURRENT_TIMESTAMP, '6086', '6839549078383414');
-
-The other thing we notice is that if the test is run under tempfs, the insertion can be done faster. However, there is still performance hit in 2.6.36 kernel.
-
-We also run the same test on 3.0.23 kernel on the Pentium 4 laptop. The performance hit still exist.
-
-Our questions are:
-1. Is anyone else on the list notice such issue?
-2. Did we did something silly in running such performance tests?
-3. Are there any new features in 2.6.36 kernel that we didn't enable and those disabled features lead to our current test result?
-
-Any suggestions and comments will be greatly appreciated.
-
-Thank you.
-
-Xiachen
- 		 	   		  
+> +	if (!dev->dev.dma_mask)
+> +		dev->dev.dma_mask = &dev->archdata.dma_mask;
+>  #endif
+> +
+>  	dev->dev.parent = parent;
+>  
+>  	if (bus_id)
