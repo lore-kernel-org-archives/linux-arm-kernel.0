@@ -1,32 +1,47 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 7 Mar 2012 18:38:44 +0800
-Subject: [PATCH v3] MM: CMA: add a simple kernel module as the helper to
- test CMA
-In-Reply-To: <4F56EBA6.6000704@gmail.com>
-References: <1331090098-25097-1-git-send-email-Barry.Song@csr.com>
- <4F56E0AC.8070501@gmail.com>
- <CAGsJ_4x4CwD+WAE9d+Xob_tfwqmE6SdBdBd5EbC64XBi4Uzvgg@mail.gmail.com>
- <4F56EA49.8070808@gmail.com>
- <CAGsJ_4xJoKGt3+b_3bteoMyeO615pCxFpMpsH4LtvufFNDv6bA@mail.gmail.com>
- <4F56EBA6.6000704@gmail.com>
-Message-ID: <CAGsJ_4wd14LNGf0xtbTzvGn5v0WUcRiN04OC+wtDqSrem0di4w@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 7 Mar 2012 11:33:52 +0100
+Subject: [PATCH 1/9 v2] ARM: at91: usb ohci add dt support
+In-Reply-To: <20120307093446.GN17370@n2100.arm.linux.org.uk>
+References: <20120307084924.GK21255@game.jcrosoft.org>
+ <1331111746-21393-1-git-send-email-plagnioj@jcrosoft.com>
+ <20120307093446.GN17370@n2100.arm.linux.org.uk>
+Message-ID: <20120307103352.GA17745@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/7 Cong Wang <xiyou.wangcong@gmail.com>:
-> On 03/07/2012 12:57 PM, Barry Song wrote:
->>
->>
->> if you think so, pls do that and send v4 with your s-o-b.
->>
->
-> This is not a good attitude, nor helps your patch to be merged...
->
-> Be collaborative.
+On 09:34 Wed 07 Mar     , Russell King - ARM Linux wrote:
+> On Wed, Mar 07, 2012 at 10:15:38AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > +static u64 at91_ohci_dma_mask = DMA_BIT_MASK(32);
+> > +
+> > +static int __devinit ohci_at91_of_init(struct platform_device *pdev)
+> > +{
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	int i, ret, gpio;
+> > +	enum of_gpio_flags flags;
+> > +	struct at91_usbh_data	*pdata;
+> > +	u32 ports;
+> > +
+> > +	if (!np)
+> > +		return 0;
+> > +
+> > +	/* Right now device-tree probed devices don't get dma_mask set.
+> > +	 * Since shared usb code relies on it, set it here for now.
+> > +	 * Once we have dma capability bindings this can go away.
+> > +	 */
+> > +	if (!pdev->dev.dma_mask)
+> > +		pdev->dev.dma_mask = &at91_ohci_dma_mask;
+> 
+> That sounds like a rather big omission from DT - what's happening to
+> address this (before we end up with lots of drivers with this).  Pretty
+> much any device which does DMA needs both this and the coherent DMA mask
+> set properly.
+> 
+> We really don't want this kind of workaround scattered in every driver
+> which has been converted to DT.
+Tegra do it also
+I do yet found a good generic way in DT
 
-pls just focus on techinical discussion and note you are not the man
-to decide whether the patch should be merged. Many people know how to
-make patches merged well.
-you said that just like you are the one maintaining MM. Be modest, man!
+Today only usb need I do plan to drop it for 3.5 can we have for 3.4
 
--barry
+Best Regards,
+J.
