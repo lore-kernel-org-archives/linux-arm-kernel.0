@@ -1,50 +1,70 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue,  6 Mar 2012 16:39:31 -0800
-Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulator for first
- instance
-Message-ID: <1331080771-30687-1-git-send-email-khilman@ti.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Tue, 6 Mar 2012 18:39:34 -0600
+Subject: [PATCH] omap3_beagle: init uart2 for beagle rev AX/BX only
+In-Reply-To: <20120306213859.GA12083@atomide.com>
+References: <1331024711-23578-1-git-send-email-govindraj.raja@ti.com>
+ <20120306213859.GA12083@atomide.com>
+Message-ID: <CAOCHtYiERN2VySbBb7BoJAa97P4z6=a094vUMmgej3JP5Cy25g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
-regulators) added regulators which are registered during
-gpmc_smsc911x_init().  However, some platforms (OMAP3/Overo) have more
-than one instance of the SMSC911x and result in attempting to register
-the same regulator more than once which causes a panic().
+On Tue, Mar 6, 2012 at 3:38 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Govindraj.R <govindraj.raja@ti.com> [120306 00:34]:
+>> From: "Govindraj.R" <govindraj.raja@ti.com>
+>>
+>> All beagle boards rev > AX/BX have external usb hubs connected to ehci
+>> interface, external hub/peripheral uses a nreset sequence for which
+>> uart2_rx.gpio_147 pin in mux mode4(USB2HS_nRST) is used on all beagle
+>> boards expect rev Ax/BX.
+>> (Reference to all beagle boards rev schematics:
+>> http://beagleboard.org/hardware/design)
+>>
+>> Initialising uart2 will lead to serial init taking over uart2_rx pin
+>> so init uart2_rx pin mux only for Beagle AX/BX rev boards.
+>> Dont init uart2 for all other boards allowing usb_ehci functionality.
+>>
+>> To initialise individual uart port by id utilise and modify the existing
+>> available func. omap_serial_board_init.
+>>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Koen Kooi <koen@dominion.thruhere.net>
+>> Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> Tested-by: Robert Nelson <robertcnelson@gmail.com>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>
+> Can somebody please test this on non-xm beagle too and
+> reply with a Tested-by?
 
-Fix this by only registering the regulator when the platform_data id
-field is zero, indicating its the first instance.
+Here's an update for my: Tested-by: Robert Nelson <robertcnelson@gmail.com>
 
-Cc: Matt Porter <mporter@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Fix needed for v3.3.
-Applies on top of Tony's fixes branch.
+Just tested with one of my Beagle C4's, (and re-verified the new patch
+on a xM B) using usb flash drives on the ehci port...
 
- arch/arm/mach-omap2/gpmc-smsc911x.c |   11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+beagle c4:
+v3.2.9
+Bus 001 Device 002: ID 0457:0151 Silicon Integrated Systems Corp.
+Super Flash 1GB / GXT  64MB Flash Drive
 
-diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
-index bbb870c..4d6f1c6 100644
---- a/arch/arm/mach-omap2/gpmc-smsc911x.c
-+++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
-@@ -101,10 +101,13 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
- 
- 	gpmc_cfg = board_data;
- 
--	ret = platform_device_register(&gpmc_smsc911x_regulator);
--	if (ret < 0) {
--		pr_err("Unable to register smsc911x regulators: %d\n", ret);
--		return;
-+	if (!gpmc_cfg) {
-+		ret = platform_device_register(&gpmc_smsc911x_regulator);
-+		if (ret < 0) {
-+			pr_err("Unable to register smsc911x regulators: %d\n",
-+			       ret);
-+			return;
-+		}
- 	}
- 
- 	if (gpmc_cs_request(gpmc_cfg->cs, SZ_16M, &cs_mem_base) < 0) {
+v3.3-rc6:
+ehci broken
+
+v3.3-rc6 + this patch:
+Bus 001 Device 002: ID 0457:0151 Silicon Integrated Systems Corp.
+Super Flash 1GB / GXT  64MB Flash Driv
+
+beagle xM B:
+v3.2.9
+Bus 001 Device 004: ID 1977:0824 T-Logic
+
+v3.3-rc6:
+ehci broken
+
+v3.3-rc6 + this patch:
+Bus 001 Device 004: ID 1977:0824 T-Logic
+
+Regards,
+
 -- 
-1.7.9.2
+Robert Nelson
+http://www.rcn-ee.com/
