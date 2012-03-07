@@ -1,18 +1,24 @@
 From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Wed, 07 Mar 2012 10:09:18 +0000
-Subject: [PATCH] pxafb: do console locking before calling fb_blank()
-In-Reply-To: <1330264322-5938-1-git-send-email-anarsoul@gmail.com>
-References: <1330264322-5938-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <4F5733CE.2060900@gmx.de>
+Date: Wed, 07 Mar 2012 10:13:41 +0000
+Subject: [PATCH] MAINTAINERS: add entry for exynos mipi display drivers
+In-Reply-To: <4F557A2A.2080108@samsung.com>
+References: <4F557A2A.2080108@samsung.com>
+Message-ID: <4F5734D5.2030504@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2012 01:52 PM, Vasily Khoruzhick wrote:
-> Otherwise we hit WARN_CONSOLE_UNLOCKED in do_unblank_screen
+On 03/06/2012 02:44 AM, Donghwa Lee wrote:
+> Hi, I'd like to add Inki Dae, Donghwa Lee and Kyungmin Park as 
+> maintainers who developers for exynos mipi display drivers for
+> video/driver/exynos/exynos_mipi* and include/video/exynos_mipi*.
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Applied.
+Applied after moving it to keep alphabetical order in MAINTAINERS and
+amending the commit message like Andrew did with v1 of this patch
+(deleting "Hi, I'd like to").
 
 
 Thanks,
@@ -20,32 +26,26 @@ Thanks,
 Florian Tobias Schandinat
 
 > ---
->  drivers/video/pxafb.c |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+>  MAINTAINERS |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-> index 1d1e4f1..c176561 100644
-> --- a/drivers/video/pxafb.c
-> +++ b/drivers/video/pxafb.c
-> @@ -54,6 +54,7 @@
->  #include <linux/mutex.h>
->  #include <linux/kthread.h>
->  #include <linux/freezer.h>
-> +#include <linux/console.h>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index b087b3bc..eb5fbcb 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2351,6 +2351,15 @@ S:	Supported
+>  F:	drivers/gpu/drm/exynos
+>  F:	include/drm/exynos*
 >  
->  #include <mach/hardware.h>
->  #include <asm/io.h>
-> @@ -730,9 +731,12 @@ static int overlayfb_open(struct fb_info *info, int user)
->  	if (user == 0)
->  		return -ENODEV;
->  
-> -	if (ofb->usage++ == 0)
-> +	if (ofb->usage++ == 0) {
->  		/* unblank the base framebuffer */
-> +		console_lock();
->  		fb_blank(&ofb->fbi->fb, FB_BLANK_UNBLANK);
-> +		console_unlock();
-> +	}
->  
->  	return 0;
->  }
+> +EXYNOS MIPI DISPLAY DRIVERS
+> +M:	Inki Dae <inki.dae@samsung.com>
+> +M:	Donghwa Lee <dh09.lee@samsung.com>
+> +M:	Kyungmin Park <kyungmin.park@samsung.com>
+> +L:	linux-fbdev at vger.kernel.org
+> +S:	Maintained
+> +F:	drivers/video/exynos/exynos_mipi*
+> +F:	include/video/exynos_mipi*
+> +
+>  DSCC4 DRIVER
+>  M:	Francois Romieu <romieu@fr.zoreil.com>
+>  L:	netdev at vger.kernel.org
