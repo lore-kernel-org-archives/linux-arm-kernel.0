@@ -1,43 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 07 Mar 2012 12:20:41 -0800
-Subject: [GIT PULL] cpufreq: OMAP updates for v3.4
-Message-ID: <87y5rci2na.fsf@ti.com>
+From: timur@freescale.com (Timur Tabi)
+Date: Wed, 7 Mar 2012 14:20:29 -0600
+Subject: [PATCH v2 09/17] ASoC: fsl: separate SSI and DMA Kconfig options
+In-Reply-To: <1330957865-19085-10-git-send-email-shawn.guo@linaro.org>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <1330957865-19085-10-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F57C30D.3000101@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
+Shawn Guo wrote:
+> The fsl_ssi driver will possibly be shared between Freescale PowerPC
+> and ARM/IMX families, so give it a separate Kconfig option.  Then
+> fsl_ssi driver can possibly be selected independently from selecting
+> PowerPC DMA based PCM driver.
 
-Please pull the following OMAP CPUfreq driver changes for v3.4.
+This patch is going to require an update to the defconfigs, because by
+default, it sets audio as disabled.
 
-Thanks,
+menuconfig SND_POWERPC_SOC
+	tristate "SoC Audio for Freescale PowerPC CPUs"
+	depends on FSL_SOC
+	help
+	  Say Y or M if you want to add support for codecs attached to
+	  the PowerPC CPUs.
 
-Kevin
+The P1022DS uses mpc85xx_smp_defconfig and mpc85xx_defconfig.  The
+MPC8610HPCD uses mpc8610_hpcd_defconfig.
 
-
-
-The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
-
-  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/cpufreq
-
-for you to fetch changes up to 42daffd2d6c665716d442d518022ecaad17ddf64:
-
-  cpufreq: OMAP: specify range for voltage scaling (2012-03-02 13:55:57 -0800)
-
-----------------------------------------------------------------
-Afzal Mohammed (1):
-      cpufreq: OMAP: specify range for voltage scaling
-
-Kevin Hilman (1):
-      cpufreq: OMAP: scale voltage along with frequency
-
-Russell King (1):
-      cpufreq: OMAP driver depends CPUfreq tables
-
- drivers/cpufreq/Kconfig.arm    |    5 +++
- drivers/cpufreq/Makefile       |    2 +-
- drivers/cpufreq/omap-cpufreq.c |   72 +++++++++++++++++++++++++++++++++++++---
- 3 files changed, 73 insertions(+), 6 deletions(-)
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
