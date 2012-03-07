@@ -1,44 +1,64 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 7 Mar 2012 11:17:55 -0300
-Subject: I.MX35 PDK
-In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D890F@MEP-EXCH.meprolight.com>
-References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A26@MEP-EXCH.meprolight.com>
- <4F562C90.6090103@freescale.com>
- <CAOMZO5CyGazr1=kLF51W7S7ZpEy2Mg4k2n_ZHnGimSyu2oVcrA@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D890F@MEP-EXCH.meprolight.com>
-Message-ID: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 7 Mar 2012 23:20:34 +0900
+Subject: [PATCH v2 04/11] ARM: EXYNOS: add interrupt definitions for
+ EXYNOS5250
+In-Reply-To: <4F575EC8.2090205@samsung.com>
+References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
+ <1328981685-8602-5-git-send-email-kgene.kim@samsung.com>
+ <CAOesGMhmcnt6LPb9O+3420VgG=PiCnOjzZA3JqsA=4OdHN-R-g@mail.gmail.com>
+ <00a901ccf084$90460900$b0d21b00$%kim@samsung.com>
+ <CAOesGMgedngJKRVCYwK=+xRnchXj4StGLTVqvv9BMqVhtM=5RA@mail.gmail.com>
+ <4F575EC8.2090205@samsung.com>
+Message-ID: <CAH9JG2VhCT6psHa3nhMCeA6dF12r1EuAaXMHxca44dOV1T5nbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/7/12, Alex Gershgorin <alexg@meprolight.com> wrote:
-
-> in spite of this I get from ov2640 driver error
-> Here Linux Kernel boot message:
+On Wed, Mar 7, 2012 at 10:12 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 03/06/12 10:55, Olof Johansson wrote:
+>>
+>> Hi,
+>>
+>> On Tue, Feb 21, 2012 at 2:35 AM, Kukjin Kim<kgene.kim@samsung.com> ?wrote:
+>>
+>>> Yes, as you said, it brakes single zImage for EXYNOS4 + EXYNOS5
+>>> (mach-exynos). So I'm working on regarding resource for EXYNOS SoCs and I
+>>> think, it can resolve the problem you said before v3.4 merge window.
+>>>
+>>> If any updates, let you know.
+>>
+>>
+>> Just a friendly reminder; the time is close to running out for staging
+>> new code for 3.4.
+>>
+> Hi Olof,
 >
-> "Linux video capture interface: v2.00
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
-> ov2640 0-0030: Product ID error fb:fb"
+> Thanks for your kindly reminder but I couldn't finish it yet because it is
+> required to touch most of samsung stuff, and it's a big change. Frankly, I
+> need more time...
 >
-> I cannot understand what the problem is, if someone tested this?
+> So how about sending current exynos5 stuff for now and then sorting out
+> single kernel for exynos4 and exynos5 next time? Actually, this exynos5 arch
+> part is _really_ needed for developing/contribution of drivers on exynos5.
+No,
 
-Looks like a I2C issue.
+I heard too many times. "we have plan to support ..." but I didn't see
+any progress.
+it's general rules. you should fix it correctly and merged correctly
+instead of "not now"
 
-Check the I2C1 pad settings in the mainline kernel.
-
-On FSL kernel we have:
-
-#define PAD_CONFIG (PAD_CTL_HYS_SCHMITZ | PAD_CTL_PKE_ENABLE |
-PAD_CTL_PUE_PUD | PAD_CTL_ODE_OpenDrain)
-
-	switch (i2c_num) {
-	case 0:
-		mxc_request_iomux(MX35_PIN_I2C1_CLK, MUX_CONFIG_SION);
-		mxc_request_iomux(MX35_PIN_I2C1_DAT, MUX_CONFIG_SION);
-
-		mxc_iomux_set_pad(MX35_PIN_I2C1_CLK, PAD_CONFIG);
-		mxc_iomux_set_pad(MX35_PIN_I2C1_DAT, PAD_CONFIG);
-
-Also check if you are getting the proper voltage levels at the I2C1 lines.
-
-Good luck!
+Thank you,
+Kyungmin Park
+>
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
