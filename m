@@ -1,45 +1,62 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 7 Mar 2012 09:10:42 +0900
-Subject: [PATCH v10 2/3] ARM: EXYNOS: Change System MMU platform device
- definitions
-In-Reply-To: <CAH9JG2Uvc27UMcsy_Apqo+Td_td_18C6i3vvC8aroBse2=+53w@mail.gmail.com>
-References: <002101ccfb73$8684c240$938e46c0$%cho@samsung.com>
- <CAH9JG2Uvc27UMcsy_Apqo+Td_td_18C6i3vvC8aroBse2=+53w@mail.gmail.com>
-Message-ID: <CAHQjnOP_mEck35PwhDd7v=MKc+ONFRFxa7i=ro0iMxWy-fuFNw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Mar 2012 16:13:11 -0800
+Subject: [PATCH V2] OMAP3+: PM: VP: fix integer truncation error
+In-Reply-To: <87hay1b7i0.fsf@ti.com>
+References: <1331059872-29011-1-git-send-email-nm@ti.com>
+ <87hay1b7i0.fsf@ti.com>
+Message-ID: <20120307001311.GB12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2012 at 7:03 PM, Kyungmin Park <kyungmin.park@samsung.com> wrote:
->>
->> -#define S5P_SYSMMU_TOTAL_IPNUM ? ? ? ? ? ? ? EXYNOS4_SYSMMU_TOTAL_IPNUM
->> +#define SYSMMU_DEVNAME_BASE "exynos-sysmmu"
->> +
->> +#define SYSMMU_CLOCK_NAME "sysmmu"
->> +#define SYSMMU_CLOCK_NAME2 "sysmmu_mc"
-> What's the meaning of "mc"?
-It stands for multi clock gating source.
-ISP block has a lot of System MMUs and I merged them in a single
-platform device to control them easier. However it is required to access
-2 control registers to gating  their clocks. "sysmmu_mc" is prepared for the
-case that requires 2 clock descriptors for clock gating.
+* Kevin Hilman <khilman@ti.com> [120306 15:33]:
+> Nishanth Menon <nm@ti.com> writes:
+> 
+> > From: Yuan Jiangli <jlyuan@motorola.com>
+> >
+> > commit 2f34ce81b8c05c900e45bd88595cc154f7bb5957
+> > (OMAP3: PM: Adding voltage driver support.)
+> > introduced runtime computation of waittime to handle all potential
+> > sys clocks available.
+> >
+> > In the voltage processor, the SPMSUpdateWait is calculated based on
+> > the slew rate and the voltage step (SMPSUpdateWait = slew rate *
+> > Voltage Step). After the voltage processor receives the SMPS_Ack
+> > signal, the Voltage Controller will wait for SMPSUpdateWait clock
+> > cycles for the voltage to settle to the new value. For all
+> > practical purposes, the waittime parameter is the OMAP hardware
+> > translation of what the slew rate on the PMIC is.
+> >
+> > As an example, with TPS62361 on OMAP4460,
+> > step_size = 10000
+> > slew_rate = 32000
+> > sys_clk_rate = 38400
+> >
+> > Our current computation results in the following:
+> >  = ((step_size / slew_rate) * sys_clk_rate) / 1000
+> >  = ((10000 / 32000) * 38400 / 1000
+> >  = 0
+> >
+> > Fix the same using DIV_ROUND_UP as an extra wait clock cycle
+> > is better than lesser clock cycle. For the above example, this
+> > translates to:
+> >  = (10000 * 38400) / (1000 * 32000)
+> >  = 12
+> >
+> > Acked-by: Jon Hunter <jon-hunter@ti.com>
+> > [nm at ti.com: slightly better implementation]
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Yuan Jiangli <jlyuan@motorola.com>
+> 
+> Acked-by: Kevin Hilman <khilman@ti.com>
+> 
+> Tony, I don't have any more PM fixes for this cycle, so feel free to add
+> this to fixes-non-critical-part2.
+> 
+> This is an important fix, but since we're not doing active voltage
+> scaling in mainline today, I don't think it's 3.3 material.
 
->> +
->> +#ifdef CONFIG_EXYNOS_DEV_SYSMMU
->> +#include <linux/device.h>
->> +struct platform_device;
->> +
->> +#define SYSMMU_PLATDEV(ipname) exynos_device_sysmmu_##ipname
->> +
->> +extern struct platform_device SYSMMU_PLATDEV(mfc_l);
->> +extern struct platform_device SYSMMU_PLATDEV(mfc_r);
->> +extern struct platform_device SYSMMU_PLATDEV(tv);
->> +extern struct platform_device SYSMMU_PLATDEV(jpeg);
->> +extern struct platform_device SYSMMU_PLATDEV(rot);
-> Where's the fimc platform_device?
->
-> I think you only tested it with exynos5.
+OK, adding.
 
-True. I am sorry that I have missed to define it externally.
-Thank you.
+Thanks,
 
-Cho KyongHo.
+Tony
