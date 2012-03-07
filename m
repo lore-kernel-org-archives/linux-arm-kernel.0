@@ -1,119 +1,80 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 07 Mar 2012 17:58:07 +0100
-Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-In-Reply-To: <20120307.091601.458605132780655792.hdoyu@nvidia.com>
-References: <401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
- <20120307.080952.2152478004740487196.hdoyu@nvidia.com>
- <20120307.083706.2087121294965856946.hdoyu@nvidia.com>
- <20120307.091601.458605132780655792.hdoyu@nvidia.com>
-Message-ID: <011701ccfc83$78030180$68090480$%szyprowski@samsung.com>
+From: xiachendong@hotmail.com (Xiachen Dong)
+Date: Wed, 7 Mar 2012 11:59:13 -0500
+Subject: 2.6.36 and higher version kernel slower than 2.6.25.1 kernel?
+Message-ID: <BAY167-W497E8A13D4F2938D985CF6BD560@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Wednesday, March 07, 2012 8:16 AM Hiroshi Doyu wrote:
+Hi,
 
-> From: Hiroshi DOYU <hdoyu@nvidia.com>
-> Subject: Re: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-> Date: Wed, 07 Mar 2012 08:37:06 +0200 (EET)
-> Message-ID: <20120307.083706.2087121294965856946.hdoyu@nvidia.com>
-> 
-> > From: Hiroshi DOYU <hdoyu@nvidia.com>
-> > Subject: Re: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-> > Date: Wed, 07 Mar 2012 08:09:52 +0200 (EET)
-> > Message-ID: <20120307.080952.2152478004740487196.hdoyu@nvidia.com>
-> >
-> > > From: Krishna Reddy <vdumpa@nvidia.com>
-> > > Subject: RE: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
-> > > Date: Tue, 6 Mar 2012 23:48:42 +0100
-> > > Message-ID: <401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com>
-> > >
-> > > > > > +struct dma_iommu_mapping *
-> > > > > > +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
-> > > > > > +                        int order)
-> > > > > > +{
-> > > > > > +       unsigned int count = (size >> PAGE_SHIFT) - order;
-> > > > > > +       unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
-> > > >
-> > > > The count calculation doesn't seem correct. "order" is log2 number and
-> > > >  size >> PAGE_SHIFT is number of pages.
-> > > >
-> > > > If size is passed as 64*4096(256KB) and order is 6(allocation granularity is 2^6
-> pages=256KB),
-> > > >  just 1 bit is enough to manage allocations.  So it should be 4 bytes or one long.
-> > >
-> > > Good catch!
-> > >
-> > > > But the calculation gives count = 64 - 6 = 58 and
-> > > > Bitmap_size gets set to (58/(4*8)) * 4 = 8 bytes, which is incorrect.
-> > >
-> > > "order" isn't the order of size passed, which is minimal *page*
-> > > allocation order which client decides whatever, just in case.
-> > >
-> > > > It should be as follows.
-> > > > unsigned int count = 1 << get_order(size) - order;
-> >
-> > To be precise, as below?
-> >
-> >  unsigned int count = 1 << (get_order(size) - order);
-> 
-> This could be:
-> 
-> From fd40740ef4bc4a3924fe1188ea6dd785be0fe859 Mon Sep 17 00:00:00 2001
-> From: Hiroshi DOYU <hdoyu@nvidia.com>
-> Date: Wed, 7 Mar 2012 08:14:38 +0200
-> Subject: [PATCH 1/1] dma-mapping: Fix count calculation of iova space
-> 
-> Fix count calculation of iova space.
-> Pointed by Krishna Reddy <vdumpa@nvidia.com>
-> 
-> Signed-off-by: Hiroshi DOYU <hdoyu@nvidia.com>
-> ---
->  arch/arm/mm/dma-mapping.c |   11 +++++++++--
->  1 files changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 6c2f104..56f0af5 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1483,11 +1483,18 @@ struct dma_iommu_mapping *
->  arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size,
->  			 int order)
->  {
-> -	unsigned int count = (size >> PAGE_SHIFT) - order;
-> -	unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
-> +	unsigned int n, count;
-> +	unsigned int bitmap_size;
->  	struct dma_iommu_mapping *mapping;
->  	int err = -ENOMEM;
-> 
-> +	n = get_order(size);
-> +	if (n < order)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	count = 1 << (n - order);
-> +	bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
-> +
->  	mapping = kzalloc(sizeof(struct dma_iommu_mapping), GFP_KERNEL);
->  	if (!mapping)
->  		goto err;
+Recently we upgrade the OS for our AT91RM9200 platform from 2.6.25.1 to 2.6.36. We run the SQLITE3 database insertion tests for the new kernel. The test result shows that 2.6.36 kernel is around 10% slower than the 2.6.25.1.
 
-Thanks again for finding another bug. I thought that I've checked that code more
-than twice, but it looks that I've missed something again.
+The sqlite3 database insertion test originates from http://www.phoronix-test-suite.com/?k=home. It is very simple: it creates a new database under current directory and simply keeps on inserting 2500 records into the new DB created. Then it calculates the time it takes to finish the task.
 
-IMHO the size of virtual memory area doesn't need to be aligned to the power of
-two, so I will simplify it to the following code:
+Here's how we run the test:
 
-unsigned int count = size >> (PAGE_SHIFT + order);
-unsigned int bitmap_size = BITS_TO_LONGS(count) * sizeof(long);
+1) Install or port sqlite3 to the platform;
+2) mke2fs /dev/ram0;
+3) mount -t ext2 /dev/ram0 /mnt/temp;
+4) cp sqliteInsertionTest.sh /mnt/temp;
+?? cp sqlite-insertions.txt /mnt/temp;
+5) cd /mnt/temp;
+6) ./sqliteInsertionTest.sh;
+7) repeat the test 10 times and take the average;
 
-if (!count)
-	return ERR_PTR(-EINVAL);
+To narrow down the problem. We also ran similar tests on a Pentium IV 1.7G laptop. Here is how the test was run:
 
+a) install sqlite3 on the laptop
+b) compile the 2.6.25.1 and 2.6.36 kernel on the laptop, try to make the kernel config as similar as possible;
+c) boot into 2.6.25.1 and 2.6.36 kernel in single user mode ("single" in commandline argument);
+d) run same tests in step 2) to step 7) above
+
+The P4 CPU is single core, no hyper-threading. We can still see the performance hit in the 2.6.36 kernel on the Pentium laptop.
+
+We may attach the kernel config files if needed. We choose CFQ for the scheduler for both kernels.
+
+
+Here is the content of sqliteInsertionTest.sh:
+
+============ sqliteInsertionTest.sh ===========
+#!/bin/sh
+
+TEST_PATH=`pwd`
+rm -f $TEST_PATH/benchmark.db
+
+echo "`date`, starting test ..."
+
+sqlite3 $TEST_PATH/benchmark.db? "CREATE TABLE pts1 ('I' SMALLINT NOT NULL, 'DT' TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, 'F1' VARCHAR(4) NOT NULL, 'F2' VARCHAR(16) NOT NULL);"
+
+cat $TEST_PATH/sqlite-insertions.txt | sqlite3 $TEST_PATH/benchmark.db
 ...
+#cat $TEST_PATH/sqlite-insertions.txt | sqlite3 $TEST_PATH/benchmark.db
+#cat $TEST_PATH/sqlite-insertions.txt | sqlite3 $TEST_PATH/behchmark.db
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+echo "`date`, test done."
+============ end of sqliteInsertionTest.sh ===========
+
+sqlite-insertions.txt is very simple:
+
+INSERT INTO 'pts1' ('I', 'DT', 'F1', 'F2') VALUES ('1', CURRENT_TIMESTAMP, '6758', '9844343722998287');
+INSERT INTO 'pts1' ('I', 'DT', 'F1', 'F2') VALUES ('2', CURRENT_TIMESTAMP, '3733', '8925952369645997');
+...
+INSERT INTO 'pts1' ('I', 'DT', 'F1', 'F2') VALUES ('2499', CURRENT_TIMESTAMP, '5955', '1088209297553915');
+INSERT INTO 'pts1' ('I', 'DT', 'F1', 'F2') VALUES ('2500', CURRENT_TIMESTAMP, '6086', '6839549078383414');
+
+The other thing we notice is that if the test is run under tempfs, the insertion can be done faster. However, there is still performance hit in 2.6.36 kernel.
+
+We also run the same test on 3.0.23 kernel on the Pentium 4 laptop. The performance hit still exist.
+
+Our questions are:
+1. Is anyone else on the list notice such issue?
+2. Did we did something silly in running such performance tests?
+3. Are there any new features in 2.6.36 kernel that we didn't enable and those disabled features lead to our current test result?
+
+Any suggestions and comments will be greatly appreciated.
+
+Thank you.
+
+Xiachen
+ 		 	   		  
