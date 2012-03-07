@@ -1,70 +1,27 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Mar 2012 03:41:22 -0800
-Subject: [PATCH] ARM: S3C24XX: Fix Section mismatch
-In-Reply-To: <20120307112219.GR17370@n2100.arm.linux.org.uk>
-References: <1331116612-14491-1-git-send-email-kgene.kim@samsung.com>
- <20120307112219.GR17370@n2100.arm.linux.org.uk>
-Message-ID: <4F574962.9020801@samsung.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 07 Mar 2012 15:40:38 +0400
+Subject: [PATCH 12/15] watchdog/mpcore_wdt: Add support for WDIOF_CARDRESET
+In-Reply-To: <cb4bdf968a4d53eebf8005636fcef5fde8cbebf7.1331115752.git.viresh.kumar@st.com>
+References: <cover.1331115751.git.viresh.kumar@st.com>
+ <cb4bdf968a4d53eebf8005636fcef5fde8cbebf7.1331115752.git.viresh.kumar@st.com>
+Message-ID: <4F574936.3010909@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/12 03:22, Russell King - ARM Linux wrote:
-> On Wed, Mar 07, 2012 at 02:36:52AM -0800, Kukjin Kim wrote:
->> WARNING: arch/arm/mach-s3c24xx/built-in.o(.data+0xf44): Section mismatch in reference
->> from the variable s3c2416_irq_interface to the function .init.text:s3c2416_irq_add()
->> The variable s3c2416_irq_interface references
->> the function __init s3c2416_irq_add()
->> If the reference is valid then annotate the
->> variable with __init* or __refdata (see linux/init.h) or name the variable:
->> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
->>
->> WARNING: arch/arm/mach-s3c24xx/built-in.o(.data+0x1b80): Section mismatch in reference
->> from the variable s3c2443_irq_interface to the function .init.text:s3c2443_irq_add()
->> The variable s3c2443_irq_interface references
->> the function __init s3c2443_irq_add()
->> If the reference is valid then annotate the
->> variable with __init* or __refdata (see linux/init.h) or name the variable:
->> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
->
->> diff --git a/arch/arm/mach-s3c24xx/irq-s3c2416.c b/arch/arm/mach-s3c24xx/irq-s3c2416.c
->> index b8a5836..59b7632 100644
->> --- a/arch/arm/mach-s3c24xx/irq-s3c2416.c
->> +++ b/arch/arm/mach-s3c24xx/irq-s3c2416.c
->> @@ -310,7 +310,7 @@ static int __init s3c2416_irq_add(struct device *dev)
->>   	return 0;
->>   }
->>
->> -static struct subsys_interface s3c2416_irq_interface = {
->> +static struct subsys_interface s3c2416_irq_interface __initdata = {
->>   	.name		= "s3c2416_irq",
->>   	.subsys		=&s3c2416_subsys,
->>   	.add_dev	= s3c2416_irq_add,
->> diff --git a/arch/arm/mach-s3c24xx/irq-s3c2443.c b/arch/arm/mach-s3c24xx/irq-s3c2443.c
->> index 35e4ff2..439f186 100644
->> --- a/arch/arm/mach-s3c24xx/irq-s3c2443.c
->> +++ b/arch/arm/mach-s3c24xx/irq-s3c2443.c
->> @@ -265,7 +265,7 @@ static int __init s3c2443_irq_add(struct device *dev)
->>   	return 0;
->>   }
->>
->> -static struct subsys_interface s3c2443_irq_interface = {
->> +static struct subsys_interface s3c2443_irq_interface __initdata = {
->>   	.name		= "s3c2443_irq",
->>   	.subsys		=&s3c2443_subsys,
->>   	.add_dev	= s3c2443_irq_add,
->
-> You register these structures with some other bit of code.  That other
-> bit of code adds these structures to a list. You then mark them as
-> __initdata, which means they get freed and the memory reused.  That
-> corrupts the list beneath the other code.
->
-> So, clearly, both of these are wrong.
+Hello.
 
-Oops, I see. Let me check it again.
-Thanks for pointing out.
+On 07-03-2012 14:27, Viresh Kumar wrote:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> mpcore watchdog can give last boot status, whether we got a watchdog reset or
+> not, via bit 0 of TWD_WDOG_RESETSTAT register. This patch adds support to return
+> correct status if WDIOC_GETBOOTSTATUS cmd is called with ioctl.
+
+    In the subject you say about another ioclt.
+
+> Signed-off-by: Viresh Kumar<viresh.kumar@st.com>
+> ---
+>   arch/arm/include/asm/smp_twd.h |    2 ++
+>   drivers/watchdog/mpcore_wdt.c  |   10 +++++++++-
+>   2 files changed, 11 insertions(+), 1 deletions(-)
+
+WBR, Sergei
