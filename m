@@ -1,189 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 07 Mar 2012 13:58:06 -0600
-Subject: [PATCH 5/6] ARM: at91: add ram controller DT support
-In-Reply-To: <1330718048-9314-5-git-send-email-plagnioj@jcrosoft.com>
-References: <20120302192844.GB21255@game.jcrosoft.org>
- <1330718048-9314-5-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4F57BDCE.1050708@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 7 Mar 2012 21:05:15 +0100
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
+In-Reply-To: <20120307192723.GE5050@titan.lakedaemon.net>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <80fb8cef577eee14364e95009f7a590fd9056ee3.1331090356.git.jason@lakedaemon.net>
+ <201203071831.31738.arnd@arndb.de>
+ <20120307192723.GE5050@titan.lakedaemon.net>
+Message-ID: <20120307200515.GC18513@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2012 01:54 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> We can now drop the call to ioremap_registers() as we have the binding for the
-> SDRAM/DDR Controller.
+On Wed, Mar 07, 2012 at 02:27:23PM -0500, Jason wrote:
+> On Wed, Mar 07, 2012 at 06:31:31PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 07 March 2012, Jason Cooper wrote:
+> > > +       serial at f1012000 {
+> > > +               compatible = "ns16550a";
+> > > +               reg = <0xf1012000 0xff>;
+> > > +               reg-shift = <2>;
+> > > +               interrupts = <33>;
+> > > +               clock-frequency = <200000000>;
+> > > +       };
+> > 
+> > I just noticed that the length here should be inclusive, i.e. 0x100 not 0xff.
+> > This is different from the way we define resources in Linux.
 > 
-> Drop ioremap_registers() for sam9x5 too.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  .../devicetree/bindings/arm/atmel-at91.txt         |   19 ++++++++++++++
->  arch/arm/boot/dts/at91sam9g20.dtsi                 |    5 +++
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |    6 ++++
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +++
->  arch/arm/mach-at91/at91sam9x5.c                    |    6 ----
->  arch/arm/mach-at91/include/mach/at91sam9x5.h       |    5 ---
->  arch/arm/mach-at91/setup.c                         |   27 +++++++++++++++++--
->  7 files changed, 59 insertions(+), 14 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index a64f867..1f87820 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -42,3 +42,22 @@ Example:
->  		compatible = "atmel,at91sam9260-rstc";
->  		reg = <0xfffffd00 0x10>;
->  	};
-> +
-> +RAMC SDRAM/DDR Controller required properties:
-> +- compatible: Should be "atmel,at91sam9260-sdramc",
-> +			"atmel,at91sam9g45-ddramc",
-> +- reg: Should contain registers location and length
-> +  For at91sam9263 and at91sam9g45 you must specify 2 entries.
-> +
-> +Examples:
-> +
-> +	ramc0: ramc at ffffe800 {
-> +		compatible = "atmel,at91sam9g45-ddramc";
-> +		reg = <0xffffe800 0x200>;
-> +	};
-> +
-> +	ramc0: ramc at ffffe400 {
-> +		compatible = "atmel,at91sam9g45-ddramc";
-> +		reg = <0xffffe400 0x200
-> +		       0xffffe600 0x200>;
-> +	};
-> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> index 5414347..573ac5a 100644
-> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> @@ -59,6 +59,11 @@
->  				reg = <0xfffff000 0x200>;
->  			};
->  
-> +			ramc0: ramc at ffffea00 {
-> +				compatible = "atmel,at91sam9260-sdramc";
-> +				reg = <0xffffea00 0x200>;
-> +			};
-> +
->  			pmc: pmc at fffffc00 {
->  				compatible = "atmel,at91rm9200-pmc";
->  				reg = <0xfffffc00 0x100>;
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index e2ccba5..6da07a9 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -60,6 +60,12 @@
->  				reg = <0xfffff000 0x200>;
->  			};
->  
-> +			ramc0: ramc at ffffe400 {
-> +				compatible = "atmel,at91sam9g45-ddramc";
-> +				reg = <0xffffe400 0x200
-> +				       0xffffe600 0x200>;
-> +			};
-> +
->  			pmc: pmc at fffffc00 {
->  				compatible = "atmel,at91rm9200-pmc";
->  				reg = <0xfffffc00 0x100>;
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 54e3030..09bc806 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -58,6 +58,11 @@
->  				reg = <0xfffff000 0x200>;
->  			};
->  
-> +			ramc0: ramc at ffffe800 {
-> +				compatible = "atmel,at91sam9g45-ddramc";
-> +				reg = <0xffffe800 0x200>;
-> +			};
-> +
->  			pmc: pmc at fffffc00 {
->  				compatible = "atmel,at91rm9200-pmc";
->  				reg = <0xfffffc00 0x100>;
-> diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-> index 0b82c34..b6831ee 100644
-> --- a/arch/arm/mach-at91/at91sam9x5.c
-> +++ b/arch/arm/mach-at91/at91sam9x5.c
-> @@ -302,11 +302,6 @@ static void __init at91sam9x5_map_io(void)
->  	at91_init_sram(0, AT91SAM9X5_SRAM_BASE, AT91SAM9X5_SRAM_SIZE);
->  }
->  
-> -static void __init at91sam9x5_ioremap_registers(void)
-> -{
-> -	at91_ioremap_ramc(0, AT91SAM9X5_BASE_DDRSDRC0, 512);
-> -}
-> -
->  void __init at91sam9x5_initialize(void)
->  {
->  	at91_extern_irq = (1 << AT91SAM9X5_ID_IRQ0);
-> @@ -359,7 +354,6 @@ static unsigned int at91sam9x5_default_irq_priority[NR_AIC_IRQS] __initdata = {
->  struct at91_init_soc __initdata at91sam9x5_soc = {
->  	.map_io = at91sam9x5_map_io,
->  	.default_irq_priority = at91sam9x5_default_irq_priority,
-> -	.ioremap_registers = at91sam9x5_ioremap_registers,
->  	.register_clocks = at91sam9x5_register_clocks,
->  	.init = at91sam9x5_initialize,
->  };
-> diff --git a/arch/arm/mach-at91/include/mach/at91sam9x5.h b/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> index a297a77..88e43d5 100644
-> --- a/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> +++ b/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> @@ -55,11 +55,6 @@
->  #define AT91SAM9X5_BASE_USART2	0xf8024000
->  
->  /*
-> - * System Peripherals
-> - */
-> -#define AT91SAM9X5_BASE_DDRSDRC0	0xffffe800
-> -
-> -/*
->   * Base addresses for early serial code (uncompress.h)
->   */
->  #define AT91_DBGU	AT91_BASE_DBGU0
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index 3e48b59..f86450d 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -315,12 +315,33 @@ static void at91_dt_rstc(void)
->  	of_node_put(np);
->  }
->  
-> +static struct of_device_id ramc_ids[] = {
-> +	{ .compatible = "atmel,at91sam9260-sdramc" },
-> +	{ .compatible = "atmel,at91sam9g45-ddramc" },
-> +	{ /*sentinel*/ }
-> +};
-> +
-> +static void at91_dt_ramc(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_matching_node(NULL, ramc_ids);
-> +	if (!np)
-> +		panic("unable to find compatible ram conroller node in dtb\n");
+> Grrr.  Now I'm getting frustrated.  I'm trying to boot without
+> earlyprintk.  Evidently, something is wrong with the above, because the
+> device boots all the way up (blinky lights come on), but I get no
+> messages after the usual "Uncompressing Linux... done, booting the
+> kernel."
 
-You really can't boot if this fails? A WARN is better if it allows you
-to boot until at least your console is actually up.
+Hi Jason
 
-> +
-> +	at91_ramc_base[0] = of_iomap(np, 0);
-> +	if (!at91_ramc_base[0])
-> +		panic("unable to map ramc[0] cpu registers\n");
-> +	/* the controller may have 2 banks */
-> +	at91_ramc_base[1] = of_iomap(np, 1);
-> +
-> +	of_node_put(np);
-> +}
-> +
->  void __init at91_dt_initialize(void)
->  {
->  	at91_dt_rstc();
-> -
-> -	/* temporary until have the ramc binding*/
-> -	at91_boot_soc.ioremap_registers();
-> +	at91_dt_ramc();
->  
->  	/* Init clock subsystem */
->  	at91_dt_clock_init();
+What do you see in /proc/iomem?
+
+You should expect:
+
+f1012000-f10120ff : serial8250.0
+  f1012000-f101201f : serial
+f1012100-f10121ff : serial8250.1
+  f1012100-f101211f : serial
+
+or probably just the first, if your device only has one serial port.
+
+How about /proc/interrupts?
+
+ 33:        195  orion_irq  serial
+
+
+Anything like this in dmesg?
+
+[   17.189397] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+[   17.210023] serial8250.0: ttyS0 at MMIO 0xf1012000 (irq = 33) is a 16550A
+[   17.624748] console [ttyS0] enabled
+[   17.648555] serial8250.1: ttyS1 at MMIO 0xf1012100 (irq = 34) is a 16550A
+
+Comparing your system to the above might help you track down which
+property is wrong.
+
+	 Andrew
