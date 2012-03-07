@@ -1,98 +1,84 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 7 Mar 2012 09:45:29 +0800
-Subject: [GIT PULL][v3.4] pull request on pxa tree for DT branch
-In-Reply-To: <CAN1soZyA8iYJjcWRQoPEP=ksCwVfP6JYqcAdVh_qYjg2oc5XqQ@mail.gmail.com>
-References: <CAN1soZyA8iYJjcWRQoPEP=ksCwVfP6JYqcAdVh_qYjg2oc5XqQ@mail.gmail.com>
-Message-ID: <CAN1soZzd_6BS=qXKzm8-a+Z=rqC1shJYcoHNwedcHUVhsMo4Ww@mail.gmail.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 7 Mar 2012 01:46:54 +0000 (GMT)
+Subject: [PATCH v2] ARM: pxa: fix regulator related build fail in
+ magician_defconfig
+In-Reply-To: <1331066978-24774-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1331084814.11802.YahooMailClassic@web29012.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+--- On Tue, 6/3/12, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+> commit
+> 737f360d5bef5e01c6cfa755dca0b449a154c1e0 (linux-next)
+> 
+> ? "regulator: Remove support for supplies specified by
+> struct device"
+> 
+> deletes the field from the struct, but this platform was
+> still trying
+> to set those fields.? Convert them to use the
+> REGULATOR_SUPPLY macro
+> so as to fix this failure:
+> 
+> arch/arm/mach-pxa/magician.c:581: error: unknown field 'dev'
+> specified in initializer
+> arch/arm/mach-pxa/magician.c:581: warning: initialization
+> from incompatible pointer type
+> arch/arm/mach-pxa/magician.c:585: error: unknown field 'dev'
+> specified in initializer
+> arch/arm/mach-pxa/magician.c:585: warning: initialization
+> from incompatible pointer type
+> 
+> arch/arm/mach-pxa/hx4700.c:683: error: unknown field 'dev'
+> specified in initializer
+> arch/arm/mach-pxa/hx4700.c:683: warning: initialization from
+> incompatible pointer type
+> arch/arm/mach-pxa/hx4700.c:687: error: unknown field 'dev'
+> specified in initializer
+> arch/arm/mach-pxa/hx4700.c:687: warning: initialization from
+> incompatible pointer type
+> 
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
+> 
+> [v2: convert to using REGULATOR_SUPPLY instead of just
+> deleting the
+>  instances of setting the .dev field ]
+> 
+> diff --git a/arch/arm/mach-pxa/hx4700.c
+> b/arch/arm/mach-pxa/hx4700.c
+> index f2c23ea..53c3366 100644
+> --- a/arch/arm/mach-pxa/hx4700.c
+> +++ b/arch/arm/mach-pxa/hx4700.c
+> @@ -679,14 +679,8 @@ static struct platform_device
+> power_supply = {
+> ? */
+>  
+>  static struct regulator_consumer_supply bq24022_consumers[]
+> = {
+> -??? {
+> -??? ??? .dev =
+> &gpio_vbus.dev,
+> -??? ??? .supply =
+> "vbus_draw",
+> -??? },
+> -??? {
+> -??? ??? .dev =
+> &power_supply.dev,
+> -??? ??? .supply = "ac_draw",
+> -??? },
+> +??? REGULATOR_SUPPLY("vbus_draw",
+> "gpio_vbus"),
+> +??? REGULATOR_SUPPLY("ac_draw",
+> "power_supply"),
+>  };
 
-I update the branch according the comments on serial-pxa driver.
-Please help to merge these patches.
+The above hx4700 patch yields the following warnings:
 
-Thanks
-Haojian
+_regulator_get: gpio-vbus supply vbus_draw not found, using dummy regulator
+_regulator_get: pda-power supply ac_draw not found, using dummy regulator
 
-The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+I suggest the following lines instead:
 
-  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
-
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git dt
-
-Haojian Zhuang (6):
-      serial: pxa: add OF support
-      i2c: pxa: add OF support
-      ARM: mmp: enable rtc clk in pxa168
-      ARM: mmp: append OF support on pxa168
-      ARM: dts: append DTS file of pxa168
-      Document: devicetree: add OF documents for arch-mmp
-
- Documentation/devicetree/bindings/arm/mrvl.txt     |    6 +
- .../devicetree/bindings/gpio/mrvl-gpio.txt         |   23 +++++
- Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   37 ++++++++
- .../devicetree/bindings/rtc/sa1100-rtc.txt         |   17 ++++
- .../devicetree/bindings/serial/mrvl-serial.txt     |    4 +
- arch/arm/boot/dts/pxa168-aspenite.dts              |   38 ++++++++
- arch/arm/boot/dts/pxa168.dtsi                      |   98 ++++++++++++++++++++
- arch/arm/mach-mmp/Kconfig                          |   10 ++
- arch/arm/mach-mmp/Makefile                         |    1 +
- arch/arm/mach-mmp/mmp-dt.c                         |   75 +++++++++++++++
- arch/arm/mach-mmp/pxa168.c                         |    2 +
- drivers/i2c/busses/i2c-pxa.c                       |   95 +++++++++++++++----
- drivers/tty/serial/pxa.c                           |   49 ++++++++---
- 13 files changed, 422 insertions(+), 33 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mrvl.txt
- create mode 100644 Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
- create mode 100644 Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
- create mode 100644 Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
- create mode 100644 Documentation/devicetree/bindings/serial/mrvl-serial.txt
- create mode 100644 arch/arm/boot/dts/pxa168-aspenite.dts
- create mode 100644 arch/arm/boot/dts/pxa168.dtsi
- create mode 100644 arch/arm/mach-mmp/mmp-dt.c
-
-
-On Tue, Mar 6, 2012 at 1:51 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> Hi Arnd,
->
-> Please help to pull DT patches on pxa tree. I based it on v3.3-rc6.
->
-> The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
->
-> ?Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
->
-> are available in the git repository at:
-> ?git://github.com/hzhuang1/linux.git dt
->
-> Haojian Zhuang (6):
-> ? ? ?serial: pxa: add OF support
-> ? ? ?i2c: pxa: add OF support
-> ? ? ?ARM: mmp: enable rtc clk in pxa168
-> ? ? ?ARM: mmp: append OF support on pxa168
-> ? ? ?ARM: dts: append DTS file of pxa168
-> ? ? ?Document: devicetree: add OF documents for arch-mmp
->
-> ?Documentation/devicetree/bindings/arm/mrvl.txt ? ? | ? ?6 +
-> ?.../devicetree/bindings/gpio/mrvl-gpio.txt ? ? ? ? | ? 23 +++++
-> ?Documentation/devicetree/bindings/i2c/mrvl-i2c.txt | ? 37 ++++++++
-> ?.../devicetree/bindings/rtc/sa1100-rtc.txt ? ? ? ? | ? 17 ++++
-> ?.../devicetree/bindings/serial/mrvl-serial.txt ? ? | ? ?4 +
-> ?arch/arm/boot/dts/pxa168-aspenite.dts ? ? ? ? ? ? ?| ? 38 ++++++++
-> ?arch/arm/boot/dts/pxa168.dtsi ? ? ? ? ? ? ? ? ? ? ?| ? 98 ++++++++++++++++++++
-> ?arch/arm/mach-mmp/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 10 ++
-> ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-mmp/mmp-dt.c ? ? ? ? ? ? ? ? ? ? ? ? | ? 75 +++++++++++++++
-> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
-> ?drivers/i2c/busses/i2c-pxa.c ? ? ? ? ? ? ? ? ? ? ? | ? 95 +++++++++++++++----
-> ?drivers/tty/serial/pxa.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 52 ++++++++---
-> ?13 files changed, 425 insertions(+), 33 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/arm/mrvl.txt
-> ?create mode 100644 Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
-> ?create mode 100644 Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
-> ?create mode 100644 Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
-> ?create mode 100644 Documentation/devicetree/bindings/serial/mrvl-serial.txt
-> ?create mode 100644 arch/arm/boot/dts/pxa168-aspenite.dts
-> ?create mode 100644 arch/arm/boot/dts/pxa168.dtsi
-> ?create mode 100644 arch/arm/mach-mmp/mmp-dt.c
+	REGULATOR_SUPPLY("vbus_draw", "gpio-vbus"),
+	REGULATOR_SUPPLY("ac_draw", "pda-power"),
