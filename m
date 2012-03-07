@@ -1,25 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Mar 2012 14:56:29 -0800
-Subject: [PATCH] MAINTAINERS: update my email address
-In-Reply-To: <1330995516-22160-1-git-send-email-swarren@nvidia.com>
-References: <1330995516-22160-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20120307225629.GA24934@quad.lixom.net>
+Date: Wed, 7 Mar 2012 14:59:05 -0800
+Subject: [GIT PULL] maintainers file updates for DaVinci
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317ECFD3@DBDE01.ent.ti.com>
+References: <DF0F476B391FA8409C78302C7BA518B6317ECFD3@DBDE01.ent.ti.com>
+Message-ID: <CAOesGMiUt9xUVf-F6B58Sn6EBWegb3Lb8tb76KeCiLk+_PUowA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2012 at 05:58:36PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@wwwdotorg.org>
-> 
-> My nvidia.com address is hosted by MS Exchange Server and isn't suitable
-> for receiving patches. Update my MAINTAINERS entry to something that is.
-> Note: The old address continues to work, I just want to ensure that I
-> receive patches at the new one where possible.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+Hi,
 
-Thanks, I reworded the subject line and applied directly to the arm-soc
-next/maintainers branch.
+On Wed, Mar 7, 2012 at 11:02 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> Hi Arnd, Olof,
+>
+> Can you please pull the following MAINTAINERS file
+> updates for DaVinci for v3.4?
+
+Pulled, thanks.
 
 
 -Olof
