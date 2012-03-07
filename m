@@ -1,25 +1,64 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 07 Mar 2012 12:59:18 +0100
-Subject: [PATCH v3 02/13] gpio/omap: fix wakeup_en register update in
- _set_gpio_wakeup()
-In-Reply-To: <1331118963-26364-3-git-send-email-tarun.kanti@ti.com>
+Date: Wed, 07 Mar 2012 13:00:13 +0100
+Subject: [PATCH v3 08/13] gpio/omap: remove redundant decoding of gpio
+ offset
+In-Reply-To: <1331118963-26364-9-git-send-email-tarun.kanti@ti.com>
 References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
- <1331118963-26364-3-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4F574D96.5070306@ti.com>
+ <1331118963-26364-9-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4F574DCD.4000507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 07 March 2012 12:15 PM, Tarun Kanti DebBarma wrote:
-> There are two ways through which wakeup_en register can be programmed
-> using gpiolib APIs as shown below. It is seen that in the second case
-> in _set_gpio_wakeup(), even though bank->suspend_wakeup is updated
-> correctly, its value is not programmed in wakeup_en register. Fix this.
+> In gpio_get(), _get_gpio_datain() and _get_gpio_dataout() get rid of
+> un-necessary operation to compute gpio mask. The gpio offset passed
+> to gpio_get() is sufficient to do that.
 > 
-> chip.irq_set_type()->gpio_irq_type()->_set_gpio_triggering()->set_gpio_trigger()
-> chip.irq_set_wake()->gpio_wake_enable()->_set_gpio_wakeup()
+> Here is Russell's original comment:
+> Can someone explain to me this:
+> #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
+> #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
 > 
+> static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
+> {
+>        void __iomem *reg = bank->base + bank->regs->datain;
+> 
+>        return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
+> }
+> 
+> static int gpio_get(struct gpio_chip *chip, unsigned offset)
+> {
+>        struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
+>        void __iomem *reg = bank->base;
+>        int gpio = chip->base + offset;
+>        u32 mask = GPIO_BIT(bank, gpio);
+> 
+>        if (gpio_is_input(bank, mask))
+>                return _get_gpio_datain(bank, gpio);
+>        else
+>                return _get_gpio_dataout(bank, gpio);
+> }
+> 
+> Given that bank->width on OMAP is either 32 or 16, and GPIO numbers for
+> any GPIO chip are always aligned to 32 or 16, why does this code bother
+> adding the chips base gpio number and then modulo the width?
+> 
+> Surely this means if - for argument sake - you registered a GPIO chip
+> with 8 lines followed by one with 16 lines, GPIO0..7 would be chip 0
+> bit 0..7, GPIO8..15 would be chip 1 bit 8..15, GPIO16..23 would be
+> chip 1 bit 0..7.
+> 
+> However, if you registered a GPIO chip with 16 lines first, it would
+> mean GPIO0..15 would be chip 0 bit 0..15, and GPIO16..31 would be
+> chip 1 bit 0..15.
+> 
+> Surely this kind of behaviour is not intended?
+> 
+> Is there a reason why the bitmask can't just be (1 << offset) where
+> offset is passed into these functions as GPIO number - chip->base ?
+> 
+> Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
 > Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> ---
 Looks good.
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
