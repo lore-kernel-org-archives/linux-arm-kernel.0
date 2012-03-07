@@ -1,126 +1,98 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed,  7 Mar 2012 09:42:05 +0800
-Subject: [PATCH v3 1/6] serial: pxa: add OF support
-In-Reply-To: <201203061502.08097.arnd@arndb.de>
-References: <201203061502.08097.arnd@arndb.de>
-Message-ID: <1331084525-4638-1-git-send-email-haojian.zhuang@gmail.com>
+Date: Wed, 7 Mar 2012 09:45:29 +0800
+Subject: [GIT PULL][v3.4] pull request on pxa tree for DT branch
+In-Reply-To: <CAN1soZyA8iYJjcWRQoPEP=ksCwVfP6JYqcAdVh_qYjg2oc5XqQ@mail.gmail.com>
+References: <CAN1soZyA8iYJjcWRQoPEP=ksCwVfP6JYqcAdVh_qYjg2oc5XqQ@mail.gmail.com>
+Message-ID: <CAN1soZzd_6BS=qXKzm8-a+Z=rqC1shJYcoHNwedcHUVhsMo4Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haojian Zhuang <haojian.zhuang@marvell.com>
+Hi Arnd,
 
-Parse uart device id from alias in DTS file.
+I update the branch according the comments on serial-pxa driver.
+Please help to merge these patches.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
----
- drivers/tty/serial/pxa.c |   49 ++++++++++++++++++++++++++++++++++-----------
- 1 files changed, 37 insertions(+), 12 deletions(-)
+Thanks
+Haojian
 
-diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-index 5c8e3bb..cdf4b2b 100644
---- a/drivers/tty/serial/pxa.c
-+++ b/drivers/tty/serial/pxa.c
-@@ -36,6 +36,7 @@
- #include <linux/circ_buf.h>
- #include <linux/delay.h>
- #include <linux/interrupt.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/tty.h>
- #include <linux/tty_flip.h>
-@@ -44,6 +45,8 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- 
-+#define PXA_NAME_LEN		8
-+
- struct uart_pxa_port {
- 	struct uart_port        port;
- 	unsigned char           ier;
-@@ -51,7 +54,7 @@ struct uart_pxa_port {
- 	unsigned char           mcr;
- 	unsigned int            lsr_break_flag;
- 	struct clk		*clk;
--	char			*name;
-+	char			name[PXA_NAME_LEN];
- };
- 
- static inline unsigned int serial_in(struct uart_pxa_port *up, int offset)
-@@ -781,6 +784,31 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
- };
- #endif
- 
-+static struct of_device_id serial_pxa_dt_ids[] = {
-+	{ .compatible = "mrvl,pxa-uart", },
-+	{ .compatible = "mrvl,mmp-uart", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, serial_pxa_dt_ids);
-+
-+static int serial_pxa_probe_dt(struct platform_device *pdev,
-+			       struct uart_pxa_port *sport)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int ret;
-+
-+	if (!np)
-+		return 1;
-+
-+	ret = of_alias_get_id(np, "serial");
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
-+		return ret;
-+	}
-+	sport->port.line = ret;
-+	return 0;
-+}
-+
- static int serial_pxa_probe(struct platform_device *dev)
- {
- 	struct uart_pxa_port *sport;
-@@ -808,20 +836,16 @@ static int serial_pxa_probe(struct platform_device *dev)
- 	sport->port.irq = irqres->start;
- 	sport->port.fifosize = 64;
- 	sport->port.ops = &serial_pxa_pops;
--	sport->port.line = dev->id;
- 	sport->port.dev = &dev->dev;
- 	sport->port.flags = UPF_IOREMAP | UPF_BOOT_AUTOCONF;
- 	sport->port.uartclk = clk_get_rate(sport->clk);
- 
--	switch (dev->id) {
--	case 0: sport->name = "FFUART"; break;
--	case 1: sport->name = "BTUART"; break;
--	case 2: sport->name = "STUART"; break;
--	case 3: sport->name = "HWUART"; break;
--	default:
--		sport->name = "???";
--		break;
--	}
-+	ret = serial_pxa_probe_dt(dev, sport);
-+	if (ret > 0)
-+		sport->port.line = dev->id;
-+	else if (ret < 0)
-+		goto err_clk;
-+	snprintf(sport->name, PXA_NAME_LEN - 1, "UART%d", sport->port.line + 1);
- 
- 	sport->port.membase = ioremap(mmres->start, resource_size(mmres));
- 	if (!sport->port.membase) {
-@@ -829,7 +853,7 @@ static int serial_pxa_probe(struct platform_device *dev)
- 		goto err_clk;
- 	}
- 
--	serial_pxa_ports[dev->id] = sport;
-+	serial_pxa_ports[sport->port.line] = sport;
- 
- 	uart_add_one_port(&serial_pxa_reg, &sport->port);
- 	platform_set_drvdata(dev, sport);
-@@ -866,6 +890,7 @@ static struct platform_driver serial_pxa_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &serial_pxa_pm_ops,
- #endif
-+		.of_match_table = serial_pxa_dt_ids,
- 	},
- };
- 
--- 
-1.7.5.4
+The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+
+  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+
+are available in the git repository at:
+  git://github.com/hzhuang1/linux.git dt
+
+Haojian Zhuang (6):
+      serial: pxa: add OF support
+      i2c: pxa: add OF support
+      ARM: mmp: enable rtc clk in pxa168
+      ARM: mmp: append OF support on pxa168
+      ARM: dts: append DTS file of pxa168
+      Document: devicetree: add OF documents for arch-mmp
+
+ Documentation/devicetree/bindings/arm/mrvl.txt     |    6 +
+ .../devicetree/bindings/gpio/mrvl-gpio.txt         |   23 +++++
+ Documentation/devicetree/bindings/i2c/mrvl-i2c.txt |   37 ++++++++
+ .../devicetree/bindings/rtc/sa1100-rtc.txt         |   17 ++++
+ .../devicetree/bindings/serial/mrvl-serial.txt     |    4 +
+ arch/arm/boot/dts/pxa168-aspenite.dts              |   38 ++++++++
+ arch/arm/boot/dts/pxa168.dtsi                      |   98 ++++++++++++++++++++
+ arch/arm/mach-mmp/Kconfig                          |   10 ++
+ arch/arm/mach-mmp/Makefile                         |    1 +
+ arch/arm/mach-mmp/mmp-dt.c                         |   75 +++++++++++++++
+ arch/arm/mach-mmp/pxa168.c                         |    2 +
+ drivers/i2c/busses/i2c-pxa.c                       |   95 +++++++++++++++----
+ drivers/tty/serial/pxa.c                           |   49 ++++++++---
+ 13 files changed, 422 insertions(+), 33 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mrvl.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/mrvl-serial.txt
+ create mode 100644 arch/arm/boot/dts/pxa168-aspenite.dts
+ create mode 100644 arch/arm/boot/dts/pxa168.dtsi
+ create mode 100644 arch/arm/mach-mmp/mmp-dt.c
+
+
+On Tue, Mar 6, 2012 at 1:51 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> Hi Arnd,
+>
+> Please help to pull DT patches on pxa tree. I based it on v3.3-rc6.
+>
+> The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+>
+> ?Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+>
+> are available in the git repository at:
+> ?git://github.com/hzhuang1/linux.git dt
+>
+> Haojian Zhuang (6):
+> ? ? ?serial: pxa: add OF support
+> ? ? ?i2c: pxa: add OF support
+> ? ? ?ARM: mmp: enable rtc clk in pxa168
+> ? ? ?ARM: mmp: append OF support on pxa168
+> ? ? ?ARM: dts: append DTS file of pxa168
+> ? ? ?Document: devicetree: add OF documents for arch-mmp
+>
+> ?Documentation/devicetree/bindings/arm/mrvl.txt ? ? | ? ?6 +
+> ?.../devicetree/bindings/gpio/mrvl-gpio.txt ? ? ? ? | ? 23 +++++
+> ?Documentation/devicetree/bindings/i2c/mrvl-i2c.txt | ? 37 ++++++++
+> ?.../devicetree/bindings/rtc/sa1100-rtc.txt ? ? ? ? | ? 17 ++++
+> ?.../devicetree/bindings/serial/mrvl-serial.txt ? ? | ? ?4 +
+> ?arch/arm/boot/dts/pxa168-aspenite.dts ? ? ? ? ? ? ?| ? 38 ++++++++
+> ?arch/arm/boot/dts/pxa168.dtsi ? ? ? ? ? ? ? ? ? ? ?| ? 98 ++++++++++++++++++++
+> ?arch/arm/mach-mmp/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 10 ++
+> ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-mmp/mmp-dt.c ? ? ? ? ? ? ? ? ? ? ? ? | ? 75 +++++++++++++++
+> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +
+> ?drivers/i2c/busses/i2c-pxa.c ? ? ? ? ? ? ? ? ? ? ? | ? 95 +++++++++++++++----
+> ?drivers/tty/serial/pxa.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 52 ++++++++---
+> ?13 files changed, 425 insertions(+), 33 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/arm/mrvl.txt
+> ?create mode 100644 Documentation/devicetree/bindings/gpio/mrvl-gpio.txt
+> ?create mode 100644 Documentation/devicetree/bindings/i2c/mrvl-i2c.txt
+> ?create mode 100644 Documentation/devicetree/bindings/rtc/sa1100-rtc.txt
+> ?create mode 100644 Documentation/devicetree/bindings/serial/mrvl-serial.txt
+> ?create mode 100644 arch/arm/boot/dts/pxa168-aspenite.dts
+> ?create mode 100644 arch/arm/boot/dts/pxa168.dtsi
+> ?create mode 100644 arch/arm/mach-mmp/mmp-dt.c
