@@ -1,61 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 7 Mar 2012 21:05:15 +0100
-Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
-In-Reply-To: <20120307192723.GE5050@titan.lakedaemon.net>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <80fb8cef577eee14364e95009f7a590fd9056ee3.1331090356.git.jason@lakedaemon.net>
- <201203071831.31738.arnd@arndb.de>
- <20120307192723.GE5050@titan.lakedaemon.net>
-Message-ID: <20120307200515.GC18513@lunn.ch>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 07 Mar 2012 12:14:38 -0800
+Subject: [GIT PULL] ARM: OMAP2+: PM: core support for SMPS regulators for v3.4
+Message-ID: <877gywjhht.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 02:27:23PM -0500, Jason wrote:
-> On Wed, Mar 07, 2012 at 06:31:31PM +0000, Arnd Bergmann wrote:
-> > On Wednesday 07 March 2012, Jason Cooper wrote:
-> > > +       serial at f1012000 {
-> > > +               compatible = "ns16550a";
-> > > +               reg = <0xf1012000 0xff>;
-> > > +               reg-shift = <2>;
-> > > +               interrupts = <33>;
-> > > +               clock-frequency = <200000000>;
-> > > +       };
-> > 
-> > I just noticed that the length here should be inclusive, i.e. 0x100 not 0xff.
-> > This is different from the way we define resources in Linux.
-> 
-> Grrr.  Now I'm getting frustrated.  I'm trying to boot without
-> earlyprintk.  Evidently, something is wrong with the above, because the
-> device boots all the way up (blinky lights come on), but I get no
-> messages after the usual "Uncompressing Linux... done, booting the
-> kernel."
+Tony,
 
-Hi Jason
+Please pull the following support for using regulators to control the
+on-chip VC/VP managed voltage domains.
 
-What do you see in /proc/iomem?
+The regulator driver support for this is already queued in the regulator
+tree, and this is the supporting core work.
 
-You should expect:
+This combined with the CPUfreq changes to use the regulator framework
+will finally result in MPU DVFS working in mainline.
 
-f1012000-f10120ff : serial8250.0
-  f1012000-f101201f : serial
-f1012100-f10121ff : serial8250.1
-  f1012100-f101211f : serial
-
-or probably just the first, if your device only has one serial port.
-
-How about /proc/interrupts?
-
- 33:        195  orion_irq  serial
+Kevin
 
 
-Anything like this in dmesg?
+The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
 
-[   17.189397] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
-[   17.210023] serial8250.0: ttyS0 at MMIO 0xf1012000 (irq = 33) is a 16550A
-[   17.624748] console [ttyS0] enabled
-[   17.648555] serial8250.1: ttyS1 at MMIO 0xf1012100 (irq = 34) is a 16550A
+  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
 
-Comparing your system to the above might help you track down which
-property is wrong.
+are available in the git repository at:
 
-	 Andrew
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/pm/smps-regulator
+
+for you to fetch changes up to c15f1d84bb3ddd668593e9bca53221a2f82e9e99:
+
+  ARM: OMAP2+: voltage: ensure voltage used is exact voltage from OPP table (2012-03-06 17:37:14 -0800)
+
+----------------------------------------------------------------
+Kevin Hilman (1):
+      ARM: OMAP2+: voltage: ensure voltage used is exact voltage from OPP table
+
+Tero Kristo (4):
+      arm: omap3: voltage: fix channel configuration
+      arm: omap3: add common twl configurations for vdd1 and vdd2
+      arm: omap3: twl: add external controllers for core voltage regulators
+      arm: omap4: add common twl configurations for vdd1, vdd2 and vdd3
+
+ arch/arm/mach-omap2/twl-common.c  |  147 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/vc3xxx_data.c |    1 +
+ arch/arm/mach-omap2/voltage.c     |   21 +++++-
+ 3 files changed, 166 insertions(+), 3 deletions(-)
