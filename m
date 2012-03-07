@@ -1,79 +1,51 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 07 Mar 2012 15:28:06 +0530
-Subject: [PATCH v2 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
-In-Reply-To: <4F54714E.6080805@ti.com>
-References: <1329996409-26861-1-git-send-email-rnayak@ti.com>
- <4F476228.7060607@ti.com> <4F54714E.6080805@ti.com>
-Message-ID: <4F57312E.4080104@ti.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Wed, 07 Mar 2012 10:09:18 +0000
+Subject: [PATCH] pxafb: do console locking before calling fb_blank()
+In-Reply-To: <1330264322-5938-1-git-send-email-anarsoul@gmail.com>
+References: <1330264322-5938-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <4F5733CE.2060900@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 March 2012 01:24 PM, Rajendra Nayak wrote:
-> On Friday 24 February 2012 03:40 PM, Rajendra Nayak wrote:
->> Chris,
->>
->> On Thursday 23 February 2012 04:56 PM, Rajendra Nayak wrote:
->>> Re-sending as these patches did not make it to the lists due to
->>> issues with my 'git send-email'
->>>
->>> This series mainly cleans up all instances of hardcoding's in
->>> the driver based on pdev->id. This is cleanup leading to the
->>> DT adaptation of omap_hsmmc driver.
->>>
->>> v2 mainly has some minor changes to get rid of a debug print
->>> which was still using host->id and getting rid of 'id' field
->>> entirely from omap_hsmmc_host struct.
->>>
->>> The series is tested on OMAP4SDP, OMAP4panda, OMAP3beagle and
->>> OMAP2430SDP
->>> boards.
->>
->> This series is reviewed/tested and acked by Balaji and Venkat.
->> Care to pull this in for 3.4?
->>
->> I have one other cleanup patch on top of this series to make all
->> remaining pr_* prints in the driver to dev_* [1].
->> It would be great if you could pick that up as well.
->>
->> These patches are cleanups leading to the DT conversion of omap_hsmmc
->> driver.
->
-> Chris, Ping. I am basing my DT support patches on top of these cleanups.
-> Would be great if you can have a look and pull them in.
+On 02/26/2012 01:52 PM, Vasily Khoruzhick wrote:
+> Otherwise we hit WARN_CONSOLE_UNLOCKED in do_unblank_screen
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-Chris, just realized the last two requests from me to get this merged
-weren't addressed to you directly, but instead you were copied.
-Resending with you in 'To', hope this lands in your inbox :)
+Applied.
 
-regards,
-Rajendra
 
->
->>
->> regards,
->> Rajendra
->>
->> [1] http://marc.info/?l=linux-mmc&m=132999677405098&w=3
->>
->>>
->>> regards,
->>> Rajendra
->>>
->>> Balaji T K (3):
->>> mmc: omap_hsmmc: use platform_get_resource_byname for tx/rx DMA
->>> channels
->>> mmc: omap_hsmmc: remove unused .set_sleep function
->>> mmc: omap_hsmmc: Use OMAP_HSMMC_SUPPORTS_DUAL_VOLT flag to remove
->>> host->id based hardcoding
->>>
->>> Rajendra Nayak (3):
->>> mmc: omap_hsmmc: Get rid of omap_hsmmc_1_set_power function
->>> mmc: omap_hsmmc: Get rid of omap_hsmmc_4_set_power function
->>> mmc: omap_hsmmc: Don't expect MMC1 to always have vmmc supply
->>>
->>> arch/arm/plat-omap/include/plat/mmc.h | 2 -
->>> drivers/mmc/host/omap_hsmmc.c | 175 +++------------------------------
->>> 2 files changed, 16 insertions(+), 161 deletions(-)
->>>
->>
->
+Thanks,
+
+Florian Tobias Schandinat
+
+> ---
+>  drivers/video/pxafb.c |    6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+> index 1d1e4f1..c176561 100644
+> --- a/drivers/video/pxafb.c
+> +++ b/drivers/video/pxafb.c
+> @@ -54,6 +54,7 @@
+>  #include <linux/mutex.h>
+>  #include <linux/kthread.h>
+>  #include <linux/freezer.h>
+> +#include <linux/console.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <asm/io.h>
+> @@ -730,9 +731,12 @@ static int overlayfb_open(struct fb_info *info, int user)
+>  	if (user == 0)
+>  		return -ENODEV;
+>  
+> -	if (ofb->usage++ == 0)
+> +	if (ofb->usage++ == 0) {
+>  		/* unblank the base framebuffer */
+> +		console_lock();
+>  		fb_blank(&ofb->fbi->fb, FB_BLANK_UNBLANK);
+> +		console_unlock();
+> +	}
+>  
+>  	return 0;
+>  }
