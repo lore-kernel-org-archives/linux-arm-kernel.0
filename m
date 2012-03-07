@@ -1,47 +1,54 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed,  7 Mar 2012 03:44:43 +0000
-Subject: [PATCH 02/14] ARM: Kirkwood: Remove tclk from
- kirkwood_asoc_platform_data.
+Date: Wed,  7 Mar 2012 03:44:48 +0000
+Subject: [PATCH 07/14] ARM: kirkwood: rtc-mv devicetree bindings
 In-Reply-To: <cover.1331090356.git.jason@lakedaemon.net>
 References: <cover.1331090356.git.jason@lakedaemon.net>
-Message-ID: <86ba431c57ae2f9172bdd92f69fd7a0938e4a374.1331090356.git.jason@lakedaemon.net>
+Message-ID: <bb4ab565bd8506f6ac126571f46fc3b26178821f.1331090356.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
-
-It is not used anywhere in the sound driver.
-
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/mach-kirkwood/common.c          |    1 -
- arch/arm/plat-orion/include/plat/audio.h |    1 -
- 2 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index cc15426..eacf7f5 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -449,7 +449,6 @@ void __init kirkwood_init(void)
- {
- 	printk(KERN_INFO "Kirkwood: %s, TCLK=%d.\n",
- 		kirkwood_id(), kirkwood_tclk);
--	kirkwood_i2s_data.tclk = kirkwood_tclk;
+Changes from previous version:
+
+* s/marvell,/mrvl,/g for compatible properties
+* split into binding patch and a use patch.
+
+ drivers/rtc/rtc-mv.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+index 768e2ed..0dd8421 100644
+--- a/drivers/rtc/rtc-mv.c
++++ b/drivers/rtc/rtc-mv.c
+@@ -12,6 +12,7 @@
+ #include <linux/bcd.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
+ #include <linux/delay.h>
+ #include <linux/gfp.h>
+ #include <linux/module.h>
+@@ -294,11 +295,19 @@ static int __exit mv_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 	/*
- 	 * Disable propagation of mbus errors to the CPU local bus,
-diff --git a/arch/arm/plat-orion/include/plat/audio.h b/arch/arm/plat-orion/include/plat/audio.h
-index 885f8ab..d6a55bd 100644
---- a/arch/arm/plat-orion/include/plat/audio.h
-+++ b/arch/arm/plat-orion/include/plat/audio.h
-@@ -2,7 +2,6 @@
- #define __PLAT_AUDIO_H
- 
- struct kirkwood_asoc_platform_data {
--	u32 tclk;
- 	int burst;
++#ifdef CONFIG_OF
++static struct of_device_id rtc_mv_of_match_table[] = {
++	{ .compatible = "mrvl,orion-rtc", },
++	{}
++};
++#endif
++
+ static struct platform_driver mv_rtc_driver = {
+ 	.remove		= __exit_p(mv_rtc_remove),
+ 	.driver		= {
+ 		.name	= "rtc-mv",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(rtc_mv_of_match_table),
+ 	},
  };
- #endif
+ 
 -- 
 1.7.3.4
