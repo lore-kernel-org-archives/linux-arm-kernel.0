@@ -1,110 +1,133 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Mar 2012 07:54:09 -0800
-Subject: [PATCH] ARM: SAMSUNG: change the name from s3c-sdhci to
- exynos4-sdhci
-In-Reply-To: <00db01ccfc6a$d34c2ee0$79e48ca0$%szyprowski@samsung.com>
-References: <4F45D343.6020409@samsung.com>
- <CAJuYYwTh8tVdA0X-TLEU-9O_M0_PmJR=i3WYAQXsaRcPF3MbJA@mail.gmail.com>
- <4F557692.8090102@samsung.com> <4F55DE1F.9010405@samsung.com>
- <4F576073.6010001@samsung.com>
- <00db01ccfc6a$d34c2ee0$79e48ca0$%szyprowski@samsung.com>
-Message-ID: <4F5784A1.1080903@samsung.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Wed, 7 Mar 2012 10:00:08 -0600
+Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <87pqcqnc7u.fsf@ti.com>
+References: <1330006564-13290-1-git-send-email-mporter@ti.com>
+ <87wr74gis6.fsf@ti.com>
+ <20120301204553.GA21841@legolas.emea.dhcp.ti.com>
+ <87pqcqnc7u.fsf@ti.com>
+Message-ID: <CA+Bv8XaJqL1L8F-n6skY7dHn1XAdDLRKaRjw0deLeoQ5Ao0Fhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/12 06:01, Marek Szyprowski wrote:
-> Hello,
+On Mon, Mar 5, 2012 at 12:18 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Felipe Balbi <balbi@ti.com> writes:
 >
-> On Wednesday, March 07, 2012 2:20 PM Kukjin Kim wrote:
->
->> On 03/06/12 01:51, Kukjin Kim wrote:
->>> On 03/05/12 18:29, Jaehoon Chung wrote:
->>>> Hi Kukjin.
->>>>
->>>> Is it merged?
->>>>
->>>> Best Regards,
->>>> Jaehoon Chung
->>>>
->>>> On 02/24/2012 06:56 PM, Thomas Abraham wrote:
->>>>
->>>>> On 23 February 2012 11:18, Jaehoon Chung<jh80.chung@samsung.com>  wrote:
->>>>>> Thomas Arbrahams's patchset have changed the device name in sdhci-s3c.c
->>>>>> (mmc: sdhci-s3c: Rework platform data and add device tree support)
->>>>>> But didn't change the regulator_consumer name.
->>>>>> So maybe didn't initialize the mmc/sd card for exynos4.
->>>>>>
->>>>>> This patch is fixed that (based-on linux-samsung for-next branch)
->>>>>>
->>>>>> Signed-off-by: Jaehoon Chung<jh80.chung@samsung.com>
->>>>>> Signed-off-by: kyungmin Park<kyungmin.park@samsung.com>
->>>>>> ---
->>>>>> arch/arm/mach-exynos/mach-nuri.c | 4 ++--
->>>>>> arch/arm/mach-exynos/mach-universal_c210.c | 2 +-
->>>>>> 2 files changed, 3 insertions(+), 3 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/mach-exynos/mach-nuri.c
->>>>>> b/arch/arm/mach-exynos/mach-nuri.c
->>>>>> index a6b9162..251dd7a 100644
->>>>>> --- a/arch/arm/mach-exynos/mach-nuri.c
->>>>>> +++ b/arch/arm/mach-exynos/mach-nuri.c
->>>>>> @@ -116,7 +116,7 @@ static struct s3c_sdhci_platdata
->>>>>> nuri_hsmmc0_data __initdata = {
->>>>>> };
->>>>>>
->>>>>> static struct regulator_consumer_supply emmc_supplies[] = {
->>>>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
->>>>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
->>>>>> REGULATOR_SUPPLY("vmmc", "dw_mmc"),
->>>>>> };
->>>>>>
->>>>>> @@ -415,7 +415,7 @@ static struct regulator_consumer_supply
->>>>>> __initdata max8997_ldo12_[] = {
->>>>>> REGULATOR_SUPPLY("vddio", "6-003c"), /* HDC802 */
->>>>>> };
->>>>>> static struct regulator_consumer_supply __initdata max8997_ldo13_[] = {
->>>>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"), /* TFLASH */
->>>>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.2"), /* TFLASH */
->>>>>> };
->>>>>> static struct regulator_consumer_supply __initdata max8997_ldo14_[] = {
->>>>>> REGULATOR_SUPPLY("inmotor", "max8997-haptic"),
->>>>>> diff --git a/arch/arm/mach-exynos/mach-universal_c210.c
->>>>>> b/arch/arm/mach-exynos/mach-universal_c210.c
->>>>>> index 6017a21..320cb1d 100644
->>>>>> --- a/arch/arm/mach-exynos/mach-universal_c210.c
->>>>>> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
->>>>>> @@ -749,7 +749,7 @@ static struct s3c_sdhci_platdata
->>>>>> universal_hsmmc0_data __initdata = {
->>>>>> };
->>>>>>
->>>>>> static struct regulator_consumer_supply mmc0_supplies[] = {
->>>>>> - REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
->>>>>> + REGULATOR_SUPPLY("vmmc", "exynos4-sdhci.0"),
->>>>>> };
->>>>>>
->>>>>> static struct regulator_init_data mmc0_fixed_voltage_init_data = {
->>>>>
->>>>> Reviewed-by: Thomas Abraham<thomas.abraham@linaro.org>
+>> Hi,
+>>
+>> On Thu, Mar 01, 2012 at 12:36:57PM -0800, Kevin Hilman wrote:
+>>> Matt Porter <mporter@ti.com> writes:
 >>>
->>> Looks OK, will apply.
+>>> > This fixes smsc911x support on platforms using gpmc_smsc911x_init().
+>>> >
+>>> > Commit c7e963f6888816 (net/smsc911x: Add regulator support) added
+>>> > the requirement that platforms provide vdd33a and vddvario supplies.
+>>> >
+>>> > Signed-off-by: Matt Porter <mporter@ti.com>
 >>>
+>>> [...]
+>>>
+>>> > ?/*
+>>> > ? * Initialize smsc911x device connected to the GPMC. Note that we
+>>> > ? * assume that pin multiplexing is done in the board-*.c file,
+>>> > @@ -55,6 +101,12 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+>>> >
+>>> > ? ?gpmc_cfg = board_data;
+>>> >
+>>> > + ?ret = platform_device_register(&gpmc_smsc911x_regulator);
+>>> > + ?if (ret < 0) {
+>>> > + ? ? ? ? ?pr_err("Unable to register smsc911x regulators: %d\n", ret);
+>>> > + ? ? ? ? ?return;
+>>> > + ?}
+>>> > +
+>>>
+>>> Boards that have more than one instance of the smsc911x (OMAP3/Overo)
+>>> barf here because of trying to register the same device twice.
+>>>
+>>> We need something like the patch below to make Overo boot again.
+>>>
+>>> Kevin
+>>>
+>>>
+>>>
+>>> From 4114dea2fb897ab75d05eaa943d29454034fc025 Mon Sep 17 00:00:00 2001
+>>> From: Kevin Hilman <khilman@ti.com>
+>>> Date: Thu, 1 Mar 2012 12:30:42 -0800
+>>> Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulators once
+>>>
+>>> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+>>> regulators) added regulators which are registered during
+>>> gpmc_smsc911x_init(). ?However, some platforms (OMAP3/Overo) have more
+>>> than one instance of the SMSC911x and result in attempting to register
+>>> the same regulator more than once which causes a panic(). ?Fix this by
+>>> tracking the regulator registration ensuring only a single device is
+>>> registered.
+>>>
+>>> Cc: Matt Porter <mporter@ti.com>
+>>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>>> ---
+>>> ?arch/arm/mach-omap2/gpmc-smsc911x.c | ? 14 ++++++++++----
+>>> ?1 file changed, 10 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
+>>> index bbb870c..95e6c7d 100644
+>>> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
+>>> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
+>>> @@ -88,6 +88,8 @@ static struct platform_device gpmc_smsc911x_regulator = {
+>>> ? ? ?},
+>>> ?};
+>>>
+>>> +static bool regulator_registered;
+>>> +
+>>> ?/*
+>>> ? * Initialize smsc911x device connected to the GPMC. Note that we
+>>> ? * assume that pin multiplexing is done in the board-*.c file,
+>>> @@ -101,10 +103,14 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
+>>>
+>>> ? ? ?gpmc_cfg = board_data;
+>>>
+>>> - ? ?ret = platform_device_register(&gpmc_smsc911x_regulator);
+>>> - ? ?if (ret < 0) {
+>>> - ? ? ? ? ? ?pr_err("Unable to register smsc911x regulators: %d\n", ret);
+>>> - ? ? ? ? ? ?return;
+>>> + ? ?if (!regulator_registered) {
+>>> + ? ? ? ? ? ?ret = platform_device_register(&gpmc_smsc911x_regulator);
+>>> + ? ? ? ? ? ?if (ret < 0) {
+>>> + ? ? ? ? ? ? ? ? ? ?pr_err("Unable to register smsc911x regulators: %d\n",
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
+>>> + ? ? ? ? ? ? ? ? ? ?return;
+>>> + ? ? ? ? ? ?}
+>>> + ? ? ? ? ? ?regulator_registered = true;
 >>
->> (Cc'ed Marek)
->>
->> Hi Kyungmin, Marek and Jaehoon,
->>
->> As you know, same patches have been submitted duplicated and this should
->> be fixed. Which one would be better to send upstream?
+>> Wow, this is quite a hack. Is the regulator part of the SMSC911x
+>> device or is it outside ? If it's outside the SMSC91xx (which I
+>> believe it is) there should be a regulator driver instead of this
+>> hack. ?For boards which don't provide such a regulator (and tie the
+>> supply pin to some constant voltage source) there should be a constant
+>> regulator supplying the pin. But this patch is quite hacky.
 >
-> For me it doesn't matter, I just need this fix to get merged, because otherwise
-> the Universal C210 and Nuri boards are dysfunctional.
+> Are you referring to my patch or to the original $SUBJECT patch? ?It's
+> not terribly clear.
 >
-> You can select the one prepared by Jaehoon if You like.
+> My patch doesn't add any regulators, it just fixes a bug when this init
+> function is called more than once.
+>
+> The addition of the regulators was done in $SUBJECT patch, not my fix.
+>
+> In either case $SUBJECT patch is already in Tony's fixes queue, so if it
+> is going be merged, then my fix above is needed also to not break
+> Overo and any other platform that has more than one smsc911x instance.
+>
+> Kevin
 
-OK, thanks :)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Have you tested this fix? The only regulator consumer supply would be:
+
+static struct regulator_consumer_supply gpmc_smsc911x_supply[] = {
+        REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
+        REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
+};
+
+I don't think the second smsc911x on the Overo, "smsc911x.1", would
+find it due to the dev_id.
