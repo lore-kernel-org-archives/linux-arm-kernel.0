@@ -1,40 +1,81 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue, 6 Mar 2012 19:16:43 -0800
-Subject: [PATCH 0/3] arm: tegra: dts: USB Updates for Tegra legacy mode /
- OTG
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF178E5D2FF5@HQMAIL01.nvidia.com>
-References: <1328288172-8059-1-git-send-email-sjg@chromium.org>
- <74CDBE0F657A3D45AFBB94109FB122FF178E5D2FF5@HQMAIL01.nvidia.com>
-Message-ID: <CAPnjgZ1rXEGbi3m3HeWiUxG_TbmUug0C0QZgb7_9Eiz-xPMHwg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue,  6 Mar 2012 21:36:22 -0600
+Subject: [PATCH] ARM: ebsa110: use runtime ioremap hook
+In-Reply-To: <alpine.LFD.2.02.1203061704180.31242@xanadu.home>
+References: <alpine.LFD.2.02.1203061704180.31242@xanadu.home>
+Message-ID: <1331091382-21149-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Olof
+From: Rob Herring <rob.herring@calxeda.com>
 
-Hi,
+Convert ebsa110 platforms to use run-time ioremap hook instead of the
+compile time hook.
 
-On Fri, Feb 3, 2012 at 11:59 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Simon Glass wrote at riday, February 03, 2012 9:56 AM:
->> This little series brings in some bindings that seem useful for U-Boot.
->>
->> I am working mostly in U-Boot, but since there is no shared .dts repo
->> I was asked to commit these changes to the kernel. I do not propose to
->> update the Linux USB drivers to match.
->
-> I think the series looks reasonable, so:
->
-> Acked-by: Stephen Warren <swarren@nvidia.com<>
->
-> (I note that the kernel's USB driver for USB1 doesn't attempt to clear
-> legacy mode; I wonder how we're getting away with that. Perhaps it's
-> only been tested with a bootloader that's already cleared legacy mode)
->
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
 
-How does this series get picked up, please?
+This fixes the missing caller ptr.
 
-Regards,
-Simon
+Rob
 
-> --
-> nvpublic
->
+ arch/arm/mach-ebsa110/core.c            |   15 +++++++++++++++
+ arch/arm/mach-ebsa110/include/mach/io.h |    9 ---------
+ 2 files changed, 15 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
+index 804c912..b049edb 100644
+--- a/arch/arm/mach-ebsa110/core.c
++++ b/arch/arm/mach-ebsa110/core.c
+@@ -119,6 +119,20 @@ static void __init ebsa110_map_io(void)
+ 	iotable_init(ebsa110_io_desc, ARRAY_SIZE(ebsa110_io_desc));
+ }
+ 
++static void __iomem *ebsa110_ioremap_caller(unsigned long cookie, size_t size,
++					    unsigned int flags, void *caller)
++{
++	return (void __iomem *)cookie;
++}
++
++static void ebsa110_iounmap(volatile void __iomem *io_addr)
++{}
++
++static void __init ebsa110_init_early(void)
++{
++	arch_ioremap_caller = ebsa110_ioremap_caller;
++	arch_iounmap = ebsa110_iounmap;
++}
+ 
+ #define PIT_CTRL		(PIT_BASE + 0x0d)
+ #define PIT_T2			(PIT_BASE + 0x09)
+@@ -315,6 +329,7 @@ MACHINE_START(EBSA110, "EBSA110")
+ 	.reserve_lp2	= 1,
+ 	.restart_mode	= 's',
+ 	.map_io		= ebsa110_map_io,
++	.init_early	= ebsa110_init_early,
+ 	.init_irq	= ebsa110_init_irq,
+ 	.timer		= &ebsa110_timer,
+ 	.restart	= ebsa110_restart,
+diff --git a/arch/arm/mach-ebsa110/include/mach/io.h b/arch/arm/mach-ebsa110/include/mach/io.h
+index 44679db..11bb079 100644
+--- a/arch/arm/mach-ebsa110/include/mach/io.h
++++ b/arch/arm/mach-ebsa110/include/mach/io.h
+@@ -62,15 +62,6 @@ void __writel(u32 val, void __iomem *addr);
+ #define writew(v,b)		__writew(v,b)
+ #define writel(v,b)		__writel(v,b)
+ 
+-static inline void __iomem *__arch_ioremap(unsigned long cookie, size_t size,
+-					   unsigned int flags)
+-{
+-	return (void __iomem *)cookie;
+-}
+-
+-#define __arch_ioremap		__arch_ioremap
+-#define __arch_iounmap(cookie)	do { } while (0)
+-
+ extern void insb(unsigned int port, void *buf, int sz);
+ extern void insw(unsigned int port, void *buf, int sz);
+ extern void insl(unsigned int port, void *buf, int sz);
+-- 
+1.7.5.4
