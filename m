@@ -1,38 +1,44 @@
-From: jwboyer@gmail.com (Josh Boyer)
-Date: Wed, 7 Mar 2012 09:15:59 -0500
-Subject: [PATCH 1/3] Kbuild: centralize MKIMAGE and cmd_uimage definitions
-In-Reply-To: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CA+5PVA7PCow=Z7TpPtQYp3ye6uKFSp3XsdH75Pe9BRu9Vyy21g@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 7 Mar 2012 11:17:55 -0300
+Subject: I.MX35 PDK
+In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D890F@MEP-EXCH.meprolight.com>
+References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A26@MEP-EXCH.meprolight.com>
+ <4F562C90.6090103@freescale.com>
+ <CAOMZO5CyGazr1=kLF51W7S7ZpEy2Mg4k2n_ZHnGimSyu2oVcrA@mail.gmail.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D890F@MEP-EXCH.meprolight.com>
+Message-ID: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2012 at 7:30 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> All ARCHs have the same definition of MKIMAGE. Move it to Makefile.lib
-> to avoid duplication.
->
-> All ARCHs have similar definitions of cmd_uimage. Place a sufficiently
-> parameterized version in Makefile.lib to avoid duplication.
->
-> The centralized cmd_uimage definition will allow the future introduction
-> of a centralized Kconfig option to make cmd_uimage use -T kernel_noload
-> rather than -T kernel.
->
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-> NOTE: I have not tested this patch in any way at all for architectures
-> other than ARM.
->
-> ?arch/arm/boot/Makefile ? ? ? ? ?| ? 23 +++++++++--------------
-> ?arch/avr32/boot/images/Makefile | ? ?9 +++------
-> ?arch/blackfin/boot/Makefile ? ? | ? 19 ++++++++-----------
-> ?arch/microblaze/boot/Makefile ? | ? 10 +++-------
-> ?arch/sh/boot/Makefile ? ? ? ? ? | ? ?8 ++------
-> ?arch/sparc/boot/Makefile ? ? ? ?| ? ?9 +++------
-> ?arch/unicore32/boot/Makefile ? ?| ? 12 ++----------
-> ?scripts/Makefile.lib ? ? ? ? ? ?| ? 24 ++++++++++++++++++++++++
-> ?8 files changed, 54 insertions(+), 60 deletions(-)
+On 3/7/12, Alex Gershgorin <alexg@meprolight.com> wrote:
 
-Is there a reason you skipped powerpc?
+> in spite of this I get from ov2640 driver error
+> Here Linux Kernel boot message:
+>
+> "Linux video capture interface: v2.00
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+> ov2640 0-0030: Product ID error fb:fb"
+>
+> I cannot understand what the problem is, if someone tested this?
 
-josh
+Looks like a I2C issue.
+
+Check the I2C1 pad settings in the mainline kernel.
+
+On FSL kernel we have:
+
+#define PAD_CONFIG (PAD_CTL_HYS_SCHMITZ | PAD_CTL_PKE_ENABLE |
+PAD_CTL_PUE_PUD | PAD_CTL_ODE_OpenDrain)
+
+	switch (i2c_num) {
+	case 0:
+		mxc_request_iomux(MX35_PIN_I2C1_CLK, MUX_CONFIG_SION);
+		mxc_request_iomux(MX35_PIN_I2C1_DAT, MUX_CONFIG_SION);
+
+		mxc_iomux_set_pad(MX35_PIN_I2C1_CLK, PAD_CONFIG);
+		mxc_iomux_set_pad(MX35_PIN_I2C1_DAT, PAD_CONFIG);
+
+Also check if you are getting the proper voltage levels at the I2C1 lines.
+
+Good luck!
