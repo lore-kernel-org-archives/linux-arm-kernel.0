@@ -1,79 +1,31 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Wed, 7 Mar 2012 16:47:12 +0530
-Subject: [PATCH 14/15] watchdog/mpcore_wdt: Add clock framework support
-In-Reply-To: <9ec7141baa4b1c1a0503893749e7ce0e19bb5029.1331115752.git.viresh.kumar@st.com>
-References: <cover.1331115751.git.viresh.kumar@st.com>
- <9ec7141baa4b1c1a0503893749e7ce0e19bb5029.1331115752.git.viresh.kumar@st.com>
-Message-ID: <20120307111711.GA31348@bnru02>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Mar 2012 03:17:44 -0800
+Subject: [PATCH 0/4] Use clock functions also for clk_h and clk_p on
+ S3C2443/2416
+In-Reply-To: <201203032214.36820.heiko@sntech.de>
+References: <201203032214.36820.heiko@sntech.de>
+Message-ID: <4F5743D8.702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 11:27:55 +0100, Viresh KUMAR wrote:
-> This patch adds in clk framework support for wdt driver. If clk_get fails for
-> some platform, then we continue without clk_* API's.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/watchdog/mpcore_wdt.c |   71 ++++++++++++++++++++++++++++++++++++-----
->  1 files changed, 63 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-> index ebd964a..9747193 100644
-> --- a/drivers/watchdog/mpcore_wdt.c
-> +++ b/drivers/watchdog/mpcore_wdt.c
-> @@ -17,6 +17,7 @@
->   *
->   * (c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
->   */
+On 03/03/12 13:14, Heiko St?bner wrote:
+> This series modifies the clock init in common-s3c2443 to use the
+> struct clk operations also for clk_p and clk_h whose values were until
+> now set statically in s3c24xx_setup_clocks - a function more suited to
+> the earlier S3C-SoCs.
+>
+> In the end it makes the code (hopefully) easier to read, as strange
+> divisions through register values get replaced by simply clk_get_rate
+> calls.
+>
+> To apply on top of the current s3c24xx consolidation.
+>
+OK, applied.
 
-[..]
+Thanks.
 
-> @@ -350,6 +368,28 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	wdt->clk = clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(wdt->clk)) {
-> +		dev_warn(&pdev->dev, "Clock not found\n");
-> +		wdt->clk = NULL;
-> +	}
-> +
-> +	if (wdt->clk) {
-> +		ret = clk_enable(wdt->clk);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "Clock enable failed\n");
-> +			goto err_put_clk;
-> +		}
-> +	}
-> +
-> +	wdt->boot_status = (readl(wdt->base + TWD_WDOG_RESETSTAT) &
-> +			TWD_WDOG_RESETSTAT_MASK) ? WDIOF_CARDRESET : 0;
-> +
-
-I see that patch 12/15 does this, why are you doing it here again in clock patch?
-
-> +	mpcore_wdt_stop(wdt);
-> +
-> +	if (wdt->clk)
-> +		clk_disable(wdt->clk);
-> +
->  	/*
->  	 * Check that the margin value is within it's range;
->  	 * if not reset to the default
-> @@ -368,25 +408,32 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
->  		dev_printk(KERN_ERR, wdt->dev,
->  			"cannot register miscdev on minor=%d (err=%d)\n",
->  							WATCHDOG_MINOR, ret);
-> -		return ret;
-> +		goto err_put_clk;
->  	}
->  
-> -	wdt->boot_status = (readl(wdt->base + TWD_WDOG_RESETSTAT) &
-> -			TWD_WDOG_RESETSTAT_MASK) ? WDIOF_CARDRESET : 0;
-> -
-
-oh, you delete this stuff here again.
-
-something messy in patch creation?
-
-Srinidhi
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
