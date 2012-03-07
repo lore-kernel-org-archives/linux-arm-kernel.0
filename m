@@ -1,83 +1,22 @@
-From: gxt@mprc.pku.edu.cn (Guan Xuetao)
-Date: Wed, 07 Mar 2012 14:52:43 +0800
-Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
-In-Reply-To: <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
-References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
- <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1331103163.2048.33.camel@epip-laptop>
+From: vdumpa@nvidia.com (Krishna Reddy)
+Date: Tue, 6 Mar 2012 23:06:13 -0800
+Subject: [PATCHv7 9/9] ARM: dma-mapping: add support for IOMMU mapper
+In-Reply-To: <20120307.083706.2087121294965856946.hdoyu@nvidia.com>
+References: <000001ccfaea$00c16f70$02444e50$%szyprowski@samsung.com><401E54CE964CD94BAE1EB4A729C7087E37970113FE@HQMAIL04.nvidia.com><20120307.080952.2152478004740487196.hdoyu@nvidia.com>
+ <20120307.083706.2087121294965856946.hdoyu@nvidia.com>
+Message-ID: <401E54CE964CD94BAE1EB4A729C7087E37973BEA74@HQMAIL04.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-03-06 at 17:30 -0700, Stephen Warren wrote:
-> This allows the user to use U-Boot's mkimage's -T kernel_noload option
-> if their arch Kconfig allows it, and they desire.
+> > > It should be as follows.
+> > > unsigned int count = 1 << get_order(size) - order;
 > 
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-> The next patch enables this new CONFIG_ALLOW_ option for ARM. I assume
-> that some other architectures will also be able to enable it, but I'm
-> not familiar enough with any to know which.
+> To be precise, as below?
 > 
->  init/Kconfig         |   15 +++++++++++++++
->  scripts/Makefile.lib |   15 ++++++++++++---
->  2 files changed, 27 insertions(+), 3 deletions(-)
-> 
-> diff --git a/init/Kconfig b/init/Kconfig
-> index 6cfd71d..2035562 100644
-> --- a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -203,6 +203,21 @@ config KERNEL_LZO
->  
->  endchoice
->  
-> +config ALLOW_UIMAGE_KERNEL_NOLOAD
-> +	bool
-> +
-> +config UIMAGE_KERNEL_NOLOAD
-> +	bool "Use mkimage's -T kernel_noload instead of -T kernel"
-> +	depends on ALLOW_UIMAGE_KERNEL_NOLOAD
-> +	help
-> +	  uImage files of type "kernel" embed an absolute load and entry point
-> +	  address. If the uImage is loaded to a different address, then the
-> +	  image must be copied the uImage file to the specified load address.
-> +	  This copy is a waste of time if the uImage is in fact completely
-> +	  relocatable. If your kernel and bootloader support it, you can build
-> +	  a "kernel_noload" uImage rather than a "kernel" uImage, which
-> +	  prevents any such copying. If unsure say N.
-> +
->  config DEFAULT_HOSTNAME
->  	string "Default hostname"
->  	default "(none)"
-> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-> index 7b0be18..d9c1c87 100644
-> --- a/scripts/Makefile.lib
-> +++ b/scripts/Makefile.lib
-> @@ -314,9 +314,18 @@ MKIMAGE := $(srctree)/scripts/mkuboot.sh
->  UIMAGE_ARCH = $(SRCARCH)
->  UIMAGE_COMPRESSION = $(if $(2),$(2),none)
->  UIMAGE_OPTS-y =
-> -UIMAGE_TYPE = kernel
-> -UIMAGE_LOADADDR=arch_must_set_this
-> -UIMAGE_ENTRYADDR=$(UIMAGE_LOADADDR)
-> +ifeq ($(CONFIG_UIMAGE_KERNEL_NOLOAD),y)
-> +  UIMAGE_TYPE = kernel_noload
-> +  # Unused by bootloader:
-> +  UIMAGE_LOADADDR=0
-> +  # Entry point relative to actual load address:
-> +  UIMAGE_ENTRYADDR=0
-> +else
-> +  UIMAGE_TYPE = kernel
-> +  # Absolute addresses:
-> +  UIMAGE_LOADADDR=arch_must_set_this
-> +  UIMAGE_ENTRYADDR=$(UIMAGE_LOADADDR)
-> +endif
->  UIMAGE_NAME = 'Linux-$(KERNELRELEASE)'
->  UIMAGE_IN = $<
->  UIMAGE_OUT = $@
-Hi, Stephen,
-It seems that UIMAGE_ARCH and UIMAGE_LOADADDR can't be modified from
-arch-Makefiles.
+>  unsigned int count = 1 << (get_order(size) - order);
 
-Regards,
+Minus has more precedence than left shift.
+"1 << get_order(size) - order;" is equivalent to 1 << (get_order(size) - order);
 
-Guan Xuetao
+-KR
+--nvpublic
