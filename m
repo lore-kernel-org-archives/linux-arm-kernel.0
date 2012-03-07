@@ -1,30 +1,60 @@
-From: jason@lakedaemon.net (Jason)
-Date: Wed, 7 Mar 2012 13:37:05 -0500
-Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
-In-Reply-To: <201203071831.31738.arnd@arndb.de>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <80fb8cef577eee14364e95009f7a590fd9056ee3.1331090356.git.jason@lakedaemon.net>
- <201203071831.31738.arnd@arndb.de>
-Message-ID: <20120307183705.GC5050@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 07 Mar 2012 11:40:18 -0700
+Subject: [PATCH 2/3] Kbuild: Implement CONFIG_UIMAGE_KERNEL_NOLOAD
+In-Reply-To: <20120307180815.GA27213@game.jcrosoft.org>
+References: <1331080238-1524-1-git-send-email-swarren@wwwdotorg.org>
+ <1331080238-1524-2-git-send-email-swarren@wwwdotorg.org>
+ <20120307180815.GA27213@game.jcrosoft.org>
+Message-ID: <4F57AB92.6060907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 06:31:31PM +0000, Arnd Bergmann wrote:
-> On Wednesday 07 March 2012, Jason Cooper wrote:
-> > +       serial at f1012000 {
-> > +               compatible = "ns16550a";
-> > +               reg = <0xf1012000 0xff>;
-> > +               reg-shift = <2>;
-> > +               interrupts = <33>;
-> > +               clock-frequency = <200000000>;
-> > +       };
+On 03/07/2012 11:08 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:30 Tue 06 Mar     , Stephen Warren wrote:
+>> This allows the user to use U-Boot's mkimage's -T kernel_noload option
+>> if their arch Kconfig allows it, and they desire.
+>>
+>> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+>> ---
+>> The next patch enables this new CONFIG_ALLOW_ option for ARM. I assume
+>> that some other architectures will also be able to enable it, but I'm
+>> not familiar enough with any to know which.
+> I'm going to repeat. I don't think any impromevent here.
 > 
-> I just noticed that the length here should be inclusive, i.e. 0x100 not 0xff.
-> This is different from the way we define resources in Linux.
+> with no specific kernel load address the uImage for is useless/
 
-I was maintaining form with plat-orion/common.c:66 (0xff)  I'll fix it
-to inclusive.
+No, the whole point of this type of kernel image is that it doesn't need
+a specific load address; the kernel zImage can run from anywhere in RAM
+(provided AUTO_ZRELADDR is enabled, subject to some slight
+restrictions), and hence the uImage doesn't need to be loaded to or
+moved to any particular location.
 
-thx,
+The scripts that U-Boot runs determine where the image gets loaded into
+memory.
 
-Jason.
+> And this no the job of the kernel to build a boot loader specific boot image
+> format.
+
+Not everyone agrees with this.
+
+> And the uImage format here is called the legacy format where now U-Boot
+> support a new format based on DT format.
+> 
+> Will you plan to add it too?
+
+No. The last time I heard anyone talk about that, it sounded like the
+adoption was basically zero, so it seems pointless. Personally, I find
+creating that kind of image more complex, and don't see any benefits in
+that format either.
+
+> no sorry I don't think it's the right way to go.
+> 
+> On X86 we boot zImage simply. The new uImage option to do not specify the load
+> address add nothing more than just boot a zImage for kernel point of view.
+
+U-Boot does not currently have the ability to boot zImage on ARM.
+
+> Further more on server the vendor will use grub mostly (even on ARM) and will
+> expect to boot a zImage.
+
+But that is irrelevant for the people who are using U-Boot not grub.
