@@ -1,73 +1,52 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed,  7 Mar 2012 03:44:46 +0000
-Subject: [PATCH 05/14] ARM: kirkwood: add interrupt controller to devicetree.
+Date: Wed,  7 Mar 2012 03:44:47 +0000
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
 In-Reply-To: <cover.1331090356.git.jason@lakedaemon.net>
 References: <cover.1331090356.git.jason@lakedaemon.net>
-Message-ID: <c27a2b2c176940d153f2659e1a64f9349fbdb9c1.1331090356.git.jason@lakedaemon.net>
+Message-ID: <80fb8cef577eee14364e95009f7a590fd9056ee3.1331090356.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on work by Michael Walle (commit a952154).
+This uart is the primary console for the dreamplug.  Removed
+kirkwood_uart0_init() call from board-dt.c.
 
-Used just the intc portion of the patch, fixed the register address, and
-used of_find_compatible_node() instead.
-
-Signed-off-by: Michael Walle <michael@walle.cc>
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/kirkwood.dtsi   |    9 ++++++++-
- arch/arm/mach-kirkwood/board-dt.c |    7 +++++++
- 2 files changed, 15 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |    7 +++++++
+ arch/arm/mach-kirkwood/board-dt.c        |    2 --
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 702b955..7896a1d 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -2,5 +2,12 @@
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 578806d..ebb2c87 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -15,4 +15,11 @@
+ 		bootargs = "console=ttyS0,115200n8 earlyprintk";
+ 	};
  
- / {
- 	compatible = "mrvl,kirkwood";
--};
-+	interrupt-parent = <&intc>;
- 
-+	intc: interrupt-controller at fed20200 {
-+		compatible = "mrvl,orion-intc";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		reg = <0xfed20200 0x20>;
++	serial at f1012000 {
++		compatible = "ns16550a";
++		reg = <0xf1012000 0xff>;
++		reg-shift = <2>;
++		interrupts = <33>;
++		clock-frequency = <200000000>;
 +	};
-+};
+ };
 diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index f514b42..f9f446b 100644
+index f9f446b..b55d25b 100644
 --- a/arch/arm/mach-kirkwood/board-dt.c
 +++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -13,6 +13,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/irqdomain.h>
- #include <linux/mtd/partitions.h>
- #include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
-@@ -159,6 +160,8 @@ static void __init dreamplug_init(void)
+@@ -143,8 +143,6 @@ static void __init dreamplug_init(void)
+ 	 */
+ 	kirkwood_mpp_conf(dreamplug_mpp_config);
  
- static void __init kirkwood_dt_init(void)
- {
-+	struct device_node *node;
-+
- 	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
- 
- 	/*
-@@ -175,6 +178,10 @@ static void __init kirkwood_dt_init(void)
- 	kirkwood_l2_init();
- #endif
- 
-+	node = of_find_compatible_node(NULL, NULL, "mrvl,orion-intc");
-+	if (node)
-+		irq_domain_add_simple(node, 0);
-+
- 	/* internal devices that every board has */
- 	kirkwood_rtc_init();
- 	kirkwood_wdt_init();
+-	kirkwood_uart0_init();
+-
+ 	spi_register_board_info(dreamplug_spi_slave_info,
+ 				ARRAY_SIZE(dreamplug_spi_slave_info));
+ 	kirkwood_spi_init();
 -- 
 1.7.3.4
