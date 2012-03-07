@@ -1,40 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Mar 2012 09:40:31 +0100
-Subject: [PATCH] ARM: remove ixp2000 platform
-In-Reply-To: <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
-References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
- <201202281945.39419.arnd@arndb.de>
- <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
- <201203061412.00073.arnd@arndb.de>
- <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
-Message-ID: <CACRpkdYQpnSMVWUizEYHTjx_AK5Ai7dos0SBd208Wf5ZJLdrCw@mail.gmail.com>
+Date: Wed, 7 Mar 2012 09:49:39 +0100
+Subject: AMBA devices behing a PCI bridge
+In-Reply-To: <20120222191339.GA28388@mail.gnudd.com>
+References: <20120222191339.GA28388@mail.gnudd.com>
+Message-ID: <CACRpkdYv02sNAcTSPgW-aq8iL6mAhcY2XTDV1BztPS_NvYqYXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2012 at 5:51 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Tue, 6 Mar 2012, Arnd Bergmann wrote:
->> Interestingly, that leaves ixp4xx as the only big-endian ARM platform.
->> I believe that ixp4xx is still being actively used quite a bit, but does
->> that include the big-endian ones? There is no immediate reason why we
->> would want to drop support for big-endian, but if it's not used at all,
->> that would be an interesting cleanup opportunity.
+On Wed, Feb 22, 2012 at 8:13 PM, Alessandro Rubini <ru@gnudd.com> wrote:
+
+> Hello Russell.
+> I'm working, with some mates, on a device which is basically a bridge
+> from PCIe to AMBA.
 >
-> The NSLU2 is (was) a quite popular NAS device and it is used in big
-> endian by default.
->
-> The BE support isn't getting in the way of anything, so there is no
-> reason to remove it, even if it isn't being used much.
+> Some of the peripherals that live behind the bridge are actually
+> normal primecell devices, with minor or no modifications from the
+> original ARM cores. The list includes dma, uart, spi, i2c and mmc.
 
-Network equipment seems to like using BE.
+Just watching from the side this is very interesting, and of course it is
+wise to reuse the existing PrimeCell drivers, given the effort that has
+been put into maintaining and generalizing them over the last few
+years.
 
-I have some vague idea that this is beacuse IP packets are big
-endian, and thus you can process them quickly by just casting fields
-to e.g. u32 pointers and read them.
-
-I don't know if this is true, but seems to much of a correlation to
-be pure coincidence. Thus a pretty interesting subject in
-embedded ARM not used for tablets/mobile/generic computing
-kind of stuff.
+Thanks for looking into this and I'll be happy to help out with the
+review!
 
 Yours,
 Linus Walleij
