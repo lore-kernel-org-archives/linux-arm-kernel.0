@@ -1,114 +1,79 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 7 Mar 2012 16:45:58 +0530
-Subject: [PATCH v3 08/13] gpio/omap: remove redundant decoding of gpio offset
-In-Reply-To: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
-References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1331118963-26364-9-git-send-email-tarun.kanti@ti.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Wed, 7 Mar 2012 16:47:12 +0530
+Subject: [PATCH 14/15] watchdog/mpcore_wdt: Add clock framework support
+In-Reply-To: <9ec7141baa4b1c1a0503893749e7ce0e19bb5029.1331115752.git.viresh.kumar@st.com>
+References: <cover.1331115751.git.viresh.kumar@st.com>
+ <9ec7141baa4b1c1a0503893749e7ce0e19bb5029.1331115752.git.viresh.kumar@st.com>
+Message-ID: <20120307111711.GA31348@bnru02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In gpio_get(), _get_gpio_datain() and _get_gpio_dataout() get rid of
-un-necessary operation to compute gpio mask. The gpio offset passed
-to gpio_get() is sufficient to do that.
+On Wed, Mar 07, 2012 at 11:27:55 +0100, Viresh KUMAR wrote:
+> This patch adds in clk framework support for wdt driver. If clk_get fails for
+> some platform, then we continue without clk_* API's.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  drivers/watchdog/mpcore_wdt.c |   71 ++++++++++++++++++++++++++++++++++++-----
+>  1 files changed, 63 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
+> index ebd964a..9747193 100644
+> --- a/drivers/watchdog/mpcore_wdt.c
+> +++ b/drivers/watchdog/mpcore_wdt.c
+> @@ -17,6 +17,7 @@
+>   *
+>   * (c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
+>   */
 
-Here is Russell's original comment:
-Can someone explain to me this:
-#define GPIO_INDEX(bank, gpio) (gpio % bank->width)
-#define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
+[..]
 
-static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
-{
-       void __iomem *reg = bank->base + bank->regs->datain;
+> @@ -350,6 +368,28 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> +	wdt->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(wdt->clk)) {
+> +		dev_warn(&pdev->dev, "Clock not found\n");
+> +		wdt->clk = NULL;
+> +	}
+> +
+> +	if (wdt->clk) {
+> +		ret = clk_enable(wdt->clk);
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "Clock enable failed\n");
+> +			goto err_put_clk;
+> +		}
+> +	}
+> +
+> +	wdt->boot_status = (readl(wdt->base + TWD_WDOG_RESETSTAT) &
+> +			TWD_WDOG_RESETSTAT_MASK) ? WDIOF_CARDRESET : 0;
+> +
 
-       return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
-}
+I see that patch 12/15 does this, why are you doing it here again in clock patch?
 
-static int gpio_get(struct gpio_chip *chip, unsigned offset)
-{
-       struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
-       void __iomem *reg = bank->base;
-       int gpio = chip->base + offset;
-       u32 mask = GPIO_BIT(bank, gpio);
+> +	mpcore_wdt_stop(wdt);
+> +
+> +	if (wdt->clk)
+> +		clk_disable(wdt->clk);
+> +
+>  	/*
+>  	 * Check that the margin value is within it's range;
+>  	 * if not reset to the default
+> @@ -368,25 +408,32 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
+>  		dev_printk(KERN_ERR, wdt->dev,
+>  			"cannot register miscdev on minor=%d (err=%d)\n",
+>  							WATCHDOG_MINOR, ret);
+> -		return ret;
+> +		goto err_put_clk;
+>  	}
+>  
+> -	wdt->boot_status = (readl(wdt->base + TWD_WDOG_RESETSTAT) &
+> -			TWD_WDOG_RESETSTAT_MASK) ? WDIOF_CARDRESET : 0;
+> -
 
-       if (gpio_is_input(bank, mask))
-               return _get_gpio_datain(bank, gpio);
-       else
-               return _get_gpio_dataout(bank, gpio);
-}
+oh, you delete this stuff here again.
 
-Given that bank->width on OMAP is either 32 or 16, and GPIO numbers for
-any GPIO chip are always aligned to 32 or 16, why does this code bother
-adding the chips base gpio number and then modulo the width?
+something messy in patch creation?
 
-Surely this means if - for argument sake - you registered a GPIO chip
-with 8 lines followed by one with 16 lines, GPIO0..7 would be chip 0
-bit 0..7, GPIO8..15 would be chip 1 bit 8..15, GPIO16..23 would be
-chip 1 bit 0..7.
-
-However, if you registered a GPIO chip with 16 lines first, it would
-mean GPIO0..15 would be chip 0 bit 0..15, and GPIO16..31 would be
-chip 1 bit 0..15.
-
-Surely this kind of behaviour is not intended?
-
-Is there a reason why the bitmask can't just be (1 << offset) where
-offset is passed into these functions as GPIO number - chip->base ?
-
-Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
----
- drivers/gpio/gpio-omap.c |   18 +++++++-----------
- 1 files changed, 7 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 19f8f44..186ce92 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -133,18 +133,18 @@ static void _set_gpio_dataout_mask(struct gpio_bank *bank, int gpio, int enable)
- 	bank->context.dataout = l;
- }
- 
--static int _get_gpio_datain(struct gpio_bank *bank, int gpio)
-+static int _get_gpio_datain(struct gpio_bank *bank, int offset)
- {
- 	void __iomem *reg = bank->base + bank->regs->datain;
- 
--	return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
-+	return (__raw_readl(reg) & (1 << offset)) != 0;
- }
- 
--static int _get_gpio_dataout(struct gpio_bank *bank, int gpio)
-+static int _get_gpio_dataout(struct gpio_bank *bank, int offset)
- {
- 	void __iomem *reg = bank->base + bank->regs->dataout;
- 
--	return (__raw_readl(reg) & GPIO_BIT(bank, gpio)) != 0;
-+	return (__raw_readl(reg) & (1 << offset)) != 0;
- }
- 
- static inline void _gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
-@@ -849,19 +849,15 @@ static int gpio_is_input(struct gpio_bank *bank, int mask)
- static int gpio_get(struct gpio_chip *chip, unsigned offset)
- {
- 	struct gpio_bank *bank;
--	void __iomem *reg;
--	int gpio;
- 	u32 mask;
- 
--	gpio = chip->base + offset;
- 	bank = container_of(chip, struct gpio_bank, chip);
--	reg = bank->base;
--	mask = GPIO_BIT(bank, gpio);
-+	mask = (1 << offset);
- 
- 	if (gpio_is_input(bank, mask))
--		return _get_gpio_datain(bank, gpio);
-+		return _get_gpio_datain(bank, offset);
- 	else
--		return _get_gpio_dataout(bank, gpio);
-+		return _get_gpio_dataout(bank, offset);
- }
- 
- static int gpio_output(struct gpio_chip *chip, unsigned offset, int value)
--- 
-1.7.0.4
+Srinidhi
