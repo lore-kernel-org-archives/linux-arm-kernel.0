@@ -1,202 +1,120 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 07 Mar 2012 11:36:57 -0800
-Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <CA+Bv8XaJqL1L8F-n6skY7dHn1XAdDLRKaRjw0deLeoQ5Ao0Fhg@mail.gmail.com>
- (Russ Dill's message of "Wed, 7 Mar 2012 10:00:08 -0600")
-References: <1330006564-13290-1-git-send-email-mporter@ti.com>
- <87wr74gis6.fsf@ti.com>
- <20120301204553.GA21841@legolas.emea.dhcp.ti.com>
- <87pqcqnc7u.fsf@ti.com>
- <CA+Bv8XaJqL1L8F-n6skY7dHn1XAdDLRKaRjw0deLeoQ5Ao0Fhg@mail.gmail.com>
-Message-ID: <87sjhkjj8m.fsf@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 07 Mar 2012 13:41:20 -0600
+Subject: [PATCH 1/1] of: add dma-mask binding
+In-Reply-To: <20120307173437.GC17087@game.jcrosoft.org>
+References: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
+ <4F5793E9.9010100@gmail.com> <20120307173437.GC17087@game.jcrosoft.org>
+Message-ID: <4F57B9E0.3030109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russ,
-
-Russ Dill <Russ.Dill@ti.com> writes:
-
-> On Mon, Mar 5, 2012 at 12:18 PM, Kevin Hilman <khilman@ti.com> wrote:
->> Felipe Balbi <balbi@ti.com> writes:
->>
->>> Hi,
+On 03/07/2012 11:34 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:59 Wed 07 Mar     , Rob Herring wrote:
+>> On 03/07/2012 05:26 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> This will allow each device to specify its dma-mask
+>>> The microblaze architecture hook is keep temporary if no dma-mask is specified
+>>> int the DT
 >>>
->>> On Thu, Mar 01, 2012 at 12:36:57PM -0800, Kevin Hilman wrote:
->>>> Matt Porter <mporter@ti.com> writes:
->>>>
->>>> > This fixes smsc911x support on platforms using gpmc_smsc911x_init().
->>>> >
->>>> > Commit c7e963f6888816 (net/smsc911x: Add regulator support) added
->>>> > the requirement that platforms provide vdd33a and vddvario supplies.
->>>> >
->>>> > Signed-off-by: Matt Porter <mporter@ti.com>
->>>>
->>>> [...]
->>>>
->>>> > ?/*
->>>> > ? * Initialize smsc911x device connected to the GPMC. Note that we
->>>> > ? * assume that pin multiplexing is done in the board-*.c file,
->>>> > @@ -55,6 +101,12 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->>>> >
->>>> > ? ?gpmc_cfg = board_data;
->>>> >
->>>> > + ?ret = platform_device_register(&gpmc_smsc911x_regulator);
->>>> > + ?if (ret < 0) {
->>>> > + ? ? ? ? ?pr_err("Unable to register smsc911x regulators: %d\n", ret);
->>>> > + ? ? ? ? ?return;
->>>> > + ?}
->>>> > +
->>>>
->>>> Boards that have more than one instance of the smsc911x (OMAP3/Overo)
->>>> barf here because of trying to register the same device twice.
->>>>
->>>> We need something like the patch below to make Overo boot again.
->>>>
->>>> Kevin
->>>>
->>>>
->>>>
->>>> From 4114dea2fb897ab75d05eaa943d29454034fc025 Mon Sep 17 00:00:00 2001
->>>> From: Kevin Hilman <khilman@ti.com>
->>>> Date: Thu, 1 Mar 2012 12:30:42 -0800
->>>> Subject: [PATCH] ARM: OMAP2+: gpmc-smsc911x: only register regulators once
->>>>
->>>> commit e4b0b2cbbb (ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
->>>> regulators) added regulators which are registered during
->>>> gpmc_smsc911x_init(). ?However, some platforms (OMAP3/Overo) have more
->>>> than one instance of the SMSC911x and result in attempting to register
->>>> the same regulator more than once which causes a panic(). ?Fix this by
->>>> tracking the regulator registration ensuring only a single device is
->>>> registered.
->>>>
->>>> Cc: Matt Porter <mporter@ti.com>
->>>> Signed-off-by: Kevin Hilman <khilman@ti.com>
->>>> ---
->>>> ?arch/arm/mach-omap2/gpmc-smsc911x.c | ? 14 ++++++++++----
->>>> ?1 file changed, 10 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/gpmc-smsc911x.c b/arch/arm/mach-omap2/gpmc-smsc911x.c
->>>> index bbb870c..95e6c7d 100644
->>>> --- a/arch/arm/mach-omap2/gpmc-smsc911x.c
->>>> +++ b/arch/arm/mach-omap2/gpmc-smsc911x.c
->>>> @@ -88,6 +88,8 @@ static struct platform_device gpmc_smsc911x_regulator = {
->>>> ? ? ?},
->>>> ?};
->>>>
->>>> +static bool regulator_registered;
->>>> +
->>>> ?/*
->>>> ? * Initialize smsc911x device connected to the GPMC. Note that we
->>>> ? * assume that pin multiplexing is done in the board-*.c file,
->>>> @@ -101,10 +103,14 @@ void __init gpmc_smsc911x_init(struct omap_smsc911x_platform_data *board_data)
->>>>
->>>> ? ? ?gpmc_cfg = board_data;
->>>>
->>>> - ? ?ret = platform_device_register(&gpmc_smsc911x_regulator);
->>>> - ? ?if (ret < 0) {
->>>> - ? ? ? ? ? ?pr_err("Unable to register smsc911x regulators: %d\n", ret);
->>>> - ? ? ? ? ? ?return;
->>>> + ? ?if (!regulator_registered) {
->>>> + ? ? ? ? ? ?ret = platform_device_register(&gpmc_smsc911x_regulator);
->>>> + ? ? ? ? ? ?if (ret < 0) {
->>>> + ? ? ? ? ? ? ? ? ? ?pr_err("Unable to register smsc911x regulators: %d\n",
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
->>>> + ? ? ? ? ? ? ? ? ? ?return;
->>>> + ? ? ? ? ? ?}
->>>> + ? ? ? ? ? ?regulator_registered = true;
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> ---
+>>>  drivers/of/platform.c |   26 +++++++++++++++++++++++++-
+>>>  1 files changed, 25 insertions(+), 1 deletions(-)
 >>>
->>> Wow, this is quite a hack. Is the regulator part of the SMSC911x
->>> device or is it outside ? If it's outside the SMSC91xx (which I
->>> believe it is) there should be a regulator driver instead of this
->>> hack. ?For boards which don't provide such a regulator (and tie the
->>> supply pin to some constant voltage source) there should be a constant
->>> regulator supplying the pin. But this patch is quite hacky.
+>>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>>> index cae9477..bb22194 100644
+>>> --- a/drivers/of/platform.c
+>>> +++ b/drivers/of/platform.c
+>>> @@ -121,6 +121,26 @@ void of_device_make_bus_id(struct device *dev)
+>>>  	dev_set_name(dev, "%s.%d", node->name, magic - 1);
+>>>  }
+>>>  
+>>> +static u64* of_get_dma_mask(struct device_node *np)
+>>> +{
+>>> +	const __be32 *prop;
+>>> +	int len;
+>>> +	u64 *dma_mask;
+>>> +
+>>> +	prop = of_get_property(np, "dma-mask", &len);
 >>
->> Are you referring to my patch or to the original $SUBJECT patch? ?It's
->> not terribly clear.
+>> This would need some documentation. There is already "dma-ranges"
+>> defined for OF which nay do what's needed.
+> what is dma-ranges I see no doc about it
+> but I don't think it could be used for the dma mask
+
+See the ePAPR spec. It's a PowerPC doc, but parts still apply.
+
+https://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.1.pdf
+
+There may also be something in OpenFirmware specs.
+
 >>
->> My patch doesn't add any regulators, it just fixes a bug when this init
->> function is called more than once.
+>>> +
+>>> +	if (!prop)
+>>> +		return NULL;
+>>> +
+>>> +	dma_mask = kzalloc(sizeof(u64), GFP_KERNEL);
 >>
->> The addition of the regulators was done in $SUBJECT patch, not my fix.
+>> This seems kind of wasteful for 1 u64.
+> no choice dma_mask must be a pointer
 >>
->> In either case $SUBJECT patch is already in Tony's fixes queue, so if it
->> is going be merged, then my fix above is needed also to not break
->> Overo and any other platform that has more than one smsc911x instance.
+>>> +	if (!dma_mask)
+>>> +		return NULL;
+>>> +
+>>> +	*dma_mask = of_read_number(prop, len / 4);
+>>> +
+>>> +	return dma_mask;
+>>> +}
+>>> +
+>>>  /**
+>>>   * of_device_alloc - Allocate and initialize an of_device
+>>>   * @np: device node to assign to device
+>>> @@ -161,10 +181,14 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>>>  		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+>>>  	}
+>>>  
+>>> +	dev->dev.dma_mask = of_get_dma_mask(np);
+>>>  	dev->dev.of_node = of_node_get(np);
+>>> +
+>>>  #if defined(CONFIG_MICROBLAZE)
+>>> -	dev->dev.dma_mask = &dev->archdata.dma_mask;
 >>
->> Kevin
->
->
-> Have you tested this fix? 
+>> And doing it this way for didn't get a warm reception either:
+>>
+>> http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-April/005285.html
+>>
+>> Do you really need this to be something other than ~0UL and if so does
+>> it need to be per device or system wide?
+>>
+>> You can solve this with bus notifiers in your at91 code. Here's an
+>> example which I did (but no longer need):
+>>
+>> static u64 highbank_dma_mask = DMA_BIT_MASK(32);
+> IIRC on at91 all of them that need it have a DMA_BIT_MASK(32)
+> 
+> 
+>>
+>> static int highbank_platform_notifier(struct notifier_block *nb,
+>> 				  unsigned long event, void *__dev)
+>> {
+>> 	struct device *dev = __dev;
+>>
+>> 	if (event != BUS_NOTIFY_ADD_DEVICE)
+>> 		return NOTIFY_DONE;
+>>
+>> 	if (of_device_is_compatible(dev->of_node, "calxeda,hb-nfc"))
+>> 		dev->dma_mask = &highbank_dma_mask;
+> execpt as example today I need it on 2 node (OHCI & EHCI)
 
-Yes.  On 3530/Overo.
+I don't think there is any reason you can't point to a single value if a
+system wide setting fits. If not, using a per device value here is
+easily doable.
 
-> The only regulator consumer supply would be:
->
-> static struct regulator_consumer_supply gpmc_smsc911x_supply[] = {
->         REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
->         REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
-> };
->
-> I don't think the second smsc911x on the Overo, "smsc911x.1", would
-> find it due to the dev_id.
+> 
+> and if more device need I don't want to end up with more fixup
+> 
+> I really prefer to set it via DT
 
-It's not about finding the second regulator.  As stated in the
-changelog, it's about the duplicate attempt to register the exact same
-platform_device.
+You don't have any h/w restrictions here and most ARM platforms don't,
+so really this doesn't need to be solved with DT for the default case.
 
-Duplicate attempts to register the exact same platform_device cause
-kobject to panic and give up[1].  So, any platform that calls
-gpmc_smsc911x_init() twice (Overo and T35 in mainline) will panic on
-boot.
-
-This patch fixes those platforms so they can boot.
-
-Kevin
-
-
-
-[1]
-[    0.337036] kobject (c06b1730): tried to init an initialized object, something is seriously wrong.
-[    0.346679] [<c001421c>] (unwind_backtrace+0x0/0xf0) from [<c022b944>] (kobject_init+0x74/0x94)
-[    0.355804] [<c022b944>] (kobject_init+0x74/0x94) from [<c0284fa8>] (device_initialize+0x20/0x90)
-[    0.365112] [<c0284fa8>] (device_initialize+0x20/0x90) from [<c02894fc>] (platform_device_register+0x10/0x24)
-[    0.375488] [<c02894fc>] (platform_device_register+0x10/0x24) from [<c0619d7c>] (gpmc_smsc911x_init+0x1c/0x200)
-[    0.386077] [<c0619d7c>] (gpmc_smsc911x_init+0x1c/0x200) from [<c06165e0>] (overo_init+0xdc/0x27c)
-[    0.395446] [<c06165e0>] (overo_init+0xdc/0x27c) from [<c0609380>] (customize_machine+0x1c/0x28)
-[    0.404663] [<c0609380>] (customize_machine+0x1c/0x28) from [<c0008800>] (do_one_initcall+0x34/0x178)
-[    0.414306] [<c0008800>] (do_one_initcall+0x34/0x178) from [<c06068ac>] (kernel_init+0x8c/0x130)
-[    0.423553] [<c06068ac>] (kernel_init+0x8c/0x130) from [<c000e850>] (kernel_thread_exit+0x0/0x8)
-[    0.432800] ------------[ cut here ]------------
-[    0.437652] WARNING: at /work/kernel/omap/pm/fs/sysfs/dir.c:481 sysfs_add_one+0x88/0xb0()
-[    0.446228] sysfs: cannot create duplicate filename '/devices/platform/reg-fixed-voltage.42'
-[    0.455047] Modules linked in:
-[    0.458312] [<c001421c>] (unwind_backtrace+0x0/0xf0) from [<c00391e4>] (warn_slowpath_common+0x4c/0x64)
-[    0.468170] [<c00391e4>] (warn_slowpath_common+0x4c/0x64) from [<c0039290>] (warn_slowpath_fmt+0x30/0x40)
-[    0.478179] [<c0039290>] (warn_slowpath_fmt+0x30/0x40) from [<c014eed8>] (sysfs_add_one+0x88/0xb0)
-[    0.487548] [<c014eed8>] (sysfs_add_one+0x88/0xb0) from [<c014ef60>] (create_dir+0x60/0xc4)
-[    0.496307] [<c014ef60>] (create_dir+0x60/0xc4) from [<c014f048>] (sysfs_create_dir+0x58/0x8c)
-[    0.505340] [<c014f048>] (sysfs_create_dir+0x58/0x8c) from [<c022bbec>] (kobject_add_internal+0x9c/0x1b8)
-[    0.515350] [<c022bbec>] (kobject_add_internal+0x9c/0x1b8) from [<c022bfd8>] (kobject_add+0x50/0x98)
-[    0.524932] [<c022bfd8>] (kobject_add+0x50/0x98) from [<c0285a14>] (device_add+0xb8/0x358)
-[    0.533599] [<c0285a14>] (device_add+0xb8/0x358) from [<c0289234>] (platform_device_add+0xf8/0x1a4)
-[    0.543090] [<c0289234>] (platform_device_add+0xf8/0x1a4) from [<c0619d7c>] (gpmc_smsc911x_init+0x1c/0x200)
-[    0.553283] [<c0619d7c>] (gpmc_smsc911x_init+0x1c/0x200) from [<c06165e0>] (overo_init+0xdc/0x27c)
-[    0.562652] [<c06165e0>] (overo_init+0xdc/0x27c) from [<c0609380>] (customize_machine+0x1c/0x28)
-[    0.571868] [<c0609380>] (customize_machine+0x1c/0x28) from [<c0008800>] (do_one_initcall+0x34/0x178)
-[    0.581512] [<c0008800>] (do_one_initcall+0x34/0x178) from [<c06068ac>] (kernel_init+0x8c/0x130)
-[    0.590728] [<c06068ac>] (kernel_init+0x8c/0x130) from [<c000e850>] (kernel_thread_exit+0x0/0x8)
-[    0.600372] ---[ end trace 1b75b31a2719ed1c ]---
-[    0.605285] kobject_add_internal failed for reg-fixed-voltage.42 with -EEXIST, don't try to register things with the same name in the same directory.
-[    0.619262] [<c001421c>] (unwind_backtrace+0x0/0xf0) from [<c022bcf0>] (kobject_add_internal+0x1a0/0x1b8)
-[    0.629272] [<c022bcf0>] (kobject_add_internal+0x1a0/0x1b8) from [<c022bfd8>] (kobject_add+0x50/0x98)
-[    0.638946] [<c022bfd8>] (kobject_add+0x50/0x98) from [<c0285a14>] (device_add+0xb8/0x358)
-[    0.647613] [<c0285a14>] (device_add+0xb8/0x358) from [<c0289234>] (platform_device_add+0xf8/0x1a4)
-[    0.657073] [<c0289234>] (platform_device_add+0xf8/0x1a4) from [<c0619d7c>] (gpmc_smsc911x_init+0x1c/0x200)
-[    0.667266] [<c0619d7c>] (gpmc_smsc911x_init+0x1c/0x200) from [<c06165e0>] (overo_init+0xdc/0x27c)
-[    0.676666] [<c06165e0>] (overo_init+0xdc/0x27c) from [<c0609380>] (customize_machine+0x1c/0x28)
-[    0.685852] [<c0609380>] (customize_machine+0x1c/0x28) from [<c0008800>] (do_one_initcall+0x34/0x178)
-[    0.695526] [<c0008800>] (do_one_initcall+0x34/0x178) from [<c06068ac>] (kernel_init+0x8c/0x130)
-[    0.704711] [<c06068ac>] (kernel_init+0x8c/0x130) from [<c000e850>] (kernel_thread_exit+0x0/0x8)
-[    0.713897] gpmc_smsc911x_init: Unable to register smsc911x regulators: -17
+Rob
