@@ -1,39 +1,29 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 08 Mar 2012 17:18:36 +0530
-Subject: [PATCH v2 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
-In-Reply-To: <m2pqcoihhu.fsf@bob.laptop.org>
-References: <1329996409-26861-1-git-send-email-rnayak@ti.com>	<4F476228.7060607@ti.com>
- <4F54714E.6080805@ti.com>	<4F57312E.4080104@ti.com>
- <m2pqcoihhu.fsf@bob.laptop.org>
-Message-ID: <4F589C94.9010601@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 8 Mar 2012 11:51:27 +0000
+Subject: [PATCH v2 00/17] ASoC: add imx-sgtl5000 machine driver working
+ with fsl_ssi
+In-Reply-To: <4F57E924.4050208@freescale.com>
+References: <1330957865-19085-1-git-send-email-shawn.guo@linaro.org>
+ <4F57CDAC.9030604@freescale.com>
+ <20120307210833.GO3107@opensource.wolfsonmicro.com>
+ <4F57E924.4050208@freescale.com>
+Message-ID: <20120308115127.GI3638@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Wed, Mar 07, 2012 at 05:03:00PM -0600, Timur Tabi wrote:
 
-On Wednesday 07 March 2012 08:29 PM, Chris Ball wrote:
-> Hi Rajendra,
->
-> On Wed, Mar 07 2012, Rajendra Nayak wrote:
->>> Chris, Ping. I am basing my DT support patches on top of these cleanups.
->>> Would be great if you can have a look and pull them in.
->>
->> Chris, just realized the last two requests from me to get this merged
->> weren't addressed to you directly, but instead you were copied.
->> Resending with you in 'To', hope this lands in your inbox :)
->
-> Sorry for the delay, thanks for the ping; I've pushed these to mmc-next
-> for 3.4 now.
+> Our exalted maintainer apparently forgot to apply this patch in a timely
+> manner for 3.3, so it probably won't make it.  But that's something I'll
+> just have to deal with.
 
-There's just one other cleanup patch here [1] to convert all pr_* prints
-in the driver to dev_*. Would be great if you can pick that as well.
-
-Thanks,
-Rajendra
-
-[1] http://marc.info/?l=linux-mmc&m=132999677405098&w=3
-
->
-> Thanks,
->
-> - Chris.
+Probably work asking for it to have a CC to stable added (or ask Greg
+directly if it gets applied without one) - people are getting better at
+deploying stable updates so it'll save you some pain if it's in there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/2c5e1442/attachment.sig>
