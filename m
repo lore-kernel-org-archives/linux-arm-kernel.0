@@ -1,25 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 8 Mar 2012 12:53:38 -0800
-Subject: [PATCH 5/9] USB: at91: Device udc add dt support
-In-Reply-To: <1331111746-21393-5-git-send-email-plagnioj@jcrosoft.com>
-References: <20120307084924.GK21255@game.jcrosoft.org>
- <1331111746-21393-5-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20120308205338.GA16644@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Mar 2012 13:08:26 -0800
+Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <87sjhkjj8m.fsf@ti.com>
+References: <1330006564-13290-1-git-send-email-mporter@ti.com>
+ <87wr74gis6.fsf@ti.com>
+ <20120301204553.GA21841@legolas.emea.dhcp.ti.com>
+ <87pqcqnc7u.fsf@ti.com>
+ <CA+Bv8XaJqL1L8F-n6skY7dHn1XAdDLRKaRjw0deLeoQ5Ao0Fhg@mail.gmail.com>
+ <87sjhkjj8m.fsf@ti.com>
+Message-ID: <20120308210825.GY12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 10:15:42AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Allow to compile it if AT91 is enable.
+* Kevin Hilman <khilman@ti.com> [120307 11:05]:
+> >
+> > I don't think the second smsc911x on the Overo, "smsc911x.1", would
+> > find it due to the dev_id.
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: linux-usb at vger.kernel.org
-> ---
-> Hi Greg
+> It's not about finding the second regulator.  As stated in the
+> changelog, it's about the duplicate attempt to register the exact same
+> platform_device.
 > 
-> 	if it's ok with you I apply with the rest of the USB patch series via
-> 	at91
+> Duplicate attempts to register the exact same platform_device cause
+> kobject to panic and give up[1].  So, any platform that calls
+> gpmc_smsc911x_init() twice (Overo and T35 in mainline) will panic on
+> boot.
+> 
+> This patch fixes those platforms so they can boot.
 
-Ok with me.
+Yeah but I guess the second smsc911x instance still would not work,
+or am I missing something?
 
-greg k-h
+Regards,
+
+Tony
