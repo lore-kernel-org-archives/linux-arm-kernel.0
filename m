@@ -1,51 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Mar 2012 13:09:04 -0700
-Subject: [PATCH 09/11] ARM: tegra: Rewrite PCIe support as a driver
-In-Reply-To: <1331218291-16119-10-git-send-email-thierry.reding@avionic-design.de>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-10-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4F5911E0.6060802@wwwdotorg.org>
+From: timur@freescale.com (Timur Tabi)
+Date: Thu, 8 Mar 2012 14:13:04 -0600
+Subject: [PATCH v3 08/11] ASoC: fsl: make fsl_ssi driver compilable on
+ ARM/IMX
+In-Reply-To: <1331225990-27308-9-git-send-email-shawn.guo@linaro.org>
+References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
+ <1331225990-27308-9-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F5912D0.2090800@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2012 07:51 AM, Thierry Reding wrote:
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-
-Patch description?
-
-> diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
-...
-> -static int __init harmony_pcie_init(void)
-> +static int tegra_pcie_init(struct platform_device *pdev)
-
-That name should probably still be called harmony_something() since it's
-still board-specific.
-
-I wonder how having a per-board callback will integrate with device
-tree. I guess I'll find out when I review patch 11:-)
-
-> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
-
-> +static int __init trimslice_pci_init(void)
->  {
->  	if (!machine_is_trimslice())
->  		return 0;
-
-You can remove that test now.
-
-> diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-
-> +#define TEGRA_PCIE_MAX_PORTS 2
+Shawn Guo wrote:
+> +static DEFINE_SPINLOCK(ssi_reg_lock);
+> +static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+> +{
+> +	u32 val;
+> +	unsigned long flags;
 > +
-> +struct tegra_pcie_pdata {
-> +	int (*init)(struct platform_device *pdev);
-> +	int (*exit)(struct platform_device *pdev);
-> +	bool enable_ports[TEGRA_PCIE_MAX_PORTS];
-> +};
+> +	spin_lock_irqsave(&ssi_reg_lock, flags);
+> +	val = readl(addr);
+> +	val = (val & ~clear) | set;
+> +	writel(val, addr);
+> +	spin_unlock_irqrestore(&ssi_reg_lock, flags);
+> +}
+> +#endif
 
-That's a somewhat odd place to put the header; a dedicated
-mach-tegra/include/mach/tegra_pcie_pdata.h or
-include/linux/platform_data/tegra_pcie.h might make more sense.
+I think this spinlock is the wrong approach.  The problem with
+read-modify-write is on the function level, not the register level.
 
-Aside from those pretty minor issues, this all looks great. Thanks for
-fixing our driver!
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
