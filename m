@@ -1,227 +1,56 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu,  8 Mar 2012 09:50:31 +0100
-Subject: [PATCH 1/5 v3] i2c/gpio: add DT support
-Message-ID: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu,  8 Mar 2012 17:11:02 +0800
+Subject: [PATCH 2/3] led-triggers: use atomic kzalloc during led trigger
+ registering
+In-Reply-To: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
+References: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1331197863-25564-2-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: linux-i2c at vger.kernel.org
-Cc: devicetree-discuss at lists.ozlabs.org
+kzalloc might cause sleep and will generate some warning detected by lockdep,
+when call led_trigger_register_simple on each cpu cores in SMP. This patch fix
+this.
+
+[    1.999938] ------------[ cut here ]------------
+[    2.004791] WARNING: at kernel/lockdep.c:2664 lockdep_trace_alloc+0xd8/0xf0()
+[    2.012298] Modules linked in:
+[    2.015563] [<c001b0cc>] (unwind_backtrace+0x0/0xf0) from [<c0052408>] (warn_slowpath_common+0x4c/0x64)
+[    2.025451] [<c0052408>] (warn_slowpath_common+0x4c/0x64) from [<c005243c>] (warn_slowpath_null+0x1c/0x24)
+[    2.035583] [<c005243c>] (warn_slowpath_null+0x1c/0x24) from [<c008be28>] (lockdep_trace_alloc+0xd8/0xf0)
+[    2.045684] [<c008be28>] (lockdep_trace_alloc+0xd8/0xf0) from [<c00feeb4>] (kmem_cache_alloc_trace+0x2c/0x148)
+[    2.056213] [<c00feeb4>] (kmem_cache_alloc_trace+0x2c/0x148) from [<c03770a0>] (led_trigger_register_simple+0x20/0x74)
+[    2.067474] [<c03770a0>] (led_trigger_register_simple+0x20/0x74) from [<c0627a30>] (ledtrig_cpu_register+0x4c/0x8c)
+[    2.078460] [<c0627a30>] (ledtrig_cpu_register+0x4c/0x8c) from [<c0094ca4>] (generic_smp_call_function_single_interrupt+0xcc/0x138)
+[    2.090911] [<c0094ca4>] (generic_smp_call_function_single_interrupt+0xcc/0x138) from [<c0008408>] (do_IPI+0xb0/0x128)
+[    2.102172] [<c0008408>] (do_IPI+0xb0/0x128) from [<c045921c>] (__irq_svc+0x3c/0x100)
+[    2.110412] Exception stack(0xc07adf70 to 0xc07adfb8)
+[    2.115722] df60:                                     c07c80f8 0000fb45 00000000 c07c80f8
+[    2.124328] df80: c07ac000 c0837be4 c0464b64 c07c9d8c 00000000 411fc092 00000000 00000000
+[    2.132934] dfa0: c0649760 c07adfb8 c07c5c58 c0014d50 20000013 ffffffff
+[    2.139892] [<c045921c>] (__irq_svc+0x3c/0x100) from [<c0014d50>] (default_idle+0x30/0x38)
+[    2.148590] [<c0014d50>] (default_idle+0x30/0x38) from [<c0014f74>] (cpu_idle+0xb4/0xf4)
+[    2.157135] [<c0014f74>] (cpu_idle+0xb4/0xf4) from [<c0602778>] (start_kernel+0x2a8/0x2fc)
+[    2.165832] [<c0602778>] (start_kernel+0x2a8/0x2fc) from [<80008040>] (0x80008040)
+[    2.173797] ---[ end trace 97549d21d8dad3f5 ]---
+
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 ---
-v3:
+ drivers/leds/led-triggers.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-	update i2c binding (Rob comments)
-
-	Jean can I have a ack to apply it?
-
-Best Regards,
-J.
- .../devicetree/bindings/gpio/gpio_i2c.txt          |   32 +++++++
- drivers/i2c/busses/i2c-gpio.c                      |   94 +++++++++++++++----
- 2 files changed, 106 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-
-diff --git a/Documentation/devicetree/bindings/gpio/gpio_i2c.txt b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-new file mode 100644
-index 0000000..4f8ec94
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-@@ -0,0 +1,32 @@
-+Device-Tree bindings for i2c gpio driver
-+
-+Required properties:
-+	- compatible = "i2c-gpio";
-+	- gpios: sda and scl gpio
-+
-+
-+Optional properties:
-+	- i2c-gpio,sda-open-drain: sda as open drain
-+	- i2c-gpio,scl-open-drain: scl as open drain
-+	- i2c-gpio,scl-output-only: scl as output only
-+	- i2c-gpio,delay-us: delay between GPIO operations (may depend on each platform)
-+	- i2c-gpio,timeout-ms: timeout to get data
-+
-+Example nodes:
-+
-+i2c at 0 {
-+	compatible = "i2c-gpio";
-+	gpios = <&pioA 23 0 /* sda */
-+		 &pioA 24 0 /* scl */
-+		>;
-+	i2c-gpio,sda-open-drain;
-+	i2c-gpio,scl-open-drain;
-+	i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	rv3029c2 at 56 {
-+		compatible = "rv3029c2";
-+		reg = <0x56>;
-+	};
-+};
-diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
-index a651779..98ae85b 100644
---- a/drivers/i2c/busses/i2c-gpio.c
-+++ b/drivers/i2c/busses/i2c-gpio.c
-@@ -14,8 +14,15 @@
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_i2c.h>
+diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+index 46b4c76..74d0ba7 100644
+--- a/drivers/leds/led-triggers.c
++++ b/drivers/leds/led-triggers.c
+@@ -255,7 +255,7 @@ void led_trigger_register_simple(const char *name, struct led_trigger **tp)
+ 	struct led_trigger *trigger;
+ 	int err;
  
--#include <asm/gpio.h>
-+struct i2c_gpio_private_data {
-+	struct i2c_adapter adap;
-+	struct i2c_algo_bit_data bit_data;
-+	struct i2c_gpio_platform_data pdata;
-+};
+-	trigger = kzalloc(sizeof(struct led_trigger), GFP_KERNEL);
++	trigger = kzalloc(sizeof(struct led_trigger), GFP_ATOMIC);
  
- /* Toggle SDA by changing the direction of the pin */
- static void i2c_gpio_setsda_dir(void *data, int state)
-@@ -78,24 +85,62 @@ static int i2c_gpio_getscl(void *data)
- 	return gpio_get_value(pdata->scl_pin);
- }
- 
-+static int __devinit of_i2c_gpio_probe(struct device_node *np,
-+			     struct i2c_gpio_platform_data *pdata)
-+{
-+	u32 reg;
-+
-+	if (of_gpio_count(np) < 2)
-+		return -ENODEV;
-+
-+	pdata->sda_pin = of_get_gpio(np, 0);
-+	pdata->scl_pin = of_get_gpio(np, 1);
-+
-+	if (pdata->sda_pin < 0 || pdata->scl_pin < 0) {
-+		pr_err("%s: invalid GPIO pins, sda=%d/scl=%d\n",
-+		       np->full_name, pdata->sda_pin, pdata->scl_pin);
-+		return -ENODEV;
-+	}
-+
-+	of_property_read_u32(np, "i2c-gpio,delay-us", &pdata->udelay);
-+
-+	if (of_property_read_u32(np, "i2c-gpio,timeout-ms", &reg))
-+		pdata->timeout = msecs_to_jiffies(reg);
-+
-+	pdata->sda_is_open_drain =
-+		!!of_property_read_bool(np, "i2c-gpio,sda-open-drain");
-+	pdata->scl_is_open_drain =
-+		!!of_property_read_bool(np, "i2c-gpio,scl-open-drain");
-+	pdata->scl_is_output_only =
-+		!!of_property_read_bool(np, "i2c-gpio,scl-output-only");
-+
-+	return 0;
-+}
-+
- static int __devinit i2c_gpio_probe(struct platform_device *pdev)
- {
-+	struct i2c_gpio_private_data *priv;
- 	struct i2c_gpio_platform_data *pdata;
- 	struct i2c_algo_bit_data *bit_data;
- 	struct i2c_adapter *adap;
- 	int ret;
- 
--	pdata = pdev->dev.platform_data;
--	if (!pdata)
--		return -ENXIO;
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+	adap = &priv->adap;
-+	bit_data = &priv->bit_data;
-+	pdata = &priv->pdata;
- 
--	ret = -ENOMEM;
--	adap = kzalloc(sizeof(struct i2c_adapter), GFP_KERNEL);
--	if (!adap)
--		goto err_alloc_adap;
--	bit_data = kzalloc(sizeof(struct i2c_algo_bit_data), GFP_KERNEL);
--	if (!bit_data)
--		goto err_alloc_bit_data;
-+	if (pdev->dev.of_node) {
-+		ret = of_i2c_gpio_probe(pdev->dev.of_node, pdata);
-+		if (ret)
-+			return ret;
-+	} else {
-+		if (!pdev->dev.platform_data)
-+			return -ENXIO;
-+		memcpy(pdata, pdev->dev.platform_data, sizeof(*pdata));
-+	}
- 
- 	ret = gpio_request(pdata->sda_pin, "sda");
- 	if (ret)
-@@ -143,6 +188,7 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
- 	adap->algo_data = bit_data;
- 	adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
- 	adap->dev.parent = &pdev->dev;
-+	adap->dev.of_node = pdev->dev.of_node;
- 
- 	/*
- 	 * If "dev->id" is negative we consider it as zero.
-@@ -154,7 +200,9 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_add_bus;
- 
--	platform_set_drvdata(pdev, adap);
-+	of_i2c_register_devices(adap);
-+
-+	platform_set_drvdata(pdev, priv);
- 
- 	dev_info(&pdev->dev, "using pins %u (SDA) and %u (SCL%s)\n",
- 		 pdata->sda_pin, pdata->scl_pin,
-@@ -168,34 +216,40 @@ err_add_bus:
- err_request_scl:
- 	gpio_free(pdata->sda_pin);
- err_request_sda:
--	kfree(bit_data);
--err_alloc_bit_data:
--	kfree(adap);
--err_alloc_adap:
- 	return ret;
- }
- 
- static int __devexit i2c_gpio_remove(struct platform_device *pdev)
- {
-+	struct i2c_gpio_private_data *priv;
- 	struct i2c_gpio_platform_data *pdata;
- 	struct i2c_adapter *adap;
- 
--	adap = platform_get_drvdata(pdev);
--	pdata = pdev->dev.platform_data;
-+	priv = platform_get_drvdata(pdev);
-+	adap = &priv->adap;
-+	pdata = &priv->pdata;
- 
- 	i2c_del_adapter(adap);
- 	gpio_free(pdata->scl_pin);
- 	gpio_free(pdata->sda_pin);
--	kfree(adap->algo_data);
--	kfree(adap);
- 
- 	return 0;
- }
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id i2c_gpio_dt_ids[] = {
-+	{ .compatible = "i2c-gpio", },
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, i2c_gpio_dt_ids);
-+#endif
-+
- static struct platform_driver i2c_gpio_driver = {
- 	.driver		= {
- 		.name	= "i2c-gpio",
- 		.owner	= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(i2c_gpio_dt_ids),
- 	},
- 	.probe		= i2c_gpio_probe,
- 	.remove		= __devexit_p(i2c_gpio_remove),
+ 	if (trigger) {
+ 		trigger->name = name;
 -- 
-1.7.7
+1.7.9
