@@ -1,31 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
 Date: Thu, 8 Mar 2012 12:53:29 -0800
-Subject: [GIT PULL 4/7] tiny uart clean-up for upcoming merge window
+Subject: [GIT PULL 5/7] more DT changes for upcoming merge window
 In-Reply-To: <pull-1331240009-558004>
-Message-ID: <mailman.6.1331240034.14256.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.7.1331240039.14256.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This one contains removal of some now unneded code.
-Also suggested to pull into cleanup branch.
+Here are some more changes to the DT branch.
+
+As these depend both on the earlier omap dt patches pulled in, and
+irqdomain patches queued by Grant, Benoit based on a merge
+of the two. Looks like arm-soc/next/dt already has Grant's
+commit 280ad7fd, so this should not add any new dependencies.
 
 
-The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
-  Linus Torvalds (1):
-        Linux 3.3-rc4
+
+The following changes since commit 1f52299ec000e2161635b263d81ab92ea7f1f0a7:
+  Benoit Cousson (1):
+        Merge branch 'irqdomain/next' of git://git.secretlab.ca/git/linux-2.6 into for_3.4/dt_irq_domain2
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap uart
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap dt-part2
 
-NeilBrown (2):
-      ARM: OMAP2+: UART: remove unused fields in omap_uart_state.
-      ARM: OMAP2+: remove some orphan function declarations.
+Benoit Cousson (3):
+      ARM: OMAP2/3: intc: Add DT support for TI interrupt controller
+      arm/dts: OMAP3: Add interrupt-controller bindings for INTC
+      ARM: OMAP2+: board-generic: Use of_irq_init API
 
-Tony Lindgren (1):
-      Merge branch 'for_3.4/cleanup/uart' of git://git.kernel.org/.../khilman/linux-omap-pm into uart
+Ilya Yanok (1):
+      arm/dts: mt_ventoux: very basic support for TeeJet Mt.Ventoux board
 
- arch/arm/mach-omap2/pm.h                 |    1 -
- arch/arm/mach-omap2/serial.c             |    4 ----
- arch/arm/plat-omap/include/plat/serial.h |    1 -
- 3 files changed, 0 insertions(+), 6 deletions(-)
+Tony Lindgren (3):
+      Merge branch 'for_3.4/dt_irq_domain' of git://git.kernel.org/.../bcousson/linux-omap-dt into dt-part2
+      ARM: OMAP2+: Fix build error when only ARCH_OMAP2/3 or 4 is selected
+      ARM: OMAP2+: Remove extra ifdefs for board-generic
+
+ .../devicetree/bindings/arm/omap/intc.txt          |   27 ++++++
+ arch/arm/boot/dts/am3517_mt_ventoux.dts            |   27 ++++++
+ arch/arm/boot/dts/omap3.dtsi                       |    6 +-
+ arch/arm/mach-omap2/board-generic.c                |   99 ++++++++++----------
+ arch/arm/mach-omap2/common.h                       |   12 +++
+ arch/arm/mach-omap2/irq.c                          |   60 ++++++++++--
+ 6 files changed, 168 insertions(+), 63 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/intc.txt
+ create mode 100644 arch/arm/boot/dts/am3517_mt_ventoux.dts
