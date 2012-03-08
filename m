@@ -1,37 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Mar 2012 10:09:32 -0800
-Subject: [GIT PULL] ARM: OMAP2+: PM: core support for SMPS regulators for
- v3.4
-In-Reply-To: <20120308021843.GQ12083@atomide.com> (Tony Lindgren's message of
- "Wed, 7 Mar 2012 18:18:43 -0800")
-References: <877gywjhht.fsf@ti.com> <20120308021843.GQ12083@atomide.com>
-Message-ID: <87399jc6cj.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Mar 2012 10:13:46 -0800
+Subject: [GIT PULL] few more fixes for v3.3-rc6
+In-Reply-To: <20120308180441.GT12083@atomide.com>
+References: <20120308180441.GT12083@atomide.com>
+Message-ID: <20120308181345.GU12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Olof,
 
-> * Kevin Hilman <khilman@ti.com> [120307 11:42]:
->> Tony,
->> 
->> Please pull the following support for using regulators to control the
->> on-chip VC/VP managed voltage domains.
->> 
->> The regulator driver support for this is already queued in the regulator
->> tree, and this is the supporting core work.
->> 
->> This combined with the CPUfreq changes to use the regulator framework
->> will finally result in MPU DVFS working in mainline.
->
-> Nice.. However this one might be missing some header changes?
+* Tony Lindgren <tony@atomide.com> [120308 09:34]:
+> 
+> Vaibhav Hiremath (1):
+>       ARM: OMAP: id: Add missing break statement in omap3xxx_check_revision
 
-Oh, that's because it depends on the regulator core changes that are in
-Mark's regulator tree.  You need the for-next branch of :
+FYI, this one will cause a minor merge conflict with what's in
+arm-soc/for-next, here's how to resolve for reference:
 
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@@ -397,7 -342,8 +397,8 @@@ void __init omap3xxx_check_revision(voi
+  		break;
+  	case 0xb944:
+  		omap_revision = AM335X_REV_ES1_0;
+ -		*cpu_rev = "1.0";
+ +		cpu_rev = "1.0";
++ 		break;
+  	case 0xb8f2:
+  		switch (rev) {
+  		case 0:
 
-For this to compile correctly.
+Regards,
 
-Sorry, I should've been more clear above about the build dependency.
-
-Kevin
+Tony
