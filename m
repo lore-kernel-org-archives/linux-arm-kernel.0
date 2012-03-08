@@ -1,27 +1,29 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Mar 2012 13:21:57 -0800
-Subject: [PATCH 0/2] ARM: OMAP2+: PM: code consolidation for 3.4
-In-Reply-To: <1331233547.18015.74.camel@cumari> (Luciano Coelho's message of
- "Thu, 08 Mar 2012 21:05:47 +0200")
-References: <20120202093600.12509.35052.stgit@dusk> <87ty39cc7s.fsf@ti.com>
- <alpine.DEB.2.00.1202021140060.586@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021328450.586@utopia.booyaka.com>
- <CAKd1q9rq67gUyXn+rOL348YwaYQiqHR8UQCSd68fpxhZHHsYGA@mail.gmail.com>
- <87sjhjaqyi.fsf@ti.com> <1331232433.18015.69.camel@cumari>
- <alpine.DEB.2.00.1203081153540.9551@utopia.booyaka.com>
- <1331233547.18015.74.camel@cumari>
-Message-ID: <87d38mbxfu.fsf@ti.com>
+From: psandeep.s@gmail.com (Sandeep Patil)
+Date: Thu, 8 Mar 2012 13:25:13 -0800
+Subject: [Linaro-mm-sig] [PATCHv23 12/16] mm: trigger page reclaim in
+ alloc_contig_range() to stabilise watermarks
+In-Reply-To: <1329929337-16648-13-git-send-email-m.szyprowski@samsung.com>
+References: <1329929337-16648-1-git-send-email-m.szyprowski@samsung.com>
+ <1329929337-16648-13-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+K6fF5aN7Z3roKOzZe+a87ey4YcLd5Fr1U794wvb+8H3qP2+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Luciano Coelho <coelho@ti.com> writes:
+> +static int __reclaim_pages(struct zone *zone, gfp_t gfp_mask, int count)
+> +{
+> + ? ? ? /*
+> + ? ? ? ?* Increase level of watermarks to force kswapd do his job
+> + ? ? ? ?* to stabilise at new watermark level.
+> + ? ? ? ?*/
+> + ? ? ? __update_cma_watermarks(zone, count);
+> +
+> + ? ? ? /* Obey watermarks as if the page was being allocated */
+> + ? ? ? watermark = low_wmark_pages(zone) + count;
+> + ? ? ? while (!zone_watermark_ok(zone, 0, watermark, 0, 0)) {
 
-[...]
+Wouldn't this reclaim (2 * count pages) above low wmark?
 
-> Thanks, Paul! I was just chatting with Kevin about this on IRC.  With
-> your patch and no_console_suspend, it works. :)
+You are updating the low wmark first and then adding "count"
+for the zone_watermark_ok() check as well ..
 
-Just FYI... I've queued this patch from Paul and it's now queued by Tony
-for v3.4 in his cleanup-pm branch.
-
-Kevin
+Sandeep
