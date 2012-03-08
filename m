@@ -1,50 +1,23 @@
-From: enrico.scholz@sigma-chemnitz.de (Enrico Scholz)
-Date: Thu, 08 Mar 2012 11:55:13 +0100
-Subject: Regression in 3.2.9 for omap-serial (at least)
-Message-ID: <lyk42vxsz2.fsf@ensc-virt.intern.sigma-chemnitz.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 8 Mar 2012 10:58:22 +0000
+Subject: [PATCH v2 2/3] ARM/ASoC: OMAP McBSP: Move remainig defines from
+ arch to ASoC header
+In-Reply-To: <1331198537-13469-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
+ <1331198537-13469-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120308105821.GA3638@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 08, 2012 at 11:22:16AM +0200, Peter Ujfalusi wrote:
+> Clock signal muxing, and functional clock related defines are only needed
+> in ASoC drivers.
 
-the commit "genirq: Unmask oneshot irqs when thread was not woken"[1]
-breaks at least the omap-serial driver which requests a shared interrupt
-as
-
- --- arch/arm/mach-omap2/serial.c ---
-	ret = request_threaded_irq(uart->irq, NULL, omap_uart_interrupt,
-				   IRQF_SHARED, "serial idle", (void *)uart);
-
- --- drivers/tty/serial/omap-serial.c
-	retval = request_irq(up->port.irq, serial_omap_irq, up->port.irqflags,
-				up->name, up);
-
-
-(note the missing IRQF_ONESHOT in the first piece of code)
-
-
-Where previously 
-
-  if (!irqd_irq_disabled(&desc->irq_data) && !(desc->istate & IRQS_ONESHOT))
-          unmask_irq(desc);
-
-was checked in kernel/irq/chip.c, now
-
-  if (!irqd_irq_disabled(&desc->irq_data) &&
-  	    irqd_irq_masked(&desc->irq_data) && !desc->threads_oneshot)
-  		unmask_irq(desc);
-
-will be done.
-
-Because the threaded irq was requested without IRQF_ONESHOT, IRQS_ONESHOT
-is not set but 'desc->threads_oneshot' is 1 due to the threaded irq. So,
-irq was unmasked with old code but stays masked with the new one.  The new
-behavior renders systems unusable because console becomes disfunctional.
-
-
-
-
-Enrico
-
-Footnotes: 
-[1]  aa0eb3474beae8f6d9dcc2311dc02bea50cfd7b7
+Acked-by: Mark Brown <broonoie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/74984923/attachment.sig>
