@@ -1,25 +1,38 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Thu, 8 Mar 2012 14:50:47 -0600
-Subject: [PATCH v3 07/11] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <1331225990-27308-8-git-send-email-shawn.guo@linaro.org>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-8-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F591BA7.2050602@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Mar 2012 12:53:29 -0800
+Subject: [GIT PULL 1/7] non-critical fixes part3 for upcoming merge window
+Message-ID: <pull-1331240009-558004>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> Check /compatible rather than /model to determine the machine name.
-> The p1022ds older device trees get a different /model from the new
-> ones, while /compatible is consistent there, so checking /compatible
-> will save the bother of detecting older p1022ds device trees.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
+Hi Olof,
 
-Acked-by: Timur Tabi <timur@freescale.com>
+Here are two more pre-emptive fixes for upcoming merge
+window to pull into arm-soc/next/fixes-non-critical.
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+Now with the fixes finallny out of the way after all
+the cleanup related changes, as a reply to this pull
+request I'm posting some more pull requests for cleanup
+and some minor board changes.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 9cf793f9b8b1ba9414e2a7591b2e911885f85a27:
+  Kevin Hilman (1):
+        ARM: OMAP: convert omap_device_build() and callers to __init
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes-non-critical-part3
+
+Tony Lindgren (2):
+      ARM: OMAP2+: Fix section warnings for hsmmc_init_one
+      ARM: OMAP2+: Fix build for omap4 only builds with missing include of linux/bug.h
+
+ arch/arm/mach-omap2/hsmmc.c           |    2 +-
+ arch/arm/mach-omap2/powerdomain44xx.c |    1 +
+ arch/arm/mach-omap2/vc.c              |    1 +
+ 3 files changed, 3 insertions(+), 1 deletions(-)
