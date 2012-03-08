@@ -1,53 +1,103 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 8 Mar 2012 07:27:39 +0100
-Subject: [PATCH v5 3/4] clk: introduce the common clock framework
-In-Reply-To: <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-4-git-send-email-mturquette@linaro.org>
- <20120303133158.GA26882@pengutronix.de>
- <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
- <20120304115201.GB26882@pengutronix.de>
- <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
- <20120305073836.GU3852@pengutronix.de>
- <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
- <20120306190039.GJ3852@pengutronix.de>
- <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
-Message-ID: <20120308062739.GE18513@lunn.ch>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Thu, 08 Mar 2012 15:52:44 +0900
+Subject: [RFC PATCH] video:backlight: add dimming sysfs node
+Message-ID: <4F58573C.3020407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Assuming that some day OMAP code can be refactored to allow for lazy
-> (or at least initcall-based) registration of clocks then perhaps your
-> suggestion can take root.  Which leads me to this question: are there
-> any other platforms out there that require the level of expose to
-> struct clk present in this patchset?  OMAP does, for now, but if that
-> changes then I need to know if others require this as well.
+In backlight class, update_status() callback function is mostly used to change
+backlight brightness. When platform enter the dimming state, it is usually used.
+But, I think dimming state can be defined variety of method including brightness.
+So, it is need to differentiated node from brightness node.
 
-Hi Mike
+In set_dimming() callback function, developers can define variety dimming functions.
 
-For kirkwood, i use static clk's for all but my root clock. I cannot
-statically know the rate of the root clock, so i have to determine it
-at boot time using heuristics, PCI ID, etc.
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Inki Dae <inki.dae@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/video/backlight/backlight.c |   37 +++++++++++++++++++++++++++++++++++
+ include/linux/backlight.h           |    9 ++++++++
+ 2 files changed, 46 insertions(+), 0 deletions(-)
 
-I used statics thinking it would be less code. No idea if it actually
-is, and there is nothing stopping me moving to creating the clocks
-after creating the root clock.
-
-One comment i have about the current static clks. I completely missing
-you need to call __clk_init() on them and so ended up with lots of
-division by zero errors, since they did not have a parent, and so the
-code seemed not be to able to determine the rate.
-
-So 
-
-1) Please add __clk_init() to the documentation in the section about
-   static clocks.
-
-2) Should maybe the name change? It seems strange having to call a
-   __X() function. If this is a function which is supposed to be used,
-   drop the __. Maybe clk_static_register()?
-
-3) Maybe, if the parent is missing, clk_get_rate() should return an
-   error?
-
-Andrew
+diff --git a/drivers/video/backlight/backlight.c b/drivers/video/backlight/backlight.c
+index bf5b1ec..44a77e4 100644
+--- a/drivers/video/backlight/backlight.c
++++ b/drivers/video/backlight/backlight.c
+@@ -101,6 +101,43 @@ static void backlight_generate_event(struct backlight_device *bd,
+ 	sysfs_notify(&bd->dev.kobj, NULL, "actual_brightness");
+ }
+ 
++static ssize_t backlight_store_dimming(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	int rc;
++	struct backlight_device *bd = to_backlight_device(dev);
++	unsigned long dimming;
++
++	rc = strict_strtoul(buf, 0, &dimming);
++	if (rc)
++		return rc;
++
++	if (dimming < 0)
++		rc = -EINVAL;
++	else {
++		pr_debug("set dimming mode\n");
++
++		if (dimming)
++			bd->props.dimming = true;
++		else
++			bd->props.dimming = false;
++
++		backlight_set_dimming(bd);
++
++		rc = count;
++	}
++
++	return rc;
++}
++
++static ssize_t backlight_show_dimming(struct device *dev,
++		struct device_attribute *attr,char *buf)
++{
++	struct backlight_device *bd = to_backlight_device(dev);
++
++	return sprintf(buf, "%d\n", bd->props.dimming);
++}
++
+ static ssize_t backlight_show_power(struct device *dev,
+ 		struct device_attribute *attr, char *buf)
+ {
+diff --git a/include/linux/backlight.h b/include/linux/backlight.h
+index 5ffc6dd..823717e 100644
+--- a/include/linux/backlight.h
++++ b/include/linux/backlight.h
+@@ -55,10 +55,13 @@ struct backlight_ops {
+ 	/* Check if given framebuffer device is the one bound to this backlight;
+ 	   return 0 if not, !=0 if it is. If NULL, backlight always matches the fb. */
+ 	int (*check_fb)(struct backlight_device *, struct fb_info *);
++	/* Notify the backlight driver to enter the dimming state */
++	int (*set_dimming)(struct backlight_device *);
+ };
+ 
+ /* This structure defines all the properties of a backlight */
+ struct backlight_properties {
++	bool dimming;
+ 	/* Current User requested brightness (0 - max_brightness) */
+ 	int brightness;
+ 	/* Maximal value for brightness (read-only) */
+@@ -111,6 +114,12 @@ static inline void backlight_update_status(struct backlight_device *bd)
+ 	mutex_unlock(&bd->update_lock);
+ }
+ 
++static inline void backlight_set_dimming(struct backlight_device *bd)
++{
++	if (bd->ops && bd->ops->set_dimming)
++		bd->ops->set_dimming(bd);
++}
++
+ extern struct backlight_device *backlight_device_register(const char *name,
+ 	struct device *dev, void *devdata, const struct backlight_ops *ops,
+ 	const struct backlight_properties *props);
+-- 
+1.7.4.1
