@@ -1,44 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Mar 2012 09:21:22 +0000
-Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
-In-Reply-To: <4F57FED8.7050708@gmail.com>
-References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
- <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
- <20120229103207.GB17745@arm.com> <4F4E0BDE.6040708@gmail.com>
- <20120229153814.GK17745@arm.com> <4F57FED8.7050708@gmail.com>
-Message-ID: <20120308092121.GA26727@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu,  8 Mar 2012 11:22:14 +0200
+Subject: [PATCH v2 0/3] ARM/ASoC: OMAP McBSP: Correct CLKR/FSR source selection
+Message-ID: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 12:35:36AM +0000, bill4carson wrote:
-> On 2012?02?29? 23:38, Catalin Marinas wrote:
-> > On Wed, Feb 29, 2012 at 11:28:30AM +0000, bill4carson wrote:
-> >> On 2012?02?29? 18:32, Catalin Marinas wrote:
-> >>> On Mon, Feb 13, 2012 at 09:44:22AM +0000, Bill Carson wrote:
-> >>>> +static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
-> >>>> +					   unsigned long addr, pte_t *ptep)
-> >>>> +{
-> >>>> +	pte_t old_pte = *ptep;
-> >>>> +	set_huge_pte_at(mm, addr, ptep, pte_wrprotect(old_pte));
-> >>>> +}
-> >>>
-> >>> You could use the generic ptep_set_wrprotect()
-> >>
-> >> I'm a bit of confused about this.
-> >>
-> >> generic ptep_set_wrprotect() can not set huge pte, that's why
-> >> set_huge_pte_at is used instead here.
-> >
-> > Ah, the generic one can only work with with LPAE where set_huge_pte_at()
-> > is just a set_pte_at(). So this part looks good.
-> 
-> Thanks for your time to review PATCH1/7 :)
-> 
-> I'm wondering if reset of this patch set is ok,
-> I would like to start working on V3 as per your comments.
+Hello,
 
-I haven't finished looking through the patches. Probably I will by the
-end of this week.
+Changes since v1:
+- Adapted to the moved mcbsp code which helped to reduce the number of patches
+  from 5 to 3.
+- Clock selection related defines moved from arch to ASoC header.
+
+No change in functionality otherwise.
+
+This series fixes the CLKR/FSR mux selection (on McBSP ports with 6 pin setup).
+OMAP2/3 has 6 pin setup on McBSP1 port while OMAP4 has the 6 pin setup on McBSP4
+port.
+Add support for OMAP4 CLKR/FSR source selection, and simplify the ASoC part of
+CLK mux configuration.
+
+This series should go via ASoC with the rest of McBSP changes.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (3):
+  ARM: OMAP2+: McBSP: Correct CLKR/FSR clock source mux configuration
+  ARM/ASoC: OMAP McBSP: Move remainig defines from arch to ASoC header
+  ASoC: omap-mcbsp: Single function CLKR/FSR source mux configuration
+
+ arch/arm/mach-omap2/mcbsp.c             |   46 ++++++++++++++++++++++++++++-
+ arch/arm/plat-omap/include/plat/mcbsp.h |   12 --------
+ sound/soc/omap/mcbsp.c                  |   48 ++++++++++++++----------------
+ sound/soc/omap/mcbsp.h                  |   13 +++++++-
+ sound/soc/omap/omap-mcbsp.c             |    8 ++--
+ 5 files changed, 81 insertions(+), 46 deletions(-)
 
 -- 
-Catalin
+1.7.8.5
