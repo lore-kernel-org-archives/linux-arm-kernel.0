@@ -1,31 +1,54 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 8 Mar 2012 09:22:48 -0800
-Subject: [GIT PULL] i.MX 35/5 AIPS Setup
-In-Reply-To: <20120307205429.GO3852@pengutronix.de>
-References: <20120307205429.GO3852@pengutronix.de>
-Message-ID: <CAOesGMjfGuof2Ss9x98PjH9Hgu0w9eNCZNRYjjNPT___r-tOQw@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 8 Mar 2012 10:27:07 -0700
+Subject: [PATCH 06/11] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <1331218291-16119-7-git-send-email-thierry.reding@avionic-design.de>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-7-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <CAErSpo6hbWjteESST1+O2WzbtmZq6hC-pnUB4o3MAXWG-EgU+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 8, 2012 at 7:51 AM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
+> ?drivers/pci/setup-irq.c | ? ?4 ++--
+> ?1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+> index eb219a1..270ae7b 100644
+> --- a/drivers/pci/setup-irq.c
+> +++ b/drivers/pci/setup-irq.c
+> @@ -18,7 +18,7 @@
+> ?#include <linux/cache.h>
+>
+>
+> -static void __init
+> +static void
+> ?pdev_fixup_irq(struct pci_dev *dev,
+> ? ? ? ? ? ? ? u8 (*swizzle)(struct pci_dev *, u8 *),
+> ? ? ? ? ? ? ? int (*map_irq)(const struct pci_dev *, u8, u8))
+> @@ -54,7 +54,7 @@ pdev_fixup_irq(struct pci_dev *dev,
+> ? ? ? ?pcibios_update_irq(dev, irq);
+> ?}
+>
+> -void __init
+> +void
+> ?pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+> ? ? ? ? ? ? ? int (*map_irq)(const struct pci_dev *, u8, u8))
+> ?{
 
-On Wed, Mar 7, 2012 at 12:54 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->
-> Hi Arnd,
->
-> Please pull the following for -next. It contains Fabios Aips setup
-> patches. They depend on your imx/soc branch.
->
-> Sascha
->
-> The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
->
-> ?Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
->
-> are available in the git repository at:
->
-> ?git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx35-imx5-aips-setup
 
-Thanks, pulled into next/soc.
+        struct pci_dev *dev = NULL;
+        for_each_pci_dev(dev)
+                pdev_fixup_irq(dev, swizzle, map_irq);
+}
 
--Olof
+Hmm, your patch looks OK as far as it goes, but the implementation of
+pci_fixup_irqs() as a call-once-at-boot-time thing with a loop through
+all the PCI devices we've found so far looks completely broken with
+regard to hotplug.
+
+Who does the swizzle for devices hot-added after boot?
+
+Bjorn
