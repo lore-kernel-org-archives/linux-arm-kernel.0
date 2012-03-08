@@ -1,41 +1,38 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Thu, 8 Mar 2012 17:36:05 +0200
-Subject: I.MX35 PDK
-In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
-References: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>,
- <CAOMZO5Amo0XFf+TV7PprCL079C5Y0qKmo+k-FfShU7k4SG7W6Q@mail.gmail.com>,
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8918@MEP-EXCH.meprolight.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 8 Mar 2012 16:43:59 +0100
+Subject: [PATCH 00/11] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <4F58CE9D.3070605@gmail.com>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <4F58CE9D.3070605@gmail.com>
+Message-ID: <20120308154359.GA544@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Rob Herring wrote:
+> There is a whole bunch of PCI DT code sitting in the powerpc tree that
+> probably needs to be moved to common location and used here.
+> 
+> This looks way too simple to be what's needed if I compare to PCI
+> bindings in powerpc dts files.
 
->On my mx31pdk I get the same dmaengine errors and the ov2640 does work fine.
->I think you can go ahead and try to use the camera on the mx35pdk now.
->You can try:
+My particular setup may be much simpler than the average PowerPC machine. The
+patchset is only what I need to get PCIe running on the platform, which has
+an FPGA connected to the Tegra via PCIe. For instance there is no legacy
+interrupt support (only MSI), so interrupt remapping is not required. I also
+know that OF nodes are not properly hooked up with the PCI devices yet, which
+I will need, among other things, to provide platform data for an SPI flash
+connected to an SPI master implemented within the FPGA. I also haven't looked
+at specifying the memory ranges via the device tree.
 
->gst-launch -v v4l2src device=/dev/video0 !
->video/x-raw-yuv,width=320,height=240,framerate=25/1 ! ffmpegcolorspace
->! fbdevsink
+So quite a lot may still be missing, but does that prevent any of this from
+being added to mainline? Things can be added on an as-needed basis, can't
+they?
 
-<<Thank Fabio I'll try to check it.
-
-I tried to test it, everything is fine,  just do not see the video on display.
-Here can see messages:
-
-Setting pipeline to PAUSED ...mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
-/GstPipeline:pipeline0/GstV4l2Src:v4l2src0.GstPad:src: caps = video/x-raw-yuv, format=(fourcc)UYVY, framerate=(fraction)25/1, width=(int)320, height=(int)240, interlaced=(boolean)false
-Pipeline is live and does not need PREROLL ...
-WARNING: from element /GstPipeline:pipeline0/GstV4l2Src:v4l2src0: Could not get parameters on device '/dev/video0'
-Additional debug info:
-v4l2src_calls.c(240): gst_v4l2src_set_capture (): /GstPipeline:pipeline0/GstV4l2Src:v4l2src0:
-system error: Invalid argument
-Setting pipeline to PLAYING ...
-New clock: GstSystemClock
-
-It works well :-) 
-gst-launch videotestsrc ! fbdevsink
-
-Regards
-Alex Gershgorin
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/5c285597/attachment.sig>
