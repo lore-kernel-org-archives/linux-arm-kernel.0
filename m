@@ -1,46 +1,159 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 7 Mar 2012 21:06:15 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP2+: hwmod data: cleanup in preparation for link
- array removal
-Message-ID: <alpine.DEB.2.00.1203072102150.21662@utopia.booyaka.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 8 Mar 2012 16:51:16 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2 tree
+Message-ID: <20120308165116.d400947f35e40a923e9c6ad0@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+Hi all,
 
-The following changes since commit b8a633451951d149494076393698880453bf6bfe:
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-omap1/board-ams-delta.c between commit ddba6c7f7ec6
+("OMAP1: pass LCD config with omapfb_set_lcd_config()") from the
+omap_dss2 tree and commits 5ca6180fa6d7 ("ARM: OMAP1: ams-delta:
+supersede custom led device by leds-gpio") and 2e3ee9f45b3c ("ARM: OMAP1:
+Move most of plat/io.h into local iomap.h") from the arm-soc tree.
 
-  ARM: OMAP: hwmod: add softreset delay field and OMAP4 data (2012-02-28 03:46:31 -0700)
+I fixed it up (see below) and can carry the fix as necessary.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-are available in the git repository at:
-
-  git://git.pwsan.com/linux-2.6 hwmod_data_cleanup_3.4
-
-for you to fetch changes up to a2d4b88dd32b02e8b5088e0d64b3c102c0852210:
-
-  ARM: OMAP2+: hwmod: extend OCP_* register offsets from 16 to 32 bits (2012-02-28 03:49:34 -0700)
-
-(This branch is based on the 'hwmod_code_cleanup_3.4' branch, pull req 
-sent previously)
-
-
-- Paul
-
-----------------------------------------------------------------
-Paul Walmsley (9):
-      ARM: OMAP2/3: hwmod data: update old names
-      ARM: OMAP3: hwmod data: fix interfaces for the MMC hwmods
-      ARM: OMAP3: hwmod data: add DSS->L3 interconnect for 3430ES1
-      ARM: OMAP3: hwmod data: GPTIMER12 is attached to a separate interconnect
-      ARM: OMAP36xx: hwmod data: fix SmartReflex interface data
-      ARM: OMAP4: hwmod data: remove bandgap hwmod
-      ARM: OMAP4: hwmod data: add OCP_USER_DSP; mark omap44xx_dsp__iva appropriately
-      ARM: OMAP4: hwmod data: uncomment some "excluded" hwmods
-      ARM: OMAP2+: hwmod: extend OCP_* register offsets from 16 to 32 bits
-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    4 +-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    6 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |  137 ++++++++++++++++++++------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |   39 +-------
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    7 +-
- 5 files changed, 121 insertions(+), 72 deletions(-)
+diff --cc arch/arm/mach-omap1/board-ams-delta.c
+index e0e8245,c847597..0000000
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@@ -20,7 -21,7 +21,8 @@@
+  #include <linux/platform_device.h>
+  #include <linux/serial_8250.h>
+  #include <linux/export.h>
+ +#include <linux/omapfb.h>
++ #include <linux/io.h>
+  
+  #include <media/soc_camera.h>
+  
+@@@ -170,6 -162,117 +163,113 @@@ static struct omap_usb_config ams_delta
+  	.pins[0]	= 2,
+  };
+  
+ -static struct omap_board_config_kernel ams_delta_config[] __initdata = {
+ -	{ OMAP_TAG_LCD,		&ams_delta_lcd_config },
+ -};
+ -
++ #define LATCH1_GPIO_BASE	232
++ #define LATCH1_NGPIO		8
++ 
++ static struct resource latch1_resources[] __initconst = {
++ 	[0] = {
++ 		.name	= "dat",
++ 		.start	= LATCH1_PHYS,
++ 		.end	= LATCH1_PHYS + (LATCH1_NGPIO - 1) / 8,
++ 		.flags	= IORESOURCE_MEM,
++ 	},
++ };
++ 
++ static struct bgpio_pdata latch1_pdata __initconst = {
++ 	.base	= LATCH1_GPIO_BASE,
++ 	.ngpio	= LATCH1_NGPIO,
++ };
++ 
++ static struct platform_device latch1_gpio_device = {
++ 	.name		= "basic-mmio-gpio",
++ 	.id		= 0,
++ 	.resource	= latch1_resources,
++ 	.num_resources	= ARRAY_SIZE(latch1_resources),
++ 	.dev		= {
++ 		.platform_data	= &latch1_pdata,
++ 	},
++ };
++ 
++ static struct resource latch2_resources[] __initconst = {
++ 	[0] = {
++ 		.name	= "dat",
++ 		.start	= LATCH2_PHYS,
++ 		.end	= LATCH2_PHYS + (AMS_DELTA_LATCH2_NGPIO - 1) / 8,
++ 		.flags	= IORESOURCE_MEM,
++ 	},
++ };
++ 
++ static struct bgpio_pdata latch2_pdata __initconst = {
++ 	.base	= AMS_DELTA_LATCH2_GPIO_BASE,
++ 	.ngpio	= AMS_DELTA_LATCH2_NGPIO,
++ };
++ 
++ static struct platform_device latch2_gpio_device = {
++ 	.name		= "basic-mmio-gpio",
++ 	.id		= 1,
++ 	.resource	= latch2_resources,
++ 	.num_resources	= ARRAY_SIZE(latch2_resources),
++ 	.dev		= {
++ 		.platform_data	= &latch2_pdata,
++ 	},
++ };
++ 
++ static struct gpio latch_gpios[] __initconst = {
++ 	{
++ 		.gpio	= LATCH1_GPIO_BASE + 6,
++ 		.flags	= GPIOF_OUT_INIT_LOW,
++ 		.label	= "dockit1",
++ 	},
++ 	{
++ 		.gpio	= LATCH1_GPIO_BASE + 7,
++ 		.flags	= GPIOF_OUT_INIT_LOW,
++ 		.label	= "dockit2",
++ 	},
++ 	{
++ 		.gpio	= AMS_DELTA_GPIO_PIN_SCARD_RSTIN,
++ 		.flags	= GPIOF_OUT_INIT_LOW,
++ 		.label	= "scard_rstin",
++ 	},
++ 	{
++ 		.gpio	= AMS_DELTA_GPIO_PIN_SCARD_CMDVCC,
++ 		.flags	= GPIOF_OUT_INIT_LOW,
++ 		.label	= "scard_cmdvcc",
++ 	},
++ 	{
++ 		.gpio	= AMS_DELTA_GPIO_PIN_MODEM_NRESET,
++ 		.flags	= GPIOF_OUT_INIT_LOW,
++ 		.label	= "modem_nreset",
++ 	},
++ 	{
++ 		.gpio	= AMS_DELTA_GPIO_PIN_MODEM_CODEC,
++ 		.flags	= GPIOF_OUT_INIT_LOW,
++ 		.label	= "modem_codec",
++ 	},
++ 	{
++ 		.gpio	= AMS_DELTA_LATCH2_GPIO_BASE + 14,
++ 		.flags	= GPIOF_OUT_INIT_LOW,
++ 		.label	= "hookflash1",
++ 	},
++ 	{
++ 		.gpio	= AMS_DELTA_LATCH2_GPIO_BASE + 15,
++ 		.flags	= GPIOF_OUT_INIT_LOW,
++ 		.label	= "hookflash2",
++ 	},
++ };
++ 
++ void ams_delta_latch_write(int base, int ngpio, u16 mask, u16 value)
++ {
++ 	int bit = 0;
++ 	u16 bitpos = 1 << bit;
++ 
++ 	for (; bit < ngpio; bit++, bitpos = bitpos << 1) {
++ 		if (!(mask & bitpos))
++ 			continue;
++ 		gpio_set_value(base + bit, (value & bitpos) != 0);
++ 	}
++ }
++ EXPORT_SYMBOL(ams_delta_latch_write);
++ 
+  static struct resource ams_delta_nand_resources[] = {
+  	[0] = {
+  		.start	= OMAP1_MPUIO_BASE,
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/0dd7fc49/attachment.sig>
