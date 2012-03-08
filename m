@@ -1,25 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 8 Mar 2012 08:56:14 -0800
-Subject: [GIT PULL] Samsung Cleanup S3C24XX for v3.4
-In-Reply-To: <4F589313.1050706@samsung.com>
-References: <4F589313.1050706@samsung.com>
-Message-ID: <CAOesGMhbmnWSrfEQC5tVrskhjQPMSj1aki1CQ-UM_=mv0-re+A@mail.gmail.com>
+Date: Thu, 8 Mar 2012 08:59:33 -0800
+Subject: [PATCH] ARM: S3C2440: Fixed build error for s3c244x
+In-Reply-To: <1331200116-2424-1-git-send-email-kgene.kim@samsung.com>
+References: <1331200116-2424-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAOesGMhkZLGRYi3QTko0gcbj3MJ4vZE6mddEFLFsMhdx9fkx9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2012 at 3:08 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd, Olof,
+On Thu, Mar 8, 2012 at 1:48 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Fixed following:
+> arch/arm/mach-s3c2440/s3c244x.c: In function 's3c244x_restart':
+> arch/arm/mach-s3c2440/s3c244x.c:209: error: expected declaration or statement at end of input
+> make[1]: *** [arch/arm/mach-s3c24xx/s3c244x.o] Error 1
+> make: *** [arch/arm/mach-s3c24xx] Error 2
 >
-> Please pull cleanup s3c24xx from following:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/cleanup-s3c24xx
->
-> As I said before, this is including merge of mach-s3c24.. directories into
-> just one mach-s3c24xx directory.
->
-> If any problems, please kindly let me know.
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Thanks, pulled. Nice first step on making all of this common!
+Thanks, applied to fixes and I'll send out a pull request for the branch today.
 
 
 -Olof
