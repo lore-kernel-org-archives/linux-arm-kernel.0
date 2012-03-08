@@ -1,92 +1,119 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 08 Mar 2012 17:01:51 +0530
-Subject: [PATCH 00/15] ARM: OMAP4: hwmod data: add almost all remaining
- IP blocks
-In-Reply-To: <20120308104918.14753.69281.stgit@dusk>
-References: <20120308104918.14753.69281.stgit@dusk>
-Message-ID: <4F5898A7.5040005@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 8 Mar 2012 12:34:41 +0100 (CET)
+Subject: I.MX35 PDK
+In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
+References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
+Message-ID: <Pine.LNX.4.64.1203081225290.29847@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Alex
 
-On Thursday 08 March 2012 04:21 PM, Paul Walmsley wrote:
-> Hi
->
-> This series adds basic hwmods for all but one of the remaining
-> OMAP4 IP blocks that can be meaningfully controlled by the
-> kernel.  (The remaining IP block is the USIM - there's a clocking
-> problem that requires further investigation to resolve.)
->
-> There are a few new boot-time warnings added by this series:
->
-> [    0.280548] omap_hwmod: trace_clk_div_ck: missing clockdomain for trace_clk_div_ck.
-> [    0.302429] omap_hwmod: ddrphy_ck: missing clockdomain for ddrphy_ck.
-> [    0.319519] omap_hwmod: sl2if: cannot be enabled for reset (3)
->
-> These messages will be resolved by subsequent patches, and, while annoying,
-> should not affect the operation of the system.
->
-> These patches have been boot-tested and suspend-tested on a
-> OMAP44xx PandaBoard.
->
-> The series is intended to apply on the
-> 'hwmod_remove_link_arrays_cleanup_3.4' branch, posted previously.
->
-> These patches are also available via git from git://git.pwsan.com/linux-2.6
-> in the branch "hwmod_enable_remaining_hwmods_devel_3.4".
+Why is the cc-list mangled again? Why is the V4L list dropped again? 
+What's so difficult about hitting the "reply-to-all" button?
 
-Could not find this branch on your tree. Found a
-'enable_remaining_omap4_hwmods' instead, but that seems to
-be an old branch.
+On Thu, 8 Mar 2012, Alex Gershgorin wrote:
 
-regards,
-Rajendra
->
->
-> - Paul
->
-> ---
->
-> hwmod_enable_remaining_hwmods_devel_3.4
->     text	   data	    bss	    dec	    hex	filename
-> 6590067	 677452	5593500	12861019	 c43e5b	vmlinux.omap2plus_defconfig.orig
-> 6594227	 684620	5593500	12872347	 c46a9b	vmlinux.omap2plus_defconfig
->
-> Beno?t Cousson (6):
->        ARM: OMAP4: hwmod data: add GPMC
->        ARM: OMAP4: hwmod data: add the Slimbus IP blocks
->        ARM: OMAP4: hwmod data: add McASP
->        ARM: OMAP4: hwmod data: add remaining USB-related IP blocks
->        ARM: OMAP4: hwmod data: add the OCP-WP IP block
->        ARM: OMAP4: hwmod data: add DEBUGSS skeleton
->
-> Ming Lei (1):
->        ARM: OMAP4: hwmod data: introduce fdif(face detect module) hwmod
->
-> Paul Walmsley (8):
->        ARM: OMAP2+: clockdomains: make {prm,cm}_clkdm common
->        ARM: OMAP4: hwmod data: add HDQ/1-wire
->        ARM: OMAP4: hwmod data: add EMIF1 and 2
->        ARM: OMAP4: hwmod data: add GPU
->        ARM: OMAP4: hwmod data: add some interconnect-related IP blocks
->        ARM: OMAP4: hwmod data: add OCM RAM IP block
->        ARM: OMAP4: hwmod data: add System Control Module
->        ARM: OMAP4: hwmod data: add PRCM and related IP blocks
->
->
->   arch/arm/mach-omap2/Makefile                     |    8
->   arch/arm/mach-omap2/clockdomain44xx.c            |    6
->   arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |   10
->   arch/arm/mach-omap2/clockdomains44xx_data.c      |    2
->   arch/arm/mach-omap2/clockdomains_common_data.c   |   24
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c       | 1473 +++++++++++++++++++++-
->   arch/arm/plat-omap/include/plat/omap_hwmod.h     |    1
->   7 files changed, 1443 insertions(+), 81 deletions(-)
->   create mode 100644 arch/arm/mach-omap2/clockdomains_common_data.c
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Hi Fabio,
+> 
+> Thanks for you response...
+> 
+> > in spite of this I get from ov2640 driver error
+> > Here Linux Kernel boot message:
+> >
+> > "Linux video capture interface: v2.00
+> > soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> > mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+> > ov2640 0-0030: Product ID error fb:fb"
+> >
+> > I cannot understand what the problem is, if someone tested this?
+> 
+> >>Looks like a I2C issue.
+> 
+> >>Check the I2C1 pad settings in the mainline kernel.
+> 
+> >>On FSL kernel we have:
+> 
+> #<<define PAD_CONFIG (PAD_CTL_HYS_SCHMITZ | PAD_CTL_PKE_ENABLE |
+> >>PAD_CTL_PUE_PUD | PAD_CTL_ODE_OpenDrain)
+> 
+> 	<<switch (i2c_num) {
+> 	<<case 0:
+> 		<<mxc_request_iomux(MX35_PIN_I2C1_CLK, MUX_CONFIG_SION);
+> 		<<mxc_request_iomux(MX35_PIN_I2C1_DAT, MUX_CONFIG_SION);
+> 
+> 		<<mxc_iomux_set_pad(MX35_PIN_I2C1_CLK, PAD_CONFIG);
+> 		<<mxc_iomux_set_pad(MX35_PIN_I2C1_DAT, PAD_CONFIG);
+> 
+> >>Also check if you are getting the proper voltage levels at the I2C1 lines.
+> 
+> Yes this I2C problem, all I2C slave device need response to Host CPU by pulls I2C data bus to low, in other words generate ACK, the clock pulse for the acknowledge bit is always created by the bus master.
+> 
+> In this case, the camera tries to reset the data bus and generate an ACK, but the voltage drops to the area of two volts, although it should be reset to zero.
+> I replaced R172 with 10K on CPU board and got a good result, but there are other surprises 
+> 
+> Linux video capture interface: v2.00
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+> ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
+> i2c i2c-0: OV2640 Probed
+> mx3-camera mx3-camera.0: MX3 Camera driver detached from camera 0
+> dmaengine: failed to get dma1chan0: (-22)
+> dmaengine: failed to get dma1chan1: (-22)
+> dmaengine: failed to get dma1chan2: (-22)
+> dmaengine: failed to get dma1chan3: (-22)
+
+First of all it shows, that you're not using the newest kernel:
+
+http://thread.gmane.org/gmane.linux.ports.sh.devel/11508
+
+Secondly, as Fabio just pointed out, these messages are not fatal, which 
+is also the reason, why I changed their priority to "debug"
+
+Please, describe the actual problem, that you're getting (if any) and do 
+add the v4l list back to the list of recipients!
+
+Thanks
+Guennadi
+
+> dmaengine: failed to get dma1chan4: (-22)
+> dmaengine: failed to get dma1chan5: (-22)
+> dmaengine: failed to get dma1chan6: (-22)
+> dmaengine: failed to get dma1chan7: (-22)
+> dmaengine: failed to get dma1chan8: (-22)
+> dmaengine: failed to get dma1chan9: (-22)
+> dmaengine: failed to get dma1chan10: (-22)
+> dmaengine: failed to get dma1chan11: (-22)
+> dmaengine: failed to get dma1chan12: (-22)
+> dmaengine: failed to get dma1chan13: (-22)
+> dmaengine: failed to get dma1chan14: (-22)
+> dmaengine: failed to get dma1chan15: (-22)
+> dmaengine: failed to get dma1chan16: (-22)
+> dmaengine: failed to get dma1chan17: (-22)
+> dmaengine: failed to get dma1chan18: (-22)
+> dmaengine: failed to get dma1chan19: (-22)
+> dmaengine: failed to get dma1chan20: (-22)
+> dmaengine: failed to get dma1chan21: (-22)
+> dmaengine: failed to get dma1chan22: (-22)
+> dmaengine: failed to get dma1chan23: (-22)
+> dmaengine: failed to get dma1chan24: (-22)
+> dmaengine: failed to get dma1chan25: (-22)
+> dmaengine: failed to get dma1chan26: (-22)
+> dmaengine: failed to get dma1chan27: (-22)
+> dmaengine: failed to get dma1chan28: (-22)
+> dmaengine: failed to get dma1chan29: (-22)
+> dmaengine: failed to get dma1chan30: (-22):
+> 
+> 
+> What is the problem? 
+> Guennadi please help me understand 
+> 
+> Thanks,
+>  
+> Alex Gershgorin
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
