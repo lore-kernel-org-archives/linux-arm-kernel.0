@@ -1,103 +1,67 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Thu, 08 Mar 2012 15:52:44 +0900
-Subject: [RFC PATCH] video:backlight: add dimming sysfs node
-Message-ID: <4F58573C.3020407@samsung.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 8 Mar 2012 08:19:15 +0100
+Subject: [PATCH v3 12/13] gpio/omap: fix incorrect context restore logic
+ in omap_gpio_runtime_resume
+In-Reply-To: <CAC83ZvLFoSppTiPw-_a=z_Mnpmk6nHeaadTShdJP8RpDWh9TLg@mail.gmail.com>
+References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
+ <1331118963-26364-13-git-send-email-tarun.kanti@ti.com>
+ <4F574F95.7090801@ti.com>
+ <CAC83ZvLFoSppTiPw-_a=z_Mnpmk6nHeaadTShdJP8RpDWh9TLg@mail.gmail.com>
+Message-ID: <CAMQu2gzgM=Hc4fis5AsgL50e2KLttTR79iroOtExGecU7F50yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In backlight class, update_status() callback function is mostly used to change
-backlight brightness. When platform enter the dimming state, it is usually used.
-But, I think dimming state can be defined variety of method including brightness.
-So, it is need to differentiated node from brightness node.
+On Thu, Mar 8, 2012 at 4:58 AM, DebBarma, Tarun Kanti
+<tarun.kanti@ti.com> wrote:
+> On Wed, Mar 7, 2012 at 5:37 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+>> On Wednesday 07 March 2012 12:16 PM, Tarun Kanti DebBarma wrote:
+>>> In omap_gpio_runtime_resume() the context restore should be independent
+>>> of bank->enabled_non_wakeup_gpios. This was preventing context restore
+>>> of GPIO lines which are not wakeup enabled.
+>>>
+>>> Reported-by: Govindraj Raja <govindraj.raja@ti.com>
+>>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>>> ---
+>>> ?drivers/gpio/gpio-omap.c | ? ?2 +-
+>>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>> index 2e8e476..ccfbae0 100644
+>>> --- a/drivers/gpio/gpio-omap.c
+>>> +++ b/drivers/gpio/gpio-omap.c
+>>> @@ -1227,7 +1227,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
+>>> ? ? ? __raw_writel(bank->context.risingdetect,
+>>> ? ? ? ? ? ? ? ? ? ?bank->base + bank->regs->risingdetect);
+>>>
+>>> - ? ? if (!bank->enabled_non_wakeup_gpios || !bank->workaround_enabled) {
+>>> + ? ? if (!bank->workaround_enabled) {
+>> This doesn't seem to be right.
+>> Don't you want to avoid GPIO restore for banks which are in
+>> always on domain. Infact the purpose of "enabled_non_wakeup_gpios"
+>> is exactly that ? Isn't it.
+>>
+>> What am I missing ?
+> The bank->enabled_non_wakeup_gpios is set whenever a gpio line is programmed
+> as edge trigger as shown below.
+> (This is not meant to distinguish between gpios in WKUP domain vs
+> those in PER domain).
+> The context restore should happen irrespective of whether the trigger
+> type is edge or level.
+> In fact context restore was not happening for a gpio line because of
+> this condition while
+> testing suspend/resume.
+>
+> [...]
+> ? ? ? ? ? ? ? ?if (trigger & IRQ_TYPE_EDGE_BOTH)
+> ? ? ? ? ? ? ? ? ? ? ? ?bank->enabled_non_wakeup_gpios |= gpio_bit;
+> ? ? ? ? ? ? ? ?else
+> ? ? ? ? ? ? ? ? ? ? ? ?bank->enabled_non_wakeup_gpios &= ~gpio_bit;
+> [...]
 
-In set_dimming() callback function, developers can define variety dimming functions.
+Make sense now. Thanks for clarification Tarun.
+You can add mine..
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/video/backlight/backlight.c |   37 +++++++++++++++++++++++++++++++++++
- include/linux/backlight.h           |    9 ++++++++
- 2 files changed, 46 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/video/backlight/backlight.c b/drivers/video/backlight/backlight.c
-index bf5b1ec..44a77e4 100644
---- a/drivers/video/backlight/backlight.c
-+++ b/drivers/video/backlight/backlight.c
-@@ -101,6 +101,43 @@ static void backlight_generate_event(struct backlight_device *bd,
- 	sysfs_notify(&bd->dev.kobj, NULL, "actual_brightness");
- }
- 
-+static ssize_t backlight_store_dimming(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	int rc;
-+	struct backlight_device *bd = to_backlight_device(dev);
-+	unsigned long dimming;
-+
-+	rc = strict_strtoul(buf, 0, &dimming);
-+	if (rc)
-+		return rc;
-+
-+	if (dimming < 0)
-+		rc = -EINVAL;
-+	else {
-+		pr_debug("set dimming mode\n");
-+
-+		if (dimming)
-+			bd->props.dimming = true;
-+		else
-+			bd->props.dimming = false;
-+
-+		backlight_set_dimming(bd);
-+
-+		rc = count;
-+	}
-+
-+	return rc;
-+}
-+
-+static ssize_t backlight_show_dimming(struct device *dev,
-+		struct device_attribute *attr,char *buf)
-+{
-+	struct backlight_device *bd = to_backlight_device(dev);
-+
-+	return sprintf(buf, "%d\n", bd->props.dimming);
-+}
-+
- static ssize_t backlight_show_power(struct device *dev,
- 		struct device_attribute *attr, char *buf)
- {
-diff --git a/include/linux/backlight.h b/include/linux/backlight.h
-index 5ffc6dd..823717e 100644
---- a/include/linux/backlight.h
-+++ b/include/linux/backlight.h
-@@ -55,10 +55,13 @@ struct backlight_ops {
- 	/* Check if given framebuffer device is the one bound to this backlight;
- 	   return 0 if not, !=0 if it is. If NULL, backlight always matches the fb. */
- 	int (*check_fb)(struct backlight_device *, struct fb_info *);
-+	/* Notify the backlight driver to enter the dimming state */
-+	int (*set_dimming)(struct backlight_device *);
- };
- 
- /* This structure defines all the properties of a backlight */
- struct backlight_properties {
-+	bool dimming;
- 	/* Current User requested brightness (0 - max_brightness) */
- 	int brightness;
- 	/* Maximal value for brightness (read-only) */
-@@ -111,6 +114,12 @@ static inline void backlight_update_status(struct backlight_device *bd)
- 	mutex_unlock(&bd->update_lock);
- }
- 
-+static inline void backlight_set_dimming(struct backlight_device *bd)
-+{
-+	if (bd->ops && bd->ops->set_dimming)
-+		bd->ops->set_dimming(bd);
-+}
-+
- extern struct backlight_device *backlight_device_register(const char *name,
- 	struct device *dev, void *devdata, const struct backlight_ops *ops,
- 	const struct backlight_properties *props);
--- 
-1.7.4.1
+Regards
+Santosh
