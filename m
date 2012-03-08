@@ -1,156 +1,130 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu,  8 Mar 2012 11:22:17 +0200
-Subject: [PATCH v2 3/3] ASoC: omap-mcbsp: Single function CLKR/FSR source mux
- configuration
-In-Reply-To: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1331198537-13469-4-git-send-email-peter.ujfalusi@ti.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 8 Mar 2012 17:23:49 +0800
+Subject: [PATCH] leds: kill CONFIG_LEDS_CLASS option
+In-Reply-To: <1323356570.5309.25.camel@ted>
+References: <1314647628-21707-1-git-send-email-bryan.wu@canonical.com>
+ <alpine.LFD.2.00.1108291630020.20358@xanadu.home>
+ <1314653699.5939.299.camel@rex>
+ <CAK5ve-+J3hzVB=_b0AOJ-Q1LYewahVraMti=y=6AaQy3+iy+rg@mail.gmail.com>
+ <1314791341.5939.464.camel@rex>
+ <CAK5ve-LcUabPS2EGAPD7q3-_thS4XhmGyhafmRkOCUAAriaXSw@mail.gmail.com>
+ <1323356570.5309.25.camel@ted>
+Message-ID: <CAK5ve-LikCFcWGgcmLYgOG_TNnLZ=LPj9XdWXVgCWXgLP6G+jQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use single function for the CLKR/FSR mux configuration.
-OMAP2/3 has 6 pin configuration on McBSP1 instance, while on OMAP4
-McBSP4 instance have the 6 pin configuration so the omap2_mcbsp1_mux_* is
-not correct name for all support OMAP versions
+On Thu, Dec 8, 2011 at 11:02 PM, Richard Purdie <rpurdie@rpsys.net> wrote:
+> On Thu, 2011-12-08 at 19:53 +0800, Bryan Wu wrote:
+>> On Wed, Aug 31, 2011 at 7:49 PM, Richard Purdie <rpurdie@rpsys.net> wrote:
+>> > On Wed, 2011-08-31 at 10:45 +0800, Bryan Wu wrote:
+>> >> On Tue, Aug 30, 2011 at 5:34 AM, Richard Purdie <rpurdie@rpsys.net> wrote:
+>> >> > On Mon, 2011-08-29 at 16:34 -0400, Nicolas Pitre wrote:
+>> >> >> On Tue, 30 Aug 2011, Bryan Wu wrote:
+>> >> >>
+>> >> >> > Almost all the new leds driver and trigger driver are depends on
+>> >> >> > CONFIG_LED_CLASS, so there is no such user with CONFIG_NEW_LEDS=y
+>> >> >> > and CONFIG_LED_CLASS=n. Moreover, lots of API functions in led-class.c
+>> >> >> > are very common and should be built-in when CONFIG_NEW_LEDS=y.
+>> >> >> >
+>> >> >> > Obviously, CONFIG_LEDS_CLASS is pointless. This patch kills it and
+>> >> >> > also updates defconfigs which contains CONFIG_LEDS_CLASS.
+>> >> >> >
+>> >> >> > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+>> >> >> > ---
+>> >> >
+>> >> > Looking at the code I'm a little concerned to see the direction this is
+>> >> > going. There was originally a reason that there were two options, it was
+>> >> > related to being able to compile as much of the LED code as a module as
+>> >> > possible.
+>> >> >
+>> >>
+>> >> I quite understand the original reason for 2 options, but I failed to
+>> >> see any user of CONFIG_NEW_LEDS=y and CONFIG_LEDS_CLASS=n.
+>> >
+>> > Right, the intent was to support CONFIG_NEW_LEDS=y and
+>> > CONFIG_LEDS_CLASS=m and I believe that still should be possible.
+>> >
+>> >> > It looks like commit 5ada28bf76752e33dce3d807bf0dfbe6d1b943ad changed
+>> >> > the tristate to a bool at which point the separate option obviously
+>> >> > becomes pointless.
+>> >>
+>> >> Exactly, this patch added some function API which are used very widely
+>> >> as default LEDS driver behavior in some drivers.
+>> >
+>> > Looking at that commit, its adds the code to leds-class.c and shouldn't
+>> > have needed to change the tristate to a bool. I know we discussed that
+>> > at the time and I think that part might have been unnecessary and just
+>> > accidentally committed. It could well be we can just revert that piece
+>> > of the patch.
+>> >
+>>
+>> Richard,
+>>
+>> Sorry for bringing up this topic so late. I was occupied by other
+>> stuff for a while.
+>>
+>> I'm trying to make leds-class.c as a module, but found APIs exported
+>> from led-class.c are widely used in kernel.
+>>
+>> For example: led_classdev_register()
+>> --
+>> linux-2.6$ grep -r led_classdev_register .
+>> ./include/linux/leds.h:extern int led_classdev_register(struct device *parent,
+>> ./drivers/mmc/host/au1xmmc.c: ? ? ? ? ret = led_classdev_register(mmc_dev(mmc), led);
+>
+> If there are users of the LED API compiled in, then the config code
+> should be handling this so the led class code is compiled in too.
+>
+> That shouldn't make it impossible to have the class code as a module, if
+> the users are also modules.
+>
+>> When CONFIG_NEW_LEDS=y, CONFIG_LEDS_CLASS=m and CONFIG_LEDS_TRIGGER=y,
+>> I got following error for building omap2plus_defconfig
+>> --
+>> arch/arm/plat-omap/built-in.o: In function `newled_init':
+>> /opt/git/linux-2.6/arch/arm/plat-omap/debug-leds.c:248: undefined
+>> reference to `led_classdev_register'
+>
+> So this is a dependency issues as far as I can see,
+>
+>> drivers/built-in.o: In function `led_trigger_blink':
+>> /opt/git/linux-2.6/drivers/leds/led-triggers.c:248: undefined
+>> reference to `led_blink_set'
+>> drivers/built-in.o: In function `led_trigger_set':
+>> /opt/git/linux-2.6/drivers/leds/led-triggers.c:116: undefined
+>> reference to `led_brightness_set'
+>
+> but I agree these are more problematic.
+>
+>> The commit 5ada28bf76752e33dce3d807bf0dfbe6d1b943ad "led-class: always
+>> implement blinking" added 2 API (led_blink_set and
+>> `led_brightness_set'), which are used by led-trigger.c
+>>
+>> For this kind of errors, I think it's quite hard to set led-class.c as
+>> a module now and suggest we merge NEW_LEDS and LEDS_CLASS together.
+>
+> I still don't believe this is necessary.
+>
+> How about moving led_timer_function(), led_set_software_blink()
+> led_blink_set() and to led-triggers.c, putting #ifdef
+> CONFIG_LEDS_TRIGGERS around the appropriate pieces of leds-class.c. We'd
+> then move led_brightness_set() and led_stop_software_blink() to
+> led-core.c since those are the real problem.
+>
+> It means there is a slightly higher always loaded footprint but its
+> better than giving up and making it all always loaded.
+>
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
----
- sound/soc/omap/mcbsp.c      |   48 +++++++++++++++++++-----------------------
- sound/soc/omap/mcbsp.h      |   15 +++++--------
- sound/soc/omap/omap-mcbsp.c |    8 +++---
- 3 files changed, 32 insertions(+), 39 deletions(-)
+Richard,
 
-diff --git a/sound/soc/omap/mcbsp.c b/sound/soc/omap/mcbsp.c
-index c3e31de..95413a1 100644
---- a/sound/soc/omap/mcbsp.c
-+++ b/sound/soc/omap/mcbsp.c
-@@ -687,40 +687,36 @@ int omap2_mcbsp_set_clks_src(struct omap_mcbsp *mcbsp, u8 fck_src_id)
- 		return -EINVAL;
- }
- 
--void omap2_mcbsp1_mux_clkr_src(struct omap_mcbsp *mcbsp, u8 mux)
-+int omap_mcbsp_6pin_src_mux(struct omap_mcbsp *mcbsp, u8 mux)
- {
--	const char *src;
--
--	if (mcbsp->id != 1)
--		return;
-+	const char *signal, *src;
-+	int ret = 0;
- 
--	if (mux == CLKR_SRC_CLKR)
-+	switch (mux) {
-+	case CLKR_SRC_CLKR:
-+		signal = "clkr";
- 		src = "clkr";
--	else if (mux == CLKR_SRC_CLKX)
-+		break;
-+	case CLKR_SRC_CLKX:
-+		signal = "clkr";
- 		src = "clkx";
--	else
--		return;
--
--	if (mcbsp->pdata->mux_signal)
--		mcbsp->pdata->mux_signal(mcbsp->dev, "clkr", src);
--}
--
--void omap2_mcbsp1_mux_fsr_src(struct omap_mcbsp *mcbsp, u8 mux)
--{
--	const char *src;
--
--	if (mcbsp->id != 1)
--		return;
--
--	if (mux == FSR_SRC_FSR)
-+		break;
-+	case FSR_SRC_FSR:
-+		signal = "fsr";
- 		src = "fsr";
--	else if (mux == FSR_SRC_FSX)
-+		break;
-+	case FSR_SRC_FSX:
-+		signal = "fsr";
- 		src = "fsx";
--	else
--		return;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
- 
- 	if (mcbsp->pdata->mux_signal)
--		mcbsp->pdata->mux_signal(mcbsp->dev, "fsr", src);
-+		ret = mcbsp->pdata->mux_signal(mcbsp->dev, signal, src);
-+
-+	return ret;
- }
- 
- #define max_thres(m)			(mcbsp->pdata->buffer_size)
-diff --git a/sound/soc/omap/mcbsp.h b/sound/soc/omap/mcbsp.h
-index acc9470..a944fcc 100644
---- a/sound/soc/omap/mcbsp.h
-+++ b/sound/soc/omap/mcbsp.h
-@@ -230,13 +230,11 @@ enum {
- #define XRDYEN			BIT(10)
- #define XEMPTYEOFEN		BIT(14)
- 
--/* CLKR signal muxing options */
--#define CLKR_SRC_CLKR		0
--#define CLKR_SRC_CLKX		1
--
--/* FSR signal muxing options */
--#define FSR_SRC_FSR		0
--#define FSR_SRC_FSX		1
-+/* Clock signal muxing options */
-+#define CLKR_SRC_CLKR		0 /* CLKR signal is from the CLKR pin */
-+#define CLKR_SRC_CLKX		1 /* CLKR signal is from the CLKX pin */
-+#define FSR_SRC_FSR		2 /* FSR signal is from the FSR pin */
-+#define FSR_SRC_FSX		3 /* FSR signal is from the FSX pin */
- 
- /* McBSP functional clock sources */
- #define MCBSP_CLKS_PRCM_SRC	0
-@@ -333,8 +331,7 @@ void omap_mcbsp_stop(struct omap_mcbsp *mcbsp, int tx, int rx);
- int omap2_mcbsp_set_clks_src(struct omap_mcbsp *mcbsp, u8 fck_src_id);
- 
- /* McBSP signal muxing API */
--void omap2_mcbsp1_mux_clkr_src(struct omap_mcbsp *mcbsp, u8 mux);
--void omap2_mcbsp1_mux_fsr_src(struct omap_mcbsp *mcbsp, u8 mux);
-+int omap_mcbsp_6pin_src_mux(struct omap_mcbsp *mcbsp, u8 mux);
- 
- /* Sidetone specific API */
- int omap_st_set_chgain(struct omap_mcbsp *mcbsp, int channel, s16 chgain);
-diff --git a/sound/soc/omap/omap-mcbsp.c b/sound/soc/omap/omap-mcbsp.c
-index 10eb645..d8409b0 100644
---- a/sound/soc/omap/omap-mcbsp.c
-+++ b/sound/soc/omap/omap-mcbsp.c
-@@ -554,22 +554,22 @@ static int omap_mcbsp_dai_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
- 	case OMAP_MCBSP_CLKR_SRC_CLKR:
- 		if (cpu_class_is_omap1())
- 			break;
--		omap2_mcbsp1_mux_clkr_src(mcbsp, CLKR_SRC_CLKR);
-+		err = omap_mcbsp_6pin_src_mux(mcbsp, CLKR_SRC_CLKR);
- 		break;
- 	case OMAP_MCBSP_CLKR_SRC_CLKX:
- 		if (cpu_class_is_omap1())
- 			break;
--		omap2_mcbsp1_mux_clkr_src(mcbsp, CLKR_SRC_CLKX);
-+		err = omap_mcbsp_6pin_src_mux(mcbsp, CLKR_SRC_CLKX);
- 		break;
- 	case OMAP_MCBSP_FSR_SRC_FSR:
- 		if (cpu_class_is_omap1())
- 			break;
--		omap2_mcbsp1_mux_fsr_src(mcbsp, FSR_SRC_FSR);
-+		err = omap_mcbsp_6pin_src_mux(mcbsp, FSR_SRC_FSR);
- 		break;
- 	case OMAP_MCBSP_FSR_SRC_FSX:
- 		if (cpu_class_is_omap1())
- 			break;
--		omap2_mcbsp1_mux_fsr_src(mcbsp, FSR_SRC_FSX);
-+		err = omap_mcbsp_6pin_src_mux(mcbsp, FSR_SRC_FSX);
- 		break;
- 	default:
- 		err = -ENODEV;
+So sorry for the delay, I was occupied by other stuff for a long time.
+
+As you pointed out, I moved some code to led-core.c to solve the
+issue, please find my patch about that.
+
+Thanks,
 -- 
-1.7.8.5
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
