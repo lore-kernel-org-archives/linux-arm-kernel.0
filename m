@@ -1,50 +1,34 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 8 Mar 2012 16:15:46 +0100
-Subject: [PATCH 05/11] tps6586x: Add device-tree support
-In-Reply-To: <20120308150607.GP3638@opensource.wolfsonmicro.com>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-6-git-send-email-thierry.reding@avionic-design.de>
- <20120308150607.GP3638@opensource.wolfsonmicro.com>
-Message-ID: <20120308151545.GA23934@avionic-0098.mockup.avionic-design.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 8 Mar 2012 07:16:59 -0800
+Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
+In-Reply-To: <4F589474.8050609@samsung.com>
+References: <4F589474.8050609@samsung.com>
+Message-ID: <CAOesGMiWOChuMjLQTK1pGys+oXCc4A=HO-2_=37rh3M6pgUP_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown wrote:
-> On Thu, Mar 08, 2012 at 03:51:25PM +0100, Thierry Reding wrote:
-> 
-> > +- gpio-controller: mark the device as a GPIO controller
-> > +- regulators: list of regulators provided by this controller, must be in the
-> > +  following order:
-> > +    SM0, SM1, SM2, LDO0, LDO1, LDO2, LDO3, LDO4, LDO5, LDO6, LDO7, LDO8, LDO9
-> 
-> This ordering requirement is fairly sad, if there are unused regulators
-> they still need to be listed even though...
-> 
-> > +			sm0_reg: sm0 {
-> > +				regulator-min-microvolt = < 725000>;
-> > +				regulator-max-microvolt = <1500000>;
-> > +				regulator-boot-on;
-> > +				regulator-always-on;
-> > +			};
-> > +
-> > +			sm1_reg: sm1 {
-> 
-> ...they all seem to be explicitly named in the device tree so presumably
-> there's enough information in there for the driver to pick any set of
-> regulators in any order.  This would be much nicer to use.
+Hi,
 
-I don't like it much either. The only reason that requirement exists is
-because it makes the assignment of the regulator ID (as defined in the
-include/linux/mfd/tps6586x.h header) very trivial. Would it be better to
-look up the ID based on the node name (sm0 --> TPS6586X_ID_SM_0, ...)?
+On Thu, Mar 8, 2012 at 3:13 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-Then the only requirement would be that the names match.
+> Kukjin Kim (2):
+> ? ? ?ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/eacd48fa/attachment.sig>
+This is one large commit that does many things in one change. As the
+patch message says:
+
+ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
+
+- the prefix of clk register replace S5P_ with EXYNOS4_
+- move mach-exynos/clock.c to mach-exynos/clock-exynos4.c
+- according to moving clock-exynos4.c,
+  move <mach/exynos4-clock.h> to "clock-exynos4.h"
+- add prefix exynos4_ on clk declaration
+
+It makes it hard to review, especially when you combine a move with
+other changes. It's better to do the move in a separate commit that
+doesn't change code (or only changes very very little) and then do the
+other changes in separate commits later.
+
+
+-Olof
