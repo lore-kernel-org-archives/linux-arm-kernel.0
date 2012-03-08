@@ -1,82 +1,92 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 8 Mar 2012 08:26:24 -0300
-Subject: I.MX35 PDK
-In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
-References: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
-Message-ID: <CAOMZO5Amo0XFf+TV7PprCL079C5Y0qKmo+k-FfShU7k4SG7W6Q@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 08 Mar 2012 17:01:51 +0530
+Subject: [PATCH 00/15] ARM: OMAP4: hwmod data: add almost all remaining
+ IP blocks
+In-Reply-To: <20120308104918.14753.69281.stgit@dusk>
+References: <20120308104918.14753.69281.stgit@dusk>
+Message-ID: <4F5898A7.5040005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/8/12, Alex Gershgorin <alexg@meprolight.com> wrote:
-...
-> Yes this I2C problem, all I2C slave device need response to Host CPU by
-> pulls I2C data bus to low, in other words generate ACK, the clock pulse for
-> the acknowledge bit is always created by the bus master.
+Hi Paul,
+
+On Thursday 08 March 2012 04:21 PM, Paul Walmsley wrote:
+> Hi
 >
-> In this case, the camera tries to reset the data bus and generate an ACK,
-> but the voltage drops to the area of two volts, although it should be reset
-> to zero.
-> I replaced R172 with 10K on CPU board and got a good result, but there are
-> other surprises
-
-Ok, good.
-
-Can you try to change the I2C1 pad settings in software, so that the
-board can work with the original resistor?
-
+> This series adds basic hwmods for all but one of the remaining
+> OMAP4 IP blocks that can be meaningfully controlled by the
+> kernel.  (The remaining IP block is the USIM - there's a clocking
+> problem that requires further investigation to resolve.)
 >
-> Linux video capture interface: v2.00
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
-> ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
-> i2c i2c-0: OV2640 Probed
-> mx3-camera mx3-camera.0: MX3 Camera driver detached from camera 0
-> dmaengine: failed to get dma1chan0: (-22)
-> dmaengine: failed to get dma1chan1: (-22)
-> dmaengine: failed to get dma1chan2: (-22)
-> dmaengine: failed to get dma1chan3: (-22)
-> dmaengine: failed to get dma1chan4: (-22)
-> dmaengine: failed to get dma1chan5: (-22)
-> dmaengine: failed to get dma1chan6: (-22)
-> dmaengine: failed to get dma1chan7: (-22)
-> dmaengine: failed to get dma1chan8: (-22)
-> dmaengine: failed to get dma1chan9: (-22)
-> dmaengine: failed to get dma1chan10: (-22)
-> dmaengine: failed to get dma1chan11: (-22)
-> dmaengine: failed to get dma1chan12: (-22)
-> dmaengine: failed to get dma1chan13: (-22)
-> dmaengine: failed to get dma1chan14: (-22)
-> dmaengine: failed to get dma1chan15: (-22)
-> dmaengine: failed to get dma1chan16: (-22)
-> dmaengine: failed to get dma1chan17: (-22)
-> dmaengine: failed to get dma1chan18: (-22)
-> dmaengine: failed to get dma1chan19: (-22)
-> dmaengine: failed to get dma1chan20: (-22)
-> dmaengine: failed to get dma1chan21: (-22)
-> dmaengine: failed to get dma1chan22: (-22)
-> dmaengine: failed to get dma1chan23: (-22)
-> dmaengine: failed to get dma1chan24: (-22)
-> dmaengine: failed to get dma1chan25: (-22)
-> dmaengine: failed to get dma1chan26: (-22)
-> dmaengine: failed to get dma1chan27: (-22)
-> dmaengine: failed to get dma1chan28: (-22)
-> dmaengine: failed to get dma1chan29: (-22)
-> dmaengine: failed to get dma1chan30: (-22):
+> There are a few new boot-time warnings added by this series:
+>
+> [    0.280548] omap_hwmod: trace_clk_div_ck: missing clockdomain for trace_clk_div_ck.
+> [    0.302429] omap_hwmod: ddrphy_ck: missing clockdomain for ddrphy_ck.
+> [    0.319519] omap_hwmod: sl2if: cannot be enabled for reset (3)
+>
+> These messages will be resolved by subsequent patches, and, while annoying,
+> should not affect the operation of the system.
+>
+> These patches have been boot-tested and suspend-tested on a
+> OMAP44xx PandaBoard.
+>
+> The series is intended to apply on the
+> 'hwmod_remove_link_arrays_cleanup_3.4' branch, posted previously.
+>
+> These patches are also available via git from git://git.pwsan.com/linux-2.6
+> in the branch "hwmod_enable_remaining_hwmods_devel_3.4".
 
-This is something that needs to be solved, but it does not prevent the
-camera to work though.
+Could not find this branch on your tree. Found a
+'enable_remaining_omap4_hwmods' instead, but that seems to
+be an old branch.
 
-On my mx31pdk I get the same dmaengine errors and the ov2640 does work fine.
-
-I think you can go ahead and try to use the camera on the mx35pdk now.
-
-You can try:
-
-gst-launch -v v4l2src device=/dev/video0 !
-video/x-raw-yuv,width=320,height=240,framerate=25/1 ! ffmpegcolorspace
-! fbdevsink
-
-Regards,
-
-Fabio Estevam
+regards,
+Rajendra
+>
+>
+> - Paul
+>
+> ---
+>
+> hwmod_enable_remaining_hwmods_devel_3.4
+>     text	   data	    bss	    dec	    hex	filename
+> 6590067	 677452	5593500	12861019	 c43e5b	vmlinux.omap2plus_defconfig.orig
+> 6594227	 684620	5593500	12872347	 c46a9b	vmlinux.omap2plus_defconfig
+>
+> Beno?t Cousson (6):
+>        ARM: OMAP4: hwmod data: add GPMC
+>        ARM: OMAP4: hwmod data: add the Slimbus IP blocks
+>        ARM: OMAP4: hwmod data: add McASP
+>        ARM: OMAP4: hwmod data: add remaining USB-related IP blocks
+>        ARM: OMAP4: hwmod data: add the OCP-WP IP block
+>        ARM: OMAP4: hwmod data: add DEBUGSS skeleton
+>
+> Ming Lei (1):
+>        ARM: OMAP4: hwmod data: introduce fdif(face detect module) hwmod
+>
+> Paul Walmsley (8):
+>        ARM: OMAP2+: clockdomains: make {prm,cm}_clkdm common
+>        ARM: OMAP4: hwmod data: add HDQ/1-wire
+>        ARM: OMAP4: hwmod data: add EMIF1 and 2
+>        ARM: OMAP4: hwmod data: add GPU
+>        ARM: OMAP4: hwmod data: add some interconnect-related IP blocks
+>        ARM: OMAP4: hwmod data: add OCM RAM IP block
+>        ARM: OMAP4: hwmod data: add System Control Module
+>        ARM: OMAP4: hwmod data: add PRCM and related IP blocks
+>
+>
+>   arch/arm/mach-omap2/Makefile                     |    8
+>   arch/arm/mach-omap2/clockdomain44xx.c            |    6
+>   arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |   10
+>   arch/arm/mach-omap2/clockdomains44xx_data.c      |    2
+>   arch/arm/mach-omap2/clockdomains_common_data.c   |   24
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c       | 1473 +++++++++++++++++++++-
+>   arch/arm/plat-omap/include/plat/omap_hwmod.h     |    1
+>   7 files changed, 1443 insertions(+), 81 deletions(-)
+>   create mode 100644 arch/arm/mach-omap2/clockdomains_common_data.c
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
