@@ -1,28 +1,23 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 8 Mar 2012 17:07:51 +1100
-Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
-Message-ID: <20120308170751.8197b85ec3ab0a95e99ce945@canb.auug.org.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Mar 2012 07:16:11 +0100
+Subject: [PATCH] watchdog/coh901327: convert to use watchdog core
+In-Reply-To: <20120307164240.GA1130@pengutronix.de>
+References: <1331131929-22383-1-git-send-email-linus.walleij@stericsson.com>
+ <20120307164240.GA1130@pengutronix.de>
+Message-ID: <CACRpkdaE5HASdF27db7EfnSoaUF8mA5bWoKUhaAzSegdBKsKFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Mar 7, 2012 at 5:42 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-vexpress/Kconfig between commit 43a6955fa8c3 ("ARM: 7346/1:
-errata: fix PL310 erratum #753970 workaround selection") from Linus' tree
-and commit 8deed1786a64 ("ARM: vexpress: Add Device Tree support") from
-the arm-soc tree.
+>> ? ? ? case WDIOC_GETTIMELEFT:
+>> ? ? ? ? ? ? ? clk_enable(clk);
+>> ? ? ? ? ? ? ? /* Read repeatedly until the value is stable! */
+>
+> I was wondering if it pays to put this IOCTL to watchdog_dev and add another
+> callback to watchdog_ops? I'd think so. Wim, Linus, what do you think?
 
-The latter took the former into account, so I dropped the former for this
-file.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/420c7380/attachment.sig>
+OK with me, shall I hack a patch?
+
+Yours,
+Linus Walleij
