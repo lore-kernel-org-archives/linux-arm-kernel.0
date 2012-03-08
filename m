@@ -1,27 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 Mar 2012 10:05:58 -0700 (MST)
-Subject: [PATCH 00/15] ARM: OMAP4: hwmod data: add almost all remaining
- IP blocks
-In-Reply-To: <4F5898A7.5040005@ti.com>
-References: <20120308104918.14753.69281.stgit@dusk> <4F5898A7.5040005@ti.com>
-Message-ID: <alpine.DEB.2.00.1203081003100.27901@utopia.booyaka.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 08 Mar 2012 11:08:11 -0600
+Subject: [PATCH 2/5 v3] ARM: at91: sam9g20 add i2c DT support
+In-Reply-To: <1331196635-27203-2-git-send-email-plagnioj@jcrosoft.com>
+References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
+ <1331196635-27203-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4F58E77B.4010500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
-
-On Thu, 8 Mar 2012, Rajendra Nayak wrote:
-
-> On Thursday 08 March 2012 04:21 PM, Paul Walmsley wrote:
->
-> > These patches are also available via git from git://git.pwsan.com/linux-2.6
-> > in the branch "hwmod_enable_remaining_hwmods_devel_3.4".
+On 03/08/2012 02:50 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> For now on use i2c-gpio driver on the same pin as the hardware IP.
 > 
-> Could not find this branch on your tree. Found a
-> 'enable_remaining_omap4_hwmods' instead, but that seems to
-> be an old branch.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> ---
+> v3:
+> 
+> 	update i2c binding (Rob comments)
+> 
+> Best Regards,
+> J.
+>  arch/arm/boot/dts/at91sam9g20.dtsi |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+> index 4b0dc99..072b2da 100644
+> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+> @@ -189,4 +189,17 @@
+>  			status = "disabled";
+>  		};
+>  	};
+> +
+> +	i2c-gpio at 0 {
 
-Sorry about that.  It should be pushed now.
+You updated the example, but not all the actual uses to i2c at 0.
 
+Rob
 
-- Paul
+> +		compatible = "i2c-gpio";
+> +		gpios = <&pioA 23 0 /* sda */
+> +			 &pioA 24 0 /* scl */
+> +			>;
+> +		i2c-gpio,sda-open-drain;
+> +		i2c-gpio,scl-open-drain;
+> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+>  };
