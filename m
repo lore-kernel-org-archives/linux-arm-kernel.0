@@ -1,94 +1,62 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Thu, 8 Mar 2012 15:43:03 +0200
-Subject: I.MX35 PDK
-In-Reply-To: <Pine.LNX.4.64.1203081225290.29847@axis700.grange>
-References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>,
- <Pine.LNX.4.64.1203081225290.29847@axis700.grange>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8914@MEP-EXCH.meprolight.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 08 Mar 2012 08:12:31 -0600
+Subject: [PATCH 5/6] ARM: at91: add ram controller DT support
+In-Reply-To: <20120308061324.GE27213@game.jcrosoft.org>
+References: <20120302192844.GB21255@game.jcrosoft.org>
+ <1330718048-9314-5-git-send-email-plagnioj@jcrosoft.com>
+ <4F57BDCE.1050708@gmail.com> <20120308061324.GE27213@game.jcrosoft.org>
+Message-ID: <4F58BE4F.5080009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+On 03/08/2012 12:13 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> diff --git a/arch/arm/mach-at91/include/mach/at91sam9x5.h b/arch/arm/mach-at91/include/mach/at91sam9x5.h
+>>> index a297a77..88e43d5 100644
+>>> --- a/arch/arm/mach-at91/include/mach/at91sam9x5.h
+>>> +++ b/arch/arm/mach-at91/include/mach/at91sam9x5.h
+>>> @@ -55,11 +55,6 @@
+>>>  #define AT91SAM9X5_BASE_USART2	0xf8024000
+>>>  
+>>>  /*
+>>> - * System Peripherals
+>>> - */
+>>> -#define AT91SAM9X5_BASE_DDRSDRC0	0xffffe800
+>>> -
+>>> -/*
+>>>   * Base addresses for early serial code (uncompress.h)
+>>>   */
+>>>  #define AT91_DBGU	AT91_BASE_DBGU0
+>>> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+>>> index 3e48b59..f86450d 100644
+>>> --- a/arch/arm/mach-at91/setup.c
+>>> +++ b/arch/arm/mach-at91/setup.c
+>>> @@ -315,12 +315,33 @@ static void at91_dt_rstc(void)
+>>>  	of_node_put(np);
+>>>  }
+>>>  
+>>> +static struct of_device_id ramc_ids[] = {
+>>> +	{ .compatible = "atmel,at91sam9260-sdramc" },
+>>> +	{ .compatible = "atmel,at91sam9g45-ddramc" },
+>>> +	{ /*sentinel*/ }
+>>> +};
+>>> +
+>>> +static void at91_dt_ramc(void)
+>>> +{
+>>> +	struct device_node *np;
+>>> +
+>>> +	np = of_find_matching_node(NULL, ramc_ids);
+>>> +	if (!np)
+>>> +		panic("unable to find compatible ram conroller node in dtb\n");
+>>
+>> You really can't boot if this fails? A WARN is better if it allows you
+>> to boot until at least your console is actually up.
+> if the restart is called you will have a oops so no it's a basic mandatory
+> device on at91
+> 
 
-Thanks for you comments...
+But you may never see the panic message because your console is not up.
+If you WARN and can continue to boot, then the user can see the problem
+and fix it. Otherwise you get nothing and have to go rebuild and turn on
+earlyprintk.
 
->>>Hi Alex
-
->>>Why is the cc-list mangled again? Why is the V4L list dropped again?
->>>What's so difficult about hitting the "reply-to-all" button?
-
- You are absolutely right, I hope that now the cc-list valid.
-
-> Hi Fabio,
->
-> Thanks for you response...
->
-> > in spite of this I get from ov2640 driver error
-> > Here Linux Kernel boot message:
-> >
-> > "Linux video capture interface: v2.00
-> > soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> > mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
-> > ov2640 0-0030: Product ID error fb:fb"
-> >
-> > I cannot understand what the problem is, if someone tested this?
->
-> >>Looks like a I2C issue.
->
-> >>Check the I2C1 pad settings in the mainline kernel.
->
-> >>On FSL kernel we have:
->
-> #<<define PAD_CONFIG (PAD_CTL_HYS_SCHMITZ | PAD_CTL_PKE_ENABLE |
-> >>PAD_CTL_PUE_PUD | PAD_CTL_ODE_OpenDrain)
->
->       <<switch (i2c_num) {
->       <<case 0:
->               <<mxc_request_iomux(MX35_PIN_I2C1_CLK, MUX_CONFIG_SION);
->               <<mxc_request_iomux(MX35_PIN_I2C1_DAT, MUX_CONFIG_SION);
->
->               <<mxc_iomux_set_pad(MX35_PIN_I2C1_CLK, PAD_CONFIG);
->               <<mxc_iomux_set_pad(MX35_PIN_I2C1_DAT, PAD_CONFIG);
->
-> >>Also check if you are getting the proper voltage levels at the I2C1 lines.
->
-> Yes this I2C problem, all I2C slave device need response to Host CPU by pulls I2C data bus to low, in other words generate ACK, the clock pulse for the acknowledge bit is always created by the bus master.
->
-> In this case, the camera tries to reset the data bus and generate an ACK, but the voltage drops to the area of two volts, although it should be reset to zero.
-> I replaced R172 with 10K on CPU board and got a good result, but there are other surprises
->
-> Linux video capture interface: v2.00
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
-> ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
-> i2c i2c-0: OV2640 Probed
-> mx3-camera mx3-camera.0: MX3 Camera driver detached from camera 0
-> dmaengine: failed to get dma1chan0: (-22)
-> dmaengine: failed to get dma1chan1: (-22)
-> dmaengine: failed to get dma1chan2: (-22)
-> dmaengine: failed to get dma1chan3: (-22)
-
->>>First of all it shows, that you're not using the newest kernel:
-
->>>http://thread.gmane.org/gmane.linux.ports.sh.devel/11508
-
-I use Linux version 3.3.0-rc6 it contains the changes.
-
->>>Secondly, as Fabio just pointed out, these messages are not fatal, which
->>>is also the reason, why I changed their priority to "debug"
-
-Ok
-
->>>Please, describe the actual problem, that you're getting (if any) and do
->>>add the v4l list back to the list of recipients!
-
-At this stage, for me the problem of this type are actual, for the simple reason that I see it the first time.
-Thanks for support and patience :-) 
-
-> What is the problem?
-> Guennadi please help me understand
->
-
-Regards, 
-Alex Gershgorin
- 
+Rob
