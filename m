@@ -1,47 +1,57 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 8 Mar 2012 08:45:10 +0100
-Subject: [PATCH 1/3] drivers: base: add support for stmp-style devices
-In-Reply-To: <CAOMZO5C9EDi_Hy-8=iphr+154gyPgBLnjSVV0seLgi+HoK4zRw@mail.gmail.com>
-References: <1331159314-12022-1-git-send-email-w.sang@pengutronix.de>
- <1331159314-12022-2-git-send-email-w.sang@pengutronix.de>
- <CAOMZO5C9EDi_Hy-8=iphr+154gyPgBLnjSVV0seLgi+HoK4zRw@mail.gmail.com>
-Message-ID: <20120308074510.GB18510@pengutronix.de>
+From: jp.francois@cynove.com (jean-philippe francois)
+Date: Thu, 8 Mar 2012 09:26:19 +0100
+Subject: soft lockup on omap3 (dm3730)
+In-Reply-To: <20120307163750.GC18787@n2100.arm.linux.org.uk>
+References: <CAGGh5h3OQTniXbm8iUYGM+2oi+zzd1F6BxDKzN5epA89+i_7nQ@mail.gmail.com>
+ <20120307163750.GC18787@n2100.arm.linux.org.uk>
+Message-ID: <CAGGh5h3AtiuFuU0OY1FpPre6hyGKTSTEc=S6hkf2hAr=6LAehg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 07:40:22PM -0300, Fabio Estevam wrote:
-> On Wed, Mar 7, 2012 at 7:28 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> ...
-> > +static int stmp_clear_poll_bit(void __iomem *addr, u32 mask)
-> > +{
-> > + ? ? ? int timeout = 0x400;
-> 
-> Could you please add a proper timeout mechanism here?
-> 
-> Something like: http://patchwork.ozlabs.org/patch/137365/
+Le 7 mars 2012 17:37, Russell King - ARM Linux
+<linux@arm.linux.org.uk> a ?crit :
+> On Wed, Mar 07, 2012 at 05:16:35PM +0100, jean-philippe francois wrote:
+>> Is the backtrace pointing to this offset because soft_lockup can only
+>> detect lockups at the output of critical sections ?
+>
+> Correct - soft lockups on ARM can only be detected when hardware
+> interrupts are enabled. ?Any region which masks hard interrupts
+> effectively prevents the soft lockup detector firing should
+> execution get stuck inside such a region.
 
->From the patch description:
+But then, how is the soft lockup detector able to break this hard lockup ?
+ Without soft / hard lockup detection configured, the loop
+runs forever. Anyway, Thanks for the suggestion, I will try to printk  my way
+out of this problem.
 
-===
-
-To avoid regressions and ease reviewing, the actual code is simply copied from
-mach-mxs. It definately wants updates, but those need a seperate patch series.
-
-===
-
-Or is that considered a wrong path?
-
-Thanks,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/cb794861/attachment.sig>
+>
+>> I don't know how to progress on this problem, any hint is welcome.
+>>
+>> int omap3isp_video_queue_streamon(struct isp_video_queue *queue)
+>> {
+>> ? ? ? ?struct isp_video_buffer *buf;
+>> ? ? ? ?unsigned long flags;
+>>
+>> ? ? ? ?mutex_lock(&queue->lock);
+>>
+>> ? ? ? ?if (queue->streaming)
+>> ? ? ? ? ? ? ? ?goto done;
+>>
+>> ? ? ? ?queue->streaming = 1;
+>>
+>> ? ? ? ?spin_lock_irqsave(&queue->irqlock, flags);
+>> ? ? ? ?list_for_each_entry(buf, &queue->queue, stream) {
+>> ? ? ? ? ? ? ? ?printk(KERN_INFO "inside list_for_each\n");
+>> ? ? ? ? ? ? ? ?queue->ops->buffer_queue(buf);
+>> ? ? ? ?}
+>> ? ? ? ?spin_unlock_irqrestore(&queue->irqlock, flags); ?<---- soft lockup
+>> says this is the culprit.
+>
+> My guess is something inside buffer_queue() is responsible. ?If things
+> get stuck for quite a period of time, the only thing I can suggest is
+> using printk() based debugging to try and find where things get stuck.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
