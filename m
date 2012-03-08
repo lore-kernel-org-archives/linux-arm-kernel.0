@@ -1,54 +1,21 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Thu, 08 Mar 2012 21:05:47 +0200
-Subject: [PATCH 0/2] ARM: OMAP2+: PM: code consolidation for 3.4
-In-Reply-To: <alpine.DEB.2.00.1203081153540.9551@utopia.booyaka.com>
-References: <20120202093600.12509.35052.stgit@dusk> <87ty39cc7s.fsf@ti.com>
- <alpine.DEB.2.00.1202021140060.586@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021328450.586@utopia.booyaka.com>
- <CAKd1q9rq67gUyXn+rOL348YwaYQiqHR8UQCSd68fpxhZHHsYGA@mail.gmail.com>
- <87sjhjaqyi.fsf@ti.com> <1331232433.18015.69.camel@cumari>
- <alpine.DEB.2.00.1203081153540.9551@utopia.booyaka.com>
-Message-ID: <1331233547.18015.74.camel@cumari>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 8 Mar 2012 19:08:27 +0000
+Subject: [PATCH 04/11] regulator: tps6586x: fix typo in debug message
+In-Reply-To: <1331218291-16119-5-git-send-email-thierry.reding@avionic-design.de>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-5-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20120308190827.GB3638@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-03-08 at 11:55 -0700, Paul Walmsley wrote: 
-> On Thu, 8 Mar 2012, Luciano Coelho wrote:
-> 
-> > On Thu, 2012-03-08 at 10:27 -0800, Kevin Hilman wrote: 
-> > 
-> > > Are you enabling UART wakeups?
-> > > 
-> > > They are disabled by default, so you need to:
-> > > 
-> > > echo enabled > /sys/devices/platform/omap/omap_uart.2/tty/ttyO2/power/wakeup
-> > 
-> > No, I was actually not enabling the UART wakeups.  But I tried it now
-> > but it still doesn't work. :(
-> 
-> You definitely need that.
-> 
-> > I have no_console_suspend in bootargs.  Without it, it didn't work with
-> > 3.2 either.
-> 
-> If you want to use no_console_suspend -- which is not recommended -- then 
-> you'll need 
-> 
-> http://www.spinics.net/lists/linux-omap/msg65786.html
-> 
-> but best simply not to use no_console_suspend.
+On Thu, Mar 08, 2012 at 03:51:24PM +0100, Thierry Reding wrote:
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 
-Thanks, Paul! I was just chatting with Kevin about this on IRC.  With
-your patch and no_console_suspend, it works. :)
-
-I needed no_console_suspend because it wouldn't work otherwise on
-<3.3-rc1.
-
-Now I tried a vanilla 3.3-rc5 without no_console_suspend and enabling
-the UART wakeup and it works fine!
-
-Thanks for your help, guys!
-
--- 
-Cheers,
-Luca.
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/dfaaea8d/attachment.sig>
