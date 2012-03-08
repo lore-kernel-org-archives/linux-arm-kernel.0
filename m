@@ -1,39 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 8 Mar 2012 12:46:38 -0300
-Subject: I.MX35 PDK
-In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8918@MEP-EXCH.meprolight.com>
-References: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
- <CAOMZO5Amo0XFf+TV7PprCL079C5Y0qKmo+k-FfShU7k4SG7W6Q@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8918@MEP-EXCH.meprolight.com>
-Message-ID: <CAOMZO5A6T+WdOE41Wx6Nctwz9wk8FKaxzjbAt_woZkCnuodNYg@mail.gmail.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Thu, 8 Mar 2012 21:23:10 +0530
+Subject: [PATCH 4/4] mmc: omap_hsmmc: Simplify init for twl6030 MMC card
+ detect
+In-Reply-To: <m2lincifj9.fsf@bob.laptop.org>
+References: <20120301185044.29210.44521.stgit@kaulin.local>
+ <20120301185535.29210.71546.stgit@kaulin.local>
+ <4F50643B.9050500@ti.com> <20120302172251.GJ18901@atomide.com>
+ <4F548457.5050205@ti.com>
+ <CANrkHUZysOnHKKUuLm0Vbo1KsNp0yUd=udjGvQ43=gTTXbWeCw@mail.gmail.com>
+ <CANrkHUaYDpv=p0p81oKWCoewyjheyZYkCqvZY7_ZQxWi_=8YFw@mail.gmail.com>
+ <m2lincifj9.fsf@bob.laptop.org>
+Message-ID: <CANrkHUbsiTz9+cRM83845=nYp82BSyje+ikV_sg3BT+64uD2XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/8/12, Alex Gershgorin <alexg@meprolight.com> wrote:
+On Wed, Mar 7, 2012 at 9:12 PM, Chris Ball <cjb@laptop.org> wrote:
+> Hi Balaji,
+>
+> On Wed, Mar 07 2012, T Krishnamoorthy, Balaji wrote:
+>> OMAP4 and OMAP3 HSMMC IP registers differ by 0x100 offset.
+>> Addng the offset to platform_device resource structure
+>> increments the start address for every insmod operation.
+>> MMC command fails on re-insertion as module due incorrect register base.
+>> Fix this by updating the ioremap base address only.
+>>
+>> Signed-off-by: Balaji T K <balajitk@ti.com>
+>
+> Is this a regression, or has it never worked in mainline?
 
-> Setting pipeline to PAUSED ...mx3-camera mx3-camera.0: MX3 Camera driver
-> attached to camera 0
-> /GstPipeline:pipeline0/GstV4l2Src:v4l2src0.GstPad:src: caps =
-> video/x-raw-yuv, format=(fourcc)UYVY, framerate=(fraction)25/1,
-> width=(int)320, height=(int)240, interlaced=(boolean)false
-> Pipeline is live and does not need PREROLL ...
-> WARNING: from element /GstPipeline:pipeline0/GstV4l2Src:v4l2src0: Could not
-> get parameters on device '/dev/video0'
-> Additional debug info:
-> v4l2src_calls.c(240): gst_v4l2src_set_capture ():
-> /GstPipeline:pipeline0/GstV4l2Src:v4l2src0:
-> system error: Invalid argument
+Not a regression introduced in current merge window.
+It happens on re-insertion of module.
+will post a patch with $SUBJECT
 
-Looks like some kind of Gstreamer issue.
+>
+>> Note: ?eMMC detection is still failing on resertion due to card vcc
+>> power off on rmmod
+>
+> And this?
 
-You could also try:
-gst-launch -v v4l2src ! fbdevsink
+This issue was hidden and uncovered after this fix.
+This problem is Vcc being powered off without sleep command.
 
-or gst-launch -v v4l2src ! filesink location= raw.data
-
-If you still get Gstreamer issues you can try v4l2grab utility:
-http://git.linuxtv.org/v4l-utils.git/blob/de42be924c5154732bc8dfd1c8bc7812985ab2d6?f=contrib/test/v4l2grab.c
-
-Good luck!
+>
+> Thanks,
+>
+> - Chris.
+> --
+> Chris Ball ? <cjb@laptop.org> ? <http://printf.net/>
+> One Laptop Per Child
