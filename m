@@ -1,89 +1,76 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Thu,  8 Mar 2012 22:03:55 +0530
-Subject: [PATCH 2/4] dt: emif: device tree bindings for TI's EMIF sdram
- controller
-In-Reply-To: <1331224437-4808-1-git-send-email-aneesh@ti.com>
-References: <1331224437-4808-1-git-send-email-aneesh@ti.com>
-Message-ID: <1331224437-4808-3-git-send-email-aneesh@ti.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 8 Mar 2012 16:39:57 +0000
+Subject: [PATCH-V2 2/2] arm:omap:am33xx: Add power domain data
+In-Reply-To: <alpine.DEB.2.00.1203020337330.15424@utopia.booyaka.com>
+References: <1324803628-16790-1-git-send-email-hvaibhav@ti.com>
+ <1324803628-16790-3-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1202291839130.12752@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A8317E515D@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1203012330490.22980@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A8317E6763@DBDE01.ent.ti.com>
+ <alpine.DEB.2.00.1203020337330.15424@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83180D786@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EMIF - External Memory Interface - is an SDRAM controller used in
-TI SoCs. EMIF supports, based on the IP revision, one or more of
-DDR2/DDR3/LPDDR2 protocols. This binding describes a given instance
-of the EMIF IP and memory parts attached to it.
+On Fri, Mar 02, 2012 at 16:16:47, Paul Walmsley wrote:
+> Hi
+> 
+> On Fri, 2 Mar 2012, Hiremath, Vaibhav wrote:
+> 
+> > Paul,
+> > Thanks for your review comments, can we also align on the approach, 
+> > Whether to merge am33xx powerdomain with omap4 (same direction we are now)
+> > OR
+> > Have separate implementation (my original approach).
+> 
+> Could you please take a look at the "am335x_prcm_devel_3.4" branch on 
+> git://git.pwsan.com/linux-2.6 and let me know what you think?
+> 
+> It is still rough, incomplete, and compile-tested only; and the patch 
+> commit messages have to be updated and revised; but I think it is a 
+> slightly better approach.
+> 
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Aneesh V <aneesh@ti.com>
----
-Changes sice RFC v4:
-- None
----
- .../bindings/memory-controllers/ti/emif.txt        |   55 ++++++++++++++++++++
- 1 files changed, 55 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+Paul,
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-new file mode 100644
-index 0000000..938f8e1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-@@ -0,0 +1,55 @@
-+* EMIF family of TI SDRAM controllers
-+
-+EMIF - External Memory Interface - is an SDRAM controller used in
-+TI SoCs. EMIF supports, based on the IP revision, one or more of
-+DDR2/DDR3/LPDDR2 protocols. This binding describes a given instance
-+of the EMIF IP and memory parts attached to it.
-+
-+Required properties:
-+- compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
-+  is the IP revision of the specific EMIF instance.
-+
-+- phy-type	: <u32> indicating the DDR phy type. Following are the
-+  allowed values
-+  <1>	: Attila PHY
-+  <2>	: Intelli PHY
-+
-+- device-handle	: phandle to a "lpddr2" node representing the memory part
-+
-+- ti,hwmods	: For TI hwmods processing and omap device creation
-+  the value shall be "emif<n>" where <n> is the number of the EMIF
-+  instance with base 1.
-+
-+Optional properties:
-+- cs1-used		: Have this property if CS1 of this EMIF
-+  instance has a memory part attached to it. If there is a memory
-+  part attached to CS1, it should be the same type as the one on CS0,
-+  so there is no need to give the details of this memory part.
-+
-+- cal-resistor-per-cs	: Have this property if the board has one
-+  calibration resistor per chip-select.
-+
-+- hw-caps-read-idle-ctrl: Have this property if the controller
-+  supports read idle window programming
-+
-+- hw-caps-dll-calib-ctrl: Have this property if the controller
-+  supports dll calibration control
-+
-+- hw-caps-ll-interface	: Have this property if the controller
-+  has a low latency interface and corresponding interrupt events
-+
-+- hw-caps-temp-alert	: Have this property if the controller
-+  has capability for generating SDRAM temperature alerts
-+
-+Example:
-+
-+emif1: emif at 0x4c000000 {
-+	compatible	= "ti,emif-4d";
-+	ti,hwmods	= "emif2";
-+	phy-type	= <1>;
-+	device-handle	= <&elpida_ECB240ABACN>;
-+	cs1-used;
-+	hw-caps-read-idle-ctrl;
-+	hw-caps-ll-interface;
-+	hw-caps-temp-alert;
-+};
--- 
-1.7.1
+Sorry for delayed response, was bit stuck with some baseport thing.
+
+
+I have reviewed the changes from your above branch. And as I mentioned 
+before, it looks closer to my earlier approach + some good and important 
+changes/cleanups.
+
+> A significant change is that the prminst code changes have been removed.  
+> That is only needed when PRM registers are spread across multiple PRCM IP 
+> blocks.  
+
+Make sense actually...I don't know, why didn't thought about this before...
+
+> This does not appear to be the case with AM33xx?  So the 
+> implementation has been modified to create a prm33xx.c file instead.  
+> This avoids an extra, unnecessary layer of indirection for PRM accesses.
+> 
+> This, along with the other differences between OMAP4 and this chip, means 
+> that a separate powerdomain33xx.c file had to be created.
+> 
+> The powerdomains33xx_data.c file is still missing the bitmask position 
+> data, but the structure members are there.
+> 
+
+Yeah, I understand, I think without this it won't be usefule. I will also get this done in next (aligned) changes.
+
+> Feel free to combine, rework, or merge this series with what you are 
+> working on if you feel that it is a good approach.  Otherwise, let's 
+> discuss.
+> 
+
+Thanks, Thanks a lot for your time/support/review, as always its helpful.
+
+
+Thanks,
+Vaibhav
+
+> 
+> - Paul
+> 
