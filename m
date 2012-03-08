@@ -1,35 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Mar 2012 14:31:41 -0700
-Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4F59253D.7070100@wwwdotorg.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 8 Mar 2012 14:32:44 -0700
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
+In-Reply-To: <20120308194725.GM5050@titan.lakedaemon.net>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <201203072113.04369.arnd@arndb.de>
+ <20120308162530.GI5050@titan.lakedaemon.net>
+ <201203081701.01663.arnd@arndb.de>
+ <alpine.LFD.2.02.1203082026470.2742@ionos>
+ <20120308194725.GM5050@titan.lakedaemon.net>
+Message-ID: <20120308213244.GD16533@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2012 07:51 AM, Thierry Reding wrote:
-> This commit adds support for instantiating the Tegra PCIe controller
-> from a device tree.
+On Thu, Mar 08, 2012 at 02:47:25PM -0500, Jason wrote:
+> On Thu, Mar 08, 2012 at 08:27:11PM +0100, Thomas Gleixner wrote:
+> > On Thu, 8 Mar 2012, Arnd Bergmann wrote:
+> > 
+> > > On Thursday 08 March 2012, Jason wrote:
+> > > > 
+> > > > On Wed, Mar 07, 2012 at 09:13:04PM +0000, Arnd Bergmann wrote:
+> > > > > Finally, something could be wrong with the interrupt controller.
+> > > > > AFAICT, you register it through the device tree now, but it's also
+> > > > > getting initialized through kirkwood_init_irq, so the numbers
+> > > > > would all be wrong.
+> > > > 
+> > > > Yes, I'm working through this now.  mv_cesa silently fails to come up
+> > > > if it can't find the interrupt controller via fdt.  So, it needs to get
+> > > > done.
+> > > > 
+> > > > Right now, I'm looking at how mach-versatile does it (vic_init()) since
+> > > > it's also an ARM926ej-s...
+> > > > 
+> > > 
+> > > Ok, sounds good. It's not important whether it's an ARM9 or not btw.
+> > > You should look at both anything that defines an "interrupt-controller"
+> > > property as an example including Documentation/devicetree/bindings/arm/vic.txt
+> > > and Documentation/devicetree/bindings/arm/gic.txt.
+> > > 
+> > > (taking Thomas Gleixner on Cc)
+> > > 
+> > > Since the orion irq chip is based on irqchip_generic, it would be
+> > > perfect to have a generic irqchip binding to go along with
+> > > kernel/irq/generic-chip.c. Not sure if anyone has thought about this
+> > > before, but it looks like we can completely avoid using
+> > > arch/arm/plat-orion/irq.c and arch/arm/mach-kirkwood/irq.c if we
+> > > do that.
+> > 
+> > Right. That should be trivial to implement.
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ok, I'm on it.  kernel/irq/of_generic_irq.c sound good?
 
-> diff --git a/Documentation/devicetree/bindings/pci/tegra-pcie.txt b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
+Rob Herring has done some work in this area.  Please coordinate with him.
 
-> +NVIDIA Tegra PCIe controller
-> +
-> +Required properties:
-> +- compatible: "nvidia,tegra20-pcie"
-> +- reg: physical base address and length of the controller's registers
-> +- interrupts: the interrupt outputs of the controller
-> +
-> +Optional properties:
-> +- pex-clk-supply: supply voltage for internal reference clock
-> +- vdd-supply: power supply for controller (1.05V)
-
-Mark, Liam,
-
-Should those *-supply properties really be optional? I got the
-impression talking to Mark in a different thread that all regulators
-should exist, although their implementation may be via a fixed
-regulator, with no GPIO, as determined by the board design.
+g.
