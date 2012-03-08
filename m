@@ -1,43 +1,50 @@
-From: k.lewandowsk@samsung.com (Karol Lewandowski)
-Date: Thu, 08 Mar 2012 11:52:00 +0100
-Subject: [PATCH 1/5 v3] i2c/gpio: add DT support
-In-Reply-To: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4F588F50.7060906@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Mar 2012 10:52:46 +0000
+Subject: [PATCH v2 4/5] Cortex-M3: Add base support for Cortex-M3
+In-Reply-To: <1330967042-25612-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <CAHkRjk70x+Fn+Z4iUxSMc7Zq2cKBo_ka0tNhV0i5JWmEixpRrA@mail.gmail.com>
+ <1330967042-25612-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20120308105246.GC26727@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.03.2012 09:50, Jean-Christophe PLAGNIOL-VILLARD wrote:
+Hi Uwe,
 
-> +static int __devinit of_i2c_gpio_probe(struct device_node *np,
-> +			     struct i2c_gpio_platform_data *pdata)
-> +{
-> +	u32 reg;
-> +
-> +	if (of_gpio_count(np) < 2)
-> +		return -ENODEV;
-> +
-> +	pdata->sda_pin = of_get_gpio(np, 0);
-> +	pdata->scl_pin = of_get_gpio(np, 1);
-> +
-> +	if (pdata->sda_pin < 0 || pdata->scl_pin < 0) {
-> +		pr_err("%s: invalid GPIO pins, sda=%d/scl=%d\n",
-> +		       np->full_name, pdata->sda_pin, pdata->scl_pin);
-> +		return -ENODEV;
-> +	}
-> +
-> +	of_property_read_u32(np, "i2c-gpio,delay-us", &pdata->udelay);
-> +
+On Mon, Mar 05, 2012 at 05:04:01PM +0000, Uwe Kleine-K?nig wrote:
+> --- a/arch/arm/include/asm/processor.h
+> +++ b/arch/arm/include/asm/processor.h
+> @@ -49,7 +49,15 @@ struct thread_struct {
+>  #ifdef CONFIG_MMU
+>  #define nommu_start_thread(regs) do { } while (0)
+>  #else
+> +#ifndef CONFIG_CPU_V7M
+>  #define nommu_start_thread(regs) regs->ARM_r10 = current->mm->start_data
+> +#else
+> +#define nommu_start_thread(regs) do {                                  \
+> +       regs->ARM_r10 = current->mm->start_data;                        \
+> +       regs->ARM_sp -= 32;             /* exception return state */    \
+> +       regs->ARM_EXCRET = 0xfffffffdL;                                 \
+> +} while (0)
+...
+> --- a/arch/arm/include/asm/ptrace.h
+> +++ b/arch/arm/include/asm/ptrace.h
+> @@ -39,16 +39,25 @@
+> @@ -127,7 +136,11 @@ struct pt_regs {
+>  #define ARM_r2         uregs[2]
+>  #define ARM_r1         uregs[1]
+>  #define ARM_r0         uregs[0]
+> +#if defined CONFIG_CPU_V7M
+> +#define ARM_EXCRET     uregs[17]
+> +#else
+>  #define ARM_ORIG_r0    uregs[17]
+> +#endif
 
+Could we save the exception return somewhere in thread_info and preserve
+ORIG_r0?
 
+Alternatively, with some care, we could extend the kernel pt_regs
+definition with two more registers and use one of them for exception
+return. The user variant would remain the same as it's used by ptrace.
 
-> +	if (of_property_read_u32(np, "i2c-gpio,timeout-ms", &reg))
-> +		pdata->timeout = msecs_to_jiffies(reg);
-
-
-I've already said (two times!) that of_property_read_u32() returns
-nonzero (negative) error code on _error_.
-
-Don't you see obvious error in above code fragment?
-
-You assign to pdata->timeout on _error_.
+-- 
+Catalin
