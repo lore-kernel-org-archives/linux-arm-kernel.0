@@ -1,34 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 8 Mar 2012 07:16:59 -0800
-Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
-In-Reply-To: <4F589474.8050609@samsung.com>
-References: <4F589474.8050609@samsung.com>
-Message-ID: <CAOesGMiWOChuMjLQTK1pGys+oXCc4A=HO-2_=37rh3M6pgUP_g@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 8 Mar 2012 15:17:56 +0000
+Subject: [PATCH 05/11] tps6586x: Add device-tree support
+In-Reply-To: <20120308151545.GA23934@avionic-0098.mockup.avionic-design.de>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-6-git-send-email-thierry.reding@avionic-design.de>
+ <20120308150607.GP3638@opensource.wolfsonmicro.com>
+ <20120308151545.GA23934@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120308151756.GQ3638@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 08, 2012 at 04:15:46PM +0100, Thierry Reding wrote:
+> * Mark Brown wrote:
 
-On Thu, Mar 8, 2012 at 3:13 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > ...they all seem to be explicitly named in the device tree so presumably
+> > there's enough information in there for the driver to pick any set of
+> > regulators in any order.  This would be much nicer to use.
 
-> Kukjin Kim (2):
-> ? ? ?ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
+> I don't like it much either. The only reason that requirement exists is
+> because it makes the assignment of the regulator ID (as defined in the
+> include/linux/mfd/tps6586x.h header) very trivial. Would it be better to
+> look up the ID based on the node name (sm0 --> TPS6586X_ID_SM_0, ...)?
 
-This is one large commit that does many things in one change. As the
-patch message says:
+> Then the only requirement would be that the names match.
 
-ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
-
-- the prefix of clk register replace S5P_ with EXYNOS4_
-- move mach-exynos/clock.c to mach-exynos/clock-exynos4.c
-- according to moving clock-exynos4.c,
-  move <mach/exynos4-clock.h> to "clock-exynos4.h"
-- add prefix exynos4_ on clk declaration
-
-It makes it hard to review, especially when you combine a move with
-other changes. It's better to do the move in a separate commit that
-doesn't change code (or only changes very very little) and then do the
-other changes in separate commits later.
-
-
--Olof
+Yes, that's going to be more code but much nicer for users.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/f2f4032e/attachment.sig>
