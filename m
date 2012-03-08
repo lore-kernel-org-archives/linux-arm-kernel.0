@@ -1,55 +1,76 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 8 Mar 2012 14:32:44 -0700
-Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
-In-Reply-To: <20120308194725.GM5050@titan.lakedaemon.net>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <201203072113.04369.arnd@arndb.de>
- <20120308162530.GI5050@titan.lakedaemon.net>
- <201203081701.01663.arnd@arndb.de>
- <alpine.LFD.2.02.1203082026470.2742@ionos>
- <20120308194725.GM5050@titan.lakedaemon.net>
-Message-ID: <20120308213244.GD16533@ponder.secretlab.ca>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu,  8 Mar 2012 16:34:54 -0500
+Subject: [PATCH] ARM: pxa: fix regulator related build fail in
+ magician_defconfig
+In-Reply-To: <1331084814.11802.YahooMailClassic@web29012.mail.ird.yahoo.com>
+References: <1331084814.11802.YahooMailClassic@web29012.mail.ird.yahoo.com>
+Message-ID: <1331242494-3157-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 02:47:25PM -0500, Jason wrote:
-> On Thu, Mar 08, 2012 at 08:27:11PM +0100, Thomas Gleixner wrote:
-> > On Thu, 8 Mar 2012, Arnd Bergmann wrote:
-> > 
-> > > On Thursday 08 March 2012, Jason wrote:
-> > > > 
-> > > > On Wed, Mar 07, 2012 at 09:13:04PM +0000, Arnd Bergmann wrote:
-> > > > > Finally, something could be wrong with the interrupt controller.
-> > > > > AFAICT, you register it through the device tree now, but it's also
-> > > > > getting initialized through kirkwood_init_irq, so the numbers
-> > > > > would all be wrong.
-> > > > 
-> > > > Yes, I'm working through this now.  mv_cesa silently fails to come up
-> > > > if it can't find the interrupt controller via fdt.  So, it needs to get
-> > > > done.
-> > > > 
-> > > > Right now, I'm looking at how mach-versatile does it (vic_init()) since
-> > > > it's also an ARM926ej-s...
-> > > > 
-> > > 
-> > > Ok, sounds good. It's not important whether it's an ARM9 or not btw.
-> > > You should look at both anything that defines an "interrupt-controller"
-> > > property as an example including Documentation/devicetree/bindings/arm/vic.txt
-> > > and Documentation/devicetree/bindings/arm/gic.txt.
-> > > 
-> > > (taking Thomas Gleixner on Cc)
-> > > 
-> > > Since the orion irq chip is based on irqchip_generic, it would be
-> > > perfect to have a generic irqchip binding to go along with
-> > > kernel/irq/generic-chip.c. Not sure if anyone has thought about this
-> > > before, but it looks like we can completely avoid using
-> > > arch/arm/plat-orion/irq.c and arch/arm/mach-kirkwood/irq.c if we
-> > > do that.
-> > 
-> > Right. That should be trivial to implement.
-> 
-> ok, I'm on it.  kernel/irq/of_generic_irq.c sound good?
+commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0 (linux-next)
 
-Rob Herring has done some work in this area.  Please coordinate with him.
+  "regulator: Remove support for supplies specified by struct device"
 
-g.
+deletes the field from the struct, but this platform was still trying
+to set those fields.  Convert them to use the REGULATOR_SUPPLY macro.
+
+arch/arm/mach-pxa/magician.c:581: error: unknown field 'dev' specified in initializer
+arch/arm/mach-pxa/magician.c:581: warning: initialization from incompatible pointer type
+arch/arm/mach-pxa/magician.c:585: error: unknown field 'dev' specified in initializer
+arch/arm/mach-pxa/magician.c:585: warning: initialization from incompatible pointer type
+
+arch/arm/mach-pxa/hx4700.c:683: error: unknown field 'dev' specified in initializer
+arch/arm/mach-pxa/hx4700.c:683: warning: initialization from incompatible pointer type
+arch/arm/mach-pxa/hx4700.c:687: error: unknown field 'dev' specified in initializer
+arch/arm/mach-pxa/hx4700.c:687: warning: initialization from incompatible pointer type
+
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+
+[v3: fix arg2 in REGULATOR_SUPPLY to have correct names ]
+
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index f2c23ea..b6a338b 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -679,14 +679,8 @@ static struct platform_device power_supply = {
+  */
+ 
+ static struct regulator_consumer_supply bq24022_consumers[] = {
+-	{
+-		.dev = &gpio_vbus.dev,
+-		.supply = "vbus_draw",
+-	},
+-	{
+-		.dev = &power_supply.dev,
+-		.supply = "ac_draw",
+-	},
++	REGULATOR_SUPPLY("vbus_draw", "gpio-vbus"),
++	REGULATOR_SUPPLY("ac_draw", "pda-power"),
+ };
+ 
+ static struct regulator_init_data bq24022_init_data = {
+diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+index 3d6baf9..1a18e63 100644
+--- a/arch/arm/mach-pxa/magician.c
++++ b/arch/arm/mach-pxa/magician.c
+@@ -577,14 +577,8 @@ static struct platform_device power_supply = {
+  */
+ 
+ static struct regulator_consumer_supply bq24022_consumers[] = {
+-	{
+-		.dev = &gpio_vbus.dev,
+-		.supply = "vbus_draw",
+-	},
+-	{
+-		.dev = &power_supply.dev,
+-		.supply = "ac_draw",
+-	},
++	REGULATOR_SUPPLY("vbus_draw", "gpio-vbus"),
++	REGULATOR_SUPPLY("ac_draw", "pda-power"),
+ };
+ 
+ static struct regulator_init_data bq24022_init_data = {
+-- 
+1.7.9.1
