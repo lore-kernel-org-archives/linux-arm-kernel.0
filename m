@@ -1,69 +1,94 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 8 Mar 2012 18:48:01 +0530
-Subject: [PATCHv2 09/13] I2C: OMAP: Correct I2C revision for OMAP3
-In-Reply-To: <1331212685-6524-1-git-send-email-shubhrajyoti@ti.com>
-References: <1331212685-6524-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1331212685-6524-10-git-send-email-shubhrajyoti@ti.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Thu, 8 Mar 2012 15:43:03 +0200
+Subject: I.MX35 PDK
+In-Reply-To: <Pine.LNX.4.64.1203081225290.29847@axis700.grange>
+References: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>,
+ <Pine.LNX.4.64.1203081225290.29847@axis700.grange>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8914@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Hunter <jon-hunter@ti.com>
+Hi Guennadi,
 
-The OMAP3530 is based upon the same silicon as the OMAP3430 and so the I2C
-revision is the same for 3430 and 3530. However, the OMAP3630 device has the
-same I2C revision as OMAP4. Correct the revision definition to reflect this.
+Thanks for you comments...
 
-This patch is based on work done by Jon Hunter <jon-hunter@ti.com>
-Changes from his patch
-- Update OMAP_I2C_REV_ON_3430 also to reflect that it is same as 3530
+>>>Hi Alex
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- drivers/i2c/busses/i2c-omap.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+>>>Why is the cc-list mangled again? Why is the V4L list dropped again?
+>>>What's so difficult about hitting the "reply-to-all" button?
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index e12144e..ed22e67 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -50,8 +50,8 @@
+ You are absolutely right, I hope that now the cc-list valid.
+
+> Hi Fabio,
+>
+> Thanks for you response...
+>
+> > in spite of this I get from ov2640 driver error
+> > Here Linux Kernel boot message:
+> >
+> > "Linux video capture interface: v2.00
+> > soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> > mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+> > ov2640 0-0030: Product ID error fb:fb"
+> >
+> > I cannot understand what the problem is, if someone tested this?
+>
+> >>Looks like a I2C issue.
+>
+> >>Check the I2C1 pad settings in the mainline kernel.
+>
+> >>On FSL kernel we have:
+>
+> #<<define PAD_CONFIG (PAD_CTL_HYS_SCHMITZ | PAD_CTL_PKE_ENABLE |
+> >>PAD_CTL_PUE_PUD | PAD_CTL_ODE_OpenDrain)
+>
+>       <<switch (i2c_num) {
+>       <<case 0:
+>               <<mxc_request_iomux(MX35_PIN_I2C1_CLK, MUX_CONFIG_SION);
+>               <<mxc_request_iomux(MX35_PIN_I2C1_DAT, MUX_CONFIG_SION);
+>
+>               <<mxc_iomux_set_pad(MX35_PIN_I2C1_CLK, PAD_CONFIG);
+>               <<mxc_iomux_set_pad(MX35_PIN_I2C1_DAT, PAD_CONFIG);
+>
+> >>Also check if you are getting the proper voltage levels at the I2C1 lines.
+>
+> Yes this I2C problem, all I2C slave device need response to Host CPU by pulls I2C data bus to low, in other words generate ACK, the clock pulse for the acknowledge bit is always created by the bus master.
+>
+> In this case, the camera tries to reset the data bus and generate an ACK, but the voltage drops to the area of two volts, although it should be reset to zero.
+> I replaced R172 with 10K on CPU board and got a good result, but there are other surprises
+>
+> Linux video capture interface: v2.00
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+> ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
+> i2c i2c-0: OV2640 Probed
+> mx3-camera mx3-camera.0: MX3 Camera driver detached from camera 0
+> dmaengine: failed to get dma1chan0: (-22)
+> dmaengine: failed to get dma1chan1: (-22)
+> dmaengine: failed to get dma1chan2: (-22)
+> dmaengine: failed to get dma1chan3: (-22)
+
+>>>First of all it shows, that you're not using the newest kernel:
+
+>>>http://thread.gmane.org/gmane.linux.ports.sh.devel/11508
+
+I use Linux version 3.3.0-rc6 it contains the changes.
+
+>>>Secondly, as Fabio just pointed out, these messages are not fatal, which
+>>>is also the reason, why I changed their priority to "debug"
+
+Ok
+
+>>>Please, describe the actual problem, that you're getting (if any) and do
+>>>add the v4l list back to the list of recipients!
+
+At this stage, for me the problem of this type are actual, for the simple reason that I see it the first time.
+Thanks for support and patience :-) 
+
+> What is the problem?
+> Guennadi please help me understand
+>
+
+Regards, 
+Alex Gershgorin
  
- /* I2C controller revisions present on specific hardware */
- #define OMAP_I2C_REV_ON_2430		0x36
--#define OMAP_I2C_REV_ON_3430		0x3C
--#define OMAP_I2C_REV_ON_3530_4430	0x40
-+#define OMAP_I2C_REV_ON_3430_3530	0x3C
-+#define OMAP_I2C_REV_ON_3630_4430	0x40
- 
- /* timeout waiting for the controller to respond */
- #define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
-@@ -298,7 +298,7 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
- 			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
- 					   SYSC_AUTOIDLE_MASK);
- 
--		} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
-+		} else if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
- 			dev->syscstate = SYSC_AUTOIDLE_MASK;
- 			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
- 			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
-@@ -1051,7 +1051,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
- 
--	if (dev->rev <= OMAP_I2C_REV_ON_3430)
-+	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
- 		dev->errata |= I2C_OMAP3_1P153;
- 
- 	if (!(dev->flags & OMAP_I2C_FLAG_NO_FIFO)) {
-@@ -1069,7 +1069,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 		dev->fifo_size = (dev->fifo_size / 2);
- 
--		if (dev->rev >= OMAP_I2C_REV_ON_3530_4430)
-+		if (dev->rev >= OMAP_I2C_REV_ON_3630_4430)
- 			dev->b_hw = 0; /* Disable hardware fixes */
- 		else
- 			dev->b_hw = 1; /* Enable hardware fixes */
--- 
-1.7.1
