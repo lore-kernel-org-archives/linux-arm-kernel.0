@@ -1,90 +1,73 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 08 Mar 2012 09:22:05 -0600
-Subject: [PATCH 00/11] ARM: tegra: Add PCIe device tree support
-In-Reply-To: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4F58CE9D.3070605@gmail.com>
+Date: Thu, 08 Mar 2012 09:24:25 -0600
+Subject: [PATCH 5/6] ARM: at91: add ram controller DT support
+In-Reply-To: <20120308141000.GF27213@game.jcrosoft.org>
+References: <20120302192844.GB21255@game.jcrosoft.org>
+ <1330718048-9314-5-git-send-email-plagnioj@jcrosoft.com>
+ <4F57BDCE.1050708@gmail.com> <20120308061324.GE27213@game.jcrosoft.org>
+ <4F58BE4F.5080009@gmail.com> <20120308141000.GF27213@game.jcrosoft.org>
+Message-ID: <4F58CF29.6020906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2012 08:51 AM, Thierry Reding wrote:
-> This patch series adds support for device tree based probing of the PCIe
-> controller found on Tegra SoCs.
+On 03/08/2012 08:10 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 08:12 Thu 08 Mar     , Rob Herring wrote:
+>> On 03/08/2012 12:13 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>>> diff --git a/arch/arm/mach-at91/include/mach/at91sam9x5.h b/arch/arm/mach-at91/include/mach/at91sam9x5.h
+>>>>> index a297a77..88e43d5 100644
+>>>>> --- a/arch/arm/mach-at91/include/mach/at91sam9x5.h
+>>>>> +++ b/arch/arm/mach-at91/include/mach/at91sam9x5.h
+>>>>> @@ -55,11 +55,6 @@
+>>>>>  #define AT91SAM9X5_BASE_USART2	0xf8024000
+>>>>>  
+>>>>>  /*
+>>>>> - * System Peripherals
+>>>>> - */
+>>>>> -#define AT91SAM9X5_BASE_DDRSDRC0	0xffffe800
+>>>>> -
+>>>>> -/*
+>>>>>   * Base addresses for early serial code (uncompress.h)
+>>>>>   */
+>>>>>  #define AT91_DBGU	AT91_BASE_DBGU0
+>>>>> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+>>>>> index 3e48b59..f86450d 100644
+>>>>> --- a/arch/arm/mach-at91/setup.c
+>>>>> +++ b/arch/arm/mach-at91/setup.c
+>>>>> @@ -315,12 +315,33 @@ static void at91_dt_rstc(void)
+>>>>>  	of_node_put(np);
+>>>>>  }
+>>>>>  
+>>>>> +static struct of_device_id ramc_ids[] = {
+>>>>> +	{ .compatible = "atmel,at91sam9260-sdramc" },
+>>>>> +	{ .compatible = "atmel,at91sam9g45-ddramc" },
+>>>>> +	{ /*sentinel*/ }
+>>>>> +};
+>>>>> +
+>>>>> +static void at91_dt_ramc(void)
+>>>>> +{
+>>>>> +	struct device_node *np;
+>>>>> +
+>>>>> +	np = of_find_matching_node(NULL, ramc_ids);
+>>>>> +	if (!np)
+>>>>> +		panic("unable to find compatible ram conroller node in dtb\n");
+>>>>
+>>>> You really can't boot if this fails? A WARN is better if it allows you
+>>>> to boot until at least your console is actually up.
+>>> if the restart is called you will have a oops so no it's a basic mandatory
+>>> device on at91
+>>>
+>>
+>> But you may never see the panic message because your console is not up.
+>> If you WARN and can continue to boot, then the user can see the problem
+>> and fix it. Otherwise you get nothing and have to go rebuild and turn on
+>> earlyprintk.
+> yeah agreed but if the restart id use before the console is enable you will
+> have the same issue. the ramc controller are basic device so people usally
+> don't touch it except you add a SoC support.
 > 
-> Patches 1 and 2 have already been posted by Grant and Mark respectively
-> but I've included them here for reference. Both patches are dependencies
-> for the subsequent patches.
+> so I prefer to panic
 > 
-> Patches 3, 4 and 5 add support for obtaining the regulators required to
-> power the PCIe controller from the device tree. Patches 6 and 7 are
-> required to make some common PCI functions available after the init
-> phase because the deferred probing will postpone the probing of the PCIe
-> controller driver until that point.
-> 
-> Patches 8 and 9 make the PCIe controller code available as a driver and
-> add the corresponding platform devices to the boards that enable PCIe
-> (Harmony and TrimSlice). Patch 10 adds MSI support and patch 11 finally
-> adds a device tree binding with documentation.
-> 
-> The code in patch 10 (MSI support) is based on the Vibrante kernel and I
-> wasn't able to get a proper Signed-off-by or even copyright information.
-> Perhaps somebody at NVIDIA can find out?
-> 
-> Thierry
-> 
-> Grant Likely (1):
->   drivercore: Add driver probe deferral mechanism
-> 
-> Mark Brown (1):
->   regulator: Support driver probe deferral
-> 
-> Thierry Reding (9):
->   regulator: fixed: Support driver probe deferral
->   regulator: tps6586x: fix typo in debug message
->   tps6586x: Add device-tree support
->   PCI: Keep pci_fixup_irqs() around after init
->   ARM: pci: Keep pci_common_init() around after init
->   ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
->   ARM: tegra: Rewrite PCIe support as a driver
->   ARM: tegra: pcie: Add MSI support
->   ARM: tegra: pcie: Add device tree support
-> 
->  .../devicetree/bindings/pci/tegra-pcie.txt         |   23 +
->  .../devicetree/bindings/regulator/tps6586x.txt     |   98 +++
->  arch/arm/boot/dts/tegra20.dtsi                     |    8 +
->  arch/arm/kernel/bios32.c                           |    4 +-
->  arch/arm/mach-tegra/Kconfig                        |    1 +
->  arch/arm/mach-tegra/board-harmony-pcie.c           |   38 +-
->  arch/arm/mach-tegra/board-harmony.c                |    1 +
->  arch/arm/mach-tegra/board-harmony.h                |    1 +
->  arch/arm/mach-tegra/board-trimslice.c              |   16 +-
->  arch/arm/mach-tegra/board.h                        |   11 +-
->  arch/arm/mach-tegra/devices.c                      |   32 +
->  arch/arm/mach-tegra/devices.h                      |    1 +
->  arch/arm/mach-tegra/include/mach/iomap.h           |    6 +
->  arch/arm/mach-tegra/include/mach/irqs.h            |    5 +-
->  arch/arm/mach-tegra/pcie.c                         |  895 +++++++++++++++-----
->  arch/arm/mach-tegra/pmc.c                          |   16 +
->  arch/arm/mach-tegra/pmc.h                          |    1 +
->  drivers/base/base.h                                |    1 +
->  drivers/base/core.c                                |    2 +
->  drivers/base/dd.c                                  |  138 ++-
->  drivers/mfd/tps6586x.c                             |   66 ++
->  drivers/pci/setup-irq.c                            |    4 +-
->  drivers/regulator/core.c                           |    4 +-
->  drivers/regulator/fixed.c                          |   14 +-
->  drivers/regulator/tps6586x-regulator.c             |    4 +-
->  include/linux/device.h                             |    5 +
->  include/linux/errno.h                              |    1 +
->  include/linux/mfd/tps6586x.h                       |    1 +
->  28 files changed, 1136 insertions(+), 261 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pci/tegra-pcie.txt
->  create mode 100644 Documentation/devicetree/bindings/regulator/tps6586x.txt
 
-There is a whole bunch of PCI DT code sitting in the powerpc tree that
-probably needs to be moved to common location and used here.
-
-This looks way too simple to be what's needed if I compare to PCI
-bindings in powerpc dts files.
+Then panic in the restart code if it doesn't have something it needs.
 
 Rob
