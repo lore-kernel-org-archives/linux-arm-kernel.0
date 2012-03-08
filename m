@@ -1,30 +1,111 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Thu, 08 Mar 2012 11:37:31 +0200
-Subject: [PATCH v2 2/3] ARM/ASoC: OMAP McBSP: Move remainig defines from
- arch to ASoC header
-In-Reply-To: <4F587C00.1090307@ti.com>
-References: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
- <1331198537-13469-3-git-send-email-peter.ujfalusi@ti.com>
- <4F587C00.1090307@ti.com>
-Message-ID: <4F587DDB.5080202@bitmer.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 08 Mar 2012 10:25:49 +0100
+Subject: [RFC PATCH] video:backlight: add dimming sysfs node
+In-Reply-To: <4F58573C.3020407@samsung.com>
+References: <4F58573C.3020407@samsung.com>
+Message-ID: <4F587B1D.5080206@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2012 11:29 AM, Peter Ujfalusi wrote:
-> Hi Jarkko,
-> 
-> On 03/08/2012 11:22 AM, Peter Ujfalusi wrote:
->> Clock signal muxing, and functional clock related defines are only needed
->> in ASoC drivers.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
-> 
-> I have added your ack to this patch by accident when I updated the
-> series. Sorry about that.
-> Please confirm if you are OK with this change.
-> 
-Go ahead :-)
+On 03/08/2012 07:52 AM, Donghwa Lee wrote:
+> In backlight class, update_status() callback function is mostly used to change
+> backlight brightness. When platform enter the dimming state, it is usually used.
+> But, I think dimming state can be defined variety of method including brightness.
+> So, it is need to differentiated node from brightness node.
 
--- 
-Jarkko
+What do you mean by dimming? Completely blank the display or just lower the
+brightness to a certain level > 0? In the former case the bl_power sysfs
+node already exposes such functionality. In the later case can you give an
+example how this will be used and how a typical driver would implement this
+functionality?
+
+> 
+> In set_dimming() callback function, developers can define variety dimming functions.
+> 
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/video/backlight/backlight.c |   37 +++++++++++++++++++++++++++++++++++
+>  include/linux/backlight.h           |    9 ++++++++
+>  2 files changed, 46 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/video/backlight/backlight.c b/drivers/video/backlight/backlight.c
+> index bf5b1ec..44a77e4 100644
+> --- a/drivers/video/backlight/backlight.c
+> +++ b/drivers/video/backlight/backlight.c
+> @@ -101,6 +101,43 @@ static void backlight_generate_event(struct backlight_device *bd,
+>  	sysfs_notify(&bd->dev.kobj, NULL, "actual_brightness");
+>  }
+>  
+> +static ssize_t backlight_store_dimming(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	int rc;
+> +	struct backlight_device *bd = to_backlight_device(dev);
+> +	unsigned long dimming;
+> +
+> +	rc = strict_strtoul(buf, 0, &dimming);
+> +	if (rc)
+> +		return rc;
+> +
+> +	if (dimming < 0)
+> +		rc = -EINVAL;
+> +	else {
+> +		pr_debug("set dimming mode\n");
+> +
+> +		if (dimming)
+> +			bd->props.dimming = true;
+> +		else
+> +			bd->props.dimming = false;
+> +
+> +		backlight_set_dimming(bd);
+> +
+> +		rc = count;
+> +	}
+> +
+> +	return rc;
+> +}
+> +
+> +static ssize_t backlight_show_dimming(struct device *dev,
+> +		struct device_attribute *attr,char *buf)
+> +{
+> +	struct backlight_device *bd = to_backlight_device(dev);
+> +
+> +	return sprintf(buf, "%d\n", bd->props.dimming);
+> +}
+> +
+>  static ssize_t backlight_show_power(struct device *dev,
+>  		struct device_attribute *attr, char *buf)
+>  {
+> diff --git a/include/linux/backlight.h b/include/linux/backlight.h
+> index 5ffc6dd..823717e 100644
+> --- a/include/linux/backlight.h
+> +++ b/include/linux/backlight.h
+> @@ -55,10 +55,13 @@ struct backlight_ops {
+>  	/* Check if given framebuffer device is the one bound to this backlight;
+>  	   return 0 if not, !=0 if it is. If NULL, backlight always matches the fb. */
+>  	int (*check_fb)(struct backlight_device *, struct fb_info *);
+> +	/* Notify the backlight driver to enter the dimming state */
+> +	int (*set_dimming)(struct backlight_device *);
+>  };
+>  
+>  /* This structure defines all the properties of a backlight */
+>  struct backlight_properties {
+> +	bool dimming;
+>  	/* Current User requested brightness (0 - max_brightness) */
+>  	int brightness;
+>  	/* Maximal value for brightness (read-only) */
+> @@ -111,6 +114,12 @@ static inline void backlight_update_status(struct backlight_device *bd)
+>  	mutex_unlock(&bd->update_lock);
+>  }
+>  
+> +static inline void backlight_set_dimming(struct backlight_device *bd)
+> +{
+> +	if (bd->ops && bd->ops->set_dimming)
+> +		bd->ops->set_dimming(bd);
+> +}
+> +
+>  extern struct backlight_device *backlight_device_register(const char *name,
+>  	struct device *dev, void *devdata, const struct backlight_ops *ops,
+>  	const struct backlight_properties *props);
