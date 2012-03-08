@@ -1,86 +1,42 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 8 Mar 2012 18:52:04 +0100
-Subject: [PATCH 5/5 v3] ARM: at91: sam9x5 add i2c DT support
-In-Reply-To: <4F58E87D.9040701@gmail.com>
-References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
- <1331196635-27203-5-git-send-email-plagnioj@jcrosoft.com>
- <4F58E87D.9040701@gmail.com>
-Message-ID: <20120308175204.GJ27213@game.jcrosoft.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Mar 2012 10:04:41 -0800
+Subject: [GIT PULL] few more fixes for v3.3-rc6
+Message-ID: <20120308180441.GT12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:12 Thu 08 Mar     , Rob Herring wrote:
-> On 03/08/2012 02:50 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > For now on use i2c-gpio driver on the same pin as the hardware IP.
-> > 
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > ---
-> > v3:
-> > 
-> > 	update i2c binding (Rob comments)
-> > 
-> > Best Regards,
-> > J.
-> >  arch/arm/boot/dts/at91sam9x5.dtsi |   39 +++++++++++++++++++++++++++++++++++++
-> >  1 files changed, 39 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> > index c294657..fdd1ac6 100644
-> > --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> > @@ -188,4 +188,43 @@
-> >  			status = "disabled";
-> >  		};
-> >  	};
-> > +
-> > +	i2c-gpio at 0 {
-> > +		compatible = "i2c-gpio";
-> > +		gpios = <&pioA 30 0 /* sda */
-> > +			 &pioA 31 0 /* scl */
-> > +			>;
-> > +		i2c-gpio,sda-open-drain;
-> > +		i2c-gpio,scl-open-drain;
-> > +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	i2c-gpio at 1 {
-> > +		compatible = "i2c-gpio";
-> > +		gpios = <&pioC 0 0 /* sda */
-> > +			 &pioC 1 0 /* scl */
-> > +			>;
-> > +		i2c-gpio,sda-open-drain;
-> > +		i2c-gpio,scl-open-drain;
-> > +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		status = "disabled";
-> > +	};
-> > +
-> > +	i2c-gpio at 2 {
-> > +		compatible = "i2c-gpio";
-> > +		gpios = <&pioB 4 0 /* sda */
-> > +			 &pioB 5 0 /* scl */
-> > +			>;
-> > +		i2c-gpio,sda-open-drain;
-> > +		i2c-gpio,scl-open-drain;
-> > +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		status = "disabled";
-> > +	};
-> 
-> If these are just any random gpio lines, it seems strange to define
-> these in a SOC dtsi and then disable them.
-they are not, they are the same pin as the i2c hardware IP.
+Hi Arnd & Olof,
 
-Today the hw driver is not ready or will not work correctly (IP issue)
+Here are few more fixes for the current -rc cycle if there's
+still enough time to get them in.
 
-On hardware design we use the I2C pin but can not use the hw driver
+Regards,
 
-Best Regards,
-J.
+Tony
+
+
+The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+  Linus Torvalds (1):
+        Linux 3.3-rc6
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fixes
+
+Cousson, Benoit (1):
+      ARM: OMAP: irqs: Fix NR_IRQS value to handle PRCM interrupts
+
+R Sricharan (1):
+      ARM: OMAP2+: Fix module build errors with CONFIG_OMAP4_ERRATA_I688
+
+Rajendra Nayak (1):
+      ARM: OMAP2+: Remove apply_uV constraints for fixed regulator
+
+Vaibhav Hiremath (1):
+      ARM: OMAP: id: Add missing break statement in omap3xxx_check_revision
+
+ arch/arm/mach-omap2/id.c               |    1 +
+ arch/arm/mach-omap2/omap4-common.c     |    2 ++
+ arch/arm/mach-omap2/twl-common.c       |    1 -
+ arch/arm/plat-omap/include/plat/irqs.h |   10 +++++++++-
+ 4 files changed, 12 insertions(+), 2 deletions(-)
