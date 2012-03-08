@@ -1,45 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 8 Mar 2012 20:27:11 +0100 (CET)
-Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
-In-Reply-To: <201203081701.01663.arnd@arndb.de>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <201203072113.04369.arnd@arndb.de>
- <20120308162530.GI5050@titan.lakedaemon.net>
- <201203081701.01663.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1203082026470.2742@ionos>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  8 Mar 2012 20:36:44 +0100
+Subject: [PATCH] ARM: davinci: cpufreq: fix compiler warning
+Message-ID: <1331235404-15565-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Mar 2012, Arnd Bergmann wrote:
+This fixes:
+	arch/arm/mach-davinci/cpufreq.c: In function davinci_target:
+	arch/arm/mach-davinci/cpufreq.c:98: warning: passing argument 2 of dev_printk from incompatible pointer type
 
-> On Thursday 08 March 2012, Jason wrote:
-> > 
-> > On Wed, Mar 07, 2012 at 09:13:04PM +0000, Arnd Bergmann wrote:
-> > > Finally, something could be wrong with the interrupt controller.
-> > > AFAICT, you register it through the device tree now, but it's also
-> > > getting initialized through kirkwood_init_irq, so the numbers
-> > > would all be wrong.
-> > 
-> > Yes, I'm working through this now.  mv_cesa silently fails to come up
-> > if it can't find the interrupt controller via fdt.  So, it needs to get
-> > done.
-> > 
-> > Right now, I'm looking at how mach-versatile does it (vic_init()) since
-> > it's also an ARM926ej-s...
-> > 
-> 
-> Ok, sounds good. It's not important whether it's an ARM9 or not btw.
-> You should look at both anything that defines an "interrupt-controller"
-> property as an example including Documentation/devicetree/bindings/arm/vic.txt
-> and Documentation/devicetree/bindings/arm/gic.txt.
-> 
-> (taking Thomas Gleixner on Cc)
-> 
-> Since the orion irq chip is based on irqchip_generic, it would be
-> perfect to have a generic irqchip binding to go along with
-> kernel/irq/generic-chip.c. Not sure if anyone has thought about this
-> before, but it looks like we can completely avoid using
-> arch/arm/plat-orion/irq.c and arch/arm/mach-kirkwood/irq.c if we
-> do that.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-davinci/cpufreq.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Right. That should be trivial to implement.
+diff --git a/arch/arm/mach-davinci/cpufreq.c b/arch/arm/mach-davinci/cpufreq.c
+index 5bba707..031048f 100644
+--- a/arch/arm/mach-davinci/cpufreq.c
++++ b/arch/arm/mach-davinci/cpufreq.c
+@@ -95,7 +95,7 @@ static int davinci_target(struct cpufreq_policy *policy,
+ 	if (freqs.old == freqs.new)
+ 		return ret;
+ 
+-	dev_dbg(&cpufreq.dev, "transition: %u --> %u\n", freqs.old, freqs.new);
++	dev_dbg(cpufreq.dev, "transition: %u --> %u\n", freqs.old, freqs.new);
+ 
+ 	ret = cpufreq_frequency_table_target(policy, pdata->freq_table,
+ 						freqs.new, relation, &idx);
+-- 
+1.7.9.1
