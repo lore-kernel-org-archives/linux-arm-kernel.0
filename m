@@ -1,43 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Mar 2012 10:32:05 -0800
-Subject: [PATCH] mmc: omap_hsmmc: Fix Unbalanced pm_runtime_enable warning
-In-Reply-To: <87obsaio93.fsf@ti.com>
-References: <20120305234240.GQ12083@atomide.com> <87obsaio93.fsf@ti.com>
-Message-ID: <4F58FB25.8020602@ti.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 8 Mar 2012 19:37:31 +0100
+Subject: [PATCH 06/11] PCI: Keep pci_fixup_irqs() around after init
+In-Reply-To: <CAErSpo6hbWjteESST1+O2WzbtmZq6hC-pnUB4o3MAXWG-EgU+g@mail.gmail.com>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-7-git-send-email-thierry.reding@avionic-design.de>
+ <CAErSpo6hbWjteESST1+O2WzbtmZq6hC-pnUB4o3MAXWG-EgU+g@mail.gmail.com>
+Message-ID: <20120308183731.GA25254@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris,
+* Bjorn Helgaas wrote:
+> Hmm, your patch looks OK as far as it goes, but the implementation of
+> pci_fixup_irqs() as a call-once-at-boot-time thing with a loop through
+> all the PCI devices we've found so far looks completely broken with
+> regard to hotplug.
+> 
+> Who does the swizzle for devices hot-added after boot?
 
-On 03/05/2012 04:09 PM, Kevin Hilman wrote:
-> Tony Lindgren<tony@atomide.com>  writes:
->
->> mmc: omap_hsmmc: Fix Unbalanced pm_runtime_enable warning
->>
->> Otherwise we can get following warning when re-loading the
->> omap_hsmmc driver module when gpio_twl4030 module is not
->> loaded:
->>
->> omap_hsmmc omap_hsmmc.0: Unbalanced pm_runtime_enable!
->> omap_hsmmc omap_hsmmc.0: Unable to grab MMC CD IRQ
->> omap_hsmmc: probe of omap_hsmmc.0 failed with error -22
->>
->> Signed-off-by: Tony Lindgren<tony@atomide.com>
->> ---
->>
->> Kevin, maybe take a look and see if this is correct and
->> fits into your PM branches?
->
-> Looks right to me:
->
-> Acked-by: Kevin Hilman<khilman@ti.com>
->
-> But this is a fix to the driver itself, so Chris should queue this in
-> mmc-next.
->
-> Chris, can you take this one?
->
+Perhaps I should have mentioned this in the commit message, but the patch
+isn't actually used in a hotplug scenario. In fact, the code is still run
+once at boot time, only very late. Grant's deferred probing allows the
+PCIe controller driver to postpone initialization until all the devices
+that it depends on (regulators) have been probed. This has the side-effect
+that the probing actually takes place *after* code and data annotated with
+__init have already been freed.
 
-just checking on this to be sure it can make it for v3.4.
-
-Kevin
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/e3caaac8/attachment.sig>
