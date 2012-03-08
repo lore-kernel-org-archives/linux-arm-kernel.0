@@ -1,143 +1,21 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 8 Mar 2012 13:11:20 -0800
-Subject: [PATCH RESEND v3] USB: Support for LPC32xx SoC
-In-Reply-To: <1331068913-9321-1-git-send-email-stigge@antcom.de>
-References: <1331068913-9321-1-git-send-email-stigge@antcom.de>
-Message-ID: <20120308211120.GB21058@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Mar 2012 13:12:48 -0800
+Subject: [PATCH v2 1/3] ARM: OMAP2+: McBSP: Correct CLKR/FSR clock
+ source mux configuration
+In-Reply-To: <1331198537-13469-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
+ <1331198537-13469-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120308211247.GZ12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 10:21:53PM +0100, Roland Stigge wrote:
-> This patch adds OHCI support to the LPC32xx ARM platform
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120308 00:50]:
+> On OMAP2/3 McBSP1 port has 6 pin setup, while on OMAP4 the port is McBSP4.
+> Implement the CLKR/FSR clock mux selection for OMAP4, and make sure that
+> we add the correct callback for the correct port across supported OMAP
+> versions.
 > 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
-> ---
->  drivers/usb/host/ohci-hcd.c     |    5 +++
->  drivers/usb/host/ohci-pnx4008.c |   66 +++++++++++++++++++++++++++++++++++++---
->  2 files changed, 67 insertions(+), 4 deletions(-)
-> 
-> --- linux-2.6.orig/drivers/usb/host/ohci-hcd.c
-> +++ linux-2.6/drivers/usb/host/ohci-hcd.c
-> @@ -1055,6 +1055,11 @@ MODULE_LICENSE ("GPL");
->  #define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
->  #endif
->  
-> +#ifdef CONFIG_ARCH_LPC32XX
-> +#include "ohci-pnx4008.c"
-> +#define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
-> +#endif
-> +
->  #ifdef CONFIG_ARCH_DAVINCI_DA8XX
->  #include "ohci-da8xx.c"
->  #define PLATFORM_DRIVER		ohci_hcd_da8xx_driver
-> --- linux-2.6.orig/drivers/usb/host/ohci-pnx4008.c
-> +++ linux-2.6/drivers/usb/host/ohci-pnx4008.c
-> @@ -22,6 +22,7 @@
->  #include <linux/i2c.h>
->  
->  #include <mach/hardware.h>
-> +#include <asm/mach-types.h>
->  #include <asm/io.h>
->  
->  #include <mach/platform.h>
-> @@ -143,7 +144,17 @@ static void i2c_write(u8 buf, u8 subaddr
->  	i2c_master_send(isp1301_i2c_client, &tmpbuf[0], 2);
->  }
->  
-> -static void isp1301_configure(void)
-> +static u16 i2c_read16(u8 subaddr)
-> +{
-> +	u16 data;
-> +
-> +	i2c_master_send(isp1301_i2c_client, &subaddr, 1);
-> +	i2c_master_recv(isp1301_i2c_client, (u8 *) &data, 2);
-> +
-> +	return data;
-> +}
-> +
-> +static void isp1301_configure_pnx4008(void)
->  {
->  	/* PNX4008 only supports DAT_SE0 USB mode */
->  	/* PNX4008 R2A requires setting the MAX603 to output 3.6V */
-> @@ -166,7 +177,51 @@ static void isp1301_configure(void)
->  		  ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
->  	i2c_write(0xFF,
->  		  ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
-> +}
->  
-> +static void isp1301_configure_lpc32xx(void)
-> +{
-> +	/* LPC32XX only supports DAT_SE0 USB mode */
-> +	/* This sequence is important */
-> +
-> +	/* Disable transparent UART mode first */
-> +	i2c_write(MC1_UART_EN, (ISP1301_I2C_MODE_CONTROL_1 |
-> +		ISP1301_I2C_REG_CLEAR_ADDR));
-> +
-> +	i2c_write(~MC1_SPEED_REG, (ISP1301_I2C_MODE_CONTROL_1 |
-> +		ISP1301_I2C_REG_CLEAR_ADDR));
-> +	i2c_write(MC1_SPEED_REG, ISP1301_I2C_MODE_CONTROL_1);
-> +	i2c_write(~0,
-> +		(ISP1301_I2C_MODE_CONTROL_2 | ISP1301_I2C_REG_CLEAR_ADDR));
-> +	i2c_write((MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL),
-> +		ISP1301_I2C_MODE_CONTROL_2);
-> +	i2c_write(~0, (ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
-> +	i2c_write(MC1_DAT_SE0, ISP1301_I2C_MODE_CONTROL_1);
-> +	i2c_write((OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN),
-> +		ISP1301_I2C_OTG_CONTROL_1);
-> +	i2c_write((OTG1_DM_PULLUP | OTG1_DP_PULLUP),
-> +		(ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
-> +	i2c_write(~0,
-> +		 ISP1301_I2C_INTERRUPT_LATCH | ISP1301_I2C_REG_CLEAR_ADDR);
-> +	i2c_write(~0,
-> +		ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
-> +	i2c_write(~0,
-> +		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
-> +
-> +	/* Enable usb_need_clk clock after transceiver is initialized */
-> +	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
-> +
-> +	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n", i2c_read16(0x00));
-> +	printk(KERN_INFO "ISP1301 Product ID : 0x%04x\n", i2c_read16(0x02));
-> +	printk(KERN_INFO "ISP1301 Version ID : 0x%04x\n", i2c_read16(0x14));
-> +}
-> +
-> +static void isp1301_configure(void)
-> +{
-> +	if (machine_is_pnx4008())
-> +		isp1301_configure_pnx4008();
-> +	else
-> +		isp1301_configure_lpc32xx();
->  }
->  
->  static inline void isp1301_vbus_on(void)
-> @@ -375,7 +430,8 @@ static int __devinit usb_hcd_pnx4008_pro
->  	}
->  
->  	/* Set all USB bits in the Start Enable register */
-> -	pnx4008_set_usb_bits();
-> +	if (machine_is_pnx4008())
-> +		pnx4008_set_usb_bits();
->  
->  	hcd->rsrc_start = pdev->resource[0].start;
->  	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
-> @@ -404,7 +460,8 @@ static int __devinit usb_hcd_pnx4008_pro
->  
->  	pnx4008_stop_hc();
->  out4:
-> -	pnx4008_unset_usb_bits();
-> +	if (machine_is_pnx4008())
-> +		pnx4008_unset_usb_bits();
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 
-How come some of these pnx4008_* functions you have wrapped in
-machine_is_pnx4008(), but not all of them?
-
-Actually, why don't those functions do that kind of checking themselves,
-without having to do this before you call them each time?
-
-Consistancy is key.
-
-thanks,
-
-greg k-h
+Acked-by: Tony Lindgren <tony@atomide.com>
