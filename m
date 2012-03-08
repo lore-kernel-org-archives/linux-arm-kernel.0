@@ -1,73 +1,75 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 7 Mar 2012 17:10:12 -0500
-Subject: [GIT PULL v4] ARM: kirkwood: fdt conversion progress
-Message-ID: <20120307221012.GH5050@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Mar 2012 16:45:59 -0800
+Subject: [PATCH] ARM: OMAP2+: Fix build issues with missing include of
+ linux/bug.h
+In-Reply-To: <20120307213209.GI12083@atomide.com>
+References: <20120307213209.GI12083@atomide.com>
+Message-ID: <20120308004559.GN12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
+* Tony Lindgren <tony@atomide.com> [120307 13:04]:
+> 
+> Looks like this is needed for some .config files with
+> current for-next
 
-  Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
+This is because of next/master commit 6c03438ed (kernel.h: doesn't
+explicitly use bug.h, so don't include it). Will update the commit
+message to say:
 
-are available in the git repository at:
-  git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt
+Otherwise we can get the following if bug.h is not included from kernel.h:
 
----
-Arnd,
+> arch/arm/mach-omap2/powerdomain-common.c:
+> In function 'omap2_pwrdm_get_mem_bank_onstate_mask':
+> arch/arm/mach-omap2/powerdomain-common.c:64:3: error:
+> implicit declaration of function 'WARN_ON' [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-My first two should match up with what you have already, the only
-outlier is that Jean-Christophe's patch is needed, but I don't think
-everyone agrees on it yet.
-
-thx,
-
-Jason.
-
-Andrew Lunn (2):
-      ARM: orion: spi: remove enable_clock_fix which is not used
-      ARM: Kirkwood: Remove tclk from kirkwood_asoc_platform_data.
-
-Jason Cooper (10):
-      ARM: kirkwood: add dreamplug (fdt) support.
-      ARM: kirkwood: convert uart0 to devicetree.
-      ARM: kirkwood: fdt: use mrvl ticker symbol
-      ARM: kirkwood: fdt: absorb kirkwood_init()
-      ARM: kirkwood: add interrupt controller to devicetree.
-      ARM: kirkwood: rtc-mv devicetree bindings
-      ARM: kirkwood: use devicetree for rtc-mv
-      ARM: kirkwood: mv_cesa devicetree support.
-      ARM: kirkwood: use devicetree for orion-ehci
-      ARM: kirkwood: use devicetree to init sata_mv
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      of: add dma-mask binding
-
-Michael Walle (3):
-      ARM: kirkwood: mv_cesa devicetree bindings
-      ARM: kirkwood: ehci-orion: add device tree binding
-      ARM: kirkwood: sata_mv: add device tree binding
-
- .../devicetree/bindings/crypto/mv_cesa.txt         |   18 ++
- .../devicetree/bindings/usb/ehci-orion.txt         |    5 +
- arch/arm/boot/dts/kirkwood-dreamplug.dts           |   41 ++++
- arch/arm/boot/dts/kirkwood.dtsi                    |   26 +++
- arch/arm/mach-kirkwood/Kconfig                     |   14 ++
- arch/arm/mach-kirkwood/Makefile                    |    1 +
- arch/arm/mach-kirkwood/Makefile.boot               |    2 +
- arch/arm/mach-kirkwood/board-dt.c                  |  206 ++++++++++++++++++++
- arch/arm/mach-kirkwood/common.c                    |   41 ++++-
- arch/arm/mach-kirkwood/common.h                    |    6 +
- arch/arm/plat-orion/include/plat/audio.h           |    1 -
- drivers/ata/sata_mv.c                              |   18 ++-
- drivers/crypto/mv_cesa.c                           |   13 ++
- drivers/of/platform.c                              |   26 +++-
- drivers/rtc/rtc-mv.c                               |    9 +
- drivers/spi/spi-orion.c                            |    5 -
- drivers/usb/host/ehci-orion.c                      |   50 +++++-
- include/linux/spi/orion_spi.h                      |    1 -
- 18 files changed, 464 insertions(+), 19 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/crypto/mv_cesa.txt
- create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
- create mode 100644 arch/arm/boot/dts/kirkwood-dreamplug.dts
- create mode 100644 arch/arm/boot/dts/kirkwood.dtsi
- create mode 100644 arch/arm/mach-kirkwood/board-dt.c
+ 
+> --- a/arch/arm/mach-omap2/clkt_clksel.c
+> +++ b/arch/arm/mach-omap2/clkt_clksel.c
+> @@ -43,6 +43,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+> +#include <linux/bug.h>
+>  
+>  #include <plat/clock.h>
+>  
+> --- a/arch/arm/mach-omap2/powerdomain-common.c
+> +++ b/arch/arm/mach-omap2/powerdomain-common.c
+> @@ -13,6 +13,7 @@
+>  
+>  #include <linux/errno.h>
+>  #include <linux/kernel.h>
+> +#include <linux/bug.h>
+>  #include "pm.h"
+>  #include "cm.h"
+>  #include "cm-regbits-34xx.h"
+> --- a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
+> +++ b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/io.h>
+>  #include <linux/errno.h>
+>  #include <linux/delay.h>
+> +#include <linux/bug.h>
+>  
+>  #include <plat/prcm.h>
+>  
+> --- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
+> +++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+> @@ -13,6 +13,7 @@
+>  
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+> +#include <linux/bug.h>
+>  
+>  #include <plat/cpu.h>
+>  
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
