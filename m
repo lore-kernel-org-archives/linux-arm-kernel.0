@@ -1,130 +1,242 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 8 Mar 2012 17:23:49 +0800
-Subject: [PATCH] leds: kill CONFIG_LEDS_CLASS option
-In-Reply-To: <1323356570.5309.25.camel@ted>
-References: <1314647628-21707-1-git-send-email-bryan.wu@canonical.com>
- <alpine.LFD.2.00.1108291630020.20358@xanadu.home>
- <1314653699.5939.299.camel@rex>
- <CAK5ve-+J3hzVB=_b0AOJ-Q1LYewahVraMti=y=6AaQy3+iy+rg@mail.gmail.com>
- <1314791341.5939.464.camel@rex>
- <CAK5ve-LcUabPS2EGAPD7q3-_thS4XhmGyhafmRkOCUAAriaXSw@mail.gmail.com>
- <1323356570.5309.25.camel@ted>
-Message-ID: <CAK5ve-LikCFcWGgcmLYgOG_TNnLZ=LPj9XdWXVgCWXgLP6G+jQ@mail.gmail.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 08 Mar 2012 10:27:58 +0100
+Subject: [PATCH v6] lpc32xx: Added ethernet driver
+In-Reply-To: <1331151693-21726-1-git-send-email-stigge@antcom.de>
+References: <1331151693-21726-1-git-send-email-stigge@antcom.de>
+Message-ID: <4F587B9E.4000708@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 8, 2011 at 11:02 PM, Richard Purdie <rpurdie@rpsys.net> wrote:
-> On Thu, 2011-12-08 at 19:53 +0800, Bryan Wu wrote:
->> On Wed, Aug 31, 2011 at 7:49 PM, Richard Purdie <rpurdie@rpsys.net> wrote:
->> > On Wed, 2011-08-31 at 10:45 +0800, Bryan Wu wrote:
->> >> On Tue, Aug 30, 2011 at 5:34 AM, Richard Purdie <rpurdie@rpsys.net> wrote:
->> >> > On Mon, 2011-08-29 at 16:34 -0400, Nicolas Pitre wrote:
->> >> >> On Tue, 30 Aug 2011, Bryan Wu wrote:
->> >> >>
->> >> >> > Almost all the new leds driver and trigger driver are depends on
->> >> >> > CONFIG_LED_CLASS, so there is no such user with CONFIG_NEW_LEDS=y
->> >> >> > and CONFIG_LED_CLASS=n. Moreover, lots of API functions in led-class.c
->> >> >> > are very common and should be built-in when CONFIG_NEW_LEDS=y.
->> >> >> >
->> >> >> > Obviously, CONFIG_LEDS_CLASS is pointless. This patch kills it and
->> >> >> > also updates defconfigs which contains CONFIG_LEDS_CLASS.
->> >> >> >
->> >> >> > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
->> >> >> > ---
->> >> >
->> >> > Looking at the code I'm a little concerned to see the direction this is
->> >> > going. There was originally a reason that there were two options, it was
->> >> > related to being able to compile as much of the LED code as a module as
->> >> > possible.
->> >> >
->> >>
->> >> I quite understand the original reason for 2 options, but I failed to
->> >> see any user of CONFIG_NEW_LEDS=y and CONFIG_LEDS_CLASS=n.
->> >
->> > Right, the intent was to support CONFIG_NEW_LEDS=y and
->> > CONFIG_LEDS_CLASS=m and I believe that still should be possible.
->> >
->> >> > It looks like commit 5ada28bf76752e33dce3d807bf0dfbe6d1b943ad changed
->> >> > the tristate to a bool at which point the separate option obviously
->> >> > becomes pointless.
->> >>
->> >> Exactly, this patch added some function API which are used very widely
->> >> as default LEDS driver behavior in some drivers.
->> >
->> > Looking at that commit, its adds the code to leds-class.c and shouldn't
->> > have needed to change the tristate to a bool. I know we discussed that
->> > at the time and I think that part might have been unnecessary and just
->> > accidentally committed. It could well be we can just revert that piece
->> > of the patch.
->> >
->>
->> Richard,
->>
->> Sorry for bringing up this topic so late. I was occupied by other
->> stuff for a while.
->>
->> I'm trying to make leds-class.c as a module, but found APIs exported
->> from led-class.c are widely used in kernel.
->>
->> For example: led_classdev_register()
->> --
->> linux-2.6$ grep -r led_classdev_register .
->> ./include/linux/leds.h:extern int led_classdev_register(struct device *parent,
->> ./drivers/mmc/host/au1xmmc.c: ? ? ? ? ret = led_classdev_register(mmc_dev(mmc), led);
->
-> If there are users of the LED API compiled in, then the config code
-> should be handling this so the led class code is compiled in too.
->
-> That shouldn't make it impossible to have the class code as a module, if
-> the users are also modules.
->
->> When CONFIG_NEW_LEDS=y, CONFIG_LEDS_CLASS=m and CONFIG_LEDS_TRIGGER=y,
->> I got following error for building omap2plus_defconfig
->> --
->> arch/arm/plat-omap/built-in.o: In function `newled_init':
->> /opt/git/linux-2.6/arch/arm/plat-omap/debug-leds.c:248: undefined
->> reference to `led_classdev_register'
->
-> So this is a dependency issues as far as I can see,
->
->> drivers/built-in.o: In function `led_trigger_blink':
->> /opt/git/linux-2.6/drivers/leds/led-triggers.c:248: undefined
->> reference to `led_blink_set'
->> drivers/built-in.o: In function `led_trigger_set':
->> /opt/git/linux-2.6/drivers/leds/led-triggers.c:116: undefined
->> reference to `led_brightness_set'
->
-> but I agree these are more problematic.
->
->> The commit 5ada28bf76752e33dce3d807bf0dfbe6d1b943ad "led-class: always
->> implement blinking" added 2 API (led_blink_set and
->> `led_brightness_set'), which are used by led-trigger.c
->>
->> For this kind of errors, I think it's quite hard to set led-class.c as
->> a module now and suggest we merge NEW_LEDS and LEDS_CLASS together.
->
-> I still don't believe this is necessary.
->
-> How about moving led_timer_function(), led_set_software_blink()
-> led_blink_set() and to led-triggers.c, putting #ifdef
-> CONFIG_LEDS_TRIGGERS around the appropriate pieces of leds-class.c. We'd
-> then move led_brightness_set() and led_stop_software_blink() to
-> led-core.c since those are the real problem.
->
-> It means there is a slightly higher always loaded footprint but its
-> better than giving up and making it all always loaded.
->
+Hi Roland,
 
-Richard,
+Le 03/07/12 21:21, Roland Stigge a ?crit :
+> This patch adds an ethernet driver for the LPC32xx ARM SoC.
+>
+> Signed-off-by: Roland Stigge<stigge@antcom.de>
 
-So sorry for the delay, I was occupied by other stuff for a long time.
+I have a couple of phylib-related comments addressed inline.
 
-As you pointed out, I moved some code to led-core.c to solve the
-issue, please find my patch about that.
+>
+> ---
+>
+> Applies to v3.3-rc6
+>
+> Changes since v5:
+>   * Indentation and whitespace fixes
+>   * Use __le32 for descriptors
+>   * Use bool for boolean function parameters
+>   * Removed unnecessary (u32) cast
+>   * Added comment regarding future device tree introduction
+>
+>   Thanks to David Miller, Arnd Bergmann and Joe Perches for
+>   reviewing the last version!
+>
+>   drivers/net/ethernet/Kconfig       |    1
+>   drivers/net/ethernet/Makefile      |    1
+>   drivers/net/ethernet/nxp/Kconfig   |    8
+>   drivers/net/ethernet/nxp/Makefile  |    1
+>   drivers/net/ethernet/nxp/lpc_eth.c | 1616 +++++++++++++++++++++++++++++++++++++
+>   5 files changed, 1627 insertions(+)
+>
+> --- linux-2.6.orig/drivers/net/ethernet/Kconfig
+> +++ linux-2.6/drivers/net/ethernet/Kconfig
 
-Thanks,
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+> +
+> +static int lpc_mii_probe(struct net_device *ndev)
+> +{
+> +	struct netdata_local *pldat = netdev_priv(ndev);
+> +	struct phy_device *phydev = NULL;
+> +	int phy_addr;
+> +
+> +	/* find the first phy */
+> +	for (phy_addr = 0; phy_addr<  PHY_MAX_ADDR; phy_addr++) {
+> +		if (pldat->mii_bus->phy_map[phy_addr]) {
+> +			phydev = pldat->mii_bus->phy_map[phy_addr];
+> +			break;
+> +		}
+> +	}
+
+Please use phy_find_first() instead of open-coding this.
+
+> +
+> +	if (!phydev) {
+> +		netdev_err(ndev, "no PHY found\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	/* Attach to the PHY */
+> +	if (lpc_phy_interface_mode() == PHY_INTERFACE_MODE_MII)
+> +		netdev_info(ndev, "using MII interface\n");
+> +	else
+> +		netdev_info(ndev, "using RMII interface\n");
+> +	phydev = phy_connect(ndev, dev_name(&phydev->dev),
+> +		&lpc_handle_link_change, 0, lpc_phy_interface_mode());
+> +
+> +	if (IS_ERR(phydev)) {
+> +		netdev_err(ndev, "Could not attach to PHY\n");
+> +		return PTR_ERR(phydev);
+> +	}
+> +
+> +	/* mask with MAC supported features */
+> +	phydev->supported&= PHY_BASIC_FEATURES;
+> +
+> +	phydev->advertising = phydev->supported;
+> +
+> +	pldat->link = 0;
+> +	pldat->speed = 0;
+> +	pldat->duplex = -1;
+> +	pldat->phy_dev = phydev;
+> +
+> +	return 0;
+> +}
+> +
+> +static int lpc_mii_init(struct netdata_local *pldat)
+> +{
+> +	int err = -ENXIO, i;
+> +
+> +	pldat->mii_bus = mdiobus_alloc();
+> +	if (!pldat->mii_bus) {
+> +		err = -ENOMEM;
+> +		goto err_out;
+> +	}
+> +
+> +	/* Setup MII mode */
+> +	if (lpc_phy_interface_mode() == PHY_INTERFACE_MODE_MII)
+> +		writel(LPC_COMMAND_PASSRUNTFRAME,
+> +		       LPC_ENET_COMMAND(pldat->net_base));
+> +	else {
+> +		writel((LPC_COMMAND_PASSRUNTFRAME | LPC_COMMAND_RMII),
+> +		       LPC_ENET_COMMAND(pldat->net_base));
+> +		writel(LPC_SUPP_RESET_RMII, LPC_ENET_SUPP(pldat->net_base));
+> +	}
+> +
+> +	pldat->mii_bus->name = "lpc_mii_bus";
+> +	pldat->mii_bus->read =&lpc_mdio_read;
+> +	pldat->mii_bus->write =&lpc_mdio_write;
+> +	pldat->mii_bus->reset =&lpc_mdio_reset;
+> +	snprintf(pldat->mii_bus->id, MII_BUS_ID_SIZE, "%x", pldat->pdev->id);
+
+No, makes this bus name unique in the system:
+snprnitf(pldat->mii_bus->id, MII_BUS_ID_SIZE, "%s-%x",
+	pldat->pdev->name, pldat->pdev->id);
+
+> +	pldat->mii_bus->priv = pldat;
+> +	pldat->mii_bus->parent =&pldat->pdev->dev;
+> +	pldat->mii_bus->phy_mask = 0xFFFFFFF0;
+
+I would rather not hardcode the phy_mask here, just leave it to 0, and 
+let phy_find_first() find the PHY devices for you, or make this platform 
+configurable.
+
+> +
+> +	pldat->mii_bus->irq = kmalloc(sizeof(int) * PHY_MAX_ADDR, GFP_KERNEL);
+> +	if (!pldat->mii_bus->irq) {
+> +		err = -ENOMEM;
+> +		goto err_out_1;
+> +	}
+> +
+> +	for (i = 0; i<  PHY_MAX_ADDR; i++)
+> +		pldat->mii_bus->irq[i] = PHY_POLL;
+> +
+> +	platform_set_drvdata(pldat->pdev, pldat->mii_bus);
+> +
+> +	if (mdiobus_register(pldat->mii_bus))
+> +		goto err_out_free_mdio_irq;
+> +
+> +	if (lpc_mii_probe(pldat->ndev) != 0)
+> +		goto err_out_unregister_bus;
+> +
+> +	return 0;
+> +
+> +err_out_unregister_bus:
+> +	mdiobus_unregister(pldat->mii_bus);
+> +err_out_free_mdio_irq:
+> +	kfree(pldat->mii_bus->irq);
+> +err_out_1:
+> +	mdiobus_free(pldat->mii_bus);
+> +err_out:
+> +	return err;
+> +}
+> +
+
+[snip]
+
+> +
+> +static int lpc_eth_open(struct net_device *ndev)
+> +{
+> +	struct netdata_local *pldat = netdev_priv(ndev);
+> +
+> +	/* if the phy is not yet registered, retry later*/
+> +	if (!pldat->phy_dev)
+> +		return -EAGAIN;
+
+You have already probed the mii bus in the driver's probe function, how 
+can you end up here without a phy being attached here?
+
+[snip]
+
+> +	if (lpc_mii_init(pldat) != 0)
+> +		goto err_out_unregister_netdev;
+> +
+> +	netdev_info(ndev, "LPC mac at 0x%08x irq %d\n",
+> +	       res->start, ndev->irq);
+> +
+> +	phydev = pldat->phy_dev;
+> +	netdev_info(ndev,
+> +		"attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
+> +		phydev->drv->name, dev_name(&phydev->dev), phydev->irq);
+
+Most drivers put this informational message in their mii probing 
+function, please move it here as well.
+
+> +
+> +	device_init_wakeup(&pdev->dev, 1);
+> +	device_set_wakeup_enable(&pdev->dev, 0);
+> +
+> +	return 0;
+> +
+> +err_out_unregister_netdev:
+> +	platform_set_drvdata(pdev, NULL);
+> +	unregister_netdev(ndev);
+> +err_out_dma_unmap:
+> +	if (!use_iram_for_net() ||
+> +	    pldat->dma_buff_size>  lpc32xx_return_iram_size())
+> +		dma_free_coherent(&pldat->pdev->dev, pldat->dma_buff_size,
+> +				  pldat->dma_buff_base_v,
+> +				  pldat->dma_buff_base_p);
+> +err_out_free_irq:
+> +	free_irq(ndev->irq, ndev);
+> +err_out_iounmap:
+> +	iounmap(pldat->net_base);
+> +err_out_disable_clocks:
+> +	clk_disable(pldat->clk);
+> +	clk_put(pldat->clk);
+> +err_out_free_dev:
+> +	free_netdev(ndev);
+> +err_exit:
+> +	pr_err("%s: not found (%d).\n", MODNAME, ret);
+> +	return ret;
+> +}
+> +
+> +static int lpc_eth_drv_remove(struct platform_device *pdev)
+> +{
+> +	struct net_device *ndev = platform_get_drvdata(pdev);
+> +	struct netdata_local *pldat = netdev_priv(ndev);
+> +
+> +	unregister_netdev(ndev);
+> +	platform_set_drvdata(pdev, NULL);
+> +
+> +	if (!use_iram_for_net() ||
+> +	    pldat->dma_buff_size>  lpc32xx_return_iram_size())
+> +		dma_free_coherent(&pldat->pdev->dev, pldat->dma_buff_size,
+> +				  pldat->dma_buff_base_v,
+> +				  pldat->dma_buff_base_p);
+> +	free_irq(ndev->irq, ndev);
+> +	iounmap(pldat->net_base);
+> +	clk_disable(pldat->clk);
+> +	clk_put(pldat->clk);
+> +	free_netdev(ndev);
+
+You are not freeing the mii bus in the driver's remove path.
+--
+Florian
