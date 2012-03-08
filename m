@@ -1,254 +1,277 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu,  8 Mar 2012 15:51:25 +0100
-Subject: [PATCH 05/11] tps6586x: Add device-tree support
+Date: Thu,  8 Mar 2012 15:51:21 +0100
+Subject: [PATCH 01/11] drivercore: Add driver probe deferral mechanism
 In-Reply-To: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1331218291-16119-6-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1331218291-16119-2-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
----
- .../devicetree/bindings/regulator/tps6586x.txt     |   98 ++++++++++++++++++++
- drivers/mfd/tps6586x.c                             |   66 +++++++++++++
- drivers/regulator/tps6586x-regulator.c             |    2 +-
- include/linux/mfd/tps6586x.h                       |    1 +
- 4 files changed, 166 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/tps6586x.txt
+From: Grant Likely <grant.likely@secretlab.ca>
 
-diff --git a/Documentation/devicetree/bindings/regulator/tps6586x.txt b/Documentation/devicetree/bindings/regulator/tps6586x.txt
-new file mode 100644
-index 0000000..e8d2888
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/tps6586x.txt
-@@ -0,0 +1,98 @@
-+TPS6586x family of regulators
-+
-+Required properties:
-+- compatible: "ti,tps6586x"
-+- reg: I2C slave address
-+- interrupts: the interrupt outputs of the controller
-+- #gpio-cells: number of cells to describe a GPIO
-+- gpio-controller: mark the device as a GPIO controller
-+- regulators: list of regulators provided by this controller, must be in the
-+  following order:
-+    SM0, SM1, SM2, LDO0, LDO1, LDO2, LDO3, LDO4, LDO5, LDO6, LDO7, LDO8, LDO9
-+
-+Each regulator is defined using the standard binding for regulators.
-+
-+Example:
-+
-+	pmu: tps6586x at 34 {
-+		compatible = "ti,tps6586x";
-+		reg = <0x34>;
-+		interrupts = <0 88 0x4>;
-+
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+
-+		regulators {
-+			sm0_reg: sm0 {
-+				regulator-min-microvolt = < 725000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sm1_reg: sm1 {
-+				regulator-min-microvolt = < 725000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sm2_reg: sm2 {
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <4550000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo0_reg: ldo0 {
-+				regulator-name = "PCIE CLK";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo1_reg: ldo1 {
-+				regulator-min-microvolt = < 725000>;
-+				regulator-max-microvolt = <1500000>;
-+			};
-+
-+			ldo2_reg: ldo2 {
-+				regulator-min-microvolt = < 725000>;
-+				regulator-max-microvolt = <1500000>;
-+			};
-+
-+			ldo3_reg: ldo3 {
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo4_reg: ldo4 {
-+				regulator-min-microvolt = <1700000>;
-+				regulator-max-microvolt = <2475000>;
-+			};
-+
-+			ldo5_reg: ldo5 {
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo6_reg: ldo6 {
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo7_reg: ldo7 {
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo8_reg: ldo8 {
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo9_reg: ldo9 {
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+		};
-+	};
-diff --git a/drivers/mfd/tps6586x.c b/drivers/mfd/tps6586x.c
-index a5ddf31..71997d2 100644
---- a/drivers/mfd/tps6586x.c
-+++ b/drivers/mfd/tps6586x.c
-@@ -23,6 +23,7 @@
- #include <linux/slab.h>
- #include <linux/gpio.h>
- #include <linux/i2c.h>
-+#include <linux/regulator/of_regulator.h>
+Allow drivers to report at probe time that they cannot get all the resources
+required by the device, and should be retried at a later time.
+
+This should completely solve the problem of getting devices
+initialized in the right order.  Right now this is mostly handled by
+mucking about with initcall ordering which is a complete hack, and
+doesn't even remotely handle the case where device drivers are in
+modules.  This approach completely sidesteps the issues by allowing
+driver registration to occur in any order, and any driver can request
+to be retried after a few more other drivers get probed.
+
+v4: - Integrate Manjunath's addition of a separate workqueue
+    - Change -EAGAIN to -EPROBE_DEFER for drivers to trigger deferral
+    - Update comment blocks to reflect how the code really works
+v3: - Hold off workqueue scheduling until late_initcall so that the bulk
+      of driver probes are complete before we start retrying deferred devices.
+    - Tested with simple use cases.  Still needs more testing though.
+      Using it to get rid of the gpio early_initcall madness, or to replace
+      the ASoC internal probe deferral code would be ideal.
+v2: - added locking so it should no longer be utterly broken in that regard
+    - remove device from deferred list at device_del time.
+    - Still completely untested with any real use case, but has been
+      boot tested.
+
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+[Cc list stripped in order not to get on people's nerves]
+---
+ drivers/base/base.h    |    1 +
+ drivers/base/core.c    |    2 +
+ drivers/base/dd.c      |  138 +++++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/device.h |    5 ++
+ include/linux/errno.h  |    1 +
+ 5 files changed, 146 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/base.h b/drivers/base/base.h
+index b858dfd..2c13dea 100644
+--- a/drivers/base/base.h
++++ b/drivers/base/base.h
+@@ -105,6 +105,7 @@ extern void bus_remove_driver(struct device_driver *drv);
  
- #include <linux/mfd/core.h>
- #include <linux/mfd/tps6586x.h>
-@@ -460,6 +461,7 @@ static int __devinit tps6586x_add_subdevs(struct tps6586x *tps6586x,
- 
- 		pdev->dev.parent = tps6586x->dev;
- 		pdev->dev.platform_data = subdev->platform_data;
-+		pdev->dev.of_node = subdev->of_node;
- 
- 		ret = platform_device_add(pdev);
- 		if (ret) {
-@@ -474,6 +476,66 @@ failed:
- 	return ret;
- }
- 
-+#ifdef CONFIG_OF
-+static struct tps6586x_platform_data *tps6586x_parse_dt(struct i2c_client *client)
-+{
-+	struct device_node *np = client->dev.of_node;
-+	struct tps6586x_platform_data *pdata;
-+	struct tps6586x_subdev_info *devs;
-+	struct device_node *regulators;
-+	struct device_node *child;
-+	unsigned int num = 0;
-+
-+	regulators = of_find_node_by_name(np, "regulators");
-+
-+	for_each_child_of_node(regulators, child)
-+		num++;
-+
-+	devs = devm_kzalloc(&client->dev, num * sizeof(*devs), GFP_KERNEL);
-+	if (!devs)
-+		return NULL;
-+
-+	num = 0;
-+
-+	for_each_child_of_node(regulators, child) {
-+		struct regulator_init_data *init_data;
-+
-+		init_data = of_get_regulator_init_data(&client->dev, child);
-+		if (!init_data)
-+			dev_err(&client->dev,
-+				"failed to parse DT for regulator %s\n",
-+				child->name);
-+
-+		devs[num].name = "tps6586x-regulator";
-+		devs[num].platform_data = init_data;
-+		devs[num].of_node = child;
-+		devs[num].id = num;
-+		num++;
-+	}
-+
-+	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return NULL;
-+
-+	pdata->num_subdevs = num;
-+	pdata->subdevs = devs;
-+	pdata->gpio_base = -1;
-+	pdata->irq_base = -1;
-+
-+	return pdata;
-+}
-+
-+static struct of_device_id tps6586x_of_match[] = {
-+	{ .compatible = "ti,tps6586x", },
-+	{ },
-+};
-+#else
-+static struct tps6586x_platform_data *tps6586x_parse_dt(struct i2c_client *client)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int __devinit tps6586x_i2c_probe(struct i2c_client *client,
- 					const struct i2c_device_id *id)
+ extern void driver_detach(struct device_driver *drv);
+ extern int driver_probe_device(struct device_driver *drv, struct device *dev);
++extern void driver_deferred_probe_del(struct device *dev);
+ static inline int driver_match_device(struct device_driver *drv,
+ 				      struct device *dev)
  {
-@@ -481,6 +543,9 @@ static int __devinit tps6586x_i2c_probe(struct i2c_client *client,
- 	struct tps6586x *tps6586x;
- 	int ret;
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index 0841a36..946094f 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -649,6 +649,7 @@ void device_initialize(struct device *dev)
+ {
+ 	dev->kobj.kset = devices_kset;
+ 	kobject_init(&dev->kobj, &device_ktype);
++	INIT_LIST_HEAD(&dev->deferred_probe);
+ 	INIT_LIST_HEAD(&dev->dma_pools);
+ 	mutex_init(&dev->mutex);
+ 	lockdep_set_novalidate_class(&dev->mutex);
+@@ -1193,6 +1194,7 @@ void device_del(struct device *dev)
+ 	device_remove_file(dev, &uevent_attr);
+ 	device_remove_attrs(dev);
+ 	bus_remove_device(dev);
++	driver_deferred_probe_del(dev);
  
-+	if (!pdata && client->dev.of_node)
-+		pdata = tps6586x_parse_dt(client);
+ 	/*
+ 	 * Some platform devices are driven without driver attached
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 142e3d600..442b764 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -28,6 +28,133 @@
+ #include "base.h"
+ #include "power/power.h"
+ 
++/*
++ * Deferred Probe infrastructure.
++ *
++ * Sometimes driver probe order matters, but the kernel doesn't always have
++ * dependency information which means some drivers will get probed before a
++ * resource it depends on is available.  For example, an SDHCI driver may
++ * first need a GPIO line from an i2c GPIO controller before it can be
++ * initialized.  If a required resource is not available yet, a driver can
++ * request probing to be deferred by returning -EPROBE_DEFER from its probe hook
++ *
++ * Deferred probe maintains two lists of devices, a pending list and an active
++ * list.  A driver returning -EPROBE_DEFER causes the device to be added to the
++ * pending list.  A successful driver probe will trigger moving all devices
++ * from the pending to the active list so that the workqueue will eventually
++ * retry them.
++ *
++ * The deferred_probe_mutex must be held any time the deferred_probe_*_list
++ * of the (struct device*)->deferred_probe pointers are manipulated
++ */
++static DEFINE_MUTEX(deferred_probe_mutex);
++static LIST_HEAD(deferred_probe_pending_list);
++static LIST_HEAD(deferred_probe_active_list);
++static struct workqueue_struct *deferred_wq;
 +
- 	if (!pdata) {
- 		dev_err(&client->dev, "tps6586x requires platform data\n");
- 		return -ENOTSUPP;
-@@ -573,6 +638,7 @@ static struct i2c_driver tps6586x_driver = {
- 	.driver	= {
- 		.name	= "tps6586x",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(tps6586x_of_match),
- 	},
- 	.probe		= tps6586x_i2c_probe,
- 	.remove		= __devexit_p(tps6586x_i2c_remove),
-diff --git a/drivers/regulator/tps6586x-regulator.c b/drivers/regulator/tps6586x-regulator.c
-index 29b615c..f10a735 100644
---- a/drivers/regulator/tps6586x-regulator.c
-+++ b/drivers/regulator/tps6586x-regulator.c
-@@ -396,7 +396,7 @@ static int __devinit tps6586x_regulator_probe(struct platform_device *pdev)
- 		return err;
++/**
++ * deferred_probe_work_func() - Retry probing devices in the active list.
++ */
++static void deferred_probe_work_func(struct work_struct *work)
++{
++	struct device *dev;
++	/*
++	 * This block processes every device in the deferred 'active' list.
++	 * Each device is removed from the active list and passed to
++	 * bus_probe_device() to re-attempt the probe.  The loop continues
++	 * until every device in the active list is removed and retried.
++	 *
++	 * Note: Once the device is removed from the list and the mutex is
++	 * released, it is possible for the device get freed by another thread
++	 * and cause a illegal pointer dereference.  This code uses
++	 * get/put_device() to ensure the device structure cannot disappear
++	 * from under our feet.
++	 */
++	mutex_lock(&deferred_probe_mutex);
++	while (!list_empty(&deferred_probe_active_list)) {
++		dev = list_first_entry(&deferred_probe_active_list,
++					typeof(*dev), deferred_probe);
++		list_del_init(&dev->deferred_probe);
++
++		get_device(dev);
++
++		/* Drop the mutex while probing each device; the probe path
++		 * may manipulate the deferred list */
++		mutex_unlock(&deferred_probe_mutex);
++		dev_dbg(dev, "Retrying from deferred list\n");
++		bus_probe_device(dev);
++		mutex_lock(&deferred_probe_mutex);
++
++		put_device(dev);
++	}
++	mutex_unlock(&deferred_probe_mutex);
++}
++static DECLARE_WORK(deferred_probe_work, deferred_probe_work_func);
++
++static void driver_deferred_probe_add(struct device *dev)
++{
++	mutex_lock(&deferred_probe_mutex);
++	if (list_empty(&dev->deferred_probe)) {
++		dev_dbg(dev, "Added to deferred list\n");
++		list_add(&dev->deferred_probe, &deferred_probe_pending_list);
++	}
++	mutex_unlock(&deferred_probe_mutex);
++}
++
++void driver_deferred_probe_del(struct device *dev)
++{
++	mutex_lock(&deferred_probe_mutex);
++	if (!list_empty(&dev->deferred_probe)) {
++		dev_dbg(dev, "Removed from deferred list\n");
++		list_del_init(&dev->deferred_probe);
++	}
++	mutex_unlock(&deferred_probe_mutex);
++}
++
++static bool driver_deferred_probe_enable = false;
++/**
++ * driver_deferred_probe_trigger() - Kick off re-probing deferred devices
++ *
++ * This functions moves all devices from the pending list to the active
++ * list and schedules the deferred probe workqueue to process them.  It
++ * should be called anytime a driver is successfully bound to a device.
++ */
++static void driver_deferred_probe_trigger(void)
++{
++	if (!driver_deferred_probe_enable)
++		return;
++
++	/* A successful probe means that all the devices in the pending list
++	 * should be triggered to be reprobed.  Move all the deferred devices
++	 * into the active list so they can be retried by the workqueue */
++	mutex_lock(&deferred_probe_mutex);
++	list_splice_tail_init(&deferred_probe_pending_list,
++			      &deferred_probe_active_list);
++	mutex_unlock(&deferred_probe_mutex);
++
++	/* Kick the re-probe thread.  It may already be scheduled, but
++	 * it is safe to kick it again. */
++	queue_work(deferred_wq, &deferred_probe_work);
++}
++
++/**
++ * deferred_probe_initcall() - Enable probing of deferred devices
++ *
++ * We don't want to get in the way when the bulk of drivers are getting probed.
++ * Instead, this initcall makes sure that deferred probing is delayed until
++ * late_initcall time.
++ */
++static int deferred_probe_initcall(void)
++{
++	deferred_wq = create_singlethread_workqueue("deferwq");
++	if (WARN_ON(!deferred_wq))
++		return -ENOMEM;
++
++	driver_deferred_probe_enable = true;
++	driver_deferred_probe_trigger();
++	return 0;
++}
++late_initcall(deferred_probe_initcall);
  
- 	rdev = regulator_register(&ri->desc, &pdev->dev,
--				  pdev->dev.platform_data, ri, NULL);
-+				  pdev->dev.platform_data, ri, pdev->dev.of_node);
- 	if (IS_ERR(rdev)) {
- 		dev_err(&pdev->dev, "failed to register regulator %s\n",
- 				ri->desc.name);
-diff --git a/include/linux/mfd/tps6586x.h b/include/linux/mfd/tps6586x.h
-index b19176e..f350fd0 100644
---- a/include/linux/mfd/tps6586x.h
-+++ b/include/linux/mfd/tps6586x.h
-@@ -68,6 +68,7 @@ struct tps6586x_subdev_info {
- 	int		id;
- 	const char	*name;
- 	void		*platform_data;
-+	struct device_node *of_node;
- };
+ static void driver_bound(struct device *dev)
+ {
+@@ -42,6 +169,11 @@ static void driver_bound(struct device *dev)
  
- struct tps6586x_platform_data {
+ 	klist_add_tail(&dev->p->knode_driver, &dev->driver->p->klist_devices);
+ 
++	/* Make sure the device is no longer in one of the deferred lists
++	 * and kick off retrying all pending devices */
++	driver_deferred_probe_del(dev);
++	driver_deferred_probe_trigger();
++
+ 	if (dev->bus)
+ 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+ 					     BUS_NOTIFY_BOUND_DRIVER, dev);
+@@ -142,7 +274,11 @@ probe_failed:
+ 	driver_sysfs_remove(dev);
+ 	dev->driver = NULL;
+ 
+-	if (ret != -ENODEV && ret != -ENXIO) {
++	if (ret == -EPROBE_DEFER) {
++		/* Driver requested deferred probing */
++		dev_info(dev, "Driver %s requests probe deferral\n", drv->name);
++		driver_deferred_probe_add(dev);
++	} else if (ret != -ENODEV && ret != -ENXIO) {
+ 		/* driver matched but the probe failed */
+ 		printk(KERN_WARNING
+ 		       "%s: probe of %s failed with error %d\n",
+diff --git a/include/linux/device.h b/include/linux/device.h
+index f62e216..22d6938 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -585,6 +585,10 @@ struct device_dma_parameters {
+  * @mutex:	Mutex to synchronize calls to its driver.
+  * @bus:	Type of bus device is on.
+  * @driver:	Which driver has allocated this
++ * @deferred_probe: entry in deferred_probe_list which is used to retry the
++ * 		binding of drivers which were unable to get all the resources
++ * 		needed by the device; typically because it depends on another
++ * 		driver getting probed first.
+  * @platform_data: Platform data specific to the device.
+  * 		Example: For devices on custom boards, as typical of embedded
+  * 		and SOC based hardware, Linux often uses platform_data to point
+@@ -644,6 +648,7 @@ struct device {
+ 	struct bus_type	*bus;		/* type of bus device is on */
+ 	struct device_driver *driver;	/* which driver has allocated this
+ 					   device */
++	struct list_head	deferred_probe;
+ 	void		*platform_data;	/* Platform specific data, device
+ 					   core doesn't touch it */
+ 	struct dev_pm_info	power;
+diff --git a/include/linux/errno.h b/include/linux/errno.h
+index 4668583..2d09bfa 100644
+--- a/include/linux/errno.h
++++ b/include/linux/errno.h
+@@ -16,6 +16,7 @@
+ #define ERESTARTNOHAND	514	/* restart if no handler.. */
+ #define ENOIOCTLCMD	515	/* No ioctl command */
+ #define ERESTART_RESTARTBLOCK 516 /* restart by calling sys_restart_syscall */
++#define EPROBE_DEFER	517	/* Driver requests probe retry */
+ 
+ /* Defined for the NFSv3 protocol */
+ #define EBADHANDLE	521	/* Illegal NFS file handle */
 -- 
 1.7.9.3
