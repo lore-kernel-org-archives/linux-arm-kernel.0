@@ -1,48 +1,66 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu,  8 Mar 2012 15:51:22 +0100
-Subject: [PATCH 02/11] regulator: Support driver probe deferral
+Date: Thu,  8 Mar 2012 15:51:23 +0100
+Subject: [PATCH 03/11] regulator: fixed: Support driver probe deferral
 In-Reply-To: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1331218291-16119-3-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1331218291-16119-4-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@opensource.wolfsonmicro.com>
+If the specified GPIO is not found, return -EPROBE_DEFER. This will
+cause the driver to be probed again later when the required GPIO may
+have become available.
 
-If we fail to locate a requested regulator return -EPROBE_DEFER. If drivers
-pass this error code through to their caller (which they really should)
-then this will ensure that the probe is retried later when further devices
-become available.
-
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-[G,Manjunath Kondaiah removed in order not to bother him]
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-Acked-by: Liam Girdwood <lrg@ti.com>
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 ---
- drivers/regulator/core.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/regulator/fixed.c |   14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 5a6b8ba..8a4b0a8 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1198,7 +1198,7 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
- {
- 	struct regulator_dev *rdev;
- 	struct regulator_map *map;
--	struct regulator *regulator = ERR_PTR(-ENODEV);
-+	struct regulator *regulator = ERR_PTR(-EPROBE_DEFER);
- 	const char *devname = NULL;
+diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
+index 40f3803..35cec44 100644
+--- a/drivers/regulator/fixed.c
++++ b/drivers/regulator/fixed.c
+@@ -58,12 +58,19 @@ of_get_fixed_voltage_config(struct device *dev)
+ 	struct device_node *np = dev->of_node;
+ 	const __be32 *delay;
+ 	struct regulator_init_data *init_data;
++	int gpio;
++
++	gpio = of_get_named_gpio(np, "gpio", 0);
++	if (gpio < 0)
++		return ERR_PTR(-EPROBE_DEFER);
+ 
+ 	config = devm_kzalloc(dev, sizeof(struct fixed_voltage_config),
+ 								 GFP_KERNEL);
+ 	if (!config)
+ 		return NULL;
+ 
++	config->gpio = gpio;
++
+ 	config->init_data = of_get_regulator_init_data(dev, dev->of_node);
+ 	if (!config->init_data)
+ 		return NULL;
+@@ -83,7 +90,6 @@ of_get_fixed_voltage_config(struct device *dev)
+ 	if (init_data->constraints.boot_on)
+ 		config->enabled_at_boot = true;
+ 
+-	config->gpio = of_get_named_gpio(np, "gpio", 0);
+ 	delay = of_get_property(np, "startup-delay-us", NULL);
+ 	if (delay)
+ 		config->startup_delay = be32_to_cpu(*delay);
+@@ -168,9 +174,11 @@ static int __devinit reg_fixed_voltage_probe(struct platform_device *pdev)
+ 	struct fixed_voltage_data *drvdata;
  	int ret;
  
-@@ -2926,7 +2926,7 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
+-	if (pdev->dev.of_node)
++	if (pdev->dev.of_node) {
+ 		config = of_get_fixed_voltage_config(&pdev->dev);
+-	else
++		if (IS_ERR(config))
++			return PTR_ERR(config);
++	} else
+ 		config = pdev->dev.platform_data;
  
- 		if (!r) {
- 			dev_err(dev, "Failed to find supply %s\n", supply);
--			ret = -ENODEV;
-+			ret = -EPROBE_DEFER;
- 			goto scrub;
- 		}
- 
+ 	if (!config)
 -- 
 1.7.9.3
