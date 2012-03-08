@@ -1,119 +1,135 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 08 Mar 2012 03:51:29 -0700
-Subject: [PATCH 04/15] ARM: OMAP4: hwmod data: add GPMC
+Date: Thu, 08 Mar 2012 03:51:25 -0700
+Subject: [PATCH 01/15] ARM: OMAP2+: clockdomains: make {prm,cm}_clkdm common
 In-Reply-To: <20120308104918.14753.69281.stgit@dusk>
 References: <20120308104918.14753.69281.stgit@dusk>
-Message-ID: <20120308105129.14753.577.stgit@dusk>
+Message-ID: <20120308105123.14753.65790.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Beno?t Cousson <b-cousson@ti.com>
+The PRM and CM implicit clockdomains will soon be used by OMAP44xx.
+So, make them common to OMAP2+ and modify the OMAP4 clockdomains code
+so use of these clockdomains doesn't crash the system.
 
-Add the GPMC hwmod and associated interconnect data.   The GPMC is a
-programmable parallel-bus memory controller.
-
-Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   67 ++++++++++++++++++++++++++++
- 1 files changed, 66 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/Makefile                     |    8 +++++--
+ arch/arm/mach-omap2/clockdomain44xx.c            |    6 ++++++
+ arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |   10 ---------
+ arch/arm/mach-omap2/clockdomains44xx_data.c      |    2 ++
+ arch/arm/mach-omap2/clockdomains_common_data.c   |   24 ++++++++++++++++++++++
+ 5 files changed, 37 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clockdomains_common_data.c
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index ae87401..6a7e26e 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -262,7 +262,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
-  *  elm
-  *  emif1
-  *  emif2
-- *  gpmc
-  *  gpu
-  *  mcasp
-  *  mpu_c0
-@@ -1056,6 +1055,53 @@ static struct omap_hwmod omap44xx_gpio6_hwmod = {
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index bd76394..9b2f406 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -117,16 +117,18 @@ obj-$(CONFIG_ARCH_OMAP4)		+= $(powerdomain-common) \
+ 					   powerdomains44xx_data.o
+ 
+ # PRCM clockdomain control
+-obj-$(CONFIG_ARCH_OMAP2)		+= clockdomain.o \
++clockdomain-common			+= clockdomain.o \
++					   clockdomains_common_data.o
++obj-$(CONFIG_ARCH_OMAP2)		+= $(clockdomain-common) \
+ 					   clockdomain2xxx_3xxx.o \
+ 					   clockdomains2xxx_3xxx_data.o
+ obj-$(CONFIG_SOC_OMAP2420)		+= clockdomains2420_data.o
+ obj-$(CONFIG_SOC_OMAP2430)		+= clockdomains2430_data.o
+-obj-$(CONFIG_ARCH_OMAP3)		+= clockdomain.o \
++obj-$(CONFIG_ARCH_OMAP3)		+= $(clockdomain-common) \
+ 					   clockdomain2xxx_3xxx.o \
+ 					   clockdomains2xxx_3xxx_data.o \
+ 					   clockdomains3xxx_data.o
+-obj-$(CONFIG_ARCH_OMAP4)		+= clockdomain.o \
++obj-$(CONFIG_ARCH_OMAP4)		+= $(clockdomain-common) \
+ 					   clockdomain44xx.o \
+ 					   clockdomains44xx_data.o
+ 
+diff --git a/arch/arm/mach-omap2/clockdomain44xx.c b/arch/arm/mach-omap2/clockdomain44xx.c
+index 935c7f0..4f04dd1 100644
+--- a/arch/arm/mach-omap2/clockdomain44xx.c
++++ b/arch/arm/mach-omap2/clockdomain44xx.c
+@@ -51,6 +51,9 @@ static int omap4_clkdm_clear_all_wkup_sleep_deps(struct clockdomain *clkdm)
+ 	struct clkdm_dep *cd;
+ 	u32 mask = 0;
+ 
++	if (!clkdm->prcm_partition)
++		return 0;
++
+ 	for (cd = clkdm->wkdep_srcs; cd && cd->clkdm_name; cd++) {
+ 		if (!cd->clkdm)
+ 			continue; /* only happens if data is erroneous */
+@@ -103,6 +106,9 @@ static int omap4_clkdm_clk_disable(struct clockdomain *clkdm)
+ {
+ 	bool hwsup = false;
+ 
++	if (!clkdm->prcm_partition)
++		return 0;
++
+ 	hwsup = omap4_cminst_is_clkdm_in_hwsup(clkdm->prcm_partition,
+ 					clkdm->cm_inst, clkdm->clkdm_offs);
+ 
+diff --git a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
+index 0a6a048..839145e 100644
+--- a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
++++ b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
+@@ -89,13 +89,3 @@ struct clockdomain wkup_common_clkdm = {
+ 	.pwrdm		= { .name = "wkup_pwrdm" },
+ 	.dep_bit	= OMAP_EN_WKUP_SHIFT,
+ };
+-
+-struct clockdomain prm_common_clkdm = {
+-	.name		= "prm_clkdm",
+-	.pwrdm		= { .name = "wkup_pwrdm" },
+-};
+-
+-struct clockdomain cm_common_clkdm = {
+-	.name		= "cm_clkdm",
+-	.pwrdm		= { .name = "core_pwrdm" },
+-};
+diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
+index 9299ac2..dc42cd6 100644
+--- a/arch/arm/mach-omap2/clockdomains44xx_data.c
++++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+@@ -430,6 +430,8 @@ static struct clockdomain *clockdomains_omap44xx[] __initdata = {
+ 	&l4_wkup_44xx_clkdm,
+ 	&emu_sys_44xx_clkdm,
+ 	&l3_dma_44xx_clkdm,
++	&prm_common_clkdm,
++	&cm_common_clkdm,
+ 	NULL
  };
  
- /*
-+ * 'gpmc' class
-+ * general purpose memory controller
+diff --git a/arch/arm/mach-omap2/clockdomains_common_data.c b/arch/arm/mach-omap2/clockdomains_common_data.c
+new file mode 100644
+index 0000000..615b1f0
+--- /dev/null
++++ b/arch/arm/mach-omap2/clockdomains_common_data.c
+@@ -0,0 +1,24 @@
++/*
++ * OMAP2+-common clockdomain data
++ *
++ * Copyright (C) 2008-2012 Texas Instruments, Inc.
++ * Copyright (C) 2008-2010 Nokia Corporation
++ *
++ * Paul Walmsley, Jouni H?gander
 + */
 +
-+static struct omap_hwmod_class_sysconfig omap44xx_gpmc_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
++#include <linux/kernel.h>
++#include <linux/io.h>
++
++#include "clockdomain.h"
++
++/* These are implicit clockdomains - they are never defined as such in TRM */
++struct clockdomain prm_common_clkdm = {
++	.name		= "prm_clkdm",
++	.pwrdm		= { .name = "wkup_pwrdm" },
 +};
 +
-+static struct omap_hwmod_class omap44xx_gpmc_hwmod_class = {
-+	.name	= "gpmc",
-+	.sysc	= &omap44xx_gpmc_sysc,
++struct clockdomain cm_common_clkdm = {
++	.name		= "cm_clkdm",
++	.pwrdm		= { .name = "core_pwrdm" },
 +};
-+
-+/* gpmc */
-+static struct omap_hwmod_irq_info omap44xx_gpmc_irqs[] = {
-+	{ .irq = 20 + OMAP44XX_IRQ_GIC_START },
-+	{ .irq = -1 }
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_gpmc_sdma_reqs[] = {
-+	{ .dma_req = 3 + OMAP44XX_DMA_REQ_START },
-+	{ .dma_req = -1 }
-+};
-+
-+static struct omap_hwmod omap44xx_gpmc_hwmod = {
-+	.name		= "gpmc",
-+	.class		= &omap44xx_gpmc_hwmod_class,
-+	.clkdm_name	= "l3_2_clkdm",
-+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
-+	.mpu_irqs	= omap44xx_gpmc_irqs,
-+	.sdma_reqs	= omap44xx_gpmc_sdma_reqs,
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP4_CM_L3_2_GPMC_CLKCTRL_OFFSET,
-+			.context_offs = OMAP4_RM_L3_2_GPMC_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'hdq1w' class
-  * hdq / 1-wire serial interface controller
-  */
-@@ -3712,6 +3758,24 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__gpio6 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+static struct omap_hwmod_addr_space omap44xx_gpmc_addrs[] = {
-+	{
-+		.pa_start	= 0x50000000,
-+		.pa_end		= 0x500003ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+	{ }
-+};
-+
-+/* l3_main_2 -> gpmc */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__gpmc = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_gpmc_hwmod,
-+	.clk		= "l3_div_ck",
-+	.addr		= omap44xx_gpmc_addrs,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- static struct omap_hwmod_addr_space omap44xx_hdq1w_addrs[] = {
- 	{
- 		.pa_start	= 0x480b2000,
-@@ -4828,6 +4892,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap44xx_l4_per__gpio4,
- 	&omap44xx_l4_per__gpio5,
- 	&omap44xx_l4_per__gpio6,
-+	&omap44xx_l3_main_2__gpmc,
- 	&omap44xx_l4_per__hdq1w,
- 	&omap44xx_l4_cfg__hsi,
- 	&omap44xx_l4_per__i2c1,
