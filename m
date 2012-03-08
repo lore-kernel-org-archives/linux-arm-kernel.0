@@ -1,87 +1,133 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Thu, 08 Mar 2012 20:47:13 +0200
-Subject: [PATCH 0/2] ARM: OMAP2+: PM: code consolidation for 3.4
-In-Reply-To: <87sjhjaqyi.fsf@ti.com>
-References: <20120202093600.12509.35052.stgit@dusk> <87ty39cc7s.fsf@ti.com>
- <alpine.DEB.2.00.1202021140060.586@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021328450.586@utopia.booyaka.com>
- <CAKd1q9rq67gUyXn+rOL348YwaYQiqHR8UQCSd68fpxhZHHsYGA@mail.gmail.com>
- <87sjhjaqyi.fsf@ti.com>
-Message-ID: <1331232433.18015.69.camel@cumari>
+From: Richard.Earnshaw@arm.com (Richard Earnshaw)
+Date: Thu, 8 Mar 2012 18:47:28 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <alpine.LFD.2.02.1203081041340.24151@xanadu.home>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1330360043.8557.302.camel@zakaz.uk.xensource.com>
+ <20120227180355.GB2023@linaro.org>
+ <1330371219.10008.34.camel@dagon.hellion.org.uk>
+ <20120228102040.GB2063@linaro.org>
+ <1330426133.31269.70.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+ <20120229093436.GA2077@linaro.org>
+ <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+ <20120229125826.GC2077@linaro.org>
+ <alpine.LFD.2.02.1203021528150.31242@xanadu.home> <4F5882BF.1030104@arm.com>
+ <alpine.LFD.2.02.1203081041340.24151@xanadu.home>
+Message-ID: <4F58FEC0.8080706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-03-08 at 10:27 -0800, Kevin Hilman wrote: 
-> Hi Luca,
+On 08/03/12 17:21, Nicolas Pitre wrote:
+> On Thu, 8 Mar 2012, Richard Earnshaw wrote:
+>
+>> On 02/03/12 21:15, Nicolas Pitre wrote:
+>>> So, to me, the gcc documentation is perfectly clear on this topic.
+>>> there really _is_ a guarantee that those asm marked variables will be in
+>>> the expected registers on entry to the inline asm, given that the
+>>> variable is _also_ listed as an operand to the asm statement.  But only
+>>> in that case.
+>>>
+>>> It is true that gcc may reorder other function calls or other code
+>>> around the inline asm and then intervening code can clobber any
+>>> registers.  Then it is up to gcc to preserve the variable's content
+>>> elsewhere when its register is used for other purposes, and restore it
+>>> when some inline asm statement is referring to it.
+>>>
+>>> And if gcc does not do this then it is buggy.  Version 3.4.0 of gcc was
+>>> buggy.  No other gcc versions in the last 7 years had such a problem or
+>>> the __asmeq macro in the kernel would have told us.
+>>>
+>>>> Or, to summarise another way, there is no way to control which register
+>>>> is used to pass something to an inline asm in general (often we get away
+>>>> with this, and there are a lot of inline asms in the kernel that assume
+>>>> it works, but the more you inline the more likely you are to get nasty
+>>>> surprises).
+>>>
+>>> This statement is therefore unfounded and wrong.  Please direct the
+>>> tools guy who mislead you to the above gcc documentation.
+>>>
+>>
+>> The problem is not really about re-ordering functions but about implicit
+>> functions that come from the source code; for example
+>>
+>> int foo (int a, int b)
+>> {
+>>   register int x __asm__("r0") = 33;
+>>
+>>   register int c __asm__("r1") = a / b; /* Ooops, clobbers r0 with
+>> division function call.  */
+>>
+>>   asm ("svc 0" : : "r" (x));
+>> }
+>>
+>> There's nothing in the specification to say what happens if there's a
+>> statement in the code that causes an implicit clobber of your assembly
+>> register.
+>
+> I'm sure gcc is full of implicit behaviors that are not mentioned in
+> the specification.  But as long as the specification is respected, then
+> there is no need to mention any unobservable side effects from a program
+> flow point of view, right?
+>
+> Why wouldn't gcc be able to respect the documented feature by
+> preventing live variable from being clobbered and reloading them in
+> the specified register at the inline asm entry point, just like it does
+> for function calls?
+>
+> Here's an example code that shows that, unfortunately, gcc is still
+> broken with regards to the documented behavior:
+>
+> extern int bar(int);
+> int foo(int y)
+> {
+>         register int x __asm__("r1") = 33;
+>         y += bar(x);
+>         asm ("@ x should be live in %0 here" : "+r" (x) : "r" (y));
+>         y += bar(x);
+>         asm ("@ x should be live in %0 here" : "+r" (x) : "r" (y));
+>         return x;
+> }
+>
+> Result is:
+>
+> foo:
+>         stmfd   sp!, {r4, lr}
+>         mov     r4, r0
+>         mov     r0, #33
+>         bl      bar
+>         add     r4, r0, r4
+>         @ x should be live in r1 here
+>         mov     r0, r1
+>         bl      bar
+>         add     r0, r0, r4
+>         @ x should be live in r1 here
+>         mov     r0, r1
+>         ldmfd   sp!, {r4, lr}
+>         bx      lr
+>
+> To me this is clearly a bug if gcc is not able to meet the documented
+> expectation.  And the documented expectation is not at all unreasonable.
+>
+No, in this case it is presumed that /you/ know that calling bar() will
+modify x.  Thus the code is either well defined (if you know what is in
+r1 after each call to bar), or undefined (if you can't say anything
+about r1 after each call).
 
-Hey Kevin,
+As I said, the problem really comes from compiler generated calls which
+are not mentioned explicitly in the source code.
 
-Thanks for your reply! :)
-
-
-> "Coelho, Luciano" <coelho@ti.com> writes:
-> 
-> [...]
-> 
-> > I can't get ttyO2 wakeup to work on my Blaze with 3.3-rc5.  It works
-> > fine with 3.2.  
-> 
-> I assume you mean wakeup from system-wide suspend (echo mem > /sys/power/state)?
-
-Yes, that's what I meant.
-
-> Are you enabling UART wakeups?
-> 
-> They are disabled by default, so you need to:
-> 
-> echo enabled > /sys/devices/platform/omap/omap_uart.2/tty/ttyO2/power/wakeup
-
-No, I was actually not enabling the UART wakeups.  But I tried it now
-but it still doesn't work. :(
+R.
 
 
-> It may work in v3.2 due to the fact that the UART runtime PM had the
-> unintended side-effect of essentially disabling MPU and CORE PM.  With
-> that bug fixed and MPU & CORE actually hitting low power states, you'll
-> need to ensure UART wakeups are enabled.
-> 
-> If you're already enabling wakeups and this still isn't working, try
-> adding 'no_console_suspend' to the kernel cmdline, try a suspend/resume
-> and post the console output.
+--
+Richard Earnshaw             Email: Richard.Earnshaw at arm.com
+Engineering Manager          Phone: +44 1223 400569 (Direct + VoiceMail)
+OpenSource Tools             Switchboard: +44 1223 400400
+ARM Ltd                      Fax: +44 1223 400410
+110 Fulbourn Rd              Web: http://www.arm.com/
+Cambridge, UK. CB1 9NJ
 
-I have no_console_suspend in bootargs.  Without it, it didn't work with
-3.2 either.
-
-This is what I get when I suspend with "echo mem > /sys/power/state": 
-
-[  128.534271] PM: Syncing filesystems ... done.                                                                        
-[  129.948364] PM: Preparing system for mem sleep                                                                       
-[  129.957061] Freezing user space processes ...                                                                        
-[  129.961761] BUG: sleeping function called from invalid context at include/linux/freezer.h:46                         
-[  129.969177] in_atomic(): 0, irqs_disabled(): 128, pid: 770, name: udevd                                              
-[  129.977813] INFO: lockdep is turned off.                                                                             
-[  129.977813] irq event stamp: 0                                                                                       
-[  129.985168] hardirqs last  enabled at (0): [<  (null)>]   (null)                                                     
-[  129.991485] hardirqs last disabled at (0): [<c004233c>] copy_process+0x3ec/0x1050                                    
-[  129.996520] softirqs last  enabled at (0): [<c004233c>] copy_process+0x3ec/0x1050                                    
-[  130.005218] softirqs last disabled at (0): [<  (null)>]   (null)                                                     
-[  130.011291] [<c001e204>] (unwind_backtrace+0x0/0x148) from [<c0502fdc>] (dump_stack+0x20/0x24)                       
-[  130.018829] [<c0502fdc>] (dump_stack+0x20/0x24) from [<c00779d0>] (__might_sleep+0x130/0x134)                        
-[  130.030670] [<c00779d0>] (__might_sleep+0x130/0x134) from [<c0018998>] (do_signal+0x54/0x600)                        
-[  130.031738] [<c0018998>] (do_signal+0x54/0x600) from [<c0018fa4>] (do_notify_resume+0x60/0x6c)                       
-[  130.049804] [<c0018fa4>] (do_notify_resume+0x60/0x6c) from [<c00154e4>] (work_pending+0x24/0x28)                     
-[  130.067138] (elapsed 0.10 seconds) done.                                                                             
-[  130.070648] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) done.                                      
-[  130.101165] PM: Entering mem sleep                                                                                   
-[  130.120056] PM: suspend of devices complete after 9.646 msecs                                                        
-[  130.127716] PM: late suspend of devices complete after 7.662 msecs                                                   
-[  130.134246] Disabling non-boot CPUs ...                                                                              
-[  130.139953] CPU1: shutdown  
-
-The "sleeping function" BUG is that known bug I already complained about
-some time ago.  I get it all the time and, in general, it doesn't really
-hurt (I guess I'm lucky most of the times not to hit a race-condition).
-
--- 
-Cheers,
-Luca.
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
