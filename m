@@ -1,18 +1,52 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Mar 2012 12:50:21 -0700
-Subject: [PATCH 08/11] ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
-In-Reply-To: <1331218291-16119-9-git-send-email-thierry.reding@avionic-design.de>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-9-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <4F590D7D.70308@wwwdotorg.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 8 Mar 2012 21:04:48 +0100
+Subject: [PATCH v2 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+In-Reply-To: <1331130825-14947-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1331130825-14947-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120308200448.GR3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2012 07:51 AM, Thierry Reding wrote:
-> The PMC code already accesses the PMC registers so it makes sense to
-> move this function there as well. While at it, rename the function to
-> tegra_pmc_pcie_xclk_clamp() for consistency.
+On Wed, Mar 07, 2012 at 03:33:32PM +0100, Javier Martin wrote:
+> The following series have to be applied on top of the following patches:
+> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+> is deprecated and no new patches are accepted for it.
+> 
+> This series merges this code into the imx-dma.c dmaengine driver.
+> 
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+I can't find a branch to apply this on. Could you provide a git tree?
+
+If you have to repost this series please consider using -M with git
+format-patch.
+
+Sascha
+
+> Changes since v1:
+>  - Merge patch 14 with 01.
+>  - Add a proper changelog to each patch of the series.
+> 
+> [PATCH v2 01/13] dmaengine: imx-dma: merge old dma-v1.c with imx-dma.c
+> [PATCH v2 02/13] dmaengine: imx-dma: remove data member from internal structure.
+> [PATCH v2 03/13] dmaengine: imx-dma: remove dma_mode member of internal structure.
+> [PATCH v2 04/13] dmaengine: imx-dma: remove 'imxdma_setup_mem2mem_hw' function.
+> [PATCH v2 05/13] dmaengine: imx-dma: remove 'imxdma_config_channel_hw' function.
+> [PATCH v2 06/13] dmaengine: imx-dma: remove 'imxdma_setup_sg_hw' function.
+> [PATCH v2 07/13] dmaengine: imx-dma: remove sg member from internal structure.
+> [PATCH v2 08/13] dmaengine: imx-dma: remove 'in_use' field of 'internal' structure.
+> [PATCH v2 09/13] dmaengine: imx-dma: remove 'resbytes' field of 'internal' structure.
+> [PATCH v2 10/13] dmaengine: imx-dma: remove internal structure.
+> [PATCH v2 11/13] dmaengine: imx-dma: remove unused arg of imxdma_sg_next.
+> [PATCH v2 12/13] dmaengine: imx-dma: remove 'imx_dmav1_baseaddr' and 'dma_clk'.
+> [PATCH v2 13/13] dmaengine: imx-dma: use 'dev_dbg' and 'dev_warn' for messages.
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
