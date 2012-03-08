@@ -1,39 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Mar 2012 12:46:07 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix compile error when FB_OMAP2 is not set
-In-Reply-To: <20120308204328.GW12083@atomide.com>
-References: <20120308204328.GW12083@atomide.com>
-Message-ID: <20120308204607.GX12083@atomide.com>
+From: timur@freescale.com (Timur Tabi)
+Date: Thu, 8 Mar 2012 14:50:21 -0600
+Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
+ codec-handle
+In-Reply-To: <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
+References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
+ <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4F591B8D.8090705@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [120308 12:11]:
-> Otherwise we will get:
-> 
-> arch/arm/plat-omap/fb.c:101: error: expected ?)? before ?*? token
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> ---
-> 
-> Tomi, you need something like this for what you have in for-next.
-> 
-> --- a/arch/arm/plat-omap/fb.c
-> +++ b/arch/arm/plat-omap/fb.c
-> @@ -98,6 +98,8 @@ arch_initcall(omap_init_fb);
->  
->  #else
->  
-> -void __init omapfb_set_lcd_config(omap_lcd_config *config) { }
-> +void __init omapfb_set_lcd_config(const struct omap_lcd_config *config)
-> +{
-> +}
->  
->  #endif
+Shawn Guo wrote:
+> As Documentation/devicetree/bindings/powerpc/fsl/ssi.txt documented,
+> codec-handle is an optional property, so missing it should not be a
+> fatal error.]
 
-Also now seeing the following with what you have in for-next:
+It's optional in the sense that if your SSI is not connected to anything,
+then you don't need to specify the codec handle.  If the SSI is connected
+to a codec, then the SSI node needs to point to it.
 
-drivers/video/omap2/displays/panel-taal.c: In function ?taal_num_errors_show?:
-drivers/video/omap2/displays/panel-taal.c:605: warning: ?errors? may be used uninitialized in this function
+> More importantly, the imx machine drivers to be added working with
+> fsl_ssi will not have this property, as they use new ASoC machine
+> driver binding mechanism.
 
-Tony
+I want to see that binding documented in Documentation/devicetree/bindings
+first.
+
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
