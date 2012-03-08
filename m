@@ -1,32 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Mar 2012 16:03:12 +0000
-Subject: [PATCH 0/3] introduce stmp-style devices
-In-Reply-To: <1331159314-12022-1-git-send-email-w.sang@pengutronix.de>
-References: <1331159314-12022-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <201203081603.12817.arnd@arndb.de>
+Date: Thu, 8 Mar 2012 16:10:21 +0000
+Subject: [GIT PULL v4] ARM: kirkwood: fdt conversion progress
+In-Reply-To: <20120307221012.GH5050@titan.lakedaemon.net>
+References: <20120307221012.GH5050@titan.lakedaemon.net>
+Message-ID: <201203081610.21493.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 March 2012, Wolfram Sang wrote:
+On Wednesday 07 March 2012, Jason Cooper wrote:
+> The following changes since commit d65b4e98d7ea3038b767b70fe8be959b2913f16d:
 > 
-> This series makes support for a certain type of devices mach independant. We
-> want that because such devices (having a special register layout) have been
-> found in mach-mxs and mach-mx6 meanwhile. Please refer to patch 1/3 for a more
-> detailed description.
+>   Linux 3.3-rc3 (2012-02-08 19:21:53 -0800)
 > 
-> Patch 1/3 adds the basic support and is of main interest to get upstream.
-> Patches 2/3 and 3/3 are usage examples and will be send to the relevant
-> subsystems once the basic support is accepted.
+> are available in the git repository at:
+>   git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt
 > 
-> Main changes since the RFC:
+> ---
+> Arnd,
 > 
-> * renamed the macros to STMP_OFFSET_*
-> * rebased to 3.3-rc6
+> My first two should match up with what you have already, the only
+> outlier is that Jean-Christophe's patch is needed, but I don't think
+> everyone agrees on it yet.
 > 
-> Tested with a TX28 board.
 
-I think having the stmp_device code is good, but I'm not sure about the
-location in drivers/base, which is otherwise reserved for anything related
-to 'struct device'. How about putting the same file into lib/stmpregs.c?
+Right now, Olof is handling the pull requests. I would suggest that he
+can use your branch to replace the current staging branch but still keep
+it in staging until everyone agrees or you replace it with a better version.
 
 	Arnd
