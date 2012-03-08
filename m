@@ -1,41 +1,96 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu,  8 Mar 2012 11:22:14 +0200
-Subject: [PATCH v2 0/3] ARM/ASoC: OMAP McBSP: Correct CLKR/FSR source selection
-Message-ID: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu,  8 Mar 2012 11:22:15 +0200
+Subject: [PATCH v2 1/3] ARM: OMAP2+: McBSP: Correct CLKR/FSR clock source mux
+ configuration
+In-Reply-To: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1331198537-13469-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1331198537-13469-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On OMAP2/3 McBSP1 port has 6 pin setup, while on OMAP4 the port is McBSP4.
+Implement the CLKR/FSR clock mux selection for OMAP4, and make sure that
+we add the correct callback for the correct port across supported OMAP
+versions.
 
-Changes since v1:
-- Adapted to the moved mcbsp code which helped to reduce the number of patches
-  from 5 to 3.
-- Clock selection related defines moved from arch to ASoC header.
-
-No change in functionality otherwise.
-
-This series fixes the CLKR/FSR mux selection (on McBSP ports with 6 pin setup).
-OMAP2/3 has 6 pin setup on McBSP1 port while OMAP4 has the 6 pin setup on McBSP4
-port.
-Add support for OMAP4 CLKR/FSR source selection, and simplify the ASoC part of
-CLK mux configuration.
-
-This series should go via ASoC with the rest of McBSP changes.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 ---
-Peter Ujfalusi (3):
-  ARM: OMAP2+: McBSP: Correct CLKR/FSR clock source mux configuration
-  ARM/ASoC: OMAP McBSP: Move remainig defines from arch to ASoC header
-  ASoC: omap-mcbsp: Single function CLKR/FSR source mux configuration
+ arch/arm/mach-omap2/mcbsp.c |   46 +++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 44 insertions(+), 2 deletions(-)
 
- arch/arm/mach-omap2/mcbsp.c             |   46 ++++++++++++++++++++++++++++-
- arch/arm/plat-omap/include/plat/mcbsp.h |   12 --------
- sound/soc/omap/mcbsp.c                  |   48 ++++++++++++++----------------
- sound/soc/omap/mcbsp.h                  |   13 +++++++-
- sound/soc/omap/omap-mcbsp.c             |    8 ++--
- 5 files changed, 81 insertions(+), 46 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+index 49ff5b8..ecc039e 100644
+--- a/arch/arm/mach-omap2/mcbsp.c
++++ b/arch/arm/mach-omap2/mcbsp.c
+@@ -34,7 +34,7 @@
+ #include "cm2xxx_3xxx.h"
+ #include "cm-regbits-34xx.h"
+ 
+-/* McBSP internal signal muxing function */
++/* McBSP1 internal signal muxing function for OMAP2/3 */
+ static int omap2_mcbsp1_mux_rx_clk(struct device *dev, const char *signal,
+ 				   const char *src)
+ {
+@@ -65,6 +65,42 @@ static int omap2_mcbsp1_mux_rx_clk(struct device *dev, const char *signal,
+ 	return 0;
+ }
+ 
++/* McBSP4 internal signal muxing function for OMAP4 */
++#define OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_FSX	(1 << 31)
++#define OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_CLKX	(1 << 30)
++static int omap4_mcbsp4_mux_rx_clk(struct device *dev, const char *signal,
++				   const char *src)
++{
++	u32 v;
++
++	/*
++	 * In CONTROL_MCBSPLP register only bit 30 (CLKR mux), and bit 31 (FSR
++	 * mux) is used */
++	v = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MCBSPLP);
++
++	if (!strcmp(signal, "clkr")) {
++		if (!strcmp(src, "clkr"))
++			v &= ~OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_CLKX;
++		else if (!strcmp(src, "clkx"))
++			v |= OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_CLKX;
++		else
++			return -EINVAL;
++	} else if (!strcmp(signal, "fsr")) {
++		if (!strcmp(src, "fsr"))
++			v &= ~OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_FSX;
++		else if (!strcmp(src, "fsx"))
++			v |= OMAP4_CONTROL_MCBSPLP_ALBCTRLRX_FSX;
++		else
++			return -EINVAL;
++	} else {
++		return -EINVAL;
++	}
++
++	omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MCBSPLP);
++
++	return 0;
++}
++
+ /* McBSP CLKS source switching function */
+ static int omap2_mcbsp_set_clk_src(struct device *dev, struct clk *clk,
+ 				   const char *src)
+@@ -146,9 +182,15 @@ static int omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+ 		pdata->has_ccr = true;
+ 	}
+ 	pdata->set_clk_src = omap2_mcbsp_set_clk_src;
+-	if (id == 1)
++
++	/* On OMAP2/3 the McBSP1 port has 6 pin configuration */
++	if (id == 1 && oh->class->rev < MCBSP_CONFIG_TYPE4)
+ 		pdata->mux_signal = omap2_mcbsp1_mux_rx_clk;
+ 
++	/* On OMAP4 the McBSP4 port has 6 pin configuration */
++	if (id == 4 && oh->class->rev == MCBSP_CONFIG_TYPE4)
++		pdata->mux_signal = omap4_mcbsp4_mux_rx_clk;
++
+ 	if (oh->class->rev == MCBSP_CONFIG_TYPE3) {
+ 		if (id == 2)
+ 			/* The FIFO has 1024 + 256 locations */
 -- 
 1.7.8.5
