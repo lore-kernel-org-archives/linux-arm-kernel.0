@@ -1,41 +1,51 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Thu, 8 Mar 2012 14:05:02 -0600
-Subject: [PATCH v3 00/11] ASoC: add imx-sgtl5000 machine driver working
- with fsl_ssi
-In-Reply-To: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F5910EE.8090408@freescale.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 08 Mar 2012 13:09:04 -0700
+Subject: [PATCH 09/11] ARM: tegra: Rewrite PCIe support as a driver
+In-Reply-To: <1331218291-16119-10-git-send-email-thierry.reding@avionic-design.de>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-10-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <4F5911E0.6060802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> I did not pick up you Ack-by tag, because there are some changes since
-> v2 you will need to take another look and have the testing, I guess.
+On 03/08/2012 07:51 AM, Thierry Reding wrote:
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 
-Unfortunately, although it works on the MPC8610, it's broken on the P1022:
+Patch description?
 
-# speaker-test -t sine -c 2 -r 44100
+> diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
+...
+> -static int __init harmony_pcie_init(void)
+> +static int tegra_pcie_init(struct platform_device *pdev)
 
+That name should probably still be called harmony_something() since it's
+still board-specific.
 
-speaker-test 1.0.11rc2
+I wonder how having a per-board callback will integrate with device
+tree. I guess I'll find out when I review patch 11:-)
 
+> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
 
-Playback device is default
-Stream parameters are 44100Hz, S16_BE, 2 channels
-Sine wave rate is 440.0000Hz
-Rate set to 44100Hz (requested 44100Hz)
-Buffer size range from 256 to 32768
-Period size range from 128 to 16384
-Periods = 4
-Buffer time size 575
-To choose buffer_size = 32768
-To choose period_size = 8192
-was set period_size = 8192
-was set buffer_size = 32768
+> +static int __init trimslice_pci_init(void)
+>  {
+>  	if (!machine_is_trimslice())
+>  		return 0;
 
-At this point, nothing else happens, there's no audio, and even Ctrl-C
-doesn't work.
+You can remove that test now.
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+> diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+
+> +#define TEGRA_PCIE_MAX_PORTS 2
+> +
+> +struct tegra_pcie_pdata {
+> +	int (*init)(struct platform_device *pdev);
+> +	int (*exit)(struct platform_device *pdev);
+> +	bool enable_ports[TEGRA_PCIE_MAX_PORTS];
+> +};
+
+That's a somewhat odd place to put the header; a dedicated
+mach-tegra/include/mach/tegra_pcie_pdata.h or
+include/linux/platform_data/tegra_pcie.h might make more sense.
+
+Aside from those pretty minor issues, this all looks great. Thanks for
+fixing our driver!
