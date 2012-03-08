@@ -1,66 +1,89 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 8 Mar 2012 12:23:01 -0800
-Subject: [GIT PULL] arm-soc: last minute fixes for 3.3
-Message-ID: <CAOesGMg0RD1KtejF0LpqO4GUdzMtPxvpbkgONOvhGQVDSH0xsQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 08 Mar 2012 14:36:05 -0600
+Subject: [PATCH 5/5 v3] ARM: at91: sam9x5 add i2c DT support
+In-Reply-To: <20120308175204.GJ27213@game.jcrosoft.org>
+References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
+ <1331196635-27203-5-git-send-email-plagnioj@jcrosoft.com>
+ <4F58E87D.9040701@gmail.com> <20120308175204.GJ27213@game.jcrosoft.org>
+Message-ID: <4F591835.5040702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 03/08/2012 11:52 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 11:12 Thu 08 Mar     , Rob Herring wrote:
+>> On 03/08/2012 02:50 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> For now on use i2c-gpio driver on the same pin as the hardware IP.
+>>>
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>> ---
+>>> v3:
+>>>
+>>> 	update i2c binding (Rob comments)
+>>>
+>>> Best Regards,
+>>> J.
+>>>  arch/arm/boot/dts/at91sam9x5.dtsi |   39 +++++++++++++++++++++++++++++++++++++
+>>>  1 files changed, 39 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> index c294657..fdd1ac6 100644
+>>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>>> @@ -188,4 +188,43 @@
+>>>  			status = "disabled";
+>>>  		};
+>>>  	};
+>>> +
+>>> +	i2c-gpio at 0 {
+>>> +		compatible = "i2c-gpio";
+>>> +		gpios = <&pioA 30 0 /* sda */
+>>> +			 &pioA 31 0 /* scl */
+>>> +			>;
+>>> +		i2c-gpio,sda-open-drain;
+>>> +		i2c-gpio,scl-open-drain;
+>>> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +		status = "disabled";
+>>> +	};
+>>> +
+>>> +	i2c-gpio at 1 {
+>>> +		compatible = "i2c-gpio";
+>>> +		gpios = <&pioC 0 0 /* sda */
+>>> +			 &pioC 1 0 /* scl */
+>>> +			>;
+>>> +		i2c-gpio,sda-open-drain;
+>>> +		i2c-gpio,scl-open-drain;
+>>> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +		status = "disabled";
+>>> +	};
+>>> +
+>>> +	i2c-gpio at 2 {
+>>> +		compatible = "i2c-gpio";
+>>> +		gpios = <&pioB 4 0 /* sda */
+>>> +			 &pioB 5 0 /* scl */
+>>> +			>;
+>>> +		i2c-gpio,sda-open-drain;
+>>> +		i2c-gpio,scl-open-drain;
+>>> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +		status = "disabled";
+>>> +	};
+>>
+>> If these are just any random gpio lines, it seems strange to define
+>> these in a SOC dtsi and then disable them.
+> they are not, they are the same pin as the i2c hardware IP.
+> 
+> Today the hw driver is not ready or will not work correctly (IP issue)
+> 
+> On hardware design we use the I2C pin but can not use the hw driver
+> 
 
-Here are a few last-minute arm-soc fixes for 3.3.
+Okay. Then other than the i2c-gpio node name, ack for all of these.
 
-
-Thanks!
-
--Olof
-
-The following changes since commit 4f262acfde22b63498b5e4f165e53d3bb4e96400:
-
-  Merge branch 'fixes' of git://git.linaro.org/people/rmk/linux-arm
-(2012-03-07 08:33:03 -0800)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/fixes-urgent
-
-for you to fetch changes up to c66fcfa938d84d4661c77e9fe85312dece0133e8:
-
-  Merge branch 'fixes' of
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into
-fixes (2012-03-08 10:56:12 -0800)
-
-----------------------------------------------------------------
-
-Last minute fixes for 3.3
-
-One samsung build fix due to a mis-applied patch, and a small set of OMAP fixes.
-This should be the last from arm-soc for 3.3, hopefully.
-
-----------------------------------------------------------------
-Cousson, Benoit (1):
-      ARM: OMAP: irqs: Fix NR_IRQS value to handle PRCM interrupts
-
-Kukjin Kim (1):
-      ARM: S3C2440: Fixed build error for s3c244x
-
-Olof Johansson (1):
-      Merge branch 'fixes' of
-git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-R Sricharan (1):
-      ARM: OMAP2+: Fix module build errors with CONFIG_OMAP4_ERRATA_I688
-
-Rajendra Nayak (1):
-      ARM: OMAP2+: Remove apply_uV constraints for fixed regulator
-
-Vaibhav Hiremath (1):
-      ARM: OMAP: id: Add missing break statement in omap3xxx_check_revision
-
- arch/arm/mach-omap2/id.c               |    1 +
- arch/arm/mach-omap2/omap4-common.c     |    2 ++
- arch/arm/mach-omap2/twl-common.c       |    1 -
- arch/arm/mach-s3c2440/s3c244x.c        |    1 +
- arch/arm/plat-omap/include/plat/irqs.h |   10 +++++++++-
- 5 files changed, 13 insertions(+), 2 deletions(-)
+Rob
