@@ -1,29 +1,45 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 8 Mar 2012 20:26:11 +0100 (CET)
-Subject: Regression in 3.2.9 for omap-serial (at least)
-In-Reply-To: <CAGGh5h3-1XhMO1-jiBdUJYgh4unRcPonvp=zcXLKMJBfS+qpuQ@mail.gmail.com>
-References: <lyk42vxsz2.fsf@ensc-virt.intern.sigma-chemnitz.de>
- <alpine.LFD.2.02.1203081246130.2742@ionos>
- <CAGGh5h3-1XhMO1-jiBdUJYgh4unRcPonvp=zcXLKMJBfS+qpuQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1203082024450.2742@ionos>
+Date: Thu, 8 Mar 2012 20:27:11 +0100 (CET)
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
+In-Reply-To: <201203081701.01663.arnd@arndb.de>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <201203072113.04369.arnd@arndb.de>
+ <20120308162530.GI5050@titan.lakedaemon.net>
+ <201203081701.01663.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.02.1203082026470.2742@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Mar 2012, jean-philippe francois wrote:
+On Thu, 8 Mar 2012, Arnd Bergmann wrote:
 
-> Le 8 mars 2012 12:46, Thomas Gleixner <tglx@linutronix.de> a ?crit :
-> > On Thu, 8 Mar 2012, Enrico Scholz wrote:
-> >> Hi,
-> >>
-> >> the commit "genirq: Unmask oneshot irqs when thread was not woken"[1]
-> >> breaks at least the omap-serial driver which requests a shared interrupt
-> >
-> > Fixed with 52abb700e16a9a
+> On Thursday 08 March 2012, Jason wrote:
+> > 
+> > On Wed, Mar 07, 2012 at 09:13:04PM +0000, Arnd Bergmann wrote:
+> > > Finally, something could be wrong with the interrupt controller.
+> > > AFAICT, you register it through the device tree now, but it's also
+> > > getting initialized through kirkwood_init_irq, so the numbers
+> > > would all be wrong.
+> > 
+> > Yes, I'm working through this now.  mv_cesa silently fails to come up
+> > if it can't find the interrupt controller via fdt.  So, it needs to get
+> > done.
+> > 
+> > Right now, I'm looking at how mach-versatile does it (vic_init()) since
+> > it's also an ARM926ej-s...
+> > 
 > 
-> How can I find it ?
-> I tried searching in various tree on git.kernel.org,
-> but could not find the fix.
+> Ok, sounds good. It's not important whether it's an ARM9 or not btw.
+> You should look at both anything that defines an "interrupt-controller"
+> property as an example including Documentation/devicetree/bindings/arm/vic.txt
+> and Documentation/devicetree/bindings/arm/gic.txt.
+> 
+> (taking Thomas Gleixner on Cc)
+> 
+> Since the orion irq chip is based on irqchip_generic, it would be
+> perfect to have a generic irqchip binding to go along with
+> kernel/irq/generic-chip.c. Not sure if anyone has thought about this
+> before, but it looks like we can completely avoid using
+> arch/arm/plat-orion/irq.c and arch/arm/mach-kirkwood/irq.c if we
+> do that.
 
-It's in Linus tree.
-
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=52abb700e16a9aa4cbc03f3d7f80206cbbc80680
+Right. That should be trivial to implement.
