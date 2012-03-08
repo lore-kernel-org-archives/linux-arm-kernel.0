@@ -1,42 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Mar 2012 21:53:38 -0800
-Subject: [PATCH v2 04/11] ARM: EXYNOS: add interrupt definitions for
- EXYNOS5250
-In-Reply-To: <4F575EC8.2090205@samsung.com>
-References: <1328981685-8602-1-git-send-email-kgene.kim@samsung.com>
- <1328981685-8602-5-git-send-email-kgene.kim@samsung.com>
- <CAOesGMhmcnt6LPb9O+3420VgG=PiCnOjzZA3JqsA=4OdHN-R-g@mail.gmail.com>
- <00a901ccf084$90460900$b0d21b00$%kim@samsung.com>
- <CAOesGMgedngJKRVCYwK=+xRnchXj4StGLTVqvv9BMqVhtM=5RA@mail.gmail.com>
- <4F575EC8.2090205@samsung.com>
-Message-ID: <CAOesGMgbm0+3nSnw=MTM--5kzUNMEofNQRudRUNzF_LCLCKX5A@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 8 Mar 2012 16:55:39 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2 tree
+Message-ID: <20120308165539.8a3b718be677de97a8767cd5@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On Wed, Mar 7, 2012 at 5:12 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-omap1/board-nokia770.c between commit 58e0d6ab02eb ("OMAP:
+N770: remove HWA742 platform data") from the omap_dss2 tree and commit
+2e3ee9f45b3c ("ARM: OMAP1: Move most of plat/io.h into local iomap.h")
+from the arm-soc tree.
 
-> Thanks for your kindly reminder but I couldn't finish it yet because it is
-> required to touch most of samsung stuff, and it's a big change. Frankly, I
-> need more time...
->
-> So how about sending current exynos5 stuff for now and then sorting out
-> single kernel for exynos4 and exynos5 next time? Actually, this exynos5 arch
-> part is _really_ needed for developing/contribution of drivers on exynos5.
+I fixed it up (see below) and can carry the fix as necessary.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-I suggest that you work on the code until it's in shape to go in. If
-we pick it up half-finished it just causes extra churn.
-
-We have been pushing back on v6/v7 additions that are not multi-board
-and multi-soc within the same machine type. Not being able to build a
-combined binary with exynos 4 and 5 support in one would be a step
-backwards on that effort.
-
-I'm not sure I understand the argument about drivers -- they should
-mostly be possible to submit and get included without the core SoC
-patches such that when those land, you'll have a fully functional
-system.
-
-
--Olof
+diff --cc arch/arm/mach-omap1/board-nokia770.c
+index 9b6332a,abdbdb0..0000000
+--- a/arch/arm/mach-omap1/board-nokia770.c
++++ b/arch/arm/mach-omap1/board-nokia770.c
+@@@ -30,7 -29,7 +29,6 @@@
+  #include <plat/usb.h>
+  #include <plat/board.h>
+  #include <plat/keypad.h>
+- #include "common.h"
+ -#include <plat/hwa742.h>
+  #include <plat/lcd_mipid.h>
+  #include <plat/mmc.h>
+  #include <plat/clock.h>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/1283461f/attachment.sig>
