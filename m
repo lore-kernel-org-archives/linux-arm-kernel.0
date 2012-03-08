@@ -1,48 +1,57 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Mar 2012 13:26:12 -0800
-Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
- regulators
-In-Reply-To: <20120308210825.GY12083@atomide.com> (Tony Lindgren's message of
- "Thu, 8 Mar 2012 13:08:26 -0800")
-References: <1330006564-13290-1-git-send-email-mporter@ti.com>
- <87wr74gis6.fsf@ti.com>
- <20120301204553.GA21841@legolas.emea.dhcp.ti.com>
- <87pqcqnc7u.fsf@ti.com>
- <CA+Bv8XaJqL1L8F-n6skY7dHn1XAdDLRKaRjw0deLeoQ5Ao0Fhg@mail.gmail.com>
- <87sjhkjj8m.fsf@ti.com> <20120308210825.GY12083@atomide.com>
-Message-ID: <87y5raaiob.fsf@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 8 Mar 2012 14:27:01 -0700
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
+In-Reply-To: <201203072113.04369.arnd@arndb.de>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <201203071831.31738.arnd@arndb.de>
+ <20120307192723.GE5050@titan.lakedaemon.net>
+ <201203072113.04369.arnd@arndb.de>
+Message-ID: <20120308212701.GB16533@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Wed, Mar 07, 2012 at 09:13:04PM +0000, Arnd Bergmann wrote:
+> On Wednesday 07 March 2012, Jason wrote:
+> > Grrr.  Now I'm getting frustrated.  I'm trying to boot without
+> > earlyprintk.  Evidently, something is wrong with the above, because the
+> > device boots all the way up (blinky lights come on), but I get no
+> > messages after the usual "Uncompressing Linux... done, booting the
+> > kernel."
+> > 
+> > Here's my most recent attempt:
+> > 
+> >         serial at f1012000 {
+> >                 device_type = "serial";
+> >                 compatible = "ns16550a";
+> >                 reg = <0xf1012000 0x100>; /*phys addr*/
+> >                 virt-reg = <0xfed12000>;  /*virt addr*/
+> >                 reg-shift = <2>;
+> >                 reg-io-width = <1>;
+> >                 interrupts = <33>;
+> >                 current-speed = <115200>;
+> >                 interrupt-parent = <&intc>;
+> >                 clock-frequency = <200000000>;
+> >         };
+> > 
+> > I've looked at what is done in the powerpc dt's, but, no luck.  When
+> > earlyprintk is enabled, I see no error messages, just:
+> > 
+> > bootconsole [earlycon0] enabled
+> > debug: skip boot console de-registration.
+> > ...
+> > Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+> > 
+> > Any pointers?
+> 
+> My first guess was that clock-frequency is wrong, but it seems that
+> this one actually is correct, at least it's the same thing that
+> the platform code sets.
+> 
+> You should never need to pass the virtual address to a device,
+> most of all because it cannot be known to the device tree at all.
+> The of_serial driver (you did enable that one in Kconfig, right?)
 
-> * Kevin Hilman <khilman@ti.com> [120307 11:05]:
->> >
->> > I don't think the second smsc911x on the Overo, "smsc911x.1", would
->> > find it due to the dev_id.
->> 
->> It's not about finding the second regulator.  As stated in the
->> changelog, it's about the duplicate attempt to register the exact same
->> platform_device.
->> 
->> Duplicate attempts to register the exact same platform_device cause
->> kobject to panic and give up[1].  So, any platform that calls
->> gpmc_smsc911x_init() twice (Overo and T35 in mainline) will panic on
->> boot.
->> 
->> This patch fixes those platforms so they can boot.
->
-> Yeah but I guess the second smsc911x instance still would not work,
-> or am I missing something?
+Ugh.  Someone really needs to step up and kill the of_serial driver.  All that
+stuff belongs in the core 16550 driver.
 
-I don't know since my Overo expansion boards don't have a 2nd NIC, but I
-suspect you're right.
-
-However, my fix isn't addressing that.  I am fixing a problem where
-mainline today will panic on some boards due to duplicate registration.
-
-If the 2nd interface doesn't work, then the original patch that added
-the regulators needs a rethink.  My patch to prevent the panic() is
-needed for mainline.
-
-Kevin
+g.
