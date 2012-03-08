@@ -1,61 +1,66 @@
-From: jason@lakedaemon.net (Jason)
-Date: Wed, 7 Mar 2012 16:29:24 -0500
-Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
-In-Reply-To: <201203072113.04369.arnd@arndb.de>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <201203071831.31738.arnd@arndb.de>
- <20120307192723.GE5050@titan.lakedaemon.net>
- <201203072113.04369.arnd@arndb.de>
-Message-ID: <20120307212924.GG5050@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Mar 2012 17:28:01 -0800
+Subject: [PATCH v2] ARM: OMAP2+: Fix build issues with missing include of
+ linux/bug.h
+Message-ID: <20120308012801.GO12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 09:13:04PM +0000, Arnd Bergmann wrote:
-> On Wednesday 07 March 2012, Jason wrote:
-> > Grrr.  Now I'm getting frustrated.  I'm trying to boot without
-> > earlyprintk.  Evidently, something is wrong with the above, because the
-> > device boots all the way up (blinky lights come on), but I get no
-> > messages after the usual "Uncompressing Linux... done, booting the
-> > kernel."
-> > 
-> > Here's my most recent attempt:
-> > 
-> >         serial at f1012000 {
-> >                 device_type = "serial";
-> >                 compatible = "ns16550a";
-> >                 reg = <0xf1012000 0x100>; /*phys addr*/
-> >                 virt-reg = <0xfed12000>;  /*virt addr*/
-> >                 reg-shift = <2>;
-> >                 reg-io-width = <1>;
-> >                 interrupts = <33>;
-> >                 current-speed = <115200>;
-> >                 interrupt-parent = <&intc>;
-> >                 clock-frequency = <200000000>;
-> >         };
-> > 
-> > I've looked at what is done in the powerpc dt's, but, no luck.  When
-> > earlyprintk is enabled, I see no error messages, just:
-> > 
-> > bootconsole [earlycon0] enabled
-> > debug: skip boot console de-registration.
-> > ...
-> > Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
-> > 
-> > Any pointers?
+Otherwise we can get the following if bug.h is not included from kernel.h:
 
-> The of_serial driver (you did enable that one in Kconfig, right?)
+arch/arm/mach-omap2/powerdomain-common.c:
+In function 'omap2_pwrdm_get_mem_bank_onstate_mask':
+arch/arm/mach-omap2/powerdomain-common.c:64:3: error:
+implicit declaration of function 'WARN_ON' [-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
 
-Wow.  I can't believe I missed that.  I now get:
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
-f1012000.serial: ttyS0 at MMIO 0xf1012000 (irq = 33) is a 16550A
-console [ttyS0] enabled
-
-without earlyprintk.
-
-Thanks, Arnd.
-
-Jason.
-
-PS - the only change from your code is the 0x100.  I'm going to do some
-more testing...
+diff --git a/arch/arm/mach-omap2/clkt_clksel.c b/arch/arm/mach-omap2/clkt_clksel.c
+index e25364d..04d551b 100644
+--- a/arch/arm/mach-omap2/clkt_clksel.c
++++ b/arch/arm/mach-omap2/clkt_clksel.c
+@@ -43,6 +43,7 @@
+ #include <linux/errno.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
++#include <linux/bug.h>
+ 
+ #include <plat/clock.h>
+ 
+diff --git a/arch/arm/mach-omap2/powerdomain-common.c b/arch/arm/mach-omap2/powerdomain-common.c
+index f97afff..c0aeabf 100644
+--- a/arch/arm/mach-omap2/powerdomain-common.c
++++ b/arch/arm/mach-omap2/powerdomain-common.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
++#include <linux/bug.h>
+ #include "pm.h"
+ #include "cm.h"
+ #include "cm-regbits-34xx.h"
+diff --git a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
+index 6a17e4c..0f0a9f1 100644
+--- a/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/errno.h>
+ #include <linux/delay.h>
++#include <linux/bug.h>
+ 
+ #include <plat/prcm.h>
+ 
+diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+index 8ef26da..b7ea468 100644
+--- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/bug.h>
+ 
+ #include <plat/cpu.h>
+ 
