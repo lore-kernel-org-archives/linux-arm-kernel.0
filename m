@@ -1,62 +1,44 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 8 Mar 2012 18:48:00 +0530
-Subject: [PATCHv2 08/13] OMAP: I2C: Fix the error handling
+Date: Thu, 8 Mar 2012 18:47:58 +0530
+Subject: [PATCHv2 06/13] OMAP: I2C: Fix the mismatch of pm_runtime enable and
+ disable
 In-Reply-To: <1331212685-6524-1-git-send-email-shubhrajyoti@ti.com>
 References: <1331212685-6524-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1331212685-6524-9-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1331212685-6524-7-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in probe
-      pm_runtime_put(dev->dev);
+Currently the i2c driver calls the pm_runtime_enable and never
+the disable. This may cause a warning when pm_runtime_enable
+checks for the count match.Attempting to fix the same by calling
+pm_runtime_disable in the error and the remove path.
 
-...
-        /* i2c device drivers may be active on return from add_adapter() */
-        adap->nr = pdev->id;
-        r = i2c_add_numbered_adapter(adap);
-        if (r) {
-                dev_err(dev->dev, "failure adding adapter\n");
-                goto err_free_irq;
-        }
-...
-
-        return 0;
-
-err_free_irq:
-        free_irq(dev->irq, dev);
-err_unuse_clocks:
-        omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-        pm_runtime_put(dev->dev);
-
-This may access the i2c registers without the clocks.
-Attempting to fix the same by moving the pm_rintime_put after the error check.
-
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index dd4e296..e12144e 100644
+index 98720c9..99b14d3 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1095,8 +1095,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
- 		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
- 
--	pm_runtime_put(dev->dev);
--
- 	adap = &dev->adapter;
- 	i2c_set_adapdata(adap, dev);
- 	adap->owner = THIS_MODULE;
-@@ -1116,6 +1114,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 
- 	of_i2c_register_devices(adap);
- 
-+	pm_runtime_put(dev->dev);
-+
- 	return 0;
- 
- err_free_irq:
+@@ -1124,6 +1124,7 @@ err_unuse_clocks:
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+ 	pm_runtime_put(dev->dev);
+ 	iounmap(dev->base);
++	pm_runtime_disable(&pdev->dev);
+ err_free_mem:
+ 	platform_set_drvdata(pdev, NULL);
+ 	kfree(dev);
+@@ -1144,6 +1145,7 @@ omap_i2c_remove(struct platform_device *pdev)
+ 	free_irq(dev->irq, dev);
+ 	i2c_del_adapter(&dev->adapter);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
++	pm_runtime_disable(&pdev->dev);
+ 	iounmap(dev->base);
+ 	kfree(dev);
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -- 
 1.7.1
