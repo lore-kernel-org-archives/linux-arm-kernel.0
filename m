@@ -1,43 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 8 Mar 2012 14:48:49 -0800
-Subject: [PATCH v4] USB: Support for LPC32xx SoC
-In-Reply-To: <4F593652.90809@antcom.de>
-References: <1331244574-32570-1-git-send-email-stigge@antcom.de>
- <20120308222234.GA25576@kroah.com> <4F593652.90809@antcom.de>
-Message-ID: <20120308224849.GA32667@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 8 Mar 2012 23:14:04 +0000
+Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
+In-Reply-To: <20120308212701.GB16533@ponder.secretlab.ca>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <201203072113.04369.arnd@arndb.de>
+ <20120308212701.GB16533@ponder.secretlab.ca>
+Message-ID: <201203082314.05385.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 11:44:34PM +0100, Roland Stigge wrote:
-> Hi,
+On Thursday 08 March 2012, Grant Likely wrote:
+> > 
+> > My first guess was that clock-frequency is wrong, but it seems that
+> > this one actually is correct, at least it's the same thing that
+> > the platform code sets.
+> > 
+> > You should never need to pass the virtual address to a device,
+> > most of all because it cannot be known to the device tree at all.
+> > The of_serial driver (you did enable that one in Kconfig, right?)
 > 
-> On 08/03/12 23:22, Greg Kroah-Hartman wrote:
-> > So, should this function just be called something else, for the type of
-> > hardware (lpc32xx?), and then do this check within the function?
-> 
-> Right. LPC32xx and PNX4008 seem to share much of the functionality but
-> they don't share the bits() part. How about renaming (the static)
-> 
-> pnx4008_set_usb_bits()
-> pnx4008_unset_usb_bits()
-> 
-> to
-> 
-> set_usb_bits()
-> unset_usb_bits()
-> 
-> and internally doing machine_is_pnx4008() dependent stuff?
-> 
-> Regarding the other pnx4008_*() functions that are shared with lpc32xx,
-> they only inherit the name for historical reasons. Which naming scheme
-> should apply here if change is due? One common name between those two
-> would be "nxp". We could replace everything common between pnx4008 and
-> lpc32xx with nxp (including ths driver name) and handle the small
-> pnx4008-specific stuff via machine_is_pnx4008().
+> Ugh.  Someone really needs to step up and kill the of_serial driver.  All that
+> stuff belongs in the core 16550 driver.
 
-That sounds more reasonable, right?  But do it in at least two patches
-to make things obvious as to what is happening.
+Well, actually I would argue that nothing belongs into the core 8250 driver.
+What we should do though is split the of_serial.c file into the main 8250
+portion and put that into drivers/tty/serial/8250/ along with the other
+14 bus glue drivers, and put the nwpserial portion into
+drivers/tty/serial/nwpserial.c.
 
-thanks,
+I have started a major rework of 8250 some time ago that I need to finish up,
+to make the different ways for registering an 8250 device more regular,
+and get rid of the more obscure ways we have in the kernel, replacing them
+with platform devices or other bus specific 'struct device' versions.
 
-greg k-h
+The main intention of that patch series is to confine the ISA/PCI specific
+inb/outb accessors in the files that need them so we can actually build
+the platform drivers without defining those, but I can take care of
+of_serial.c as well -- after all I wrote that file originally.
+
+	Arnd
