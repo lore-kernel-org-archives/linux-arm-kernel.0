@@ -1,199 +1,214 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu,  8 Mar 2012 17:11:01 +0800
-Subject: [PATCH 1/3] led-class: change back LEDS_CLASS to tristate instead of
- bool
-Message-ID: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
+Date: Thu,  8 Mar 2012 17:11:03 +0800
+Subject: [PATCH 3/3] led-triggers: create a trigger for CPU activity
+In-Reply-To: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
+References: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1331197863-25564-3-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After moving some core functions to led-core.c, led-class.c can be built as
-module again.
+Attempting to consolidate the ARM LED code, this removes the
+custom RealView LED trigger code to turn LEDs on and off in
+response to CPU activity and replace it with a standard trigger.
 
+(bryan.wu at canonical.com:
+It moves arch/arm/kernel/leds.c syscore stubs into this trigger.
+It also provides ledtrig_cpu trigger event stub in <linux/leds.h>.
+Although it was inspired by ARM work, it can be used in other arch.)
+
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+
+Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+Tested-by: Jochen Friedrich <jochen@scram.de>
 ---
- drivers/leds/Kconfig     |    2 +-
- drivers/leds/led-class.c |   70 ----------------------------------------------
- drivers/leds/led-core.c  |   70 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 71 insertions(+), 71 deletions(-)
+ drivers/leds/Kconfig       |   10 ++++
+ drivers/leds/Makefile      |    1 +
+ drivers/leds/ledtrig-cpu.c |  119 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/leds.h       |   15 ++++++
+ 4 files changed, 145 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/leds/ledtrig-cpu.c
 
 diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 9ca28fc..3f17f0d 100644
+index 3f17f0d..f7f4761 100644
 --- a/drivers/leds/Kconfig
 +++ b/drivers/leds/Kconfig
-@@ -17,7 +17,7 @@ menuconfig NEW_LEDS
- if NEW_LEDS
+@@ -457,6 +457,16 @@ config LEDS_TRIGGER_BACKLIGHT
  
- config LEDS_CLASS
--	bool "LED Class Support"
-+	tristate "LED Class Support"
- 	help
- 	  This option enables the led sysfs class in /sys/class/leds.  You'll
- 	  need this to do anything useful with LEDs.  If unsure, say N.
-diff --git a/drivers/leds/led-class.c b/drivers/leds/led-class.c
-index 0c8739c..5bff843 100644
---- a/drivers/leds/led-class.c
-+++ b/drivers/leds/led-class.c
-@@ -110,50 +110,6 @@ static void led_timer_function(unsigned long data)
- 	mod_timer(&led_cdev->blink_timer, jiffies + msecs_to_jiffies(delay));
- }
+ 	  If unsure, say N.
  
--static void led_stop_software_blink(struct led_classdev *led_cdev)
--{
--	/* deactivate previous settings */
--	del_timer_sync(&led_cdev->blink_timer);
--	led_cdev->blink_delay_on = 0;
--	led_cdev->blink_delay_off = 0;
--}
--
--static void led_set_software_blink(struct led_classdev *led_cdev,
--				   unsigned long delay_on,
--				   unsigned long delay_off)
--{
--	int current_brightness;
--
--	current_brightness = led_get_brightness(led_cdev);
--	if (current_brightness)
--		led_cdev->blink_brightness = current_brightness;
--	if (!led_cdev->blink_brightness)
--		led_cdev->blink_brightness = led_cdev->max_brightness;
--
--	if (led_get_trigger_data(led_cdev) &&
--	    delay_on == led_cdev->blink_delay_on &&
--	    delay_off == led_cdev->blink_delay_off)
--		return;
--
--	led_stop_software_blink(led_cdev);
--
--	led_cdev->blink_delay_on = delay_on;
--	led_cdev->blink_delay_off = delay_off;
--
--	/* never on - don't blink */
--	if (!delay_on)
--		return;
--
--	/* never off - just set to brightness */
--	if (!delay_off) {
--		led_set_brightness(led_cdev, led_cdev->blink_brightness);
--		return;
--	}
--
--	mod_timer(&led_cdev->blink_timer, jiffies + 1);
--}
--
--
- /**
-  * led_classdev_suspend - suspend an led_classdev.
-  * @led_cdev: the led_classdev to suspend.
-@@ -262,32 +218,6 @@ void led_classdev_unregister(struct led_classdev *led_cdev)
- }
- EXPORT_SYMBOL_GPL(led_classdev_unregister);
- 
--void led_blink_set(struct led_classdev *led_cdev,
--		   unsigned long *delay_on,
--		   unsigned long *delay_off)
--{
--	del_timer_sync(&led_cdev->blink_timer);
--
--	if (led_cdev->blink_set &&
--	    !led_cdev->blink_set(led_cdev, delay_on, delay_off))
--		return;
--
--	/* blink with 1 Hz as default if nothing specified */
--	if (!*delay_on && !*delay_off)
--		*delay_on = *delay_off = 500;
--
--	led_set_software_blink(led_cdev, *delay_on, *delay_off);
--}
--EXPORT_SYMBOL(led_blink_set);
--
--void led_brightness_set(struct led_classdev *led_cdev,
--			enum led_brightness brightness)
--{
--	led_stop_software_blink(led_cdev);
--	led_cdev->brightness_set(led_cdev, brightness);
--}
--EXPORT_SYMBOL(led_brightness_set);
--
- static int __init leds_init(void)
- {
- 	leds_class = class_create(THIS_MODULE, "leds");
-diff --git a/drivers/leds/led-core.c b/drivers/leds/led-core.c
-index 016d19f..d686004 100644
---- a/drivers/leds/led-core.c
-+++ b/drivers/leds/led-core.c
-@@ -23,3 +23,73 @@ EXPORT_SYMBOL_GPL(leds_list_lock);
- 
- LIST_HEAD(leds_list);
- EXPORT_SYMBOL_GPL(leds_list);
++config LEDS_TRIGGER_CPU
++	tristate "LED CPU Trigger"
++	depends on LEDS_TRIGGERS
++	help
++	  This allows LEDs to be controlled by active CPUs. This shows
++	  the active CPUs across an array of LEDs so you can see what
++	  CPUs are active on the system at any given moment.
 +
-+static void led_stop_software_blink(struct led_classdev *led_cdev)
++	  If unsure, say N.
++
+ config LEDS_TRIGGER_GPIO
+ 	tristate "LED GPIO Trigger"
+ 	depends on LEDS_TRIGGERS
+diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+index 1fc6875..6629916 100644
+--- a/drivers/leds/Makefile
++++ b/drivers/leds/Makefile
+@@ -56,4 +56,5 @@ obj-$(CONFIG_LEDS_TRIGGER_IDE_DISK)	+= ledtrig-ide-disk.o
+ obj-$(CONFIG_LEDS_TRIGGER_HEARTBEAT)	+= ledtrig-heartbeat.o
+ obj-$(CONFIG_LEDS_TRIGGER_BACKLIGHT)	+= ledtrig-backlight.o
+ obj-$(CONFIG_LEDS_TRIGGER_GPIO)		+= ledtrig-gpio.o
++obj-$(CONFIG_LEDS_TRIGGER_CPU)		+= ledtrig-cpu.o
+ obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON)	+= ledtrig-default-on.o
+diff --git a/drivers/leds/ledtrig-cpu.c b/drivers/leds/ledtrig-cpu.c
+new file mode 100644
+index 0000000..49f7879
+--- /dev/null
++++ b/drivers/leds/ledtrig-cpu.c
+@@ -0,0 +1,119 @@
++/*
++ * ledtrig-cpu.c - LED trigger based on CPU activity
++ *
++ * Copyright 2011 Linus Walleij <linus.walleij@linaro.org>
++ * Copyright 2011 Bryan Wu <bryan.wu@canonical.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/slab.h>
++#include <linux/percpu.h>
++#include <linux/syscore_ops.h>
++#include "leds.h"
++
++static DEFINE_PER_CPU(struct led_trigger *, cpu_trig);
++static DEFINE_PER_CPU(char [8], trig_name);
++
++void ledtrig_cpu(enum cpu_led_event ledevt)
 +{
-+	/* deactivate previous settings */
-+	del_timer_sync(&led_cdev->blink_timer);
-+	led_cdev->blink_delay_on = 0;
-+	led_cdev->blink_delay_off = 0;
-+}
++	struct led_trigger *trig = __get_cpu_var(cpu_trig);
 +
-+static void led_set_software_blink(struct led_classdev *led_cdev,
-+				   unsigned long delay_on,
-+				   unsigned long delay_off)
-+{
-+	int current_brightness;
-+
-+	current_brightness = led_get_brightness(led_cdev);
-+	if (current_brightness)
-+		led_cdev->blink_brightness = current_brightness;
-+	if (!led_cdev->blink_brightness)
-+		led_cdev->blink_brightness = led_cdev->max_brightness;
-+
-+	if (led_get_trigger_data(led_cdev) &&
-+	    delay_on == led_cdev->blink_delay_on &&
-+	    delay_off == led_cdev->blink_delay_off)
++	if (!trig)
 +		return;
 +
-+	led_stop_software_blink(led_cdev);
++	/* Locate the correct CPU LED */
++	switch (ledevt) {
++	case CPU_LED_IDLE_END:
++	case CPU_LED_START:
++		/* Will turn the LED on, max brightness */
++		led_trigger_event(trig, LED_FULL);
++		break;
 +
-+	led_cdev->blink_delay_on = delay_on;
-+	led_cdev->blink_delay_off = delay_off;
++	case CPU_LED_IDLE_START:
++	case CPU_LED_STOP:
++	case CPU_LED_HALTED:
++		/* Will turn the LED off */
++		led_trigger_event(trig, LED_OFF);
++		break;
 +
-+	/* never on - don't blink */
-+	if (!delay_on)
-+		return;
-+
-+	/* never off - just set to brightness */
-+	if (!delay_off) {
-+		led_set_brightness(led_cdev, led_cdev->blink_brightness);
-+		return;
++	default:
++		/* Will leave the LED as it is */
++		break;
 +	}
-+
-+	mod_timer(&led_cdev->blink_timer, jiffies + 1);
 +}
++EXPORT_SYMBOL(ledtrig_cpu);
 +
-+
-+void led_blink_set(struct led_classdev *led_cdev,
-+		   unsigned long *delay_on,
-+		   unsigned long *delay_off)
++static int ledtrig_cpu_syscore_suspend(void)
 +{
-+	del_timer_sync(&led_cdev->blink_timer);
-+
-+	if (led_cdev->blink_set &&
-+	    !led_cdev->blink_set(led_cdev, delay_on, delay_off))
-+		return;
-+
-+	/* blink with 1 Hz as default if nothing specified */
-+	if (!*delay_on && !*delay_off)
-+		*delay_on = *delay_off = 500;
-+
-+	led_set_software_blink(led_cdev, *delay_on, *delay_off);
++	ledtrig_cpu(CPU_LED_STOP);
++	return 0;
 +}
-+EXPORT_SYMBOL(led_blink_set);
 +
-+void led_brightness_set(struct led_classdev *led_cdev,
-+			enum led_brightness brightness)
++static void ledtrig_cpu_syscore_resume(void)
 +{
-+	led_stop_software_blink(led_cdev);
-+	led_cdev->brightness_set(led_cdev, brightness);
++	ledtrig_cpu(CPU_LED_START);
 +}
-+EXPORT_SYMBOL(led_brightness_set);
++
++static void ledtrig_cpu_syscore_shutdown(void)
++{
++	ledtrig_cpu(CPU_LED_HALTED);
++}
++
++static struct syscore_ops ledtrig_cpu_syscore_ops = {
++	.shutdown	= ledtrig_cpu_syscore_shutdown,
++	.suspend	= ledtrig_cpu_syscore_suspend,
++	.resume		= ledtrig_cpu_syscore_resume,
++};
++
++static void __init ledtrig_cpu_register(void *info)
++{
++	int cpuid = smp_processor_id();
++	struct led_trigger *trig;
++	char *name = __get_cpu_var(trig_name);
++
++	snprintf(name, 8, "cpu%d", cpuid);
++	led_trigger_register_simple(name, &trig);
++
++	pr_info("LED trigger %s indicate activity on CPU %d\n",
++		trig->name, cpuid);
++
++	__get_cpu_var(cpu_trig) = trig;
++}
++
++static void __exit ledtrig_cpu_unregister(void *info)
++{
++	struct led_trigger *trig = __get_cpu_var(cpu_trig);
++	char *name = __get_cpu_var(trig_name);
++
++	led_trigger_unregister_simple(trig);
++	__get_cpu_var(cpu_trig) = NULL;
++	memset(name, 0, 8);
++}
++
++static int __init ledtrig_cpu_init(void)
++{
++	on_each_cpu(ledtrig_cpu_register, NULL, 1);
++	register_syscore_ops(&ledtrig_cpu_syscore_ops);
++
++	return 0;
++}
++module_init(ledtrig_cpu_init);
++
++static void __exit ledtrig_cpu_exit(void)
++{
++	on_each_cpu(ledtrig_cpu_unregister, NULL, 1);
++	unregister_syscore_ops(&ledtrig_cpu_syscore_ops);
++}
++module_exit(ledtrig_cpu_exit);
++
++MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");
++MODULE_AUTHOR("Bryan Wu <bryan.wu@canonical.com>");
++MODULE_DESCRIPTION("CPU LED trigger");
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/leds.h b/include/linux/leds.h
+index 5884def..2afecb7 100644
+--- a/include/linux/leds.h
++++ b/include/linux/leds.h
+@@ -210,4 +210,19 @@ struct gpio_led_platform_data {
+ struct platform_device *gpio_led_register_device(
+ 		int id, const struct gpio_led_platform_data *pdata);
+ 
++#if defined(CONFIG_LEDS_TRIGGER_CPU) || defined(CONFIG_LEDS_TRIGGER_CPU_MODULE)
++enum cpu_led_event {
++	CPU_LED_IDLE_START,	/* CPU enters idle */
++	CPU_LED_IDLE_END,	/* CPU idle ends */
++	CPU_LED_START,		/* Machine starts, especially resume */
++	CPU_LED_STOP,		/* Machine stops, especially suspend */
++	CPU_LED_HALTED,		/* Machine shutdown */
++};
++
++/* Use this routine to handle LEDs */
++extern void ledtrig_cpu(enum cpu_led_event evt);
++#else
++#define ledtrig_cpu(evt) do {} while (0)
++#endif
++
+ #endif		/* __LINUX_LEDS_H_INCLUDED */
 -- 
 1.7.9
