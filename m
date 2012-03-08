@@ -1,82 +1,215 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 08 Mar 2012 03:51:35 -0700
-Subject: [PATCH 11/15] ARM: OMAP4: hwmod data: add OCM RAM IP block
+Date: Thu, 08 Mar 2012 03:51:32 -0700
+Subject: [PATCH 07/15] ARM: OMAP4: hwmod data: add the Slimbus IP blocks
 In-Reply-To: <20120308104918.14753.69281.stgit@dusk>
 References: <20120308104918.14753.69281.stgit@dusk>
-Message-ID: <20120308105134.14753.63101.stgit@dusk>
+Message-ID: <20120308105131.14753.60810.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the OCM RAM IP block and interconnect data.  This is an oh-chip
-block of SRAM connected directly to the L3 bus.
+From: Beno?t Cousson <b-cousson@ti.com>
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Add the Slimbus hwmods and associated interconnect data.  The Slimbus
+IP blocks implement a two-wire serial interface.
+
 Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   32 +++++++++++++++++++++++++++-
- 1 files changed, 31 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  163 ++++++++++++++++++++++++++++
+ 1 files changed, 161 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 968feb0..f48fe77 100644
+index adacc09..283c5b2 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -280,7 +280,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
-  *  efuse_ctrl_std
-  *  mpu_c0
-  *  mpu_c1
-- *  ocmc_ram
-  *  ocp_wp_noc
-  *  prcm_mpu
+@@ -270,8 +270,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
   *  prm
-@@ -2356,6 +2355,28 @@ static struct omap_hwmod omap44xx_mpu_hwmod = {
+  *  scrm
+  *  sl2if
+- *  slimbus1
+- *  slimbus2
+  *  usb_host_fs
+  *  usb_host_hs
+  *  usb_phy_cm
+@@ -2219,6 +2217,110 @@ static struct omap_hwmod omap44xx_mpu_hwmod = {
  };
  
  /*
-+ * 'ocmc_ram' class
-+ * top-level core on-chip ram
++ * 'slimbus' class
++ * bidirectional, multi-drop, multi-channel two-line serial interface between
++ * the device and external components
 + */
 +
-+static struct omap_hwmod_class omap44xx_ocmc_ram_hwmod_class = {
-+	.name	= "ocmc_ram",
++static struct omap_hwmod_class_sysconfig omap44xx_slimbus_sysc = {
++	.rev_offs	= 0x0000,
++	.sysc_offs	= 0x0010,
++	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
++			   SYSC_HAS_SOFTRESET),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
++			   SIDLE_SMART_WKUP),
++	.sysc_fields	= &omap_hwmod_sysc_type2,
 +};
 +
-+/* ocmc_ram */
-+static struct omap_hwmod omap44xx_ocmc_ram_hwmod = {
-+	.name		= "ocmc_ram",
-+	.class		= &omap44xx_ocmc_ram_hwmod_class,
-+	.clkdm_name	= "l3_2_clkdm",
++static struct omap_hwmod_class omap44xx_slimbus_hwmod_class = {
++	.name	= "slimbus",
++	.sysc	= &omap44xx_slimbus_sysc,
++};
++
++/* slimbus1 */
++static struct omap_hwmod_irq_info omap44xx_slimbus1_irqs[] = {
++	{ .irq = 97 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_dma_info omap44xx_slimbus1_sdma_reqs[] = {
++	{ .name = "tx0", .dma_req = 84 + OMAP44XX_DMA_REQ_START },
++	{ .name = "tx1", .dma_req = 85 + OMAP44XX_DMA_REQ_START },
++	{ .name = "tx2", .dma_req = 86 + OMAP44XX_DMA_REQ_START },
++	{ .name = "tx3", .dma_req = 87 + OMAP44XX_DMA_REQ_START },
++	{ .name = "rx0", .dma_req = 88 + OMAP44XX_DMA_REQ_START },
++	{ .name = "rx1", .dma_req = 89 + OMAP44XX_DMA_REQ_START },
++	{ .name = "rx2", .dma_req = 90 + OMAP44XX_DMA_REQ_START },
++	{ .name = "rx3", .dma_req = 91 + OMAP44XX_DMA_REQ_START },
++	{ .dma_req = -1 }
++};
++
++static struct omap_hwmod_opt_clk slimbus1_opt_clks[] = {
++	{ .role = "fclk_1", .clk = "slimbus1_fclk_1" },
++	{ .role = "fclk_0", .clk = "slimbus1_fclk_0" },
++	{ .role = "fclk_2", .clk = "slimbus1_fclk_2" },
++	{ .role = "slimbus_clk", .clk = "slimbus1_slimbus_clk" },
++};
++
++static struct omap_hwmod omap44xx_slimbus1_hwmod = {
++	.name		= "slimbus1",
++	.class		= &omap44xx_slimbus_hwmod_class,
++	.clkdm_name	= "abe_clkdm",
++	.mpu_irqs	= omap44xx_slimbus1_irqs,
++	.sdma_reqs	= omap44xx_slimbus1_sdma_reqs,
 +	.prcm = {
 +		.omap4 = {
-+			.clkctrl_offs = OMAP4_CM_L3_2_OCMC_RAM_CLKCTRL_OFFSET,
-+			.context_offs = OMAP4_RM_L3_2_OCMC_RAM_CONTEXT_OFFSET,
++			.clkctrl_offs = OMAP4_CM1_ABE_SLIMBUS_CLKCTRL_OFFSET,
++			.context_offs = OMAP4_RM_ABE_SLIMBUS_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
 +		},
 +	},
++	.opt_clks	= slimbus1_opt_clks,
++	.opt_clks_cnt	= ARRAY_SIZE(slimbus1_opt_clks),
++};
++
++/* slimbus2 */
++static struct omap_hwmod_irq_info omap44xx_slimbus2_irqs[] = {
++	{ .irq = 98 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_dma_info omap44xx_slimbus2_sdma_reqs[] = {
++	{ .name = "tx0", .dma_req = 92 + OMAP44XX_DMA_REQ_START },
++	{ .name = "tx1", .dma_req = 93 + OMAP44XX_DMA_REQ_START },
++	{ .name = "tx2", .dma_req = 94 + OMAP44XX_DMA_REQ_START },
++	{ .name = "tx3", .dma_req = 95 + OMAP44XX_DMA_REQ_START },
++	{ .name = "rx0", .dma_req = 96 + OMAP44XX_DMA_REQ_START },
++	{ .name = "rx1", .dma_req = 97 + OMAP44XX_DMA_REQ_START },
++	{ .name = "rx2", .dma_req = 98 + OMAP44XX_DMA_REQ_START },
++	{ .name = "rx3", .dma_req = 99 + OMAP44XX_DMA_REQ_START },
++	{ .dma_req = -1 }
++};
++
++static struct omap_hwmod_opt_clk slimbus2_opt_clks[] = {
++	{ .role = "fclk_1", .clk = "slimbus2_fclk_1" },
++	{ .role = "fclk_0", .clk = "slimbus2_fclk_0" },
++	{ .role = "slimbus_clk", .clk = "slimbus2_slimbus_clk" },
++};
++
++static struct omap_hwmod omap44xx_slimbus2_hwmod = {
++	.name		= "slimbus2",
++	.class		= &omap44xx_slimbus_hwmod_class,
++	.clkdm_name	= "l4_per_clkdm",
++	.mpu_irqs	= omap44xx_slimbus2_irqs,
++	.sdma_reqs	= omap44xx_slimbus2_sdma_reqs,
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = OMAP4_CM_L4PER_SLIMBUS2_CLKCTRL_OFFSET,
++			.context_offs = OMAP4_RM_L4PER_SLIMBUS2_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_SWCTRL,
++		},
++	},
++	.opt_clks	= slimbus2_opt_clks,
++	.opt_clks_cnt	= ARRAY_SIZE(slimbus2_opt_clks),
 +};
 +
 +/*
-  * 'ocp2scp' class
-  * bridge to transform ocp interface protocol to scp (serial control port)
-  * protocol
-@@ -4923,6 +4944,14 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__mmc5 = {
+  * 'smartreflex' class
+  * smartreflex module (monitor silicon performance and outputs a measure of
+  * performance error)
+@@ -4452,6 +4554,60 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__mmc5 = {
  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
  };
  
-+/* l3_main_2 -> ocmc_ram */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__ocmc_ram = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_ocmc_ram_hwmod,
-+	.clk		= "l3_div_ck",
++static struct omap_hwmod_addr_space omap44xx_slimbus1_addrs[] = {
++	{
++		.pa_start	= 0x4012c000,
++		.pa_end		= 0x4012c3ff,
++		.flags		= ADDR_TYPE_RT
++	},
++	{ }
++};
++
++/* l4_abe -> slimbus1 */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__slimbus1 = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_slimbus1_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_slimbus1_addrs,
++	.user		= OCP_USER_MPU,
++};
++
++static struct omap_hwmod_addr_space omap44xx_slimbus1_dma_addrs[] = {
++	{
++		.pa_start	= 0x4902c000,
++		.pa_end		= 0x4902c3ff,
++		.flags		= ADDR_TYPE_RT
++	},
++	{ }
++};
++
++/* l4_abe -> slimbus1 (dma) */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__slimbus1_dma = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_slimbus1_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_slimbus1_dma_addrs,
++	.user		= OCP_USER_SDMA,
++};
++
++static struct omap_hwmod_addr_space omap44xx_slimbus2_addrs[] = {
++	{
++		.pa_start	= 0x48076000,
++		.pa_end		= 0x480763ff,
++		.flags		= ADDR_TYPE_RT
++	},
++	{ }
++};
++
++/* l4_per -> slimbus2 */
++static struct omap_hwmod_ocp_if omap44xx_l4_per__slimbus2 = {
++	.master		= &omap44xx_l4_per_hwmod,
++	.slave		= &omap44xx_slimbus2_hwmod,
++	.clk		= "l4_div_ck",
++	.addr		= omap44xx_slimbus2_addrs,
 +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 +};
 +
- /* l4_cfg -> ocp2scp_usb_phy */
- static struct omap_hwmod_ocp_if omap44xx_l4_cfg__ocp2scp_usb_phy = {
- 	.master		= &omap44xx_l4_cfg_hwmod,
-@@ -5654,6 +5683,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+ static struct omap_hwmod_addr_space omap44xx_smartreflex_core_addrs[] = {
+ 	{
+ 		.pa_start	= 0x4a0dd000,
+@@ -5084,6 +5240,9 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
  	&omap44xx_l4_per__mmc3,
  	&omap44xx_l4_per__mmc4,
  	&omap44xx_l4_per__mmc5,
-+	&omap44xx_l3_main_2__ocmc_ram,
- 	&omap44xx_l4_cfg__ocp2scp_usb_phy,
- 	&omap44xx_l3_main_2__sl2if,
- 	&omap44xx_l4_abe__slimbus1,
++	&omap44xx_l4_abe__slimbus1,
++	&omap44xx_l4_abe__slimbus1_dma,
++	&omap44xx_l4_per__slimbus2,
+ 	&omap44xx_l4_cfg__smartreflex_core,
+ 	&omap44xx_l4_cfg__smartreflex_iva,
+ 	&omap44xx_l4_cfg__smartreflex_mpu,
