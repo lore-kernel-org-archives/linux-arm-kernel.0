@@ -1,32 +1,34 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 8 Mar 2012 16:43:59 +0100
-Subject: [PATCH 00/11] ARM: tegra: Add PCIe device tree support
-In-Reply-To: <4F58CE9D.3070605@gmail.com>
+Date: Thu, 8 Mar 2012 16:45:03 +0100
+Subject: [PATCH 05/11] tps6586x: Add device-tree support
+In-Reply-To: <20120308151756.GQ3638@opensource.wolfsonmicro.com>
 References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <4F58CE9D.3070605@gmail.com>
-Message-ID: <20120308154359.GA544@avionic-0098.mockup.avionic-design.de>
+ <1331218291-16119-6-git-send-email-thierry.reding@avionic-design.de>
+ <20120308150607.GP3638@opensource.wolfsonmicro.com>
+ <20120308151545.GA23934@avionic-0098.mockup.avionic-design.de>
+ <20120308151756.GQ3638@opensource.wolfsonmicro.com>
+Message-ID: <20120308154502.GA4617@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring wrote:
-> There is a whole bunch of PCI DT code sitting in the powerpc tree that
-> probably needs to be moved to common location and used here.
+* Mark Brown wrote:
+> On Thu, Mar 08, 2012 at 04:15:46PM +0100, Thierry Reding wrote:
+> > * Mark Brown wrote:
 > 
-> This looks way too simple to be what's needed if I compare to PCI
-> bindings in powerpc dts files.
+> > > ...they all seem to be explicitly named in the device tree so presumably
+> > > there's enough information in there for the driver to pick any set of
+> > > regulators in any order.  This would be much nicer to use.
+> 
+> > I don't like it much either. The only reason that requirement exists is
+> > because it makes the assignment of the regulator ID (as defined in the
+> > include/linux/mfd/tps6586x.h header) very trivial. Would it be better to
+> > look up the ID based on the node name (sm0 --> TPS6586X_ID_SM_0, ...)?
+> 
+> > Then the only requirement would be that the names match.
+> 
+> Yes, that's going to be more code but much nicer for users.
 
-My particular setup may be much simpler than the average PowerPC machine. The
-patchset is only what I need to get PCIe running on the platform, which has
-an FPGA connected to the Tegra via PCIe. For instance there is no legacy
-interrupt support (only MSI), so interrupt remapping is not required. I also
-know that OF nodes are not properly hooked up with the PCI devices yet, which
-I will need, among other things, to provide platform data for an SPI flash
-connected to an SPI master implemented within the FPGA. I also haven't looked
-at specifying the memory ranges via the device tree.
-
-So quite a lot may still be missing, but does that prevent any of this from
-being added to mainline? Things can be added on an as-needed basis, can't
-they?
+Okay, I'll add that for the next round.
 
 Thierry
 -------------- next part --------------
@@ -35,4 +37,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/5c285597/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/6cfa72be/attachment.sig>
