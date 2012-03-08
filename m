@@ -1,33 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Mar 2012 01:57:42 -0800
-Subject: [PATCH V6 1/5] ARM: exynos: Add support AFTR mode on EXYNOS4210
-In-Reply-To: <CAMXH7KHtEcg5VSCNFarX9-GuKzWsh3k8Kz+bCu3ZtiqJpvWZZw@mail.gmail.com>
-References: <1329805190-8874-1-git-send-email-amit.kachhap@linaro.org>	<1329805190-8874-2-git-send-email-amit.kachhap@linaro.org>	<CAMXH7KHTgzY7XZ=4rOxsu-Ra8SRTOsCg=YWOLBD1QDTskRbygw@mail.gmail.com>	<CAK44p22LOnJx=bZRfdzAHt7X_snhJGrNoBuXOfsgwBHLLuUziA@mail.gmail.com>
- <CAMXH7KHtEcg5VSCNFarX9-GuKzWsh3k8Kz+bCu3ZtiqJpvWZZw@mail.gmail.com>
-Message-ID: <4F588296.8020601@samsung.com>
+From: Jon.Povey@racelogic.co.uk (Jon Povey)
+Date: Thu, 8 Mar 2012 09:58:39 +0000
+Subject: DaVinci unbanked GPIO IRQs broken
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317EC8CA@DBDE01.ent.ti.com>
+Message-ID: <70E876B0EA86DD4BAF101844BC814DFE0BF41C8E81@Cloud.RL.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/12 15:12, Rob Lee wrote:
-> Hello Kukjim and Amit,
+> On Fri, Jan 27, 2012 at 18:49:42, Nori, Sekhar wrote:
+>> Hi Jon,
+>>
+>> On Tue, Jan 17, 2012 at 15:32:23, Nori, Sekhar wrote:
+>>
+>>> I was able to reproduce this on the EVM using v2.6.38 (works)
+>>> and v3.2 + my patch (doesn't work). I just started poking some
+>>> registers to see what is happening. Will keep you updated
+>>> on any progress.
+>>>
+>>
+>> Following patch fixes the issue of interrupt handler not getting
+>> called. I tested it using GPIO3 on DM365. On applying this, I
+>> see a constant rate of 4-5 interrupts per second on that line.
+>> Yet to figure out what is triggering those. Anyway I will wait for
+>> you to test this after you are back before sending this to Grant.
 >
-> Can you tell me the status of this patch?  I based my core cpuidle
-> consolidation patchset on these changes.  My patchset seems to be
-> acceptable now and I would like to do a git pull-request for
-> linux-next, but I see these Exynos cpuidle changes have not yet made
-> it to linux-next.
->
-Hi Rob,
+> Are you back? Did you get a chance to test this?
 
-Probably, I missed merging its topic branch and I will do right now.
-I think you can see it in a couple of hours.
+Hi, sorry about that. I was away for a month, and forgot about this.
 
-Then, if any problems, please let me know.
+Tested just now. It seems good, GPIO interrupts work under 3.2
+with this patch same as they do if I revert the genirq change.
 
-Thanks for your reminder.
+I noticed that something else is broken for me under 3.2 (my FPGA driver
+fails to load bitstream) compared with 3.0, but that is also broken with
+genirq reverted so I think it's a separate issue and your patch is good.
 
-Best regards,
-Kgene.
+So,
+
+Tested-By: Jon Povey <jon.povey@racelogic.co.uk>
+
 --
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Jon Povey
+jon.povey at racelogic.co.uk
+
+Racelogic is a limited company registered in England. Registered number 2743719 .
+Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
+
+The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
