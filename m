@@ -1,73 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 08 Mar 2012 09:24:25 -0600
-Subject: [PATCH 5/6] ARM: at91: add ram controller DT support
-In-Reply-To: <20120308141000.GF27213@game.jcrosoft.org>
-References: <20120302192844.GB21255@game.jcrosoft.org>
- <1330718048-9314-5-git-send-email-plagnioj@jcrosoft.com>
- <4F57BDCE.1050708@gmail.com> <20120308061324.GE27213@game.jcrosoft.org>
- <4F58BE4F.5080009@gmail.com> <20120308141000.GF27213@game.jcrosoft.org>
-Message-ID: <4F58CF29.6020906@gmail.com>
+From: jp.francois@cynove.com (jean-philippe francois)
+Date: Thu, 8 Mar 2012 16:26:56 +0100
+Subject: Regression in 3.2.9 for omap-serial (at least)
+In-Reply-To: <alpine.LFD.2.02.1203081246130.2742@ionos>
+References: <lyk42vxsz2.fsf@ensc-virt.intern.sigma-chemnitz.de>
+ <alpine.LFD.2.02.1203081246130.2742@ionos>
+Message-ID: <CAGGh5h3-1XhMO1-jiBdUJYgh4unRcPonvp=zcXLKMJBfS+qpuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2012 08:10 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 08:12 Thu 08 Mar     , Rob Herring wrote:
->> On 03/08/2012 12:13 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>>> diff --git a/arch/arm/mach-at91/include/mach/at91sam9x5.h b/arch/arm/mach-at91/include/mach/at91sam9x5.h
->>>>> index a297a77..88e43d5 100644
->>>>> --- a/arch/arm/mach-at91/include/mach/at91sam9x5.h
->>>>> +++ b/arch/arm/mach-at91/include/mach/at91sam9x5.h
->>>>> @@ -55,11 +55,6 @@
->>>>>  #define AT91SAM9X5_BASE_USART2	0xf8024000
->>>>>  
->>>>>  /*
->>>>> - * System Peripherals
->>>>> - */
->>>>> -#define AT91SAM9X5_BASE_DDRSDRC0	0xffffe800
->>>>> -
->>>>> -/*
->>>>>   * Base addresses for early serial code (uncompress.h)
->>>>>   */
->>>>>  #define AT91_DBGU	AT91_BASE_DBGU0
->>>>> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
->>>>> index 3e48b59..f86450d 100644
->>>>> --- a/arch/arm/mach-at91/setup.c
->>>>> +++ b/arch/arm/mach-at91/setup.c
->>>>> @@ -315,12 +315,33 @@ static void at91_dt_rstc(void)
->>>>>  	of_node_put(np);
->>>>>  }
->>>>>  
->>>>> +static struct of_device_id ramc_ids[] = {
->>>>> +	{ .compatible = "atmel,at91sam9260-sdramc" },
->>>>> +	{ .compatible = "atmel,at91sam9g45-ddramc" },
->>>>> +	{ /*sentinel*/ }
->>>>> +};
->>>>> +
->>>>> +static void at91_dt_ramc(void)
->>>>> +{
->>>>> +	struct device_node *np;
->>>>> +
->>>>> +	np = of_find_matching_node(NULL, ramc_ids);
->>>>> +	if (!np)
->>>>> +		panic("unable to find compatible ram conroller node in dtb\n");
->>>>
->>>> You really can't boot if this fails? A WARN is better if it allows you
->>>> to boot until at least your console is actually up.
->>> if the restart is called you will have a oops so no it's a basic mandatory
->>> device on at91
->>>
+Le 8 mars 2012 12:46, Thomas Gleixner <tglx@linutronix.de> a ?crit :
+> On Thu, 8 Mar 2012, Enrico Scholz wrote:
+>> Hi,
 >>
->> But you may never see the panic message because your console is not up.
->> If you WARN and can continue to boot, then the user can see the problem
->> and fix it. Otherwise you get nothing and have to go rebuild and turn on
->> earlyprintk.
-> yeah agreed but if the restart id use before the console is enable you will
-> have the same issue. the ramc controller are basic device so people usally
-> don't touch it except you add a SoC support.
-> 
-> so I prefer to panic
-> 
+>> the commit "genirq: Unmask oneshot irqs when thread was not woken"[1]
+>> breaks at least the omap-serial driver which requests a shared interrupt
+>
+> Fixed with 52abb700e16a9a
 
-Then panic in the restart code if it doesn't have something it needs.
-
-Rob
+How can I find it ?
+I tried searching in various tree on git.kernel.org,
+but could not find the fix.
+>
+> Thanks,
+>
+> ? ? ? ?tglx
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
