@@ -1,56 +1,53 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 8 Mar 2012 07:13:24 +0100
-Subject: [PATCH 5/6] ARM: at91: add ram controller DT support
-In-Reply-To: <4F57BDCE.1050708@gmail.com>
-References: <20120302192844.GB21255@game.jcrosoft.org>
- <1330718048-9314-5-git-send-email-plagnioj@jcrosoft.com>
- <4F57BDCE.1050708@gmail.com>
-Message-ID: <20120308061324.GE27213@game.jcrosoft.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 8 Mar 2012 07:27:39 +0100
+Subject: [PATCH v5 3/4] clk: introduce the common clock framework
+In-Reply-To: <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-4-git-send-email-mturquette@linaro.org>
+ <20120303133158.GA26882@pengutronix.de>
+ <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
+ <20120304115201.GB26882@pengutronix.de>
+ <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
+ <20120305073836.GU3852@pengutronix.de>
+ <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
+ <20120306190039.GJ3852@pengutronix.de>
+ <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
+Message-ID: <20120308062739.GE18513@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > diff --git a/arch/arm/mach-at91/include/mach/at91sam9x5.h b/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> > index a297a77..88e43d5 100644
-> > --- a/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> > +++ b/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> > @@ -55,11 +55,6 @@
-> >  #define AT91SAM9X5_BASE_USART2	0xf8024000
-> >  
-> >  /*
-> > - * System Peripherals
-> > - */
-> > -#define AT91SAM9X5_BASE_DDRSDRC0	0xffffe800
-> > -
-> > -/*
-> >   * Base addresses for early serial code (uncompress.h)
-> >   */
-> >  #define AT91_DBGU	AT91_BASE_DBGU0
-> > diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> > index 3e48b59..f86450d 100644
-> > --- a/arch/arm/mach-at91/setup.c
-> > +++ b/arch/arm/mach-at91/setup.c
-> > @@ -315,12 +315,33 @@ static void at91_dt_rstc(void)
-> >  	of_node_put(np);
-> >  }
-> >  
-> > +static struct of_device_id ramc_ids[] = {
-> > +	{ .compatible = "atmel,at91sam9260-sdramc" },
-> > +	{ .compatible = "atmel,at91sam9g45-ddramc" },
-> > +	{ /*sentinel*/ }
-> > +};
-> > +
-> > +static void at91_dt_ramc(void)
-> > +{
-> > +	struct device_node *np;
-> > +
-> > +	np = of_find_matching_node(NULL, ramc_ids);
-> > +	if (!np)
-> > +		panic("unable to find compatible ram conroller node in dtb\n");
-> 
-> You really can't boot if this fails? A WARN is better if it allows you
-> to boot until at least your console is actually up.
-if the restart is called you will have a oops so no it's a basic mandatory
-device on at91
+> Assuming that some day OMAP code can be refactored to allow for lazy
+> (or at least initcall-based) registration of clocks then perhaps your
+> suggestion can take root.  Which leads me to this question: are there
+> any other platforms out there that require the level of expose to
+> struct clk present in this patchset?  OMAP does, for now, but if that
+> changes then I need to know if others require this as well.
 
-Best Regards,
-J.
+Hi Mike
+
+For kirkwood, i use static clk's for all but my root clock. I cannot
+statically know the rate of the root clock, so i have to determine it
+at boot time using heuristics, PCI ID, etc.
+
+I used statics thinking it would be less code. No idea if it actually
+is, and there is nothing stopping me moving to creating the clocks
+after creating the root clock.
+
+One comment i have about the current static clks. I completely missing
+you need to call __clk_init() on them and so ended up with lots of
+division by zero errors, since they did not have a parent, and so the
+code seemed not be to able to determine the rate.
+
+So 
+
+1) Please add __clk_init() to the documentation in the section about
+   static clocks.
+
+2) Should maybe the name change? It seems strange having to call a
+   __X() function. If this is a function which is supposed to be used,
+   drop the __. Maybe clk_static_register()?
+
+3) Maybe, if the parent is missing, clk_get_rate() should return an
+   error?
+
+Andrew
