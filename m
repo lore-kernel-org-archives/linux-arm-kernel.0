@@ -1,27 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Mar 2012 23:43:08 +0000
-Subject: Latest OMAP4 build errors
-In-Reply-To: <20120307224459.GJ12083@atomide.com>
-References: <20120228090209.GC18045@n2100.arm.linux.org.uk>
- <CAK=WgbZEDr_fYSonBQr3XNcTx5vefsH7LJfqycaxsqg-yechWQ@mail.gmail.com>
- <20120306165545.GB15392@n2100.arm.linux.org.uk>
- <201203061701.54141.arnd@arndb.de>
- <20120307100615.GA17404@n2100.arm.linux.org.uk>
- <20120307171044.GE12083@atomide.com>
- <CAOesGMiNSyc9F+Wf5pXPG=hRAfnG6aMHtccLBwvekuB3HpyevQ@mail.gmail.com>
- <20120307224459.GJ12083@atomide.com>
-Message-ID: <20120307234308.GA20364@n2100.arm.linux.org.uk>
+From: bill4carson@gmail.com (bill4carson)
+Date: Thu, 08 Mar 2012 08:35:36 +0800
+Subject: [PATCH 1/7] Add various hugetlb arm high level hooks
+In-Reply-To: <20120229153814.GK17745@arm.com>
+References: <1329126268-11032-1-git-send-email-bill4carson@gmail.com>
+ <1329126268-11032-2-git-send-email-bill4carson@gmail.com>
+ <20120229103207.GB17745@arm.com> <4F4E0BDE.6040708@gmail.com>
+ <20120229153814.GK17745@arm.com>
+Message-ID: <4F57FED8.7050708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 02:44:59PM -0800, Tony Lindgren wrote:
-> OK thanks, will do that next time if there's something urgent.
-> 
-> I'll send a pull request shortly for fixes-non-critical-part2 that
-> should sort out the remaining issues.
 
-FYI, I've just updated the build tree with what's in arm-soc (as of
-a couple of minutes ago), which contained a bunch of OMAP updates, so
-I'm hopeful that tomorrows results should show an improvement.
 
-It'll start its run in about 2h20.
+On 2012?02?29? 23:38, Catalin Marinas wrote:
+> On Wed, Feb 29, 2012 at 11:28:30AM +0000, bill4carson wrote:
+>> On 2012?02?29? 18:32, Catalin Marinas wrote:
+>>> On Mon, Feb 13, 2012 at 09:44:22AM +0000, Bill Carson wrote:
+>>>> +static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
+>>>> +					   unsigned long addr, pte_t *ptep)
+>>>> +{
+>>>> +	pte_t old_pte = *ptep;
+>>>> +	set_huge_pte_at(mm, addr, ptep, pte_wrprotect(old_pte));
+>>>> +}
+>>>
+>>> You could use the generic ptep_set_wrprotect()
+>>
+>> I'm a bit of confused about this.
+>>
+>> generic ptep_set_wrprotect() can not set huge pte, that's why
+>> set_huge_pte_at is used instead here.
+>
+> Ah, the generic one can only work with with LPAE where set_huge_pte_at()
+> is just a set_pte_at(). So this part looks good.
+>
+Hi, Catalin
+
+Thanks for your time to review PATCH1/7 :)
+
+I'm wondering if reset of this patch set is ok,
+I would like to start working on V3 as per your comments.
+
+
+
+-- 
+I am a slow learner
+but I will keep trying to fight for my dreams!
+
+--bill
