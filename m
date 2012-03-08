@@ -1,339 +1,145 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Thu,  8 Mar 2012 17:59:03 +0800
-Subject: [PATCH v10] Regulator: Add Anatop regulator driver
-Message-ID: <1331200744-5986-1-git-send-email-paul.liu@linaro.org>
+From: Richard.Earnshaw@arm.com (Richard Earnshaw)
+Date: Thu, 8 Mar 2012 09:58:23 +0000
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <alpine.LFD.2.02.1203021528150.31242@xanadu.home>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1330360043.8557.302.camel@zakaz.uk.xensource.com>
+ <20120227180355.GB2023@linaro.org>
+ <1330371219.10008.34.camel@dagon.hellion.org.uk>
+ <20120228102040.GB2063@linaro.org>
+ <1330426133.31269.70.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+ <20120229093436.GA2077@linaro.org>
+ <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+ <20120229125826.GC2077@linaro.org>
+ <alpine.LFD.2.02.1203021528150.31242@xanadu.home>
+Message-ID: <4F5882BF.1030104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+On 02/03/12 21:15, Nicolas Pitre wrote:
+> [ coming back from vacation and trying to catch up ]
+>
+> On Wed, 29 Feb 2012, Dave Martin wrote:
+>
+>> Just had a chat with some tools guys -- apparently, when passing register
+>> arguments to gcc inline asms there really isn't a guarantee that those
+>> variables will be in the expected registers on entry to the inline asm.
+>>
+>> If gcc reorders other function calls or other code around the inline asm
+>> (which it can do, except under certain controlled situations), then
+>> intervening code can clobber any registers in general.
+>
+> I'm hearing this argument about once every year or so for the last 8
+> years.  I think that the tools people are getting confused between
+> themselves as you may get a different interpretation of what gcc should
+> do depending to whom you happen to talk to.
+>
+> I did submit a bug to gcc in 2004 about this:
+>
+>       http://gcc.gnu.org/bugzilla/show_bug.cgi?id=15089
+>
+> You can see the confusion among gcc developers lurking there.
+>
+> So let's quote the relevant gcc documentation:
+>
+> -> * C Extensions::    GNU extensions to the C language family.
+>    -> * Explicit Reg Vars::   Defining variables residing in specified registers.
+>
+> |GNU C allows you to put a few global variables into specified hardware
+> |registers.  You can also specify the register in which an ordinary
+> |register variable should be allocated.
+> |
+> |   * Global register variables reserve registers throughout the program.
+> |     This may be useful in programs such as programming language
+> |     interpreters which have a couple of global variables that are
+> |     accessed very often.
+> |
+> |   * Local register variables in specific registers do not reserve the
+> |     registers, except at the point where they are used as input or
+> |     output operands in an `asm' statement and the `asm' statement
+> |     itself is not deleted.  The compiler's data flow analysis is
+> |     capable of determining where the specified registers contain live
+> |     values, and where they are available for other uses.  Stores into
+> |     local register variables may be deleted when they appear to be
+> |     dead according to dataflow analysis.  References to local register
+> |     variables may be deleted or moved or simplified.
+> |
+> |     These local variables are sometimes convenient for use with the
+> |     extended `asm' feature (*note Extended Asm::), if you want to
+> |     write one output of the assembler instruction directly into a
+> |     particular register.  (This will work provided the register you
+> |     specify fits the constraints specified for that operand in the
+> |     `asm'.)
+>
+>       -> * Local Reg Vars::
+>
+> [...]
+>
+> | Defining such a register variable does not reserve the register; it
+> |remains available for other uses in places where flow control
+> |determines the variable's value is not live.
+> |
+> | This option does not guarantee that GCC will generate code that has
+> |this variable in the register you specify at all times.  You may not
+> |code an explicit reference to this register in the _assembler
+> |instruction template_ part of an `asm' statement and assume it will
+> |always refer to this variable.  However, using the variable as an `asm'
+> |_operand_ guarantees that the specified register is used for the
+> |operand.
+>
+> So, to me, the gcc documentation is perfectly clear on this topic.
+> there really _is_ a guarantee that those asm marked variables will be in
+> the expected registers on entry to the inline asm, given that the
+> variable is _also_ listed as an operand to the asm statement.  But only
+> in that case.
+>
+> It is true that gcc may reorder other function calls or other code
+> around the inline asm and then intervening code can clobber any
+> registers.  Then it is up to gcc to preserve the variable's content
+> elsewhere when its register is used for other purposes, and restore it
+> when some inline asm statement is referring to it.
+>
+> And if gcc does not do this then it is buggy.  Version 3.4.0 of gcc was
+> buggy.  No other gcc versions in the last 7 years had such a problem or
+> the __asmeq macro in the kernel would have told us.
+>
+>> Or, to summarise another way, there is no way to control which register
+>> is used to pass something to an inline asm in general (often we get away
+>> with this, and there are a lot of inline asms in the kernel that assume
+>> it works, but the more you inline the more likely you are to get nasty
+>> surprises).
+>
+> This statement is therefore unfounded and wrong.  Please direct the
+> tools guy who mislead you to the above gcc documentation.
+>
 
-Anatop is an integrated regulator inside i.MX6 SoC.
-There are 3 digital regulators which controls PU, CORE (ARM), and SOC.
-And 3 analog regulators which controls 1P1, 2P5, 3P0 (USB).
-This patch adds the Anatop regulator driver.
+The problem is not really about re-ordering functions but about implicit
+functions that come from the source code; for example
 
-Signed-off-by: Nancy Chen <Nancy.Chen@freescale.com>
-Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Axel Lin <axel.lin@gmail.com>
----
- .../bindings/regulator/anatop-regulator.txt        |   28 +++
- drivers/regulator/Kconfig                          |    8 +
- drivers/regulator/Makefile                         |    1 +
- drivers/regulator/anatop-regulator.c               |  236 ++++++++++++++++++++
- 4 files changed, 273 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/anatop-regulator.txt
- create mode 100644 drivers/regulator/anatop-regulator.c
+int foo (int a, int b)
+{
+  register int x __asm__("r0") = 33;
 
-diff --git a/Documentation/devicetree/bindings/regulator/anatop-regulator.txt b/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
-new file mode 100644
-index 0000000..73363e76
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
-@@ -0,0 +1,28 @@
-+Anatop Voltage regulators
-+
-+Required properties:
-+- compatible: Must be "fsl,anatop-regulator"
-+- anatop-vol-bit-shift: Bit shift for the register
-+- anatop-vol-bit-width: Number of bits used in the register
-+- anatop-min-bit-val: Minimum value of this register
-+- anatop-min-voltage: Minimum voltage of this regulator
-+- anatop-max-voltage: Maximum voltage of this regulator
-+
-+Any property defined as part of the core regulator
-+binding, defined in regulator.txt, can also be used.
-+
-+Example:
-+
-+	reg_vddpu: regulator-vddpu at 140 {
-+		compatible = "fsl,anatop-regulator";
-+		regulator-name = "vddpu";
-+		regulator-min-microvolt = <725000>;
-+		regulator-max-microvolt = <1300000>;
-+		regulator-always-on;
-+		reg = <0x140>;
-+		anatop-vol-bit-shift = <9>;
-+		anatop-vol-bit-width = <5>;
-+		anatop-min-bit-val = <1>;
-+		anatop-min-voltage = <725000>;
-+		anatop-max-voltage = <1300000>;
-+	};
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 7a61b17..3857209 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -213,6 +213,14 @@ config REGULATOR_PCAP
- 	 This driver provides support for the voltage regulators of the
- 	 PCAP2 PMIC.
- 
-+config REGULATOR_ANATOP
-+	tristate "Freescale i.MX on-chip ANATOP LDO regulators"
-+	depends on MFD_ANATOP
-+	help
-+	  Say y here to support Freescale i.MX on-chip ANATOP LDOs
-+	  regulators. It is recommended that this option be
-+	  enabled on i.MX6 platform.
-+
- config REGULATOR_MC13XXX_CORE
- 	tristate
- 
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 503bac8..8440871 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -48,5 +48,6 @@ obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
- obj-$(CONFIG_REGULATOR_DB8500_PRCMU) += db8500-prcmu.o
- obj-$(CONFIG_REGULATOR_TPS65910) += tps65910-regulator.o
- obj-$(CONFIG_REGULATOR_AAT2870) += aat2870-regulator.o
-+obj-$(CONFIG_REGULATOR_ANATOP) += anatop-regulator.o
- 
- ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
-diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
-new file mode 100644
-index 0000000..133a17b
---- /dev/null
-+++ b/drivers/regulator/anatop-regulator.c
-@@ -0,0 +1,236 @@
-+/*
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ */
-+
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
-+
-+#include <linux/slab.h>
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/mfd/anatop.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/of_regulator.h>
-+
-+struct anatop_regulator {
-+	const char *name;
-+	u32 control_reg;
-+	struct anatop *mfd;
-+	int vol_bit_shift;
-+	int vol_bit_width;
-+	int min_bit_val;
-+	int min_voltage;
-+	int max_voltage;
-+	struct regulator_desc rdesc;
-+	struct regulator_init_data *initdata;
-+};
-+
-+static int anatop_set_voltage(struct regulator_dev *reg, int min_uV,
-+				  int max_uV, unsigned *selector)
-+{
-+	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
-+	u32 val, sel;
-+	int uv;
-+
-+	uv = min_uV;
-+	dev_dbg(&reg->dev, "%s: uv %d, min %d, max %d\n", __func__,
-+		uv, anatop_reg->min_voltage,
-+		anatop_reg->max_voltage);
-+
-+	if (uv < anatop_reg->min_voltage) {
-+		if (max_uV > anatop_reg->min_voltage)
-+			uv = anatop_reg->min_voltage;
-+		else
-+			return -EINVAL;
-+	}
-+
-+	if (anatop_reg->control_reg) {
-+		sel = (uv - anatop_reg->min_voltage) / 25000;
-+		if (sel * 25000 + anatop_reg->min_voltage
-+		    > anatop_reg->max_voltage)
-+			return -EINVAL;
-+		val = anatop_reg->min_bit_val + sel;
-+		*selector = sel;
-+		dev_dbg(&reg->dev, "%s: calculated val %d\n", __func__, val);
-+		anatop_set_bits(anatop_reg->mfd,
-+				anatop_reg->control_reg,
-+				anatop_reg->vol_bit_shift,
-+				anatop_reg->vol_bit_width,
-+				val);
-+		return 0;
-+	} else {
-+		return -ENOTSUPP;
-+	}
-+}
-+
-+static int anatop_get_voltage_sel(struct regulator_dev *reg)
-+{
-+	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
-+	int selector;
-+
-+	if (anatop_reg->control_reg) {
-+		u32 val = anatop_get_bits(anatop_reg->mfd,
-+					  anatop_reg->control_reg,
-+					  anatop_reg->vol_bit_shift,
-+					  anatop_reg->vol_bit_width);
-+		selector = val - anatop_reg->min_bit_val;
-+		return selector;
-+	} else {
-+		return -ENOTSUPP;
-+	}
-+}
-+
-+static int anatop_list_voltage(struct regulator_dev *reg, unsigned selector)
-+{
-+	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
-+	int uv;
-+
-+	uv = anatop_reg->min_voltage + selector * 25000;
-+	dev_dbg(&reg->dev, "vddio = %d, selector = %u\n", uv, selector);
-+
-+	return uv;
-+}
-+
-+static struct regulator_ops anatop_rops = {
-+	.set_voltage     = anatop_set_voltage,
-+	.get_voltage_sel = anatop_get_voltage_sel,
-+	.list_voltage    = anatop_list_voltage,
-+};
-+
-+static int __devinit anatop_regulator_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct regulator_desc *rdesc;
-+	struct regulator_dev *rdev;
-+	struct anatop_regulator *sreg;
-+	struct regulator_init_data *initdata;
-+	struct anatop *anatopmfd = dev_get_drvdata(pdev->dev.parent);
-+	int ret = 0;
-+
-+	initdata = of_get_regulator_init_data(dev, np);
-+	sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
-+	if (!sreg)
-+		return -ENOMEM;
-+	sreg->initdata = initdata;
-+	sreg->name = kstrdup(of_get_property(np, "regulator-name", NULL),
-+			     GFP_KERNEL);
-+	rdesc = &sreg->rdesc;
-+	memset(rdesc, 0, sizeof(*rdesc));
-+	rdesc->name = sreg->name;
-+	rdesc->ops = &anatop_rops;
-+	rdesc->type = REGULATOR_VOLTAGE;
-+	rdesc->owner = THIS_MODULE;
-+	sreg->mfd = anatopmfd;
-+	if (of_property_read_u32(np, "reg", &sreg->control_reg)) {
-+		dev_err(&pdev->dev, "no reg property set\n");
-+		ret = -ENODEV;
-+		goto anatop_probe_end;
-+	}
-+	if (of_property_read_u32(np, "anatop-vol-bit-width",
-+				 &sreg->vol_bit_width)) {
-+		dev_err(&pdev->dev, "no anatop-vol-bit-width property set\n");
-+		ret = -ENODEV;
-+		goto anatop_probe_end;
-+	}
-+	if (of_property_read_u32(np, "anatop-vol-bit-shift",
-+				 &sreg->vol_bit_shift)) {
-+		dev_err(&pdev->dev, "no anatop-vol-bit-shift property set\n");
-+		ret = -ENODEV;
-+		goto anatop_probe_end;
-+	}
-+	if (of_property_read_u32(np, "anatop-min-bit-val",
-+				 &sreg->min_bit_val)) {
-+		dev_err(&pdev->dev, "no anatop-min-bit-val property set\n");
-+		ret = -ENODEV;
-+		goto anatop_probe_end;
-+	}
-+	if (of_property_read_u32(np, "anatop-min-voltage",
-+				 &sreg->min_voltage)) {
-+		dev_err(&pdev->dev, "no anatop-min-voltage property set\n");
-+		ret = -ENODEV;
-+		goto anatop_probe_end;
-+	}
-+	if (of_property_read_u32(np, "anatop-max-voltage",
-+				 &sreg->max_voltage)) {
-+		dev_err(&pdev->dev, "no anatop-max-voltage property set\n");
-+		ret = -ENODEV;
-+		goto anatop_probe_end;
-+	}
-+
-+	/* register regulator */
-+	rdev = regulator_register(rdesc, &pdev->dev,
-+				  initdata, sreg, pdev->dev.of_node);
-+	if (IS_ERR(rdev)) {
-+		dev_err(&pdev->dev, "failed to register %s\n",
-+			rdesc->name);
-+		ret = PTR_ERR(rdev);
-+		goto anatop_probe_end;
-+	}
-+
-+	platform_set_drvdata(pdev, rdev);
-+
-+anatop_probe_end:
-+	if (ret != 0 && sreg->name)
-+		kfree(sreg->name);
-+	return ret;
-+}
-+
-+static int __devexit anatop_regulator_remove(struct platform_device *pdev)
-+{
-+	struct regulator_dev *rdev = platform_get_drvdata(pdev);
-+	struct anatop_regulator *sreg = rdev_get_drvdata(rdev);
-+	kfree(sreg->name);
-+	regulator_unregister(rdev);
-+	return 0;
-+}
-+
-+static struct of_device_id __devinitdata of_anatop_regulator_match_tbl[] = {
-+	{ .compatible = "fsl,anatop-regulator", },
-+	{ /* end */ }
-+};
-+
-+static struct platform_driver anatop_regulator = {
-+	.driver = {
-+		.name	= "anatop_regulator",
-+		.owner  = THIS_MODULE,
-+		.of_match_table = of_anatop_regulator_match_tbl,
-+	},
-+	.probe	= anatop_regulator_probe,
-+	.remove	= anatop_regulator_remove,
-+};
-+
-+static int __init anatop_regulator_init(void)
-+{
-+	return platform_driver_register(&anatop_regulator);
-+}
-+postcore_initcall(anatop_regulator_init);
-+
-+static void __exit anatop_regulator_exit(void)
-+{
-+	platform_driver_unregister(&anatop_regulator);
-+}
-+module_exit(anatop_regulator_exit);
-+
-+MODULE_AUTHOR("Nancy Chen <Nancy.Chen@freescale.com>, "
-+	      "Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>");
-+MODULE_DESCRIPTION("ANATOP Regulator driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.1
+  register int c __asm__("r1") = a / b; /* Ooops, clobbers r0 with
+division function call.  */
+
+  asm ("svc 0" : : "r" (x));
+}
+
+There's nothing in the specification to say what happens if there's a
+statement in the code that causes an implicit clobber of your assembly
+register.
+
+The best you can do here is to never initialize asm regs until you are
+about to use them, but even that won't help if your register
+initialization code needs the help of a function call.
+
+Other common ways of exposing this weakness in the spec are TLS
+variables and structure copies...
+
+R.
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
