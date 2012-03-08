@@ -1,143 +1,82 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 08 Mar 2012 03:51:33 -0700
-Subject: [PATCH 08/15] ARM: OMAP4: hwmod data: add McASP
+Date: Thu, 08 Mar 2012 03:51:35 -0700
+Subject: [PATCH 11/15] ARM: OMAP4: hwmod data: add OCM RAM IP block
 In-Reply-To: <20120308104918.14753.69281.stgit@dusk>
 References: <20120308104918.14753.69281.stgit@dusk>
-Message-ID: <20120308105132.14753.91529.stgit@dusk>
+Message-ID: <20120308105134.14753.63101.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Beno?t Cousson <b-cousson@ti.com>
+Add the OCM RAM IP block and interconnect data.  This is an oh-chip
+block of SRAM connected directly to the L3 bus.
 
-Add the McASP hwmod and associated interconnect data.  The McASP is a
-general-purpose audio serial port.
-
-Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   91 ++++++++++++++++++++++++++++
- 1 files changed, 90 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   32 +++++++++++++++++++++++++++-
+ 1 files changed, 31 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 283c5b2..3be64f5 100644
+index 968feb0..f48fe77 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -260,7 +260,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
-  *  efuse_ctrl_cust
+@@ -280,7 +280,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
   *  efuse_ctrl_std
-  *  elm
-- *  mcasp
   *  mpu_c0
   *  mpu_c1
-  *  ocmc_ram
-@@ -1669,6 +1668,58 @@ static struct omap_hwmod omap44xx_mailbox_hwmod = {
+- *  ocmc_ram
+  *  ocp_wp_noc
+  *  prcm_mpu
+  *  prm
+@@ -2356,6 +2355,28 @@ static struct omap_hwmod omap44xx_mpu_hwmod = {
  };
  
  /*
-+ * 'mcasp' class
-+ * multi-channel audio serial port controller
++ * 'ocmc_ram' class
++ * top-level core on-chip ram
 + */
 +
-+/* The IP is not compliant to type1 / type2 scheme */
-+static struct omap_hwmod_sysc_fields omap_hwmod_sysc_type_mcasp = {
-+	.sidle_shift	= 0,
++static struct omap_hwmod_class omap44xx_ocmc_ram_hwmod_class = {
++	.name	= "ocmc_ram",
 +};
 +
-+static struct omap_hwmod_class_sysconfig omap44xx_mcasp_sysc = {
-+	.sysc_offs	= 0x0004,
-+	.sysc_flags	= SYSC_HAS_SIDLEMODE,
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   SIDLE_SMART_WKUP),
-+	.sysc_fields	= &omap_hwmod_sysc_type_mcasp,
-+};
-+
-+static struct omap_hwmod_class omap44xx_mcasp_hwmod_class = {
-+	.name	= "mcasp",
-+	.sysc	= &omap44xx_mcasp_sysc,
-+};
-+
-+/* mcasp */
-+static struct omap_hwmod_irq_info omap44xx_mcasp_irqs[] = {
-+	{ .name = "arevt", .irq = 108 + OMAP44XX_IRQ_GIC_START },
-+	{ .name = "axevt", .irq = 109 + OMAP44XX_IRQ_GIC_START },
-+	{ .irq = -1 }
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_mcasp_sdma_reqs[] = {
-+	{ .name = "axevt", .dma_req = 7 + OMAP44XX_DMA_REQ_START },
-+	{ .name = "arevt", .dma_req = 10 + OMAP44XX_DMA_REQ_START },
-+	{ .dma_req = -1 }
-+};
-+
-+static struct omap_hwmod omap44xx_mcasp_hwmod = {
-+	.name		= "mcasp",
-+	.class		= &omap44xx_mcasp_hwmod_class,
-+	.clkdm_name	= "abe_clkdm",
-+	.mpu_irqs	= omap44xx_mcasp_irqs,
-+	.sdma_reqs	= omap44xx_mcasp_sdma_reqs,
-+	.main_clk	= "mcasp_fck",
++/* ocmc_ram */
++static struct omap_hwmod omap44xx_ocmc_ram_hwmod = {
++	.name		= "ocmc_ram",
++	.class		= &omap44xx_ocmc_ram_hwmod_class,
++	.clkdm_name	= "l3_2_clkdm",
 +	.prcm = {
 +		.omap4 = {
-+			.clkctrl_offs = OMAP4_CM1_ABE_MCASP_CLKCTRL_OFFSET,
-+			.context_offs = OMAP4_RM_ABE_MCASP_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_SWCTRL,
++			.clkctrl_offs = OMAP4_CM_L3_2_OCMC_RAM_CLKCTRL_OFFSET,
++			.context_offs = OMAP4_RM_L3_2_OCMC_RAM_CONTEXT_OFFSET,
 +		},
 +	},
 +};
 +
 +/*
-  * 'mcbsp' class
-  * multi channel buffered serial port controller
-  */
-@@ -4224,6 +4275,42 @@ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__mailbox = {
+  * 'ocp2scp' class
+  * bridge to transform ocp interface protocol to scp (serial control port)
+  * protocol
+@@ -4923,6 +4944,14 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__mmc5 = {
  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
  };
  
-+static struct omap_hwmod_addr_space omap44xx_mcasp_addrs[] = {
-+	{
-+		.pa_start	= 0x40128000,
-+		.pa_end		= 0x401283ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+	{ }
++/* l3_main_2 -> ocmc_ram */
++static struct omap_hwmod_ocp_if omap44xx_l3_main_2__ocmc_ram = {
++	.master		= &omap44xx_l3_main_2_hwmod,
++	.slave		= &omap44xx_ocmc_ram_hwmod,
++	.clk		= "l3_div_ck",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 +};
 +
-+/* l4_abe -> mcasp */
-+static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcasp = {
-+	.master		= &omap44xx_l4_abe_hwmod,
-+	.slave		= &omap44xx_mcasp_hwmod,
-+	.clk		= "ocp_abe_iclk",
-+	.addr		= omap44xx_mcasp_addrs,
-+	.user		= OCP_USER_MPU,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_mcasp_dma_addrs[] = {
-+	{
-+		.pa_start	= 0x49028000,
-+		.pa_end		= 0x490283ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+	{ }
-+};
-+
-+/* l4_abe -> mcasp (dma) */
-+static struct omap_hwmod_ocp_if omap44xx_l4_abe__mcasp_dma = {
-+	.master		= &omap44xx_l4_abe_hwmod,
-+	.slave		= &omap44xx_mcasp_hwmod,
-+	.clk		= "ocp_abe_iclk",
-+	.addr		= omap44xx_mcasp_dma_addrs,
-+	.user		= OCP_USER_SDMA,
-+};
-+
- static struct omap_hwmod_addr_space omap44xx_mcbsp1_addrs[] = {
- 	{
- 		.name		= "mpu",
-@@ -5222,6 +5309,8 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap44xx_l3_main_2__iva,
- 	&omap44xx_l4_wkup__kbd,
- 	&omap44xx_l4_cfg__mailbox,
-+	&omap44xx_l4_abe__mcasp,
-+	&omap44xx_l4_abe__mcasp_dma,
- 	&omap44xx_l4_abe__mcbsp1,
- 	&omap44xx_l4_abe__mcbsp1_dma,
- 	&omap44xx_l4_abe__mcbsp2,
+ /* l4_cfg -> ocp2scp_usb_phy */
+ static struct omap_hwmod_ocp_if omap44xx_l4_cfg__ocp2scp_usb_phy = {
+ 	.master		= &omap44xx_l4_cfg_hwmod,
+@@ -5654,6 +5683,7 @@ static struct omap_hwmod_ocp_if *omap44xx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap44xx_l4_per__mmc3,
+ 	&omap44xx_l4_per__mmc4,
+ 	&omap44xx_l4_per__mmc5,
++	&omap44xx_l3_main_2__ocmc_ram,
+ 	&omap44xx_l4_cfg__ocp2scp_usb_phy,
+ 	&omap44xx_l3_main_2__sl2if,
+ 	&omap44xx_l4_abe__slimbus1,
