@@ -1,56 +1,191 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu,  8 Mar 2012 17:06:06 -0500
-Subject: [PATCH] ARM: pxa: fix build failure for regulator consumer in
- em-x270.c
-In-Reply-To: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
-References: <CAP=VYLp-weNj35OHtmZ6pf5-t7OUxWREeu8r5sSOLhFYu0CppQ@mail.gmail.com>
-Message-ID: <1331244366-6147-1-git-send-email-paul.gortmaker@windriver.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu,  8 Mar 2012 23:09:34 +0100
+Subject: [PATCH v4] USB: Support for LPC32xx SoC
+Message-ID: <1331244574-32570-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0 (linux-next)
+This patch adds OHCI support to the LPC32xx ARM platform
 
-  "regulator: Remove support for supplies specified by struct device"
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-caused this file to break, since it was still relying on the
-device field to be present.  Update them to use the new dev_name
-entries instead.
-
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
+ Applies to v3.3-rc6
 
-[v2: replace dev with dev_name instead of just deleting dev.
- Note however there is dev_name overlap; not sure if that matters? ]
+ Since v3, only the machine_is_*() dependencies have been pulled into
+ the machine dependent functions.
 
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index c1b65da..0ffc100 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -1083,19 +1083,19 @@ static void __init em_x270_userspace_consumers_init(void)
+ Thanks to Greg Kroah-Hartman for reviewing!
+
+ drivers/usb/host/ohci-hcd.c     |    5 +
+ drivers/usb/host/ohci-pnx4008.c |  119 +++++++++++++++++++++++++++++-----------
+ 2 files changed, 94 insertions(+), 30 deletions(-)
+
+--- linux-2.6.orig/drivers/usb/host/ohci-hcd.c
++++ linux-2.6/drivers/usb/host/ohci-hcd.c
+@@ -1055,6 +1055,11 @@ MODULE_LICENSE ("GPL");
+ #define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
+ #endif
+ 
++#ifdef CONFIG_ARCH_LPC32XX
++#include "ohci-pnx4008.c"
++#define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
++#endif
++
+ #ifdef CONFIG_ARCH_DAVINCI_DA8XX
+ #include "ohci-da8xx.c"
+ #define PLATFORM_DRIVER		ohci_hcd_da8xx_driver
+--- linux-2.6.orig/drivers/usb/host/ohci-pnx4008.c
++++ linux-2.6/drivers/usb/host/ohci-pnx4008.c
+@@ -22,6 +22,7 @@
+ #include <linux/i2c.h>
+ 
+ #include <mach/hardware.h>
++#include <asm/mach-types.h>
+ #include <asm/io.h>
+ 
+ #include <mach/platform.h>
+@@ -143,7 +144,17 @@ static void i2c_write(u8 buf, u8 subaddr
+ 	i2c_master_send(isp1301_i2c_client, &tmpbuf[0], 2);
  }
  
- /* DA9030 related initializations */
--#define REGULATOR_CONSUMER(_name, _dev, _supply)			       \
-+#define REGULATOR_CONSUMER(_name, _dev_name, _supply)		        \
- 	static struct regulator_consumer_supply _name##_consumers[] = {	\
- 		{							\
--			.dev = _dev,					\
-+			.dev_name = _dev_name,				\
- 			.supply = _supply,				\
- 		},							\
- 	}
+-static void isp1301_configure(void)
++static u16 i2c_read16(u8 subaddr)
++{
++	u16 data;
++
++	i2c_master_send(isp1301_i2c_client, &subaddr, 1);
++	i2c_master_recv(isp1301_i2c_client, (u8 *) &data, 2);
++
++	return data;
++}
++
++static void isp1301_configure_pnx4008(void)
+ {
+ 	/* PNX4008 only supports DAT_SE0 USB mode */
+ 	/* PNX4008 R2A requires setting the MAX603 to output 3.6V */
+@@ -166,7 +177,51 @@ static void isp1301_configure(void)
+ 		  ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
+ 	i2c_write(0xFF,
+ 		  ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
++}
  
--REGULATOR_CONSUMER(ldo3, &em_x270_gps_userspace_consumer.dev, "vcc gps");
-+REGULATOR_CONSUMER(ldo3, "reg-userspace-consumer", "vcc gps");
- REGULATOR_CONSUMER(ldo5, NULL, "vcc cam");
--REGULATOR_CONSUMER(ldo10, &pxa_device_mci.dev, "vcc sdio");
-+REGULATOR_CONSUMER(ldo10, "pxa2xx-mci", "vcc sdio");
- REGULATOR_CONSUMER(ldo12, NULL, "vcc usb");
--REGULATOR_CONSUMER(ldo19, &em_x270_gprs_userspace_consumer.dev, "vcc gprs");
-+REGULATOR_CONSUMER(ldo19, "reg-userspace-consumer", "vcc gprs");
- REGULATOR_CONSUMER(buck2, NULL, "vcc_core");
++static void isp1301_configure_lpc32xx(void)
++{
++	/* LPC32XX only supports DAT_SE0 USB mode */
++	/* This sequence is important */
++
++	/* Disable transparent UART mode first */
++	i2c_write(MC1_UART_EN, (ISP1301_I2C_MODE_CONTROL_1 |
++		ISP1301_I2C_REG_CLEAR_ADDR));
++
++	i2c_write(~MC1_SPEED_REG, (ISP1301_I2C_MODE_CONTROL_1 |
++		ISP1301_I2C_REG_CLEAR_ADDR));
++	i2c_write(MC1_SPEED_REG, ISP1301_I2C_MODE_CONTROL_1);
++	i2c_write(~0,
++		(ISP1301_I2C_MODE_CONTROL_2 | ISP1301_I2C_REG_CLEAR_ADDR));
++	i2c_write((MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL),
++		ISP1301_I2C_MODE_CONTROL_2);
++	i2c_write(~0, (ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
++	i2c_write(MC1_DAT_SE0, ISP1301_I2C_MODE_CONTROL_1);
++	i2c_write((OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN),
++		ISP1301_I2C_OTG_CONTROL_1);
++	i2c_write((OTG1_DM_PULLUP | OTG1_DP_PULLUP),
++		(ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR));
++	i2c_write(~0,
++		 ISP1301_I2C_INTERRUPT_LATCH | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(~0,
++		ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(~0,
++		ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
++
++	/* Enable usb_need_clk clock after transceiver is initialized */
++	__raw_writel((__raw_readl(USB_CTRL) | (1 << 22)), USB_CTRL);
++
++	printk(KERN_INFO "ISP1301 Vendor ID  : 0x%04x\n", i2c_read16(0x00));
++	printk(KERN_INFO "ISP1301 Product ID : 0x%04x\n", i2c_read16(0x02));
++	printk(KERN_INFO "ISP1301 Version ID : 0x%04x\n", i2c_read16(0x14));
++}
++
++static void isp1301_configure(void)
++{
++	if (machine_is_pnx4008())
++		isp1301_configure_pnx4008();
++	else
++		isp1301_configure_lpc32xx();
+ }
  
- #define REGULATOR_INIT(_ldo, _min_uV, _max_uV, _ops_mask)		\
--- 
-1.7.9.1
+ static inline void isp1301_vbus_on(void)
+@@ -257,39 +312,43 @@ static const struct hc_driver ohci_pnx40
+ 
+ static void pnx4008_set_usb_bits(void)
+ {
+-	start_int_set_falling_edge(SE_USB_OTG_ATX_INT_N);
+-	start_int_ack(SE_USB_OTG_ATX_INT_N);
+-	start_int_umask(SE_USB_OTG_ATX_INT_N);
+-
+-	start_int_set_rising_edge(SE_USB_OTG_TIMER_INT);
+-	start_int_ack(SE_USB_OTG_TIMER_INT);
+-	start_int_umask(SE_USB_OTG_TIMER_INT);
+-
+-	start_int_set_rising_edge(SE_USB_I2C_INT);
+-	start_int_ack(SE_USB_I2C_INT);
+-	start_int_umask(SE_USB_I2C_INT);
+-
+-	start_int_set_rising_edge(SE_USB_INT);
+-	start_int_ack(SE_USB_INT);
+-	start_int_umask(SE_USB_INT);
+-
+-	start_int_set_rising_edge(SE_USB_NEED_CLK_INT);
+-	start_int_ack(SE_USB_NEED_CLK_INT);
+-	start_int_umask(SE_USB_NEED_CLK_INT);
+-
+-	start_int_set_rising_edge(SE_USB_AHB_NEED_CLK_INT);
+-	start_int_ack(SE_USB_AHB_NEED_CLK_INT);
+-	start_int_umask(SE_USB_AHB_NEED_CLK_INT);
++	if (machine_is_pnx4008()) {
++		start_int_set_falling_edge(SE_USB_OTG_ATX_INT_N);
++		start_int_ack(SE_USB_OTG_ATX_INT_N);
++		start_int_umask(SE_USB_OTG_ATX_INT_N);
++
++		start_int_set_rising_edge(SE_USB_OTG_TIMER_INT);
++		start_int_ack(SE_USB_OTG_TIMER_INT);
++		start_int_umask(SE_USB_OTG_TIMER_INT);
++
++		start_int_set_rising_edge(SE_USB_I2C_INT);
++		start_int_ack(SE_USB_I2C_INT);
++		start_int_umask(SE_USB_I2C_INT);
++
++		start_int_set_rising_edge(SE_USB_INT);
++		start_int_ack(SE_USB_INT);
++		start_int_umask(SE_USB_INT);
++
++		start_int_set_rising_edge(SE_USB_NEED_CLK_INT);
++		start_int_ack(SE_USB_NEED_CLK_INT);
++		start_int_umask(SE_USB_NEED_CLK_INT);
++
++		start_int_set_rising_edge(SE_USB_AHB_NEED_CLK_INT);
++		start_int_ack(SE_USB_AHB_NEED_CLK_INT);
++		start_int_umask(SE_USB_AHB_NEED_CLK_INT);
++	}
+ }
+ 
+ static void pnx4008_unset_usb_bits(void)
+ {
+-	start_int_mask(SE_USB_OTG_ATX_INT_N);
+-	start_int_mask(SE_USB_OTG_TIMER_INT);
+-	start_int_mask(SE_USB_I2C_INT);
+-	start_int_mask(SE_USB_INT);
+-	start_int_mask(SE_USB_NEED_CLK_INT);
+-	start_int_mask(SE_USB_AHB_NEED_CLK_INT);
++	if (machine_is_pnx4008()) {
++		start_int_mask(SE_USB_OTG_ATX_INT_N);
++		start_int_mask(SE_USB_OTG_TIMER_INT);
++		start_int_mask(SE_USB_I2C_INT);
++		start_int_mask(SE_USB_INT);
++		start_int_mask(SE_USB_NEED_CLK_INT);
++		start_int_mask(SE_USB_AHB_NEED_CLK_INT);
++	}
+ }
+ 
+ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
