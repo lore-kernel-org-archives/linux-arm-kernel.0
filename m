@@ -1,49 +1,62 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Thu, 8 Mar 2012 18:47:52 +0530
-Subject: [PATCHv2 00/13] I2C updates
-Message-ID: <1331212685-6524-1-git-send-email-shubhrajyoti@ti.com>
+Date: Thu, 8 Mar 2012 18:48:00 +0530
+Subject: [PATCHv2 08/13] OMAP: I2C: Fix the error handling
+In-Reply-To: <1331212685-6524-1-git-send-email-shubhrajyoti@ti.com>
+References: <1331212685-6524-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1331212685-6524-9-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch series does the following 
+Currently in probe
+      pm_runtime_put(dev->dev);
 
-- Warn fixes if CONFIG_PM_RUNTIME is not selected.
-- I2C register restore only if context if the context is lost
-- Bus busy recovery mechanism.
-- the reset is not done in init.
+...
+        /* i2c device drivers may be active on return from add_adapter() */
+        adap->nr = pdev->id;
+        r = i2c_add_numbered_adapter(adap);
+        if (r) {
+                dev_err(dev->dev, "failure adding adapter\n");
+                goto err_free_irq;
+        }
+...
 
-v2 changes
--Adds a patch to use devm_* functions
--Also checks the return type of the get_sync and in case
- of errors prevents register access. 
-- In case of i2c remove register access was done without any
- get_sync fix the same.
-- Adds a pdata function pointer to do context save restore
+        return 0;
+
+err_free_irq:
+        free_irq(dev->irq, dev);
+err_unuse_clocks:
+        omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+        pm_runtime_put(dev->dev);
+
+This may access the i2c registers without the clocks.
+Attempting to fix the same by moving the pm_rintime_put after the error check.
+
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index dd4e296..e12144e 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1095,8 +1095,6 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", pdev->id,
+ 		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed);
  
-Tested on omap4sdp and omap3sdp. 
-
-Also available through 
-
-git://gitorious.org/linus-tree/linus-tree.git for_3.4_i2c_fixes
-
-
-Jon Hunter (1):
-  I2C: OMAP: Correct I2C revision for OMAP3
-
-Shubhrajyoti D (11):
-  I2C : OMAP : make omap_i2c_unidle/idle functions depend on
-    CONFIG_PM_RUNTIME
-  OMAP : I2C : Remove reset at init
-  OMAP: I2C: I2C register restore only if context is lost
-  OMAP: I2C: Fix the interrupt clearing in OMAP4
-  OMAP: I2C: Fix the mismatch of pm_runtime enable and disable
-  OMAP: I2C: Optimise the remove code
-  OMAP: I2C: Fix the error handling
-  I2C: OMAP: Don't check if wait_for_completion_timeout() returns less
-    than zero
-  OMAP : I2C : use devm_* functions
-  I2C : OMAP : Fix the crash in i2c remove
-  OMAP: I2C: Handle error check for pm runtime
-
-Vikram Pandita (1):
-  I2C: OMAP: Recover from Bus Busy condition
+-	pm_runtime_put(dev->dev);
+-
+ 	adap = &dev->adapter;
+ 	i2c_set_adapdata(adap, dev);
+ 	adap->owner = THIS_MODULE;
+@@ -1116,6 +1114,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	of_i2c_register_devices(adap);
+ 
++	pm_runtime_put(dev->dev);
++
+ 	return 0;
+ 
+ err_free_irq:
+-- 
+1.7.1
