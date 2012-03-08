@@ -1,34 +1,90 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 8 Mar 2012 15:17:56 +0000
-Subject: [PATCH 05/11] tps6586x: Add device-tree support
-In-Reply-To: <20120308151545.GA23934@avionic-0098.mockup.avionic-design.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 08 Mar 2012 09:22:05 -0600
+Subject: [PATCH 00/11] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-6-git-send-email-thierry.reding@avionic-design.de>
- <20120308150607.GP3638@opensource.wolfsonmicro.com>
- <20120308151545.GA23934@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120308151756.GQ3638@opensource.wolfsonmicro.com>
+Message-ID: <4F58CE9D.3070605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 04:15:46PM +0100, Thierry Reding wrote:
-> * Mark Brown wrote:
+On 03/08/2012 08:51 AM, Thierry Reding wrote:
+> This patch series adds support for device tree based probing of the PCIe
+> controller found on Tegra SoCs.
+> 
+> Patches 1 and 2 have already been posted by Grant and Mark respectively
+> but I've included them here for reference. Both patches are dependencies
+> for the subsequent patches.
+> 
+> Patches 3, 4 and 5 add support for obtaining the regulators required to
+> power the PCIe controller from the device tree. Patches 6 and 7 are
+> required to make some common PCI functions available after the init
+> phase because the deferred probing will postpone the probing of the PCIe
+> controller driver until that point.
+> 
+> Patches 8 and 9 make the PCIe controller code available as a driver and
+> add the corresponding platform devices to the boards that enable PCIe
+> (Harmony and TrimSlice). Patch 10 adds MSI support and patch 11 finally
+> adds a device tree binding with documentation.
+> 
+> The code in patch 10 (MSI support) is based on the Vibrante kernel and I
+> wasn't able to get a proper Signed-off-by or even copyright information.
+> Perhaps somebody at NVIDIA can find out?
+> 
+> Thierry
+> 
+> Grant Likely (1):
+>   drivercore: Add driver probe deferral mechanism
+> 
+> Mark Brown (1):
+>   regulator: Support driver probe deferral
+> 
+> Thierry Reding (9):
+>   regulator: fixed: Support driver probe deferral
+>   regulator: tps6586x: fix typo in debug message
+>   tps6586x: Add device-tree support
+>   PCI: Keep pci_fixup_irqs() around after init
+>   ARM: pci: Keep pci_common_init() around after init
+>   ARM: tegra: Move tegra_pcie_xclk_clamp() to PMC
+>   ARM: tegra: Rewrite PCIe support as a driver
+>   ARM: tegra: pcie: Add MSI support
+>   ARM: tegra: pcie: Add device tree support
+> 
+>  .../devicetree/bindings/pci/tegra-pcie.txt         |   23 +
+>  .../devicetree/bindings/regulator/tps6586x.txt     |   98 +++
+>  arch/arm/boot/dts/tegra20.dtsi                     |    8 +
+>  arch/arm/kernel/bios32.c                           |    4 +-
+>  arch/arm/mach-tegra/Kconfig                        |    1 +
+>  arch/arm/mach-tegra/board-harmony-pcie.c           |   38 +-
+>  arch/arm/mach-tegra/board-harmony.c                |    1 +
+>  arch/arm/mach-tegra/board-harmony.h                |    1 +
+>  arch/arm/mach-tegra/board-trimslice.c              |   16 +-
+>  arch/arm/mach-tegra/board.h                        |   11 +-
+>  arch/arm/mach-tegra/devices.c                      |   32 +
+>  arch/arm/mach-tegra/devices.h                      |    1 +
+>  arch/arm/mach-tegra/include/mach/iomap.h           |    6 +
+>  arch/arm/mach-tegra/include/mach/irqs.h            |    5 +-
+>  arch/arm/mach-tegra/pcie.c                         |  895 +++++++++++++++-----
+>  arch/arm/mach-tegra/pmc.c                          |   16 +
+>  arch/arm/mach-tegra/pmc.h                          |    1 +
+>  drivers/base/base.h                                |    1 +
+>  drivers/base/core.c                                |    2 +
+>  drivers/base/dd.c                                  |  138 ++-
+>  drivers/mfd/tps6586x.c                             |   66 ++
+>  drivers/pci/setup-irq.c                            |    4 +-
+>  drivers/regulator/core.c                           |    4 +-
+>  drivers/regulator/fixed.c                          |   14 +-
+>  drivers/regulator/tps6586x-regulator.c             |    4 +-
+>  include/linux/device.h                             |    5 +
+>  include/linux/errno.h                              |    1 +
+>  include/linux/mfd/tps6586x.h                       |    1 +
+>  28 files changed, 1136 insertions(+), 261 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/tegra-pcie.txt
+>  create mode 100644 Documentation/devicetree/bindings/regulator/tps6586x.txt
 
-> > ...they all seem to be explicitly named in the device tree so presumably
-> > there's enough information in there for the driver to pick any set of
-> > regulators in any order.  This would be much nicer to use.
+There is a whole bunch of PCI DT code sitting in the powerpc tree that
+probably needs to be moved to common location and used here.
 
-> I don't like it much either. The only reason that requirement exists is
-> because it makes the assignment of the regulator ID (as defined in the
-> include/linux/mfd/tps6586x.h header) very trivial. Would it be better to
-> look up the ID based on the node name (sm0 --> TPS6586X_ID_SM_0, ...)?
+This looks way too simple to be what's needed if I compare to PCI
+bindings in powerpc dts files.
 
-> Then the only requirement would be that the names match.
-
-Yes, that's going to be more code but much nicer for users.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120308/f2f4032e/attachment.sig>
+Rob
