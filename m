@@ -1,71 +1,317 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 8 Mar 2012 15:10:00 +0100
-Subject: [PATCH 5/6] ARM: at91: add ram controller DT support
-In-Reply-To: <4F58BE4F.5080009@gmail.com>
-References: <20120302192844.GB21255@game.jcrosoft.org>
- <1330718048-9314-5-git-send-email-plagnioj@jcrosoft.com>
- <4F57BDCE.1050708@gmail.com>
- <20120308061324.GE27213@game.jcrosoft.org>
- <4F58BE4F.5080009@gmail.com>
-Message-ID: <20120308141000.GF27213@game.jcrosoft.org>
+Date: Thu, 8 Mar 2012 15:18:47 +0100
+Subject: [PATCH v10] Regulator: Add Anatop regulator driver
+In-Reply-To: <1331200744-5986-1-git-send-email-paul.liu@linaro.org>
+References: <1331200744-5986-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <20120308141847.GG27213@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:12 Thu 08 Mar     , Rob Herring wrote:
-> On 03/08/2012 12:13 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>> diff --git a/arch/arm/mach-at91/include/mach/at91sam9x5.h b/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> >>> index a297a77..88e43d5 100644
-> >>> --- a/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> >>> +++ b/arch/arm/mach-at91/include/mach/at91sam9x5.h
-> >>> @@ -55,11 +55,6 @@
-> >>>  #define AT91SAM9X5_BASE_USART2	0xf8024000
-> >>>  
-> >>>  /*
-> >>> - * System Peripherals
-> >>> - */
-> >>> -#define AT91SAM9X5_BASE_DDRSDRC0	0xffffe800
-> >>> -
-> >>> -/*
-> >>>   * Base addresses for early serial code (uncompress.h)
-> >>>   */
-> >>>  #define AT91_DBGU	AT91_BASE_DBGU0
-> >>> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> >>> index 3e48b59..f86450d 100644
-> >>> --- a/arch/arm/mach-at91/setup.c
-> >>> +++ b/arch/arm/mach-at91/setup.c
-> >>> @@ -315,12 +315,33 @@ static void at91_dt_rstc(void)
-> >>>  	of_node_put(np);
-> >>>  }
-> >>>  
-> >>> +static struct of_device_id ramc_ids[] = {
-> >>> +	{ .compatible = "atmel,at91sam9260-sdramc" },
-> >>> +	{ .compatible = "atmel,at91sam9g45-ddramc" },
-> >>> +	{ /*sentinel*/ }
-> >>> +};
-> >>> +
-> >>> +static void at91_dt_ramc(void)
-> >>> +{
-> >>> +	struct device_node *np;
-> >>> +
-> >>> +	np = of_find_matching_node(NULL, ramc_ids);
-> >>> +	if (!np)
-> >>> +		panic("unable to find compatible ram conroller node in dtb\n");
-> >>
-> >> You really can't boot if this fails? A WARN is better if it allows you
-> >> to boot until at least your console is actually up.
-> > if the restart is called you will have a oops so no it's a basic mandatory
-> > device on at91
-> > 
+On 17:59 Thu 08 Mar     , Ying-Chun Liu (PaulLiu) wrote:
+> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 > 
-> But you may never see the panic message because your console is not up.
-> If you WARN and can continue to boot, then the user can see the problem
-> and fix it. Otherwise you get nothing and have to go rebuild and turn on
-> earlyprintk.
-yeah agreed but if the restart id use before the console is enable you will
-have the same issue. the ramc controller are basic device so people usally
-don't touch it except you add a SoC support.
-
-so I prefer to panic
-
+> Anatop is an integrated regulator inside i.MX6 SoC.
+> There are 3 digital regulators which controls PU, CORE (ARM), and SOC.
+> And 3 analog regulators which controls 1P1, 2P5, 3P0 (USB).
+> This patch adds the Anatop regulator driver.
+> 
+> Signed-off-by: Nancy Chen <Nancy.Chen@freescale.com>
+> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Axel Lin <axel.lin@gmail.com>
+> ---
+>  .../bindings/regulator/anatop-regulator.txt        |   28 +++
+>  drivers/regulator/Kconfig                          |    8 +
+>  drivers/regulator/Makefile                         |    1 +
+>  drivers/regulator/anatop-regulator.c               |  236 ++++++++++++++++++++
+>  4 files changed, 273 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/anatop-regulator.txt
+>  create mode 100644 drivers/regulator/anatop-regulator.c
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/anatop-regulator.txt b/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
+> new file mode 100644
+> index 0000000..73363e76
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
+> @@ -0,0 +1,28 @@
+> +Anatop Voltage regulators
+> +
+> +Required properties:
+> +- compatible: Must be "fsl,anatop-regulator"
+> +- anatop-vol-bit-shift: Bit shift for the register
+> +- anatop-vol-bit-width: Number of bits used in the register
+> +- anatop-min-bit-val: Minimum value of this register
+> +- anatop-min-voltage: Minimum voltage of this regulator
+> +- anatop-max-voltage: Maximum voltage of this regulator
+> +
+> +Any property defined as part of the core regulator
+> +binding, defined in regulator.txt, can also be used.
+> +
+> +Example:
+> +
+> +	reg_vddpu: regulator-vddpu at 140 {
+> +		compatible = "fsl,anatop-regulator";
+> +		regulator-name = "vddpu";
+> +		regulator-min-microvolt = <725000>;
+> +		regulator-max-microvolt = <1300000>;
+> +		regulator-always-on;
+> +		reg = <0x140>;
+> +		anatop-vol-bit-shift = <9>;
+> +		anatop-vol-bit-width = <5>;
+> +		anatop-min-bit-val = <1>;
+> +		anatop-min-voltage = <725000>;
+> +		anatop-max-voltage = <1300000>;
+> +	};
+> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> index 7a61b17..3857209 100644
+> --- a/drivers/regulator/Kconfig
+> +++ b/drivers/regulator/Kconfig
+> @@ -213,6 +213,14 @@ config REGULATOR_PCAP
+>  	 This driver provides support for the voltage regulators of the
+>  	 PCAP2 PMIC.
+>  
+> +config REGULATOR_ANATOP
+> +	tristate "Freescale i.MX on-chip ANATOP LDO regulators"
+> +	depends on MFD_ANATOP
+> +	help
+> +	  Say y here to support Freescale i.MX on-chip ANATOP LDOs
+> +	  regulators. It is recommended that this option be
+> +	  enabled on i.MX6 platform.
+> +
+>  config REGULATOR_MC13XXX_CORE
+>  	tristate
+>  
+> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> index 503bac8..8440871 100644
+> --- a/drivers/regulator/Makefile
+> +++ b/drivers/regulator/Makefile
+> @@ -48,5 +48,6 @@ obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
+>  obj-$(CONFIG_REGULATOR_DB8500_PRCMU) += db8500-prcmu.o
+>  obj-$(CONFIG_REGULATOR_TPS65910) += tps65910-regulator.o
+>  obj-$(CONFIG_REGULATOR_AAT2870) += aat2870-regulator.o
+> +obj-$(CONFIG_REGULATOR_ANATOP) += anatop-regulator.o
+>  
+>  ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
+> diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
+> new file mode 100644
+> index 0000000..133a17b
+> --- /dev/null
+> +++ b/drivers/regulator/anatop-regulator.c
+> @@ -0,0 +1,236 @@
+> +/*
+> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + */
+> +
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> +
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> +
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#include <linux/slab.h>
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/mfd/anatop.h>
+> +#include <linux/regulator/driver.h>
+> +#include <linux/regulator/of_regulator.h>
+> +
+> +struct anatop_regulator {
+> +	const char *name;
+> +	u32 control_reg;
+> +	struct anatop *mfd;
+> +	int vol_bit_shift;
+> +	int vol_bit_width;
+> +	int min_bit_val;
+> +	int min_voltage;
+> +	int max_voltage;
+> +	struct regulator_desc rdesc;
+> +	struct regulator_init_data *initdata;
+> +};
+> +
+> +static int anatop_set_voltage(struct regulator_dev *reg, int min_uV,
+> +				  int max_uV, unsigned *selector)
+> +{
+> +	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
+> +	u32 val, sel;
+> +	int uv;
+> +
+> +	uv = min_uV;
+> +	dev_dbg(&reg->dev, "%s: uv %d, min %d, max %d\n", __func__,
+> +		uv, anatop_reg->min_voltage,
+> +		anatop_reg->max_voltage);
+> +
+> +	if (uv < anatop_reg->min_voltage) {
+> +		if (max_uV > anatop_reg->min_voltage)
+> +			uv = anatop_reg->min_voltage;
+> +		else
+> +			return -EINVAL;
+> +	}
+> +
+> +	if (anatop_reg->control_reg) {
+> +		sel = (uv - anatop_reg->min_voltage) / 25000;
+> +		if (sel * 25000 + anatop_reg->min_voltage
+> +		    > anatop_reg->max_voltage)
+> +			return -EINVAL;
+> +		val = anatop_reg->min_bit_val + sel;
+> +		*selector = sel;
+> +		dev_dbg(&reg->dev, "%s: calculated val %d\n", __func__, val);
+> +		anatop_set_bits(anatop_reg->mfd,
+> +				anatop_reg->control_reg,
+> +				anatop_reg->vol_bit_shift,
+> +				anatop_reg->vol_bit_width,
+> +				val);
+> +		return 0;
+> +	} else {
+> +		return -ENOTSUPP;
+> +	}
+invert the test to make the code more readable
+> +}
+> +
+> +static int anatop_get_voltage_sel(struct regulator_dev *reg)
+> +{
+> +	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
+> +	int selector;
+> +
+> +	if (anatop_reg->control_reg) {
+> +		u32 val = anatop_get_bits(anatop_reg->mfd,
+> +					  anatop_reg->control_reg,
+> +					  anatop_reg->vol_bit_shift,
+> +					  anatop_reg->vol_bit_width);
+> +		selector = val - anatop_reg->min_bit_val;
+> +		return selector;
+why do you need selector
+> +	} else {
+> +		return -ENOTSUPP;
+> +	}
+invert the test to make the code more readable
+> +}
+> +
+> +static int anatop_list_voltage(struct regulator_dev *reg, unsigned selector)
+> +{
+> +	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
+> +	int uv;
+> +
+> +	uv = anatop_reg->min_voltage + selector * 25000;
+> +	dev_dbg(&reg->dev, "vddio = %d, selector = %u\n", uv, selector);
+> +
+> +	return uv;
+> +}
+> +
+> +static struct regulator_ops anatop_rops = {
+> +	.set_voltage     = anatop_set_voltage,
+> +	.get_voltage_sel = anatop_get_voltage_sel,
+> +	.list_voltage    = anatop_list_voltage,
+> +};
+> +
+> +static int __devinit anatop_regulator_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+you set a dev var but use &pdev->dev most of the time
+> +	struct device_node *np = dev->of_node;
+> +	struct regulator_desc *rdesc;
+> +	struct regulator_dev *rdev;
+> +	struct anatop_regulator *sreg;
+> +	struct regulator_init_data *initdata;
+> +	struct anatop *anatopmfd = dev_get_drvdata(pdev->dev.parent);
+> +	int ret = 0;
+> +
+> +	initdata = of_get_regulator_init_data(dev, np);
+> +	sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
+> +	if (!sreg)
+> +		return -ENOMEM;
+> +	sreg->initdata = initdata;
+> +	sreg->name = kstrdup(of_get_property(np, "regulator-name", NULL),
+> +			     GFP_KERNEL);
+> +	rdesc = &sreg->rdesc;
+> +	memset(rdesc, 0, sizeof(*rdesc));
+> +	rdesc->name = sreg->name;
+> +	rdesc->ops = &anatop_rops;
+> +	rdesc->type = REGULATOR_VOLTAGE;
+> +	rdesc->owner = THIS_MODULE;
+> +	sreg->mfd = anatopmfd;
+> +	if (of_property_read_u32(np, "reg", &sreg->control_reg)) {
+> +		dev_err(&pdev->dev, "no reg property set\n");
+> +		ret = -ENODEV;
+why not return the err return by the read_u32 or atleast print it
+> +		goto anatop_probe_end;
+> +	}
+> +	if (of_property_read_u32(np, "anatop-vol-bit-width",
+> +				 &sreg->vol_bit_width)) {
+> +		dev_err(&pdev->dev, "no anatop-vol-bit-width property set\n");
+> +		ret = -ENODEV;
+> +		goto anatop_probe_end;
+> +	}
+> +	if (of_property_read_u32(np, "anatop-vol-bit-shift",
+> +				 &sreg->vol_bit_shift)) {
+> +		dev_err(&pdev->dev, "no anatop-vol-bit-shift property set\n");
+> +		ret = -ENODEV;
+> +		goto anatop_probe_end;
+> +	}
+> +	if (of_property_read_u32(np, "anatop-min-bit-val",
+> +				 &sreg->min_bit_val)) {
+> +		dev_err(&pdev->dev, "no anatop-min-bit-val property set\n");
+> +		ret = -ENODEV;
+> +		goto anatop_probe_end;
+> +	}
+> +	if (of_property_read_u32(np, "anatop-min-voltage",
+> +				 &sreg->min_voltage)) {
+> +		dev_err(&pdev->dev, "no anatop-min-voltage property set\n");
+> +		ret = -ENODEV;
+> +		goto anatop_probe_end;
+> +	}
+> +	if (of_property_read_u32(np, "anatop-max-voltage",
+> +				 &sreg->max_voltage)) {
+> +		dev_err(&pdev->dev, "no anatop-max-voltage property set\n");
+> +		ret = -ENODEV;
+> +		goto anatop_probe_end;
+> +	}
+> +
+> +	/* register regulator */
+> +	rdev = regulator_register(rdesc, &pdev->dev,
+> +				  initdata, sreg, pdev->dev.of_node);
+> +	if (IS_ERR(rdev)) {
+> +		dev_err(&pdev->dev, "failed to register %s\n",
+> +			rdesc->name);
+> +		ret = PTR_ERR(rdev);
+> +		goto anatop_probe_end;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, rdev);
+> +
+> +anatop_probe_end:
+> +	if (ret != 0 && sreg->name)
+> +		kfree(sreg->name);
+kfree can be called with a NULL pointer
+> +	return ret;
+> +}
+> +
+> +static int __devexit anatop_regulator_remove(struct platform_device *pdev)
+> +{
+> +	struct regulator_dev *rdev = platform_get_drvdata(pdev);
+> +	struct anatop_regulator *sreg = rdev_get_drvdata(rdev);
+> +	kfree(sreg->name);
+> +	regulator_unregister(rdev);
+return from the unregister
+> +	return 0;
+> +}
 Best Regards,
 J.
