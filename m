@@ -1,51 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 8 Mar 2012 17:53:38 +0100
-Subject: [PATCH 1/5 v3] i2c/gpio: add DT support
-In-Reply-To: <4F588F50.7060906@samsung.com>
-References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
- <4F588F50.7060906@samsung.com>
-Message-ID: <20120308165338.GI27213@game.jcrosoft.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 8 Mar 2012 10:05:58 -0700 (MST)
+Subject: [PATCH 00/15] ARM: OMAP4: hwmod data: add almost all remaining
+ IP blocks
+In-Reply-To: <4F5898A7.5040005@ti.com>
+References: <20120308104918.14753.69281.stgit@dusk> <4F5898A7.5040005@ti.com>
+Message-ID: <alpine.DEB.2.00.1203081003100.27901@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:52 Thu 08 Mar     , Karol Lewandowski wrote:
-> On 08.03.2012 09:50, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> > +static int __devinit of_i2c_gpio_probe(struct device_node *np,
-> > +			     struct i2c_gpio_platform_data *pdata)
-> > +{
-> > +	u32 reg;
-> > +
-> > +	if (of_gpio_count(np) < 2)
-> > +		return -ENODEV;
-> > +
-> > +	pdata->sda_pin = of_get_gpio(np, 0);
-> > +	pdata->scl_pin = of_get_gpio(np, 1);
-> > +
-> > +	if (pdata->sda_pin < 0 || pdata->scl_pin < 0) {
-> > +		pr_err("%s: invalid GPIO pins, sda=%d/scl=%d\n",
-> > +		       np->full_name, pdata->sda_pin, pdata->scl_pin);
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	of_property_read_u32(np, "i2c-gpio,delay-us", &pdata->udelay);
-> > +
-> 
-> 
-> 
-> > +	if (of_property_read_u32(np, "i2c-gpio,timeout-ms", &reg))
-> > +		pdata->timeout = msecs_to_jiffies(reg);
-> 
-> 
-> I've already said (two times!) that of_property_read_u32() returns
-> nonzero (negative) error code on _error_.
-> 
-> Don't you see obvious error in above code fragment?
-> 
-> You assign to pdata->timeout on _error_.
-yeah forget this one
+Hi Rajendra,
 
-Jean can I have you are ack so I send the v4 and the pull today
+On Thu, 8 Mar 2012, Rajendra Nayak wrote:
 
-Best Regards,
-J.
+> On Thursday 08 March 2012 04:21 PM, Paul Walmsley wrote:
+>
+> > These patches are also available via git from git://git.pwsan.com/linux-2.6
+> > in the branch "hwmod_enable_remaining_hwmods_devel_3.4".
+> 
+> Could not find this branch on your tree. Found a
+> 'enable_remaining_omap4_hwmods' instead, but that seems to
+> be an old branch.
+
+Sorry about that.  It should be pushed now.
+
+
+- Paul
