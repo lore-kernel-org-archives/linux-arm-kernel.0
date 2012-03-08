@@ -1,53 +1,91 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Mar 2012 03:13:56 -0800
-Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
-Message-ID: <4F589474.8050609@samsung.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Thu, 8 Mar 2012 13:16:50 +0200
+Subject: I.MX35 PDK
+In-Reply-To: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Fabio,
 
-Here is cleanup clock part for EXYNOS SoCs from:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/cleanup-exynos-clock
+Thanks for you response...
 
-Please pull and if any problems, please kindly let me know.
+> in spite of this I get from ov2640 driver error
+> Here Linux Kernel boot message:
+>
+> "Linux video capture interface: v2.00
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+> ov2640 0-0030: Product ID error fb:fb"
+>
+> I cannot understand what the problem is, if someone tested this?
 
-Thanks.
+>>Looks like a I2C issue.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>>Check the I2C1 pad settings in the mainline kernel.
 
-The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+>>On FSL kernel we have:
 
-   Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+#<<define PAD_CONFIG (PAD_CTL_HYS_SCHMITZ | PAD_CTL_PKE_ENABLE |
+>>PAD_CTL_PUE_PUD | PAD_CTL_ODE_OpenDrain)
 
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/cleanup-exynos-clock
+	<<switch (i2c_num) {
+	<<case 0:
+		<<mxc_request_iomux(MX35_PIN_I2C1_CLK, MUX_CONFIG_SION);
+		<<mxc_request_iomux(MX35_PIN_I2C1_DAT, MUX_CONFIG_SION);
 
-Kukjin Kim (2):
-       ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
-       PM / devfreq: update the name of EXYNOS clock register
+		<<mxc_iomux_set_pad(MX35_PIN_I2C1_CLK, PAD_CONFIG);
+		<<mxc_iomux_set_pad(MX35_PIN_I2C1_DAT, PAD_CONFIG);
 
-  arch/arm/mach-exynos/Makefile                     |    3 +-
-  arch/arm/mach-exynos/clock-exynos4.c              | 1564 
-+++++++++++++++++++++
-  arch/arm/mach-exynos/clock-exynos4.h              |   32 +
-  arch/arm/mach-exynos/clock-exynos4210.c           |   46 +-
-  arch/arm/mach-exynos/clock-exynos4212.c           |   30 +-
-  arch/arm/mach-exynos/clock.c                      | 1564 
----------------------
-  arch/arm/mach-exynos/common.h                     |    9 +
-  arch/arm/mach-exynos/include/mach/exynos4-clock.h |   43 -
-  arch/arm/mach-exynos/include/mach/regs-clock.h    |  364 +++---
-  arch/arm/mach-exynos/pm.c                         |   40 +-
-  drivers/devfreq/exynos4_bus.c                     |  224 ++--
-  11 files changed, 1959 insertions(+), 1960 deletions(-)
-  create mode 100644 arch/arm/mach-exynos/clock-exynos4.c
-  create mode 100644 arch/arm/mach-exynos/clock-exynos4.h
-  delete mode 100644 arch/arm/mach-exynos/clock.c
-  delete mode 100644 arch/arm/mach-exynos/include/mach/exynos4-clock.h
+>>Also check if you are getting the proper voltage levels at the I2C1 lines.
+
+Yes this I2C problem, all I2C slave device need response to Host CPU by pulls I2C data bus to low, in other words generate ACK, the clock pulse for the acknowledge bit is always created by the bus master.
+
+In this case, the camera tries to reset the data bus and generate an ACK, but the voltage drops to the area of two volts, although it should be reset to zero.
+I replaced R172 with 10K on CPU board and got a good result, but there are other surprises 
+
+Linux video capture interface: v2.00
+soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+ov2640 0-0030: ov2640 Product ID 26:42 Manufacturer ID 7f:a2
+i2c i2c-0: OV2640 Probed
+mx3-camera mx3-camera.0: MX3 Camera driver detached from camera 0
+dmaengine: failed to get dma1chan0: (-22)
+dmaengine: failed to get dma1chan1: (-22)
+dmaengine: failed to get dma1chan2: (-22)
+dmaengine: failed to get dma1chan3: (-22)
+dmaengine: failed to get dma1chan4: (-22)
+dmaengine: failed to get dma1chan5: (-22)
+dmaengine: failed to get dma1chan6: (-22)
+dmaengine: failed to get dma1chan7: (-22)
+dmaengine: failed to get dma1chan8: (-22)
+dmaengine: failed to get dma1chan9: (-22)
+dmaengine: failed to get dma1chan10: (-22)
+dmaengine: failed to get dma1chan11: (-22)
+dmaengine: failed to get dma1chan12: (-22)
+dmaengine: failed to get dma1chan13: (-22)
+dmaengine: failed to get dma1chan14: (-22)
+dmaengine: failed to get dma1chan15: (-22)
+dmaengine: failed to get dma1chan16: (-22)
+dmaengine: failed to get dma1chan17: (-22)
+dmaengine: failed to get dma1chan18: (-22)
+dmaengine: failed to get dma1chan19: (-22)
+dmaengine: failed to get dma1chan20: (-22)
+dmaengine: failed to get dma1chan21: (-22)
+dmaengine: failed to get dma1chan22: (-22)
+dmaengine: failed to get dma1chan23: (-22)
+dmaengine: failed to get dma1chan24: (-22)
+dmaengine: failed to get dma1chan25: (-22)
+dmaengine: failed to get dma1chan26: (-22)
+dmaengine: failed to get dma1chan27: (-22)
+dmaengine: failed to get dma1chan28: (-22)
+dmaengine: failed to get dma1chan29: (-22)
+dmaengine: failed to get dma1chan30: (-22):
+
+
+What is the problem? 
+Guennadi please help me understand 
+
+Thanks,
+ 
+Alex Gershgorin
