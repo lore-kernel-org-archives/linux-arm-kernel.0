@@ -1,55 +1,76 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  9 Mar 2012 00:59:40 +0800
-Subject: [PATCH v3 01/11] ASoC: core: missing set_fmt should not be complaint
+Date: Fri,  9 Mar 2012 00:59:41 +0800
+Subject: [PATCH v3 02/11] ASoC: fsl: separate SSI and DMA Kconfig options
 In-Reply-To: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
 References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331225990-27308-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1331225990-27308-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not having a DAI link set_fmt operation is perfectly normal and
-should not be complaint.
+The fsl_ssi driver will possibly be shared between Freescale PowerPC
+and ARM/IMX families, so give it a separate Kconfig option.  Then
+fsl_ssi driver can possibly be selected independently from selecting
+PowerPC DMA based PCM driver.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- sound/soc/soc-core.c |   11 ++++++-----
- 1 files changed, 6 insertions(+), 5 deletions(-)
+ sound/soc/fsl/Kconfig  |   15 +++++++++------
+ sound/soc/fsl/Makefile |    3 ++-
+ 2 files changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-index 7978f6c..98b2635 100644
---- a/sound/soc/soc-core.c
-+++ b/sound/soc/soc-core.c
-@@ -1531,14 +1531,14 @@ static void snd_soc_instantiate_card(struct snd_soc_card *card)
- 		if (dai_link->dai_fmt) {
- 			ret = snd_soc_dai_set_fmt(card->rtd[i].codec_dai,
- 						  dai_link->dai_fmt);
--			if (ret != 0)
-+			if (ret != 0 && ret != -ENOTSUPP)
- 				dev_warn(card->rtd[i].codec_dai->dev,
- 					 "Failed to set DAI format: %d\n",
- 					 ret);
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index d754d34..ca693b2 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -1,10 +1,11 @@
+ config SND_MPC52xx_DMA
+ 	tristate
  
- 			ret = snd_soc_dai_set_fmt(card->rtd[i].cpu_dai,
- 						  dai_link->dai_fmt);
--			if (ret != 0)
-+			if (ret != 0 && ret != -ENOTSUPP)
- 				dev_warn(card->rtd[i].cpu_dai->dev,
- 					 "Failed to set DAI format: %d\n",
- 					 ret);
-@@ -2971,10 +2971,11 @@ EXPORT_SYMBOL_GPL(snd_soc_codec_set_pll);
-  */
- int snd_soc_dai_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
- {
--	if (dai->driver && dai->driver->ops->set_fmt)
--		return dai->driver->ops->set_fmt(dai, fmt);
--	else
-+	if (dai->driver == NULL)
- 		return -EINVAL;
-+	if (dai->driver->ops->set_fmt == NULL)
-+		return -ENOTSUPP;
-+	return dai->driver->ops->set_fmt(dai, fmt);
- }
- EXPORT_SYMBOL_GPL(snd_soc_dai_set_fmt);
+-# ASoC platform support for the Freescale PowerPC SOCs that have an SSI and
+-# an Elo DMA controller, such as the MPC8610 and P1022.  You will still need to
+-# select a platform driver and a codec driver.
+-config SND_SOC_POWERPC_SSI
++config SND_SOC_FSL_SSI
++	tristate
++	depends on FSL_SOC
++
++config SND_SOC_POWERPC_DMA
+ 	tristate
+ 	depends on FSL_SOC
  
+@@ -12,7 +13,8 @@ config SND_SOC_MPC8610_HPCD
+ 	tristate "ALSA SoC support for the Freescale MPC8610 HPCD board"
+ 	# I2C is necessary for the CS4270 driver
+ 	depends on MPC8610_HPCD && I2C
+-	select SND_SOC_POWERPC_SSI
++	select SND_SOC_FSL_SSI
++	select SND_SOC_POWERPC_DMA
+ 	select SND_SOC_CS4270
+ 	select SND_SOC_CS4270_VD33_ERRATA
+ 	default y if MPC8610_HPCD
+@@ -23,7 +25,8 @@ config SND_SOC_P1022_DS
+ 	tristate "ALSA SoC support for the Freescale P1022 DS board"
+ 	# I2C is necessary for the WM8776 driver
+ 	depends on P1022_DS && I2C
+-	select SND_SOC_POWERPC_SSI
++	select SND_SOC_FSL_SSI
++	select SND_SOC_POWERPC_DMA
+ 	select SND_SOC_WM8776
+ 	default y if P1022_DS
+ 	help
+diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
+index b4a38c0..95d483f 100644
+--- a/sound/soc/fsl/Makefile
++++ b/sound/soc/fsl/Makefile
+@@ -9,7 +9,8 @@ obj-$(CONFIG_SND_SOC_P1022_DS) += snd-soc-p1022-ds.o
+ # Freescale PowerPC SSI/DMA Platform Support
+ snd-soc-fsl-ssi-objs := fsl_ssi.o
+ snd-soc-fsl-dma-objs := fsl_dma.o
+-obj-$(CONFIG_SND_SOC_POWERPC_SSI) += snd-soc-fsl-ssi.o snd-soc-fsl-dma.o
++obj-$(CONFIG_SND_SOC_FSL_SSI) += snd-soc-fsl-ssi.o
++obj-$(CONFIG_SND_SOC_POWERPC_DMA) += snd-soc-fsl-dma.o
+ 
+ # MPC5200 Platform Support
+ obj-$(CONFIG_SND_MPC52xx_DMA) += mpc5200_dma.o
 -- 
 1.7.5.4
