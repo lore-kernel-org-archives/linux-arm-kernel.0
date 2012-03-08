@@ -1,234 +1,113 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 08 Mar 2012 11:16:04 -0600
-Subject: [PATCH 1/5 v3] i2c/gpio: add DT support
-In-Reply-To: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4F58E954.4010205@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 8 Mar 2012 12:21:17 -0500 (EST)
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <4F5882BF.1030104@arm.com>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1330360043.8557.302.camel@zakaz.uk.xensource.com>
+ <20120227180355.GB2023@linaro.org>
+ <1330371219.10008.34.camel@dagon.hellion.org.uk>
+ <20120228102040.GB2063@linaro.org>
+ <1330426133.31269.70.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+ <20120229093436.GA2077@linaro.org>
+ <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+ <20120229125826.GC2077@linaro.org>
+ <alpine.LFD.2.02.1203021528150.31242@xanadu.home> <4F5882BF.1030104@arm.com>
+Message-ID: <alpine.LFD.2.02.1203081041340.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2012 02:50 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: linux-i2c at vger.kernel.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> ---
-> v3:
-> 
-> 	update i2c binding (Rob comments)
-> 
-> 	Jean can I have a ack to apply it?
-> 
-> Best Regards,
-> J.
+On Thu, 8 Mar 2012, Richard Earnshaw wrote:
 
-For this patch:
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-
->  .../devicetree/bindings/gpio/gpio_i2c.txt          |   32 +++++++
->  drivers/i2c/busses/i2c-gpio.c                      |   94 +++++++++++++++----
->  2 files changed, 106 insertions(+), 20 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_i2c.txt
+> On 02/03/12 21:15, Nicolas Pitre wrote:
+> > So, to me, the gcc documentation is perfectly clear on this topic.
+> > there really _is_ a guarantee that those asm marked variables will be in
+> > the expected registers on entry to the inline asm, given that the
+> > variable is _also_ listed as an operand to the asm statement.  But only
+> > in that case.
+> >
+> > It is true that gcc may reorder other function calls or other code
+> > around the inline asm and then intervening code can clobber any
+> > registers.  Then it is up to gcc to preserve the variable's content
+> > elsewhere when its register is used for other purposes, and restore it
+> > when some inline asm statement is referring to it.
+> >
+> > And if gcc does not do this then it is buggy.  Version 3.4.0 of gcc was
+> > buggy.  No other gcc versions in the last 7 years had such a problem or
+> > the __asmeq macro in the kernel would have told us.
+> >
+> >> Or, to summarise another way, there is no way to control which register
+> >> is used to pass something to an inline asm in general (often we get away
+> >> with this, and there are a lot of inline asms in the kernel that assume
+> >> it works, but the more you inline the more likely you are to get nasty
+> >> surprises).
+> >
+> > This statement is therefore unfounded and wrong.  Please direct the
+> > tools guy who mislead you to the above gcc documentation.
+> >
 > 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio_i2c.txt b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-> new file mode 100644
-> index 0000000..4f8ec94
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-> @@ -0,0 +1,32 @@
-> +Device-Tree bindings for i2c gpio driver
-> +
-> +Required properties:
-> +	- compatible = "i2c-gpio";
-> +	- gpios: sda and scl gpio
-> +
-> +
-> +Optional properties:
-> +	- i2c-gpio,sda-open-drain: sda as open drain
-> +	- i2c-gpio,scl-open-drain: scl as open drain
-> +	- i2c-gpio,scl-output-only: scl as output only
-> +	- i2c-gpio,delay-us: delay between GPIO operations (may depend on each platform)
-> +	- i2c-gpio,timeout-ms: timeout to get data
-> +
-> +Example nodes:
-> +
-> +i2c at 0 {
-> +	compatible = "i2c-gpio";
-> +	gpios = <&pioA 23 0 /* sda */
-> +		 &pioA 24 0 /* scl */
-> +		>;
-> +	i2c-gpio,sda-open-drain;
-> +	i2c-gpio,scl-open-drain;
-> +	i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	rv3029c2 at 56 {
-> +		compatible = "rv3029c2";
-> +		reg = <0x56>;
-> +	};
-> +};
-> diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
-> index a651779..98ae85b 100644
-> --- a/drivers/i2c/busses/i2c-gpio.c
-> +++ b/drivers/i2c/busses/i2c-gpio.c
-> @@ -14,8 +14,15 @@
->  #include <linux/module.h>
->  #include <linux/slab.h>
->  #include <linux/platform_device.h>
-> +#include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/of_i2c.h>
->  
-> -#include <asm/gpio.h>
-> +struct i2c_gpio_private_data {
-> +	struct i2c_adapter adap;
-> +	struct i2c_algo_bit_data bit_data;
-> +	struct i2c_gpio_platform_data pdata;
-> +};
->  
->  /* Toggle SDA by changing the direction of the pin */
->  static void i2c_gpio_setsda_dir(void *data, int state)
-> @@ -78,24 +85,62 @@ static int i2c_gpio_getscl(void *data)
->  	return gpio_get_value(pdata->scl_pin);
->  }
->  
-> +static int __devinit of_i2c_gpio_probe(struct device_node *np,
-> +			     struct i2c_gpio_platform_data *pdata)
-> +{
-> +	u32 reg;
-> +
-> +	if (of_gpio_count(np) < 2)
-> +		return -ENODEV;
-> +
-> +	pdata->sda_pin = of_get_gpio(np, 0);
-> +	pdata->scl_pin = of_get_gpio(np, 1);
-> +
-> +	if (pdata->sda_pin < 0 || pdata->scl_pin < 0) {
-> +		pr_err("%s: invalid GPIO pins, sda=%d/scl=%d\n",
-> +		       np->full_name, pdata->sda_pin, pdata->scl_pin);
-> +		return -ENODEV;
-> +	}
-> +
-> +	of_property_read_u32(np, "i2c-gpio,delay-us", &pdata->udelay);
-> +
-> +	if (of_property_read_u32(np, "i2c-gpio,timeout-ms", &reg))
-> +		pdata->timeout = msecs_to_jiffies(reg);
-> +
-> +	pdata->sda_is_open_drain =
-> +		!!of_property_read_bool(np, "i2c-gpio,sda-open-drain");
-> +	pdata->scl_is_open_drain =
-> +		!!of_property_read_bool(np, "i2c-gpio,scl-open-drain");
-> +	pdata->scl_is_output_only =
-> +		!!of_property_read_bool(np, "i2c-gpio,scl-output-only");
-> +
-> +	return 0;
-> +}
-> +
->  static int __devinit i2c_gpio_probe(struct platform_device *pdev)
->  {
-> +	struct i2c_gpio_private_data *priv;
->  	struct i2c_gpio_platform_data *pdata;
->  	struct i2c_algo_bit_data *bit_data;
->  	struct i2c_adapter *adap;
->  	int ret;
->  
-> -	pdata = pdev->dev.platform_data;
-> -	if (!pdata)
-> -		return -ENXIO;
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +	adap = &priv->adap;
-> +	bit_data = &priv->bit_data;
-> +	pdata = &priv->pdata;
->  
-> -	ret = -ENOMEM;
-> -	adap = kzalloc(sizeof(struct i2c_adapter), GFP_KERNEL);
-> -	if (!adap)
-> -		goto err_alloc_adap;
-> -	bit_data = kzalloc(sizeof(struct i2c_algo_bit_data), GFP_KERNEL);
-> -	if (!bit_data)
-> -		goto err_alloc_bit_data;
-> +	if (pdev->dev.of_node) {
-> +		ret = of_i2c_gpio_probe(pdev->dev.of_node, pdata);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		if (!pdev->dev.platform_data)
-> +			return -ENXIO;
-> +		memcpy(pdata, pdev->dev.platform_data, sizeof(*pdata));
-> +	}
->  
->  	ret = gpio_request(pdata->sda_pin, "sda");
->  	if (ret)
-> @@ -143,6 +188,7 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
->  	adap->algo_data = bit_data;
->  	adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
->  	adap->dev.parent = &pdev->dev;
-> +	adap->dev.of_node = pdev->dev.of_node;
->  
->  	/*
->  	 * If "dev->id" is negative we consider it as zero.
-> @@ -154,7 +200,9 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto err_add_bus;
->  
-> -	platform_set_drvdata(pdev, adap);
-> +	of_i2c_register_devices(adap);
-> +
-> +	platform_set_drvdata(pdev, priv);
->  
->  	dev_info(&pdev->dev, "using pins %u (SDA) and %u (SCL%s)\n",
->  		 pdata->sda_pin, pdata->scl_pin,
-> @@ -168,34 +216,40 @@ err_add_bus:
->  err_request_scl:
->  	gpio_free(pdata->sda_pin);
->  err_request_sda:
-> -	kfree(bit_data);
-> -err_alloc_bit_data:
-> -	kfree(adap);
-> -err_alloc_adap:
->  	return ret;
->  }
->  
->  static int __devexit i2c_gpio_remove(struct platform_device *pdev)
->  {
-> +	struct i2c_gpio_private_data *priv;
->  	struct i2c_gpio_platform_data *pdata;
->  	struct i2c_adapter *adap;
->  
-> -	adap = platform_get_drvdata(pdev);
-> -	pdata = pdev->dev.platform_data;
-> +	priv = platform_get_drvdata(pdev);
-> +	adap = &priv->adap;
-> +	pdata = &priv->pdata;
->  
->  	i2c_del_adapter(adap);
->  	gpio_free(pdata->scl_pin);
->  	gpio_free(pdata->sda_pin);
-> -	kfree(adap->algo_data);
-> -	kfree(adap);
->  
->  	return 0;
->  }
->  
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id i2c_gpio_dt_ids[] = {
-> +	{ .compatible = "i2c-gpio", },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, i2c_gpio_dt_ids);
-> +#endif
-> +
->  static struct platform_driver i2c_gpio_driver = {
->  	.driver		= {
->  		.name	= "i2c-gpio",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(i2c_gpio_dt_ids),
->  	},
->  	.probe		= i2c_gpio_probe,
->  	.remove		= __devexit_p(i2c_gpio_remove),
+> The problem is not really about re-ordering functions but about implicit
+> functions that come from the source code; for example
+> 
+> int foo (int a, int b)
+> {
+>   register int x __asm__("r0") = 33;
+> 
+>   register int c __asm__("r1") = a / b; /* Ooops, clobbers r0 with
+> division function call.  */
+> 
+>   asm ("svc 0" : : "r" (x));
+> }
+> 
+> There's nothing in the specification to say what happens if there's a
+> statement in the code that causes an implicit clobber of your assembly
+> register.
+
+I'm sure gcc is full of implicit behaviors that are not mentioned in 
+the specification.  But as long as the specification is respected, then 
+there is no need to mention any unobservable side effects from a program 
+flow point of view, right?
+
+Why wouldn't gcc be able to respect the documented feature by 
+preventing live variable from being clobbered and reloading them in 
+the specified register at the inline asm entry point, just like it does 
+for function calls?
+
+Here's an example code that shows that, unfortunately, gcc is still 
+broken with regards to the documented behavior:
+
+extern int bar(int);
+int foo(int y)
+{
+        register int x __asm__("r1") = 33;
+        y += bar(x);
+        asm ("@ x should be live in %0 here" : "+r" (x) : "r" (y));
+        y += bar(x);
+        asm ("@ x should be live in %0 here" : "+r" (x) : "r" (y));
+        return x;
+}
+
+Result is:
+
+foo:
+        stmfd   sp!, {r4, lr}
+        mov     r4, r0
+        mov     r0, #33
+        bl      bar
+        add     r4, r0, r4
+        @ x should be live in r1 here
+        mov     r0, r1
+        bl      bar
+        add     r0, r0, r4
+        @ x should be live in r1 here
+        mov     r0, r1
+        ldmfd   sp!, {r4, lr}
+        bx      lr
+
+To me this is clearly a bug if gcc is not able to meet the documented 
+expectation.  And the documented expectation is not at all unreasonable.
+
+
+Nicolas
