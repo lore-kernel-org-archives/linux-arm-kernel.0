@@ -1,28 +1,34 @@
-From: jason@lakedaemon.net (Jason)
-Date: Thu, 8 Mar 2012 11:25:30 -0500
-Subject: [PATCH 06/14] ARM: kirkwood: convert uart0 to devicetree.
-In-Reply-To: <201203072113.04369.arnd@arndb.de>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <201203071831.31738.arnd@arndb.de>
- <20120307192723.GE5050@titan.lakedaemon.net>
- <201203072113.04369.arnd@arndb.de>
-Message-ID: <20120308162530.GI5050@titan.lakedaemon.net>
+From: aneesh@ti.com (Aneesh V)
+Date: Thu,  8 Mar 2012 22:03:53 +0530
+Subject: [PATCH 0/4] dt: device tree support for TI EMIF driver
+Message-ID: <1331224437-4808-1-git-send-email-aneesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 09:13:04PM +0000, Arnd Bergmann wrote:
-> Finally, something could be wrong with the interrupt controller.
-> AFAICT, you register it through the device tree now, but it's also
-> getting initialized through kirkwood_init_irq, so the numbers
-> would all be wrong.
+This series adds device tree support for TI EMIF SDRAM controller
+driver. For this, a binding has been added for representing AC timing
+parameters and other details of LPDDR2 memories.
 
-Yes, I'm working through this now.  mv_cesa silently fails to come up
-if it can't find the interrupt controller via fdt.  So, it needs to get
-done.
+This series depends my series for adding EMIF driver [1]
 
-Right now, I'm looking at how mach-versatile does it (vic_init()) since
-it's also an ARM926ej-s...
+[1] http://marc.info/?l=linux-omap&m=133122243430942&w=2
 
-thx,
+Aneesh V (4):
+  dt: device tree bindings for LPDDR2 memories
+  dt: emif: device tree bindings for TI's EMIF sdram controller
+  arm: dts: EMIF and LPDDR2 device tree data for OMAP4 boards
+  misc: emif: add device tree support to emif driver
 
-Jason.
+ .../devicetree/bindings/lpddr2/lpddr2-timings.txt  |   52 ++++
+ .../devicetree/bindings/lpddr2/lpddr2.txt          |  102 +++++++
+ .../bindings/memory-controllers/ti/emif.txt        |   55 ++++
+ arch/arm/boot/dts/elpida_ecb240abacn.dtsi          |   67 +++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   13 +
+ arch/arm/boot/dts/omap4-sdp.dts                    |   13 +
+ arch/arm/boot/dts/omap4.dtsi                       |   18 ++
+ drivers/misc/emif.c                                |  289 +++++++++++++++++++-
+ 8 files changed, 608 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/lpddr2/lpddr2-timings.txt
+ create mode 100644 Documentation/devicetree/bindings/lpddr2/lpddr2.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+ create mode 100644 arch/arm/boot/dts/elpida_ecb240abacn.dtsi
