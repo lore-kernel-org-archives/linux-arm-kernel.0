@@ -1,31 +1,41 @@
-From: jp.francois@cynove.com (jean-philippe francois)
-Date: Thu, 8 Mar 2012 16:26:56 +0100
-Subject: Regression in 3.2.9 for omap-serial (at least)
-In-Reply-To: <alpine.LFD.2.02.1203081246130.2742@ionos>
-References: <lyk42vxsz2.fsf@ensc-virt.intern.sigma-chemnitz.de>
- <alpine.LFD.2.02.1203081246130.2742@ionos>
-Message-ID: <CAGGh5h3-1XhMO1-jiBdUJYgh4unRcPonvp=zcXLKMJBfS+qpuQ@mail.gmail.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Thu, 8 Mar 2012 17:36:05 +0200
+Subject: I.MX35 PDK
+In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
+References: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>,
+ <CAOMZO5Amo0XFf+TV7PprCL079C5Y0qKmo+k-FfShU7k4SG7W6Q@mail.gmail.com>,
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8918@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 8 mars 2012 12:46, Thomas Gleixner <tglx@linutronix.de> a ?crit :
-> On Thu, 8 Mar 2012, Enrico Scholz wrote:
->> Hi,
->>
->> the commit "genirq: Unmask oneshot irqs when thread was not woken"[1]
->> breaks at least the omap-serial driver which requests a shared interrupt
->
-> Fixed with 52abb700e16a9a
 
-How can I find it ?
-I tried searching in various tree on git.kernel.org,
-but could not find the fix.
->
-> Thanks,
->
-> ? ? ? ?tglx
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>On my mx31pdk I get the same dmaengine errors and the ov2640 does work fine.
+>I think you can go ahead and try to use the camera on the mx35pdk now.
+>You can try:
+
+>gst-launch -v v4l2src device=/dev/video0 !
+>video/x-raw-yuv,width=320,height=240,framerate=25/1 ! ffmpegcolorspace
+>! fbdevsink
+
+<<Thank Fabio I'll try to check it.
+
+I tried to test it, everything is fine,  just do not see the video on display.
+Here can see messages:
+
+Setting pipeline to PAUSED ...mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
+/GstPipeline:pipeline0/GstV4l2Src:v4l2src0.GstPad:src: caps = video/x-raw-yuv, format=(fourcc)UYVY, framerate=(fraction)25/1, width=(int)320, height=(int)240, interlaced=(boolean)false
+Pipeline is live and does not need PREROLL ...
+WARNING: from element /GstPipeline:pipeline0/GstV4l2Src:v4l2src0: Could not get parameters on device '/dev/video0'
+Additional debug info:
+v4l2src_calls.c(240): gst_v4l2src_set_capture (): /GstPipeline:pipeline0/GstV4l2Src:v4l2src0:
+system error: Invalid argument
+Setting pipeline to PLAYING ...
+New clock: GstSystemClock
+
+It works well :-) 
+gst-launch videotestsrc ! fbdevsink
+
+Regards
+Alex Gershgorin
