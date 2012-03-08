@@ -1,39 +1,33 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu,  8 Mar 2012 01:48:36 -0800
-Subject: [PATCH] ARM: S3C2440: Fixed build error for s3c244x
-Message-ID: <1331200116-2424-1-git-send-email-kgene.kim@samsung.com>
+Date: Thu, 08 Mar 2012 01:57:42 -0800
+Subject: [PATCH V6 1/5] ARM: exynos: Add support AFTR mode on EXYNOS4210
+In-Reply-To: <CAMXH7KHtEcg5VSCNFarX9-GuKzWsh3k8Kz+bCu3ZtiqJpvWZZw@mail.gmail.com>
+References: <1329805190-8874-1-git-send-email-amit.kachhap@linaro.org>	<1329805190-8874-2-git-send-email-amit.kachhap@linaro.org>	<CAMXH7KHTgzY7XZ=4rOxsu-Ra8SRTOsCg=YWOLBD1QDTskRbygw@mail.gmail.com>	<CAK44p22LOnJx=bZRfdzAHt7X_snhJGrNoBuXOfsgwBHLLuUziA@mail.gmail.com>
+ <CAMXH7KHtEcg5VSCNFarX9-GuKzWsh3k8Kz+bCu3ZtiqJpvWZZw@mail.gmail.com>
+Message-ID: <4F588296.8020601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed following:
-arch/arm/mach-s3c2440/s3c244x.c: In function 's3c244x_restart':
-arch/arm/mach-s3c2440/s3c244x.c:209: error: expected declaration or statement at end of input
-make[1]: *** [arch/arm/mach-s3c24xx/s3c244x.o] Error 1
-make: *** [arch/arm/mach-s3c24xx] Error 2
+On 03/07/12 15:12, Rob Lee wrote:
+> Hello Kukjim and Amit,
+>
+> Can you tell me the status of this patch?  I based my core cpuidle
+> consolidation patchset on these changes.  My patchset seems to be
+> acceptable now and I would like to do a git pull-request for
+> linux-next, but I see these Exynos cpuidle changes have not yet made
+> it to linux-next.
+>
+Hi Rob,
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
-Hi Arnd, Olof,
+Probably, I missed merging its topic branch and I will do right now.
+I think you can see it in a couple of hours.
 
-This happened when I applied Heiko's 'Fix restart on S3C2442'.
-It was my fault :( and this should be sent before release v3.3.
+Then, if any problems, please let me know.
 
-Please pick this up.
+Thanks for your reminder.
 
-Thanks.
+Best regards,
 Kgene.
-
- arch/arm/mach-s3c2440/s3c244x.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s3c2440/s3c244x.c b/arch/arm/mach-s3c2440/s3c244x.c
-index 744930a..d15852f 100644
---- a/arch/arm/mach-s3c2440/s3c244x.c
-+++ b/arch/arm/mach-s3c2440/s3c244x.c
-@@ -207,3 +207,4 @@ void s3c244x_restart(char mode, const char *cmd)
- 
- 	/* we'll take a jump through zero as a poor second */
- 	soft_restart(0);
-+}
--- 
-1.7.4.4
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
