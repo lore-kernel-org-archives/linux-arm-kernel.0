@@ -1,96 +1,91 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 9 Mar 2012 10:25:00 -0800
-Subject: [PATCH v5 3/4] clk: introduce the common clock framework
-In-Reply-To: <20120309075720.GC16608@lunn.ch>
-References: <20120303133158.GA26882@pengutronix.de>
- <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
- <20120304115201.GB26882@pengutronix.de>
- <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
- <20120305073836.GU3852@pengutronix.de>
- <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
- <20120306190039.GJ3852@pengutronix.de>
- <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
- <20120308062739.GE18513@lunn.ch> <20120308232549.GU3852@pengutronix.de>
- <20120309075720.GC16608@lunn.ch>
-Message-ID: <CAJOA=zPztBfTY_WDwZ5iFEa94eCtHyrzN422RTACMQXs625gRA@mail.gmail.com>
+From: richard.zhao@linaro.org (Richard Zhao)
+Date: Fri, 9 Mar 2012 22:20:46 +0800
+Subject: [RFC] i.MX: drop secondary clocks
+In-Reply-To: <20313.60910.420339.905973@ipc1.ka-ro>
+References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
+ <20313.52782.832292.580932@ipc1.ka-ro>
+ <20120309102931.GY3852@pengutronix.de>
+ <20313.60910.420339.905973@ipc1.ka-ro>
+Message-ID: <20120309142043.GA3138@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2012 at 11:57 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> I'd say use the nonstatic ones. I think using the static initializers
->> will cause us much pain in the future. I've been through several rebases
->> on the i.MX clock rework and everytime I wish my sed foo would be
->> better. Now imagine what happens when it turns out that the internal
->> struct clk layout or the structs for the muxes/dividers/gates have to
->> be changed.
->
-> /*****************************************************************************
-> ?* CLK tree
-> ?****************************************************************************/
-> static DEFINE_SPINLOCK(gating_lock);
->
-> #define DEFINE_KIRKWOOD_CLK_GATE(_name, _bit) ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ?DEFINE_CLK_GATE(_name, "tclk", NULL, 0, ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? ? ? ? ? ? ? ? ?(void __iomem *)CLOCK_GATING_CTRL, ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? ? ? ?_bit, 0, &gating_lock)
->
-> DEFINE_KIRKWOOD_CLK_GATE(clk_ge0, ? ?CGC_BIT_GE0);
-> DEFINE_KIRKWOOD_CLK_GATE(clk_pex0, ? CGC_BIT_PEX0);
-> DEFINE_KIRKWOOD_CLK_GATE(clk_usb0, ? CGC_BIT_USB0);
-> DEFINE_KIRKWOOD_CLK_GATE(clk_sdio, ? CGC_BIT_SDIO);
-> DEFINE_KIRKWOOD_CLK_GATE(clk_tsu, ? ?CGC_BIT_TSU);
-> DEFINE_KIRKWOOD_CLK_GATE(clk_dunit, ?CGC_BIT_DUNIT);
-> DEFINE_KIRKWOOD_CLK_GATE(clk_runit, ?CGC_BIT_RUNIT);
->
-> I've so far not had any problems, and not needed an sed foo. ?I do
-> only have a dozen or so clocks, which helps. But even so, all the real
-> pain is hidden inside DEFINE_CLK_GATE() which Mike maintains.
+On Fri, Mar 09, 2012 at 12:47:58PM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Sascha Hauer writes:
+> > On Fri, Mar 09, 2012 at 10:32:30AM +0100, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Sascha Hauer writes:
+> > > > Hi All,
+> > > > 
+> [...]
+> > > I think that's a bad idea! Drivers should not have to know intimate
+> > > details about the clock logic of the CPU core they are running on!
+> > 
+> > They don't have to. There really are different clocks connected to the
+> > devices. If for example you have a look eSDHC Block diagram in the
+> > reference Manual  you'll see that this has three clock inputs. All
+> > we do is to tell the driver about these three clocks which are device
+> > specific and not SoC specific. Which of these clocks are actually
+> > gatetable varies from SoC to SoC. Also on some SoCs two of the three
+> > clocks may be actually the same.
+> > 
+> At least this should be done in a way that is independent from the
+> name of the clock on a specific SoC, but is related to the function of
+> the clock for the driver. Thus instead of e.g. CLK_IPG and CLK_PER use
+> CLK_REG and CLK_BITRATE.
+> 
+> > > They should simply request a clock for the unit they operate on and
+> > > the clock core code should figure out which other clocks need to be
+> > > enabled on a specific machine to get the unit working.
+> > 
+> > Yes, that's what we want to do, except that devices do not need 'a'
+> > clock but several. And the clock core figures out which other clocks
+> > have to be activated, these are the parent clocks.
+> > 
+> What about devices which have multiple 'parent' clocks that are
+> completely unrelated wrt. each other? In the current clock system you
+> can model this by having secondary clocks.
+> How would you represent the current structure on i.MX53:
+> uart_ipg_clk <- aips_tz1_clk <-+- ahb_clk
+>                                +-> ahb_max_clk
+> in the new model?
+> Should every driver have to request the ahb_max_clk in addition to the
+> uart_ipg_clk?
+Right. binding bus clock and device core clock together is only one of the
+use cases of secondary clock. Sascha, I remember we ever talked about it?
+Back to the above example, it's caused by bus topology. It needs other
+code, maybe busfreq, to support it, and leaving clock code pure.
 
-It's true that if the argument list for the macros doesn't change then
-the pain of static initialization is hidden from the platform data.
-
-However if you have the ability to use the clk_foo_register functions
-please do use them in place of static initialization.  The static init
-stuff is only for folks backed into a corner and forced to use it...
-for now.  I'm looking at ways to allow for kmalloc'ing in early boot,
-as well as reducing the number of clocks that my platform registers
-during early boot drastically.
-
->
-> I guess the problem comes when you are not using the basic clk
-> providers, but your own provider. What might help is if
-> linux/clk-provider.h could provide some macros to do most of the
-> generic definitions. Something like:
-
-I'd rather people just used the registration functions instead.
-
-Thanks,
-Mike
-
->
-> #define DEFINE_CLK_GENERIC(_name, _flags, _ops) ? ? ? ? ? ? ? ? \
-> ? ? ? ?static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?static char *_name##_parent_names[] = {}; ? ? ? ? ? ? ? \
-> ? ? ? ?static struct clk _name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? ? ? ? ?.name = #_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? ? ? ? ?.ops = &_ops, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? ? ? ? ?.hw = &_name##_hw.hw, ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? ? ? ? ?.parent_names = _name##_parent_names, ? ? ? ? ? \
-> ? ? ? ? ? ? ? ?.num_parents = ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ? ? ? ? ?ARRAY_SIZE(_name##_parent_names), ? ? ? \
-> ? ? ? ? ? ? ? ?.flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?};
->
-> and then you have something like
->
-> #define DEFINE_CLK_IMX(_name, _flags, _foo, _bar) ? ? ? ? ? ? ? \
-> ? ? ? ?static struct clk_imx _name##_hw = { ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?.hw = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ? ? ? ? ? ? ? ? ?.clk = &_name, ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?}, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?.foo = _foo, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ? ? ? ? ?.bar = _bar, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?}; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?DEFINE_CLK_GENERIC(_name, _flags, clk_imx_ops)
->
-> ? ? ? ?Andrew
+Thanks
+Richard
+> 
+> What, if you have a device on a number of SoCs with a certain set of
+> clocks, but on a later SoC another clock is required for the device?
+> You would not only have to change the driver to add the new clock but
+> also would have to add that clock as a dummy clock in the core clock
+> code for all previous SoCs that did not provide that clock.
+> 
+> > I also don't really like exposing this to the drivers, but it's a clean
+> > way to do so. A framebuffer driver needs a pixel clock which must be
+> > enabled when the display is turned on. It may also have a register clock
+> > which has to be turned on when we want to access registers. These are
+> > two different clocks and the driver can make use of this (not that we
+> > currently do though...)
+> > 
+> But we could do so without any problem.
+> 
+> 
+> Lothar Wa?mann
+> -- 
+> ___________________________________________________________
+> 
+> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+> Gesch?ftsf?hrer: Matthias Kaussen
+> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+> 
+> www.karo-electronics.de | info at karo-electronics.de
+> ___________________________________________________________
