@@ -1,105 +1,301 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 09 Mar 2012 12:05:05 +0100
-Subject: [PATCH 3/3] ARM: Exynos: Add DRM core support for NURI board
-In-Reply-To: <1331291105-18152-1-git-send-email-m.szyprowski@samsung.com>
-References: <1331291105-18152-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1331291105-18152-4-git-send-email-m.szyprowski@samsung.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Fri,  9 Mar 2012 16:20:39 +0100
+Subject: [PATCH v3 03/13] dmaengine: imx-dma: remove dma_mode member of
+ internal structure.
+In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1331306449-28591-4-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add core DRM device and alternative platform device data for FIMD DRM
-subdriver. Based on the initial patch by Joonyoung Shim
-<jy0922.shim@samsung.com>
+dmaengine now provides 'enum dma_transfer_direction' to properly
+specify DMA transfer direction. For this reason, DMA_MODE_* defines
+are replaced by this new type and therefore dma_mode member becomes
+redundant.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
- arch/arm/mach-exynos/Kconfig     |    1 +
- arch/arm/mach-exynos/mach-nuri.c |   31 +++++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+), 0 deletions(-)
+ drivers/dma/imx-dma.c |  103 +++++++++++++++++++++---------------------------
+ 1 files changed, 45 insertions(+), 58 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index c73eeba..e996b5d 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -293,6 +293,7 @@ config MACH_NURI
- 	select S5P_DEV_USB_EHCI
- 	select S5P_SETUP_MIPIPHY
- 	select EXYNOS4_DEV_DMA
-+	select EXYNOS_DEV_DRM
- 	select EXYNOS4_SETUP_FIMC
- 	select EXYNOS4_SETUP_FIMD0
- 	select EXYNOS4_SETUP_I2C1
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index a6b9162..682203a 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -25,6 +25,7 @@
- #include <linux/mmc/host.h>
- #include <linux/fb.h>
- #include <linux/pwm_backlight.h>
-+#include <drm/exynos_drm.h>
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index a5bb9bd..400082d 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -35,10 +35,6 @@
+ #define IMXDMA_MAX_CHAN_DESCRIPTORS	16
+ #define IMX_DMA_CHANNELS  16
  
- #include <video/platform_lcd.h>
- #include <media/m5mols.h>
-@@ -210,6 +211,27 @@ static struct platform_device nuri_gpio_keys = {
- 	},
- };
+-#define DMA_MODE_READ		0
+-#define DMA_MODE_WRITE		1
+-#define DMA_MODE_MASK		1
+-
+ #define IMX_DMA_LENGTH_LOOP	((unsigned int)-1)
+ #define IMX_DMA_MEMSIZE_32	(0 << 4)
+ #define IMX_DMA_MEMSIZE_8	(1 << 4)
+@@ -132,7 +128,6 @@ enum  imxdma_prep_type {
+  */
  
-+#ifdef CONFIG_DRM_EXYNOS
-+static struct exynos_drm_fimd_pdata drm_fimd_pdata = {
-+	.timing	= {
-+		.xres		= 1024,
-+		.yres		= 600,
-+		.hsync_len	= 40,
-+		.left_margin	= 79,
-+		.right_margin	= 200,
-+		.vsync_len	= 10,
-+		.upper_margin	= 10,
-+		.lower_margin	= 11,
-+		.refresh	= 60,
-+	},
-+	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB |
-+			  VIDCON0_CLKSEL_LCD,
-+	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-+	.default_win	= 3,
-+	.bpp		= 32,
-+};
-+
-+#else
- /* Frame Buffer */
- static struct s3c_fb_pd_win nuri_fb_win0 = {
- 	.win_mode = {
-@@ -236,6 +258,7 @@ static struct s3c_fb_platdata nuri_fb_pdata __initdata = {
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
- 	.setup_gpio	= exynos4_fimd0_gpio_setup_24bpp,
- };
-+#endif
+ struct imxdma_channel_internal {
+-	unsigned int dma_mode;
+ 	struct scatterlist *sg;
+ 	unsigned int resbytes;
  
- static void nuri_lcd_power_on(struct plat_lcd_data *pd, unsigned int power)
+@@ -153,7 +148,7 @@ struct imxdma_desc {
+ 	dma_addr_t			src;
+ 	dma_addr_t			dest;
+ 	size_t				len;
+-	unsigned int			dmamode;
++	enum dma_transfer_direction	direction;
+ 	enum imxdma_prep_type		type;
+ 	/* For memcpy and interleaved */
+ 	unsigned int			config_port;
+@@ -237,8 +232,9 @@ static int imxdma_hw_chain(struct imxdma_channel_internal *imxdma)
+ /*
+  * imxdma_sg_next - prepare next chunk for scatter-gather DMA emulation
+  */
+-static inline int imxdma_sg_next(struct imxdma_channel *imxdmac, struct scatterlist *sg)
++static inline int imxdma_sg_next(struct imxdma_desc *d, struct scatterlist *sg)
  {
-@@ -1335,6 +1358,9 @@ static struct platform_device *nuri_devices[] __initdata = {
- 	&cam_vt_cam15_fixed_rdev,
- 	&cam_vdda_fixed_rdev,
- 	&cam_8m_12v_fixed_rdev,
-+#ifdef CONFIG_DRM_EXYNOS
-+	&exynos_device_drm,
-+#endif
- };
++	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+ 	struct imxdma_channel_internal *imxdma = &imxdmac->internal;
+ 	unsigned long now;
  
- static void __init nuri_map_io(void)
-@@ -1366,7 +1392,12 @@ static void __init nuri_machine_init(void)
- 	i2c_register_board_info(9, i2c9_devs, ARRAY_SIZE(i2c9_devs));
- 	s3c_i2c6_set_platdata(&nuri_i2c6_platdata);
+@@ -246,7 +242,7 @@ static inline int imxdma_sg_next(struct imxdma_channel *imxdmac, struct scatterl
+ 	if (imxdma->resbytes != IMX_DMA_LENGTH_LOOP)
+ 		imxdma->resbytes -= now;
  
-+#ifdef CONFIG_DRM_EXYNOS
-+	s5p_device_fimd0.dev.platform_data = &drm_fimd_pdata;
-+	exynos4_fimd0_gpio_setup_24bpp();
-+#else
- 	s5p_fimd0_set_platdata(&nuri_fb_pdata);
-+#endif
+-	if ((imxdma->dma_mode & DMA_MODE_MASK) == DMA_MODE_READ)
++	if (d->direction == DMA_DEV_TO_MEM)
+ 		imx_dmav1_writel(sg->dma_address, DMA_DAR(imxdmac->channel));
+ 	else
+ 		imx_dmav1_writel(sg->dma_address, DMA_SAR(imxdmac->channel));
+@@ -263,14 +259,12 @@ static inline int imxdma_sg_next(struct imxdma_channel *imxdmac, struct scatterl
+ }
  
- 	nuri_camera_init();
+ static int
+-imxdma_setup_single_hw(struct imxdma_channel *imxdmac, dma_addr_t dma_address,
+-		     unsigned int dma_length, unsigned int dev_addr,
+-		     unsigned int dmamode)
++imxdma_setup_mem2mem_hw(struct imxdma_channel *imxdmac, dma_addr_t dma_address,
++		     unsigned int dma_length, unsigned int dev_addr)
+ {
+ 	int channel = imxdmac->channel;
  
+ 	imxdmac->internal.sg = NULL;
+-	imxdmac->internal.dma_mode = dmamode;
+ 
+ 	if (!dma_address) {
+ 		printk(KERN_ERR "imxdma%d: imx_dma_setup_single null address\n",
+@@ -284,38 +278,24 @@ imxdma_setup_single_hw(struct imxdma_channel *imxdmac, dma_addr_t dma_address,
+ 		return -EINVAL;
+ 	}
+ 
+-	if ((dmamode & DMA_MODE_MASK) == DMA_MODE_READ) {
+-		pr_debug("imxdma%d: %s dma_addressg=0x%08x dma_length=%d "
+-			"dev_addr=0x%08x for read\n",
+-			channel, __func__, (unsigned int)dma_address,
+-			dma_length, dev_addr);
++	pr_debug("imxdma%d: %s dma_addressg=0x%08x dma_length=%d "
++		"dev_addr=0x%08x for write\n",
++		channel, __func__, (unsigned int)dma_address,
++		dma_length, dev_addr);
+ 
+-		imx_dmav1_writel(dev_addr, DMA_SAR(channel));
+-		imx_dmav1_writel(dma_address, DMA_DAR(channel));
+-		imx_dmav1_writel(imxdmac->internal.ccr_from_device, DMA_CCR(channel));
+-	} else if ((dmamode & DMA_MODE_MASK) == DMA_MODE_WRITE) {
+-		pr_debug("imxdma%d: %s dma_addressg=0x%08x dma_length=%d "
+-			"dev_addr=0x%08x for write\n",
+-			channel, __func__, (unsigned int)dma_address,
+-			dma_length, dev_addr);
+-
+-		imx_dmav1_writel(dma_address, DMA_SAR(channel));
+-		imx_dmav1_writel(dev_addr, DMA_DAR(channel));
+-		imx_dmav1_writel(imxdmac->internal.ccr_to_device,
+-				DMA_CCR(channel));
+-	} else {
+-		printk(KERN_ERR "imxdma%d: imx_dma_setup_single bad dmamode\n",
+-		       channel);
+-		return -EINVAL;
+-	}
++	imx_dmav1_writel(dma_address, DMA_SAR(channel));
++	imx_dmav1_writel(dev_addr, DMA_DAR(channel));
++	imx_dmav1_writel(imxdmac->internal.ccr_to_device,
++			 DMA_CCR(channel));
+ 
+ 	imx_dmav1_writel(dma_length, DMA_CNTR(channel));
+ 
+ 	return 0;
+ }
+ 
+-static void imxdma_enable_hw(struct imxdma_channel *imxdmac)
++static void imxdma_enable_hw(struct imxdma_desc *d)
+ {
++	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+ 	int channel = imxdmac->channel;
+ 	unsigned long flags;
+ 
+@@ -336,7 +316,7 @@ static void imxdma_enable_hw(struct imxdma_channel *imxdmac)
+ 		imxdmac->internal.sg = sg_next(imxdmac->internal.sg);
+ 		if (imxdmac->internal.sg) {
+ 			u32 tmp;
+-			imxdma_sg_next(imxdmac, imxdmac->internal.sg);
++			imxdma_sg_next(d, imxdmac->internal.sg);
+ 			tmp = imx_dmav1_readl(DMA_CCR(channel));
+ 			imx_dmav1_writel(tmp | CCR_RPT | CCR_ACRPT,
+ 				DMA_CCR(channel));
+@@ -393,18 +373,18 @@ imxdma_config_channel_hw(struct imxdma_channel *imxdmac, unsigned int config_por
+ }
+ 
+ static int
+-imxdma_setup_sg_hw(struct imxdma_channel *imxdmac,
++imxdma_setup_sg_hw(struct imxdma_desc *d,
+ 		 struct scatterlist *sg, unsigned int sgcount,
+ 		 unsigned int dma_length, unsigned int dev_addr,
+-		 unsigned int dmamode)
++		 enum dma_transfer_direction direction)
+ {
++	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+ 	int channel = imxdmac->channel;
+ 
+ 	if (imxdmac->internal.in_use)
+ 		return -EBUSY;
+ 
+ 	imxdmac->internal.sg = sg;
+-	imxdmac->internal.dma_mode = dmamode;
+ 	imxdmac->internal.resbytes = dma_length;
+ 
+ 	if (!sg || !sgcount) {
+@@ -419,14 +399,14 @@ imxdma_setup_sg_hw(struct imxdma_channel *imxdmac,
+ 		return -EINVAL;
+ 	}
+ 
+-	if ((dmamode & DMA_MODE_MASK) == DMA_MODE_READ) {
++	if (direction == DMA_DEV_TO_MEM) {
+ 		pr_debug("imxdma%d: %s sg=%p sgcount=%d total length=%d "
+ 			"dev_addr=0x%08x for read\n",
+ 			channel, __func__, sg, sgcount, dma_length, dev_addr);
+ 
+ 		imx_dmav1_writel(dev_addr, DMA_SAR(channel));
+ 		imx_dmav1_writel(imxdmac->internal.ccr_from_device, DMA_CCR(channel));
+-	} else if ((dmamode & DMA_MODE_MASK) == DMA_MODE_WRITE) {
++	} else if (direction == DMA_MEM_TO_DEV) {
+ 		pr_debug("imxdma%d: %s sg=%p sgcount=%d total length=%d "
+ 			"dev_addr=0x%08x for write\n",
+ 			channel, __func__, sg, sgcount, dma_length, dev_addr);
+@@ -439,7 +419,7 @@ imxdma_setup_sg_hw(struct imxdma_channel *imxdmac,
+ 		return -EINVAL;
+ 	}
+ 
+-	imxdma_sg_next(imxdmac, sg);
++	imxdma_sg_next(d, sg);
+ 
+ 	return 0;
+ }
+@@ -517,13 +497,26 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
+ {
+ 	struct imxdma_channel_internal *imxdma = &imxdmac->internal;
+ 	int chno = imxdmac->channel;
++	struct imxdma_desc *desc;
+ 
+ 	if (imxdma->sg) {
+ 		u32 tmp;
+ 		imxdma->sg = sg_next(imxdma->sg);
+ 
+ 		if (imxdma->sg) {
+-			imxdma_sg_next(imxdmac, imxdma->sg);
++
++			spin_lock(&imxdmac->lock);
++			if (list_empty(&imxdmac->ld_active)) {
++				spin_unlock(&imxdmac->lock);
++				goto out;
++			}
++
++			desc = list_first_entry(&imxdmac->ld_active,
++						struct imxdma_desc,
++						node);
++			spin_unlock(&imxdmac->lock);
++
++			imxdma_sg_next(desc, imxdma->sg);
+ 
+ 			tmp = imx_dmav1_readl(DMA_CCR(chno));
+ 
+@@ -556,6 +549,7 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
+ 		}
+ 	}
+ 
++out:
+ 	imx_dmav1_writel(0, DMA_CCR(chno));
+ 	imxdma->in_use = 0;
+ 	/* Tasklet irq */
+@@ -599,8 +593,7 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ 					  d->config_port, d->config_mem, 0, 0);
+ 		if (ret < 0)
+ 			return ret;
+-		ret = imxdma_setup_single_hw(imxdmac, d->src,
+-					   d->len, d->dest, d->dmamode);
++		ret = imxdma_setup_mem2mem_hw(imxdmac, d->src, d->len, d->dest);
+ 		if (ret < 0)
+ 			return ret;
+ 		break;
+@@ -608,19 +601,15 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ 	/* Cyclic transfer is the same as slave_sg with special sg configuration. */
+ 	case IMXDMA_DESC_CYCLIC:
+ 	case IMXDMA_DESC_SLAVE_SG:
+-		if (d->dmamode == DMA_MODE_READ)
+-			ret = imxdma_setup_sg_hw(imxdmac, d->sg,
+-				       d->sgcount, d->len, d->src, d->dmamode);
+-		else
+-			ret = imxdma_setup_sg_hw(imxdmac, d->sg,
+-				      d->sgcount, d->len, d->dest, d->dmamode);
++		ret = imxdma_setup_sg_hw(d, d->sg, d->sgcount, d->len,
++					 imxdmac->per_address, d->direction);
+ 		if (ret < 0)
+ 			return ret;
+ 		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+-	imxdma_enable_hw(imxdmac);
++	imxdma_enable_hw(d);
+ 	return 0;
+ }
+ 
+@@ -865,11 +854,10 @@ static struct dma_async_tx_descriptor *imxdma_prep_slave_sg(
+ 	desc->sg = sgl;
+ 	desc->sgcount = sg_len;
+ 	desc->len = dma_length;
++	desc->direction = direction;
+ 	if (direction == DMA_DEV_TO_MEM) {
+-		desc->dmamode = DMA_MODE_READ;
+ 		desc->src = imxdmac->per_address;
+ 	} else {
+-		desc->dmamode = DMA_MODE_WRITE;
+ 		desc->dest = imxdmac->per_address;
+ 	}
+ 	desc->desc.callback = NULL;
+@@ -925,11 +913,10 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+ 	desc->sg = imxdmac->sg_list;
+ 	desc->sgcount = periods;
+ 	desc->len = IMX_DMA_LENGTH_LOOP;
++	desc->direction = direction;
+ 	if (direction == DMA_DEV_TO_MEM) {
+-		desc->dmamode = DMA_MODE_READ;
+ 		desc->src = imxdmac->per_address;
+ 	} else {
+-		desc->dmamode = DMA_MODE_WRITE;
+ 		desc->dest = imxdmac->per_address;
+ 	}
+ 	desc->desc.callback = NULL;
+@@ -959,7 +946,7 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+ 	desc->src = src;
+ 	desc->dest = dest;
+ 	desc->len = len;
+-	desc->dmamode = DMA_MODE_WRITE;
++	desc->direction = DMA_MEM_TO_MEM;
+ 	desc->config_port = IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR;
+ 	desc->config_mem = IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR;
+ 	desc->desc.callback = NULL;
 -- 
-1.7.1.569.g6f426
+1.7.0.4
