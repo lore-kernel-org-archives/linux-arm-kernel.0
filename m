@@ -1,29 +1,37 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 Mar 2012 18:57:04 -0700 (MST)
+Date: Thu, 8 Mar 2012 19:04:31 -0700 (MST)
 Subject: [GIT PULL] ARM: OMAP2+: hwmod data: cleanup in preparation for
  link array removal
-In-Reply-To: <20120309014016.GC12083@atomide.com>
+In-Reply-To: <alpine.DEB.2.00.1203081851570.9551@utopia.booyaka.com>
 References: <alpine.DEB.2.00.1203072102150.21662@utopia.booyaka.com>
  <20120309014016.GC12083@atomide.com>
-Message-ID: <alpine.DEB.2.00.1203081851570.9551@utopia.booyaka.com>
+ <alpine.DEB.2.00.1203081851570.9551@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1203081900500.26543@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi
 
-On Thu, 8 Mar 2012, Tony Lindgren wrote:
+on second thought...
 
-> Got these now merged into l-o master, but ran into a merge
-> conflict with already queued sr branch. Resolved it by using
-> your version except left out vdd_name.
+On Thu, 8 Mar 2012, Paul Walmsley wrote:
 
-Definitely we want the vdd_name fields.  Other than that it looks okay.  
+> On Thu, 8 Mar 2012, Tony Lindgren wrote:
+> 
+> > Got these now merged into l-o master, but ran into a merge
+> > conflict with already queued sr branch. Resolved it by using
+> > your version except left out vdd_name.
+> 
+> Definitely we want the vdd_name fields.  Other than that it looks okay.  
 
-> As the namings have changed for smartreflex, now I suspect it's broken 
-> for the interrupts..
+I guess that other SR series that you merged removed the vdd_name fields?
 
-Hmm, not sure I understand that part?  AFAIK the SmartReflex code doesn't 
-rely on hwmod names.  Or are you talking about the vdd_name?
+If so then yeah, we'd better leave those out.
+
+This means that I'm going to have to rebase those big hwmod data changes 
+:-(
+
+Can you send me a stable commit for that?
 
 
 - Paul
