@@ -1,31 +1,18 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri,  9 Mar 2012 11:39:32 -0800
-Subject: [PATCH] MAINTAINERS: new git entry for arm/mach-msm
-Message-ID: <1331321972-9353-1-git-send-email-davidb@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Mar 2012 10:33:44 -0800
+Subject: [PATCH 1/2] ARM: OMAP: Remove CONFIG_OMAP_MCBSP references
+In-Reply-To: <1331283078-14846-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
+ <1331283078-14846-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120309183344.GI12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Git tree moved to
-git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [120309 00:54]:
+> The McBSP driver stack has been moved to ASoC. The CONFIG_OMAP_MCBSP will
+> be removed since the CONFIG_SND_OMAP_SOC_MCBSP will trigger to build the
+> McBSP (audio) drivers.
 
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
- MAINTAINERS |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Great, glad to see this! Thanks for working on this:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b087b3bc..3321d75 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -962,7 +962,7 @@ F:	drivers/tty/serial/msm_serial.c
- F:	drivers/platform/msm/
- F:	drivers/*/pm8???-*
- F:	include/linux/mfd/pm8xxx/
--T:	git git://codeaurora.org/quic/kernel/davidb/linux-msm.git
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git
- S:	Maintained
- 
- ARM/TOSA MACHINE SUPPORT
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Acked-by: Tony Lindgren <tony@atomide.com>
