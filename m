@@ -1,35 +1,71 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Mon, 12 Mar 2012 23:30:21 +0400
-Subject: [PATCH v2 2/2] arm/tegra: add timeout to PCIe PLL lock detection
- loop
-In-Reply-To: <4F5E3BE7.4080207@wwwdotorg.org>
-References: <20120306201538.GA14350@rainbow>
- <1331287760-10546-1-git-send-email-mad_soft@inbox.ru>
- <4F5E3BE7.4080207@wwwdotorg.org>
-Message-ID: <20120312193020.GA1584@rainbow>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Fri, 9 Mar 2012 10:18:58 -0800
+Subject: [PATCH v5 3/4] clk: introduce the common clock framework
+In-Reply-To: <20120308062739.GE18513@lunn.ch>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-4-git-send-email-mturquette@linaro.org>
+ <20120303133158.GA26882@pengutronix.de>
+ <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
+ <20120304115201.GB26882@pengutronix.de>
+ <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
+ <20120305073836.GU3852@pengutronix.de>
+ <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
+ <20120306190039.GJ3852@pengutronix.de>
+ <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
+ <20120308062739.GE18513@lunn.ch>
+Message-ID: <CAJOA=zOV769hz8Bam7TvdXN5AYep66h8H596nK1ETkNAMJBsvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:09 Mon 12 Mar     , Stephen Warren wrote:
-> Thierry pointed out that one of NVIDIA's downstream kernels uses a
-> timeout of 300 here, rather than 2000 above. Do you see a specific need
-> for this timeout for be 2000 rather than 300? It might be nice to be
-> consistent.
-No, there's no specific need for it to be 2000 - it may as well be 300.
-I just wanted to stay on the safe side, but I think 300 should be still
-more than enough time for PLL to lock.
+On Wed, Mar 7, 2012 at 10:27 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> Assuming that some day OMAP code can be refactored to allow for lazy
+>> (or at least initcall-based) registration of clocks then perhaps your
+>> suggestion can take root. ?Which leads me to this question: are there
+>> any other platforms out there that require the level of expose to
+>> struct clk present in this patchset? ?OMAP does, for now, but if that
+>> changes then I need to know if others require this as well.
+>
+> Hi Mike
+>
+> For kirkwood, i use static clk's for all but my root clock. I cannot
+> statically know the rate of the root clock, so i have to determine it
+> at boot time using heuristics, PCI ID, etc.
+>
+> I used statics thinking it would be less code. No idea if it actually
+> is, and there is nothing stopping me moving to creating the clocks
+> after creating the root clock.
+>
+> One comment i have about the current static clks. I completely missing
+> you need to call __clk_init() on them and so ended up with lots of
+> division by zero errors, since they did not have a parent, and so the
+> code seemed not be to able to determine the rate.
+>
+> So
+>
+> 1) Please add __clk_init() to the documentation in the section about
+> ? static clocks.
 
-> 
-> Olof, I notice you've already applied V1 of this, which has the return
-> statement issue. Can you replace it with this, or should Dmitry send an
-> incremental patch?
+Done.
 
-Yes, V1 breaks more things than it fixes, so it would be nice if
-it can be replaced with fixed version (I hope it's not too late yet).
-BTW, regarding timeout discussion above - should I resend patch with
-adjusted timeout, or can you change it while applying? (of course,
-if we settle on incremental patch, I'll roll this change in)
+>
+> 2) Should maybe the name change? It seems strange having to call a
+> ? __X() function. If this is a function which is supposed to be used,
+> ? drop the __. Maybe clk_static_register()?
 
--- 
-Best regards,
-Dmitry "MAD" Artamonow
+That function is used internally by clk_register and is only exposed
+by clk-private.h, so I think the naming scheme is sane.  I basically
+want to create a sense of worry in anyone using clk-private.h :-)
+
+>
+> 3) Maybe, if the parent is missing, clk_get_rate() should return an
+> ? error?
+
+Non-root, non-fixed-rate, orphan clocks can return an error in this
+case.  Will update for V6.  Any idea on best -EERROR?  I'm thinking
+ENODEV, but ECHILD and EPIPE are kinda funny in this context.
+
+Regards,
+Mike
+
+>
+> Andrew
