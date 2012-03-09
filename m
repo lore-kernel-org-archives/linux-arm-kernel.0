@@ -1,39 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 Mar 2012 08:04:04 -0800
-Subject: [PATCH 0/4] ARM: SAMSUNG: Add __init attribute to functions
- calling s3c_set_platdata
-In-Reply-To: <1330593446-663-1-git-send-email-tushar.behera@linaro.org>
-References: <1330593446-663-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <4F5A29F4.7020308@samsung.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Fri, 9 Mar 2012 09:00:35 +0100
+Subject: [PATCH v2 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+In-Reply-To: <20120308200448.GR3852@pengutronix.de>
+References: <1331130825-14947-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120308200448.GR3852@pengutronix.de>
+Message-ID: <CACKLOr2_y9aw+-79d4FfKsOuiDdOvDHAanQ6j+qF4Ynf2r5rag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/12 01:17, Tushar Behera wrote:
-> The function s3c_set_platdata is defined with __init attribute, hence the
-> functions calling s3c_set_platdata should also be defined with __init
-> attribute.
->
-> Even though all the modified functions are called from xxx_machine_init()
-> functions, it is still better to define each of them with __init attribute.
->
-> Tushar Behera (4):
->    ARM: EXYNOS: Add __init attribute to nuri_camera_init()
->    ARM: EXYNOS: Add __init attribute to universal_camera_init()
->    ARM: SAMSUNG: Add __init attribute to samsung_bl_set()
->    ARM: SAMSUNG: Add __init attribute to xxx_set_platdata() wrappers
->
->   arch/arm/mach-exynos/mach-nuri.c           |    2 +-
->   arch/arm/mach-exynos/mach-universal_c210.c |    2 +-
->   arch/arm/plat-samsung/dev-backlight.c      |    2 +-
->   arch/arm/plat-samsung/devs.c               |    4 ++--
->   4 files changed, 5 insertions(+), 5 deletions(-)
->
-Looks good to me, applied.
+Hi Sascha,
 
-Thanks.
+On 8 March 2012 21:04, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Mar 07, 2012 at 03:33:32PM +0100, Javier Martin wrote:
+>> The following series have to be applied on top of the following patches:
+>> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+>> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
+>>
+>> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+>> is deprecated and no new patches are accepted for it.
+>>
+>> This series merges this code into the imx-dma.c dmaengine driver.
+>>
+>
+> I can't find a branch to apply this on. Could you provide a git tree?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I'm developing and testing here:
+
+git://git.infradead.org/users/vkoul/slave-dma.git next
+
+> If you have to repost this series please consider using -M with git
+> format-patch.
+
+OK, thanks for the suggestion.
+
+Regards.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
