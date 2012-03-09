@@ -1,19 +1,33 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Fri, 9 Mar 2012 18:35:41 +0100
-Subject: [PATCH] pxa/hx4700: Remove pcmcia platform_device structure
-In-Reply-To: <1331305076.23513.YahooMailClassic@web29009.mail.ird.yahoo.com>
-References: <1331305076.23513.YahooMailClassic@web29009.mail.ird.yahoo.com>
-Message-ID: <CA+gwMce5x8XddOoKKNhYVfowstUtfeTNegJYA41av6EBLvS7sg@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 09 Mar 2012 09:30:05 -0800
+Subject: [GIT PULL] ARM: OMAP: GPIO cleanup and device tree adaptation
+In-Reply-To: <CACxGe6uo774Vf=rgnxxT6htFYSu7xROhgT-=Ernfbr9Lp-WvYQ@mail.gmail.com>
+ (Grant Likely's message of "Fri, 9 Mar 2012 09:38:12 -0700")
+References: <4F5A30DB.7060004@ti.com>
+ <CACxGe6uo774Vf=rgnxxT6htFYSu7xROhgT-=Ernfbr9Lp-WvYQ@mail.gmail.com>
+Message-ID: <8762ed4r8i.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2012 at 3:57 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> The existing pcmcia platform_device structure is not used and is not needed by
-> the pending hx4700 PCMCIA/CF support. So let's remove it.
+Hi Grant,
+
+Grant Likely <grant.likely@secretlab.ca> writes:
+
+> On Fri, Mar 9, 2012 at 9:33 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>> Hi Grant,
+>>
+>> Please pull the patches for OMAP GPIO DT support.
+>> It is based on your current gpio/next branch.
+>>
+>> Thanks,
+>> Benoit
 >
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> Merged, thanks.
 
-Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
+Since you're queuing OMAP GPIO stuff, ping on this one:
 
-regards
-Philipp
+    http://marc.info/?l=linux-omap&m=133098903909156&w=2
+
+Thanks,
+
+Kevin
