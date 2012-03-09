@@ -1,60 +1,78 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 9 Mar 2012 15:38:39 -0800
-Subject: [PATCH v5 4/4] clk: basic clock hardware types
-In-Reply-To: <20120305101708.GF24858@lunn.ch>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-5-git-send-email-mturquette@linaro.org>
- <20120304174229.GD11546@lunn.ch>
- <CAJOA=zNWN6L+-YEkNKoQnjnrrswNpCBmtnhKBm04HekWP46i5w@mail.gmail.com>
- <20120305084823.GD24858@lunn.ch> <20120305092948.GV3852@pengutronix.de>
- <20120305101708.GF24858@lunn.ch>
-Message-ID: <CAJOA=zNS+s+b1_KvBeur0KxnBkUbXeu0Pyj9n877dvUQF22VPw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 09 Mar 2012 07:59:17 -0600
+Subject: [PATCH 2/5 v3] ARM: at91: sam9g20 add i2c DT support
+In-Reply-To: <20120309095336.GK27213@game.jcrosoft.org>
+References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
+ <1331196635-27203-2-git-send-email-plagnioj@jcrosoft.com>
+ <4F58E77B.4010500@gmail.com> <20120309095336.GK27213@game.jcrosoft.org>
+Message-ID: <4F5A0CB5.2020203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2012 at 2:17 AM, Andrew Lunn <andrew@lunn.ch> wrote:
->> > I think i can wrap your simple gate clock, to make my "complex" gate
->> > clock. What would help is if you would EXPORT_SYMBOL_GPL
->> > clk_gate_enable() and clk_gate_disable(), since they do exactly what i
->> > want. I can then build my own clk_ops structure, with my own
->> > unprepare() function. I would probably use DEFINE_CLK_GATE as is, and
->> > then at run time, before calling __clk_init() overwrite the .ops with
->> > my own version.
+On 03/09/2012 03:53 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 11:08 Thu 08 Mar     , Rob Herring wrote:
+>> On 03/08/2012 02:50 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> For now on use i2c-gpio driver on the same pin as the hardware IP.
+>>>
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>> ---
+>>> v3:
+>>>
+>>> 	update i2c binding (Rob comments)
+>>>
+>>> Best Regards,
+>>> J.
+>>>  arch/arm/boot/dts/at91sam9g20.dtsi |   13 +++++++++++++
+>>>  1 files changed, 13 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+>>> index 4b0dc99..072b2da 100644
+>>> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
+>>> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+>>> @@ -189,4 +189,17 @@
+>>>  			status = "disabled";
+>>>  		};
+>>>  	};
+>>> +> > +	i2c-gpio at 0 {
 >>
->> Maybe I don't get your point, but clk_unprepare should be used when
->> you have to sleep to disable your clock. When clk_gate_disable() is
->> exactly why do you want to use clk_unprepare instead of clk_disable?
->
-> I'm trying to avoid having to implement a new clock provider. The
-> whole point of the generic clk code is to consolidate code. It seems
-> silly to create a new clk provider which is 95% identical to Mike's
-> gated provider, if i can avoid it.
+>> You updated the example, but not all the actual uses to i2c at 0.
+> on purpose as on some soc we will have HW and soft binding
+> 
+> on the board you put the alias
+> 
 
-I will export the operations in my next patchset, but I'm concerned
-over how useful this might be...
+I'm not sure I follow.
 
-Using your example of struct clk_gate, both clk_gate_enable and
-clk_gate_disable call to_clk_gate.  So you would either have to re-use
-struct clk_gate for your own needs (which involves hacking up a
-specific struct clk_gate_foo_ops for your needs) or you could not use
-struct clk_gate and pack your data identically (struct clk_hw must be
-the first member) which is too horrible to imagine.
+If you use the h/w block, then you would have i2c@<addr> while for gpio
+it's basically an index.
 
-Hmm, or you could re-use struct clk_gate but provide your own struct
-clk_ops AND your own registration functions (since you won't be able
-to pass in the ops to your clk_register_gate).  So that sounds sane,
-if a bit convoluted.  It does re-use code though...
+Also, I don't think you need an alias for i2c. You should not care about
+bus numbering as devices should be sub nodes.
 
-Regards,
-Mike
+Rob
 
->
-> If i stuff it into clk_disable(), it means i cannot use the basic gate
-> clock Mike provides in the generic clock framework. Which is a shame,
-> since it does exactly what i want in terms of gating the clock.
->
-> If i can use unprepare(), which basic gate does not use, i can use
-> Mikes code, and just extend it. It is there, it is unused, so why not
-> use it?
->
-> ? ?Andrew
+> Best Regards,
+> J.
+>>
+>> Rob
+>>
+>>> +		compatible = "i2c-gpio";
+>>> +		gpios = <&pioA 23 0 /* sda */
+>>> +			 &pioA 24 0 /* scl */
+>>> +			>;
+>>> +		i2c-gpio,sda-open-drain;
+>>> +		i2c-gpio,scl-open-drain;
+>>> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +		status = "disabled";
+>>> +	};
+>>>  };
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
