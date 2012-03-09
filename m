@@ -1,102 +1,92 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 9 Mar 2012 17:58:00 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <20120305225530.GJ12083@atomide.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
- <20120305225530.GJ12083@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83180F73D@DBDE01.ent.ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 09 Mar 2012 09:26:38 -0700
+Subject: [PATCH 1/1] of: introduce helper to manage boolean
+In-Reply-To: <20120309100435.GN27213@game.jcrosoft.org>
+References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
+ <20120309014441.8236B3E0903@localhost>
+ <20120309100435.GN27213@game.jcrosoft.org>
+Message-ID: <20120309162638.92E813E0880@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2012 at 04:25:30, Tony Lindgren wrote:
-> Hi,
-> 
-> * Vaibhav Hiremath <hvaibhav@ti.com> [120119 06:01]:
-> > OMAP device has 32k-sync timer which is currently used as a
-> > clocksource in the kernel (omap2plus_defconfig).
-> > The current implementation uses compile time selection between
-> > gp-timer and 32k-sync timer, which breaks multi-omap build for
-> > the devices like AM33xx, where 32k-sync timer is not available.
+On Fri, 9 Mar 2012 11:04:35 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> On 18:44 Thu 08 Mar     , Grant Likely wrote:
+> > On Tue,  7 Feb 2012 05:13:48 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > > of_property_read_bool
+> > > 
+> > > Search for a property in a device node and read a 32-bit value from
+> > > it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
+> > > 
+> > > this will allow to disable a boolean
+> > > 
+> > > is-ok;          => true
+> > > is-ok = <1>;    => true
+> > > is-ok = <0>;    => false
+> > > 
+> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > Cc: devicetree-discuss at lists.ozlabs.org
+> > > ---
+> > > Hi,
+> > > 
+> > > 	if this is ok I'll rebase my mtd and i2c patch to use it
+> > > 
+> > > Best Regards,
+> > > J.
+> > >  drivers/of/base.c  |   30 ++++++++++++++++++++++++++++++
+> > >  include/linux/of.h |    8 ++++++++
+> > >  2 files changed, 38 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/drivers/of/base.c b/drivers/of/base.c
+> > > index 133908a..a0eaf08 100644
+> > > --- a/drivers/of/base.c
+> > > +++ b/drivers/of/base.c
+> > > @@ -686,6 +686,36 @@ int of_property_read_u64(const struct device_node *np, const char *propname,
+> > >  EXPORT_SYMBOL_GPL(of_property_read_u64);
+> > >  
+> > >  /**
+> > > + * of_property_read_bool - Find and read a boolean from a property
+> > > + * @np:		device node from which the property value is to be read.
+> > > + * @propname:	name of the property to be searched.
+> > > + *
+> > > + * Search for a property in a device node and read a 32-bit value from
+> > > + * it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
+> > > + *
+> > > + * is-ok;	=> true
+> > > + * is-ok = <1>;	=> true
+> > > + * is-ok = <0>;	=> false
+> > > + */
+> > > +int of_property_read_bool(const struct device_node *np, const char *propname)
+> > > +{
+> > > +	u32 reg;
+> > > +	int ret = of_property_read_u32(np, propname, &reg);
+> > > +
+> > > +	switch (ret) {
+> > > +	case -EINVAL:
+> > > +		return false;
+> > > +	case -ENODATA:
+> > > +		return true;
+> > > +	case 0:
+> > > +		return reg == 1;
 > > 
-> > So use hwmod database lookup mechanism, through which at run-time
-> > we can identify availability of 32k-sync timer on the device,
-> > else fall back to gp-timer.
-> ...
+> > Ugh.  so any value other than 1 returns false?  I think that will surprise
+> > most people.
+> > 
+> > I don't like this api or binding.  If it is a bool property, then why isn't
+> > simply testing for the property existance sufficient?
+> no if you want to disable it
 > 
-> > --- a/arch/arm/plat-omap/counter_32k.c
-> > +++ b/arch/arm/plat-omap/counter_32k.c
-> > @@ -69,52 +69,55 @@ void read_persistent_clock(struct timespec *ts)
-> >  
-> >  int __init omap_init_clocksource_32k(void)
-> >  {
-> > -	static char err[] __initdata = KERN_ERR
-> > -			"%s: can't register clocksource!\n";
-> > -
-> > -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
-> > -		u32 pbase;
-> > -		unsigned long size = SZ_4K;
-> > -		void __iomem *base;
-> > -		struct clk *sync_32k_ick;
-> > -
-> > -		if (cpu_is_omap16xx()) {
-> > -			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
-> > -			size = SZ_1K;
-> > -		} else if (cpu_is_omap2420())
-> > -			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
-> > -		else if (cpu_is_omap2430())
-> > -			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
-> > -		else if (cpu_is_omap34xx())
-> > -			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
-> > -		else if (cpu_is_omap44xx())
-> > -			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
-> > -		else
-> > +	u32 pbase;
-> > +	unsigned long size = SZ_4K;
-> > +	void __iomem *base;
-> > +	struct clk *sync_32k_ick;
-> > +
-> > +	if (cpu_is_omap16xx()) {
-> > +		pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
-> > +		size = SZ_1K;
-> > +	} else if (cpu_class_is_omap2()) {
-> > +		struct omap_hwmod *oh;
-> > +		const char *oh_name = "counter_32k";
-> > +
-> > +		oh = omap_hwmod_lookup(oh_name);
-> > +		if (!oh || oh->slaves_cnt == 0) {
-> > +			pr_err("Could not lookup %s hwmod\n", oh_name);
-> >  			return -ENODEV;
-> > +		}
-> > +		pbase = oh->slaves[0]->addr->pa_start + 0x10;
-> > +	} else {
-> > +		return -ENODEV;
-> > +	}
+> if a bool is define in the dtsi and want to disable it int the dts
 > 
-> How about have separate omap1 and omap2+ init functions that
-> call a common function and passes the pbase as a parameter?
+> if you we can do the the invert
 > 
-> That way we can get rid of the cpu_is_omapxxxx tests here.
+> if !0 => true
 > 
+> is-ok;			=> true
+> is-ok = <val != 0>;	=> true
+> is-ok = <0>;		=> false
 
-Tony,
+This is a failure of the dtc tool, not the binding.  Accepting this binding
+means we have to live with it for a very long time.  It needs to be fixed
+in dtc instead so that properties can be deleted instead of only modified.
 
-In the morning, I replied very soon, without much thinking...
-
-Just now I started working on the patch, I was just reviewing the code, 
-and I felt that, it is unnecessary to split the code between omap1 and 
-omap2+.
-
-The reason is,
-
-Currently Only OMAP16xx base-address is hardcoded with cpu_is_omap16xx() 
-macro, For all other omap family of devices the complete information is fetched from HWDMO api's/data.
-
-Thanks,
-Vaibhav
-
-> Regards,
-> 
-> Tony 
-> 
+g.
