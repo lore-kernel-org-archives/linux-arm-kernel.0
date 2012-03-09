@@ -1,36 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 Mar 2012 20:57:41 -0700 (MST)
-Subject: [GIT PULL] ARM: OMAP2+: hwmod: miscellaneous changes for 3.4
-Message-ID: <alpine.DEB.2.00.1203082056230.26656@utopia.booyaka.com>
+From: B04825@freescale.com (Tabi Timur-B04825)
+Date: Fri, 9 Mar 2012 04:02:40 +0000
+Subject: [PATCH v3 10/11] ASoC: fsl: let fsl_ssi work with imx pcm and
+ machine drivers
+In-Reply-To: <20120309031909.GJ2499@S2101-09.ap.freescale.net>
+References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
+ <1331225990-27308-11-git-send-email-shawn.guo@linaro.org>
+ <4F591A69.9060401@freescale.com>
+ <20120309031909.GJ2499@S2101-09.ap.freescale.net>
+Message-ID: <4F5980DE.9050002@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+Shawn Guo wrote:
 
-The following changes since commit bb887688bccb48d94fa873f0f6cc7e7e3e4dc05e:
+> Ok, got you.  We used to set fifo_depth on imx-ssi not the value given
+> by hardware manual, but the one already tuned.
 
-  Merge branch 'for_3.4/cleanup/sr' of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into sr (2012-03-05 14:25:35 -0800)
+What do you mean by "already tuned".  Tuned by whom?
 
-are available in the git repository at:
+>>> +		 */
+>>> +		ssi_private->dma_params_tx.burstsize =
+>>> +			ssi_private->fifo_depth - 2;
+>>> +		ssi_private->dma_params_rx.burstsize =
+>>> +			ssi_private->fifo_depth - 2;
+>>> +		ssi_private->dma_params_tx.dma_addr =
+>>> +			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, stx0);
+>>> +		ssi_private->dma_params_rx.dma_addr =
+>>> +			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, srx0);
+>>
+>> So I'm a little confused by this new binding.  I went through a lot of
+>> work to remove DMA-specific data from the SSI driver, and here you are
+>> aFrom arnd at arndb.de  Mon Mar 12 12:43:25 2012
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Mar 2012 16:43:25 +0000
+Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
+In-Reply-To: <20120312161004.GB5050@titan.lakedaemon.net>
+References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
+ <201203120811.23137.arnd@arndb.de>
+ <20120312161004.GB5050@titan.lakedaemon.net>
+Message-ID: <201203121643.26133.arnd@arndb.de>
 
-  git://git.pwsan.com/linux-2.6 hwmod_misc_devel_3.4
+On Monday 12 March 2012, Jason Cooper wrote:
+> Okay, that's what smelled funny.  wdt and intc both only have registers
+> in virtual address space defined.  Can I assume they map like everything
+> else to corresponding physical addresses?
+> 
+> eg wdt at fed20300 -> wdt at f1020300 ?
 
-for you to fetch changes up to 7ef827505cbc58660ee18e5c4080ed8072022162:
+Yes, correct. Or just uses 20300 as the address if you remap everything
+using the ranges property.
 
-  ARM: OMAP2+: hwmod: manage the wake-up latency constraints (2012-03-08 20:04:45 -0700)
-
-
-- Paul
-
-
-----------------------------------------------------------------
-Jean Pihet (1):
-      ARM: OMAP2+: hwmod: manage the wake-up latency constraints
-
-Paul Walmsley (1):
-      ARM: OMAP36xx: hwmod data: fix SmartReflex interface data
-
- arch/arm/mach-omap2/omap_hwmod.c             |   54 +++++++++++++++++++++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   54 +++++++++++++++++++-------
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    5 ++
- 3 files changed, 98 insertions(+), 15 deletions(-)
+	Arnd
