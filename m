@@ -1,52 +1,60 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 9 Mar 2012 09:19:16 +0800
-Subject: [PATCH v3 00/11] ASoC: add imx-sgtl5000 machine driver working
- with fsl_ssi
-In-Reply-To: <4F5910EE.8090408@freescale.com>
+Date: Fri, 9 Mar 2012 09:26:55 +0800
+Subject: [PATCH v3 08/11] ASoC: fsl: make fsl_ssi driver compilable on
+ ARM/IMX
+In-Reply-To: <4F5912D0.2090800@freescale.com>
 References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <4F5910EE.8090408@freescale.com>
-Message-ID: <20120309011914.GF2499@S2101-09.ap.freescale.net>
+ <1331225990-27308-9-git-send-email-shawn.guo@linaro.org>
+ <4F5912D0.2090800@freescale.com>
+Message-ID: <20120309012653.GG2499@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 02:05:02PM -0600, Timur Tabi wrote:
+On Thu, Mar 08, 2012 at 02:13:04PM -0600, Timur Tabi wrote:
 > Shawn Guo wrote:
-> > I did not pick up you Ack-by tag, because there are some changes since
-> > v2 you will need to take another look and have the testing, I guess.
+> > +static DEFINE_SPINLOCK(ssi_reg_lock);
+> > +static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
+> > +{
+> > +	u32 val;
+> > +	unsigned long flags;
+> > +
+> > +	spin_lock_irqsave(&ssi_reg_lock, flags);
+> > +	val = readl(addr);
+> > +	val = (val & ~clear) | set;
+> > +	writel(val, addr);
+> > +	spin_unlock_irqrestore(&ssi_reg_lock, flags);
+> > +}
+> > +#endif
 > 
-> Unfortunately, although it works on the MPC8610, it's broken on the P1022:
+> I think this spinlock is the wrong approach.  The problem with
+> read-modify-write is on the function level, not the register level.
 > 
-> # speaker-test -t sine -c 2 -r 44100
-> 
-> 
-> speaker-test 1.0.11rc2
-> 
-> 
-> Playback device is default
-> Stream parameters are 44100Hz, S16_BE, 2 channels
-> Sine wave rate is 440.0000Hz
-> Rate set to 44100Hz (requested 44100Hz)
-> Buffer size range from 256 to 32768
-> Period size range from 128 to 16384
-> Periods = 4
-> Buffer time size 575
-> To choose buffer_size = 32768
-> To choose period_size = 8192
-> was set period_size = 8192
-> was set buffer_size = 32768
-> 
-> At this point, nothing else happens, there's no audio, and even Ctrl-C
-> doesn't work.
-> 
-Are you testing the patch set on top of the SHA below, which I
-mentioned in the cover letter?
+Something like this:
 
-  3030763 (Merge tag 'asoc-3.4' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound into topic/asoc)
+@@ -496,6 +494,10 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+        struct snd_soc_pcm_runtime *rtd = substream->private_data;
+        struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+        struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
++       unsigned long flags;
++       int ret = 0;
++
++       spin_lock_irqsave(&ssi_lock, flags);
 
-I see the similar problem on the following SHA with my testing on
-imx-sgtl5000.
+        switch (cmd) {
+        case SNDRV_PCM_TRIGGER_START:
+@@ -517,10 +519,12 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
+                break;
 
-  1a8feca (Merge branch 'for-3.4' into asoc-next)
+        default:
+-               return -EINVAL;
++               ret = -EINVAL;
+        }
+
+-       return 0;
++       spin_unlock_irqrestore(&ssi_lock, flags);
++
++       return ret;
+ }
 
 -- 
 Regards,
