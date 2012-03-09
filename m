@@ -1,26 +1,23 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 12 Mar 2012 12:06:11 +0000
-Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <4F59253D.7070100@wwwdotorg.org>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
- <4F59253D.7070100@wwwdotorg.org>
-Message-ID: <20120312120610.GA14020@sirena.org.uk>
+Date: Fri, 9 Mar 2012 12:50:03 +0000
+Subject: [PATCH 2/2] ASoC: OMAP: Build config cleanup for McBSP
+In-Reply-To: <1331283078-14846-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
+ <1331283078-14846-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20120309125003.GY3273@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 02:31:41PM -0700, Stephen Warren wrote:
-> On 03/08/2012 07:51 AM, Thierry Reding wrote:
+On Fri, Mar 09, 2012 at 10:51:18AM +0200, Peter Ujfalusi wrote:
+> The McBSP driver stack has been moved, and rewritten resulting a single
+> driver - selected by CONFIG_SND_OMAP_SOC_MCBSP. There is no longer need to
+> have CONFIG_OMAP_MCBSP anymore.
 
-> > +- vdd-supply: power supply for controller (1.05V)
-
-> Should those *-supply properties really be optional? I got the
-> impression talking to Mark in a different thread that all regulators
-> should exist, although their implementation may be via a fixed
-> regulator, with no GPIO, as determined by the board design.
-
-Depends on the electronics, if the device can function without a supply
-then it is OK for it to be optional.  This is moderately unusual but not
-unknown.  It's obviously also OK to omit the supply if the system
-doesn't use software regulators at all, though a kernel with regulator
-support enabled would need to use dummy regulators to stub things out.
+Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/96c80f9a/attachment-0001.sig>
