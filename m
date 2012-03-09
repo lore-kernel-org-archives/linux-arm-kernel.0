@@ -1,77 +1,80 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 12 Mar 2012 10:15:05 +0000
-Subject: [PATCH] ARM: OMAP2+: hwmod: Fix wrong SYSC_TYPE1_XXX_MASK bit
- definitions
-In-Reply-To: <4F3E581E.1050009@ti.com>
-References: <1329477961-1307-1-git-send-email-hvaibhav@ti.com>
- <4F3E581E.1050009@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A831810F23@DBDE01.ent.ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 09 Mar 2012 14:56:07 +0530
+Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board
+ data
+In-Reply-To: <20120309054608.647473E0901@localhost>
+References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
+ <1329998490-27555-5-git-send-email-rnayak@ti.com>
+ <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
+ <20120224184859.GN18185@atomide.com> <20120309054608.647473E0901@localhost>
+Message-ID: <4F59CCAF.1090806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2012 at 19:07:34, Cousson, Benoit wrote:
-> On 2/17/2012 12:26 PM, Vaibhav Hiremath wrote:
-> > In the SYSC_TYPE1_XXX_MASK configuration, SYSC_XXX_SHIFT macro
-> > is used which is not defined anywhere in the kernel.
-> > Until now the build was going through successfully, since it
-> > is not being used anywhere in kernel.
-> 
-> Good catch.
-> 
-> > This bug got introduced by the commit
-> > 358f0e630d5409ab3837b86db3595560eae773b6 ("OMAP3: hwmod: support
-> > to specify the offset position of various SYSCONFIG register bits.")
-> >
-> > Signed-off-by: Vaibhav Hiremath<hvaibhav@ti.com>
-> 
-> Acked-by: Benoit Cousson <b-cousson@ti.com>
-> 
+On Friday 09 March 2012 11:16 AM, Grant Likely wrote:
+> On Fri, 24 Feb 2012 10:49:00 -0800, Tony Lindgren<tony@atomide.com>  wrote:
+>> * Rajendra Nayak<rnayak@ti.com>  [120223 19:29]:
+>>> On Friday 24 February 2012 12:27 AM, Tony Lindgren wrote:
+>>>>> --- a/arch/arm/boot/dts/omap3.dtsi
+>>>>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>>>>> @@ -113,5 +113,31 @@
+>>>>>   			#size-cells =<0>;
+>>>>>   			ti,hwmods = "i2c3";
+>>>>>   		};
+>>>>> +
+>>>>> +		mmc1: mmc at 1 {
+>>>>> +			compatible = "ti,omap2-hsmmc";
+>>>>> +			ti,hwmods = "mmc1";
+>>>>> +			ti,dual-volt;
+>>>>> +		};
+>>>>> +
+>>>>> +		mmc2: mmc at 2 {
+>>>>> +			compatible = "ti,omap2-hsmmc";
+>>>>> +			ti,hwmods = "mmc2";
+>>>>> +		};
+>>>>> +
+>>>>> +		mmc3: mmc at 3 {
+>>>>> +			compatible = "ti,omap2-hsmmc";
+>>>>> +			ti,hwmods = "mmc3";
+>>>>> +		};
+>>>>> +
+>>>>> +		mmc4: mmc at 4 {
+>>>>> +			compatible = "ti,omap2-hsmmc";
+>>>>> +			ti,hwmods = "mmc4";
+>>>>> +		};
+>>>>> +
+>>>>> +		mmc5: mmc at 5 {
+>>>>> +			compatible = "ti,omap2-hsmmc";
+>>>>> +			ti,hwmods = "mmc5";
+>>>>> +		};
+>>>>>   	};
+>>>>>   };
+>>>>
+>>>> These all should all be "ti,omap3-hsmmc" I guess?
+>>>
+>>> Well, I defined the binding such that both omap2 and omap3
+>>> can use the same compatible "ti,omap2-hsmmc" since there is
+>>> no difference in the way they are defined or handled. If thats
+>>> confusing, I can have separate compatibles.
+>>> Btw, I guess we do the same with a few other re-used IPs as well,
+>>> I just checked and mcpsi does the same.
+>>
+>> Yeah let's use separate compatibles to avoid confusion.
+>> For omap2 we also have the ti,omap2-mmc in addition to
+>> ti,omap2-hsmmc..
+>
+> Yes, absolutely use separate compatible values.  It is always important
+> to be specific as to the silicon implementing the IP.  The omap3 instance
+> can also carry the omap2 string in its compatible list:
+>
+> 	compatible = "ti,omap3-hsmmc", "ti,omap2-hsmmc";
 
-Tony/Paul,
+Sure, will repost with seperate compatible strings. Also missed adding
+the 'status = "disable";' for unused mmc blocks in the board .dts file
+causing unused mmc modules to get probed too. Will fix that as well.
 
-Can you accept/merge this patch? 
+thanks,
+Rajendra
 
-Thanks,
-Vaibhav
-
-> Regards,
-> Benoit
-> 
-> 
-> > ---
-> >   arch/arm/plat-omap/include/plat/omap_hwmod.h |   12 ++++++------
-> >   1 files changed, 6 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> > index dbc18ad..55bef2b 100644
-> > --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> > +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> > @@ -49,17 +49,17 @@ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type4;
-> >    * with the original PRCM protocol defined for OMAP2420
-> >    */
-> >   #define SYSC_TYPE1_MIDLEMODE_SHIFT	12
-> > -#define SYSC_TYPE1_MIDLEMODE_MASK	(0x3<<  SYSC_MIDLEMODE_SHIFT)
-> > +#define SYSC_TYPE1_MIDLEMODE_MASK	(0x3<<  SYSC_TYPE1_MIDLEMODE_SHIFT)
-> >   #define SYSC_TYPE1_CLOCKACTIVITY_SHIFT	8
-> > -#define SYSC_TYPE1_CLOCKACTIVITY_MASK	(0x3<<  SYSC_CLOCKACTIVITY_SHIFT)
-> > +#define SYSC_TYPE1_CLOCKACTIVITY_MASK	(0x3<<  SYSC_TYPE1_CLOCKACTIVITY_SHIFT)
-> >   #define SYSC_TYPE1_SIDLEMODE_SHIFT	3
-> > -#define SYSC_TYPE1_SIDLEMODE_MASK	(0x3<<  SYSC_SIDLEMODE_SHIFT)
-> > +#define SYSC_TYPE1_SIDLEMODE_MASK	(0x3<<  SYSC_TYPE1_SIDLEMODE_SHIFT)
-> >   #define SYSC_TYPE1_ENAWAKEUP_SHIFT	2
-> > -#define SYSC_TYPE1_ENAWAKEUP_MASK	(1<<  SYSC_ENAWAKEUP_SHIFT)
-> > +#define SYSC_TYPE1_ENAWAKEUP_MASK	(1<<  SYSC_TYPE1_ENAWAKEUP_SHIFT)
-> >   #define SYSC_TYPE1_SOFTRESET_SHIFT	1
-> > -#define SYSC_TYPE1_SOFTRESET_MASK	(1<<  SYSC_SOFTRESET_SHIFT)
-> > +#define SYSC_TYPE1_SOFTRESET_MASK	(1<<  SYSC_TYPE1_SOFTRESET_SHIFT)
-> >   #define SYSC_TYPE1_AUTOIDLE_SHIFT	0
-> > -#define SYSC_TYPE1_AUTOIDLE_MASK	(1<<  SYSC_AUTOIDLE_SHIFT)
-> > +#define SYSC_TYPE1_AUTOIDLE_MASK	(1<<  SYSC_TYPE1_AUTOIDLE_SHIFT)
-> >
-> >   /*
-> >    * OCP SYSCONFIG bit shifts/masks TYPE2. These are for IPs compliant
-> > --
-> > 1.7.0.4
-> >
-> 
-> 
+>
+> g.
