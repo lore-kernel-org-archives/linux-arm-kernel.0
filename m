@@ -1,25 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Mar 2012 12:26:06 +0000
-Subject: [PATCH 2/2] mmc: sdhci-s3c: Enable runtime power management
-In-Reply-To: <m2vcmenyxh.fsf@bob.laptop.org>
-References: <4F51697C.40408@samsung.com>
- <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1330735602-22409-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- <m2vcmenyxh.fsf@bob.laptop.org>
-Message-ID: <20120309122606.GN3273@opensource.wolfsonmicro.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Fri, 09 Mar 2012 14:56:52 +1030
+Subject: [PATCH 8/8] ARM: KVM: don't BUG() if guest executes smc.
+Message-ID: <1331267212.6033.rusty@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2012 at 12:08:58AM -0500, Chris Ball wrote:
 
-> The reworked patch is below, please let me know if it looks incorrect:
+From: Rusty Russell <rusty@rustcorp.com.au>
 
-That looks about right, I'll find out soon enough if it doesn't work in
--next as my main development system has the rootfs on this device :)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/22cf3130/attachment-0001.sig>
+In this case, we just kill the guest.
+
+Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+---
+ arch/arm/kvm/arm.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 1724657..9ef5bdb 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -367,6 +367,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 0;
+ }
+ 
++static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	/* We don't support SMC; don't do that. */
++	kvm_debug("smc: at %08x", vcpu->arch.regs.pc);
++	return -EINVAL;
++}
++
+ static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	/* The hypervisor should never cause aborts */
+@@ -386,6 +393,7 @@ static int (*arm_exit_handlers[])(struct kvm_vcpu *vcpu, struct kvm_run *r) = {
+ 	[HSR_EC_CP10_ID]	= kvm_handle_cp10_id,
+ 	[HSR_EC_SVC_HYP]	= handle_svc_hyp,
+ 	[HSR_EC_HVC]		= handle_hvc,
++	[HSR_EC_SMC	]	= handle_smc,
+ 	[HSR_EC_IABT]		= kvm_handle_guest_abort,
+ 	[HSR_EC_DABT]		= kvm_handle_guest_abort,
+ 	[HSR_EC_DABT_HYP]	= handle_dabt_hyp,
