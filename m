@@ -1,225 +1,132 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 9 Mar 2012 14:41:47 +0530
-Subject: [PATCH 2/4] ARM: OMAP2+: hsmmc: Split the clock src selection and
- pbias programming
+Date: Fri, 9 Mar 2012 14:41:46 +0530
+Subject: [PATCH 1/4] ARM: OMAP2+: hsmmc: Add a flag to identify modules
+ supporting clock src selection
 In-Reply-To: <1331284309-22101-1-git-send-email-rnayak@ti.com>
 References: <1331284309-22101-1-git-send-email-rnayak@ti.com>
-Message-ID: <1331284309-22101-3-git-send-email-rnayak@ti.com>
+Message-ID: <1331284309-22101-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the pbias programming is something needed every time a regulator
-output voltage is changed, the clock source selection to select between
-an internal loopback and external clock seems like a one time setting.
+hsmmc2_before_set_reg() seems to do a clock source selection (supported
+only on some mmc IP blocks) but decides to do so based on a 'HSMMC_HAS_PBIAS'
+feature flag which seems completely wrong. Fix this by adding a new controller
+flag 'OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT' which can be then used to identify which
+controller instance supports this feature.
 
-These are today clubbed into a single platform callback, called from
-the driver for every regulator voltage switch. Split these into seperate
-callbacks and make the driver do this once at setup.
-
-Also some platforms like AM35x seem to be doing this using a .set_power
-callback, which seems completely orthogonal to what the callback is
-expected to do.
-
-Lastly, though the System control module has the registers to control
-clock source selection, even on OMAP2430, the latest 2430 TRM version Z
-clearly mentions in Table 7-135 and Table 7-154, that these bits are not
-useful/used on OMAP2430. So get rid of control_devconf1_offset and just
-use the OMAP3 based offsets for the register.
+Looking at the TRM for OMAP2/3/4, it turns out only the 2 controller instances on
+OMAP3 support this, so update this flag in the .dev_attr structure for the
+corresponding hwmods.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Cc: Balaji TK <balajitk@ti.com>
 Cc: Venkatraman S <svenkatr@ti.com>
 Cc: Chris Ball <cjb@laptop.org>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/hsmmc.c           |   86 ++++++++++++++-------------------
- arch/arm/plat-omap/include/plat/mmc.h |    1 +
- drivers/mmc/host/omap_hsmmc.c         |    3 +
- 3 files changed, 40 insertions(+), 50 deletions(-)
+ arch/arm/mach-omap2/hsmmc.c                |   15 +++++++--------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   14 +++++++++++---
+ arch/arm/plat-omap/include/plat/mmc.h      |    1 +
+ 3 files changed, 19 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index 11e26fc..0133b29 100644
+index 19dd165..11e26fc 100644
 --- a/arch/arm/mach-omap2/hsmmc.c
 +++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -27,7 +27,6 @@
- #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
- 
- static u16 control_pbias_offset;
--static u16 control_devconf1_offset;
- static u16 control_mmc1;
- 
- #define HSMMC_NAME_LEN	9
-@@ -43,6 +42,32 @@ static int hsmmc_get_context_loss(struct device *dev)
- #define hsmmc_get_context_loss NULL
- #endif
- 
-+static void hsmmc1_select_input_clk_src(struct device *dev)
-+{
-+	u32 reg;
-+	struct omap_mmc_platform_data *mmc = dev->platform_data;
-+
-+	reg = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
-+	if (mmc->slots[0].internal_clock)
-+		reg |= OMAP2_MMCSDIO1ADPCLKISEL;
-+	else
-+		reg &= ~OMAP2_MMCSDIO1ADPCLKISEL;
-+	omap_ctrl_writel(reg, OMAP2_CONTROL_DEVCONF0);
-+}
-+
-+static void hsmmc2_select_input_clk_src(struct device *dev)
-+{
-+	u32 reg;
-+	struct omap_mmc_platform_data *mmc = dev->platform_data;
-+
-+	reg = omap_ctrl_readl(OMAP343X_CONTROL_DEVCONF1);
-+	if (mmc->slots[0].internal_clock)
-+		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
-+	else
-+		reg &= ~OMAP2_MMCSDIO2ADPCLKISEL;
-+	omap_ctrl_writel(reg, OMAP343X_CONTROL_DEVCONF1);
-+}
-+
- static void omap_hsmmc1_before_set_reg(struct device *dev, int slot,
- 				  int power_on, int vdd)
- {
-@@ -72,12 +97,6 @@ static void omap_hsmmc1_before_set_reg(struct device *dev, int slot,
- 			omap_ctrl_writel(reg, OMAP243X_CONTROL_DEVCONF1);
- 		}
- 
--		if (mmc->slots[0].internal_clock) {
--			reg = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
--			reg |= OMAP2_MMCSDIO1ADPCLKISEL;
--			omap_ctrl_writel(reg, OMAP2_CONTROL_DEVCONF0);
--		}
--
- 		reg = omap_ctrl_readl(control_pbias_offset);
- 		if (cpu_is_omap3630()) {
- 			/* Set MMC I/O to 52Mhz */
-@@ -171,17 +190,6 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 	}
- }
- 
--static void hsmmc2_select_input_clk_src(struct omap_mmc_platform_data *mmc)
--{
--	u32 reg;
--
--	reg = omap_ctrl_readl(control_devconf1_offset);
--	if (mmc->slots[0].internal_clock)
--		reg |= OMAP2_MMCSDIO2ADPCLKISEL;
--	else
--		reg &= ~OMAP2_MMCSDIO2ADPCLKISEL;
--	omap_ctrl_writel(reg, control_devconf1_offset);
--}
- 
- static void hsmmc2_before_set_reg(struct device *dev, int slot,
- 				   int power_on, int vdd)
-@@ -190,26 +198,6 @@ static void hsmmc2_before_set_reg(struct device *dev, int slot,
- 
- 	if (mmc->slots[0].remux)
- 		mmc->slots[0].remux(dev, slot, power_on);
--
--	if (power_on)
--		hsmmc2_select_input_clk_src(mmc);
--}
--
--static int am35x_hsmmc2_set_power(struct device *dev, int slot,
--				  int power_on, int vdd)
--{
--	struct omap_mmc_platform_data *mmc = dev->platform_data;
--
--	if (power_on)
--		hsmmc2_select_input_clk_src(mmc);
--
--	return 0;
--}
--
--static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
--							int vdd)
--{
--	return 0;
- }
- 
- static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
-@@ -387,9 +375,6 @@ static int omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 			}
- 		}
- 
--		if (cpu_is_omap3517() || cpu_is_omap3505())
--			mmc->slots[0].set_power = nop_mmc_set_power;
--
- 		/* OMAP3630 HSMMC1 supports only 4-bit */
- 		if (cpu_is_omap3630() &&
- 				(c->caps & MMC_CAP_8_BIT_DATA)) {
-@@ -397,21 +382,25 @@ static int omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
- 			c->caps |= MMC_CAP_4_BIT_DATA;
- 			mmc->slots[0].caps = c->caps;
- 		}
-+
-+		if (mmc->controller_flags & OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT)
-+			mmc->select_input_clk_src = hsmmc1_select_input_clk_src;
- 		break;
- 	case 2:
--		if (cpu_is_omap3517() || cpu_is_omap3505())
--			mmc->slots[0].set_power = am35x_hsmmc2_set_power;
--
- 		if (c->ext_clock)
- 			c->transceiver = 1;
- 		if (c->transceiver && (c->caps & MMC_CAP_8_BIT_DATA)) {
+@@ -408,8 +408,7 @@ static int omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
  			c->caps &= ~MMC_CAP_8_BIT_DATA;
  			c->caps |= MMC_CAP_4_BIT_DATA;
  		}
--		if (mmc->controller_flags & OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT) {
-+
-+		if (cpu_is_omap34xx()) {
+-		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
+-			/* off-chip level shifting, or none */
++		if (mmc->controller_flags & OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT) {
  			mmc->slots[0].before_set_reg = hsmmc2_before_set_reg;
  			mmc->slots[0].after_set_reg = NULL;
  		}
-+
-+		if (mmc->controller_flags & OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT)
-+			mmc->select_input_clk_src = hsmmc2_select_input_clk_src;
- 		break;
- 	case 3:
- 	case 4:
-@@ -497,13 +486,10 @@ void omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
- 	omap_hsmmc_done = 1;
- 
- 	if (!cpu_is_omap44xx()) {
--		if (cpu_is_omap2430()) {
-+		if (cpu_is_omap2430())
- 			control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
--			control_devconf1_offset = OMAP243X_CONTROL_DEVCONF1;
--		} else {
-+		else
- 			control_pbias_offset = OMAP343X_CONTROL_PBIAS_LITE;
--			control_devconf1_offset = OMAP343X_CONTROL_DEVCONF1;
--		}
- 	} else {
- 		control_pbias_offset =
- 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_PBIASLITE;
-diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
-index 5d9c98b..a155eb8 100644
---- a/arch/arm/plat-omap/include/plat/mmc.h
-+++ b/arch/arm/plat-omap/include/plat/mmc.h
-@@ -80,6 +80,7 @@ struct omap_mmc_platform_data {
- 
- 	/* Return context loss count due to PM states changing */
- 	int (*get_context_loss_count)(struct device *dev);
-+	void (*select_input_clk_src)(struct device *dev);
- 
- 	u64 dma_mask;
- 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index fd0c661..ce658e4 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2020,6 +2020,9 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
- 		}
+@@ -447,12 +446,6 @@ void omap_init_hsmmc(struct omap2_hsmmc_info *hsmmcinfo, int ctrl_nr)
+ 		goto done;
  	}
  
-+	if (pdata->select_input_clk_src)
-+		pdata->select_input_clk_src(&pdev->dev);
+-	if (omap_hsmmc_pdata_init(hsmmcinfo, mmc_data) < 0) {
+-		pr_err("%s fails!\n", __func__);
+-		goto done;
+-	}
+-	omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
+-
+ 	name = "omap_hsmmc";
+ 
+ 	l = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
+@@ -471,6 +464,12 @@ void omap_init_hsmmc(struct omap2_hsmmc_info *hsmmcinfo, int ctrl_nr)
+ 		mmc_data->controller_flags = mmc_dev_attr->flags;
+ 	}
+ 
++	if (omap_hsmmc_pdata_init(hsmmcinfo, mmc_data) < 0) {
++		pr_err("%s fails!\n", __func__);
++		goto done;
++	}
++	omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
 +
- 	if (omap_hsmmc_have_reg() && !mmc_slot(host).set_power) {
- 		ret = omap_hsmmc_reg_get(host);
- 		if (ret)
+ 	pdev = omap_device_build(name, ctrl_nr - 1, oh, mmc_data,
+ 		sizeof(struct omap_mmc_platform_data), NULL, 0, false);
+ 	if (IS_ERR(pdev)) {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 3c8dd92..236785f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3145,13 +3145,15 @@ static struct omap_hwmod_ocp_if *omap3xxx_mmc1_slaves[] = {
+ };
+ 
+ static struct omap_mmc_dev_attr mmc1_dev_attr = {
+-	.flags = OMAP_HSMMC_SUPPORTS_DUAL_VOLT,
++	.flags = (OMAP_HSMMC_SUPPORTS_DUAL_VOLT |
++		  OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT),
+ };
+ 
+ /* See 35xx errata 2.1.1.128 in SPRZ278F */
+ static struct omap_mmc_dev_attr mmc1_pre_es3_dev_attr = {
+ 	.flags = (OMAP_HSMMC_SUPPORTS_DUAL_VOLT |
+-		  OMAP_HSMMC_BROKEN_MULTIBLOCK_READ),
++		  OMAP_HSMMC_BROKEN_MULTIBLOCK_READ |
++		  OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT),
+ };
+ 
+ static struct omap_hwmod omap3xxx_pre_es3_mmc1_hwmod = {
+@@ -3219,9 +3221,14 @@ static struct omap_hwmod_ocp_if *omap3xxx_mmc2_slaves[] = {
+ 	&omap3xxx_l4_core__mmc2,
+ };
+ 
++static struct omap_mmc_dev_attr mmc2_dev_attr = {
++	.flags = OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT,
++};
++
+ /* See 35xx errata 2.1.1.128 in SPRZ278F */
+ static struct omap_mmc_dev_attr mmc2_pre_es3_dev_attr = {
+-	.flags = OMAP_HSMMC_BROKEN_MULTIBLOCK_READ,
++	.flags = (OMAP_HSMMC_BROKEN_MULTIBLOCK_READ |
++		  OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT),
+ };
+ 
+ static struct omap_hwmod omap3xxx_pre_es3_mmc2_hwmod = {
+@@ -3262,6 +3269,7 @@ static struct omap_hwmod omap3xxx_es3plus_mmc2_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_MMC2_SHIFT,
+ 		},
+ 	},
++	.dev_attr	= &mmc2_dev_attr,
+ 	.slaves		= omap3xxx_mmc2_slaves,
+ 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_mmc2_slaves),
+ 	.class		= &omap34xx_mmc_class,
+diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
+index f75946c..5d9c98b 100644
+--- a/arch/arm/plat-omap/include/plat/mmc.h
++++ b/arch/arm/plat-omap/include/plat/mmc.h
+@@ -49,6 +49,7 @@
+  */
+ #define OMAP_HSMMC_SUPPORTS_DUAL_VOLT		BIT(0)
+ #define OMAP_HSMMC_BROKEN_MULTIBLOCK_READ	BIT(1)
++#define OMAP_HSMMC_SUPPORTS_CLKSRC_SELECT	BIT(2)
+ 
+ struct omap_mmc_dev_attr {
+ 	u8 flags;
 -- 
 1.7.1
