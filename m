@@ -1,207 +1,164 @@
-From: richard.purdie@linuxfoundation.org (Richard Purdie)
-Date: Sun, 11 Mar 2012 13:13:52 +0000
-Subject: [PATCH 1/3] led-class: change back LEDS_CLASS to tristate
- instead of bool
-In-Reply-To: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
-References: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1331471632.14746.3.camel@ted>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Fri, 09 Mar 2012 14:56:52 +1030
+Subject: [PATCH 5/8] ARM: KVM: make emulation functions return bool.
+Message-ID: <1331267212.5775.rusty@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-03-08 at 17:11 +0800, Bryan Wu wrote:
-> After moving some core functions to led-core.c, led-class.c can be built as
-> module again.
-> 
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 
-I'd prefer to have less code being required in led-core.c but this is
-better than many of the alternatives. I'm happy to see it becoming
-modular again, thanks!
+From: Rusty Russell <rusty@rustcorp.com.au>
 
-Acked-by: Richard Purdie <richard.purdie@linuxfoundation.org>
+Simplifies error handling into the parent: all errors mean
+"can't emulate".
 
-> ---
->  drivers/leds/Kconfig     |    2 +-
->  drivers/leds/led-class.c |   70 ----------------------------------------------
->  drivers/leds/led-core.c  |   70 ++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 71 insertions(+), 71 deletions(-)
-> 
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index 9ca28fc..3f17f0d 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -17,7 +17,7 @@ menuconfig NEW_LEDS
->  if NEW_LEDS
->  
->  config LEDS_CLASS
-> -	bool "LED Class Support"
-> +	tristate "LED Class Support"
->  	help
->  	  This option enables the led sysfs class in /sys/class/leds.  You'll
->  	  need this to do anything useful with LEDs.  If unsure, say N.
-> diff --git a/drivers/leds/led-class.c b/drivers/leds/led-class.c
-> index 0c8739c..5bff843 100644
-> --- a/drivers/leds/led-class.c
-> +++ b/drivers/leds/led-class.c
-> @@ -110,50 +110,6 @@ static void led_timer_function(unsigned long data)
->  	mod_timer(&led_cdev->blink_timer, jiffies + msecs_to_jiffies(delay));
->  }
->  
-> -static void led_stop_software_blink(struct led_classdev *led_cdev)
-> -{
-> -	/* deactivate previous settings */
-> -	del_timer_sync(&led_cdev->blink_timer);
-> -	led_cdev->blink_delay_on = 0;
-> -	led_cdev->blink_delay_off = 0;
-> -}
-> -
-> -static void led_set_software_blink(struct led_classdev *led_cdev,
-> -				   unsigned long delay_on,
-> -				   unsigned long delay_off)
-> -{
-> -	int current_brightness;
-> -
-> -	current_brightness = led_get_brightness(led_cdev);
-> -	if (current_brightness)
-> -		led_cdev->blink_brightness = current_brightness;
-> -	if (!led_cdev->blink_brightness)
-> -		led_cdev->blink_brightness = led_cdev->max_brightness;
-> -
-> -	if (led_get_trigger_data(led_cdev) &&
-> -	    delay_on == led_cdev->blink_delay_on &&
-> -	    delay_off == led_cdev->blink_delay_off)
-> -		return;
-> -
-> -	led_stop_software_blink(led_cdev);
-> -
-> -	led_cdev->blink_delay_on = delay_on;
-> -	led_cdev->blink_delay_off = delay_off;
-> -
-> -	/* never on - don't blink */
-> -	if (!delay_on)
-> -		return;
-> -
-> -	/* never off - just set to brightness */
-> -	if (!delay_off) {
-> -		led_set_brightness(led_cdev, led_cdev->blink_brightness);
-> -		return;
-> -	}
-> -
-> -	mod_timer(&led_cdev->blink_timer, jiffies + 1);
-> -}
-> -
-> -
->  /**
->   * led_classdev_suspend - suspend an led_classdev.
->   * @led_cdev: the led_classdev to suspend.
-> @@ -262,32 +218,6 @@ void led_classdev_unregister(struct led_classdev *led_cdev)
->  }
->  EXPORT_SYMBOL_GPL(led_classdev_unregister);
->  
-> -void led_blink_set(struct led_classdev *led_cdev,
-> -		   unsigned long *delay_on,
-> -		   unsigned long *delay_off)
-> -{
-> -	del_timer_sync(&led_cdev->blink_timer);
-> -
-> -	if (led_cdev->blink_set &&
-> -	    !led_cdev->blink_set(led_cdev, delay_on, delay_off))
-> -		return;
-> -
-> -	/* blink with 1 Hz as default if nothing specified */
-> -	if (!*delay_on && !*delay_off)
-> -		*delay_on = *delay_off = 500;
-> -
-> -	led_set_software_blink(led_cdev, *delay_on, *delay_off);
-> -}
-> -EXPORT_SYMBOL(led_blink_set);
-> -
-> -void led_brightness_set(struct led_classdev *led_cdev,
-> -			enum led_brightness brightness)
-> -{
-> -	led_stop_software_blink(led_cdev);
-> -	led_cdev->brightness_set(led_cdev, brightness);
-> -}
-> -EXPORT_SYMBOL(led_brightness_set);
-> -
->  static int __init leds_init(void)
->  {
->  	leds_class = class_create(THIS_MODULE, "leds");
-> diff --git a/drivers/leds/led-core.c b/drivers/leds/led-core.c
-> index 016d19f..d686004 100644
-> --- a/drivers/leds/led-core.c
-> +++ b/drivers/leds/led-core.c
-> @@ -23,3 +23,73 @@ EXPORT_SYMBOL_GPL(leds_list_lock);
->  
->  LIST_HEAD(leds_list);
->  EXPORT_SYMBOL_GPL(leds_list);
-> +
-> +static void led_stop_software_blink(struct led_classdev *led_cdev)
-> +{
-> +	/* deactivate previous settings */
-> +	del_timer_sync(&led_cdev->blink_timer);
-> +	led_cdev->blink_delay_on = 0;
-> +	led_cdev->blink_delay_off = 0;
-> +}
-> +
-> +static void led_set_software_blink(struct led_classdev *led_cdev,
-> +				   unsigned long delay_on,
-> +				   unsigned long delay_off)
-> +{
-> +	int current_brightness;
-> +
-> +	current_brightness = led_get_brightness(led_cdev);
-> +	if (current_brightness)
-> +		led_cdev->blink_brightness = current_brightness;
-> +	if (!led_cdev->blink_brightness)
-> +		led_cdev->blink_brightness = led_cdev->max_brightness;
-> +
-> +	if (led_get_trigger_data(led_cdev) &&
-> +	    delay_on == led_cdev->blink_delay_on &&
-> +	    delay_off == led_cdev->blink_delay_off)
-> +		return;
-> +
-> +	led_stop_software_blink(led_cdev);
-> +
-> +	led_cdev->blink_delay_on = delay_on;
-> +	led_cdev->blink_delay_off = delay_off;
-> +
-> +	/* never on - don't blink */
-> +	if (!delay_on)
-> +		return;
-> +
-> +	/* never off - just set to brightness */
-> +	if (!delay_off) {
-> +		led_set_brightness(led_cdev, led_cdev->blink_brightness);
-> +		return;
-> +	}
-> +
-> +	mod_timer(&led_cdev->blink_timer, jiffies + 1);
-> +}
-> +
-> +
-> +void led_blink_set(struct led_classdev *led_cdev,
-> +		   unsigned long *delay_on,
-> +		   unsigned long *delay_off)
-> +{
-> +	del_timer_sync(&led_cdev->blink_timer);
-> +
-> +	if (led_cdev->blink_set &&
-> +	    !led_cdev->blink_set(led_cdev, delay_on, delay_off))
-> +		return;
-> +
-> +	/* blink with 1 Hz as default if nothing specified */
-> +	if (!*delay_on && !*delay_off)
-> +		*delay_on = *delay_off = 500;
-> +
-> +	led_set_software_blink(led_cdev, *delay_on, *delay_off);
-> +}
-> +EXPORT_SYMBOL(led_blink_set);
-> +
-> +void led_brightness_set(struct led_classdev *led_cdev,
-> +			enum led_brightness brightness)
-> +{
-> +	led_stop_software_blink(led_cdev);
-> +	led_cdev->brightness_set(led_cdev, brightness);
-> +}
-> +EXPORT_SYMBOL(led_brightness_set);
+Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+---
+ arch/arm/kvm/emulate.c |   44 ++++++++++++++++++++++----------------------
+ 1 files changed, 22 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index 88c6493..d386874 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -212,8 +212,8 @@ int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
+  * @vcpu: The VCPU pointer
+  * @p:    The coprocessor parameters struct pointer holding trap inst. details
+  */
+-static int emulate_cp15_c9_access(struct kvm_vcpu *vcpu,
+-				  const struct coproc_params *p)
++static bool emulate_cp15_c9_access(struct kvm_vcpu *vcpu,
++				   const struct coproc_params *p)
+ {
+ 	BUG_ON(p->CRn != 9);
+ 	BUG_ON(p->is_64bit);
+@@ -223,7 +223,7 @@ static int emulate_cp15_c9_access(struct kvm_vcpu *vcpu,
+ 		u32 l2ctlr, ncores;
+ 
+ 		if (p->is_write)
+-			return 0;
++			return true;
+ 
+ 		asm volatile("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
+ 		l2ctlr &= ~(3 << 24);
+@@ -231,13 +231,13 @@ static int emulate_cp15_c9_access(struct kvm_vcpu *vcpu,
+ 		l2ctlr |= (ncores & 3) << 24;
+ 		*vcpu_reg(vcpu, p->Rt1) = l2ctlr;
+ 
+-		return 0;
++		return true;
+ 	}
+ 
+ 	/* hack alert!!! */
+ 	if (!p->is_write)
+ 		*vcpu_reg(vcpu, p->Rt1) = 0;
+-	return 0;
++	return true;
+ }
+ 
+ /**
+@@ -250,8 +250,8 @@ static int emulate_cp15_c9_access(struct kvm_vcpu *vcpu,
+  * host/guest PRRR and NMRR memory remap registers and allow guest direct access
+  * to these registers.
+  */
+-static int emulate_cp15_c10_access(struct kvm_vcpu *vcpu,
+-				   const struct coproc_params *p)
++static bool emulate_cp15_c10_access(struct kvm_vcpu *vcpu,
++				    const struct coproc_params *p)
+ {
+ 	BUG_ON(p->CRn != 10);
+ 	BUG_ON(p->is_64bit);
+@@ -259,7 +259,7 @@ static int emulate_cp15_c10_access(struct kvm_vcpu *vcpu,
+ 	if ((p->CRm == 0 || p->CRm == 1 || p->CRm == 4 || p->CRm == 8) &&
+ 	    (p->Op2 <= 7)) {
+ 		/* TLB Lockdown operations - ignored */
+-		return 0;
++		return true;
+ 	}
+ 
+ 	/*
+@@ -270,15 +270,15 @@ static int emulate_cp15_c10_access(struct kvm_vcpu *vcpu,
+ 
+ 	if (p->CRm == 2 && p->Op1 == 0 && p->Op2 == 0) {
+ 		cp15_op(vcpu, p, c10_PRRR);
+-		return 0;
++		return true;
+ 	}
+ 
+ 	if (p->CRm == 2 && p->Op1 == 0 && p->Op2 == 1) {
+ 		cp15_op(vcpu, p, c10_NMRR);
+-		return 0;
++		return true;
+ 	}
+ 
+-	return -EINVAL;
++	return false;
+ }
+ 
+ /**
+@@ -292,8 +292,8 @@ static int emulate_cp15_c10_access(struct kvm_vcpu *vcpu,
+  *
+  * This may need to be refined.
+  */
+-static int emulate_cp15_c15_access(struct kvm_vcpu *vcpu,
+-				   const struct coproc_params *p)
++static bool emulate_cp15_c15_access(struct kvm_vcpu *vcpu,
++				    const struct coproc_params *p)
+ {
+ 	trace_kvm_emulate_cp15_imp(p->Op1, p->Rt1, p->CRn, p->CRm,
+ 				   p->Op2, p->is_write);
+@@ -301,14 +301,14 @@ static int emulate_cp15_c15_access(struct kvm_vcpu *vcpu,
+ 	if (!p->is_write)
+ 		*vcpu_reg(vcpu, p->Rt1) = 0;
+ 
+-	return 0;
++	return true;
+ }
+ 
+ static int emulate_cp15(struct kvm_vcpu *vcpu,
+ 			const struct coproc_params *params)
+ {
+ 	unsigned long instr_len;
+-	int ret;
++	bool ok;
+ 
+ 	/* So far no mrrc/mcrr accesses are emulated */
+ 	if (params->is_64bit)
+@@ -316,31 +316,31 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
+ 
+ 	switch (params->CRn) {
+ 	case 9:
+-		ret = emulate_cp15_c9_access(vcpu, params);
++		ok = emulate_cp15_c9_access(vcpu, params);
+ 		break;
+ 	case 10:
+-		ret = emulate_cp15_c10_access(vcpu, params);
++		ok = emulate_cp15_c10_access(vcpu, params);
+ 		break;
+ 	case 15:
+-		ret = emulate_cp15_c15_access(vcpu, params);
++		ok = emulate_cp15_c15_access(vcpu, params);
+ 		break;
+ 	default:
+-		ret = -EINVAL;
++		ok = false;
+ 	}
+ 
+-	if (ret != 0)
++	if (!ok)
+ 		goto unsupp_err_out;
+ 
+ 	/* Skip instruction, since it was emulated */
+ 	instr_len = ((vcpu->arch.hsr >> 25) & 1) ? 4 : 2;
+ 	*vcpu_reg(vcpu, 15) += instr_len;
+ 
+-	return ret;
++	return 0;
+ 
+ unsupp_err_out:	
+ 	kvm_err("Unsupported guest CP15 access at: %08x\n", vcpu->arch.regs.pc);
+ 	print_cp_instr(params);
+-	return ret;
++	return -EINVAL;
+ }
+ 
+ /**
