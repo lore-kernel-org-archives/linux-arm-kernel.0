@@ -1,102 +1,52 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Fri,  9 Mar 2012 16:20:40 +0100
-Subject: [PATCH v3 04/13] dmaengine: imx-dma: remove 'imxdma_setup_mem2mem_hw'
- function.
-In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1331306449-28591-5-git-send-email-javier.martin@vista-silicon.com>
+From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
+Date: Fri,  9 Mar 2012 15:55:12 +0100
+Subject: [PATCH 0/4] mc13783 sound support
+Message-ID: <1331304916-4724-1-git-send-email-philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is only used once in the driver and has a lot of checks
-that are not needed anymore. For this reason it's been merged
-with 'imxdma_enable_hw'.
+Hello
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- drivers/dma/imx-dma.c |   57 ++++++++++++-------------------------------------
- 1 files changed, 14 insertions(+), 43 deletions(-)
+This is patchset enable sound support on boards with mc13783 codec.
+The first patch adds the codec driver. It's Sascha's code ported to the
+current kernel with some minors additions.
+The second patch adds a generic SoC platform driver for imx3 boards with
+mc13783 codecs.
+The last two patches enable the sound on the mx31moboard boards and on 
+mx31pdk_3ds boards.
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 400082d..f86ac06 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -258,41 +258,6 @@ static inline int imxdma_sg_next(struct imxdma_desc *d, struct scatterlist *sg)
- 	return now;
- }
- 
--static int
--imxdma_setup_mem2mem_hw(struct imxdma_channel *imxdmac, dma_addr_t dma_address,
--		     unsigned int dma_length, unsigned int dev_addr)
--{
--	int channel = imxdmac->channel;
--
--	imxdmac->internal.sg = NULL;
--
--	if (!dma_address) {
--		printk(KERN_ERR "imxdma%d: imx_dma_setup_single null address\n",
--		       channel);
--		return -EINVAL;
--	}
--
--	if (!dma_length) {
--		printk(KERN_ERR "imxdma%d: imx_dma_setup_single zero length\n",
--		       channel);
--		return -EINVAL;
--	}
--
--	pr_debug("imxdma%d: %s dma_addressg=0x%08x dma_length=%d "
--		"dev_addr=0x%08x for write\n",
--		channel, __func__, (unsigned int)dma_address,
--		dma_length, dev_addr);
--
--	imx_dmav1_writel(dma_address, DMA_SAR(channel));
--	imx_dmav1_writel(dev_addr, DMA_DAR(channel));
--	imx_dmav1_writel(imxdmac->internal.ccr_to_device,
--			 DMA_CCR(channel));
--
--	imx_dmav1_writel(dma_length, DMA_CNTR(channel));
--
--	return 0;
--}
--
- static void imxdma_enable_hw(struct imxdma_desc *d)
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
-@@ -584,20 +549,26 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- static int imxdma_xfer_desc(struct imxdma_desc *d)
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
-+	struct imxdma_engine *imxdma = imxdmac->imxdma;
- 	int ret;
- 
- 	/* Configure and enable */
- 	switch (d->type) {
- 	case IMXDMA_DESC_MEMCPY:
--		ret = imxdma_config_channel_hw(imxdmac,
--					  d->config_port, d->config_mem, 0, 0);
--		if (ret < 0)
--			return ret;
--		ret = imxdma_setup_mem2mem_hw(imxdmac, d->src, d->len, d->dest);
--		if (ret < 0)
--			return ret;
--		break;
-+		imxdmac->internal.sg = NULL;
-+
-+		imx_dmav1_writel(d->src, DMA_SAR(imxdmac->channel));
-+		imx_dmav1_writel(d->dest, DMA_DAR(imxdmac->channel));
-+		imx_dmav1_writel(d->config_mem | (d->config_port << 2),
-+			 DMA_CCR(imxdmac->channel));
- 
-+		imx_dmav1_writel(d->len, DMA_CNTR(imxdmac->channel));
-+
-+		dev_dbg(imxdma->dev, "%s channel: %d dest=0x%08x src=0x%08x "
-+			"dma_length=%d\n", __func__, imxdmac->channel,
-+			d->dest, d->src, d->len);
-+
-+		break;
- 	/* Cyclic transfer is the same as slave_sg with special sg configuration. */
- 	case IMXDMA_DESC_CYCLIC:
- 	case IMXDMA_DESC_SLAVE_SG:
--- 
-1.7.0.4
+This patchset has been tested on mx31moboard and mx31pdk_3ds.
+
+It is based on a 3.3-rc6 kernel. I know there are some patches which change
+how audmux is handled on i.Mx processor but they are not yet merged so
+I prefer to post this patchset based on a known tree than to add another
+dependency. If the audmux change is merged I will rebase this patchset.
+
+Small note: If you want to test this, make sure you use redboot as bootloader
+or that you have the patch i.MX 35/5 AIPS Setup applied.
+
+
+Philippe R??tornaz (3):
+  Add imx3sound sound support.
+  mx31moboard: Add ssi configuration
+  imx31pdk: Add sound support
+
+Sascha Hauer (1):
+  add a mc13783 codec driver
+
+ arch/arm/mach-imx/Kconfig            |    2 +
+ arch/arm/mach-imx/mach-mx31_3ds.c    |   40 ++-
+ arch/arm/mach-imx/mach-mx31moboard.c |   37 ++-
+ drivers/mfd/mc13xxx-core.c           |    3 +-
+ include/linux/mfd/mc13xxx.h          |   11 +
+ sound/soc/codecs/Kconfig             |    4 +
+ sound/soc/codecs/Makefile            |    2 +
+ sound/soc/codecs/mc13783.c           | 1036 ++++++++++++++++++++++++++++++++++
+ sound/soc/codecs/mc13783.h           |   30 +
+ sound/soc/imx/Kconfig                |   10 +
+ sound/soc/imx/Makefile               |    2 +
+ sound/soc/imx/imx3sound-mc13783.c    |  141 +++++
+ 12 files changed, 1315 insertions(+), 3 deletions(-)
+ create mode 100644 sound/soc/codecs/mc13783.c
+ create mode 100644 sound/soc/codecs/mc13783.h
+ create mode 100644 sound/soc/imx/imx3sound-mc13783.c
