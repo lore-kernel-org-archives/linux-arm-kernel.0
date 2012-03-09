@@ -1,46 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Mar 2012 18:16:33 -0800
-Subject: [GIT PULL] ARM: OMAP2+: hwmod data: cleanup in preparation for
- link array removal
-In-Reply-To: <alpine.DEB.2.00.1203081900500.26543@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1203072102150.21662@utopia.booyaka.com>
- <20120309014016.GC12083@atomide.com>
- <alpine.DEB.2.00.1203081851570.9551@utopia.booyaka.com>
- <alpine.DEB.2.00.1203081900500.26543@utopia.booyaka.com>
-Message-ID: <20120309021633.GE12083@atomide.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 09 Mar 2012 13:32:45 +1100
+Subject: [PATCH 1/1] of: add dma-mask binding
+In-Reply-To: <20120309005923.2E04F3E0901@localhost>
+References: <1331119575-6638-1-git-send-email-plagnioj@jcrosoft.com>
+ <4F5793E9.9010100@gmail.com> <20120307173437.GC17087@game.jcrosoft.org>
+ <20120309005923.2E04F3E0901@localhost>
+Message-ID: <1331260365.3105.46.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120308 18:07]:
-> Hi
-> 
-> on second thought...
-> 
-> On Thu, 8 Mar 2012, Paul Walmsley wrote:
-> 
-> > On Thu, 8 Mar 2012, Tony Lindgren wrote:
-> > 
-> > > Got these now merged into l-o master, but ran into a merge
-> > > conflict with already queued sr branch. Resolved it by using
-> > > your version except left out vdd_name.
-> > 
-> > Definitely we want the vdd_name fields.  Other than that it looks okay.  
-> 
-> I guess that other SR series that you merged removed the vdd_name fields?
+On Thu, 2012-03-08 at 17:59 -0700, Grant Likely wrote:
 
-So it seems, commit cea6b942124683305280962969599fed36f0ea7e. Then
-the interrupts we added there for smartreflex it seems.
+> > > This would need some documentation. There is already "dma-ranges"
+> > > defined for OF which nay do what's needed.
+> > what is dma-ranges I see no doc about it
+> > but I don't think it could be used for the dma mask
+> 
+> As Rob says, it's documented in ePAPR.
+
+dma-ranges is generally defined for bridges to indicate the dma window
+to system memory, it's not been by actual devices so far. It provides
+the opposite of "ranges", ie a translation from children to parent
+address space.
+
+So it's not quite the same thing.
+
+Now the fact that we are limited to power-of-2 masks is a Linux
+implementation detail. We might want to make the device-tree a bit more
+flexible and use something like dma-limit instead. However hardware
+limits tend to be in term of number of bits anyways so it's not a big
+issue.
+
+I don't see a need to keep a "ranges" type of semantic. If we ever do
+that we can do a new binding for it or add a dma-base...
+
+> We could merely add an empty dma_mask u64 to the containing struct
+> platform_device and then assign the pointer to dev.dma_mask if it is
+> needed.  That would eliminate the malloc.
+
+Agreed.
+
+>   Or we could by default
+> use dev->dev.dma_mask = &dev->dev.coherent_dma_mask;  Drivers or
+> notifier code could override whatever we setup here as the default.
+> 
+> dma-ranges really is the property that should be used for this, but
+> dma-ranges can describe a different set of permutations than dma_mask.
+
+I don't think so. As I said, dma-ranges is about a bridge/bus exposing
+DMA windows & translations. It has nothing to do with the device
+intrinsic DMA'ing capabilities.
  
-> If so then yeah, we'd better leave those out.
-> 
-> This means that I'm going to have to rebase those big hwmod data changes 
-> :-(
-> 
-> Can you send me a stable commit for that?
-
-Bummer :( What we already have queued is the sr branch at commit
-bb887688bccb48d94fa873f0f6cc7e7e3e4dc05e.
-
-Regards,
-
-Tony
+Cheers,
+Ben.
