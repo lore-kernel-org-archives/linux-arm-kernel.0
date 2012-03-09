@@ -1,55 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Mar 2012 16:32:18 -0800
-Subject: [GIT PULL] ARM: OMAP2+: PM: core support for SMPS regulators
- for v3.4
-In-Reply-To: <87399jc6cj.fsf@ti.com>
-References: <877gywjhht.fsf@ti.com> <20120308021843.GQ12083@atomide.com>
- <87399jc6cj.fsf@ti.com>
-Message-ID: <20120309003217.GB12083@atomide.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 9 Mar 2012 01:51:36 +0100 (CET)
+Subject: [PATCH v5 3/4] clk: introduce the common clock framework
+In-Reply-To: <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-4-git-send-email-mturquette@linaro.org>
+ <20120303133158.GA26882@pengutronix.de>
+ <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
+ <20120304115201.GB26882@pengutronix.de>
+ <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
+ <20120305073836.GU3852@pengutronix.de>
+ <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
+ <20120306190039.GJ3852@pengutronix.de>
+ <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1203090148270.2742@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [120308 09:37]:
-> Tony Lindgren <tony@atomide.com> writes:
-> 
-> > * Kevin Hilman <khilman@ti.com> [120307 11:42]:
-> >> Tony,
-> >> 
-> >> Please pull the following support for using regulators to control the
-> >> on-chip VC/VP managed voltage domains.
-> >> 
-> >> The regulator driver support for this is already queued in the regulator
-> >> tree, and this is the supporting core work.
-> >> 
-> >> This combined with the CPUfreq changes to use the regulator framework
-> >> will finally result in MPU DVFS working in mainline.
-> >
-> > Nice.. However this one might be missing some header changes?
-> 
-> Oh, that's because it depends on the regulator core changes that are in
-> Mark's regulator tree.  You need the for-next branch of :
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
-> 
-> For this to compile correctly.
-> 
-> Sorry, I should've been more clear above about the build dependency.
+On Wed, 7 Mar 2012, Turquette, Mike wrote:
+> Assuming that some day OMAP code can be refactored to allow for lazy
+> (or at least initcall-based) registration of clocks then perhaps your
+> suggestion can take root.  Which leads me to this question: are there
+> any other platforms out there that require the level of expose to
+> struct clk present in this patchset?  OMAP does, for now, but if that
+> changes then I need to know if others require this as well.
 
-Hmm just checking.. Recently Mark replied to Peter:
+I can't see the problem, really. Other than existing code doing stuff
+before the memory allocator is up and running.
 
-* Mark Brown <broonie@opensource.wolfsonmicro.com> [120228 02:17]:
-> On Tue, Feb 28, 2012 at 09:40:10AM +0200, Peter Ujfalusi wrote:
->
-> > NOTE: this series has been generated agains Takashi's topic/asoc branch merged
-> > with Mark's for-next branch since this series depends on changes in Marks'
-> > branch, but not yet pulled by Takashi (snd_soc_add_dai_controls implementation
-> > from Liam).
->
-> Never base *anything* off my for-next branch, it gets rebuilt regularly.
+We allocate interrupt data structures in the early boot process today
+and I don't see a reason why you want clocks, which have not been
+configured by the boot loader, accesible before that point.
 
-So can you guys please confirm that if is indeed an immutable
-commit to use as a base to merge in something?
+Thanks,
 
-Regards,
-
-Tony
+	tglx
