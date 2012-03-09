@@ -1,66 +1,57 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri,  9 Mar 2012 10:51:18 +0200
-Subject: [PATCH 2/2] ASoC: OMAP: Build config cleanup for McBSP
-In-Reply-To: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1331283078-14846-3-git-send-email-peter.ujfalusi@ti.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 9 Mar 2012 14:16:52 +0530
+Subject: [PATCH v3 05/13] gpio/omap: get rid of retrigger variable in
+ gpio_irq_handler
+In-Reply-To: <1331118963-26364-6-git-send-email-tarun.kanti@ti.com>
+References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
+ <1331118963-26364-6-git-send-email-tarun.kanti@ti.com>
+Message-ID: <CAC83ZvJXK-FsiqyQT6BQxggRewkiHZkRBi44CVH15gb4dUbsjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The McBSP driver stack has been moved, and rewritten resulting a single
-driver - selected by CONFIG_SND_OMAP_SOC_MCBSP. There is no longer need to
-have CONFIG_OMAP_MCBSP anymore.
+On Wed, Mar 7, 2012 at 4:45 PM, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
+> This local variable is just assigned zero and then OR'ed
+> with isr. It does not appear to serve any purpose and so
+> removing it.
+Missed following comments from Kevin given in v2. Sorry about that.
+I have updated the change in:
+git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev
+for_3.4/gpio_further_cleanup_fixes
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- sound/soc/omap/Kconfig  |    6 ------
- sound/soc/omap/Makefile |    3 +--
- 2 files changed, 1 insertions(+), 8 deletions(-)
-
-diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
-index 4bb7802..deafbfa 100644
---- a/sound/soc/omap/Kconfig
-+++ b/sound/soc/omap/Kconfig
-@@ -5,13 +5,8 @@ config SND_OMAP_SOC
- config SND_OMAP_SOC_DMIC
- 	tristate
- 
--config OMAP_MCBSP
--	tristate
--	depends on ARCH_OMAP
--
- config SND_OMAP_SOC_MCBSP
- 	tristate
--	select OMAP_MCBSP
- 
- config SND_OMAP_SOC_MCPDM
- 	tristate
-@@ -31,7 +26,6 @@ config SND_OMAP_SOC_N810
- config SND_OMAP_SOC_RX51
- 	tristate "SoC Audio support for Nokia RX-51"
- 	depends on SND_OMAP_SOC && MACH_NOKIA_RX51
--	select OMAP_MCBSP
- 	select SND_OMAP_SOC_MCBSP
- 	select SND_SOC_TLV320AIC3X
- 	select SND_SOC_TPA6130A2
-diff --git a/sound/soc/omap/Makefile b/sound/soc/omap/Makefile
-index 9f8fbd5..1d656bc 100644
---- a/sound/soc/omap/Makefile
-+++ b/sound/soc/omap/Makefile
-@@ -1,13 +1,12 @@
- # OMAP Platform Support
- snd-soc-omap-objs := omap-pcm.o
- snd-soc-omap-dmic-objs := omap-dmic.o
--snd-soc-omap-mcbsp-objs := omap-mcbsp.o
-+snd-soc-omap-mcbsp-objs := omap-mcbsp.o mcbsp.o
- snd-soc-omap-mcpdm-objs := omap-mcpdm.o
- snd-soc-omap-hdmi-objs := omap-hdmi.o
- 
- obj-$(CONFIG_SND_OMAP_SOC) += snd-soc-omap.o
- obj-$(CONFIG_SND_OMAP_SOC_DMIC) += snd-soc-omap-dmic.o
--obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
- obj-$(CONFIG_SND_OMAP_SOC_MCBSP) += snd-soc-omap-mcbsp.o
- obj-$(CONFIG_SND_OMAP_SOC_MCPDM) += snd-soc-omap-mcpdm.o
- obj-$(CONFIG_SND_OMAP_SOC_HDMI) += snd-soc-omap-hdmi.o
--- 
-1.7.8.5
+"commit 672e302e3c (ARM: OMAP: use edge/level handlers from generic IRQ
+framework) removed retrigger support in favor of using generic IRQ
+framework.  This patch cleans up some unused remnants of that removal.
+--
+Tarun
+>
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> ---
+> ?drivers/gpio/gpio-omap.c | ? ?3 ---
+> ?1 files changed, 0 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 3765654..de5fe8f 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -626,7 +626,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ?u32 isr;
+> ? ? ? ?unsigned int gpio_irq, gpio_index;
+> ? ? ? ?struct gpio_bank *bank;
+> - ? ? ? u32 retrigger = 0;
+> ? ? ? ?int unmasked = 0;
+> ? ? ? ?struct irq_chip *chip = irq_desc_get_chip(desc);
+>
+> @@ -663,8 +662,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ? ? ? ? ? ? ? ? ?chained_irq_exit(chip, desc);
+> ? ? ? ? ? ? ? ?}
+>
+> - ? ? ? ? ? ? ? isr |= retrigger;
+> - ? ? ? ? ? ? ? retrigger = 0;
+> ? ? ? ? ? ? ? ?if (!isr)
+> ? ? ? ? ? ? ? ? ? ? ? ?break;
+>
+> --
+> 1.7.0.4
+>
