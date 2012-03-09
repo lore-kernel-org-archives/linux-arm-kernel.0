@@ -1,37 +1,49 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 09 Mar 2012 12:05:02 +0100
-Subject: [PATCH 0/3] Add support for DRM display subsystem
-Message-ID: <1331291105-18152-1-git-send-email-m.szyprowski@samsung.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 08 Mar 2012 23:43:25 -0500
+Subject: [PATCH] mmc: omap_hsmmc: Fix Unbalanced pm_runtime_enable warning
+In-Reply-To: <4F58FB25.8020602@ti.com> (Kevin Hilman's message of "Thu, 08 Mar
+ 2012 10:32:05 -0800")
+References: <20120305234240.GQ12083@atomide.com> <87obsaio93.fsf@ti.com>
+ <4F58FB25.8020602@ti.com>
+Message-ID: <m2ty1ypeoi.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-This patch set adds support for Exysno DRM display subsystem for
-Universal C210 and NURI boards. Exynos DRM driver has been merged to 3.3
-kernel tree and provides unified and more powerful alternative for
-s3c-fb and s5p-tv drivers.
+On Thu, Mar 08 2012, Kevin Hilman wrote:
+>> Tony Lindgren<tony@atomide.com>  writes:
+>>
+>>> mmc: omap_hsmmc: Fix Unbalanced pm_runtime_enable warning
+>>>
+>>> Otherwise we can get following warning when re-loading the
+>>> omap_hsmmc driver module when gpio_twl4030 module is not
+>>> loaded:
+>>>
+>>> omap_hsmmc omap_hsmmc.0: Unbalanced pm_runtime_enable!
+>>> omap_hsmmc omap_hsmmc.0: Unable to grab MMC CD IRQ
+>>> omap_hsmmc: probe of omap_hsmmc.0 failed with error -22
+>>>
+>>> Signed-off-by: Tony Lindgren<tony@atomide.com>
+>>> ---
+>>>
+>>> Kevin, maybe take a look and see if this is correct and
+>>> fits into your PM branches?
+>>
+>> Looks right to me:
+>>
+>> Acked-by: Kevin Hilman<khilman@ti.com>
+>>
+>> But this is a fix to the driver itself, so Chris should queue this in
+>> mmc-next.
+>>
+>> Chris, can you take this one?
+>
+> just checking on this to be sure it can make it for v3.4.
 
-Best regards
+Thanks, I've pushed this to mmc-next for 3.4 now.
 
-Marek Szyprowski
-Samsung Poland R&D Center
-
-Patch summary:
-
-Marek Szyprowski (3):
-  ARM: Exynos4: add platform device for core DRM subsystem
-  ARM: Exynos4: Add DRM core device support for Universal C210 board
-  ARM: Exynos4: Add DRM core support for NURI board
-
- arch/arm/mach-exynos/Kconfig               |    7 ++++++
- arch/arm/mach-exynos/Makefile              |    1 +
- arch/arm/mach-exynos/dev-drm.c             |   29 ++++++++++++++++++++++++++
- arch/arm/mach-exynos/mach-nuri.c           |   31 ++++++++++++++++++++++++++++
- arch/arm/mach-exynos/mach-universal_c210.c |   31 ++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/devs.h  |    2 +
- 6 files changed, 101 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos/dev-drm.c
-
+- Chris.
 -- 
-1.7.1.569.g6f426
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
