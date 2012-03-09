@@ -1,92 +1,231 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 09 Mar 2012 09:26:38 -0700
-Subject: [PATCH 1/1] of: introduce helper to manage boolean
-In-Reply-To: <20120309100435.GN27213@game.jcrosoft.org>
-References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
- <20120309014441.8236B3E0903@localhost>
- <20120309100435.GN27213@game.jcrosoft.org>
-Message-ID: <20120309162638.92E813E0880@localhost>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Fri, 9 Mar 2012 14:50:26 -0800
+Subject: [PATCH v5 4/4] clk: basic clock hardware types
+In-Reply-To: <20120307212025.GC26882@pengutronix.de>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-5-git-send-email-mturquette@linaro.org>
+ <20120307212025.GC26882@pengutronix.de>
+Message-ID: <CAJOA=zM0rymi3r897grTbWRA2UZm07Fb4682ee15Z0Zz1RtA3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Mar 2012 11:04:35 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> On 18:44 Thu 08 Mar     , Grant Likely wrote:
-> > On Tue,  7 Feb 2012 05:13:48 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > > of_property_read_bool
-> > > 
-> > > Search for a property in a device node and read a 32-bit value from
-> > > it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
-> > > 
-> > > this will allow to disable a boolean
-> > > 
-> > > is-ok;          => true
-> > > is-ok = <1>;    => true
-> > > is-ok = <0>;    => false
-> > > 
-> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > Cc: devicetree-discuss at lists.ozlabs.org
-> > > ---
-> > > Hi,
-> > > 
-> > > 	if this is ok I'll rebase my mtd and i2c patch to use it
-> > > 
-> > > Best Regards,
-> > > J.
-> > >  drivers/of/base.c  |   30 ++++++++++++++++++++++++++++++
-> > >  include/linux/of.h |    8 ++++++++
-> > >  2 files changed, 38 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/drivers/of/base.c b/drivers/of/base.c
-> > > index 133908a..a0eaf08 100644
-> > > --- a/drivers/of/base.c
-> > > +++ b/drivers/of/base.c
-> > > @@ -686,6 +686,36 @@ int of_property_read_u64(const struct device_node *np, const char *propname,
-> > >  EXPORT_SYMBOL_GPL(of_property_read_u64);
-> > >  
-> > >  /**
-> > > + * of_property_read_bool - Find and read a boolean from a property
-> > > + * @np:		device node from which the property value is to be read.
-> > > + * @propname:	name of the property to be searched.
-> > > + *
-> > > + * Search for a property in a device node and read a 32-bit value from
-> > > + * it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
-> > > + *
-> > > + * is-ok;	=> true
-> > > + * is-ok = <1>;	=> true
-> > > + * is-ok = <0>;	=> false
-> > > + */
-> > > +int of_property_read_bool(const struct device_node *np, const char *propname)
-> > > +{
-> > > +	u32 reg;
-> > > +	int ret = of_property_read_u32(np, propname, &reg);
-> > > +
-> > > +	switch (ret) {
-> > > +	case -EINVAL:
-> > > +		return false;
-> > > +	case -ENODATA:
-> > > +		return true;
-> > > +	case 0:
-> > > +		return reg == 1;
-> > 
-> > Ugh.  so any value other than 1 returns false?  I think that will surprise
-> > most people.
-> > 
-> > I don't like this api or binding.  If it is a bool property, then why isn't
-> > simply testing for the property existance sufficient?
-> no if you want to disable it
-> 
-> if a bool is define in the dtsi and want to disable it int the dts
-> 
-> if you we can do the the invert
-> 
-> if !0 => true
-> 
-> is-ok;			=> true
-> is-ok = <val != 0>;	=> true
-> is-ok = <0>;		=> false
+On Wed, Mar 7, 2012 at 1:20 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Sat, Mar 03, 2012 at 12:29:01AM -0800, Mike Turquette wrote:
+>> +struct clk *clk_register_divider(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? const char *parent_name, unsigned long flags,
+>> + ? ? ? ? ? ? void __iomem *reg, u8 shift, u8 width,
+>> + ? ? ? ? ? ? u8 clk_divider_flags, spinlock_t *lock)
+>> +{
+>> + ? ? struct clk_divider *div;
+>> + ? ? char **parent_names = NULL;
+>> + ? ? u8 len;
+>> +
+>> + ? ? div = kmalloc(sizeof(struct clk_divider), GFP_KERNEL);
+>> +
+>> + ? ? if (!div) {
+>> + ? ? ? ? ? ? pr_err("%s: could not allocate divider clk\n", __func__);
+>> + ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
+>> + ? ? }
+>> +
+>> + ? ? /* struct clk_divider assignments */
+>> + ? ? div->reg = reg;
+>> + ? ? div->shift = shift;
+>> + ? ? div->width = width;
+>> + ? ? div->flags = clk_divider_flags;
+>> + ? ? div->lock = lock;
+>> +
+>> + ? ? if (parent_name) {
+>> + ? ? ? ? ? ? parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
+>> +
+>> + ? ? ? ? ? ? if (! parent_names)
+>> + ? ? ? ? ? ? ? ? ? ? goto out;
+>> +
+>> + ? ? ? ? ? ? len = sizeof(char) * strlen(parent_name);
+>> +
+>> + ? ? ? ? ? ? parent_names[0] = kmalloc(len, GFP_KERNEL);
+>> +
+>> + ? ? ? ? ? ? if (!parent_names[0])
+>> + ? ? ? ? ? ? ? ? ? ? goto out;
+>> +
+>> + ? ? ? ? ? ? strncpy(parent_names[0], parent_name, len);
+>> + ? ? }
+>> +
+>> +out:
+>> + ? ? return clk_register(dev, name,
+>> + ? ? ? ? ? ? ? ? ? ? &clk_divider_ops, &div->hw,
+>> + ? ? ? ? ? ? ? ? ? ? parent_names,
+>> + ? ? ? ? ? ? ? ? ? ? (parent_name ? 1 : 0),
+>> + ? ? ? ? ? ? ? ? ? ? flags);
+>> +}
+>
+> clk_register_divider and also clk_register_gate have some problems.
+> First you allocate memory with exactly the string length without
+> the terminating 0. Then the functions leak memory when clk_register
+> fails. Could you fold in the following patch to fix this?
 
-This is a failure of the dtc tool, not the binding.  Accepting this binding
-means we have to live with it for a very long time.  It needs to be fixed
-in dtc instead so that properties can be deleted instead of only modified.
+Thanks for the patch Sascha.  This has been pulled into v6 and tested.
 
-g.
+Regards,
+Mike
+
+>
+> Sascha
+>
+> 8<--------------------------------------------------
+>
+> fix divider/gate registration
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ?drivers/clk/clk-divider.c ? ?| ? 34 +++++++++++++++-------------------
+> ?drivers/clk/clk-gate.c ? ? ? | ? 33 ++++++++++++++-------------------
+> ?include/linux/clk-provider.h | ? ?2 ++
+> ?3 files changed, 31 insertions(+), 38 deletions(-)
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 8f02930..99b6b55 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -156,14 +156,13 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+> ? ? ? ? ? ? ? ?u8 clk_divider_flags, spinlock_t *lock)
+> ?{
+> ? ? ? ?struct clk_divider *div;
+> - ? ? ? char **parent_names = NULL;
+> - ? ? ? u8 len;
+> + ? ? ? struct clk *clk;
+>
+> - ? ? ? div = kmalloc(sizeof(struct clk_divider), GFP_KERNEL);
+> + ? ? ? div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
+>
+> ? ? ? ?if (!div) {
+> ? ? ? ? ? ? ? ?pr_err("%s: could not allocate divider clk\n", __func__);
+> - ? ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
+> + ? ? ? ? ? ? ? return NULL;
+> ? ? ? ?}
+>
+> ? ? ? ?/* struct clk_divider assignments */
+> @@ -174,25 +173,22 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
+> ? ? ? ?div->lock = lock;
+>
+> ? ? ? ?if (parent_name) {
+> - ? ? ? ? ? ? ? parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
+> -
+> - ? ? ? ? ? ? ? if (! parent_names)
+> - ? ? ? ? ? ? ? ? ? ? ? goto out;
+> -
+> - ? ? ? ? ? ? ? len = sizeof(char) * strlen(parent_name);
+> -
+> - ? ? ? ? ? ? ? parent_names[0] = kmalloc(len, GFP_KERNEL);
+> -
+> - ? ? ? ? ? ? ? if (!parent_names[0])
+> + ? ? ? ? ? ? ? div->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+> + ? ? ? ? ? ? ? if (!div->parent[0])
+> ? ? ? ? ? ? ? ? ? ? ? ?goto out;
+> -
+> - ? ? ? ? ? ? ? strncpy(parent_names[0], parent_name, len);
+> ? ? ? ?}
+>
+> -out:
+> - ? ? ? return clk_register(dev, name,
+> + ? ? ? clk = clk_register(dev, name,
+> ? ? ? ? ? ? ? ? ? ? ? ?&clk_divider_ops, &div->hw,
+> - ? ? ? ? ? ? ? ? ? ? ? parent_names,
+> + ? ? ? ? ? ? ? ? ? ? ? div->parent,
+> ? ? ? ? ? ? ? ? ? ? ? ?(parent_name ? 1 : 0),
+> ? ? ? ? ? ? ? ? ? ? ? ?flags);
+> + ? ? ? if (clk)
+> + ? ? ? ? ? ? ? return clk;
+> +
+> +out:
+> + ? ? ? kfree(div->parent[0]);
+> + ? ? ? kfree(div);
+> +
+> + ? ? ? return NULL;
+> ?}
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> index e831f7b..92c0489 100644
+> --- a/drivers/clk/clk-gate.c
+> +++ b/drivers/clk/clk-gate.c
+> @@ -80,14 +80,13 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+> ? ? ? ? ? ? ? ?u8 clk_gate_flags, spinlock_t *lock)
+> ?{
+> ? ? ? ?struct clk_gate *gate;
+> - ? ? ? char **parent_names = NULL;
+> - ? ? ? u8 len;
+> + ? ? ? struct clk *clk;
+>
+> - ? ? ? gate = kmalloc(sizeof(struct clk_gate), GFP_KERNEL);
+> + ? ? ? gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
+>
+> ? ? ? ?if (!gate) {
+> ? ? ? ? ? ? ? ?pr_err("%s: could not allocate gated clk\n", __func__);
+> - ? ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
+> + ? ? ? ? ? ? ? return NULL;
+> ? ? ? ?}
+>
+> ? ? ? ?/* struct clk_gate assignments */
+> @@ -97,25 +96,21 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
+> ? ? ? ?gate->lock = lock;
+>
+> ? ? ? ?if (parent_name) {
+> - ? ? ? ? ? ? ? parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
+> -
+> - ? ? ? ? ? ? ? if (! parent_names)
+> - ? ? ? ? ? ? ? ? ? ? ? goto out;
+> -
+> - ? ? ? ? ? ? ? len = sizeof(char) * strlen(parent_name);
+> -
+> - ? ? ? ? ? ? ? parent_names[0] = kmalloc(len, GFP_KERNEL);
+> -
+> - ? ? ? ? ? ? ? if (!parent_names[0])
+> + ? ? ? ? ? ? ? gate->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+> + ? ? ? ? ? ? ? if (!gate->parent[0])
+> ? ? ? ? ? ? ? ? ? ? ? ?goto out;
+> -
+> - ? ? ? ? ? ? ? strncpy(parent_names[0], parent_name, len);
+> ? ? ? ?}
+>
+> -out:
+> - ? ? ? return clk_register(dev, name,
+> + ? ? ? clk = clk_register(dev, name,
+> ? ? ? ? ? ? ? ? ? ? ? ?&clk_gate_ops, &gate->hw,
+> - ? ? ? ? ? ? ? ? ? ? ? parent_names,
+> + ? ? ? ? ? ? ? ? ? ? ? gate->parent,
+> ? ? ? ? ? ? ? ? ? ? ? ?(parent_name ? 1 : 0),
+> ? ? ? ? ? ? ? ? ? ? ? ?flags);
+> + ? ? ? if (clk)
+> + ? ? ? ? ? ? ? return clk;
+> +out:
+> + ? ? ? kfree(gate->parent[0]);
+> + ? ? ? kfree(gate);
+> +
+> + ? ? ? return NULL;
+> ?}
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 9b7dd5e..ed1f918 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -174,6 +174,7 @@ struct clk_gate {
+> ? ? ? ?u8 ? ? ? ? ? ? ?bit_idx;
+> ? ? ? ?u8 ? ? ? ? ? ? ?flags;
+> ? ? ? ?spinlock_t ? ? ?*lock;
+> + ? ? ? char ? ? ? ? ? ?*parent[1];
+> ?};
+>
+> ?#define CLK_GATE_SET_TO_DISABLE ? ? ? ? ? ? ? ?BIT(0)
+> @@ -210,6 +211,7 @@ struct clk_divider {
+> ? ? ? ?u8 ? ? ? ? ? ? ?width;
+> ? ? ? ?u8 ? ? ? ? ? ? ?flags;
+> ? ? ? ?spinlock_t ? ? ?*lock;
+> + ? ? ? char ? ? ? ? ? ?*parent[1];
+> ?};
+>
+> ?#define CLK_DIVIDER_ONE_BASED ? ? ? ? ?BIT(0)
+> --
+> 1.7.9.1
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
