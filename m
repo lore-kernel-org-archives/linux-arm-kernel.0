@@ -1,76 +1,51 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 12 Mar 2012 09:52:04 +0530
-Subject: [PATCH V2 09/22] watchdog/mpcore_wdt: Set default heartbeat in probe
- instead of init
-In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
-References: <cover.1331524811.git.viresh.kumar@st.com>
-Message-ID: <34c24fee0a69d3dd7fa82badb8af1dd66230d0f2.1331524811.git.viresh.kumar@st.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 9 Mar 2012 07:31:16 +0100
+Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4F59253D.7070100@wwwdotorg.org>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
+ <4F59253D.7070100@wwwdotorg.org>
+Message-ID: <20120309063115.GA25208@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently mpcore_margin is handled in mpcore_wdt_init routine, which will be
-called even if we haven't added any device for watchdog.
+* Stephen Warren wrote:
+> On 03/08/2012 07:51 AM, Thierry Reding wrote:
+> > This commit adds support for instantiating the Tegra PCIe controller
+> > from a device tree.
+> > 
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> 
+> > diff --git a/Documentation/devicetree/bindings/pci/tegra-pcie.txt b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
+> 
+> > +NVIDIA Tegra PCIe controller
+> > +
+> > +Required properties:
+> > +- compatible: "nvidia,tegra20-pcie"
+> > +- reg: physical base address and length of the controller's registers
+> > +- interrupts: the interrupt outputs of the controller
+> > +
+> > +Optional properties:
+> > +- pex-clk-supply: supply voltage for internal reference clock
+> > +- vdd-supply: power supply for controller (1.05V)
+> 
+> Mark, Liam,
+> 
+> Should those *-supply properties really be optional? I got the
+> impression talking to Mark in a different thread that all regulators
+> should exist, although their implementation may be via a fixed
+> regulator, with no GPIO, as determined by the board design.
 
-This patch moves this code into probe routine, so that it only gets hit once we
-add device for this driver.
+If I read the TrimSlice code correctly, there is no regulator setup required
+to make PCIe work there presumably because they hardwire the proper voltages.
+On the other hand, maybe a better solution in this case would be to use the
+dummy regulator in those cases.
 
-This also uses dev_info() style print statements instead of printk()
-
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/watchdog/mpcore_wdt.c |   31 +++++++++++++++----------------
- 1 files changed, 15 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 1c37109..19aaad7 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -222,6 +222,21 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
- 		goto err_register;
- 	}
- 
-+	/*
-+	 * Check that the mpcore_margin value is within it's range; if not reset
-+	 * to the default
-+	 */
-+	if (mpcore_margin < MIN_TIME || mpcore_margin > MAX_TIME) {
-+		mpcore_margin = TIMER_MARGIN;
-+		dev_info(wdt->dev, "mpcore_margin value must be 0 < mpcore_margin < 65536, using %d\n",
-+			TIMER_MARGIN);
-+	}
-+
-+	mpcore_wdt_set_heartbeat(NULL, mpcore_margin);
-+	dev_info(wdt->dev, "MPcore Watchdog Timer: 0.1. mpcore_noboot=%d "
-+			"mpcore_margin=%d sec (nowayout= %d)\n", mpcore_noboot,
-+			mpcore_margin, nowayout);
-+
- 	return 0;
- 
- err_register:
-@@ -279,24 +294,8 @@ static struct platform_driver mpcore_wdt_driver = {
- 	},
- };
- 
--static char banner[] __initdata = KERN_INFO "MPcore Watchdog Timer: 0.1. "
--		"mpcore_noboot=%d mpcore_margin=%d sec (nowayout= %d)\n";
--
- static int __init mpcore_wdt_init(void)
- {
--	/*
--	 * Check that the mpcore_margin value is within it's range;
--	 * if not reset to the default
--	 */
--	if (mpcore_margin < MIN_TIME || mpcore_margin > MAX_TIME) {
--		mpcore_margin = TIMER_MARGIN;
--		printk(KERN_INFO "mpcore_margin value must be 0 < mpcore_margin < 65536, using %d\n",
--				TIMER_MARGIN);
--	}
--
--	mpcore_wdt_set_heartbeat(NULL, mpcore_margin);
--	printk(banner, mpcore_noboot, mpcore_margin, nowayout);
--
- 	return platform_driver_register(&mpcore_wdt_driver);
- }
- 
--- 
-1.7.8.110.g4cb5d
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/8b96a367/attachment-0001.sig>
