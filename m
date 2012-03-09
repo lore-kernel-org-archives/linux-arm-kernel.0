@@ -1,60 +1,80 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 09 Mar 2012 11:35:51 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the
- omap_dss2 tree
-In-Reply-To: <201203081616.12510.arnd@arndb.de>
-References: <20120308170048.f1a992bca2ca2d93fa9747bf@canb.auug.org.au>
- <201203081616.12510.arnd@arndb.de>
-Message-ID: <1331285751.1927.20.camel@deskari>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri,  9 Mar 2012 10:51:17 +0200
+Subject: [PATCH 1/2] ARM: OMAP: Remove CONFIG_OMAP_MCBSP references
+In-Reply-To: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1331283078-14846-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The McBSP driver stack has been moved to ASoC. The CONFIG_OMAP_MCBSP will
+be removed since the CONFIG_SND_OMAP_SOC_MCBSP will trigger to build the
+McBSP (audio) drivers.
 
-On Thu, 2012-03-08 at 16:16 +0000, Arnd Bergmann wrote:
-> On Thursday 08 March 2012, Stephen Rothwell wrote:
-> > Hi all,
-> > 
-> > Today's linux-next merge of the arm-soc tree got a conflict in
-> > arch/arm/mach-omap1/board-palmtt.c between commit ddba6c7f7ec6 ("OMAP1:
-> > pass LCD config with omapfb_set_lcd_config()") from the omap_dss2 tree
-> > and commit 2e3ee9f45b3c ("ARM: OMAP1: Move most of plat/io.h into local
-> > iomap.h") from the arm-soc tree.
-> > 
-> > I fixed it up (see below) and can carry the fix as necessary.
-> 
-> Hi Stephen,
-> 
-> Thanks for fixing up all the conflicts between arm-soc and omap_dss2.
-> I think we should make sure they are resolved in one of the trees before
-> the merge window.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-omap1/Kconfig  |    3 ---
+ arch/arm/mach-omap1/Makefile |    4 +++-
+ arch/arm/mach-omap2/Makefile |    4 +++-
+ 3 files changed, 6 insertions(+), 5 deletions(-)
 
-Do we need to? The conflicts seemed to be trivial ones, like arm-soc
-adds/removes something that just happens to be next to something else
-that I add/remove.
-
-My understanding is that it's better to leave those conflicts than to do
-"trickery" to avoid them.
-
-> Tomi, what are your plans for the omap_dss2 branch to get merged?
-
-Normally my tree goes via fbdev-tree (Florian's tree) to mainline.
-
-> Do you think you should send it to Linus first and we merge it into
-> arm-soc to resolve the conflicts?
-> Or do you want to merge it through the arm-soc tree?
-> Or should we go first and you fix up the conflicts by pulling in the
-> necessary topic branches from arm-soc into your tree?
-
-If we want to resolve the conflicts, perhaps it's simplest if the dss
-tree is merged to arm-soc.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/38627a82/attachment-0001.sig>
+diff --git a/arch/arm/mach-omap1/Kconfig b/arch/arm/mach-omap1/Kconfig
+index 4f8d66f..922ab0d 100644
+--- a/arch/arm/mach-omap1/Kconfig
++++ b/arch/arm/mach-omap1/Kconfig
+@@ -37,7 +37,6 @@ comment "OMAP Board Type"
+ config MACH_OMAP_INNOVATOR
+ 	bool "TI Innovator"
+ 	depends on ARCH_OMAP1 && (ARCH_OMAP15XX || ARCH_OMAP16XX)
+-	select OMAP_MCBSP
+ 	help
+           TI OMAP 1510 or 1610 Innovator board support. Say Y here if you
+           have such a board.
+@@ -45,7 +44,6 @@ config MACH_OMAP_INNOVATOR
+ config MACH_OMAP_H2
+ 	bool "TI H2 Support"
+ 	depends on ARCH_OMAP1 && ARCH_OMAP16XX
+-	select OMAP_MCBSP
+     	help
+ 	  TI OMAP 1610/1611B H2 board support. Say Y here if you have such
+ 	  a board.
+@@ -72,7 +70,6 @@ config MACH_HERALD
+ config MACH_OMAP_OSK
+ 	bool "TI OSK Support"
+ 	depends on ARCH_OMAP1 && ARCH_OMAP16XX
+-	select OMAP_MCBSP
+     	help
+ 	  TI OMAP 5912 OSK (OMAP Starter Kit) board support. Say Y here
+           if you have such a board.
+diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
+index 11c85cd..9923f92 100644
+--- a/arch/arm/mach-omap1/Makefile
++++ b/arch/arm/mach-omap1/Makefile
+@@ -6,7 +6,9 @@
+ obj-y := io.o id.o sram.o time.o irq.o mux.o flash.o serial.o devices.o dma.o
+ obj-y += clock.o clock_data.o opp_data.o reset.o pm_bus.o timer.o
+ 
+-obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
++ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
++obj-y += mcbsp.o
++endif
+ 
+ obj-$(CONFIG_OMAP_32K_TIMER)	+= timer32k.o
+ 
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index bd76394..06326a6 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -17,7 +17,9 @@ obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
+ obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
+ obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common) $(secure-common)
+ 
+-obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
++ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
++obj-y += mcbsp.o
++endif
+ 
+ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+ 
+-- 
+1.7.8.5
