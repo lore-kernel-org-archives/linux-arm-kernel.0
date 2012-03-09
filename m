@@ -1,56 +1,102 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 Mar 2012 07:33:15 -0800
-Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
-In-Reply-To: <CAJ0PZbQebwvFrmXWn=-m7YH3Ri7t2fvm+E_EKZ45rD7cAyo2UA@mail.gmail.com>
-References: <22926872.16671331267895327.JavaMail.weblogic@epml04>
- <CAJ0PZbQebwvFrmXWn=-m7YH3Ri7t2fvm+E_EKZ45rD7cAyo2UA@mail.gmail.com>
-Message-ID: <4F5A22BB.2080808@samsung.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Fri,  9 Mar 2012 16:20:40 +0100
+Subject: [PATCH v3 04/13] dmaengine: imx-dma: remove 'imxdma_setup_mem2mem_hw'
+ function.
+In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1331306449-28591-5-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/12 23:06, MyungJoo Ham wrote:
-> 2012/3/9 ???<myungjoo.ham@samsung.com>:
+This function is only used once in the driver and has a lot of checks
+that are not needed anymore. For this reason it's been merged
+with 'imxdma_enable_hw'.
 
-[...]
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ drivers/dma/imx-dma.c |   57 ++++++++++++-------------------------------------
+ 1 files changed, 14 insertions(+), 43 deletions(-)
 
-> 
-> Hello, Kgene
-> 
-> I've rebased the branch that was pull-requested to Kgene based on this branch.
-> 
-
-OK, thanks. Let me apply this series on top of new cleanup-exynos-clock.
-
-> http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/devfreq-for-samsung
-> 
-> 
-> The following changes since commit e01127814c640f6cd06a5c06731c6d1ee8c45101:
-> 
->    PM / devfreq: update the name of EXYNOS clock register (2012-03-07
-> 03:25:31 -0800)
-> 
-> are available in the git repository at:
->    git://git.infradead.org / users/kmpark/linux-samsung devfreq-for-samsung
-> 
-> MyungJoo Ham (4):
->        ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
->        ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus
-> devfreq driver
->        ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
->        PM / devfreq: update the name of EXYNOS clock registers that were omitted.
-> 
->   arch/arm/mach-exynos/common.c                  |    7 +++-
->   arch/arm/mach-exynos/include/mach/map.h        |    1 +
->   arch/arm/mach-exynos/include/mach/regs-clock.h |   42 ++++++++++++++++++++++++
->   arch/arm/mach-exynos/mach-nuri.c               |   11 ++++--
->   drivers/devfreq/exynos4_bus.c                  |    6 ++--
->   5 files changed, 60 insertions(+), 7 deletions(-)
-> 
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index 400082d..f86ac06 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -258,41 +258,6 @@ static inline int imxdma_sg_next(struct imxdma_desc *d, struct scatterlist *sg)
+ 	return now;
+ }
+ 
+-static int
+-imxdma_setup_mem2mem_hw(struct imxdma_channel *imxdmac, dma_addr_t dma_address,
+-		     unsigned int dma_length, unsigned int dev_addr)
+-{
+-	int channel = imxdmac->channel;
+-
+-	imxdmac->internal.sg = NULL;
+-
+-	if (!dma_address) {
+-		printk(KERN_ERR "imxdma%d: imx_dma_setup_single null address\n",
+-		       channel);
+-		return -EINVAL;
+-	}
+-
+-	if (!dma_length) {
+-		printk(KERN_ERR "imxdma%d: imx_dma_setup_single zero length\n",
+-		       channel);
+-		return -EINVAL;
+-	}
+-
+-	pr_debug("imxdma%d: %s dma_addressg=0x%08x dma_length=%d "
+-		"dev_addr=0x%08x for write\n",
+-		channel, __func__, (unsigned int)dma_address,
+-		dma_length, dev_addr);
+-
+-	imx_dmav1_writel(dma_address, DMA_SAR(channel));
+-	imx_dmav1_writel(dev_addr, DMA_DAR(channel));
+-	imx_dmav1_writel(imxdmac->internal.ccr_to_device,
+-			 DMA_CCR(channel));
+-
+-	imx_dmav1_writel(dma_length, DMA_CNTR(channel));
+-
+-	return 0;
+-}
+-
+ static void imxdma_enable_hw(struct imxdma_desc *d)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+@@ -584,20 +549,26 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
++	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	int ret;
+ 
+ 	/* Configure and enable */
+ 	switch (d->type) {
+ 	case IMXDMA_DESC_MEMCPY:
+-		ret = imxdma_config_channel_hw(imxdmac,
+-					  d->config_port, d->config_mem, 0, 0);
+-		if (ret < 0)
+-			return ret;
+-		ret = imxdma_setup_mem2mem_hw(imxdmac, d->src, d->len, d->dest);
+-		if (ret < 0)
+-			return ret;
+-		break;
++		imxdmac->internal.sg = NULL;
++
++		imx_dmav1_writel(d->src, DMA_SAR(imxdmac->channel));
++		imx_dmav1_writel(d->dest, DMA_DAR(imxdmac->channel));
++		imx_dmav1_writel(d->config_mem | (d->config_port << 2),
++			 DMA_CCR(imxdmac->channel));
+ 
++		imx_dmav1_writel(d->len, DMA_CNTR(imxdmac->channel));
++
++		dev_dbg(imxdma->dev, "%s channel: %d dest=0x%08x src=0x%08x "
++			"dma_length=%d\n", __func__, imxdmac->channel,
++			d->dest, d->src, d->len);
++
++		break;
+ 	/* Cyclic transfer is the same as slave_sg with special sg configuration. */
+ 	case IMXDMA_DESC_CYCLIC:
+ 	case IMXDMA_DESC_SLAVE_SG:
+-- 
+1.7.0.4
