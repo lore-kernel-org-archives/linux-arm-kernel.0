@@ -1,97 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Mar 2012 19:58:50 +0800
-Subject: [PATCH v4 03/10] ASoC: fsl: rename imx-pcm Kconfig options and
- filename
-In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331553537-19789-4-git-send-email-shawn.guo@linaro.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri,  9 Mar 2012 10:51:18 +0200
+Subject: [PATCH 2/2] ASoC: OMAP: Build config cleanup for McBSP
+In-Reply-To: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1331283078-14846-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename a couple of imx-pcm Kconfig options and filename to get them
-well named and less confusing.
+The McBSP driver stack has been moved, and rewritten resulting a single
+driver - selected by CONFIG_SND_OMAP_SOC_MCBSP. There is no longer need to
+have CONFIG_OMAP_MCBSP anymore.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- sound/soc/fsl/Kconfig                              |   12 ++++++------
- sound/soc/fsl/Makefile                             |    4 ++--
- sound/soc/fsl/{imx-pcm-dma-mx2.c => imx-pcm-dma.c} |    0
- 3 files changed, 8 insertions(+), 8 deletions(-)
- rename sound/soc/fsl/{imx-pcm-dma-mx2.c => imx-pcm-dma.c} (100%)
+ sound/soc/omap/Kconfig  |    6 ------
+ sound/soc/omap/Makefile |    3 +--
+ 2 files changed, 1 insertions(+), 8 deletions(-)
 
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index 19856a0..e3f7509 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -97,12 +97,12 @@ config SND_SOC_IMX_SSI
- config SND_SOC_IMX_PCM
+diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
+index 4bb7802..deafbfa 100644
+--- a/sound/soc/omap/Kconfig
++++ b/sound/soc/omap/Kconfig
+@@ -5,13 +5,8 @@ config SND_OMAP_SOC
+ config SND_OMAP_SOC_DMIC
  	tristate
  
--config SND_MXC_SOC_FIQ
-+config SND_SOC_IMX_PCM_FIQ
+-config OMAP_MCBSP
+-	tristate
+-	depends on ARCH_OMAP
+-
+ config SND_OMAP_SOC_MCBSP
  	tristate
- 	select FIQ
- 	select SND_SOC_IMX_PCM
+-	select OMAP_MCBSP
  
--config SND_MXC_SOC_MX2
-+config SND_SOC_IMX_PCM_DMA
+ config SND_OMAP_SOC_MCPDM
  	tristate
- 	select SND_SOC_DMAENGINE_PCM
- 	select SND_SOC_IMX_PCM
-@@ -114,7 +114,7 @@ config SND_MXC_SOC_WM1133_EV1
- 	tristate "Audio on the the i.MX31ADS with WM1133-EV1 fitted"
- 	depends on MACH_MX31ADS_WM1133_EV1 && EXPERIMENTAL
- 	select SND_SOC_WM8350
--	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_PCM_FIQ
- 	select SND_SOC_IMX_AUDMUX
- 	select SND_SOC_IMX_SSI
- 	help
-@@ -125,7 +125,7 @@ config SND_SOC_MX27VIS_AIC32X4
- 	tristate "SoC audio support for Visstrim M10 boards"
- 	depends on MACH_IMX27_VISSTRIM_M10 && I2C
- 	select SND_SOC_TLV320AIC32X4
--	select SND_MXC_SOC_MX2
-+	select SND_SOC_IMX_PCM_DMA
- 	select SND_SOC_IMX_AUDMUX
- 	select SND_SOC_IMX_SSI
- 	help
-@@ -137,7 +137,7 @@ config SND_SOC_PHYCORE_AC97
- 	depends on MACH_PCM043 || MACH_PCA100
- 	select SND_SOC_AC97_BUS
- 	select SND_SOC_WM9712
--	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_PCM_FIQ
- 	select SND_SOC_IMX_AUDMUX
- 	select SND_SOC_IMX_SSI
- 	help
-@@ -152,7 +152,7 @@ config SND_SOC_EUKREA_TLV320
- 		|| MACH_EUKREA_MBIMXSD51_BASEBOARD
- 	depends on I2C
- 	select SND_SOC_TLV320AIC23
--	select SND_MXC_SOC_FIQ
-+	select SND_SOC_IMX_PCM_FIQ
- 	select SND_SOC_IMX_AUDMUX
- 	select SND_SOC_IMX_SSI
- 	help
-diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
-index 36c257f..f031409 100644
---- a/sound/soc/fsl/Makefile
-+++ b/sound/soc/fsl/Makefile
-@@ -30,8 +30,8 @@ obj-$(CONFIG_SND_SOC_IMX_AUDMUX) += snd-soc-imx-audmux.o
+@@ -31,7 +26,6 @@ config SND_OMAP_SOC_N810
+ config SND_OMAP_SOC_RX51
+ 	tristate "SoC Audio support for Nokia RX-51"
+ 	depends on SND_OMAP_SOC && MACH_NOKIA_RX51
+-	select OMAP_MCBSP
+ 	select SND_OMAP_SOC_MCBSP
+ 	select SND_SOC_TLV320AIC3X
+ 	select SND_SOC_TPA6130A2
+diff --git a/sound/soc/omap/Makefile b/sound/soc/omap/Makefile
+index 9f8fbd5..1d656bc 100644
+--- a/sound/soc/omap/Makefile
++++ b/sound/soc/omap/Makefile
+@@ -1,13 +1,12 @@
+ # OMAP Platform Support
+ snd-soc-omap-objs := omap-pcm.o
+ snd-soc-omap-dmic-objs := omap-dmic.o
+-snd-soc-omap-mcbsp-objs := omap-mcbsp.o
++snd-soc-omap-mcbsp-objs := omap-mcbsp.o mcbsp.o
+ snd-soc-omap-mcpdm-objs := omap-mcpdm.o
+ snd-soc-omap-hdmi-objs := omap-hdmi.o
  
- obj-$(CONFIG_SND_SOC_IMX_PCM) += snd-soc-imx-pcm.o
- snd-soc-imx-pcm-y := imx-pcm.o
--snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_FIQ) += imx-pcm-fiq.o
--snd-soc-imx-pcm-$(CONFIG_SND_MXC_SOC_MX2) += imx-pcm-dma-mx2.o
-+snd-soc-imx-pcm-$(CONFIG_SND_SOC_IMX_PCM_FIQ) += imx-pcm-fiq.o
-+snd-soc-imx-pcm-$(CONFIG_SND_SOC_IMX_PCM_DMA) += imx-pcm-dma.o
- 
- # i.MX Machine Support
- snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
-diff --git a/sound/soc/fsl/imx-pcm-dma-mx2.c b/sound/soc/fsl/imx-pcm-dma.c
-similarity index 100%
-rename from sound/soc/fsl/imx-pcm-dma-mx2.c
-rename to sound/soc/fsl/imx-pcm-dma.c
+ obj-$(CONFIG_SND_OMAP_SOC) += snd-soc-omap.o
+ obj-$(CONFIG_SND_OMAP_SOC_DMIC) += snd-soc-omap-dmic.o
+-obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
+ obj-$(CONFIG_SND_OMAP_SOC_MCBSP) += snd-soc-omap-mcbsp.o
+ obj-$(CONFIG_SND_OMAP_SOC_MCPDM) += snd-soc-omap-mcpdm.o
+ obj-$(CONFIG_SND_OMAP_SOC_HDMI) += snd-soc-omap-hdmi.o
 -- 
-1.7.5.4
+1.7.8.5
