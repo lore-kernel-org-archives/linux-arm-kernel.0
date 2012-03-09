@@ -1,46 +1,41 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 10 Mar 2012 11:51:36 +0100 (CET)
-Subject: [PATCH v6 2/3] clk: introduce the common clock framework
-In-Reply-To: <1331366064-1273-3-git-send-email-mturquette@linaro.org>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-3-git-send-email-mturquette@linaro.org>
-Message-ID: <alpine.LFD.2.02.1203101128100.2742@ionos>
+From: sdharia@codeaurora.org (Sagar Dharia)
+Date: Fri, 09 Mar 2012 12:50:24 -0700
+Subject: [RFC PATCH] slimbus message encoding/decoding
+In-Reply-To: <20120309002106.GA605@plastictigers.com>
+References: <20120309002106.GA605@plastictigers.com>
+Message-ID: <4F5A5F00.70508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Mar 2012, Mike Turquette wrote:
-> +inline unsigned long __clk_get_enable_count(struct clk *clk)
-> +{
-> +	return !clk ? -EINVAL : clk->enable_count;
+On 03/08/2012 05:21 PM, Marc Butler wrote:
+> All,
+>
+> This patch provides generic functions for encoding/decoding SLIMbus
+> messages (Section 8 of the specification).
 
-Returning negative error codes in a function with a return value
-unsigned long is a bit strange at least. Shouldn't that be long ?
+Thanks for providing this patch. My understanding is that this patch 
+provides helper functions for h/w controllers which rely on s/w to 
+provide the exact message to be sent out on the bus.
 
-> +#ifndef __LINUX_CLK_PRIVATE_H
-> +#define __LINUX_CLK_PRIVATE_H
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/list.h>
-> +
-> +/*
-> + * WARNING: Do not include clk-private.h from any file that implements struct
-> + * clk_ops.  Doing so is a layering violation!
-> + *
-> + * This header exists only to allow for statically initialized clock data.  Any
-> + * static clock data must be defined in a separate file from the logic that
-> + * implements the clock operations for that same data.
+> No CRC generator is included for the PI and MI fields. The OMAP4430
+> chip this is being tested on generates and populates these fields in
+> h/w. However, I have include a general (and untested) callback
+> mechanism.
 
-Now the question is whether you should provide a data structure which
-is explicitely used for static initialization and instead of having
-struct clk static you register the static initializer structure, which
-would be initdata. I don't think that anything needs clocks before the
-memory allocators are up and running. The clocks which are necessary
-to get that far have to be enabled in the boot loader anyway.
+Just like CRC, some other fields may be populated by HW. e.g. Qualcomm 
+chip also populates Arbitration priority, Arbitration Extension fields. 
+So it expects SW to only program a few fields, a.k.a logical/elemental 
+address, MT,MC, DT etc.(that too, SW programs this based on software 
+interface manual). The hardware will convert this information to actual 
+slimbus-compliant message and send it on the bus.
 
-The static initialization question should not hold off this set from
-being merged, though settling it before growing users would be nice.
+Being said that, I am not aware of how majority of h/w controllers work 
+and will be open to have this patch if other hardwares rely on s/w to 
+provide the exact message as well.
 
-Otherwise this is a very well done infrastructure implementation!
-Thanks a lot Mike!
+-Sagar
+> -m
 
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
