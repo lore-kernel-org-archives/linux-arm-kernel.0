@@ -1,39 +1,82 @@
-From: alan@signal11.us (Alan Ott)
-Date: Sat, 10 Mar 2012 15:06:06 -0500
-Subject: [PATCH 1/2] ARM: at91: only RM9200 has ISA-style PIO
-In-Reply-To: <201203101924.31710.arnd@arndb.de>
-References: <1331405049-3186-1-git-send-email-alan@signal11.us>
- <1331405075-3231-1-git-send-email-alan@signal11.us>
- <201203101924.31710.arnd@arndb.de>
-Message-ID: <4F5BB42E.3090201@signal11.us>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Mar 2012 10:31:51 -0800
+Subject: [PATCH v2] ARM: OMAP: WiLink platform data for the PandaBoard
+In-Reply-To: <1331074504-22683-1-git-send-email-mgherzan@gmail.com>
+References: <1331074504-22683-1-git-send-email-mgherzan@gmail.com>
+Message-ID: <20120309183150.GH12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2012 02:24 PM, Arnd Bergmann wrote:
-> On Saturday 10 March 2012, Alan Ott wrote:
->> From: Arnd Bergmann <arnd@arndb.de>
->>
->> Most at91 systems have no support for PCMCIA or other
->> PC-style buses, so we can select NO_IOPORT in order to
->> disable compilationf or all drivers that need these.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Alan Ott <alan@signal11.us>
-> You forgot to Cc the at91 maintainers on this patch (and on patch 0).
-> Also, this patch relies on the another series I did to redefine
-> the meaning of CONFIG_NO_IOPORT while renaming the existing one to
-> CONFIG_NO_IOPORT_MAP. This patch will have to wait for the other
-> series.
+Hi Luca,
 
-Hi Arnd,
+* Mircea Gherzan <mgherzan@gmail.com> [120306 14:23]:
+> The "uim" deamon requires sysfs entries that are filled in using
+> this platform data.
+> 
+> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+> ---
+>  arch/arm/mach-omap2/board-omap4panda.c |   14 ++++++++++++--
+>  include/linux/ti_wilink_st.h           |    2 ++
+>  2 files changed, 14 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> index b1d74d6..339e781 100644
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/i2c/twl.h>
+>  #include <linux/regulator/machine.h>
+>  #include <linux/regulator/fixed.h>
+> +#include <linux/ti_wilink_st.h>
+>  #include <linux/wl12xx.h>
+>  
+>  #include <mach/hardware.h>
+> @@ -56,12 +57,21 @@
+>  #define HDMI_GPIO_HPD  63 /* Hotplug detect */
+>  
+>  /* wl127x BT, FM, GPS connectivity chip */
+> -static int wl1271_gpios[] = {46, -1, -1};
+> +static struct ti_st_plat_data wilink_platform_data = {
+> +	.nshutdown_gpio	= 46,
+> +	.dev_name	= "/dev/ttyO1",
+> +	.flow_cntrl	= 1,
+> +	.baud_rate	= 3000000,
+> +	.chip_enable	= NULL,
+> +	.suspend	= NULL,
+> +	.resume		= NULL,
+> +};
+> +
+>  static struct platform_device wl1271_device = {
+>  	.name	= "kim",
+>  	.id	= -1,
+>  	.dev	= {
+> -		.platform_data	= &wl1271_gpios,
+> +		.platform_data	= &wilink_platform_data,
+>  	},
+>  };
+>  
+> diff --git a/include/linux/ti_wilink_st.h b/include/linux/ti_wilink_st.h
+> index 2ef4385..3ca0269 100644
+> --- a/include/linux/ti_wilink_st.h
+> +++ b/include/linux/ti_wilink_st.h
+> @@ -25,6 +25,8 @@
+>  #ifndef TI_WILINK_ST_H
+>  #define TI_WILINK_ST_H
+>  
+> +#include <linux/skbuff.h>
+> +
+>  /**
+>   * enum proto-type - The protocol on WiLink chips which share a
+>   *	common physical interface like UART.
+> -- 
 
-I'm going to assume you mean randconfig/ioport in
-git://git.linaro.org/people/arnd/linux.git .
-I'll take this patch out for v2 and make a note that it needs to go with
-the patches in randconfig/ioport.
+Just checking.. Can you please take a look at this patch
+and confirm that this is how things are supposed to be done?
 
-I used scripts/get_maintainers.pl for the recipient list, but I now see
-how that failed, since this patch modifies the AT91 section of a file
-not in arc/arm/mach-at91.
+To me passing some third driver's dev_name in pdata seems
+pretty weird.. But then again maybe I just don't know how
+this is supposed to work.
 
-Alan.
+Regards,
+
+Tony
