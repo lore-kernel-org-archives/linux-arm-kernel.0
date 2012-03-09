@@ -1,61 +1,98 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Mar 2012 10:26:10 -0800
-Subject: [PATCH] ARM: OMAP2+: Fix compile error when FB_OMAP2 is not set
-In-Reply-To: <1331280718.1927.10.camel@deskari>
-References: <20120308204328.GW12083@atomide.com>
- <20120308204607.GX12083@atomide.com>
- <1331280718.1927.10.camel@deskari>
-Message-ID: <20120309182609.GG12083@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 09 Mar 2012 08:49:11 -0700
+Subject: [PATCH v2 3/4] arm/dts: OMAP4: Add mmc controller nodes and board
+ data
+In-Reply-To: <4F4765EC.1000102@ti.com>
+References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
+ <1329998490-27555-4-git-send-email-rnayak@ti.com>
+ <CANrkHUaP7cV_vSKQYZkeF-aS5CEi2CAp3_9aDJKCVOX-67oNPg@mail.gmail.com>
+ <4F4765EC.1000102@ti.com>
+Message-ID: <20120309154911.8C23C3E08E2@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [120309 00:14]:
-> On Thu, 2012-03-08 at 12:46 -0800, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [120308 12:11]:
-> > > Otherwise we will get:
-> > > 
-> > > arch/arm/plat-omap/fb.c:101: error: expected ?)? before ?*? token
-> > > 
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > ---
-> > > 
-> > > Tomi, you need something like this for what you have in for-next.
-> > > 
-> > > --- a/arch/arm/plat-omap/fb.c
-> > > +++ b/arch/arm/plat-omap/fb.c
-> > > @@ -98,6 +98,8 @@ arch_initcall(omap_init_fb);
-> > >  
-> > >  #else
-> > >  
-> > > -void __init omapfb_set_lcd_config(omap_lcd_config *config) { }
-> > > +void __init omapfb_set_lcd_config(const struct omap_lcd_config *config)
-> > > +{
-> > > +}
-> > >  
-> > >  #endif
-> > 
-> > Also now seeing the following with what you have in for-next:
-> > 
-> > drivers/video/omap2/displays/panel-taal.c: In function ?taal_num_errors_show?:
-> > drivers/video/omap2/displays/panel-taal.c:605: warning: ?errors? may be used uninitialized in this function
+On Fri, 24 Feb 2012 15:56:52 +0530, Rajendra Nayak <rnayak@ti.com> wrote:
+> On Friday 24 February 2012 03:46 PM, T Krishnamoorthy, Balaji wrote:
+> >> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> >> index 29f4589..9204f60 100644
+> >> --- a/arch/arm/boot/dts/omap4.dtsi
+> >> +++ b/arch/arm/boot/dts/omap4.dtsi
+> >> @@ -25,6 +25,11 @@
+> >>                 serial1 =&uart2;
+> >>                 serial2 =&uart3;
+> >>                 serial3 =&uart4;
+> >> +               mmc1 =&mmc1;
+> >> +               mmc2 =&mmc2;
+> >> +               mmc3 =&mmc3;
+> >> +               mmc4 =&mmc4;
+> >> +               mmc5 =&mmc5;
+> >>         };
+> >>
+> >>         cpus {
+> >> @@ -155,5 +160,31 @@
+> >>                         #size-cells =<0>;
+> >>                         ti,hwmods = "i2c4";
+> >>                 };
+> >> +
+> >> +               mmc1: mmc at 1 {
+> >> +                       compatible = "ti,omap4-hsmmc";
+> >> +                       ti,hwmods = "mmc1";
+> >> +                       ti,dual-volt;
+> >> +               };
+> >> +
+> >> +               mmc2: mmc at 2 {
+> >> +                       compatible = "ti,omap4-hsmmc";
+> >> +                       ti,hwmods = "mmc2";
+> >> +               };
+> >
+> > Hi Rajendra,
+> > Is there a way to control the device registration order,
+> > eMMC connected to mmc2 needs to be registered as /dev/mmcblk0p ...
+> > irrespective of whether SD card is mount or not on mmc1 card slot.
+> > So that bootargs would not have to be modified when filesystem is on eMMC.
 > 
-> Hmm, my compiler doesn't complain (codesourcery 2010.09-50), so I didn't
-> notice that. Which compiler version reports the warning?
+> I don't know if we can, but even if we could, we take care of the same
+> bootargs working on two boards (say sdp and panda) *if* on sdp I have my
+> filesystem on eMMC and on panda I have it on external card.
+> What happens if I want to use my filesystem on both boards on external
+> card?
+
+of_alias_get_id() may be able to help you here.  It will extract the id
+numbering from the /aliases node.  That is the safe way to do global
+enumeration of devices in the device tree (instead of 'cell-index' which
+is strongly discouraged)
+
+g.
+
 > 
-> I'm not 100% sure, but I think it's a false warning, the code path that
-> uses "errors" should only be ran when "errors" has been set.
+> >
+> >> +
+> >> +               mmc3: mmc at 3 {
+> >> +                       compatible = "ti,omap4-hsmmc";
+> >> +                       ti,hwmods = "mmc3";
+> >> +               };
+> >> +
+> >> +               mmc4: mmc at 4 {
+> >> +                       compatible = "ti,omap4-hsmmc";
+> >> +                       ti,hwmods = "mmc4";
+> >> +               };
+> >> +
+> >> +               mmc5: mmc at 5 {
+> >> +                       compatible = "ti,omap4-hsmmc";
+> >> +                       ti,hwmods = "mmc5";
+> >> +               };
+> >>         };
+> >>   };
+> >> --
+> >> 1.7.1
+> >>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-This seems to depend on the .config options somehow. Not getting
-it with omap2plus_defconfig, but getting it at least with Russell's
-omap4430-sdp seed config from:
-
-http://www.arm.linux.org.uk/developer/build/
-
-Using now emdebian 4.3.5-4 as there seems to be some issues
-showing all the section warnings with CodeSourcery and Linaro
-toolchains.
-
-Regards,
-
-Tony
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
