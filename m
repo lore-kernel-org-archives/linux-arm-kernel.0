@@ -1,90 +1,100 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 9 Mar 2012 13:00:59 +0800
-Subject: [PATCH v3 10/11] ASoC: fsl: let fsl_ssi work with imx pcm and
- machine drivers
-In-Reply-To: <4F5980DE.9050002@freescale.com>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-11-git-send-email-shawn.guo@linaro.org>
- <4F591A69.9060401@freescale.com>
- <20120309031909.GJ2499@S2101-09.ap.freescale.net>
- <4F5980DE.9050002@freescale.com>
-Message-ID: <20120309050057.GL2499@S2101-09.ap.freescale.net>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Fri, 9 Mar 2012 16:06:15 +0900
+Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
+In-Reply-To: <22926872.16671331267895327.JavaMail.weblogic@epml04>
+References: <22926872.16671331267895327.JavaMail.weblogic@epml04>
+Message-ID: <CAJ0PZbQebwvFrmXWn=-m7YH3Ri7t2fvm+E_EKZ45rD7cAyo2UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2012 at 04:02:40AM +0000, Tabi Timur-B04825 wrote:
-> Shawn Guo wrote:
-> 
-> > Ok, got you.  We used to set fifo_depth on imx-ssi not the value given
-> > by hardware manual, but the one already tuned.
-> 
-> What do you mean by "already tuned".  Tuned by whom?
-> 
-For example, we have SSI fifo depth 15 on i.MX51 design.  Instead of
-having fifo_depth as 15 and then writing 15 - 2 into burstsize and
-watermark, we used to have fifo_depth as 13, and then burstsize and
-watermark can just be fifo_depth.
+2012/3/9 ??? <myungjoo.ham@samsung.com>:
+>> Hi Arnd, Olof,
+>>
+>> Here is cleanup clock part for EXYNOS SoCs from:
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> next/cleanup-exynos-clock
+>>
+>> Please pull and if any problems, please kindly let me know.
+>
+> Hello,
+>
+> It appears that some patches are missing in this branch; i.e., you seemed not to have pulled one required by this patchset: http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/8474
+>
+> If the missing patches are included in another branch of yours and being pulled at somewhere else, please never mind. However, it doesn't appear so.
+>
+> Anyway, I'm rebasing the pull-requested branch upon most recent RC, so it'll be available soon (in an hour?) at http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/devfreq-for-samsung
+>
+>
+> Cheers!
+> MyungJoo.
+>
 
-I agree that fsl_ssi does the right thing, having fifo_depth be the
-hardware value.
+Hello, Kgene
 
-> >>> +		 */
-> >>> +		ssi_private->dma_params_tx.burstsize =
-> >>> +			ssi_private->fifo_depth - 2;
-> >>> +		ssi_private->dma_params_rx.burstsize =
-> >>> +			ssi_private->fifo_depth - 2;
-> >>> +		ssi_private->dma_params_tx.dma_addr =
-> >>> +			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, stx0);
-> >>> +		ssi_private->dma_params_rx.dma_addr =
-> >>> +			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, srx0);
-> >>
-> >> So I'm a little confused by this new binding.  I went through a lot of
-> >> work to remove DMA-specific data from the SSI driver, and here you are
-> >> adding a bunch of it back.  What you're doing here -- I'm doing it in the
-> >> DMA driver where it belongs.
-> >
-> > I'm not sure these all belong to DMA driver.  These are all
-> > configurations/parameters of SSI, which are related to DMA though.
-> > I see fsl_dma are handling these, but I do not fully agree with that,
-> > because we end up with fsl_dma driver accessing SSI node and
-> > "struct ccsr_ssi" which should be SSI private data.
-> 
-> Well, the SSI needs to tell the DMA driver how to program itself.  On 
-> PowerPC, the DMA's burst size is based on the SSI's FIFO depth.  You're 
-> effectively doing what I already do, except you do more work in the SSI 
-> driver.
-> 
-> I understand that we need to support old and new bindings, but I already 
-> created an infrastructure that supports passing SSI information to the DMA 
-> driver.
+I've rebased the branch that was pull-requested to Kgene based on this branch.
 
-I do not see an infrastructure, but that fsl_dma driver accesses SSI
-private data structure.  Instead, snd_soc_dai_set[get]_dma_data looks
-more like an infrastructure to me.
+http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/devfreq-for-samsung
 
-> It seems that the above code is different only for the sake of 
-> being different, not because it's better.
-> 
-> This is not really an i.MX vs. PowerPC issue, which is why I'm not sure 
-> this change belong in this patchset.
-> 
-Without this change, fsl_ssi can not work with imx-pcm-dma.  I do not
-understand how it can possibly not belong in this patchset?
 
-> > Secondly, this is the way that how imx-ssi and imx-pcm-dma works and
-> > interacts.  If we want to move these stuff into imx-pcm-dma, we need
-> > a good story to convince imx-ssi users that why it's better than what
-> > they currently do.
-> 
-> I don't understand that.  You're already rewriting these drivers.  Who 
-> else needs to be convinced?
-> 
-As I told before, even now we have fsl_ssi working for DT based IMX
-platforms, imx5 and imx6, imx-ssi will still exist for those non-DT
-IMX, like imx21, imx25, imx27, imx31, imx35.  That said, imx-pcm-dma
-will need to work with both fsl_ssi and imx-ssi.  Moving those stuff
-into imx-pcm-dma will require significant changes on imx-ssi too.
+The following changes since commit e01127814c640f6cd06a5c06731c6d1ee8c45101:
+
+  PM / devfreq: update the name of EXYNOS clock register (2012-03-07
+03:25:31 -0800)
+
+are available in the git repository at:
+  git://git.infradead.org / users/kmpark/linux-samsung devfreq-for-samsung
+
+MyungJoo Ham (4):
+      ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
+      ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus
+devfreq driver
+      ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
+      PM / devfreq: update the name of EXYNOS clock registers that were omitted.
+
+ arch/arm/mach-exynos/common.c                  |    7 +++-
+ arch/arm/mach-exynos/include/mach/map.h        |    1 +
+ arch/arm/mach-exynos/include/mach/regs-clock.h |   42 ++++++++++++++++++++++++
+ arch/arm/mach-exynos/mach-nuri.c               |   11 ++++--
+ drivers/devfreq/exynos4_bus.c                  |    6 ++--
+ 5 files changed, 60 insertions(+), 7 deletions(-)
+
+
+
+>>
+>> The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+>>
+>>    Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+>>
+>> are available in the git repository at:
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> next/cleanup-exynos-clock
+>>
+>> Kukjin Kim (2):
+>>        ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
+>>        PM / devfreq: update the name of EXYNOS clock register
+>>
+>>   arch/arm/mach-exynos/Makefile                     |    3 +-
+>>   arch/arm/mach-exynos/clock-exynos4.c              | 1564
+>> +++++++++++++++++++++
+>>   arch/arm/mach-exynos/clock-exynos4.h              |   32 +
+>>   arch/arm/mach-exynos/clock-exynos4210.c           |   46 +-
+>>   arch/arm/mach-exynos/clock-exynos4212.c           |   30 +-
+>>   arch/arm/mach-exynos/clock.c                      | 1564
+>> ---------------------
+>>   arch/arm/mach-exynos/common.h                     |    9 +
+>>   arch/arm/mach-exynos/include/mach/exynos4-clock.h |   43 -
+>>   arch/arm/mach-exynos/include/mach/regs-clock.h    |  364 +++---
+>>   arch/arm/mach-exynos/pm.c                         |   40 +-
+>>   drivers/devfreq/exynos4_bus.c                     |  224 ++--
+>>   11 files changed, 1959 insertions(+), 1960 deletions(-)
+>>   create mode 100644 arch/arm/mach-exynos/clock-exynos4.c
+>>   create mode 100644 arch/arm/mach-exynos/clock-exynos4.h
+>>   delete mode 100644 arch/arm/mach-exynos/clock.c
+>>   delete mode 100644 arch/arm/mach-exynos/include/mach/exynos4-clock.h
+>>
+
+
 
 -- 
-Regards,
-Shawn
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab, DMC Business, Samsung Electronics
