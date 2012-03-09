@@ -1,49 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 Mar 2012 10:10:38 -0800
-Subject: [GIT PULL 3/4] Samsung devel-mmc for v3.4
-In-Reply-To: <CAOesGMgx-86rUuOfjTN8BeYZD+S=04oj+N9u-m9dr8JQA1Oxiw@mail.gmail.com>
-References: <4F5B7C8D.5000805@samsung.com>
- <CAOesGMgx-86rUuOfjTN8BeYZD+S=04oj+N9u-m9dr8JQA1Oxiw@mail.gmail.com>
-Message-ID: <CAOesGMjPqWbKQ+kSKa6EfTpBwE3-3aBWTRoDDr9bGF-HuLcpGg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 09 Mar 2012 10:11:58 +0200
+Subject: [PATCH] ARM: OMAP2+: Fix compile error when FB_OMAP2 is not set
+In-Reply-To: <20120308204607.GX12083@atomide.com>
+References: <20120308204328.GW12083@atomide.com>
+ <20120308204607.GX12083@atomide.com>
+Message-ID: <1331280718.1927.10.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2012 at 10:08 AM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
->
-> On Sat, Mar 10, 2012 at 8:08 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->> Hi Arnd, Olof
->>
->> This is regarding Samsung mmc for v3.4.
->>
->> As a note, v3.4-for-cjb branch is merged into mmc/mmc-next like following:
->> http://git.kernel.org/?p=linux/kernel/git/cjb/mmc.git;a=commit;h=fcd9bdae386753531a9cb6b2577359a83f4e121c
->
-> Looking at this series, there's really only one patch that is not in
-> the mmc tree:
->
-> ARM: SAMSUNG: change the name from s3c-sdhci to exynos4-sdhci
->
-> And all it does is change the platform device string contents.
->
-> Since there are no build-time dependencies between this and the MMC
-> change, I suggest you send only this patch so that we avoid having
-> merge dependencies where not strictly needed.
->
-> Would that be OK with you? If so, please send a fresh pull request
-> with only the above change in it.
+On Thu, 2012-03-08 at 12:46 -0800, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [120308 12:11]:
+> > Otherwise we will get:
+> > 
+> > arch/arm/plat-omap/fb.c:101: error: expected ?)? before ?*? token
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > ---
+> > 
+> > Tomi, you need something like this for what you have in for-next.
+> > 
+> > --- a/arch/arm/plat-omap/fb.c
+> > +++ b/arch/arm/plat-omap/fb.c
+> > @@ -98,6 +98,8 @@ arch_initcall(omap_init_fb);
+> >  
+> >  #else
+> >  
+> > -void __init omapfb_set_lcd_config(omap_lcd_config *config) { }
+> > +void __init omapfb_set_lcd_config(const struct omap_lcd_config *config)
+> > +{
+> > +}
+> >  
+> >  #endif
+> 
+> Also now seeing the following with what you have in for-next:
+> 
+> drivers/video/omap2/displays/panel-taal.c: In function ?taal_num_errors_show?:
+> drivers/video/omap2/displays/panel-taal.c:605: warning: ?errors? may be used uninitialized in this function
 
-Sorry, I misread the series when browsing it. Looks like there are two
-more patches in it:
+Hmm, my compiler doesn't complain (codesourcery 2010.09-50), so I didn't
+notice that. Which compiler version reports the warning?
 
-mmc: sdhci-s3c: add platform data for the second capability
-ARM: SAMSUNG: support the second capability for samsung-soc
+I'm not 100% sure, but I think it's a false warning, the code path that
+uses "errors" should only be ran when "errors" has been set.
 
-But the original suggestion remains, since those two seem to be
-unrelated to the branch sent to Chris. So please resend with just
-those patches, please?
+ Tomi
 
-
-Thanks,
-
--Olof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/bf151e56/attachment-0001.sig>
