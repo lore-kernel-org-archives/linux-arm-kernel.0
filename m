@@ -1,223 +1,66 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Sun, 11 Mar 2012 15:45:23 +0800
-Subject: [PATCH 1/3] led-class: change back LEDS_CLASS to tristate instead
- of bool
-In-Reply-To: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
-References: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <CAK5ve-+KxyQ4RgftyHZ5PLYSvbxWG263f1d6WXty0RO6khYTrA@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 08 Mar 2012 23:56:10 -0500
+Subject: [PATCH 1/2] mmc: sdhci-s3c: Use CONFIG_PM_SLEEP to ifdef system
+ suspend
+In-Reply-To: <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ (Mark Brown's message of "Sat, 3 Mar 2012 00:46:41 +0000")
+References: <4F51697C.40408@samsung.com>
+ <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <m27gyupe39.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard,
+Hi Mark,
 
-How about this patch we discussed before? Thanks,
-
--Bryan
-
-On Thu, Mar 8, 2012 at 5:11 PM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> After moving some core functions to led-core.c, led-class.c can be built as
-> module again.
+On Fri, Mar 02 2012, Mark Brown wrote:
+> This matches current best practice as one can have runtime PM enabled
+> without system sleep and CONFIG_PM is defined for both.
 >
-> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
-> ?drivers/leds/Kconfig ? ? | ? ?2 +-
-> ?drivers/leds/led-class.c | ? 70 ----------------------------------------------
-> ?drivers/leds/led-core.c ?| ? 70 ++++++++++++++++++++++++++++++++++++++++++++++
-> ?3 files changed, 71 insertions(+), 71 deletions(-)
+>  drivers/mmc/host/sdhci-s3c.c |    9 +++++----
+>  1 files changed, 5 insertions(+), 4 deletions(-)
 >
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index 9ca28fc..3f17f0d 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -17,7 +17,7 @@ menuconfig NEW_LEDS
-> ?if NEW_LEDS
->
-> ?config LEDS_CLASS
-> - ? ? ? bool "LED Class Support"
-> + ? ? ? tristate "LED Class Support"
-> ? ? ? ?help
-> ? ? ? ? ?This option enables the led sysfs class in /sys/class/leds. ?You'll
-> ? ? ? ? ?need this to do anything useful with LEDs. ?If unsure, say N.
-> diff --git a/drivers/leds/led-class.c b/drivers/leds/led-class.c
-> index 0c8739c..5bff843 100644
-> --- a/drivers/leds/led-class.c
-> +++ b/drivers/leds/led-class.c
-> @@ -110,50 +110,6 @@ static void led_timer_function(unsigned long data)
-> ? ? ? ?mod_timer(&led_cdev->blink_timer, jiffies + msecs_to_jiffies(delay));
-> ?}
->
-> -static void led_stop_software_blink(struct led_classdev *led_cdev)
-> -{
-> - ? ? ? /* deactivate previous settings */
-> - ? ? ? del_timer_sync(&led_cdev->blink_timer);
-> - ? ? ? led_cdev->blink_delay_on = 0;
-> - ? ? ? led_cdev->blink_delay_off = 0;
-> -}
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index ea0767e..46152d6 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_gpio.h>
+> +#include <linux/pm.h>
+>  
+>  #include <linux/mmc/host.h>
+>  
+> @@ -807,8 +808,7 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_PM
 > -
-> -static void led_set_software_blink(struct led_classdev *led_cdev,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long delay_on,
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long delay_off)
-> -{
-> - ? ? ? int current_brightness;
-> -
-> - ? ? ? current_brightness = led_get_brightness(led_cdev);
-> - ? ? ? if (current_brightness)
-> - ? ? ? ? ? ? ? led_cdev->blink_brightness = current_brightness;
-> - ? ? ? if (!led_cdev->blink_brightness)
-> - ? ? ? ? ? ? ? led_cdev->blink_brightness = led_cdev->max_brightness;
-> -
-> - ? ? ? if (led_get_trigger_data(led_cdev) &&
-> - ? ? ? ? ? delay_on == led_cdev->blink_delay_on &&
-> - ? ? ? ? ? delay_off == led_cdev->blink_delay_off)
-> - ? ? ? ? ? ? ? return;
-> -
-> - ? ? ? led_stop_software_blink(led_cdev);
-> -
-> - ? ? ? led_cdev->blink_delay_on = delay_on;
-> - ? ? ? led_cdev->blink_delay_off = delay_off;
-> -
-> - ? ? ? /* never on - don't blink */
-> - ? ? ? if (!delay_on)
-> - ? ? ? ? ? ? ? return;
-> -
-> - ? ? ? /* never off - just set to brightness */
-> - ? ? ? if (!delay_off) {
-> - ? ? ? ? ? ? ? led_set_brightness(led_cdev, led_cdev->blink_brightness);
-> - ? ? ? ? ? ? ? return;
-> - ? ? ? }
-> -
-> - ? ? ? mod_timer(&led_cdev->blink_timer, jiffies + 1);
-> -}
-> -
-> -
-> ?/**
-> ?* led_classdev_suspend - suspend an led_classdev.
-> ?* @led_cdev: the led_classdev to suspend.
-> @@ -262,32 +218,6 @@ void led_classdev_unregister(struct led_classdev *led_cdev)
-> ?}
-> ?EXPORT_SYMBOL_GPL(led_classdev_unregister);
->
-> -void led_blink_set(struct led_classdev *led_cdev,
-> - ? ? ? ? ? ? ? ? ?unsigned long *delay_on,
-> - ? ? ? ? ? ? ? ? ?unsigned long *delay_off)
-> -{
-> - ? ? ? del_timer_sync(&led_cdev->blink_timer);
-> -
-> - ? ? ? if (led_cdev->blink_set &&
-> - ? ? ? ? ? !led_cdev->blink_set(led_cdev, delay_on, delay_off))
-> - ? ? ? ? ? ? ? return;
-> -
-> - ? ? ? /* blink with 1 Hz as default if nothing specified */
-> - ? ? ? if (!*delay_on && !*delay_off)
-> - ? ? ? ? ? ? ? *delay_on = *delay_off = 500;
-> -
-> - ? ? ? led_set_software_blink(led_cdev, *delay_on, *delay_off);
-> -}
-> -EXPORT_SYMBOL(led_blink_set);
-> -
-> -void led_brightness_set(struct led_classdev *led_cdev,
-> - ? ? ? ? ? ? ? ? ? ? ? enum led_brightness brightness)
-> -{
-> - ? ? ? led_stop_software_blink(led_cdev);
-> - ? ? ? led_cdev->brightness_set(led_cdev, brightness);
-> -}
-> -EXPORT_SYMBOL(led_brightness_set);
-> -
-> ?static int __init leds_init(void)
-> ?{
-> ? ? ? ?leds_class = class_create(THIS_MODULE, "leds");
-> diff --git a/drivers/leds/led-core.c b/drivers/leds/led-core.c
-> index 016d19f..d686004 100644
-> --- a/drivers/leds/led-core.c
-> +++ b/drivers/leds/led-core.c
-> @@ -23,3 +23,73 @@ EXPORT_SYMBOL_GPL(leds_list_lock);
->
-> ?LIST_HEAD(leds_list);
-> ?EXPORT_SYMBOL_GPL(leds_list);
-> +
-> +static void led_stop_software_blink(struct led_classdev *led_cdev)
-> +{
-> + ? ? ? /* deactivate previous settings */
-> + ? ? ? del_timer_sync(&led_cdev->blink_timer);
-> + ? ? ? led_cdev->blink_delay_on = 0;
-> + ? ? ? led_cdev->blink_delay_off = 0;
-> +}
-> +
-> +static void led_set_software_blink(struct led_classdev *led_cdev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long delay_on,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long delay_off)
-> +{
-> + ? ? ? int current_brightness;
-> +
-> + ? ? ? current_brightness = led_get_brightness(led_cdev);
-> + ? ? ? if (current_brightness)
-> + ? ? ? ? ? ? ? led_cdev->blink_brightness = current_brightness;
-> + ? ? ? if (!led_cdev->blink_brightness)
-> + ? ? ? ? ? ? ? led_cdev->blink_brightness = led_cdev->max_brightness;
-> +
-> + ? ? ? if (led_get_trigger_data(led_cdev) &&
-> + ? ? ? ? ? delay_on == led_cdev->blink_delay_on &&
-> + ? ? ? ? ? delay_off == led_cdev->blink_delay_off)
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? led_stop_software_blink(led_cdev);
-> +
-> + ? ? ? led_cdev->blink_delay_on = delay_on;
-> + ? ? ? led_cdev->blink_delay_off = delay_off;
-> +
-> + ? ? ? /* never on - don't blink */
-> + ? ? ? if (!delay_on)
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? /* never off - just set to brightness */
-> + ? ? ? if (!delay_off) {
-> + ? ? ? ? ? ? ? led_set_brightness(led_cdev, led_cdev->blink_brightness);
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? }
-> +
-> + ? ? ? mod_timer(&led_cdev->blink_timer, jiffies + 1);
-> +}
-> +
-> +
-> +void led_blink_set(struct led_classdev *led_cdev,
-> + ? ? ? ? ? ? ? ? ?unsigned long *delay_on,
-> + ? ? ? ? ? ? ? ? ?unsigned long *delay_off)
-> +{
-> + ? ? ? del_timer_sync(&led_cdev->blink_timer);
-> +
-> + ? ? ? if (led_cdev->blink_set &&
-> + ? ? ? ? ? !led_cdev->blink_set(led_cdev, delay_on, delay_off))
-> + ? ? ? ? ? ? ? return;
-> +
-> + ? ? ? /* blink with 1 Hz as default if nothing specified */
-> + ? ? ? if (!*delay_on && !*delay_off)
-> + ? ? ? ? ? ? ? *delay_on = *delay_off = 500;
-> +
-> + ? ? ? led_set_software_blink(led_cdev, *delay_on, *delay_off);
-> +}
-> +EXPORT_SYMBOL(led_blink_set);
-> +
-> +void led_brightness_set(struct led_classdev *led_cdev,
-> + ? ? ? ? ? ? ? ? ? ? ? enum led_brightness brightness)
-> +{
-> + ? ? ? led_stop_software_blink(led_cdev);
-> + ? ? ? led_cdev->brightness_set(led_cdev, brightness);
-> +}
-> +EXPORT_SYMBOL(led_brightness_set);
-> --
-> 1.7.9
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +#ifdef CONFIG_PM_SLEEP
+>  static int sdhci_s3c_suspend(struct device *dev)
+>  {
+>  	struct sdhci_host *host = dev_get_drvdata(dev);
+> @@ -822,10 +822,11 @@ static int sdhci_s3c_resume(struct device *dev)
+>  
+>  	return sdhci_resume_host(host);
+>  }
+> +#endif
+>  
+> +#ifdef CONFIG_PM
+>  static const struct dev_pm_ops sdhci_s3c_pmops = {
+> -	.suspend	= sdhci_s3c_suspend,
+> -	.resume		= sdhci_s3c_resume,
+> +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_s3c_suspend, sdhci_s3c_resume)
+>  };
+>  
+>  #define SDHCI_S3C_PMOPS (&sdhci_s3c_pmops)
 
+Thanks, pushed to mmc-next for 3.4 with Jaehoon's ACK.
 
-
+- Chris.
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu ARM Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
