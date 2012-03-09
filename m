@@ -1,319 +1,1396 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 09 Mar 2012 14:56:52 +1030
-Subject: [PATCH 6/8] ARM: KVM: table-driven coprocessor emulation.
-Message-ID: <1331267212.16020.rusty@rustcorp.com.au>
+From: pullip.cho@samsung.com (Cho KyongHo)
+Date: Fri, 09 Mar 2012 21:15:04 +0900
+Subject: [PATCH v11 2/3] ARM: EXYNOS: Change System MMU platform device
+ definitions
+Message-ID: <017901ccfdee$42420b10$c6c62130$%cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Handling System MMUs with an identifier is not flexible to manage
+System MMU platform devices because of the following reasons:
+1. A device driver which needs to handle System MMU must know the ID.
+2. A System MMU may not present in some implementations of Exynos family.
+3. Handling System MMU with IOMMU API does not require an ID.
 
-From: Rusty Russell <rusty@rustcorp.com.au>
+This patch is the result of removing ID of System MMUs.
+Instead, a device driver that needs to handle its System MMU must
+use IOMMU API while its descriptor of platform device is given.
 
-To try to avoid encroaching ad-hoc emulation, drive it from
-a single table, so it's clear exactly what we do and do not
-emulate.
+This patch also includes the following enhancements:
+- A System MMU device becomes a child if its power domain device.
+- clkdev
 
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
 ---
- arch/arm/kvm/emulate.c |  255 ++++++++++++++++++++++++------------------------
- 1 files changed, 130 insertions(+), 125 deletions(-)
+ arch/arm/mach-exynos/Kconfig                    |   11 +-
+ arch/arm/mach-exynos/Makefile                   |    2 +-
+ arch/arm/mach-exynos/clock-exynos4.c            |   79 ++--
+ arch/arm/mach-exynos/clock-exynos4.h            |    2 +
+ arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
+ arch/arm/mach-exynos/clock-exynos4212.c         |   28 ++-
+ arch/arm/mach-exynos/clock-exynos5.c            |   90 +++++
+ arch/arm/mach-exynos/dev-sysmmu.c               |  457 ++++++++++++----------
+ arch/arm/mach-exynos/include/mach/irqs.h        |  179 +++++-----
+ arch/arm/mach-exynos/include/mach/map.h         |   38 ++
+ arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
+ arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 --
+ arch/arm/mach-exynos/include/mach/sysmmu.h      |   88 +++--
+ arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
+ arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
+ 15 files changed, 616 insertions(+), 404 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/include/mach/regs-sysmmu.h
 
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index d386874..bd2c3dc 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -165,25 +165,19 @@ struct coproc_params {
- 	bool is_write;
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 9b8ccef..b08923f 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -90,10 +90,10 @@ config EXYNOS4_SETUP_FIMD0
+ 	help
+ 	  Common setup code for FIMD0.
+ 
+-config EXYNOS4_DEV_SYSMMU
++config EXYNOS_DEV_SYSMMU
+ 	bool
+ 	help
+-	  Common setup code for SYSTEM MMU in EXYNOS4
++	  Common setup code for SYSTEM MMU in EXYNOS platforms
+ 
+ config EXYNOS4_DEV_DWMCI
+ 	bool
+@@ -203,12 +203,12 @@ config MACH_SMDKV310
+ 	select S3C_DEV_HSMMC2
+ 	select S3C_DEV_HSMMC3
+ 	select SAMSUNG_DEV_BACKLIGHT
++	select EXYNOS_DEV_SYSMMU
+ 	select EXYNOS4_DEV_AHCI
+ 	select SAMSUNG_DEV_KEYPAD
+ 	select EXYNOS4_DEV_DMA
+ 	select SAMSUNG_DEV_PWM
+ 	select EXYNOS4_DEV_USB_OHCI
+-	select EXYNOS4_DEV_SYSMMU
+ 	select EXYNOS4_SETUP_FIMD0
+ 	select EXYNOS4_SETUP_I2C1
+ 	select EXYNOS4_SETUP_KEYPAD
+@@ -227,7 +227,6 @@ config MACH_ARMLEX4210
+ 	select S3C_DEV_HSMMC3
+ 	select EXYNOS4_DEV_AHCI
+ 	select EXYNOS4_DEV_DMA
+-	select EXYNOS4_DEV_SYSMMU
+ 	select EXYNOS4_SETUP_SDHCI
+ 	help
+ 	  Machine support for Samsung ARMLEX4210 based on EXYNOS4210
+@@ -253,6 +252,7 @@ config MACH_UNIVERSAL_C210
+ 	select S5P_DEV_MFC
+ 	select S5P_DEV_ONENAND
+ 	select S5P_DEV_TV
++	select EXYNOS_DEV_SYSMMU
+ 	select EXYNOS4_DEV_DMA
+ 	select EXYNOS4_SETUP_FIMD0
+ 	select EXYNOS4_SETUP_I2C1
+@@ -322,6 +322,7 @@ config MACH_ORIGEN
+ 	select S5P_DEV_USB_EHCI
+ 	select SAMSUNG_DEV_BACKLIGHT
+ 	select SAMSUNG_DEV_PWM
++	select EXYNOS_DEV_SYSMMU
+ 	select EXYNOS4_DEV_DMA
+ 	select EXYNOS4_DEV_USB_OHCI
+ 	select EXYNOS4_SETUP_FIMD0
+@@ -357,6 +358,7 @@ config MACH_SMDK4212
+ 	select SAMSUNG_DEV_KEYPAD
+ 	select SAMSUNG_DEV_PWM
+ 	select EXYNOS4_DEV_DMA
++	select EXYNOS_DEV_SYSMMU
+ 	select EXYNOS4_SETUP_I2C1
+ 	select EXYNOS4_SETUP_I2C3
+ 	select EXYNOS4_SETUP_I2C7
+@@ -382,6 +384,7 @@ comment "EXYNOS5250 Boards"
+ config MACH_SMDK5250
+ 	bool "SMDK5250"
+ 	select SOC_EXYNOS5250
++	select EXYNOS_DEV_SYSMMU
+ 	help
+ 	  Machine support for Samsung SMDK5250
+ endif
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 04feed2..7d33283 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -51,7 +51,7 @@ obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
+ obj-y					+= dev-uart.o
+ obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
+ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
+-obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
++obj-$(CONFIG_EXYNOS_DEV_SYSMMU)		+= dev-sysmmu.o
+ obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
+ obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
+ obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
+diff --git a/arch/arm/mach-exynos/clock-exynos4.c b/arch/arm/mach-exynos/clock-exynos4.c
+index af48ad1..7d4784d 100644
+--- a/arch/arm/mach-exynos/clock-exynos4.c
++++ b/arch/arm/mach-exynos/clock-exynos4.c
+@@ -169,7 +169,7 @@ static int exynos4_clk_ip_tv_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(EXYNOS4_CLKGATE_IP_TV, clk, enable);
+ }
+ 
+-static int exynos4_clk_ip_image_ctrl(struct clk *clk, int enable)
++int exynos4_clk_ip_image_ctrl(struct clk *clk, int enable)
+ {
+ 	return s5p_gatectrl(EXYNOS4_CLKGATE_IP_IMAGE, clk, enable);
+ }
+@@ -199,6 +199,11 @@ static int exynos4_clk_ip_perir_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(EXYNOS4_CLKGATE_IP_PERIR, clk, enable);
+ }
+ 
++int exynos4_clk_ip_dmc_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(EXYNOS4_CLKGATE_IP_DMC, clk, enable);
++}
++
+ static int exynos4_clk_hdmiphy_ctrl(struct clk *clk, int enable)
+ {
+ 	return s5p_gatectrl(S5P_HDMI_PHY_CONTROL, clk, enable);
+@@ -679,61 +684,55 @@ static struct clk exynos4_init_clocks_off[] = {
+ 		.enable		= exynos4_clk_ip_peril_ctrl,
+ 		.ctrlbit	= (1 << 14),
+ 	}, {
+-		.name		= "SYSMMU_MDMA",
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
++		.enable		= exynos4_clk_ip_mfc_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
++		.enable		= exynos4_clk_ip_mfc_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(tv, 2),
++		.enable		= exynos4_clk_ip_tv_ctrl,
++		.ctrlbit	= (1 << 4),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(jpeg, 3),
++		.enable		= exynos4_clk_ip_cam_ctrl,
++		.ctrlbit	= (1 << 11),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(rot, 4),
+ 		.enable		= exynos4_clk_ip_image_ctrl,
+-		.ctrlbit	= (1 << 5),
++		.ctrlbit	= (1 << 4),
+ 	}, {
+-		.name		= "SYSMMU_FIMC0",
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(fimc0, 5),
+ 		.enable		= exynos4_clk_ip_cam_ctrl,
+ 		.ctrlbit	= (1 << 7),
+ 	}, {
+-		.name		= "SYSMMU_FIMC1",
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(fimc1, 6),
+ 		.enable		= exynos4_clk_ip_cam_ctrl,
+ 		.ctrlbit	= (1 << 8),
+ 	}, {
+-		.name		= "SYSMMU_FIMC2",
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(fimc2, 7),
+ 		.enable		= exynos4_clk_ip_cam_ctrl,
+ 		.ctrlbit	= (1 << 9),
+ 	}, {
+-		.name		= "SYSMMU_FIMC3",
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(fimc3, 8),
+ 		.enable		= exynos4_clk_ip_cam_ctrl,
+ 		.ctrlbit	= (1 << 10),
+ 	}, {
+-		.name		= "SYSMMU_JPEG",
+-		.enable		= exynos4_clk_ip_cam_ctrl,
+-		.ctrlbit	= (1 << 11),
+-	}, {
+-		.name		= "SYSMMU_FIMD0",
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(fimd0, 10),
+ 		.enable		= exynos4_clk_ip_lcd0_ctrl,
+ 		.ctrlbit	= (1 << 4),
+-	}, {
+-		.name		= "SYSMMU_FIMD1",
+-		.enable		= exynos4_clk_ip_lcd1_ctrl,
+-		.ctrlbit	= (1 << 4),
+-	}, {
+-		.name		= "SYSMMU_PCIe",
+-		.enable		= exynos4_clk_ip_fsys_ctrl,
+-		.ctrlbit	= (1 << 18),
+-	}, {
+-		.name		= "SYSMMU_G2D",
+-		.enable		= exynos4_clk_ip_image_ctrl,
+-		.ctrlbit	= (1 << 3),
+-	}, {
+-		.name		= "SYSMMU_ROTATOR",
+-		.enable		= exynos4_clk_ip_image_ctrl,
+-		.ctrlbit	= (1 << 4),
+-	}, {
+-		.name		= "SYSMMU_TV",
+-		.enable		= exynos4_clk_ip_tv_ctrl,
+-		.ctrlbit	= (1 << 4),
+-	}, {
+-		.name		= "SYSMMU_MFC_L",
+-		.enable		= exynos4_clk_ip_mfc_ctrl,
+-		.ctrlbit	= (1 << 1),
+-	}, {
+-		.name		= "SYSMMU_MFC_R",
+-		.enable		= exynos4_clk_ip_mfc_ctrl,
+-		.ctrlbit	= (1 << 2),
+ 	}
  };
  
--static void cp15_op(struct kvm_vcpu *vcpu, const struct coproc_params *p,
--			   enum cp15_regs cp15_reg)
+diff --git a/arch/arm/mach-exynos/clock-exynos4.h b/arch/arm/mach-exynos/clock-exynos4.h
+index 9d27a56..309cc71 100644
+--- a/arch/arm/mach-exynos/clock-exynos4.h
++++ b/arch/arm/mach-exynos/clock-exynos4.h
+@@ -28,5 +28,7 @@ extern struct clk *exynos4_clkset_group_list[];
+ extern int exynos4_clksrc_mask_fsys_ctrl(struct clk *clk, int enable);
+ extern int exynos4_clk_ip_fsys_ctrl(struct clk *clk, int enable);
+ extern int exynos4_clk_ip_lcd1_ctrl(struct clk *clk, int enable);
++extern int exynos4_clk_ip_image_ctrl(struct clk *clk, int enable);
++extern int exynos4_clk_ip_dmc_ctrl(struct clk *clk, int enable);
+ 
+ #endif /* __ASM_ARCH_CLOCK_H */
+diff --git a/arch/arm/mach-exynos/clock-exynos4210.c b/arch/arm/mach-exynos/clock-exynos4210.c
+index 68763b3..c1fcd2f 100644
+--- a/arch/arm/mach-exynos/clock-exynos4210.c
++++ b/arch/arm/mach-exynos/clock-exynos4210.c
+@@ -28,6 +28,7 @@
+ #include <mach/hardware.h>
+ #include <mach/map.h>
+ #include <mach/regs-clock.h>
++#include <mach/sysmmu.h>
+ 
+ #include "clock-exynos4.h"
+ #include "common.h"
+@@ -96,6 +97,16 @@ static struct clk init_clocks_off[] = {
+ 		.devname	= "exynos4-fb.1",
+ 		.enable		= exynos4_clk_ip_lcd1_ctrl,
+ 		.ctrlbit	= (1 << 0),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(2d, 14),
++		.enable		= exynos4_clk_ip_image_ctrl,
++		.ctrlbit	= (1 << 3),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(fimd1, 11),
++		.enable		= exynos4_clk_ip_lcd1_ctrl,
++		.ctrlbit	= (1 << 4),
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-exynos/clock-exynos4212.c b/arch/arm/mach-exynos/clock-exynos4212.c
+index f22a0a2..e1059a2 100644
+--- a/arch/arm/mach-exynos/clock-exynos4212.c
++++ b/arch/arm/mach-exynos/clock-exynos4212.c
+@@ -28,6 +28,7 @@
+ #include <mach/hardware.h>
+ #include <mach/map.h>
+ #include <mach/regs-clock.h>
++#include <mach/sysmmu.h>
+ 
+ #include "clock-exynos4.h"
+ #include "common.h"
+@@ -41,6 +42,16 @@ static struct sleep_save exynos4212_clock_save[] = {
+ };
+ #endif
+ 
++static int exynos4212_clk_ip_isp0_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(EXYNOS4_CLKGATE_IP_ISP0, clk, enable);
++}
++
++static int exynos4212_clk_ip_isp1_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(EXYNOS4_CLKGATE_IP_ISP1, clk, enable);
++}
++
+ static struct clk *clk_src_mpll_user_list[] = {
+ 	[0] = &clk_fin_mpll,
+ 	[1] = &exynos4_clk_mout_mpll.clk,
+@@ -68,7 +79,22 @@ static struct clksrc_clk clksrcs[] = {
+ };
+ 
+ static struct clk init_clocks_off[] = {
+-	/* nothing here yet */
++	{
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(2d, 14),
++		.enable		= exynos4_clk_ip_dmc_ctrl,
++		.ctrlbit	= (1 << 24),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
++		.enable		= exynos4212_clk_ip_isp0_ctrl,
++		.ctrlbit	= (7 << 8),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME2,
++		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
++		.enable		= exynos4212_clk_ip_isp1_ctrl,
++		.ctrlbit	= (1 << 4),
++	}
+ };
+ 
+ #ifdef CONFIG_PM_SLEEP
+diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+index d013982..3320ad1 100644
+--- a/arch/arm/mach-exynos/clock-exynos5.c
++++ b/arch/arm/mach-exynos/clock-exynos5.c
+@@ -82,6 +82,11 @@ static int exynos5_clksrc_mask_peric0_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(EXYNOS5_CLKSRC_MASK_PERIC0, clk, enable);
+ }
+ 
++static int exynos5_clk_ip_acp_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_ACP, clk, enable);
++}
++
+ static int exynos5_clk_ip_core_ctrl(struct clk *clk, int enable)
+ {
+ 	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_CORE, clk, enable);
+@@ -127,6 +132,21 @@ static int exynos5_clk_ip_peris_ctrl(struct clk *clk, int enable)
+ 	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_PERIS, clk, enable);
+ }
+ 
++static int exynos5_clk_ip_gscl_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_GSCL, clk, enable);
++}
++
++static int exynos5_clk_ip_isp0_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_ISP0, clk, enable);
++}
++
++static int exynos5_clk_ip_isp1_ctrl(struct clk *clk, int enable)
++{
++	return s5p_gatectrl(EXYNOS5_CLKGATE_IP_ISP1, clk, enable);
++}
++
+ /* Core list of CMU_CPU side */
+ 
+ static struct clksrc_clk exynos5_clk_mout_apll = {
+@@ -630,6 +650,76 @@ static struct clk exynos5_init_clocks_off[] = {
+ 		.parent		= &exynos5_clk_aclk_66.clk,
+ 		.enable		= exynos5_clk_ip_peric_ctrl,
+ 		.ctrlbit	= (1 << 14),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_l, 0),
++		.enable		= &exynos5_clk_ip_mfc_ctrl,
++		.ctrlbit	= (1 << 1),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(mfc_r, 1),
++		.enable		= &exynos5_clk_ip_mfc_ctrl,
++		.ctrlbit	= (1 << 2),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(tv, 2),
++		.enable		= &exynos5_clk_ip_disp1_ctrl,
++		.ctrlbit	= (1 << 9)
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(jpeg, 3),
++		.enable		= &exynos5_clk_ip_gen_ctrl,
++		.ctrlbit	= (1 << 7),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(rot, 4),
++		.enable		= &exynos5_clk_ip_gen_ctrl,
++		.ctrlbit	= (1 << 6)
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(gsc0, 5),
++		.enable		= &exynos5_clk_ip_gscl_ctrl,
++		.ctrlbit	= (1 << 7),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(gsc1, 6),
++		.enable		= &exynos5_clk_ip_gscl_ctrl,
++		.ctrlbit	= (1 << 8),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(gsc2, 7),
++		.enable		= &exynos5_clk_ip_gscl_ctrl,
++		.ctrlbit	= (1 << 9),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(gsc3, 8),
++		.enable		= &exynos5_clk_ip_gscl_ctrl,
++		.ctrlbit	= (1 << 10),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
++		.enable		= &exynos5_clk_ip_isp0_ctrl,
++		.ctrlbit	= (0x3F << 8),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME2,
++		.devname	= SYSMMU_CLOCK_DEVNAME(isp, 9),
++		.enable		= &exynos5_clk_ip_isp1_ctrl,
++		.ctrlbit	= (0xF << 4),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(camif0, 12),
++		.enable		= &exynos5_clk_ip_gscl_ctrl,
++		.ctrlbit	= (1 << 11),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(camif1, 13),
++		.enable		= &exynos5_clk_ip_gscl_ctrl,
++		.ctrlbit	= (1 << 12),
++	}, {
++		.name		= SYSMMU_CLOCK_NAME,
++		.devname	= SYSMMU_CLOCK_DEVNAME(2d, 14),
++		.enable		= &exynos5_clk_ip_acp_ctrl,
++		.ctrlbit	= (1 << 7)
+ 	}
+ };
+ 
+diff --git a/arch/arm/mach-exynos/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
+index 781563f..c5b1ea3 100644
+--- a/arch/arm/mach-exynos/dev-sysmmu.c
++++ b/arch/arm/mach-exynos/dev-sysmmu.c
+@@ -1,9 +1,9 @@
+-/* linux/arch/arm/mach-exynos4/dev-sysmmu.c
++/* linux/arch/arm/mach-exynos/dev-sysmmu.c
+  *
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
++ * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+- * EXYNOS4 - System MMU support
++ * EXYNOS - System MMU support
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -12,222 +12,263 @@
+ 
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
+-#include <linux/export.h>
++
++#include <plat/cpu.h>
+ 
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+ #include <mach/sysmmu.h>
+-#include <plat/s5p-clock.h>
+-
+-/* These names must be equal to the clock names in mach-exynos4/clock.c */
+-const char *sysmmu_ips_name[EXYNOS4_SYSMMU_TOTAL_IPNUM] = {
+-	"SYSMMU_MDMA"	,
+-	"SYSMMU_SSS"	,
+-	"SYSMMU_FIMC0"	,
+-	"SYSMMU_FIMC1"	,
+-	"SYSMMU_FIMC2"	,
+-	"SYSMMU_FIMC3"	,
+-	"SYSMMU_JPEG"	,
+-	"SYSMMU_FIMD0"	,
+-	"SYSMMU_FIMD1"	,
+-	"SYSMMU_PCIe"	,
+-	"SYSMMU_G2D"	,
+-	"SYSMMU_ROTATOR",
+-	"SYSMMU_MDMA2"	,
+-	"SYSMMU_TV"	,
+-	"SYSMMU_MFC_L"	,
+-	"SYSMMU_MFC_R"	,
+-};
+ 
+-static struct resource exynos4_sysmmu_resource[] = {
+-	[0] = {
+-		.start	= EXYNOS4_PA_SYSMMU_MDMA,
+-		.end	= EXYNOS4_PA_SYSMMU_MDMA + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_SYSMMU_MDMA0_0,
+-		.end	= IRQ_SYSMMU_MDMA0_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[2] = {
+-		.start	= EXYNOS4_PA_SYSMMU_SSS,
+-		.end	= EXYNOS4_PA_SYSMMU_SSS + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[3] = {
+-		.start	= IRQ_SYSMMU_SSS_0,
+-		.end	= IRQ_SYSMMU_SSS_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[4] = {
+-		.start	= EXYNOS4_PA_SYSMMU_FIMC0,
+-		.end	= EXYNOS4_PA_SYSMMU_FIMC0 + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[5] = {
+-		.start	= IRQ_SYSMMU_FIMC0_0,
+-		.end	= IRQ_SYSMMU_FIMC0_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[6] = {
+-		.start	= EXYNOS4_PA_SYSMMU_FIMC1,
+-		.end	= EXYNOS4_PA_SYSMMU_FIMC1 + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[7] = {
+-		.start	= IRQ_SYSMMU_FIMC1_0,
+-		.end	= IRQ_SYSMMU_FIMC1_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[8] = {
+-		.start	= EXYNOS4_PA_SYSMMU_FIMC2,
+-		.end	= EXYNOS4_PA_SYSMMU_FIMC2 + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[9] = {
+-		.start	= IRQ_SYSMMU_FIMC2_0,
+-		.end	= IRQ_SYSMMU_FIMC2_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[10] = {
+-		.start	= EXYNOS4_PA_SYSMMU_FIMC3,
+-		.end	= EXYNOS4_PA_SYSMMU_FIMC3 + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[11] = {
+-		.start	= IRQ_SYSMMU_FIMC3_0,
+-		.end	= IRQ_SYSMMU_FIMC3_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[12] = {
+-		.start	= EXYNOS4_PA_SYSMMU_JPEG,
+-		.end	= EXYNOS4_PA_SYSMMU_JPEG + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[13] = {
+-		.start	= IRQ_SYSMMU_JPEG_0,
+-		.end	= IRQ_SYSMMU_JPEG_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[14] = {
+-		.start	= EXYNOS4_PA_SYSMMU_FIMD0,
+-		.end	= EXYNOS4_PA_SYSMMU_FIMD0 + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[15] = {
+-		.start	= IRQ_SYSMMU_LCD0_M0_0,
+-		.end	= IRQ_SYSMMU_LCD0_M0_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[16] = {
+-		.start	= EXYNOS4_PA_SYSMMU_FIMD1,
+-		.end	= EXYNOS4_PA_SYSMMU_FIMD1 + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[17] = {
+-		.start	= IRQ_SYSMMU_LCD1_M1_0,
+-		.end	= IRQ_SYSMMU_LCD1_M1_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[18] = {
+-		.start	= EXYNOS4_PA_SYSMMU_PCIe,
+-		.end	= EXYNOS4_PA_SYSMMU_PCIe + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[19] = {
+-		.start	= IRQ_SYSMMU_PCIE_0,
+-		.end	= IRQ_SYSMMU_PCIE_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[20] = {
+-		.start	= EXYNOS4_PA_SYSMMU_G2D,
+-		.end	= EXYNOS4_PA_SYSMMU_G2D + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[21] = {
+-		.start	= IRQ_SYSMMU_2D_0,
+-		.end	= IRQ_SYSMMU_2D_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[22] = {
+-		.start	= EXYNOS4_PA_SYSMMU_ROTATOR,
+-		.end	= EXYNOS4_PA_SYSMMU_ROTATOR + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[23] = {
+-		.start	= IRQ_SYSMMU_ROTATOR_0,
+-		.end	= IRQ_SYSMMU_ROTATOR_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[24] = {
+-		.start	= EXYNOS4_PA_SYSMMU_MDMA2,
+-		.end	= EXYNOS4_PA_SYSMMU_MDMA2 + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[25] = {
+-		.start	= IRQ_SYSMMU_MDMA1_0,
+-		.end	= IRQ_SYSMMU_MDMA1_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[26] = {
+-		.start	= EXYNOS4_PA_SYSMMU_TV,
+-		.end	= EXYNOS4_PA_SYSMMU_TV + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[27] = {
+-		.start	= IRQ_SYSMMU_TV_M0_0,
+-		.end	= IRQ_SYSMMU_TV_M0_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[28] = {
+-		.start	= EXYNOS4_PA_SYSMMU_MFC_L,
+-		.end	= EXYNOS4_PA_SYSMMU_MFC_L + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[29] = {
+-		.start	= IRQ_SYSMMU_MFC_M0_0,
+-		.end	= IRQ_SYSMMU_MFC_M0_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[30] = {
+-		.start	= EXYNOS4_PA_SYSMMU_MFC_R,
+-		.end	= EXYNOS4_PA_SYSMMU_MFC_R + SZ_64K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[31] = {
+-		.start	= IRQ_SYSMMU_MFC_M1_0,
+-		.end	= IRQ_SYSMMU_MFC_M1_0,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
++static u64 exynos_sysmmu_dma_mask = DMA_BIT_MASK(32);
++
++#define SYSMMU_PLATFORM_DEVICE(ipname, devid)				\
++static struct sysmmu_platform_data platdata_##ipname = {		\
++	.dbgname = #ipname,						\
++};									\
++struct platform_device SYSMMU_PLATDEV(ipname) =				\
++{									\
++	.name		= SYSMMU_DEVNAME_BASE,				\
++	.id		= devid,					\
++	.dev		= {						\
++		.dma_mask		= &exynos_sysmmu_dma_mask,	\
++		.coherent_dma_mask	= DMA_BIT_MASK(32),		\
++		.platform_data		= &platdata_##ipname,		\
++	},								\
++}
++
++SYSMMU_PLATFORM_DEVICE(mfc_l,	0);
++SYSMMU_PLATFORM_DEVICE(mfc_r,	1);
++SYSMMU_PLATFORM_DEVICE(tv,	2);
++SYSMMU_PLATFORM_DEVICE(jpeg,	3);
++SYSMMU_PLATFORM_DEVICE(rot,	4);
++SYSMMU_PLATFORM_DEVICE(fimc0,	5); /* fimc* and gsc* exist exclusively */
++SYSMMU_PLATFORM_DEVICE(fimc1,	6);
++SYSMMU_PLATFORM_DEVICE(fimc2,	7);
++SYSMMU_PLATFORM_DEVICE(fimc3,	8);
++SYSMMU_PLATFORM_DEVICE(gsc0,	5);
++SYSMMU_PLATFORM_DEVICE(gsc1,	6);
++SYSMMU_PLATFORM_DEVICE(gsc2,	7);
++SYSMMU_PLATFORM_DEVICE(gsc3,	8);
++SYSMMU_PLATFORM_DEVICE(isp,	9);
++SYSMMU_PLATFORM_DEVICE(fimd0,	10);
++SYSMMU_PLATFORM_DEVICE(fimd1,	11);
++SYSMMU_PLATFORM_DEVICE(camif0,	12);
++SYSMMU_PLATFORM_DEVICE(camif1,	13);
++SYSMMU_PLATFORM_DEVICE(2d,	14);
++
++#define SYSMMU_RESOURCE_NAME(core, ipname) sysmmures_##core##_##ipname
++
++#define SYSMMU_RESOURCE(core, ipname)					\
++	static struct resource SYSMMU_RESOURCE_NAME(core, ipname)[] __initdata =
++
++#define DEFINE_SYSMMU_RESOURCE(core, mem, irq)				\
++	DEFINE_RES_MEM_NAMED(core##_PA_SYSMMU_##mem, SZ_4K, #mem),	\
++	DEFINE_RES_IRQ_NAMED(core##_IRQ_SYSMMU_##irq##_0, #mem)
++
++#define SYSMMU_RESOURCE_DEFINE(core, ipname, mem, irq)			\
++	SYSMMU_RESOURCE(core, ipname) {					\
++		DEFINE_SYSMMU_RESOURCE(core, mem, irq)			\
++	}
+ 
+-struct platform_device exynos4_device_sysmmu = {
+-	.name		= "s5p-sysmmu",
+-	.id		= 32,
+-	.num_resources	= ARRAY_SIZE(exynos4_sysmmu_resource),
+-	.resource	= exynos4_sysmmu_resource,
++struct sysmmu_resource_map {
++	struct platform_device *pdev;
++	struct resource *res;
++	u32 rnum;
++	struct device *pdd;
++	char *clocknames;
+ };
+-EXPORT_SYMBOL(exynos4_device_sysmmu);
+ 
+-static struct clk *sysmmu_clk[S5P_SYSMMU_TOTAL_IPNUM];
+-void sysmmu_clk_init(struct device *dev, sysmmu_ips ips)
 -{
--	if (p->is_write)
--		vcpu->arch.cp15[cp15_reg] = *vcpu_reg(vcpu, p->Rt1);
+-	sysmmu_clk[ips] = clk_get(dev, sysmmu_ips_name[ips]);
+-	if (IS_ERR(sysmmu_clk[ips]))
+-		sysmmu_clk[ips] = NULL;
 -	else
--		*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[cp15_reg];
--}
--
- static void print_cp_instr(const struct coproc_params *p)
- {
-+	/* Look, we even formatted it for you to paste into the table! */
- 	if (p->is_64bit) {
--		kvm_debug("%s\tp15, %lu, r%lu, r%lu, c%lu",
--			  (p->is_write) ? "mcrr" : "mrrc",
--			  p->Op1, p->Rt1, p->Rt2, p->CRm);
-+		kvm_debug("{ .is_64bit = true, .is_write = %s, .param ="
-+			  " { .CRm = %lu, .Op1 = %lu } }",
-+			  p->is_write ? "true" : "false", p->CRm, p->Op1);
- 	} else {
--		kvm_debug("%s\tp15, %lu, r%lu, c%lu, c%lu, %lu",
--			  (p->is_write) ? "mcr" : "mrc",
--			  p->Op1, p->Rt1, p->CRn, p->CRm, p->Op2);
-+		kvm_debug("{ .is_64bit = false, .is_write = %s, .param ="
-+			  " { .CRn = %lu, .CRm = %lu,"
-+			  " .Op1 = %lu, .Op2 = %lu } }",
-+			  p->is_write ? "true" : "false",
-+			  p->CRn, p->CRm, p->Op1, p->Op2);
- 	}
+-		clk_put(sysmmu_clk[ips]);
++#define SYSMMU_RESOURCE_MAPPING(core, ipname, resname) {		\
++	.pdev = &SYSMMU_PLATDEV(ipname),				\
++	.res = SYSMMU_RESOURCE_NAME(EXYNOS##core, resname),		\
++	.rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
++	.clocknames = SYSMMU_CLOCK_NAME,				\
  }
  
-@@ -207,139 +201,150 @@ int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return -EINVAL;
- }
- 
--/**
-- * emulate_cp15_c9_access -- emulates cp15 accesses for CRn == 9
-- * @vcpu: The VCPU pointer
-- * @p:    The coprocessor parameters struct pointer holding trap inst. details
-- */
--static bool emulate_cp15_c9_access(struct kvm_vcpu *vcpu,
--				   const struct coproc_params *p)
-+static bool ignore_write(struct kvm_vcpu *vcpu,
-+			 const struct coproc_params *p,
-+			 unsigned long arg)
- {
--	BUG_ON(p->CRn != 9);
--	BUG_ON(p->is_64bit);
--
--	if (p->CRm == 0 && p->Op1 == 1 && p->Op2 == 2) {
--		/* Emulate L2CTLR access */
--		u32 l2ctlr, ncores;
-+	if (arg)
-+		trace_kvm_emulate_cp15_imp(p->Op1, p->Rt1, p->CRn, p->CRm,
-+					   p->Op2, p->is_write);
-+	return true;
+-void sysmmu_clk_enable(sysmmu_ips ips)
+-{
+-	if (sysmmu_clk[ips])
+-		clk_enable(sysmmu_clk[ips]);
++#define SYSMMU_RESOURCE_MAPPING_MC(core, ipname, resname, pdata) {	\
++	.pdev = &SYSMMU_PLATDEV(ipname),				\
++	.res = SYSMMU_RESOURCE_NAME(EXYNOS##core, resname),		\
++	.rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
++	.clocknames = SYSMMU_CLOCK_NAME "," SYSMMU_CLOCK_NAME2,		\
 +}
- 
--		if (p->is_write)
--			return true;
-+static bool read_zero(struct kvm_vcpu *vcpu,
-+		      const struct coproc_params *p,
-+		      unsigned long arg)
-+{
-+	if (arg)
-+		trace_kvm_emulate_cp15_imp(p->Op1, p->Rt1, p->CRn, p->CRm,
-+					   p->Op2, p->is_write);
-+	*vcpu_reg(vcpu, p->Rt1) = 0;
-+	return true;
-+}
- 
--		asm volatile("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
--		l2ctlr &= ~(3 << 24);
--		ncores = atomic_read(&vcpu->kvm->online_vcpus) - 1;
--		l2ctlr |= (ncores & 3) << 24;
--		*vcpu_reg(vcpu, p->Rt1) = l2ctlr;
-+static bool read_l2ctlr(struct kvm_vcpu *vcpu,
-+			const struct coproc_params *p,
-+			unsigned long arg)
-+{
-+	u32 l2ctlr, ncores;
- 
--		return true;
--	}
-+	asm volatile("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (l2ctlr));
-+	l2ctlr &= ~(3 << 24);
-+	ncores = atomic_read(&vcpu->kvm->online_vcpus) - 1;
-+	l2ctlr |= (ncores & 3) << 24;
-+	*vcpu_reg(vcpu, p->Rt1) = l2ctlr;
- 
--	/* hack alert!!! */
--	if (!p->is_write)
--		*vcpu_reg(vcpu, p->Rt1) = 0;
- 	return true;
- }
- 
--/**
-- * emulate_cp15_c10_access -- emulates cp15 accesses for CRn == 10
-- * @vcpu: The VCPU pointer
-- * @p:    The coprocessor parameters struct pointer holding trap inst. details
-- *
-- * This function may not need to exist - if we can ignore guest attempts to
-- * tamper with TLB lockdowns then it should be enough to store/restore the
-- * host/guest PRRR and NMRR memory remap registers and allow guest direct access
-- * to these registers.
-- */
--static bool emulate_cp15_c10_access(struct kvm_vcpu *vcpu,
--				    const struct coproc_params *p)
-+static bool access_cp15_reg(struct kvm_vcpu *vcpu,
-+			    const struct coproc_params *p,
-+			    unsigned long cp15_reg)
- {
--	BUG_ON(p->CRn != 10);
--	BUG_ON(p->is_64bit);
--
--	if ((p->CRm == 0 || p->CRm == 1 || p->CRm == 4 || p->CRm == 8) &&
--	    (p->Op2 <= 7)) {
--		/* TLB Lockdown operations - ignored */
--		return true;
--	}
-+	if (p->is_write)
-+		vcpu->arch.cp15[cp15_reg] = *vcpu_reg(vcpu, p->Rt1);
-+	else
-+		*vcpu_reg(vcpu, p->Rt1) = vcpu->arch.cp15[cp15_reg];
-+	return true;
-+}
- 
--	/*
--	 * The role of these registers depends on whether LPAE is defined or
--	 * not, but there shouldn't be any breakage in any case - we may
--	 * simply not respect the nomenclature here.
--	 */
- 
--	if (p->CRm == 2 && p->Op1 == 0 && p->Op2 == 0) {
--		cp15_op(vcpu, p, c10_PRRR);
--		return true;
--	}
-+/* Any field which is 0xFFFFFFFF == any. */
-+#define ANY (-1UL)
-+struct coproc_emulate {
-+	unsigned long is_64;
-+	unsigned long is_w;
-+	struct {
-+		unsigned long CRm;
-+		unsigned long CRn;
-+		unsigned long Op1;
-+		unsigned long Op2;
-+	} param;
 +
-+	bool (*f)(struct kvm_vcpu *,
-+		  const struct coproc_params *,
-+		  unsigned long);
-+	unsigned long arg;
++#ifdef CONFIG_EXYNOS_DEV_PD
++#define SYSMMU_RESOURCE_MAPPING_PD(core, ipname, resname, pd) {		\
++	.pdev = &SYSMMU_PLATDEV(ipname),				\
++	.res = &SYSMMU_RESOURCE_NAME(EXYNOS##core, resname),		\
++	.rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
++	.clocknames = SYSMMU_CLOCK_NAME,				\
++	.pdd = &exynos##core##_device_pd[pd].dev,			\
++}
++
++#define SYSMMU_RESOURCE_MAPPING_MCPD(core, ipname, resname, pd, pdata) {\
++	.pdev = &SYSMMU_PLATDEV(ipname),				\
++	.res = &SYSMMU_RESOURCE_NAME(EXYNOS##core, resname),		\
++	.rnum = ARRAY_SIZE(SYSMMU_RESOURCE_NAME(EXYNOS##core, resname)),\
++	.clocknames = SYSMMU_CLOCK_NAME "," SYSMMU_CLOCK_NAME2,		\
++	.pdd = &exynos##core##_device_pd[pd].dev,			\
+ }
++#else
++#define SYSMMU_RESOURCE_MAPPING_PD(core, ipname, resname, pd)		\
++		SYSMMU_RESOURCE_MAPPING(core, ipname, resname)
++#define SYSMMU_RESOURCE_MAPPING_MCPD(core, ipname, resname, pd, pdata)	\
++		SYSMMU_RESOURCE_MAPPING_MC(core, ipname, resname, pdata)
++
++#endif /* CONFIG_EXYNOS_DEV_PD */
++
++#ifdef CONFIG_ARCH_EXYNOS4
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc0,	FIMC0,	FIMC0);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc1,	FIMC1,	FIMC1);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc2,	FIMC2,	FIMC2);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimc3,	FIMC3,	FIMC3);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, jpeg,	JPEG,	JPEG);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, 2d,	G2D,	2D);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, tv,	TV,	TV_M0);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, 2d_acp,	2D_ACP,	2D);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, rot,	ROTATOR, ROTATOR);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimd0,	FIMD0,	LCD0_M0);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, fimd1,	FIMD1,	LCD1_M1);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, flite0,	FIMC_LITE0, FIMC_LITE0);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, flite1,	FIMC_LITE1, FIMC_LITE1);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, mfc_r,	MFC_R,	MFC_M0);
++SYSMMU_RESOURCE_DEFINE(EXYNOS4, mfc_l,	MFC_L,	MFC_M1);
++SYSMMU_RESOURCE(EXYNOS4, isp) {
++	DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_ISP, FIMC_ISP),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_DRC, FIMC_DRC),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS4, FIMC_FD, FIMC_FD),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS4, ISPCPU, FIMC_CX),
 +};
- 
--	if (p->CRm == 2 && p->Op1 == 0 && p->Op2 == 1) {
--		cp15_op(vcpu, p, c10_NMRR);
--		return true;
--	}
- 
--	return false;
--}
-+static const struct coproc_emulate coproc_emulate[] = {
-+	/* Ignore writes to L2CTLR access */
-+	{ .is_64 = false, .is_w = true, .f = ignore_write,
-+	  .param = { .CRn = 9, .CRm = 0, .Op1 = 1, .Op2 = 2 } },
-+	{ .is_64 = false, .is_w = false, .f = read_l2ctlr,
-+	  .param = { .CRn = 9, .CRm = 0, .Op1 = 1, .Op2 = 2 } },
-+	/* Hack alert!!! */
-+	{ .is_64 = false, .is_w = true, .f = ignore_write,
-+	  .param = { .CRn = 9, .CRm = ANY, .Op1 = ANY, .Op2 = ANY } },
-+	{ .is_64 = false, .is_w = false, .f = read_zero,
-+	  .param = { .CRn = 9, .CRm = ANY, .Op1 = ANY, .Op2 = ANY } },
 +
-+	/* These CRn == 10 entries may not need to exist - if we can
-+	 * ignore guest attempts to tamper with TLB lockdowns then it
-+	 * should be enough to store/restore the host/guest PRRR and
-+	 * NMRR memory remap registers and allow guest direct access
-+	 * to these registers. */
-+	/* TLB Lockdown operations - ignored */
-+	{ .is_64 = false, .is_w = true, .f = ignore_write,
-+	  .param = { .CRn = 10, .CRm = 0, .Op1 = ANY, .Op2 = ANY } },
-+	{ .is_64 = false, .is_w = ANY, .f = access_cp15_reg,
-+	  .arg = c10_PRRR,
-+	  .param = { .CRn = 10, .CRm = 2, .Op1 = 0, .Op2 = 0 } },
-+	{ .is_64 = false, .is_w = ANY, .f = access_cp15_reg,
-+	  .arg = c10_NMRR,
-+	  .param = { .CRn = 10, .CRm = 2, .Op1 = 0, .Op2 = 1 } },
-+
-+	/* The CP15 c15 register is architecturally implementation
-+	 * defined, but some guest kernels attempt to read/write a
-+	 * diagnostics register here. We always return 0 and ignore
-+	 * writes and hope for the best. */
-+	{ .is_64 = false, .is_w = true, .f = ignore_write, .arg = 1,
-+	  .param = { .CRn = 15, .CRm = ANY, .Op1 = ANY, .Op2 = ANY } },
-+	{ .is_64 = false, .is_w = false, .f = read_zero, .arg = 1,
-+	  .param = { .CRn = 15, .CRm = ANY, .Op1 = ANY, .Op2 = ANY } },
++static struct sysmmu_resource_map sysmmu_resmap4[] __initdata = {
++	SYSMMU_RESOURCE_MAPPING_PD(4, fimc0,	fimc0,	PD_CAM),
++	SYSMMU_RESOURCE_MAPPING_PD(4, fimc1,	fimc1,	PD_CAM),
++	SYSMMU_RESOURCE_MAPPING_PD(4, fimc2,	fimc2,	PD_CAM),
++	SYSMMU_RESOURCE_MAPPING_PD(4, fimc3,	fimc3,	PD_CAM),
++	SYSMMU_RESOURCE_MAPPING_PD(4, tv,	tv,	PD_TV),
++	SYSMMU_RESOURCE_MAPPING_PD(4, mfc_r,	mfc_r,	PD_MFC),
++	SYSMMU_RESOURCE_MAPPING_PD(4, mfc_l,	mfc_l,	PD_MFC),
++	SYSMMU_RESOURCE_MAPPING_PD(4, rot,	rot,	PD_LCD0),
++	SYSMMU_RESOURCE_MAPPING_PD(4, jpeg,	jpeg,	PD_CAM),
++	SYSMMU_RESOURCE_MAPPING_PD(4, fimd0,	fimd0,	PD_LCD0),
 +};
++
++static struct sysmmu_resource_map sysmmu_resmap4210[] __initdata = {
++	SYSMMU_RESOURCE_MAPPING_PD(4, 2d,	2d,	PD_LCD0),
++	SYSMMU_RESOURCE_MAPPING_PD(4, fimd1,	fimd1,	PD_LCD1),
++};
++
++static struct sysmmu_resource_map sysmmu_resmap4212[] __initdata = {
++	SYSMMU_RESOURCE_MAPPING(4,	2d,	2d_acp),
++	SYSMMU_RESOURCE_MAPPING_PD(4,	camif0, flite0,	PD_ISP),
++	SYSMMU_RESOURCE_MAPPING_PD(4,	camif1, flite1,	PD_ISP),
++	SYSMMU_RESOURCE_MAPPING_PD(4,	isp,	isp,	PD_ISP),
++};
++#endif /* CONFIG_ARCH_EXYNOS4 */
  
--/**
-- * emulate_cp15_c15_access -- emulates cp15 accesses for CRn == 15
-- * @vcpu: The VCPU pointer
-- * @p:    The coprocessor parameters struct pointer holding trap inst. details
-- *
-- * The CP15 c15 register is architecturally implementation defined, but some
-- * guest kernels attempt to read/write a diagnostics register here. We always
-- * return 0 and ignore writes and hope for the best.
-- *
-- * This may need to be refined.
-- */
--static bool emulate_cp15_c15_access(struct kvm_vcpu *vcpu,
--				    const struct coproc_params *p)
-+static inline bool match(unsigned long val, unsigned long param)
+-void sysmmu_clk_disable(sysmmu_ips ips)
++#ifdef CONFIG_ARCH_EXYNOS5
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, jpeg,	JPEG,	JPEG);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, fimd1,	FIMD1,	FIMD1);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, 2d,	2D,	2D);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, rot,	ROTATOR, ROTATOR);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, tv,	TV,	TV);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, flite0,	LITE0,	LITE0);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, flite1,	LITE1,	LITE1);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, gsc0,	GSC0,	GSC0);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, gsc1,	GSC1,	GSC1);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, gsc2,	GSC2,	GSC2);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, gsc3,	GSC3,	GSC3);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, mfc_r,	MFC_R,	MFC_R);
++SYSMMU_RESOURCE_DEFINE(EXYNOS5, mfc_l,	MFC_L,	MFC_L);
++SYSMMU_RESOURCE(EXYNOS5, isp) {
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, ISP, ISP),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, DRC, DRC),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, FD, FD),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, ISPCPU, MCUISP),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, SCALERC, SCALERCISP),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, SCALERP, SCALERPISP),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5,	ODC, ODC),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, DIS0, DIS0),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, DIS1, DIS1),
++	DEFINE_SYSMMU_RESOURCE(EXYNOS5, 3DNR, 3DNR),
++};
++
++static struct sysmmu_resource_map sysmmu_resmap5[] __initdata = {
++	SYSMMU_RESOURCE_MAPPING(5,	jpeg,	jpeg),
++	SYSMMU_RESOURCE_MAPPING(5,	fimd1,	fimd1),
++	SYSMMU_RESOURCE_MAPPING(5,	2d,	2d),
++	SYSMMU_RESOURCE_MAPPING(5,	rot,	rot),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	tv,	tv,	PD_DISP1),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	camif0,	flite0,	PD_GSCL),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	camif1,	flite1,	PD_GSCL),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	gsc0,	gsc0,	PD_GSCL),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	gsc1,	gsc1,	PD_GSCL),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	gsc2,	gsc2,	PD_GSCL),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	gsc3,	gsc3,	PD_GSCL),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	mfc_r,	mfc_r,	PD_MFC),
++	SYSMMU_RESOURCE_MAPPING_PD(5,	mfc_l,	mfc_l,	PD_MFC),
++	SYSMMU_RESOURCE_MAPPING_MCPD(5,	isp,	isp,	PD_ISP, mc_platdata),
++};
++#endif /* CONFIG_ARCH_EXYNOS5 */
++
++static int __init init_sysmmu_platform_device(void)
  {
--	trace_kvm_emulate_cp15_imp(p->Op1, p->Rt1, p->CRn, p->CRm,
--				   p->Op2, p->is_write);
--
--	if (!p->is_write)
--		*vcpu_reg(vcpu, p->Rt1) = 0;
--
--	return true;
-+	return param == ANY || val == param;
+-	if (sysmmu_clk[ips])
+-		clk_disable(sysmmu_clk[ips]);
++	int i, j;
++	struct sysmmu_resource_map *resmap[2] = {NULL, NULL};
++	int nmap[2] = {0, 0};
++
++#ifdef CONFIG_ARCH_EXYNOS5
++	if (soc_is_exynos5250()) {
++		resmap[0] = sysmmu_resmap5;
++		nmap[0] = ARRAY_SIZE(sysmmu_resmap5);
++		nmap[1] = 0;
++	}
++#endif
++
++#ifdef CONFIG_ARCH_EXYNOS4
++	if (resmap[0] == NULL) {
++		resmap[0] = sysmmu_resmap4;
++		nmap[0] = ARRAY_SIZE(sysmmu_resmap4);
++	}
++
++	if (soc_is_exynos4210()) {
++		resmap[1] = sysmmu_resmap4210;
++		nmap[1] = ARRAY_SIZE(sysmmu_resmap4210);
++	}
++
++	if (soc_is_exynos4412() || soc_is_exynos4212()) {
++		resmap[1] = sysmmu_resmap4212;
++		nmap[1] = ARRAY_SIZE(sysmmu_resmap4212);
++	}
++#endif
++
++	for (j = 0; j < 2; j++) {
++		for (i = 0; i < nmap[j]; i++) {
++			struct sysmmu_resource_map *map;
++			struct sysmmu_platform_data *platdata;
++
++			map = &resmap[j][i];
++
++			map->pdev->dev.parent = map->pdd;
++
++			platdata = map->pdev->dev.platform_data;
++			platdata->clockname = map->clocknames;
++
++			if (platform_device_add_resources(map->pdev, map->res,
++								map->rnum)) {
++				pr_err("%s: Failed to add device resources for "
++						"%s.%d\n", __func__,
++						map->pdev->name, map->pdev->id);
++				continue;
++			}
++
++			if (platform_device_register(map->pdev)) {
++				pr_err("%s: Failed to register %s.%d\n",
++					__func__, map->pdev->name,
++						map->pdev->id);
++			}
++		}
++	}
++
++	return 0;
  }
++arch_initcall(init_sysmmu_platform_device);
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 2fd2c25..60c5c81 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -131,23 +131,30 @@
+ #define COMBINER_GROUP(x)	((x) * MAX_IRQ_IN_COMBINER + IRQ_SPI(128))
+ #define COMBINER_IRQ(x, y)	(COMBINER_GROUP(x) + y)
  
- static int emulate_cp15(struct kvm_vcpu *vcpu,
- 			const struct coproc_params *params)
- {
--	unsigned long instr_len;
--	bool ok;
+-#define IRQ_SYSMMU_MDMA0_0	COMBINER_IRQ(4, 0)
+-#define IRQ_SYSMMU_SSS_0	COMBINER_IRQ(4, 1)
+-#define IRQ_SYSMMU_FIMC0_0	COMBINER_IRQ(4, 2)
+-#define IRQ_SYSMMU_FIMC1_0	COMBINER_IRQ(4, 3)
+-#define IRQ_SYSMMU_FIMC2_0	COMBINER_IRQ(4, 4)
+-#define IRQ_SYSMMU_FIMC3_0	COMBINER_IRQ(4, 5)
+-#define IRQ_SYSMMU_JPEG_0	COMBINER_IRQ(4, 6)
+-#define IRQ_SYSMMU_2D_0		COMBINER_IRQ(4, 7)
 -
--	/* So far no mrrc/mcrr accesses are emulated */
--	if (params->is_64bit)
--		goto unsupp_err_out;
--
--	switch (params->CRn) {
--	case 9:
--		ok = emulate_cp15_c9_access(vcpu, params);
--		break;
--	case 10:
--		ok = emulate_cp15_c10_access(vcpu, params);
--		break;
--	case 15:
--		ok = emulate_cp15_c15_access(vcpu, params);
--		break;
--	default:
--		ok = false;
-+	unsigned long instr_len, i;
+-#define IRQ_SYSMMU_ROTATOR_0	COMBINER_IRQ(5, 0)
+-#define IRQ_SYSMMU_MDMA1_0	COMBINER_IRQ(5, 1)
+-#define IRQ_SYSMMU_LCD0_M0_0	COMBINER_IRQ(5, 2)
+-#define IRQ_SYSMMU_LCD1_M1_0	COMBINER_IRQ(5, 3)
+-#define IRQ_SYSMMU_TV_M0_0	COMBINER_IRQ(5, 4)
+-#define IRQ_SYSMMU_MFC_M0_0	COMBINER_IRQ(5, 5)
+-#define IRQ_SYSMMU_MFC_M1_0	COMBINER_IRQ(5, 6)
+-#define IRQ_SYSMMU_PCIE_0	COMBINER_IRQ(5, 7)
++#define EXYNOS4_IRQ_SYSMMU_MDMA0_0	COMBINER_IRQ(4, 0)
++#define EXYNOS4_IRQ_SYSMMU_SSS_0	COMBINER_IRQ(4, 1)
++#define EXYNOS4_IRQ_SYSMMU_FIMC0_0	COMBINER_IRQ(4, 2)
++#define EXYNOS4_IRQ_SYSMMU_FIMC1_0	COMBINER_IRQ(4, 3)
++#define EXYNOS4_IRQ_SYSMMU_FIMC2_0	COMBINER_IRQ(4, 4)
++#define EXYNOS4_IRQ_SYSMMU_FIMC3_0	COMBINER_IRQ(4, 5)
++#define EXYNOS4_IRQ_SYSMMU_JPEG_0	COMBINER_IRQ(4, 6)
++#define EXYNOS4_IRQ_SYSMMU_2D_0		COMBINER_IRQ(4, 7)
 +
-+	for (i = 0; i < ARRAY_SIZE(coproc_emulate); i++) {
-+		const struct coproc_emulate *e = &coproc_emulate[i];
++#define EXYNOS4_IRQ_SYSMMU_ROTATOR_0	COMBINER_IRQ(5, 0)
++#define EXYNOS4_IRQ_SYSMMU_MDMA1_0	COMBINER_IRQ(5, 1)
++#define EXYNOS4_IRQ_SYSMMU_LCD0_M0_0	COMBINER_IRQ(5, 2)
++#define EXYNOS4_IRQ_SYSMMU_LCD1_M1_0	COMBINER_IRQ(5, 3)
++#define EXYNOS4_IRQ_SYSMMU_TV_M0_0	COMBINER_IRQ(5, 4)
++#define EXYNOS4_IRQ_SYSMMU_MFC_M0_0	COMBINER_IRQ(5, 5)
++#define EXYNOS4_IRQ_SYSMMU_MFC_M1_0	COMBINER_IRQ(5, 6)
++#define EXYNOS4_IRQ_SYSMMU_PCIE_0	COMBINER_IRQ(5, 7)
 +
-+		if (!match(params->is_64bit, e->is_64))
-+			continue;
-+		if (!match(params->is_write, e->is_w))
-+			continue;
-+		if (!match(params->CRn, e->param.CRn))
-+			continue;
-+		if (!match(params->CRm, e->param.CRm))
-+			continue;
-+		if (!match(params->Op1, e->param.Op1))
-+			continue;
-+		if (!match(params->Op2, e->param.Op2))
-+			continue;
-+
-+		/* If function fails, it should complain. */
-+		if (!e->f(vcpu, params, e->arg))
-+			goto fail;
-+
-+		/* Skip instruction, since it was emulated */
-+		instr_len = ((vcpu->arch.hsr >> 25) & 1) ? 4 : 2;
-+		*vcpu_reg(vcpu, 15) += instr_len;
-+		return 0;
- 	}
++#define EXYNOS4_IRQ_SYSMMU_FIMC_LITE0_0	COMBINER_IRQ(16, 0)
++#define EXYNOS4_IRQ_SYSMMU_FIMC_LITE1_0	COMBINER_IRQ(16, 1)
++#define EXYNOS4_IRQ_SYSMMU_FIMC_ISP_0	COMBINER_IRQ(16, 2)
++#define EXYNOS4_IRQ_SYSMMU_FIMC_DRC_0	COMBINER_IRQ(16, 3)
++#define EXYNOS4_IRQ_SYSMMU_FIMC_FD_0	COMBINER_IRQ(16, 4)
++#define EXYNOS4_IRQ_SYSMMU_FIMC_CX_0	COMBINER_IRQ(16, 5)
  
--	if (!ok)
--		goto unsupp_err_out;
--
--	/* Skip instruction, since it was emulated */
--	instr_len = ((vcpu->arch.hsr >> 25) & 1) ? 4 : 2;
--	*vcpu_reg(vcpu, 15) += instr_len;
--
--	return 0;
--
--unsupp_err_out:	
--	kvm_err("Unsupported guest CP15 access at: %08x\n", vcpu->arch.regs.pc);
-+	kvm_err("Unsupported guest CP15 access at: %08x\n",
-+		vcpu->arch.regs.pc);
- 	print_cp_instr(params);
-+fail:
- 	return -EINVAL;
- }
+ #define IRQ_FIMD0_FIFO		COMBINER_IRQ(11, 0)
+ #define IRQ_FIMD0_VSYNC		COMBINER_IRQ(11, 1)
+@@ -277,70 +284,70 @@
+ #define IRQ_PMU			COMBINER_IRQ(1, 2)
+ #define IRQ_PMU_CPU1		COMBINER_IRQ(1, 6)
  
+-#define IRQ_SYSMMU_GSC0_0	COMBINER_IRQ(2, 0)
+-#define IRQ_SYSMMU_GSC0_1	COMBINER_IRQ(2, 1)
+-#define IRQ_SYSMMU_GSC1_0	COMBINER_IRQ(2, 2)
+-#define IRQ_SYSMMU_GSC1_1	COMBINER_IRQ(2, 3)
+-#define IRQ_SYSMMU_GSC2_0	COMBINER_IRQ(2, 4)
+-#define IRQ_SYSMMU_GSC2_1	COMBINER_IRQ(2, 5)
+-#define IRQ_SYSMMU_GSC3_0	COMBINER_IRQ(2, 6)
+-#define IRQ_SYSMMU_GSC3_1	COMBINER_IRQ(2, 7)
+-
+-#define IRQ_SYSMMU_FIMD1_0	COMBINER_IRQ(3, 2)
+-#define IRQ_SYSMMU_FIMD1_1	COMBINER_IRQ(3, 3)
+-#define IRQ_SYSMMU_LITE0_0	COMBINER_IRQ(3, 4)
+-#define IRQ_SYSMMU_LITE0_1	COMBINER_IRQ(3, 5)
+-#define IRQ_SYSMMU_SCALERPISP_0	COMBINER_IRQ(3, 6)
+-#define IRQ_SYSMMU_SCALERPISP_1	COMBINER_IRQ(3, 7)
+-
+-#define IRQ_SYSMMU_ROTATOR_0	COMBINER_IRQ(4, 0)
+-#define IRQ_SYSMMU_ROTATOR_1	COMBINER_IRQ(4, 1)
+-#define IRQ_SYSMMU_JPEG_0	COMBINER_IRQ(4, 2)
+-#define IRQ_SYSMMU_JPEG_1	COMBINER_IRQ(4, 3)
+-
+-#define IRQ_SYSMMU_FD_0		COMBINER_IRQ(5, 0)
+-#define IRQ_SYSMMU_FD_1		COMBINER_IRQ(5, 1)
+-#define IRQ_SYSMMU_SCALERCISP_0	COMBINER_IRQ(5, 2)
+-#define IRQ_SYSMMU_SCALERCISP_1	COMBINER_IRQ(5, 3)
+-#define IRQ_SYSMMU_MCUISP_0	COMBINER_IRQ(5, 4)
+-#define IRQ_SYSMMU_MCUISP_1	COMBINER_IRQ(5, 5)
+-#define IRQ_SYSMMU_3DNR_0	COMBINER_IRQ(5, 6)
+-#define IRQ_SYSMMU_3DNR_1	COMBINER_IRQ(5, 7)
+-
+-#define IRQ_SYSMMU_ARM_0	COMBINER_IRQ(6, 0)
+-#define IRQ_SYSMMU_ARM_1	COMBINER_IRQ(6, 1)
+-#define IRQ_SYSMMU_MFC_L_0	COMBINER_IRQ(6, 2)
+-#define IRQ_SYSMMU_MFC_L_1	COMBINER_IRQ(6, 3)
+-#define IRQ_SYSMMU_RTIC_0	COMBINER_IRQ(6, 4)
+-#define IRQ_SYSMMU_RTIC_1	COMBINER_IRQ(6, 5)
+-#define IRQ_SYSMMU_SSS_0	COMBINER_IRQ(6, 6)
+-#define IRQ_SYSMMU_SSS_1	COMBINER_IRQ(6, 7)
+-
+-#define IRQ_SYSMMU_MDMA0_0	COMBINER_IRQ(7, 0)
+-#define IRQ_SYSMMU_MDMA0_1	COMBINER_IRQ(7, 1)
+-#define IRQ_SYSMMU_MDMA1_0	COMBINER_IRQ(7, 2)
+-#define IRQ_SYSMMU_MDMA1_1	COMBINER_IRQ(7, 3)
+-#define IRQ_SYSMMU_TV_0		COMBINER_IRQ(7, 4)
+-#define IRQ_SYSMMU_TV_1		COMBINER_IRQ(7, 5)
+-#define IRQ_SYSMMU_GPSX_0	COMBINER_IRQ(7, 6)
+-#define IRQ_SYSMMU_GPSX_1	COMBINER_IRQ(7, 7)
+-
+-#define IRQ_SYSMMU_MFC_R_0	COMBINER_IRQ(8, 5)
+-#define IRQ_SYSMMU_MFC_R_1	COMBINER_IRQ(8, 6)
+-
+-#define IRQ_SYSMMU_DIS1_0	COMBINER_IRQ(9, 4)
+-#define IRQ_SYSMMU_DIS1_1	COMBINER_IRQ(9, 5)
+-
+-#define IRQ_DP			COMBINER_IRQ(10, 3)
+-#define IRQ_SYSMMU_DIS0_0	COMBINER_IRQ(10, 4)
+-#define IRQ_SYSMMU_DIS0_1	COMBINER_IRQ(10, 5)
+-#define IRQ_SYSMMU_ISP_0	COMBINER_IRQ(10, 6)
+-#define IRQ_SYSMMU_ISP_1	COMBINER_IRQ(10, 7)
+-
+-#define IRQ_SYSMMU_ODC_0	COMBINER_IRQ(11, 0)
+-#define IRQ_SYSMMU_ODC_1	COMBINER_IRQ(11, 1)
+-#define IRQ_SYSMMU_DRC_0	COMBINER_IRQ(11, 6)
+-#define IRQ_SYSMMU_DRC_1	COMBINER_IRQ(11, 7)
++#define EXYNOS5_IRQ_SYSMMU_GSC0_0	COMBINER_IRQ(2, 0)
++#define EXYNOS5_IRQ_SYSMMU_GSC0_1	COMBINER_IRQ(2, 1)
++#define EXYNOS5_IRQ_SYSMMU_GSC1_0	COMBINER_IRQ(2, 2)
++#define EXYNOS5_IRQ_SYSMMU_GSC1_1	COMBINER_IRQ(2, 3)
++#define EXYNOS5_IRQ_SYSMMU_GSC2_0	COMBINER_IRQ(2, 4)
++#define EXYNOS5_IRQ_SYSMMU_GSC2_1	COMBINER_IRQ(2, 5)
++#define EXYNOS5_IRQ_SYSMMU_GSC3_0	COMBINER_IRQ(2, 6)
++#define EXYNOS5_IRQ_SYSMMU_GSC3_1	COMBINER_IRQ(2, 7)
++
++#define EXYNOS5_IRQ_SYSMMU_FIMD1_0	COMBINER_IRQ(3, 2)
++#define EXYNOS5_IRQ_SYSMMU_FIMD1_1	COMBINER_IRQ(3, 3)
++#define EXYNOS5_IRQ_SYSMMU_LITE0_0	COMBINER_IRQ(3, 4)
++#define EXYNOS5_IRQ_SYSMMU_LITE0_1	COMBINER_IRQ(3, 5)
++#define EXYNOS5_IRQ_SYSMMU_SCALERPISP_0	COMBINER_IRQ(3, 6)
++#define EXYNOS5_IRQ_SYSMMU_SCALERPISP_1	COMBINER_IRQ(3, 7)
++
++#define EXYNOS5_IRQ_SYSMMU_ROTATOR_0	COMBINER_IRQ(4, 0)
++#define EXYNOS5_IRQ_SYSMMU_ROTATOR_1	COMBINER_IRQ(4, 1)
++#define EXYNOS5_IRQ_SYSMMU_JPEG_0	COMBINER_IRQ(4, 2)
++#define EXYNOS5_IRQ_SYSMMU_JPEG_1	COMBINER_IRQ(4, 3)
++
++#define EXYNOS5_IRQ_SYSMMU_FD_0		COMBINER_IRQ(5, 0)
++#define EXYNOS5_IRQ_SYSMMU_FD_1		COMBINER_IRQ(5, 1)
++#define EXYNOS5_IRQ_SYSMMU_SCALERCISP_0	COMBINER_IRQ(5, 2)
++#define EXYNOS5_IRQ_SYSMMU_SCALERCISP_1	COMBINER_IRQ(5, 3)
++#define EXYNOS5_IRQ_SYSMMU_MCUISP_0	COMBINER_IRQ(5, 4)
++#define EXYNOS5_IRQ_SYSMMU_MCUISP_1	COMBINER_IRQ(5, 5)
++#define EXYNOS5_IRQ_SYSMMU_3DNR_0	COMBINER_IRQ(5, 6)
++#define EXYNOS5_IRQ_SYSMMU_3DNR_1	COMBINER_IRQ(5, 7)
++
++#define EXYNOS5_IRQ_SYSMMU_ARM_0	COMBINER_IRQ(6, 0)
++#define EXYNOS5_IRQ_SYSMMU_ARM_1	COMBINER_IRQ(6, 1)
++#define EXYNOS5_IRQ_SYSMMU_MFC_L_0	COMBINER_IRQ(6, 2)
++#define EXYNOS5_IRQ_SYSMMU_MFC_L_1	COMBINER_IRQ(6, 3)
++#define EXYNOS5_IRQ_SYSMMU_RTIC_0	COMBINER_IRQ(6, 4)
++#define EXYNOS5_IRQ_SYSMMU_RTIC_1	COMBINER_IRQ(6, 5)
++#define EXYNOS5_IRQ_SYSMMU_SSS_0	COMBINER_IRQ(6, 6)
++#define EXYNOS5_IRQ_SYSMMU_SSS_1	COMBINER_IRQ(6, 7)
++
++#define EXYNOS5_IRQ_SYSMMU_MDMA0_0	COMBINER_IRQ(7, 0)
++#define EXYNOS5_IRQ_SYSMMU_MDMA0_1	COMBINER_IRQ(7, 1)
++#define EXYNOS5_IRQ_SYSMMU_MDMA1_0	COMBINER_IRQ(7, 2)
++#define EXYNOS5_IRQ_SYSMMU_MDMA1_1	COMBINER_IRQ(7, 3)
++#define EXYNOS5_IRQ_SYSMMU_TV_0		COMBINER_IRQ(7, 4)
++#define EXYNOS5_IRQ_SYSMMU_TV_1		COMBINER_IRQ(7, 5)
++#define EXYNOS5_IRQ_SYSMMU_GPSX_0	COMBINER_IRQ(7, 6)
++#define EXYNOS5_IRQ_SYSMMU_GPSX_1	COMBINER_IRQ(7, 7)
++
++#define EXYNOS5_IRQ_SYSMMU_MFC_R_0	COMBINER_IRQ(8, 5)
++#define EXYNOS5_IRQ_SYSMMU_MFC_R_1	COMBINER_IRQ(8, 6)
++
++#define EXYNOS5_IRQ_SYSMMU_DIS1_0	COMBINER_IRQ(9, 4)
++#define EXYNOS5_IRQ_SYSMMU_DIS1_1	COMBINER_IRQ(9, 5)
++
++#define IRQ_DP				COMBINER_IRQ(10, 3)
++#define EXYNOS5_IRQ_SYSMMU_DIS0_0	COMBINER_IRQ(10, 4)
++#define EXYNOS5_IRQ_SYSMMU_DIS0_1	COMBINER_IRQ(10, 5)
++#define EXYNOS5_IRQ_SYSMMU_ISP_0	COMBINER_IRQ(10, 6)
++#define EXYNOS5_IRQ_SYSMMU_ISP_1	COMBINER_IRQ(10, 7)
++
++#define EXYNOS5_IRQ_SYSMMU_ODC_0	COMBINER_IRQ(11, 0)
++#define EXYNOS5_IRQ_SYSMMU_ODC_1	COMBINER_IRQ(11, 1)
++#define EXYNOS5_IRQ_SYSMMU_DRC_0	COMBINER_IRQ(11, 6)
++#define EXYNOS5_IRQ_SYSMMU_DRC_1	COMBINER_IRQ(11, 7)
+ 
+ #define IRQ_FIMD1_FIFO		COMBINER_IRQ(18, 4)
+ #define IRQ_FIMD1_VSYNC		COMBINER_IRQ(18, 5)
+@@ -354,11 +361,11 @@
+ #define IRQ_MCT_G2		COMBINER_IRQ(23, 5)
+ #define IRQ_MCT_G3		COMBINER_IRQ(23, 6)
+ 
+-#define IRQ_EINT1		COMBINER_IRQ(24, 0)
+-#define IRQ_SYSMMU_LITE1_0	COMBINER_IRQ(24, 1)
+-#define IRQ_SYSMMU_LITE1_1	COMBINER_IRQ(24, 2)
+-#define IRQ_SYSMMU_2D_0		COMBINER_IRQ(24, 5)
+-#define IRQ_SYSMMU_2D_1		COMBINER_IRQ(24, 6)
++#define IRQ_EINT1			COMBINER_IRQ(24, 0)
++#define EXYNOS5_IRQ_SYSMMU_LITE1_0	COMBINER_IRQ(24, 1)
++#define EXYNOS5_IRQ_SYSMMU_LITE1_1	COMBINER_IRQ(24, 2)
++#define EXYNOS5_IRQ_SYSMMU_2D_0		COMBINER_IRQ(24, 5)
++#define EXYNOS5_IRQ_SYSMMU_2D_1		COMBINER_IRQ(24, 6)
+ 
+ #define IRQ_EINT2		COMBINER_IRQ(25, 0)
+ #define IRQ_EINT3		COMBINER_IRQ(25, 1)
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index f28f5de..a687642 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -88,6 +88,7 @@
+ #define EXYNOS4_PA_PDMA1		0x12690000
+ 
+ #define EXYNOS4_PA_SYSMMU_MDMA		0x10A40000
++#define EXYNOS4_PA_SYSMMU_2D_ACP	0x10A40000
+ #define EXYNOS4_PA_SYSMMU_SSS		0x10A50000
+ #define EXYNOS4_PA_SYSMMU_FIMC0		0x11A20000
+ #define EXYNOS4_PA_SYSMMU_FIMC1		0x11A30000
+@@ -96,6 +97,12 @@
+ #define EXYNOS4_PA_SYSMMU_JPEG		0x11A60000
+ #define EXYNOS4_PA_SYSMMU_FIMD0		0x11E20000
+ #define EXYNOS4_PA_SYSMMU_FIMD1		0x12220000
++#define EXYNOS4_PA_SYSMMU_FIMC_ISP	0x12260000
++#define EXYNOS4_PA_SYSMMU_FIMC_DRC	0x12270000
++#define EXYNOS4_PA_SYSMMU_FIMC_FD	0x122A0000
++#define EXYNOS4_PA_SYSMMU_ISPCPU	0x122B0000
++#define EXYNOS4_PA_SYSMMU_FIMC_LITE0	0x123B0000
++#define EXYNOS4_PA_SYSMMU_FIMC_LITE1	0x123C0000
+ #define EXYNOS4_PA_SYSMMU_PCIe		0x12620000
+ #define EXYNOS4_PA_SYSMMU_G2D		0x12A20000
+ #define EXYNOS4_PA_SYSMMU_ROTATOR	0x12A30000
+@@ -103,6 +110,37 @@
+ #define EXYNOS4_PA_SYSMMU_TV		0x12E20000
+ #define EXYNOS4_PA_SYSMMU_MFC_L		0x13620000
+ #define EXYNOS4_PA_SYSMMU_MFC_R		0x13630000
++
++#define EXYNOS5_PA_SYSMMU_MDMA1		0x10A40000
++#define EXYNOS5_PA_SYSMMU_SSS		0x10A50000
++#define EXYNOS5_PA_SYSMMU_2D		0x10A60000
++#define EXYNOS5_PA_SYSMMU_MFC_L		0x11200000
++#define EXYNOS5_PA_SYSMMU_MFC_R		0x11210000
++#define EXYNOS5_PA_SYSMMU_ROTATOR	0x11D40000
++#define EXYNOS5_PA_SYSMMU_MDMA2		0x11D50000
++#define EXYNOS5_PA_SYSMMU_JPEG		0x11F20000
++#define EXYNOS5_PA_SYSMMU_IOP		0x12360000
++#define EXYNOS5_PA_SYSMMU_RTIC		0x12370000
++#define EXYNOS5_PA_SYSMMU_GPS		0x12630000
++#define EXYNOS5_PA_SYSMMU_ISP		0x13260000
++#define EXYNOS5_PA_SYSMMU_DRC		0x12370000
++#define EXYNOS5_PA_SYSMMU_SCALERC	0x13280000
++#define EXYNOS5_PA_SYSMMU_SCALERP	0x13290000
++#define EXYNOS5_PA_SYSMMU_FD		0x132A0000
++#define EXYNOS5_PA_SYSMMU_ISPCPU	0x132B0000
++#define EXYNOS5_PA_SYSMMU_ODC		0x132C0000
++#define EXYNOS5_PA_SYSMMU_DIS0		0x132D0000
++#define EXYNOS5_PA_SYSMMU_DIS1		0x132E0000
++#define EXYNOS5_PA_SYSMMU_3DNR		0x132F0000
++#define EXYNOS5_PA_SYSMMU_LITE0		0x13C40000
++#define EXYNOS5_PA_SYSMMU_LITE1		0x13C50000
++#define EXYNOS5_PA_SYSMMU_GSC0		0x13E80000
++#define EXYNOS5_PA_SYSMMU_GSC1		0x13E90000
++#define EXYNOS5_PA_SYSMMU_GSC2		0x13EA0000
++#define EXYNOS5_PA_SYSMMU_GSC3		0x13EB0000
++#define EXYNOS5_PA_SYSMMU_FIMD1		0x14640000
++#define EXYNOS5_PA_SYSMMU_TV		0x14650000
++
+ #define EXYNOS4_PA_SPI0			0x13920000
+ #define EXYNOS4_PA_SPI1			0x13930000
+ #define EXYNOS4_PA_SPI2			0x13940000
+diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
+index 113836b..de42145 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
+@@ -130,6 +130,9 @@
+ #define EXYNOS4_CLKGATE_SCLKCPU			EXYNOS_CLKREG(0x14800)
+ #define EXYNOS4_CLKGATE_IP_CPU			EXYNOS_CLKREG(0x14900)
+ 
++#define EXYNOS4_CLKGATE_IP_ISP0			EXYNOS_CLKREG(0x18800)
++#define EXYNOS4_CLKGATE_IP_ISP1			EXYNOS_CLKREG(0x18804)
++
+ #define EXYNOS4_APLL_LOCKTIME			(0x1C20)	/* 300us */
+ 
+ #define EXYNOS4_APLLCON0_ENABLE_SHIFT		(31)
+@@ -245,6 +248,8 @@
+ #define EXYNOS5_CLKDIV_PERIC0			EXYNOS_CLKREG(0x10558)
+ 
+ #define EXYNOS5_CLKGATE_IP_ACP			EXYNOS_CLKREG(0x08800)
++#define EXYNOS5_CLKGATE_IP_ISP0			EXYNOS_CLKREG(0x0C800)
++#define EXYNOS5_CLKGATE_IP_ISP1			EXYNOS_CLKREG(0x0C804)
+ #define EXYNOS5_CLKGATE_IP_GSCL			EXYNOS_CLKREG(0x10920)
+ #define EXYNOS5_CLKGATE_IP_DISP1		EXYNOS_CLKREG(0x10928)
+ #define EXYNOS5_CLKGATE_IP_MFC			EXYNOS_CLKREG(0x1092C)
+diff --git a/arch/arm/mach-exynos/include/mach/regs-sysmmu.h b/arch/arm/mach-exynos/include/mach/regs-sysmmu.h
+deleted file mode 100644
+index 68ff6ad..0000000
+--- a/arch/arm/mach-exynos/include/mach/regs-sysmmu.h
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/regs-sysmmu.h
+- *
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * EXYNOS4 - System MMU register
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_SYSMMU_H
+-#define __ASM_ARCH_REGS_SYSMMU_H __FILE__
+-
+-#define S5P_MMU_CTRL			0x000
+-#define S5P_MMU_CFG			0x004
+-#define S5P_MMU_STATUS			0x008
+-#define S5P_MMU_FLUSH			0x00C
+-#define S5P_PT_BASE_ADDR		0x014
+-#define S5P_INT_STATUS			0x018
+-#define S5P_INT_CLEAR			0x01C
+-#define S5P_PAGE_FAULT_ADDR		0x024
+-#define S5P_AW_FAULT_ADDR		0x028
+-#define S5P_AR_FAULT_ADDR		0x02C
+-#define S5P_DEFAULT_SLAVE_ADDR		0x030
+-
+-#endif /* __ASM_ARCH_REGS_SYSMMU_H */
+diff --git a/arch/arm/mach-exynos/include/mach/sysmmu.h b/arch/arm/mach-exynos/include/mach/sysmmu.h
+index 6a5fbb5..998daf2 100644
+--- a/arch/arm/mach-exynos/include/mach/sysmmu.h
++++ b/arch/arm/mach-exynos/include/mach/sysmmu.h
+@@ -1,46 +1,66 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/sysmmu.h
+- *
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
++/*
++ * Copyright (c) 2011-2012 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+- * Samsung sysmmu driver for EXYNOS4
++ * EXYNOS - System MMU support
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARM_ARCH_SYSMMU_H
+-#define __ASM_ARM_ARCH_SYSMMU_H __FILE__
+-
+-enum exynos4_sysmmu_ips {
+-	SYSMMU_MDMA,
+-	SYSMMU_SSS,
+-	SYSMMU_FIMC0,
+-	SYSMMU_FIMC1,
+-	SYSMMU_FIMC2,
+-	SYSMMU_FIMC3,
+-	SYSMMU_JPEG,
+-	SYSMMU_FIMD0,
+-	SYSMMU_FIMD1,
+-	SYSMMU_PCIe,
+-	SYSMMU_G2D,
+-	SYSMMU_ROTATOR,
+-	SYSMMU_MDMA2,
+-	SYSMMU_TV,
+-	SYSMMU_MFC_L,
+-	SYSMMU_MFC_R,
+-	EXYNOS4_SYSMMU_TOTAL_IPNUM,
++ */
++
++#ifndef _ARM_MACH_EXYNOS_SYSMMU_H_
++#define _ARM_MACH_EXYNOS_SYSMMU_H_
++
++struct sysmmu_platform_data {
++	char *dbgname;
++	/* comma(,) separated list of clock names for clock gating */
++	char *clockname;
+ };
+ 
+-#define S5P_SYSMMU_TOTAL_IPNUM		EXYNOS4_SYSMMU_TOTAL_IPNUM
++#define SYSMMU_DEVNAME_BASE "exynos-sysmmu"
++
++#define SYSMMU_CLOCK_NAME "sysmmu"
++#define SYSMMU_CLOCK_NAME2 "sysmmu_mc"
++
++#ifdef CONFIG_EXYNOS_DEV_SYSMMU
++#include <linux/device.h>
++struct platform_device;
++
++#define SYSMMU_PLATDEV(ipname) exynos_device_sysmmu_##ipname
++
++extern struct platform_device SYSMMU_PLATDEV(mfc_l);
++extern struct platform_device SYSMMU_PLATDEV(mfc_r);
++extern struct platform_device SYSMMU_PLATDEV(tv);
++extern struct platform_device SYSMMU_PLATDEV(jpeg);
++extern struct platform_device SYSMMU_PLATDEV(rot);
++extern struct platform_device SYSMMU_PLATDEV(fimc0);
++extern struct platform_device SYSMMU_PLATDEV(fimc1);
++extern struct platform_device SYSMMU_PLATDEV(fimc2);
++extern struct platform_device SYSMMU_PLATDEV(fimc3);
++extern struct platform_device SYSMMU_PLATDEV(gsc0);
++extern struct platform_device SYSMMU_PLATDEV(gsc1);
++extern struct platform_device SYSMMU_PLATDEV(gsc2);
++extern struct platform_device SYSMMU_PLATDEV(gsc3);
++extern struct platform_device SYSMMU_PLATDEV(isp);
++extern struct platform_device SYSMMU_PLATDEV(fimd0);
++extern struct platform_device SYSMMU_PLATDEV(fimd1);
++extern struct platform_device SYSMMU_PLATDEV(camif0);
++extern struct platform_device SYSMMU_PLATDEV(camif1);
++extern struct platform_device SYSMMU_PLATDEV(2d);
+ 
+-extern const char *sysmmu_ips_name[EXYNOS4_SYSMMU_TOTAL_IPNUM];
++#ifdef CONFIG_IOMMU_API
++static inline void platform_set_sysmmu(
++				struct device *sysmmu, struct device *dev)
++{
++	dev->archdata.iommu = sysmmu;
++}
++#endif
+ 
+-typedef enum exynos4_sysmmu_ips sysmmu_ips;
++#else /* !CONFIG_EXYNOS_DEV_SYSMMU */
++#define platform_set_sysmmu(dev, sysmmu) do { } while (0)
++#endif
+ 
+-void sysmmu_clk_init(struct device *dev, sysmmu_ips ips);
+-void sysmmu_clk_enable(sysmmu_ips ips);
+-void sysmmu_clk_disable(sysmmu_ips ips);
++#define SYSMMU_CLOCK_DEVNAME(ipname, id) (SYSMMU_DEVNAME_BASE "." #id)
+ 
+-#endif /* __ASM_ARM_ARCH_SYSMMU_H */
++#endif /* _ARM_MACH_EXYNOS_SYSMMU_H_ */
+diff --git a/arch/arm/mach-exynos/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
+index a1e7007..6ab171c 100644
+--- a/arch/arm/mach-exynos/mach-armlex4210.c
++++ b/arch/arm/mach-exynos/mach-armlex4210.c
+@@ -154,7 +154,6 @@ static struct platform_device *armlex4210_devices[] __initdata = {
+ 	&s3c_device_hsmmc3,
+ 	&s3c_device_rtc,
+ 	&s3c_device_wdt,
+-	&exynos4_device_sysmmu,
+ 	&samsung_asoc_dma,
+ 	&armlex4210_smsc911x,
+ 	&exynos4_device_ahci,
+diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
+index 2b71f18..49975ad 100644
+--- a/arch/arm/mach-exynos/mach-smdkv310.c
++++ b/arch/arm/mach-exynos/mach-smdkv310.c
+@@ -275,7 +275,6 @@ static struct platform_device *smdkv310_devices[] __initdata = {
+ 	&s5p_device_mfc_l,
+ 	&s5p_device_mfc_r,
+ 	&exynos4_device_spdif,
+-	&exynos4_device_sysmmu,
+ 	&samsung_asoc_dma,
+ 	&samsung_asoc_idma,
+ 	&s5p_device_fimd0,
+-- 
+1.7.1
