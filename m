@@ -1,78 +1,79 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 9 Mar 2012 08:57:20 +0100
-Subject: [PATCH v5 3/4] clk: introduce the common clock framework
-In-Reply-To: <20120308232549.GU3852@pengutronix.de>
-References: <20120303133158.GA26882@pengutronix.de>
- <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
- <20120304115201.GB26882@pengutronix.de>
- <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
- <20120305073836.GU3852@pengutronix.de>
- <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
- <20120306190039.GJ3852@pengutronix.de>
- <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
- <20120308062739.GE18513@lunn.ch>
- <20120308232549.GU3852@pengutronix.de>
-Message-ID: <20120309075720.GC16608@lunn.ch>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 9 Mar 2012 17:09:22 +0100
+Subject: [RFC] i.MX: drop secondary clocks
+In-Reply-To: <20314.5967.278184.187691@ipc1.ka-ro>
+References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
+ <20313.52782.832292.580932@ipc1.ka-ro>
+ <20120309102931.GY3852@pengutronix.de>
+ <20313.60910.420339.905973@ipc1.ka-ro>
+ <20120309142205.GF3852@pengutronix.de>
+ <20314.5967.278184.187691@ipc1.ka-ro>
+Message-ID: <20120309160922.GG3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'd say use the nonstatic ones. I think using the static initializers
-> will cause us much pain in the future. I've been through several rebases
-> on the i.MX clock rework and everytime I wish my sed foo would be
-> better. Now imagine what happens when it turns out that the internal
-> struct clk layout or the structs for the muxes/dividers/gates have to
-> be changed.
+On Fri, Mar 09, 2012 at 03:44:31PM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Sascha Hauer writes:
+> > On Fri, Mar 09, 2012 at 12:47:58PM +0100, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Sascha Hauer writes:
+> > > > On Fri, Mar 09, 2012 at 10:32:30AM +0100, Lothar Wa?mann wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > Sascha Hauer writes:
+> > > > > > Hi All,
+> > > > > > 
+> > > [...]
+> > > > > I think that's a bad idea! Drivers should not have to know intimate
+> > > > > details about the clock logic of the CPU core they are running on!
+> > > > 
+> > > > They don't have to. There really are different clocks connected to the
+> > > > devices. If for example you have a look eSDHC Block diagram in the
+> > > > reference Manual  you'll see that this has three clock inputs. All
+> > > > we do is to tell the driver about these three clocks which are device
+> > > > specific and not SoC specific. Which of these clocks are actually
+> > > > gatetable varies from SoC to SoC. Also on some SoCs two of the three
+> > > > clocks may be actually the same.
+> > > > 
+> > > At least this should be done in a way that is independent from the
+> > > name of the clock on a specific SoC, but is related to the function of
+> > > the clock for the driver. Thus instead of e.g. CLK_IPG and CLK_PER use
+> > > CLK_REG and CLK_BITRATE.
+> > 
+> > 'per', 'ipg' and 'ahb' seems to be a common pattern with all i.MXs. Only
+> > ahb is sometimes refered to as hclk. Do you also have a name for
+> > ahb/hclk? I don't insist on specific names, in the end they are just
+> > names and the pattern I used at least seems mostly consistent.
+> > 
+> CLK_BUS?
+> 
+> > I assume that any given device has a set of clocks as inputs which
+> > should get device specific names. It's the job of the clock tree
+> > to know which SoC clocks map to which device clocks. If now a newer
+> > UART block has an additional clock, then we would depending on the
+> > device id (fsl,imx7-uart) know that it requires the additional clock
+> > and request it.
+> > 
+> It's also not the business of a device driver to know any details
+> about clock dependencies on a specific SoC.
+> We probably really need a bus layer that can hide the details of the
+> bus architecture and their corresponding clocks from the device
+> drivers.
 
-/*****************************************************************************
- * CLK tree
- ****************************************************************************/
-static DEFINE_SPINLOCK(gating_lock);
+I agree there's room for improvements, but I don't want to make that a
+dependency for the generic clock support.
 
-#define DEFINE_KIRKWOOD_CLK_GATE(_name, _bit)                           \
-        DEFINE_CLK_GATE(_name, "tclk", NULL, 0,                         \
-                        (void __iomem *)CLOCK_GATING_CTRL,              \
-                        _bit, 0, &gating_lock)
+Does anyone know which clocks are really worth to be turned off for
+powermanement? I have no idea whether we really save power when we for
+example turn off aips_tz1_clk.
 
-DEFINE_KIRKWOOD_CLK_GATE(clk_ge0,    CGC_BIT_GE0);
-DEFINE_KIRKWOOD_CLK_GATE(clk_pex0,   CGC_BIT_PEX0);
-DEFINE_KIRKWOOD_CLK_GATE(clk_usb0,   CGC_BIT_USB0);
-DEFINE_KIRKWOOD_CLK_GATE(clk_sdio,   CGC_BIT_SDIO);
-DEFINE_KIRKWOOD_CLK_GATE(clk_tsu,    CGC_BIT_TSU);
-DEFINE_KIRKWOOD_CLK_GATE(clk_dunit,  CGC_BIT_DUNIT);
-DEFINE_KIRKWOOD_CLK_GATE(clk_runit,  CGC_BIT_RUNIT);
+Sascha
 
-I've so far not had any problems, and not needed an sed foo.  I do
-only have a dozen or so clocks, which helps. But even so, all the real
-pain is hidden inside DEFINE_CLK_GATE() which Mike maintains.
-
-I guess the problem comes when you are not using the basic clk
-providers, but your own provider. What might help is if
-linux/clk-provider.h could provide some macros to do most of the
-generic definitions. Something like:
-
-#define DEFINE_CLK_GENERIC(_name, _flags, _ops)                 \
-        static struct clk _name;                                \
-        static char *_name##_parent_names[] = {};               \
-        static struct clk _name = {                             \
-                .name = #_name,                                 \
-                .ops = &_ops,                                   \
-                .hw = &_name##_hw.hw,                           \
-                .parent_names = _name##_parent_names,           \
-                .num_parents =                                  \
-                        ARRAY_SIZE(_name##_parent_names),       \
-                .flags = _flags,                                \
-        };
-
-and then you have something like
-
-#define DEFINE_CLK_IMX(_name, _flags, _foo, _bar)               \
-        static struct clk_imx _name##_hw = {                    \
-                .hw = {                                         \
-                        .clk = &_name,                          \
-                },                                              \
-                .foo = _foo,                                    \
-                .bar = _bar,                                    \
-        };                                                      \
-	DEFINE_CLK_GENERIC(_name, _flags, clk_imx_ops)           
-
-	Andrew
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
