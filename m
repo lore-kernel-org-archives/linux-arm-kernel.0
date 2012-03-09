@@ -1,34 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Mar 2012 08:17:19 +0000
-Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
-In-Reply-To: <20120312030232.GX5050@titan.lakedaemon.net>
-References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
- <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
- <20120312030232.GX5050@titan.lakedaemon.net>
-Message-ID: <201203120817.19777.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 9 Mar 2012 12:41:19 +0000
+Subject: [PATCH v6 1/5] Extcon (external connector): import Android's
+ switch class and modify.
+In-Reply-To: <1330344939-18394-2-git-send-email-myungjoo.ham@samsung.com>
+References: <1328856038-21912-1-git-send-email-myungjoo.ham@samsung.com>
+ <1330344939-18394-1-git-send-email-myungjoo.ham@samsung.com>
+ <1330344939-18394-2-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <20120309124119.GV3273@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 March 2012, Jason Cooper wrote:
-> > +     dnskw_gpio_register(39, "dnskw:power:sata0", 1);
-> > +     dnskw_gpio_register(40, "dnskw:power:sata1", 1);
-> > +
-> > +     /* Set NAS to turn back on after a power failure */
-> > +     dnskw_gpio_register(37, "dnskw:power:recover", 1);
-> > +}
-> > +
-> 
-> I doubt this board is the only one that wants to be added while the
-> conversion to devicetree is progressing.  It makes more sense to me to
-> break the above out to a separate file, eg board-dnskw.c.  I'll follow
-> and break out the dreamplug code to board-dreamplug.c.  Otherwise, I see
-> board-dt.c becoming a long mess.
-> 
-> Arnd, sound okay to you?
+On Mon, Feb 27, 2012 at 09:15:35PM +0900, MyungJoo Ham wrote:
 
-Either way is fine with me. I personally wouldn't expect many more boards
-to come in before the DT conversion has mostly completed, but I guess you
-have a better feeling for what other hardware is out there that people
-are interested in.
+> +#ifdef CONFIG_ANDROID
+> +		extcon_class = class_create(THIS_MODULE, "switch");
+> +#else /* !CONFIG_ANDROID */
+> +		extcon_class = class_create(THIS_MODULE, "extcon");
+> +#endif /* CONFIG_ANDROID */
 
-	Arnd
+This seems somewhat sad - if ANDROID is turned on the standard ABI
+vanishes.  It'd be much nicer to do this with a symlink (or with
+symlinks within the android directory if the driver core doesn't support
+that).  That way userspace code can be written to the new ABI and will
+work on Android systems without ifdefery.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/a0180f35/attachment-0001.sig>
