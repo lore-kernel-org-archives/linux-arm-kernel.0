@@ -1,42 +1,48 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Fri, 09 Mar 2012 08:15:02 +0200
-Subject: [PATCH 0/2] ARM: OMAP2+: PM: code consolidation for 3.4
-In-Reply-To: <87d38mbxfu.fsf@ti.com>
-References: <20120202093600.12509.35052.stgit@dusk> <87ty39cc7s.fsf@ti.com>
- <alpine.DEB.2.00.1202021140060.586@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021328450.586@utopia.booyaka.com>
- <CAKd1q9rq67gUyXn+rOL348YwaYQiqHR8UQCSd68fpxhZHHsYGA@mail.gmail.com>
- <87sjhjaqyi.fsf@ti.com> <1331232433.18015.69.camel@cumari>
- <alpine.DEB.2.00.1203081153540.9551@utopia.booyaka.com>
- <1331233547.18015.74.camel@cumari> <87d38mbxfu.fsf@ti.com>
-Message-ID: <1331273702.18015.92.camel@cumari>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 08 Mar 2012 21:54:23 -0700
+Subject: [PATCH 00/11] ARM: tegra: Add PCIe device tree support
+In-Reply-To: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <20120309045423.F34F43E0903@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On Thu, 2012-03-08 at 13:21 -0800, Kevin Hilman wrote: 
-> Luciano Coelho <coelho@ti.com> writes:
+On Thu,  8 Mar 2012 15:51:20 +0100, Thierry Reding <thierry.reding@avionic-design.de> wrote:
+> This patch series adds support for device tree based probing of the PCIe
+> controller found on Tegra SoCs.
 > 
-> [...]
+> Patches 1 and 2 have already been posted by Grant and Mark respectively
+> but I've included them here for reference. Both patches are dependencies
+> for the subsequent patches.
 > 
-> > Thanks, Paul! I was just chatting with Kevin about this on IRC.  With
-> > your patch and no_console_suspend, it works. :)
+> Patches 3, 4 and 5 add support for obtaining the regulators required to
+> power the PCIe controller from the device tree. Patches 6 and 7 are
+> required to make some common PCI functions available after the init
+> phase because the deferred probing will postpone the probing of the PCIe
+> controller driver until that point.
 > 
-> Just FYI... I've queued this patch from Paul and it's now queued by Tony
-> for v3.4 in his cleanup-pm branch.
+> Patches 8 and 9 make the PCIe controller code available as a driver and
+> add the corresponding platform devices to the boards that enable PCIe
+> (Harmony and TrimSlice). Patch 10 adds MSI support and patch 11 finally
+> adds a device tree binding with documentation.
+> 
+> The code in patch 10 (MSI support) is based on the Vibrante kernel and I
+> wasn't able to get a proper Signed-off-by or even copyright information.
+> Perhaps somebody at NVIDIA can find out?
+> 
+> Thierry
+> 
+> Grant Likely (1):
+>   drivercore: Add driver probe deferral mechanism
+> 
+> Mark Brown (1):
+>   regulator: Support driver probe deferral
 
-Great, thanks for the info!
+Greg has picked up the drivercore patch, so the regulator one can be queued
+up too now.
 
-BTW, you and Paul said that it was not recommended to use
-no_console_suspend, but Ido (on CC) said that it can be useful for us,
-because we need to see if our own (wireless) stuff goes into suspend
-correctly.
-
-Are there any real problems with no_console_suspend besides power
-consumption? Is it safe for us to simply apply Paul's patch when we need
-it?
+g.
 
 -- 
-Cheers,
-Luca.
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
