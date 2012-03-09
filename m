@@ -1,26 +1,27 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 Mar 2012 23:51:05 -0700 (MST)
-Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and
- board data
-In-Reply-To: <20120309054608.647473E0901@localhost>
-References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
- <1329998490-27555-5-git-send-email-rnayak@ti.com>
- <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
- <20120224184859.GN18185@atomide.com> <20120309054608.647473E0901@localhost>
-Message-ID: <alpine.DEB.2.00.1203082348200.26656@utopia.booyaka.com>
+Date: Thu, 8 Mar 2012 21:27:27 -0700 (MST)
+Subject: [PATCH 00/12] ARM: OMAP2+: hwmod: remove link arrays
+In-Reply-To: <20120308023614.8205.78768.stgit@dusk>
+References: <20120308023614.8205.78768.stgit@dusk>
+Message-ID: <alpine.DEB.2.00.1203082123540.26656@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Mar 2012, Grant Likely wrote:
 
-> Yes, absolutely use separate compatible values.  It is always important
-> to be specific as to the silicon implementing the IP.
+This series has been rebased on top of a merge of the hwmod_misc_devel_3.4 
+branch and the hwmod_data_cleanup_3.4 branch, both previously posted.  
+Fortunately the auto-merger came up with something reasonable.  Patches 5 
+and 7 have been trivially updated to take account of the SmartReflex 
+changes.  The updated series has been posted at:
 
-In that case, it is probably best to use the full chip name in the 
-compatible string, e.g., omap2420 or omap2430 rather than just "omap2".  
-Particularly in the case of "OMAP3," which is a largely meaningless group 
-these days with AM33xx, OMAP34xx, OMAP36xx, and AM3517, many of which are 
-quite different from each other...
+http://www.pwsan.com/omap/patches-hwmod_remove_link_arrays_cleanup_3.4_2
+
+since the two patches that changed were the ones that were too big to make 
+it onto the lists.
+
+The updated branch is in the same place as before: 
+git://git.pwsan.com/linux-2.6 in the 
+'hwmod_remove_link_arrays_cleanup_3.4' branch.
 
 
 - Paul
