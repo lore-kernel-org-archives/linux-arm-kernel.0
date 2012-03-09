@@ -1,31 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 9 Mar 2012 09:51:30 +0800
-Subject: [PATCH v3 10/11] ASoC: fsl: let fsl_ssi work with imx pcm and
- machine drivers
-In-Reply-To: <20120308191526.GQ3852@pengutronix.de>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-11-git-send-email-shawn.guo@linaro.org>
- <20120308191526.GQ3852@pengutronix.de>
-Message-ID: <20120309015128.GI2499@S2101-09.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 8 Mar 2012 18:57:04 -0700 (MST)
+Subject: [GIT PULL] ARM: OMAP2+: hwmod data: cleanup in preparation for
+ link array removal
+In-Reply-To: <20120309014016.GC12083@atomide.com>
+References: <alpine.DEB.2.00.1203072102150.21662@utopia.booyaka.com>
+ <20120309014016.GC12083@atomide.com>
+Message-ID: <alpine.DEB.2.00.1203081851570.9551@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 08:15:26PM +0100, Sascha Hauer wrote:
-...
-> > @@ -796,6 +862,7 @@ static int fsl_ssi_remove(struct platform_device *pdev)
-> >  
-> >  static const struct of_device_id fsl_ssi_ids[] = {
-> >  	{ .compatible = "fsl,mpc8610-ssi", },
-> > +	{ .compatible = "fsl,imx1-ssi", },
-> 
-> imx1 seems wrong here. The register layout has changed significantly between
-> i.MX1 and i.MX21.
-> 
-Yeah, that's right.  You indeed know i.MX1 much better than me.  Will
-change to:
+Hi
 
-  .compatible = "fsl,imx21-ssi"
+On Thu, 8 Mar 2012, Tony Lindgren wrote:
 
--- 
-Regards,
-Shawn
+> Got these now merged into l-o master, but ran into a merge
+> conflict with already queued sr branch. Resolved it by using
+> your version except left out vdd_name.
+
+Definitely we want the vdd_name fields.  Other than that it looks okay.  
+
+> As the namings have changed for smartreflex, now I suspect it's broken 
+> for the interrupts..
+
+Hmm, not sure I understand that part?  AFAIK the SmartReflex code doesn't 
+rely on hwmod names.  Or are you talking about the vdd_name?
+
+
+- Paul
