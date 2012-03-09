@@ -1,125 +1,109 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 08 Mar 2012 22:42:13 -0700
-Subject: [PATCH v2 1/4] mmc: omap_hsmmc: Convert hsmmc driver to use
- device tree
-In-Reply-To: <1329998490-27555-2-git-send-email-rnayak@ti.com>
-References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
- <1329998490-27555-2-git-send-email-rnayak@ti.com>
-Message-ID: <20120309054213.9E69C3E0901@localhost>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 9 Mar 2012 15:22:05 +0100
+Subject: [RFC] i.MX: drop secondary clocks
+In-Reply-To: <20313.60910.420339.905973@ipc1.ka-ro>
+References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
+ <20313.52782.832292.580932@ipc1.ka-ro>
+ <20120309102931.GY3852@pengutronix.de>
+ <20313.60910.420339.905973@ipc1.ka-ro>
+Message-ID: <20120309142205.GF3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Feb 2012 17:31:27 +0530, Rajendra Nayak <rnayak@ti.com> wrote:
-> Define dt bindings for the ti-omap-hsmmc, and adapt
-> the driver to extract data (which was earlier passed as
-> platform_data) from device tree.
+On Fri, Mar 09, 2012 at 12:47:58PM +0100, Lothar Wa?mann wrote:
+> Hi,
 > 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   31 +++++++++
->  drivers/mmc/host/omap_hsmmc.c                      |   68 ++++++++++++++++++++
->  2 files changed, 99 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+> Sascha Hauer writes:
+> > On Fri, Mar 09, 2012 at 10:32:30AM +0100, Lothar Wa?mann wrote:
+> > > Hi,
+> > > 
+> > > Sascha Hauer writes:
+> > > > Hi All,
+> > > > 
+> [...]
+> > > I think that's a bad idea! Drivers should not have to know intimate
+> > > details about the clock logic of the CPU core they are running on!
+> > 
+> > They don't have to. There really are different clocks connected to the
+> > devices. If for example you have a look eSDHC Block diagram in the
+> > reference Manual  you'll see that this has three clock inputs. All
+> > we do is to tell the driver about these three clocks which are device
+> > specific and not SoC specific. Which of these clocks are actually
+> > gatetable varies from SoC to SoC. Also on some SoCs two of the three
+> > clocks may be actually the same.
+> > 
+> At least this should be done in a way that is independent from the
+> name of the clock on a specific SoC, but is related to the function of
+> the clock for the driver. Thus instead of e.g. CLK_IPG and CLK_PER use
+> CLK_REG and CLK_BITRATE.
+
+'per', 'ipg' and 'ahb' seems to be a common pattern with all i.MXs. Only
+ahb is sometimes refered to as hclk. Do you also have a name for
+ahb/hclk? I don't insist on specific names, in the end they are just
+names and the pattern I used at least seems mostly consistent.
+
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> new file mode 100644
-> index 0000000..e4fa8f0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -0,0 +1,31 @@
-> +* TI Highspeed MMC host controller for OMAP
-> +
-> +The Highspeed MMC Host Controller on TI OMAP family
-> +provides an interface for MMC, SD, and SDIO types of memory cards.
-> +
-> +Required properties:
-> +- compatible:
-> + Should be "ti,omap2-hsmmc", for OMAP2/3 controllers
-> + Should be "ti,omap4-hsmmc", for OMAP4 controllers
-> +- ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
-> +- reg : should contain hsmmc registers location and length
-> +
-> +Optional properties:
-> +ti,dual-volt: boolean, supports dual voltage cards
-> +<supply-name>-supply: phandle to the regulator device tree node
-> +"supply-name" examples are "vmmc", "vmmc_aux" etc
-> +ti,bus-width: Number of data lines, default assumed is 1 if the property is missing.
-> +cd-gpios: GPIOs for card detection
-> +wp-gpios: GPIOs for write protection
-> +ti,non-removable: non-removable slot (like eMMC)
+> > > They should simply request a clock for the unit they operate on and
+> > > the clock core code should figure out which other clocks need to be
+> > > enabled on a specific machine to get the unit working.
+> > 
+> > Yes, that's what we want to do, except that devices do not need 'a'
+> > clock but several. And the clock core figures out which other clocks
+> > have to be activated, these are the parent clocks.
+> > 
+> What about devices which have multiple 'parent' clocks that are
+> completely unrelated wrt. each other? In the current clock system you
+> can model this by having secondary clocks.
+> How would you represent the current structure on i.MX53:
+> uart_ipg_clk <- aips_tz1_clk <-+- ahb_clk
+>                                +-> ahb_max_clk
+> in the new model?
+> Should every driver have to request the ahb_max_clk in addition to the
+> uart_ipg_clk?
 
-Binding looks okay.  A couple comments below...
+No.
 
-[...]
-> +static const struct of_device_id omap_mmc_of_match[];
+The dependeny to the aips_tz1_clk comes in because the UART is behind
+the AIPS bridge. That's a dependency on bus topology level but not on clock
+topology level. If we really have to handle this then on bus level. The
+i.MX5 devicetree already shows this bus topology, it should be doable
+to hook drivers on fsl,aips-bus which handle the clock.
 
-If you move the omap_mmc_of_match[] table up to here then there is no
-need for the forward declaration.
+Unfortunately the documentation where these clocks are really used goes
+to zero and the FSL sourcecode is rather confusing in this area. I think
+we will learn more about it once we have something in the generic clock
+framework which disables the unused clocks.
 
-> +
->  static int __init omap_hsmmc_probe(struct platform_device *pdev)
->  {
->  	struct omap_mmc_platform_data *pdata = pdev->dev.platform_data;
-> @@ -1725,6 +1768,14 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
->  	struct omap_hsmmc_host *host = NULL;
->  	struct resource *res;
->  	int ret, irq;
-> +	const struct of_device_id *match;
-> +
-> +	match = of_match_device(omap_mmc_of_match, &pdev->dev);
-> +	if (match) {
-> +		pdata = of_get_hsmmc_pdata(&pdev->dev);
-> +		if (match->data)
-> +			pdata->reg_offset = *(u16 *)match->data;
-
-Blech on the ugly cast.  It is slightly safer to do thusly:
-
-	u16 *offsetp = match->data;
-	pdata->reg_offset = *offsetp
-
-> +	}
->  
->  	if (pdata == NULL) {
->  		dev_err(&pdev->dev, "Platform Data is missing\n");
-> @@ -2120,12 +2171,29 @@ static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
->  	.runtime_resume = omap_hsmmc_runtime_resume,
->  };
->  
-> +#if defined(CONFIG_OF)
-> +static u16 omap4_reg_offset = 0x100;
-> +
-> +static const struct of_device_id omap_mmc_of_match[] = {
-> +	{
-> +		.compatible = "ti,omap2-hsmmc",
-> +	},
-> +	{
-> +		.compatible = "ti,omap4-hsmmc",
-> +		.data = &omap4_reg_offset,
-> +	},
-> +	{},
-> +}
-> +MODULE_DEVICE_TABLE(of, omap_mmc_of_match);
-> +#endif
-> +
->  static struct platform_driver omap_hsmmc_driver = {
->  	.remove		= omap_hsmmc_remove,
->  	.driver		= {
->  		.name = DRIVER_NAME,
->  		.owner = THIS_MODULE,
->  		.pm = &omap_hsmmc_dev_pm_ops,
-> +		.of_match_table = of_match_ptr(omap_mmc_of_match),
->  	},
->  };
->  
-> -- 
-> 1.7.1
 > 
+> What, if you have a device on a number of SoCs with a certain set of
+> clocks, but on a later SoC another clock is required for the device?
+
+I assume that any given device has a set of clocks as inputs which
+should get device specific names. It's the job of the clock tree
+to know which SoC clocks map to which device clocks. If now a newer
+UART block has an additional clock, then we would depending on the
+device id (fsl,imx7-uart) know that it requires the additional clock
+and request it.
+
+> You would not only have to change the driver to add the new clock but
+> also would have to add that clock as a dummy clock in the core clock
+> code for all previous SoCs that did not provide that clock.
 > 
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
+> > I also don't really like exposing this to the drivers, but it's a clean
+> > way to do so. A framebuffer driver needs a pixel clock which must be
+> > enabled when the display is turned on. It may also have a register clock
+> > which has to be turned on when we want to access registers. These are
+> > two different clocks and the driver can make use of this (not that we
+> > currently do though...)
+> > 
+> But we could do so without any problem.
+
+Not without exposing the individual clocks to the devices.
+
+Sascha
 
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies,Ltd.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
