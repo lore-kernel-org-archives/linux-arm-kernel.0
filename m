@@ -1,41 +1,46 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 12 Mar 2012 11:40:06 +0530
-Subject: [PATCHv5 3/6] ARM: OMAP4 PM: Add IO Daisychain support
-In-Reply-To: <4F5D8F2A.1070602@ti.com>
-References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
- <1331046702-2472-4-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1203092051140.30879@utopia.booyaka.com>
- <4F5D8F2A.1070602@ti.com>
-Message-ID: <4F5D933E.2070200@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 9 Mar 2012 15:28:22 +0800
+Subject: [PATCH v3 00/11] ASoC: add imx-sgtl5000 machine driver working
+ with fsl_ssi
+In-Reply-To: <20120309071347.GM2499@S2101-09.ap.freescale.net>
+References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
+ <4F5910EE.8090408@freescale.com>
+ <20120309011914.GF2499@S2101-09.ap.freescale.net>
+ <4F5966DC.6090201@freescale.com>
+ <20120309071347.GM2499@S2101-09.ap.freescale.net>
+Message-ID: <CAAQ0ZWQHm+SZgDA6x93=Q9CxAqz6uVu1F2UPBc=zafrhT71D1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 March 2012 11:22 AM, Rajendra Nayak wrote:
+On 9 March 2012 15:13, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Fri, Mar 09, 2012 at 02:11:41AM +0000, Tabi Timur-B04825 wrote:
+>> Shawn Guo wrote:
+>> > Are you testing the patch set on top of the SHA below, which I
+>> > mentioned in the cover letter?
+>> >
+>> > ? ?3030763 (Merge tag 'asoc-3.4' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound into topic/asoc)
+>> >
+>> > I see the similar problem on the following SHA with my testing on
+>> > imx-sgtl5000.
+>> >
+>> > ? ?1a8feca (Merge branch 'for-3.4' into asoc-next)
 >>
->> From: Rajendra Nayak<rnayak@ti.com>
->> Date: Fri, 2 Mar 2012 17:17:52 +0200
->> Subject: [PATCH 3/6] ARM: OMAP4: PRM: Add IO Daisychain support
+>> It appears the problem is with for-3.4 itself. ?I'm running git-bisect now
+>> to narrow it down.
 >>
->> IO daisychain is a mechanism that allows individual IO pads to generate
->> wakeup events on their own based on a switch of an input signal level.
->> This allows the hardware module behind the pad to be powered down, but
->> still have device level capability to detect IO events, and once this
->> happens the module can be powered back up to resume IO. See section
->> 3.9.4 in OMAP4430 Public TRM for details.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com> is just bad
-> documentation.
+> My bisect tells that the offending commit is:
 >
->> Signed-off-by: Tero Kristo<t-kristo@ti.com>
->> [paul at pwsan.com: removed MAX_IOPAD_LATCH_TIME declaration; renamed
+> ?96acc35 (ASoC: DAPM: Make sure DAPM widget IO ops hold the component mutex)
 >
-> But the code below still seems to use it. Is it now defined in some
-> common header so the same value is used in omap3 and omap4?
+> But I do not understand why yet.
 
-never mind, just saw the other updates from you. The patches look good
-to me, except for the comment I add to add the second timeout back in
-omap3.
+=============================================
+[ INFO: possible recursive locking detected ]
+3.3.0-rc4+ #159 Not tainted
+---------------------------------------------
+aplay/395 is trying to acquire lock:
+ (&codec->mutex){+.+...}, at: [<802f7414>] soc_widget_update_bits_locked+0x88/0x
+1a0
 
-Tero, was there a specific reason you got rid of it for omap3 in your
-latest patch-set?
+but task is already holding lock:
+ (&codec->mutex){+.+...}, at: [<802f9df4>] snd_soc_dapm_stream_event+0x38/0xc0
