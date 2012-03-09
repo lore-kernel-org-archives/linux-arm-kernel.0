@@ -1,80 +1,76 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 09 Mar 2012 14:56:07 +0530
-Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board
- data
-In-Reply-To: <20120309054608.647473E0901@localhost>
-References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
- <1329998490-27555-5-git-send-email-rnayak@ti.com>
- <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
- <20120224184859.GN18185@atomide.com> <20120309054608.647473E0901@localhost>
-Message-ID: <4F59CCAF.1090806@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 9 Mar 2012 12:06:14 +0100
+Subject: [PATCH v6] ARM : mx35: 3ds-board: add framebuffer device
+In-Reply-To: <1331269521-20784-1-git-send-email-b39297@freescale.com>
+References: <1331269521-20784-1-git-send-email-b39297@freescale.com>
+Message-ID: <20120309110614.GC3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 March 2012 11:16 AM, Grant Likely wrote:
-> On Fri, 24 Feb 2012 10:49:00 -0800, Tony Lindgren<tony@atomide.com>  wrote:
->> * Rajendra Nayak<rnayak@ti.com>  [120223 19:29]:
->>> On Friday 24 February 2012 12:27 AM, Tony Lindgren wrote:
->>>>> --- a/arch/arm/boot/dts/omap3.dtsi
->>>>> +++ b/arch/arm/boot/dts/omap3.dtsi
->>>>> @@ -113,5 +113,31 @@
->>>>>   			#size-cells =<0>;
->>>>>   			ti,hwmods = "i2c3";
->>>>>   		};
->>>>> +
->>>>> +		mmc1: mmc at 1 {
->>>>> +			compatible = "ti,omap2-hsmmc";
->>>>> +			ti,hwmods = "mmc1";
->>>>> +			ti,dual-volt;
->>>>> +		};
->>>>> +
->>>>> +		mmc2: mmc at 2 {
->>>>> +			compatible = "ti,omap2-hsmmc";
->>>>> +			ti,hwmods = "mmc2";
->>>>> +		};
->>>>> +
->>>>> +		mmc3: mmc at 3 {
->>>>> +			compatible = "ti,omap2-hsmmc";
->>>>> +			ti,hwmods = "mmc3";
->>>>> +		};
->>>>> +
->>>>> +		mmc4: mmc at 4 {
->>>>> +			compatible = "ti,omap2-hsmmc";
->>>>> +			ti,hwmods = "mmc4";
->>>>> +		};
->>>>> +
->>>>> +		mmc5: mmc at 5 {
->>>>> +			compatible = "ti,omap2-hsmmc";
->>>>> +			ti,hwmods = "mmc5";
->>>>> +		};
->>>>>   	};
->>>>>   };
->>>>
->>>> These all should all be "ti,omap3-hsmmc" I guess?
->>>
->>> Well, I defined the binding such that both omap2 and omap3
->>> can use the same compatible "ti,omap2-hsmmc" since there is
->>> no difference in the way they are defined or handled. If thats
->>> confusing, I can have separate compatibles.
->>> Btw, I guess we do the same with a few other re-used IPs as well,
->>> I just checked and mcpsi does the same.
->>
->> Yeah let's use separate compatibles to avoid confusion.
->> For omap2 we also have the ti,omap2-mmc in addition to
->> ti,omap2-hsmmc..
->
-> Yes, absolutely use separate compatible values.  It is always important
-> to be specific as to the silicon implementing the IP.  The omap3 instance
-> can also carry the omap2 string in its compatible list:
->
-> 	compatible = "ti,omap3-hsmmc", "ti,omap2-hsmmc";
+On Fri, Mar 09, 2012 at 01:05:21PM +0800, Wu Guoxing wrote:
+> From: wu guoxing <b39297@freescale.com>
+> 
+> This patch adds framebuffer support for freescale mx35 3ds board
+> 
+> Signed-off-by: Wu Guoxing <b39297@freescale.com>
+> 
+>  arch/arm/mach-imx/mach-mx35_3ds.c |  121 +++++++++++++++++++++++++++++++++++++
+>  1 files changed, 121 insertions(+), 0 deletions(-)
+> 
+> +static int lcd_power_gpio = -ENXIO;
+> +
+> +static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
+> +						     void *data)
+> +{
+> +	return !strcmp(chip->label, data);
+> +}
+> +
+> +static int mc9s08dz60_lcd_gpio_get(void)
+> +{
+> +	struct gpio_chip *chip;
+> +
+> +	if (!gpio_is_valid(lcd_power_gpio)) {
+> +		chip = gpiochip_find(
+> +				"mc9s08dz60", mc9s08dz60_gpiochip_match);
+> +		if (chip) {
+> +			lcd_power_gpio = chip->base + 6;
+> +			if (gpio_request(lcd_power_gpio, "lcd_power") < 0) {
+> +				pr_err("error: gpio already requested by other!\n");
+> +				lcd_power_gpio = -ENXIO;
+> +			}
+> +		} else {
+> +			pr_err("error: didn't find mc9s08dz60 gpio chip\n");
+> +			lcd_power_gpio = -ENXIO;
+> +		}
+> +	}
+> +
+> +	return lcd_power_gpio;
+> +}
+> +
+> +static void mx35_3ds_lcd_set_power(struct plat_lcd_data *pd, unsigned int power)
+> +{
+> +	int gpio;
+> +
+> +	gpio = mc9s08dz60_lcd_gpio_get();
+> +	if (gpio_is_valid(gpio))
+> +		gpio_set_value_cansleep(gpio, power);
+> +}
 
-Sure, will repost with seperate compatible strings. Also missed adding
-the 'status = "disable";' for unused mmc blocks in the board .dts file
-causing unused mmc modules to get probed too. Will fix that as well.
+This looks unnecessary complicated. Please fold mc9s08dz60_lcd_gpio_get
+into mx35_3ds_lcd_set_power:
 
-thanks,
-Rajendra
+	if (!gpio_is_valid()) {
+		request()
+	}
 
->
-> g.
+	if (gpio_is_valid()) {
+		set_value()
+	}
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
