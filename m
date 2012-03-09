@@ -1,55 +1,105 @@
-From: thomas@codesourcery.com (Thomas Schwinge)
-Date: Fri, 9 Mar 2012 17:38:51 +0100
-Subject: [PATCH 5/7] USB: r8a66597-hcd: restore big-endian operation.
-In-Reply-To: <1331311133-26937-1-git-send-email-thomas@codesourcery.com>
-References: <1331311133-26937-1-git-send-email-thomas@codesourcery.com>
-Message-ID: <1331311133-26937-5-git-send-email-thomas@codesourcery.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 9 Mar 2012 17:39:32 +0100
+Subject: [PATCH 08/12] gpio/twl: Allocate irq_desc dynamically for
+ SPARSE_IRQ support
+In-Reply-To: <4F575B21.30909@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-9-git-send-email-b-cousson@ti.com> <4F575B21.30909@ti.com>
+Message-ID: <4F5A3244.3080109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On SH, as of 37b7a97884ba64bf7d403351ac2a9476ab4f1bba we have to use the
-endianess-agnostic I/O accessor functions.
+Hi Grant,
 
-This driver is also enabled in ARM's viper_defconfig as well as MIPS'
-bcm47xx_defconfig and fuloong2e_defconfig -- I suppose none of these are
-operating in big-endian mode, or this issue should already have been noticed
-before.
+Gentle ping for these patches.
 
-The device is now recognized correctly for both litte-endian and big-endian
-sh7785lcr, but I have not tested this any further, as the board is situated in
-a remote data center.
+Thanks,
+Benoit
 
-Signed-off-by: Thomas Schwinge <thomas@codesourcery.com>
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: linux-sh at vger.kernel.org
-Cc: linux-usb at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mips at linux-mips.org
----
- drivers/usb/host/r8a66597.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/r8a66597.h b/drivers/usb/host/r8a66597.h
-index f28782d..c2ea6d1 100644
---- a/drivers/usb/host/r8a66597.h
-+++ b/drivers/usb/host/r8a66597.h
-@@ -170,7 +170,7 @@ static inline struct urb *r8a66597_get_urb(struct r8a66597 *r8a66597,
- 
- static inline u16 r8a66597_read(struct r8a66597 *r8a66597, unsigned long offset)
- {
--	return ioread16(r8a66597->reg + offset);
-+	return __raw_readw(r8a66597->reg + offset);
- }
- 
- static inline void r8a66597_read_fifo(struct r8a66597 *r8a66597,
-@@ -198,7 +198,7 @@ static inline void r8a66597_read_fifo(struct r8a66597 *r8a66597,
- static inline void r8a66597_write(struct r8a66597 *r8a66597, u16 val,
- 				  unsigned long offset)
- {
--	iowrite16(val, r8a66597->reg + offset);
-+	__raw_writew(val, r8a66597->reg + offset);
- }
- 
- static inline void r8a66597_mdfy(struct r8a66597 *r8a66597,
--- 
-1.7.4.1
+On 3/7/2012 1:57 PM, Cousson, Benoit wrote:
+> Hi Grant,
+>
+> That fix is tightly coupled with the previous twl4030-irq change, so it
+> will be good to pulled it with the twl series through MFD if you are OK
+> with that?
+>
+> Care to ack this one and the next one?
+>
+> Thanks,
+> Benoit
+>
+>
+> On 3/2/2012 5:50 PM, Benoit Cousson wrote:
+>> Do not use the board pdata for irq_base, but allocate them dynamically
+>> to allow a proper support of SPARSE_IRQ.
+>>
+>> Fix an unneeded line wrap.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Acked-by: Felipe Balbi<balbi@ti.com>
+>> ---
+>> drivers/gpio/gpio-twl4030.c | 33 +++++++++++++++++----------------
+>> 1 files changed, 17 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+>> index 697396c..49e5c6e 100644
+>> --- a/drivers/gpio/gpio-twl4030.c
+>> +++ b/drivers/gpio/gpio-twl4030.c
+>> @@ -395,23 +395,26 @@ static int gpio_twl4030_remove(struct
+>> platform_device *pdev);
+>> static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+>> {
+>> struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
+>> - int ret;
+>> + int ret, irq_base;
+>>
+>> /* maybe setup IRQs */
+>> - if (pdata->irq_base) {
+>> - if (is_module()) {
+>> - dev_err(&pdev->dev,
+>> - "can't dispatch IRQs from modules\n");
+>> - goto no_irqs;
+>> - }
+>> - ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO,
+>> - pdata->irq_base);
+>> - if (ret< 0)
+>> - return ret;
+>> - WARN_ON(ret != pdata->irq_base);
+>> - twl4030_gpio_irq_base = ret;
+>> + if (is_module()) {
+>> + dev_err(&pdev->dev, "can't dispatch IRQs from modules\n");
+>> + goto no_irqs;
+>> + }
+>> +
+>> + irq_base = irq_alloc_descs(-1, 0, TWL4030_GPIO_MAX, 0);
+>> + if (irq_base< 0) {
+>> + dev_err(&pdev->dev, "Failed to alloc irq_descs\n");
+>> + return irq_base;
+>> }
+>>
+>> + ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO, irq_base);
+>> + if (ret< 0)
+>> + return ret;
+>> +
+>> + twl4030_gpio_irq_base = irq_base;
+>> +
+>> no_irqs:
+>> /*
+>> * NOTE: boards may waste power if they don't set pullups
+>> @@ -443,9 +446,7 @@ no_irqs:
+>>
+>> ret = gpiochip_add(&twl_gpiochip);
+>> if (ret< 0) {
+>> - dev_err(&pdev->dev,
+>> - "could not register gpiochip, %d\n",
+>> - ret);
+>> + dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
+>> twl_gpiochip.ngpio = 0;
+>> gpio_twl4030_remove(pdev);
+>> } else if (pdata->setup) {
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at http://vger.kernel.org/majordomo-info.html
