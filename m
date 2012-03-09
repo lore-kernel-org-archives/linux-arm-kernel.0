@@ -1,68 +1,54 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 12 Mar 2012 20:32:40 +0530
-Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board data
-In-Reply-To: <1331564560-23276-1-git-send-email-rnayak@ti.com>
-References: <1331564560-23276-1-git-send-email-rnayak@ti.com>
-Message-ID: <1331564560-23276-5-git-send-email-rnayak@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 9 Mar 2012 17:36:08 +0100
+Subject: [PATCH 1/1] of: introduce helper to manage boolean
+In-Reply-To: <20120309162638.92E813E0880@localhost>
+References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
+ <20120309014441.8236B3E0903@localhost>
+ <20120309100435.GN27213@game.jcrosoft.org>
+ <20120309162638.92E813E0880@localhost>
+Message-ID: <20120309163608.GQ27213@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap mmc related device tree data for OMAP3.
-Currenly limited to only omap3-beagle board.
+> > > > +int of_property_read_bool(const struct device_node *np, const char *propname)
+> > > > +{
+> > > > +	u32 reg;
+> > > > +	int ret = of_property_read_u32(np, propname, &reg);
+> > > > +
+> > > > +	switch (ret) {
+> > > > +	case -EINVAL:
+> > > > +		return false;
+> > > > +	case -ENODATA:
+> > > > +		return true;
+> > > > +	case 0:
+> > > > +		return reg == 1;
+> > > 
+> > > Ugh.  so any value other than 1 returns false?  I think that will surprise
+> > > most people.
+> > > 
+> > > I don't like this api or binding.  If it is a bool property, then why isn't
+> > > simply testing for the property existance sufficient?
+> > no if you want to disable it
+> > 
+> > if a bool is define in the dtsi and want to disable it int the dts
+> > 
+> > if you we can do the the invert
+> > 
+> > if !0 => true
+> > 
+> > is-ok;			=> true
+> > is-ok = <val != 0>;	=> true
+> > is-ok = <0>;		=> false
+> 
+> This is a failure of the dtc tool, not the binding.  Accepting this binding
+> means we have to live with it for a very long time.  It needs to be fixed
+> in dtc instead so that properties can be deleted instead of only modified.
+I understand your idea but today if you put and value in the property it's true.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/boot/dts/omap3-beagle.dts |   14 ++++++++++++++
- arch/arm/boot/dts/omap3.dtsi       |   16 ++++++++++++++++
- 2 files changed, 30 insertions(+), 0 deletions(-)
+So is-ok = <0>; is true also which is illogical as in any language a boolean is
+true (1) or false (0). When I read the property I will understand false not true
 
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index 714ba5d..5cf67d1 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -47,3 +47,17 @@
- 		reg = <0x50>;
- 	};
- };
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	vmmc_aux-supply = <&vsim>;
-+	ti,bus-width = <8>;
-+};
-+
-+&mmc2 {
-+	status = "disable";
-+};
-+
-+&mmc3 {
-+	status = "disable";
-+};
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index ca37ba5..3892e34 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -113,5 +113,21 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c3";
- 		};
-+
-+		mmc1: mmc at 1 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc1";
-+			ti,dual-volt;
-+		};
-+
-+		mmc2: mmc at 2 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc2";
-+		};
-+
-+		mmc3: mmc at 3 {
-+			compatible = "ti,omap3-hsmmc";
-+			ti,hwmods = "mmc3";
-+		};
- 	};
- };
--- 
-1.7.1
+And I see no good way to add the "delete" in dtc.
+
+Best Regards,
+J.
