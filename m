@@ -1,52 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 09 Mar 2012 09:45:22 -0700
-Subject: [PATCH 10/11] ARM: tegra: pcie: Add MSI support
-In-Reply-To: <20120309065004.GD25208@avionic-0098.mockup.avionic-design.de>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-11-git-send-email-thierry.reding@avionic-design.de>
- <4F59213F.6070107@wwwdotorg.org>
- <20120309065004.GD25208@avionic-0098.mockup.avionic-design.de>
-Message-ID: <4F5A33A2.4000305@wwwdotorg.org>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 9 Mar 2012 22:13:56 +0530
+Subject: [PATCH v3 0/4] ARM: Exynos4: Add irq domain and device tree
+ support for wakeup interrupts
+In-Reply-To: <4F5A30B8.6060801@samsung.com>
+References: <1329912858-32750-1-git-send-email-thomas.abraham@linaro.org>
+ <4F5A30B8.6060801@samsung.com>
+Message-ID: <CAJuYYwTFzuzhWo0CXt4mn8N3pKefKgX6h-NFCkvh4ZYhsw+_OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2012 11:50 PM, Thierry Reding wrote:
-> * Stephen Warren wrote:
->> On 03/08/2012 07:51 AM, Thierry Reding wrote:
->>> This commit adds support for message signaled interrupts to the Tegra
->>> PCIe controller.
->>>
->>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
->>> ---
->>> This code is taken from the NVIDIA Vibrante kernel and therefore has no
->>> appropriate Signed-off-by from the original author. Maybe someone at
->>> NVIDIA can find out who wrote this code and maybe provide a proper
->>> Signed-off-by that I can add?
+On 9 March 2012 22:02, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 02/22/12 04:14, Thomas Abraham wrote:
 >>
->> I think if you look in:
->> git://nv-tegra.nvidia.com/linux-2.6.git android-tegra-2.6.36
+>> Changes since v2:
+>> - Reworked irq domain support based on v5 of the irq_domain generalization
+>> ? patches.
 >>
->> the following commits are what you're after:
+>> Changes since v1: (only patch 4/4 has changes)
+>> - Fixes based on Rob's comments:
+>> ? a. Fixed the function prototype of exynos4_init_irq_eint(void)
+>> ? b. Included interrupt-parent as an optional property for wakeup
+>> interrupt
+>> ? ? ? controller node.
 >>
->> de7fd8768b32da66eaf4eaf58473c65f7a76808d
->> arm: tegra: pcie: enabling MSI support for pcie
+>> Samsung Exynos4 includes 32 external wakeup interrupt sources. The first
+>> 16
+>> of these interrupts are connected to GIC SPI[31:16]. The last 16 of these
+>> interrupts are grouped together into one interrupt and connected to GIC
+>> SPI[32].
 >>
->> ac1f8310811c64a084511d2afc27f66334b31a81
->> ARM: tegra: pcie: fix return value from MSI irq routine
+>> This patchset adds irq domain and device tree support for these
+>> interrupts.
+>> Since there are users of fixed linux irq numbers of the external wakeup
+>> interrupts, the legacy mapping is used for the irq domain.
 >>
->> Although the patch below only partially resembles those patches, I guess
->> because you've rewritten the code a lot to conform to the current kernel
->> APIs, clean stuff up, etc. Perhaps just saying "based on code by Krishna
->> Kishore <kthota@nvidia.com>" is enough...
-> 
-> Yes, it is indeed a major rewrite because the original code had some
-> peculiarities and FIXME that I thought wouldn't make it through the review
-> anyway so I fixed them up.
-> 
-> I'll add some comment about the original authorship. There is no official
-> Signed-off-by in the original commit. Do I still need one or is it enough to
-> mention the original authors in the commit message and add keep my own
-> Signed-off-by?
+>> This patchset is based on
+>> http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>> [for-next]
+>>
+>> with all irq_domain (v5) patches merged from
+>> http://git.secretlab.ca/git/linux-2.6.git [irqdomain/next]
+>>
+>> This patchset should be applied after applying the following patch.
+>> [PATCH] ARM: Exynos: Add irq domain and device tree support for interrupt
+>> combiner
+>
+>
+> Looks ok to me this series, but I lost above patch in my mail box.
+> Thomas, could you please send updated it so that I can apply this series?
 
-Yes, I think just mentioning the original code author in free-form text,
-and including only your S-o-b sounds good to me.
+Dear Mr. Kim,
+
+Sure. I will test and send the patchset based on the your latest
+for-next branch.
+
+Thanks,
+Thomas.
+
+[...]
