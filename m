@@ -1,68 +1,52 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Sat, 10 Mar 2012 22:05:08 +0000 (GMT)
-Subject: [PATCH] pxa/hx4700: Reduce sleep mode power consumption by 35%
-In-Reply-To: <20120310182144.GA20013@n2100.arm.linux.org.uk>
-Message-ID: <1331417108.99129.YahooMailClassic@web29004.mail.ird.yahoo.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 09 Mar 2012 09:45:22 -0700
+Subject: [PATCH 10/11] ARM: tegra: pcie: Add MSI support
+In-Reply-To: <20120309065004.GD25208@avionic-0098.mockup.avionic-design.de>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-11-git-send-email-thierry.reding@avionic-design.de>
+ <4F59213F.6070107@wwwdotorg.org>
+ <20120309065004.GD25208@avionic-0098.mockup.avionic-design.de>
+Message-ID: <4F5A33A2.4000305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---- On Sat, 10/3/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > Drive the two Bluetooth UART output GPIOs
-> (GPIO43_BTUART_TXD,
-> > GPIO45_BTUART_RTS) LOW during sleep mode instead of
-> HIGH. This
-> > reduces sleep mode power consumption from approximately
-> 46 mA/h
-> > to approximately 30 mA/h.
+On 03/08/2012 11:50 PM, Thierry Reding wrote:
+> * Stephen Warren wrote:
+>> On 03/08/2012 07:51 AM, Thierry Reding wrote:
+>>> This commit adds support for message signaled interrupts to the Tegra
+>>> PCIe controller.
+>>>
+>>> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+>>> ---
+>>> This code is taken from the NVIDIA Vibrante kernel and therefore has no
+>>> appropriate Signed-off-by from the original author. Maybe someone at
+>>> NVIDIA can find out who wrote this code and maybe provide a proper
+>>> Signed-off-by that I can add?
+>>
+>> I think if you look in:
+>> git://nv-tegra.nvidia.com/linux-2.6.git android-tegra-2.6.36
+>>
+>> the following commits are what you're after:
+>>
+>> de7fd8768b32da66eaf4eaf58473c65f7a76808d
+>> arm: tegra: pcie: enabling MSI support for pcie
+>>
+>> ac1f8310811c64a084511d2afc27f66334b31a81
+>> ARM: tegra: pcie: fix return value from MSI irq routine
+>>
+>> Although the patch below only partially resembles those patches, I guess
+>> because you've rewritten the code a lot to conform to the current kernel
+>> APIs, clean stuff up, etc. Perhaps just saying "based on code by Krishna
+>> Kishore <kthota@nvidia.com>" is enough...
 > 
-> What are you saying here?? I think you're confusing
-> power with current.
-> Also, current is measured in amps, not amps per second (or a
-> scaled
-> version of that.)
+> Yes, it is indeed a major rewrite because the original code had some
+> peculiarities and FIXME that I thought wouldn't make it through the review
+> anyway so I fixed them up.
+> 
+> I'll add some comment about the original authorship. There is no official
+> Signed-off-by in the original commit. Do I still need one or is it enough to
+> mention the original authors in the commit message and add keep my own
+> Signed-off-by?
 
-Apologies for the sloppy nomenclature; evidently electronics is not my
-thing.
-The figures I quoted were the reduction in accumulated current (charge)
-over time. For example in the second case, the charge reduced from 1853500
-?Ah to 1782750 ?Ah over 8610 seconds = 29.58 mA.
-If that seems high it is: it should be nearer 4.7 mA.
-
-> >? ??? /* BTUART */
-> >? ??? GPIO42_BTUART_RXD,
-> > -??? GPIO43_BTUART_TXD,
-> > +??? GPIO43_GPIO | MFP_AF2 |
-> MFP_LPM_DRIVE_LOW,
-> 
-> I don't believe that's right.
-> 
-> This expands to:
-> 
-> ??? MFP_CFG_IN(GPIO43, AF0) | MFP_AF2 |
-> MFP_LPM_DRIVE_LOW
-> 
-> and:
-> 
-> ??? (MFP_CFG_DEFAULT & ~(MFP_AF_MASK |
-> MFP_DIR_MASK)) |
-> ??? (MFP_PIN(MFP_PIN_GPIO43) | MFP_AF0 |
-> MFP_DIR_IN)
-> ??? | MFP_AF2 | MFP_LPM_DRIVE_LOW
-> 
-> Note the presence of both MFP_AF2 and MFP_AF0 in there.
-> 
-> The default for GPIO43_BTUART_TXD is:
-> 
-> ??? MFP_CFG_OUT(GPIO43, AF2, DRIVE_HIGH)
-> 
-> and I'd suggest defining a new GPIO43_BTUART_TXD_LPM_LOW to
-> cover your
-> case.
-
-It wasn't right but it evaluated to the correct value because MFP_AF0 = 0.
-What I intended was: MFP_PIN_GPIO43 | MFP_AF2 | MFP_LPM_DRIVE_LOW
-But I'll add the new values to <mach/mfp-pxa27x.h> if that's preferable.
-
-Oddly the absence of direction didn't seem to matter; GPIO43 and GPIO45
-default to input here, yet are still being driven as outputs in low power
-mode contrary to what the manual says.
+Yes, I think just mentioning the original code author in free-form text,
+and including only your S-o-b sounds good to me.
