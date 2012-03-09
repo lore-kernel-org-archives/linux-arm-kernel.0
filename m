@@ -1,68 +1,183 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 09 Mar 2012 14:14:29 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the
- omap_dss2 tree
-In-Reply-To: <201203091150.11294.arnd@arndb.de>
-References: <20120308170048.f1a992bca2ca2d93fa9747bf@canb.auug.org.au>
- <201203081616.12510.arnd@arndb.de> <1331285751.1927.20.camel@deskari>
- <201203091150.11294.arnd@arndb.de>
-Message-ID: <1331295269.1927.54.camel@deskari>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 09 Mar 2012 00:08:58 -0500
+Subject: [PATCH 2/2] mmc: sdhci-s3c: Enable runtime power management
+In-Reply-To: <1330735602-22409-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+ (Mark Brown's message of "Sat, 3 Mar 2012 00:46:42 +0000")
+References: <4F51697C.40408@samsung.com>
+ <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1330735602-22409-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <m2vcmenyxh.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-03-09 at 11:50 +0000, Arnd Bergmann wrote:
-> On Friday 09 March 2012, Tomi Valkeinen wrote:
-> > On Thu, 2012-03-08 at 16:16 +0000, Arnd Bergmann wrote:
-> > > On Thursday 08 March 2012, Stephen Rothwell wrote:
-> > > > Hi all,
-> > > > 
-> > > > Today's linux-next merge of the arm-soc tree got a conflict in
-> > > > arch/arm/mach-omap1/board-palmtt.c between commit ddba6c7f7ec6 ("OMAP1:
-> > > > pass LCD config with omapfb_set_lcd_config()") from the omap_dss2 tree
-> > > > and commit 2e3ee9f45b3c ("ARM: OMAP1: Move most of plat/io.h into local
-> > > > iomap.h") from the arm-soc tree.
-> > > > 
-> > > > I fixed it up (see below) and can carry the fix as necessary.
-> > > 
-> > > Hi Stephen,
-> > > 
-> > > Thanks for fixing up all the conflicts between arm-soc and omap_dss2.
-> > > I think we should make sure they are resolved in one of the trees before
-> > > the merge window.
-> > 
-> > Do we need to? The conflicts seemed to be trivial ones, like arm-soc
-> > adds/removes something that just happens to be next to something else
-> > that I add/remove.
-> > 
-> > My understanding is that it's better to leave those conflicts than to do
-> > "trickery" to avoid them.
-> 
-> Each of the conflicts is simple enough, but I feel it's worth resolving
-> them in this case because there are a number of them. Looking at them
-> again now, it's probably ok either way -- resolving them now or letting
-> Linus take care of them.
+Hi,
 
-Florian, do you have an opinion about this?
+On Fri, Mar 02 2012, Mark Brown wrote:
+> Since most of the work is already done by the core we just need to add
+> runtime suspend methods and tell the PM core that runtime PM is enabled
+> for this device.
+>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  drivers/mmc/host/sdhci-s3c.c |   28 ++++++++++++++++++++++++++++
+>  1 files changed, 28 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 46152d6..6926ac9 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_gpio.h>
+>  #include <linux/pm.h>
+> +#include <linux/pm_runtime.h>
+>  
+>  #include <linux/mmc/host.h>
+>  
+> @@ -721,6 +722,11 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  	if (pdata->host_caps2)
+>  		host->mmc->caps2 |= pdata->host_caps2;
+>  
+> +	pm_runtime_enable(&pdev->dev);
+> +	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> +	pm_runtime_use_autosuspend(&pdev->dev);
+> +	pm_suspend_ignore_children(&pdev->dev, 1);
+> +
+>  	ret = sdhci_add_host(host);
+>  	if (ret) {
+>  		dev_err(dev, "sdhci_add_host() failed\n");
+> @@ -740,6 +746,8 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>  
+>   err_add_host:
+>  	release_resource(sc->ioarea);
+> +	pm_runtime_forbid(&pdev->dev);
+> +	pm_runtime_get_noresume(&pdev->dev);
+>  	kfree(sc->ioarea);
+>  
+>   err_req_regs:
+> @@ -784,6 +792,8 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+>  
+>  	sdhci_remove_host(host, 1);
+>  
+> +	pm_runtime_disable(&pdev->dev);
+> +
+>  	for (ptr = 0; ptr < 3; ptr++) {
+>  		if (sc->clk_bus[ptr]) {
+>  			clk_disable(sc->clk_bus[ptr]);
+> @@ -824,9 +834,27 @@ static int sdhci_s3c_resume(struct device *dev)
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_PM_RUNTIME
+> +static int sdhci_s3c_runtime_suspend(struct device *dev)
+> +{
+> +	struct sdhci_host *host = dev_get_drvdata(dev);
+> +
+> +	return sdhci_runtime_suspend_host(host);
+> +}
+> +
+> +static int sdhci_s3c_runtime_resume(struct device *dev)
+> +{
+> +	struct sdhci_host *host = dev_get_drvdata(dev);
+> +
+> +	return sdhci_runtime_resume_host(host);
+> +}
+> +#endif
+> +
+>  #ifdef CONFIG_PM
+>  static const struct dev_pm_ops sdhci_s3c_pmops = {
+>  	SET_SYSTEM_SLEEP_PM_OPS(sdhci_s3c_suspend, sdhci_s3c_resume)
+> +	SET_RUNTIME_PM_OPS(sdhci_s3c_runtime_suspend, sdhci_s3c_runtime_resume,
+> +			   NULL)
+>  };
+>  
+>  #define SDHCI_S3C_PMOPS (&sdhci_s3c_pmops)
 
-Merging omapdss tree through arm-soc would make sense for avoiding
-conflicts, because almost every merge window there are some conflicts as
-I often need to edit arch/arm files also. But I'm not sure if we have
-ever had a conflict in drivers/video.
+I had to rework this patch to avoid a conflict with Julia Lawall's patch
+"mmc: sdhci-s3c: use devm_ functions": https://lkml.org/lkml/2012/2/18/76
 
-But still, it's a video driver, and fbdev tree sounds more suited for a
-video driver.
+The reworked patch is below, please let me know if it looks incorrect:
 
-So I don't know =). Basically it's ok for me either way also. But it
-would be nice to have a standard way of doing this, instead of, for
-example, merging omapdss sometimes through fbdev, sometimes through
-arm-soc, depending on the conflicts...
+From: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Subject: [PATCH] mmc: sdhci-s3c: Enable runtime power management
 
- Tomi
+Since most of the work is already done by the core we just need to add
+runtime suspend methods and tell the PM core that runtime PM is enabled
+for this device.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/8ce8e297/attachment-0001.sig>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+Signed-off-by: Chris Ball <cjb@laptop.org>
+---
+ drivers/mmc/host/sdhci-s3c.c |   28 ++++++++++++++++++++++++++++
+ 1 files changed, 28 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index 9683322..312aaf4 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -23,6 +23,7 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/pm.h>
++#include <linux/pm_runtime.h>
+ 
+ #include <linux/mmc/host.h>
+ 
+@@ -705,9 +706,16 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 	if (pdata->host_caps)
+ 		host->mmc->caps |= pdata->host_caps;
+ 
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
++	pm_runtime_use_autosuspend(&pdev->dev);
++	pm_suspend_ignore_children(&pdev->dev, 1);
++
+ 	ret = sdhci_add_host(host);
+ 	if (ret) {
+ 		dev_err(dev, "sdhci_add_host() failed\n");
++		pm_runtime_forbid(&pdev->dev);
++		pm_runtime_get_noresume(&pdev->dev);
+ 		goto err_req_regs;
+ 	}
+ 
+@@ -764,6 +772,8 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
+ 
+ 	sdhci_remove_host(host, 1);
+ 
++	pm_runtime_disable(&pdev->dev);
++
+ 	for (ptr = 0; ptr < 3; ptr++) {
+ 		if (sc->clk_bus[ptr]) {
+ 			clk_disable(sc->clk_bus[ptr]);
+@@ -800,9 +810,27 @@ static int sdhci_s3c_resume(struct device *dev)
+ }
+ #endif
+ 
++#ifdef CONFIG_PM_RUNTIME
++static int sdhci_s3c_runtime_suspend(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++
++	return sdhci_runtime_suspend_host(host);
++}
++
++static int sdhci_s3c_runtime_resume(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++
++	return sdhci_runtime_resume_host(host);
++}
++#endif
++
+ #ifdef CONFIG_PM
+ static const struct dev_pm_ops sdhci_s3c_pmops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(sdhci_s3c_suspend, sdhci_s3c_resume)
++	SET_RUNTIME_PM_OPS(sdhci_s3c_runtime_suspend, sdhci_s3c_runtime_resume,
++			   NULL)
+ };
+ 
+ #define SDHCI_S3C_PMOPS (&sdhci_s3c_pmops)
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
