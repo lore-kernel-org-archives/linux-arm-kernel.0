@@ -1,162 +1,183 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 09 Mar 2012 14:56:52 +1030
-Subject: [PATCH 2/8] ARM: KVM: neaten offset calculations.
-Message-ID: <1331267212.29504.rusty@rustcorp.com.au>
+From: b39297@freescale.com (Wu Guoxing)
+Date: Fri, 9 Mar 2012 12:35:24 +0800
+Subject: [PATCH v4] ARM : mx35: 3ds-board: add framebuffer device
+Message-ID: <1331267724-16432-1-git-send-email-b39297@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: wu guoxing <b39297@freescale.com>
 
-From: Rusty Russell <rusty@rustcorp.com.au>
+This patch adds framebuffer support for freescale mx35 3ds board
 
-If we do this the C-correct way, we use fewer casts and it's a bit clearer.
-
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+Signed-off-by: Wu Guoxing <b39297@freescale.com>
 ---
- arch/arm/include/asm/kvm_host.h |    6 +++-
- arch/arm/kvm/emulate.c          |   60 ++++++++++++++++++++-------------------
- 2 files changed, 36 insertions(+), 30 deletions(-)
+Changes since v3:
+        1. use a static variable to save the gpio value instead of find
+	   the gpiochip every time.
+	2. add gpio_request after found the gpio.
+Changes since v2:
+	1. use gpio_set_value_cansleep instead of gpio_set_value Changes
+Changes since v1:
+	1. use gpio driver for mc9s08dz60
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 8002903..e211d8e 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -86,7 +86,11 @@ enum cp15_regs {
- };
+ arch/arm/mach-imx/mach-mx35_3ds.c |  121 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 121 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
+index 0af6c9c..d1fb466 100644
+--- a/arch/arm/mach-imx/mach-mx35_3ds.c
++++ b/arch/arm/mach-imx/mach-mx35_3ds.c
+@@ -40,9 +40,94 @@
+ #include <mach/iomux-mx35.h>
+ #include <mach/irqs.h>
+ #include <mach/3ds_debugboard.h>
++#include <video/platform_lcd.h>
  
- struct kvm_vcpu_arch {
--	struct kvm_vcpu_regs regs;
-+	/* We sometimes access these as an array for simplicity. */
-+	union {
-+		struct kvm_vcpu_regs regs;
-+		u32 reg_array[sizeof(struct kvm_vcpu_regs) / sizeof(u32)];
-+	};
+ #include "devices-imx35.h"
  
- 	/* System control coprocessor (cp15) */
- 	u32 cp15[nr_cp15_regs];
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index 4f5f2de..108db38 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -22,8 +22,10 @@
- 
- #include "trace.h"
- 
--#define USR_REG_OFFSET(_reg) \
--	offsetof(struct kvm_vcpu_arch, regs.usr_regs[_reg])
-+#define REG_OFFSET(_reg) \
-+	(offsetof(struct kvm_vcpu_regs, _reg) / sizeof(u32))
++static const struct fb_videomode fb_modedb[] = {
++	{
++		 /* 800x480 @ 55 Hz */
++		 .name = "Ceramate-CLAA070VC01",
++		 .refresh = 55,
++		 .xres = 800,
++		 .yres = 480,
++		 .pixclock = 40000,
++		 .left_margin = 40,
++		 .right_margin = 40,
++		 .upper_margin = 5,
++		 .lower_margin = 5,
++		 .hsync_len = 20,
++		 .vsync_len = 10,
++		 .sync = FB_SYNC_OE_ACT_HIGH,
++		 .vmode = FB_VMODE_NONINTERLACED,
++		 .flag = 0,
++	 },
++};
 +
-+#define USR_REG_OFFSET(_num) REG_OFFSET(usr_regs[_num])
++static const struct ipu_platform_data mx3_ipu_data __initconst = {
++	.irq_base = MXC_IPU_IRQ_START,
++};
++
++static struct mx3fb_platform_data mx3fb_pdata __initdata = {
++	.name = "Ceramate-CLAA070VC01",
++	.mode = fb_modedb,
++	.num_modes = ARRAY_SIZE(fb_modedb),
++};
++
++static struct i2c_board_info __initdata i2c_devices_3ds[] = {
++	{
++		I2C_BOARD_INFO("mc9s08dz60", 0x69),
++	},
++};
++
++static int lcd_power_gpio = -ENXIO;
++
++static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
++						     void *data)
++{
++	return !strcmp(chip->label, data);
++}
++
++static int mc9s08dz60_lcd_gpio_get(void)
++{
++	struct gpio_chip *chip;
++
++	if (!gpio_is_valid(lcd_power_gpio)) {
++		chip = gpiochip_find(
++				"mc9s08dz60", mc9s08dz60_gpiochip_match);
++		if (chip) {
++			lcd_power_gpio = chip->base + 6;
++			if (gpio_request(lcd_power_gpio, "lcd_power") < 0) {
++				pr_err("error: gpio already requested by other!\n");
++				lcd_power_gpio = -ENXIO;
++			}
++		} else {
++			pr_err("error: didn't find mc9s08dz60 gpio chip\n");
++			lcd_power_gpio = -ENXIO;
++		}
++	}
++
++	return lcd_power_gpio;
++}
++
++static void mx35_3ds_lcd_set_power(struct plat_lcd_data *pd, unsigned int power)
++{
++	int gpio;
++
++	gpio = mc9s08dz60_lcd_gpio_get();
++	if (gpio_is_valid(lcd_power_gpio))
++		gpio_set_value_cansleep(gpio, power);
++}
++
++static struct plat_lcd_data mx35_3ds_lcd_data = {
++	.set_power = mx35_3ds_lcd_set_power,
++};
++
++static struct platform_device mx35_3ds_lcd = {
++	.name = "platform-lcd",
++	.dev.platform_data = &mx35_3ds_lcd_data,
++};
++
+ #define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
  
- static const unsigned long vcpu_reg_offsets[MODE_SYS + 1][16] = {
- 	/* FIQ Registers */
-@@ -31,14 +33,14 @@ static const unsigned long vcpu_reg_offsets[MODE_SYS + 1][16] = {
- 		USR_REG_OFFSET(0), USR_REG_OFFSET(1), USR_REG_OFFSET(2),
- 		USR_REG_OFFSET(3), USR_REG_OFFSET(4), USR_REG_OFFSET(5),
- 		USR_REG_OFFSET(6), USR_REG_OFFSET(7),
--		offsetof(struct kvm_vcpu_arch, regs.fiq_regs[1]), /* r8 */
--		offsetof(struct kvm_vcpu_arch, regs.fiq_regs[1]), /* r9 */
--		offsetof(struct kvm_vcpu_arch, regs.fiq_regs[2]), /* r10 */
--		offsetof(struct kvm_vcpu_arch, regs.fiq_regs[3]), /* r11 */
--		offsetof(struct kvm_vcpu_arch, regs.fiq_regs[4]), /* r12 */
--		offsetof(struct kvm_vcpu_arch, regs.fiq_regs[5]), /* r13 */
--		offsetof(struct kvm_vcpu_arch, regs.fiq_regs[6]), /* r14 */
--		offsetof(struct kvm_vcpu_arch, regs.pc)		  /* r15 */
-+		REG_OFFSET(fiq_regs[1]), /* r8 */
-+		REG_OFFSET(fiq_regs[1]), /* r9 */
-+		REG_OFFSET(fiq_regs[2]), /* r10 */
-+		REG_OFFSET(fiq_regs[3]), /* r11 */
-+		REG_OFFSET(fiq_regs[4]), /* r12 */
-+		REG_OFFSET(fiq_regs[5]), /* r13 */
-+		REG_OFFSET(fiq_regs[6]), /* r14 */
-+		REG_OFFSET(pc)		 /* r15 */
- 	},
- 
- 	/* IRQ Registers */
-@@ -48,9 +50,9 @@ static const unsigned long vcpu_reg_offsets[MODE_SYS + 1][16] = {
- 		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
- 		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
- 		USR_REG_OFFSET(12),
--		offsetof(struct kvm_vcpu_arch, regs.irq_regs[0]), /* r13 */
--		offsetof(struct kvm_vcpu_arch, regs.irq_regs[1]), /* r14 */
--		offsetof(struct kvm_vcpu_arch, regs.pc)	          /* r15 */
-+		REG_OFFSET(irq_regs[0]), /* r13 */
-+		REG_OFFSET(irq_regs[1]), /* r14 */
-+		REG_OFFSET(pc)	         /* r15 */
- 	},
- 
- 	/* SVC Registers */
-@@ -60,9 +62,9 @@ static const unsigned long vcpu_reg_offsets[MODE_SYS + 1][16] = {
- 		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
- 		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
- 		USR_REG_OFFSET(12),
--		offsetof(struct kvm_vcpu_arch, regs.svc_regs[0]), /* r13 */
--		offsetof(struct kvm_vcpu_arch, regs.svc_regs[1]), /* r14 */
--		offsetof(struct kvm_vcpu_arch, regs.pc)		  /* r15 */
-+		REG_OFFSET(svc_regs[0]), /* r13 */
-+		REG_OFFSET(svc_regs[1]), /* r14 */
-+		REG_OFFSET(pc)		 /* r15 */
- 	},
- 
- 	/* ABT Registers */
-@@ -72,9 +74,9 @@ static const unsigned long vcpu_reg_offsets[MODE_SYS + 1][16] = {
- 		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
- 		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
- 		USR_REG_OFFSET(12),
--		offsetof(struct kvm_vcpu_arch, regs.abt_regs[0]), /* r13 */
--		offsetof(struct kvm_vcpu_arch, regs.abt_regs[1]), /* r14 */
--		offsetof(struct kvm_vcpu_arch, regs.pc)	          /* r15 */
-+		REG_OFFSET(abt_regs[0]), /* r13 */
-+		REG_OFFSET(abt_regs[1]), /* r14 */
-+		REG_OFFSET(pc)	         /* r15 */
- 	},
- 
- 	/* UND Registers */
-@@ -84,9 +86,9 @@ static const unsigned long vcpu_reg_offsets[MODE_SYS + 1][16] = {
- 		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
- 		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
- 		USR_REG_OFFSET(12),
--		offsetof(struct kvm_vcpu_arch, regs.und_regs[0]), /* r13 */
--		offsetof(struct kvm_vcpu_arch, regs.und_regs[1]), /* r14 */
--		offsetof(struct kvm_vcpu_arch, regs.pc)	          /* r15 */
-+		REG_OFFSET(und_regs[0]), /* r13 */
-+		REG_OFFSET(und_regs[1]), /* r14 */
-+		REG_OFFSET(pc)	         /* r15 */
- 	},
- 
- 	/* USR Registers */
-@@ -96,9 +98,9 @@ static const unsigned long vcpu_reg_offsets[MODE_SYS + 1][16] = {
- 		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
- 		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
- 		USR_REG_OFFSET(12),
--		offsetof(struct kvm_vcpu_arch, regs.usr_regs[13]), /* r13 */
--		offsetof(struct kvm_vcpu_arch, regs.usr_regs[14]), /* r14 */
--		offsetof(struct kvm_vcpu_arch, regs.pc)	           /* r15 */
-+		REG_OFFSET(usr_regs[13]), /* r13 */
-+		REG_OFFSET(usr_regs[14]), /* r14 */
-+		REG_OFFSET(pc)	          /* r15 */
- 	},
- 
- 	/* SYS Registers */
-@@ -108,9 +110,9 @@ static const unsigned long vcpu_reg_offsets[MODE_SYS + 1][16] = {
- 		USR_REG_OFFSET(6), USR_REG_OFFSET(7), USR_REG_OFFSET(8),
- 		USR_REG_OFFSET(9), USR_REG_OFFSET(10), USR_REG_OFFSET(11),
- 		USR_REG_OFFSET(12),
--		offsetof(struct kvm_vcpu_arch, regs.usr_regs[13]), /* r13 */
--		offsetof(struct kvm_vcpu_arch, regs.usr_regs[14]), /* r14 */
--		offsetof(struct kvm_vcpu_arch, regs.pc)	           /* r15 */
-+		REG_OFFSET(usr_regs[13]), /* r13 */
-+		REG_OFFSET(usr_regs[14]), /* r14 */
-+		REG_OFFSET(pc)	          /* r15 */
- 	},
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+@@ -120,6 +205,32 @@ static iomux_v3_cfg_t mx35pdk_pads[] = {
+ 	/* I2C1 */
+ 	MX35_PAD_I2C1_CLK__I2C1_SCL,
+ 	MX35_PAD_I2C1_DAT__I2C1_SDA,
++	/* Display */
++	MX35_PAD_LD0__IPU_DISPB_DAT_0,
++	MX35_PAD_LD1__IPU_DISPB_DAT_1,
++	MX35_PAD_LD2__IPU_DISPB_DAT_2,
++	MX35_PAD_LD3__IPU_DISPB_DAT_3,
++	MX35_PAD_LD4__IPU_DISPB_DAT_4,
++	MX35_PAD_LD5__IPU_DISPB_DAT_5,
++	MX35_PAD_LD6__IPU_DISPB_DAT_6,
++	MX35_PAD_LD7__IPU_DISPB_DAT_7,
++	MX35_PAD_LD8__IPU_DISPB_DAT_8,
++	MX35_PAD_LD9__IPU_DISPB_DAT_9,
++	MX35_PAD_LD10__IPU_DISPB_DAT_10,
++	MX35_PAD_LD11__IPU_DISPB_DAT_11,
++	MX35_PAD_LD12__IPU_DISPB_DAT_12,
++	MX35_PAD_LD13__IPU_DISPB_DAT_13,
++	MX35_PAD_LD14__IPU_DISPB_DAT_14,
++	MX35_PAD_LD15__IPU_DISPB_DAT_15,
++	MX35_PAD_LD16__IPU_DISPB_DAT_16,
++	MX35_PAD_LD17__IPU_DISPB_DAT_17,
++	MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC,
++	MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK,
++	MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY,
++	MX35_PAD_CONTRAST__IPU_DISPB_CONTR,
++	MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC,
++	MX35_PAD_D3_REV__IPU_DISPB_D3_REV,
++	MX35_PAD_D3_CLS__IPU_DISPB_D3_CLS,
  };
  
-@@ -123,7 +125,7 @@ u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode)
- 	BUG_ON(reg_num > 15);
- 	BUG_ON(mode > MODE_SYS);
+ static int mx35_3ds_otg_init(struct platform_device *pdev)
+@@ -179,6 +290,8 @@ static const struct imxi2c_platform_data mx35_3ds_i2c0_data __initconst = {
+  */
+ static void __init mx35_3ds_init(void)
+ {
++	struct platform_device *imx35_fb_pdev;
++
+ 	imx35_soc_init();
  
--	return (u32 *)((void *)&vcpu->arch + vcpu_reg_offsets[mode][reg_num]);
-+	return &vcpu->arch.reg_array[vcpu_reg_offsets[mode][reg_num]];
+ 	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
+@@ -204,6 +317,14 @@ static void __init mx35_3ds_init(void)
+ 		pr_warn("Init of the debugboard failed, all "
+ 				"devices on the debugboard are unusable.\n");
+ 	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
++
++	i2c_register_board_info(
++		0, i2c_devices_3ds, ARRAY_SIZE(i2c_devices_3ds));
++
++	imx35_add_ipu_core(&mx3_ipu_data);
++	imx35_fb_pdev = imx35_add_mx3_sdc_fb(&mx3fb_pdata);
++	mx35_3ds_lcd.dev.parent = &imx35_fb_pdev->dev;
++	platform_device_register(&mx35_3ds_lcd);
  }
  
- /******************************************************************************
+ static void __init mx35pdk_timer_init(void)
+-- 
+1.7.1
