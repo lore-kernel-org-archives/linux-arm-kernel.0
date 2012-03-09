@@ -1,42 +1,31 @@
-From: jdzheng@broadcom.com (JD (Jiandong) Zheng)
-Date: Fri, 9 Mar 2012 14:07:42 -0800
-Subject: [PATCH] ARM: BCMRING: Add debug macro
-Message-ID: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D7942F1D@SJEXCHCCR02.corp.ad.broadcom.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri,  9 Mar 2012 11:39:32 -0800
+Subject: [PATCH] MAINTAINERS: new git entry for arm/mach-msm
+Message-ID: <1331321972-9353-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debug macro to bcmring so that it supports LL debug and early printk.
+Git tree moved to
+git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git
 
-Signed-off-by: Jiandong Zheng jdzheng at broadcom.com
+Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-bcmring/include/mach/debug-macro.S |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
- create mode 100755 arch/arm/mach-bcmring/include/mach/debug-macro.S
+ MAINTAINERS |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-bcmring/include/mach/debug-macro.S b/arch/arm/mach-bcmring/include/mach/debug-macro.S
-new file mode 100755
-index 0000000..fae01fd
---- /dev/null
-+++ b/arch/arm/mach-bcmring/include/mach/debug-macro.S
-@@ -0,0 +1,19 @@
-+/* arch/arm/mach-bcmring/include/mach/debug-macro.S
-+ *
-+ * Debugging macro include header
-+ *
-+ *  Based on arch/arm/mach-versatile/include/mach/debug-macro.S 
-+ *  by Jiandong Zheng
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+*/
-+		.macro	addruart, rp, rv, tmp
-+		mov	\rp,      #0x00012000
-+		orr	\rv, \rp, #0xf8000000	@ virtual base
-+		orr	\rp, \rp, #0x80000000	@ physical base
-+		.endm
-+
-+#include <asm/hardware/debug-pl01x.S>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b087b3bc..3321d75 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -962,7 +962,7 @@ F:	drivers/tty/serial/msm_serial.c
+ F:	drivers/platform/msm/
+ F:	drivers/*/pm8???-*
+ F:	include/linux/mfd/pm8xxx/
+-T:	git git://codeaurora.org/quic/kernel/davidb/linux-msm.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git
+ S:	Maintained
+ 
+ ARM/TOSA MACHINE SUPPORT
 -- 
-1.7.9.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
