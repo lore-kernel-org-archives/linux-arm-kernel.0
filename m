@@ -1,92 +1,68 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Sat, 10 Mar 2012 07:07:17 +0200
-Subject: [PATCH v2] ARM: OMAP: WiLink platform data for the PandaBoard
-In-Reply-To: <20120309183150.GH12083@atomide.com>
-References: <1331074504-22683-1-git-send-email-mgherzan@gmail.com>
- <20120309183150.GH12083@atomide.com>
-Message-ID: <1331356037.3164.31.camel@cumari>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 9 Mar 2012 07:37:40 +0100
+Subject: [PATCH 09/11] ARM: tegra: Rewrite PCIe support as a driver
+In-Reply-To: <4F5911E0.6060802@wwwdotorg.org>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-10-git-send-email-thierry.reding@avionic-design.de>
+ <4F5911E0.6060802@wwwdotorg.org>
+Message-ID: <20120309063739.GC25208@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-03-09 at 10:31 -0800, Tony Lindgren wrote: 
-> Hi Luca,
+* Stephen Warren wrote:
+> On 03/08/2012 07:51 AM, Thierry Reding wrote:
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> 
+> Patch description?
 
-Hi Tony,
+I actually sat in front of the editor for a couple of minutes and I just
+couldn't think of anything. I'll try harder for the next version.
 
+> > diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
+> ...
+> > -static int __init harmony_pcie_init(void)
+> > +static int tegra_pcie_init(struct platform_device *pdev)
+> 
+> That name should probably still be called harmony_something() since it's
+> still board-specific.
 
-> * Mircea Gherzan <mgherzan@gmail.com> [120306 14:23]:
-> > The "uim" deamon requires sysfs entries that are filled in using
-> > this platform data.
-> > 
-> > Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
-> > ---
-> >  arch/arm/mach-omap2/board-omap4panda.c |   14 ++++++++++++--
-> >  include/linux/ti_wilink_st.h           |    2 ++
-> >  2 files changed, 14 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> > index b1d74d6..339e781 100644
-> > --- a/arch/arm/mach-omap2/board-omap4panda.c
-> > +++ b/arch/arm/mach-omap2/board-omap4panda.c
-> > @@ -27,6 +27,7 @@
-> >  #include <linux/i2c/twl.h>
-> >  #include <linux/regulator/machine.h>
-> >  #include <linux/regulator/fixed.h>
-> > +#include <linux/ti_wilink_st.h>
-> >  #include <linux/wl12xx.h>
-> >  
-> >  #include <mach/hardware.h>
-> > @@ -56,12 +57,21 @@
-> >  #define HDMI_GPIO_HPD  63 /* Hotplug detect */
-> >  
-> >  /* wl127x BT, FM, GPS connectivity chip */
-> > -static int wl1271_gpios[] = {46, -1, -1};
-> > +static struct ti_st_plat_data wilink_platform_data = {
-> > +	.nshutdown_gpio	= 46,
-> > +	.dev_name	= "/dev/ttyO1",
-> > +	.flow_cntrl	= 1,
-> > +	.baud_rate	= 3000000,
-> > +	.chip_enable	= NULL,
-> > +	.suspend	= NULL,
-> > +	.resume		= NULL,
+Okay, I'll rename it to harmony_pcie_init().
+
+> I wonder how having a per-board callback will integrate with device
+> tree. I guess I'll find out when I review patch 11:-)
+> 
+> > diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+> 
+> > +static int __init trimslice_pci_init(void)
+> >  {
+> >  	if (!machine_is_trimslice())
+> >  		return 0;
+> 
+> You can remove that test now.
+
+Okay.
+
+> > diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
+> 
+> > +#define TEGRA_PCIE_MAX_PORTS 2
+> > +
+> > +struct tegra_pcie_pdata {
+> > +	int (*init)(struct platform_device *pdev);
+> > +	int (*exit)(struct platform_device *pdev);
+> > +	bool enable_ports[TEGRA_PCIE_MAX_PORTS];
 > > +};
-> > +
-> >  static struct platform_device wl1271_device = {
-> >  	.name	= "kim",
-> >  	.id	= -1,
-> >  	.dev	= {
-> > -		.platform_data	= &wl1271_gpios,
-> > +		.platform_data	= &wilink_platform_data,
-> >  	},
-> >  };
-> >  
-> > diff --git a/include/linux/ti_wilink_st.h b/include/linux/ti_wilink_st.h
-> > index 2ef4385..3ca0269 100644
-> > --- a/include/linux/ti_wilink_st.h
-> > +++ b/include/linux/ti_wilink_st.h
-> > @@ -25,6 +25,8 @@
-> >  #ifndef TI_WILINK_ST_H
-> >  #define TI_WILINK_ST_H
-> >  
-> > +#include <linux/skbuff.h>
-> > +
-> >  /**
-> >   * enum proto-type - The protocol on WiLink chips which share a
-> >   *	common physical interface like UART.
-> > -- 
 > 
-> Just checking.. Can you please take a look at this patch
-> and confirm that this is how things are supposed to be done?
-> 
-> To me passing some third driver's dev_name in pdata seems
-> pretty weird.. But then again maybe I just don't know how
-> this is supposed to work.
+> That's a somewhat odd place to put the header; a dedicated
+> mach-tegra/include/mach/tegra_pcie_pdata.h or
+> include/linux/platform_data/tegra_pcie.h might make more sense.
 
-This looks pretty weird to me too.  The "/dev/ttyO1" thing doesn't look
-right.  But I don't really know how this works either, because this is
-the BT/FM/GPS part of the wl12xx chip.  And, to be honest, I don't know
-anything about it.  I only know about the wifi part of it. :\
+mach-tegra/include/mach/pcie.h perhaps? That would be less redundant.
 
--- 
-Cheers,
-Luca.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/e23b9cb7/attachment-0001.sig>
