@@ -1,61 +1,60 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 09 Mar 2012 07:29:28 -0800
-Subject: [GIT PULL] ARM: OMAP2+: PM: core support for SMPS regulators for
- v3.4
-In-Reply-To: <20120309114731.GA3273@opensource.wolfsonmicro.com> (Mark Brown's
- message of "Fri, 9 Mar 2012 11:47:36 +0000")
-References: <877gywjhht.fsf@ti.com> <20120308021843.GQ12083@atomide.com>
- <87399jc6cj.fsf@ti.com> <20120309003217.GB12083@atomide.com>
- <20120309114731.GA3273@opensource.wolfsonmicro.com>
-Message-ID: <87zkbp4wtj.fsf@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 09 Mar 2012 11:35:51 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the
+ omap_dss2 tree
+In-Reply-To: <201203081616.12510.arnd@arndb.de>
+References: <20120308170048.f1a992bca2ca2d93fa9747bf@canb.auug.org.au>
+ <201203081616.12510.arnd@arndb.de>
+Message-ID: <1331285751.1927.20.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+Hi,
 
-> On Thu, Mar 08, 2012 at 04:32:18PM -0800, Tony Lindgren wrote:
->> * Kevin Hilman <khilman@ti.com> [120308 09:37]:
->> > Tony Lindgren <tony@atomide.com> writes:
->
->> > Oh, that's because it depends on the regulator core changes that are in
->> > Mark's regulator tree.  You need the for-next branch of :
->
->> > git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
->
->> > For this to compile correctly.
->
->> > Sorry, I should've been more clear above about the build dependency.
->
->> Hmm just checking.. Recently Mark replied to Peter:
->
-> ...
->
->> So can you guys please confirm that if is indeed an immutable
->> commit to use as a base to merge in something?
->
-> Absolutely not, the for-next branch is rebuilt frequently especially
-> since it includes stuff sent to Linus and he complained about bugfixes
-> merged up into development code.  What is the actual dependency here?
+On Thu, 2012-03-08 at 16:16 +0000, Arnd Bergmann wrote:
+> On Thursday 08 March 2012, Stephen Rothwell wrote:
+> > Hi all,
+> > 
+> > Today's linux-next merge of the arm-soc tree got a conflict in
+> > arch/arm/mach-omap1/board-palmtt.c between commit ddba6c7f7ec6 ("OMAP1:
+> > pass LCD config with omapfb_set_lcd_config()") from the omap_dss2 tree
+> > and commit 2e3ee9f45b3c ("ARM: OMAP1: Move most of plat/io.h into local
+> > iomap.h") from the arm-soc tree.
+> > 
+> > I fixed it up (see below) and can carry the fix as necessary.
+> 
+> Hi Stephen,
+> 
+> Thanks for fixing up all the conflicts between arm-soc and omap_dss2.
+> I think we should make sure they are resolved in one of the trees before
+> the merge window.
 
-The stuff is in your topic/drivers branch.  Specifically:
+Do we need to? The conflicts seemed to be trivial ones, like arm-soc
+adds/removes something that just happens to be next to something else
+that I add/remove.
 
-ed5da2a mfd: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS
-77a3915 regulator: twl-regulator: Add fixed LDO for V1V8, V2V1 supply
-d64214b regulator: twl: adapt twl-regulator driver to dt
-3e1ff1f regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators
-1a4a805 regulator: twl4030: add support for external voltage get/set
+My understanding is that it's better to leave those conflicts than to do
+"trickery" to avoid them.
 
-> The topic branches are more or less static, though some more than
-> others.
+> Tomi, what are your plans for the omap_dss2 branch to get merged?
 
-Is topic/drivers something stable?  If not, these are a ways back in
-that branch, maybe you make a topic/drivers-stable for us?
+Normally my tree goes via fbdev-tree (Florian's tree) to mainline.
 
-> In general you should warn people if you've got a dependency on their
-> tree, it makes life easier.
+> Do you think you should send it to Linus first and we merge it into
+> arm-soc to resolve the conflicts?
+> Or do you want to merge it through the arm-soc tree?
+> Or should we go first and you fix up the conflicts by pulling in the
+> necessary topic branches from arm-soc into your tree?
 
-Yeah, I should've raised this when the original series were posted.  The
-arch stuff and drivers/regulator stuff were posted all together, but you
-picked out the regulator stuff and I picked up the rest.  
+If we want to resolve the conflicts, perhaps it's simplest if the dss
+tree is merged to arm-soc.
 
-Kevin
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/38627a82/attachment-0001.sig>
