@@ -1,30 +1,28 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Fri, 9 Mar 2012 09:20:07 +0100
-Subject: [PATCH 5/9] ARM: OMAP36xx: hwmod data: fix SmartReflex interface
- data
-In-Reply-To: <alpine.DEB.2.00.1203082051150.26656@utopia.booyaka.com>
-References: <20120228110943.808.73639.stgit@dusk>
- <20120228111054.808.16941.stgit@dusk>
- <alpine.DEB.2.00.1203082051150.26656@utopia.booyaka.com>
-Message-ID: <CAORVsuV8YXNRF=UjBOd8hoYbJ+ksg6RT1dZYC=TuUTmLiuD+ow@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 9 Mar 2012 18:44:11 +0100
+Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20120309174411.GI3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Fri, Mar 09, 2012 at 04:20:36PM +0100, Javier Martin wrote:
+> The following series have to be applied on top of the following patches:
+> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
+> 
+> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+> is deprecated and no new patches are accepted for it.
+> 
+> This series merges this code into the imx-dma.c dmaengine driver.
 
-On Fri, Mar 9, 2012 at 4:51 AM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> Dropping this patch from this series due to conflicts with the SmartReflex
-> branch. ?It will be moved to a subsequent series.
-I can take this change as part of the series I am preparing for the SR
-conversion to drivers/.
-What do you thin?
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-> - Paul
 
-Jean
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
