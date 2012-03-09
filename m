@@ -1,42 +1,165 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Fri, 9 Mar 2012 13:24:36 +0000 (GMT)
-Subject: [PATCH] MAINTAINERS: update maintainer entry for pxa/hx4700
-In-Reply-To: <1330256419.3673.27.camel@flow>
-Message-ID: <1331299476.1616.YahooMailClassic@web29006.mail.ird.yahoo.com>
+From: aneesh@ti.com (Aneesh V)
+Date: Fri, 09 Mar 2012 18:20:51 +0530
+Subject: [PATCH 4/4] misc: emif: add device tree support to emif driver
+In-Reply-To: <20120309053704.E40433E0901@localhost>
+References: <1331224437-4808-1-git-send-email-aneesh@ti.com>
+ <1331224437-4808-5-git-send-email-aneesh@ti.com>
+ <20120309053704.E40433E0901@localhost>
+Message-ID: <4F59FCAB.5040107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Paul Parsons <lost.distance@yahoo.com>
+Hi Grant,
 
---- On Sun, 26/2/12, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> Add Paul Parsons as maintainer for
-> pxa/hx4700.
-> Also, add a mailing list and update the files.
-> 
-> Cc: Paul Parsons <lost.distance@yahoo.com>
-> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-> ---
->  MAINTAINERS |? ? 3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 9a648eb..154ab2b 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -815,9 +815,12 @@ S:??? Maintained
->  
->  ARM/H4700 (HP IPAQ HX4700) MACHINE SUPPORT
->  M:??? Philipp Zabel <philipp.zabel@gmail.com>
-> +M:??? Paul Parsons <lost.distance@yahoo.com>
-> +L:??? linux-arm-kernel at lists.infradead.org
-> (moderated for non-subscribers)
->  S:??? Maintained
->  F:??? arch/arm/mach-pxa/hx4700.c
->  F:???
-> arch/arm/mach-pxa/include/mach/hx4700.h
-> +F:??? sound/soc/pxa/hx4700.c
->  
->  ARM/HP JORNADA 7XX MACHINE SUPPORT
->  M:??? Kristoffer Ericson <kristoffer.ericson@gmail.com>
-> -- 
-> 1.7.9
+On Friday 09 March 2012 11:07 AM, Grant Likely wrote:
+> On Thu,  8 Mar 2012 22:03:57 +0530, Aneesh V<aneesh@ti.com>  wrote:
+>> Cc: Rajendra Nayak<rnayak@ti.com>
+>> Cc: Benoit Cousson<b-cousson@ti.com>
+>> Signed-off-by: Aneesh V<aneesh@ti.com>
+>> ---
+>> Changes since RFC v4:
+>> - Rebased to the latest version of EMIF series
+>> - Replace kzalloc()/kfree() with devm_* variants
+>> ---
+>>   drivers/misc/emif.c |  289 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>>   1 files changed, 288 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/misc/emif.c b/drivers/misc/emif.c
+>> index 79fb161..0aaa61e 100644
+>> --- a/drivers/misc/emif.c
+>> +++ b/drivers/misc/emif.c
+>> @@ -18,6 +18,7 @@
+>>   #include<linux/platform_device.h>
+>>   #include<linux/interrupt.h>
+>>   #include<linux/slab.h>
+>> +#include<linux/of.h>
+>>   #include<linux/debugfs.h>
+>>   #include<linux/seq_file.h>
+>>   #include<linux/module.h>
+>> @@ -49,6 +50,7 @@
+>>    *				frequency in effect at the moment)
+>>    * @plat_data:			Pointer to saved platform data.
+>>    * @debugfs_root:		dentry to the root folder for EMIF in debugfs
+>> + * @np_ddr:			Pointer to ddr device tree node
+>>    */
+>>   struct emif_data {
+>>   	u8				duplicate;
+>> @@ -63,6 +65,9 @@ struct emif_data {
+>>   	struct emif_regs		*curr_regs;
+>>   	struct emif_platform_data	*plat_data;
+>>   	struct dentry			*debugfs_root;
+>> +#if defined(CONFIG_OF)
+>> +	struct device_node		*np_ddr;
+>> +#endif
+>
+> Don't bother with the #if/#endif wrapper here.
+
+Ok.
+
+>
+>>   };
+>>
+>>   static struct emif_data *emif1;
+>> @@ -1147,6 +1152,270 @@ static int is_custom_config_valid(struct emif_custom_configs *cust_cfgs,
+>>   	return valid;
+>>   }
+>>
+>> +#if defined(CONFIG_OF)
+>> +static void __init of_get_custom_configs(struct device_node *np_emif,
+>
+> __devinit. Same through the rest of the file.
+
+I am not sure if we need __devinit. I see that __devinit will not have
+any effect if CONFIG_HOTPLUG is enabled and CONFIG_HOTPLUG is always
+enabled in our configuration. EMIF devices are not hot-pluggable
+devices and are always added at boot-time from the board file. They are
+on-chip IP modules and dynamic discovery and addition doesn't make
+sense for them. So, can't we save some memory by making them __init.
+
+AFAIU, __init doesn't have any effect in a module. However, I can make
+that more explicit by using '__init_or_module'. Is that ok?
+
+>
+> [...]
+>> +	return NULL;
+>> +out:
+>> +	return emif;
+>> +}
+>> +#endif
+>> +
+>>   static struct emif_data * __init get_device_details(
+>
+> This function also must be __devinit
+>
+>>   		struct platform_device *pdev)
+>>   {
+>> @@ -1266,7 +1535,13 @@ static int __init emif_probe(struct platform_device *pdev)
+>>   	struct resource		*res;
+>>   	int			irq;
+>>
+>> -	emif = get_device_details(pdev);
+>> +#if defined(CONFIG_OF)
+>> +	if (pdev->dev.of_node)
+>> +		emif = of_get_device_details(pdev->dev.of_node,&pdev->dev);
+>> +	else
+>> +#endif
+>> +		emif = get_device_details(pdev);
+>> +
+>>   	if (!emif) {
+>>   		pr_err("%s: error getting device data\n", __func__);
+>>   		goto error;
+>> @@ -1643,11 +1918,23 @@ static void __attribute__((unused)) freq_post_notify_handling(void)
+>>   	spin_unlock_irqrestore(&emif_lock, irq_state);
+>>   }
+>>
+>> +#if defined(CONFIG_OF)
+>> +static const struct of_device_id emif_of_match[] = {
+>> +		{ .compatible = "ti,emif-4d" },
+>> +		{ .compatible = "ti,emif-4d5" },
+>> +		{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, emif_of_match);
+>> +#endif
+>> +
+>>   static struct platform_driver emif_driver = {
+>>   	.remove		= __exit_p(emif_remove),
+>
+> Not part of this patch I realize, but this is a bug.  .remove must
+> be in the __devexit section and the __devexit_p() wrapper must
+> be used.  Similarly, emif_probe must be in the __devinit section.
+
+Again, in our case remove() is not needed unless the driver is built as
+a module because the devices will never be un-registered. When it is
+built as a module the effect is same for both:
+
+#if defined(MODULE) || defined(CONFIG_HOTPLUG)
+#define __devexit_p(x) x
+#else
+#define __devexit_p(x) NULL
+#endif
+
+#ifdef MODULE
+#define __exit_p(x) x
+#else
+#define __exit_p(x) NULL
+#endif
+
+>
+>>   	.shutdown	= emif_shutdown,
+>>   	.driver = {
+>>   		.name = "emif",
+>> +#if defined(CONFIG_OF)
+>> +		.of_match_table = of_match_ptr(emif_of_match),
+>> +#endif
+>
+> The of_match_ptr() macro makes the #if/#endif wrapper redundant.
+
+Ok. I will remove it.
+
+>
+> Otherwise, on brief review this patch looks right.
+
+Thanks for the review. Are you ok with the bindings too?
+
+br,
+Aneesh
