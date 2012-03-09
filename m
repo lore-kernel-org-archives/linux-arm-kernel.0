@@ -1,26 +1,19 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Mar 2012 10:00:28 -0800
-Subject: [PATCH] ARM: OMAP4: clock: Add aliases for McBSP fclk clocks
-In-Reply-To: <4F5A258F.8050704@ti.com>
-References: <1331024133-18201-1-git-send-email-peter.ujfalusi@ti.com>
- <4F5A258F.8050704@ti.com>
-Message-ID: <20120309180027.GF12083@atomide.com>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Fri, 9 Mar 2012 18:35:41 +0100
+Subject: [PATCH] pxa/hx4700: Remove pcmcia platform_device structure
+In-Reply-To: <1331305076.23513.YahooMailClassic@web29009.mail.ird.yahoo.com>
+References: <1331305076.23513.YahooMailClassic@web29009.mail.ird.yahoo.com>
+Message-ID: <CA+gwMce5x8XddOoKKNhYVfowstUtfeTNegJYA41av6EBLvS7sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [120309 07:47]:
-> Hi Paul, Tony,
-> 
-> On 03/06/2012 10:55 AM, Peter Ujfalusi wrote:
-> > CLKS signal for McBSP ports can be selected from internal (PRCM) or external
-> > (ABE_CLKS pin) source.
-> > To be able to use existing code we need to create clock aliases consistent
-> > among OMAP2/3/4.
-> 
-> Would you be able to take a look at this patch?
+On Fri, Mar 9, 2012 at 3:57 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> The existing pcmcia platform_device structure is not used and is not needed by
+> the pending hx4700 PCMCIA/CF support. So let's remove it.
+>
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 
-To me this looks safe to merge via ASoC tree, assuming Paul
-acks it too, and it does not cause merge conflicts with
-Paul's changes:
+Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+regards
+Philipp
