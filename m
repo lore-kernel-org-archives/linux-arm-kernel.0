@@ -1,57 +1,42 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Fri, 9 Mar 2012 14:16:52 +0530
-Subject: [PATCH v3 05/13] gpio/omap: get rid of retrigger variable in
- gpio_irq_handler
-In-Reply-To: <1331118963-26364-6-git-send-email-tarun.kanti@ti.com>
-References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
- <1331118963-26364-6-git-send-email-tarun.kanti@ti.com>
-Message-ID: <CAC83ZvJXK-FsiqyQT6BQxggRewkiHZkRBi44CVH15gb4dUbsjw@mail.gmail.com>
+From: coelho@ti.com (Luciano Coelho)
+Date: Fri, 09 Mar 2012 08:15:02 +0200
+Subject: [PATCH 0/2] ARM: OMAP2+: PM: code consolidation for 3.4
+In-Reply-To: <87d38mbxfu.fsf@ti.com>
+References: <20120202093600.12509.35052.stgit@dusk> <87ty39cc7s.fsf@ti.com>
+ <alpine.DEB.2.00.1202021140060.586@utopia.booyaka.com>
+ <alpine.DEB.2.00.1202021328450.586@utopia.booyaka.com>
+ <CAKd1q9rq67gUyXn+rOL348YwaYQiqHR8UQCSd68fpxhZHHsYGA@mail.gmail.com>
+ <87sjhjaqyi.fsf@ti.com> <1331232433.18015.69.camel@cumari>
+ <alpine.DEB.2.00.1203081153540.9551@utopia.booyaka.com>
+ <1331233547.18015.74.camel@cumari> <87d38mbxfu.fsf@ti.com>
+Message-ID: <1331273702.18015.92.camel@cumari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2012 at 4:45 PM, Tarun Kanti DebBarma <tarun.kanti@ti.com> wrote:
-> This local variable is just assigned zero and then OR'ed
-> with isr. It does not appear to serve any purpose and so
-> removing it.
-Missed following comments from Kevin given in v2. Sorry about that.
-I have updated the change in:
-git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev
-for_3.4/gpio_further_cleanup_fixes
+Hi Kevin,
 
-"commit 672e302e3c (ARM: OMAP: use edge/level handlers from generic IRQ
-framework) removed retrigger support in favor of using generic IRQ
-framework.  This patch cleans up some unused remnants of that removal.
---
-Tarun
->
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> ---
-> ?drivers/gpio/gpio-omap.c | ? ?3 ---
-> ?1 files changed, 0 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 3765654..de5fe8f 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -626,7 +626,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> ? ? ? ?u32 isr;
-> ? ? ? ?unsigned int gpio_irq, gpio_index;
-> ? ? ? ?struct gpio_bank *bank;
-> - ? ? ? u32 retrigger = 0;
-> ? ? ? ?int unmasked = 0;
-> ? ? ? ?struct irq_chip *chip = irq_desc_get_chip(desc);
->
-> @@ -663,8 +662,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> ? ? ? ? ? ? ? ? ? ? ? ?chained_irq_exit(chip, desc);
-> ? ? ? ? ? ? ? ?}
->
-> - ? ? ? ? ? ? ? isr |= retrigger;
-> - ? ? ? ? ? ? ? retrigger = 0;
-> ? ? ? ? ? ? ? ?if (!isr)
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
->
-> --
-> 1.7.0.4
->
+On Thu, 2012-03-08 at 13:21 -0800, Kevin Hilman wrote: 
+> Luciano Coelho <coelho@ti.com> writes:
+> 
+> [...]
+> 
+> > Thanks, Paul! I was just chatting with Kevin about this on IRC.  With
+> > your patch and no_console_suspend, it works. :)
+> 
+> Just FYI... I've queued this patch from Paul and it's now queued by Tony
+> for v3.4 in his cleanup-pm branch.
+
+Great, thanks for the info!
+
+BTW, you and Paul said that it was not recommended to use
+no_console_suspend, but Ido (on CC) said that it can be useful for us,
+because we need to see if our own (wireless) stuff goes into suspend
+correctly.
+
+Are there any real problems with no_console_suspend besides power
+consumption? Is it safe for us to simply apply Paul's patch when we need
+it?
+
+-- 
+Cheers,
+Luca.
