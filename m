@@ -1,72 +1,101 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 09 Mar 2012 07:23:16 -0800
-Subject: [PATCH 0/2] ARM: OMAP2+: PM: code consolidation for 3.4
-In-Reply-To: <1331273702.18015.92.camel@cumari> (Luciano Coelho's message of
- "Fri, 09 Mar 2012 08:15:02 +0200")
-References: <20120202093600.12509.35052.stgit@dusk> <87ty39cc7s.fsf@ti.com>
- <alpine.DEB.2.00.1202021140060.586@utopia.booyaka.com>
- <alpine.DEB.2.00.1202021328450.586@utopia.booyaka.com>
- <CAKd1q9rq67gUyXn+rOL348YwaYQiqHR8UQCSd68fpxhZHHsYGA@mail.gmail.com>
- <87sjhjaqyi.fsf@ti.com> <1331232433.18015.69.camel@cumari>
- <alpine.DEB.2.00.1203081153540.9551@utopia.booyaka.com>
- <1331233547.18015.74.camel@cumari> <87d38mbxfu.fsf@ti.com>
- <1331273702.18015.92.camel@cumari>
-Message-ID: <87haxx6bob.fsf@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 9 Mar 2012 08:23:50 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the sound tree
+In-Reply-To: <20120309180647.a27cc03a8997f9b38eb8ad0e@canb.auug.org.au>
+References: <20120309180647.a27cc03a8997f9b38eb8ad0e@canb.auug.org.au>
+Message-ID: <20120309072350.GV3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Luciano Coelho <coelho@ti.com> writes:
+On Fri, Mar 09, 2012 at 06:06:47PM +1100, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got conflicts in
+> arch/arm/mach-imx/mm-imx3.c and arch/arm/mach-imx/mm-imx5.c between
+> commit 3bc34a614335 ("ARM: imx: convert audmux to a platform driver")
+> from the sound tree and commits 38bb3630bcba ("ARM: mx35: Setup the AIPS
+> registers") and aa6a9fa1f274 ("ARM: mx5: Use common function for
+> configuring AIPS") from the arm-soc tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary.
 
-> Hi Kevin,
->
-> On Thu, 2012-03-08 at 13:21 -0800, Kevin Hilman wrote: 
->> Luciano Coelho <coelho@ti.com> writes:
->> 
->> [...]
->> 
->> > Thanks, Paul! I was just chatting with Kevin about this on IRC.  With
->> > your patch and no_console_suspend, it works. :)
->> 
->> Just FYI... I've queued this patch from Paul and it's now queued by Tony
->> for v3.4 in his cleanup-pm branch.
->
-> Great, thanks for the info!
->
-> BTW, you and Paul said that it was not recommended to use
-> no_console_suspend, but Ido (on CC) said that it can be useful for us,
-> because we need to see if our own (wireless) stuff goes into suspend
-> correctly.
+Looks good, thanks
 
-no_console_suspend should not be needed there.  It is really only
-intended as a *temporary* debug feature when suspend fails.
-
-Since the console is disabled during suspend, if suspend fails, you
-might not see the reason for failure.  So in this case, you enable
-no_console_suspend just to see the suspend output, and why it's failing.
-
-If suspend/resume succeed, you will see all the console output after
-resume because even though the console is disabled, the printks are
-buffered, so you will see them eventually.
-
-So with a working suspend/resume, you will eventually see all the
-console output.
-
-So basically, any usage of no_console_suspend should be temporary, until
-you figure out why suspend if failing. 
-
-> Are there any real problems with no_console_suspend besides power
-> consumption? Is it safe for us to simply apply Paul's patch when we need
-> it?
-
-There are important side effects of leaving the console enabled.
-Namely, the console UART will stay clocked, and thus prevent it's
-surrounding powerdomain from reaching a low power state.  UARTs can be
-in either the PER or CORE powerdomains, so preventing them from reaching
-the low powerstate will affect other drivers in those powerdomains.
-
-For example, if your device is in the same powerdomain as the UART, it
-will not be clock gated (or power gated) so the context save/restore
-paths of those devices will not be exercised.
+Sascha
 
 
-Kevin
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/mach-imx/mm-imx3.c
+> index 9c9b7f9,1646991..0000000
+> --- a/arch/arm/mach-imx/mm-imx3.c
+> +++ b/arch/arm/mach-imx/mm-imx3.c
+> @@@ -177,8 -175,9 +179,12 @@@ void __init imx31_soc_init(void
+>   	}
+>   
+>   	imx_add_imx_sdma("imx31-sdma", MX31_SDMA_BASE_ADDR, MX31_INT_SDMA, &imx31_sdma_pdata);
+> + 
+> + 	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS1_BASE_ADDR));
+> + 	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS2_BASE_ADDR));
+> ++
+>  +	platform_device_register_simple("imx31-audmux", 0, imx31_audmux_res,
+>  +					ARRAY_SIZE(imx31_audmux_res));
+>   }
+>   #endif /* ifdef CONFIG_SOC_IMX31 */
+>   
+> @@@ -267,8 -262,9 +273,13 @@@ void __init imx35_soc_init(void
+>   	}
+>   
+>   	imx_add_imx_sdma("imx35-sdma", MX35_SDMA_BASE_ADDR, MX35_INT_SDMA, &imx35_sdma_pdata);
+> + 
+> + 	/* Setup AIPS registers */
+> + 	imx_set_aips(MX35_IO_ADDRESS(MX35_AIPS1_BASE_ADDR));
+> + 	imx_set_aips(MX35_IO_ADDRESS(MX35_AIPS2_BASE_ADDR));
+> ++
+>  +	/* i.mx35 has the i.mx31 type audmux */
+>  +	platform_device_register_simple("imx31-audmux", 0, imx35_audmux_res,
+>  +					ARRAY_SIZE(imx35_audmux_res));
+>   }
+>   #endif /* ifdef CONFIG_SOC_IMX35 */
+> diff --cc arch/arm/mach-imx/mm-imx5.c
+> index dc7c4ed,92efece..0000000
+> --- a/arch/arm/mach-imx/mm-imx5.c
+> +++ b/arch/arm/mach-imx/mm-imx5.c
+> @@@ -201,9 -185,10 +201,14 @@@ void __init imx51_soc_init(void
+>   
+>   	/* i.mx51 has the i.mx35 type sdma */
+>   	imx_add_imx_sdma("imx35-sdma", MX51_SDMA_BASE_ADDR, MX51_INT_SDMA, &imx51_sdma_pdata);
+> + 
+> + 	/* Setup AIPS registers */
+> + 	imx_set_aips(MX51_IO_ADDRESS(MX51_AIPS1_BASE_ADDR));
+> + 	imx_set_aips(MX51_IO_ADDRESS(MX51_AIPS2_BASE_ADDR));
+> ++
+>  +	/* i.mx51 has the i.mx31 type audmux */
+>  +	platform_device_register_simple("imx31-audmux", 0, imx51_audmux_res,
+>  +					ARRAY_SIZE(imx51_audmux_res));
+>   }
+>   
+>   void __init imx53_soc_init(void)
+> @@@ -219,7 -204,8 +224,12 @@@
+>   
+>   	/* i.mx53 has the i.mx35 type sdma */
+>   	imx_add_imx_sdma("imx35-sdma", MX53_SDMA_BASE_ADDR, MX53_INT_SDMA, &imx53_sdma_pdata);
+> + 
+> + 	/* Setup AIPS registers */
+> + 	imx_set_aips(MX53_IO_ADDRESS(MX53_AIPS1_BASE_ADDR));
+> + 	imx_set_aips(MX53_IO_ADDRESS(MX53_AIPS2_BASE_ADDR));
+> ++
+>  +	/* i.mx53 has the i.mx31 type audmux */
+>  +	platform_device_register_simple("imx31-audmux", 0, imx53_audmux_res,
+>  +					ARRAY_SIZE(imx53_audmux_res));
+>   }
+
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
