@@ -1,35 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 Mar 2012 10:21:49 -0800
-Subject: [GIT PULL 4/4] Samsung devel-dma for v3.4
-In-Reply-To: <4F5B7CA7.2010604@samsung.com>
-References: <4F5B7CA7.2010604@samsung.com>
-Message-ID: <20120310182149.GA656@quad.lixom.net>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri,  9 Mar 2012 10:51:16 +0200
+Subject: [PATCH 0/2] ARM/ASoC: OMAP: McBSP config cleanup
+Message-ID: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2012 at 08:09:11AM -0800, Kukjin Kim wrote:
-> Hi Arnd, Olof,
-> 
-> This is for Samsung dma stuff for v3.4 and depends on following:
->   next/cleanup-use-static
->   next/cleanup-exynos-clock
-> 
-> Please pull from:
-
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/devel-samsung-dma
-> 
-> And conflicts will be happened in clock part. Here is my preferred
-> resolution. The mach-exynos/clock.c can be removed with following:
-> 
-> arch/arm/mach-exynos/exynos-clock4.c
-
 Hi,
 
-given my feedback on the cleanup-exynos-clock pull request, I'm holding off on
-this one waiting on you to do the resolution of the conflicts. :-)
+Since the McBSP driver has been moved out from arch/arm/plat-omap/ and it is
+combined as a single driver with the sound/soc/omap/omap-mcbsp.c there is no
+longer need to have CONFIG_OMAP_MCBSP.
+This series cleans up the Kconfigs, and Makefiles.
+Also it is fixes the issue that the OMAP audio drivers were not buildable as
+modules (the ones using McBSP) reported by Grazvydas Ignotas <notasas@gmail.com>
 
+I have generated this series on top of Liam's for-3.4 branch. The
+arch/arm/mach-omap* patch applies cleanly on top of todays linux-next, so if
+this series goes via ASoC we are not going to have conflicts with stuff coming
+via l-o.
 
-Thanks,
+Tested on BeagleBoard, and SDP4430, compile tested for OMAP1.
 
--Olof
+This series should go via ASoC along with the rest of the McBSP changes.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (2):
+  ARM: OMAP: Remove CONFIG_OMAP_MCBSP references
+  ASoC: OMAP: Build config cleanup for McBSP
+
+ arch/arm/mach-omap1/Kconfig  |    3 ---
+ arch/arm/mach-omap1/Makefile |    4 +++-
+ arch/arm/mach-omap2/Makefile |    4 +++-
+ sound/soc/omap/Kconfig       |    6 ------
+ sound/soc/omap/Makefile      |    3 +--
+ 5 files changed, 7 insertions(+), 13 deletions(-)
+
+-- 
+1.7.8.5
