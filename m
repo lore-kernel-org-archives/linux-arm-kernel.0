@@ -1,107 +1,53 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 08 Mar 2012 18:05:55 -0700
-Subject: [PATCH 1/4] gpiolib: Add gpiochip_find_by_name() and
- gpio_find_by_chip_name()
-In-Reply-To: <20120302190614.GO18901@atomide.com>
-References: <20120301185044.29210.44521.stgit@kaulin.local>
- <20120301185524.29210.60381.stgit@kaulin.local>
- <20120302075804.F28DB3E2DB4@localhost> <20120302170327.GF18901@atomide.com>
- <20120302180848.GM18901@atomide.com> <20120302184833.C296A3E1C63@localhost>
- <20120302190614.GO18901@atomide.com>
-Message-ID: <20120309010555.8DE213E0901@localhost>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 9 Mar 2012 09:19:16 +0800
+Subject: [PATCH v3 00/11] ASoC: add imx-sgtl5000 machine driver working
+ with fsl_ssi
+In-Reply-To: <4F5910EE.8090408@freescale.com>
+References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
+ <4F5910EE.8090408@freescale.com>
+Message-ID: <20120309011914.GF2499@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Mar 2012 11:06:15 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> * Grant Likely <grant.likely@secretlab.ca> [120302 10:16]:
-> > On Fri, 2 Mar 2012 10:08:48 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > > * Tony Lindgren <tony@atomide.com> [120302 08:31]:
-> > > > * Grant Likely <grant.likely@secretlab.ca> [120302 01:00]:
-> > > > > On Thu, 01 Mar 2012 10:55:24 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > > > > > +
-> > > > > > +/**
-> > > > > > + * gpiochip_find_by_name() - iterator for locating a gpio_chip by name
-> > > > > > + * @name: name of the gpio_chip
-> > > > > > + *
-> > > > > > + * Similar to bus_find_device_by_name. It returns a reference to the
-> > > > > > + * first gpio_chip with matching name. It ignores NULL and empty names.
-> > > > > > + * If you need to do something more complex, then use gpiochip_find.
-> > > > > > + */
-> > > > > > +struct gpio_chip *gpiochip_find_by_name(const char *name)
-> > > > > > +{
-> > > > > > +	if (!name || !strcmp(name, ""))
-> > > > > > +		return NULL;
-> > > > > > +
-> > > > > > +	return gpiochip_find((void *)name, match_name);
-> > > > > 
-> > > > > Nasty cast.  Can the signature for gpiochip_find be changed to accept
-> > > > > a (const void *)?
-> > > > 
-> > > > I think so, this too comes from the bus code.
-> > > 
-> > > Looks like it can't be const as of_node_to_gpiochip uses it with
-> > > a struct device_node * that for of_get_named_gpio_flags comes from
-> > > of_parse_phandle_with_args.
-> > 
-> > Really? It sees to work fine here:
+On Thu, Mar 08, 2012 at 02:05:02PM -0600, Timur Tabi wrote:
+> Shawn Guo wrote:
+> > I did not pick up you Ack-by tag, because there are some changes since
+> > v2 you will need to take another look and have the testing, I guess.
 > 
-> Hmm right you are. I must have missed adding the const to
-> of_gpiochip_is_match, that's good news :)
+> Unfortunately, although it works on the MPC8610, it's broken on the P1022:
 > 
-> Want to do that as a separate patch or want me to fold it in?
+> # speaker-test -t sine -c 2 -r 44100
+> 
+> 
+> speaker-test 1.0.11rc2
+> 
+> 
+> Playback device is default
+> Stream parameters are 44100Hz, S16_BE, 2 channels
+> Sine wave rate is 440.0000Hz
+> Rate set to 44100Hz (requested 44100Hz)
+> Buffer size range from 256 to 32768
+> Period size range from 128 to 16384
+> Periods = 4
+> Buffer time size 575
+> To choose buffer_size = 32768
+> To choose period_size = 8192
+> was set period_size = 8192
+> was set buffer_size = 32768
+> 
+> At this point, nothing else happens, there's no audio, and even Ctrl-C
+> doesn't work.
+> 
+Are you testing the patch set on top of the SHA below, which I
+mentioned in the cover letter?
 
-I've got it as a separate commit in my gpio/next branch.
+  3030763 (Merge tag 'asoc-3.4' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound into topic/asoc)
 
-g.
+I see the similar problem on the following SHA with my testing on
+imx-sgtl5000.
 
-> > ---
-> > 
-> > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> > index d773540..e633a2a 100644
-> > --- a/drivers/gpio/gpiolib.c
-> > +++ b/drivers/gpio/gpiolib.c
-> > @@ -1152,8 +1152,9 @@ EXPORT_SYMBOL_GPL(gpiochip_remove);
-> >   * non-zero, this function will return to the caller and not iterate over any
-> >   * more gpio_chips.
-> >   */
-> > -struct gpio_chip *gpiochip_find(void *data,
-> > -				int (*match)(struct gpio_chip *chip, void *data))
-> > +struct gpio_chip *gpiochip_find(const void *data,
-> > +				int (*match)(struct gpio_chip *chip,
-> > +					     const void *data))
-> >  {
-> >  	struct gpio_chip *chip = NULL;
-> >  	unsigned long flags;
-> > diff --git a/drivers/of/gpio.c b/drivers/of/gpio.c
-> > index e034b38..bba8121 100644
-> > --- a/drivers/of/gpio.c
-> > +++ b/drivers/of/gpio.c
-> > @@ -229,7 +229,7 @@ void of_gpiochip_remove(struct gpio_chip *chip)
-> >  }
-> >  
-> >  /* Private function for resolving node pointer to gpio_chip */
-> > -static int of_gpiochip_is_match(struct gpio_chip *chip, void *data)
-> > +static int of_gpiochip_is_match(struct gpio_chip *chip, const void *data)
-> >  {
-> >  	return chip->of_node == data;
-> >  }
-> > diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-> > index 1ff4e22..5f52690 100644
-> > --- a/include/asm-generic/gpio.h
-> > +++ b/include/asm-generic/gpio.h
-> > @@ -142,9 +142,9 @@ extern int __must_check gpiochip_reserve(int start, int ngpio);
-> >  /* add/remove chips */
-> >  extern int gpiochip_add(struct gpio_chip *chip);
-> >  extern int __must_check gpiochip_remove(struct gpio_chip *chip);
-> > -extern struct gpio_chip *gpiochip_find(void *data,
-> > +extern struct gpio_chip *gpiochip_find(const void *data,
-> >  					int (*match)(struct gpio_chip *chip,
-> > -						     void *data));
-> > +						     const void *data));
-> >  
-> >  
-> >  /* Always use the library code for GPIO management calls,
-> > 
+  1a8feca (Merge branch 'for-3.4' into asoc-next)
 
 -- 
-email sent from notmuch.vim plugin
+Regards,
+Shawn
