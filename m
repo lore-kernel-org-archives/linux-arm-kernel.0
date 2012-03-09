@@ -1,197 +1,113 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 11 Mar 2012 18:16:03 +0530
-Subject: [PATCH 3/5] ARM: Exynos4: Add pinctrl devices and pin maps
-In-Reply-To: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
-References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1331469965-28846-4-git-send-email-thomas.abraham@linaro.org>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Fri,  9 Mar 2012 16:20:43 +0100
+Subject: [PATCH v3 07/13] dmaengine: imx-dma: remove sg member from internal
+ structure.
+In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1331306449-28591-8-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the three pinctrl platform devices and the pin maps for Exynos4.
+This member is redundant, because it is already present in
+descriptor structure. Removing it will make further removing
+of 'internal' structure easier.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
- arch/arm/mach-exynos/Kconfig              |    1 +
- arch/arm/mach-exynos/Makefile             |    1 +
- arch/arm/mach-exynos/common.h             |    6 ++
- arch/arm/mach-exynos/dev-pinctrl.c        |  115 +++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/devs.h |    3 +
- 5 files changed, 126 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos/dev-pinctrl.c
+ drivers/dma/imx-dma.c |   42 ++++++++++++++++++------------------------
+ 1 files changed, 18 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index c49d450..3e6a1cd 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -18,6 +18,7 @@ choice
- config ARCH_EXYNOS4
- 	bool "SAMSUNG EXYNOS4"
- 	select HAVE_SMP
-+	select PINCTRL
- 	select MIGHT_HAVE_CACHE_L2X0
- 	help
- 	  Samsung EXYNOS4 SoCs based systems
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 6fd8dd9..dbac5f9 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -56,6 +56,7 @@ obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
- obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
- obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
- obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
-+obj-$(CONFIG_PINCTRL_SAMSUNG)		+= dev-pinctrl.o
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index e8b6efa..dba62bc 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -128,7 +128,6 @@ enum  imxdma_prep_type {
+  */
  
- obj-$(CONFIG_ARCH_EXYNOS)		+= setup-i2c0.o
- obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 677b546..64f3c57 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -52,4 +52,10 @@ void exynos4212_register_clocks(void);
- #define exynos4212_register_clocks()
- #endif
+ struct imxdma_channel_internal {
+-	struct scatterlist *sg;
+ 	unsigned int resbytes;
  
-+#ifdef CONFIG_PINCTRL_SAMSUNG
-+extern int exynos4210_pinctrl_register_def_mappings(void);
-+#else
-+#define exynos4210_pinctrl_register_def_mappings()
-+#endif
-+
- #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-diff --git a/arch/arm/mach-exynos/dev-pinctrl.c b/arch/arm/mach-exynos/dev-pinctrl.c
-new file mode 100644
-index 0000000..d909052
---- /dev/null
-+++ b/arch/arm/mach-exynos/dev-pinctrl.c
-@@ -0,0 +1,115 @@
-+/*
-+ * platform device for all the instances of pinctrl.
-+ *
-+ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/platform_device.h>
-+#include <linux/interrupt.h>
-+#include <linux/pinctrl/machine.h>
-+
-+#include <plat/devs.h>
-+#include <plat/pinctrl.h>
-+
-+#include <mach/map.h>
-+
-+static struct resource exynos4_pinctrl_resource0[] = {
-+	[0] = {
-+		.start  = EXYNOS4_PA_GPIO1,
-+		.end    = EXYNOS4_PA_GPIO1 + SZ_4K - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = IRQ_GPIO_XA,
-+		.end    = IRQ_GPIO_XA,
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device exynos4_pinctrl0 = {
-+	.name		= "exynos4-pinctrl",
-+	.id		= 0,
-+	.resource	= exynos4_pinctrl_resource0,
-+	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource0),
-+};
-+
-+static struct resource exynos4_pinctrl_resource1[] = {
-+	[0] = {
-+		.start  = EXYNOS4_PA_GPIO2,
-+		.end    = EXYNOS4_PA_GPIO2 + SZ_4K - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start  = IRQ_GPIO_XB,
-+		.end    = IRQ_GPIO_XB,
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device exynos4_pinctrl1 = {
-+	.name		= "exynos4-pinctrl",
-+	.id		= 1,
-+	.resource	= exynos4_pinctrl_resource1,
-+	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource1),
-+};
-+
-+static struct resource exynos4_pinctrl_resource2[] = {
-+	[0] = {
-+		.start  = EXYNOS4_PA_GPIO3,
-+		.end    = EXYNOS4_PA_GPIO3 + SZ_4K - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device exynos4_pinctrl2 = {
-+	.name		= "exynos4-pinctrl",
-+	.id		= 2,
-+	.resource	= exynos4_pinctrl_resource2,
-+	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource2),
-+};
-+
-+/* pin config options. todo: add other options here. */
-+static unsigned long pcfg_pu_drv3[] __initdata = {
-+	PINCTRL_CFG_PACK(PUD_UP, DRV_4X),
-+};
-+
-+static unsigned long pcfg_pn_drv3[] __initdata = {
-+	PINCTRL_CFG_PACK(PUD_NONE, DRV_4X),
-+};
-+
-+/* Exynos4210 SoC default pin-maps reusable by Exynos4210 based boards*/
-+
-+static struct pinctrl_map __initdata exynos4210_sdhci2_8bit_map[] = {
-+	PIN_MAP_MUX_GROUP("exynos4-sdhci.2", "sdhci-pcfg8", "exynos4-pinctrl.1", "sdhci2_ctrl_grp", "sdhci2-mux"),
-+	PIN_MAP_MUX_GROUP("exynos4-sdhci.2", "sdhci-pcfg8", "exynos4-pinctrl.1", "sdhci2_cd_grp", "sdhci2-mux"),
-+	PIN_MAP_MUX_GROUP("exynos4-sdhci.2", "sdhci-pcfg8", "exynos4-pinctrl.1", "sdhci2_4bit_grp", "sdhci2-mux"),
-+	PIN_MAP_MUX_GROUP("exynos4-sdhci.2", "sdhci-pcfg8", "exynos4-pinctrl.1", "sdhci2_8bit_grp", "sdhci2-mux"),
-+	PIN_MAP_CONFIGS_GROUP("exynos4-sdhci.2", "sdhci-pcfg8", "exynos4-pinctrl.1", "sdhci2_ctrl_grp", pcfg_pn_drv3),
-+	PIN_MAP_CONFIGS_GROUP("exynos4-sdhci.2", "sdhci-pcfg8", "exynos4-pinctrl.1", "sdhci2_cd_grp", pcfg_pu_drv3),
-+	PIN_MAP_CONFIGS_GROUP("exynos4-sdhci.2", "sdhci-pcfg8", "exynos4-pinctrl.1", "sdhci2_4bit_grp", pcfg_pu_drv3),
-+	PIN_MAP_CONFIGS_GROUP("exynos4-sdhci.2", "sdhci-pcfg8", "exynos4-pinctrl.1", "sdhci2_8bit_grp", pcfg_pu_drv3),
-+};
-+
-+static struct pinctrl_map __initdata exynos4210_sdhci2_4bit_map[] = {
-+	PIN_MAP_MUX_GROUP("exynos4-sdhci.2", "sdhci-pcfg4", "exynos4-pinctrl.1", "sdhci2_ctrl_grp", "sdhci2-mux"),
-+	PIN_MAP_MUX_GROUP("exynos4-sdhci.2", "sdhci-pcfg4", "exynos4-pinctrl.1", "sdhci2_cd_grp", "sdhci2-mux"),
-+	PIN_MAP_MUX_GROUP("exynos4-sdhci.2", "sdhci-pcfg4", "exynos4-pinctrl.1", "sdhci2_4bit_grp", "sdhci2-mux"),
-+	PIN_MAP_CONFIGS_GROUP("exynos4-sdhci.2", "sdhci-pcfg4", "exynos4-pinctrl.1", "sdhci2_ctrl_grp", pcfg_pn_drv3),
-+	PIN_MAP_CONFIGS_GROUP("exynos4-sdhci.2", "sdhci-pcfg4", "exynos4-pinctrl.1", "sdhci2_cd_grp", pcfg_pu_drv3),
-+	PIN_MAP_CONFIGS_GROUP("exynos4-sdhci.2", "sdhci-pcfg4", "exynos4-pinctrl.1", "sdhci2_4bit_grp", pcfg_pu_drv3),
-+};
-+
-+int __init exynos4210_pinctrl_register_def_mappings(void)
-+{
-+	pinctrl_register_mappings(exynos4210_sdhci2_8bit_map, ARRAY_SIZE(exynos4210_sdhci2_8bit_map));
-+	pinctrl_register_mappings(exynos4210_sdhci2_4bit_map, ARRAY_SIZE(exynos4210_sdhci2_4bit_map));
-+	return 0;
-+}
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 2dd5267..760445f 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -133,6 +133,9 @@ extern struct platform_device exynos4_device_pcm2;
- extern struct platform_device exynos4_device_pd[];
- extern struct platform_device exynos4_device_spdif;
- extern struct platform_device exynos4_device_sysmmu;
-+extern struct platform_device exynos4_pinctrl0;
-+extern struct platform_device exynos4_pinctrl1;
-+extern struct platform_device exynos4_pinctrl2;
+ 	int in_use;
+@@ -276,11 +275,11 @@ static void imxdma_enable_hw(struct imxdma_desc *d)
+ 		CCR_ACRPT, DMA_CCR(channel));
  
- extern struct platform_device samsung_asoc_dma;
- extern struct platform_device samsung_asoc_idma;
+ 	if ((cpu_is_mx21() || cpu_is_mx27()) &&
+-			imxdmac->internal.sg && imxdma_hw_chain(&imxdmac->internal)) {
+-		imxdmac->internal.sg = sg_next(imxdmac->internal.sg);
+-		if (imxdmac->internal.sg) {
++			d->sg && imxdma_hw_chain(&imxdmac->internal)) {
++		d->sg = sg_next(d->sg);
++		if (d->sg) {
+ 			u32 tmp;
+-			imxdma_sg_next(d, imxdmac->internal.sg);
++			imxdma_sg_next(d, d->sg);
+ 			tmp = imx_dmav1_readl(DMA_CCR(channel));
+ 			imx_dmav1_writel(tmp | CCR_RPT | CCR_ACRPT,
+ 				DMA_CCR(channel));
+@@ -317,7 +316,6 @@ static void imxdma_watchdog(unsigned long data)
+ 
+ 	imx_dmav1_writel(0, DMA_CCR(channel));
+ 	imxdmac->internal.in_use = 0;
+-	imxdmac->internal.sg = NULL;
+ 
+ 	/* Tasklet watchdog error handler */
+ 	tasklet_schedule(&imxdmac->dma_tasklet);
+@@ -385,24 +383,23 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
+ 	int chno = imxdmac->channel;
+ 	struct imxdma_desc *desc;
+ 
+-	if (imxdma->sg) {
+-		u32 tmp;
+-		imxdma->sg = sg_next(imxdma->sg);
+-
+-		if (imxdma->sg) {
++	spin_lock(&imxdmac->lock);
++	if (list_empty(&imxdmac->ld_active)) {
++		spin_unlock(&imxdmac->lock);
++		goto out;
++	}
+ 
+-			spin_lock(&imxdmac->lock);
+-			if (list_empty(&imxdmac->ld_active)) {
+-				spin_unlock(&imxdmac->lock);
+-				goto out;
+-			}
++	desc = list_first_entry(&imxdmac->ld_active,
++				struct imxdma_desc,
++				node);
++	spin_unlock(&imxdmac->lock);
+ 
+-			desc = list_first_entry(&imxdmac->ld_active,
+-						struct imxdma_desc,
+-						node);
+-			spin_unlock(&imxdmac->lock);
++	if (desc->sg) {
++		u32 tmp;
++		desc->sg = sg_next(desc->sg);
+ 
+-			imxdma_sg_next(desc, imxdma->sg);
++		if (desc->sg) {
++			imxdma_sg_next(desc, desc->sg);
+ 
+ 			tmp = imx_dmav1_readl(DMA_CCR(chno));
+ 
+@@ -475,8 +472,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ 	/* Configure and enable */
+ 	switch (d->type) {
+ 	case IMXDMA_DESC_MEMCPY:
+-		imxdmac->internal.sg = NULL;
+-
+ 		imx_dmav1_writel(d->src, DMA_SAR(imxdmac->channel));
+ 		imx_dmav1_writel(d->dest, DMA_DAR(imxdmac->channel));
+ 		imx_dmav1_writel(d->config_mem | (d->config_port << 2),
+@@ -492,7 +487,6 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ 	/* Cyclic transfer is the same as slave_sg with special sg configuration. */
+ 	case IMXDMA_DESC_CYCLIC:
+ 	case IMXDMA_DESC_SLAVE_SG:
+-		imxdmac->internal.sg = d->sg;
+ 		imxdmac->internal.resbytes = d->len;
+ 
+ 		if (d->direction == DMA_DEV_TO_MEM) {
 -- 
-1.6.6.rc2
+1.7.0.4
