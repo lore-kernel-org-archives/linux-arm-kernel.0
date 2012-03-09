@@ -1,51 +1,78 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Mon, 12 Mar 2012 16:00:59 +0530
-Subject: [PATCH v3 0/2] Add Qualcomm MSM ADM DMAEngine driver
-Message-ID: <1331548259-26865-1-git-send-email-kumarrav@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 9 Mar 2012 08:57:20 +0100
+Subject: [PATCH v5 3/4] clk: introduce the common clock framework
+In-Reply-To: <20120308232549.GU3852@pengutronix.de>
+References: <20120303133158.GA26882@pengutronix.de>
+ <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
+ <20120304115201.GB26882@pengutronix.de>
+ <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
+ <20120305073836.GU3852@pengutronix.de>
+ <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
+ <20120306190039.GJ3852@pengutronix.de>
+ <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
+ <20120308062739.GE18513@lunn.ch>
+ <20120308232549.GU3852@pengutronix.de>
+Message-ID: <20120309075720.GC16608@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following are the changes we have done from the previous
-v1 posted here: https://lkml.org/lkml/2011/12/22/148 
+> I'd say use the nonstatic ones. I think using the static initializers
+> will cause us much pain in the future. I've been through several rebases
+> on the i.MX clock rework and everytime I wish my sed foo would be
+> better. Now imagine what happens when it turns out that the internal
+> struct clk layout or the structs for the muxes/dividers/gates have to
+> be changed.
 
-As our ADM Scatter-gather hardware needs
--32-bit command configuration parameter
- apart from 
--32-bit source address
--32-bit destination address
--16-bit length
+/*****************************************************************************
+ * CLK tree
+ ****************************************************************************/
+static DEFINE_SPINLOCK(gating_lock);
 
-So,we have added new parameter in struct scatterlist to support xfer descriptor
-specific private data, and for supporting ADM Box mode DMA we added new
-API and data structure.
+#define DEFINE_KIRKWOOD_CLK_GATE(_name, _bit)                           \
+        DEFINE_CLK_GATE(_name, "tclk", NULL, 0,                         \
+                        (void __iomem *)CLOCK_GATING_CTRL,              \
+                        _bit, 0, &gating_lock)
 
-Changes done from v2:
+DEFINE_KIRKWOOD_CLK_GATE(clk_ge0,    CGC_BIT_GE0);
+DEFINE_KIRKWOOD_CLK_GATE(clk_pex0,   CGC_BIT_PEX0);
+DEFINE_KIRKWOOD_CLK_GATE(clk_usb0,   CGC_BIT_USB0);
+DEFINE_KIRKWOOD_CLK_GATE(clk_sdio,   CGC_BIT_SDIO);
+DEFINE_KIRKWOOD_CLK_GATE(clk_tsu,    CGC_BIT_TSU);
+DEFINE_KIRKWOOD_CLK_GATE(clk_dunit,  CGC_BIT_DUNIT);
+DEFINE_KIRKWOOD_CLK_GATE(clk_runit,  CGC_BIT_RUNIT);
 
-As per our previous discussion you had suggested us to follow the below patch
-https://lkml.org/lkml/2012/1/26/405
-Please check the below link of our discussion
-https://lkml.org/lkml/2012/1/30/48
- 
-So we have added the new context parameter in device_prep_dma_sg and 
-device_prep_interleave_dma API's to support for passing client channel specific
-private data associated with every transfer descriptor. 
+I've so far not had any problems, and not needed an sed foo.  I do
+only have a dozen or so clocks, which helps. But even so, all the real
+pain is hidden inside DEFINE_CLK_GATE() which Mike maintains.
 
-We are using 
-Interleaved API for BOX type transfer.
-SG API for SG type transfer.
- 
-Ravi Kumar V (2):
-  dmaengine: Add support for per xfer specific privatedata
-  DMAEngine: Add DMAEngine driver based on old MSM DMA APIs
+I guess the problem comes when you are not using the basic clk
+providers, but your own provider. What might help is if
+linux/clk-provider.h could provide some macros to do most of the
+generic definitions. Something like:
 
- arch/arm/mach-msm/include/mach/dma.h |   30 ++
- drivers/dma/Kconfig                  |   12 +
- drivers/dma/Makefile                 |    1 +
- drivers/dma/msm-dma.c                |  724 ++++++++++++++++++++++++++++++++++
- include/linux/dmaengine.h            |    4 +-
- 5 files changed, 769 insertions(+), 2 deletions(-)
- create mode 100644 drivers/dma/msm-dma.c
+#define DEFINE_CLK_GENERIC(_name, _flags, _ops)                 \
+        static struct clk _name;                                \
+        static char *_name##_parent_names[] = {};               \
+        static struct clk _name = {                             \
+                .name = #_name,                                 \
+                .ops = &_ops,                                   \
+                .hw = &_name##_hw.hw,                           \
+                .parent_names = _name##_parent_names,           \
+                .num_parents =                                  \
+                        ARRAY_SIZE(_name##_parent_names),       \
+                .flags = _flags,                                \
+        };
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+and then you have something like
+
+#define DEFINE_CLK_IMX(_name, _flags, _foo, _bar)               \
+        static struct clk_imx _name##_hw = {                    \
+                .hw = {                                         \
+                        .clk = &_name,                          \
+                },                                              \
+                .foo = _foo,                                    \
+                .bar = _bar,                                    \
+        };                                                      \
+	DEFINE_CLK_GENERIC(_name, _flags, clk_imx_ops)           
+
+	Andrew
