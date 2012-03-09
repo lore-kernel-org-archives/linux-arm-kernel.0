@@ -1,360 +1,138 @@
-From: marc@plastictigers.com (Marc Butler)
-Date: Thu, 8 Mar 2012 19:21:06 -0500
-Subject: [RFC PATCH] slimbus message encoding/decoding
-Message-ID: <20120309002106.GA605@plastictigers.com>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Fri, 09 Mar 2012 09:30:27 +0900
+Subject: [RFC PATCH] video:backlight: add dimming sysfs node
+In-Reply-To: <4F587B1D.5080206@metafoo.de>
+References: <4F58573C.3020407@samsung.com> <4F587B1D.5080206@metafoo.de>
+Message-ID: <4F594F23.9030308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Hi,
+On Thu, Mar 8, 2012? 18:25, Lars-Peter Clausen wrote:
 
-This patch provides generic functions for encoding/decoding SLIMbus
-messages (Section 8 of the specification).
+> On 03/08/2012 07:52 AM, Donghwa Lee wrote:
+>> In backlight class, update_status() callback function is mostly used to change
+>> backlight brightness. When platform enter the dimming state, it is usually used.
+>> But, I think dimming state can be defined variety of method including brightness.
+>> So, it is need to differentiated node from brightness node.
+> 
+> What do you mean by dimming? Completely blank the display or just lower the
+> brightness to a certain level > 0? In the former case the bl_power sysfs
+> node already exposes such functionality. In the later case can you give an
+> example how this will be used and how a typical driver would implement this
+> functionality?
+> 
 
-This message API is built around the conjecture that the vast majority
-of transactions will be using short arbitration, and a logical address
-destination type. So there are separate functions for handling
-short/long arbitration fields, logical/enumerated/broadcast header
-fields.
 
-This work has been done in separate files slimbus-msg.[ch] to avoid
-collision with work in the main (slimbus.*) patch. The API is internal
-to slimbus, and I do not anticipate slimbus device drivers needing
-these functions.
+The dimming usually means minimum backlight brightness status which is not 
+completely blank. Most backlight driver uses minimum brightness by using 
+update_status() callback function so far as I know. 
 
-No CRC generator is included for the PI and MI fields. The OMAP4430
-chip this is being tested on generates and populates these fields in
-h/w. However, I have include a general (and untested) callback
-mechanism.
+But, I think sysfs node have to use only one goals. update_status() is normally
+used to change brightness. 
 
--m
+I think dimming is different from changing brightness function. Others 
+functionality can be added to dimming, for example, functionality to reduce 
+power consumption. In each drivers, some functionalities can be implemented 
+how to reduce power consumption in driver not only setting minimum brightness
+to enter dimming state.
 
-Signed-off-by: Marc Butler <marc@plastictigers.com>
----
-drivers/slimbus/slimbus-msg.c |  242 +++++++++++++++++++++++++++++++++++++++++
- drivers/slimbus/slimbus-msg.h |   70 ++++++++++++
- 2 files changed, 312 insertions(+), 0 deletions(-)
+That is to say, dimming status can be defined many ways and be implemented by 
+developers. Just that time, I think dimming node is used to interface between
+driver and platform.
 
-diff --git a/drivers/slimbus/slimbus-msg.c b/drivers/slimbus/slimbus-msg.c
-new file mode 100644
-index 0000000..c88974e
---- /dev/null
-+++ b/drivers/slimbus/slimbus-msg.c
-@@ -0,0 +1,242 @@
-+/* Copyright (c) 2012, Audience Inc. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "slimbus-msg.h"
-+
-+/**
-+ * slim_msg_scout() - quickly extract important information.
-+ * @msg:	Valid binary message.
-+ * @mt:		Message type.
-+ * @mc:		Message code.
-+ * @atype:	Address type.
-+ * @paddr:	Pointer to destination address in message. Will be
-+ *		Null if atype == broadcast.
-+ * @plen:	Payload length in bytes.
-+ * @pdat:	Pointer to first byte of payload. Null if plen == 0.
-+ *
-+ * This function is intended to aid parsing and handling incoming
-+ * messages, by quickly extracting commonly referenced fields.
-+ */
-+int slim_msg_scout(struct slim_msg *msg, u8 *mt, u8 *mc, int *atype, u8 **paddr,
-+		   u8 *plen, u8 **pdat)
-+{
-+	u8 i = 0;
-+	u8 tmp;
-+	u8 rlen;
-+	u8 alen;
-+
-+	if (msg->len < SLIM_MSG_MINLEN) {
-+		pr_err("slimbus: message with invalid length = %u\n", msg->len);
-+		return -1;
-+	}
-+
-+	/* Skip arbitration header. */
-+	tmp = msg->b[0] >> 4;
-+	switch (tmp) {
-+	case 0xf:
-+		i += 2; /* Short = logical address. */
-+		break;
-+	case 0x5:
-+		i += 7; /* Long = enumerated address. */
-+		break;
-+	default:
-+		pr_err("slimbus: unknown arbitration type = 0x%x\n", tmp);
-+		return -1;
-+	}
-+
-+	/* Cache the length of the arbitration portion. */
-+	alen = i;
-+	rlen = msg->b[i] & 0x1f;
-+	*mt = msg->b[i++] >> 5;
-+	*mc = msg->b[i++];
-+
-+	/* Extract the destination address. */
-+	tmp = msg->b[i++] >> 4;
-+	*atype = tmp;
-+	switch (tmp) {
-+	case SLIM_MSG_DEST_LOGICALADDR:
-+		*paddr = &msg->b[i++];
-+		break;
-+	case SLIM_MSG_DEST_ENUMADDR:
-+		*paddr = &msg->b[i];
-+		i += 6;
-+		break;
-+	case SLIM_MSG_DEST_BROADCAST:
-+		*paddr = NULL;
-+		break;
-+	default:
-+		pr_warn("Slimbus invalid dt=0x%x\n", tmp);
-+		return -1;
-+	}
-+
-+	/*
-+	 * Payload length = remaining length - header - 1 (MR+MI byte).
-+	 *
-+	 * We do not need to account for the MR+MI byte as i includes
-+	 * the byte that contains remaining length (rlen), which is
-+	 * not included by the specification. However, this means we
-+	 * can simply ignore the -1 adjustment for the MR+MI byte.
-+	 */
-+	*plen = rlen - (i - alen);
-+	*pdat = (*plen > 0) ? &msg->b[i] : NULL;
-+	return 0;
-+}
-+
-+/**
-+ * slim_ins_arb_short() - insert a short arbitration field.
-+ * @msg:	Empty message.
-+ * @pri:	Arbitration priority.
-+ * @la:		Logical address.
-+ *
-+ * The Arbitation Extension field (Spec: 8.2.1.2) is assumed to be
-+ * Normal, as it is unclear to me if Reserved is valid.
-+ */
-+void slim_ins_arb_short(struct slim_msg *msg, u8 pri, u8 la)
-+{
-+	BUG_ON(msg->len > 0);
-+	msg->b[msg->len++] = (SLIM_AT_SHORT << 4) | (pri & 0x7);
-+	msg->b[msg->len++] = la;
-+}
-+
-+/**
-+ * slim_ins_arb_long() - insert a long arbitration field.
-+ * @msg:	Empty message.
-+ * @pri:	Arbitration priority.
-+ * @la:		Enumerated address.
-+ *
-+ * The Arbitation Extension field (Spec: 8.2.1.2) is assumed to be
-+ * Normal, as it is unclear to me if Reserved is valid.
-+ */
-+void slim_ins_arb_long(struct slim_msg *msg, u8 pri, u8 *ea)
-+{
-+	BUG_ON(msg->len > 0);
-+	msg->b[msg->len++] = (SLIM_AT_LONG << 4) | (pri & 0x7);
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+}
-+
-+/**
-+ * slim_ins_hdr_la() -	insert a logical address header field.
-+ * @msg:	Message already containing arbitration field.
-+ * @mt:		Message type.
-+ * @mc:		Message code.
-+ * @plen:	Payload length.
-+ * @la:		Logical address.
-+ * @crcgen:	Optional 4-bit CRC generator.
-+ *
-+ * The remaining length field will be calculated based on the payload
-+ * length @plen.
-+ */
-+void slim_ins_hdr_la(struct slim_msg *msg, u8 mt, u8 mc, u8 plen, u8 la,
-+		     slim_crc_gen crcgen)
-+{
-+	/* Account for the 3 bytes following this field, the payload,
-+	 * and +1 for the MR+MI field.
-+	 */
-+	msg->b[msg->len++] = (mt << 5) | (plen + 3 + 1);
-+	msg->b[msg->len++] = mc & 0x7f;
-+	if (crcgen)
-+		msg->b[msg->len] |= crcgen(msg);
-+	msg->b[msg->len++] |= SLIM_MSG_DEST_LOGICALADDR << 4;
-+	msg->b[msg->len++] = la;
-+}
-+
-+/**
-+ * slim_ins_hdr_ea() -	insert an enumerated address header field.
-+ * @msg:	Message already containing arbitration field.
-+ * @mt:		Message type.
-+ * @mc:		Message code.
-+ * @plen:	Payload length.
-+ * @ea:		Pointer to first byte of the enumerated address.
-+ * @crcgen:	Optional 4-bit CRC generator.
-+ *
-+ * The remaining length field will be calculated based on the payload
-+ * length @plen.
-+ */
-+void slim_ins_hdr_ea(struct slim_msg *msg, u8 mc, u8 mt, u8 plen, u8 *ea,
-+		     slim_crc_gen crcgen)
-+{
-+	/* Account for the 7 bytes following this field, the
-+	 * payload, and +1 for the MR+MI field.
-+	 */
-+	msg->b[msg->len++] = (mt << 5) | (plen + 7 + 1);
-+	msg->b[msg->len++] = mc & 0x7f;
-+	if (crcgen)
-+		msg->b[msg->len] = crcgen(msg);
-+	msg->b[msg->len++] |= SLIM_MSG_DEST_ENUMADDR << 4;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+	msg->b[msg->len++] = *ea++;
-+}
-+
-+/**
-+ * slim_ins_hdr_bcast() -	insert a broadcast header field.
-+ * @msg:	Message already containing arbitration field.
-+ * @mt:		Message type.
-+ * @mc:		Message code.
-+ * @plen:	Payload length.
-+ * @ea:		Pointer to first byte of the enumerated address.
-+ * @crcgen:	Optional 4-bit CRC generator.
-+ *
-+ * The remaining length field will be calculated based on the payload
-+ * length @plen.
-+ */
-+void slim_ins_hdr_bcast(struct slim_msg *msg, u8 mc, u8 mt, u8 plen,
-+			slim_crc_gen crcgen)
-+{
-+	/* Account for the 2 bytes following this field, the
-+	 * payload, and +1 for the MR+MI field.
-+	 */
-+	msg->b[msg->len++] = (mt << 5) | (plen + 2 + 1);
-+	msg->b[msg->len++] = mc & 0x7f;
-+	if (crcgen)
-+		msg->b[msg->len] = crcgen(msg);
-+	msg->b[msg->len++] |= SLIM_MSG_DEST_BROADCAST << 4;
-+}
-+
-+/**
-+ * slim_ins_payload() -	insert a payload.
-+ * @msg:	Message containing arbitration and header fields.
-+ * @plen:	Payload length in bytes. This *must* match the value
-+ *		given to slim_ins_hdr_*().
-+ * @pdat:	Pointer to the first byte of the payload.
-+ */
-+void slim_ins_payload(struct slim_msg *msg, u8 plen, u8 *pdat)
-+{
-+	while (plen--)
-+		msg->b[msg->len++] = *pdat++;
-+}
-+
-+/**
-+ * @slim_ins_mi() -	insert message response and
-+ *			message integrity fields.
-+ * @msg:	Message containing arbitration, header, and
-+ *		payload.
-+ * @crcgen:	Optional 4-bit CRC generator.
-+ */
-+void slim_ins_mi(struct slim_msg *msg, slim_crc_gen crcgen)
-+{
-+	if (!crcgen)
-+		msg->b[msg->len] = 0;
-+	else
-+		msg->b[msg->len] = crcgen(msg);
-+	msg->len++;
-+}
-+
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/slimbus/slimbus-msg.h b/drivers/slimbus/slimbus-msg.h
-new file mode 100644
-index 0000000..311ccb6
---- /dev/null
-+++ b/drivers/slimbus/slimbus-msg.h
-@@ -0,0 +1,70 @@
-+/* Copyright (c) 2012, Audience Inc. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef _SLIMBUS_MSG_H
-+#define _SLIMBUS_MSG_H
-+
-+#include <linux/slimbus/slimbus.h>
-+
-+/* Spec: 8.2 */
-+#define SLIM_MSG_MAXLEN	39
-+/* Inferred from Spec: 8.2, tbl 24. */
-+#define SLIM_MSG_MINLEN	6
-+/**
-+ * slim_msg -	Slimbus message in binary form.
-+ * @len:	Length of the message in bytes.
-+ * @b:		Message in binary form.
-+ */
-+struct slim_msg {
-+	u8 len;
-+	u8 b[SLIM_MSG_MAXLEN];
-+};
-+
-+#define SLIM_MSG_INIT_EMPTY { .len = 0 }
-+
-+/* Message arbitration types. Spec: 8.2.1.1. */
-+#define SLIM_AT_NONE	0x0
-+#define SLIM_AT_LONG	0x5
-+#define SLIM_AT_SHORT	0xf
-+
-+/* Arbitration priority codes. Spec: 8.2.1.3. */
-+#define SLIM_AP_LOW	0x01
-+#define SLIM_AP_DEFAULT	0x02
-+#define SLIM_AP_HIGH	0x03
-+#define SLIM_AP_MAX	0x07
-+
-+/* Callback for 4-bit CRC generator. Spec: 8.2.4.1
-+ *
-+ * A callback is used so that h/w that the same functions can be used
-+ * for drivers that control h/w that will automatically generate and
-+ * fill in the integrity fields, such as the TI OMAP4430.
-+ */
-+typedef u8 (*slim_crc_gen)(struct slim_msg *msg);
-+
-+int slim_msg_scout(struct slim_msg *msg, u8 *mt, u8 *mc, int *atype, u8 **paddr,
-+		   u8 *plen, u8 **pdat);
-+
-+void slim_ins_arb_short(struct slim_msg *msg, u8 pri, u8 la);
-+
-+void slim_ins_arb_long(struct slim_msg *msg, u8 pri, u8 *ea);
-+
-+void slim_ins_hdr_la(struct slim_msg *msg, u8 mt, u8 mc, u8 plen, u8 la,
-+		     slim_crc_gen crcgen);
-+void slim_ins_hdr_ea(struct slim_msg *msg, u8 mt, u8 mc, u8 plen, u8 *ea,
-+		     slim_crc_gen crcgen);
-+void slim_ins_hdr_bcast(struct slim_msg *msg, u8 mc, u8 mt, u8 plen,
-+			slim_crc_gen crcgen);
-+
-+void slim_ins_payload(struct slim_msg *msg, u8 plen, u8 *pdat);
-+
-+void slim_ins_mi(struct slim_msg *msg, slim_crc_gen crcgen);
-+
-+#endif
+Thank you, 
+Donghwa Lee
+
+>>
+>> In set_dimming() callback function, developers can define variety dimming functions.
+>>
+>> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+>> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  drivers/video/backlight/backlight.c |   37 +++++++++++++++++++++++++++++++++++
+>>  include/linux/backlight.h           |    9 ++++++++
+>>  2 files changed, 46 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/video/backlight/backlight.c b/drivers/video/backlight/backlight.c
+>> index bf5b1ec..44a77e4 100644
+>> --- a/drivers/video/backlight/backlight.c
+>> +++ b/drivers/video/backlight/backlight.c
+>> @@ -101,6 +101,43 @@ static void backlight_generate_event(struct backlight_device *bd,
+>>  	sysfs_notify(&bd->dev.kobj, NULL, "actual_brightness");
+>>  }
+>>  
+>> +static ssize_t backlight_store_dimming(struct device *dev,
+>> +		struct device_attribute *attr, const char *buf, size_t count)
+>> +{
+>> +	int rc;
+>> +	struct backlight_device *bd = to_backlight_device(dev);
+>> +	unsigned long dimming;
+>> +
+>> +	rc = strict_strtoul(buf, 0, &dimming);
+>> +	if (rc)
+>> +		return rc;
+>> +
+>> +	if (dimming < 0)
+>> +		rc = -EINVAL;
+>> +	else {
+>> +		pr_debug("set dimming mode\n");
+>> +
+>> +		if (dimming)
+>> +			bd->props.dimming = true;
+>> +		else
+>> +			bd->props.dimming = false;
+>> +
+>> +		backlight_set_dimming(bd);
+>> +
+>> +		rc = count;
+>> +	}
+>> +
+>> +	return rc;
+>> +}
+>> +
+>> +static ssize_t backlight_show_dimming(struct device *dev,
+>> +		struct device_attribute *attr,char *buf)
+>> +{
+>> +	struct backlight_device *bd = to_backlight_device(dev);
+>> +
+>> +	return sprintf(buf, "%d\n", bd->props.dimming);
+>> +}
+>> +
+>>  static ssize_t backlight_show_power(struct device *dev,
+>>  		struct device_attribute *attr, char *buf)
+>>  {
+>> diff --git a/include/linux/backlight.h b/include/linux/backlight.h
+>> index 5ffc6dd..823717e 100644
+>> --- a/include/linux/backlight.h
+>> +++ b/include/linux/backlight.h
+>> @@ -55,10 +55,13 @@ struct backlight_ops {
+>>  	/* Check if given framebuffer device is the one bound to this backlight;
+>>  	   return 0 if not, !=0 if it is. If NULL, backlight always matches the fb. */
+>>  	int (*check_fb)(struct backlight_device *, struct fb_info *);
+>> +	/* Notify the backlight driver to enter the dimming state */
+>> +	int (*set_dimming)(struct backlight_device *);
+>>  };
+>>  
+>>  /* This structure defines all the properties of a backlight */
+>>  struct backlight_properties {
+>> +	bool dimming;
+>>  	/* Current User requested brightness (0 - max_brightness) */
+>>  	int brightness;
+>>  	/* Maximal value for brightness (read-only) */
+>> @@ -111,6 +114,12 @@ static inline void backlight_update_status(struct backlight_device *bd)
+>>  	mutex_unlock(&bd->update_lock);
+>>  }
+>>  
+>> +static inline void backlight_set_dimming(struct backlight_device *bd)
+>> +{
+>> +	if (bd->ops && bd->ops->set_dimming)
+>> +		bd->ops->set_dimming(bd);
+>> +}
+>> +
+>>  extern struct backlight_device *backlight_device_register(const char *name,
+>>  	struct device *dev, void *devdata, const struct backlight_ops *ops,
+>>  	const struct backlight_properties *props);
+> 
+> 
