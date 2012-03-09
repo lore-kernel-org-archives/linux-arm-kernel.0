@@ -1,75 +1,48 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 9 Mar 2012 15:44:31 +0100
-Subject: [RFC] i.MX: drop secondary clocks
-In-Reply-To: <20120309142205.GF3852@pengutronix.de>
-References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
- <20313.52782.832292.580932@ipc1.ka-ro>
- <20120309102931.GY3852@pengutronix.de>
- <20313.60910.420339.905973@ipc1.ka-ro>
- <20120309142205.GF3852@pengutronix.de>
-Message-ID: <20314.5967.278184.187691@ipc1.ka-ro>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 09 Mar 2012 10:52:10 -0700
+Subject: [PATCH 6/6] spi/s3c64xx: Allow usage for ARCH_S3C24XX
+In-Reply-To: <201203041909.10400.heiko@sntech.de>
+References: <201203041902.38318.heiko@sntech.de>
+ <201203041909.10400.heiko@sntech.de>
+Message-ID: <20120309175210.21B2C3E0880@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Sascha Hauer writes:
-> On Fri, Mar 09, 2012 at 12:47:58PM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Sascha Hauer writes:
-> > > On Fri, Mar 09, 2012 at 10:32:30AM +0100, Lothar Wa?mann wrote:
-> > > > Hi,
-> > > > 
-> > > > Sascha Hauer writes:
-> > > > > Hi All,
-> > > > > 
-> > [...]
-> > > > I think that's a bad idea! Drivers should not have to know intimate
-> > > > details about the clock logic of the CPU core they are running on!
-> > > 
-> > > They don't have to. There really are different clocks connected to the
-> > > devices. If for example you have a look eSDHC Block diagram in the
-> > > reference Manual  you'll see that this has three clock inputs. All
-> > > we do is to tell the driver about these three clocks which are device
-> > > specific and not SoC specific. Which of these clocks are actually
-> > > gatetable varies from SoC to SoC. Also on some SoCs two of the three
-> > > clocks may be actually the same.
-> > > 
-> > At least this should be done in a way that is independent from the
-> > name of the clock on a specific SoC, but is related to the function of
-> > the clock for the driver. Thus instead of e.g. CLK_IPG and CLK_PER use
-> > CLK_REG and CLK_BITRATE.
+On Sun, 4 Mar 2012 19:09:10 +0100, Heiko St??bner <heiko@sntech.de> wrote:
+> Newer SoCs from the S3C24XX line, namely S3C2416/2443/2450 contain
+> hsspi-controllers compatible with the s3c64xx type.
 > 
-> 'per', 'ipg' and 'ahb' seems to be a common pattern with all i.MXs. Only
-> ahb is sometimes refered to as hclk. Do you also have a name for
-> ahb/hclk? I don't insist on specific names, in the end they are just
-> names and the pattern I used at least seems mostly consistent.
+> The previous patches enabled platform support for it, so make the
+> driver also usable for the S3C24xx architecture.
 > 
-CLK_BUS?
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-> I assume that any given device has a set of clocks as inputs which
-> should get device specific names. It's the job of the clock tree
-> to know which SoC clocks map to which device clocks. If now a newer
-> UART block has an additional clock, then we would depending on the
-> device id (fsl,imx7-uart) know that it requires the additional clock
-> and request it.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+> ---
+> As it is part of a series this probably needs an ack from Grant Likely
+> and should be merged via the samsung tree.
 > 
-It's also not the business of a device driver to know any details
-about clock dependencies on a specific SoC.
-We probably really need a bus layer that can hide the details of the
-bus architecture and their corresponding clocks from the device
-drivers.
+>  drivers/spi/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index ac92194..e411364 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -299,7 +299,7 @@ config SPI_S3C24XX_FIQ
+>  
+>  config SPI_S3C64XX
+>  	tristate "Samsung S3C64XX series type SPI"
+> -	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_EXYNOS)
+> +	depends on (ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_EXYNOS)
+>  	select S3C64XX_DMA if ARCH_S3C64XX
+>  	help
+>  	  SPI driver for Samsung S3C64XX and newer SoCs.
+> -- 
+> 1.7.2.3
+> 
 
-
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
