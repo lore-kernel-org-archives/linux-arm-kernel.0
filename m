@@ -1,91 +1,71 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 11 Mar 2012 12:34:14 +0100
-Subject: [PATCH v6 2/3] clk: introduce the common clock framework
-In-Reply-To: <1331366064-1273-3-git-send-email-mturquette@linaro.org>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-3-git-send-email-mturquette@linaro.org>
-Message-ID: <20120311113414.GM3852@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 08 Mar 2012 22:46:08 -0700
+Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board
+ data
+In-Reply-To: <20120224184859.GN18185@atomide.com>
+References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
+ <1329998490-27555-5-git-send-email-rnayak@ti.com>
+ <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
+ <20120224184859.GN18185@atomide.com>
+Message-ID: <20120309054608.647473E0901@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Fri, 24 Feb 2012 10:49:00 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> * Rajendra Nayak <rnayak@ti.com> [120223 19:29]:
+> > On Friday 24 February 2012 12:27 AM, Tony Lindgren wrote:
+> > >>--- a/arch/arm/boot/dts/omap3.dtsi
+> > >>+++ b/arch/arm/boot/dts/omap3.dtsi
+> > >>@@ -113,5 +113,31 @@
+> > >>  			#size-cells =<0>;
+> > >>  			ti,hwmods = "i2c3";
+> > >>  		};
+> > >>+
+> > >>+		mmc1: mmc at 1 {
+> > >>+			compatible = "ti,omap2-hsmmc";
+> > >>+			ti,hwmods = "mmc1";
+> > >>+			ti,dual-volt;
+> > >>+		};
+> > >>+
+> > >>+		mmc2: mmc at 2 {
+> > >>+			compatible = "ti,omap2-hsmmc";
+> > >>+			ti,hwmods = "mmc2";
+> > >>+		};
+> > >>+
+> > >>+		mmc3: mmc at 3 {
+> > >>+			compatible = "ti,omap2-hsmmc";
+> > >>+			ti,hwmods = "mmc3";
+> > >>+		};
+> > >>+
+> > >>+		mmc4: mmc at 4 {
+> > >>+			compatible = "ti,omap2-hsmmc";
+> > >>+			ti,hwmods = "mmc4";
+> > >>+		};
+> > >>+
+> > >>+		mmc5: mmc at 5 {
+> > >>+			compatible = "ti,omap2-hsmmc";
+> > >>+			ti,hwmods = "mmc5";
+> > >>+		};
+> > >>  	};
+> > >>  };
+> > >
+> > >These all should all be "ti,omap3-hsmmc" I guess?
+> > 
+> > Well, I defined the binding such that both omap2 and omap3
+> > can use the same compatible "ti,omap2-hsmmc" since there is
+> > no difference in the way they are defined or handled. If thats
+> > confusing, I can have separate compatibles.
+> > Btw, I guess we do the same with a few other re-used IPs as well,
+> > I just checked and mcpsi does the same.
+> 
+> Yeah let's use separate compatibles to avoid confusion.
+> For omap2 we also have the ti,omap2-mmc in addition to
+> ti,omap2-hsmmc..
 
-I was about to give my tested-by when I decided to test the set_rate
-function. Unfortunately this is broken for several reasons. I'll try
-to come up with a fixup series later the day.
+Yes, absolutely use separate compatible values.  It is always important
+to be specific as to the silicon implementing the IP.  The omap3 instance
+can also carry the omap2 string in its compatible list:
 
-On Fri, Mar 09, 2012 at 11:54:23PM -0800, Mike Turquette wrote:
-> +
-> +/**
-> + * DOC: Using the CLK_SET_RATE_PARENT flag
-> + *
-> + * __clk_set_rate changes the child's rate before the parent's to more
-> + * easily handle failure conditions.
-> + *
-> + * This means clk might run out of spec for a short time if its rate is
-> + * increased before the parent's rate is updated.
-> + *
-> + * To prevent this consider setting the CLK_SET_RATE_GATE flag on any
-> + * clk where you also set the CLK_SET_RATE_PARENT flag
-> + *
-> + * PRE_RATE_CHANGE notifications are supposed to stack as a rate change
-> + * request propagates up the clk tree.  This reflects the different
-> + * rates that a downstream clk might experience if left enabled while
-> + * upstream parents change their rates.
-> + */
-> +static struct clk *__clk_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	struct clk *fail_clk = NULL;
-> +	int ret = NOTIFY_DONE;
-> +	unsigned long old_rate = clk->rate;
-> +	unsigned long new_rate;
-> +	unsigned long parent_old_rate;
-> +	unsigned long parent_new_rate = 0;
-> +	struct clk *child;
-> +	struct hlist_node *tmp;
-> +
-> +	/* bail early if we can't change rate while clk is enabled */
-> +	if ((clk->flags & CLK_SET_RATE_GATE) && clk->enable_count)
-> +		return clk;
-> +
-> +	/* find the new rate and see if parent rate should change too */
-> +	WARN_ON(!clk->ops->round_rate);
-> +
-> +	new_rate = clk->ops->round_rate(clk->hw, rate, &parent_new_rate);
+	compatible = "ti,omap3-hsmmc", "ti,omap2-hsmmc";
 
-You don't need a WARN_ON when you derefence clk->ops->round_rate anyway.
-Also, even when the current clock does not have a set_rate function it
-can still change its rate when the CLK_SET_RATE_PARENT is set.
-
-> +
-> +	/* NOTE: pre-rate change notifications will stack */
-> +	if (clk->notifier_count)
-> +		ret = __clk_notify(clk, PRE_RATE_CHANGE, clk->rate, new_rate);
-> +
-> +	if (ret == NOTIFY_BAD)
-> +		return clk;
-> +
-> +	/* speculate rate changes down the tree */
-> +	hlist_for_each_entry(child, tmp, &clk->children, child_node) {
-> +		ret = __clk_speculate_rates(child, new_rate);
-> +		if (ret == NOTIFY_BAD)
-> +			return clk;
-> +	}
-> +
-> +	/* change the rate of this clk */
-> +	if (clk->ops->set_rate)
-> +		ret = clk->ops->set_rate(clk->hw, new_rate);
-
-I don't know the reason why you change the child clock before the parent
-clock, but it cannot work since this clock will change its rate based on
-the old parent rate and not the new one.
-
-There are more things, as said I'll try to come up with a fixup series.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+g.
