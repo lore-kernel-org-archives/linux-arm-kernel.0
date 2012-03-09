@@ -1,55 +1,73 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 08 Mar 2012 18:44:39 -0700
-Subject: [PULL] of nand generic binding
-In-Reply-To: <4F576602.8020808@gmail.com>
-References: <20120217155707.GR1214@game.jcrosoft.org>
- <20120229152534.GH3318@game.jcrosoft.org>
- <20120307082945.GJ21255@game.jcrosoft.org> <4F576602.8020808@gmail.com>
-Message-ID: <20120309014439.235C23E0901@localhost>
+Date: Thu, 08 Mar 2012 18:44:41 -0700
+Subject: [PATCH 1/1] of: introduce helper to manage boolean
+In-Reply-To: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20120309014441.8236B3E0903@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 07 Mar 2012 07:43:30 -0600, Rob Herring <robherring2@gmail.com> wrote:
-> On 03/07/2012 02:29 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 16:25 Wed 29 Feb     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> On 16:57 Fri 17 Feb     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>> HI,
-> >>>
-> >>> 	please find attached the generic binding for the MTD nand
-> >>>
-> >>> 	This will add boolean and nand helpers
-> >> is it ok?
-> > I need this for 3.4
-> > 
-> > will you apply it or can I apply it via AT91
+On Tue,  7 Feb 2012 05:13:48 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> of_property_read_bool
 > 
-> Looks fine to me and Grant acked it, so go ahead and take with your at91
-> branch.
+> Search for a property in a device node and read a 32-bit value from
+> it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
+> 
+> this will allow to disable a boolean
+> 
+> is-ok;          => true
+> is-ok = <1>;    => true
+> is-ok = <0>;    => false
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> ---
+> Hi,
+> 
+> 	if this is ok I'll rebase my mtd and i2c patch to use it
+> 
+> Best Regards,
+> J.
+>  drivers/of/base.c  |   30 ++++++++++++++++++++++++++++++
+>  include/linux/of.h |    8 ++++++++
+>  2 files changed, 38 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 133908a..a0eaf08 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -686,6 +686,36 @@ int of_property_read_u64(const struct device_node *np, const char *propname,
+>  EXPORT_SYMBOL_GPL(of_property_read_u64);
+>  
+>  /**
+> + * of_property_read_bool - Find and read a boolean from a property
+> + * @np:		device node from which the property value is to be read.
+> + * @propname:	name of the property to be searched.
+> + *
+> + * Search for a property in a device node and read a 32-bit value from
+> + * it. Returns 0 if <0> or if the property does not exist, 1 if <1> or none.
+> + *
+> + * is-ok;	=> true
+> + * is-ok = <1>;	=> true
+> + * is-ok = <0>;	=> false
+> + */
+> +int of_property_read_bool(const struct device_node *np, const char *propname)
+> +{
+> +	u32 reg;
+> +	int ret = of_property_read_u32(np, propname, &reg);
+> +
+> +	switch (ret) {
+> +	case -EINVAL:
+> +		return false;
+> +	case -ENODATA:
+> +		return true;
+> +	case 0:
+> +		return reg == 1;
 
-Actually, taking another look at the of_mtd patch, that stuff really
-belongs in the drivers/mtd directory.  I'm not nacking the patch, but
-you should send a follow up to move it into the correct place.
+Ugh.  so any value other than 1 returns false?  I think that will surprise
+most people.
 
-I don't like the of_property_read_bool patch.  I don't want the
-of_property_read_ functions to mix data return and error codes.
-Either return a bool with an error code in the parameter list, or the
-other way around.  Otherwise we'll end up with the same problem as
-APIs that use the ERR_PTR() pattern where callers will use it without
-understanding that the return value isn't necessarily a bool.
+I don't like this api or binding.  If it is a bool property, then why isn't
+simply testing for the property existance sufficient?
 
 g.
-
-> 
-> Rob
-> 
-> > 
-> > Best Regards,
-> > J.
-> > _______________________________________________
-> > devicetree-discuss mailing list
-> > devicetree-discuss at lists.ozlabs.org
-> > https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
-
--- 
-email sent from notmuch.vim plugin
