@@ -1,36 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Mar 2012 11:05:01 -0700
-Subject: [PATCH 4/8] ARM: OMAP1: Move 16xx GPIO system clock to
- platform init code
-In-Reply-To: <20120312173005.A11093E07B0@localhost>
-References: <20120221233619.18709.87982.stgit@kaulin.local>
- <20120221234042.18709.57610.stgit@kaulin.local>
- <20120312173005.A11093E07B0@localhost>
-Message-ID: <20120312180500.GJ12083@atomide.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 9 Mar 2012 10:53:36 +0100
+Subject: [PATCH 2/5 v3] ARM: at91: sam9g20 add i2c DT support
+In-Reply-To: <4F58E77B.4010500@gmail.com>
+References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
+ <1331196635-27203-2-git-send-email-plagnioj@jcrosoft.com>
+ <4F58E77B.4010500@gmail.com>
+Message-ID: <20120309095336.GK27213@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@secretlab.ca> [120312 10:32]:
-> On Tue, 21 Feb 2012 15:40:42 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> > This way we can remove omap_read/write call from the GPIO driver
-> > and remove include to linux/io.h.
+On 11:08 Thu 08 Mar     , Rob Herring wrote:
+> On 03/08/2012 02:50 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > For now on use i2c-gpio driver on the same pin as the hardware IP.
 > > 
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > ---
+> > v3:
+> > 
+> > 	update i2c binding (Rob comments)
+> > 
+> > Best Regards,
+> > J.
+> >  arch/arm/boot/dts/at91sam9g20.dtsi |   13 +++++++++++++
+> >  1 files changed, 13 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+> > index 4b0dc99..072b2da 100644
+> > --- a/arch/arm/boot/dts/at91sam9g20.dtsi
+> > +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+> > @@ -189,4 +189,17 @@
+> >  			status = "disabled";
+> >  		};
+> >  	};
+> > +> > +	i2c-gpio at 0 {
 > 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> You updated the example, but not all the actual uses to i2c at 0.
+on purpose as on some soc we will have HW and soft binding
+
+on the board you put the alias
+
+Best Regards,
+J.
 > 
-> Who will be picking up this series?  How intertwined is it with your tree Tony?
-
-Thanks for following up on this, no need to do anything on this.
-
-This popped up few weeks ago and was resolved by pulling your GPIO
-branch into arm-soc. For more info, please see:
-
-Subject: linux-next: manual merge of the arm-soc tree with the gpio tree
-
-http://lkml.org/lkml/2012/3/1/7
-
-Regards,
-
-Tony
+> Rob
+> 
+> > +		compatible = "i2c-gpio";
+> > +		gpios = <&pioA 23 0 /* sda */
+> > +			 &pioA 24 0 /* scl */
+> > +			>;
+> > +		i2c-gpio,sda-open-drain;
+> > +		i2c-gpio,scl-open-drain;
+> > +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		status = "disabled";
+> > +	};
+> >  };
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
