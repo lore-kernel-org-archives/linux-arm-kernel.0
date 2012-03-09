@@ -1,76 +1,106 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Fri,  9 Mar 2012 16:20:44 +0100
-Subject: [PATCH v3 08/13] dmaengine: imx-dma: remove 'in_use' field of
- 'internal' structure.
-In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1331306449-28591-9-git-send-email-javier.martin@vista-silicon.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 09 Mar 2012 12:05:04 +0100
+Subject: [PATCH 2/3] ARM: Exynos: Add DRM core device support for Universal
+ C210 board
+In-Reply-To: <1331291105-18152-1-git-send-email-m.szyprowski@samsung.com>
+References: <1331291105-18152-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1331291105-18152-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It makes no sense keeping an 'in_use' flag when the multiple descriptor
-mechanism already prevents a new DMA transfer to be issued when another
-one is in course.
+Add core DRM device and alternative platform device data for FIMD DRM
+subdriver. Based on the initial patch by Joonyoung Shim
+<jy0922.shim@samsung.com>
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/dma/imx-dma.c |    9 ---------
- 1 files changed, 0 insertions(+), 9 deletions(-)
+ arch/arm/mach-exynos/Kconfig               |    1 +
+ arch/arm/mach-exynos/mach-universal_c210.c |   31 ++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index dba62bc..8499f15 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -130,8 +130,6 @@ enum  imxdma_prep_type {
- struct imxdma_channel_internal {
- 	unsigned int resbytes;
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 5a26944..c73eeba 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -257,6 +257,7 @@ config MACH_UNIVERSAL_C210
+ 	select S5P_DEV_ONENAND
+ 	select S5P_DEV_TV
+ 	select EXYNOS4_DEV_DMA
++	select EXYNOS_DEV_DRM
+ 	select EXYNOS4_SETUP_FIMD0
+ 	select EXYNOS4_SETUP_I2C1
+ 	select EXYNOS4_SETUP_I2C3
+diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
+index 322b272..30a3ff3 100644
+--- a/arch/arm/mach-exynos/mach-universal_c210.c
++++ b/arch/arm/mach-exynos/mach-universal_c210.c
+@@ -23,6 +23,7 @@
+ #include <linux/i2c-gpio.h>
+ #include <linux/i2c/mcs.h>
+ #include <linux/i2c/atmel_mxt_ts.h>
++#include <drm/exynos_drm.h>
  
--	int in_use;
--
- 	struct timer_list watchdog;
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/gic.h>
+@@ -811,6 +812,27 @@ static struct i2c_board_info i2c1_devs[] __initdata = {
+ 	/* Gyro, To be updated */
+ };
  
- 	int hw_chaining;
-@@ -264,9 +262,6 @@ static void imxdma_enable_hw(struct imxdma_desc *d)
++#ifdef CONFIG_DRM_EXYNOS
++static struct exynos_drm_fimd_pdata drm_fimd_pdata = {
++	.timing	= {
++		.left_margin	= 16,
++		.right_margin	= 16,
++		.upper_margin	= 2,
++		.lower_margin	= 28,
++		.hsync_len	= 2,
++		.vsync_len	= 1,
++		.xres		= 480,
++		.yres		= 800,
++		.refresh	= 55,
++	},
++	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB |
++			  VIDCON0_CLKSEL_LCD,
++	.vidcon1	= VIDCON1_INV_VCLK | VIDCON1_INV_VDEN
++			  | VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++	.default_win	= 3,
++	.bpp		= 32,
++};
++#else
+ /* Frame Buffer */
+ static struct s3c_fb_pd_win universal_fb_win0 = {
+ 	.win_mode = {
+@@ -838,6 +860,7 @@ static struct s3c_fb_platdata universal_lcd_pdata __initdata = {
+ 			  | VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+ 	.setup_gpio	= exynos4_fimd0_gpio_setup_24bpp,
+ };
++#endif
  
- 	pr_debug("imxdma%d: imx_dma_enable\n", channel);
+ static struct regulator_consumer_supply cam_vt_dio_supply =
+ 	REGULATOR_SUPPLY("vdd_core", "0-003c");
+@@ -1046,6 +1069,9 @@ static struct platform_device *universal_devices[] __initdata = {
+ 	&universal_gpio_keys,
+ 	&s5p_device_onenand,
+ 	&s5p_device_fimd0,
++#ifdef CONFIG_DRM_EXYNOS
++	&exynos_device_drm,
++#endif
+ 	&s5p_device_mfc,
+ 	&s5p_device_mfc_l,
+ 	&s5p_device_mfc_r,
+@@ -1091,7 +1117,12 @@ static void __init universal_machine_init(void)
+ 	s5p_i2c_hdmiphy_set_platdata(NULL);
+ 	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
  
--	if (imxdmac->internal.in_use)
--		return;
--
- 	local_irq_save(flags);
++#ifdef CONFIG_DRM_EXYNOS
++	s5p_device_fimd0.dev.platform_data = &drm_fimd_pdata;
++	exynos4_fimd0_gpio_setup_24bpp();
++#else
+ 	s5p_fimd0_set_platdata(&universal_lcd_pdata);
++#endif
  
- 	imx_dmav1_writel(1 << channel, DMA_DISR);
-@@ -285,7 +280,6 @@ static void imxdma_enable_hw(struct imxdma_desc *d)
- 				DMA_CCR(channel));
- 		}
- 	}
--	imxdmac->internal.in_use = 1;
- 
- 	local_irq_restore(flags);
- }
-@@ -305,7 +299,6 @@ static void imxdma_disable_hw(struct imxdma_channel *imxdmac)
- 	imx_dmav1_writel(imx_dmav1_readl(DMA_CCR(channel)) & ~CCR_CEN,
- 			DMA_CCR(channel));
- 	imx_dmav1_writel(1 << channel, DMA_DISR);
--	imxdmac->internal.in_use = 0;
- 	local_irq_restore(flags);
- }
- 
-@@ -315,7 +308,6 @@ static void imxdma_watchdog(unsigned long data)
- 	int channel = imxdmac->channel;
- 
- 	imx_dmav1_writel(0, DMA_CCR(channel));
--	imxdmac->internal.in_use = 0;
- 
- 	/* Tasklet watchdog error handler */
- 	tasklet_schedule(&imxdmac->dma_tasklet);
-@@ -434,7 +426,6 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
- 
- out:
- 	imx_dmav1_writel(0, DMA_CCR(chno));
--	imxdma->in_use = 0;
- 	/* Tasklet irq */
- 	tasklet_schedule(&imxdmac->dma_tasklet);
- }
+ 	universal_touchkey_init();
+ 	i2c_register_board_info(I2C_GPIO_BUS_12, i2c_gpio12_devs,
 -- 
-1.7.0.4
+1.7.1.569.g6f426
