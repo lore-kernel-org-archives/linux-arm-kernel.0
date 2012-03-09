@@ -1,43 +1,42 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 Mar 2012 07:33:01 -0800
-Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
-In-Reply-To: <CAOesGMiWOChuMjLQTK1pGys+oXCc4A=HO-2_=37rh3M6pgUP_g@mail.gmail.com>
-References: <4F589474.8050609@samsung.com>
- <CAOesGMiWOChuMjLQTK1pGys+oXCc4A=HO-2_=37rh3M6pgUP_g@mail.gmail.com>
-Message-ID: <4F5A22AD.1070907@samsung.com>
+Date: Fri, 09 Mar 2012 07:34:27 -0800
+Subject: [PATCH V6 1/5] ARM: exynos: Add support AFTR mode on EXYNOS4210
+In-Reply-To: <CAK44p22LOnJx=bZRfdzAHt7X_snhJGrNoBuXOfsgwBHLLuUziA@mail.gmail.com>
+References: <1329805190-8874-1-git-send-email-amit.kachhap@linaro.org>	<1329805190-8874-2-git-send-email-amit.kachhap@linaro.org>	<CAMXH7KHTgzY7XZ=4rOxsu-Ra8SRTOsCg=YWOLBD1QDTskRbygw@mail.gmail.com>
+ <CAK44p22LOnJx=bZRfdzAHt7X_snhJGrNoBuXOfsgwBHLLuUziA@mail.gmail.com>
+Message-ID: <4F5A2303.7040403@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/12 07:16, Olof Johansson wrote:
-> Hi,
->
-> On Thu, Mar 8, 2012 at 3:13 AM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
->
->> Kukjin Kim (2):
->>       ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
->
-> This is one large commit that does many things in one change. As the
-> patch message says:
->
-> ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
->
-> - the prefix of clk register replace S5P_ with EXYNOS4_
-> - move mach-exynos/clock.c to mach-exynos/clock-exynos4.c
-> - according to moving clock-exynos4.c,
->    move<mach/exynos4-clock.h>  to "clock-exynos4.h"
-> - add prefix exynos4_ on clk declaration
->
-> It makes it hard to review, especially when you combine a move with
-> other changes. It's better to do the move in a separate commit that
-> doesn't change code (or only changes very very little) and then do the
-> other changes in separate commits later.
->
-Hmm...OK, let me do as per your suggestion and will re-send this soon.
+On 02/23/12 03:49, Amit Kachhap wrote:
+> On 23 February 2012 11:54, Rob Lee<rob.lee@linaro.org>  wrote:
 
-Thanks.
+[...]
+
+> Hi Mr kim,
+>
+> Can this change be accommodated in the current patch series as below
+> or should i send a new patchset?
+>
+I did, Thanks.
 
 Best regards,
 Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -41,7 +41,7 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+>                                  struct cpuidle_driver *drv,
+>                                  int index);
+>
+> -static struct cpuidle_state exynos4_cpuidle_set[] = {
+> +static struct cpuidle_state exynos4_cpuidle_set[] __initdata = {
+>          [0] = {
+>                  .enter                  = exynos4_enter_idle,
+>                  .exit_latency           = 1,
+>
+>
