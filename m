@@ -1,30 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Mar 2012 19:24:31 +0000
-Subject: [PATCH 1/2] ARM: at91: only RM9200 has ISA-style PIO
-In-Reply-To: <1331405075-3231-1-git-send-email-alan@signal11.us>
-References: <1331405049-3186-1-git-send-email-alan@signal11.us>
- <1331405075-3231-1-git-send-email-alan@signal11.us>
-Message-ID: <201203101924.31710.arnd@arndb.de>
+Date: Fri, 9 Mar 2012 11:50:11 +0000
+Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2
+ tree
+In-Reply-To: <1331285751.1927.20.camel@deskari>
+References: <20120308170048.f1a992bca2ca2d93fa9747bf@canb.auug.org.au>
+ <201203081616.12510.arnd@arndb.de> <1331285751.1927.20.camel@deskari>
+Message-ID: <201203091150.11294.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 10 March 2012, Alan Ott wrote:
+On Friday 09 March 2012, Tomi Valkeinen wrote:
+> On Thu, 2012-03-08 at 16:16 +0000, Arnd Bergmann wrote:
+> > On Thursday 08 March 2012, Stephen Rothwell wrote:
+> > > Hi all,
+> > > 
+> > > Today's linux-next merge of the arm-soc tree got a conflict in
+> > > arch/arm/mach-omap1/board-palmtt.c between commit ddba6c7f7ec6 ("OMAP1:
+> > > pass LCD config with omapfb_set_lcd_config()") from the omap_dss2 tree
+> > > and commit 2e3ee9f45b3c ("ARM: OMAP1: Move most of plat/io.h into local
+> > > iomap.h") from the arm-soc tree.
+> > > 
+> > > I fixed it up (see below) and can carry the fix as necessary.
+> > 
+> > Hi Stephen,
+> > 
+> > Thanks for fixing up all the conflicts between arm-soc and omap_dss2.
+> > I think we should make sure they are resolved in one of the trees before
+> > the merge window.
 > 
-> From: Arnd Bergmann <arnd@arndb.de>
+> Do we need to? The conflicts seemed to be trivial ones, like arm-soc
+> adds/removes something that just happens to be next to something else
+> that I add/remove.
 > 
-> Most at91 systems have no support for PCMCIA or other
-> PC-style buses, so we can select NO_IOPORT in order to
-> disable compilationf or all drivers that need these.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Alan Ott <alan@signal11.us>
+> My understanding is that it's better to leave those conflicts than to do
+> "trickery" to avoid them.
 
-Hi Alan,
+Each of the conflicts is simple enough, but I feel it's worth resolving
+them in this case because there are a number of them. Looking at them
+again now, it's probably ok either way -- resolving them now or letting
+Linus take care of them.
 
-You forgot to Cc the at91 maintainers on this patch (and on patch 0).
-Also, this patch relies on the another series I did to redefine
-the meaning of CONFIG_NO_IOPORT while renaming the existing one to
-CONFIG_NO_IOPORT_MAP. This patch will have to wait for the other
-series.
+> > Tomi, what are your plans for the omap_dss2 branch to get merged?
+> 
+> Normally my tree goes via fbdev-tree (Florian's tree) to mainline.
+
+ok.
+
+> > Do you think you should send it to Linus first and we merge it into
+> > arm-soc to resolve the conflicts?
+> > Or do you want to merge it through the arm-soc tree?
+> > Or should we go first and you fix up the conflicts by pulling in the
+> > necessary topic branches from arm-soc into your tree?
+> 
+> If we want to resolve the conflicts, perhaps it's simplest if the dss
+> tree is merged to arm-soc.
+
+Ok. Maybe we'll just merge them in case Florian is upstream faster and
+not merge them otherwise.
 
 	Arnd
