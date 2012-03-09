@@ -1,49 +1,86 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 9 Mar 2012 10:32:30 +0100
-Subject: [RFC] i.MX: drop secondary clocks
-In-Reply-To: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
-References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20313.52782.832292.580932@ipc1.ka-ro>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 9 Mar 2012 14:55:18 +0530
+Subject: [PATCH v3 12/13] gpio/omap: fix incorrect context restore logic
+ in omap_gpio_runtime_resume
+In-Reply-To: <CAMQu2gzgM=Hc4fis5AsgL50e2KLttTR79iroOtExGecU7F50yw@mail.gmail.com>
+References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
+ <1331118963-26364-13-git-send-email-tarun.kanti@ti.com>
+ <4F574F95.7090801@ti.com>
+ <CAC83ZvLFoSppTiPw-_a=z_Mnpmk6nHeaadTShdJP8RpDWh9TLg@mail.gmail.com>
+ <CAMQu2gzgM=Hc4fis5AsgL50e2KLttTR79iroOtExGecU7F50yw@mail.gmail.com>
+Message-ID: <CAC83ZvKpLEBRAa1JDM5tGebD514ogqiDqeFraWERG9+x207xcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 8, 2012 at 12:49 PM, Shilimkar, Santosh
+<santosh.shilimkar@ti.com> wrote:
+> On Thu, Mar 8, 2012 at 4:58 AM, DebBarma, Tarun Kanti
+> <tarun.kanti@ti.com> wrote:
+>> On Wed, Mar 7, 2012 at 5:37 PM, Santosh Shilimkar
+>> <santosh.shilimkar@ti.com> wrote:
+>>> On Wednesday 07 March 2012 12:16 PM, Tarun Kanti DebBarma wrote:
+>>>> In omap_gpio_runtime_resume() the context restore should be independent
+>>>> of bank->enabled_non_wakeup_gpios. This was preventing context restore
+>>>> of GPIO lines which are not wakeup enabled.
+>>>>
+>>>> Reported-by: Govindraj Raja <govindraj.raja@ti.com>
+>>>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>>>> ---
+>>>> ?drivers/gpio/gpio-omap.c | ? ?2 +-
+>>>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>>> index 2e8e476..ccfbae0 100644
+>>>> --- a/drivers/gpio/gpio-omap.c
+>>>> +++ b/drivers/gpio/gpio-omap.c
+>>>> @@ -1227,7 +1227,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
+>>>> ? ? ? __raw_writel(bank->context.risingdetect,
+>>>> ? ? ? ? ? ? ? ? ? ?bank->base + bank->regs->risingdetect);
+>>>>
+>>>> - ? ? if (!bank->enabled_non_wakeup_gpios || !bank->workaround_enabled) {
+>>>> + ? ? if (!bank->workaround_enabled) {
+>>> This doesn't seem to be right.
+>>> Don't you want to avoid GPIO restore for banks which are in
+>>> always on domain. Infact the purpose of "enabled_non_wakeup_gpios"
+>>> is exactly that ? Isn't it.
+>>>
+>>> What am I missing ?
+>> The bank->enabled_non_wakeup_gpios is set whenever a gpio line is programmed
+>> as edge trigger as shown below.
+>> (This is not meant to distinguish between gpios in WKUP domain vs
+>> those in PER domain).
+>> The context restore should happen irrespective of whether the trigger
+>> type is edge or level.
+>> In fact context restore was not happening for a gpio line because of
+>> this condition while
+>> testing suspend/resume.
+>>
+>> [...]
+>> ? ? ? ? ? ? ? ?if (trigger & IRQ_TYPE_EDGE_BOTH)
+>> ? ? ? ? ? ? ? ? ? ? ? ?bank->enabled_non_wakeup_gpios |= gpio_bit;
+>> ? ? ? ? ? ? ? ?else
+>> ? ? ? ? ? ? ? ? ? ? ? ?bank->enabled_non_wakeup_gpios &= ~gpio_bit;
+>> [...]
+>
+> Make sense now. Thanks for clarification Tarun.
+> You can add mine..
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Thanks.
+I have missed removing the same change from omap_gpio_runtime_suspend().
 
-Sascha Hauer writes:
-> Hi All,
-> 
-> On i.MX we currently have grouped clocks, also known as secondary clocks.
-> These are clocks that get enabled when the primary clock gets enabled.  This
-> doesn't integrate well into the generic clock framework. Also we often return
-> the rate of one clock and really enable/disable another clock. I plan to get
-> rid of these clocks by exposing the individual clocks to the drivers. The
-> following is meant as an example how this can be done. I have a more complete
-> series internally but this conflicts with Richards clk_prepare series.
-> 
-> Thanks to the nature of clk_get we can simply clk_get the individual clocks in
-> the drivers and the current clock implementation will always return the one
-> with con_id = NULL. Then with the generic clk implementation the drivers will
-> finally get the individual clocks.
-> 
-> So unless there are objections I will follow up on this after the next merge
-> window.
-> 
-I think that's a bad idea! Drivers should not have to know intimate
-details about the clock logic of the CPU core they are running on!
-
-They should simply request a clock for the unit they operate on and
-the clock core code should figure out which other clocks need to be
-enabled on a specific machine to get the unit working.
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+@@ -1178,9 +1178,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+         * non-wakeup GPIOs.  Otherwise spurious IRQs will be
+         * generated.  See OMAP2420 Errata item 1.101.
+         */
+-       if (!(bank->enabled_non_wakeup_gpios))
+-               goto update_gpio_context_count;
+-
+FYI, I tested the change on OMAP5 code-base which did not have the above change.
+Anyways, I have updated the change in:
+git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev
+for_3.4/gpio_further_cleanup_fixes
+--
+Tarun
+>
+> Regards
+> Santosh
