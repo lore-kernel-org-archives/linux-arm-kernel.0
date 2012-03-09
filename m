@@ -1,40 +1,104 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 9 Mar 2012 09:32:17 +0800
-Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <4F591B8D.8090705@freescale.com>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
- <4F591B8D.8090705@freescale.com>
-Message-ID: <20120309013216.GH2499@S2101-09.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Mar 2012 17:40:16 -0800
+Subject: [GIT PULL] ARM: OMAP2+: hwmod data: cleanup in preparation for
+ link array removal
+In-Reply-To: <alpine.DEB.2.00.1203072102150.21662@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1203072102150.21662@utopia.booyaka.com>
+Message-ID: <20120309014016.GC12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 02:50:21PM -0600, Timur Tabi wrote:
-> Shawn Guo wrote:
-> > As Documentation/devicetree/bindings/powerpc/fsl/ssi.txt documented,
-> > codec-handle is an optional property, so missing it should not be a
-> > fatal error.]
-> 
-> It's optional in the sense that if your SSI is not connected to anything,
-> then you don't need to specify the codec handle.  If the SSI is connected
-> to a codec, then the SSI node needs to point to it.
-> 
-It's true for the binding that mpc8610_hpcd and p1022_ds use.  But per
-request from Mark, we need to use the new binding for imx machine
-drivers, which will have the codec phandle in "audio complex" node.
+Hi Paul,
 
-> > More importantly, the imx machine drivers to be added working with
-> > fsl_ssi will not have this property, as they use new ASoC machine
-> > driver binding mechanism.
+* Paul Walmsley <paul@pwsan.com> [120307 19:34]:
+> Hi Tony
 > 
-> I want to see that binding documented in Documentation/devicetree/bindings
-> first.
+> The following changes since commit b8a633451951d149494076393698880453bf6bfe:
+> 
+>   ARM: OMAP: hwmod: add softreset delay field and OMAP4 data (2012-02-28 03:46:31 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pwsan.com/linux-2.6 hwmod_data_cleanup_3.4
+> 
+> for you to fetch changes up to a2d4b88dd32b02e8b5088e0d64b3c102c0852210:
+> 
+>   ARM: OMAP2+: hwmod: extend OCP_* register offsets from 16 to 32 bits (2012-02-28 03:49:34 -0700)
+> 
+> (This branch is based on the 'hwmod_code_cleanup_3.4' branch, pull req 
+> sent previously)
 
-Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt, which
-takes Documentation/devicetree/bindings/sound/tegra-audio-wm8903.txt
-as the example.
+Got these now merged into l-o master, but ran into a merge
+conflict with already queued sr branch. Resolved it by using
+your version except left out vdd_name. As the namings have
+changed for smartreflex, now I suspect it's broken for the
+interrupts..
 
--- 
+Care to take a look and see how we should deal with this?
+My merge resolution below for reference.
+
 Regards,
-Shawn
+
+Tony
+
+
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@@ -2684,9 -2736,10 +2736,9 @@@ static struct omap_hwmod_ocp_if *omap34
+  };
+  
+  static struct omap_hwmod omap34xx_sr1_hwmod = {
+- 	.name		= "sr1_hwmod",
++ 	.name		= "sr1",
+  	.class		= &omap34xx_smartreflex_hwmod_class,
+  	.main_clk	= "sr1_fck",
+ -	.vdd_name	= "mpu_iva",
+  	.prcm		= {
+  		.omap2 = {
+  			.prcm_reg_id = 1,
+@@@ -2703,10 -2754,15 +2753,14 @@@
+  	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+  };
+  
++ static struct omap_hwmod_ocp_if *omap36xx_sr1_slaves[] = {
++ 	&omap36xx_l4_core__sr1,
++ };
++ 
+  static struct omap_hwmod omap36xx_sr1_hwmod = {
+- 	.name		= "sr1_hwmod",
++ 	.name		= "sr1",
+  	.class		= &omap36xx_smartreflex_hwmod_class,
+  	.main_clk	= "sr1_fck",
+ -	.vdd_name	= "mpu_iva",
+  	.prcm		= {
+  		.omap2 = {
+  			.prcm_reg_id = 1,
+@@@ -2732,9 -2782,10 +2780,9 @@@ static struct omap_hwmod_ocp_if *omap34
+  };
+  
+  static struct omap_hwmod omap34xx_sr2_hwmod = {
+- 	.name		= "sr2_hwmod",
++ 	.name		= "sr2",
+  	.class		= &omap34xx_smartreflex_hwmod_class,
+  	.main_clk	= "sr2_fck",
+ -	.vdd_name	= "core",
+  	.prcm		= {
+  		.omap2 = {
+  			.prcm_reg_id = 1,
+@@@ -2751,10 -2800,15 +2797,14 @@@
+  	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+  };
+  
++ static struct omap_hwmod_ocp_if *omap36xx_sr2_slaves[] = {
++ 	&omap36xx_l4_core__sr2,
++ };
++ 
+  static struct omap_hwmod omap36xx_sr2_hwmod = {
+- 	.name		= "sr2_hwmod",
++ 	.name		= "sr2",
+  	.class		= &omap36xx_smartreflex_hwmod_class,
+  	.main_clk	= "sr2_fck",
+ -	.vdd_name	= "core",
+  	.prcm		= {
+  		.omap2 = {
+  			.prcm_reg_id = 1,
