@@ -1,105 +1,49 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 9 Mar 2012 17:39:32 +0100
-Subject: [PATCH 08/12] gpio/twl: Allocate irq_desc dynamically for
- SPARSE_IRQ support
-In-Reply-To: <4F575B21.30909@ti.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-9-git-send-email-b-cousson@ti.com> <4F575B21.30909@ti.com>
-Message-ID: <4F5A3244.3080109@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 9 Mar 2012 09:38:12 -0700
+Subject: [GIT PULL] ARM: OMAP: GPIO cleanup and device tree adaptation
+In-Reply-To: <4F5A30DB.7060004@ti.com>
+References: <4F5A30DB.7060004@ti.com>
+Message-ID: <CACxGe6uo774Vf=rgnxxT6htFYSu7xROhgT-=Ernfbr9Lp-WvYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
-
-Gentle ping for these patches.
-
-Thanks,
-Benoit
-
-
-On 3/7/2012 1:57 PM, Cousson, Benoit wrote:
+On Fri, Mar 9, 2012 at 9:33 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
 > Hi Grant,
 >
-> That fix is tightly coupled with the previous twl4030-irq change, so it
-> will be good to pulled it with the twl series through MFD if you are OK
-> with that?
->
-> Care to ack this one and the next one?
+> Please pull the patches for OMAP GPIO DT support.
+> It is based on your current gpio/next branch.
 >
 > Thanks,
 > Benoit
+
+Merged, thanks.
+
+g.
+
 >
 >
-> On 3/2/2012 5:50 PM, Benoit Cousson wrote:
->> Do not use the board pdata for irq_base, but allocate them dynamically
->> to allow a proper support of SPARSE_IRQ.
->>
->> Fix an unneeded line wrap.
->>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Acked-by: Felipe Balbi<balbi@ti.com>
->> ---
->> drivers/gpio/gpio-twl4030.c | 33 +++++++++++++++++----------------
->> 1 files changed, 17 insertions(+), 16 deletions(-)
->>
->> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
->> index 697396c..49e5c6e 100644
->> --- a/drivers/gpio/gpio-twl4030.c
->> +++ b/drivers/gpio/gpio-twl4030.c
->> @@ -395,23 +395,26 @@ static int gpio_twl4030_remove(struct
->> platform_device *pdev);
->> static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
->> {
->> struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
->> - int ret;
->> + int ret, irq_base;
->>
->> /* maybe setup IRQs */
->> - if (pdata->irq_base) {
->> - if (is_module()) {
->> - dev_err(&pdev->dev,
->> - "can't dispatch IRQs from modules\n");
->> - goto no_irqs;
->> - }
->> - ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO,
->> - pdata->irq_base);
->> - if (ret< 0)
->> - return ret;
->> - WARN_ON(ret != pdata->irq_base);
->> - twl4030_gpio_irq_base = ret;
->> + if (is_module()) {
->> + dev_err(&pdev->dev, "can't dispatch IRQs from modules\n");
->> + goto no_irqs;
->> + }
->> +
->> + irq_base = irq_alloc_descs(-1, 0, TWL4030_GPIO_MAX, 0);
->> + if (irq_base< 0) {
->> + dev_err(&pdev->dev, "Failed to alloc irq_descs\n");
->> + return irq_base;
->> }
->>
->> + ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO, irq_base);
->> + if (ret< 0)
->> + return ret;
->> +
->> + twl4030_gpio_irq_base = irq_base;
->> +
->> no_irqs:
->> /*
->> * NOTE: boards may waste power if they don't set pullups
->> @@ -443,9 +446,7 @@ no_irqs:
->>
->> ret = gpiochip_add(&twl_gpiochip);
->> if (ret< 0) {
->> - dev_err(&pdev->dev,
->> - "could not register gpiochip, %d\n",
->> - ret);
->> + dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
->> twl_gpiochip.ngpio = 0;
->> gpio_twl4030_remove(pdev);
->> } else if (pdata->setup) {
+> The following changes since commit e4e449e82871c53ef3b22bd3a50fceabc0638926:
+> ?Mark Brown (1):
+> ? ? ? ?gpiolib: Add comments explaining the _cansleep() WARN_ON()s
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at http://vger.kernel.org/majordomo-info.html
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_grant/for_3.4/dt_gpio
+>
+> Benoit Cousson (4):
+> ? ? ?gpio/omap: Remove bank->id information and misc cleanup
+> ? ? ?gpio/omap: Use devm_ API and add request_mem_region
+> ? ? ?gpio/omap: Add DT support to GPIO driver
+> ? ? ?gpio/omap: Fix IRQ handling for SPARSE_IRQ
+>
+> ?.../devicetree/bindings/gpio/gpio-omap.txt ? ? ? ? | ? 36 ++++
+> ?arch/arm/plat-omap/include/plat/gpio.h ? ? ? ? ? ? | ? 22 +--
+> ?drivers/gpio/gpio-omap.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ?208 ++++++++++++++------
+> ?3 files changed, 190 insertions(+), 76 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
+
+
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
