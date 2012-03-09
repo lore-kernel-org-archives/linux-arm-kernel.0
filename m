@@ -1,57 +1,49 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 12 Mar 2012 09:52:10 +0530
-Subject: [PATCH V2 15/22] watchdog/mpcore_wdt: Add support for
- WDIOC_GETBOOTSTATUS IOCTL
-In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
-References: <cover.1331524811.git.viresh.kumar@st.com>
-Message-ID: <11fa6e13f63feffb2242683225531edcf8e43402.1331524811.git.viresh.kumar@st.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 9 Mar 2012 18:17:55 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the regulator tree
+Message-ID: <20120309181755.256b898808bd14726de0e977@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mpcore watchdog can give last boot status, whether we got a watchdog reset or
-not, via bit 0 of TWD_WDOG_RESETSTAT register. This patch adds support to return
-correct status if WDIOC_GETBOOTSTATUS cmd is called with ioctl.
+Hi all,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/include/asm/smp_twd.h |    2 ++
- drivers/watchdog/mpcore_wdt.c  |    4 ++++
- 2 files changed, 6 insertions(+), 0 deletions(-)
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/regulator/Makefile between commit 8aa1ab9219e7 ("regulator: Sort
+Kconfig and Makefile entries") from the regulator tree and commit
+8a16a701ad78 ("regulator: Remove bq24022 regulator driver") from the
+arm-soc tree.
 
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index ef9ffba9..a13b536 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -18,6 +18,8 @@
- #define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
- #define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
- 
-+#define TWD_WDOG_RESETSTAT_MASK		0x1
-+
- struct clock_event_device;
- 
- extern void __iomem *twd_base;
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 0d2ea32..73d50c3 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -148,6 +148,7 @@ static int mpcore_wdt_set_heartbeat(struct watchdog_device *wdd, unsigned int t)
- static const struct watchdog_info mpcore_wdt_info = {
- 	.options		= WDIOF_SETTIMEOUT |
- 				  WDIOF_KEEPALIVEPING |
-+				  WDIOF_CARDRESET |
- 				  WDIOF_MAGICCLOSE,
- 	.identity		= "MPcore Watchdog",
- };
-@@ -213,6 +214,9 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, wdt);
- 	watchdog_set_drvdata(&wdt->wdd, wdt);
- 
-+	wdt->wdd.bootstatus = (readl_relaxed(wdt->base + TWD_WDOG_RESETSTAT) &
-+			TWD_WDOG_RESETSTAT_MASK) ? WDIOF_CARDRESET : 0;
-+
- 	mpcore_wdt_stop(&wdt->wdd);
- 
- 	ret = watchdog_register_device(&wdt->wdd);
+I fixed it up (see below) and can carry the fix as necessary.
 -- 
-1.7.8.110.g4cb5d
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/regulator/Makefile
+index 2b09c81,f53cf80..0000000
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@@ -10,17 -10,7 +10,16 @@@ obj-$(CONFIG_REGULATOR_VIRTUAL_CONSUMER
+  obj-$(CONFIG_REGULATOR_USERSPACE_CONSUMER) += userspace-consumer.o
+  
+  obj-$(CONFIG_REGULATOR_GPIO) += gpio-regulator.o
+ +obj-$(CONFIG_REGULATOR_88PM8607) += 88pm8607.o
+ +obj-$(CONFIG_REGULATOR_AAT2870) += aat2870-regulator.o
+ +obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
+ +obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
+  obj-$(CONFIG_REGULATOR_AD5398) += ad5398.o
+- obj-$(CONFIG_REGULATOR_BQ24022) += bq24022.o
+ +obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
+ +obj-$(CONFIG_REGULATOR_DA9052)	+= da9052-regulator.o
+ +obj-$(CONFIG_REGULATOR_DBX500_PRCMU) += dbx500-prcmu.o
+ +obj-$(CONFIG_REGULATOR_DB8500_PRCMU) += db8500-prcmu.o
+ +obj-$(CONFIG_REGULATOR_ISL6271A) += isl6271a-regulator.o
+  obj-$(CONFIG_REGULATOR_LP3971) += lp3971.o
+  obj-$(CONFIG_REGULATOR_LP3972) += lp3972.o
+  obj-$(CONFIG_REGULATOR_MAX1586) += max1586.o
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/fa6284a1/attachment-0001.sig>
