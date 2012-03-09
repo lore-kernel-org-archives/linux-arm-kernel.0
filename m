@@ -1,62 +1,61 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 9 Mar 2012 11:56:45 +0100
-Subject: [PATCH v2 00/13] dmaengine: imx-dma: merge dma arch code into
- dmaengine.
-In-Reply-To: <1331130825-14947-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1331130825-14947-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <20120309105645.GA3852@pengutronix.de>
+Date: Fri, 9 Mar 2012 11:29:31 +0100
+Subject: [RFC] i.MX: drop secondary clocks
+In-Reply-To: <20313.52782.832292.580932@ipc1.ka-ro>
+References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
+ <20313.52782.832292.580932@ipc1.ka-ro>
+Message-ID: <20120309102931.GY3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2012 at 03:33:32PM +0100, Javier Martin wrote:
-> The following series have to be applied on top of the following patches:
-> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
-> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
+On Fri, Mar 09, 2012 at 10:32:30AM +0100, Lothar Wa?mann wrote:
+> Hi,
 > 
-> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
-> is deprecated and no new patches are accepted for it.
+> Sascha Hauer writes:
+> > Hi All,
+> > 
+> > On i.MX we currently have grouped clocks, also known as secondary clocks.
+> > These are clocks that get enabled when the primary clock gets enabled.  This
+> > doesn't integrate well into the generic clock framework. Also we often return
+> > the rate of one clock and really enable/disable another clock. I plan to get
+> > rid of these clocks by exposing the individual clocks to the drivers. The
+> > following is meant as an example how this can be done. I have a more complete
+> > series internally but this conflicts with Richards clk_prepare series.
+> > 
+> > Thanks to the nature of clk_get we can simply clk_get the individual clocks in
+> > the drivers and the current clock implementation will always return the one
+> > with con_id = NULL. Then with the generic clk implementation the drivers will
+> > finally get the individual clocks.
+> > 
+> > So unless there are objections I will follow up on this after the next merge
+> > window.
+> > 
+> I think that's a bad idea! Drivers should not have to know intimate
+> details about the clock logic of the CPU core they are running on!
+
+They don't have to. There really are different clocks connected to the
+devices. If for example you have a look eSDHC Block diagram in the
+reference Manual  you'll see that this has three clock inputs. All
+we do is to tell the driver about these three clocks which are device
+specific and not SoC specific. Which of these clocks are actually
+gatetable varies from SoC to SoC. Also on some SoCs two of the three
+clocks may be actually the same.
+
 > 
-> This series merges this code into the imx-dma.c dmaengine driver.
-> 
-> Changes since v1:
->  - Merge patch 14 with 01.
->  - Add a proper changelog to each patch of the series.
-> 
-> [PATCH v2 01/13] dmaengine: imx-dma: merge old dma-v1.c with imx-dma.c
-> [PATCH v2 02/13] dmaengine: imx-dma: remove data member from internal structure.
-> [PATCH v2 03/13] dmaengine: imx-dma: remove dma_mode member of internal structure.
-> [PATCH v2 04/13] dmaengine: imx-dma: remove 'imxdma_setup_mem2mem_hw' function.
-> [PATCH v2 05/13] dmaengine: imx-dma: remove 'imxdma_config_channel_hw' function.
-> [PATCH v2 06/13] dmaengine: imx-dma: remove 'imxdma_setup_sg_hw' function.
-> [PATCH v2 07/13] dmaengine: imx-dma: remove sg member from internal structure.
-> [PATCH v2 08/13] dmaengine: imx-dma: remove 'in_use' field of 'internal' structure.
-> [PATCH v2 09/13] dmaengine: imx-dma: remove 'resbytes' field of 'internal' structure.
-> [PATCH v2 10/13] dmaengine: imx-dma: remove internal structure.
-> [PATCH v2 11/13] dmaengine: imx-dma: remove unused arg of imxdma_sg_next.
-> [PATCH v2 12/13] dmaengine: imx-dma: remove 'imx_dmav1_baseaddr' and 'dma_clk'.
-> [PATCH v2 13/13] dmaengine: imx-dma: use 'dev_dbg' and 'dev_warn' for messages.
+> They should simply request a clock for the unit they operate on and
+> the clock core code should figure out which other clocks need to be
+> enabled on a specific machine to get the unit working.
 
-I didn't look at the individual patches but only on the end result and
-overall it looks good. There are several things left for further cleanup:
+Yes, that's what we want to do, except that devices do not need 'a'
+clock but several. And the clock core figures out which other clocks
+have to be activated, these are the parent clocks.
 
-- use resources for irq and base address
-- use platform device id rather than cpu_is_* to distinguish
-  between the different device types.
-- request_irq for i.MX21/27 in alloc_chan_resources instead in probe
-- Use all available channels. In the time we had dmaengine users and
-  legacy API users 8 channels were reserved for the old API and 8
-  channels for the dmaengine API.
-
-I think the first three points can be done in a later series, the last
-one should be trivial to fix now.
-
-Some comments follow to the individual patches.
-
-And, oh:
-
-Tested-by: Sascha Hauer <s.hauer@pengutronix.de
-
-Thanks for working on this topic, it has long been on my todo list.
+I also don't really like exposing this to the drivers, but it's a clean
+way to do so. A framebuffer driver needs a pixel clock which must be
+enabled when the display is turned on. It may also have a register clock
+which has to be turned on when we want to access registers. These are
+two different clocks and the driver can make use of this (not that we
+currently do though...)
 
 Sascha
 
