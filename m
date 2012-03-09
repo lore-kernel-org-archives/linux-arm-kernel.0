@@ -1,54 +1,93 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 12 Mar 2012 16:14:37 +0100
-Subject: [PATCH] stmmac: Add device-tree support
-In-Reply-To: <201203121606.26926.sr@denx.de>
-References: <1331561157-3820-1-git-send-email-sr@denx.de>
- <4F5E0993.9020000@gmail.com> <201203121606.26926.sr@denx.de>
-Message-ID: <20120312151437.GC13869@game.jcrosoft.org>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Fri,  9 Mar 2012 16:20:41 +0100
+Subject: [PATCH v3 05/13] dmaengine: imx-dma: remove
+ 'imxdma_config_channel_hw' function.
+In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1331306449-28591-6-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:06 Mon 12 Mar     , Stefan Roese wrote:
-> Hi Rob,
-> 
-> On Monday 12 March 2012 15:34:59 Rob Herring wrote:
-> > On 03/12/2012 09:05 AM, Stefan Roese wrote:
-> > > This patch adds support to configure the STMMAC ethernet driver via
-> > > device-tree instead of platform_data.
-> > > 
-> > > Currently, only the properties needed on SPEAr600 are provided. All
-> > > other properties should be added once needed on other platforms.
-> > > 
-> > > Signed-off-by: Stefan Roese <sr@denx.de>
-> > > Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> > > Cc: Viresh Kumar <viresh.kumar@st.com>
-> > > ---
-> > > 
-> > >  Documentation/devicetree/bindings/net/stmmac.txt   |   38 +++++++++++
-> > >  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   66
-> > >  +++++++++++++++++++- 2 files changed, 103 insertions(+), 1 deletion(-)
-> > >  create mode 100644 Documentation/devicetree/bindings/net/stmmac.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/net/stmmac.txt
-> > > b/Documentation/devicetree/bindings/net/stmmac.txt new file mode 100644
-> > > index 0000000..386a47f
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/net/stmmac.txt
-> > > @@ -0,0 +1,38 @@
-> > > +* STMicroelectronics 10/100/1000 Ethernet driver (GMAC)
-> > > +
-> > > +Required properties:
-> > > +- compatible: Should be "stm,gmac"
-> > 
-> > This is too generic. This should be 1 string per version of h/w.
-> 
-> Viresh, Giuseppe, can you please suggest a proper string for the SPEAr600 
-> STMMAC core, including version?
-IIRC this IP is the same as the sti7108
+This function is only used once in the driver and uses some
+intermediary variables that are not needed anymore. For this
+reason it's been merged with 'imxdma_control'.
 
-st,sti7018-gmac
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ drivers/dma/imx-dma.c |   46 +++++++++++++---------------------------------
+ 1 files changed, 13 insertions(+), 33 deletions(-)
 
-as this IP has been used first on SH4
-
-Best Regards,
-J.
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index f86ac06..d86b3d5 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -312,32 +312,6 @@ static void imxdma_disable_hw(struct imxdma_channel *imxdmac)
+ }
+ 
+ static int
+-imxdma_config_channel_hw(struct imxdma_channel *imxdmac, unsigned int config_port,
+-	unsigned int config_mem, unsigned int dmareq, int hw_chaining)
+-{
+-	int channel = imxdmac->channel;
+-	u32 dreq = 0;
+-
+-	imxdmac->internal.hw_chaining = 0;
+-
+-	if (hw_chaining) {
+-		imxdmac->internal.hw_chaining = 1;
+-		if (!imxdma_hw_chain(&imxdmac->internal))
+-			return -EINVAL;
+-	}
+-
+-	if (dmareq)
+-		dreq = CCR_REN;
+-
+-	imxdmac->internal.ccr_from_device = config_port | (config_mem << 2) | dreq;
+-	imxdmac->internal.ccr_to_device = config_mem | (config_port << 2) | dreq;
+-
+-	imx_dmav1_writel(dmareq, DMA_RSSR(channel));
+-
+-	return 0;
+-}
+-
+-static int
+ imxdma_setup_sg_hw(struct imxdma_desc *d,
+ 		 struct scatterlist *sg, unsigned int sgcount,
+ 		 unsigned int dma_length, unsigned int dev_addr,
+@@ -626,7 +600,6 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+ 	struct dma_slave_config *dmaengine_cfg = (void *)arg;
+-	int ret;
+ 	unsigned long flags;
+ 	unsigned int mode = 0;
+ 
+@@ -662,13 +635,20 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 			mode = IMX_DMA_MEMSIZE_32;
+ 			break;
+ 		}
+-		ret = imxdma_config_channel_hw(imxdmac,
+-				mode | IMX_DMA_TYPE_FIFO,
+-				IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
+-				imxdmac->dma_request, 1);
+ 
+-		if (ret)
+-			return ret;
++		imxdmac->internal.hw_chaining = 1;
++		if (!imxdma_hw_chain(&imxdmac->internal))
++			return -EINVAL;
++		imxdmac->internal.ccr_from_device =
++			(mode | IMX_DMA_TYPE_FIFO) |
++			((IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) << 2) |
++			CCR_REN;
++		imxdmac->internal.ccr_to_device =
++			(IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) |
++			((mode | IMX_DMA_TYPE_FIFO) << 2) | CCR_REN;
++		imx_dmav1_writel(imxdmac->dma_request,
++				 DMA_RSSR(imxdmac->channel));
++
+ 		/* Set burst length */
+ 		imx_dmav1_writel(imxdmac->watermark_level * imxdmac->word_size,
+ 				 DMA_BLR(imxdmac->channel));
+-- 
+1.7.0.4
