@@ -1,35 +1,44 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 9 Mar 2012 17:33:31 +0100
-Subject: [GIT PULL] ARM: OMAP: GPIO cleanup and device tree adaptation
-Message-ID: <4F5A30DB.7060004@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 9 Mar 2012 11:20:20 -0500 (EST)
+Subject: [PATCH-WIP 01/13] xen/arm: use r12 to pass the hypercall number
+ to the hypervisor
+In-Reply-To: <CA+wbFdfF5c+Bw6RrxCm3YThqCRDuDYzanq+HV8a6LyXaBqWrQA@mail.gmail.com>
+References: <alpine.DEB.2.00.1202231714590.23091@kaball-desktop>
+ <1330019314-20865-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1330360043.8557.302.camel@zakaz.uk.xensource.com>
+ <20120227180355.GB2023@linaro.org>
+ <1330371219.10008.34.camel@dagon.hellion.org.uk>
+ <20120228102040.GB2063@linaro.org>
+ <1330426133.31269.70.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.00.1202281149210.23091@kaball-desktop>
+ <20120229093436.GA2077@linaro.org>
+ <1330509362.4270.20.camel@zakaz.uk.xensource.com>
+ <20120229125826.GC2077@linaro.org>
+ <alpine.LFD.2.02.1203021528150.31242@xanadu.home> <4F5882BF.1030104@arm.com>
+ <alpine.LFD.2.02.1203081041340.24151@xanadu.home> <4F58FEC0.8080706@arm.com>
+ <CA+wbFdfF5c+Bw6RrxCm3YThqCRDuDYzanq+HV8a6LyXaBqWrQA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1203091112050.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Fri, 9 Mar 2012, Dave Martin wrote:
 
-Please pull the patches for OMAP GPIO DT support.
-It is based on your current gpio/next branch.
+> Register variables feel like a red herring though.  We're only using
+> those because we can't do the needful thing and actually desscribe
+> these constraints in the asm constraints (which would seem to be the
+> right place).  We specifically don't care where those values are
+> except at the boundaries of the asm block itself.
 
-Thanks,
-Benoit
+Absolutely.
+
+> Is there a reason why ARM gcc doesn't provide the ability to specify
+> such exact-register constraints, or is this more for historical
+> reasons?  It is possible?
+
+I don't know how much things have changed since I last looked at the gcc 
+code, but implementing this seemed to be pretty trivial at the time.  
+The problem would be to determine a good letter scheme to map to actual 
+registers.
 
 
-The following changes since commit e4e449e82871c53ef3b22bd3a50fceabc0638926:
-  Mark Brown (1):
-        gpiolib: Add comments explaining the _cansleep() WARN_ON()s
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_grant/for_3.4/dt_gpio
-
-Benoit Cousson (4):
-      gpio/omap: Remove bank->id information and misc cleanup
-      gpio/omap: Use devm_ API and add request_mem_region
-      gpio/omap: Add DT support to GPIO driver
-      gpio/omap: Fix IRQ handling for SPARSE_IRQ
-
- .../devicetree/bindings/gpio/gpio-omap.txt         |   36 ++++
- arch/arm/plat-omap/include/plat/gpio.h             |   22 +--
- drivers/gpio/gpio-omap.c                           |  208 ++++++++++++++------
- 3 files changed, 190 insertions(+), 76 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
+Nicolas
