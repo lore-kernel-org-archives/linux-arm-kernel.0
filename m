@@ -1,52 +1,64 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 9 Mar 2012 00:25:49 +0100
-Subject: [PATCH v5 3/4] clk: introduce the common clock framework
-In-Reply-To: <20120308062739.GE18513@lunn.ch>
-References: <1330763341-3437-4-git-send-email-mturquette@linaro.org>
- <20120303133158.GA26882@pengutronix.de>
- <CAJOA=zNFNEHxBDhRDdvm7DYR83R0LJjsp_AT3BoG+nL+iN5_tw@mail.gmail.com>
- <20120304115201.GB26882@pengutronix.de>
- <CAJOA=zP8d8wm==7=svOzh03Ft-1_LV71q0mA6Pncrh5vQSWGEA@mail.gmail.com>
- <20120305073836.GU3852@pengutronix.de>
- <CAJOA=zMs75ZQ24g5PXpSLV3AJzWEo12g86G8+4+ryQR_cTYpzA@mail.gmail.com>
- <20120306190039.GJ3852@pengutronix.de>
- <CAJOA=zOG_6eSWPEfFL6VKWeTpGKD9y11xeHoOwdS3b59tAZ45A@mail.gmail.com>
- <20120308062739.GE18513@lunn.ch>
-Message-ID: <20120308232549.GU3852@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 8 Mar 2012 16:06:22 -0800
+Subject: [PATCH v3] ARM: OMAP2+: gpmc-smsc911x: add required smsc911x
+ regulators
+In-Reply-To: <87y5raaiob.fsf@ti.com>
+References: <1330006564-13290-1-git-send-email-mporter@ti.com>
+ <87wr74gis6.fsf@ti.com>
+ <20120301204553.GA21841@legolas.emea.dhcp.ti.com>
+ <87pqcqnc7u.fsf@ti.com>
+ <CA+Bv8XaJqL1L8F-n6skY7dHn1XAdDLRKaRjw0deLeoQ5Ao0Fhg@mail.gmail.com>
+ <87sjhkjj8m.fsf@ti.com> <20120308210825.GY12083@atomide.com>
+ <87y5raaiob.fsf@ti.com>
+Message-ID: <20120309000621.GA12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 07:27:39AM +0100, Andrew Lunn wrote:
-> > Assuming that some day OMAP code can be refactored to allow for lazy
-> > (or at least initcall-based) registration of clocks then perhaps your
-> > suggestion can take root.  Which leads me to this question: are there
-> > any other platforms out there that require the level of expose to
-> > struct clk present in this patchset?  OMAP does, for now, but if that
-> > changes then I need to know if others require this as well.
+* Kevin Hilman <khilman@ti.com> [120308 12:54]:
+> Tony Lindgren <tony@atomide.com> writes:
 > 
-> Hi Mike
+> > * Kevin Hilman <khilman@ti.com> [120307 11:05]:
+> >> >
+> >> > I don't think the second smsc911x on the Overo, "smsc911x.1", would
+> >> > find it due to the dev_id.
+> >> 
+> >> It's not about finding the second regulator.  As stated in the
+> >> changelog, it's about the duplicate attempt to register the exact same
+> >> platform_device.
+> >> 
+> >> Duplicate attempts to register the exact same platform_device cause
+> >> kobject to panic and give up[1].  So, any platform that calls
+> >> gpmc_smsc911x_init() twice (Overo and T35 in mainline) will panic on
+> >> boot.
+> >> 
+> >> This patch fixes those platforms so they can boot.
+> >
+> > Yeah but I guess the second smsc911x instance still would not work,
+> > or am I missing something?
 > 
-> For kirkwood, i use static clk's for all but my root clock. I cannot
-> statically know the rate of the root clock, so i have to determine it
-> at boot time using heuristics, PCI ID, etc.
+> I don't know since my Overo expansion boards don't have a 2nd NIC, but I
+> suspect you're right.
 > 
-> I used statics thinking it would be less code. No idea if it actually
-> is, and there is nothing stopping me moving to creating the clocks
-> after creating the root clock.
+> However, my fix isn't addressing that.  I am fixing a problem where
+> mainline today will panic on some boards due to duplicate registration.
+> 
+> If the 2nd interface doesn't work, then the original patch that added
+> the regulators needs a rethink.  My patch to prevent the panic() is
+> needed for mainline.
 
-I'd say use the nonstatic ones. I think using the static initializers
-will cause us much pain in the future. I've been through several rebases
-on the i.MX clock rework and everytime I wish my sed foo would be
-better. Now imagine what happens when it turns out that the internal
-struct clk layout or the structs for the muxes/dividers/gates have to
-be changed. This task is next to impossible when we have thousands of
-clocks scattered around the tree.
+With Kevin's second version of this patch applied we avoid the panic
+on boards with more than one smsc911x.
 
-Sascha
+After this patch, board-*.c files can add custom regulators for their
+other smsc911x instances.
 
+We should also add a regulator to the struct omap_smsc911x_platform_data,
+and then only initialize the fixed regulator automatically
+if (!board_data->regulator && !board_data->id).
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+So I've pushed Kevin's second version of the fix to fix-smsc911x-regulator
+branch.
+
+Regards,
+
+Tony
