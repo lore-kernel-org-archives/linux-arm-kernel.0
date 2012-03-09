@@ -1,82 +1,59 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 9 Mar 2012 12:47:58 +0100
-Subject: [RFC] i.MX: drop secondary clocks
-In-Reply-To: <20120309102931.GY3852@pengutronix.de>
-References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
- <20313.52782.832292.580932@ipc1.ka-ro>
- <20120309102931.GY3852@pengutronix.de>
-Message-ID: <20313.60910.420339.905973@ipc1.ka-ro>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 08 Mar 2012 21:33:19 -0700
+Subject: [PATCH 01/14] ARM: orion: spi: remove enable_clock_fix which is
+ not used
+In-Reply-To: <b0fe0cfb7e76a869a8ba7f7344de75eb122e206c.1331090356.git.jason@lakedaemon.net>
+References: <cover.1331090356.git.jason@lakedaemon.net>
+ <b0fe0cfb7e76a869a8ba7f7344de75eb122e206c.1331090356.git.jason@lakedaemon.net>
+Message-ID: <20120309043319.316C93E0903@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Sascha Hauer writes:
-> On Fri, Mar 09, 2012 at 10:32:30AM +0100, Lothar Wa?mann wrote:
-> > Hi,
-> > 
-> > Sascha Hauer writes:
-> > > Hi All,
-> > > 
-[...]
-> > I think that's a bad idea! Drivers should not have to know intimate
-> > details about the clock logic of the CPU core they are running on!
+On Wed,  7 Mar 2012 03:44:42 +0000, Jason Cooper <jason@lakedaemon.net> wrote:
+> From: Andrew Lunn <andrew@lunn.ch>
 > 
-> They don't have to. There really are different clocks connected to the
-> devices. If for example you have a look eSDHC Block diagram in the
-> reference Manual  you'll see that this has three clock inputs. All
-> we do is to tell the driver about these three clocks which are device
-> specific and not SoC specific. Which of these clocks are actually
-> gatetable varies from SoC to SoC. Also on some SoCs two of the three
-> clocks may be actually the same.
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+> ---
+>  drivers/spi/spi-orion.c       |    5 -----
+>  include/linux/spi/orion_spi.h |    1 -
+>  2 files changed, 0 insertions(+), 6 deletions(-)
 > 
-At least this should be done in a way that is independent from the
-name of the clock on a specific SoC, but is related to the function of
-the clock for the driver. Thus instead of e.g. CLK_IPG and CLK_PER use
-CLK_REG and CLK_BITRATE.
-
-> > They should simply request a clock for the unit they operate on and
-> > the clock core code should figure out which other clocks need to be
-> > enabled on a specific machine to get the unit working.
+> diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+> index 13448c8..e496f79 100644
+> --- a/drivers/spi/spi-orion.c
+> +++ b/drivers/spi/spi-orion.c
+> @@ -359,11 +359,6 @@ static int orion_spi_setup(struct spi_device *spi)
+>  
+>  	orion_spi = spi_master_get_devdata(spi->master);
+>  
+> -	/* Fix ac timing if required.   */
+> -	if (orion_spi->spi_info->enable_clock_fix)
+> -		orion_spi_setbits(orion_spi, ORION_SPI_IF_CONFIG_REG,
+> -				  (1 << 14));
+> -
+>  	if ((spi->max_speed_hz == 0)
+>  			|| (spi->max_speed_hz > orion_spi->max_speed))
+>  		spi->max_speed_hz = orion_spi->max_speed;
+> diff --git a/include/linux/spi/orion_spi.h b/include/linux/spi/orion_spi.h
+> index decf6d8..b4d9fa6 100644
+> --- a/include/linux/spi/orion_spi.h
+> +++ b/include/linux/spi/orion_spi.h
+> @@ -11,7 +11,6 @@
+>  
+>  struct orion_spi_info {
+>  	u32	tclk;		/* no <linux/clk.h> support yet */
+> -	u32	enable_clock_fix;
+>  };
+>  
+>  
+> -- 
+> 1.7.3.4
 > 
-> Yes, that's what we want to do, except that devices do not need 'a'
-> clock but several. And the clock core figures out which other clocks
-> have to be activated, these are the parent clocks.
-> 
-What about devices which have multiple 'parent' clocks that are
-completely unrelated wrt. each other? In the current clock system you
-can model this by having secondary clocks.
-How would you represent the current structure on i.MX53:
-uart_ipg_clk <- aips_tz1_clk <-+- ahb_clk
-                               +-> ahb_max_clk
-in the new model?
-Should every driver have to request the ahb_max_clk in addition to the
-uart_ipg_clk?
 
-What, if you have a device on a number of SoCs with a certain set of
-clocks, but on a later SoC another clock is required for the device?
-You would not only have to change the driver to add the new clock but
-also would have to add that clock as a dummy clock in the core clock
-code for all previous SoCs that did not provide that clock.
-
-> I also don't really like exposing this to the drivers, but it's a clean
-> way to do so. A framebuffer driver needs a pixel clock which must be
-> enabled when the display is turned on. It may also have a register clock
-> which has to be turned on when we want to access registers. These are
-> two different clocks and the driver can make use of this (not that we
-> currently do though...)
-> 
-But we could do so without any problem.
-
-
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies,Ltd.
