@@ -1,168 +1,82 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 12 Mar 2012 10:39:28 +0000
-Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
- presence of 32k timer
-In-Reply-To: <20120312101757.GH5375@legolas.emea.dhcp.ti.com>
-References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
- <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
- <20120305225530.GJ12083@atomide.com>
- <79CD15C6BA57404B839C016229A409A83180F73D@DBDE01.ent.ti.com>
- <20120312093921.GA5375@legolas.emea.dhcp.ti.com>
- <79CD15C6BA57404B839C016229A409A831810E32@DBDE01.ent.ti.com>
- <20120312101757.GH5375@legolas.emea.dhcp.ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A831810FE1@DBDE01.ent.ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 9 Mar 2012 12:47:58 +0100
+Subject: [RFC] i.MX: drop secondary clocks
+In-Reply-To: <20120309102931.GY3852@pengutronix.de>
+References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
+ <20313.52782.832292.580932@ipc1.ka-ro>
+ <20120309102931.GY3852@pengutronix.de>
+Message-ID: <20313.60910.420339.905973@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 15:47:58, Balbi, Felipe wrote:
-> Hi,
-> 
-> On Mon, Mar 12, 2012 at 09:48:20AM +0000, Hiremath, Vaibhav wrote:
-> > On Mon, Mar 12, 2012 at 15:09:24, Balbi, Felipe wrote:
-> > > On Fri, Mar 09, 2012 at 05:58:00PM +0000, Hiremath, Vaibhav wrote:
-> > > > On Tue, Mar 06, 2012 at 04:25:30, Tony Lindgren wrote:
-> > > > > Hi,
-> > > > > 
-> > > > > * Vaibhav Hiremath <hvaibhav@ti.com> [120119 06:01]:
-> > > > > > OMAP device has 32k-sync timer which is currently used as a
-> > > > > > clocksource in the kernel (omap2plus_defconfig).
-> > > > > > The current implementation uses compile time selection between
-> > > > > > gp-timer and 32k-sync timer, which breaks multi-omap build for
-> > > > > > the devices like AM33xx, where 32k-sync timer is not available.
-> > > > > > 
-> > > > > > So use hwmod database lookup mechanism, through which at run-time
-> > > > > > we can identify availability of 32k-sync timer on the device,
-> > > > > > else fall back to gp-timer.
-> > > > > ...
-> > > > > 
-> > > > > > --- a/arch/arm/plat-omap/counter_32k.c
-> > > > > > +++ b/arch/arm/plat-omap/counter_32k.c
-> > > > > > @@ -69,52 +69,55 @@ void read_persistent_clock(struct timespec *ts)
-> > > > > >  
-> > > > > >  int __init omap_init_clocksource_32k(void)
-> > > > > >  {
-> > > > > > -	static char err[] __initdata = KERN_ERR
-> > > > > > -			"%s: can't register clocksource!\n";
-> > > > > > -
-> > > > > > -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
-> > > > > > -		u32 pbase;
-> > > > > > -		unsigned long size = SZ_4K;
-> > > > > > -		void __iomem *base;
-> > > > > > -		struct clk *sync_32k_ick;
-> > > > > > -
-> > > > > > -		if (cpu_is_omap16xx()) {
-> > > > > > -			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
-> > > > > > -			size = SZ_1K;
-> > > > > > -		} else if (cpu_is_omap2420())
-> > > > > > -			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
-> > > > > > -		else if (cpu_is_omap2430())
-> > > > > > -			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
-> > > > > > -		else if (cpu_is_omap34xx())
-> > > > > > -			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
-> > > > > > -		else if (cpu_is_omap44xx())
-> > > > > > -			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
-> > > > > > -		else
-> > > > > > +	u32 pbase;
-> > > > > > +	unsigned long size = SZ_4K;
-> > > > > > +	void __iomem *base;
-> > > > > > +	struct clk *sync_32k_ick;
-> > > > > > +
-> > > > > > +	if (cpu_is_omap16xx()) {
-> > > > > > +		pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
-> > > > > > +		size = SZ_1K;
-> > > > > > +	} else if (cpu_class_is_omap2()) {
-> > > > > > +		struct omap_hwmod *oh;
-> > > > > > +		const char *oh_name = "counter_32k";
-> > > > > > +
-> > > > > > +		oh = omap_hwmod_lookup(oh_name);
-> > > > > > +		if (!oh || oh->slaves_cnt == 0) {
-> > > > > > +			pr_err("Could not lookup %s hwmod\n", oh_name);
-> > > > > >  			return -ENODEV;
-> > > > > > +		}
-> > > > > > +		pbase = oh->slaves[0]->addr->pa_start + 0x10;
-> > > > > > +	} else {
-> > > > > > +		return -ENODEV;
-> > > > > > +	}
-> > > > > 
-> > > > > How about have separate omap1 and omap2+ init functions that
-> > > > > call a common function and passes the pbase as a parameter?
-> > > > > 
-> > > > > That way we can get rid of the cpu_is_omapxxxx tests here.
-> > > > > 
-> > > > 
-> > > > Tony,
-> > > > 
-> > > > In the morning, I replied very soon, without much thinking...
-> > > > 
-> > > > Just now I started working on the patch, I was just reviewing the code, 
-> > > > and I felt that, it is unnecessary to split the code between omap1 and 
-> > > > omap2+.
-> > > > 
-> > > > The reason is,
-> > > > 
-> > > > Currently Only OMAP16xx base-address is hardcoded with
-> > > > cpu_is_omap16xx() macro, For all other omap family of devices the
-> > > > complete information is fetched from HWDMO api's/data.
+Hi,
+
+Sascha Hauer writes:
+> On Fri, Mar 09, 2012 at 10:32:30AM +0100, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > Sascha Hauer writes:
+> > > Hi All,
 > > > 
-> > > In that case, why don't you create the platform_device by hand on
-> > > arch/arm/mach-omap1/devices.c and move the omap2+ (which is based on
-> > > hwmod) to arch/arm/mach-omap2/devices.c ?
-> > > 
-> > 
-> > Balbi,
-> > 
-> > 32k_counter code is not a platform_device/driver, we don't build the 
-> > any device here. We only need hwmod data to fetch the basic information like, 
-> > base-address, size, etc...
-> > 
-> > And I am note sure whether we really intend to make it 
-> > platform_device/driver thing.
+[...]
+> > I think that's a bad idea! Drivers should not have to know intimate
+> > details about the clock logic of the CPU core they are running on!
 > 
-> that's kinda weird... 
-
-Balbi,
-
-Its not that weird, I think its because, this code is used as system 
-clocksource.
-
-> anyway, you can also pass base as argument to
-> omap_init_clocksource_32k()... dunno.
+> They don't have to. There really are different clocks connected to the
+> devices. If for example you have a look eSDHC Block diagram in the
+> reference Manual  you'll see that this has three clock inputs. All
+> we do is to tell the driver about these three clocks which are device
+> specific and not SoC specific. Which of these clocks are actually
+> gatetable varies from SoC to SoC. Also on some SoCs two of the three
+> clocks may be actually the same.
 > 
+At least this should be done in a way that is independent from the
+name of the clock on a specific SoC, but is related to the function of
+the clock for the driver. Thus instead of e.g. CLK_IPG and CLK_PER use
+CLK_REG and CLK_BITRATE.
 
-That's the whole point, just for one platform (omap16xx), we are changing the code. Rest all other platforms are using hwmod data, which is I believe 
-is clean interface as of now.
-
-To be more specific, we have to choose between something like -
-
-"arch/arm/mach-omap1/timer32k.c"
-bool __init omap_32k_timer_init(void) {
-	omap_init_clocksource_32k(OMAP16XX_TIMER_32K_SYNCHRONIZED, SZ_1K);
-	...
-}
-"arch/arm/mach-omap2/timer.c"
-
-static void __init omap2_gp_clocksource_init(int gptimer_id,
-                                                 const char *fck_source)
-{
-	/* Parse the hwmod data here*/
-	Base = oh->slaves[0]->addr->pa_start + 0x10;
-	Size = oh->slaves[0]->addr->pa_end - oh->slaves[0]->addr->pa_start;
-	res = omap_init_clocksource_32k(base, size);
-	if (!res)
-		return;
-
-	/* Fall back to gptimer */
-}
-
-
-OR
-
-My current patch, which actually add cpu_is_16xx() check at one place and
-does everything.
-
-
-Thanks,
-Vaibhav
-> -- 
-> balbi
+> > They should simply request a clock for the unit they operate on and
+> > the clock core code should figure out which other clocks need to be
+> > enabled on a specific machine to get the unit working.
 > 
+> Yes, that's what we want to do, except that devices do not need 'a'
+> clock but several. And the clock core figures out which other clocks
+> have to be activated, these are the parent clocks.
+> 
+What about devices which have multiple 'parent' clocks that are
+completely unrelated wrt. each other? In the current clock system you
+can model this by having secondary clocks.
+How would you represent the current structure on i.MX53:
+uart_ipg_clk <- aips_tz1_clk <-+- ahb_clk
+                               +-> ahb_max_clk
+in the new model?
+Should every driver have to request the ahb_max_clk in addition to the
+uart_ipg_clk?
+
+What, if you have a device on a number of SoCs with a certain set of
+clocks, but on a later SoC another clock is required for the device?
+You would not only have to change the driver to add the new clock but
+also would have to add that clock as a dummy clock in the core clock
+code for all previous SoCs that did not provide that clock.
+
+> I also don't really like exposing this to the drivers, but it's a clean
+> way to do so. A framebuffer driver needs a pixel clock which must be
+> enabled when the display is turned on. It may also have a register clock
+> which has to be turned on when we want to access registers. These are
+> two different clocks and the driver can make use of this (not that we
+> currently do though...)
+> 
+But we could do so without any problem.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
