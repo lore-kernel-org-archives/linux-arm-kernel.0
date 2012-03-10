@@ -1,46 +1,104 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Fri,  9 Mar 2012 16:20:36 +0100
-Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
- dmaengine.
-Message-ID: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 10 Mar 2012 07:34:35 -0800
+Subject: [GIT PULL] Samsung board stuff for v3.4
+Message-ID: <4F5B748B.6050404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series have to be applied on top of the following patches:
-[PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
-[PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
+Hi Arnd, Olof,
 
-As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
-is deprecated and no new patches are accepted for it.
+Please pull regarding Samsung board patches for v3.4.
 
-This series merges this code into the imx-dma.c dmaengine driver.
+Most are enabling some features(IPs) on each board and
+one is adding new board file, Samsung Mobile's TRATS board.
 
-Notes for v3:
- - I send the whole series again despite some patches being the same. I think
- this is more comfortable for Vinod than just sending those patches that have
- been modified.
- - I've generated my series with the following command this time:
- 'git format-patch -s -13 -M -B --subject-prefix="PATCH v3"' as suggested by
- Sascha but still removing two files in 01/13 generates a lot of noisy diffs.
- Sorry about that.
- - I don't include Sascha's Tested-by since maybe he wants to test this last
- version.
+If any problems, please let me know.
 
-Changes since v2:
- - Alloc all DMA channels (16) instead of 8.
- - Free IRQs properly for i.MX1
+Thanks.
 
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-[PATCH v3 01/13] dmaengine: imx-dma: merge old dma-v1.c with imx-dma.c
-[PATCH v3 02/13] dmaengine: imx-dma: remove data member from internal structure.
-[PATCH v3 03/13] dmaengine: imx-dma: remove dma_mode member of internal structure.
-[PATCH v3 04/13] dmaengine: imx-dma: remove 'imxdma_setup_mem2mem_hw' function.
-[PATCH v3 05/13] dmaengine: imx-dma: remove 'imxdma_config_channel_hw' function.
-[PATCH v3 06/13] dmaengine: imx-dma: remove 'imxdma_setup_sg_hw' function.
-[PATCH v3 07/13] dmaengine: imx-dma: remove sg member from internal structure.
-[PATCH v3 08/13] dmaengine: imx-dma: remove 'in_use' field of 'internal' structure.
-[PATCH v3 09/13] dmaengine: imx-dma: remove 'resbytes' field of 'internal' structure.
-[PATCH v3 10/13] dmaengine: imx-dma: remove internal structure.
-[PATCH v3 11/13] dmaengine: imx-dma: remove unused arg of imxdma_sg_next.
-[PATCH v3 12/13] dmaengine: imx-dma: remove 'imx_dmav1_baseaddr' and 'dma_clk'.
-[PATCH v3 13/13] dmaengine: imx-dma: use 'dev_dbg' and 'dev_warn' for messages.
+The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+
+   Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/board-samsung
+
+Andrzej Pietrasiewicz (2):
+       ARM: EXYNOS: Register JPEG on universal_c210
+       ARM: EXYNOS: Register JPEG on nuri
+
+HeungJun, Kim (1):
+       ARM: EXYNOS: Adds Samsung TRATS board support
+
+Kamil Debski (2):
+       ARM: EXYNOS: add G2D to mach-nuri
+       ARM: EXYNOS: add G2D to mach-universal
+
+Mark Brown (8):
+       ARM: S3C64XX: Support GPIO LEDs on Cragganmore
+       ARM: S3C64XX: Fix build of Cragganmore after SPI changes
+       ARM: S3C64XX: Enable power management for disk on Cragganmore
+       ARM: S3C64XX: Enable power management for WiFi on Cragganmore
+       ARM: S3C64XX: Add hookup for Tomatin module on Cragganmore
+       ARM: S3C64XX: Add a SPKVDD supply for CODECs on Cragganmore
+       ARM: S3C64XX: Add some more Cragganmore module IDs to the table
+       ARM: S3C64XX: Supply platform data for SPI on Cragganmore
+
+MyungJoo Ham (1):
+       ARM: EXYNOS: support Exynos4210-bus Devfreq driver on Nuri board
+
+Sachin Kamat (13):
+       ARM: EXYNOS: Enable G2D on ORIGEN
+       ARM: S5PV210: Add missing FIMC media device to Aquila
+       ARM: EXYNOS: Add missing FIMC media device to SMDKV310
+       ARM: EXYNOS: Add missing FIMC media device to Origen
+       ARM: EXYNOS: Enable G2D on SMDKV310
+       ARM: S5PV210: Enable MFC on SMDKV210
+       ARM: S5PV210: Enable MFC on SMDKC110
+       ARM: S5PV210: Enable FIMC on SMDKV210
+       ARM: S5PV210: Enable FIMC on SMDKC110
+       ARM: EXYNOS: Enable JPEG on SMDKV310
+       ARM: EXYNOS: Enable JPEG on Origen
+       ARM: S5PV210: Add JPEG board definition
+       ARM: S5PV210: Enable JPEG on SMDKV210
+
+Sangwook Lee (1):
+       ARM: EXYNOS: Enable Bluetooth on ORIGEN
+
+Sylwester Nawrocki (3):
+       ARM: EXYNOS: Increase virtual framebuffer size on Universal C210 
+board
+       ARM: EXYNOS: Add support for S5K6AAFX image sensor on Universal 
+C210 board
+       ARM: SAMSUNG: Add support for S5K6AAFX camera on Nuri board
+
+Tushar Behera (2):
+       ARM: EXYNOS: Add __init attribute to nuri_camera_init()
+       ARM: EXYNOS: Add __init attribute to universal_camera_init()
+
+  arch/arm/mach-exynos/Kconfig                 |   21 ++
+  arch/arm/mach-exynos/Makefile                |    1 +
+  arch/arm/mach-exynos/mach-nuri.c             |   80 ++++++-
+  arch/arm/mach-exynos/mach-origen.c           |   37 +++
+  arch/arm/mach-exynos/mach-smdkv310.c         |    3 +
+  arch/arm/mach-exynos/mach-trats.c            |  344 
+++++++++++++++++++++++++++
+  arch/arm/mach-exynos/mach-universal_c210.c   |   80 ++++++-
+  arch/arm/mach-s3c64xx/Kconfig                |    1 +
+  arch/arm/mach-s3c64xx/mach-crag6410-module.c |   31 +++-
+  arch/arm/mach-s3c64xx/mach-crag6410.c        |   67 +++++-
+  arch/arm/mach-s5pv210/Kconfig                |    9 +
+  arch/arm/mach-s5pv210/clock.c                |    5 +
+  arch/arm/mach-s5pv210/include/mach/map.h     |    4 +
+  arch/arm/mach-s5pv210/mach-aquila.c          |    1 +
+  arch/arm/mach-s5pv210/mach-smdkc110.c        |   14 +
+  arch/arm/mach-s5pv210/mach-smdkv210.c        |   15 ++
+  16 files changed, 702 insertions(+), 11 deletions(-)
+  create mode 100644 arch/arm/mach-exynos/mach-trats.c
