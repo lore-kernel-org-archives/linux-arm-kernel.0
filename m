@@ -1,103 +1,39 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Fri,  9 Mar 2012 16:20:49 +0100
-Subject: [PATCH v3 13/13] dmaengine: imx-dma: use 'dev_dbg' and 'dev_warn' for
- messages.
-In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1331306449-28591-14-git-send-email-javier.martin@vista-silicon.com>
+From: alan@signal11.us (Alan Ott)
+Date: Sat, 10 Mar 2012 15:06:06 -0500
+Subject: [PATCH 1/2] ARM: at91: only RM9200 has ISA-style PIO
+In-Reply-To: <201203101924.31710.arnd@arndb.de>
+References: <1331405049-3186-1-git-send-email-alan@signal11.us>
+ <1331405075-3231-1-git-send-email-alan@signal11.us>
+ <201203101924.31710.arnd@arndb.de>
+Message-ID: <4F5BB42E.3090201@signal11.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There were some 'pr_crit' and 'pr_debug' messages due to the
-initial merge. Replace them by 'dev_dbg' and 'dev_warn' to be
-consistent.
+On 03/10/2012 02:24 PM, Arnd Bergmann wrote:
+> On Saturday 10 March 2012, Alan Ott wrote:
+>> From: Arnd Bergmann <arnd@arndb.de>
+>>
+>> Most at91 systems have no support for PCMCIA or other
+>> PC-style buses, so we can select NO_IOPORT in order to
+>> disable compilationf or all drivers that need these.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Alan Ott <alan@signal11.us>
+> You forgot to Cc the at91 maintainers on this patch (and on patch 0).
+> Also, this patch relies on the another series I did to redefine
+> the meaning of CONFIG_NO_IOPORT while renaming the existing one to
+> CONFIG_NO_IOPORT_MAP. This patch will have to wait for the other
+> series.
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- drivers/dma/imx-dma.c |   23 ++++++++++++-----------
- 1 files changed, 12 insertions(+), 11 deletions(-)
+Hi Arnd,
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index c4a039c..4584012 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -225,8 +225,8 @@ static inline int imxdma_sg_next(struct imxdma_desc *d)
- 
- 	imx_dmav1_writel(imxdma, now, DMA_CNTR(imxdmac->channel));
- 
--	pr_debug("imxdma%d: next sg chunk dst 0x%08x, src 0x%08x, "
--		"size 0x%08x\n", imxdmac->channel,
-+	dev_dbg(imxdma->dev, " %s channel: %d dst 0x%08x, src 0x%08x, "
-+		"size 0x%08x\n", __func__, imxdmac->channel,
- 		 imx_dmav1_readl(imxdma, DMA_DAR(imxdmac->channel)),
- 		 imx_dmav1_readl(imxdma, DMA_SAR(imxdmac->channel)),
- 		 imx_dmav1_readl(imxdma, DMA_CNTR(imxdmac->channel)));
-@@ -241,7 +241,7 @@ static void imxdma_enable_hw(struct imxdma_desc *d)
- 	int channel = imxdmac->channel;
- 	unsigned long flags;
- 
--	pr_debug("imxdma%d: imx_dma_enable\n", channel);
-+	dev_dbg(imxdma->dev, "%s channel %d\n", __func__, channel);
- 
- 	local_irq_save(flags);
- 
-@@ -272,7 +272,7 @@ static void imxdma_disable_hw(struct imxdma_channel *imxdmac)
- 	int channel = imxdmac->channel;
- 	unsigned long flags;
- 
--	pr_debug("imxdma%d: imx_dma_disable\n", channel);
-+	dev_dbg(imxdma->dev,"%s channel %d\n", __func__, channel);
- 
- 	if (imxdma_hw_chain(imxdmac))
- 		del_timer(&imxdmac->watchdog);
-@@ -296,7 +296,8 @@ static void imxdma_watchdog(unsigned long data)
- 
- 	/* Tasklet watchdog error handler */
- 	tasklet_schedule(&imxdmac->dma_tasklet);
--	pr_debug("imxdma%d: watchdog timeout!\n", imxdmac->channel);
-+	dev_dbg(imxdma->dev, "channel %d: watchdog timeout!\n",
-+		imxdmac->channel);
- }
- 
- static irqreturn_t imxdma_err_handler(int irq, void *dev_id)
-@@ -424,8 +425,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- 
- 	disr = imx_dmav1_readl(imxdma, DMA_DISR);
- 
--	pr_debug("imxdma: dma_irq_handler called, disr=0x%08x\n",
--		     disr);
-+	dev_dbg(imxdma->dev, "%s called, disr=0x%08x\n", __func__, disr);
- 
- 	imx_dmav1_writel(imxdma, disr, DMA_DISR);
- 	for (i = 0; i < IMX_DMA_CHANNELS; i++) {
-@@ -900,14 +900,14 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 	if (cpu_is_mx1()) {
- 		ret = request_irq(MX1_DMA_INT, dma_irq_handler, 0, "DMA", imxdma);
- 		if (ret) {
--			pr_crit("Can't register IRQ for DMA\n");
-+			dev_warn(imxdma->dev, "Can't register IRQ for DMA\n");
- 			kfree(imxdma);
- 			return ret;
- 		}
- 
- 		ret = request_irq(MX1_DMA_ERR, imxdma_err_handler, 0, "DMA", imxdma);
- 		if (ret) {
--			pr_crit("Can't register ERRIRQ for DMA\n");
-+			dev_warn(imxdma->dev, "Can't register ERRIRQ for DMA\n");
- 			free_irq(MX1_DMA_INT, NULL);
- 			kfree(imxdma);
- 			return ret;
-@@ -937,8 +937,9 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 			ret = request_irq(MX2x_INT_DMACH0 + i,
- 					dma_irq_handler, 0, "DMA", imxdma);
- 			if (ret) {
--				pr_crit("Can't register IRQ %d for DMA channel %d\n",
--						MX2x_INT_DMACH0 + i, i);
-+				dev_warn(imxdma->dev, "Can't register IRQ %d "
-+					 "for DMA channel %d\n",
-+					 MX2x_INT_DMACH0 + i, i);
- 				goto err_init;
- 			}
- 			init_timer(&imxdmac->watchdog);
--- 
-1.7.0.4
+I'm going to assume you mean randconfig/ioport in
+git://git.linaro.org/people/arnd/linux.git .
+I'll take this patch out for v2 and make a note that it needs to go with
+the patches in randconfig/ioport.
+
+I used scripts/get_maintainers.pl for the recipient list, but I now see
+how that failed, since this patch modifies the AT91 section of a file
+not in arc/arm/mach-at91.
+
+Alan.
