@@ -1,32 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Mar 2012 12:41:19 +0000
-Subject: [PATCH v6 1/5] Extcon (external connector): import Android's
- switch class and modify.
-In-Reply-To: <1330344939-18394-2-git-send-email-myungjoo.ham@samsung.com>
-References: <1328856038-21912-1-git-send-email-myungjoo.ham@samsung.com>
- <1330344939-18394-1-git-send-email-myungjoo.ham@samsung.com>
- <1330344939-18394-2-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <20120309124119.GV3273@opensource.wolfsonmicro.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 10 Mar 2012 14:29:45 -0700 (MST)
+Subject: [PATCHv5 0/6] ARM: OMAP3+: IO daisy chain support fixes
+In-Reply-To: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1203101425230.27395@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2012 at 09:15:35PM +0900, MyungJoo Ham wrote:
 
-> +#ifdef CONFIG_ANDROID
-> +		extcon_class = class_create(THIS_MODULE, "switch");
-> +#else /* !CONFIG_ANDROID */
-> +		extcon_class = class_create(THIS_MODULE, "extcon");
-> +#endif /* CONFIG_ANDROID */
+Hi
 
-This seems somewhat sad - if ANDROID is turned on the standard ABI
-vanishes.  It'd be much nicer to do this with a symlink (or with
-symlinks within the android directory if the driver core doesn't support
-that).  That way userspace code can be written to the new ABI and will
-work on Android systems without ifdefery.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/a0180f35/attachment-0001.sig>
+By the way, one other thing I forgot to mention.  It would be really great 
+if kerneldoc comments can be created for any new functions added to hwmod, 
+PRCM, clock, or omap_device code.  The intention is to help not only 
+people unfamiliar with the code, but even ourselves in the future.  I've 
+been adding these by hand on Tero's last few patch series, but at some 
+point I'll probably stop accepting patches without kerneldoc.
+
+
+thanks,
+
+- Paul
