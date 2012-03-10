@@ -1,51 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Mar 2012 14:58:39 +0000
-Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
-In-Reply-To: <20120312142716.GA5050@titan.lakedaemon.net>
-References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
- <op.wa197mq94cuzmg@gonzo.lentin.co.uk>
- <20120312142716.GA5050@titan.lakedaemon.net>
-Message-ID: <201203121458.39524.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 9 Mar 2012 21:05:45 -0700 (MST)
+Subject: [PATCHv5 0/6] ARM: OMAP3+: IO daisy chain support fixes
+In-Reply-To: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1203092102450.30879@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 March 2012, Jason Cooper wrote:
-> > 
-> > It probably depends on how easy it is to add the gpiochips into
-> > devicetree. Being able to put the LED, buttons and fans in
-> > devicetree would make board-dt.c much more manageable. I started to
-> > look into it and wasn't immediately obvious, but will have a closer
-> > look.
+Hi
 
-I would think that gpio should not be too hard, since it has very
-little dependencies on other things. GPIO on kirkwood seems to be
-tightly coupled with the irq stuff, so I guess these should be done
-together. We can discuss how to do these on #linaro-kernel on 
-irc.freenode.net if you like.
+On Tue, 6 Mar 2012, Tero Kristo wrote:
 
-Once interrupts and GPIO are done, that will enable a lot of
-the things that already have bindings like gpio-led and gpio-key.
-AFAICT, those won't even need any code changes, only a correct
-specification of the device node according to the bindings in
-Documentation/devicetree/bindings/gpio/*.
-
-> > Happy to resubmit, breaking it out into a board-dnskw.c though.
+> Changes compared to previous version:
 > 
-> Yeah, let's go ahead and do that.  pinmux and the above are going to take
-> a while to sort out.  In the mean time, there's:
+> - patch2:
+>   * fixed the timeout for waiting for ST_IO_CHAIN == 1
+>   * added clear for ST_IO_CHAIN bit (as per spec + implementation in patch 1)
+>   * replaced the timeout at the end of function with a simple register
+>     readback (timing out on a register value that we are clearing does
+>     not make that much sense, the bit is cleared the very first time CPU
+>     manages to read it)
+> - patch5:
+>   * added spinlock for protecting io_chain_trigger operation
 > 
-> sheevaplug
-> guruplug
-> guruplug-serverplus
-> Lacie-*
-> Seagate-*
-> rd-boards-*
+> Tested on omap3 beagle + omap4 blaze. Also did measurements for the
+> cost of IO chain trigger operation with ARM performance counters:
 > 
-> just to name a few.  Plus it'll give me something to do while we wait
-> for pinmux/common clock to land.
+> - omap3 approx 7...8us
+> - omap4 approx 2...4us
 
-Ok, fair enough. We might also see some interest in having some of the
-existing board files moved over to DT based probing in order to slim
-them down, which fits in nicely with this approach.
+Thanks for the changes.  So as you probably already saw, a few changes 
+have been made.  The updated series is in the branch 
+'io_chain_devel_3.4' on git://git.pwsan.com/linux-2.6.
 
-	Arnd
+The main outstanding question is whether the OMAP4 WUCLKOUT poll should be 
+removed to match the v5 changes to the OMAP3 function.  Please let me 
+know.   Any other testing or comments are of course welcome.
+
+
+- Paul
