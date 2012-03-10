@@ -1,69 +1,34 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 12 Mar 2012 09:52:10 +0530
-Subject: [PATCH 3/5] ARM: Exynos4: Add pinctrl devices and pin maps
-In-Reply-To: <4F5D1661.4090007@samsung.com>
-References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
- <1331469965-28846-4-git-send-email-thomas.abraham@linaro.org>
- <4F5D1661.4090007@samsung.com>
-Message-ID: <CAJuYYwQPrOte4EjpfBbUW0vg+qFJwYgZcSM88iZ95C8LwWuptg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 10 Mar 2012 02:37:51 -0800
+Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
+In-Reply-To: <4F5A22BB.2080808@samsung.com>
+References: <22926872.16671331267895327.JavaMail.weblogic@epml04>
+ <CAJ0PZbQebwvFrmXWn=-m7YH3Ri7t2fvm+E_EKZ45rD7cAyo2UA@mail.gmail.com>
+ <4F5A22BB.2080808@samsung.com>
+Message-ID: <4F5B2EFF.3020407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/12 Kukjin Kim <kgene.kim@samsung.com>:
-> Thomas Abraham wrote:
->> Add the three pinctrl platform devices and the pin maps for Exynos4.
->>
->> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
->> ---
->> ? arch/arm/mach-exynos/Kconfig ? ? ? ? ? ? ?| ? ?1 +
->> ? arch/arm/mach-exynos/Makefile ? ? ? ? ? ? | ? ?1 +
->> ? arch/arm/mach-exynos/common.h ? ? ? ? ? ? | ? ?6 ++
->> ? arch/arm/mach-exynos/dev-pinctrl.c ? ? ? ?| ?115 +++++++++++++++++++++++++++++
->> ? arch/arm/plat-samsung/include/plat/devs.h | ? ?3 +
->> ? 5 files changed, 126 insertions(+), 0 deletions(-)
->> ? create mode 100644 arch/arm/mach-exynos/dev-pinctrl.c
->
+On 03/09/12 07:33, Kukjin Kim wrote:
+> On 03/08/12 23:06, MyungJoo Ham wrote:
+>> 2012/3/9 ???<myungjoo.ham@samsung.com>:
+> 
 > [...]
->
->> +#include<linux/kernel.h>
->> +#include<linux/dma-mapping.h>
->> +#include<linux/platform_device.h>
->> +#include<linux/interrupt.h>
->> +#include<linux/pinctrl/machine.h>
->
-> #include <linux/ioport.h> for DEFINE_RES_xxx at below.
->
->> +
->> +#include<plat/devs.h>
->> +#include<plat/pinctrl.h>
->> +
->> +#include<mach/map.h>
->> +
->> +static struct resource exynos4_pinctrl_resource0[] = {
->> + ? ? [0] = {
->> + ? ? ? ? ? ? .start ?= EXYNOS4_PA_GPIO1,
->> + ? ? ? ? ? ? .end ? ?= EXYNOS4_PA_GPIO1 + SZ_4K - 1,
->> + ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
->> + ? ? },
->
-> [0] = DEFINE_RES_MEM(EXYNOS4_PA_GPIO1, SZ_4K),
->
->> + ? ? [1] = {
->> + ? ? ? ? ? ? .start ?= IRQ_GPIO_XA,
->> + ? ? ? ? ? ? .end ? ?= IRQ_GPIO_XA,
->> + ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
->> + ? ? },
->
-> [1] = DEFINE_RES_IRQ(IRQ_GPIO_XA),
->
-> But I'm thinking, we need to move to use EXYNOS4_IRQ_GPIO_XA here for
-> both EXYNOS4 and EXYNOS5 and as a note, I'm working on updating IRQ
-> naming you can see it in this week :)
+> 
+>>
+>> Hello, Kgene
+>>
+>> I've rebased the branch that was pull-requested to Kgene based on this branch.
+>>
+> 
+> OK, thanks. Let me apply this series on top of new cleanup-exynos-clock.
+> 
+Applied, thanks.
 
-Thanks for reviewing this patch series. I will use DEFINE_RES_xxx for
-resource instantiation.
+Thanks.
 
-Regards,
-Thomas.
-
-[...]
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
