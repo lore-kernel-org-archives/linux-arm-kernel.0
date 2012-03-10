@@ -1,34 +1,46 @@
-From: neidhard.kim@lge.com (Kim, Jong-Sung)
-Date: Mon, 12 Mar 2012 20:22:07 +0900
-Subject: [PATCH] serial: PL011: clear pending interrupts
-In-Reply-To: <20120312083221.GW17370@n2100.arm.linux.org.uk>
-References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
- <20120312083221.GW17370@n2100.arm.linux.org.uk>
-Message-ID: <01e101cd0042$5bf692a0$13e3b7e0$@lge.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 Mar 2012 08:30:18 -0800
+Subject: [GIT PULL] DaVinci DM644x video display support
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317EEB34@DBDE01.ent.ti.com>
+References: <DF0F476B391FA8409C78302C7BA518B6317EEB34@DBDE01.ent.ti.com>
+Message-ID: <CAOesGMhcowDuD9FDUG8cMy-a7s-43Ch-=WWjNvrmCtS6+3=t6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > diff --git a/drivers/tty/serial/amba-pl011.c
-> > b/drivers/tty/serial/amba-pl011.c index 6800f5f..ff3fed0 100644
-> > --- a/drivers/tty/serial/amba-pl011.c
-> > +++ b/drivers/tty/serial/amba-pl011.c
-> > @@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct uart_amba_port
-> *uap)
-> >  		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
-> >  	}
-> >
-> 
-> What if we really do end up receiving some characters here?
+Hi,
 
-Maybe the character is handled on next upcoming RTIS or RXIS in normal.
-However, I agree with you there is possibility of already asserted RXIS at
-this point. (with debugger?) In such a case, we may lose Rx interrupts
-forever because it's not level-triggered, and the ISR lacks error interrupt
-handling. Correct me if something wrong.
-Thank you for your comment, Russell.
+On Thu, Mar 8, 2012 at 11:23 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> Hi Arnd, Olof,
+>
+> Can you please pull these two patches adding support
+> for DaVinci DM644x V4L2 display support for v3.4.
+>
+> These patches heavily depend on the clean-up series sent earlier.
+> Since the clean-up series is already included in for-next branch
+> of arm-soc, I have generated a request using that as baseline.
+>
+> Let me know if that's not desirable, and I can do it any
+> other way you want.
+>
+> Thanks,
+> Sekhar
+>
+> The following changes since commit 3a034af7c1a3c55014eeb15a9c9430e9f72810e4:
+> ?Arnd Bergmann (1):
+> ? ? ? ?Merge branch 'next/fixes-non-critical' into for-next
 
-> 
-> > +	/* RXIS but RXFE? Just clear the interrupt */
-> > +	if(unlikely(fifotaken == 0))
-> > +		writew(UART011_RTIS | UART011_RXIS,
-> > +		       uap->port.membase + UART011_ICR);
+It looks like this branch is based on the contents of the for-next
+branch. That's not a stable base so I can't pull it.
+
+If you need it to build on contents already in arm-soc, you need to
+base it on either your own cleanup branch, or the aggregate next/*
+branch in arm-soc. for-next is rebuilt, and is never sent up to Linus
+in it's current form.
+
+Since you said they require the cleanup branch as a base, please
+rebase them on top of next/cleanup instead.
+
+Thanks!
+
+
+-Olof
