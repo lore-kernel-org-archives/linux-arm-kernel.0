@@ -1,177 +1,412 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Mar 2012 23:59:51 +0000
-Subject: Conflict between Versatile Express DT conversion and local
- timer updates
-In-Reply-To: <20120312231016.GC10830@n2100.arm.linux.org.uk>
-References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
-Message-ID: <20120312235951.GA31601@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 10 Mar 2012 02:19:08 -0800
+Subject: [PATCH 4/5] PM / devfreq: update the name of EXYNOS clock register
+In-Reply-To: <1331374749-23256-1-git-send-email-kgene.kim@samsung.com>
+References: <1331374749-23256-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331374749-23256-5-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 11:10:16PM +0000, Russell King - ARM Linux wrote:
-> Marc, Pawel,
-> 
-> Your changes are conflicting badly.  Seriously badly.  So badly that I'm
-> not bothering to fix the conflicts because I can't work out what the fix
-> should be.
-> 
-> You both work for the same frigging organization and yet you seem to
-> work completely independently (I really don't care if you work in
-> different departments - the fact of the matter is you're touching the
-> same code in completely different ways with zero coordination between
-> yourselves.  That's simply broken workflow.)
-> 
-> For example, Marc's deleting arch/arm/plat-versatile/localtimer.c, but
-> Pawel is modifying it to add DT support for Versatile Express.  The
-> correct solution?  Hell knows.  And I don't want a solution to the merge
-> conflict.  I want the merge conflict to go away (because I'm not frigging
-> around applying the same git-rerere immune fixes to a tree I'm regenerating
-> each night for the kernel autobuilder.)
-> 
-> I'm getting conflicts in arch/arm/mach-vexpress/ct-ca9x4.c and
-> arch/arm/mach-ux500/timer.c as well, which I'm not going to bother trying
-> to sort out - the obvious solution for ux500/timer.c doesn't look right.
-> 
-> I've a mind to drop the localtimer changes on the floor until after this
-> merge window, but unfortunately they're part of devel-stable so I can't.
+According to replacing the name of EXYNOS clock registers,
+this patch updates exynos4_bus.c file where it is used.
 
-Correction: I haven't been pushing out my devel-stable branch for
-apparantly two months (according to gitweb, and no one noticed?), so I
-_could_ drop the merge of Marc's tree until the conflicts can be sanely
-resolved.
+Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/devfreq/exynos4_bus.c |  224 ++++++++++++++++++++--------------------
+ 1 files changed, 112 insertions(+), 112 deletions(-)
 
-> 
-> How do we fix this?
-> 
-> (In the mean time, I've had to reset the kernel autobuilder back to last
-> nights tree, which is -rc6 based.)
-> 
-> diff --cc arch/arm/mach-ux500/timer.c
-> index cadf982,fd00024..0000000
-> --- a/arch/arm/mach-ux500/timer.c
-> +++ b/arch/arm/mach-ux500/timer.c
-> @@@ -15,38 -15,22 +15,52 @@@
->   #include <mach/setup.h>
->   #include <mach/hardware.h>
->   
->  +#ifdef CONFIG_HAVE_ARM_TWD
->  +static DEFINE_TWD_LOCAL_TIMER(u5500_twd_local_timer,
->  +			      U5500_TWD_BASE, IRQ_LOCALTIMER);
->  +static DEFINE_TWD_LOCAL_TIMER(u8500_twd_local_timer,
->  +			      U8500_TWD_BASE, IRQ_LOCALTIMER);
->  +
->  +static void __init ux500_twd_init(void)
->  +{
->  +	struct twd_local_timer *twd_local_timer;
->  +	int err;
->  +
->  +	twd_local_timer = cpu_is_u5500() ? &u5500_twd_local_timer :
->  +					   &u8500_twd_local_timer;
->  +
->  +	err = twd_local_timer_register(twd_local_timer);
->  +	if (err)
->  +		pr_err("twd_local_timer_register failed %d\n", err);
->  +}
->  +#else
->  +#define ux500_twd_init()	do { } while(0)
->  +#endif
->  +
->   static void __init ux500_timer_init(void)
->   {
-> + 	void __iomem *mtu_timer_base;
->   	void __iomem *prcmu_timer_base;
->  +	int err;
->   
->   	if (cpu_is_u5500()) {
-> ++<<<<<<< HEAD
->  +		mtu_base = __io_address(U5500_MTU0_BASE);
->  +		prcmu_timer_base = __io_address(U5500_PRCMU_TIMER_3_BASE);
->  +	} else if (cpu_is_u8500()) {
->  +		mtu_base = __io_address(U8500_MTU0_BASE);
-> ++=======
-> + #ifdef CONFIG_LOCAL_TIMERS
-> + 		twd_base = __io_address(U5500_TWD_BASE);
-> + #endif
-> + 		mtu_timer_base = __io_address(U5500_MTU0_BASE);
-> + 		prcmu_timer_base = __io_address(U5500_PRCMU_TIMER_3_BASE);
-> + 	} else if (cpu_is_u8500()) {
-> + #ifdef CONFIG_LOCAL_TIMERS
-> + 		twd_base = __io_address(U8500_TWD_BASE);
-> + #endif
-> + 		mtu_timer_base = __io_address(U8500_MTU0_BASE);
-> ++>>>>>>> arm-soc
->   		prcmu_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
->   	} else {
->   		ux500_unknown_soc();
-> @@@ -69,9 -53,8 +83,9 @@@
->   	 *
->   	 */
->   
-> - 	nmdk_timer_init();
-> + 	nmdk_timer_init(mtu_timer_base);
->   	clksrc_dbx500_prcmu_init(prcmu_timer_base);
->  +	ux500_twd_init();
->   }
->   
->   static void ux500_timer_reset(void)
-> diff --cc arch/arm/mach-vexpress/ct-ca9x4.c
-> index b391538,73791f0..0000000
-> --- a/arch/arm/mach-vexpress/ct-ca9x4.c
-> +++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-> @@@ -54,44 -42,17 +42,50 @@@ static struct map_desc ct_ca9x4_io_desc
->   static void __init ct_ca9x4_map_io(void)
->   {
->   	iotable_init(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
-> ++<<<<<<< HEAD
-> ++=======
-> + #ifdef CONFIG_LOCAL_TIMERS
-> + 	twd_base = ioremap(A9_MPCORE_TWD, SZ_32);
-> + #endif
-> ++>>>>>>> arm-soc
->   }
->   
->  +#ifdef CONFIG_HAVE_ARM_TWD
->  +static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, A9_MPCORE_TWD, IRQ_LOCALTIMER);
->  +
->  +static void __init ca9x4_twd_init(void)
->  +{
->  +	int err = twd_local_timer_register(&twd_local_timer);
->  +	if (err)
->  +		pr_err("twd_local_timer_register failed %d\n", err);
->  +}
->  +#else
->  +#define ca9x4_twd_init()	do {} while(0)
->  +#endif
->  +
->   static void __init ct_ca9x4_init_irq(void)
->   {
-> ++<<<<<<< HEAD
->  +	gic_init(0, 29, MMIO_P2V(A9_MPCORE_GIC_DIST),
->  +		 MMIO_P2V(A9_MPCORE_GIC_CPU));
->  +	ca9x4_twd_init();
->  +}
->  +
->  +#if 0
->  +static void __init ct_ca9x4_timer_init(void)
->  +{
->  +	writel(0, MMIO_P2V(CT_CA9X4_TIMER0) + TIMER_CTRL);
->  +	writel(0, MMIO_P2V(CT_CA9X4_TIMER1) + TIMER_CTRL);
->  +
->  +	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1), "ct-timer1");
->  +	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0,
->  +		"ct-timer0");
-> ++=======
-> + 	gic_init(0, 29, ioremap(A9_MPCORE_GIC_DIST, SZ_4K),
-> + 		 ioremap(A9_MPCORE_GIC_CPU, SZ_256));
-> ++>>>>>>> arm-soc
->   }
->   
-> - static struct sys_timer ct_ca9x4_timer = {
-> - 	.init	= ct_ca9x4_timer_init,
-> - };
-> - #endif
-> - 
->   static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
->   {
->   	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE_DB1, 0);
-> 
+diff --git a/drivers/devfreq/exynos4_bus.c b/drivers/devfreq/exynos4_bus.c
+index 6460577..565aa98 100644
+--- a/drivers/devfreq/exynos4_bus.c
++++ b/drivers/devfreq/exynos4_bus.c
+@@ -311,51 +311,51 @@ static int exynos4210_set_busclk(struct busfreq_data *data, struct opp *opp)
+ 	/* Change Divider - DMC0 */
+ 	tmp = data->dmc_divtable[index];
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_DMC0);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_DMC0);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_DMC0);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_DMC0);
+ 	} while (tmp & 0x11111111);
+ 
+ 	/* Change Divider - TOP */
+ 	tmp = data->top_divtable[index];
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_TOP);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_TOP);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_TOP);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_TOP);
+ 	} while (tmp & 0x11111);
+ 
+ 	/* Change Divider - LEFTBUS */
+-	tmp = __raw_readl(S5P_CLKDIV_LEFTBUS);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_LEFTBUS);
+ 
+-	tmp &= ~(S5P_CLKDIV_BUS_GDLR_MASK | S5P_CLKDIV_BUS_GPLR_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_BUS_GDLR_MASK | EXYNOS4_CLKDIV_BUS_GPLR_MASK);
+ 
+ 	tmp |= ((exynos4210_clkdiv_lr_bus[index][0] <<
+-				S5P_CLKDIV_BUS_GDLR_SHIFT) |
++				EXYNOS4_CLKDIV_BUS_GDLR_SHIFT) |
+ 		(exynos4210_clkdiv_lr_bus[index][1] <<
+-				S5P_CLKDIV_BUS_GPLR_SHIFT));
++				EXYNOS4_CLKDIV_BUS_GPLR_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_LEFTBUS);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_LEFTBUS);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_LEFTBUS);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_LEFTBUS);
+ 	} while (tmp & 0x11);
+ 
+ 	/* Change Divider - RIGHTBUS */
+-	tmp = __raw_readl(S5P_CLKDIV_RIGHTBUS);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_RIGHTBUS);
+ 
+-	tmp &= ~(S5P_CLKDIV_BUS_GDLR_MASK | S5P_CLKDIV_BUS_GPLR_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_BUS_GDLR_MASK | EXYNOS4_CLKDIV_BUS_GPLR_MASK);
+ 
+ 	tmp |= ((exynos4210_clkdiv_lr_bus[index][0] <<
+-				S5P_CLKDIV_BUS_GDLR_SHIFT) |
++				EXYNOS4_CLKDIV_BUS_GDLR_SHIFT) |
+ 		(exynos4210_clkdiv_lr_bus[index][1] <<
+-				S5P_CLKDIV_BUS_GPLR_SHIFT));
++				EXYNOS4_CLKDIV_BUS_GPLR_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_RIGHTBUS);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_RIGHTBUS);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_RIGHTBUS);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_RIGHTBUS);
+ 	} while (tmp & 0x11);
+ 
+ 	return 0;
+@@ -376,137 +376,137 @@ static int exynos4x12_set_busclk(struct busfreq_data *data, struct opp *opp)
+ 	/* Change Divider - DMC0 */
+ 	tmp = data->dmc_divtable[index];
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_DMC0);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_DMC0);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_DMC0);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_DMC0);
+ 	} while (tmp & 0x11111111);
+ 
+ 	/* Change Divider - DMC1 */
+-	tmp = __raw_readl(S5P_CLKDIV_DMC1);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_DMC1);
+ 
+-	tmp &= ~(S5P_CLKDIV_DMC1_G2D_ACP_MASK |
+-		S5P_CLKDIV_DMC1_C2C_MASK |
+-		S5P_CLKDIV_DMC1_C2CACLK_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_DMC1_G2D_ACP_MASK |
++		EXYNOS4_CLKDIV_DMC1_C2C_MASK |
++		EXYNOS4_CLKDIV_DMC1_C2CACLK_MASK);
+ 
+ 	tmp |= ((exynos4x12_clkdiv_dmc1[index][0] <<
+-				S5P_CLKDIV_DMC1_G2D_ACP_SHIFT) |
++				EXYNOS4_CLKDIV_DMC1_G2D_ACP_SHIFT) |
+ 		(exynos4x12_clkdiv_dmc1[index][1] <<
+-				S5P_CLKDIV_DMC1_C2C_SHIFT) |
++				EXYNOS4_CLKDIV_DMC1_C2C_SHIFT) |
+ 		(exynos4x12_clkdiv_dmc1[index][2] <<
+-				S5P_CLKDIV_DMC1_C2CACLK_SHIFT));
++				EXYNOS4_CLKDIV_DMC1_C2CACLK_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_DMC1);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_DMC1);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_DMC1);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_DMC1);
+ 	} while (tmp & 0x111111);
+ 
+ 	/* Change Divider - TOP */
+-	tmp = __raw_readl(S5P_CLKDIV_TOP);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_TOP);
+ 
+-	tmp &= ~(S5P_CLKDIV_TOP_ACLK266_GPS_MASK |
+-		S5P_CLKDIV_TOP_ACLK100_MASK |
+-		S5P_CLKDIV_TOP_ACLK160_MASK |
+-		S5P_CLKDIV_TOP_ACLK133_MASK |
+-		S5P_CLKDIV_TOP_ONENAND_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_TOP_ACLK266_GPS_MASK |
++		EXYNOS4_CLKDIV_TOP_ACLK100_MASK |
++		EXYNOS4_CLKDIV_TOP_ACLK160_MASK |
++		EXYNOS4_CLKDIV_TOP_ACLK133_MASK |
++		EXYNOS4_CLKDIV_TOP_ONENAND_MASK);
+ 
+ 	tmp |= ((exynos4x12_clkdiv_top[index][0] <<
+-				S5P_CLKDIV_TOP_ACLK266_GPS_SHIFT) |
++				EXYNOS4_CLKDIV_TOP_ACLK266_GPS_SHIFT) |
+ 		(exynos4x12_clkdiv_top[index][1] <<
+-				S5P_CLKDIV_TOP_ACLK100_SHIFT) |
++				EXYNOS4_CLKDIV_TOP_ACLK100_SHIFT) |
+ 		(exynos4x12_clkdiv_top[index][2] <<
+-				S5P_CLKDIV_TOP_ACLK160_SHIFT) |
++				EXYNOS4_CLKDIV_TOP_ACLK160_SHIFT) |
+ 		(exynos4x12_clkdiv_top[index][3] <<
+-				S5P_CLKDIV_TOP_ACLK133_SHIFT) |
++				EXYNOS4_CLKDIV_TOP_ACLK133_SHIFT) |
+ 		(exynos4x12_clkdiv_top[index][4] <<
+-				S5P_CLKDIV_TOP_ONENAND_SHIFT));
++				EXYNOS4_CLKDIV_TOP_ONENAND_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_TOP);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_TOP);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_TOP);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_TOP);
+ 	} while (tmp & 0x11111);
+ 
+ 	/* Change Divider - LEFTBUS */
+-	tmp = __raw_readl(S5P_CLKDIV_LEFTBUS);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_LEFTBUS);
+ 
+-	tmp &= ~(S5P_CLKDIV_BUS_GDLR_MASK | S5P_CLKDIV_BUS_GPLR_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_BUS_GDLR_MASK | EXYNOS4_CLKDIV_BUS_GPLR_MASK);
+ 
+ 	tmp |= ((exynos4x12_clkdiv_lr_bus[index][0] <<
+-				S5P_CLKDIV_BUS_GDLR_SHIFT) |
++				EXYNOS4_CLKDIV_BUS_GDLR_SHIFT) |
+ 		(exynos4x12_clkdiv_lr_bus[index][1] <<
+-				S5P_CLKDIV_BUS_GPLR_SHIFT));
++				EXYNOS4_CLKDIV_BUS_GPLR_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_LEFTBUS);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_LEFTBUS);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_LEFTBUS);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_LEFTBUS);
+ 	} while (tmp & 0x11);
+ 
+ 	/* Change Divider - RIGHTBUS */
+-	tmp = __raw_readl(S5P_CLKDIV_RIGHTBUS);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_RIGHTBUS);
+ 
+-	tmp &= ~(S5P_CLKDIV_BUS_GDLR_MASK | S5P_CLKDIV_BUS_GPLR_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_BUS_GDLR_MASK | EXYNOS4_CLKDIV_BUS_GPLR_MASK);
+ 
+ 	tmp |= ((exynos4x12_clkdiv_lr_bus[index][0] <<
+-				S5P_CLKDIV_BUS_GDLR_SHIFT) |
++				EXYNOS4_CLKDIV_BUS_GDLR_SHIFT) |
+ 		(exynos4x12_clkdiv_lr_bus[index][1] <<
+-				S5P_CLKDIV_BUS_GPLR_SHIFT));
++				EXYNOS4_CLKDIV_BUS_GPLR_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_RIGHTBUS);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_RIGHTBUS);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_RIGHTBUS);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_RIGHTBUS);
+ 	} while (tmp & 0x11);
+ 
+ 	/* Change Divider - MFC */
+-	tmp = __raw_readl(S5P_CLKDIV_MFC);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_MFC);
+ 
+-	tmp &= ~(S5P_CLKDIV_MFC_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_MFC_MASK);
+ 
+ 	tmp |= ((exynos4x12_clkdiv_sclkip[index][0] <<
+-				S5P_CLKDIV_MFC_SHIFT));
++				EXYNOS4_CLKDIV_MFC_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_MFC);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_MFC);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_MFC);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_MFC);
+ 	} while (tmp & 0x1);
+ 
+ 	/* Change Divider - JPEG */
+-	tmp = __raw_readl(S5P_CLKDIV_CAM1);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_CAM1);
+ 
+-	tmp &= ~(S5P_CLKDIV_CAM1_JPEG_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_CAM1_JPEG_MASK);
+ 
+ 	tmp |= ((exynos4x12_clkdiv_sclkip[index][1] <<
+-				S5P_CLKDIV_CAM1_JPEG_SHIFT));
++				EXYNOS4_CLKDIV_CAM1_JPEG_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_CAM1);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_CAM1);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_CAM1);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_CAM1);
+ 	} while (tmp & 0x1);
+ 
+ 	/* Change Divider - FIMC0~3 */
+-	tmp = __raw_readl(S5P_CLKDIV_CAM);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_CAM);
+ 
+-	tmp &= ~(S5P_CLKDIV_CAM_FIMC0_MASK | S5P_CLKDIV_CAM_FIMC1_MASK |
+-		S5P_CLKDIV_CAM_FIMC2_MASK | S5P_CLKDIV_CAM_FIMC3_MASK);
++	tmp &= ~(EXYNOS4_CLKDIV_CAM_FIMC0_MASK | EXYNOS4_CLKDIV_CAM_FIMC1_MASK |
++		EXYNOS4_CLKDIV_CAM_FIMC2_MASK | EXYNOS4_CLKDIV_CAM_FIMC3_MASK);
+ 
+ 	tmp |= ((exynos4x12_clkdiv_sclkip[index][2] <<
+-				S5P_CLKDIV_CAM_FIMC0_SHIFT) |
++				EXYNOS4_CLKDIV_CAM_FIMC0_SHIFT) |
+ 		(exynos4x12_clkdiv_sclkip[index][2] <<
+-				S5P_CLKDIV_CAM_FIMC1_SHIFT) |
++				EXYNOS4_CLKDIV_CAM_FIMC1_SHIFT) |
+ 		(exynos4x12_clkdiv_sclkip[index][2] <<
+-				S5P_CLKDIV_CAM_FIMC2_SHIFT) |
++				EXYNOS4_CLKDIV_CAM_FIMC2_SHIFT) |
+ 		(exynos4x12_clkdiv_sclkip[index][2] <<
+-				S5P_CLKDIV_CAM_FIMC3_SHIFT));
++				EXYNOS4_CLKDIV_CAM_FIMC3_SHIFT));
+ 
+-	__raw_writel(tmp, S5P_CLKDIV_CAM);
++	__raw_writel(tmp, EXYNOS4_CLKDIV_CAM);
+ 
+ 	do {
+-		tmp = __raw_readl(S5P_CLKDIV_STAT_CAM1);
++		tmp = __raw_readl(EXYNOS4_CLKDIV_STAT_CAM1);
+ 	} while (tmp & 0x1111);
+ 
+ 	return 0;
+@@ -760,55 +760,55 @@ static int exynos4210_init_tables(struct busfreq_data *data)
+ 	int mgrp;
+ 	int i, err = 0;
+ 
+-	tmp = __raw_readl(S5P_CLKDIV_DMC0);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_DMC0);
+ 	for (i = LV_0; i < EX4210_LV_NUM; i++) {
+-		tmp &= ~(S5P_CLKDIV_DMC0_ACP_MASK |
+-			S5P_CLKDIV_DMC0_ACPPCLK_MASK |
+-			S5P_CLKDIV_DMC0_DPHY_MASK |
+-			S5P_CLKDIV_DMC0_DMC_MASK |
+-			S5P_CLKDIV_DMC0_DMCD_MASK |
+-			S5P_CLKDIV_DMC0_DMCP_MASK |
+-			S5P_CLKDIV_DMC0_COPY2_MASK |
+-			S5P_CLKDIV_DMC0_CORETI_MASK);
++		tmp &= ~(EXYNOS4_CLKDIV_DMC0_ACP_MASK |
++			EXYNOS4_CLKDIV_DMC0_ACPPCLK_MASK |
++			EXYNOS4_CLKDIV_DMC0_DPHY_MASK |
++			EXYNOS4_CLKDIV_DMC0_DMC_MASK |
++			EXYNOS4_CLKDIV_DMC0_DMCD_MASK |
++			EXYNOS4_CLKDIV_DMC0_DMCP_MASK |
++			EXYNOS4_CLKDIV_DMC0_COPY2_MASK |
++			EXYNOS4_CLKDIV_DMC0_CORETI_MASK);
+ 
+ 		tmp |= ((exynos4210_clkdiv_dmc0[i][0] <<
+-					S5P_CLKDIV_DMC0_ACP_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_ACP_SHIFT) |
+ 			(exynos4210_clkdiv_dmc0[i][1] <<
+-					S5P_CLKDIV_DMC0_ACPPCLK_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_ACPPCLK_SHIFT) |
+ 			(exynos4210_clkdiv_dmc0[i][2] <<
+-					S5P_CLKDIV_DMC0_DPHY_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_DPHY_SHIFT) |
+ 			(exynos4210_clkdiv_dmc0[i][3] <<
+-					S5P_CLKDIV_DMC0_DMC_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_DMC_SHIFT) |
+ 			(exynos4210_clkdiv_dmc0[i][4] <<
+-					S5P_CLKDIV_DMC0_DMCD_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_DMCD_SHIFT) |
+ 			(exynos4210_clkdiv_dmc0[i][5] <<
+-					S5P_CLKDIV_DMC0_DMCP_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_DMCP_SHIFT) |
+ 			(exynos4210_clkdiv_dmc0[i][6] <<
+-					S5P_CLKDIV_DMC0_COPY2_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_COPY2_SHIFT) |
+ 			(exynos4210_clkdiv_dmc0[i][7] <<
+-					S5P_CLKDIV_DMC0_CORETI_SHIFT));
++					EXYNOS4_CLKDIV_DMC0_CORETI_SHIFT));
+ 
+ 		data->dmc_divtable[i] = tmp;
+ 	}
+ 
+-	tmp = __raw_readl(S5P_CLKDIV_TOP);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_TOP);
+ 	for (i = LV_0; i <  EX4210_LV_NUM; i++) {
+-		tmp &= ~(S5P_CLKDIV_TOP_ACLK200_MASK |
+-			S5P_CLKDIV_TOP_ACLK100_MASK |
+-			S5P_CLKDIV_TOP_ACLK160_MASK |
+-			S5P_CLKDIV_TOP_ACLK133_MASK |
+-			S5P_CLKDIV_TOP_ONENAND_MASK);
++		tmp &= ~(EXYNOS4_CLKDIV_TOP_ACLK200_MASK |
++			EXYNOS4_CLKDIV_TOP_ACLK100_MASK |
++			EXYNOS4_CLKDIV_TOP_ACLK160_MASK |
++			EXYNOS4_CLKDIV_TOP_ACLK133_MASK |
++			EXYNOS4_CLKDIV_TOP_ONENAND_MASK);
+ 
+ 		tmp |= ((exynos4210_clkdiv_top[i][0] <<
+-					S5P_CLKDIV_TOP_ACLK200_SHIFT) |
++					EXYNOS4_CLKDIV_TOP_ACLK200_SHIFT) |
+ 			(exynos4210_clkdiv_top[i][1] <<
+-					S5P_CLKDIV_TOP_ACLK100_SHIFT) |
++					EXYNOS4_CLKDIV_TOP_ACLK100_SHIFT) |
+ 			(exynos4210_clkdiv_top[i][2] <<
+-					S5P_CLKDIV_TOP_ACLK160_SHIFT) |
++					EXYNOS4_CLKDIV_TOP_ACLK160_SHIFT) |
+ 			(exynos4210_clkdiv_top[i][3] <<
+-					S5P_CLKDIV_TOP_ACLK133_SHIFT) |
++					EXYNOS4_CLKDIV_TOP_ACLK133_SHIFT) |
+ 			(exynos4210_clkdiv_top[i][4] <<
+-					S5P_CLKDIV_TOP_ONENAND_SHIFT));
++					EXYNOS4_CLKDIV_TOP_ONENAND_SHIFT));
+ 
+ 		data->top_divtable[i] = tmp;
+ 	}
+@@ -872,28 +872,28 @@ static int exynos4x12_init_tables(struct busfreq_data *data)
+ 	tmp |= DMC_PAUSE_ENABLE;
+ 	__raw_writel(tmp, S5P_DMC_PAUSE_CTRL);
+ 
+-	tmp = __raw_readl(S5P_CLKDIV_DMC0);
++	tmp = __raw_readl(EXYNOS4_CLKDIV_DMC0);
+ 
+ 	for (i = 0; i <  EX4x12_LV_NUM; i++) {
+-		tmp &= ~(S5P_CLKDIV_DMC0_ACP_MASK |
+-			S5P_CLKDIV_DMC0_ACPPCLK_MASK |
+-			S5P_CLKDIV_DMC0_DPHY_MASK |
+-			S5P_CLKDIV_DMC0_DMC_MASK |
+-			S5P_CLKDIV_DMC0_DMCD_MASK |
+-			S5P_CLKDIV_DMC0_DMCP_MASK);
++		tmp &= ~(EXYNOS4_CLKDIV_DMC0_ACP_MASK |
++			EXYNOS4_CLKDIV_DMC0_ACPPCLK_MASK |
++			EXYNOS4_CLKDIV_DMC0_DPHY_MASK |
++			EXYNOS4_CLKDIV_DMC0_DMC_MASK |
++			EXYNOS4_CLKDIV_DMC0_DMCD_MASK |
++			EXYNOS4_CLKDIV_DMC0_DMCP_MASK);
+ 
+ 		tmp |= ((exynos4x12_clkdiv_dmc0[i][0] <<
+-					S5P_CLKDIV_DMC0_ACP_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_ACP_SHIFT) |
+ 			(exynos4x12_clkdiv_dmc0[i][1] <<
+-					S5P_CLKDIV_DMC0_ACPPCLK_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_ACPPCLK_SHIFT) |
+ 			(exynos4x12_clkdiv_dmc0[i][2] <<
+-					S5P_CLKDIV_DMC0_DPHY_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_DPHY_SHIFT) |
+ 			(exynos4x12_clkdiv_dmc0[i][3] <<
+-					S5P_CLKDIV_DMC0_DMC_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_DMC_SHIFT) |
+ 			(exynos4x12_clkdiv_dmc0[i][4] <<
+-					S5P_CLKDIV_DMC0_DMCD_SHIFT) |
++					EXYNOS4_CLKDIV_DMC0_DMCD_SHIFT) |
+ 			(exynos4x12_clkdiv_dmc0[i][5] <<
+-					S5P_CLKDIV_DMC0_DMCP_SHIFT));
++					EXYNOS4_CLKDIV_DMC0_DMCP_SHIFT));
+ 
+ 		data->dmc_divtable[i] = tmp;
+ 	}
+-- 
+1.7.4.4
