@@ -1,26 +1,38 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Sun, 11 Mar 2012 14:02:53 -0700
-Subject: [PATCH v6 2/3] clk: introduce the common clock framework
-In-Reply-To: <20120311075250.GB3138@richard-laptop>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-3-git-send-email-mturquette@linaro.org>
- <20120311075250.GB3138@richard-laptop>
-Message-ID: <CAJOA=zPzCSBHEynvm1hf-5VqdevAg26KQ2PZ5yykZqmxFywZpw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 Mar 2012 10:08:57 -0800
+Subject: [GIT PULL 3/4] Samsung devel-mmc for v3.4
+In-Reply-To: <4F5B7C8D.5000805@samsung.com>
+References: <4F5B7C8D.5000805@samsung.com>
+Message-ID: <CAOesGMgx-86rUuOfjTN8BeYZD+S=04oj+N9u-m9dr8JQA1Oxiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2012 at 11:52 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
-> Looks like you didn't take my comments for v5.
-> http://www.spinics.net/lists/arm-kernel/msg162903.html
+Hi,
 
-Sorry Richard, that one slipped through the cracks.  I'll publish a
-new version tomorrow with some of those fixes.  Some of the others
-(such as multiple pre-rate change notifiers) I won't take in, but we
-can discuss more.
-
-Regards,
-Mike
-
+On Sat, Mar 10, 2012 at 8:08 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd, Olof
 >
-> Regards
-> Richard
+> This is regarding Samsung mmc for v3.4.
+>
+> As a note, v3.4-for-cjb branch is merged into mmc/mmc-next like following:
+> http://git.kernel.org/?p=linux/kernel/git/cjb/mmc.git;a=commit;h=fcd9bdae386753531a9cb6b2577359a83f4e121c
+
+Looking at this series, there's really only one patch that is not in
+the mmc tree:
+
+ARM: SAMSUNG: change the name from s3c-sdhci to exynos4-sdhci
+
+And all it does is change the platform device string contents.
+
+Since there are no build-time dependencies between this and the MMC
+change, I suggest you send only this patch so that we avoid having
+merge dependencies where not strictly needed.
+
+Would that be OK with you? If so, please send a fresh pull request
+with only the above change in it.
+
+
+
+Thanks,
+
+-Olof
