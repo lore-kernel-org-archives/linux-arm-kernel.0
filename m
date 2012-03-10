@@ -1,74 +1,78 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 11 Mar 2012 18:16:05 +0530
-Subject: [PATCH 5/5] mmc: sdhci-s3c: setup pins using pinctrl interface
-In-Reply-To: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
-References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1331469965-28846-6-git-send-email-thomas.abraham@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 10 Mar 2012 08:08:33 -0800
+Subject: [GIT PULL 2/4] Samsung devel-pd for v3.4
+Message-ID: <4F5B7C81.6080301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform specific callback to setup the sdhci pin mux and pin config
-is removed and the pinctrl subsystem interface is used to setup the
-mux and config.
+Hi Arnd, Olof,
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- drivers/mmc/host/sdhci-s3c.c |   15 +++++++++++++--
- 1 files changed, 13 insertions(+), 2 deletions(-)
+This is Generic Power Domain patches for EXYNOS. Basically, Thomas' 
+patches, adding support Generic Power Domain patches are in Rafael's 
+tree, linux-pm/linux-next and see below merge commit.
+http://git.kernel.org/?p=linux/kernel/git/rafael/linux-pm.git;a=commit;h=dcaad77a8074b6de58e745546bc543d5538404f2
+And this adds hooking up G2D and JPEG to Generic PD.
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index ea0767e..76c1c36 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -22,6 +22,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_gpio.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include <linux/mmc/host.h>
- 
-@@ -50,6 +51,7 @@ struct sdhci_s3c {
- 	struct platform_device	*pdev;
- 	struct resource		*ioarea;
- 	struct s3c_sdhci_platdata *pdata;
-+	struct pinctrl 		*pinctrl;
- 	unsigned int		cur_clk;
- 	int			ext_cd_irq;
- 	int			ext_cd_gpio;
-@@ -529,6 +531,9 @@ static inline struct sdhci_s3c_drv_data *sdhci_s3c_get_driver_data(
- 			platform_get_device_id(pdev)->driver_data;
- }
- 
-+#include <plat/map-s5p.h>
-+#include <plat/map-base.h>
-+
- static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- {
- 	struct s3c_sdhci_platdata *pdata;
-@@ -538,6 +543,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	struct sdhci_s3c *sc;
- 	struct resource *res;
- 	int ret, irq, ptr, clks;
-+	char *pstate;
- 
- 	if (!pdev->dev.platform_data && !pdev->dev.of_node) {
- 		dev_err(dev, "no device data specified\n");
-@@ -643,8 +649,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Ensure we have minimal gpio selected CMD/CLK/Detect */
--	if (pdata->cfg_gpio)
--		pdata->cfg_gpio(pdev, pdata->max_width);
-+	pstate = pdata->max_width ? "sdhci-pcfg8" : "sdhci-pcfg4";
-+	sc->pinctrl = pinctrl_get_select(&pdev->dev, pstate);
-+	if (IS_ERR(sc->pinctrl)) {
-+		dev_err(dev, "failed to setup pin configuration\n");
-+		ret = -ENXIO;
-+		goto err_req_regs;
-+	}
- 
- 	host->hw_name = "samsung-hsmmc";
- 	host->ops = &sdhci_s3c_ops;
--- 
-1.6.6.rc2
+Please pull and here is my preferred resolution when merge this after 
+next/board-samsung.
+
+diff --cc arch/arm/mach-exynos/mach-universal_c210.c
+index 3663aee,0262417..0b944eb
+--- a/arch/arm/mach-exynos/mach-universal_c210.c
++++ b/arch/arm/mach-exynos/mach-universal_c210.c
+@@@ -1053,10 -981,6 +1052,7 @@@ static struct platform_device *universa
+         &s5p_device_mfc,
+         &s5p_device_mfc_l,
+         &s5p_device_mfc_r,
+-       &exynos4_device_pd[PD_MFC],
+-       &exynos4_device_pd[PD_LCD0],
+-       &exynos4_device_pd[PD_CAM],
+  +      &cam_vt_dio_fixed_reg_dev,
+         &cam_i_core_fixed_reg_dev,
+         &cam_s_if_fixed_reg_dev,
+         &s5p_device_fimc_md,
+
+If any problems, please kindly let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+
+   Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/devel-samsung-pd
+
+Sachin Kamat (2):
+       ARM: EXYNOS: Hook up G2D PD to generic PD infrastructure
+       ARM: EXYNOS: Hook up JPEG PD to generic PD infrastructure
+
+Thomas Abraham (2):
+       PM / Domains: Add OF support
+       ARM: EXYNOS: Hook up power domains to generic power domain 
+infrastructure
+
+  .../bindings/arm/exynos/power_domain.txt           |   21 ++
+  arch/arm/mach-exynos/Kconfig                       |   10 +-
+  arch/arm/mach-exynos/Makefile                      |    2 +-
+  arch/arm/mach-exynos/dev-pd.c                      |  139 --------------
+  arch/arm/mach-exynos/mach-nuri.c                   |   11 -
+  arch/arm/mach-exynos/mach-origen.c                 |   14 --
+  arch/arm/mach-exynos/mach-smdkv310.c               |   12 --
+  arch/arm/mach-exynos/mach-universal_c210.c         |   17 --
+  arch/arm/mach-exynos/pm_domains.c                  |  201 
+++++++++++++++++++++
+  drivers/base/power/domain.c                        |   32 +++
+  include/linux/pm_domain.h                          |   12 ++
+  11 files changed, 268 insertions(+), 203 deletions(-)
+  create mode 100644 
+Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+  delete mode 100644 arch/arm/mach-exynos/dev-pd.c
+  create mode 100644 arch/arm/mach-exynos/pm_domains.c
