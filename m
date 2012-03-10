@@ -1,97 +1,21 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 12 Mar 2012 09:51:57 +0530
-Subject: [PATCH V2 02/22] watchdog: Add support for WDIOC_GETTIMELEFT IOCTL in
- watchdog core
-In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
-References: <cover.1331524811.git.viresh.kumar@st.com>
-Message-ID: <3743d1bdbd827e09add04206c0413c5d7f1c7b1d.1331524811.git.viresh.kumar@st.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 10 Mar 2012 18:50:16 +0100
+Subject: [PATCH v6 1/3] Documentation: common clk API
+In-Reply-To: <1331366064-1273-2-git-send-email-mturquette@linaro.org>
+References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
+ <1331366064-1273-2-git-send-email-mturquette@linaro.org>
+Message-ID: <20120310175016.GJ16608@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for WDIOC_GETTIMELEFT IOCTL in watchdog core. So, there
-is another function pointer added to struct watchdog_ops, which can be passed by
-drivers to support this IOCTL.
+On Fri, Mar 09, 2012 at 11:54:22PM -0800, Mike Turquette wrote:
+> Provide documentation for the common clk structures and APIs.  This code
+> can be found in drivers/clk/ and include/linux/clk*.h.
 
-Related documentation is updated too.
+Hi Mike
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- .../watchdog/convert_drivers_to_kernel_api.txt     |    4 ++++
- Documentation/watchdog/watchdog-kernel-api.txt     |    2 ++
- drivers/watchdog/watchdog_dev.c                    |    5 +++++
- include/linux/watchdog.h                           |    2 ++
- 4 files changed, 13 insertions(+), 0 deletions(-)
+Please feel free to add:
 
-diff --git a/Documentation/watchdog/convert_drivers_to_kernel_api.txt b/Documentation/watchdog/convert_drivers_to_kernel_api.txt
-index be8119b..271b885 100644
---- a/Documentation/watchdog/convert_drivers_to_kernel_api.txt
-+++ b/Documentation/watchdog/convert_drivers_to_kernel_api.txt
-@@ -59,6 +59,10 @@ Here is a overview of the functions and probably needed actions:
- 	WDIOC_GETTIMEOUT:
- 		No preparations needed
- 
-+	WDIOC_GETTIMELEFT:
-+		It needs get_timeleft() callback to be defined. Otherwise it
-+		will return EOPNOTSUPP
-+
-   Other IOCTLs can be served using the ioctl-callback. Note that this is mainly
-   intended for porting old drivers; new drivers should not invent private IOCTLs.
-   Private IOCTLs are processed first. When the callback returns with
-diff --git a/Documentation/watchdog/watchdog-kernel-api.txt b/Documentation/watchdog/watchdog-kernel-api.txt
-index 9e16246..24d9a35 100644
---- a/Documentation/watchdog/watchdog-kernel-api.txt
-+++ b/Documentation/watchdog/watchdog-kernel-api.txt
-@@ -77,6 +77,7 @@ struct watchdog_ops {
- 	int (*ping)(struct watchdog_device *);
- 	unsigned int (*status)(struct watchdog_device *);
- 	int (*set_timeout)(struct watchdog_device *, unsigned int);
-+	unsigned int (*get_timeleft)(struct watchdog_device *);
- 	long (*ioctl)(struct watchdog_device *, unsigned int, unsigned long);
- };
- 
-@@ -122,6 +123,7 @@ they are supported. These optional routines/operations are:
-   to re-program the watchdog timer device.
-   (Note: the WDIOF_SETTIMEOUT needs to be set in the options field of the
-   watchdog's info structure).
-+* get_timeleft: this routines returns the time left for reset.
- * ioctl: if this routine is present then it will be called first before we do
-   our own internal ioctl call handling. This routine should return -ENOIOCTLCMD
-   if a command is not supported. The parameters that are passed to the ioctl
-diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
-index 9668253..6206e1b 100644
---- a/drivers/watchdog/watchdog_dev.c
-+++ b/drivers/watchdog/watchdog_dev.c
-@@ -237,6 +237,11 @@ static long watchdog_ioctl(struct file *file, unsigned int cmd,
- 		if (wdd->timeout == 0)
- 			return -EOPNOTSUPP;
- 		return put_user(wdd->timeout, p);
-+	case WDIOC_GETTIMELEFT:
-+		if (!wdd->ops->get_timeleft)
-+			return -EOPNOTSUPP;
-+
-+		return put_user(wdd->ops->get_timeleft(wdd), p);
- 	default:
- 		return -ENOTTY;
- 	}
-diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-index 4fc57b2..6b4e918 100644
---- a/include/linux/watchdog.h
-+++ b/include/linux/watchdog.h
-@@ -66,6 +66,7 @@ struct watchdog_device;
-  * @ping:	The routine that sends a keepalive ping to the watchdog device.
-  * @status:	The routine that shows the status of the watchdog device.
-  * @set_timeout:The routine for setting the watchdog devices timeout value.
-+ * @get_timeleft:The routine for getting the watchdog device's timeleft value.
-  * @ioctl:	The routines that handles extra ioctl calls.
-  *
-  * The watchdog_ops structure contains a list of low-level operations
-@@ -82,6 +83,7 @@ struct watchdog_ops {
- 	int (*ping)(struct watchdog_device *);
- 	unsigned int (*status)(struct watchdog_device *);
- 	int (*set_timeout)(struct watchdog_device *, unsigned int);
-+	unsigned int (*get_timeleft)(struct watchdog_device *);
- 	long (*ioctl)(struct watchdog_device *, unsigned int, unsigned long);
- };
- 
--- 
-1.7.8.110.g4cb5d
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+     Andrew
