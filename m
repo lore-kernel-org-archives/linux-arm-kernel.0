@@ -1,9 +1,9 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 11 Mar 2012 11:53:37 +0100
-Subject: [PATCH v7 2/4] USB: ohci-nxp: Rename symbols from pnx4008 to nxp
-In-Reply-To: <1331463219-23293-1-git-send-email-stigge@antcom.de>
-References: <1331463219-23293-1-git-send-email-stigge@antcom.de>
-Message-ID: <1331463219-23293-3-git-send-email-stigge@antcom.de>
+Date: Sat, 10 Mar 2012 20:36:05 +0100
+Subject: [PATCH v5 2/3] USB: ohci-nxp: Rename symbols from pnx4008 to nxp
+In-Reply-To: <1331408166-11607-1-git-send-email-stigge@antcom.de>
+References: <1331408166-11607-1-git-send-email-stigge@antcom.de>
+Message-ID: <1331408166-11607-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
