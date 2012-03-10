@@ -1,44 +1,35 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 10 Mar 2012 21:53:51 +0100
-Subject: [PATCH v5 3/3] USB: ohci-nxp: Support for LPC32xx
-In-Reply-To: <20120310204955.GA14564@pengutronix.de>
-References: <1331408166-11607-1-git-send-email-stigge@antcom.de>
- <1331408166-11607-4-git-send-email-stigge@antcom.de>
- <20120310204955.GA14564@pengutronix.de>
-Message-ID: <20120310205351.GB14564@pengutronix.de>
+From: alan@signal11.us (Alan Ott)
+Date: Sat, 10 Mar 2012 13:44:35 -0500
+Subject: [PATCH 1/2] ARM: at91: only RM9200 has ISA-style PIO
+In-Reply-To: <1331405049-3186-1-git-send-email-alan@signal11.us>
+References: <1331405049-3186-1-git-send-email-alan@signal11.us>
+Message-ID: <1331405075-3231-1-git-send-email-alan@signal11.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2012 at 09:49:55PM +0100, Wolfram Sang wrote:
-> 
-> > -static void isp1301_configure(void)
-> > +static u16 i2c_read16(u8 subaddr)
-> > +{
-> > +	u16 data;
-> > +
-> > +	i2c_master_send(isp1301_i2c_client, &subaddr, 1);
-> > +	i2c_master_recv(isp1301_i2c_client, (u8 *) &data, 2);
-> > +
-> > +	return data;
-> > +}
-> 
-> Won't i2c_smbus_read_word_data(isp1301_i2c_client, reg) do?
-> 
-> And while we are at it: Could you also try replacing i2c_write() with
-> i2c_smbus_write_byte_data(isp1301_i2c_client, reg, val)?
-> 
-> No need to recode it (and in general, those solutions will also work with SMBus
-> for free)
+From: Arnd Bergmann <arnd@arndb.de>
 
-"no need to recode it" means "no need to recode these already existing functions"
+Most at91 systems have no support for PCMCIA or other
+PC-style buses, so we can select NO_IOPORT in order to
+disable compilationf or all drivers that need these.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Alan Ott <alan@signal11.us>
+---
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dfb0312..1306f0d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -322,6 +322,7 @@ config ARCH_AT91
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select HAVE_CLK
+ 	select CLKDEV_LOOKUP
++	select NO_IOPORT if !ARCH_AT91RM9200
+ 	help
+ 	  This enables support for systems based on the Atmel AT91RM9200,
+ 	  AT91SAM9 and AT91CAP9 processors.
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120310/53437b57/attachment-0001.sig>
+1.7.0.4
