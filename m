@@ -1,61 +1,131 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Mar 2012 11:50:11 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2
- tree
-In-Reply-To: <1331285751.1927.20.camel@deskari>
-References: <20120308170048.f1a992bca2ca2d93fa9747bf@canb.auug.org.au>
- <201203081616.12510.arnd@arndb.de> <1331285751.1927.20.camel@deskari>
-Message-ID: <201203091150.11294.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 9 Mar 2012 20:59:25 -0700 (MST)
+Subject: [PATCHv5 3/6] ARM: OMAP4 PM: Add IO Daisychain support
+In-Reply-To: <1331046702-2472-4-git-send-email-t-kristo@ti.com>
+References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+ <1331046702-2472-4-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1203092051140.30879@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 March 2012, Tomi Valkeinen wrote:
-> On Thu, 2012-03-08 at 16:16 +0000, Arnd Bergmann wrote:
-> > On Thursday 08 March 2012, Stephen Rothwell wrote:
-> > > Hi all,
-> > > 
-> > > Today's linux-next merge of the arm-soc tree got a conflict in
-> > > arch/arm/mach-omap1/board-palmtt.c between commit ddba6c7f7ec6 ("OMAP1:
-> > > pass LCD config with omapfb_set_lcd_config()") from the omap_dss2 tree
-> > > and commit 2e3ee9f45b3c ("ARM: OMAP1: Move most of plat/io.h into local
-> > > iomap.h") from the arm-soc tree.
-> > > 
-> > > I fixed it up (see below) and can carry the fix as necessary.
-> > 
-> > Hi Stephen,
-> > 
-> > Thanks for fixing up all the conflicts between arm-soc and omap_dss2.
-> > I think we should make sure they are resolved in one of the trees before
-> > the merge window.
+Hi
+
+On Tue, 6 Mar 2012, Tero Kristo wrote:
+
+> From: Rajendra Nayak <rnayak@ti.com>
 > 
-> Do we need to? The conflicts seemed to be trivial ones, like arm-soc
-> adds/removes something that just happens to be next to something else
-> that I add/remove.
+> IO daisychain is a mechanism that allows individual IO pads to generate
+> wakeup events on their own based on a switch of an input signal level.
+> This allows the hardware module behind the pad to be powered down, but
+> still have device level capability to detect IO events, and once this
+> happens the module can be powered back up to resume IO. See section
+> 3.9.4 in OMAP4430 Public TRM for details.
 > 
-> My understanding is that it's better to leave those conflicts than to do
-> "trickery" to avoid them.
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-Each of the conflicts is simple enough, but I feel it's worth resolving
-them in this case because there are a number of them. Looking at them
-again now, it's probably ok either way -- resolving them now or letting
-Linus take care of them.
+Here's an updated version of this patch.  Please let me know if you think 
+we should remove the poll on the WUCLKOUT line to conform with the change 
+that Tero made to the OMAP3 version.
 
-> > Tomi, what are your plans for the omap_dss2 branch to get merged?
-> 
-> Normally my tree goes via fbdev-tree (Florian's tree) to mainline.
 
-ok.
+- Paul
 
-> > Do you think you should send it to Linus first and we merge it into
-> > arm-soc to resolve the conflicts?
-> > Or do you want to merge it through the arm-soc tree?
-> > Or should we go first and you fix up the conflicts by pulling in the
-> > necessary topic branches from arm-soc into your tree?
-> 
-> If we want to resolve the conflicts, perhaps it's simplest if the dss
-> tree is merged to arm-soc.
+From: Rajendra Nayak <rnayak@ti.com>
+Date: Fri, 2 Mar 2012 17:17:52 +0200
+Subject: [PATCH 3/6] ARM: OMAP4: PRM: Add IO Daisychain support
 
-Ok. Maybe we'll just merge them in case Florian is upstream faster and
-not merge them otherwise.
+IO daisychain is a mechanism that allows individual IO pads to generate
+wakeup events on their own based on a switch of an input signal level.
+This allows the hardware module behind the pad to be powered down, but
+still have device level capability to detect IO events, and once this
+happens the module can be powered back up to resume IO. See section
+3.9.4 in OMAP4430 Public TRM for details.
 
-	Arnd
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+[paul at pwsan.com: removed MAX_IOPAD_LATCH_TIME declaration; renamed
+ omap4_trigger_io_chain() to conform to other PRM function names;
+ added kerneldoc]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/prm44xx.c |   48 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm44xx.h |    2 +
+ 2 files changed, 50 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index a1d6154..5868a12 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -231,6 +231,54 @@ void omap44xx_prm_restore_irqen(u32 *saved_mask)
+ 				 OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
+ }
+ 
++/**
++ * omap44xx_prm_reconfigure_io_chain - clear latches and reconfigure I/O chain
++ *
++ * Clear any previously-latched I/O wakeup events and ensure that the
++ * I/O wakeup gates are aligned with the current mux settings.  Works
++ * by asserting WUCLKIN, waiting for WUCLKOUT to be asserted, and then
++ * deasserting WUCLKIN and waiting for WUCLKOUT to be deasserted.
++ * No return value. XXX Are the final two steps necessary?
++ */
++void omap44xx_prm_reconfigure_io_chain(void)
++{
++	int i = 0;
++
++	/* Enable GLOBAL_WUEN */
++	if (!(omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++		OMAP4_PRM_IO_PMCTRL_OFFSET) & OMAP4430_GLOBAL_WUEN_MASK))
++		omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
++			OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_PRM_DEVICE_INST,
++			OMAP4_PRM_IO_PMCTRL_OFFSET);
++
++	/* Trigger WUCLKIN enable */
++	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK,
++			OMAP4430_WUCLK_CTRL_MASK, OMAP4430_PRM_DEVICE_INST,
++			OMAP4_PRM_IO_PMCTRL_OFFSET);
++	omap_test_timeout(
++		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++			OMAP4_PRM_IO_PMCTRL_OFFSET) &
++			OMAP4430_WUCLK_STATUS_MASK) >>
++			OMAP4430_WUCLK_STATUS_SHIFT) == 1),
++		MAX_IOPAD_LATCH_TIME, i);
++	if (i == MAX_IOPAD_LATCH_TIME)
++		pr_warn("PRM: I/O chain clock line assertion timed out\n");
++
++	/* Trigger WUCLKIN disable */
++	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
++			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
++	omap_test_timeout(
++		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
++			OMAP4_PRM_IO_PMCTRL_OFFSET) &
++			OMAP4430_WUCLK_STATUS_MASK) >>
++			OMAP4430_WUCLK_STATUS_SHIFT) == 0),
++		MAX_IOPAD_LATCH_TIME, i);
++	if (i == MAX_IOPAD_LATCH_TIME)
++		pr_warn("PRM: I/O chain clock line deassertion timed out\n");
++
++	return;
++}
++
+ static int __init omap4xxx_prcm_init(void)
+ {
+ 	if (cpu_is_omap44xx())
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index 7978092..ee72ae6 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -763,6 +763,8 @@ extern u32 omap4_prm_vcvp_read(u8 offset);
+ extern void omap4_prm_vcvp_write(u32 val, u8 offset);
+ extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+ 
++extern void omap44xx_prm_reconfigure_io_chain(void);
++
+ /* PRM interrupt-related functions */
+ extern void omap44xx_prm_read_pending_irqs(unsigned long *events);
+ extern void omap44xx_prm_ocp_barrier(void);
+-- 
+1.7.9.1
