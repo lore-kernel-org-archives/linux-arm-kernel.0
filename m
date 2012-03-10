@@ -1,55 +1,69 @@
-From: jdzheng@broadcom.com (JD (Jiandong) Zheng)
-Date: Fri, 9 Mar 2012 13:59:14 -0800
-Subject: [PATCH] ARM: BCMRING: Fix static IO mapping
-Message-ID: <8628FE4E7912BF47A96AE7DD7BAC0AAD0109D775AF28@SJEXCHCCR02.corp.ad.broadcom.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sat, 10 Mar 2012 14:54:25 +0000 (GMT)
+Subject: [PATCH v3] pxa/hx4700: Fix basic suspend/resume
+Message-ID: <1331391265.88838.YahooMailClassic@web29002.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix bcmring static IO mapping which causes booting issue since v3.2.0
+Basic suspend/resume is fixed by ensuring that the PGSR registers are set
+correctly before sleep mode is entered. In particular four of the active low
+resets need to be driven high while in sleep mode, otherwise the unit resets
+itself instead of suspending. Another problem was that the PCFR_GPROD bit is set
+by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail
+immediately after returning from sleep mode.
 
-Signed-off-by: Jiandong Zheng jdzheng at broadcom.com 
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 ---
- arch/arm/mach-bcmring/mm.c |   27 +++++++++++----------------
- 1 files changed, 11 insertions(+), 16 deletions(-)
-diff --git a/arch/arm/mach-bcmring/mm.c b/arch/arm/mach-bcmring/mm.c
-index 1adec78..b46ea07 100644
---- a/arch/arm/mach-bcmring/mm.c
-+++ b/arch/arm/mach-bcmring/mm.c
-@@ -31,24 +31,19 @@
-  .type = MT_MEMORY }
+
+V3:
+Changed GPIO72, GPIO96 back to KEEP_OUTPUT.
+
+diff -uprN clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c
+--- clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c	2012-03-04 01:08:09.000000000 +0000
++++ linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c	2012-03-10 14:42:41.328255002 +0000
+@@ -121,7 +121,11 @@ static unsigned long hx4700_pin_config[]
+ 	GPIO19_SSP2_SCLK,
+ 	GPIO86_SSP2_RXD,
+ 	GPIO87_SSP2_TXD,
+-	GPIO88_GPIO,
++	GPIO88_GPIO | MFP_LPM_DRIVE_HIGH,	/* TSC2046_CS */
++
++	/* BQ24022 Regulator */
++	GPIO72_GPIO | MFP_LPM_KEEP_OUTPUT,	/* BQ24022_nCHARGE_EN */
++	GPIO96_GPIO | MFP_LPM_KEEP_OUTPUT,	/* BQ24022_ISET2 */
  
- static struct map_desc bcmring_io_desc[] __initdata = {
-- IO_DESC(MM_IO_BASE_NAND, SZ_64K), /* phys:0x28000000-0x28000FFF  virt:0xE8000000-0xE8000FFF  size:0x00010000 */
-- IO_DESC(MM_IO_BASE_UMI, SZ_64K), /* phys:0x2C000000-0x2C000FFF  virt:0xEC000000-0xEC000FFF  size:0x00010000 */
--
-  IO_DESC(MM_IO_BASE_BROM, SZ_64K), /* phys:0x30000000-0x3000FFFF  virt:0xF3000000-0xF300FFFF  size:0x00010000 */
-- MEM_DESC(MM_IO_BASE_ARAM, SZ_1M), /* phys:0x31000000-0x31FFFFFF  virt:0xF3100000-0xF31FFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_DMA0, SZ_1M), /* phys:0x32000000-0x32FFFFFF  virt:0xF3200000-0xF32FFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_DMA1, SZ_1M), /* phys:0x33000000-0x33FFFFFF  virt:0xF3300000-0xF33FFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_ESW, SZ_1M), /* phys:0x34000000-0x34FFFFFF  virt:0xF3400000-0xF34FFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_CLCD, SZ_1M), /* phys:0x35000000-0x35FFFFFF  virt:0xF3500000-0xF35FFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_APM, SZ_1M), /* phys:0x36000000-0x36FFFFFF  virt:0xF3600000-0xF36FFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_SPUM, SZ_1M), /* phys:0x37000000-0x37FFFFFF  virt:0xF3700000-0xF37FFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M), /* phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M), /* phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x01000000 */
--
-+ MEM_DESC(MM_IO_BASE_ARAM, SZ_1M), /* phys:0x31000000-0x31FFFFFF  virt:0xF3100000-0xF31FFFFF  size:0x00100000 */
-+ IO_DESC(MM_IO_BASE_DMA0, SZ_1M), /* phys:0x32000000-0x32FFFFFF  virt:0xF3200000-0xF32FFFFF  size:0x00100000 */
-+ IO_DESC(MM_IO_BASE_DMA1, SZ_1M), /* phys:0x33000000-0x33FFFFFF  virt:0xF3300000-0xF33FFFFF  size:0x00100000 */
-+ IO_DESC(MM_IO_BASE_ESW, SZ_1M),         /* phys:0x34000000-0x34FFFFFF  virt:0xF3400000-0xF34FFFFF  size:0x00100000 */
-+ IO_DESC(MM_IO_BASE_CLCD, SZ_1M), /* phys:0x35000000-0x35FFFFFF  virt:0xF3500000-0xF35FFFFF  size:0x00100000 */
-+ IO_DESC(MM_IO_BASE_APM, SZ_1M),         /* phys:0x36000000-0x36FFFFFF  virt:0xF3600000-0xF36FFFFF  size:0x00100000 */
-+ IO_DESC(MM_IO_BASE_SPUM, SZ_1M), /* phys:0x37000000-0x37FFFFFF  virt:0xF3700000-0xF37FFFFF  size:0x00100000 */
-+ IO_DESC(MM_IO_BASE_VPM_PROG, SZ_1M), /* phys:0x38000000-0x38FFFFFF  virt:0xF3800000-0xF38FFFFF  size:0x00100000 */
-+ IO_DESC(MM_IO_BASE_VPM_DATA, SZ_1M), /* phys:0x3A000000-0x3AFFFFFF  virt:0xF3A00000-0xF3AFFFFF  size:0x00100000 */
-  IO_DESC(MM_IO_BASE_VRAM, SZ_64K), /* phys:0x40000000-0x4000FFFF  virt:0xF4000000-0xF400FFFF  size:0x00010000 */
-- IO_DESC(MM_IO_BASE_CHIPC, SZ_16M), /* phys:0x80000000-0x80FFFFFF  virt:0xF8000000-0xF8FFFFFF  size:0x01000000 */
-- IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD,
--  SZ_16M), /* phys:0x0F000000-0x0FFFFFFF  virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
-+ IO_DESC(MM_IO_BASE_CHIPC, SZ_8M), /* phys:0x80000000-0x807FFFFF  virt:0xF8000000-0xF87FFFFF  size:0x00800000 */
-+ IO_DESC(MM_IO_BASE_VPM_EXTMEM_RSVD, SZ_16M), /* phys:0x0F000000-0x0FFFFFFF virt:0xF0000000-0xF0FFFFFF  size:0x01000000 */
+ 	/* HX4700 specific input GPIOs */
+ 	GPIO12_GPIO,	/* ASIC3_IRQ */
+@@ -134,6 +138,11 @@ static unsigned long hx4700_pin_config[]
+ 	GPIO108_GPIO,	/* GSM_READY */
+ 	GPIO58_GPIO,	/* TSC2046_nPENIRQ */
+ 	GPIO66_GPIO,	/* nSDIO_IRQ */
++
++	GPIO61_GPIO | MFP_LPM_DRIVE_HIGH,	/* W3220_nRESET */
++	GPIO71_GPIO | MFP_LPM_DRIVE_HIGH,	/* ASIC3_nRESET */
++	GPIO81_GPIO | MFP_LPM_DRIVE_HIGH,	/* CPU_GP_nRESET */
++	GPIO116_GPIO | MFP_LPM_DRIVE_HIGH,	/* CPU_HW_nRESET */
  };
  
- void __init bcmring_map_io(void)
--- 
-1.7.9.1
+ /*
+@@ -828,15 +837,20 @@ static struct gpio global_gpios[] = {
+ 	{ GPIO110_HX4700_LCD_LVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_LVDD" },
+ 	{ GPIO111_HX4700_LCD_AVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_AVDD" },
+ 	{ GPIO32_HX4700_RS232_ON,         GPIOF_OUT_INIT_HIGH, "RS232_ON" },
++	{ GPIO61_HX4700_W3220_nRESET,     GPIOF_OUT_INIT_HIGH, "W3220_nRESET" },
+ 	{ GPIO71_HX4700_ASIC3_nRESET,     GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
++	{ GPIO81_HX4700_CPU_GP_nRESET,    GPIOF_OUT_INIT_HIGH, "CPU_GP_nRESET" },
+ 	{ GPIO82_HX4700_EUART_RESET,      GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
+ 	{ GPIO105_HX4700_nIR_ON,          GPIOF_OUT_INIT_HIGH, "nIR_EN" },
++	{ GPIO116_HX4700_CPU_HW_nRESET,   GPIOF_OUT_INIT_HIGH, "CPU_HW_nRESET" },
+ };
+ 
+ static void __init hx4700_init(void)
+ {
+ 	int ret;
+ 
++	PCFR = PCFR_GPR_EN | PCFR_OPDE;
++
+ 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
+ 	ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
+ 	if (ret)
