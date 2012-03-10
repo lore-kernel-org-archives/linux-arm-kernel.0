@@ -1,32 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 12 Mar 2012 14:32:11 +0000
-Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <20120312142857.GA6694@avionic-0098.mockup.avionic-design.de>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
- <4F59253D.7070100@wwwdotorg.org>
- <20120312120610.GA14020@sirena.org.uk>
- <20120312141705.GA16395@avionic-0098.mockup.avionic-design.de>
- <20120312142340.GI3110@opensource.wolfsonmicro.com>
- <20120312142857.GA6694@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120312143210.GJ3110@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 10 Mar 2012 19:24:31 +0000
+Subject: [PATCH 1/2] ARM: at91: only RM9200 has ISA-style PIO
+In-Reply-To: <1331405075-3231-1-git-send-email-alan@signal11.us>
+References: <1331405049-3186-1-git-send-email-alan@signal11.us>
+ <1331405075-3231-1-git-send-email-alan@signal11.us>
+Message-ID: <201203101924.31710.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 03:28:58PM +0100, Thierry Reding wrote:
+On Saturday 10 March 2012, Alan Ott wrote:
+> 
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> Most at91 systems have no support for PCMCIA or other
+> PC-style buses, so we can select NO_IOPORT in order to
+> disable compilationf or all drivers that need these.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Alan Ott <alan@signal11.us>
 
-> In that case I'll mark the *-supply properties required. Would it be a good
-> idea to mention this (or even give an example with fixed regulators) in the
-> binding documentation or can I assume this to be common knowledge?
+Hi Alan,
 
-Probably the best thing here is to just reference the regulator binding
-documentation which mentions -supply properties (or should do) and then
-clarify that if need be.  No sense in putting things like this into the
-binding document for a specific driver, there's nothing driver specific.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/a5a8b0cf/attachment-0001.sig>
+You forgot to Cc the at91 maintainers on this patch (and on patch 0).
+Also, this patch relies on the another series I did to redefine
+the meaning of CONFIG_NO_IOPORT while renaming the existing one to
+CONFIG_NO_IOPORT_MAP. This patch will have to wait for the other
+series.
+
+	Arnd
