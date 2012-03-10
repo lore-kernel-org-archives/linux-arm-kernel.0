@@ -1,23 +1,25 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 09 Mar 2012 15:14:31 +1030
-Subject: [PATCH 1/8] ARM: KVM: Fix missing clobber (causes host oops on UP)
-In-Reply-To: <1331267212.8104.rusty@rustcorp.com.au>
-References: <1331267212.8104.rusty@rustcorp.com.au>
-Message-ID: <878vja1iz4.fsf@rustcorp.com.au>
+From: bppdimd@dlzhept.com (ncocbax)
+Date: Sat, 10 Mar 2012 21:28:22 +0800
+Subject: =?utf-8?B?77yIM+aciDE15pel5rex5Zyz5Lya6K6u77yJ56eR5oqA6aG555uu5LiT6aG56LWE6YeR55Sz?=
+ =?utf-8?B?5oql5pqo5LyB5Lia55+l6K+G5Lqn5p2D566h55CG5oiY55Wl5Y+K5LiT5Yip6L+Q55So?=
+Message-ID: <DDA18F4C4578D775AC7ECA7C653613B2@fpwd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 09 Mar 2012 14:56:52 +1030, Rusty Russell <rusty@rustcorp.com.au> wrote:
-> 
-> From: Rusty Russell <rusty@rustcorp.com.au>
 
-Oops, premature script misfire.
 
-These were meant to go to Christoffer, and the android-virt list.
 
-Will resend...
 
-Cheers,
-Rusty.
--- 
-  How could I marry someone with more hair than me?  http://baldalex.org
+
+
+21:28:31
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120310/d0a213a0/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ???????????????????(???).doc
+Type: application/octet-stream
+Size: 73728 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120310/d0a213a0/attachment-0001.obj>
