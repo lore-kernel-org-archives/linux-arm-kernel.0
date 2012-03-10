@@ -1,70 +1,38 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 08 Mar 2012 22:26:00 -0700
-Subject: [PATCH 2/5 v3] ARM: at91: sam9g20 add i2c DT support
-In-Reply-To: <1331196635-27203-2-git-send-email-plagnioj@jcrosoft.com>
-References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
- <1331196635-27203-2-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20120309052600.B13BA3E0649@localhost>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 Mar 2012 10:20:29 -0800
+Subject: [GIT PULL] mach/io.h clean-up and removal
+In-Reply-To: <4F58DD30.4060704@gmail.com>
+References: <4F58DD30.4060704@gmail.com>
+Message-ID: <CAOesGMi1pD+1BEkXSGDA8k6UC2DD65QYt3Z_59McFkgWrdqehQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  8 Mar 2012 09:50:32 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> For now on use i2c-gpio driver on the same pin as the hardware IP.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> ---
-> v3:
-> 
-> 	update i2c binding (Rob comments)
-> 
-> Best Regards,
-> J.
->  arch/arm/boot/dts/at91sam9g20.dtsi |   13 +++++++++++++
->  1 files changed, 13 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> index 4b0dc99..072b2da 100644
-> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> @@ -189,4 +189,17 @@
->  			status = "disabled";
->  		};
->  	};
-> +
-> +	i2c-gpio at 0 {
+Hi,
 
-i2c at 0
+On Thu, Mar 8, 2012 at 8:24 AM, Rob Herring <robherring2@gmail.com> wrote:
+> Arnd, Olof,
+>
+> Please pull the mach/io.h cleanup series for 3.4. This does not include
+> the PCI i/o mapping changes. In hopes of testing, I'll wait until 3.5
+> for that. Although, it seems no one has devices with i/o.
+>
+> I'm sending this to you rather than Russell as it is based on at91 and
+> omap cleanup branches in arm-soc tree.
+>
+> Rob
+>
+> The following changes since commit d50673ed97a7ce609cf62bcd40c57517ada31806:
+>
+> ?Merge remote-tracking branch 'arm-soc/at91/base2+cleanup' into
+> cleanup-base (2012-03-04 22:00:46 -0600)
+>
+> are available in the git repository at:
+>
+> ?git://sources.calxeda.com/kernel/linux.git io-cleanup-for-3.4
 
-> +		compatible = "i2c-gpio";
-> +		gpios = <&pioA 23 0 /* sda */
-> +			 &pioA 24 0 /* scl */
-> +			>;
-> +		i2c-gpio,sda-open-drain;
-> +		i2c-gpio,scl-open-drain;
-> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
+I've pulled this into next/cleanup2. Nice diffstat!
 
-gpio-driven i2c busses are inherently board-specific.  Why is this
-in the SoC include file?
 
-Otherwise I think this patch series looks okay.
+Thanks,
 
-g.
-
->  };
-> -- 
-> 1.7.7
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies,Ltd.
+-Olof
