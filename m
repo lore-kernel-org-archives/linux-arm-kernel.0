@@ -1,76 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Mar 2012 19:58:48 +0800
-Subject: [PATCH v4 01/10] ASoC: fsl: separate SSI and DMA Kconfig options
-In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331553537-19789-2-git-send-email-shawn.guo@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 10 Mar 2012 02:19:09 -0800
+Subject: [PATCH 5/5] ARM: EXYNOS: add clock registers for exynos4x12-cpufreq
+In-Reply-To: <1331374749-23256-1-git-send-email-kgene.kim@samsung.com>
+References: <1331374749-23256-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331374749-23256-6-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fsl_ssi driver will possibly be shared between Freescale PowerPC
-and ARM/IMX families, so give it a separate Kconfig option.  Then
-fsl_ssi driver can possibly be selected independently from selecting
-PowerPC DMA based PCM driver.
+From: Jaecheol Lee <jc.lee@samsung.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- sound/soc/fsl/Kconfig  |   15 +++++++++------
- sound/soc/fsl/Makefile |    3 ++-
- 2 files changed, 11 insertions(+), 7 deletions(-)
+ arch/arm/mach-exynos/include/mach/regs-clock.h |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index d754d34..ca693b2 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -1,10 +1,11 @@
- config SND_MPC52xx_DMA
- 	tristate
- 
--# ASoC platform support for the Freescale PowerPC SOCs that have an SSI and
--# an Elo DMA controller, such as the MPC8610 and P1022.  You will still need to
--# select a platform driver and a codec driver.
--config SND_SOC_POWERPC_SSI
-+config SND_SOC_FSL_SSI
-+	tristate
-+	depends on FSL_SOC
+diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
+index 790f525..b1a2aeb 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
+@@ -160,6 +160,15 @@
+ #define EXYNOS4_CLKDIV_CPU0_PCLKDBG_MASK	(0x7 << EXYNOS4_CLKDIV_CPU0_PCLKDBG_SHIFT)
+ #define EXYNOS4_CLKDIV_CPU0_APLL_SHIFT		(24)
+ #define EXYNOS4_CLKDIV_CPU0_APLL_MASK		(0x7 << EXYNOS4_CLKDIV_CPU0_APLL_SHIFT)
++#define EXYNOS4_CLKDIV_CPU0_CORE2_SHIFT		28
++#define EXYNOS4_CLKDIV_CPU0_CORE2_MASK		(0x7 << EXYNOS4_CLKDIV_CPU0_CORE2_SHIFT)
 +
-+config SND_SOC_POWERPC_DMA
- 	tristate
- 	depends on FSL_SOC
++#define EXYNOS4_CLKDIV_CPU1_COPY_SHIFT		0
++#define EXYNOS4_CLKDIV_CPU1_COPY_MASK		(0x7 << EXYNOS4_CLKDIV_CPU1_COPY_SHIFT)
++#define EXYNOS4_CLKDIV_CPU1_HPM_SHIFT		4
++#define EXYNOS4_CLKDIV_CPU1_HPM_MASK		(0x7 << EXYNOS4_CLKDIV_CPU1_HPM_SHIFT)
++#define EXYNOS4_CLKDIV_CPU1_CORES_SHIFT		8
++#define EXYNOS4_CLKDIV_CPU1_CORES_MASK		(0x7 << EXYNOS4_CLKDIV_CPU1_CORES_SHIFT)
  
-@@ -12,7 +13,8 @@ config SND_SOC_MPC8610_HPCD
- 	tristate "ALSA SoC support for the Freescale MPC8610 HPCD board"
- 	# I2C is necessary for the CS4270 driver
- 	depends on MPC8610_HPCD && I2C
--	select SND_SOC_POWERPC_SSI
-+	select SND_SOC_FSL_SSI
-+	select SND_SOC_POWERPC_DMA
- 	select SND_SOC_CS4270
- 	select SND_SOC_CS4270_VD33_ERRATA
- 	default y if MPC8610_HPCD
-@@ -23,7 +25,8 @@ config SND_SOC_P1022_DS
- 	tristate "ALSA SoC support for the Freescale P1022 DS board"
- 	# I2C is necessary for the WM8776 driver
- 	depends on P1022_DS && I2C
--	select SND_SOC_POWERPC_SSI
-+	select SND_SOC_FSL_SSI
-+	select SND_SOC_POWERPC_DMA
- 	select SND_SOC_WM8776
- 	default y if P1022_DS
- 	help
-diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
-index b4a38c0..95d483f 100644
---- a/sound/soc/fsl/Makefile
-+++ b/sound/soc/fsl/Makefile
-@@ -9,7 +9,8 @@ obj-$(CONFIG_SND_SOC_P1022_DS) += snd-soc-p1022-ds.o
- # Freescale PowerPC SSI/DMA Platform Support
- snd-soc-fsl-ssi-objs := fsl_ssi.o
- snd-soc-fsl-dma-objs := fsl_dma.o
--obj-$(CONFIG_SND_SOC_POWERPC_SSI) += snd-soc-fsl-ssi.o snd-soc-fsl-dma.o
-+obj-$(CONFIG_SND_SOC_FSL_SSI) += snd-soc-fsl-ssi.o
-+obj-$(CONFIG_SND_SOC_POWERPC_DMA) += snd-soc-fsl-dma.o
- 
- # MPC5200 Platform Support
- obj-$(CONFIG_SND_MPC52xx_DMA) += mpc5200_dma.o
+ #define EXYNOS4_CLKDIV_DMC0_ACP_SHIFT		(0)
+ #define EXYNOS4_CLKDIV_DMC0_ACP_MASK		(0x7 << EXYNOS4_CLKDIV_DMC0_ACP_SHIFT)
 -- 
-1.7.5.4
+1.7.4.4
