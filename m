@@ -1,135 +1,32 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 9 Mar 2012 07:50:04 +0100
-Subject: [PATCH 10/11] ARM: tegra: pcie: Add MSI support
-In-Reply-To: <4F59213F.6070107@wwwdotorg.org>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-11-git-send-email-thierry.reding@avionic-design.de>
- <4F59213F.6070107@wwwdotorg.org>
-Message-ID: <20120309065004.GD25208@avionic-0098.mockup.avionic-design.de>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sat, 10 Mar 2012 18:11:20 +0000 (GMT)
+Subject: [PATCH] pxa/hx4700: Reduce sleep mode power consumption by 35%
+Message-ID: <1331403080.2319.YahooMailClassic@web29002.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 03/08/2012 07:51 AM, Thierry Reding wrote:
-> > This commit adds support for message signaled interrupts to the Tegra
-> > PCIe controller.
-> > 
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > ---
-> > This code is taken from the NVIDIA Vibrante kernel and therefore has no
-> > appropriate Signed-off-by from the original author. Maybe someone at
-> > NVIDIA can find out who wrote this code and maybe provide a proper
-> > Signed-off-by that I can add?
-> 
-> I think if you look in:
-> git://nv-tegra.nvidia.com/linux-2.6.git android-tegra-2.6.36
-> 
-> the following commits are what you're after:
-> 
-> de7fd8768b32da66eaf4eaf58473c65f7a76808d
-> arm: tegra: pcie: enabling MSI support for pcie
-> 
-> ac1f8310811c64a084511d2afc27f66334b31a81
-> ARM: tegra: pcie: fix return value from MSI irq routine
-> 
-> Although the patch below only partially resembles those patches, I guess
-> because you've rewritten the code a lot to conform to the current kernel
-> APIs, clean stuff up, etc. Perhaps just saying "based on code by Krishna
-> Kishore <kthota@nvidia.com>" is enough...
+Drive the two Bluetooth UART output GPIOs (GPIO43_BTUART_TXD, GPIO45_BTUART_RTS)
+LOW during sleep mode instead of HIGH. This reduces sleep mode power consumption
+from approximately 46 mA/h to approximately 30 mA/h.
 
-Yes, it is indeed a major rewrite because the original code had some
-peculiarities and FIXME that I thought wouldn't make it through the review
-anyway so I fixed them up.
+Signed-off-by: Oliver Winker <oliver@oli1170.net>
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+---
 
-I'll add some comment about the original authorship. There is no official
-Signed-off-by in the original commit. Do I still need one or is it enough to
-mention the original authors in the commit message and add keep my own
-Signed-off-by?
+Thanks to Oliver Winker for finding this.
 
-Thierry
-
-> 
-> > diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-> 
-> > +static int tegra_pcie_enable_msi(struct platform_device *pdev)
-> > +{
-> > +	struct tegra_pcie_info *pcie = platform_get_drvdata(pdev);
-> > +	volatile void *pages;
-> > +	unsigned long base;
-> > +	unsigned int msi;
-> > +	int msi_base;
-> > +	int err;
-> > +	u32 reg;
-> > +
-> > +	mutex_init(&pcie->msi_lock);
-> > +
-> > +	msi_base = irq_alloc_descs(-1, 0, INT_PCI_MSI_NR, 0);
-> > +	if (msi_base < 0) {
-> > +		dev_err(&pdev->dev, "failed to allocate IRQs\n");
-> > +		return msi_base;
-> > +	}
-> > +
-> > +	pcie->msi_domain = irq_domain_add_legacy(pcie->dev->of_node,
-> > +						 INT_PCI_MSI_NR, msi_base,
-> > +						 0, &irq_domain_simple_ops,
-> > +						 NULL);
-> > +	if (!pcie->msi_domain) {
-> > +		dev_err(&pdev->dev, "failed to create IRQ domain\n");
-> 
-> Free the IRQ descriptors in the error paths?
-
-Yes, that would make sense.
-
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	pcie->msi_chip.name = "PCIe-MSI";
-> > +	pcie->msi_chip.irq_enable = unmask_msi_irq;
-> > +	pcie->msi_chip.irq_disable = mask_msi_irq;
-> > +	pcie->msi_chip.irq_mask = mask_msi_irq;
-> > +	pcie->msi_chip.irq_unmask = unmask_msi_irq;
-> > +
-> > +	for (msi = 0; msi < INT_PCI_MSI_NR; msi++) {
-> > +		unsigned int irq = irq_find_mapping(pcie->msi_domain, msi);
-> > +
-> > +		irq_set_chip_data(irq, pcie);
-> > +		irq_set_chip_and_handler(irq, &pcie->msi_chip,
-> > +					 handle_simple_irq);
-> > +		set_irq_flags(irq, IRQF_VALID);
-> > +	}
-> > +
-> > +	err = platform_get_irq(pdev, 1);
-> > +	if (err < 0) {
-> > +		dev_err(&pdev->dev, "failed to get IRQ: %d\n", err);
-> 
-> Same here, and undo setting IRQF_VALID?
-
-Right. I assume it would be best to also free the struct irq_domain and set
-the chip data and handler back to NULL? AFAICT there is no canonical way to
-teardown an irq_domain.
-
-> > +		return err;
-> > +	}
-> ...
-> 
-> > +static int tegra_pcie_disable_msi(struct platform_device *pdev)
-> > +{
-> > +	return 0;
-> > +}
-> 
-> This is empty in both the ifdef(CONFIG_PCI_MSI) case and otherwise. It
-> should probably clean everything up here right?
-
-Yes, initially this contained a call to free_irq(), which I removed when I
-switched to using a chained handler. I can probably put all of the cleanup
-code from your comments above in here and perhaps even call that in the error
-paths of tegra_pcie_enable_msi().
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/3035ffec/attachment-0001.sig>
+diff -uprN clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c
+--- clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c	2012-03-04 01:08:09.000000000 +0000
++++ linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c	2012-03-10 15:44:18.597238757 +0000
+@@ -97,9 +97,9 @@ static unsigned long hx4700_pin_config[]
+ 
+ 	/* BTUART */
+ 	GPIO42_BTUART_RXD,
+-	GPIO43_BTUART_TXD,
++	GPIO43_GPIO | MFP_AF2 | MFP_LPM_DRIVE_LOW,
+ 	GPIO44_BTUART_CTS,
+-	GPIO45_BTUART_RTS,
++	GPIO45_GPIO | MFP_AF2 | MFP_LPM_DRIVE_LOW,
+ 
+ 	/* PWM 1 (Backlight) */
+ 	GPIO17_PWM1_OUT,
