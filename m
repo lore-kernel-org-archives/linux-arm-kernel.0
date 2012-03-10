@@ -1,190 +1,103 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 09 Mar 2012 14:56:52 +1030
-Subject: [PATCH 7/8] ARM: KVM: guest_didnt_mean_it()
-Message-ID: <1331267212.26948.rusty@rustcorp.com.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 Mar 2012 10:05:15 -0800
+Subject: [GIT PULL 2/4] Samsung devel-pd for v3.4
+In-Reply-To: <4F5B7C81.6080301@samsung.com>
+References: <4F5B7C81.6080301@samsung.com>
+Message-ID: <CAOesGMjff3gVNJQ5FpJuSf+uvVDW8k22b+Xcikot-isM-4-6iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rafael,
 
-From: Rusty Russell <rusty@rustcorp.com.au>
+The below series contains two patches that have been sent to you, and
+that are sitting in the pm-domains branch.
 
-Conditional instructions may trap even if the condition isn't true, so a good
-hypervisor will check this.  The same can happen with undefined instructions,
-so the kernel should be doing this dance already (it isn't).
+Two questions before I pull this into arm-soc:
 
-(See p1206 of ARMv7-A ARM)
+1) Are you 100% sure this will be submitted to 3.4? And if so, will
+you send it early during the merge window?
+2) Are you 100% sure you will not rebase the branch into which you
+pulled the v3.4-for-rafael branch?
 
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
----
- arch/arm/include/asm/kvm_arm.h     |    4 +++
- arch/arm/include/asm/kvm_emulate.h |    2 +
- arch/arm/kvm/Makefile              |    2 +
- arch/arm/kvm/arm.c                 |    3 ++
- arch/arm/kvm/emulate.c             |   41 +++++++++++++++++++++++++++
- arch/arm/kvm/kvm_cond_match.S      |   54 ++++++++++++++++++++++++++++++++++++
- 6 files changed, 105 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/kvm/kvm_cond_match.S
+I am asking because if we pull this in, and you rebase between now and
+when it's sent in, we're risking merge conflicts that will be painful
+to resolve. We've been bitten by that from other dependencies in the
+past so we're being careful.
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index 1769187..156284a 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -107,6 +107,10 @@
- #define HSR_ISS		(HSR_IL - 1)
- #define HSR_ISV_SHIFT	(24)
- #define HSR_ISV		(1U << HSR_ISV_SHIFT)
-+#define HSR_CV_SHIFT	(24)
-+#define HSR_CV		(1U << HSR_CV_SHIFT)
-+#define HSR_COND_SHIFT	(20)
-+#define HSR_COND	(0xfU << HSR_COND_SHIFT)
- 
- #define HSR_EC_UNKNOWN	(0x00)
- #define HSR_EC_WFI	(0x01)
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index fa54247..fe21e86 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -49,6 +49,8 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_wfi(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_emulate_mmio_ls(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			unsigned long instr);
-+bool kvm_should_not_have_trapped(struct kvm_vcpu *vcpu);
-+bool kvm_cond_match(u32 flags, u32 cond);
- 
- /*
-  * Return the SPSR for the specified mode of the virtual CPU.
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index e69a8e1..68f05b9 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -12,6 +12,6 @@ obj-$(CONFIG_KVM_ARM_HOST) += init.o interrupts.o exports.o
- 
- kvm-arm-y += $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
- 
--kvm-arm-y += arm.o guest.o mmu.o emulate.o
-+kvm-arm-y += arm.o guest.o mmu.o emulate.o kvm_cond_match.o
- 
- obj-$(CONFIG_KVM) += kvm-arm.o
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index a6cf02b..1724657 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -414,6 +414,9 @@ static inline int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		BUG();
- 	}
- 
-+	if (kvm_should_not_have_trapped(vcpu))
-+		return 0;
-+
- 	return arm_exit_handlers[hsr_ec](vcpu, run);
- }
- 
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index bd2c3dc..11e2dab 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -659,3 +659,44 @@ int kvm_emulate_mmio_ls(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	*vcpu_reg(vcpu, 15) += 4;
- 	return 0;
- }
-+
-+/* Some implementations may not check condition codes before trapping! */
-+bool kvm_should_not_have_trapped(struct kvm_vcpu *vcpu)
-+{
-+	unsigned long spsr, cond, flags;
-+
-+	/*
-+	 * Exception Code 0 can only happen if we set HCR.TGE to 1, to
-+	 * catch undefined instructions, and then we won't get past
-+	 * the arm_exit_handlers test anyway.
-+	 */
-+	BUG_ON(((vcpu->arch.hsr & HSR_EC) >> HSR_EC_SHIFT) == 0);
-+
-+	/* Top two bits non-zero?  Unconditional. */
-+	if (vcpu->arch.hsr >> 30)
-+		return false;
-+
-+	spsr = *vcpu_spsr(vcpu);
-+
-+	/* Is condition field valid? */
-+	if ((vcpu->arch.hsr & HSR_CV) >> HSR_CV_SHIFT)
-+		cond = (vcpu->arch.hsr & HSR_COND) >> HSR_COND_SHIFT;
-+	else {
-+		/* This can happen in Thumb mode: examine IT state. */
-+		unsigned long it;
-+		
-+		it = ((spsr >> 8) & 0xFC)
-+			| ((spsr >> 25) & 0x3);
-+
-+		/* it == 0 => unconditional. */
-+		if (it == 0)
-+			return false;
-+
-+		/* The cond for this insn works out as the top 4 bits. */
-+		cond = (it >> 4);
-+	}
-+
-+	flags = spsr & ~0x07FFFFFF;
-+
-+	return !kvm_cond_match(flags, cond);
-+}
-diff --git a/arch/arm/kvm/kvm_cond_match.S b/arch/arm/kvm/kvm_cond_match.S
-new file mode 100644
-index 0000000..cf48786
---- /dev/null
-+++ b/arch/arm/kvm/kvm_cond_match.S
-@@ -0,0 +1,54 @@
-+#include <linux/linkage.h>
-+
-+/* extern bool kvm_cond_match(u32 flags, u32 cond); */
-+ENTRY(kvm_cond_match)
-+.arm
-+	/* First, set our condition flags to the arg. */
-+	mrs	r2, cpsr
-+	and	r2, r2, #0x07FFFFFF
-+	orr	r2, r2, r0
-+	msr	cpsr, r2
-+
-+	/* Now, jump to table depending on cond, return via there. */
-+	mov	r0, #0
-+	add	r2, r0, r1, LSL #3
-+	sub	r2, #4
-+	add	pc, r2
-+
-+/* This is "mov<cond>	r0, #1" */
-+#define COND_MOVEQ_R0_1(cond) .word	((cond << 28) | 0x03a00001)
-+
-+cond_table:
-+	COND_MOVEQ_R0_1(0)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(1)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(2)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(3)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(4)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(5)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(6)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(7)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(8)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(9)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(10)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(11)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(12)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(13)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(14)
-+	mov	pc, lr
-+	COND_MOVEQ_R0_1(15)
-+	mov	pc, lr
-+ENDPROC(kvm_cond_match)
+
+Thanks,
+
+-Olof
+
+On Sat, Mar 10, 2012 at 8:08 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd, Olof,
+>
+> This is Generic Power Domain patches for EXYNOS. Basically, Thomas' patches,
+> adding support Generic Power Domain patches are in Rafael's tree,
+> linux-pm/linux-next and see below merge commit.
+> http://git.kernel.org/?p=linux/kernel/git/rafael/linux-pm.git;a=commit;h=dcaad77a8074b6de58e745546bc543d5538404f2
+> And this adds hooking up G2D and JPEG to Generic PD.
+>
+> Please pull and here is my preferred resolution when merge this after
+> next/board-samsung.
+>
+> diff --cc arch/arm/mach-exynos/mach-universal_c210.c
+> index 3663aee,0262417..0b944eb
+> --- a/arch/arm/mach-exynos/mach-universal_c210.c
+> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
+> @@@ -1053,10 -981,6 +1052,7 @@@ static struct platform_device *universa
+> ? ? ? ?&s5p_device_mfc,
+> ? ? ? ?&s5p_device_mfc_l,
+> ? ? ? ?&s5p_device_mfc_r,
+> - ? ? ? &exynos4_device_pd[PD_MFC],
+> - ? ? ? &exynos4_device_pd[PD_LCD0],
+> - ? ? ? &exynos4_device_pd[PD_CAM],
+> ?+ ? ? ?&cam_vt_dio_fixed_reg_dev,
+> ? ? ? ?&cam_i_core_fixed_reg_dev,
+> ? ? ? ?&cam_s_if_fixed_reg_dev,
+> ? ? ? ?&s5p_device_fimc_md,
+>
+> If any problems, please kindly let me know.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
+>
+> ?Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
+>
+> are available in the git repository at:
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/devel-samsung-pd
+>
+> Sachin Kamat (2):
+> ? ? ?ARM: EXYNOS: Hook up G2D PD to generic PD infrastructure
+> ? ? ?ARM: EXYNOS: Hook up JPEG PD to generic PD infrastructure
+>
+> Thomas Abraham (2):
+> ? ? ?PM / Domains: Add OF support
+> ? ? ?ARM: EXYNOS: Hook up power domains to generic power domain
+> infrastructure
+>
+> ?.../bindings/arm/exynos/power_domain.txt ? ? ? ? ? | ? 21 ++
+> ?arch/arm/mach-exynos/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? 10 +-
+> ?arch/arm/mach-exynos/Makefile ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-exynos/dev-pd.c ? ? ? ? ? ? ? ? ? ? ?| ?139 --------------
+> ?arch/arm/mach-exynos/mach-nuri.c ? ? ? ? ? ? ? ? ? | ? 11 -
+> ?arch/arm/mach-exynos/mach-origen.c ? ? ? ? ? ? ? ? | ? 14 --
+> ?arch/arm/mach-exynos/mach-smdkv310.c ? ? ? ? ? ? ? | ? 12 --
+> ?arch/arm/mach-exynos/mach-universal_c210.c ? ? ? ? | ? 17 --
+> ?arch/arm/mach-exynos/pm_domains.c ? ? ? ? ? ? ? ? ?| ?201
+> ++++++++++++++++++++
+> ?drivers/base/power/domain.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 32 +++
+> ?include/linux/pm_domain.h ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 12 ++
+> ?11 files changed, 268 insertions(+), 203 deletions(-)
+> ?create mode 100644
+> Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+> ?delete mode 100644 arch/arm/mach-exynos/dev-pd.c
+> ?create mode 100644 arch/arm/mach-exynos/pm_domains.c
