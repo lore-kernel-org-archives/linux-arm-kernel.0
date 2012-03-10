@@ -1,44 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 12 Mar 2012 20:04:32 +0530
-Subject: [PATCH 1/2] ARM: OMAP: powerdomain: Wait for powerdomain transition
- in pwrdm_state_switch()
-In-Reply-To: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 10 Mar 2012 15:02:38 +0400
+Subject: [PATCH 5/7] USB: r8a66597-hcd: restore big-endian operation.
+In-Reply-To: <1331311133-26937-5-git-send-email-thomas@codesourcery.com>
+References: <1331311133-26937-1-git-send-email-thomas@codesourcery.com>
+ <1331311133-26937-5-git-send-email-thomas@codesourcery.com>
+Message-ID: <4F5B34CE.5040900@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b1cbdb00d{OMAP: clockdomain: Wait for powerdomain to be ON
-when using clockdomain force wakeup} was assuming that pwrdm_state_switch()
-does wait for the powerdomain transition which is not the case.
+Hello.
 
-Fix this API by adding the pwrdm_wait_transition().
+On 09-03-2012 20:38, Thomas Schwinge wrote:
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-CC: Rajendra Nayak <rnayak@ti.com>
-CC: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/powerdomain.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+> On SH, as of 37b7a97884ba64bf7d403351ac2a9476ab4f1bba we have to use the
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 8a18d1b..96ad3dbe 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -972,7 +972,13 @@ int pwrdm_wait_transition(struct powerdomain *pwrdm)
- 
- int pwrdm_state_switch(struct powerdomain *pwrdm)
- {
--	return _pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
-+	int ret;
-+
-+	ret = pwrdm_wait_transition(pwrdm);
-+	if (!ret)
-+		ret = _pwrdm_state_switch(pwrdm, PWRDM_STATE_NOW);
-+
-+	return ret;
- }
- 
- int pwrdm_clkdm_state_switch(struct clockdomain *clkdm)
--- 
-1.7.4.1
+    Please also specify the summary of thta commit in parens.
+
+> endianess-agnostic I/O accessor functions.
+
+> This driver is also enabled in ARM's viper_defconfig as well as MIPS'
+> bcm47xx_defconfig and fuloong2e_defconfig -- I suppose none of these are
+> operating in big-endian mode, or this issue should already have been noticed
+> before.
+
+> The device is now recognized correctly for both litte-endian and big-endian
+> sh7785lcr, but I have not tested this any further, as the board is situated in
+> a remote data center.
+
+> Signed-off-by: Thomas Schwinge<thomas@codesourcery.com>
+> Cc: Paul Mundt<lethal@linux-sh.org>
+> Cc: linux-sh at vger.kernel.org
+> Cc: linux-usb at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mips at linux-mips.org
+
+WBR, Sergei
