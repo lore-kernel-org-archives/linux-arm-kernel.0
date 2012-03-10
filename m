@@ -1,69 +1,40 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Fri, 9 Mar 2012 16:26:00 -0600
-Subject: linux-next: manual merge of the cpuidle-cons tree with the
- arm-soc tree
-In-Reply-To: <20120309183732.512d3676599da324f4747219@canb.auug.org.au>
-References: <20120309183732.512d3676599da324f4747219@canb.auug.org.au>
-Message-ID: <CAMXH7KE5En7U-2zydT3MfJ7C7B164-zsQuBoHMUqzD-Kb_nh1w@mail.gmail.com>
+From: hustgqyang@gmail.com (yang gqyang)
+Date: Sat, 10 Mar 2012 22:37:09 +0800
+Subject: implementing "suspend to ram" on cortex A8 based on linux 3.0.8
+In-Reply-To: <CAFawwkWQd=y=kVm97UjSs37=-MRmJiy9f7sy8ChYzCHZ9Y-gyA@mail.gmail.com>
+References: <CAFawwkXQhyj+c8LEDnD7q4mXDJV2jYCAHV0tBrqxrEaNGk+_0w@mail.gmail.com>
+ <CACNz9cVbULxVSGvo60V+JLL=15BDEaYwgd5k9ZMNu09Kfwz4WQ@mail.gmail.com>
+ <CAFawwkWQd=y=kVm97UjSs37=-MRmJiy9f7sy8ChYzCHZ9Y-gyA@mail.gmail.com>
+Message-ID: <CAFawwkVuCTijwLr6UWVRh9XNGCt-8brr2f4aDrpM_YwkWSGP+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
+ Thanks for your comment.
+ Finally, i find out that i made a mistake.  The uart(8250) have not been
+ restore after resume, instead, it use the configuration got from boot. The
+ uart have not been restored correctly, so that "ls" can not output result
+ correctly resulting in it seems that the busybox can not work correctly.
+ Now, i still have a question about the uart: why the "printk" can work
+ correctly, but the "printf" not?
 
-Yes, your resolution looks correct to me.
+ Before this, i believe that the "printk" work correctly, then the uart
+ work ok. but now, i  need more reconsidaration about
+ the relation between the "printk", "printf" and "uart".
+ Can anyone give me some suggestion? Any comment is welcome, thanks a
+ lot.
 
-Thanks,
-Rob Lee
 
+> ? 2012?3?9? ??10:08?Chenglie He <chengjie.he@linaro.org>???
+>
+>> Hi,
+>>
+>> I am doing this on A9, echo mem >/sys/power/state is right, will trigger
+>> kernel to sleep.
+>>
+>> -jack
 
-On Fri, Mar 9, 2012 at 1:37 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Rob,
 >
-> Today's linux-next merge of the cpuidle-cons tree got a conflict in
-> arch/arm/mach-at91/cpuidle.c between commit 00482a4078f4 ("ARM: at91:
-> implement the standby function for pm/cpuidle") from the arm-soc tree and
-> commit 7a1f6e72dce1 ("ARM: at91: Consolidate time keeping and irq
-> enable") from the cpuidle-cons tree.
->
-> I fixed it up (I think - see below) and can carry the fix as necessary.
-> --
-> Cheers,
-> Stephen Rothwell ? ? ? ? ? ? ? ? ? ?sfr at canb.auug.org.au
->
-> diff --cc arch/arm/mach-at91/cpuidle.c
-> index 555d956,d40b3f3..0000000
-> --- a/arch/arm/mach-at91/cpuidle.c
-> +++ b/arch/arm/mach-at91/cpuidle.c
-> @@@ -37,23 -33,15 +33,8 @@@ static int at91_enter_idle(struct cpuid
-> ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_driver *drv,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? int index)
-> ?{
-> - ? ? ? struct timeval before, after;
-> - ? ? ? int idle_time;
-> -
-> - ? ? ? local_irq_disable();
-> - ? ? ? do_gettimeofday(&before);
-> - ? ? ? if (index == 0)
-> - ? ? ? ? ? ? ? /* Wait for interrupt state */
-> - ? ? ? ? ? ? ? cpu_do_idle();
-> - ? ? ? else if (index == 1)
-> - ? ? ? ? ? ? ? at91_standby();
-> ?- ? ? ?u32 saved_lpr;
-> ?-
-> ?- ? ? ?__asm__("b 1f; .align 5; 1:\n"
-> ?- ? ? ?" ? ? ? mcr p15, 0, r0, c7, c10, 4"); ? /* drain write buffer */
-> ?-
-> ?- ? ? ?saved_lpr = sdram_selfrefresh_enable();
-> ?- ? ? ?cpu_do_idle();
-> ?- ? ? ?sdram_selfrefresh_disable(saved_lpr);
-> ++ ? ? ?at91_standby();
->
-> - ? ? ? do_gettimeofday(&after);
-> - ? ? ? local_irq_enable();
-> - ? ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> - ? ? ? ? ? ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
-> -
-> - ? ? ? dev->last_residency = idle_time;
-> ? ? ? ?return index;
-> ?}
->
+some recipient promote:
+"The message contains HTML subpart, therefore we consider it SPAM or
+Outlook Virus"
+so i resend the email, hope it not disturb u. thanks a lot.
