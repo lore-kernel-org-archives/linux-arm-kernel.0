@@ -1,66 +1,35 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 08 Mar 2012 23:56:10 -0500
-Subject: [PATCH 1/2] mmc: sdhci-s3c: Use CONFIG_PM_SLEEP to ifdef system
- suspend
-In-Reply-To: <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- (Mark Brown's message of "Sat, 3 Mar 2012 00:46:41 +0000")
-References: <4F51697C.40408@samsung.com>
- <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <m27gyupe39.fsf@bob.laptop.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 Mar 2012 10:21:49 -0800
+Subject: [GIT PULL 4/4] Samsung devel-dma for v3.4
+In-Reply-To: <4F5B7CA7.2010604@samsung.com>
+References: <4F5B7CA7.2010604@samsung.com>
+Message-ID: <20120310182149.GA656@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Sat, Mar 10, 2012 at 08:09:11AM -0800, Kukjin Kim wrote:
+> Hi Arnd, Olof,
+> 
+> This is for Samsung dma stuff for v3.4 and depends on following:
+>   next/cleanup-use-static
+>   next/cleanup-exynos-clock
+> 
+> Please pull from:
 
-On Fri, Mar 02 2012, Mark Brown wrote:
-> This matches current best practice as one can have runtime PM enabled
-> without system sleep and CONFIG_PM is defined for both.
->
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |    9 +++++----
->  1 files changed, 5 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index ea0767e..46152d6 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -22,6 +22,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_gpio.h>
-> +#include <linux/pm.h>
->  
->  #include <linux/mmc/host.h>
->  
-> @@ -807,8 +808,7 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_PM
-> -
-> +#ifdef CONFIG_PM_SLEEP
->  static int sdhci_s3c_suspend(struct device *dev)
->  {
->  	struct sdhci_host *host = dev_get_drvdata(dev);
-> @@ -822,10 +822,11 @@ static int sdhci_s3c_resume(struct device *dev)
->  
->  	return sdhci_resume_host(host);
->  }
-> +#endif
->  
-> +#ifdef CONFIG_PM
->  static const struct dev_pm_ops sdhci_s3c_pmops = {
-> -	.suspend	= sdhci_s3c_suspend,
-> -	.resume		= sdhci_s3c_resume,
-> +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_s3c_suspend, sdhci_s3c_resume)
->  };
->  
->  #define SDHCI_S3C_PMOPS (&sdhci_s3c_pmops)
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/devel-samsung-dma
+> 
+> And conflicts will be happened in clock part. Here is my preferred
+> resolution. The mach-exynos/clock.c can be removed with following:
+> 
+> arch/arm/mach-exynos/exynos-clock4.c
 
-Thanks, pushed to mmc-next for 3.4 with Jaehoon's ACK.
+Hi,
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+given my feedback on the cleanup-exynos-clock pull request, I'm holding off on
+this one waiting on you to do the resolution of the conflicts. :-)
+
+
+Thanks,
+
+-Olof
