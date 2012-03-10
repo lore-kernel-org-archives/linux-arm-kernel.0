@@ -1,51 +1,29 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 12 Mar 2012 12:06:24 +0100
-Subject: iMX53 and MMC_CAP_SDIO_IRQ
-In-Reply-To: <4F5DD28F.50600@linuxtv.org>
-References: <4F5DB793.3080904@linuxtv.org>
- <20120312101037.GA2459@pengutronix.de> <4F5DD28F.50600@linuxtv.org>
-Message-ID: <20120312110624.GB2459@pengutronix.de>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sat, 10 Mar 2012 15:11:10 +0000 (GMT)
+Subject: [PATCH v2] pxa/hx4700: Fix basic suspend/resume
+In-Reply-To: <CA+gwMccn+rLo2Q+z+gxboE82pmGT0ud2c1Q65PzhrGhFXLrvgw@mail.gmail.com>
+Message-ID: <1331392270.97238.YahooMailClassic@web29005.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Philipp,
 
-> Ok, to sum this up:
+--- On Fri, 9/3/12, Philipp Zabel <philipp.zabel@gmail.com> wrote:
+> > Changed GPIO88, GPIO72, GPIO96 from KEEP_OUTPUT to
+> DRIVE_HIGH.
 > 
-> SDIO IRQs are working in mx_sdhci in the Freescale tree because it was
-> properly implemented and tested, obviously.
+> The bq24022 GPIOs (72 and 96) should stay KEEP_OUTPUT to
+> allow
+> charging from the AC adapter while suspended.
 
-Not sure about "properly", but, yes ;)
+I think I disabled this because I was wary of uncontrolled charging while
+suspended. The SDG bootloader does have specific code to control charging
+and the LEDs while suspended, but AFAIK it is not currently working.
 
-> SDIO IRQs are working for sdhci in mainline probably for other
-> non-freescale platforms.
+Nonetheless, I've modified the patch.
 
-Probably, but I can't say 'yes' for sure. You'd need to find out.
+Interestingly, the SDG bootloader seems to use LED interrupts to
+periodically wake up during suspend. At last, that would explain why the
+LED GPIOs are inputs, not outputs.
 
-> You fixed the generic sdhci driver in mainline to work with iMX53 to get
-> rid of the need for mx_sdhci, but probably never got the chance to test
-> if SDIO IRQs are really working.
-
-I worked mainly with MX25/35 back then, and a little bit with MX51. IIRC
-I only had an SDIO card for which no Linux drivers were available, so I
-only could test that the card was detected :(
-
-> That means, the subtle difference between mx_sdhci and sdhci to get SDIO
-> IRQS to work on sdhci with iMX53 has yet to be found.
-
-Yup. Try 'git log --follow sdhci-esdhc-imx.c' to find people who worked
-with MX53 or SDIO using that driver.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/fa9e24dc/attachment-0001.sig>
+Paul
