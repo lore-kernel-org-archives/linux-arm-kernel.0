@@ -1,29 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 11 Mar 2012 11:59:40 -0300
-Subject: [PATCH 2/4] Add imx3sound sound support.
-In-Reply-To: <1331304916-4724-3-git-send-email-philippe.retornaz@epfl.ch>
-References: <1331304916-4724-1-git-send-email-philippe.retornaz@epfl.ch>
- <1331304916-4724-2-git-send-email-philippe.retornaz@epfl.ch>
- <1331304916-4724-3-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <CAOMZO5DP4P9Lq-gH_NNtDxwf8DxVAVg9MWHKr1E3RoexOgNYnQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 Mar 2012 09:45:08 -0800
+Subject: [GIT PULL] Samsung board stuff for v3.4
+In-Reply-To: <4F5B748B.6050404@samsung.com>
+References: <4F5B748B.6050404@samsung.com>
+Message-ID: <CAOesGMjiYDFhkjS=2e+3YdPJHExupt3Wm_NS3x1XW-17eEZM=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 9, 2012 at 11:55 AM, Philippe R?tornaz
-<philippe.retornaz@epfl.ch> wrote:
+Hi,
 
-> --- /dev/null
-> +++ b/sound/soc/imx/imx3sound-mc13783.c
-> @@ -0,0 +1,141 @@
-> +/*
-> + * imx3sound-mc13783.c ?-- ?SoC audio for imx31_3ds based boards
+On Sat, Mar 10, 2012 at 7:34 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd, Olof,
+>
+> Please pull regarding Samsung board patches for v3.4.
+>
+> Most are enabling some features(IPs) on each board and
+> one is adding new board file, Samsung Mobile's TRATS board.
 
-Please rename this file to  "imx-mc13783.c".
+Given that exynos has started conversion to device tree, there should
+not be any  additions of non-devicetree-probed board files being
+added.
 
-mx27pdk board also has a mc13783 and will use this file.
+At the very least, you should move over to using DT_MACHINE instead of
+MACHINE for the new board, and probe using device tree. Even better
+would be if you added support for this board through mach-exynos4-dt.c
+instead of adding a brand new board file.
 
-It is not restricted to mx3 boards.
+I also see a large number of the same additions of devices, done to a
+number of board files. I don't think you need to rework those patches
+now, but please consider how you can make it less "churny" to add a
+device on the SoC in the future without touching all board files.
+
+
+If you rebase without the board file addition I can take the rest of
+the branch while that part is being reworked. Please send a new pull
+request with the rebased tree.
+
 
 Thanks,
 
-Fabio Estevam
+-Olof
