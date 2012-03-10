@@ -1,79 +1,97 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Fri,  9 Mar 2012 14:09:20 +0400
-Subject: [PATCH v2 2/2] arm/tegra: add timeout to PCIe PLL lock detection loop
-In-Reply-To: <20120306201538.GA14350@rainbow>
-References: <20120306201538.GA14350@rainbow>
-Message-ID: <1331287760-10546-1-git-send-email-mad_soft@inbox.ru>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Sat, 10 Mar 2012 19:15:18 +0800
+Subject: [PATCH 2/3] led-triggers: use atomic kzalloc during led trigger
+ registering
+In-Reply-To: <20120308092913.GF14173@pengutronix.de>
+References: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
+ <1331197863-25564-2-git-send-email-bryan.wu@canonical.com>
+ <20120308092913.GF14173@pengutronix.de>
+Message-ID: <CAK5ve-+L9gVBOp4RVe2pTUbBnrb-PEn7ERbWWkb=7A=4qOrdTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra PCIe driver waits for PLL to lock using busy loop.
-If PLL fails to lock for some reason, this leads to silent lockup
-while booting (PCIe code is not modular).
+2012/3/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Thu, Mar 08, 2012 at 05:11:02PM +0800, Bryan Wu wrote:
+>> kzalloc might cause sleep and will generate some warning detected by lockdep,
+>> when call led_trigger_register_simple on each cpu cores in SMP. This patch fix
+>> this.
+> The obvious (and IMHO better) alternative is to call
+> led_trigger_register_simple from non-atomic context.
+>
+> For registering this should be OK, shouldn't it?
+>
+Thanks Uwe, it's my bad. I think I should not use on_each_cpu() API to
+run led_trigger_register_simple. on_each_cpu() will disable interrupt.
 
-Fix by adding timeout, so if PLL doesn't lock in a couple
-of seconds, just PCIe driver fails and machine continues to boot.
+Let's ignore this patch and I will update my ledtrig-cpu patch to use
+for_each_cpu().
 
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
-Changes v1 -> v2:
-* msleep is changed to usleep_range
-* function now returns 0 on success instead of undefined value
+And thanks Ming for your advice.
 
- arch/arm/mach-tegra/pcie.c |   16 ++++++++++++----
- 1 files changed, 12 insertions(+), 4 deletions(-)
+Best Regards,
+-Bryan
 
-diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-index 14b29ab..90f85eb 100644
---- a/arch/arm/mach-tegra/pcie.c
-+++ b/arch/arm/mach-tegra/pcie.c
-@@ -585,10 +585,10 @@ static void tegra_pcie_setup_translations(void)
- 	afi_writel(0, AFI_MSI_BAR_SZ);
- }
- 
--static void tegra_pcie_enable_controller(void)
-+static int tegra_pcie_enable_controller(void)
- {
- 	u32 val, reg;
--	int i;
-+	int i, timeout;
- 
- 	/* Enable slot clock and pulse the reset signals */
- 	for (i = 0, reg = AFI_PEX0_CTRL; i < 2; i++, reg += 0x8) {
-@@ -639,8 +639,14 @@ static void tegra_pcie_enable_controller(void)
- 	pads_writel(0xfa5cfa5c, 0xc8);
- 
- 	/* Wait for the PLL to lock */
-+	timeout = 2000;
- 	do {
- 		val = pads_readl(PADS_PLL_CTL);
-+		usleep_range(1000, 1000);
-+		if (--timeout == 0) {
-+			pr_err("Tegra PCIe error: timeout waiting for PLL\n");
-+			return -EBUSY;
-+		}
- 	} while (!(val & PADS_PLL_CTL_LOCKDET));
- 
- 	/* turn off IDDQ override */
-@@ -671,7 +677,7 @@ static void tegra_pcie_enable_controller(void)
- 	/* Disable all execptions */
- 	afi_writel(0, AFI_FPCI_ERROR_MASKS);
- 
--	return;
-+	return 0;
- }
- 
- static void tegra_pcie_xclk_clamp(bool clamp)
-@@ -921,7 +927,9 @@ int __init tegra_pcie_init(bool init_port0, bool init_port1)
- 	if (err)
- 		return err;
- 
--	tegra_pcie_enable_controller();
-+	err = tegra_pcie_enable_controller();
-+	if (err)
-+		return err;
- 
- 	/* setup the AFI address translations */
- 	tegra_pcie_setup_translations();
+>
+>>
+>> [ ? ?1.999938] ------------[ cut here ]------------
+>> [ ? ?2.004791] WARNING: at kernel/lockdep.c:2664 lockdep_trace_alloc+0xd8/0xf0()
+>> [ ? ?2.012298] Modules linked in:
+>> [ ? ?2.015563] [<c001b0cc>] (unwind_backtrace+0x0/0xf0) from [<c0052408>] (warn_slowpath_common+0x4c/0x64)
+>> [ ? ?2.025451] [<c0052408>] (warn_slowpath_common+0x4c/0x64) from [<c005243c>] (warn_slowpath_null+0x1c/0x24)
+>> [ ? ?2.035583] [<c005243c>] (warn_slowpath_null+0x1c/0x24) from [<c008be28>] (lockdep_trace_alloc+0xd8/0xf0)
+>> [ ? ?2.045684] [<c008be28>] (lockdep_trace_alloc+0xd8/0xf0) from [<c00feeb4>] (kmem_cache_alloc_trace+0x2c/0x148)
+>> [ ? ?2.056213] [<c00feeb4>] (kmem_cache_alloc_trace+0x2c/0x148) from [<c03770a0>] (led_trigger_register_simple+0x20/0x74)
+>> [ ? ?2.067474] [<c03770a0>] (led_trigger_register_simple+0x20/0x74) from [<c0627a30>] (ledtrig_cpu_register+0x4c/0x8c)
+>> [ ? ?2.078460] [<c0627a30>] (ledtrig_cpu_register+0x4c/0x8c) from [<c0094ca4>] (generic_smp_call_function_single_interrupt+0xcc/0x138)
+>> [ ? ?2.090911] [<c0094ca4>] (generic_smp_call_function_single_interrupt+0xcc/0x138) from [<c0008408>] (do_IPI+0xb0/0x128)
+>> [ ? ?2.102172] [<c0008408>] (do_IPI+0xb0/0x128) from [<c045921c>] (__irq_svc+0x3c/0x100)
+>> [ ? ?2.110412] Exception stack(0xc07adf70 to 0xc07adfb8)
+>> [ ? ?2.115722] df60: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? c07c80f8 0000fb45 00000000 c07c80f8
+>> [ ? ?2.124328] df80: c07ac000 c0837be4 c0464b64 c07c9d8c 00000000 411fc092 00000000 00000000
+>> [ ? ?2.132934] dfa0: c0649760 c07adfb8 c07c5c58 c0014d50 20000013 ffffffff
+>> [ ? ?2.139892] [<c045921c>] (__irq_svc+0x3c/0x100) from [<c0014d50>] (default_idle+0x30/0x38)
+>> [ ? ?2.148590] [<c0014d50>] (default_idle+0x30/0x38) from [<c0014f74>] (cpu_idle+0xb4/0xf4)
+>> [ ? ?2.157135] [<c0014f74>] (cpu_idle+0xb4/0xf4) from [<c0602778>] (start_kernel+0x2a8/0x2fc)
+>> [ ? ?2.165832] [<c0602778>] (start_kernel+0x2a8/0x2fc) from [<80008040>] (0x80008040)
+>> [ ? ?2.173797] ---[ end trace 97549d21d8dad3f5 ]---
+>>
+>> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+>> ---
+>> ?drivers/leds/led-triggers.c | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+>> index 46b4c76..74d0ba7 100644
+>> --- a/drivers/leds/led-triggers.c
+>> +++ b/drivers/leds/led-triggers.c
+>> @@ -255,7 +255,7 @@ void led_trigger_register_simple(const char *name, struct led_trigger **tp)
+>> ? ? ? struct led_trigger *trigger;
+>> ? ? ? int err;
+>>
+>> - ? ? trigger = kzalloc(sizeof(struct led_trigger), GFP_KERNEL);
+>> + ? ? trigger = kzalloc(sizeof(struct led_trigger), GFP_ATOMIC);
+>>
+>> ? ? ? if (trigger) {
+>> ? ? ? ? ? ? ? trigger->name = name;
+>> --
+>> 1.7.9
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+
+
+
 -- 
-1.7.5.1.300.gc565c
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu ARM Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
