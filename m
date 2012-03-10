@@ -1,56 +1,77 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Mon, 12 Mar 2012 18:06:55 +0200
-Subject: I.MX35 PDK
-In-Reply-To: <CAOMZO5B_mZ16zvXdNbKP_PWM5axNPzMeHQttxe8PYHET7UMufg@mail.gmail.com>
-References: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
- <CAOMZO5Amo0XFf+TV7PprCL079C5Y0qKmo+k-FfShU7k4SG7W6Q@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8918@MEP-EXCH.meprolight.com>
- <CAOMZO5A6T+WdOE41Wx6Nctwz9wk8FKaxzjbAt_woZkCnuodNYg@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A29@MEP-EXCH.meprolight.com>,
- <CAOMZO5B_mZ16zvXdNbKP_PWM5axNPzMeHQttxe8PYHET7UMufg@mail.gmail.com>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D891C@MEP-EXCH.meprolight.com>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Sat, 10 Mar 2012 16:09:43 +0100
+Subject: [PATCH v3] pxa/hx4700: Fix basic suspend/resume
+In-Reply-To: <1331391265.88838.YahooMailClassic@web29002.mail.ird.yahoo.com>
+References: <1331391265.88838.YahooMailClassic@web29002.mail.ird.yahoo.com>
+Message-ID: <CA+gwMcfa4Bqcj-86cW8tuFLtXVFWayeXzACJHb0xdkxY4r8Q4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your response,
-
-> 1. Back resistor 172 to the default value.
+On Sat, Mar 10, 2012 at 3:54 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> Basic suspend/resume is fixed by ensuring that the PGSR registers are set
+> correctly before sleep mode is entered. In particular four of the active low
+> resets need to be driven high while in sleep mode, otherwise the unit resets
+> itself instead of suspending. Another problem was that the PCFR_GPROD bit is set
+> by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail
+> immediately after returning from sleep mode.
 >
-> 2. Removed the resistor 146, through which a voltage was applied from a PMIC
-> (EXT_3V) on "CMOS_VIO".
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> ---
 >
-> 3. Connecting a resistor 147 which supplies power from the LDO_3V3 on
-> "CMOS_VIO".
+> V3:
+> Changed GPIO72, GPIO96 back to KEEP_OUTPUT.
 
-> >The camera on the FSL BSP works fine with no hardware modification on
-> >the mx35pdk.
+Thanks!
 
-> >As I suggested previously you should control the power rails, i2c pad
-> >settings, etc from software so that the camera can also work in
-> >mainline without the need of changing the hardware.
+Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
 
-You're right, currently mainline Linux kernel  i.MX35 PDK platform does not support power management 
-devices, probably for this reason was the need for small changes in equipment.
-
-> On my display I see snow flickering and unfortunately not a live video from
-> camera.
-
-> >Do you have this patch applied?
-
-Yes I need to prepare it.
-
-
- > >http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=f910fb8fcd1c97788f2291c8646597bcd87ee061
-
-> >Also, try to isolate the display from this issue. Capture the image to
-> >a file and try to play it on a PC.
-
-Thanks for the tip, I'll think about how I can check it.
-
-Regards
-
-Alex Gershgorin 
-
- 
+> diff -uprN clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c
+> --- clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c ? ?2012-03-04 01:08:09.000000000 +0000
+> +++ linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c ? ?2012-03-10 14:42:41.328255002 +0000
+> @@ -121,7 +121,11 @@ static unsigned long hx4700_pin_config[]
+> ? ? ? ?GPIO19_SSP2_SCLK,
+> ? ? ? ?GPIO86_SSP2_RXD,
+> ? ? ? ?GPIO87_SSP2_TXD,
+> - ? ? ? GPIO88_GPIO,
+> + ? ? ? GPIO88_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* TSC2046_CS */
+> +
+> + ? ? ? /* BQ24022 Regulator */
+> + ? ? ? GPIO72_GPIO | MFP_LPM_KEEP_OUTPUT, ? ? ?/* BQ24022_nCHARGE_EN */
+> + ? ? ? GPIO96_GPIO | MFP_LPM_KEEP_OUTPUT, ? ? ?/* BQ24022_ISET2 */
+>
+> ? ? ? ?/* HX4700 specific input GPIOs */
+> ? ? ? ?GPIO12_GPIO, ? ?/* ASIC3_IRQ */
+> @@ -134,6 +138,11 @@ static unsigned long hx4700_pin_config[]
+> ? ? ? ?GPIO108_GPIO, ? /* GSM_READY */
+> ? ? ? ?GPIO58_GPIO, ? ?/* TSC2046_nPENIRQ */
+> ? ? ? ?GPIO66_GPIO, ? ?/* nSDIO_IRQ */
+> +
+> + ? ? ? GPIO61_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* W3220_nRESET */
+> + ? ? ? GPIO71_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* ASIC3_nRESET */
+> + ? ? ? GPIO81_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ? /* CPU_GP_nRESET */
+> + ? ? ? GPIO116_GPIO | MFP_LPM_DRIVE_HIGH, ? ? ?/* CPU_HW_nRESET */
+> ?};
+>
+> ?/*
+> @@ -828,15 +837,20 @@ static struct gpio global_gpios[] = {
+> ? ? ? ?{ GPIO110_HX4700_LCD_LVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_LVDD" },
+> ? ? ? ?{ GPIO111_HX4700_LCD_AVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_AVDD" },
+> ? ? ? ?{ GPIO32_HX4700_RS232_ON, ? ? ? ? GPIOF_OUT_INIT_HIGH, "RS232_ON" },
+> + ? ? ? { GPIO61_HX4700_W3220_nRESET, ? ? GPIOF_OUT_INIT_HIGH, "W3220_nRESET" },
+> ? ? ? ?{ GPIO71_HX4700_ASIC3_nRESET, ? ? GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
+> + ? ? ? { GPIO81_HX4700_CPU_GP_nRESET, ? ?GPIOF_OUT_INIT_HIGH, "CPU_GP_nRESET" },
+> ? ? ? ?{ GPIO82_HX4700_EUART_RESET, ? ? ?GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
+> ? ? ? ?{ GPIO105_HX4700_nIR_ON, ? ? ? ? ?GPIOF_OUT_INIT_HIGH, "nIR_EN" },
+> + ? ? ? { GPIO116_HX4700_CPU_HW_nRESET, ? GPIOF_OUT_INIT_HIGH, "CPU_HW_nRESET" },
+> ?};
+>
+> ?static void __init hx4700_init(void)
+> ?{
+> ? ? ? ?int ret;
+>
+> + ? ? ? PCFR = PCFR_GPR_EN | PCFR_OPDE;
+> +
+> ? ? ? ?pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
+> ? ? ? ?ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
+> ? ? ? ?if (ret)
+>
