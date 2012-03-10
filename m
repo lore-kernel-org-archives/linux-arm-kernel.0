@@ -1,67 +1,92 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 12 Mar 2012 21:53:58 +0530
-Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
-In-Reply-To: <20120312161143.GA10830@n2100.arm.linux.org.uk>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
- <1331128466.24656.421.camel@vkoul-udesk3>
- <20120312161143.GA10830@n2100.arm.linux.org.uk>
-Message-ID: <1331569438.1727.3.camel@vkoul-udesk3>
+From: coelho@ti.com (Luciano Coelho)
+Date: Sat, 10 Mar 2012 07:07:17 +0200
+Subject: [PATCH v2] ARM: OMAP: WiLink platform data for the PandaBoard
+In-Reply-To: <20120309183150.GH12083@atomide.com>
+References: <1331074504-22683-1-git-send-email-mgherzan@gmail.com>
+ <20120309183150.GH12083@atomide.com>
+Message-ID: <1331356037.3164.31.camel@cumari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-03-12 at 16:11 +0000, Russell King - ARM Linux wrote:
-> On Wed, Mar 07, 2012 at 07:24:26PM +0530, Vinod Koul wrote:
-> > On Tue, 2012-03-06 at 22:33 +0000, Russell King - ARM Linux wrote:
-> > > [v2 - more or less same description.  Including lakml in cc for the full
-> > > set]
-> > > 
-> > > This patch series cleans up the handling of cookies in DMA engine drivers.
-> > > This is done by providing a set of inline library functions for common
-> > > tasks:
-> > > 
-> > > - moving the 'last completed cookie' into struct dma_chan - everyone
-> > >   has this in their driver private channel data structure
-> > > 
-> > > - consolidate allocation of cookies to DMA descriptors
-> > > 
-> > > - common way to update 'last completed cookie' value
-> > > 
-> > > - standard way to implement tx_status callback and update the residue
-> > > 
-> > > - consolidate initialization of cookies
-> > > 
-> > > - update implementations differing from the majority of DMA engine drivers
-> > >   to behave the same as the majority implementation in respect of cookies
-> > > 
-> > > What this means is that we get to the point where all DMA engine drivers
-> > > will hand out cookie value '2' as the first, and incrementing cookie
-> > > values up to INT_MAX, returning to cookie '1' as the next cookie.
-> > > 
-> > > Think of this patch series as round 1...  I am hoping over time that more
-> > > code can be consolidated between the DMA engine drivers and end up with a
-> > > consistent way to handle various common themes in DMA engine hardware
-> > > (like physical channel<->peripheral request signal selection.)
-> > Thanks Russell,
+On Fri, 2012-03-09 at 10:31 -0800, Tony Lindgren wrote: 
+> Hi Luca,
+
+Hi Tony,
+
+
+> * Mircea Gherzan <mgherzan@gmail.com> [120306 14:23]:
+> > The "uim" deamon requires sysfs entries that are filled in using
+> > this platform data.
 > > 
-> > I have tested this on atom today, and as expected works flawlessly :)
-> > After all acks, I can merge or these can go thru your tree with my Ack.
-> > Either way is okay.
+> > Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+> > ---
+> >  arch/arm/mach-omap2/board-omap4panda.c |   14 ++++++++++++--
+> >  include/linux/ti_wilink_st.h           |    2 ++
+> >  2 files changed, 14 insertions(+), 2 deletions(-)
 > > 
-> > I applied the v2 on a branch and also rebased on top of slave-dma.next.
-> > There were few conflicts in imx-dma.c. Sacha, Javier, pls see that merge
-> > is right.
-> > 
-> > This branch (rmk_cookie_fixes2_rebased) is not yet pushed, as I am not
-> > able to connect to infradead.org, should be done when server is back.
+> > diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> > index b1d74d6..339e781 100644
+> > --- a/arch/arm/mach-omap2/board-omap4panda.c
+> > +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> > @@ -27,6 +27,7 @@
+> >  #include <linux/i2c/twl.h>
+> >  #include <linux/regulator/machine.h>
+> >  #include <linux/regulator/fixed.h>
+> > +#include <linux/ti_wilink_st.h>
+> >  #include <linux/wl12xx.h>
+> >  
+> >  #include <mach/hardware.h>
+> > @@ -56,12 +57,21 @@
+> >  #define HDMI_GPIO_HPD  63 /* Hotplug detect */
+> >  
+> >  /* wl127x BT, FM, GPS connectivity chip */
+> > -static int wl1271_gpios[] = {46, -1, -1};
+> > +static struct ti_st_plat_data wilink_platform_data = {
+> > +	.nshutdown_gpio	= 46,
+> > +	.dev_name	= "/dev/ttyO1",
+> > +	.flow_cntrl	= 1,
+> > +	.baud_rate	= 3000000,
+> > +	.chip_enable	= NULL,
+> > +	.suspend	= NULL,
+> > +	.resume		= NULL,
+> > +};
+> > +
+> >  static struct platform_device wl1271_device = {
+> >  	.name	= "kim",
+> >  	.id	= -1,
+> >  	.dev	= {
+> > -		.platform_data	= &wl1271_gpios,
+> > +		.platform_data	= &wilink_platform_data,
+> >  	},
+> >  };
+> >  
+> > diff --git a/include/linux/ti_wilink_st.h b/include/linux/ti_wilink_st.h
+> > index 2ef4385..3ca0269 100644
+> > --- a/include/linux/ti_wilink_st.h
+> > +++ b/include/linux/ti_wilink_st.h
+> > @@ -25,6 +25,8 @@
+> >  #ifndef TI_WILINK_ST_H
+> >  #define TI_WILINK_ST_H
+> >  
+> > +#include <linux/skbuff.h>
+> > +
+> >  /**
+> >   * enum proto-type - The protocol on WiLink chips which share a
+> >   *	common physical interface like UART.
+> > -- 
 > 
-> Are you going to pick up Shawn Guo's tested-by for these patches, or are
-> we saying its too late for that now?
-Sure, his and others we have received on this series.
-Also, IIRC there was one fixup from Jassi on pl330?
+> Just checking.. Can you please take a look at this patch
+> and confirm that this is how things are supposed to be done?
+> 
+> To me passing some third driver's dev_name in pdata seems
+> pretty weird.. But then again maybe I just don't know how
+> this is supposed to work.
 
-I should be able to merge this tomorrow, if thats fine with you.
-
-
+This looks pretty weird to me too.  The "/dev/ttyO1" thing doesn't look
+right.  But I don't really know how this works either, because this is
+the BT/FM/GPS part of the wl12xx chip.  And, to be honest, I don't know
+anything about it.  I only know about the wifi part of it. :\
 
 -- 
-~Vinod
+Cheers,
+Luca.
