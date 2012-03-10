@@ -1,56 +1,68 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 9 Mar 2012 17:48:21 +0100
-Subject: [PATCH] ARM: smp_twd: Only wait for reprogramming on active cpus
-Message-ID: <1331311701-32071-1-git-send-email-linus.walleij@stericsson.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sat, 10 Mar 2012 22:05:08 +0000 (GMT)
+Subject: [PATCH] pxa/hx4700: Reduce sleep mode power consumption by 35%
+In-Reply-To: <20120310182144.GA20013@n2100.arm.linux.org.uk>
+Message-ID: <1331417108.99129.YahooMailClassic@web29004.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Aaberg <jonas.aberg@stericsson.com>
+--- On Sat, 10/3/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > Drive the two Bluetooth UART output GPIOs
+> (GPIO43_BTUART_TXD,
+> > GPIO45_BTUART_RTS) LOW during sleep mode instead of
+> HIGH. This
+> > reduces sleep mode power consumption from approximately
+> 46 mA/h
+> > to approximately 30 mA/h.
+> 
+> What are you saying here?? I think you're confusing
+> power with current.
+> Also, current is measured in amps, not amps per second (or a
+> scaled
+> version of that.)
 
-During booting of cpu1, there is a short window where cpu1
-is online, but not active where cpu1 is occupied by waiting
-to become active. If cpu0 then decides to schedule something
-on cpu1 and wait for it to complete, before cpu0 has set
-cpu1 active, we have a deadlock.
+Apologies for the sloppy nomenclature; evidently electronics is not my
+thing.
+The figures I quoted were the reduction in accumulated current (charge)
+over time. For example in the second case, the charge reduced from 1853500
+?Ah to 1782750 ?Ah over 8610 seconds = 29.58 mA.
+If that seems high it is: it should be nearer 4.7 mA.
 
-Typically it's this CPU frequency transition that happens at
-this time, so let's just not wait for it to happen, it will
-happen whenever the CPU eventually comes online instead.
+> >? ??? /* BTUART */
+> >? ??? GPIO42_BTUART_RXD,
+> > -??? GPIO43_BTUART_TXD,
+> > +??? GPIO43_GPIO | MFP_AF2 |
+> MFP_LPM_DRIVE_LOW,
+> 
+> I don't believe that's right.
+> 
+> This expands to:
+> 
+> ??? MFP_CFG_IN(GPIO43, AF0) | MFP_AF2 |
+> MFP_LPM_DRIVE_LOW
+> 
+> and:
+> 
+> ??? (MFP_CFG_DEFAULT & ~(MFP_AF_MASK |
+> MFP_DIR_MASK)) |
+> ??? (MFP_PIN(MFP_PIN_GPIO43) | MFP_AF0 |
+> MFP_DIR_IN)
+> ??? | MFP_AF2 | MFP_LPM_DRIVE_LOW
+> 
+> Note the presence of both MFP_AF2 and MFP_AF0 in there.
+> 
+> The default for GPIO43_BTUART_TXD is:
+> 
+> ??? MFP_CFG_OUT(GPIO43, AF2, DRIVE_HIGH)
+> 
+> and I'd suggest defining a new GPIO43_BTUART_TXD_LPM_LOW to
+> cover your
+> case.
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: stable at kernel.org
-Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-Reviewed-by: Rickard Andersson <rickard.andersson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This situation occurs as discussed here:
-https://lkml.org/lkml/2012/2/29/141
+It wasn't right but it evaluated to the correct value because MFP_AF0 = 0.
+What I intended was: MFP_PIN_GPIO43 | MFP_AF2 | MFP_LPM_DRIVE_LOW
+But I'll add the new values to <mach/mfp-pxa27x.h> if that's preferable.
 
-We're also testing this patch from Peter:
-https://lkml.org/lkml/2011/12/15/255
----
- arch/arm/kernel/smp_twd.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 7a79b24..692afa4 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -115,10 +115,14 @@ static int twd_cpufreq_transition(struct notifier_block *nb,
- 	 * The twd clock events must be reprogrammed to account for the new
- 	 * frequency.  The timer is local to a cpu, so cross-call to the
- 	 * changing cpu.
-+	 *
-+	 * Only wait for it to finish, if the cpu is active to avoid
-+	 * deadlock when cpu1 is spinning on while(!cpu_active(cpu1)) during
-+	 * booting of that cpu.
- 	 */
- 	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
- 		smp_call_function_single(freqs->cpu, twd_update_frequency,
--			NULL, 1);
-+					 NULL, cpu_active(freqs->cpu));
- 
- 	return NOTIFY_OK;
- }
--- 
-1.7.8
+Oddly the absence of direction didn't seem to matter; GPIO43 and GPIO45
+default to input here, yet are still being driven as outputs in low power
+mode contrary to what the manual says.
