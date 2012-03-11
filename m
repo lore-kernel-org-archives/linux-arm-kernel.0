@@ -1,42 +1,40 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 11 Mar 2012 11:53:35 +0100
-Subject: [PATCH v7 0/4] USB: OHCI-HCD: Support for LPC32xx
-Message-ID: <1331463219-23293-1-git-send-email-stigge@antcom.de>
+Date: Sun, 11 Mar 2012 11:16:43 +0100
+Subject: [PATCH v5 3/3] USB: ohci-nxp: Support for LPC32xx
+In-Reply-To: <20120311074323.GA30894@pengutronix.de>
+References: <1331408166-11607-1-git-send-email-stigge@antcom.de>
+ <1331408166-11607-4-git-send-email-stigge@antcom.de>
+ <20120310204955.GA14564@pengutronix.de> <4F5BD5BE.3000808@antcom.de>
+ <20120311074323.GA30894@pengutronix.de>
+Message-ID: <4F5C7B8B.7050508@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add support for the LPC32xx to the ohci-pnx4008 driver and make
-the driver use smbus functions.
+Hi,
 
-As discussed with Greg-KH on the USB mailing list, the ohci-pnx4008 driver is
-first renamed to reflect its multi-platform support. The second patch also
-renames the respective pnx4008_* symbols accordingly.
+On 11/03/12 08:43, Wolfram Sang wrote:
+>>> And while we are at it: Could you also try replacing
+>>> i2c_write() with i2c_smbus_write_byte_data(isp1301_i2c_client,
+>>> reg, val)?
+>> 
+>> Interestingly now, replacing i2c_write() calls with 
+>> i2c_smbus_write_byte_data() did _not_ work (hardware
+>> initialization failure). I guess this is due to the differences
+>> between i2c and smbus, and the hardware only handles the former
+>> correctly?
+> 
+> Did you take into consideration that the smbus-call has (client,
+> reg, val) as arguments while i2c_write has (val, reg), that is you
+> have to swap the arguments?
 
-The third patch adds the actual lpc32xx support.
+Yes, that's it! :-)
 
-The fourth patch removes the re-coded i2c_write() by using an existing smbus
-function. You can leave out this very single patch to still have the desired
-LPC32xx support. It just fixes existing kernel code to only use smbus calls in
-this driver.
+I'll update my patch to not use i2c_write() anymore.
 
-Applies to v3.3-rc6
+For the remaining i2c_write() in the current kernel driver, I will
+include an additional patch to remove it completely in favour of
+i2c_smbus_write_byte_data().
 
-Since v6, i2c_write() has been removed in favour of i2c_smbus_write_byte_data()
+Thanks,
 
-Thanks to Wolfram Sang for reviewing!
-
-Signed-off-by: Roland Stigge <stigge@antcom.de>
-
----
-
-Roland Stigge (4):
- USB: OHCI-HCD: Rename ohci-pnx4008 to ohci-nxp
- USB: ohci-nxp: Rename symbols from pnx4008 to nxp
- USB: ohci-nxp: Support for LPC32xx
- USB: ohci-nxp: Remove i2c_write(), use smbus
-
- Documentation/i2c/instantiating-devices |    6 
- drivers/usb/host/ohci-hcd.c             |    6 
- drivers/usb/host/ohci-nxp.c             |  652 ++++++++++++++++++++++++++++----
- drivers/usb/host/ohci-pnx4008.c         |  453 ----------------------
- 4 files changed, 596 insertions(+), 521 deletions(-)
+Roland
