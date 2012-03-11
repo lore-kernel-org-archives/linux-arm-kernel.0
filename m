@@ -1,225 +1,121 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 12 Mar 2012 10:32:19 +0800
-Subject: [PATCH 1/3] led-class: change back LEDS_CLASS to tristate instead
- of bool
-In-Reply-To: <1331471632.14746.3.camel@ted>
-References: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
- <1331471632.14746.3.camel@ted>
-Message-ID: <CAK5ve-JFotWoeDCfBLpBbTnpvp2hpkY-tK8nJvdN1WfV7o0cdw@mail.gmail.com>
+From: pavan.savoy@gmail.com (Pavan Savoy)
+Date: Sun, 11 Mar 2012 14:13:43 -0600
+Subject: [PATCH v2] ARM: OMAP: WiLink platform data for the PandaBoard
+In-Reply-To: <4F5D057A.3080601@gmail.com>
+References: <1331074504-22683-1-git-send-email-mgherzan@gmail.com>
+ <20120309183150.GH12083@atomide.com> <4F5D057A.3080601@gmail.com>
+Message-ID: <CAHd==dp1GNov4gqMzPLkJzX1A205HUMhTPtg28399FcPQFZH0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 11, 2012 at 9:13 PM, Richard Purdie
-<richard.purdie@linuxfoundation.org> wrote:
-> On Thu, 2012-03-08 at 17:11 +0800, Bryan Wu wrote:
->> After moving some core functions to led-core.c, led-class.c can be built as
->> module again.
+On Sun, Mar 11, 2012 at 2:05 PM, Mircea Gherzan <mgherzan@gmail.com> wrote:
+> Am 09.03.2012 19:31, schrieb Tony Lindgren:
+>> Hi Luca,
 >>
->> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+>> * Mircea Gherzan <mgherzan@gmail.com> [120306 14:23]:
+>>> The "uim" deamon requires sysfs entries that are filled in using
+>>> this platform data.
+>>>
+>>> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
+>>> ---
+>>> ?arch/arm/mach-omap2/board-omap4panda.c | ? 14 ++++++++++++--
+>>> ?include/linux/ti_wilink_st.h ? ? ? ? ? | ? ?2 ++
+>>> ?2 files changed, 14 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+>>> index b1d74d6..339e781 100644
+>>> --- a/arch/arm/mach-omap2/board-omap4panda.c
+>>> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+>>> @@ -27,6 +27,7 @@
+>>> ?#include <linux/i2c/twl.h>
+>>> ?#include <linux/regulator/machine.h>
+>>> ?#include <linux/regulator/fixed.h>
+>>> +#include <linux/ti_wilink_st.h>
+>>> ?#include <linux/wl12xx.h>
+>>>
+>>> ?#include <mach/hardware.h>
+>>> @@ -56,12 +57,21 @@
+>>> ?#define HDMI_GPIO_HPD ?63 /* Hotplug detect */
+>>>
+>>> ?/* wl127x BT, FM, GPS connectivity chip */
+>>> -static int wl1271_gpios[] = {46, -1, -1};
+>>> +static struct ti_st_plat_data wilink_platform_data = {
+>>> + ? ?.nshutdown_gpio = 46,
+>>> + ? ?.dev_name ? ? ? = "/dev/ttyO1",
+>>> + ? ?.flow_cntrl ? ? = 1,
+>>> + ? ?.baud_rate ? ? ?= 3000000,
+>>> + ? ?.chip_enable ? ?= NULL,
+>>> + ? ?.suspend ? ? ? ?= NULL,
+>>> + ? ?.resume ? ? ? ? = NULL,
+>>> +};
+>>> +
+>>> ?static struct platform_device wl1271_device = {
+>>> ? ? ?.name ? = "kim",
+>>> ? ? ?.id ? ? = -1,
+>>> ? ? ?.dev ? ?= {
+>>> - ? ? ? ? ? ?.platform_data ?= &wl1271_gpios,
+>>> + ? ? ? ? ? ?.platform_data ?= &wilink_platform_data,
+>>> ? ? ?},
+>>> ?};
+>>>
+>>> diff --git a/include/linux/ti_wilink_st.h b/include/linux/ti_wilink_st.h
+>>> index 2ef4385..3ca0269 100644
+>>> --- a/include/linux/ti_wilink_st.h
+>>> +++ b/include/linux/ti_wilink_st.h
+>>> @@ -25,6 +25,8 @@
+>>> ?#ifndef TI_WILINK_ST_H
+>>> ?#define TI_WILINK_ST_H
+>>>
+>>> +#include <linux/skbuff.h>
+>>> +
+>>> ?/**
+>>> ? * enum proto-type - The protocol on WiLink chips which share a
+>>> ? * ?common physical interface like UART.
+>>> --
+>>
+>> Just checking.. Can you please take a look at this patch
+>> and confirm that this is how things are supposed to be done?
+>>
+>> To me passing some third driver's dev_name in pdata seems
+>> pretty weird.. But then again maybe I just don't know how
+>> this is supposed to work.
 >
-> I'd prefer to have less code being required in led-core.c but this is
-> better than many of the alternatives. I'm happy to see it becoming
-> modular again, thanks!
+> This is what the ti_st driver expects in the platform data structure.
+> More precisely, in kim_probe():
 >
-> Acked-by: Richard Purdie <richard.purdie@linuxfoundation.org>
+> ? ? ? ?/* copying platform data */
+> ? ? ? ?strncpy(kim_gdata->dev_name, pdata->dev_name,UART_DEV_NAME_LEN);
+> ? ? ? ?kim_gdata->flow_cntrl = pdata->flow_cntrl;
+> ? ? ? ?kim_gdata->baud_rate = pdata->baud_rate;
+> ? ? ? ?pr_info("sysfs entries created\n");
 >
+> So IMHO the patch is a valid fix. However, one more patch [1] is still
+> required to get BT and WLAN working on the PandaBoard.
 
-Great, Thank you very much.
+The patch looks alright to me.
+Yes, the UART to which BT chip is connected (along with other
+technologies for which shared transport is required), the baud rate
+which the UART supports & also a flag so as to check whether it
+supports flow control - ideally is supposed to come from boot-loader,
+device tree sort of configuration - if not can be hard-coded in the
+relevant platform specific files like in this case.
 
--Bryan
+This is picked up from ST as platform data as is read from the
+user-space daemon, because unfortunately none of these configurations
+can be done in kernel (the right way for TTY).
 
->> ---
->> ?drivers/leds/Kconfig ? ? | ? ?2 +-
->> ?drivers/leds/led-class.c | ? 70 ----------------------------------------------
->> ?drivers/leds/led-core.c ?| ? 70 ++++++++++++++++++++++++++++++++++++++++++++++
->> ?3 files changed, 71 insertions(+), 71 deletions(-)
->>
->> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
->> index 9ca28fc..3f17f0d 100644
->> --- a/drivers/leds/Kconfig
->> +++ b/drivers/leds/Kconfig
->> @@ -17,7 +17,7 @@ menuconfig NEW_LEDS
->> ?if NEW_LEDS
->>
->> ?config LEDS_CLASS
->> - ? ? bool "LED Class Support"
->> + ? ? tristate "LED Class Support"
->> ? ? ? help
->> ? ? ? ? This option enables the led sysfs class in /sys/class/leds. ?You'll
->> ? ? ? ? need this to do anything useful with LEDs. ?If unsure, say N.
->> diff --git a/drivers/leds/led-class.c b/drivers/leds/led-class.c
->> index 0c8739c..5bff843 100644
->> --- a/drivers/leds/led-class.c
->> +++ b/drivers/leds/led-class.c
->> @@ -110,50 +110,6 @@ static void led_timer_function(unsigned long data)
->> ? ? ? mod_timer(&led_cdev->blink_timer, jiffies + msecs_to_jiffies(delay));
->> ?}
->>
->> -static void led_stop_software_blink(struct led_classdev *led_cdev)
->> -{
->> - ? ? /* deactivate previous settings */
->> - ? ? del_timer_sync(&led_cdev->blink_timer);
->> - ? ? led_cdev->blink_delay_on = 0;
->> - ? ? led_cdev->blink_delay_off = 0;
->> -}
->> -
->> -static void led_set_software_blink(struct led_classdev *led_cdev,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long delay_on,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long delay_off)
->> -{
->> - ? ? int current_brightness;
->> -
->> - ? ? current_brightness = led_get_brightness(led_cdev);
->> - ? ? if (current_brightness)
->> - ? ? ? ? ? ? led_cdev->blink_brightness = current_brightness;
->> - ? ? if (!led_cdev->blink_brightness)
->> - ? ? ? ? ? ? led_cdev->blink_brightness = led_cdev->max_brightness;
->> -
->> - ? ? if (led_get_trigger_data(led_cdev) &&
->> - ? ? ? ? delay_on == led_cdev->blink_delay_on &&
->> - ? ? ? ? delay_off == led_cdev->blink_delay_off)
->> - ? ? ? ? ? ? return;
->> -
->> - ? ? led_stop_software_blink(led_cdev);
->> -
->> - ? ? led_cdev->blink_delay_on = delay_on;
->> - ? ? led_cdev->blink_delay_off = delay_off;
->> -
->> - ? ? /* never on - don't blink */
->> - ? ? if (!delay_on)
->> - ? ? ? ? ? ? return;
->> -
->> - ? ? /* never off - just set to brightness */
->> - ? ? if (!delay_off) {
->> - ? ? ? ? ? ? led_set_brightness(led_cdev, led_cdev->blink_brightness);
->> - ? ? ? ? ? ? return;
->> - ? ? }
->> -
->> - ? ? mod_timer(&led_cdev->blink_timer, jiffies + 1);
->> -}
->> -
->> -
->> ?/**
->> ? * led_classdev_suspend - suspend an led_classdev.
->> ? * @led_cdev: the led_classdev to suspend.
->> @@ -262,32 +218,6 @@ void led_classdev_unregister(struct led_classdev *led_cdev)
->> ?}
->> ?EXPORT_SYMBOL_GPL(led_classdev_unregister);
->>
->> -void led_blink_set(struct led_classdev *led_cdev,
->> - ? ? ? ? ? ? ? ?unsigned long *delay_on,
->> - ? ? ? ? ? ? ? ?unsigned long *delay_off)
->> -{
->> - ? ? del_timer_sync(&led_cdev->blink_timer);
->> -
->> - ? ? if (led_cdev->blink_set &&
->> - ? ? ? ? !led_cdev->blink_set(led_cdev, delay_on, delay_off))
->> - ? ? ? ? ? ? return;
->> -
->> - ? ? /* blink with 1 Hz as default if nothing specified */
->> - ? ? if (!*delay_on && !*delay_off)
->> - ? ? ? ? ? ? *delay_on = *delay_off = 500;
->> -
->> - ? ? led_set_software_blink(led_cdev, *delay_on, *delay_off);
->> -}
->> -EXPORT_SYMBOL(led_blink_set);
->> -
->> -void led_brightness_set(struct led_classdev *led_cdev,
->> - ? ? ? ? ? ? ? ? ? ? enum led_brightness brightness)
->> -{
->> - ? ? led_stop_software_blink(led_cdev);
->> - ? ? led_cdev->brightness_set(led_cdev, brightness);
->> -}
->> -EXPORT_SYMBOL(led_brightness_set);
->> -
->> ?static int __init leds_init(void)
->> ?{
->> ? ? ? leds_class = class_create(THIS_MODULE, "leds");
->> diff --git a/drivers/leds/led-core.c b/drivers/leds/led-core.c
->> index 016d19f..d686004 100644
->> --- a/drivers/leds/led-core.c
->> +++ b/drivers/leds/led-core.c
->> @@ -23,3 +23,73 @@ EXPORT_SYMBOL_GPL(leds_list_lock);
->>
->> ?LIST_HEAD(leds_list);
->> ?EXPORT_SYMBOL_GPL(leds_list);
->> +
->> +static void led_stop_software_blink(struct led_classdev *led_cdev)
->> +{
->> + ? ? /* deactivate previous settings */
->> + ? ? del_timer_sync(&led_cdev->blink_timer);
->> + ? ? led_cdev->blink_delay_on = 0;
->> + ? ? led_cdev->blink_delay_off = 0;
->> +}
->> +
->> +static void led_set_software_blink(struct led_classdev *led_cdev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long delay_on,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long delay_off)
->> +{
->> + ? ? int current_brightness;
->> +
->> + ? ? current_brightness = led_get_brightness(led_cdev);
->> + ? ? if (current_brightness)
->> + ? ? ? ? ? ? led_cdev->blink_brightness = current_brightness;
->> + ? ? if (!led_cdev->blink_brightness)
->> + ? ? ? ? ? ? led_cdev->blink_brightness = led_cdev->max_brightness;
->> +
->> + ? ? if (led_get_trigger_data(led_cdev) &&
->> + ? ? ? ? delay_on == led_cdev->blink_delay_on &&
->> + ? ? ? ? delay_off == led_cdev->blink_delay_off)
->> + ? ? ? ? ? ? return;
->> +
->> + ? ? led_stop_software_blink(led_cdev);
->> +
->> + ? ? led_cdev->blink_delay_on = delay_on;
->> + ? ? led_cdev->blink_delay_off = delay_off;
->> +
->> + ? ? /* never on - don't blink */
->> + ? ? if (!delay_on)
->> + ? ? ? ? ? ? return;
->> +
->> + ? ? /* never off - just set to brightness */
->> + ? ? if (!delay_off) {
->> + ? ? ? ? ? ? led_set_brightness(led_cdev, led_cdev->blink_brightness);
->> + ? ? ? ? ? ? return;
->> + ? ? }
->> +
->> + ? ? mod_timer(&led_cdev->blink_timer, jiffies + 1);
->> +}
->> +
->> +
->> +void led_blink_set(struct led_classdev *led_cdev,
->> + ? ? ? ? ? ? ? ?unsigned long *delay_on,
->> + ? ? ? ? ? ? ? ?unsigned long *delay_off)
->> +{
->> + ? ? del_timer_sync(&led_cdev->blink_timer);
->> +
->> + ? ? if (led_cdev->blink_set &&
->> + ? ? ? ? !led_cdev->blink_set(led_cdev, delay_on, delay_off))
->> + ? ? ? ? ? ? return;
->> +
->> + ? ? /* blink with 1 Hz as default if nothing specified */
->> + ? ? if (!*delay_on && !*delay_off)
->> + ? ? ? ? ? ? *delay_on = *delay_off = 500;
->> +
->> + ? ? led_set_software_blink(led_cdev, *delay_on, *delay_off);
->> +}
->> +EXPORT_SYMBOL(led_blink_set);
->> +
->> +void led_brightness_set(struct led_classdev *led_cdev,
->> + ? ? ? ? ? ? ? ? ? ? enum led_brightness brightness)
->> +{
->> + ? ? led_stop_software_blink(led_cdev);
->> + ? ? led_cdev->brightness_set(led_cdev, brightness);
->> +}
->> +EXPORT_SYMBOL(led_brightness_set);
+1 more patch or an addition to this patch to add the wl1271_device &
+the btwilink device is also required to get ST probe & BT probe.
+The btwilink driver is a platform device because UART devices don't
+have a probe mechanism unlike say usb, i2c..
+
+> Thanks,
+> Mircea
 >
+> [1] http://elinux.org/images/8/8d/0001a-omap4-pandaboard-wlan-fix.patch
 >
 
 
 
 -- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+--Pavan Savoy
