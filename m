@@ -1,107 +1,349 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Mar 2012 19:58:53 +0800
-Subject: [PATCH v4 06/10] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331553537-19789-7-git-send-email-shawn.guo@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 11 Mar 2012 16:08:20 -0500
+Subject: [PATCH 4/4] ARM: __io abuse cleanup
+In-Reply-To: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1331500100-31351-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check /compatible rather than /model to determine the machine name.
-The p1022ds older device trees get a different /model from the new
-ones, while /compatible is consistent there, so checking /compatible
-will save the bother of detecting older p1022ds device trees.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Several platforms incorrectly use __io() for casting to 'void __iomem *'.
+This converts all of those uses to use the common IOMEM macro.
+
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Anton Vorontsov <avorontsov@mvista.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: linux-sh at vger.kernel.org
 ---
- sound/soc/fsl/fsl_ssi.c      |    6 +++---
- sound/soc/fsl/mpc8610_hpcd.c |    2 +-
- sound/soc/fsl/p1022_ds.c     |   32 +++++---------------------------
- 3 files changed, 9 insertions(+), 31 deletions(-)
+ arch/arm/mach-cns3xxx/core.c                   |    8 ++++----
+ arch/arm/mach-cns3xxx/devices.c                |    2 +-
+ arch/arm/mach-netx/generic.c                   |    2 +-
+ arch/arm/mach-netx/include/mach/hardware.h     |    2 +-
+ arch/arm/mach-netx/include/mach/netx-regs.h    |   16 ++++++++--------
+ arch/arm/mach-realview/include/mach/hardware.h |    2 +-
+ arch/arm/mach-shmobile/board-ag5evm.c          |    2 +-
+ arch/arm/mach-shmobile/board-bonito.c          |    2 +-
+ arch/arm/mach-shmobile/board-kota2.c           |    2 +-
+ arch/arm/mach-shmobile/intc-r8a7779.c          |    4 ++--
+ arch/arm/mach-shmobile/intc-sh73a0.c           |    4 ++--
+ arch/arm/mach-shmobile/smp-r8a7779.c           |    4 ++--
+ arch/arm/mach-shmobile/smp-sh73a0.c            |   20 ++++++++++----------
+ arch/arm/mach-ux500/include/mach/hardware.h    |    2 +-
+ 14 files changed, 36 insertions(+), 36 deletions(-)
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 3e06696..2eb407f 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -716,12 +716,12 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Trigger the machine driver's probe function.  The platform driver
--	 * name of the machine driver is taken from the /model property of the
-+	 * name of the machine driver is taken from /compatible property of the
- 	 * device tree.  We also pass the address of the CPU DAI driver
- 	 * structure.
- 	 */
--	sprop = of_get_property(of_find_node_by_path("/"), "model", NULL);
--	/* Sometimes the model name has a "fsl," prefix, so we strip that. */
-+	sprop = of_get_property(of_find_node_by_path("/"), "compatible", NULL);
-+	/* Sometimes the compatible name has a "fsl," prefix, so we strip it. */
- 	p = strrchr(sprop, ',');
- 	if (p)
- 		sprop = p + 1;
-diff --git a/sound/soc/fsl/mpc8610_hpcd.c b/sound/soc/fsl/mpc8610_hpcd.c
-index 354b753..8fdc430 100644
---- a/sound/soc/fsl/mpc8610_hpcd.c
-+++ b/sound/soc/fsl/mpc8610_hpcd.c
-@@ -402,7 +402,7 @@ static struct platform_driver mpc8610_hpcd_driver = {
- 	.probe = mpc8610_hpcd_probe,
- 	.remove = __devexit_p(mpc8610_hpcd_remove),
- 	.driver = {
--		/* The name must match the 'model' property in the device tree,
-+		/* The name must match 'compatible' property in the device tree,
- 		 * in lowercase letters.
- 		 */
- 		.name = "snd-soc-mpc8610hpcd",
-diff --git a/sound/soc/fsl/p1022_ds.c b/sound/soc/fsl/p1022_ds.c
-index e87cb41..0f42f31 100644
---- a/sound/soc/fsl/p1022_ds.c
-+++ b/sound/soc/fsl/p1022_ds.c
-@@ -403,6 +403,11 @@ static struct platform_driver p1022_ds_driver = {
- 	.probe = p1022_ds_probe,
- 	.remove = __devexit_p(p1022_ds_remove),
- 	.driver = {
-+		/*
-+		 * The name must match 'compatible' property in the device tree,
-+		 * in lowercase letters.
-+		 */
-+		.name = "snd-soc-p1022ds",
- 		.owner = THIS_MODULE,
- 	},
- };
-@@ -416,33 +421,6 @@ static int __init p1022_ds_init(void)
+diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
+index 941a308..031805b 100644
+--- a/arch/arm/mach-cns3xxx/core.c
++++ b/arch/arm/mach-cns3xxx/core.c
+@@ -72,13 +72,13 @@ void __init cns3xxx_map_io(void)
+ /* used by entry-macro.S */
+ void __init cns3xxx_init_irq(void)
  {
- 	struct device_node *guts_np;
- 	struct resource res;
--	const char *sprop;
--
--	/*
--	 * Check if we're actually running on a P1022DS.  Older device trees
--	 * have a model of "fsl,P1022" and newer ones use "fsl,P1022DS", so we
--	 * need to support both.  The SSI driver uses that property to link to
--	 * the machine driver, so have to match it.
--	 */
--	sprop = of_get_property(of_find_node_by_path("/"), "model", NULL);
--	if (!sprop) {
--		pr_err("snd-soc-p1022ds: missing /model node");
--		return -ENODEV;
--	}
--
--	pr_debug("snd-soc-p1022ds: board model name is %s\n", sprop);
--
--	/*
--	 * The name of this board, taken from the device tree.  Normally, this is a*
--	 * fixed string, but some P1022DS device trees have a /model property of
--	 * "fsl,P1022", and others have "fsl,P1022DS".
--	 */
--	if (strcasecmp(sprop, "fsl,p1022ds") == 0)
--		p1022_ds_driver.driver.name = "snd-soc-p1022ds";
--	else if (strcasecmp(sprop, "fsl,p1022") == 0)
--		p1022_ds_driver.driver.name = "snd-soc-p1022";
--	else
--		return -ENODEV;
+-	gic_init(0, 29, __io(CNS3XXX_TC11MP_GIC_DIST_BASE_VIRT),
+-		 __io(CNS3XXX_TC11MP_GIC_CPU_BASE_VIRT));
++	gic_init(0, 29, IOMEM(CNS3XXX_TC11MP_GIC_DIST_BASE_VIRT),
++		 IOMEM(CNS3XXX_TC11MP_GIC_CPU_BASE_VIRT));
+ }
  
- 	/* Get the physical address of the global utilities registers */
- 	guts_np = of_find_compatible_node(NULL, NULL, "fsl,p1022-guts");
+ void cns3xxx_power_off(void)
+ {
+-	u32 __iomem *pm_base = __io(CNS3XXX_PM_BASE_VIRT);
++	u32 __iomem *pm_base = IOMEM(CNS3XXX_PM_BASE_VIRT);
+ 	u32 clkctrl;
+ 
+ 	printk(KERN_INFO "powering system down...\n");
+@@ -237,7 +237,7 @@ static void __init __cns3xxx_timer_init(unsigned int timer_irq)
+ 
+ static void __init cns3xxx_timer_init(void)
+ {
+-	cns3xxx_tmr1 = __io(CNS3XXX_TIMER1_2_3_BASE_VIRT);
++	cns3xxx_tmr1 = IOMEM(CNS3XXX_TIMER1_2_3_BASE_VIRT);
+ 
+ 	__cns3xxx_timer_init(IRQ_CNS3XXX_TIMER0);
+ }
+diff --git a/arch/arm/mach-cns3xxx/devices.c b/arch/arm/mach-cns3xxx/devices.c
+index 79d1fb0..1e40c99 100644
+--- a/arch/arm/mach-cns3xxx/devices.c
++++ b/arch/arm/mach-cns3xxx/devices.c
+@@ -98,7 +98,7 @@ static struct platform_device cns3xxx_sdhci_pdev = {
+ 
+ void __init cns3xxx_sdhci_init(void)
+ {
+-	u32 __iomem *gpioa = __io(CNS3XXX_MISC_BASE_VIRT + 0x0014);
++	u32 __iomem *gpioa = IOMEM(CNS3XXX_MISC_BASE_VIRT + 0x0014);
+ 	u32 gpioa_pins = __raw_readl(gpioa);
+ 
+ 	/* MMC/SD pins share with GPIOA */
+diff --git a/arch/arm/mach-netx/generic.c b/arch/arm/mach-netx/generic.c
+index 59e6797..aa62746 100644
+--- a/arch/arm/mach-netx/generic.c
++++ b/arch/arm/mach-netx/generic.c
+@@ -168,7 +168,7 @@ void __init netx_init_irq(void)
+ {
+ 	int irq;
+ 
+-	vic_init(__io(io_p2v(NETX_PA_VIC)), 0, ~0, 0);
++	vic_init(io_p2v(NETX_PA_VIC), 0, ~0, 0);
+ 
+ 	for (irq = NETX_IRQ_HIF_CHAINED(0); irq <= NETX_IRQ_HIF_LAST; irq++) {
+ 		irq_set_chip_and_handler(irq, &netx_hif_chip,
+diff --git a/arch/arm/mach-netx/include/mach/hardware.h b/arch/arm/mach-netx/include/mach/hardware.h
+index 517a2bd..b661af2 100644
+--- a/arch/arm/mach-netx/include/mach/hardware.h
++++ b/arch/arm/mach-netx/include/mach/hardware.h
+@@ -33,7 +33,7 @@
+ #define XMAC_MEM_SIZE 0x1000
+ #define SRAM_MEM_SIZE 0x8000
+ 
+-#define io_p2v(x) ((x) - NETX_IO_PHYS + NETX_IO_VIRT)
++#define io_p2v(x) IOMEM((x) - NETX_IO_PHYS + NETX_IO_VIRT)
+ #define io_v2p(x) ((x) - NETX_IO_VIRT + NETX_IO_PHYS)
+ 
+ #endif
+diff --git a/arch/arm/mach-netx/include/mach/netx-regs.h b/arch/arm/mach-netx/include/mach/netx-regs.h
+index 5a03e7c..fdde22b 100644
+--- a/arch/arm/mach-netx/include/mach/netx-regs.h
++++ b/arch/arm/mach-netx/include/mach/netx-regs.h
+@@ -115,7 +115,7 @@
+  *********************************/
+ 
+ /* Registers */
+-#define NETX_SYSTEM_REG(ofs)            __io(NETX_VA_SYSTEM + (ofs))
++#define NETX_SYSTEM_REG(ofs)            IOMEM(NETX_VA_SYSTEM + (ofs))
+ #define NETX_SYSTEM_BOO_SR          NETX_SYSTEM_REG(0x00)
+ #define NETX_SYSTEM_IOC_CR          NETX_SYSTEM_REG(0x04)
+ #define NETX_SYSTEM_IOC_MR          NETX_SYSTEM_REG(0x08)
+@@ -185,7 +185,7 @@
+  *******************************/
+ 
+ /* Registers */
+-#define NETX_GPIO_REG(ofs)                     __io(NETX_VA_GPIO + (ofs))
++#define NETX_GPIO_REG(ofs)                     IOMEM(NETX_VA_GPIO + (ofs))
+ #define NETX_GPIO_CFG(gpio)                NETX_GPIO_REG(0x0  + ((gpio)<<2))
+ #define NETX_GPIO_THRESHOLD_CAPTURE(gpio)  NETX_GPIO_REG(0x40 + ((gpio)<<2))
+ #define NETX_GPIO_COUNTER_CTRL(counter)    NETX_GPIO_REG(0x80 + ((counter)<<2))
+@@ -230,7 +230,7 @@
+  *******************************/
+ 
+ /* Registers */
+-#define NETX_PIO_REG(ofs)        __io(NETX_VA_PIO + (ofs))
++#define NETX_PIO_REG(ofs)        IOMEM(NETX_VA_PIO + (ofs))
+ #define NETX_PIO_INPIO       NETX_PIO_REG(0x0)
+ #define NETX_PIO_OUTPIO      NETX_PIO_REG(0x4)
+ #define NETX_PIO_OEPIO       NETX_PIO_REG(0x8)
+@@ -240,7 +240,7 @@
+  *******************************/
+ 
+ /* Registers */
+-#define NETX_MIIMU           __io(NETX_VA_MIIMU)
++#define NETX_MIIMU           IOMEM(NETX_VA_MIIMU)
+ 
+ /* Bits */
+ #define MIIMU_SNRDY        (1<<0)
+@@ -317,7 +317,7 @@
+  *******************************/
+ 
+ /* Registers */
+-#define NETX_PFIFO_REG(ofs)               __io(NETX_VA_PFIFO + (ofs))
++#define NETX_PFIFO_REG(ofs)               IOMEM(NETX_VA_PFIFO + (ofs))
+ #define NETX_PFIFO_BASE(pfifo)        NETX_PFIFO_REG(0x00 + ((pfifo)<<2))
+ #define NETX_PFIFO_BORDER_BASE(pfifo) NETX_PFIFO_REG(0x80 + ((pfifo)<<2))
+ #define NETX_PFIFO_RESET              NETX_PFIFO_REG(0x100)
+@@ -334,7 +334,7 @@
+  *******************************/
+ 
+ /* Registers */
+-#define NETX_MEMCR_REG(ofs)               __io(NETX_VA_MEMCR + (ofs))
++#define NETX_MEMCR_REG(ofs)               IOMEM(NETX_VA_MEMCR + (ofs))
+ #define NETX_MEMCR_SRAM_CTRL(cs)      NETX_MEMCR_REG(0x0 + 4 * (cs)) /* SRAM for CS 0..2 */
+ #define NETX_MEMCR_SDRAM_CFG_CTRL     NETX_MEMCR_REG(0x40)
+ #define NETX_MEMCR_SDRAM_TIMING_CTRL  NETX_MEMCR_REG(0x44)
+@@ -355,7 +355,7 @@
+  *******************************/
+ 
+ /* Registers */
+-#define NETX_DPMAS_REG(ofs)               __io(NETX_VA_DPMAS + (ofs))
++#define NETX_DPMAS_REG(ofs)               IOMEM(NETX_VA_DPMAS + (ofs))
+ #define NETX_DPMAS_SYS_STAT           NETX_DPMAS_REG(0x4d8)
+ #define NETX_DPMAS_INT_STAT           NETX_DPMAS_REG(0x4e0)
+ #define NETX_DPMAS_INT_EN             NETX_DPMAS_REG(0x4f0)
+@@ -425,7 +425,7 @@
+ /*******************************
+  * I2C                         *
+  *******************************/
+-#define NETX_I2C_REG(ofs)	__io(NETX_VA_I2C, (ofs))
++#define NETX_I2C_REG(ofs)	IOMEM(NETX_VA_I2C, (ofs))
+ #define NETX_I2C_CTRL	NETX_I2C_REG(0x0)
+ #define NETX_I2C_DATA	NETX_I2C_REG(0x4)
+ 
+diff --git a/arch/arm/mach-realview/include/mach/hardware.h b/arch/arm/mach-realview/include/mach/hardware.h
+index 8a638d1..281e71c 100644
+--- a/arch/arm/mach-realview/include/mach/hardware.h
++++ b/arch/arm/mach-realview/include/mach/hardware.h
+@@ -37,6 +37,6 @@
+ #else
+ #define IO_ADDRESS(x)		(x)
+ #endif
+-#define __io_address(n)		__io(IO_ADDRESS(n))
++#define __io_address(n)		IOMEM(IO_ADDRESS(n))
+ 
+ #endif
+diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
+index eff8a96..5346529 100644
+--- a/arch/arm/mach-shmobile/board-ag5evm.c
++++ b/arch/arm/mach-shmobile/board-ag5evm.c
+@@ -615,7 +615,7 @@ static void __init ag5evm_init(void)
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* Shared attribute override enable, 64K*8way */
+-	l2x0_init(__io(0xf0100000), 0x00460000, 0xc2000fff);
++	l2x0_init(IOMEM(0xf0100000), 0x00460000, 0xc2000fff);
+ #endif
+ 	sh73a0_add_standard_devices();
+ 	platform_add_devices(ag5evm_devices, ARRAY_SIZE(ag5evm_devices));
+diff --git a/arch/arm/mach-shmobile/board-bonito.c b/arch/arm/mach-shmobile/board-bonito.c
+index 4d22016..91d4c22 100644
+--- a/arch/arm/mach-shmobile/board-bonito.c
++++ b/arch/arm/mach-shmobile/board-bonito.c
+@@ -394,7 +394,7 @@ static void __init bonito_init(void)
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* Early BRESP enable, Shared attribute override enable, 32K*8way */
+-	l2x0_init(__io(0xf0002000), 0x40440000, 0x82000fff);
++	l2x0_init(IOMEM(0xf0002000), 0x40440000, 0x82000fff);
+ #endif
+ 
+ 	r8a7740_add_standard_devices();
+diff --git a/arch/arm/mach-shmobile/board-kota2.c b/arch/arm/mach-shmobile/board-kota2.c
+index 857ceee..4cf6100 100644
+--- a/arch/arm/mach-shmobile/board-kota2.c
++++ b/arch/arm/mach-shmobile/board-kota2.c
+@@ -530,7 +530,7 @@ static void __init kota2_init(void)
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
+-	l2x0_init(__io(0xf0100000), 0x40460000, 0x82000fff);
++	l2x0_init(IOMEM(0xf0100000), 0x40460000, 0x82000fff);
+ #endif
+ 	sh73a0_add_standard_devices();
+ 	platform_add_devices(kota2_devices, ARRAY_SIZE(kota2_devices));
+diff --git a/arch/arm/mach-shmobile/intc-r8a7779.c b/arch/arm/mach-shmobile/intc-r8a7779.c
+index 5d92fcd..550b23d 100644
+--- a/arch/arm/mach-shmobile/intc-r8a7779.c
++++ b/arch/arm/mach-shmobile/intc-r8a7779.c
+@@ -42,8 +42,8 @@ static int r8a7779_set_wake(struct irq_data *data, unsigned int on)
+ 
+ void __init r8a7779_init_irq(void)
+ {
+-	void __iomem *gic_dist_base = __io(0xf0001000);
+-	void __iomem *gic_cpu_base = __io(0xf0000100);
++	void __iomem *gic_dist_base = IOMEM(0xf0001000);
++	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+ 
+ 	/* use GIC to handle interrupts */
+ 	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index 1eda6b0..dbb4357 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -419,8 +419,8 @@ static irqreturn_t sh73a0_pint1_demux(int irq, void *dev_id)
+ 
+ void __init sh73a0_init_irq(void)
+ {
+-	void __iomem *gic_dist_base = __io(0xf0001000);
+-	void __iomem *gic_cpu_base = __io(0xf0000100);
++	void __iomem *gic_dist_base = IOMEM(0xf0001000);
++	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+ 	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
+ 	int k, n;
+ 
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 4fe2e9e..6d5e57d 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -30,7 +30,7 @@
+ #include <asm/smp_twd.h>
+ #include <asm/hardware/gic.h>
+ 
+-#define AVECR 0xfe700040
++#define AVECR IOMEM(0xfe700040)
+ 
+ static struct r8a7779_pm_ch r8a7779_ch_cpu1 = {
+ 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
+@@ -140,7 +140,7 @@ void __init r8a7779_smp_prepare_cpus(void)
+ 	scu_enable(scu_base_addr());
+ 
+ 	/* Map the reset vector (in headsmp.S) */
+-	__raw_writel(__pa(shmobile_secondary_vector), __io(AVECR));
++	__raw_writel(__pa(shmobile_secondary_vector), AVECR);
+ 
+ 	/* enable cache coherency on CPU0 */
+ 	modify_scu_cpu_psr(0, 3 << (cpu * 8));
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 0d159d6..667d53d 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -28,11 +28,11 @@
+ #include <asm/smp_twd.h>
+ #include <asm/hardware/gic.h>
+ 
+-#define WUPCR		0xe6151010
+-#define SRESCR		0xe6151018
+-#define PSTR		0xe6151040
+-#define SBAR            0xe6180020
+-#define APARMBAREA      0xe6f10020
++#define WUPCR		IOMEM(0xe6151010)
++#define SRESCR		IOMEM(0xe6151018)
++#define PSTR		IOMEM(0xe6151040)
++#define SBAR		IOMEM(0xe6180020)
++#define APARMBAREA	IOMEM(0xe6f10020)
+ 
+ static void __iomem *scu_base_addr(void)
+ {
+@@ -80,10 +80,10 @@ int __cpuinit sh73a0_boot_secondary(unsigned int cpu)
+ 	/* enable cache coherency */
+ 	modify_scu_cpu_psr(0, 3 << (cpu * 8));
+ 
+-	if (((__raw_readw(__io(PSTR)) >> (4 * cpu)) & 3) == 3)
+-		__raw_writel(1 << cpu, __io(WUPCR));	/* wake up */
++	if (((__raw_readw(PSTR) >> (4 * cpu)) & 3) == 3)
++		__raw_writel(1 << cpu, WUPCR);	/* wake up */
+ 	else
+-		__raw_writel(1 << cpu, __io(SRESCR));	/* reset */
++		__raw_writel(1 << cpu, SRESCR);	/* reset */
+ 
+ 	return 0;
+ }
+@@ -95,8 +95,8 @@ void __init sh73a0_smp_prepare_cpus(void)
+ 	scu_enable(scu_base_addr());
+ 
+ 	/* Map the reset vector (in headsmp.S) */
+-	__raw_writel(0, __io(APARMBAREA));      /* 4k */
+-	__raw_writel(__pa(shmobile_secondary_vector), __io(SBAR));
++	__raw_writel(0, APARMBAREA);      /* 4k */
++	__raw_writel(__pa(shmobile_secondary_vector), SBAR);
+ 
+ 	/* enable cache coherency on CPU0 */
+ 	modify_scu_cpu_psr(0, 3 << (cpu * 8));
+diff --git a/arch/arm/mach-ux500/include/mach/hardware.h b/arch/arm/mach-ux500/include/mach/hardware.h
+index b6ba26a..aac7689 100644
+--- a/arch/arm/mach-ux500/include/mach/hardware.h
++++ b/arch/arm/mach-ux500/include/mach/hardware.h
+@@ -23,7 +23,7 @@
+ 	(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + U8500_IO_VIRTUAL)
+ 
+ /* typesafe io address */
+-#define __io_address(n)		__io(IO_ADDRESS(n))
++#define __io_address(n)		IOMEM(IO_ADDRESS(n))
+ /* Used by some plat-nomadik code */
+ #define io_p2v(n)		__io_address(n)
+ 
 -- 
 1.7.5.4
