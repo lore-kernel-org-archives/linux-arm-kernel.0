@@ -1,80 +1,91 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 11 Mar 2012 10:33:21 +0100
-Subject: [PATCH v2 1/3] mfd: mc13xxx-core: Prepare for separate spi and
- i2c backends.
-In-Reply-To: <1331429402-9639-2-git-send-email-marc@cpdesign.com.au>
-References: <1331429402-9639-1-git-send-email-marc@cpdesign.com.au>
- <1331429402-9639-2-git-send-email-marc@cpdesign.com.au>
-Message-ID: <20120311093321.GK14173@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 11 Mar 2012 12:34:14 +0100
+Subject: [PATCH v6 2/3] clk: introduce the common clock framework
+In-Reply-To: <1331366064-1273-3-git-send-email-mturquette@linaro.org>
+References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
+ <1331366064-1273-3-git-send-email-mturquette@linaro.org>
+Message-ID: <20120311113414.GM3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 11, 2012 at 12:30:00PM +1100, Marc Reilly wrote:
-> This patch abstracts the bus specific operations from the driver core.
-> Read and write handlers are introduced and generic initialization is
-> consolidated into mc13xxx_comon_init. The irq member is removed because
-s/_comon_/_common_/
+Hi Mike,
 
-one minor nitpick below.
+I was about to give my tested-by when I decided to test the set_rate
+function. Unfortunately this is broken for several reasons. I'll try
+to come up with a fixup series later the day.
 
-> it is unused.
-> 
-> Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
-> ---
->  drivers/mfd/mc13xxx-core.c |  162 ++++++++++++++++++++++++++------------------
->  1 files changed, 97 insertions(+), 65 deletions(-)
-> 
-> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-> index 7122386..19d94a1 100644
-> --- a/drivers/mfd/mc13xxx-core.c
-> +++ b/drivers/mfd/mc13xxx-core.c
-> @@ -235,6 +234,34 @@ int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
->  
->  	return 0;
->  }
+On Fri, Mar 09, 2012 at 11:54:23PM -0800, Mike Turquette wrote:
 > +
-> +int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
+> +/**
+> + * DOC: Using the CLK_SET_RATE_PARENT flag
+> + *
+> + * __clk_set_rate changes the child's rate before the parent's to more
+> + * easily handle failure conditions.
+> + *
+> + * This means clk might run out of spec for a short time if its rate is
+> + * increased before the parent's rate is updated.
+> + *
+> + * To prevent this consider setting the CLK_SET_RATE_GATE flag on any
+> + * clk where you also set the CLK_SET_RATE_PARENT flag
+> + *
+> + * PRE_RATE_CHANGE notifications are supposed to stack as a rate change
+> + * request propagates up the clk tree.  This reflects the different
+> + * rates that a downstream clk might experience if left enabled while
+> + * upstream parents change their rates.
+> + */
+> +static struct clk *__clk_set_rate(struct clk *clk, unsigned long rate)
 > +{
-> +	int ret;
+> +	struct clk *fail_clk = NULL;
+> +	int ret = NOTIFY_DONE;
+> +	unsigned long old_rate = clk->rate;
+> +	unsigned long new_rate;
+> +	unsigned long parent_old_rate;
+> +	unsigned long parent_new_rate = 0;
+> +	struct clk *child;
+> +	struct hlist_node *tmp;
 > +
-> +	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
+> +	/* bail early if we can't change rate while clk is enabled */
+> +	if ((clk->flags & CLK_SET_RATE_GATE) && clk->enable_count)
+> +		return clk;
 > +
-> +	if (offset > MC13XXX_NUMREGS)
-> +		return -EINVAL;
+> +	/* find the new rate and see if parent rate should change too */
+> +	WARN_ON(!clk->ops->round_rate);
 > +
-> +	ret = mc13xxx->read_dev(mc13xxx, offset, val);
-> +	dev_vdbg(mc13xxx->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(mc13xxx_reg_read);
-> +
-> +int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
-> +{
-> +	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
-> +
-> +	dev_vdbg(mc13xxx->dev, "[0x%02x] <- 0x%06x\n", offset, val);
-> +
-> +	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
-> +		return -EINVAL;
-> +
-> +	return mc13xxx->write_dev(mc13xxx, offset, val);
-> +}
->  EXPORT_SYMBOL(mc13xxx_reg_write);
->  
->  int mc13xxx_reg_rmw(struct mc13xxx *mc13xxx, unsigned int offset,
-> @@ -439,7 +466,7 @@ static int mc13xxx_irq_handle(struct mc13xxx *mc13xxx,
->  			if (handled == IRQ_HANDLED)
->  				num_handled++;
->  		} else {
-> -			dev_err(&mc13xxx->spidev->dev,
-> +			dev_err(mc13xxx->dev,
->  					"BUG: irq %u but no handler\n",
-Without having counted I think you can join these two lines.
+> +	new_rate = clk->ops->round_rate(clk->hw, rate, &parent_new_rate);
 
-Best regards
-Uwe
+You don't need a WARN_ON when you derefence clk->ops->round_rate anyway.
+Also, even when the current clock does not have a set_rate function it
+can still change its rate when the CLK_SET_RATE_PARENT is set.
+
+> +
+> +	/* NOTE: pre-rate change notifications will stack */
+> +	if (clk->notifier_count)
+> +		ret = __clk_notify(clk, PRE_RATE_CHANGE, clk->rate, new_rate);
+> +
+> +	if (ret == NOTIFY_BAD)
+> +		return clk;
+> +
+> +	/* speculate rate changes down the tree */
+> +	hlist_for_each_entry(child, tmp, &clk->children, child_node) {
+> +		ret = __clk_speculate_rates(child, new_rate);
+> +		if (ret == NOTIFY_BAD)
+> +			return clk;
+> +	}
+> +
+> +	/* change the rate of this clk */
+> +	if (clk->ops->set_rate)
+> +		ret = clk->ops->set_rate(clk->hw, new_rate);
+
+I don't know the reason why you change the child clock before the parent
+clock, but it cannot work since this clock will change its rate based on
+the old parent rate and not the new one.
+
+There are more things, as said I'll try to come up with a fixup series.
+
+Sascha
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
