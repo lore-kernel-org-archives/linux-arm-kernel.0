@@ -1,26 +1,27 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Mar 2012 12:23:59 +0000
-Subject: linux-next: manual merge of the arm-soc tree with the regulator
- tree
-In-Reply-To: <20120309181755.256b898808bd14726de0e977@canb.auug.org.au>
-References: <20120309181755.256b898808bd14726de0e977@canb.auug.org.au>
-Message-ID: <20120309122358.GM3273@opensource.wolfsonmicro.com>
+Date: Sun, 11 Mar 2012 11:41:04 +0000
+Subject: [PATCH 3/4] mx31moboard: Add ssi configuration
+In-Reply-To: <1331304916-4724-4-git-send-email-philippe.retornaz@epfl.ch>
+References: <1331304916-4724-1-git-send-email-philippe.retornaz@epfl.ch>
+ <1331304916-4724-2-git-send-email-philippe.retornaz@epfl.ch>
+ <1331304916-4724-3-git-send-email-philippe.retornaz@epfl.ch>
+ <1331304916-4724-4-git-send-email-philippe.retornaz@epfl.ch>
+Message-ID: <20120311114104.GC3233@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2012 at 06:17:55PM +1100, Stephen Rothwell wrote:
+On Fri, Mar 09, 2012 at 03:55:15PM +0100, Philippe R?tornaz wrote:
 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/regulator/Makefile between commit 8aa1ab9219e7 ("regulator: Sort
-> Kconfig and Makefile entries") from the regulator tree and commit
-> 8a16a701ad78 ("regulator: Remove bq24022 regulator driver") from the
-> arm-soc tree.
+> +	mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0,
+> +		MXC_AUDMUX_V2_PTCR_SYN |
+> +		MXC_AUDMUX_V2_PTCR_TFSDIR |
 
-Both fixups look good, thanks.
+This will need to be rebased off current code, the audmux has been moved
+into sound/soc.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/6da738e5/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120311/ba39bc23/attachment-0001.sig>
