@@ -1,29 +1,38 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Sat, 10 Mar 2012 15:11:10 +0000 (GMT)
-Subject: [PATCH v2] pxa/hx4700: Fix basic suspend/resume
-In-Reply-To: <CA+gwMccn+rLo2Q+z+gxboE82pmGT0ud2c1Q65PzhrGhFXLrvgw@mail.gmail.com>
-Message-ID: <1331392270.97238.YahooMailClassic@web29005.mail.ird.yahoo.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Sun, 11 Mar 2012 07:36:55 +0000
+Subject: [GIT PULL v2] DaVinci DM644x video display support
+Message-ID: <DF0F476B391FA8409C78302C7BA518B6317F13DB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi Arnd, Olof,
 
---- On Fri, 9/3/12, Philipp Zabel <philipp.zabel@gmail.com> wrote:
-> > Changed GPIO88, GPIO72, GPIO96 from KEEP_OUTPUT to
-> DRIVE_HIGH.
-> 
-> The bq24022 GPIOs (72 and 96) should stay KEEP_OUTPUT to
-> allow
-> charging from the AC adapter while suspended.
+Can you please pull these two patches adding support
+for DaVinci DM644x V4L2 display support for v3.4.
 
-I think I disabled this because I was wary of uncontrolled charging while
-suspended. The SDG bootloader does have specific code to control charging
-and the LEDs while suspended, but AFAIK it is not currently working.
+These patches heavily depend on the clean-up series sent
+earlier. I have re-generated the pull request against
+v3.4/cleanup branch of my tree (already pulled earlier
+and unchanged since) as suggested by Olof.
 
-Nonetheless, I've modified the patch.
+Let me know if this works for you.
 
-Interestingly, the SDG bootloader seems to use LED interrupts to
-periodically wake up during suspend. At last, that would explain why the
-LED GPIOs are inputs, not outputs.
+Thanks,
+Sekhar
 
-Paul
+The following changes since commit 12db9588ff811ae43a476b1234b27323055ab3ad:
+  Manjunath Hadli (1):
+        ARM: davinci: dm644x: don't force vpfe registeration on all boards
+
+are available in the git repository at:
+
+  git://gitorious.org/linux-davinci/linux-davinci.git v3.4/features
+
+Manjunath Hadli (2):
+      ARM: davinci: dm644x: add support for v4l2 video display
+      ARM: davinci: dm644x evm: add support for VPBE display
+
+ arch/arm/mach-davinci/board-dm644x-evm.c |  109 +++++++++++++++++++-
+ arch/arm/mach-davinci/davinci.h          |    8 ++-
+ arch/arm/mach-davinci/dm644x.c           |  166 +++++++++++++++++++++++++++---
+ 3 files changed, 268 insertions(+), 15 deletions(-)
