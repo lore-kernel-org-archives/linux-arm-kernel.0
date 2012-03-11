@@ -1,30 +1,117 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Thu, 08 Mar 2012 23:53:35 -0500
-Subject: [PATCH v2 0/6] mmc: omap_hsmmc: Clean up use/abuse of pdev->id
-In-Reply-To: <4F589C94.9010601@ti.com> (Rajendra Nayak's message of "Thu, 08
- Mar 2012 17:18:36 +0530")
-References: <1329996409-26861-1-git-send-email-rnayak@ti.com>
- <4F476228.7060607@ti.com> <4F54714E.6080805@ti.com>
- <4F57312E.4080104@ti.com> <m2pqcoihhu.fsf@bob.laptop.org>
- <4F589C94.9010601@ti.com>
-Message-ID: <m2boo6pe7k.fsf@bob.laptop.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Sun, 11 Mar 2012 14:24:46 -0700
+Subject: [PATCH v6 2/3] clk: introduce the common clock framework
+In-Reply-To: <20120311113414.GM3852@pengutronix.de>
+References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
+ <1331366064-1273-3-git-send-email-mturquette@linaro.org>
+ <20120311113414.GM3852@pengutronix.de>
+Message-ID: <CAJOA=zMdkLB-DCPOk=kz5mn6BK6A_swocyCHJHeGE6H7FxBbmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 08 2012, Rajendra Nayak wrote:
-> There's just one other cleanup patch here [1] to convert all pr_* prints
-> in the driver to dev_*. Would be great if you can pick that as well.
+On Sun, Mar 11, 2012 at 4:34 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Mike,
 >
-> Thanks,
-> Rajendra
+> I was about to give my tested-by when I decided to test the set_rate
+> function. Unfortunately this is broken for several reasons. I'll try
+> to come up with a fixup series later the day.
+
+I haven't tested clk_set_rate since V4, but I also haven't changed the
+code appreciably.  I'll retest on my end also.
+
+> On Fri, Mar 09, 2012 at 11:54:23PM -0800, Mike Turquette wrote:
+>> + ? ? /* find the new rate and see if parent rate should change too */
+>> + ? ? WARN_ON(!clk->ops->round_rate);
+>> +
+>> + ? ? new_rate = clk->ops->round_rate(clk->hw, rate, &parent_new_rate);
 >
-> [1] http://marc.info/?l=linux-mmc&m=132999677405098&w=3
+> You don't need a WARN_ON when you derefence clk->ops->round_rate anyway.
 
-Thanks, I've pushed this to mmc-next for 3.4 now too.
+Agreed that the WARN_ON should not be there.
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+The v6 Documentation/clk.txt states that .round_rate is mandatory for
+clocks that can adjust their rate, but I need to clarify this a bit
+more.  Ideally we want to be able to call clk_set_rate on any clock
+and get a changed rate (if possible) by either adjusting that clocks
+rate direction (e.g. a PLL or an adjustable divider) or by propagating
+__clk_set_rate up the parents (assuming of course that
+CLK_SET_RATE_PARENT flag is set appropriately).
+
+> Also, even when the current clock does not have a set_rate function it
+> can still change its rate when the CLK_SET_RATE_PARENT is set.
+
+Correct.  I'll clean this up and make the documentation a bit more
+verbose on when .set_rate/.round_rate/.recalc_rate are mandatory.
+
+>
+>> +
+>> + ? ? /* NOTE: pre-rate change notifications will stack */
+>> + ? ? if (clk->notifier_count)
+>> + ? ? ? ? ? ? ret = __clk_notify(clk, PRE_RATE_CHANGE, clk->rate, new_rate);
+>> +
+>> + ? ? if (ret == NOTIFY_BAD)
+>> + ? ? ? ? ? ? return clk;
+>> +
+>> + ? ? /* speculate rate changes down the tree */
+>> + ? ? hlist_for_each_entry(child, tmp, &clk->children, child_node) {
+>> + ? ? ? ? ? ? ret = __clk_speculate_rates(child, new_rate);
+>> + ? ? ? ? ? ? if (ret == NOTIFY_BAD)
+>> + ? ? ? ? ? ? ? ? ? ? return clk;
+>> + ? ? }
+>> +
+>> + ? ? /* change the rate of this clk */
+>> + ? ? if (clk->ops->set_rate)
+>> + ? ? ? ? ? ? ret = clk->ops->set_rate(clk->hw, new_rate);
+>
+> I don't know the reason why you change the child clock before the parent
+> clock, but it cannot work since this clock will change its rate based on
+> the old parent rate and not the new one.
+
+This depends on the .round_rate implementation, which I admit to
+having lost some sleep over.  A clever .round_rate will request the
+"intermediate" rate for a clock when propagating a request to change
+the parent rate later on.  Take for instance the following:
+
+pll @ 200MHz (locked)
+    |
+parent @ 100MHz (can divide by 1 or 2; currently divider is 2)
+    |
+child @ 25MHz (can divide by 2 or 4; currently divider is 4)
+
+If we want child to run at 100MHz then the desirable configuration
+would be to have parent divide-by-1 and child divide-by-2.  When we
+call,
+
+clk_set_rate(child, 100MHz);
+
+Its .round_rate should return 50MHz, and &parent_new_rate should be
+200MHz.  So 50MHz is an "intermediate" rate, but it gets us the
+divider we want.  And in fact 50MHz reflects reality because that will
+be the rate of child until the parent propagation completes and we can
+adjust parent's dividers.  (this is one reason why I prefer for
+pre-rate change notifiers to stack on top of each other).
+
+So now that &parent_new_rate is > 0, __clk_set_rate will propagate the
+request up and parent's .round_rate will simply return 200MHz and
+leave it's own &parent_new_rate at 0.  This will change from
+divide-by-2 to divide-by-1 and from this highest point in the tree we
+will propagate post-rate change notifiers downstream, as part of the
+recalc_rate tree walk.
+
+I have tested this with OMAP4's CPUfreq driver and I think, while
+complicated, it is a sound way to approach the problem.  Maybe the API
+can be cleaned up, if you have any suggestions.
+
+Regards,
+Mike
+
+>
+> There are more things, as said I'll try to come up with a fixup series.
+>
+> Sascha
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
