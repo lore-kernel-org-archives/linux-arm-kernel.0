@@ -1,34 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 9 Mar 2012 16:03:26 +0800
-Subject: [RFC] i.MX: drop secondary clocks
-In-Reply-To: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
-References: <1331242949-22780-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20120309080324.GN2499@S2101-09.ap.freescale.net>
+From: hector.oron@gmail.com (Hector Oron)
+Date: Sun, 11 Mar 2012 13:33:47 +0100
+Subject: [PATCH] efikamx: match machine descriptions with legacy
+In-Reply-To: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
+References: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
+Message-ID: <CAODfWeE86mUf17CAZ+aa1bKxX4Toq9ogm01tDEMVYcnqu96LAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 10:42:27PM +0100, Sascha Hauer wrote:
-> Hi All,
-> 
-> On i.MX we currently have grouped clocks, also known as secondary clocks.
-> These are clocks that get enabled when the primary clock gets enabled.  This
-> doesn't integrate well into the generic clock framework. Also we often return
-> the rate of one clock and really enable/disable another clock. I plan to get
-> rid of these clocks by exposing the individual clocks to the drivers. The
-> following is meant as an example how this can be done. I have a more complete
-> series internally but this conflicts with Richards clk_prepare series.
-> 
-> Thanks to the nature of clk_get we can simply clk_get the individual clocks in
-> the drivers and the current clock implementation will always return the one
-> with con_id = NULL. Then with the generic clk implementation the drivers will
-> finally get the individual clocks.
-> 
-> So unless there are objections I will follow up on this after the next merge
-> window.
-> 
-So glad to see you are getting rid of this nasty imx secondary clock.
-I agree this is the way to go.
+Hello,
 
+2012/2/21 Hector Oron <hector.oron@gmail.com>:
+> ?Rename machine descriptions to match legacy descriptions distributed by
+> ?manufacturer BSP. This way distributions can do clean upgrades from
+> ?userspace scripts which check for these values to differentiate platforms
+> ?with single kernel binaries.
+>
+> Signed-off-by: Hector Oron <hector.oron@gmail.com>
+> Acked-by: Matt Sealey <matt@genesi-usa.com>
+> ---
+> ?arch/arm/mach-mx5/board-mx51_efikamx.c | ? ?3 +--
+> ?arch/arm/mach-mx5/board-mx51_efikasb.c | ? ?2 +-
+> ?2 files changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+> index 3a5ed2d..fbfccc7 100644
+> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
+> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+> @@ -283,8 +283,7 @@ static struct sys_timer mx51_efikamx_timer = {
+> ? ? ? ?.init = mx51_efikamx_timer_init,
+> ?};
+>
+> -MACHINE_START(MX51_EFIKAMX, "Genesi EfikaMX nettop")
+> - ? ? ? /* Maintainer: Amit Kucheria <amit.kucheria@linaro.org> */
+> +MACHINE_START(MX51_EFIKAMX, "Genesi Efika MX (Smarttop)")
+> ? ? ? ?.atag_offset = 0x100,
+> ? ? ? ?.map_io = mx51_map_io,
+> ? ? ? ?.init_early = imx51_init_early,
+> diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
+> index 4baf05c..dedbca5 100644
+> --- a/arch/arm/mach-mx5/board-mx51_efikasb.c
+> +++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
+> @@ -483,7 +483,7 @@ static struct sys_timer mx51_efikasb_timer = {
+> ? ? ? ?.init ? = mx51_efikasb_timer_init,
+> ?};
+>
+> -MACHINE_START(MX51_EFIKASB, "Genesi Efika Smartbook")
+> +MACHINE_START(MX51_EFIKASB, "Genesi Efika MX (Smartbook)")
+> ? ? ? ?.atag_offset = 0x100,
+> ? ? ? ?.map_io = mx51_map_io,
+> ? ? ? ?.init_early = imx51_init_early,
+> --
+> 1.7.9
+>
+
+Ping!
+I dont see the patch being applied. Is there any problem with it?
+
+Cheers,
 -- 
-Regards,
-Shawn
+?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
