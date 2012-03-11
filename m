@@ -1,61 +1,47 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Sun, 11 Mar 2012 13:33:47 +0100
-Subject: [PATCH] efikamx: match machine descriptions with legacy
-In-Reply-To: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
-References: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
-Message-ID: <CAODfWeE86mUf17CAZ+aa1bKxX4Toq9ogm01tDEMVYcnqu96LAg@mail.gmail.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sun, 11 Mar 2012 13:23:42 +0000 (GMT)
+Subject: [PATCH v2] pxa/hx4700: Reduce sleep mode battery discharge by 35%
+Message-ID: <1331472222.71907.YahooMailClassic@web29003.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Drive the two Bluetooth UART output GPIOs (GPIO43_BTUART_TXD, GPIO45_BTUART_RTS)
+LOW during sleep mode instead of HIGH. This reduces sleep mode battery discharge
+from approximately 46 mA to approximately 30 mA.
 
-2012/2/21 Hector Oron <hector.oron@gmail.com>:
-> ?Rename machine descriptions to match legacy descriptions distributed by
-> ?manufacturer BSP. This way distributions can do clean upgrades from
-> ?userspace scripts which check for these values to differentiate platforms
-> ?with single kernel binaries.
->
-> Signed-off-by: Hector Oron <hector.oron@gmail.com>
-> Acked-by: Matt Sealey <matt@genesi-usa.com>
-> ---
-> ?arch/arm/mach-mx5/board-mx51_efikamx.c | ? ?3 +--
-> ?arch/arm/mach-mx5/board-mx51_efikasb.c | ? ?2 +-
-> ?2 files changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
-> index 3a5ed2d..fbfccc7 100644
-> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
-> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
-> @@ -283,8 +283,7 @@ static struct sys_timer mx51_efikamx_timer = {
-> ? ? ? ?.init = mx51_efikamx_timer_init,
-> ?};
->
-> -MACHINE_START(MX51_EFIKAMX, "Genesi EfikaMX nettop")
-> - ? ? ? /* Maintainer: Amit Kucheria <amit.kucheria@linaro.org> */
-> +MACHINE_START(MX51_EFIKAMX, "Genesi Efika MX (Smarttop)")
-> ? ? ? ?.atag_offset = 0x100,
-> ? ? ? ?.map_io = mx51_map_io,
-> ? ? ? ?.init_early = imx51_init_early,
-> diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
-> index 4baf05c..dedbca5 100644
-> --- a/arch/arm/mach-mx5/board-mx51_efikasb.c
-> +++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
-> @@ -483,7 +483,7 @@ static struct sys_timer mx51_efikasb_timer = {
-> ? ? ? ?.init ? = mx51_efikasb_timer_init,
-> ?};
->
-> -MACHINE_START(MX51_EFIKASB, "Genesi Efika Smartbook")
-> +MACHINE_START(MX51_EFIKASB, "Genesi Efika MX (Smartbook)")
-> ? ? ? ?.atag_offset = 0x100,
-> ? ? ? ?.map_io = mx51_map_io,
-> ? ? ? ?.init_early = imx51_init_early,
-> --
-> 1.7.9
->
+Signed-off-by: Oliver Winker <oliver@oli1170.net>
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+---
 
-Ping!
-I dont see the patch being applied. Is there any problem with it?
+V2:
+Corrected nomenclature.
+Added GPIO43_BTUART_TXD_LPM_LOW and GPIO45_BTUART_RTS_LPM_LOW to mfp-pxa27x.h
 
-Cheers,
--- 
-?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
+diff -uprN clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c
+--- clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c	2012-03-04 01:08:09.000000000 +0000
++++ linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c	2012-03-11 12:30:29.799567611 +0000
+@@ -97,9 +97,9 @@ static unsigned long hx4700_pin_config[]
+ 
+ 	/* BTUART */
+ 	GPIO42_BTUART_RXD,
+-	GPIO43_BTUART_TXD,
++	GPIO43_BTUART_TXD_LPM_LOW,
+ 	GPIO44_BTUART_CTS,
+-	GPIO45_BTUART_RTS,
++	GPIO45_BTUART_RTS_LPM_LOW,
+ 
+ 	/* PWM 1 (Backlight) */
+ 	GPIO17_PWM1_OUT,
+diff -uprN clean-3.3-rc6/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h linux-3.3-rc6/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h
+--- clean-3.3-rc6/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h	2012-03-04 01:08:09.000000000 +0000
++++ linux-3.3-rc6/arch/arm/mach-pxa/include/mach/mfp-pxa27x.h	2012-03-11 12:32:23.728285708 +0000
+@@ -158,7 +158,9 @@
+ #define GPIO44_BTUART_CTS	MFP_CFG_IN(GPIO44, AF1)
+ #define GPIO42_BTUART_RXD	MFP_CFG_IN(GPIO42, AF1)
+ #define GPIO45_BTUART_RTS	MFP_CFG_OUT(GPIO45, AF2, DRIVE_HIGH)
++#define GPIO45_BTUART_RTS_LPM_LOW	MFP_CFG_OUT(GPIO45, AF2, DRIVE_LOW)
+ #define GPIO43_BTUART_TXD	MFP_CFG_OUT(GPIO43, AF2, DRIVE_HIGH)
++#define GPIO43_BTUART_TXD_LPM_LOW	MFP_CFG_OUT(GPIO43, AF2, DRIVE_LOW)
+ 
+ /* STUART */
+ #define GPIO46_STUART_RXD	MFP_CFG_IN(GPIO46, AF2)
