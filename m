@@ -1,9 +1,9 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 12 Mar 2012 22:54:50 +0100
-Subject: [PATCH v8 2/4] USB: ohci-nxp: Rename symbols from pnx4008 to nxp
-In-Reply-To: <1331589292-18986-1-git-send-email-stigge@antcom.de>
-References: <1331589292-18986-1-git-send-email-stigge@antcom.de>
-Message-ID: <1331589292-18986-3-git-send-email-stigge@antcom.de>
+Date: Sun, 11 Mar 2012 11:53:37 +0100
+Subject: [PATCH v7 2/4] USB: ohci-nxp: Rename symbols from pnx4008 to nxp
+In-Reply-To: <1331463219-23293-1-git-send-email-stigge@antcom.de>
+References: <1331463219-23293-1-git-send-email-stigge@antcom.de>
+Message-ID: <1331463219-23293-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,17 +11,16 @@ Since this driver is compatible with several NXP devices, the driver was renamed
 accordingly. This patch also changes the respective symbol names.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
----
- Documentation/i2c/instantiating-devices |    6 ++--
- drivers/usb/host/ohci-hcd.c             |    2 +-
- drivers/usb/host/ohci-nxp.c             |   53 ++++++++++++++++---------------
- 3 files changed, 31 insertions(+), 30 deletions(-)
 
-diff --git a/Documentation/i2c/instantiating-devices b/Documentation/i2c/instantiating-devices
-index 9edb75d..abf6361 100644
---- a/Documentation/i2c/instantiating-devices
-+++ b/Documentation/i2c/instantiating-devices
-@@ -87,11 +87,11 @@ it may have different addresses from one board to the next (manufacturer
+---
+ Documentation/i2c/instantiating-devices |    6 +--
+ drivers/usb/host/ohci-hcd.c             |    2 -
+ drivers/usb/host/ohci-nxp.c             |   55 ++++++++++++++++----------------
+ 3 files changed, 33 insertions(+), 30 deletions(-)
+
+--- linux-2.6.orig/Documentation/i2c/instantiating-devices
++++ linux-2.6/Documentation/i2c/instantiating-devices
+@@ -87,11 +87,11 @@ it may have different addresses from one
  changing its design without notice). In this case, you can call
  i2c_new_probed_device() instead of i2c_new_device().
  
@@ -35,7 +34,7 @@ index 9edb75d..abf6361 100644
  {
  	(...)
  	struct i2c_adapter *i2c_adap;
-@@ -100,7 +100,7 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+@@ -100,7 +100,7 @@ static int __devinit usb_hcd_pnx4008_pro
  	(...)
  	i2c_adap = i2c_get_adapter(2);
  	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
@@ -44,10 +43,8 @@ index 9edb75d..abf6361 100644
  	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
  						   normal_i2c, NULL);
  	i2c_put_adapter(i2c_adap);
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 713c66c..c190962 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
+--- linux-2.6.orig/drivers/usb/host/ohci-hcd.c
++++ linux-2.6/drivers/usb/host/ohci-hcd.c
 @@ -1052,7 +1052,7 @@ MODULE_LICENSE ("GPL");
  
  #ifdef CONFIG_ARCH_PNX4008
@@ -57,22 +54,22 @@ index 713c66c..c190962 100644
  #endif
  
  #ifdef CONFIG_ARCH_DAVINCI_DA8XX
-diff --git a/drivers/usb/host/ohci-nxp.c b/drivers/usb/host/ohci-nxp.c
-index 0013db7..a12c6b4 100644
---- a/drivers/usb/host/ohci-nxp.c
-+++ b/drivers/usb/host/ohci-nxp.c
-@@ -1,7 +1,8 @@
+--- linux-2.6.orig/drivers/usb/host/ohci-nxp.c
++++ linux-2.6/drivers/usb/host/ohci-nxp.c
+@@ -1,7 +1,10 @@
  /*
 - * drivers/usb/host/ohci-pnx4008.c
-+ * driver for NXP USB Host devices
++ * drivers/usb/host/ohci-nxp.c
   *
 - * driver for Philips PNX4008 USB Host
++ * driver for NXP USB Host devices
++ *
 + * Currently supported OHCI host devices:
 + * - Philips PNX4008
   *
   * Authors: Dmitry Chigirev <source@mvista.com>
   *	    Vitaly Wool <vitalywool@gmail.com>
-@@ -121,13 +122,13 @@ static int isp1301_remove(struct i2c_client *client)
+@@ -121,13 +124,13 @@ static int isp1301_remove(struct i2c_cli
  }
  
  static const struct i2c_device_id isp1301_id[] = {
@@ -88,7 +85,7 @@ index 0013db7..a12c6b4 100644
  	},
  	.probe = isp1301_probe,
  	.remove = isp1301_remove,
-@@ -180,14 +181,14 @@ static inline void isp1301_vbus_off(void)
+@@ -180,14 +183,14 @@ static inline void isp1301_vbus_off(void
  		  ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
  }
  
@@ -105,7 +102,7 @@ index 0013db7..a12c6b4 100644
  {
  	unsigned long tmp;
  	isp1301_vbus_off();
-@@ -195,7 +196,7 @@ static void pnx4008_stop_hc(void)
+@@ -195,7 +198,7 @@ static void pnx4008_stop_hc(void)
  	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
  }
  
@@ -114,7 +111,7 @@ index 0013db7..a12c6b4 100644
  {
  	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
  	int ret;
-@@ -211,9 +212,9 @@ static int __devinit ohci_pnx4008_start(struct usb_hcd *hcd)
+@@ -211,9 +214,9 @@ static int __devinit ohci_pnx4008_start(
  	return 0;
  }
  
@@ -126,7 +123,7 @@ index 0013db7..a12c6b4 100644
  
  	/*
  	 * generic hardware linkage
-@@ -225,7 +226,7 @@ static const struct hc_driver ohci_pnx4008_hc_driver = {
+@@ -225,7 +228,7 @@ static const struct hc_driver ohci_pnx40
  	/*
  	 * basic lifecycle operations
  	 */
@@ -135,7 +132,7 @@ index 0013db7..a12c6b4 100644
  	.stop = ohci_stop,
  	.shutdown = ohci_shutdown,
  
-@@ -255,7 +256,7 @@ static const struct hc_driver ohci_pnx4008_hc_driver = {
+@@ -255,7 +258,7 @@ static const struct hc_driver ohci_pnx40
  
  #define USB_CLOCK_MASK (AHB_M_CLOCK_ON| OTG_CLOCK_ON | HOST_CLOCK_ON | I2C_CLOCK_ON)
  
@@ -144,7 +141,7 @@ index 0013db7..a12c6b4 100644
  {
  	start_int_set_falling_edge(SE_USB_OTG_ATX_INT_N);
  	start_int_ack(SE_USB_OTG_ATX_INT_N);
-@@ -282,7 +283,7 @@ static void pnx4008_set_usb_bits(void)
+@@ -282,7 +285,7 @@ static void pnx4008_set_usb_bits(void)
  	start_int_umask(SE_USB_AHB_NEED_CLK_INT);
  }
  
@@ -153,7 +150,7 @@ index 0013db7..a12c6b4 100644
  {
  	start_int_mask(SE_USB_OTG_ATX_INT_N);
  	start_int_mask(SE_USB_OTG_TIMER_INT);
-@@ -292,17 +293,17 @@ static void pnx4008_unset_usb_bits(void)
+@@ -292,17 +295,17 @@ static void pnx4008_unset_usb_bits(void)
  	start_int_mask(SE_USB_AHB_NEED_CLK_INT);
  }
  
@@ -174,7 +171,7 @@ index 0013db7..a12c6b4 100644
  	if (usb_disabled()) {
  		err("USB is disabled");
  		ret = -ENODEV;
-@@ -327,7 +328,7 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+@@ -327,7 +330,7 @@ static int __devinit usb_hcd_pnx4008_pro
  	}
  	i2c_adap = i2c_get_adapter(2);
  	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
@@ -183,7 +180,7 @@ index 0013db7..a12c6b4 100644
  	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
  						   normal_i2c, NULL);
  	i2c_put_adapter(i2c_adap);
-@@ -375,7 +376,7 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+@@ -375,7 +378,7 @@ static int __devinit usb_hcd_pnx4008_pro
  	}
  
  	/* Set all USB bits in the Start Enable register */
@@ -192,7 +189,7 @@ index 0013db7..a12c6b4 100644
  
  	hcd->rsrc_start = pdev->resource[0].start;
  	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
-@@ -392,7 +393,7 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+@@ -392,7 +395,7 @@ static int __devinit usb_hcd_pnx4008_pro
  		goto out4;
  	}
  
@@ -201,7 +198,7 @@ index 0013db7..a12c6b4 100644
  	platform_set_drvdata(pdev, hcd);
  	ohci = hcd_to_ohci(hcd);
  	ohci_hcd_init(ohci);
-@@ -402,9 +403,9 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+@@ -402,9 +405,9 @@ static int __devinit usb_hcd_pnx4008_pro
  	if (ret == 0)
  		return ret;
  
@@ -213,7 +210,7 @@ index 0013db7..a12c6b4 100644
  	usb_put_hcd(hcd);
  out3:
  	clk_disable(usb_clk);
-@@ -419,15 +420,15 @@ out:
+@@ -419,15 +422,15 @@ out:
  	return ret;
  }
  
@@ -232,7 +229,7 @@ index 0013db7..a12c6b4 100644
  	clk_disable(usb_clk);
  	clk_put(usb_clk);
  	i2c_unregister_device(isp1301_i2c_client);
-@@ -442,12 +443,12 @@ static int usb_hcd_pnx4008_remove(struct platform_device *pdev)
+@@ -442,12 +445,12 @@ static int usb_hcd_pnx4008_remove(struct
  /* work with hotplug and coldplug */
  MODULE_ALIAS("platform:usb-ohci");
  
@@ -248,5 +245,3 @@ index 0013db7..a12c6b4 100644
 +	.remove = usb_hcd_nxp_remove,
  };
  
--- 
-1.7.9
