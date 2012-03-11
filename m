@@ -1,30 +1,23 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Mar 2012 11:55:44 +0000
-Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <4F591B8D.8090705@freescale.com>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
- <4F591B8D.8090705@freescale.com>
-Message-ID: <20120309115540.GE3273@opensource.wolfsonmicro.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Sun, 11 Mar 2012 12:29:59 +1100
+Subject: mfd: mc13xxx: add I2C support, V2
+Message-ID: <1331429402-9639-1-git-send-email-marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 08, 2012 at 02:50:21PM -0600, Timur Tabi wrote:
-> Shawn Guo wrote:
+Hi,                                                                                                                            
 
-> > More importantly, the imx machine drivers to be added working with
-> > fsl_ssi will not have this property, as they use new ASoC machine
-> > driver binding mechanism.
+This series (based on Samuel's mfd-2.6/for-next) adds I2C support for the
+mc13xxx family PMICs. Thanks to Oscar for adding dt support for the I2C driver.                       
 
-> I want to see that binding documented in Documentation/devicetree/bindings
-> first.
+V2 lets both I2C and SPI support be enabled at the same time and limits the 
+scope of common definitions by using a private include header rather than global
+one.
+The only issue from V1 [0] not addressed is the use of regmap - mainly, I don't
+have the time. I accept that this is a lame excuse but hope that use of regmap 
+can come later if it is required.
 
-That binding will generally be per machine driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/942ac0dc/attachment-0001.sig>
+Cheers,
+Marc                        
+
+[0] http://www.spinics.net/lists/linux-i2c/msg06992.html
