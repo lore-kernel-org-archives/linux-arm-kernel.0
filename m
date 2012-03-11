@@ -1,58 +1,41 @@
-From: uri.y@variscite.com (Uri Yosef)
-Date: Mon, 12 Mar 2012 12:20:29 +0200
-Subject: [PATCH]: arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule support
-Message-ID: <1331547629-17556-1-git-send-email-uri.y@variscite.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Sun, 11 Mar 2012 14:33:24 +0000
+Subject: [PATCH 0/2] Add support for DNS-320 and DNS-325 using devicetree
+Message-ID: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Uri yosef <uri.y@variscite.com>
+As agreed with Arnd Bergmann and Jason Cooper, include any board setup that
+cannot be done in devicetree in board-dt.c, then replace with devicetree
+entries.
 
- Hi Tony,
+The NAND driver is converted to devicetree as part of this patch series, 
+although I don't feel qualified to explain the parameters actually mean so 
+have left documentation fields blank.
 
- This patch add device tree support for Variscite OMAP4 System-On-Modeule.
+The patches should apply cleanly to staging/kirkwood/dt, although 
+kirkwood-dns320.dts attempts to override the orion-wdt definition with a
+lower TCLK, even though the orion-wdt work isn't merged yet. If this would
+be better to remove I shall.
 
- Regards,
- Uri Yosef
+Cheers,
 
----
- arch/arm/boot/dts/omap4-var_som.dts |   29 +++++++++++++++++++++++++++++
- 1 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4-var_som.dts
+Jamie Lentin (2):
+  ARM: kirkwood: Basic support for DNS-320 and DNS-325
+  ARM: kirkwood: Convert orion-nand to fdt
 
-diff --git a/arch/arm/boot/dts/omap4-var_som.dts b/arch/arm/boot/dts/omap4-var_som.dts
-new file mode 100644
-index 0000000..e352f38
---- /dev/null
-+++ b/arch/arm/boot/dts/omap4-var_som.dts
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) 2012 Variscite Ltd. - http://www.variscite.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+/include/ "omap4.dtsi"
-+
-+/ {
-+	model = "Variscite OMAP4 SOM";
-+	compatible = "var,omap4-var_som", "ti,omap4430", "ti,omap4";
-+
-+	/*
-+	 * Since the initial device tree board file does not create any
-+	 * devices (MMC, network...), the only way to boot is to provide a
-+	 * ramdisk.
-+	 */
-+	chosen {
-+		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>; /* 1 GB */
-+	};
-+};
+ .../devicetree/bindings/mtd/orion-nand.txt         |   41 +++
+ arch/arm/boot/dts/kirkwood-dns320.dts              |   96 +++++++
+ arch/arm/boot/dts/kirkwood-dns325.dts              |   82 ++++++
+ arch/arm/mach-kirkwood/Kconfig                     |   18 ++
+ arch/arm/mach-kirkwood/Makefile.boot               |    2 +
+ arch/arm/mach-kirkwood/board-dt.c                  |  264 ++++++++++++++++++++
+ arch/arm/mach-kirkwood/common.c                    |    6 +
+ drivers/mtd/nand/orion_nand.c                      |   39 +++-
+ 8 files changed, 546 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
+ create mode 100644 arch/arm/boot/dts/kirkwood-dns320.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-dns325.dts
+
 -- 
-1.7.5.4
+1.7.9.1
