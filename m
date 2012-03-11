@@ -1,370 +1,944 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Sun, 11 Mar 2012 12:30:00 +1100
-Subject: [PATCH v2 1/3] mfd: mc13xxx-core: Prepare for separate spi and i2c
- backends.
-In-Reply-To: <1331429402-9639-1-git-send-email-marc@cpdesign.com.au>
-References: <1331429402-9639-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1331429402-9639-2-git-send-email-marc@cpdesign.com.au>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 11 Mar 2012 02:46:13 +0100
+Subject: [PATCH v6 1/3] USB: OHCI-HCD: Rename ohci-pnx4008 to ohci-nxp
+In-Reply-To: <1331430375-31227-1-git-send-email-stigge@antcom.de>
+References: <1331430375-31227-1-git-send-email-stigge@antcom.de>
+Message-ID: <1331430375-31227-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch abstracts the bus specific operations from the driver core.
-Read and write handlers are introduced and generic initialization is
-consolidated into mc13xxx_comon_init. The irq member is removed because
-it is unused.
+Since this driver is compatible with several NXP devices, the driver is renamed
+accordingly. Please combine with the following patch which also changes the
+respective symbol names.
 
-Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+
 ---
- drivers/mfd/mc13xxx-core.c |  162 ++++++++++++++++++++++++++------------------
- 1 files changed, 97 insertions(+), 65 deletions(-)
+ drivers/usb/host/ohci-hcd.c     |    2 
+ drivers/usb/host/ohci-nxp.c     |  453 ++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/ohci-pnx4008.c |  453 ----------------------------------------
+ 3 files changed, 454 insertions(+), 454 deletions(-)
 
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index 7122386..19d94a1 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -22,12 +22,24 @@
- #include <linux/of_device.h>
- #include <linux/of_gpio.h>
+--- linux-2.6.orig/drivers/usb/host/ohci-hcd.c
++++ linux-2.6/drivers/usb/host/ohci-hcd.c
+@@ -1051,7 +1051,7 @@ MODULE_LICENSE ("GPL");
+ #endif
  
-+enum mc13xxx_id {
-+	MC13XXX_ID_MC13783,
-+	MC13XXX_ID_MC13892,
-+	MC13XXX_ID_INVALID,
+ #ifdef CONFIG_ARCH_PNX4008
+-#include "ohci-pnx4008.c"
++#include "ohci-nxp.c"
+ #define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
+ #endif
+ 
+--- /dev/null
++++ linux-2.6/drivers/usb/host/ohci-nxp.c
+@@ -0,0 +1,453 @@
++/*
++ * drivers/usb/host/ohci-pnx4008.c
++ *
++ * driver for Philips PNX4008 USB Host
++ *
++ * Authors: Dmitry Chigirev <source@mvista.com>
++ *	    Vitaly Wool <vitalywool@gmail.com>
++ *
++ * register initialization is based on code examples provided by Philips
++ * Copyright (c) 2005 Koninklijke Philips Electronics N.V.
++ *
++ * NOTE: This driver does not have suspend/resume functionality
++ * This driver is intended for engineering development purposes only
++ *
++ * 2005-2006 (c) MontaVista Software, Inc. This file is licensed under
++ * the terms of the GNU General Public License version 2. This program
++ * is licensed "as is" without any warranty of any kind, whether express
++ * or implied.
++ */
++#include <linux/clk.h>
++#include <linux/platform_device.h>
++#include <linux/i2c.h>
++
++#include <mach/hardware.h>
++#include <asm/io.h>
++
++#include <mach/platform.h>
++#include <mach/irqs.h>
++#include <asm/gpio.h>
++
++#define USB_CTRL	IO_ADDRESS(PNX4008_PWRMAN_BASE + 0x64)
++
++/* USB_CTRL bit defines */
++#define USB_SLAVE_HCLK_EN	(1 << 24)
++#define USB_HOST_NEED_CLK_EN	(1 << 21)
++
++#define USB_OTG_CLK_CTRL	IO_ADDRESS(PNX4008_USB_CONFIG_BASE + 0xFF4)
++#define USB_OTG_CLK_STAT	IO_ADDRESS(PNX4008_USB_CONFIG_BASE + 0xFF8)
++
++/* USB_OTG_CLK_CTRL bit defines */
++#define AHB_M_CLOCK_ON		(1 << 4)
++#define OTG_CLOCK_ON		(1 << 3)
++#define I2C_CLOCK_ON		(1 << 2)
++#define DEV_CLOCK_ON		(1 << 1)
++#define HOST_CLOCK_ON		(1 << 0)
++
++#define USB_OTG_STAT_CONTROL	IO_ADDRESS(PNX4008_USB_CONFIG_BASE + 0x110)
++
++/* USB_OTG_STAT_CONTROL bit defines */
++#define TRANSPARENT_I2C_EN	(1 << 7)
++#define HOST_EN			(1 << 0)
++
++/* ISP1301 USB transceiver I2C registers */
++#define	ISP1301_MODE_CONTROL_1		0x04	/* u8 read, set, +1 clear */
++
++#define	MC1_SPEED_REG		(1 << 0)
++#define	MC1_SUSPEND_REG		(1 << 1)
++#define	MC1_DAT_SE0		(1 << 2)
++#define	MC1_TRANSPARENT		(1 << 3)
++#define	MC1_BDIS_ACON_EN	(1 << 4)
++#define	MC1_OE_INT_EN		(1 << 5)
++#define	MC1_UART_EN		(1 << 6)
++#define	MC1_MASK		0x7f
++
++#define	ISP1301_MODE_CONTROL_2		0x12	/* u8 read, set, +1 clear */
++
++#define	MC2_GLOBAL_PWR_DN	(1 << 0)
++#define	MC2_SPD_SUSP_CTRL	(1 << 1)
++#define	MC2_BI_DI		(1 << 2)
++#define	MC2_TRANSP_BDIR0	(1 << 3)
++#define	MC2_TRANSP_BDIR1	(1 << 4)
++#define	MC2_AUDIO_EN		(1 << 5)
++#define	MC2_PSW_EN		(1 << 6)
++#define	MC2_EN2V7		(1 << 7)
++
++#define	ISP1301_OTG_CONTROL_1		0x06	/* u8 read, set, +1 clear */
++#	define	OTG1_DP_PULLUP		(1 << 0)
++#	define	OTG1_DM_PULLUP		(1 << 1)
++#	define	OTG1_DP_PULLDOWN	(1 << 2)
++#	define	OTG1_DM_PULLDOWN	(1 << 3)
++#	define	OTG1_ID_PULLDOWN	(1 << 4)
++#	define	OTG1_VBUS_DRV		(1 << 5)
++#	define	OTG1_VBUS_DISCHRG	(1 << 6)
++#	define	OTG1_VBUS_CHRG		(1 << 7)
++#define	ISP1301_OTG_STATUS		0x10	/* u8 readonly */
++#	define	OTG_B_SESS_END		(1 << 6)
++#	define	OTG_B_SESS_VLD		(1 << 7)
++
++#define ISP1301_I2C_ADDR 0x2C
++
++#define ISP1301_I2C_MODE_CONTROL_1 0x4
++#define ISP1301_I2C_MODE_CONTROL_2 0x12
++#define ISP1301_I2C_OTG_CONTROL_1 0x6
++#define ISP1301_I2C_OTG_CONTROL_2 0x10
++#define ISP1301_I2C_INTERRUPT_SOURCE 0x8
++#define ISP1301_I2C_INTERRUPT_LATCH 0xA
++#define ISP1301_I2C_INTERRUPT_FALLING 0xC
++#define ISP1301_I2C_INTERRUPT_RISING 0xE
++#define ISP1301_I2C_REG_CLEAR_ADDR 1
++
++static struct i2c_driver isp1301_driver;
++static struct i2c_client *isp1301_i2c_client;
++
++extern int usb_disabled(void);
++extern int ocpi_enable(void);
++
++static struct clk *usb_clk;
++
++static const unsigned short normal_i2c[] =
++    { ISP1301_I2C_ADDR, ISP1301_I2C_ADDR + 1, I2C_CLIENT_END };
++
++static int isp1301_probe(struct i2c_client *client,
++			 const struct i2c_device_id *id)
++{
++	return 0;
++}
++
++static int isp1301_remove(struct i2c_client *client)
++{
++	return 0;
++}
++
++static const struct i2c_device_id isp1301_id[] = {
++	{ "isp1301_pnx", 0 },
++	{ }
 +};
 +
- struct mc13xxx {
- 	struct spi_device *spidev;
++static struct i2c_driver isp1301_driver = {
++	.driver = {
++		.name = "isp1301_pnx",
++	},
++	.probe = isp1301_probe,
++	.remove = isp1301_remove,
++	.id_table = isp1301_id,
++};
 +
-+	struct device *dev;
-+	enum mc13xxx_id ictype;
-+
- 	struct mutex lock;
--	int irq;
- 	int flags;
- 
-+	int (*read_dev)(struct mc13xxx *, unsigned int, u32 *);
-+	int (*write_dev)(struct mc13xxx *, unsigned int, u32);
-+
- 	irq_handler_t irqhandler[MC13XXX_NUM_IRQ];
- 	void *irqdata[MC13XXX_NUM_IRQ];
- 
-@@ -144,36 +156,32 @@ struct mc13xxx {
- void mc13xxx_lock(struct mc13xxx *mc13xxx)
- {
- 	if (!mutex_trylock(&mc13xxx->lock)) {
--		dev_dbg(&mc13xxx->spidev->dev, "wait for %s from %pf\n",
-+		dev_dbg(mc13xxx->dev, "wait for %s from %pf\n",
- 				__func__, __builtin_return_address(0));
- 
- 		mutex_lock(&mc13xxx->lock);
- 	}
--	dev_dbg(&mc13xxx->spidev->dev, "%s from %pf\n",
-+	dev_dbg(mc13xxx->dev, "%s from %pf\n",
- 			__func__, __builtin_return_address(0));
- }
- EXPORT_SYMBOL(mc13xxx_lock);
- 
- void mc13xxx_unlock(struct mc13xxx *mc13xxx)
- {
--	dev_dbg(&mc13xxx->spidev->dev, "%s from %pf\n",
-+	dev_dbg(mc13xxx->dev, "%s from %pf\n",
- 			__func__, __builtin_return_address(0));
- 	mutex_unlock(&mc13xxx->lock);
- }
- EXPORT_SYMBOL(mc13xxx_unlock);
- 
- #define MC13XXX_REGOFFSET_SHIFT 25
--int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
-+static int mc13xxx_spi_reg_read(struct mc13xxx *mc13xxx,
-+				unsigned int offset, u32 *val)
- {
- 	struct spi_transfer t;
- 	struct spi_message m;
- 	int ret;
- 
--	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
--
--	if (offset > MC13XXX_NUMREGS)
--		return -EINVAL;
--
- 	*val = offset << MC13XXX_REGOFFSET_SHIFT;
- 
- 	memset(&t, 0, sizeof(t));
-@@ -195,26 +203,17 @@ int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
- 
- 	*val &= 0xffffff;
- 
--	dev_vdbg(&mc13xxx->spidev->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
--
- 	return 0;
- }
--EXPORT_SYMBOL(mc13xxx_reg_read);
- 
--int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
-+static int mc13xxx_spi_reg_write(struct mc13xxx *mc13xxx, unsigned int offset,
-+		u32 val)
- {
- 	u32 buf;
- 	struct spi_transfer t;
- 	struct spi_message m;
- 	int ret;
- 
--	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
--
--	dev_vdbg(&mc13xxx->spidev->dev, "[0x%02x] <- 0x%06x\n", offset, val);
--
--	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
--		return -EINVAL;
--
- 	buf = 1 << 31 | offset << MC13XXX_REGOFFSET_SHIFT | val;
- 
- 	memset(&t, 0, sizeof(t));
-@@ -235,6 +234,34 @@ int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
- 
- 	return 0;
- }
-+
-+int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
++static void i2c_write(u8 buf, u8 subaddr)
 +{
++	char tmpbuf[2];
++
++	tmpbuf[0] = subaddr;	/*register number */
++	tmpbuf[1] = buf;	/*register data */
++	i2c_master_send(isp1301_i2c_client, &tmpbuf[0], 2);
++}
++
++static void isp1301_configure(void)
++{
++	/* PNX4008 only supports DAT_SE0 USB mode */
++	/* PNX4008 R2A requires setting the MAX603 to output 3.6V */
++	/* Power up externel charge-pump */
++
++	i2c_write(MC1_DAT_SE0 | MC1_SPEED_REG, ISP1301_I2C_MODE_CONTROL_1);
++	i2c_write(~(MC1_DAT_SE0 | MC1_SPEED_REG),
++		  ISP1301_I2C_MODE_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL,
++		  ISP1301_I2C_MODE_CONTROL_2);
++	i2c_write(~(MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL),
++		  ISP1301_I2C_MODE_CONTROL_2 | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN,
++		  ISP1301_I2C_OTG_CONTROL_1);
++	i2c_write(~(OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN),
++		  ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(0xFF,
++		  ISP1301_I2C_INTERRUPT_LATCH | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(0xFF,
++		  ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
++	i2c_write(0xFF,
++		  ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
++
++}
++
++static inline void isp1301_vbus_on(void)
++{
++	i2c_write(OTG1_VBUS_DRV, ISP1301_I2C_OTG_CONTROL_1);
++}
++
++static inline void isp1301_vbus_off(void)
++{
++	i2c_write(OTG1_VBUS_DRV,
++		  ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
++}
++
++static void pnx4008_start_hc(void)
++{
++	unsigned long tmp = __raw_readl(USB_OTG_STAT_CONTROL) | HOST_EN;
++	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
++	isp1301_vbus_on();
++}
++
++static void pnx4008_stop_hc(void)
++{
++	unsigned long tmp;
++	isp1301_vbus_off();
++	tmp = __raw_readl(USB_OTG_STAT_CONTROL) & ~HOST_EN;
++	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
++}
++
++static int __devinit ohci_pnx4008_start(struct usb_hcd *hcd)
++{
++	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
 +	int ret;
 +
-+	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
++	if ((ret = ohci_init(ohci)) < 0)
++		return ret;
 +
-+	if (offset > MC13XXX_NUMREGS)
-+		return -EINVAL;
-+
-+	ret = mc13xxx->read_dev(mc13xxx, offset, val);
-+	dev_vdbg(mc13xxx->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
-+
-+	return ret;
++	if ((ret = ohci_run(ohci)) < 0) {
++		dev_err(hcd->self.controller, "can't start\n");
++		ohci_stop(hcd);
++		return ret;
++	}
++	return 0;
 +}
-+EXPORT_SYMBOL(mc13xxx_reg_read);
 +
-+int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
-+{
-+	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
++static const struct hc_driver ohci_pnx4008_hc_driver = {
++	.description = hcd_name,
++	.product_desc =		"pnx4008 OHCI",
 +
-+	dev_vdbg(mc13xxx->dev, "[0x%02x] <- 0x%06x\n", offset, val);
-+
-+	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
-+		return -EINVAL;
-+
-+	return mc13xxx->write_dev(mc13xxx, offset, val);
-+}
- EXPORT_SYMBOL(mc13xxx_reg_write);
- 
- int mc13xxx_reg_rmw(struct mc13xxx *mc13xxx, unsigned int offset,
-@@ -439,7 +466,7 @@ static int mc13xxx_irq_handle(struct mc13xxx *mc13xxx,
- 			if (handled == IRQ_HANDLED)
- 				num_handled++;
- 		} else {
--			dev_err(&mc13xxx->spidev->dev,
-+			dev_err(mc13xxx->dev,
- 					"BUG: irq %u but no handler\n",
- 					baseirq + irq);
- 
-@@ -475,25 +502,23 @@ static irqreturn_t mc13xxx_irq_thread(int irq, void *data)
- 	return IRQ_RETVAL(handled);
- }
- 
--enum mc13xxx_id {
--	MC13XXX_ID_MC13783,
--	MC13XXX_ID_MC13892,
--	MC13XXX_ID_INVALID,
--};
--
- static const char *mc13xxx_chipname[] = {
- 	[MC13XXX_ID_MC13783] = "mc13783",
- 	[MC13XXX_ID_MC13892] = "mc13892",
- };
- 
- #define maskval(reg, mask)	(((reg) & (mask)) >> __ffs(mask))
--static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
-+static int mc13xxx_identify(struct mc13xxx *mc13xxx)
- {
- 	u32 icid;
- 	u32 revision;
--	const char *name;
- 	int ret;
- 
 +	/*
-+	 * Get the generation ID from register 46, as apparently some older
-+	 * IC revisions only have this info at this location. Newer ICs seem to
-+	 * have both.
++	 * generic hardware linkage
 +	 */
- 	ret = mc13xxx_reg_read(mc13xxx, 46, &icid);
- 	if (ret)
- 		return ret;
-@@ -502,26 +527,23 @@ static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
- 
- 	switch (icid) {
- 	case 2:
--		*id = MC13XXX_ID_MC13783;
--		name = "mc13783";
-+		mc13xxx->ictype = MC13XXX_ID_MC13783;
- 		break;
- 	case 7:
--		*id = MC13XXX_ID_MC13892;
--		name = "mc13892";
-+		mc13xxx->ictype = MC13XXX_ID_MC13892;
- 		break;
- 	default:
--		*id = MC13XXX_ID_INVALID;
-+		mc13xxx->ictype = MC13XXX_ID_INVALID;
- 		break;
- 	}
- 
--	if (*id == MC13XXX_ID_MC13783 || *id == MC13XXX_ID_MC13892) {
-+	if (mc13xxx->ictype == MC13XXX_ID_MC13783 ||
-+			mc13xxx->ictype == MC13XXX_ID_MC13892) {
- 		ret = mc13xxx_reg_read(mc13xxx, MC13XXX_REVISION, &revision);
--		if (ret)
--			return ret;
- 
--		dev_info(&mc13xxx->spidev->dev, "%s: rev: %d.%d, "
-+		dev_info(mc13xxx->dev, "%s: rev: %d.%d, "
- 				"fin: %d, fab: %d, icid: %d/%d\n",
--				mc13xxx_chipname[*id],
-+				mc13xxx_chipname[mc13xxx->ictype],
- 				maskval(revision, MC13XXX_REVISION_REVFULL),
- 				maskval(revision, MC13XXX_REVISION_REVMETAL),
- 				maskval(revision, MC13XXX_REVISION_FIN),
-@@ -530,26 +552,12 @@ static int mc13xxx_identify(struct mc13xxx *mc13xxx, enum mc13xxx_id *id)
- 				maskval(revision, MC13XXX_REVISION_ICIDCODE));
- 	}
- 
--	if (*id != MC13XXX_ID_INVALID) {
--		const struct spi_device_id *devid =
--			spi_get_device_id(mc13xxx->spidev);
--		if (!devid || devid->driver_data != *id)
--			dev_warn(&mc13xxx->spidev->dev, "device id doesn't "
--					"match auto detection!\n");
--	}
--
--	return 0;
-+	return (mc13xxx->ictype == MC13XXX_ID_INVALID) ? -ENODEV : 0;
- }
- 
- static const char *mc13xxx_get_chipname(struct mc13xxx *mc13xxx)
- {
--	const struct spi_device_id *devid =
--		spi_get_device_id(mc13xxx->spidev);
--
--	if (!devid)
--		return NULL;
--
--	return mc13xxx_chipname[devid->driver_data];
-+	return mc13xxx_chipname[mc13xxx->ictype];
- }
- 
- int mc13xxx_get_flags(struct mc13xxx *mc13xxx)
-@@ -589,7 +597,7 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
- 	};
- 	init_completion(&adcdone_data.done);
- 
--	dev_dbg(&mc13xxx->spidev->dev, "%s\n", __func__);
-+	dev_dbg(mc13xxx->dev, "%s\n", __func__);
- 
- 	mc13xxx_lock(mc13xxx);
- 
-@@ -631,7 +639,7 @@ int mc13xxx_adc_do_conversion(struct mc13xxx *mc13xxx, unsigned int mode,
- 		return -EINVAL;
- 	}
- 
--	dev_dbg(&mc13xxx->spidev->dev, "%s: request irq\n", __func__);
-+	dev_dbg(mc13xxx->dev, "%s: request irq\n", __func__);
- 	mc13xxx_irq_request(mc13xxx, MC13XXX_IRQ_ADCDONE,
- 			mc13xxx_handler_adcdone, __func__, &adcdone_data);
- 	mc13xxx_irq_ack(mc13xxx, MC13XXX_IRQ_ADCDONE);
-@@ -689,7 +697,7 @@ static int mc13xxx_add_subdevice_pdata(struct mc13xxx *mc13xxx,
- 	if (!cell.name)
- 		return -ENOMEM;
- 
--	return mfd_add_devices(&mc13xxx->spidev->dev, -1, &cell, 1, NULL, 0);
-+	return mfd_add_devices(mc13xxx->dev, -1, &cell, 1, NULL, 0);
- }
- 
- static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
-@@ -700,7 +708,7 @@ static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
- #ifdef CONFIG_OF
- static int mc13xxx_probe_flags_dt(struct mc13xxx *mc13xxx)
- {
--	struct device_node *np = mc13xxx->spidev->dev.of_node;
-+	struct device_node *np = mc13xxx->dev.of_node;
- 
- 	if (!np)
- 		return -ENODEV;
-@@ -746,13 +754,15 @@ static const struct of_device_id mc13xxx_dt_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, mc13xxx_dt_ids);
- 
-+static int mc13xxx_common_init(struct mc13xxx *mc13xxx,
-+		struct mc13xxx_platform_data *pdata, int irq);
++	.irq = ohci_irq,
++	.flags = HCD_USB11 | HCD_MEMORY,
 +
- static int mc13xxx_probe(struct spi_device *spi)
- {
- 	const struct of_device_id *of_id;
- 	struct spi_driver *sdrv = to_spi_driver(spi->dev.driver);
- 	struct mc13xxx *mc13xxx;
- 	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
--	enum mc13xxx_id id;
- 	int ret;
- 
- 	of_id = of_match_device(mc13xxx_dt_ids, &spi->dev);
-@@ -768,13 +778,36 @@ static int mc13xxx_probe(struct spi_device *spi)
- 	spi->bits_per_word = 32;
- 	spi_setup(spi);
- 
-+	mc13xxx->dev = &spi->dev;
- 	mc13xxx->spidev = spi;
-+	mc13xxx->read_dev = mc13xxx_spi_reg_read;
-+	mc13xxx->write_dev = mc13xxx_spi_reg_write;
++	.hcd_priv_size =	sizeof(struct ohci_hcd),
++	/*
++	 * basic lifecycle operations
++	 */
++	.start = ohci_pnx4008_start,
++	.stop = ohci_stop,
++	.shutdown = ohci_shutdown,
 +
-+	ret = mc13xxx_common_init(mc13xxx, pdata, spi->irq);
++	/*
++	 * managing i/o requests and associated device resources
++	 */
++	.urb_enqueue = ohci_urb_enqueue,
++	.urb_dequeue = ohci_urb_dequeue,
++	.endpoint_disable = ohci_endpoint_disable,
 +
-+	if (ret) {
-+		dev_set_drvdata(&spi->dev, NULL);
-+	} else {
-+		const struct spi_device_id *devid =
-+			spi_get_device_id(mc13xxx->spidev);
-+		if (!devid || devid->driver_data != mc13xxx->ictype)
-+			dev_warn(mc13xxx->dev,
-+				"device id doesn't match auto detection!\n");
++	/*
++	 * scheduling support
++	 */
++	.get_frame_number = ohci_get_frame,
++
++	/*
++	 * root hub support
++	 */
++	.hub_status_data = ohci_hub_status_data,
++	.hub_control = ohci_hub_control,
++#ifdef	CONFIG_PM
++	.bus_suspend = ohci_bus_suspend,
++	.bus_resume = ohci_bus_resume,
++#endif
++	.start_port_reset = ohci_start_port_reset,
++};
++
++#define USB_CLOCK_MASK (AHB_M_CLOCK_ON| OTG_CLOCK_ON | HOST_CLOCK_ON | I2C_CLOCK_ON)
++
++static void pnx4008_set_usb_bits(void)
++{
++	start_int_set_falling_edge(SE_USB_OTG_ATX_INT_N);
++	start_int_ack(SE_USB_OTG_ATX_INT_N);
++	start_int_umask(SE_USB_OTG_ATX_INT_N);
++
++	start_int_set_rising_edge(SE_USB_OTG_TIMER_INT);
++	start_int_ack(SE_USB_OTG_TIMER_INT);
++	start_int_umask(SE_USB_OTG_TIMER_INT);
++
++	start_int_set_rising_edge(SE_USB_I2C_INT);
++	start_int_ack(SE_USB_I2C_INT);
++	start_int_umask(SE_USB_I2C_INT);
++
++	start_int_set_rising_edge(SE_USB_INT);
++	start_int_ack(SE_USB_INT);
++	start_int_umask(SE_USB_INT);
++
++	start_int_set_rising_edge(SE_USB_NEED_CLK_INT);
++	start_int_ack(SE_USB_NEED_CLK_INT);
++	start_int_umask(SE_USB_NEED_CLK_INT);
++
++	start_int_set_rising_edge(SE_USB_AHB_NEED_CLK_INT);
++	start_int_ack(SE_USB_AHB_NEED_CLK_INT);
++	start_int_umask(SE_USB_AHB_NEED_CLK_INT);
++}
++
++static void pnx4008_unset_usb_bits(void)
++{
++	start_int_mask(SE_USB_OTG_ATX_INT_N);
++	start_int_mask(SE_USB_OTG_TIMER_INT);
++	start_int_mask(SE_USB_I2C_INT);
++	start_int_mask(SE_USB_INT);
++	start_int_mask(SE_USB_NEED_CLK_INT);
++	start_int_mask(SE_USB_AHB_NEED_CLK_INT);
++}
++
++static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
++{
++	struct usb_hcd *hcd = 0;
++	struct ohci_hcd *ohci;
++	const struct hc_driver *driver = &ohci_pnx4008_hc_driver;
++	struct i2c_adapter *i2c_adap;
++	struct i2c_board_info i2c_info;
++
++	int ret = 0, irq;
++
++	dev_dbg(&pdev->dev, "%s: " DRIVER_DESC " (pnx4008)\n", hcd_name);
++	if (usb_disabled()) {
++		err("USB is disabled");
++		ret = -ENODEV;
++		goto out;
 +	}
 +
++	if (pdev->num_resources != 2
++	    || pdev->resource[0].flags != IORESOURCE_MEM
++	    || pdev->resource[1].flags != IORESOURCE_IRQ) {
++		err("Invalid resource configuration");
++		ret = -ENODEV;
++		goto out;
++	}
++
++	/* Enable AHB slave USB clock, needed for further USB clock control */
++	__raw_writel(USB_SLAVE_HCLK_EN | (1 << 19), USB_CTRL);
++
++	ret = i2c_add_driver(&isp1301_driver);
++	if (ret < 0) {
++		err("failed to add ISP1301 driver");
++		goto out;
++	}
++	i2c_adap = i2c_get_adapter(2);
++	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
++	strlcpy(i2c_info.type, "isp1301_pnx", I2C_NAME_SIZE);
++	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
++						   normal_i2c, NULL);
++	i2c_put_adapter(i2c_adap);
++	if (!isp1301_i2c_client) {
++		err("failed to connect I2C to ISP1301 USB Transceiver");
++		ret = -ENODEV;
++		goto out_i2c_driver;
++	}
++
++	isp1301_configure();
++
++	/* Enable USB PLL */
++	usb_clk = clk_get(&pdev->dev, "ck_pll5");
++	if (IS_ERR(usb_clk)) {
++		err("failed to acquire USB PLL");
++		ret = PTR_ERR(usb_clk);
++		goto out1;
++	}
++
++	ret = clk_enable(usb_clk);
++	if (ret < 0) {
++		err("failed to start USB PLL");
++		goto out2;
++	}
++
++	ret = clk_set_rate(usb_clk, 48000);
++	if (ret < 0) {
++		err("failed to set USB clock rate");
++		goto out3;
++	}
++
++	__raw_writel(__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN, USB_CTRL);
++
++	/* Set to enable all needed USB clocks */
++	__raw_writel(USB_CLOCK_MASK, USB_OTG_CLK_CTRL);
++
++	while ((__raw_readl(USB_OTG_CLK_STAT) & USB_CLOCK_MASK) !=
++	       USB_CLOCK_MASK) ;
++
++	hcd = usb_create_hcd (driver, &pdev->dev, dev_name(&pdev->dev));
++	if (!hcd) {
++		err("Failed to allocate HC buffer");
++		ret = -ENOMEM;
++		goto out3;
++	}
++
++	/* Set all USB bits in the Start Enable register */
++	pnx4008_set_usb_bits();
++
++	hcd->rsrc_start = pdev->resource[0].start;
++	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
++	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
++		dev_dbg(&pdev->dev, "request_mem_region failed\n");
++		ret =  -ENOMEM;
++		goto out4;
++	}
++	hcd->regs = (void __iomem *)pdev->resource[0].start;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		ret = -ENXIO;
++		goto out4;
++	}
++
++	pnx4008_start_hc();
++	platform_set_drvdata(pdev, hcd);
++	ohci = hcd_to_ohci(hcd);
++	ohci_hcd_init(ohci);
++
++	dev_info(&pdev->dev, "at 0x%p, irq %d\n", hcd->regs, hcd->irq);
++	ret = usb_add_hcd(hcd, irq, 0);
++	if (ret == 0)
++		return ret;
++
++	pnx4008_stop_hc();
++out4:
++	pnx4008_unset_usb_bits();
++	usb_put_hcd(hcd);
++out3:
++	clk_disable(usb_clk);
++out2:
++	clk_put(usb_clk);
++out1:
++	i2c_unregister_device(isp1301_i2c_client);
++	isp1301_i2c_client = NULL;
++out_i2c_driver:
++	i2c_del_driver(&isp1301_driver);
++out:
 +	return ret;
 +}
 +
-+static int mc13xxx_common_init(struct mc13xxx *mc13xxx,
-+		struct mc13xxx_platform_data *pdata, int irq)
++static int usb_hcd_pnx4008_remove(struct platform_device *pdev)
 +{
-+	int ret;
- 
- 	mutex_init(&mc13xxx->lock);
- 	mc13xxx_lock(mc13xxx);
- 
--	ret = mc13xxx_identify(mc13xxx, &id);
--	if (ret || id == MC13XXX_ID_INVALID)
-+	ret = mc13xxx_identify(mc13xxx);
-+	if (ret)
- 		goto err_revision;
- 
- 	/* mask all irqs */
-@@ -786,14 +819,13 @@ static int mc13xxx_probe(struct spi_device *spi)
- 	if (ret)
- 		goto err_mask;
- 
--	ret = request_threaded_irq(spi->irq, NULL, mc13xxx_irq_thread,
-+	ret = request_threaded_irq(irq, NULL, mc13xxx_irq_thread,
- 			IRQF_ONESHOT | IRQF_TRIGGER_HIGH, "mc13xxx", mc13xxx);
- 
- 	if (ret) {
- err_mask:
- err_revision:
- 		mc13xxx_unlock(mc13xxx);
--		dev_set_drvdata(&spi->dev, NULL);
- 		kfree(mc13xxx);
- 		return ret;
- 	}
--- 
-1.7.3.4
++	struct usb_hcd *hcd = platform_get_drvdata(pdev);
++
++	usb_remove_hcd(hcd);
++	pnx4008_stop_hc();
++	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
++	usb_put_hcd(hcd);
++	pnx4008_unset_usb_bits();
++	clk_disable(usb_clk);
++	clk_put(usb_clk);
++	i2c_unregister_device(isp1301_i2c_client);
++	isp1301_i2c_client = NULL;
++	i2c_del_driver(&isp1301_driver);
++
++	platform_set_drvdata(pdev, NULL);
++
++	return 0;
++}
++
++/* work with hotplug and coldplug */
++MODULE_ALIAS("platform:usb-ohci");
++
++static struct platform_driver usb_hcd_pnx4008_driver = {
++	.driver = {
++		.name = "usb-ohci",
++		.owner	= THIS_MODULE,
++	},
++	.probe = usb_hcd_pnx4008_probe,
++	.remove = usb_hcd_pnx4008_remove,
++};
++
+--- linux-2.6.orig/drivers/usb/host/ohci-pnx4008.c
++++ /dev/null
+@@ -1,453 +0,0 @@
+-/*
+- * drivers/usb/host/ohci-pnx4008.c
+- *
+- * driver for Philips PNX4008 USB Host
+- *
+- * Authors: Dmitry Chigirev <source@mvista.com>
+- *	    Vitaly Wool <vitalywool@gmail.com>
+- *
+- * register initialization is based on code examples provided by Philips
+- * Copyright (c) 2005 Koninklijke Philips Electronics N.V.
+- *
+- * NOTE: This driver does not have suspend/resume functionality
+- * This driver is intended for engineering development purposes only
+- *
+- * 2005-2006 (c) MontaVista Software, Inc. This file is licensed under
+- * the terms of the GNU General Public License version 2. This program
+- * is licensed "as is" without any warranty of any kind, whether express
+- * or implied.
+- */
+-#include <linux/clk.h>
+-#include <linux/platform_device.h>
+-#include <linux/i2c.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/io.h>
+-
+-#include <mach/platform.h>
+-#include <mach/irqs.h>
+-#include <asm/gpio.h>
+-
+-#define USB_CTRL	IO_ADDRESS(PNX4008_PWRMAN_BASE + 0x64)
+-
+-/* USB_CTRL bit defines */
+-#define USB_SLAVE_HCLK_EN	(1 << 24)
+-#define USB_HOST_NEED_CLK_EN	(1 << 21)
+-
+-#define USB_OTG_CLK_CTRL	IO_ADDRESS(PNX4008_USB_CONFIG_BASE + 0xFF4)
+-#define USB_OTG_CLK_STAT	IO_ADDRESS(PNX4008_USB_CONFIG_BASE + 0xFF8)
+-
+-/* USB_OTG_CLK_CTRL bit defines */
+-#define AHB_M_CLOCK_ON		(1 << 4)
+-#define OTG_CLOCK_ON		(1 << 3)
+-#define I2C_CLOCK_ON		(1 << 2)
+-#define DEV_CLOCK_ON		(1 << 1)
+-#define HOST_CLOCK_ON		(1 << 0)
+-
+-#define USB_OTG_STAT_CONTROL	IO_ADDRESS(PNX4008_USB_CONFIG_BASE + 0x110)
+-
+-/* USB_OTG_STAT_CONTROL bit defines */
+-#define TRANSPARENT_I2C_EN	(1 << 7)
+-#define HOST_EN			(1 << 0)
+-
+-/* ISP1301 USB transceiver I2C registers */
+-#define	ISP1301_MODE_CONTROL_1		0x04	/* u8 read, set, +1 clear */
+-
+-#define	MC1_SPEED_REG		(1 << 0)
+-#define	MC1_SUSPEND_REG		(1 << 1)
+-#define	MC1_DAT_SE0		(1 << 2)
+-#define	MC1_TRANSPARENT		(1 << 3)
+-#define	MC1_BDIS_ACON_EN	(1 << 4)
+-#define	MC1_OE_INT_EN		(1 << 5)
+-#define	MC1_UART_EN		(1 << 6)
+-#define	MC1_MASK		0x7f
+-
+-#define	ISP1301_MODE_CONTROL_2		0x12	/* u8 read, set, +1 clear */
+-
+-#define	MC2_GLOBAL_PWR_DN	(1 << 0)
+-#define	MC2_SPD_SUSP_CTRL	(1 << 1)
+-#define	MC2_BI_DI		(1 << 2)
+-#define	MC2_TRANSP_BDIR0	(1 << 3)
+-#define	MC2_TRANSP_BDIR1	(1 << 4)
+-#define	MC2_AUDIO_EN		(1 << 5)
+-#define	MC2_PSW_EN		(1 << 6)
+-#define	MC2_EN2V7		(1 << 7)
+-
+-#define	ISP1301_OTG_CONTROL_1		0x06	/* u8 read, set, +1 clear */
+-#	define	OTG1_DP_PULLUP		(1 << 0)
+-#	define	OTG1_DM_PULLUP		(1 << 1)
+-#	define	OTG1_DP_PULLDOWN	(1 << 2)
+-#	define	OTG1_DM_PULLDOWN	(1 << 3)
+-#	define	OTG1_ID_PULLDOWN	(1 << 4)
+-#	define	OTG1_VBUS_DRV		(1 << 5)
+-#	define	OTG1_VBUS_DISCHRG	(1 << 6)
+-#	define	OTG1_VBUS_CHRG		(1 << 7)
+-#define	ISP1301_OTG_STATUS		0x10	/* u8 readonly */
+-#	define	OTG_B_SESS_END		(1 << 6)
+-#	define	OTG_B_SESS_VLD		(1 << 7)
+-
+-#define ISP1301_I2C_ADDR 0x2C
+-
+-#define ISP1301_I2C_MODE_CONTROL_1 0x4
+-#define ISP1301_I2C_MODE_CONTROL_2 0x12
+-#define ISP1301_I2C_OTG_CONTROL_1 0x6
+-#define ISP1301_I2C_OTG_CONTROL_2 0x10
+-#define ISP1301_I2C_INTERRUPT_SOURCE 0x8
+-#define ISP1301_I2C_INTERRUPT_LATCH 0xA
+-#define ISP1301_I2C_INTERRUPT_FALLING 0xC
+-#define ISP1301_I2C_INTERRUPT_RISING 0xE
+-#define ISP1301_I2C_REG_CLEAR_ADDR 1
+-
+-static struct i2c_driver isp1301_driver;
+-static struct i2c_client *isp1301_i2c_client;
+-
+-extern int usb_disabled(void);
+-extern int ocpi_enable(void);
+-
+-static struct clk *usb_clk;
+-
+-static const unsigned short normal_i2c[] =
+-    { ISP1301_I2C_ADDR, ISP1301_I2C_ADDR + 1, I2C_CLIENT_END };
+-
+-static int isp1301_probe(struct i2c_client *client,
+-			 const struct i2c_device_id *id)
+-{
+-	return 0;
+-}
+-
+-static int isp1301_remove(struct i2c_client *client)
+-{
+-	return 0;
+-}
+-
+-static const struct i2c_device_id isp1301_id[] = {
+-	{ "isp1301_pnx", 0 },
+-	{ }
+-};
+-
+-static struct i2c_driver isp1301_driver = {
+-	.driver = {
+-		.name = "isp1301_pnx",
+-	},
+-	.probe = isp1301_probe,
+-	.remove = isp1301_remove,
+-	.id_table = isp1301_id,
+-};
+-
+-static void i2c_write(u8 buf, u8 subaddr)
+-{
+-	char tmpbuf[2];
+-
+-	tmpbuf[0] = subaddr;	/*register number */
+-	tmpbuf[1] = buf;	/*register data */
+-	i2c_master_send(isp1301_i2c_client, &tmpbuf[0], 2);
+-}
+-
+-static void isp1301_configure(void)
+-{
+-	/* PNX4008 only supports DAT_SE0 USB mode */
+-	/* PNX4008 R2A requires setting the MAX603 to output 3.6V */
+-	/* Power up externel charge-pump */
+-
+-	i2c_write(MC1_DAT_SE0 | MC1_SPEED_REG, ISP1301_I2C_MODE_CONTROL_1);
+-	i2c_write(~(MC1_DAT_SE0 | MC1_SPEED_REG),
+-		  ISP1301_I2C_MODE_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
+-	i2c_write(MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL,
+-		  ISP1301_I2C_MODE_CONTROL_2);
+-	i2c_write(~(MC2_BI_DI | MC2_PSW_EN | MC2_SPD_SUSP_CTRL),
+-		  ISP1301_I2C_MODE_CONTROL_2 | ISP1301_I2C_REG_CLEAR_ADDR);
+-	i2c_write(OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN,
+-		  ISP1301_I2C_OTG_CONTROL_1);
+-	i2c_write(~(OTG1_DM_PULLDOWN | OTG1_DP_PULLDOWN),
+-		  ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
+-	i2c_write(0xFF,
+-		  ISP1301_I2C_INTERRUPT_LATCH | ISP1301_I2C_REG_CLEAR_ADDR);
+-	i2c_write(0xFF,
+-		  ISP1301_I2C_INTERRUPT_FALLING | ISP1301_I2C_REG_CLEAR_ADDR);
+-	i2c_write(0xFF,
+-		  ISP1301_I2C_INTERRUPT_RISING | ISP1301_I2C_REG_CLEAR_ADDR);
+-
+-}
+-
+-static inline void isp1301_vbus_on(void)
+-{
+-	i2c_write(OTG1_VBUS_DRV, ISP1301_I2C_OTG_CONTROL_1);
+-}
+-
+-static inline void isp1301_vbus_off(void)
+-{
+-	i2c_write(OTG1_VBUS_DRV,
+-		  ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
+-}
+-
+-static void pnx4008_start_hc(void)
+-{
+-	unsigned long tmp = __raw_readl(USB_OTG_STAT_CONTROL) | HOST_EN;
+-	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
+-	isp1301_vbus_on();
+-}
+-
+-static void pnx4008_stop_hc(void)
+-{
+-	unsigned long tmp;
+-	isp1301_vbus_off();
+-	tmp = __raw_readl(USB_OTG_STAT_CONTROL) & ~HOST_EN;
+-	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
+-}
+-
+-static int __devinit ohci_pnx4008_start(struct usb_hcd *hcd)
+-{
+-	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+-	int ret;
+-
+-	if ((ret = ohci_init(ohci)) < 0)
+-		return ret;
+-
+-	if ((ret = ohci_run(ohci)) < 0) {
+-		dev_err(hcd->self.controller, "can't start\n");
+-		ohci_stop(hcd);
+-		return ret;
+-	}
+-	return 0;
+-}
+-
+-static const struct hc_driver ohci_pnx4008_hc_driver = {
+-	.description = hcd_name,
+-	.product_desc =		"pnx4008 OHCI",
+-
+-	/*
+-	 * generic hardware linkage
+-	 */
+-	.irq = ohci_irq,
+-	.flags = HCD_USB11 | HCD_MEMORY,
+-
+-	.hcd_priv_size =	sizeof(struct ohci_hcd),
+-	/*
+-	 * basic lifecycle operations
+-	 */
+-	.start = ohci_pnx4008_start,
+-	.stop = ohci_stop,
+-	.shutdown = ohci_shutdown,
+-
+-	/*
+-	 * managing i/o requests and associated device resources
+-	 */
+-	.urb_enqueue = ohci_urb_enqueue,
+-	.urb_dequeue = ohci_urb_dequeue,
+-	.endpoint_disable = ohci_endpoint_disable,
+-
+-	/*
+-	 * scheduling support
+-	 */
+-	.get_frame_number = ohci_get_frame,
+-
+-	/*
+-	 * root hub support
+-	 */
+-	.hub_status_data = ohci_hub_status_data,
+-	.hub_control = ohci_hub_control,
+-#ifdef	CONFIG_PM
+-	.bus_suspend = ohci_bus_suspend,
+-	.bus_resume = ohci_bus_resume,
+-#endif
+-	.start_port_reset = ohci_start_port_reset,
+-};
+-
+-#define USB_CLOCK_MASK (AHB_M_CLOCK_ON| OTG_CLOCK_ON | HOST_CLOCK_ON | I2C_CLOCK_ON)
+-
+-static void pnx4008_set_usb_bits(void)
+-{
+-	start_int_set_falling_edge(SE_USB_OTG_ATX_INT_N);
+-	start_int_ack(SE_USB_OTG_ATX_INT_N);
+-	start_int_umask(SE_USB_OTG_ATX_INT_N);
+-
+-	start_int_set_rising_edge(SE_USB_OTG_TIMER_INT);
+-	start_int_ack(SE_USB_OTG_TIMER_INT);
+-	start_int_umask(SE_USB_OTG_TIMER_INT);
+-
+-	start_int_set_rising_edge(SE_USB_I2C_INT);
+-	start_int_ack(SE_USB_I2C_INT);
+-	start_int_umask(SE_USB_I2C_INT);
+-
+-	start_int_set_rising_edge(SE_USB_INT);
+-	start_int_ack(SE_USB_INT);
+-	start_int_umask(SE_USB_INT);
+-
+-	start_int_set_rising_edge(SE_USB_NEED_CLK_INT);
+-	start_int_ack(SE_USB_NEED_CLK_INT);
+-	start_int_umask(SE_USB_NEED_CLK_INT);
+-
+-	start_int_set_rising_edge(SE_USB_AHB_NEED_CLK_INT);
+-	start_int_ack(SE_USB_AHB_NEED_CLK_INT);
+-	start_int_umask(SE_USB_AHB_NEED_CLK_INT);
+-}
+-
+-static void pnx4008_unset_usb_bits(void)
+-{
+-	start_int_mask(SE_USB_OTG_ATX_INT_N);
+-	start_int_mask(SE_USB_OTG_TIMER_INT);
+-	start_int_mask(SE_USB_I2C_INT);
+-	start_int_mask(SE_USB_INT);
+-	start_int_mask(SE_USB_NEED_CLK_INT);
+-	start_int_mask(SE_USB_AHB_NEED_CLK_INT);
+-}
+-
+-static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+-{
+-	struct usb_hcd *hcd = 0;
+-	struct ohci_hcd *ohci;
+-	const struct hc_driver *driver = &ohci_pnx4008_hc_driver;
+-	struct i2c_adapter *i2c_adap;
+-	struct i2c_board_info i2c_info;
+-
+-	int ret = 0, irq;
+-
+-	dev_dbg(&pdev->dev, "%s: " DRIVER_DESC " (pnx4008)\n", hcd_name);
+-	if (usb_disabled()) {
+-		err("USB is disabled");
+-		ret = -ENODEV;
+-		goto out;
+-	}
+-
+-	if (pdev->num_resources != 2
+-	    || pdev->resource[0].flags != IORESOURCE_MEM
+-	    || pdev->resource[1].flags != IORESOURCE_IRQ) {
+-		err("Invalid resource configuration");
+-		ret = -ENODEV;
+-		goto out;
+-	}
+-
+-	/* Enable AHB slave USB clock, needed for further USB clock control */
+-	__raw_writel(USB_SLAVE_HCLK_EN | (1 << 19), USB_CTRL);
+-
+-	ret = i2c_add_driver(&isp1301_driver);
+-	if (ret < 0) {
+-		err("failed to add ISP1301 driver");
+-		goto out;
+-	}
+-	i2c_adap = i2c_get_adapter(2);
+-	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
+-	strlcpy(i2c_info.type, "isp1301_pnx", I2C_NAME_SIZE);
+-	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
+-						   normal_i2c, NULL);
+-	i2c_put_adapter(i2c_adap);
+-	if (!isp1301_i2c_client) {
+-		err("failed to connect I2C to ISP1301 USB Transceiver");
+-		ret = -ENODEV;
+-		goto out_i2c_driver;
+-	}
+-
+-	isp1301_configure();
+-
+-	/* Enable USB PLL */
+-	usb_clk = clk_get(&pdev->dev, "ck_pll5");
+-	if (IS_ERR(usb_clk)) {
+-		err("failed to acquire USB PLL");
+-		ret = PTR_ERR(usb_clk);
+-		goto out1;
+-	}
+-
+-	ret = clk_enable(usb_clk);
+-	if (ret < 0) {
+-		err("failed to start USB PLL");
+-		goto out2;
+-	}
+-
+-	ret = clk_set_rate(usb_clk, 48000);
+-	if (ret < 0) {
+-		err("failed to set USB clock rate");
+-		goto out3;
+-	}
+-
+-	__raw_writel(__raw_readl(USB_CTRL) | USB_HOST_NEED_CLK_EN, USB_CTRL);
+-
+-	/* Set to enable all needed USB clocks */
+-	__raw_writel(USB_CLOCK_MASK, USB_OTG_CLK_CTRL);
+-
+-	while ((__raw_readl(USB_OTG_CLK_STAT) & USB_CLOCK_MASK) !=
+-	       USB_CLOCK_MASK) ;
+-
+-	hcd = usb_create_hcd (driver, &pdev->dev, dev_name(&pdev->dev));
+-	if (!hcd) {
+-		err("Failed to allocate HC buffer");
+-		ret = -ENOMEM;
+-		goto out3;
+-	}
+-
+-	/* Set all USB bits in the Start Enable register */
+-	pnx4008_set_usb_bits();
+-
+-	hcd->rsrc_start = pdev->resource[0].start;
+-	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
+-	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
+-		dev_dbg(&pdev->dev, "request_mem_region failed\n");
+-		ret =  -ENOMEM;
+-		goto out4;
+-	}
+-	hcd->regs = (void __iomem *)pdev->resource[0].start;
+-
+-	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0) {
+-		ret = -ENXIO;
+-		goto out4;
+-	}
+-
+-	pnx4008_start_hc();
+-	platform_set_drvdata(pdev, hcd);
+-	ohci = hcd_to_ohci(hcd);
+-	ohci_hcd_init(ohci);
+-
+-	dev_info(&pdev->dev, "at 0x%p, irq %d\n", hcd->regs, hcd->irq);
+-	ret = usb_add_hcd(hcd, irq, 0);
+-	if (ret == 0)
+-		return ret;
+-
+-	pnx4008_stop_hc();
+-out4:
+-	pnx4008_unset_usb_bits();
+-	usb_put_hcd(hcd);
+-out3:
+-	clk_disable(usb_clk);
+-out2:
+-	clk_put(usb_clk);
+-out1:
+-	i2c_unregister_device(isp1301_i2c_client);
+-	isp1301_i2c_client = NULL;
+-out_i2c_driver:
+-	i2c_del_driver(&isp1301_driver);
+-out:
+-	return ret;
+-}
+-
+-static int usb_hcd_pnx4008_remove(struct platform_device *pdev)
+-{
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+-
+-	usb_remove_hcd(hcd);
+-	pnx4008_stop_hc();
+-	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+-	usb_put_hcd(hcd);
+-	pnx4008_unset_usb_bits();
+-	clk_disable(usb_clk);
+-	clk_put(usb_clk);
+-	i2c_unregister_device(isp1301_i2c_client);
+-	isp1301_i2c_client = NULL;
+-	i2c_del_driver(&isp1301_driver);
+-
+-	platform_set_drvdata(pdev, NULL);
+-
+-	return 0;
+-}
+-
+-/* work with hotplug and coldplug */
+-MODULE_ALIAS("platform:usb-ohci");
+-
+-static struct platform_driver usb_hcd_pnx4008_driver = {
+-	.driver = {
+-		.name = "usb-ohci",
+-		.owner	= THIS_MODULE,
+-	},
+-	.probe = usb_hcd_pnx4008_probe,
+-	.remove = usb_hcd_pnx4008_remove,
+-};
+-
