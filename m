@@ -1,82 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Mar 2012 10:31:51 -0800
-Subject: [PATCH v2] ARM: OMAP: WiLink platform data for the PandaBoard
-In-Reply-To: <1331074504-22683-1-git-send-email-mgherzan@gmail.com>
-References: <1331074504-22683-1-git-send-email-mgherzan@gmail.com>
-Message-ID: <20120309183150.GH12083@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 11 Mar 2012 00:56:14 -0800
+Subject: [GIT PULL v2 3/4] Samsung devel-mmc for v3.4
+Message-ID: <4F5C68AE.4000101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luca,
+Hi Arnd, Olof
 
-* Mircea Gherzan <mgherzan@gmail.com> [120306 14:23]:
-> The "uim" deamon requires sysfs entries that are filled in using
-> this platform data.
-> 
-> Signed-off-by: Mircea Gherzan <mgherzan@gmail.com>
-> ---
->  arch/arm/mach-omap2/board-omap4panda.c |   14 ++++++++++++--
->  include/linux/ti_wilink_st.h           |    2 ++
->  2 files changed, 14 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-> index b1d74d6..339e781 100644
-> --- a/arch/arm/mach-omap2/board-omap4panda.c
-> +++ b/arch/arm/mach-omap2/board-omap4panda.c
-> @@ -27,6 +27,7 @@
->  #include <linux/i2c/twl.h>
->  #include <linux/regulator/machine.h>
->  #include <linux/regulator/fixed.h>
-> +#include <linux/ti_wilink_st.h>
->  #include <linux/wl12xx.h>
->  
->  #include <mach/hardware.h>
-> @@ -56,12 +57,21 @@
->  #define HDMI_GPIO_HPD  63 /* Hotplug detect */
->  
->  /* wl127x BT, FM, GPS connectivity chip */
-> -static int wl1271_gpios[] = {46, -1, -1};
-> +static struct ti_st_plat_data wilink_platform_data = {
-> +	.nshutdown_gpio	= 46,
-> +	.dev_name	= "/dev/ttyO1",
-> +	.flow_cntrl	= 1,
-> +	.baud_rate	= 3000000,
-> +	.chip_enable	= NULL,
-> +	.suspend	= NULL,
-> +	.resume		= NULL,
-> +};
-> +
->  static struct platform_device wl1271_device = {
->  	.name	= "kim",
->  	.id	= -1,
->  	.dev	= {
-> -		.platform_data	= &wl1271_gpios,
-> +		.platform_data	= &wilink_platform_data,
->  	},
->  };
->  
-> diff --git a/include/linux/ti_wilink_st.h b/include/linux/ti_wilink_st.h
-> index 2ef4385..3ca0269 100644
-> --- a/include/linux/ti_wilink_st.h
-> +++ b/include/linux/ti_wilink_st.h
-> @@ -25,6 +25,8 @@
->  #ifndef TI_WILINK_ST_H
->  #define TI_WILINK_ST_H
->  
-> +#include <linux/skbuff.h>
-> +
->  /**
->   * enum proto-type - The protocol on WiLink chips which share a
->   *	common physical interface like UART.
-> -- 
+Please pull Samsung devel-mmc for v3.4 and I rebased it on top of 
+v3.3-rc7 without v3.4-for-cjb.
 
-Just checking.. Can you please take a look at this patch
-and confirm that this is how things are supposed to be done?
+Please pull it from:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/devel-samsung-mmc
 
-To me passing some third driver's dev_name in pdata seems
-pretty weird.. But then again maybe I just don't know how
-this is supposed to work.
+If any problems, please kindly let me know.
 
-Regards,
+Thanks.
 
-Tony
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
+
+   Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/devel-samsung-mmc
+
+Jaehoon Chung (3):
+       ARM: SAMSUNG: support the second capability for samsung-soc
+       mmc: sdhci-s3c: add platform data for the second capability
+       ARM: SAMSUNG: change the name from s3c-sdhci to exynos4-sdhci
+
+  arch/arm/mach-exynos/mach-nuri.c           |    4 ++--
+  arch/arm/mach-exynos/mach-universal_c210.c |    2 +-
+  arch/arm/plat-samsung/include/plat/sdhci.h |    2 ++
+  arch/arm/plat-samsung/platformdata.c       |    2 ++
+  drivers/mmc/host/sdhci-s3c.c               |    6 +++---
+  5 files changed, 10 insertions(+), 6 deletions(-)
