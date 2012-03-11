@@ -1,101 +1,80 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Mon, 12 Mar 2012 17:19:07 +0530
-Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
- modules.
-In-Reply-To: <CAMrsUdJq8J8dTnKcZmXgMucDX=dNXgR+9xFhYOdHvNDuw_=4Mw@mail.gmail.com>
-References: <1331122775-761-1-git-send-email-govindraj.raja@ti.com>
- <CAMrsUdJq8J8dTnKcZmXgMucDX=dNXgR+9xFhYOdHvNDuw_=4Mw@mail.gmail.com>
-Message-ID: <CAMrsUdLe1gq-tWeg_GgEp_HHUVXCGMgegCtfEzEp9zzMpbDfHA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 11 Mar 2012 10:33:21 +0100
+Subject: [PATCH v2 1/3] mfd: mc13xxx-core: Prepare for separate spi and
+ i2c backends.
+In-Reply-To: <1331429402-9639-2-git-send-email-marc@cpdesign.com.au>
+References: <1331429402-9639-1-git-send-email-marc@cpdesign.com.au>
+ <1331429402-9639-2-git-send-email-marc@cpdesign.com.au>
+Message-ID: <20120311093321.GK14173@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2012 at 7:40 PM, Raja, Govindraj <govindraj.raja@ti.com> wrote:
-> On Wed, Mar 7, 2012 at 5:49 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
->>
+On Sun, Mar 11, 2012 at 12:30:00PM +1100, Marc Reilly wrote:
+> This patch abstracts the bus specific operations from the driver core.
+> Read and write handlers are introduced and generic initialization is
+> consolidated into mc13xxx_comon_init. The irq member is removed because
+s/_comon_/_common_/
 
-[...]
+one minor nitpick below.
 
->
-> From b3aa1dac5909cad1b959f5b97bbf408b2f974060 Mon Sep 17 00:00:00 2001
-> From: "Govindraj.R" <govindraj.raja@ti.com>
-> Date: Wed, 7 Mar 2012 17:14:02 +0530
-> Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
-> ?modules.
->
-> Some modules doesn't have SYSC_HAS_ENAWAKEUP bit available
-> (ex: usb host uhh module) in absence of this flag
-> omap_hwmod_enable/disable_wakeup avoids configuring
-> pad mux wakeup capability.
->
-> Configure sysc if SYSC_HAS_ENAWAKEUP is available and for other cases
-> try enabling/disabling wakeup from mux_pad pins.
->
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> it is unused.
+> 
+> Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
 > ---
-
-Gentle Ping.
-
---
-Thanks,
-Govindraj.R
-
-
-
-> ?arch/arm/mach-omap2/omap_hwmod.c | ? 30 ++++++++++++++++--------------
-> ?1 files changed, 16 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index eba6cd3..9605fad 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -2475,14 +2475,15 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
-> ? ? ? ?unsigned long flags;
-> ? ? ? ?u32 v;
->
-> - ? ? ? if (!oh->class->sysc ||
-> - ? ? ? ? ? !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
-> - ? ? ? ? ? ? ? return -EINVAL;
-> -
-> ? ? ? ?spin_lock_irqsave(&oh->_lock, flags);
-> - ? ? ? v = oh->_sysc_cache;
-> - ? ? ? _enable_wakeup(oh, &v);
-> - ? ? ? _write_sysconfig(v, oh);
+>  drivers/mfd/mc13xxx-core.c |  162 ++++++++++++++++++++++++++------------------
+>  1 files changed, 97 insertions(+), 65 deletions(-)
+> 
+> diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
+> index 7122386..19d94a1 100644
+> --- a/drivers/mfd/mc13xxx-core.c
+> +++ b/drivers/mfd/mc13xxx-core.c
+> @@ -235,6 +234,34 @@ int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
+>  
+>  	return 0;
+>  }
 > +
-> + ? ? ? if (oh->class->sysc &&
-> + ? ? ? ? ? (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-> + ? ? ? ? ? ? ? v = oh->_sysc_cache;
-> + ? ? ? ? ? ? ? _enable_wakeup(oh, &v);
-> + ? ? ? ? ? ? ? _write_sysconfig(v, oh);
-> + ? ? ? }
+> +int mc13xxx_reg_read(struct mc13xxx *mc13xxx, unsigned int offset, u32 *val)
+> +{
+> +	int ret;
 > +
-> ? ? ? ?_set_idle_ioring_wakeup(oh, true);
-> ? ? ? ?spin_unlock_irqrestore(&oh->_lock, flags);
->
-> @@ -2506,14 +2507,15 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
-> ? ? ? ?unsigned long flags;
-> ? ? ? ?u32 v;
->
-> - ? ? ? if (!oh->class->sysc ||
-> - ? ? ? ? ? !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
-> - ? ? ? ? ? ? ? return -EINVAL;
-> -
-> ? ? ? ?spin_lock_irqsave(&oh->_lock, flags);
-> - ? ? ? v = oh->_sysc_cache;
-> - ? ? ? _disable_wakeup(oh, &v);
-> - ? ? ? _write_sysconfig(v, oh);
+> +	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
 > +
-> + ? ? ? if (oh->class->sysc &&
-> + ? ? ? ? ? (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
-> + ? ? ? ? ? ? ? v = oh->_sysc_cache;
-> + ? ? ? ? ? ? ? _disable_wakeup(oh, &v);
-> + ? ? ? ? ? ? ? _write_sysconfig(v, oh);
-> + ? ? ? }
+> +	if (offset > MC13XXX_NUMREGS)
+> +		return -EINVAL;
 > +
-> ? ? ? ?_set_idle_ioring_wakeup(oh, false);
-> ? ? ? ?spin_unlock_irqrestore(&oh->_lock, flags);
->
-> --
-> 1.7.5.4
+> +	ret = mc13xxx->read_dev(mc13xxx, offset, val);
+> +	dev_vdbg(mc13xxx->dev, "[0x%02x] -> 0x%06x\n", offset, *val);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(mc13xxx_reg_read);
+> +
+> +int mc13xxx_reg_write(struct mc13xxx *mc13xxx, unsigned int offset, u32 val)
+> +{
+> +	BUG_ON(!mutex_is_locked(&mc13xxx->lock));
+> +
+> +	dev_vdbg(mc13xxx->dev, "[0x%02x] <- 0x%06x\n", offset, val);
+> +
+> +	if (offset > MC13XXX_NUMREGS || val > 0xffffff)
+> +		return -EINVAL;
+> +
+> +	return mc13xxx->write_dev(mc13xxx, offset, val);
+> +}
+>  EXPORT_SYMBOL(mc13xxx_reg_write);
+>  
+>  int mc13xxx_reg_rmw(struct mc13xxx *mc13xxx, unsigned int offset,
+> @@ -439,7 +466,7 @@ static int mc13xxx_irq_handle(struct mc13xxx *mc13xxx,
+>  			if (handled == IRQ_HANDLED)
+>  				num_handled++;
+>  		} else {
+> -			dev_err(&mc13xxx->spidev->dev,
+> +			dev_err(mc13xxx->dev,
+>  					"BUG: irq %u but no handler\n",
+Without having counted I think you can join these two lines.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
