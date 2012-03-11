@@ -1,78 +1,39 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 12 Mar 2012 20:32:38 +0530
-Subject: [PATCH v2 2/4] mmc: omap_hsmmc: Avoid a regulator voltage change with
- dt
-In-Reply-To: <1331564560-23276-1-git-send-email-rnayak@ti.com>
-References: <1331564560-23276-1-git-send-email-rnayak@ti.com>
-Message-ID: <1331564560-23276-3-git-send-email-rnayak@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 11 Mar 2012 19:38:56 +0100
+Subject: [PATCH v2 1/2] ARM: AT91: Add parameter for AT91_HAS_PATA
+In-Reply-To: <1331415531-10961-1-git-send-email-alan@signal11.us>
+References: <1331415380-10928-1-git-send-email-alan@signal11.us>
+ <1331415531-10961-1-git-send-email-alan@signal11.us>
+Message-ID: <20120311183856.GA13869@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with Device tree, the omap_hsmmc driver does not
-program the pbias cell (inside OMAP control module) during
-a regulator voltage change.
-In case of non-dt boot, this is handled using callbacks
-from within platform_data and implemented in machine code.
-To be able to do this with device tree, without invoking
-any machine code, a OMAP control module driver is needed
-which is yet missing.
+On 16:38 Sat 10 Mar     , Alan Ott wrote:
+> Not all at91 chips have PATA, this parameter will identify which
+> chips do. The determining of which chips support PATA was done
+> by Arnd Bergmann.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Alan Ott <alan@signal11.us>
+> CC: Ben Dooks <ben-linux@fluff.org>
+> ---
+>  arch/arm/mach-at91/Kconfig |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 71feb00..9eeeabe 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -24,6 +24,9 @@ config AT91_SAM9_ALT_RESET
+>  config AT91_SAM9G45_RESET
+>  	bool
+>  
+> +config AT91_HAS_PATA
+> +	bool
+what is the need for this?
 
-The pbias cell is used to provide a 1.8v or 3.0v reference
-to the mmc/sd/sdio1 interface supporting both 1.8v and 3.0v
-voltages.
+As we switch to DT, I don't want to track the soc list in the Kconfig anymore
+if the soc support the PATA will be describe in the DT
 
-Until a OMAP control module driver is available to handle this,
-when booting with a device tree blob, never change the regulator
-voltage which might then require a pbias cell re-program.
-There are 2 instances where in the mmc regulator voltage can be
-changed.
--1- when the regulator is turned OFF.
--2- when attempting a switch to 1.8v from 3.0v for dual volt cards
-
-This patch avoids a voltage change in both cases when booting from
-device tree, and hence compromises on power savings.
-Once the OMAP control module driver is available and hsmmc driver
-is modified to then do pbias programming even when booting
-with device tree, these limitaions can be removed to achieve better
-power savings.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- drivers/mmc/host/omap_hsmmc.c |   15 ++++++++++++++-
- 1 files changed, 14 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 38ae8c0..f29e1a2 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -244,6 +244,13 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
- 	 */
- 	if (!host->vcc)
- 		return 0;
-+	/*
-+	 * With DT, never turn OFF the regulator. This is because
-+	 * the pbias cell programming support is still missing when
-+	 * booting with Device tree
-+	 */
-+	if (of_have_populated_dt() && !vdd)
-+		return 0;
- 
- 	if (mmc_slot(host).before_set_reg)
- 		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
-@@ -1516,7 +1523,13 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		 * of external transceiver; but they all handle 1.8V.
- 		 */
- 		if ((OMAP_HSMMC_READ(host->base, HCTL) & SDVSDET) &&
--			(ios->vdd == DUAL_VOLT_OCR_BIT)) {
-+			(ios->vdd == DUAL_VOLT_OCR_BIT) &&
-+			/*
-+			 * With pbias cell programming missing, this
-+			 * can't be allowed when booting with device
-+			 * tree.
-+			 */
-+			(!of_have_populated_dt())) {
- 				/*
- 				 * The mmc_select_voltage fn of the core does
- 				 * not seem to set the power_mode to
--- 
-1.7.1
+Best Regards,
+J.
