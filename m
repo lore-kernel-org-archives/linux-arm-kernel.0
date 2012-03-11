@@ -1,27 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 Mar 2012 21:27:27 -0700 (MST)
-Subject: [PATCH 00/12] ARM: OMAP2+: hwmod: remove link arrays
-In-Reply-To: <20120308023614.8205.78768.stgit@dusk>
-References: <20120308023614.8205.78768.stgit@dusk>
-Message-ID: <alpine.DEB.2.00.1203082123540.26656@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 11 Mar 2012 21:36:47 +0000
+Subject: [PATCH v2 1/2] ARM: AT91: Add parameter for AT91_HAS_PATA
+In-Reply-To: <20120311183856.GA13869@game.jcrosoft.org>
+References: <1331415380-10928-1-git-send-email-alan@signal11.us>
+ <1331415531-10961-1-git-send-email-alan@signal11.us>
+ <20120311183856.GA13869@game.jcrosoft.org>
+Message-ID: <201203112136.47694.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sunday 11 March 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > 
+> > diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> > index 71feb00..9eeeabe 100644
+> > --- a/arch/arm/mach-at91/Kconfig
+> > +++ b/arch/arm/mach-at91/Kconfig
+> > @@ -24,6 +24,9 @@ config AT91_SAM9_ALT_RESET
+> >  config AT91_SAM9G45_RESET
+> >       bool
+> >  
+> > +config AT91_HAS_PATA
+> > +     bool
+> what is the need for this?
+> 
+> As we switch to DT, I don't want to track the soc list in the Kconfig anymore
+> if the soc support the PATA will be describe in the DT
+> 
 
-This series has been rebased on top of a merge of the hwmod_misc_devel_3.4 
-branch and the hwmod_data_cleanup_3.4 branch, both previously posted.  
-Fortunately the auto-merger came up with something reasonable.  Patches 5 
-and 7 have been trivially updated to take account of the SmartReflex 
-changes.  The updated series has been posted at:
+When I originally wrote the patch, I was hitting build errors when trying
+to enable the at91 pata driver on socs that don't have the right declarations
+in their headers. If that has been resolved in a better way already, this
+patch can be dropped.
 
-http://www.pwsan.com/omap/patches-hwmod_remove_link_arrays_cleanup_3.4_2
-
-since the two patches that changed were the ones that were too big to make 
-it onto the lists.
-
-The updated branch is in the same place as before: 
-git://git.pwsan.com/linux-2.6 in the 
-'hwmod_remove_link_arrays_cleanup_3.4' branch.
-
-
-- Paul
+	Arnd
