@@ -1,29 +1,97 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 12 Mar 2012 08:51:07 +0100
-Subject: [PATCH] mtd/gpmi : fix the wrong DMA command.
-In-Reply-To: <1331518938-24047-1-git-send-email-b32955@freescale.com>
-References: <1331518938-24047-1-git-send-email-b32955@freescale.com>
-Message-ID: <20120312075107.GB3928@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 11 Mar 2012 00:38:57 -0800
+Subject: [GIT PULL v2] Samsung board patches for v3.4
+Message-ID: <4F5C64A1.1090900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 10:22:18AM +0800, Huang Shijie wrote:
-> The last DMA command of ECC read page is used to disable the BCH module.
-> But the original code missed to set the pio[2] which is used to set the
-> GPMI_HW_GPMI_ECCCTRL register. fix it now.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+Hi Arnd, Olof,
 
-Thanks! What does happen because of this bug? Additional checksum errors? I
-haven't seen many on MX28 IIRC, so I wonder.
+Please pull regarding rebased Samsung board patches without the non-dt 
+board file addition for v3.4.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/fbb120b6/attachment-0001.sig>
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
+
+   Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/board-samsung
+
+Andrzej Pietrasiewicz (2):
+       ARM: EXYNOS: Register JPEG on universal_c210
+       ARM: EXYNOS: Register JPEG on nuri
+
+Kamil Debski (2):
+       ARM: EXYNOS: add G2D to mach-nuri
+       ARM: EXYNOS: add G2D to mach-universal
+
+Mark Brown (8):
+       ARM: S3C64XX: Support GPIO LEDs on Cragganmore
+       ARM: S3C64XX: Fix build of Cragganmore after SPI changes
+       ARM: S3C64XX: Enable power management for disk on Cragganmore
+       ARM: S3C64XX: Enable power management for WiFi on Cragganmore
+       ARM: S3C64XX: Add hookup for Tomatin module on Cragganmore
+       ARM: S3C64XX: Add a SPKVDD supply for CODECs on Cragganmore
+       ARM: S3C64XX: Add some more Cragganmore module IDs to the table
+       ARM: S3C64XX: Supply platform data for SPI on Cragganmore
+
+MyungJoo Ham (1):
+       ARM: EXYNOS: support Exynos4210-bus Devfreq driver on Nuri board
+
+Sachin Kamat (13):
+       ARM: EXYNOS: Enable G2D on ORIGEN
+       ARM: S5PV210: Add missing FIMC media device to Aquila
+       ARM: EXYNOS: Add missing FIMC media device to SMDKV310
+       ARM: EXYNOS: Add missing FIMC media device to Origen
+       ARM: EXYNOS: Enable G2D on SMDKV310
+       ARM: S5PV210: Enable MFC on SMDKV210
+       ARM: S5PV210: Enable MFC on SMDKC110
+       ARM: S5PV210: Enable FIMC on SMDKV210
+       ARM: S5PV210: Enable FIMC on SMDKC110
+       ARM: EXYNOS: Enable JPEG on SMDKV310
+       ARM: EXYNOS: Enable JPEG on Origen
+       ARM: S5PV210: Add JPEG board definition
+       ARM: S5PV210: Enable JPEG on SMDKV210
+
+Sangwook Lee (1):
+       ARM: EXYNOS: Enable Bluetooth on ORIGEN
+
+Sylwester Nawrocki (3):
+       ARM: EXYNOS: Increase virtual framebuffer size on Universal C210 
+board
+       ARM: EXYNOS: Add support for S5K6AAFX image sensor on Universal 
+C210 board
+       ARM: SAMSUNG: Add support for S5K6AAFX camera on Nuri board
+
+Tushar Behera (2):
+       ARM: EXYNOS: Add __init attribute to nuri_camera_init()
+       ARM: EXYNOS: Add __init attribute to universal_camera_init()
+
+  arch/arm/mach-exynos/Kconfig                 |   10 +++
+  arch/arm/mach-exynos/mach-nuri.c             |   80 
+++++++++++++++++++++++++-
+  arch/arm/mach-exynos/mach-origen.c           |   37 ++++++++++++
+  arch/arm/mach-exynos/mach-smdkv310.c         |    3 +
+  arch/arm/mach-exynos/mach-universal_c210.c   |   80 
+++++++++++++++++++++++++--
+  arch/arm/mach-s3c64xx/Kconfig                |    1 +
+  arch/arm/mach-s3c64xx/mach-crag6410-module.c |   31 ++++++++++-
+  arch/arm/mach-s3c64xx/mach-crag6410.c        |   67 +++++++++++++++++++++-
+  arch/arm/mach-s5pv210/Kconfig                |    9 +++
+  arch/arm/mach-s5pv210/clock.c                |    5 ++
+  arch/arm/mach-s5pv210/include/mach/map.h     |    4 +
+  arch/arm/mach-s5pv210/mach-aquila.c          |    1 +
+  arch/arm/mach-s5pv210/mach-smdkc110.c        |   14 +++++
+  arch/arm/mach-s5pv210/mach-smdkv210.c        |   15 +++++
+  14 files changed, 346 insertions(+), 11 deletions(-)
