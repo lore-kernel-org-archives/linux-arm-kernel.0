@@ -1,50 +1,100 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 12 Mar 2012 12:00:27 +0200
-Subject: [PATCHv5 0/6] ARM: OMAP3+: IO daisy chain support fixes
-In-Reply-To: <alpine.DEB.2.00.1203092102450.30879@utopia.booyaka.com>
-References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1203092102450.30879@utopia.booyaka.com>
-Message-ID: <1331546427.2116.264.camel@sokoban>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 11 Mar 2012 17:46:09 +0000
+Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
+In-Reply-To: <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
+References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
+ <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
+Message-ID: <201203111746.09757.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-03-09 at 21:05 -0700, Paul Walmsley wrote:
-> Hi
+On Sunday 11 March 2012, Jamie Lentin wrote:
+> Add support for the DNS-320 and DNS-325. Describe as much as currently possible
+> in the devicetree files, leave everything else in board-dt.c to be patched
+> later.
 > 
-> On Tue, 6 Mar 2012, Tero Kristo wrote:
-> 
-> > Changes compared to previous version:
-> > 
-> > - patch2:
-> >   * fixed the timeout for waiting for ST_IO_CHAIN == 1
-> >   * added clear for ST_IO_CHAIN bit (as per spec + implementation in patch 1)
-> >   * replaced the timeout at the end of function with a simple register
-> >     readback (timing out on a register value that we are clearing does
-> >     not make that much sense, the bit is cleared the very first time CPU
-> >     manages to read it)
-> > - patch5:
-> >   * added spinlock for protecting io_chain_trigger operation
-> > 
-> > Tested on omap3 beagle + omap4 blaze. Also did measurements for the
-> > cost of IO chain trigger operation with ARM performance counters:
-> > 
-> > - omap3 approx 7...8us
-> > - omap4 approx 2...4us
-> 
-> Thanks for the changes.  So as you probably already saw, a few changes 
-> have been made.  The updated series is in the branch 
-> 'io_chain_devel_3.4' on git://git.pwsan.com/linux-2.6.
-> 
-> The main outstanding question is whether the OMAP4 WUCLKOUT poll should be 
-> removed to match the v5 changes to the OMAP3 function.  Please let me 
-> know.   Any other testing or comments are of course welcome.
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 
-Just tested your branch with omap3 beagle + omap4 blaze (with my omap4
-cswr set on top), and it works on both.
+Great work!
 
-For the WUCLK poll bit I added detailed comments on patch 2 thread, but
-my current understanding is that the implementation now on omap3 / omap4
-is what they should be due to IP differences (except maybe the small
-optimization for omap3 part you commented about.)
+> +
+> +/ {
+> +	model = "D-Link DNS-320 NAS (Rev A1)";
+> +	compatible = "dlink,dns-320-a1", "dlink,dns-320", "dlink,dns-kirkwood", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x8000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
+> +	};
+> +
+> +	wdt at fed20300 {
+> +		compatible = "mrvl,orion-wdt";
+> +		reg = <0xfed20300 0x28>;
+> +		clock-frequency = <166666667>;
+> +	};
+> +
+> +	serial at f1012000 {
+> +		compatible = "ns16550a";
+> +		reg = <0xf1012000 0xff>;
+> +		reg-shift = <2>;
+> +		interrupts = <33>;
+> +		clock-frequency = <166666667>;
+> +	};
+> +
+> +	serial at f1012100 {
+> +		compatible = "ns16550a";
+> +		reg = <0xf1012100 0xff>;
+> +		reg-shift = <2>;
+> +		interrupts = <34>;
+> +		clock-frequency = <166666667>;
+> +	};
 
--Tero
+I think the generic kirkwood device nodes should all be part of
+the kirkwood.dtsi file, except for any properties you want to
+override.
+
+You can add a status="disabled" property in device nodes
+that may not be connected in individual boards, and then
+just override it by listing status="enabled" in the board.dts
+file, without having to duplicate all the other properties.
+
+I would also suggest to change the kirkwood.dtsi layout to
+put all the on-chip peripherals from the 0xf1 section into
+one bus in the device tree, like
+
+	ocp at f1000000 {
+		compatible = "simple-bus";
+		ranges = <0xf1000000 0xf1000000 0x1000000>;
+		#address-cells = 1;
+		#size-cells = 1;
+
+		serial at f1012000 {
+			...
+		};
+
+		...
+	};
+
+Or even use the ranges property to remap everything into
+a simpler address range:
+
+	ocp at f1000000 {
+		compatible = "simple-bus";
+		ranges = <0 0xf1000000 0x1000000>;
+		#address-cells = 1;
+		#size-cells = 1;
+
+		serial at 12000 {
+			reg = <0x12000 0x100>;
+			...
+		};
+
+		...
+	};
+
+
+	Arnd
