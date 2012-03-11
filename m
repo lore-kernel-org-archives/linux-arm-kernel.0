@@ -1,45 +1,49 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 9 Mar 2012 09:00:35 +0100
-Subject: [PATCH v2 00/13] dmaengine: imx-dma: merge dma arch code into
- dmaengine.
-In-Reply-To: <20120308200448.GR3852@pengutronix.de>
-References: <1331130825-14947-1-git-send-email-javier.martin@vista-silicon.com>
- <20120308200448.GR3852@pengutronix.de>
-Message-ID: <CACKLOr2_y9aw+-79d4FfKsOuiDdOvDHAanQ6j+qF4Ynf2r5rag@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 11 Mar 2012 00:02:30 -0800
+Subject: [GIT PULL] Samsung board stuff for v3.4
+In-Reply-To: <CAOesGMjiYDFhkjS=2e+3YdPJHExupt3Wm_NS3x1XW-17eEZM=A@mail.gmail.com>
+References: <4F5B748B.6050404@samsung.com>
+ <CAOesGMjiYDFhkjS=2e+3YdPJHExupt3Wm_NS3x1XW-17eEZM=A@mail.gmail.com>
+Message-ID: <4F5C5C16.6020106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On 8 March 2012 21:04, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Mar 07, 2012 at 03:33:32PM +0100, Javier Martin wrote:
->> The following series have to be applied on top of the following patches:
->> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
->> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
->>
->> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
->> is deprecated and no new patches are accepted for it.
->>
->> This series merges this code into the imx-dma.c dmaengine driver.
->>
+On 03/10/12 09:45, Olof Johansson wrote:
+> Hi,
 >
-> I can't find a branch to apply this on. Could you provide a git tree?
+> On Sat, Mar 10, 2012 at 7:34 AM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>> Hi Arnd, Olof,
+>>
+>> Please pull regarding Samsung board patches for v3.4.
+>>
+>> Most are enabling some features(IPs) on each board and
+>> one is adding new board file, Samsung Mobile's TRATS board.
+>
+> Given that exynos has started conversion to device tree, there should
+> not be any  additions of non-devicetree-probed board files being
+> added.
+>
+> At the very least, you should move over to using DT_MACHINE instead of
+> MACHINE for the new board, and probe using device tree. Even better
+> would be if you added support for this board through mach-exynos4-dt.c
+> instead of adding a brand new board file.
+>
+> I also see a large number of the same additions of devices, done to a
+> number of board files. I don't think you need to rework those patches
+> now, but please consider how you can make it less "churny" to add a
+> device on the SoC in the future without touching all board files.
+>
+>
+> If you rebase without the board file addition I can take the rest of
+> the branch while that part is being reworked. Please send a new pull
+> request with the rebased tree.
+>
+OK, I see. let me send a new pull request soon as per your suggestion.
 
-I'm developing and testing here:
+Thanks.
 
-git://git.infradead.org/users/vkoul/slave-dma.git next
-
-> If you have to repost this series please consider using -M with git
-> format-patch.
-
-OK, thanks for the suggestion.
-
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
