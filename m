@@ -1,36 +1,26 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 12 Mar 2012 20:03:36 +0100
-Subject: [PATCH 6/6] spi/s3c64xx: Allow usage for ARCH_S3C24XX
-In-Reply-To: <201203121959.32966.heiko@sntech.de>
-References: <201203121959.32966.heiko@sntech.de>
-Message-ID: <201203122003.36553.heiko@sntech.de>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Sun, 11 Mar 2012 14:02:53 -0700
+Subject: [PATCH v6 2/3] clk: introduce the common clock framework
+In-Reply-To: <20120311075250.GB3138@richard-laptop>
+References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
+ <1331366064-1273-3-git-send-email-mturquette@linaro.org>
+ <20120311075250.GB3138@richard-laptop>
+Message-ID: <CAJOA=zPzCSBHEynvm1hf-5VqdevAg26KQ2PZ5yykZqmxFywZpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Newer SoCs from the S3C24XX line, namely S3C2416/2443/2450 contain
-hsspi-controllers compatible with the s3c64xx type.
+On Sat, Mar 10, 2012 at 11:52 PM, Richard Zhao <richard.zhao@linaro.org> wrote:
+> Looks like you didn't take my comments for v5.
+> http://www.spinics.net/lists/arm-kernel/msg162903.html
 
-The previous patches enabled platform support for it, so make the
-driver also usable for the S3C24xx architecture.
+Sorry Richard, that one slipped through the cracks.  I'll publish a
+new version tomorrow with some of those fixes.  Some of the others
+(such as multiple pre-rate change notifiers) I won't take in, but we
+can discuss more.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
----
- drivers/spi/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Regards,
+Mike
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 004e6d1..e981fe6 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -305,7 +305,7 @@ config SPI_S3C24XX_FIQ
- 
- config SPI_S3C64XX
- 	tristate "Samsung S3C64XX series type SPI"
--	depends on (ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_EXYNOS)
-+	depends on (ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_EXYNOS)
- 	select S3C64XX_DMA if ARCH_S3C64XX
- 	help
- 	  SPI driver for Samsung S3C64XX and newer SoCs.
--- 
-1.7.2.3
+>
+> Regards
+> Richard
