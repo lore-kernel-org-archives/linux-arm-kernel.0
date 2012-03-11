@@ -1,93 +1,70 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Fri,  9 Mar 2012 16:20:41 +0100
-Subject: [PATCH v3 05/13] dmaengine: imx-dma: remove
- 'imxdma_config_channel_hw' function.
-In-Reply-To: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1331306449-28591-6-git-send-email-javier.martin@vista-silicon.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 11 Mar 2012 14:25:23 -0700
+Subject: [PATCH 5/5] mmc: sdhci-s3c: setup pins using pinctrl interface
+In-Reply-To: <1331469965-28846-6-git-send-email-thomas.abraham@linaro.org>
+References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
+ <1331469965-28846-6-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4F5D1843.1010608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is only used once in the driver and uses some
-intermediary variables that are not needed anymore. For this
-reason it's been merged with 'imxdma_control'.
+Thomas Abraham wrote:
+> The platform specific callback to setup the sdhci pin mux and pin config
+> is removed and the pinctrl subsystem interface is used to setup the
+> mux and config.
+> 
+> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+> ---
+>   drivers/mmc/host/sdhci-s3c.c |   15 +++++++++++++--
+>   1 files changed, 13 insertions(+), 2 deletions(-)
+> 
+[...]
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- drivers/dma/imx-dma.c |   46 +++++++++++++---------------------------------
- 1 files changed, 13 insertions(+), 33 deletions(-)
+> 
+> +#include<plat/map-s5p.h>
+> +#include<plat/map-base.h>
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index f86ac06..d86b3d5 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -312,32 +312,6 @@ static void imxdma_disable_hw(struct imxdma_channel *imxdmac)
- }
- 
- static int
--imxdma_config_channel_hw(struct imxdma_channel *imxdmac, unsigned int config_port,
--	unsigned int config_mem, unsigned int dmareq, int hw_chaining)
--{
--	int channel = imxdmac->channel;
--	u32 dreq = 0;
--
--	imxdmac->internal.hw_chaining = 0;
--
--	if (hw_chaining) {
--		imxdmac->internal.hw_chaining = 1;
--		if (!imxdma_hw_chain(&imxdmac->internal))
--			return -EINVAL;
--	}
--
--	if (dmareq)
--		dreq = CCR_REN;
--
--	imxdmac->internal.ccr_from_device = config_port | (config_mem << 2) | dreq;
--	imxdmac->internal.ccr_to_device = config_mem | (config_port << 2) | dreq;
--
--	imx_dmav1_writel(dmareq, DMA_RSSR(channel));
--
--	return 0;
--}
--
--static int
- imxdma_setup_sg_hw(struct imxdma_desc *d,
- 		 struct scatterlist *sg, unsigned int sgcount,
- 		 unsigned int dma_length, unsigned int dev_addr,
-@@ -626,7 +600,6 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- {
- 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
- 	struct dma_slave_config *dmaengine_cfg = (void *)arg;
--	int ret;
- 	unsigned long flags;
- 	unsigned int mode = 0;
- 
-@@ -662,13 +635,20 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 			mode = IMX_DMA_MEMSIZE_32;
- 			break;
- 		}
--		ret = imxdma_config_channel_hw(imxdmac,
--				mode | IMX_DMA_TYPE_FIFO,
--				IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
--				imxdmac->dma_request, 1);
- 
--		if (ret)
--			return ret;
-+		imxdmac->internal.hw_chaining = 1;
-+		if (!imxdma_hw_chain(&imxdmac->internal))
-+			return -EINVAL;
-+		imxdmac->internal.ccr_from_device =
-+			(mode | IMX_DMA_TYPE_FIFO) |
-+			((IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) << 2) |
-+			CCR_REN;
-+		imxdmac->internal.ccr_to_device =
-+			(IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR) |
-+			((mode | IMX_DMA_TYPE_FIFO) << 2) | CCR_REN;
-+		imx_dmav1_writel(imxdmac->dma_request,
-+				 DMA_RSSR(imxdmac->channel));
-+
- 		/* Set burst length */
- 		imx_dmav1_writel(imxdmac->watermark_level * imxdmac->word_size,
- 				 DMA_BLR(imxdmac->channel));
--- 
-1.7.0.4
+You can add <mach/map.h> instead of above.
+
+> +
+>   static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>   {
+>   	struct s3c_sdhci_platdata *pdata;
+> @@ -538,6 +543,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>   	struct sdhci_s3c *sc;
+>   	struct resource *res;
+>   	int ret, irq, ptr, clks;
+> +	char *pstate;
+> 
+>   	if (!pdev->dev.platform_data&&  !pdev->dev.of_node) {
+>   		dev_err(dev, "no device data specified\n");
+> @@ -643,8 +649,13 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>   	}
+> 
+>   	/* Ensure we have minimal gpio selected CMD/CLK/Detect */
+> -	if (pdata->cfg_gpio)
+> -		pdata->cfg_gpio(pdev, pdata->max_width);
+
+I'm not sure we can remove above now for all of Samsung stuff?
+
+> +	pstate = pdata->max_width ? "sdhci-pcfg8" : "sdhci-pcfg4";
+
+Is this right? Current max_width can be 4 or 8 in each board file now.
+
+> +	sc->pinctrl = pinctrl_get_select(&pdev->dev, pstate);
+> +	if (IS_ERR(sc->pinctrl)) {
+> +		dev_err(dev, "failed to setup pin configuration\n");
+> +		ret = -ENXIO;
+> +		goto err_req_regs;
+> +	}
+> 
+>   	host->hw_name = "samsung-hsmmc";
+>   	host->ops =&sdhci_s3c_ops;
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
