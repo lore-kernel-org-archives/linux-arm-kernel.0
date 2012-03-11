@@ -1,42 +1,34 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 9 Mar 2012 10:35:07 -0800
-Subject: [PATCH v5 0/4] common clk framework
-In-Reply-To: <20120309023418.GF3261@b20223-02.ap.freescale.net>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <20120309023418.GF3261@b20223-02.ap.freescale.net>
-Message-ID: <CAJOA=zOPTG-pZcQvpSPuNVduxN-3SyBGoygdALeAZFU01Bi4oQ@mail.gmail.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sun, 11 Mar 2012 13:31:36 +0100
+Subject: [PATCH] ARM: remove ixp2000 platform
+In-Reply-To: <4F574C64.7010905@snapgear.com> (Greg Ungerer's message of "Wed,
+ 7 Mar 2012 21:54:12 +1000")
+References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
+ <201202281945.39419.arnd@arndb.de>
+ <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
+ <201203061412.00073.arnd@arndb.de>
+ <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
+ <CACRpkdYQpnSMVWUizEYHTjx_AK5Ai7dos0SBd208Wf5ZJLdrCw@mail.gmail.com>
+ <20120307091409.GL17370@n2100.arm.linux.org.uk>
+ <4F574C64.7010905@snapgear.com>
+Message-ID: <m3aa3nqpxz.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 8, 2012 at 6:34 PM, Richard Zhao <richard.zhao@freescale.com> wrote:
-> Hello Mike,
->
-> The main interface for clk implementer is to register clocks dynamically.
-> I think it highly depends on clk DT bindings. From the patch Grant sent
-> out, it looks like he doesn't like one node per clk. So how do we
-> register clocks dynamically? You have any sample code?
+Greg Ungerer <gerg@snapgear.com> writes:
 
-I can only speak for my own platform, but after talks with Paul W. and
-Benoit C. I believe that OMAP will not push ALL of it's on-SoC clocks
-into DT.  DT is meant to solve board-level integration problems and
-the majority of OMAP clocks are SoC-level, not board level.  Some
-clocks will migrate out to DT such as the primary oscillator (which
-varies per board) as well as some leaf clocks and modules clocks that
-depend on board-specific peripherals.
+> The built in ethernet interfaces on the ixp4xx family are not PCI
+> based. So they at least do not suffer from the BE/LE conversions
+> at the eth driver.
 
-Otherwise the answer to your question is 'no'.  I don't have any
-sample code for DT bindings.  It should not be hard to map some sample
-clock bindings onto the existing registration functions... but it will
-still be one clock per node.  I'm not really a fan of making clock
-black-boxes where the details of the tree are hidden from the
-framework anyways... that's something that clkdev already achieves to
-some degree (by not exposing the entire tree to drivers, but only the
-clocks that we want exposed).
+The problematic one is IXP42x rev. A0. It has no support for hw mixed
+mode (LE core + lane swapping where needed). Unfortunately this early
+chip is quite popular. "Software" mixed mode means byte swapping in the
+network drivers and IIRC the crypto accelerator becomes unusable (at
+least without workarounds).
 
-Regards,
-Mike
-
->
-> Thanks
-> Richard
->
+Later revisions (42x rev. B0 and up, and all other IXP4[356]) can work
+in the most efficient hw mixed mode. Support is not upstream but it's
+basically ready. I think it may be incompatible with XIP.
+-- 
+Krzysztof Halasa
