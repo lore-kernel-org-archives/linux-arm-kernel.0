@@ -1,76 +1,50 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Fri, 9 Mar 2012 13:04:36 +0100
-Subject: [PATCH v2 00/13] dmaengine: imx-dma: merge dma arch code into
- dmaengine.
-In-Reply-To: <20120309105645.GA3852@pengutronix.de>
-References: <1331130825-14947-1-git-send-email-javier.martin@vista-silicon.com>
- <20120309105645.GA3852@pengutronix.de>
-Message-ID: <CACKLOr3Y9BW_pMUnr6q4eH2c+2=jQ2WHEjWprb=O5wFrS9=T=A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 11 Mar 2012 01:03:41 -0800
+Subject: [GIT PULL v2 4/4] Samsung devel-dma for v3.4
+Message-ID: <4F5C6A6D.9010400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-thank you for your time.
+Hi Arnd, Olof,
 
-On 9 March 2012 11:56, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Mar 07, 2012 at 03:33:32PM +0100, Javier Martin wrote:
->> The following series have to be applied on top of the following patches:
->> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
->> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
->>
->> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
->> is deprecated and no new patches are accepted for it.
->>
->> This series merges this code into the imx-dma.c dmaengine driver.
->>
->> Changes since v1:
->> ?- Merge patch 14 with 01.
->> ?- Add a proper changelog to each patch of the series.
->>
->> [PATCH v2 01/13] dmaengine: imx-dma: merge old dma-v1.c with imx-dma.c
->> [PATCH v2 02/13] dmaengine: imx-dma: remove data member from internal structure.
->> [PATCH v2 03/13] dmaengine: imx-dma: remove dma_mode member of internal structure.
->> [PATCH v2 04/13] dmaengine: imx-dma: remove 'imxdma_setup_mem2mem_hw' function.
->> [PATCH v2 05/13] dmaengine: imx-dma: remove 'imxdma_config_channel_hw' function.
->> [PATCH v2 06/13] dmaengine: imx-dma: remove 'imxdma_setup_sg_hw' function.
->> [PATCH v2 07/13] dmaengine: imx-dma: remove sg member from internal structure.
->> [PATCH v2 08/13] dmaengine: imx-dma: remove 'in_use' field of 'internal' structure.
->> [PATCH v2 09/13] dmaengine: imx-dma: remove 'resbytes' field of 'internal' structure.
->> [PATCH v2 10/13] dmaengine: imx-dma: remove internal structure.
->> [PATCH v2 11/13] dmaengine: imx-dma: remove unused arg of imxdma_sg_next.
->> [PATCH v2 12/13] dmaengine: imx-dma: remove 'imx_dmav1_baseaddr' and 'dma_clk'.
->> [PATCH v2 13/13] dmaengine: imx-dma: use 'dev_dbg' and 'dev_warn' for messages.
->
-> I didn't look at the individual patches but only on the end result and
-> overall it looks good. There are several things left for further cleanup:
->
-> - use resources for irq and base address
-> - use platform device id rather than cpu_is_* to distinguish
-> ?between the different device types.
-> - request_irq for i.MX21/27 in alloc_chan_resources instead in probe
-> - Use all available channels. In the time we had dmaengine users and
-> ?legacy API users 8 channels were reserved for the old API and 8
-> ?channels for the dmaengine API.
->
-> I think the first three points can be done in a later series, the last
-> one should be trivial to fix now.
+I rebased devel-samsung-dma on top of new next-exynos-clock as per 
+Olof's suggestion.
 
-I agree. Let me fix the last issue you mention in a v3 of the involved patch.
+Please pull it from:
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/devel-samsung-dma
 
-> Some comments follow to the individual patches.
->
-> And, oh:
->
-> Tested-by: Sascha Hauer <s.hauer@pengutronix.de
+If any problems, please let me know.
 
-Cool. Did you test it for any other platform than i.MX27?
+Thanks.
 
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 44b2cef5ae6da48523fa634230ca66107110a7dd:
+
+   ARM: EXYNOS: Add clock register addresses for EXYNOS4X12 bus devfreq 
+driver (2012-03-10 22:30:32 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/devel-samsung-dma
+
+Boojin Kim (2):
+       ARM: EXYNOS: Enable MDMA driver
+       ARM: EXYNOS: add support DMA for EXYNOS4X12 SoC
+
+Tushar Behera (1):
+       ARM: EXYNOS: Add apb_pclk clkdev entry for mdma1
+
+  arch/arm/mach-exynos/Kconfig                   |    3 +
+  arch/arm/mach-exynos/clock-exynos4.c           |    9 ++
+  arch/arm/mach-exynos/dma.c                     |  117 
+++++++++++++++++++++++--
+  arch/arm/mach-exynos/include/mach/irqs.h       |    2 +
+  arch/arm/mach-exynos/include/mach/map.h        |    3 +-
+  arch/arm/plat-samsung/include/plat/dma-pl330.h |   16 +++
+  6 files changed, 141 insertions(+), 9 deletions(-)
