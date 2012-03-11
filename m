@@ -1,34 +1,59 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 9 Mar 2012 11:02:15 -0700 (MST)
-Subject: [PATCH] ARM: OMAP4: clock: Add aliases for McBSP fclk clocks
-In-Reply-To: <20120309180027.GF12083@atomide.com>
-References: <1331024133-18201-1-git-send-email-peter.ujfalusi@ti.com>
- <4F5A258F.8050704@ti.com> <20120309180027.GF12083@atomide.com>
-Message-ID: <alpine.DEB.2.00.1203091101400.7039@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 11 Mar 2012 17:52:32 +0000
+Subject: [PATCH 2/2] ARM: kirkwood: Convert orion-nand to fdt
+In-Reply-To: <1331476406-9844-3-git-send-email-jm@lentin.co.uk>
+References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
+ <1331476406-9844-3-git-send-email-jm@lentin.co.uk>
+Message-ID: <201203111752.32497.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Mar 2012, Tony Lindgren wrote:
+On Sunday 11 March 2012, Jamie Lentin wrote:
+> The DNS-320 and 325 have a NAND partitioned to store uboot, uimage and root
+> filesystem. Store this information in devicetree.
 
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [120309 07:47]:
-> > Hi Paul, Tony,
-> > 
-> > On 03/06/2012 10:55 AM, Peter Ujfalusi wrote:
-> > > CLKS signal for McBSP ports can be selected from internal (PRCM) or external
-> > > (ABE_CLKS pin) source.
-> > > To be able to use existing code we need to create clock aliases consistent
-> > > among OMAP2/3/4.
-> > 
-> > Would you be able to take a look at this patch?
-> 
-> To me this looks safe to merge via ASoC tree, assuming Paul
-> acks it too, and it does not cause merge conflicts with
-> Paul's changes:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+All the important parts  look good to me, just two small details:
 
-Please let's not merge this one yet.  It should not be necessary to change 
-the clkdev aliases, this change should occur in the hwmod code.
+> -	board = pdev->dev.platform_data;
+> +	if (pdev->dev.of_node) {
+> +		board = kzalloc(sizeof(struct orion_nand_data), GFP_KERNEL);
+> +		if (!board) {
+> +			printk(KERN_ERR "orion_nand: failed to allocate board structure.\n");
+> +			ret = -ENOMEM;
+> +			goto no_res;
+> +		}
+> +		if (!of_property_read_u32(pdev->dev.of_node, "cle", &val))
+> +			board->cle = (u8)val;
+> +		if (!of_property_read_u32(pdev->dev.of_node, "ale", &val))
+> +			board->ale = (u8)val;
+> +		if (!of_property_read_u32(pdev->dev.of_node, "width", &val))
+> +			board->width = (u8)val;
+> +		if (!of_property_read_u32(pdev->dev.of_node,
+> +						"chip-delay", &val))
+> +			board->chip_delay = (u8)val;
+> +	} else
+> +		board = pdev->dev.platform_data;
 
+If you use devm_kzalloc, the memory will get freed automatically during cleanup.
+  
+> +#ifdef CONFIG_OF
+> +static struct of_device_id orion_nand_of_match_table[] = {
+> +	{ .compatible = "mrvl,orion-nand", },
+> +	{},
+> +};
+> +#else
+> +#define orion_nand_of_match_table NULL
+> +#endif
+> +
+>  static struct platform_driver orion_nand_driver = {
+>  	.remove		= __devexit_p(orion_nand_remove),
+>  	.driver		= {
+>  		.name	= "orion_nand",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(orion_nand_of_match_table),
+>  	},
+>  };
 
-- Paul
+When you use of_match_ptr(), you can leave out the "#else\n#define orion_nand_of_match_table NULL".
+
+	Arnd
