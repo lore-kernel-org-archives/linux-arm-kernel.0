@@ -1,25 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 Mar 2012 10:20:41 -0800
-Subject: [GIT PULL 1/4] Samsung devel for v3.4
-In-Reply-To: <4F5B7C71.2090303@samsung.com>
-References: <4F5B7C71.2090303@samsung.com>
-Message-ID: <CAOesGMgec=KVBQJjVs3p3B2GGj9q9mwC2XCdxLNvvJL61u+f8g@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 11 Mar 2012 11:53:35 +0100
+Subject: [PATCH v7 0/4] USB: OHCI-HCD: Support for LPC32xx
+Message-ID: <1331463219-23293-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2012 at 8:08 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd, Olof,
->
-> This is various develop regarding Samsung stuff for v3.4.
-> Please pull following:
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/devel-samsung
->
-> I think, you can pull this cleanly without any conflicts.
-> If any problems, please kindly let me know.
+These patches add support for the LPC32xx to the ohci-pnx4008 driver and make
+the driver use smbus functions.
 
+As discussed with Greg-KH on the USB mailing list, the ohci-pnx4008 driver is
+first renamed to reflect its multi-platform support. The second patch also
+renames the respective pnx4008_* symbols accordingly.
 
-Thanks, pulled into next/soc.
+The third patch adds the actual lpc32xx support.
 
+The fourth patch removes the re-coded i2c_write() by using an existing smbus
+function. You can leave out this very single patch to still have the desired
+LPC32xx support. It just fixes existing kernel code to only use smbus calls in
+this driver.
 
--Olof
+Applies to v3.3-rc6
+
+Since v6, i2c_write() has been removed in favour of i2c_smbus_write_byte_data()
+
+Thanks to Wolfram Sang for reviewing!
+
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+
+---
+
+Roland Stigge (4):
+ USB: OHCI-HCD: Rename ohci-pnx4008 to ohci-nxp
+ USB: ohci-nxp: Rename symbols from pnx4008 to nxp
+ USB: ohci-nxp: Support for LPC32xx
+ USB: ohci-nxp: Remove i2c_write(), use smbus
+
+ Documentation/i2c/instantiating-devices |    6 
+ drivers/usb/host/ohci-hcd.c             |    6 
+ drivers/usb/host/ohci-nxp.c             |  652 ++++++++++++++++++++++++++++----
+ drivers/usb/host/ohci-pnx4008.c         |  453 ----------------------
+ 4 files changed, 596 insertions(+), 521 deletions(-)
