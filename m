@@ -1,63 +1,121 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 12 Mar 2012 18:02:26 +0100
-Subject: [PATCH] stmmac: Add device-tree support
-In-Reply-To: <4F5E169D.3070508@st.com>
-References: <1331561157-3820-1-git-send-email-sr@denx.de>
- <4F5E0993.9020000@gmail.com> <201203121606.26926.sr@denx.de>
- <4F5E169D.3070508@st.com>
-Message-ID: <20120312170226.GE13869@game.jcrosoft.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 11 Mar 2012 14:17:21 -0700
+Subject: [PATCH 3/5] ARM: Exynos4: Add pinctrl devices and pin maps
+In-Reply-To: <1331469965-28846-4-git-send-email-thomas.abraham@linaro.org>
+References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
+ <1331469965-28846-4-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4F5D1661.4090007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:30 Mon 12 Mar     , Giuseppe CAVALLARO wrote:
-> On 3/12/2012 4:06 PM, Stefan Roese wrote:
-> > Hi Rob,
-> > 
-> > On Monday 12 March 2012 15:34:59 Rob Herring wrote:
-> >> On 03/12/2012 09:05 AM, Stefan Roese wrote:
-> >>> This patch adds support to configure the STMMAC ethernet driver via
-> >>> device-tree instead of platform_data.
-> >>>
-> >>> Currently, only the properties needed on SPEAr600 are provided. All
-> >>> other properties should be added once needed on other platforms.
-> >>>
-> >>> Signed-off-by: Stefan Roese <sr@denx.de>
-> >>> Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> >>> Cc: Viresh Kumar <viresh.kumar@st.com>
-> >>> ---
-> >>>
-> >>>  Documentation/devicetree/bindings/net/stmmac.txt   |   38 +++++++++++
-> >>>  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   66
-> >>>  +++++++++++++++++++- 2 files changed, 103 insertions(+), 1 deletion(-)
-> >>>  create mode 100644 Documentation/devicetree/bindings/net/stmmac.txt
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/net/stmmac.txt
-> >>> b/Documentation/devicetree/bindings/net/stmmac.txt new file mode 100644
-> >>> index 0000000..386a47f
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/net/stmmac.txt
-> >>> @@ -0,0 +1,38 @@
-> >>> +* STMicroelectronics 10/100/1000 Ethernet driver (GMAC)
-> >>> +
-> >>> +Required properties:
-> >>> +- compatible: Should be "stm,gmac"
-> >>
-> >> This is too generic. This should be 1 string per version of h/w.
-> > 
-> > Viresh, Giuseppe, can you please suggest a proper string for the SPEAr600 
-> > STMMAC core, including version?
-> >  
-> >> 'stm' should be 'st' according to vendor-prefixes.txt.
+Thomas Abraham wrote:
+> Add the three pinctrl platform devices and the pin maps for Exynos4.
 > 
-> I'm not familiar with devicetree; maybe we should have:
-> 
-> "stmicro,mac100"
-> "stmicro,gmac"
-> 
-> or: st instead of stmicro if you prefer.
-you need to put the first soc where the ip appear on gmac it's sti7105
+> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+> ---
+>   arch/arm/mach-exynos/Kconfig              |    1 +
+>   arch/arm/mach-exynos/Makefile             |    1 +
+>   arch/arm/mach-exynos/common.h             |    6 ++
+>   arch/arm/mach-exynos/dev-pinctrl.c        |  115 +++++++++++++++++++++++++++++
+>   arch/arm/plat-samsung/include/plat/devs.h |    3 +
+>   5 files changed, 126 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/mach-exynos/dev-pinctrl.c
 
-but with PM IIRC it's sti7108
+[...]
 
-Best Regards,
-J.
+> +#include<linux/kernel.h>
+> +#include<linux/dma-mapping.h>
+> +#include<linux/platform_device.h>
+> +#include<linux/interrupt.h>
+> +#include<linux/pinctrl/machine.h>
+
+#include <linux/ioport.h> for DEFINE_RES_xxx at below.
+
+> +
+> +#include<plat/devs.h>
+> +#include<plat/pinctrl.h>
+> +
+> +#include<mach/map.h>
+> +
+> +static struct resource exynos4_pinctrl_resource0[] = {
+> +	[0] = {
+> +		.start  = EXYNOS4_PA_GPIO1,
+> +		.end    = EXYNOS4_PA_GPIO1 + SZ_4K - 1,
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+
+[0] = DEFINE_RES_MEM(EXYNOS4_PA_GPIO1, SZ_4K),
+
+> +	[1] = {
+> +		.start  = IRQ_GPIO_XA,
+> +		.end    = IRQ_GPIO_XA,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+
+[1] = DEFINE_RES_IRQ(IRQ_GPIO_XA),
+
+But I'm thinking, we need to move to use EXYNOS4_IRQ_GPIO_XA here for
+both EXYNOS4 and EXYNOS5 and as a note, I'm working on updating IRQ
+naming you can see it in this week :)
+
+> +};
+> +
+> +struct platform_device exynos4_pinctrl0 = {
+> +	.name		= "exynos4-pinctrl",
+> +	.id		= 0,
+> +	.resource	= exynos4_pinctrl_resource0,
+> +	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource0),
+> +};
+> +
+> +static struct resource exynos4_pinctrl_resource1[] = {
+> +	[0] = {
+> +		.start  = EXYNOS4_PA_GPIO2,
+> +		.end    = EXYNOS4_PA_GPIO2 + SZ_4K - 1,
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+
+same as above.
+
+> +	[1] = {
+> +		.start  = IRQ_GPIO_XB,
+> +		.end    = IRQ_GPIO_XB,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+
+same.
+
+> +};
+> +
+> +struct platform_device exynos4_pinctrl1 = {
+> +	.name		= "exynos4-pinctrl",
+> +	.id		= 1,
+> +	.resource	= exynos4_pinctrl_resource1,
+> +	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource1),
+> +};
+> +
+> +static struct resource exynos4_pinctrl_resource2[] = {
+> +	[0] = {
+> +		.start  = EXYNOS4_PA_GPIO3,
+> +		.end    = EXYNOS4_PA_GPIO3 + SZ_4K - 1,
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+
+same.
+
+> +};
+> +
+> +struct platform_device exynos4_pinctrl2 = {
+> +	.name		= "exynos4-pinctrl",
+> +	.id		= 2,
+> +	.resource	= exynos4_pinctrl_resource2,
+> +	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource2),
+> +};
+> +
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
