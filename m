@@ -1,183 +1,49 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Fri, 09 Mar 2012 00:08:58 -0500
-Subject: [PATCH 2/2] mmc: sdhci-s3c: Enable runtime power management
-In-Reply-To: <1330735602-22409-2-git-send-email-broonie@opensource.wolfsonmicro.com>
- (Mark Brown's message of "Sat, 3 Mar 2012 00:46:42 +0000")
-References: <4F51697C.40408@samsung.com>
- <1330735602-22409-1-git-send-email-broonie@opensource.wolfsonmicro.com>
- <1330735602-22409-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <m2vcmenyxh.fsf@bob.laptop.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 11 Mar 2012 16:08:17 -0500
+Subject: [PATCH 1/4] ARM: fix ioremap/iounmap for !CONFIG_MMU
+In-Reply-To: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1331500100-31351-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Rob Herring <rob.herring@calxeda.com>
 
-On Fri, Mar 02 2012, Mark Brown wrote:
-> Since most of the work is already done by the core we just need to add
-> runtime suspend methods and tell the PM core that runtime PM is enabled
-> for this device.
->
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  drivers/mmc/host/sdhci-s3c.c |   28 ++++++++++++++++++++++++++++
->  1 files changed, 28 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index 46152d6..6926ac9 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -23,6 +23,7 @@
->  #include <linux/of.h>
->  #include <linux/of_gpio.h>
->  #include <linux/pm.h>
-> +#include <linux/pm_runtime.h>
->  
->  #include <linux/mmc/host.h>
->  
-> @@ -721,6 +722,11 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->  	if (pdata->host_caps2)
->  		host->mmc->caps2 |= pdata->host_caps2;
->  
-> +	pm_runtime_enable(&pdev->dev);
-> +	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-> +	pm_runtime_use_autosuspend(&pdev->dev);
-> +	pm_suspend_ignore_children(&pdev->dev, 1);
-> +
->  	ret = sdhci_add_host(host);
->  	if (ret) {
->  		dev_err(dev, "sdhci_add_host() failed\n");
-> @@ -740,6 +746,8 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->  
->   err_add_host:
->  	release_resource(sc->ioarea);
-> +	pm_runtime_forbid(&pdev->dev);
-> +	pm_runtime_get_noresume(&pdev->dev);
->  	kfree(sc->ioarea);
->  
->   err_req_regs:
-> @@ -784,6 +792,8 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
->  
->  	sdhci_remove_host(host, 1);
->  
-> +	pm_runtime_disable(&pdev->dev);
-> +
->  	for (ptr = 0; ptr < 3; ptr++) {
->  		if (sc->clk_bus[ptr]) {
->  			clk_disable(sc->clk_bus[ptr]);
-> @@ -824,9 +834,27 @@ static int sdhci_s3c_resume(struct device *dev)
->  }
->  #endif
->  
-> +#ifdef CONFIG_PM_RUNTIME
-> +static int sdhci_s3c_runtime_suspend(struct device *dev)
-> +{
-> +	struct sdhci_host *host = dev_get_drvdata(dev);
-> +
-> +	return sdhci_runtime_suspend_host(host);
-> +}
-> +
-> +static int sdhci_s3c_runtime_resume(struct device *dev)
-> +{
-> +	struct sdhci_host *host = dev_get_drvdata(dev);
-> +
-> +	return sdhci_runtime_resume_host(host);
-> +}
-> +#endif
-> +
->  #ifdef CONFIG_PM
->  static const struct dev_pm_ops sdhci_s3c_pmops = {
->  	SET_SYSTEM_SLEEP_PM_OPS(sdhci_s3c_suspend, sdhci_s3c_resume)
-> +	SET_RUNTIME_PM_OPS(sdhci_s3c_runtime_suspend, sdhci_s3c_runtime_resume,
-> +			   NULL)
->  };
->  
->  #define SDHCI_S3C_PMOPS (&sdhci_s3c_pmops)
+With commit 4fe7ef3a081 (ARM: provide runtime hook for ioremap/iounmap),
+compiles with !CONFIG_MMU were broken. Rename nommu __iounmap to
+__arm_iounmap and add arch_ioremap_caller and arch_iounmap. Its
+not expected that these need to be overriden for !CONFIG_MMU, so setting
+the function ptrs has no effect in this case.
 
-I had to rework this patch to avoid a conflict with Julia Lawall's patch
-"mmc: sdhci-s3c: use devm_ functions": https://lkml.org/lkml/2012/2/18/76
-
-The reworked patch is below, please let me know if it looks incorrect:
-
-From: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Subject: [PATCH] mmc: sdhci-s3c: Enable runtime power management
-
-Since most of the work is already done by the core we just need to add
-runtime suspend methods and tell the PM core that runtime PM is enabled
-for this device.
-
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-Signed-off-by: Chris Ball <cjb@laptop.org>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- drivers/mmc/host/sdhci-s3c.c |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
+ arch/arm/mm/nommu.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 9683322..312aaf4 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -23,6 +23,7 @@
- #include <linux/of.h>
- #include <linux/of_gpio.h>
- #include <linux/pm.h>
-+#include <linux/pm_runtime.h>
- 
- #include <linux/mmc/host.h>
- 
-@@ -705,9 +706,16 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	if (pdata->host_caps)
- 		host->mmc->caps |= pdata->host_caps;
- 
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-+	pm_runtime_use_autosuspend(&pdev->dev);
-+	pm_suspend_ignore_children(&pdev->dev, 1);
-+
- 	ret = sdhci_add_host(host);
- 	if (ret) {
- 		dev_err(dev, "sdhci_add_host() failed\n");
-+		pm_runtime_forbid(&pdev->dev);
-+		pm_runtime_get_noresume(&pdev->dev);
- 		goto err_req_regs;
- 	}
- 
-@@ -764,6 +772,8 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
- 
- 	sdhci_remove_host(host, 1);
- 
-+	pm_runtime_disable(&pdev->dev);
-+
- 	for (ptr = 0; ptr < 3; ptr++) {
- 		if (sc->clk_bus[ptr]) {
- 			clk_disable(sc->clk_bus[ptr]);
-@@ -800,9 +810,27 @@ static int sdhci_s3c_resume(struct device *dev)
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 4fc6794..6486d2f 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -86,13 +86,17 @@ void __iomem *__arm_ioremap(unsigned long phys_addr, size_t size,
  }
- #endif
+ EXPORT_SYMBOL(__arm_ioremap);
  
-+#ifdef CONFIG_PM_RUNTIME
-+static int sdhci_s3c_runtime_suspend(struct device *dev)
-+{
-+	struct sdhci_host *host = dev_get_drvdata(dev);
++void __iomem * (*arch_ioremap_caller)(unsigned long, size_t, unsigned int, void *);
 +
-+	return sdhci_runtime_suspend_host(host);
-+}
-+
-+static int sdhci_s3c_runtime_resume(struct device *dev)
-+{
-+	struct sdhci_host *host = dev_get_drvdata(dev);
-+
-+	return sdhci_runtime_resume_host(host);
-+}
-+#endif
-+
- #ifdef CONFIG_PM
- static const struct dev_pm_ops sdhci_s3c_pmops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(sdhci_s3c_suspend, sdhci_s3c_resume)
-+	SET_RUNTIME_PM_OPS(sdhci_s3c_runtime_suspend, sdhci_s3c_runtime_resume,
-+			   NULL)
- };
+ void __iomem *__arm_ioremap_caller(unsigned long phys_addr, size_t size,
+ 				   unsigned int mtype, void *caller)
+ {
+ 	return __arm_ioremap(phys_addr, size, mtype);
+ }
  
- #define SDHCI_S3C_PMOPS (&sdhci_s3c_pmops)
+-void __iounmap(volatile void __iomem *addr)
++void (*arch_iounmap)(volatile void __iomem *);
++
++void __arm_iounmap(volatile void __iomem *addr)
+ {
+ }
+-EXPORT_SYMBOL(__iounmap);
++EXPORT_SYMBOL(__arm_iounmap);
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.5.4
