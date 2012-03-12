@@ -1,70 +1,107 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 11 Mar 2012 16:08:16 -0500
-Subject: [PATCH 0/4] mach/io.h cleanup fixes
-Message-ID: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Mar 2012 19:58:53 +0800
+Subject: [PATCH v4 06/10] ASoC: fsl: check property 'compatible' for the
+ machine name
+In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
+References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1331553537-19789-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Check /compatible rather than /model to determine the machine name.
+The p1022ds older device trees get a different /model from the new
+ones, while /compatible is consistent there, so checking /compatible
+will save the bother of detecting older p1022ds device trees.
 
-This is a couple of fixes to mach/io.h clean-up series. The first 2 patches
-are a couple of compile fixes. The 3rd patch creates a common definition of
-IOMEM() macros. The 4th patch uses the common IOMEM() definition to fix
-incorrect usages of __io() macro.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ sound/soc/fsl/fsl_ssi.c      |    6 +++---
+ sound/soc/fsl/mpc8610_hpcd.c |    2 +-
+ sound/soc/fsl/p1022_ds.c     |   32 +++++---------------------------
+ 3 files changed, 9 insertions(+), 31 deletions(-)
 
-This applies on top of io-cleanup-for-3.4 branch already pulled into
-arm-soc.
-
-Rob
-
-Rob Herring (4):
-  ARM: fix ioremap/iounmap for !CONFIG_MMU
-  ARM: iop13xx: fix missing declaration of iop13xx_init_early
-  ARM: create a common IOMEM definition
-  ARM: __io abuse cleanup
-
- arch/arm/include/asm/assembler.h                |    2 ++
- arch/arm/include/asm/io.h                       |    2 ++
- arch/arm/kernel/debug.S                         |    1 +
- arch/arm/kernel/entry-armv.S                    |    1 +
- arch/arm/mach-cns3xxx/core.c                    |    8 ++++----
- arch/arm/mach-cns3xxx/devices.c                 |    2 +-
- arch/arm/mach-davinci/include/mach/hardware.h   |    6 ------
- arch/arm/mach-davinci/include/mach/uncompress.h |    2 ++
- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    9 ---------
- arch/arm/mach-iop13xx/include/mach/iop13xx.h    |    1 +
- arch/arm/mach-mmp/include/mach/addr-map.h       |    6 ------
- arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ------
- arch/arm/mach-msm/include/mach/msm_iomap.h      |    6 ------
- arch/arm/mach-mxs/include/mach/hardware.h       |    6 ------
- arch/arm/mach-netx/generic.c                    |    2 +-
- arch/arm/mach-netx/include/mach/hardware.h      |    2 +-
- arch/arm/mach-netx/include/mach/netx-regs.h     |   16 ++++++++--------
- arch/arm/mach-omap1/ams-delta-fiq-handler.S     |    1 +
- arch/arm/mach-omap1/iomap.h                     |    6 ------
- arch/arm/mach-omap2/clock3xxx_data.c            |    1 +
- arch/arm/mach-omap2/clock44xx_data.c            |    1 +
- arch/arm/mach-omap2/iomap.h                     |    6 ------
- arch/arm/mach-realview/include/mach/hardware.h  |    2 +-
- arch/arm/mach-rpc/include/mach/hardware.h       |    6 ------
- arch/arm/mach-shmobile/board-ag5evm.c           |    2 +-
- arch/arm/mach-shmobile/board-bonito.c           |    2 +-
- arch/arm/mach-shmobile/board-kota2.c            |    2 +-
- arch/arm/mach-shmobile/intc-r8a7779.c           |    4 ++--
- arch/arm/mach-shmobile/intc-sh73a0.c            |    4 ++--
- arch/arm/mach-shmobile/smp-r8a7779.c            |    4 ++--
- arch/arm/mach-shmobile/smp-sh73a0.c             |   20 ++++++++++----------
- arch/arm/mach-spear3xx/clock.c                  |    1 +
- arch/arm/mach-spear6xx/clock.c                  |    1 +
- arch/arm/mach-tegra/include/mach/iomap.h        |    6 ------
- arch/arm/mach-u300/include/mach/u300-regs.h     |    6 ------
- arch/arm/mach-ux500/include/mach/hardware.h     |    2 +-
- arch/arm/mm/nommu.c                             |    8 ++++++--
- arch/arm/plat-mxc/include/mach/hardware.h       |    6 ------
- arch/arm/plat-omap/include/plat/hardware.h      |    6 ------
- arch/arm/plat-omap/include/plat/usb.h           |    1 -
- arch/arm/plat-spear/include/plat/hardware.h     |    6 ------
- 41 files changed, 56 insertions(+), 126 deletions(-)
-
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 3e06696..2eb407f 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -716,12 +716,12 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Trigger the machine driver's probe function.  The platform driver
+-	 * name of the machine driver is taken from the /model property of the
++	 * name of the machine driver is taken from /compatible property of the
+ 	 * device tree.  We also pass the address of the CPU DAI driver
+ 	 * structure.
+ 	 */
+-	sprop = of_get_property(of_find_node_by_path("/"), "model", NULL);
+-	/* Sometimes the model name has a "fsl," prefix, so we strip that. */
++	sprop = of_get_property(of_find_node_by_path("/"), "compatible", NULL);
++	/* Sometimes the compatible name has a "fsl," prefix, so we strip it. */
+ 	p = strrchr(sprop, ',');
+ 	if (p)
+ 		sprop = p + 1;
+diff --git a/sound/soc/fsl/mpc8610_hpcd.c b/sound/soc/fsl/mpc8610_hpcd.c
+index 354b753..8fdc430 100644
+--- a/sound/soc/fsl/mpc8610_hpcd.c
++++ b/sound/soc/fsl/mpc8610_hpcd.c
+@@ -402,7 +402,7 @@ static struct platform_driver mpc8610_hpcd_driver = {
+ 	.probe = mpc8610_hpcd_probe,
+ 	.remove = __devexit_p(mpc8610_hpcd_remove),
+ 	.driver = {
+-		/* The name must match the 'model' property in the device tree,
++		/* The name must match 'compatible' property in the device tree,
+ 		 * in lowercase letters.
+ 		 */
+ 		.name = "snd-soc-mpc8610hpcd",
+diff --git a/sound/soc/fsl/p1022_ds.c b/sound/soc/fsl/p1022_ds.c
+index e87cb41..0f42f31 100644
+--- a/sound/soc/fsl/p1022_ds.c
++++ b/sound/soc/fsl/p1022_ds.c
+@@ -403,6 +403,11 @@ static struct platform_driver p1022_ds_driver = {
+ 	.probe = p1022_ds_probe,
+ 	.remove = __devexit_p(p1022_ds_remove),
+ 	.driver = {
++		/*
++		 * The name must match 'compatible' property in the device tree,
++		 * in lowercase letters.
++		 */
++		.name = "snd-soc-p1022ds",
+ 		.owner = THIS_MODULE,
+ 	},
+ };
+@@ -416,33 +421,6 @@ static int __init p1022_ds_init(void)
+ {
+ 	struct device_node *guts_np;
+ 	struct resource res;
+-	const char *sprop;
+-
+-	/*
+-	 * Check if we're actually running on a P1022DS.  Older device trees
+-	 * have a model of "fsl,P1022" and newer ones use "fsl,P1022DS", so we
+-	 * need to support both.  The SSI driver uses that property to link to
+-	 * the machine driver, so have to match it.
+-	 */
+-	sprop = of_get_property(of_find_node_by_path("/"), "model", NULL);
+-	if (!sprop) {
+-		pr_err("snd-soc-p1022ds: missing /model node");
+-		return -ENODEV;
+-	}
+-
+-	pr_debug("snd-soc-p1022ds: board model name is %s\n", sprop);
+-
+-	/*
+-	 * The name of this board, taken from the device tree.  Normally, this is a*
+-	 * fixed string, but some P1022DS device trees have a /model property of
+-	 * "fsl,P1022", and others have "fsl,P1022DS".
+-	 */
+-	if (strcasecmp(sprop, "fsl,p1022ds") == 0)
+-		p1022_ds_driver.driver.name = "snd-soc-p1022ds";
+-	else if (strcasecmp(sprop, "fsl,p1022") == 0)
+-		p1022_ds_driver.driver.name = "snd-soc-p1022";
+-	else
+-		return -ENODEV;
+ 
+ 	/* Get the physical address of the global utilities registers */
+ 	guts_np = of_find_compatible_node(NULL, NULL, "fsl,p1022-guts");
 -- 
 1.7.5.4
