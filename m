@@ -1,100 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 11 Mar 2012 17:46:09 +0000
-Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
-In-Reply-To: <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
-References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
- <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
-Message-ID: <201203111746.09757.arnd@arndb.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 12 Mar 2012 12:06:24 +0100
+Subject: iMX53 and MMC_CAP_SDIO_IRQ
+In-Reply-To: <4F5DD28F.50600@linuxtv.org>
+References: <4F5DB793.3080904@linuxtv.org>
+ <20120312101037.GA2459@pengutronix.de> <4F5DD28F.50600@linuxtv.org>
+Message-ID: <20120312110624.GB2459@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 11 March 2012, Jamie Lentin wrote:
-> Add support for the DNS-320 and DNS-325. Describe as much as currently possible
-> in the devicetree files, leave everything else in board-dt.c to be patched
-> later.
+
+> Ok, to sum this up:
 > 
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> SDIO IRQs are working in mx_sdhci in the Freescale tree because it was
+> properly implemented and tested, obviously.
 
-Great work!
+Not sure about "properly", but, yes ;)
 
-> +
-> +/ {
-> +	model = "D-Link DNS-320 NAS (Rev A1)";
-> +	compatible = "dlink,dns-320-a1", "dlink,dns-320", "dlink,dns-kirkwood", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x8000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +	};
-> +
-> +	wdt at fed20300 {
-> +		compatible = "mrvl,orion-wdt";
-> +		reg = <0xfed20300 0x28>;
-> +		clock-frequency = <166666667>;
-> +	};
-> +
-> +	serial at f1012000 {
-> +		compatible = "ns16550a";
-> +		reg = <0xf1012000 0xff>;
-> +		reg-shift = <2>;
-> +		interrupts = <33>;
-> +		clock-frequency = <166666667>;
-> +	};
-> +
-> +	serial at f1012100 {
-> +		compatible = "ns16550a";
-> +		reg = <0xf1012100 0xff>;
-> +		reg-shift = <2>;
-> +		interrupts = <34>;
-> +		clock-frequency = <166666667>;
-> +	};
+> SDIO IRQs are working for sdhci in mainline probably for other
+> non-freescale platforms.
 
-I think the generic kirkwood device nodes should all be part of
-the kirkwood.dtsi file, except for any properties you want to
-override.
+Probably, but I can't say 'yes' for sure. You'd need to find out.
 
-You can add a status="disabled" property in device nodes
-that may not be connected in individual boards, and then
-just override it by listing status="enabled" in the board.dts
-file, without having to duplicate all the other properties.
+> You fixed the generic sdhci driver in mainline to work with iMX53 to get
+> rid of the need for mx_sdhci, but probably never got the chance to test
+> if SDIO IRQs are really working.
 
-I would also suggest to change the kirkwood.dtsi layout to
-put all the on-chip peripherals from the 0xf1 section into
-one bus in the device tree, like
+I worked mainly with MX25/35 back then, and a little bit with MX51. IIRC
+I only had an SDIO card for which no Linux drivers were available, so I
+only could test that the card was detected :(
 
-	ocp at f1000000 {
-		compatible = "simple-bus";
-		ranges = <0xf1000000 0xf1000000 0x1000000>;
-		#address-cells = 1;
-		#size-cells = 1;
+> That means, the subtle difference between mx_sdhci and sdhci to get SDIO
+> IRQS to work on sdhci with iMX53 has yet to be found.
 
-		serial at f1012000 {
-			...
-		};
+Yup. Try 'git log --follow sdhci-esdhc-imx.c' to find people who worked
+with MX53 or SDIO using that driver.
 
-		...
-	};
+Regards,
 
-Or even use the ranges property to remap everything into
-a simpler address range:
+   Wolfram
 
-	ocp at f1000000 {
-		compatible = "simple-bus";
-		ranges = <0 0xf1000000 0x1000000>;
-		#address-cells = 1;
-		#size-cells = 1;
-
-		serial at 12000 {
-			reg = <0x12000 0x100>;
-			...
-		};
-
-		...
-	};
-
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/fa9e24dc/attachment-0001.sig>
