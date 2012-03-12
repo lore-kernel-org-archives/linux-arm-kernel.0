@@ -1,149 +1,92 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 12 Mar 2012 09:51:58 +0530
-Subject: [PATCH V2 03/22] watchdog/mpcore_wdt: Rename dev to pdev for pointing
- to struct platform_device
-In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
-References: <cover.1331524811.git.viresh.kumar@st.com>
-Message-ID: <d9bc91707225b317a0700b50e70227aae91e9d78.1331524811.git.viresh.kumar@st.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 12 Mar 2012 09:25:50 +0100
+Subject: [PATCH] serial: PL011: clear pending interrupts
+Message-ID: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pointer to struct platform_device is named as dev, which makes it confusing when
-we write statements like dev->dev to access struct device within it.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-This patch renames such names to pdev.
+Chanho Min reported that when the boot loader transfers
+control to the kernel, there may be pending interrupts
+causing the UART to lock up in an eternal loop trying to
+pick tokens from the FIFO (since the RX interrupt flag
+indicates there are tokens) while in practice there are
+no tokens - in fact there is only a pending IRQ flag.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+This patch address the issue with a combination of a patch
+from Russell King that clears and mask all interrupts at
+probe() and clears any pending error and RX interrupts at
+port startup time, and a patch from Jong-Sung Kim that
+clears any RX interrupts (including timeouts) even if if
+there are zero tokens in the FIFO.
+
+This way these pending interrupts should be addressed in
+two ways and solidify the driver in both probe() and
+IRQ paths.
+
+Cc: stable at kernel.org
+Cc: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
+Reported-by: Chanho Min <chanho0207@gmail.com>
+Suggested-by: Russell King <linux@arm.linux.org.uk>
+Suggested-by: Jong-Sung Kim <neidhard.kim@lge.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/watchdog/mpcore_wdt.c |   40 ++++++++++++++++++++--------------------
- 1 files changed, 20 insertions(+), 20 deletions(-)
+OK Greg requested that we send out this combined approach, can
+addressees (Chanho especially) please confirm that the patch
+solves the problem? Tested on U300 and U8500.
+---
+ drivers/tty/serial/amba-pl011.c |   17 +++++++++++++----
+ 1 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 82ccd36..fd9f91b 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -44,7 +44,7 @@ struct mpcore_wdt {
- 	char		expect_close;
- };
- 
--static struct platform_device *mpcore_wdt_dev;
-+static struct platform_device *mpcore_wdt_pdev;
- static DEFINE_SPINLOCK(wdt_lock);
- 
- #define TIMER_MARGIN	60
-@@ -148,7 +148,7 @@ static int mpcore_wdt_set_heartbeat(int t)
-  */
- static int mpcore_wdt_open(struct inode *inode, struct file *file)
- {
--	struct mpcore_wdt *wdt = platform_get_drvdata(mpcore_wdt_dev);
-+	struct mpcore_wdt *wdt = platform_get_drvdata(mpcore_wdt_pdev);
- 
- 	if (test_and_set_bit(0, &wdt->timer_alive))
- 		return -EBUSY;
-@@ -298,9 +298,9 @@ static long mpcore_wdt_ioctl(struct file *file, unsigned int cmd,
-  *	System shutdown handler.  Turn off the watchdog if we're
-  *	restarting or halting the system.
-  */
--static void mpcore_wdt_shutdown(struct platform_device *dev)
-+static void mpcore_wdt_shutdown(struct platform_device *pdev)
- {
--	struct mpcore_wdt *wdt = platform_get_drvdata(dev);
-+	struct mpcore_wdt *wdt = platform_get_drvdata(pdev);
- 
- 	if (system_state == SYSTEM_RESTART || system_state == SYSTEM_HALT)
- 		mpcore_wdt_stop(wdt);
-@@ -324,17 +324,17 @@ static struct miscdevice mpcore_wdt_miscdev = {
- 	.fops		= &mpcore_wdt_fops,
- };
- 
--static int __devinit mpcore_wdt_probe(struct platform_device *dev)
-+static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
- {
- 	struct mpcore_wdt *wdt;
- 	struct resource *res;
- 	int ret;
- 
- 	/* We only accept one device, and it must have an id of -1 */
--	if (dev->id != -1)
-+	if (pdev->id != -1)
- 		return -ENODEV;
- 
--	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
- 		ret = -ENODEV;
- 		goto err_out;
-@@ -346,8 +346,8 @@ static int __devinit mpcore_wdt_probe(struct platform_device *dev)
- 		goto err_out;
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 6800f5f..ff3fed0 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+ 		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
  	}
  
--	wdt->dev = &dev->dev;
--	wdt->irq = platform_get_irq(dev, 0);
-+	wdt->dev = &pdev->dev;
-+	wdt->irq = platform_get_irq(pdev, 0);
- 	if (wdt->irq < 0) {
- 		ret = -ENXIO;
- 		goto err_free;
-@@ -358,7 +358,7 @@ static int __devinit mpcore_wdt_probe(struct platform_device *dev)
- 		goto err_free;
++	/* RXIS but RXFE? Just clear the interrupt */
++	if(unlikely(fifotaken == 0))
++		writew(UART011_RTIS | UART011_RXIS,
++		       uap->port.membase + UART011_ICR);
++
+ 	return fifotaken;
+ }
+ 
+@@ -1381,6 +1386,10 @@ static int pl011_startup(struct uart_port *port)
+ 
+ 	uap->port.uartclk = clk_get_rate(uap->clk);
+ 
++	/* Clear pending error and receive interrupts */
++	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
++	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
++
+ 	/*
+ 	 * Allocate the IRQ
+ 	 */
+@@ -1417,10 +1426,6 @@ static int pl011_startup(struct uart_port *port)
+ 	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
+ 	writew(cr, uap->port.membase + UART011_CR);
+ 
+-	/* Clear pending error interrupts */
+-	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS,
+-	       uap->port.membase + UART011_ICR);
+-
+ 	/*
+ 	 * initialise the old status of the modem signals
+ 	 */
+@@ -1927,6 +1932,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		goto unmap;
  	}
  
--	mpcore_wdt_miscdev.parent = &dev->dev;
-+	mpcore_wdt_miscdev.parent = &pdev->dev;
- 	ret = misc_register(&mpcore_wdt_miscdev);
- 	if (ret) {
- 		dev_printk(KERN_ERR, wdt->dev,
-@@ -375,8 +375,8 @@ static int __devinit mpcore_wdt_probe(struct platform_device *dev)
- 	}
- 
- 	mpcore_wdt_stop(wdt);
--	platform_set_drvdata(dev, wdt);
--	mpcore_wdt_dev = dev;
-+	platform_set_drvdata(pdev, wdt);
-+	mpcore_wdt_pdev = pdev;
- 
- 	return 0;
- 
-@@ -390,15 +390,15 @@ err_out:
- 	return ret;
- }
- 
--static int __devexit mpcore_wdt_remove(struct platform_device *dev)
-+static int __devexit mpcore_wdt_remove(struct platform_device *pdev)
- {
--	struct mpcore_wdt *wdt = platform_get_drvdata(dev);
-+	struct mpcore_wdt *wdt = platform_get_drvdata(pdev);
- 
--	platform_set_drvdata(dev, NULL);
-+	platform_set_drvdata(pdev, NULL);
- 
- 	misc_deregister(&mpcore_wdt_miscdev);
- 
--	mpcore_wdt_dev = NULL;
-+	mpcore_wdt_pdev = NULL;
- 
- 	free_irq(wdt->irq, wdt);
- 	iounmap(wdt->base);
-@@ -407,16 +407,16 @@ static int __devexit mpcore_wdt_remove(struct platform_device *dev)
- }
- 
- #ifdef CONFIG_PM
--static int mpcore_wdt_suspend(struct platform_device *dev, pm_message_t msg)
-+static int mpcore_wdt_suspend(struct platform_device *pdev, pm_message_t msg)
- {
--	struct mpcore_wdt *wdt = platform_get_drvdata(dev);
-+	struct mpcore_wdt *wdt = platform_get_drvdata(pdev);
- 	mpcore_wdt_stop(wdt);		/* Turn the WDT off */
- 	return 0;
- }
- 
--static int mpcore_wdt_resume(struct platform_device *dev)
-+static int mpcore_wdt_resume(struct platform_device *pdev)
- {
--	struct mpcore_wdt *wdt = platform_get_drvdata(dev);
-+	struct mpcore_wdt *wdt = platform_get_drvdata(pdev);
- 	/* re-activate timer */
- 	if (test_bit(0, &wdt->timer_alive))
- 		mpcore_wdt_start(wdt);
++	/* Ensure interrupts from this UART are masked and cleared */
++	writew(0, uap->port.membase + UART011_IMSC);
++	writew(0xffff, uap->port.membase + UART011_ICR);
++
+ 	uap->vendor = vendor;
+ 	uap->lcrh_rx = vendor->lcrh_rx;
+ 	uap->lcrh_tx = vendor->lcrh_tx;
 -- 
-1.7.8.110.g4cb5d
+1.7.8
