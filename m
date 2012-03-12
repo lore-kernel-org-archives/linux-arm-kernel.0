@@ -1,30 +1,25 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 11 Mar 2012 11:13:54 -0300
-Subject: [PATCH 3/4] mx31moboard: Add ssi configuration
-In-Reply-To: <20120311114104.GC3233@opensource.wolfsonmicro.com>
-References: <1331304916-4724-1-git-send-email-philippe.retornaz@epfl.ch>
- <1331304916-4724-2-git-send-email-philippe.retornaz@epfl.ch>
- <1331304916-4724-3-git-send-email-philippe.retornaz@epfl.ch>
- <1331304916-4724-4-git-send-email-philippe.retornaz@epfl.ch>
- <20120311114104.GC3233@opensource.wolfsonmicro.com>
-Message-ID: <CAOMZO5Ao2u71AixumSUgG8BbqL_BPYw-yKjkmZOj0ygkqLRdtw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Mar 2012 08:32:22 +0000
+Subject: [PATCH] serial: PL011: clear pending interrupts
+In-Reply-To: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
+References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20120312083221.GW17370@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philippe,
+On Mon, Mar 12, 2012 at 09:25:50AM +0100, Linus Walleij wrote:
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 6800f5f..ff3fed0 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+>  		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
+>  	}
+>  
 
-2012/3/11 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> On Fri, Mar 09, 2012 at 03:55:15PM +0100, Philippe R?tornaz wrote:
->
->> + ? ? mxc_audmux_v2_configure_port(MX31_AUDMUX_PORT1_SSI0,
->> + ? ? ? ? ? ? MXC_AUDMUX_V2_PTCR_SYN |
->> + ? ? ? ? ? ? MXC_AUDMUX_V2_PTCR_TFSDIR |
->
-> This will need to be rebased off current code, the audmux has been moved
-> into sound/soc.
+What if we really do end up receiving some characters here?
 
-You can use linux-next tree as it already contains the recent audmux changes.
-
-Thanks,
-
-Fabio Estevam
+> +	/* RXIS but RXFE? Just clear the interrupt */
+> +	if(unlikely(fifotaken == 0))
+> +		writew(UART011_RTIS | UART011_RXIS,
+> +		       uap->port.membase + UART011_ICR);
