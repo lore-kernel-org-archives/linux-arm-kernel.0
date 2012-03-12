@@ -1,77 +1,51 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 12 Mar 2012 21:03:08 +0530
-Subject: [PATCH] ARM: OMAP4: Workaround the OCP synchronisation issue with 32K
- synctimer.
-Message-ID: <1331566388-2397-1-git-send-email-santosh.shilimkar@ti.com>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Mon, 12 Mar 2012 16:00:59 +0530
+Subject: [PATCH v3 0/2] Add Qualcomm MSM ADM DMAEngine driver
+Message-ID: <1331548259-26865-1-git-send-email-kumarrav@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4, recently a synchronisation bug is discovered by hardware
-team, which leads to incorrect timer value read from 32K sync timer
-IP when the IP is comming out of idle.
+Following are the changes we have done from the previous
+v1 posted here: https://lkml.org/lkml/2011/12/22/148 
 
-The issue is due to the synchronization methodology used in the SYNCTIMER IP.
-The value of the counter register in 32kHz domain is synchronized to the OCP
-domain register only at count up event, and if the OCP clock is switched off,
-the OCP register gets out of synch until the first count up event after the
-clock is switched back -at the next falling edge of the 32kHz clock.
+As our ADM Scatter-gather hardware needs
+-32-bit command configuration parameter
+ apart from 
+-32-bit source address
+-32-bit destination address
+-16-bit length
 
-Further investigation revealed that it applies to gptimer1 and watchdog timer2
-as well which may run on 32KHz. This patch fixes the issue for all the
-applicable modules.
+So,we have added new parameter in struct scatterlist to support xfer descriptor
+specific private data, and for supporting ADM Box mode DMA we added new
+API and data structure.
 
-The BUG has not made it yet to the OMAP errata list and it is applicable to
-OMAP1/2/3/4/5. OMAP1/2/3 it is taken care indirectly by autodeps.
+Changes done from v2:
 
-Reported-Tested-by: dave.long at linaro.org
-[dave.long at linaro.org: Reported the oprofile time stamp issue with synctimer
-and helped to test this patch]
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/pm44xx.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index c264ef7..974f7ea 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -196,7 +196,7 @@ static void omap_default_idle(void)
- static int __init omap4_pm_init(void)
- {
- 	int ret;
--	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm;
-+	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
- 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
+As per our previous discussion you had suggested us to follow the below patch
+https://lkml.org/lkml/2012/1/26/405
+Please check the below link of our discussion
+https://lkml.org/lkml/2012/1/30/48
  
- 	if (!cpu_is_omap44xx())
-@@ -220,14 +220,19 @@ static int __init omap4_pm_init(void)
- 	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
- 	 * expected. The hardware recommendation is to enable static
- 	 * dependencies for these to avoid system lock ups or random crashes.
-+	 * The L4 wakeup depedency is added to workaround the OCP sync hardware
-+	 * BUG with 32K synctimer which lead to incorrect timer value read
-+	 * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
-+	 * are part of L4 wakeup clockdomain.
- 	 */
- 	mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
- 	emif_clkdm = clkdm_lookup("l3_emif_clkdm");
- 	l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
- 	l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
- 	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
-+	l4wkup = clkdm_lookup("l4_wkup_clkdm");
- 	ducati_clkdm = clkdm_lookup("ducati_clkdm");
--	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
-+	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) || (!l4wkup) ||
- 		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
- 		goto err2;
+So we have added the new context parameter in device_prep_dma_sg and 
+device_prep_interleave_dma API's to support for passing client channel specific
+private data associated with every transfer descriptor. 
+
+We are using 
+Interleaved API for BOX type transfer.
+SG API for SG type transfer.
  
-@@ -235,6 +240,7 @@ static int __init omap4_pm_init(void)
- 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
- 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
- 	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
-+	ret |= clkdm_add_wkdep(mpuss_clkdm, l4wkup);
- 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
- 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
- 	if (ret) {
+Ravi Kumar V (2):
+  dmaengine: Add support for per xfer specific privatedata
+  DMAEngine: Add DMAEngine driver based on old MSM DMA APIs
+
+ arch/arm/mach-msm/include/mach/dma.h |   30 ++
+ drivers/dma/Kconfig                  |   12 +
+ drivers/dma/Makefile                 |    1 +
+ drivers/dma/msm-dma.c                |  724 ++++++++++++++++++++++++++++++++++
+ include/linux/dmaengine.h            |    4 +-
+ 5 files changed, 769 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/dma/msm-dma.c
+
 -- 
-1.7.4.1
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
