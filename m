@@ -1,234 +1,868 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 13 Mar 2012 09:48:21 +1100
-Subject: [PATCH v4 10/11] ep93xx: Move EP93XX_SYSCON defines to SoC private
- header
-Message-ID: <1331592502-9083-11-git-send-email-rmallon@gmail.com>
+Date: Tue, 13 Mar 2012 09:48:20 +1100
+Subject: [PATCH v4 09/11] ep93xx: Move crunch code to mach-ep93xx directory
+Message-ID: <1331592502-9083-10-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EP93XX_SYSCON defines are now no longer needed outside of the
-EP93xx SoC core code, so they can be moved to a private header.
+The crunch code in arch/arm/kernel is specific to the EP93xx. Move it
+to the mach-ep93xx directory. This removes the need for the
+EP93XX_SYSCON defines to be exported to arch/arm/kernel.
 
 Signed-off-by: Ryan Mallon <rmallon@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
 Acked-by: Hartley Sweeten <hsweeten@visionengravers.com>
 ---
- arch/arm/mach-ep93xx/crunch.c                   |    2 +
- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |   89 ----------------------
- arch/arm/mach-ep93xx/soc.h                      |   90 +++++++++++++++++++++++
- 3 files changed, 92 insertions(+), 89 deletions(-)
+ arch/arm/kernel/Makefile           |    3 -
+ arch/arm/kernel/crunch-bits.S      |  305 ------------------------------------
+ arch/arm/kernel/crunch.c           |   88 -----------
+ arch/arm/mach-ep93xx/Makefile      |    3 +
+ arch/arm/mach-ep93xx/crunch-bits.S |  305 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-ep93xx/crunch.c      |   88 +++++++++++
+ 6 files changed, 396 insertions(+), 396 deletions(-)
+ delete mode 100644 arch/arm/kernel/crunch-bits.S
+ delete mode 100644 arch/arm/kernel/crunch.c
+ create mode 100644 arch/arm/mach-ep93xx/crunch-bits.S
+ create mode 100644 arch/arm/mach-ep93xx/crunch.c
 
-diff --git a/arch/arm/mach-ep93xx/crunch.c b/arch/arm/mach-ep93xx/crunch.c
-index 25ef223..d05ed0b 100644
---- a/arch/arm/mach-ep93xx/crunch.c
-+++ b/arch/arm/mach-ep93xx/crunch.c
-@@ -19,6 +19,8 @@
- #include <mach/ep93xx-regs.h>
- #include <asm/thread_notify.h>
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 43b740d..f16d765 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -62,9 +62,6 @@ obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
+ CFLAGS_swp_emulate.o		:= -Wa,-march=armv7-a
+ obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
  
-+#include "soc.h"
-+
- struct crunch_state *crunch_owner;
- 
- void crunch_task_release(struct thread_info *thread)
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-index fbda7b4..c64d742 100644
---- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-@@ -38,93 +38,4 @@
- #define EP93XX_UART3_PHYS_BASE		EP93XX_APB_PHYS(0x000e0000)
- #define EP93XX_UART3_BASE		EP93XX_APB_IOMEM(0x000e0000)
- 
--#define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000)
--#define EP93XX_SYSCON_REG(x)		(EP93XX_SYSCON_BASE + (x))
--#define EP93XX_SYSCON_POWER_STATE	EP93XX_SYSCON_REG(0x00)
--#define EP93XX_SYSCON_PWRCNT		EP93XX_SYSCON_REG(0x04)
--#define EP93XX_SYSCON_PWRCNT_FIR_EN	(1<<31)
--#define EP93XX_SYSCON_PWRCNT_UARTBAUD	(1<<29)
--#define EP93XX_SYSCON_PWRCNT_USH_EN	(1<<28)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2M1	(1<<27)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2M0	(1<<26)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P8	(1<<25)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P9	(1<<24)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P6	(1<<23)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P7	(1<<22)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P4	(1<<21)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P5	(1<<20)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P2	(1<<19)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P3	(1<<18)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P0	(1<<17)
--#define EP93XX_SYSCON_PWRCNT_DMA_M2P1	(1<<16)
--#define EP93XX_SYSCON_HALT		EP93XX_SYSCON_REG(0x08)
--#define EP93XX_SYSCON_STANDBY		EP93XX_SYSCON_REG(0x0c)
--#define EP93XX_SYSCON_CLKSET1		EP93XX_SYSCON_REG(0x20)
--#define EP93XX_SYSCON_CLKSET1_NBYP1	(1<<23)
--#define EP93XX_SYSCON_CLKSET2		EP93XX_SYSCON_REG(0x24)
--#define EP93XX_SYSCON_CLKSET2_NBYP2	(1<<19)
--#define EP93XX_SYSCON_CLKSET2_PLL2_EN	(1<<18)
--#define EP93XX_SYSCON_DEVCFG		EP93XX_SYSCON_REG(0x80)
--#define EP93XX_SYSCON_DEVCFG_SWRST	(1<<31)
--#define EP93XX_SYSCON_DEVCFG_D1ONG	(1<<30)
--#define EP93XX_SYSCON_DEVCFG_D0ONG	(1<<29)
--#define EP93XX_SYSCON_DEVCFG_IONU2	(1<<28)
--#define EP93XX_SYSCON_DEVCFG_GONK	(1<<27)
--#define EP93XX_SYSCON_DEVCFG_TONG	(1<<26)
--#define EP93XX_SYSCON_DEVCFG_MONG	(1<<25)
--#define EP93XX_SYSCON_DEVCFG_U3EN	(1<<24)
--#define EP93XX_SYSCON_DEVCFG_CPENA	(1<<23)
--#define EP93XX_SYSCON_DEVCFG_A2ONG	(1<<22)
--#define EP93XX_SYSCON_DEVCFG_A1ONG	(1<<21)
--#define EP93XX_SYSCON_DEVCFG_U2EN	(1<<20)
--#define EP93XX_SYSCON_DEVCFG_EXVC	(1<<19)
--#define EP93XX_SYSCON_DEVCFG_U1EN	(1<<18)
--#define EP93XX_SYSCON_DEVCFG_TIN	(1<<17)
--#define EP93XX_SYSCON_DEVCFG_HC3IN	(1<<15)
--#define EP93XX_SYSCON_DEVCFG_HC3EN	(1<<14)
--#define EP93XX_SYSCON_DEVCFG_HC1IN	(1<<13)
--#define EP93XX_SYSCON_DEVCFG_HC1EN	(1<<12)
--#define EP93XX_SYSCON_DEVCFG_HONIDE	(1<<11)
--#define EP93XX_SYSCON_DEVCFG_GONIDE	(1<<10)
--#define EP93XX_SYSCON_DEVCFG_PONG	(1<<9)
--#define EP93XX_SYSCON_DEVCFG_EONIDE	(1<<8)
--#define EP93XX_SYSCON_DEVCFG_I2SONSSP	(1<<7)
--#define EP93XX_SYSCON_DEVCFG_I2SONAC97	(1<<6)
--#define EP93XX_SYSCON_DEVCFG_RASONP3	(1<<4)
--#define EP93XX_SYSCON_DEVCFG_RAS	(1<<3)
--#define EP93XX_SYSCON_DEVCFG_ADCPD	(1<<2)
--#define EP93XX_SYSCON_DEVCFG_KEYS	(1<<1)
--#define EP93XX_SYSCON_DEVCFG_SHENA	(1<<0)
--#define EP93XX_SYSCON_VIDCLKDIV		EP93XX_SYSCON_REG(0x84)
--#define EP93XX_SYSCON_CLKDIV_ENABLE	(1<<15)
--#define EP93XX_SYSCON_CLKDIV_ESEL	(1<<14)
--#define EP93XX_SYSCON_CLKDIV_PSEL	(1<<13)
--#define EP93XX_SYSCON_CLKDIV_PDIV_SHIFT	8
--#define EP93XX_SYSCON_I2SCLKDIV		EP93XX_SYSCON_REG(0x8c)
--#define EP93XX_SYSCON_I2SCLKDIV_SENA	(1<<31)
--#define EP93XX_SYSCON_I2SCLKDIV_ORIDE   (1<<29)
--#define EP93XX_SYSCON_I2SCLKDIV_SPOL	(1<<19)
--#define EP93XX_I2SCLKDIV_SDIV		(1 << 16)
--#define EP93XX_I2SCLKDIV_LRDIV32	(0 << 17)
--#define EP93XX_I2SCLKDIV_LRDIV64	(1 << 17)
--#define EP93XX_I2SCLKDIV_LRDIV128 	(2 << 17)
--#define EP93XX_I2SCLKDIV_LRDIV_MASK 	(3 << 17)
--#define EP93XX_SYSCON_KEYTCHCLKDIV	EP93XX_SYSCON_REG(0x90)
--#define EP93XX_SYSCON_KEYTCHCLKDIV_TSEN	(1<<31)
--#define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
--#define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
--#define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
--#define EP93XX_SYSCON_SYSCFG		EP93XX_SYSCON_REG(0x9c)
--#define EP93XX_SYSCON_SYSCFG_REV_MASK	(0xf0000000)
--#define EP93XX_SYSCON_SYSCFG_REV_SHIFT	(28)
--#define EP93XX_SYSCON_SYSCFG_SBOOT	(1<<8)
--#define EP93XX_SYSCON_SYSCFG_LCSN7	(1<<7)
--#define EP93XX_SYSCON_SYSCFG_LCSN6	(1<<6)
--#define EP93XX_SYSCON_SYSCFG_LASDO	(1<<5)
--#define EP93XX_SYSCON_SYSCFG_LEEDA	(1<<4)
--#define EP93XX_SYSCON_SYSCFG_LEECLK	(1<<3)
--#define EP93XX_SYSCON_SYSCFG_LCSN2	(1<<1)
--#define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
--#define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
+-obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+-AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
 -
- #endif
-diff --git a/arch/arm/mach-ep93xx/soc.h b/arch/arm/mach-ep93xx/soc.h
-index 1273013..ce32c2c 100644
---- a/arch/arm/mach-ep93xx/soc.h
-+++ b/arch/arm/mach-ep93xx/soc.h
-@@ -104,6 +104,96 @@
- #define EP93XX_WATCHDOG_PHYS_BASE	EP93XX_APB_PHYS(0x00140000)
- #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
+ obj-$(CONFIG_CPU_XSCALE)	+= xscale-cp0.o
+ obj-$(CONFIG_CPU_XSC3)		+= xscale-cp0.o
+ obj-$(CONFIG_CPU_MOHAWK)	+= xscale-cp0.o
+diff --git a/arch/arm/kernel/crunch-bits.S b/arch/arm/kernel/crunch-bits.S
+deleted file mode 100644
+index 0ec9bb4..0000000
+--- a/arch/arm/kernel/crunch-bits.S
++++ /dev/null
+@@ -1,305 +0,0 @@
+-/*
+- * arch/arm/kernel/crunch-bits.S
+- * Cirrus MaverickCrunch context switching and handling
+- *
+- * Copyright (C) 2006 Lennert Buytenhek <buytenh@wantstofly.org>
+- *
+- * Shamelessly stolen from the iWMMXt code by Nicolas Pitre, which is
+- * Copyright (c) 2003-2004, MontaVista Software, Inc.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/linkage.h>
+-#include <asm/ptrace.h>
+-#include <asm/thread_info.h>
+-#include <asm/asm-offsets.h>
+-#include <mach/ep93xx-regs.h>
+-
+-/*
+- * We can't use hex constants here due to a bug in gas.
+- */
+-#define CRUNCH_MVDX0		0
+-#define CRUNCH_MVDX1		8
+-#define CRUNCH_MVDX2		16
+-#define CRUNCH_MVDX3		24
+-#define CRUNCH_MVDX4		32
+-#define CRUNCH_MVDX5		40
+-#define CRUNCH_MVDX6		48
+-#define CRUNCH_MVDX7		56
+-#define CRUNCH_MVDX8		64
+-#define CRUNCH_MVDX9		72
+-#define CRUNCH_MVDX10		80
+-#define CRUNCH_MVDX11		88
+-#define CRUNCH_MVDX12		96
+-#define CRUNCH_MVDX13		104
+-#define CRUNCH_MVDX14		112
+-#define CRUNCH_MVDX15		120
+-#define CRUNCH_MVAX0L		128
+-#define CRUNCH_MVAX0M		132
+-#define CRUNCH_MVAX0H		136
+-#define CRUNCH_MVAX1L		140
+-#define CRUNCH_MVAX1M		144
+-#define CRUNCH_MVAX1H		148
+-#define CRUNCH_MVAX2L		152
+-#define CRUNCH_MVAX2M		156
+-#define CRUNCH_MVAX2H		160
+-#define CRUNCH_MVAX3L		164
+-#define CRUNCH_MVAX3M		168
+-#define CRUNCH_MVAX3H		172
+-#define CRUNCH_DSPSC		176
+-
+-#define CRUNCH_SIZE		184
+-
+-	.text
+-
+-/*
+- * Lazy switching of crunch coprocessor context
+- *
+- * r10 = struct thread_info pointer
+- * r9  = ret_from_exception
+- * lr  = undefined instr exit
+- *
+- * called from prefetch exception handler with interrupts disabled
+- */
+-ENTRY(crunch_task_enable)
+-	ldr	r8, =(EP93XX_APB_VIRT_BASE + 0x00130000)	@ syscon addr
+-
+-	ldr	r1, [r8, #0x80]
+-	tst	r1, #0x00800000			@ access to crunch enabled?
+-	movne	pc, lr				@ if so no business here
+-	mov	r3, #0xaa			@ unlock syscon swlock
+-	str	r3, [r8, #0xc0]
+-	orr	r1, r1, #0x00800000		@ enable access to crunch
+-	str	r1, [r8, #0x80]
+-
+-	ldr	r3, =crunch_owner
+-	add	r0, r10, #TI_CRUNCH_STATE	@ get task crunch save area
+-	ldr	r2, [sp, #60]			@ current task pc value
+-	ldr	r1, [r3]			@ get current crunch owner
+-	str	r0, [r3]			@ this task now owns crunch
+-	sub	r2, r2, #4			@ adjust pc back
+-	str	r2, [sp, #60]
+-
+-	ldr	r2, [r8, #0x80]
+-	mov	r2, r2				@ flush out enable (@@@)
+-
+-	teq	r1, #0				@ test for last ownership
+-	mov	lr, r9				@ normal exit from exception
+-	beq	crunch_load			@ no owner, skip save
+-
+-crunch_save:
+-	cfstr64		mvdx0, [r1, #CRUNCH_MVDX0]	@ save 64b registers
+-	cfstr64		mvdx1, [r1, #CRUNCH_MVDX1]
+-	cfstr64		mvdx2, [r1, #CRUNCH_MVDX2]
+-	cfstr64		mvdx3, [r1, #CRUNCH_MVDX3]
+-	cfstr64		mvdx4, [r1, #CRUNCH_MVDX4]
+-	cfstr64		mvdx5, [r1, #CRUNCH_MVDX5]
+-	cfstr64		mvdx6, [r1, #CRUNCH_MVDX6]
+-	cfstr64		mvdx7, [r1, #CRUNCH_MVDX7]
+-	cfstr64		mvdx8, [r1, #CRUNCH_MVDX8]
+-	cfstr64		mvdx9, [r1, #CRUNCH_MVDX9]
+-	cfstr64		mvdx10, [r1, #CRUNCH_MVDX10]
+-	cfstr64		mvdx11, [r1, #CRUNCH_MVDX11]
+-	cfstr64		mvdx12, [r1, #CRUNCH_MVDX12]
+-	cfstr64		mvdx13, [r1, #CRUNCH_MVDX13]
+-	cfstr64		mvdx14, [r1, #CRUNCH_MVDX14]
+-	cfstr64		mvdx15, [r1, #CRUNCH_MVDX15]
+-
+-#ifdef __ARMEB__
+-#error fix me for ARMEB
+-#endif
+-
+-	cfmv32al	mvfx0, mvax0			@ save 72b accumulators
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX0L]
+-	cfmv32am	mvfx0, mvax0
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX0M]
+-	cfmv32ah	mvfx0, mvax0
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX0H]
+-	cfmv32al	mvfx0, mvax1
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX1L]
+-	cfmv32am	mvfx0, mvax1
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX1M]
+-	cfmv32ah	mvfx0, mvax1
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX1H]
+-	cfmv32al	mvfx0, mvax2
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX2L]
+-	cfmv32am	mvfx0, mvax2
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX2M]
+-	cfmv32ah	mvfx0, mvax2
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX2H]
+-	cfmv32al	mvfx0, mvax3
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX3L]
+-	cfmv32am	mvfx0, mvax3
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX3M]
+-	cfmv32ah	mvfx0, mvax3
+-	cfstr32		mvfx0, [r1, #CRUNCH_MVAX3H]
+-
+-	cfmv32sc	mvdx0, dspsc			@ save status word
+-	cfstr64		mvdx0, [r1, #CRUNCH_DSPSC]
+-
+-	teq		r0, #0				@ anything to load?
+-	cfldr64eq	mvdx0, [r1, #CRUNCH_MVDX0]	@ mvdx0 was clobbered
+-	moveq		pc, lr
+-
+-crunch_load:
+-	cfldr64		mvdx0, [r0, #CRUNCH_DSPSC]	@ load status word
+-	cfmvsc32	dspsc, mvdx0
+-
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX0L]	@ load 72b accumulators
+-	cfmval32	mvax0, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX0M]
+-	cfmvam32	mvax0, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX0H]
+-	cfmvah32	mvax0, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX1L]
+-	cfmval32	mvax1, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX1M]
+-	cfmvam32	mvax1, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX1H]
+-	cfmvah32	mvax1, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX2L]
+-	cfmval32	mvax2, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX2M]
+-	cfmvam32	mvax2, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX2H]
+-	cfmvah32	mvax2, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX3L]
+-	cfmval32	mvax3, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX3M]
+-	cfmvam32	mvax3, mvfx0
+-	cfldr32		mvfx0, [r0, #CRUNCH_MVAX3H]
+-	cfmvah32	mvax3, mvfx0
+-
+-	cfldr64		mvdx0, [r0, #CRUNCH_MVDX0]	@ load 64b registers
+-	cfldr64		mvdx1, [r0, #CRUNCH_MVDX1]
+-	cfldr64		mvdx2, [r0, #CRUNCH_MVDX2]
+-	cfldr64		mvdx3, [r0, #CRUNCH_MVDX3]
+-	cfldr64		mvdx4, [r0, #CRUNCH_MVDX4]
+-	cfldr64		mvdx5, [r0, #CRUNCH_MVDX5]
+-	cfldr64		mvdx6, [r0, #CRUNCH_MVDX6]
+-	cfldr64		mvdx7, [r0, #CRUNCH_MVDX7]
+-	cfldr64		mvdx8, [r0, #CRUNCH_MVDX8]
+-	cfldr64		mvdx9, [r0, #CRUNCH_MVDX9]
+-	cfldr64		mvdx10, [r0, #CRUNCH_MVDX10]
+-	cfldr64		mvdx11, [r0, #CRUNCH_MVDX11]
+-	cfldr64		mvdx12, [r0, #CRUNCH_MVDX12]
+-	cfldr64		mvdx13, [r0, #CRUNCH_MVDX13]
+-	cfldr64		mvdx14, [r0, #CRUNCH_MVDX14]
+-	cfldr64		mvdx15, [r0, #CRUNCH_MVDX15]
+-
+-	mov	pc, lr
+-
+-/*
+- * Back up crunch regs to save area and disable access to them
+- * (mainly for gdb or sleep mode usage)
+- *
+- * r0 = struct thread_info pointer of target task or NULL for any
+- */
+-ENTRY(crunch_task_disable)
+-	stmfd	sp!, {r4, r5, lr}
+-
+-	mrs	ip, cpsr
+-	orr	r2, ip, #PSR_I_BIT		@ disable interrupts
+-	msr	cpsr_c, r2
+-
+-	ldr	r4, =(EP93XX_APB_VIRT_BASE + 0x00130000)	@ syscon addr
+-
+-	ldr	r3, =crunch_owner
+-	add	r2, r0, #TI_CRUNCH_STATE	@ get task crunch save area
+-	ldr	r1, [r3]			@ get current crunch owner
+-	teq	r1, #0				@ any current owner?
+-	beq	1f				@ no: quit
+-	teq	r0, #0				@ any owner?
+-	teqne	r1, r2				@ or specified one?
+-	bne	1f				@ no: quit
+-
+-	ldr	r5, [r4, #0x80]			@ enable access to crunch
+-	mov	r2, #0xaa
+-	str	r2, [r4, #0xc0]
+-	orr	r5, r5, #0x00800000
+-	str	r5, [r4, #0x80]
+-
+-	mov	r0, #0				@ nothing to load
+-	str	r0, [r3]			@ no more current owner
+-	ldr	r2, [r4, #0x80]			@ flush out enable (@@@)
+-	mov	r2, r2
+-	bl	crunch_save
+-
+-	mov	r2, #0xaa			@ disable access to crunch
+-	str	r2, [r4, #0xc0]
+-	bic	r5, r5, #0x00800000
+-	str	r5, [r4, #0x80]
+-	ldr	r5, [r4, #0x80]			@ flush out enable (@@@)
+-	mov	r5, r5
+-
+-1:	msr	cpsr_c, ip			@ restore interrupt mode
+-	ldmfd	sp!, {r4, r5, pc}
+-
+-/*
+- * Copy crunch state to given memory address
+- *
+- * r0 = struct thread_info pointer of target task
+- * r1 = memory address where to store crunch state
+- *
+- * this is called mainly in the creation of signal stack frames
+- */
+-ENTRY(crunch_task_copy)
+-	mrs	ip, cpsr
+-	orr	r2, ip, #PSR_I_BIT		@ disable interrupts
+-	msr	cpsr_c, r2
+-
+-	ldr	r3, =crunch_owner
+-	add	r2, r0, #TI_CRUNCH_STATE	@ get task crunch save area
+-	ldr	r3, [r3]			@ get current crunch owner
+-	teq	r2, r3				@ does this task own it...
+-	beq	1f
+-
+-	@ current crunch values are in the task save area
+-	msr	cpsr_c, ip			@ restore interrupt mode
+-	mov	r0, r1
+-	mov	r1, r2
+-	mov	r2, #CRUNCH_SIZE
+-	b	memcpy
+-
+-1:	@ this task owns crunch regs -- grab a copy from there
+-	mov	r0, #0				@ nothing to load
+-	mov	r3, lr				@ preserve return address
+-	bl	crunch_save
+-	msr	cpsr_c, ip			@ restore interrupt mode
+-	mov	pc, r3
+-
+-/*
+- * Restore crunch state from given memory address
+- *
+- * r0 = struct thread_info pointer of target task
+- * r1 = memory address where to get crunch state from
+- *
+- * this is used to restore crunch state when unwinding a signal stack frame
+- */
+-ENTRY(crunch_task_restore)
+-	mrs	ip, cpsr
+-	orr	r2, ip, #PSR_I_BIT		@ disable interrupts
+-	msr	cpsr_c, r2
+-
+-	ldr	r3, =crunch_owner
+-	add	r2, r0, #TI_CRUNCH_STATE	@ get task crunch save area
+-	ldr	r3, [r3]			@ get current crunch owner
+-	teq	r2, r3				@ does this task own it...
+-	beq	1f
+-
+-	@ this task doesn't own crunch regs -- use its save area
+-	msr	cpsr_c, ip			@ restore interrupt mode
+-	mov	r0, r2
+-	mov	r2, #CRUNCH_SIZE
+-	b	memcpy
+-
+-1:	@ this task owns crunch regs -- load them directly
+-	mov	r0, r1
+-	mov	r1, #0				@ nothing to save
+-	mov	r3, lr				@ preserve return address
+-	bl	crunch_load
+-	msr	cpsr_c, ip			@ restore interrupt mode
+-	mov	pc, r3
+diff --git a/arch/arm/kernel/crunch.c b/arch/arm/kernel/crunch.c
+deleted file mode 100644
+index 25ef223..0000000
+--- a/arch/arm/kernel/crunch.c
++++ /dev/null
+@@ -1,88 +0,0 @@
+-/*
+- * arch/arm/kernel/crunch.c
+- * Cirrus MaverickCrunch context switching and handling
+- *
+- * Copyright (C) 2006 Lennert Buytenhek <buytenh@wantstofly.org>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/module.h>
+-#include <linux/types.h>
+-#include <linux/kernel.h>
+-#include <linux/signal.h>
+-#include <linux/sched.h>
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <mach/ep93xx-regs.h>
+-#include <asm/thread_notify.h>
+-
+-struct crunch_state *crunch_owner;
+-
+-void crunch_task_release(struct thread_info *thread)
+-{
+-	local_irq_disable();
+-	if (crunch_owner == &thread->crunchstate)
+-		crunch_owner = NULL;
+-	local_irq_enable();
+-}
+-
+-static int crunch_enabled(u32 devcfg)
+-{
+-	return !!(devcfg & EP93XX_SYSCON_DEVCFG_CPENA);
+-}
+-
+-static int crunch_do(struct notifier_block *self, unsigned long cmd, void *t)
+-{
+-	struct thread_info *thread = (struct thread_info *)t;
+-	struct crunch_state *crunch_state;
+-	u32 devcfg;
+-
+-	crunch_state = &thread->crunchstate;
+-
+-	switch (cmd) {
+-	case THREAD_NOTIFY_FLUSH:
+-		memset(crunch_state, 0, sizeof(*crunch_state));
+-
+-		/*
+-		 * FALLTHROUGH: Ensure we don't try to overwrite our newly
+-		 * initialised state information on the first fault.
+-		 */
+-
+-	case THREAD_NOTIFY_EXIT:
+-		crunch_task_release(thread);
+-		break;
+-
+-	case THREAD_NOTIFY_SWITCH:
+-		devcfg = __raw_readl(EP93XX_SYSCON_DEVCFG);
+-		if (crunch_enabled(devcfg) || crunch_owner == crunch_state) {
+-			/*
+-			 * We don't use ep93xx_syscon_swlocked_write() here
+-			 * because we are on the context switch path and
+-			 * preemption is already disabled.
+-			 */
+-			devcfg ^= EP93XX_SYSCON_DEVCFG_CPENA;
+-			__raw_writel(0xaa, EP93XX_SYSCON_SWLOCK);
+-			__raw_writel(devcfg, EP93XX_SYSCON_DEVCFG);
+-		}
+-		break;
+-	}
+-
+-	return NOTIFY_DONE;
+-}
+-
+-static struct notifier_block crunch_notifier_block = {
+-	.notifier_call	= crunch_do,
+-};
+-
+-static int __init crunch_init(void)
+-{
+-	thread_register_notifier(&crunch_notifier_block);
+-	elf_hwcap |= HWCAP_CRUNCH;
+-
+-	return 0;
+-}
+-
+-late_initcall(crunch_init);
+diff --git a/arch/arm/mach-ep93xx/Makefile b/arch/arm/mach-ep93xx/Makefile
+index 574209d..0dc51f9 100644
+--- a/arch/arm/mach-ep93xx/Makefile
++++ b/arch/arm/mach-ep93xx/Makefile
+@@ -8,6 +8,9 @@ obj-			:=
  
-+/* System controller */
-+#define EP93XX_SYSCON_BASE		EP93XX_APB_IOMEM(0x00130000)
-+#define EP93XX_SYSCON_REG(x)		(EP93XX_SYSCON_BASE + (x))
-+#define EP93XX_SYSCON_POWER_STATE	EP93XX_SYSCON_REG(0x00)
-+#define EP93XX_SYSCON_PWRCNT		EP93XX_SYSCON_REG(0x04)
-+#define EP93XX_SYSCON_PWRCNT_FIR_EN	(1<<31)
-+#define EP93XX_SYSCON_PWRCNT_UARTBAUD	(1<<29)
-+#define EP93XX_SYSCON_PWRCNT_USH_EN	(1<<28)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2M1	(1<<27)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2M0	(1<<26)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P8	(1<<25)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P9	(1<<24)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P6	(1<<23)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P7	(1<<22)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P4	(1<<21)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P5	(1<<20)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P2	(1<<19)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P3	(1<<18)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P0	(1<<17)
-+#define EP93XX_SYSCON_PWRCNT_DMA_M2P1	(1<<16)
-+#define EP93XX_SYSCON_HALT		EP93XX_SYSCON_REG(0x08)
-+#define EP93XX_SYSCON_STANDBY		EP93XX_SYSCON_REG(0x0c)
-+#define EP93XX_SYSCON_CLKSET1		EP93XX_SYSCON_REG(0x20)
-+#define EP93XX_SYSCON_CLKSET1_NBYP1	(1<<23)
-+#define EP93XX_SYSCON_CLKSET2		EP93XX_SYSCON_REG(0x24)
-+#define EP93XX_SYSCON_CLKSET2_NBYP2	(1<<19)
-+#define EP93XX_SYSCON_CLKSET2_PLL2_EN	(1<<18)
-+#define EP93XX_SYSCON_DEVCFG		EP93XX_SYSCON_REG(0x80)
-+#define EP93XX_SYSCON_DEVCFG_SWRST	(1<<31)
-+#define EP93XX_SYSCON_DEVCFG_D1ONG	(1<<30)
-+#define EP93XX_SYSCON_DEVCFG_D0ONG	(1<<29)
-+#define EP93XX_SYSCON_DEVCFG_IONU2	(1<<28)
-+#define EP93XX_SYSCON_DEVCFG_GONK	(1<<27)
-+#define EP93XX_SYSCON_DEVCFG_TONG	(1<<26)
-+#define EP93XX_SYSCON_DEVCFG_MONG	(1<<25)
-+#define EP93XX_SYSCON_DEVCFG_U3EN	(1<<24)
-+#define EP93XX_SYSCON_DEVCFG_CPENA	(1<<23)
-+#define EP93XX_SYSCON_DEVCFG_A2ONG	(1<<22)
-+#define EP93XX_SYSCON_DEVCFG_A1ONG	(1<<21)
-+#define EP93XX_SYSCON_DEVCFG_U2EN	(1<<20)
-+#define EP93XX_SYSCON_DEVCFG_EXVC	(1<<19)
-+#define EP93XX_SYSCON_DEVCFG_U1EN	(1<<18)
-+#define EP93XX_SYSCON_DEVCFG_TIN	(1<<17)
-+#define EP93XX_SYSCON_DEVCFG_HC3IN	(1<<15)
-+#define EP93XX_SYSCON_DEVCFG_HC3EN	(1<<14)
-+#define EP93XX_SYSCON_DEVCFG_HC1IN	(1<<13)
-+#define EP93XX_SYSCON_DEVCFG_HC1EN	(1<<12)
-+#define EP93XX_SYSCON_DEVCFG_HONIDE	(1<<11)
-+#define EP93XX_SYSCON_DEVCFG_GONIDE	(1<<10)
-+#define EP93XX_SYSCON_DEVCFG_PONG	(1<<9)
-+#define EP93XX_SYSCON_DEVCFG_EONIDE	(1<<8)
-+#define EP93XX_SYSCON_DEVCFG_I2SONSSP	(1<<7)
-+#define EP93XX_SYSCON_DEVCFG_I2SONAC97	(1<<6)
-+#define EP93XX_SYSCON_DEVCFG_RASONP3	(1<<4)
-+#define EP93XX_SYSCON_DEVCFG_RAS	(1<<3)
-+#define EP93XX_SYSCON_DEVCFG_ADCPD	(1<<2)
-+#define EP93XX_SYSCON_DEVCFG_KEYS	(1<<1)
-+#define EP93XX_SYSCON_DEVCFG_SHENA	(1<<0)
-+#define EP93XX_SYSCON_VIDCLKDIV		EP93XX_SYSCON_REG(0x84)
-+#define EP93XX_SYSCON_CLKDIV_ENABLE	(1<<15)
-+#define EP93XX_SYSCON_CLKDIV_ESEL	(1<<14)
-+#define EP93XX_SYSCON_CLKDIV_PSEL	(1<<13)
-+#define EP93XX_SYSCON_CLKDIV_PDIV_SHIFT	8
-+#define EP93XX_SYSCON_I2SCLKDIV		EP93XX_SYSCON_REG(0x8c)
-+#define EP93XX_SYSCON_I2SCLKDIV_SENA	(1<<31)
-+#define EP93XX_SYSCON_I2SCLKDIV_ORIDE   (1<<29)
-+#define EP93XX_SYSCON_I2SCLKDIV_SPOL	(1<<19)
-+#define EP93XX_I2SCLKDIV_SDIV		(1 << 16)
-+#define EP93XX_I2SCLKDIV_LRDIV32	(0 << 17)
-+#define EP93XX_I2SCLKDIV_LRDIV64	(1 << 17)
-+#define EP93XX_I2SCLKDIV_LRDIV128 	(2 << 17)
-+#define EP93XX_I2SCLKDIV_LRDIV_MASK 	(3 << 17)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV	EP93XX_SYSCON_REG(0x90)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV_TSEN	(1<<31)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV_ADIV	(1<<16)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV_KEN	(1<<15)
-+#define EP93XX_SYSCON_KEYTCHCLKDIV_KDIV	(1<<0)
-+#define EP93XX_SYSCON_SYSCFG		EP93XX_SYSCON_REG(0x9c)
-+#define EP93XX_SYSCON_SYSCFG_REV_MASK	(0xf0000000)
-+#define EP93XX_SYSCON_SYSCFG_REV_SHIFT	(28)
-+#define EP93XX_SYSCON_SYSCFG_SBOOT	(1<<8)
-+#define EP93XX_SYSCON_SYSCFG_LCSN7	(1<<7)
-+#define EP93XX_SYSCON_SYSCFG_LCSN6	(1<<6)
-+#define EP93XX_SYSCON_SYSCFG_LASDO	(1<<5)
-+#define EP93XX_SYSCON_SYSCFG_LEEDA	(1<<4)
-+#define EP93XX_SYSCON_SYSCFG_LEECLK	(1<<3)
-+#define EP93XX_SYSCON_SYSCFG_LCSN2	(1<<1)
-+#define EP93XX_SYSCON_SYSCFG_LCSN1	(1<<0)
-+#define EP93XX_SYSCON_SWLOCK		EP93XX_SYSCON_REG(0xc0)
+ obj-$(CONFIG_EP93XX_DMA)	+= dma.o
+ 
++obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
++AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
 +
- /* EP93xx System Controller software locked register write */
- void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg);
- void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits);
+ obj-$(CONFIG_MACH_ADSSPHERE)	+= adssphere.o
+ obj-$(CONFIG_MACH_EDB93XX)	+= edb93xx.o
+ obj-$(CONFIG_MACH_GESBC9312)	+= gesbc9312.o
+diff --git a/arch/arm/mach-ep93xx/crunch-bits.S b/arch/arm/mach-ep93xx/crunch-bits.S
+new file mode 100644
+index 0000000..0ec9bb4
+--- /dev/null
++++ b/arch/arm/mach-ep93xx/crunch-bits.S
+@@ -0,0 +1,305 @@
++/*
++ * arch/arm/kernel/crunch-bits.S
++ * Cirrus MaverickCrunch context switching and handling
++ *
++ * Copyright (C) 2006 Lennert Buytenhek <buytenh@wantstofly.org>
++ *
++ * Shamelessly stolen from the iWMMXt code by Nicolas Pitre, which is
++ * Copyright (c) 2003-2004, MontaVista Software, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++#include <asm/ptrace.h>
++#include <asm/thread_info.h>
++#include <asm/asm-offsets.h>
++#include <mach/ep93xx-regs.h>
++
++/*
++ * We can't use hex constants here due to a bug in gas.
++ */
++#define CRUNCH_MVDX0		0
++#define CRUNCH_MVDX1		8
++#define CRUNCH_MVDX2		16
++#define CRUNCH_MVDX3		24
++#define CRUNCH_MVDX4		32
++#define CRUNCH_MVDX5		40
++#define CRUNCH_MVDX6		48
++#define CRUNCH_MVDX7		56
++#define CRUNCH_MVDX8		64
++#define CRUNCH_MVDX9		72
++#define CRUNCH_MVDX10		80
++#define CRUNCH_MVDX11		88
++#define CRUNCH_MVDX12		96
++#define CRUNCH_MVDX13		104
++#define CRUNCH_MVDX14		112
++#define CRUNCH_MVDX15		120
++#define CRUNCH_MVAX0L		128
++#define CRUNCH_MVAX0M		132
++#define CRUNCH_MVAX0H		136
++#define CRUNCH_MVAX1L		140
++#define CRUNCH_MVAX1M		144
++#define CRUNCH_MVAX1H		148
++#define CRUNCH_MVAX2L		152
++#define CRUNCH_MVAX2M		156
++#define CRUNCH_MVAX2H		160
++#define CRUNCH_MVAX3L		164
++#define CRUNCH_MVAX3M		168
++#define CRUNCH_MVAX3H		172
++#define CRUNCH_DSPSC		176
++
++#define CRUNCH_SIZE		184
++
++	.text
++
++/*
++ * Lazy switching of crunch coprocessor context
++ *
++ * r10 = struct thread_info pointer
++ * r9  = ret_from_exception
++ * lr  = undefined instr exit
++ *
++ * called from prefetch exception handler with interrupts disabled
++ */
++ENTRY(crunch_task_enable)
++	ldr	r8, =(EP93XX_APB_VIRT_BASE + 0x00130000)	@ syscon addr
++
++	ldr	r1, [r8, #0x80]
++	tst	r1, #0x00800000			@ access to crunch enabled?
++	movne	pc, lr				@ if so no business here
++	mov	r3, #0xaa			@ unlock syscon swlock
++	str	r3, [r8, #0xc0]
++	orr	r1, r1, #0x00800000		@ enable access to crunch
++	str	r1, [r8, #0x80]
++
++	ldr	r3, =crunch_owner
++	add	r0, r10, #TI_CRUNCH_STATE	@ get task crunch save area
++	ldr	r2, [sp, #60]			@ current task pc value
++	ldr	r1, [r3]			@ get current crunch owner
++	str	r0, [r3]			@ this task now owns crunch
++	sub	r2, r2, #4			@ adjust pc back
++	str	r2, [sp, #60]
++
++	ldr	r2, [r8, #0x80]
++	mov	r2, r2				@ flush out enable (@@@)
++
++	teq	r1, #0				@ test for last ownership
++	mov	lr, r9				@ normal exit from exception
++	beq	crunch_load			@ no owner, skip save
++
++crunch_save:
++	cfstr64		mvdx0, [r1, #CRUNCH_MVDX0]	@ save 64b registers
++	cfstr64		mvdx1, [r1, #CRUNCH_MVDX1]
++	cfstr64		mvdx2, [r1, #CRUNCH_MVDX2]
++	cfstr64		mvdx3, [r1, #CRUNCH_MVDX3]
++	cfstr64		mvdx4, [r1, #CRUNCH_MVDX4]
++	cfstr64		mvdx5, [r1, #CRUNCH_MVDX5]
++	cfstr64		mvdx6, [r1, #CRUNCH_MVDX6]
++	cfstr64		mvdx7, [r1, #CRUNCH_MVDX7]
++	cfstr64		mvdx8, [r1, #CRUNCH_MVDX8]
++	cfstr64		mvdx9, [r1, #CRUNCH_MVDX9]
++	cfstr64		mvdx10, [r1, #CRUNCH_MVDX10]
++	cfstr64		mvdx11, [r1, #CRUNCH_MVDX11]
++	cfstr64		mvdx12, [r1, #CRUNCH_MVDX12]
++	cfstr64		mvdx13, [r1, #CRUNCH_MVDX13]
++	cfstr64		mvdx14, [r1, #CRUNCH_MVDX14]
++	cfstr64		mvdx15, [r1, #CRUNCH_MVDX15]
++
++#ifdef __ARMEB__
++#error fix me for ARMEB
++#endif
++
++	cfmv32al	mvfx0, mvax0			@ save 72b accumulators
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX0L]
++	cfmv32am	mvfx0, mvax0
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX0M]
++	cfmv32ah	mvfx0, mvax0
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX0H]
++	cfmv32al	mvfx0, mvax1
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX1L]
++	cfmv32am	mvfx0, mvax1
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX1M]
++	cfmv32ah	mvfx0, mvax1
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX1H]
++	cfmv32al	mvfx0, mvax2
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX2L]
++	cfmv32am	mvfx0, mvax2
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX2M]
++	cfmv32ah	mvfx0, mvax2
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX2H]
++	cfmv32al	mvfx0, mvax3
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX3L]
++	cfmv32am	mvfx0, mvax3
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX3M]
++	cfmv32ah	mvfx0, mvax3
++	cfstr32		mvfx0, [r1, #CRUNCH_MVAX3H]
++
++	cfmv32sc	mvdx0, dspsc			@ save status word
++	cfstr64		mvdx0, [r1, #CRUNCH_DSPSC]
++
++	teq		r0, #0				@ anything to load?
++	cfldr64eq	mvdx0, [r1, #CRUNCH_MVDX0]	@ mvdx0 was clobbered
++	moveq		pc, lr
++
++crunch_load:
++	cfldr64		mvdx0, [r0, #CRUNCH_DSPSC]	@ load status word
++	cfmvsc32	dspsc, mvdx0
++
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX0L]	@ load 72b accumulators
++	cfmval32	mvax0, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX0M]
++	cfmvam32	mvax0, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX0H]
++	cfmvah32	mvax0, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX1L]
++	cfmval32	mvax1, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX1M]
++	cfmvam32	mvax1, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX1H]
++	cfmvah32	mvax1, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX2L]
++	cfmval32	mvax2, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX2M]
++	cfmvam32	mvax2, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX2H]
++	cfmvah32	mvax2, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX3L]
++	cfmval32	mvax3, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX3M]
++	cfmvam32	mvax3, mvfx0
++	cfldr32		mvfx0, [r0, #CRUNCH_MVAX3H]
++	cfmvah32	mvax3, mvfx0
++
++	cfldr64		mvdx0, [r0, #CRUNCH_MVDX0]	@ load 64b registers
++	cfldr64		mvdx1, [r0, #CRUNCH_MVDX1]
++	cfldr64		mvdx2, [r0, #CRUNCH_MVDX2]
++	cfldr64		mvdx3, [r0, #CRUNCH_MVDX3]
++	cfldr64		mvdx4, [r0, #CRUNCH_MVDX4]
++	cfldr64		mvdx5, [r0, #CRUNCH_MVDX5]
++	cfldr64		mvdx6, [r0, #CRUNCH_MVDX6]
++	cfldr64		mvdx7, [r0, #CRUNCH_MVDX7]
++	cfldr64		mvdx8, [r0, #CRUNCH_MVDX8]
++	cfldr64		mvdx9, [r0, #CRUNCH_MVDX9]
++	cfldr64		mvdx10, [r0, #CRUNCH_MVDX10]
++	cfldr64		mvdx11, [r0, #CRUNCH_MVDX11]
++	cfldr64		mvdx12, [r0, #CRUNCH_MVDX12]
++	cfldr64		mvdx13, [r0, #CRUNCH_MVDX13]
++	cfldr64		mvdx14, [r0, #CRUNCH_MVDX14]
++	cfldr64		mvdx15, [r0, #CRUNCH_MVDX15]
++
++	mov	pc, lr
++
++/*
++ * Back up crunch regs to save area and disable access to them
++ * (mainly for gdb or sleep mode usage)
++ *
++ * r0 = struct thread_info pointer of target task or NULL for any
++ */
++ENTRY(crunch_task_disable)
++	stmfd	sp!, {r4, r5, lr}
++
++	mrs	ip, cpsr
++	orr	r2, ip, #PSR_I_BIT		@ disable interrupts
++	msr	cpsr_c, r2
++
++	ldr	r4, =(EP93XX_APB_VIRT_BASE + 0x00130000)	@ syscon addr
++
++	ldr	r3, =crunch_owner
++	add	r2, r0, #TI_CRUNCH_STATE	@ get task crunch save area
++	ldr	r1, [r3]			@ get current crunch owner
++	teq	r1, #0				@ any current owner?
++	beq	1f				@ no: quit
++	teq	r0, #0				@ any owner?
++	teqne	r1, r2				@ or specified one?
++	bne	1f				@ no: quit
++
++	ldr	r5, [r4, #0x80]			@ enable access to crunch
++	mov	r2, #0xaa
++	str	r2, [r4, #0xc0]
++	orr	r5, r5, #0x00800000
++	str	r5, [r4, #0x80]
++
++	mov	r0, #0				@ nothing to load
++	str	r0, [r3]			@ no more current owner
++	ldr	r2, [r4, #0x80]			@ flush out enable (@@@)
++	mov	r2, r2
++	bl	crunch_save
++
++	mov	r2, #0xaa			@ disable access to crunch
++	str	r2, [r4, #0xc0]
++	bic	r5, r5, #0x00800000
++	str	r5, [r4, #0x80]
++	ldr	r5, [r4, #0x80]			@ flush out enable (@@@)
++	mov	r5, r5
++
++1:	msr	cpsr_c, ip			@ restore interrupt mode
++	ldmfd	sp!, {r4, r5, pc}
++
++/*
++ * Copy crunch state to given memory address
++ *
++ * r0 = struct thread_info pointer of target task
++ * r1 = memory address where to store crunch state
++ *
++ * this is called mainly in the creation of signal stack frames
++ */
++ENTRY(crunch_task_copy)
++	mrs	ip, cpsr
++	orr	r2, ip, #PSR_I_BIT		@ disable interrupts
++	msr	cpsr_c, r2
++
++	ldr	r3, =crunch_owner
++	add	r2, r0, #TI_CRUNCH_STATE	@ get task crunch save area
++	ldr	r3, [r3]			@ get current crunch owner
++	teq	r2, r3				@ does this task own it...
++	beq	1f
++
++	@ current crunch values are in the task save area
++	msr	cpsr_c, ip			@ restore interrupt mode
++	mov	r0, r1
++	mov	r1, r2
++	mov	r2, #CRUNCH_SIZE
++	b	memcpy
++
++1:	@ this task owns crunch regs -- grab a copy from there
++	mov	r0, #0				@ nothing to load
++	mov	r3, lr				@ preserve return address
++	bl	crunch_save
++	msr	cpsr_c, ip			@ restore interrupt mode
++	mov	pc, r3
++
++/*
++ * Restore crunch state from given memory address
++ *
++ * r0 = struct thread_info pointer of target task
++ * r1 = memory address where to get crunch state from
++ *
++ * this is used to restore crunch state when unwinding a signal stack frame
++ */
++ENTRY(crunch_task_restore)
++	mrs	ip, cpsr
++	orr	r2, ip, #PSR_I_BIT		@ disable interrupts
++	msr	cpsr_c, r2
++
++	ldr	r3, =crunch_owner
++	add	r2, r0, #TI_CRUNCH_STATE	@ get task crunch save area
++	ldr	r3, [r3]			@ get current crunch owner
++	teq	r2, r3				@ does this task own it...
++	beq	1f
++
++	@ this task doesn't own crunch regs -- use its save area
++	msr	cpsr_c, ip			@ restore interrupt mode
++	mov	r0, r2
++	mov	r2, #CRUNCH_SIZE
++	b	memcpy
++
++1:	@ this task owns crunch regs -- load them directly
++	mov	r0, r1
++	mov	r1, #0				@ nothing to save
++	mov	r3, lr				@ preserve return address
++	bl	crunch_load
++	msr	cpsr_c, ip			@ restore interrupt mode
++	mov	pc, r3
+diff --git a/arch/arm/mach-ep93xx/crunch.c b/arch/arm/mach-ep93xx/crunch.c
+new file mode 100644
+index 0000000..25ef223
+--- /dev/null
++++ b/arch/arm/mach-ep93xx/crunch.c
+@@ -0,0 +1,88 @@
++/*
++ * arch/arm/kernel/crunch.c
++ * Cirrus MaverickCrunch context switching and handling
++ *
++ * Copyright (C) 2006 Lennert Buytenhek <buytenh@wantstofly.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/types.h>
++#include <linux/kernel.h>
++#include <linux/signal.h>
++#include <linux/sched.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <mach/ep93xx-regs.h>
++#include <asm/thread_notify.h>
++
++struct crunch_state *crunch_owner;
++
++void crunch_task_release(struct thread_info *thread)
++{
++	local_irq_disable();
++	if (crunch_owner == &thread->crunchstate)
++		crunch_owner = NULL;
++	local_irq_enable();
++}
++
++static int crunch_enabled(u32 devcfg)
++{
++	return !!(devcfg & EP93XX_SYSCON_DEVCFG_CPENA);
++}
++
++static int crunch_do(struct notifier_block *self, unsigned long cmd, void *t)
++{
++	struct thread_info *thread = (struct thread_info *)t;
++	struct crunch_state *crunch_state;
++	u32 devcfg;
++
++	crunch_state = &thread->crunchstate;
++
++	switch (cmd) {
++	case THREAD_NOTIFY_FLUSH:
++		memset(crunch_state, 0, sizeof(*crunch_state));
++
++		/*
++		 * FALLTHROUGH: Ensure we don't try to overwrite our newly
++		 * initialised state information on the first fault.
++		 */
++
++	case THREAD_NOTIFY_EXIT:
++		crunch_task_release(thread);
++		break;
++
++	case THREAD_NOTIFY_SWITCH:
++		devcfg = __raw_readl(EP93XX_SYSCON_DEVCFG);
++		if (crunch_enabled(devcfg) || crunch_owner == crunch_state) {
++			/*
++			 * We don't use ep93xx_syscon_swlocked_write() here
++			 * because we are on the context switch path and
++			 * preemption is already disabled.
++			 */
++			devcfg ^= EP93XX_SYSCON_DEVCFG_CPENA;
++			__raw_writel(0xaa, EP93XX_SYSCON_SWLOCK);
++			__raw_writel(devcfg, EP93XX_SYSCON_DEVCFG);
++		}
++		break;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block crunch_notifier_block = {
++	.notifier_call	= crunch_do,
++};
++
++static int __init crunch_init(void)
++{
++	thread_register_notifier(&crunch_notifier_block);
++	elf_hwcap |= HWCAP_CRUNCH;
++
++	return 0;
++}
++
++late_initcall(crunch_init);
 -- 
 1.7.0.4
