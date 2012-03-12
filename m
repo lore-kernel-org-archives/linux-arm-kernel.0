@@ -1,23 +1,52 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Mar 2012 12:50:03 +0000
-Subject: [PATCH 2/2] ASoC: OMAP: Build config cleanup for McBSP
-In-Reply-To: <1331283078-14846-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1331283078-14846-1-git-send-email-peter.ujfalusi@ti.com>
- <1331283078-14846-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20120309125003.GY3273@opensource.wolfsonmicro.com>
+From: hunold@linuxtv.org (Michael Hunold)
+Date: Mon, 12 Mar 2012 09:45:07 +0100
+Subject: iMX53 and MMC_CAP_SDIO_IRQ
+Message-ID: <4F5DB793.3080904@linuxtv.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2012 at 10:51:18AM +0200, Peter Ujfalusi wrote:
-> The McBSP driver stack has been moved, and rewritten resulting a single
-> driver - selected by CONFIG_SND_OMAP_SOC_MCBSP. There is no longer need to
-> have CONFIG_OMAP_MCBSP anymore.
+Hi,
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/96c80f9a/attachment-0001.sig>
+I am using a Freescale iMX53 Quick Start Board. The uSD card that comes
+with the device contains a Linux kernel labeled "Linux version
+2.6.35.3-01129-g691c08a-dirty".
+
+After some digging I found out that this corresponds to the
+"imx_2.6.35_11.09.01" tag in the Freescale Linux kernel that can be
+found at http://opensource.freescale.com/pub/scm/imx/linux-2.6-imx.git
+
+I am experimenting with an SDIO card and that one works fine using that
+kernel. So far, so good.
+
+Now I have tried to use a vanilla Git Linux kernel (3.3.0-rc6+) with
+mixed results.
+
+The card is recognised correctly and mostly initialised, up to the point
+where an apparently an interrupt from the card is expected to happen.
+Because the SDHCI driver supports "real" interrupts (via
+MMC_CAP_SDIO_IRQ) the SDIO IRQ thread goes to sleep, but is never woken
+up in my case.
+
+After about 2.5 seconds, I receive an error -110 (timeout) and the
+initialisation is aborted.
+
+So my question is: is anybody using an iMX53 (or any other hardware
+using the SDHCI driver) together with "real" interrupts (via
+MMC_CAP_SDIO_IRQ), not polled interrupts?
+
+The main problem is that the ancient Freescale 2.6.35 kernel is using
+the "mx_sdhci" driver, while in 3.3.0-rc6+ the generic "sdhci" driver is
+used, so it's not possible to simply compare the changes between the two
+versions. :-(
+
+Does anybody know the difference between the "mx_sdhci" from Freescale
+2.6.35 kernel and the the "sdhci" driver in 3.3.0-rc6+?
+
+Probably this is a question for the Freescale people: why was the
+"mx_sdhci" necessary at all and why is it not necessary any more?
+
+Any help, hints and historical informations are highly appreciated,
+before I start to look deeper into this problem.
+
+CU
+Michael.
