@@ -1,28 +1,78 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Fri, 9 Mar 2012 16:25:28 +0800
-Subject: [PATCH v11] Regulator: Add Anatop regulator driver
-In-Reply-To: <1331279829-4584-1-git-send-email-paul.liu@linaro.org>
-References: <1331279829-4584-1-git-send-email-paul.liu@linaro.org>
-Message-ID: <CAF+7xWkA-rDML03U=7d30ipXV9buhbqnZYWS54nGVKZbkYxXJw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Mar 2012 11:30:05 -0600
+Subject: [PATCH 4/8] ARM: OMAP1: Move 16xx GPIO system clock to platform
+ init code
+In-Reply-To: <20120221234042.18709.57610.stgit@kaulin.local>
+References: <20120221233619.18709.87982.stgit@kaulin.local>
+ <20120221234042.18709.57610.stgit@kaulin.local>
+Message-ID: <20120312173005.A11093E07B0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/9 Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>:
-> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
->
-> Anatop is an integrated regulator inside i.MX6 SoC.
-> There are 3 digital regulators which controls PU, CORE (ARM), and SOC.
-> And 3 analog regulators which controls 1P1, 2P5, 3P0 (USB).
-> This patch adds the Anatop regulator driver.
->
-> Signed-off-by: Nancy Chen <Nancy.Chen@freescale.com>
-> Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Axel Lin <axel.lin@gmail.com>
+On Tue, 21 Feb 2012 15:40:42 -0800, Tony Lindgren <tony@atomide.com> wrote:
+> This way we can remove omap_read/write call from the GPIO driver
+> and remove include to linux/io.h.
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-The rdesc->n_voltage setting is missing.
-Otherwise, Reviewed-by: Axel Lin <axel.lin@gmail.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+Who will be picking up this series?  How intertwined is it with your tree Tony?
+
+g.
+
+> ---
+>  arch/arm/mach-omap1/gpio16xx.c |    7 +++++++
+>  drivers/gpio/gpio-omap.c       |    8 --------
+>  2 files changed, 7 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
+> index 0f399bd..99cabc4 100644
+> --- a/arch/arm/mach-omap1/gpio16xx.c
+> +++ b/arch/arm/mach-omap1/gpio16xx.c
+> @@ -218,6 +218,13 @@ static int __init omap16xx_gpio_init(void)
+>  	if (!cpu_is_omap16xx())
+>  		return -EINVAL;
+>  
+> +	/*
+> +	 * Enable system clock for GPIO module.
+> +	 * The CAM_CLK_CTRL *is* really the right place.
+> +	 */
+> +	omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
+> +					ULPD_CAM_CLK_CTRL);
+> +
+>  	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
+>  		platform_device_register(omap16xx_gpio_dev[i]);
+>  
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 0b05629..1078a14 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -18,7 +18,6 @@
+>  #include <linux/syscore_ops.h>
+>  #include <linux/err.h>
+>  #include <linux/clk.h>
+> -#include <linux/io.h>
+>  #include <linux/slab.h>
+>  #include <linux/pm_runtime.h>
+>  
+> @@ -1064,13 +1063,6 @@ static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
+>  						+ OMAP1610_GPIO_IRQSTATUS1);
+>  			__raw_writew(0x0014, bank->base
+>  						+ OMAP1610_GPIO_SYSCONFIG);
+> -
+> -			/*
+> -			 * Enable system clock for GPIO module.
+> -			 * The CAM_CLK_CTRL *is* really the right place.
+> -			 */
+> -			omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
+> -						ULPD_CAM_CLK_CTRL);
+>  		}
+>  		if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
+>  			__raw_writel(0xffffffff, bank->base
+> 
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
