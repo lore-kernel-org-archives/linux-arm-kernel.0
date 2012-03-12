@@ -1,53 +1,38 @@
-From: B04825@freescale.com (Tabi Timur-B04825)
-Date: Fri, 9 Mar 2012 04:02:40 +0000
-Subject: [PATCH v3 10/11] ASoC: fsl: let fsl_ssi work with imx pcm and
- machine drivers
-In-Reply-To: <20120309031909.GJ2499@S2101-09.ap.freescale.net>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-11-git-send-email-shawn.guo@linaro.org>
- <4F591A69.9060401@freescale.com>
- <20120309031909.GJ2499@S2101-09.ap.freescale.net>
-Message-ID: <4F5980DE.9050002@freescale.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Mar 2012 10:32:12 -0600
+Subject: [PATCH 1/2] Documentation/gpio.txt: Explain expected pinctrl
+ interaction
+In-Reply-To: <CACRpkdbPeVBv5VWefDvib5HmGF0K2gT79Mx7g-yviyQj33+Z-w@mail.gmail.com>
+References: <1329719263-18971-1-git-send-email-swarren@nvidia.com>
+ <CACRpkdbPeVBv5VWefDvib5HmGF0K2gT79Mx7g-yviyQj33+Z-w@mail.gmail.com>
+Message-ID: <20120312163212.70E283E07B0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-
-> Ok, got you.  We used to set fifo_depth on imx-ssi not the value given
-> by hardware manual, but the one already tuned.
-
-What do you mean by "already tuned".  Tuned by whom?
-
->>> +		 */
->>> +		ssi_private->dma_params_tx.burstsize =
->>> +			ssi_private->fifo_depth - 2;
->>> +		ssi_private->dma_params_rx.burstsize =
->>> +			ssi_private->fifo_depth - 2;
->>> +		ssi_private->dma_params_tx.dma_addr =
->>> +			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, stx0);
->>> +		ssi_private->dma_params_rx.dma_addr =
->>> +			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, srx0);
->>
->> So I'm a little confused by this new binding.  I went through a lot of
->> work to remove DMA-specific data from the SSI driver, and here you are
->> aFrom arnd at arndb.de  Mon Mar 12 12:43:25 2012
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Mar 2012 16:43:25 +0000
-Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
-In-Reply-To: <20120312161004.GB5050@titan.lakedaemon.net>
-References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
- <201203120811.23137.arnd@arndb.de>
- <20120312161004.GB5050@titan.lakedaemon.net>
-Message-ID: <201203121643.26133.arnd@arndb.de>
-
-On Monday 12 March 2012, Jason Cooper wrote:
-> Okay, that's what smelled funny.  wdt and intc both only have registers
-> in virtual address space defined.  Can I assume they map like everything
-> else to corresponding physical addresses?
+On Tue, 21 Feb 2012 11:46:03 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Feb 20, 2012 at 7:27 AM, Stephen Warren <swarren@nvidia.com> wrote:
 > 
-> eg wdt at fed20300 -> wdt at f1020300 ?
+> > Update gpio.txt based on recent discussions regarding interaction with the
+> > pinctrl subsystem.
+> >
+> > Previously, gpio_request() was described as explicitly not performing any
+> > required mux setup operations etc.
+> >
+> > Now, gpio_request() is explicitly as explicitly performing any required mux
+> > setup operations where possible. In the case it isn't, platform code is
+> > required to have set up any required muxing or other configuration prior to
+> > gpio_request() being called, in order to maintain the same semantics.
+> >
+> > This is achieved by gpiolib drivers calling e.g. pinctrl_request_gpio() in
+> > their .request() operation.
+> >
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Grant can you take this one? I'd prefer for you to have a look at
+> it as well.
 
-Yes, correct. Or just uses 20300 as the address if you remap everything
-using the ranges property.
+I've taken this one, but left the 2nd for Olof.
 
-	Arnd
+g.
