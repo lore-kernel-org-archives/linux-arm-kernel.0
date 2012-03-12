@@ -1,35 +1,64 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 12 Mar 2012 09:52:08 +0530
-Subject: [PATCH V2 13/22] watchdog/mpcore_wdt: disable wdt in suspend only if
- it is busy
-In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
-References: <cover.1331524811.git.viresh.kumar@st.com>
-Message-ID: <6e7bfa62de432452eb6b814e92a9045ea9e6d0c9.1331524811.git.viresh.kumar@st.com>
+Date: Mon, 12 Mar 2012 09:51:55 +0530
+Subject: [PATCH V2 00/22] watchdog: ARM watchdogs: sp805 & mpcore updates &
+ fixes
+Message-ID: <cover.1331524811.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need to call mpcore_wdt_stop() in suspend, if wdt is not BUSY. So, call
-mpcore_wdt_stop() conditionally in suspend.
+Hello,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/watchdog/mpcore_wdt.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+This patchset contains fixes and updates for ARM watchdog drivers sp805 and
+mpcore.
 
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 3f47b7e..7ded2a0 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -260,7 +260,9 @@ static int __devexit mpcore_wdt_remove(struct platform_device *pdev)
- static int mpcore_wdt_suspend(struct device *dev)
- {
- 	struct mpcore_wdt *wdt = dev_get_drvdata(dev);
--	mpcore_wdt_stop(&wdt->wdd);	/* Turn the WDT off */
-+
-+	if (is_wdd_active(&wdt->wdd))
-+		mpcore_wdt_stop(&wdt->wdd);	/* Turn the WDT off */
- 
- 	return 0;
- }
+Changes since V1:
+- Included patches for sp805 driver.
+- Removed: wdt->clk = NULL from mpcore driver, and use IS_ERR() to check if
+  clock is supported or not.
+- Adapted to watchdog core for both the drivers.
+- two patches for watchdog core added
+- add patch to use __raw_readl{writel} instead of readl{writel}
+- taken care of few more review comments.
+
+Changes are mentioned in following patch list:
+
+watchdog/mpcore: updates & fixes
+Viresh Kumar (22):
+  watchdog: Add is_wdt_active() routine
+  watchdog: Add support for WDIOC_GETTIMELEFT IOCTL in watchdog core
+  watchdog/mpcore_wdt: Rename dev to pdev for pointing to struct
+    platform_device
+  watchdog/mpcore_wdt: Use devm routines
+  watchdog/mpcore_wdt: Allow platform_get_irq() to fail
+  watchdog/mpcore_wdt: convert to watchdog core
+  watchdog/mpcore_wdt: Fix multiline comments
+  watchdog/mpcore_wdt: Arrange #includes in alphabetical order
+  watchdog/mpcore_wdt: Set default heartbeat in probe instead of init
+  watchdog/mpcore_wdt: Use dev_(crit, err, info) instead of dev_printk
+  watchdog/mpcore_wdt: convert to use module_platform_driver()
+  watchdog/mpcore_wdt: Add support for dev_pm_ops interface
+  watchdog/mpcore_wdt: disable wdt in suspend only if it is busy
+  watchdog/mpcore_wdt: replace (__raw_)readl/writel with lighter
+    *_relaxed variants
+  watchdog/mpcore_wdt: Add support for WDIOC_GETBOOTSTATUS IOCTL
+  watchdog/mpcore_wdt: Add clock framework support
+  watchdog/mpcore_wdt: use correct clk_rate to program timeout
+  watchdog/sp805: Fix documentation style comment
+  watchdog/sp805: replace readl/writel with lighter _relaxed variants
+  watchdog/sp805: Use devm routines
+  watchdog/sp805: convert to watchdog core
+  watchdog/sp805: Add clk_{un}prepare support
+
+ .../watchdog/convert_drivers_to_kernel_api.txt     |    4 +
+ Documentation/watchdog/watchdog-kernel-api.txt     |    2 +
+ arch/arm/include/asm/smp_twd.h                     |   12 +
+ drivers/watchdog/Kconfig                           |    2 +
+ drivers/watchdog/mpcore_wdt.c                      |  573 +++++++++-----------
+ drivers/watchdog/sp805_wdt.c                       |  309 ++++-------
+ drivers/watchdog/via_wdt.c                         |    2 +-
+ drivers/watchdog/watchdog_dev.c                    |   11 +-
+ include/linux/watchdog.h                           |    7 +
+ 9 files changed, 408 insertions(+), 514 deletions(-)
+
 -- 
 1.7.8.110.g4cb5d
