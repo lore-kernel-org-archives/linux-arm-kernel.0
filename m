@@ -1,58 +1,102 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 13 Mar 2012 09:48:18 +1100
-Subject: [PATCH v4 07/11] ep93xx: Configure GPIO ports in core code
-Message-ID: <1331592502-9083-8-git-send-email-rmallon@gmail.com>
+Date: Tue, 13 Mar 2012 09:48:19 +1100
+Subject: [PATCH v4 08/11] ep93xx: Make syscon access functions private to SoC
+Message-ID: <1331592502-9083-9-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the pinmux setting of the EP93xx GPIOs to the core code. This
-removes the need for the GPIO driver to have access to the system
-controller registers.
+The syscon access functions are no longer used outside of the core
+EP93xx code. Move their definitions into the SoC code.
 
 Signed-off-by: Ryan Mallon <rmallon@gmail.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
 Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
 Acked-by: Hartley Sweeten <hsweeten@visionengravers.com>
 ---
- arch/arm/mach-ep93xx/core.c |    7 +++++++
- drivers/gpio/gpio-ep93xx.c  |    7 -------
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-ep93xx/clock.c                 |    1 +
+ arch/arm/mach-ep93xx/core.c                  |    2 --
+ arch/arm/mach-ep93xx/include/mach/platform.h |   14 --------------
+ arch/arm/mach-ep93xx/soc.h                   |   14 ++++++++++++++
+ 4 files changed, 15 insertions(+), 16 deletions(-)
 
+diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+index ca4de71..c95dbce 100644
+--- a/arch/arm/mach-ep93xx/clock.c
++++ b/arch/arm/mach-ep93xx/clock.c
+@@ -25,6 +25,7 @@
+ 
+ #include <asm/div64.h>
+ 
++#include "soc.h"
+ 
+ struct clk {
+ 	struct clk	*parent;
 diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 776b346..bab6e47 100644
+index bab6e47..c9511fe 100644
 --- a/arch/arm/mach-ep93xx/core.c
 +++ b/arch/arm/mach-ep93xx/core.c
-@@ -909,6 +909,13 @@ void __init ep93xx_init_devices(void)
- 	/* Disallow access to MaverickCrunch initially */
- 	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
+@@ -205,7 +205,6 @@ void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg)
  
-+	/* Default all ports to GPIO */
-+	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
-+			       EP93XX_SYSCON_DEVCFG_GONK |
-+			       EP93XX_SYSCON_DEVCFG_EONIDE |
-+			       EP93XX_SYSCON_DEVCFG_GONIDE |
-+			       EP93XX_SYSCON_DEVCFG_HONIDE);
-+
- 	/* Get the GPIO working early, other devices need it */
- 	platform_device_register(&ep93xx_gpio_device);
+ 	spin_unlock_irqrestore(&syscon_swlock, flags);
+ }
+-EXPORT_SYMBOL(ep93xx_syscon_swlocked_write);
  
-diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
-index 1c0fc37..4ca5642 100644
---- a/drivers/gpio/gpio-ep93xx.c
-+++ b/drivers/gpio/gpio-ep93xx.c
-@@ -378,13 +378,6 @@ static int __devinit ep93xx_gpio_probe(struct platform_device *pdev)
- 	}
- 	ep93xx_gpio->mmio_base = mmio;
+ void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits)
+ {
+@@ -222,7 +221,6 @@ void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits)
  
--	/* Default all ports to GPIO */
--	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
--			       EP93XX_SYSCON_DEVCFG_GONK |
--			       EP93XX_SYSCON_DEVCFG_EONIDE |
--			       EP93XX_SYSCON_DEVCFG_GONIDE |
--			       EP93XX_SYSCON_DEVCFG_HONIDE);
+ 	spin_unlock_irqrestore(&syscon_swlock, flags);
+ }
+-EXPORT_SYMBOL(ep93xx_devcfg_set_clear);
+ 
+ /**
+  * ep93xx_chip_revision() - returns the EP93xx chip revision
+diff --git a/arch/arm/mach-ep93xx/include/mach/platform.h b/arch/arm/mach-ep93xx/include/mach/platform.h
+index ad63d4b..602bd87 100644
+--- a/arch/arm/mach-ep93xx/include/mach/platform.h
++++ b/arch/arm/mach-ep93xx/include/mach/platform.h
+@@ -21,20 +21,6 @@ struct ep93xx_eth_data
+ void ep93xx_map_io(void);
+ void ep93xx_init_irq(void);
+ 
+-/* EP93xx System Controller software locked register write */
+-void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg);
+-void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits);
 -
- 	for (i = 0; i < ARRAY_SIZE(ep93xx_gpio_banks); i++) {
- 		struct bgpio_chip *bgc = &ep93xx_gpio->bgc[i];
- 		struct ep93xx_gpio_bank *bank = &ep93xx_gpio_banks[i];
+-static inline void ep93xx_devcfg_set_bits(unsigned int bits)
+-{
+-	ep93xx_devcfg_set_clear(bits, 0x00);
+-}
+-
+-static inline void ep93xx_devcfg_clear_bits(unsigned int bits)
+-{
+-	ep93xx_devcfg_set_clear(0x00, bits);
+-}
+-
+ #define EP93XX_CHIP_REV_D0	3
+ #define EP93XX_CHIP_REV_D1	4
+ #define EP93XX_CHIP_REV_E0	5
+diff --git a/arch/arm/mach-ep93xx/soc.h b/arch/arm/mach-ep93xx/soc.h
+index a22e11b..1273013 100644
+--- a/arch/arm/mach-ep93xx/soc.h
++++ b/arch/arm/mach-ep93xx/soc.h
+@@ -104,4 +104,18 @@
+ #define EP93XX_WATCHDOG_PHYS_BASE	EP93XX_APB_PHYS(0x00140000)
+ #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
+ 
++/* EP93xx System Controller software locked register write */
++void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg);
++void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits);
++
++static inline void ep93xx_devcfg_set_bits(unsigned int bits)
++{
++	ep93xx_devcfg_set_clear(bits, 0x00);
++}
++
++static inline void ep93xx_devcfg_clear_bits(unsigned int bits)
++{
++	ep93xx_devcfg_set_clear(0x00, bits);
++}
++
+ #endif /* _EP93XX_PHYS_BASE_H */
 -- 
 1.7.0.4
