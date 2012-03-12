@@ -1,55 +1,68 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 12 Mar 2012 20:32:36 +0530
-Subject: [PATCH v2 0/4] omap hsmmc device tree support
-Message-ID: <1331564560-23276-1-git-send-email-rnayak@ti.com>
+Date: Mon, 12 Mar 2012 20:32:40 +0530
+Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board data
+In-Reply-To: <1331564560-23276-1-git-send-email-rnayak@ti.com>
+References: <1331564560-23276-1-git-send-email-rnayak@ti.com>
+Message-ID: <1331564560-23276-5-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series adds device tree support for OMAP hsmmc
-driver.
+Add omap mmc related device tree data for OMAP3.
+Currenly limited to only omap3-beagle board.
 
-Changes in V2:
--1- Minor fixes based on comments from Grant.
--2- Added a seperate compatible for omap3.
--3- Added a new binding "ti,needs-special-reset"
-to handle some mmc modules which need special
-softreset sequence.
--4- Updated board dts files with "status = disable;"
-for unused mmc modules.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle.dts |   14 ++++++++++++++
+ arch/arm/boot/dts/omap3.dtsi       |   16 ++++++++++++++++
+ 2 files changed, 30 insertions(+), 0 deletions(-)
 
-Rob,
-I retained your ack on patch 1 despite the additional
-binding that I added to handle the special softreset
-sequence. Let me know if you have any issues with it.
-
-Chris.
-Patch 1 and Patch 2 apply cleanly on mmc-next and can
-be taken in from the mmc tree after relevent acks from
-DT folks.
-Patch 3 and Patch 4 which update dts files, I plan to
-push via linux-omap/Tony's tree.
-
-The series is tested on omap4sdp (both external and emmc),
-omap4panda amd omap3beagle boards.
-
-Things to do:
--1- Card detect isn't functional and needs twl4030 gpio
-to be DT converted.
--2- pbias cell programming is missing and needs an OMAP
-control module driver.
-
-Rajendra Nayak (4):
-  mmc: omap_hsmmc: Convert hsmmc driver to use device tree
-  mmc: omap_hsmmc: Avoid a regulator voltage change with dt
-  arm/dts: OMAP4: Add mmc controller nodes and board data
-  arm/dts: OMAP3: Add mmc controller nodes and board data
-
- .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   33 +++++++
- arch/arm/boot/dts/omap3-beagle.dts                 |   14 +++
- arch/arm/boot/dts/omap3.dtsi                       |   16 ++++
- arch/arm/boot/dts/omap4-panda.dts                  |   22 +++++
- arch/arm/boot/dts/omap4-sdp.dts                    |   24 ++++++
- arch/arm/boot/dts/omap4.dtsi                       |   31 +++++++
- drivers/mmc/host/omap_hsmmc.c                      |   88 +++++++++++++++++++-
- 7 files changed, 227 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 714ba5d..5cf67d1 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -47,3 +47,17 @@
+ 		reg = <0x50>;
+ 	};
+ };
++
++&mmc1 {
++	vmmc-supply = <&vmmc1>;
++	vmmc_aux-supply = <&vsim>;
++	ti,bus-width = <8>;
++};
++
++&mmc2 {
++	status = "disable";
++};
++
++&mmc3 {
++	status = "disable";
++};
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index ca37ba5..3892e34 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -113,5 +113,21 @@
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c3";
+ 		};
++
++		mmc1: mmc at 1 {
++			compatible = "ti,omap3-hsmmc";
++			ti,hwmods = "mmc1";
++			ti,dual-volt;
++		};
++
++		mmc2: mmc at 2 {
++			compatible = "ti,omap3-hsmmc";
++			ti,hwmods = "mmc2";
++		};
++
++		mmc3: mmc at 3 {
++			compatible = "ti,omap3-hsmmc";
++			ti,hwmods = "mmc3";
++		};
+ 	};
+ };
+-- 
+1.7.1
