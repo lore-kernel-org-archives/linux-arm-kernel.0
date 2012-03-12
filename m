@@ -1,35 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 11 Mar 2012 21:36:47 +0000
-Subject: [PATCH v2 1/2] ARM: AT91: Add parameter for AT91_HAS_PATA
-In-Reply-To: <20120311183856.GA13869@game.jcrosoft.org>
-References: <1331415380-10928-1-git-send-email-alan@signal11.us>
- <1331415531-10961-1-git-send-email-alan@signal11.us>
- <20120311183856.GA13869@game.jcrosoft.org>
-Message-ID: <201203112136.47694.arnd@arndb.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 12 Mar 2012 00:51:29 -0600 (MDT)
+Subject: [PATCHv5 3/6] ARM: OMAP4 PM: Add IO Daisychain support
+In-Reply-To: <4F5D8F2A.1070602@ti.com>
+References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+ <1331046702-2472-4-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1203092051140.30879@utopia.booyaka.com>
+ <4F5D8F2A.1070602@ti.com>
+Message-ID: <alpine.DEB.2.00.1203120050360.11332@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 11 March 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > 
-> > diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> > index 71feb00..9eeeabe 100644
-> > --- a/arch/arm/mach-at91/Kconfig
-> > +++ b/arch/arm/mach-at91/Kconfig
-> > @@ -24,6 +24,9 @@ config AT91_SAM9_ALT_RESET
-> >  config AT91_SAM9G45_RESET
-> >       bool
-> >  
-> > +config AT91_HAS_PATA
-> > +     bool
-> what is the need for this?
-> 
-> As we switch to DT, I don't want to track the soc list in the Kconfig anymore
-> if the soc support the PATA will be describe in the DT
-> 
+On Mon, 12 Mar 2012, Rajendra Nayak wrote:
 
-When I originally wrote the patch, I was hitting build errors when trying
-to enable the at91 pata driver on socs that don't have the right declarations
-in their headers. If that has been resolved in a better way already, this
-patch can be dropped.
+> > Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> > [paul at pwsan.com: removed MAX_IOPAD_LATCH_TIME declaration; renamed
+> 
+> But the code below still seems to use it. Is it now defined in some
+> common header so the same value is used in omap3 and omap4?
 
-	Arnd
+Yes, I put it into prcm-common.h in the previous patch that added it for 
+OMAP3.  I'll update that comment to clarify.
+
+
+- Paul
