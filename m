@@ -1,35 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Mar 2012 22:12:31 +0000
-Subject: Regression in 3.2.9 for omap-serial (at least)
-In-Reply-To: <CAGGh5h0sC1mYFpDj973Xgbh7CQ3eGZEYVTy8qZwbsPBA_z4MRQ@mail.gmail.com>
-References: <lyk42vxsz2.fsf@ensc-virt.intern.sigma-chemnitz.de>
- <alpine.LFD.2.02.1203081246130.2742@ionos>
- <CAGGh5h3-1XhMO1-jiBdUJYgh4unRcPonvp=zcXLKMJBfS+qpuQ@mail.gmail.com>
- <alpine.LFD.2.02.1203082024450.2742@ionos>
- <CAGGh5h0sC1mYFpDj973Xgbh7CQ3eGZEYVTy8qZwbsPBA_z4MRQ@mail.gmail.com>
-Message-ID: <20120312221231.GB10830@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 12 Mar 2012 15:17:04 -0700
+Subject: [PATCH v3 00/13] gpio/omap: Some more driver cleanup and fixes
+In-Reply-To: <CAC83ZvJDfDBcRU1isYaxRe-fWN8F2+QW6W5EeWWuTRcFBGpYNg@mail.gmail.com>
+ (Tarun Kanti DebBarma's message of "Tue, 13 Mar 2012 01:57:03 +0530")
+References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
+ <878vj5y7iv.fsf@ti.com>
+ <CAC83Zv+8AjCHBOJbtvSQS-URvCE5Xm9oPk9_X7h4Kz7FZ_7Otw@mail.gmail.com>
+ <CAC83ZvJKS34Py6vVtk_Si9q3A-9CVN6v4ixNM+HJ37AATcGNPA@mail.gmail.com>
+ <CAC83ZvJDfDBcRU1isYaxRe-fWN8F2+QW6W5EeWWuTRcFBGpYNg@mail.gmail.com>
+Message-ID: <87boo1wjkv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2012 at 08:34:44AM +0100, jean-philippe francois wrote:
-> Le 8 mars 2012 20:26, Thomas Gleixner <tglx@linutronix.de> a ?crit :
-> > It's in Linus tree.
-> >
-> > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=52abb700e16a9aa4cbc03f3d7f80206cbbc80680
-> 
-> Thank you !
-> In fact I don't know how to use this interface to search by commit number.
-> Do you know if it is possible ?
+"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
 
-There is no direct way to do it.
+[...]
 
-You can replace <commit-id> below with either the long commit id, or an
-abbreviated commit id:
+>>> Oops... I am sorry.
+>>> I was in the process of updating the branch with latest comments after
+>>> base-lining on Grant's:
+>>> git://git.secretlab.ca/git/linux-2.6.git
+>>> Branch: gpio/next
+>>> Because this has all the gpio changes including Benoit's latest gpio
+>>> devicetree changes.
+>>> Should I go ahead?
+>> Anyways, for the time being I am updating on top of your changes as before.
+>> You should be able to see the branch shortly.
+> Please note that the branch has your following patch:
+> gpio/omap: fix wakeups on level-triggered GPIOs
 
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=<commit-id>
+After addressing my comments on the series, please go ahead and rebase
+on Grant's gpio/next branch.
 
-So, for commit id 52abb70,
+Thanks,
 
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=52abb70
-
-will work.
+Kevin
