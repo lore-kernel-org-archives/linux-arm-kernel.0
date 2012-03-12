@@ -1,43 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 11 Mar 2012 00:00:39 -0800
-Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
-In-Reply-To: <20120310173526.GB5972@quad.lixom.net>
-References: <4F589474.8050609@samsung.com>
- <CAOesGMiWOChuMjLQTK1pGys+oXCc4A=HO-2_=37rh3M6pgUP_g@mail.gmail.com>
- <4F5A22AD.1070907@samsung.com> <4F5B74C1.3080200@samsung.com>
- <20120310173526.GB5972@quad.lixom.net>
-Message-ID: <4F5C5BA7.8050904@samsung.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 12 Mar 2012 09:52:10 +0530
+Subject: [PATCH 3/5] ARM: Exynos4: Add pinctrl devices and pin maps
+In-Reply-To: <4F5D1661.4090007@samsung.com>
+References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
+ <1331469965-28846-4-git-send-email-thomas.abraham@linaro.org>
+ <4F5D1661.4090007@samsung.com>
+Message-ID: <CAJuYYwQPrOte4EjpfBbUW0vg+qFJwYgZcSM88iZ95C8LwWuptg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/12 09:35, Olof Johansson wrote:
+2012/3/12 Kukjin Kim <kgene.kim@samsung.com>:
+> Thomas Abraham wrote:
+>> Add the three pinctrl platform devices and the pin maps for Exynos4.
+>>
+>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+>> ---
+>> ? arch/arm/mach-exynos/Kconfig ? ? ? ? ? ? ?| ? ?1 +
+>> ? arch/arm/mach-exynos/Makefile ? ? ? ? ? ? | ? ?1 +
+>> ? arch/arm/mach-exynos/common.h ? ? ? ? ? ? | ? ?6 ++
+>> ? arch/arm/mach-exynos/dev-pinctrl.c ? ? ? ?| ?115 +++++++++++++++++++++++++++++
+>> ? arch/arm/plat-samsung/include/plat/devs.h | ? ?3 +
+>> ? 5 files changed, 126 insertions(+), 0 deletions(-)
+>> ? create mode 100644 arch/arm/mach-exynos/dev-pinctrl.c
+>
+> [...]
+>
+>> +#include<linux/kernel.h>
+>> +#include<linux/dma-mapping.h>
+>> +#include<linux/platform_device.h>
+>> +#include<linux/interrupt.h>
+>> +#include<linux/pinctrl/machine.h>
+>
+> #include <linux/ioport.h> for DEFINE_RES_xxx at below.
+>
+>> +
+>> +#include<plat/devs.h>
+>> +#include<plat/pinctrl.h>
+>> +
+>> +#include<mach/map.h>
+>> +
+>> +static struct resource exynos4_pinctrl_resource0[] = {
+>> + ? ? [0] = {
+>> + ? ? ? ? ? ? .start ?= EXYNOS4_PA_GPIO1,
+>> + ? ? ? ? ? ? .end ? ?= EXYNOS4_PA_GPIO1 + SZ_4K - 1,
+>> + ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
+>> + ? ? },
+>
+> [0] = DEFINE_RES_MEM(EXYNOS4_PA_GPIO1, SZ_4K),
+>
+>> + ? ? [1] = {
+>> + ? ? ? ? ? ? .start ?= IRQ_GPIO_XA,
+>> + ? ? ? ? ? ? .end ? ?= IRQ_GPIO_XA,
+>> + ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
+>> + ? ? },
+>
+> [1] = DEFINE_RES_IRQ(IRQ_GPIO_XA),
+>
+> But I'm thinking, we need to move to use EXYNOS4_IRQ_GPIO_XA here for
+> both EXYNOS4 and EXYNOS5 and as a note, I'm working on updating IRQ
+> naming you can see it in this week :)
+
+Thanks for reviewing this patch series. I will use DEFINE_RES_xxx for
+resource instantiation.
+
+Regards,
+Thomas.
 
 [...]
-
->
-> The contents of the branch itself looks good, but now you have introduced
-> a modified/delete conflict with yourself.
->
-> You modify arch/arm/mach-exynos/clock.c in your cleanup-use-static branch, and
-> then you move it here. That means that when I merge in this branch, git throws
-> a conflict and I have to do manual edits to make the contents match.
->
-> It's better if you base this branch on your cleanup-use-static branch, so that
-> the move includes those edits. That way there is no conflict resolution to do
-> at our end either.
->
-> Can you please do that rebase and send a fresh pull request? I'll continue
-> looking at your other requests meanwhile.
->
-Hi Olof,
-
-Sorry for late response. OK I see and your suggestion sounds good to me. 
-Let me send a new pull request after that.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
