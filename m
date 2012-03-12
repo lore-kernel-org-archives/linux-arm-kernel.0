@@ -1,54 +1,48 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 9 Mar 2012 17:40:18 -0700 (MST)
-Subject: [PATCHv5 2/6] ARM: OMAP3 PM: Move IO Daisychain function to
- omap3 prm file
-In-Reply-To: <1331046702-2472-3-git-send-email-t-kristo@ti.com>
-References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
- <1331046702-2472-3-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1203091737390.30879@utopia.booyaka.com>
+Date: Mon, 12 Mar 2012 04:09:10 -0600 (MDT)
+Subject: [GIT PULL] ARM: OMAP: clock: clock patches for 3.4
+Message-ID: <alpine.DEB.2.00.1203120407460.11332@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc Rajendra
+Hi Tony
 
-Hi Tero,
+The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
 
-a few comments:
+  Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
 
-On Tue, 6 Mar 2012, Tero Kristo wrote:
+are available in the git repository at:
 
-...
+  git://git.pwsan.com/linux-2.6 clock_devel_3.4
 
-> +/* OMAP3 Daisychain enable sequence */
-> +void omap3_trigger_io_chain(void)
-> +{
-> +	int i = 0;
-> +
-> +	omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> +				   PM_WKEN);
-> +	/* Do a readback to assure write has been done */
-> +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+for you to fetch changes up to ae6f0a61f6a30f387ff0ce883b4ca8ff23424b11:
 
-Looks like this barrier shouldn't be needed?  The write is immediately 
-followed by another read from the same IP block.
-
-> +
-> +	omap_test_timeout(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
-> +			  OMAP3430_ST_IO_CHAIN_MASK,
-> +			  MAX_IOPAD_LATCH_TIME, i);
-> +
-> +	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-> +				     PM_WKEN);
-> +
-> +	omap2_prm_set_mod_reg_bits(OMAP3430_ST_IO_CHAIN_MASK, WKUP_MOD,
-> +				     PM_WKST);
-> +
-> +	omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST);
-> +}
-
-I see that you removed the second timeout test from this code, but not 
-from the OMAP4 version.  Any reason why?  Seems like if the second timeout 
-can be removed from one, then it can also be removed from the other?
+  ARM: OMAP: clock: cleanup CPUfreq leftovers (2012-03-12 03:24:45 -0600)
 
 
 - Paul
+
+----------------------------------------------------------------
+Ameya Palande (1):
+      ARM: OMAP4: clock data: fix mult and div mask for USB_DPLL
+
+Ilya Yanok (1):
+      ARM: OMAP3: clock3xxx_data: change EMAC clocks aliases
+
+Kevin Hilman (1):
+      ARM: OMAP: clock: cleanup CPUfreq leftovers
+
+Paul Walmsley (1):
+      ARM: OMAP3: clock data: fill in some missing clockdomains
+
+Rajendra Nayak (1):
+      ARM: OMAP4: clock data: Force a DPLL clkdm/pwrdm ON before a relock
+
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   80 --------------------------
+ arch/arm/mach-omap2/clock.c                  |    5 --
+ arch/arm/mach-omap2/clock.h                  |    8 ---
+ arch/arm/mach-omap2/clock3xxx_data.c         |   10 +++-
+ arch/arm/mach-omap2/clock44xx_data.c         |    5 +-
+ arch/arm/plat-omap/clock.c                   |   26 --------
+ arch/arm/plat-omap/include/plat/clock.h      |   10 ---
+ 7 files changed, 11 insertions(+), 133 deletions(-)
