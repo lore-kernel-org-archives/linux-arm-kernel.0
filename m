@@ -1,101 +1,112 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 9 Mar 2012 08:23:50 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the sound tree
-In-Reply-To: <20120309180647.a27cc03a8997f9b38eb8ad0e@canb.auug.org.au>
-References: <20120309180647.a27cc03a8997f9b38eb8ad0e@canb.auug.org.au>
-Message-ID: <20120309072350.GV3852@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Mar 2012 10:16:17 -0600
+Subject: [PATCH] gpio/omap: fix wakeups on level-triggered GPIOs
+In-Reply-To: <1330989004-9855-1-git-send-email-khilman@ti.com>
+References: <1330989004-9855-1-git-send-email-khilman@ti.com>
+Message-ID: <20120312161618.3EBD33E07B0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2012 at 06:06:47PM +1100, Stephen Rothwell wrote:
-> Hi all,
+On Mon,  5 Mar 2012 15:10:04 -0800, Kevin Hilman <khilman@ti.com> wrote:
+> While both level- and edge-triggered GPIOs are capable of generating
+> interrupts, only edge-triggered GPIOs are capable of generating a
+> module-level wakeup to the PRCM (c.f. 34xx NDA TRM section 25.5.3.2.)
 > 
-> Today's linux-next merge of the arm-soc tree got conflicts in
-> arch/arm/mach-imx/mm-imx3.c and arch/arm/mach-imx/mm-imx5.c between
-> commit 3bc34a614335 ("ARM: imx: convert audmux to a platform driver")
-> from the sound tree and commits 38bb3630bcba ("ARM: mx35: Setup the AIPS
-> registers") and aa6a9fa1f274 ("ARM: mx5: Use common function for
-> configuring AIPS") from the arm-soc tree.
+> In order to ensure that devices using level-triggered GPIOs as
+> interrupts can also cause wakeups (e.g. from idle), this patch enables
+> edge-triggering for wakeup-enabled, level-triggered GPIOs when a GPIO
+> bank is runtime-suspended (which also happens during idle.)
 > 
-> I fixed it up (see below) and can carry the fix as necessary.
+> This fixes a problem found in GPMC-connected network cards with GPIO
+> interrupts (e.g. smsc911x on Zoom3, Overo, ...) where network booting
+> with NFSroot was very slow since the GPIO IRQs used by the NIC were
+> not generating PRCM wakeups, and thus not waking the system from idle.
+> NOTE: until v3.3, this boot-time problem was somewhat masked because
+> the UART init prevented WFI during boot until the full serial driver
+> was available.  Preventing WFI allowed regular GPIO interrupts to fire
+> and this problem was not seen.  After the UART runtime PM cleanups, we
+> no longer avoid WFI during boot, so GPIO IRQs that were not causing
+> wakeups resulted in very slow IRQ response times.
+> 
+> Tested on platforms using level-triggered GPIOs for network IRQs using
+> the SMSC911x NIC: 3530/Overo and 3630/Zoom3.
+> 
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Tested-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 
-Looks good, thanks
+Applied, thx.
 
-Sascha
+g.
 
-
+> ---
+> Grant, here's another one for your gpio/next branch, and applies on
+> top of the for_3.4/gpio/runtime-pm-cleanup branch you've already
+> pulled from me.  While it's a fix, it's not a regressions since
+> this problem has been around for awhile, so it can be for 3.4.
+> 
+>  drivers/gpio/gpio-omap.c |   34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index f49bd6f..752ae9b 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1196,8 +1196,30 @@ static int omap_gpio_runtime_suspend(struct device *dev)
+>  	struct gpio_bank *bank = platform_get_drvdata(pdev);
+>  	u32 l1 = 0, l2 = 0;
+>  	unsigned long flags;
+> +	u32 wake_low, wake_hi;
+>  
+>  	spin_lock_irqsave(&bank->lock, flags);
+> +
+> +	/*
+> +	 * Only edges can generate a wakeup event to the PRCM.
+> +	 *
+> +	 * Therefore, ensure any wake-up capable GPIOs have
+> +	 * edge-detection enabled before going idle to ensure a wakeup
+> +	 * to the PRCM is generated on a GPIO transition. (c.f. 34xx
+> +	 * NDA TRM 25.5.3.1)
+> +	 *
+> +	 * The normal values will be restored upon ->runtime_resume()
+> +	 * by writing back the values saved in bank->context.
+> +	 */
+> +	wake_low = bank->context.leveldetect0 & bank->context.wake_en;
+> +	if (wake_low)
+> +		__raw_writel(wake_low | bank->context.fallingdetect,
+> +			     bank->base + bank->regs->fallingdetect);
+> +	wake_hi = bank->context.leveldetect1 & bank->context.wake_en;
+> +	if (wake_hi)
+> +		__raw_writel(wake_hi | bank->context.risingdetect,
+> +			     bank->base + bank->regs->risingdetect);
+> +
+>  	if (bank->power_mode != OFF_MODE) {
+>  		bank->power_mode = 0;
+>  		goto update_gpio_context_count;
+> @@ -1246,6 +1268,18 @@ static int omap_gpio_runtime_resume(struct device *dev)
+>  
+>  	spin_lock_irqsave(&bank->lock, flags);
+>  	_gpio_dbck_enable(bank);
+> +
+> +	/*
+> +	 * In ->runtime_suspend(), level-triggered, wakeup-enabled
+> +	 * GPIOs were set to edge trigger also in order to be able to
+> +	 * generate a PRCM wakeup.  Here we restore the
+> +	 * pre-runtime_suspend() values for edge triggering.
+> +	 */
+> +	__raw_writel(bank->context.fallingdetect,
+> +		     bank->base + bank->regs->fallingdetect);
+> +	__raw_writel(bank->context.risingdetect,
+> +		     bank->base + bank->regs->risingdetect);
+> +
+>  	if (!bank->enabled_non_wakeup_gpios || !bank->workaround_enabled) {
+>  		spin_unlock_irqrestore(&bank->lock, flags);
+>  		return 0;
 > -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
+> 1.7.9.2
 > 
-> diff --cc arch/arm/mach-imx/mm-imx3.c
-> index 9c9b7f9,1646991..0000000
-> --- a/arch/arm/mach-imx/mm-imx3.c
-> +++ b/arch/arm/mach-imx/mm-imx3.c
-> @@@ -177,8 -175,9 +179,12 @@@ void __init imx31_soc_init(void
->   	}
->   
->   	imx_add_imx_sdma("imx31-sdma", MX31_SDMA_BASE_ADDR, MX31_INT_SDMA, &imx31_sdma_pdata);
-> + 
-> + 	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS1_BASE_ADDR));
-> + 	imx_set_aips(MX31_IO_ADDRESS(MX31_AIPS2_BASE_ADDR));
-> ++
->  +	platform_device_register_simple("imx31-audmux", 0, imx31_audmux_res,
->  +					ARRAY_SIZE(imx31_audmux_res));
->   }
->   #endif /* ifdef CONFIG_SOC_IMX31 */
->   
-> @@@ -267,8 -262,9 +273,13 @@@ void __init imx35_soc_init(void
->   	}
->   
->   	imx_add_imx_sdma("imx35-sdma", MX35_SDMA_BASE_ADDR, MX35_INT_SDMA, &imx35_sdma_pdata);
-> + 
-> + 	/* Setup AIPS registers */
-> + 	imx_set_aips(MX35_IO_ADDRESS(MX35_AIPS1_BASE_ADDR));
-> + 	imx_set_aips(MX35_IO_ADDRESS(MX35_AIPS2_BASE_ADDR));
-> ++
->  +	/* i.mx35 has the i.mx31 type audmux */
->  +	platform_device_register_simple("imx31-audmux", 0, imx35_audmux_res,
->  +					ARRAY_SIZE(imx35_audmux_res));
->   }
->   #endif /* ifdef CONFIG_SOC_IMX35 */
-> diff --cc arch/arm/mach-imx/mm-imx5.c
-> index dc7c4ed,92efece..0000000
-> --- a/arch/arm/mach-imx/mm-imx5.c
-> +++ b/arch/arm/mach-imx/mm-imx5.c
-> @@@ -201,9 -185,10 +201,14 @@@ void __init imx51_soc_init(void
->   
->   	/* i.mx51 has the i.mx35 type sdma */
->   	imx_add_imx_sdma("imx35-sdma", MX51_SDMA_BASE_ADDR, MX51_INT_SDMA, &imx51_sdma_pdata);
-> + 
-> + 	/* Setup AIPS registers */
-> + 	imx_set_aips(MX51_IO_ADDRESS(MX51_AIPS1_BASE_ADDR));
-> + 	imx_set_aips(MX51_IO_ADDRESS(MX51_AIPS2_BASE_ADDR));
-> ++
->  +	/* i.mx51 has the i.mx31 type audmux */
->  +	platform_device_register_simple("imx31-audmux", 0, imx51_audmux_res,
->  +					ARRAY_SIZE(imx51_audmux_res));
->   }
->   
->   void __init imx53_soc_init(void)
-> @@@ -219,7 -204,8 +224,12 @@@
->   
->   	/* i.mx53 has the i.mx35 type sdma */
->   	imx_add_imx_sdma("imx35-sdma", MX53_SDMA_BASE_ADDR, MX53_INT_SDMA, &imx53_sdma_pdata);
-> + 
-> + 	/* Setup AIPS registers */
-> + 	imx_set_aips(MX53_IO_ADDRESS(MX53_AIPS1_BASE_ADDR));
-> + 	imx_set_aips(MX53_IO_ADDRESS(MX53_AIPS2_BASE_ADDR));
-> ++
->  +	/* i.mx53 has the i.mx31 type audmux */
->  +	platform_device_register_simple("imx31-audmux", 0, imx53_audmux_res,
->  +					ARRAY_SIZE(imx53_audmux_res));
->   }
-
-
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
