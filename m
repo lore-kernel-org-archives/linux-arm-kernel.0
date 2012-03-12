@@ -1,34 +1,77 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 11 Mar 2012 16:08:18 -0500
-Subject: [PATCH 2/4] ARM: iop13xx: fix missing declaration of
- iop13xx_init_early
-In-Reply-To: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
-References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1331500100-31351-3-git-send-email-robherring2@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 12 Mar 2012 21:03:08 +0530
+Subject: [PATCH] ARM: OMAP4: Workaround the OCP synchronisation issue with 32K
+ synctimer.
+Message-ID: <1331566388-2397-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On OMAP4, recently a synchronisation bug is discovered by hardware
+team, which leads to incorrect timer value read from 32K sync timer
+IP when the IP is comming out of idle.
 
-Commit 1dfe34ae794c13 (ARM: iop13xx: use runtime ioremap hook) missed
-a declaration of iop13xx_init_early resulting in a build error.
+The issue is due to the synchronization methodology used in the SYNCTIMER IP.
+The value of the counter register in 32kHz domain is synchronized to the OCP
+domain register only at count up event, and if the OCP clock is switched off,
+the OCP register gets out of synch until the first count up event after the
+clock is switched back -at the next falling edge of the 32kHz clock.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Further investigation revealed that it applies to gptimer1 and watchdog timer2
+as well which may run on 32KHz. This patch fixes the issue for all the
+applicable modules.
+
+The BUG has not made it yet to the OMAP errata list and it is applicable to
+OMAP1/2/3/4/5. OMAP1/2/3 it is taken care indirectly by autodeps.
+
+Reported-Tested-by: dave.long at linaro.org
+[dave.long at linaro.org: Reported the oprofile time stamp issue with synctimer
+and helped to test this patch]
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-iop13xx/include/mach/iop13xx.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm44xx.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-iop13xx/include/mach/iop13xx.h b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-index 07e9ff7..e190dcd 100644
---- a/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-+++ b/arch/arm/mach-iop13xx/include/mach/iop13xx.h
-@@ -5,6 +5,7 @@
- /* The ATU offsets can change based on the strapping */
- extern u32 iop13xx_atux_pmmr_offset;
- extern u32 iop13xx_atue_pmmr_offset;
-+void iop13xx_init_early(void);
- void iop13xx_init_irq(void);
- void iop13xx_map_io(void);
- void iop13xx_platform_init(void);
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index c264ef7..974f7ea 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -196,7 +196,7 @@ static void omap_default_idle(void)
+ static int __init omap4_pm_init(void)
+ {
+ 	int ret;
+-	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm;
++	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
+ 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
+ 
+ 	if (!cpu_is_omap44xx())
+@@ -220,14 +220,19 @@ static int __init omap4_pm_init(void)
+ 	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
+ 	 * expected. The hardware recommendation is to enable static
+ 	 * dependencies for these to avoid system lock ups or random crashes.
++	 * The L4 wakeup depedency is added to workaround the OCP sync hardware
++	 * BUG with 32K synctimer which lead to incorrect timer value read
++	 * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
++	 * are part of L4 wakeup clockdomain.
+ 	 */
+ 	mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
+ 	emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+ 	l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
+ 	l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
+ 	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
++	l4wkup = clkdm_lookup("l4_wkup_clkdm");
+ 	ducati_clkdm = clkdm_lookup("ducati_clkdm");
+-	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
++	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) || (!l4wkup) ||
+ 		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
+ 		goto err2;
+ 
+@@ -235,6 +240,7 @@ static int __init omap4_pm_init(void)
+ 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
+ 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
+ 	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
++	ret |= clkdm_add_wkdep(mpuss_clkdm, l4wkup);
+ 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
+ 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
+ 	if (ret) {
 -- 
-1.7.5.4
+1.7.4.1
