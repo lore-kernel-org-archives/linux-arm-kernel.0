@@ -1,186 +1,236 @@
-From: b39297@freescale.com (Wu Guoxing)
-Date: Mon, 12 Mar 2012 12:57:59 +0800
-Subject: [PATCH v7 2/2] ARM : mx35: 3ds-board: add framebuffer device
-In-Reply-To: <1331528279-2263-1-git-send-email-b39297@freescale.com>
-References: <1331528279-2263-1-git-send-email-b39297@freescale.com>
-Message-ID: <1331528279-2263-2-git-send-email-b39297@freescale.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 12 Mar 2012 10:13:54 +0530
+Subject: [PATCH] AMBA: Add module_amba_driver() helper macro for amba_driver
+Message-ID: <e8a9a1ba29099f7d6fd374d960f030b0cbdaf359.1331527353.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: wu guoxing <b39297@freescale.com>
+For simple modules that contain a single amba_driver without any
+additional setup code then ends up being a block of duplicated
+boilerplate. This patch adds a new macro, module_amba_driver(),
+which replaces the module_init()/module_exit() registrations with
+template functions.
 
-This patch adds framebuffer support for freescale mx35 3ds board
-
-Signed-off-by: Wu Guoxing <b39297@freescale.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
-Changes since v6:
-	1. use the macro for lcd-enable that added in board_mx35_3ds.h
-	2. fold mc9s08dz60_lcd_gpio_get into mx35_3ds_lcd_set_power
-Changes since v5:
-	1. fixed a typo error in fb_modedb[].
-Changes since v4:
-	1. fixed a typo error in mx35_3ds_lcd_set_power.
-Changes since v3:
-	1. use a static variable to save the gpio value instead of find
-	the gpiochip every time.
-	2. add gpio_request after found the gpio.
-Changes since v2:
-	1. use gpio_set_value_cansleep instead of gpio_set_value
-Changes since v1:
-	1. use gpio driver for mc9s08dz60
+ drivers/char/hw_random/nomadik-rng.c |   13 +------------
+ drivers/dma/pl330.c                  |   13 +------------
+ drivers/input/serio/ambakmi.c        |   13 +------------
+ drivers/mmc/host/mmci.c              |   12 +-----------
+ drivers/rtc/rtc-pl030.c              |   13 +------------
+ drivers/rtc/rtc-pl031.c              |   13 +------------
+ drivers/watchdog/sp805_wdt.c         |   12 +-----------
+ include/linux/amba/bus.h             |    9 +++++++++
+ sound/arm/aaci.c                     |   13 +------------
+ 9 files changed, 17 insertions(+), 94 deletions(-)
 
-arch/arm/mach-imx/mach-mx35_3ds.c |  115 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 115 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 0af6c9c..604759f 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -40,9 +40,88 @@
- #include <mach/iomux-mx35.h>
- #include <mach/irqs.h>
- #include <mach/3ds_debugboard.h>
-+#include <mach/board_mx35_3ds.h>
-+#include <video/platform_lcd.h>
- 
- #include "devices-imx35.h"
- 
-+static const struct fb_videomode fb_modedb[] = {
-+	{
-+		 /* 800x480 @ 55 Hz */
-+		.name = "Ceramate-CLAA070VC01",
-+		.refresh = 55,
-+		.xres = 800,
-+		.yres = 480,
-+		.pixclock = 40000,
-+		.left_margin = 40,
-+		.right_margin = 40,
-+		.upper_margin = 5,
-+		.lower_margin = 5,
-+		.hsync_len = 20,
-+		.vsync_len = 10,
-+		.sync = FB_SYNC_OE_ACT_HIGH,
-+		.vmode = FB_VMODE_NONINTERLACED,
-+		.flag = 0,
-+	 },
-+};
-+
-+static const struct ipu_platform_data mx3_ipu_data __initconst = {
-+	.irq_base = MXC_IPU_IRQ_START,
-+};
-+
-+static struct mx3fb_platform_data mx3fb_pdata __initdata = {
-+	.name = "Ceramate-CLAA070VC01",
-+	.mode = fb_modedb,
-+	.num_modes = ARRAY_SIZE(fb_modedb),
-+};
-+
-+static struct i2c_board_info __initdata i2c_devices_3ds[] = {
-+	{
-+		I2C_BOARD_INFO("mc9s08dz60", 0x69),
-+	},
-+};
-+
-+static int lcd_power_gpio = -ENXIO;
-+
-+static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
-+						     void *data)
-+{
-+	return !strcmp(chip->label, data);
-+}
-+
-+static void mx35_3ds_lcd_set_power(
-+				struct plat_lcd_data *pd, unsigned int power)
-+{
-+	struct gpio_chip *chip;
-+
-+	if (!gpio_is_valid(lcd_power_gpio)) {
-+		chip = gpiochip_find(
-+				"mc9s08dz60", mc9s08dz60_gpiochip_match);
-+		if (chip) {
-+			lcd_power_gpio =
-+				chip->base + GPIO_MC9S08DZ60_LCD_ENABLE;
-+			if (gpio_request(lcd_power_gpio, "lcd_power") < 0) {
-+				pr_err("error: gpio already requested!\n");
-+				lcd_power_gpio = -ENXIO;
-+			}
-+		} else {
-+			pr_err("error: didn't find mc9s08dz60 gpio chip\n");
-+		}
-+	}
-+
-+	if (gpio_is_valid(lcd_power_gpio))
-+		gpio_set_value_cansleep(lcd_power_gpio, power);
-+}
-+
-+static struct plat_lcd_data mx35_3ds_lcd_data = {
-+	.set_power = mx35_3ds_lcd_set_power,
-+};
-+
-+static struct platform_device mx35_3ds_lcd = {
-+	.name = "platform-lcd",
-+	.dev.platform_data = &mx35_3ds_lcd_data,
-+};
-+
- #define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
- 
- static const struct imxuart_platform_data uart_pdata __initconst = {
-@@ -120,6 +199,32 @@ static iomux_v3_cfg_t mx35pdk_pads[] = {
- 	/* I2C1 */
- 	MX35_PAD_I2C1_CLK__I2C1_SCL,
- 	MX35_PAD_I2C1_DAT__I2C1_SDA,
-+	/* Display */
-+	MX35_PAD_LD0__IPU_DISPB_DAT_0,
-+	MX35_PAD_LD1__IPU_DISPB_DAT_1,
-+	MX35_PAD_LD2__IPU_DISPB_DAT_2,
-+	MX35_PAD_LD3__IPU_DISPB_DAT_3,
-+	MX35_PAD_LD4__IPU_DISPB_DAT_4,
-+	MX35_PAD_LD5__IPU_DISPB_DAT_5,
-+	MX35_PAD_LD6__IPU_DISPB_DAT_6,
-+	MX35_PAD_LD7__IPU_DISPB_DAT_7,
-+	MX35_PAD_LD8__IPU_DISPB_DAT_8,
-+	MX35_PAD_LD9__IPU_DISPB_DAT_9,
-+	MX35_PAD_LD10__IPU_DISPB_DAT_10,
-+	MX35_PAD_LD11__IPU_DISPB_DAT_11,
-+	MX35_PAD_LD12__IPU_DISPB_DAT_12,
-+	MX35_PAD_LD13__IPU_DISPB_DAT_13,
-+	MX35_PAD_LD14__IPU_DISPB_DAT_14,
-+	MX35_PAD_LD15__IPU_DISPB_DAT_15,
-+	MX35_PAD_LD16__IPU_DISPB_DAT_16,
-+	MX35_PAD_LD17__IPU_DISPB_DAT_17,
-+	MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC,
-+	MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK,
-+	MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY,
-+	MX35_PAD_CONTRAST__IPU_DISPB_CONTR,
-+	MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC,
-+	MX35_PAD_D3_REV__IPU_DISPB_D3_REV,
-+	MX35_PAD_D3_CLS__IPU_DISPB_D3_CLS,
+diff --git a/drivers/char/hw_random/nomadik-rng.c b/drivers/char/hw_random/nomadik-rng.c
+index 3d3c1e6..96de024 100644
+--- a/drivers/char/hw_random/nomadik-rng.c
++++ b/drivers/char/hw_random/nomadik-rng.c
+@@ -107,17 +107,6 @@ static struct amba_driver nmk_rng_driver = {
+ 	.id_table = nmk_rng_ids,
  };
  
- static int mx35_3ds_otg_init(struct platform_device *pdev)
-@@ -179,6 +284,8 @@ static const struct imxi2c_platform_data mx35_3ds_i2c0_data __initconst = {
-  */
- static void __init mx35_3ds_init(void)
- {
-+	struct platform_device *imx35_fb_pdev;
-+
- 	imx35_soc_init();
+-static int __init nmk_rng_init(void)
+-{
+-	return amba_driver_register(&nmk_rng_driver);
+-}
+-
+-static void __devexit nmk_rng_exit(void)
+-{
+-	amba_driver_unregister(&nmk_rng_driver);
+-}
+-
+-module_init(nmk_rng_init);
+-module_exit(nmk_rng_exit);
++module_amba_driver(nmk_rng_driver);
  
- 	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
-@@ -204,6 +311,14 @@ static void __init mx35_3ds_init(void)
- 		pr_warn("Init of the debugboard failed, all "
- 				"devices on the debugboard are unusable.\n");
- 	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
-+
-+	i2c_register_board_info(
-+		0, i2c_devices_3ds, ARRAY_SIZE(i2c_devices_3ds));
-+
-+	imx35_add_ipu_core(&mx3_ipu_data);
-+	imx35_fb_pdev = imx35_add_mx3_sdc_fb(&mx3fb_pdata);
-+	mx35_3ds_lcd.dev.parent = &imx35_fb_pdev->dev;
-+	platform_device_register(&mx35_3ds_lcd);
+ MODULE_LICENSE("GPL");
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 84ebea9..79df175 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -1040,18 +1040,7 @@ static struct amba_driver pl330_driver = {
+ 	.remove = pl330_remove,
+ };
+ 
+-static int __init pl330_init(void)
+-{
+-	return amba_driver_register(&pl330_driver);
+-}
+-module_init(pl330_init);
+-
+-static void __exit pl330_exit(void)
+-{
+-	amba_driver_unregister(&pl330_driver);
+-	return;
+-}
+-module_exit(pl330_exit);
++module_amba_driver(pl330_driver);
+ 
+ MODULE_AUTHOR("Jaswinder Singh <jassi.brar@samsung.com>");
+ MODULE_DESCRIPTION("API Driver for PL330 DMAC");
+diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
+index 8407d5b..2ffd110 100644
+--- a/drivers/input/serio/ambakmi.c
++++ b/drivers/input/serio/ambakmi.c
+@@ -208,18 +208,7 @@ static struct amba_driver ambakmi_driver = {
+ 	.resume		= amba_kmi_resume,
+ };
+ 
+-static int __init amba_kmi_init(void)
+-{
+-	return amba_driver_register(&ambakmi_driver);
+-}
+-
+-static void __exit amba_kmi_exit(void)
+-{
+-	amba_driver_unregister(&ambakmi_driver);
+-}
+-
+-module_init(amba_kmi_init);
+-module_exit(amba_kmi_exit);
++module_amba_driver(ambakmi_driver);
+ 
+ MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
+ MODULE_DESCRIPTION("AMBA KMI controller driver");
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index ea2236a..a7f079a 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1598,18 +1598,8 @@ static struct amba_driver mmci_driver = {
+ 	.id_table	= mmci_ids,
+ };
+ 
+-static int __init mmci_init(void)
+-{
+-	return amba_driver_register(&mmci_driver);
+-}
+-
+-static void __exit mmci_exit(void)
+-{
+-	amba_driver_unregister(&mmci_driver);
+-}
++module_amba_driver(mmci_driver);
+ 
+-module_init(mmci_init);
+-module_exit(mmci_exit);
+ module_param(fmax, uint, 0444);
+ 
+ MODULE_DESCRIPTION("ARM PrimeCell PL180/181 Multimedia Card Interface driver");
+diff --git a/drivers/rtc/rtc-pl030.c b/drivers/rtc/rtc-pl030.c
+index a4a1e53..22bacdb 100644
+--- a/drivers/rtc/rtc-pl030.c
++++ b/drivers/rtc/rtc-pl030.c
+@@ -185,18 +185,7 @@ static struct amba_driver pl030_driver = {
+ 	.id_table	= pl030_ids,
+ };
+ 
+-static int __init pl030_init(void)
+-{
+-	return amba_driver_register(&pl030_driver);
+-}
+-
+-static void __exit pl030_exit(void)
+-{
+-	amba_driver_unregister(&pl030_driver);
+-}
+-
+-module_init(pl030_init);
+-module_exit(pl030_exit);
++module_amba_driver(pl030_driver);
+ 
+ MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
+ MODULE_DESCRIPTION("ARM AMBA PL030 RTC Driver");
+diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
+index 3a470e2..692de73 100644
+--- a/drivers/rtc/rtc-pl031.c
++++ b/drivers/rtc/rtc-pl031.c
+@@ -431,18 +431,7 @@ static struct amba_driver pl031_driver = {
+ 	.remove = pl031_remove,
+ };
+ 
+-static int __init pl031_init(void)
+-{
+-	return amba_driver_register(&pl031_driver);
+-}
+-
+-static void __exit pl031_exit(void)
+-{
+-	amba_driver_unregister(&pl031_driver);
+-}
+-
+-module_init(pl031_init);
+-module_exit(pl031_exit);
++module_amba_driver(pl031_driver);
+ 
+ MODULE_AUTHOR("Deepak Saxena <dsaxena@plexity.net");
+ MODULE_DESCRIPTION("ARM AMBA PL031 RTC Driver");
+diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
+index e2d5249..2b0939a 100644
+--- a/drivers/watchdog/sp805_wdt.c
++++ b/drivers/watchdog/sp805_wdt.c
+@@ -403,17 +403,7 @@ static struct amba_driver sp805_wdt_driver = {
+ 	.remove = __devexit_p(sp805_wdt_remove),
+ };
+ 
+-static int __init sp805_wdt_init(void)
+-{
+-	return amba_driver_register(&sp805_wdt_driver);
+-}
+-module_init(sp805_wdt_init);
+-
+-static void __exit sp805_wdt_exit(void)
+-{
+-	amba_driver_unregister(&sp805_wdt_driver);
+-}
+-module_exit(sp805_wdt_exit);
++module_amba_driver(sp805_wdt_driver);
+ 
+ module_param(nowayout, int, 0);
+ MODULE_PARM_DESC(nowayout,
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index a9fab83..7847e19 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -125,4 +125,13 @@ struct amba_device name##_device = {				\
+ 	.periphid = id,						\
  }
  
- static void __init mx35pdk_timer_init(void)
++/*
++ * module_amba_driver() - Helper macro for drivers that don't do anything
++ * special in module init/exit.  This eliminates a lot of boilerplate.  Each
++ * module may only use this macro once, and calling it replaces module_init()
++ * and module_exit()
++ */
++#define module_amba_driver(__amba_drv) \
++	module_driver(__amba_drv, amba_driver_register, amba_driver_unregister)
++
+ #endif
+diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
+index b37b702a..5119fda 100644
+--- a/sound/arm/aaci.c
++++ b/sound/arm/aaci.c
+@@ -1110,18 +1110,7 @@ static struct amba_driver aaci_driver = {
+ 	.id_table	= aaci_ids,
+ };
+ 
+-static int __init aaci_init(void)
+-{
+-	return amba_driver_register(&aaci_driver);
+-}
+-
+-static void __exit aaci_exit(void)
+-{
+-	amba_driver_unregister(&aaci_driver);
+-}
+-
+-module_init(aaci_init);
+-module_exit(aaci_exit);
++module_amba_driver(aaci_driver);
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_DESCRIPTION("ARM PrimeCell PL041 Advanced Audio CODEC Interface driver");
 -- 
-1.7.1
+1.7.8.110.g4cb5d
