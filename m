@@ -1,78 +1,31 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 10 Mar 2012 08:08:33 -0800
-Subject: [GIT PULL 2/4] Samsung devel-pd for v3.4
-Message-ID: <4F5B7C81.6080301@samsung.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 12 Mar 2012 20:02:41 +0100
+Subject: [PATCH v7 0/4] USB: OHCI-HCD: Support for LPC32xx
+In-Reply-To: <1331463219-23293-1-git-send-email-stigge@antcom.de>
+References: <1331463219-23293-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120312190241.GA28087@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Sun, Mar 11, 2012 at 11:53:35AM +0100, Roland Stigge wrote:
+> These patches add support for the LPC32xx to the ohci-pnx4008 driver and make
+> the driver use smbus functions.
 
-This is Generic Power Domain patches for EXYNOS. Basically, Thomas' 
-patches, adding support Generic Power Domain patches are in Rafael's 
-tree, linux-pm/linux-next and see below merge commit.
-http://git.kernel.org/?p=linux/kernel/git/rafael/linux-pm.git;a=commit;h=dcaad77a8074b6de58e745546bc543d5538404f2
-And this adds hooking up G2D and JPEG to Generic PD.
+Do you have a branch ready to test (USB driver fixes + mach additions)? I'd
+like to test but I get lots of conflicts when adding the mach related stuff.
+I probably have a different base?
 
-Please pull and here is my preferred resolution when merge this after 
-next/board-samsung.
+Thanks,
 
-diff --cc arch/arm/mach-exynos/mach-universal_c210.c
-index 3663aee,0262417..0b944eb
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@@ -1053,10 -981,6 +1052,7 @@@ static struct platform_device *universa
-         &s5p_device_mfc,
-         &s5p_device_mfc_l,
-         &s5p_device_mfc_r,
--       &exynos4_device_pd[PD_MFC],
--       &exynos4_device_pd[PD_LCD0],
--       &exynos4_device_pd[PD_CAM],
-  +      &cam_vt_dio_fixed_reg_dev,
-         &cam_i_core_fixed_reg_dev,
-         &cam_s_if_fixed_reg_dev,
-         &s5p_device_fimc_md,
+   Wolfram
 
-If any problems, please kindly let me know.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
-
-   Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
-
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/devel-samsung-pd
-
-Sachin Kamat (2):
-       ARM: EXYNOS: Hook up G2D PD to generic PD infrastructure
-       ARM: EXYNOS: Hook up JPEG PD to generic PD infrastructure
-
-Thomas Abraham (2):
-       PM / Domains: Add OF support
-       ARM: EXYNOS: Hook up power domains to generic power domain 
-infrastructure
-
-  .../bindings/arm/exynos/power_domain.txt           |   21 ++
-  arch/arm/mach-exynos/Kconfig                       |   10 +-
-  arch/arm/mach-exynos/Makefile                      |    2 +-
-  arch/arm/mach-exynos/dev-pd.c                      |  139 --------------
-  arch/arm/mach-exynos/mach-nuri.c                   |   11 -
-  arch/arm/mach-exynos/mach-origen.c                 |   14 --
-  arch/arm/mach-exynos/mach-smdkv310.c               |   12 --
-  arch/arm/mach-exynos/mach-universal_c210.c         |   17 --
-  arch/arm/mach-exynos/pm_domains.c                  |  201 
-++++++++++++++++++++
-  drivers/base/power/domain.c                        |   32 +++
-  include/linux/pm_domain.h                          |   12 ++
-  11 files changed, 268 insertions(+), 203 deletions(-)
-  create mode 100644 
-Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-  delete mode 100644 arch/arm/mach-exynos/dev-pd.c
-  create mode 100644 arch/arm/mach-exynos/pm_domains.c
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/cc2d3541/attachment-0001.sig>
