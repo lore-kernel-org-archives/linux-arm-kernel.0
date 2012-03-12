@@ -1,36 +1,46 @@
-From: neidhard.kim@lge.com (Kim, Jong-Sung)
-Date: Mon, 12 Mar 2012 20:28:56 +0900
-Subject: [PATCH] serial: PL011: clear pending interrupts
-In-Reply-To: <20120312101100.GA8649@n2100.arm.linux.org.uk>
-References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
- <20120312083221.GW17370@n2100.arm.linux.org.uk>
- <20120312101100.GA8649@n2100.arm.linux.org.uk>
-Message-ID: <01e201cd0043$5010cea0$f0326be0$@lge.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Mon, 12 Mar 2012 14:22:24 -0000
+Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
+In-Reply-To: <201203120817.19777.arnd@arndb.de>
+References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
+ <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
+ <20120312030232.GX5050@titan.lakedaemon.net>
+ <201203120817.19777.arnd@arndb.de>
+Message-ID: <op.wa197mq94cuzmg@gonzo.lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, Mar 12, 2012 at 08:32:21AM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Mar 12, 2012 at 09:25:50AM +0100, Linus Walleij wrote:
-> > > diff --git a/drivers/tty/serial/amba-pl011.c
-> > > b/drivers/tty/serial/amba-pl011.c index 6800f5f..ff3fed0 100644
-> > > --- a/drivers/tty/serial/amba-pl011.c
-> > > +++ b/drivers/tty/serial/amba-pl011.c
-> > > @@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct
-uart_amba_port
-> *uap)
-> > >  		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
-> > >  	}
-> > >
-> >
-> > What if we really do end up receiving some characters here?
-> >
-> > > +	/* RXIS but RXFE? Just clear the interrupt */
-> > > +	if(unlikely(fifotaken == 0))
-> > > +		writew(UART011_RTIS | UART011_RXIS,
-> > > +		       uap->port.membase + UART011_ICR);
-> 
-> BTW, I don't see why we need any of this stuff.
+On Mon, 12 Mar 2012 08:17:19 -0000, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Actually, I meant my patch applied alone, not with your patch. My thought
-was the problem we're trying to handle is undocumented and is not guaranteed
-not to happen again.
+> On Monday 12 March 2012, Jason Cooper wrote:
+>> > +     dnskw_gpio_register(39, "dnskw:power:sata0", 1);
+>> > +     dnskw_gpio_register(40, "dnskw:power:sata1", 1);
+>> > +
+>> > +     /* Set NAS to turn back on after a power failure */
+>> > +     dnskw_gpio_register(37, "dnskw:power:recover", 1);
+>> > +}
+>> > +
+>>
+>> I doubt this board is the only one that wants to be added while the
+>> conversion to devicetree is progressing.  It makes more sense to me to
+>> break the above out to a separate file, eg board-dnskw.c.  I'll follow
+>> and break out the dreamplug code to board-dreamplug.c.  Otherwise, I see
+>> board-dt.c becoming a long mess.
+>>
+>> Arnd, sound okay to you?
+>
+> Either way is fine with me. I personally wouldn't expect many more boards
+> to come in before the DT conversion has mostly completed, but I guess you
+> have a better feeling for what other hardware is out there that people
+> are interested in.
+>
+
+It probably depends on how easy it is to add the gpiochips into  
+devicetree. Being able to put the LED, buttons and fans in devicetree  
+would make board-dt.c much more manageable. I started to look into it and  
+wasn't immediately obvious, but will have a closer look.
+
+Happy to resubmit, breaking it out into a board-dnskw.c though.
+
+-- 
+Jamie Lentin
