@@ -1,97 +1,65 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 12 Mar 2012 10:38:24 -0600
-Subject: [PATCH RESEND v3 2/2] GPIO: LPC32xx: Add output reading to GPO P3
-In-Reply-To: <1330984871-411-2-git-send-email-stigge@antcom.de>
-References: <1330984871-411-1-git-send-email-stigge@antcom.de>
- <1330984871-411-2-git-send-email-stigge@antcom.de>
-Message-ID: <20120312163824.96F933E07B0@localhost>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 12 Mar 2012 11:42:34 -0700
+Subject: [PATCH 0/6] gpio/omap: Some more driver cleanup and fixes
+In-Reply-To: <20120312173425.A6B893E07B0@localhost> (Grant Likely's message of
+ "Mon, 12 Mar 2012 11:34:25 -0600")
+References: <1329999031-6914-1-git-send-email-tarun.kanti@ti.com>
+ <CAMQu2gzdfxJms8cc3VhsVzhGq4f8x1QeY6LU6X+2eFZ4_Yv_bw@mail.gmail.com>
+ <20120312173425.A6B893E07B0@localhost>
+Message-ID: <87wr6py82t.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  5 Mar 2012 23:01:11 +0100, Roland Stigge <stigge@antcom.de> wrote:
-> The chip offers the function to detect the current state of output of the GPO
-> P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
-> sysfs.
-> 
-> Please note that this only reads back the currently programmed output state,
-> not the actual electrical level in terms of a GPI function. Finally, GPO3 is
-> still just an output.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-Applied, thanks
+> On Thu, 23 Feb 2012 17:56:33 +0530, "Shilimkar, Santosh" <santosh.shilimkar@ti.com> wrote:
+>> On Thu, Feb 23, 2012 at 5:40 PM, Tarun Kanti DebBarma
+>> <tarun.kanti@ti.com> wrote:
+>> > The cleanup is mostly getting rid of redundant fields in struct gpio_bank{}
+>> > as we already have them as part of bank->context now. Also, remove un-used
+>> > variable from gpio_irq_handler.
+>> >
+>> > The fix include correction of _set_gpio_irqenable() implementation and fix
+>> > type mismatch of gpio trigger parameter.
+>> >
+>> > It is baselined on top of Kevin's following series:
+>> > gpio/omap: cleanup and runtime PM conversion for v3.4
+>> > git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/gpio/runtime-pm-cleanup
+>> >
+>> > I have applied Benoit's GPIO patches in following series on top of Kevin's
+>> > before applying my changes.
+>> > gpio/omap: Cleanup and adaptation to Device Tree
+>> > git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dt_gpio
+>> >
+>> > Series is available here for reference:
+>> > git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_further_cleanup_fixes
+>> >
+>> > Power Test: Off-mode and Retention on OMAP3430 (Suspend and Idle paths).
+>> > Functional Test: OMAP2430, OMAP3430SDP, ZOOM3, OMAP4430, OMAP4-BLAZE
+>> >
+>> > Tarun Kanti DebBarma (6):
+>> > ?gpio/omap: remove saved_fallingdetect, saved_risingdetect fields
+>> > ?gpio/omap: remove saved_wakeup field from struct gpio_bank
+>> > ?gpio/omap: remove suspend_wakeup field from struct gpio_bank
+>> > ?gpio/omap: get rid of retrigger variable in gpio_irq_handler
+>> > ?gpio/omap: fix trigger type to unsigned
+>> > ?gpio/omap: fix _set_gpio_irqenable implementation
+>> >
+>> > ?drivers/gpio/gpio-omap.c | ? 56 +++++++++++++++++++--------------------------
+>> > ?1 files changed, 24 insertions(+), 32 deletions(-)
+>> >
+>> Nice clean-up series. I have gone through this series one more time
+>> Thanks for updating change-logs. I noticed you dropped the edge triggered
+>> irq wakeup fix....I see on the list now.... Kevin has fixed that already.
+>> 
+>> Series looks good to me. You can add:
+>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+> What's the status of this series?  Should I be expecting a v2?  Or am I supposed
+> to pick up this one? (a pull req would make things easier for me)
 
-g.
+I haven't been through this one yet.
 
-> 
-> ---
->  drivers/gpio/gpio-lpc32xx.c |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> --- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
-> +++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
-> @@ -62,9 +62,11 @@
->  #define GPIO3_PIN_IN_SEL(x, y)			(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
->  #define GPIO3_PIN5_IN_SEL(x)			(((x) >> 24) & 1)
->  #define GPI3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
-> +#define GPO3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
->  
->  struct gpio_regs {
->  	void __iomem *inp_state;
-> +	void __iomem *outp_state;
->  	void __iomem *outp_set;
->  	void __iomem *outp_clr;
->  	void __iomem *dir_set;
-> @@ -145,6 +147,7 @@ static struct gpio_regs gpio_grp_regs_p2
->  
->  static struct gpio_regs gpio_grp_regs_p3 = {
->  	.inp_state	= LPC32XX_GPIO_P3_INP_STATE,
-> +	.outp_state	= LPC32XX_GPIO_P3_OUTP_STATE,
->  	.outp_set	= LPC32XX_GPIO_P3_OUTP_SET,
->  	.outp_clr	= LPC32XX_GPIO_P3_OUTP_CLR,
->  	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
-> @@ -240,6 +243,12 @@ static int __get_gpi_state_p3(struct lpc
->  	return GPI3_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state), pin);
->  }
->  
-> +static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
-> +	unsigned pin)
-> +{
-> +	return GPO3_PIN_IN_SEL(__raw_readl(group->gpio_grp->outp_state), pin);
-> +}
-> +
->  /*
->   * GENERIC_GPIO primitives.
->   */
-> @@ -340,6 +349,13 @@ static void lpc32xx_gpo_set_value(struct
->  	__set_gpo_level_p3(group, pin, value);
->  }
->  
-> +static int lpc32xx_gpo_get_value(struct gpio_chip *chip, unsigned pin)
-> +{
-> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
-> +
-> +	return __get_gpo_state_p3(group, pin);
-> +}
-> +
->  static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
->  {
->  	if (pin < chip->ngpio)
-> @@ -427,6 +443,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
->  			.label			= "gpo_p3",
->  			.direction_output	= lpc32xx_gpio_dir_out_always,
->  			.set			= lpc32xx_gpo_set_value,
-> +			.get			= lpc32xx_gpo_get_value,
->  			.request		= lpc32xx_gpio_request,
->  			.base			= LPC32XX_GPO_P3_GRP,
->  			.ngpio			= LPC32XX_GPO_P3_MAX,
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+You can expect a pull req from me when ready.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies,Ltd.
+Kevin
