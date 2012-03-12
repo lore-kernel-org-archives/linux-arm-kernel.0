@@ -1,59 +1,70 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 08 Mar 2012 21:33:19 -0700
-Subject: [PATCH 01/14] ARM: orion: spi: remove enable_clock_fix which is
- not used
-In-Reply-To: <b0fe0cfb7e76a869a8ba7f7344de75eb122e206c.1331090356.git.jason@lakedaemon.net>
-References: <cover.1331090356.git.jason@lakedaemon.net>
- <b0fe0cfb7e76a869a8ba7f7344de75eb122e206c.1331090356.git.jason@lakedaemon.net>
-Message-ID: <20120309043319.316C93E0903@localhost>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Mon, 12 Mar 2012 20:01:02 +0100
+Subject: [PATCH 2/6] ARM: S3C24XX: claim spi channels for hsspi in dma-s3c2443
+In-Reply-To: <201203121959.32966.heiko@sntech.de>
+References: <201203121959.32966.heiko@sntech.de>
+Message-ID: <201203122001.03099.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  7 Mar 2012 03:44:42 +0000, Jason Cooper <jason@lakedaemon.net> wrote:
-> From: Andrew Lunn <andrew@lunn.ch>
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+SoCs starting with the S3C2443 contain SPI controllers compatible with the
+spi-s3c64xx driver and therefore need separate dma channels for rx and tx.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+This patch introduces dma channel declarations for these and changes the
+dma-s3c2443.c accordingly.
 
-> ---
->  drivers/spi/spi-orion.c       |    5 -----
->  include/linux/spi/orion_spi.h |    1 -
->  2 files changed, 0 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-> index 13448c8..e496f79 100644
-> --- a/drivers/spi/spi-orion.c
-> +++ b/drivers/spi/spi-orion.c
-> @@ -359,11 +359,6 @@ static int orion_spi_setup(struct spi_device *spi)
->  
->  	orion_spi = spi_master_get_devdata(spi->master);
->  
-> -	/* Fix ac timing if required.   */
-> -	if (orion_spi->spi_info->enable_clock_fix)
-> -		orion_spi_setbits(orion_spi, ORION_SPI_IF_CONFIG_REG,
-> -				  (1 << 14));
-> -
->  	if ((spi->max_speed_hz == 0)
->  			|| (spi->max_speed_hz > orion_spi->max_speed))
->  		spi->max_speed_hz = orion_spi->max_speed;
-> diff --git a/include/linux/spi/orion_spi.h b/include/linux/spi/orion_spi.h
-> index decf6d8..b4d9fa6 100644
-> --- a/include/linux/spi/orion_spi.h
-> +++ b/include/linux/spi/orion_spi.h
-> @@ -11,7 +11,6 @@
->  
->  struct orion_spi_info {
->  	u32	tclk;		/* no <linux/clk.h> support yet */
-> -	u32	enable_clock_fix;
->  };
->  
->  
-> -- 
-> 1.7.3.4
-> 
+None of the older SoCs use the spi-dma at all. Most boards bitbang their
+spi use and the spi-s3c24xx driver also does not use the dma system.
 
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/dma-s3c2443.c      |   16 ++++++++++++----
+ arch/arm/mach-s3c24xx/include/mach/dma.h |    4 ++++
+ 2 files changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-s3c24xx/dma-s3c2443.c b/arch/arm/mach-s3c24xx/dma-s3c2443.c
+index e227c47..2d94228 100644
+--- a/arch/arm/mach-s3c24xx/dma-s3c2443.c
++++ b/arch/arm/mach-s3c24xx/dma-s3c2443.c
+@@ -55,12 +55,20 @@ static struct s3c24xx_dma_map __initdata s3c2443_dma_mappings[] = {
+ 		.name		= "sdi",
+ 		.channels	= MAP(S3C2443_DMAREQSEL_SDI),
+ 	},
+-	[DMACH_SPI0] = {
+-		.name		= "spi0",
++	[DMACH_SPI0_RX] = {
++		.name		= "spi0-rx",
++		.channels	= MAP(S3C2443_DMAREQSEL_SPI0RX),
++	},
++	[DMACH_SPI0_TX] = {
++		.name		= "spi0-tx",
+ 		.channels	= MAP(S3C2443_DMAREQSEL_SPI0TX),
+ 	},
+-	[DMACH_SPI1] = { /* only on S3C2443/S3C2450 */
+-		.name		= "spi1",
++	[DMACH_SPI1_RX] = { /* only on S3C2443/S3C2450 */
++		.name		= "spi1-rx",
++		.channels	= MAP(S3C2443_DMAREQSEL_SPI1RX),
++	},
++	[DMACH_SPI1_TX] = { /* only on S3C2443/S3C2450 */
++		.name		= "spi1-tx",
+ 		.channels	= MAP(S3C2443_DMAREQSEL_SPI1TX),
+ 	},
+ 	[DMACH_UART0] = {
+diff --git a/arch/arm/mach-s3c24xx/include/mach/dma.h b/arch/arm/mach-s3c24xx/include/mach/dma.h
+index acbdfec..454831b 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/dma.h
++++ b/arch/arm/mach-s3c24xx/include/mach/dma.h
+@@ -47,6 +47,10 @@ enum dma_ch {
+ 	DMACH_UART2_SRC2,
+ 	DMACH_UART3,		/* s3c2443 has extra uart */
+ 	DMACH_UART3_SRC2,
++	DMACH_SPI0_TX,		/* s3c2443/2416/2450 hsspi0 */
++	DMACH_SPI0_RX,		/* s3c2443/2416/2450 hsspi0 */
++	DMACH_SPI1_TX,		/* s3c2443/2450 hsspi1 */
++	DMACH_SPI1_RX,		/* s3c2443/2450 hsspi1 */
+ 	DMACH_MAX,		/* the end entry */
+ };
+ 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies,Ltd.
+1.7.2.3
