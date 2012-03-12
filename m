@@ -1,92 +1,44 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 12 Mar 2012 09:25:50 +0100
-Subject: [PATCH] serial: PL011: clear pending interrupts
-Message-ID: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Mar 2012 17:05:32 +0100
+Subject: linux-next: manual merge of the cpuidle-cons tree with the arm-soc
+ tree
+In-Reply-To: <20120309183732.512d3676599da324f4747219@canb.auug.org.au>
+References: <20120309183732.512d3676599da324f4747219@canb.auug.org.au>
+Message-ID: <4F5E1ECC.1040605@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Chanho Min reported that when the boot loader transfers
-control to the kernel, there may be pending interrupts
-causing the UART to lock up in an eternal loop trying to
-pick tokens from the FIFO (since the RX interrupt flag
-indicates there are tokens) while in practice there are
-no tokens - in fact there is only a pending IRQ flag.
+On 03/09/2012 08:37 AM, Stephen Rothwell :
+> Hi Rob,
+> 
+> Today's linux-next merge of the cpuidle-cons tree got a conflict
+> in arch/arm/mach-at91/cpuidle.c between commit 00482a4078f4 ("ARM:
+> at91: implement the standby function for pm/cpuidle") from the
+> arm-soc tree and commit 7a1f6e72dce1 ("ARM: at91: Consolidate time
+> keeping and irq enable") from the cpuidle-cons tree.
+> 
+> I fixed it up (I think - see below) and can carry the fix as
+> necessary.
 
-This patch address the issue with a combination of a patch
-from Russell King that clears and mask all interrupts at
-probe() and clears any pending error and RX interrupts at
-port startup time, and a patch from Jong-Sung Kim that
-clears any RX interrupts (including timeouts) even if if
-there are zero tokens in the FIFO.
+Yes: resolution correct. Please carry it.
 
-This way these pending interrupts should be addressed in
-two ways and solidify the driver in both probe() and
-IRQ paths.
+Thanks to Rob and Daniel for their answers.
 
-Cc: stable at kernel.org
-Cc: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
-Reported-by: Chanho Min <chanho0207@gmail.com>
-Suggested-by: Russell King <linux@arm.linux.org.uk>
-Suggested-by: Jong-Sung Kim <neidhard.kim@lge.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-OK Greg requested that we send out this combined approach, can
-addressees (Chanho especially) please confirm that the patch
-solves the problem? Tested on U300 and U8500.
----
- drivers/tty/serial/amba-pl011.c |   17 +++++++++++++----
- 1 files changed, 13 insertions(+), 4 deletions(-)
+Best regards,
+- -- 
+Nicolas Ferre
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.11 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 6800f5f..ff3fed0 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct uart_amba_port *uap)
- 		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
- 	}
- 
-+	/* RXIS but RXFE? Just clear the interrupt */
-+	if(unlikely(fifotaken == 0))
-+		writew(UART011_RTIS | UART011_RXIS,
-+		       uap->port.membase + UART011_ICR);
-+
- 	return fifotaken;
- }
- 
-@@ -1381,6 +1386,10 @@ static int pl011_startup(struct uart_port *port)
- 
- 	uap->port.uartclk = clk_get_rate(uap->clk);
- 
-+	/* Clear pending error and receive interrupts */
-+	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
-+	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
-+
- 	/*
- 	 * Allocate the IRQ
- 	 */
-@@ -1417,10 +1426,6 @@ static int pl011_startup(struct uart_port *port)
- 	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
- 	writew(cr, uap->port.membase + UART011_CR);
- 
--	/* Clear pending error interrupts */
--	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS,
--	       uap->port.membase + UART011_ICR);
--
- 	/*
- 	 * initialise the old status of the modem signals
- 	 */
-@@ -1927,6 +1932,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 		goto unmap;
- 	}
- 
-+	/* Ensure interrupts from this UART are masked and cleared */
-+	writew(0, uap->port.membase + UART011_IMSC);
-+	writew(0xffff, uap->port.membase + UART011_ICR);
-+
- 	uap->vendor = vendor;
- 	uap->lcrh_rx = vendor->lcrh_rx;
- 	uap->lcrh_tx = vendor->lcrh_tx;
--- 
-1.7.8
+iQEcBAEBAgAGBQJPXh7HAAoJEAf03oE53VmQSQwH/15D3okPxJSEiH0k8IFt6Df0
+RDY/CdaGYDllGMq7Yc1LiQAPrlHkv+gFNAJkhH8aJvC603pYBFGIa5IPLeZEE+XD
+MkXiO7pQAOdGtojqSrZI8Sp0kxtfdR6QlNu5o518yvlKIkxbWJoXdVty9+MuciOv
+GOR+164hJtlr4fLLg7bTzsdnxquDVBBbks9qLhSYEQBEuNkgXKgNfdMouwVI/Zuj
+sX9DSKnVVm5LS/rrq888JRPPtBf8/HkmOeFRWKktq7Q8WldQbBI79vj01osH++jf
+rwDiM/CSC0nhXY0IWEof+Hz1mSinM07XGZglDYwqI1ca7HId2C/txaFI3NtcC7A=
+=rZpG
+-----END PGP SIGNATURE-----
