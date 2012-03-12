@@ -1,44 +1,77 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Tue, 13 Mar 2012 01:23:45 +0530
-Subject: [PATCH v3 00/13] gpio/omap: Some more driver cleanup and fixes
-In-Reply-To: <878vj5y7iv.fsf@ti.com>
-References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
- <878vj5y7iv.fsf@ti.com>
-Message-ID: <CAC83Zv+8AjCHBOJbtvSQS-URvCE5Xm9oPk9_X7h4Kz7FZ_7Otw@mail.gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Mon, 12 Mar 2012 17:23:38 +0100
+Subject: [PATCH] stmmac: Add device-tree support
+In-Reply-To: <4F5E169D.3070508@st.com>
+References: <1331561157-3820-1-git-send-email-sr@denx.de>
+ <201203121606.26926.sr@denx.de> <4F5E169D.3070508@st.com>
+Message-ID: <201203121723.38411.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 12:24 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->
->> The cleanup is mostly getting rid of redundant fields in struct gpio_bank{}
->> as we already have them as part of bank->context now. Also, remove un-used
->> variable from gpio_irq_handler.
->>
->> The fixes include correction of _set_gpio_irqenable() implementation,
->> missing wakeup_en register update in set_gpio_wakeup(), type mismatch
->> of gpio trigger parameter in set_gpio_trigger(), incorrect dataout
->> register update in set_gpio_dataout_() and few corrections in context
->> save logic.
->>
->> It is baselined on top of Kevin's following series:
->> gpio/omap: cleanup and runtime PM conversion for v3.4
->> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/gpio/runtime-pm-cleanup
->>
->> Series is available here for reference:
->> git://gitorious.org/~tarunkanti/omap-sw-develoment/tarunkantis-linux-omap-dev for_3.4/gpio_further_cleanup_fixes
->
-> This branch doesn't exist.
-Oops... I am sorry.
-I was in the process of updating the branch with latest comments after
-base-lining on Grant's:
-git://git.secretlab.ca/git/linux-2.6.git
-Branch: gpio/next
-Because this has all the gpio changes including Benoit's latest gpio
-devicetree changes.
-Should I go ahead?
---
-Tarun
->
-> Kevin
->
+On Monday 12 March 2012 16:30:37 Giuseppe CAVALLARO wrote:
+> >>> +Required properties:
+> >>> +- compatible: Should be "stm,gmac"
+> >> 
+> >> This is too generic. This should be 1 string per version of h/w.
+> > 
+> > Viresh, Giuseppe, can you please suggest a proper string for the SPEAr600
+> > STMMAC core, including version?
+> > 
+> >> 'stm' should be 'st' according to vendor-prefixes.txt.
+> 
+> I'm not familiar with devicetree; maybe we should have:
+> 
+> "stmicro,mac100"
+> "stmicro,gmac"
+> 
+> or: st instead of stmicro if you prefer.
+> 
+> in fact, stmmac is for mac100 and gmac devices.
+
+How about "st,spear600-gmac" for SPEAr600 then?
+ 
+> > Okay.
+> > 
+> >>> +- reg: Address and length of the register set for the device
+> >>> +- interrupt-parent: Should be the phandle for the interrupt controller
+> >>> +  that services interrupts for this device
+> >>> +- interrupts: Should contain the STMMAC interrupts
+> >>> +- interrupt-names: Should contain the interrupt names "macirq"
+> >>> +  "eth_wake_irq" if this interrupt is supported in the "interrupts"
+> >>> +  property
+> >> 
+> >> You should be able to tell this from the compatible string and number of
+> >> interrupts.
+> > 
+> > Yes. Currently the driver uses platform_get_irq_byname() to register the
+> > irq's. That's why I added these properties. Is there something wrong with
+> > using it this way?
+> > 
+> >>> +- phy-mode: String, operation mode of the PHY interface.
+> >>> +  Supported values are: "mii", "rmii", "gmii", "rgmii".
+> >>> +- phy-addr: MDIO address of the PHY
+> >> 
+> >> This is normally probed or the mdio bus is a sub-node of the MAC node.
+> >> See arch/powerpc/boot/dts/mpc8377_mds.dts for an example.
+> > 
+> > Okay, I'll rework this.
+> > 
+> >>> +
+> >>> +Optional properties:
+> >>> +- stm,prog-burst-len: Specify the burst length
+> >>> +- stm,has-gmac: Indicates that the controller supports 1000Mbps
+> >>> +- stm,has-pmt: Indicates that the controller supports power management
+> >> 
+> >> I think these should all be encoded by the compatible string.
+> 
+> and should we have all the other flags e.g. tx_coe etc?
+> (see stmmac.txt)
+
+As Rob suggested, some of these flags/parameters are implicitly defined by the 
+compatible string. If this is not the case, then sure, those flags/parameters 
+need to be provided via the device-tree as well. I just don't need "tx_coe" 
+etc. for my platform (SPEAr600) as far as I know. I suggest to add support for 
+them once they are really needed/used by other platforms.
+
+Thanks,
+Stefan
