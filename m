@@ -1,49 +1,99 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Mon, 12 Mar 2012 14:39:06 -0500
-Subject: [PATCH 1/1] of: introduce helper to manage boolean
-In-Reply-To: <20120309163608.GQ27213@game.jcrosoft.org>
-References: <1328588028-24766-1-git-send-email-plagnioj@jcrosoft.com>
- <20120309014441.8236B3E0903@localhost>
- <20120309100435.GN27213@game.jcrosoft.org>
- <20120309162638.92E813E0880@localhost>
- <20120309163608.GQ27213@game.jcrosoft.org>
-Message-ID: <4F5E50DA.6080000@freescale.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Mar 2012 11:46:58 -0600
+Subject: [PATCH 08/12] gpio/twl: Allocate irq_desc dynamically for
+ SPARSE_IRQ support
+In-Reply-To: <4F575B21.30909@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-9-git-send-email-b-cousson@ti.com> <4F575B21.30909@ti.com>
+Message-ID: <20120312174658.132053E07B0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2012 10:36 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>> Ugh.  so any value other than 1 returns false?  I think that will surprise
->>>> most people.
->>>>
->>>> I don't like this api or binding.  If it is a bool property, then why isn't
->>>> simply testing for the property existance sufficient?
->>> no if you want to disable it
->>>
->>> if a bool is define in the dtsi and want to disable it int the dts
->>>
->>> if you we can do the the invert
->>>
->>> if !0 => true
->>>
->>> is-ok;			=> true
->>> is-ok = <val != 0>;	=> true
->>> is-ok = <0>;		=> false
->>
->> This is a failure of the dtc tool, not the binding.  Accepting this binding
->> means we have to live with it for a very long time.  It needs to be fixed
->> in dtc instead so that properties can be deleted instead of only modified.
-> I understand your idea but today if you put and value in the property it's true.
+On Wed, 7 Mar 2012 13:57:05 +0100, "Cousson, Benoit" <b-cousson@ti.com> wrote:
+> Hi Grant,
 > 
-> So is-ok = <0>; is true also which is illogical as in any language a boolean is
-> true (1) or false (0). When I read the property I will understand false not true
+> That fix is tightly coupled with the previous twl4030-irq change, so it 
+> will be good to pulled it with the twl series through MFD if you are OK 
+> with that?
+> 
+> Care to ack this one and the next one?
+> 
+> Thanks,
+> Benoit
+> 
+> 
+> On 3/2/2012 5:50 PM, Benoit Cousson wrote:
+> > Do not use the board pdata for irq_base, but allocate them dynamically
+> > to allow a proper support of SPARSE_IRQ.
+> >
+> > Fix an unneeded line wrap.
+> >
+> > Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> > Acked-by: Felipe Balbi<balbi@ti.com>
 
-You could say similar things about is-ok = "no" or is-ok = "" or is-ok =
-"I'd rather you didn't"... it's expected that violating the binding may
-produce illogical results.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-> And I see no good way to add the "delete" in dtc.
+> > ---
+> >   drivers/gpio/gpio-twl4030.c |   33 +++++++++++++++++----------------
+> >   1 files changed, 17 insertions(+), 16 deletions(-)
+> >
+> > diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+> > index 697396c..49e5c6e 100644
+> > --- a/drivers/gpio/gpio-twl4030.c
+> > +++ b/drivers/gpio/gpio-twl4030.c
+> > @@ -395,23 +395,26 @@ static int gpio_twl4030_remove(struct platform_device *pdev);
+> >   static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+> >   {
+> >   	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
+> > -	int ret;
+> > +	int ret, irq_base;
+> >
+> >   	/* maybe setup IRQs */
+> > -	if (pdata->irq_base) {
+> > -		if (is_module()) {
+> > -			dev_err(&pdev->dev,
+> > -				"can't dispatch IRQs from modules\n");
+> > -			goto no_irqs;
+> > -		}
+> > -		ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO,
+> > -					pdata->irq_base);
+> > -		if (ret<  0)
+> > -			return ret;
+> > -		WARN_ON(ret != pdata->irq_base);
+> > -		twl4030_gpio_irq_base = ret;
+> > +	if (is_module()) {
+> > +		dev_err(&pdev->dev, "can't dispatch IRQs from modules\n");
+> > +		goto no_irqs;
+> > +	}
+> > +
+> > +	irq_base = irq_alloc_descs(-1, 0, TWL4030_GPIO_MAX, 0);
+> > +	if (irq_base<  0) {
+> > +		dev_err(&pdev->dev, "Failed to alloc irq_descs\n");
+> > +		return irq_base;
+> >   	}
+> >
+> > +	ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO, irq_base);
+> > +	if (ret<  0)
+> > +		return ret;
+> > +
+> > +	twl4030_gpio_irq_base = irq_base;
+> > +
+> >   no_irqs:
+> >   	/*
+> >   	 * NOTE:  boards may waste power if they don't set pullups
+> > @@ -443,9 +446,7 @@ no_irqs:
+> >
+> >   	ret = gpiochip_add(&twl_gpiochip);
+> >   	if (ret<  0) {
+> > -		dev_err(&pdev->dev,
+> > -				"could not register gpiochip, %d\n",
+> > -				ret);
+> > +		dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
+> >   		twl_gpiochip.ngpio = 0;
+> >   		gpio_twl4030_remove(pdev);
+> >   	} else if (pdata->setup) {
+> 
 
-It shouldn't be that hard, just needs a new keyword and/or bit of syntax
-to express what you want it to do.
-
--Scott
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
