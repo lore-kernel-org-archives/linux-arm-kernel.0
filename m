@@ -1,29 +1,73 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 12 Mar 2012 20:46:23 +0000
-Subject: [PATCH] ARM: davinci: DA850: move da850_register_pm to .init.text
-In-Reply-To: <1331157836-30527-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1331157836-30527-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6317F2EA8@DBDE01.ent.ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 13 Mar 2012 02:29:56 +0530
+Subject: [PATCH v2 0/3] video: s3c-fb: Rearrange the elements in platform data
+Message-ID: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Changes since v1:
+- Includes all changes suggested by Jingoo Han.
+- Reworked s3c-fb platform data in all Samsung SoC based board files.
 
-On Thu, Mar 08, 2012 at 03:33:56, Uwe Kleine-K?nig wrote:
-> All callers (board-mityomapl138.c and board-da850-evm.c) use it in
-> __init functions only.
-> 
-> This fixes:
-> 
-> 	WARNING: vmlinux.o(.text+0xd664): Section mismatch in reference from the function da850_register_pm() to the function .init.text:da8xx_get_mem_ctlr()
-> 	The function da850_register_pm() references
-> 	the function __init da8xx_get_mem_ctlr().
-> 	This is often because da850_register_pm lacks a __init
-> 	annotation or the annotation of da8xx_get_mem_ctlr is wrong.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+This patchset rearranges the elements in the platform data of the s3c-fb
+driver with the intent of adding device tree support to the driver in
+subsequent patches.
 
-Applying this, thanks.
+The first patch moves the video timing information from the individual window
+setup data into the platform specific configuration section in the platform
+data. The video timing is independent of the window setup. The resolution of
+the window could be smaller than that of the lcd panel attached. So the video
+timing data is removed from window configuration data.
 
-Regards,
-Sekhar
+The second patch removes the need for the 'default_win' element in the
+platform data. This element was used to decide whether the video data
+output from the controller should be enabled or disabled when the window
+specified by 'default_win' is enabled or disabled. With the first patch
+removing the need for atleast one window to be of the same resolution as
+that of the lcd panel, it is now possible to decide when to enable/disable
+the video data output based on the state of each window. If any of the
+window is active, the lcd data output is enabled. Otherwise, the lcd data
+output is disabled. Hence, the 'default_win' parameter from the platform
+data can be removed, which anyways cannot be specified when using
+device tree.
+
+For all the Samsung SoC based boards, the third patch reworks the platform
+data of the display controller based on the changes introduced in the first
+two patches.
+
+This patch series is based on
+http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git [for-next]
+
+with all patches merged from
+https://github.com/schandinat/linux-2.6.git [fbdev-next]
+
+and tested one Exynos4210 based Origen board (only compile tested for
+other boards)
+
+Thomas Abraham (3):
+  video: s3c-fb: move video interface timing out of window setup data
+  video: s3c-fb: remove 'default_win' element from platform data
+  ARM: Samsung: Rework platform data of s3c-fb driver
+
+ arch/arm/mach-exynos/mach-nuri.c           |   26 +++---
+ arch/arm/mach-exynos/mach-origen.c         |   24 +++--
+ arch/arm/mach-exynos/mach-smdkv310.c       |   28 ++++---
+ arch/arm/mach-exynos/mach-universal_c210.c |   26 +++---
+ arch/arm/mach-s3c24xx/mach-smdk2416.c      |   27 +++---
+ arch/arm/mach-s3c64xx/mach-anw6410.c       |   25 +++---
+ arch/arm/mach-s3c64xx/mach-crag6410.c      |   25 +++---
+ arch/arm/mach-s3c64xx/mach-hmt.c           |   24 +++--
+ arch/arm/mach-s3c64xx/mach-mini6410.c      |   40 ++++-----
+ arch/arm/mach-s3c64xx/mach-real6410.c      |   40 ++++-----
+ arch/arm/mach-s3c64xx/mach-smartq5.c       |   26 +++---
+ arch/arm/mach-s3c64xx/mach-smartq7.c       |   26 +++---
+ arch/arm/mach-s3c64xx/mach-smdk6410.c      |   25 +++---
+ arch/arm/mach-s5p64x0/mach-smdk6440.c      |   24 +++--
+ arch/arm/mach-s5p64x0/mach-smdk6450.c      |   24 +++--
+ arch/arm/mach-s5pc100/mach-smdkc100.c      |   27 +++---
+ arch/arm/mach-s5pv210/mach-aquila.c        |   36 ++++----
+ arch/arm/mach-s5pv210/mach-goni.c          |   26 +++---
+ arch/arm/mach-s5pv210/mach-smdkv210.c      |   24 +++--
+ arch/arm/plat-samsung/include/plat/fb.h    |   11 ++-
+ drivers/video/s3c-fb.c                     |  136 +++++++++++++---------------
+ 21 files changed, 356 insertions(+), 314 deletions(-)
