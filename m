@@ -1,33 +1,97 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 12 Mar 2012 13:33:28 -0500
-Subject: [PATCH 3/4] ARM: create a common IOMEM definition
-In-Reply-To: <201203112134.45302.arnd@arndb.de>
-References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
- <1331500100-31351-4-git-send-email-robherring2@gmail.com>
- <201203112134.45302.arnd@arndb.de>
-Message-ID: <4F5E4178.50801@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Mar 2012 10:38:24 -0600
+Subject: [PATCH RESEND v3 2/2] GPIO: LPC32xx: Add output reading to GPO P3
+In-Reply-To: <1330984871-411-2-git-send-email-stigge@antcom.de>
+References: <1330984871-411-1-git-send-email-stigge@antcom.de>
+ <1330984871-411-2-git-send-email-stigge@antcom.de>
+Message-ID: <20120312163824.96F933E07B0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2012 04:34 PM, Arnd Bergmann wrote:
-> On Sunday 11 March 2012, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> Several platforms create IOMEM defines for casting to 'void __iomem *',
->> and other platforms are incorrectly using __io() macro for the same
->> purpose. This creates a common definition and removes all the platform
->> specific versions. Rather than try to make linux/io.h and asm/io.h
->> assembly safe, the assembly version of IOMEM is moved into
->> asm/assembler.h.
+On Mon,  5 Mar 2012 23:01:11 +0100, Roland Stigge <stigge@antcom.de> wrote:
+> The chip offers the function to detect the current state of output of the GPO
+> P3 pins. Useful for reading GPIO output state in Linux' GPIO API, e.g. via
+> sysfs.
 > 
-> Looks good to me, in order to fix the problem at hand. I'm not sure
-> about spreading the IOMEM() macro further, that is largely a separate
-> problem and only a question of style, not of correctness as with __io().
-
-Got a better suggestion? I didn't think adding IOMEM to 5 more platforms
-or inventing something different was the right path. Hopefully this is a
-shrinking problem as things move to DT.
-
-Rob
-
+> Please note that this only reads back the currently programmed output state,
+> not the actual electrical level in terms of a GPI function. Finally, GPO3 is
+> still just an output.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 > Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Applied, thanks
+
+g.
+
+> 
+> ---
+>  drivers/gpio/gpio-lpc32xx.c |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> --- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
+> +++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+> @@ -62,9 +62,11 @@
+>  #define GPIO3_PIN_IN_SEL(x, y)			(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
+>  #define GPIO3_PIN5_IN_SEL(x)			(((x) >> 24) & 1)
+>  #define GPI3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
+> +#define GPO3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
+>  
+>  struct gpio_regs {
+>  	void __iomem *inp_state;
+> +	void __iomem *outp_state;
+>  	void __iomem *outp_set;
+>  	void __iomem *outp_clr;
+>  	void __iomem *dir_set;
+> @@ -145,6 +147,7 @@ static struct gpio_regs gpio_grp_regs_p2
+>  
+>  static struct gpio_regs gpio_grp_regs_p3 = {
+>  	.inp_state	= LPC32XX_GPIO_P3_INP_STATE,
+> +	.outp_state	= LPC32XX_GPIO_P3_OUTP_STATE,
+>  	.outp_set	= LPC32XX_GPIO_P3_OUTP_SET,
+>  	.outp_clr	= LPC32XX_GPIO_P3_OUTP_CLR,
+>  	.dir_set	= LPC32XX_GPIO_P2_DIR_SET,
+> @@ -240,6 +243,12 @@ static int __get_gpi_state_p3(struct lpc
+>  	return GPI3_PIN_IN_SEL(__raw_readl(group->gpio_grp->inp_state), pin);
+>  }
+>  
+> +static int __get_gpo_state_p3(struct lpc32xx_gpio_chip *group,
+> +	unsigned pin)
+> +{
+> +	return GPO3_PIN_IN_SEL(__raw_readl(group->gpio_grp->outp_state), pin);
+> +}
+> +
+>  /*
+>   * GENERIC_GPIO primitives.
+>   */
+> @@ -340,6 +349,13 @@ static void lpc32xx_gpo_set_value(struct
+>  	__set_gpo_level_p3(group, pin, value);
+>  }
+>  
+> +static int lpc32xx_gpo_get_value(struct gpio_chip *chip, unsigned pin)
+> +{
+> +	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+> +
+> +	return __get_gpo_state_p3(group, pin);
+> +}
+> +
+>  static int lpc32xx_gpio_request(struct gpio_chip *chip, unsigned pin)
+>  {
+>  	if (pin < chip->ngpio)
+> @@ -427,6 +443,7 @@ static struct lpc32xx_gpio_chip lpc32xx_
+>  			.label			= "gpo_p3",
+>  			.direction_output	= lpc32xx_gpio_dir_out_always,
+>  			.set			= lpc32xx_gpo_set_value,
+> +			.get			= lpc32xx_gpo_get_value,
+>  			.request		= lpc32xx_gpio_request,
+>  			.base			= LPC32XX_GPO_P3_GRP,
+>  			.ngpio			= LPC32XX_GPO_P3_MAX,
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
