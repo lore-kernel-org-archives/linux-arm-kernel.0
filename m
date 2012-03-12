@@ -1,25 +1,39 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Sat, 10 Mar 2012 10:55:04 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the omap_dss2
- tree
-In-Reply-To: <20120308165116.d400947f35e40a923e9c6ad0@canb.auug.org.au>
-References: <20120308165116.d400947f35e40a923e9c6ad0@canb.auug.org.au>
-Message-ID: <1678557.FviZqEVemH@vclass>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Mar 2012 08:46:28 +0000
+Subject: [PATCH v7 1/4] USB: OHCI-HCD: Rename ohci-pnx4008 to ohci-nxp
+In-Reply-To: <1331463219-23293-2-git-send-email-stigge@antcom.de>
+References: <1331463219-23293-1-git-send-email-stigge@antcom.de>
+ <1331463219-23293-2-git-send-email-stigge@antcom.de>
+Message-ID: <201203120846.29070.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 of March 2012 16:51:16 Stephen Rothwell wrote:
-> Hi all,
+On Sunday 11 March 2012, Roland Stigge wrote:
+> Since this driver is compatible with several NXP devices, the driver is renamed
+> accordingly. Please combine with the following patch which also changes the
+> respective symbol names.
 > 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-omap1/board-ams-delta.c between commit ddba6c7f7ec6
-> ("OMAP1: pass LCD config with omapfb_set_lcd_config()") from the
-> omap_dss2 tree and commits 5ca6180fa6d7 ("ARM: OMAP1: ams-delta:
-> supersede custom led device by leds-gpio") and 2e3ee9f45b3c ("ARM: OMAP1:
-> Move most of plat/io.h into local iomap.h") from the arm-soc tree.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 > 
-> I fixed it up (see below) and can carry the fix as necessary.
 
-Hi,
-Your resolution looks good to me, thanks!
-Janusz
+Hi Roland,
+
+As a general comment, it's helpful to use the "-M" flag to git-format-patch
+whenever you rename files, because that makes it obvious whether you have
+changed anything in the file or not.
+
+> --- /dev/null
+> +++ linux-2.6/drivers/usb/host/ohci-nxp.c
+> @@ -0,0 +1,453 @@
+> +/*
+> + * drivers/usb/host/ohci-pnx4008.c
+> + *
+> + * driver for Philips PNX4008 USB Host
+> + *
+
+I think your second patch does not change this comment and probably should.
+
+Just remove the file name from the comment because that one is generally
+not helpful.
+
+	Arnd
