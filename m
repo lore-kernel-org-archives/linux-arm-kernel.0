@@ -1,48 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 12 Mar 2012 04:09:10 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP: clock: clock patches for 3.4
-Message-ID: <alpine.DEB.2.00.1203120407460.11332@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Mar 2012 08:17:19 +0000
+Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
+In-Reply-To: <20120312030232.GX5050@titan.lakedaemon.net>
+References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
+ <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
+ <20120312030232.GX5050@titan.lakedaemon.net>
+Message-ID: <201203120817.19777.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+On Monday 12 March 2012, Jason Cooper wrote:
+> > +     dnskw_gpio_register(39, "dnskw:power:sata0", 1);
+> > +     dnskw_gpio_register(40, "dnskw:power:sata1", 1);
+> > +
+> > +     /* Set NAS to turn back on after a power failure */
+> > +     dnskw_gpio_register(37, "dnskw:power:recover", 1);
+> > +}
+> > +
+> 
+> I doubt this board is the only one that wants to be added while the
+> conversion to devicetree is progressing.  It makes more sense to me to
+> break the above out to a separate file, eg board-dnskw.c.  I'll follow
+> and break out the dreamplug code to board-dreamplug.c.  Otherwise, I see
+> board-dt.c becoming a long mess.
+> 
+> Arnd, sound okay to you?
 
-The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
+Either way is fine with me. I personally wouldn't expect many more boards
+to come in before the DT conversion has mostly completed, but I guess you
+have a better feeling for what other hardware is out there that people
+are interested in.
 
-  Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
-
-are available in the git repository at:
-
-  git://git.pwsan.com/linux-2.6 clock_devel_3.4
-
-for you to fetch changes up to ae6f0a61f6a30f387ff0ce883b4ca8ff23424b11:
-
-  ARM: OMAP: clock: cleanup CPUfreq leftovers (2012-03-12 03:24:45 -0600)
-
-
-- Paul
-
-----------------------------------------------------------------
-Ameya Palande (1):
-      ARM: OMAP4: clock data: fix mult and div mask for USB_DPLL
-
-Ilya Yanok (1):
-      ARM: OMAP3: clock3xxx_data: change EMAC clocks aliases
-
-Kevin Hilman (1):
-      ARM: OMAP: clock: cleanup CPUfreq leftovers
-
-Paul Walmsley (1):
-      ARM: OMAP3: clock data: fill in some missing clockdomains
-
-Rajendra Nayak (1):
-      ARM: OMAP4: clock data: Force a DPLL clkdm/pwrdm ON before a relock
-
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   80 --------------------------
- arch/arm/mach-omap2/clock.c                  |    5 --
- arch/arm/mach-omap2/clock.h                  |    8 ---
- arch/arm/mach-omap2/clock3xxx_data.c         |   10 +++-
- arch/arm/mach-omap2/clock44xx_data.c         |    5 +-
- arch/arm/plat-omap/clock.c                   |   26 --------
- arch/arm/plat-omap/include/plat/clock.h      |   10 ---
- 7 files changed, 11 insertions(+), 133 deletions(-)
+	Arnd
