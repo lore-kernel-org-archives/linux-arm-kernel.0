@@ -1,45 +1,26 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 12 Mar 2012 19:59:32 +0100
-Subject: [PATCH 0/6] S3C24XX: Add support for HSSPI on S3C2416/S3C2443
-Message-ID: <201203121959.32966.heiko@sntech.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 12 Mar 2012 12:06:11 +0000
+Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <4F59253D.7070100@wwwdotorg.org>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
+ <4F59253D.7070100@wwwdotorg.org>
+Message-ID: <20120312120610.GA14020@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S3C2416/S3C2443/S3C2450 SoCs contain HSSPI controllers compatible
-with the ones in the S3C64xx and later.
+On Thu, Mar 08, 2012 at 02:31:41PM -0700, Stephen Warren wrote:
+> On 03/08/2012 07:51 AM, Thierry Reding wrote:
 
-The second patch modifying the dma selection depends on the series
-enabling the dma support on the S3C2416, but as the whole s3c64xx-spi
-driver needs dma support this should be ok.
+> > +- vdd-supply: power supply for controller (1.05V)
 
-Tested on an Asus DR-900 ebook reader with a Marvell MR8686 using the
-libertas driver.
+> Should those *-supply properties really be optional? I got the
+> impression talking to Mark in a different thread that all regulators
+> should exist, although their implementation may be via a fixed
+> regulator, with no GPIO, as determined by the board design.
 
-
-This is a repost of the series adapted to changes resulting from the
-other cleanup series.
-
-
-Heiko Stuebner (6):
-  ARM: S3C24XX: Add forgotten clock lookup table to S3C2443
-  ARM: S3C24XX: claim spi channels for hsspi in dma-s3c2443
-  ARM: S3C24XX: Add map entries needed by the s3c64xx-spi devices
-  ARM: S3C24XX: Add clock-lookup entries required by s3c64xx-spi
-  ARM: S3C24XX: Add HSSPI setup callback for s3c64xx-spi driver
-  spi/s3c64xx: Allow usage for ARCH_S3C24XX
-
- arch/arm/mach-s3c24xx/Kconfig            |    5 ++++
- arch/arm/mach-s3c24xx/Makefile           |    1 +
- arch/arm/mach-s3c24xx/clock-s3c2416.c    |    1 +
- arch/arm/mach-s3c24xx/clock-s3c2443.c    |    6 ++++
- arch/arm/mach-s3c24xx/common-s3c2443.c   |   15 +++++++----
- arch/arm/mach-s3c24xx/dma-s3c2443.c      |   16 +++++++++---
- arch/arm/mach-s3c24xx/include/mach/dma.h |    4 +++
- arch/arm/mach-s3c24xx/include/mach/map.h |    5 ++++
- arch/arm/mach-s3c24xx/setup-spi.c        |   39 ++++++++++++++++++++++++++++++
- drivers/spi/Kconfig                      |    2 +-
- 10 files changed, 84 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/mach-s3c24xx/setup-spi.c
-
--- 
-1.7.2.3
+Depends on the electronics, if the device can function without a supply
+then it is OK for it to be optional.  This is moderately unusual but not
+unknown.  It's obviously also OK to omit the supply if the system
+doesn't use software regulators at all, though a kernel with regulator
+support enabled would need to use dummy regulators to stub things out.
