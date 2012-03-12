@@ -1,38 +1,55 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Sun, 11 Mar 2012 07:36:55 +0000
-Subject: [GIT PULL v2] DaVinci DM644x video display support
-Message-ID: <DF0F476B391FA8409C78302C7BA518B6317F13DB@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Mar 2012 10:11:00 +0000
+Subject: [PATCH] serial: PL011: clear pending interrupts
+In-Reply-To: <20120312083221.GW17370@n2100.arm.linux.org.uk>
+References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
+ <20120312083221.GW17370@n2100.arm.linux.org.uk>
+Message-ID: <20120312101100.GA8649@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Mon, Mar 12, 2012 at 08:32:21AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 12, 2012 at 09:25:50AM +0100, Linus Walleij wrote:
+> > diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> > index 6800f5f..ff3fed0 100644
+> > --- a/drivers/tty/serial/amba-pl011.c
+> > +++ b/drivers/tty/serial/amba-pl011.c
+> > @@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+> >  		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
+> >  	}
+> >  
+> 
+> What if we really do end up receiving some characters here?
+> 
+> > +	/* RXIS but RXFE? Just clear the interrupt */
+> > +	if(unlikely(fifotaken == 0))
+> > +		writew(UART011_RTIS | UART011_RXIS,
+> > +		       uap->port.membase + UART011_ICR);
 
-Can you please pull these two patches adding support
-for DaVinci DM644x V4L2 display support for v3.4.
+BTW, I don't see why we need any of this stuff.
 
-These patches heavily depend on the clean-up series sent
-earlier. I have re-generated the pull request against
-v3.4/cleanup branch of my tree (already pulled earlier
-and unchanged since) as suggested by Olof.
+The problem as described is that the interrupt handler is called with one
+of the receive flags set (UART011_RTIS or UART011_RXIS) but with
+UART01x_FR_RXFE clear.
 
-Let me know if this works for you.
+The problem report indicates that this is caused when we switch from FIFO
+mode to non-FIFO mode, and the FIFO contained some unread characters.
 
-Thanks,
-Sekhar
+That can only happen once we've enabled interrupts in the IMSC register,
+which doesn't happen until later in the startup function.
 
-The following changes since commit 12db9588ff811ae43a476b1234b27323055ab3ad:
-  Manjunath Hadli (1):
-        ARM: davinci: dm644x: don't force vpfe registeration on all boards
+So:
 
-are available in the git repository at:
+        spin_lock_irq(&uap->port.lock);
+        uap->im = UART011_RTIM;
+        if (!pl011_dma_rx_running(uap))
+                uap->im |= UART011_RXIM;
+        writew(uap->im, uap->port.membase + UART011_IMSC);
+        spin_unlock_irq(&uap->port.lock);
 
-  git://gitorious.org/linux-davinci/linux-davinci.git v3.4/features
+clearing the transmit/receive interrupts here _before_ we unmask them
+should be sufficient.
 
-Manjunath Hadli (2):
-      ARM: davinci: dm644x: add support for v4l2 video display
-      ARM: davinci: dm644x evm: add support for VPBE display
-
- arch/arm/mach-davinci/board-dm644x-evm.c |  109 +++++++++++++++++++-
- arch/arm/mach-davinci/davinci.h          |    8 ++-
- arch/arm/mach-davinci/dm644x.c           |  166 +++++++++++++++++++++++++++---
- 3 files changed, 268 insertions(+), 15 deletions(-)
+As we never turn the FIFO off after that point, we can't then cause the
+condition.  So I don't see any point in adding stuff to the interrupt
+handling for this.
