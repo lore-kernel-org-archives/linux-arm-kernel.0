@@ -1,45 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 12 Mar 2012 11:52:16 -0700
-Subject: [PATCH v2 3/3] gpio/samsung: use ioremap() for EXYNOS4 GPIOlib
-In-Reply-To: <20120312161904.E57193E07B0@localhost>
-References: <1329341829-14403-1-git-send-email-kgene.kim@samsung.com>
- <1329341829-14403-4-git-send-email-kgene.kim@samsung.com>
- <20120312161904.E57193E07B0@localhost>
-Message-ID: <4F5E45E0.9020108@samsung.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Mar 2012 11:17:27 -0600
+Subject: [PATCH] gpio/mxs: support irqs triggered by both edges
+In-Reply-To: <lyhaxt4usz.fsf@ensc-virt.intern.sigma-chemnitz.de>
+References: <1329745925-7868-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
+ <20120312163503.AEBC73E07B0@localhost>
+ <lyhaxt4usz.fsf@ensc-virt.intern.sigma-chemnitz.de>
+Message-ID: <CACxGe6uOtgqb1GcBUCDY3L7B5THg1_set0pNcxkzZihr2y9==Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote:
-> On Thu, 16 Feb 2012 06:37:09 +0900, Kukjin Kim<kgene.kim@samsung.com>  wrote:
->> From: Sangsu Park<sangsu4u.park@samsung.com>
+On Mon, Mar 12, 2012 at 11:02 AM, Enrico Scholz
+<enrico.scholz@sigma-chemnitz.de> wrote:
+> Grant Likely <grant.likely@secretlab.ca> writes:
+>
+>>> iMX28 silicon does not support irqs triggered by both gpio edges. Patch
+>>> emulates this behavior by configuring such irqs as level triggered and
+>>> by switching polarity in the interrupt handler.
 >>
->> This patch changes to use ioremap() for EXYNOS4210
->> so that we can drop the static mapping for EXYNOS
->> SoCs.
->>
->> Note: Will be updated for all of Samsung GPIOlibs
->> to use ioremap() next time.
->>
->> Signed-off-by: Sangsu Park<sangsu4u.park@samsung.com>
->> Cc: Grant Likely<grant.likely@secretlab.ca>
->> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> 
-> Acked-by: Grant Likely<grant.likely@secretlab.ca>
-> 
-> Kukjin, I think you wanted to take this via your tree?  I'm fine with that.
-> Let me know if you'd rather it go via the gpio tree.
-> 
-Hi Grant,
+>> That looks dodgy and hacky. ?This will definitely miss interrupts if
+>> they come in too fast.
+>
+> Because patch calculates the trigger from the actual level, there should
+> not be missed more interrupts than with native edge-both support.
 
-I think, since this series has no depenency with current samsung tree
-for upcoming merge window, this can be sent to upstream via the gpio tree.
+Edge interrupt controllers latch interrupt requests. so that nothing
+gets missed.  Level interrupt controllers do not.  So, if the irq line
+toggles 3 times before the handling code gets executed, then the
+kernel will still only recognize 1 irq, not 3.
 
-If any problems, please kindly let me know.
+>> I don't like this approach. ?What do you need it for?
+>
+> some drivers (e.g. gpio-keys, otg gpio-vbus, gpio-charger) are requesting
+> gpio based interrupts with IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING
+> flags. ?It is not possible to use such drivers without having EDGE_BOTH
+> support.
+>
+>
+> Enrico
 
-Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
