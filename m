@@ -1,37 +1,94 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 9 Mar 2012 12:40:02 +0100
-Subject: [PULL] of nand generic binding
-In-Reply-To: <20120309014439.235C23E0901@localhost>
-References: <20120217155707.GR1214@game.jcrosoft.org>
- <20120229152534.GH3318@game.jcrosoft.org>
- <20120307082945.GJ21255@game.jcrosoft.org>
- <4F576602.8020808@gmail.com> <20120309014439.235C23E0901@localhost>
-Message-ID: <20120309114002.GP27213@game.jcrosoft.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 12 Mar 2012 16:28:31 -0700
+Subject: [GIT PULL] ARM: OMAP2+: PM: core support for SMPS regulators for
+ v3.4
+In-Reply-To: <20120312173215.GL3110@opensource.wolfsonmicro.com> (Mark Brown's
+ message of "Mon, 12 Mar 2012 17:32:16 +0000")
+References: <877gywjhht.fsf@ti.com> <20120308021843.GQ12083@atomide.com>
+ <87399jc6cj.fsf@ti.com> <20120309003217.GB12083@atomide.com>
+ <20120309114731.GA3273@opensource.wolfsonmicro.com>
+ <87zkbp4wtj.fsf@ti.com>
+ <20120311204232.GC3171@opensource.wolfsonmicro.com>
+ <87399dzq5e.fsf@ti.com>
+ <20120312173215.GL3110@opensource.wolfsonmicro.com>
+Message-ID: <87pqchv1pc.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:44 Thu 08 Mar     , Grant Likely wrote:
-> On Wed, 07 Mar 2012 07:43:30 -0600, Rob Herring <robherring2@gmail.com> wrote:
-> > On 03/07/2012 02:29 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 16:25 Wed 29 Feb     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > >> On 16:57 Fri 17 Feb     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > >>> HI,
-> > >>>
-> > >>> 	please find attached the generic binding for the MTD nand
-> > >>>
-> > >>> 	This will add boolean and nand helpers
-> > >> is it ok?
-> > > I need this for 3.4
-> > > 
-> > > will you apply it or can I apply it via AT91
-> > 
-> > Looks fine to me and Grant acked it, so go ahead and take with your at91
-> > branch.
-> 
-> Actually, taking another look at the of_mtd patch, that stuff really
-> belongs in the drivers/mtd directory.  I'm not nacking the patch, but
-> you should send a follow up to move it into the correct place.
-ok
+Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 
-Best Regards,
-J.
+> On Mon, Mar 12, 2012 at 10:26:53AM -0700, Kevin Hilman wrote:
+>> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+>
+>> > The branch itself is essentially stable but I'm not enthused about the
+>> > idea of merging the whole thing via the OMAP tree.  
+>
+>> Right, I wasn't suggesting we merge it via OMAP tree.   I was just
+>> looking for a stable point we could use as s dependency when merging
+>> everything together for the arm-soc tree.
+>
+> Well, if you don't base the OMAP changes that depend on it off the
+> regulator changes then you'll break bisection as you'll have a bunch of
+> commits which won't have all their dependencies present on a branch
+> (since they're not present in the branch point and aren't otherwise
+> merged in), if bisect goes down that branch it'll be miserable.  That
+> seems bad and while I've not run into it with OMAP in particular it's
+> rather painful when it does happen.
+>
+> It's much better if the branch has the required changes merged into it
+> prior to their being used.
+
+OK.
+
+Tony, updated pull request below.  This includes all the TWL depencies
+merged from the 'topic/twl' tag in Mark's tree.
+
+Kevin
+
+
+The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
+
+  Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.4/pm/smps-regulator
+
+for you to fetch changes up to 39358f2b57f37fe079eff4159307c844a0bfb176:
+
+  Merge branch 'pm-wip/smps-regulator' into for_3.4/pm/smps-regulator (2012-03-12 15:36:45 -0700)
+
+----------------------------------------------------------------
+
+Kevin Hilman (3):
+      ARM: OMAP2+: voltage: ensure voltage used is exact voltage from OPP table
+      Merge tag 'topic/twl' into for_3.4/pm/smps-regulator
+      Merge branch 'pm-wip/smps-regulator' into for_3.4/pm/smps-regulator
+
+Laxman Dewangan (1):
+      regulator: twl6030: Fix voltage selection logic
+
+Peter Ujfalusi (2):
+      regulator: twl-regulator: Add fixed LDO for V1V8, V2V1 supply
+      mfd: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS
+
+Rajendra Nayak (1):
+      regulator: twl: adapt twl-regulator driver to dt
+
+Tero Kristo (6):
+      arm: omap3: voltage: fix channel configuration
+      arm: omap3: add common twl configurations for vdd1 and vdd2
+      arm: omap3: twl: add external controllers for core voltage regulators
+      arm: omap4: add common twl configurations for vdd1, vdd2 and vdd3
+      regulator: twl4030: add support for external voltage get/set
+      regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators
+
+ .../bindings/regulator/twl-regulator.txt           |   68 ++++
+ arch/arm/mach-omap2/twl-common.c                   |  147 +++++++++
+ arch/arm/mach-omap2/vc3xxx_data.c                  |    1 +
+ arch/arm/mach-omap2/voltage.c                      |   21 +-
+ drivers/mfd/twl-core.c                             |   41 ++-
+ drivers/regulator/twl-regulator.c                  |  327 +++++++++++++++-----
+ include/linux/i2c/twl.h                            |   14 +-
+ 7 files changed, 532 insertions(+), 87 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
