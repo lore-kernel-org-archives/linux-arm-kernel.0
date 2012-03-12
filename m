@@ -1,74 +1,56 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 12 Mar 2012 16:42:53 -0600
-Subject: [PATCH 2/5] ARM: OMAP2+: add includes for missing prototypes
-In-Reply-To: <20120312224006.4103.29464.stgit@dusk>
-References: <20120312224006.4103.29464.stgit@dusk>
-Message-ID: <20120312224252.4103.75837.stgit@dusk>
+Date: Mon, 12 Mar 2012 16:42:51 -0600
+Subject: [PATCH 0/5] ARM: OMAP2+: resolve some warnings from sparse, cppcheck
+Message-ID: <20120312224006.4103.29464.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several C files in arch/arm/mach-omap2 declare functions that are used
-by other files, but don't include the header file where the prototype is
-declared.  This results in the following warnings from sparse:
+Hello
 
-    arch/arm/mach-omap2/irq.c:114:5: warning: symbol 'omap_irq_pending' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:186:13: warning: symbol 'omap2_init_irq' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:191:13: warning: symbol 'omap3_init_irq' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:196:13: warning: symbol 'ti81xx_init_irq' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:233:39: warning: symbol 'omap2_intc_handle_irq' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:242:6: warning: symbol 'omap_intc_save_context' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:265:6: warning: symbol 'omap_intc_restore_context' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:291:6: warning: symbol 'omap3_intc_suspend' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:297:6: warning: symbol 'omap3_intc_prepare_idle' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:306:6: warning: symbol 'omap3_intc_resume_idle' was not declared. Should it be static?
-    arch/arm/mach-omap2/irq.c:312:39: warning: symbol 'omap3_intc_handle_irq' was not declared. Should it be static?
-    arch/arm/mach-omap2/omap-secure.c:59:12: warning: symbol 'omap_secure_ram_reserve_memblock' was not declared. Should it be static?
-    arch/arm/mach-omap2/board-zoom-display.c:133:13: warning: symbol 'zoom_display_init' was not declared. Should it be static?
+This series resolves all of the current sparse warnings and many of
+the meaningful cppcheck warnings in arch/arm/mach-omap2.
 
-Fix by including the appropriate header files.
+This series is also available from git://git.pwsan.com/linux-2.6 in the
+branch 'sparse_cppcheck_fixes_3.4'.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Senthilvadivu Guruswamy <svadivu@ti.com>
+
+- Paul
+
 ---
- arch/arm/mach-omap2/board-zoom-display.c |    1 +
- arch/arm/mach-omap2/irq.c                |    1 +
- arch/arm/mach-omap2/omap-secure.c        |    1 +
- 3 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-zoom-display.c b/arch/arm/mach-omap2/board-zoom-display.c
-index d4683ba..75ff74e 100644
---- a/arch/arm/mach-omap2/board-zoom-display.c
-+++ b/arch/arm/mach-omap2/board-zoom-display.c
-@@ -16,6 +16,7 @@
- #include <linux/spi/spi.h>
- #include <plat/mcspi.h>
- #include <video/omapdss.h>
-+#include <mach/board-zoom.h>
- 
- #define LCD_PANEL_RESET_GPIO_PROD	96
- #define LCD_PANEL_RESET_GPIO_PILOT	55
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 1fef061..8247c51 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -18,6 +18,7 @@
- #include <asm/exception.h>
- #include <asm/mach/irq.h>
- 
-+#include "common.h"
- 
- /* selected INTC register offsets */
- 
-diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
-index d8f8ef4..d9ae4a5 100644
---- a/arch/arm/mach-omap2/omap-secure.c
-+++ b/arch/arm/mach-omap2/omap-secure.c
-@@ -18,6 +18,7 @@
- #include <asm/cacheflush.h>
- #include <asm/memblock.h>
- 
-+#include <plat/omap-secure.h>
- #include <mach/omap-secure.h>
- 
- static phys_addr_t omap_secure_memblock_base;
+sparse_cppcheck_fixes_3.4
+   text	   data	    bss	    dec	    hex	filename
+6588152	 692980	5594140	12875272	 c47608	vmlinux.omap2plus_defconfig.orig
+6588028	 692956	5594140	12875124	 c47574	vmlinux.omap2plus_defconfig
+
+Paul Walmsley (5):
+      ARM: OMAP2+: declare file-local functions as static
+      ARM: OMAP2+: add includes for missing prototypes
+      ARM: OMAP2+: GPMC: resolve type-conversion warning from sparse
+      ARM: OMAP2+: fix 'using plain integer as NULL pointer' sparse warnings
+      ARM: OMAP2+: clean up some cppcheck warnings
+
+
+ arch/arm/mach-omap2/board-am3517evm.c        |    6 +-----
+ arch/arm/mach-omap2/board-omap3evm.c         |    8 ++++----
+ arch/arm/mach-omap2/board-omap4panda.c       |    8 ++++----
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    4 ++--
+ arch/arm/mach-omap2/board-zoom-display.c     |    1 +
+ arch/arm/mach-omap2/devices.c                |    3 +--
+ arch/arm/mach-omap2/gpio.c                   |    4 ++--
+ arch/arm/mach-omap2/gpmc-onenand.c           |    3 +--
+ arch/arm/mach-omap2/gpmc.c                   |    3 +--
+ arch/arm/mach-omap2/hsmmc.c                  |    2 +-
+ arch/arm/mach-omap2/hwspinlock.c             |    2 +-
+ arch/arm/mach-omap2/irq.c                    |    3 ++-
+ arch/arm/mach-omap2/mcbsp.c                  |    2 +-
+ arch/arm/mach-omap2/mux.c                    |    2 +-
+ arch/arm/mach-omap2/omap-secure.c            |    1 +
+ arch/arm/mach-omap2/omap-wakeupgen.c         |    2 +-
+ arch/arm/mach-omap2/pm24xx.c                 |    3 ---
+ arch/arm/mach-omap2/pm34xx.c                 |    4 +---
+ arch/arm/mach-omap2/prm_common.c             |    4 +++-
+ arch/arm/mach-omap2/serial.c                 |    2 +-
+ arch/arm/mach-omap2/usb-tusb6010.c           |    2 +-
+ arch/arm/plat-omap/include/plat/dmtimer.h    |    4 ++--
+ 22 files changed, 33 insertions(+), 40 deletions(-)
