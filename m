@@ -1,59 +1,143 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Mar 2012 13:51:35 +0100
-Subject: [PATCH 3/4] pinctrl: support pinconfig on the U300
-In-Reply-To: <4F57E3D2.40405@wwwdotorg.org>
-References: <1331071533-24789-1-git-send-email-linus.walleij@stericsson.com>
- <4F57E3D2.40405@wwwdotorg.org>
-Message-ID: <CACRpkdbSzU-eXCfzFVmynO_D44PYA4g7dRSvRj+0s6uZxYD+tw@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 12 Mar 2012 11:22:42 +0530
+Subject: [PATCHv5 3/6] ARM: OMAP4 PM: Add IO Daisychain support
+In-Reply-To: <alpine.DEB.2.00.1203092051140.30879@utopia.booyaka.com>
+References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+ <1331046702-2472-4-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1203092051140.30879@utopia.booyaka.com>
+Message-ID: <4F5D8F2A.1070602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2012 at 11:40 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 03/06/2012 03:05 PM, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
+On Saturday 10 March 2012 09:29 AM, Paul Walmsley wrote:
+> Hi
+>
+> On Tue, 6 Mar 2012, Tero Kristo wrote:
+>
+>> From: Rajendra Nayak<rnayak@ti.com>
 >>
->> This adds pin configuration support for the U300 driver pair,
->> we can now read out the biasing and drive mode in debugfs and
->> configure it using the new configuration API.
+>> IO daisychain is a mechanism that allows individual IO pads to generate
+>> wakeup events on their own based on a switch of an input signal level.
+>> This allows the hardware module behind the pad to be powered down, but
+>> still have device level capability to detect IO events, and once this
+>> happens the module can be powered back up to resume IO. See section
+>> 3.9.4 in OMAP4430 Public TRM for details.
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com>
+>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
 >
->> +int u300_pin_config_set(struct pinctrl_dev *pctldev,
->> + ? ? ? ? ? ? ? ? ? ? unsigned pin,
->> + ? ? ? ? ? ? ? ? ? ? unsigned long config)
->> +{
->> + ? ? struct pinctrl_gpio_range *range = u300_match_gpio_range(pin);
->> + ? ? int ret;
->> +
->> + ? ? if (!range)
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? /* Note: none of these configurations take any argument */
->> + ? ? ret = u300_gpio_config_set(range->gc,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(pin - range->pin_base + range->base),
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?to_config_param(config));
+> Here's an updated version of this patch.  Please let me know if you think
+> we should remove the poll on the WUCLKOUT line to conform with the change
+> that Tero made to the OMAP3 version.
+
+Thanks Paul, for the updates patch. Just one comment below..
+
 >
-> I'm a little confused here; the documentation for most of the
-> PIN_CONFIG_* parameters that this function is passed does explicitly
-> document that there is an associated argument value. For example,
-> IN_CONFIG_BIAS_PULL_UP is coupled with the pull up resistance in Ohms.
-> Shouldn't this code extract the argument and validate that it's a
-> supported value for the HW?
+>
+> - Paul
+>
+> From: Rajendra Nayak<rnayak@ti.com>
+> Date: Fri, 2 Mar 2012 17:17:52 +0200
+> Subject: [PATCH 3/6] ARM: OMAP4: PRM: Add IO Daisychain support
+>
+> IO daisychain is a mechanism that allows individual IO pads to generate
+> wakeup events on their own based on a switch of an input signal level.
+> This allows the hardware module behind the pad to be powered down, but
+> still have device level capability to detect IO events, and once this
+> happens the module can be powered back up to resume IO. See section
+> 3.9.4 in OMAP4430 Public TRM for details.
+>
+> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com> is just bad
+documentation.
 
-It says:
+> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+> [paul at pwsan.com: removed MAX_IOPAD_LATCH_TIME declaration; renamed
 
- * @PIN_CONFIG_BIAS_PULL_UP: the pin will be pulled up (usually with high
- *      impedance to VDD), if the controller supports specifying a certain
- *      pull-up resistance, this is given as an argument (in Ohms) when
- *      setting this parameter.
+But the code below still seems to use it. Is it now defined in some
+common header so the same value is used in omap3 and omap4?
 
-Notice "if controller supports specifying ..." clause.
+regards,
+Rajendra
 
-The reverse holds: if the pin controller doesn't support specifying that,
-the pull-up will just be enabled, no matter what the argument was.
-
-But maybe I should try to dig out which exact value it is, since it's
-anyway a 1-1 copuling between board data and this one driver it
-could be clearer (though the argument will just be checked to be
-the one value the chip supports, and then discarded).
-
-Yours,
-Linus Walleij
+>   omap4_trigger_io_chain() to conform to other PRM function names;
+>   added kerneldoc]
+> Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> ---
+>   arch/arm/mach-omap2/prm44xx.c |   48 +++++++++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-omap2/prm44xx.h |    2 +
+>   2 files changed, 50 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+> index a1d6154..5868a12 100644
+> --- a/arch/arm/mach-omap2/prm44xx.c
+> +++ b/arch/arm/mach-omap2/prm44xx.c
+> @@ -231,6 +231,54 @@ void omap44xx_prm_restore_irqen(u32 *saved_mask)
+>   				 OMAP4_PRM_IRQENABLE_MPU_2_OFFSET);
+>   }
+>
+> +/**
+> + * omap44xx_prm_reconfigure_io_chain - clear latches and reconfigure I/O chain
+> + *
+> + * Clear any previously-latched I/O wakeup events and ensure that the
+> + * I/O wakeup gates are aligned with the current mux settings.  Works
+> + * by asserting WUCLKIN, waiting for WUCLKOUT to be asserted, and then
+> + * deasserting WUCLKIN and waiting for WUCLKOUT to be deasserted.
+> + * No return value. XXX Are the final two steps necessary?
+> + */
+> +void omap44xx_prm_reconfigure_io_chain(void)
+> +{
+> +	int i = 0;
+> +
+> +	/* Enable GLOBAL_WUEN */
+> +	if (!(omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+> +		OMAP4_PRM_IO_PMCTRL_OFFSET)&  OMAP4430_GLOBAL_WUEN_MASK))
+> +		omap4_prm_rmw_inst_reg_bits(OMAP4430_GLOBAL_WUEN_MASK,
+> +			OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_PRM_DEVICE_INST,
+> +			OMAP4_PRM_IO_PMCTRL_OFFSET);
+> +
+> +	/* Trigger WUCLKIN enable */
+> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK,
+> +			OMAP4430_WUCLK_CTRL_MASK, OMAP4430_PRM_DEVICE_INST,
+> +			OMAP4_PRM_IO_PMCTRL_OFFSET);
+> +	omap_test_timeout(
+> +		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+> +			OMAP4_PRM_IO_PMCTRL_OFFSET)&
+> +			OMAP4430_WUCLK_STATUS_MASK)>>
+> +			OMAP4430_WUCLK_STATUS_SHIFT) == 1),
+> +		MAX_IOPAD_LATCH_TIME, i);
+> +	if (i == MAX_IOPAD_LATCH_TIME)
+> +		pr_warn("PRM: I/O chain clock line assertion timed out\n");
+> +
+> +	/* Trigger WUCLKIN disable */
+> +	omap4_prm_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
+> +			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
+> +	omap_test_timeout(
+> +		(((omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+> +			OMAP4_PRM_IO_PMCTRL_OFFSET)&
+> +			OMAP4430_WUCLK_STATUS_MASK)>>
+> +			OMAP4430_WUCLK_STATUS_SHIFT) == 0),
+> +		MAX_IOPAD_LATCH_TIME, i);
+> +	if (i == MAX_IOPAD_LATCH_TIME)
+> +		pr_warn("PRM: I/O chain clock line deassertion timed out\n");
+> +
+> +	return;
+> +}
+> +
+>   static int __init omap4xxx_prcm_init(void)
+>   {
+>   	if (cpu_is_omap44xx())
+> diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+> index 7978092..ee72ae6 100644
+> --- a/arch/arm/mach-omap2/prm44xx.h
+> +++ b/arch/arm/mach-omap2/prm44xx.h
+> @@ -763,6 +763,8 @@ extern u32 omap4_prm_vcvp_read(u8 offset);
+>   extern void omap4_prm_vcvp_write(u32 val, u8 offset);
+>   extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+>
+> +extern void omap44xx_prm_reconfigure_io_chain(void);
+> +
+>   /* PRM interrupt-related functions */
+>   extern void omap44xx_prm_read_pending_irqs(unsigned long *events);
+>   extern void omap44xx_prm_ocp_barrier(void);
