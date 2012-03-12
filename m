@@ -1,55 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Mar 2012 10:11:00 +0000
-Subject: [PATCH] serial: PL011: clear pending interrupts
-In-Reply-To: <20120312083221.GW17370@n2100.arm.linux.org.uk>
-References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
- <20120312083221.GW17370@n2100.arm.linux.org.uk>
-Message-ID: <20120312101100.GA8649@n2100.arm.linux.org.uk>
+From: govindraj.raja@ti.com (Raja, Govindraj)
+Date: Mon, 12 Mar 2012 17:19:07 +0530
+Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
+ modules.
+In-Reply-To: <CAMrsUdJq8J8dTnKcZmXgMucDX=dNXgR+9xFhYOdHvNDuw_=4Mw@mail.gmail.com>
+References: <1331122775-761-1-git-send-email-govindraj.raja@ti.com>
+ <CAMrsUdJq8J8dTnKcZmXgMucDX=dNXgR+9xFhYOdHvNDuw_=4Mw@mail.gmail.com>
+Message-ID: <CAMrsUdLe1gq-tWeg_GgEp_HHUVXCGMgegCtfEzEp9zzMpbDfHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 08:32:21AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 12, 2012 at 09:25:50AM +0100, Linus Walleij wrote:
-> > diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> > index 6800f5f..ff3fed0 100644
-> > --- a/drivers/tty/serial/amba-pl011.c
-> > +++ b/drivers/tty/serial/amba-pl011.c
-> > @@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct uart_amba_port *uap)
-> >  		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
-> >  	}
-> >  
-> 
-> What if we really do end up receiving some characters here?
-> 
-> > +	/* RXIS but RXFE? Just clear the interrupt */
-> > +	if(unlikely(fifotaken == 0))
-> > +		writew(UART011_RTIS | UART011_RXIS,
-> > +		       uap->port.membase + UART011_ICR);
+On Wed, Mar 7, 2012 at 7:40 PM, Raja, Govindraj <govindraj.raja@ti.com> wrote:
+> On Wed, Mar 7, 2012 at 5:49 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
+>>
 
-BTW, I don't see why we need any of this stuff.
+[...]
 
-The problem as described is that the interrupt handler is called with one
-of the receive flags set (UART011_RTIS or UART011_RXIS) but with
-UART01x_FR_RXFE clear.
+>
+> From b3aa1dac5909cad1b959f5b97bbf408b2f974060 Mon Sep 17 00:00:00 2001
+> From: "Govindraj.R" <govindraj.raja@ti.com>
+> Date: Wed, 7 Mar 2012 17:14:02 +0530
+> Subject: [PATCH] omap_hwmod: Allow io_ring wakeup configuration for all
+> ?modules.
+>
+> Some modules doesn't have SYSC_HAS_ENAWAKEUP bit available
+> (ex: usb host uhh module) in absence of this flag
+> omap_hwmod_enable/disable_wakeup avoids configuring
+> pad mux wakeup capability.
+>
+> Configure sysc if SYSC_HAS_ENAWAKEUP is available and for other cases
+> try enabling/disabling wakeup from mux_pad pins.
+>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> ---
 
-The problem report indicates that this is caused when we switch from FIFO
-mode to non-FIFO mode, and the FIFO contained some unread characters.
+Gentle Ping.
 
-That can only happen once we've enabled interrupts in the IMSC register,
-which doesn't happen until later in the startup function.
+--
+Thanks,
+Govindraj.R
 
-So:
 
-        spin_lock_irq(&uap->port.lock);
-        uap->im = UART011_RTIM;
-        if (!pl011_dma_rx_running(uap))
-                uap->im |= UART011_RXIM;
-        writew(uap->im, uap->port.membase + UART011_IMSC);
-        spin_unlock_irq(&uap->port.lock);
 
-clearing the transmit/receive interrupts here _before_ we unmask them
-should be sufficient.
-
-As we never turn the FIFO off after that point, we can't then cause the
-condition.  So I don't see any point in adding stuff to the interrupt
-handling for this.
+> ?arch/arm/mach-omap2/omap_hwmod.c | ? 30 ++++++++++++++++--------------
+> ?1 files changed, 16 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index eba6cd3..9605fad 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2475,14 +2475,15 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
+> ? ? ? ?unsigned long flags;
+> ? ? ? ?u32 v;
+>
+> - ? ? ? if (!oh->class->sysc ||
+> - ? ? ? ? ? !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+> - ? ? ? ? ? ? ? return -EINVAL;
+> -
+> ? ? ? ?spin_lock_irqsave(&oh->_lock, flags);
+> - ? ? ? v = oh->_sysc_cache;
+> - ? ? ? _enable_wakeup(oh, &v);
+> - ? ? ? _write_sysconfig(v, oh);
+> +
+> + ? ? ? if (oh->class->sysc &&
+> + ? ? ? ? ? (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
+> + ? ? ? ? ? ? ? v = oh->_sysc_cache;
+> + ? ? ? ? ? ? ? _enable_wakeup(oh, &v);
+> + ? ? ? ? ? ? ? _write_sysconfig(v, oh);
+> + ? ? ? }
+> +
+> ? ? ? ?_set_idle_ioring_wakeup(oh, true);
+> ? ? ? ?spin_unlock_irqrestore(&oh->_lock, flags);
+>
+> @@ -2506,14 +2507,15 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
+> ? ? ? ?unsigned long flags;
+> ? ? ? ?u32 v;
+>
+> - ? ? ? if (!oh->class->sysc ||
+> - ? ? ? ? ? !(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP))
+> - ? ? ? ? ? ? ? return -EINVAL;
+> -
+> ? ? ? ?spin_lock_irqsave(&oh->_lock, flags);
+> - ? ? ? v = oh->_sysc_cache;
+> - ? ? ? _disable_wakeup(oh, &v);
+> - ? ? ? _write_sysconfig(v, oh);
+> +
+> + ? ? ? if (oh->class->sysc &&
+> + ? ? ? ? ? (oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP)) {
+> + ? ? ? ? ? ? ? v = oh->_sysc_cache;
+> + ? ? ? ? ? ? ? _disable_wakeup(oh, &v);
+> + ? ? ? ? ? ? ? _write_sysconfig(v, oh);
+> + ? ? ? }
+> +
+> ? ? ? ?_set_idle_ioring_wakeup(oh, false);
+> ? ? ? ?spin_unlock_irqrestore(&oh->_lock, flags);
+>
+> --
+> 1.7.5.4
