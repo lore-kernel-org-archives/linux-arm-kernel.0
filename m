@@ -1,80 +1,97 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 12 Mar 2012 09:52:07 +0530
-Subject: [PATCH V2 12/22] watchdog/mpcore_wdt: Add support for dev_pm_ops
- interface
+Date: Mon, 12 Mar 2012 09:52:02 +0530
+Subject: [PATCH V2 07/22] watchdog/mpcore_wdt: Fix multiline comments
 In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
 References: <cover.1331524811.git.viresh.kumar@st.com>
-Message-ID: <70350419aeda6aa96081b6d81407efeb17b2d87c.1331524811.git.viresh.kumar@st.com>
+Message-ID: <c6c6a42167a5938b869c43045fadcdfe0b069555.1331524811.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dev_pm_ops support for standby/slepp/hibernate.
+In case of few multiline comment a 'tab' is present instead of 'space' after the
+'*' in the second column. Replace tab with space here.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- drivers/watchdog/mpcore_wdt.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/watchdog/mpcore_wdt.c |   42 +++++++++++++++++++---------------------
+ 1 files changed, 20 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 6902580..3f47b7e 100644
+index 953044a..7c9f78c 100644
 --- a/drivers/watchdog/mpcore_wdt.c
 +++ b/drivers/watchdog/mpcore_wdt.c
-@@ -23,6 +23,7 @@
+@@ -1,23 +1,21 @@
+ /*
+- *	Watchdog driver for the mpcore watchdog timer
++ * Watchdog driver for the mpcore watchdog timer
+  *
+- *	(c) Copyright 2004 ARM Limited
++ * (c) Copyright 2004 ARM Limited
+  *
+- *	Based on the SoftDog driver:
+- *	(c) Copyright 1996 Alan Cox <alan@lxorguk.ukuu.org.uk>,
+- *						All Rights Reserved.
++ * Based on the SoftDog driver:
++ * (c) Copyright 1996 Alan Cox <alan@lxorguk.ukuu.org.uk>, All Rights Reserved.
+  *
+- *	This program is free software; you can redistribute it and/or
+- *	modify it under the terms of the GNU General Public License
+- *	as published by the Free Software Foundation; either version
+- *	2 of the License, or (at your option) any later version.
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
+  *
+- *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
+- *	warranty for any of this software. This material is provided
+- *	"AS-IS" and at no charge.
+- *
+- *	(c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
++ * Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
++ * warranty for any of this software. This material is provided
++ * "AS-IS" and at no charge.
+  *
++ * (c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
+  */
  #include <linux/module.h>
  #include <linux/moduleparam.h>
- #include <linux/platform_device.h>
-+#include <linux/pm.h>
- #include <linux/reboot.h>
- #include <linux/slab.h>
- #include <linux/types.h>
-@@ -256,40 +257,39 @@ static int __devexit mpcore_wdt_remove(struct platform_device *pdev)
- }
+@@ -64,8 +62,8 @@ MODULE_PARM_DESC(mpcore_noboot, "MPcore watchdog action, "
+ 					__MODULE_STRING(ONLY_TESTING) ")");
  
- #ifdef CONFIG_PM
--static int mpcore_wdt_suspend(struct platform_device *pdev, pm_message_t msg)
-+static int mpcore_wdt_suspend(struct device *dev)
+ /*
+- *	This is the interrupt handler.  Note that we only use this
+- *	in testing mode, so don't actually do a reboot here.
++ * This is the interrupt handler.  Note that we only use this
++ * in testing mode, so don't actually do a reboot here.
+  */
+ static irqreturn_t mpcore_wdt_fire(int irq, void *arg)
  {
--	struct mpcore_wdt *wdt = platform_get_drvdata(pdev);
-+	struct mpcore_wdt *wdt = dev_get_drvdata(dev);
- 	mpcore_wdt_stop(&wdt->wdd);	/* Turn the WDT off */
- 
- 	return 0;
+@@ -83,11 +81,11 @@ static irqreturn_t mpcore_wdt_fire(int irq, void *arg)
  }
  
--static int mpcore_wdt_resume(struct platform_device *pdev)
-+static int mpcore_wdt_resume(struct device *dev)
+ /*
+- *	mpcore_wdt_ping - reload the timer
++ * mpcore_wdt_ping - reload the timer
+  *
+- *	Note that the spec says a DIFFERENT value must be written to the reload
+- *	register each time.  The "perturb" variable deals with this by adding 1
+- *	to the count every other time the function is called.
++ * Note that the spec says a DIFFERENT value must be written to the reload
++ * register each time.  The "perturb" variable deals with this by adding 1 to
++ * the count every other time the function is called.
+  */
+ static int mpcore_wdt_ping(struct watchdog_device *wdd)
  {
--	struct mpcore_wdt *wdt = platform_get_drvdata(pdev);
-+	struct mpcore_wdt *wdt = dev_get_drvdata(dev);
- 
- 	if (is_wdd_active(&wdt->wdd))
- 		mpcore_wdt_start(&wdt->wdd);
- 
- 	return 0;
- }
--#else
--#define mpcore_wdt_suspend	NULL
--#define mpcore_wdt_resume	NULL
- #endif
- 
-+static SIMPLE_DEV_PM_OPS(mpcore_wdt_dev_pm_ops, mpcore_wdt_suspend,
-+		mpcore_wdt_resume);
-+
- /* work with hotplug and coldplug */
- MODULE_ALIAS("platform:mpcore_wdt");
- 
- static struct platform_driver mpcore_wdt_driver = {
- 	.probe		= mpcore_wdt_probe,
- 	.remove		= __devexit_p(mpcore_wdt_remove),
--	.suspend	= mpcore_wdt_suspend,
--	.resume		= mpcore_wdt_resume,
- 	.shutdown	= mpcore_wdt_shutdown,
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "mpcore_wdt",
-+		.pm	= &mpcore_wdt_dev_pm_ops,
- 	},
+@@ -163,8 +161,8 @@ static const struct watchdog_ops mpcore_wdt_ops = {
  };
  
+ /*
+- *	System shutdown handler.  Turn off the watchdog if we're
+- *	restarting or halting the system.
++ * System shutdown handler.  Turn off the watchdog if we're restarting or
++ * halting the system.
+  */
+ static void mpcore_wdt_shutdown(struct platform_device *pdev)
+ {
 -- 
 1.7.8.110.g4cb5d
