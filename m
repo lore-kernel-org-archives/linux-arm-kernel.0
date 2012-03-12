@@ -1,122 +1,41 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 12 Mar 2012 09:51:59 +0530
-Subject: [PATCH V2 04/22] watchdog/mpcore_wdt: Use devm routines
-In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
-References: <cover.1331524811.git.viresh.kumar@st.com>
-Message-ID: <549910322568234ac5843863c8ad9999cfd0a366.1331524811.git.viresh.kumar@st.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Mon, 12 Mar 2012 20:01:32 +0100
+Subject: [PATCH 3/6] ARM: S3C24XX: Add map entries needed by the s3c64xx-spi
+ devices
+In-Reply-To: <201203121959.32966.heiko@sntech.de>
+References: <201203121959.32966.heiko@sntech.de>
+Message-ID: <201203122001.33226.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mpcore_wdt driver currently uses normal kzalloc, request_irq, ioremap, etc
-routines. This patch replaces these routines with devm_kzalloc and
-devm_request_mem_region etc, so that we don't need to handle freeing of
-resources for error cases and module removal routine.
+The S3C_PA_SPIx constants are only used by the s3c64xx-spi driver
+and don't conflict with the older SoCs as they don't support hsspi.
 
-Also, request_irq is moved before registering misc device, so that we are ready
-for irq as soon as device is registered.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/watchdog/mpcore_wdt.c |   58 +++++++++++++---------------------------
- 1 files changed, 19 insertions(+), 39 deletions(-)
+ arch/arm/mach-s3c24xx/include/mach/map.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index fd9f91b..63bd161 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -335,43 +335,37 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
- 		return -ENODEV;
+diff --git a/arch/arm/mach-s3c24xx/include/mach/map.h b/arch/arm/mach-s3c24xx/include/mach/map.h
+index 78ae807..8ba381f 100644
+--- a/arch/arm/mach-s3c24xx/include/mach/map.h
++++ b/arch/arm/mach-s3c24xx/include/mach/map.h
+@@ -98,6 +98,8 @@
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		ret = -ENODEV;
--		goto err_out;
--	}
-+	if (!res)
-+		return -ENODEV;
+ /* SPI */
+ #define S3C2410_PA_SPI	   (0x59000000)
++#define S3C2443_PA_SPI0		(0x52000000)
++#define S3C2443_PA_SPI1		S3C2410_PA_SPI
  
--	wdt = kzalloc(sizeof(struct mpcore_wdt), GFP_KERNEL);
--	if (!wdt) {
--		ret = -ENOMEM;
--		goto err_out;
--	}
-+	wdt = devm_kzalloc(&pdev->dev, sizeof(struct mpcore_wdt), GFP_KERNEL);
-+	if (!wdt)
-+		return -ENOMEM;
+ /* SDI */
+ #define S3C2410_PA_SDI	   (0x5A000000)
+@@ -162,4 +164,7 @@
+ #define S3C_PA_WDT	    S3C2410_PA_WATCHDOG
+ #define S3C_PA_NAND	    S3C24XX_PA_NAND
  
- 	wdt->dev = &pdev->dev;
- 	wdt->irq = platform_get_irq(pdev, 0);
--	if (wdt->irq < 0) {
--		ret = -ENXIO;
--		goto err_free;
--	}
--	wdt->base = ioremap(res->start, resource_size(res));
--	if (!wdt->base) {
--		ret = -ENOMEM;
--		goto err_free;
-+	if (wdt->irq < 0)
-+		return -ENXIO;
++#define S3C_PA_SPI0		S3C2443_PA_SPI0
++#define S3C_PA_SPI1		S3C2443_PA_SPI1
 +
-+	ret = devm_request_irq(wdt->dev, wdt->irq, mpcore_wdt_fire, 0,
-+			"mpcore_wdt", wdt);
-+	if (ret) {
-+		dev_printk(KERN_ERR, wdt->dev,
-+			"cannot register IRQ%d for watchdog\n", wdt->irq);
-+		return ret;
- 	}
- 
-+	wdt->base = devm_ioremap(wdt->dev, res->start, resource_size(res));
-+	if (!wdt->base)
-+		return -ENOMEM;
-+
- 	mpcore_wdt_miscdev.parent = &pdev->dev;
- 	ret = misc_register(&mpcore_wdt_miscdev);
- 	if (ret) {
- 		dev_printk(KERN_ERR, wdt->dev,
- 			"cannot register miscdev on minor=%d (err=%d)\n",
- 							WATCHDOG_MINOR, ret);
--		goto err_misc;
--	}
--
--	ret = request_irq(wdt->irq, mpcore_wdt_fire, 0, "mpcore_wdt", wdt);
--	if (ret) {
--		dev_printk(KERN_ERR, wdt->dev,
--			"cannot register IRQ%d for watchdog\n", wdt->irq);
--		goto err_irq;
-+		return ret;
- 	}
- 
- 	mpcore_wdt_stop(wdt);
-@@ -379,30 +373,16 @@ static int __devinit mpcore_wdt_probe(struct platform_device *pdev)
- 	mpcore_wdt_pdev = pdev;
- 
- 	return 0;
--
--err_irq:
--	misc_deregister(&mpcore_wdt_miscdev);
--err_misc:
--	iounmap(wdt->base);
--err_free:
--	kfree(wdt);
--err_out:
--	return ret;
- }
- 
- static int __devexit mpcore_wdt_remove(struct platform_device *pdev)
- {
--	struct mpcore_wdt *wdt = platform_get_drvdata(pdev);
--
- 	platform_set_drvdata(pdev, NULL);
- 
- 	misc_deregister(&mpcore_wdt_miscdev);
- 
- 	mpcore_wdt_pdev = NULL;
- 
--	free_irq(wdt->irq, wdt);
--	iounmap(wdt->base);
--	kfree(wdt);
- 	return 0;
- }
- 
+ #endif /* __ASM_ARCH_MAP_H */
 -- 
-1.7.8.110.g4cb5d
+1.7.2.3
