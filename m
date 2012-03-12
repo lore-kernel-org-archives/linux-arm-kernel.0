@@ -1,182 +1,73 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 12 Mar 2012 15:45:30 +0200
-Subject: OMAP DSS device tree design problems
-Message-ID: <1331559930.2097.100.camel@deskari>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 12 Mar 2012 22:14:40 +0100
+Subject: [PATCH 4/4 v2] ARM: u300: configure some pins as an example
+Message-ID: <1331586880-15690-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-I'm struggling with the design of the DT data for OMAP display subsystem
-driver, and any thoughts and ideas are welcome. This mail is a rather
-long one, where I'm trying to show the different approaches I've
-thought.
+To show how the pin configuration is used on the U300, let's
+include some configs for two GPIO pins.
 
-So the .dts format would be something like this, taking 4430SDP as an
-example. It's just an outline, missing dispc, hwmods,
-compatible-properties etc, which are not so relevant here.
+ChangeLog v1->v2:
+- Provide a better example, set the clock return pin to pull-up
+  and set the card detect pin to high impedance.
 
-ocp {
-	dss {
-		dsi1 {
-			taal {
-
-			};
-		};
-	};
-};
-
-So there we have a Taal panel, connected to DSI1 output interface, which
-is part of the OMAP display subsystem.
-
-One thing to note here is that although there's only one panel under
-dsi1 in this case, the current SW supports having multiple panels under
-one output interface. And while the output can support only one active
-panel at a time, we do have boards where two panels are connected to one
-output, and there's some kind of HW switch used to select which panel is
-enabled.
-
-The first problem here is that I don't know how to manage the switch
-part. With current SW we have had the switch handling in the board
-files, in functions called when a display is enabled/disabled. I guess
-one option is to have the switch related code in their own drivers,
-totally apart from the dss code, perhaps offering a sysfs interface or
-such. And then, if the switch happens to be in the wrong position, the
-panel will fail in some way.
-
-The second problem is about the DT properties. With multiple panels it's
-not possible to do this:
-
-dsi1 {
-	dsi-ddr-clk = <250000000>;
-
-	taal {
-	};
-
-	some-other-panel {
-	};
-};
-
-because the panels could require different dsi clock rates. So we need
-something like this:
-
-dsi1 {
-	taal {
-		dsi-ddr-clk = <250000000>;
-	};
-
-	some-other-panel {
-		dsi-ddr-clk = <350000000>;
-	};
-};
-
-However, here the problem is that while ultimately we're interested in
-the ddr-clk rate, calculation of the rate is non-trivial and may need
-customizations at times. So instead of the clock rate we actually need
-to define a bunch of dividers/multipliers.
-
-But these dividers are OMAP specific things, and do not belong to Taal
-driver. So this bring the question: is the general rule about DT node
-properties such that only the driver handling the particular node should
-read the properties in that node? So, in the example above, should the
-dsi driver only read props in the dsi1 and dsi2 nodes, and never look at
-props in the taal nodes?
-
-So basically, can we do this:
-
-dsi1 {
-	taal {
-		omap-specific-clk-divs = <1 2 3 4 5 6 7>;
-	};
-
-	some-other-panel {
-		omap-specific-clk-divs = <7 6 5 4 3 2 1>;
-	};
-};
-
-and the Taal driver would ignore those, but dsi driver would use them?
-This looks like quite easy solution to this, but also doesn't feel
-right. So my current idea is to have clk-div tables in the dsi node,
-something like this:
-
-dsi1 {
-	omap-specific-clk-divs = <
-		250 1 2 3 4 5 6 7 /* divs that produce 250MHz clk */
-		350 7 6 5 4 3 2 1 /* divs that produce 350MHz clk */
-	>;
-
-	taal {
-		dsi-ddr-clk = <250000000>;
-	};
-
-	some-other-panel {
-		dsi-ddr-clk = <350000000>;
-	};
-};
-
-Here the panel drivers would ask the DSI driver to configure DSI DDR clk
-of 250/350MHz, and the DSI driver would then use the lookup table to
-find the dividers. If the lookup fails, the DSI driver could fail or try
-to calculate the dividers itself. Other platforms could handle the DDR
-clk configuration however they see best.
-
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ arch/arm/mach-u300/core.c |   18 ++++++++++++++++--
+ 1 files changed, 16 insertions(+), 2 deletions(-)
 
-Another thing related to DSI command mode panels is the DSI lane
-configuration, and I can't make my mind if they belong to the panel
-driver in some way or not.
-
-So, again taking SDP board and Taal as an example, we have 6 pads on
-OMAP which are used for communicating with Taal. The pads need to be
-muxed to DSI mode like any other OMAP pads. Currently the pad muxing is
-not touched by the driver, but I think it's doable in the DSI driver (as
-long as the DSI driver knows the required pad config).
-
-However, that's not enough.
-
-DSI uses differential pairs for communication (a "lane" consists of two
-wires), and we have always one clock lane, and a number of data lanes.
-In Taal's case we have a clock lane and two data lanes, which means 6
-pads/wires.
-
-We need to configure which of the OMAPs pads is used for which function,
-so, for example, pad x and x+1 are used for clock lane, and x is the
-negative pair and x+1 is the positive pair. And this configuration has
-to match the wiring going to the panel, so that clk+ from OMAP goes to
-clk+ in the panel.
-
-So it dts data we need something, perhaps, like below. Here we define
-the pad numbers and polarities in an array, where the first cell-pair is
-for clk, then data1, then data2 and so on (if there are more than two
-data lanes).
-
-lanes = <
-	/* pad-pair number, polarity */
-	1 0	/* DSI pad pair 1 is used for clk, pol +/-  */
-	2 1	/* DSI pad pair 2 is used for data1, pol -/+ */
-	0 0	/* DSI pad pair 0 is used for data2, pol +/- */
->;
-
-Now, I don't quite know where this data should be. If it's in the
-dsi-node, it doesn't work with multiple panels. But then, it's quite
-OMAP specific thing. While other platforms probably need some kind of
-pad configuration also, it may be something totally different. And so it
-doesn't feel right in the taal-node either.
-
-And a look-up table like in the clock case doesn't make much sense
-either, as we don't have a key here, as we had in the clock case (the
-dsi-ddr-clk).
-
-So basically the only option I've come up with is to define the lane
-configuration in the panel's data, and let the dsi driver peek there and
-configure the HW. And this doesn't feel right.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/56ed0d5f/attachment-0001.sig>
+diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+index f326d31..a7b3f36 100644
+--- a/arch/arm/mach-u300/core.c
++++ b/arch/arm/mach-u300/core.c
+@@ -27,6 +27,7 @@
+ #include <linux/mtd/fsmc.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/pinctrl/pinconf-generic.h>
+ #include <linux/dma-mapping.h>
+ 
+ #include <asm/types.h>
+@@ -1605,7 +1606,15 @@ static struct platform_device dma_device = {
+ 	},
+ };
+ 
+-/* Pinmux settings */
++static unsigned long pin_pullup_conf[] = {
++	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 1),
++};
++
++static unsigned long pin_highz_conf[] = {
++	PIN_CONF_PACKED(PIN_CONFIG_BIAS_HIGH_IMPEDANCE, 0),
++};
++
++/* Pin control settings */
+ static struct pinctrl_map __initdata u300_pinmux_map[] = {
+ 	/* anonymous maps for chip power and EMIFs */
+ 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-u300", NULL, "power"),
+@@ -1615,6 +1624,12 @@ static struct pinctrl_map __initdata u300_pinmux_map[] = {
+ 	PIN_MAP_MUX_GROUP_DEFAULT("mmci",  "pinctrl-u300", NULL, "mmc0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("pl022", "pinctrl-u300", NULL, "spi0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("uart0", "pinctrl-u300", NULL, "uart0"),
++	/* This pin is used for clock return rather than GPIO */
++	PIN_MAP_CONFIGS_PIN_DEFAULT("mmci", "pinctrl-u300", "PIO APP GPIO 11",
++				    pin_pullup_conf),
++	/* This pin is used for card detect */
++	PIN_MAP_CONFIGS_PIN_DEFAULT("mmci", "pinctrl-u300", "PIO MS INS",
++				    pin_highz_conf),
+ };
+ 
+ struct u300_mux_hog {
+@@ -1640,7 +1655,6 @@ static int __init u300_pinctrl_fetch(void)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
+ 		struct pinctrl *p;
+-		int ret;
+ 
+ 		p = pinctrl_get_select_default(u300_mux_hogs[i].dev);
+ 		if (IS_ERR(p)) {
+-- 
+1.7.8
