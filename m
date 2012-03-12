@@ -1,189 +1,37 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 12 Mar 2012 15:05:57 +0100
-Subject: [PATCH] stmmac: Add device-tree support
-Message-ID: <1331561157-3820-1-git-send-email-sr@denx.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 12 Mar 2012 20:01:34 +0530
+Subject: [PATCH 5/5] mmc: sdhci-s3c: setup pins using pinctrl interface
+In-Reply-To: <20120312142143.GC14020@sirena.org.uk>
+References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
+ <1331469965-28846-6-git-send-email-thomas.abraham@linaro.org>
+ <20120312142143.GC14020@sirena.org.uk>
+Message-ID: <CAJuYYwQ=vhcrbH3gsMBuLG1D_p=mx_RFbN86+ETPT4bLYrRgEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to configure the STMMAC ethernet driver via
-device-tree instead of platform_data.
+On 12 March 2012 19:51, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Sun, Mar 11, 2012 at 06:16:05PM +0530, Thomas Abraham wrote:
+>> The platform specific callback to setup the sdhci pin mux and pin config
+>> is removed and the pinctrl subsystem interface is used to setup the
+>> mux and config.
+>
+> You've only added pinctrl support for Exynos but this driver is also
+> used by SoCs going back to s3c24xx era. ?Either all those SoCs need to
+> be converted to use pinctrl or the driver needs to understand both
+> methods (eg, using pinctrl if no callback is supplied).
 
-Currently, only the properties needed on SPEAr600 are provided. All
-other properties should be added once needed on other platforms.
+Yes, I agree with your comment. I did refer to manuals of s3c24xx to
+Exynos to ensure that the samsung pinctrl driver is generic and
+reusable on all samsung soc's. I hope I have not missed out something
+important that would require additional tweaks in the samsung pinctrl
+driver. The missing bits now are gpio interrupt and wakeup interrupt
+support in the samsung pinctrl driver. Once that is complete, I
+believe it should be easy to add support for other SoC and convert the
+drivers to use pinctrl (other option being to let pinctrl driver hog
+all the mappings at boot and remove the cfg_gpio platform callbacks
+from the driver).
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Cc: Viresh Kumar <viresh.kumar@st.com>
----
- Documentation/devicetree/bindings/net/stmmac.txt   |   38 +++++++++++
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   66 +++++++++++++++++++-
- 2 files changed, 103 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/net/stmmac.txt
+Thank you Mark for your comments.
 
-diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
-new file mode 100644
-index 0000000..386a47f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/stmmac.txt
-@@ -0,0 +1,38 @@
-+* STMicroelectronics 10/100/1000 Ethernet driver (GMAC)
-+
-+Required properties:
-+- compatible: Should be "stm,gmac"
-+- reg: Address and length of the register set for the device
-+- interrupt-parent: Should be the phandle for the interrupt controller
-+  that services interrupts for this device
-+- interrupts: Should contain the STMMAC interrupts
-+- interrupt-names: Should contain the interrupt names "macirq"
-+  "eth_wake_irq" if this interrupt is supported in the "interrupts"
-+  property
-+- phy-mode: String, operation mode of the PHY interface.
-+  Supported values are: "mii", "rmii", "gmii", "rgmii".
-+- phy-addr: MDIO address of the PHY
-+
-+Optional properties:
-+- stm,prog-burst-len: Specify the burst length
-+- stm,has-gmac: Indicates that the controller supports 1000Mbps
-+- stm,has-pmt: Indicates that the controller supports power management
-+- mac-address: 6 bytes, mac address
-+
-+Examples:
-+
-+	gmac0: stmmac at e0800000 {
-+		compatible = "stm,gmac";
-+		reg = <0xe0800000 0x8000>;
-+		interrupt-parent = <&vic1>;
-+		interrupts = <24 23>;
-+		interrupt-names = "macirq", "eth_wake_irq";
-+		mac-address = [000000000000]; /* Filled in by U-Boot */
-+
-+		stm,prog-burst-len = <8>;
-+		stm,has-gmac;
-+		stm,has-pmt;
-+
-+		phy-mode = "gmii";
-+		phy-addr = <0>;
-+	};
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 3aad981..fcf46c7 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -24,8 +24,43 @@
- 
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_net.h>
- #include "stmmac.h"
- 
-+#ifdef CONFIG_OF
-+static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
-+					    struct plat_stmmacenet_data *plat,
-+					    const char **mac)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	*mac = of_get_mac_address(np);
-+
-+	plat->interface = of_get_phy_mode(np);
-+	of_property_read_u32(np, "phy-addr", &plat->phy_addr);
-+	plat->mdio_bus_data = devm_kzalloc(&pdev->dev,
-+					   sizeof(struct stmmac_mdio_bus_data),
-+					   GFP_KERNEL);
-+
-+	/*
-+	 * Currently only the properties needed on SPEAr600
-+	 * are provided. All other properties should be added
-+	 * once needed on other platforms.
-+	 */
-+	of_property_read_u32(np, "stm,prog-burst-len", &plat->pbl);
-+	if (of_get_property(np, "stm,has-gmac", NULL))
-+		plat->has_gmac = 1;
-+	if (of_get_property(np, "stm,has-pmt", NULL))
-+		plat->pmt = 1;
-+
-+	return 0;
-+}
-+#endif /* CONFIG_OF */
-+
- /**
-  * stmmac_pltfr_probe
-  * @pdev: platform device pointer
-@@ -39,7 +74,8 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	void __iomem *addr = NULL;
- 	struct stmmac_priv *priv = NULL;
--	struct plat_stmmacenet_data *plat_dat;
-+	struct plat_stmmacenet_data *plat_dat = NULL;
-+	const char *mac = NULL;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
-@@ -58,6 +94,22 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
- 		ret = -ENOMEM;
- 		goto out_release_region;
- 	}
-+
-+#ifdef CONFIG_OF
-+	plat_dat = devm_kzalloc(&pdev->dev, sizeof(struct plat_stmmacenet_data),
-+				GFP_KERNEL);
-+	if (!plat_dat) {
-+		pr_err("%s: ERROR: no memory", __func__);
-+		ret = -ENOMEM;
-+		goto out_unmap;
-+	}
-+
-+	ret = stmmac_probe_config_dt(pdev, plat_dat, &mac);
-+	if (ret) {
-+		pr_err("%s: main dt probe failed", __func__);
-+		goto out_unmap;
-+	}
-+#else
- 	plat_dat = pdev->dev.platform_data;
- 
- 	/* Custom initialisation (if needed)*/
-@@ -66,6 +118,7 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
- 		if (unlikely(ret))
- 			goto out_unmap;
- 	}
-+#endif
- 
- 	priv = stmmac_dvr_probe(&(pdev->dev), plat_dat, addr);
- 	if (!priv) {
-@@ -73,6 +126,10 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
- 		goto out_unmap;
- 	}
- 
-+	/* Get MAC address if available (DT) */
-+	if (mac)
-+		memcpy(priv->dev->dev_addr, mac, ETH_ALEN);
-+
- 	/* Get the MAC information */
- 	priv->dev->irq = platform_get_irq_byname(pdev, "macirq");
- 	if (priv->dev->irq == -ENXIO) {
-@@ -178,6 +235,12 @@ static const struct dev_pm_ops stmmac_pltfr_pm_ops = {
- static const struct dev_pm_ops stmmac_pltfr_pm_ops;
- #endif /* CONFIG_PM */
- 
-+static const struct of_device_id stmmac_dt_ids[] = {
-+	{ .compatible = "stm,gmac", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
-+
- static struct platform_driver stmmac_driver = {
- 	.probe = stmmac_pltfr_probe,
- 	.remove = stmmac_pltfr_remove,
-@@ -185,6 +248,7 @@ static struct platform_driver stmmac_driver = {
- 		   .name = STMMAC_RESOURCE_NAME,
- 		   .owner = THIS_MODULE,
- 		   .pm = &stmmac_pltfr_pm_ops,
-+		   .of_match_table = of_match_ptr(stmmac_dt_ids),
- 		   },
- };
- 
--- 
-1.7.9.2
+Regards,
+Thomas.
