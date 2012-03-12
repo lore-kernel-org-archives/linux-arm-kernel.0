@@ -1,63 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 12 Mar 2012 10:27:16 -0400
-Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
-In-Reply-To: <op.wa197mq94cuzmg@gonzo.lentin.co.uk>
-References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
- <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
- <20120312030232.GX5050@titan.lakedaemon.net>
- <201203120817.19777.arnd@arndb.de>
- <op.wa197mq94cuzmg@gonzo.lentin.co.uk>
-Message-ID: <20120312142716.GA5050@titan.lakedaemon.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Mar 2012 19:58:47 +0800
+Subject: [PATCH v4] ASoC: add imx-sgtl5000 machine driver working with fsl_ssi
+Message-ID: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 02:22:24PM -0000, Jamie Lentin wrote:
-> On Mon, 12 Mar 2012 08:17:19 -0000, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> >On Monday 12 March 2012, Jason Cooper wrote:
-> >>> +     dnskw_gpio_register(39, "dnskw:power:sata0", 1);
-> >>> +     dnskw_gpio_register(40, "dnskw:power:sata1", 1);
-> >>> +
-> >>> +     /* Set NAS to turn back on after a power failure */
-> >>> +     dnskw_gpio_register(37, "dnskw:power:recover", 1);
-> >>> +}
-> >>> +
-> >>
-> >>I doubt this board is the only one that wants to be added while the
-> >>conversion to devicetree is progressing.  It makes more sense to me to
-> >>break the above out to a separate file, eg board-dnskw.c.  I'll follow
-> >>and break out the dreamplug code to board-dreamplug.c.  Otherwise, I see
-> >>board-dt.c becoming a long mess.
-> >>
-> >>Arnd, sound okay to you?
-> >
-> >Either way is fine with me. I personally wouldn't expect many more boards
-> >to come in before the DT conversion has mostly completed, but I guess you
-> >have a better feeling for what other hardware is out there that people
-> >are interested in.
-> >
-> 
-> It probably depends on how easy it is to add the gpiochips into
-> devicetree. Being able to put the LED, buttons and fans in
-> devicetree would make board-dt.c much more manageable. I started to
-> look into it and wasn't immediately obvious, but will have a closer
-> look.
-> 
-> Happy to resubmit, breaking it out into a board-dnskw.c though.
+Changes since v3:
+ * Change imx compatible to "fsl,imx21-ssi"
+ * Leave locking issue as a FIXME for Timur to sort out separately
 
-Yeah, let's go ahead and do that.  pinmux and the above are going to take
-a while to sort out.  In the mean time, there's:
+---
+Shawn Guo (10):
+      ASoC: fsl: separate SSI and DMA Kconfig options
+      ASoC: imx: merge sound/soc/imx into sound/soc/fsl
+      ASoC: fsl: rename imx-pcm Kconfig options and filename
+      ASoC: fsl: create fsl_utils to accommodate the common functions
+      ASoC: fsl: remove helper fsl_asoc_get_codec_dev_name
+      ASoC: fsl: check property 'compatible' for the machine name
+      ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+      ASoC: fsl: remove the fatal error checking on codec-handle
+      ASoC: fsl: let fsl_ssi work with imx pcm and machine drivers
+      ASoC: fsl: add imx-sgtl5000 machine driver
 
-sheevaplug
-guruplug
-guruplug-serverplus
-Lacie-*
-Seagate-*
-rd-boards-*
-
-just to name a few.  Plus it'll give me something to do while we wait
-for pinmux/common clock to land.
-
-thx,
-
-Jason.
+ .../bindings/sound/imx-audio-sgtl5000.txt          |   24 +++
+ arch/powerpc/configs/86xx/mpc8610_hpcd_defconfig   |    1 +
+ arch/powerpc/configs/mpc85xx_defconfig             |    1 +
+ arch/powerpc/configs/mpc85xx_smp_defconfig         |    1 +
+ sound/soc/Kconfig                                  |    1 -
+ sound/soc/Makefile                                 |    1 -
+ sound/soc/fsl/Kconfig                              |  124 ++++++++++++-
+ sound/soc/fsl/Makefile                             |   29 +++-
+ sound/soc/{imx => fsl}/eukrea-tlv320.c             |    2 +-
+ sound/soc/fsl/fsl_ssi.c                            |  140 +++++++++++----
+ sound/soc/fsl/fsl_utils.c                          |   91 ++++++++++
+ sound/soc/fsl/fsl_utils.h                          |   26 +++
+ sound/soc/{imx => fsl}/imx-audmux.c                |    0
+ sound/soc/{imx => fsl}/imx-audmux.h                |    0
+ .../{imx/imx-pcm-dma-mx2.c => fsl/imx-pcm-dma.c}   |    0
+ sound/soc/{imx => fsl}/imx-pcm-fiq.c               |    0
+ sound/soc/{imx => fsl}/imx-pcm.c                   |    0
+ sound/soc/{imx => fsl}/imx-pcm.h                   |    0
+ sound/soc/fsl/imx-sgtl5000.c                       |  177 ++++++++++++++++++
+ sound/soc/{imx => fsl}/imx-ssi.c                   |    2 +-
+ sound/soc/{imx => fsl}/imx-ssi.h                   |    0
+ sound/soc/fsl/mpc8610_hpcd.c                       |  168 ++----------------
+ sound/soc/{imx => fsl}/mx27vis-aic32x4.c           |    0
+ sound/soc/fsl/p1022_ds.c                           |  190 ++------------------
+ sound/soc/{imx => fsl}/phycore-ac97.c              |    0
+ sound/soc/{imx => fsl}/wm1133-ev1.c                |    0
+ sound/soc/imx/Kconfig                              |   79 --------
+ sound/soc/imx/Makefile                             |   22 ---
+ 28 files changed, 604 insertions(+), 475 deletions(-)
