@@ -1,71 +1,45 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 08 Mar 2012 22:46:08 -0700
-Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board
- data
-In-Reply-To: <20120224184859.GN18185@atomide.com>
-References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
- <1329998490-27555-5-git-send-email-rnayak@ti.com>
- <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
- <20120224184859.GN18185@atomide.com>
-Message-ID: <20120309054608.647473E0901@localhost>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 12 Mar 2012 10:24:35 -0300
+Subject: I.MX35 PDK
+In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A29@MEP-EXCH.meprolight.com>
+References: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
+ <CAOMZO5Amo0XFf+TV7PprCL079C5Y0qKmo+k-FfShU7k4SG7W6Q@mail.gmail.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8918@MEP-EXCH.meprolight.com>
+ <CAOMZO5A6T+WdOE41Wx6Nctwz9wk8FKaxzjbAt_woZkCnuodNYg@mail.gmail.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A29@MEP-EXCH.meprolight.com>
+Message-ID: <CAOMZO5B_mZ16zvXdNbKP_PWM5axNPzMeHQttxe8PYHET7UMufg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Feb 2012 10:49:00 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> * Rajendra Nayak <rnayak@ti.com> [120223 19:29]:
-> > On Friday 24 February 2012 12:27 AM, Tony Lindgren wrote:
-> > >>--- a/arch/arm/boot/dts/omap3.dtsi
-> > >>+++ b/arch/arm/boot/dts/omap3.dtsi
-> > >>@@ -113,5 +113,31 @@
-> > >>  			#size-cells =<0>;
-> > >>  			ti,hwmods = "i2c3";
-> > >>  		};
-> > >>+
-> > >>+		mmc1: mmc at 1 {
-> > >>+			compatible = "ti,omap2-hsmmc";
-> > >>+			ti,hwmods = "mmc1";
-> > >>+			ti,dual-volt;
-> > >>+		};
-> > >>+
-> > >>+		mmc2: mmc at 2 {
-> > >>+			compatible = "ti,omap2-hsmmc";
-> > >>+			ti,hwmods = "mmc2";
-> > >>+		};
-> > >>+
-> > >>+		mmc3: mmc at 3 {
-> > >>+			compatible = "ti,omap2-hsmmc";
-> > >>+			ti,hwmods = "mmc3";
-> > >>+		};
-> > >>+
-> > >>+		mmc4: mmc at 4 {
-> > >>+			compatible = "ti,omap2-hsmmc";
-> > >>+			ti,hwmods = "mmc4";
-> > >>+		};
-> > >>+
-> > >>+		mmc5: mmc at 5 {
-> > >>+			compatible = "ti,omap2-hsmmc";
-> > >>+			ti,hwmods = "mmc5";
-> > >>+		};
-> > >>  	};
-> > >>  };
-> > >
-> > >These all should all be "ti,omap3-hsmmc" I guess?
-> > 
-> > Well, I defined the binding such that both omap2 and omap3
-> > can use the same compatible "ti,omap2-hsmmc" since there is
-> > no difference in the way they are defined or handled. If thats
-> > confusing, I can have separate compatibles.
-> > Btw, I guess we do the same with a few other re-used IPs as well,
-> > I just checked and mcpsi does the same.
-> 
-> Yeah let's use separate compatibles to avoid confusion.
-> For omap2 we also have the ti,omap2-mmc in addition to
-> ti,omap2-hsmmc..
+On 3/12/12, Alex Gershgorin <alexg@meprolight.com> wrote:
 
-Yes, absolutely use separate compatible values.  It is always important
-to be specific as to the silicon implementing the IP.  The omap3 instance
-can also carry the omap2 string in its compatible list:
+> 1. Back resistor 172 to the default value.
+>
+> 2. Removed the resistor 146, through which a voltage was applied from a PMIC
+> (EXT_3V) on "CMOS_VIO".
+>
+> 3. Connecting a resistor 147 which supplies power from the LDO_3V3 on
+> "CMOS_VIO".
 
-	compatible = "ti,omap3-hsmmc", "ti,omap2-hsmmc";
+The camera on the FSL BSP works fine with no hardware modification on
+the mx35pdk.
 
-g.
+As I suggested previously you should control the power rails, i2c pad
+settings, etc from software so that the camera can also work in
+mainline without the need of changing the hardware.
+
+> On my display I see snow flickering and unfortunately not a live video from
+> camera.
+
+Do you have this patch applied?
+
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=f910fb8fcd1c97788f2291c8646597bcd87ee061
+
+Also, try to isolate the display from this issue. Capture the image to
+a file and try to play it on a PC.
+
+Regards,
+
+Fabio Estevam
