@@ -1,38 +1,46 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 12 Mar 2012 10:32:12 -0600
-Subject: [PATCH 1/2] Documentation/gpio.txt: Explain expected pinctrl
- interaction
-In-Reply-To: <CACRpkdbPeVBv5VWefDvib5HmGF0K2gT79Mx7g-yviyQj33+Z-w@mail.gmail.com>
-References: <1329719263-18971-1-git-send-email-swarren@nvidia.com>
- <CACRpkdbPeVBv5VWefDvib5HmGF0K2gT79Mx7g-yviyQj33+Z-w@mail.gmail.com>
-Message-ID: <20120312163212.70E283E07B0@localhost>
+Date: Mon, 12 Mar 2012 10:38:38 -0600
+Subject: [PATCH RESEND v3 1/2] GPIO: LPC32xx: Fix missing bit selection
+ mask
+In-Reply-To: <1330984871-411-1-git-send-email-stigge@antcom.de>
+References: <1330984871-411-1-git-send-email-stigge@antcom.de>
+Message-ID: <20120312163838.AABCC3E07B0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Feb 2012 11:46:03 +0100, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Feb 20, 2012 at 7:27 AM, Stephen Warren <swarren@nvidia.com> wrote:
+On Mon,  5 Mar 2012 23:01:10 +0100, Roland Stigge <stigge@antcom.de> wrote:
+> Add missing mask to pin bit selection in gpio-lpc32xx.c
+> (#define GPIO3_PIN_IN_SEL)
 > 
-> > Update gpio.txt based on recent discussions regarding interaction with the
-> > pinctrl subsystem.
-> >
-> > Previously, gpio_request() was described as explicitly not performing any
-> > required mux setup operations etc.
-> >
-> > Now, gpio_request() is explicitly as explicitly performing any required mux
-> > setup operations where possible. In the case it isn't, platform code is
-> > required to have set up any required muxing or other configuration prior to
-> > gpio_request() being called, in order to maintain the same semantics.
-> >
-> > This is achieved by gpiolib drivers calling e.g. pinctrl_request_gpio() in
-> > their .request() operation.
-> >
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Grant can you take this one? I'd prefer for you to have a look at
-> it as well.
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-I've taken this one, but left the 2nd for Olof.
+Applied, thx.
 
 g.
+
+> 
+> ---
+>  drivers/gpio/gpio-lpc32xx.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- linux-2.6.orig/drivers/gpio/gpio-lpc32xx.c
+> +++ linux-2.6/drivers/gpio/gpio-lpc32xx.c
+> @@ -59,7 +59,7 @@
+>  #define GPO3_PIN_TO_BIT(x)			(1 << (x))
+>  #define GPIO012_PIN_IN_SEL(x, y)		(((x) >> (y)) & 1)
+>  #define GPIO3_PIN_IN_SHIFT(x)			((x) == 5 ? 24 : 10 + (x))
+> -#define GPIO3_PIN_IN_SEL(x, y)			((x) >> GPIO3_PIN_IN_SHIFT(y))
+> +#define GPIO3_PIN_IN_SEL(x, y)			(((x) >> GPIO3_PIN_IN_SHIFT(y)) & 1)
+>  #define GPIO3_PIN5_IN_SEL(x)			(((x) >> 24) & 1)
+>  #define GPI3_PIN_IN_SEL(x, y)			(((x) >> (y)) & 1)
+>  
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
