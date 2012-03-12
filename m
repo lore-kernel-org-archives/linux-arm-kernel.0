@@ -1,45 +1,37 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 12 Mar 2012 11:17:27 -0600
-Subject: [PATCH] gpio/mxs: support irqs triggered by both edges
-In-Reply-To: <lyhaxt4usz.fsf@ensc-virt.intern.sigma-chemnitz.de>
-References: <1329745925-7868-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
- <20120312163503.AEBC73E07B0@localhost>
- <lyhaxt4usz.fsf@ensc-virt.intern.sigma-chemnitz.de>
-Message-ID: <CACxGe6uOtgqb1GcBUCDY3L7B5THg1_set0pNcxkzZihr2y9==Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 12 Mar 2012 12:56:10 -0700
+Subject: [PATCH v2 2/2] arm/tegra: add timeout to PCIe PLL lock detection
+ loop
+In-Reply-To: <20120312193020.GA1584@rainbow>
+References: <20120306201538.GA14350@rainbow>
+ <1331287760-10546-1-git-send-email-mad_soft@inbox.ru>
+ <4F5E3BE7.4080207@wwwdotorg.org> <20120312193020.GA1584@rainbow>
+Message-ID: <CAOesGMi0aqCjLsJ5wWXwFVQL2T8wtUuE14rFZ9h7NKHXcWAoqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 11:02 AM, Enrico Scholz
-<enrico.scholz@sigma-chemnitz.de> wrote:
-> Grant Likely <grant.likely@secretlab.ca> writes:
+On Mon, Mar 12, 2012 at 12:30 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+> On 12:09 Mon 12 Mar ? ? , Stephen Warren wrote:
+>> Thierry pointed out that one of NVIDIA's downstream kernels uses a
+>> timeout of 300 here, rather than 2000 above. Do you see a specific need
+>> for this timeout for be 2000 rather than 300? It might be nice to be
+>> consistent.
+> No, there's no specific need for it to be 2000 - it may as well be 300.
+> I just wanted to stay on the safe side, but I think 300 should be still
+> more than enough time for PLL to lock.
 >
->>> iMX28 silicon does not support irqs triggered by both gpio edges. Patch
->>> emulates this behavior by configuring such irqs as level triggered and
->>> by switching polarity in the interrupt handler.
 >>
->> That looks dodgy and hacky. ?This will definitely miss interrupts if
->> they come in too fast.
+>> Olof, I notice you've already applied V1 of this, which has the return
+>> statement issue. Can you replace it with this, or should Dmitry send an
+>> incremental patch?
 >
-> Because patch calculates the trigger from the actual level, there should
-> not be missed more interrupts than with native edge-both support.
+> Yes, V1 breaks more things than it fixes, so it would be nice if
+> it can be replaced with fixed version (I hope it's not too late yet).
+> BTW, regarding timeout discussion above - should I resend patch with
+> adjusted timeout, or can you change it while applying? (of course,
+> if we settle on incremental patch, I'll roll this change in)
 
-Edge interrupt controllers latch interrupt requests. so that nothing
-gets missed.  Level interrupt controllers do not.  So, if the irq line
-toggles 3 times before the handling code gets executed, then the
-kernel will still only recognize 1 irq, not 3.
-
->> I don't like this approach. ?What do you need it for?
->
-> some drivers (e.g. gpio-keys, otg gpio-vbus, gpio-charger) are requesting
-> gpio based interrupts with IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING
-> flags. ?It is not possible to use such drivers without having EDGE_BOTH
-> support.
->
->
-> Enrico
+Please send an incremental patch which also solves the above question. :)
 
 
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+-Olof
