@@ -1,71 +1,252 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 12 Mar 2012 17:00:57 -0500
-Subject: [PATCH v6 3/3] clk: basic clock hardware types
-In-Reply-To: <CAJOA=zOS44YRfg3A7D8G+jWoQ_gzRQ937A7tYDU+DxWce_khzQ@mail.gmail.com>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-4-git-send-email-mturquette@linaro.org>
- <4F5E5A0C.6080604@gmail.com>
- <CAJOA=zOS44YRfg3A7D8G+jWoQ_gzRQ937A7tYDU+DxWce_khzQ@mail.gmail.com>
-Message-ID: <4F5E7219.7020301@gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 12 Mar 2012 22:54:50 +0100
+Subject: [PATCH v8 2/4] USB: ohci-nxp: Rename symbols from pnx4008 to nxp
+In-Reply-To: <1331589292-18986-1-git-send-email-stigge@antcom.de>
+References: <1331589292-18986-1-git-send-email-stigge@antcom.de>
+Message-ID: <1331589292-18986-3-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2012 03:58 PM, Turquette, Mike wrote:
-> On Mon, Mar 12, 2012 at 1:18 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On 03/10/2012 01:54 AM, Mike Turquette wrote:
->>> Many platforms support simple gateable clocks, fixed-rate clocks,
->>> adjustable divider clocks and multi-parent multiplexer clocks.
->>>
->>> This patch introduces basic clock types for the above-mentioned hardware
->>> which share some common characteristics.
->>>
->>> Based on original work by Jeremy Kerr and contribution by Jamie Iles.
->>> Dividers and multiplexor clocks originally contributed by Richard Zhao &
->>> Sascha Hauer.
->>>
+Since this driver is compatible with several NXP devices, the driver was renamed
+accordingly. This patch also changes the respective symbol names.
 
-snip
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+---
+ Documentation/i2c/instantiating-devices |    6 ++--
+ drivers/usb/host/ohci-hcd.c             |    2 +-
+ drivers/usb/host/ohci-nxp.c             |   53 ++++++++++++++++---------------
+ 3 files changed, 31 insertions(+), 30 deletions(-)
 
->>> +static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->>> +             unsigned long parent_rate)
->>> +{
->>> +     struct clk_divider *divider = to_clk_divider(hw);
->>> +     unsigned int div;
->>> +     unsigned long flags = 0;
->>> +
->>> +     if (divider->lock)
->>> +             spin_lock_irqsave(divider->lock, flags);
->>> +
->>> +     div = readl(divider->reg) >> divider->shift;
->>> +     div &= (1 << divider->width) - 1;
->>> +
->>> +     if (divider->lock)
->>> +             spin_unlock_irqrestore(divider->lock, flags);
->>
->> What are you locking against? You are only reading the register.
-> 
-> Hi Rob,
-> 
-> These register-level locks originally came in from the divider &
-> multiplexer patches from Richard and Sascha and I'm sure they can give
-> you more details than I.
-> 
-> Basically on their platform they have some 32-bits regs that have a
-> lot of overlapping clock functions in them, such as enable/disable and
-> adjusting a divider all in one reg.  Those operations are protected by
-> different locks (enable spinlock and prepare mutex, respectively) so
-> some synchronization mechanism is necessary.  On OMAP we don't use
-> this since we have a billion registers that typically only map to one
-> clock each.  I also wonder if having device type memory for the
-> affected regions makes a this irrelevant on ARM... but that wouldn't
-> matter for non-ARM architectures.  Just a thought.
-> 
-
-In fact, I pointed out that locking for a register access was needed in
-an early version of this series as well. However, locking is only needed
-if you are doing a read-mod-write on a field in a shared register or
-reading from multiple registers. It makes no sense if you are *only*
-reading a single shared register as is the case here. That's already an
-atomic operation.
-
-Rob
+diff --git a/Documentation/i2c/instantiating-devices b/Documentation/i2c/instantiating-devices
+index 9edb75d..abf6361 100644
+--- a/Documentation/i2c/instantiating-devices
++++ b/Documentation/i2c/instantiating-devices
+@@ -87,11 +87,11 @@ it may have different addresses from one board to the next (manufacturer
+ changing its design without notice). In this case, you can call
+ i2c_new_probed_device() instead of i2c_new_device().
+ 
+-Example (from the pnx4008 OHCI driver):
++Example (from the nxp OHCI driver):
+ 
+ static const unsigned short normal_i2c[] = { 0x2c, 0x2d, I2C_CLIENT_END };
+ 
+-static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
++static int __devinit usb_hcd_nxp_probe(struct platform_device *pdev)
+ {
+ 	(...)
+ 	struct i2c_adapter *i2c_adap;
+@@ -100,7 +100,7 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+ 	(...)
+ 	i2c_adap = i2c_get_adapter(2);
+ 	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
+-	strlcpy(i2c_info.type, "isp1301_pnx", I2C_NAME_SIZE);
++	strlcpy(i2c_info.type, "isp1301_nxp", I2C_NAME_SIZE);
+ 	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
+ 						   normal_i2c, NULL);
+ 	i2c_put_adapter(i2c_adap);
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index 713c66c..c190962 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1052,7 +1052,7 @@ MODULE_LICENSE ("GPL");
+ 
+ #ifdef CONFIG_ARCH_PNX4008
+ #include "ohci-nxp.c"
+-#define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
++#define PLATFORM_DRIVER		usb_hcd_nxp_driver
+ #endif
+ 
+ #ifdef CONFIG_ARCH_DAVINCI_DA8XX
+diff --git a/drivers/usb/host/ohci-nxp.c b/drivers/usb/host/ohci-nxp.c
+index 0013db7..a12c6b4 100644
+--- a/drivers/usb/host/ohci-nxp.c
++++ b/drivers/usb/host/ohci-nxp.c
+@@ -1,7 +1,8 @@
+ /*
+- * drivers/usb/host/ohci-pnx4008.c
++ * driver for NXP USB Host devices
+  *
+- * driver for Philips PNX4008 USB Host
++ * Currently supported OHCI host devices:
++ * - Philips PNX4008
+  *
+  * Authors: Dmitry Chigirev <source@mvista.com>
+  *	    Vitaly Wool <vitalywool@gmail.com>
+@@ -121,13 +122,13 @@ static int isp1301_remove(struct i2c_client *client)
+ }
+ 
+ static const struct i2c_device_id isp1301_id[] = {
+-	{ "isp1301_pnx", 0 },
++	{ "isp1301_nxp", 0 },
+ 	{ }
+ };
+ 
+ static struct i2c_driver isp1301_driver = {
+ 	.driver = {
+-		.name = "isp1301_pnx",
++		.name = "isp1301_nxp",
+ 	},
+ 	.probe = isp1301_probe,
+ 	.remove = isp1301_remove,
+@@ -180,14 +181,14 @@ static inline void isp1301_vbus_off(void)
+ 		  ISP1301_I2C_OTG_CONTROL_1 | ISP1301_I2C_REG_CLEAR_ADDR);
+ }
+ 
+-static void pnx4008_start_hc(void)
++static void nxp_start_hc(void)
+ {
+ 	unsigned long tmp = __raw_readl(USB_OTG_STAT_CONTROL) | HOST_EN;
+ 	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
+ 	isp1301_vbus_on();
+ }
+ 
+-static void pnx4008_stop_hc(void)
++static void nxp_stop_hc(void)
+ {
+ 	unsigned long tmp;
+ 	isp1301_vbus_off();
+@@ -195,7 +196,7 @@ static void pnx4008_stop_hc(void)
+ 	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
+ }
+ 
+-static int __devinit ohci_pnx4008_start(struct usb_hcd *hcd)
++static int __devinit ohci_nxp_start(struct usb_hcd *hcd)
+ {
+ 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+ 	int ret;
+@@ -211,9 +212,9 @@ static int __devinit ohci_pnx4008_start(struct usb_hcd *hcd)
+ 	return 0;
+ }
+ 
+-static const struct hc_driver ohci_pnx4008_hc_driver = {
++static const struct hc_driver ohci_nxp_hc_driver = {
+ 	.description = hcd_name,
+-	.product_desc =		"pnx4008 OHCI",
++	.product_desc =		"nxp OHCI",
+ 
+ 	/*
+ 	 * generic hardware linkage
+@@ -225,7 +226,7 @@ static const struct hc_driver ohci_pnx4008_hc_driver = {
+ 	/*
+ 	 * basic lifecycle operations
+ 	 */
+-	.start = ohci_pnx4008_start,
++	.start = ohci_nxp_start,
+ 	.stop = ohci_stop,
+ 	.shutdown = ohci_shutdown,
+ 
+@@ -255,7 +256,7 @@ static const struct hc_driver ohci_pnx4008_hc_driver = {
+ 
+ #define USB_CLOCK_MASK (AHB_M_CLOCK_ON| OTG_CLOCK_ON | HOST_CLOCK_ON | I2C_CLOCK_ON)
+ 
+-static void pnx4008_set_usb_bits(void)
++static void nxp_set_usb_bits(void)
+ {
+ 	start_int_set_falling_edge(SE_USB_OTG_ATX_INT_N);
+ 	start_int_ack(SE_USB_OTG_ATX_INT_N);
+@@ -282,7 +283,7 @@ static void pnx4008_set_usb_bits(void)
+ 	start_int_umask(SE_USB_AHB_NEED_CLK_INT);
+ }
+ 
+-static void pnx4008_unset_usb_bits(void)
++static void nxp_unset_usb_bits(void)
+ {
+ 	start_int_mask(SE_USB_OTG_ATX_INT_N);
+ 	start_int_mask(SE_USB_OTG_TIMER_INT);
+@@ -292,17 +293,17 @@ static void pnx4008_unset_usb_bits(void)
+ 	start_int_mask(SE_USB_AHB_NEED_CLK_INT);
+ }
+ 
+-static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
++static int __devinit usb_hcd_nxp_probe(struct platform_device *pdev)
+ {
+ 	struct usb_hcd *hcd = 0;
+ 	struct ohci_hcd *ohci;
+-	const struct hc_driver *driver = &ohci_pnx4008_hc_driver;
++	const struct hc_driver *driver = &ohci_nxp_hc_driver;
+ 	struct i2c_adapter *i2c_adap;
+ 	struct i2c_board_info i2c_info;
+ 
+ 	int ret = 0, irq;
+ 
+-	dev_dbg(&pdev->dev, "%s: " DRIVER_DESC " (pnx4008)\n", hcd_name);
++	dev_dbg(&pdev->dev, "%s: " DRIVER_DESC " (nxp)\n", hcd_name);
+ 	if (usb_disabled()) {
+ 		err("USB is disabled");
+ 		ret = -ENODEV;
+@@ -327,7 +328,7 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+ 	}
+ 	i2c_adap = i2c_get_adapter(2);
+ 	memset(&i2c_info, 0, sizeof(struct i2c_board_info));
+-	strlcpy(i2c_info.type, "isp1301_pnx", I2C_NAME_SIZE);
++	strlcpy(i2c_info.type, "isp1301_nxp", I2C_NAME_SIZE);
+ 	isp1301_i2c_client = i2c_new_probed_device(i2c_adap, &i2c_info,
+ 						   normal_i2c, NULL);
+ 	i2c_put_adapter(i2c_adap);
+@@ -375,7 +376,7 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Set all USB bits in the Start Enable register */
+-	pnx4008_set_usb_bits();
++	nxp_set_usb_bits();
+ 
+ 	hcd->rsrc_start = pdev->resource[0].start;
+ 	hcd->rsrc_len = pdev->resource[0].end - pdev->resource[0].start + 1;
+@@ -392,7 +393,7 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+ 		goto out4;
+ 	}
+ 
+-	pnx4008_start_hc();
++	nxp_start_hc();
+ 	platform_set_drvdata(pdev, hcd);
+ 	ohci = hcd_to_ohci(hcd);
+ 	ohci_hcd_init(ohci);
+@@ -402,9 +403,9 @@ static int __devinit usb_hcd_pnx4008_probe(struct platform_device *pdev)
+ 	if (ret == 0)
+ 		return ret;
+ 
+-	pnx4008_stop_hc();
++	nxp_stop_hc();
+ out4:
+-	pnx4008_unset_usb_bits();
++	nxp_unset_usb_bits();
+ 	usb_put_hcd(hcd);
+ out3:
+ 	clk_disable(usb_clk);
+@@ -419,15 +420,15 @@ out:
+ 	return ret;
+ }
+ 
+-static int usb_hcd_pnx4008_remove(struct platform_device *pdev)
++static int usb_hcd_nxp_remove(struct platform_device *pdev)
+ {
+ 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+ 
+ 	usb_remove_hcd(hcd);
+-	pnx4008_stop_hc();
++	nxp_stop_hc();
+ 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+ 	usb_put_hcd(hcd);
+-	pnx4008_unset_usb_bits();
++	nxp_unset_usb_bits();
+ 	clk_disable(usb_clk);
+ 	clk_put(usb_clk);
+ 	i2c_unregister_device(isp1301_i2c_client);
+@@ -442,12 +443,12 @@ static int usb_hcd_pnx4008_remove(struct platform_device *pdev)
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:usb-ohci");
+ 
+-static struct platform_driver usb_hcd_pnx4008_driver = {
++static struct platform_driver usb_hcd_nxp_driver = {
+ 	.driver = {
+ 		.name = "usb-ohci",
+ 		.owner	= THIS_MODULE,
+ 	},
+-	.probe = usb_hcd_pnx4008_probe,
+-	.remove = usb_hcd_pnx4008_remove,
++	.probe = usb_hcd_nxp_probe,
++	.remove = usb_hcd_nxp_remove,
+ };
+ 
+-- 
+1.7.9
