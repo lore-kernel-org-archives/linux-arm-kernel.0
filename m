@@ -1,5 +1,5 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 12 Mar 2012 15:17:04 -0700
+Date: Mon, 12 Mar 2012 15:28:42 -0700
 Subject: [PATCH v3 00/13] gpio/omap: Some more driver cleanup and fixes
 In-Reply-To: <CAC83ZvJDfDBcRU1isYaxRe-fWN8F2+QW6W5EeWWuTRcFBGpYNg@mail.gmail.com>
  (Tarun Kanti DebBarma's message of "Tue, 13 Mar 2012 01:57:03 +0530")
@@ -8,7 +8,7 @@ References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
  <CAC83Zv+8AjCHBOJbtvSQS-URvCE5Xm9oPk9_X7h4Kz7FZ_7Otw@mail.gmail.com>
  <CAC83ZvJKS34Py6vVtk_Si9q3A-9CVN6v4ixNM+HJ37AATcGNPA@mail.gmail.com>
  <CAC83ZvJDfDBcRU1isYaxRe-fWN8F2+QW6W5EeWWuTRcFBGpYNg@mail.gmail.com>
-Message-ID: <87boo1wjkv.fsf@ti.com>
+Message-ID: <87vcm9v4h1.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,8 +29,14 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Please note that the branch has your following patch:
 > gpio/omap: fix wakeups on level-triggered GPIOs
 
-After addressing my comments on the series, please go ahead and rebase
-on Grant's gpio/next branch.
+Please be sure to Cc the GPIO maintainer (added now.)
+
+Grant can we consider your gpio/next a stable baseline for further
+GPIO fixes?
+
+If so, Tarun, please base your branch there.  Otherwise, continue to use
+my for_3.4/gpio/runtime-pm-cleanup, but please test it by merging with
+the gpio/next branch.
 
 Thanks,
 
