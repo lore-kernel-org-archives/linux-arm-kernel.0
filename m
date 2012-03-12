@@ -1,37 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Mar 2012 12:56:10 -0700
-Subject: [PATCH v2 2/2] arm/tegra: add timeout to PCIe PLL lock detection
- loop
-In-Reply-To: <20120312193020.GA1584@rainbow>
-References: <20120306201538.GA14350@rainbow>
- <1331287760-10546-1-git-send-email-mad_soft@inbox.ru>
- <4F5E3BE7.4080207@wwwdotorg.org> <20120312193020.GA1584@rainbow>
-Message-ID: <CAOesGMi0aqCjLsJ5wWXwFVQL2T8wtUuE14rFZ9h7NKHXcWAoqQ@mail.gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Mon, 12 Mar 2012 16:25:50 +0100
+Subject: [PATCH] stmmac: Add device-tree support
+In-Reply-To: <20120312143825.GB13869@game.jcrosoft.org>
+References: <1331561157-3820-1-git-send-email-sr@denx.de>
+ <20120312143825.GB13869@game.jcrosoft.org>
+Message-ID: <201203121625.50283.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 12:30 PM, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
-> On 12:09 Mon 12 Mar ? ? , Stephen Warren wrote:
->> Thierry pointed out that one of NVIDIA's downstream kernels uses a
->> timeout of 300 here, rather than 2000 above. Do you see a specific need
->> for this timeout for be 2000 rather than 300? It might be nice to be
->> consistent.
-> No, there's no specific need for it to be 2000 - it may as well be 300.
-> I just wanted to stay on the safe side, but I think 300 should be still
-> more than enough time for PLL to lock.
->
->>
->> Olof, I notice you've already applied V1 of this, which has the return
->> statement issue. Can you replace it with this, or should Dmitry send an
->> incremental patch?
->
-> Yes, V1 breaks more things than it fixes, so it would be nice if
-> it can be replaced with fixed version (I hope it's not too late yet).
-> BTW, regarding timeout discussion above - should I resend patch with
-> adjusted timeout, or can you change it while applying? (of course,
-> if we settle on incremental patch, I'll roll this change in)
+On Monday 12 March 2012 15:38:25 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > @@ -58,6 +94,22 @@ static int stmmac_pltfr_probe(struct platform_device
+> > *pdev)
+> > 
+> >  		ret = -ENOMEM;
+> >  		goto out_release_region;
+> >  	
+> >  	}
+> > 
+> > +
+> > +#ifdef CONFIG_OF
+> > +	plat_dat = devm_kzalloc(&pdev->dev, sizeof(struct
+> > plat_stmmacenet_data), +				GFP_KERNEL);
+> > +	if (!plat_dat) {
+> > +		pr_err("%s: ERROR: no memory", __func__);
+> > +		ret = -ENOMEM;
+> > +		goto out_unmap;
+> > +	}
+> > +
+> > +	ret = stmmac_probe_config_dt(pdev, plat_dat, &mac);
+> > +	if (ret) {
+> > +		pr_err("%s: main dt probe failed", __func__);
+> > +		goto out_unmap;
+> > +	}
+> > +#else
+> 
+> This must be check at runtime, we can boot a kernel with or without DT.
 
-Please send an incremental patch which also solves the above question. :)
+Are you referring to using "if (pdev->dev.of_node)" to distinguish between DT 
+and non-DT version instead of this #ifdef?
 
-
--Olof
+Thanks,
+Stefan
