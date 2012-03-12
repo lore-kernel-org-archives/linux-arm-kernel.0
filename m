@@ -1,69 +1,58 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Sat, 10 Mar 2012 14:54:25 +0000 (GMT)
-Subject: [PATCH v3] pxa/hx4700: Fix basic suspend/resume
-Message-ID: <1331391265.88838.YahooMailClassic@web29002.mail.ird.yahoo.com>
+From: uri.y@variscite.com (Uri Yosef)
+Date: Mon, 12 Mar 2012 12:20:29 +0200
+Subject: [PATCH]: arm/dts: OMAP4: Add Variscite OMAP4 System-On-Modeule support
+Message-ID: <1331547629-17556-1-git-send-email-uri.y@variscite.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basic suspend/resume is fixed by ensuring that the PGSR registers are set
-correctly before sleep mode is entered. In particular four of the active low
-resets need to be driven high while in sleep mode, otherwise the unit resets
-itself instead of suspending. Another problem was that the PCFR_GPROD bit is set
-by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail
-immediately after returning from sleep mode.
+From: Uri yosef <uri.y@variscite.com>
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+ Hi Tony,
+
+ This patch add device tree support for Variscite OMAP4 System-On-Modeule.
+
+ Regards,
+ Uri Yosef
+
 ---
+ arch/arm/boot/dts/omap4-var_som.dts |   29 +++++++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-var_som.dts
 
-V3:
-Changed GPIO72, GPIO96 back to KEEP_OUTPUT.
-
-diff -uprN clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c
---- clean-3.3-rc6/arch/arm/mach-pxa/hx4700.c	2012-03-04 01:08:09.000000000 +0000
-+++ linux-3.3-rc6/arch/arm/mach-pxa/hx4700.c	2012-03-10 14:42:41.328255002 +0000
-@@ -121,7 +121,11 @@ static unsigned long hx4700_pin_config[]
- 	GPIO19_SSP2_SCLK,
- 	GPIO86_SSP2_RXD,
- 	GPIO87_SSP2_TXD,
--	GPIO88_GPIO,
-+	GPIO88_GPIO | MFP_LPM_DRIVE_HIGH,	/* TSC2046_CS */
+diff --git a/arch/arm/boot/dts/omap4-var_som.dts b/arch/arm/boot/dts/omap4-var_som.dts
+new file mode 100644
+index 0000000..e352f38
+--- /dev/null
++++ b/arch/arm/boot/dts/omap4-var_som.dts
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2012 Variscite Ltd. - http://www.variscite.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
 +
-+	/* BQ24022 Regulator */
-+	GPIO72_GPIO | MFP_LPM_KEEP_OUTPUT,	/* BQ24022_nCHARGE_EN */
-+	GPIO96_GPIO | MFP_LPM_KEEP_OUTPUT,	/* BQ24022_ISET2 */
- 
- 	/* HX4700 specific input GPIOs */
- 	GPIO12_GPIO,	/* ASIC3_IRQ */
-@@ -134,6 +138,11 @@ static unsigned long hx4700_pin_config[]
- 	GPIO108_GPIO,	/* GSM_READY */
- 	GPIO58_GPIO,	/* TSC2046_nPENIRQ */
- 	GPIO66_GPIO,	/* nSDIO_IRQ */
++/include/ "omap4.dtsi"
 +
-+	GPIO61_GPIO | MFP_LPM_DRIVE_HIGH,	/* W3220_nRESET */
-+	GPIO71_GPIO | MFP_LPM_DRIVE_HIGH,	/* ASIC3_nRESET */
-+	GPIO81_GPIO | MFP_LPM_DRIVE_HIGH,	/* CPU_GP_nRESET */
-+	GPIO116_GPIO | MFP_LPM_DRIVE_HIGH,	/* CPU_HW_nRESET */
- };
- 
- /*
-@@ -828,15 +837,20 @@ static struct gpio global_gpios[] = {
- 	{ GPIO110_HX4700_LCD_LVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_LVDD" },
- 	{ GPIO111_HX4700_LCD_AVDD_3V3_ON, GPIOF_OUT_INIT_HIGH, "LCD_AVDD" },
- 	{ GPIO32_HX4700_RS232_ON,         GPIOF_OUT_INIT_HIGH, "RS232_ON" },
-+	{ GPIO61_HX4700_W3220_nRESET,     GPIOF_OUT_INIT_HIGH, "W3220_nRESET" },
- 	{ GPIO71_HX4700_ASIC3_nRESET,     GPIOF_OUT_INIT_HIGH, "ASIC3_nRESET" },
-+	{ GPIO81_HX4700_CPU_GP_nRESET,    GPIOF_OUT_INIT_HIGH, "CPU_GP_nRESET" },
- 	{ GPIO82_HX4700_EUART_RESET,      GPIOF_OUT_INIT_HIGH, "EUART_RESET" },
- 	{ GPIO105_HX4700_nIR_ON,          GPIOF_OUT_INIT_HIGH, "nIR_EN" },
-+	{ GPIO116_HX4700_CPU_HW_nRESET,   GPIOF_OUT_INIT_HIGH, "CPU_HW_nRESET" },
- };
- 
- static void __init hx4700_init(void)
- {
- 	int ret;
- 
-+	PCFR = PCFR_GPR_EN | PCFR_OPDE;
++/ {
++	model = "Variscite OMAP4 SOM";
++	compatible = "var,omap4-var_som", "ti,omap4430", "ti,omap4";
 +
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
- 	ret = gpio_request_array(ARRAY_AND_SIZE(global_gpios));
- 	if (ret)
++	/*
++	 * Since the initial device tree board file does not create any
++	 * devices (MMC, network...), the only way to boot is to provide a
++	 * ramdisk.
++	 */
++	chosen {
++		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x40000000>; /* 1 GB */
++	};
++};
+-- 
+1.7.5.4
