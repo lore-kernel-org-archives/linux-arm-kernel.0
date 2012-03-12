@@ -1,97 +1,118 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 12 Mar 2012 09:52:02 +0530
-Subject: [PATCH V2 07/22] watchdog/mpcore_wdt: Fix multiline comments
-In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
-References: <cover.1331524811.git.viresh.kumar@st.com>
-Message-ID: <c6c6a42167a5938b869c43045fadcdfe0b069555.1331524811.git.viresh.kumar@st.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 12 Mar 2012 15:07:26 -0500
+Subject: [PATCH] stmmac: Add device-tree support
+In-Reply-To: <4F5E2858.4000708@st.com>
+References: <1331561157-3820-1-git-send-email-sr@denx.de>
+ <201203121606.26926.sr@denx.de> <4F5E169D.3070508@st.com>
+ <201203121723.38411.sr@denx.de> <4F5E2858.4000708@st.com>
+Message-ID: <4F5E577E.7090808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of few multiline comment a 'tab' is present instead of 'space' after the
-'*' in the second column. Replace tab with space here.
+On 03/12/2012 11:46 AM, Giuseppe CAVALLARO wrote:
+> On 3/12/2012 5:23 PM, Stefan Roese wrote:
+>> On Monday 12 March 2012 16:30:37 Giuseppe CAVALLARO wrote:
+>>>>>> +Required properties:
+>>>>>> +- compatible: Should be "stm,gmac"
+>>>>>
+>>>>> This is too generic. This should be 1 string per version of h/w.
+>>>>
+>>>> Viresh, Giuseppe, can you please suggest a proper string for the SPEAr600
+>>>> STMMAC core, including version?
+>>>>
+>>>>> 'stm' should be 'st' according to vendor-prefixes.txt.
+>>>
+>>> I'm not familiar with devicetree; maybe we should have:
+>>>
+>>> "stmicro,mac100"
+>>> "stmicro,gmac"
+>>>
+>>> or: st instead of stmicro if you prefer.
+>>>
+>>> in fact, stmmac is for mac100 and gmac devices.
+>>
+>> How about "st,spear600-gmac" for SPEAr600 then?
+> 
+> IIUC, as final result we should have something like this... that sounds
+> quite good to me.
+> 
+> ST/ARM SPEAr
+> "st,spear600-gmac"
+> "st,spear1310-gmac"
+>   ...
+> 
+> ST/SH
+> 
+> "st,stx7108-gmac"
+> "st,stx7106-gmac"
+> "st,stx7109-mac"    ->>> mac10/100
+> ...
+> 
+> MIPS
+> "st,Loongson1B"
+> 
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- drivers/watchdog/mpcore_wdt.c |   42 +++++++++++++++++++---------------------
- 1 files changed, 20 insertions(+), 22 deletions(-)
+This seems fine to me.
 
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 953044a..7c9f78c 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -1,23 +1,21 @@
- /*
-- *	Watchdog driver for the mpcore watchdog timer
-+ * Watchdog driver for the mpcore watchdog timer
-  *
-- *	(c) Copyright 2004 ARM Limited
-+ * (c) Copyright 2004 ARM Limited
-  *
-- *	Based on the SoftDog driver:
-- *	(c) Copyright 1996 Alan Cox <alan@lxorguk.ukuu.org.uk>,
-- *						All Rights Reserved.
-+ * Based on the SoftDog driver:
-+ * (c) Copyright 1996 Alan Cox <alan@lxorguk.ukuu.org.uk>, All Rights Reserved.
-  *
-- *	This program is free software; you can redistribute it and/or
-- *	modify it under the terms of the GNU General Public License
-- *	as published by the Free Software Foundation; either version
-- *	2 of the License, or (at your option) any later version.
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-  *
-- *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
-- *	warranty for any of this software. This material is provided
-- *	"AS-IS" and at no charge.
-- *
-- *	(c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
-+ * Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
-+ * warranty for any of this software. This material is provided
-+ * "AS-IS" and at no charge.
-  *
-+ * (c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
-  */
- #include <linux/module.h>
- #include <linux/moduleparam.h>
-@@ -64,8 +62,8 @@ MODULE_PARM_DESC(mpcore_noboot, "MPcore watchdog action, "
- 					__MODULE_STRING(ONLY_TESTING) ")");
- 
- /*
-- *	This is the interrupt handler.  Note that we only use this
-- *	in testing mode, so don't actually do a reboot here.
-+ * This is the interrupt handler.  Note that we only use this
-+ * in testing mode, so don't actually do a reboot here.
-  */
- static irqreturn_t mpcore_wdt_fire(int irq, void *arg)
- {
-@@ -83,11 +81,11 @@ static irqreturn_t mpcore_wdt_fire(int irq, void *arg)
- }
- 
- /*
-- *	mpcore_wdt_ping - reload the timer
-+ * mpcore_wdt_ping - reload the timer
-  *
-- *	Note that the spec says a DIFFERENT value must be written to the reload
-- *	register each time.  The "perturb" variable deals with this by adding 1
-- *	to the count every other time the function is called.
-+ * Note that the spec says a DIFFERENT value must be written to the reload
-+ * register each time.  The "perturb" variable deals with this by adding 1 to
-+ * the count every other time the function is called.
-  */
- static int mpcore_wdt_ping(struct watchdog_device *wdd)
- {
-@@ -163,8 +161,8 @@ static const struct watchdog_ops mpcore_wdt_ops = {
- };
- 
- /*
-- *	System shutdown handler.  Turn off the watchdog if we're
-- *	restarting or halting the system.
-+ * System shutdown handler.  Turn off the watchdog if we're restarting or
-+ * halting the system.
-  */
- static void mpcore_wdt_shutdown(struct platform_device *pdev)
- {
--- 
-1.7.8.110.g4cb5d
+Rob
+
+>>  
+>>>> Okay.
+>>>>
+>>>>>> +- reg: Address and length of the register set for the device
+>>>>>> +- interrupt-parent: Should be the phandle for the interrupt controller
+>>>>>> +  that services interrupts for this device
+>>>>>> +- interrupts: Should contain the STMMAC interrupts
+>>>>>> +- interrupt-names: Should contain the interrupt names "macirq"
+>>>>>> +  "eth_wake_irq" if this interrupt is supported in the "interrupts"
+>>>>>> +  property
+>>>>>
+>>>>> You should be able to tell this from the compatible string and number of
+>>>>> interrupts.
+>>>>
+>>>> Yes. Currently the driver uses platform_get_irq_byname() to register the
+>>>> irq's. That's why I added these properties. Is there something wrong with
+>>>> using it this way?
+>>>>
+>>>>>> +- phy-mode: String, operation mode of the PHY interface.
+>>>>>> +  Supported values are: "mii", "rmii", "gmii", "rgmii".
+>>>>>> +- phy-addr: MDIO address of the PHY
+>>>>>
+>>>>> This is normally probed or the mdio bus is a sub-node of the MAC node.
+>>>>> See arch/powerpc/boot/dts/mpc8377_mds.dts for an example.
+>>>>
+>>>> Okay, I'll rework this.
+>>>>
+>>>>>> +
+>>>>>> +Optional properties:
+>>>>>> +- stm,prog-burst-len: Specify the burst length
+>>>>>> +- stm,has-gmac: Indicates that the controller supports 1000Mbps
+>>>>>> +- stm,has-pmt: Indicates that the controller supports power management
+>>>>>
+>>>>> I think these should all be encoded by the compatible string.
+>>>
+>>> and should we have all the other flags e.g. tx_coe etc?
+>>> (see stmmac.txt)
+>>
+>> As Rob suggested, some of these flags/parameters are implicitly defined by the 
+>> compatible string. If this is not the case, then sure, those flags/parameters 
+>> need to be provided via the device-tree as well. I just don't need "tx_coe" 
+>> etc. for my platform (SPEAr600) as far as I know. I suggest to add support for 
+>> them once they are really needed/used by other platforms.
+> 
+> Ok, but on SPEAr indeed some of these are not used at all.
+> If you agree, we can go head with these and then we will add new ones
+> next time. In the meantime, I will try to be more familiar with
+> devicetree and provide further patches
+> 
+> peppe
+> 
+>>
+>> Thanks,
+>> Stefan
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe netdev" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+> 
