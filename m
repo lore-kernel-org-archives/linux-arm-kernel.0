@@ -1,57 +1,71 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 12 Mar 2012 14:54:17 -0700
-Subject: [PATCH v3 11/13] gpio/omap: fix dataout register overwrite in
- _set_gpio_dataout_*
-In-Reply-To: <1331118963-26364-12-git-send-email-tarun.kanti@ti.com> (Tarun
- Kanti DebBarma's message of "Wed, 7 Mar 2012 16:46:01 +0530")
-References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
- <1331118963-26364-12-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87y5r5wkmu.fsf@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 12 Mar 2012 17:00:57 -0500
+Subject: [PATCH v6 3/3] clk: basic clock hardware types
+In-Reply-To: <CAJOA=zOS44YRfg3A7D8G+jWoQ_gzRQ937A7tYDU+DxWce_khzQ@mail.gmail.com>
+References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
+ <1331366064-1273-4-git-send-email-mturquette@linaro.org>
+ <4F5E5A0C.6080604@gmail.com>
+ <CAJOA=zOS44YRfg3A7D8G+jWoQ_gzRQ937A7tYDU+DxWce_khzQ@mail.gmail.com>
+Message-ID: <4F5E7219.7020301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+On 03/12/2012 03:58 PM, Turquette, Mike wrote:
+> On Mon, Mar 12, 2012 at 1:18 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> On 03/10/2012 01:54 AM, Mike Turquette wrote:
+>>> Many platforms support simple gateable clocks, fixed-rate clocks,
+>>> adjustable divider clocks and multi-parent multiplexer clocks.
+>>>
+>>> This patch introduces basic clock types for the above-mentioned hardware
+>>> which share some common characteristics.
+>>>
+>>> Based on original work by Jeremy Kerr and contribution by Jamie Iles.
+>>> Dividers and multiplexor clocks originally contributed by Richard Zhao &
+>>> Sascha Hauer.
+>>>
 
-> In the existing _set_gpio_dataout_*() implementation, the dataout
-> register is overwritten every time the function is called. This is
-> not intended behavior because that would end up one user of a GPIO
-> line overwriting what is written by another. Fix this so that previous
-> value is always preserved until explicitly changed by respective
-> user/driver of the GPIO line.
->
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> ---
->  drivers/gpio/gpio-omap.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 04c2677..2e8e476 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -114,6 +114,7 @@ static void _set_gpio_dataout_reg(struct gpio_bank *bank, int gpio, int enable)
->  	else
->  		reg += bank->regs->clr_dataout;
->  
-> +	l |= __raw_readl(bank->base + bank->regs->set_dataout);
+snip
 
-minor: IMO, it's more reader-friendly if this looks like
+>>> +static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+>>> +             unsigned long parent_rate)
+>>> +{
+>>> +     struct clk_divider *divider = to_clk_divider(hw);
+>>> +     unsigned int div;
+>>> +     unsigned long flags = 0;
+>>> +
+>>> +     if (divider->lock)
+>>> +             spin_lock_irqsave(divider->lock, flags);
+>>> +
+>>> +     div = readl(divider->reg) >> divider->shift;
+>>> +     div &= (1 << divider->width) - 1;
+>>> +
+>>> +     if (divider->lock)
+>>> +             spin_unlock_irqrestore(divider->lock, flags);
+>>
+>> What are you locking against? You are only reading the register.
+> 
+> Hi Rob,
+> 
+> These register-level locks originally came in from the divider &
+> multiplexer patches from Richard and Sascha and I'm sure they can give
+> you more details than I.
+> 
+> Basically on their platform they have some 32-bits regs that have a
+> lot of overlapping clock functions in them, such as enable/disable and
+> adjusting a divider all in one reg.  Those operations are protected by
+> different locks (enable spinlock and prepare mutex, respectively) so
+> some synchronization mechanism is necessary.  On OMAP we don't use
+> this since we have a billion registers that typically only map to one
+> clock each.  I also wonder if having device type memory for the
+> affected regions makes a this irrelevant on ARM... but that wouldn't
+> matter for non-ARM architectures.  Just a thought.
+> 
 
-       l = __raw_read(...)
-       l |= GPIO_BIT(...)
-       __raw_write(...)
+In fact, I pointed out that locking for a register access was needed in
+an early version of this series as well. However, locking is only needed
+if you are doing a read-mod-write on a field in a shared register or
+reading from multiple registers. It makes no sense if you are *only*
+reading a single shared register as is the case here. That's already an
+atomic operation.
 
->  	__raw_writel(l, reg);
->  	bank->context.dataout = l;
->  }
-> @@ -130,6 +131,8 @@ static void _set_gpio_dataout_mask(struct gpio_bank *bank, int gpio, int enable)
->  		l |= gpio_bit;
->  	else
->  		l &= ~gpio_bit;
-> +
-> +	l |= __raw_readl(bank->base + bank->regs->set_dataout);
-
-There's already a __raw_read() in this function just above.
-
->  	__raw_writel(l, reg);
->  	bank->context.dataout = l;
->  }
+Rob
