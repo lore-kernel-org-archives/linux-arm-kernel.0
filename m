@@ -1,43 +1,36 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 09 Mar 2012 14:56:52 +1030
-Subject: [PATCH 8/8] ARM: KVM: don't BUG() if guest executes smc.
-Message-ID: <1331267212.6033.rusty@rustcorp.com.au>
+From: neidhard.kim@lge.com (Kim, Jong-Sung)
+Date: Mon, 12 Mar 2012 20:28:56 +0900
+Subject: [PATCH] serial: PL011: clear pending interrupts
+In-Reply-To: <20120312101100.GA8649@n2100.arm.linux.org.uk>
+References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
+ <20120312083221.GW17370@n2100.arm.linux.org.uk>
+ <20120312101100.GA8649@n2100.arm.linux.org.uk>
+Message-ID: <01e201cd0043$5010cea0$f0326be0$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> On Mon, Mar 12, 2012 at 08:32:21AM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Mar 12, 2012 at 09:25:50AM +0100, Linus Walleij wrote:
+> > > diff --git a/drivers/tty/serial/amba-pl011.c
+> > > b/drivers/tty/serial/amba-pl011.c index 6800f5f..ff3fed0 100644
+> > > --- a/drivers/tty/serial/amba-pl011.c
+> > > +++ b/drivers/tty/serial/amba-pl011.c
+> > > @@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct
+uart_amba_port
+> *uap)
+> > >  		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
+> > >  	}
+> > >
+> >
+> > What if we really do end up receiving some characters here?
+> >
+> > > +	/* RXIS but RXFE? Just clear the interrupt */
+> > > +	if(unlikely(fifotaken == 0))
+> > > +		writew(UART011_RTIS | UART011_RXIS,
+> > > +		       uap->port.membase + UART011_ICR);
+> 
+> BTW, I don't see why we need any of this stuff.
 
-From: Rusty Russell <rusty@rustcorp.com.au>
-
-In this case, we just kill the guest.
-
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
----
- arch/arm/kvm/arm.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 1724657..9ef5bdb 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -367,6 +367,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return 0;
- }
- 
-+static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	/* We don't support SMC; don't do that. */
-+	kvm_debug("smc: at %08x", vcpu->arch.regs.pc);
-+	return -EINVAL;
-+}
-+
- static int handle_dabt_hyp(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
- 	/* The hypervisor should never cause aborts */
-@@ -386,6 +393,7 @@ static int (*arm_exit_handlers[])(struct kvm_vcpu *vcpu, struct kvm_run *r) = {
- 	[HSR_EC_CP10_ID]	= kvm_handle_cp10_id,
- 	[HSR_EC_SVC_HYP]	= handle_svc_hyp,
- 	[HSR_EC_HVC]		= handle_hvc,
-+	[HSR_EC_SMC	]	= handle_smc,
- 	[HSR_EC_IABT]		= kvm_handle_guest_abort,
- 	[HSR_EC_DABT]		= kvm_handle_guest_abort,
- 	[HSR_EC_DABT_HYP]	= handle_dabt_hyp,
+Actually, I meant my patch applied alone, not with your patch. My thought
+was the problem we're trying to handle is undocumented and is not guaranteed
+not to happen again.
