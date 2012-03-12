@@ -1,261 +1,977 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 13 Mar 2012 02:29:57 +0530
-Subject: [PATCH v2 1/3] video: s3c-fb: move video interface timing out of
- window setup data
-In-Reply-To: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
-References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1331585999-8604-2-git-send-email-thomas.abraham@linaro.org>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 12 Mar 2012 13:58:11 -0700
+Subject: [PATCH v6 3/3] clk: basic clock hardware types
+In-Reply-To: <4F5E5A0C.6080604@gmail.com>
+References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
+ <1331366064-1273-4-git-send-email-mturquette@linaro.org>
+ <4F5E5A0C.6080604@gmail.com>
+Message-ID: <CAJOA=zOS44YRfg3A7D8G+jWoQ_gzRQ937A7tYDU+DxWce_khzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The video interface timing is independent of the window setup data.
-The resolution of the window can be smaller than that of the lcd
-panel to which the video data is output.
+On Mon, Mar 12, 2012 at 1:18 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On 03/10/2012 01:54 AM, Mike Turquette wrote:
+>> Many platforms support simple gateable clocks, fixed-rate clocks,
+>> adjustable divider clocks and multi-parent multiplexer clocks.
+>>
+>> This patch introduces basic clock types for the above-mentioned hardware
+>> which share some common characteristics.
+>>
+>> Based on original work by Jeremy Kerr and contribution by Jamie Iles.
+>> Dividers and multiplexor clocks originally contributed by Richard Zhao &
+>> Sascha Hauer.
+>>
+>> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>> Signed-off-by: Mike Turquette <mturquette@ti.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Cc: Shawn Guo <shawn.guo@freescale.com>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> Cc: Jamie Iles <jamie@jamieiles.com>
+>> Cc: Richard Zhao <richard.zhao@linaro.org>
+>> Cc: Saravana Kannan <skannan@codeaurora.org>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> Cc: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> Cc: Linus Walleij <linus.walleij@stericsson.com>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Amit Kucheria <amit.kucheria@linaro.org>
+>> Cc: Deepak Saxena <dsaxena@linaro.org>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>
+> One issue with spinlocks below, but otherwise:
+>
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+>
+>> ---
+>> Changes since v5:
+>> ?* standardized the hw-specific locking in the basic clock types
+>> ?* export the individual ops for each basic clock type
+>> ?* improve registration for single-parent basic clocks (thanks Sascha)
+>> ?* fixed bugs in gate clock's static initializers (thanks Andrew)
+>>
+>> ?drivers/clk/Makefile ? ? ? ? | ? ?3 +-
+>> ?drivers/clk/clk-divider.c ? ?| ?204 ++++++++++++++++++++++++++++++++++++++++++
+>> ?drivers/clk/clk-fixed-rate.c | ? 82 +++++++++++++++++
+>> ?drivers/clk/clk-gate.c ? ? ? | ?157 ++++++++++++++++++++++++++++++++
+>> ?drivers/clk/clk-mux.c ? ? ? ?| ?123 +++++++++++++++++++++++++
+>> ?include/linux/clk-private.h ?| ?124 +++++++++++++++++++++++++
+>> ?include/linux/clk-provider.h | ?127 ++++++++++++++++++++++++++
+>> ?7 files changed, 819 insertions(+), 1 deletions(-)
+>> ?create mode 100644 drivers/clk/clk-divider.c
+>> ?create mode 100644 drivers/clk/clk-fixed-rate.c
+>> ?create mode 100644 drivers/clk/clk-gate.c
+>> ?create mode 100644 drivers/clk/clk-mux.c
+>>
+>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+>> index ff362c4..1f736bc 100644
+>> --- a/drivers/clk/Makefile
+>> +++ b/drivers/clk/Makefile
+>> @@ -1,3 +1,4 @@
+>>
+>> ?obj-$(CONFIG_CLKDEV_LOOKUP) ?+= clkdev.o
+>> -obj-$(CONFIG_COMMON_CLK) ? ? += clk.o
+>> +obj-$(CONFIG_COMMON_CLK) ? ? += clk.o clk-fixed-rate.o clk-gate.o \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?clk-mux.o clk-divider.o
+>> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+>> new file mode 100644
+>> index 0000000..c0c4e0b
+>> --- /dev/null
+>> +++ b/drivers/clk/clk-divider.c
+>> @@ -0,0 +1,204 @@
+>> +/*
+>> + * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+>> + * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
+>> + * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Adjustable divider clock implementation
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/io.h>
+>> +#include <linux/err.h>
+>> +#include <linux/string.h>
+>> +
+>> +/*
+>> + * DOC: basic adjustable divider clock that cannot gate
+>> + *
+>> + * Traits of this clock:
+>> + * prepare - clk_prepare only ensures that parents are prepared
+>> + * enable - clk_enable only ensures that parents are enabled
+>> + * rate - rate is adjustable. ?clk->rate = parent->rate / divisor
+>> + * parent - fixed parent. ?No clk_set_parent support
+>> + */
+>> +
+>> +#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+>> +
+>> +static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+>> + ? ? ? ? ? ? unsigned long parent_rate)
+>> +{
+>> + ? ? struct clk_divider *divider = to_clk_divider(hw);
+>> + ? ? unsigned int div;
+>> + ? ? unsigned long flags = 0;
+>> +
+>> + ? ? if (divider->lock)
+>> + ? ? ? ? ? ? spin_lock_irqsave(divider->lock, flags);
+>> +
+>> + ? ? div = readl(divider->reg) >> divider->shift;
+>> + ? ? div &= (1 << divider->width) - 1;
+>> +
+>> + ? ? if (divider->lock)
+>> + ? ? ? ? ? ? spin_unlock_irqrestore(divider->lock, flags);
+>
+> What are you locking against? You are only reading the register.
 
-So move the video timing data from the per-window setup data to the
-platform specific section in the platform data. This also removes
-the restriction that atleast one window should have the same
-resolution as that of the panel attached.
+Hi Rob,
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Jingoo Han <jg1.han@samsung.com>
----
- arch/arm/plat-samsung/include/plat/fb.h |    9 ++-
- drivers/video/s3c-fb.c                  |  114 +++++++++++++++++--------------
- 2 files changed, 68 insertions(+), 55 deletions(-)
+These register-level locks originally came in from the divider &
+multiplexer patches from Richard and Sascha and I'm sure they can give
+you more details than I.
 
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index 0fedf47..39d6bd7 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -24,15 +24,16 @@
- 
- /**
-  * struct s3c_fb_pd_win - per window setup data
-- * @win_mode: The display parameters to initialise (not for window 0)
-+ * @xres     : The window X size.
-+ * @yres     : The window Y size.
-  * @virtual_x: The virtual X size.
-  * @virtual_y: The virtual Y size.
-  */
- struct s3c_fb_pd_win {
--	struct fb_videomode	win_mode;
--
- 	unsigned short		default_bpp;
- 	unsigned short		max_bpp;
-+	unsigned short		xres;
-+	unsigned short		yres;
- 	unsigned short		virtual_x;
- 	unsigned short		virtual_y;
- };
-@@ -45,6 +46,7 @@ struct s3c_fb_pd_win {
-  * @default_win: default window layer number to be used for UI layer.
-  * @vidcon0: The base vidcon0 values to control the panel data format.
-  * @vidcon1: The base vidcon1 values to control the panel data output.
-+ * @vtiming: Video timing when connected to a RGB type panel.
-  * @win: The setup data for each hardware window, or NULL for unused.
-  * @display_mode: The LCD output display mode.
-  *
-@@ -58,6 +60,7 @@ struct s3c_fb_platdata {
- 	void	(*setup_gpio)(void);
- 
- 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
-+	struct fb_videomode     *vtiming;
- 
- 	u32			 default_win;
- 
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index f310516..60d1c12 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -495,7 +495,6 @@ static int s3c_fb_set_par(struct fb_info *info)
- 	u32 alpha = 0;
- 	u32 data;
- 	u32 pagewidth;
--	int clkdiv;
- 
- 	dev_dbg(sfb->dev, "setting framebuffer parameters\n");
- 
-@@ -532,47 +531,8 @@ static int s3c_fb_set_par(struct fb_info *info)
- 	/* disable the window whilst we update it */
- 	writel(0, regs + WINCON(win_no));
- 
--	/* use platform specified window as the basis for the lcd timings */
--
--	if (win_no == sfb->pdata->default_win) {
--		clkdiv = s3c_fb_calc_pixclk(sfb, var->pixclock);
--
--		data = sfb->pdata->vidcon0;
--		data &= ~(VIDCON0_CLKVAL_F_MASK | VIDCON0_CLKDIR);
--
--		if (clkdiv > 1)
--			data |= VIDCON0_CLKVAL_F(clkdiv-1) | VIDCON0_CLKDIR;
--		else
--			data &= ~VIDCON0_CLKDIR;	/* 1:1 clock */
--
--		/* write the timing data to the panel */
--
--		if (sfb->variant.is_2443)
--			data |= (1 << 5);
--
--		writel(data, regs + VIDCON0);
--
--		s3c_fb_enable(sfb, 1);
--
--		data = VIDTCON0_VBPD(var->upper_margin - 1) |
--		       VIDTCON0_VFPD(var->lower_margin - 1) |
--		       VIDTCON0_VSPW(var->vsync_len - 1);
--
--		writel(data, regs + sfb->variant.vidtcon);
--
--		data = VIDTCON1_HBPD(var->left_margin - 1) |
--		       VIDTCON1_HFPD(var->right_margin - 1) |
--		       VIDTCON1_HSPW(var->hsync_len - 1);
--
--		/* VIDTCON1 */
--		writel(data, regs + sfb->variant.vidtcon + 4);
--
--		data = VIDTCON2_LINEVAL(var->yres - 1) |
--		       VIDTCON2_HOZVAL(var->xres - 1) |
--		       VIDTCON2_LINEVAL_E(var->yres - 1) |
--		       VIDTCON2_HOZVAL_E(var->xres - 1);
--		writel(data, regs + sfb->variant.vidtcon + 8);
--	}
-+	if (win_no == sfb->pdata->default_win)
-+		s3c_fb_enable(sfb, 1);
- 
- 	/* write the buffer address */
- 
-@@ -1144,11 +1104,11 @@ static int __devinit s3c_fb_alloc_memory(struct s3c_fb *sfb,
- 
- 	dev_dbg(sfb->dev, "allocating memory for display\n");
- 
--	real_size = windata->win_mode.xres * windata->win_mode.yres;
-+	real_size = windata->xres * windata->yres;
- 	virt_size = windata->virtual_x * windata->virtual_y;
- 
- 	dev_dbg(sfb->dev, "real_size=%u (%u.%u), virt_size=%u (%u.%u)\n",
--		real_size, windata->win_mode.xres, windata->win_mode.yres,
-+		real_size, windata->xres, windata->yres,
- 		virt_size, windata->virtual_x, windata->virtual_y);
- 
- 	size = (real_size > virt_size) ? real_size : virt_size;
-@@ -1230,7 +1190,7 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 				      struct s3c_fb_win **res)
- {
- 	struct fb_var_screeninfo *var;
--	struct fb_videomode *initmode;
-+	struct fb_videomode initmode;
- 	struct s3c_fb_pd_win *windata;
- 	struct s3c_fb_win *win;
- 	struct fb_info *fbinfo;
-@@ -1251,11 +1211,11 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 	}
- 
- 	windata = sfb->pdata->win[win_no];
--	initmode = &windata->win_mode;
-+	initmode = *sfb->pdata->vtiming;
- 
- 	WARN_ON(windata->max_bpp == 0);
--	WARN_ON(windata->win_mode.xres == 0);
--	WARN_ON(windata->win_mode.yres == 0);
-+	WARN_ON(windata->xres == 0);
-+	WARN_ON(windata->yres == 0);
- 
- 	win = fbinfo->par;
- 	*res = win;
-@@ -1294,7 +1254,9 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- 	}
- 
- 	/* setup the initial video mode from the window */
--	fb_videomode_to_var(&fbinfo->var, initmode);
-+	initmode.xres = windata->xres;
-+	initmode.yres = windata->yres;
-+	fb_videomode_to_var(&fbinfo->var, &initmode);
- 
- 	fbinfo->fix.type	= FB_TYPE_PACKED_PIXELS;
- 	fbinfo->fix.accel	= FB_ACCEL_NONE;
-@@ -1339,6 +1301,53 @@ static int __devinit s3c_fb_probe_win(struct s3c_fb *sfb, unsigned int win_no,
- }
- 
- /**
-+ * s3c_fb_set_rgb_timing() - set video timing for rgb interface.
-+ * @sfb: The base resources for the hardware.
-+ *
-+ * Set horizontal and vertical lcd rgb interface timing.
-+ */
-+static void s3c_fb_set_rgb_timing(struct s3c_fb *sfb)
-+{
-+	struct fb_videomode *vmode = sfb->pdata->vtiming;
-+	void __iomem *regs = sfb->regs;
-+	int clkdiv;
-+	u32 data;
-+
-+	if (!vmode->pixclock)
-+		s3c_fb_missing_pixclock(vmode);
-+
-+	clkdiv = s3c_fb_calc_pixclk(sfb, vmode->pixclock);
-+
-+	data = sfb->pdata->vidcon0;
-+	data &= ~(VIDCON0_CLKVAL_F_MASK | VIDCON0_CLKDIR);
-+
-+	if (clkdiv > 1)
-+		data |= VIDCON0_CLKVAL_F(clkdiv-1) | VIDCON0_CLKDIR;
-+	else
-+		data &= ~VIDCON0_CLKDIR;	/* 1:1 clock */
-+
-+	if (sfb->variant.is_2443)
-+		data |= (1 << 5);
-+	writel(data, regs + VIDCON0);
-+
-+	data = VIDTCON0_VBPD(vmode->upper_margin - 1) |
-+	       VIDTCON0_VFPD(vmode->lower_margin - 1) |
-+	       VIDTCON0_VSPW(vmode->vsync_len - 1);
-+	writel(data, regs + sfb->variant.vidtcon);
-+
-+	data = VIDTCON1_HBPD(vmode->left_margin - 1) |
-+	       VIDTCON1_HFPD(vmode->right_margin - 1) |
-+	       VIDTCON1_HSPW(vmode->hsync_len - 1);
-+	writel(data, regs + sfb->variant.vidtcon + 4);
-+
-+	data = VIDTCON2_LINEVAL(vmode->yres - 1) |
-+	       VIDTCON2_HOZVAL(vmode->xres - 1) |
-+	       VIDTCON2_LINEVAL_E(vmode->yres - 1) |
-+	       VIDTCON2_HOZVAL_E(vmode->xres - 1);
-+	writel(data, regs + sfb->variant.vidtcon + 8);
-+}
-+
-+/**
-  * s3c_fb_clear_win() - clear hardware window registers.
-  * @sfb: The base resources for the hardware.
-  * @win: The window to process.
-@@ -1481,15 +1490,14 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
- 		writel(0xffffff, regs + WKEYCON1);
- 	}
- 
-+	s3c_fb_set_rgb_timing(sfb);
-+
- 	/* we have the register setup, start allocating framebuffers */
- 
- 	for (win = 0; win < fbdrv->variant.nr_windows; win++) {
- 		if (!pd->win[win])
- 			continue;
- 
--		if (!pd->win[win]->win_mode.pixclock)
--			s3c_fb_missing_pixclock(&pd->win[win]->win_mode);
--
- 		ret = s3c_fb_probe_win(sfb, win, fbdrv->win[win],
- 				       &sfb->windows[win]);
- 		if (ret < 0) {
-@@ -1623,6 +1631,8 @@ static int s3c_fb_resume(struct device *dev)
- 		shadow_protect_win(win, 0);
- 	}
- 
-+	s3c_fb_set_rgb_timing(sfb);
-+
- 	/* restore framebuffers */
- 	for (win_no = 0; win_no < S3C_FB_MAX_WIN; win_no++) {
- 		win = sfb->windows[win_no];
--- 
-1.6.6.rc2
+Basically on their platform they have some 32-bits regs that have a
+lot of overlapping clock functions in them, such as enable/disable and
+adjusting a divider all in one reg.  Those operations are protected by
+different locks (enable spinlock and prepare mutex, respectively) so
+some synchronization mechanism is necessary.  On OMAP we don't use
+this since we have a billion registers that typically only map to one
+clock each.  I also wonder if having device type memory for the
+affected regions makes a this irrelevant on ARM... but that wouldn't
+matter for non-ARM architectures.  Just a thought.
+
+Regards,
+Mike
+
+>
+>> +
+>> + ? ? if (!(divider->flags & CLK_DIVIDER_ONE_BASED))
+>> + ? ? ? ? ? ? div++;
+>> +
+>> + ? ? return parent_rate / div;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_divider_recalc_rate);
+>> +
+>> +static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+>> + ? ? ? ? ? ? unsigned long *best_parent_rate)
+>> +{
+>> + ? ? struct clk_divider *divider = to_clk_divider(hw);
+>> + ? ? int i, bestdiv = 0;
+>> + ? ? unsigned long parent_rate, best = 0, now, maxdiv;
+>> +
+>> + ? ? maxdiv = (1 << divider->width);
+>> +
+>> + ? ? if (divider->flags & CLK_DIVIDER_ONE_BASED)
+>> + ? ? ? ? ? ? maxdiv--;
+>> +
+>> + ? ? if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
+>> + ? ? ? ? ? ? parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
+>> + ? ? ? ? ? ? bestdiv = parent_rate / rate;
+>> + ? ? ? ? ? ? bestdiv = bestdiv == 0 ? 1 : bestdiv;
+>> + ? ? ? ? ? ? bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
+>> + ? ? ? ? ? ? goto out;
+>> + ? ? }
+>> +
+>> + ? ? /*
+>> + ? ? ?* The maximum divider we can use without overflowing
+>> + ? ? ?* unsigned long in rate * i below
+>> + ? ? ?*/
+>> + ? ? maxdiv = min(ULONG_MAX / rate, maxdiv);
+>> +
+>> + ? ? for (i = 1; i <= maxdiv; i++) {
+>> + ? ? ? ? ? ? int div;
+>> + ? ? ? ? ? ? parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? rate * i);
+>> + ? ? ? ? ? ? div = parent_rate / rate;
+>> + ? ? ? ? ? ? div = div > maxdiv ? maxdiv : div;
+>> + ? ? ? ? ? ? div = div < 1 ? 1 : div;
+>> + ? ? ? ? ? ? now = parent_rate / div;
+>> +
+>> + ? ? ? ? ? ? if (now <= rate && now >= best) {
+>> + ? ? ? ? ? ? ? ? ? ? bestdiv = div;
+>> + ? ? ? ? ? ? ? ? ? ? best = now;
+>> + ? ? ? ? ? ? ? ? ? ? *best_parent_rate = parent_rate;
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> +
+>> + ? ? if (!bestdiv) {
+>> + ? ? ? ? ? ? bestdiv = (1 << divider->width);
+>> + ? ? ? ? ? ? parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
+>> + ? ? } else {
+>> + ? ? ? ? ? ? parent_rate = best * bestdiv;
+>> + ? ? }
+>> +
+>> +out:
+>> + ? ? if (best_parent_rate)
+>> + ? ? ? ? ? ? *best_parent_rate = parent_rate;
+>> +
+>> + ? ? return bestdiv;
+>> +}
+>> +
+>> +static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long *prate)
+>> +{
+>> + ? ? unsigned long best_parent_rate;
+>> + ? ? int div = clk_divider_bestdiv(hw, rate, &best_parent_rate);
+>> + ? ? if (prate) {
+>> + ? ? ? ? ? ? if (best_parent_rate == __clk_get_rate(
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __clk_get_parent(hw->clk)))
+>> + ? ? ? ? ? ? ? ? ? ? *prate = 0;
+>> + ? ? ? ? ? ? else
+>> + ? ? ? ? ? ? ? ? ? ? *prate = best_parent_rate;
+>> + ? ? }
+>> +
+>> + ? ? return best_parent_rate / div;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_divider_round_rate);
+>> +
+>> +static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate)
+>> +{
+>> + ? ? unsigned long best_parent_rate;
+>> + ? ? struct clk_divider *divider = to_clk_divider(hw);
+>> + ? ? unsigned int div;
+>> + ? ? unsigned long flags = 0;
+>> + ? ? u32 val;
+>> +
+>> + ? ? div = clk_divider_bestdiv(hw, rate, &best_parent_rate);
+>> +
+>> + ? ? if (divider->lock)
+>> + ? ? ? ? ? ? spin_lock_irqsave(divider->lock, flags);
+>> +
+>> + ? ? if (!(divider->flags & CLK_DIVIDER_ONE_BASED))
+>> + ? ? ? ? ? ? div--;
+>> +
+>> + ? ? val = readl(divider->reg);
+>> + ? ? val &= ~(((1 << divider->width) - 1) << divider->shift);
+>> + ? ? val |= div << divider->shift;
+>> + ? ? writel(val, divider->reg);
+>> +
+>> + ? ? if (divider->lock)
+>> + ? ? ? ? ? ? spin_unlock_irqrestore(divider->lock, flags);
+>> +
+>> + ? ? return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_divider_set_rate);
+>> +
+>> +struct clk_ops clk_divider_ops = {
+>> + ? ? .recalc_rate = clk_divider_recalc_rate,
+>> + ? ? .round_rate = clk_divider_round_rate,
+>> + ? ? .set_rate = clk_divider_set_rate,
+>> +};
+>> +EXPORT_SYMBOL_GPL(clk_divider_ops);
+>> +
+>> +struct clk *clk_register_divider(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? const char *parent_name, unsigned long flags,
+>> + ? ? ? ? ? ? void __iomem *reg, u8 shift, u8 width,
+>> + ? ? ? ? ? ? u8 clk_divider_flags, spinlock_t *lock)
+>> +{
+>> + ? ? struct clk_divider *div;
+>> + ? ? struct clk *clk;
+>> +
+>> + ? ? div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
+>> +
+>> + ? ? if (!div) {
+>> + ? ? ? ? ? ? pr_err("%s: could not allocate divider clk\n", __func__);
+>> + ? ? ? ? ? ? return NULL;
+>> + ? ? }
+>> +
+>> + ? ? /* struct clk_divider assignments */
+>> + ? ? div->reg = reg;
+>> + ? ? div->shift = shift;
+>> + ? ? div->width = width;
+>> + ? ? div->flags = clk_divider_flags;
+>> + ? ? div->lock = lock;
+>> +
+>> + ? ? if (parent_name) {
+>> + ? ? ? ? ? ? div->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+>> + ? ? ? ? ? ? if (!div->parent[0])
+>> + ? ? ? ? ? ? ? ? ? ? goto out;
+>> + ? ? }
+>> +
+>> + ? ? clk = clk_register(dev, name,
+>> + ? ? ? ? ? ? ? ? ? ? &clk_divider_ops, &div->hw,
+>> + ? ? ? ? ? ? ? ? ? ? div->parent,
+>> + ? ? ? ? ? ? ? ? ? ? (parent_name ? 1 : 0),
+>> + ? ? ? ? ? ? ? ? ? ? flags);
+>> + ? ? if (clk)
+>> + ? ? ? ? ? ? return clk;
+>> +
+>> +out:
+>> + ? ? kfree(div->parent[0]);
+>> + ? ? kfree(div);
+>> +
+>> + ? ? return NULL;
+>> +}
+>> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
+>> new file mode 100644
+>> index 0000000..90c79fb
+>> --- /dev/null
+>> +++ b/drivers/clk/clk-fixed-rate.c
+>> @@ -0,0 +1,82 @@
+>> +/*
+>> + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
+>> + * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Fixed rate clock implementation
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/io.h>
+>> +#include <linux/err.h>
+>> +
+>> +/*
+>> + * DOC: basic fixed-rate clock that cannot gate
+>> + *
+>> + * Traits of this clock:
+>> + * prepare - clk_(un)prepare only ensures parents are prepared
+>> + * enable - clk_enable only ensures parents are enabled
+>> + * rate - rate is always a fixed value. ?No clk_set_rate support
+>> + * parent - fixed parent. ?No clk_set_parent support
+>> + */
+>> +
+>> +#define to_clk_fixed_rate(_hw) container_of(_hw, struct clk_fixed_rate, hw)
+>> +
+>> +static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
+>> + ? ? ? ? ? ? unsigned long parent_rate)
+>> +{
+>> + ? ? return to_clk_fixed_rate(hw)->fixed_rate;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_fixed_rate_recalc_rate);
+>> +
+>> +struct clk_ops clk_fixed_rate_ops = {
+>> + ? ? .recalc_rate = clk_fixed_rate_recalc_rate,
+>> +};
+>> +EXPORT_SYMBOL_GPL(clk_fixed_rate_ops);
+>> +
+>> +struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? const char *parent_name, unsigned long flags,
+>> + ? ? ? ? ? ? unsigned long fixed_rate)
+>> +{
+>> + ? ? struct clk_fixed_rate *fixed;
+>> + ? ? char **parent_names = NULL;
+>> + ? ? u8 len;
+>> +
+>> + ? ? fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
+>> +
+>> + ? ? if (!fixed) {
+>> + ? ? ? ? ? ? pr_err("%s: could not allocate fixed clk\n", __func__);
+>> + ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
+>> + ? ? }
+>> +
+>> + ? ? /* struct clk_fixed_rate assignments */
+>> + ? ? fixed->fixed_rate = fixed_rate;
+>> +
+>> + ? ? if (parent_name) {
+>> + ? ? ? ? ? ? parent_names = kmalloc(sizeof(char *), GFP_KERNEL);
+>> +
+>> + ? ? ? ? ? ? if (! parent_names)
+>> + ? ? ? ? ? ? ? ? ? ? goto out;
+>> +
+>> + ? ? ? ? ? ? len = sizeof(char) * strlen(parent_name);
+>> +
+>> + ? ? ? ? ? ? parent_names[0] = kmalloc(len, GFP_KERNEL);
+>> +
+>> + ? ? ? ? ? ? if (!parent_names[0])
+>> + ? ? ? ? ? ? ? ? ? ? goto out;
+>> +
+>> + ? ? ? ? ? ? strncpy(parent_names[0], parent_name, len);
+>> + ? ? }
+>> +
+>> +out:
+>> + ? ? return clk_register(dev, name,
+>> + ? ? ? ? ? ? ? ? ? ? &clk_fixed_rate_ops, &fixed->hw,
+>> + ? ? ? ? ? ? ? ? ? ? parent_names,
+>> + ? ? ? ? ? ? ? ? ? ? (parent_name ? 1 : 0),
+>> + ? ? ? ? ? ? ? ? ? ? flags);
+>> +}
+>> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+>> new file mode 100644
+>> index 0000000..5d50efa
+>> --- /dev/null
+>> +++ b/drivers/clk/clk-gate.c
+>> @@ -0,0 +1,157 @@
+>> +/*
+>> + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
+>> + * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Gated clock implementation
+>> + */
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/io.h>
+>> +#include <linux/err.h>
+>> +#include <linux/string.h>
+>> +
+>> +/**
+>> + * DOC: basic gatable clock which can gate and ungate it's ouput
+>> + *
+>> + * Traits of this clock:
+>> + * prepare - clk_(un)prepare only ensures parent is (un)prepared
+>> + * enable - clk_enable and clk_disable are functional & control gating
+>> + * rate - inherits rate from parent. ?No clk_set_rate support
+>> + * parent - fixed parent. ?No clk_set_parent support
+>> + */
+>> +
+>> +#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
+>> +
+>> +static void clk_gate_set_bit(struct clk_gate *gate)
+>> +{
+>> + ? ? u32 reg;
+>> + ? ? unsigned long flags = 0;
+>> +
+>> + ? ? if (gate->lock)
+>> + ? ? ? ? ? ? spin_lock_irqsave(gate->lock, flags);
+>> +
+>> + ? ? reg = readl(gate->reg);
+>> + ? ? reg |= BIT(gate->bit_idx);
+>> + ? ? writel(reg, gate->reg);
+>> +
+>> + ? ? if (gate->lock)
+>> + ? ? ? ? ? ? spin_unlock_irqrestore(gate->lock, flags);
+>> +}
+>> +
+>> +static void clk_gate_clear_bit(struct clk_gate *gate)
+>> +{
+>> + ? ? u32 reg;
+>> + ? ? unsigned long flags = 0;
+>> +
+>> + ? ? if (gate->lock)
+>> + ? ? ? ? ? ? spin_lock_irqsave(gate->lock, flags);
+>> +
+>> + ? ? reg = readl(gate->reg);
+>> + ? ? reg &= ~BIT(gate->bit_idx);
+>> + ? ? writel(reg, gate->reg);
+>> +
+>> + ? ? if (gate->lock)
+>> + ? ? ? ? ? ? spin_unlock_irqrestore(gate->lock, flags);
+>> +}
+>> +
+>> +static int clk_gate_enable(struct clk_hw *hw)
+>> +{
+>> + ? ? struct clk_gate *gate = to_clk_gate(hw);
+>> +
+>> + ? ? if (gate->flags & CLK_GATE_SET_TO_DISABLE)
+>> + ? ? ? ? ? ? clk_gate_clear_bit(gate);
+>> + ? ? else
+>> + ? ? ? ? ? ? clk_gate_set_bit(gate);
+>> +
+>> + ? ? return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_gate_enable);
+>> +
+>> +static void clk_gate_disable(struct clk_hw *hw)
+>> +{
+>> + ? ? struct clk_gate *gate = to_clk_gate(hw);
+>> +
+>> + ? ? if (gate->flags & CLK_GATE_SET_TO_DISABLE)
+>> + ? ? ? ? ? ? clk_gate_set_bit(gate);
+>> + ? ? else
+>> + ? ? ? ? ? ? clk_gate_clear_bit(gate);
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_gate_disable);
+>> +
+>> +static int clk_gate_is_enabled(struct clk_hw *hw)
+>> +{
+>> + ? ? u32 reg;
+>> + ? ? unsigned long flags = 0;
+>> + ? ? struct clk_gate *gate = to_clk_gate(hw);
+>> +
+>> + ? ? if (gate->lock)
+>> + ? ? ? ? ? ? spin_lock_irqsave(gate->lock, flags);
+>> +
+>> + ? ? reg = readl(gate->reg);
+>> +
+>> + ? ? if (gate->lock)
+>> + ? ? ? ? ? ? spin_unlock_irqrestore(gate->lock, flags);
+>> +
+>
+> ditto.
+>
+>> + ? ? /* if a set bit disables this clk, flip it before masking */
+>> + ? ? if (gate->flags & CLK_GATE_SET_TO_DISABLE)
+>> + ? ? ? ? ? ? reg ^= BIT(gate->bit_idx);
+>> +
+>> + ? ? reg &= BIT(gate->bit_idx);
+>> +
+>> + ? ? return reg ? 1 : 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
+>> +
+>> +struct clk_ops clk_gate_ops = {
+>> + ? ? .enable = clk_gate_enable,
+>> + ? ? .disable = clk_gate_disable,
+>> + ? ? .is_enabled = clk_gate_is_enabled,
+>> +};
+>> +EXPORT_SYMBOL_GPL(clk_gate_ops);
+>> +
+>> +struct clk *clk_register_gate(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? const char *parent_name, unsigned long flags,
+>> + ? ? ? ? ? ? void __iomem *reg, u8 bit_idx,
+>> + ? ? ? ? ? ? u8 clk_gate_flags, spinlock_t *lock)
+>> +{
+>> + ? ? struct clk_gate *gate;
+>> + ? ? struct clk *clk;
+>> +
+>> + ? ? gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
+>> +
+>> + ? ? if (!gate) {
+>> + ? ? ? ? ? ? pr_err("%s: could not allocate gated clk\n", __func__);
+>> + ? ? ? ? ? ? return NULL;
+>> + ? ? }
+>> +
+>> + ? ? /* struct clk_gate assignments */
+>> + ? ? gate->reg = reg;
+>> + ? ? gate->bit_idx = bit_idx;
+>> + ? ? gate->flags = clk_gate_flags;
+>> + ? ? gate->lock = lock;
+>> +
+>> + ? ? if (parent_name) {
+>> + ? ? ? ? ? ? gate->parent[0] = kstrdup(parent_name, GFP_KERNEL);
+>> + ? ? ? ? ? ? if (!gate->parent[0])
+>> + ? ? ? ? ? ? ? ? ? ? goto out;
+>> + ? ? }
+>> +
+>> + ? ? clk = clk_register(dev, name,
+>> + ? ? ? ? ? ? ? ? ? ? &clk_gate_ops, &gate->hw,
+>> + ? ? ? ? ? ? ? ? ? ? gate->parent,
+>> + ? ? ? ? ? ? ? ? ? ? (parent_name ? 1 : 0),
+>> + ? ? ? ? ? ? ? ? ? ? flags);
+>> + ? ? if (clk)
+>> + ? ? ? ? ? ? return clk;
+>> +out:
+>> + ? ? kfree(gate->parent[0]);
+>> + ? ? kfree(gate);
+>> +
+>> + ? ? return NULL;
+>> +}
+>> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+>> new file mode 100644
+>> index 0000000..6fc0878
+>> --- /dev/null
+>> +++ b/drivers/clk/clk-mux.c
+>> @@ -0,0 +1,123 @@
+>> +/*
+>> + * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+>> + * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
+>> + * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Simple multiplexer clock implementation
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/io.h>
+>> +#include <linux/err.h>
+>> +
+>> +/*
+>> + * DOC: basic adjustable multiplexer clock that cannot gate
+>> + *
+>> + * Traits of this clock:
+>> + * prepare - clk_prepare only ensures that parents are prepared
+>> + * enable - clk_enable only ensures that parents are enabled
+>> + * rate - rate is only affected by parent switching. ?No clk_set_rate support
+>> + * parent - parent is adjustable through clk_set_parent
+>> + */
+>> +
+>> +#define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
+>> +
+>> +static u8 clk_mux_get_parent(struct clk_hw *hw)
+>> +{
+>> + ? ? struct clk_mux *mux = to_clk_mux(hw);
+>> + ? ? u32 val;
+>> + ? ? unsigned long flags = 0;
+>> +
+>> + ? ? if (mux->lock)
+>> + ? ? ? ? ? ? spin_lock_irqsave(mux->lock, flags);
+>> +
+>> + ? ? /*
+>> + ? ? ?* FIXME need a mux-specific flag to determine if val is bitwise or numeric
+>> + ? ? ?* e.g. sys_clkin_ck's clksel field is 3 bits wide, but ranges from 0x1
+>> + ? ? ?* to 0x7 (index starts at one)
+>> + ? ? ?* OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
+>> + ? ? ?* val = 0x4 really means "bit 2, index starts at bit 0"
+>> + ? ? ?*/
+>> + ? ? val = readl(mux->reg) >> mux->shift;
+>> + ? ? val &= (1 << mux->width) - 1;
+>> +
+>> + ? ? if (mux->lock)
+>> + ? ? ? ? ? ? spin_unlock_irqrestore(mux->lock, flags);
+>
+> ditto
+>
+>> +
+>> + ? ? if (val && (mux->flags & CLK_MUX_INDEX_BIT))
+>> + ? ? ? ? ? ? val = ffs(val) - 1;
+>> +
+>> + ? ? if (val && (mux->flags & CLK_MUX_INDEX_ONE))
+>> + ? ? ? ? ? ? val--;
+>> +
+>> + ? ? if (val >= __clk_get_num_parents(hw->clk))
+>> + ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? return val;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_mux_get_parent);
+>> +
+>> +static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+>> +{
+>> + ? ? struct clk_mux *mux = to_clk_mux(hw);
+>> + ? ? u32 val;
+>> + ? ? unsigned long flags = 0;
+>> +
+>> + ? ? if (mux->flags & CLK_MUX_INDEX_BIT)
+>> + ? ? ? ? ? ? index = (1 << ffs(index));
+>> +
+>> + ? ? if (mux->flags & CLK_MUX_INDEX_ONE)
+>> + ? ? ? ? ? ? index++;
+>> +
+>> + ? ? if (mux->lock)
+>> + ? ? ? ? ? ? spin_lock_irqsave(mux->lock, flags);
+>> +
+>> + ? ? val = readl(mux->reg);
+>> + ? ? val &= ~(((1 << mux->width) - 1) << mux->shift);
+>> + ? ? val |= index << mux->shift;
+>> + ? ? writel(val, mux->reg);
+>> +
+>> + ? ? if (mux->lock)
+>> + ? ? ? ? ? ? spin_unlock_irqrestore(mux->lock, flags);
+>> +
+>> + ? ? return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_mux_set_parent);
+>> +
+>> +struct clk_ops clk_mux_ops = {
+>> + ? ? .get_parent = clk_mux_get_parent,
+>> + ? ? .set_parent = clk_mux_set_parent,
+>> +};
+>> +EXPORT_SYMBOL_GPL(clk_mux_ops);
+>> +
+>> +struct clk *clk_register_mux(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? char **parent_names, u8 num_parents, unsigned long flags,
+>> + ? ? ? ? ? ? void __iomem *reg, u8 shift, u8 width,
+>> + ? ? ? ? ? ? u8 clk_mux_flags, spinlock_t *lock)
+>> +{
+>> + ? ? struct clk_mux *mux;
+>> +
+>> + ? ? mux = kmalloc(sizeof(struct clk_mux), GFP_KERNEL);
+>> +
+>> + ? ? if (!mux) {
+>> + ? ? ? ? ? ? pr_err("%s: could not allocate mux clk\n", __func__);
+>> + ? ? ? ? ? ? return ERR_PTR(-ENOMEM);
+>> + ? ? }
+>> +
+>> + ? ? /* struct clk_mux assignments */
+>> + ? ? mux->reg = reg;
+>> + ? ? mux->shift = shift;
+>> + ? ? mux->width = width;
+>> + ? ? mux->flags = clk_mux_flags;
+>> + ? ? mux->lock = lock;
+>> +
+>> + ? ? return clk_register(dev, name, &clk_mux_ops, &mux->hw,
+>> + ? ? ? ? ? ? ? ? ? ? parent_names, num_parents, flags);
+>> +}
+>> diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+>> index 33bf6a7..9d5c4b1 100644
+>> --- a/include/linux/clk-private.h
+>> +++ b/include/linux/clk-private.h
+>> @@ -45,6 +45,130 @@ struct clk {
+>> ?#endif
+>> ?};
+>>
+>> +/*
+>> + * DOC: Basic clock implementations common to many platforms
+>> + *
+>> + * Each basic clock hardware type is comprised of a structure describing the
+>> + * clock hardware, implementations of the relevant callbacks in struct clk_ops,
+>> + * unique flags for that hardware type, a registration function and an
+>> + * alternative macro for static initialization
+>> + */
+>> +
+>> +extern struct clk_ops clk_fixed_rate_ops;
+>> +
+>> +#define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate, ? ? ? ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? _fixed_rate_flags) ? ? ? ? ? ? ?\
+>> + ? ? static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static char *_name##_parent_names[] = {}; ? ? ? ? ? ? ? \
+>> + ? ? static struct clk_fixed_rate _name##_hw = { ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .hw = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? .clk = &_name, ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .fixed_rate = _rate, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .flags = _fixed_rate_flags, ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk _name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .name = #_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .ops = &clk_fixed_rate_ops, ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .hw = &_name##_hw.hw, ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .parent_names = _name##_parent_names, ? ? ? ? ? \
+>> + ? ? ? ? ? ? .num_parents = ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(_name##_parent_names), ? ? ? \
+>> + ? ? ? ? ? ? .flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? };
+>> +
+>> +extern struct clk_ops clk_gate_ops;
+>> +
+>> +#define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr, ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? _flags, _reg, _bit_idx, ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? _gate_flags, _lock) ? ? ? ? ? ? \
+>> + ? ? static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static char *_name##_parent_names[] = { ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? _parent_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk *_name##_parents[] = { ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? _parent_ptr, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk_gate _name##_hw = { ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .hw = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? .clk = &_name, ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .reg = _reg, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .bit_idx = _bit_idx, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .flags = _gate_flags, ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .lock = _lock, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk _name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .name = #_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .ops = &clk_gate_ops, ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .hw = &_name##_hw.hw, ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .parent_names = _name##_parent_names, ? ? ? ? ? \
+>> + ? ? ? ? ? ? .num_parents = ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(_name##_parent_names), ? ? ? \
+>> + ? ? ? ? ? ? .parents = _name##_parents, ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? };
+>> +
+>> +extern struct clk_ops clk_divider_ops;
+>> +
+>> +#define DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr, \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? _flags, _reg, _shift, _width, ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? _divider_flags, _lock) ? ? ? ? ?\
+>> + ? ? static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static char *_name##_parent_names[] = { ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? _parent_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk *_name##_parents[] = { ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? _parent_ptr, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk_divider _name##_hw = { ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .hw = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? .clk = &_name, ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .reg = _reg, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .shift = _shift, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .width = _width, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .flags = _divider_flags, ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .lock = _lock, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk _name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .name = #_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .ops = &clk_divider_ops, ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .hw = &_name##_hw.hw, ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .parent_names = _name##_parent_names, ? ? ? ? ? \
+>> + ? ? ? ? ? ? .num_parents = ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(_name##_parent_names), ? ? ? \
+>> + ? ? ? ? ? ? .parents = _name##_parents, ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? };
+>> +
+>> +extern struct clk_ops clk_mux_ops;
+>> +
+>> +#define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags, ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? _reg, _shift, _width, ? ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? _mux_flags, _lock) ? ? ? ? ? ? ?\
+>> + ? ? static struct clk _name; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk_mux _name##_hw = { ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .hw = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? ? ? ? ? .clk = &_name, ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? }, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .reg = _reg, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .shift = _shift, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .width = _width, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .flags = _mux_flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .lock = _lock, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? }; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? static struct clk _name = { ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .name = #_name, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .ops = &clk_mux_ops, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .hw = &_name##_hw.hw, ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? ? ? ? ? .parent_names = _parent_names, ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .num_parents = ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ARRAY_SIZE(_parent_names), ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .parents = _parents, ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? .flags = _flags, ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? };
+>> +
+>> ?/**
+>> ? * __clk_init - initialize the data structures in a struct clk
+>> ? * @dev: ? ? device initializing this clk, placeholder for now
+>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+>> index 09dea1f..853d526 100644
+>> --- a/include/linux/clk-provider.h
+>> +++ b/include/linux/clk-provider.h
+>> @@ -129,6 +129,133 @@ struct clk_ops {
+>> ? ? ? void ? ? ? ? ? ?(*init)(struct clk_hw *hw);
+>> ?};
+>>
+>> +/*
+>> + * DOC: Basic clock implementations common to many platforms
+>> + *
+>> + * Each basic clock hardware type is comprised of a structure describing the
+>> + * clock hardware, implementations of the relevant callbacks in struct clk_ops,
+>> + * unique flags for that hardware type, a registration function and an
+>> + * alternative macro for static initialization
+>> + */
+>> +
+>> +/**
+>> + * struct clk_fixed_rate - fixed-rate clock
+>> + * @hw: ? ? ? ? ? ? ?handle between common and hardware-specific interfaces
+>> + * @fixed_rate: ? ? ?constant frequency of clock
+>> + */
+>> +struct clk_fixed_rate {
+>> + ? ? struct ? ? ? ? ?clk_hw hw;
+>> + ? ? unsigned long ? fixed_rate;
+>> + ? ? u8 ? ? ? ? ? ? ?flags;
+>> +};
+>> +
+>> +struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? const char *parent_name, unsigned long flags,
+>> + ? ? ? ? ? ? unsigned long fixed_rate);
+>> +
+>> +/**
+>> + * struct clk_gate - gating clock
+>> + *
+>> + * @hw: ? ? ? ? ? ? ?handle between common and hardware-specific interfaces
+>> + * @reg: ? ? register controlling gate
+>> + * @bit_idx: single bit controlling gate
+>> + * @flags: ? hardware-specific flags
+>> + * @lock: ? ?register lock
+>> + *
+>> + * Clock which can gate its output. ?Implements .enable & .disable
+>> + *
+>> + * Flags:
+>> + * CLK_GATE_SET_DISABLE - by default this clock sets the bit at bit_idx to
+>> + * ? enable the clock. ?Setting this flag does the opposite: setting the bit
+>> + * ? disable the clock and clearing it enables the clock
+>> + */
+>> +struct clk_gate {
+>> + ? ? struct clk_hw hw;
+>> + ? ? void __iomem ? ?*reg;
+>> + ? ? u8 ? ? ? ? ? ? ?bit_idx;
+>> + ? ? u8 ? ? ? ? ? ? ?flags;
+>> + ? ? spinlock_t ? ? ?*lock;
+>> + ? ? char ? ? ? ? ? ?*parent[1];
+>> +};
+>> +
+>> +#define CLK_GATE_SET_TO_DISABLE ? ? ? ? ? ? ?BIT(0)
+>> +
+>> +struct clk *clk_register_gate(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? const char *parent_name, unsigned long flags,
+>> + ? ? ? ? ? ? void __iomem *reg, u8 bit_idx,
+>> + ? ? ? ? ? ? u8 clk_gate_flags, spinlock_t *lock);
+>> +
+>> +/**
+>> + * struct clk_divider - adjustable divider clock
+>> + *
+>> + * @hw: ? ? ? ? ? ? ?handle between common and hardware-specific interfaces
+>> + * @reg: ? ? register containing the divider
+>> + * @shift: ? shift to the divider bit field
+>> + * @width: ? width of the divider bit field
+>> + * @lock: ? ?register lock
+>> + *
+>> + * Clock with an adjustable divider affecting its output frequency. ?Implements
+>> + * .recalc_rate, .set_rate and .round_rate
+>> + *
+>> + * Flags:
+>> + * CLK_DIVIDER_ONE_BASED - by default the divisor is the value read from the
+>> + * ? register plus one. ?If CLK_DIVIDER_ONE_BASED is set then the divider is
+>> + * ? the raw value read from the register, with the value of zero considered
+>> + * ? invalid
+>> + * CLK_DIVIDER_POWER_OF_TWO - clock divisor is 2 raised to the value read from
+>> + * ? the hardware register
+>> + */
+>> +struct clk_divider {
+>> + ? ? struct clk_hw ? hw;
+>> + ? ? void __iomem ? ?*reg;
+>> + ? ? u8 ? ? ? ? ? ? ?shift;
+>> + ? ? u8 ? ? ? ? ? ? ?width;
+>> + ? ? u8 ? ? ? ? ? ? ?flags;
+>> + ? ? spinlock_t ? ? ?*lock;
+>> + ? ? char ? ? ? ? ? ?*parent[1];
+>> +};
+>> +
+>> +#define CLK_DIVIDER_ONE_BASED ? ? ? ? ? ? ? ?BIT(0)
+>> +#define CLK_DIVIDER_POWER_OF_TWO ? ? BIT(1)
+>> +
+>> +struct clk *clk_register_divider(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? const char *parent_name, unsigned long flags,
+>> + ? ? ? ? ? ? void __iomem *reg, u8 shift, u8 width,
+>> + ? ? ? ? ? ? u8 clk_divider_flags, spinlock_t *lock);
+>> +
+>> +/**
+>> + * struct clk_mux - multiplexer clock
+>> + *
+>> + * @hw: ? ? ? ? ? ? ?handle between common and hardware-specific interfaces
+>> + * @reg: ? ? register controlling multiplexer
+>> + * @shift: ? shift to multiplexer bit field
+>> + * @width: ? width of mutliplexer bit field
+>> + * @num_clks: ? ? ? ?number of parent clocks
+>> + * @lock: ? ?register lock
+>> + *
+>> + * Clock with multiple selectable parents. ?Implements .get_parent, .set_parent
+>> + * and .recalc_rate
+>> + *
+>> + * Flags:
+>> + * CLK_MUX_INDEX_ONE - register index starts at 1, not 0
+>> + * CLK_MUX_INDEX_BITWISE - register index is a single bit (power of two)
+>> + */
+>> +struct clk_mux {
+>> + ? ? struct clk_hw ? hw;
+>> + ? ? void __iomem ? ?*reg;
+>> + ? ? u8 ? ? ? ? ? ? ?shift;
+>> + ? ? u8 ? ? ? ? ? ? ?width;
+>> + ? ? u8 ? ? ? ? ? ? ?flags;
+>> + ? ? spinlock_t ? ? ?*lock;
+>> +};
+>> +
+>> +#define CLK_MUX_INDEX_ONE ? ? ? ? ? ?BIT(0)
+>> +#define CLK_MUX_INDEX_BIT ? ? ? ? ? ?BIT(1)
+>> +
+>> +struct clk *clk_register_mux(struct device *dev, const char *name,
+>> + ? ? ? ? ? ? char **parent_names, u8 num_parents, unsigned long flags,
+>> + ? ? ? ? ? ? void __iomem *reg, u8 shift, u8 width,
+>> + ? ? ? ? ? ? u8 clk_mux_flags, spinlock_t *lock);
+>>
+>> ?/**
+>> ? * clk_register - allocate a new clock, register it and return an opaque cookie
+>
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
