@@ -1,73 +1,37 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 12 Mar 2012 22:14:40 +0100
-Subject: [PATCH 4/4 v2] ARM: u300: configure some pins as an example
-Message-ID: <1331586880-15690-1-git-send-email-linus.walleij@stericsson.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Mar 2012 21:15:54 +0000
+Subject: [PATCH 3/4] ARM: create a common IOMEM definition
+In-Reply-To: <4F5E4178.50801@gmail.com>
+References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+ <201203112134.45302.arnd@arndb.de> <4F5E4178.50801@gmail.com>
+Message-ID: <201203122115.54422.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Monday 12 March 2012, Rob Herring wrote:
+> On 03/11/2012 04:34 PM, Arnd Bergmann wrote:
+> > On Sunday 11 March 2012, Rob Herring wrote:
+> >> From: Rob Herring <rob.herring@calxeda.com>
+> >>
+> >> Several platforms create IOMEM defines for casting to 'void __iomem *',
+> >> and other platforms are incorrectly using __io() macro for the same
+> >> purpose. This creates a common definition and removes all the platform
+> >> specific versions. Rather than try to make linux/io.h and asm/io.h
+> >> assembly safe, the assembly version of IOMEM is moved into
+> >> asm/assembler.h.
+> > 
+> > Looks good to me, in order to fix the problem at hand. I'm not sure
+> > about spreading the IOMEM() macro further, that is largely a separate
+> > problem and only a question of style, not of correctness as with __io().
+> 
+> Got a better suggestion? I didn't think adding IOMEM to 5 more platforms
+> or inventing something different was the right path. Hopefully this is a
+> shrinking problem as things move to DT.
 
-To show how the pin configuration is used on the U300, let's
-include some configs for two GPIO pins.
+In a cleanup series I started earlier, I used ${PLATFORM}_IO_P2V, which
+is now used on at91 and imx. I'm not particularly attached to that
+one either, the basic idea was that we could define them all concurrently,
+but in hindsight that looks flawed now. Let's just use the patch you came
+up with.
 
-ChangeLog v1->v2:
-- Provide a better example, set the clock return pin to pull-up
-  and set the card detect pin to high impedance.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-u300/core.c |   18 ++++++++++++++++--
- 1 files changed, 16 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index f326d31..a7b3f36 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -27,6 +27,7 @@
- #include <linux/mtd/fsmc.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/pinctrl/pinconf-generic.h>
- #include <linux/dma-mapping.h>
- 
- #include <asm/types.h>
-@@ -1605,7 +1606,15 @@ static struct platform_device dma_device = {
- 	},
- };
- 
--/* Pinmux settings */
-+static unsigned long pin_pullup_conf[] = {
-+	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 1),
-+};
-+
-+static unsigned long pin_highz_conf[] = {
-+	PIN_CONF_PACKED(PIN_CONFIG_BIAS_HIGH_IMPEDANCE, 0),
-+};
-+
-+/* Pin control settings */
- static struct pinctrl_map __initdata u300_pinmux_map[] = {
- 	/* anonymous maps for chip power and EMIFs */
- 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-u300", NULL, "power"),
-@@ -1615,6 +1624,12 @@ static struct pinctrl_map __initdata u300_pinmux_map[] = {
- 	PIN_MAP_MUX_GROUP_DEFAULT("mmci",  "pinctrl-u300", NULL, "mmc0"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("pl022", "pinctrl-u300", NULL, "spi0"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("uart0", "pinctrl-u300", NULL, "uart0"),
-+	/* This pin is used for clock return rather than GPIO */
-+	PIN_MAP_CONFIGS_PIN_DEFAULT("mmci", "pinctrl-u300", "PIO APP GPIO 11",
-+				    pin_pullup_conf),
-+	/* This pin is used for card detect */
-+	PIN_MAP_CONFIGS_PIN_DEFAULT("mmci", "pinctrl-u300", "PIO MS INS",
-+				    pin_highz_conf),
- };
- 
- struct u300_mux_hog {
-@@ -1640,7 +1655,6 @@ static int __init u300_pinctrl_fetch(void)
- 
- 	for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
- 		struct pinctrl *p;
--		int ret;
- 
- 		p = pinctrl_get_select_default(u300_mux_hogs[i].dev);
- 		if (IS_ERR(p)) {
--- 
-1.7.8
+	Arnd
