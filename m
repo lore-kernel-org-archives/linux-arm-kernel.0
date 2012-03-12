@@ -1,25 +1,28 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 12 Mar 2012 00:51:29 -0600 (MDT)
-Subject: [PATCHv5 3/6] ARM: OMAP4 PM: Add IO Daisychain support
-In-Reply-To: <4F5D8F2A.1070602@ti.com>
+Date: Mon, 12 Mar 2012 04:13:16 -0600 (MDT)
+Subject: [PATCHv5 0/6] ARM: OMAP3+: IO daisy chain support fixes
+In-Reply-To: <1331546427.2116.264.camel@sokoban>
 References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
- <1331046702-2472-4-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1203092051140.30879@utopia.booyaka.com>
- <4F5D8F2A.1070602@ti.com>
-Message-ID: <alpine.DEB.2.00.1203120050360.11332@utopia.booyaka.com>
+ <alpine.DEB.2.00.1203092102450.30879@utopia.booyaka.com>
+ <1331546427.2116.264.camel@sokoban>
+Message-ID: <alpine.DEB.2.00.1203120412230.11332@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Mar 2012, Rajendra Nayak wrote:
+Hi Tero, Rajendra,
 
-> > Signed-off-by: Tero Kristo<t-kristo@ti.com>
-> > [paul at pwsan.com: removed MAX_IOPAD_LATCH_TIME declaration; renamed
+On Mon, 12 Mar 2012, Tero Kristo wrote:
+
+> Just tested your branch with omap3 beagle + omap4 blaze (with my omap4
+> cswr set on top), and it works on both.
 > 
-> But the code below still seems to use it. Is it now defined in some
-> common header so the same value is used in omap3 and omap4?
+> For the WUCLK poll bit I added detailed comments on patch 2 thread, but
+> my current understanding is that the implementation now on omap3 / omap4
+> is what they should be due to IP differences (except maybe the small
+> optimization for omap3 part you commented about.)
 
-Yes, I put it into prcm-common.h in the previous patch that added it for 
-OMAP3.  I'll update that comment to clarify.
+Thank you both for the detailed comments and explanation on this series, 
+and the testing... sounds like this set is okay to go.
 
 
 - Paul
