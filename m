@@ -1,44 +1,125 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 09 Mar 2012 09:30:30 -0700
-Subject: Subject: [PATCH] MAINTAINERS: add maintainer entry for SAMSUNG
- EXYNOS DeviceTree
-In-Reply-To: <CAJuYYwSqGDmuXrtBscCSFoQEOpWCQ-1H+2dHxeUYny7KwUPLOg@mail.gmail.com>
-References: <00f301ccf0f7$39f222a0$add667e0$%kim@samsung.com>
- <CAJuYYwSqGDmuXrtBscCSFoQEOpWCQ-1H+2dHxeUYny7KwUPLOg@mail.gmail.com>
-Message-ID: <20120309163030.661F93E0880@localhost>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 12 Mar 2012 20:32:39 +0530
+Subject: [PATCH v2 3/4] arm/dts: OMAP4: Add mmc controller nodes and board data
+In-Reply-To: <1331564560-23276-1-git-send-email-rnayak@ti.com>
+References: <1331564560-23276-1-git-send-email-rnayak@ti.com>
+Message-ID: <1331564560-23276-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Feb 2012 07:49:18 +0530, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> On 22 February 2012 05:46, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Add Samsung EXYNOS DT maintainer
-> >
-> > Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > ??MAINTAINERS | ?? 10 ++++++++++
-> > ??1 files changed, 10 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index 9a648eb..5ac5aaf 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -1065,6 +1065,16 @@ S: ?? ?? ?? Maintained
-> > ??F: ?? ?? arch/arm/mach-s5p*/
-> > ??F: ?? ?? arch/arm/mach-exynos*/
-> >
-> > +ARM/SAMSUNG EXYNOS DEVICE TREE
-> > +M: ?? ?? Thomas Abraham <thomas.abraham@linaro.org>
-> > +M: ?? ?? Kukjin Kim <kgene.kim@samsung.com>
-> > +L: ?? ?? devicetree-discuss at lists.ozlabs.org (moderated for non-subscribers)
-> > +L: ?? ?? linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-> > +S: ?? ?? Maintained
-> > +F: ?? ?? arch/arm/boot/dts/exynos*
-> > +F: ?? ?? arch/arm/mach-exynos/*dt.c
-> > +F: ?? ?? Documentation/devicetree/*/*/*samsung*
-> > +
-> 
-> Acked-by: Thomas Abraham <thomas.abraham@linaro.org>
+Add omap mmc related device tree data for OMAP4.
+Currenly limited to only omap4-panda and omap4-sdp
+boards.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/boot/dts/omap4-panda.dts |   22 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts   |   24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi      |   31 +++++++++++++++++++++++++++++++
+ 3 files changed, 77 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+index 29646dc..ea6f5bb 100644
+--- a/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
+@@ -52,3 +52,25 @@
+ &i2c4 {
+ 	clock-frequency = <400000>;
+ };
++
++&mmc1 {
++	vmmc-supply = <&vmmc>;
++	ti,bus-width = <8>;
++};
++
++&mmc2 {
++	status = "disable";
++};
++
++&mmc3 {
++	status = "disable";
++};
++
++&mmc4 {
++	status = "disable";
++};
++
++&mmc5 {
++	ti,non-removable;
++	ti,bus-width = <4>;
++};
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index 01db8b7..852657a 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -70,3 +70,27 @@
+ 		reg = <0x1e>;
+ 	};
+ };
++
++&mmc1 {
++	vmmc-supply = <&vmmc>;
++	ti,bus-width = <8>;
++};
++
++&mmc2 {
++	vmmc-supply = <&vaux1>;
++	ti,bus-width = <8>;
++	ti,non-removable;
++};
++
++&mmc3 {
++	status = "disable";
++};
++
++&mmc4 {
++	status = "disable";
++};
++
++&mmc5 {
++	ti,bus-width = <4>;
++	ti,non-removable;
++};
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 29f4589..9226543 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -155,5 +155,36 @@
+ 			#size-cells = <0>;
+ 			ti,hwmods = "i2c4";
+ 		};
++
++		mmc1: mmc at 1 {
++			compatible = "ti,omap4-hsmmc";
++			ti,hwmods = "mmc1";
++			ti,dual-volt;
++			ti,needs-special-reset;
++		};
++
++		mmc2: mmc at 2 {
++			compatible = "ti,omap4-hsmmc";
++			ti,hwmods = "mmc2";
++			ti,needs-special-reset;
++		};
++
++		mmc3: mmc at 3 {
++			compatible = "ti,omap4-hsmmc";
++			ti,hwmods = "mmc3";
++			ti,needs-special-reset;
++		};
++
++		mmc4: mmc at 4 {
++			compatible = "ti,omap4-hsmmc";
++			ti,hwmods = "mmc4";
++			ti,needs-special-reset;
++		};
++
++		mmc5: mmc at 5 {
++			compatible = "ti,omap4-hsmmc";
++			ti,hwmods = "mmc5";
++			ti,needs-special-reset;
++		};
+ 	};
+ };
+-- 
+1.7.1
