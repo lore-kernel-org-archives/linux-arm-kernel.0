@@ -1,42 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Mar 2012 19:58:55 +0800
-Subject: [PATCH v4 08/10] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331553537-19789-9-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Mar 2012 10:03:45 +0000
+Subject: [PATCH] serial: PL011: clear pending interrupts
+In-Reply-To: <CAAMvbhF7-5FyzjgtK7EjFZSJg4KBxdMdd1jnTRTLA-LnsVhKyw@mail.gmail.com>
+References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
+ <CAAMvbhF7-5FyzjgtK7EjFZSJg4KBxdMdd1jnTRTLA-LnsVhKyw@mail.gmail.com>
+Message-ID: <20120312100345.GX17370@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As Documentation/devicetree/bindings/powerpc/fsl/ssi.txt documented,
-codec-handle is an optional property, so missing it should not be a
-fatal error.
+On Mon, Mar 12, 2012 at 09:27:28AM +0000, James Courtier-Dutton wrote:
+> On 12 March 2012 08:25, Linus Walleij <linus.walleij@stericsson.com> wrote:
+> > From: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > Chanho Min reported that when the boot loader transfers
+> > control to the kernel, there may be pending interrupts
+> > causing the UART to lock up in an eternal loop trying to
+> > pick tokens from the FIFO (since the RX interrupt flag
+> > indicates there are tokens) while in practice there are
+> > no tokens - in fact there is only a pending IRQ flag.
+> >
+> 
+> I might be off base here, because I don't know this particular UART,
+> but if an IRQ routine is called because the RX interrupt flag is set,
+> shouldn't the IRQ routine be written in such a way that it can never
+> lock up.
 
-More importantly, the imx machine drivers to be added working with
-fsl_ssi will not have this property, as they use new ASoC machine
-driver binding mechanism.
+The problem is that there are two flags:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- sound/soc/fsl/fsl_ssi.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+1. The receiver interrupt status flags
+2. The fifo status flags
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index db9a734..0192c02 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -642,12 +642,6 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
- 	if (!of_device_is_available(np))
- 		return -ENODEV;
- 
--	/* Check for a codec-handle property. */
--	if (!of_get_property(np, "codec-handle", NULL)) {
--		dev_err(&pdev->dev, "missing codec-handle property\n");
--		return -ENODEV;
--	}
--
- 	/* We only support the SSI in "I2S Slave" mode */
- 	sprop = of_get_property(np, "fsl,mode", NULL);
- 	if (!sprop || strcmp(sprop, "i2s-slave")) {
--- 
-1.7.5.4
+It appears that there's a condition where the receiver interrupt flags can
+indicate that characters are pending, but the status flags say that there
+are no characters pending in the receive buffer.
+
+This occurs because it seems there's a hardware bug when switching from
+FIFO mode to non-FIFO mode - this causes previously received characters
+to be hidden from the FIFO status flags.
