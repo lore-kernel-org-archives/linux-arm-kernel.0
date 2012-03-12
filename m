@@ -1,56 +1,55 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 12 Mar 2012 16:42:51 -0600
-Subject: [PATCH 0/5] ARM: OMAP2+: resolve some warnings from sparse, cppcheck
-Message-ID: <20120312224006.4103.29464.stgit@dusk>
+Date: Mon, 12 Mar 2012 16:42:57 -0600
+Subject: [PATCH 4/5] ARM: OMAP2+: fix 'using plain integer as NULL pointer'
+ sparse warnings
+In-Reply-To: <20120312224006.4103.29464.stgit@dusk>
+References: <20120312224006.4103.29464.stgit@dusk>
+Message-ID: <20120312224255.4103.6182.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+sparse warns when 0 is passed to a function expecting a pointer argument.
+Resolve these warnings by replacing the 0 with NULL.
 
-This series resolves all of the current sparse warnings and many of
-the meaningful cppcheck warnings in arch/arm/mach-omap2.
+arch/arm/plat-omap/include/plat/dmtimer.h:319:34: warning: Using plain integer as NULL pointer
+arch/arm/plat-omap/include/plat/dmtimer.h:324:35: warning: Using plain integer as NULL pointer
+arch/arm/mach-omap2/irq.c:294:22: warning: Using plain integer as NULL pointer
 
-This series is also available from git://git.pwsan.com/linux-2.6 in the
-branch 'sparse_cppcheck_fixes_3.4'.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/irq.c                 |    2 +-
+ arch/arm/plat-omap/include/plat/dmtimer.h |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-sparse_cppcheck_fixes_3.4
-   text	   data	    bss	    dec	    hex	filename
-6588152	 692980	5594140	12875272	 c47608	vmlinux.omap2plus_defconfig.orig
-6588028	 692956	5594140	12875124	 c47574	vmlinux.omap2plus_defconfig
-
-Paul Walmsley (5):
-      ARM: OMAP2+: declare file-local functions as static
-      ARM: OMAP2+: add includes for missing prototypes
-      ARM: OMAP2+: GPMC: resolve type-conversion warning from sparse
-      ARM: OMAP2+: fix 'using plain integer as NULL pointer' sparse warnings
-      ARM: OMAP2+: clean up some cppcheck warnings
-
-
- arch/arm/mach-omap2/board-am3517evm.c        |    6 +-----
- arch/arm/mach-omap2/board-omap3evm.c         |    8 ++++----
- arch/arm/mach-omap2/board-omap4panda.c       |    8 ++++----
- arch/arm/mach-omap2/board-rx51-peripherals.c |    4 ++--
- arch/arm/mach-omap2/board-zoom-display.c     |    1 +
- arch/arm/mach-omap2/devices.c                |    3 +--
- arch/arm/mach-omap2/gpio.c                   |    4 ++--
- arch/arm/mach-omap2/gpmc-onenand.c           |    3 +--
- arch/arm/mach-omap2/gpmc.c                   |    3 +--
- arch/arm/mach-omap2/hsmmc.c                  |    2 +-
- arch/arm/mach-omap2/hwspinlock.c             |    2 +-
- arch/arm/mach-omap2/irq.c                    |    3 ++-
- arch/arm/mach-omap2/mcbsp.c                  |    2 +-
- arch/arm/mach-omap2/mux.c                    |    2 +-
- arch/arm/mach-omap2/omap-secure.c            |    1 +
- arch/arm/mach-omap2/omap-wakeupgen.c         |    2 +-
- arch/arm/mach-omap2/pm24xx.c                 |    3 ---
- arch/arm/mach-omap2/pm34xx.c                 |    4 +---
- arch/arm/mach-omap2/prm_common.c             |    4 +++-
- arch/arm/mach-omap2/serial.c                 |    2 +-
- arch/arm/mach-omap2/usb-tusb6010.c           |    2 +-
- arch/arm/plat-omap/include/plat/dmtimer.h    |    4 ++--
- 22 files changed, 33 insertions(+), 40 deletions(-)
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 8247c51..22d9f6b 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -292,7 +292,7 @@ void omap_intc_restore_context(void)
+ void omap3_intc_suspend(void)
+ {
+ 	/* A pending interrupt would prevent OMAP from entering suspend */
+-	omap_ack_irq(0);
++	omap_ack_irq(NULL);
+ }
+ 
+ void omap3_intc_prepare_idle(void)
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index 9418f00..230ff91 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -316,12 +316,12 @@ static inline void __omap_dm_timer_init_regs(struct omap_dm_timer *timer)
+ 				OMAP_TIMER_V1_SYS_STAT_OFFSET;
+ 		timer->irq_stat = timer->io_base + OMAP_TIMER_V1_STAT_OFFSET;
+ 		timer->irq_ena = timer->io_base + OMAP_TIMER_V1_INT_EN_OFFSET;
+-		timer->irq_dis = 0;
++		timer->irq_dis = NULL;
+ 		timer->pend = timer->io_base + _OMAP_TIMER_WRITE_PEND_OFFSET;
+ 		timer->func_base = timer->io_base;
+ 	} else {
+ 		timer->revision = 2;
+-		timer->sys_stat = 0;
++		timer->sys_stat = NULL;
+ 		timer->irq_stat = timer->io_base + OMAP_TIMER_V2_IRQSTATUS;
+ 		timer->irq_ena = timer->io_base + OMAP_TIMER_V2_IRQENABLE_SET;
+ 		timer->irq_dis = timer->io_base + OMAP_TIMER_V2_IRQENABLE_CLR;
