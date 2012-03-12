@@ -1,31 +1,205 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Mar 2012 20:37:44 +0100
-Subject: [PATCH 2/3] led-triggers: use atomic kzalloc during led trigger
- registering
-In-Reply-To: <CAK5ve-+L9gVBOp4RVe2pTUbBnrb-PEn7ERbWWkb=7A=4qOrdTQ@mail.gmail.com>
-References: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
- <1331197863-25564-2-git-send-email-bryan.wu@canonical.com>
- <20120308092913.GF14173@pengutronix.de>
- <CAK5ve-+L9gVBOp4RVe2pTUbBnrb-PEn7ERbWWkb=7A=4qOrdTQ@mail.gmail.com>
-Message-ID: <CACRpkdYvfzrdAC1vjT5WD4rk0ozpbXkPtkQpBVMv_WYhdkg7ag@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Mar 2012 11:48:12 -0600
+Subject: [PATCH 09/12] gpio/twl: Add DT support to gpio-twl4030 driver
+In-Reply-To: <1330707024-23730-10-git-send-email-b-cousson@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-10-git-send-email-b-cousson@ti.com>
+Message-ID: <20120312174812.6A6BD3E07B0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/10 Bryan Wu <bryan.wu@canonical.com>:
-> 2012/3/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->> On Thu, Mar 08, 2012 at 05:11:02PM +0800, Bryan Wu wrote:
->>> kzalloc might cause sleep and will generate some warning detected by lockdep,
->>> when call led_trigger_register_simple on each cpu cores in SMP. This patch fix
->>> this.
->> The obvious (and IMHO better) alternative is to call
->> led_trigger_register_simple from non-atomic context.
->>
->> For registering this should be OK, shouldn't it?
->>
-> Thanks Uwe, it's my bad. I think I should not use on_each_cpu() API to
-> run led_trigger_register_simple. on_each_cpu() will disable interrupt.
+On Fri, 2 Mar 2012 17:50:21 +0100, Benoit Cousson <b-cousson@ti.com> wrote:
+> Add the DT support for the I2C GPIO expander inside the twl4030.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
-It might have been my mistake even so not your fault ... :-)
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Thanks,
-Linus Walleij
+> ---
+>  .../devicetree/bindings/gpio/gpio-twl4030.txt      |   23 ++++++
+>  drivers/gpio/gpio-twl4030.c                        |   79 ++++++++++++-------
+>  2 files changed, 73 insertions(+), 29 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt b/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
+> new file mode 100644
+> index 0000000..16695d9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
+> @@ -0,0 +1,23 @@
+> +twl4030 GPIO controller bindings
+> +
+> +Required properties:
+> +- compatible:
+> +  - "ti,twl4030-gpio" for twl4030 GPIO controller
+> +- #gpio-cells : Should be two.
+> +  - first cell is the pin number
+> +  - second cell is used to specify optional parameters (unused)
+> +- gpio-controller : Marks the device node as a GPIO controller.
+> +- #interrupt-cells : Should be 2.
+> +- interrupt-controller: Mark the device node as an interrupt controller
+> +  The first cell is the GPIO number.
+> +  The second cell is not used.
+> +
+> +Example:
+> +
+> +twl_gpio: gpio {
+> +    compatible = "ti,twl4030-gpio";
+> +    #gpio-cells = <2>;
+> +    gpio-controller;
+> +    #interrupt-cells = <2>;
+> +    interrupt-controller;
+> +};
+> diff --git a/drivers/gpio/gpio-twl4030.c b/drivers/gpio/gpio-twl4030.c
+> index 49e5c6e..94256fe 100644
+> --- a/drivers/gpio/gpio-twl4030.c
+> +++ b/drivers/gpio/gpio-twl4030.c
+> @@ -32,6 +32,8 @@
+>  #include <linux/irq.h>
+>  #include <linux/gpio.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/irqdomain.h>
+>  
+>  #include <linux/i2c/twl.h>
+>  
+> @@ -256,7 +258,8 @@ static int twl_request(struct gpio_chip *chip, unsigned offset)
+>  		 * and vMMC2 power supplies based on card presence.
+>  		 */
+>  		pdata = chip->dev->platform_data;
+> -		value |= pdata->mmc_cd & 0x03;
+> +		if (pdata)
+> +			value |= pdata->mmc_cd & 0x03;
+>  
+>  		status = gpio_twl4030_write(REG_GPIO_CTRL, value);
+>  	}
+> @@ -395,6 +398,7 @@ static int gpio_twl4030_remove(struct platform_device *pdev);
+>  static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+>  {
+>  	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
+> +	struct device_node *node = pdev->dev.of_node;
+>  	int ret, irq_base;
+>  
+>  	/* maybe setup IRQs */
+> @@ -409,6 +413,9 @@ static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+>  		return irq_base;
+>  	}
+>  
+> +	irq_domain_add_legacy(node, TWL4030_GPIO_MAX, irq_base, 0,
+> +			      &irq_domain_simple_ops, NULL);
+> +
+>  	ret = twl4030_sih_setup(&pdev->dev, TWL4030_MODULE_GPIO, irq_base);
+>  	if (ret < 0)
+>  		return ret;
+> @@ -416,40 +423,45 @@ static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
+>  	twl4030_gpio_irq_base = irq_base;
+>  
+>  no_irqs:
+> -	/*
+> -	 * NOTE:  boards may waste power if they don't set pullups
+> -	 * and pulldowns correctly ... default for non-ULPI pins is
+> -	 * pulldown, and some other pins may have external pullups
+> -	 * or pulldowns.  Careful!
+> -	 */
+> -	ret = gpio_twl4030_pulls(pdata->pullups, pdata->pulldowns);
+> -	if (ret)
+> -		dev_dbg(&pdev->dev, "pullups %.05x %.05x --> %d\n",
+> -				pdata->pullups, pdata->pulldowns,
+> -				ret);
+> -
+> -	ret = gpio_twl4030_debounce(pdata->debounce, pdata->mmc_cd);
+> -	if (ret)
+> -		dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
+> -				pdata->debounce, pdata->mmc_cd,
+> -				ret);
+> -
+> -	twl_gpiochip.base = pdata->gpio_base;
+> +	twl_gpiochip.base = -1;
+>  	twl_gpiochip.ngpio = TWL4030_GPIO_MAX;
+>  	twl_gpiochip.dev = &pdev->dev;
+>  
+> -	/* NOTE: we assume VIBRA_CTL.VIBRA_EN, in MODULE_AUDIO_VOICE,
+> -	 * is (still) clear if use_leds is set.
+> -	 */
+> -	if (pdata->use_leds)
+> -		twl_gpiochip.ngpio += 2;
+> +	if (pdata) {
+> +		twl_gpiochip.base = pdata->gpio_base;
+> +
+> +		/*
+> +		 * NOTE:  boards may waste power if they don't set pullups
+> +		 * and pulldowns correctly ... default for non-ULPI pins is
+> +		 * pulldown, and some other pins may have external pullups
+> +		 * or pulldowns.  Careful!
+> +		 */
+> +		ret = gpio_twl4030_pulls(pdata->pullups, pdata->pulldowns);
+> +		if (ret)
+> +			dev_dbg(&pdev->dev, "pullups %.05x %.05x --> %d\n",
+> +					pdata->pullups, pdata->pulldowns,
+> +					ret);
+> +
+> +		ret = gpio_twl4030_debounce(pdata->debounce, pdata->mmc_cd);
+> +		if (ret)
+> +			dev_dbg(&pdev->dev, "debounce %.03x %.01x --> %d\n",
+> +					pdata->debounce, pdata->mmc_cd,
+> +					ret);
+> +
+> +		/*
+> +		 * NOTE: we assume VIBRA_CTL.VIBRA_EN, in MODULE_AUDIO_VOICE,
+> +		 * is (still) clear if use_leds is set.
+> +		 */
+> +		if (pdata->use_leds)
+> +			twl_gpiochip.ngpio += 2;
+> +	}
+>  
+>  	ret = gpiochip_add(&twl_gpiochip);
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "could not register gpiochip, %d\n", ret);
+>  		twl_gpiochip.ngpio = 0;
+>  		gpio_twl4030_remove(pdev);
+> -	} else if (pdata->setup) {
+> +	} else if (pdata && pdata->setup) {
+>  		int status;
+>  
+>  		status = pdata->setup(&pdev->dev,
+> @@ -467,7 +479,7 @@ static int gpio_twl4030_remove(struct platform_device *pdev)
+>  	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
+>  	int status;
+>  
+> -	if (pdata->teardown) {
+> +	if (pdata && pdata->teardown) {
+>  		status = pdata->teardown(&pdev->dev,
+>  				pdata->gpio_base, TWL4030_GPIO_MAX);
+>  		if (status) {
+> @@ -488,12 +500,21 @@ static int gpio_twl4030_remove(struct platform_device *pdev)
+>  	return -EIO;
+>  }
+>  
+> +static const struct of_device_id twl_gpio_match[] = {
+> +	{ .compatible = "ti,twl4030-gpio", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, twl_gpio_match);
+> +
+>  /* Note:  this hardware lives inside an I2C-based multi-function device. */
+>  MODULE_ALIAS("platform:twl4030_gpio");
+>  
+>  static struct platform_driver gpio_twl4030_driver = {
+> -	.driver.name	= "twl4030_gpio",
+> -	.driver.owner	= THIS_MODULE,
+> +	.driver = {
+> +		.name	= "twl4030_gpio",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(twl_gpio_match),
+> +	},
+>  	.probe		= gpio_twl4030_probe,
+>  	.remove		= gpio_twl4030_remove,
+>  };
+> -- 
+> 1.7.0.4
+> 
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
