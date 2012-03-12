@@ -1,942 +1,383 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 13 Mar 2012 02:29:59 +0530
-Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
-In-Reply-To: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
-References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Mar 2012 14:56:56 +0100
+Subject: [PATCH 1/4] pinctrl: introduce generic pin config
+In-Reply-To: <4F57E1DB.3020605@wwwdotorg.org>
+References: <1331071509-24661-1-git-send-email-linus.walleij@stericsson.com>
+ <4F57E1DB.3020605@wwwdotorg.org>
+Message-ID: <CACRpkdY_PV0UvMYCKBnrd1bnfgVSBWhLjFfV4m_i_+jpkc453Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For all the Samsung SoC based boards which have the platform data for
-s3c-fb driver, the 'default_win' element in the platform data is removed
-and the lcd panel video timing values are moved out of individual window
-configuration data.
+On Wed, Mar 7, 2012 at 11:31 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 03/06/2012 03:05 PM, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This is a split-off from the earlier patch set which adds generic
+>> pin configuration for the pin controllers that want it. Since
+>> we may have a system with mixed generic and custom pin controllers,
+>> we pass a boolean in the pin controller ops vtable to indicate
+>> if it is generic.
+>>
+>> ChangeLog v1->v5:
+>> - Follow parent patch versioning number system.
+>> - Document the semantic meaning of return values from pin config
+>> ? get functions, so we can iterate over pins and check their
+>> ? properties from debugfs as part of the generic config code.
+>> - Use proper cast functions in the generic debugfs pin config
+>> ? file.
+>> - Expand generic config to optionally cover groups too.
+>> ChangeLog v5->v6:
+>> - Update to match underlying changes.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+>> diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
+> ...
+>> +/**
+>> + * enum pin_config_param - possible pin configuration parameters
+>> + * @PIN_CONFIG_BIAS_DISABLE: disable any pin bias on the pin, a
+>> + * ? ? transition from say pull-up to pull-down implies that you disable
+>> + * ? ? pull-up in the process, this setting disables all biasing.
+>
+> What's the use-case for that? It seems like if one state's mapping table
+> entry says:
+>
+> PIN_CONFIG_BIAS_PULL_UP, value
 
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: JeongHyeon Kim <jhkim@insignal.co.kr>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kwangwoo Lee <kwangwoo.lee@gmail.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Peter Korsgaard <jacmet@sunsite.dk>
-Cc: Darius Augulis <augulis.darius@gmail.com>
-Cc: Maurus Cuelenaere <mcuelenaere@gmail.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos/mach-nuri.c           |   26 ++++++++++-------
- arch/arm/mach-exynos/mach-origen.c         |   24 ++++++++++-------
- arch/arm/mach-exynos/mach-smdkv310.c       |   28 +++++++++++--------
- arch/arm/mach-exynos/mach-universal_c210.c |   26 ++++++++++-------
- arch/arm/mach-s3c24xx/mach-smdk2416.c      |   27 ++++++++++--------
- arch/arm/mach-s3c64xx/mach-anw6410.c       |   25 ++++++++++-------
- arch/arm/mach-s3c64xx/mach-crag6410.c      |   25 ++++++++++-------
- arch/arm/mach-s3c64xx/mach-hmt.c           |   24 ++++++++++-------
- arch/arm/mach-s3c64xx/mach-mini6410.c      |   40 ++++++++++++---------------
- arch/arm/mach-s3c64xx/mach-real6410.c      |   40 ++++++++++++---------------
- arch/arm/mach-s3c64xx/mach-smartq5.c       |   26 ++++++++++-------
- arch/arm/mach-s3c64xx/mach-smartq7.c       |   26 ++++++++++-------
- arch/arm/mach-s3c64xx/mach-smdk6410.c      |   25 ++++++++++-------
- arch/arm/mach-s5p64x0/mach-smdk6440.c      |   24 ++++++++++-------
- arch/arm/mach-s5p64x0/mach-smdk6450.c      |   24 ++++++++++-------
- arch/arm/mach-s5pc100/mach-smdkc100.c      |   27 ++++++++++--------
- arch/arm/mach-s5pv210/mach-aquila.c        |   36 +++++++++++--------------
- arch/arm/mach-s5pv210/mach-goni.c          |   26 ++++++++++-------
- arch/arm/mach-s5pv210/mach-smdkv210.c      |   24 ++++++++++-------
- 19 files changed, 285 insertions(+), 238 deletions(-)
+The mapping table only has an unsigned long really, but yes it
+might look something like that syntactically speaking (albeit being
+compiled into a constant)
 
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index 7ac81ce..a7e6731 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -212,25 +212,29 @@ static struct platform_device nuri_gpio_keys = {
- 
- /* Frame Buffer */
- static struct s3c_fb_pd_win nuri_fb_win0 = {
--	.win_mode = {
--		.left_margin	= 64,
--		.right_margin	= 16,
--		.upper_margin	= 64,
--		.lower_margin	= 1,
--		.hsync_len	= 48,
--		.vsync_len	= 3,
--		.xres		= 1024,
--		.yres		= 600,
--		.refresh	= 60,
--	},
- 	.max_bpp	= 24,
- 	.default_bpp	= 16,
-+	.xres		= 1024,
-+	.yres		= 600,
- 	.virtual_x	= 1024,
- 	.virtual_y	= 2 * 600,
- };
- 
-+static struct fb_videomode nuri_lcd_timing = {
-+	.left_margin	= 64,
-+	.right_margin	= 16,
-+	.upper_margin	= 64,
-+	.lower_margin	= 1,
-+	.hsync_len	= 48,
-+	.vsync_len	= 3,
-+	.xres		= 1024,
-+	.yres		= 600,
-+	.refresh	= 60,
-+};
-+
- static struct s3c_fb_platdata nuri_fb_pdata __initdata = {
- 	.win[0]		= &nuri_fb_win0,
-+	.vtiming	= &nuri_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB |
- 			  VIDCON0_CLKSEL_LCD,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-index 25c9b46..de71237 100644
---- a/arch/arm/mach-exynos/mach-origen.c
-+++ b/arch/arm/mach-exynos/mach-origen.c
-@@ -583,22 +583,26 @@ static struct platform_device origen_lcd_hv070wsa = {
- };
- 
- static struct s3c_fb_pd_win origen_fb_win0 = {
--	.win_mode = {
--		.left_margin	= 64,
--		.right_margin	= 16,
--		.upper_margin	= 64,
--		.lower_margin	= 16,
--		.hsync_len	= 48,
--		.vsync_len	= 3,
--		.xres		= 1024,
--		.yres		= 600,
--	},
-+	.xres			= 1024,
-+	.yres			= 600,
- 	.max_bpp		= 32,
- 	.default_bpp		= 24,
- };
- 
-+static struct fb_videomode origen_lcd_timing = {
-+	.left_margin	= 64,
-+	.right_margin	= 16,
-+	.upper_margin	= 64,
-+	.lower_margin	= 16,
-+	.hsync_len	= 48,
-+	.vsync_len	= 3,
-+	.xres		= 1024,
-+	.yres		= 600,
-+};
-+
- static struct s3c_fb_platdata origen_lcd_pdata __initdata = {
- 	.win[0]		= &origen_fb_win0,
-+	.vtiming	= &origen_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
- 				VIDCON1_INV_VCLK,
-diff --git a/arch/arm/mach-exynos/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
-index f08529f..6c00fa6 100644
---- a/arch/arm/mach-exynos/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos/mach-smdkv310.c
-@@ -157,22 +157,26 @@ static struct platform_device smdkv310_lcd_lte480wv = {
- };
- 
- static struct s3c_fb_pd_win smdkv310_fb_win0 = {
--	.win_mode = {
--		.left_margin	= 13,
--		.right_margin	= 8,
--		.upper_margin	= 7,
--		.lower_margin	= 5,
--		.hsync_len	= 3,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--	},
--	.max_bpp		= 32,
--	.default_bpp		= 24,
-+	.max_bpp	= 32,
-+	.default_bpp	= 24,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode smdkv310_lcd_timing = {
-+	.left_margin	= 13,
-+	.right_margin	= 8,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
- };
- 
- static struct s3c_fb_platdata smdkv310_lcd0_pdata __initdata = {
- 	.win[0]		= &smdkv310_fb_win0,
-+	.vtiming	= &smdkv310_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
- 	.setup_gpio	= exynos4_fimd0_gpio_setup_24bpp,
-diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-index 57e4418..67a9547 100644
---- a/arch/arm/mach-exynos/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos/mach-universal_c210.c
-@@ -813,25 +813,29 @@ static struct i2c_board_info i2c1_devs[] __initdata = {
- 
- /* Frame Buffer */
- static struct s3c_fb_pd_win universal_fb_win0 = {
--	.win_mode = {
--		.left_margin	= 16,
--		.right_margin	= 16,
--		.upper_margin	= 2,
--		.lower_margin	= 28,
--		.hsync_len	= 2,
--		.vsync_len	= 1,
--		.xres		= 480,
--		.yres		= 800,
--		.refresh	= 55,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 480,
-+	.yres		= 800,
- 	.virtual_x	= 480,
- 	.virtual_y	= 2 * 800,
- };
- 
-+static struct fb_videomode universal_lcd_timing = {
-+	.left_margin	= 16,
-+	.right_margin	= 16,
-+	.upper_margin	= 2,
-+	.lower_margin	= 28,
-+	.hsync_len	= 2,
-+	.vsync_len	= 1,
-+	.xres		= 480,
-+	.yres		= 800,
-+	.refresh	= 55,
-+};
-+
- static struct s3c_fb_platdata universal_lcd_pdata __initdata = {
- 	.win[0]		= &universal_fb_win0,
-+	.vtiming	= &universal_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB |
- 			  VIDCON0_CLKSEL_LCD,
- 	.vidcon1	= VIDCON1_INV_VCLK | VIDCON1_INV_VDEN
-diff --git a/arch/arm/mach-s3c24xx/mach-smdk2416.c b/arch/arm/mach-s3c24xx/mach-smdk2416.c
-index 30a44f8..c3100a0 100644
---- a/arch/arm/mach-s3c24xx/mach-smdk2416.c
-+++ b/arch/arm/mach-s3c24xx/mach-smdk2416.c
-@@ -148,23 +148,25 @@ static struct s3c24xx_hsudc_platdata smdk2416_hsudc_platdata = {
- 
- static struct s3c_fb_pd_win smdk2416_fb_win[] = {
- 	[0] = {
--		/* think this is the same as the smdk6410 */
--		.win_mode	= {
--			.pixclock	= 41094,
--			.left_margin	= 8,
--			.right_margin	= 13,
--			.upper_margin	= 7,
--			.lower_margin	= 5,
--			.hsync_len	= 3,
--			.vsync_len	= 1,
--			.xres           = 800,
--			.yres           = 480,
--		},
- 		.default_bpp	= 16,
- 		.max_bpp	= 32,
-+		.xres           = 800,
-+		.yres           = 480,
- 	},
- };
- 
-+static struct fb_videomode smdk2416_lcd_timing = {
-+	.pixclock	= 41094,
-+	.left_margin	= 8,
-+	.right_margin	= 13,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres           = 800,
-+	.yres           = 480,
-+};
-+
- static void s3c2416_fb_gpio_setup_24bpp(void)
- {
- 	unsigned int gpio;
-@@ -187,6 +189,7 @@ static void s3c2416_fb_gpio_setup_24bpp(void)
- 
- static struct s3c_fb_platdata smdk2416_fb_platdata = {
- 	.win[0]		= &smdk2416_fb_win[0],
-+	.vtiming	= &smdk2416_lcd_timing,
- 	.setup_gpio	= s3c2416_fb_gpio_setup_24bpp,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-diff --git a/arch/arm/mach-s3c64xx/mach-anw6410.c b/arch/arm/mach-s3c64xx/mach-anw6410.c
-index b86f277..58fd0e3 100644
---- a/arch/arm/mach-s3c64xx/mach-anw6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-anw6410.c
-@@ -134,24 +134,27 @@ static struct platform_device anw6410_lcd_powerdev = {
- };
- 
- static struct s3c_fb_pd_win anw6410_fb_win0 = {
--	/* this is to ensure we use win0 */
--	.win_mode	= {
--		.left_margin	= 8,
--		.right_margin	= 13,
--		.upper_margin	= 7,
--		.lower_margin	= 5,
--		.hsync_len	= 3,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode anw6410_lcd_timing = {
-+	.left_margin	= 8,
-+	.right_margin	= 13,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
- };
- 
- /* 405566 clocks per frame => 60Hz refresh requires 24333960Hz clock */
- static struct s3c_fb_platdata anw6410_lcd_pdata __initdata = {
- 	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
-+	.vtiming	= &anw6410_lcd_timing,
- 	.win[0]		= &anw6410_fb_win0,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index e20bf58..c1ef57e 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -151,26 +151,29 @@ static struct platform_device crag6410_lcd_powerdev = {
- 
- /* 640x480 URT */
- static struct s3c_fb_pd_win crag6410_fb_win0 = {
--	/* this is to ensure we use win0 */
--	.win_mode	= {
--		.left_margin	= 150,
--		.right_margin	= 80,
--		.upper_margin	= 40,
--		.lower_margin	= 5,
--		.hsync_len	= 40,
--		.vsync_len	= 5,
--		.xres		= 640,
--		.yres		= 480,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 640,
-+	.yres		= 480,
- 	.virtual_y	= 480 * 2,
- 	.virtual_x	= 640,
- };
- 
-+static struct fb_videomode crag6410_lcd_timing = {
-+	.left_margin	= 150,
-+	.right_margin	= 80,
-+	.upper_margin	= 40,
-+	.lower_margin	= 5,
-+	.hsync_len	= 40,
-+	.vsync_len	= 5,
-+	.xres		= 640,
-+	.yres		= 480,
-+};
-+
- /* 405566 clocks per frame => 60Hz refresh requires 24333960Hz clock */
- static struct s3c_fb_platdata crag6410_lcd_pdata __initdata = {
- 	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
-+	.vtiming	= &crag6410_lcd_timing,
- 	.win[0]		= &crag6410_fb_win0,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
-index 521e07b..4e9b1ac 100644
---- a/arch/arm/mach-s3c64xx/mach-hmt.c
-+++ b/arch/arm/mach-s3c64xx/mach-hmt.c
-@@ -129,23 +129,27 @@ static struct platform_device hmt_backlight_device = {
- };
- 
- static struct s3c_fb_pd_win hmt_fb_win0 = {
--	.win_mode	= {
--		.left_margin	= 8,
--		.right_margin	= 13,
--		.upper_margin	= 7,
--		.lower_margin	= 5,
--		.hsync_len	= 3,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode hmt_lcd_timing = {
-+	.left_margin	= 8,
-+	.right_margin	= 13,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
- };
- 
- /* 405566 clocks per frame => 60Hz refresh requires 24333960Hz clock */
- static struct s3c_fb_platdata hmt_lcd_pdata __initdata = {
- 	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
-+	.vtiming	= &hmt_lcd_timing,
- 	.win[0]		= &hmt_fb_win0,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index c34c2ab..24dcdc9 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -153,36 +153,32 @@ static struct s3c2410_platform_nand mini6410_nand_info = {
- 
- static struct s3c_fb_pd_win mini6410_fb_win[] = {
- 	{
--		.win_mode	= {	/* 4.3" 480x272 */
--			.left_margin	= 3,
--			.right_margin	= 2,
--			.upper_margin	= 1,
--			.lower_margin	= 1,
--			.hsync_len	= 40,
--			.vsync_len	= 1,
--			.xres		= 480,
--			.yres		= 272,
--		},
- 		.max_bpp	= 32,
- 		.default_bpp	= 16,
-+		.xres		= 480,
-+		.yres		= 272,
- 	}, {
--		.win_mode	= {	/* 7.0" 800x480 */
--			.left_margin	= 8,
--			.right_margin	= 13,
--			.upper_margin	= 7,
--			.lower_margin	= 5,
--			.hsync_len	= 3,
--			.vsync_len	= 1,
--			.xres		= 800,
--			.yres		= 480,
--		},
- 		.max_bpp	= 32,
- 		.default_bpp	= 16,
-+		.xres		= 800,
-+		.yres		= 480,
- 	},
- };
- 
-+static struct fb_videomode mini6410_lcd_timing = {
-+	.left_margin	= 8,
-+	.right_margin	= 13,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
- static struct s3c_fb_platdata mini6410_lcd_pdata __initdata = {
- 	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
-+	.vtiming	= &mini6410_lcd_timing,
- 	.win[0]		= &mini6410_fb_win[0],
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-@@ -310,8 +306,8 @@ static void __init mini6410_machine_init(void)
- 	mini6410_lcd_pdata.win[0] = &mini6410_fb_win[features.lcd_index];
- 
- 	printk(KERN_INFO "MINI6410: selected LCD display is %dx%d\n",
--		mini6410_lcd_pdata.win[0]->win_mode.xres,
--		mini6410_lcd_pdata.win[0]->win_mode.yres);
-+		mini6410_lcd_pdata.win[0]->xres,
-+		mini6410_lcd_pdata.win[0]->yres);
- 
- 	s3c_nand_set_platdata(&mini6410_nand_info);
- 	s3c_fb_set_platdata(&mini6410_lcd_pdata);
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index be2a9a2..41e4f74 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -119,36 +119,32 @@ static struct platform_device real6410_device_eth = {
- 
- static struct s3c_fb_pd_win real6410_fb_win[] = {
- 	{
--		.win_mode	= {	/* 4.3" 480x272 */
--			.left_margin	= 3,
--			.right_margin	= 2,
--			.upper_margin	= 1,
--			.lower_margin	= 1,
--			.hsync_len	= 40,
--			.vsync_len	= 1,
--			.xres		= 480,
--			.yres		= 272,
--		},
- 		.max_bpp	= 32,
- 		.default_bpp	= 16,
-+		.xres		= 480,
-+		.yres		= 272,
- 	}, {
--		.win_mode	= {	/* 7.0" 800x480 */
--			.left_margin	= 8,
--			.right_margin	= 13,
--			.upper_margin	= 7,
--			.lower_margin	= 5,
--			.hsync_len	= 3,
--			.vsync_len	= 1,
--			.xres		= 800,
--			.yres		= 480,
--		},
- 		.max_bpp	= 32,
- 		.default_bpp	= 16,
-+		.xres		= 800,
-+		.yres		= 480,
- 	},
- };
- 
-+static struct fb_videomode real6410_lcd_timing = {
-+	.left_margin	= 3,
-+	.right_margin	= 2,
-+	.upper_margin	= 1,
-+	.lower_margin	= 1,
-+	.hsync_len	= 40,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
- static struct s3c_fb_platdata real6410_lcd_pdata __initdata = {
- 	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
-+	.vtiming	= &real6410_lcd_timing,
- 	.win[0]		= &real6410_fb_win[0],
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-@@ -291,8 +287,8 @@ static void __init real6410_machine_init(void)
- 	real6410_lcd_pdata.win[0] = &real6410_fb_win[features.lcd_index];
- 
- 	printk(KERN_INFO "REAL6410: selected LCD display is %dx%d\n",
--		real6410_lcd_pdata.win[0]->win_mode.xres,
--		real6410_lcd_pdata.win[0]->win_mode.yres);
-+		real6410_lcd_pdata.win[0]->xres,
-+		real6410_lcd_pdata.win[0]->yres);
- 
- 	s3c_fb_set_platdata(&real6410_lcd_pdata);
- 	s3c_nand_set_platdata(&real6410_nand_info);
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq5.c b/arch/arm/mach-s3c64xx/mach-smartq5.c
-index 3f42431..03a2f88 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq5.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq5.c
-@@ -108,23 +108,27 @@ static struct platform_device smartq5_buttons_device  = {
- };
- 
- static struct s3c_fb_pd_win smartq5_fb_win0 = {
--	.win_mode	= {
--		.left_margin	= 216,
--		.right_margin	= 40,
--		.upper_margin	= 35,
--		.lower_margin	= 10,
--		.hsync_len	= 1,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--		.refresh	= 80,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode smartq5_lcd_timing = {
-+	.left_margin	= 216,
-+	.right_margin	= 40,
-+	.upper_margin	= 35,
-+	.lower_margin	= 10,
-+	.hsync_len	= 1,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
-+	.refresh	= 80,
- };
- 
- static struct s3c_fb_platdata smartq5_lcd_pdata __initdata = {
- 	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
-+	.vtiming	= &smartq5_lcd_timing,
- 	.win[0]		= &smartq5_fb_win0,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq7.c b/arch/arm/mach-s3c64xx/mach-smartq7.c
-index e5c09b6..4e3b038 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq7.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq7.c
-@@ -124,23 +124,27 @@ static struct platform_device smartq7_buttons_device  = {
- };
- 
- static struct s3c_fb_pd_win smartq7_fb_win0 = {
--	.win_mode	= {
--		.left_margin	= 3,
--		.right_margin	= 5,
--		.upper_margin	= 1,
--		.lower_margin	= 20,
--		.hsync_len	= 10,
--		.vsync_len	= 3,
--		.xres		= 800,
--		.yres		= 480,
--		.refresh	= 80,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode smartq7_lcd_timing = {
-+	.left_margin	= 3,
-+	.right_margin	= 5,
-+	.upper_margin	= 1,
-+	.lower_margin	= 20,
-+	.hsync_len	= 10,
-+	.vsync_len	= 3,
-+	.xres		= 800,
-+	.yres		= 480,
-+	.refresh	= 80,
- };
- 
- static struct s3c_fb_platdata smartq7_lcd_pdata __initdata = {
- 	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
-+	.vtiming	= &smartq7_lcd_timing,
- 	.win[0]		= &smartq7_fb_win0,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index d55bc96..3cfc90f 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -146,26 +146,29 @@ static struct platform_device smdk6410_lcd_powerdev = {
- };
- 
- static struct s3c_fb_pd_win smdk6410_fb_win0 = {
--	/* this is to ensure we use win0 */
--	.win_mode	= {
--		.left_margin	= 8,
--		.right_margin	= 13,
--		.upper_margin	= 7,
--		.lower_margin	= 5,
--		.hsync_len	= 3,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 800,
-+	.yres		= 480,
- 	.virtual_y	= 480 * 2,
- 	.virtual_x	= 800,
- };
- 
-+static struct fb_videomode smdk6410_lcd_timing = {
-+	.left_margin	= 8,
-+	.right_margin	= 13,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
- /* 405566 clocks per frame => 60Hz refresh requires 24333960Hz clock */
- static struct s3c_fb_platdata smdk6410_lcd_pdata __initdata = {
- 	.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
-+	.vtiming	= &smdk6410_lcd_timing,
- 	.win[0]		= &smdk6410_fb_win0,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-index a40e325..92fefad 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-@@ -103,22 +103,26 @@ static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
- 
- /* Frame Buffer */
- static struct s3c_fb_pd_win smdk6440_fb_win0 = {
--	.win_mode = {
--		.left_margin	= 8,
--		.right_margin	= 13,
--		.upper_margin	= 7,
--		.lower_margin	= 5,
--		.hsync_len	= 3,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 24,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode smdk6440_lcd_timing = {
-+	.left_margin	= 8,
-+	.right_margin	= 13,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
- };
- 
- static struct s3c_fb_platdata smdk6440_lcd_pdata __initdata = {
- 	.win[0]		= &smdk6440_fb_win0,
-+	.vtiming	= &smdk6440_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
- 	.setup_gpio	= s5p64x0_fb_gpio_setup_24bpp,
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-index efb69e2..e2335ec 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-@@ -121,22 +121,26 @@ static struct s3c2410_uartcfg smdk6450_uartcfgs[] __initdata = {
- 
- /* Frame Buffer */
- static struct s3c_fb_pd_win smdk6450_fb_win0 = {
--	.win_mode	= {
--		.left_margin	= 8,
--		.right_margin	= 13,
--		.upper_margin	= 7,
--		.lower_margin	= 5,
--		.hsync_len	= 3,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 24,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode smdk6450_lcd_timing = {
-+	.left_margin	= 8,
-+	.right_margin	= 13,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
- };
- 
- static struct s3c_fb_platdata smdk6450_lcd_pdata __initdata = {
- 	.win[0]		= &smdk6450_fb_win0,
-+	.vtiming	= &smdk6450_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
- 	.setup_gpio	= s5p64x0_fb_gpio_setup_24bpp,
-diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
-index 674d229..0c3ae38 100644
---- a/arch/arm/mach-s5pc100/mach-smdkc100.c
-+++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
-@@ -136,24 +136,27 @@ static struct platform_device smdkc100_lcd_powerdev = {
- 
- /* Frame Buffer */
- static struct s3c_fb_pd_win smdkc100_fb_win0 = {
--	/* this is to ensure we use win0 */
--	.win_mode	= {
--		.left_margin	= 8,
--		.right_margin	= 13,
--		.upper_margin	= 7,
--		.lower_margin	= 5,
--		.hsync_len	= 3,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--		.refresh	= 80,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode smdkc100_lcd_timing = {
-+	.left_margin	= 8,
-+	.right_margin	= 13,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
-+	.refresh	= 80,
- };
- 
- static struct s3c_fb_platdata smdkc100_lcd_pdata __initdata = {
- 	.win[0]		= &smdkc100_fb_win0,
-+	.vtiming	= &smdkc100_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
- 	.setup_gpio	= s5pc100_fb_gpio_setup_24bpp,
-diff --git a/arch/arm/mach-s5pv210/mach-aquila.c b/arch/arm/mach-s5pv210/mach-aquila.c
-index a9ea64e..7b91bbf 100644
---- a/arch/arm/mach-s5pv210/mach-aquila.c
-+++ b/arch/arm/mach-s5pv210/mach-aquila.c
-@@ -96,38 +96,34 @@ static struct s3c2410_uartcfg aquila_uartcfgs[] __initdata = {
- 
- /* Frame Buffer */
- static struct s3c_fb_pd_win aquila_fb_win0 = {
--	.win_mode = {
--		.left_margin = 16,
--		.right_margin = 16,
--		.upper_margin = 3,
--		.lower_margin = 28,
--		.hsync_len = 2,
--		.vsync_len = 2,
--		.xres = 480,
--		.yres = 800,
--	},
- 	.max_bpp = 32,
- 	.default_bpp = 16,
-+	.xres = 480,
-+	.yres = 800,
- };
- 
- static struct s3c_fb_pd_win aquila_fb_win1 = {
--	.win_mode = {
--		.left_margin = 16,
--		.right_margin = 16,
--		.upper_margin = 3,
--		.lower_margin = 28,
--		.hsync_len = 2,
--		.vsync_len = 2,
--		.xres = 480,
--		.yres = 800,
--	},
- 	.max_bpp = 32,
- 	.default_bpp = 16,
-+	.xres = 480,
-+	.yres = 800,
-+};
-+
-+static struct fb_videomode aquila_lcd_timing = {
-+	.left_margin = 16,
-+	.right_margin = 16,
-+	.upper_margin = 3,
-+	.lower_margin = 28,
-+	.hsync_len = 2,
-+	.vsync_len = 2,
-+	.xres = 480,
-+	.yres = 800,
- };
- 
- static struct s3c_fb_platdata aquila_lcd_pdata __initdata = {
- 	.win[0]		= &aquila_fb_win0,
- 	.win[1]		= &aquila_fb_win1,
-+	.vtiming	= &aquila_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
- 			  VIDCON1_INV_VCLK | VIDCON1_INV_VDEN,
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 2cf5ed7..07a840d 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -105,25 +105,29 @@ static struct s3c2410_uartcfg goni_uartcfgs[] __initdata = {
- 
- /* Frame Buffer */
- static struct s3c_fb_pd_win goni_fb_win0 = {
--	.win_mode = {
--		.left_margin	= 16,
--		.right_margin	= 16,
--		.upper_margin	= 2,
--		.lower_margin	= 28,
--		.hsync_len	= 2,
--		.vsync_len	= 1,
--		.xres		= 480,
--		.yres		= 800,
--		.refresh	= 55,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.xres		= 480,
-+	.yres		= 800,
- 	.virtual_x	= 480,
- 	.virtual_y	= 2 * 800,
- };
- 
-+static struct fb_videomode goni_lcd_timing = {
-+	.left_margin	= 16,
-+	.right_margin	= 16,
-+	.upper_margin	= 2,
-+	.lower_margin	= 28,
-+	.hsync_len	= 2,
-+	.vsync_len	= 1,
-+	.xres		= 480,
-+	.yres		= 800,
-+	.refresh	= 55,
-+};
-+
- static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
- 	.win[0]		= &goni_fb_win0,
-+	.vtiming	= &goni_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB |
- 			  VIDCON0_CLKSEL_LCD,
- 	.vidcon1	= VIDCON1_INV_VCLK | VIDCON1_INV_VDEN
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index 91d4ad8..5e0c955 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -189,22 +189,26 @@ static struct platform_device smdkv210_lcd_lte480wv = {
- };
- 
- static struct s3c_fb_pd_win smdkv210_fb_win0 = {
--	.win_mode = {
--		.left_margin	= 13,
--		.right_margin	= 8,
--		.upper_margin	= 7,
--		.lower_margin	= 5,
--		.hsync_len	= 3,
--		.vsync_len	= 1,
--		.xres		= 800,
--		.yres		= 480,
--	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 24,
-+	.xres		= 800,
-+	.yres		= 480,
-+};
-+
-+static struct fb_videomode smdkv210_lcd_timing = {
-+	.left_margin	= 13,
-+	.right_margin	= 8,
-+	.upper_margin	= 7,
-+	.lower_margin	= 5,
-+	.hsync_len	= 3,
-+	.vsync_len	= 1,
-+	.xres		= 800,
-+	.yres		= 480,
- };
- 
- static struct s3c_fb_platdata smdkv210_lcd0_pdata __initdata = {
- 	.win[0]		= &smdkv210_fb_win0,
-+	.vtiming	= &smdkv210_lcd_timing,
- 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
- 	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
--- 
-1.6.6.rc2
+> and another state wants to switch to pull-down, it'd be best to just be
+> explicit, and say:
+>
+> PIN_CONFIG_BIAS_PULL_UP, disabled
+> PIN_CONFIG_BIAS_PULL_DOWN, value
+
+I tried to avoid ging state-switching capabilities to arguments.
+So going put of bias mode is a state changes and thus has its
+own enumerator. Conflating parameters and their arguments
+is less elegant IMO.
+
+>> + * @PIN_CONFIG_BIAS_HIGH_IMPEDANCE: the pin will be set to a high impedance
+>> + * ? ? mode, also know as "third-state" (tristate) or "high-Z" or "floating".
+>> + * ? ? On output pins this effectively disconnects the pin, which is useful
+>> + * ? ? if for example some other pin is going to drive the signal connected
+>> + * ? ? to it for a while. Pins used for input are usually always high
+>> + * ? ? impedance.
+>
+> Isn't this the same as DRIVE_OFF?
+
+Yeah probably, so I'll drop DRIVE_OFF and kee? high impedance, because
+it's more precise.
+
+>> + * @PIN_CONFIG_BIAS_PULL_UP: the pin will be pulled up (usually with high
+>> + * ? ? impedance to VDD), if the controller supports specifying a certain
+>> + * ? ? pull-up resistance, this is given as an argument (in Ohms) when
+>> + * ? ? setting this parameter.
+>> + * @PIN_CONFIG_BIAS_PULL_DOWN: the pin will be pulled down (usually with high
+>> + * ? ? impedance to GROUND), if the controller supports specifying a certain
+>> + * ? ? pull-down resistance, this is given as an argument (in Ohms) when
+>> + * ? ? setting this parameter.
+>
+> I don't think its a good idea to combine enabling/disabling features
+> with configuring values for those features. If an SoC only has on/off
+> control for pull-up, and the resistance isn't documented, what value
+> does the driver author guess and require as the value here?
+>
+> Even when multiple pull-up/down strengths are available, it's quite
+> plausible they're just documented as "weak" and "strong", and requiring
+> someone to go find out what the exact values are rather than just using
+> an enum disabled/enabled,weak=0/enabled,strong=1/ is going to be annoying.
+>
+> In other words, I think we'd be better off with:
+>
+> PIN_CONFIG_BIAS_PULL_UP = enabled/disabled 0/1
+> PIN_CONFIG_BIAS_PULL_DOWN = enabled/disabled 0/1
+> PIN_CONFIG_PULL_UP_STRENGTH = enumerated value 0..n-1
+> PIN_CONFIG_PULL_DOWN_STRENGTH = enumerated value 0..n-1
+
+Hm! I like the looks of this. I'm going to split them anyway.
+
+But what's wrong with just using Ohms as the parameter?
+That's what it's all about in the end is it not?
+(The U300 GPIOs are 50 kOhm BTW, clearly specified.)
+
+(Here I'm vaguely remembering some implementers not having a
+clue what their enumerators really meant and me being alien to
+the concept of incomplete hardware docs.)
+
+I'm taking strength out for adding later, I only need
+enable/disable for the U300 driver anyway.
+
+>> + * @PIN_CONFIG_BIAS_HIGH: the pin will be wired high, connected to VDD
+>> + * @PIN_CONFIG_BIAS_GROUND: the pin will be grounded, connected to GROUND
+>
+> Aren't these special cases of pull-up/down, with nominally zero
+> resistance? I suppose I could see these having separate control bits
+> though, so I suppose having explicit PIN_CONFIG_* values is reasonable.
+
+Hm right, following my own argument above to encode pull up/down
+arguments as Ohms I'll just delete them. Can be added back if we
+encounter a HW like that.
+
+>> + * @PIN_CONFIG_DRIVE_PUSH_PULL: the pin will be driven actively high and
+>> + * ? ? low, this is the most typical case and is typically achieved with two
+>> + * ? ? active transistors on the output. If the pin can support different
+>> + * ? ? drive strengths for push/pull, the strength is given in the argument
+>> + * ? ? as the number of driving stages vs nominal load impedance, so say
+>> + * ? ? quadruple driving stages (usually 8 transistors rather than two) will
+>> + * ? ? be configured with the 8 passed as argument.
+>> + * @PIN_CONFIG_DRIVE_OPEN_DRAIN: the pin will be driven with open drain (open
+>> + * ? ? collector) which means it is usually wired with other output ports
+>> + * ? ? which are then pulled up with an external resistor. If the pin can
+>> + * ? ? support different drive strengths for the open drain pin, the format
+>> + * ? ? is the same as for PIN_CONFIG_DRIVE_PUSH_PULL.
+>> + * @PIN_CONFIG_DRIVE_OPEN_SOURCE: the pin will be driven with open drain
+>> + * ? ? (open emitter) which is the same as open drain but pulled to ground.
+>> + * ? ? If the pin can support different drive strengths for the open drain
+>> + * ? ? pin, the format is the same as for PIN_CONFIG_DRIVE_PUSH_PULL.
+>> + * @PIN_CONFIG_DRIVE_OFF: the pin is set to inactive drive mode, off.
+>
+> Again, I don't think that explicitly documenting the units (# of
+> transistors) here is helpful. Datasheets may just be written in terms of
+> weak/normal/strong...
+
+Since I don't need these for this implementation I'll just delete them
+and postpone the inclusion to the day we have a hardware that needs
+them.
+
+> Again, this mixes selection of drive type with configuring that drive
+> type. For example, on some SoCs, PUSH_PULL might have a different set of
+> available drive strengths for PUSH and PULL hence need two parameters.
+
+Hm, interesting! But that very fact again underscores the underlying
+silicon construct as a number of driver stages.
+
+> Equally, the parameter for OPEN_DRAIN is the same as for PUSH_PULL, so
+> why not separate selecting the drive type and setting the drive strength
+> so that the setting of the drive strength can be shared between the
+> drive types?
+
+OK atleast I'm taking the argument out and replacing with just
+enable/disable for now, so we can discuss that separately.
+
+> So, I think this should be:
+>
+> PIN_CONFIG_DRIVE = push_pull/open_drain/open_source/tristate
+
+Tristate is not a drive mode but equivalent to
+BIAS_HIGH_IMPEDANCE.
+
+I'll go for three parameters for each drive mode and the
+argument ignored, I'm not copying the schem from pull up/down
+with an enable/disable argument since you probably cannot "disable"
+push-pull but rather have to set the pin to high impedance or OD, or
+OS rather i.e. an implicit state transition, then it's better to have
+that explicit.
+
+> PIN_CONFIG_DRIVE_STRENGTH_UP = enumerated value 0..n-1
+> PIN_CONFIG_DRIVE_STRENGTH_DOWN = enumerated value 0..n-1
+
+Saving this stuff for later. Let's agree on a starting
+point first.
+
+> Note that PIN_CONFIG_SLEW_RATE_* are essentially parameterizations of
+> the drive type just like drive strength is, and they're already separate
+> config parameters.
+
+True.
+
+>> + * @PIN_CONFIG_SLEW_RATE_RISING: this will configure the slew rate for rising
+>> + * ? ? signals on the pin. The argument gives the rise time in fractions
+>> + * ? ? compared to maximum rise time, 0 means nominal rise time. If you can
+>> + * ? ? control slew rate in 4 steps these will likely be equidistant like
+>> + * ? ? 1/4, 1/2, 3/4 or full nominal slew rate, which means argument 4 gives
+>> + * ? ? you 1/4 of nominal slew rate and the argument 4 has the same meaning
+>> + * ? ? as 0 - nominal slew rate (fastest possible, steep edges). You may want
+>> + * ? ? to adjust slew rates so that signal edges don't get too steep, causing
+>> + * ? ? disturbances in surrounding electronics known as electromagnetic
+>> + * ? ? interference (EMI) for example.
+>> + * @PIN_CONFIG_SLEW_RATE_FALLING: this will configure the slew rate for falling
+>> + * ? ? signals on the pin. The argument gives the fall time in fractions
+>> + * ? ? compared to nominal fall time.
+>
+> The same comment here; I think the value of those two should just be an
+> enumeration 0..n-1 to avoid documenting specific units.
+
+I'm taking them out for later discussion alongside the first driver that
+need them.
+
+>> + * @PIN_CONFIG_POWER_SOURCE: if the pin can select between different power
+>> + * ? ? supplies, the argument to this parameter (on a custom format) tells
+>> + * ? ? the driver which alternative power source to use.
+>> + * @PIN_CONFIG_LOW_POWER_MODE: this will configure the pin for low power
+>> + * ? ? operation, if several modes of operation are supported these can be
+>> + * ? ? passed in the argument on a custom form, else just use argument 1
+>> + * ? ? to indicate low power mode, argument 0 turns low power mode off.
+>
+>> + * @PIN_CONFIG_WAKEUP: this will configure an input pin such that if a
+>> + * ? ? signal transition arrives at the pin when the pin controller/system
+>> + * ? ? is sleeping, it will wake up the system if argument 1 is passed along.
+>> + * ? ? Pass argument 0 to turn wakeup enablement off.
+>
+> Is this something that's controlled at the pinmux level? I would have
+> expected it to be controlled by whatever HW input signals were routed to
+> - i.e. a GPIO controller could control which GPIO inputs provided
+> wakeup, or a USB controller would wake if some bus condition was seen
+> etc. I suppose it's possible that a pin controller itself could wake the
+> system, but how would the wake reason be mapped to something that could
+> interpret that? If co-ordination between e.g. the GPIO driver an pinctrl
+> driver is needed to achieve this, shouldn't the GPIO driver call into
+> some private API in the pinctrl driver to set this up, similar to how
+> pinctrl_gpio_direction_input() works?
+>
+> Still, if there's a specific reason for this I don't see any need to
+> oppose it; it just seems surprising it'd be needed.
+
+No I think it's plain wrong actually.
+
+The struct irq_chip already provides methods for setting pins to
+wakeup, so I'm just deleteing this.
+
+There could be a usecase for a complex pin controller that can wake
+up the system on a pin which however isn't going to generate an IRQ,
+but that sounds backwards to me, and we can add it the day we
+need it in that case.
+
+>> + * @PIN_CONFIG_END: this is the last enumerator for pin configurations, if
+>> + * ? ? you need to pass in custom configurations to the pin controller, use
+>> + * ? ? PIN_CONFIG_END+1 as the base offset.
+>> + */
+>> +enum pin_config_param {
+>> + ? ? ? PIN_CONFIG_BIAS_DISABLE,
+>> + ? ? ? PIN_CONFIG_BIAS_HIGH_IMPEDANCE,
+>> + ? ? ? PIN_CONFIG_BIAS_PULL_UP,
+>> + ? ? ? PIN_CONFIG_BIAS_PULL_DOWN,
+>> + ? ? ? PIN_CONFIG_BIAS_HIGH,
+>> + ? ? ? PIN_CONFIG_BIAS_GROUND,
+>> + ? ? ? PIN_CONFIG_DRIVE_PUSH_PULL,
+>> + ? ? ? PIN_CONFIG_DRIVE_OPEN_DRAIN,
+>> + ? ? ? PIN_CONFIG_DRIVE_OPEN_SOURCE,
+>> + ? ? ? PIN_CONFIG_DRIVE_OFF,
+>> + ? ? ? PIN_CONFIG_INPUT_SCHMITT,
+>> + ? ? ? PIN_CONFIG_INPUT_DEBOUNCE,
+>> + ? ? ? PIN_CONFIG_SLEW_RATE_RISING,
+>> + ? ? ? PIN_CONFIG_SLEW_RATE_FALLING,
+>> + ? ? ? PIN_CONFIG_POWER_SOURCE,
+>> + ? ? ? PIN_CONFIG_LOW_POWER_MODE,
+>> + ? ? ? PIN_CONFIG_WAKEUP,
+>> + ? ? ? PIN_CONFIG_END,
+>> +};
+>
+> I think this should be given a large static value, e.g. 0x8000. That way
+> the value will never change, and hence the values of custom enumerations
+> will never change.
+
+PIN_CONFIG_END you mean?
+
+> That isn't important for mapping tables/... provided by data in the
+> kernel since a recompile would trivially adapt to changes, but it might
+> be for device tree; someone might want to represent the raw custom
+> pin_config_param enumeration values directly in device tree (so they
+> could read an int from device tree and cast it directly to an enum
+> pin_config_param without using a lookup table to do the conversion), and
+> the meanings of values in device tree need to stay static.
+>
+> Of course, you could argue that drivers parsing DT and creating mapping
+> tables from it must always do an explicit mapping, in which case having
+> PIN_CONFIG_END floating is fine.
+
+We can have both. But I will set it to 0x7fff and let 0x8000 be the first
+custom parameter...
+
+>> +static inline enum pin_config_param to_config_param(unsigned long config)
+>> +{
+>> + ? ? ? return (enum pin_config_param) (config & 0xffffUL);
+>> +}
+>> +
+>> +static inline u16 to_config_argument(unsigned long config)
+>> +{
+>> + ? ? ? return (enum pin_config_param) ((config >> 16) & 0xffffUL);
+>> +}
+>> +
+>> +static inline unsigned long to_config_packed(enum pin_config_param param,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u16 argument)
+>> +{
+>> + ? ? ? return (argument << 16) | ((unsigned long) param & 0xffffUL);
+>> +}
+>
+> Those function names all have very generic names; shouldn't they be
+> name-spaced e.g. pinconfig_to_param()/pinconfig_to_argument()?
+
+Yep, I'll fix.
+
+> Shouldn't to_config_packed() either be removed, or rewritten to use
+> PIN_CONF_PACKED() to remove the duplication?
+
+Ah. The latter was for tables so needed to be compile-time
+resolvable. Didn't see the duplication. Will move the macro
+above the function and use the macro in the static inline!
+
+>> diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
+>
+>> +void pinconf_generic_dump_pin(struct pinctrl_dev *pctldev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct seq_file *s, unsigned pin)
+> ...
+>> + ? ? ? ? ? ? ? /* We want to check out this parameter */
+>> + ? ? ? ? ? ? ? config = to_config_packed(conf_items[i].param, 0);
+>> + ? ? ? ? ? ? ? ret = pin_config_get_for_pin(pctldev, pin, &config);
+>> + ? ? ? ? ? ? ? /* These are legal errors */
+>> + ? ? ? ? ? ? ? if (ret == -EINVAL || ret == -ENOTSUPP)
+>> + ? ? ? ? ? ? ? ? ? ? ? continue;
+>
+> What's the meaning of -EINVAL and -ENOTSUPP in this context? I don't
+> understand why you'd need two "legal errors" rather than just -ENOTSUPP.
+
+The reasoning is that -ENOTSUPP cannot be done by this
+pin controller at all while -EINVAL is returned when the pin controller
+does support the parameter, bit it has no meaning right now.
+
+For example the pin controller might not support pull down
+at all and then returns -ENOTSUPP for any attempt to read that
+code.
+
+However it might be that it does support pull-down, but right now
+it is in output (drive) mode so there is nothing relevant to say
+about pull-down right now.
+
+I gave these two different error codes so we could tell them
+apart, semantically speaking, practically you can write code doing
+the same thing with just -ENOTSUPP but then this return code
+means one of two things and you don't know which one it is.
+
+The use cases in debugfs is:
+
+(A) Show all settings right now (current implementation)
+   iterate/skip over all error codes like above
+
+(B) Show all *possible* settings (can be added if we can
+  tell these two apart) show "available" for anything
+  -EINVAL but do not show at all anything reporting
+  -ENOTSUPP.
+
+I think I had this documented at some point and it got lost..
+will reinsert it somewhere.
+
+> ...
+>> + ? ? ? ? ? ? ? seq_puts(s, conf_items[i].display);
+>> + ? ? ? ? ? ? ? /* Print unit if available */
+>> + ? ? ? ? ? ? ? if (conf_items[i].format && to_config_argument(config) != 0)
+>> + ? ? ? ? ? ? ? ? ? ? ? seq_printf(s, " (%u %s)", to_config_argument(config),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?conf_items[i].format);
+>
+> Wouldn't you always want to dump the value, or if not, wouldn't you only
+> want to print conf_items[i].display if you're going to print the value too?
+
+We have some parameters where the value is meaningless so
+we don't want to show these at all.
+
+Let me post v7 so we can discuss from there.
+
+Yours,
+Linus Walleij
