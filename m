@@ -1,156 +1,100 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Mar 2012 19:58:52 +0800
-Subject: [PATCH v4 05/10] ASoC: fsl: remove helper fsl_asoc_get_codec_dev_name
-In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331553537-19789-6-git-send-email-shawn.guo@linaro.org>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 13 Mar 2012 02:29:58 +0530
+Subject: [PATCH v2 2/3] video: s3c-fb: remove 'default_win' element from
+ platform data
+In-Reply-To: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1331585999-8604-3-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ASoC core now can support matching codec with device node besides
-name, so we can save helper function fsl_asoc_get_codec_dev_name.
+The decision to enable or disable the data output to the lcd panel from
+the controller need not be based on the value of 'default_win' element
+in the platform data. Instead, the data output to the panel is enabled
+if any of the windows are active, else data output is disabled.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Jingoo Han <jg1.han@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- sound/soc/fsl/fsl_utils.c    |   44 ------------------------------------------
- sound/soc/fsl/fsl_utils.h    |    1 -
- sound/soc/fsl/mpc8610_hpcd.c |   13 +----------
- sound/soc/fsl/p1022_ds.c     |   13 +----------
- 4 files changed, 4 insertions(+), 67 deletions(-)
+ arch/arm/plat-samsung/include/plat/fb.h |    2 --
+ drivers/video/s3c-fb.c                  |   28 ++++++----------------------
+ 2 files changed, 6 insertions(+), 24 deletions(-)
 
-diff --git a/sound/soc/fsl/fsl_utils.c b/sound/soc/fsl/fsl_utils.c
-index 4370c28..b9e42b5 100644
---- a/sound/soc/fsl/fsl_utils.c
-+++ b/sound/soc/fsl/fsl_utils.c
-@@ -12,55 +12,11 @@
+diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+index 39d6bd7..536002f 100644
+--- a/arch/arm/plat-samsung/include/plat/fb.h
++++ b/arch/arm/plat-samsung/include/plat/fb.h
+@@ -62,8 +62,6 @@ struct s3c_fb_platdata {
+ 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
+ 	struct fb_videomode     *vtiming;
  
- #include <linux/module.h>
- #include <linux/of_address.h>
--#include <linux/of_i2c.h>
- #include <sound/soc.h>
+-	u32			 default_win;
+-
+ 	u32			 vidcon0;
+ 	u32			 vidcon1;
+ };
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 60d1c12..cfe5113 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -531,8 +531,8 @@ static int s3c_fb_set_par(struct fb_info *info)
+ 	/* disable the window whilst we update it */
+ 	writel(0, regs + WINCON(win_no));
  
- #include "fsl_utils.h"
+-	if (win_no == sfb->pdata->default_win)
+- 		s3c_fb_enable(sfb, 1);
++	if (!sfb->output_on)
++		s3c_fb_enable(sfb, 1);
+ 
+ 	/* write the buffer address */
+ 
+@@ -798,7 +798,7 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
+ 	struct s3c_fb_win *win = info->par;
+ 	struct s3c_fb *sfb = win->parent;
+ 	unsigned int index = win->index;
+-	u32 wincon;
++	u32 wincon, output_on = sfb->output_on;
+ 
+ 	dev_dbg(sfb->dev, "blank mode %d\n", blank_mode);
+ 
+@@ -837,34 +837,18 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
+ 
+ 	shadow_protect_win(win, 1);
+ 	writel(wincon, sfb->regs + sfb->variant.wincon + (index * 4));
+-	shadow_protect_win(win, 0);
+ 
+ 	/* Check the enabled state to see if we need to be running the
+ 	 * main LCD interface, as if there are no active windows then
+ 	 * it is highly likely that we also do not need to output
+ 	 * anything.
+ 	 */
+-
+-	/* We could do something like the following code, but the current
+-	 * system of using framebuffer events means that we cannot make
+-	 * the distinction between just window 0 being inactive and all
+-	 * the windows being down.
+-	 *
+-	 * s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
+-	*/
+-
+-	/* we're stuck with this until we can do something about overriding
+-	 * the power control using the blanking event for a single fb.
+-	 */
+-	if (index == sfb->pdata->default_win) {
+-		shadow_protect_win(win, 1);
+-		s3c_fb_enable(sfb, blank_mode != FB_BLANK_POWERDOWN ? 1 : 0);
+-		shadow_protect_win(win, 0);
+-	}
++	s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
++	shadow_protect_win(win, 0);
+ 
+ 	pm_runtime_put_sync(sfb->dev);
+ 
+-	return 0;
++	return output_on == sfb->output_on;
+ }
  
  /**
-- * fsl_asoc_get_codec_dev_name - determine the dev_name for a codec node
-- *
-- * @np: pointer to the I2C device tree node
-- * @buf: buffer to be filled with the dev_name of the I2C device
-- * @len: the length of the buffer
-- *
-- * This function determines the dev_name for an I2C node.  This is the name
-- * that would be returned by dev_name() if this device_node were part of a
-- * 'struct device'  It's ugly and hackish, but it works.
-- *
-- * The dev_name for such devices include the bus number and I2C address. For
-- * example, "cs4270.0-004f".
-- */
--int fsl_asoc_get_codec_dev_name(struct device_node *np, char *buf, size_t len)
--{
--	const u32 *iprop;
--	u32 addr;
--	char temp[DAI_NAME_SIZE];
--	struct i2c_client *i2c;
--
--	of_modalias_node(np, temp, DAI_NAME_SIZE);
--
--	iprop = of_get_property(np, "reg", NULL);
--	if (!iprop)
--		return -EINVAL;
--
--	addr = be32_to_cpup(iprop);
--
--	/* We need the adapter number */
--	i2c = of_find_i2c_device_by_node(np);
--	if (!i2c) {
--		put_device(&i2c->dev);
--		return -ENODEV;
--	}
--
--	snprintf(buf, len, "%s.%u-%04x", temp, i2c->adapter->nr, addr);
--	put_device(&i2c->dev);
--
--	return 0;
--}
--EXPORT_SYMBOL(fsl_asoc_get_codec_dev_name);
--
--/**
-  * fsl_asoc_get_dma_channel - determine the dma channel for a SSI node
-  *
-  * @ssi_np: pointer to the SSI device tree node
-diff --git a/sound/soc/fsl/fsl_utils.h b/sound/soc/fsl/fsl_utils.h
-index 44d1436..b295112 100644
---- a/sound/soc/fsl/fsl_utils.h
-+++ b/sound/soc/fsl/fsl_utils.h
-@@ -18,7 +18,6 @@
- struct snd_soc_dai_link;
- struct device_node;
- 
--int fsl_asoc_get_codec_dev_name(struct device_node *np, char *buf, size_t len);
- int fsl_asoc_get_dma_channel(struct device_node *ssi_np, const char *name,
- 			     struct snd_soc_dai_link *dai,
- 			     unsigned int *dma_channel_id,
-diff --git a/sound/soc/fsl/mpc8610_hpcd.c b/sound/soc/fsl/mpc8610_hpcd.c
-index 7ead1e5..354b753 100644
---- a/sound/soc/fsl/mpc8610_hpcd.c
-+++ b/sound/soc/fsl/mpc8610_hpcd.c
-@@ -41,7 +41,6 @@ struct mpc8610_hpcd_data {
- 	unsigned int dma_id[2];		/* 0 = DMA1, 1 = DMA2, etc */
- 	unsigned int dma_channel_id[2]; /* 0 = ch 0, 1 = ch 1, etc*/
- 	char codec_dai_name[DAI_NAME_SIZE];
--	char codec_name[DAI_NAME_SIZE];
- 	char platform_name[2][DAI_NAME_SIZE]; /* One for each DMA channel */
- };
- 
-@@ -215,16 +214,8 @@ static int mpc8610_hpcd_probe(struct platform_device *pdev)
- 	machine_data->dai[0].cpu_dai_name = dev_name(&ssi_pdev->dev);
- 	machine_data->dai[0].ops = &mpc8610_hpcd_ops;
- 
--	/* Determine the codec name, it will be used as the codec DAI name */
--	ret = fsl_asoc_get_codec_dev_name(codec_np, machine_data->codec_name,
--					  DAI_NAME_SIZE);
--	if (ret) {
--		dev_err(&pdev->dev, "invalid codec node %s\n",
--			codec_np->full_name);
--		ret = -EINVAL;
--		goto error;
--	}
--	machine_data->dai[0].codec_name = machine_data->codec_name;
-+	/* ASoC core can match codec with device node */
-+	machine_data->dai[0].codec_of_node = codec_np;
- 
- 	/* The DAI name from the codec (snd_soc_dai_driver.name) */
- 	machine_data->dai[0].codec_dai_name = "cs4270-hifi";
-diff --git a/sound/soc/fsl/p1022_ds.c b/sound/soc/fsl/p1022_ds.c
-index 60f7bb8..e87cb41 100644
---- a/sound/soc/fsl/p1022_ds.c
-+++ b/sound/soc/fsl/p1022_ds.c
-@@ -73,7 +73,6 @@ struct machine_data {
- 	unsigned int ssi_id;		/* 0 = SSI1, 1 = SSI2, etc */
- 	unsigned int dma_id[2];		/* 0 = DMA1, 1 = DMA2, etc */
- 	unsigned int dma_channel_id[2]; /* 0 = ch 0, 1 = ch 1, etc*/
--	char codec_name[DAI_NAME_SIZE];
- 	char platform_name[2][DAI_NAME_SIZE]; /* One for each DMA channel */
- };
- 
-@@ -225,16 +224,8 @@ static int p1022_ds_probe(struct platform_device *pdev)
- 	mdata->dai[0].cpu_dai_name = dev_name(&ssi_pdev->dev);
- 	mdata->dai[0].ops = &p1022_ds_ops;
- 
--	/* Determine the codec name, it will be used as the codec DAI name */
--	ret = fsl_asoc_get_codec_dev_name(codec_np, mdata->codec_name,
--					  DAI_NAME_SIZE);
--	if (ret) {
--		dev_err(&pdev->dev, "invalid codec node %s\n",
--			codec_np->full_name);
--		ret = -EINVAL;
--		goto error;
--	}
--	mdata->dai[0].codec_name = mdata->codec_name;
-+	/* ASoC core can match codec with device node */
-+	mdata->dai[0].codec_of_node = codec_np;
- 
- 	/* We register two DAIs per SSI, one for playback and the other for
- 	 * capture.  We support codecs that have separate DAIs for both playback
 -- 
-1.7.5.4
+1.6.6.rc2
