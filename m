@@ -1,44 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Mar 2012 17:05:32 +0100
-Subject: linux-next: manual merge of the cpuidle-cons tree with the arm-soc
- tree
-In-Reply-To: <20120309183732.512d3676599da324f4747219@canb.auug.org.au>
-References: <20120309183732.512d3676599da324f4747219@canb.auug.org.au>
-Message-ID: <4F5E1ECC.1040605@atmel.com>
+From: b39297@freescale.com (Wu Guoxing)
+Date: Mon, 12 Mar 2012 12:57:58 +0800
+Subject: [PATCH 1/2] ARM: mx35: 3ds: add mc9s08dz60 gpio definitions
+Message-ID: <1331528279-2263-1-git-send-email-b39297@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+add a new header file for mx35 3ds board
+add the mc9s08dz60 gpio definitions
 
-On 03/09/2012 08:37 AM, Stephen Rothwell :
-> Hi Rob,
-> 
-> Today's linux-next merge of the cpuidle-cons tree got a conflict
-> in arch/arm/mach-at91/cpuidle.c between commit 00482a4078f4 ("ARM:
-> at91: implement the standby function for pm/cpuidle") from the
-> arm-soc tree and commit 7a1f6e72dce1 ("ARM: at91: Consolidate time
-> keeping and irq enable") from the cpuidle-cons tree.
-> 
-> I fixed it up (I think - see below) and can carry the fix as
-> necessary.
+Signed-off-by: Wu Guoxing <b39297@freescale.com>
+---
+ arch/arm/plat-mxc/include/mach/board_mx35_3ds.h |   26 +++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/include/mach/board_mx35_3ds.h
 
-Yes: resolution correct. Please carry it.
-
-Thanks to Rob and Daniel for their answers.
-
-Best regards,
-- -- 
-Nicolas Ferre
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
-
-iQEcBAEBAgAGBQJPXh7HAAoJEAf03oE53VmQSQwH/15D3okPxJSEiH0k8IFt6Df0
-RDY/CdaGYDllGMq7Yc1LiQAPrlHkv+gFNAJkhH8aJvC603pYBFGIa5IPLeZEE+XD
-MkXiO7pQAOdGtojqSrZI8Sp0kxtfdR6QlNu5o518yvlKIkxbWJoXdVty9+MuciOv
-GOR+164hJtlr4fLLg7bTzsdnxquDVBBbks9qLhSYEQBEuNkgXKgNfdMouwVI/Zuj
-sX9DSKnVVm5LS/rrq888JRPPtBf8/HkmOeFRWKktq7Q8WldQbBI79vj01osH++jf
-rwDiM/CSC0nhXY0IWEof+Hz1mSinM07XGZglDYwqI1ca7HId2C/txaFI3NtcC7A=
-=rZpG
------END PGP SIGNATURE-----
+diff --git a/arch/arm/plat-mxc/include/mach/board_mx35_3ds.h b/arch/arm/plat-mxc/include/mach/board_mx35_3ds.h
+new file mode 100644
+index 0000000..df0d5f7
+--- /dev/null
++++ b/arch/arm/plat-mxc/include/mach/board_mx35_3ds.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * Author: Wu Guoxing <b39297@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __ASM_ARCH_MXC_BOARD_MX35_3DS_H__
++#define __ASM_ARCH_MXC_BOARD_MX35_3DS_H__
++
++#define GPIO_MC9S08DZ60_GPS_ENABLE 0
++#define GPIO_MC9S08DZ60_HDD_ENABLE 4
++#define GPIO_MC9S08DZ60_WIFI_ENABLE 5
++#define GPIO_MC9S08DZ60_LCD_ENABLE 6
++#define GPIO_MC9S08DZ60_SPEAKER_ENABLE 8
++
++#endif
+-- 
+1.7.1
