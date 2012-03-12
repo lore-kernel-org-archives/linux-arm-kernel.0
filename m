@@ -1,194 +1,198 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Mar 2012 19:58:54 +0800
-Subject: [PATCH v4 07/10] ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
-In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331553537-19789-8-git-send-email-shawn.guo@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Mar 2012 10:19:04 -0600
+Subject: [PATCH v2 3/3] gpio/samsung: use ioremap() for EXYNOS4 GPIOlib
+In-Reply-To: <1329341829-14403-4-git-send-email-kgene.kim@samsung.com>
+References: <1329341829-14403-1-git-send-email-kgene.kim@samsung.com>
+ <1329341829-14403-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20120312161904.E57193E07B0@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide different pair of accessors for accessing SSI registers on
-PowerPC and ARM/IMX, so that fsl_ssi driver can be built on both
-architectures.
+On Thu, 16 Feb 2012 06:37:09 +0900, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> From: Sangsu Park <sangsu4u.park@samsung.com>
+> 
+> This patch changes to use ioremap() for EXYNOS4210
+> so that we can drop the static mapping for EXYNOS
+> SoCs.
+> 
+> Note: Will be updated for all of Samsung GPIOlibs
+> to use ioremap() next time.
+> 
+> Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- sound/soc/fsl/fsl_ssi.c |   64 ++++++++++++++++++++++++++++++----------------
- 1 files changed, 42 insertions(+), 22 deletions(-)
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 2eb407f..db9a734 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -11,11 +11,14 @@
-  */
- 
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/device.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- 
- #include <sound/core.h>
-@@ -26,6 +29,25 @@
- 
- #include "fsl_ssi.h"
- 
-+#ifdef PPC
-+#define read_ssi(addr)			 in_be32(addr)
-+#define write_ssi(val, addr)		 out_be32(addr, val)
-+#define write_ssi_mask(addr, clear, set) clrsetbits_be32(addr, clear, set)
-+#elif defined ARM
-+#define read_ssi(addr)			 readl(addr)
-+#define write_ssi(val, addr)		 writel(val, addr)
-+/*
-+ * FIXME: Proper locking should be added at write_ssi_mask caller level
-+ * to ensure this register read/modify/write sequence is race free.
-+ */
-+static inline void write_ssi_mask(u32 __iomem *addr, u32 clear, u32 set)
-+{
-+	u32 val = readl(addr);
-+	val = (val & ~clear) | set;
-+	writel(val, addr);
-+}
-+#endif
-+
- /**
-  * FSLSSI_I2S_RATES: sample rates supported by the I2S
-  *
-@@ -145,7 +167,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 	   were interrupted for.  We mask it with the Interrupt Enable register
- 	   so that we only check for events that we're interested in.
- 	 */
--	sisr = in_be32(&ssi->sisr) & SIER_FLAGS;
-+	sisr = read_ssi(&ssi->sisr) & SIER_FLAGS;
- 
- 	if (sisr & CCSR_SSI_SISR_RFRC) {
- 		ssi_private->stats.rfrc++;
-@@ -260,7 +282,7 @@ static irqreturn_t fsl_ssi_isr(int irq, void *dev_id)
- 
- 	/* Clear the bits that we set */
- 	if (sisr2)
--		out_be32(&ssi->sisr, sisr2);
-+		write_ssi(sisr2, &ssi->sisr);
- 
- 	return ret;
- }
-@@ -295,7 +317,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 * SSI needs to be disabled before updating the registers we set
- 		 * here.
- 		 */
--		clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
-+		write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_SSIEN, 0);
- 
- 		/*
- 		 * Program the SSI into I2S Slave Non-Network Synchronous mode.
-@@ -303,20 +325,18 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 *
- 		 * FIXME: Little-endian samples require a different shift dir
- 		 */
--		clrsetbits_be32(&ssi->scr,
-+		write_ssi_mask(&ssi->scr,
- 			CCSR_SSI_SCR_I2S_MODE_MASK | CCSR_SSI_SCR_SYN,
- 			CCSR_SSI_SCR_TFR_CLK_DIS | CCSR_SSI_SCR_I2S_MODE_SLAVE
- 			| (synchronous ? CCSR_SSI_SCR_SYN : 0));
- 
--		out_be32(&ssi->stcr,
--			 CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
-+		write_ssi(CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFEN0 |
- 			 CCSR_SSI_STCR_TFSI | CCSR_SSI_STCR_TEFS |
--			 CCSR_SSI_STCR_TSCKP);
-+			 CCSR_SSI_STCR_TSCKP, &ssi->stcr);
- 
--		out_be32(&ssi->srcr,
--			 CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
-+		write_ssi(CCSR_SSI_SRCR_RXBIT0 | CCSR_SSI_SRCR_RFEN0 |
- 			 CCSR_SSI_SRCR_RFSI | CCSR_SSI_SRCR_REFS |
--			 CCSR_SSI_SRCR_RSCKP);
-+			 CCSR_SSI_SRCR_RSCKP, &ssi->srcr);
- 
- 		/*
- 		 * The DC and PM bits are only used if the SSI is the clock
-@@ -324,7 +344,7 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 */
- 
- 		/* Enable the interrupts and DMA requests */
--		out_be32(&ssi->sier, SIER_FLAGS);
-+		write_ssi(SIER_FLAGS, &ssi->sier);
- 
- 		/*
- 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
-@@ -339,9 +359,9 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 * make this value larger (and maybe we should), but this way
- 		 * data will be written to memory as soon as it's available.
- 		 */
--		out_be32(&ssi->sfcsr,
--			CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
--			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2));
-+		write_ssi(CCSR_SSI_SFCSR_TFWM0(ssi_private->fifo_depth - 2) |
-+			CCSR_SSI_SFCSR_RFWM0(ssi_private->fifo_depth - 2),
-+			&ssi->sfcsr);
- 
- 		/*
- 		 * We keep the SSI disabled because if we enable it, then the
-@@ -417,7 +437,7 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
- 	unsigned int sample_size =
- 		snd_pcm_format_width(params_format(hw_params));
- 	u32 wl = CCSR_SSI_SxCCR_WL(sample_size);
--	int enabled = in_be32(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
-+	int enabled = read_ssi(&ssi->scr) & CCSR_SSI_SCR_SSIEN;
- 
- 	/*
- 	 * If we're in synchronous mode, and the SSI is already enabled,
-@@ -439,9 +459,9 @@ static int fsl_ssi_hw_params(struct snd_pcm_substream *substream,
- 	/* In synchronous mode, the SSI uses STCCR for capture */
- 	if ((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ||
- 	    ssi_private->cpu_dai_drv.symmetric_rates)
--		clrsetbits_be32(&ssi->stccr, CCSR_SSI_SxCCR_WL_MASK, wl);
-+		write_ssi_mask(&ssi->stccr, CCSR_SSI_SxCCR_WL_MASK, wl);
- 	else
--		clrsetbits_be32(&ssi->srccr, CCSR_SSI_SxCCR_WL_MASK, wl);
-+		write_ssi_mask(&ssi->srccr, CCSR_SSI_SxCCR_WL_MASK, wl);
- 
- 	return 0;
- }
-@@ -466,19 +486,19 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
- 	case SNDRV_PCM_TRIGGER_START:
- 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			setbits32(&ssi->scr,
-+			write_ssi_mask(&ssi->scr, 0,
- 				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_TE);
- 		else
--			setbits32(&ssi->scr,
-+			write_ssi_mask(&ssi->scr, 0,
- 				CCSR_SSI_SCR_SSIEN | CCSR_SSI_SCR_RE);
- 		break;
- 
- 	case SNDRV_PCM_TRIGGER_STOP:
- 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
--			clrbits32(&ssi->scr, CCSR_SSI_SCR_TE);
-+			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_TE, 0);
- 		else
--			clrbits32(&ssi->scr, CCSR_SSI_SCR_RE);
-+			write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_RE, 0);
- 		break;
- 
- 	default:
-@@ -510,7 +530,7 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
- 	if (!ssi_private->first_stream) {
- 		struct ccsr_ssi __iomem *ssi = ssi_private->ssi;
- 
--		clrbits32(&ssi->scr, CCSR_SSI_SCR_SSIEN);
-+		write_ssi_mask(&ssi->scr, CCSR_SSI_SCR_SSIEN, 0);
- 	}
- }
- 
+Kukjin, I think you wanted to take this via your tree?  I'm fine with that.
+Let me know if you'd rather it go via the gpio tree.
+
+g.
+
+
+> ---
+>  arch/arm/mach-exynos/common.c |   15 ------------
+>  drivers/gpio/gpio-samsung.c   |   48 +++++++++++++++++++++++++++++------------
+>  2 files changed, 34 insertions(+), 29 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 63a2b04..618e7f3 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -172,21 +172,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+>  		.length		= SZ_4K,
+>  		.type		= MT_DEVICE,
+>  	}, {
+> -		.virtual	= (unsigned long)S5P_VA_GPIO1,
+> -		.pfn		= __phys_to_pfn(EXYNOS4_PA_GPIO1),
+> -		.length		= SZ_4K,
+> -		.type		= MT_DEVICE,
+> -	}, {
+> -		.virtual	= (unsigned long)S5P_VA_GPIO2,
+> -		.pfn		= __phys_to_pfn(EXYNOS4_PA_GPIO2),
+> -		.length		= SZ_4K,
+> -		.type		= MT_DEVICE,
+> -	}, {
+> -		.virtual	= (unsigned long)S5P_VA_GPIO3,
+> -		.pfn		= __phys_to_pfn(EXYNOS4_PA_GPIO3),
+> -		.length		= SZ_256,
+> -		.type		= MT_DEVICE,
+> -	}, {
+>  		.virtual	= (unsigned long)S5P_VA_DMC0,
+>  		.pfn		= __phys_to_pfn(EXYNOS4_PA_DMC0),
+>  		.length		= SZ_4K,
+> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
+> index d6cfdee7..4627787 100644
+> --- a/drivers/gpio/gpio-samsung.c
+> +++ b/drivers/gpio/gpio-samsung.c
+> @@ -2331,7 +2331,6 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
+>  			.label	= "GPY6",
+>  		},
+>  	}, {
+> -		.base	= (S5P_VA_GPIO2 + 0xC00),
+>  		.config	= &samsung_gpio_cfgs[9],
+>  		.irq_base = IRQ_EINT(0),
+>  		.chip	= {
+> @@ -2341,7 +2340,6 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
+>  			.to_irq	= samsung_gpiolib_to_irq,
+>  		},
+>  	}, {
+> -		.base	= (S5P_VA_GPIO2 + 0xC20),
+>  		.config	= &samsung_gpio_cfgs[9],
+>  		.irq_base = IRQ_EINT(8),
+>  		.chip	= {
+> @@ -2351,7 +2349,6 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
+>  			.to_irq	= samsung_gpiolib_to_irq,
+>  		},
+>  	}, {
+> -		.base	= (S5P_VA_GPIO2 + 0xC40),
+>  		.config	= &samsung_gpio_cfgs[9],
+>  		.irq_base = IRQ_EINT(16),
+>  		.chip	= {
+> @@ -2361,7 +2358,6 @@ static struct samsung_gpio_chip exynos4_gpios_2[] = {
+>  			.to_irq	= samsung_gpiolib_to_irq,
+>  		},
+>  	}, {
+> -		.base	= (S5P_VA_GPIO2 + 0xC60),
+>  		.config	= &samsung_gpio_cfgs[9],
+>  		.irq_base = IRQ_EINT(24),
+>  		.chip	= {
+> @@ -2789,9 +2785,16 @@ static __init int samsung_gpiolib_init(void)
+>  		s5p_register_gpioint_bank(IRQ_GPIOINT, 0, S5P_GPIOINT_GROUP_MAXNR);
+>  #endif
+>  	} else if (soc_is_exynos4210()) {
+> -		group = 0;
+> +#ifdef CONFIG_CPU_EXYNOS4210
+> +		void __iomem *gpx_base;
+>  
+>  		/* gpio part1 */
+> +		gpio_base1 = ioremap(EXYNOS4_PA_GPIO1, SZ_4K);
+> +		if (gpio_base1 == NULL) {
+> +			pr_err("unable to ioremap for gpio_base1\n");
+> +			goto err_ioremap1;
+> +		}
+> +
+>  		chip = exynos4_gpios_1;
+>  		nr_chips = ARRAY_SIZE(exynos4_gpios_1);
+>  
+> @@ -2800,14 +2803,25 @@ static __init int samsung_gpiolib_init(void)
+>  				chip->config = &exynos_gpio_cfg;
+>  				chip->group = group++;
+>  			}
+> -#ifdef CONFIG_CPU_EXYNOS4210
+>  			exynos_gpiolib_attach_ofnode(chip,
+>  					EXYNOS4_PA_GPIO1, i * 0x20);
+> -#endif
+>  		}
+> -		samsung_gpiolib_add_4bit_chips(exynos4_gpios_1, nr_chips, S5P_VA_GPIO1);
+> +		samsung_gpiolib_add_4bit_chips(exynos4_gpios_1,
+> +					       nr_chips, gpio_base1);
+>  
+>  		/* gpio part2 */
+> +		gpio_base2 = ioremap(EXYNOS4_PA_GPIO2, SZ_4K);
+> +		if (gpio_base2 == NULL) {
+> +			pr_err("unable to ioremap for gpio_base2\n");
+> +			goto err_ioremap2;
+> +		}
+> +
+> +		/* need to set base address for gpx */
+> +		chip = &exynos4_gpios_2[16];
+> +		gpx_base = gpio_base2 + 0xC00;
+> +		for (i = 0; i < 4; i++, chip++, gpx_base += 0x20)
+> +			chip->base = gpx_base;
+> +
+>  		chip = exynos4_gpios_2;
+>  		nr_chips = ARRAY_SIZE(exynos4_gpios_2);
+>  
+> @@ -2816,14 +2830,19 @@ static __init int samsung_gpiolib_init(void)
+>  				chip->config = &exynos_gpio_cfg;
+>  				chip->group = group++;
+>  			}
+> -#ifdef CONFIG_CPU_EXYNOS4210
+>  			exynos_gpiolib_attach_ofnode(chip,
+>  					EXYNOS4_PA_GPIO2, i * 0x20);
+> -#endif
+>  		}
+> -		samsung_gpiolib_add_4bit_chips(exynos4_gpios_2, nr_chips, S5P_VA_GPIO2);
+> +		samsung_gpiolib_add_4bit_chips(exynos4_gpios_2,
+> +					       nr_chips, gpio_base2);
+>  
+>  		/* gpio part3 */
+> +		gpio_base3 = ioremap(EXYNOS4_PA_GPIO3, SZ_256);
+> +		if (gpio_base3 == NULL) {
+> +			pr_err("unable to ioremap for gpio_base3\n");
+> +			goto err_ioremap3;
+> +		}
+> +
+>  		chip = exynos4_gpios_3;
+>  		nr_chips = ARRAY_SIZE(exynos4_gpios_3);
+>  
+> @@ -2832,17 +2851,18 @@ static __init int samsung_gpiolib_init(void)
+>  				chip->config = &exynos_gpio_cfg;
+>  				chip->group = group++;
+>  			}
+> -#ifdef CONFIG_CPU_EXYNOS4210
+>  			exynos_gpiolib_attach_ofnode(chip,
+>  					EXYNOS4_PA_GPIO3, i * 0x20);
+> -#endif
+>  		}
+> -		samsung_gpiolib_add_4bit_chips(exynos4_gpios_3, nr_chips, S5P_VA_GPIO3);
+> +		samsung_gpiolib_add_4bit_chips(exynos4_gpios_3,
+> +					       nr_chips, gpio_base3);
+>  
+>  #if defined(CONFIG_CPU_EXYNOS4210) && defined(CONFIG_S5P_GPIO_INT)
+>  		s5p_register_gpioint_bank(IRQ_GPIO_XA, 0, IRQ_GPIO1_NR_GROUPS);
+>  		s5p_register_gpioint_bank(IRQ_GPIO_XB, IRQ_GPIO1_NR_GROUPS, IRQ_GPIO2_NR_GROUPS);
+>  #endif
+> +
+> +#endif	/* CONFIG_CPU_EXYNOS4210 */
+>  	} else if (soc_is_exynos5250()) {
+>  #ifdef CONFIG_SOC_EXYNOS5250
+>  		void __iomem *gpx_base;
+> -- 
+> 1.7.4.4
+> 
+
 -- 
-1.7.5.4
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
