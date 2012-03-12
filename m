@@ -1,48 +1,85 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 09 Mar 2012 15:06:56 +0530
-Subject: [PATCH v2 4/4] arm/dts: OMAP3: Add mmc controller nodes and board
- data
-In-Reply-To: <alpine.DEB.2.00.1203082348200.26656@utopia.booyaka.com>
-References: <1329998490-27555-1-git-send-email-rnayak@ti.com>
- <1329998490-27555-5-git-send-email-rnayak@ti.com>
- <20120223185718.GZ18185@atomide.com> <4F470B71.1020308@ti.com>
- <20120224184859.GN18185@atomide.com> <20120309054608.647473E0901@localhost>
- <alpine.DEB.2.00.1203082348200.26656@utopia.booyaka.com>
-Message-ID: <4F59CF38.6090706@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 12 Mar 2012 18:44:49 +0100
+Subject: [PATCH 1/2] ARM: Add Kconfig option to use mkimage -T
+ kernel_noload
+In-Reply-To: <201203121840.49776.marek.vasut@gmail.com>
+References: <1330473804-23348-1-git-send-email-swarren@nvidia.com>
+ <4F4E6F96.8080907@am.sony.com>
+ <20120229185013.GJ3318@game.jcrosoft.org>
+ <201203121840.49776.marek.vasut@gmail.com>
+Message-ID: <20120312174449.GG13869@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On Friday 09 March 2012 12:21 PM, Paul Walmsley wrote:
-> On Thu, 8 Mar 2012, Grant Likely wrote:
+On 18:40 Mon 12 Mar     , Marek Vasut wrote:
+> Dear Jean-Christophe PLAGNIOL-VILLARD,
+> 
+> > On 10:33 Wed 29 Feb     , Tim Bird wrote:
+> > > On 02/29/2012 10:14 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > On 08:58 Wed 29 Feb     , Stephen Warren wrote:
+> > > >> Jean-Christophe PLAGNIOL-VILLARD wrote at Wednesday, February 29, 2012 
+> 5:30 AM:
+> > > >>> On 17:03 Tue 28 Feb     , Stephen Warren wrote:
+> > > >>>> uImage files typically encode a single absolute load and entry
+> > > >>>> address. This is inconvenient when attempting to share that uImage
+> > > >>>> across multiple SoCs with different physical RAM addresses. Recent
+> > > >>>> versions of mkimage implement a "kernel_noload" image type which
+> > > >>>> encodes no absolute load address, and a relative entry address.
+> > > >>>> This works well for uImage-wrapped ARM zImages, since they are
+> > > >>>> relocatable.
+> > > >>>> 
+> > > >>>> This is enabled by commit b9b50e89d317c58becd0e2d7fac2e21e3a81dd0a
+> > > >>>> "image: Implement IH_TYPE_KERNEL_NOLOAD" in U-Boot.
+> > > >>>> 
+> > > >>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > > >>>> ---
+> > > >>>> I assume I should put this into the ARM patch tracker if it's OK?
+> > > >>> 
+> > > >>> Again a new option for uImage no why not just boot the zImage
+> > > >>> 
+> > > >>> in this case the uImage is useless
+> > > >> 
+> > > >> U-Boot doesn't support zImage at present.
+> > > >> 
+> > > >> A patch was posted to support it at least for ARM, but needed a little
+> > > >> work before it could be committed.
+> > > > 
+> > > > Sorry I see no advantage to have the uImage build by the kernel anymore
+> > > > as we have a relocatable zImage
+> > > > 
+> > > > I'll even drop its support
+> > > 
+> > > This seems at least premature, and possibly ill-advised in general.
+> > > There are lots of U-Boot images out in the field, many of which that
+> > > are rarely updated. A lot of workflow will be disrupted unnecessarily
+> > > by a change like this.
+> > > 
+> > > Could you wait to drop uImage build support in the kernel until
+> > > U-Boot supports zImage, and has worked it's way into the field
+> > > for a few years?
+> > 
+> > I'm fine to keep for now on but not to add new feature
+> > 
+> > Barebox (former U-Boot v2) support zImage for quite a while and
+> > relocable one for too.
+> 
+> On the other hand, noone uses barebox and you should stop with this obvious 
+> malice towards uboot please. I believe for most people it's easier to spend time 
+> only on implementing their hardware support into U-Boot, not waste time 
+> implementing basic components that are still missing in barebox.
+Speak for yourself please
+> 
+> Last but not least, the uImage contains additional checksum on the whole image, 
+> which is useful on flash media.
 >
->> Yes, absolutely use separate compatible values.  It is always important
->> to be specific as to the silicon implementing the IP.
->
-> In that case, it is probably best to use the full chip name in the
-> compatible string, e.g., omap2420 or omap2430 rather than just "omap2".
+> That said, I'm all for having uImage support in kernel and for adding this 
+> NOLOAD option.
+I'm going to repeat myself, we work on kernel here NOT bootloader specific bla
+bla. The standard image for the kernel is zImage. After if you want to use
+your specifc bootloader stuff do it outside of the kernel.
 
-Since omap2420 and omap2430 have different MMC controllers (and these
-bindings only cover the hsmmc controller used in 2430 and beyond, I
-haven't done the bindings for the legacy one yet), the idea was
-to differentiate between omap2420 and omap2430 by using
-compatible of "ti,omap2-hsmmc" for the High-Speed controller used in
-OMAP2 (2430) and "ti,omap2-mmc" for the legacy one used in OMAP2 (2420).
-Does that sound good to you?
+My comment is the same for ANY bootloader. Do your specifc stuff at your place
+not HERE.
 
-> Particularly in the case of "OMAP3," which is a largely meaningless group
-> these days with AM33xx, OMAP34xx, OMAP36xx, and AM3517, many of which are
-> quite different from each other...
-
-But these bindings are specific and limited to HSMMC module which is
-not quite different in the different SoC variants. There is a single
-driver to handle hsmmc module on all the SoCs which does not need to
-differentiate which SoC it is on.
-
-regards,
-Rajendra
-
->
->
-> - Paul
+Best Regards,
+J.
