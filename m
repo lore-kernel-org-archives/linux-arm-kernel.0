@@ -1,60 +1,145 @@
 From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 13 Mar 2012 09:48:14 +1100
-Subject: [PATCH v4 03/11] ep93xx: Move GPIO defines to gpio-ep93xx.h
-Message-ID: <1331592502-9083-4-git-send-email-rmallon@gmail.com>
+Date: Tue, 13 Mar 2012 09:48:15 +1100
+Subject: [PATCH v4 04/11] ep93xx: Use ioremap for backlight driver
+Message-ID: <1331592502-9083-5-git-send-email-rmallon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the GPIO related defines out of ep93xx-regs.h and into
-gpio-ep93xx.h where they belong.
+The ep93xx backlight driver uses a single register within the
+framebuffer's register space. Currently the backlight driver uses a
+static IO mapping for the register since the memory cannot be
+requested by both drivers.
+
+Convert the static mapping to use ioremap so that we can remove the
+dependency on mach/hardware.h. To do so, we need remove the
+request_mem_region from both the backlight and framebuffer drivers,
+since whichever driver is loaded second will fail with -EBUSY
+otherwise.
+
+A proper fix is still required, and a FIXME comment has been added to
+both drivers.
 
 Signed-off-by: Ryan Mallon <rmallon@gmail.com>
-Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
-Acked-by: Hartley Sweeten <hsweeten@visionengravers.com>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Mika Westerberg <mika.westerberg@iki.fi>
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
 ---
- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    8 --------
- arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |   10 ++++++++++
- 2 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/mach-ep93xx/core.c         |   10 ++++++++++
+ drivers/video/backlight/ep93xx_bl.c |   25 ++++++++++++++-----------
+ drivers/video/ep93xx-fb.c           |   15 +++++++++------
+ 3 files changed, 33 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-index b029305..72b8687 100644
---- a/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-+++ b/arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h
-@@ -64,14 +64,6 @@
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index b5c1dae..c73e299 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -682,9 +682,19 @@ static struct platform_device ep93xx_fb_device = {
+ 	.resource		= ep93xx_fb_resource,
+ };
  
- #define EP93XX_SECURITY_BASE		EP93XX_APB_IOMEM(0x00030000)
++/* The backlight use a single register in the framebuffer's register space */
++#define EP93XX_RASTER_REG_BRIGHTNESS 0x20
++
++static struct resource ep93xx_bl_resources[] = {
++	DEFINE_RES_MEM(EP93XX_RASTER_PHYS_BASE +
++		       EP93XX_RASTER_REG_BRIGHTNESS, 0x04),
++};
++
+ static struct platform_device ep93xx_bl_device = {
+ 	.name		= "ep93xx-bl",
+ 	.id		= -1,
++	.num_resources	= ARRAY_SIZE(ep93xx_bl_resources),
++	.resource	= ep93xx_bl_resources,
+ };
  
--#define EP93XX_GPIO_PHYS_BASE		EP93XX_APB_PHYS(0x00040000)
--#define EP93XX_GPIO_BASE		EP93XX_APB_IOMEM(0x00040000)
--#define EP93XX_GPIO_REG(x)		(EP93XX_GPIO_BASE + (x))
--#define EP93XX_GPIO_F_INT_STATUS	EP93XX_GPIO_REG(0x5c)
--#define EP93XX_GPIO_A_INT_STATUS	EP93XX_GPIO_REG(0xa0)
--#define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
--#define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
+ /**
+diff --git a/drivers/video/backlight/ep93xx_bl.c b/drivers/video/backlight/ep93xx_bl.c
+index b62b8b9..08214e1 100644
+--- a/drivers/video/backlight/ep93xx_bl.c
++++ b/drivers/video/backlight/ep93xx_bl.c
+@@ -17,11 +17,6 @@
+ #include <linux/fb.h>
+ #include <linux/backlight.h>
+ 
+-#include <mach/hardware.h>
 -
- #define EP93XX_AAC_PHYS_BASE		EP93XX_APB_PHYS(0x00080000)
- #define EP93XX_AAC_BASE			EP93XX_APB_IOMEM(0x00080000)
+-#define EP93XX_RASTER_REG(x)		(EP93XX_RASTER_BASE + (x))
+-#define EP93XX_RASTER_BRIGHTNESS	EP93XX_RASTER_REG(0x20)
+-
+ #define EP93XX_MAX_COUNT		255
+ #define EP93XX_MAX_BRIGHT		255
+ #define EP93XX_DEF_BRIGHT		128
+@@ -35,7 +30,7 @@ static int ep93xxbl_set(struct backlight_device *bl, int brightness)
+ {
+ 	struct ep93xxbl *ep93xxbl = bl_get_data(bl);
  
-diff --git a/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h b/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
-index 8aff2ea..6d7c571 100644
---- a/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
-+++ b/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
-@@ -3,6 +3,16 @@
- #ifndef __GPIO_EP93XX_H
- #define __GPIO_EP93XX_H
+-	__raw_writel((brightness << 8) | EP93XX_MAX_COUNT, ep93xxbl->mmio);
++	writel((brightness << 8) | EP93XX_MAX_COUNT, ep93xxbl->mmio);
  
-+#include <mach/ep93xx-regs.h>
+ 	ep93xxbl->brightness = brightness;
+ 
+@@ -70,21 +65,29 @@ static int __init ep93xxbl_probe(struct platform_device *dev)
+ 	struct ep93xxbl *ep93xxbl;
+ 	struct backlight_device *bl;
+ 	struct backlight_properties props;
++	struct resource *res;
+ 
+ 	ep93xxbl = devm_kzalloc(&dev->dev, sizeof(*ep93xxbl), GFP_KERNEL);
+ 	if (!ep93xxbl)
+ 		return -ENOMEM;
+ 
++	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -ENXIO;
 +
-+#define EP93XX_GPIO_PHYS_BASE		EP93XX_APB_PHYS(0x00040000)
-+#define EP93XX_GPIO_BASE		EP93XX_APB_IOMEM(0x00040000)
-+#define EP93XX_GPIO_REG(x)		(EP93XX_GPIO_BASE + (x))
-+#define EP93XX_GPIO_F_INT_STATUS	EP93XX_GPIO_REG(0x5c)
-+#define EP93XX_GPIO_A_INT_STATUS	EP93XX_GPIO_REG(0xa0)
-+#define EP93XX_GPIO_B_INT_STATUS	EP93XX_GPIO_REG(0xbc)
-+#define EP93XX_GPIO_EEDRIVE		EP93XX_GPIO_REG(0xc8)
-+
- /* GPIO port A.  */
- #define EP93XX_GPIO_LINE_A(x)		((x) + 0)
- #define EP93XX_GPIO_LINE_EGPIO0		EP93XX_GPIO_LINE_A(0)
+ 	/*
+-	 * This register is located in the range already ioremap'ed by
+-	 * the framebuffer driver.  A MFD driver seems a bit of overkill
+-	 * to handle this so use the static I/O mapping; this address
+-	 * is already virtual.
++	 * FIXME - We don't do a request_mem_region here because we are
++	 * sharing the register space with the framebuffer driver (see
++	 * drivers/video/ep93xx-fb.c) and doing so will cause the second
++	 * loaded driver to return -EBUSY.
+ 	 *
+ 	 * NOTE: No locking is required; the framebuffer does not touch
+ 	 * this register.
+ 	 */
+-	ep93xxbl->mmio = EP93XX_RASTER_BRIGHTNESS;
++	ep93xxbl->mmio = devm_ioremap(&dev->dev, res->start,
++				      resource_size(res));
++	if (!ep93xxbl->mmio)
++		return -ENXIO;
+ 
+ 	memset(&props, 0, sizeof(struct backlight_properties));
+ 	props.type = BACKLIGHT_RAW;
+diff --git a/drivers/video/ep93xx-fb.c b/drivers/video/ep93xx-fb.c
+index 2e830ec..5301275 100644
+--- a/drivers/video/ep93xx-fb.c
++++ b/drivers/video/ep93xx-fb.c
+@@ -519,12 +519,15 @@ static int __devinit ep93xxfb_probe(struct platform_device *pdev)
+ 		goto failed;
+ 	}
+ 
+-	res = request_mem_region(res->start, resource_size(res), pdev->name);
+-	if (!res) {
+-		err = -EBUSY;
+-		goto failed;
+-	}
+-
++	/*
++	 * FIXME - We don't do a request_mem_region here because we are
++	 * sharing the register space with the backlight driver (see
++	 * drivers/video/backlight/ep93xx_bl.c) and doing so will cause
++	 * the second loaded driver to return -EBUSY.
++	 *
++	 * NOTE: No locking is required; the backlight does not touch
++	 * any of the framebuffer registers.
++	 */
+ 	fbi->res = res;
+ 	fbi->mmio_base = ioremap(res->start, resource_size(res));
+ 	if (!fbi->mmio_base) {
 -- 
 1.7.0.4
