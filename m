@@ -1,43 +1,70 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 12 Mar 2012 10:13:45 +0000
-Subject: [PATCH] ARM: OMAP2+: hwmod: Add new sysc_type3 into omap_hwmod
- required for am33xx
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D12143317A918A@DBDE01.ent.ti.com>
-References: <1329481488-27771-1-git-send-email-hvaibhav@ti.com>
- <4F3E545F.8070802@ti.com>
- <B5906170F1614E41A8A28DE3B8D12143317A918A@DBDE01.ent.ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A831810F02@DBDE01.ent.ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 13 Mar 2012 02:40:03 +0530
+Subject: [PATCH v3 0/2] regulator: add irq domain and device tree support
+ for MAX8997
+In-Reply-To: <1330000688-11226-1-git-send-email-thomas.abraham@linaro.org>
+References: <1330000688-11226-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAJuYYwQMB0ANS6noscRe6P4d0JKmTPLP_1r2Sr6-N3amAZiD5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2012 at 10:49:47, Bedia, Vaibhav wrote:
-> Hi Benoit,
-> 
-> On Fri, Feb 17, 2012 at 18:51:35, Cousson, Benoit wrote:
-> > Hi Vaibhav,
-> > 
-> > On 2/17/2012 1:24 PM, Vaibhav Hiremath wrote:
-> > > In case of AM33xx family of devices (like cpsw) have different sysc
-> > > bit field offsets defined,
-> > 
-> > It is really used by several IPs, or it is just an unique exception?
-> > 
-> > For an exception, you can just define the omap_hwmod_sysc_fields for 
-> > that IP.
-> > This is what SmartReflex is using for example.
-> > 
-> 
-> I haven't really check TI81xx code but we might need to share these SYSC types
-> with a few IPs in that family also. How can the sharing of the sysc data be handled?
-> 
+Hi Rob/Grant,
 
-Benoit,
+On 23 February 2012 18:08, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> Changes since v2:
+> - Atleast one voltage level has to be specfied for Buck 1/2/5 even if GPIO
+> ?DVS option is not used (suggested by MyungJoo Ham).
+> - Reworked the irq_domain support based the v5 of irq_domain generalization
+> ?patches.
+>
+> MAX8997 is a multi-function device which includes support for regulators, rtc,
+> battery charger and other sub-blocks. This patchset adds device tree support
+> for the pmic (regulators) sub-block.
+>
+> The first patch adds irq domain support for the interrupts supported by max8997
+> mainly for removing the need to pass a irq_base from the platform code. The
+> irq_base could not anyway be passed in case of device tree based instantiation.
+> The reverse mapping method used is linear since the sub-drivers of max8997 has
+> access to the max8997 irq_domain from which the linux irq number can be
+> obtained.
+>
+> The second patch adds device tree support for max8997. This patch modifies both
+> mfd and regulator portions of the max8997 code.
+>
+> This patchset is based on the following tree.
+> http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git [for-next]
+>
+> with all patches merged from
+> http://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git [for-next]
+> http://git.secretlab.ca/git/linux-2.6.git [irqdomain/next]
+>
+> and depends on the following patchset.
+> [PATCH v3 0/4] ARM: Exynos4: Add irq domain and device tree support for wakeup interrupts.
+>
+> This patchset has been tested on Origen board.
+>
+> Thomas Abraham (2):
+> ?mfd: add irq domain support for max8997 interrupts
+> ?regulator: add device tree support for max8997
 
-Any comments on this patch? 
+Any comments for this patch series?
 
 Thanks,
-Vaibhav
+Thomas.
 
-> Regards,
-> Vaibhav B.
-> 
+>
+> ?.../devicetree/bindings/regulator/max8997-pmic.txt | ?134 +++++++++++++++++++
+> ?arch/arm/mach-exynos/mach-nuri.c ? ? ? ? ? ? ? ? ? | ? ?4 -
+> ?arch/arm/mach-exynos/mach-origen.c ? ? ? ? ? ? ? ? | ? ?1 -
+> ?drivers/mfd/max8997-irq.c ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 60 +++++----
+> ?drivers/mfd/max8997.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 73 ++++++++++-
+> ?drivers/regulator/max8997.c ? ? ? ? ? ? ? ? ? ? ? ?| ?139 +++++++++++++++++++-
+> ?include/linux/mfd/max8997-private.h ? ? ? ? ? ? ? ?| ? ?4 +-
+> ?include/linux/mfd/max8997.h ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?8 files changed, 382 insertions(+), 35 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/regulator/max8997-pmic.txt
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
