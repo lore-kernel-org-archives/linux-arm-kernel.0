@@ -1,41 +1,48 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Sun, 11 Mar 2012 14:33:24 +0000
-Subject: [PATCH 0/2] Add support for DNS-320 and DNS-325 using devicetree
-Message-ID: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
+From: enrico.scholz@sigma-chemnitz.de (Enrico Scholz)
+Date: Mon, 12 Mar 2012 18:38:53 +0100
+Subject: [PATCH] gpio/mxs: support irqs triggered by both edges
+In-Reply-To: <CACxGe6uOtgqb1GcBUCDY3L7B5THg1_set0pNcxkzZihr2y9==Q@mail.gmail.com>
+ (Grant Likely's message of "Mon, 12 Mar 2012 11:17:27 -0600")
+References: <1329745925-7868-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
+ <20120312163503.AEBC73E07B0@localhost>
+ <lyhaxt4usz.fsf@ensc-virt.intern.sigma-chemnitz.de>
+ <CACxGe6uOtgqb1GcBUCDY3L7B5THg1_set0pNcxkzZihr2y9==Q@mail.gmail.com>
+Message-ID: <lyd38h4t3m.fsf@ensc-virt.intern.sigma-chemnitz.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As agreed with Arnd Bergmann and Jason Cooper, include any board setup that
-cannot be done in devicetree in board-dt.c, then replace with devicetree
-entries.
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-The NAND driver is converted to devicetree as part of this patch series, 
-although I don't feel qualified to explain the parameters actually mean so 
-have left documentation fields blank.
+>>>> iMX28 silicon does not support irqs triggered by both gpio edges. Patch
+>>>> emulates this behavior by configuring such irqs as level triggered and
+>>>> by switching polarity in the interrupt handler.
+>>>
+>>> That looks dodgy and hacky. ?This will definitely miss interrupts if
+>>> they come in too fast.
+>>
+>> Because patch calculates the trigger from the actual level, there should
+>> not be missed more interrupts than with native edge-both support.
+>
+> Edge interrupt controllers latch interrupt requests. so that nothing
+> gets missed.  Level interrupt controllers do not.
 
-The patches should apply cleanly to staging/kirkwood/dt, although 
-kirkwood-dns320.dts attempts to override the orion-wdt definition with a
-lower TCLK, even though the orion-wdt work isn't merged yet. If this would
-be better to remove I shall.
+iMX28 hardware sets interrupt status only but never clears it[1]. E.g. when
+the requested level has been seen, the interrupt is pending until software
+clears it.  It does not matter whether level changes back or stays asserted.
 
-Cheers,
 
-Jamie Lentin (2):
-  ARM: kirkwood: Basic support for DNS-320 and DNS-325
-  ARM: kirkwood: Convert orion-nand to fdt
+> So, if the irq line toggles 3 times before the handling code gets
+> executed, then the kernel will still only recognize 1 irq, not 3.
 
- .../devicetree/bindings/mtd/orion-nand.txt         |   41 +++
- arch/arm/boot/dts/kirkwood-dns320.dts              |   96 +++++++
- arch/arm/boot/dts/kirkwood-dns325.dts              |   82 ++++++
- arch/arm/mach-kirkwood/Kconfig                     |   18 ++
- arch/arm/mach-kirkwood/Makefile.boot               |    2 +
- arch/arm/mach-kirkwood/board-dt.c                  |  264 ++++++++++++++++++++
- arch/arm/mach-kirkwood/common.c                    |    6 +
- drivers/mtd/nand/orion_nand.c                      |   39 +++-
- 8 files changed, 546 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/orion-nand.txt
- create mode 100644 arch/arm/boot/dts/kirkwood-dns320.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-dns325.dts
+There is no difference to edge triggered interrupts. When the trigger
+events happen too fast, not all of them can be handled. But both for
+edge and for level triggered interrupts, the interrupt handler will be
+executed at least once.
 
--- 
-1.7.9.1
+
+
+Enrico
+
+Footnotes: 
+[1]  see figure "Figure 9-5. GPIO Interrupt Generation", page 688 in
+     "i.MX28 Applications Processor Reference Manual, Rev. 1, 2010"
