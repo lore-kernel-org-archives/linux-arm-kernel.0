@@ -1,28 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 9 Mar 2012 18:00:46 -0300
-Subject: [PATCH v2] ARM : mx35: 3ds-board: add framebuffer device
-In-Reply-To: <1320381217-28711-1-git-send-email-b39297@freescale.com>
-References: <1320381217-28711-1-git-send-email-b39297@freescale.com>
-Message-ID: <CAOMZO5AvJ1SxOBkHom97MeNOktodj=si3moq+VJB_FaHXwpHOQ@mail.gmail.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Mon, 12 Mar 2012 23:30:21 +0400
+Subject: [PATCH v2 2/2] arm/tegra: add timeout to PCIe PLL lock detection
+ loop
+In-Reply-To: <4F5E3BE7.4080207@wwwdotorg.org>
+References: <20120306201538.GA14350@rainbow>
+ <1331287760-10546-1-git-send-email-mad_soft@inbox.ru>
+ <4F5E3BE7.4080207@wwwdotorg.org>
+Message-ID: <20120312193020.GA1584@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2011 at 2:33 AM, wu guoxing <b39297@freescale.com> wrote:
+On 12:09 Mon 12 Mar     , Stephen Warren wrote:
+> Thierry pointed out that one of NVIDIA's downstream kernels uses a
+> timeout of 300 here, rather than 2000 above. Do you see a specific need
+> for this timeout for be 2000 rather than 300? It might be nice to be
+> consistent.
+No, there's no specific need for it to be 2000 - it may as well be 300.
+I just wanted to stay on the safe side, but I think 300 should be still
+more than enough time for PLL to lock.
 
-> +static int mc9s08dz60_lcd_gpio_get(void)
-> +{
-> + ? ? ? int ret;
-> + ? ? ? struct gpio_chip *chip;
-> + ? ? ? chip = gpiochip_find(
-> + ? ? ? ? ? ? ? ? ? ? ? "mc9s08dz60", mc9s08dz60_gpiochip_match);
-> + ? ? ? if (chip)
-> + ? ? ? ? ? ? ? ret = chip->base + 6;
+> 
+> Olof, I notice you've already applied V1 of this, which has the return
+> statement issue. Can you replace it with this, or should Dmitry send an
+> incremental patch?
 
-Please add a define to replace this magic "6".
+Yes, V1 breaks more things than it fixes, so it would be nice if
+it can be replaced with fixed version (I hope it's not too late yet).
+BTW, regarding timeout discussion above - should I resend patch with
+adjusted timeout, or can you change it while applying? (of course,
+if we settle on incremental patch, I'll roll this change in)
 
-The extra defines would be also useful for people that want to access
-the other GPIOs from mc9s08dz60.
-
-Regards,
-
-Fabio Estevam
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
