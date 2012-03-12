@@ -1,100 +1,41 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Fri, 9 Mar 2012 16:06:15 +0900
-Subject: [GIT PULL] Samsung Cleanup EXYNOS clock for v3.4
-In-Reply-To: <22926872.16671331267895327.JavaMail.weblogic@epml04>
-References: <22926872.16671331267895327.JavaMail.weblogic@epml04>
-Message-ID: <CAJ0PZbQebwvFrmXWn=-m7YH3Ri7t2fvm+E_EKZ45rD7cAyo2UA@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 12 Mar 2012 11:40:06 +0530
+Subject: [PATCHv5 3/6] ARM: OMAP4 PM: Add IO Daisychain support
+In-Reply-To: <4F5D8F2A.1070602@ti.com>
+References: <1331046702-2472-1-git-send-email-t-kristo@ti.com>
+ <1331046702-2472-4-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1203092051140.30879@utopia.booyaka.com>
+ <4F5D8F2A.1070602@ti.com>
+Message-ID: <4F5D933E.2070200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/3/9 ??? <myungjoo.ham@samsung.com>:
->> Hi Arnd, Olof,
+On Monday 12 March 2012 11:22 AM, Rajendra Nayak wrote:
 >>
->> Here is cleanup clock part for EXYNOS SoCs from:
->>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> next/cleanup-exynos-clock
+>> From: Rajendra Nayak<rnayak@ti.com>
+>> Date: Fri, 2 Mar 2012 17:17:52 +0200
+>> Subject: [PATCH 3/6] ARM: OMAP4: PRM: Add IO Daisychain support
 >>
->> Please pull and if any problems, please kindly let me know.
+>> IO daisychain is a mechanism that allows individual IO pads to generate
+>> wakeup events on their own based on a switch of an input signal level.
+>> This allows the hardware module behind the pad to be powered down, but
+>> still have device level capability to detect IO events, and once this
+>> happens the module can be powered back up to resume IO. See section
+>> 3.9.4 in OMAP4430 Public TRM for details.
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> Signed-off-by: Vishwanath BS<vishwanath.bs@ti.com> is just bad
+> documentation.
 >
-> Hello,
+>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+>> [paul at pwsan.com: removed MAX_IOPAD_LATCH_TIME declaration; renamed
 >
-> It appears that some patches are missing in this branch; i.e., you seemed not to have pulled one required by this patchset: http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/8474
->
-> If the missing patches are included in another branch of yours and being pulled at somewhere else, please never mind. However, it doesn't appear so.
->
-> Anyway, I'm rebasing the pull-requested branch upon most recent RC, so it'll be available soon (in an hour?) at http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/devfreq-for-samsung
->
->
-> Cheers!
-> MyungJoo.
->
+> But the code below still seems to use it. Is it now defined in some
+> common header so the same value is used in omap3 and omap4?
 
-Hello, Kgene
+never mind, just saw the other updates from you. The patches look good
+to me, except for the comment I add to add the second timeout back in
+omap3.
 
-I've rebased the branch that was pull-requested to Kgene based on this branch.
-
-http://git.infradead.org/users/kmpark/linux-samsung/shortlog/refs/heads/devfreq-for-samsung
-
-
-The following changes since commit e01127814c640f6cd06a5c06731c6d1ee8c45101:
-
-  PM / devfreq: update the name of EXYNOS clock register (2012-03-07
-03:25:31 -0800)
-
-are available in the git repository at:
-  git://git.infradead.org / users/kmpark/linux-samsung devfreq-for-samsung
-
-MyungJoo Ham (4):
-      ARM: EXYNOS4: Add DMC1, allow PPMU access for DMC.
-      ARM: EXYNOS4: Add clock register addresses for Exynos4x12 bus
-devfreq driver
-      ARM Exynos4210-Nuri: support Exynos4210-bus Devfreq driver.
-      PM / devfreq: update the name of EXYNOS clock registers that were omitted.
-
- arch/arm/mach-exynos/common.c                  |    7 +++-
- arch/arm/mach-exynos/include/mach/map.h        |    1 +
- arch/arm/mach-exynos/include/mach/regs-clock.h |   42 ++++++++++++++++++++++++
- arch/arm/mach-exynos/mach-nuri.c               |   11 ++++--
- drivers/devfreq/exynos4_bus.c                  |    6 ++--
- 5 files changed, 60 insertions(+), 7 deletions(-)
-
-
-
->>
->> The following changes since commit b01543dfe67bb1d191998e90d20534dc354de059:
->>
->>    Linux 3.3-rc4 (2012-02-18 15:53:33 -0800)
->>
->> are available in the git repository at:
->>    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->> next/cleanup-exynos-clock
->>
->> Kukjin Kim (2):
->>        ARM: EXYNOS: cleanup clock part for new EXYNOS SoCs
->>        PM / devfreq: update the name of EXYNOS clock register
->>
->>   arch/arm/mach-exynos/Makefile                     |    3 +-
->>   arch/arm/mach-exynos/clock-exynos4.c              | 1564
->> +++++++++++++++++++++
->>   arch/arm/mach-exynos/clock-exynos4.h              |   32 +
->>   arch/arm/mach-exynos/clock-exynos4210.c           |   46 +-
->>   arch/arm/mach-exynos/clock-exynos4212.c           |   30 +-
->>   arch/arm/mach-exynos/clock.c                      | 1564
->> ---------------------
->>   arch/arm/mach-exynos/common.h                     |    9 +
->>   arch/arm/mach-exynos/include/mach/exynos4-clock.h |   43 -
->>   arch/arm/mach-exynos/include/mach/regs-clock.h    |  364 +++---
->>   arch/arm/mach-exynos/pm.c                         |   40 +-
->>   drivers/devfreq/exynos4_bus.c                     |  224 ++--
->>   11 files changed, 1959 insertions(+), 1960 deletions(-)
->>   create mode 100644 arch/arm/mach-exynos/clock-exynos4.c
->>   create mode 100644 arch/arm/mach-exynos/clock-exynos4.h
->>   delete mode 100644 arch/arm/mach-exynos/clock.c
->>   delete mode 100644 arch/arm/mach-exynos/include/mach/exynos4-clock.h
->>
-
-
-
--- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab, DMC Business, Samsung Electronics
+Tero, was there a specific reason you got rid of it for omap3 in your
+latest patch-set?
