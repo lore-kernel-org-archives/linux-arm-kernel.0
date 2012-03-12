@@ -1,36 +1,59 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 12 Mar 2012 16:35:13 +0800
-Subject: [PATCH] mtd/gpmi : fix the wrong DMA command.
-In-Reply-To: <20120312075107.GB3928@pengutronix.de>
-References: <1331518938-24047-1-git-send-email-b32955@freescale.com>
- <20120312075107.GB3928@pengutronix.de>
-Message-ID: <4F5DB541.3000107@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Mar 2012 13:51:35 +0100
+Subject: [PATCH 3/4] pinctrl: support pinconfig on the U300
+In-Reply-To: <4F57E3D2.40405@wwwdotorg.org>
+References: <1331071533-24789-1-git-send-email-linus.walleij@stericsson.com>
+ <4F57E3D2.40405@wwwdotorg.org>
+Message-ID: <CACRpkdbSzU-eXCfzFVmynO_D44PYA4g7dRSvRj+0s6uZxYD+tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?03?12? 15:51, Wolfram Sang ??:
-> On Mon, Mar 12, 2012 at 10:22:18AM +0800, Huang Shijie wrote:
->> The last DMA command of ECC read page is used to disable the BCH module.
->> But the original code missed to set the pio[2] which is used to set the
->> GPMI_HW_GPMI_ECCCTRL register. fix it now.
+On Wed, Mar 7, 2012 at 11:40 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 03/06/2012 03:05 PM, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
 >>
->> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> Thanks! What does happen because of this bug? Additional checksum errors? I
-> haven't seen many on MX28 IIRC, so I wonder.
+>> This adds pin configuration support for the U300 driver pair,
+>> we can now read out the biasing and drive mode in debugfs and
+>> configure it using the new configuration API.
 >
-The MX28 runs well without this patch. I guess the speed of mx28 is too
-slow.
+>> +int u300_pin_config_set(struct pinctrl_dev *pctldev,
+>> + ? ? ? ? ? ? ? ? ? ? unsigned pin,
+>> + ? ? ? ? ? ? ? ? ? ? unsigned long config)
+>> +{
+>> + ? ? struct pinctrl_gpio_range *range = u300_match_gpio_range(pin);
+>> + ? ? int ret;
+>> +
+>> + ? ? if (!range)
+>> + ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? /* Note: none of these configurations take any argument */
+>> + ? ? ret = u300_gpio_config_set(range->gc,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(pin - range->pin_base + range->base),
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?to_config_param(config));
+>
+> I'm a little confused here; the documentation for most of the
+> PIN_CONFIG_* parameters that this function is passed does explicitly
+> document that there is an associated argument value. For example,
+> IN_CONFIG_BIAS_PULL_UP is coupled with the pull up resistance in Ohms.
+> Shouldn't this code extract the argument and validate that it's a
+> supported value for the HW?
 
-The bug only observed in mx6q. A DMA timeout occurs.
+It says:
 
-But if you apply this patch to mx28's code. A dma timeout occurs too.
-This is why i sent the patch
-"mxs-dma : rewrite the last parameter of mxs_dma_prep_slave_sg()"
+ * @PIN_CONFIG_BIAS_PULL_UP: the pin will be pulled up (usually with high
+ *      impedance to VDD), if the controller supports specifying a certain
+ *      pull-up resistance, this is given as an argument (in Ohms) when
+ *      setting this parameter.
 
-IC guy told me to add a WAIT4END in the middle one of the ECC read page
-chain, and disable the BCH in the last
-DMA command of the chain. After this patch, the code follows this rule.
+Notice "if controller supports specifying ..." clause.
 
+The reverse holds: if the pin controller doesn't support specifying that,
+the pull-up will just be enabled, no matter what the argument was.
 
-BR
-Huang Shijie
+But maybe I should try to dig out which exact value it is, since it's
+anyway a 1-1 copuling between board data and this one driver it
+could be clearer (though the argument will just be checked to be
+the one value the chip supports, and then discarded).
+
+Yours,
+Linus Walleij
