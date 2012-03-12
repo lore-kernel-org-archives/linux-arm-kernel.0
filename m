@@ -1,45 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 Mar 2012 10:24:35 -0300
-Subject: I.MX35 PDK
-In-Reply-To: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A29@MEP-EXCH.meprolight.com>
-References: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
- <CAOMZO5Amo0XFf+TV7PprCL079C5Y0qKmo+k-FfShU7k4SG7W6Q@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8918@MEP-EXCH.meprolight.com>
- <CAOMZO5A6T+WdOE41Wx6Nctwz9wk8FKaxzjbAt_woZkCnuodNYg@mail.gmail.com>
- <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A29@MEP-EXCH.meprolight.com>
-Message-ID: <CAOMZO5B_mZ16zvXdNbKP_PWM5axNPzMeHQttxe8PYHET7UMufg@mail.gmail.com>
+From: neidhard.kim@lge.com (Kim, Jong-Sung)
+Date: Mon, 12 Mar 2012 20:22:07 +0900
+Subject: [PATCH] serial: PL011: clear pending interrupts
+In-Reply-To: <20120312083221.GW17370@n2100.arm.linux.org.uk>
+References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
+ <20120312083221.GW17370@n2100.arm.linux.org.uk>
+Message-ID: <01e101cd0042$5bf692a0$13e3b7e0$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/12/12, Alex Gershgorin <alexg@meprolight.com> wrote:
+> > diff --git a/drivers/tty/serial/amba-pl011.c
+> > b/drivers/tty/serial/amba-pl011.c index 6800f5f..ff3fed0 100644
+> > --- a/drivers/tty/serial/amba-pl011.c
+> > +++ b/drivers/tty/serial/amba-pl011.c
+> > @@ -224,6 +224,11 @@ static int pl011_fifo_to_tty(struct uart_amba_port
+> *uap)
+> >  		uart_insert_char(&uap->port, ch, UART011_DR_OE, ch, flag);
+> >  	}
+> >
+> 
+> What if we really do end up receiving some characters here?
 
-> 1. Back resistor 172 to the default value.
->
-> 2. Removed the resistor 146, through which a voltage was applied from a PMIC
-> (EXT_3V) on "CMOS_VIO".
->
-> 3. Connecting a resistor 147 which supplies power from the LDO_3V3 on
-> "CMOS_VIO".
+Maybe the character is handled on next upcoming RTIS or RXIS in normal.
+However, I agree with you there is possibility of already asserted RXIS at
+this point. (with debugger?) In such a case, we may lose Rx interrupts
+forever because it's not level-triggered, and the ISR lacks error interrupt
+handling. Correct me if something wrong.
+Thank you for your comment, Russell.
 
-The camera on the FSL BSP works fine with no hardware modification on
-the mx35pdk.
-
-As I suggested previously you should control the power rails, i2c pad
-settings, etc from software so that the camera can also work in
-mainline without the need of changing the hardware.
-
-> On my display I see snow flickering and unfortunately not a live video from
-> camera.
-
-Do you have this patch applied?
-
-http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=f910fb8fcd1c97788f2291c8646597bcd87ee061
-
-Also, try to isolate the display from this issue. Capture the image to
-a file and try to play it on a PC.
-
-Regards,
-
-Fabio Estevam
+> 
+> > +	/* RXIS but RXFE? Just clear the interrupt */
+> > +	if(unlikely(fifotaken == 0))
+> > +		writew(UART011_RTIS | UART011_RXIS,
+> > +		       uap->port.membase + UART011_ICR);
