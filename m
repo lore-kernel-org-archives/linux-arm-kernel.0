@@ -1,45 +1,91 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 11 Mar 2012 00:56:14 -0800
-Subject: [GIT PULL v2 3/4] Samsung devel-mmc for v3.4
-Message-ID: <4F5C68AE.4000101@samsung.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 12 Mar 2012 10:07:54 +0530
+Subject: [PATCH 5/5] mmc: sdhci-s3c: setup pins using pinctrl interface
+In-Reply-To: <CAH9JG2XJ3HrQROc-_6Lq6zccgF-QZupVozXCQnXYGN7+DBnq+A@mail.gmail.com>
+References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
+ <1331469965-28846-6-git-send-email-thomas.abraham@linaro.org>
+ <CAH9JG2XJ3HrQROc-_6Lq6zccgF-QZupVozXCQnXYGN7+DBnq+A@mail.gmail.com>
+Message-ID: <CAJuYYwSbtJvOM_EY7MXRJ-wEk-vNZvjk64+yKgYRxXABSFk2AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+On 12 March 2012 08:08, Kyungmin Park <kmpark@infradead.org> wrote:
+> On 3/11/12, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>> The platform specific callback to setup the sdhci pin mux and pin config
+>> is removed and the pinctrl subsystem interface is used to setup the
+>> mux and config.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>> ?drivers/mmc/host/sdhci-s3c.c | ? 15 +++++++++++++--
+>> ?1 files changed, 13 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+>> index ea0767e..76c1c36 100644
+>> --- a/drivers/mmc/host/sdhci-s3c.c
+>> +++ b/drivers/mmc/host/sdhci-s3c.c
+>> @@ -22,6 +22,7 @@
+>> ?#include <linux/module.h>
+>> ?#include <linux/of.h>
+>> ?#include <linux/of_gpio.h>
+>> +#include <linux/pinctrl/consumer.h>
+>>
+>> ?#include <linux/mmc/host.h>
+>>
+>> @@ -50,6 +51,7 @@ struct sdhci_s3c {
+>> ? ? ? struct platform_device ?*pdev;
+>> ? ? ? struct resource ? ? ? ? *ioarea;
+>> ? ? ? struct s3c_sdhci_platdata *pdata;
+>> + ? ? struct pinctrl ? ? ? ? ?*pinctrl;
+>> ? ? ? unsigned int ? ? ? ? ? ?cur_clk;
+>> ? ? ? int ? ? ? ? ? ? ? ? ? ? ext_cd_irq;
+>> ? ? ? int ? ? ? ? ? ? ? ? ? ? ext_cd_gpio;
+>> @@ -529,6 +531,9 @@ static inline struct sdhci_s3c_drv_data
+>> *sdhci_s3c_get_driver_data(
+>> ? ? ? ? ? ? ? ? ? ? ? platform_get_device_id(pdev)->driver_data;
+>> ?}
+>>
+>> +#include <plat/map-s5p.h>
+>> +#include <plat/map-base.h>
+>
+> Why this header files are required?
 
-Please pull Samsung devel-mmc for v3.4 and I rebased it on top of 
-v3.3-rc7 without v3.4-for-cjb.
+Sorry, that was a mistake. This was left over here after adding it
+here for some debugging. I will take care next time.
 
-Please pull it from:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/devel-samsung-mmc
+>> +
+>> ?static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+>> ?{
+>> ? ? ? struct s3c_sdhci_platdata *pdata;
+>> @@ -538,6 +543,7 @@ static int __devinit sdhci_s3c_probe(struct
+>> platform_device *pdev)
+>> ? ? ? struct sdhci_s3c *sc;
+>> ? ? ? struct resource *res;
+>> ? ? ? int ret, irq, ptr, clks;
+>> + ? ? char *pstate;
+>>
+>> ? ? ? if (!pdev->dev.platform_data && !pdev->dev.of_node) {
+>> ? ? ? ? ? ? ? dev_err(dev, "no device data specified\n");
+>> @@ -643,8 +649,13 @@ static int __devinit sdhci_s3c_probe(struct
+>> platform_device *pdev)
+>> ? ? ? }
+>>
+>> ? ? ? /* Ensure we have minimal gpio selected CMD/CLK/Detect */
+>> - ? ? if (pdata->cfg_gpio)
+>> - ? ? ? ? ? ? pdata->cfg_gpio(pdev, pdata->max_width);
+>> + ? ? pstate = pdata->max_width ? "sdhci-pcfg8" : "sdhci-pcfg4";
+> You should check pdata->max_width == 8 instead of max_width itself.
 
-If any problems, please kindly let me know.
+Thanks. I will fix that.
 
-Thanks.
+> BTW if platform set the amx_width as 1. How do you handle this?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+If the bus width is 1, we need to add pin map entry for 1 bit bus
+width and correspondingly change the code here. I used the sdhci-s3c
+driver for testing the samsung pinctrl driver and only tested with
+4-bit and 8-bit bus width. The changes in this patch are not final yet
+and was mainly included in this series to show how platform callbacks
+can be removed.
 
-The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
-
-   Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
-
-are available in the git repository at:
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-next/devel-samsung-mmc
-
-Jaehoon Chung (3):
-       ARM: SAMSUNG: support the second capability for samsung-soc
-       mmc: sdhci-s3c: add platform data for the second capability
-       ARM: SAMSUNG: change the name from s3c-sdhci to exynos4-sdhci
-
-  arch/arm/mach-exynos/mach-nuri.c           |    4 ++--
-  arch/arm/mach-exynos/mach-universal_c210.c |    2 +-
-  arch/arm/plat-samsung/include/plat/sdhci.h |    2 ++
-  arch/arm/plat-samsung/platformdata.c       |    2 ++
-  drivers/mmc/host/sdhci-s3c.c               |    6 +++---
-  5 files changed, 10 insertions(+), 6 deletions(-)
+Thanks,
+Thomas.
