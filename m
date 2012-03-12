@@ -1,78 +1,111 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 09 Mar 2012 07:59:17 -0600
-Subject: [PATCH 2/5 v3] ARM: at91: sam9g20 add i2c DT support
-In-Reply-To: <20120309095336.GK27213@game.jcrosoft.org>
-References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
- <1331196635-27203-2-git-send-email-plagnioj@jcrosoft.com>
- <4F58E77B.4010500@gmail.com> <20120309095336.GK27213@game.jcrosoft.org>
-Message-ID: <4F5A0CB5.2020203@gmail.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Mon, 12 Mar 2012 17:46:16 +0100
+Subject: [PATCH] stmmac: Add device-tree support
+In-Reply-To: <201203121723.38411.sr@denx.de>
+References: <1331561157-3820-1-git-send-email-sr@denx.de>
+ <201203121606.26926.sr@denx.de> <4F5E169D.3070508@st.com>
+ <201203121723.38411.sr@denx.de>
+Message-ID: <4F5E2858.4000708@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2012 03:53 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:08 Thu 08 Mar     , Rob Herring wrote:
->> On 03/08/2012 02:50 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> For now on use i2c-gpio driver on the same pin as the hardware IP.
+On 3/12/2012 5:23 PM, Stefan Roese wrote:
+> On Monday 12 March 2012 16:30:37 Giuseppe CAVALLARO wrote:
+>>>>> +Required properties:
+>>>>> +- compatible: Should be "stm,gmac"
+>>>>
+>>>> This is too generic. This should be 1 string per version of h/w.
 >>>
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> Cc: devicetree-discuss at lists.ozlabs.org
->>> ---
->>> v3:
+>>> Viresh, Giuseppe, can you please suggest a proper string for the SPEAr600
+>>> STMMAC core, including version?
 >>>
->>> 	update i2c binding (Rob comments)
->>>
->>> Best Regards,
->>> J.
->>>  arch/arm/boot/dts/at91sam9g20.dtsi |   13 +++++++++++++
->>>  1 files changed, 13 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
->>> index 4b0dc99..072b2da 100644
->>> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
->>> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
->>> @@ -189,4 +189,17 @@
->>>  			status = "disabled";
->>>  		};
->>>  	};
->>> +> > +	i2c-gpio at 0 {
+>>>> 'stm' should be 'st' according to vendor-prefixes.txt.
 >>
->> You updated the example, but not all the actual uses to i2c at 0.
-> on purpose as on some soc we will have HW and soft binding
+>> I'm not familiar with devicetree; maybe we should have:
+>>
+>> "stmicro,mac100"
+>> "stmicro,gmac"
+>>
+>> or: st instead of stmicro if you prefer.
+>>
+>> in fact, stmmac is for mac100 and gmac devices.
 > 
-> on the board you put the alias
+> How about "st,spear600-gmac" for SPEAr600 then?
+
+IIUC, as final result we should have something like this... that sounds
+quite good to me.
+
+ST/ARM SPEAr
+"st,spear600-gmac"
+"st,spear1310-gmac"
+  ...
+
+ST/SH
+
+"st,stx7108-gmac"
+"st,stx7106-gmac"
+"st,stx7109-mac"    ->>> mac10/100
+...
+
+MIPS
+"st,Loongson1B"
+
+>  
+>>> Okay.
+>>>
+>>>>> +- reg: Address and length of the register set for the device
+>>>>> +- interrupt-parent: Should be the phandle for the interrupt controller
+>>>>> +  that services interrupts for this device
+>>>>> +- interrupts: Should contain the STMMAC interrupts
+>>>>> +- interrupt-names: Should contain the interrupt names "macirq"
+>>>>> +  "eth_wake_irq" if this interrupt is supported in the "interrupts"
+>>>>> +  property
+>>>>
+>>>> You should be able to tell this from the compatible string and number of
+>>>> interrupts.
+>>>
+>>> Yes. Currently the driver uses platform_get_irq_byname() to register the
+>>> irq's. That's why I added these properties. Is there something wrong with
+>>> using it this way?
+>>>
+>>>>> +- phy-mode: String, operation mode of the PHY interface.
+>>>>> +  Supported values are: "mii", "rmii", "gmii", "rgmii".
+>>>>> +- phy-addr: MDIO address of the PHY
+>>>>
+>>>> This is normally probed or the mdio bus is a sub-node of the MAC node.
+>>>> See arch/powerpc/boot/dts/mpc8377_mds.dts for an example.
+>>>
+>>> Okay, I'll rework this.
+>>>
+>>>>> +
+>>>>> +Optional properties:
+>>>>> +- stm,prog-burst-len: Specify the burst length
+>>>>> +- stm,has-gmac: Indicates that the controller supports 1000Mbps
+>>>>> +- stm,has-pmt: Indicates that the controller supports power management
+>>>>
+>>>> I think these should all be encoded by the compatible string.
+>>
+>> and should we have all the other flags e.g. tx_coe etc?
+>> (see stmmac.txt)
 > 
+> As Rob suggested, some of these flags/parameters are implicitly defined by the 
+> compatible string. If this is not the case, then sure, those flags/parameters 
+> need to be provided via the device-tree as well. I just don't need "tx_coe" 
+> etc. for my platform (SPEAr600) as far as I know. I suggest to add support for 
+> them once they are really needed/used by other platforms.
 
-I'm not sure I follow.
+Ok, but on SPEAr indeed some of these are not used at all.
+If you agree, we can go head with these and then we will add new ones
+next time. In the meantime, I will try to be more familiar with
+devicetree and provide further patches
 
-If you use the h/w block, then you would have i2c@<addr> while for gpio
-it's basically an index.
+peppe
 
-Also, I don't think you need an alias for i2c. You should not care about
-bus numbering as devices should be sub nodes.
-
-Rob
-
-> Best Regards,
-> J.
->>
->> Rob
->>
->>> +		compatible = "i2c-gpio";
->>> +		gpios = <&pioA 23 0 /* sda */
->>> +			 &pioA 24 0 /* scl */
->>> +			>;
->>> +		i2c-gpio,sda-open-drain;
->>> +		i2c-gpio,scl-open-drain;
->>> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
->>> +		#address-cells = <1>;
->>> +		#size-cells = <0>;
->>> +		status = "disabled";
->>> +	};
->>>  };
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> Thanks,
+> Stefan
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
