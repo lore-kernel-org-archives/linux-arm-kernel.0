@@ -1,99 +1,75 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 12 Mar 2012 10:26:53 -0700
-Subject: [GIT PULL] ARM: OMAP2+: PM: core support for SMPS regulators for
- v3.4
-In-Reply-To: <20120311204232.GC3171@opensource.wolfsonmicro.com> (Mark Brown's
- message of "Sun, 11 Mar 2012 20:42:33 +0000")
-References: <877gywjhht.fsf@ti.com> <20120308021843.GQ12083@atomide.com>
- <87399jc6cj.fsf@ti.com> <20120309003217.GB12083@atomide.com>
- <20120309114731.GA3273@opensource.wolfsonmicro.com>
- <87zkbp4wtj.fsf@ti.com>
- <20120311204232.GC3171@opensource.wolfsonmicro.com>
-Message-ID: <87399dzq5e.fsf@ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 12 Mar 2012 09:53:18 +0530
+Subject: [PATCH 3/4] ARM: create a common IOMEM definition
+In-Reply-To: <1331500100-31351-4-git-send-email-robherring2@gmail.com>
+References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+ <1331500100-31351-4-git-send-email-robherring2@gmail.com>
+Message-ID: <4F5D7A36.8030601@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+On 3/12/2012 2:38 AM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Several platforms create IOMEM defines for casting to 'void __iomem *',
+> and other platforms are incorrectly using __io() macro for the same
+> purpose. This creates a common definition and removes all the platform
+> specific versions. Rather than try to make linux/io.h and asm/io.h
+> assembly safe, the assembly version of IOMEM is moved into
+> asm/assembler.h.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  arch/arm/include/asm/assembler.h                |    2 ++
+>  arch/arm/include/asm/io.h                       |    2 ++
+>  arch/arm/kernel/debug.S                         |    1 +
+>  arch/arm/kernel/entry-armv.S                    |    1 +
+>  arch/arm/mach-davinci/include/mach/hardware.h   |    6 ------
+>  arch/arm/mach-davinci/include/mach/uncompress.h |    2 ++
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    9 ---------
+>  arch/arm/mach-mmp/include/mach/addr-map.h       |    6 ------
+>  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ------
+>  arch/arm/mach-msm/include/mach/msm_iomap.h      |    6 ------
+>  arch/arm/mach-mxs/include/mach/hardware.h       |    6 ------
+>  arch/arm/mach-omap1/ams-delta-fiq-handler.S     |    1 +
+>  arch/arm/mach-omap1/iomap.h                     |    6 ------
+>  arch/arm/mach-omap2/clock3xxx_data.c            |    1 +
+>  arch/arm/mach-omap2/clock44xx_data.c            |    1 +
+>  arch/arm/mach-omap2/iomap.h                     |    6 ------
+>  arch/arm/mach-rpc/include/mach/hardware.h       |    6 ------
+>  arch/arm/mach-spear3xx/clock.c                  |    1 +
+>  arch/arm/mach-spear6xx/clock.c                  |    1 +
+>  arch/arm/mach-tegra/include/mach/iomap.h        |    6 ------
+>  arch/arm/mach-u300/include/mach/u300-regs.h     |    6 ------
+>  arch/arm/plat-mxc/include/mach/hardware.h       |    6 ------
+>  arch/arm/plat-omap/include/plat/hardware.h      |    6 ------
+>  arch/arm/plat-omap/include/plat/usb.h           |    1 -
+>  arch/arm/plat-spear/include/plat/hardware.h     |    6 ------
+>  25 files changed, 13 insertions(+), 88 deletions(-)
+> 
 
-> The branch itself is essentially stable but I'm not enthused about the
-> idea of merging the whole thing via the OMAP tree.  
+[For SPEAr]
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
 
-Right, I wasn't suggesting we merge it via OMAP tree.   I was just
-looking for a stable point we could use as s dependency when merging
-everything together for the arm-soc tree.
-
-> However, as Linus has released an -rc7 I should pull some stuff out of
-> there and send fixes to him so I've created a topic/twl so let's just
-> rebase.
-
-OK.
-
->> > In general you should warn people if you've got a dependency on their
->> > tree, it makes life easier.
->
->> Yeah, I should've raised this when the original series were posted.  The
->> arch stuff and drivers/regulator stuff were posted all together, but you
->> picked out the regulator stuff and I picked up the rest.  
->
-> Actually IIRC by the time I applied this the ARM changes had been
-> totally deteched from the regulator stuff - Tero was sending just the
-> regulator patch by itself and I actually applied the patch it was part
-> of a twl regulator series Rajendra put together after I got fed up with
-> the number of people sending me incompatible changes without talking to
-> each other.  I'd completely forgotten about any arch/arm stuff.
->
-> This sort of issue is becoming far too common with the OMAP stuff, there
-> needs to be a much greater awareness of the need to coordinate both
-> between trees and with multiple people working on the same code.
-
-Completely agree, hence this email trying to work this out before the
-merge window.
-
-Thanks for this topic branch.  We'll ask for it to be included as a
-branch in arm-soc/depends/* so that OMAP voltage core changes will build
-there as well as in linux-next.
-
-Thanks,
-
-Kevin
-
-
-> The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
->
->   Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tags/topic/twl
->
-> for you to fetch changes up to 46eda3e96a65b378041c79c51ff2e02009f7e2d0:
->
->   mfd: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS (2012-03-11 20:09:26 +0000)
->
-> ----------------------------------------------------------------
-> TWL specific changes, cross-merged with OMAP due to arch/arm wanting to
-> use the new ability to override the voltage set and get operations to
-> support the in-CPU voltage management.  The other changes are minor
-> fixes, the addition of a few new regulators and device tree support.
->
-> ----------------------------------------------------------------
-> Laxman Dewangan (1):
->       regulator: twl6030: Fix voltage selection logic
->
-> Peter Ujfalusi (2):
->       regulator: twl-regulator: Add fixed LDO for V1V8, V2V1 supply
->       mfd: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS
->
-> Rajendra Nayak (1):
->       regulator: twl: adapt twl-regulator driver to dt
->
-> Tero Kristo (2):
->       regulator: twl4030: add support for external voltage get/set
->       regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators
->
->  .../bindings/regulator/twl-regulator.txt           |   68 ++++
->  drivers/mfd/twl-core.c                             |   41 +++-
->  drivers/regulator/twl-regulator.c                  |  327 +++++++++++++++-----
->  include/linux/i2c/twl.h                            |   14 +-
->  4 files changed, 366 insertions(+), 84 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
+--
+viresh
