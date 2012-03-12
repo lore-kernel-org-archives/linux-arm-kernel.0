@@ -1,42 +1,92 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 Mar 2012 09:45:08 -0800
-Subject: [GIT PULL] Samsung board stuff for v3.4
-In-Reply-To: <4F5B748B.6050404@samsung.com>
-References: <4F5B748B.6050404@samsung.com>
-Message-ID: <CAOesGMjiYDFhkjS=2e+3YdPJHExupt3Wm_NS3x1XW-17eEZM=A@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Mon, 12 Mar 2012 20:02:33 +0100
+Subject: [PATCH 4/6] ARM: S3C24XX: Add clock-lookup entries required by
+ s3c64xx-spi
+In-Reply-To: <201203121959.32966.heiko@sntech.de>
+References: <201203121959.32966.heiko@sntech.de>
+Message-ID: <201203122002.33629.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently usable are busclk0 and busclk2.
 
-On Sat, Mar 10, 2012 at 7:34 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd, Olof,
->
-> Please pull regarding Samsung board patches for v3.4.
->
-> Most are enabling some features(IPs) on each board and
-> one is adding new board file, Samsung Mobile's TRATS board.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-s3c24xx/clock-s3c2416.c  |    1 +
+ arch/arm/mach-s3c24xx/clock-s3c2443.c  |    1 +
+ arch/arm/mach-s3c24xx/common-s3c2443.c |   15 ++++++++++-----
+ 3 files changed, 12 insertions(+), 5 deletions(-)
 
-Given that exynos has started conversion to device tree, there should
-not be any  additions of non-devicetree-probed board files being
-added.
-
-At the very least, you should move over to using DT_MACHINE instead of
-MACHINE for the new board, and probe using device tree. Even better
-would be if you added support for this board through mach-exynos4-dt.c
-instead of adding a brand new board file.
-
-I also see a large number of the same additions of devices, done to a
-number of board files. I don't think you need to rework those patches
-now, but please consider how you can make it less "churny" to add a
-device on the SoC in the future without touching all board files.
-
-
-If you rebase without the board file addition I can take the rest of
-the branch while that part is being reworked. Please send a new pull
-request with the rebased tree.
-
-
-Thanks,
-
--Olof
+diff --git a/arch/arm/mach-s3c24xx/clock-s3c2416.c b/arch/arm/mach-s3c24xx/clock-s3c2416.c
+index dbc9ab4..8702ecf 100644
+--- a/arch/arm/mach-s3c24xx/clock-s3c2416.c
++++ b/arch/arm/mach-s3c24xx/clock-s3c2416.c
+@@ -144,6 +144,7 @@ static struct clk_lookup s3c2416_clk_lookup[] = {
+ 	CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.0", &hsmmc0_clk),
+ 	CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.2", &hsmmc_mux0.clk),
+ 	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &hsmmc_mux1.clk),
++	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk2", &hsspi_mux.clk),
+ };
+ 
+ void __init s3c2416_init_clocks(int xtal)
+diff --git a/arch/arm/mach-s3c24xx/clock-s3c2443.c b/arch/arm/mach-s3c24xx/clock-s3c2443.c
+index bce1cd3..bb3231d 100644
+--- a/arch/arm/mach-s3c24xx/clock-s3c2443.c
++++ b/arch/arm/mach-s3c24xx/clock-s3c2443.c
+@@ -181,6 +181,7 @@ static struct clk *clks[] __initdata = {
+ 
+ static struct clk_lookup s3c2443_clk_lookup[] = {
+ 	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &clk_hsmmc),
++	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk2", &clk_hsspi.clk),
+ };
+ 
+ void __init s3c2443_init_clocks(int xtal)
+diff --git a/arch/arm/mach-s3c24xx/common-s3c2443.c b/arch/arm/mach-s3c24xx/common-s3c2443.c
+index 4604315..aeeb2be 100644
+--- a/arch/arm/mach-s3c24xx/common-s3c2443.c
++++ b/arch/arm/mach-s3c24xx/common-s3c2443.c
+@@ -424,11 +424,6 @@ static struct clk init_clocks_off[] = {
+ 		.enable		= s3c2443_clkcon_enable_p,
+ 		.ctrlbit	= S3C2443_PCLKCON_IIS,
+ 	}, {
+-		.name		= "hsspi",
+-		.parent		= &clk_p,
+-		.enable		= s3c2443_clkcon_enable_p,
+-		.ctrlbit	= S3C2443_PCLKCON_HSSPI,
+-	}, {
+ 		.name		= "adc",
+ 		.parent		= &clk_p,
+ 		.enable		= s3c2443_clkcon_enable_p,
+@@ -562,6 +557,14 @@ static struct clk hsmmc1_clk = {
+ 	.ctrlbit	= S3C2443_HCLKCON_HSMMC,
+ };
+ 
++static struct clk hsspi_clk = {
++	.name		= "spi",
++	.devname	= "s3c64xx-spi.0",
++	.parent		= &clk_p,
++	.enable		= s3c2443_clkcon_enable_p,
++	.ctrlbit	= S3C2443_PCLKCON_HSSPI,
++};
++
+ /* EPLLCON compatible enough to get on/off information */
+ 
+ void __init_or_cpufreq s3c2443_common_setup_clocks(pll_fn get_mpll)
+@@ -612,6 +615,7 @@ static struct clk *clks[] __initdata = {
+ 	&clk_usb_bus,
+ 	&clk_armdiv,
+ 	&hsmmc1_clk,
++	&hsspi_clk,
+ };
+ 
+ static struct clksrc_clk *clksrcs[] __initdata = {
+@@ -629,6 +633,7 @@ static struct clk_lookup s3c2443_clk_lookup[] = {
+ 	CLKDEV_INIT(NULL, "clk_uart_baud2", &clk_p),
+ 	CLKDEV_INIT(NULL, "clk_uart_baud3", &clk_esys_uart.clk),
+ 	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.0", &hsmmc1_clk),
++	CLKDEV_INIT("s3c64xx-spi.0", "spi_busclk0", &hsspi_clk),
+ };
+ 
+ void __init s3c2443_common_init_clocks(int xtal, pll_fn get_mpll,
+-- 
+1.7.2.3
