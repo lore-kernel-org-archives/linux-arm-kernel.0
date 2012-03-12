@@ -1,51 +1,45 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 9 Mar 2012 07:31:16 +0100
-Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
-In-Reply-To: <4F59253D.7070100@wwwdotorg.org>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
- <4F59253D.7070100@wwwdotorg.org>
-Message-ID: <20120309063115.GA25208@avionic-0098.mockup.avionic-design.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 12 Mar 2012 09:52:13 +0530
+Subject: [PATCH V2 18/22] watchdog/sp805: Fix documentation style comment
+In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
+References: <cover.1331524811.git.viresh.kumar@st.com>
+Message-ID: <9928ca5b3a445b49a693dd7be48e09359cda1c94.1331524811.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren wrote:
-> On 03/08/2012 07:51 AM, Thierry Reding wrote:
-> > This commit adds support for instantiating the Tegra PCIe controller
-> > from a device tree.
-> > 
-> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> 
-> > diff --git a/Documentation/devicetree/bindings/pci/tegra-pcie.txt b/Documentation/devicetree/bindings/pci/tegra-pcie.txt
-> 
-> > +NVIDIA Tegra PCIe controller
-> > +
-> > +Required properties:
-> > +- compatible: "nvidia,tegra20-pcie"
-> > +- reg: physical base address and length of the controller's registers
-> > +- interrupts: the interrupt outputs of the controller
-> > +
-> > +Optional properties:
-> > +- pex-clk-supply: supply voltage for internal reference clock
-> > +- vdd-supply: power supply for controller (1.05V)
-> 
-> Mark, Liam,
-> 
-> Should those *-supply properties really be optional? I got the
-> impression talking to Mark in a different thread that all regulators
-> should exist, although their implementation may be via a fixed
-> regulator, with no GPIO, as determined by the board design.
+@ was missing before variables names, in their description. Also adev is
+mentioned as dev in comment. Fix both these issues.
 
-If I read the TrimSlice code correctly, there is no regulator setup required
-to make PCIe work there presumably because they hardwire the proper voltages.
-On the other hand, maybe a better solution in this case would be to use the
-dummy regulator in those cases.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/watchdog/sp805_wdt.c |   15 +++++++--------
+ 1 files changed, 7 insertions(+), 8 deletions(-)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/8b96a367/attachment-0001.sig>
+diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
+index e2d5249..7af1386 100644
+--- a/drivers/watchdog/sp805_wdt.c
++++ b/drivers/watchdog/sp805_wdt.c
+@@ -56,14 +56,13 @@
+ 
+ /**
+  * struct sp805_wdt: sp805 wdt device structure
+- *
+- * lock: spin lock protecting dev structure and io access
+- * base: base address of wdt
+- * clk: clock structure of wdt
+- * dev: amba device structure of wdt
+- * status: current status of wdt
+- * load_val: load value to be set for current timeout
+- * timeout: current programmed timeout
++ * @lock: spin lock protecting dev structure and io access
++ * @base: base address of wdt
++ * @clk: clock structure of wdt
++ * @adev: amba device structure of wdt
++ * @status: current status of wdt
++ * @load_val: load value to be set for current timeout
++ * @timeout: current programmed timeout
+  */
+ struct sp805_wdt {
+ 	spinlock_t			lock;
+-- 
+1.7.8.110.g4cb5d
