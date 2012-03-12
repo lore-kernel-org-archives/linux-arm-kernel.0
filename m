@@ -1,309 +1,108 @@
-From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
-Date: Sat, 10 Mar 2012 11:13:08 +0800
-Subject: [PATCH v12] Regulator: Add Anatop regulator driver
-Message-ID: <1331349188-14765-1-git-send-email-paul.liu@linaro.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 12 Mar 2012 10:40:27 -0700
+Subject: [PATCH] arm: Add unwinding support for memset and memzero.
+Message-ID: <1331574027-28542-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+Both memset and memzero lack unwinding annoations. If
+an abort occurs trying to access the pointer, the backtrace
+is incomplete. Add unwinding annotations to both functions
+so we can actually get a useful backtrace.
 
-Anatop is an integrated regulator inside i.MX6 SoC.
-There are 3 digital regulators which controls PU, CORE (ARM), and SOC.
-And 3 analog regulators which controls 1P1, 2P5, 3P0 (USB).
-This patch adds the Anatop regulator driver.
-
-Signed-off-by: Nancy Chen <Nancy.Chen@freescale.com>
-Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Reviewed-by: Axel Lin <axel.lin@gmail.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- drivers/regulator/Kconfig            |    8 +
- drivers/regulator/Makefile           |    1 +
- drivers/regulator/anatop-regulator.c |  241 ++++++++++++++++++++++++++++++++++
- 3 files changed, 250 insertions(+), 0 deletions(-)
- create mode 100644 drivers/regulator/anatop-regulator.c
+ arch/arm/lib/memset.S  |    7 +++++--
+ arch/arm/lib/memzero.S |    7 +++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index c733df5..a229de9 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -102,6 +102,14 @@ config REGULATOR_DA9052
- 	  This driver supports the voltage regulators of DA9052-BC and
- 	  DA9053-AA/Bx PMIC.
+diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
+index 650d592..4379912 100644
+--- a/arch/arm/lib/memset.S
++++ b/arch/arm/lib/memset.S
+@@ -11,6 +11,7 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
++#include <asm/unwind.h>
  
-+config REGULATOR_ANATOP
-+	tristate "Freescale i.MX on-chip ANATOP LDO regulators"
-+	depends on MFD_ANATOP
-+	help
-+	  Say y here to support Freescale i.MX on-chip ANATOP LDOs
-+	  regulators. It is recommended that this option be
-+	  enabled on i.MX6 platform.
-+
- config REGULATOR_MC13XXX_CORE
- 	tristate
+ 	.text
+ 	.align	5
+@@ -29,6 +30,7 @@
+  */
  
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 2b09c81..b5042c8 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -15,6 +15,7 @@ obj-$(CONFIG_REGULATOR_AAT2870) += aat2870-regulator.o
- obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
- obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
- obj-$(CONFIG_REGULATOR_AD5398) += ad5398.o
-+obj-$(CONFIG_REGULATOR_ANATOP) += anatop-regulator.o
- obj-$(CONFIG_REGULATOR_BQ24022) += bq24022.o
- obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
- obj-$(CONFIG_REGULATOR_DA9052)	+= da9052-regulator.o
-diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
-new file mode 100644
-index 0000000..17499a5
---- /dev/null
-+++ b/drivers/regulator/anatop-regulator.c
-@@ -0,0 +1,241 @@
-+/*
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ */
-+
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
-+
-+#include <linux/slab.h>
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/mfd/anatop.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/of_regulator.h>
-+
-+struct anatop_regulator {
-+	const char *name;
-+	u32 control_reg;
-+	struct anatop *mfd;
-+	int vol_bit_shift;
-+	int vol_bit_width;
-+	int min_bit_val;
-+	int min_voltage;
-+	int max_voltage;
-+	struct regulator_desc rdesc;
-+	struct regulator_init_data *initdata;
-+};
-+
-+static int anatop_set_voltage(struct regulator_dev *reg, int min_uV,
-+				  int max_uV, unsigned *selector)
-+{
-+	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
-+	u32 val, sel;
-+	int uv;
-+
-+	uv = min_uV;
-+	dev_dbg(&reg->dev, "%s: uv %d, min %d, max %d\n", __func__,
-+		uv, anatop_reg->min_voltage,
-+		anatop_reg->max_voltage);
-+
-+	if (uv < anatop_reg->min_voltage) {
-+		if (max_uV > anatop_reg->min_voltage)
-+			uv = anatop_reg->min_voltage;
-+		else
-+			return -EINVAL;
-+	}
-+
-+	if (!anatop_reg->control_reg)
-+		return -ENOTSUPP;
-+
-+	sel = DIV_ROUND_UP(uv - anatop_reg->min_voltage, 25000);
-+	if (sel * 25000 + anatop_reg->min_voltage > anatop_reg->max_voltage)
-+		return -EINVAL;
-+	val = anatop_reg->min_bit_val + sel;
-+	*selector = sel;
-+	dev_dbg(&reg->dev, "%s: calculated val %d\n", __func__, val);
-+	anatop_set_bits(anatop_reg->mfd,
-+			anatop_reg->control_reg,
-+			anatop_reg->vol_bit_shift,
-+			anatop_reg->vol_bit_width,
-+			val);
-+
-+	return 0;
-+}
-+
-+static int anatop_get_voltage_sel(struct regulator_dev *reg)
-+{
-+	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
-+	u32 val;
-+
-+	if (!anatop_reg->control_reg)
-+		return -ENOTSUPP;
-+
-+	val = anatop_get_bits(anatop_reg->mfd,
-+			      anatop_reg->control_reg,
-+			      anatop_reg->vol_bit_shift,
-+			      anatop_reg->vol_bit_width);
-+
-+	return val - anatop_reg->min_bit_val;
-+}
-+
-+static int anatop_list_voltage(struct regulator_dev *reg, unsigned selector)
-+{
-+	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
-+	int uv;
-+
-+	uv = anatop_reg->min_voltage + selector * 25000;
-+	dev_dbg(&reg->dev, "vddio = %d, selector = %u\n", uv, selector);
-+
-+	return uv;
-+}
-+
-+static struct regulator_ops anatop_rops = {
-+	.set_voltage     = anatop_set_voltage,
-+	.get_voltage_sel = anatop_get_voltage_sel,
-+	.list_voltage    = anatop_list_voltage,
-+};
-+
-+static int __devinit anatop_regulator_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct regulator_desc *rdesc;
-+	struct regulator_dev *rdev;
-+	struct anatop_regulator *sreg;
-+	struct regulator_init_data *initdata;
-+	struct anatop *anatopmfd = dev_get_drvdata(pdev->dev.parent);
-+	int ret = 0;
-+
-+	initdata = of_get_regulator_init_data(dev, np);
-+	sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
-+	if (!sreg)
-+		return -ENOMEM;
-+	sreg->initdata = initdata;
-+	sreg->name = kstrdup(of_get_property(np, "regulator-name", NULL),
-+			     GFP_KERNEL);
-+	rdesc = &sreg->rdesc;
-+	memset(rdesc, 0, sizeof(*rdesc));
-+	rdesc->name = sreg->name;
-+	rdesc->ops = &anatop_rops;
-+	rdesc->type = REGULATOR_VOLTAGE;
-+	rdesc->owner = THIS_MODULE;
-+	sreg->mfd = anatopmfd;
-+	ret = of_property_read_u32(np, "reg", &sreg->control_reg);
-+	if (ret) {
-+		dev_err(dev, "no reg property set\n");
-+		goto anatop_probe_end;
-+	}
-+	ret = of_property_read_u32(np, "anatop-vol-bit-width",
-+				   &sreg->vol_bit_width);
-+	if (ret) {
-+		dev_err(dev, "no anatop-vol-bit-width property set\n");
-+		goto anatop_probe_end;
-+	}
-+	ret = of_property_read_u32(np, "anatop-vol-bit-shift",
-+				   &sreg->vol_bit_shift);
-+	if (ret) {
-+		dev_err(dev, "no anatop-vol-bit-shift property set\n");
-+		goto anatop_probe_end;
-+	}
-+	ret = of_property_read_u32(np, "anatop-min-bit-val",
-+				   &sreg->min_bit_val);
-+	if (ret) {
-+		dev_err(dev, "no anatop-min-bit-val property set\n");
-+		goto anatop_probe_end;
-+	}
-+	ret = of_property_read_u32(np, "anatop-min-voltage",
-+				   &sreg->min_voltage);
-+	if (ret) {
-+		dev_err(dev, "no anatop-min-voltage property set\n");
-+		goto anatop_probe_end;
-+	}
-+	ret = of_property_read_u32(np, "anatop-max-voltage",
-+				   &sreg->max_voltage);
-+	if (ret) {
-+		dev_err(dev, "no anatop-max-voltage property set\n");
-+		goto anatop_probe_end;
-+	}
-+
-+	rdesc->n_voltages = (sreg->max_voltage - sreg->min_voltage)
-+		/ 25000 + 1;
-+
-+	/* register regulator */
-+	rdev = regulator_register(rdesc, dev,
-+				  initdata, sreg, pdev->dev.of_node);
-+	if (IS_ERR(rdev)) {
-+		dev_err(dev, "failed to register %s\n",
-+			rdesc->name);
-+		ret = PTR_ERR(rdev);
-+		goto anatop_probe_end;
-+	}
-+
-+	platform_set_drvdata(pdev, rdev);
-+
-+anatop_probe_end:
-+	if (ret)
-+		kfree(sreg->name);
-+
-+	return ret;
-+}
-+
-+static int __devexit anatop_regulator_remove(struct platform_device *pdev)
-+{
-+	struct regulator_dev *rdev = platform_get_drvdata(pdev);
-+	struct anatop_regulator *sreg = rdev_get_drvdata(rdev);
-+	const char *name = sreg->name;
-+
-+	regulator_unregister(rdev);
-+	kfree(name);
-+
-+	return 0;
-+}
-+
-+static struct of_device_id __devinitdata of_anatop_regulator_match_tbl[] = {
-+	{ .compatible = "fsl,anatop-regulator", },
-+	{ /* end */ }
-+};
-+
-+static struct platform_driver anatop_regulator = {
-+	.driver = {
-+		.name	= "anatop_regulator",
-+		.owner  = THIS_MODULE,
-+		.of_match_table = of_anatop_regulator_match_tbl,
-+	},
-+	.probe	= anatop_regulator_probe,
-+	.remove	= anatop_regulator_remove,
-+};
-+
-+static int __init anatop_regulator_init(void)
-+{
-+	return platform_driver_register(&anatop_regulator);
-+}
-+postcore_initcall(anatop_regulator_init);
-+
-+static void __exit anatop_regulator_exit(void)
-+{
-+	platform_driver_unregister(&anatop_regulator);
-+}
-+module_exit(anatop_regulator_exit);
-+
-+MODULE_AUTHOR("Nancy Chen <Nancy.Chen@freescale.com>, "
-+	      "Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>");
-+MODULE_DESCRIPTION("ANATOP Regulator driver");
-+MODULE_LICENSE("GPL v2");
+ ENTRY(memset)
++UNWIND(.fnstart)
+ 	ands	r3, r0, #3		@ 1 unaligned?
+ 	bne	1b			@ 1
+ /*
+@@ -41,7 +43,7 @@ ENTRY(memset)
+ 	blt	4f
+ 
+ #if ! CALGN(1)+0
+-
++UNWIND(.save {lr})
+ /*
+  * We need an extra register for this loop - save the return address and
+  * use the LR
+@@ -68,7 +70,7 @@ ENTRY(memset)
+ 	ldr	lr, [sp], #4
+ 
+ #else
+-
++UNWIND(.save {r4, r5, r6, r7, lr})
+ /*
+  * This version aligns the destination pointer in order to write
+  * whole cache lines at once.
+@@ -124,4 +126,5 @@ ENTRY(memset)
+ 	tst	r2, #1
+ 	strneb	r1, [r0], #1
+ 	mov	pc, lr
++UNWIND(.fnend)
+ ENDPROC(memset)
+diff --git a/arch/arm/lib/memzero.S b/arch/arm/lib/memzero.S
+index 3fbdef5..26f9ce8 100644
+--- a/arch/arm/lib/memzero.S
++++ b/arch/arm/lib/memzero.S
+@@ -9,6 +9,7 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
++#include <asm/unwind.h>
+ 
+ 	.text
+ 	.align	5
+@@ -31,6 +32,7 @@
+  */
+ 
+ ENTRY(__memzero)
++UNWIND(.fnstart)
+ 	mov	r2, #0			@ 1
+ 	ands	r3, r0, #3		@ 1 unaligned?
+ 	bne	1b			@ 1
+@@ -41,7 +43,7 @@ ENTRY(__memzero)
+ 	blt	4f			@ 1 have < 16 bytes
+ 
+ #if ! CALGN(1)+0
+-
++UNWIND(.save {lr})
+ /*
+  * We need an extra register for this loop - save the return address and
+  * use the LR
+@@ -68,7 +70,7 @@ ENTRY(__memzero)
+ 	ldr	lr, [sp], #4		@ 1
+ 
+ #else
+-
++UNWIND(.save{r4, r5, r6, r7})
+ /*
+  * This version aligns the destination pointer in order to write
+  * whole cache lines@once.
+@@ -122,4 +124,5 @@ ENTRY(__memzero)
+ 	tst	r1, #1			@ 1 a byte left over
+ 	strneb	r2, [r0], #1		@ 1
+ 	mov	pc, lr			@ 1
++UNWIND(.fnend)
+ ENDPROC(__memzero)
 -- 
-1.7.9.1
+1.7.8.3
