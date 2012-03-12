@@ -1,121 +1,56 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 11 Mar 2012 14:17:21 -0700
-Subject: [PATCH 3/5] ARM: Exynos4: Add pinctrl devices and pin maps
-In-Reply-To: <1331469965-28846-4-git-send-email-thomas.abraham@linaro.org>
-References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
- <1331469965-28846-4-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4F5D1661.4090007@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Mar 2012 16:11:43 +0000
+Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
+In-Reply-To: <1331128466.24656.421.camel@vkoul-udesk3>
+References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
+ <1331128466.24656.421.camel@vkoul-udesk3>
+Message-ID: <20120312161143.GA10830@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> Add the three pinctrl platform devices and the pin maps for Exynos4.
+On Wed, Mar 07, 2012 at 07:24:26PM +0530, Vinod Koul wrote:
+> On Tue, 2012-03-06 at 22:33 +0000, Russell King - ARM Linux wrote:
+> > [v2 - more or less same description.  Including lakml in cc for the full
+> > set]
+> > 
+> > This patch series cleans up the handling of cookies in DMA engine drivers.
+> > This is done by providing a set of inline library functions for common
+> > tasks:
+> > 
+> > - moving the 'last completed cookie' into struct dma_chan - everyone
+> >   has this in their driver private channel data structure
+> > 
+> > - consolidate allocation of cookies to DMA descriptors
+> > 
+> > - common way to update 'last completed cookie' value
+> > 
+> > - standard way to implement tx_status callback and update the residue
+> > 
+> > - consolidate initialization of cookies
+> > 
+> > - update implementations differing from the majority of DMA engine drivers
+> >   to behave the same as the majority implementation in respect of cookies
+> > 
+> > What this means is that we get to the point where all DMA engine drivers
+> > will hand out cookie value '2' as the first, and incrementing cookie
+> > values up to INT_MAX, returning to cookie '1' as the next cookie.
+> > 
+> > Think of this patch series as round 1...  I am hoping over time that more
+> > code can be consolidated between the DMA engine drivers and end up with a
+> > consistent way to handle various common themes in DMA engine hardware
+> > (like physical channel<->peripheral request signal selection.)
+> Thanks Russell,
 > 
-> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
-> ---
->   arch/arm/mach-exynos/Kconfig              |    1 +
->   arch/arm/mach-exynos/Makefile             |    1 +
->   arch/arm/mach-exynos/common.h             |    6 ++
->   arch/arm/mach-exynos/dev-pinctrl.c        |  115 +++++++++++++++++++++++++++++
->   arch/arm/plat-samsung/include/plat/devs.h |    3 +
->   5 files changed, 126 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/mach-exynos/dev-pinctrl.c
+> I have tested this on atom today, and as expected works flawlessly :)
+> After all acks, I can merge or these can go thru your tree with my Ack.
+> Either way is okay.
+> 
+> I applied the v2 on a branch and also rebased on top of slave-dma.next.
+> There were few conflicts in imx-dma.c. Sacha, Javier, pls see that merge
+> is right.
+> 
+> This branch (rmk_cookie_fixes2_rebased) is not yet pushed, as I am not
+> able to connect to infradead.org, should be done when server is back.
 
-[...]
-
-> +#include<linux/kernel.h>
-> +#include<linux/dma-mapping.h>
-> +#include<linux/platform_device.h>
-> +#include<linux/interrupt.h>
-> +#include<linux/pinctrl/machine.h>
-
-#include <linux/ioport.h> for DEFINE_RES_xxx at below.
-
-> +
-> +#include<plat/devs.h>
-> +#include<plat/pinctrl.h>
-> +
-> +#include<mach/map.h>
-> +
-> +static struct resource exynos4_pinctrl_resource0[] = {
-> +	[0] = {
-> +		.start  = EXYNOS4_PA_GPIO1,
-> +		.end    = EXYNOS4_PA_GPIO1 + SZ_4K - 1,
-> +		.flags  = IORESOURCE_MEM,
-> +	},
-
-[0] = DEFINE_RES_MEM(EXYNOS4_PA_GPIO1, SZ_4K),
-
-> +	[1] = {
-> +		.start  = IRQ_GPIO_XA,
-> +		.end    = IRQ_GPIO_XA,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-
-[1] = DEFINE_RES_IRQ(IRQ_GPIO_XA),
-
-But I'm thinking, we need to move to use EXYNOS4_IRQ_GPIO_XA here for
-both EXYNOS4 and EXYNOS5 and as a note, I'm working on updating IRQ
-naming you can see it in this week :)
-
-> +};
-> +
-> +struct platform_device exynos4_pinctrl0 = {
-> +	.name		= "exynos4-pinctrl",
-> +	.id		= 0,
-> +	.resource	= exynos4_pinctrl_resource0,
-> +	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource0),
-> +};
-> +
-> +static struct resource exynos4_pinctrl_resource1[] = {
-> +	[0] = {
-> +		.start  = EXYNOS4_PA_GPIO2,
-> +		.end    = EXYNOS4_PA_GPIO2 + SZ_4K - 1,
-> +		.flags  = IORESOURCE_MEM,
-> +	},
-
-same as above.
-
-> +	[1] = {
-> +		.start  = IRQ_GPIO_XB,
-> +		.end    = IRQ_GPIO_XB,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-
-same.
-
-> +};
-> +
-> +struct platform_device exynos4_pinctrl1 = {
-> +	.name		= "exynos4-pinctrl",
-> +	.id		= 1,
-> +	.resource	= exynos4_pinctrl_resource1,
-> +	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource1),
-> +};
-> +
-> +static struct resource exynos4_pinctrl_resource2[] = {
-> +	[0] = {
-> +		.start  = EXYNOS4_PA_GPIO3,
-> +		.end    = EXYNOS4_PA_GPIO3 + SZ_4K - 1,
-> +		.flags  = IORESOURCE_MEM,
-> +	},
-
-same.
-
-> +};
-> +
-> +struct platform_device exynos4_pinctrl2 = {
-> +	.name		= "exynos4-pinctrl",
-> +	.id		= 2,
-> +	.resource	= exynos4_pinctrl_resource2,
-> +	.num_resources	= ARRAY_SIZE(exynos4_pinctrl_resource2),
-> +};
-> +
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Are you going to pick up Shawn Guo's tested-by for these patches, or are
+we saying its too late for that now?
