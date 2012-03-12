@@ -1,106 +1,144 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 11 Mar 2012 20:42:33 +0000
-Subject: [GIT PULL] ARM: OMAP2+: PM: core support for SMPS regulators for
- v3.4
-In-Reply-To: <87zkbp4wtj.fsf@ti.com>
-References: <877gywjhht.fsf@ti.com> <20120308021843.GQ12083@atomide.com>
- <87399jc6cj.fsf@ti.com> <20120309003217.GB12083@atomide.com>
- <20120309114731.GA3273@opensource.wolfsonmicro.com>
- <87zkbp4wtj.fsf@ti.com>
-Message-ID: <20120311204232.GC3171@opensource.wolfsonmicro.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 12 Mar 2012 19:58:56 +0800
+Subject: [PATCH v4 09/10] ASoC: fsl: let fsl_ssi work with imx pcm and machine
+ drivers
+In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
+References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1331553537-19789-10-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2012 at 07:29:28AM -0800, Kevin Hilman wrote:
-> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
+Makes necessary changes on fsl_ssi to let it work with imx pcm and
+machine drivers.
 
-> > Absolutely not, the for-next branch is rebuilt frequently especially
-> > since it includes stuff sent to Linus and he complained about bugfixes
-> > merged up into development code.  What is the actual dependency here?
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ sound/soc/fsl/fsl_ssi.c |   64 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 64 insertions(+), 0 deletions(-)
 
-> The stuff is in your topic/drivers branch.  Specifically:
-
-> ed5da2a mfd: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS
-> 77a3915 regulator: twl-regulator: Add fixed LDO for V1V8, V2V1 supply
-> d64214b regulator: twl: adapt twl-regulator driver to dt
-> 3e1ff1f regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators
-> 1a4a805 regulator: twl4030: add support for external voltage get/set
-
-Oh, ick.  That really is quite buried and probably depends on some of
-the earlier changes too.
-
-> > The topic branches are more or less static, though some more than
-> > others.
-
-> Is topic/drivers something stable?  If not, these are a ways back in
-> that branch, maybe you make a topic/drivers-stable for us?
-
-The branch itself is essentially stable but I'm not enthused about the
-idea of merging the whole thing via the OMAP tree.  However, as Linus
-has released an -rc7 I should pull some stuff out of there and send
-fixes to him so I've created a topic/twl so let's just rebase.
-
-> > In general you should warn people if you've got a dependency on their
-> > tree, it makes life easier.
-
-> Yeah, I should've raised this when the original series were posted.  The
-> arch stuff and drivers/regulator stuff were posted all together, but you
-> picked out the regulator stuff and I picked up the rest.  
-
-Actually IIRC by the time I applied this the ARM changes had been
-totally deteched from the regulator stuff - Tero was sending just the
-regulator patch by itself and I actually applied the patch it was part
-of a twl regulator series Rajendra put together after I got fed up with
-the number of people sending me incompatible changes without talking to
-each other.  I'd completely forgotten about any arch/arm stuff.
-
-This sort of issue is becoming far too common with the OMAP stuff, there
-needs to be a much greater awareness of the need to coordinate both
-between trees and with multiple people working on the same code.
-
-The following changes since commit dcd6c92267155e70a94b3927bce681ce74b80d1f:
-
-  Linux 3.3-rc1 (2012-01-19 15:04:48 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tags/topic/twl
-
-for you to fetch changes up to 46eda3e96a65b378041c79c51ff2e02009f7e2d0:
-
-  mfd: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS (2012-03-11 20:09:26 +0000)
-
-----------------------------------------------------------------
-TWL specific changes, cross-merged with OMAP due to arch/arm wanting to
-use the new ability to override the voltage set and get operations to
-support the in-CPU voltage management.  The other changes are minor
-fixes, the addition of a few new regulators and device tree support.
-
-----------------------------------------------------------------
-Laxman Dewangan (1):
-      regulator: twl6030: Fix voltage selection logic
-
-Peter Ujfalusi (2):
-      regulator: twl-regulator: Add fixed LDO for V1V8, V2V1 supply
-      mfd: twl-core: regulator configuration for twl6030 V1V8, V2V1 SMPS
-
-Rajendra Nayak (1):
-      regulator: twl: adapt twl-regulator driver to dt
-
-Tero Kristo (2):
-      regulator: twl4030: add support for external voltage get/set
-      regulator: twl6030: add support for vdd1, vdd2 and vdd3 regulators
-
- .../bindings/regulator/twl-regulator.txt           |   68 ++++
- drivers/mfd/twl-core.c                             |   41 +++-
- drivers/regulator/twl-regulator.c                  |  327 +++++++++++++++-----
- include/linux/i2c/twl.h                            |   14 +-
- 4 files changed, 366 insertions(+), 84 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120311/51f01c43/attachment-0001.sig>
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 0192c02..3cf23e5 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -28,6 +28,7 @@
+ #include <sound/soc.h>
+ 
+ #include "fsl_ssi.h"
++#include "imx-pcm.h"
+ 
+ #ifdef PPC
+ #define read_ssi(addr)			 in_be32(addr)
+@@ -116,6 +117,11 @@ struct fsl_ssi_private {
+ 	struct device_attribute dev_attr;
+ 	struct platform_device *pdev;
+ 
++	int ssi_on_imx;
++	struct platform_device *imx_pcm_pdev;
++	struct imx_pcm_dma_params dma_params_tx;
++	struct imx_pcm_dma_params dma_params_rx;
++
+ 	struct {
+ 		unsigned int rfrc;
+ 		unsigned int tfrc;
+@@ -413,6 +419,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		ssi_private->second_stream = substream;
+ 	}
+ 
++	if (ssi_private->ssi_on_imx)
++		snd_soc_dai_set_dma_data(dai, substream,
++			(substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ?
++				&ssi_private->dma_params_tx :
++				&ssi_private->dma_params_rx);
++
+ 	return 0;
+ }
+ 
+@@ -706,6 +718,35 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
+                 /* Older 8610 DTs didn't have the fifo-depth property */
+ 		ssi_private->fifo_depth = 8;
+ 
++	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx21-ssi")) {
++		u32 dma_events[2];
++		ssi_private->ssi_on_imx = 1;
++		/*
++		 * We have burstsize be "fifo_depth - 2" to match the SSI
++		 * watermark setting in fsl_ssi_startup().
++		 */
++		ssi_private->dma_params_tx.burstsize =
++			ssi_private->fifo_depth - 2;
++		ssi_private->dma_params_rx.burstsize =
++			ssi_private->fifo_depth - 2;
++		ssi_private->dma_params_tx.dma_addr =
++			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, stx0);
++		ssi_private->dma_params_rx.dma_addr =
++			ssi_private->ssi_phys + offsetof(struct ccsr_ssi, srx0);
++		/*
++		 * TODO: This is a temporary solution and should be changed
++		 * to use generic DMA binding later when the helplers get in.
++		 */
++		ret = of_property_read_u32_array(pdev->dev.of_node,
++					"fsl,ssi-dma-events", dma_events, 2);
++		if (ret) {
++			dev_err(&pdev->dev, "could not get dma events\n");
++			goto error_irq;
++		}
++		ssi_private->dma_params_tx.dma = dma_events[0];
++		ssi_private->dma_params_rx.dma = dma_events[1];
++	}
++
+ 	/* Initialize the the device_attribute structure */
+ 	dev_attr = &ssi_private->dev_attr;
+ 	sysfs_attr_init(&dev_attr->attr);
+@@ -729,6 +770,24 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
+ 		goto error_dev;
+ 	}
+ 
++	/*
++	 * In case of imx, the machine driver uses new binding which does
++	 * not require SSI driver to trigger machine driver's probe, but
++	 * the pcm device needs to be registered here.
++	 */
++	if (ssi_private->ssi_on_imx) {
++		ssi_private->imx_pcm_pdev =
++			platform_device_register_simple("imx-pcm-audio",
++							-1, NULL, 0);
++		if (IS_ERR(ssi_private->imx_pcm_pdev)) {
++			ret = PTR_ERR(ssi_private->imx_pcm_pdev);
++			goto error_dev;
++		} else {
++			/* success for imx */
++			return 0;
++		}
++	}
++
+ 	/* Trigger the machine driver's probe function.  The platform driver
+ 	 * name of the machine driver is taken from /compatible property of the
+ 	 * device tree.  We also pass the address of the CPU DAI driver
+@@ -754,6 +813,8 @@ static int __devinit fsl_ssi_probe(struct platform_device *pdev)
+ 
+ error_dai:
+ 	snd_soc_unregister_dai(&pdev->dev);
++	if (ssi_private->ssi_on_imx)
++		platform_device_unregister(ssi_private->imx_pcm_pdev);
+ 
+ error_dev:
+ 	dev_set_drvdata(&pdev->dev, NULL);
+@@ -780,6 +841,8 @@ static int fsl_ssi_remove(struct platform_device *pdev)
+ 
+ 	platform_device_unregister(ssi_private->pdev);
+ 	snd_soc_unregister_dai(&pdev->dev);
++	if (ssi_private->ssi_on_imx)
++		platform_device_unregister(ssi_private->imx_pcm_pdev);
+ 	device_remove_file(&pdev->dev, &ssi_private->dev_attr);
+ 
+ 	free_irq(ssi_private->irq, ssi_private);
+@@ -793,6 +856,7 @@ static int fsl_ssi_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id fsl_ssi_ids[] = {
+ 	{ .compatible = "fsl,mpc8610-ssi", },
++	{ .compatible = "fsl,imx21-ssi", },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, fsl_ssi_ids);
+-- 
+1.7.5.4
