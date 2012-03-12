@@ -1,80 +1,68 @@
-From: alan@signal11.us (Alan Ott)
-Date: Sat, 10 Mar 2012 13:44:55 -0500
-Subject: [PATCH 2/2] ARM: at91: Use proper __iomem annotations
-In-Reply-To: <1331405049-3186-1-git-send-email-alan@signal11.us>
-References: <1331405049-3186-1-git-send-email-alan@signal11.us>
-Message-ID: <1331405095-3299-1-git-send-email-alan@signal11.us>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 12 Mar 2012 15:17:05 +0100
+Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120312120610.GA14020@sirena.org.uk>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
+ <4F59253D.7070100@wwwdotorg.org>
+ <20120312120610.GA14020@sirena.org.uk>
+Message-ID: <20120312141705.GA16395@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+* Mark Brown wrote:
+> On Thu, Mar 08, 2012 at 02:31:41PM -0700, Stephen Warren wrote:
+> > On 03/08/2012 07:51 AM, Thierry Reding wrote:
+> 
+> > > +- vdd-supply: power supply for controller (1.05V)
+> 
+> > Should those *-supply properties really be optional? I got the
+> > impression talking to Mark in a different thread that all regulators
+> > should exist, although their implementation may be via a fixed
+> > regulator, with no GPIO, as determined by the board design.
+> 
+> Depends on the electronics, if the device can function without a supply
+> then it is OK for it to be optional.  This is moderately unusual but not
+> unknown.  It's obviously also OK to omit the supply if the system
+> doesn't use software regulators at all, though a kernel with regulator
+> support enabled would need to use dummy regulators to stub things out.
 
-MMIO addresses should be of type 'void __iomem *', not integer,
-in order to make the build-time type system of the kernel work.
+The PCIe controller actually needs those supplies and won't work without
+them. However on TrimSlice both of these supplies seem to be hardwired and
+always on. At least that's what I deduce from the code because there is no
+code that enables either the 1.05V or the pex-clk supplies.
 
-This changes some of the locations in the at91 platform that
-I noticed, but there may be more, since I have not yet built
-every configuration.
+My understanding of the fixed regulator was that it was meant to be used for
+fixed voltage supplies that can still be enabled or disabled (for example as
+supplied by a GPIO) but not regulators that are fix in the sense that they
+cannot be enabled or disabled at all but are always on.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Alan Ott <alan@signal11.us>
----
- arch/arm/mach-at91/at91rm9200.c            |    2 +-
- arch/arm/mach-at91/include/mach/hardware.h |    4 ++++
- arch/arm/mach-at91/setup.c                 |    4 ++--
- 3 files changed, 7 insertions(+), 3 deletions(-)
+Then again, the fixed regulator binding says that the gpio property is
+optional, so perhaps doing something like the following will work:
 
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 99c3174..239b657 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -27,7 +27,7 @@
- 
- static struct map_desc at91rm9200_io_desc[] __initdata = {
- 	{
--		.virtual	= AT91_VA_BASE_EMAC,
-+		.virtual	= (unsigned long)AT91_VA_BASE_EMAC,
- 		.pfn		= __phys_to_pfn(AT91RM9200_BASE_EMAC),
- 		.length		= SZ_16K,
- 		.type		= MT_DEVICE,
-diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-index 2d0e4e9..91375e2 100644
---- a/arch/arm/mach-at91/include/mach/hardware.h
-+++ b/arch/arm/mach-at91/include/mach/hardware.h
-@@ -75,8 +75,12 @@
-  * to 0xFEF78000 .. 0xFF000000.  (544Kb)
-  */
- #define AT91_IO_PHYS_BASE	0xFFF78000
-+#ifdef __ASSEMBLER__
- #define AT91_IO_VIRT_BASE	(0xFF000000 - AT91_IO_SIZE)
- #else
-+#define AT91_IO_VIRT_BASE	(void __iomem *)(0xFF000000 - AT91_IO_SIZE)
-+#endif
-+#else
- /*
-  * Identity mapping for the non MMU case.
-  */
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 69d3fc4..809da35 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -57,7 +57,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
- {
- 	struct map_desc *desc = &sram_desc[bank];
- 
--	desc->virtual = AT91_IO_VIRT_BASE - length;
-+	desc->virtual = (unsigned long)AT91_IO_VIRT_BASE - length;
- 	if (bank > 0)
- 		desc->virtual -= sram_desc[bank - 1].length;
- 
-@@ -72,7 +72,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
- }
- 
- static struct map_desc at91_io_desc __initdata = {
--	.virtual	= AT91_VA_BASE_SYS,
-+	.virtual	= (unsigned long)AT91_VA_BASE_SYS,
- 	.pfn		= __phys_to_pfn(AT91_BASE_SYS),
- 	.length		= SZ_16K,
- 	.type		= MT_DEVICE,
--- 
-1.7.0.4
+	pex_clk_reg: fixedregulator at 0 {
+		compatible = "regulator-fixed";
+		regulator-name = "PCIE CLK";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+
+	pcie_reg: fixedregulator at 1 {
+		compatible = "regulator-fixed";
+		regulator-name = "PCIE VDD";
+		regulator-min-microvolt = <1050000>;
+		regulator-max-microvolt = <1050000>;
+		regulator-always-on;
+	};
+
+Is that how it is supposed to work?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/4da42232/attachment-0001.sig>
