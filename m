@@ -1,78 +1,168 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 12 Mar 2012 11:30:05 -0600
-Subject: [PATCH 4/8] ARM: OMAP1: Move 16xx GPIO system clock to platform
- init code
-In-Reply-To: <20120221234042.18709.57610.stgit@kaulin.local>
-References: <20120221233619.18709.87982.stgit@kaulin.local>
- <20120221234042.18709.57610.stgit@kaulin.local>
-Message-ID: <20120312173005.A11093E07B0@localhost>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 12 Mar 2012 10:39:28 +0000
+Subject: [PATCH 1/3] ARM: OMAP2+: 32k-counter: Use hwmod lookup to check
+ presence of 32k timer
+In-Reply-To: <20120312101757.GH5375@legolas.emea.dhcp.ti.com>
+References: <1326983304-14619-1-git-send-email-hvaibhav@ti.com>
+ <1326983304-14619-2-git-send-email-hvaibhav@ti.com>
+ <20120305225530.GJ12083@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83180F73D@DBDE01.ent.ti.com>
+ <20120312093921.GA5375@legolas.emea.dhcp.ti.com>
+ <79CD15C6BA57404B839C016229A409A831810E32@DBDE01.ent.ti.com>
+ <20120312101757.GH5375@legolas.emea.dhcp.ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A831810FE1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Feb 2012 15:40:42 -0800, Tony Lindgren <tony@atomide.com> wrote:
-> This way we can remove omap_read/write call from the GPIO driver
-> and remove include to linux/io.h.
+On Mon, Mar 12, 2012 at 15:47:58, Balbi, Felipe wrote:
+> Hi,
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-Who will be picking up this series?  How intertwined is it with your tree Tony?
-
-g.
-
-> ---
->  arch/arm/mach-omap1/gpio16xx.c |    7 +++++++
->  drivers/gpio/gpio-omap.c       |    8 --------
->  2 files changed, 7 insertions(+), 8 deletions(-)
+> On Mon, Mar 12, 2012 at 09:48:20AM +0000, Hiremath, Vaibhav wrote:
+> > On Mon, Mar 12, 2012 at 15:09:24, Balbi, Felipe wrote:
+> > > On Fri, Mar 09, 2012 at 05:58:00PM +0000, Hiremath, Vaibhav wrote:
+> > > > On Tue, Mar 06, 2012 at 04:25:30, Tony Lindgren wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > * Vaibhav Hiremath <hvaibhav@ti.com> [120119 06:01]:
+> > > > > > OMAP device has 32k-sync timer which is currently used as a
+> > > > > > clocksource in the kernel (omap2plus_defconfig).
+> > > > > > The current implementation uses compile time selection between
+> > > > > > gp-timer and 32k-sync timer, which breaks multi-omap build for
+> > > > > > the devices like AM33xx, where 32k-sync timer is not available.
+> > > > > > 
+> > > > > > So use hwmod database lookup mechanism, through which at run-time
+> > > > > > we can identify availability of 32k-sync timer on the device,
+> > > > > > else fall back to gp-timer.
+> > > > > ...
+> > > > > 
+> > > > > > --- a/arch/arm/plat-omap/counter_32k.c
+> > > > > > +++ b/arch/arm/plat-omap/counter_32k.c
+> > > > > > @@ -69,52 +69,55 @@ void read_persistent_clock(struct timespec *ts)
+> > > > > >  
+> > > > > >  int __init omap_init_clocksource_32k(void)
+> > > > > >  {
+> > > > > > -	static char err[] __initdata = KERN_ERR
+> > > > > > -			"%s: can't register clocksource!\n";
+> > > > > > -
+> > > > > > -	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
+> > > > > > -		u32 pbase;
+> > > > > > -		unsigned long size = SZ_4K;
+> > > > > > -		void __iomem *base;
+> > > > > > -		struct clk *sync_32k_ick;
+> > > > > > -
+> > > > > > -		if (cpu_is_omap16xx()) {
+> > > > > > -			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
+> > > > > > -			size = SZ_1K;
+> > > > > > -		} else if (cpu_is_omap2420())
+> > > > > > -			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
+> > > > > > -		else if (cpu_is_omap2430())
+> > > > > > -			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
+> > > > > > -		else if (cpu_is_omap34xx())
+> > > > > > -			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
+> > > > > > -		else if (cpu_is_omap44xx())
+> > > > > > -			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
+> > > > > > -		else
+> > > > > > +	u32 pbase;
+> > > > > > +	unsigned long size = SZ_4K;
+> > > > > > +	void __iomem *base;
+> > > > > > +	struct clk *sync_32k_ick;
+> > > > > > +
+> > > > > > +	if (cpu_is_omap16xx()) {
+> > > > > > +		pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
+> > > > > > +		size = SZ_1K;
+> > > > > > +	} else if (cpu_class_is_omap2()) {
+> > > > > > +		struct omap_hwmod *oh;
+> > > > > > +		const char *oh_name = "counter_32k";
+> > > > > > +
+> > > > > > +		oh = omap_hwmod_lookup(oh_name);
+> > > > > > +		if (!oh || oh->slaves_cnt == 0) {
+> > > > > > +			pr_err("Could not lookup %s hwmod\n", oh_name);
+> > > > > >  			return -ENODEV;
+> > > > > > +		}
+> > > > > > +		pbase = oh->slaves[0]->addr->pa_start + 0x10;
+> > > > > > +	} else {
+> > > > > > +		return -ENODEV;
+> > > > > > +	}
+> > > > > 
+> > > > > How about have separate omap1 and omap2+ init functions that
+> > > > > call a common function and passes the pbase as a parameter?
+> > > > > 
+> > > > > That way we can get rid of the cpu_is_omapxxxx tests here.
+> > > > > 
+> > > > 
+> > > > Tony,
+> > > > 
+> > > > In the morning, I replied very soon, without much thinking...
+> > > > 
+> > > > Just now I started working on the patch, I was just reviewing the code, 
+> > > > and I felt that, it is unnecessary to split the code between omap1 and 
+> > > > omap2+.
+> > > > 
+> > > > The reason is,
+> > > > 
+> > > > Currently Only OMAP16xx base-address is hardcoded with
+> > > > cpu_is_omap16xx() macro, For all other omap family of devices the
+> > > > complete information is fetched from HWDMO api's/data.
+> > > 
+> > > In that case, why don't you create the platform_device by hand on
+> > > arch/arm/mach-omap1/devices.c and move the omap2+ (which is based on
+> > > hwmod) to arch/arm/mach-omap2/devices.c ?
+> > > 
+> > 
+> > Balbi,
+> > 
+> > 32k_counter code is not a platform_device/driver, we don't build the 
+> > any device here. We only need hwmod data to fetch the basic information like, 
+> > base-address, size, etc...
+> > 
+> > And I am note sure whether we really intend to make it 
+> > platform_device/driver thing.
 > 
-> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-> index 0f399bd..99cabc4 100644
-> --- a/arch/arm/mach-omap1/gpio16xx.c
-> +++ b/arch/arm/mach-omap1/gpio16xx.c
-> @@ -218,6 +218,13 @@ static int __init omap16xx_gpio_init(void)
->  	if (!cpu_is_omap16xx())
->  		return -EINVAL;
->  
-> +	/*
-> +	 * Enable system clock for GPIO module.
-> +	 * The CAM_CLK_CTRL *is* really the right place.
-> +	 */
-> +	omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
-> +					ULPD_CAM_CLK_CTRL);
-> +
->  	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
->  		platform_device_register(omap16xx_gpio_dev[i]);
->  
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 0b05629..1078a14 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -18,7 +18,6 @@
->  #include <linux/syscore_ops.h>
->  #include <linux/err.h>
->  #include <linux/clk.h>
-> -#include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/pm_runtime.h>
->  
-> @@ -1064,13 +1063,6 @@ static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
->  						+ OMAP1610_GPIO_IRQSTATUS1);
->  			__raw_writew(0x0014, bank->base
->  						+ OMAP1610_GPIO_SYSCONFIG);
-> -
-> -			/*
-> -			 * Enable system clock for GPIO module.
-> -			 * The CAM_CLK_CTRL *is* really the right place.
-> -			 */
-> -			omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
-> -						ULPD_CAM_CLK_CTRL);
->  		}
->  		if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
->  			__raw_writel(0xffffffff, bank->base
+> that's kinda weird... 
+
+Balbi,
+
+Its not that weird, I think its because, this code is used as system 
+clocksource.
+
+> anyway, you can also pass base as argument to
+> omap_init_clocksource_32k()... dunno.
 > 
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies,Ltd.
+That's the whole point, just for one platform (omap16xx), we are changing the code. Rest all other platforms are using hwmod data, which is I believe 
+is clean interface as of now.
+
+To be more specific, we have to choose between something like -
+
+"arch/arm/mach-omap1/timer32k.c"
+bool __init omap_32k_timer_init(void) {
+	omap_init_clocksource_32k(OMAP16XX_TIMER_32K_SYNCHRONIZED, SZ_1K);
+	...
+}
+"arch/arm/mach-omap2/timer.c"
+
+static void __init omap2_gp_clocksource_init(int gptimer_id,
+                                                 const char *fck_source)
+{
+	/* Parse the hwmod data here*/
+	Base = oh->slaves[0]->addr->pa_start + 0x10;
+	Size = oh->slaves[0]->addr->pa_end - oh->slaves[0]->addr->pa_start;
+	res = omap_init_clocksource_32k(base, size);
+	if (!res)
+		return;
+
+	/* Fall back to gptimer */
+}
+
+
+OR
+
+My current patch, which actually add cpu_is_16xx() check at one place and
+does everything.
+
+
+Thanks,
+Vaibhav
+> -- 
+> balbi
+> 
