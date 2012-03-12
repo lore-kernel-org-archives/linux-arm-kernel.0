@@ -1,29 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 9 Mar 2012 09:55:18 -0700 (MST)
-Subject: [PATCH 5/9] ARM: OMAP36xx: hwmod data: fix SmartReflex interface
- data
-In-Reply-To: <CAORVsuV8YXNRF=UjBOd8hoYbJ+ksg6RT1dZYC=TuUTmLiuD+ow@mail.gmail.com>
-References: <20120228110943.808.73639.stgit@dusk>
- <20120228111054.808.16941.stgit@dusk>
- <alpine.DEB.2.00.1203082051150.26656@utopia.booyaka.com>
- <CAORVsuV8YXNRF=UjBOd8hoYbJ+ksg6RT1dZYC=TuUTmLiuD+ow@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1203090949130.17504@utopia.booyaka.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 12 Mar 2012 14:32:11 +0000
+Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120312142857.GA6694@avionic-0098.mockup.avionic-design.de>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
+ <4F59253D.7070100@wwwdotorg.org>
+ <20120312120610.GA14020@sirena.org.uk>
+ <20120312141705.GA16395@avionic-0098.mockup.avionic-design.de>
+ <20120312142340.GI3110@opensource.wolfsonmicro.com>
+ <20120312142857.GA6694@avionic-0098.mockup.avionic-design.de>
+Message-ID: <20120312143210.GJ3110@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon, Mar 12, 2012 at 03:28:58PM +0100, Thierry Reding wrote:
 
-On Fri, 9 Mar 2012, Jean Pihet wrote:
+> In that case I'll mark the *-supply properties required. Would it be a good
+> idea to mention this (or even give an example with fixed regulators) in the
+> binding documentation or can I assume this to be common knowledge?
 
-> On Fri, Mar 9, 2012 at 4:51 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> >
-> > Dropping this patch from this series due to conflicts with the SmartReflex
-> > branch. ?It will be moved to a subsequent series.
-> I can take this change as part of the series I am preparing for the SR
-> conversion to drivers/.
-> What do you thin?
-
-I've already included it as part of another pull request...
-
-
-- Paul
+Probably the best thing here is to just reference the regulator binding
+documentation which mentions -supply properties (or should do) and then
+clarify that if need be.  No sense in putting things like this into the
+binding document for a specific driver, there's nothing driver specific.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/a5a8b0cf/attachment-0001.sig>
