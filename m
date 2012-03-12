@@ -1,48 +1,63 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 12 Mar 2012 04:15:08 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP3+: PRM/hwmod: fix and improve I/O chain wakeup
- support
-Message-ID: <alpine.DEB.2.00.1203120413530.11332@utopia.booyaka.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 12 Mar 2012 10:27:16 -0400
+Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
+In-Reply-To: <op.wa197mq94cuzmg@gonzo.lentin.co.uk>
+References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
+ <1331476406-9844-2-git-send-email-jm@lentin.co.uk>
+ <20120312030232.GX5050@titan.lakedaemon.net>
+ <201203120817.19777.arnd@arndb.de>
+ <op.wa197mq94cuzmg@gonzo.lentin.co.uk>
+Message-ID: <20120312142716.GA5050@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+On Mon, Mar 12, 2012 at 02:22:24PM -0000, Jamie Lentin wrote:
+> On Mon, 12 Mar 2012 08:17:19 -0000, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> >On Monday 12 March 2012, Jason Cooper wrote:
+> >>> +     dnskw_gpio_register(39, "dnskw:power:sata0", 1);
+> >>> +     dnskw_gpio_register(40, "dnskw:power:sata1", 1);
+> >>> +
+> >>> +     /* Set NAS to turn back on after a power failure */
+> >>> +     dnskw_gpio_register(37, "dnskw:power:recover", 1);
+> >>> +}
+> >>> +
+> >>
+> >>I doubt this board is the only one that wants to be added while the
+> >>conversion to devicetree is progressing.  It makes more sense to me to
+> >>break the above out to a separate file, eg board-dnskw.c.  I'll follow
+> >>and break out the dreamplug code to board-dreamplug.c.  Otherwise, I see
+> >>board-dt.c becoming a long mess.
+> >>
+> >>Arnd, sound okay to you?
+> >
+> >Either way is fine with me. I personally wouldn't expect many more boards
+> >to come in before the DT conversion has mostly completed, but I guess you
+> >have a better feeling for what other hardware is out there that people
+> >are interested in.
+> >
+> 
+> It probably depends on how easy it is to add the gpiochips into
+> devicetree. Being able to put the LED, buttons and fans in
+> devicetree would make board-dt.c much more manageable. I started to
+> look into it and wasn't immediately obvious, but will have a closer
+> look.
+> 
+> Happy to resubmit, breaking it out into a board-dnskw.c though.
 
-The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
+Yeah, let's go ahead and do that.  pinmux and the above are going to take
+a while to sort out.  In the mean time, there's:
 
-  Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
+sheevaplug
+guruplug
+guruplug-serverplus
+Lacie-*
+Seagate-*
+rd-boards-*
 
-are available in the git repository at:
+just to name a few.  Plus it'll give me something to do while we wait
+for pinmux/common clock to land.
 
-  git://git.pwsan.com/linux-2.6 io_chain_devel_3.4
+thx,
 
-for you to fetch changes up to efd360a8902101148f4fc6325097b94ae1fbb451:
-
-  ARM: OMAP3: PM: Remove IO Daisychain control from cpuidle (2012-03-12 04:11:48 -0600)
-
-
-- Paul
-
-----------------------------------------------------------------
-Mohan V (1):
-      ARM: OMAP3: PM: correct enable/disable of daisy io chain
-
-Rajendra Nayak (1):
-      ARM: OMAP4: PRM: Add IO Daisychain support
-
-Tero Kristo (1):
-      ARM: OMAP3+: PRM: Enable IO wake up
-
-Vishwanath BS (3):
-      ARM: OMAP3: PM: Move IO Daisychain function to omap3 prm file
-      ARM: OMAP3PLUS: hwmod: reconfigure IO Daisychain during hwmod mux
-      ARM: OMAP3: PM: Remove IO Daisychain control from cpuidle
-
- arch/arm/mach-omap2/omap_hwmod.c   |   37 +++++++++++++++++++++-
- arch/arm/mach-omap2/pm34xx.c       |   44 --------------------------
- arch/arm/mach-omap2/prcm-common.h  |    8 +++++
- arch/arm/mach-omap2/prm2xxx_3xxx.c |   51 ++++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/prm2xxx_3xxx.h |    2 +
- arch/arm/mach-omap2/prm44xx.c      |   60 +++++++++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/prm44xx.h      |    2 +
- 7 files changed, 156 insertions(+), 48 deletions(-)
+Jason.
