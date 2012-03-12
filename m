@@ -1,48 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Mar 2012 11:48:36 +0100
-Subject: [PATCH] serial: PL011: clear pending interrupts
-In-Reply-To: <20120312101100.GA8649@n2100.arm.linux.org.uk>
-References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
- <20120312083221.GW17370@n2100.arm.linux.org.uk>
- <20120312101100.GA8649@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdbsa6HW63vN7CeKNpgLZokB+S6GEaU27CiaVsbvo5qA-g@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 12 Mar 2012 10:13:45 +0000
+Subject: [PATCH] ARM: OMAP2+: hwmod: Add new sysc_type3 into omap_hwmod
+ required for am33xx
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D12143317A918A@DBDE01.ent.ti.com>
+References: <1329481488-27771-1-git-send-email-hvaibhav@ti.com>
+ <4F3E545F.8070802@ti.com>
+ <B5906170F1614E41A8A28DE3B8D12143317A918A@DBDE01.ent.ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A831810F02@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 11:11 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Tue, Feb 21, 2012 at 10:49:47, Bedia, Vaibhav wrote:
+> Hi Benoit,
+> 
+> On Fri, Feb 17, 2012 at 18:51:35, Cousson, Benoit wrote:
+> > Hi Vaibhav,
+> > 
+> > On 2/17/2012 1:24 PM, Vaibhav Hiremath wrote:
+> > > In case of AM33xx family of devices (like cpsw) have different sysc
+> > > bit field offsets defined,
+> > 
+> > It is really used by several IPs, or it is just an unique exception?
+> > 
+> > For an exception, you can just define the omap_hwmod_sysc_fields for 
+> > that IP.
+> > This is what SmartReflex is using for example.
+> > 
+> 
+> I haven't really check TI81xx code but we might need to share these SYSC types
+> with a few IPs in that family also. How can the sharing of the sysc data be handled?
+> 
 
->> > + ? /* RXIS but RXFE? Just clear the interrupt */
->> > + ? if(unlikely(fifotaken == 0))
->> > + ? ? ? ? ? writew(UART011_RTIS | UART011_RXIS,
->> > + ? ? ? ? ? ? ? ? ?uap->port.membase + UART011_ICR);
->
-> BTW, I don't see why we need any of this stuff.
->
-> The problem as described is that the interrupt handler is called with one
-> of the receive flags set (UART011_RTIS or UART011_RXIS) but with
-> UART01x_FR_RXFE clear.
->
-> The problem report indicates that this is caused when we switch from FIFO
-> mode to non-FIFO mode, and the FIFO contained some unread characters.
->
-> That can only happen once we've enabled interrupts in the IMSC register,
-> which doesn't happen until later in the startup function.
->
-> So:
->
-> ? ? ? ?spin_lock_irq(&uap->port.lock);
-> ? ? ? ?uap->im = UART011_RTIM;
-> ? ? ? ?if (!pl011_dma_rx_running(uap))
-> ? ? ? ? ? ? ? ?uap->im |= UART011_RXIM;
-> ? ? ? ?writew(uap->im, uap->port.membase + UART011_IMSC);
-> ? ? ? ?spin_unlock_irq(&uap->port.lock);
->
-> clearing the transmit/receive interrupts here _before_ we unmask them
-> should be sufficient.
+Benoit,
 
-Right! OK I'll cook a v2 patch according to this suggestion and
-request Chanho to test it.
+Any comments on this patch? 
 
-Yours,
-Linus Walleij
+Thanks,
+Vaibhav
+
+> Regards,
+> Vaibhav B.
+> 
