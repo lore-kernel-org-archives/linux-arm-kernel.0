@@ -1,106 +1,142 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 12 Mar 2012 10:35:03 -0600
-Subject: [PATCH] gpio/mxs: support irqs triggered by both edges
-In-Reply-To: <1329745925-7868-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
-References: <1329745925-7868-1-git-send-email-enrico.scholz@sigma-chemnitz.de>
-Message-ID: <20120312163503.AEBC73E07B0@localhost>
+From: joancarles@fqingenieria.es (joancarles)
+Date: Mon, 12 Mar 2012 14:12:02 +0100
+Subject: [MX25][MMC] mmc esdhc failure in 3.3-rc5 (still present in rc7)
+In-Reply-To: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
+References: <5e57eb999780335721212bb8d411406f@mail.fqingenieria.es>
+Message-ID: <49e17e1a8ded2e38805a5caebae62abc@mail.fqingenieria.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Feb 2012 14:52:05 +0100, Enrico Scholz <enrico.scholz@sigma-chemnitz.de> wrote:
-> iMX28 silicon does not support irqs triggered by both gpio edges. Patch
-> emulates this behavior by configuring such irqs as level triggered and
-> by switching polarity in the interrupt handler.
-> 
-> Signed-off-by: Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
+Hi
 
-That looks dodgy and hacky.  This will definitely miss interrupts if they
-come in too fast.  I don't like this approach.  What do you need it for?
+On Tue, 06 Mar 2012 11:29:50 +0000, joancarles wrote:
+> Hi
+>
+> I have the following error when trying to access the SD-card on my 
+> MX25
+> device:
+>
+> root at mx25-noah:~$> mount /media/card/
+> root at mx25-noah:~$> df -kh /media/card
+> Filesystem                Size      Used Available Use% Mounted on
+> /dev/mmcblk0p1          123.6M      2.7M    120.9M   2% /media/card
+> root at mx25-noah:~$> touch /media/card/file
+> [   82.982920] mmcblk0: error -110 transferring data, sector 559, nr 
+> 1,
+> cmd response 0x900, card status 0x0
+> [   82.993544] end_request: I/O error, dev mmcblk0, sector 559
+> [   82.999169] Buffer I/O error on device mmcblk0p1, logical block 
+> 497
+> [   83.005458] lost page write due to I/O error on mmcblk0p1
+> [   83.013922] mmcblk0: error -84 transferring data, sector 559, nr 
+> 1, cmd
+> response 0x900, card status 0x0
+> [   83.024114] end_request: I/O error, dev mmcblk0, sector 559
+> [   83.029965] FAT-fs (mmcblk0p1): Directory bread(block 497) failed
+> [   83.038051] mmcblk0: error -84 transferring data, sector 560, nr 
+> 1, cmd
+> response 0x900, card status 0x0
+> [   83.048579] end_request: I/O error, dev mmcblk0, sector 560
+> [   83.054205] Buffer I/O error on device mmcblk0p1, logical block 
+> 498
+> [   83.060494] lost page write due to I/O error on mmcblk0p1
+> touch: /media/card/file: Input/output error
+>
+> I have compiled the kernel 3.3-rc5 with driver core debug support and 
+> I
+> get the following information:
+>
+> root at mx25-noah:~$> dmesg | grep -i mmc
+> [    0.228098] bus: 'mmc': registered
+> [    0.228139] device class 'mmc_host': registering
+> [    1.405180] bus: 'mmc': add driver mmcblk
+> [    1.429969] device: 'mmc0::': device_add
+> [    1.430249] PM: Adding info for No Bus:mmc0::
+> [    1.430837] Registered led device: mmc0::
+> [    1.430884] device: 'mmc0': device_add
+> [    1.431114] PM: Adding info for No Bus:mmc0
+> [    1.432953] mmc0: SDHCI controller on sdhci-esdhc-imx25.0
+> [sdhci-esdhc-imx25.0] using DMA
+> [    1.771322] mmc0: host does not support reading read-only switch.
+> assuming write-enable.
+> [    1.798584] mmc0: new high speed SD card at address 0002
+> [    1.804018] device: 'mmc0:0002': device_add
+> [    1.804283] bus: 'mmc': add device mmc0:0002
+> [    1.804445] PM: Adding info for mmc:mmc0:0002
+> [    1.815198] bus: 'mmc': driver_probe_device: matched device 
+> mmc0:0002
+> with driver mmcblk
+> [    1.815256] bus: 'mmc': really_probe: probing driver mmcblk with 
+> device
+> mmc0:0002
+> [    1.825154] mmcblk0: mmc0:0002 00000 1.86 GiB
+> [    1.835076] device: 'mmcblk0': device_add
+> [    1.835680] PM: Adding info for No Bus:mmcblk0
+> [    1.849286]  mmcblk0: p1 p2
+> [    1.852252] device: 'mmcblk0p1': device_add
+> [    1.855232] PM: Adding info for No Bus:mmcblk0p1
+> [    1.855371] device: 'mmcblk0p2': device_add
+> [    1.855874] PM: Adding info for No Bus:mmcblk0p2
+> [    1.866667] driver: 'mmc0:0002': driver_bound: bound to device 
+> 'mmcblk'
+> [    1.866720] bus: 'mmc': really_probe: bound device mmc0:0002 to 
+> driver
+> mmcblk
+> [   82.982920] mmcblk0: error -110 transferring data, sector 559, nr 
+> 1,
+> cmd response 0x900, card status 0x0
+> [   82.993544] end_request: I/O error, dev mmcblk0, sector 559
+> [   82.999169] Buffer I/O error on device mmcblk0p1, logical block 
+> 497
+> [   83.005458] lost page write due to I/O error on mmcblk0p1
+> [   83.013922] mmcblk0: error -84 transferring data, sector 559, nr 
+> 1, cmd
+> response 0x900, card status 0x0
+> [   83.024114] end_request: I/O error, dev mmcblk0, sector 559
+> [   83.029965] FAT-fs (mmcblk0p1): Directory bread(block 497) failed
+> [   83.038051] mmcblk0: error -84 transferring data, sector 560, nr 
+> 1, cmd
+> response 0x900, card status 0x0
+> [   83.048579] end_request: I/O error, dev mmcblk0, sector 560
+> [   83.054205] Buffer I/O error on device mmcblk0p1, logical block 
+> 498
+> [   83.060494] lost page write due to I/O error on mmcblk0p1
+>
+> The same device booted into a 2.6.39.3 kernel works just fine. The
+> initialization of the esdhc driver in the device section is as 
+> follows:
+>
+> imx25_add_sdhci_esdhc_imx(0, NULL);
+>
+> Changing it to a pdata init as shown below does not change anything 
+> with
+> regard to the failure:
+>
+> imx25_add_sdhci_esdhc_imx(0, &noah_esdhc_pdata);
+> static const struct esdhc_platform_data noah_esdhc_pdata __initconst 
+> = {
+>         .wp_gpio = -EINVAL,
+>         .cd_gpio = -EINVAL,
+>         .wp_type = ESDHC_WP_NONE,
+>         .cd_type = ESDHC_CD_NONE,
+> };
+>
+> What could have changed between 2.6.39.3 and 3.3-rc5 to trigger this
+> behaviour? A quick look at
+>
+> git diff v2.6.39 drivers/mmc/host/sdhci-esdhc-imx.c
+>
+> only confuses me with regard to this issue.
+>
+> Regards
 
-g.
+This is still present in 3.3-rc7. Anyone? Where could I start debugging 
+this? The same device works just fine with the 2.6.39.3 kernel based 
+sdhci driver (drivers/mmc/host/sdhci-esdhc-imx.c). Unfortunately, due to 
+out-of-tree device support for a custom i.MX25 board that I have started 
+with a fresh 3.3-rc2 git tree, I cannot bisect the tree down to 2.6.39, 
+or at least I don't know how.
 
-> ---
->  drivers/gpio/gpio-mxs.c |   31 +++++++++++++++++++++++++++++--
->  1 files changed, 29 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-> index 385c58e..ab973be 100644
-> --- a/drivers/gpio/gpio-mxs.c
-> +++ b/drivers/gpio/gpio-mxs.c
-> @@ -57,6 +57,7 @@ struct mxs_gpio_port {
->  	int id;
->  	int irq;
->  	int virtual_irq_start;
-> +	unsigned long both_edge;
->  	struct bgpio_chip bgc;
->  };
->  
-> @@ -68,9 +69,12 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
->  	u32 pin_mask = 1 << (gpio & 31);
->  	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
->  	struct mxs_gpio_port *port = gc->private;
-> +	int lvl;
->  	void __iomem *pin_addr;
->  	int edge;
->  
-> +	clear_bit(gpio & 31, &port->both_edge);
-> +
->  	switch (type) {
->  	case IRQ_TYPE_EDGE_RISING:
->  		edge = GPIO_INT_RISE_EDGE;
-> @@ -84,6 +88,14 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
->  	case IRQ_TYPE_LEVEL_HIGH:
->  		edge = GPIO_INT_HIGH_LEV;
->  		break;
-> +	case IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING:
-> +		/* mx28 does not support triggering irq by both edges; emulate
-> +		 * behavior by configuring irq as level triggered and update
-> +		 * irq polarity in the irq handler */
-> +		set_bit(gpio & 31, &port->both_edge);
-> +		lvl  = readl(port->base + PINCTRL_DIN(port->id));
-> +		edge = (lvl & pin_mask) ? GPIO_INT_LOW_LEV : GPIO_INT_HIGH_LEV;
-> +		break;
->  	default:
->  		return -EINVAL;
->  	}
-> @@ -114,11 +126,26 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
->  	u32 irq_stat;
->  	struct mxs_gpio_port *port = irq_get_handler_data(irq);
->  	u32 gpio_irq_no_base = port->virtual_irq_start;
-> +	void __iomem *base = port->base;
-> +	u32 pol_msk;
->  
->  	desc->irq_data.chip->irq_ack(&desc->irq_data);
->  
-> -	irq_stat = readl(port->base + PINCTRL_IRQSTAT(port->id)) &
-> -			readl(port->base + PINCTRL_IRQEN(port->id));
-> +	irq_stat = readl(base + PINCTRL_IRQSTAT(port->id)) &
-> +			readl(base + PINCTRL_IRQEN(port->id));
-> +
-> +	/* handle irqs triggered by both edges */
-> +	pol_msk = irq_stat & port->both_edge;
-> +	if (pol_msk) {
-> +		void __iomem *reg = base + PINCTRL_IRQPOL(port->id);
-> +		u32 port_lvl = readl(base + PINCTRL_DIN(port->id));
-> +
-> +		/* \todo write into the TOGGLE register (without reading port
-> +		 * level register); this requires a special unmask operation
-> +		 * which updates the IRQPOL register */
-> +		writel(pol_msk & port_lvl, reg + MXS_CLR);
-> +		writel(pol_msk & ~port_lvl, reg + MXS_SET);
-> +	}
->  
->  	while (irq_stat != 0) {
->  		int irqoffset = fls(irq_stat) - 1;
-> -- 
-> 1.7.7.6
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+Best regards
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies,Ltd.
+Joan C. Abelaira
