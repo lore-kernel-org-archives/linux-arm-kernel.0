@@ -1,276 +1,357 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Mar 2012 19:58:57 +0800
-Subject: [PATCH v4 10/10] ASoC: fsl: add imx-sgtl5000 machine driver
-In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1331553537-19789-11-git-send-email-shawn.guo@linaro.org>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Mon, 12 Mar 2012 12:18:52 +0100
+Subject: [PATCH] dmaengine: i.MX: Add support for interleaved transfers.
+Message-ID: <1331551132-29383-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the initial imx-sgtl5000 machine driver support with only
-playback dai link implemented.  More features can be added on top
-of it later.
+i.MX2 and i.MX1 chips have the possibility to do
+interleaved transfers with two constraints:
+* Only one chunk can be used (i.e. only 2D transfers are allowed).
+* Only 2 interleaved configurations can be applied at the same time
+for all channels.
 
-It's a device tree only machine driver working with fsl_ssi driver.
+Since this patch adds a new resource 'slots_2d' which is shared
+by all the DMA channels and to avoid disgustin locking BUGs, the
+'lock' member has been moved to the global 'imxdma_engine' structure.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
- .../bindings/sound/imx-audio-sgtl5000.txt          |   24 +++
- sound/soc/fsl/Kconfig                              |   12 ++
- sound/soc/fsl/Makefile                             |    2 +
- sound/soc/fsl/imx-sgtl5000.c                       |  177 ++++++++++++++++++++
- 4 files changed, 215 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt
- create mode 100644 sound/soc/fsl/imx-sgtl5000.c
+ NOTE: This patch must be applied on top of the following series:
+ [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into dmaengine.
 
-diff --git a/Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt b/Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt
-new file mode 100644
-index 0000000..421a374
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/imx-audio-sgtl5000.txt
-@@ -0,0 +1,24 @@
-+Freescale i.MX audio complex with SGTL5000 codec
-+
-+Required properties:
-+- compatible : "fsl,imx-audio-sgtl5000"
-+- model : The user-visible name of this sound complex
-+- ssi-controller : The phandle of the i.MX SSI controller
-+- audio-codec : The phandle of the SGTL5000 audio codec
-+- mux-int-port : The internal port of the i.MX audio muxer (AUDMUX)
-+- mux-ext-port : The external port of the i.MX audio muxer
-+
-+Note: The AUDMUX port numbering should start at 1, which is consistent with
-+hardware manual.
-+
-+Example:
-+
-+sound {
-+	compatible = "fsl,imx51-babbage-sgtl5000",
-+		     "fsl,imx-audio-sgtl5000";
-+	model = "imx51-babbage-sgtl5000";
-+	ssi-controller = <&ssi1>;
-+	audio-codec = <&sgtl5000>;
-+	mux-int-port = <1>;
-+	mux-ext-port = <3>;
-+};
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index 535ee73..aa14fc9 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -164,4 +164,16 @@ config SND_SOC_EUKREA_TLV320
- 	  Enable I2S based access to the TLV320AIC23B codec attached
- 	  to the SSI interface
+---
+ drivers/dma/imx-dma.c |  151 +++++++++++++++++++++++++++++++++++++++++++------
+ 1 files changed, 134 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index 4584012..5931e02 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -35,6 +35,10 @@
+ #define IMXDMA_MAX_CHAN_DESCRIPTORS	16
+ #define IMX_DMA_CHANNELS  16
  
-+config SND_SOC_IMX_SGTL5000
-+	tristate "SoC Audio support for i.MX boards with sgtl5000"
-+	depends on OF && I2C
-+	select SND_SOC_SGTL5000
-+	select SND_SOC_IMX_PCM_DMA
-+	select SND_SOC_IMX_AUDMUX
-+	select SND_SOC_FSL_SSI
-+	select SND_SOC_FSL_UTILS
-+	help
-+	  Say Y if you want to add support for SoC audio on an i.MX board with
-+	  a sgtl5000 codec.
++#define IMX_DMA_2D_SLOTS	2
++#define IMX_DMA_2D_SLOT_A	0
++#define IMX_DMA_2D_SLOT_B	1
 +
- endif # SND_IMX_SOC
-diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
-index fbdbed0..638d385 100644
---- a/sound/soc/fsl/Makefile
-+++ b/sound/soc/fsl/Makefile
-@@ -40,8 +40,10 @@ snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
- snd-soc-phycore-ac97-objs := phycore-ac97.o
- snd-soc-mx27vis-aic32x4-objs := mx27vis-aic32x4.o
- snd-soc-wm1133-ev1-objs := wm1133-ev1.o
-+snd-soc-imx-sgtl5000-objs := imx-sgtl5000.o
+ #define IMX_DMA_LENGTH_LOOP	((unsigned int)-1)
+ #define IMX_DMA_MEMSIZE_32	(0 << 4)
+ #define IMX_DMA_MEMSIZE_8	(1 << 4)
+@@ -110,6 +114,13 @@ enum  imxdma_prep_type {
+ 	IMXDMA_DESC_CYCLIC,
+ };
  
- obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
- obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
- obj-$(CONFIG_SND_SOC_MX27VIS_AIC32X4) += snd-soc-mx27vis-aic32x4.o
- obj-$(CONFIG_SND_MXC_SOC_WM1133_EV1) += snd-soc-wm1133-ev1.o
-+obj-$(CONFIG_SND_SOC_IMX_SGTL5000) += snd-soc-imx-sgtl5000.o
-diff --git a/sound/soc/fsl/imx-sgtl5000.c b/sound/soc/fsl/imx-sgtl5000.c
-new file mode 100644
-index 0000000..3786b61
---- /dev/null
-+++ b/sound/soc/fsl/imx-sgtl5000.c
-@@ -0,0 +1,177 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2012 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <sound/soc.h>
-+
-+#include "../codecs/sgtl5000.h"
-+#include "imx-audmux.h"
-+
-+#define DAI_NAME_SIZE	32
-+
-+struct imx_sgtl5000_data {
-+	struct snd_soc_dai_link dai;
-+	struct snd_soc_card card;
-+	char codec_dai_name[DAI_NAME_SIZE];
-+	char platform_name[DAI_NAME_SIZE];
-+	unsigned int clk_frequency;
++struct imx_dma_2d_config {
++	u16		xsr;
++	u16		ysr;
++	u16		wsr;
++	int		count;
 +};
 +
-+static int imx_sgtl5000_dai_init(struct snd_soc_pcm_runtime *rtd)
-+{
-+	struct imx_sgtl5000_data *data = container_of(rtd->card,
-+					struct imx_sgtl5000_data, card);
-+	struct device *dev = rtd->card->dev;
-+	int ret;
+ struct imxdma_desc {
+ 	struct list_head		node;
+ 	struct dma_async_tx_descriptor	desc;
+@@ -146,12 +157,13 @@ struct imxdma_channel {
+ 	dma_addr_t			per_address;
+ 	u32				watermark_level;
+ 	struct dma_chan			chan;
+-	spinlock_t			lock;
+ 	dma_cookie_t			last_completed;
+ 	int				dma_request;
+ 	struct scatterlist		*sg_list;
+ 	u32				ccr_from_device;
+ 	u32				ccr_to_device;
++	bool				enabled_2d;
++	int				slot_2d;
+ };
+ 
+ struct imxdma_engine {
+@@ -160,6 +172,8 @@ struct imxdma_engine {
+ 	struct dma_device		dma_device;
+ 	void __iomem			*base;
+ 	struct clk			*dma_clk;
++	spinlock_t			lock;
++	struct imx_dma_2d_config	slots_2d[IMX_DMA_2D_SLOTS];
+ 	struct imxdma_channel		channel[IMX_DMA_CHANNELS];
+ };
+ 
+@@ -359,16 +373,16 @@ static void dma_irq_handle_channel(struct imxdma_channel *imxdmac)
+ 	int chno = imxdmac->channel;
+ 	struct imxdma_desc *desc;
+ 
+-	spin_lock(&imxdmac->lock);
++	spin_lock(&imxdma->lock);
+ 	if (list_empty(&imxdmac->ld_active)) {
+-		spin_unlock(&imxdmac->lock);
++		spin_unlock(&imxdma->lock);
+ 		goto out;
+ 	}
+ 
+ 	desc = list_first_entry(&imxdmac->ld_active,
+ 				struct imxdma_desc,
+ 				node);
+-	spin_unlock(&imxdmac->lock);
++	spin_unlock(&imxdma->lock);
+ 
+ 	if (desc->sg) {
+ 		u32 tmp;
+@@ -440,9 +454,53 @@ static int imxdma_xfer_desc(struct imxdma_desc *d)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(d->desc.chan);
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
++	unsigned long flags;
++	int slot = -1;
++	int i;
+ 
+ 	/* Configure and enable */
+ 	switch (d->type) {
++	case IMXDMA_DESC_INTERLEAVED:
++		/* Try to get a free 2D slot */
++		spin_lock_irqsave(&imxdma->lock, flags);
++		for (i = 0; i < IMX_DMA_2D_SLOTS; i++) {
++			if ((imxdma->slots_2d[i].count > 0) &&
++			((imxdma->slots_2d[i].xsr != d->x) ||
++			(imxdma->slots_2d[i].ysr != d->y) ||
++			(imxdma->slots_2d[i].wsr != d->w)))
++				continue;
++			slot = i;
++			break;
++		}
++		if (slot < 0)
++			return -EBUSY;
 +
-+	ret = snd_soc_dai_set_sysclk(rtd->codec_dai, SGTL5000_SYSCLK,
-+				     data->clk_frequency, SND_SOC_CLOCK_IN);
-+	if (ret) {
-+		dev_err(dev, "could not set codec driver clock params\n");
-+		return ret;
++		imxdma->slots_2d[slot].xsr = d->x;
++		imxdma->slots_2d[slot].ysr = d->y;
++		imxdma->slots_2d[slot].wsr = d->w;
++		imxdma->slots_2d[slot].count++;
++
++		imxdmac->slot_2d = slot;
++		imxdmac->enabled_2d = true;
++		spin_unlock_irqrestore(&imxdma->lock, flags);
++
++		if (slot == IMX_DMA_2D_SLOT_A) {
++			d->config_mem &= ~CCR_MSEL_B;
++			d->config_port &= ~CCR_MSEL_B;
++			imx_dmav1_writel(imxdma, d->x, DMA_XSRA);
++			imx_dmav1_writel(imxdma, d->y, DMA_YSRA);
++			imx_dmav1_writel(imxdma, d->w, DMA_WSRA);
++		} else {
++			d->config_mem |= CCR_MSEL_B;
++			d->config_port |= CCR_MSEL_B;
++			imx_dmav1_writel(imxdma, d->x, DMA_XSRB);
++			imx_dmav1_writel(imxdma, d->y, DMA_YSRB);
++			imx_dmav1_writel(imxdma, d->w, DMA_WSRB);
++		}
++		/*
++		 * We fall-through here intentionally, since a 2D transfer is
++		 * similar to MEMCPY just adding the 2D slot configuration.
++		 */
+ 	case IMXDMA_DESC_MEMCPY:
+ 		imx_dmav1_writel(imxdma, d->src, DMA_SAR(imxdmac->channel));
+ 		imx_dmav1_writel(imxdma, d->dest, DMA_DAR(imxdmac->channel));
+@@ -501,7 +559,7 @@ static void imxdma_tasklet(unsigned long data)
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	struct imxdma_desc *desc;
+ 
+-	spin_lock(&imxdmac->lock);
++	spin_lock(&imxdma->lock);
+ 
+ 	if (list_empty(&imxdmac->ld_active)) {
+ 		/* Someone might have called terminate all */
+@@ -518,6 +576,12 @@ static void imxdma_tasklet(unsigned long data)
+ 	if (imxdma_chan_is_doing_cyclic(imxdmac))
+ 		goto out;
+ 
++	/* Free 2D slot if it was an interleaved transfer */
++	if (imxdmac->enabled_2d) {
++		imxdma->slots_2d[imxdmac->slot_2d].count--;
++		imxdmac->enabled_2d = false;
 +	}
 +
-+	return 0;
+ 	list_move_tail(imxdmac->ld_active.next, &imxdmac->ld_free);
+ 
+ 	if (!list_empty(&imxdmac->ld_queue)) {
+@@ -529,7 +593,7 @@ static void imxdma_tasklet(unsigned long data)
+ 				 __func__, imxdmac->channel);
+ 	}
+ out:
+-	spin_unlock(&imxdmac->lock);
++	spin_unlock(&imxdma->lock);
+ }
+ 
+ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+@@ -545,10 +609,10 @@ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	case DMA_TERMINATE_ALL:
+ 		imxdma_disable_hw(imxdmac);
+ 
+-		spin_lock_irqsave(&imxdmac->lock, flags);
++		spin_lock_irqsave(&imxdma->lock, flags);
+ 		list_splice_tail_init(&imxdmac->ld_active, &imxdmac->ld_free);
+ 		list_splice_tail_init(&imxdmac->ld_queue, &imxdmac->ld_free);
+-		spin_unlock_irqrestore(&imxdmac->lock, flags);
++		spin_unlock_irqrestore(&imxdma->lock, flags);
+ 		return 0;
+ 	case DMA_SLAVE_CONFIG:
+ 		if (dmaengine_cfg->direction == DMA_DEV_TO_MEM) {
+@@ -603,16 +667,17 @@ static enum dma_status imxdma_tx_status(struct dma_chan *chan,
+ 					    struct dma_tx_state *txstate)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
++	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	dma_cookie_t last_used;
+ 	enum dma_status ret;
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&imxdmac->lock, flags);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 	last_used = chan->cookie;
+ 
+ 	ret = dma_async_is_complete(cookie, imxdmac->last_completed, last_used);
+ 	dma_set_tx_state(txstate, imxdmac->last_completed, last_used, 0);
+-	spin_unlock_irqrestore(&imxdmac->lock, flags);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ 
+ 	return ret;
+ }
+@@ -632,16 +697,17 @@ static dma_cookie_t imxdma_assign_cookie(struct imxdma_channel *imxdma)
+ static dma_cookie_t imxdma_tx_submit(struct dma_async_tx_descriptor *tx)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(tx->chan);
++	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	dma_cookie_t cookie;
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&imxdmac->lock, flags);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 
+ 	list_move_tail(imxdmac->ld_free.next, &imxdmac->ld_queue);
+ 	cookie = imxdma_assign_cookie(imxdmac);
+ 	tx->cookie = cookie;
+ 
+-	spin_unlock_irqrestore(&imxdmac->lock, flags);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ 
+ 	return cookie;
+ }
+@@ -680,16 +746,17 @@ static int imxdma_alloc_chan_resources(struct dma_chan *chan)
+ static void imxdma_free_chan_resources(struct dma_chan *chan)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
++	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	struct imxdma_desc *desc, *_desc;
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&imxdmac->lock, flags);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 
+ 	imxdma_disable_hw(imxdmac);
+ 	list_splice_tail_init(&imxdmac->ld_active, &imxdmac->ld_free);
+ 	list_splice_tail_init(&imxdmac->ld_queue, &imxdmac->ld_free);
+ 
+-	spin_unlock_irqrestore(&imxdmac->lock, flags);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ 
+ 	list_for_each_entry_safe(desc, _desc, &imxdmac->ld_free, node) {
+ 		kfree(desc);
+@@ -843,6 +910,49 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+ 	return &desc->desc;
+ }
+ 
++static struct dma_async_tx_descriptor *imxdma_prep_dma_interleaved(
++	struct dma_chan *chan, struct dma_interleaved_template *xt,
++	unsigned long flags)
++{
++	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
++	struct imxdma_engine *imxdma = imxdmac->imxdma;
++	struct imxdma_desc *desc;
++
++	dev_dbg(imxdma->dev, "%s channel: %d src_start=0x%x dst_start=0x%x\n"
++		"   src_sgl=%s dst_sgl=%s numf=%d frame_size=%d\n", __func__,
++		imxdmac->channel, xt->src_start, xt->dst_start,
++		xt->src_sgl ? "true" : "false", xt->dst_sgl ? "true" : "false",
++		xt->numf, xt->frame_size);
++
++	if (list_empty(&imxdmac->ld_free) ||
++	    imxdma_chan_is_doing_cyclic(imxdmac))
++		return NULL;
++
++	if (xt->frame_size != 1 || xt->numf <= 0 || xt->dir != DMA_MEM_TO_MEM)
++		return NULL;
++
++	desc = list_first_entry(&imxdmac->ld_free, struct imxdma_desc, node);
++
++	desc->type = IMXDMA_DESC_INTERLEAVED;
++	desc->src = xt->src_start;
++	desc->dest = xt->dst_start;
++	desc->x = xt->sgl[0].size;
++	desc->y = xt->numf;
++	desc->w = xt->sgl[0].icg + desc->x;
++	desc->len = desc->x * desc->y;
++	desc->direction = DMA_MEM_TO_MEM;
++	desc->config_port = IMX_DMA_MEMSIZE_32;
++	desc->config_mem = IMX_DMA_MEMSIZE_32;
++	if (xt->src_sgl)
++		desc->config_mem |= IMX_DMA_TYPE_2D;
++	if (xt->dst_sgl)
++		desc->config_port |= IMX_DMA_TYPE_2D;
++	desc->desc.callback = NULL;
++	desc->desc.callback_param = NULL;
++
++	return &desc->desc;
 +}
 +
-+static int __devinit imx_sgtl5000_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *ssi_np, *codec_np;
-+	struct platform_device *ssi_pdev;
-+	struct imx_sgtl5000_data *data;
-+	int int_port, ext_port;
-+	int ret;
+ static void imxdma_issue_pending(struct dma_chan *chan)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+@@ -850,7 +960,7 @@ static void imxdma_issue_pending(struct dma_chan *chan)
+ 	struct imxdma_desc *desc;
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&imxdmac->lock, flags);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 	if (list_empty(&imxdmac->ld_active) &&
+ 	    !list_empty(&imxdmac->ld_queue)) {
+ 		desc = list_first_entry(&imxdmac->ld_queue,
+@@ -865,7 +975,7 @@ static void imxdma_issue_pending(struct dma_chan *chan)
+ 				       &imxdmac->ld_active);
+ 		}
+ 	}
+-	spin_unlock_irqrestore(&imxdmac->lock, flags);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ }
+ 
+ static int __init imxdma_probe(struct platform_device *pdev)
+@@ -928,6 +1038,13 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	dma_cap_set(DMA_SLAVE, imxdma->dma_device.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, imxdma->dma_device.cap_mask);
+ 	dma_cap_set(DMA_MEMCPY, imxdma->dma_device.cap_mask);
++	dma_cap_set(DMA_INTERLEAVE, imxdma->dma_device.cap_mask);
 +
-+	ret = of_property_read_u32(np, "mux-int-port", &int_port);
-+	if (ret) {
-+		dev_err(&pdev->dev, "mux-int-port missing or invalid\n");
-+		return ret;
-+	}
-+	ret = of_property_read_u32(np, "mux-ext-port", &ext_port);
-+	if (ret) {
-+		dev_err(&pdev->dev, "mux-ext-port missing or invalid\n");
-+		return ret;
-+	}
++	/* Initialize 2D global parameters */
++	for (i = 0; i < IMX_DMA_2D_SLOTS; i++)
++		imxdma->slots_2d[i].count = 0;
 +
-+	/*
-+	 * The port numbering in the hardware manual starts at 1, while
-+	 * the audmux API expects it starts at 0.
-+	 */
-+	int_port--;
-+	ext_port--;
-+	ret = imx_audmux_v2_configure_port(int_port,
-+			IMX_AUDMUX_V2_PTCR_SYN |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(ext_port) |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(ext_port) |
-+			IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR,
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(ext_port));
-+	if (ret) {
-+		dev_err(&pdev->dev, "audmux internal port setup failed\n");
-+		return ret;
-+	}
-+	imx_audmux_v2_configure_port(ext_port,
-+			IMX_AUDMUX_V2_PTCR_SYN |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(int_port),
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(int_port));
-+	if (ret) {
-+		dev_err(&pdev->dev, "audmux external port setup failed\n");
-+		return ret;
-+	}
-+
-+	ssi_np = of_parse_phandle(pdev->dev.of_node, "ssi-controller", 0);
-+	codec_np = of_parse_phandle(pdev->dev.of_node, "audio-codec", 0);
-+	if (!ssi_np || !codec_np) {
-+		dev_err(&pdev->dev, "phandle missing or invalid\n");
-+		return -EINVAL;
-+	}
-+
-+	ssi_pdev = of_find_device_by_node(ssi_np);
-+	if (!ssi_pdev) {
-+		dev_err(&pdev->dev, "failed to find SSI platform device\n");
-+		return -EINVAL;
-+	}
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	ret = of_property_read_u32(codec_np, "clock-frequency",
-+				   &data->clk_frequency);
-+	if (ret) {
-+		dev_err(&pdev->dev, "clock-frequency missing or invalid\n");
-+		return ret;
-+	}
-+
-+	data->dai.name = "HiFi";
-+	data->dai.stream_name = "HiFi";
-+	data->dai.codec_dai_name = "sgtl5000";
-+	data->dai.codec_of_node = codec_np;
-+	data->dai.cpu_dai_name = dev_name(&ssi_pdev->dev);
-+	data->dai.platform_name = "imx-pcm-audio";
-+	data->dai.init = &imx_sgtl5000_dai_init;
-+	data->dai.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+			    SND_SOC_DAIFMT_CBM_CFM;
-+
-+	data->card.dev = &pdev->dev;
-+	ret = snd_soc_of_parse_card_name(&data->card, "model");
-+	if (ret)
-+		return ret;
-+	data->card.num_links = 1;
-+	data->card.dai_link = &data->dai;
-+
-+	ret = snd_soc_register_card(&data->card);
-+	if (ret) {
-+		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, data);
-+	of_node_put(ssi_np);
-+	of_node_put(codec_np);
-+
-+	return 0;
-+}
-+
-+static int __devexit imx_sgtl5000_remove(struct platform_device *pdev)
-+{
-+	struct imx_sgtl5000_data *data = platform_get_drvdata(pdev);
-+
-+	snd_soc_unregister_card(&data->card);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id imx_sgtl5000_dt_ids[] = {
-+	{ .compatible = "fsl,imx-audio-sgtl5000", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, imx_sgtl5000_dt_ids);
-+
-+static struct platform_driver imx_sgtl5000_driver = {
-+	.driver = {
-+		.name = "imx-sgtl5000",
-+		.owner = THIS_MODULE,
-+		.of_match_table = imx_sgtl5000_dt_ids,
-+	},
-+	.probe = imx_sgtl5000_probe,
-+	.remove = __devexit_p(imx_sgtl5000_remove),
-+};
-+module_platform_driver(imx_sgtl5000_driver);
-+
-+MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
-+MODULE_DESCRIPTION("Freescale i.MX SGTL5000 ASoC machine driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:imx-sgtl5000");
++	spin_lock_init(&imxdma->lock);
+ 
+ 	/* Initialize channel parameters */
+ 	for (i = 0; i < IMX_DMA_CHANNELS; i++) {
+@@ -948,7 +1065,6 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		imxdmac->imxdma = imxdma;
+-		spin_lock_init(&imxdmac->lock);
+ 
+ 		INIT_LIST_HEAD(&imxdmac->ld_queue);
+ 		INIT_LIST_HEAD(&imxdmac->ld_free);
+@@ -973,6 +1089,7 @@ static int __init imxdma_probe(struct platform_device *pdev)
+ 	imxdma->dma_device.device_prep_slave_sg = imxdma_prep_slave_sg;
+ 	imxdma->dma_device.device_prep_dma_cyclic = imxdma_prep_dma_cyclic;
+ 	imxdma->dma_device.device_prep_dma_memcpy = imxdma_prep_dma_memcpy;
++	imxdma->dma_device.device_prep_interleaved_dma = imxdma_prep_dma_interleaved;
+ 	imxdma->dma_device.device_control = imxdma_control;
+ 	imxdma->dma_device.device_issue_pending = imxdma_issue_pending;
+ 
 -- 
-1.7.5.4
+1.7.0.4
