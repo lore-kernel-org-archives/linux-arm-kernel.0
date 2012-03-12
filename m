@@ -1,43 +1,50 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Fri, 9 Mar 2012 08:53:47 +0100
-Subject: [PATCH 05/11] tps6586x: Add device-tree support
-In-Reply-To: <20120309051506.761B63E090F@localhost>
-References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
- <1331218291-16119-6-git-send-email-thierry.reding@avionic-design.de>
- <20120308150607.GP3638@opensource.wolfsonmicro.com>
- <20120308151545.GA23934@avionic-0098.mockup.avionic-design.de>
- <20120309051506.761B63E090F@localhost>
-Message-ID: <20120309075347.GA27270@avionic-0098.mockup.avionic-design.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 12 Mar 2012 09:52:17 +0530
+Subject: [PATCH V2 22/22] watchdog/sp805: Add clk_{un}prepare support
+In-Reply-To: <cover.1331524811.git.viresh.kumar@st.com>
+References: <cover.1331524811.git.viresh.kumar@st.com>
+Message-ID: <aadd8e1398e5a85fff68b3b501e32e1fe5c4c580.1331524811.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely wrote:
-> On Thu, 8 Mar 2012 16:15:46 +0100, Thierry Reding <thierry.reding@avionic-design.de> wrote:
-> > * Mark Brown wrote:
-> > > ...they all seem to be explicitly named in the device tree so presumably
-> > > there's enough information in there for the driver to pick any set of
-> > > regulators in any order.  This would be much nicer to use.
-> > 
-> > I don't like it much either. The only reason that requirement exists is
-> > because it makes the assignment of the regulator ID (as defined in the
-> > include/linux/mfd/tps6586x.h header) very trivial. Would it be better to
-> > look up the ID based on the node name (sm0 --> TPS6586X_ID_SM_0, ...)?
-> > 
-> > Then the only requirement would be that the names match.
-> 
-> Yes, please look up id via name.  Alternately you can give each child node
-> a 'reg' property and put #address-cells = <1>; #size-cells = <0>; in the
-> parent (assuming the regulator number is a documented attribute of the
-> hardware and not just a convenient linux construct).
+clk_{un}prepare() routines are required for required on some platforms to run
+part of clk enable/disable() routines from contexts that can schedule.
 
-I'll go with the lookup via name then because as far as I can tell the
-datasheet doesn't list any specific ordering of the regulators.
+This patch adds support for these routines in sp805 driver.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120309/61b3ddc2/attachment-0001.sig>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ drivers/watchdog/sp805_wdt.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/watchdog/sp805_wdt.c b/drivers/watchdog/sp805_wdt.c
+index 5c34eda..938b8ab 100644
+--- a/drivers/watchdog/sp805_wdt.c
++++ b/drivers/watchdog/sp805_wdt.c
+@@ -130,9 +130,16 @@ static int wdt_config(struct watchdog_device *wdd, bool ping)
+ 	int ret;
+ 
+ 	if (!ping) {
++		ret = clk_prepare(wdt->clk);
++		if (ret) {
++			dev_err(&wdt->adev->dev, "clock prepare fail");
++			return ret;
++		}
++
+ 		ret = clk_enable(wdt->clk);
+ 		if (ret) {
+ 			dev_err(&wdt->adev->dev, "clock enable fail");
++			clk_unprepare(wdt->clk);
+ 			return ret;
+ 		}
+ 	}
+@@ -184,6 +191,7 @@ static int wdt_disable(struct watchdog_device *wdd)
+ 	spin_unlock(&wdt->lock);
+ 
+ 	clk_disable(wdt->clk);
++	clk_unprepare(wdt->clk);
+ 
+ 	return 0;
+ }
+-- 
+1.7.8.110.g4cb5d
