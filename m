@@ -1,66 +1,43 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 12 Mar 2012 21:41:10 +0100
-Subject: [PATCH] pinctrl: fix error path in pinconf_map_to_setting()
-Message-ID: <1331584870-10077-1-git-send-email-linus.walleij@stericsson.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 12 Mar 2012 15:28:58 +0100
+Subject: [PATCH 11/11] ARM: tegra: pcie: Add device tree support
+In-Reply-To: <20120312142340.GI3110@opensource.wolfsonmicro.com>
+References: <1331218291-16119-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331218291-16119-12-git-send-email-thierry.reding@avionic-design.de>
+ <4F59253D.7070100@wwwdotorg.org>
+ <20120312120610.GA14020@sirena.org.uk>
+ <20120312141705.GA16395@avionic-0098.mockup.avionic-design.de>
+ <20120312142340.GI3110@opensource.wolfsonmicro.com>
+Message-ID: <20120312142857.GA6694@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+* Mark Brown wrote:
+> On Mon, Mar 12, 2012 at 03:17:05PM +0100, Thierry Reding wrote:
+> 
+> > My understanding of the fixed regulator was that it was meant to be used for
+> > fixed voltage supplies that can still be enabled or disabled (for example as
+> > supplied by a GPIO) but not regulators that are fix in the sense that they
+> > cannot be enabled or disabled at all but are always on.
+> 
+> No, not at all.  It's for any random supply that doesn't have much
+> meaningful control - as you'll see from the code the GPIO is totally
+> optional if you look at the git history you'll see that the GPIO was
+> added some time after the driver was originally merged.
+> 
+> > Is that how it is supposed to work?
+> 
+> Yes.
 
-The code was using the union member
-setting->data.configs.group_or_pin to store a potential
-error code, but since that member is unsigned the
-< 0 comparison was not true, letting errors pass thru,
-ending up as mapped to pin "-22". Fix this up and print
-the error.
+In that case I'll mark the *-supply properties required. Would it be a good
+idea to mention this (or even give an example with fixed regulators) in the
+binding documentation or can I assume this to be common knowledge?
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinconf.c |   27 +++++++++++++++++----------
- 1 files changed, 17 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/pinctrl/pinconf.c b/drivers/pinctrl/pinconf.c
-index 247b9f2..f9c9cd1 100644
---- a/drivers/pinctrl/pinconf.c
-+++ b/drivers/pinctrl/pinconf.c
-@@ -282,21 +282,28 @@ int pinconf_map_to_setting(struct pinctrl_map const *map,
- 			  struct pinctrl_setting *setting)
- {
- 	struct pinctrl_dev *pctldev = setting->pctldev;
-+	int ret;
- 
- 	switch (setting->type) {
- 	case PIN_MAP_TYPE_CONFIGS_PIN:
--		setting->data.configs.group_or_pin =
--			pin_get_from_name(pctldev,
--					  map->data.configs.group_or_pin);
--		if (setting->data.configs.group_or_pin < 0)
--			return setting->data.configs.group_or_pin;
-+		ret = pin_get_from_name(pctldev,
-+					map->data.configs.group_or_pin);
-+		if (ret < 0) {
-+			dev_err(pctldev->dev, "could not map pin config for \"%s\"",
-+				map->data.configs.group_or_pin);
-+			return ret;
-+		}
-+		setting->data.configs.group_or_pin = ret;
- 		break;
- 	case PIN_MAP_TYPE_CONFIGS_GROUP:
--		setting->data.configs.group_or_pin =
--			pinctrl_get_group_selector(pctldev,
--					map->data.configs.group_or_pin);
--		if (setting->data.configs.group_or_pin < 0)
--			return setting->data.configs.group_or_pin;
-+		ret = pinctrl_get_group_selector(pctldev,
-+					 map->data.configs.group_or_pin);
-+		if (ret < 0) {
-+			dev_err(pctldev->dev, "could not map group config for \"%s\"",
-+				map->data.configs.group_or_pin);
-+			return ret;
-+		}
-+		setting->data.configs.group_or_pin = ret;
- 		break;
- 	default:
- 		return -EINVAL;
--- 
-1.7.8
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120312/ecb77ca9/attachment-0001.sig>
