@@ -1,53 +1,56 @@
-From: govindraj.raja@ti.com (Raja, Govindraj)
-Date: Fri, 9 Mar 2012 11:49:51 +0530
-Subject: [RFC PATCH] OMAP: UART: Enable tx wakeup bit in wer
-In-Reply-To: <alpine.DEB.2.00.1203062251270.23214@utopia.booyaka.com>
-References: <1327412249-31575-1-git-send-email-govindraj.raja@ti.com>
- <alpine.DEB.2.00.1201251217120.5324@utopia.booyaka.com>
- <alpine.DEB.2.00.1203051321580.1430@utopia.booyaka.com>
- <CAMrsUdJqmJ75=X_Qg3vQCr7zezs0jOK8L1ri8p5K=+6ZKsRFcg@mail.gmail.com>
- <alpine.DEB.2.00.1203062251270.23214@utopia.booyaka.com>
-Message-ID: <CAMrsUdL6jPguVLDnEkg-T9fyvv+XY5tkNiooZOXszUYrdrUwPw@mail.gmail.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Mon, 12 Mar 2012 18:06:55 +0200
+Subject: I.MX35 PDK
+In-Reply-To: <CAOMZO5B_mZ16zvXdNbKP_PWM5axNPzMeHQttxe8PYHET7UMufg@mail.gmail.com>
+References: <CAOMZO5DnP7+zupy9vwBPS0+2XtKM1+nLbwCqBzuCqEG5OWbZRQ@mail.gmail.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A28@MEP-EXCH.meprolight.com>
+ <CAOMZO5Amo0XFf+TV7PprCL079C5Y0qKmo+k-FfShU7k4SG7W6Q@mail.gmail.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8913@MEP-EXCH.meprolight.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D8918@MEP-EXCH.meprolight.com>
+ <CAOMZO5A6T+WdOE41Wx6Nctwz9wk8FKaxzjbAt_woZkCnuodNYg@mail.gmail.com>
+ <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A29@MEP-EXCH.meprolight.com>,
+ <CAOMZO5B_mZ16zvXdNbKP_PWM5axNPzMeHQttxe8PYHET7UMufg@mail.gmail.com>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD5D891C@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 7, 2012 at 11:27 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi
->
-> On Tue, 6 Mar 2012, Raja, Govindraj wrote:
->
->> I see two ways of adding this tx wake-up flag.
->>
->> 1.) passing a feature flag from pdata and populating the feature value to wer.
->>
->> 2.) Duplicating the uart1/2/3 hwmod for omap3430 without dev attrib
->> and uart1/2/3/4
->> ? ? ?hwmod for omap3630 with dev attribs.
->>
->> Approach-2 adds unnecessary code duplication in hwmod file with and without
->> dev_attribs, So right now here is the patch to follow approach [1],
->>
->> If its strongly recommended to use approach-2 will add it.
->> (My concern is the diffstat it might produce with approach-2)
->
-> Both 1 and 2 are needed.
->
-> The current way that errata are handled in arch/arm/mach-omap2/serial.c
-> needs to be changed. ?Those should be flags that are passed from hwmod
-> dev_attr data. ?The presence of the TX wakeup bit should simply be another
-> dev_attr flag. ?These flags should be passed to the driver via the
-> omap_up.errata field for the time being.
+Thanks for your response,
 
-okay.
-
+> 1. Back resistor 172 to the default value.
 >
-> The exception to this is if the IP block's revision register was changed
-> when TX wakeups became possible. ?If that's the case, then that mechanism
-> can be used in lieu of dev_attr and platform_data in this situation.
+> 2. Removed the resistor 146, through which a voltage was applied from a PMIC
+> (EXT_3V) on "CMOS_VIO".
+>
+> 3. Connecting a resistor 147 which supplies power from the LDO_3V3 on
+> "CMOS_VIO".
 
-I will check on the MVR reg available for uart-rev on different omap socs,
-and will get back by end on next of week with a possible patch.
+> >The camera on the FSL BSP works fine with no hardware modification on
+> >the mx35pdk.
 
---
-Thanks,
-Govindraj.R
+> >As I suggested previously you should control the power rails, i2c pad
+> >settings, etc from software so that the camera can also work in
+> >mainline without the need of changing the hardware.
+
+You're right, currently mainline Linux kernel  i.MX35 PDK platform does not support power management 
+devices, probably for this reason was the need for small changes in equipment.
+
+> On my display I see snow flickering and unfortunately not a live video from
+> camera.
+
+> >Do you have this patch applied?
+
+Yes I need to prepare it.
+
+
+ > >http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=f910fb8fcd1c97788f2291c8646597bcd87ee061
+
+> >Also, try to isolate the display from this issue. Capture the image to
+> >a file and try to play it on a PC.
+
+Thanks for the tip, I'll think about how I can check it.
+
+Regards
+
+Alex Gershgorin 
+
+ 
