@@ -1,22 +1,17 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Mar 2012 23:28:19 +0000
-Subject: [PATCH v6 1/3] USB: OHCI-HCD: Rename ohci-pnx4008 to ohci-nxp
-In-Reply-To: <1331430375-31227-2-git-send-email-stigge@antcom.de>
-References: <1331430375-31227-1-git-send-email-stigge@antcom.de>
- <1331430375-31227-2-git-send-email-stigge@antcom.de>
-Message-ID: <20120312232819.GD10830@n2100.arm.linux.org.uk>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Mon, 12 Mar 2012 19:31:58 -0400
+Subject: ARM926EJS boot failure on v3.3, __iounmap
+In-Reply-To: <CAKON4OzL9HtF+3bxzC9zexd7QgAFd5R7Wr=QTShYR+Kk1b4L+g@mail.gmail.com>
+References: <CAKON4OzL9HtF+3bxzC9zexd7QgAFd5R7Wr=QTShYR+Kk1b4L+g@mail.gmail.com>
+Message-ID: <CAKON4OyURmGP79oJaCkAw1dx3orynZDZSqZOC_t=PTKwHWaRJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 11, 2012 at 02:46:13AM +0100, Roland Stigge wrote:
-> Since this driver is compatible with several NXP devices, the driver is renamed
-> accordingly. Please combine with the following patch which also changes the
-> respective symbol names.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+The answer to this is that as of v3.3 you can't have overlapping IO
+regions. The code I was porting has a large define covering peripheral
+space and then many smaller ones inside the region, one for each
+device. I needed to delete the defines for those inner devices.
 
-Please use -C or -M when generating these kinds of patches.  It makes
-it possible to see what if anything has changed in the renamed file
-(and makes the diff smaller.)
-
-Thanks.
+-- 
+Jon Smirl
+jonsmirl at gmail.com
