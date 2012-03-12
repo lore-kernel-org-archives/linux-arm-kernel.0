@@ -1,25 +1,77 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 Mar 2012 09:22:27 -0800
-Subject: [PATCH 1/5] ARM: EXYNOS: replace clock.c for other new EXYNOS SoCs
-In-Reply-To: <1331374749-23256-2-git-send-email-kgene.kim@samsung.com>
-References: <1331374749-23256-1-git-send-email-kgene.kim@samsung.com>
- <1331374749-23256-2-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20120310172227.GA5972@quad.lixom.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 12 Mar 2012 10:15:05 +0000
+Subject: [PATCH] ARM: OMAP2+: hwmod: Fix wrong SYSC_TYPE1_XXX_MASK bit
+ definitions
+In-Reply-To: <4F3E581E.1050009@ti.com>
+References: <1329477961-1307-1-git-send-email-hvaibhav@ti.com>
+ <4F3E581E.1050009@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A831810F23@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2012 at 02:19:05AM -0800, Kukjin Kim wrote:
-> This patch changes the name of clock.c to clock-exynos4.c for other
-> EXYNOS series such as EXYNOS5. And since the header file of clock
-> is used only in arch/arm/mach-exynos, moves it in the local directory.
+On Fri, Feb 17, 2012 at 19:07:34, Cousson, Benoit wrote:
+> On 2/17/2012 12:26 PM, Vaibhav Hiremath wrote:
+> > In the SYSC_TYPE1_XXX_MASK configuration, SYSC_XXX_SHIFT macro
+> > is used which is not defined anywhere in the kernel.
+> > Until now the build was going through successfully, since it
+> > is not being used anywhere in kernel.
 > 
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Good catch.
+> 
+> > This bug got introduced by the commit
+> > 358f0e630d5409ab3837b86db3595560eae773b6 ("OMAP3: hwmod: support
+> > to specify the offset position of various SYSCONFIG register bits.")
+> >
+> > Signed-off-by: Vaibhav Hiremath<hvaibhav@ti.com>
+> 
+> Acked-by: Benoit Cousson <b-cousson@ti.com>
+> 
 
-Thanks, much easier to review this way!
+Tony/Paul,
 
-Ideally the whitespace cleanup could also be split up to a separate
-patch that has _no_ contents changes besides whitespace, but this is OK
-too since it's easy to see what's a change and not anyway.
+Can you accept/merge this patch? 
 
+Thanks,
+Vaibhav
 
--Olof
+> Regards,
+> Benoit
+> 
+> 
+> > ---
+> >   arch/arm/plat-omap/include/plat/omap_hwmod.h |   12 ++++++------
+> >   1 files changed, 6 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > index dbc18ad..55bef2b 100644
+> > --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> > @@ -49,17 +49,17 @@ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type4;
+> >    * with the original PRCM protocol defined for OMAP2420
+> >    */
+> >   #define SYSC_TYPE1_MIDLEMODE_SHIFT	12
+> > -#define SYSC_TYPE1_MIDLEMODE_MASK	(0x3<<  SYSC_MIDLEMODE_SHIFT)
+> > +#define SYSC_TYPE1_MIDLEMODE_MASK	(0x3<<  SYSC_TYPE1_MIDLEMODE_SHIFT)
+> >   #define SYSC_TYPE1_CLOCKACTIVITY_SHIFT	8
+> > -#define SYSC_TYPE1_CLOCKACTIVITY_MASK	(0x3<<  SYSC_CLOCKACTIVITY_SHIFT)
+> > +#define SYSC_TYPE1_CLOCKACTIVITY_MASK	(0x3<<  SYSC_TYPE1_CLOCKACTIVITY_SHIFT)
+> >   #define SYSC_TYPE1_SIDLEMODE_SHIFT	3
+> > -#define SYSC_TYPE1_SIDLEMODE_MASK	(0x3<<  SYSC_SIDLEMODE_SHIFT)
+> > +#define SYSC_TYPE1_SIDLEMODE_MASK	(0x3<<  SYSC_TYPE1_SIDLEMODE_SHIFT)
+> >   #define SYSC_TYPE1_ENAWAKEUP_SHIFT	2
+> > -#define SYSC_TYPE1_ENAWAKEUP_MASK	(1<<  SYSC_ENAWAKEUP_SHIFT)
+> > +#define SYSC_TYPE1_ENAWAKEUP_MASK	(1<<  SYSC_TYPE1_ENAWAKEUP_SHIFT)
+> >   #define SYSC_TYPE1_SOFTRESET_SHIFT	1
+> > -#define SYSC_TYPE1_SOFTRESET_MASK	(1<<  SYSC_SOFTRESET_SHIFT)
+> > +#define SYSC_TYPE1_SOFTRESET_MASK	(1<<  SYSC_TYPE1_SOFTRESET_SHIFT)
+> >   #define SYSC_TYPE1_AUTOIDLE_SHIFT	0
+> > -#define SYSC_TYPE1_AUTOIDLE_MASK	(1<<  SYSC_AUTOIDLE_SHIFT)
+> > +#define SYSC_TYPE1_AUTOIDLE_MASK	(1<<  SYSC_TYPE1_AUTOIDLE_SHIFT)
+> >
+> >   /*
+> >    * OCP SYSCONFIG bit shifts/masks TYPE2. These are for IPs compliant
+> > --
+> > 1.7.0.4
+> >
+> 
+> 
