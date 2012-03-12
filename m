@@ -1,39 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Mar 2012 10:03:45 +0000
-Subject: [PATCH] serial: PL011: clear pending interrupts
-In-Reply-To: <CAAMvbhF7-5FyzjgtK7EjFZSJg4KBxdMdd1jnTRTLA-LnsVhKyw@mail.gmail.com>
-References: <1331540750-25697-1-git-send-email-linus.walleij@stericsson.com>
- <CAAMvbhF7-5FyzjgtK7EjFZSJg4KBxdMdd1jnTRTLA-LnsVhKyw@mail.gmail.com>
-Message-ID: <20120312100345.GX17370@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Mar 2012 08:11:22 +0000
+Subject: [PATCH 1/2] ARM: kirkwood: Basic support for DNS-320 and DNS-325
+In-Reply-To: <20120312031751.GY5050@titan.lakedaemon.net>
+References: <1331476406-9844-1-git-send-email-jm@lentin.co.uk>
+ <201203111746.09757.arnd@arndb.de>
+ <20120312031751.GY5050@titan.lakedaemon.net>
+Message-ID: <201203120811.23137.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 09:27:28AM +0000, James Courtier-Dutton wrote:
-> On 12 March 2012 08:25, Linus Walleij <linus.walleij@stericsson.com> wrote:
-> > From: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > Chanho Min reported that when the boot loader transfers
-> > control to the kernel, there may be pending interrupts
-> > causing the UART to lock up in an eternal loop trying to
-> > pick tokens from the FIFO (since the RX interrupt flag
-> > indicates there are tokens) while in practice there are
-> > no tokens - in fact there is only a pending IRQ flag.
-> >
+On Monday 12 March 2012, Jason Cooper wrote:
+> > Or even use the ranges property to remap everything into
+> > a simpler address range:
+> > 
+> >       ocp at f1000000 {
+> >               compatible = "simple-bus";
+> >               ranges = <0 0xf1000000 0x1000000>;
+> >               #address-cells = 1;
+> >               #size-cells = 1;
+> > 
+> >               serial at 12000 {
+> >                       reg = <0x12000 0x100>;
+> >                       ...
+> >               };
+> > 
+> >               ...
+> >       };
 > 
-> I might be off base here, because I don't know this particular UART,
-> but if an IRQ routine is called because the RX interrupt flag is set,
-> shouldn't the IRQ routine be written in such a way that it can never
-> lock up.
+> Okay, that's pretty slick.  The wdt and intc are at 0xfed00000, is that
+> another ocp bus?  Or, am I missing something?
 
-The problem is that there are two flags:
+If they are on those addresses, yes. If you have a data sheet, you should
+look at what the buses are named there, "ocp" was just an example and I
+took that name from the <mach/kirkwood.h> file.
 
-1. The receiver interrupt status flags
-2. The fifo status flags
+It does seem though that the 0xfed00000 address is where Linux maps
+the same 0xf1000000 range in its own virtual address space, so it's
+not something that should appear in the device tree.
 
-It appears that there's a condition where the receiver interrupt flags can
-indicate that characters are pending, but the status flags say that there
-are no characters pending in the receive buffer.
-
-This occurs because it seems there's a hardware bug when switching from
-FIFO mode to non-FIFO mode - this causes previously received characters
-to be hidden from the FIFO status flags.
+	Arnd
