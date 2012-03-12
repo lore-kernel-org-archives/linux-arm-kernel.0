@@ -1,77 +1,45 @@
-From: sr@denx.de (Stefan Roese)
-Date: Mon, 12 Mar 2012 17:23:38 +0100
-Subject: [PATCH] stmmac: Add device-tree support
-In-Reply-To: <4F5E169D.3070508@st.com>
-References: <1331561157-3820-1-git-send-email-sr@denx.de>
- <201203121606.26926.sr@denx.de> <4F5E169D.3070508@st.com>
-Message-ID: <201203121723.38411.sr@denx.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 12 Mar 2012 11:52:16 -0700
+Subject: [PATCH v2 3/3] gpio/samsung: use ioremap() for EXYNOS4 GPIOlib
+In-Reply-To: <20120312161904.E57193E07B0@localhost>
+References: <1329341829-14403-1-git-send-email-kgene.kim@samsung.com>
+ <1329341829-14403-4-git-send-email-kgene.kim@samsung.com>
+ <20120312161904.E57193E07B0@localhost>
+Message-ID: <4F5E45E0.9020108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 March 2012 16:30:37 Giuseppe CAVALLARO wrote:
-> >>> +Required properties:
-> >>> +- compatible: Should be "stm,gmac"
-> >> 
-> >> This is too generic. This should be 1 string per version of h/w.
-> > 
-> > Viresh, Giuseppe, can you please suggest a proper string for the SPEAr600
-> > STMMAC core, including version?
-> > 
-> >> 'stm' should be 'st' according to vendor-prefixes.txt.
+Grant Likely wrote:
+> On Thu, 16 Feb 2012 06:37:09 +0900, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>> From: Sangsu Park<sangsu4u.park@samsung.com>
+>>
+>> This patch changes to use ioremap() for EXYNOS4210
+>> so that we can drop the static mapping for EXYNOS
+>> SoCs.
+>>
+>> Note: Will be updated for all of Samsung GPIOlibs
+>> to use ioremap() next time.
+>>
+>> Signed-off-by: Sangsu Park<sangsu4u.park@samsung.com>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
 > 
-> I'm not familiar with devicetree; maybe we should have:
+> Acked-by: Grant Likely<grant.likely@secretlab.ca>
 > 
-> "stmicro,mac100"
-> "stmicro,gmac"
+> Kukjin, I think you wanted to take this via your tree?  I'm fine with that.
+> Let me know if you'd rather it go via the gpio tree.
 > 
-> or: st instead of stmicro if you prefer.
-> 
-> in fact, stmmac is for mac100 and gmac devices.
+Hi Grant,
 
-How about "st,spear600-gmac" for SPEAr600 then?
- 
-> > Okay.
-> > 
-> >>> +- reg: Address and length of the register set for the device
-> >>> +- interrupt-parent: Should be the phandle for the interrupt controller
-> >>> +  that services interrupts for this device
-> >>> +- interrupts: Should contain the STMMAC interrupts
-> >>> +- interrupt-names: Should contain the interrupt names "macirq"
-> >>> +  "eth_wake_irq" if this interrupt is supported in the "interrupts"
-> >>> +  property
-> >> 
-> >> You should be able to tell this from the compatible string and number of
-> >> interrupts.
-> > 
-> > Yes. Currently the driver uses platform_get_irq_byname() to register the
-> > irq's. That's why I added these properties. Is there something wrong with
-> > using it this way?
-> > 
-> >>> +- phy-mode: String, operation mode of the PHY interface.
-> >>> +  Supported values are: "mii", "rmii", "gmii", "rgmii".
-> >>> +- phy-addr: MDIO address of the PHY
-> >> 
-> >> This is normally probed or the mdio bus is a sub-node of the MAC node.
-> >> See arch/powerpc/boot/dts/mpc8377_mds.dts for an example.
-> > 
-> > Okay, I'll rework this.
-> > 
-> >>> +
-> >>> +Optional properties:
-> >>> +- stm,prog-burst-len: Specify the burst length
-> >>> +- stm,has-gmac: Indicates that the controller supports 1000Mbps
-> >>> +- stm,has-pmt: Indicates that the controller supports power management
-> >> 
-> >> I think these should all be encoded by the compatible string.
-> 
-> and should we have all the other flags e.g. tx_coe etc?
-> (see stmmac.txt)
+I think, since this series has no depenency with current samsung tree
+for upcoming merge window, this can be sent to upstream via the gpio tree.
 
-As Rob suggested, some of these flags/parameters are implicitly defined by the 
-compatible string. If this is not the case, then sure, those flags/parameters 
-need to be provided via the device-tree as well. I just don't need "tx_coe" 
-etc. for my platform (SPEAr600) as far as I know. I suggest to add support for 
-them once they are really needed/used by other platforms.
+If any problems, please kindly let me know.
 
-Thanks,
-Stefan
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
