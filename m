@@ -1,59 +1,39 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 13 Mar 2012 15:33:35 +0100
-Subject: [PATCH 1/1] net: phylib: add error checking if no phy found
-In-Reply-To: <1331636302-18256-1-git-send-email-b29396@freescale.com>
-References: <1331636302-18256-1-git-send-email-b29396@freescale.com>
-Message-ID: <4F5F5ABF.5030103@openwrt.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 13 Mar 2012 22:34:18 +0800
+Subject: implementing "suspend to ram" on cortex A8 based on linux 3.0.8
+In-Reply-To: <CAFawwkVuCTijwLr6UWVRh9XNGCt-8brr2f4aDrpM_YwkWSGP+A@mail.gmail.com>
+References: <CAFawwkXQhyj+c8LEDnD7q4mXDJV2jYCAHV0tBrqxrEaNGk+_0w@mail.gmail.com>
+ <CACNz9cVbULxVSGvo60V+JLL=15BDEaYwgd5k9ZMNu09Kfwz4WQ@mail.gmail.com>
+ <CAFawwkWQd=y=kVm97UjSs37=-MRmJiy9f7sy8ChYzCHZ9Y-gyA@mail.gmail.com>
+ <CAFawwkVuCTijwLr6UWVRh9XNGCt-8brr2f4aDrpM_YwkWSGP+A@mail.gmail.com>
+Message-ID: <CAGsJ_4yDjDLSPwXubcecmCzpeJTwvGz30-awSAZfC+YtTwB_-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+hi yang,
 
-Le 03/13/12 11:58, Dong Aisheng a ?crit :
-> From: Dong Aisheng<dong.aisheng@linaro.org>
+? 2012?3?10? ??10:37?yang gqyang <hustgqyang@gmail.com> ???
+> ?Thanks for your comment.
+> ?Finally, i find out that i made a mistake. ?The uart(8250) have not been
+> ?restore after resume, instead, it use the configuration got from boot. The
+> ?uart have not been restored correctly, so that "ls" can not output result
+> ?correctly resulting in it seems that the busybox can not work correctly.
+> ?Now, i still have a question about the uart: why the "printk" can work
+> ?correctly, but the "printf" not?
 >
-> Signed-off-by: Dong Aisheng<dong.aisheng@linaro.org>
-> ---
->   drivers/net/phy/mdio_bus.c |   11 ++++++++++-
->   1 files changed, 10 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
-> index 88cc5db..d8e044d 100644
-> --- a/drivers/net/phy/mdio_bus.c
-> +++ b/drivers/net/phy/mdio_bus.c
-> @@ -101,6 +101,7 @@ static struct class mdio_bus_class = {
->   int mdiobus_register(struct mii_bus *bus)
->   {
->   	int i, err;
-> +	u32 phynum = 0;
->
->   	if (NULL == bus || NULL == bus->name ||
->   			NULL == bus->read ||
-> @@ -134,12 +135,20 @@ int mdiobus_register(struct mii_bus *bus)
->   			if (IS_ERR(phydev)) {
->   				err = PTR_ERR(phydev);
->   				goto error;
-> +			} else if (phydev != NULL) {
-> +				phynum++;
->   			}
->   		}
->   	}
->
-> +	if (!phynum) {
-> +		err = -ENODEV;
-> +		printk(KERN_ERR "%s: no phys found\n", bus->name);
-> +		goto error;
-> +	}
+> ?Before this, i believe that the "printk" work correctly, then the uart
+> ?work ok. but now, i ?need more reconsidaration about
+> ?the relation between the "printk", "printf" and "uart".
+> ?Can anyone give me some suggestion? Any comment is welcome, thanks a
+> ?lot.
 
-I am not sure if this is a good idea to change it, especially if:
-- the MII bus probing is also done later (quite some drivers do this)
-- if we want to attach a fixed PHY because we could not probe one at 
-registration time
+printk use "struct console" driver, it doesn't depend on a device node
+for userspace.
+printf actaully depends on uart_driver and a /dev/ttySx device node,
+stdout and stderr are redirected to /dev/ttySx
+uart is just a hardware which can be a tty or kernel console output.
 
-> +
->   	bus->state = MDIOBUS_REGISTERED;
-> -	pr_info("%s: probed\n", bus->name);
-> +	pr_info("%s: %d phys probed\n", bus->name, phynum);
->   	return 0;
+
 >
->   error:
+>
+-barry
