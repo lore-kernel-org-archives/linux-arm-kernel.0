@@ -1,100 +1,50 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 13 Mar 2012 11:39:37 +0100
-Subject: [PATCHv2 1/3] ARM: Exynos: add platform device for core DRM subsystem
-In-Reply-To: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
-References: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1331635180-7207-2-git-send-email-m.szyprowski@samsung.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 13 Mar 2012 18:58:22 +0800
+Subject: [PATCH 1/1] net: phylib: add error checking if no phy found
+Message-ID: <1331636302-18256-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add platform device for Exynos DRM core. This device is used for
-creating DRM user-space device and allocating memory for display buffers.
+From: Dong Aisheng <dong.aisheng@linaro.org>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
- arch/arm/mach-exynos/Kconfig              |    5 +++++
- arch/arm/mach-exynos/Makefile             |    1 +
- arch/arm/mach-exynos/dev-drm.c            |   29 +++++++++++++++++++++++++++++
- arch/arm/plat-samsung/include/plat/devs.h |    2 ++
- 4 files changed, 37 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos/dev-drm.c
+ drivers/net/phy/mdio_bus.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 060414e..9124ce9 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -85,6 +85,11 @@ config EXYNOS4_DEV_AHCI
- 	help
- 	  Compile in platform device definitions for AHCI
+diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
+index 88cc5db..d8e044d 100644
+--- a/drivers/net/phy/mdio_bus.c
++++ b/drivers/net/phy/mdio_bus.c
+@@ -101,6 +101,7 @@ static struct class mdio_bus_class = {
+ int mdiobus_register(struct mii_bus *bus)
+ {
+ 	int i, err;
++	u32 phynum = 0;
  
-+config EXYNOS_DEV_DRM
-+	bool
-+	help
-+	  Compile in platform device definitions for core DRM device
-+
- config EXYNOS4_SETUP_FIMD0
- 	bool
- 	help
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 8631840..f67e882 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
- obj-y					+= dev-uart.o
- obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
- obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
-+obj-$(CONFIG_EXYNOS_DEV_DRM)		+= dev-drm.o
- obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
- obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
- obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
-diff --git a/arch/arm/mach-exynos/dev-drm.c b/arch/arm/mach-exynos/dev-drm.c
-new file mode 100644
-index 0000000..17c9c6e
---- /dev/null
-+++ b/arch/arm/mach-exynos/dev-drm.c
-@@ -0,0 +1,29 @@
-+/*
-+ * linux/arch/arm/mach-exynos/dev-drm.c
-+ *
-+ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * EXYNOS - core DRM device
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/platform_device.h>
-+
-+#include <plat/devs.h>
-+
-+static u64 exynos_drm_dma_mask = DMA_BIT_MASK(32);
-+
-+struct platform_device exynos_device_drm = {
-+	.name	= "exynos-drm",
-+	.dev	= {
-+		.dma_mask		= &exynos_drm_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
+ 	if (NULL == bus || NULL == bus->name ||
+ 			NULL == bus->read ||
+@@ -134,12 +135,20 @@ int mdiobus_register(struct mii_bus *bus)
+ 			if (IS_ERR(phydev)) {
+ 				err = PTR_ERR(phydev);
+ 				goto error;
++			} else if (phydev != NULL) {
++				phynum++;
+ 			}
+ 		}
+ 	}
+ 
++	if (!phynum) {
++		err = -ENODEV;
++		printk(KERN_ERR "%s: no phys found\n", bus->name);
++		goto error;
 +	}
-+};
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 2155d4a..62e6251 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -135,6 +135,8 @@ extern struct platform_device exynos4_device_pd[];
- extern struct platform_device exynos4_device_spdif;
- extern struct platform_device exynos4_device_sysmmu;
- 
-+extern struct platform_device exynos_device_drm;
 +
- extern struct platform_device samsung_asoc_dma;
- extern struct platform_device samsung_asoc_idma;
- extern struct platform_device samsung_device_keypad;
+ 	bus->state = MDIOBUS_REGISTERED;
+-	pr_info("%s: probed\n", bus->name);
++	pr_info("%s: %d phys probed\n", bus->name, phynum);
+ 	return 0;
+ 
+ error:
 -- 
-1.7.1.569.g6f426
+1.7.0.4
