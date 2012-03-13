@@ -1,51 +1,51 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 13 Mar 2012 23:46:39 +0000
-Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <4F5FD706.8040209@freescale.com>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
- <4F591B8D.8090705@freescale.com>
- <20120309013216.GH2499@S2101-09.ap.freescale.net>
- <4F5FD706.8040209@freescale.com>
-Message-ID: <20120313234638.GY3177@opensource.wolfsonmicro.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Mar 2012 16:46:56 -0700
+Subject: [GIT PULL 2/4] Samsung devel-pd for v3.4
+In-Reply-To: <201203102209.22451.rjw@sisk.pl>
+References: <4F5B7C81.6080301@samsung.com>
+ <CAOesGMjff3gVNJQ5FpJuSf+uvVDW8k22b+Xcikot-isM-4-6iw@mail.gmail.com>
+ <201203102209.22451.rjw@sisk.pl>
+Message-ID: <CAOesGMiOXKV03YC=6eG6rHhWw+ObGYoVJCqrPdHAsZLmjjzmtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 06:23:50PM -0500, Timur Tabi wrote:
+Hi,
 
-> sound {
-> 	compatible = "fsl,imx51-babbage-sgtl5000",
-> 		     "fsl,imx-audio-sgtl5000";
-> 	model = "imx51-babbage-sgtl5000";
-> 	ssi-controller = <&ssi1>;
-> 	audio-codec = <&sgtl5000>;
-> 	mux-int-port = <1>;
-> 	mux-ext-port = <3>;
-> };
+On Sat, Mar 10, 2012 at 1:09 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> Hi,
+>
+> On Saturday, March 10, 2012, Olof Johansson wrote:
+>> Hi Rafael,
+>>
+>> The below series contains two patches that have been sent to you, and
+>> that are sitting in the pm-domains branch.
+>>
+>> Two questions before I pull this into arm-soc:
+>>
+>> 1) Are you 100% sure this will be submitted to 3.4? And if so, will
+>> you send it early during the merge window?
+>
+> Yes and yes.
+>
+>> 2) Are you 100% sure you will not rebase the branch into which you
+>> pulled the v3.4-for-rafael branch?
+>
+> Yes, I am.
+>
+>> I am asking because if we pull this in, and you rebase between now and
+>> when it's sent in, we're risking merge conflicts that will be painful
+>> to resolve. We've been bitten by that from other dependencies in the
+>> past so we're being careful.
+>
+> Sure, I understand that.
+>
+> As a general rule, topic braches in my tree whose names start with pm- are
+> never rebased (exactly for this reason).
 
-> How does this handle multiple SSIs, each connected to its own codec?
+Excellent, thanks! I'll pull that in as a depends/ branch in arm-soc
+(since that's how we document it), and mark it in our notes so the
+Samsung branch gets merged after yours when going to Linus.
 
-With this card those would just be separate CODECs.  This is a binding
-for a simple card.
 
-> And where's the binding for the DMA controller?
 
-The DMA controller is transparently instantiated on Tegra systems, there
-really isn't a meaningfully separate DMA controller - the I2S controller
-specifies the signal to use.  Currently the card takes care of the ASoC
-level driver stuff but it really should be done by the I2S controller.
-
-> I honestly don't see how this is an improvement over what I came up with.
-
-The biggest improvement is that the SoC binding knows nothing about the
-card binding at all, cards are completely separate and are free to
-define any binding they choose using any number of on-SoC and off-SoC
-devices.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/db40adc5/attachment.sig>
+-Olof
