@@ -1,38 +1,48 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 13 Mar 2012 11:49:54 -0500
-Subject: [PATCH v4 04/11] ep93xx: Use ioremap for backlight driver
-In-Reply-To: <1331592502-9083-5-git-send-email-rmallon@gmail.com>
-References: <1331592502-9083-5-git-send-email-rmallon@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020695AB97F3@AUSP01VMBX24.collaborationhost.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 13 Mar 2012 17:52:14 +0100
+Subject: [PATCH v1 3/5] ARM: imx28evk: add mmc dt support
+In-Reply-To: <4F5F5C22.1080506@gmail.com>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-4-git-send-email-b29396@freescale.com>
+ <4F5F5C22.1080506@gmail.com>
+Message-ID: <20120313165214.GO26642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 12, 2012 3:48 PM, Ryan Mallon wrote:
->
-> The ep93xx backlight driver uses a single register within the
-> framebuffer's register space. Currently the backlight driver uses a
-> static IO mapping for the register since the memory cannot be
-> requested by both drivers.
->
-> Convert the static mapping to use ioremap so that we can remove the
-> dependency on mach/hardware.h. To do so, we need remove the
-> request_mem_region from both the backlight and framebuffer drivers,
-> since whichever driver is loaded second will fail with -EBUSY
-> otherwise.
->
-> A proper fix is still required, and a FIXME comment has been added to
-> both drivers.
->
-> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Mika Westerberg <mika.westerberg@iki.fi>
-> Cc: Richard Purdie <rpurdie@rpsys.net>
-> Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-> ---
->  arch/arm/mach-ep93xx/core.c         |   10 ++++++++++
->  drivers/video/backlight/ep93xx_bl.c |   25 ++++++++++++++-----------
->  drivers/video/ep93xx-fb.c           |   15 +++++++++------
->  3 files changed, 33 insertions(+), 17 deletions(-)
+On Tue, Mar 13, 2012 at 09:39:30AM -0500, Rob Herring wrote:
+> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/imx28-evk.dts |   14 ++++++++++++++
+> >  arch/arm/boot/dts/imx28.dtsi    |   33 +++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-mxs/imx28-dt.c    |    2 ++
+> >  3 files changed, 49 insertions(+), 0 deletions(-)
+> 
+> snip
+> 
+> > diff --git a/arch/arm/mach-mxs/imx28-dt.c b/arch/arm/mach-mxs/imx28-dt.c
+> > index 78d1129..429b88e 100644
+> > --- a/arch/arm/mach-mxs/imx28-dt.c
+> > +++ b/arch/arm/mach-mxs/imx28-dt.c
+> > @@ -23,6 +23,8 @@ static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
+> >  	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
+> >  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
+> >  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
+> > +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP0_BASE_ADDR, "mxs-mmc.0", NULL),
+> > +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP1_BASE_ADDR, "mxs-mmc.1", NULL),
+> 
+> Why is this needed?
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+These are needed for the drivers which have still the mxs-mmc.* names
+to find their clocks. Alternatively we could also add the appropriate
+clocks to the clock file. Don't know if that's better though.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
