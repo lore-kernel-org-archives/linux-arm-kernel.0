@@ -1,70 +1,25 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Tue, 13 Mar 2012 19:05:40 +0100
-Subject: [PATCH] efikamx: match machine descriptions with legacy
-In-Reply-To: <CAODfWeE86mUf17CAZ+aa1bKxX4Toq9ogm01tDEMVYcnqu96LAg@mail.gmail.com>
-References: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
- <CAODfWeE86mUf17CAZ+aa1bKxX4Toq9ogm01tDEMVYcnqu96LAg@mail.gmail.com>
-Message-ID: <CAODfWeGKRqbQuB20rFOJC6wgwqTGt9eZOog8fOWfB-3GQC0cFw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 13 Mar 2012 12:18:03 -0600
+Subject: [PATCH v3 2/2] regulator: add device tree support for max8997
+In-Reply-To: <CAJuYYwRAXyU7d7qhGUX-=qWUJ0M1KB3XCGPOnUxToP=0XOhzqg@mail.gmail.com>
+References: <1330000688-11226-1-git-send-email-thomas.abraham@linaro.org>
+ <1330000688-11226-3-git-send-email-thomas.abraham@linaro.org>
+ <20120313034306.16CF73E07E4@localhost>
+ <CAJuYYwRAXyU7d7qhGUX-=qWUJ0M1KB3XCGPOnUxToP=0XOhzqg@mail.gmail.com>
+Message-ID: <20120313181803.B45073E053B@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sending as I forgot to CC Sascha
+On Tue, 13 Mar 2012 12:14:42 +0530, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> On 13 March 2012 09:13, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > On Thu, 23 Feb 2012 18:08:08 +0530, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> > Otherwise, the patch looks pretty good. ??(although seeing the decode function
+> > has got me thinking that we need a much better way of decoding the dt data).
+> 
+> The parsing function looks huge since there is lot of data to pick up
+> from the dt node.
 
-2012/3/11 Hector Oron <hector.oron@gmail.com>:
-> Hello,
->
-> 2012/2/21 Hector Oron <hector.oron@gmail.com>:
->> ?Rename machine descriptions to match legacy descriptions distributed by
->> ?manufacturer BSP. This way distributions can do clean upgrades from
->> ?userspace scripts which check for these values to differentiate platforms
->> ?with single kernel binaries.
->>
->> Signed-off-by: Hector Oron <hector.oron@gmail.com>
->> Acked-by: Matt Sealey <matt@genesi-usa.com>
->> ---
->> ?arch/arm/mach-mx5/board-mx51_efikamx.c | ? ?3 +--
->> ?arch/arm/mach-mx5/board-mx51_efikasb.c | ? ?2 +-
->> ?2 files changed, 2 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
->> index 3a5ed2d..fbfccc7 100644
->> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
->> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
->> @@ -283,8 +283,7 @@ static struct sys_timer mx51_efikamx_timer = {
->> ? ? ? ?.init = mx51_efikamx_timer_init,
->> ?};
->>
->> -MACHINE_START(MX51_EFIKAMX, "Genesi EfikaMX nettop")
->> - ? ? ? /* Maintainer: Amit Kucheria <amit.kucheria@linaro.org> */
->> +MACHINE_START(MX51_EFIKAMX, "Genesi Efika MX (Smarttop)")
->> ? ? ? ?.atag_offset = 0x100,
->> ? ? ? ?.map_io = mx51_map_io,
->> ? ? ? ?.init_early = imx51_init_early,
->> diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
->> index 4baf05c..dedbca5 100644
->> --- a/arch/arm/mach-mx5/board-mx51_efikasb.c
->> +++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
->> @@ -483,7 +483,7 @@ static struct sys_timer mx51_efikasb_timer = {
->> ? ? ? ?.init ? = mx51_efikasb_timer_init,
->> ?};
->>
->> -MACHINE_START(MX51_EFIKASB, "Genesi Efika Smartbook")
->> +MACHINE_START(MX51_EFIKASB, "Genesi Efika MX (Smartbook)")
->> ? ? ? ?.atag_offset = 0x100,
->> ? ? ? ?.map_io = mx51_map_io,
->> ? ? ? ?.init_early = imx51_init_early,
->> --
->> 1.7.9
->>
->
-> Ping!
-> I dont see the patch being applied. Is there any problem with it?
->
-> Cheers,
-> --
-> ?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
+Oh, I understand that you have to do it this way; I just think the core code
+should make it a lot easier.  :-)
 
-
-
--- 
-?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
+g.
