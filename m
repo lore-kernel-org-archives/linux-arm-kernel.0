@@ -1,47 +1,36 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Tue, 13 Mar 2012 18:16:39 +0530
-Subject: [PATCH v3 2/2] DMAEngine: Add DMAEngine driver based on old MSM
- DMA APIs
-In-Reply-To: <20120312201421.GA3459@fifo99.com>
-References: <1331548364-27845-1-git-send-email-kumarrav@codeaurora.org>
- <20120312201421.GA3459@fifo99.com>
-Message-ID: <4F5F41AF.1090907@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Mar 2012 13:09:21 +0000
+Subject: [PATCH v8 0/4] USB: OHCI-HCD: Support for LPC32xx
+In-Reply-To: <1331589292-18986-1-git-send-email-stigge@antcom.de>
+References: <1331589292-18986-1-git-send-email-stigge@antcom.de>
+Message-ID: <201203131309.21529.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/13/2012 1:44 AM, Daniel Walker wrote:
-> On Mon, Mar 12, 2012 at 04:02:44PM +0530, Ravi Kumar V wrote:
->> Add DMAEngine based driver using the old MSM DMA APIs internally.
->
-> What do you mean by this?
->
-There is a MSM DMA driver in arch/arm/mach-msm/ which is not in
-dmaengine framework standards, but that driver is been used by client 
-drivers nand, eMMC and serial drivers. Now if we implement the whole dma 
-driver using dmaengine framework then nand, eMMC like drivers will be 
-failed as they are using old dma driver API's, so instead of 
-implementing new driver from scratch we are keeping the old dma API's as 
-it is and using those API's in new dmaengine framework.So that we can 
-convert clients drivers to use dma engine framework.
+On Monday 12 March 2012, Roland Stigge wrote:
+> These patches add support for the LPC32xx to the ohci-pnx4008 driver and make
+> the driver use smbus functions.
+> 
+> As discussed with Greg-KH on the USB mailing list, the ohci-pnx4008 driver is
+> first renamed to reflect its multi-platform support. The second patch also
+> renames the respective pnx4008_* symbols accordingly.
+> 
+> The third patch adds the actual lpc32xx support.
+> 
+> The fourth patch removes the re-coded i2c_write() by using an existing smbus
+> function. You can leave out this very single patch to still have the desired
+> LPC32xx support. It just fixes existing kernel code to only use smbus calls in
+> this driver.
+> 
+> Applies to v3.3-rc7
+> 
+> Changes since v7:
+> 
+> * Removed pnx4008 filename reference
+> * Rename via git format-patch -M
+> 
+> Thanks to Arnd Bergmann and Wolfram Sang for reviewing!
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
->> The benefit of this approach is that not all the drivers
->> have to get converted to DMAEngine APIs simultaneosly while
->> both the drivers can stay enabled in the kernel. The client
->> drivers using the old MSM APIs directly can now convert to
->> DMAEngine one by one.
->
-> Which drivers?
-
-client drivers which are using dma.
->
-> Daniel
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
