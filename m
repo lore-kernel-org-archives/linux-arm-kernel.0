@@ -1,185 +1,276 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 13 Mar 2012 16:47:05 +0800
-Subject: [PATCH v1 2/5] mmc: mxs-mmc: add dt probe support
+Date: Tue, 13 Mar 2012 16:47:04 +0800
+Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
 In-Reply-To: <1331628428-24017-1-git-send-email-b29396@freescale.com>
 References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
-Message-ID: <1331628428-24017-3-git-send-email-b29396@freescale.com>
+Message-ID: <1331628428-24017-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
+This patch includes basic dt support which can boot via nfs rootfs.
+
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-
 ---
-The patch is still using a private way for dma part binding
-since the common dma binding is still under discussion.
-http://www.spinics.net/lists/linux-omap/msg65528.html
+ Documentation/devicetree/bindings/arm/fsl.txt |    4 +
+ arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
+ arch/arm/boot/dts/imx28.dtsi                  |   88 +++++++++++++++++++++++++
+ arch/arm/mach-mxs/Kconfig                     |    9 +++
+ arch/arm/mach-mxs/Makefile                    |    1 +
+ arch/arm/mach-mxs/imx28-dt.c                  |   67 +++++++++++++++++++
+ 6 files changed, 200 insertions(+), 0 deletions(-)
 
-Will update to use common dma binding when it hits mainline.
----
- .../devicetree/bindings/mmc/fsl-mxs-mmc.txt        |   23 ++++++
- drivers/mmc/host/mxs-mmc.c                         |   82 +++++++++++++++++++-
- 2 files changed, 102 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 54bddda..9f21faf 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -1,6 +1,10 @@
+ Freescale i.MX Platforms Device Tree Bindings
+ -----------------------------------------------
+ 
++i.MX28 Evaluation Kit
++Required root node properties:
++    - compatible = "fsl,imx28-evk", "fsl,imx28";
++
+ i.MX51 Babbage Board
+ Required root node properties:
+     - compatible = "fsl,imx51-babbage", "fsl,imx51";
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
 new file mode 100644
-index 0000000..adc1142
+index 0000000..9758dc4
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt
-@@ -0,0 +1,23 @@
-+* FREESCALE MXS MMC peripheral
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -0,0 +1,31 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
-+Required properties:
-+- compatible : Should be "fsl,<chip>-mmc"
-+- reg : Should contain registers location and length
-+- interrupts : Should contain interrupt.
-+  The format is <irq_err irq_dma>.
-+- dma_channel: Should contain the dma channel it uses
++/dts-v1/;
++/include/ "imx28.dtsi"
 +
-+Optional properties:
-+- wp-gpios : Specify GPIOs for write protection
-+- slot-4bit: Specify 4 bit mode support
-+- slot-8bit: Specify 8 bit and 4 bit mode support
++/ {
++	model = "Freescale i.MX28 Evaluation Kit";
++	compatible = "fsl,imx28-evk", "fsl,imx28";
 +
-+Examples:
-+mmc1: ssp at 80010000 {
-+	compatible = "fsl,imx28-mmc";
-+	reg = <0x80010000 2000>;
-+	/* <irq_err irq_dma> */
-+	interrupts = <96 82>;
-+	dma_channel = <0>;
-+	slot-8bit;
++	memory {
++		device_type = "memory";
++		reg = <0x40000000 0x08000000>;
++	};
++
++	ahb at 80080000 {
++		fec at 800f0000 {
++			phy-mode = "rmii";
++			local-mac-address = [00 04 9F 01 7D 5B];
++			status = "okay";
++		};
++	};
 +};
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 382c835..6cf2d17 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -38,6 +38,10 @@
- #include <linux/gpio.h>
- #include <linux/regulator/consumer.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/slab.h>
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+new file mode 100644
+index 0000000..acf0dab
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -0,0 +1,88 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	interrupt-parent = <&icoll>;
++
++	aliases {
++		serial0 = &uart1;
++	};
++
++	cpus {
++		cpu at 0 {
++			compatible = "arm,arm926ejs";
++		};
++	};
++
++	apb at 80000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x80000000 0x80000>;
++		ranges;
++
++		apbh at 80000000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x80000000 0x3c900>;
++			ranges;
++
++			icoll: interrupt-controller at 80000000 {
++				compatible = "fsl,imx28-icoll";
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				reg = <0x80000000 0x2000>;
++			};
++		};
++
++		apbx at 80040000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x80040000 0x40000>;
++			ranges;
++
++			uart1: uart at 80074000 {
++				compatible = "arm,pl011", "arm,primecell";
++				reg = <0x80074000 0x2000>;
++				interrupts = <47>;
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x80080000 0x80000>;
++		ranges;
++
++		fec at 800f0000 {
++			compatible = "fsl,imx28-fec";
++			reg = <0x800f0000 0x4000>;
++			interrupts = <101>;
++			status = "disabled";
++		};
++
++		fec at 800f4000 {
++			compatible = "fsl,imx28-fec";
++			reg = <0x800f4000 0x4000>;
++			interrupts = <102>;
++			status = "disabled";
++		};
++
++	};
++};
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index c57f996..6ab66af 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -17,6 +17,15 @@ config SOC_IMX28
  
- #include <mach/mxs.h>
- #include <mach/common.h>
-@@ -673,17 +677,79 @@ static bool mxs_mmc_dma_filter(struct dma_chan *chan, void *param)
- 	return true;
- }
+ comment "MXS platforms:"
  
-+#ifdef CONFIG_OF
-+static struct resource * __devinit mxs_mmc_get_of_dmares(
-+				struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct resource *dmares;
-+	int ret;
++config MACH_IMX28_DT
++	bool "Support i.MX28 platforms from device tree"
++	select SOC_IMX28
++	select USE_OF
++	select MACH_MX28EVK
++	help
++	  Include support for Freescale i.MX28 based platforms
++	  using the device tree for discovery
 +
-+	if (!np)
-+		return NULL;
-+
-+	dmares = kzalloc(sizeof(*dmares), GFP_KERNEL);
-+	dmares->flags = IORESOURCE_DMA;
-+	ret = of_property_read_u32(np, "dma_channel", &dmares->start);
-+	if (ret) {
-+		dev_err(&pdev->dev, "unable to get dmares from dt\n");
-+		return NULL;
-+	}
-+	dmares->end = dmares->start;
-+
-+	return dmares;
-+}
-+
-+static int __devinit mxs_mmc_get_of_property(struct platform_device *pdev,
-+				struct mxs_mmc_platform_data **ppdata)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct mxs_mmc_platform_data *pdata = *ppdata;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+
-+	if (of_get_property(np, "slot-8bit", NULL))
-+		pdata->flags |= SLOTF_8_BIT_CAPABLE;
-+
-+	if (of_get_property(np, "slot-4bit", NULL))
-+		pdata->flags |= SLOTF_4_BIT_CAPABLE;
-+
-+	pdata->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
-+
-+	dev_dbg(&pdev->dev, "wp-gpios %d flags %d\n", pdata->wp_gpio,
-+		pdata->flags);
-+
-+	return 0;
-+}
-+#else
-+static struct resource * __devinit mxs_mmc_get_of_dmares(
-+				struct platform_device *pdev)
-+{
-+	return NULL;
-+}
-+static inline int mxs_mmc_get_of_property(struct platform_device *pdev,
-+			struct mxs_mmc_platform_data *pdata)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int mxs_mmc_probe(struct platform_device *pdev)
- {
- 	struct mxs_mmc_host *host;
- 	struct mmc_host *mmc;
- 	struct resource *iores, *dmares, *r;
--	struct mxs_mmc_platform_data *pdata;
-+	struct mxs_mmc_platform_data *pdata = NULL;
- 	int ret = 0, irq_err, irq_dma;
- 	dma_cap_mask_t mask;
+ config MACH_STMP378X_DEVB
+ 	bool "Support STMP378x_devb Platform"
+ 	select SOC_IMX23
+diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+index 908bf9a..25a4122 100644
+--- a/arch/arm/mach-mxs/Makefile
++++ b/arch/arm/mach-mxs/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_PM) += pm.o
+ obj-$(CONFIG_SOC_IMX23) += clock-mx23.o
+ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o
  
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-+	dmares = mxs_mmc_get_of_dmares(pdev);
-+	if (dmares == NULL)
-+		dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
- 	irq_err = platform_get_irq(pdev, 0);
- 	irq_dma = platform_get_irq(pdev, 1);
- 	if (!iores || !dmares || irq_err < 0 || irq_dma < 0)
-@@ -740,7 +806,9 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 	mmc->caps = MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED |
- 		    MMC_CAP_SDIO_IRQ | MMC_CAP_NEEDS_POLL;
- 
--	pdata =	mmc_dev(host->mmc)->platform_data;
-+	mxs_mmc_get_of_property(pdev, &pdata);
-+	if (pdata == NULL)
-+		pdata =	mmc_dev(host->mmc)->platform_data;
- 	if (pdata) {
- 		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
- 			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
-@@ -851,6 +919,13 @@ static const struct dev_pm_ops mxs_mmc_pm_ops = {
- };
- #endif
- 
-+static const struct of_device_id mxs_mmc_dt_ids[] = {
-+	{ .compatible = "fsl,imx23-mmc", .data = NULL, },
-+	{ .compatible = "fsl,imx28-mmc", .data = NULL, },
++obj-$(CONFIG_MACH_IMX28_DT) += imx28-dt.o
+ obj-$(CONFIG_MACH_STMP378X_DEVB) += mach-stmp378x_devb.o
+ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+ obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+diff --git a/arch/arm/mach-mxs/imx28-dt.c b/arch/arm/mach-mxs/imx28-dt.c
+new file mode 100644
+index 0000000..78d1129
+--- /dev/null
++++ b/arch/arm/mach-mxs/imx28-dt.c
+@@ -0,0 +1,67 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/init.h>
++#include <linux/irqdomain.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <mach/common.h>
++#include <mach/mx28.h>
++
++static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
++	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
++	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
++	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
 +	{ /* sentinel */ }
 +};
-+MODULE_DEVICE_TABLE(of, mxs_mmc_dt_ids);
 +
- static struct platform_driver mxs_mmc_driver = {
- 	.probe		= mxs_mmc_probe,
- 	.remove		= mxs_mmc_remove,
-@@ -860,6 +935,7 @@ static struct platform_driver mxs_mmc_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &mxs_mmc_pm_ops,
- #endif
-+		.of_match_table = mxs_mmc_dt_ids,
- 	},
- };
- 
++static void __init imx28_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table,
++			     imx28_auxdata_lookup, NULL);
++}
++
++static const struct of_device_id icoll_of_match[] __initconst = {
++	{ .compatible = "fsl,imx28-icoll", },
++	{},
++};
++
++static void __init imx28_dt_init_irq(void)
++{
++	irq_domain_generate_simple(icoll_of_match, MX28_ICOLL_BASE_ADDR, 0);
++	mx28_init_irq();
++}
++
++static void __init imx28_timer_init(void)
++{
++	mx28_clocks_init();
++}
++
++static struct sys_timer imx28_timer = {
++	.init = imx28_timer_init,
++};
++
++static const char *imx28_dt_compat[] __initdata = {
++	"fsl,imx28-evk",
++	NULL,
++};
++
++DT_MACHINE_START(IMX28, "Freescale i.MX28 (Device Tree)")
++	.map_io		= mx28_map_io,
++	.init_irq	= imx28_dt_init_irq,
++	.timer		= &imx28_timer,
++	.init_machine	= imx28_init,
++	.dt_compat	= imx28_dt_compat,
++	.restart	= mxs_restart,
++MACHINE_END
 -- 
 1.7.0.4
