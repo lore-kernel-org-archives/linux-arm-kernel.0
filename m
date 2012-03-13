@@ -1,69 +1,35 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Tue, 13 Mar 2012 16:04:13 +0530
-Subject: [PATCH 6/6] ARM: OMAP3+: SmartReflex Class3: restrict CPU to run
- on
-In-Reply-To: <1331634381-31436-7-git-send-email-j-pihet@ti.com>
-References: <1331634381-31436-1-git-send-email-j-pihet@ti.com>
- <1331634381-31436-7-git-send-email-j-pihet@ti.com>
-Message-ID: <ef588847b5162cc1174c7cdeffc74ffd@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 13 Mar 2012 11:38:29 +0100
+Subject: [PATCH v6 3/3] clk: basic clock hardware types
+In-Reply-To: <CAKGA1b=huAnG6tLoaGqoFoJnuEg-+rs8KLYVB1KF6_q73ot63A@mail.gmail.com>
+References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
+ <1331366064-1273-4-git-send-email-mturquette@linaro.org>
+ <CAKGA1b=huAnG6tLoaGqoFoJnuEg-+rs8KLYVB1KF6_q73ot63A@mail.gmail.com>
+Message-ID: <20120313103829.GR3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of jean.pihet at newoldbits.com
-> Sent: Tuesday, March 13, 2012 3:56 PM
-> To: linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Kevin Hilman
-> Cc: Nishanth Menon; Jean Pihet
-> Subject: [PATCH 6/6] ARM: OMAP3+: SmartReflex Class3: restrict CPU
-> to run on
->
-> From: Nishanth Menon <nm@ti.com>
->
-> Use SmartReflex AVS Class3 initialization only for OMAP343x family
-> of
-> processors.
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> ---
->  arch/arm/mach-omap2/smartreflex-class3.c |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/smartreflex-class3.c
-> b/arch/arm/mach-omap2/smartreflex-class3.c
-> index 9dcda93..735937a 100644
-> --- a/arch/arm/mach-omap2/smartreflex-class3.c
-> +++ b/arch/arm/mach-omap2/smartreflex-class3.c
-> @@ -11,6 +11,7 @@
->   * published by the Free Software Foundation.
->   */
->
-> +#include <plat/cpu.h>
->  #include "smartreflex.h"
->
->  static int sr_class3_enable(struct voltagedomain *voltdm,
-> @@ -58,6 +59,10 @@ static struct omap_sr_class_data class3_data = {
->  /* Smartreflex Class3 init API to be called from board file */
->  static int __init sr_class3_init(void)
->  {
-> +	/* Enable this class only for OMAP343x */
-> +	if (!cpu_is_omap343x())
-> +		return -EINVAL;
-Wouldn't this break SR on OMAP3630 and OMAP4? Shouldn't this be done once
-you have SR1.5 support in mainline?
+On Mon, Mar 12, 2012 at 10:50:09PM -0500, Matt Sealey wrote:
+> Hi Mike,
+> 
+> Can I suggest/we discuss that we support fractional (i.e. represented
+> by fixed point value with integer and fractional part) dividers in the
+> common divider clock case, simplistically just adding a divider
+> fractional width and shifting all the calculations by it (and fixing
+> the "maxdiv" calculation as in a fractional case width of the divider
+> area in the register is not an indicator of the actual maximum
+> divider)? (I guess for the standard integer divider case, it would be
+> continually shifting by 0 which might make the code a bit bigger, I
+> don't think that would truly be a concern though?)
 
-Vishwa
-> +
->  	pr_info("SmartReflex Class3 initialized\n");
->  	return sr_register_class(&class3_data);
->  }
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-
-> omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I have patches for this, see
+
+git://git.pengutronix.de/git/imx/linux-2.6.git imx/work/imx-clkv6
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
