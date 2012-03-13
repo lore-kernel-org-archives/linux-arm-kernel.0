@@ -1,54 +1,20 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 13 Mar 2012 22:35:22 +0100
-Subject: [PATCH 12/12] ARM: OMAP2+: board-omap4-*: Do not use anymore
- TWL6030_IRQ_BASE in board files
-In-Reply-To: <20120313170756.GK12083@atomide.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-13-git-send-email-b-cousson@ti.com>
- <20120313170756.GK12083@atomide.com>
-Message-ID: <4F5FBD9A.4030607@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 13 Mar 2012 14:40:52 -0700
+Subject: [PATCH 3/4] ARM: create a common IOMEM definition
+In-Reply-To: <1331500100-31351-4-git-send-email-robherring2@gmail.com>
+References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+ <1331500100-31351-4-git-send-email-robherring2@gmail.com>
+Message-ID: <20120313214052.GA16221@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/13/2012 6:07 PM, Tony Lindgren wrote:
-> * Benoit Cousson<b-cousson@ti.com>  [120302 08:19]:
->> With the introduction of dynamically allocated IRQ in the twl6030 driver,
->> the board files can no longer rely of static IRQ defines like before.
->>
->> Retrieve the value dynamically allocated from the mmc ->  twl6030 init
->> callback.
->>
->> Note: The Panda board does not seems to use the card detect IRQ.
->
-> Looks like this one is safe to merge via MFD and does not seem to
-> cause any merge conflicts.
->
-> This one should be folded into patch 08/12 to avoid boot issues
-> for between patches 08 and 12 in this series. Other than that:
+On Sun, Mar 11, 2012 at 04:08:19PM -0500, Rob Herring wrote:
 
-In fact there is no need to merge them. They should just be at the 
-beginning of the series.
+>  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ------
+>  arch/arm/mach-msm/include/mach/msm_iomap.h      |    6 ------
 
-The first patch...
-  mfd: twl6030-irq: Return twl6030_mmc_card_detect IRQ for board setup
+Acked-by: David Brown <davidb@codeaurora.org>
 
--       return 0;
-+
-+       return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
-
-...will just return the proper interrupt number instead of 0, but at 
-that time, the board is still using the static TWL6030_IRQ_BASE + 
-MMCDETECT_INTR_OFFSET value.
-
-Only the next one...
-  ARM: OMAP2+: board-omap4-*: Do not use anymore TWL6030_IRQ_BASE in 
-board files
-...will switch from the static to the value returned by 
-twl6030_mmc_card_detect and then it keeps working.
-
-> Acked-by: Tony Lindgren<tony@atomide.com>
-
-Cool, I'll send the pull request to Samuel ASAP.
-
-Thanks,
-Benoit
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
