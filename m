@@ -1,63 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 13 Mar 2012 08:30:35 -0700
-Subject: [PATCH v3 04/12] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
-In-Reply-To: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
-References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1331652643-12626-5-git-send-email-kgene.kim@samsung.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Tue, 13 Mar 2012 21:13:30 +0530
+Subject: [PATCH v2 0/4] omap hsmmc device tree support
+In-Reply-To: <1331564560-23276-1-git-send-email-rnayak@ti.com>
+References: <1331564560-23276-1-git-send-email-rnayak@ti.com>
+Message-ID: <CANrkHUb3Aypm7H44-6efiEoka_WO20hW1vMy-wBV1RzkRPt_UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In all of Samsung platform, the setup-i2c0.c file for I2C channel 0
-is always compiled. So when supporting new SoC,it should be updated
-for it. Since EXYNOS5 GPIO will be supported after this, there is no
-setup gpio in there now. It will be implemented with that, of course.
+On Mon, Mar 12, 2012 at 8:32 PM, Rajendra Nayak <rnayak@ti.com> wrote:
+> The series adds device tree support for OMAP hsmmc
+> driver.
+>
+> Changes in V2:
+> -1- Minor fixes based on comments from Grant.
+> -2- Added a seperate compatible for omap3.
+> -3- Added a new binding "ti,needs-special-reset"
+> to handle some mmc modules which need special
+> softreset sequence.
+> -4- Updated board dts files with "status = disable;"
+> for unused mmc modules.
+>
+> Rob,
+> I retained your ack on patch 1 despite the additional
+> binding that I added to handle the special softreset
+> sequence. Let me know if you have any issues with it.
+>
+> Chris.
+> Patch 1 and Patch 2 apply cleanly on mmc-next and can
+> be taken in from the mmc tree after relevent acks from
+> DT folks.
+> Patch 3 and Patch 4 which update dts files, I plan to
+> push via linux-omap/Tony's tree.
+Hi Rajendra,
 
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-exynos/Makefile     |    2 +-
- arch/arm/mach-exynos/setup-i2c0.c |    9 ++++++---
- 2 files changed, 7 insertions(+), 4 deletions(-)
+Tested this series on omap4sdp, so feel free to add
+Tested-by: Balaji T K <balajitk@ti.com>
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 995e7cc..2117f02 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -52,7 +52,7 @@ obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
- obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
- obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
- 
--obj-$(CONFIG_ARCH_EXYNOS4)		+= setup-i2c0.o
-+obj-$(CONFIG_ARCH_EXYNOS)		+= setup-i2c0.o
- obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
- obj-$(CONFIG_EXYNOS4_SETUP_FIMD0)	+= setup-fimd0.o
- obj-$(CONFIG_EXYNOS4_SETUP_I2C1)	+= setup-i2c1.o
-diff --git a/arch/arm/mach-exynos/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
-index d395bd1..b90d94c 100644
---- a/arch/arm/mach-exynos/setup-i2c0.c
-+++ b/arch/arm/mach-exynos/setup-i2c0.c
-@@ -1,7 +1,5 @@
- /*
-- * linux/arch/arm/mach-exynos4/setup-i2c0.c
-- *
-- * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-+ * Copyright (c) 2009-2012 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-  *
-  * I2C0 GPIO configuration.
-@@ -18,9 +16,14 @@ struct platform_device; /* don't need the contents */
- #include <linux/gpio.h>
- #include <plat/iic.h>
- #include <plat/gpio-cfg.h>
-+#include <plat/cpu.h>
- 
- void s3c_i2c0_cfg_gpio(struct platform_device *dev)
- {
-+	if (soc_is_exynos5250())
-+		/* will be implemented with gpio function */
-+		return;
-+
- 	s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
- 			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
- }
--- 
-1.7.4.4
+>
+> The series is tested on omap4sdp (both external and emmc),
+> omap4panda amd omap3beagle boards.
+>
+> Things to do:
+> -1- Card detect isn't functional and needs twl4030 gpio
+> to be DT converted.
+> -2- pbias cell programming is missing and needs an OMAP
+> control module driver.
+>
+> Rajendra Nayak (4):
+> ?mmc: omap_hsmmc: Convert hsmmc driver to use device tree
+> ?mmc: omap_hsmmc: Avoid a regulator voltage change with dt
+> ?arm/dts: OMAP4: Add mmc controller nodes and board data
+> ?arm/dts: OMAP3: Add mmc controller nodes and board data
+>
+> ?.../devicetree/bindings/mmc/ti-omap-hsmmc.txt ? ? ?| ? 33 +++++++
+> ?arch/arm/boot/dts/omap3-beagle.dts ? ? ? ? ? ? ? ? | ? 14 +++
+> ?arch/arm/boot/dts/omap3.dtsi ? ? ? ? ? ? ? ? ? ? ? | ? 16 ++++
+> ?arch/arm/boot/dts/omap4-panda.dts ? ? ? ? ? ? ? ? ?| ? 22 +++++
+> ?arch/arm/boot/dts/omap4-sdp.dts ? ? ? ? ? ? ? ? ? ?| ? 24 ++++++
+> ?arch/arm/boot/dts/omap4.dtsi ? ? ? ? ? ? ? ? ? ? ? | ? 31 +++++++
+> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? ? ? ? ? ? ? ?| ? 88 +++++++++++++++++++-
+> ?7 files changed, 227 insertions(+), 1 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
