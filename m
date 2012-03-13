@@ -1,42 +1,36 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 13 Mar 2012 20:46:17 +0100
-Subject: [PATCH 1/5 v4] i2c/gpio: add DT support
-In-Reply-To: <20120313164756.GF18320@game.jcrosoft.org>
-References: <1331642024-19869-1-git-send-email-plagnioj@jcrosoft.com>
- <20120313140822.GD2488@pengutronix.de>
- <20120313164756.GF18320@game.jcrosoft.org>
-Message-ID: <20120313194616.GE2488@pengutronix.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 13 Mar 2012 21:36:56 +0100
+Subject: [INFO] : Hibernation and Resume between 2 similar devices
+In-Reply-To: <28119509.96581331614425960.JavaMail.weblogic@epml27>
+References: <28119509.96581331614425960.JavaMail.weblogic@epml27>
+Message-ID: <201203132136.56353.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 05:47:56PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 15:08 Tue 13 Mar     , Wolfram Sang wrote:
-> > On Tue, Mar 13, 2012 at 01:33:40PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > 
-> > > update to use devm_kzalloc for private data
-> > 
-> > Hmm, you need really to work on the commit messages, not everybody is
-> > familiar with DT and its implications:
-> > 
-> > "To achieve DT support, we need to populate a custom platform_data in a
-> > private struct from DT information. To simplify code, the adapter and
-> > algorithm are also put into the private struct."
-> > 
-> ok I put this can I get the Ack ?
+On Tuesday, March 13, 2012, PINTU KUMAR wrote:
+> Dear All,
+> 
+> I am just curious to know if it is possible to "Hibernate in one device" and "Resume the hibernated image from another similar device".
 
-Yes.
+Not out of the box (you'd need to hack the kernel for that to work I think,
+at least on x86) and the devices would need to be _exactly_ identical.
+Moreover, if there is read-write mass storage in them, the filesystems on
+both would have to be exactly identical as well (including metadata and data
+layout etc.).
 
-> I need to send the pull asap
+> Suppose, I have 2 exactly similar device (Laptop or mobile phone) with me.
+> At one time I will be working on only one device at a time.
+> Suppose I started my work on "Device 1"  with few opened application and later I wanted to switch to "Device 2" which is exactly similar to Device 1.
+> I thought to hibernate (suspend to disk) the Device 1 and store the hibernated image as a swap file and later transfer to sd card.
+> Then take of the sd card from Device 1 and put it into Device 2.
+> Copy the swap file from sd card to Device 2 in some swap partition.
+> Then reboot the Device 2 to Resume from this swap file.
+> I will get back my Device 1 content in Device 2.
+> 
+> Hope this is possible ?
 
-Please, no rush. Makes it too easy for bugs to slip in...
+It may be possible to make it kind of work, but I wouldn't recommend it to
+anyone.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/7cf3bc0a/attachment.sig>
+Thanks,
+Rafael
