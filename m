@@ -1,60 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Mar 2012 18:23:53 -0700
-Subject: Conflict between Versatile Express DT conversion and local timer
- updates
-In-Reply-To: <20120312235951.GA31601@n2100.arm.linux.org.uk>
-References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
- <20120312235951.GA31601@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMjt26JgySpcqVT+PsSgGq9cxQWn+msG4DSwo=2ykGz91A@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 12 Mar 2012 20:34:51 -0500
+Subject: [PATCH v4 0/2] ARM: Exynos: Add irq_domain and device tree support
+ for combiner
+In-Reply-To: <1329798806-32482-1-git-send-email-thomas.abraham@linaro.org>
+References: <1329798806-32482-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4F5EA43B.8040802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/20/2012 10:33 PM, Thomas Abraham wrote:
+> Changes since v3:
+> - In dt case, the use of fixed gic linux irq number to map the combiner
+>   interrupt output is removed. This is replaced with the interrupt number
+>   obtained from the gic irq domain. (Thanks to Rob Herring and Grant
+>   Likely for this suggestion).
+> - Split the patch into two parts - irq_domain and device tree support
+>   addition.
+> 
+> Changes since v2:
+> - Rebased to Grant's irqdomain/next branch.
+> 
+> Changes since v1:
+> - Includes all changes suggested by Rob Herring.
+> - Tested with SPARSE_IRQ enabled.
+> 
+> This patchset adds irq_domain and device tree support for the Exynos Interrupt
+> Combiner controller.
+> 
+> The first patch adds a common irq domain for the interrupts managed by the
+> interrupt combiners. All the instances of irq combiner reference the common irq
+> domain for translating hardware interrupts to linux irq number.
+> 
+> The second patch adds a interrupt specifier translator to support device tree
+> based instantiation. It can translate interrupt specifiers for device nodes
+> which use combiner as their interrupt parent.
+> 
+> This patchset is based on
+> http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git [for-next]
+> 
+> with all irq_domain (v5) patches merged from
+> http://git.secretlab.ca/git/linux-2.6.git [irqdomain/next]
+> 
+> Thomas Abraham (2):
+>   ARM: Exynos: Add irq_domain support for interrupt combiner
+>   ARM: Exynos: Add device tree support for interrupt combiner
+> 
+>  .../bindings/arm/samsung/interrupt-combiner.txt    |   48 +++++++++
+>  arch/arm/mach-exynos/common.c                      |  112 ++++++++++++++++----
+>  2 files changed, 140 insertions(+), 20 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/samsung/interrupt-combiner.txt
 
-On Mon, Mar 12, 2012 at 4:59 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Mar 12, 2012 at 11:10:16PM +0000, Russell King - ARM Linux wrote:
->> Marc, Pawel,
->>
->> Your changes are conflicting badly. ?Seriously badly. ?So badly that I'm
->> not bothering to fix the conflicts because I can't work out what the fix
->> should be.
->>
->> You both work for the same frigging organization and yet you seem to
->> work completely independently (I really don't care if you work in
->> different departments - the fact of the matter is you're touching the
->> same code in completely different ways with zero coordination between
->> yourselves. ?That's simply broken workflow.)
->>
->> For example, Marc's deleting arch/arm/plat-versatile/localtimer.c, but
->> Pawel is modifying it to add DT support for Versatile Express. ?The
->> correct solution? ?Hell knows. ?And I don't want a solution to the merge
->> conflict. ?I want the merge conflict to go away (because I'm not frigging
->> around applying the same git-rerere immune fixes to a tree I'm regenerating
->> each night for the kernel autobuilder.)
->>
->> I'm getting conflicts in arch/arm/mach-vexpress/ct-ca9x4.c and
->> arch/arm/mach-ux500/timer.c as well, which I'm not going to bother trying
->> to sort out - the obvious solution for ux500/timer.c doesn't look right.
->>
->> I've a mind to drop the localtimer changes on the floor until after this
->> merge window, but unfortunately they're part of devel-stable so I can't.
->
-> Correction: I haven't been pushing out my devel-stable branch for
-> apparantly two months (according to gitweb, and no one noticed?), so I
-> _could_ drop the merge of Marc's tree until the conflicts can be sanely
-> resolved.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-I haven't noticed because I stopped tracking your tree directly when
-you were having server load issues; I tend to have kept an eye on
-linux-next-level breakage instead, but probably not as close as I
-should have.
-
-Dropping Marc's branch and having him either resubmit on top of
-arm-soc like the io cleanup was done, or pull it in as an early
-dependency for 3.5 and stage it in an for-armsoc branch sounds like
-two good options to me, with no real preference in either direction.
-
-
-
--Olof
+Rob
