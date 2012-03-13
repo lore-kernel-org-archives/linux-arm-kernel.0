@@ -1,27 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Mar 2012 09:58:30 +0000
-Subject: [PATCH 7/7] ARM: kirkwood: use devicetree for rtc-mv
-In-Reply-To: <92d02581e0fce75f84d61edf55678108237e881a.1331601448.git.jason@lakedaemon.net>
-References: <cover.1331601448.git.jason@lakedaemon.net>
- <92d02581e0fce75f84d61edf55678108237e881a.1331601448.git.jason@lakedaemon.net>
-Message-ID: <201203130958.31223.arnd@arndb.de>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Tue, 13 Mar 2012 11:00:24 +0100
+Subject: [PATCH v11 3/3] iommu/exynos: Add iommu driver for Exynos
+ Platforms
+In-Reply-To: <CAHQjnOOCQb4G1aeFB0FQVBstXpaXmahnQO8+FoinPcQNZEieGg@mail.gmail.com>
+References: <017a01ccfdee$4e5e7a00$eb1b6e00$%cho@samsung.com>
+ <20120312150156.GF18973@amd.com>
+ <CAHQjnOOCQb4G1aeFB0FQVBstXpaXmahnQO8+FoinPcQNZEieGg@mail.gmail.com>
+Message-ID: <20120313100024.GG18973@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 March 2012, Jason Cooper wrote:
-> 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/boot/dts/kirkwood.dtsi   |    6 ++++++
->  arch/arm/mach-kirkwood/board-dt.c |    1 -
->  arch/arm/mach-kirkwood/common.c   |    2 +-
->  arch/arm/mach-kirkwood/common.h   |    1 -
->  4 files changed, 7 insertions(+), 3 deletions(-)
-> 
+On Tue, Mar 13, 2012 at 05:50:16PM +0900, KyongHo Cho wrote:
+> >> +struct sysmmu_drvdata {
+> >> + ? ? struct device *sysmmu;
+> >> + ? ? char *dbgname;
+> >> + ? ? int nsfrs;
+> >> + ? ? void __iomem **sfrbases;
+> >> + ? ? struct clk *clk[2];
+> >> + ? ? int activations;
+> >> + ? ? rwlock_t lock;
+> >> + ? ? struct iommu_domain *domain;
+> >> + ? ? sysmmu_fault_handler_t fault_handler;
+> >> + ? ? unsigned long pgtable;
+> >> + ? ? struct iommu_client client;
+> >> +};
+> >
+> > Is there any reason why 'struct iommu_client' is a seperate data
+> > structure? Otherwise it can be merged with 'truct sysmmu_drvdata'.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Of course this doesn't need to be changed immediatly. I just asked if
+there was a specific reason for this seperation.
 
-I think you can just merge this with patch 6, as they are two halves
-of the same work.
+> The problems will be soon fixed and I will post next patch tomorrow.
 
-	Arnd
+Fine. Please also get the Acked-bys from the Exynos maintainer on
+patches 1 and 2 at least. I'll merge it then.
+
+
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
