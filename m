@@ -1,103 +1,70 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 13 Mar 2012 18:34:32 +0900
-Subject: [PATCH v3 2/3] video: s3c-fb: remove 'default_win' element from
- platform data
-In-Reply-To: <1331585999-8604-3-git-send-email-thomas.abraham@linaro.org>
-References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
- <1331585999-8604-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <002e01cd00fc$7efad9e0$7cf08da0$%han@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Mar 2012 09:39:57 +0000
+Subject: Conflict between Versatile Express DT conversion and local timer
+ updates
+In-Reply-To: <CAOesGMjt26JgySpcqVT+PsSgGq9cxQWn+msG4DSwo=2ykGz91A@mail.gmail.com>
+References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
+ <20120312235951.GA31601@n2100.arm.linux.org.uk>
+ <CAOesGMjt26JgySpcqVT+PsSgGq9cxQWn+msG4DSwo=2ykGz91A@mail.gmail.com>
+Message-ID: <4F5F15ED.2010602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.abraham@linaro.org>
+On 13/03/12 01:23, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, Mar 12, 2012 at 4:59 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Mar 12, 2012 at 11:10:16PM +0000, Russell King - ARM Linux wrote:
+>>> Marc, Pawel,
+>>>
+>>> Your changes are conflicting badly.  Seriously badly.  So badly that I'm
+>>> not bothering to fix the conflicts because I can't work out what the fix
+>>> should be.
+>>>
+>>> You both work for the same frigging organization and yet you seem to
+>>> work completely independently (I really don't care if you work in
+>>> different departments - the fact of the matter is you're touching the
+>>> same code in completely different ways with zero coordination between
+>>> yourselves.  That's simply broken workflow.)
+>>>
+>>> For example, Marc's deleting arch/arm/plat-versatile/localtimer.c, but
+>>> Pawel is modifying it to add DT support for Versatile Express.  The
+>>> correct solution?  Hell knows.  And I don't want a solution to the merge
+>>> conflict.  I want the merge conflict to go away (because I'm not frigging
+>>> around applying the same git-rerere immune fixes to a tree I'm regenerating
+>>> each night for the kernel autobuilder.)
+>>>
+>>> I'm getting conflicts in arch/arm/mach-vexpress/ct-ca9x4.c and
+>>> arch/arm/mach-ux500/timer.c as well, which I'm not going to bother trying
+>>> to sort out - the obvious solution for ux500/timer.c doesn't look right.
+>>>
+>>> I've a mind to drop the localtimer changes on the floor until after this
+>>> merge window, but unfortunately they're part of devel-stable so I can't.
+>>
+>> Correction: I haven't been pushing out my devel-stable branch for
+>> apparantly two months (according to gitweb, and no one noticed?), so I
+>> _could_ drop the merge of Marc's tree until the conflicts can be sanely
+>> resolved.
+> 
+> I haven't noticed because I stopped tracking your tree directly when
+> you were having server load issues; I tend to have kept an eye on
+> linux-next-level breakage instead, but probably not as close as I
+> should have.
+> 
+> Dropping Marc's branch and having him either resubmit on top of
+> arm-soc like the io cleanup was done, or pull it in as an early
+> dependency for 3.5 and stage it in an for-armsoc branch sounds like
+> two good options to me, with no real preference in either direction.
 
-The decision to enable or disable the data output to the lcd panel from
-the controller need not be based on the value of 'default_win' element
-in the platform data. Instead, the data output to the panel is enabled
-if any of the windows are active, else data output is disabled.
+I'm happy to rebase my patches on anything that will make the merge
+easier (IOW conflict-less).
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
-v3: fix some minor coding styles
+Russell, would you prefer this series to go via armsoc? This seems the
+cleanest solution for the time being.
 
- arch/arm/plat-samsung/include/plat/fb.h |    3 ---
- drivers/video/s3c-fb.c                  |   24 +++++-------------------
- 2 files changed, 5 insertions(+), 22 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index 39d6bd7..b885322 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -43,7 +43,6 @@ struct s3c_fb_pd_win {
-  * @setup_gpio: Setup the external GPIO pins to the right state to transfer
-  *		the data from the display system to the connected display
-  *		device.
-- * @default_win: default window layer number to be used for UI layer.
-  * @vidcon0: The base vidcon0 values to control the panel data format.
-  * @vidcon1: The base vidcon1 values to control the panel data output.
-  * @vtiming: Video timing when connected to a RGB type panel.
-@@ -62,8 +61,6 @@ struct s3c_fb_platdata {
- 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
- 	struct fb_videomode     *vtiming;
- 
--	u32			 default_win;
--
- 	u32			 vidcon0;
- 	u32			 vidcon1;
- };
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index c94f40d..dd816fb 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -531,7 +531,7 @@ static int s3c_fb_set_par(struct fb_info *info)
- 	/* disable the window whilst we update it */
- 	writel(0, regs + WINCON(win_no));
- 
--	if (win_no == sfb->pdata->default_win)
-+	if (!sfb->output_on)
- 		s3c_fb_enable(sfb, 1);
- 
- 	/* write the buffer address */
-@@ -799,6 +799,7 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
- 	struct s3c_fb *sfb = win->parent;
- 	unsigned int index = win->index;
- 	u32 wincon;
-+	u32 output_on = sfb->output_on;
- 
- 	dev_dbg(sfb->dev, "blank mode %d\n", blank_mode);
- 
-@@ -844,27 +845,12 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
- 	 * it is highly likely that we also do not need to output
- 	 * anything.
- 	 */
--
--	/* We could do something like the following code, but the current
--	 * system of using framebuffer events means that we cannot make
--	 * the distinction between just window 0 being inactive and all
--	 * the windows being down.
--	 *
--	 * s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
--	*/
--
--	/* we're stuck with this until we can do something about overriding
--	 * the power control using the blanking event for a single fb.
--	 */
--	if (index == sfb->pdata->default_win) {
--		shadow_protect_win(win, 1);
--		s3c_fb_enable(sfb, blank_mode != FB_BLANK_POWERDOWN ? 1 : 0);
--		shadow_protect_win(win, 0);
--	}
-+	s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
-+	shadow_protect_win(win, 0);
- 
- 	pm_runtime_put_sync(sfb->dev);
- 
--	return 0;
-+	return output_on == sfb->output_on;
- }
- 
- /**
+	M.
 -- 
-1.7.1
+Jazz is not dead. It just smells funny...
