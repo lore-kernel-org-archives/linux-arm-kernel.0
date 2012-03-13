@@ -1,44 +1,72 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 13 Mar 2012 09:31:46 -0700
-Subject: [PATCH] ARM: OMAP4: Workaround the OCP synchronisation issue with
- 32K synctimer.
-In-Reply-To: <4F5F098E.4040006@ti.com> (Santosh Shilimkar's message of "Tue,
- 13 Mar 2012 14:17:10 +0530")
-References: <1331566388-2397-1-git-send-email-santosh.shilimkar@ti.com>
- <87399d225f.fsf@ti.com> <4F5F098E.4040006@ti.com>
-Message-ID: <87vcm8tqbx.fsf@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 13 Mar 2012 11:32:12 -0500
+Subject: [PATCH 3/4] ARM: create a common IOMEM definition
+In-Reply-To: <1331500100-31351-4-git-send-email-robherring2@gmail.com>
+References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
+ <1331500100-31351-4-git-send-email-robherring2@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020695AB97DC@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Sunday, March 11, 2012 2:08 PM, Rob Herring wrote:
+>
+> Several platforms create IOMEM defines for casting to 'void __iomem *',
+> and other platforms are incorrectly using __io() macro for the same
+> purpose. This creates a common definition and removes all the platform
+> specific versions. Rather than try to make linux/io.h and asm/io.h
+> assembly safe, the assembly version of IOMEM is moved into
+> asm/assembler.h.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  arch/arm/include/asm/assembler.h                |    2 ++
+>  arch/arm/include/asm/io.h                       |    2 ++
+>  arch/arm/kernel/debug.S                         |    1 +
+>  arch/arm/kernel/entry-armv.S                    |    1 +
+>  arch/arm/mach-davinci/include/mach/hardware.h   |    6 ------
+>  arch/arm/mach-davinci/include/mach/uncompress.h |    2 ++
+>  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    9 ---------
+>  arch/arm/mach-mmp/include/mach/addr-map.h       |    6 ------
+>  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ------
+>  arch/arm/mach-msm/include/mach/msm_iomap.h      |    6 ------
+>  arch/arm/mach-mxs/include/mach/hardware.h       |    6 ------
+>  arch/arm/mach-omap1/ams-delta-fiq-handler.S     |    1 +
+>  arch/arm/mach-omap1/iomap.h                     |    6 ------
+>  arch/arm/mach-omap2/clock3xxx_data.c            |    1 +
+>  arch/arm/mach-omap2/clock44xx_data.c            |    1 +
+>  arch/arm/mach-omap2/iomap.h                     |    6 ------
+>  arch/arm/mach-rpc/include/mach/hardware.h       |    6 ------
+>  arch/arm/mach-spear3xx/clock.c                  |    1 +
+>  arch/arm/mach-spear6xx/clock.c                  |    1 +
+>  arch/arm/mach-tegra/include/mach/iomap.h        |    6 ------
+>  arch/arm/mach-u300/include/mach/u300-regs.h     |    6 ------
+>  arch/arm/plat-mxc/include/mach/hardware.h       |    6 ------
+>  arch/arm/plat-omap/include/plat/hardware.h      |    6 ------
+>  arch/arm/plat-omap/include/plat/usb.h           |    1 -
+>  arch/arm/plat-spear/include/plat/hardware.h     |    6 ------
+>  25 files changed, 13 insertions(+), 88 deletions(-)
+>
 
-> On Monday 12 March 2012 10:21 PM, Kevin Hilman wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->> 
->>> On OMAP4, recently a synchronisation bug is discovered by hardware
->>> team, which leads to incorrect timer value read from 32K sync timer
->>> IP when the IP is comming out of idle.
->>>
->>> The issue is due to the synchronization methodology used in the SYNCTIMER IP.
->>> The value of the counter register in 32kHz domain is synchronized to the OCP
->>> domain register only at count up event, and if the OCP clock is switched off,
->>> the OCP register gets out of synch until the first count up event after the
->>> clock is switched back -at the next falling edge of the 32kHz clock.
->>>
->>> Further investigation revealed that it applies to gptimer1 and watchdog timer2
->>> as well which may run on 32KHz. This patch fixes the issue for all the
->>> applicable modules.
->> 
->> The changelog describes the problem ver well, but doesn't actually
->> describe the fix (enable static dep.)  Can you update the changelog do
->> describe the fix, and why it fixes the problem.
->> 
-> Sure. Updated patch below. The idea is to ensure that synctimer is
-> syncronised before software does any reads on the counter. The BUG
-> will get fixed in future OMAP designs
+For ep93xx:
 
-Thanks for the updated changelog.
-
-Since this doesn't qualify as a regression, queuing for v3.4 (branch: for_3.4/fixes/pm)
-
-Kevin
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
