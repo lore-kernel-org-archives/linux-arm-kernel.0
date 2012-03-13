@@ -1,47 +1,79 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 13 Mar 2012 23:21:30 +0100
-Subject: [GIT PULL] LPC32xx: Ethernet support
-Message-ID: <4F5FC86A.70501@antcom.de>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Wed, 14 Mar 2012 09:22:37 +1100
+Subject: [PATCH v4 00/11] ep93xx: Move SoC private bits to core
+In-Reply-To: <201203131235.53593.arnd@arndb.de>
+References: <1331592502-9083-1-git-send-email-rmallon@gmail.com>
+ <201203131235.53593.arnd@arndb.de>
+Message-ID: <4F5FC8AD.4070505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On 13/03/12 23:35, Arnd Bergmann wrote:
 
-now that David Miller has accepted the LPC32xx Ethernet patches into
-net-next, I'm providing the respective LPC32xx platform code as described
-below.
+> On Monday 12 March 2012, Ryan Mallon wrote:
+>> This patch series is an effort to move the ep93xx SoC specific code out
+>> of drivers and include/mach into arch/arm/mach-ep93xx. This work
+>> involves the following changes:
+>>
+>>  - Create a new private header called soc.h to replace most of 
+>>    mach/include/ep93xx-regs.h
+>>  - Move the Maverick crunch code from arch/arm/kernel to mach-ep93xx
+>>  - Convert the ep93xx backlight and watchdog drivers to properly
+>>    ioremap memory.
+>>  - Move all system controller access to the ep93xx core code
+>>
+>> The only defines left in ep93xx-regs.h are for the APB UARTS which
+>> are also needed in include/mach/uncompress.h and
+>> include/mach/debug-macro.S.
+>>
+>> Patch 2 has already been merged to the ASoC tree and patch 5 has
+>> already been merged to the watchdog tree. Neither patch has been
+>> modified since they were applied, and are included here for
+>> completeness and to avoid build errors. 
+> 
+> Looks all very nice, great work!
+> 
+>> All of the patches are against v3.3-rc7 and  now have reviewed-by
+>> and/or acked-by tags except for patch 4 which has been changed
+>> since the last version. Arnd, once I get an ack for the final patch
+>> I can prepare a git branch for you to pull. I understand if this is
+>> now too late for v3.4.
+> 
+> If there are no conflicts against the for-next branch and Olof agrees,
+> I would probably let this one go in for v3.4. It's a nice cleanup
+> and it will be easier to do your v3.5 patches if it's all merged.
 
-It's on top of v3.3-rc5, the already existing LPC32xx patches in arm-soc
-and the USB support patch. So please first pull the USB patch.
 
-Thanks in advance,
+Okay thanks. I'll try and fix up the minor bits and pieces that you and
+Hartley pointed out and send a pull request later tonight.
 
-Roland
+I'm planning on using my tree for future ep93xx development, so that I
+can aggregate any patches there to be included in arm-soc.
+
+> 
+> On a related note, I would like to understand better what your plans
+> are for the future of ep93xx. My undestanding is that the product line
+> is a dead end and there won't be any other compatible socs, but the
+> Linux support is very much alive and supports all the existing hardware,
+> is that correct?
+
+Yeah, the product line is dead, but there are a handful of boards still
+being used in production systems and we now support most of the
+peripherals, I think IDE is the only major device missing support.
+
+> There are currently eight board files (since all the dev boards got
+> merged into one file), which seems very manageable and there should be
+> no problem adding a few more over the years to come, if necessary.
+
+I doubt there will be many new boards added.
+
+> At the same time, the platform seems simple enough that you could
+> also do a device tree port in rather in a fairly short time if you
+> like, which would let you obsolete all the board files and add new
+> machines just through device tree blobs.
 
 
+Yeah, converting to device tree is one of my goals. I need to spend some
+time reading through the device tree specification first.
 
-The following changes since commit 48a5dedfa78899dad50b3b4ae30f07e27e6591ab:
-
-  ARM: LPC32xx: USB Support (2012-03-13 21:15:50 +0100)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx/mach-lpc32xx-eth
-
-for you to fetch changes up to c20b909be9ba27173294a52d08cab293ec030a2c:
-
-  ARM: LPC32xx: Ethernet support (2012-03-13 21:23:07 +0100)
-
-----------------------------------------------------------------
-Roland Stigge (1):
-      ARM: LPC32xx: Ethernet support
-
- arch/arm/mach-lpc32xx/Kconfig              |   25 +++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/clock.c              |    2 +-
- arch/arm/mach-lpc32xx/common.c             |   21 +++++++++++++++++++++
- arch/arm/mach-lpc32xx/common.h             |    4 ++--
- arch/arm/mach-lpc32xx/include/mach/board.h |   24 ++++++++++++++++++++++++
- arch/arm/mach-lpc32xx/irq.c                |    4 ++++
- arch/arm/mach-lpc32xx/phy3250.c            |    2 ++
- 7 files changed, 79 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/mach-lpc32xx/include/mach/board.h
+~Ryan
