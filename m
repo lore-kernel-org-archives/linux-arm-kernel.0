@@ -1,78 +1,46 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Tue, 13 Mar 2012 15:41:21 -0700
-Subject: [PATCH v6 2/3] clk: introduce the common clock framework
-In-Reply-To: <4F5FC090.90005@gmail.com>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-3-git-send-email-mturquette@linaro.org>
- <4F5FC090.90005@gmail.com>
-Message-ID: <CAJOA=zMtaiHWmUJJO7eWEmGQkNmkzHnr0B4zneDrEEirFn3hAw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Mar 2012 15:49:54 -0700
+Subject: [GIT PULL] one kernel panic fix for v3.3-rc7
+In-Reply-To: <20120313183352.GN12083@atomide.com>
+References: <20120313183352.GN12083@atomide.com>
+Message-ID: <CAOesGMi+ySz9QZNZAZYRBD8J8i5TzmfVd+fBrpvSFsHOOQ3_aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 2:48 PM, Rob Herring <robherring2@gmail.com> wrote:
-> Mike,
+On Tue, Mar 13, 2012 at 11:33 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi Olof,
 >
-> On 03/10/2012 01:54 AM, Mike Turquette wrote:
->> The common clock framework defines a common struct clk useful across
->> most platforms as well as an implementation of the clk api that drivers
->> can use safely for managing clocks.
->>
->> The net result is consolidation of many different struct clk definitions
->> and platform-specific clock framework implementations.
->>
->> This patch introduces the common struct clk, struct clk_ops and an
->> implementation of the well-known clock api in include/clk/clk.h.
->> Platforms may define their own hardware-specific clock structure and
->> their own clock operation callbacks, so long as it wraps an instance of
->> struct clk_hw.
->>
->> See Documentation/clk.txt for more details.
->>
->> This patch is based on the work of Jeremy Kerr, which in turn was based
->> on the work of Ben Herrenschmidt.
->>
->> Signed-off-by: Mike Turquette <mturquette@linaro.org>
->> Signed-off-by: Mike Turquette <mturquette@ti.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Shawn Guo <shawn.guo@freescale.com>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Richard Zhao <richard.zhao@linaro.org>
->> Cc: Saravana Kannan <skannan@codeaurora.org>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> Cc: Linus Walleij <linus.walleij@stericsson.com>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Amit Kucheria <amit.kucheria@linaro.org>
->> Cc: Deepak Saxena <dsaxena@linaro.org>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Andrew Lunn <andrew@lunn.ch>
+> Here's one more kernel panic fix that I dropped from last weeks
+> fixes as it was still being discussed.
 >
-> snip
+> This is a fix for the regression caused by fixing an earlier
+> regression for smsc911x fixed regulators :(
 >
->> +
->> + ? ? /*
->> + ? ? ?* walk the list of orphan clocks and reparent any that are children of
->> + ? ? ?* this clock
->> + ? ? ?*/
->> + ? ? hlist_for_each_entry(orphan, tmp, &clk_orphan_list, child_node)
+> Turns out that we have more than one smsc911x on some boards,
+> and the earlier fix causes a kernel panic for board trying to
+> register second smsc911x instance, even if the second smsc911x
+> is on an add-on board that is not connected.
 >
-> In __clk_init, this needs to be hlist_for_each_entry_safe as entries can
-> be removed.
+> Note that the boards with second smsc911x will also need to be
+> patched later on to provide their own regulators.
+>
+> Regards,
+>
+> Tony
+>
+>
+> The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
+> ?Linus Torvalds (1):
+> ? ? ? ?Linux 3.3-rc7
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fix-smsc911x-regulator
+>
+> Kevin Hilman (1):
+> ? ? ?ARM: OMAP2+: gpmc-smsc911x: only register regulator for first instance
 
-Thanks for the catch Rob.  I'll take this in.
+Thanks, pulled.
 
-Regards,
-Mike
 
->
-> Rob
->
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
+-Olof
