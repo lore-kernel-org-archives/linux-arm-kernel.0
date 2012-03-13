@@ -1,52 +1,34 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 13 Mar 2012 22:55:24 +0530
-Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait for
- reset status
-In-Reply-To: <1331659524-7635-1-git-send-email-rnayak@ti.com>
-References: <1331659524-7635-1-git-send-email-rnayak@ti.com>
-Message-ID: <1331659524-7635-3-git-send-email-rnayak@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 13 Mar 2012 11:28:07 -0600
+Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
+In-Reply-To: <4F5F60DB.9090801@itwatchdogs.com>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-2-git-send-email-b29396@freescale.com>
+ <4F5F5B3F.2000303@gmail.com> <4F5F60DB.9090801@itwatchdogs.com>
+Message-ID: <20120313172807.AC4763E053B@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_hwmod_softreset() does not seem to wait for reset status
-after doing a softreset. Make it use _ocp_softreset() instead
-which does this correctly.
+On Tue, 13 Mar 2012 09:59:39 -0500, Zach Sadecki <zsadecki@itwatchdogs.com> wrote:
+> On 03/13/2012 09:35 AM, Rob Herring wrote:
+> > +	ahb at 80080000 {
+> > +		fec at 800f0000 {
+> > Use generic names: ethernet at 800f0000
+> Generic is good, but consistency is better, IMHO.  grepping existing dts 
+> files in 3.2.9 finds 6 instances of "fec@" and 0 instances of "ethernet@"
+> >> +			uart1: uart at 80074000 {
+> > Use generic names: uart1: serial at ...
+> Same comment here, but unfortunately there is already inconsistency in 
+> existing files...  25 instances of "serial@" and 35 instances of "uart@"
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Anand Gadiyar <gadiyar@ti.com>
-Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   14 ++------------
- 1 files changed, 2 insertions(+), 12 deletions(-)
+No, Rob is correct.  The generic names recommended practice is well
+established and documented.  Expand your grep search to include
+arch/powerpc/bot/dts/*.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 6c0e7eb..0c64853 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2423,20 +2423,10 @@ void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs)
-  */
- int omap_hwmod_softreset(struct omap_hwmod *oh)
- {
--	u32 v;
--	int ret;
--
--	if (!oh || !(oh->_sysc_cache))
-+	if (!oh)
- 		return -EINVAL;
- 
--	v = oh->_sysc_cache;
--	ret = _set_softreset(oh, &v);
--	if (ret)
--		goto error;
--	_write_sysconfig(v, oh);
--
--error:
--	return ret;
-+	return _ocp_softreset(oh);
- }
- 
- /**
+See section 2.2.2 of ePAPR[1]
+
+[1]https://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.1.pdf
+
 -- 
-1.7.1
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
