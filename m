@@ -1,35 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 Mar 2012 11:38:29 +0100
-Subject: [PATCH v6 3/3] clk: basic clock hardware types
-In-Reply-To: <CAKGA1b=huAnG6tLoaGqoFoJnuEg-+rs8KLYVB1KF6_q73ot63A@mail.gmail.com>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-4-git-send-email-mturquette@linaro.org>
- <CAKGA1b=huAnG6tLoaGqoFoJnuEg-+rs8KLYVB1KF6_q73ot63A@mail.gmail.com>
-Message-ID: <20120313103829.GR3852@pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 13 Mar 2012 11:39:36 +0100
+Subject: [PATCHv2 0/3] Add support for DRM display subsystem
+Message-ID: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 10:50:09PM -0500, Matt Sealey wrote:
-> Hi Mike,
-> 
-> Can I suggest/we discuss that we support fractional (i.e. represented
-> by fixed point value with integer and fractional part) dividers in the
-> common divider clock case, simplistically just adding a divider
-> fractional width and shifting all the calculations by it (and fixing
-> the "maxdiv" calculation as in a fractional case width of the divider
-> area in the register is not an indicator of the actual maximum
-> divider)? (I guess for the standard integer divider case, it would be
-> continually shifting by 0 which might make the code a bit bigger, I
-> don't think that would truly be a concern though?)
+Hello,
 
-I have patches for this, see
+This patch set adds support for Exynos DRM display subsystem for
+Universal C210 and NURI boards. Exynos DRM driver has been merged to 3.3
+kernel tree and provides unified and more powerful alternative for
+s3c-fb and s5p-tv drivers. V2 includes update for the latest changes in
+platform data structure (added 'panel' entry).
 
-git://git.pengutronix.de/git/imx/linux-2.6.git imx/work/imx-clkv6
+Best regards
 
-Sascha
+Marek Szyprowski
+Samsung Poland R&D Center
+
+Patch summary:
+
+Marek Szyprowski (3):
+  ARM: Exynos: add platform device for core DRM subsystem
+  ARM: Exynos: Add DRM core device support for Universal C210 board
+  ARM: Exynos: Add DRM core support for NURI board
+
+ arch/arm/mach-exynos/Kconfig               |    7 ++++++
+ arch/arm/mach-exynos/Makefile              |    1 +
+ arch/arm/mach-exynos/dev-drm.c             |   29 ++++++++++++++++++++++++
+ arch/arm/mach-exynos/mach-nuri.c           |   33 ++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/mach-universal_c210.c |   33 ++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/devs.h  |    2 +
+ 6 files changed, 105 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-exynos/dev-drm.c
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.1.569.g6f426
