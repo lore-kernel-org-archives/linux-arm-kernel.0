@@ -1,48 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Mar 2012 12:45:02 -0500
-Subject: [PATCH v1 3/5] ARM: imx28evk: add mmc dt support
-In-Reply-To: <20120313165214.GO26642@pengutronix.de>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-4-git-send-email-b29396@freescale.com>
- <4F5F5C22.1080506@gmail.com> <20120313165214.GO26642@pengutronix.de>
-Message-ID: <4F5F879E.4030407@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 13 Mar 2012 18:48:23 +0100
+Subject: [PATCH v4] of: introduce helper to manage boolean
+Message-ID: <1331660903-10193-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2012 11:52 AM, Sascha Hauer wrote:
-> On Tue, Mar 13, 2012 at 09:39:30AM -0500, Rob Herring wrote:
->> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
->>> From: Dong Aisheng <dong.aisheng@linaro.org>
->>>
->>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
->>> ---
->>>  arch/arm/boot/dts/imx28-evk.dts |   14 ++++++++++++++
->>>  arch/arm/boot/dts/imx28.dtsi    |   33 +++++++++++++++++++++++++++++++++
->>>  arch/arm/mach-mxs/imx28-dt.c    |    2 ++
->>>  3 files changed, 49 insertions(+), 0 deletions(-)
->>
->> snip
->>
->>> diff --git a/arch/arm/mach-mxs/imx28-dt.c b/arch/arm/mach-mxs/imx28-dt.c
->>> index 78d1129..429b88e 100644
->>> --- a/arch/arm/mach-mxs/imx28-dt.c
->>> +++ b/arch/arm/mach-mxs/imx28-dt.c
->>> @@ -23,6 +23,8 @@ static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
->>>  	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
->>>  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
->>>  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
->>> +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP0_BASE_ADDR, "mxs-mmc.0", NULL),
->>> +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP1_BASE_ADDR, "mxs-mmc.1", NULL),
->>
->> Why is this needed?
-> 
-> These are needed for the drivers which have still the mxs-mmc.* names
-> to find their clocks. Alternatively we could also add the appropriate
-> clocks to the clock file. Don't know if that's better though.
+of_property_read_bool
 
-Ah, yes I should have known that... If clk lookup is all that's needed,
-I'd suggest adding the necessary clk lookups either here or in the clock
-code. Not much difference, but at least it removes the use of
-*_BASE_ADDR defines.
+Search for a property in a device node.
+Returns true if the property exist false otherwise.
 
-Rob
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+---
+v4:
+
+	send the right version
+
+	include Grant comment
+
+	Grant can I get the go please?
+
+Best Regards,
+J.
+ include/linux/of.h |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index a75a831..a992cdf 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -342,6 +342,22 @@ static inline int of_machine_is_compatible(const char *compat)
+ #define of_match_node(_matches, _node)	NULL
+ #endif /* CONFIG_OF */
+ 
++/**
++ * of_property_read_bool - Findfrom a property
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ *
++ * Search for a property in a device node.
++ * Returns true if the property exist false otherwise.
++ */
++static inline bool of_property_read_bool(const struct device_node *np,
++					 const char *propname)
++{
++	struct property *prop = of_find_property(np, propname, NULL);
++
++	return prop ? true : false;
++}
++
+ static inline int of_property_read_u32(const struct device_node *np,
+ 				       const char *propname,
+ 				       u32 *out_value)
+-- 
+1.7.7
