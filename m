@@ -1,26 +1,87 @@
-From: pintu.k@samsung.com (PINTU KUMAR)
-Date: Tue, 13 Mar 2012 04:53:46 +0000 (GMT)
-Subject: [INFO] : Hibernation and Resume between 2 similar devices
-Message-ID: <28119509.96581331614425960.JavaMail.weblogic@epml27>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Tue, 13 Mar 2012 11:01:57 +0530
+Subject: [PATCH v3 13/13] gpio/omap: fix incorrect update to
+ context.irqenable1
+In-Reply-To: <87haxtwjwt.fsf@ti.com>
+References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
+ <1331118963-26364-14-git-send-email-tarun.kanti@ti.com>
+ <87haxtwjwt.fsf@ti.com>
+Message-ID: <CAC83Zv+_kOTe1rThNC2_KEqc+cMdt6YzEbCqyr9pnT8Z41u9Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
-
-I am just curious to know if it is possible to "Hibernate in one device" and "Resume the hibernated image from another similar device".
-
-Suppose, I have 2 exactly similar device (Laptop or mobile phone) with me.
-At one time I will be working on only one device at a time.
-Suppose I started my work on "Device 1"  with few opened application and later I wanted to switch to "Device 2" which is exactly similar to Device 1.
-I thought to hibernate (suspend to disk) the Device 1 and store the hibernated image as a swap file and later transfer to sd card.
-Then take of the sd card from Device 1 and put it into Device 2.
-Copy the swap file from sd card to Device 2 in some swap partition.
-Then reboot the Device 2 to Resume from this swap file.
-I will get back my Device 1 content in Device 2.
-
-Hope this is possible ?
-
-Any comments.....
-
-Regards,
-Pintu
+On Tue, Mar 13, 2012 at 3:39 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>
+>> In _enable_gpio_irqbank() when bank->regs->set_irqenable is valid,
+>> gpio_mask can be directly set by writing to set_irqenable register
+>> without overwriting current value.
+>
+> Ouch. ?Nice catch.
+>
+>> In order to ensure the same is
+>> stored in context.irqenable1, we must read from regs->irqenable
+>> instead of overwriting it with gpio_mask.
+>> The overwriting makes sense only in the second case where irqenable
+>> is explicitly read and updated with new gpio_mask before writing it
+>> back. However, for consistency reading regs->irqenable into the
+>> bank->context.irqenable1 takes care of both the scenarios.
+>
+> ...takes care of both scenarios, but adds and extra duplicate read for
+> the second.
+Right. I wanted to keep code change minimum.
+>
+> Instead, how about just move the context update into each side of the
+> if/else? ?untested patch below to show what I mean.
+Yes, initially I thought of doing in this way as well. I will make the change.
+--
+Tarun
+>
+> Kevin
+>
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 752ae9b..f8b7099 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -442,6 +442,7 @@ static void _enable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+> ? ? ? ?if (bank->regs->set_irqenable) {
+> ? ? ? ? ? ? ? ?reg += bank->regs->set_irqenable;
+> ? ? ? ? ? ? ? ?l = gpio_mask;
+> + ? ? ? ? ? ? ? bank->context.irqenable1 |= gpio_mask;
+> ? ? ? ?} else {
+> ? ? ? ? ? ? ? ?reg += bank->regs->irqenable;
+> ? ? ? ? ? ? ? ?l = __raw_readl(reg);
+> @@ -449,10 +450,10 @@ static void _enable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+> ? ? ? ? ? ? ? ? ? ? ? ?l &= ~gpio_mask;
+> ? ? ? ? ? ? ? ?else
+> ? ? ? ? ? ? ? ? ? ? ? ?l |= gpio_mask;
+> + ? ? ? ? ? ? ? bank->context.irqenable1 = l;
+> ? ? ? ?}
+>
+> ? ? ? ?__raw_writel(l, reg);
+> - ? ? ? bank->context.irqenable1 = l;
+> ?}
+>
+> ?static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+> @@ -463,6 +464,7 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+> ? ? ? ?if (bank->regs->clr_irqenable) {
+> ? ? ? ? ? ? ? ?reg += bank->regs->clr_irqenable;
+> ? ? ? ? ? ? ? ?l = gpio_mask;
+> + ? ? ? ? ? ? ? bank->context.irqenable1 &= ~gpio_mask;
+> ? ? ? ?} else {
+> ? ? ? ? ? ? ? ?reg += bank->regs->irqenable;
+> ? ? ? ? ? ? ? ?l = __raw_readl(reg);
+> @@ -470,10 +472,10 @@ static void _disable_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+> ? ? ? ? ? ? ? ? ? ? ? ?l |= gpio_mask;
+> ? ? ? ? ? ? ? ?else
+> ? ? ? ? ? ? ? ? ? ? ? ?l &= ~gpio_mask;
+> + ? ? ? ? ? ? ? bank->context.irqenable1 = l;
+> ? ? ? ?}
+>
+> ? ? ? ?__raw_writel(l, reg);
+> - ? ? ? bank->context.irqenable1 = l;
+> ?}
+>
+> ?static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int enable)
+>
