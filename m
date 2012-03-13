@@ -1,51 +1,91 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Mar 2012 16:46:56 -0700
-Subject: [GIT PULL 2/4] Samsung devel-pd for v3.4
-In-Reply-To: <201203102209.22451.rjw@sisk.pl>
-References: <4F5B7C81.6080301@samsung.com>
- <CAOesGMjff3gVNJQ5FpJuSf+uvVDW8k22b+Xcikot-isM-4-6iw@mail.gmail.com>
- <201203102209.22451.rjw@sisk.pl>
-Message-ID: <CAOesGMiOXKV03YC=6eG6rHhWw+ObGYoVJCqrPdHAsZLmjjzmtw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 13 Mar 2012 16:52:49 -0700
+Subject: [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <4F1929E9.7070707@linaro.org> (Daniel Lezcano's message of "Fri,
+ 20 Jan 2012 09:46:33 +0100")
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <4F1929E9.7070707@linaro.org>
+Message-ID: <8762e8kqi6.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Colin,
 
-On Sat, Mar 10, 2012 at 1:09 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> Hi,
->
-> On Saturday, March 10, 2012, Olof Johansson wrote:
->> Hi Rafael,
->>
->> The below series contains two patches that have been sent to you, and
->> that are sitting in the pm-domains branch.
->>
->> Two questions before I pull this into arm-soc:
->>
->> 1) Are you 100% sure this will be submitted to 3.4? And if so, will
->> you send it early during the merge window?
->
-> Yes and yes.
->
->> 2) Are you 100% sure you will not rebase the branch into which you
->> pulled the v3.4-for-rafael branch?
->
-> Yes, I am.
->
->> I am asking because if we pull this in, and you rebase between now and
->> when it's sent in, we're risking merge conflicts that will be painful
->> to resolve. We've been bitten by that from other dependencies in the
->> past so we're being careful.
->
-> Sure, I understand that.
->
-> As a general rule, topic braches in my tree whose names start with pm- are
-> never rebased (exactly for this reason).
+On 12/21/2011 01:09 AM, Colin Cross wrote:
 
-Excellent, thanks! I'll pull that in as a depends/ branch in arm-soc
-(since that's how we document it), and mark it in our notes so the
-Samsung branch gets merged after yours when going to Linus.
+> To use coupled cpuidle states, a cpuidle driver must:
+
+[...]
+
+>     Provide a struct cpuidle_state.enter function for each state
+>     that affects multiple cpus.  This function is guaranteed to be
+>     called on all cpus at approximately the same time.  The driver
+>     should ensure that the cpus all abort together if any cpu tries
+>     to abort once the function is called.
+
+I've discoved the last sentence above is crucial, and in order to catch
+all the corner cases I found it useful to have the struct
+cpuidle_coupled in cpuidle.h so that the driver can check ready_count
+itself (patch below, on top of $SUBJECT series.)
+
+As you know, on OMAP4, when entering the coupled state, CPU0 has to wait
+for CPU1 to enter its low power state before entering itself.  The first
+pass at implementing this was to just spin waiting for the powerdomain
+of CPU1 to hit off.  That works... most of the time.
+
+If CPU1 wakes up immediately (or before CPU0 starts checking), or more
+likely, fails to hit the low-power state because of other hardware
+"conditions", CPU0 will end up stuck in the loop waiting for CPU1.
+
+To solve this, in addition to checking the power state of CPU1, I also 
+check if (coupled->ready_count != cpumask_weight(&coupled->alive_coupled_cpus)).
+If true, it means that CPU1 has already exited/aborted so CPU0 had
+better abort as well.
+
+Checking the ready_count seemed like an easy way to do this, but did you
+have any other mechanisms in mind for CPUs to communicate that they've
+exited/aborted?
+
+Kevin
 
 
-
--Olof
+diff --git a/drivers/cpuidle/cpuidle.h b/drivers/cpuidle/cpuidle.h
+index bf34d67..16e00cc 100644
+--- a/drivers/cpuidle/cpuidle.h
++++ b/drivers/cpuidle/cpuidle.h
+@@ -32,15 +32,6 @@ extern void cpuidle_remove_state_sysfs(struct cpuidle_device *device);
+ extern int cpuidle_add_sysfs(struct device *dev);
+ extern void cpuidle_remove_sysfs(struct device *dev);
+ 
+-/* coupled states */
+-struct cpuidle_coupled {
+-	spinlock_t lock;
+-	int requested_state[NR_CPUS];
+-	int ready_count;
+-	cpumask_t alive_coupled_cpus;
+-	int refcnt;
+-};
+-
+ #ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
+ bool cpuidle_state_is_coupled(struct cpuidle_device *dev,
+ 		struct cpuidle_driver *drv, int state);
+diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+index 71f2fba..dbc1f2e 100644
+--- a/include/linux/cpuidle.h
++++ b/include/linux/cpuidle.h
+@@ -51,6 +51,15 @@ struct cpuidle_state {
+ 			int index);
+ };
+ 
++/* coupled states */
++struct cpuidle_coupled {
++	spinlock_t lock;
++	int requested_state[NR_CPUS];
++	int ready_count;
++	cpumask_t alive_coupled_cpus;
++	int refcnt;
++};
++
+ /* Idle State Flags */
+ #define CPUIDLE_FLAG_TIME_VALID	(0x01) /* is residency time measurable? */
+ #define CPUIDLE_FLAG_COUPLED	(0x02) /* state applies to multiple cpus */
