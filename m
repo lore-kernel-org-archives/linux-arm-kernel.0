@@ -1,68 +1,67 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Mar 2012 18:22:25 -0500
-Subject: [PATCH 5/7] dt/clock: add a simple provider get function
+Date: Tue, 13 Mar 2012 18:22:26 -0500
+Subject: [PATCH 6/7] dt/clock: add function to get parent clock name
 In-Reply-To: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
 References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1331680947-29861-6-git-send-email-robherring2@gmail.com>
+Message-ID: <1331680947-29861-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-For simple cases, the clock provider data can simply be the struct clk ptr.
-
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- drivers/of/clock.c |   18 +++++++++++-------
- 1 files changed, 11 insertions(+), 7 deletions(-)
+ drivers/of/clock.c     |   24 ++++++++++++++++++++++++
+ include/linux/of_clk.h |    2 ++
+ 2 files changed, 26 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/of/clock.c b/drivers/of/clock.c
-index 06fd5ad..f4a0965 100644
+index f4a0965..8ad2dbd 100644
 --- a/drivers/of/clock.c
 +++ b/drivers/of/clock.c
-@@ -33,6 +33,12 @@ struct of_clk_provider {
- static LIST_HEAD(of_clk_providers);
- static DEFINE_MUTEX(of_clk_lock);
+@@ -128,6 +128,30 @@ struct clk *of_clk_get(struct device_node *np, int index)
+ 	return clk;
+ }
  
-+static struct clk *of_clk_simple_get(struct of_phandle_args *clkspec,
-+				     void *data)
++const char *of_clk_get_parent_name(struct device_node *np, int index)
 +{
-+	return data;
++	struct of_phandle_args clkspec;
++	const char *clk_name;
++	int rc;
++
++	if (index < 0)
++		return NULL;
++
++	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
++					&clkspec);
++	if (rc)
++		return NULL;
++
++	if (of_property_read_string_index(clkspec.np, "clock-output-names",
++					  clkspec.args_count ? clkspec.args[0] : 0,
++					  &clk_name) < 0)
++		clk_name = clkspec.np->name;
++
++	of_node_put(clkspec.np);
++	return clk_name;
 +}
 +
++
  /**
-  * of_clk_add_provider() - Register a clock provider for a node
-  * @np: Device node pointer associated with clock provider
-@@ -52,7 +58,10 @@ int of_clk_add_provider(struct device_node *np,
+  * of_clk_get_by_name() - Parse and lookup a clock referenced by a device node
+  * @np: pointer to clock consumer node
+diff --git a/include/linux/of_clk.h b/include/linux/of_clk.h
+index 02ecc98..6a07071 100644
+--- a/include/linux/of_clk.h
++++ b/include/linux/of_clk.h
+@@ -22,6 +22,8 @@ void of_clk_del_provider(struct device_node *np);
+ struct clk *of_clk_get(struct device_node *np, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
  
- 	cp->node = of_node_get(np);
- 	cp->data = data;
--	cp->get = clk_src_get;
-+	if (clk_src_get)
-+		cp->get = clk_src_get;
-+	else
-+		cp->get = of_clk_simple_get;
++const char *of_clk_get_parent_name(struct device_node *np, int index);
++
+ void of_clk_init(const struct of_device_id *matches);
+ extern void of_fixed_clk_setup(struct device_node *np);
  
- 	mutex_lock(&of_clk_lock);
- 	list_add(&cp->link, &of_clk_providers);
-@@ -183,11 +192,6 @@ void __init of_clk_init(const struct of_device_id *matches)
- 	}
- }
- 
--static struct clk *of_fixed_clk_get(struct of_phandle_args *a, void *data)
--{
--	return data;
--}
--
- /**
-  * of_fixed_clk_setup() - Setup function for simple fixed rate clock
-  */
-@@ -204,5 +208,5 @@ void __init of_fixed_clk_setup(struct device_node *node)
- 
- 	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
- 	if (clk)
--		of_clk_add_provider(node, of_fixed_clk_get, clk);
-+		of_clk_add_provider(node, NULL, clk);
- }
 -- 
 1.7.5.4
