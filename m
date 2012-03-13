@@ -1,55 +1,102 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Mon, 12 Mar 2012 20:50:14 -0500
-Subject: linux-next: manual merge of the cpuidle-cons tree with the
- arm-soc tree
-In-Reply-To: <20120313100625.b500f0efb546a9f4ceeb12ba@canb.auug.org.au>
-References: <20120309183732.512d3676599da324f4747219@canb.auug.org.au>
- <4F5E1ECC.1040605@atmel.com>
- <CAMXH7KH_vgri3EPRvkXR+LddRUc=0ve=4u7yr51utBfgV5bF3w@mail.gmail.com>
- <20120313100625.b500f0efb546a9f4ceeb12ba@canb.auug.org.au>
-Message-ID: <CAMXH7KFw703n3UyXFj0cGZ_scpvHR8c+iguuUQPuEQgfswnaRw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 13 Mar 2012 01:57:42 +0000
+Subject: [PATCH 0/7 v4] ARM: kirkwood: fdt: convert kirkwood to fdt
+In-Reply-To: <cover.1330625877.git.jason@lakedaemon.net>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+Message-ID: <cover.1331601448.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 6:06 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Rob,
->
-> On Mon, 12 Mar 2012 12:03:48 -0500 Rob Lee <rob.lee@linaro.org> wrote:
->>
->> On Mon, Mar 12, 2012 at 11:05 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> > -----BEGIN PGP SIGNED MESSAGE-----
->> > Hash: SHA1
->> >
->> > On 03/09/2012 08:37 AM, Stephen Rothwell :
->> >>
->> >> Today's linux-next merge of the cpuidle-cons tree got a conflict
->> >> in arch/arm/mach-at91/cpuidle.c between commit 00482a4078f4 ("ARM:
->> >> at91: implement the standby function for pm/cpuidle") from the
->> >> arm-soc tree and commit 7a1f6e72dce1 ("ARM: at91: Consolidate time
->> >> keeping and irq enable") from the cpuidle-cons tree.
->> >>
->> >> I fixed it up (I think - see below) and can carry the fix as
->> >> necessary.
->> >
->> > Yes: resolution correct. Please carry it.
->>
->> Who should carry this fixup and related necessary at91 changes? ?Me?
->> FYI, my at91 changes are dependent on my core cpuidle change, but my
->> core cpuidle changes do not require any at91 changes as the at91 and
->> other platform changes were only made to consolidate duplicate code.
->
-> I will carry the fixup and Linus will presumably do the same fix when he
-> merges these trees in his tree. ?I am not sure what you mean by "related
-> at91 changes".
->
+This series begins the process of converting all of the drivers initialized
+from kirkwood_init() to devicetree.
 
-Thanks Stephen.  By "related changes" I just meant that if I were to
-make a branch to carry the fixup, I'd need to all merge in the at91
-related changes that are on linux-next but not on an rc tag yet.  But
-please ignore this statement if it doesn't make sense.  I'm not yet
-knowledgeable on the workflow once submitted patchsets reach this
-level.
+The first three patches are code cleanup from Andrew Lunn.
 
-> --
-> Cheers,
-> Stephen Rothwell ? ? ? ? ? ? ? ? ? ?sfr at canb.auug.org.au
+The rest of the series is the initial conversion to devicetree for kirkwood,
+use by dreamplug, and devicetree bindings for drivers that don't use tclk or
+pinux.  These should be safe to merge as they won't interfere with the
+clk/clkdev work Andrew Lunn is working on.
+
+Overall changes since v3:
+
+	- squashed several fixup patches into the series (use mrvl, use
+	  inclusive address sizes)
+	- applied Arnd's suggestion for serial ports in kirkwood.dtsi, added my
+	  idea of defining serial clock in dts.
+	- moved dreamplug_init() out of board-dt.c (into board-dreamplug.c) to
+	  facilitate the orderly arrival of new boards with fdt support (Jamie
+	  Lentin's boards)
+	- moved all non-fdt cleanups to the beginning of the series.
+	- removed mv_cesa, mv_sata, and orion-ehci from this series as they
+	  depend on intc/dma/clock to work properly
+	- removed Ack's and Reviewed-By's on patches with significant changes
+		- Grant's Ack remains on the "wdt: use resource" patch as it is
+		  a reduced scope version (no fdt bindings), otherwise,
+		  identical to code originally Acked.  Please let me know if
+		  that's not appropriate.
+
+Overall changes since v2:
+
+	- added Andrew Lunn's cleanup patches
+	- reshuffled to more logical order
+	- wrapped all struct of_device_id[]'s in #ifdef CONFIG_OF
+	- s/marvell,/mrvl,/g
+	- added orion-ehci
+	- added mv_sata
+	- prevent clocks from gating when booting from devicetree
+
+Drivers yet to be converted are:
+
+	mv_cesa:    needs intc in fdt (next on list)
+	mv_sata:    needs dma, intc
+	orion-ehci: needs dma, intc
+	orion-spi:  uses tclk
+	orion-wdt:  uses tclk
+	mvsdio:     uses tclk
+	i2c:        uses freq_m/freq_n, not sure if that should use clk/clkdev
+	mv_xor:     haven't figured out howto do shared resources/dma in fdt
+	ge0/ge1:    haven't looked at it yet
+	nand:       not needed for dreamplug, Jamie Lentin is working on it
+
+Please be aware that this is a complete reshuffle of the whole series and is
+based purely against v3.3-rc3.
+
+Interested folks can pull from:
+
+git://git.infradead.org/users/jcooper/linux-kirkwood.git kirkwood_dt_for_3.4
+
+
+Andrew Lunn (3):
+  ARM: orion: spi: remove enable_clock_fix which is not used
+  ARM: Kirkwood: Remove tclk from kirkwood_asoc_platform_data.
+  ARM: orion: wdt: use resource vice direct access
+
+Jason Cooper (4):
+  ARM: kirkwood: add dreamplug (fdt) support.
+  ARM: kirkwood: convert uart0 to devicetree.
+  ARM: kirkwood: rtc-mv devicetree bindings
+  ARM: kirkwood: use devicetree for rtc-mv
+
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   24 +++++
+ arch/arm/boot/dts/kirkwood.dtsi          |   36 +++++++
+ arch/arm/mach-kirkwood/Kconfig           |   14 +++
+ arch/arm/mach-kirkwood/Makefile          |    2 +
+ arch/arm/mach-kirkwood/Makefile.boot     |    2 +
+ arch/arm/mach-kirkwood/board-dreamplug.c |  149 ++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dt.c        |   75 +++++++++++++++
+ arch/arm/mach-kirkwood/common.c          |   11 +-
+ arch/arm/mach-kirkwood/common.h          |   11 ++
+ arch/arm/plat-orion/common.c             |    7 +-
+ arch/arm/plat-orion/include/plat/audio.h |    1 -
+ drivers/rtc/rtc-mv.c                     |    9 ++
+ drivers/spi/spi-orion.c                  |    5 -
+ drivers/watchdog/orion_wdt.c             |   24 +++--
+ include/linux/spi/orion_spi.h            |    1 -
+ 15 files changed, 348 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-dreamplug.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-dreamplug.c
+ create mode 100644 arch/arm/mach-kirkwood/board-dt.c
+
+-- 
+1.7.3.4
