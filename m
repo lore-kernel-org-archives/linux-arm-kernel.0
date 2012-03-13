@@ -1,76 +1,69 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 13 Mar 2012 08:30:41 -0700
-Subject: [PATCH v3 10/12] ARM: EXYNOS: add support ARCH_EXYNOS5 for EXYNOS5
- SoCs
+Date: Tue, 13 Mar 2012 08:30:33 -0700
+Subject: [PATCH v3 02/12] ARM: EXYNOS: use exynos_init_uarts() instead of
+ exynos4_init_uarts()
 In-Reply-To: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
 References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1331652643-12626-11-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331652643-12626-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds CONFIG_ARCH_EXYNOS5 and CONFIG_SOC_EXYNOS5250
-for supporting EXYNOS5250 SoC and allows supporting EXYNOS4
-and EXYNOS5 together.
+Since exynos4_init_uarts() can be used for EXYNOS5 SoCs,
+this patch changes the name of function to exynos_init_uarts().
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/Kconfig  |   17 ++++++++++++-----
- arch/arm/mach-exynos/Makefile |    1 +
- 2 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm/mach-exynos/common.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 5d602f6..31ef33f 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -11,10 +11,6 @@ if ARCH_EXYNOS
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index a1f8a99..02eed29 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -52,7 +52,7 @@ static const char name_exynos4412[] = "EXYNOS4412";
  
- menu "SAMSUNG EXYNOS SoCs Support"
+ static void exynos4_map_io(void);
+ static void exynos4_init_clocks(int xtal);
+-static void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
++static void exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+ static int exynos_init(void);
  
--choice
--	prompt "EXYNOS System Type"
--	default ARCH_EXYNOS4
--
- config ARCH_EXYNOS4
- 	bool "SAMSUNG EXYNOS4"
- 	select HAVE_SMP
-@@ -22,7 +18,11 @@ config ARCH_EXYNOS4
- 	help
- 	  Samsung EXYNOS4 SoCs based systems
+ static struct cpu_table cpu_ids[] __initdata = {
+@@ -61,7 +61,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idmask		= EXYNOS4_CPU_MASK,
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+-		.init_uarts	= exynos4_init_uarts,
++		.init_uarts	= exynos_init_uarts,
+ 		.init		= exynos_init,
+ 		.name		= name_exynos4210,
+ 	}, {
+@@ -69,7 +69,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idmask		= EXYNOS4_CPU_MASK,
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+-		.init_uarts	= exynos4_init_uarts,
++		.init_uarts	= exynos_init_uarts,
+ 		.init		= exynos_init,
+ 		.name		= name_exynos4212,
+ 	}, {
+@@ -77,7 +77,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idmask		= EXYNOS4_CPU_MASK,
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+-		.init_uarts	= exynos4_init_uarts,
++		.init_uarts	= exynos_init_uarts,
+ 		.init		= exynos_init,
+ 		.name		= name_exynos4412,
+ 	},
+@@ -469,7 +469,7 @@ static int __init exynos_init(void)
  
--endchoice
-+config ARCH_EXYNOS5
-+	bool "SAMSUNG EXYNOS5"
-+	select HAVE_SMP
-+	help
-+	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
+ /* uart registration process */
  
- comment "EXYNOS SoCs"
- 
-@@ -53,6 +53,13 @@ config SOC_EXYNOS4412
- 	help
- 	  Enable EXYNOS4412 SoC support
- 
-+config SOC_EXYNOS5250
-+	bool "SAMSUNG EXYNOS5250"
-+	default y
-+	depends on ARCH_EXYNOS5
-+	help
-+	  Enable EXYNOS5250 SoC support
-+
- config EXYNOS4_MCT
- 	bool
- 	default y
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index f8a3770..7214092 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -14,6 +14,7 @@ obj-				:=
- 
- obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
- obj-$(CONFIG_ARCH_EXYNOS4)	+= clock-exynos4.o
-+obj-$(CONFIG_ARCH_EXYNOS5)	+= clock-exynos5.o
- obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
- obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
- 
+-static void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
++static void __init exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ {
+ 	struct s3c2410_uartcfg *tcfg = cfg;
+ 	u32 ucnt;
 -- 
 1.7.4.4
