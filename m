@@ -1,54 +1,45 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 13 Mar 2012 12:33:52 -0500
-Subject: [PATCH v4 08/11] ep93xx: Make syscon access functions private
- to SoC
-In-Reply-To: <1331592502-9083-9-git-send-email-rmallon@gmail.com>
-References: <1331592502-9083-9-git-send-email-rmallon@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020695AB9832@AUSP01VMBX24.collaborationhost.net>
+From: nm@ti.com (Menon, Nishanth)
+Date: Tue, 13 Mar 2012 12:40:01 -0500
+Subject: [PATCH 3/6] ARM: OMAP3+: SmartReflex: introduce notifier_control
+In-Reply-To: <1331634381-31436-4-git-send-email-j-pihet@ti.com>
+References: <1331634381-31436-1-git-send-email-j-pihet@ti.com>
+ <1331634381-31436-4-git-send-email-j-pihet@ti.com>
+Message-ID: <CAOMWX4fauZQccPhHn+f4-SOAXRbaU135xUKva0QsGgJoXDQzwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 12, 2012 3:48 PM, Ryan Mallon wrote:
+On Tue, Mar 13, 2012 at 05:26, <jean.pihet@newoldbits.com> wrote:
 >
-> The syscon access functions are no longer used outside of the core
-> EP93xx code. Move their definitions into the SoC code.
->
-> Signed-off-by: Ryan Mallon <rmallon@gmail.com>
-> Reviewed-by: Mika Westerberg <mika.westerberg@iki.fi>
-> Acked-by: Hartley Sweeten <hsweeten@visionengravers.com>
-> ---
-
-<snip>
-
-> diff --git a/arch/arm/mach-ep93xx/soc.h b/arch/arm/mach-ep93xx/soc.h
-> index a22e11b..1273013 100644
-> --- a/arch/arm/mach-ep93xx/soc.h
-> +++ b/arch/arm/mach-ep93xx/soc.h
-> @@ -104,4 +104,18 @@
->  #define EP93XX_WATCHDOG_PHYS_BASE	EP93XX_APB_PHYS(0x00140000)
->  #define EP93XX_WATCHDOG_BASE		EP93XX_APB_IOMEM(0x00140000)
->  
-> +/* EP93xx System Controller software locked register write */
-> +void ep93xx_syscon_swlocked_write(unsigned int val, void __iomem *reg);
-> +void ep93xx_devcfg_set_clear(unsigned int set_bits, unsigned int clear_bits);
+> diff --git a/arch/arm/mach-omap2/smartreflex.c
+> b/arch/arm/mach-omap2/smartreflex.c
+> index 7977018..dfe8075 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+...
+> + ? ? ? switch (sr->ip_type) {
+> + ? ? ? case SR_TYPE_V1:
+> + ? ? ? ? ? ? ? value = notifier_to_irqen_v1(sr_class->notify_flags);
+> + ? ? ? ? ? ? ? sr_modify_reg(sr, ERRCONFIG_V1, value,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (enable) ? value : 0);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? case SR_TYPE_V2:
+> + ? ? ? ? ? ? ? value = notifier_to_irqen_v2(sr_class->notify_flags);
+> + ? ? ? ? ? ? ? sr_write_reg(sr, (enable) ? IRQENABLE_SET : IRQENABLE_CLR,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? value);
+> + ? ? ? ? ? ? ? break;
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? ?dev_warn(&sr->pdev->dev, "%s: unknown type of sr??\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
 > +
-> +static inline void ep93xx_devcfg_set_bits(unsigned int bits)
-> +{
-> +	ep93xx_devcfg_set_clear(bits, 0x00);
-> +}
-> +
-> +static inline void ep93xx_devcfg_clear_bits(unsigned int bits)
-> +{
-> +	ep93xx_devcfg_set_clear(0x00, bits);
-> +}
-> +
->  #endif /* _EP93XX_PHYS_BASE_H */
+> + ? ? ? if (!enable)
+> + ? ? ? ? ? ? ? sr_write_reg(sr, IRQSTATUS, value);
 
-Ryan,
-
-I just noticed that the comment after the #endif is wrong.
-
-It should either be /* _EP93XX_SOC_H */ or should just be removed.
+can you move this to before we disable the interrupt? it took a while,
+but we caught a bug recently when we disable IRQ and then attempt to
+clear the status[1]
 
 Regards,
-Hartley
+Nishanth Menon
+[1] http://review.omapzoom.org/#/c/20231/
