@@ -1,128 +1,139 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 13 Mar 2012 16:47:07 +0800
-Subject: [PATCH v1 4/5] dma: mxs-dma: add dt probe support
-In-Reply-To: <1331628428-24017-1-git-send-email-b29396@freescale.com>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
-Message-ID: <1331628428-24017-5-git-send-email-b29396@freescale.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 13 Mar 2012 14:17:10 +0530
+Subject: [PATCH] ARM: OMAP4: Workaround the OCP synchronisation issue
+ with 32K synctimer.
+In-Reply-To: <87399d225f.fsf@ti.com>
+References: <1331566388-2397-1-git-send-email-santosh.shilimkar@ti.com>
+ <87399d225f.fsf@ti.com>
+Message-ID: <4F5F098E.4040006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <dong.aisheng@linaro.org>
+On Monday 12 March 2012 10:21 PM, Kevin Hilman wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> 
+>> On OMAP4, recently a synchronisation bug is discovered by hardware
+>> team, which leads to incorrect timer value read from 32K sync timer
+>> IP when the IP is comming out of idle.
+>>
+>> The issue is due to the synchronization methodology used in the SYNCTIMER IP.
+>> The value of the counter register in 32kHz domain is synchronized to the OCP
+>> domain register only at count up event, and if the OCP clock is switched off,
+>> the OCP register gets out of synch until the first count up event after the
+>> clock is switched back -at the next falling edge of the 32kHz clock.
+>>
+>> Further investigation revealed that it applies to gptimer1 and watchdog timer2
+>> as well which may run on 32KHz. This patch fixes the issue for all the
+>> applicable modules.
+> 
+> The changelog describes the problem ver well, but doesn't actually
+> describe the fix (enable static dep.)  Can you update the changelog do
+> describe the fix, and why it fixes the problem.
+> 
+Sure. Updated patch below. The idea is to ensure that synctimer is
+syncronised before software does any reads on the counter. The BUG
+will get fixed in future OMAP designs
 
-Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+Attaching the patch in case thunderbird email client eats the tabs.
+
+Regards
+Santosh
+
+>From 2edeebbd434627d1d0a9d96f6c5bda044a68fa70 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Mon, 12 Mar 2012 20:34:45 +0530
+Subject: [PATCH] ARM: OMAP4: Workaround the OCP synchronisation issue
+with 32K synctimer.
+
+On OMAP4, recently a synchronisation bug is discovered by hardware
+team, which leads to incorrect timer value read from 32K sync timer
+IP when the IP is comming out of idle.
+
+The issue is due to the synchronization methodology used in the
+SYNCTIMER IP.
+The value of the counter register in 32kHz domain is synchronized to the OCP
+domain register only at count up event, and if the OCP clock is switched
+off,
+the OCP register gets out of synch until the first count up event after the
+clock is switched back -at the next falling edge of the 32kHz clock.
+
+Further investigation revealed that it applies to gptimer1 and watchdog
+timer2
+as well which may run on 32KHz. This patch fixes the issue for all the
+applicable modules.
+
+The BUG has not made it yet to the OMAP errata list and it is applicable to
+OMAP1/2/3/4/5. OMAP1/2/3 it is taken care indirectly by autodeps.
+
+By enabling static depedency of wakeup clockdomain with MPU, as soon as MPU
+is woken up from lowpower state(idle) or whenever MPU is active, PRCM forces
+the OCP clock to be running and allow the counter value to be updated
+properly
+in the OCP clock domain.
+
+The bug is going to fixed in future OMAP versions.
+
+Reported-Tested-by: dave.long at linaro.org
+[dave.long at linaro.org: Reported the oprofile time stamp issue with synctimer
+and helped to test this patch]
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- .../devicetree/bindings/dma/fsl-mxs-dma.txt        |   17 ++++++++
- drivers/dma/mxs-dma.c                              |   44 +++++++++++++------
- 2 files changed, 47 insertions(+), 14 deletions(-)
+ arch/arm/mach-omap2/pm44xx.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
-new file mode 100644
-index 0000000..cfa1730
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
-@@ -0,0 +1,17 @@
-+* Freescale MXS DMA
-+
-+Required properties:
-+- compatible : Should be "fsl,mxs-dma-apbh" or "fsl,mxs-dma-apbx"
-+- reg : Should contain registers location and length
-+
-+Examples:
-+
-+dma-apbh at 80004000 {
-+	compatible = "fsl,mxs-dma-apbh";
-+	reg = <0x80004000 2000>;
-+};
-+
-+dma-apbx at 80024000 {
-+	compatible = "fsl,mxs-dma-apbx";
-+	reg = <0x80024000 2000>;
-+};
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index b06cd4c..45e8d46 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -22,6 +22,9 @@
- #include <linux/platform_device.h>
- #include <linux/dmaengine.h>
- #include <linux/delay.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <asm/irq.h>
- #include <mach/mxs.h>
-@@ -130,6 +133,25 @@ struct mxs_dma_engine {
- 	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
- };
- 
-+static struct platform_device_id mxs_dma_type[] = {
-+	{
-+		.name = "mxs-dma-apbh",
-+		.driver_data = MXS_DMA_APBH,
-+	}, {
-+		.name = "mxs-dma-apbx",
-+		.driver_data = MXS_DMA_APBX,
-+	}, {
-+		/* end of list */
-+	}
-+};
-+
-+static const struct of_device_id mxs_dma_dt_ids[] = {
-+	{ .compatible = "fsl,mxs-dma-apbh", .data = &mxs_dma_type[0], },
-+	{ .compatible = "fsl,mxs-dma-apbx", .data = &mxs_dma_type[1], },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_dma_dt_ids);
-+
- static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index c264ef7..974f7ea 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -196,7 +196,7 @@ static void omap_default_idle(void)
+ static int __init omap4_pm_init(void)
  {
- 	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-@@ -587,8 +609,8 @@ err_out:
- 
- static int __init mxs_dma_probe(struct platform_device *pdev)
- {
--	const struct platform_device_id *id_entry =
--				platform_get_device_id(pdev);
-+	const struct platform_device_id *id_entry;
-+	const struct of_device_id *of_id;
- 	struct mxs_dma_engine *mxs_dma;
- 	struct resource *iores;
- 	int ret, i;
-@@ -597,6 +619,11 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
- 	if (!mxs_dma)
- 		return -ENOMEM;
- 
-+	of_id = of_match_device(mxs_dma_dt_ids, &pdev->dev);
-+	if (of_id)
-+		id_entry = of_id->data;
-+	else
-+		id_entry = platform_get_device_id(pdev);
- 	mxs_dma->dev_id = id_entry->driver_data;
- 
- 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -679,21 +706,10 @@ err_request_region:
- 	return ret;
- }
- 
--static struct platform_device_id mxs_dma_type[] = {
--	{
--		.name = "mxs-dma-apbh",
--		.driver_data = MXS_DMA_APBH,
--	}, {
--		.name = "mxs-dma-apbx",
--		.driver_data = MXS_DMA_APBX,
--	}, {
--		/* end of list */
--	}
--};
--
- static struct platform_driver mxs_dma_driver = {
- 	.driver		= {
- 		.name	= "mxs-dma",
-+		.of_match_table = mxs_dma_dt_ids,
- 	},
- 	.id_table	= mxs_dma_type,
- };
+ 	int ret;
+-	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm;
++	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
+ 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
+
+ 	if (!cpu_is_omap44xx())
+@@ -220,14 +220,19 @@ static int __init omap4_pm_init(void)
+ 	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
+ 	 * expected. The hardware recommendation is to enable static
+ 	 * dependencies for these to avoid system lock ups or random crashes.
++	 * The L4 wakeup depedency is added to workaround the OCP sync hardware
++	 * BUG with 32K synctimer which lead to incorrect timer value read
++	 * from the 32K counter. The BUG applies for GPTIMER1 and WDT2 which
++	 * are part of L4 wakeup clockdomain.
+ 	 */
+ 	mpuss_clkdm = clkdm_lookup("mpuss_clkdm");
+ 	emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+ 	l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
+ 	l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
+ 	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
++	l4wkup = clkdm_lookup("l4_wkup_clkdm");
+ 	ducati_clkdm = clkdm_lookup("ducati_clkdm");
+-	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
++	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) || (!l4wkup) ||
+ 		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
+ 		goto err2;
+
+@@ -235,6 +240,7 @@ static int __init omap4_pm_init(void)
+ 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
+ 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
+ 	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
++	ret |= clkdm_add_wkdep(mpuss_clkdm, l4wkup);
+ 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
+ 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
+ 	if (ret) {
 -- 
-1.7.0.4
+1.7.4.1
+
+
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-OMAP4-Workaround-the-OCP-synchronisation-issue-w.patch
+Type: text/x-patch
+Size: 3667 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/d2699d79/attachment.bin>
