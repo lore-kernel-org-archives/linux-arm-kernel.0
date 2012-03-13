@@ -1,28 +1,43 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 13 Mar 2012 18:00:49 -0400
-Subject: Inconsistent kallsyms data on ARM.
-Message-ID: <CAP=VYLoStscdVJretZ-Rkbp7V3Vsm8N0oWcjih7ruHFiDN7CiA@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 13 Mar 2012 23:15:58 +0100
+Subject: [GIT PULL] LPC32xx: USB Support
+Message-ID: <4F5FC71E.30907@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This bug(?)  has been seen to float from one ARM build to another since
-I started tracking the day-to-day changes in Stephen's linux-next builds.
+Hi Arnd and Olof,
 
-I see it was discussed earlier:
+now that Greg-KH has accepted the LPC32xx OHCI patches into usb-next,
+I'm providing the respective lpc32xx platform code as described below.
 
-   https://lkml.org/lkml/2011/8/2/233
-   https://lkml.org/lkml/2011/10/8/70
+It's on top of v3.3-rc5 and the LPC32xx patches in arm-soc. Thanks
+Arnd for helping woth this.
 
-but no concrete cause was nailed down.  Can the linux-next build results
-help shed some light on this in any way?  Since it seems sporadic, is
-there value in embedding a diagnostic of some sort in the infrastructure
-so that when the error is detected, that it prints out more detailed info?
+Thanks in advance,
 
-I can provide links to failed linux-next builds, but at the moment, all they
-really seem to have is the same repeated error message, like this one:
+Roland
 
-   http://kisskb.ellerman.id.au/kisskb/buildresult/5869367/
 
-and I don't see that helping folks all that much....
 
-Paul.
+The following changes since commit a7e4c6a7145ee375a688e1701ae4c975d6c6419a:
+
+  Merge branch 'lpc32xx/drivers' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc into lpc32xx/tmp (2012-03-13 21:15:40 +0100)
+
+are available in the git repository at:
+
+
+  git://git.antcom.de/linux-2.6.git lpc32xx/mach-lpc32xx-usb
+
+for you to fetch changes up to 48a5dedfa78899dad50b3b4ae30f07e27e6591ab:
+
+  ARM: LPC32xx: USB Support (2012-03-13 21:15:50 +0100)
+
+----------------------------------------------------------------
+Roland Stigge (1):
+      ARM: LPC32xx: USB Support
+
+ arch/arm/mach-lpc32xx/clock.c   |   87 ++++++++++++++++++++++++++++-----------
+ arch/arm/mach-lpc32xx/common.c  |   26 ++++++++++++
+ arch/arm/mach-lpc32xx/common.h  |    1 +
+ arch/arm/mach-lpc32xx/phy3250.c |    1 +
+ 4 files changed, 91 insertions(+), 24 deletions(-)
