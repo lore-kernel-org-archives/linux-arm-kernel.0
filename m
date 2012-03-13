@@ -1,25 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 13 Mar 2012 23:15:02 +0000
-Subject: [PATCH v4 06/10] ASoC: fsl: check property 'compatible' for the
- machine name
-In-Reply-To: <4F5FD47A.9040808@freescale.com>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
- <1331553537-19789-7-git-send-email-shawn.guo@linaro.org>
- <4F5FD47A.9040808@freescale.com>
-Message-ID: <20120313231502.GR3177@opensource.wolfsonmicro.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 13 Mar 2012 17:18:34 -0600
+Subject: [PULL] generic irq chip and pl061 irqdomain support
+In-Reply-To: <4F5FD037.5000703@gmail.com>
+References: <4F3ADFE7.4090409@gmail.com> <4F5437FE.2000306@gmail.com>
+ <4F5FD037.5000703@gmail.com>
+Message-ID: <20120313231834.8B6AE3E050F@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 06:12:58PM -0500, Timur Tabi wrote:
+On Tue, 13 Mar 2012 17:54:47 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On 03/04/2012 09:50 PM, Rob Herring wrote:
+> > Grant,
+> > 
+> > On 02/14/2012 04:27 PM, Rob Herring wrote:
+> >> Grant,
+> >>
+> >> Please pull. This is based on your current branch which you have said
+> >> you plan to rebase, so feel free to rebase these as you need to. This
+> >> has been tested on highbank and i.MX5.
+> >>
+> > 
+> > Ping.
+> > 
+> > I've rebased onto your current tree. Updated pull request:
+> > 
+> > The following changes since commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e:
+> > 
+> >   mfd: twl-core: Add IRQ_DOMAIN dependency (2012-02-26 16:48:06 -0700)
+> > 
+> > are available in the git repository at:
+> >   git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
+> > 
+> > Rob Herring (3):
+> >       ARM: kconfig: always select IRQ_DOMAIN
+> >       irq: add irq_domain support to generic-chip
+> >       gpio: pl061: enable interrupts with DT style binding
+> > 
+> >  .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
+> >  arch/arm/Kconfig                                   |    2 +-
+> >  arch/arm/common/Kconfig                            |    2 -
+> >  drivers/gpio/gpio-pl061.c                          |   48 ++++---
+> >  include/linux/irq.h                                |   15 ++
+> >  kernel/irq/generic-chip.c                          |  152
+> > +++++++++++++++++---
+> >  6 files changed, 186 insertions(+), 48 deletions(-)
+> > 
+> 
+> Ping again...
 
-> I'm pretty sure I ack'd this patch already.  Regardless, it does not apply
-> to for-3.4.
+Okay, I've pulled this in.  I need to do some compile testing before I push
+it out.
 
-You did, it doesn't apply because it's already applied.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/bb8131cc/attachment.sig>
+g.
