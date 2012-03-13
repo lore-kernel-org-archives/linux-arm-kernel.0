@@ -1,56 +1,80 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 13 Mar 2012 12:45:56 +0100
-Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
-In-Reply-To: <20120306223321.GD15201@n2100.arm.linux.org.uk>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
-Message-ID: <4F5F3374.8000506@atmel.com>
+From: joancarles@fqingenieria.es (joancarles)
+Date: Tue, 13 Mar 2012 12:59:12 +0100
+Subject: [PATCH] iomux-mx25.h slew rate adjusted for LCD __LD pins
+In-Reply-To: <3F263ABB4EDE344D974E1983B56807739E868EAB@EX-DAG01.eckelmann.group>
+References: <3F263ABB4EDE344D974E1983B56807739E868EAB@EX-DAG01.eckelmann.group>
+Message-ID: <efb4350f3d236ae7feb088b9a5072b8c@mail.fqingenieria.es>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2012 11:33 PM, Russell King - ARM Linux :
-> [v2 - more or less same description.  Including lakml in cc for the full
-> set]
-> 
-> This patch series cleans up the handling of cookies in DMA engine drivers.
-> This is done by providing a set of inline library functions for common
-> tasks:
-> 
-> - moving the 'last completed cookie' into struct dma_chan - everyone
->   has this in their driver private channel data structure
-> 
-> - consolidate allocation of cookies to DMA descriptors
-> 
-> - common way to update 'last completed cookie' value
-> 
-> - standard way to implement tx_status callback and update the residue
-> 
-> - consolidate initialization of cookies
-> 
-> - update implementations differing from the majority of DMA engine drivers
->   to behave the same as the majority implementation in respect of cookies
-> 
-> What this means is that we get to the point where all DMA engine drivers
-> will hand out cookie value '2' as the first, and incrementing cookie
-> values up to INT_MAX, returning to cookie '1' as the next cookie.
-> 
-> Think of this patch series as round 1...  I am hoping over time that more
-> code can be consolidated between the DMA engine drivers and end up with a
-> consistent way to handle various common themes in DMA engine hardware
-> (like physical channel<->peripheral request signal selection.)
-> 
-> Overall, the diffstat looks like this:
-> 
->  arch/arm/include/asm/hardware/iop_adma.h |    2 -
->  drivers/dma/amba-pl08x.c                 |   38 ++++---------
->  drivers/dma/at_hdmac.c                   |   48 ++++------------
->  drivers/dma/at_hdmac_regs.h              |    2 -
+Hi
 
-For at_hdmac Atmel DMA driver:
+What a coincidence, we have been fighting with the LCD color issue on 
+an i.MX258 about two weeks ago and came up with almost the same patch.
 
-Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> For some reason (sadly i don't identifying the patch right now)
+> two LCD data lines configured PAD_CTL_SRE_SLOW (wrong slew rate)
+> since Kernel 3.1. MX25_PAD_GPIO_E__LD16 and MX25_PAD_GPIO_F__LD17
+> This results in an fauly behaviour and strange color effects.
+>
+> To ensure that all LCD data pins configured with the proper slew 
+> rate,
+> this patch changes to IOMUX define of all LCD __LDxx pins to
+> PAD_CTL_SRE_FAST.
 
-Thanks a lot Russell.
+For us it was enough to change the MX25_PAD_GPIO_E__LD16 and 
+MX25_PAD_GPIO_F__LD17 pins to PAD_CTL_SRE_FAST. Why do you need to 
+change the others too? Could this introduce undesired signal noise on 
+the board? We actually experience a weird effect on the ADC lines. It's 
+all been discussed here:
 
-Best regards,
+
+
+> This problem may affect other mx25 platforms like mx25pdk. Sadly i 
+> can't test
+> it. Of course this problem shouldn't occur when you done your LCD 
+> muxing
+> correctly in the bootloader.
+
+Would you care to explain how to perform the "LCD muxing correctly" in 
+the bootloader and why it should influence what the kernel does?
+
+I will test your patch (adding PAD_CTL_SRE_FAST to all __LDxx pins 
+instead of just LD16 and LD17) and report back. In any case, I can 
+confirm that without this patch the LCD has weird colors. Juergen 
+Beisert has more iomux-mx25.h changes, especially with regard to PWM, so 
+I reckon he'll send them upstream soon enough.
+
+> @@ -468,11 +468,11 @@
+>  #define MX25_PAD_GPIO_C__CAN2_TX	IOMUX_PAD(0x3f8, 0x1fc, 0x16, 0, 0,
+> PAD_CTL_PUS_22K_UP)
+>
+>  #define MX25_PAD_GPIO_D__GPIO_D		IOMUX_PAD(0x3fc, 0x200, 0x10, 0, 0,
+> NO_PAD_CTRL)
+> -#define MX25_PAD_GPIO_E__LD16		IOMUX_PAD(0x400, 0x204, 0x02, 0, 0,
+> NO_PAD_CTRL)
+> +#define MX25_PAD_GPIO_E__LD16		IOMUX_PAD(0x400, 0x204, 0x02, 0, 0,
+> PAD_CTL_SRE_FAST)
+>  #define MX25_PAD_GPIO_D__CAN2_RX	IOMUX_PAD(0x3fc, 0x200, 0x16,
+> 0x484, 1, PAD_CTL_PUS_22K_UP)
+>
+>  #define MX25_PAD_GPIO_E__GPIO_E		IOMUX_PAD(0x400, 0x204, 0x10, 0, 0,
+> NO_PAD_CTRL)
+> -#define MX25_PAD_GPIO_F__LD17		IOMUX_PAD(0x404, 0x208, 0x02, 0, 0,
+> NO_PAD_CTRL)
+> +#define MX25_PAD_GPIO_F__LD17		IOMUX_PAD(0x404, 0x208, 0x02, 0, 0,
+> PAD_CTL_SRE_FAST)
+>  #define MX25_PAD_GPIO_E__AUD7_TXD	IOMUX_PAD(0x400, 0x204, 0x14, 0,
+> 0, NO_PAD_CTRL)
+>
+>  #define MX25_PAD_GPIO_F__GPIO_F		IOMUX_PAD(0x404, 0x208, 0x10, 0, 0,
+> NO_PAD_CTRL)
+
+As mentioned above, this is the only part we needed from the patch to 
+address the wrong slew rate for the LCD color wash-out. But I am curious 
+as to hear your explanation with regard to changing the slew rate of the 
+other __LDxx pins.
+
+Best regards
 -- 
-Nicolas Ferre
+Joan C. Abelaira
