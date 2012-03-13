@@ -1,63 +1,45 @@
 From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Tue, 13 Mar 2012 11:26:19 +0100
-Subject: [PATCH 4/6] ARM: OMAP3+: SmartReflex: disable spamming interrupts
+Date: Tue, 13 Mar 2012 11:26:21 +0100
+Subject: [PATCH 6/6] ARM: OMAP3+: SmartReflex Class3: restrict CPU to run on
 In-Reply-To: <1331634381-31436-1-git-send-email-j-pihet@ti.com>
 References: <1331634381-31436-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1331634381-31436-5-git-send-email-j-pihet@ti.com>
+Message-ID: <1331634381-31436-7-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-At times with bad SR configurations, especially during silicon bring-ups,
-we could get continuous spurious interrupts which end up hanging the
-platform in the form of an ISR call for status bits that are
-automatically enabled by the hardware without any software clearing
-option.
-
-If we detect scenarios where ISR was called without the corresponding
-notification bit being set, instead of hanging up the system,
-we will disable interrupt after noting the event in the system log
-to try and keep system sanity and allow developer to debug and fix
-the condition.
+Use SmartReflex AVS Class3 initialization only for OMAP343x family of
+processors.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |   21 +++++++++++++++++++--
- 1 files changed, 19 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/smartreflex-class3.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index dfe8075..8a10c0a 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -223,8 +223,25 @@ static irqreturn_t sr_interrupt(int irq, void *data)
- 		return IRQ_NONE;
- 	}
+diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
+index 9dcda93..735937a 100644
+--- a/arch/arm/mach-omap2/smartreflex-class3.c
++++ b/arch/arm/mach-omap2/smartreflex-class3.c
+@@ -11,6 +11,7 @@
+  * published by the Free Software Foundation.
+  */
  
--	if (sr_class->notify)
--		sr_class->notify(sr_info->voltdm, value);
-+	/* Attempt some resemblance of recovery! */
-+	if (!value) {
-+		dev_err(&sr_info->pdev->dev, "%s: Spurious interrupt!"
-+			"status = 0x%08x. Disabling to prevent spamming!!\n",
-+			__func__, status);
-+		disable_irq_nosync(sr_info->irq);
-+		sr_info->irq_enabled = false;
-+	} else {
-+		/* If the caller reports inability to handle, disable as well */
-+		if (sr_class->notify &&
-+		    sr_class->notify(sr_info->voltdm, value)) {
-+			dev_err(&sr_info->pdev->dev, "%s: Callback cant handle!"
-+				"status=0x%08x. Disabling to prevent spam!!\n",
-+				__func__, status);
-+			disable_irq_nosync(sr_info->irq);
-+			sr_info->irq_enabled = false;
-+		}
++#include <plat/cpu.h>
+ #include "smartreflex.h"
+ 
+ static int sr_class3_enable(struct voltagedomain *voltdm,
+@@ -58,6 +59,10 @@ static struct omap_sr_class_data class3_data = {
+ /* Smartreflex Class3 init API to be called from board file */
+ static int __init sr_class3_init(void)
+ {
++	/* Enable this class only for OMAP343x */
++	if (!cpu_is_omap343x())
++		return -EINVAL;
 +
-+	}
- 
- 	return IRQ_HANDLED;
+ 	pr_info("SmartReflex Class3 initialized\n");
+ 	return sr_register_class(&class3_data);
  }
 -- 
 1.7.5.4
