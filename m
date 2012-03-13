@@ -1,47 +1,68 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Tue, 13 Mar 2012 11:00:24 +0100
-Subject: [PATCH v11 3/3] iommu/exynos: Add iommu driver for Exynos
- Platforms
-In-Reply-To: <CAHQjnOOCQb4G1aeFB0FQVBstXpaXmahnQO8+FoinPcQNZEieGg@mail.gmail.com>
-References: <017a01ccfdee$4e5e7a00$eb1b6e00$%cho@samsung.com>
- <20120312150156.GF18973@amd.com>
- <CAHQjnOOCQb4G1aeFB0FQVBstXpaXmahnQO8+FoinPcQNZEieGg@mail.gmail.com>
-Message-ID: <20120313100024.GG18973@amd.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 13 Mar 2012 11:03:47 +0100
+Subject: [PATCH 6/7] ARM: kirkwood: rtc-mv devicetree bindings
+In-Reply-To: <0b9921e304cb46af9c4fbc8b7b8c8b9ba3d18654.1331601448.git.jason@lakedaemon.net>
+References: <cover.1330625877.git.jason@lakedaemon.net>
+ <cover.1331601448.git.jason@lakedaemon.net>
+ <0b9921e304cb46af9c4fbc8b7b8c8b9ba3d18654.1331601448.git.jason@lakedaemon.net>
+Message-ID: <20120313100347.GA10400@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 05:50:16PM +0900, KyongHo Cho wrote:
-> >> +struct sysmmu_drvdata {
-> >> + ? ? struct device *sysmmu;
-> >> + ? ? char *dbgname;
-> >> + ? ? int nsfrs;
-> >> + ? ? void __iomem **sfrbases;
-> >> + ? ? struct clk *clk[2];
-> >> + ? ? int activations;
-> >> + ? ? rwlock_t lock;
-> >> + ? ? struct iommu_domain *domain;
-> >> + ? ? sysmmu_fault_handler_t fault_handler;
-> >> + ? ? unsigned long pgtable;
-> >> + ? ? struct iommu_client client;
-> >> +};
-> >
-> > Is there any reason why 'struct iommu_client' is a seperate data
-> > structure? Otherwise it can be merged with 'truct sysmmu_drvdata'.
+On Tue, Mar 13, 2012 at 01:57:48AM +0000, Jason Cooper wrote:
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  drivers/rtc/rtc-mv.c |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+> index 768e2ed..0dd8421 100644
+> --- a/drivers/rtc/rtc-mv.c
+> +++ b/drivers/rtc/rtc-mv.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/bcd.h>
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of.h>
+>  #include <linux/delay.h>
+>  #include <linux/gfp.h>
+>  #include <linux/module.h>
+> @@ -294,11 +295,19 @@ static int __exit mv_rtc_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static struct of_device_id rtc_mv_of_match_table[] = {
+> +	{ .compatible = "mrvl,orion-rtc", },
+> +	{}
+> +};
+> +#endif
+I guess it's a matter of taste, but you could use __maybe_unused instead
+of #ifdef .. #endif.
 
-Of course this doesn't need to be changed immediatly. I just asked if
-there was a specific reason for this seperation.
+Best regards
+Uwe
 
-> The problems will be soon fixed and I will post next patch tomorrow.
-
-Fine. Please also get the Acked-bys from the Exynos maintainer on
-patches 1 and 2 at least. I'll merge it then.
-
-
-	Joerg
+> +
+>  static struct platform_driver mv_rtc_driver = {
+>  	.remove		= __exit_p(mv_rtc_remove),
+>  	.driver		= {
+>  		.name	= "rtc-mv",
+>  		.owner	= THIS_MODULE,
+> +		.of_match_table = of_match_ptr(rtc_mv_of_match_table),
+>  	},
+>  };
+>  
+> -- 
+> 1.7.3.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
