@@ -1,45 +1,210 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Tue, 13 Mar 2012 12:40:01 -0500
-Subject: [PATCH 3/6] ARM: OMAP3+: SmartReflex: introduce notifier_control
-In-Reply-To: <1331634381-31436-4-git-send-email-j-pihet@ti.com>
-References: <1331634381-31436-1-git-send-email-j-pihet@ti.com>
- <1331634381-31436-4-git-send-email-j-pihet@ti.com>
-Message-ID: <CAOMWX4fauZQccPhHn+f4-SOAXRbaU135xUKva0QsGgJoXDQzwA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 13 Mar 2012 11:42:38 -0600
+Subject: [PATCH v1 2/5] mmc: mxs-mmc: add dt probe support
+In-Reply-To: <1331628428-24017-3-git-send-email-b29396@freescale.com>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-3-git-send-email-b29396@freescale.com>
+Message-ID: <20120313174238.CE9133E053B@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 05:26, <jean.pihet@newoldbits.com> wrote:
->
-> diff --git a/arch/arm/mach-omap2/smartreflex.c
-> b/arch/arm/mach-omap2/smartreflex.c
-> index 7977018..dfe8075 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-...
-> + ? ? ? switch (sr->ip_type) {
-> + ? ? ? case SR_TYPE_V1:
-> + ? ? ? ? ? ? ? value = notifier_to_irqen_v1(sr_class->notify_flags);
-> + ? ? ? ? ? ? ? sr_modify_reg(sr, ERRCONFIG_V1, value,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (enable) ? value : 0);
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? case SR_TYPE_V2:
-> + ? ? ? ? ? ? ? value = notifier_to_irqen_v2(sr_class->notify_flags);
-> + ? ? ? ? ? ? ? sr_write_reg(sr, (enable) ? IRQENABLE_SET : IRQENABLE_CLR,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? value);
-> + ? ? ? ? ? ? ? break;
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? ?dev_warn(&sr->pdev->dev, "%s: unknown type of sr??\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__);
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
+On Tue, 13 Mar 2012 16:47:05 +0800, Dong Aisheng <b29396@freescale.com> wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> ---
+> The patch is still using a private way for dma part binding
+> since the common dma binding is still under discussion.
+> http://www.spinics.net/lists/linux-omap/msg65528.html
+> 
+> Will update to use common dma binding when it hits mainline.
+> ---
+>  .../devicetree/bindings/mmc/fsl-mxs-mmc.txt        |   23 ++++++
+>  drivers/mmc/host/mxs-mmc.c                         |   82 +++++++++++++++++++-
+>  2 files changed, 102 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt
+> new file mode 100644
+> index 0000000..adc1142
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt
+> @@ -0,0 +1,23 @@
+> +* FREESCALE MXS MMC peripheral
 > +
-> + ? ? ? if (!enable)
-> + ? ? ? ? ? ? ? sr_write_reg(sr, IRQSTATUS, value);
+> +Required properties:
+> +- compatible : Should be "fsl,<chip>-mmc"
+> +- reg : Should contain registers location and length
+> +- interrupts : Should contain interrupt.
+> +  The format is <irq_err irq_dma>.
+> +- dma_channel: Should contain the dma channel it uses
 
-can you move this to before we disable the interrupt? it took a while,
-but we caught a bug recently when we disable IRQ and then attempt to
-clear the status[1]
+Don't use '_' in property names.
 
-Regards,
-Nishanth Menon
-[1] http://review.omapzoom.org/#/c/20231/
+The is a generic dma binding being drafted that uses a phandle to the dma
+controller and the ability to encode channel numbers.  You may want to take
+a look at it.
+
+> +
+> +Optional properties:
+> +- wp-gpios : Specify GPIOs for write protection
+> +- slot-4bit: Specify 4 bit mode support
+> +- slot-8bit: Specify 8 bit and 4 bit mode support
+> +
+> +Examples:
+> +mmc1: ssp at 80010000 {
+> +	compatible = "fsl,imx28-mmc";
+> +	reg = <0x80010000 2000>;
+> +	/* <irq_err irq_dma> */
+> +	interrupts = <96 82>;
+> +	dma_channel = <0>;
+> +	slot-8bit;
+> +};
+> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> index 382c835..6cf2d17 100644
+> --- a/drivers/mmc/host/mxs-mmc.c
+> +++ b/drivers/mmc/host/mxs-mmc.c
+> @@ -38,6 +38,10 @@
+>  #include <linux/gpio.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/slab.h>
+>  
+>  #include <mach/mxs.h>
+>  #include <mach/common.h>
+> @@ -673,17 +677,79 @@ static bool mxs_mmc_dma_filter(struct dma_chan *chan, void *param)
+>  	return true;
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static struct resource * __devinit mxs_mmc_get_of_dmares(
+> +				struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct resource *dmares;
+> +	int ret;
+> +
+> +	if (!np)
+> +		return NULL;
+> +
+> +	dmares = kzalloc(sizeof(*dmares), GFP_KERNEL);
+
+devm_kzalloc()
+
+> +	dmares->flags = IORESOURCE_DMA;
+> +	ret = of_property_read_u32(np, "dma_channel", &dmares->start);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "unable to get dmares from dt\n");
+> +		return NULL;
+> +	}
+> +	dmares->end = dmares->start;
+> +
+> +	return dmares;
+> +}
+> +
+> +static int __devinit mxs_mmc_get_of_property(struct platform_device *pdev,
+> +				struct mxs_mmc_platform_data **ppdata)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct mxs_mmc_platform_data *pdata = *ppdata;
+> +
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+
+Ditto
+
+Fix up those comments and you can add my:
+
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+> +
+> +	if (of_get_property(np, "slot-8bit", NULL))
+> +		pdata->flags |= SLOTF_8_BIT_CAPABLE;
+> +
+> +	if (of_get_property(np, "slot-4bit", NULL))
+> +		pdata->flags |= SLOTF_4_BIT_CAPABLE;
+> +
+> +	pdata->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
+> +
+> +	dev_dbg(&pdev->dev, "wp-gpios %d flags %d\n", pdata->wp_gpio,
+> +		pdata->flags);
+> +
+> +	return 0;
+> +}
+> +#else
+> +static struct resource * __devinit mxs_mmc_get_of_dmares(
+> +				struct platform_device *pdev)
+> +{
+> +	return NULL;
+> +}
+> +static inline int mxs_mmc_get_of_property(struct platform_device *pdev,
+> +			struct mxs_mmc_platform_data *pdata)
+> +{
+> +	return -ENODEV;
+> +}
+> +#endif
+> +
+>  static int mxs_mmc_probe(struct platform_device *pdev)
+>  {
+>  	struct mxs_mmc_host *host;
+>  	struct mmc_host *mmc;
+>  	struct resource *iores, *dmares, *r;
+> -	struct mxs_mmc_platform_data *pdata;
+> +	struct mxs_mmc_platform_data *pdata = NULL;
+>  	int ret = 0, irq_err, irq_dma;
+>  	dma_cap_mask_t mask;
+>  
+>  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+> +	dmares = mxs_mmc_get_of_dmares(pdev);
+> +	if (dmares == NULL)
+> +		dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
+>  	irq_err = platform_get_irq(pdev, 0);
+>  	irq_dma = platform_get_irq(pdev, 1);
+>  	if (!iores || !dmares || irq_err < 0 || irq_dma < 0)
+> @@ -740,7 +806,9 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+>  	mmc->caps = MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED |
+>  		    MMC_CAP_SDIO_IRQ | MMC_CAP_NEEDS_POLL;
+>  
+> -	pdata =	mmc_dev(host->mmc)->platform_data;
+> +	mxs_mmc_get_of_property(pdev, &pdata);
+> +	if (pdata == NULL)
+> +		pdata =	mmc_dev(host->mmc)->platform_data;
+>  	if (pdata) {
+>  		if (pdata->flags & SLOTF_8_BIT_CAPABLE)
+>  			mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA;
+> @@ -851,6 +919,13 @@ static const struct dev_pm_ops mxs_mmc_pm_ops = {
+>  };
+>  #endif
+>  
+> +static const struct of_device_id mxs_mmc_dt_ids[] = {
+> +	{ .compatible = "fsl,imx23-mmc", .data = NULL, },
+> +	{ .compatible = "fsl,imx28-mmc", .data = NULL, },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_mmc_dt_ids);
+> +
+>  static struct platform_driver mxs_mmc_driver = {
+>  	.probe		= mxs_mmc_probe,
+>  	.remove		= mxs_mmc_remove,
+> @@ -860,6 +935,7 @@ static struct platform_driver mxs_mmc_driver = {
+>  #ifdef CONFIG_PM
+>  		.pm	= &mxs_mmc_pm_ops,
+>  #endif
+> +		.of_match_table = mxs_mmc_dt_ids,
+>  	},
+>  };
+>  
+> -- 
+> 1.7.0.4
+> 
+> 
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
