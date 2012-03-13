@@ -1,259 +1,103 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 13 Mar 2012 10:11:04 +0100
-Subject: [PATCH 1/5 v3] i2c/gpio: add DT support
-In-Reply-To: <20120313073748.GA7746@pengutronix.de>
-References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
- <20120313073748.GA7746@pengutronix.de>
-Message-ID: <20120313091104.GE18320@game.jcrosoft.org>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 13 Mar 2012 18:34:32 +0900
+Subject: [PATCH v3 2/3] video: s3c-fb: remove 'default_win' element from
+ platform data
+In-Reply-To: <1331585999-8604-3-git-send-email-thomas.abraham@linaro.org>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <002e01cd00fc$7efad9e0$7cf08da0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08:37 Tue 13 Mar     , Wolfram Sang wrote:
-> On Thu, Mar 08, 2012 at 09:50:31AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Cc: linux-i2c at vger.kernel.org
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> 
-> Your patch description says "add DT support" but you are doing a bit more.
-> This should at least be described here.
-> 
-> > ---
-> > v3:
-> > 
-> > 	update i2c binding (Rob comments)
-> > 
-> > 	Jean can I have a ack to apply it?
-> > 
-> > Best Regards,
-> > J.
-> >  .../devicetree/bindings/gpio/gpio_i2c.txt          |   32 +++++++
-> >  drivers/i2c/busses/i2c-gpio.c                      |   94 +++++++++++++++----
-> >  2 files changed, 106 insertions(+), 20 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/gpio/gpio_i2c.txt b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-> > new file mode 100644
-> > index 0000000..4f8ec94
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/gpio/gpio_i2c.txt
-> > @@ -0,0 +1,32 @@
-> > +Device-Tree bindings for i2c gpio driver
-> > +
-> > +Required properties:
-> > +	- compatible = "i2c-gpio";
-> 
-> I assume people at "devicetree-discuss" have taken care of that, yet I wonder
-> that this breaks the "vendor,product" syntax I know of for compatible entries.
-yes but there no vendor here
-get ack from Grant and Rob
-> 
-> > +	- gpios: sda and scl gpio
-> > +
-> > +
-> > +Optional properties:
-> > +	- i2c-gpio,sda-open-drain: sda as open drain
-> > +	- i2c-gpio,scl-open-drain: scl as open drain
-> > +	- i2c-gpio,scl-output-only: scl as output only
-> > +	- i2c-gpio,delay-us: delay between GPIO operations (may depend on each platform)
-> > +	- i2c-gpio,timeout-ms: timeout to get data
-> > +
-> > +Example nodes:
-> > +
-> > +i2c at 0 {
-> > +	compatible = "i2c-gpio";
-> > +	gpios = <&pioA 23 0 /* sda */
-> > +		 &pioA 24 0 /* scl */
-> > +		>;
-> > +	i2c-gpio,sda-open-drain;
-> > +	i2c-gpio,scl-open-drain;
-> > +	i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +
-> > +	rv3029c2 at 56 {
-> > +		compatible = "rv3029c2";
-> > +		reg = <0x56>;
-> > +	};
-> > +};
-> > diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
-> > index a651779..98ae85b 100644
-> > --- a/drivers/i2c/busses/i2c-gpio.c
-> > +++ b/drivers/i2c/busses/i2c-gpio.c
-> > @@ -14,8 +14,15 @@
-> >  #include <linux/module.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/gpio.h>
-> > +#include <linux/of_gpio.h>
-> > +#include <linux/of_i2c.h>
-> >  
-> > -#include <asm/gpio.h>
-> > +struct i2c_gpio_private_data {
-> > +	struct i2c_adapter adap;
-> > +	struct i2c_algo_bit_data bit_data;
-> > +	struct i2c_gpio_platform_data pdata;
-> > +};
-> >  
-> >  /* Toggle SDA by changing the direction of the pin */
-> >  static void i2c_gpio_setsda_dir(void *data, int state)
-> > @@ -78,24 +85,62 @@ static int i2c_gpio_getscl(void *data)
-> >  	return gpio_get_value(pdata->scl_pin);
-> >  }
-> >  
-> > +static int __devinit of_i2c_gpio_probe(struct device_node *np,
-> > +			     struct i2c_gpio_platform_data *pdata)
-> > +{
-> > +	u32 reg;
-> > +
-> > +	if (of_gpio_count(np) < 2)
-> > +		return -ENODEV;
-> > +
-> > +	pdata->sda_pin = of_get_gpio(np, 0);
-> > +	pdata->scl_pin = of_get_gpio(np, 1);
-> > +
-> > +	if (pdata->sda_pin < 0 || pdata->scl_pin < 0) {
-> 
-> gpio_is_valid()?
-> 
-> > +		pr_err("%s: invalid GPIO pins, sda=%d/scl=%d\n",
-> > +		       np->full_name, pdata->sda_pin, pdata->scl_pin);
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	of_property_read_u32(np, "i2c-gpio,delay-us", &pdata->udelay);
-> > +
-> > +	if (of_property_read_u32(np, "i2c-gpio,timeout-ms", &reg))
-> > +		pdata->timeout = msecs_to_jiffies(reg);
-> > +
-> > +	pdata->sda_is_open_drain =
-> > +		!!of_property_read_bool(np, "i2c-gpio,sda-open-drain");
-> > +	pdata->scl_is_open_drain =
-> > +		!!of_property_read_bool(np, "i2c-gpio,scl-open-drain");
-> > +	pdata->scl_is_output_only =
-> > +		!!of_property_read_bool(np, "i2c-gpio,scl-output-only");
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >  static int __devinit i2c_gpio_probe(struct platform_device *pdev)
-> >  {
-> > +	struct i2c_gpio_private_data *priv;
-> >  	struct i2c_gpio_platform_data *pdata;
-> >  	struct i2c_algo_bit_data *bit_data;
-> >  	struct i2c_adapter *adap;
-> >  	int ret;
-> >  
-> > -	pdata = pdev->dev.platform_data;
-> > -	if (!pdata)
-> > -		return -ENXIO;
-> > +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> > +	if (!priv)
-> > +		return -ENOMEM;
-> > +	adap = &priv->adap;
-> > +	bit_data = &priv->bit_data;
-> > +	pdata = &priv->pdata;
-> >  
-> > -	ret = -ENOMEM;
-> > -	adap = kzalloc(sizeof(struct i2c_adapter), GFP_KERNEL);
-> > -	if (!adap)
-> > -		goto err_alloc_adap;
-> > -	bit_data = kzalloc(sizeof(struct i2c_algo_bit_data), GFP_KERNEL);
-> > -	if (!bit_data)
-> > -		goto err_alloc_bit_data;
-> > +	if (pdev->dev.of_node) {
-> > +		ret = of_i2c_gpio_probe(pdev->dev.of_node, pdata);
-> > +		if (ret)
-> > +			return ret;
-> > +	} else {
-> > +		if (!pdev->dev.platform_data)
-> > +			return -ENXIO;
-> > +		memcpy(pdata, pdev->dev.platform_data, sizeof(*pdata));
-> > +	}
-> >  
-> >  	ret = gpio_request(pdata->sda_pin, "sda");
-> >  	if (ret)
-> > @@ -143,6 +188,7 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
-> >  	adap->algo_data = bit_data;
-> >  	adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
-> >  	adap->dev.parent = &pdev->dev;
-> > +	adap->dev.of_node = pdev->dev.of_node;
-> >  
-> >  	/*
-> >  	 * If "dev->id" is negative we consider it as zero.
-> > @@ -154,7 +200,9 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
-> >  	if (ret)
-> >  		goto err_add_bus;
-> >  
-> > -	platform_set_drvdata(pdev, adap);
-> > +	of_i2c_register_devices(adap);
-> > +
-> > +	platform_set_drvdata(pdev, priv);
-> >  
-> >  	dev_info(&pdev->dev, "using pins %u (SDA) and %u (SCL%s)\n",
-> >  		 pdata->sda_pin, pdata->scl_pin,
-> > @@ -168,34 +216,40 @@ err_add_bus:
-> >  err_request_scl:
-> >  	gpio_free(pdata->sda_pin);
-> >  err_request_sda:
-> > -	kfree(bit_data);
-> > -err_alloc_bit_data:
-> > -	kfree(adap);
-> > -err_alloc_adap:
-> >  	return ret;
-> >  }
-> >  
-> >  static int __devexit i2c_gpio_remove(struct platform_device *pdev)
-> >  {
-> > +	struct i2c_gpio_private_data *priv;
-> >  	struct i2c_gpio_platform_data *pdata;
-> >  	struct i2c_adapter *adap;
-> >  
-> > -	adap = platform_get_drvdata(pdev);
-> > -	pdata = pdev->dev.platform_data;
-> > +	priv = platform_get_drvdata(pdev);
-> > +	adap = &priv->adap;
-> > +	pdata = &priv->pdata;
-> >  
-> >  	i2c_del_adapter(adap);
-> >  	gpio_free(pdata->scl_pin);
-> >  	gpio_free(pdata->sda_pin);
-> > -	kfree(adap->algo_data);
-> > -	kfree(adap);
-> >  
-> >  	return 0;
-> >  }
-> >  
-> > +#if defined(CONFIG_OF)
-> > +static const struct of_device_id i2c_gpio_dt_ids[] = {
-> > +	{ .compatible = "i2c-gpio", },
-> > +	{ /* sentinel */ }
-> > +};
-> > +
-> > +MODULE_DEVICE_TABLE(of, i2c_gpio_dt_ids);
-> > +#endif
-> > +
-> >  static struct platform_driver i2c_gpio_driver = {
-> >  	.driver		= {
-> >  		.name	= "i2c-gpio",
-> >  		.owner	= THIS_MODULE,
-> > +		.of_match_table	= of_match_ptr(i2c_gpio_dt_ids),
-> >  	},
-> >  	.probe		= i2c_gpio_probe,
-> >  	.remove		= __devexit_p(i2c_gpio_remove),
-> 
-> Otherwise looks good in general. What was your test scenario?
-AT91 support on 3 different SoC
+From: Thomas Abraham <thomas.abraham@linaro.org>
 
-will update and send it via AT91  with your ack
+The decision to enable or disable the data output to the lcd panel from
+the controller need not be based on the value of 'default_win' element
+in the platform data. Instead, the data output to the panel is enabled
+if any of the windows are active, else data output is disabled.
 
-Best Regards,
-J.
-> 
-> Thanks,
-> 
->    Wolfram
-> 
-> -- 
-> Pengutronix e.K.                           | Wolfram Sang                |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cc: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+v3: fix some minor coding styles
+
+ arch/arm/plat-samsung/include/plat/fb.h |    3 ---
+ drivers/video/s3c-fb.c                  |   24 +++++-------------------
+ 2 files changed, 5 insertions(+), 22 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+index 39d6bd7..b885322 100644
+--- a/arch/arm/plat-samsung/include/plat/fb.h
++++ b/arch/arm/plat-samsung/include/plat/fb.h
+@@ -43,7 +43,6 @@ struct s3c_fb_pd_win {
+  * @setup_gpio: Setup the external GPIO pins to the right state to transfer
+  *		the data from the display system to the connected display
+  *		device.
+- * @default_win: default window layer number to be used for UI layer.
+  * @vidcon0: The base vidcon0 values to control the panel data format.
+  * @vidcon1: The base vidcon1 values to control the panel data output.
+  * @vtiming: Video timing when connected to a RGB type panel.
+@@ -62,8 +61,6 @@ struct s3c_fb_platdata {
+ 	struct s3c_fb_pd_win	*win[S3C_FB_MAX_WIN];
+ 	struct fb_videomode     *vtiming;
+ 
+-	u32			 default_win;
+-
+ 	u32			 vidcon0;
+ 	u32			 vidcon1;
+ };
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index c94f40d..dd816fb 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -531,7 +531,7 @@ static int s3c_fb_set_par(struct fb_info *info)
+ 	/* disable the window whilst we update it */
+ 	writel(0, regs + WINCON(win_no));
+ 
+-	if (win_no == sfb->pdata->default_win)
++	if (!sfb->output_on)
+ 		s3c_fb_enable(sfb, 1);
+ 
+ 	/* write the buffer address */
+@@ -799,6 +799,7 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
+ 	struct s3c_fb *sfb = win->parent;
+ 	unsigned int index = win->index;
+ 	u32 wincon;
++	u32 output_on = sfb->output_on;
+ 
+ 	dev_dbg(sfb->dev, "blank mode %d\n", blank_mode);
+ 
+@@ -844,27 +845,12 @@ static int s3c_fb_blank(int blank_mode, struct fb_info *info)
+ 	 * it is highly likely that we also do not need to output
+ 	 * anything.
+ 	 */
+-
+-	/* We could do something like the following code, but the current
+-	 * system of using framebuffer events means that we cannot make
+-	 * the distinction between just window 0 being inactive and all
+-	 * the windows being down.
+-	 *
+-	 * s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
+-	*/
+-
+-	/* we're stuck with this until we can do something about overriding
+-	 * the power control using the blanking event for a single fb.
+-	 */
+-	if (index == sfb->pdata->default_win) {
+-		shadow_protect_win(win, 1);
+-		s3c_fb_enable(sfb, blank_mode != FB_BLANK_POWERDOWN ? 1 : 0);
+-		shadow_protect_win(win, 0);
+-	}
++	s3c_fb_enable(sfb, sfb->enabled ? 1 : 0);
++	shadow_protect_win(win, 0);
+ 
+ 	pm_runtime_put_sync(sfb->dev);
+ 
+-	return 0;
++	return output_on == sfb->output_on;
+ }
+ 
+ /**
+-- 
+1.7.1
