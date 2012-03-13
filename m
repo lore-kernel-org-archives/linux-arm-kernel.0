@@ -1,36 +1,45 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 12 Mar 2012 21:52:46 -0600
-Subject: [PATCH v4 2/2] ARM: Exynos: Add device tree support for interrupt
- combiner
-In-Reply-To: <1329798806-32482-3-git-send-email-thomas.abraham@linaro.org>
-References: <1329798806-32482-1-git-send-email-thomas.abraham@linaro.org>
- <1329798806-32482-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20120313035246.6BC8A3E07E4@localhost>
+Date: Mon, 12 Mar 2012 21:57:28 -0600
+Subject: [PATCH v3 00/13] gpio/omap: Some more driver cleanup and fixes
+In-Reply-To: <87vcm9v4h1.fsf@ti.com>
+References: <1331118963-26364-1-git-send-email-tarun.kanti@ti.com>
+ <878vj5y7iv.fsf@ti.com>
+ <CAC83Zv+8AjCHBOJbtvSQS-URvCE5Xm9oPk9_X7h4Kz7FZ_7Otw@mail.gmail.com>
+ <CAC83ZvJKS34Py6vVtk_Si9q3A-9CVN6v4ixNM+HJ37AATcGNPA@mail.gmail.com>
+ <CAC83ZvJDfDBcRU1isYaxRe-fWN8F2+QW6W5EeWWuTRcFBGpYNg@mail.gmail.com>
+ <87vcm9v4h1.fsf@ti.com>
+Message-ID: <20120313035728.B56993E0FAA@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Feb 2012 10:03:26 +0530, Thomas Abraham <thomas.abraham@linaro.org> wrote:
-> Add device tree based instantiation of the interrupt combiner controller.
+On Mon, 12 Mar 2012 15:28:42 -0700, Kevin Hilman <khilman@ti.com> wrote:
+> "DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
 > 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> @@ -406,13 +432,33 @@ void __init combiner_init(void __iomem *combiner_base, struct device_node *np)
->  
->  	for (i = 0; i < MAX_COMBINER_NR; i++) {
->  		combiner_init_one(i, combiner_base + (i >> 2) * 0x10);
-> -		combiner_cascade_irq(i, IRQ_SPI(i));
-> +#ifdef CONFIG_OF
-> +		irq = np ? irq_of_parse_and_map(np, i) : IRQ_SPI(i);
-> +#else
-> +		irq = IRQ_SPI(i);
-> +#endif
+> [...]
+> 
+> >>> Oops... I am sorry.
+> >>> I was in the process of updating the branch with latest comments after
+> >>> base-lining on Grant's:
+> >>> git://git.secretlab.ca/git/linux-2.6.git
+> >>> Branch: gpio/next
+> >>> Because this has all the gpio changes including Benoit's latest gpio
+> >>> devicetree changes.
+> >>> Should I go ahead?
+> >> Anyways, for the time being I am updating on top of your changes as before.
+> >> You should be able to see the branch shortly.
+> > Please note that the branch has your following patch:
+> > gpio/omap: fix wakeups on level-triggered GPIOs
+> 
+> Please be sure to Cc the GPIO maintainer (added now.)
+> 
+> Grant can we consider your gpio/next a stable baseline for further
+> GPIO fixes?
+> 
+> If so, Tarun, please base your branch there.  Otherwise, continue to use
+> my for_3.4/gpio/runtime-pm-cleanup, but please test it by merging with
+> the gpio/next branch.
 
-Hmmm, the #ifdef is rather ugly.  I'd rather have an empty
-irq_of_parse_and_map() that always returns 0.
+I'm not going to rebase gpio/next before the merge window; you can base on it with
+confidence.
 
-The patch series is fine, and you can add my acked-by, but please send
-a follow-up patch to clean it up.
-
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+g.
