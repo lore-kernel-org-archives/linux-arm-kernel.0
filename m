@@ -1,156 +1,90 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 13 Mar 2012 14:10:36 +0530
-Subject: [PATCH v2 0/9] DMA engine cookie handling cleanups
-In-Reply-To: <1331569438.1727.3.camel@vkoul-udesk3>
-References: <20120306223321.GD15201@n2100.arm.linux.org.uk>
- <1331128466.24656.421.camel@vkoul-udesk3>
- <20120312161143.GA10830@n2100.arm.linux.org.uk>
- <1331569438.1727.3.camel@vkoul-udesk3>
-Message-ID: <1331628036.1727.22.camel@vkoul-udesk3>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 13 Mar 2012 19:36:41 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120313193641.674b271a134d9dba201cd644@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-03-12 at 21:53 +0530, Vinod Koul wrote:
-> > > I applied the v2 on a branch and also rebased on top of
-> slave-dma.next.
-> > > There were few conflicts in imx-dma.c. Sacha, Javier, pls see that
-> merge
-> > > is right.
-> > > 
-> > > This branch (rmk_cookie_fixes2_rebased) is not yet pushed, as I am
-> not
-> > > able to connect to infradead.org, should be done when server is
-> back.
-> > 
-> > Are you going to pick up Shawn Guo's tested-by for these patches, or
-> are
-> > we saying its too late for that now?
-> Sure, his and others we have received on this series.
-> Also, IIRC there was one fixup from Jassi on pl330?
-> 
-> I should be able to merge this tomorrow, if thats fine with you. 
-I have merged this to my next, but haven't pushed out yet. This is
-available on branch next_cookie2_merge.
-Also I got few (more than expected build failures) and a merge issue on
-imx driver. Sascha, Russell can you see if fix on imx is right
+Hi all,
 
-Please see if the below patch is the right fix for build failures in
-addition to one suggested by Jassi.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-ux500/timer.c between commit 8eed6eac103b ("ARM: ux500:
+convert to twd_local_timer_register() interface") from the arm tree and
+commit b9576623c421 ("ARM: plat-nomadik: get rid of global mtu base
+pointer") from the arm-soc tree.
 
--------------------x-------------------------x----------------------
-
->From 949ff5b8d46b5e3435d21b2651ce3a2599208d44 Mon Sep 17 00:00:00 2001
-From: Vinod Koul <vinod.koul@linux.intel.com>
-Date: Tue, 13 Mar 2012 11:58:12 +0530
-Subject: [PATCH] dmaengine: fix for cookie changes and merge
-
-Fixed trivial issues in drivers:
-	drivers/dma/imx-sdma.c
-	drivers/dma/intel_mid_dma.c
-	drivers/dma/ioat/dma_v3.c
-	drivers/dma/iop-adma.c
-	drivers/dma/sirf-dma.c
-	drivers/dma/timb_dma.c
-
-Signed-off-by: Vinod Koul <vinod.koul@linux.intel.com>
----
- drivers/dma/imx-sdma.c      |    1 +
- drivers/dma/intel_mid_dma.c |    1 +
- drivers/dma/ioat/dma_v3.c   |    1 +
- drivers/dma/iop-adma.c      |    1 +
- drivers/dma/sirf-dma.c      |    2 ++
- drivers/dma/timb_dma.c      |    6 +-----
- 6 files changed, 7 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index ccfc7c4..81f9d57 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1127,6 +1127,7 @@ static void sdma_issue_pending(struct dma_chan *chan)
- 	struct sdma_engine *sdma = sdmac->sdma;
- 
- 	if (sdmac->status == DMA_IN_PROGRESS)
-+		sdma_enable_channel(sdma, sdmac->channel);
- }
- 
- #define SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1	34
-diff --git a/drivers/dma/intel_mid_dma.c b/drivers/dma/intel_mid_dma.c
-index d599d96..2449812 100644
---- a/drivers/dma/intel_mid_dma.c
-+++ b/drivers/dma/intel_mid_dma.c
-@@ -477,6 +477,7 @@ static enum dma_status intel_mid_dma_tx_status(struct dma_chan *chan,
- 						dma_cookie_t cookie,
- 						struct dma_tx_state *txstate)
- {
-+	struct intel_mid_dma_chan *midc = to_intel_mid_dma_chan(chan);
- 	enum dma_status ret;
- 
- 	ret = dma_cookie_status(chan, cookie, txstate);
-diff --git a/drivers/dma/ioat/dma_v3.c b/drivers/dma/ioat/dma_v3.c
-index 145eda2..2c4476c 100644
---- a/drivers/dma/ioat/dma_v3.c
-+++ b/drivers/dma/ioat/dma_v3.c
-@@ -61,6 +61,7 @@
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
- #include <linux/prefetch.h>
-+#include "../dmaengine.h"
- #include "registers.h"
- #include "hw.h"
- #include "dma.h"
-diff --git a/drivers/dma/iop-adma.c b/drivers/dma/iop-adma.c
-index 1f3a703..4499f88 100644
---- a/drivers/dma/iop-adma.c
-+++ b/drivers/dma/iop-adma.c
-@@ -894,6 +894,7 @@ static enum dma_status iop_adma_status(struct dma_chan *chan,
- 					struct dma_tx_state *txstate)
- {
- 	struct iop_adma_chan *iop_chan = to_iop_adma_chan(chan);
-+	int ret;
- 
- 	ret = dma_cookie_status(chan, cookie, txstate);
- 	if (ret == DMA_SUCCESS)
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index a2cde85..45ba352 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -18,6 +18,8 @@
- #include <linux/of_platform.h>
- #include <linux/sirfsoc_dma.h>
- 
-+#include "dmaengine.h"
-+
- #define SIRFSOC_DMA_DESCRIPTORS                 16
- #define SIRFSOC_DMA_CHANNELS                    16
- 
-diff --git a/drivers/dma/timb_dma.c b/drivers/dma/timb_dma.c
-index 7805996..d408c22 100644
---- a/drivers/dma/timb_dma.c
-+++ b/drivers/dma/timb_dma.c
-@@ -510,17 +510,13 @@ static void td_free_chan_resources(struct dma_chan *chan)
- static enum dma_status td_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
- 				    struct dma_tx_state *txstate)
- {
--	struct timb_dma_chan *td_chan =
--		container_of(chan, struct timb_dma_chan, chan);
- 	enum dma_status ret;
- 
- 	dev_dbg(chan2dev(chan), "%s: Entry\n", __func__);
- 
- 	ret = dma_cookie_status(chan, cookie, txstate);
- 
--	dev_dbg(chan2dev(chan),
--		"%s: exit, ret: %d, last_complete: %d, last_used: %d\n",
--		__func__, ret, last_complete, last_used);
-+	dev_dbg(chan2dev(chan), "%s: exit, ret: %d\n", 	__func__, ret);
- 
- 	return ret;
- }
+I fixed it up (I think - see below) and can carry the fix as necessary.
 -- 
-1.7.0.4
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-
-
-
--- 
-~Vinod
+diff --cc arch/arm/mach-ux500/timer.c
+index cadf982,fd00024..0000000
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@@ -15,38 -15,22 +15,39 @@@
+  #include <mach/setup.h>
+  #include <mach/hardware.h>
+  
+ +#ifdef CONFIG_HAVE_ARM_TWD
+ +static DEFINE_TWD_LOCAL_TIMER(u5500_twd_local_timer,
+ +			      U5500_TWD_BASE, IRQ_LOCALTIMER);
+ +static DEFINE_TWD_LOCAL_TIMER(u8500_twd_local_timer,
+ +			      U8500_TWD_BASE, IRQ_LOCALTIMER);
+ +
+ +static void __init ux500_twd_init(void)
+ +{
+ +	struct twd_local_timer *twd_local_timer;
+ +	int err;
+ +
+ +	twd_local_timer = cpu_is_u5500() ? &u5500_twd_local_timer :
+ +					   &u8500_twd_local_timer;
+ +
+ +	err = twd_local_timer_register(twd_local_timer);
+ +	if (err)
+ +		pr_err("twd_local_timer_register failed %d\n", err);
+ +}
+ +#else
+ +#define ux500_twd_init()	do { } while(0)
+ +#endif
+ +
+  static void __init ux500_timer_init(void)
+  {
++ 	void __iomem *mtu_timer_base;
+  	void __iomem *prcmu_timer_base;
+ +	int err;
+  
+  	if (cpu_is_u5500()) {
+- 		mtu_base = __io_address(U5500_MTU0_BASE);
+ -#ifdef CONFIG_LOCAL_TIMERS
+ -		twd_base = __io_address(U5500_TWD_BASE);
+ -#endif
++ 		mtu_timer_base = __io_address(U5500_MTU0_BASE);
+  		prcmu_timer_base = __io_address(U5500_PRCMU_TIMER_3_BASE);
+  	} else if (cpu_is_u8500()) {
+- 		mtu_base = __io_address(U8500_MTU0_BASE);
+ -#ifdef CONFIG_LOCAL_TIMERS
+ -		twd_base = __io_address(U8500_TWD_BASE);
+ -#endif
++ 		mtu_timer_base = __io_address(U8500_MTU0_BASE);
+  		prcmu_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
+  	} else {
+  		ux500_unknown_soc();
+@@@ -69,9 -53,8 +70,9 @@@
+  	 *
+  	 */
+  
+- 	nmdk_timer_init();
++ 	nmdk_timer_init(mtu_timer_base);
+  	clksrc_dbx500_prcmu_init(prcmu_timer_base);
+ +	ux500_twd_init();
+  }
+  
+  static void ux500_timer_reset(void)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/de01efab/attachment.sig>
