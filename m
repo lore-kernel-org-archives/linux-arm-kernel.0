@@ -1,214 +1,85 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 13 Mar 2012 15:40:51 +0530
-Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
-In-Reply-To: <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
-References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
- <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
- <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
-Message-ID: <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Mar 2012 10:10:42 +0000
+Subject: [PATCH 4/7 v4] ARM: kirkwood: add dreamplug (fdt) support.
+In-Reply-To: <0032addd7e94c5d4d1a3a0be77fe79bcffee53db.1331601448.git.jason@lakedaemon.net>
+References: <cover.1331601448.git.jason@lakedaemon.net>
+ <0032addd7e94c5d4d1a3a0be77fe79bcffee53db.1331601448.git.jason@lakedaemon.net>
+Message-ID: <201203131010.43095.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2012 15:17, Jingoo Han <jg1.han@samsung.com> wrote:
->> -----Original Message-----
->> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
->> Sent: Tuesday, March 13, 2012 6:00 AM
->> To: linux-fbdev at vger.kernel.org
->> Cc: FlorianSchandinat at gmx.de; linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
->> kgene.kim at samsung.com; jg1.han at samsung.com; ben-linux at fluff.org; patches at linaro.org; Kyungmin Park;
->> JeongHyeon Kim; Heiko Stuebner; Kwangwoo Lee; Mark Brown; Peter Korsgaard; Darius Augulis; Maurus
->> Cuelenaere
->> Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
->>
->> For all the Samsung SoC based boards which have the platform data for
->> s3c-fb driver, the 'default_win' element in the platform data is removed
->> and the lcd panel video timing values are moved out of individual window
->> configuration data.
->>
->> Cc: Jingoo Han <jg1.han@samsung.com>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Cc: JeongHyeon Kim <jhkim@insignal.co.kr>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Ben Dooks <ben-linux@fluff.org>
->> Cc: Kwangwoo Lee <kwangwoo.lee@gmail.com>
->> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> Cc: Peter Korsgaard <jacmet@sunsite.dk>
->> Cc: Darius Augulis <augulis.darius@gmail.com>
->> Cc: Maurus Cuelenaere <mcuelenaere@gmail.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->> ?arch/arm/mach-exynos/mach-nuri.c ? ? ? ? ? | ? 26 ++++++++++-------
->> ?arch/arm/mach-exynos/mach-origen.c ? ? ? ? | ? 24 ++++++++++-------
->> ?arch/arm/mach-exynos/mach-smdkv310.c ? ? ? | ? 28 +++++++++++--------
->> ?arch/arm/mach-exynos/mach-universal_c210.c | ? 26 ++++++++++-------
->> ?arch/arm/mach-s3c24xx/mach-smdk2416.c ? ? ?| ? 27 ++++++++++--------
->> ?arch/arm/mach-s3c64xx/mach-anw6410.c ? ? ? | ? 25 ++++++++++-------
->> ?arch/arm/mach-s3c64xx/mach-crag6410.c ? ? ?| ? 25 ++++++++++-------
->> ?arch/arm/mach-s3c64xx/mach-hmt.c ? ? ? ? ? | ? 24 ++++++++++-------
->> ?arch/arm/mach-s3c64xx/mach-mini6410.c ? ? ?| ? 40 ++++++++++++---------------
->> ?arch/arm/mach-s3c64xx/mach-real6410.c ? ? ?| ? 40 ++++++++++++---------------
->> ?arch/arm/mach-s3c64xx/mach-smartq5.c ? ? ? | ? 26 ++++++++++-------
->> ?arch/arm/mach-s3c64xx/mach-smartq7.c ? ? ? | ? 26 ++++++++++-------
->> ?arch/arm/mach-s3c64xx/mach-smdk6410.c ? ? ?| ? 25 ++++++++++-------
->> ?arch/arm/mach-s5p64x0/mach-smdk6440.c ? ? ?| ? 24 ++++++++++-------
->> ?arch/arm/mach-s5p64x0/mach-smdk6450.c ? ? ?| ? 24 ++++++++++-------
->> ?arch/arm/mach-s5pc100/mach-smdkc100.c ? ? ?| ? 27 ++++++++++--------
->> ?arch/arm/mach-s5pv210/mach-aquila.c ? ? ? ?| ? 36 +++++++++++--------------
->> ?arch/arm/mach-s5pv210/mach-goni.c ? ? ? ? ?| ? 26 ++++++++++-------
->> ?arch/arm/mach-s5pv210/mach-smdkv210.c ? ? ?| ? 24 ++++++++++-------
->> ?19 files changed, 285 insertions(+), 238 deletions(-)
->>
->
-> [.....]
->
->> diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
->> index c34c2ab..24dcdc9 100644
->> --- a/arch/arm/mach-s3c64xx/mach-mini6410.c
->> +++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
->> @@ -153,36 +153,32 @@ static struct s3c2410_platform_nand mini6410_nand_info = {
->>
->> ?static struct s3c_fb_pd_win mini6410_fb_win[] = {
->> ? ? ? {
->> - ? ? ? ? ? ? .win_mode ? ? ? = { ? ? /* 4.3" 480x272 */
->> - ? ? ? ? ? ? ? ? ? ? .left_margin ? ?= 3,
->> - ? ? ? ? ? ? ? ? ? ? .right_margin ? = 2,
->> - ? ? ? ? ? ? ? ? ? ? .upper_margin ? = 1,
->> - ? ? ? ? ? ? ? ? ? ? .lower_margin ? = 1,
->> - ? ? ? ? ? ? ? ? ? ? .hsync_len ? ? ?= 40,
->> - ? ? ? ? ? ? ? ? ? ? .vsync_len ? ? ?= 1,
->> - ? ? ? ? ? ? ? ? ? ? .xres ? ? ? ? ? = 480,
->> - ? ? ? ? ? ? ? ? ? ? .yres ? ? ? ? ? = 272,
->> - ? ? ? ? ? ? },
->> ? ? ? ? ? ? ? .max_bpp ? ? ? ?= 32,
->> ? ? ? ? ? ? ? .default_bpp ? ?= 16,
->> + ? ? ? ? ? ? .xres ? ? ? ? ? = 480,
->> + ? ? ? ? ? ? .yres ? ? ? ? ? = 272,
->> ? ? ? }, {
->> - ? ? ? ? ? ? .win_mode ? ? ? = { ? ? /* 7.0" 800x480 */
->> - ? ? ? ? ? ? ? ? ? ? .left_margin ? ?= 8,
->> - ? ? ? ? ? ? ? ? ? ? .right_margin ? = 13,
->> - ? ? ? ? ? ? ? ? ? ? .upper_margin ? = 7,
->> - ? ? ? ? ? ? ? ? ? ? .lower_margin ? = 5,
->> - ? ? ? ? ? ? ? ? ? ? .hsync_len ? ? ?= 3,
->> - ? ? ? ? ? ? ? ? ? ? .vsync_len ? ? ?= 1,
->> - ? ? ? ? ? ? ? ? ? ? .xres ? ? ? ? ? = 800,
->> - ? ? ? ? ? ? ? ? ? ? .yres ? ? ? ? ? = 480,
->> - ? ? ? ? ? ? },
->> ? ? ? ? ? ? ? .max_bpp ? ? ? ?= 32,
->> ? ? ? ? ? ? ? .default_bpp ? ?= 16,
->> + ? ? ? ? ? ? .xres ? ? ? ? ? = 800,
->> + ? ? ? ? ? ? .yres ? ? ? ? ? = 480,
->> ? ? ? },
->> ?};
->>
->> +static struct fb_videomode mini6410_lcd_timing = {
->> + ? ? .left_margin ? ?= 8,
->> + ? ? .right_margin ? = 13,
->> + ? ? .upper_margin ? = 7,
->> + ? ? .lower_margin ? = 5,
->> + ? ? .hsync_len ? ? ?= 3,
->> + ? ? .vsync_len ? ? ?= 1,
->> + ? ? .xres ? ? ? ? ? = 800,
->> + ? ? .yres ? ? ? ? ? = 480,
->> +};
->> +
->> ?static struct s3c_fb_platdata mini6410_lcd_pdata __initdata = {
->> ? ? ? .setup_gpio ? ? = s3c64xx_fb_gpio_setup_24bpp,
->> + ? ? .vtiming ? ? ? ?= &mini6410_lcd_timing,
->> ? ? ? .win[0] ? ? ? ? = &mini6410_fb_win[0],
->> ? ? ? .vidcon0 ? ? ? ?= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
->> ? ? ? .vidcon1 ? ? ? ?= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
->> @@ -310,8 +306,8 @@ static void __init mini6410_machine_init(void)
->> ? ? ? mini6410_lcd_pdata.win[0] = &mini6410_fb_win[features.lcd_index];
->>
->> ? ? ? printk(KERN_INFO "MINI6410: selected LCD display is %dx%d\n",
->> - ? ? ? ? ? ? mini6410_lcd_pdata.win[0]->win_mode.xres,
->> - ? ? ? ? ? ? mini6410_lcd_pdata.win[0]->win_mode.yres);
->> + ? ? ? ? ? ? mini6410_lcd_pdata.win[0]->xres,
->> + ? ? ? ? ? ? mini6410_lcd_pdata.win[0]->yres);
->>
->> ? ? ? s3c_nand_set_platdata(&mini6410_nand_info);
->> ? ? ? s3c_fb_set_platdata(&mini6410_lcd_pdata);
->> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
->> index be2a9a2..41e4f74 100644
->> --- a/arch/arm/mach-s3c64xx/mach-real6410.c
->> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
->> @@ -119,36 +119,32 @@ static struct platform_device real6410_device_eth = {
->>
->> ?static struct s3c_fb_pd_win real6410_fb_win[] = {
->> ? ? ? {
->> - ? ? ? ? ? ? .win_mode ? ? ? = { ? ? /* 4.3" 480x272 */
->> - ? ? ? ? ? ? ? ? ? ? .left_margin ? ?= 3,
->> - ? ? ? ? ? ? ? ? ? ? .right_margin ? = 2,
->> - ? ? ? ? ? ? ? ? ? ? .upper_margin ? = 1,
->> - ? ? ? ? ? ? ? ? ? ? .lower_margin ? = 1,
->> - ? ? ? ? ? ? ? ? ? ? .hsync_len ? ? ?= 40,
->> - ? ? ? ? ? ? ? ? ? ? .vsync_len ? ? ?= 1,
->> - ? ? ? ? ? ? ? ? ? ? .xres ? ? ? ? ? = 480,
->> - ? ? ? ? ? ? ? ? ? ? .yres ? ? ? ? ? = 272,
->> - ? ? ? ? ? ? },
->> ? ? ? ? ? ? ? .max_bpp ? ? ? ?= 32,
->> ? ? ? ? ? ? ? .default_bpp ? ?= 16,
->> + ? ? ? ? ? ? .xres ? ? ? ? ? = 480,
->> + ? ? ? ? ? ? .yres ? ? ? ? ? = 272,
->> ? ? ? }, {
->> - ? ? ? ? ? ? .win_mode ? ? ? = { ? ? /* 7.0" 800x480 */
->> - ? ? ? ? ? ? ? ? ? ? .left_margin ? ?= 8,
->> - ? ? ? ? ? ? ? ? ? ? .right_margin ? = 13,
->> - ? ? ? ? ? ? ? ? ? ? .upper_margin ? = 7,
->> - ? ? ? ? ? ? ? ? ? ? .lower_margin ? = 5,
->> - ? ? ? ? ? ? ? ? ? ? .hsync_len ? ? ?= 3,
->> - ? ? ? ? ? ? ? ? ? ? .vsync_len ? ? ?= 1,
->> - ? ? ? ? ? ? ? ? ? ? .xres ? ? ? ? ? = 800,
->> - ? ? ? ? ? ? ? ? ? ? .yres ? ? ? ? ? = 480,
->> - ? ? ? ? ? ? },
->> ? ? ? ? ? ? ? .max_bpp ? ? ? ?= 32,
->> ? ? ? ? ? ? ? .default_bpp ? ?= 16,
->> + ? ? ? ? ? ? .xres ? ? ? ? ? = 800,
->> + ? ? ? ? ? ? .yres ? ? ? ? ? = 480,
->> ? ? ? },
->> ?};
->>
->> +static struct fb_videomode real6410_lcd_timing = {
->> + ? ? .left_margin ? ?= 3,
->> + ? ? .right_margin ? = 2,
->> + ? ? .upper_margin ? = 1,
->> + ? ? .lower_margin ? = 1,
->> + ? ? .hsync_len ? ? ?= 40,
->> + ? ? .vsync_len ? ? ?= 1,
->> + ? ? .xres ? ? ? ? ? = 800,
->> + ? ? .yres ? ? ? ? ? = 480,
->> +};
->
->
-> What is the difference between mini6410_lcd_timing and real6410_lcd_timing?
-> In my opinion, it would be good as follows:
->
-> +static struct fb_videomode real6410_lcd_timing = {
-> + ? ? ? .left_margin ? ?= 8,
-> + ? ? ? .right_margin ? = 13,
-> + ? ? ? .upper_margin ? = 7,
-> + ? ? ? .lower_margin ? = 5,
-> + ? ? ? .hsync_len ? ? ?= 3,
-> + ? ? ? .vsync_len ? ? ?= 1,
-> + ? ? ? .xres ? ? ? ? ? = 800,
-> + ? ? ? .yres ? ? ? ? ? = 480,
-> +};
->
->
+On Tuesday 13 March 2012, Jason Cooper wrote:
+> Initially, copied guruplug-setup.c and did s/guruplug/dreamplug/g.
+> Then, switched to SPI based NOR flash.
+> 
+> After talking to Arnd Bergman, chose an incremental approach to adding
+> devicetree support.  First, we use the dtb to tell us we are on the
+> dreamplug, then we gradually port over drivers.
+> 
+> Driver porting will start with the uart (see next patch), and progress
+> from there.  Next, all drivers not needing common clock (kirkwood_tclk)
+> or pinmux.  Then, remain drivers as that support hits the tree.
+> 
+> We need to absorb kirkwood_init() into kirkwood_dt_init() so that as we
+> convert drivers, we can remove the platform call, eg
+> kirkwood_rtc_init().  This maintains compatibility with non-fdt
+> configurations because they still call kirkwood_init() in common.c.
+> 
+> As drivers are converted, we will reinstate the 'static' qualifier in
+> common.c.
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
-Before this patch series, both real6410 and mini6410 had 'default_win'
-= 0 in the platform data. And, the s3c-fb driver selected the video
-timing from the window selected by the default_win parameter in s3c-fb
-platform data, i.e window 0 for both mini6440 and real6410. So, in
-this patch, while moving the timing values out of window data, the
-timing values for window 0 was selected.
+Patches 4 and 5 both look ok, but since I merged the earlier versions
+of these into the stable next/board branch of arm-soc.git, you will have
+to generate these as incremental patches now, and adapt the changeset
+comments accordingly.
 
-The timing value for window 1 was never used on mini6410 and real6410.
-So I would suggest to use timing value of window 0 in this patch.
+One small issue:
 
-Thanks for your comments.
+> --- a/arch/arm/mach-kirkwood/Kconfig
+> +++ b/arch/arm/mach-kirkwood/Kconfig
+> @@ -44,6 +44,20 @@ config MACH_GURUPLUG
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Marvell GuruPlug Reference Board.
+>  
+> +config ARCH_KIRKWOOD_DT
+> +	bool "Marvell Kirkwood Flattened Device Tree"
+> +	select USE_OF
+> +	help
+> +	  Say 'Y' here if you want your kernel to support the
+> +	  Marvell Kirkwood using flattened device tree.
+> +
+> +config MACH_DREAMPLUG_DT
+> +	bool "Marvell DreamPlug (Flattened Device Tree)"
+> +	select ARCH_KIRKWOOD_DT
+> +	help
+> +	  Say 'Y' here if you want your kernel to support the
+> +	  Marvell DreamPlug (Flattened Device Tree).
+> +
 
-Regards,
-Thomas.
+You allow ARCH_KIRKWOOD_DT to be enabled without also enabling
+dreamplug. That is ok, but
+
+> +
+> +	if (of_machine_is_compatible("globalscale,dreamplug"))
+> +		dreamplug_init();
+> +
+
+you call a function from dreamplug.o in board-dt.o and
+
+> +/* board init functions for drivers not converted to fdt */
+> +void dreamplug_init(void);
+
+you have an unconditional forward declaration in the header.
+
+The idiomatic way to deal with this is to replace turn the
+declaration into
+
+#ifdef CONFIG_DREAMPLUG_DT
+void dreamplug_init(void);
+#else
+static inline void dreamplug_init(void) {}
+#endif
+
+	Arnd
