@@ -1,59 +1,70 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 13 Mar 2012 18:48:23 +0100
-Subject: [PATCH v4] of: introduce helper to manage boolean
-Message-ID: <1331660903-10193-1-git-send-email-plagnioj@jcrosoft.com>
+From: hector.oron@gmail.com (Hector Oron)
+Date: Tue, 13 Mar 2012 19:05:40 +0100
+Subject: [PATCH] efikamx: match machine descriptions with legacy
+In-Reply-To: <CAODfWeE86mUf17CAZ+aa1bKxX4Toq9ogm01tDEMVYcnqu96LAg@mail.gmail.com>
+References: <1329779368-27878-1-git-send-email-hector.oron@gmail.com>
+ <CAODfWeE86mUf17CAZ+aa1bKxX4Toq9ogm01tDEMVYcnqu96LAg@mail.gmail.com>
+Message-ID: <CAODfWeGKRqbQuB20rFOJC6wgwqTGt9eZOog8fOWfB-3GQC0cFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_property_read_bool
+Sending as I forgot to CC Sascha
 
-Search for a property in a device node.
-Returns true if the property exist false otherwise.
+2012/3/11 Hector Oron <hector.oron@gmail.com>:
+> Hello,
+>
+> 2012/2/21 Hector Oron <hector.oron@gmail.com>:
+>> ?Rename machine descriptions to match legacy descriptions distributed by
+>> ?manufacturer BSP. This way distributions can do clean upgrades from
+>> ?userspace scripts which check for these values to differentiate platforms
+>> ?with single kernel binaries.
+>>
+>> Signed-off-by: Hector Oron <hector.oron@gmail.com>
+>> Acked-by: Matt Sealey <matt@genesi-usa.com>
+>> ---
+>> ?arch/arm/mach-mx5/board-mx51_efikamx.c | ? ?3 +--
+>> ?arch/arm/mach-mx5/board-mx51_efikasb.c | ? ?2 +-
+>> ?2 files changed, 2 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> index 3a5ed2d..fbfccc7 100644
+>> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+>> @@ -283,8 +283,7 @@ static struct sys_timer mx51_efikamx_timer = {
+>> ? ? ? ?.init = mx51_efikamx_timer_init,
+>> ?};
+>>
+>> -MACHINE_START(MX51_EFIKAMX, "Genesi EfikaMX nettop")
+>> - ? ? ? /* Maintainer: Amit Kucheria <amit.kucheria@linaro.org> */
+>> +MACHINE_START(MX51_EFIKAMX, "Genesi Efika MX (Smarttop)")
+>> ? ? ? ?.atag_offset = 0x100,
+>> ? ? ? ?.map_io = mx51_map_io,
+>> ? ? ? ?.init_early = imx51_init_early,
+>> diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
+>> index 4baf05c..dedbca5 100644
+>> --- a/arch/arm/mach-mx5/board-mx51_efikasb.c
+>> +++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
+>> @@ -483,7 +483,7 @@ static struct sys_timer mx51_efikasb_timer = {
+>> ? ? ? ?.init ? = mx51_efikasb_timer_init,
+>> ?};
+>>
+>> -MACHINE_START(MX51_EFIKASB, "Genesi Efika Smartbook")
+>> +MACHINE_START(MX51_EFIKASB, "Genesi Efika MX (Smartbook)")
+>> ? ? ? ?.atag_offset = 0x100,
+>> ? ? ? ?.map_io = mx51_map_io,
+>> ? ? ? ?.init_early = imx51_init_early,
+>> --
+>> 1.7.9
+>>
+>
+> Ping!
+> I dont see the patch being applied. Is there any problem with it?
+>
+> Cheers,
+> --
+> ?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Grant Likely <grant.likely@secretlab.ca>
----
-v4:
 
-	send the right version
 
-	include Grant comment
-
-	Grant can I get the go please?
-
-Best Regards,
-J.
- include/linux/of.h |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
-
-diff --git a/include/linux/of.h b/include/linux/of.h
-index a75a831..a992cdf 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -342,6 +342,22 @@ static inline int of_machine_is_compatible(const char *compat)
- #define of_match_node(_matches, _node)	NULL
- #endif /* CONFIG_OF */
- 
-+/**
-+ * of_property_read_bool - Findfrom a property
-+ * @np:		device node from which the property value is to be read.
-+ * @propname:	name of the property to be searched.
-+ *
-+ * Search for a property in a device node.
-+ * Returns true if the property exist false otherwise.
-+ */
-+static inline bool of_property_read_bool(const struct device_node *np,
-+					 const char *propname)
-+{
-+	struct property *prop = of_find_property(np, propname, NULL);
-+
-+	return prop ? true : false;
-+}
-+
- static inline int of_property_read_u32(const struct device_node *np,
- 				       const char *propname,
- 				       u32 *out_value)
 -- 
-1.7.7
+?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
