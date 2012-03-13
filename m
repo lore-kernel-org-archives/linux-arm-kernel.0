@@ -1,60 +1,43 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Mar 2012 18:22:20 -0500
-Subject: [PATCH 0/7] Highbank clock support using DT
-Message-ID: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+Date: Tue, 13 Mar 2012 18:22:21 -0500
+Subject: [PATCH 1/7] clk: fix orphan list iterator to be safe
+In-Reply-To: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1331680947-29861-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-This series adds clock support to highbank using common clock
-infrastructure and DT clock bindings. This is based on DT clock
-support cherry-picked from Grant's devicetree/test-clocks branch
-and Mike T's v6 common clock infrastructure series.
+__clk_reparent can remove orphans, so the list iterator needs to be the
+safe from removal version.
 
-It supports initialization of the clocks in any order at least in my
-relatively simple case of 1 clock output per DT node. 
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ drivers/clk/clk.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Rob
-
-Grant Likely (3):
-  of: add clock providers
-  of: Add of_property_match_string() to find index into a string list
-  dt/clock: Add handling for fixed clocks and a clock node setup
-    iterator
-
-Rob Herring (4):
-  clk: fix orphan list iterator to be safe
-  dt/clock: add a simple provider get function
-  dt/clock: add function to get parent clock name
-  clk: add highbank clock support
-
- .../devicetree/bindings/clock/clock-bindings.txt   |  116 +++++++
- .../devicetree/bindings/clock/fixed-clock.txt      |   21 ++
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/highbank.dts                     |   76 +++++
- arch/arm/boot/dts/testcases/tests-phandle.dtsi     |    2 +
- arch/arm/mach-highbank/Makefile                    |    2 +-
- arch/arm/mach-highbank/clock.c                     |   62 ----
- arch/arm/mach-highbank/highbank.c                  |   16 +
- drivers/clk/Makefile                               |    2 +
- drivers/clk/clk-highbank.c                         |  335 ++++++++++++++++++++
- drivers/clk/clk.c                                  |    4 +-
- drivers/clk/clkdev.c                               |    9 +
- drivers/of/Kconfig                                 |    6 +
- drivers/of/Makefile                                |    1 +
- drivers/of/base.c                                  |   36 ++
- drivers/of/clock.c                                 |  236 ++++++++++++++
- drivers/of/selftest.c                              |   29 ++
- include/linux/of.h                                 |    3 +
- include/linux/of_clk.h                             |   43 +++
- 19 files changed, 935 insertions(+), 65 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
- create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
- delete mode 100644 arch/arm/mach-highbank/clock.c
- create mode 100644 drivers/clk/clk-highbank.c
- create mode 100644 drivers/of/clock.c
- create mode 100644 include/linux/of_clk.h
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index c7c3bc5..802eda4 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1172,7 +1172,7 @@ void __clk_init(struct device *dev, struct clk *clk)
+ {
+ 	int i;
+ 	struct clk *orphan;
+-	struct hlist_node *tmp;
++	struct hlist_node *tmp, *tmp2;
+ 
+ 	if (!clk)
+ 		return;
+@@ -1246,7 +1246,7 @@ void __clk_init(struct device *dev, struct clk *clk)
+ 	 * walk the list of orphan clocks and reparent any that are children of
+ 	 * this clock
+ 	 */
+-	hlist_for_each_entry(orphan, tmp, &clk_orphan_list, child_node)
++	hlist_for_each_entry_safe(orphan, tmp, tmp2, &clk_orphan_list, child_node)
+ 		__clk_reparent(orphan, __clk_init_parent(orphan));
+ 
+ 	/*
 -- 
 1.7.5.4
