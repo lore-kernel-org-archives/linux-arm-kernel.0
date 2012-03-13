@@ -1,102 +1,199 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Tue, 13 Mar 2012 16:47:06 +0800
-Subject: [PATCH v1 3/5] ARM: imx28evk: add mmc dt support
+Date: Tue, 13 Mar 2012 16:47:08 +0800
+Subject: [PATCH v1 5/5] ARM: mxs: add mxs dma dt support
 In-Reply-To: <1331628428-24017-1-git-send-email-b29396@freescale.com>
 References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
-Message-ID: <1331628428-24017-4-git-send-email-b29396@freescale.com>
+Message-ID: <1331628428-24017-6-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dong Aisheng <dong.aisheng@linaro.org>
 
+Originally the dma device will be added by default via
+arch_initcall(mxs_add_mxs_dma);
+
+Now change to call it explicitly in board file to avoid conflict
+with device tree support.
+
 Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 ---
- arch/arm/boot/dts/imx28-evk.dts |   14 ++++++++++++++
- arch/arm/boot/dts/imx28.dtsi    |   33 +++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/imx28-dt.c    |    2 ++
- 3 files changed, 49 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx28.dtsi                    |   12 +++++++++++-
+ arch/arm/mach-mxs/devices-mx23.h                |    2 ++
+ arch/arm/mach-mxs/devices-mx28.h                |    2 ++
+ arch/arm/mach-mxs/devices/platform-dma.c        |    3 +--
+ arch/arm/mach-mxs/imx28-dt.c                    |    2 ++
+ arch/arm/mach-mxs/include/mach/devices-common.h |    3 +++
+ arch/arm/mach-mxs/mach-apx4devkit.c             |    1 +
+ arch/arm/mach-mxs/mach-m28evk.c                 |    1 +
+ arch/arm/mach-mxs/mach-mx23evk.c                |    1 +
+ arch/arm/mach-mxs/mach-mx28evk.c                |    1 +
+ arch/arm/mach-mxs/mach-stmp378x_devb.c          |    1 +
+ arch/arm/mach-mxs/mach-tx28.c                   |    1 +
+ 12 files changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 9758dc4..61350ab 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -21,6 +21,20 @@
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-+        apb at 80000000 {
-+                apbh at 80000000 {
-+			mmc1: ssp at 80010000 {
-+				slot-8bit;
-+				status = "okay";
-+			};
-+
-+			mmc2: ssp at 80012000 {
-+				slot-8bit;
-+				status = "okay";
-+			};
-+		};
-+	};
-+
- 	ahb at 80080000 {
- 		fec at 800f0000 {
- 			phy-mode = "rmii";
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index acf0dab..71c7bfb 100644
+index 71c7bfb..f0322e9 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -46,6 +46,39 @@
- 				#interrupt-cells = <1>;
+@@ -47,6 +47,11 @@
  				reg = <0x80000000 0x2000>;
  			};
-+
-+			ssp at 80010000 {
-+				compatible = "fsl,imx28-mmc";
-+				reg = <0x80010000 2000>;
-+				/* <irq_err irq_dma> */
-+				interrupts = <96 82>;
-+				dma_channel = <0>;
-+				status = "disabled";
+ 
++			dma-apbh at 80004000 {
++				compatible = "fsl,mxs-dma-apbh";
++				reg = <0x80004000 2000>;
 +			};
 +
-+			ssp at 80012000 {
-+				compatible = "fsl,imx28-mmc";
-+				reg = <0x80012000 2000>;
-+				interrupts = <97 83>;
-+				dma_channel = <1>;
-+				status = "disabled";
-+			};
+ 			ssp at 80010000 {
+ 				compatible = "fsl,imx28-mmc";
+ 				reg = <0x80010000 2000>;
+@@ -79,7 +84,12 @@
+ 				dma_channel = <3>;
+ 				status = "disabled";
+ 			};
+-		};
 +
-+			ssp at 80014000 {
-+				compatible = "fsl,imx28-mmc";
-+				reg = <0x80014000 2000>;
-+				interrupts = <98 84>;
-+				dma_channel = <2>;
-+				status = "disabled";
++			dma-apbx at 80024000 {
++				compatible = "fsl,mxs-dma-apbx";
++				reg = <0x80024000 2000>;
 +			};
-+
-+			ssp at 80016000 {
-+				compatible = "fsl,imx28-mmc";
-+				reg = <0x80016000 2000>;
-+				interrupts = <99 85>;
-+				dma_channel = <3>;
-+				status = "disabled";
-+			};
- 		};
++                };
  
  		apbx at 80040000 {
+ 			compatible = "simple-bus";
+diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+index 3fa651d..721c91a 100644
+--- a/arch/arm/mach-mxs/devices-mx23.h
++++ b/arch/arm/mach-mxs/devices-mx23.h
+@@ -31,3 +31,5 @@ struct platform_device *__init mx23_add_mxsfb(
+ 		const struct mxsfb_platform_data *pdata);
+ 
+ struct platform_device *__init mx23_add_rtc_stmp3xxx(void);
++
++#define mx23_add_dma()	mxs_add_mxs_dma()
+diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+index 4f50094..c0cfd4e 100644
+--- a/arch/arm/mach-mxs/devices-mx28.h
++++ b/arch/arm/mach-mxs/devices-mx28.h
+@@ -51,3 +51,5 @@ extern const struct mxs_saif_data mx28_saif_data[] __initconst;
+ 	mxs_add_saif(&mx28_saif_data[id], pdata)
+ 
+ struct platform_device *__init mx28_add_rtc_stmp3xxx(void);
++
++#define mx28_add_dma()	mxs_add_mxs_dma()
+diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
+index 6a0202b..57f851e 100644
+--- a/arch/arm/mach-mxs/devices/platform-dma.c
++++ b/arch/arm/mach-mxs/devices/platform-dma.c
+@@ -30,7 +30,7 @@ static struct platform_device *__init mxs_add_dma(const char *devid,
+ 				DMA_BIT_MASK(32));
+ }
+ 
+-static int __init mxs_add_mxs_dma(void)
++int __init mxs_add_mxs_dma(void)
+ {
+ 	char *apbh = "mxs-dma-apbh";
+ 	char *apbx = "mxs-dma-apbx";
+@@ -47,4 +47,3 @@ static int __init mxs_add_mxs_dma(void)
+ 
+ 	return 0;
+ }
+-arch_initcall(mxs_add_mxs_dma);
 diff --git a/arch/arm/mach-mxs/imx28-dt.c b/arch/arm/mach-mxs/imx28-dt.c
-index 78d1129..429b88e 100644
+index 429b88e..1c4d317 100644
 --- a/arch/arm/mach-mxs/imx28-dt.c
 +++ b/arch/arm/mach-mxs/imx28-dt.c
-@@ -23,6 +23,8 @@ static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
- 	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
+@@ -25,6 +25,8 @@ static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP0_BASE_ADDR, "mxs-mmc.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP1_BASE_ADDR, "mxs-mmc.1", NULL),
+ 	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP0_BASE_ADDR, "mxs-mmc.0", NULL),
+ 	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP1_BASE_ADDR, "mxs-mmc.1", NULL),
++	OF_DEV_AUXDATA("fsl,mxs-dma-apbh", MX28_APBH_DMA_BASE_ADDR, "mxs-dma-apbh", NULL),
++	OF_DEV_AUXDATA("fsl,mxs-dma-apbx", MX28_APBX_DMA_BASE_ADDR, "mxs-dma-apbx", NULL),
  	{ /* sentinel */ }
  };
+ 
+diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+index dc369c1..87939a2 100644
+--- a/arch/arm/mach-mxs/include/mach/devices-common.h
++++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+@@ -106,3 +106,6 @@ struct mxs_saif_data {
+ struct platform_device *__init mxs_add_saif(
+ 		const struct mxs_saif_data *data,
+ 		const struct mxs_saif_platform_data *pdata);
++
++/* dma */
++int __init mxs_add_mxs_dma(void);
+diff --git a/arch/arm/mach-mxs/mach-apx4devkit.c b/arch/arm/mach-mxs/mach-apx4devkit.c
+index 48a7fab..92f47e9 100644
+--- a/arch/arm/mach-mxs/mach-apx4devkit.c
++++ b/arch/arm/mach-mxs/mach-apx4devkit.c
+@@ -210,6 +210,7 @@ static void __init apx4devkit_init(void)
+ 	mxs_iomux_setup_multiple_pads(apx4devkit_pads,
+ 			ARRAY_SIZE(apx4devkit_pads));
+ 
++	mx28_add_dma();
+ 	mx28_add_duart();
+ 	mx28_add_auart0();
+ 	mx28_add_auart1();
+diff --git a/arch/arm/mach-mxs/mach-m28evk.c b/arch/arm/mach-mxs/mach-m28evk.c
+index 06d7996..9a74ce6 100644
+--- a/arch/arm/mach-mxs/mach-m28evk.c
++++ b/arch/arm/mach-mxs/mach-m28evk.c
+@@ -321,6 +321,7 @@ static void __init m28evk_init(void)
+ {
+ 	mxs_iomux_setup_multiple_pads(m28evk_pads, ARRAY_SIZE(m28evk_pads));
+ 
++	mx28_add_dma();
+ 	mx28_add_duart();
+ 	mx28_add_auart0();
+ 	mx28_add_auart3();
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+index 5ea1c57..cabc884 100644
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -143,6 +143,7 @@ static void __init mx23evk_init(void)
+ 
+ 	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
+ 
++	mx23_add_dma();
+ 	mx23_add_duart();
+ 	mx23_add_auart0();
+ 
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index e386c14..4b645eb 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -415,6 +415,7 @@ static void __init mx28evk_init(void)
+ 
+ 	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
+ 
++	mx28_add_dma();
+ 	mx28_add_duart();
+ 	mx28_add_auart0();
+ 	mx28_add_auart3();
+diff --git a/arch/arm/mach-mxs/mach-stmp378x_devb.c b/arch/arm/mach-mxs/mach-stmp378x_devb.c
+index a626c07..a391b9e 100644
+--- a/arch/arm/mach-mxs/mach-stmp378x_devb.c
++++ b/arch/arm/mach-mxs/mach-stmp378x_devb.c
+@@ -88,6 +88,7 @@ static void __init stmp378x_dvb_init(void)
+ 	mxs_iomux_setup_multiple_pads(stmp378x_dvb_pads,
+ 			ARRAY_SIZE(stmp378x_dvb_pads));
+ 
++	mx23_add_dma();
+ 	mx23_add_duart();
+ 	mx23_add_auart0();
+ 	mx23_add_rtc_stmp3xxx();
+diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
+index 2c0862e..e17e262 100644
+--- a/arch/arm/mach-mxs/mach-tx28.c
++++ b/arch/arm/mach-mxs/mach-tx28.c
+@@ -149,6 +149,7 @@ static void __init tx28_stk5v3_init(void)
+ 	mxs_iomux_setup_multiple_pads(tx28_stk5v3_pads,
+ 			ARRAY_SIZE(tx28_stk5v3_pads));
+ 
++	mx28_add_dma();
+ 	mx28_add_duart(); /* UART1 */
+ 	mx28_add_auart(1); /* UART2 */
  
 -- 
 1.7.0.4
