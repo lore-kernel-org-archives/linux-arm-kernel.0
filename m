@@ -1,33 +1,26 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 13 Mar 2012 15:48:24 +0530
-Subject: [PATCH 0/5] pinctrl: add new Samsung pinctrl driver and add
- Exynos4 support
-In-Reply-To: <CACRpkdYB4ambuDeMUX1kZn793xxfaaNjQ56EB4C8OAykMxoPJQ@mail.gmail.com>
-References: <1331469965-28846-1-git-send-email-thomas.abraham@linaro.org>
- <CACRpkdYB4ambuDeMUX1kZn793xxfaaNjQ56EB4C8OAykMxoPJQ@mail.gmail.com>
-Message-ID: <CAJuYYwSUepRJuwdtDUGu6frCsHvvtmDEUrXEHKitYJppWwL0aw@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 13 Mar 2012 11:22:08 +0100
+Subject: [PATCH 1/5 v3] i2c/gpio: add DT support
+In-Reply-To: <20120313091104.GE18320@game.jcrosoft.org>
+References: <1331196635-27203-1-git-send-email-plagnioj@jcrosoft.com>
+ <20120313073748.GA7746@pengutronix.de>
+ <20120313091104.GE18320@game.jcrosoft.org>
+Message-ID: <20120313102208.GA2488@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2012 15:43, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sun, Mar 11, 2012 at 1:46 PM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
->
->> This patch series adds new pinctrl driver for Samsung SoC's. The driver supports
->> a gpiolib interface as well since Samsung SoC's have a combined pinmux/pinctrl
->> and gpio controller.
->
-> Overall this all looks good to me Thomas!
-> I will provide detailed review if/when it is more ripe for merge.
 
-Thanks linus for having a look. The missing bits in the driver are
-wakeup interrupt and gpio interrupt support. Without these, it would
-not be possible to meaningfully demonstrate a fully functional system
-using the pinctrl and gpiolib driver for Exynos4.
+> will update and send it via AT91  with your ack
 
-Regards,
-Thomas.
+Please wait with my ack until I saw the update.
 
->
-> Yours,
-> Linus Walleij
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/65cd860a/attachment.sig>
