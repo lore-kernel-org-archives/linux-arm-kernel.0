@@ -1,40 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 Mar 2012 14:36:10 +0100
-Subject: [GIT PULL] i.MX25 iomux fix
-Message-ID: <20120313133610.GH3852@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Mar 2012 13:44:37 +0000
+Subject: [PATCH 7/7] ARM: kirkwood: use devicetree for rtc-mv
+In-Reply-To: <20120313132216.GI5050@titan.lakedaemon.net>
+References: <cover.1331601448.git.jason@lakedaemon.net>
+ <201203130958.31223.arnd@arndb.de>
+ <20120313132216.GI5050@titan.lakedaemon.net>
+Message-ID: <201203131344.37661.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Tuesday 13 March 2012, Jason Cooper wrote:
+> On Tue, Mar 13, 2012 at 09:58:30AM +0000, Arnd Bergmann wrote:
+> > On Tuesday 13 March 2012, Jason Cooper wrote:
+> > > 
+> > > Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> > > ---
+> > >  arch/arm/boot/dts/kirkwood.dtsi   |    6 ++++++
+> > >  arch/arm/mach-kirkwood/board-dt.c |    1 -
+> > >  arch/arm/mach-kirkwood/common.c   |    2 +-
+> > >  arch/arm/mach-kirkwood/common.h   |    1 -
+> > >  4 files changed, 7 insertions(+), 3 deletions(-)
+> > > 
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > I think you can just merge this with patch 6, as they are two halves
+> > of the same work.
+> 
+> Others working on kirkwood and dt asked me to separate the two to
+> facilitate integrating with their existing work.  I can undo if you
+> think it's best.
 
-Please pull the following (non urgent, for next) fix for the i.MX25
-iomux.
+No, just ignore my comment in that case. If it helps anyone to
+split the patches, it's definitely ok to do so, I just didn't
+see any reason why you would.
 
-Sascha
-
-The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
-
-  Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx25-iomux-ds
-
-for you to fetch changes up to 1dde9f75b658edcd4fb7e00259206d727702ce61:
-
-  iomux-mx25.h slew rate adjusted for LCD __LD pins (2012-03-13 13:57:07 +0100)
-
-----------------------------------------------------------------
-ARM i.MX25: iomux lcd drivestrength fixes
-
-----------------------------------------------------------------
-Mehnert (1):
-      iomux-mx25.h slew rate adjusted for LCD __LD pins
-
- arch/arm/plat-mxc/include/mach/iomux-mx25.h |   42 +++++++++++++-------------
- 1 files changed, 21 insertions(+), 21 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
