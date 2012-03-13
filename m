@@ -1,46 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Mar 2012 15:49:54 -0700
-Subject: [GIT PULL] one kernel panic fix for v3.3-rc7
-In-Reply-To: <20120313183352.GN12083@atomide.com>
-References: <20120313183352.GN12083@atomide.com>
-Message-ID: <CAOesGMi+ySz9QZNZAZYRBD8J8i5TzmfVd+fBrpvSFsHOOQ3_aA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Mar 2012 17:54:47 -0500
+Subject: [PULL] generic irq chip and pl061 irqdomain support
+In-Reply-To: <4F5437FE.2000306@gmail.com>
+References: <4F3ADFE7.4090409@gmail.com> <4F5437FE.2000306@gmail.com>
+Message-ID: <4F5FD037.5000703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 11:33 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Olof,
->
-> Here's one more kernel panic fix that I dropped from last weeks
-> fixes as it was still being discussed.
->
-> This is a fix for the regression caused by fixing an earlier
-> regression for smsc911x fixed regulators :(
->
-> Turns out that we have more than one smsc911x on some boards,
-> and the earlier fix causes a kernel panic for board trying to
-> register second smsc911x instance, even if the second smsc911x
-> is on an add-on board that is not connected.
->
-> Note that the boards with second smsc911x will also need to be
-> patched later on to provide their own regulators.
->
-> Regards,
->
-> Tony
->
->
-> The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
-> ?Linus Torvalds (1):
-> ? ? ? ?Linux 3.3-rc7
->
+On 03/04/2012 09:50 PM, Rob Herring wrote:
+> Grant,
+> 
+> On 02/14/2012 04:27 PM, Rob Herring wrote:
+>> Grant,
+>>
+>> Please pull. This is based on your current branch which you have said
+>> you plan to rebase, so feel free to rebase these as you need to. This
+>> has been tested on highbank and i.MX5.
+>>
+> 
+> Ping.
+> 
+> I've rebased onto your current tree. Updated pull request:
+> 
+> The following changes since commit 280ad7fda5f95211857fda38960f2b6fdf6edd3e:
+> 
+>   mfd: twl-core: Add IRQ_DOMAIN dependency (2012-02-26 16:48:06 -0700)
+> 
 > are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap fix-smsc911x-regulator
->
-> Kevin Hilman (1):
-> ? ? ?ARM: OMAP2+: gpmc-smsc911x: only register regulator for first instance
+>   git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
+> 
+> Rob Herring (3):
+>       ARM: kconfig: always select IRQ_DOMAIN
+>       irq: add irq_domain support to generic-chip
+>       gpio: pl061: enable interrupts with DT style binding
+> 
+>  .../devicetree/bindings/gpio/pl061-gpio.txt        |   15 ++
+>  arch/arm/Kconfig                                   |    2 +-
+>  arch/arm/common/Kconfig                            |    2 -
+>  drivers/gpio/gpio-pl061.c                          |   48 ++++---
+>  include/linux/irq.h                                |   15 ++
+>  kernel/irq/generic-chip.c                          |  152
+> +++++++++++++++++---
+>  6 files changed, 186 insertions(+), 48 deletions(-)
+> 
 
-Thanks, pulled.
+Ping again...
 
-
--Olof
+Rob
