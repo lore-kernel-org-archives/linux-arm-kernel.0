@@ -1,38 +1,52 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 13 Mar 2012 19:33:54 +0530
-Subject: [PATCH v2 1/2] ARM: omap: hwmod: Restore sysc after a reset
+Date: Tue, 13 Mar 2012 19:33:55 +0530
+Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait for
+ reset status
 In-Reply-To: <1331647435-31666-1-git-send-email-rnayak@ti.com>
 References: <1331647435-31666-1-git-send-email-rnayak@ti.com>
-Message-ID: <1331647435-31666-2-git-send-email-rnayak@ti.com>
+Message-ID: <1331647435-31666-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a softreset, make sure the sysc settings are correctly
-restored.
+omap_hwmod_softreset() does not seem to wait for reset status
+after doing a softreset. Make it use _ocp_softreset() instead
+which does this correctly.
 
-Reported-by: Anand Gadiyar <gadiyar@ti.com>
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Cc: Benoit Cousson <b-cousson@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Anand Gadiyar <gadiyar@ti.com>
 Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |   14 ++------------
+ 1 files changed, 2 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index eba6cd3..ae56939 100644
+index ae56939..489f82d 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2270,6 +2270,10 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
+@@ -1907,20 +1907,10 @@ void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs)
+  */
+ int omap_hwmod_softreset(struct omap_hwmod *oh)
+ {
+-	u32 v;
+-	int ret;
+-
+-	if (!oh || !(oh->_sysc_cache))
++	if (!oh)
+ 		return -EINVAL;
  
- 	spin_lock_irqsave(&oh->_lock, flags);
- 	r = _reset(oh);
-+	if (oh->class->sysc) {
-+		_update_sysc_cache(oh);
-+		_enable_sysc(oh);
-+	}
- 	spin_unlock_irqrestore(&oh->_lock, flags);
+-	v = oh->_sysc_cache;
+-	ret = _set_softreset(oh, &v);
+-	if (ret)
+-		goto error;
+-	_write_sysconfig(v, oh);
+-
+-error:
+-	return ret;
++	return _ocp_softreset(oh);
+ }
  
- 	return r;
+ /**
 -- 
 1.7.1
