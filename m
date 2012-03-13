@@ -1,65 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Mar 2012 16:48:00 -0500
-Subject: [PATCH v6 2/3] clk: introduce the common clock framework
-In-Reply-To: <1331366064-1273-3-git-send-email-mturquette@linaro.org>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-3-git-send-email-mturquette@linaro.org>
-Message-ID: <4F5FC090.90005@gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 13 Mar 2012 18:00:49 -0400
+Subject: Inconsistent kallsyms data on ARM.
+Message-ID: <CAP=VYLoStscdVJretZ-Rkbp7V3Vsm8N0oWcjih7ruHFiDN7CiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+This bug(?)  has been seen to float from one ARM build to another since
+I started tracking the day-to-day changes in Stephen's linux-next builds.
 
-On 03/10/2012 01:54 AM, Mike Turquette wrote:
-> The common clock framework defines a common struct clk useful across
-> most platforms as well as an implementation of the clk api that drivers
-> can use safely for managing clocks.
-> 
-> The net result is consolidation of many different struct clk definitions
-> and platform-specific clock framework implementations.
-> 
-> This patch introduces the common struct clk, struct clk_ops and an
-> implementation of the well-known clock api in include/clk/clk.h.
-> Platforms may define their own hardware-specific clock structure and
-> their own clock operation callbacks, so long as it wraps an instance of
-> struct clk_hw.
-> 
-> See Documentation/clk.txt for more details.
-> 
-> This patch is based on the work of Jeremy Kerr, which in turn was based
-> on the work of Ben Herrenschmidt.
-> 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Mike Turquette <mturquette@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Richard Zhao <richard.zhao@linaro.org>
-> Cc: Saravana Kannan <skannan@codeaurora.org>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Amit Kucheria <amit.kucheria@linaro.org>
-> Cc: Deepak Saxena <dsaxena@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Andrew Lunn <andrew@lunn.ch>
+I see it was discussed earlier:
 
-snip
+   https://lkml.org/lkml/2011/8/2/233
+   https://lkml.org/lkml/2011/10/8/70
 
-> +
-> +	/*
-> +	 * walk the list of orphan clocks and reparent any that are children of
-> +	 * this clock
-> +	 */
-> +	hlist_for_each_entry(orphan, tmp, &clk_orphan_list, child_node)
+but no concrete cause was nailed down.  Can the linux-next build results
+help shed some light on this in any way?  Since it seems sporadic, is
+there value in embedding a diagnostic of some sort in the infrastructure
+so that when the error is detected, that it prints out more detailed info?
 
-In __clk_init, this needs to be hlist_for_each_entry_safe as entries can
-be removed.
+I can provide links to failed linux-next builds, but at the moment, all they
+really seem to have is the same repeated error message, like this one:
 
-Rob
+   http://kisskb.ellerman.id.au/kisskb/buildresult/5869367/
+
+and I don't see that helping folks all that much....
+
+Paul.
