@@ -1,25 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Mar 2012 09:52:24 +0000
-Subject: [PATCH v4 04/11] ep93xx: Use ioremap for backlight driver
-In-Reply-To: <1331592502-9083-5-git-send-email-rmallon@gmail.com>
-References: <1331592502-9083-5-git-send-email-rmallon@gmail.com>
-Message-ID: <201203130952.24401.arnd@arndb.de>
+Date: Tue, 13 Mar 2012 09:54:17 +0000
+Subject: [PATCH 3/7 v2] ARM: orion: wdt: use resource vice direct access
+In-Reply-To: <e8cd3863d70b322ee7625d0e49af0acdb82644fc.1331601448.git.jason@lakedaemon.net>
+References: <cover.1331601448.git.jason@lakedaemon.net>
+ <e8cd3863d70b322ee7625d0e49af0acdb82644fc.1331601448.git.jason@lakedaemon.net>
+Message-ID: <201203130954.17559.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 March 2012, Ryan Mallon wrote:
-> The ep93xx backlight driver uses a single register within the
-> framebuffer's register space. Currently the backlight driver uses a
-> static IO mapping for the register since the memory cannot be
-> requested by both drivers.
+On Tuesday 13 March 2012, Jason Cooper wrote:
+> From: Andrew Lunn <andrew@lunn.ch>
 > 
-> Convert the static mapping to use ioremap so that we can remove the
-> dependency on mach/hardware.h. To do so, we need remove the
-> request_mem_region from both the backlight and framebuffer drivers,
-> since whichever driver is loaded second will fail with -EBUSY
-> otherwise.
-> 
-> A proper fix is still required, and a FIXME comment has been added to
-> both drivers.
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
