@@ -1,48 +1,28 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 13 Mar 2012 17:52:14 +0100
-Subject: [PATCH v1 3/5] ARM: imx28evk: add mmc dt support
-In-Reply-To: <4F5F5C22.1080506@gmail.com>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-4-git-send-email-b29396@freescale.com>
- <4F5F5C22.1080506@gmail.com>
-Message-ID: <20120313165214.GO26642@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 13 Mar 2012 17:47:56 +0100
+Subject: [PATCH 1/5 v4] i2c/gpio: add DT support
+In-Reply-To: <20120313140822.GD2488@pengutronix.de>
+References: <1331642024-19869-1-git-send-email-plagnioj@jcrosoft.com>
+ <20120313140822.GD2488@pengutronix.de>
+Message-ID: <20120313164756.GF18320@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 09:39:30AM -0500, Rob Herring wrote:
-> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
-> > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > 
-> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/imx28-evk.dts |   14 ++++++++++++++
-> >  arch/arm/boot/dts/imx28.dtsi    |   33 +++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-mxs/imx28-dt.c    |    2 ++
-> >  3 files changed, 49 insertions(+), 0 deletions(-)
+On 15:08 Tue 13 Mar     , Wolfram Sang wrote:
+> On Tue, Mar 13, 2012 at 01:33:40PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > 
-> snip
+> > update to use devm_kzalloc for private data
 > 
-> > diff --git a/arch/arm/mach-mxs/imx28-dt.c b/arch/arm/mach-mxs/imx28-dt.c
-> > index 78d1129..429b88e 100644
-> > --- a/arch/arm/mach-mxs/imx28-dt.c
-> > +++ b/arch/arm/mach-mxs/imx28-dt.c
-> > @@ -23,6 +23,8 @@ static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
-> >  	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
-> >  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
-> >  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
-> > +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP0_BASE_ADDR, "mxs-mmc.0", NULL),
-> > +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP1_BASE_ADDR, "mxs-mmc.1", NULL),
+> Hmm, you need really to work on the commit messages, not everybody is
+> familiar with DT and its implications:
 > 
-> Why is this needed?
+> "To achieve DT support, we need to populate a custom platform_data in a
+> private struct from DT information. To simplify code, the adapter and
+> algorithm are also put into the private struct."
+> 
+ok I put this can I get the Ack ?
 
-These are needed for the drivers which have still the mxs-mmc.* names
-to find their clocks. Alternatively we could also add the appropriate
-clocks to the clock file. Don't know if that's better though.
+I need to send the pull asap
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best Regards,
+J.
