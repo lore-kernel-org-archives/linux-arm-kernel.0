@@ -1,81 +1,248 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 13 Mar 2012 19:42:43 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20120313194243.4b330327115d48b34bc556c4@canb.auug.org.au>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 13 Mar 2012 02:44:21 -0600 (MDT)
+Subject: [PATCH v3 5/5] ARM: OMAP2+: clean up some cppcheck warnings
+In-Reply-To: <alpine.DEB.2.00.1203130211300.22211@utopia.booyaka.com>
+References: <20120312224006.4103.29464.stgit@dusk>
+ <20120312224257.4103.11096.stgit@dusk>
+ <alpine.DEB.2.00.1203130211300.22211@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1203130243030.22211@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-vexpress/ct-ca9x4.c between commit e9f07fbc5f5b ("ARM:
-plat-versatile: convert to twd_local_timer_register() interface") from
-the arm tree and commit 98ed4ceb93ba ("ARM: vexpress: Get rid of
-MMIO_P2V") from the arm-soc tree.
+Resolve some warnings identified by cppcheck in arch/arm/mach-omap2:
 
-I fixed it up (I think - see below) and can carry the fix as necessary.
+    [arch/arm/mach-omap2/usb-tusb6010.c:129]: (style) Checking if unsigned variable 'tmp' is less than zero.
+    [arch/arm/mach-omap2/prm_common.c:241]: (error) Possible null pointer dereference: irq_setup - otherwise it is redundant to check if irq_setup is null at line 247
+    [arch/arm/mach-omap2/pm34xx.c:790]: (style) Variable 'per_clkdm' is assigned a value that is never used
+    [arch/arm/mach-omap2/pm34xx.c:790]: (style) Variable 'core_clkdm' is assigned a value that is never used
+    [arch/arm/mach-omap2/pm24xx.c:185]: (style) Variable 'only_idle' is assigned a value that is never used
+    [arch/arm/mach-omap2/mux.c:254]: (error) Possible null pointer dereference: mux
+    [arch/arm/mach-omap2/mux.c:258]: (error) Possible null pointer dereference: mux
+    [arch/arm/mach-omap2/gpmc-onenand.c:178]: (style) Variable 'tick_ns' is assigned a value that is never used
+    [arch/arm/mach-omap2/gpio.c:56]: (error) Possible null pointer dereference: pdata - otherwise it is redundant to check if pdata is null at line 57
+    [arch/arm/mach-omap2/devices.c:45]: (style) Variable 'l' is assigned a value that is never used
+    [arch/arm/mach-omap2/board-am3517evm.c:134]: (style) Variable 'regval' is assigned a value that is never used
+    [arch/arm/mach-omap2/board-omap3evm.c:641] -> [arch/arm/mach-omap2/board-omap3evm.c:639]: (style) Found duplicate branches for if and else.
+
+Some of them are pretty good catches, such the gpio.c:56 and
+usb-tusb6010.c:129.
+
+Thanks to Jarkko Nikula for some comments on the sscanf() warnings.
+It seems that the kernel sscanf() ignores the field width anyway for the
+%d format, so those changes have been dropped from this second version.
+
+Thanks to Daniel Marjam?ki <daniel.marjamaki@gmail.com> for pointing
+out that a variable was unnecessarily marked static in the 
+board-omap3evm.c change.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
+Cc: Charulatha Varadarajan <charu@ti.com>
+Cc: Daniel Marjam?ki <daniel.marjamaki@gmail.com>
+Reviewed-by: Charulatha Varadarajan <charu@ti.com> # for gpio.c
+---
+ arch/arm/mach-omap2/board-am3517evm.c |    6 +-----
+ arch/arm/mach-omap2/board-omap3evm.c  |    8 ++++----
+ arch/arm/mach-omap2/devices.c         |    3 +--
+ arch/arm/mach-omap2/gpio.c            |    2 +-
+ arch/arm/mach-omap2/gpmc-onenand.c    |    3 +--
+ arch/arm/mach-omap2/mux.c             |    2 +-
+ arch/arm/mach-omap2/pm24xx.c          |    3 ---
+ arch/arm/mach-omap2/pm34xx.c          |    4 +---
+ arch/arm/mach-omap2/prm_common.c      |    4 +++-
+ arch/arm/mach-omap2/usb-tusb6010.c    |    2 +-
+ 10 files changed, 14 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index 4b1cfe3..24b1f9a 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -150,13 +150,9 @@ static void am3517_evm_ethernet_init(struct emac_platform_data *pdata)
+ 	regval = omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET);
+ 	regval = regval & (~(AM35XX_CPGMACSS_SW_RST));
+ 	omap_ctrl_writel(regval, AM35XX_CONTROL_IP_SW_RESET);
+-	regval = omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET);
+-
+-	return ;
++	omap_ctrl_readl(AM35XX_CONTROL_IP_SW_RESET);
+ }
+ 
+-
+-
+ #define LCD_PANEL_PWR		176
+ #define LCD_PANEL_BKLIGHT_PWR	182
+ #define LCD_PANEL_PWM		181
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index c877236..7a45d1e 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -634,12 +634,12 @@ static void __init omap3_evm_wl12xx_init(void)
+ 
+ static void __init omap3_evm_init(void)
+ {
++	struct omap_board_mux *obm;
++
+ 	omap3_evm_get_revision();
+ 
+-	if (cpu_is_omap3630())
+-		omap3_mux_init(omap36x_board_mux, OMAP_PACKAGE_CBB);
+-	else
+-		omap3_mux_init(omap35x_board_mux, OMAP_PACKAGE_CBB);
++	obm = (cpu_is_omap3630()) ? omap36x_board_mux : omap35x_board_mux;
++	omap3_mux_init(obm, OMAP_PACKAGE_CBB);
+ 
+ 	omap_board_config = omap3_evm_config;
+ 	omap_board_config_size = ARRAY_SIZE(omap3_evm_config);
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 283d11e..b52cd16 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -42,7 +42,6 @@
+ 
+ static int __init omap3_l3_init(void)
+ {
+-	int l;
+ 	struct omap_hwmod *oh;
+ 	struct platform_device *pdev;
+ 	char oh_name[L3_MODULES_MAX_LEN];
+@@ -54,7 +53,7 @@ static int __init omap3_l3_init(void)
+ 	if (!(cpu_is_omap34xx()))
+ 		return -ENODEV;
+ 
+-	l = snprintf(oh_name, L3_MODULES_MAX_LEN, "l3_main");
++	snprintf(oh_name, L3_MODULES_MAX_LEN, "l3_main");
+ 
+ 	oh = omap_hwmod_lookup(oh_name);
+ 
+diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+index 8cbfbc2..2803ff8 100644
+--- a/arch/arm/mach-omap2/gpio.c
++++ b/arch/arm/mach-omap2/gpio.c
+@@ -54,7 +54,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 	pdata->virtual_irq_start = IH_GPIO_BASE + 32 * (id - 1);
+ 
+ 	pdata->regs = kzalloc(sizeof(struct omap_gpio_reg_offs), GFP_KERNEL);
+-	if (!pdata) {
++	if (!pdata->regs) {
+ 		pr_err("gpio%d: Memory allocation failed\n", id);
+ 		return -ENOMEM;
+ 	}
+diff --git a/arch/arm/mach-omap2/gpmc-onenand.c b/arch/arm/mach-omap2/gpmc-onenand.c
+index 5cdce10..6ab726f 100644
+--- a/arch/arm/mach-omap2/gpmc-onenand.c
++++ b/arch/arm/mach-omap2/gpmc-onenand.c
+@@ -175,7 +175,7 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
+ 	const int t_wpl  = 40;
+ 	const int t_wph  = 30;
+ 	int min_gpmc_clk_period, t_ces, t_avds, t_avdh, t_ach, t_aavdh, t_rdyo;
+-	int tick_ns, div, fclk_offset_ns, fclk_offset, gpmc_clk_ns, latency;
++	int div, fclk_offset_ns, fclk_offset, gpmc_clk_ns, latency;
+ 	int first_time = 0, hf = 0, vhf = 0, sync_read = 0, sync_write = 0;
+ 	int err, ticks_cez;
+ 	int cs = cfg->cs, freq = *freq_ptr;
+@@ -239,7 +239,6 @@ static int omap2_onenand_set_sync_mode(struct omap_onenand_platform_data *cfg,
+ 		break;
+ 	}
+ 
+-	tick_ns = gpmc_ticks_to_ns(1);
+ 	div = gpmc_cs_calc_divider(cs, min_gpmc_clk_period);
+ 	gpmc_clk_ns = gpmc_ticks_to_ns(div);
+ 	if (gpmc_clk_ns < 15) /* >66Mhz */
+diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+index 611a0e3..552225a 100644
+--- a/arch/arm/mach-omap2/mux.c
++++ b/arch/arm/mach-omap2/mux.c
+@@ -248,7 +248,7 @@ int omap_mux_init_signal(const char *muxname, int val)
+ 	int mux_mode;
+ 
+ 	mux_mode = omap_mux_get_by_name(muxname, &partition, &mux);
+-	if (mux_mode < 0)
++	if (mux_mode < 0 || !mux)
+ 		return mux_mode;
+ 
+ 	old_mode = omap_mux_read(partition, mux->reg_offset);
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 23de98d..b3a4765 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -182,8 +182,6 @@ static int omap2_allow_mpu_retention(void)
+ 
+ static void omap2_enter_mpu_retention(void)
+ {
+-	int only_idle = 0;
+-
+ 	/* Putting MPU into the WFI state while a transfer is active
+ 	 * seems to cause the I2C block to timeout. Why? Good question. */
+ 	if (omap2_i2c_active())
+@@ -206,7 +204,6 @@ static void omap2_enter_mpu_retention(void)
+ 
+ 		omap2_prm_write_mod_reg(OMAP_LOGICRETSTATE_MASK, MPU_MOD,
+ 						 OMAP2_PM_PWSTCTRL);
+-		only_idle = 1;
+ 	}
+ 
+ 	omap2_sram_idle();
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index fc69875..0b65785 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -787,7 +787,7 @@ static void __init pm_errata_configure(void)
+ static int __init omap3_pm_init(void)
+ {
+ 	struct power_state *pwrst, *tmp;
+-	struct clockdomain *neon_clkdm, *per_clkdm, *mpu_clkdm, *core_clkdm;
++	struct clockdomain *neon_clkdm, *mpu_clkdm;
+ 	int ret;
+ 
+ 	if (!cpu_is_omap34xx())
+@@ -841,8 +841,6 @@ static int __init omap3_pm_init(void)
+ 
+ 	neon_clkdm = clkdm_lookup("neon_clkdm");
+ 	mpu_clkdm = clkdm_lookup("mpu_clkdm");
+-	per_clkdm = clkdm_lookup("per_clkdm");
+-	core_clkdm = clkdm_lookup("core_clkdm");
+ 
+ #ifdef CONFIG_SUSPEND
+ 	suspend_set_ops(&omap_pm_ops);
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 860118a..c7c7373 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -238,7 +238,7 @@ void omap_prcm_irq_complete(void)
+  */
+ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
+ {
+-	int nr_regs = irq_setup->nr_regs;
++	int nr_regs;
+ 	u32 mask[OMAP_PRCM_MAX_NR_PENDING_REG];
+ 	int offset, i;
+ 	struct irq_chip_generic *gc;
+@@ -247,6 +247,8 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
+ 	if (!irq_setup)
+ 		return -EINVAL;
+ 
++	nr_regs = irq_setup->nr_regs;
++
+ 	if (prcm_irq_setup) {
+ 		pr_err("PRCM: already initialized; won't reinitialize\n");
+ 		return -EINVAL;
+diff --git a/arch/arm/mach-omap2/usb-tusb6010.c b/arch/arm/mach-omap2/usb-tusb6010.c
+index 994d8f5..db84a46 100644
+--- a/arch/arm/mach-omap2/usb-tusb6010.c
++++ b/arch/arm/mach-omap2/usb-tusb6010.c
+@@ -126,7 +126,7 @@ static int tusb_set_sync_mode(unsigned sysclk_ps, unsigned fclk_ps)
+ 	tmp = (t.sync_clk + fclk_ps - 1) / fclk_ps;
+ 	if (tmp > 4)
+ 		return -ERANGE;
+-	if (tmp <= 0)
++	if (tmp == 0)
+ 		tmp = 1;
+ 	t.page_burst_access = (fclk_ps * tmp) / 1000;
+ 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-vexpress/ct-ca9x4.c
-index b391538,73791f0..0000000
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@@ -54,44 -42,17 +42,28 @@@ static struct map_desc ct_ca9x4_io_desc
-  static void __init ct_ca9x4_map_io(void)
-  {
-  	iotable_init(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
- -#ifdef CONFIG_LOCAL_TIMERS
- -	twd_base = ioremap(A9_MPCORE_TWD, SZ_32);
- -#endif
-  }
-  
- +#ifdef CONFIG_HAVE_ARM_TWD
- +static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, A9_MPCORE_TWD, IRQ_LOCALTIMER);
- +
- +static void __init ca9x4_twd_init(void)
- +{
- +	int err = twd_local_timer_register(&twd_local_timer);
- +	if (err)
- +		pr_err("twd_local_timer_register failed %d\n", err);
- +}
- +#else
- +#define ca9x4_twd_init()	do {} while(0)
- +#endif
- +
-  static void __init ct_ca9x4_init_irq(void)
-  {
-- 	gic_init(0, 29, MMIO_P2V(A9_MPCORE_GIC_DIST),
-- 		 MMIO_P2V(A9_MPCORE_GIC_CPU));
-+ 	gic_init(0, 29, ioremap(A9_MPCORE_GIC_DIST, SZ_4K),
-+ 		 ioremap(A9_MPCORE_GIC_CPU, SZ_256));
- +	ca9x4_twd_init();
-  }
-  
-- #if 0
-- static void __init ct_ca9x4_timer_init(void)
-- {
-- 	writel(0, MMIO_P2V(CT_CA9X4_TIMER0) + TIMER_CTRL);
-- 	writel(0, MMIO_P2V(CT_CA9X4_TIMER1) + TIMER_CTRL);
-- 
-- 	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1), "ct-timer1");
-- 	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0,
-- 		"ct-timer0");
-- }
-- 
-- static struct sys_timer ct_ca9x4_timer = {
-- 	.init	= ct_ca9x4_timer_init,
-- };
-- #endif
-- 
-  static void ct_ca9x4_clcd_enable(struct clcd_fb *fb)
-  {
-  	v2m_cfg_write(SYS_CFG_MUXFPGA | SYS_CFG_SITE_DB1, 0);
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/6f4ef4c5/attachment.sig>
+1.7.9.1
