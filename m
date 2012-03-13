@@ -1,9 +1,10 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 13 Mar 2012 11:39:39 +0100
-Subject: [PATCHv2 3/3] ARM: Exynos: Add DRM core support for NURI board
+Date: Tue, 13 Mar 2012 11:39:38 +0100
+Subject: [PATCHv2 2/3] ARM: Exynos: Add DRM core device support for Universal
+ C210 board
 In-Reply-To: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
 References: <1331635180-7207-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1331635180-7207-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1331635180-7207-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,94 +15,94 @@ subdriver. Based on the initial patch by Joonyoung Shim
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/Kconfig     |    1 +
- arch/arm/mach-exynos/mach-nuri.c |   33 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/Kconfig               |    1 +
+ arch/arm/mach-exynos/mach-universal_c210.c |   33 ++++++++++++++++++++++++++++
  2 files changed, 34 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 52cb248..db4b897 100644
+index 9124ce9..52cb248 100644
 --- a/arch/arm/mach-exynos/Kconfig
 +++ b/arch/arm/mach-exynos/Kconfig
-@@ -299,6 +299,7 @@ config MACH_NURI
- 	select S5P_DEV_USB_EHCI
- 	select S5P_SETUP_MIPIPHY
+@@ -262,6 +262,7 @@ config MACH_UNIVERSAL_C210
+ 	select S5P_DEV_ONENAND
+ 	select S5P_DEV_TV
  	select EXYNOS4_DEV_DMA
 +	select EXYNOS_DEV_DRM
- 	select EXYNOS4_SETUP_FIMC
  	select EXYNOS4_SETUP_FIMD0
  	select EXYNOS4_SETUP_I2C1
-diff --git a/arch/arm/mach-exynos/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-index 7ac81ce..8049f93 100644
---- a/arch/arm/mach-exynos/mach-nuri.c
-+++ b/arch/arm/mach-exynos/mach-nuri.c
-@@ -25,6 +25,7 @@
- #include <linux/mmc/host.h>
- #include <linux/fb.h>
- #include <linux/pwm_backlight.h>
+ 	select EXYNOS4_SETUP_I2C3
+diff --git a/arch/arm/mach-exynos/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
+index 57e4418..b8bd8ab 100644
+--- a/arch/arm/mach-exynos/mach-universal_c210.c
++++ b/arch/arm/mach-exynos/mach-universal_c210.c
+@@ -23,6 +23,7 @@
+ #include <linux/i2c-gpio.h>
+ #include <linux/i2c/mcs.h>
+ #include <linux/i2c/atmel_mxt_ts.h>
 +#include <drm/exynos_drm.h>
  
- #include <video/platform_lcd.h>
- #include <media/m5mols.h>
-@@ -210,6 +211,29 @@ static struct platform_device nuri_gpio_keys = {
- 	},
+ #include <asm/mach/arch.h>
+ #include <asm/hardware/gic.h>
+@@ -811,6 +812,29 @@ static struct i2c_board_info i2c1_devs[] __initdata = {
+ 	/* Gyro, To be updated */
  };
  
 +#ifdef CONFIG_DRM_EXYNOS
 +static struct exynos_drm_fimd_pdata drm_fimd_pdata = {
 +	.panel = {
 +		.timing	= {
-+			.xres		= 1024,
-+			.yres		= 600,
-+			.hsync_len	= 40,
-+			.left_margin	= 79,
-+			.right_margin	= 200,
-+			.vsync_len	= 10,
-+			.upper_margin	= 10,
-+			.lower_margin	= 11,
-+			.refresh	= 60,
++			.left_margin	= 16,
++			.right_margin	= 16,
++			.upper_margin	= 2,
++			.lower_margin	= 28,
++			.hsync_len	= 2,
++			.vsync_len	= 1,
++			.xres		= 480,
++			.yres		= 800,
++			.refresh	= 55,
 +		},
 +	},
 +	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB |
 +			  VIDCON0_CLKSEL_LCD,
-+	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
++	.vidcon1	= VIDCON1_INV_VCLK | VIDCON1_INV_VDEN
++			  | VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
 +	.default_win	= 3,
 +	.bpp		= 32,
 +};
-+
 +#else
  /* Frame Buffer */
- static struct s3c_fb_pd_win nuri_fb_win0 = {
+ static struct s3c_fb_pd_win universal_fb_win0 = {
  	.win_mode = {
-@@ -236,6 +260,7 @@ static struct s3c_fb_platdata nuri_fb_pdata __initdata = {
- 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+@@ -838,6 +862,7 @@ static struct s3c_fb_platdata universal_lcd_pdata __initdata = {
+ 			  | VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
  	.setup_gpio	= exynos4_fimd0_gpio_setup_24bpp,
  };
 +#endif
  
- static void nuri_lcd_power_on(struct plat_lcd_data *pd, unsigned int power)
- {
-@@ -1341,6 +1366,9 @@ static struct platform_device *nuri_devices[] __initdata = {
- 	&cam_vdda_fixed_rdev,
- 	&cam_8m_12v_fixed_rdev,
- 	&exynos4_bus_devfreq,
+ static struct regulator_consumer_supply cam_vt_dio_supply =
+ 	REGULATOR_SUPPLY("vdd_core", "0-003c");
+@@ -1047,6 +1072,9 @@ static struct platform_device *universal_devices[] __initdata = {
+ 	&s5p_device_onenand,
+ 	&s5p_device_fimd0,
+ 	&s5p_device_jpeg,
 +#ifdef CONFIG_DRM_EXYNOS
 +	&exynos_device_drm,
 +#endif
- };
- 
- static void __init nuri_map_io(void)
-@@ -1372,7 +1400,12 @@ static void __init nuri_machine_init(void)
- 	i2c_register_board_info(9, i2c9_devs, ARRAY_SIZE(i2c9_devs));
- 	s3c_i2c6_set_platdata(&nuri_i2c6_platdata);
+ 	&s5p_device_mfc,
+ 	&s5p_device_mfc_l,
+ 	&s5p_device_mfc_r,
+@@ -1092,7 +1120,12 @@ static void __init universal_machine_init(void)
+ 	s5p_i2c_hdmiphy_set_platdata(NULL);
+ 	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
  
 +#ifdef CONFIG_DRM_EXYNOS
 +	s5p_device_fimd0.dev.platform_data = &drm_fimd_pdata;
 +	exynos4_fimd0_gpio_setup_24bpp();
 +#else
- 	s5p_fimd0_set_platdata(&nuri_fb_pdata);
+ 	s5p_fimd0_set_platdata(&universal_lcd_pdata);
 +#endif
  
- 	nuri_camera_init();
- 
+ 	universal_touchkey_init();
+ 	i2c_register_board_info(I2C_GPIO_BUS_12, i2c_gpio12_devs,
 -- 
 1.7.1.569.g6f426
