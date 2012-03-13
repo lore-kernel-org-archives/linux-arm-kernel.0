@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Mar 2012 09:51:59 +0100
-Subject: [PATCH 3/4] ARM: create a common IOMEM definition
-In-Reply-To: <1331500100-31351-4-git-send-email-robherring2@gmail.com>
+Date: Tue, 13 Mar 2012 09:56:03 +0100
+Subject: [PATCH 4/4] ARM: __io abuse cleanup
+In-Reply-To: <1331500100-31351-5-git-send-email-robherring2@gmail.com>
 References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
- <1331500100-31351-4-git-send-email-robherring2@gmail.com>
-Message-ID: <CACRpkda=WDTkSAwF8TYWfhnSX_FjJDwzKRhcuk6=pn9j96Eu=w@mail.gmail.com>
+ <1331500100-31351-5-git-send-email-robherring2@gmail.com>
+Message-ID: <CACRpkdZ_y3=vcj99C34SZ=hKQUmXdqoj0mqKJg2MLGqyUFsB0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,20 +12,20 @@ On Sun, Mar 11, 2012 at 10:08 PM, Rob Herring <robherring2@gmail.com> wrote:
 
 > From: Rob Herring <rob.herring@calxeda.com>
 >
-> Several platforms create IOMEM defines for casting to 'void __iomem *',
-> and other platforms are incorrectly using __io() macro for the same
-> purpose. This creates a common definition and removes all the platform
-> specific versions. Rather than try to make linux/io.h and asm/io.h
-> assembly safe, the assembly version of IOMEM is moved into
-> asm/assembler.h.
+> Several platforms incorrectly use __io() for casting to 'void __iomem *'.
+> This converts all of those uses to use the common IOMEM macro.
 >
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Anton Vorontsov <avorontsov@mvista.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: linux-sh at vger.kernel.org
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-For:
-
-> ?arch/arm/mach-u300/include/mach/u300-regs.h ? ? | ? ?6 ------
-
-Yours,
+Thanks Rob!
 Linus Walleij
