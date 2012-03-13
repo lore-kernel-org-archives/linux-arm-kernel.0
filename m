@@ -1,23 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 13 Mar 2012 13:36:27 -0600
-Subject: [PATCH] arm/tegra: pcie: fix return value of function
-In-Reply-To: <1331617587-10714-1-git-send-email-mad_soft@inbox.ru>
-References: <CAOesGMi0aqCjLsJ5wWXwFVQL2T8wtUuE14rFZ9h7NKHXcWAoqQ@mail.gmail.com>
- <1331617587-10714-1-git-send-email-mad_soft@inbox.ru>
-Message-ID: <4F5FA1BB.5050002@wwwdotorg.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 13 Mar 2012 20:46:17 +0100
+Subject: [PATCH 1/5 v4] i2c/gpio: add DT support
+In-Reply-To: <20120313164756.GF18320@game.jcrosoft.org>
+References: <1331642024-19869-1-git-send-email-plagnioj@jcrosoft.com>
+ <20120313140822.GD2488@pengutronix.de>
+ <20120313164756.GF18320@game.jcrosoft.org>
+Message-ID: <20120313194616.GE2488@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2012 11:46 PM, Dmitry Artamonow wrote:
-> In previous patch (arm/tegra: add timeout to PCIe PLL lock detection loop)
-> tegra_pcie_enable_controller() function type has been changed from
-> void to int, but the last return statement wasn't converted, so
-> function returns undefined value. Fix it.
-> 
-> Also while at it, address couple of minor concerns raised by reviewers:
-> use usleep_range for delay, and lower the value of timeout to 300ms
-> to be consistent with Nvidia Vibrante kernel.
-> 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+On Tue, Mar 13, 2012 at 05:47:56PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 15:08 Tue 13 Mar     , Wolfram Sang wrote:
+> > On Tue, Mar 13, 2012 at 01:33:40PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > 
+> > > update to use devm_kzalloc for private data
+> > 
+> > Hmm, you need really to work on the commit messages, not everybody is
+> > familiar with DT and its implications:
+> > 
+> > "To achieve DT support, we need to populate a custom platform_data in a
+> > private struct from DT information. To simplify code, the adapter and
+> > algorithm are also put into the private struct."
+> > 
+> ok I put this can I get the Ack ?
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Yes.
+
+> I need to send the pull asap
+
+Please, no rush. Makes it too easy for bugs to slip in...
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/7cf3bc0a/attachment.sig>
