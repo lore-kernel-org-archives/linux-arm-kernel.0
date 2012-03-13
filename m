@@ -1,52 +1,26 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 13 Mar 2012 19:33:55 +0530
-Subject: [PATCH v2 2/2] ARM: omap: hwmod: Make omap_hwmod_softreset wait for
- reset status
-In-Reply-To: <1331647435-31666-1-git-send-email-rnayak@ti.com>
-References: <1331647435-31666-1-git-send-email-rnayak@ti.com>
-Message-ID: <1331647435-31666-3-git-send-email-rnayak@ti.com>
+From: alexg@meprolight.com (Alex Gershgorin)
+Date: Tue, 13 Mar 2012 16:04:50 +0200
+Subject: [PATCH] i.MX35-PDK: Add Camera support
+In-Reply-To: <CAOMZO5Dmf3mqDZkrhnFLrFyc90vk8Vyfv5mwrFfWsY-05=AyJg@mail.gmail.com>
+Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A2B@MEP-EXCH.meprolight.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_hwmod_softreset() does not seem to wait for reset status
-after doing a softreset. Make it use _ocp_softreset() instead
-which does this correctly.
+Hi Fabio,
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Anand Gadiyar <gadiyar@ti.com>
-Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   14 ++------------
- 1 files changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index ae56939..489f82d 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1907,20 +1907,10 @@ void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs)
-  */
- int omap_hwmod_softreset(struct omap_hwmod *oh)
- {
--	u32 v;
--	int ret;
--
--	if (!oh || !(oh->_sysc_cache))
-+	if (!oh)
- 		return -EINVAL;
- 
--	v = oh->_sysc_cache;
--	ret = _set_softreset(oh, &v);
--	if (ret)
--		goto error;
--	_write_sysconfig(v, oh);
--
--error:
--	return ret;
-+	return _ocp_softreset(oh);
- }
- 
- /**
--- 
-1.7.1
+
+On Mon, Mar 12, 2012 at 1:28 PM, Alex <alexg@meprolight.com> wrote:
+> In i.MX35-PDK, OV2640 ?camera is populated on the
+> personality board. This camera is registered as a subdevice via soc-camera interface.
+>
+> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+
+> >Are you able to get the camera working correctly now?
+
+> >Or are you still facing the issues you reported earlier?
+
+This problem not solved, I'm still doing testing
+
+Thanks
+Alex Gershgorin
