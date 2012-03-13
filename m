@@ -1,47 +1,47 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 14 Mar 2012 01:38:05 +0900
-Subject: [PATCH v11 3/3] iommu/exynos: Add iommu driver for Exynos
- Platforms
-In-Reply-To: <20120313100024.GG18973@amd.com>
-References: <017a01ccfdee$4e5e7a00$eb1b6e00$%cho@samsung.com>
- <20120312150156.GF18973@amd.com>
- <CAHQjnOOCQb4G1aeFB0FQVBstXpaXmahnQO8+FoinPcQNZEieGg@mail.gmail.com>
- <20120313100024.GG18973@amd.com>
-Message-ID: <CAHQjnOO2Me5C6it=M0OFKdRcK0LObDR8+hPGyuUb21oqGwsg0g@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Tue, 13 Mar 2012 22:10:09 +0530
+Subject: [PATCH] ARM: OMAP4: Workaround the OCP synchronisation issue with
+ 32K synctimer.
+In-Reply-To: <87vcm8tqbx.fsf@ti.com>
+References: <1331566388-2397-1-git-send-email-santosh.shilimkar@ti.com>
+ <87399d225f.fsf@ti.com> <4F5F098E.4040006@ti.com> <87vcm8tqbx.fsf@ti.com>
+Message-ID: <CAMQu2gxwH5oK4C6OBMZqBfijwfC8=eQYJv3jqh55qpZEqOhx0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 7:00 PM, Joerg Roedel <joerg.roedel@amd.com> wrote:
-> On Tue, Mar 13, 2012 at 05:50:16PM +0900, KyongHo Cho wrote:
->> >> +struct sysmmu_drvdata {
->> >> + ? ? struct device *sysmmu;
->> >> + ? ? char *dbgname;
->> >> + ? ? int nsfrs;
->> >> + ? ? void __iomem **sfrbases;
->> >> + ? ? struct clk *clk[2];
->> >> + ? ? int activations;
->> >> + ? ? rwlock_t lock;
->> >> + ? ? struct iommu_domain *domain;
->> >> + ? ? sysmmu_fault_handler_t fault_handler;
->> >> + ? ? unsigned long pgtable;
->> >> + ? ? struct iommu_client client;
->> >> +};
->> >
->> > Is there any reason why 'struct iommu_client' is a seperate data
->> > structure? Otherwise it can be merged with 'truct sysmmu_drvdata'.
+On Tue, Mar 13, 2012 at 10:01 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 >
-> Of course this doesn't need to be changed immediatly. I just asked if
-> there was a specific reason for this seperation.
+>> On Monday 12 March 2012 10:21 PM, Kevin Hilman wrote:
+>>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>>
+>>>> On OMAP4, recently a synchronisation bug is discovered by hardware
+>>>> team, which leads to incorrect timer value read from 32K sync timer
+>>>> IP when the IP is comming out of idle.
+>>>>
+>>>> The issue is due to the synchronization methodology used in the SYNCTIMER IP.
+>>>> The value of the counter register in 32kHz domain is synchronized to the OCP
+>>>> domain register only at count up event, and if the OCP clock is switched off,
+>>>> the OCP register gets out of synch until the first count up event after the
+>>>> clock is switched back -at the next falling edge of the 32kHz clock.
+>>>>
+>>>> Further investigation revealed that it applies to gptimer1 and watchdog timer2
+>>>> as well which may run on 32KHz. This patch fixes the issue for all the
+>>>> applicable modules.
+>>>
+>>> The changelog describes the problem ver well, but doesn't actually
+>>> describe the fix (enable static dep.) ?Can you update the changelog do
+>>> describe the fix, and why it fixes the problem.
+>>>
+>> Sure. Updated patch below. The idea is to ensure that synctimer is
+>> syncronised before software does any reads on the counter. The BUG
+>> will get fixed in future OMAP designs
 >
->> The problems will be soon fixed and I will post next patch tomorrow.
+> Thanks for the updated changelog.
 >
-> Fine. Please also get the Acked-bys from the Exynos maintainer on
-> patches 1 and 2 at least. I'll merge it then.
+> Since this doesn't qualify as a regression, queuing for v3.4 (branch: for_3.4/fixes/pm)
 >
-Thank you.
-AFAIK, Exynos maintainer is somewhat busy for his own job.
-I will ask him to ack my patch soon.
+Thanks Kevin.
 
-Best regards,
-
-Cho KyongHo.
+Regards
+Santosh
