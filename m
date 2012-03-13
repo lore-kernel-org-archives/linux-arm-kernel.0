@@ -1,34 +1,25 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Tue, 13 Mar 2012 18:12:58 -0500
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 13 Mar 2012 23:15:02 +0000
 Subject: [PATCH v4 06/10] ASoC: fsl: check property 'compatible' for the
  machine name
-In-Reply-To: <1331553537-19789-7-git-send-email-shawn.guo@linaro.org>
+In-Reply-To: <4F5FD47A.9040808@freescale.com>
 References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
  <1331553537-19789-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4F5FD47A.9040808@freescale.com>
+ <4F5FD47A.9040808@freescale.com>
+Message-ID: <20120313231502.GR3177@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> Check /compatible rather than /model to determine the machine name.
-> The p1022ds older device trees get a different /model from the new
-> ones, while /compatible is consistent there, so checking /compatible
-> will save the bother of detecting older p1022ds device trees.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
+On Tue, Mar 13, 2012 at 06:12:58PM -0500, Timur Tabi wrote:
 
-I'm pretty sure I ack'd this patch already.  Regardless, it does not apply
-to for-3.4.
+> I'm pretty sure I ack'd this patch already.  Regardless, it does not apply
+> to for-3.4.
 
-Applying: ASoC: fsl: check property 'compatible' for the machine name
-error: patch failed: sound/soc/fsl/fsl_ssi.c:716
-error: sound/soc/fsl/fsl_ssi.c: patch does not apply
-error: patch failed: sound/soc/fsl/mpc8610_hpcd.c:402
-error: sound/soc/fsl/mpc8610_hpcd.c: patch does not apply
-error: patch failed: sound/soc/fsl/p1022_ds.c:403
-error: sound/soc/fsl/p1022_ds.c: patch does not apply
-
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+You did, it doesn't apply because it's already applied.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/bb8131cc/attachment.sig>
