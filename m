@@ -1,72 +1,47 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 13 Mar 2012 11:32:12 -0500
-Subject: [PATCH 3/4] ARM: create a common IOMEM definition
-In-Reply-To: <1331500100-31351-4-git-send-email-robherring2@gmail.com>
-References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
- <1331500100-31351-4-git-send-email-robherring2@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F0020695AB97DC@AUSP01VMBX24.collaborationhost.net>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 14 Mar 2012 01:38:05 +0900
+Subject: [PATCH v11 3/3] iommu/exynos: Add iommu driver for Exynos
+ Platforms
+In-Reply-To: <20120313100024.GG18973@amd.com>
+References: <017a01ccfdee$4e5e7a00$eb1b6e00$%cho@samsung.com>
+ <20120312150156.GF18973@amd.com>
+ <CAHQjnOOCQb4G1aeFB0FQVBstXpaXmahnQO8+FoinPcQNZEieGg@mail.gmail.com>
+ <20120313100024.GG18973@amd.com>
+Message-ID: <CAHQjnOO2Me5C6it=M0OFKdRcK0LObDR8+hPGyuUb21oqGwsg0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, March 11, 2012 2:08 PM, Rob Herring wrote:
+On Tue, Mar 13, 2012 at 7:00 PM, Joerg Roedel <joerg.roedel@amd.com> wrote:
+> On Tue, Mar 13, 2012 at 05:50:16PM +0900, KyongHo Cho wrote:
+>> >> +struct sysmmu_drvdata {
+>> >> + ? ? struct device *sysmmu;
+>> >> + ? ? char *dbgname;
+>> >> + ? ? int nsfrs;
+>> >> + ? ? void __iomem **sfrbases;
+>> >> + ? ? struct clk *clk[2];
+>> >> + ? ? int activations;
+>> >> + ? ? rwlock_t lock;
+>> >> + ? ? struct iommu_domain *domain;
+>> >> + ? ? sysmmu_fault_handler_t fault_handler;
+>> >> + ? ? unsigned long pgtable;
+>> >> + ? ? struct iommu_client client;
+>> >> +};
+>> >
+>> > Is there any reason why 'struct iommu_client' is a seperate data
+>> > structure? Otherwise it can be merged with 'truct sysmmu_drvdata'.
 >
-> Several platforms create IOMEM defines for casting to 'void __iomem *',
-> and other platforms are incorrectly using __io() macro for the same
-> purpose. This creates a common definition and removes all the platform
-> specific versions. Rather than try to make linux/io.h and asm/io.h
-> assembly safe, the assembly version of IOMEM is moved into
-> asm/assembler.h.
+> Of course this doesn't need to be changed immediatly. I just asked if
+> there was a specific reason for this seperation.
 >
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Cc: Colin Cross <ccross@android.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> ---
->  arch/arm/include/asm/assembler.h                |    2 ++
->  arch/arm/include/asm/io.h                       |    2 ++
->  arch/arm/kernel/debug.S                         |    1 +
->  arch/arm/kernel/entry-armv.S                    |    1 +
->  arch/arm/mach-davinci/include/mach/hardware.h   |    6 ------
->  arch/arm/mach-davinci/include/mach/uncompress.h |    2 ++
->  arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    9 ---------
->  arch/arm/mach-mmp/include/mach/addr-map.h       |    6 ------
->  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ------
->  arch/arm/mach-msm/include/mach/msm_iomap.h      |    6 ------
->  arch/arm/mach-mxs/include/mach/hardware.h       |    6 ------
->  arch/arm/mach-omap1/ams-delta-fiq-handler.S     |    1 +
->  arch/arm/mach-omap1/iomap.h                     |    6 ------
->  arch/arm/mach-omap2/clock3xxx_data.c            |    1 +
->  arch/arm/mach-omap2/clock44xx_data.c            |    1 +
->  arch/arm/mach-omap2/iomap.h                     |    6 ------
->  arch/arm/mach-rpc/include/mach/hardware.h       |    6 ------
->  arch/arm/mach-spear3xx/clock.c                  |    1 +
->  arch/arm/mach-spear6xx/clock.c                  |    1 +
->  arch/arm/mach-tegra/include/mach/iomap.h        |    6 ------
->  arch/arm/mach-u300/include/mach/u300-regs.h     |    6 ------
->  arch/arm/plat-mxc/include/mach/hardware.h       |    6 ------
->  arch/arm/plat-omap/include/plat/hardware.h      |    6 ------
->  arch/arm/plat-omap/include/plat/usb.h           |    1 -
->  arch/arm/plat-spear/include/plat/hardware.h     |    6 ------
->  25 files changed, 13 insertions(+), 88 deletions(-)
+>> The problems will be soon fixed and I will post next patch tomorrow.
 >
+> Fine. Please also get the Acked-bys from the Exynos maintainer on
+> patches 1 and 2 at least. I'll merge it then.
+>
+Thank you.
+AFAIK, Exynos maintainer is somewhat busy for his own job.
+I will ask him to ack my patch soon.
 
-For ep93xx:
+Best regards,
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cho KyongHo.
