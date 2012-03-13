@@ -1,26 +1,45 @@
-From: alexg@meprolight.com (Alex Gershgorin)
-Date: Tue, 13 Mar 2012 16:04:50 +0200
-Subject: [PATCH] i.MX35-PDK: Add Camera support
-In-Reply-To: <CAOMZO5Dmf3mqDZkrhnFLrFyc90vk8Vyfv5mwrFfWsY-05=AyJg@mail.gmail.com>
-Message-ID: <4875438356E7CA4A8F2145FCD3E61C0B2CBD666A2B@MEP-EXCH.meprolight.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 13 Mar 2012 15:08:22 +0100
+Subject: [PATCH 1/5 v4] i2c/gpio: add DT support
+In-Reply-To: <1331642024-19869-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1331642024-19869-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20120313140822.GD2488@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Tue, Mar 13, 2012 at 01:33:40PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
+> update to use devm_kzalloc for private data
 
+Hmm, you need really to work on the commit messages, not everybody is
+familiar with DT and its implications:
 
-On Mon, Mar 12, 2012 at 1:28 PM, Alex <alexg@meprolight.com> wrote:
-> In i.MX35-PDK, OV2640 ?camera is populated on the
-> personality board. This camera is registered as a subdevice via soc-camera interface.
->
-> Signed-off-by: Alex Gershgorin <alexg@meprolight.com>
+"To achieve DT support, we need to populate a custom platform_data in a
+private struct from DT information. To simplify code, the adapter and
+algorithm are also put into the private struct."
 
-> >Are you able to get the camera working correctly now?
+Something like this?
 
-> >Or are you still facing the issues you reported earlier?
+> ---
+> v4:
+> 
+> 	fix timeout
 
-This problem not solved, I'm still doing testing
+You need to work on the changelogs as well :)
 
-Thanks
-Alex Gershgorin
+> 	use gpio_is_valid
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120313/913aa960/attachment.sig>
