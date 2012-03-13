@@ -1,49 +1,101 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 13 Mar 2012 01:57:43 +0000
-Subject: [PATCH 1/7] ARM: orion: spi: remove enable_clock_fix which is not used
+Date: Tue, 13 Mar 2012 01:57:47 +0000
+Subject: [PATCH 5/7 v2] ARM: kirkwood: convert uart0 to devicetree.
 In-Reply-To: <cover.1331601448.git.jason@lakedaemon.net>
 References: <cover.1331601448.git.jason@lakedaemon.net>
-Message-ID: <09fda0555ea860b7b6bfdf3fef0ebe08926edaa1.1331601448.git.jason@lakedaemon.net>
+Message-ID: <970083c931bbd5c58be3aa982a66fddc48ceb534.1331601448.git.jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
+This uart is the primary console for the dreamplug.  Removed
+kirkwood_uart0_init() call from board-dreamplug.c.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+There are two uarts on the kirkwood SoC, all or none of them may be
+enabled, and the clock-frequency is board-dependant.  So, enabling and
+clock-frequency are left to the board dts.
+
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- drivers/spi/spi-orion.c       |    5 -----
- include/linux/spi/orion_spi.h |    1 -
- 2 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index 13448c8..e496f79 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -359,11 +359,6 @@ static int orion_spi_setup(struct spi_device *spi)
- 
- 	orion_spi = spi_master_get_devdata(spi->master);
- 
--	/* Fix ac timing if required.   */
--	if (orion_spi->spi_info->enable_clock_fix)
--		orion_spi_setbits(orion_spi, ORION_SPI_IF_CONFIG_REG,
--				  (1 << 14));
--
- 	if ((spi->max_speed_hz == 0)
- 			|| (spi->max_speed_hz > orion_spi->max_speed))
- 		spi->max_speed_hz = orion_spi->max_speed;
-diff --git a/include/linux/spi/orion_spi.h b/include/linux/spi/orion_spi.h
-index decf6d8..b4d9fa6 100644
---- a/include/linux/spi/orion_spi.h
-+++ b/include/linux/spi/orion_spi.h
-@@ -11,7 +11,6 @@
- 
- struct orion_spi_info {
- 	u32	tclk;		/* no <linux/clk.h> support yet */
--	u32	enable_clock_fix;
+Changes from v1:
+
+* moved on-chip peripherals (uart's here) in kirkwood.dtsi and used ranges to
+  simplify addressing
+* disable uarts by default as not all boards enable them.  Can be enabled in
+  board file
+* specify clock-frequency in board file as it is board specific.  of_serial
+  prints an error message if it isn't specified (view with earlyprintk)
+* removed previous versions Reviewed-By's and Acked-By's as this is
+  significantly different from the previous version.
+
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |    7 +++++++
+ arch/arm/boot/dts/kirkwood.dtsi          |   26 +++++++++++++++++++++++++-
+ arch/arm/mach-kirkwood/board-dreamplug.c |    2 --
+ 3 files changed, 32 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 9946d01..a5376b8 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -14,4 +14,11 @@
+ 	chosen {
+ 		bootargs = "console=ttyS0,115200n8 earlyprintk";
+ 	};
++
++	ocp at f1000000 {
++		serial at 12000 {
++			clock-frequency = <200000000>;
++			status = "ok";
++		};
++	};
  };
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 702b955..825310b 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -2,5 +2,29 @@
  
+ / {
+ 	compatible = "mrvl,kirkwood";
+-};
  
++	ocp at f1000000 {
++		compatible = "simple-bus";
++		ranges = <0 0xf1000000 0x1000000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		serial at 12000 {
++			compatible = "ns16550a";
++			reg = <0x12000 0x100>;
++			reg-shift = <2>;
++			interrupts = <33>;
++			/* set clock-frequency in board dts */
++			status = "disabled";
++		};
++
++		serial at 12100 {
++			compatible = "ns16550a";
++			reg = <0x12100 0x100>;
++			reg-shift = <2>;
++			interrupts = <34>;
++			/* set clock-frequency in board dts */
++			status = "disabled";
++		};
++	};
++};
+diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
+index 3b37315..3fbfb7d 100644
+--- a/arch/arm/mach-kirkwood/board-dreamplug.c
++++ b/arch/arm/mach-kirkwood/board-dreamplug.c
+@@ -135,8 +135,6 @@ void __init dreamplug_init(void)
+ 	 */
+ 	kirkwood_mpp_conf(dreamplug_mpp_config);
+ 
+-	kirkwood_uart0_init();
+-
+ 	spi_register_board_info(dreamplug_spi_slave_info,
+ 				ARRAY_SIZE(dreamplug_spi_slave_info));
+ 	kirkwood_spi_init();
 -- 
 1.7.3.4
