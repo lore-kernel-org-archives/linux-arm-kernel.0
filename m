@@ -1,36 +1,54 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Tue, 13 Mar 2012 22:15:29 +0100
-Subject: [PATCH] ARM: remove ixp2000 platform
-In-Reply-To: <4F5D39D1.4050000@snapgear.com> (Greg Ungerer's message of "Mon,
- 12 Mar 2012 09:48:33 +1000")
-References: <1330450426-14639-1-git-send-email-robherring2@gmail.com>
- <201202281945.39419.arnd@arndb.de>
- <alpine.LFD.2.02.1203052035170.31242@xanadu.home>
- <201203061412.00073.arnd@arndb.de>
- <alpine.LFD.2.02.1203061146210.31242@xanadu.home>
- <CACRpkdYQpnSMVWUizEYHTjx_AK5Ai7dos0SBd208Wf5ZJLdrCw@mail.gmail.com>
- <20120307091409.GL17370@n2100.arm.linux.org.uk>
- <4F574C64.7010905@snapgear.com> <m3aa3nqpxz.fsf@intrepid.localdomain>
- <4F5D39D1.4050000@snapgear.com>
-Message-ID: <m3sjhcdwy6.fsf@intrepid.localdomain>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 13 Mar 2012 22:35:22 +0100
+Subject: [PATCH 12/12] ARM: OMAP2+: board-omap4-*: Do not use anymore
+ TWL6030_IRQ_BASE in board files
+In-Reply-To: <20120313170756.GK12083@atomide.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-13-git-send-email-b-cousson@ti.com>
+ <20120313170756.GK12083@atomide.com>
+Message-ID: <4F5FBD9A.4030607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg Ungerer <gerg@snapgear.com> writes:
-
->> The problematic one is IXP42x rev. A0. It has no support for hw mixed
->> mode (LE core + lane swapping where needed). Unfortunately this early
+On 3/13/2012 6:07 PM, Tony Lindgren wrote:
+> * Benoit Cousson<b-cousson@ti.com>  [120302 08:19]:
+>> With the introduction of dynamically allocated IRQ in the twl6030 driver,
+>> the board files can no longer rely of static IRQ defines like before.
+>>
+>> Retrieve the value dynamically allocated from the mmc ->  twl6030 init
+>> callback.
+>>
+>> Note: The Panda board does not seems to use the card detect IRQ.
 >
-> It is not problematic if you are running your core BE right?
+> Looks like this one is safe to merge via MFD and does not seem to
+> cause any merge conflicts.
+>
+> This one should be folded into patch 08/12 to avoid boot issues
+> for between patches 08 and 12 in this series. Other than that:
 
-Right.
-Of course it requires lane-swapping between PCI and the core/RAM. The
-chip is set to hardware swap these accesses (block transfers and binary
-structure layouts are correct, including bus master transfers) and
-integer data (mostly u16/u32) are swapped again by the core
-(readl/writel, also in-memory descriptors etc). All other peripherals
-are always BE (NPE net coprocessors, EXP bus).
+In fact there is no need to merge them. They should just be at the 
+beginning of the series.
 
-This all works fine on all revisions including the IXP425-A0.
--- 
-Krzysztof Halasa
+The first patch...
+  mfd: twl6030-irq: Return twl6030_mmc_card_detect IRQ for board setup
+
+-       return 0;
++
++       return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
+
+...will just return the proper interrupt number instead of 0, but at 
+that time, the board is still using the static TWL6030_IRQ_BASE + 
+MMCDETECT_INTR_OFFSET value.
+
+Only the next one...
+  ARM: OMAP2+: board-omap4-*: Do not use anymore TWL6030_IRQ_BASE in 
+board files
+...will switch from the static to the value returned by 
+twl6030_mmc_card_detect and then it keeps working.
+
+> Acked-by: Tony Lindgren<tony@atomide.com>
+
+Cool, I'll send the pull request to Samuel ASAP.
+
+Thanks,
+Benoit
