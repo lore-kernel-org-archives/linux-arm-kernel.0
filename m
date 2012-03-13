@@ -1,79 +1,230 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Wed, 14 Mar 2012 09:22:37 +1100
-Subject: [PATCH v4 00/11] ep93xx: Move SoC private bits to core
-In-Reply-To: <201203131235.53593.arnd@arndb.de>
-References: <1331592502-9083-1-git-send-email-rmallon@gmail.com>
- <201203131235.53593.arnd@arndb.de>
-Message-ID: <4F5FC8AD.4070505@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 13 Mar 2012 23:47:00 +0100
+Subject: OMAP DSS device tree design problems
+In-Reply-To: <1331559930.2097.100.camel@deskari>
+References: <1331559930.2097.100.camel@deskari>
+Message-ID: <4F5FCE64.5070902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/12 23:35, Arnd Bergmann wrote:
++ devicetree list and Mike T. for the clock aspect
 
-> On Monday 12 March 2012, Ryan Mallon wrote:
->> This patch series is an effort to move the ep93xx SoC specific code out
->> of drivers and include/mach into arch/arm/mach-ep93xx. This work
->> involves the following changes:
->>
->>  - Create a new private header called soc.h to replace most of 
->>    mach/include/ep93xx-regs.h
->>  - Move the Maverick crunch code from arch/arm/kernel to mach-ep93xx
->>  - Convert the ep93xx backlight and watchdog drivers to properly
->>    ioremap memory.
->>  - Move all system controller access to the ep93xx core code
->>
->> The only defines left in ep93xx-regs.h are for the APB UARTS which
->> are also needed in include/mach/uncompress.h and
->> include/mach/debug-macro.S.
->>
->> Patch 2 has already been merged to the ASoC tree and patch 5 has
->> already been merged to the watchdog tree. Neither patch has been
->> modified since they were applied, and are included here for
->> completeness and to avoid build errors. 
-> 
-> Looks all very nice, great work!
-> 
->> All of the patches are against v3.3-rc7 and  now have reviewed-by
->> and/or acked-by tags except for patch 4 which has been changed
->> since the last version. Arnd, once I get an ack for the final patch
->> I can prepare a git branch for you to pull. I understand if this is
->> now too late for v3.4.
-> 
-> If there are no conflicts against the for-next branch and Olof agrees,
-> I would probably let this one go in for v3.4. It's a nice cleanup
-> and it will be easier to do your v3.5 patches if it's all merged.
+Hi Tomi,
 
+On 3/12/2012 2:45 PM, Tomi Valkeinen wrote:
+> Hi,
+>
+> I'm struggling with the design of the DT data for OMAP display subsystem
+> driver, and any thoughts and ideas are welcome. This mail is a rather
+> long one, where I'm trying to show the different approaches I've
+> thought.
+>
+> So the .dts format would be something like this, taking 4430SDP as an
+> example. It's just an outline, missing dispc, hwmods,
+> compatible-properties etc, which are not so relevant here.
+>
+> ocp {
+> 	dss {
+> 		dsi1 {
+> 			taal {
+>
+> 			};
+> 		};
+> 	};
+> };
+>
+> So there we have a Taal panel, connected to DSI1 output interface, which
+> is part of the OMAP display subsystem.
+>
+> One thing to note here is that although there's only one panel under
+> dsi1 in this case, the current SW supports having multiple panels under
+> one output interface. And while the output can support only one active
+> panel at a time, we do have boards where two panels are connected to one
+> output, and there's some kind of HW switch used to select which panel is
+> enabled.
+>
+> The first problem here is that I don't know how to manage the switch
+> part. With current SW we have had the switch handling in the board
+> files, in functions called when a display is enabled/disabled. I guess
+> one option is to have the switch related code in their own drivers,
+> totally apart from the dss code, perhaps offering a sysfs interface or
+> such. And then, if the switch happens to be in the wrong position, the
+> panel will fail in some way.
 
-Okay thanks. I'll try and fix up the minor bits and pieces that you and
-Hartley pointed out and send a pull request later tonight.
+DT is supposed to reflect the HW capability, so if you do have two 
+panels on a board, then both should be described in the DTS.
 
-I'm planning on using my tree for future ep93xx development, so that I
-can aggregate any patches there to be included in arm-soc.
+I'm just wondering if the multiple panels is something supported by the 
+DSI protocol or it is a HW hacks done on TI board only?
 
-> 
-> On a related note, I would like to understand better what your plans
-> are for the future of ep93xx. My undestanding is that the product line
-> is a dead end and there won't be any other compatible socs, but the
-> Linux support is very much alive and supports all the existing hardware,
-> is that correct?
+Maybe in that case the DSI mux HW will have to be represented in the DT 
+hierarchy as well.
 
-Yeah, the product line is dead, but there are a handful of boards still
-being used in production systems and we now support most of the
-peripherals, I think IDE is the only major device missing support.
+> The second problem is about the DT properties. With multiple panels it's
+> not possible to do this:
+>
+> dsi1 {
+> 	dsi-ddr-clk =<250000000>;
+>
+> 	taal {
+> 	};
+>
+> 	some-other-panel {
+> 	};
+> };
+>
+> because the panels could require different dsi clock rates. So we need
+> something like this:
+>
+> dsi1 {
+> 	taal {
+> 		dsi-ddr-clk =<250000000>;
+> 	};
+>
+> 	some-other-panel {
+> 		dsi-ddr-clk =<350000000>;
+> 	};
+> };
+>
+> However, here the problem is that while ultimately we're interested in
+> the ddr-clk rate, calculation of the rate is non-trivial and may need
+> customizations at times. So instead of the clock rate we actually need
+> to define a bunch of dividers/multipliers.
 
-> There are currently eight board files (since all the dev boards got
-> merged into one file), which seems very manageable and there should be
-> no problem adding a few more over the years to come, if necessary.
+Well, in theory you should not. This is up to the clock provider to 
+convert the clock rate in the proper n/m value. This is how it is done 
+for the regular OMAP DPLLs.
 
-I doubt there will be many new boards added.
+> But these dividers are OMAP specific things, and do not belong to Taal
+> driver. So this bring the question: is the general rule about DT node
+> properties such that only the driver handling the particular node should
+> read the properties in that node? So, in the example above, should the
+> dsi driver only read props in the dsi1 and dsi2 nodes, and never look at
+> props in the taal nodes?
 
-> At the same time, the platform seems simple enough that you could
-> also do a device tree port in rather in a fairly short time if you
-> like, which would let you obsolete all the board files and add new
-> machines just through device tree blobs.
+Yes, because the taal parameters should be relative to the Taal HW spec 
+that should not have a clue about the current DSI bus in used.
 
+This is the clock provider that will have to handle that.
 
-Yeah, converting to device tree is one of my goals. I need to spend some
-time reading through the device tree specification first.
+> So basically, can we do this:
+>
+> dsi1 {
+> 	taal {
+> 		omap-specific-clk-divs =<1 2 3 4 5 6 7>;
+> 	};
+>
+> 	some-other-panel {
+> 		omap-specific-clk-divs =<7 6 5 4 3 2 1>;
+> 	};
+> };
+>
+> and the Taal driver would ignore those, but dsi driver would use them?
+> This looks like quite easy solution to this, but also doesn't feel
+> right. So my current idea is to have clk-div tables in the dsi node,
+> something like this:
+>
+> dsi1 {
+> 	omap-specific-clk-divs =<
+> 		250 1 2 3 4 5 6 7 /* divs that produce 250MHz clk */
+> 		350 7 6 5 4 3 2 1 /* divs that produce 350MHz clk */
+> 	>;
 
-~Ryan
+That's the idea, except that this will represent the clock provider.
+
+>
+> 	taal {
+> 		dsi-ddr-clk =<250000000>;
+
+And here you will have a phandle to the clock provider. And use it to 
+set the proper clock rate.
+
+> 	};
+>
+> 	some-other-panel {
+> 		dsi-ddr-clk =<350000000>;
+> 	};
+> };
+>
+> Here the panel drivers would ask the DSI driver to configure DSI DDR clk
+> of 250/350MHz, and the DSI driver would then use the lookup table to
+> find the dividers. If the lookup fails, the DSI driver could fail or try
+> to calculate the dividers itself. Other platforms could handle the DDR
+> clk configuration however they see best.
+>
+
+Grant was working on the clock device tree binding. I'm not sure it got 
+merged yet. But that should not there soon.
+
+> ---
+>
+> Another thing related to DSI command mode panels is the DSI lane
+> configuration, and I can't make my mind if they belong to the panel
+> driver in some way or not.
+>
+> So, again taking SDP board and Taal as an example, we have 6 pads on
+> OMAP which are used for communicating with Taal. The pads need to be
+> muxed to DSI mode like any other OMAP pads. Currently the pad muxing is
+> not touched by the driver, but I think it's doable in the DSI driver (as
+> long as the DSI driver knows the required pad config).
+>
+> However, that's not enough.
+>
+> DSI uses differential pairs for communication (a "lane" consists of two
+> wires), and we have always one clock lane, and a number of data lanes.
+> In Taal's case we have a clock lane and two data lanes, which means 6
+> pads/wires.
+>
+> We need to configure which of the OMAPs pads is used for which function,
+> so, for example, pad x and x+1 are used for clock lane, and x is the
+> negative pair and x+1 is the positive pair. And this configuration has
+> to match the wiring going to the panel, so that clk+ from OMAP goes to
+> clk+ in the panel.
+>
+> So it dts data we need something, perhaps, like below. Here we define
+> the pad numbers and polarities in an array, where the first cell-pair is
+> for clk, then data1, then data2 and so on (if there are more than two
+> data lanes).
+>
+> lanes =<
+> 	/* pad-pair number, polarity */
+> 	1 0	/* DSI pad pair 1 is used for clk, pol +/-  */
+> 	2 1	/* DSI pad pair 2 is used for data1, pol -/+ */
+> 	0 0	/* DSI pad pair 0 is used for data2, pol +/- */
+>> ;
+>
+> Now, I don't quite know where this data should be. If it's in the
+> dsi-node, it doesn't work with multiple panels.
+
+Is the lane configuration only dependent of the panel?
+
+> But then, it's quite
+> OMAP specific thing. While other platforms probably need some kind of
+> pad configuration also, it may be something totally different. And so it
+> doesn't feel right in the taal-node either.
+>
+> And a look-up table like in the clock case doesn't make much sense
+> either, as we don't have a key here, as we had in the clock case (the
+> dsi-ddr-clk).
+
+The lane configuration code will belong to the DSI driver. The data will 
+belong to the panel. The panel might use some phandle to the various DSI 
+lane config a provide the needed information.
+
+This look pretty similar to the pinmux device tree binding that is 
+currently under discussion.
+
+> So basically the only option I've come up with is to define the lane
+> configuration in the panel's data, and let the dsi driver peek there and
+> configure the HW. And this doesn't feel right.
+
+This is fine, except for the last part. The panel driver should retrieve 
+the data from the panel node, and call some DSI configuration API using 
+the DSI phandle retrieved from the panel node as well or using the 
+parent node directly if the hierarchy is always the same.
+
+You should have a look at pinmux and clock binding discussion. Even the 
+way GPIO binding is working should give you some hints.
+
+Regards,
+Benoit
