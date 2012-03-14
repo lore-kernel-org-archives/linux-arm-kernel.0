@@ -1,103 +1,346 @@
 From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 14 Mar 2012 16:56:27 +0100
-Subject: [PATCH v4 04/10] ARM: tegra: Fix PWM clock programming
+Date: Wed, 14 Mar 2012 16:56:26 +0100
+Subject: [PATCH v4 03/10] pwm: Add device tree support
 In-Reply-To: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
 References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <1331740593-10807-5-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <1331740593-10807-4-git-send-email-thierry.reding@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Que <sque@chromium.org>
-
-PWM clock source registers in Tegra 2 have different clock source selection bit
-fields than other registers.  PWM clock source bits in CLK_SOURCE_PWM_0 register
-are located at bit field bit[30:28] while others are at bit field bit[31:30] in
-their respective clock source register.
-
-This patch updates the clock programming to correctly reflect that, by adding a
-flag to indicate the alternate bit field format and checking for it when
-selecting a clock source (parent clock).
+This patch adds helpers to support device tree bindings for the generic
+PWM API. Device tree binding documentation for PWM controllers is also
+provided.
 
 Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-Signed-off-by: Bill Huang <bilhuang@nvidia.com>
-Signed-off-by: Simon Que <sque@chromium.org>
 ---
 Changes in v4:
-  - reuse PWM flag from Tegra 30 clock programming
-  - mask out bit 31 explicitly
+  - add OF-specific code removed from patch 2
+  - make of_node_to_pwmchip() and of_pwm_simple_xlate() static
+  - rename of_get_named_pwm() to of_pwm_request(), return a struct
+    pwm_device, get rid of the now unused spec parameter and use the
+    device_node.name field as the PWM's name
+  - return a requested struct pwm_device from pwm_chip.of_xlate and
+    drop the now unused spec parameter
+  - move OF support code into drivers/pwm/core.c
+  - used deferred probing if a PWM chip is not available yet
 
- arch/arm/mach-tegra/tegra2_clocks.c |   32 ++++++++++++++++++++++++++++----
- 1 file changed, 28 insertions(+), 4 deletions(-)
+Changes in v2:
+  - add device tree binding documentation
+  - add of_xlate to parse controller-specific PWM-specifier
 
-diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 592a4ee..64735bd 100644
---- a/arch/arm/mach-tegra/tegra2_clocks.c
-+++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -69,6 +69,8 @@
- 
- #define PERIPH_CLK_SOURCE_MASK		(3<<30)
- #define PERIPH_CLK_SOURCE_SHIFT		30
-+#define PERIPH_CLK_SOURCE_PWM_MASK	(7<<28)
-+#define PERIPH_CLK_SOURCE_PWM_SHIFT	28
- #define PERIPH_CLK_SOURCE_ENABLE	(1<<28)
- #define PERIPH_CLK_SOURCE_DIVU71_MASK	0xFF
- #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
-@@ -908,9 +910,20 @@ static void tegra2_periph_clk_init(struct clk *c)
- 	u32 val = clk_readl(c->reg);
- 	const struct clk_mux_sel *mux = NULL;
- 	const struct clk_mux_sel *sel;
-+	u32 shift;
-+	u32 mask;
+ Documentation/devicetree/bindings/pwm/pwm.txt |   48 ++++++++++
+ drivers/of/Kconfig                            |    6 ++
+ drivers/pwm/core.c                            |  127 +++++++++++++++++++++++++
+ include/linux/of_pwm.h                        |   36 +++++++
+ include/linux/pwm.h                           |    8 ++
+ 5 files changed, 225 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm.txt
+ create mode 100644 include/linux/of_pwm.h
+
+diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
+new file mode 100644
+index 0000000..9421fe7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm.txt
+@@ -0,0 +1,48 @@
++Specifying PWM information for devices
++======================================
 +
-+	if (c->flags & MUX_PWM) {
-+		shift = PERIPH_CLK_SOURCE_PWM_SHIFT;
-+		mask = PERIPH_CLK_SOURCE_PWM_MASK;
-+	} else {
-+		shift = PERIPH_CLK_SOURCE_SHIFT;
-+		mask = PERIPH_CLK_SOURCE_MASK;
++1) PWM user nodes
++-----------------
++
++PWM users should specify a list of PWM devices that they want to use
++with a property containing a 'pwm-list':
++
++	pwm-list ::= <single-pwm> [pwm-list]
++	single-pwm ::= <pwm-phandle> <pwm-specifier>
++	pwm-phandle : phandle to PWM controller node
++	pwm-specifier : array of #pwm-cells specifying the given PWM
++			(controller specific)
++
++PWM properties should be named "[<name>-]pwms". Exact meaning of each
++pwms property must be documented in the device tree binding for each
++device.
++
++The following example could be used to describe a PWM-based backlight
++device:
++
++	pwm: pwm {
++		#pwm-cells = <2>;
++	};
++
++	[...]
++
++	bl: backlight {
++		pwms = <&pwm 0 5000000>;
++	};
++
++pwm-specifier typically encodes the chip-relative PWM number and the PWM
++period in nanoseconds.
++
++2) PWM controller nodes
++-----------------------
++
++PWM controller nodes must specify the number of cells used for the
++specifier using the '#pwm-cells' property.
++
++An example PWM controller might look like this:
++
++	pwm: pwm at 7000a000 {
++		compatible = "nvidia,tegra20-pwm";
++		reg = <0x7000a000 0x100>;
++		#pwm-cells = <2>;
++	};
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index 6ea51dc..d47b8ee 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -57,6 +57,12 @@ config OF_GPIO
+ 	help
+ 	  OpenFirmware GPIO accessors
+ 
++config OF_PWM
++	def_bool y
++	depends on PWM
++	help
++	  OpenFirmware PWM accessors
++
+ config OF_I2C
+ 	def_tristate I2C
+ 	depends on I2C && !SPARC
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 74dd295..c600606 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -20,6 +20,7 @@
+  */
+ 
+ #include <linux/module.h>
++#include <linux/of_pwm.h>
+ #include <linux/pwm.h>
+ #include <linux/radix-tree.h>
+ #include <linux/list.h>
+@@ -121,6 +122,75 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF_PWM
++static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
++{
++	struct pwm_chip *chip;
++
++	mutex_lock(&pwm_lock);
++
++	list_for_each_entry(chip, &pwm_chips, list)
++		if (chip->dev && chip->dev->of_node == np) {
++			mutex_unlock(&pwm_lock);
++			return chip;
++		}
++
++	mutex_unlock(&pwm_lock);
++
++	return ERR_PTR(-EPROBE_DEFER);
++}
++
++static struct pwm_device *of_pwm_simple_xlate(struct pwm_chip *pc,
++					      const struct of_phandle_args *args)
++{
++	struct pwm_device *pwm;
++
++	if (pc->of_pwm_n_cells < 2)
++		return ERR_PTR(-EINVAL);
++
++	if (args->args_count < pc->of_pwm_n_cells)
++		return ERR_PTR(-EINVAL);
++
++	if (args->args[0] >= pc->npwm)
++		return ERR_PTR(-EINVAL);
++
++	pwm = pwm_request_from_device(pc->dev, args->args[0], NULL);
++	if (IS_ERR(pwm))
++		return ERR_PTR(-ENODEV);
++
++	pwm_set_period(pwm, args->args[1]);
++
++	return pwm;
++}
++
++void of_pwmchip_add(struct pwm_chip *chip)
++{
++	if (!chip->dev || !chip->dev->of_node)
++		return;
++
++	if (!chip->of_xlate) {
++		chip->of_xlate = of_pwm_simple_xlate;
++		chip->of_pwm_n_cells = 2;
 +	}
 +
- 	if (c->flags & MUX) {
- 		for (sel = c->inputs; sel->input != NULL; sel++) {
--			if (val >> PERIPH_CLK_SOURCE_SHIFT == sel->value)
-+			if ((val & mask) >> shift == sel->value)
- 				mux = sel;
- 		}
- 		BUG_ON(!mux);
-@@ -1023,12 +1036,23 @@ static int tegra2_periph_clk_set_parent(struct clk *c, struct clk *p)
++	of_node_get(chip->dev->of_node);
++}
++
++void of_pwmchip_remove(struct pwm_chip *chip)
++{
++	if (chip->dev && chip->dev->of_node)
++		of_node_put(chip->dev->of_node);
++}
++#else
++static inline void of_pwmchip_add(struct pwm_chip *pc)
++{
++}
++
++static inline void of_pwmchip_remove(struct pwm_chip *pc)
++{
++}
++#endif /* CONFIG_OF_PWM */
++
+ /**
+  * pwm_set_chip_data - set private chip data for a PWM
+  * @pwm: PWM device
+@@ -184,6 +254,7 @@ int pwmchip_add(struct pwm_chip *chip)
+ 
+ 	INIT_LIST_HEAD(&chip->list);
+ 	list_add(&chip->list, &pwm_chips);
++	of_pwmchip_add(chip);
+ 
+ out:
+ 	mutex_unlock(&pwm_lock);
+@@ -215,6 +286,7 @@ int pwmchip_remove(struct pwm_chip *chip)
+ 	}
+ 
+ 	list_del_init(&chip->list);
++	of_pwmchip_remove(chip);
+ 	free_pwms(chip);
+ 
+ out:
+@@ -364,6 +436,61 @@ void pwm_disable(struct pwm_device *pwm)
+ }
+ EXPORT_SYMBOL_GPL(pwm_disable);
+ 
++#ifdef CONFIG_OF
++/**
++ * of_pwm_request() - request a PWM via the PWM framework
++ * @np: device node to get the PWM from
++ * @propname: property name containing PWM specifier(s)
++ * @index: index of the PWM
++ *
++ * Returns the PWM device parsed from the phandle specified in the given
++ * property of a device tree node or NULL on failure. Values parsed from
++ * the device tree are stored in the returned PWM device object.
++ */
++struct pwm_device *of_pwm_request(struct device_node *np,
++				  const char *propname, int index)
++{
++	struct pwm_device *pwm = NULL;
++	struct of_phandle_args args;
++	struct pwm_chip *pc;
++	int err;
++
++	err = of_parse_phandle_with_args(np, propname, "#pwm-cells", index,
++					 &args);
++	if (err) {
++		pr_debug("%s(): can't parse property \"%s\"\n", __func__,
++			 propname);
++		return ERR_PTR(err);
++	}
++
++	pc = of_node_to_pwmchip(args.np);
++	if (IS_ERR(pc)) {
++		pr_debug("%s(): PWM chip not found\n", __func__);
++		pwm = ERR_CAST(pc);
++		goto put;
++	}
++
++	if (args.args_count != pc->of_pwm_n_cells) {
++		pr_debug("%s: wrong #pwm-cells for %s\n", np->full_name,
++			 args.np->full_name);
++		pwm = ERR_PTR(-EINVAL);
++		goto put;
++	}
++
++	pwm = pc->of_xlate(pc, &args);
++	if (IS_ERR(pwm))
++		goto put;
++
++	pwm->label = np->name;
++
++put:
++	of_node_put(args.np);
++
++	return pwm;
++}
++EXPORT_SYMBOL(of_pwm_request);
++#endif
++
+ #ifdef CONFIG_DEBUG_FS
+ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
  {
- 	u32 val;
- 	const struct clk_mux_sel *sel;
-+	u32 mask, shift;
+diff --git a/include/linux/of_pwm.h b/include/linux/of_pwm.h
+new file mode 100644
+index 0000000..a3a3da7
+--- /dev/null
++++ b/include/linux/of_pwm.h
+@@ -0,0 +1,36 @@
++/*
++ * OF helpers for the PWM API
++ *
++ * Copyright (c) 2011-2012 Avionic Design GmbH
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
- 	pr_debug("%s: %s %s\n", __func__, c->name, p->name);
++#ifndef __LINUX_OF_PWM_H
++#define __LINUX_OF_PWM_H
 +
-+	if (c->flags & MUX_PWM) {
-+		shift = PERIPH_CLK_SOURCE_PWM_SHIFT;
-+		mask = PERIPH_CLK_SOURCE_PWM_MASK;
-+	} else {
-+		shift = PERIPH_CLK_SOURCE_SHIFT;
-+		mask = PERIPH_CLK_SOURCE_MASK;
-+	}
++#include <linux/err.h>
++#include <linux/pwm.h>
 +
- 	for (sel = c->inputs; sel->input != NULL; sel++) {
- 		if (sel->input == p) {
- 			val = clk_readl(c->reg);
--			val &= ~PERIPH_CLK_SOURCE_MASK;
--			val |= (sel->value) << PERIPH_CLK_SOURCE_SHIFT;
-+			val &= ~mask;
-+			val |= (sel->value) << shift;
++struct device_node;
++
++#ifdef CONFIG_OF_PWM
++
++struct pwm_device *of_pwm_request(struct device_node *np,
++				  const char *propname, int index);
++
++#else
++
++static inline struct pwm_device *of_pwm_request(struct device_node *np,
++						const char *propname,
++						int index);
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++#endif /* CONFIG_OF_PWM */
++
++#endif /* __LINUX_OF_PWM_H */
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 7261911..7b42336 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -1,6 +1,8 @@
+ #ifndef __LINUX_PWM_H
+ #define __LINUX_PWM_H
  
- 			if (c->refcnt)
- 				clk_enable(p);
-@@ -2146,7 +2170,7 @@ static struct clk tegra_list_clks[] = {
- 	PERIPH_CLK("i2s2",	"tegra-i2s.1",		NULL,	18,	0x104,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
- 	PERIPH_CLK("spdif_out",	"spdif_out",		NULL,	10,	0x108,	100000000, mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
- 	PERIPH_CLK("spdif_in",	"spdif_in",		NULL,	10,	0x10c,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71),
--	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71),
-+	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71 | MUX_PWM),
- 	PERIPH_CLK("spi",	"spi",			NULL,	43,	0x114,	40000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
- 	PERIPH_CLK("xio",	"xio",			NULL,	45,	0x120,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
- 	PERIPH_CLK("twc",	"twc",			NULL,	16,	0x12c,	150000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
++#include <linux/of.h>
++
+ struct pwm_device;
+ 
+ /*
+@@ -102,6 +104,12 @@ struct pwm_chip {
+ 	unsigned int		npwm;
+ 
+ 	struct pwm_device	*pwms;
++
++#ifdef CONFIG_OF_PWM
++	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
++					    const struct of_phandle_args *args);
++	unsigned int		of_pwm_n_cells;
++#endif
+ };
+ 
+ int pwm_set_chip_data(struct pwm_device *pwm, void *data);
 -- 
 1.7.9.4
