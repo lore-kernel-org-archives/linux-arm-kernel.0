@@ -1,38 +1,24 @@
-From: B04825@freescale.com (Tabi Timur-B04825)
-Date: Wed, 14 Mar 2012 02:57:00 +0000
-Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <20120313234638.GY3177@opensource.wolfsonmicro.com>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
- <4F591B8D.8090705@freescale.com>
- <20120309013216.GH2499@S2101-09.ap.freescale.net>
- <4F5FD706.8040209@freescale.com>
- <20120313234638.GY3177@opensource.wolfsonmicro.com>
-Message-ID: <4F6008FA.3040805@freescale.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 14 Mar 2012 00:24:37 -0300
+Subject: Want to Get Suggestion for MX28 USB Submisson
+In-Reply-To: <201202100447.14248.marek.vasut@gmail.com>
+References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
+ <201202041117.48190.marek.vasut@gmail.com>
+ <F281D0F91ED19E4D8E63A7504E8A6498033336@039-SN2MPN1-021.039d.mgd.msft.net>
+ <201202100447.14248.marek.vasut@gmail.com>
+Message-ID: <CAOMZO5C3Y3kP5k_CKkCVMVdDem2T82g6F3uL=8GCVfNKHpdymA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Hi Peter,
 
-> With this card those would just be separate CODECs.  This is a binding
-> for a simple card.
+On Fri, Feb 10, 2012 at 1:47 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
 
-But that is insufficient for the SSI driver, which is expected to handle 
-multiple SSIs.  If you're going to document a binding for the SSI driver, 
-then you need to document how to handle multiple SSIs.
+> Oh, so you're still working on it. All right then, I'll now dive into the IIO
+> LRADC driver and let you handle this.
 
-> The biggest improvement is that the SoC binding knows nothing about the
-> card binding at all, cards are completely separate and are free to
-> define any binding they choose using any number of on-SoC and off-SoC
-> devices.
+Do you plan to re-submit the mxs usb driver?
 
-Ok, I don't understand that at all.
+Regards,
 
-I also don't understand why you insist on perverting my driver to support 
-two incompatible bindings, especially since I still haven't heard an 
-explanation as to what's wrong with the binding that I defined.
-
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+Fabio Estevam
