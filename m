@@ -1,61 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 16:18:57 -0700
-Subject: [PATCH v4 11/12] ARM: EXYNOS: add support device tree enabled
- board file for EXYNOS5
-In-Reply-To: <20120314223715.GA13872@quad.lixom.net>
-References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
- <1331736138-28964-12-git-send-email-kgene.kim@samsung.com>
- <20120314223715.GA13872@quad.lixom.net>
-Message-ID: <4F612761.6050903@samsung.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 14 Mar 2012 18:19:50 -0500
+Subject: [PATCH v4 00/10] Add PWM framework and device tree support.
+In-Reply-To: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020695DB5858@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> On Wed, Mar 14, 2012 at 07:42:17AM -0700, Kukjin Kim wrote:
->> This patch adds a new EXYNOS5 compatible device tree enabled board
->> When using this, a corresponding device tree blob which describes the
->> board's properties should be supplied at boot time to the kernel.
->
-> Hi,
->
-Hi Olof,
+On Wednesday, March 14, 2012 8:56 AM, Thierry Reding wrote:
+> 
+> This patch series adds very rudimentary device-tree support for PWM
+> devices. With all of these patches applied (plus one board-specific
+> patch that is not included), I'm able to control the backlight on the
+> device I'm working on using the sysfs interface provided by the pwm-bl
+> driver and the backlight class.
 
-> Sorry, missed this last time around:
->
-No problem and thanks.
+Hello Thierry,
 
->> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->> index a2ed05c..ac24386 100644
->> --- a/arch/arm/mach-exynos/Kconfig
->> +++ b/arch/arm/mach-exynos/Kconfig
->> @@ -362,7 +362,18 @@ config MACH_SMDK4412
->>   	  Machine support for Samsung SMDK4412
->>   endif
->>
->> -comment "Flattened Device Tree based board for Exynos4 based SoC"
->> +if ARCH_EXYNOS5
->> +
->> +comment "EXYNOS5250 Boards"
->> +
->> +config MACH_SMDK5250
->> +	bool "SMDK5250"
->> +	select SOC_EXYNOS5250
->> +	help
->> +	  Machine support for Samsung SMDK5250
->> +endif
->
->
-> There's no board file for SMDK5250 in this series (and there shouldn't be since
-> it should all be covered by MACH_EXYNOS5_DT. So the above config option can go
-> away.
->
-Yeah, you're right. I think, it seem that remained after just testing 
-anyway, it will be fixed before sending pull request.
+Are you planning on adding a sysfs interface for generic userspace access
+to the PWM devices?
 
-Thanks.
+I have tested your patches (with a couple fixes already mentioned) on a
+ep93xx board and have converted the drivers/misc/ep93xx_pwm.c driver
+to use the framework.  Everything "seems" to work but my use for the
+PWM is from userspace so I can't really test anything.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I have hacked in the sysfs interface from the ep93xx_pwm driver but it
+is a hack... It's not really using the framework to control the PWM since
+all the sysfs knobs are directly accessing the pwm registers.
+
+Anyway, I would be happy to convert the current driver to the new framework
+and get it out of drivers/misc and into a proper location. But, before I can do
+that, I need to be able to control the PWM from userspace somehow.
+
+Maybe an interface similar to the one gpiolib provides with CONFIG_GPIO_SYSFS?
+
+Regards,
+Hartley
