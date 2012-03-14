@@ -1,38 +1,58 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 14 Mar 2012 13:38:16 +0800
+Date: Wed, 14 Mar 2012 13:41:20 +0800
 Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20120313172807.AC4763E053B@localhost>
+In-Reply-To: <20120313172351.97C5E3E053B@localhost>
 References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
  <1331628428-24017-2-git-send-email-b29396@freescale.com>
- <4F5F5B3F.2000303@gmail.com> <4F5F60DB.9090801@itwatchdogs.com>
- <20120313172807.AC4763E053B@localhost>
-Message-ID: <20120314053814.GC21337@S2101-09.ap.freescale.net>
+ <20120313172351.97C5E3E053B@localhost>
+Message-ID: <20120314054116.GD21337@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 11:28:07AM -0600, Grant Likely wrote:
-> On Tue, 13 Mar 2012 09:59:39 -0500, Zach Sadecki <zsadecki@itwatchdogs.com> wrote:
-> > On 03/13/2012 09:35 AM, Rob Herring wrote:
-> > > +	ahb at 80080000 {
-> > > +		fec at 800f0000 {
-> > > Use generic names: ethernet at 800f0000
-> > Generic is good, but consistency is better, IMHO.  grepping existing dts 
-> > files in 3.2.9 finds 6 instances of "fec@" and 0 instances of "ethernet@"
-> > >> +			uart1: uart at 80074000 {
-> > > Use generic names: uart1: serial at ...
-> > Same comment here, but unfortunately there is already inconsistency in 
-> > existing files...  25 instances of "serial@" and 35 instances of "uart@"
+On Tue, Mar 13, 2012 at 11:23:51AM -0600, Grant Likely wrote:
+...
+> > +	apb at 80000000 {
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		reg = <0x80000000 0x80000>;
+> > +		ranges;
+> > +
+> > +		apbh at 80000000 {
+> > +			compatible = "simple-bus";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			reg = <0x80000000 0x3c900>;
+> > +			ranges;
+> > +
+> > +			icoll: interrupt-controller at 80000000 {
+> > +				compatible = "fsl,imx28-icoll";
+> > +				interrupt-controller;
+> > +				#interrupt-cells = <1>;
+> > +				reg = <0x80000000 0x2000>;
+> > +			};
+> > +		};
+> > +
+> > +		apbx at 80040000 {
+> > +			compatible = "simple-bus";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			reg = <0x80040000 0x40000>;
+> > +			ranges;
+> > +
+> > +			uart1: uart at 80074000 {
+> > +				compatible = "arm,pl011", "arm,primecell";
+> > +				reg = <0x80074000 0x2000>;
+> > +				interrupts = <47>;
+> > +			};
+> > +		};
 > 
-> No, Rob is correct.  The generic names recommended practice is well
-> established and documented.  Expand your grep search to include
-> arch/powerpc/bot/dts/*.
+> What is the purpose of the apbh and apbx busses?  Will more device nodes
+> get added to them later, or does each only contain a single device?
 > 
-> See section 2.2.2 of ePAPR[1]
-> 
-> [1]https://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.1.pdf
-> 
-I will probably need to patch imx5 and imx6 dts files with the
-inconsistency fixed.
+Since our ultimate goal is to convert mach-mxs over to device tree,
+I would also suggest we have all the hardware blocks defined in dts
+from the beginning.
 
 -- 
 Regards,
