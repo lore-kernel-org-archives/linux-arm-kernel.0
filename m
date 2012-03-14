@@ -1,117 +1,117 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 14 Mar 2012 08:23:43 +0100
-Subject: [PATCH v1 2/5] mmc: mxs-mmc: add dt probe support
-In-Reply-To: <1331628428-24017-3-git-send-email-b29396@freescale.com>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-3-git-send-email-b29396@freescale.com>
-Message-ID: <20120314072343.GG18320@game.jcrosoft.org>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 14 Mar 2012 08:40:17 +0100
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203131644.12048.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203131644.12048.arnd@arndb.de>
+Message-ID: <201203140840.18333.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:47 Tue 13 Mar     , Dong Aisheng wrote:
-> From: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> 
-> ---
-> The patch is still using a private way for dma part binding
-> since the common dma binding is still under discussion.
-> http://www.spinics.net/lists/linux-omap/msg65528.html
-> 
-> Will update to use common dma binding when it hits mainline.
-> ---
->  .../devicetree/bindings/mmc/fsl-mxs-mmc.txt        |   23 ++++++
->  drivers/mmc/host/mxs-mmc.c                         |   82 +++++++++++++++++++-
->  2 files changed, 102 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt
-> new file mode 100644
-> index 0000000..adc1142
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt
-> @@ -0,0 +1,23 @@
-> +* FREESCALE MXS MMC peripheral
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,<chip>-mmc"
-> +- reg : Should contain registers location and length
-> +- interrupts : Should contain interrupt.
-> +  The format is <irq_err irq_dma>.
-> +- dma_channel: Should contain the dma channel it uses
-> +
-> +Optional properties:
-> +- wp-gpios : Specify GPIOs for write protection
-> +- slot-4bit: Specify 4 bit mode support
-> +- slot-8bit: Specify 8 bit and 4 bit mode support
-> +
-> +Examples:
-> +mmc1: ssp at 80010000 {
-> +	compatible = "fsl,imx28-mmc";
-> +	reg = <0x80010000 2000>;
-> +	/* <irq_err irq_dma> */
-> +	interrupts = <96 82>;
-> +	dma_channel = <0>;
-> +	slot-8bit;
-> +};
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index 382c835..6cf2d17 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -38,6 +38,10 @@
->  #include <linux/gpio.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/slab.h>
->  
->  #include <mach/mxs.h>
->  #include <mach/common.h>
-> @@ -673,17 +677,79 @@ static bool mxs_mmc_dma_filter(struct dma_chan *chan, void *param)
->  	return true;
->  }
->  
-> +#ifdef CONFIG_OF
-> +static struct resource * __devinit mxs_mmc_get_of_dmares(
-> +				struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct resource *dmares;
-> +	int ret;
-> +
-> +	if (!np)
-> +		return NULL;
-> +
-> +	dmares = kzalloc(sizeof(*dmares), GFP_KERNEL);
-> +	dmares->flags = IORESOURCE_DMA;
-> +	ret = of_property_read_u32(np, "dma_channel", &dmares->start);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "unable to get dmares from dt\n");
-> +		return NULL;
-> +	}
-> +	dmares->end = dmares->start;
-> +
-> +	return dmares;
-> +}
-> +
-> +static int __devinit mxs_mmc_get_of_property(struct platform_device *pdev,
-> +				struct mxs_mmc_platform_data **ppdata)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct mxs_mmc_platform_data *pdata = *ppdata;
-> +
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-> +
-> +	if (of_get_property(np, "slot-8bit", NULL))
-> +		pdata->flags |= SLOTF_8_BIT_CAPABLE;
-> +
-> +	if (of_get_property(np, "slot-4bit", NULL))
-> +		pdata->flags |= SLOTF_4_BIT_CAPABLE;
-it will conflit if both binding are set use a number instead
+Hi Arnd,
 
-Best Regards,
-J.
+On Tuesday 13 March 2012 17:44:11 Arnd Bergmann wrote:
+> On Tuesday 13 March 2012, Stefan Roese wrote:
+> > This patch adds a generic target for SPEAr600 board that can be
+> > configured via the device-tree. Currently only interrupts are
+> > configured via device-tree. Other peripheral devices (e.g.
+> > ethernet, I2C, SMI flash, FSMC NAND flash etc) will follow in
+> > later patches.
+> > 
+> > Only the spear600-evb is currently supported. Other SPEAr600
+> > based boards will follow later.
+> > 
+> > Signed-off-by: Stefan Roese <sr@denx.de>
+> > Cc: Viresh Kumar <viresh.kumar@st.com>
+> 
+> Hi Stefan,
+> 
+> This is very cool, welcome onboard for the DT conversion with spear600!
+> 
+> > +static struct amba_device *amba_devs[] __initdata = {
+> > +	&gpio_device[0],
+> > +	&gpio_device[1],
+> > +	&gpio_device[2],
+> > +	&uart_device[0],
+> > +	&uart_device[1],
+> > +};
+> 
+> I would suggest you convert these to DT next so you can remove the
+> amba_devs list. Which devices are these? If they are pl061 and
+> pl010/pl011, the binding should be really easy to do.
+
+Yes. I really wanted to do that. But from a quick look at the pl011 driver 
+(drivers/tty/serial/amba-pl011.c), this driver doesn't support DT probing. I 
+might have missed something here though. And ideas?
+ 
+> > +static struct platform_device *plat_devs[] __initdata = {
+> > +};
+> 
+> This could be dropped right away, because you would never
+> add anything here.
+
+Yes.
+ 
+> > +static void __init spear600_dt_init(void)
+> > +{
+> > +	unsigned int i;
+> > +
+> > +	/* call spear600 machine init function */
+> > +	spear600_init();
+> 
+> spear600_init currently is an empty function, I think you can
+> drop that one too.
+
+Okay.
+ 
+> > +	/* Add Platform Devices */
+> > +	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+> > +
+> > +	/* Add Amba Devices */
+> > +	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
+> > +		amba_device_register(amba_devs[i], &iomem_resource);
+> 
+> So although all of this can go away soon, you will have to
+> add a call to of_platform_populate() here in order to add the
+> devices from the device tree.
+
+Okay.
+
+> > +}
+> > +
+> > +static const char *spear600_dt_board_compat[] = {
+> > +	"st,spear600-evb",
+> > +	NULL
+> > +};
+> > +
+> > +static const struct of_device_id vic_of_match[] __initconst = {
+> > +	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
+> > +	{ /* Sentinel */ }
+> > +};
+> > +
+> > +static void __init spear6xx_dt_init_irq(void)
+> > +{
+> > +	of_irq_init(vic_of_match);
+> > +}
+> > +
+> > +DT_MACHINE_START(SPEAR600_DT, "ST-SPEAR600-DT")
+> > +	.map_io		=	spear6xx_map_io,
+> > +	.init_irq	=	spear6xx_dt_init_irq,
+> > +	.handle_irq	=	vic_handle_irq,
+> > +	.timer		=	&spear6xx_timer,
+> > +	.init_machine	=	spear600_dt_init,
+> > +	.restart	=	spear_restart,
+> > +	.dt_compat	=	spear600_dt_board_compat,
+> > +MACHINE_END
+> 
+> Since there is only one upstream board file and that is for the same board,
+> we can soon collapse all of it into the base platform support.
+> 
+> I think you should add all the code from this file to spear6xx.c instead
+> of adding a new file. We can then delete the spear600.c and spear600_evb.c
+> files once the DT support has matured.
+
+Sounds like a plan. I'll rework the patch soon.
+
+Thanks,
+Stefan
