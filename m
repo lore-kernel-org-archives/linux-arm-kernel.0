@@ -1,43 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Mar 2012 20:24:57 -0700
-Subject: [PATCH 3/4] ARM: create a common IOMEM definition
-In-Reply-To: <1331500100-31351-4-git-send-email-robherring2@gmail.com>
-References: <1331500100-31351-1-git-send-email-robherring2@gmail.com>
- <1331500100-31351-4-git-send-email-robherring2@gmail.com>
-Message-ID: <CAOesGMjwnAHNBHC7SR0qkFO0yiZ3kAEPhQwfTp00pHh6W4QsMQ@mail.gmail.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Wed, 14 Mar 2012 03:30:26 +0000
+Subject: Want to Get Suggestion for MX28 USB Submisson
+In-Reply-To: <CAOMZO5C3Y3kP5k_CKkCVMVdDem2T82g6F3uL=8GCVfNKHpdymA@mail.gmail.com>
+References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
+ <201202041117.48190.marek.vasut@gmail.com>
+ <F281D0F91ED19E4D8E63A7504E8A6498033336@039-SN2MPN1-021.039d.mgd.msft.net>
+ <201202100447.14248.marek.vasut@gmail.com>
+ <CAOMZO5C3Y3kP5k_CKkCVMVdDem2T82g6F3uL=8GCVfNKHpdymA@mail.gmail.com>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498093839@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 11, 2012 at 2:08 PM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Several platforms create IOMEM defines for casting to 'void __iomem *',
-> and other platforms are incorrectly using __io() macro for the same
-> purpose. This creates a common definition and removes all the platform
-> specific versions. Rather than try to make linux/io.h and asm/io.h
-> assembly safe, the assembly version of IOMEM is moved into
-> asm/assembler.h.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Cc: Colin Cross <ccross@android.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
+ 
+> 
+> Hi Peter,
+> 
+> On Fri, Feb 10, 2012 at 1:47 AM, Marek Vasut <marek.vasut@gmail.com>
+> wrote:
+> 
+> > Oh, so you're still working on it. All right then, I'll now dive into
+> the IIO
+> > LRADC driver and let you handle this.
+> 
+> Do you plan to re-submit the mxs usb driver?
+> 
+According to sascha's suggestion, it is better to re-submit after we have
+a generic USB PHY Layer in mainline.
 
-Acked-by: Olof Johansson <olof@lixom.net>  Tegra portions
+Currently, Heikki's split PHY from OTG structure patches have mainlined, 
+next step is to submit a generic USB PHY driver.
+
+> Regards,
+> 
+> Fabio Estevam
