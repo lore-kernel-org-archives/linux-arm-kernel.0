@@ -1,172 +1,30 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 14 Mar 2012 07:51:30 +0100
-Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20120314062354.GA8494@shlinux2.ap.freescale.net>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 14 Mar 2012 14:55:13 +0800
+Subject: [PATCH v1 2/5] mmc: mxs-mmc: add dt probe support
+In-Reply-To: <201203140658.25854.marek.vasut@gmail.com>
 References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <4F5F5B3F.2000303@gmail.com>
- <20120314062354.GA8494@shlinux2.ap.freescale.net>
-Message-ID: <201203140751.30747.marek.vasut@gmail.com>
+ <1331628428-24017-3-git-send-email-b29396@freescale.com>
+ <201203140658.25854.marek.vasut@gmail.com>
+Message-ID: <20120314065512.GB25735@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Dong Aisheng,
-
-> On Tue, Mar 13, 2012 at 09:35:43AM -0500, Rob Herring wrote:
-> > On 03/13/2012 03:47 AM, Dong Aisheng wrote:
-> > > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > > 
-> > > This patch includes basic dt support which can boot via nfs rootfs.
-> > > 
-> > > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > > ---
-> > > 
-> > >  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
-> > >  arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
-> > >  arch/arm/boot/dts/imx28.dtsi                  |   88
-> > >  +++++++++++++++++++++++++ arch/arm/mach-mxs/Kconfig                  
-> > >    |    9 +++
-> > >  arch/arm/mach-mxs/Makefile                    |    1 +
-> > >  arch/arm/mach-mxs/imx28-dt.c                  |   67
-> > >  +++++++++++++++++++ 6 files changed, 200 insertions(+), 0
-> > >  deletions(-)
+On Wed, Mar 14, 2012 at 01:58:25PM +0800, Marek Vasut wrote:
+> Dear Dong Aisheng,
 > 
-> ....
-> 
-> > > +				interrupts = <47>;
-> > > +			};
-> > > +		};
-> > > +	};
-> > > +
-> > > +	ahb at 80080000 {
-> > > +		compatible = "simple-bus";
-> > > +		#address-cells = <1>;
-> > > +		#size-cells = <1>;
-> > > +		reg = <0x80080000 0x80000>;
-> > > +		ranges;
-> > > +
-> > > +		fec at 800f0000 {
-> > > +			compatible = "fsl,imx28-fec";
-> > > +			reg = <0x800f0000 0x4000>;
 > > 
-> > This too IIRC.
-> 
-> The size is 16KB/0x4000 in iMX28 spec. :)
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+........
 
-Agreed, the memory map is slightly non-standard.
+> > +static const struct of_device_id mxs_mmc_dt_ids[] = {
+> > +	{ .compatible = "fsl,imx23-mmc", .data = NULL, },
+> > +	{ .compatible = "fsl,imx28-mmc", .data = NULL, },
+> 
+> Do you really need two distinct ones here?
+> 
+Hmm, my original purpose is to put soc difference data in .data
+to remove cpu_is_* function calls in the driver later.
+Do you think if any issue?
 
-> 
-> > > +			interrupts = <101>;
-> > > +			status = "disabled";
-> > > +		};
-> > > +
-> > > +		fec at 800f4000 {
-> > > +			compatible = "fsl,imx28-fec";
-> > > +			reg = <0x800f4000 0x4000>;
-> > > +			interrupts = <102>;
-> > > +			status = "disabled";
-> > > +		};
-> > > +
-> > > +	};
-> > > +};
-> > > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> > > index c57f996..6ab66af 100644
-> > > --- a/arch/arm/mach-mxs/Kconfig
-> > > +++ b/arch/arm/mach-mxs/Kconfig
-> > > @@ -17,6 +17,15 @@ config SOC_IMX28
-> > > 
-> > >  comment "MXS platforms:"
-> > > 
-> > > +config MACH_IMX28_DT
-> > 
-> > Perhaps this should be more generic like MACH_MXS_DT to eventually
-> > support MX23 as well?
-> 
-> I just did like the imx ways.
-> But yes if we see the need when do imx23 dt support.
-
-Let's do it all in one swipe, there's not so much difference between these two 
-chips.
-> 
-> > > +	bool "Support i.MX28 platforms from device tree"
-> > > +	select SOC_IMX28
-> > > +	select USE_OF
-> > > +	select MACH_MX28EVK
-> > 
-> > This should not be selected here.
-> 
-> Like other imx soc dt board files, the imx28-dt.c may need to use some bits
-> like pinmux in mx28evk.c board file.
-> 
-> Yes, currently i can remove it since it is using uboot pinmux setting.
-> But when add other devices support which is not covered in u-boot like
-> flexcan, i may need to use non-dt board's pinmux setting.
-> So maybe we can keep it first and remove it when totally not dependent
-> on non-dt files.
-
-I'd be all in for the "decremental approach" -- keep in whatever is needed and 
-remove is as it becomes redundant.
-
-> 
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +#include <linux/init.h>
-> > > +#include <linux/irqdomain.h>
-> > > +#include <linux/of_irq.h>
-> > > +#include <linux/of_platform.h>
-> > > +#include <asm/mach/arch.h>
-> > > +#include <asm/mach/time.h>
-> > > +#include <mach/common.h>
-> > > +#include <mach/mx28.h>
-> > > +
-> > > +static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst
-> > > = { +	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart",
-> > > NULL), +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR,
-> > > "imx28-fec.0", NULL), +	OF_DEV_AUXDATA("fsl,imx28-fec",
-> > > MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
-> > 
-> > Why do you need the old names?
-> 
-> To keep align with the old clocks.
-> See arch/arm/mach-mxs/clock-mx28.c:
-> _REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
-> _REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
-> Is there any better way to avoid this?
-> 
-> > > +	{ /* sentinel */ }
-> > > +};
-> > > +
-> > > +static void __init imx28_init(void)
-> > > +{
-> > > +	of_platform_populate(NULL, of_default_bus_match_table,
-> > > +			     imx28_auxdata_lookup, NULL);
-> > > +}
-> > > +
-> > > +static const struct of_device_id icoll_of_match[] __initconst = {
-> > > +	{ .compatible = "fsl,imx28-icoll", },
-> > > +	{},
-> > > +};
-> > > +
-> > > +static void __init imx28_dt_init_irq(void)
-> > > +{
-> > > +	irq_domain_generate_simple(icoll_of_match, MX28_ICOLL_BASE_ADDR, 0);
-> > 
-> > Please do "proper" domain support for the interrupt controller and use
-> > of_irq_init.
-> 
-> Ok, i will see it.
-> 
-> For others, will fix them all.
-> Thanks for the review.
-> 
-> Regards
-> Dong Aisheng
-
-
-Best regards,
-Marek Vasut
+Regards
+Dong Aisheng
