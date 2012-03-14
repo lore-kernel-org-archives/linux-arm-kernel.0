@@ -1,37 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 00:08:17 -0700
-Subject: [PATCH v3 00/12] ARM: EXYNOS: add support new EXYNOS5250
-In-Reply-To: <20120314035728.GC2531@quad.lixom.net>
-References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
- <201203131622.09048.arnd@arndb.de> <20120314035728.GC2531@quad.lixom.net>
-Message-ID: <4F6043E1.2090507@samsung.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 14 Mar 2012 08:09:22 +0100
+Subject: [PATCH v1 2/5] mmc: mxs-mmc: add dt probe support
+In-Reply-To: <20120314065512.GB25735@shlinux2.ap.freescale.net>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <201203140658.25854.marek.vasut@gmail.com>
+ <20120314065512.GB25735@shlinux2.ap.freescale.net>
+Message-ID: <201203140809.22676.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/12 20:57, Olof Johansson wrote:
-> On Tue, Mar 13, 2012 at 04:22:08PM +0000, Arnd Bergmann wrote:
->> On Tuesday 13 March 2012, Kukjin Kim wrote:
->>>
->>> This patch adds support EXYNOS5250 SoC which has two A15 cores
->>> can be used on mobile and tablet devices.
->>
->> Looks basically ok to me. I've commented on patches 5 and 9 and
->> in both cases, I would either like to see the patch get dropped
->> or the changeset description expanded to give a good explanation
->> why the change is actually needed.
->
-> Agree, looks quite reasonable. I had a few nits as well but nothing
-> major.
->
-Hi Arnd, Olof,
+Dear Dong Aisheng,
 
-Thank you for kindly comments on this.
-Let me address comments from you and re-submit in a couple of hours.
+> On Wed, Mar 14, 2012 at 01:58:25PM +0800, Marek Vasut wrote:
+> > Dear Dong Aisheng,
+> > 
+> > > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> ........
+> 
+> > > +static const struct of_device_id mxs_mmc_dt_ids[] = {
+> > > +	{ .compatible = "fsl,imx23-mmc", .data = NULL, },
+> > > +	{ .compatible = "fsl,imx28-mmc", .data = NULL, },
+> > 
+> > Do you really need two distinct ones here?
+> 
+> Hmm, my original purpose is to put soc difference data in .data
+> to remove cpu_is_* function calls in the driver later.
+> Do you think if any issue?
+> 
 
-Thanks.
+Well, what's the difference between the interfaces on mx233 and mx28? Is it 
+something that can't be encoded otherwise? I think they're not so different.
 
 Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Marek Vasut
