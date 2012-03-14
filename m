@@ -1,137 +1,87 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 14 Mar 2012 15:54:37 +0800
-Subject: [PATCH v1 4/5] dma: mxs-dma: add dt probe support
-In-Reply-To: <1331628428-24017-5-git-send-email-b29396@freescale.com>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-5-git-send-email-b29396@freescale.com>
-Message-ID: <4F604EBD.7060400@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 14 Mar 2012 15:55:55 +0800
+Subject: [PATCH 2/7] of: add clock providers
+In-Reply-To: <1331680947-29861-3-git-send-email-robherring2@gmail.com>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+ <1331680947-29861-3-git-send-email-robherring2@gmail.com>
+Message-ID: <20120314075553.GE21337@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aisheng:
-> From: Dong Aisheng<dong.aisheng@linaro.org>
->
-> Signed-off-by: Dong Aisheng<dong.aisheng@linaro.org>
+On Tue, Mar 13, 2012 at 06:22:22PM -0500, Rob Herring wrote:
+> From: Grant Likely <grant.likely@secretlab.ca>
+> 
+> Based on work by Ben Herrenschmidt and Jeremy Kerr, this patch adds an
+> of_clk_get function to allow platforms to retrieve clock data from the
+> device tree.
+> 
+> Platform register a provider through of_clk_add_provider, which will be
+> called when a device references the provider's OF node for a clock
+> reference.
+> 
+> v3: - Clarified documentation
+> 
+> v2: - fixed errant ';' causing compile error
+>     - Editorial fixes from Shawn Guo
+>     - merged in adding lookup to clkdev
+>     - changed property names to match established convention. After
+>       working with the binding a bit it really made more sense to follow the
+>       lead of 'reg', 'gpios' and 'interrupts' by making the input simply
+>       'clocks' & 'clock-names' instead of 'clock-input-*', and to only use
+>       clock-output* for the producer nodes. (Sorry Shawn, this will mean
+>       you need to change some code, but it should be trivial)
+>     - Add ability to inherit clocks from parent nodes by using an empty
+>       'clock-ranges' property.  Useful for busses.  I could use some feedback
+>       on the new property name, 'clock-ranges' doesn't feel right to me.
+> 
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> Reviewed-by: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Mike Turquette <mturquette@ti.com>
 > ---
->   .../devicetree/bindings/dma/fsl-mxs-dma.txt        |   17 ++++++++
->   drivers/dma/mxs-dma.c                              |   44 +++++++++++++------
->   2 files changed, 47 insertions(+), 14 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
+>  .../devicetree/bindings/clock/clock-bindings.txt   |  116 ++++++++++++++
+>  .../devicetree/bindings/clock/fixed-clock.txt      |   21 +++
+>  drivers/clk/clkdev.c                               |    9 +
+>  drivers/of/Kconfig                                 |    6 +
+>  drivers/of/Makefile                                |    1 +
+>  drivers/of/clock.c                                 |  165 ++++++++++++++++++++
+>  include/linux/of_clk.h                             |   37 +++++
+>  7 files changed, 355 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/fixed-clock.txt
+>  create mode 100644 drivers/of/clock.c
+>  create mode 100644 include/linux/of_clk.h
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
 > new file mode 100644
-> index 0000000..cfa1730
+> index 0000000..3cb6746
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
-> @@ -0,0 +1,17 @@
-> +* Freescale MXS DMA
+> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> @@ -0,0 +1,116 @@
+> +This binding is a work-in-progress, and are based on some experimental
+> +work by benh[1].
+> +
+> +Sources of clock signal can be represented by any node in the device
+> +tree.  Those nodes are designated as clock providers.  Clock consumer
+> +nodes use a phandle and clock specifier pair to connect clock provider
+> +outputs to clock inputs.  Similar to the gpio specifiers, a clock
+> +specifier is an array of one more more cells identifying the clock
+> +output on a device.  The length of a clock specifier is defined by the
+> +value of a #clock-cells property in the clock provider node.
+> +
+> +[1] http://patchwork.ozlabs.org/patch/31551/
+> +
+> +==Clock providers==
 > +
 > +Required properties:
-> +- compatible : Should be "fsl,mxs-dma-apbh" or "fsl,mxs-dma-apbx"
-> +- reg : Should contain registers location and length
+> +#clock-cells:	   Number of cells in a clock specifier; typically will be
+> +		   set to 1
 > +
-> +Examples:
-> +
-> +dma-apbh at 80004000 {
-> +	compatible = "fsl,mxs-dma-apbh";
-> +	reg =<0x80004000 2000>;
-> +};
-> +
-> +dma-apbx at 80024000 {
-> +	compatible = "fsl,mxs-dma-apbx";
-> +	reg =<0x80024000 2000>;
-> +};
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> index b06cd4c..45e8d46 100644
-> --- a/drivers/dma/mxs-dma.c
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -22,6 +22,9 @@
->   #include<linux/platform_device.h>
->   #include<linux/dmaengine.h>
->   #include<linux/delay.h>
-> +#include<linux/module.h>
-> +#include<linux/of.h>
-> +#include<linux/of_device.h>
->
->   #include<asm/irq.h>
->   #include<mach/mxs.h>
-> @@ -130,6 +133,25 @@ struct mxs_dma_engine {
->   	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
->   };
->
-> +static struct platform_device_id mxs_dma_type[] = {
-> +	{
-> +		.name = "mxs-dma-apbh",
-> +		.driver_data = MXS_DMA_APBH,
-> +	}, {
-> +		.name = "mxs-dma-apbx",
-> +		.driver_data = MXS_DMA_APBX,
-> +	}, {
-> +		/* end of list */
-> +	}
-> +};
-> +
-I think you should use the platform_device_id to distinguish different 
-archs.
-In the mx6q,  you will meet some compiler error for the macro cpu_is_mx23().
 
-BR
-Huang Shijie
+We had a discussion[1] regarding it.
 
+Regards,
+Shawn
 
-
-> +static const struct of_device_id mxs_dma_dt_ids[] = {
-> +	{ .compatible = "fsl,mxs-dma-apbh", .data =&mxs_dma_type[0], },
-> +	{ .compatible = "fsl,mxs-dma-apbx", .data =&mxs_dma_type[1], },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, mxs_dma_dt_ids);
-> +
->   static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
->   {
->   	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> @@ -587,8 +609,8 @@ err_out:
->
->   static int __init mxs_dma_probe(struct platform_device *pdev)
->   {
-> -	const struct platform_device_id *id_entry =
-> -				platform_get_device_id(pdev);
-> +	const struct platform_device_id *id_entry;
-> +	const struct of_device_id *of_id;
->   	struct mxs_dma_engine *mxs_dma;
->   	struct resource *iores;
->   	int ret, i;
-> @@ -597,6 +619,11 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
->   	if (!mxs_dma)
->   		return -ENOMEM;
->
-> +	of_id = of_match_device(mxs_dma_dt_ids,&pdev->dev);
-> +	if (of_id)
-> +		id_entry = of_id->data;
-> +	else
-> +		id_entry = platform_get_device_id(pdev);
->   	mxs_dma->dev_id = id_entry->driver_data;
->
->   	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -679,21 +706,10 @@ err_request_region:
->   	return ret;
->   }
->
-> -static struct platform_device_id mxs_dma_type[] = {
-> -	{
-> -		.name = "mxs-dma-apbh",
-> -		.driver_data = MXS_DMA_APBH,
-> -	}, {
-> -		.name = "mxs-dma-apbx",
-> -		.driver_data = MXS_DMA_APBX,
-> -	}, {
-> -		/* end of list */
-> -	}
-> -};
-> -
->   static struct platform_driver mxs_dma_driver = {
->   	.driver		= {
->   		.name	= "mxs-dma",
-> +		.of_match_table = mxs_dma_dt_ids,
->   	},
->   	.id_table	= mxs_dma_type,
->   };
+http://article.gmane.org/gmane.linux.drivers.devicetree/11554
