@@ -1,43 +1,132 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 07:42:06 -0700
-Subject: [PATCH v4 00/12] ARM: EXYNOS: add support new EXYNOS5250
-Message-ID: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
+Date: Wed, 14 Mar 2012 07:42:07 -0700
+Subject: [PATCH v4 01/12] ARM: EXYNOS: to declare static for
+ mach-exynos/common.c
+In-Reply-To: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
+References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331736138-28964-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support EXYNOS5250 SoC which has two A15 cores
-can be used on mobile and tablet devices.
+According to commit cc511b8d84d8 ("ARM: 7257/1: EXYNOS: introduce
+arch/arm/mach-exynos/common.[ch]"), we don't need to declare extern
+for exynos4_map_io(), exynos4_init_clocks(), exynos4_init_uarts(),
+and exynos_init(). And the exynos4210_register_clocks() and
+exynos4212_register_clocks depend on each SoC not ARCH_EXYNOS4.
+So this patch fixed above.
 
-Changes since v3:
-- fix external interrupt number
-- use local helper function instead of irq_to_gpio()
-- fix and expand commit descriptions
-- update dts file
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos/common.c |   13 +++++++++----
+ arch/arm/mach-exynos/common.h |   28 +++++++++++-----------------
+ 2 files changed, 20 insertions(+), 21 deletions(-)
 
-Changes since v2:
-- update interrupt number declaration for single zImage
-  of exynos4 and exynos5
-- allow to select for exynos4 and exynos5 together
-- add support EINT for exynos4 and exynos5
-- add l2 cache initializer for exynos5250
-
-Changes since v1:
-- address comments from mailing list
-- update the option accordingly common.[ch]
-- update clock part
-- get rid of static mapping for uart
-- add device tree enabled board file(mach-exynos5-dt.c)
-- add initial dts file for EXYNOS5250(SoC), SMDK5250(Board)
-
-[PATCH v4 01/12] ARM: EXYNOS: to declare static for mach-exynos/common.c
-[PATCH v4 02/12] ARM: EXYNOS: use exynos_init_uarts() instead of exynos4_init_uarts()
-[PATCH v4 03/12] ARM: EXYNOS: add clock part for EXYNOS5250 SoC
-[PATCH v4 04/12] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
-[PATCH v4 05/12] ARM: EXYNOS: add support uart for EXYNOS4 and EXYNOS5
-[PATCH v4 06/12] ARM: EXYNOS: add support for EXYNOS5250 SoC
-[PATCH v4 07/12] ARM: EXYNOS: add interrupt definitions for EXYNOS5250
-[PATCH v4 08/12] ARM: EXYNOS: support EINT for EXYNOS4 and EXYNOS5
-[PATCH v4 09/12] ARM: EXYNOS: add support get_core_count() for EXYNOS5250
-[PATCH v4 10/12] ARM: EXYNOS: add support ARCH_EXYNOS5 for EXYNOS5 SoCs
-[PATCH v4 11/12] ARM: EXYNOS: add support device tree enabled board file for EXYNOS5
-[PATCH v4 12/12] ARM: dts: add initial dts file for EXYNOS5250, SMDK5250
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 34e8190..a1f8a99 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -50,6 +50,11 @@ static const char name_exynos4210[] = "EXYNOS4210";
+ static const char name_exynos4212[] = "EXYNOS4212";
+ static const char name_exynos4412[] = "EXYNOS4412";
+ 
++static void exynos4_map_io(void);
++static void exynos4_init_clocks(int xtal);
++static void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
++static int exynos_init(void);
++
+ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+ 		.idcode		= EXYNOS4210_CPU_ID,
+@@ -225,7 +230,7 @@ void __init exynos_init_io(struct map_desc *mach_desc, int size)
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+ }
+ 
+-void __init exynos4_map_io(void)
++static void __init exynos4_map_io(void)
+ {
+ 	iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
+ 
+@@ -256,7 +261,7 @@ void __init exynos4_map_io(void)
+ 	s5p_hdmi_setname("exynos4-hdmi");
+ }
+ 
+-void __init exynos4_init_clocks(int xtal)
++static void __init exynos4_init_clocks(int xtal)
+ {
+ 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
+ 
+@@ -456,7 +461,7 @@ static int __init exynos4_l2x0_cache_init(void)
+ early_initcall(exynos4_l2x0_cache_init);
+ #endif
+ 
+-int __init exynos_init(void)
++static int __init exynos_init(void)
+ {
+ 	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
+ 	return device_register(&exynos4_dev);
+@@ -464,7 +469,7 @@ int __init exynos_init(void)
+ 
+ /* uart registration process */
+ 
+-void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
++static void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ {
+ 	struct s3c2410_uartcfg *tcfg = cfg;
+ 	u32 ucnt;
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 8c1efe6..b32c6b5 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -12,39 +12,33 @@
+ #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
+ #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
+ 
++extern struct sys_timer exynos4_timer;
++
+ void exynos_init_io(struct map_desc *mach_desc, int size);
+ void exynos4_init_irq(void);
++void exynos4_restart(char mode, const char *cmd);
+ 
+ #ifdef CONFIG_ARCH_EXYNOS4
+ void exynos4_register_clocks(void);
+ void exynos4_setup_clocks(void);
+ 
+-void exynos4210_register_clocks(void);
+-void exynos4212_register_clocks(void);
+-
+ #else
+ #define exynos4_register_clocks()
+ #define exynos4_setup_clocks()
+-
+-#define exynos4210_register_clocks()
+-#define exynos4212_register_clocks()
+ #endif
+ 
+-void exynos4_restart(char mode, const char *cmd);
++#ifdef CONFIG_CPU_EXYNOS4210
++void exynos4210_register_clocks(void);
+ 
+-extern struct sys_timer exynos4_timer;
++#else
++#define exynos4210_register_clocks()
++#endif
+ 
+-#ifdef CONFIG_ARCH_EXYNOS
+-extern  int exynos_init(void);
+-extern void exynos4_map_io(void);
+-extern void exynos4_init_clocks(int xtal);
+-extern void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
++#ifdef CONFIG_SOC_EXYNOS4212
++void exynos4212_register_clocks(void);
+ 
+ #else
+-#define exynos4_init_clocks NULL
+-#define exynos4_init_uarts NULL
+-#define exynos4_map_io NULL
+-#define exynos_init NULL
++#define exynos4212_register_clocks()
+ #endif
+ 
+ #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
+-- 
+1.7.4.4
