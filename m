@@ -1,54 +1,309 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 13 Mar 2012 19:21:33 -0700
-Subject: [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <4F5FFCC1.2030702@linux.intel.com>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <4F1929E9.7070707@linaro.org> <8762e8kqi6.fsf@ti.com>
- <4F5FFCC1.2030702@linux.intel.com>
-Message-ID: <CAMbhsRSrS-gwu20Ba5=n_LNUwDh3p+5bQPOymGJ9x5O2Fn28kA@mail.gmail.com>
+From: paul.liu@linaro.org (Ying-Chun Liu (PaulLiu))
+Date: Wed, 14 Mar 2012 10:29:12 +0800
+Subject: [PATCH v13] Regulator: Add Anatop regulator driver
+Message-ID: <1331692152-9256-1-git-send-email-paul.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 7:04 PM, Arjan van de Ven <arjan@linux.intel.com> wrote:
-> On 3/13/2012 4:52 PM, Kevin Hilman wrote:
->> Checking the ready_count seemed like an easy way to do this, but did you
->> have any other mechanisms in mind for CPUs to communicate that they've
->> exited/aborted?
->
-> this indeed is the tricky part (which I warned about earlier);
-> I've spent quite a lot of time (weeks) to get this provably working for
-> an Intel system with similar requirements... and it's extremely unfunny,
-> and needed firmware support to close some of the race conditions.
+From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 
-As long as you can tell from cpu0 that cpu1 has succesfully entered
-the low power state, this should be easy, and the
-coupled_cpuidle_parallel_barrier helper should make it even easier.
-This series just allows the exact same sequence of transitions used by
-hotplug cpufreq governors to happen from the idle thread:
+Anatop is an integrated regulator inside i.MX6 SoC.
+There are 3 digital regulators which controls PU, CORE (ARM), and SOC.
+And 3 analog regulators which controls 1P1, 2P5, 3P0 (USB).
+This patch adds the Anatop regulator driver.
 
-1. cpu0 forces cpu1 offline.  From a wakeup perspective, this is
-exactly like hotplug removing cpu1.  Unlike hotplug, the state of cpu1
-has to be saved, and the scheduler is not told that the cpu is gone.
-Instead of using the IPI signalling that hotplug uses, we call the
-same function on both cpus, and one cpu runs the equivalent of
-platform_cpu_kill, and the other the equivalent of platform_cpu_die.
-Wakeup events that are only targeted at cpu1 will need to be
-temporarily migrated to cpu0.
-2. If the hotplug is successful, cpu0 goes to a low power state, the
-same way it would when the hotplug cpufreq governor had removed cpu1.
-3. cpu0 wakes up, because all wakeup events are pointed at it.
-4. After restoring its own state, cpu0 brings cpu1 back online,
-exactly like hotplug online would, except that the boot vector has to
-point to a cpu_resume handler instead of secondary start.
+Signed-off-by: Nancy Chen <Nancy.Chen@freescale.com>
+Signed-off-by: Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Reviewed-by: Axel Lin <axel.lin@gmail.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Liam Girdwood <lrg@ti.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/regulator/Kconfig            |    8 +
+ drivers/regulator/Makefile           |    1 +
+ drivers/regulator/anatop-regulator.c |  241 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 250 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/regulator/anatop-regulator.c
 
-> I sure hope that hardware with these requirements is on the way out...
-> it's not very OS friendly.
-
-Even hardware that was designed not not have these requirements
-sometimes has bugs that require this kind of sequencing.  OMAP4430
-should theoretically support idle without sequencing, but OMAP4460
-introduced a ROM code bug that requires sequencing again (turning on
-cpu1 corrupts the interrupt controller, so cpu0 has to be waiting with
-interrupts off to run a workaround whenever cpu1 turns on).
-
-Out of curiosity, what Intel hardware needs this?
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index c733df5..a229de9 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -102,6 +102,14 @@ config REGULATOR_DA9052
+ 	  This driver supports the voltage regulators of DA9052-BC and
+ 	  DA9053-AA/Bx PMIC.
+ 
++config REGULATOR_ANATOP
++	tristate "Freescale i.MX on-chip ANATOP LDO regulators"
++	depends on MFD_ANATOP
++	help
++	  Say y here to support Freescale i.MX on-chip ANATOP LDOs
++	  regulators. It is recommended that this option be
++	  enabled on i.MX6 platform.
++
+ config REGULATOR_MC13XXX_CORE
+ 	tristate
+ 
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index cf0934b..ab06474 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -15,6 +15,7 @@ obj-$(CONFIG_REGULATOR_AAT2870) += aat2870-regulator.o
+ obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
+ obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o
+ obj-$(CONFIG_REGULATOR_AD5398) += ad5398.o
++obj-$(CONFIG_REGULATOR_ANATOP) += anatop-regulator.o
+ obj-$(CONFIG_REGULATOR_BQ24022) += bq24022.o
+ obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
+ obj-$(CONFIG_REGULATOR_DA9052)	+= da9052-regulator.o
+diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
+new file mode 100644
+index 0000000..17499a5
+--- /dev/null
++++ b/drivers/regulator/anatop-regulator.c
+@@ -0,0 +1,241 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ */
++
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#include <linux/slab.h>
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/mfd/anatop.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/of_regulator.h>
++
++struct anatop_regulator {
++	const char *name;
++	u32 control_reg;
++	struct anatop *mfd;
++	int vol_bit_shift;
++	int vol_bit_width;
++	int min_bit_val;
++	int min_voltage;
++	int max_voltage;
++	struct regulator_desc rdesc;
++	struct regulator_init_data *initdata;
++};
++
++static int anatop_set_voltage(struct regulator_dev *reg, int min_uV,
++				  int max_uV, unsigned *selector)
++{
++	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
++	u32 val, sel;
++	int uv;
++
++	uv = min_uV;
++	dev_dbg(&reg->dev, "%s: uv %d, min %d, max %d\n", __func__,
++		uv, anatop_reg->min_voltage,
++		anatop_reg->max_voltage);
++
++	if (uv < anatop_reg->min_voltage) {
++		if (max_uV > anatop_reg->min_voltage)
++			uv = anatop_reg->min_voltage;
++		else
++			return -EINVAL;
++	}
++
++	if (!anatop_reg->control_reg)
++		return -ENOTSUPP;
++
++	sel = DIV_ROUND_UP(uv - anatop_reg->min_voltage, 25000);
++	if (sel * 25000 + anatop_reg->min_voltage > anatop_reg->max_voltage)
++		return -EINVAL;
++	val = anatop_reg->min_bit_val + sel;
++	*selector = sel;
++	dev_dbg(&reg->dev, "%s: calculated val %d\n", __func__, val);
++	anatop_set_bits(anatop_reg->mfd,
++			anatop_reg->control_reg,
++			anatop_reg->vol_bit_shift,
++			anatop_reg->vol_bit_width,
++			val);
++
++	return 0;
++}
++
++static int anatop_get_voltage_sel(struct regulator_dev *reg)
++{
++	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
++	u32 val;
++
++	if (!anatop_reg->control_reg)
++		return -ENOTSUPP;
++
++	val = anatop_get_bits(anatop_reg->mfd,
++			      anatop_reg->control_reg,
++			      anatop_reg->vol_bit_shift,
++			      anatop_reg->vol_bit_width);
++
++	return val - anatop_reg->min_bit_val;
++}
++
++static int anatop_list_voltage(struct regulator_dev *reg, unsigned selector)
++{
++	struct anatop_regulator *anatop_reg = rdev_get_drvdata(reg);
++	int uv;
++
++	uv = anatop_reg->min_voltage + selector * 25000;
++	dev_dbg(&reg->dev, "vddio = %d, selector = %u\n", uv, selector);
++
++	return uv;
++}
++
++static struct regulator_ops anatop_rops = {
++	.set_voltage     = anatop_set_voltage,
++	.get_voltage_sel = anatop_get_voltage_sel,
++	.list_voltage    = anatop_list_voltage,
++};
++
++static int __devinit anatop_regulator_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct regulator_desc *rdesc;
++	struct regulator_dev *rdev;
++	struct anatop_regulator *sreg;
++	struct regulator_init_data *initdata;
++	struct anatop *anatopmfd = dev_get_drvdata(pdev->dev.parent);
++	int ret = 0;
++
++	initdata = of_get_regulator_init_data(dev, np);
++	sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
++	if (!sreg)
++		return -ENOMEM;
++	sreg->initdata = initdata;
++	sreg->name = kstrdup(of_get_property(np, "regulator-name", NULL),
++			     GFP_KERNEL);
++	rdesc = &sreg->rdesc;
++	memset(rdesc, 0, sizeof(*rdesc));
++	rdesc->name = sreg->name;
++	rdesc->ops = &anatop_rops;
++	rdesc->type = REGULATOR_VOLTAGE;
++	rdesc->owner = THIS_MODULE;
++	sreg->mfd = anatopmfd;
++	ret = of_property_read_u32(np, "reg", &sreg->control_reg);
++	if (ret) {
++		dev_err(dev, "no reg property set\n");
++		goto anatop_probe_end;
++	}
++	ret = of_property_read_u32(np, "anatop-vol-bit-width",
++				   &sreg->vol_bit_width);
++	if (ret) {
++		dev_err(dev, "no anatop-vol-bit-width property set\n");
++		goto anatop_probe_end;
++	}
++	ret = of_property_read_u32(np, "anatop-vol-bit-shift",
++				   &sreg->vol_bit_shift);
++	if (ret) {
++		dev_err(dev, "no anatop-vol-bit-shift property set\n");
++		goto anatop_probe_end;
++	}
++	ret = of_property_read_u32(np, "anatop-min-bit-val",
++				   &sreg->min_bit_val);
++	if (ret) {
++		dev_err(dev, "no anatop-min-bit-val property set\n");
++		goto anatop_probe_end;
++	}
++	ret = of_property_read_u32(np, "anatop-min-voltage",
++				   &sreg->min_voltage);
++	if (ret) {
++		dev_err(dev, "no anatop-min-voltage property set\n");
++		goto anatop_probe_end;
++	}
++	ret = of_property_read_u32(np, "anatop-max-voltage",
++				   &sreg->max_voltage);
++	if (ret) {
++		dev_err(dev, "no anatop-max-voltage property set\n");
++		goto anatop_probe_end;
++	}
++
++	rdesc->n_voltages = (sreg->max_voltage - sreg->min_voltage)
++		/ 25000 + 1;
++
++	/* register regulator */
++	rdev = regulator_register(rdesc, dev,
++				  initdata, sreg, pdev->dev.of_node);
++	if (IS_ERR(rdev)) {
++		dev_err(dev, "failed to register %s\n",
++			rdesc->name);
++		ret = PTR_ERR(rdev);
++		goto anatop_probe_end;
++	}
++
++	platform_set_drvdata(pdev, rdev);
++
++anatop_probe_end:
++	if (ret)
++		kfree(sreg->name);
++
++	return ret;
++}
++
++static int __devexit anatop_regulator_remove(struct platform_device *pdev)
++{
++	struct regulator_dev *rdev = platform_get_drvdata(pdev);
++	struct anatop_regulator *sreg = rdev_get_drvdata(rdev);
++	const char *name = sreg->name;
++
++	regulator_unregister(rdev);
++	kfree(name);
++
++	return 0;
++}
++
++static struct of_device_id __devinitdata of_anatop_regulator_match_tbl[] = {
++	{ .compatible = "fsl,anatop-regulator", },
++	{ /* end */ }
++};
++
++static struct platform_driver anatop_regulator = {
++	.driver = {
++		.name	= "anatop_regulator",
++		.owner  = THIS_MODULE,
++		.of_match_table = of_anatop_regulator_match_tbl,
++	},
++	.probe	= anatop_regulator_probe,
++	.remove	= anatop_regulator_remove,
++};
++
++static int __init anatop_regulator_init(void)
++{
++	return platform_driver_register(&anatop_regulator);
++}
++postcore_initcall(anatop_regulator_init);
++
++static void __exit anatop_regulator_exit(void)
++{
++	platform_driver_unregister(&anatop_regulator);
++}
++module_exit(anatop_regulator_exit);
++
++MODULE_AUTHOR("Nancy Chen <Nancy.Chen@freescale.com>, "
++	      "Ying-Chun Liu (PaulLiu) <paul.liu@linaro.org>");
++MODULE_DESCRIPTION("ANATOP Regulator driver");
++MODULE_LICENSE("GPL v2");
+-- 
+1.7.9.1
