@@ -1,48 +1,108 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 14 Mar 2012 15:40:54 +0800
-Subject: [PATCH] pxa/hx4700: Reduce sleep mode power consumption by 35%
-In-Reply-To: <1331417108.99129.YahooMailClassic@web29004.mail.ird.yahoo.com>
-References: <20120310182144.GA20013@n2100.arm.linux.org.uk>
- <1331417108.99129.YahooMailClassic@web29004.mail.ird.yahoo.com>
-Message-ID: <CAN1soZy0nfSNA71a0SM1sfBMvzboOV+P4Ymd4YtsyphNCdiVbw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 14 Mar 2012 08:28:39 +0100
+Subject: [PATCH v1 3/5] ARM: imx28evk: add mmc dt support
+In-Reply-To: <1331628428-24017-4-git-send-email-b29396@freescale.com>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-4-git-send-email-b29396@freescale.com>
+Message-ID: <20120314072839.GH18320@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 11, 2012 at 6:05 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> --- On Sat, 10/3/12, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> >? ??? /* BTUART */
->> >? ??? GPIO42_BTUART_RXD,
->> > -??? GPIO43_BTUART_TXD,
->> > +??? GPIO43_GPIO | MFP_AF2 |
->> MFP_LPM_DRIVE_LOW,
->>
->> I don't believe that's right.
->>
->> This expands to:
->>
->> ??? MFP_CFG_IN(GPIO43, AF0) | MFP_AF2 |
->> MFP_LPM_DRIVE_LOW
->>
->> and:
->>
->> ??? (MFP_CFG_DEFAULT & ~(MFP_AF_MASK |
->> MFP_DIR_MASK)) |
->> ??? (MFP_PIN(MFP_PIN_GPIO43) | MFP_AF0 |
->> MFP_DIR_IN)
->> ??? | MFP_AF2 | MFP_LPM_DRIVE_LOW
->>
->> Note the presence of both MFP_AF2 and MFP_AF0 in there.
->>
->> The default for GPIO43_BTUART_TXD is:
->>
->> ??? MFP_CFG_OUT(GPIO43, AF2, DRIVE_HIGH)
->>
->> and I'd suggest defining a new GPIO43_BTUART_TXD_LPM_LOW to
->> cover your
->> case.
->
-> It wasn't right but it evaluated to the correct value because MFP_AF0 = 0.
-> What I intended was: MFP_PIN_GPIO43 | MFP_AF2 | MFP_LPM_DRIVE_LOW
-> But I'll add the new values to <mach/mfp-pxa27x.h> if that's preferable.
->
-Yes, you can do it. It's prefer to append new values in <mfp-pxa27x.h>.
+On 16:47 Tue 13 Mar     , Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
+> 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+>  arch/arm/boot/dts/imx28-evk.dts |   14 ++++++++++++++
+>  arch/arm/boot/dts/imx28.dtsi    |   33 +++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/imx28-dt.c    |    2 ++
+>  3 files changed, 49 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> index 9758dc4..61350ab 100644
+> --- a/arch/arm/boot/dts/imx28-evk.dts
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -21,6 +21,20 @@
+>  		reg = <0x40000000 0x08000000>;
+>  	};
+>  
+> +        apb at 80000000 {
+> +                apbh at 80000000 {
+> +			mmc1: ssp at 80010000 {
+> +				slot-8bit;
+> +				status = "okay";
+> +			};
+> +
+> +			mmc2: ssp at 80012000 {
+> +				slot-8bit;
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+>  	ahb at 80080000 {
+>  		fec at 800f0000 {
+>  			phy-mode = "rmii";
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index acf0dab..71c7bfb 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -46,6 +46,39 @@
+>  				#interrupt-cells = <1>;
+>  				reg = <0x80000000 0x2000>;
+>  			};
+> +
+> +			ssp at 80010000 {
+> +				compatible = "fsl,imx28-mmc";
+> +				reg = <0x80010000 2000>;
+> +				/* <irq_err irq_dma> */
+> +				interrupts = <96 82>;
+> +				dma_channel = <0>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ssp at 80012000 {
+> +				compatible = "fsl,imx28-mmc";
+> +				reg = <0x80012000 2000>;
+> +				interrupts = <97 83>;
+> +				dma_channel = <1>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ssp at 80014000 {
+> +				compatible = "fsl,imx28-mmc";
+> +				reg = <0x80014000 2000>;
+> +				interrupts = <98 84>;
+> +				dma_channel = <2>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ssp at 80016000 {
+> +				compatible = "fsl,imx28-mmc";
+> +				reg = <0x80016000 2000>;
+> +				interrupts = <99 85>;
+> +				dma_channel = <3>;
+> +				status = "disabled";
+> +			};
+>  		};
+>  
+>  		apbx at 80040000 {
+> diff --git a/arch/arm/mach-mxs/imx28-dt.c b/arch/arm/mach-mxs/imx28-dt.c
+> index 78d1129..429b88e 100644
+> --- a/arch/arm/mach-mxs/imx28-dt.c
+> +++ b/arch/arm/mach-mxs/imx28-dt.c
+> @@ -23,6 +23,8 @@ static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
+>  	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
+>  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
+>  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP0_BASE_ADDR, "mxs-mmc.0", NULL),
+> +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP1_BASE_ADDR, "mxs-mmc.1", NULL),
+do we really need to continue to add OF_DEV_AUXDATA
+
+instead add a clkdev entry
+
+IIRC OF_DEV_AUXDATA was a temporary solution, we need to stop to use it more
+and more
+
+Best Reards,
+J.
