@@ -1,110 +1,57 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 14 Mar 2012 11:15:04 +0000
-Subject: [PATCH] arm: Add unwinding support for memset and memzero.
-In-Reply-To: <1331574027-28542-1-git-send-email-lauraa@codeaurora.org>
-References: <1331574027-28542-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20120314111504.GA2033@linaro.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Wed, 14 Mar 2012 12:17:19 +0100
+Subject: [PATCH v1 2/5] mmc: mxs-mmc: add dt probe support
+In-Reply-To: <20120314072603.GC8494@shlinux2.ap.freescale.net>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <201203140809.22676.marek.vasut@gmail.com>
+ <20120314072603.GC8494@shlinux2.ap.freescale.net>
+Message-ID: <201203141217.19842.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 12, 2012 at 10:40:27AM -0700, Laura Abbott wrote:
-> Both memset and memzero lack unwinding annoations. If
-> an abort occurs trying to access the pointer, the backtrace
-> is incomplete. Add unwinding annotations to both functions
-> so we can actually get a useful backtrace.
+Dear Dong Aisheng,
+
+> On Wed, Mar 14, 2012 at 08:09:22AM +0100, Marek Vasut wrote:
+> > Dear Dong Aisheng,
+> > 
+> > > On Wed, Mar 14, 2012 at 01:58:25PM +0800, Marek Vasut wrote:
+> > > > Dear Dong Aisheng,
+> > > > 
+> > > > > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > > 
+> > > ........
+> > > 
+> > > > > +static const struct of_device_id mxs_mmc_dt_ids[] = {
+> > > > > +	{ .compatible = "fsl,imx23-mmc", .data = NULL, },
+> > > > > +	{ .compatible = "fsl,imx28-mmc", .data = NULL, },
+> > > > 
+> > > > Do you really need two distinct ones here?
+> > > 
+> > > Hmm, my original purpose is to put soc difference data in .data
+> > > to remove cpu_is_* function calls in the driver later.
+> > > Do you think if any issue?
+> > 
+> > Well, what's the difference between the interfaces on mx233 and mx28? Is
+> > it something that can't be encoded otherwise? I think they're not so
+> > different.
 > 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  arch/arm/lib/memset.S  |    7 +++++--
->  arch/arm/lib/memzero.S |    7 +++++--
->  2 files changed, 10 insertions(+), 4 deletions(-)
+> Not much difference except the one register offset and ip version.
+> See:
+> #define SSP_VERSION_LATEST      4
+> #define ssp_is_old()            (host->version < SSP_VERSION_LATEST)
+> ..
+> #define HW_SSP_VERSION (cpu_is_mx23() ? 0x110 : 0x130)
+> The ip version can be handled in driver, but for offset...
+> it depends on cpu_is_* macro.
+> Putting the HW_SSP_VERSION offset difference in .data can eliminate the
+> need of cpu_is_*.
 > 
-> diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
-> index 650d592..4379912 100644
-> --- a/arch/arm/lib/memset.S
-> +++ b/arch/arm/lib/memset.S
-> @@ -11,6 +11,7 @@
->   */
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> +#include <asm/unwind.h>
->  
->  	.text
->  	.align	5
-> @@ -29,6 +30,7 @@
->   */
->  
->  ENTRY(memset)
-> +UNWIND(.fnstart)
->  	ands	r3, r0, #3		@ 1 unaligned?
->  	bne	1b			@ 1
->  /*
-> @@ -41,7 +43,7 @@ ENTRY(memset)
->  	blt	4f
->  
->  #if ! CALGN(1)+0
-> -
-> +UNWIND(.save {lr})
->  /*
->   * We need an extra register for this loop - save the return address and
->   * use the LR
-> @@ -68,7 +70,7 @@ ENTRY(memset)
->  	ldr	lr, [sp], #4
->  
->  #else
-> -
-> +UNWIND(.save {r4, r5, r6, r7, lr})
+> Despite of that, since they're two devices,
+> i guess it's ok to put two compatible string there, right?
+> Or you thought just put one as below?
+> { .compatible = "fsl,mxs-mmc", .data = NULL, },
+> 
+No, I understand now /wrt the register layout.
 
-For functions like this, the unwinding requirements are different
-depending on where we are in the function.  But the unwinder annotations
-don't remember exact instruction locations; only the extent of the
-whole unwind block is recorded, along with the sequence (but not
-location) of unwinder directives.
-
-As is, the unwinding may be wrong depending on which part of the function
-is executing when the fault occurs.
-
-It may be possible to split the function into multiple unwind blocks,
-e.g.:
-
-ENTRY(somefunc)
-UNWIND(.fnstart)
-
-UNWIND(.save {r4,lr})
-	stfmd	sp!, {r4,lr}
-
-	/* check something */
-
-	blt	_the_other_way
-	/* maybe carry out our job this way */
-
-	ldmfd	sp!, {r4,lr}
-UNWIND(.fnend)
-
-_the_other_way:
-UNWIND(.fnstart)
-UNWIND(.save {r4,lr})
-UNWIND(.save {r5-r8})
-	stmfd	sp!, {r5-r8}	/* !! */
-
-	/* carry out our job the other way */
-
-	ldmfd	sp!, {r5-r8}
-	ldmfd	sp!, {r4,pc}	/* !! */
-UNWIND(.fnend)
-
-
-This is still not exactly right (it's hard to be exactly right,
-since the unwind tables are not meant for handling asynchronous
-unwinding), but unwinding should be correct for the main bits of code
-where most time is spent and/or faults are most likely (the "carry out
-our job" comments).
-
-You'd have to experiment to see whether the backtracer does something
-sensible with unwind tables like this.  It might need tweaking to
-find the correct function symbol if a fault occurs in the second
-unwind block for example ... that perhaps it will already do the
-right thing.
-
-Cheers
----Dave
+Best regards,
+Marek Vasut
