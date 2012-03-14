@@ -1,196 +1,79 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 14 Mar 2012 11:21:19 +0100
-Subject: [PATCH v3 1/5] ARM: protect usage of cr_alignment by #ifdef
- CONFIG_CPU_CP15
-In-Reply-To: <20120314101928.GA29474@pengutronix.de>
-References: <20120314101928.GA29474@pengutronix.de>
-Message-ID: <1331720483-10075-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: pintu_agarwal@yahoo.com (PINTU KUMAR)
+Date: Wed, 14 Mar 2012 03:21:58 -0700 (PDT)
+Subject: [INFO] : Hibernation and Resume between 2 similar devices
+In-Reply-To: <201203132136.56353.rjw@sisk.pl>
+References: <28119509.96581331614425960.JavaMail.weblogic@epml27>
+ <201203132136.56353.rjw@sisk.pl>
+Message-ID: <1331720518.14716.YahooMailNeo@web162005.mail.bf1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/include/asm/system.h |    2 ++
- arch/arm/kernel/entry-armv.S  |    4 ++++
- arch/arm/kernel/head-common.S |   10 ++++++++--
- arch/arm/kernel/setup.c       |    8 ++++++--
- arch/arm/mm/alignment.c       |    6 ++++++
- arch/arm/mm/mmu.c             |    8 +++++++-
- 6 files changed, 33 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index e4c96cc..de46477 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -185,6 +185,7 @@ extern unsigned int user_debug;
- #define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
- #define nop() __asm__ __volatile__("mov\tr0,r0\t@ nop\n\t");
- 
-+#ifdef CONFIG_CPU_CP15
- extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
- extern unsigned long cr_alignment;	/* defined in entry-armv.S */
- 
-@@ -224,6 +225,7 @@ static inline void set_copro_access(unsigned int val)
- 	  : : "r" (val) : "cc");
- 	isb();
- }
-+#endif
- 
- /*
-  * switch_mm() may do a full cache flush over the context switch,
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index be16a48..a6f2ef5 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -314,8 +314,10 @@ __pabt_svc:
- ENDPROC(__pabt_svc)
- 
- 	.align	5
-+#ifdef CONFIG_CPU_CP15
- .LCcralign:
- 	.word	cr_alignment
-+#endif
- #ifdef MULTI_DABORT
- .LCprocfns:
- 	.word	processor
-@@ -1146,12 +1148,14 @@ __vectors_end:
- 
- 	.data
- 
-+#ifdef CONFIG_CPU_CP15
- 	.globl	cr_alignment
- 	.globl	cr_no_alignment
- cr_alignment:
- 	.space	4
- cr_no_alignment:
- 	.space	4
-+#endif
- 
- #ifdef CONFIG_MULTI_IRQ_HANDLER
- 	.globl	handle_arch_irq
-diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-index 854bd22..efeb2d0 100644
---- a/arch/arm/kernel/head-common.S
-+++ b/arch/arm/kernel/head-common.S
-@@ -98,8 +98,10 @@ __mmap_switched:
- 	str	r9, [r4]			@ Save processor ID
- 	str	r1, [r5]			@ Save machine type
- 	str	r2, [r6]			@ Save atags pointer
--	bic	r4, r0, #CR_A			@ Clear 'A' bit
--	stmia	r7, {r0, r4}			@ Save control register values
-+	cmp	r7, #0
-+	itt	ne
-+	bicne	r4, r0, #CR_A			@ Clear 'A' bit
-+	stmneia	r7, {r0, r4}			@ Save control register values
- 	b	start_kernel
- ENDPROC(__mmap_switched)
- 
-@@ -113,7 +115,11 @@ __mmap_switched_data:
- 	.long	processor_id			@ r4
- 	.long	__machine_arch_type		@ r5
- 	.long	__atags_pointer			@ r6
-+#ifdef CONFIG_CPU_CP15
- 	.long	cr_alignment			@ r7
-+#else
-+	.long	0				@ r7
-+#endif
- 	.long	init_thread_union + THREAD_START_SP @ sp
- 	.size	__mmap_switched_data, . - __mmap_switched_data
- 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index a255c39..50d3df8 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -472,9 +472,13 @@ static void __init setup_processor(void)
- 	cpu_cache = *list->cache;
- #endif
- 
--	printk("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
-+	printk("CPU: %s [%08x] revision %d (ARMv%s)",
- 	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
--	       proc_arch[cpu_architecture()], cr_alignment);
-+	       proc_arch[cpu_architecture()]);
-+
-+#ifdef CONFIG_CPU_CP15
-+	printk(KERN_CONT ", cr=%08lx\n", cr_alignment);
-+#endif
- 
- 	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
- 		 list->arch_name, ENDIANNESS);
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index caf14dc..119d178 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -89,7 +89,11 @@ core_param(alignment, ai_usermode, int, 0600);
- /* Return true if and only if the ARMv6 unaligned access model is in use. */
- static bool cpu_is_v6_unaligned(void)
- {
-+#ifdef CONFIG_CPU_CP15
- 	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
-+#else
-+	return 0;
-+#endif
- }
- 
- static int safe_usermode(int new_usermode, bool warn)
-@@ -961,12 +965,14 @@ static int __init alignment_init(void)
- 		return -ENOMEM;
- #endif
- 
-+#ifdef CONFIG_CPU_CP15
- 	if (cpu_is_v6_unaligned()) {
- 		cr_alignment &= ~CR_A;
- 		cr_no_alignment &= ~CR_A;
- 		set_cr(cr_alignment);
- 		ai_usermode = safe_usermode(ai_usermode, false);
- 	}
-+#endif
- 
- 	hook_fault_code(FAULT_CODE_ALIGNMENT, do_alignment, SIGBUS, BUS_ADRALN,
- 			"alignment exception");
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 94c5a0c..f6dbe1a 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -109,8 +109,10 @@ static int __init early_cachepolicy(char *p)
- 
- 		if (memcmp(p, cache_policies[i].policy, len) == 0) {
- 			cachepolicy = i;
-+#ifdef CONFIG_CPU_CP15
- 			cr_alignment &= ~cache_policies[i].cr_mask;
- 			cr_no_alignment &= ~cache_policies[i].cr_mask;
-+#endif
- 			break;
- 		}
- 	}
-@@ -128,7 +130,9 @@ static int __init early_cachepolicy(char *p)
- 		cachepolicy = CPOLICY_WRITEBACK;
- 	}
- 	flush_cache_all();
-+#ifdef CONFIG_CPU_CP15
- 	set_cr(cr_alignment);
-+#endif
- 	return 0;
- }
- early_param("cachepolicy", early_cachepolicy);
-@@ -163,6 +167,7 @@ static int __init early_ecc(char *p)
- early_param("ecc", early_ecc);
- #endif
- 
-+#ifdef CONFIG_CPU_CP15
- static int __init noalign_setup(char *__unused)
- {
- 	cr_alignment &= ~CR_A;
-@@ -171,8 +176,9 @@ static int __init noalign_setup(char *__unused)
- 	return 1;
- }
- __setup("noalign", noalign_setup);
-+#endif
- 
--#ifndef CONFIG_SMP
-+#if !defined(CONFIG_SMP) && defined(CONFIG_CPU_CP15)
- void adjust_cr(unsigned long mask, unsigned long set)
- {
- 	unsigned long flags;
--- 
-1.7.9.1
+>________________________________
+>From: Rafael J. Wysocki <rjw@sisk.pl>
+>To: pintu.k at samsung.com 
+>Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org 
+>Sent: Wednesday, 14 March 2012 2:06 AM
+>Subject: Re: [INFO] : Hibernation and Resume between 2 similar devices
+>
+>On Tuesday, March 13, 2012, PINTU KUMAR wrote:
+>> Dear All,
+>> 
+>> I am just curious to know if it is possible to "Hibernate in one device" and "Resume the hibernated image from another similar device".
+>
+>Not out of the box (you'd need to hack the kernel for that to work I think,
+>at least on x86) and the devices would need to be _exactly_ identical.
+>Moreover, if there is read-write mass storage in them, the filesystems on
+>both would have to be exactly identical as well (including metadata and data
+>layout etc.).
+?
+[Pintu]
+I wanted to try this on arm based Linux mobile phone.
+I have 2 exactly similar mobile phone.
+Here exactly means: 
+hardware is same, kernel version is same, platform is same, filesystem is same.
+The only difference could be some user space application state.
+Hmmm.....the metadata and data layout within file system....this is were the confusion is.
+Suppose in "Device 1" during hibernation, I have a file say "file1.txt" opened whose inode number is say "123456".
+This opened state of file1.txt will be captured in hibernation image.
+Now assume that same "file1.txt" is also present (not opened) in "Device2" but whose inode number is say "567890".
+Now if I reboot "Device 2" and try to resume from hibernated image of "Device 1", what would happen to "file1.txt" ??
+And similarly other senarios.......
+Will resume work, at least partially. Like discard whatever is not relevant to "Device 2" and continue to load others.
+
+
+>
+>> Suppose, I have 2 exactly similar device (Laptop or mobile phone) with me.
+>> At one time I will be working on only one device at a time.
+>> Suppose I started my work on "Device 1"? with few opened application and later I wanted to switch to "Device 2" which is exactly similar to Device 1.
+>> I thought to hibernate (suspend to disk) the Device 1 and store the hibernated image as a swap file and later transfer to sd card.
+>> Then take of the sd card from Device 1 and put it into Device 2.
+>> Copy the swap file from sd card to Device 2 in some swap partition.
+>> Then reboot the Device 2 to Resume from this swap file.
+>> I will get back my Device 1 content in Device 2.
+>> 
+>> Hope this is possible ?
+>
+>It may be possible to make it kind of work, but I wouldn't recommend it to
+>anyone.
+?
+[Pintu]
+if this can be possible we can derive many use cases.
+Till now we heard about hibernating and resuming from same device. And also people uses it rarely.
+With the Tizen coming up (supporting multiple devices) we can think about it.
+Also if "cloud" is integrated with kernel in _future_ we can save all our work from one device in cloud and restore our work from cloud in another device.
+I think that make sense.
+
+
+?
+>
+>Thanks,
+>Rafael
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
