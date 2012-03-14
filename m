@@ -1,79 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Mar 2012 10:02:42 -0500
-Subject: [PATCH 07/10] ARM: ux500: Provide local timer support for Device
- Tree
-In-Reply-To: <1331730306-11461-8-git-send-email-lee.jones@linaro.org>
-References: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
- <1331730306-11461-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <4F60B312.8070900@gmail.com>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Wed, 14 Mar 2012 08:05:53 -0700
+Subject: [PATCH v3 2/2] DMAEngine: Add DMAEngine driver based on old MSM
+ DMA APIs
+In-Reply-To: <4F5F41AF.1090907@codeaurora.org>
+References: <1331548364-27845-1-git-send-email-kumarrav@codeaurora.org>
+ <20120312201421.GA3459@fifo99.com>
+ <4F5F41AF.1090907@codeaurora.org>
+Message-ID: <20120314150533.GA8757@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2012 08:05 AM, Lee Jones wrote:
-> This enables local timer (AKA: private timer) support for
-> all u8500 based hardware using DT.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/db8500.dtsi    |    6 ++++++
->  arch/arm/mach-ux500/localtimer.c |   18 +++++++++++++++++-
->  2 files changed, 23 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-> index cce5df8..35d0146 100644
-> --- a/arch/arm/boot/dts/db8500.dtsi
-> +++ b/arch/arm/boot/dts/db8500.dtsi
-> @@ -34,6 +34,12 @@
->  			interrupts = <7>;
->  		};
->  
-> +		timer at a0410600 {
-> +			compatible = "arm,smp-twd";
-> +			reg = <0xa0410600 0x20>;
-> +			interrupts = <1 13 0x304>;
-> +		};
-> +
->  		rtc at 80154000 {
->  			compatible = "stericsson,db8500-rtc";
->  			reg = <0x80154000 0x1000>;
-> diff --git a/arch/arm/mach-ux500/localtimer.c b/arch/arm/mach-ux500/localtimer.c
-> index 5ba1133..295e580 100644
-> --- a/arch/arm/mach-ux500/localtimer.c
-> +++ b/arch/arm/mach-ux500/localtimer.c
-> @@ -14,6 +14,10 @@
->  #include <linux/smp.h>
->  #include <linux/clockchips.h>
->  
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
->  #include <asm/irq.h>
->  #include <asm/smp_twd.h>
->  #include <asm/localtimer.h>
-> @@ -23,7 +27,19 @@
->   */
->  int __cpuinit local_timer_setup(struct clock_event_device *evt)
->  {
-> -	evt->irq = IRQ_LOCALTIMER;
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
-> +	if (np) {
-> +		if (!twd_base) {
-> +			twd_base = of_iomap(np, 0);
-> +			WARN_ON(!twd_base);
-> +		}
-> +		evt->irq = irq_of_parse_and_map(np, 0);
-> +	}
-> +	else
-> +		evt->irq = IRQ_LOCALTIMER;
-> +
->  	twd_timer_setup(evt);
->  	return 0;
->  }
+On Tue, Mar 13, 2012 at 06:16:39PM +0530, Ravi Kumar V wrote:
+> On 3/13/2012 1:44 AM, Daniel Walker wrote:
+> >On Mon, Mar 12, 2012 at 04:02:44PM +0530, Ravi Kumar V wrote:
+> >>Add DMAEngine based driver using the old MSM DMA APIs internally.
+> >
+> >What do you mean by this?
+> >
+> There is a MSM DMA driver in arch/arm/mach-msm/ which is not in
+> dmaengine framework standards, but that driver is been used by
+> client drivers nand, eMMC and serial drivers. Now if we implement
+> the whole dma driver using dmaengine framework then nand, eMMC like
+> drivers will be failed as they are using old dma driver API's, so
+> instead of implementing new driver from scratch we are keeping the
+> old dma API's as it is and using those API's in new dmaengine
+> framework.So that we can convert clients drivers to use dma engine
+> framework.
 
-FYI, this will probably collide with Marc Z's local timer changes queued
-up for 3.4.
+Did you investigate converting the drivers (nand, eMMC, serial) ? It
+seems like there would be a 1:1 mapping between the API's , so it might
+only be a find->replace operation.
 
-Rob
+Daniel
