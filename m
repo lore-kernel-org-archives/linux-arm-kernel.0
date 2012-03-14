@@ -1,38 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 14 Mar 2012 13:08:40 +0800
-Subject: [GIT PULL] imx irq_domain migration
-In-Reply-To: <4F3D41D2.5090203@gmail.com>
-References: <20120216154941.GB11758@r65073-Latitude-D630>
- <4F3D41D2.5090203@gmail.com>
-Message-ID: <20120314050837.GB21337@S2101-09.ap.freescale.net>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 14 Mar 2012 10:57:32 +0530
+Subject: [PATCH v3 07/12] ARM: EXYNOS: add interrupt definitions for
+ EXYNOS5250
+In-Reply-To: <1331652643-12626-8-git-send-email-kgene.kim@samsung.com>
+References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
+ <1331652643-12626-8-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAJuYYwTFEV06C+gWEoXDtKoqhujA8HphNuLLJs3EBzaKnTvcfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2012 at 11:50:10AM -0600, Rob Herring wrote:
-> Shawn,
-> 
-> On 02/16/2012 09:49 AM, Shawn Guo wrote:
-> > Hi Rob,
-> > 
-> > Please pull imx irq_domain support below. It's based on Grant's
-> > irqdomain/next today with your generic-chip series applied on top
-> > of it.
-> 
-> You're asking me to pull changes on top of a branch that I don't even
-> have as you've rebased my changes. While it would work I don't think
-> this is the right flow. Plus there is not really any reason for iMX
-> changes to go thru me.
-> 
-> Either Grant needs to stabilize his branch so you and I can send him
-> pull requests or he can pull in our changes and rebase them as he
-> rebases. I already asked him to do just that with my 1 patch others are
-> dependent on.
-> 
-Hi Grant,
+On 13 March 2012 21:00, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> ARM: EXYNOS: irqs.h for exynos4 and exynos5 - WIP
+> This patch adds the interrupt definitions for EXYNOS5250 at
+> <mach/irqs.h> file. Basically, now it is needed for EXYNOS5250
+> interrupt and will be updated for single zImage next time.
+>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> ?arch/arm/mach-exynos/common.c ? ? ? ? ? ?| ? 97 ++++--
+> ?arch/arm/mach-exynos/dev-ahci.c ? ? ? ? ?| ? ?4 +-
+> ?arch/arm/mach-exynos/dev-audio.c ? ? ? ? | ? ?4 +-
+> ?arch/arm/mach-exynos/include/mach/irqs.h | ?580 ++++++++++++++++++++++--------
+> ?arch/arm/mach-exynos/mct.c ? ? ? ? ? ? ? | ? 23 +-
+> ?arch/arm/plat-s5p/irq-pm.c ? ? ? ? ? ? ? | ? 25 +-
+> ?arch/arm/plat-samsung/irq-vic-timer.c ? ?| ? 16 +
+> ?7 files changed, 548 insertions(+), 201 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 7fdb139..0b53018 100644
+> --- a/arch/arm/mach-exynos/common.c
 
-Would you consider to take this request after you take Rob's
-generic_irq one?
 
--- 
-Regards,
-Shawn
+[...]
+
+> ? ? ? ?for (irq = 0 ; irq <= 15 ; irq++) {
+> ? ? ? ? ? ? ? ?eint0_15_data[irq] = IRQ_EINT(irq);
+>
+> - ? ? ? ? ? ? ? irq_set_handler_data(exynos4_get_irq_nr(irq),
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&eint0_15_data[irq]);
+> - ? ? ? ? ? ? ? irq_set_chained_handler(exynos4_get_irq_nr(irq),
+> + ? ? ? ? ? ? ? if (soc_is_exynos5250()) {
+> + ? ? ? ? ? ? ? ? ? ? ? irq_set_handler_data(exynos4_eint0_15_src_int[irq],
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&eint0_15_data[irq]);
+> + ? ? ? ? ? ? ? ? ? ? ? irq_set_chained_handler(exynos4_eint0_15_src_int[irq],
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? exynos4_irq_eint0_15);
+> + ? ? ? ? ? ? ? } else {
+> + ? ? ? ? ? ? ? ? ? ? ? irq_set_handler_data(exynos5_eint0_15_src_int[irq],
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&eint0_15_data[irq]);
+> + ? ? ? ? ? ? ? ? ? ? ? irq_set_chained_handler(exynos5_eint0_15_src_int[irq],
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?exynos4_irq_eint0_15);
+> + ? ? ? ? ? ? ? }
+> ? ? ? ?}
+
+The external interrupt numbers for Exynos4 and Exynos5 have been
+swapped. This needs to be fixed.
+
+Thanks,
+Thomas.
