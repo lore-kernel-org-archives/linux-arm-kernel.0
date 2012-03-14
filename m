@@ -1,70 +1,229 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Wed, 14 Mar 2012 16:54:14 +0800
-Subject: [PATCH v6 3/3] clk: basic clock hardware types
-In-Reply-To: <1331366064-1273-4-git-send-email-mturquette@linaro.org>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-4-git-send-email-mturquette@linaro.org>
-Message-ID: <20120314085413.GG3261@b20223-02.ap.freescale.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 14 Mar 2012 09:48:38 +0100
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <1331650032-15274-1-git-send-email-sr@denx.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+Message-ID: <20120314084838.GJ18320@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 15:47 Tue 13 Mar     , Stefan Roese wrote:
+> This patch adds a generic target for SPEAr600 board that can be
+> configured via the device-tree. Currently only interrupts are
+> configured via device-tree. Other peripheral devices (e.g.
+> ethernet, I2C, SMI flash, FSMC NAND flash etc) will follow in
+> later patches.
+> 
+> Only the spear600-evb is currently supported. Other SPEAr600
+> based boards will follow later.
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  Documentation/devicetree/bindings/arm/spear.txt |    6 ++
+>  arch/arm/boot/dts/spear600-evb.dts              |   23 +++++++
+>  arch/arm/boot/dts/spear600.dtsi                 |   49 +++++++++++++++
+>  arch/arm/mach-spear6xx/Kconfig                  |    7 +++
+>  arch/arm/mach-spear6xx/Makefile                 |    1 +
+>  arch/arm/mach-spear6xx/board-dt.c               |   75 +++++++++++++++++++++++
+>  6 files changed, 161 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/spear.txt
+>  create mode 100644 arch/arm/boot/dts/spear600-evb.dts
+>  create mode 100644 arch/arm/boot/dts/spear600.dtsi
+>  create mode 100644 arch/arm/mach-spear6xx/board-dt.c
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/spear.txt b/Documentation/devicetree/bindings/arm/spear.txt
+> new file mode 100644
+> index 0000000..8e9f83e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/spear.txt
+> @@ -0,0 +1,6 @@
+> +ST SPEAr Platforms Device Tree Bindings
+> +---------------------------------------
+> +
+> +SPEAr600 EVB (Evaluation Board)
+> +Required root node properties:
+> +    - compatible = "st,spear600-evb";
+> diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
+> new file mode 100644
+> index 0000000..f92d099
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/spear600-evb.dts
+> @@ -0,0 +1,23 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+freescale for a ST SoC ??
+> + *
+> + * Copyright 2012 Stefan Roese <sr@denx.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "spear600.dtsi"
+> +
+> +/ {
+> +	model = "ST SPEAr600 Evaluation Board";
+> +	compatible = "st,spear600-evb";
+put the soc too
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +};
 
-> +static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
-> +		unsigned long *best_parent_rate)
+put the board memory
+> diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+> new file mode 100644
+> index 0000000..82b086d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/spear600.dtsi
+> @@ -0,0 +1,49 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * Copyright 2012 Stefan Roese <sr@denx.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,arm926ejs";
+> +		};
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0 0>; /* Filled by U-Boot */
+here the max and do not expect the bootloader to do it
+put the min of the board
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		ranges;
+> +
+> +		vic0: interrupt-controller at f1100000 {
+> +			compatible = "arm,pl190-vic";
+> +			interrupt-controller;
+> +			reg = <0xf1100000 0x1000>;
+> +			#interrupt-cells = <1>;
+> +		};
+> +
+> +		vic1: interrupt-controller at f1000000 {
+> +			compatible = "arm,pl190-vic";
+> +			interrupt-controller;
+> +			reg = <0xf1000000 0x1000>;
+> +			#interrupt-cells = <1>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-spear6xx/Kconfig b/arch/arm/mach-spear6xx/Kconfig
+> index ff4ae5b..7777f72 100644
+> --- a/arch/arm/mach-spear6xx/Kconfig
+> +++ b/arch/arm/mach-spear6xx/Kconfig
+> @@ -11,6 +11,13 @@ config BOARD_SPEAR600_EVB
+>  	help
+>  	  Supports ST SPEAr600 Evaluation Board
+>  
+> +config BOARD_SPEAR600_DT
+> +	bool "SPEAr600 generic board configured via device-tree"
+> +	select MACH_SPEAR600
+> +	select USE_OF
+> +	help
+> +	  Supports ST SPEAr600 boards configured via the device-tree
+> +
+>  endmenu
+>  
+>  config MACH_SPEAR600
+> diff --git a/arch/arm/mach-spear6xx/Makefile b/arch/arm/mach-spear6xx/Makefile
+> index cc1a4d8..e2d79b8 100644
+> --- a/arch/arm/mach-spear6xx/Makefile
+> +++ b/arch/arm/mach-spear6xx/Makefile
+> @@ -10,3 +10,4 @@ obj-$(CONFIG_MACH_SPEAR600) += spear600.o
+>  
+>  # spear600 boards files
+>  obj-$(CONFIG_BOARD_SPEAR600_EVB) += spear600_evb.o
+> +obj-$(CONFIG_BOARD_SPEAR600_DT) += board-dt.o
+> diff --git a/arch/arm/mach-spear6xx/board-dt.c b/arch/arm/mach-spear6xx/board-dt.c
+> new file mode 100644
+> index 0000000..ee4ff33
+> --- /dev/null
+> +++ b/arch/arm/mach-spear6xx/board-dt.c
+> @@ -0,0 +1,75 @@
+> +/*
+> + * arch/arm/mach-spear6xx/board-dt.c
+> + *
+> + * Generic SPEAr600 platform support
+> + *
+> + * Copyright (C) 2009 ST Microelectronics
+> + * Viresh Kumar<viresh.kumar@st.com>
+> + *
+> + * Copyright 2012 Stefan Roese <sr@denx.de>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/of.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <asm/hardware/vic.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach-types.h>
+> +#include <mach/generic.h>
+> +#include <mach/hardware.h>
+> +
+> +static struct amba_device *amba_devs[] __initdata = {
+> +	&gpio_device[0],
+> +	&gpio_device[1],
+> +	&gpio_device[2],
+> +	&uart_device[0],
+> +	&uart_device[1],
+> +};
+there is no bining?
+> +
+> +static struct platform_device *plat_devs[] __initdata = {
+> +};
+> +
+> +static void __init spear600_dt_init(void)
 > +{
-> +	struct clk_divider *divider = to_clk_divider(hw);
-> +	int i, bestdiv = 0;
-> +	unsigned long parent_rate, best = 0, now, maxdiv;
+> +	unsigned int i;
 > +
-> +	maxdiv = (1 << divider->width);
+> +	/* call spear600 machine init function */
+> +	spear600_init();
 > +
-> +	if (divider->flags & CLK_DIVIDER_ONE_BASED)
-> +		maxdiv--;
+> +	/* Add Platform Devices */
+> +	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
 > +
-> +	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
-> +		parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
-> +		bestdiv = parent_rate / rate;
-> +		bestdiv = bestdiv == 0 ? 1 : bestdiv;
-> +		bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
-> +		goto out;
-> +	}
-> +
-> +	/*
-> +	 * The maximum divider we can use without overflowing
-> +	 * unsigned long in rate * i below
-> +	 */
-> +	maxdiv = min(ULONG_MAX / rate, maxdiv);
-> +
-> +	for (i = 1; i <= maxdiv; i++) {
-> +		int div;
-> +		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-> +				rate * i);
-> +		div = parent_rate / rate;
-> +		div = div > maxdiv ? maxdiv : div;
-> +		div = div < 1 ? 1 : div;
-> +		now = parent_rate / div;
-> +
-> +		if (now <= rate && now >= best) {
-> +			bestdiv = div;
-> +			best = now;
-> +			*best_parent_rate = parent_rate;
-			if (now == rate)
-				break;
-we don't need it to loop to end, and smaller parent_rate is better.
-> +		}
-> +	}
-> +
-> +	if (!bestdiv) {
-> +		bestdiv = (1 << divider->width);
-> +		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
-> +	} else {
-> +		parent_rate = best * bestdiv;
-> +	}
-> +
-> +out:
-> +	if (best_parent_rate)
-> +		*best_parent_rate = parent_rate;
-> +
-> +	return bestdiv;
+> +	/* Add Amba Devices */
+> +	for (i = 0; i < ARRAY_SIZE(amba_devs); i++)
+> +		amba_device_register(amba_devs[i], &iomem_resource);
 > +}
+> +
+> +static const char *spear600_dt_board_compat[] = {
+> +	"st,spear600-evb",
+> +	NULL
+> +};
+put the soc instead of the list of bord
+
+Best Regards,
+J.
