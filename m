@@ -1,129 +1,435 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 14 Mar 2012 11:24:36 -0400 (EDT)
-Subject: [PATCH v3 1/5] ARM: protect usage of cr_alignment by #ifdef
- CONFIG_CPU_CP15
-In-Reply-To: <1331720483-10075-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20120314101928.GA29474@pengutronix.de>
- <1331720483-10075-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1203141103080.24151@xanadu.home>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 14 Mar 2012 17:21:52 +0100
+Subject: [PATCH v2] ARM: SPEAr600: Add device-tree support to SPEAr600
+ boards
+In-Reply-To: <1331737232-25477-1-git-send-email-sr@denx.de>
+References: <1331737232-25477-1-git-send-email-sr@denx.de>
+Message-ID: <20120314162152.GN18320@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Mar 2012, Uwe Kleine-K?nig wrote:
-
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-I think you could reduce the amount of #ifdef's significantly here.  
-While the cr_alignment variable and its sister are of no use in a 
-no-CP15 system, you could still leave them there initialized to zero and 
-only conditionally compile out the CP15 modifyers with a dummy version.  
-This is only 2 words wasted in your kernel image to keep the code 
-cleaner.
-
-More comments below.
-
-> index 854bd22..efeb2d0 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -98,8 +98,10 @@ __mmap_switched:
->  	str	r9, [r4]			@ Save processor ID
->  	str	r1, [r5]			@ Save machine type
->  	str	r2, [r6]			@ Save atags pointer
-> -	bic	r4, r0, #CR_A			@ Clear 'A' bit
-> -	stmia	r7, {r0, r4}			@ Save control register values
-> +	cmp	r7, #0
-> +	itt	ne
-> +	bicne	r4, r0, #CR_A			@ Clear 'A' bit
-> +	stmneia	r7, {r0, r4}			@ Save control register values
-
-The kernel is compiled with -mimplicit-it so you do not need to specify 
-any it here.
-
-> index a255c39..50d3df8 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -472,9 +472,13 @@ static void __init setup_processor(void)
->  	cpu_cache = *list->cache;
->  #endif
->  
-> -	printk("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
-> +	printk("CPU: %s [%08x] revision %d (ARMv%s)",
->  	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
-> -	       proc_arch[cpu_architecture()], cr_alignment);
-> +	       proc_arch[cpu_architecture()]);
+On 16:00 Wed 14 Mar     , Stefan Roese wrote:
+> This patch adds a generic target for SPEAr600 board that can be
+> configured via the device-tree. Currently the following devices
+> are supported via the devicetree:
+> 
+> - VIC interrupts
+> - PL011 UART
+> - PL061 GPIO
+> - Synopsys DW I2C
+> - Synopsys DW ethernet
+> 
+> Other peripheral devices (e.g. SMI flash, FSMC NAND flash etc) will
+> follow in later patches.
+> 
+> Only the spear600-evb is currently supported. Other SPEAr600
+> based boards will follow later.
+> 
+> Additionally the file spear600.c is deleted. It contained only
+> one empty function and is not needed. So lets just remove it.
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2:
+> - Added DT support to spear6xx.c instead of creating board-dt.c
+> - Removed UART (PL011) and GPIO (PL061) platform data for
+>   devicetree board port. This works now via DT probing
+> - Added OF_DEV_AUXDATA for clock device name matching for some
+>   device drivers
+> - Removed sper600.c file completely
+> - Added DW I2C and ethernet nodes to the dts files
+> - Added other DT nodes (SMI, FSMC, ECHI, OHCI), currently disabled
+>   since the corresponding device drivers don't support DT probing
+> - Removed Linaro/FSL copyright notice from SPEAr DT files (copy-paste cruft)
+> - Many smaller modification to the dts/dtsi files
+> - Changed Documentation/devicetree/bindings/arm/spear.txt to match
+>   the changed bindings
+> 
+>  Documentation/devicetree/bindings/arm/spear.txt |    8 ++
+>  arch/arm/boot/dts/spear600-evb.dts              |   30 +++++
+>  arch/arm/boot/dts/spear600.dtsi                 |  162 +++++++++++++++++++++++
+>  arch/arm/mach-spear6xx/Kconfig                  |    7 +
+>  arch/arm/mach-spear6xx/Makefile                 |    3 -
+>  arch/arm/mach-spear6xx/spear600.c               |   25 ----
+>  arch/arm/mach-spear6xx/spear600_evb.c           |    3 -
+>  arch/arm/mach-spear6xx/spear6xx.c               |   69 +++++++++-
+>  8 files changed, 270 insertions(+), 37 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/spear.txt
+>  create mode 100644 arch/arm/boot/dts/spear600-evb.dts
+>  create mode 100644 arch/arm/boot/dts/spear600.dtsi
+>  delete mode 100644 arch/arm/mach-spear6xx/spear600.c
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/spear.txt b/Documentation/devicetree/bindings/arm/spear.txt
+> new file mode 100644
+> index 0000000..f8e54f0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/spear.txt
+> @@ -0,0 +1,8 @@
+> +ST SPEAr Platforms Device Tree Bindings
+> +---------------------------------------
 > +
-> +#ifdef CONFIG_CPU_CP15
-> +	printk(KERN_CONT ", cr=%08lx\n", cr_alignment);
-> +#endif
+> +Boards with the ST SPEAr600 SoC shall have the following properties:
+> +
+> +Required root node property:
+> +
+> +compatible = "st,spear600";
+> diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
+> new file mode 100644
+> index 0000000..cbfda8d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/spear600-evb.dts
+> @@ -0,0 +1,30 @@
+> +/*
+> + * Copyright 2012 Stefan Roese <sr@denx.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "spear600.dtsi"
+> +
+> +/ {
+> +	model = "ST SPEAr600 Evaluation Board";
+> +	compatible = "st,spear600-evb", "st,spear600";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+please put the mem size here
+
+
+> +
+> +	soc {
+> +		gmac0: ethernet at e0800000 {
+> +			phy-mode = "gmii";
+> +		};
+> +
+> +		i2c at d0200000 {
+> +			clock-frequency = <400000>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+> new file mode 100644
+> index 0000000..e45e58f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/spear600.dtsi
+> @@ -0,0 +1,162 @@
+> +/*
+> + * Copyright 2012 Stefan Roese <sr@denx.de>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "st,spear600";
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,arm926ejs";
+> +		};
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0 0>; /* Filled by U-Boot */
+please put the max mem of the SoC here
+> +	};
+> +
+> +	soc {
+please put the name of the bus not soc
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		ranges;
+> +
+> +		vic0: interrupt-controller at f1100000 {
+> +			compatible = "arm,pl190-vic";
+> +			interrupt-controller;
+> +			reg = <0xf1100000 0x1000>;
+> +			#interrupt-cells = <1>;
+> +		};
+> +
+> +		vic1: interrupt-controller at f1000000 {
+> +			compatible = "arm,pl190-vic";
+> +			interrupt-controller;
+> +			reg = <0xf1000000 0x1000>;
+> +			#interrupt-cells = <1>;
+> +		};
+> +
+> +		serial at d0000000 {
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			reg = <0xd0000000 0x1000>;
+> +			interrupt-parent = <&vic0>;
+> +			interrupts = <24>;
+> +		};
+> +
+> +		serial at d0080000 {
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			reg = <0xd0080000 0x1000>;
+> +			interrupt-parent = <&vic0>;
+> +			interrupts = <25>;
+> +		};
+> +
+> +		/* local/cpu GPIO */
+> +		gpio0: gpio at f0100000 {
+> +			#gpio-cells = <2>;
+> +			compatible = "arm,pl061", "arm,primecell";
+> +			gpio-controller;
+> +			reg = <0xf0100000 0x1000>;
+> +			interrupt-parent = <&vic0>;
+> +			interrupts = <18>;
+> +		};
+> +
+> +		/* basic GPIO */
+> +		gpio1: gpio at fc980000 {
+> +			#gpio-cells = <2>;
+> +			compatible = "arm,pl061", "arm,primecell";
+> +			gpio-controller;
+> +			reg = <0xfc980000 0x1000>;
+> +			interrupt-parent = <&vic1>;
+> +			interrupts = <19>;
+> +		};
+> +
+> +		/* appl GPIO */
+> +		gpio2: gpio at d8100000 {
+> +			#gpio-cells = <2>;
+> +			compatible = "arm,pl061", "arm,primecell";
+> +			gpio-controller;
+> +			reg = <0xd8100000 0x1000>;
+> +			interrupt-parent = <&vic1>;
+> +			interrupts = <4>;
+> +		};
+> +
+> +		gmac0: ethernet at e0800000 {
+> +			compatible = "st,spear600-gmac";
+> +			reg = <0xe0800000 0x8000>;
+> +			interrupt-parent = <&vic1>;
+> +			interrupts = <24 23>;
+> +			interrupt-names = "macirq", "eth_wake_irq";
+> +			mac-address = [000000000000]; /* Filled in by U-Boot */
+> +		};
+> +
+> +		i2c at d0200000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0xd0200000 0x1000>;
+> +			interrupt-parent = <&vic0>;
+> +			interrupts = <28>;
+> +		};
+> +
+> +		fsmc0: flash at d1800000 {
+> +			status = "disabled";
+> +			compatible = "st,spear600-fsmc-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0xd1800000 0x1000	/* FSMC Register */
+> +			       0xd2000000 0x4000>;	/* NAND Base */
+> +			reg-names = "fsmc_regs", "nand_data";
+> +		};
+> +
+> +		smi0: flash at fc000000 {
+> +			status = "disabled";
+> +			compatible = "st,spear600-smi";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0xfc000000 0x1000>;
+> +			interrupt-parent = <&vic1>;
+> +			interrupts = <12>;
+> +		};
+> +
+> +		ehci at e1800000 {
+> +			status = "disabled";
+> +			compatible = "st,spear600-ehci", "usb-ehci";
+> +			reg = <0xe1800000 0x1000>;
+> +			interrupt-parent = <&vic1>;
+> +			interrupts = <27>;
+> +		};
+> +
+> +		ehci at e2000000 {
+> +			status = "disabled";
+> +			compatible = "st,spear600-ehci", "usb-ehci";
+> +			reg = <0xe2000000 0x1000>;
+> +			interrupt-parent = <&vic1>;
+> +			interrupts = <29>;
+> +		};
+> +
+> +		ohci at e1900000 {
+> +			status = "disabled";
+> +			compatible = "st,spear600-ohci", "usb-ohci";
+> +			reg = <0xe1900000 0x1000>;
+> +			interrupt-parent = <&vic1>;
+> +			interrupts = <26>;
+> +		};
+> +
+> +		ohci at e2100000 {
+> +			status = "disabled";
+> +			compatible = "st,spear600-ohci", "usb-ohci";
+> +			reg = <0xe2100000 0x1000>;
+> +			interrupt-parent = <&vic1>;
+> +			interrupts = <28>;
+> +		};
+all of this need a Doc for the ST bindings
+> +	};
+> +};
+> diff --git a/arch/arm/mach-spear6xx/Kconfig b/arch/arm/mach-spear6xx/Kconfig
+> index ff4ae5b..7777f72 100644
+> --- a/arch/arm/mach-spear6xx/Kconfig
+> +++ b/arch/arm/mach-spear6xx/Kconfig
+> @@ -11,6 +11,13 @@ config BOARD_SPEAR600_EVB
+>  	help
+>  	  Supports ST SPEAr600 Evaluation Board
 >  
-
-Again, you could just leave the original display, with cr=00000000 which 
-is a fairly good representation of reality.
-
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index caf14dc..119d178 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -89,7 +89,11 @@ core_param(alignment, ai_usermode, int, 0600);
->  /* Return true if and only if the ARMv6 unaligned access model is in use. */
->  static bool cpu_is_v6_unaligned(void)
+> +config BOARD_SPEAR600_DT
+> +	bool "SPEAr600 generic board configured via device-tree"
+> +	select MACH_SPEAR600
+> +	select USE_OF
+> +	help
+> +	  Supports ST SPEAr600 boards configured via the device-tree
+> +
+>  endmenu
+>  
+>  config MACH_SPEAR600
+> diff --git a/arch/arm/mach-spear6xx/Makefile b/arch/arm/mach-spear6xx/Makefile
+> index cc1a4d8..6f87c3a 100644
+> --- a/arch/arm/mach-spear6xx/Makefile
+> +++ b/arch/arm/mach-spear6xx/Makefile
+> @@ -5,8 +5,5 @@
+>  # common files
+>  obj-y	+= clock.o spear6xx.o
+>  
+> -# spear600 specific files
+> -obj-$(CONFIG_MACH_SPEAR600) += spear600.o
+> -
+>  # spear600 boards files
+>  obj-$(CONFIG_BOARD_SPEAR600_EVB) += spear600_evb.o
+> diff --git a/arch/arm/mach-spear6xx/spear600.c b/arch/arm/mach-spear6xx/spear600.c
+> deleted file mode 100644
+> index d0e6eea..0000000
+> --- a/arch/arm/mach-spear6xx/spear600.c
+> +++ /dev/null
+> @@ -1,25 +0,0 @@
+> -/*
+> - * arch/arm/mach-spear6xx/spear600.c
+> - *
+> - * SPEAr600 machine source file
+> - *
+> - * Copyright (C) 2009 ST Microelectronics
+> - * Rajeev Kumar<rajeev-dlh.kumar@st.com>
+> - *
+> - * This file is licensed under the terms of the GNU General Public
+> - * License version 2. This program is licensed "as is" without any
+> - * warranty of any kind, whether express or implied.
+> - */
+> -
+> -#include <linux/ptrace.h>
+> -#include <asm/irq.h>
+> -#include <mach/generic.h>
+> -#include <mach/hardware.h>
+> -
+> -/* Add spear600 specific devices here */
+> -
+> -void __init spear600_init(void)
+> -{
+> -	/* call spear6xx family common init function */
+> -	spear6xx_init();
+> -}
+> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+> index c6e4254..c4949aa 100644
+> --- a/arch/arm/mach-spear6xx/spear600_evb.c
+> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
+> @@ -32,9 +32,6 @@ static void __init spear600_evb_init(void)
 >  {
-> +#ifdef CONFIG_CPU_CP15
->  	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
-> +#else
-> +	return 0;
-> +#endif
->  }
-
-Same here.  With cr_alignment set to zero, you don't need the above 
-#ifdef.
-
->  static int safe_usermode(int new_usermode, bool warn)
-> @@ -961,12 +965,14 @@ static int __init alignment_init(void)
->  		return -ENOMEM;
->  #endif
+>  	unsigned int i;
 >  
-> +#ifdef CONFIG_CPU_CP15
->  	if (cpu_is_v6_unaligned()) {
->  		cr_alignment &= ~CR_A;
->  		cr_no_alignment &= ~CR_A;
->  		set_cr(cr_alignment);
->  		ai_usermode = safe_usermode(ai_usermode, false);
->  	}
-> +#endif
-
-Here the #ifdef is probably legitimate.
-
->  	hook_fault_code(FAULT_CODE_ALIGNMENT, do_alignment, SIGBUS, BUS_ADRALN,
->  			"alignment exception");
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 94c5a0c..f6dbe1a 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -109,8 +109,10 @@ static int __init early_cachepolicy(char *p)
+> -	/* call spear600 machine init function */
+> -	spear600_init();
+> -
+>  	/* Add Platform Devices */
+>  	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
 >  
->  		if (memcmp(p, cache_policies[i].policy, len) == 0) {
->  			cachepolicy = i;
-> +#ifdef CONFIG_CPU_CP15
->  			cr_alignment &= ~cache_policies[i].cr_mask;
->  			cr_no_alignment &= ~cache_policies[i].cr_mask;
-> +#endif
-
-Probably here as well.
-
->  			break;
->  		}
+> diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+> index e0f6628..aca20f0 100644
+> --- a/arch/arm/mach-spear6xx/spear6xx.c
+> +++ b/arch/arm/mach-spear6xx/spear6xx.c
+> @@ -6,6 +6,8 @@
+>   * Copyright (C) 2009 ST Microelectronics
+>   * Rajeev Kumar<rajeev-dlh.kumar@st.com>
+>   *
+> + * Copyright 2012 Stefan Roese <sr@denx.de>
+> + *
+>   * This file is licensed under the terms of the GNU General Public
+>   * License version 2. This program is licensed "as is" without any
+>   * warranty of any kind, whether express or implied.
+> @@ -15,6 +17,10 @@
+>  #include <linux/amba/pl061.h>
+>  #include <linux/ptrace.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+>  #include <asm/hardware/vic.h>
+>  #include <asm/irq.h>
+>  #include <asm/mach/arch.h>
+> @@ -99,12 +105,6 @@ struct amba_device gpio_device[] = {
 >  	}
-> @@ -128,7 +130,9 @@ static int __init early_cachepolicy(char *p)
->  		cachepolicy = CPOLICY_WRITEBACK;
->  	}
->  	flush_cache_all();
-> +#ifdef CONFIG_CPU_CP15
->  	set_cr(cr_alignment);
-> +#endif
+>  };
+>  
+> -/* This will add devices, and do machine specific tasks */
+> -void __init spear6xx_init(void)
+> -{
+> -	/* nothing to do for now */
+> -}
+> -
+>  /* This will initialize vic */
+>  void __init spear6xx_init_irq(void)
+>  {
+> @@ -181,3 +181,60 @@ static void __init spear6xx_timer_init(void)
+>  struct sys_timer spear6xx_timer = {
+>  	.init = spear6xx_timer_init,
+>  };
+> +
+> +/*
+> + * Devicetree specific init structs/functions:
+> + * Once the SPEAr600 devicetree support has matured, we can remove
+> + * spear600_evb.c and the non-devicetree support above in this file.
+> + */
+> +
+> +/*
+> + * Add auxdata so that clock name matching doesn't fail in device
+> + * drivers
+> + */
+> +struct of_dev_auxdata spear600_auxdata_lookup[] __initdata = {
+> +	OF_DEV_AUXDATA("arm,pl011", SPEAR6XX_ICM1_UART0_BASE,
+> +		       "uart0", NULL),
+> +	OF_DEV_AUXDATA("arm,pl011", SPEAR6XX_ICM1_UART1_BASE,
+> +		       "uart1", NULL),
+> +	OF_DEV_AUXDATA("arm,pl061", SPEAR6XX_CPU_GPIO_BASE,
+> +		       "gpio0", NULL),
+> +	OF_DEV_AUXDATA("arm,pl061", SPEAR6XX_ICM3_GPIO_BASE,
+> +		       "gpio1", NULL),
+> +	OF_DEV_AUXDATA("arm,pl061", SPEAR6XX_ICM2_GPIO_BASE,
+> +		       "gpio2", NULL),
+> +	OF_DEV_AUXDATA("snps,designware-i2c", SPEAR6XX_ICM1_I2C_BASE,
+> +		       "i2c_designware.0", NULL),
+update the clkdev no more OF_DEV_AUXDATA
 
-However it might be best to provide a dummy set_cr() instead of 
-#ifdef'ing it out everywhere.
 
+please keep me in Cc
 
-Nicolas
+Best Regards,
+J.
