@@ -1,40 +1,61 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 15 Mar 2012 00:04:04 +0100
-Subject: [GIT PULL] ARM: OMAP: i2c, gpio, spi and regulator DTS updates
-In-Reply-To: <20120314225743.GT12083@atomide.com>
-References: <4F5E89B4.4010505@ti.com> <4F6120A5.6050407@ti.com>
- <20120314225743.GT12083@atomide.com>
-Message-ID: <4F6123E4.5090808@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 14 Mar 2012 16:18:57 -0700
+Subject: [PATCH v4 11/12] ARM: EXYNOS: add support device tree enabled
+ board file for EXYNOS5
+In-Reply-To: <20120314223715.GA13872@quad.lixom.net>
+References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
+ <1331736138-28964-12-git-send-email-kgene.kim@samsung.com>
+ <20120314223715.GA13872@quad.lixom.net>
+Message-ID: <4F612761.6050903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/14/2012 11:57 PM, Tony Lindgren wrote:
-> * Cousson, Benoit<b-cousson@ti.com>  [120314 15:52]:
->> Hi Tony,
->>
->> It looks like Chris Ball just queued  the HSMMC DT stuff from
->> Rajendra, so I can add as well the MMC DTS for OMAP3 and OMAP4 as
->> well.
->>
->> It is fine for an update?
+Olof Johansson wrote:
+> On Wed, Mar 14, 2012 at 07:42:17AM -0700, Kukjin Kim wrote:
+>> This patch adds a new EXYNOS5 compatible device tree enabled board
+>> When using this, a corresponding device tree blob which describes the
+>> board's properties should be supplied at boot time to the kernel.
 >
-> Sure, I'm not planning to pull this until after the merge
-> window.
-
-OK, so we will not have the DTS support for the new drivers for 3.4 :-(
-
-Well, if you pull that in a lo branch, that will be enough to base the 
-further work on it.
-
->> Than I can add as Kevin's patch for twl irq_base removal.
+> Hi,
 >
-> Hmm I don't follow. That's needed first as a fix for the
-> merge window?
+Hi Olof,
 
-No, not that one. It is just some more cleanup on top of the one Felipe 
-already did in the twl series I've just sent to Samuel.
-But if you do not plan to pull that series for 3.4, that does not really 
-matter.
+> Sorry, missed this last time around:
+>
+No problem and thanks.
 
-Regards,
-Benoit
+>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>> index a2ed05c..ac24386 100644
+>> --- a/arch/arm/mach-exynos/Kconfig
+>> +++ b/arch/arm/mach-exynos/Kconfig
+>> @@ -362,7 +362,18 @@ config MACH_SMDK4412
+>>   	  Machine support for Samsung SMDK4412
+>>   endif
+>>
+>> -comment "Flattened Device Tree based board for Exynos4 based SoC"
+>> +if ARCH_EXYNOS5
+>> +
+>> +comment "EXYNOS5250 Boards"
+>> +
+>> +config MACH_SMDK5250
+>> +	bool "SMDK5250"
+>> +	select SOC_EXYNOS5250
+>> +	help
+>> +	  Machine support for Samsung SMDK5250
+>> +endif
+>
+>
+> There's no board file for SMDK5250 in this series (and there shouldn't be since
+> it should all be covered by MACH_EXYNOS5_DT. So the above config option can go
+> away.
+>
+Yeah, you're right. I think, it seem that remained after just testing 
+anyway, it will be fixed before sending pull request.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
