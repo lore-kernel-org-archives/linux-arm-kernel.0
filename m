@@ -1,47 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 14 Mar 2012 13:00:56 -0700
-Subject: [PATCH] ARM: Kconfig: Remove duplicate IRQ Kconfig entries
-Message-ID: <1331755256-31163-1-git-send-email-sboyd@codeaurora.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 14 Mar 2012 21:06:30 +0100
+Subject: [PATCH v3 2/5] ARM: Add a printk loglevel modifier
+In-Reply-To: <201203141312.51547.arnd@arndb.de>
+References: <20120314101928.GA29474@pengutronix.de>
+ <1331720516-11801-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <201203141312.51547.arnd@arndb.de>
+Message-ID: <20120314200630.GB2391@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These kconfig entries are already defined in kernel/irq/Kconfig
-so select them instead of redefining them.
+On Wed, Mar 14, 2012 at 01:12:51PM +0000, Arnd Bergmann wrote:
+> On Wednesday 14 March 2012, Uwe Kleine-K?nig wrote:
+> > This is a needed followup for
+> > 
+> >         ARM: protect usage of cr_alignment by #ifdef CONFIG_CPU_CP15
+> > 
+> > otherwise no newline is printed for !CONFIG_CPU_CP15
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > Should this be folded into the
+> > 
+> >         ARM: protect usage of cr_alignment by #ifdef CONFIG_CPU_CP15
+> > 
+> > patch? Or should it come before it?
+> > 
+> 
+> I think this patch needs a better explanation. It looks to me that
+> it's simply a bug fix, because every printk that is not a continuation
+> of a previous printk needs a KERN_* line. In that case, it should
+> just get applied as a bug fix independent of the other patches.
+> 
+> However, if you sometimes don't have a newline after the previous
+> printk, this patch is actually wrong and should not get applied at
+> all.
+I don't get your reasoning here.
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/Kconfig |   10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+An (independant) printk (that is expected to start at a new line) must
+start with KERN_SOMETHING iff the previous printk always ends in \n?
+Probably not. 
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7a08e37..a3ae6e9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -30,6 +30,8 @@ config ARM
- 	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
- 	select HAVE_C_RECORDMCOUNT
- 	select HAVE_GENERIC_HARDIRQS
-+	select HARDIRQS_SW_RESEND
-+	select GENERIC_IRQ_PROBE
- 	select GENERIC_IRQ_SHOW
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
- 	select GENERIC_PCI_IOMAP
-@@ -125,14 +127,6 @@ config TRACE_IRQFLAGS_SUPPORT
- 	bool
- 	default y
- 
--config HARDIRQS_SW_RESEND
--	bool
--	default y
--
--config GENERIC_IRQ_PROBE
--	bool
--	default y
--
- config GENERIC_LOCKBREAK
- 	bool
- 	default y
+Independently of the correctness of the first patch that splits the
+printk I'm just taking it as an example:
+
+In this case the two printks in question are:
+
+		printk("CPU: %s [%08x] revision %d (ARMv%s)", ...);
+	#ifdef CONFIG_CPU_CP15
+		printk(KERN_CONT ", cr=%08lx\n", cr_alignment);
+	#endif
+
+and
+
+		printk("CPU: %s data cache, %s instruction cache\n", ...)
+
+In this case it's correct to add KERN_INFO to the last printk, isn't it?
+When would you consider it to be wrong?
+
+If you want to have the first group of printks to always end in \n, I'd
+have to do:
+
+		printk("CPU: %s [%08x] revision %d (ARMv%s)", ...);
+	#ifdef CONFIG_CPU_CP15
+		printk(KERN_CONT ", cr=%08lx", cr_alignment);
+	#endif
+		printk(KERN_CONT "\n");
+
+but ISTR Linus (Torvalds) telling me that KERN_CONT "\n" is wrong and
+should just be skipped.
+
+Best regards
+Uwe
+
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
