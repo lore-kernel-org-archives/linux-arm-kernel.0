@@ -1,29 +1,40 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 14 Mar 2012 10:22:38 -0700
-Subject: [GIT PULL] cpufreq: OMAP updates for v3.4
-In-Reply-To: <CANOLnON91vXWb2L-FXjz3sqq-9j5SaEodtpt_yvFiN33D4Q3Ow@mail.gmail.com>
- (Grazvydas Ignotas's message of "Wed, 14 Mar 2012 18:41:51 +0200")
-References: <87y5rci2na.fsf@ti.com>
- <CANOLnON91vXWb2L-FXjz3sqq-9j5SaEodtpt_yvFiN33D4Q3Ow@mail.gmail.com>
-Message-ID: <87wr6ngkrl.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Mar 2012 10:26:01 -0700
+Subject: [GIT PULL 1/7] non-critical fixes part3 for upcoming merge window
+In-Reply-To: <201203141658.08234.arnd@arndb.de>
+References: <4f591c4d.e471340a.1f3f.3a69SMTPIN_ADDED@mx.google.com>
+ <20120310182425.GA698@quad.lixom.net>
+ <20120314163547.GO12083@atomide.com>
+ <201203141658.08234.arnd@arndb.de>
+Message-ID: <20120314172600.GP12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grazvydas Ignotas <notasas@gmail.com> writes:
+* Arnd Bergmann <arnd@arndb.de> [120314 10:00]:
+> On Wednesday 14 March 2012, Tony Lindgren wrote:
+> > * Olof Johansson <olof@lixom.net> [120310 10:26]:
+> > > On Thu, Mar 08, 2012 at 12:53:29PM -0800, Tony Lindgren wrote:
+> > > > Hi Olof,
+> > > > 
+> > > > Here are two more pre-emptive fixes for upcoming merge
+> > > > window to pull into arm-soc/next/fixes-non-critical.
+> > > > 
+> > > > Now with the fixes finallny out of the way after all
+> > > > the cleanup related changes, as a reply to this pull
+> > > > request I'm posting some more pull requests for cleanup
+> > > > and some minor board changes.
+> > > 
+> > > Pulled request 1-7.
+> > 
+> > Now with another -rc, can you please pull in also
+> > 2 - 7 in this series?
+> 
+> Hi Tony,
+> 
+> I'm pretty sure that Olof pulled all the branches the first time
+> around, i.e. 1-7, not just 1/7. Please check the for-next
+> branch and tell us if there is anything still missing.
 
-[...]
+Indeed, all seven are there! Thanks,
 
->> Russell King (1):
->> ? ? ?cpufreq: OMAP driver depends CPUfreq tables
->
-> It seems this one got messed up, it says "default ARCH_OMAP2PLUS"
-> instead of depends.
-
-That was intentional.  What do you think is messed up about it?
-
-It's the same as saying:
-
-     depends on ARCH_OMAP2PLUS
-     default y
-
-Kevin
+Tony
