@@ -1,48 +1,36 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 14 Mar 2012 19:38:38 +0200
-Subject: [GIT PULL] cpufreq: OMAP updates for v3.4
-In-Reply-To: <87wr6ngkrl.fsf@ti.com>
-References: <87y5rci2na.fsf@ti.com>
- <CANOLnON91vXWb2L-FXjz3sqq-9j5SaEodtpt_yvFiN33D4Q3Ow@mail.gmail.com>
- <87wr6ngkrl.fsf@ti.com>
-Message-ID: <CANOLnON+hHtnjo9samAqvXp_nVJMjQ7CnxMCe7ggO4UwYaz4rw@mail.gmail.com>
+From: mvs@tigris.de (Maximilian Schwerin)
+Date: Wed, 14 Mar 2012 18:38:15 +0100
+Subject: [PATCH] OMAP3: OPP: Test for IVA subsystem before attempting to add
+ IVA OPP
+Message-ID: <1331746695-24372-1-git-send-email-mvs@tigris.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 7:22 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Grazvydas Ignotas <notasas@gmail.com> writes:
->
-> [...]
->
->>> Russell King (1):
->>> ? ? ?cpufreq: OMAP driver depends CPUfreq tables
->>
->> It seems this one got messed up, it says "default ARCH_OMAP2PLUS"
->> instead of depends.
->
-> That was intentional. ?What do you think is messed up about it?
->
-> It's the same as saying:
->
-> ? ? depends on ARCH_OMAP2PLUS
-> ? ? default y
+From: Steve Sakoman <steve@sakoman.com>
 
-Hm, somehow I've never encountered this syntax, but it more looks like
-it means "default y if ARCH_OMAP2PLUS" instead of that.
+Don't try to add IVA OPPs for OMAP3 versions not containing an IVA
+subsystem, as this would make omap_init_opp_table fail.
 
-Checked this with menuconfig now:
-  default ARCH_OMAP2PLUS
-resolves to:
-  ARCH_HAS_CPUFREQ [=y] && CPU_FREQ [=y] && ARM [=y]
+Signed-off-by: Steve Sakoman <steve@sakoman.com>
+Signed-off-by: Maximilian Schwerin <mvs@tigris.de>
+---
+ arch/arm/mach-omap2/opp.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-..which might cause build break when OMAP is not selected, and
-
-  depends on ARCH_OMAP2PLUS
-  default y
-resolves to:
-  ARCH_HAS_CPUFREQ [=y] && CPU_FREQ [=y] && ARM [=y] && ARCH_OMAP2PLUS [=y]
-
-..which should be randconfig friendly.
-
+diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+index 9262a6b..414f2ec 100644
+--- a/arch/arm/mach-omap2/opp.c
++++ b/arch/arm/mach-omap2/opp.c
+@@ -62,6 +62,10 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+ 				__func__, i);
+ 			return -EINVAL;
+ 		}
++
++		if ((strcmp(opp_def->hwmod_name,"iva") == 0) && !omap3_has_iva())
++			continue;
++
+ 		oh = omap_hwmod_lookup(opp_def->hwmod_name);
+ 		if (!oh || !oh->od) {
+ 			pr_warn("%s: no hwmod or odev for %s, [%d] "
 -- 
-Gra?vydas
+1.7.0.4
