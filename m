@@ -1,52 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Mar 2012 13:27:00 +0000
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <201203141136.48513.sr@denx.de>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203140948.44823.arnd@arndb.de> <201203141136.48513.sr@denx.de>
-Message-ID: <201203141327.01038.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 14 Mar 2012 14:36:57 +0100
+Subject: [GIT PULL] mfd: twl: Fix for irqdomain/next + SPARSE_IRQ + MMC card
+ detect
+Message-ID: <4F609EF9.7040602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Stefan Roese wrote:
-> On Wednesday 14 March 2012 10:48:44 Arnd Bergmann wrote:
-> > > > I would suggest you convert these to DT next so you can remove the
-> > > > amba_devs list. Which devices are these? If they are pl061 and
-> > > > pl010/pl011, the binding should be really easy to do.
-> > > 
-> > > Yes. I really wanted to do that. But from a quick look at the pl011
-> > > driver (drivers/tty/serial/amba-pl011.c), this driver doesn't support DT
-> > > probing. I might have missed something here though. And ideas?
-> > 
-> > amba primecell devices don't actually need to register to a "compatible"
-> > property, they are probed using the primecell ID, and the device tree
-> > is just used to tell the system about memory and IRQ resources.
-> 
-> Ahh, I see. Let me see, if I can get this working...
+Hi Samuel,
 
-I just saw that there is a patch series for pl061 that Rob Herring did at  
+Here is a fix + cleanup + SPARSE_IRQ series for TWL4030 and TWL6030.
 
-git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
+I added the patch from Peter as well.
 
-Please have a look at that branch first.
+Please note that this series does depend on the irqdomain/next series
+from Grant.
 
-> > Don't worry about the the gpio and uart devices if they are not in the
-> > first initial version. I do think that they should be done fairly soon
-> > though, before we get into most of the other devices.
-> > 
-> > It's ok if you put a lot of the other devices in the dts file though,
-> > like the ethernet device, it gives a better overview of what is actually
-> > there, even if the driver does not actually use it yet.
-> 
-> My initial idea was to push the devices once their DT support is accepted. 
-> Otherwise the bindings are still not settled.
+It is based on your current for-next branch + Grant's series merged on top.
 
-Right, that makes sense. However, you can add a property containing
+Regards,
+Benoit
 
-	status = "disabled;
 
-so that the device is visible in the source but no platform device gets
-generated. That would have no consequences at run time but can be helpful
-for review.
+The following changes since commit 81d14f4516578ca71d7f97612cb2b9cd4db0e7dd:
+  Benoit Cousson (1):
+        Merge remote branch 'grant/irqdomain/next' into HEAD
 
-	Arnd
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/twl_irq_gpio_mmc_fix
+
+Benoit Cousson (8):
+      mfd: twl6030-irq: Return twl6030_mmc_card_detect IRQ for board setup
+      ARM: OMAP2+: board-omap4-*: Do not use anymore TWL6030_IRQ_BASE in board files
+      mfd: twl-core: Remove references already defined in header file
+      mfd: twl-core: Move IRQ allocation into twl[4030|6030]-irq files
+      mfd: twl4030-irq: Make SIH SPARSE_IRQ capable
+      mfd: twl-*: Replace pr_ macros by the dev_ equivalent and do various cleanups
+      gpio/twl: Allocate irq_desc dynamically for SPARSE_IRQ support
+      gpio/twl: Add DT support to gpio-twl4030 driver
+
+Felipe Balbi (3):
+      mfd: twl-core: don't depend on pdata->irq_base/end
+      mfd: twl-core: remove unneeded header
+      mfd: twl4030-irq: micro-optimization on IRQ handler
+
+Peter Ujfalusi (1):
+      mfd: twl-core: Detach twl6040 from the pmic mfd driver
+
+ .../devicetree/bindings/gpio/gpio-twl4030.txt      |   23 +++
+ arch/arm/mach-omap2/board-4430sdp.c                |   13 +-
+ arch/arm/mach-omap2/board-omap4panda.c             |   15 +-
+ drivers/gpio/gpio-twl4030.c                        |  111 +++++++++------
+ drivers/mfd/twl-core.c                             |  154 +++++++++-----------
+ drivers/mfd/twl-core.h                             |    4 +-
+ drivers/mfd/twl4030-irq.c                          |   83 ++++++-----
+ drivers/mfd/twl6030-irq.c                          |   71 ++++++----
+ include/linux/i2c/twl.h                            |    2 +-
+ 9 files changed, 267 insertions(+), 209 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-twl4030.txt
