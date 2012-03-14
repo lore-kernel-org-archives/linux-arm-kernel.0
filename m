@@ -1,54 +1,37 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 14 Mar 2012 08:07:28 +0100
-Subject: [PATCH 2/7] of: add clock providers
-In-Reply-To: <1331680947-29861-3-git-send-email-robherring2@gmail.com>
-References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
- <1331680947-29861-3-git-send-email-robherring2@gmail.com>
-Message-ID: <20120314070728.GC2659@avionic-0098.mockup.avionic-design.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 14 Mar 2012 00:08:17 -0700
+Subject: [PATCH v3 00/12] ARM: EXYNOS: add support new EXYNOS5250
+In-Reply-To: <20120314035728.GC2531@quad.lixom.net>
+References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
+ <201203131622.09048.arnd@arndb.de> <20120314035728.GC2531@quad.lixom.net>
+Message-ID: <4F6043E1.2090507@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring wrote:
-> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-[...]
-> +clock-output-names: Recommended to be a list of strings of clock output signal
-> +		    names indexed by the first cell in the clock specifier.
-> +		    However, the meaning of clock-output-name is domain
+On 03/13/12 20:57, Olof Johansson wrote:
+> On Tue, Mar 13, 2012 at 04:22:08PM +0000, Arnd Bergmann wrote:
+>> On Tuesday 13 March 2012, Kukjin Kim wrote:
+>>>
+>>> This patch adds support EXYNOS5250 SoC which has two A15 cores
+>>> can be used on mobile and tablet devices.
+>>
+>> Looks basically ok to me. I've commented on patches 5 and 9 and
+>> in both cases, I would either like to see the patch get dropped
+>> or the changeset description expanded to give a good explanation
+>> why the change is actually needed.
+>
+> Agree, looks quite reasonable. I had a few nits as well but nothing
+> major.
+>
+Hi Arnd, Olof,
 
-"clock-output-names"?
+Thank you for kindly comments on this.
+Let me address comments from you and re-submit in a couple of hours.
 
-> +		    specific to the clock provider, and is only provided to
-> +		    encourage using the same meaning for the majority of clock
-> +		    providers.  This format may not work for clock providers
-> +		    using a complex clock specifier format.  In those cases it
-> +		    is recommended to omit this property and create a binding
-> +		    specific names property.
-> +
-> +		    Clock consumer nodes must never directly reference
-> +		    the provider's clock-output-name property.
+Thanks.
 
-Ditto.
-
-[...]
-> diff --git a/Documentation/devicetree/bindings/clock/fixed-clock.txt b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-> new file mode 100644
-> index 0000000..9a75342
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/fixed-clock.txt
-> @@ -0,0 +1,21 @@
-> +Binding for simple fixed-rate clock sources.
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/fixed-clock.txt
-
-This document references itself.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120314/f733a8bd/attachment.sig>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
