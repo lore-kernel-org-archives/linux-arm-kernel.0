@@ -1,55 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 14 Mar 2012 14:20:03 +0000
-Subject: [PATCH 5/5] MMC: mmci: Add required documentation for Device Tree
- bindings
-In-Reply-To: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1331734803-17954-6-git-send-email-lee.jones@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 14 Mar 2012 07:23:59 -0700
+Subject: [linux-pm] [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <CAMbhsRRD2bdkcUZvScb-cF05e=R3h69bNVaTPFX4jBKBBOjuMg@mail.gmail.com>
+ (Colin Cross's message of "Tue, 13 Mar 2012 17:47:20 -0700")
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <4F1929E9.7070707@linaro.org> <8762e8kqi6.fsf@ti.com>
+ <CAMbhsRRZ+xt179RN32-+eBWngbRow=MpKV1XcLvG-sHGF6VOJA@mail.gmail.com>
+ <CAMbhsRRD2bdkcUZvScb-cF05e=R3h69bNVaTPFX4jBKBBOjuMg@mail.gmail.com>
+Message-ID: <87mx7jjm68.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This provides full documentation detailing each compulsory,
-optional and device (variant) specific properties available
-for use within the MMCI Device Tree.
+Colin Cross <ccross@android.com> writes:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/mmc/mmci.txt |   27 ++++++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/mmci.txt
+> On Tue, Mar 13, 2012 at 5:28 PM, Colin Cross <ccross@android.com> wrote:
+>> On Tue, Mar 13, 2012 at 4:52 PM, Kevin Hilman <khilman@ti.com> wrote:
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-new file mode 100644
-index 0000000..946f080
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-@@ -0,0 +1,27 @@
-+* ARM PrimeCell MultiMedia Card Interface (MMCI) PL180/1
-+
-+The ARM PrimeCell MMCI PL180 and PL181 provides and interface for 
-+reading and writing to MultiMedia and SD cards alike.
-+
-+Required properties:
-+- compatible             : contains "arm,pl18x", "arm,primecell".
-+- reg                    : contains pl18x registers and length.
-+- interrupts             : contains the device IRQ(s).
-+- arm,primecell-periphid : contains the PrimeCell Peripheral ID.
-+
-+Optional properties:
-+- ocr_mask               : contains the regulator oscillator mask
-+- wp-gpios               : contains any write protect (ro) gpios
-+- cd-gpios               : contains any card detection gpios
-+- cd-invert              : indicates whether the cd gpio is inverted 
-+- clock_frequency        : contains the maximum operating frequency
-+- mmc_cap_4_bit_data     : indicates whether device is 4 bit capable
-+- mmc_cap_8_bit_data     : indicates whether device is 8 bit capable
-+- mmc_cap_mmc_highspeed  : indicates whether MMC is high speed capable
-+- mmc_cap_sd_highspeed   : indicates whether SD is high speed capable
-+
-+ux500 variant specific properties:
-+- gpio-en                : contains the level-shifter enable gpio
-+- gpio-vsel              : contains the level-shifter voltage select gpio
-+- tx_dst_dev_type        : contains the tx destination device (DMA) 
-+- rx_src_dev_type        : contains the rx source device (DMA)
--- 
-1.7.5.4
+[...]
+
+>>>
+>>> Checking the ready_count seemed like an easy way to do this, but did you
+>>> have any other mechanisms in mind for CPUs to communicate that they've
+>>> exited/aborted?
+>>
+>> Why not set a flag from CPU1 when it exits the low power state, and
+>> have CPU0 spin on the powerdomain register or the flag? ?You can then
+>> use the parallel barrier function to ensure both cpus have seen the
+>> flag and reset it to 0 before returning.
+>
+> I realized the parallel barrier helper was not included in the patch
+> set I posted, it will be in the next patch set.  
+
+Do you have an ETA for the next patchset?  I'll be glad to give it a
+spin on OMAP4.
+
+> Short version, no caller to cpuidle_coupled_parallel_barrier will
+> return before all cpus in the coupled set have called it.  It allows
+> you to resynchronize the cpus after an abort to ensure they have all
+> seen the abort flag before clearing it and returning, leaving
+> everything in the correct state for the next idle attempt.
+
+OK, this sounds like it will work well for what I need.
+
+Kevin
