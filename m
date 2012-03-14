@@ -1,40 +1,36 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Mar 2012 08:10:30 -0500
-Subject: [GIT PULL] imx irq_domain migration
-In-Reply-To: <20120314050837.GB21337@S2101-09.ap.freescale.net>
-References: <20120216154941.GB11758@r65073-Latitude-D630>
- <4F3D41D2.5090203@gmail.com>
- <20120314050837.GB21337@S2101-09.ap.freescale.net>
-Message-ID: <4F6098C6.7050503@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Mar 2012 13:12:51 +0000
+Subject: [PATCH v3 2/5] ARM: Add a printk loglevel modifier
+In-Reply-To: <1331720516-11801-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20120314101928.GA29474@pengutronix.de>
+ <1331720516-11801-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <201203141312.51547.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2012 12:08 AM, Shawn Guo wrote:
-> On Thu, Feb 16, 2012 at 11:50:10AM -0600, Rob Herring wrote:
->> Shawn,
->>
->> On 02/16/2012 09:49 AM, Shawn Guo wrote:
->>> Hi Rob,
->>>
->>> Please pull imx irq_domain support below. It's based on Grant's
->>> irqdomain/next today with your generic-chip series applied on top
->>> of it.
->>
->> You're asking me to pull changes on top of a branch that I don't even
->> have as you've rebased my changes. While it would work I don't think
->> this is the right flow. Plus there is not really any reason for iMX
->> changes to go thru me.
->>
->> Either Grant needs to stabilize his branch so you and I can send him
->> pull requests or he can pull in our changes and rebase them as he
->> rebases. I already asked him to do just that with my 1 patch others are
->> dependent on.
->>
-> Hi Grant,
+On Wednesday 14 March 2012, Uwe Kleine-K?nig wrote:
+> This is a needed followup for
 > 
-> Would you consider to take this request after you take Rob's
-> generic_irq one?
+>         ARM: protect usage of cr_alignment by #ifdef CONFIG_CPU_CP15
+> 
+> otherwise no newline is printed for !CONFIG_CPU_CP15
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Should this be folded into the
+> 
+>         ARM: protect usage of cr_alignment by #ifdef CONFIG_CPU_CP15
+> 
+> patch? Or should it come before it?
+> 
 
-You'll need rebase your branch as I did since Grant did.
+I think this patch needs a better explanation. It looks to me that
+it's simply a bug fix, because every printk that is not a continuation
+of a previous printk needs a KERN_* line. In that case, it should
+just get applied as a bug fix independent of the other patches.
 
-Rob
+However, if you sometimes don't have a newline after the previous
+printk, this patch is actually wrong and should not get applied at
+all.
+
+	Arnd
