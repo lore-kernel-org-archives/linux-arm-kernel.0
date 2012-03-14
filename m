@@ -1,30 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Mar 2012 15:57:43 -0700
-Subject: [GIT PULL] ARM: OMAP: i2c, gpio, spi and regulator DTS updates
-In-Reply-To: <4F6120A5.6050407@ti.com>
-References: <4F5E89B4.4010505@ti.com>
- <4F6120A5.6050407@ti.com>
-Message-ID: <20120314225743.GT12083@atomide.com>
+From: b04825@freescale.com (Timur Tabi)
+Date: Wed, 14 Mar 2012 18:00:41 -0500
+Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
+ codec-handle
+In-Reply-To: <20120314122723.GC3133@opensource.wolfsonmicro.com>
+References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
+ <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
+ <4F591B8D.8090705@freescale.com>
+ <20120309013216.GH2499@S2101-09.ap.freescale.net>
+ <4F5FD706.8040209@freescale.com>
+ <20120313234638.GY3177@opensource.wolfsonmicro.com>
+ <4F6008FA.3040805@freescale.com>
+ <20120314122723.GC3133@opensource.wolfsonmicro.com>
+Message-ID: <4F612319.50302@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cousson, Benoit <b-cousson@ti.com> [120314 15:52]:
-> Hi Tony,
+Mark Brown wrote:
+
+> All of which is exactly the same as for any other device and essentially
+> irrelevant to how we define the bindings for the cards.
+
+So using imx-audio-sgtl5000.txt as an example, you're saying that if I
+have two SSIs, I should do this in my device tree:
+
+sound1 {
+	compatible = "fsl,imx51-babbage-sgtl5000",
+		     "fsl,imx-audio-sgtl5000";
+	model = "imx51-babbage-sgtl5000";
+	ssi-controller = <&ssi1>;
+	audio-codec = <&sgtl5000_1>;
+	mux-int-port = <1>;
+	mux-ext-port = <3>;
+};
+
+sound2 {
+	compatible = "fsl,imx51-babbage-sgtl5000",
+		     "fsl,imx-audio-sgtl5000";
+	model = "imx51-babbage-sgtl5000";
+	ssi-controller = <&ssi2>;
+	audio-codec = <&sgtl5000_2>;
+	mux-int-port = <1>;
+	mux-ext-port = <3>;
+};
+
+>>> The biggest improvement is that the SoC binding knows nothing about the
+>>> card binding at all, cards are completely separate and are free to
+>>> define any binding they choose using any number of on-SoC and off-SoC
+>>> devices.
 > 
-> It looks like Chris Ball just queued  the HSMMC DT stuff from
-> Rajendra, so I can add as well the MMC DTS for OMAP3 and OMAP4 as
-> well.
+>> Ok, I don't understand that at all.
 > 
-> It is fine for an update?
+> Do you have some questions about the above?  What is it that you find
+> unclear?   
 
-Sure, I'm not planning to pull this until after the merge
-window.
- 
-> Than I can add as Kevin's patch for twl irq_base removal.
+What's the difference between an "SoC binding" and a "card binding"?
 
-Hmm I don't follow. That's needed first as a fix for the
-merge window?
+> We've been through this *repeatedly*, including in the message you're
+> replying to, and we're still going back to square one every time you
+> decide to start talking about device tree again.  This is frustrating
+> in the extreme.
 
-Regards,
+I'm sorry you're frustrated, but so am I.  I still don't understand why
+the binding that I invented for the SSI driver isn't good enough for i.MX.
+ The binding and the code was documented and approved a long time ago.
+Why can't we keep the same binding on i.MX, to keep the code simpler?
 
-Tony 
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
