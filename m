@@ -1,106 +1,89 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 13 Mar 2012 23:33:44 -0700
-Subject: [PATCH v3 08/12] ARM: EXYNOS: support EINT for EXYNOS4 and EXYNOS5
-In-Reply-To: <20120314035203.GA2531@quad.lixom.net>
-References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
- <1331652643-12626-9-git-send-email-kgene.kim@samsung.com>
- <20120314035203.GA2531@quad.lixom.net>
-Message-ID: <4F603BC8.3020900@samsung.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 14 Mar 2012 14:42:25 +0800
+Subject: [PATCH v1 2/5] mmc: mxs-mmc: add dt probe support
+In-Reply-To: <20120313174238.CE9133E053B@localhost>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-3-git-send-email-b29396@freescale.com>
+ <20120313174238.CE9133E053B@localhost>
+Message-ID: <20120314064224.GA25735@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/12 20:52, Olof Johansson wrote:
-> Hi,
->
-> A couple of comments below.
->
-I agree, and will address comments from you.
+On Wed, Mar 14, 2012 at 01:42:38AM +0800, Grant Likely wrote:
+> On Tue, 13 Mar 2012 16:47:05 +0800, Dong Aisheng <b29396@freescale.com> wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > ---
+> > The patch is still using a private way for dma part binding
+> > since the common dma binding is still under discussion.
+> > http://www.spinics.net/lists/linux-omap/msg65528.html
+> > 
+> > Will update to use common dma binding when it hits mainline.
+> > ---
+> >  .../devicetree/bindings/mmc/fsl-mxs-mmc.txt        |   23 ++++++
+> >  drivers/mmc/host/mxs-mmc.c                         |   82 +++++++++++++++++++-
+> >  2 files changed, 102 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt b/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt
+> > new file mode 100644
+> > index 0000000..adc1142
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mmc/fsl-mxs-mmc.txt
+> > @@ -0,0 +1,23 @@
+> > +* FREESCALE MXS MMC peripheral
+> > +
+> > +Required properties:
+> > +- compatible : Should be "fsl,<chip>-mmc"
+> > +- reg : Should contain registers location and length
+> > +- interrupts : Should contain interrupt.
+> > +  The format is <irq_err irq_dma>.
+> > +- dma_channel: Should contain the dma channel it uses
+> 
+> Don't use '_' in property names.
+> 
+Yes, my mistake.
 
+> The is a generic dma binding being drafted that uses a phandle to the dma
+> controller and the ability to encode channel numbers.  You may want to take
+> a look at it.
+> 
+I will look at it.
+Thanks for the reminder.
+
+...
+> > +	dmares->flags = IORESOURCE_DMA;
+> > +	ret = of_property_read_u32(np, "dma_channel", &dmares->start);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "unable to get dmares from dt\n");
+> > +		return NULL;
+> > +	}
+> > +	dmares->end = dmares->start;
+> > +
+> > +	return dmares;
+> > +}
+> > +
+> > +static int __devinit mxs_mmc_get_of_property(struct platform_device *pdev,
+> > +				struct mxs_mmc_platform_data **ppdata)
+> > +{
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	struct mxs_mmc_platform_data *pdata = *ppdata;
+> > +
+> > +	if (!np)
+> > +		return -ENODEV;
+> > +
+> > +	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+> 
+> Ditto
+> 
+Got it.
+
+> Fix up those comments and you can add my:
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> 
 Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
->
-> On Tue, Mar 13, 2012 at 08:30:39AM -0700, Kukjin Kim wrote:
->> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
->> index 0b53018..72f21e4 100644
->> --- a/arch/arm/mach-exynos/common.c
->> +++ b/arch/arm/mach-exynos/common.c
->> @@ -777,39 +779,24 @@ static int exynos4_irq_eint_set_type(struct irq_data *data, unsigned int type)
->>   	mask = 0x7<<  shift;
->>
->>   	spin_lock(&eint_lock);
->> -	ctrl = __raw_readl(S5P_EINT_CON(EINT_REG_NR(data->irq)));
->> +	ctrl = __raw_readl(EINT_CON(exynos_eint_base, data->irq));
->>   	ctrl&= ~mask;
->>   	ctrl |= newvalue<<  shift;
->> -	__raw_writel(ctrl, S5P_EINT_CON(EINT_REG_NR(data->irq)));
->> +	__raw_writel(ctrl, EINT_CON(exynos_eint_base, data->irq));
->>   	spin_unlock(&eint_lock);
->>
->> -	switch (offs) {
->> -	case 0 ... 7:
->> -		s3c_gpio_cfgpin(EINT_GPIO_0(offs&  0x7), EINT_MODE);
->> -		break;
->> -	case 8 ... 15:
->> -		s3c_gpio_cfgpin(EINT_GPIO_1(offs&  0x7), EINT_MODE);
->> -		break;
->> -	case 16 ... 23:
->> -		s3c_gpio_cfgpin(EINT_GPIO_2(offs&  0x7), EINT_MODE);
->> -		break;
->> -	case 24 ... 31:
->> -		s3c_gpio_cfgpin(EINT_GPIO_3(offs&  0x7), EINT_MODE);
->> -		break;
->> -	default:
->> -		printk(KERN_ERR "No such irq number %d", offs);
->> -	}
->> +	s3c_gpio_cfgpin(irq_to_gpio(data->irq), S3C_GPIO_SFN(0xf));
->
-> irq_to_gpio is going away, so it's not a good idea to add it under that name.
->
-> Add a local function locally at the top of this file instead. and call
-> it something else.
->
->> diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
->> index 80523ca..c09deb6 100644
->> --- a/arch/arm/mach-exynos/include/mach/gpio.h
->> +++ b/arch/arm/mach-exynos/include/mach/gpio.h
->> @@ -146,4 +146,33 @@ enum s5p_gpio_number {
->>   #define ARCH_NR_GPIOS		(EXYNOS4_GPZ(EXYNOS4_GPIO_Z_NR) +	\
->>   				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
->>
->> +#include<linux/types.h>
->> +#include<linux/err.h>
->> +#include<mach/irqs.h>
->> +#include<plat/cpu.h>
->> +
->> +static inline int irq_to_gpio(unsigned int irq)
->> +{
->> +	if (irq<  IRQ_EINT(0))
->> +		return -EINVAL;
->> +
->> +	irq -= IRQ_EINT(0);
->> +	if (irq<  8)
->> +		return soc_is_exynos5250() ?  EXYNOS5_GPX0(irq) :
->> +					 EXYNOS4_GPX0(irq);
->> +	irq -= 8;
->> +	if (irq<  8)
->> +		return soc_is_exynos5250() ?  EXYNOS5_GPX1(irq) :
->> +					 EXYNOS4_GPX1(irq);
->> +	irq -= 8;
->> +	if (irq<  8)
->> +		return soc_is_exynos5250() ?  EXYNOS5_GPX2(irq) :
->> +					 EXYNOS4_GPX2(irq);
->> +	irq -= 8;
->> +	if (irq<  8)
->> +		return soc_is_exynos5250() ?  EXYNOS5_GPX3(irq) :
->> +					 EXYNOS4_GPX3(irq);
->> +	return -EINVAL;
->> +}
->
-> I think this would be cleaner as two small helpers and one check for SoC
-> version instead.
+Regards
+Dong Aisheng
