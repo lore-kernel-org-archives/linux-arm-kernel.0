@@ -1,62 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Mar 2012 17:53:06 -0700
-Subject: [GIT PULL 2/4] Samsung devel-pd for v3.4
-In-Reply-To: <4F5B7C81.6080301@samsung.com>
-References: <4F5B7C81.6080301@samsung.com>
-Message-ID: <CAOesGMg8iv=jE52sFs-np4HXuokMstZt8igHTQBJ4wJNOCae9A@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Wed, 14 Mar 2012 12:18:21 +1100
+Subject: [PATCH v4 02/11] ep93xx: Don't use system controller defines
+ in audio drivers
+In-Reply-To: <201203131209.52031.arnd@arndb.de>
+References: <1331592502-9083-3-git-send-email-rmallon@gmail.com>
+ <201203131209.52031.arnd@arndb.de>
+Message-ID: <4F5FF1DD.5020003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 13/03/12 23:09, Arnd Bergmann wrote:
 
-On Sat, Mar 10, 2012 at 8:08 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd, Olof,
->
-> This is Generic Power Domain patches for EXYNOS. Basically, Thomas' patches,
-> adding support Generic Power Domain patches are in Rafael's tree,
-> linux-pm/linux-next and see below merge commit.
-> http://git.kernel.org/?p=linux/kernel/git/rafael/linux-pm.git;a=commit;h=dcaad77a8074b6de58e745546bc543d5538404f2
-> And this adds hooking up G2D and JPEG to Generic PD.
->
-> Please pull and here is my preferred resolution when merge this after
-> next/board-samsung.
->
-> diff --cc arch/arm/mach-exynos/mach-universal_c210.c
-> index 3663aee,0262417..0b944eb
-> --- a/arch/arm/mach-exynos/mach-universal_c210.c
-> +++ b/arch/arm/mach-exynos/mach-universal_c210.c
-> @@@ -1053,10 -981,6 +1052,7 @@@ static struct platform_device *universa
-> ? ? ? ?&s5p_device_mfc,
-> ? ? ? ?&s5p_device_mfc_l,
-> ? ? ? ?&s5p_device_mfc_r,
-> - ? ? ? &exynos4_device_pd[PD_MFC],
-> - ? ? ? &exynos4_device_pd[PD_LCD0],
-> - ? ? ? &exynos4_device_pd[PD_CAM],
-> ?+ ? ? ?&cam_vt_dio_fixed_reg_dev,
-> ? ? ? ?&cam_i_core_fixed_reg_dev,
-> ? ? ? ?&cam_s_if_fixed_reg_dev,
-> ? ? ? ?&s5p_device_fimc_md,
->
-> If any problems, please kindly let me know.
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
-> The following changes since commit 192cfd58774b4d17b2fe8bdc77d89c2ef4e0591d:
->
-> ?Linux 3.3-rc6 (2012-03-03 17:08:09 -0800)
->
-> are available in the git repository at:
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> next/devel-samsung-pd
+> On Monday 12 March 2012, Ryan Mallon wrote:
+>> This patch has already been applied in Mark's tree. It is posted
+>> for inclusion here because this series is against v3.3-rc7 and
+>> will cause build failures without it. There have been no changes
+>> to the patch since Mark applied it, so it should be okay to
+>> merge into both his tree and the arm-soc tree.
+> 
+> Ok, that should work. However, in the future when you anticipate
+> having to do something like this, I would suggest you do any patches
+> that you want to see applied to multiple branches as git-pull
+> requests, because that allows us to use the same changeset ids.
+
+Okay, the patches still need to be posted as a series for review before
+doing a pull request though right? Should I just put a note on such
+patches (below the changelog) that I am expecting to send them all via
+arm-soc so that other maintainers don't grab individual patches for
+driver support?
+
+> When we apply one patch separately to two branches, we end up
+> with multiple changesets in the git history, which is something
+> we normally try to avoid.
 
 
-Pulled, thanks!
+Okay, thanks for the heads up.
 
-
--Olof
+~Ryan
