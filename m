@@ -1,43 +1,98 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 14 Mar 2012 17:06:28 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the sound-asoc tree
-Message-ID: <20120314170628.4b0b5688441624a7a080d7cd@canb.auug.org.au>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Wed, 14 Mar 2012 06:16:54 +0000
+Subject: [PATCH] arm:da850: register musb device
+In-Reply-To: <4F5F7F91.8010301@mvista.com>
+References: <1331651015-32586-1-git-send-email-prakash.pm@ti.com>
+ <4F5F7F91.8010301@mvista.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3178406C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Sergei,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-imx/mach-imx27_visstrim_m10.c between commit 5ec65ee589fd
-("ASoC: mx27vis-aic32x4: Convert it to platform driver") from the
-sound-asoc tree and commit f52f5a5503b5 ("i.MX27: visstrim_m10: Add video
-support") from the arm-soc tree.
+On Tue, Mar 13, 2012 at 22:40:41, Sergei Shtylyov wrote:
+> On 03/13/2012 06:03 PM, Manjunathappa, Prakash wrote:
+> 
+> > Properly set up the OTG mode thru the CFGCHIP2 register, enable the
+> > USB0_DRVVBUS pin,
+> 
+>     I don't see where you are enabling it.
+> 
 
-I fixed it up (see below) and can carry the fix as necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Yes, I will correct the message.
 
-diff --cc arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-index 428459f,0a1643c..0000000
---- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-+++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-@@@ -263,7 -393,10 +393,11 @@@ static void __init visstrim_m10_board_i
-  	imx27_add_fec(NULL);
-  	imx_add_gpio_keys(&visstrim_gpio_keys_platform_data);
-  	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+ 	platform_device_register_resndata(NULL, "soc-camera-pdrv", 0, NULL, 0,
-+ 				      &iclink_tvp5150, sizeof(iclink_tvp5150));
-+ 	gpio_led_register_device(0, &visstrim_m10_led_data);
-+ 	visstrim_camera_init();
- +	imx_add_platform_device("mx27vis", 0, NULL, 0, NULL, 0);
-  }
-  
-  static void __init visstrim_m10_timer_init(void)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120314/01e70bc7/attachment.sig>
+> > and finally register the MUSB platform device.
+> >
+> > Signed-off-by: Ajay Kumar Gupta<ajay.gupta@ti.com>
+> > Signed-off-by: Manjunathappa, Prakash<prakash.pm@ti.com>
+> > ---
+> > Patche are on top below posted patches:
+> > http://www.spinics.net/lists/linux-usb/msg59656.html
+> 
+> >   arch/arm/mach-davinci/board-da850-evm.c |   12 ++++++++++++
+> >   arch/arm/mach-davinci/usb.c             |    9 +++++++++
+> >   2 files changed, 21 insertions(+), 0 deletions(-)
+> 
+> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> > index 178d178..539e12c 100644
+> > --- a/arch/arm/mach-davinci/board-da850-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> > @@ -787,6 +787,18 @@ static __init void da850_evm_usb_init(void)
+> >   	 */
+> >   	cfgchip2&= ~CFGCHIP2_USB1PHYCLKMUX;
+> >   	cfgchip2 |=  CFGCHIP2_USB2PHYCLKMUX;
+> > +	/*
+> > +	 * We have to override VBUS/ID signals when MUSB is configured into the
+> > +	 * host-only mode -- ID pin will float if no cable is connected, so the
+> > +	 * controller won't be able to drive VBUS thinking that it's a B-device.
+> > +	 * Otherwise, we want to use the OTG mode and enable VBUS comparators.
+> > +	 */
+> > +	cfgchip2 &= ~CFGCHIP2_OTGMODE;
+> > +#if CONFIG_USB_MUSB_DA8XX
+> 
+>     This #ifdef doesn't make sense. It will make driver always work in host mode.
+> 
+
+I will change it to support OTG.
+
+> > +	cfgchip2 |=  CFGCHIP2_FORCE_HOST;
+> > +#else
+> > +	cfgchip2 |=  CFGCHIP2_SESENDEN | CFGCHIP2_VBDTCTEN;
+> 
+>     This is what you need to leave. The driver should always work in OTG mode now.
+> 
+
+Correct, I will fix this.
+
+> > +#endif
+> >
+> >   	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> >
+> > diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
+> > index 25c3520..a941dc5 100644
+> > --- a/arch/arm/mach-davinci/usb.c
+> > +++ b/arch/arm/mach-davinci/usb.c
+> > @@ -284,6 +284,15 @@ void __init da8xx_board_usb_init(const short pins[],
+> >   		goto usb11_setup_fail;
+> >   	}
+> >
+> > +	/*
+> > +	 * TPS2065 switch @ 5V supplies 1 A (sustains 1.5 A),
+> > +	 * with the power on to power good time of 3 ms.
+> > +	 */
+> > +	ret = da8xx_register_usb20(1000, 3);
+> > +	if (ret)
+> > +		pr_warning("%s: USB 2.0 registration failed: %d\n",
+> > +			   __func__, ret);
+> 
+>     Er, why this code is moved there? And how will this work on DA830 -- try to 
+> register MUSB twice? Place this in the board file please where it belongs.
+> 
+
+Yes, I will revert this change.
+
+Thanks,
+Prakash
+
+> WBR, Sergei
+> 
