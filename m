@@ -1,58 +1,118 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Mar 2012 21:40:54 +0000
-Subject: [PATCH v3 2/5] ARM: Add a printk loglevel modifier
-In-Reply-To: <20120314200630.GB2391@pengutronix.de>
-References: <20120314101928.GA29474@pengutronix.de>
- <201203141312.51547.arnd@arndb.de> <20120314200630.GB2391@pengutronix.de>
-Message-ID: <201203142140.55052.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 14 Mar 2012 14:53:45 -0700
+Subject: [PATCH 01/12] mfd: twl-core: don't depend on pdata->irq_base/end
+In-Reply-To: <87pqcegapk.fsf@ti.com> (Kevin Hilman's message of "Wed, 14 Mar
+ 2012 13:59:51 -0700")
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-2-git-send-email-b-cousson@ti.com>
+ <87pqcegapk.fsf@ti.com>
+Message-ID: <87k42metna.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Uwe Kleine-K?nig wrote:
-> I don't get your reasoning here.
-> 
-> An (independant) printk (that is expected to start at a new line) must
-> start with KERN_SOMETHING iff the previous printk always ends in \n?
-> Probably not. 
-> 
-> Independently of the correctness of the first patch that splits the
-> printk I'm just taking it as an example:
-> 
-> In this case the two printks in question are:
-> 
->                 printk("CPU: %s [%08x] revision %d (ARMv%s)", ...);
->         #ifdef CONFIG_CPU_CP15
->                 printk(KERN_CONT ", cr=%08lx\n", cr_alignment);
->         #endif
-> 
-> and
-> 
->                 printk("CPU: %s data cache, %s instruction cache\n", ...)
-> 
-> In this case it's correct to add KERN_INFO to the last printk, isn't it?
-> When would you consider it to be wrong?
+Kevin Hilman <khilman@ti.com> writes:
 
-I forgot about KERN_CONT, which did not exist until a few years ago
-and is still not all that common. Initially, KERN_CONT was just an
-empty string that was used to make it clear when a printk was
-intentionally used as a continuation of the previous line, rather
-than having no KERN_* at all.
+> Benoit Cousson <b-cousson@ti.com> writes:
+>
+>> From: Felipe Balbi <balbi@ti.com>
+>>
+>> With sparse IRQs the driver shouldn't depend at all on
+>> any IRQ values coming from board-file.
+>>
+>> Remove every occurences of pdata->irq_base/end.
+>
+> Well, not quite *every*. :)
+>
+> If the driver isn't going to use those fields anymore, they should also
+> be removed from the pdata struct too[1].  Also, the remaining board/init
+> code that is initializing those fields should be removed as well[2], since
+> it obviously has no effect.
+>
+> The first patch below should probably be folded into this one, and then
+> the 2nd patch removes all the users.
 
-In the example above, the first and the second line should get a KERN_INFO
-or one of the others.
+Below is a correct version of the 2nd patch which removes all the users.
 
-> If you want to have the first group of printks to always end in \n, I'd
-> have to do:
-> 
->                 printk("CPU: %s [%08x] revision %d (ARMv%s)", ...);
->         #ifdef CONFIG_CPU_CP15
->                 printk(KERN_CONT ", cr=%08lx", cr_alignment);
->         #endif
->                 printk(KERN_CONT "\n");
-> 
-> but ISTR Linus (Torvalds) telling me that KERN_CONT "\n" is wrong and
-> should just be skipped.
+The previous version wouldn't apply cleanly because I generated it on
+top of a local branch that also included some other changes to
+twl-common.c from the SMPS regulator series (which seems to have missed
+the window for v3.4.)
 
-Ok, didn't know that.
+This one applies cleanly on your for_3.4/twl_irq_gpio_mmc_fix branch.
 
-	Arnd
+Kevin
+
+>From b59a4754fb66f6f729ebbd0563c4cd2bd2cda56e Mon Sep 17 00:00:00 2001
+From: Kevin Hilman <khilman@ti.com>
+Date: Wed, 14 Mar 2012 13:56:01 -0700
+Subject: [PATCH] ARM: OMAP2+: TWL: remove usage of pdata->irq_base/_end
+
+The driver has been converted to use SPARSE_IRQ and no longer needs to
+be passed IRQ base/end.  The driver no longer uses these fields, so
+remove them from the reamaining users.
+
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/board-2430sdp.c    |    3 ---
+ arch/arm/mach-omap2/board-omap3logic.c |    3 ---
+ arch/arm/mach-omap2/twl-common.c       |   10 ----------
+ 3 files changed, 16 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+index 7370983..7dfcb96 100644
+--- a/arch/arm/mach-omap2/board-2430sdp.c
++++ b/arch/arm/mach-omap2/board-2430sdp.c
+@@ -218,9 +218,6 @@ static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
+ };
+ 
+ static struct twl4030_platform_data sdp2430_twldata = {
+-	.irq_base	= TWL4030_IRQ_BASE,
+-	.irq_end	= TWL4030_IRQ_END,
+-
+ 	/* platform_data for children goes here */
+ 	.gpio		= &sdp2430_gpio_data,
+ 	.vmmc1		= &sdp2430_vmmc1,
+diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+index 4198dd0..0b053b4 100644
+--- a/arch/arm/mach-omap2/board-omap3logic.c
++++ b/arch/arm/mach-omap2/board-omap3logic.c
+@@ -85,9 +85,6 @@ static struct twl4030_gpio_platform_data omap3logic_gpio_data = {
+ };
+ 
+ static struct twl4030_platform_data omap3logic_twldata = {
+-	.irq_base	= TWL4030_IRQ_BASE,
+-	.irq_end	= TWL4030_IRQ_END,
+-
+ 	/* platform_data for children goes here */
+ 	.gpio		= &omap3logic_gpio_data,
+ 	.vmmc1		= &omap3logic_vmmc1,
+diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+index 10b20c6..ce349ac 100644
+--- a/arch/arm/mach-omap2/twl-common.c
++++ b/arch/arm/mach-omap2/twl-common.c
+@@ -129,11 +129,6 @@ static struct regulator_init_data omap3_vpll2_idata = {
+ void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+ 				  u32 pdata_flags, u32 regulators_flags)
+ {
+-	if (!pmic_data->irq_base)
+-		pmic_data->irq_base = TWL4030_IRQ_BASE;
+-	if (!pmic_data->irq_end)
+-		pmic_data->irq_end = TWL4030_IRQ_END;
+-
+ 	/* Common platform data configurations */
+ 	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
+ 		pmic_data->usb = &omap3_usb_pdata;
+@@ -287,11 +282,6 @@ static struct regulator_init_data omap4_clk32kg_idata = {
+ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
+ 				  u32 pdata_flags, u32 regulators_flags)
+ {
+-	if (!pmic_data->irq_base)
+-		pmic_data->irq_base = TWL6030_IRQ_BASE;
+-	if (!pmic_data->irq_end)
+-		pmic_data->irq_end = TWL6030_IRQ_END;
+-
+ 	/* Common platform data configurations */
+ 	if (pdata_flags & TWL_COMMON_PDATA_USB && !pmic_data->usb)
+ 		pmic_data->usb = &omap4_usb_pdata;
+-- 
+1.7.9.2
