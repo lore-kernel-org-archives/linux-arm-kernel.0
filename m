@@ -1,41 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 14 Mar 2012 10:33:52 +0000
-Subject: [PATCH v3 0/5] ARM: Initial support for Cortex-M3
-In-Reply-To: <20120314101928.GA29474@pengutronix.de>
-References: <20120314101928.GA29474@pengutronix.de>
-Message-ID: <20120314103352.GA20899@arm.com>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 14 Mar 2012 11:36:48 +0100
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203140948.44823.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203140840.18333.sr@denx.de> <201203140948.44823.arnd@arndb.de>
+Message-ID: <201203141136.48513.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 10:19:28AM +0000, Uwe Kleine-K?nig wrote:
-> this is the result of reworking Catalin's exception handling patch to
-> stick to the current pt_regs layout. I extended it by two words to save
-> the exception return value. (The 2nd word is unused and only to maintain
-> stack alignment.)
+On Wednesday 14 March 2012 10:48:44 Arnd Bergmann wrote:
+> > > I would suggest you convert these to DT next so you can remove the
+> > > amba_devs list. Which devices are these? If they are pl061 and
+> > > pl010/pl011, the binding should be really easy to do.
+> > 
+> > Yes. I really wanted to do that. But from a quick look at the pl011
+> > driver (drivers/tty/serial/amba-pl011.c), this driver doesn't support DT
+> > probing. I might have missed something here though. And ideas?
 > 
-> Other than that only minor cleanups were done (some of them were
-> suggested by Catalin in reply to my v2 series).
-> 
-> These patches are available at
-> 
-> 	git://git.pengutronix.de/git/ukl/linux.git cortexm3-for-rmk
-> 
-> basing on 3.3-rc7. There are some bits missing to allow a Cortex-M3 to
-> boot. They are contained in the branch efm32 in the same repository
-> together with support for the efm32 SoC if you're interested.
-> The most important parts missing (apart from SoC specific stuff) are
-> interrupt support and Makefile/Kconfig glue.
-> 
-> I'd be happy if these patches made it into 3.4-rc1.
+> amba primecell devices don't actually need to register to a "compatible"
+> property, they are probed using the primecell ID, and the device tree
+> is just used to tell the system about memory and IRQ resources.
 
-That's pretty ambitious. Most maintainers (including Russell) closed
-their trees by now. You can still aim for 3.5-rc1 and ideally have them
-in -next a few weeks before (though only once Russell is fine with the
-patches).
+Ahh, I see. Let me see, if I can get this working...
+ 
+> The pl061 driver has support for setting the gc.base and irq_base using
+> device tree instead of the platform data and that might be enough.
+> 
+> > > Since there is only one upstream board file and that is for the same
+> > > board, we can soon collapse all of it into the base platform support.
+> > > 
+> > > I think you should add all the code from this file to spear6xx.c
+> > > instead of adding a new file. We can then delete the spear600.c and
+> > > spear600_evb.c files once the DT support has matured.
+> > 
+> > Sounds like a plan. I'll rework the patch soon.
+> 
+> Great!
+> 
+> Don't worry about the the gpio and uart devices if they are not in the
+> first initial version. I do think that they should be done fairly soon
+> though, before we get into most of the other devices.
+> 
+> It's ok if you put a lot of the other devices in the dts file though,
+> like the ethernet device, it gives a better overview of what is actually
+> there, even if the driver does not actually use it yet.
 
-> Any constructive feedback welcome.
+My initial idea was to push the devices once their DT support is accepted. 
+Otherwise the bindings are still not settled.
 
-I'll go through the patches sometime next week.
-
--- 
-Catalin
+Thanks,
+Stefan
