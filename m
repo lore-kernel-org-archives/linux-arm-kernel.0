@@ -1,25 +1,120 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 14 Mar 2012 12:38:01 +0000
-Subject: [PATCH v13] Regulator: Add Anatop regulator driver
-In-Reply-To: <1331692152-9256-1-git-send-email-paul.liu@linaro.org>
-References: <1331692152-9256-1-git-send-email-paul.liu@linaro.org>
-Message-ID: <20120314123800.GH3133@opensource.wolfsonmicro.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 14 Mar 2012 20:45:23 +0800
+Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
+In-Reply-To: <20120313172351.97C5E3E053B@localhost>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-2-git-send-email-b29396@freescale.com>
+ <20120313172351.97C5E3E053B@localhost>
+Message-ID: <20120314124512.GG1180@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 10:29:12AM +0800, Ying-Chun Liu (PaulLiu) wrote:
-> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
+On Wed, Mar 14, 2012 at 01:23:51AM +0800, Grant Likely wrote:
+> On Tue, 13 Mar 2012 16:47:04 +0800, Dong Aisheng <b29396@freescale.com> wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > This patch includes basic dt support which can boot via nfs rootfs.
+> > 
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
+> >  arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
+> >  arch/arm/boot/dts/imx28.dtsi                  |   88 +++++++++++++++++++++++++
+> >  arch/arm/mach-mxs/Kconfig                     |    9 +++
+> >  arch/arm/mach-mxs/Makefile                    |    1 +
+> >  arch/arm/mach-mxs/imx28-dt.c                  |   67 +++++++++++++++++++
+> >  6 files changed, 200 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> > index 54bddda..9f21faf 100644
+> > --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> > +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> > @@ -1,6 +1,10 @@
+> >  Freescale i.MX Platforms Device Tree Bindings
+> >  -----------------------------------------------
+> >  
+> > +i.MX28 Evaluation Kit
+> > +Required root node properties:
+> > +    - compatible = "fsl,imx28-evk", "fsl,imx28";
+> > +
+> >  i.MX51 Babbage Board
+> >  Required root node properties:
+> >      - compatible = "fsl,imx51-babbage", "fsl,imx51";
+> > diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> > new file mode 100644
+> > index 0000000..9758dc4
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx28-evk.dts
+> > @@ -0,0 +1,31 @@
+> > +/*
+> > + * Copyright 2012 Freescale Semiconductor, Inc.
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +/dts-v1/;
+> > +/include/ "imx28.dtsi"
+> > +
+> > +/ {
+> > +	model = "Freescale i.MX28 Evaluation Kit";
+> > +	compatible = "fsl,imx28-evk", "fsl,imx28";
+> > +
+> > +	memory {
+> > +		device_type = "memory";
+> > +		reg = <0x40000000 0x08000000>;
+> > +	};
+> > +
+> > +	ahb at 80080000 {
+> > +		fec at 800f0000 {
+> > +			phy-mode = "rmii";
+> > +			local-mac-address = [00 04 9F 01 7D 5B];
 > 
-> Anatop is an integrated regulator inside i.MX6 SoC.
-> There are 3 digital regulators which controls PU, CORE (ARM), and SOC.
-> And 3 analog regulators which controls 1P1, 2P5, 3P0 (USB).
-> This patch adds the Anatop regulator driver.
+> Generally a bad idea to put a specific mac address into the device tree.
+> Better to fill it with zeros.  Otherwise all the dev boards will end up using
+> the same value.
+> 
+Yes, this issue also exists on other platfroms like mx6q.
+One way is to dynamically get mac address by reading otp register as non-dt does
+like:
+static int __init mx28evk_fec_get_mac(void)
+{
+        int i;
+        u32 val;
+        const u32 *ocotp = mxs_get_ocotp();
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120314/c7b2514a/attachment.sig>
+        if (!ocotp)
+                return -ETIMEDOUT;
+
+        /*
+         * OCOTP only stores the last 4 octets for each mac address,
+         * so hard-code Freescale OUI (00:04:9f) here.
+         */
+        for (i = 0; i < 2; i++) {
+                val = ocotp[i];
+                mx28_fec_pdata[i].mac[0] = 0x00;
+                mx28_fec_pdata[i].mac[1] = 0x04;
+                mx28_fec_pdata[i].mac[2] = 0x9f;
+                mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
+                mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
+                mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
+        }
+
+        return 0;
+}
+
+But it seems this needs pass mac address to fec driver via platforom data which is
+not friendly to dt.
+
+Another way may be changing fec driver to get the fixed part of mac address(first
+two bytes) from device tree and read the left dynamical part from otp which i'm not
+sure is better enough.
+
+BTW, filling with zeros seems not work since it's invalid mac address.
+
+Regards
+Dong Aisheng
