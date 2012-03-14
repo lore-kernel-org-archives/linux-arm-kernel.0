@@ -1,43 +1,137 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 14 Mar 2012 08:43:45 +0100
-Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
- dmaengine.
-In-Reply-To: <20120309174411.GI3852@pengutronix.de>
-References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
- <20120309174411.GI3852@pengutronix.de>
-Message-ID: <CACKLOr0XzE0PZk=k5xQQvOA_5dfBk1mYDVyKCep36=3w7ugwWg@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 14 Mar 2012 15:54:37 +0800
+Subject: [PATCH v1 4/5] dma: mxs-dma: add dt probe support
+In-Reply-To: <1331628428-24017-5-git-send-email-b29396@freescale.com>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-5-git-send-email-b29396@freescale.com>
+Message-ID: <4F604EBD.7060400@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 March 2012 18:44, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Fri, Mar 09, 2012 at 04:20:36PM +0100, Javier Martin wrote:
->> The following series have to be applied on top of the following patches:
->> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
->> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
->>
->> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
->> is deprecated and no new patches are accepted for it.
->>
->> This series merges this code into the imx-dma.c dmaengine driver.
+Hi Aisheng:
+> From: Dong Aisheng<dong.aisheng@linaro.org>
 >
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Dong Aisheng<dong.aisheng@linaro.org>
+> ---
+>   .../devicetree/bindings/dma/fsl-mxs-dma.txt        |   17 ++++++++
+>   drivers/dma/mxs-dma.c                              |   44 +++++++++++++------
+>   2 files changed, 47 insertions(+), 14 deletions(-)
 >
+> diff --git a/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
+> new file mode 100644
+> index 0000000..cfa1730
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/fsl-mxs-dma.txt
+> @@ -0,0 +1,17 @@
+> +* Freescale MXS DMA
+> +
+> +Required properties:
+> +- compatible : Should be "fsl,mxs-dma-apbh" or "fsl,mxs-dma-apbx"
+> +- reg : Should contain registers location and length
+> +
+> +Examples:
+> +
+> +dma-apbh at 80004000 {
+> +	compatible = "fsl,mxs-dma-apbh";
+> +	reg =<0x80004000 2000>;
+> +};
+> +
+> +dma-apbx at 80024000 {
+> +	compatible = "fsl,mxs-dma-apbx";
+> +	reg =<0x80024000 2000>;
+> +};
+> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> index b06cd4c..45e8d46 100644
+> --- a/drivers/dma/mxs-dma.c
+> +++ b/drivers/dma/mxs-dma.c
+> @@ -22,6 +22,9 @@
+>   #include<linux/platform_device.h>
+>   #include<linux/dmaengine.h>
+>   #include<linux/delay.h>
+> +#include<linux/module.h>
+> +#include<linux/of.h>
+> +#include<linux/of_device.h>
+>
+>   #include<asm/irq.h>
+>   #include<mach/mxs.h>
+> @@ -130,6 +133,25 @@ struct mxs_dma_engine {
+>   	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
+>   };
+>
+> +static struct platform_device_id mxs_dma_type[] = {
+> +	{
+> +		.name = "mxs-dma-apbh",
+> +		.driver_data = MXS_DMA_APBH,
+> +	}, {
+> +		.name = "mxs-dma-apbx",
+> +		.driver_data = MXS_DMA_APBX,
+> +	}, {
+> +		/* end of list */
+> +	}
+> +};
+> +
+I think you should use the platform_device_id to distinguish different 
+archs.
+In the mx6q,  you will meet some compiler error for the macro cpu_is_mx23().
 
-Vinod,
-I think with Sascha's ack, this series is ready to be merged. It's
-quite important for us that it makes it for 3.4.
+BR
+Huang Shijie
 
-Please, don't forget the following patch too, which is meant to be
-applied on top of this series:
 
-[PATCH] dmaengine: i.MX: Add support for interleaved transfers.
 
-Regards.
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+> +static const struct of_device_id mxs_dma_dt_ids[] = {
+> +	{ .compatible = "fsl,mxs-dma-apbh", .data =&mxs_dma_type[0], },
+> +	{ .compatible = "fsl,mxs-dma-apbx", .data =&mxs_dma_type[1], },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mxs_dma_dt_ids);
+> +
+>   static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+>   {
+>   	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> @@ -587,8 +609,8 @@ err_out:
+>
+>   static int __init mxs_dma_probe(struct platform_device *pdev)
+>   {
+> -	const struct platform_device_id *id_entry =
+> -				platform_get_device_id(pdev);
+> +	const struct platform_device_id *id_entry;
+> +	const struct of_device_id *of_id;
+>   	struct mxs_dma_engine *mxs_dma;
+>   	struct resource *iores;
+>   	int ret, i;
+> @@ -597,6 +619,11 @@ static int __init mxs_dma_probe(struct platform_device *pdev)
+>   	if (!mxs_dma)
+>   		return -ENOMEM;
+>
+> +	of_id = of_match_device(mxs_dma_dt_ids,&pdev->dev);
+> +	if (of_id)
+> +		id_entry = of_id->data;
+> +	else
+> +		id_entry = platform_get_device_id(pdev);
+>   	mxs_dma->dev_id = id_entry->driver_data;
+>
+>   	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -679,21 +706,10 @@ err_request_region:
+>   	return ret;
+>   }
+>
+> -static struct platform_device_id mxs_dma_type[] = {
+> -	{
+> -		.name = "mxs-dma-apbh",
+> -		.driver_data = MXS_DMA_APBH,
+> -	}, {
+> -		.name = "mxs-dma-apbx",
+> -		.driver_data = MXS_DMA_APBX,
+> -	}, {
+> -		/* end of list */
+> -	}
+> -};
+> -
+>   static struct platform_driver mxs_dma_driver = {
+>   	.driver		= {
+>   		.name	= "mxs-dma",
+> +		.of_match_table = mxs_dma_dt_ids,
+>   	},
+>   	.id_table	= mxs_dma_type,
+>   };
