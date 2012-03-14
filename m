@@ -1,71 +1,87 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Wed, 14 Mar 2012 15:13:28 -0700
-Subject: [PATCH v5 3/4] clk: introduce the common clock framework
-In-Reply-To: <alpine.LFD.2.02.1203142218320.2466@ionos>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-4-git-send-email-mturquette@linaro.org>
- <20120313112447.GA29317@pengutronix.de>
- <CAJOA=zMTY+4dU9VUa-TkEbdE-WJd7V4tCG-af6vgq0CPN6rWpg@mail.gmail.com>
- <20120314084857.GL3852@pengutronix.de>
- <CAJOA=zMsCuZgmp1Hm0dq=EVoX6Zj62XQVqR=6GzDntSD5HnHzg@mail.gmail.com>
- <alpine.LFD.2.02.1203142218320.2466@ionos>
-Message-ID: <CAJOA=zNj8eC+h-S9KqwuAEiGFZMAn2h0TNTR6nund4qM7Z97ug@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Mar 2012 15:14:54 -0700
+Subject: [PATCH 01/12] mfd: twl-core: don't depend on pdata->irq_base/end
+In-Reply-To: <87pqcegapk.fsf@ti.com>
+References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
+ <1330707024-23730-2-git-send-email-b-cousson@ti.com>
+ <87pqcegapk.fsf@ti.com>
+Message-ID: <20120314221454.GS12083@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 2:28 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Wed, 14 Mar 2012, Turquette, Mike wrote:
->
-> Could you folks please trim your replies? It's annoying to page down a
-> gazillion of lines to find the gist.
+* Kevin Hilman <khilman@ti.com> [120314 14:02]:
+> From: Kevin Hilman <khilman@ti.com>
+> Date: Wed, 14 Mar 2012 13:56:01 -0700
+> Subject: [PATCH 2/2] ARM: OMAP2+: TWL: remove usage of pdata->irq_base/_end
+> 
+> The driver has been converted to use SPARSE_IRQ and no longer needs to
+> be passed IRQ base/end.  The driver no longer uses these fields, so
+> remove them from the reamaining users.
+> 
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-2430sdp.c    |    3 ---
+>  arch/arm/mach-omap2/board-omap3logic.c |    3 ---
+>  arch/arm/mach-omap2/twl-common.c       |    9 ---------
+>  3 files changed, 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+> index c8bda62..b8b3700 100644
+> --- a/arch/arm/mach-omap2/board-2430sdp.c
+> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+> @@ -218,9 +218,6 @@ static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
+>  };
+>  
+>  static struct twl4030_platform_data sdp2430_twldata = {
+> -	.irq_base	= TWL4030_IRQ_BASE,
+> -	.irq_end	= TWL4030_IRQ_END,
+> -
+>  	/* platform_data for children goes here */
+>  	.gpio		= &sdp2430_gpio_data,
+>  	.vmmc1		= &sdp2430_vmmc1,
+> diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+> index 4a7d8c8..f145935 100644
+> --- a/arch/arm/mach-omap2/board-omap3logic.c
+> +++ b/arch/arm/mach-omap2/board-omap3logic.c
+> @@ -85,9 +85,6 @@ static struct twl4030_gpio_platform_data omap3logic_gpio_data = {
+>  };
+>  
+>  static struct twl4030_platform_data omap3logic_twldata = {
+> -	.irq_base	= TWL4030_IRQ_BASE,
+> -	.irq_end	= TWL4030_IRQ_END,
+> -
+>  	/* platform_data for children goes here */
+>  	.gpio		= &omap3logic_gpio_data,
+>  	.vmmc1		= &omap3logic_vmmc1,
+> diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+> index 1cddcb2..5c9aa3f 100644
+> --- a/arch/arm/mach-omap2/twl-common.c
+> +++ b/arch/arm/mach-omap2/twl-common.c
+> @@ -184,10 +184,6 @@ static struct twl_regulator_driver_data omap3_vdd2_drvdata = {
+>  void __init omap3_pmic_get_config(struct twl4030_platform_data *pmic_data,
+>  				  u32 pdata_flags, u32 regulators_flags)
+>  {
+> -	if (!pmic_data->irq_base)
+> -		pmic_data->irq_base = TWL4030_IRQ_BASE;
+> -	if (!pmic_data->irq_end)
+> -		pmic_data->irq_end = TWL4030_IRQ_END;
+>  	if (!pmic_data->vdd1) {
+>  		omap3_vdd1.driver_data = &omap3_vdd1_drvdata;
+>  		omap3_vdd1_drvdata.data = voltdm_lookup("mpu_iva");
+> @@ -415,11 +411,6 @@ static struct twl_regulator_driver_data omap4_vdd3_drvdata = {
+>  void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
+>  				  u32 pdata_flags, u32 regulators_flags)
+>  {
+> -	if (!pmic_data->irq_base)
+> -		pmic_data->irq_base = TWL6030_IRQ_BASE;
+> -	if (!pmic_data->irq_end)
+> -		pmic_data->irq_end = TWL6030_IRQ_END;
+> -
+>  	if (!pmic_data->vdd1) {
+>  		omap4_vdd1.driver_data = &omap4_vdd1_drvdata;
+>  		omap4_vdd1_drvdata.data = voltdm_lookup("mpu");
+> -- 
 
-Sure.  My mailer does this for me so I forget to do it sometimes...
+Looks right to me:
 
->> On Wed, Mar 14, 2012 at 1:48 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> >> Also, do you forsee needing hole in parent_names for any reason other
->> >> than described above?
->> >
->> > I need it only for the case where a some values in the mux are marked as
->> > reserved in the datasheet or we simply do not have the corresponding
->> > clock in our tree (yet). We could also say that NULL pointers are not
->> > allowed in parent arrays, but instead "orphan" or "dummy" should be
->> > used. Then __clk_init should check for NULL pointers to make this clear.
->>
->> I've added a WARN in __clk_init if any entries in .parent_names are
->> NULL. ?I think it best to populate it with "dummy", or maybe a
->> platform-specific name if it helps you during development.
->
-> There is no guarantee that the selection of a parent can be mapped
-> linear to register values.
-
-Agreed.  I have always viewed .parent_names as only a list of the
-names of all possible parents, nothing more.  And of course its array
-indexing should line up with struct clk **parents.
-
-> So the right way to deal with it is to have an array of valid names
-> with no holes and NULL pointers allowed and have a mapping from the
-> array index to the register value.
-
-This is essentially what the .set_rate callback does.  It takes as
-input "u8 index" and peforms the hardware specific magic to select the
-correct parent clock.  This might be a register write using that exact
-same index, or it might be a single-bit register write using that
-index as the shift value, or it might translate that index into the
-data sent to an i2c device (where the address would be stored in
-struct clk_foo), etc etc.
-
-We both agree that .parent_names must contain valid names and should
-not have holes.  What I don't understand is if you are saying that we
-should allow NULL ptrs as names; that seems contradictory but I want
-to make sure I'm reading you correctly.
-
-Thanks,
-Mike
-
-> That makes the core code robust and allows to handle all corner cases
-> including reserved bits, not implemented clocks and weird register
-> layouts.
->
-> Thanks,
->
-> ? ? ? ?tglx
+Acked-by: Tony Lindgren <tony@atomide.com>
