@@ -1,167 +1,313 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 07:26:27 -0700
-Subject: [PATCH 2/5] ARM: EXYNOS: Rename of function for pm.c
+Date: Wed, 14 Mar 2012 07:26:28 -0700
+Subject: [PATCH 3/5] ARM: EXYNOS: Add PMU table for EXYNOS5250
 In-Reply-To: <1331735190-28773-1-git-send-email-kgene.kim@samsung.com>
 References: <1331735190-28773-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1331735190-28773-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331735190-28773-4-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jongpill Lee <boyko.lee@samsung.com>
 
-This patch changes the function name of pmc. to support new
-EXYNOS SoCs commonly.
+This patch adds pmu table setting feature for EXYNOS5250.
 
 Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/pm.c |   55 +++++++++++++++++++++++----------------------
- 1 files changed, 28 insertions(+), 27 deletions(-)
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |  148 +++++++++++++++++++++++++-
+ arch/arm/mach-exynos/pmu.c                   |  110 +++++++++++++++++++
+ 2 files changed, 254 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 696f0bf..abc1def 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
+diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+index 4c53f38..2274b83 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
 @@ -1,9 +1,8 @@
--/* linux/arch/arm/mach-exynos4/pm.c
+-/* linux/arch/arm/mach-exynos4/include/mach/regs-pmu.h
 - *
-- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
 +/*
-+ * Copyright (c) 2011-2012 Samsung Electronics Co., Ltd.
++ * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
   *		http://www.samsung.com
   *
-- * EXYNOS4210 - Power Management support
-+ * EXYNOS - Power Management support
+- * EXYNOS4 - Power management unit definition
++ * EXYNOS - Power management unit definition
   *
-  * Based on arch/arm/mach-s3c2410/pm.c
-  * Copyright (c) 2006 Simtec Electronics
-@@ -63,7 +62,7 @@ static struct sleep_save exynos4_vpll_save[] = {
- 	SAVE_ITEM(EXYNOS4_VPLL_CON1),
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -218,4 +217,145 @@
+ #define S5P_SECSS_MEM_OPTION			S5P_PMUREG(0x2EC8)
+ #define S5P_ROTATOR_MEM_OPTION			S5P_PMUREG(0x2F48)
+ 
++/* For EXYNOS5 */
++
++#define EXYNOS5_GPS_LPI						S5P_PMUREG(0x0004)
++
++#define EXYNOS5_USB_CFG						S5P_PMUREG(0x0230)
++
++#define EXYNOS5_ARM_CORE0_SYS_PWR_REG				S5P_PMUREG(0x1000)
++#define EXYNOS5_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG		S5P_PMUREG(0x1004)
++#define EXYNOS5_DIS_IRQ_ARM_CORE0_CENTRAL_SYS_PWR_REG		S5P_PMUREG(0x1008)
++#define EXYNOS5_ARM_CORE1_SYS_PWR_REG				S5P_PMUREG(0x1010)
++#define EXYNOS5_DIS_IRQ_ARM_CORE1_LOCAL_SYS_PWR_REG		S5P_PMUREG(0x1014)
++#define EXYNOS5_DIS_IRQ_ARM_CORE1_CENTRAL_SYS_PWR_REG		S5P_PMUREG(0x1018)
++#define EXYNOS5_FSYS_ARM_SYS_PWR_REG				S5P_PMUREG(0x1040)
++#define EXYNOS5_DIS_IRQ_FSYS_ARM_CENTRAL_SYS_PWR_REG		S5P_PMUREG(0x1048)
++#define EXYNOS5_ISP_ARM_SYS_PWR_REG				S5P_PMUREG(0x1050)
++#define EXYNOS5_DIS_IRQ_ISP_ARM_LOCAL_SYS_PWR_REG		S5P_PMUREG(0x1054)
++#define EXYNOS5_DIS_IRQ_ISP_ARM_CENTRAL_SYS_PWR_REG		S5P_PMUREG(0x1058)
++#define EXYNOS5_ARM_COMMON_SYS_PWR_REG				S5P_PMUREG(0x1080)
++#define EXYNOS5_ARM_L2_SYS_PWR_REG				S5P_PMUREG(0x10C0)
++#define EXYNOS5_CMU_ACLKSTOP_SYS_PWR_REG			S5P_PMUREG(0x1100)
++#define EXYNOS5_CMU_SCLKSTOP_SYS_PWR_REG			S5P_PMUREG(0x1104)
++#define EXYNOS5_CMU_RESET_SYS_PWR_REG				S5P_PMUREG(0x110C)
++#define EXYNOS5_CMU_ACLKSTOP_SYSMEM_SYS_PWR_REG			S5P_PMUREG(0x1120)
++#define EXYNOS5_CMU_SCLKSTOP_SYSMEM_SYS_PWR_REG			S5P_PMUREG(0x1124)
++#define EXYNOS5_CMU_RESET_SYSMEM_SYS_PWR_REG			S5P_PMUREG(0x112C)
++#define EXYNOS5_DRAM_FREQ_DOWN_SYS_PWR_REG			S5P_PMUREG(0x1130)
++#define EXYNOS5_DDRPHY_DLLOFF_SYS_PWR_REG			S5P_PMUREG(0x1134)
++#define EXYNOS5_DDRPHY_DLLLOCK_SYS_PWR_REG			S5P_PMUREG(0x1138)
++#define EXYNOS5_APLL_SYSCLK_SYS_PWR_REG				S5P_PMUREG(0x1140)
++#define EXYNOS5_MPLL_SYSCLK_SYS_PWR_REG				S5P_PMUREG(0x1144)
++#define EXYNOS5_VPLL_SYSCLK_SYS_PWR_REG				S5P_PMUREG(0x1148)
++#define EXYNOS5_EPLL_SYSCLK_SYS_PWR_REG				S5P_PMUREG(0x114C)
++#define EXYNOS5_BPLL_SYSCLK_SYS_PWR_REG				S5P_PMUREG(0x1150)
++#define EXYNOS5_CPLL_SYSCLK_SYS_PWR_REG				S5P_PMUREG(0x1154)
++#define EXYNOS5_MPLLUSER_SYSCLK_SYS_PWR_REG			S5P_PMUREG(0x1164)
++#define EXYNOS5_BPLLUSER_SYSCLK_SYS_PWR_REG			S5P_PMUREG(0x1170)
++#define EXYNOS5_TOP_BUS_SYS_PWR_REG				S5P_PMUREG(0x1180)
++#define EXYNOS5_TOP_RETENTION_SYS_PWR_REG			S5P_PMUREG(0x1184)
++#define EXYNOS5_TOP_PWR_SYS_PWR_REG				S5P_PMUREG(0x1188)
++#define EXYNOS5_TOP_BUS_SYSMEM_SYS_PWR_REG			S5P_PMUREG(0x1190)
++#define EXYNOS5_TOP_RETENTION_SYSMEM_SYS_PWR_REG		S5P_PMUREG(0x1194)
++#define EXYNOS5_TOP_PWR_SYSMEM_SYS_PWR_REG			S5P_PMUREG(0x1198)
++#define EXYNOS5_LOGIC_RESET_SYS_PWR_REG				S5P_PMUREG(0x11A0)
++#define EXYNOS5_OSCCLK_GATE_SYS_PWR_REG				S5P_PMUREG(0x11A4)
++#define EXYNOS5_LOGIC_RESET_SYSMEM_SYS_PWR_REG			S5P_PMUREG(0x11B0)
++#define EXYNOS5_OSCCLK_GATE_SYSMEM_SYS_PWR_REG			S5P_PMUREG(0x11B4)
++#define EXYNOS5_USBOTG_MEM_SYS_PWR_REG				S5P_PMUREG(0x11C0)
++#define EXYNOS5_G2D_MEM_SYS_PWR_REG				S5P_PMUREG(0x11C8)
++#define EXYNOS5_USBDRD_MEM_SYS_PWR_REG				S5P_PMUREG(0x11CC)
++#define EXYNOS5_SDMMC_MEM_SYS_PWR_REG				S5P_PMUREG(0x11D0)
++#define EXYNOS5_CSSYS_MEM_SYS_PWR_REG				S5P_PMUREG(0x11D4)
++#define EXYNOS5_SECSS_MEM_SYS_PWR_REG				S5P_PMUREG(0x11D8)
++#define EXYNOS5_ROTATOR_MEM_SYS_PWR_REG				S5P_PMUREG(0x11DC)
++#define EXYNOS5_INTRAM_MEM_SYS_PWR_REG				S5P_PMUREG(0x11E0)
++#define EXYNOS5_INTROM_MEM_SYS_PWR_REG				S5P_PMUREG(0x11E4)
++#define EXYNOS5_JPEG_MEM_SYS_PWR_REG				S5P_PMUREG(0x11E8)
++#define EXYNOS5_HSI_MEM_SYS_PWR_REG				S5P_PMUREG(0x11EC)
++#define EXYNOS5_MCUIOP_MEM_SYS_PWR_REG				S5P_PMUREG(0x11F4)
++#define EXYNOS5_SATA_MEM_SYS_PWR_REG				S5P_PMUREG(0x11FC)
++#define EXYNOS5_PAD_RETENTION_DRAM_SYS_PWR_REG			S5P_PMUREG(0x1200)
++#define EXYNOS5_PAD_RETENTION_MAU_SYS_PWR_REG			S5P_PMUREG(0x1204)
++#define EXYNOS5_PAD_RETENTION_EFNAND_SYS_PWR_REG		S5P_PMUREG(0x1208)
++#define EXYNOS5_PAD_RETENTION_GPIO_SYS_PWR_REG			S5P_PMUREG(0x1220)
++#define EXYNOS5_PAD_RETENTION_UART_SYS_PWR_REG			S5P_PMUREG(0x1224)
++#define EXYNOS5_PAD_RETENTION_MMCA_SYS_PWR_REG			S5P_PMUREG(0x1228)
++#define EXYNOS5_PAD_RETENTION_MMCB_SYS_PWR_REG			S5P_PMUREG(0x122C)
++#define EXYNOS5_PAD_RETENTION_EBIA_SYS_PWR_REG			S5P_PMUREG(0x1230)
++#define EXYNOS5_PAD_RETENTION_EBIB_SYS_PWR_REG			S5P_PMUREG(0x1234)
++#define EXYNOS5_PAD_RETENTION_SPI_SYS_PWR_REG			S5P_PMUREG(0x1238)
++#define EXYNOS5_PAD_RETENTION_GPIO_SYSMEM_SYS_PWR_REG		S5P_PMUREG(0x123C)
++#define EXYNOS5_PAD_ISOLATION_SYS_PWR_REG			S5P_PMUREG(0x1240)
++#define EXYNOS5_PAD_ISOLATION_SYSMEM_SYS_PWR_REG		S5P_PMUREG(0x1250)
++#define EXYNOS5_PAD_ALV_SEL_SYS_PWR_REG				S5P_PMUREG(0x1260)
++#define EXYNOS5_XUSBXTI_SYS_PWR_REG				S5P_PMUREG(0x1280)
++#define EXYNOS5_XXTI_SYS_PWR_REG				S5P_PMUREG(0x1284)
++#define EXYNOS5_EXT_REGULATOR_SYS_PWR_REG			S5P_PMUREG(0x12C0)
++#define EXYNOS5_GPIO_MODE_SYS_PWR_REG				S5P_PMUREG(0x1300)
++#define EXYNOS5_GPIO_MODE_SYSMEM_SYS_PWR_REG			S5P_PMUREG(0x1320)
++#define EXYNOS5_GPIO_MODE_MAU_SYS_PWR_REG			S5P_PMUREG(0x1340)
++#define EXYNOS5_TOP_ASB_RESET_SYS_PWR_REG			S5P_PMUREG(0x1344)
++#define EXYNOS5_TOP_ASB_ISOLATION_SYS_PWR_REG			S5P_PMUREG(0x1348)
++#define EXYNOS5_GSCL_SYS_PWR_REG				S5P_PMUREG(0x1400)
++#define EXYNOS5_ISP_SYS_PWR_REG					S5P_PMUREG(0x1404)
++#define EXYNOS5_MFC_SYS_PWR_REG					S5P_PMUREG(0x1408)
++#define EXYNOS5_G3D_SYS_PWR_REG					S5P_PMUREG(0x140C)
++#define EXYNOS5_DISP1_SYS_PWR_REG				S5P_PMUREG(0x1414)
++#define EXYNOS5_MAU_SYS_PWR_REG					S5P_PMUREG(0x1418)
++#define EXYNOS5_GPS_SYS_PWR_REG					S5P_PMUREG(0x141C)
++#define EXYNOS5_CMU_CLKSTOP_GSCL_SYS_PWR_REG			S5P_PMUREG(0x1480)
++#define EXYNOS5_CMU_CLKSTOP_ISP_SYS_PWR_REG			S5P_PMUREG(0x1484)
++#define EXYNOS5_CMU_CLKSTOP_MFC_SYS_PWR_REG			S5P_PMUREG(0x1488)
++#define EXYNOS5_CMU_CLKSTOP_G3D_SYS_PWR_REG			S5P_PMUREG(0x148C)
++#define EXYNOS5_CMU_CLKSTOP_DISP1_SYS_PWR_REG			S5P_PMUREG(0x1494)
++#define EXYNOS5_CMU_CLKSTOP_MAU_SYS_PWR_REG			S5P_PMUREG(0x1498)
++#define EXYNOS5_CMU_CLKSTOP_GPS_SYS_PWR_REG			S5P_PMUREG(0x149C)
++#define EXYNOS5_CMU_SYSCLK_GSCL_SYS_PWR_REG			S5P_PMUREG(0x14C0)
++#define EXYNOS5_CMU_SYSCLK_ISP_SYS_PWR_REG			S5P_PMUREG(0x14C4)
++#define EXYNOS5_CMU_SYSCLK_MFC_SYS_PWR_REG			S5P_PMUREG(0x14C8)
++#define EXYNOS5_CMU_SYSCLK_G3D_SYS_PWR_REG			S5P_PMUREG(0x14CC)
++#define EXYNOS5_CMU_SYSCLK_DISP1_SYS_PWR_REG			S5P_PMUREG(0x14D4)
++#define EXYNOS5_CMU_SYSCLK_MAU_SYS_PWR_REG			S5P_PMUREG(0x14D8)
++#define EXYNOS5_CMU_SYSCLK_GPS_SYS_PWR_REG			S5P_PMUREG(0x14DC)
++#define EXYNOS5_CMU_RESET_GSCL_SYS_PWR_REG			S5P_PMUREG(0x1580)
++#define EXYNOS5_CMU_RESET_ISP_SYS_PWR_REG			S5P_PMUREG(0x1584)
++#define EXYNOS5_CMU_RESET_MFC_SYS_PWR_REG			S5P_PMUREG(0x1588)
++#define EXYNOS5_CMU_RESET_G3D_SYS_PWR_REG			S5P_PMUREG(0x158C)
++#define EXYNOS5_CMU_RESET_DISP1_SYS_PWR_REG			S5P_PMUREG(0x1594)
++#define EXYNOS5_CMU_RESET_MAU_SYS_PWR_REG			S5P_PMUREG(0x1598)
++#define EXYNOS5_CMU_RESET_GPS_SYS_PWR_REG			S5P_PMUREG(0x159C)
++
++#define EXYNOS5_ARM_CORE0_OPTION				S5P_PMUREG(0x2008)
++#define EXYNOS5_ARM_CORE1_OPTION				S5P_PMUREG(0x2088)
++#define EXYNOS5_FSYS_ARM_OPTION					S5P_PMUREG(0x2208)
++#define EXYNOS5_ISP_ARM_OPTION					S5P_PMUREG(0x2288)
++#define EXYNOS5_ARM_COMMON_OPTION				S5P_PMUREG(0x2408)
++#define EXYNOS5_TOP_PWR_OPTION					S5P_PMUREG(0x2C48)
++#define EXYNOS5_TOP_PWR_SYSMEM_OPTION				S5P_PMUREG(0x2CC8)
++#define EXYNOS5_JPEG_MEM_OPTION					S5P_PMUREG(0x2F48)
++#define EXYNOS5_GSCL_STATUS					S5P_PMUREG(0x4004)
++#define EXYNOS5_ISP_STATUS					S5P_PMUREG(0x4024)
++#define EXYNOS5_GSCL_OPTION					S5P_PMUREG(0x4008)
++#define EXYNOS5_ISP_OPTION					S5P_PMUREG(0x4028)
++#define EXYNOS5_MFC_OPTION					S5P_PMUREG(0x4048)
++#define EXYNOS5_G3D_CONFIGURATION				S5P_PMUREG(0x4060)
++#define EXYNOS5_G3D_STATUS					S5P_PMUREG(0x4064)
++#define EXYNOS5_G3D_OPTION					S5P_PMUREG(0x4068)
++#define EXYNOS5_DISP1_OPTION					S5P_PMUREG(0x40A8)
++#define EXYNOS5_MAU_OPTION					S5P_PMUREG(0x40C8)
++#define EXYNOS5_GPS_OPTION					S5P_PMUREG(0x40E8)
++
++#define EXYNOS5_USE_SC_FEEDBACK					(1 << 1)
++#define EXYNOS5_USE_SC_COUNTER					(1 << 0)
++
++#define EXYNOS5_MANUAL_L2RSTDISABLE_CONTROL			(1 << 2)
++#define EXYNOS5_SKIP_DEACTIVATE_ACEACP_IN_PWDN			(1 << 7)
++
++#define EXYNOS5_OPTION_USE_STANDBYWFE				(1 << 24)
++#define EXYNOS5_OPTION_USE_STANDBYWFI				(1 << 16)
++
++#define EXYNOS5_OPTION_USE_RETENTION				(1 << 4)
++
+ #endif /* __ASM_ARCH_REGS_PMU_H */
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index bba48f5..5c7eb15 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -202,6 +202,113 @@ static struct exynos4_pmu_conf exynos4212_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
  };
  
--static struct sleep_save exynos4_core_save[] = {
-+static struct sleep_save exynos_core_save[] = {
- 	/* SROM side */
- 	SAVE_ITEM(S5P_SROM_BW),
- 	SAVE_ITEM(S5P_SROM_BC0),
-@@ -83,7 +82,7 @@ static struct sleep_save exynos4_l2cc_save[] = {
- /* For Cortex-A9 Diagnostic and Power control register */
- static unsigned int save_arm_register[2];
- 
--static int exynos4_cpu_suspend(unsigned long arg)
-+static int exynos_cpu_suspend(unsigned long arg)
++static struct exynos4_pmu_conf exynos5250_pmu_config[] = {
++	/* { .reg = address, .val = { AFTR, LPA, SLEEP } */
++	{ EXYNOS5_ARM_CORE0_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
++	{ EXYNOS5_DIS_IRQ_ARM_CORE0_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS5_DIS_IRQ_ARM_CORE0_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS5_ARM_CORE1_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
++	{ EXYNOS5_DIS_IRQ_ARM_CORE1_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS5_DIS_IRQ_ARM_CORE1_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS5_FSYS_ARM_SYS_PWR_REG,			{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_DIS_IRQ_FSYS_ARM_CENTRAL_SYS_PWR_REG,	{ 0x1, 0x1, 0x1} },
++	{ EXYNOS5_ISP_ARM_SYS_PWR_REG,			{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_DIS_IRQ_ISP_ARM_LOCAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS5_DIS_IRQ_ISP_ARM_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
++	{ EXYNOS5_ARM_COMMON_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
++	{ EXYNOS5_ARM_L2_SYS_PWR_REG,			{ 0x3, 0x3, 0x3} },
++	{ EXYNOS5_CMU_ACLKSTOP_SYS_PWR_REG,		{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_CMU_SCLKSTOP_SYS_PWR_REG,		{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_CMU_RESET_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_CMU_ACLKSTOP_SYSMEM_SYS_PWR_REG,	{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_CMU_SCLKSTOP_SYSMEM_SYS_PWR_REG,	{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_CMU_RESET_SYSMEM_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_DRAM_FREQ_DOWN_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS5_DDRPHY_DLLOFF_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS5_DDRPHY_DLLLOCK_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS5_APLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_MPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_VPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_EPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_BPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CPLL_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_MPLLUSER_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_BPLLUSER_SYSCLK_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_TOP_BUS_SYS_PWR_REG,			{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_TOP_RETENTION_SYS_PWR_REG,		{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_TOP_PWR_SYS_PWR_REG,			{ 0x3, 0x0, 0x3} },
++	{ EXYNOS5_TOP_BUS_SYSMEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_TOP_RETENTION_SYSMEM_SYS_PWR_REG,	{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_TOP_PWR_SYSMEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x3} },
++	{ EXYNOS5_LOGIC_RESET_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_OSCCLK_GATE_SYS_PWR_REG,		{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_LOGIC_RESET_SYSMEM_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_OSCCLK_GATE_SYSMEM_SYS_PWR_REG,	{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_USBOTG_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_G2D_MEM_SYS_PWR_REG,			{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_USBDRD_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_SDMMC_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_CSSYS_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_SECSS_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_ROTATOR_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_INTRAM_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_INTROM_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_JPEG_MEM_SYS_PWR_REG,			{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_HSI_MEM_SYS_PWR_REG,			{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_MCUIOP_MEM_SYS_PWR_REG,		{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_SATA_MEM_SYS_PWR_REG,			{ 0x3, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_DRAM_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_MAU_SYS_PWR_REG,	{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_GPIO_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_UART_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_MMCA_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_MMCB_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_EBIA_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_EBIB_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_SPI_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_RETENTION_GPIO_SYSMEM_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_ISOLATION_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_ISOLATION_SYSMEM_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_PAD_ALV_SEL_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_XUSBXTI_SYS_PWR_REG,			{ 0x1, 0x1, 0x1} },
++	{ EXYNOS5_XXTI_SYS_PWR_REG,			{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_EXT_REGULATOR_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_GPIO_MODE_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_GPIO_MODE_SYSMEM_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_GPIO_MODE_MAU_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_TOP_ASB_RESET_SYS_PWR_REG,		{ 0x1, 0x1, 0x1} },
++	{ EXYNOS5_TOP_ASB_ISOLATION_SYS_PWR_REG,	{ 0x1, 0x0, 0x1} },
++	{ EXYNOS5_GSCL_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS5_ISP_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS5_MFC_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS5_G3D_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS5_DISP1_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS5_MAU_SYS_PWR_REG,			{ 0x7, 0x7, 0x0} },
++	{ EXYNOS5_GPS_SYS_PWR_REG,			{ 0x7, 0x0, 0x0} },
++	{ EXYNOS5_CMU_CLKSTOP_GSCL_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_CLKSTOP_ISP_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_CLKSTOP_MFC_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_CLKSTOP_G3D_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_CLKSTOP_DISP1_SYS_PWR_REG,	{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_CLKSTOP_MAU_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_CMU_CLKSTOP_GPS_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_SYSCLK_GSCL_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_SYSCLK_ISP_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_SYSCLK_MFC_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_SYSCLK_G3D_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_SYSCLK_DISP1_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_SYSCLK_MAU_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_CMU_SYSCLK_GPS_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_RESET_GSCL_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_RESET_ISP_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_RESET_MFC_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_RESET_G3D_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_RESET_DISP1_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ EXYNOS5_CMU_RESET_MAU_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
++	{ EXYNOS5_CMU_RESET_GPS_SYS_PWR_REG,		{ 0x1, 0x0, 0x0} },
++	{ PMU_TABLE_END,},
++};
++
+ void exynos4_sys_powerdown_conf(enum sys_powerdown mode)
  {
- 	outer_flush_all();
- 
-@@ -94,11 +93,11 @@ static int exynos4_cpu_suspend(unsigned long arg)
- 	panic("sleep resumed to originator?");
- }
- 
--static void exynos4_pm_prepare(void)
-+static void exynos_pm_prepare(void)
- {
- 	u32 tmp;
- 
--	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
-+	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
- 	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
- 	s3c_pm_do_save(exynos4_epll_save, ARRAY_SIZE(exynos4_epll_save));
- 	s3c_pm_do_save(exynos4_vpll_save, ARRAY_SIZE(exynos4_vpll_save));
-@@ -123,10 +122,10 @@ static void exynos4_pm_prepare(void)
- 
- }
- 
--static int exynos4_pm_add(struct device *dev, struct subsys_interface *sif)
-+static int exynos_pm_add(struct device *dev, struct subsys_interface *sif)
- {
--	pm_cpu_prep = exynos4_pm_prepare;
--	pm_cpu_sleep = exynos4_cpu_suspend;
-+	pm_cpu_prep = exynos_pm_prepare;
-+	pm_cpu_sleep = exynos_cpu_suspend;
- 
- 	return 0;
- }
-@@ -198,13 +197,13 @@ static void exynos4_restore_pll(void)
- 	} while (epll_wait || vpll_wait);
- }
- 
--static struct subsys_interface exynos4_pm_interface = {
-+static struct subsys_interface exynos_pm_interface = {
- 	.name		= "exynos4_pm",
- 	.subsys		= &exynos4_subsys,
--	.add_dev	= exynos4_pm_add,
-+	.add_dev	= exynos_pm_add,
- };
- 
--static __init int exynos4_pm_drvinit(void)
-+static __init int exynos_pm_drvinit(void)
- {
- 	struct clk *pll_base;
- 	unsigned int tmp;
-@@ -217,18 +216,20 @@ static __init int exynos4_pm_drvinit(void)
- 	tmp |= ((0xFF << 8) | (0x1F << 1));
- 	__raw_writel(tmp, S5P_WAKEUP_MASK);
- 
--	pll_base = clk_get(NULL, "xtal");
-+	if (!soc_is_exynos5250()) {
-+		pll_base = clk_get(NULL, "xtal");
- 
--	if (!IS_ERR(pll_base)) {
--		pll_base_rate = clk_get_rate(pll_base);
--		clk_put(pll_base);
-+		if (!IS_ERR(pll_base)) {
-+			pll_base_rate = clk_get_rate(pll_base);
-+			clk_put(pll_base);
-+		}
+ 	unsigned int i;
+@@ -221,6 +328,9 @@ static int __init exynos4_pmu_init(void)
+ 	} else if (soc_is_exynos4212()) {
+ 		exynos4_pmu_config = exynos4212_pmu_config;
+ 		pr_info("EXYNOS4212 PMU Initialize\n");
++	} else if (soc_is_exynos5250()) {
++		exynos4_pmu_config = exynos5250_pmu_config;
++		pr_info("EXYNOS5250 PMU Initialize\n");
+ 	} else {
+ 		pr_info("EXYNOS4: PMU not supported\n");
  	}
- 
--	return subsys_interface_register(&exynos4_pm_interface);
-+	return subsys_interface_register(&exynos_pm_interface);
- }
--arch_initcall(exynos4_pm_drvinit);
-+arch_initcall(exynos_pm_drvinit);
- 
--static int exynos4_pm_suspend(void)
-+static int exynos_pm_suspend(void)
- {
- 	unsigned long tmp;
- 
-@@ -258,7 +259,7 @@ static int exynos4_pm_suspend(void)
- 	return 0;
- }
- 
--static void exynos4_pm_resume(void)
-+static void exynos_pm_resume(void)
- {
- 	unsigned long tmp;
- 
-@@ -297,7 +298,7 @@ static void exynos4_pm_resume(void)
- 	__raw_writel((1 << 28), S5P_PAD_RET_EBIA_OPTION);
- 	__raw_writel((1 << 28), S5P_PAD_RET_EBIB_OPTION);
- 
--	s3c_pm_do_restore_core(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
-+	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
- 
- 	exynos4_restore_pll();
- 
-@@ -316,14 +317,14 @@ early_wakeup:
- 	return;
- }
- 
--static struct syscore_ops exynos4_pm_syscore_ops = {
--	.suspend	= exynos4_pm_suspend,
--	.resume		= exynos4_pm_resume,
-+static struct syscore_ops exynos_pm_syscore_ops = {
-+	.suspend	= exynos_pm_suspend,
-+	.resume		= exynos_pm_resume,
- };
- 
- static __init int exynos4_pm_syscore_init(void)
- {
--	register_syscore_ops(&exynos4_pm_syscore_ops);
-+	register_syscore_ops(&exynos_pm_syscore_ops);
- 	return 0;
- }
- arch_initcall(exynos4_pm_syscore_init);
 -- 
 1.7.4.4
