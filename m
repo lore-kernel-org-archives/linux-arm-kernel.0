@@ -1,69 +1,63 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 07:42:08 -0700
-Subject: [PATCH v4 02/12] ARM: EXYNOS: use exynos_init_uarts() instead of
- exynos4_init_uarts()
+Date: Wed, 14 Mar 2012 07:42:10 -0700
+Subject: [PATCH v4 04/12] ARM: EXYNOS: add initial setup-i2c0 for EXYNOS5
 In-Reply-To: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
 References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1331736138-28964-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331736138-28964-5-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since exynos4_init_uarts() can be used for EXYNOS5 SoCs,
-this patch changes the name of function to exynos_init_uarts().
+In all of Samsung platform, the setup-i2c0.c file for I2C channel 0
+is always compiled. So when supporting new SoC,it should be updated
+for it. Since EXYNOS5 GPIO will be supported after this, there is no
+setup gpio in there now. It will be implemented with that, of course.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/common.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-exynos/Makefile     |    2 +-
+ arch/arm/mach-exynos/setup-i2c0.c |    9 ++++++---
+ 2 files changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index a1f8a99..02eed29 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -52,7 +52,7 @@ static const char name_exynos4412[] = "EXYNOS4412";
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 995e7cc..2117f02 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -52,7 +52,7 @@ obj-$(CONFIG_EXYNOS4_DEV_DWMCI)		+= dev-dwmci.o
+ obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
+ obj-$(CONFIG_EXYNOS4_DEV_USB_OHCI)	+= dev-ohci.o
  
- static void exynos4_map_io(void);
- static void exynos4_init_clocks(int xtal);
--static void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
-+static void exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- static int exynos_init(void);
+-obj-$(CONFIG_ARCH_EXYNOS4)		+= setup-i2c0.o
++obj-$(CONFIG_ARCH_EXYNOS)		+= setup-i2c0.o
+ obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
+ obj-$(CONFIG_EXYNOS4_SETUP_FIMD0)	+= setup-fimd0.o
+ obj-$(CONFIG_EXYNOS4_SETUP_I2C1)	+= setup-i2c1.o
+diff --git a/arch/arm/mach-exynos/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
+index d395bd1..b90d94c 100644
+--- a/arch/arm/mach-exynos/setup-i2c0.c
++++ b/arch/arm/mach-exynos/setup-i2c0.c
+@@ -1,7 +1,5 @@
+ /*
+- * linux/arch/arm/mach-exynos4/setup-i2c0.c
+- *
+- * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
++ * Copyright (c) 2009-2012 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+  *
+  * I2C0 GPIO configuration.
+@@ -18,9 +16,14 @@ struct platform_device; /* don't need the contents */
+ #include <linux/gpio.h>
+ #include <plat/iic.h>
+ #include <plat/gpio-cfg.h>
++#include <plat/cpu.h>
  
- static struct cpu_table cpu_ids[] __initdata = {
-@@ -61,7 +61,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
--		.init_uarts	= exynos4_init_uarts,
-+		.init_uarts	= exynos_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4210,
- 	}, {
-@@ -69,7 +69,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
--		.init_uarts	= exynos4_init_uarts,
-+		.init_uarts	= exynos_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4212,
- 	}, {
-@@ -77,7 +77,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
--		.init_uarts	= exynos4_init_uarts,
-+		.init_uarts	= exynos_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4412,
- 	},
-@@ -469,7 +469,7 @@ static int __init exynos_init(void)
- 
- /* uart registration process */
- 
--static void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
-+static void __init exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ void s3c_i2c0_cfg_gpio(struct platform_device *dev)
  {
- 	struct s3c2410_uartcfg *tcfg = cfg;
- 	u32 ucnt;
++	if (soc_is_exynos5250())
++		/* will be implemented with gpio function */
++		return;
++
+ 	s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
+ 			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+ }
 -- 
 1.7.4.4
