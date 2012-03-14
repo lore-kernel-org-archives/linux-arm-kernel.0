@@ -1,23 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Mar 2012 13:15:01 +0000
-Subject: [PATCH v3 0/5] ARM: Initial support for Cortex-M3
-In-Reply-To: <20120314103352.GA20899@arm.com>
-References: <20120314101928.GA29474@pengutronix.de>
- <20120314103352.GA20899@arm.com>
-Message-ID: <201203141315.01840.arnd@arndb.de>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Wed, 14 Mar 2012 14:16:56 +0100
+Subject: [PATCH] stmmac: Add device-tree support
+In-Reply-To: <201203141307.55808.arnd@arndb.de>
+References: <1331561157-3820-1-git-send-email-sr@denx.de>
+ <20120312143825.GB13869@game.jcrosoft.org> <4F60832E.6060100@st.com>
+ <201203141307.55808.arnd@arndb.de>
+Message-ID: <4F609A48.6050702@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Catalin Marinas wrote:
-> > I'd be happy if these patches made it into 3.4-rc1.
+On 3/14/2012 2:07 PM, Arnd Bergmann wrote:
+> On Wednesday 14 March 2012, Giuseppe CAVALLARO wrote:
+>> On 3/12/2012 3:38 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> On 15:05 Mon 12 Mar     , Stefan Roese wrote:
+>>>> This patch adds support to configure the STMMAC ethernet driver via
+>>>> device-tree instead of platform_data.
+>>>>
+>>>> Currently, only the properties needed on SPEAr600 are provided. All
+>>>> other properties should be added once needed on other platforms.
+>>>>
+>>>> Signed-off-by: Stefan Roese <sr@denx.de>
+>>>> Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+>>>> Cc: Viresh Kumar <viresh.kumar@st.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/net/stmmac.txt   |   38 +++++++++++
+>>>>  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   66 +++++++++++++++++++-
+>>>>  2 files changed, 103 insertions(+), 1 deletion(-)
+>>>>  create mode 100644 Documentation/devicetree/bindings/net/stmmac.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
+>>>> new file mode 100644
+>>>> index 0000000..386a47f
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/net/stmmac.txt
+>>>> @@ -0,0 +1,38 @@
+>>>> +* STMicroelectronics 10/100/1000 Ethernet driver (GMAC)
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: Should be "stm,gmac"
+>>
+>>> this IP have 2 version at least the GMAC for the second generation and mac for
+>>> the first generation
+>>
+>> yes you are right. STMMAC supports two device generations I named:
+>> dwma10/100 and dwmac1000 (gmac).
+>>
+>> Concerning the latter, we support several different versions of the
+>> synopsys GMAC cores ... from 3.30 to 3.61a.
+>>
+>> For example, stx7108 and Stx7109 have the same GMAC core (also SPEAr600
+>> IIRC).
+>> SPEAr13xx has 3.50a
+>> New ST SoC Stxh415 has the 3.60a. etc.
 > 
-> That's pretty ambitious. Most maintainers (including Russell) closed
-> their trees by now. You can still aim for 3.5-rc1 and ideally have them
-> in -next a few weeks before (though only once Russell is fine with the
-> patches).
+> In that case, you should definitely list the exact device versions in the
+> compatible string, like:
+> 
+> compatible = "stm,spear600-gmac", "snps,dw-gmac-3.50a", "snps,dw-gmac";
 
-Right. I don't see anything wrong with the patches, but now is not
-the time for them. Let's do a proper review after the merge window
-and then get them in early for 3.5.
+looks good to me
 
-	Arnd
+> 
+> When we have other socs with the same version, that lets us add quirks
+> for the specific version by checking the compatible property once in the
+> driver.
+> 
+> It also sounds to me that the entire stmmac driver should live in the
+> drivers/net/ethernet/synopsys directory, not stmicro, but that is a
+> different issue.
+> 
+
+I had also proposed to rename it from stmmac to synmac.
+
+peppe
+
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
