@@ -1,66 +1,59 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 13 Mar 2012 17:47:20 -0700
-Subject: [PATCH 0/3] coupled cpuidle state support
-In-Reply-To: <CAMbhsRRZ+xt179RN32-+eBWngbRow=MpKV1XcLvG-sHGF6VOJA@mail.gmail.com>
-References: <1324426147-16735-1-git-send-email-ccross@android.com>
- <4F1929E9.7070707@linaro.org> <8762e8kqi6.fsf@ti.com>
- <CAMbhsRRZ+xt179RN32-+eBWngbRow=MpKV1XcLvG-sHGF6VOJA@mail.gmail.com>
-Message-ID: <CAMbhsRRD2bdkcUZvScb-cF05e=R3h69bNVaTPFX4jBKBBOjuMg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Mar 2012 17:52:13 -0700
+Subject: Conflict between Versatile Express DT conversion and local timer
+ updates
+In-Reply-To: <201203131433.07214.arnd@arndb.de>
+References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
+ <201203131155.16454.arnd@arndb.de> <4F5F52A2.3050005@arm.com>
+ <201203131433.07214.arnd@arndb.de>
+Message-ID: <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 5:28 PM, Colin Cross <ccross@android.com> wrote:
-> On Tue, Mar 13, 2012 at 4:52 PM, Kevin Hilman <khilman@ti.com> wrote:
->> Hi Colin,
->>
->> On 12/21/2011 01:09 AM, Colin Cross wrote:
->>
->>> To use coupled cpuidle states, a cpuidle driver must:
->>
->> [...]
->>
->>> ? ? Provide a struct cpuidle_state.enter function for each state
->>> ? ? that affects multiple cpus. ?This function is guaranteed to be
->>> ? ? called on all cpus at approximately the same time. ?The driver
->>> ? ? should ensure that the cpus all abort together if any cpu tries
->>> ? ? to abort once the function is called.
->>
->> I've discoved the last sentence above is crucial, and in order to catch
->> all the corner cases I found it useful to have the struct
->> cpuidle_coupled in cpuidle.h so that the driver can check ready_count
->> itself (patch below, on top of $SUBJECT series.)
+On Tue, Mar 13, 2012 at 7:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 13 March 2012, Marc Zyngier wrote:
+>> On 13/03/12 11:55, Arnd Bergmann wrote:
+>> > On Tuesday 13 March 2012, Marc Zyngier wrote:
+>> >> On 13/03/12 10:15, Russell King - ARM Linux wrote:
 >
-> ready_count is an internal state of core coupled code, and will change
-> significantly in the next version of the patches. ?Drivers cannot
-> depend on it.
+>> > d) create a new next/timer branch in arm-soc that has Pawel's
+>> > ? ?98ed4ceb "ARM: vexpress: Get rid of MMIO_P2V" (the first patch from
+>> > ? ?vexpress/dt, your patches and the ux500/timer series. Also put
+>> > ? ?98ed4ceb into the next/cleanup branch.
+>> >
+>> > Any of those will work for us, my preference would be on #4. I have
+>> > created the next/timer branch in the arm-soc tree, so you can use
+>> > that and either rebase your patches on top or merge your tree into
+>> > it and fix up the merge conflicts.
+>>
+>> Thanks for doing that Arnd.
+>>
+>> I've thus created a new branch:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>> local_timers-for-arm-soc
+>>
+>> which contains the arm-soc next/timers branch as well as my local timers
+>> series. I'd greatly appreciate if you could pull it for 3.4.
+>>
 >
->> As you know, on OMAP4, when entering the coupled state, CPU0 has to wait
->> for CPU1 to enter its low power state before entering itself. ?The first
->> pass at implementing this was to just spin waiting for the powerdomain
->> of CPU1 to hit off. ?That works... most of the time.
->>
->> If CPU1 wakes up immediately (or before CPU0 starts checking), or more
->> likely, fails to hit the low-power state because of other hardware
->> "conditions", CPU0 will end up stuck in the loop waiting for CPU1.
->>
->> To solve this, in addition to checking the power state of CPU1, I also
->> check if (coupled->ready_count != cpumask_weight(&coupled->alive_coupled_cpus)).
->> If true, it means that CPU1 has already exited/aborted so CPU0 had
->> better abort as well.
->>
->> Checking the ready_count seemed like an easy way to do this, but did you
->> have any other mechanisms in mind for CPUs to communicate that they've
->> exited/aborted?
+> I've updated the next/timer branch with your changes now, but did not
+> put it into the for-next branch because Olof is currently handling that.
 >
-> Why not set a flag from CPU1 when it exits the low power state, and
-> have CPU0 spin on the powerdomain register or the flag? ?You can then
-> use the parallel barrier function to ensure both cpus have seen the
-> flag and reset it to 0 before returning.
+> Olof, can you add it to for-next please? The timer branch should have
+> no dependencies other than rmk/for-armsoc, so it can be fairly close to
+> the start.
 
-I realized the parallel barrier helper was not included in the patch
-set I posted, it will be in the next patch set.  Short version, no
-caller to cpuidle_coupled_parallel_barrier will return before all cpus
-in the coupled set have called it.  It allows you to resynchronize the
-cpus after an abort to ensure they have all seen the abort flag before
-clearing it and returning, leaving everything in the correct state for
-the next idle attempt.
+
+Thanks. I merged into for-next, but since there's already a history in
+there and I didn't rebuild it, it's on top of everything else.
+
+I got two trivial merge conflicts (and a few that git sorted out
+automatically): one with the tegra makefile, the other with shmobile's
+timer init.
+
+Marc, please take a look at the next/timers merge in the arm-soc
+for-next branch and let me know if they're OK. I'm pretty sure they
+are though.
+
+
+-Olof
