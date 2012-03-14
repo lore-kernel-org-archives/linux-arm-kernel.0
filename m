@@ -1,79 +1,22 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Wed, 14 Mar 2012 16:35:17 -0500
-Subject: [PATCH] OMAP3: OPP: Test for IVA subsystem before attempting to
- add IVA OPP
-In-Reply-To: <874ntqg9yr.fsf@ti.com>
-References: <1331746695-24372-1-git-send-email-mvs@tigris.de>
- <874ntqg9yr.fsf@ti.com>
-Message-ID: <CAOMWX4eYQvwHfpci1AgLO8kk1yxzB-zruMQQvLXeLnxbfUHFgw@mail.gmail.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Thu, 15 Mar 2012 07:43:04 +1100
+Subject: mc13xxx: add I2C support (now with regmap), V3
+Message-ID: <1331757790-10583-1-git-send-email-marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 16:15, Kevin Hilman <khilman@ti.com> wrote:
-> Maximilian Schwerin <mvs@tigris.de> writes:
->
->> From: Steve Sakoman <steve@sakoman.com>
->>
->> Don't try to add IVA OPPs for OMAP3 versions not containing an IVA
->> subsystem, as this would make omap_init_opp_table fail.
->>
->> Signed-off-by: Steve Sakoman <steve@sakoman.com>
->> Signed-off-by: Maximilian Schwerin <mvs@tigris.de>
->
-> Minor: patch subjects for arch/arm/* core code need to have the ARM:
-> prefix also.
->
-> Also, please run scripts/checkpatch.pl on your patch and fix the
-> warnings.
->
->> ---
->> ?arch/arm/mach-omap2/opp.c | ? ?4 ++++
->> ?1 files changed, 4 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
->> index 9262a6b..414f2ec 100644
->> --- a/arch/arm/mach-omap2/opp.c
->> +++ b/arch/arm/mach-omap2/opp.c
->> @@ -62,6 +62,10 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, i);
->> ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
->> ? ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? if ((strcmp(opp_def->hwmod_name,"iva") == 0) && !omap3_has_iva())
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> +
->> ? ? ? ? ? ? ? oh = omap_hwmod_lookup(opp_def->hwmod_name);
->> ? ? ? ? ? ? ? if (!oh || !oh->od) {
->> ? ? ? ? ? ? ? ? ? ? ? pr_warn("%s: no hwmod or odev for %s, [%d] "
->
-> Wouldn't the one-liner below do the same thing?
->
-> Actually, your patch makes it less noisy at boot time, avoiding the
-> pr_warn(), so is probably better.
+Hi,
 
-The only issue i have with current patch is that it focusses to solve
-a specific device IVA.
-we could have similar variances if we had SGX/AESS device etc
-registered in the common
-table. a generic solution might be preferable - could we reduce the
-severity of pr_warn to pr_debug and do a continue instead?
+This series (against mfd-2.6/for-next) changes the mc13xxx driver to use 
+regmap and adds I2C support. It generally goes about this the same way as 
+the previous 2 versions, but now uses regmap.
 
->
-> Kevin
->
-> diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
-> index 9262a6b..d3d4fa2 100644
-> --- a/arch/arm/mach-omap2/opp.c
-> +++ b/arch/arm/mach-omap2/opp.c
-> @@ -67,7 +67,7 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
-> ? ? ? ? ? ? ? ? ? ? ? ?pr_warn("%s: no hwmod or odev for %s, [%d] "
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"cannot add OPPs.\n", __func__,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?opp_def->hwmod_name, i);
-> - ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? ? ? ? ? ? ? ? ? continue;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?dev = &oh->od->pdev->dev;
+I am unable to test SPI functionality, but the I2C stuff works. It would be
+great if someone could test the SPI side again.
 
+The first 2 patches add required support to regmap for the mc13xxx register
+format(s), I've included them here for convenience.
+@Mark B: I also have some versions of these that apply against regmap/for-next.
 
-Regards,
-Nishanth Menon
+Cheers,
+Marc
