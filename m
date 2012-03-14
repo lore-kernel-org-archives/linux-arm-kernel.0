@@ -1,36 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Mar 2012 13:12:51 +0000
-Subject: [PATCH v3 2/5] ARM: Add a printk loglevel modifier
-In-Reply-To: <1331720516-11801-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Wed, 14 Mar 2012 13:15:01 +0000
+Subject: [PATCH v3 0/5] ARM: Initial support for Cortex-M3
+In-Reply-To: <20120314103352.GA20899@arm.com>
 References: <20120314101928.GA29474@pengutronix.de>
- <1331720516-11801-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <201203141312.51547.arnd@arndb.de>
+ <20120314103352.GA20899@arm.com>
+Message-ID: <201203141315.01840.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Uwe Kleine-K?nig wrote:
-> This is a needed followup for
+On Wednesday 14 March 2012, Catalin Marinas wrote:
+> > I'd be happy if these patches made it into 3.4-rc1.
 > 
->         ARM: protect usage of cr_alignment by #ifdef CONFIG_CPU_CP15
-> 
-> otherwise no newline is printed for !CONFIG_CPU_CP15
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Should this be folded into the
-> 
->         ARM: protect usage of cr_alignment by #ifdef CONFIG_CPU_CP15
-> 
-> patch? Or should it come before it?
-> 
+> That's pretty ambitious. Most maintainers (including Russell) closed
+> their trees by now. You can still aim for 3.5-rc1 and ideally have them
+> in -next a few weeks before (though only once Russell is fine with the
+> patches).
 
-I think this patch needs a better explanation. It looks to me that
-it's simply a bug fix, because every printk that is not a continuation
-of a previous printk needs a KERN_* line. In that case, it should
-just get applied as a bug fix independent of the other patches.
-
-However, if you sometimes don't have a newline after the previous
-printk, this patch is actually wrong and should not get applied at
-all.
+Right. I don't see anything wrong with the patches, but now is not
+the time for them. Let's do a proper review after the merge window
+and then get them in early for 3.5.
 
 	Arnd
