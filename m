@@ -1,35 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Mar 2012 13:21:46 +0000
-Subject: Inconsistent kallsyms data on ARM.
-In-Reply-To: <CAP=VYLoStscdVJretZ-Rkbp7V3Vsm8N0oWcjih7ruHFiDN7CiA@mail.gmail.com>
-References: <CAP=VYLoStscdVJretZ-Rkbp7V3Vsm8N0oWcjih7ruHFiDN7CiA@mail.gmail.com>
-Message-ID: <201203141321.47010.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Mar 2012 08:26:17 -0500
+Subject: [PATCH 4/7] dt/clock: Add handling for fixed clocks and a clock
+ node setup iterator
+In-Reply-To: <20120314075930.GF21337@S2101-09.ap.freescale.net>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+ <1331680947-29861-5-git-send-email-robherring2@gmail.com>
+ <20120314075930.GF21337@S2101-09.ap.freescale.net>
+Message-ID: <4F609C79.2060307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 March 2012, Paul Gortmaker wrote:
-> This bug(?)  has been seen to float from one ARM build to another since
-> I started tracking the day-to-day changes in Stephen's linux-next builds.
+On 03/14/2012 02:59 AM, Shawn Guo wrote:
+> On Tue, Mar 13, 2012 at 06:22:24PM -0500, Rob Herring wrote:
+> ...
+>> +/**
+>> + * of_fixed_clk_setup() - Setup function for simple fixed rate clock
+>> + */
+>> +void __init of_fixed_clk_setup(struct device_node *node)
+>> +{
+>> +	struct clk *clk;
+>> +	const char *clk_name = node->name;
+>> +	u32 rate;
+>> +
+>> +	if (of_property_read_u32(node, "clock-frequency", &rate))
+>> +		return;
+>> +
+>> +	of_property_read_string(node, "clock-output-names", &clk_name);
+>> +
+>> +	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
+>> +	if (clk)
+>> +		of_clk_add_provider(node, of_fixed_clk_get, clk);
+>> +}
 > 
-> I see it was discussed earlier:
+> It seems my comment[1] did not get addressed in this post.
 > 
->    https://lkml.org/lkml/2011/8/2/233
->    https://lkml.org/lkml/2011/10/8/70
+> Regards,
+> Shawn
 > 
-> but no concrete cause was nailed down.  Can the linux-next build results
-> help shed some light on this in any way?  Since it seems sporadic, is
-> there value in embedding a diagnostic of some sort in the infrastructure
-> so that when the error is detected, that it prints out more detailed info?
-> 
-> I can provide links to failed linux-next builds, but at the moment, all they
-> really seem to have is the same repeated error message, like this one:
-> 
->    http://kisskb.ellerman.id.au/kisskb/buildresult/5869367/
-> 
-> and I don't see that helping folks all that much....
-> 
+> [1] http://article.gmane.org/gmane.linux.drivers.devicetree/10589
 
-I'm sure I can reproduce it if necessary, but I need to know what to
-look for to find out what the problem is.
+I just took Grant's commit as is.
 
-	Arnd
+It also only works for root fixed clocks, but the common clock allows
+for non-root fixed clocks. I don't think there's much use case for that
+at least as a DT clock node.
+
+Rob
