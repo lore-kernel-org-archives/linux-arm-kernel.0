@@ -1,450 +1,219 @@
-From: sr@denx.de (Stefan Roese)
-Date: Wed, 14 Mar 2012 20:01:58 +0100
-Subject: [PATCH v2] ARM: SPEAr600: Add device-tree support to SPEAr600
- boards
-In-Reply-To: <20120314172435.GP18320@game.jcrosoft.org>
-References: <1331737232-25477-1-git-send-email-sr@denx.de>
- <201203141749.05899.sr@denx.de> <20120314172435.GP18320@game.jcrosoft.org>
-Message-ID: <201203142001.58762.sr@denx.de>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Wed, 14 Mar 2012 21:08:11 +0200
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+Message-ID: <4F60EC9B.9040409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012 18:24:35 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > diff --git a/arch/arm/boot/dts/spear600-evb.dts
-> > > > b/arch/arm/boot/dts/spear600-evb.dts new file mode 100644
-> > > > index 0000000..cbfda8d
-> > > > --- /dev/null
-> > > > +++ b/arch/arm/boot/dts/spear600-evb.dts
-> > > > @@ -0,0 +1,30 @@
-> > > > +/*
-> > > > + * Copyright 2012 Stefan Roese <sr@denx.de>
-> > > > + *
-> > > > + * The code contained herein is licensed under the GNU General
-> > > > Public + * License. You may obtain a copy of the GNU General Public
-> > > > License + * Version 2 or later at the following locations:
-> > > > + *
-> > > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > > + * http://www.gnu.org/copyleft/gpl.html
-> > > > + */
-> > > > +
-> > > > +/dts-v1/;
-> > > > +/include/ "spear600.dtsi"
-> > > > +
-> > > > +/ {
-> > > > +	model = "ST SPEAr600 Evaluation Board";
-> > > > +	compatible = "st,spear600-evb", "st,spear600";
-> > > > +	#address-cells = <1>;
-> > > > +	#size-cells = <1>;
-> > > 
-> > > please put the mem size here
-> > 
-> > Might I ask why? Other *.dtsi files don't have it either.
-> 
-> do not expect the bootloader to put it. I t's not mandatory
+On 03/13/2012 12:10 PM, Thomas Abraham wrote:
+> On 13 March 2012 15:17, Jingoo Han<jg1.han@samsung.com>  wrote:
+>>> -----Original Message-----
+>>> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
+>>> Sent: Tuesday, March 13, 2012 6:00 AM
+>>> To: linux-fbdev at vger.kernel.org
+>>> Cc: FlorianSchandinat at gmx.de; linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
+>>> kgene.kim at samsung.com; jg1.han at samsung.com; ben-linux at fluff.org; patches at linaro.org; Kyungmin Park;
+>>> JeongHyeon Kim; Heiko Stuebner; Kwangwoo Lee; Mark Brown; Peter Korsgaard; Darius Augulis; Maurus
+>>> Cuelenaere
+>>> Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+>>>
+>>> For all the Samsung SoC based boards which have the platform data for
+>>> s3c-fb driver, the 'default_win' element in the platform data is removed
+>>> and the lcd panel video timing values are moved out of individual window
+>>> configuration data.
+>>>
+>>> Cc: Jingoo Han<jg1.han@samsung.com>
+>>> Cc: Kyungmin Park<kyungmin.park@samsung.com>
+>>> Cc: JeongHyeon Kim<jhkim@insignal.co.kr>
+>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>>> Cc: Heiko Stuebner<heiko@sntech.de>
+>>> Cc: Ben Dooks<ben-linux@fluff.org>
+>>> Cc: Kwangwoo Lee<kwangwoo.lee@gmail.com>
+>>> Cc: Mark Brown<broonie@opensource.wolfsonmicro.com>
+>>> Cc: Peter Korsgaard<jacmet@sunsite.dk>
+>>> Cc: Darius Augulis<augulis.darius@gmail.com>
+>>> Cc: Maurus Cuelenaere<mcuelenaere@gmail.com>
+>>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+>>> ---
+>>>   arch/arm/mach-exynos/mach-nuri.c           |   26 ++++++++++-------
+>>>   arch/arm/mach-exynos/mach-origen.c         |   24 ++++++++++-------
+>>>   arch/arm/mach-exynos/mach-smdkv310.c       |   28 +++++++++++--------
+>>>   arch/arm/mach-exynos/mach-universal_c210.c |   26 ++++++++++-------
+>>>   arch/arm/mach-s3c24xx/mach-smdk2416.c      |   27 ++++++++++--------
+>>>   arch/arm/mach-s3c64xx/mach-anw6410.c       |   25 ++++++++++-------
+>>>   arch/arm/mach-s3c64xx/mach-crag6410.c      |   25 ++++++++++-------
+>>>   arch/arm/mach-s3c64xx/mach-hmt.c           |   24 ++++++++++-------
+>>>   arch/arm/mach-s3c64xx/mach-mini6410.c      |   40 ++++++++++++---------------
+>>>   arch/arm/mach-s3c64xx/mach-real6410.c      |   40 ++++++++++++---------------
+>>>   arch/arm/mach-s3c64xx/mach-smartq5.c       |   26 ++++++++++-------
+>>>   arch/arm/mach-s3c64xx/mach-smartq7.c       |   26 ++++++++++-------
+>>>   arch/arm/mach-s3c64xx/mach-smdk6410.c      |   25 ++++++++++-------
+>>>   arch/arm/mach-s5p64x0/mach-smdk6440.c      |   24 ++++++++++-------
+>>>   arch/arm/mach-s5p64x0/mach-smdk6450.c      |   24 ++++++++++-------
+>>>   arch/arm/mach-s5pc100/mach-smdkc100.c      |   27 ++++++++++--------
+>>>   arch/arm/mach-s5pv210/mach-aquila.c        |   36 +++++++++++--------------
+>>>   arch/arm/mach-s5pv210/mach-goni.c          |   26 ++++++++++-------
+>>>   arch/arm/mach-s5pv210/mach-smdkv210.c      |   24 ++++++++++-------
+>>>   19 files changed, 285 insertions(+), 238 deletions(-)
+>>>
+>> [.....]
+>>
+>>> diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+>>> index c34c2ab..24dcdc9 100644
+>>> --- a/arch/arm/mach-s3c64xx/mach-mini6410.c
+>>> +++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+>>> @@ -153,36 +153,32 @@ static struct s3c2410_platform_nand mini6410_nand_info = {
+>>>
+>>>   static struct s3c_fb_pd_win mini6410_fb_win[] = {
+>>>        {
+>>> -             .win_mode       = {     /* 4.3" 480x272 */
+>>> -                     .left_margin    = 3,
+>>> -                     .right_margin   = 2,
+>>> -                     .upper_margin   = 1,
+>>> -                     .lower_margin   = 1,
+>>> -                     .hsync_len      = 40,
+>>> -                     .vsync_len      = 1,
+>>> -                     .xres           = 480,
+>>> -                     .yres           = 272,
+>>> -             },
+>>>                .max_bpp        = 32,
+>>>                .default_bpp    = 16,
+>>> +             .xres           = 480,
+>>> +             .yres           = 272,
+>>>        }, {
+>>> -             .win_mode       = {     /* 7.0" 800x480 */
+>>> -                     .left_margin    = 8,
+>>> -                     .right_margin   = 13,
+>>> -                     .upper_margin   = 7,
+>>> -                     .lower_margin   = 5,
+>>> -                     .hsync_len      = 3,
+>>> -                     .vsync_len      = 1,
+>>> -                     .xres           = 800,
+>>> -                     .yres           = 480,
+>>> -             },
+>>>                .max_bpp        = 32,
+>>>                .default_bpp    = 16,
+>>> +             .xres           = 800,
+>>> +             .yres           = 480,
+>>>        },
+>>>   };
+>>>
+>>> +static struct fb_videomode mini6410_lcd_timing = {
+>>> +     .left_margin    = 8,
+>>> +     .right_margin   = 13,
+>>> +     .upper_margin   = 7,
+>>> +     .lower_margin   = 5,
+>>> +     .hsync_len      = 3,
+>>> +     .vsync_len      = 1,
+>>> +     .xres           = 800,
+>>> +     .yres           = 480,
+>>> +};
+>>> +
+>>>   static struct s3c_fb_platdata mini6410_lcd_pdata __initdata = {
+>>>        .setup_gpio     = s3c64xx_fb_gpio_setup_24bpp,
+>>> +     .vtiming        =&mini6410_lcd_timing,
+>>>        .win[0]         =&mini6410_fb_win[0],
+>>>        .vidcon0        = VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+>>>        .vidcon1        = VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+>>> @@ -310,8 +306,8 @@ static void __init mini6410_machine_init(void)
+>>>        mini6410_lcd_pdata.win[0] =&mini6410_fb_win[features.lcd_index];
+>>>
+>>>        printk(KERN_INFO "MINI6410: selected LCD display is %dx%d\n",
+>>> -             mini6410_lcd_pdata.win[0]->win_mode.xres,
+>>> -             mini6410_lcd_pdata.win[0]->win_mode.yres);
+>>> +             mini6410_lcd_pdata.win[0]->xres,
+>>> +             mini6410_lcd_pdata.win[0]->yres);
+>>>
+>>>        s3c_nand_set_platdata(&mini6410_nand_info);
+>>>        s3c_fb_set_platdata(&mini6410_lcd_pdata);
+>>> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+>>> index be2a9a2..41e4f74 100644
+>>> --- a/arch/arm/mach-s3c64xx/mach-real6410.c
+>>> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+>>> @@ -119,36 +119,32 @@ static struct platform_device real6410_device_eth = {
+>>>
+>>>   static struct s3c_fb_pd_win real6410_fb_win[] = {
+>>>        {
+>>> -             .win_mode       = {     /* 4.3" 480x272 */
+>>> -                     .left_margin    = 3,
+>>> -                     .right_margin   = 2,
+>>> -                     .upper_margin   = 1,
+>>> -                     .lower_margin   = 1,
+>>> -                     .hsync_len      = 40,
+>>> -                     .vsync_len      = 1,
+>>> -                     .xres           = 480,
+>>> -                     .yres           = 272,
+>>> -             },
+>>>                .max_bpp        = 32,
+>>>                .default_bpp    = 16,
+>>> +             .xres           = 480,
+>>> +             .yres           = 272,
+>>>        }, {
+>>> -             .win_mode       = {     /* 7.0" 800x480 */
+>>> -                     .left_margin    = 8,
+>>> -                     .right_margin   = 13,
+>>> -                     .upper_margin   = 7,
+>>> -                     .lower_margin   = 5,
+>>> -                     .hsync_len      = 3,
+>>> -                     .vsync_len      = 1,
+>>> -                     .xres           = 800,
+>>> -                     .yres           = 480,
+>>> -             },
+>>>                .max_bpp        = 32,
+>>>                .default_bpp    = 16,
+>>> +             .xres           = 800,
+>>> +             .yres           = 480,
+>>>        },
+>>>   };
+>>>
+>>> +static struct fb_videomode real6410_lcd_timing = {
+>>> +     .left_margin    = 3,
+>>> +     .right_margin   = 2,
+>>> +     .upper_margin   = 1,
+>>> +     .lower_margin   = 1,
+>>> +     .hsync_len      = 40,
+>>> +     .vsync_len      = 1,
+>>> +     .xres           = 800,
+>>> +     .yres           = 480,
+>>> +};
+>>
+>> What is the difference between mini6410_lcd_timing and real6410_lcd_timing?
+>> In my opinion, it would be good as follows:
+>>
+>> +static struct fb_videomode real6410_lcd_timing = {
+>> +       .left_margin    = 8,
+>> +       .right_margin   = 13,
+>> +       .upper_margin   = 7,
+>> +       .lower_margin   = 5,
+>> +       .hsync_len      = 3,
+>> +       .vsync_len      = 1,
+>> +       .xres           = 800,
+>> +       .yres           = 480,
+>> +};
+>>
+>>
+> Before this patch series, both real6410 and mini6410 had 'default_win'
+> = 0 in the platform data. And, the s3c-fb driver selected the video
+> timing from the window selected by the default_win parameter in s3c-fb
+> platform data, i.e window 0 for both mini6440 and real6410. So, in
+> this patch, while moving the timing values out of window data, the
+> timing values for window 0 was selected.
+>
+> The timing value for window 1 was never used on mini6410 and real6410.
+> So I would suggest to use timing value of window 0 in this patch.
 
-But the memory node it is already present in spear600.dtsi (see below). Do we 
-really need to duplicate this in the board specific dts file?
- 
-> > > > +
-> > > > +	soc {
-> > > > +		gmac0: ethernet at e0800000 {
-> > > > +			phy-mode = "gmii";
-> > > > +		};
-> > > > +
-> > > > +		i2c at d0200000 {
-> > > > +			clock-frequency = <400000>;
-> > > > +		};
-> > > > +	};
-> > > > +};
-> > > > diff --git a/arch/arm/boot/dts/spear600.dtsi
-> > > > b/arch/arm/boot/dts/spear600.dtsi new file mode 100644
-> > > > index 0000000..e45e58f
-> > > > --- /dev/null
-> > > > +++ b/arch/arm/boot/dts/spear600.dtsi
-> > > > @@ -0,0 +1,162 @@
-> > > > +/*
-> > > > + * Copyright 2012 Stefan Roese <sr@denx.de>
-> > > > + *
-> > > > + * The code contained herein is licensed under the GNU General
-> > > > Public + * License. You may obtain a copy of the GNU General Public
-> > > > License + * Version 2 or later at the following locations:
-> > > > + *
-> > > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > > + * http://www.gnu.org/copyleft/gpl.html
-> > > > + */
-> > > > +
-> > > > +/include/ "skeleton.dtsi"
-> > > > +
-> > > > +/ {
-> > > > +	compatible = "st,spear600";
-> > > > +
-> > > > +	cpus {
-> > > > +		cpu at 0 {
-> > > > +			compatible = "arm,arm926ejs";
-> > > > +		};
-> > > > +	};
-> > > > +
-> > > > +	memory {
-> > > > +		device_type = "memory";
-> > > > +		reg = <0 0>; /* Filled by U-Boot */
-> > > 
-> > > please put the max mem of the SoC here
-> > 
-> > Why? It's always updated by the bootloader. And a max. mem size (when not
-> > updated to the correct mem size by the bootloader) would crash the board
-> > if it is equipped with less memory.
-> 
-> yes but we descripbe the soc here and on the dts you reduce it
-> Never expect the bootloader to update it.
+You are wrong. Please see mini6410_parse_features(). Please do not 
+remove second window because it could be selected via kernel parameters 
+dinamically. It's very useful and I spend my hours to create it.
 
-Without update to real size we're doomed.
- 
-> It's a possibility not mandatory
-
-Okay, I'll add the max. size here.
- 
-> > > > +	};
-> > > > +
-> > > > +	soc {
-> > > 
-> > > please put the name of the bus not soc
-> > 
-> > Okay.
-> > 
-> > > > +		#address-cells = <1>;
-> > > > +		#size-cells = <1>;
-> > > > +		compatible = "simple-bus";
-> > > > +		ranges;
-> > > > +
-> > > > +		vic0: interrupt-controller at f1100000 {
-> > > > +			compatible = "arm,pl190-vic";
-> > > > +			interrupt-controller;
-> > > > +			reg = <0xf1100000 0x1000>;
-> > > > +			#interrupt-cells = <1>;
-> > > > +		};
-> > > > +
-> > > > +		vic1: interrupt-controller at f1000000 {
-> > > > +			compatible = "arm,pl190-vic";
-> > > > +			interrupt-controller;
-> > > > +			reg = <0xf1000000 0x1000>;
-> > > > +			#interrupt-cells = <1>;
-> > > > +		};
-> > > > +
-> > > > +		serial at d0000000 {
-> > > > +			compatible = "arm,pl011", "arm,primecell";
-> > > > +			reg = <0xd0000000 0x1000>;
-> > > > +			interrupt-parent = <&vic0>;
-> > > > +			interrupts = <24>;
-> > > > +		};
-> > > > +
-> > > > +		serial at d0080000 {
-> > > > +			compatible = "arm,pl011", "arm,primecell";
-> > > > +			reg = <0xd0080000 0x1000>;
-> > > > +			interrupt-parent = <&vic0>;
-> > > > +			interrupts = <25>;
-> > > > +		};
-> > > > +
-> > > > +		/* local/cpu GPIO */
-> > > > +		gpio0: gpio at f0100000 {
-> > > > +			#gpio-cells = <2>;
-> > > > +			compatible = "arm,pl061", "arm,primecell";
-> > > > +			gpio-controller;
-> > > > +			reg = <0xf0100000 0x1000>;
-> > > > +			interrupt-parent = <&vic0>;
-> > > > +			interrupts = <18>;
-> > > > +		};
-> > > > +
-> > > > +		/* basic GPIO */
-> > > > +		gpio1: gpio at fc980000 {
-> > > > +			#gpio-cells = <2>;
-> > > > +			compatible = "arm,pl061", "arm,primecell";
-> > > > +			gpio-controller;
-> > > > +			reg = <0xfc980000 0x1000>;
-> > > > +			interrupt-parent = <&vic1>;
-> > > > +			interrupts = <19>;
-> > > > +		};
-> > > > +
-> > > > +		/* appl GPIO */
-> > > > +		gpio2: gpio at d8100000 {
-> > > > +			#gpio-cells = <2>;
-> > > > +			compatible = "arm,pl061", "arm,primecell";
-> > > > +			gpio-controller;
-> > > > +			reg = <0xd8100000 0x1000>;
-> > > > +			interrupt-parent = <&vic1>;
-> > > > +			interrupts = <4>;
-> > > > +		};
-> > > > +
-> > > > +		gmac0: ethernet at e0800000 {
-> > > > +			compatible = "st,spear600-gmac";
-> > > > +			reg = <0xe0800000 0x8000>;
-> > > > +			interrupt-parent = <&vic1>;
-> > > > +			interrupts = <24 23>;
-> > > > +			interrupt-names = "macirq", "eth_wake_irq";
-> > > > +			mac-address = [000000000000]; /* Filled in 
-by U-Boot
-> > 
-> > */
-> 
-> drop this no dummy data
-
-Okay.
-
-> > > > +		};
-> > > > +
-> > > > +		i2c at d0200000 {
-> > > > +			#address-cells = <1>;
-> > > > +			#size-cells = <0>;
-> > > > +			compatible = "snps,designware-i2c";
-> > > > +			reg = <0xd0200000 0x1000>;
-> > > > +			interrupt-parent = <&vic0>;
-> > > > +			interrupts = <28>;
-> > > > +		};
-> > > > +
-> > > > +		fsmc0: flash at d1800000 {
-> > > > +			status = "disabled";
-> > > > +			compatible = "st,spear600-fsmc-nand";
-> > > > +			#address-cells = <1>;
-> > > > +			#size-cells = <1>;
-> > > > +			reg = <0xd1800000 0x1000	/* FSMC 
-Register */
-> > > > +			       0xd2000000 0x4000>;	/* NAND Base 
-*/
-> > > > +			reg-names = "fsmc_regs", "nand_data";
-> > > > +		};
-> > > > +
-> > > > +		smi0: flash at fc000000 {
-> > > > +			status = "disabled";
-> > > > +			compatible = "st,spear600-smi";
-> > > > +			#address-cells = <1>;
-> > > > +			#size-cells = <1>;
-> > > > +			reg = <0xfc000000 0x1000>;
-> > > > +			interrupt-parent = <&vic1>;
-> > > > +			interrupts = <12>;
-> > > > +		};
-> > > > +
-> > > > +		ehci at e1800000 {
-> > > > +			status = "disabled";
-> > > > +			compatible = "st,spear600-ehci", "usb-ehci";
-> > > > +			reg = <0xe1800000 0x1000>;
-> > > > +			interrupt-parent = <&vic1>;
-> > > > +			interrupts = <27>;
-> > > > +		};
-> > > > +
-> > > > +		ehci at e2000000 {
-> > > > +			status = "disabled";
-> > > > +			compatible = "st,spear600-ehci", "usb-ehci";
-> > > > +			reg = <0xe2000000 0x1000>;
-> > > > +			interrupt-parent = <&vic1>;
-> > > > +			interrupts = <29>;
-> > > > +		};
-> > > > +
-> > > > +		ohci at e1900000 {
-> > > > +			status = "disabled";
-> > > > +			compatible = "st,spear600-ohci", "usb-ohci";
-> > > > +			reg = <0xe1900000 0x1000>;
-> > > > +			interrupt-parent = <&vic1>;
-> > > > +			interrupts = <26>;
-> > > > +		};
-> > > > +
-> > > > +		ohci at e2100000 {
-> > > > +			status = "disabled";
-> > > > +			compatible = "st,spear600-ohci", "usb-ohci";
-> > > > +			reg = <0xe2100000 0x1000>;
-> > > > +			interrupt-parent = <&vic1>;
-> > > > +			interrupts = <28>;
-> > > > +		};
-> > > 
-> > > all of this need a Doc for the ST bindings
-> > 
-> > Sure. I only provided those nodes on Arnd's special request. They are
-> > currently disabled. And documentation will follow with the DT device
-> > driver patches.
-> 
-> no update it after
-
-Hmmm. I'm sorry, but I fail to understand you here. Please explain.
- 
-> > > > +	};
-> > > > +};
-> > > > diff --git a/arch/arm/mach-spear6xx/Kconfig
-> > > > b/arch/arm/mach-spear6xx/Kconfig index ff4ae5b..7777f72 100644
-> > > > --- a/arch/arm/mach-spear6xx/Kconfig
-> > > > +++ b/arch/arm/mach-spear6xx/Kconfig
-> > > > @@ -11,6 +11,13 @@ config BOARD_SPEAR600_EVB
-> > > > 
-> > > >  	help
-> > > >  	
-> > > >  	  Supports ST SPEAr600 Evaluation Board
-> > > > 
-> > > > +config BOARD_SPEAR600_DT
-> > > > +	bool "SPEAr600 generic board configured via device-tree"
-> > > > +	select MACH_SPEAR600
-> > > > +	select USE_OF
-> > > > +	help
-> > > > +	  Supports ST SPEAr600 boards configured via the device-tree
-> > > > +
-> > > > 
-> > > >  endmenu
-> > > >  
-> > > >  config MACH_SPEAR600
-> > > > 
-> > > > diff --git a/arch/arm/mach-spear6xx/Makefile
-> > > > b/arch/arm/mach-spear6xx/Makefile index cc1a4d8..6f87c3a 100644
-> > > > --- a/arch/arm/mach-spear6xx/Makefile
-> > > > +++ b/arch/arm/mach-spear6xx/Makefile
-> > > > @@ -5,8 +5,5 @@
-> > > > 
-> > > >  # common files
-> > > >  obj-y	+= clock.o spear6xx.o
-> > > > 
-> > > > -# spear600 specific files
-> > > > -obj-$(CONFIG_MACH_SPEAR600) += spear600.o
-> > > > -
-> > > > 
-> > > >  # spear600 boards files
-> > > >  obj-$(CONFIG_BOARD_SPEAR600_EVB) += spear600_evb.o
-> > > > 
-> > > > diff --git a/arch/arm/mach-spear6xx/spear600.c
-> > > > b/arch/arm/mach-spear6xx/spear600.c deleted file mode 100644
-> > > > index d0e6eea..0000000
-> > > > --- a/arch/arm/mach-spear6xx/spear600.c
-> > > > +++ /dev/null
-> > > > @@ -1,25 +0,0 @@
-> > > > -/*
-> > > > - * arch/arm/mach-spear6xx/spear600.c
-> > > > - *
-> > > > - * SPEAr600 machine source file
-> > > > - *
-> > > > - * Copyright (C) 2009 ST Microelectronics
-> > > > - * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-> > > > - *
-> > > > - * This file is licensed under the terms of the GNU General Public
-> > > > - * License version 2. This program is licensed "as is" without any
-> > > > - * warranty of any kind, whether express or implied.
-> > > > - */
-> > > > -
-> > > > -#include <linux/ptrace.h>
-> > > > -#include <asm/irq.h>
-> > > > -#include <mach/generic.h>
-> > > > -#include <mach/hardware.h>
-> > > > -
-> > > > -/* Add spear600 specific devices here */
-> > > > -
-> > > > -void __init spear600_init(void)
-> > > > -{
-> > > > -	/* call spear6xx family common init function */
-> > > > -	spear6xx_init();
-> > > > -}
-> > > > diff --git a/arch/arm/mach-spear6xx/spear600_evb.c
-> > > > b/arch/arm/mach-spear6xx/spear600_evb.c index c6e4254..c4949aa 100644
-> > > > --- a/arch/arm/mach-spear6xx/spear600_evb.c
-> > > > +++ b/arch/arm/mach-spear6xx/spear600_evb.c
-> > > > @@ -32,9 +32,6 @@ static void __init spear600_evb_init(void)
-> > > > 
-> > > >  {
-> > > >  
-> > > >  	unsigned int i;
-> > > > 
-> > > > -	/* call spear600 machine init function */
-> > > > -	spear600_init();
-> > > > -
-> > > > 
-> > > >  	/* Add Platform Devices */
-> > > >  	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-> > > > 
-> > > > diff --git a/arch/arm/mach-spear6xx/spear6xx.c
-> > > > b/arch/arm/mach-spear6xx/spear6xx.c index e0f6628..aca20f0 100644
-> > > > --- a/arch/arm/mach-spear6xx/spear6xx.c
-> > > > +++ b/arch/arm/mach-spear6xx/spear6xx.c
-> > > > @@ -6,6 +6,8 @@
-> > > > 
-> > > >   * Copyright (C) 2009 ST Microelectronics
-> > > >   * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-> > > >   *
-> > > > 
-> > > > + * Copyright 2012 Stefan Roese <sr@denx.de>
-> > > > + *
-> > > > 
-> > > >   * This file is licensed under the terms of the GNU General Public
-> > > >   * License version 2. This program is licensed "as is" without any
-> > > >   * warranty of any kind, whether express or implied.
-> > > > 
-> > > > @@ -15,6 +17,10 @@
-> > > > 
-> > > >  #include <linux/amba/pl061.h>
-> > > >  #include <linux/ptrace.h>
-> > > >  #include <linux/io.h>
-> > > > 
-> > > > +#include <linux/of.h>
-> > > > +#include <linux/of_address.h>
-> > > > +#include <linux/of_irq.h>
-> > > > +#include <linux/of_platform.h>
-> > > > 
-> > > >  #include <asm/hardware/vic.h>
-> > > >  #include <asm/irq.h>
-> > > >  #include <asm/mach/arch.h>
-> > > > 
-> > > > @@ -99,12 +105,6 @@ struct amba_device gpio_device[] = {
-> > > > 
-> > > >  	}
-> > > >  
-> > > >  };
-> > > > 
-> > > > -/* This will add devices, and do machine specific tasks */
-> > > > -void __init spear6xx_init(void)
-> > > > -{
-> > > > -	/* nothing to do for now */
-> > > > -}
-> > > > -
-> > > > 
-> > > >  /* This will initialize vic */
-> > > >  void __init spear6xx_init_irq(void)
-> > > >  {
-> > > > 
-> > > > @@ -181,3 +181,60 @@ static void __init spear6xx_timer_init(void)
-> > > > 
-> > > >  struct sys_timer spear6xx_timer = {
-> > > >  
-> > > >  	.init = spear6xx_timer_init,
-> > > >  
-> > > >  };
-> > > > 
-> > > > +
-> > > > +/*
-> > > > + * Devicetree specific init structs/functions:
-> > > > + * Once the SPEAr600 devicetree support has matured, we can remove
-> > > > + * spear600_evb.c and the non-devicetree support above in this file.
-> > > > + */
-> > > > +
-> > > > +/*
-> > > > + * Add auxdata so that clock name matching doesn't fail in device
-> > > > + * drivers
-> > > > + */
-> > > > +struct of_dev_auxdata spear600_auxdata_lookup[] __initdata = {
-> > > > +	OF_DEV_AUXDATA("arm,pl011", SPEAR6XX_ICM1_UART0_BASE,
-> > > > +		       "uart0", NULL),
-> > > > +	OF_DEV_AUXDATA("arm,pl011", SPEAR6XX_ICM1_UART1_BASE,
-> > > > +		       "uart1", NULL),
-> > > > +	OF_DEV_AUXDATA("arm,pl061", SPEAR6XX_CPU_GPIO_BASE,
-> > > > +		       "gpio0", NULL),
-> > > > +	OF_DEV_AUXDATA("arm,pl061", SPEAR6XX_ICM3_GPIO_BASE,
-> > > > +		       "gpio1", NULL),
-> > > > +	OF_DEV_AUXDATA("arm,pl061", SPEAR6XX_ICM2_GPIO_BASE,
-> > > > +		       "gpio2", NULL),
-> > > > +	OF_DEV_AUXDATA("snps,designware-i2c", SPEAR6XX_ICM1_I2C_BASE,
-> > > > +		       "i2c_designware.0", NULL),
-> > > 
-> > > update the clkdev no more OF_DEV_AUXDATA
-> > 
-> > That will break non-DT boards. We can change it in clkdev later, once DT
-> > support has stabalized for SPEAr600. And remove all this then.
-> 
-> it will not just add new entry
-> 
-> as done on AT91 as example and requested for imx recently too
-
-Again, I fail to understand you. Sorry. Please describe in a complete sentence 
-what exactly you mean.
-
-Thanks,
-Stefan
+>
+> Thanks for your comments.
+>
+> Regards,
+> Thomas.
+>
