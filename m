@@ -1,41 +1,59 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 14 Mar 2012 20:24:50 +0100
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A6498093839@039-SN2MPN1-021.039d.mgd.msft.net>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <201202041117.48190.marek.vasut@gmail.com>
- <F281D0F91ED19E4D8E63A7504E8A6498033336@039-SN2MPN1-021.039d.mgd.msft.net>
- <201202100447.14248.marek.vasut@gmail.com>
- <CAOMZO5C3Y3kP5k_CKkCVMVdDem2T82g6F3uL=8GCVfNKHpdymA@mail.gmail.com>
- <F281D0F91ED19E4D8E63A7504E8A6498093839@039-SN2MPN1-021.039d.mgd.msft.net>
-Message-ID: <20120314192450.GS3852@pengutronix.de>
+Date: Wed, 14 Mar 2012 20:41:23 +0100
+Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
+In-Reply-To: <1331628428-24017-2-git-send-email-b29396@freescale.com>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-2-git-send-email-b29396@freescale.com>
+Message-ID: <20120314194123.GR26642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 03:30:26AM +0000, Chen Peter-B29397 wrote:
->  
-> > 
-> > Hi Peter,
-> > 
-> > On Fri, Feb 10, 2012 at 1:47 AM, Marek Vasut <marek.vasut@gmail.com>
-> > wrote:
-> > 
-> > > Oh, so you're still working on it. All right then, I'll now dive into
-> > the IIO
-> > > LRADC driver and let you handle this.
-> > 
-> > Do you plan to re-submit the mxs usb driver?
-> > 
-> According to sascha's suggestion, it is better to re-submit after we have
-> a generic USB PHY Layer in mainline.
+On Tue, Mar 13, 2012 at 04:47:04PM +0800, Dong Aisheng wrote:
+> From: Dong Aisheng <dong.aisheng@linaro.org>
 > 
-> Currently, Heikki's split PHY from OTG structure patches have mainlined, 
-> next step is to submit a generic USB PHY driver.
+> This patch includes basic dt support which can boot via nfs rootfs.
 > 
+> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
+>  arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
+>  arch/arm/boot/dts/imx28.dtsi                  |   88 +++++++++++++++++++++++++
+>  arch/arm/mach-mxs/Kconfig                     |    9 +++
+>  arch/arm/mach-mxs/Makefile                    |    1 +
+>  arch/arm/mach-mxs/imx28-dt.c                  |   67 +++++++++++++++++++
+>  6 files changed, 200 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> index 54bddda..9f21faf 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -1,6 +1,10 @@
 
-Cool, sounds like we get dt bindings for the i.MX ehci/otg ;)
+> +
+> +static const char *imx28_dt_compat[] __initdata = {
+> +	"fsl,imx28-evk",
+> +	NULL,
+> +};
+> +
+
+I suggest to add a generic "fsl,imx28" entry here. It helps people to
+start an unpatched kernel on their boards.
 
 Sascha
+
+> +DT_MACHINE_START(IMX28, "Freescale i.MX28 (Device Tree)")
+> +	.map_io		= mx28_map_io,
+> +	.init_irq	= imx28_dt_init_irq,
+> +	.timer		= &imx28_timer,
+> +	.init_machine	= imx28_init,
+> +	.dt_compat	= imx28_dt_compat,
+> +	.restart	= mxs_restart,
+> +MACHINE_END
+> -- 
+> 1.7.0.4
+> 
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
