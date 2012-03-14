@@ -1,65 +1,95 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 14 Mar 2012 12:27:23 +0000
-Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <4F6008FA.3040805@freescale.com>
-References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
- <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
- <4F591B8D.8090705@freescale.com>
- <20120309013216.GH2499@S2101-09.ap.freescale.net>
- <4F5FD706.8040209@freescale.com>
- <20120313234638.GY3177@opensource.wolfsonmicro.com>
- <4F6008FA.3040805@freescale.com>
-Message-ID: <20120314122723.GC3133@opensource.wolfsonmicro.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 14 Mar 2012 08:30:07 -0400
+Subject: [PATCH] ARM: pxa: fix regulator related build fail in
+ magician_defconfig
+In-Reply-To: <CAN1soZzDRR4XQ34WDL48=j+Ff8t5fsCFaccqZAKOQ1OAPeDXcA@mail.gmail.com>
+References: <1331084814.11802.YahooMailClassic@web29012.mail.ird.yahoo.com>	<1331242494-3157-1-git-send-email-paul.gortmaker@windriver.com>
+ <CAN1soZzDRR4XQ34WDL48=j+Ff8t5fsCFaccqZAKOQ1OAPeDXcA@mail.gmail.com>
+Message-ID: <4F608F4F.8020106@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 02:57:00AM +0000, Tabi Timur-B04825 wrote:
-> Mark Brown wrote:
+On 12-03-14 04:38 AM, Haojian Zhuang wrote:
+> On Fri, Mar 9, 2012 at 5:34 AM, Paul Gortmaker
+> <paul.gortmaker@windriver.com> wrote:
+>> commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0 (linux-next)
+>>
+>>  "regulator: Remove support for supplies specified by struct device"
+>>
+>> deletes the field from the struct, but this platform was still trying
+>> to set those fields.  Convert them to use the REGULATOR_SUPPLY macro.
+>>
+>> arch/arm/mach-pxa/magician.c:581: error: unknown field 'dev' specified in initializer
+>> arch/arm/mach-pxa/magician.c:581: warning: initialization from incompatible pointer type
+>> arch/arm/mach-pxa/magician.c:585: error: unknown field 'dev' specified in initializer
+>> arch/arm/mach-pxa/magician.c:585: warning: initialization from incompatible pointer type
+>>
+>> arch/arm/mach-pxa/hx4700.c:683: error: unknown field 'dev' specified in initializer
+>> arch/arm/mach-pxa/hx4700.c:683: warning: initialization from incompatible pointer type
+>> arch/arm/mach-pxa/hx4700.c:687: error: unknown field 'dev' specified in initializer
+>> arch/arm/mach-pxa/hx4700.c:687: warning: initialization from incompatible pointer type
+>>
+>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>> ---
+>>
+>> [v3: fix arg2 in REGULATOR_SUPPLY to have correct names ]
+>>
+>> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+>> index f2c23ea..b6a338b 100644
+>> --- a/arch/arm/mach-pxa/hx4700.c
+>> +++ b/arch/arm/mach-pxa/hx4700.c
+>> @@ -679,14 +679,8 @@ static struct platform_device power_supply = {
+>>  */
+>>
+>>  static struct regulator_consumer_supply bq24022_consumers[] = {
+>> -       {
+>> -               .dev = &gpio_vbus.dev,
+>> -               .supply = "vbus_draw",
+>> -       },
+>> -       {
+>> -               .dev = &power_supply.dev,
+>> -               .supply = "ac_draw",
+>> -       },
+>> +       REGULATOR_SUPPLY("vbus_draw", "gpio-vbus"),
+>> +       REGULATOR_SUPPLY("ac_draw", "pda-power"),
+> 
+> How do you think about Mark's comments? Use dev_name() at here.
 
-> > With this card those would just be separate CODECs.  This is a binding
-> > for a simple card.
+Hi Haojian,
 
-> But that is insufficient for the SSI driver, which is expected to handle 
-> multiple SSIs.  If you're going to document a binding for the SSI driver, 
-> then you need to document how to handle multiple SSIs.
+I'm not sure I quite understand you.  I'd looked up the
+structs and got their respective value that would be
+returned by dev_name(), which is what I thought was
+requested of me.
 
-For almost all SoC audio ports this works in exactly the same way it
-works for multiple instances of any other device - you do a binding that
-covers a single device and then you bind multiple instances of that
-device in the system each of which need know nothing about any other
-instances of the IP.  
+Thanks,
+Paul.
 
-If your SoC has IP which provides more than one port in a single IP
-block then the driver for that IP would need to register multiple DAIs
-from a single binding which is again exactly the same thing as you'd do
-with any other IP block that behaved similarly.
 
-All of which is exactly the same as for any other device and essentially
-irrelevant to how we define the bindings for the cards.
-
-> > The biggest improvement is that the SoC binding knows nothing about the
-> > card binding at all, cards are completely separate and are free to
-> > define any binding they choose using any number of on-SoC and off-SoC
-> > devices.
-
-> Ok, I don't understand that at all.
-
-Do you have some questions about the above?  What is it that you find
-unclear?   
-
-> I also don't understand why you insist on perverting my driver to support 
-> two incompatible bindings, especially since I still haven't heard an 
-> explanation as to what's wrong with the binding that I defined.
-
-We've been through this *repeatedly*, including in the message you're
-replying to, and we're still going back to square one every time you
-decide to start talking about device tree again.  This is frustrating
-in the extreme.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120314/52007cc3/attachment.sig>
+>>  };
+>>
+>>  static struct regulator_init_data bq24022_init_data = {
+>> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+>> index 3d6baf9..1a18e63 100644
+>> --- a/arch/arm/mach-pxa/magician.c
+>> +++ b/arch/arm/mach-pxa/magician.c
+>> @@ -577,14 +577,8 @@ static struct platform_device power_supply = {
+>>  */
+>>
+>>  static struct regulator_consumer_supply bq24022_consumers[] = {
+>> -       {
+>> -               .dev = &gpio_vbus.dev,
+>> -               .supply = "vbus_draw",
+>> -       },
+>> -       {
+>> -               .dev = &power_supply.dev,
+>> -               .supply = "ac_draw",
+>> -       },
+>> +       REGULATOR_SUPPLY("vbus_draw", "gpio-vbus"),
+>> +       REGULATOR_SUPPLY("ac_draw", "pda-power"),
+>>  };
+>>
+>>  static struct regulator_init_data bq24022_init_data = {
+>> --
+>> 1.7.9.1
+>>
