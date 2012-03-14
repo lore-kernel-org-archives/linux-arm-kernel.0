@@ -1,35 +1,54 @@
 From: sr@denx.de (Stefan Roese)
-Date: Wed, 14 Mar 2012 14:37:42 +0100
-Subject: [PATCH] stmmac: Add device-tree support
-In-Reply-To: <4F609A48.6050702@st.com>
-References: <1331561157-3820-1-git-send-email-sr@denx.de>
- <201203141307.55808.arnd@arndb.de> <4F609A48.6050702@st.com>
-Message-ID: <201203141437.42673.sr@denx.de>
+Date: Wed, 14 Mar 2012 14:43:57 +0100
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203141327.01038.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203141136.48513.sr@denx.de> <201203141327.01038.arnd@arndb.de>
+Message-ID: <201203141443.57221.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012 14:16:56 Giuseppe CAVALLARO wrote:
-> >> Concerning the latter, we support several different versions of the
-> >> synopsys GMAC cores ... from 3.30 to 3.61a.
-> >> 
-> >> For example, stx7108 and Stx7109 have the same GMAC core (also SPEAr600
-> >> IIRC).
-> >> SPEAr13xx has 3.50a
-> >> New ST SoC Stxh415 has the 3.60a. etc.
+On Wednesday 14 March 2012 14:27:00 Arnd Bergmann wrote:
+> > > amba primecell devices don't actually need to register to a
+> > > "compatible" property, they are probed using the primecell ID, and the
+> > > device tree is just used to tell the system about memory and IRQ
+> > > resources.
 > > 
-> > In that case, you should definitely list the exact device versions in the
-> > compatible string, like:
-> > 
-> > compatible = "stm,spear600-gmac", "snps,dw-gmac-3.50a", "snps,dw-gmac";
+> > Ahh, I see. Let me see, if I can get this working...
+
+Okay. Finally got it working. The main problem was the clock device name 
+matching. Solved it via OF_DEV_AUXDATA. New patch will follow soon...
+ 
+> I just saw that there is a patch series for pl061 that Rob Herring did at
 > 
-> looks good to me
+> git://sources.calxeda.com/kernel/linux.git irqdomain-for-grant
+> 
+> Please have a look at that branch first.
 
-So whats the Synopsys version for SPEAr600? 
+That's for GPIO interrupt support, right? I'll postpone this GPIO interrupt 
+support to a later patch. This one will "only" support the plain GPIO's.
+ 
+> > > Don't worry about the the gpio and uart devices if they are not in the
+> > > first initial version. I do think that they should be done fairly soon
+> > > though, before we get into most of the other devices.
+> > > 
+> > > It's ok if you put a lot of the other devices in the dts file though,
+> > > like the ethernet device, it gives a better overview of what is
+> > > actually there, even if the driver does not actually use it yet.
+> > 
+> > My initial idea was to push the devices once their DT support is
+> > accepted. Otherwise the bindings are still not settled.
+> 
+> Right, that makes sense. However, you can add a property containing
+> 
+> 	status = "disabled;
+> 
+> so that the device is visible in the source but no platform device gets
+> generated. That would have no consequences at run time but can be helpful
+> for review.
 
-"snps,dw-gmac-3.50a" ???
-
-Perhaps you should add this info for all supported SoC's into the device 
-driver? Or even better into the devicetree bindings Documentation?
+Okay, I'll add all of what I got locally. And enable only the ones that should 
+be fine.
 
 Thanks,
 Stefan
