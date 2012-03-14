@@ -1,58 +1,85 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 14 Mar 2012 13:19:29 -0700
-Subject: [PATCH v3 2/2] DMAEngine: Add DMAEngine driver based on old MSM
- DMA APIs
-In-Reply-To: <20120314150533.GA8757@fifo99.com>
-References: <1331548364-27845-1-git-send-email-kumarrav@codeaurora.org>
- <20120312201421.GA3459@fifo99.com>
- <4F5F41AF.1090907@codeaurora.org>
- <20120314150533.GA8757@fifo99.com>
-Message-ID: <20120314201929.GA17259@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 14 Mar 2012 15:42:37 -0500
+Subject: [PATCH v4 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <1331740593-10807-3-git-send-email-thierry.reding@avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-3-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020695DB57DC@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 08:05:53AM -0700, Daniel Walker wrote:
-> On Tue, Mar 13, 2012 at 06:16:39PM +0530, Ravi Kumar V wrote:
-> > On 3/13/2012 1:44 AM, Daniel Walker wrote:
-> > >On Mon, Mar 12, 2012 at 04:02:44PM +0530, Ravi Kumar V wrote:
-> > >>Add DMAEngine based driver using the old MSM DMA APIs internally.
-> > >
-> > >What do you mean by this?
-> > >
-> > There is a MSM DMA driver in arch/arm/mach-msm/ which is not in
-> > dmaengine framework standards, but that driver is been used by
-> > client drivers nand, eMMC and serial drivers. Now if we implement
-> > the whole dma driver using dmaengine framework then nand, eMMC like
-> > drivers will be failed as they are using old dma driver API's, so
-> > instead of implementing new driver from scratch we are keeping the
-> > old dma API's as it is and using those API's in new dmaengine
-> > framework.So that we can convert clients drivers to use dma engine
-> > framework.
+On Wednesday, March 14, 2012 8:56 AM, Thierry Reding wrote:
 > 
-> Did you investigate converting the drivers (nand, eMMC, serial) ? It
-> seems like there would be a 1:1 mapping between the API's , so it might
-> only be a find->replace operation.
+> Many PWM controllers provide access to more than a single PWM output and
+> may even share some resource among them. Allowing a PWM chip to provide
+> multiple PWM devices enables better sharing of those resources. As a
+> side-effect this change allows easy integration with the device tree
+> where a given PWM can be looked up based on the PWM chip's phandle and a
+> corresponding index.
+>
+> This commit modifies the PWM core to support multiple PWMs per struct
+> pwm_chip. It achieves this in a similar way to how gpiolib works, by
+> allowing PWM ranges to be requested dynamically (pwm_chip.base == -1) or
+> starting at a given offset (pwm_chip.base >= 0). A chip specifies how
+> many PWMs it controls using the npwm member. Each of the functions in
+> the pwm_ops structure gets an additional argument that specified the PWM
+> number (it can be converted to a per-chip index by subtracting the
+> chip's base).
+>
+> The total maximum number of PWM devices is currently fixed to 1024 while
+> the data is actually stored in a radix tree, thus saving resources if
+> not all of them are used.
+>
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
 
-Only at a very superficial level--they both do DMA.  The ADM driver
-wants its scatterlists constructed manually by the caller (in DMA-able
-memory) and just the pointer handed over.  The drivers will have to be
-converted to use the abstracted scatterlists that dmaengine wants.
-Drivers like msm_sdcc are currently fairly intimitely tied to flow
-that is specific to ADM.  The msm_sdcc driver also needs use of the
-ADM's "box" mode, which has to be made to work with DMAEngine as well.
+<snip>
 
-Providing both APIs is really the only practical way to get this in
-without having to rewrite several other drivers.
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> index df9681b..7261911 100644
+> --- a/include/linux/pwm.h
+> +++ b/include/linux/pwm.h
 
-The nand driver (which doesn't seem to have made it in yet,
-https://lkml.org/lkml/2011/2/28/570) is much worse.  About half of the
-code is constructing ADM specific command blocks.  I'm not even sure
-it will be practical to even migrate that driver to DMAEngine, since
-the nand controller hardware is so intimately tied to the functioning
-of the ADM.
+<snip>
 
-David
+>  /**
+> - * struct pwm_ops - PWM operations
+> + * struct pwm_ops - PWM controller operations
+>   * @request: optional hook for requesting a PWM
+>   * @free: optional hook for freeing a PWM
+>   * @config: configure duty cycles and period length for this PWM
+>   * @enable: enable PWM output toggling
+>   * @disable: disable PWM output toggling
+> + * @dbg_show: optional routine to show contents in debugfs
+> + * @owner: helps prevent removal of modules exporting active PWMs
+>   */
+>  struct pwm_ops {
+> -	int			(*request)(struct pwm_chip *chip);
+> -	void			(*free)(struct pwm_chip *chip);
+> -	int			(*config)(struct pwm_chip *chip, int duty_ns,
+> -						int period_ns);
+> -	int			(*enable)(struct pwm_chip *chip);
+> -	void			(*disable)(struct pwm_chip *chip);
+> +	int			(*request)(struct pwm_chip *chip,
+> +					   struct pwm_device *pwm);
+> +	void			(*free)(struct pwm_chip *chip,
+> +					struct pwm_device *pwm);
+> +	int			(*config)(struct pwm_chip *chip,
+> +					  struct pwm_device *pwm,
+> +					  int duty_ns, int period_ns);
+> +	int			(*enable)(struct pwm_chip *chip,
+> +					  struct pwm_device *pwm);
+> +	void			(*disable)(struct pwm_chip *chip,
+> +					   struct pwm_device *pwm);
+> +#ifdef CONFIG_DEBUG_FS
+> +	void			(*dbg_show)(struct pwm_chip *chip,
+> +					    struct seq_file *s);
+> +#endif
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+This doesn't compile...
+
+include/linux/pwm.h:87: warning: 'struct seq_file' declared inside parameter list
+include/linux/pwm.h:87: warning: its scope is only this definition or declaration, which is probably not what you want
+
+Regards,
+Hartley
