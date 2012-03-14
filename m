@@ -1,98 +1,150 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Wed, 14 Mar 2012 06:16:54 +0000
-Subject: [PATCH] arm:da850: register musb device
-In-Reply-To: <4F5F7F91.8010301@mvista.com>
-References: <1331651015-32586-1-git-send-email-prakash.pm@ti.com>
- <4F5F7F91.8010301@mvista.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3178406C@DBDE01.ent.ti.com>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 14 Mar 2012 14:23:55 +0800
+Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
+In-Reply-To: <4F5F5B3F.2000303@gmail.com>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-2-git-send-email-b29396@freescale.com>
+ <4F5F5B3F.2000303@gmail.com>
+Message-ID: <20120314062354.GA8494@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Tue, Mar 13, 2012 at 22:40:41, Sergei Shtylyov wrote:
-> On 03/13/2012 06:03 PM, Manjunathappa, Prakash wrote:
-> 
-> > Properly set up the OTG mode thru the CFGCHIP2 register, enable the
-> > USB0_DRVVBUS pin,
-> 
->     I don't see where you are enabling it.
-> 
-
-Yes, I will correct the message.
-
-> > and finally register the MUSB platform device.
-> >
-> > Signed-off-by: Ajay Kumar Gupta<ajay.gupta@ti.com>
-> > Signed-off-by: Manjunathappa, Prakash<prakash.pm@ti.com>
+On Tue, Mar 13, 2012 at 09:35:43AM -0500, Rob Herring wrote:
+> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
+> > From: Dong Aisheng <dong.aisheng@linaro.org>
+> > 
+> > This patch includes basic dt support which can boot via nfs rootfs.
+> > 
+> > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
 > > ---
-> > Patche are on top below posted patches:
-> > http://www.spinics.net/lists/linux-usb/msg59656.html
+> >  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
+> >  arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
+> >  arch/arm/boot/dts/imx28.dtsi                  |   88 +++++++++++++++++++++++++
+> >  arch/arm/mach-mxs/Kconfig                     |    9 +++
+> >  arch/arm/mach-mxs/Makefile                    |    1 +
+> >  arch/arm/mach-mxs/imx28-dt.c                  |   67 +++++++++++++++++++
+> >  6 files changed, 200 insertions(+), 0 deletions(-)
+....
+> > +				interrupts = <47>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > +	ahb at 80080000 {
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		reg = <0x80080000 0x80000>;
+> > +		ranges;
+> > +
+> > +		fec at 800f0000 {
+> > +			compatible = "fsl,imx28-fec";
+> > +			reg = <0x800f0000 0x4000>;
 > 
-> >   arch/arm/mach-davinci/board-da850-evm.c |   12 ++++++++++++
-> >   arch/arm/mach-davinci/usb.c             |    9 +++++++++
-> >   2 files changed, 21 insertions(+), 0 deletions(-)
+> This too IIRC.
 > 
-> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> > index 178d178..539e12c 100644
-> > --- a/arch/arm/mach-davinci/board-da850-evm.c
-> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> > @@ -787,6 +787,18 @@ static __init void da850_evm_usb_init(void)
-> >   	 */
-> >   	cfgchip2&= ~CFGCHIP2_USB1PHYCLKMUX;
-> >   	cfgchip2 |=  CFGCHIP2_USB2PHYCLKMUX;
-> > +	/*
-> > +	 * We have to override VBUS/ID signals when MUSB is configured into the
-> > +	 * host-only mode -- ID pin will float if no cable is connected, so the
-> > +	 * controller won't be able to drive VBUS thinking that it's a B-device.
-> > +	 * Otherwise, we want to use the OTG mode and enable VBUS comparators.
-> > +	 */
-> > +	cfgchip2 &= ~CFGCHIP2_OTGMODE;
-> > +#if CONFIG_USB_MUSB_DA8XX
-> 
->     This #ifdef doesn't make sense. It will make driver always work in host mode.
-> 
+The size is 16KB/0x4000 in iMX28 spec. :)
 
-I will change it to support OTG.
-
-> > +	cfgchip2 |=  CFGCHIP2_FORCE_HOST;
-> > +#else
-> > +	cfgchip2 |=  CFGCHIP2_SESENDEN | CFGCHIP2_VBDTCTEN;
+> > +			interrupts = <101>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		fec at 800f4000 {
+> > +			compatible = "fsl,imx28-fec";
+> > +			reg = <0x800f4000 0x4000>;
+> > +			interrupts = <102>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +	};
+> > +};
+> > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> > index c57f996..6ab66af 100644
+> > --- a/arch/arm/mach-mxs/Kconfig
+> > +++ b/arch/arm/mach-mxs/Kconfig
+> > @@ -17,6 +17,15 @@ config SOC_IMX28
+> >  
+> >  comment "MXS platforms:"
+> >  
+> > +config MACH_IMX28_DT
 > 
->     This is what you need to leave. The driver should always work in OTG mode now.
+> Perhaps this should be more generic like MACH_MXS_DT to eventually
+> support MX23 as well?
 > 
+I just did like the imx ways.
+But yes if we see the need when do imx23 dt support.
 
-Correct, I will fix this.
-
-> > +#endif
-> >
-> >   	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
-> >
-> > diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
-> > index 25c3520..a941dc5 100644
-> > --- a/arch/arm/mach-davinci/usb.c
-> > +++ b/arch/arm/mach-davinci/usb.c
-> > @@ -284,6 +284,15 @@ void __init da8xx_board_usb_init(const short pins[],
-> >   		goto usb11_setup_fail;
-> >   	}
-> >
-> > +	/*
-> > +	 * TPS2065 switch @ 5V supplies 1 A (sustains 1.5 A),
-> > +	 * with the power on to power good time of 3 ms.
-> > +	 */
-> > +	ret = da8xx_register_usb20(1000, 3);
-> > +	if (ret)
-> > +		pr_warning("%s: USB 2.0 registration failed: %d\n",
-> > +			   __func__, ret);
+> > +	bool "Support i.MX28 platforms from device tree"
+> > +	select SOC_IMX28
+> > +	select USE_OF
+> > +	select MACH_MX28EVK
 > 
->     Er, why this code is moved there? And how will this work on DA830 -- try to 
-> register MUSB twice? Place this in the board file please where it belongs.
+> This should not be selected here.
 > 
+Like other imx soc dt board files, the imx28-dt.c may need to use some bits
+like pinmux in mx28evk.c board file.
 
-Yes, I will revert this change.
+Yes, currently i can remove it since it is using uboot pinmux setting.
+But when add other devices support which is not covered in u-boot like flexcan,
+i may need to use non-dt board's pinmux setting.
+So maybe we can keep it first and remove it when totally not dependent
+on non-dt files.
 
-Thanks,
-Prakash
-
-> WBR, Sergei
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/irqdomain.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/of_platform.h>
+> > +#include <asm/mach/arch.h>
+> > +#include <asm/mach/time.h>
+> > +#include <mach/common.h>
+> > +#include <mach/mx28.h>
+> > +
+> > +static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
+> > +	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
+> > +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
+> > +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
 > 
+> Why do you need the old names?
+> 
+To keep align with the old clocks.
+See arch/arm/mach-mxs/clock-mx28.c:
+_REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
+_REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
+Is there any better way to avoid this?
+
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> > +static void __init imx28_init(void)
+> > +{
+> > +	of_platform_populate(NULL, of_default_bus_match_table,
+> > +			     imx28_auxdata_lookup, NULL);
+> > +}
+> > +
+> > +static const struct of_device_id icoll_of_match[] __initconst = {
+> > +	{ .compatible = "fsl,imx28-icoll", },
+> > +	{},
+> > +};
+> > +
+> > +static void __init imx28_dt_init_irq(void)
+> > +{
+> > +	irq_domain_generate_simple(icoll_of_match, MX28_ICOLL_BASE_ADDR, 0);
+> 
+> Please do "proper" domain support for the interrupt controller and use
+> of_irq_init.
+> 
+Ok, i will see it.
+
+For others, will fix them all.
+Thanks for the review.
+
+Regards
+Dong Aisheng
