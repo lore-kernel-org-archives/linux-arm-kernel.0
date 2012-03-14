@@ -1,165 +1,68 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Mar 2012 08:05:34 -0500
-Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20120314062354.GA8494@shlinux2.ap.freescale.net>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-2-git-send-email-b29396@freescale.com>
- <4F5F5B3F.2000303@gmail.com>
- <20120314062354.GA8494@shlinux2.ap.freescale.net>
-Message-ID: <4F60979E.3060704@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Mar 2012 13:07:55 +0000
+Subject: [PATCH] stmmac: Add device-tree support
+In-Reply-To: <4F60832E.6060100@st.com>
+References: <1331561157-3820-1-git-send-email-sr@denx.de>
+ <20120312143825.GB13869@game.jcrosoft.org> <4F60832E.6060100@st.com>
+Message-ID: <201203141307.55808.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2012 01:23 AM, Dong Aisheng wrote:
-> On Tue, Mar 13, 2012 at 09:35:43AM -0500, Rob Herring wrote:
->> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
->>> From: Dong Aisheng <dong.aisheng@linaro.org>
->>>
->>> This patch includes basic dt support which can boot via nfs rootfs.
->>>
->>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
->>>  arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
->>>  arch/arm/boot/dts/imx28.dtsi                  |   88 +++++++++++++++++++++++++
->>>  arch/arm/mach-mxs/Kconfig                     |    9 +++
->>>  arch/arm/mach-mxs/Makefile                    |    1 +
->>>  arch/arm/mach-mxs/imx28-dt.c                  |   67 +++++++++++++++++++
->>>  6 files changed, 200 insertions(+), 0 deletions(-)
-> ....
->>> +				interrupts = <47>;
->>> +			};
->>> +		};
->>> +	};
->>> +
->>> +	ahb at 80080000 {
->>> +		compatible = "simple-bus";
->>> +		#address-cells = <1>;
->>> +		#size-cells = <1>;
->>> +		reg = <0x80080000 0x80000>;
->>> +		ranges;
->>> +
->>> +		fec at 800f0000 {
->>> +			compatible = "fsl,imx28-fec";
->>> +			reg = <0x800f0000 0x4000>;
->>
->> This too IIRC.
->>
-> The size is 16KB/0x4000 in iMX28 spec. :)
-
-Yes, but the module only uses <4KB. You waste virtual memory space by
-mapping all the unused area. It's not really an issue when you have
-<512MB of RAM, but does become an issue.
-
-
->>> +			interrupts = <101>;
->>> +			status = "disabled";
->>> +		};
->>> +
->>> +		fec at 800f4000 {
->>> +			compatible = "fsl,imx28-fec";
->>> +			reg = <0x800f4000 0x4000>;
->>> +			interrupts = <102>;
->>> +			status = "disabled";
->>> +		};
->>> +
->>> +	};
->>> +};
->>> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
->>> index c57f996..6ab66af 100644
->>> --- a/arch/arm/mach-mxs/Kconfig
->>> +++ b/arch/arm/mach-mxs/Kconfig
->>> @@ -17,6 +17,15 @@ config SOC_IMX28
->>>  
->>>  comment "MXS platforms:"
->>>  
->>> +config MACH_IMX28_DT
->>
->> Perhaps this should be more generic like MACH_MXS_DT to eventually
->> support MX23 as well?
->>
-> I just did like the imx ways.
-> But yes if we see the need when do imx23 dt support.
+On Wednesday 14 March 2012, Giuseppe CAVALLARO wrote:
+> On 3/12/2012 3:38 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 15:05 Mon 12 Mar     , Stefan Roese wrote:
+> >> This patch adds support to configure the STMMAC ethernet driver via
+> >> device-tree instead of platform_data.
+> >>
+> >> Currently, only the properties needed on SPEAr600 are provided. All
+> >> other properties should be added once needed on other platforms.
+> >>
+> >> Signed-off-by: Stefan Roese <sr@denx.de>
+> >> Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> >> Cc: Viresh Kumar <viresh.kumar@st.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/net/stmmac.txt   |   38 +++++++++++
+> >>  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   66 +++++++++++++++++++-
+> >>  2 files changed, 103 insertions(+), 1 deletion(-)
+> >>  create mode 100644 Documentation/devicetree/bindings/net/stmmac.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
+> >> new file mode 100644
+> >> index 0000000..386a47f
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/net/stmmac.txt
+> >> @@ -0,0 +1,38 @@
+> >> +* STMicroelectronics 10/100/1000 Ethernet driver (GMAC)
+> >> +
+> >> +Required properties:
+> >> +- compatible: Should be "stm,gmac"
 > 
->>> +	bool "Support i.MX28 platforms from device tree"
->>> +	select SOC_IMX28
->>> +	select USE_OF
->>> +	select MACH_MX28EVK
->>
->> This should not be selected here.
->>
-> Like other imx soc dt board files, the imx28-dt.c may need to use some bits
-> like pinmux in mx28evk.c board file.
+> > this IP have 2 version at least the GMAC for the second generation and mac for
+> > the first generation
 > 
-> Yes, currently i can remove it since it is using uboot pinmux setting.
-> But when add other devices support which is not covered in u-boot like flexcan,
-> i may need to use non-dt board's pinmux setting.
-> So maybe we can keep it first and remove it when totally not dependent
-> on non-dt files.
-
-Okay either way, but my vote would be add it as needed.
-
->>> + * The code contained herein is licensed under the GNU General Public
->>> + * License. You may obtain a copy of the GNU General Public License
->>> + * Version 2 or later at the following locations:
->>> + *
->>> + * http://www.opensource.org/licenses/gpl-license.html
->>> + * http://www.gnu.org/copyleft/gpl.html
->>> + */
->>> +
->>> +#include <linux/init.h>
->>> +#include <linux/irqdomain.h>
->>> +#include <linux/of_irq.h>
->>> +#include <linux/of_platform.h>
->>> +#include <asm/mach/arch.h>
->>> +#include <asm/mach/time.h>
->>> +#include <mach/common.h>
->>> +#include <mach/mx28.h>
->>> +
->>> +static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
->>> +	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
->>> +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
->>> +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
->>
->> Why do you need the old names?
->>
-> To keep align with the old clocks.
-> See arch/arm/mach-mxs/clock-mx28.c:
-> _REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
-> _REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
-> Is there any better way to avoid this?
-
-Yes, you can add more clock look-ups with the DT name.
-
-Rob
-
+> yes you are right. STMMAC supports two device generations I named:
+> dwma10/100 and dwmac1000 (gmac).
 > 
->>> +	{ /* sentinel */ }
->>> +};
->>> +
->>> +static void __init imx28_init(void)
->>> +{
->>> +	of_platform_populate(NULL, of_default_bus_match_table,
->>> +			     imx28_auxdata_lookup, NULL);
->>> +}
->>> +
->>> +static const struct of_device_id icoll_of_match[] __initconst = {
->>> +	{ .compatible = "fsl,imx28-icoll", },
->>> +	{},
->>> +};
->>> +
->>> +static void __init imx28_dt_init_irq(void)
->>> +{
->>> +	irq_domain_generate_simple(icoll_of_match, MX28_ICOLL_BASE_ADDR, 0);
->>
->> Please do "proper" domain support for the interrupt controller and use
->> of_irq_init.
->>
-> Ok, i will see it.
+> Concerning the latter, we support several different versions of the
+> synopsys GMAC cores ... from 3.30 to 3.61a.
 > 
-> For others, will fix them all.
-> Thanks for the review.
-> 
-> Regards
-> Dong Aisheng
-> 
+> For example, stx7108 and Stx7109 have the same GMAC core (also SPEAr600
+> IIRC).
+> SPEAr13xx has 3.50a
+> New ST SoC Stxh415 has the 3.60a. etc.
+
+In that case, you should definitely list the exact device versions in the
+compatible string, like:
+
+compatible = "stm,spear600-gmac", "snps,dw-gmac-3.50a", "snps,dw-gmac";
+
+When we have other socs with the same version, that lets us add quirks
+for the specific version by checking the compatible property once in the
+driver.
+
+It also sounds to me that the entire stmmac driver should live in the
+drivers/net/ethernet/synopsys directory, not stmicro, but that is a
+different issue.
+
+
+	Arnd
