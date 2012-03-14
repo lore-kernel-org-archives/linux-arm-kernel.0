@@ -1,66 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 14 Mar 2012 08:43:39 +0000
-Subject: Conflict between Versatile Express DT conversion and local timer
- updates
-In-Reply-To: <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
-References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
- <201203131155.16454.arnd@arndb.de>	<4F5F52A2.3050005@arm.com>
- <201203131433.07214.arnd@arndb.de>
- <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
-Message-ID: <4F605A3B.5030800@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 14 Mar 2012 02:45:03 -0600 (MDT)
+Subject: [GIT PULL] ARM: OMAP4: hwmod data: add almost all remaining IP blocks
+Message-ID: <alpine.DEB.2.00.1203140241070.7269@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/12 00:52, Olof Johansson wrote:
-> On Tue, Mar 13, 2012 at 7:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tuesday 13 March 2012, Marc Zyngier wrote:
->>> On 13/03/12 11:55, Arnd Bergmann wrote:
->>>> On Tuesday 13 March 2012, Marc Zyngier wrote:
->>>>> On 13/03/12 10:15, Russell King - ARM Linux wrote:
->>
->>>> d) create a new next/timer branch in arm-soc that has Pawel's
->>>>    98ed4ceb "ARM: vexpress: Get rid of MMIO_P2V" (the first patch from
->>>>    vexpress/dt, your patches and the ux500/timer series. Also put
->>>>    98ed4ceb into the next/cleanup branch.
->>>>
->>>> Any of those will work for us, my preference would be on #4. I have
->>>> created the next/timer branch in the arm-soc tree, so you can use
->>>> that and either rebase your patches on top or merge your tree into
->>>> it and fix up the merge conflicts.
->>>
->>> Thanks for doing that Arnd.
->>>
->>> I've thus created a new branch:
->>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
->>> local_timers-for-arm-soc
->>>
->>> which contains the arm-soc next/timers branch as well as my local timers
->>> series. I'd greatly appreciate if you could pull it for 3.4.
->>>
->>
->> I've updated the next/timer branch with your changes now, but did not
->> put it into the for-next branch because Olof is currently handling that.
->>
->> Olof, can you add it to for-next please? The timer branch should have
->> no dependencies other than rmk/for-armsoc, so it can be fairly close to
->> the start.
-> 
-> 
-> Thanks. I merged into for-next, but since there's already a history in
-> there and I didn't rebuild it, it's on top of everything else.
-> 
-> I got two trivial merge conflicts (and a few that git sorted out
-> automatically): one with the tegra makefile, the other with shmobile's
-> timer init.
-> 
-> Marc, please take a look at the next/timers merge in the arm-soc
-> for-next branch and let me know if they're OK. I'm pretty sure they
-> are though.
+Hi Tony
 
-Had a brief look, and it seems alright to me.
+The following changes since commit afce19b152eedea0402561087dd939b23b53f3cb:
 
-Thanks Olof!
+  ARM: OMAP2xxx: hwmod data: start to fix the IVA1, IVA2 and DSP (2012-03-08 21:04:50 -0700)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+are available in the git repository at:
+
+  git://git.pwsan.com/linux-2.6 hwmod_enable_remaining_hwmods_devel_3.4
+
+for you to fetch changes up to de028b2eb97649d82ebb1ca1f6fabc932ca98354:
+
+  ARM: OMAP4: hwmod data: add DEBUGSS skeleton (2012-03-08 21:29:05 -0700)
+
+This series has a dependency on the 'hwmod_remove_link_arrays_cleanup_3.4' 
+branch.
+
+
+- Paul
+
+----------------------------------------------------------------
+Beno?t Cousson (6):
+      ARM: OMAP4: hwmod data: add GPMC
+      ARM: OMAP4: hwmod data: add the Slimbus IP blocks
+      ARM: OMAP4: hwmod data: add McASP
+      ARM: OMAP4: hwmod data: add remaining USB-related IP blocks
+      ARM: OMAP4: hwmod data: add the OCP-WP IP block
+      ARM: OMAP4: hwmod data: add DEBUGSS skeleton
+
+Ming Lei (1):
+      ARM: OMAP4: hwmod data: introduce fdif(face detect module) hwmod
+
+Paul Walmsley (8):
+      ARM: OMAP2+: clockdomains: make {prm,cm}_clkdm common
+      ARM: OMAP4: hwmod data: add HDQ/1-wire
+      ARM: OMAP4: hwmod data: add EMIF1 and 2
+      ARM: OMAP4: hwmod data: add GPU
+      ARM: OMAP4: hwmod data: add some interconnect-related IP blocks
+      ARM: OMAP4: hwmod data: add OCM RAM IP block
+      ARM: OMAP4: hwmod data: add System Control Module
+      ARM: OMAP4: hwmod data: add PRCM and related IP blocks
+
+ arch/arm/mach-omap2/Makefile                     |    8 +-
+ arch/arm/mach-omap2/clockdomain44xx.c            |    6 +
+ arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |   10 -
+ arch/arm/mach-omap2/clockdomains44xx_data.c      |    2 +
+ arch/arm/mach-omap2/clockdomains_common_data.c   |   24 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c       | 1473 +++++++++++++++++++++-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h     |    1 +
+ 7 files changed, 1443 insertions(+), 81 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clockdomains_common_data.c
