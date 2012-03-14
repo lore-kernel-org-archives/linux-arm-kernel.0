@@ -1,39 +1,41 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 14 Mar 2012 15:32:42 +0530
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <201203140958.27289.arnd@arndb.de>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203131644.12048.arnd@arndb.de> <4F604400.1040805@st.com>
- <201203140958.27289.arnd@arndb.de>
-Message-ID: <4F606CC2.9000402@st.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Mar 2012 16:44:54 +0530
+Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+In-Reply-To: <CACKLOr0XzE0PZk=k5xQQvOA_5dfBk1mYDVyKCep36=3w7ugwWg@mail.gmail.com>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120309174411.GI3852@pengutronix.de>
+ <CACKLOr0XzE0PZk=k5xQQvOA_5dfBk1mYDVyKCep36=3w7ugwWg@mail.gmail.com>
+Message-ID: <1331723694.1727.28.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/14/2012 3:28 PM, Arnd Bergmann wrote:
-> No problem, we are all learning things as we are working on them.
+On Wed, 2012-03-14 at 08:43 +0100, javier Martin wrote:
+> On 9 March 2012 18:44, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Fri, Mar 09, 2012 at 04:20:36PM +0100, Javier Martin wrote:
+> >> The following series have to be applied on top of the following patches:
+> >> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+> >> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
+> >>
+> >> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+> >> is deprecated and no new patches are accepted for it.
+> >>
+> >> This series merges this code into the imx-dma.c dmaengine driver.
+> >
+> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >
 > 
-> The idea with DT is that you no longer need any board files because all of
-> the information in those files is now passed as a data structure to the kernel
-> at boot time. Platforms that are fully converted to DT don't have any
-> board files but just have one DT_MACHINE_START entry for all of them in
-> the common platform files. Since spear600 has very little board specific
-> contents at the moment, it is very easy to get to this point now, and
-> that will actually help support other boards without having to do more
-> patches to add board files.
+> Vinod,
+> I think with Sascha's ack, this series is ready to be merged. It's
+> quite important for us that it makes it for 3.4.
 > 
-> When this work is completed, we might actually be able to extend the
-> spear6xx DT code to also support spear3xx and spear13xx, renaming it
-> to mach-spear. In that case, we would probably need one DT_MACHINE_START
-> entry for each family and would not be able to actually build 13xx together
-> with the other ones, but I guess a lot of the infrastructure could be shared.
+> Please, don't forget the following patch too, which is meant to be
+> applied on top of this series:
 > 
-> I would suggest you read Documentation/devicetree/booting-without-of.txt
-> to get a better understanding of what this is all about.
-
-You pointed exactly to the doubt i had.
-That was very helpful. I really appreciate it.
-
-Thanks a lot.
+> [PATCH] dmaengine: i.MX: Add support for interleaved transfers.
+> 
+This is my merge queue which means I will merged it after the cookie
+fixes (hate rebasing that series again)
 
 -- 
-viresh
+~Vinod
