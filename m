@@ -1,97 +1,109 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Mar 2012 20:52:03 -0700
-Subject: [PATCH v3 08/12] ARM: EXYNOS: support EINT for EXYNOS4 and EXYNOS5
-In-Reply-To: <1331652643-12626-9-git-send-email-kgene.kim@samsung.com>
+Date: Tue, 13 Mar 2012 20:56:55 -0700
+Subject: [PATCH v3 12/12] ARM: dts: add initial dts file for EXYNOS5250,
+ SMDK5250
+In-Reply-To: <1331652643-12626-13-git-send-email-kgene.kim@samsung.com>
 References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
- <1331652643-12626-9-git-send-email-kgene.kim@samsung.com>
-Message-ID: <20120314035203.GA2531@quad.lixom.net>
+ <1331652643-12626-13-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20120314035655.GB2531@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-A couple of comments below.
-
-
-On Tue, Mar 13, 2012 at 08:30:39AM -0700, Kukjin Kim wrote:
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index 0b53018..72f21e4 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -777,39 +779,24 @@ static int exynos4_irq_eint_set_type(struct irq_data *data, unsigned int type)
->  	mask = 0x7 << shift;
->  
->  	spin_lock(&eint_lock);
-> -	ctrl = __raw_readl(S5P_EINT_CON(EINT_REG_NR(data->irq)));
-> +	ctrl = __raw_readl(EINT_CON(exynos_eint_base, data->irq));
->  	ctrl &= ~mask;
->  	ctrl |= newvalue << shift;
-> -	__raw_writel(ctrl, S5P_EINT_CON(EINT_REG_NR(data->irq)));
-> +	__raw_writel(ctrl, EINT_CON(exynos_eint_base, data->irq));
->  	spin_unlock(&eint_lock);
->  
-> -	switch (offs) {
-> -	case 0 ... 7:
-> -		s3c_gpio_cfgpin(EINT_GPIO_0(offs & 0x7), EINT_MODE);
-> -		break;
-> -	case 8 ... 15:
-> -		s3c_gpio_cfgpin(EINT_GPIO_1(offs & 0x7), EINT_MODE);
-> -		break;
-> -	case 16 ... 23:
-> -		s3c_gpio_cfgpin(EINT_GPIO_2(offs & 0x7), EINT_MODE);
-> -		break;
-> -	case 24 ... 31:
-> -		s3c_gpio_cfgpin(EINT_GPIO_3(offs & 0x7), EINT_MODE);
-> -		break;
-> -	default:
-> -		printk(KERN_ERR "No such irq number %d", offs);
-> -	}
-> +	s3c_gpio_cfgpin(irq_to_gpio(data->irq), S3C_GPIO_SFN(0xf));
-
-irq_to_gpio is going away, so it's not a good idea to add it under that name.
-
-Add a local function locally at the top of this file instead. and call
-it something else.
-
-> diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
-> index 80523ca..c09deb6 100644
-> --- a/arch/arm/mach-exynos/include/mach/gpio.h
-> +++ b/arch/arm/mach-exynos/include/mach/gpio.h
-> @@ -146,4 +146,33 @@ enum s5p_gpio_number {
->  #define ARCH_NR_GPIOS		(EXYNOS4_GPZ(EXYNOS4_GPIO_Z_NR) +	\
->  				 CONFIG_SAMSUNG_GPIO_EXTRA + 1)
->  
-> +#include <linux/types.h>
-> +#include <linux/err.h>
-> +#include <mach/irqs.h>
-> +#include <plat/cpu.h>
+On Tue, Mar 13, 2012 at 08:30:43AM -0700, Kukjin Kim wrote:
+> This patch adds initial dts file for EXYNOS5250 SoC. This dts
+> file is including the SoC specific devices and properties. And
+> adds the dts file for SMDK5250 board which uses the EXYNOS5250
+> dts file. Its board specific properites will be added later.
+> 
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts |   26 ++
+>  arch/arm/boot/dts/exynos5250.dtsi         |  413 +++++++++++++++++++++++++++++
+>  2 files changed, 439 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos5250-smdk5250.dts
+>  create mode 100644 arch/arm/boot/dts/exynos5250.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> new file mode 100644
+> index 0000000..491539a
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -0,0 +1,26 @@
+> +/*
+> + * SAMSUNG SMDK5250 board device tree source
+> + *
+> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
 > +
-> +static inline int irq_to_gpio(unsigned int irq)
-> +{
-> +	if (irq < IRQ_EINT(0))
-> +		return -EINVAL;
+> +/dts-v1/;
+> +/include/ "exynos5250.dtsi"
 > +
-> +	irq -= IRQ_EINT(0);
-> +	if (irq < 8)
-> +		return soc_is_exynos5250() ?  EXYNOS5_GPX0(irq) :
-> +					 EXYNOS4_GPX0(irq);
-> +	irq -= 8;
-> +	if (irq < 8)
-> +		return soc_is_exynos5250() ?  EXYNOS5_GPX1(irq) :
-> +					 EXYNOS4_GPX1(irq);
-> +	irq -= 8;
-> +	if (irq < 8)
-> +		return soc_is_exynos5250() ?  EXYNOS5_GPX2(irq) :
-> +					 EXYNOS4_GPX2(irq);
-> +	irq -= 8;
-> +	if (irq < 8)
-> +		return soc_is_exynos5250() ?  EXYNOS5_GPX3(irq) :
-> +					 EXYNOS4_GPX3(irq);
-> +	return -EINVAL;
-> +}
+> +/ {
+> +	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
+> +	compatible = "samsung,smdk5250", "samsung,exynos5250";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x80000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "root=/dev/ram0 rw ramdisk=8192 rootfstype=squashfs initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc";
 
-I think this would be cleaner as two small helpers and one check for SoC
-version instead.
+Having these specific bootargs in the include file rarely makes sense, it's
+better to have firmware update from the settings in firmware and just have a very
+simple fallback here.
+
+In particular initrd is quite custom to hardcode like that.
+
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -0,0 +1,413 @@
+> +/*
+> + * SAMSUNG EXYNOS5250 SoC device tree source
+> + *
+> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * SAMSUNG EXYNOS5250 SoC device nodes are listed in this file.
+> + * EXYNOS5250 based board files can include this file and provide
+> + * values for board specfic bindings.
+> + *
+> + * Note: This file does not include device nodes for all the controllers in
+> + * EXYNOS5250 SoC. As device tree coverage for EXYNOS5250 increases,
+> + * additional nodes can be added to this file.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "samsung,exynos5250";
+> +	interrupt-parent = <&gic>;
+> +
+> +	gic:interrupt-controller at 10490000 {
+> +		compatible = "arm,cortex-a9-gic";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg = <0x10490000 0x1000>, <0x10480000 0x100>;
+> +	};
+> +
+> +	watchdog at 101D0000 {
+
+lowercase hex here and elsewhere in these files, please.
+
+Also, technically no need to specify a unit address (@<foo>) in the device node
+name unless you need it to tell more than one entry apart, but it's become
+customary to always add them on ARM for some reason.
 
 
 -Olof
