@@ -1,93 +1,165 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 14 Mar 2012 13:05:06 +0000
-Subject: [PATCH 10/10] ARM: ux500: Enable PL022 SSP Controller in Device Tree
-In-Reply-To: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
-References: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1331730306-11461-11-git-send-email-lee.jones@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Mar 2012 08:05:34 -0500
+Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
+In-Reply-To: <20120314062354.GA8494@shlinux2.ap.freescale.net>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-2-git-send-email-b29396@freescale.com>
+ <4F5F5B3F.2000303@gmail.com>
+ <20120314062354.GA8494@shlinux2.ap.freescale.net>
+Message-ID: <4F60979E.3060704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This SSP Controller supports a number of serial communication methods.
+On 03/14/2012 01:23 AM, Dong Aisheng wrote:
+> On Tue, Mar 13, 2012 at 09:35:43AM -0500, Rob Herring wrote:
+>> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
+>>> From: Dong Aisheng <dong.aisheng@linaro.org>
+>>>
+>>> This patch includes basic dt support which can boot via nfs rootfs.
+>>>
+>>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
+>>>  arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
+>>>  arch/arm/boot/dts/imx28.dtsi                  |   88 +++++++++++++++++++++++++
+>>>  arch/arm/mach-mxs/Kconfig                     |    9 +++
+>>>  arch/arm/mach-mxs/Makefile                    |    1 +
+>>>  arch/arm/mach-mxs/imx28-dt.c                  |   67 +++++++++++++++++++
+>>>  6 files changed, 200 insertions(+), 0 deletions(-)
+> ....
+>>> +				interrupts = <47>;
+>>> +			};
+>>> +		};
+>>> +	};
+>>> +
+>>> +	ahb at 80080000 {
+>>> +		compatible = "simple-bus";
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <1>;
+>>> +		reg = <0x80080000 0x80000>;
+>>> +		ranges;
+>>> +
+>>> +		fec at 800f0000 {
+>>> +			compatible = "fsl,imx28-fec";
+>>> +			reg = <0x800f0000 0x4000>;
+>>
+>> This too IIRC.
+>>
+> The size is 16KB/0x4000 in iMX28 spec. :)
 
-Namely:
+Yes, but the module only uses <4KB. You waste virtual memory space by
+mapping all the unused area. It's not really an issue when you have
+<512MB of RAM, but does become an issue.
 
-/**
- * enum ssp_interface - interfaces allowed for this SSP Controller
- * @SSP_INTERFACE_MOTOROLA_SPI: Motorola Interface
- * @SSP_INTERFACE_TI_SYNC_SERIAL: Texas Instrument Synchronous Serial
- * interface
- * @SSP_INTERFACE_NATIONAL_MICROWIRE: National Semiconductor Microwire
- * interface
- * @SSP_INTERFACE_UNIDIRECTIONAL: Unidirectional interface (STn8810
- * &STn8815 only)
- */
 
-... and as such cannot be registered using of_register_spi_devices.
-Instead it can be registered simply as a primecell device.
+>>> +			interrupts = <101>;
+>>> +			status = "disabled";
+>>> +		};
+>>> +
+>>> +		fec at 800f4000 {
+>>> +			compatible = "fsl,imx28-fec";
+>>> +			reg = <0x800f4000 0x4000>;
+>>> +			interrupts = <102>;
+>>> +			status = "disabled";
+>>> +		};
+>>> +
+>>> +	};
+>>> +};
+>>> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+>>> index c57f996..6ab66af 100644
+>>> --- a/arch/arm/mach-mxs/Kconfig
+>>> +++ b/arch/arm/mach-mxs/Kconfig
+>>> @@ -17,6 +17,15 @@ config SOC_IMX28
+>>>  
+>>>  comment "MXS platforms:"
+>>>  
+>>> +config MACH_IMX28_DT
+>>
+>> Perhaps this should be more generic like MACH_MXS_DT to eventually
+>> support MX23 as well?
+>>
+> I just did like the imx ways.
+> But yes if we see the need when do imx23 dt support.
+> 
+>>> +	bool "Support i.MX28 platforms from device tree"
+>>> +	select SOC_IMX28
+>>> +	select USE_OF
+>>> +	select MACH_MX28EVK
+>>
+>> This should not be selected here.
+>>
+> Like other imx soc dt board files, the imx28-dt.c may need to use some bits
+> like pinmux in mx28evk.c board file.
+> 
+> Yes, currently i can remove it since it is using uboot pinmux setting.
+> But when add other devices support which is not covered in u-boot like flexcan,
+> i may need to use non-dt board's pinmux setting.
+> So maybe we can keep it first and remove it when totally not dependent
+> on non-dt files.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/db8500.dtsi      |    5 ++++-
- arch/arm/mach-ux500/board-mop500.c |    6 +++---
- 2 files changed, 7 insertions(+), 4 deletions(-)
+Okay either way, but my vote would be add it as needed.
 
-diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index 6ae7f69..a9866a3 100644
---- a/arch/arm/boot/dts/db8500.dtsi
-+++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -206,11 +206,14 @@
- 		ssp at 80002000 {
- 			compatible = "arm,pl022", "arm,primecell";
- 			reg = <80002000 0x1000>;
--			interrupts = <14>;
-+			interrupts = <0 14 4>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
-+
-+			// Add one of these for each child device
- 			cs-gpios = <&gpio0 31 &gpio4 14 &gpio4 16 &gpio6 22 &gpio7 0>;
-+
- 		};
- 
- 		uart at 80120000 {
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index ea0242a..d0799d5 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -443,7 +443,7 @@ static struct stedma40_chan_cfg ssp0_dma_cfg_tx = {
- };
- #endif
- 
--static struct pl022_ssp_controller ssp0_platform_data = {
-+static struct pl022_ssp_controller ssp0_plat = {
- 	.bus_id = 0,
- #ifdef CONFIG_STE_DMA40
- 	.enable_dma = 1,
-@@ -461,7 +461,7 @@ static struct pl022_ssp_controller ssp0_platform_data = {
- 
- static void __init mop500_spi_init(struct device *parent)
- {
--	db8500_add_ssp0(parent, &ssp0_platform_data);
-+	db8500_add_ssp0(parent, &ssp0_plat);
- }
- 
- #ifdef CONFIG_STE_DMA40
-@@ -749,6 +749,7 @@ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
- 	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
- 	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
-+	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
- 	{},
- };
- 
-@@ -804,7 +805,6 @@ static void __init u8500_init_machine(void)
- 		hrefv60_sdi_init(parent);
- 	}
- 	mop500_i2c_init(parent);
--	mop500_spi_init(parent);
- 
- 	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
- 	i2c_register_board_info(2, mop500_i2c2_devices,
--- 
-1.7.5.4
+>>> + * The code contained herein is licensed under the GNU General Public
+>>> + * License. You may obtain a copy of the GNU General Public License
+>>> + * Version 2 or later at the following locations:
+>>> + *
+>>> + * http://www.opensource.org/licenses/gpl-license.html
+>>> + * http://www.gnu.org/copyleft/gpl.html
+>>> + */
+>>> +
+>>> +#include <linux/init.h>
+>>> +#include <linux/irqdomain.h>
+>>> +#include <linux/of_irq.h>
+>>> +#include <linux/of_platform.h>
+>>> +#include <asm/mach/arch.h>
+>>> +#include <asm/mach/time.h>
+>>> +#include <mach/common.h>
+>>> +#include <mach/mx28.h>
+>>> +
+>>> +static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
+>>> +	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
+>>> +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
+>>> +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
+>>
+>> Why do you need the old names?
+>>
+> To keep align with the old clocks.
+> See arch/arm/mach-mxs/clock-mx28.c:
+> _REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
+> _REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
+> Is there any better way to avoid this?
+
+Yes, you can add more clock look-ups with the DT name.
+
+Rob
+
+> 
+>>> +	{ /* sentinel */ }
+>>> +};
+>>> +
+>>> +static void __init imx28_init(void)
+>>> +{
+>>> +	of_platform_populate(NULL, of_default_bus_match_table,
+>>> +			     imx28_auxdata_lookup, NULL);
+>>> +}
+>>> +
+>>> +static const struct of_device_id icoll_of_match[] __initconst = {
+>>> +	{ .compatible = "fsl,imx28-icoll", },
+>>> +	{},
+>>> +};
+>>> +
+>>> +static void __init imx28_dt_init_irq(void)
+>>> +{
+>>> +	irq_domain_generate_simple(icoll_of_match, MX28_ICOLL_BASE_ADDR, 0);
+>>
+>> Please do "proper" domain support for the interrupt controller and use
+>> of_irq_init.
+>>
+> Ok, i will see it.
+> 
+> For others, will fix them all.
+> Thanks for the review.
+> 
+> Regards
+> Dong Aisheng
+> 
