@@ -1,51 +1,47 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 14 Mar 2012 14:24:50 -0700
-Subject: [PATCH 00/12] mfd: twl: Fix for irqdomain/next + SPARSE_IRQ + MMC
- card detect
-In-Reply-To: <4F61072B.9030606@ti.com> (Benoit Cousson's message of "Wed, 14
- Mar 2012 22:01:31 +0100")
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <87399ahppf.fsf@ti.com> <4F61072B.9030606@ti.com>
-Message-ID: <87ty1qeuzh.fsf@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 14 Mar 2012 22:28:15 +0100 (CET)
+Subject: [PATCH v5 3/4] clk: introduce the common clock framework
+In-Reply-To: <CAJOA=zMsCuZgmp1Hm0dq=EVoX6Zj62XQVqR=6GzDntSD5HnHzg@mail.gmail.com>
+References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
+ <1330763341-3437-4-git-send-email-mturquette@linaro.org>
+ <20120313112447.GA29317@pengutronix.de>
+ <CAJOA=zMTY+4dU9VUa-TkEbdE-WJd7V4tCG-af6vgq0CPN6rWpg@mail.gmail.com>
+ <20120314084857.GL3852@pengutronix.de>
+ <CAJOA=zMsCuZgmp1Hm0dq=EVoX6Zj62XQVqR=6GzDntSD5HnHzg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1203142218320.2466@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Cousson, Benoit" <b-cousson@ti.com> writes:
+On Wed, 14 Mar 2012, Turquette, Mike wrote:
 
-> Hi Kevin,
->
-> On 3/14/2012 9:50 PM, Kevin Hilman wrote:
->> Hi Benoit,
->>
->> Benoit Cousson<b-cousson@ti.com>  writes:
->>
->> [...]
->>
->>> This is not for pull-request, becasue it is based on irqdomain + OMAP
->>> IRQ DT series + OMAP twl DT series yet to be pushed.
->>
->> What's the status of this series?
->
-> I sent earlier today the pull request to Samuel.
->
-> Here is the branch for information: for_3.4/twl_irq_gpio_mmc_fix
->
->> At least 'gpio/twl: Allocate irq_desc dynamically for SPARSE_IRQ
->> support' is needed in mainline (linux-next) now since without it, non-DT
->> boots will dump a big fat warning trace[2].
->
-> Yeah, I know :-(
->
->> Also FYI, I needed the patch below[1] in order to build this series.
->
-> That's weird, this include was added by the following commit
-> a7cbb9b15d55dff0488b1a6d93929c2386d8632b at 3.2 time frame.
+Could you folks please trim your replies? It's annoying to page down a
+gazillion of lines to find the gist.
 
-OK.
+> On Wed, Mar 14, 2012 at 1:48 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> Also, do you forsee needing hole in parent_names for any reason other
+> >> than described above?
+> >
+> > I need it only for the case where a some values in the mux are marked as
+> > reserved in the datasheet or we simply do not have the corresponding
+> > clock in our tree (yet). We could also say that NULL pointers are not
+> > allowed in parent arrays, but instead "orphan" or "dummy" should be
+> > used. Then __clk_init should check for NULL pointers to make this clear.
+> 
+> I've added a WARN in __clk_init if any entries in .parent_names are
+> NULL.  I think it best to populate it with "dummy", or maybe a
+> platform-specific name if it helps you during development.
 
-> What branch are you using?
+There is no guarantee that the selection of a parent can be mapped
+linear to register values.
 
-I was using your for_3.4/twl_irq_gpio_cleanup, but had some merge
-conflicts.  Maybe I mis-merged something and dropped that include.
+So the right way to deal with it is to have an array of valid names
+with no holes and NULL pointers allowed and have a mapping from the
+array index to the register value.
 
-Kevin
+That makes the core code robust and allows to handle all corner cases
+including reserved bits, not implemented clocks and weird register
+layouts.
+
+Thanks,
+
+	tglx
