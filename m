@@ -1,70 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 13 Mar 2012 21:34:19 -0500
-Subject: [GIT PULL] mach/io.h cleanup fixes
-Message-ID: <4F6003AB.2030005@gmail.com>
+From: B04825@freescale.com (Tabi Timur-B04825)
+Date: Wed, 14 Mar 2012 02:57:00 +0000
+Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
+ codec-handle
+In-Reply-To: <20120313234638.GY3177@opensource.wolfsonmicro.com>
+References: <1331225990-27308-1-git-send-email-shawn.guo@linaro.org>
+ <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
+ <4F591B8D.8090705@freescale.com>
+ <20120309013216.GH2499@S2101-09.ap.freescale.net>
+ <4F5FD706.8040209@freescale.com>
+ <20120313234638.GY3177@opensource.wolfsonmicro.com>
+Message-ID: <4F6008FA.3040805@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Mark Brown wrote:
 
-Please pull these fixes for mach/io.h cleanup series. They apply on top
-of my previous pull request.
+> With this card those would just be separate CODECs.  This is a binding
+> for a simple card.
 
-Cheers,
-Rob
+But that is insufficient for the SSI driver, which is expected to handle 
+multiple SSIs.  If you're going to document a binding for the SSI driver, 
+then you need to document how to handle multiple SSIs.
 
-The following changes since commit 5621caac1d9514b568f986b55ce5494b1d119d40:
+> The biggest improvement is that the SoC binding knows nothing about the
+> card binding at all, cards are completely separate and are free to
+> define any binding they choose using any number of on-SoC and off-SoC
+> devices.
 
-  ARM: kill off __mem_pci (2012-03-06 21:34:45 -0600)
+Ok, I don't understand that at all.
 
-are available in the git repository at:
-  git://sources.calxeda.com/kernel/linux.git io-cleanup-for-3.4
+I also don't understand why you insist on perverting my driver to support 
+two incompatible bindings, especially since I still haven't heard an 
+explanation as to what's wrong with the binding that I defined.
 
-Rob Herring (4):
-      ARM: fix ioremap/iounmap for !CONFIG_MMU
-      ARM: iop13xx: fix missing declaration of iop13xx_init_early
-      ARM: create a common IOMEM definition
-      ARM: __io abuse cleanup
-
- arch/arm/include/asm/assembler.h                |    2 ++
- arch/arm/include/asm/io.h                       |    2 ++
- arch/arm/kernel/debug.S                         |    1 +
- arch/arm/kernel/entry-armv.S                    |    1 +
- arch/arm/mach-cns3xxx/core.c                    |    8 ++++----
- arch/arm/mach-cns3xxx/devices.c                 |    2 +-
- arch/arm/mach-davinci/include/mach/hardware.h   |    6 ------
- arch/arm/mach-davinci/include/mach/uncompress.h |    2 ++
- arch/arm/mach-ep93xx/include/mach/ep93xx-regs.h |    9 ---------
- arch/arm/mach-iop13xx/include/mach/iop13xx.h    |    1 +
- arch/arm/mach-mmp/include/mach/addr-map.h       |    6 ------
- arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |    6 ------
- arch/arm/mach-msm/include/mach/msm_iomap.h      |    6 ------
- arch/arm/mach-mxs/include/mach/hardware.h       |    6 ------
- arch/arm/mach-netx/generic.c                    |    2 +-
- arch/arm/mach-netx/include/mach/hardware.h      |    2 +-
- arch/arm/mach-netx/include/mach/netx-regs.h     |   16 ++++++++--------
- arch/arm/mach-omap1/ams-delta-fiq-handler.S     |    1 +
- arch/arm/mach-omap1/iomap.h                     |    6 ------
- arch/arm/mach-omap2/clock3xxx_data.c            |    1 +
- arch/arm/mach-omap2/clock44xx_data.c            |    1 +
- arch/arm/mach-omap2/iomap.h                     |    6 ------
- arch/arm/mach-realview/include/mach/hardware.h  |    2 +-
- arch/arm/mach-rpc/include/mach/hardware.h       |    6 ------
- arch/arm/mach-shmobile/board-ag5evm.c           |    2 +-
- arch/arm/mach-shmobile/board-bonito.c           |    2 +-
- arch/arm/mach-shmobile/board-kota2.c            |    2 +-
- arch/arm/mach-shmobile/intc-r8a7779.c           |    4 ++--
- arch/arm/mach-shmobile/intc-sh73a0.c            |    4 ++--
- arch/arm/mach-shmobile/smp-r8a7779.c            |    4 ++--
- arch/arm/mach-shmobile/smp-sh73a0.c             |   20 ++++++++++----------
- arch/arm/mach-spear3xx/clock.c                  |    1 +
- arch/arm/mach-spear6xx/clock.c                  |    1 +
- arch/arm/mach-tegra/include/mach/iomap.h        |    6 ------
- arch/arm/mach-u300/include/mach/u300-regs.h     |    6 ------
- arch/arm/mach-ux500/include/mach/hardware.h     |    2 +-
- arch/arm/mm/nommu.c                             |    8 ++++++--
- arch/arm/plat-mxc/include/mach/hardware.h       |    6 ------
- arch/arm/plat-omap/include/plat/hardware.h      |    6 ------
- arch/arm/plat-omap/include/plat/usb.h           |    1 -
- arch/arm/plat-spear/include/plat/hardware.h     |    6 ------
- 41 files changed, 56 insertions(+), 126 deletions(-)
+-- 
+Timur Tabi
+Linux kernel developer at Freescale
