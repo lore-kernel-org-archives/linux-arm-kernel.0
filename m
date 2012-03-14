@@ -1,144 +1,334 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 07:26:29 -0700
-Subject: [PATCH 4/5] ARM: EXYNOS: Add Clock register list for save and restore
+Date: Wed, 14 Mar 2012 07:26:30 -0700
+Subject: [PATCH 5/5] ARM: EXYNOS: Support suspend and resume for EXYNOS5250
 In-Reply-To: <1331735190-28773-1-git-send-email-kgene.kim@samsung.com>
 References: <1331735190-28773-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1331735190-28773-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331735190-28773-6-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jongpill Lee <boyko.lee@samsung.com>
 
-This patch adds clock register list for save and restore. When system
-enter suspend mode and wakeup from suspend mode, All clock register is
-reset.  So critical register should be saved and reset.
+This patch adds function for suspend and resume of Exynos5250.
 
 Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/clock-exynos5.c           |   52 +++++++++++++++++++++++-
- arch/arm/mach-exynos/include/mach/regs-clock.h |   17 +++++++-
- 2 files changed, 67 insertions(+), 2 deletions(-)
+ arch/arm/mach-exynos/include/mach/pm-core.h |    2 +-
+ arch/arm/mach-exynos/pm.c                   |  123 ++++++++++++++++-----------
+ arch/arm/mach-exynos/pmu.c                  |   59 +++++++++++++
+ arch/arm/plat-samsung/include/plat/cpu.h    |    1 +
+ 4 files changed, 135 insertions(+), 50 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index d013982..f300941 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -30,7 +30,57 @@
+diff --git a/arch/arm/mach-exynos/include/mach/pm-core.h b/arch/arm/mach-exynos/include/mach/pm-core.h
+index 9d8da51e3..a67ecfa 100644
+--- a/arch/arm/mach-exynos/include/mach/pm-core.h
++++ b/arch/arm/mach-exynos/include/mach/pm-core.h
+@@ -33,7 +33,7 @@ static inline void s3c_pm_arch_prepare_irqs(void)
+ 	__raw_writel(tmp, S5P_WAKEUP_MASK);
  
- #ifdef CONFIG_PM_SLEEP
- static struct sleep_save exynos5_clock_save[] = {
--	/* will be implemented */
-+	SAVE_ITEM(EXYNOS5_CLKSRC_MASK_TOP),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_MASK_GSCL),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_MASK_DISP1_0),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_MASK_FSYS),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_MASK_MAUDIO),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_MASK_PERIC0),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_MASK_PERIC1),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_GSCL),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_DISP1),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_MFC),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_G3D),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_GEN),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_FSYS),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_GPS),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_PERIC),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_IP_PERIS),
-+	SAVE_ITEM(EXYNOS5_CLKGATE_BLOCK),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_TOP0),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_TOP1),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_GSCL),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_DISP1_0),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_GEN),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_MAUDIO),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_FSYS0),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_FSYS1),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_FSYS2),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_FSYS3),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_PERIC0),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_PERIC1),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_PERIC2),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_PERIC3),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_PERIC4),
-+	SAVE_ITEM(EXYNOS5_CLKDIV_PERIC5),
-+	SAVE_ITEM(EXYNOS5_SCLK_DIV_ISP),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_TOP0),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_TOP1),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_TOP2),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_TOP3),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_GSCL),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_DISP1_0),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_MAUDIO),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_FSYS),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_PERIC0),
-+	SAVE_ITEM(EXYNOS5_CLKSRC_PERIC1),
-+	SAVE_ITEM(EXYNOS5_SCLK_SRC_ISP),
-+	SAVE_ITEM(EXYNOS5_EPLL_CON0),
-+	SAVE_ITEM(EXYNOS5_EPLL_CON1),
-+	SAVE_ITEM(EXYNOS5_EPLL_CON2),
-+	SAVE_ITEM(EXYNOS5_VPLL_CON0),
-+	SAVE_ITEM(EXYNOS5_VPLL_CON1),
-+	SAVE_ITEM(EXYNOS5_VPLL_CON2),
+ 	__raw_writel(s3c_irqwake_intmask, S5P_WAKEUP_MASK);
+-	__raw_writel(s3c_irqwake_eintmask, S5P_EINT_WAKEUP_MASK);
++	__raw_writel(s3c_irqwake_eintmask & 0xFFFFFFFE, S5P_EINT_WAKEUP_MASK);
+ }
+ 
+ static inline void s3c_pm_arch_stop_clocks(void)
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index abc1def..94faa3e 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -84,7 +84,14 @@ static unsigned int save_arm_register[2];
+ 
+ static int exynos_cpu_suspend(unsigned long arg)
+ {
++#ifdef CONFIG_CACHE_L2X0
+ 	outer_flush_all();
++#endif
++	/*
++	 * To enter suspend mode, GPS LPI register must be set.
++	 */
++	if (soc_is_exynos5250())
++		__raw_writel(0x10000, EXYNOS5_GPS_LPI);
+ 
+ 	/* issue the standby signal into the pm unit. */
+ 	cpu_do_idle();
+@@ -95,27 +102,35 @@ static int exynos_cpu_suspend(unsigned long arg)
+ 
+ static void exynos_pm_prepare(void)
+ {
+-	u32 tmp;
++	unsigned int tmp;
+ 
+ 	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+-	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
+-	s3c_pm_do_save(exynos4_epll_save, ARRAY_SIZE(exynos4_epll_save));
+-	s3c_pm_do_save(exynos4_vpll_save, ARRAY_SIZE(exynos4_vpll_save));
+ 
+-	tmp = __raw_readl(S5P_INFORM1);
++	if (!soc_is_exynos5250()) {
++		s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
++		s3c_pm_do_save(exynos4_epll_save, ARRAY_SIZE(exynos4_epll_save));
++		s3c_pm_do_save(exynos4_vpll_save, ARRAY_SIZE(exynos4_vpll_save));
++	} else {
++		/* Disable USE_RETENTION of JPEG_MEM_OPTION */
++		tmp = __raw_readl(EXYNOS5_JPEG_MEM_OPTION);
++		tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
++		__raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
++	}
+ 
+ 	/* Set value of power down register for sleep mode */
+-
+ 	exynos4_sys_powerdown_conf(SYS_SLEEP);
+ 	__raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
+ 
+ 	/* ensure at least INFORM0 has the resume address */
+-
+ 	__raw_writel(virt_to_phys(s3c_cpu_resume), S5P_INFORM0);
+ 
+-	/* Before enter central sequence mode, clock src register have to set */
+-
+-	s3c_pm_do_restore_core(exynos4_set_clksrc, ARRAY_SIZE(exynos4_set_clksrc));
++	/*
++	 * Before enter central sequence mode,
++	 * clock src register have to set.
++	 */
++	if (!soc_is_exynos5250())
++		s3c_pm_do_restore_core(exynos4_set_clksrc,
++				ARRAY_SIZE(exynos4_set_clksrc));
+ 
+ 	if (soc_is_exynos4210())
+ 		s3c_pm_do_restore_core(exynos4210_set_clksrc, ARRAY_SIZE(exynos4210_set_clksrc));
+@@ -197,12 +212,18 @@ static void exynos4_restore_pll(void)
+ 	} while (epll_wait || vpll_wait);
+ }
+ 
+-static struct subsys_interface exynos_pm_interface = {
+-	.name		= "exynos4_pm",
++static struct subsys_interface exynos4_pm_interface = {
++	.name		= "exynos_pm",
+ 	.subsys		= &exynos4_subsys,
+ 	.add_dev	= exynos_pm_add,
  };
+ 
++static struct subsys_interface exynos5_pm_interface = {
++	.name		= "exynos_pm",
++	.subsys		= &exynos5_subsys,
++	.add_dev	= exynos_pm_add,
++};
++
+ static __init int exynos_pm_drvinit(void)
+ {
+ 	struct clk *pll_base;
+@@ -224,8 +245,10 @@ static __init int exynos_pm_drvinit(void)
+ 			clk_put(pll_base);
+ 		}
+ 	}
+-
+-	return subsys_interface_register(&exynos_pm_interface);
++	if (soc_is_exynos5250())
++		return subsys_interface_register(&exynos5_pm_interface);
++	else
++		return subsys_interface_register(&exynos4_pm_interface);
+ }
+ arch_initcall(exynos_pm_drvinit);
+ 
+@@ -234,27 +257,25 @@ static int exynos_pm_suspend(void)
+ 	unsigned long tmp;
+ 
+ 	/* Setting Central Sequence Register for power down mode */
+-
+ 	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+ 	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
+ 	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+ 
+-	if (soc_is_exynos4212()) {
+-		tmp = __raw_readl(S5P_CENTRAL_SEQ_OPTION);
+-		tmp &= ~(S5P_USE_STANDBYWFI_ISP_ARM |
+-			 S5P_USE_STANDBYWFE_ISP_ARM);
+-		__raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
+-	}
+-
+-	/* Save Power control register */
+-	asm ("mrc p15, 0, %0, c15, c0, 0"
+-	     : "=r" (tmp) : : "cc");
+-	save_arm_register[0] = tmp;
++	/* Setting SEQ_OPTION register */
++	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
++	__raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
+ 
+-	/* Save Diagnostic register */
+-	asm ("mrc p15, 0, %0, c15, c0, 1"
+-	     : "=r" (tmp) : : "cc");
+-	save_arm_register[1] = tmp;
++	if (!soc_is_exynos5250()) {
++		/* Save Power control register */
++		asm ("mrc p15, 0, %0, c15, c0, 0"
++		     : "=r" (tmp) : : "cc");
++		save_arm_register[0] = tmp;
++
++		/* Save Diagnostic register */
++		asm ("mrc p15, 0, %0, c15, c0, 1"
++		     : "=r" (tmp) : : "cc");
++		save_arm_register[1] = tmp;
++	}
+ 
+ 	return 0;
+ }
+@@ -276,17 +297,19 @@ static void exynos_pm_resume(void)
+ 		/* No need to perform below restore code */
+ 		goto early_wakeup;
+ 	}
+-	/* Restore Power control register */
+-	tmp = save_arm_register[0];
+-	asm volatile ("mcr p15, 0, %0, c15, c0, 0"
+-		      : : "r" (tmp)
+-		      : "cc");
+-
+-	/* Restore Diagnostic register */
+-	tmp = save_arm_register[1];
+-	asm volatile ("mcr p15, 0, %0, c15, c0, 1"
+-		      : : "r" (tmp)
+-		      : "cc");
++	if (!soc_is_exynos5250()) {
++		/* Restore Power control register */
++		tmp = save_arm_register[0];
++		asm volatile ("mcr p15, 0, %0, c15, c0, 0"
++			      : : "r" (tmp)
++			      : "cc");
++
++		/* Restore Diagnostic register */
++		tmp = save_arm_register[1];
++		asm volatile ("mcr p15, 0, %0, c15, c0, 1"
++			      : : "r" (tmp)
++			      : "cc");
++	}
+ 
+ 	/* For release retention */
+ 
+@@ -300,18 +323,20 @@ static void exynos_pm_resume(void)
+ 
+ 	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+ 
+-	exynos4_restore_pll();
++	if (!soc_is_exynos5250()) {
++		exynos4_restore_pll();
+ 
+ #ifdef CONFIG_SMP
+-	scu_enable(S5P_VA_SCU);
++		scu_enable(S5P_VA_SCU);
  #endif
  
-diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
-index e141c1f..5542b8c 100644
---- a/arch/arm/mach-exynos/include/mach/regs-clock.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
-@@ -265,36 +265,51 @@
+ #ifdef CONFIG_CACHE_L2X0
+-	s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
+-	outer_inv_all();
+-	/* enable L2X0*/
+-	writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
++		s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
++		outer_inv_all();
++		/* enable L2X0*/
++		writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
+ #endif
++	}
  
- #define EXYNOS5_CLKDIV_ACP			EXYNOS_CLKREG(0x08500)
+ early_wakeup:
+ 	return;
+@@ -322,9 +347,9 @@ static struct syscore_ops exynos_pm_syscore_ops = {
+ 	.resume		= exynos_pm_resume,
+ };
  
--#define EXYNOS5_CLKSRC_TOP2			EXYNOS_CLKREG(0x10218)
- #define EXYNOS5_EPLL_CON0			EXYNOS_CLKREG(0x10130)
- #define EXYNOS5_EPLL_CON1			EXYNOS_CLKREG(0x10134)
-+#define EXYNOS5_EPLL_CON2			EXYNOS_CLKREG(0x10138)
- #define EXYNOS5_VPLL_CON0			EXYNOS_CLKREG(0x10140)
- #define EXYNOS5_VPLL_CON1			EXYNOS_CLKREG(0x10144)
-+#define EXYNOS5_VPLL_CON2			EXYNOS_CLKREG(0x10148)
- #define EXYNOS5_CPLL_CON0			EXYNOS_CLKREG(0x10120)
+-static __init int exynos4_pm_syscore_init(void)
++static __init int exynos_pm_syscore_init(void)
+ {
+ 	register_syscore_ops(&exynos_pm_syscore_ops);
+ 	return 0;
+ }
+-arch_initcall(exynos4_pm_syscore_init);
++arch_initcall(exynos_pm_syscore_init);
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index 5c7eb15..51aa1ec 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -309,10 +309,69 @@ static struct exynos4_pmu_conf exynos5250_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
+ };
  
- #define EXYNOS5_CLKSRC_TOP0			EXYNOS_CLKREG(0x10210)
-+#define EXYNOS5_CLKSRC_TOP1			EXYNOS_CLKREG(0x10214)
-+#define EXYNOS5_CLKSRC_TOP2			EXYNOS_CLKREG(0x10218)
- #define EXYNOS5_CLKSRC_TOP3			EXYNOS_CLKREG(0x1021C)
- #define EXYNOS5_CLKSRC_GSCL			EXYNOS_CLKREG(0x10220)
- #define EXYNOS5_CLKSRC_DISP1_0			EXYNOS_CLKREG(0x1022C)
-+#define EXYNOS5_CLKSRC_MAUDIO			EXYNOS_CLKREG(0x10240)
- #define EXYNOS5_CLKSRC_FSYS			EXYNOS_CLKREG(0x10244)
- #define EXYNOS5_CLKSRC_PERIC0			EXYNOS_CLKREG(0x10250)
-+#define EXYNOS5_CLKSRC_PERIC1			EXYNOS_CLKREG(0x10254)
-+#define EXYNOS5_SCLK_SRC_ISP			EXYNOS_CLKREG(0x10270)
++void __iomem *exynos5_list_both_cnt_feed[] = {
++	EXYNOS5_ARM_CORE0_OPTION,
++	EXYNOS5_ARM_CORE1_OPTION,
++	EXYNOS5_ARM_COMMON_OPTION,
++	EXYNOS5_GSCL_OPTION,
++	EXYNOS5_ISP_OPTION,
++	EXYNOS5_MFC_OPTION,
++	EXYNOS5_G3D_OPTION,
++	EXYNOS5_DISP1_OPTION,
++	EXYNOS5_MAU_OPTION,
++	EXYNOS5_GPS_OPTION,
++	EXYNOS5_TOP_PWR_OPTION,
++	EXYNOS5_TOP_PWR_SYSMEM_OPTION,
++};
++
++void __iomem *exynos5_list_diable_wfi_wfe[] = {
++	EXYNOS5_ARM_CORE1_OPTION,
++	EXYNOS5_FSYS_ARM_OPTION,
++	EXYNOS5_ISP_ARM_OPTION,
++};
++
++static void exynos5_init_pmu(void)
++{
++	unsigned int i;
++	unsigned int tmp;
++
++	/*
++	 * Enable both SC_FEEDBACK and SC_COUNTER
++	 */
++	for (i = 0 ; i < ARRAY_SIZE(exynos5_list_both_cnt_feed) ; i++) {
++		tmp = __raw_readl(exynos5_list_both_cnt_feed[i]);
++		tmp |= (EXYNOS5_USE_SC_FEEDBACK |
++			EXYNOS5_USE_SC_COUNTER);
++		__raw_writel(tmp, exynos5_list_both_cnt_feed[i]);
++	}
++
++	/*
++	 * SKIP_DEACTIVATE_ACEACP_IN_PWDN_BITFIELD Enable
++	 * MANUAL_L2RSTDISABLE_CONTROL_BITFIELD Enable
++	 */
++	tmp = __raw_readl(EXYNOS5_ARM_COMMON_OPTION);
++	tmp |= (EXYNOS5_MANUAL_L2RSTDISABLE_CONTROL |
++		EXYNOS5_SKIP_DEACTIVATE_ACEACP_IN_PWDN);
++	__raw_writel(tmp, EXYNOS5_ARM_COMMON_OPTION);
++
++	/*
++	 * Disable WFI/WFE on XXX_OPTION
++	 */
++	for (i = 0 ; i < ARRAY_SIZE(exynos5_list_diable_wfi_wfe) ; i++) {
++		tmp = __raw_readl(exynos5_list_diable_wfi_wfe[i]);
++		tmp &= ~(EXYNOS5_OPTION_USE_STANDBYWFE |
++			 EXYNOS5_OPTION_USE_STANDBYWFI);
++		__raw_writel(tmp, exynos5_list_diable_wfi_wfe[i]);
++	}
++}
++
+ void exynos4_sys_powerdown_conf(enum sys_powerdown mode)
+ {
+ 	unsigned int i;
  
- #define EXYNOS5_CLKSRC_MASK_TOP			EXYNOS_CLKREG(0x10310)
- #define EXYNOS5_CLKSRC_MASK_GSCL		EXYNOS_CLKREG(0x10320)
- #define EXYNOS5_CLKSRC_MASK_DISP1_0		EXYNOS_CLKREG(0x1032C)
-+#define EXYNOS5_CLKSRC_MASK_MAUDIO		EXYNOS_CLKREG(0x10334)
- #define EXYNOS5_CLKSRC_MASK_FSYS		EXYNOS_CLKREG(0x10340)
- #define EXYNOS5_CLKSRC_MASK_PERIC0		EXYNOS_CLKREG(0x10350)
-+#define EXYNOS5_CLKSRC_MASK_PERIC1		EXYNOS_CLKREG(0x10354)
++	if (soc_is_exynos5250())
++		exynos5_init_pmu();
++
+ 	for (i = 0; (exynos4_pmu_config[i].reg != PMU_TABLE_END) ; i++)
+ 		__raw_writel(exynos4_pmu_config[i].val[mode],
+ 				exynos4_pmu_config[i].reg);
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 787ceac..747c27d 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -203,6 +203,7 @@ extern struct bus_type s3c6410_subsys;
+ extern struct bus_type s5p64x0_subsys;
+ extern struct bus_type s5pv210_subsys;
+ extern struct bus_type exynos4_subsys;
++extern struct bus_type exynos5_subsys;
  
- #define EXYNOS5_CLKDIV_TOP0			EXYNOS_CLKREG(0x10510)
- #define EXYNOS5_CLKDIV_TOP1			EXYNOS_CLKREG(0x10514)
- #define EXYNOS5_CLKDIV_GSCL			EXYNOS_CLKREG(0x10520)
- #define EXYNOS5_CLKDIV_DISP1_0			EXYNOS_CLKREG(0x1052C)
- #define EXYNOS5_CLKDIV_GEN			EXYNOS_CLKREG(0x1053C)
-+#define EXYNOS5_CLKDIV_MAUDIO			EXYNOS_CLKREG(0x10544)
- #define EXYNOS5_CLKDIV_FSYS0			EXYNOS_CLKREG(0x10548)
- #define EXYNOS5_CLKDIV_FSYS1			EXYNOS_CLKREG(0x1054C)
- #define EXYNOS5_CLKDIV_FSYS2			EXYNOS_CLKREG(0x10550)
- #define EXYNOS5_CLKDIV_FSYS3			EXYNOS_CLKREG(0x10554)
- #define EXYNOS5_CLKDIV_PERIC0			EXYNOS_CLKREG(0x10558)
-+#define EXYNOS5_CLKDIV_PERIC1			EXYNOS_CLKREG(0x1055C)
-+#define EXYNOS5_CLKDIV_PERIC2			EXYNOS_CLKREG(0x10560)
-+#define EXYNOS5_CLKDIV_PERIC3			EXYNOS_CLKREG(0x10564)
-+#define EXYNOS5_CLKDIV_PERIC4			EXYNOS_CLKREG(0x10568)
-+#define EXYNOS5_CLKDIV_PERIC5			EXYNOS_CLKREG(0x1056C)
-+#define EXYNOS5_SCLK_DIV_ISP			EXYNOS_CLKREG(0x10580)
+ extern void (*s5pc1xx_idle)(void);
  
- #define EXYNOS5_CLKGATE_IP_ACP			EXYNOS_CLKREG(0x08800)
- #define EXYNOS5_CLKGATE_IP_GSCL			EXYNOS_CLKREG(0x10920)
 -- 
 1.7.4.4
