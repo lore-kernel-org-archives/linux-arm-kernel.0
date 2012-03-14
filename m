@@ -1,191 +1,54 @@
-From: b39297@freescale.com (Wu Guoxing)
-Date: Wed, 14 Mar 2012 10:10:54 +0800
-Subject: [PATCH v8] ARM : mx35: 3ds-board: add framebuffer device
-Message-ID: <1331691054-6442-1-git-send-email-b39297@freescale.com>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 13 Mar 2012 19:21:33 -0700
+Subject: [PATCH 0/3] coupled cpuidle state support
+In-Reply-To: <4F5FFCC1.2030702@linux.intel.com>
+References: <1324426147-16735-1-git-send-email-ccross@android.com>
+ <4F1929E9.7070707@linaro.org> <8762e8kqi6.fsf@ti.com>
+ <4F5FFCC1.2030702@linux.intel.com>
+Message-ID: <CAMbhsRSrS-gwu20Ba5=n_LNUwDh3p+5bQPOymGJ9x5O2Fn28kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: wu guoxing <b39297@freescale.com>
+On Tue, Mar 13, 2012 at 7:04 PM, Arjan van de Ven <arjan@linux.intel.com> wrote:
+> On 3/13/2012 4:52 PM, Kevin Hilman wrote:
+>> Checking the ready_count seemed like an easy way to do this, but did you
+>> have any other mechanisms in mind for CPUs to communicate that they've
+>> exited/aborted?
+>
+> this indeed is the tricky part (which I warned about earlier);
+> I've spent quite a lot of time (weeks) to get this provably working for
+> an Intel system with similar requirements... and it's extremely unfunny,
+> and needed firmware support to close some of the race conditions.
 
-This patch adds framebuffer support for freescale mx35 3ds board
+As long as you can tell from cpu0 that cpu1 has succesfully entered
+the low power state, this should be easy, and the
+coupled_cpuidle_parallel_barrier helper should make it even easier.
+This series just allows the exact same sequence of transitions used by
+hotplug cpufreq governors to happen from the idle thread:
 
-Signed-off-by: Wu Guoxing <b39297@freescale.com>
----
-Changes since v7:
-	1. move mc9s08dz60 gpio definitions into mx35 3ds board file
-Changes since v6:
-	1. use the macro for lcd-enable that added in board_mx35_3ds.h
-	2. fold mc9s08dz60_lcd_gpio_get into mx35_3ds_lcd_set_power
-Changes since v5:
-	1. fixed a typo error in fb_modedb[].
-Changes since v4:
-	1. fixed a typo error in mx35_3ds_lcd_set_power.
-Changes since v3:
-	1. use a static variable to save the gpio value instead of find
-	the gpiochip every time.
-	2. add gpio_request after found the gpio.
-Changes since v2:
-	1. use gpio_set_value_cansleep instead of gpio_set_value
-Changes since v1:
-	1. use gpio driver for mc9s08dz60
+1. cpu0 forces cpu1 offline.  From a wakeup perspective, this is
+exactly like hotplug removing cpu1.  Unlike hotplug, the state of cpu1
+has to be saved, and the scheduler is not told that the cpu is gone.
+Instead of using the IPI signalling that hotplug uses, we call the
+same function on both cpus, and one cpu runs the equivalent of
+platform_cpu_kill, and the other the equivalent of platform_cpu_die.
+Wakeup events that are only targeted at cpu1 will need to be
+temporarily migrated to cpu0.
+2. If the hotplug is successful, cpu0 goes to a low power state, the
+same way it would when the hotplug cpufreq governor had removed cpu1.
+3. cpu0 wakes up, because all wakeup events are pointed at it.
+4. After restoring its own state, cpu0 brings cpu1 back online,
+exactly like hotplug online would, except that the boot vector has to
+point to a cpu_resume handler instead of secondary start.
 
-arch/arm/mach-imx/mach-mx35_3ds.c |  120 +++++++++++++++++++++++++++++++++++++
- 1 files changed, 120 insertions(+), 0 deletions(-)
+> I sure hope that hardware with these requirements is on the way out...
+> it's not very OS friendly.
 
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 0af6c9c..e6c64d0 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -40,9 +40,93 @@
- #include <mach/iomux-mx35.h>
- #include <mach/irqs.h>
- #include <mach/3ds_debugboard.h>
-+#include <video/platform_lcd.h>
- 
- #include "devices-imx35.h"
- 
-+#define GPIO_MC9S08DZ60_GPS_ENABLE 0
-+#define GPIO_MC9S08DZ60_HDD_ENABLE 4
-+#define GPIO_MC9S08DZ60_WIFI_ENABLE 5
-+#define GPIO_MC9S08DZ60_LCD_ENABLE 6
-+#define GPIO_MC9S08DZ60_SPEAKER_ENABLE 8
-+
-+static const struct fb_videomode fb_modedb[] = {
-+	{
-+		 /* 800x480 @ 55 Hz */
-+		.name = "Ceramate-CLAA070VC01",
-+		.refresh = 55,
-+		.xres = 800,
-+		.yres = 480,
-+		.pixclock = 40000,
-+		.left_margin = 40,
-+		.right_margin = 40,
-+		.upper_margin = 5,
-+		.lower_margin = 5,
-+		.hsync_len = 20,
-+		.vsync_len = 10,
-+		.sync = FB_SYNC_OE_ACT_HIGH,
-+		.vmode = FB_VMODE_NONINTERLACED,
-+		.flag = 0,
-+	 },
-+};
-+
-+static const struct ipu_platform_data mx3_ipu_data __initconst = {
-+	.irq_base = MXC_IPU_IRQ_START,
-+};
-+
-+static struct mx3fb_platform_data mx3fb_pdata __initdata = {
-+	.name = "Ceramate-CLAA070VC01",
-+	.mode = fb_modedb,
-+	.num_modes = ARRAY_SIZE(fb_modedb),
-+};
-+
-+static struct i2c_board_info __initdata i2c_devices_3ds[] = {
-+	{
-+		I2C_BOARD_INFO("mc9s08dz60", 0x69),
-+	},
-+};
-+
-+static int lcd_power_gpio = -ENXIO;
-+
-+static int mc9s08dz60_gpiochip_match(struct gpio_chip *chip,
-+						     void *data)
-+{
-+	return !strcmp(chip->label, data);
-+}
-+
-+static void mx35_3ds_lcd_set_power(
-+				struct plat_lcd_data *pd, unsigned int power)
-+{
-+	struct gpio_chip *chip;
-+
-+	if (!gpio_is_valid(lcd_power_gpio)) {
-+		chip = gpiochip_find(
-+				"mc9s08dz60", mc9s08dz60_gpiochip_match);
-+		if (chip) {
-+			lcd_power_gpio =
-+				chip->base + GPIO_MC9S08DZ60_LCD_ENABLE;
-+			if (gpio_request(lcd_power_gpio, "lcd_power") < 0) {
-+				pr_err("error: gpio already requested!\n");
-+				lcd_power_gpio = -ENXIO;
-+			}
-+		} else {
-+			pr_err("error: didn't find mc9s08dz60 gpio chip\n");
-+		}
-+	}
-+
-+	if (gpio_is_valid(lcd_power_gpio))
-+		gpio_set_value_cansleep(lcd_power_gpio, power);
-+}
-+
-+static struct plat_lcd_data mx35_3ds_lcd_data = {
-+	.set_power = mx35_3ds_lcd_set_power,
-+};
-+
-+static struct platform_device mx35_3ds_lcd = {
-+	.name = "platform-lcd",
-+	.dev.platform_data = &mx35_3ds_lcd_data,
-+};
-+
- #define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
- 
- static const struct imxuart_platform_data uart_pdata __initconst = {
-@@ -120,6 +204,32 @@ static iomux_v3_cfg_t mx35pdk_pads[] = {
- 	/* I2C1 */
- 	MX35_PAD_I2C1_CLK__I2C1_SCL,
- 	MX35_PAD_I2C1_DAT__I2C1_SDA,
-+	/* Display */
-+	MX35_PAD_LD0__IPU_DISPB_DAT_0,
-+	MX35_PAD_LD1__IPU_DISPB_DAT_1,
-+	MX35_PAD_LD2__IPU_DISPB_DAT_2,
-+	MX35_PAD_LD3__IPU_DISPB_DAT_3,
-+	MX35_PAD_LD4__IPU_DISPB_DAT_4,
-+	MX35_PAD_LD5__IPU_DISPB_DAT_5,
-+	MX35_PAD_LD6__IPU_DISPB_DAT_6,
-+	MX35_PAD_LD7__IPU_DISPB_DAT_7,
-+	MX35_PAD_LD8__IPU_DISPB_DAT_8,
-+	MX35_PAD_LD9__IPU_DISPB_DAT_9,
-+	MX35_PAD_LD10__IPU_DISPB_DAT_10,
-+	MX35_PAD_LD11__IPU_DISPB_DAT_11,
-+	MX35_PAD_LD12__IPU_DISPB_DAT_12,
-+	MX35_PAD_LD13__IPU_DISPB_DAT_13,
-+	MX35_PAD_LD14__IPU_DISPB_DAT_14,
-+	MX35_PAD_LD15__IPU_DISPB_DAT_15,
-+	MX35_PAD_LD16__IPU_DISPB_DAT_16,
-+	MX35_PAD_LD17__IPU_DISPB_DAT_17,
-+	MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC,
-+	MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK,
-+	MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY,
-+	MX35_PAD_CONTRAST__IPU_DISPB_CONTR,
-+	MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC,
-+	MX35_PAD_D3_REV__IPU_DISPB_D3_REV,
-+	MX35_PAD_D3_CLS__IPU_DISPB_D3_CLS,
- };
- 
- static int mx35_3ds_otg_init(struct platform_device *pdev)
-@@ -179,6 +289,8 @@ static const struct imxi2c_platform_data mx35_3ds_i2c0_data __initconst = {
-  */
- static void __init mx35_3ds_init(void)
- {
-+	struct platform_device *imx35_fb_pdev;
-+
- 	imx35_soc_init();
- 
- 	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
-@@ -204,6 +316,14 @@ static void __init mx35_3ds_init(void)
- 		pr_warn("Init of the debugboard failed, all "
- 				"devices on the debugboard are unusable.\n");
- 	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
-+
-+	i2c_register_board_info(
-+		0, i2c_devices_3ds, ARRAY_SIZE(i2c_devices_3ds));
-+
-+	imx35_add_ipu_core(&mx3_ipu_data);
-+	imx35_fb_pdev = imx35_add_mx3_sdc_fb(&mx3fb_pdata);
-+	mx35_3ds_lcd.dev.parent = &imx35_fb_pdev->dev;
-+	platform_device_register(&mx35_3ds_lcd);
- }
- 
- static void __init mx35pdk_timer_init(void)
--- 
-1.7.1
+Even hardware that was designed not not have these requirements
+sometimes has bugs that require this kind of sequencing.  OMAP4430
+should theoretically support idle without sequencing, but OMAP4460
+introduced a ROM code bug that requires sequencing again (turning on
+cpu1 corrupts the interrupt controller, so cpu0 has to be waiting with
+interrupts off to run a workaround whenever cpu1 turns on).
+
+Out of curiosity, what Intel hardware needs this?
