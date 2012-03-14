@@ -1,168 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 14 Mar 2012 20:51:20 +0100
-Subject: [PATCH v3 1/5] ARM: protect usage of cr_alignment by #ifdef
- CONFIG_CPU_CP15
-In-Reply-To: <alpine.LFD.2.02.1203141103080.24151@xanadu.home>
-References: <20120314101928.GA29474@pengutronix.de>
- <1331720483-10075-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <alpine.LFD.2.02.1203141103080.24151@xanadu.home>
-Message-ID: <20120314195120.GA2391@pengutronix.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 14 Mar 2012 13:00:56 -0700
+Subject: [PATCH] ARM: Kconfig: Remove duplicate IRQ Kconfig entries
+Message-ID: <1331755256-31163-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 11:24:36AM -0400, Nicolas Pitre wrote:
-> On Wed, 14 Mar 2012, Uwe Kleine-K?nig wrote:
-> 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> I think you could reduce the amount of #ifdef's significantly here.  
-> While the cr_alignment variable and its sister are of no use in a 
-> no-CP15 system, you could still leave them there initialized to zero and 
-> only conditionally compile out the CP15 modifyers with a dummy version.  
-> This is only 2 words wasted in your kernel image to keep the code 
-> cleaner.
-The main purpose to create this patch is that for v7m I don't compile
-entry-armv.S. As cr_alignment is defined there I don't "have" this
-variable. So I have to move the definition to a different file to waste
-it :-)
+These kconfig entries are already defined in kernel/irq/Kconfig
+so select them instead of redefining them.
 
-> More comments below.
-> 
-> > index 854bd22..efeb2d0 100644
-> > --- a/arch/arm/kernel/head-common.S
-> > +++ b/arch/arm/kernel/head-common.S
-> > @@ -98,8 +98,10 @@ __mmap_switched:
-> >  	str	r9, [r4]			@ Save processor ID
-> >  	str	r1, [r5]			@ Save machine type
-> >  	str	r2, [r6]			@ Save atags pointer
-> > -	bic	r4, r0, #CR_A			@ Clear 'A' bit
-> > -	stmia	r7, {r0, r4}			@ Save control register values
-> > +	cmp	r7, #0
-> > +	itt	ne
-> > +	bicne	r4, r0, #CR_A			@ Clear 'A' bit
-> > +	stmneia	r7, {r0, r4}			@ Save control register values
-> 
-> The kernel is compiled with -mimplicit-it so you do not need to specify 
-> any it here.
-ok
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/Kconfig |   10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7a08e37..a3ae6e9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -30,6 +30,8 @@ config ARM
+ 	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
+ 	select HAVE_C_RECORDMCOUNT
+ 	select HAVE_GENERIC_HARDIRQS
++	select HARDIRQS_SW_RESEND
++	select GENERIC_IRQ_PROBE
+ 	select GENERIC_IRQ_SHOW
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select GENERIC_PCI_IOMAP
+@@ -125,14 +127,6 @@ config TRACE_IRQFLAGS_SUPPORT
+ 	bool
+ 	default y
  
-> > index a255c39..50d3df8 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -472,9 +472,13 @@ static void __init setup_processor(void)
-> >  	cpu_cache = *list->cache;
-> >  #endif
-> >  
-> > -	printk("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
-> > +	printk("CPU: %s [%08x] revision %d (ARMv%s)",
-> >  	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
-> > -	       proc_arch[cpu_architecture()], cr_alignment);
-> > +	       proc_arch[cpu_architecture()]);
-> > +
-> > +#ifdef CONFIG_CPU_CP15
-> > +	printk(KERN_CONT ", cr=%08lx\n", cr_alignment);
-> > +#endif
-> >  
-> 
-> Again, you could just leave the original display, with cr=00000000 which 
-> is a fairly good representation of reality.
-Maybe having
-
-	#define cr_alignment 0
-
-for the !CONFIG_CPU_CP15 case would be a nice alternative. This way all
-places that want to modify cr_alignment fail to compile, but reading
-gives a "fairly good representation of reality".
-
-Having said that I'm not sure about "fairly good". v7m also supports
-unaligned accesses. But it's not configured in a cp15 register
-(obviously) but in a system register. Quoting ARMARM-v7m:
-
-	Configuration and Control Register, CCR
-	[...]
-	Bit [3] UNALIGN_TRP	Controls the trapping of unaligned word or
-				halfword accesses:
-				0 = Trapping disabled.
-				1 = Trapping enabled.
-				Unaligned load-store multiples and word
-				or halfword exclusive accesses always
-				fault.
-
-So we need a more general abstraction to have correct and clean code?
-
-But note I didn't check the two different implementations deeply to be
-sure not to compare two different things.
-
-> > diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> > index caf14dc..119d178 100644
-> > --- a/arch/arm/mm/alignment.c
-> > +++ b/arch/arm/mm/alignment.c
-> > @@ -89,7 +89,11 @@ core_param(alignment, ai_usermode, int, 0600);
-> >  /* Return true if and only if the ARMv6 unaligned access model is in use. */
-> >  static bool cpu_is_v6_unaligned(void)
-> >  {
-> > +#ifdef CONFIG_CPU_CP15
-> >  	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
-> > +#else
-> > +	return 0;
-> > +#endif
-> >  }
-> 
-> Same here.  With cr_alignment set to zero, you don't need the above 
-> #ifdef.
-> 
-> >  static int safe_usermode(int new_usermode, bool warn)
-> > @@ -961,12 +965,14 @@ static int __init alignment_init(void)
-> >  		return -ENOMEM;
-> >  #endif
-> >  
-> > +#ifdef CONFIG_CPU_CP15
-> >  	if (cpu_is_v6_unaligned()) {
-> >  		cr_alignment &= ~CR_A;
-> >  		cr_no_alignment &= ~CR_A;
-> >  		set_cr(cr_alignment);
-> >  		ai_usermode = safe_usermode(ai_usermode, false);
-> >  	}
-> > +#endif
-> 
-> Here the #ifdef is probably legitimate.
-> 
-> >  	hook_fault_code(FAULT_CODE_ALIGNMENT, do_alignment, SIGBUS, BUS_ADRALN,
-> >  			"alignment exception");
-> > diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> > index 94c5a0c..f6dbe1a 100644
-> > --- a/arch/arm/mm/mmu.c
-> > +++ b/arch/arm/mm/mmu.c
-> > @@ -109,8 +109,10 @@ static int __init early_cachepolicy(char *p)
-> >  
-> >  		if (memcmp(p, cache_policies[i].policy, len) == 0) {
-> >  			cachepolicy = i;
-> > +#ifdef CONFIG_CPU_CP15
-> >  			cr_alignment &= ~cache_policies[i].cr_mask;
-> >  			cr_no_alignment &= ~cache_policies[i].cr_mask;
-> > +#endif
-> 
-> Probably here as well.
-> 
-> >  			break;
-> >  		}
-> >  	}
-> > @@ -128,7 +130,9 @@ static int __init early_cachepolicy(char *p)
-> >  		cachepolicy = CPOLICY_WRITEBACK;
-> >  	}
-> >  	flush_cache_all();
-> > +#ifdef CONFIG_CPU_CP15
-> >  	set_cr(cr_alignment);
-> > +#endif
-> 
-> However it might be best to provide a dummy set_cr() instead of 
-> #ifdef'ing it out everywhere.
-What should the dummy set_cr do? Print a runtime warning if called with
-!= 0?
-
-Best regards
-Uwe
-
+-config HARDIRQS_SW_RESEND
+-	bool
+-	default y
+-
+-config GENERIC_IRQ_PROBE
+-	bool
+-	default y
+-
+ config GENERIC_LOCKBREAK
+ 	bool
+ 	default y
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
