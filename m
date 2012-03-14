@@ -1,41 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Mar 2012 10:01:00 +0100
-Subject: [PATCH 3/3] led-triggers: create a trigger for CPU activity
-In-Reply-To: <20120313161138.cbeb594d.akpm@linux-foundation.org>
-References: <1331197863-25564-1-git-send-email-bryan.wu@canonical.com>
- <1331197863-25564-3-git-send-email-bryan.wu@canonical.com>
- <20120313161138.cbeb594d.akpm@linux-foundation.org>
-Message-ID: <CACRpkdYMgRsJaKSNhChWvZGj497pgGYWTh26oSCXSYjYr8_JxA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 14 Mar 2012 10:01:15 +0100
+Subject: [PATCH v4] ASoC: add imx-sgtl5000 machine driver working with
+ fsl_ssi
+In-Reply-To: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
+References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20120314090115.GN3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 12:11 AM, Andrew Morton
-<akpm@linux-foundation.org> wrote:
-> On Thu, ?8 Mar 2012 17:11:03 +0800
-> Bryan Wu <bryan.wu@canonical.com> wrote:
->
->> Attempting to consolidate the ARM LED code, this removes the
->> custom RealView LED trigger code to turn LEDs on and off in
->> response to CPU activity and replace it with a standard trigger.
->>
->> (bryan.wu at canonical.com:
->> It moves arch/arm/kernel/leds.c syscore stubs into this trigger.
->> It also provides ledtrig_cpu trigger event stub in <linux/leds.h>.
->> Although it was inspired by ARM work, it can be used in other arch.)
->
-> The patch doesn't "remove" or "move" anything. ?It wholly consists of
-> additions. ?Confused.
->
->> Cc: Richard Purdie <rpurdie@rpsys.net>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
->> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
->> Tested-by: Jochen Friedrich <jochen@scram.de>
->
-> The authorship is a bit unclear. ?You're the primary author, yes?
+On Mon, Mar 12, 2012 at 07:58:47PM +0800, Shawn Guo wrote:
+> Changes since v3:
+>  * Change imx compatible to "fsl,imx21-ssi"
+>  * Leave locking issue as a FIXME for Timur to sort out separately
+> 
+> ---
+> Shawn Guo (10):
+>       ASoC: fsl: separate SSI and DMA Kconfig options
+>       ASoC: imx: merge sound/soc/imx into sound/soc/fsl
+>       ASoC: fsl: rename imx-pcm Kconfig options and filename
+>       ASoC: fsl: create fsl_utils to accommodate the common functions
+>       ASoC: fsl: remove helper fsl_asoc_get_codec_dev_name
+>       ASoC: fsl: check property 'compatible' for the machine name
+>       ASoC: fsl: make fsl_ssi driver compilable on ARM/IMX
+>       ASoC: fsl: remove the fatal error checking on codec-handle
+>       ASoC: fsl: let fsl_ssi work with imx pcm and machine drivers
+>       ASoC: fsl: add imx-sgtl5000 machine driver
 
-It's based on a patch I wrote ages ago, but I don't care much.
-Since Bryan's been driving it since, let's say Bryan wrote it.
-Just remove the signoff if it's confusing.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Linus Walleij
+What are the next steps here? Now we have fsl_ssi.c and imx-ssi.c, one
+for dt bindings and the other one for platform bindings and also AC97
+support. They should probably get merged some day which might be a bit
+difficult since currently I don't see the platform users moving over
+to devicetree and the seem to be no AC97 users in powerpc.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
