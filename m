@@ -1,21 +1,38 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 14 Mar 2012 15:58:23 +0800
-Subject: [PATCH v1 5/5] ARM: mxs: add mxs dma dt support
-In-Reply-To: <1331628428-24017-6-git-send-email-b29396@freescale.com>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-6-git-send-email-b29396@freescale.com>
-Message-ID: <4F604F9F.1070801@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 14 Mar 2012 15:59:42 +0800
+Subject: [PATCH 4/7] dt/clock: Add handling for fixed clocks and a clock
+ node setup iterator
+In-Reply-To: <1331680947-29861-5-git-send-email-robherring2@gmail.com>
+References: <1331680947-29861-1-git-send-email-robherring2@gmail.com>
+ <1331680947-29861-5-git-send-email-robherring2@gmail.com>
+Message-ID: <20120314075930.GF21337@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-> +			dma-apbh at 80004000 {
-> +				compatible = "fsl,mxs-dma-apbh";
-> +				reg =<0x80004000 2000>;
-> +			};
+On Tue, Mar 13, 2012 at 06:22:24PM -0500, Rob Herring wrote:
+...
+> +/**
+> + * of_fixed_clk_setup() - Setup function for simple fixed rate clock
+> + */
+> +void __init of_fixed_clk_setup(struct device_node *node)
+> +{
+> +	struct clk *clk;
+> +	const char *clk_name = node->name;
+> +	u32 rate;
 > +
-Why you do not add the `interrupt` for the it?
-the gpmi-nand needs to parse the interrupt out.
+> +	if (of_property_read_u32(node, "clock-frequency", &rate))
+> +		return;
+> +
+> +	of_property_read_string(node, "clock-output-names", &clk_name);
+> +
+> +	clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
+> +	if (clk)
+> +		of_clk_add_provider(node, of_fixed_clk_get, clk);
+> +}
 
-BR
-Huang Shijie
+It seems my comment[1] did not get addressed in this post.
+
+Regards,
+Shawn
+
+[1] http://article.gmane.org/gmane.linux.drivers.devicetree/10589
