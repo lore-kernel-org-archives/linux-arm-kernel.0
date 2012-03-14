@@ -1,520 +1,307 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 07:42:12 -0700
-Subject: [PATCH v4 06/12] ARM: EXYNOS: add support for EXYNOS5250 SoC
+Date: Wed, 14 Mar 2012 07:42:14 -0700
+Subject: [PATCH v4 08/12] ARM: EXYNOS: support EINT for EXYNOS4 and EXYNOS5
 In-Reply-To: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
 References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1331736138-28964-7-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331736138-28964-9-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for EXYNOS5250 SoC has two Cortex-A15 cores.
-Since actually, most codes in mach-exynos/ are used commonly for
-EXYNOS4 and EXYNOS5 the EXYNOS5/EXYNOS5250 has been implemented
-in mach-exynos/.
+From: Eunki Kim <eunki_kim@samsung.com>
 
+The GPIOs of EXYNOS4 and EXYNOS5 are changed to use
+ioremap instead of static mapping. It alse causes the
+change of external interrupt IO mapping. This patch
+changes EXYNOS4 to EXYNOS for common use and changes
+EINT_x macros for supporting dynamic IO mapping.
+
+Signed-off-by: Eunki Kim <eunki_kim@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/Makefile                            |    1 +
- arch/arm/mach-exynos/common.c                |  191 ++++++++++++++++++++++++--
- arch/arm/mach-exynos/common.h                |   11 ++
- arch/arm/mach-exynos/include/mach/map.h      |   21 +++-
- arch/arm/mach-exynos/include/mach/regs-pmu.h |    1 +
- arch/arm/plat-s5p/Kconfig                    |    4 +-
- arch/arm/plat-samsung/include/plat/cpu.h     |   10 ++
- 7 files changed, 223 insertions(+), 16 deletions(-)
+ arch/arm/mach-exynos/common.c                 |  147 ++++++++++++++++---------
+ arch/arm/mach-exynos/include/mach/regs-gpio.h |   20 ++--
+ 2 files changed, 105 insertions(+), 62 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 1683bfb..a826ffc 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -180,6 +180,7 @@ machine-$(CONFIG_ARCH_S5P64X0)		:= s5p64x0
- machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
- machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
- machine-$(CONFIG_ARCH_EXYNOS4)		:= exynos
-+machine-$(CONFIG_ARCH_EXYNOS5)		:= exynos
- machine-$(CONFIG_ARCH_SA1100)		:= sa1100
- machine-$(CONFIG_ARCH_SHARK)		:= shark
- machine-$(CONFIG_ARCH_SHMOBILE) 	:= shmobile
 diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 4a82cf0..7fdb139 100644
+index 4ef0cb5..cbbaca5 100644
 --- a/arch/arm/mach-exynos/common.c
 +++ b/arch/arm/mach-exynos/common.c
-@@ -49,9 +49,12 @@
- static const char name_exynos4210[] = "EXYNOS4210";
- static const char name_exynos4212[] = "EXYNOS4212";
- static const char name_exynos4412[] = "EXYNOS4412";
-+static const char name_exynos5250[] = "EXYNOS5250";
+@@ -665,10 +665,60 @@ static void __init exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ 		s3c24xx_init_uartdevs("exynos4210-uart", exynos4_uart_resources, cfg, no);
+ }
  
- static void exynos4_map_io(void);
-+static void exynos5_map_io(void);
- static void exynos4_init_clocks(int xtal);
-+static void exynos5_init_clocks(int xtal);
- static void exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- static int exynos_init(void);
- 
-@@ -80,6 +83,14 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.init_uarts	= exynos_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4412,
-+	}, {
-+		.idcode		= EXYNOS5250_SOC_ID,
-+		.idmask		= EXYNOS5_SOC_MASK,
-+		.map_io		= exynos5_map_io,
-+		.init_clocks	= exynos5_init_clocks,
-+		.init_uarts	= exynos_init_uarts,
-+		.init		= exynos_init,
-+		.name		= name_exynos5250,
- 	},
- };
- 
-@@ -88,10 +99,14 @@ static struct cpu_table cpu_ids[] __initdata = {
- static struct map_desc exynos_iodesc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long)S5P_VA_CHIPID,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_CHIPID),
-+		.pfn		= __phys_to_pfn(EXYNOS_PA_CHIPID),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
--	}, {
-+	},
-+};
++static void __iomem *exynos_eint_base;
 +
-+static struct map_desc exynos4_iodesc[] __initdata = {
-+	{
- 		.virtual	= (unsigned long)S3C_VA_SYS,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSCON),
- 		.length		= SZ_64K,
-@@ -141,11 +156,7 @@ static struct map_desc exynos_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_UART),
- 		.length		= SZ_512K,
- 		.type		= MT_DEVICE,
--	},
--};
--
--static struct map_desc exynos4_iodesc[] __initdata = {
--	{
-+	}, {
- 		.virtual	= (unsigned long)S5P_VA_CMU,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
- 		.length		= SZ_128K,
-@@ -206,11 +217,80 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
- 	},
- };
+ static DEFINE_SPINLOCK(eint_lock);
  
-+static struct map_desc exynos5_iodesc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)S3C_VA_SYS,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSCON),
-+		.length		= SZ_64K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S3C_VA_TIMER,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_TIMER),
-+		.length		= SZ_16K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S3C_VA_WATCHDOG,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_WATCHDOG),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_SROMC,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_SROMC),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSTIMER),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_SYSRAM,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSRAM),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_CMU,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_CMU),
-+		.length		= 144 * SZ_1K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_PMU,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_PMU),
-+		.length		= SZ_64K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_COMBINER_BASE,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_COMBINER),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S3C_VA_UART,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_UART),
-+		.length		= SZ_512K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_CPU),
-+		.length		= SZ_64K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
-+		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_DIST),
-+		.length		= SZ_64K,
-+		.type		= MT_DEVICE,
-+	},
-+};
+ static unsigned int eint0_15_data[16];
+ 
++static inline int exynos4_irq_to_gpio(unsigned int irq)
++{
++	if (irq < IRQ_EINT(0))
++		return -EINVAL;
 +
- void exynos4_restart(char mode, const char *cmd)
++	irq -= IRQ_EINT(0);
++	if (irq < 8)
++		return EXYNOS4_GPX0(irq);
++
++	irq -= 8;
++	if (irq < 8)
++		return EXYNOS4_GPX1(irq);
++
++	irq -= 8;
++	if (irq < 8)
++		return EXYNOS4_GPX2(irq);
++
++	irq -= 8;
++	if (irq < 8)
++		return EXYNOS4_GPX3(irq);
++
++	return -EINVAL;
++}
++
++static inline int exynos5_irq_to_gpio(unsigned int irq)
++{
++	if (irq < IRQ_EINT(0))
++		return -EINVAL;
++
++	irq -= IRQ_EINT(0);
++	if (irq < 8)
++		return EXYNOS5_GPX0(irq);
++
++	irq -= 8;
++	if (irq < 8)
++		return EXYNOS5_GPX1(irq);
++
++	irq -= 8;
++	if (irq < 8)
++		return EXYNOS5_GPX2(irq);
++
++	irq -= 8;
++	if (irq < 8)
++		return EXYNOS5_GPX3(irq);
++
++	return -EINVAL;
++}
++
+ static unsigned int exynos4_eint0_15_src_int[16] = {
+ 	EXYNOS4_IRQ_EINT0,
+ 	EXYNOS4_IRQ_EINT1,
+@@ -706,41 +756,41 @@ static unsigned int exynos5_eint0_15_src_int[16] = {
+ 	EXYNOS5_IRQ_EINT14,
+ 	EXYNOS5_IRQ_EINT15,
+ };
+-static inline void exynos4_irq_eint_mask(struct irq_data *data)
++static inline void exynos_irq_eint_mask(struct irq_data *data)
  {
- 	__raw_writel(0x1, S5P_SWRESET);
+ 	u32 mask;
+ 
+ 	spin_lock(&eint_lock);
+-	mask = __raw_readl(S5P_EINT_MASK(EINT_REG_NR(data->irq)));
+-	mask |= eint_irq_to_bit(data->irq);
+-	__raw_writel(mask, S5P_EINT_MASK(EINT_REG_NR(data->irq)));
++	mask = __raw_readl(EINT_MASK(exynos_eint_base, data->irq));
++	mask |= EINT_OFFSET_BIT(data->irq);
++	__raw_writel(mask, EINT_MASK(exynos_eint_base, data->irq));
+ 	spin_unlock(&eint_lock);
  }
  
-+void exynos5_restart(char mode, const char *cmd)
-+{
-+	__raw_writel(0x1, EXYNOS_SWRESET);
-+}
-+
- /*
-  * exynos_map_io
-  *
-@@ -261,6 +341,16 @@ static void __init exynos4_map_io(void)
- 	s5p_hdmi_setname("exynos4-hdmi");
- }
- 
-+static void __init exynos5_map_io(void)
-+{
-+	iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
-+
-+	/* The I2C bus controllers are directly compatible with s3c2440 */
-+	s3c_i2c0_setname("s3c2440-i2c");
-+	s3c_i2c1_setname("s3c2440-i2c");
-+	s3c_i2c2_setname("s3c2440-i2c");
-+}
-+
- static void __init exynos4_init_clocks(int xtal)
+-static void exynos4_irq_eint_unmask(struct irq_data *data)
++static void exynos_irq_eint_unmask(struct irq_data *data)
  {
- 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
-@@ -277,6 +367,17 @@ static void __init exynos4_init_clocks(int xtal)
- 	exynos4_setup_clocks();
+ 	u32 mask;
+ 
+ 	spin_lock(&eint_lock);
+-	mask = __raw_readl(S5P_EINT_MASK(EINT_REG_NR(data->irq)));
+-	mask &= ~(eint_irq_to_bit(data->irq));
+-	__raw_writel(mask, S5P_EINT_MASK(EINT_REG_NR(data->irq)));
++	mask = __raw_readl(EINT_MASK(exynos_eint_base, data->irq));
++	mask &= ~(EINT_OFFSET_BIT(data->irq));
++	__raw_writel(mask, EINT_MASK(exynos_eint_base, data->irq));
+ 	spin_unlock(&eint_lock);
  }
  
-+static void __init exynos5_init_clocks(int xtal)
-+{
-+	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
-+
-+	s3c24xx_register_baseclocks(xtal);
-+	s5p_register_clocks(xtal);
-+
-+	exynos5_register_clocks();
-+	exynos5_setup_clocks();
-+}
-+
- #define COMBINER_ENABLE_SET	0x0
- #define COMBINER_ENABLE_CLEAR	0x4
- #define COMBINER_INT_STATUS	0xC
-@@ -420,24 +521,59 @@ void __init exynos4_init_irq(void)
- 	s5p_init_irq(NULL, 0);
- }
- 
-+void __init exynos5_init_irq(void)
-+{
-+	int irq;
-+
-+	gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
-+
-+	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
-+		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
-+				COMBINER_IRQ(irq, 0));
-+		combiner_cascade_irq(irq, IRQ_SPI(irq));
-+	}
-+
-+	/*
-+	 * The parameters of s5p_init_irq() are for VIC init.
-+	 * Theses parameters should be NULL and 0 because EXYNOS4
-+	 * uses GIC instead of VIC.
-+	 */
-+	s5p_init_irq(NULL, 0);
-+}
-+
- struct bus_type exynos4_subsys = {
- 	.name		= "exynos4-core",
- 	.dev_name	= "exynos4-core",
- };
- 
-+struct bus_type exynos5_subsys = {
-+	.name		= "exynos5-core",
-+	.dev_name	= "exynos5-core",
-+};
-+
- static struct device exynos4_dev = {
- 	.bus	= &exynos4_subsys,
- };
- 
--static int __init exynos4_core_init(void)
-+static struct device exynos5_dev = {
-+	.bus	= &exynos5_subsys,
-+};
-+
-+static int __init exynos_core_init(void)
+-static inline void exynos4_irq_eint_ack(struct irq_data *data)
++static inline void exynos_irq_eint_ack(struct irq_data *data)
  {
--	return subsys_system_register(&exynos4_subsys, NULL);
+-	__raw_writel(eint_irq_to_bit(data->irq),
+-		     S5P_EINT_PEND(EINT_REG_NR(data->irq)));
++	__raw_writel(EINT_OFFSET_BIT(data->irq),
++		     EINT_PEND(exynos_eint_base, data->irq));
+ }
+ 
+-static void exynos4_irq_eint_maskack(struct irq_data *data)
++static void exynos_irq_eint_maskack(struct irq_data *data)
+ {
+-	exynos4_irq_eint_mask(data);
+-	exynos4_irq_eint_ack(data);
++	exynos_irq_eint_mask(data);
++	exynos_irq_eint_ack(data);
+ }
+ 
+-static int exynos4_irq_eint_set_type(struct irq_data *data, unsigned int type)
++static int exynos_irq_eint_set_type(struct irq_data *data, unsigned int type)
+ {
+ 	int offs = EINT_OFFSET(data->irq);
+ 	int shift;
+@@ -777,39 +827,27 @@ static int exynos4_irq_eint_set_type(struct irq_data *data, unsigned int type)
+ 	mask = 0x7 << shift;
+ 
+ 	spin_lock(&eint_lock);
+-	ctrl = __raw_readl(S5P_EINT_CON(EINT_REG_NR(data->irq)));
++	ctrl = __raw_readl(EINT_CON(exynos_eint_base, data->irq));
+ 	ctrl &= ~mask;
+ 	ctrl |= newvalue << shift;
+-	__raw_writel(ctrl, S5P_EINT_CON(EINT_REG_NR(data->irq)));
++	__raw_writel(ctrl, EINT_CON(exynos_eint_base, data->irq));
+ 	spin_unlock(&eint_lock);
+ 
+-	switch (offs) {
+-	case 0 ... 7:
+-		s3c_gpio_cfgpin(EINT_GPIO_0(offs & 0x7), EINT_MODE);
+-		break;
+-	case 8 ... 15:
+-		s3c_gpio_cfgpin(EINT_GPIO_1(offs & 0x7), EINT_MODE);
+-		break;
+-	case 16 ... 23:
+-		s3c_gpio_cfgpin(EINT_GPIO_2(offs & 0x7), EINT_MODE);
+-		break;
+-	case 24 ... 31:
+-		s3c_gpio_cfgpin(EINT_GPIO_3(offs & 0x7), EINT_MODE);
+-		break;
+-	default:
+-		printk(KERN_ERR "No such irq number %d", offs);
+-	}
 +	if (soc_is_exynos5250())
-+		return subsys_system_register(&exynos5_subsys, NULL);
++		s3c_gpio_cfgpin(exynos5_irq_to_gpio(data->irq), S3C_GPIO_SFN(0xf));
 +	else
-+		return subsys_system_register(&exynos4_subsys, NULL);
- }
--core_initcall(exynos4_core_init);
-+core_initcall(exynos_core_init);
- 
- #ifdef CONFIG_CACHE_L2X0
- static int __init exynos4_l2x0_cache_init(void)
- {
-+	if (soc_is_exynos5250())
-+		return 0;
-+
- 	/* TAG, Data Latency Control: 2cycle */
- 	__raw_writel(0x110, S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL);
- 
-@@ -457,14 +593,42 @@ static int __init exynos4_l2x0_cache_init(void)
++		s3c_gpio_cfgpin(exynos4_irq_to_gpio(data->irq), S3C_GPIO_SFN(0xf));
  
  	return 0;
  }
--
- early_initcall(exynos4_l2x0_cache_init);
- #endif
  
-+static int __init exynos5_l2_cache_init(void)
-+{
-+	unsigned int val;
-+
-+	if (!soc_is_exynos5250())
-+		return 0;
-+
-+	asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
-+		     "bic %0, %0, #(1 << 2)\n"	/* cache disable */
-+		     "mcr p15, 0, %0, c1, c0, 0\n"
-+		     "mrc p15, 1, %0, c9, c0, 2\n"
-+		     : "=r"(val));
-+
-+	val |= (1 << 9) | (1 << 5) | (2 << 6) | (2 << 0);
-+
-+	asm volatile("mcr p15, 1, %0, c9, c0, 2\n" : : "r"(val));
-+	asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
-+		     "orr %0, %0, #(1 << 2)\n"	/* cache enable */
-+		     "mcr p15, 0, %0, c1, c0, 0\n"
-+		     : : "r"(val));
-+
-+	return 0;
-+}
-+early_initcall(exynos5_l2_cache_init);
-+
- static int __init exynos_init(void)
+-static struct irq_chip exynos4_irq_eint = {
+-	.name		= "exynos4-eint",
+-	.irq_mask	= exynos4_irq_eint_mask,
+-	.irq_unmask	= exynos4_irq_eint_unmask,
+-	.irq_mask_ack	= exynos4_irq_eint_maskack,
+-	.irq_ack	= exynos4_irq_eint_ack,
+-	.irq_set_type	= exynos4_irq_eint_set_type,
++static struct irq_chip exynos_irq_eint = {
++	.name		= "exynos-eint",
++	.irq_mask	= exynos_irq_eint_mask,
++	.irq_unmask	= exynos_irq_eint_unmask,
++	.irq_mask_ack	= exynos_irq_eint_maskack,
++	.irq_ack	= exynos_irq_eint_ack,
++	.irq_set_type	= exynos_irq_eint_set_type,
+ #ifdef CONFIG_PM
+ 	.irq_set_wake	= s3c_irqext_wake,
+ #endif
+@@ -824,12 +862,12 @@ static struct irq_chip exynos4_irq_eint = {
+  *
+  * Each EINT pend/mask registers handle eight of them.
+  */
+-static inline void exynos4_irq_demux_eint(unsigned int start)
++static inline void exynos_irq_demux_eint(unsigned int start)
  {
- 	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
--	return device_register(&exynos4_dev);
-+
-+	if (soc_is_exynos5250())
-+		return device_register(&exynos5_dev);
-+	else
-+		return device_register(&exynos4_dev);
+ 	unsigned int irq;
+ 
+-	u32 status = __raw_readl(S5P_EINT_PEND(EINT_REG_NR(start)));
+-	u32 mask = __raw_readl(S5P_EINT_MASK(EINT_REG_NR(start)));
++	u32 status = __raw_readl(EINT_PEND(exynos_eint_base, start));
++	u32 mask = __raw_readl(EINT_MASK(exynos_eint_base, start));
+ 
+ 	status &= ~mask;
+ 	status &= 0xff;
+@@ -841,12 +879,12 @@ static inline void exynos4_irq_demux_eint(unsigned int start)
+ 	}
  }
  
- /* uart registration process */
-@@ -673,6 +837,9 @@ static int __init exynos4_init_irq_eint(void)
+-static void exynos4_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
++static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
+ {
+ 	struct irq_chip *chip = irq_get_chip(irq);
+ 	chained_irq_enter(chip, desc);
+-	exynos4_irq_demux_eint(IRQ_EINT(16));
+-	exynos4_irq_demux_eint(IRQ_EINT(24));
++	exynos_irq_demux_eint(IRQ_EINT(16));
++	exynos_irq_demux_eint(IRQ_EINT(24));
+ 	chained_irq_exit(chip, desc);
+ }
+ 
+@@ -867,20 +905,27 @@ static void exynos_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
+ 
+-static int __init exynos4_init_irq_eint(void)
++static int __init exynos_init_irq_eint(void)
  {
  	int irq;
  
-+	if (soc_is_exynos5250())
-+		return 0;
+ 	if (soc_is_exynos5250())
+-		return 0;
++		exynos_eint_base = ioremap(EXYNOS5_PA_GPIO1, SZ_4K);
++	else
++		exynos_eint_base = ioremap(EXYNOS4_PA_GPIO2, SZ_4K);
 +
++	if (exynos_eint_base == NULL) {
++		pr_err("unable to ioremap for EINT base address\n");
++		return -ENOMEM;
++	}
+ 
  	for (irq = 0 ; irq <= 31 ; irq++) {
- 		irq_set_chip_and_handler(IRQ_EINT(irq), &exynos4_irq_eint,
+-		irq_set_chip_and_handler(IRQ_EINT(irq), &exynos4_irq_eint,
++		irq_set_chip_and_handler(IRQ_EINT(irq), &exynos_irq_eint,
  					 handle_level_irq);
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index b32c6b5..677b546 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -16,7 +16,9 @@ extern struct sys_timer exynos4_timer;
+ 		set_irq_flags(IRQ_EINT(irq), IRQF_VALID);
+ 	}
  
- void exynos_init_io(struct map_desc *mach_desc, int size);
- void exynos4_init_irq(void);
-+void exynos5_init_irq(void);
- void exynos4_restart(char mode, const char *cmd);
-+void exynos5_restart(char mode, const char *cmd);
+-	irq_set_chained_handler(EXYNOS_IRQ_EINT16_31, exynos4_irq_demux_eint16_31);
++	irq_set_chained_handler(EXYNOS_IRQ_EINT16_31, exynos_irq_demux_eint16_31);
  
- #ifdef CONFIG_ARCH_EXYNOS4
- void exynos4_register_clocks(void);
-@@ -27,6 +29,15 @@ void exynos4_setup_clocks(void);
- #define exynos4_setup_clocks()
- #endif
+ 	for (irq = 0 ; irq <= 15 ; irq++) {
+ 		eint0_15_data[irq] = IRQ_EINT(irq);
+@@ -900,4 +945,4 @@ static int __init exynos4_init_irq_eint(void)
  
-+#ifdef CONFIG_ARCH_EXYNOS5
-+void exynos5_register_clocks(void);
-+void exynos5_setup_clocks(void);
+ 	return 0;
+ }
+-arch_initcall(exynos4_init_irq_eint);
++arch_initcall(exynos_init_irq_eint);
+diff --git a/arch/arm/mach-exynos/include/mach/regs-gpio.h b/arch/arm/mach-exynos/include/mach/regs-gpio.h
+index 1401b21..e4b5b60 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-gpio.h
++++ b/arch/arm/mach-exynos/include/mach/regs-gpio.h
+@@ -16,6 +16,15 @@
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+ 
++#define EINT_REG_NR(x)			(EINT_OFFSET(x) >> 3)
++#define EINT_CON(b, x)			(b + 0xE00 + (EINT_REG_NR(x) * 4))
++#define EINT_FLTCON(b, x)		(b + 0xE80 + (EINT_REG_NR(x) * 4))
++#define EINT_MASK(b, x)			(b + 0xF00 + (EINT_REG_NR(x) * 4))
++#define EINT_PEND(b, x)			(b + 0xF40 + (EINT_REG_NR(x) * 4))
 +
-+#else
-+#define exynos5_register_clocks()
-+#define exynos5_setup_clocks()
-+#endif
++#define EINT_OFFSET_BIT(x)		(1 << (EINT_OFFSET(x) & 0x7))
 +
- #ifdef CONFIG_CPU_EXYNOS4210
- void exynos4210_register_clocks(void);
++/* compatibility for plat-s5p/irq-pm.c */
+ #define EXYNOS4_EINT40CON		(S5P_VA_GPIO2 + 0xE00)
+ #define S5P_EINT_CON(x)			(EXYNOS4_EINT40CON + ((x) * 0x4))
  
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index ea513c6..bf90bb0 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -25,6 +25,7 @@
+@@ -28,15 +37,4 @@
+ #define EXYNOS4_EINT40PEND		(S5P_VA_GPIO2 + 0xF40)
+ #define S5P_EINT_PEND(x)		(EXYNOS4_EINT40PEND + ((x) * 0x4))
  
- #define EXYNOS4_PA_SYSRAM0		0x02025000
- #define EXYNOS4_PA_SYSRAM1		0x02020000
-+#define EXYNOS5_PA_SYSRAM		0x02020000
- 
- #define EXYNOS4_PA_FIMC0		0x11800000
- #define EXYNOS4_PA_FIMC1		0x11810000
-@@ -44,14 +45,23 @@
- #define EXYNOS4_PA_ONENAND		0x0C000000
- #define EXYNOS4_PA_ONENAND_DMA		0x0C600000
- 
--#define EXYNOS4_PA_CHIPID		0x10000000
-+#define EXYNOS_PA_CHIPID		0x10000000
- 
- #define EXYNOS4_PA_SYSCON		0x10010000
-+#define EXYNOS5_PA_SYSCON		0x10050100
-+
- #define EXYNOS4_PA_PMU			0x10020000
-+#define EXYNOS5_PA_PMU			0x10040000
-+
- #define EXYNOS4_PA_CMU			0x10030000
-+#define EXYNOS5_PA_CMU			0x10010000
- 
- #define EXYNOS4_PA_SYSTIMER		0x10050000
-+#define EXYNOS5_PA_SYSTIMER		0x101C0000
-+
- #define EXYNOS4_PA_WATCHDOG		0x10060000
-+#define EXYNOS5_PA_WATCHDOG		0x101D0000
-+
- #define EXYNOS4_PA_RTC			0x10070000
- 
- #define EXYNOS4_PA_KEYPAD		0x100A0000
-@@ -59,9 +69,12 @@
- #define EXYNOS4_PA_DMC0			0x10400000
- 
- #define EXYNOS4_PA_COMBINER		0x10440000
-+#define EXYNOS5_PA_COMBINER		0x10440000
- 
- #define EXYNOS4_PA_GIC_CPU		0x10480000
- #define EXYNOS4_PA_GIC_DIST		0x10490000
-+#define EXYNOS5_PA_GIC_CPU		0x10480000
-+#define EXYNOS5_PA_GIC_DIST		0x10490000
- 
- #define EXYNOS4_PA_COREPERI		0x10500000
- #define EXYNOS4_PA_TWD			0x10500600
-@@ -92,7 +105,6 @@
- #define EXYNOS4_PA_SPI1			0x13930000
- #define EXYNOS4_PA_SPI2			0x13940000
- 
+-#define EINT_REG_NR(x)			(EINT_OFFSET(x) >> 3)
 -
- #define EXYNOS4_PA_GPIO1		0x11400000
- #define EXYNOS4_PA_GPIO2		0x11000000
- #define EXYNOS4_PA_GPIO3		0x03860000
-@@ -110,6 +122,7 @@
- #define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
- 
- #define EXYNOS4_PA_SROMC		0x12570000
-+#define EXYNOS5_PA_SROMC		0x12250000
- 
- #define EXYNOS4_PA_EHCI			0x12580000
- #define EXYNOS4_PA_OHCI			0x12590000
-@@ -117,6 +130,7 @@
- #define EXYNOS4_PA_MFC			0x13400000
- 
- #define EXYNOS4_PA_UART			0x13800000
-+#define EXYNOS5_PA_UART			0x12C00000
- 
- #define EXYNOS4_PA_VP			0x12C00000
- #define EXYNOS4_PA_MIXER		0x12C10000
-@@ -125,6 +139,7 @@
- #define EXYNOS4_PA_IIC_HDMIPHY		0x138E0000
- 
- #define EXYNOS4_PA_IIC(x)		(0x13860000 + ((x) * 0x10000))
-+#define EXYNOS5_PA_IIC(x)		(0x12C60000 + ((x) * 0x10000))
- 
- #define EXYNOS4_PA_ADC			0x13910000
- #define EXYNOS4_PA_ADC1			0x13911000
-@@ -134,8 +149,10 @@
- #define EXYNOS4_PA_SPDIF		0x139B0000
- 
- #define EXYNOS4_PA_TIMER		0x139D0000
-+#define EXYNOS5_PA_TIMER		0x12DD0000
- 
- #define EXYNOS4_PA_SDRAM		0x40000000
-+#define EXYNOS5_PA_SDRAM		0x40000000
- 
- /* Compatibiltiy Defines */
- 
-diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-index 4fff8e9..4c53f38 100644
---- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-@@ -31,6 +31,7 @@
- #define S5P_USE_STANDBYWFE_ISP_ARM		(1 << 26)
- 
- #define S5P_SWRESET				S5P_PMUREG(0x0400)
-+#define EXYNOS_SWRESET				S5P_PMUREG(0x0400)
- 
- #define S5P_WAKEUP_STAT				S5P_PMUREG(0x0600)
- #define S5P_EINT_WAKEUP_MASK			S5P_PMUREG(0x0604)
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 10e235cc7..88795ea 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -9,8 +9,8 @@ config PLAT_S5P
- 	bool
- 	depends on (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS)
- 	default y
--	select ARM_VIC if !ARCH_EXYNOS4
--	select ARM_GIC if ARCH_EXYNOS4
-+	select ARM_VIC if !ARCH_EXYNOS
-+	select ARM_GIC if ARCH_EXYNOS
- 	select GIC_NON_BANKED if ARCH_EXYNOS4
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-index 73cb3cf..787ceac 100644
---- a/arch/arm/plat-samsung/include/plat/cpu.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -42,6 +42,9 @@ extern unsigned long samsung_cpu_id;
- #define EXYNOS4412_CPU_ID	0xE4412200
- #define EXYNOS4_CPU_MASK	0xFFFE0000
- 
-+#define EXYNOS5250_SOC_ID	0x43520000
-+#define EXYNOS5_SOC_MASK	0xFFFFF000
-+
- #define IS_SAMSUNG_CPU(name, id, mask)		\
- static inline int is_samsung_##name(void)	\
- {						\
-@@ -58,6 +61,7 @@ IS_SAMSUNG_CPU(s5pv210, S5PV210_CPU_ID, S5PV210_CPU_MASK)
- IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
- IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
- IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
-+IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
- 
- #if defined(CONFIG_CPU_S3C2410) || defined(CONFIG_CPU_S3C2412) || \
-     defined(CONFIG_CPU_S3C2416) || defined(CONFIG_CPU_S3C2440) || \
-@@ -120,6 +124,12 @@ IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
- #define EXYNOS4210_REV_1_0	(0x10)
- #define EXYNOS4210_REV_1_1	(0x11)
- 
-+#if defined(CONFIG_SOC_EXYNOS5250)
-+# define soc_is_exynos5250()	is_samsung_exynos5250()
-+#else
-+# define soc_is_exynos5250()	0
-+#endif
-+
- #define IODESC_ENT(x) { (unsigned long)S3C24XX_VA_##x, __phys_to_pfn(S3C24XX_PA_##x), S3C24XX_SZ_##x, MT_DEVICE }
- 
- #ifndef MHZ
+-#define eint_irq_to_bit(irq)		(1 << (EINT_OFFSET(irq) & 0x7))
+-
+-#define EINT_MODE			S3C_GPIO_SFN(0xf)
+-
+-#define EINT_GPIO_0(x)			EXYNOS4_GPX0(x)
+-#define EINT_GPIO_1(x)			EXYNOS4_GPX1(x)
+-#define EINT_GPIO_2(x)			EXYNOS4_GPX2(x)
+-#define EINT_GPIO_3(x)			EXYNOS4_GPX3(x)
+-
+ #endif /* __ASM_ARCH_REGS_GPIO_H */
 -- 
 1.7.4.4
