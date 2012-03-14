@@ -1,66 +1,66 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 14 Mar 2012 22:08:17 +0100
-Subject: [PATCH 01/12] mfd: twl-core: don't depend on pdata->irq_base/end
-In-Reply-To: <87pqcegapk.fsf@ti.com>
-References: <1330707024-23730-1-git-send-email-b-cousson@ti.com>
- <1330707024-23730-2-git-send-email-b-cousson@ti.com> <87pqcegapk.fsf@ti.com>
-Message-ID: <4F6108C1.2060004@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 14 Mar 2012 14:15:56 -0700
+Subject: [PATCH] OMAP3: OPP: Test for IVA subsystem before attempting to
+ add IVA OPP
+In-Reply-To: <1331746695-24372-1-git-send-email-mvs@tigris.de> (Maximilian
+ Schwerin's message of "Wed, 14 Mar 2012 18:38:15 +0100")
+References: <1331746695-24372-1-git-send-email-mvs@tigris.de>
+Message-ID: <874ntqg9yr.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/14/2012 9:59 PM, Kevin Hilman wrote:
-> Benoit Cousson<b-cousson@ti.com>  writes:
->
->> From: Felipe Balbi<balbi@ti.com>
->>
->> With sparse IRQs the driver shouldn't depend at all on
->> any IRQ values coming from board-file.
->>
->> Remove every occurences of pdata->irq_base/end.
->
-> Well, not quite *every*. :)
+Maximilian Schwerin <mvs@tigris.de> writes:
 
-Hehe, good catch, thanks.
-
-> If the driver isn't going to use those fields anymore, they should also
-> be removed from the pdata struct too[1].  Also, the remaining board/init
-> code that is initializing those fields should be removed as well[2], since
-> it obviously has no effect.
+> From: Steve Sakoman <steve@sakoman.com>
 >
-> The first patch below should probably be folded into this one, and then
-> the 2nd patch removes all the users.
-
-We should probably remove all the users before removing the attribute? 
-It looks like your patches are ordered in the opposite way.
-
-I'll add that in the series and repost the pull request.
-
-Regards,
-Benoit
-
+> Don't try to add IVA OPPs for OMAP3 versions not containing an IVA
+> subsystem, as this would make omap_init_opp_table fail.
 >
-> Kevin
->
-> [1]
->  From 70a1833ca20142ef5b6b96dbc92a63c7f8ef9a04 Mon Sep 17 00:00:00 2001
-> From: Kevin Hilman<khilman@ti.com>
-> Date: Wed, 14 Mar 2012 13:55:31 -0700
-> Subject: [PATCH 1/2] mfd: twl-core: remove pdata->irq_base/end
->
-> Signed-off-by: Kevin Hilman<khilman@ti.com>
+> Signed-off-by: Steve Sakoman <steve@sakoman.com>
+> Signed-off-by: Maximilian Schwerin <mvs@tigris.de>
+
+Minor: patch subjects for arch/arm/* core code need to have the ARM:
+prefix also.
+
+Also, please run scripts/checkpatch.pl on your patch and fix the
+warnings.
+
 > ---
->   include/linux/i2c/twl.h |    1 -
->   1 file changed, 1 deletion(-)
+>  arch/arm/mach-omap2/opp.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 >
-> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-> index 2463b61..fa76006 100644
-> --- a/include/linux/i2c/twl.h
-> +++ b/include/linux/i2c/twl.h
-> @@ -697,7 +697,6 @@ struct twl4030_audio_data {
->   };
->
->   struct twl4030_platform_data {
-> -	unsigned				irq_base, irq_end;
->   	struct twl4030_clock_init_data		*clock;
->   	struct twl4030_bci_platform_data	*bci;
->   	struct twl4030_gpio_platform_data	*gpio;
+> diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+> index 9262a6b..414f2ec 100644
+> --- a/arch/arm/mach-omap2/opp.c
+> +++ b/arch/arm/mach-omap2/opp.c
+> @@ -62,6 +62,10 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+>  				__func__, i);
+>  			return -EINVAL;
+>  		}
+> +
+> +		if ((strcmp(opp_def->hwmod_name,"iva") == 0) && !omap3_has_iva())
+> +			continue;
+> +
+>  		oh = omap_hwmod_lookup(opp_def->hwmod_name);
+>  		if (!oh || !oh->od) {
+>  			pr_warn("%s: no hwmod or odev for %s, [%d] "
+
+Wouldn't the one-liner below do the same thing?
+
+Actually, your patch makes it less noisy at boot time, avoiding the
+pr_warn(), so is probably better.
+
+Kevin
+
+diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+index 9262a6b..d3d4fa2 100644
+--- a/arch/arm/mach-omap2/opp.c
++++ b/arch/arm/mach-omap2/opp.c
+@@ -67,7 +67,7 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+ 			pr_warn("%s: no hwmod or odev for %s, [%d] "
+ 				"cannot add OPPs.\n", __func__,
+ 				opp_def->hwmod_name, i);
+-			return -EINVAL;
++			continue;
+ 		}
+ 		dev = &oh->od->pdev->dev;
