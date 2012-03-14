@@ -1,39 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer [s.hauer@pengutronix.de] (s.hauer@pengutronix.de))
-Date: Wed, 14 Mar 2012 10:50:50 +0100
-Subject: [PATCH] iomux-mx25.h slew rate adjusted for LCD __LD pins
-In-Reply-To: <3F263ABB4EDE344D974E1983B56807739E868EAB@EX-DAG01.eckelmann.group>
-References: <3F263ABB4EDE344D974E1983B56807739E868EAB@EX-DAG01.eckelmann.group>
-Message-ID: <20120314095050.GP26642@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Mar 2012 09:58:26 +0000
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <4F604400.1040805@st.com>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203131644.12048.arnd@arndb.de> <4F604400.1040805@st.com>
+Message-ID: <201203140958.27289.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 11:35:22AM +0000, Mehnert, Torsten wrote:
-> From: Mehnert <tmehnert@eckelmann.de>
-> Date: Mon, 13 Mar 2012 12:13:51 +0100
-> Subject: [PATCH] iomux-mx25.h slew rate adjusted for LCD __LD pins
+On Wednesday 14 March 2012, Viresh Kumar wrote:
+> On 3/13/2012 10:14 PM, Arnd Bergmann wrote:
+> > I think you should add all the code from this file to spear6xx.c instead
+> > of adding a new file. We can then delete the spear600.c and spear600_evb.c
+> > files once the DT support has matured.
 > 
-> For some reason (sadly i don't identifying the patch right now)
-> two LCD data lines configured PAD_CTL_SRE_SLOW (wrong slew rate)
-> since Kernel 3.1. MX25_PAD_GPIO_E__LD16 and MX25_PAD_GPIO_F__LD17
-> This results in an fauly behaviour and strange color effects.
+> But what if have another board in future, and this is what Stefan is going
+> to do soon, as they have another board.
 > 
-> To ensure that all LCD data pins configured with the proper slew rate,
-> this patch changes to IOMUX define of all LCD __LDxx pins to PAD_CTL_SRE_FAST.
+> So we may actually move this code to spear600_evb.c instead.
 > 
-> This problem may affect other mx25 platforms like mx25pdk. Sadly i can't test
-> it. Of course this problem shouldn't occur when you done your LCD muxing 
-> correctly in the bootloader.
+> Sorry for any bad suggestions, i am new to DT. :)
 
-Your patch lacks a signed-off-by Tag. Please remember adding it next
-time. For now it should be enough to answer your original mail with
-a
+No problem, we are all learning things as we are working on them.
 
-Signed-off-by: Torsten Mehnert <T.Mehnert@eckelmann.de>
+The idea with DT is that you no longer need any board files because all of
+the information in those files is now passed as a data structure to the kernel
+at boot time. Platforms that are fully converted to DT don't have any
+board files but just have one DT_MACHINE_START entry for all of them in
+the common platform files. Since spear600 has very little board specific
+contents at the moment, it is very easy to get to this point now, and
+that will actually help support other boards without having to do more
+patches to add board files.
 
-Sascha
+When this work is completed, we might actually be able to extend the
+spear6xx DT code to also support spear3xx and spear13xx, renaming it
+to mach-spear. In that case, we would probably need one DT_MACHINE_START
+entry for each family and would not be able to actually build 13xx together
+with the other ones, but I guess a lot of the infrastructure could be shared.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I would suggest you read Documentation/devicetree/booting-without-of.txt
+to get a better understanding of what this is all about.
+
+	Arnd
