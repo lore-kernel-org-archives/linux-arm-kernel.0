@@ -1,44 +1,47 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 14 Mar 2012 11:37:24 -0400
-Subject: [PATCH v2 0/4] omap hsmmc device tree support
-In-Reply-To: <1331564560-23276-1-git-send-email-rnayak@ti.com> (Rajendra
- Nayak's message of "Mon, 12 Mar 2012 20:32:36 +0530")
-References: <1331564560-23276-1-git-send-email-rnayak@ti.com>
-Message-ID: <87pqcfdwi3.fsf@laptop.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 14 Mar 2012 09:44:26 -0600
+Subject: [GIT PULL] imx irq_domain migration
+In-Reply-To: <4F6098C6.7050503@gmail.com>
+References: <20120216154941.GB11758@r65073-Latitude-D630>
+ <4F3D41D2.5090203@gmail.com>
+ <20120314050837.GB21337@S2101-09.ap.freescale.net>
+ <4F6098C6.7050503@gmail.com>
+Message-ID: <CACxGe6tsHWj+bHcg1uEV8x-KE7B8p1Lj-_DL9mysYn1z+Bex3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Mar 12 2012, Rajendra Nayak wrote:
-> The series adds device tree support for OMAP hsmmc
-> driver.
+On Wed, Mar 14, 2012 at 7:10 AM, Rob Herring <robherring2@gmail.com> wrote:
+> On 03/14/2012 12:08 AM, Shawn Guo wrote:
+>> On Thu, Feb 16, 2012 at 11:50:10AM -0600, Rob Herring wrote:
+>>> Shawn,
+>>>
+>>> On 02/16/2012 09:49 AM, Shawn Guo wrote:
+>>>> Hi Rob,
+>>>>
+>>>> Please pull imx irq_domain support below. It's based on Grant's
+>>>> irqdomain/next today with your generic-chip series applied on top
+>>>> of it.
+>>>
+>>> You're asking me to pull changes on top of a branch that I don't even
+>>> have as you've rebased my changes. While it would work I don't think
+>>> this is the right flow. Plus there is not really any reason for iMX
+>>> changes to go thru me.
+>>>
+>>> Either Grant needs to stabilize his branch so you and I can send him
+>>> pull requests or he can pull in our changes and rebase them as he
+>>> rebases. I already asked him to do just that with my 1 patch others are
+>>> dependent on.
+>>>
+>> Hi Grant,
+>>
+>> Would you consider to take this request after you take Rob's
+>> generic_irq one?
 >
-> Changes in V2:
-> -1- Minor fixes based on comments from Grant.
-> -2- Added a seperate compatible for omap3.
-> -3- Added a new binding "ti,needs-special-reset"
-> to handle some mmc modules which need special
-> softreset sequence.
-> -4- Updated board dts files with "status = disable;"
-> for unused mmc modules.
->
-> Rob,
-> I retained your ack on patch 1 despite the additional
-> binding that I added to handle the special softreset
-> sequence. Let me know if you have any issues with it.
->
-> Chris.
-> Patch 1 and Patch 2 apply cleanly on mmc-next and can
-> be taken in from the mmc tree after relevent acks from
-> DT folks.
-> Patch 3 and Patch 4 which update dts files, I plan to
-> push via linux-omap/Tony's tree.
+> You'll need rebase your branch as I did since Grant did.
 
-Thanks, I've pushed patches 1 and 2 to mmc-next for 3.4, with Balaji's
-Tested-by.
+Also, the imx changes should go via the arm-soc tree, not the
+irqdomain/next branch.  irqdomain/next is stable now, so you can use
+it as your base.  Rebase your changes on top of it and ask Arnd or
+Olof to pull the result into an arm-soc branch.
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+g.
