@@ -1,63 +1,31 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 14 Mar 2012 14:30:13 +0800
-Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20120314054116.GD21337@S2101-09.ap.freescale.net>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-2-git-send-email-b29396@freescale.com>
- <20120313172351.97C5E3E053B@localhost>
- <20120314054116.GD21337@S2101-09.ap.freescale.net>
-Message-ID: <20120314063012.GB8494@shlinux2.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 13 Mar 2012 23:30:22 -0700
+Subject: [PATCH v3 07/12] ARM: EXYNOS: add interrupt definitions for
+ EXYNOS5250
+In-Reply-To: <CAOesGMgEg3Pem4ZMCEp341MxSrW7uajZ0wB1YWgQM-k=KSdiXA@mail.gmail.com>
+References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>	<1331652643-12626-8-git-send-email-kgene.kim@samsung.com>
+ <CAOesGMgEg3Pem4ZMCEp341MxSrW7uajZ0wB1YWgQM-k=KSdiXA@mail.gmail.com>
+Message-ID: <4F603AFE.9040303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 01:41:20PM +0800, Shawn Guo wrote:
-> On Tue, Mar 13, 2012 at 11:23:51AM -0600, Grant Likely wrote:
-> ...
-> > > +	apb at 80000000 {
-> > > +		compatible = "simple-bus";
-> > > +		#address-cells = <1>;
-> > > +		#size-cells = <1>;
-> > > +		reg = <0x80000000 0x80000>;
-> > > +		ranges;
-> > > +
-> > > +		apbh at 80000000 {
-> > > +			compatible = "simple-bus";
-> > > +			#address-cells = <1>;
-> > > +			#size-cells = <1>;
-> > > +			reg = <0x80000000 0x3c900>;
-> > > +			ranges;
-> > > +
-> > > +			icoll: interrupt-controller at 80000000 {
-> > > +				compatible = "fsl,imx28-icoll";
-> > > +				interrupt-controller;
-> > > +				#interrupt-cells = <1>;
-> > > +				reg = <0x80000000 0x2000>;
-> > > +			};
-> > > +		};
-> > > +
-> > > +		apbx at 80040000 {
-> > > +			compatible = "simple-bus";
-> > > +			#address-cells = <1>;
-> > > +			#size-cells = <1>;
-> > > +			reg = <0x80040000 0x40000>;
-> > > +			ranges;
-> > > +
-> > > +			uart1: uart at 80074000 {
-> > > +				compatible = "arm,pl011", "arm,primecell";
-> > > +				reg = <0x80074000 0x2000>;
-> > > +				interrupts = <47>;
-> > > +			};
-> > > +		};
-> > 
-> > What is the purpose of the apbh and apbx busses?  Will more device nodes
-> > get added to them later, or does each only contain a single device?
-> > 
-> Since our ultimate goal is to convert mach-mxs over to device tree,
-> I would also suggest we have all the hardware blocks defined in dts
-> from the beginning.
-> 
-Also agree.
-Will add them all in later patches.
+On 03/13/12 20:42, Olof Johansson wrote:
+> Hi
+>
+> On Tue, Mar 13, 2012 at 8:30 AM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>> ARM: EXYNOS: irqs.h for exynos4 and exynos5 - WIP
+>> This patch adds the interrupt definitions for EXYNOS5250 at
+>> <mach/irqs.h>  file. Basically, now it is needed for EXYNOS5250
+>> interrupt and will be updated for single zImage next time.
+>
+> Nit for when you stage the branch: Update the commit message a bit, I think?
+>
+Oops, what's happened :( Let me update it.
 
-Regards
-Dong Aisheng
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
