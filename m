@@ -1,47 +1,79 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 14 Mar 2012 22:28:15 +0100 (CET)
-Subject: [PATCH v5 3/4] clk: introduce the common clock framework
-In-Reply-To: <CAJOA=zMsCuZgmp1Hm0dq=EVoX6Zj62XQVqR=6GzDntSD5HnHzg@mail.gmail.com>
-References: <1330763341-3437-1-git-send-email-mturquette@linaro.org>
- <1330763341-3437-4-git-send-email-mturquette@linaro.org>
- <20120313112447.GA29317@pengutronix.de>
- <CAJOA=zMTY+4dU9VUa-TkEbdE-WJd7V4tCG-af6vgq0CPN6rWpg@mail.gmail.com>
- <20120314084857.GL3852@pengutronix.de>
- <CAJOA=zMsCuZgmp1Hm0dq=EVoX6Zj62XQVqR=6GzDntSD5HnHzg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1203142218320.2466@ionos>
+From: nm@ti.com (Menon, Nishanth)
+Date: Wed, 14 Mar 2012 16:35:17 -0500
+Subject: [PATCH] OMAP3: OPP: Test for IVA subsystem before attempting to
+ add IVA OPP
+In-Reply-To: <874ntqg9yr.fsf@ti.com>
+References: <1331746695-24372-1-git-send-email-mvs@tigris.de>
+ <874ntqg9yr.fsf@ti.com>
+Message-ID: <CAOMWX4eYQvwHfpci1AgLO8kk1yxzB-zruMQQvLXeLnxbfUHFgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Mar 2012, Turquette, Mike wrote:
+On Wed, Mar 14, 2012 at 16:15, Kevin Hilman <khilman@ti.com> wrote:
+> Maximilian Schwerin <mvs@tigris.de> writes:
+>
+>> From: Steve Sakoman <steve@sakoman.com>
+>>
+>> Don't try to add IVA OPPs for OMAP3 versions not containing an IVA
+>> subsystem, as this would make omap_init_opp_table fail.
+>>
+>> Signed-off-by: Steve Sakoman <steve@sakoman.com>
+>> Signed-off-by: Maximilian Schwerin <mvs@tigris.de>
+>
+> Minor: patch subjects for arch/arm/* core code need to have the ARM:
+> prefix also.
+>
+> Also, please run scripts/checkpatch.pl on your patch and fix the
+> warnings.
+>
+>> ---
+>> ?arch/arm/mach-omap2/opp.c | ? ?4 ++++
+>> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+>> index 9262a6b..414f2ec 100644
+>> --- a/arch/arm/mach-omap2/opp.c
+>> +++ b/arch/arm/mach-omap2/opp.c
+>> @@ -62,6 +62,10 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, i);
+>> ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+>> ? ? ? ? ? ? ? }
+>> +
+>> + ? ? ? ? ? ? if ((strcmp(opp_def->hwmod_name,"iva") == 0) && !omap3_has_iva())
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>> +
+>> ? ? ? ? ? ? ? oh = omap_hwmod_lookup(opp_def->hwmod_name);
+>> ? ? ? ? ? ? ? if (!oh || !oh->od) {
+>> ? ? ? ? ? ? ? ? ? ? ? pr_warn("%s: no hwmod or odev for %s, [%d] "
+>
+> Wouldn't the one-liner below do the same thing?
+>
+> Actually, your patch makes it less noisy at boot time, avoiding the
+> pr_warn(), so is probably better.
 
-Could you folks please trim your replies? It's annoying to page down a
-gazillion of lines to find the gist.
+The only issue i have with current patch is that it focusses to solve
+a specific device IVA.
+we could have similar variances if we had SGX/AESS device etc
+registered in the common
+table. a generic solution might be preferable - could we reduce the
+severity of pr_warn to pr_debug and do a continue instead?
 
-> On Wed, Mar 14, 2012 at 1:48 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> Also, do you forsee needing hole in parent_names for any reason other
-> >> than described above?
-> >
-> > I need it only for the case where a some values in the mux are marked as
-> > reserved in the datasheet or we simply do not have the corresponding
-> > clock in our tree (yet). We could also say that NULL pointers are not
-> > allowed in parent arrays, but instead "orphan" or "dummy" should be
-> > used. Then __clk_init should check for NULL pointers to make this clear.
-> 
-> I've added a WARN in __clk_init if any entries in .parent_names are
-> NULL.  I think it best to populate it with "dummy", or maybe a
-> platform-specific name if it helps you during development.
+>
+> Kevin
+>
+> diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+> index 9262a6b..d3d4fa2 100644
+> --- a/arch/arm/mach-omap2/opp.c
+> +++ b/arch/arm/mach-omap2/opp.c
+> @@ -67,7 +67,7 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+> ? ? ? ? ? ? ? ? ? ? ? ?pr_warn("%s: no hwmod or odev for %s, [%d] "
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"cannot add OPPs.\n", __func__,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?opp_def->hwmod_name, i);
+> - ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? ? ? ? ? ? ? ? ? continue;
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?dev = &oh->od->pdev->dev;
 
-There is no guarantee that the selection of a parent can be mapped
-linear to register values.
 
-So the right way to deal with it is to have an array of valid names
-with no holes and NULL pointers allowed and have a mapping from the
-array index to the register value.
-
-That makes the core code robust and allows to handle all corner cases
-including reserved bits, not implemented clocks and weird register
-layouts.
-
-Thanks,
-
-	tglx
+Regards,
+Nishanth Menon
