@@ -1,53 +1,43 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 14 Mar 2012 08:30:35 +0100
-Subject: [PATCH v1 3/5] ARM: imx28evk: add mmc dt support
-In-Reply-To: <4F5F879E.4030407@gmail.com>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-4-git-send-email-b29396@freescale.com>
- <4F5F5C22.1080506@gmail.com>
- <20120313165214.GO26642@pengutronix.de>
- <4F5F879E.4030407@gmail.com>
-Message-ID: <20120314073035.GI18320@game.jcrosoft.org>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 14 Mar 2012 08:43:45 +0100
+Subject: [PATCH v3 00/13] dmaengine: imx-dma: merge dma arch code into
+ dmaengine.
+In-Reply-To: <20120309174411.GI3852@pengutronix.de>
+References: <1331306449-28591-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120309174411.GI3852@pengutronix.de>
+Message-ID: <CACKLOr0XzE0PZk=k5xQQvOA_5dfBk1mYDVyKCep36=3w7ugwWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:45 Tue 13 Mar     , Rob Herring wrote:
-> On 03/13/2012 11:52 AM, Sascha Hauer wrote:
-> > On Tue, Mar 13, 2012 at 09:39:30AM -0500, Rob Herring wrote:
-> >> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
-> >>> From: Dong Aisheng <dong.aisheng@linaro.org>
-> >>>
-> >>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> >>> ---
-> >>>  arch/arm/boot/dts/imx28-evk.dts |   14 ++++++++++++++
-> >>>  arch/arm/boot/dts/imx28.dtsi    |   33 +++++++++++++++++++++++++++++++++
-> >>>  arch/arm/mach-mxs/imx28-dt.c    |    2 ++
-> >>>  3 files changed, 49 insertions(+), 0 deletions(-)
-> >>
-> >> snip
-> >>
-> >>> diff --git a/arch/arm/mach-mxs/imx28-dt.c b/arch/arm/mach-mxs/imx28-dt.c
-> >>> index 78d1129..429b88e 100644
-> >>> --- a/arch/arm/mach-mxs/imx28-dt.c
-> >>> +++ b/arch/arm/mach-mxs/imx28-dt.c
-> >>> @@ -23,6 +23,8 @@ static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
-> >>>  	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
-> >>>  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
-> >>>  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
-> >>> +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP0_BASE_ADDR, "mxs-mmc.0", NULL),
-> >>> +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP1_BASE_ADDR, "mxs-mmc.1", NULL),
-> >>
-> >> Why is this needed?
-> > 
-> > These are needed for the drivers which have still the mxs-mmc.* names
-> > to find their clocks. Alternatively we could also add the appropriate
-> > clocks to the clock file. Don't know if that's better though.
-> 
-> Ah, yes I should have known that... If clk lookup is all that's needed,
-> I'd suggest adding the necessary clk lookups either here or in the clock
-> code. Not much difference, but at least it removes the use of
-> *_BASE_ADDR defines.
-Agreed we do this on AT91
+On 9 March 2012 18:44, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Fri, Mar 09, 2012 at 04:20:36PM +0100, Javier Martin wrote:
+>> The following series have to be applied on top of the following patches:
+>> [PATCH v2 1/2] dmaengine: Add support for MEMCPY for imx-dma.
+>> [PATCH v3 2/2] dmaengine: Add support for multiple descriptors for imx-dma.
+>>
+>> As discussed with Vinod and Sascha, the file 'arch/arm/mach-imx/dma-v1.c'
+>> is deprecated and no new patches are accepted for it.
+>>
+>> This series merges this code into the imx-dma.c dmaengine driver.
+>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+>
 
-Best Regards,
-J.
+Vinod,
+I think with Sascha's ack, this series is ready to be merged. It's
+quite important for us that it makes it for 3.4.
+
+Please, don't forget the following patch too, which is meant to be
+applied on top of this series:
+
+[PATCH] dmaengine: i.MX: Add support for interleaved transfers.
+
+Regards.
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
