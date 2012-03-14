@@ -1,25 +1,40 @@
-From: timur@freescale.com (Timur Tabi)
-Date: Wed, 14 Mar 2012 18:02:44 -0500
-Subject: [PATCH v4] ASoC: add imx-sgtl5000 machine driver working with
- fsl_ssi
-In-Reply-To: <20120314090115.GN3852@pengutronix.de>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
- <20120314090115.GN3852@pengutronix.de>
-Message-ID: <4F612394.4060703@freescale.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 15 Mar 2012 00:04:04 +0100
+Subject: [GIT PULL] ARM: OMAP: i2c, gpio, spi and regulator DTS updates
+In-Reply-To: <20120314225743.GT12083@atomide.com>
+References: <4F5E89B4.4010505@ti.com> <4F6120A5.6050407@ti.com>
+ <20120314225743.GT12083@atomide.com>
+Message-ID: <4F6123E4.5090808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer wrote:
-> What are the next steps here? Now we have fsl_ssi.c and imx-ssi.c, one
-> for dt bindings and the other one for platform bindings and also AC97
-> support. They should probably get merged some day which might be a bit
-> difficult since currently I don't see the platform users moving over
-> to devicetree and the seem to be no AC97 users in powerpc.
+On 3/14/2012 11:57 PM, Tony Lindgren wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [120314 15:52]:
+>> Hi Tony,
+>>
+>> It looks like Chris Ball just queued  the HSMMC DT stuff from
+>> Rajendra, so I can add as well the MMC DTS for OMAP3 and OMAP4 as
+>> well.
+>>
+>> It is fine for an update?
+>
+> Sure, I'm not planning to pull this until after the merge
+> window.
 
-I don't have any problem with adding AC97 support to fsl_ssi.c, assuming
-it's not a huge mess.  I don't know enough about AC97 to know how easy
-that is, though.
+OK, so we will not have the DTS support for the new drivers for 3.4 :-(
 
--- 
-Timur Tabi
-Linux kernel developer at Freescale
+Well, if you pull that in a lo branch, that will be enough to base the 
+further work on it.
+
+>> Than I can add as Kevin's patch for twl irq_base removal.
+>
+> Hmm I don't follow. That's needed first as a fix for the
+> merge window?
+
+No, not that one. It is just some more cleanup on top of the one Felipe 
+already did in the twl series I've just sent to Samuel.
+But if you do not plan to pull that series for 3.4, that does not really 
+matter.
+
+Regards,
+Benoit
