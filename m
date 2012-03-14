@@ -1,57 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Mar 2012 09:48:44 +0000
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <201203140840.18333.sr@denx.de>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <201203131644.12048.arnd@arndb.de> <201203140840.18333.sr@denx.de>
-Message-ID: <201203140948.44823.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer [s.hauer@pengutronix.de] (s.hauer@pengutronix.de))
+Date: Wed, 14 Mar 2012 10:50:50 +0100
+Subject: [PATCH] iomux-mx25.h slew rate adjusted for LCD __LD pins
+In-Reply-To: <3F263ABB4EDE344D974E1983B56807739E868EAB@EX-DAG01.eckelmann.group>
+References: <3F263ABB4EDE344D974E1983B56807739E868EAB@EX-DAG01.eckelmann.group>
+Message-ID: <20120314095050.GP26642@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Stefan Roese wrote:
-
-> > This is very cool, welcome onboard for the DT conversion with spear600!
-> > 
-> > > +static struct amba_device *amba_devs[] __initdata = {
-> > > +	&gpio_device[0],
-> > > +	&gpio_device[1],
-> > > +	&gpio_device[2],
-> > > +	&uart_device[0],
-> > > +	&uart_device[1],
-> > > +};
-> > 
-> > I would suggest you convert these to DT next so you can remove the
-> > amba_devs list. Which devices are these? If they are pl061 and
-> > pl010/pl011, the binding should be really easy to do.
+On Tue, Mar 13, 2012 at 11:35:22AM +0000, Mehnert, Torsten wrote:
+> From: Mehnert <tmehnert@eckelmann.de>
+> Date: Mon, 13 Mar 2012 12:13:51 +0100
+> Subject: [PATCH] iomux-mx25.h slew rate adjusted for LCD __LD pins
 > 
-> Yes. I really wanted to do that. But from a quick look at the pl011 driver 
-> (drivers/tty/serial/amba-pl011.c), this driver doesn't support DT probing. I 
-> might have missed something here though. And ideas?
-
-amba primecell devices don't actually need to register to a "compatible"
-property, they are probed using the primecell ID, and the device tree
-is just used to tell the system about memory and IRQ resources.
-
-The pl061 driver has support for setting the gc.base and irq_base using
-device tree instead of the platform data and that might be enough.
-
-> > Since there is only one upstream board file and that is for the same board,
-> > we can soon collapse all of it into the base platform support.
-> > 
-> > I think you should add all the code from this file to spear6xx.c instead
-> > of adding a new file. We can then delete the spear600.c and spear600_evb.c
-> > files once the DT support has matured.
+> For some reason (sadly i don't identifying the patch right now)
+> two LCD data lines configured PAD_CTL_SRE_SLOW (wrong slew rate)
+> since Kernel 3.1. MX25_PAD_GPIO_E__LD16 and MX25_PAD_GPIO_F__LD17
+> This results in an fauly behaviour and strange color effects.
 > 
-> Sounds like a plan. I'll rework the patch soon.
+> To ensure that all LCD data pins configured with the proper slew rate,
+> this patch changes to IOMUX define of all LCD __LDxx pins to PAD_CTL_SRE_FAST.
+> 
+> This problem may affect other mx25 platforms like mx25pdk. Sadly i can't test
+> it. Of course this problem shouldn't occur when you done your LCD muxing 
+> correctly in the bootloader.
 
-Great!
+Your patch lacks a signed-off-by Tag. Please remember adding it next
+time. For now it should be enough to answer your original mail with
+a
 
-Don't worry about the the gpio and uart devices if they are not in the
-first initial version. I do think that they should be done fairly soon
-though, before we get into most of the other devices.
+Signed-off-by: Torsten Mehnert <T.Mehnert@eckelmann.de>
 
-It's ok if you put a lot of the other devices in the dts file though,
-like the ethernet device, it gives a better overview of what is actually
-there, even if the driver does not actually use it yet.
+Sascha
 
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
