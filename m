@@ -1,324 +1,520 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 07:42:11 -0700
-Subject: [PATCH v4 05/12] ARM: EXYNOS: add support uart for EXYNOS4 and EXYNOS5
+Date: Wed, 14 Mar 2012 07:42:12 -0700
+Subject: [PATCH v4 06/12] ARM: EXYNOS: add support for EXYNOS5250 SoC
 In-Reply-To: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
 References: <1331736138-28964-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1331736138-28964-6-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331736138-28964-7-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Actually, the base address of uart is different between EXYNOS4
-and EXYNOS5 and this patch enables to support uart for EXYNOS4
-and EXYNOS5 SoCs at runtime.
+This patch add support for EXYNOS5250 SoC has two Cortex-A15 cores.
+Since actually, most codes in mach-exynos/ are used commonly for
+EXYNOS4 and EXYNOS5 the EXYNOS5/EXYNOS5250 has been implemented
+in mach-exynos/.
 
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/Makefile                   |    1 +
- arch/arm/mach-exynos/common.c                   |    5 +-
- arch/arm/mach-exynos/dev-uart.c                 |   78 +++++++++++++++++++++++
- arch/arm/mach-exynos/include/mach/debug-macro.S |    9 ++-
- arch/arm/mach-exynos/include/mach/irqs.h        |   12 ++++
- arch/arm/mach-exynos/include/mach/map.h         |   20 +++---
- arch/arm/mach-exynos/include/mach/uncompress.h  |   17 ++++--
- arch/arm/plat-s5p/Kconfig                       |    4 +
- arch/arm/plat-s5p/Makefile                      |    3 +-
- arch/arm/plat-samsung/include/plat/devs.h       |    2 +
- arch/arm/plat-samsung/include/plat/uncompress.h |    2 +
- 11 files changed, 135 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm/mach-exynos/dev-uart.c
+ arch/arm/Makefile                            |    1 +
+ arch/arm/mach-exynos/common.c                |  191 ++++++++++++++++++++++++--
+ arch/arm/mach-exynos/common.h                |   11 ++
+ arch/arm/mach-exynos/include/mach/map.h      |   21 +++-
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |    1 +
+ arch/arm/plat-s5p/Kconfig                    |    4 +-
+ arch/arm/plat-samsung/include/plat/cpu.h     |   10 ++
+ 7 files changed, 223 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 2117f02..f8a3770 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -44,6 +44,7 @@ obj-$(CONFIG_MACH_EXYNOS4_DT)		+= mach-exynos4-dt.o
- 
- # device support
- 
-+obj-y					+= dev-uart.o
- obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
- obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
- obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 1683bfb..a826ffc 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -180,6 +180,7 @@ machine-$(CONFIG_ARCH_S5P64X0)		:= s5p64x0
+ machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
+ machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
+ machine-$(CONFIG_ARCH_EXYNOS4)		:= exynos
++machine-$(CONFIG_ARCH_EXYNOS5)		:= exynos
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+ machine-$(CONFIG_ARCH_SHMOBILE) 	:= shmobile
 diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 02eed29..4a82cf0 100644
+index 4a82cf0..7fdb139 100644
 --- a/arch/arm/mach-exynos/common.c
 +++ b/arch/arm/mach-exynos/common.c
-@@ -477,7 +477,10 @@ static void __init exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no)
- 	for (ucnt = 0; ucnt < no; ucnt++, tcfg++)
- 		tcfg->has_fracval = 1;
+@@ -49,9 +49,12 @@
+ static const char name_exynos4210[] = "EXYNOS4210";
+ static const char name_exynos4212[] = "EXYNOS4212";
+ static const char name_exynos4412[] = "EXYNOS4412";
++static const char name_exynos5250[] = "EXYNOS5250";
  
--	s3c24xx_init_uartdevs("exynos4210-uart", s5p_uart_resources, cfg, no);
-+	if (soc_is_exynos5250())
-+		s3c24xx_init_uartdevs("exynos4210-uart", exynos5_uart_resources, cfg, no);
-+	else
-+		s3c24xx_init_uartdevs("exynos4210-uart", exynos4_uart_resources, cfg, no);
+ static void exynos4_map_io(void);
++static void exynos5_map_io(void);
+ static void exynos4_init_clocks(int xtal);
++static void exynos5_init_clocks(int xtal);
+ static void exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+ static int exynos_init(void);
+ 
+@@ -80,6 +83,14 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.init_uarts	= exynos_init_uarts,
+ 		.init		= exynos_init,
+ 		.name		= name_exynos4412,
++	}, {
++		.idcode		= EXYNOS5250_SOC_ID,
++		.idmask		= EXYNOS5_SOC_MASK,
++		.map_io		= exynos5_map_io,
++		.init_clocks	= exynos5_init_clocks,
++		.init_uarts	= exynos_init_uarts,
++		.init		= exynos_init,
++		.name		= name_exynos5250,
+ 	},
+ };
+ 
+@@ -88,10 +99,14 @@ static struct cpu_table cpu_ids[] __initdata = {
+ static struct map_desc exynos_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S5P_VA_CHIPID,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_CHIPID),
++		.pfn		= __phys_to_pfn(EXYNOS_PA_CHIPID),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+-	}, {
++	},
++};
++
++static struct map_desc exynos4_iodesc[] __initdata = {
++	{
+ 		.virtual	= (unsigned long)S3C_VA_SYS,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSCON),
+ 		.length		= SZ_64K,
+@@ -141,11 +156,7 @@ static struct map_desc exynos_iodesc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_UART),
+ 		.length		= SZ_512K,
+ 		.type		= MT_DEVICE,
+-	},
+-};
+-
+-static struct map_desc exynos4_iodesc[] __initdata = {
+-	{
++	}, {
+ 		.virtual	= (unsigned long)S5P_VA_CMU,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
+ 		.length		= SZ_128K,
+@@ -206,11 +217,80 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
+ 	},
+ };
+ 
++static struct map_desc exynos5_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S3C_VA_SYS,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSCON),
++		.length		= SZ_64K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S3C_VA_TIMER,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_TIMER),
++		.length		= SZ_16K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S3C_VA_WATCHDOG,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_WATCHDOG),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_SROMC,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_SROMC),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSTIMER),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_SYSRAM,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_SYSRAM),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_CMU,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_CMU),
++		.length		= 144 * SZ_1K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_PMU,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_PMU),
++		.length		= SZ_64K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_COMBINER_BASE,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_COMBINER),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S3C_VA_UART,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_UART),
++		.length		= SZ_512K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_CPU),
++		.length		= SZ_64K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
++		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_DIST),
++		.length		= SZ_64K,
++		.type		= MT_DEVICE,
++	},
++};
++
+ void exynos4_restart(char mode, const char *cmd)
+ {
+ 	__raw_writel(0x1, S5P_SWRESET);
  }
  
- static DEFINE_SPINLOCK(eint_lock);
-diff --git a/arch/arm/mach-exynos/dev-uart.c b/arch/arm/mach-exynos/dev-uart.c
-new file mode 100644
-index 0000000..2e85c02
---- /dev/null
-+++ b/arch/arm/mach-exynos/dev-uart.c
-@@ -0,0 +1,78 @@
-+/*
-+ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Base EXYNOS UART resource and device definitions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++void exynos5_restart(char mode, const char *cmd)
++{
++	__raw_writel(0x1, EXYNOS_SWRESET);
++}
 +
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/list.h>
-+#include <linux/ioport.h>
-+#include <linux/platform_device.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/irq.h>
-+#include <mach/hardware.h>
-+#include <mach/map.h>
-+
-+#include <plat/devs.h>
-+
-+#define EXYNOS_UART_RESOURCE(_series, _nr)	\
-+static struct resource exynos##_series##_uart##_nr##_resource[] = {	\
-+	[0] = DEFINE_RES_MEM(EXYNOS##_series##_PA_UART##_nr, EXYNOS##_series##_SZ_UART),	\
-+	[1] = DEFINE_RES_IRQ(EXYNOS##_series##_IRQ_UART##_nr),	\
-+};
-+
-+EXYNOS_UART_RESOURCE(4, 0)
-+EXYNOS_UART_RESOURCE(4, 1)
-+EXYNOS_UART_RESOURCE(4, 2)
-+EXYNOS_UART_RESOURCE(4, 3)
-+
-+struct s3c24xx_uart_resources exynos4_uart_resources[] __initdata = {
-+	[0] = {
-+		.resources	= exynos4_uart0_resource,
-+		.nr_resources	= ARRAY_SIZE(exynos4_uart0_resource),
-+	},
-+	[1] = {
-+		.resources	= exynos4_uart1_resource,
-+		.nr_resources	= ARRAY_SIZE(exynos4_uart1_resource),
-+	},
-+	[2] = {
-+		.resources	= exynos4_uart2_resource,
-+		.nr_resources	= ARRAY_SIZE(exynos4_uart2_resource),
-+	},
-+	[3] = {
-+		.resources	= exynos4_uart3_resource,
-+		.nr_resources	= ARRAY_SIZE(exynos4_uart3_resource),
-+	},
-+};
-+
-+EXYNOS_UART_RESOURCE(5, 0)
-+EXYNOS_UART_RESOURCE(5, 1)
-+EXYNOS_UART_RESOURCE(5, 2)
-+EXYNOS_UART_RESOURCE(5, 3)
-+
-+struct s3c24xx_uart_resources exynos5_uart_resources[] __initdata = {
-+	[0] = {
-+		.resources	= exynos5_uart0_resource,
-+		.nr_resources	= ARRAY_SIZE(exynos5_uart0_resource),
-+	},
-+	[1] = {
-+		.resources	= exynos5_uart1_resource,
-+		.nr_resources	= ARRAY_SIZE(exynos5_uart0_resource),
-+	},
-+	[2] = {
-+		.resources	= exynos5_uart2_resource,
-+		.nr_resources	= ARRAY_SIZE(exynos5_uart2_resource),
-+	},
-+	[3] = {
-+		.resources	= exynos5_uart3_resource,
-+		.nr_resources	= ARRAY_SIZE(exynos5_uart3_resource),
-+	},
-+};
-diff --git a/arch/arm/mach-exynos/include/mach/debug-macro.S b/arch/arm/mach-exynos/include/mach/debug-macro.S
-index 6cacf16..6c857ff 100644
---- a/arch/arm/mach-exynos/include/mach/debug-macro.S
-+++ b/arch/arm/mach-exynos/include/mach/debug-macro.S
-@@ -21,8 +21,13 @@
- 	 */
+ /*
+  * exynos_map_io
+  *
+@@ -261,6 +341,16 @@ static void __init exynos4_map_io(void)
+ 	s5p_hdmi_setname("exynos4-hdmi");
+ }
  
- 	.macro addruart, rp, rv, tmp
--		ldr	\rp, = S3C_PA_UART
--		ldr	\rv, = S3C_VA_UART
-+		mov	\rp, #0x10000000
-+		ldr	\rp, [\rp, #0x0]
-+		and	\rp, \rp, #0xf00000
-+		teq	\rp, #0x500000		@@ EXYNOS5
-+		ldreq	\rp, =EXYNOS5_PA_UART
-+		movne	\rp, #EXYNOS4_PA_UART	@@ EXYNOS4
-+		ldr	\rv, =S3C_VA_UART
- #if CONFIG_DEBUG_S3C_UART != 0
- 		add	\rp, \rp, #(0x10000 * CONFIG_DEBUG_S3C_UART)
- 		add	\rv, \rv, #(0x10000 * CONFIG_DEBUG_S3C_UART)
-diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-index 1d401c9..f78070e 100644
---- a/arch/arm/mach-exynos/include/mach/irqs.h
-+++ b/arch/arm/mach-exynos/include/mach/irqs.h
-@@ -173,4 +173,16 @@
- /* Set the default NR_IRQS */
- #define NR_IRQS			(IRQ_TIMER_BASE + IRQ_TIMER_COUNT)
++static void __init exynos5_map_io(void)
++{
++	iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
++
++	/* The I2C bus controllers are directly compatible with s3c2440 */
++	s3c_i2c0_setname("s3c2440-i2c");
++	s3c_i2c1_setname("s3c2440-i2c");
++	s3c_i2c2_setname("s3c2440-i2c");
++}
++
+ static void __init exynos4_init_clocks(int xtal)
+ {
+ 	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
+@@ -277,6 +367,17 @@ static void __init exynos4_init_clocks(int xtal)
+ 	exynos4_setup_clocks();
+ }
  
-+#define EXYNOS4_IRQ_UART0		IRQ_SPI(52)
-+#define EXYNOS4_IRQ_UART1		IRQ_SPI(53)
-+#define EXYNOS4_IRQ_UART2		IRQ_SPI(54)
-+#define EXYNOS4_IRQ_UART3		IRQ_SPI(55)
-+#define EXYNOS4_IRQ_UART4		IRQ_SPI(56)
++static void __init exynos5_init_clocks(int xtal)
++{
++	printk(KERN_DEBUG "%s: initializing clocks\n", __func__);
 +
-+#define EXYNOS5_IRQ_UART0		IRQ_SPI(51)
-+#define EXYNOS5_IRQ_UART1		IRQ_SPI(52)
-+#define EXYNOS5_IRQ_UART2		IRQ_SPI(53)
-+#define EXYNOS5_IRQ_UART3		IRQ_SPI(54)
-+#define EXYNOS5_IRQ_UART4		IRQ_SPI(55)
++	s3c24xx_register_baseclocks(xtal);
++	s5p_register_clocks(xtal);
 +
- #endif /* __ASM_ARCH_IRQS_H */
++	exynos5_register_clocks();
++	exynos5_setup_clocks();
++}
++
+ #define COMBINER_ENABLE_SET	0x0
+ #define COMBINER_ENABLE_CLEAR	0x4
+ #define COMBINER_INT_STATUS	0xC
+@@ -420,24 +521,59 @@ void __init exynos4_init_irq(void)
+ 	s5p_init_irq(NULL, 0);
+ }
+ 
++void __init exynos5_init_irq(void)
++{
++	int irq;
++
++	gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
++
++	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
++		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
++				COMBINER_IRQ(irq, 0));
++		combiner_cascade_irq(irq, IRQ_SPI(irq));
++	}
++
++	/*
++	 * The parameters of s5p_init_irq() are for VIC init.
++	 * Theses parameters should be NULL and 0 because EXYNOS4
++	 * uses GIC instead of VIC.
++	 */
++	s5p_init_irq(NULL, 0);
++}
++
+ struct bus_type exynos4_subsys = {
+ 	.name		= "exynos4-core",
+ 	.dev_name	= "exynos4-core",
+ };
+ 
++struct bus_type exynos5_subsys = {
++	.name		= "exynos5-core",
++	.dev_name	= "exynos5-core",
++};
++
+ static struct device exynos4_dev = {
+ 	.bus	= &exynos4_subsys,
+ };
+ 
+-static int __init exynos4_core_init(void)
++static struct device exynos5_dev = {
++	.bus	= &exynos5_subsys,
++};
++
++static int __init exynos_core_init(void)
+ {
+-	return subsys_system_register(&exynos4_subsys, NULL);
++	if (soc_is_exynos5250())
++		return subsys_system_register(&exynos5_subsys, NULL);
++	else
++		return subsys_system_register(&exynos4_subsys, NULL);
+ }
+-core_initcall(exynos4_core_init);
++core_initcall(exynos_core_init);
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ static int __init exynos4_l2x0_cache_init(void)
+ {
++	if (soc_is_exynos5250())
++		return 0;
++
+ 	/* TAG, Data Latency Control: 2cycle */
+ 	__raw_writel(0x110, S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL);
+ 
+@@ -457,14 +593,42 @@ static int __init exynos4_l2x0_cache_init(void)
+ 
+ 	return 0;
+ }
+-
+ early_initcall(exynos4_l2x0_cache_init);
+ #endif
+ 
++static int __init exynos5_l2_cache_init(void)
++{
++	unsigned int val;
++
++	if (!soc_is_exynos5250())
++		return 0;
++
++	asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
++		     "bic %0, %0, #(1 << 2)\n"	/* cache disable */
++		     "mcr p15, 0, %0, c1, c0, 0\n"
++		     "mrc p15, 1, %0, c9, c0, 2\n"
++		     : "=r"(val));
++
++	val |= (1 << 9) | (1 << 5) | (2 << 6) | (2 << 0);
++
++	asm volatile("mcr p15, 1, %0, c9, c0, 2\n" : : "r"(val));
++	asm volatile("mrc p15, 0, %0, c1, c0, 0\n"
++		     "orr %0, %0, #(1 << 2)\n"	/* cache enable */
++		     "mcr p15, 0, %0, c1, c0, 0\n"
++		     : : "r"(val));
++
++	return 0;
++}
++early_initcall(exynos5_l2_cache_init);
++
+ static int __init exynos_init(void)
+ {
+ 	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
+-	return device_register(&exynos4_dev);
++
++	if (soc_is_exynos5250())
++		return device_register(&exynos5_dev);
++	else
++		return device_register(&exynos4_dev);
+ }
+ 
+ /* uart registration process */
+@@ -673,6 +837,9 @@ static int __init exynos4_init_irq_eint(void)
+ {
+ 	int irq;
+ 
++	if (soc_is_exynos5250())
++		return 0;
++
+ 	for (irq = 0 ; irq <= 31 ; irq++) {
+ 		irq_set_chip_and_handler(IRQ_EINT(irq), &exynos4_irq_eint,
+ 					 handle_level_irq);
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index b32c6b5..677b546 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -16,7 +16,9 @@ extern struct sys_timer exynos4_timer;
+ 
+ void exynos_init_io(struct map_desc *mach_desc, int size);
+ void exynos4_init_irq(void);
++void exynos5_init_irq(void);
+ void exynos4_restart(char mode, const char *cmd);
++void exynos5_restart(char mode, const char *cmd);
+ 
+ #ifdef CONFIG_ARCH_EXYNOS4
+ void exynos4_register_clocks(void);
+@@ -27,6 +29,15 @@ void exynos4_setup_clocks(void);
+ #define exynos4_setup_clocks()
+ #endif
+ 
++#ifdef CONFIG_ARCH_EXYNOS5
++void exynos5_register_clocks(void);
++void exynos5_setup_clocks(void);
++
++#else
++#define exynos5_register_clocks()
++#define exynos5_setup_clocks()
++#endif
++
+ #ifdef CONFIG_CPU_EXYNOS4210
+ void exynos4210_register_clocks(void);
+ 
 diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 2ad4e9c..ea513c6 100644
+index ea513c6..bf90bb0 100644
 --- a/arch/arm/mach-exynos/include/mach/map.h
 +++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -153,7 +153,6 @@
- #define S3C_PA_IIC7			EXYNOS4_PA_IIC(7)
- #define S3C_PA_RTC			EXYNOS4_PA_RTC
- #define S3C_PA_WDT			EXYNOS4_PA_WATCHDOG
--#define S3C_PA_UART			EXYNOS4_PA_UART
- #define S3C_PA_SPI0			EXYNOS4_PA_SPI0
- #define S3C_PA_SPI1			EXYNOS4_PA_SPI1
- #define S3C_PA_SPI2			EXYNOS4_PA_SPI2
-@@ -182,15 +181,18 @@
+@@ -25,6 +25,7 @@
  
- /* Compatibility UART */
+ #define EXYNOS4_PA_SYSRAM0		0x02025000
+ #define EXYNOS4_PA_SYSRAM1		0x02020000
++#define EXYNOS5_PA_SYSRAM		0x02020000
  
--#define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
-+#define EXYNOS4_PA_UART0		0x13800000
-+#define EXYNOS4_PA_UART1		0x13810000
-+#define EXYNOS4_PA_UART2		0x13820000
-+#define EXYNOS4_PA_UART3		0x13830000
-+#define EXYNOS4_SZ_UART			SZ_256
+ #define EXYNOS4_PA_FIMC0		0x11800000
+ #define EXYNOS4_PA_FIMC1		0x11810000
+@@ -44,14 +45,23 @@
+ #define EXYNOS4_PA_ONENAND		0x0C000000
+ #define EXYNOS4_PA_ONENAND_DMA		0x0C600000
  
--#define S5P_PA_UART(x)			(EXYNOS4_PA_UART + ((x) * S3C_UART_OFFSET))
--#define S5P_PA_UART0			S5P_PA_UART(0)
--#define S5P_PA_UART1			S5P_PA_UART(1)
--#define S5P_PA_UART2			S5P_PA_UART(2)
--#define S5P_PA_UART3			S5P_PA_UART(3)
--#define S5P_PA_UART4			S5P_PA_UART(4)
-+#define EXYNOS5_PA_UART0		0x12C00000
-+#define EXYNOS5_PA_UART1		0x12C10000
-+#define EXYNOS5_PA_UART2		0x12C20000
-+#define EXYNOS5_PA_UART3		0x12C30000
-+#define EXYNOS5_SZ_UART			SZ_256
+-#define EXYNOS4_PA_CHIPID		0x10000000
++#define EXYNOS_PA_CHIPID		0x10000000
  
--#define S5P_SZ_UART			SZ_256
-+#define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
- 
- #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
-index 21d97bc..493f4f3 100644
---- a/arch/arm/mach-exynos/include/mach/uncompress.h
-+++ b/arch/arm/mach-exynos/include/mach/uncompress.h
-@@ -1,9 +1,8 @@
--/* linux/arch/arm/mach-exynos4/include/mach/uncompress.h
-- *
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-+/*
-+ * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-  *
-- * EXYNOS4 - uncompress code
-+ * EXYNOS - uncompress code
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -13,12 +12,20 @@
- #ifndef __ASM_ARCH_UNCOMPRESS_H
- #define __ASM_ARCH_UNCOMPRESS_H __FILE__
- 
-+#include <asm/mach-types.h>
+ #define EXYNOS4_PA_SYSCON		0x10010000
++#define EXYNOS5_PA_SYSCON		0x10050100
 +
- #include <mach/map.h>
+ #define EXYNOS4_PA_PMU			0x10020000
++#define EXYNOS5_PA_PMU			0x10040000
 +
-+volatile u8 *uart_base;
+ #define EXYNOS4_PA_CMU			0x10030000
++#define EXYNOS5_PA_CMU			0x10010000
+ 
+ #define EXYNOS4_PA_SYSTIMER		0x10050000
++#define EXYNOS5_PA_SYSTIMER		0x101C0000
 +
- #include <plat/uncompress.h>
+ #define EXYNOS4_PA_WATCHDOG		0x10060000
++#define EXYNOS5_PA_WATCHDOG		0x101D0000
++
+ #define EXYNOS4_PA_RTC			0x10070000
  
- static void arch_detect_cpu(void)
- {
--	/* we do not need to do any cpu detection here at the moment. */
-+	if (machine_is_smdk5250())
-+		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
-+	else
-+		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
+ #define EXYNOS4_PA_KEYPAD		0x100A0000
+@@ -59,9 +69,12 @@
+ #define EXYNOS4_PA_DMC0			0x10400000
  
- 	/*
- 	 * For preventing FIFO overrun or infinite loop of UART console,
+ #define EXYNOS4_PA_COMBINER		0x10440000
++#define EXYNOS5_PA_COMBINER		0x10440000
+ 
+ #define EXYNOS4_PA_GIC_CPU		0x10480000
+ #define EXYNOS4_PA_GIC_DIST		0x10490000
++#define EXYNOS5_PA_GIC_CPU		0x10480000
++#define EXYNOS5_PA_GIC_DIST		0x10490000
+ 
+ #define EXYNOS4_PA_COREPERI		0x10500000
+ #define EXYNOS4_PA_TWD			0x10500600
+@@ -92,7 +105,6 @@
+ #define EXYNOS4_PA_SPI1			0x13930000
+ #define EXYNOS4_PA_SPI2			0x13940000
+ 
+-
+ #define EXYNOS4_PA_GPIO1		0x11400000
+ #define EXYNOS4_PA_GPIO2		0x11000000
+ #define EXYNOS4_PA_GPIO3		0x03860000
+@@ -110,6 +122,7 @@
+ #define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
+ 
+ #define EXYNOS4_PA_SROMC		0x12570000
++#define EXYNOS5_PA_SROMC		0x12250000
+ 
+ #define EXYNOS4_PA_EHCI			0x12580000
+ #define EXYNOS4_PA_OHCI			0x12590000
+@@ -117,6 +130,7 @@
+ #define EXYNOS4_PA_MFC			0x13400000
+ 
+ #define EXYNOS4_PA_UART			0x13800000
++#define EXYNOS5_PA_UART			0x12C00000
+ 
+ #define EXYNOS4_PA_VP			0x12C00000
+ #define EXYNOS4_PA_MIXER		0x12C10000
+@@ -125,6 +139,7 @@
+ #define EXYNOS4_PA_IIC_HDMIPHY		0x138E0000
+ 
+ #define EXYNOS4_PA_IIC(x)		(0x13860000 + ((x) * 0x10000))
++#define EXYNOS5_PA_IIC(x)		(0x12C60000 + ((x) * 0x10000))
+ 
+ #define EXYNOS4_PA_ADC			0x13910000
+ #define EXYNOS4_PA_ADC1			0x13911000
+@@ -134,8 +149,10 @@
+ #define EXYNOS4_PA_SPDIF		0x139B0000
+ 
+ #define EXYNOS4_PA_TIMER		0x139D0000
++#define EXYNOS5_PA_TIMER		0x12DD0000
+ 
+ #define EXYNOS4_PA_SDRAM		0x40000000
++#define EXYNOS5_PA_SDRAM		0x40000000
+ 
+ /* Compatibiltiy Defines */
+ 
+diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+index 4fff8e9..4c53f38 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+@@ -31,6 +31,7 @@
+ #define S5P_USE_STANDBYWFE_ISP_ARM		(1 << 26)
+ 
+ #define S5P_SWRESET				S5P_PMUREG(0x0400)
++#define EXYNOS_SWRESET				S5P_PMUREG(0x0400)
+ 
+ #define S5P_WAKEUP_STAT				S5P_PMUREG(0x0600)
+ #define S5P_EINT_WAKEUP_MASK			S5P_PMUREG(0x0604)
 diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 8167ce6..10e235cc7 100644
+index 10e235cc7..88795ea 100644
 --- a/arch/arm/plat-s5p/Kconfig
 +++ b/arch/arm/plat-s5p/Kconfig
-@@ -40,6 +40,10 @@ config S5P_HRT
- 	help
- 	  Use the High Resolution timer support
- 
-+config S5P_DEV_UART
-+	def_bool y
-+	depends on (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210)
-+
- config S5P_PM
+@@ -9,8 +9,8 @@ config PLAT_S5P
  	bool
- 	help
-diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
-index 30d8c30..4bd8241 100644
---- a/arch/arm/plat-s5p/Makefile
-+++ b/arch/arm/plat-s5p/Makefile
-@@ -12,7 +12,6 @@ obj-				:=
+ 	depends on (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS)
+ 	default y
+-	select ARM_VIC if !ARCH_EXYNOS4
+-	select ARM_GIC if ARCH_EXYNOS4
++	select ARM_VIC if !ARCH_EXYNOS
++	select ARM_GIC if ARCH_EXYNOS
+ 	select GIC_NON_BANKED if ARCH_EXYNOS4
+ 	select NO_IOPORT
+ 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 73cb3cf..787ceac 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -42,6 +42,9 @@ extern unsigned long samsung_cpu_id;
+ #define EXYNOS4412_CPU_ID	0xE4412200
+ #define EXYNOS4_CPU_MASK	0xFFFE0000
  
- # Core files
- 
--obj-y				+= dev-uart.o
- obj-y				+= clock.o
- obj-y				+= irq.o
- obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
-@@ -23,5 +22,7 @@ obj-$(CONFIG_S5P_SLEEP)		+= sleep.o
- obj-$(CONFIG_S5P_HRT) 		+= s5p-time.o
- 
- # devices
++#define EXYNOS5250_SOC_ID	0x43520000
++#define EXYNOS5_SOC_MASK	0xFFFFF000
 +
-+obj-$(CONFIG_S5P_DEV_UART)	+= dev-uart.o
- obj-$(CONFIG_S5P_DEV_MFC)	+= dev-mfc.o
- obj-$(CONFIG_S5P_SETUP_MIPIPHY)	+= setup-mipiphy.o
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 4214ea0..32cc67e 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -26,6 +26,8 @@ struct s3c24xx_uart_resources {
- extern struct s3c24xx_uart_resources s3c2410_uart_resources[];
- extern struct s3c24xx_uart_resources s3c64xx_uart_resources[];
- extern struct s3c24xx_uart_resources s5p_uart_resources[];
-+extern struct s3c24xx_uart_resources exynos4_uart_resources[];
-+extern struct s3c24xx_uart_resources exynos5_uart_resources[];
+ #define IS_SAMSUNG_CPU(name, id, mask)		\
+ static inline int is_samsung_##name(void)	\
+ {						\
+@@ -58,6 +61,7 @@ IS_SAMSUNG_CPU(s5pv210, S5PV210_CPU_ID, S5PV210_CPU_MASK)
+ IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
+ IS_SAMSUNG_CPU(exynos4212, EXYNOS4212_CPU_ID, EXYNOS4_CPU_MASK)
+ IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
++IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
  
- extern struct platform_device *s3c24xx_uart_devs[];
- extern struct platform_device *s3c24xx_uart_src[];
-diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
-index ee48e12..7e068d1 100644
---- a/arch/arm/plat-samsung/include/plat/uncompress.h
-+++ b/arch/arm/plat-samsung/include/plat/uncompress.h
-@@ -37,7 +37,9 @@ static void arch_detect_cpu(void);
- /* how many bytes we allow into the FIFO at a time in FIFO mode */
- #define FIFO_MAX	 (14)
+ #if defined(CONFIG_CPU_S3C2410) || defined(CONFIG_CPU_S3C2412) || \
+     defined(CONFIG_CPU_S3C2416) || defined(CONFIG_CPU_S3C2440) || \
+@@ -120,6 +124,12 @@ IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
+ #define EXYNOS4210_REV_1_0	(0x10)
+ #define EXYNOS4210_REV_1_1	(0x11)
  
-+#ifdef S3C_PA_UART
- #define uart_base S3C_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT)
++#if defined(CONFIG_SOC_EXYNOS5250)
++# define soc_is_exynos5250()	is_samsung_exynos5250()
++#else
++# define soc_is_exynos5250()	0
 +#endif
++
+ #define IODESC_ENT(x) { (unsigned long)S3C24XX_VA_##x, __phys_to_pfn(S3C24XX_PA_##x), S3C24XX_SZ_##x, MT_DEVICE }
  
- static __inline__ void
- uart_wr(unsigned int reg, unsigned int val)
+ #ifndef MHZ
 -- 
 1.7.4.4
