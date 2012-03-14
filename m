@@ -1,30 +1,39 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 14 Mar 2012 18:37:46 +0800
-Subject: [GIT PULL][for 3.4] pull request from fixes-non-critical branch in
- arch-pxa git
-Message-ID: <CAN1soZy5LR2vFF4BNgiuUcWubCdt1+a+nEwVM24WavOR8oJRkA@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 14 Mar 2012 15:32:42 +0530
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203140958.27289.arnd@arndb.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203131644.12048.arnd@arndb.de> <4F604400.1040805@st.com>
+ <201203140958.27289.arnd@arndb.de>
+Message-ID: <4F606CC2.9000402@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On 3/14/2012 3:28 PM, Arnd Bergmann wrote:
+> No problem, we are all learning things as we are working on them.
+> 
+> The idea with DT is that you no longer need any board files because all of
+> the information in those files is now passed as a data structure to the kernel
+> at boot time. Platforms that are fully converted to DT don't have any
+> board files but just have one DT_MACHINE_START entry for all of them in
+> the common platform files. Since spear600 has very little board specific
+> contents at the moment, it is very easy to get to this point now, and
+> that will actually help support other boards without having to do more
+> patches to add board files.
+> 
+> When this work is completed, we might actually be able to extend the
+> spear6xx DT code to also support spear3xx and spear13xx, renaming it
+> to mach-spear. In that case, we would probably need one DT_MACHINE_START
+> entry for each family and would not be able to actually build 13xx together
+> with the other ones, but I guess a lot of the infrastructure could be shared.
+> 
+> I would suggest you read Documentation/devicetree/booting-without-of.txt
+> to get a better understanding of what this is all about.
 
-Please help to pull commits from fixes-non-critical branch in arch-pxa git tree.
+You pointed exactly to the doubt i had.
+That was very helpful. I really appreciate it.
 
-The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
+Thanks a lot.
 
-  Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
-
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git fixes-non-critical
-
-Haojian Zhuang (1):
-      MAINTAINERS: update MAINTAINERS email entry
-
-Philipp Zabel (1):
-      MAINTAINERS: update maintainer entry for pxa/hx4700
-
- MAINTAINERS |    7 +++++--
- 1 files changed, 5 insertions(+), 2 deletions(-)
-
-Thanks
-Haojian
+-- 
+viresh
