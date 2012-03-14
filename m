@@ -1,28 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Mar 2012 20:57:28 -0700
-Subject: [PATCH v3 00/12] ARM: EXYNOS: add support new EXYNOS5250
-In-Reply-To: <201203131622.09048.arnd@arndb.de>
-References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
- <201203131622.09048.arnd@arndb.de>
-Message-ID: <20120314035728.GC2531@quad.lixom.net>
+Date: Tue, 13 Mar 2012 21:08:44 -0700
+Subject: [GIT PULL] mach/io.h cleanup fixes
+In-Reply-To: <4F6003AB.2030005@gmail.com>
+References: <4F6003AB.2030005@gmail.com>
+Message-ID: <CAOesGMg-ybrAEDYZZEx20BZCcuH5pygUEMtOOD1YETkE66BgGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 04:22:08PM +0000, Arnd Bergmann wrote:
-> On Tuesday 13 March 2012, Kukjin Kim wrote:
-> > 
-> > This patch adds support EXYNOS5250 SoC which has two A15 cores
-> > can be used on mobile and tablet devices.
-> 
-> Looks basically ok to me. I've commented on patches 5 and 9 and
-> in both cases, I would either like to see the patch get dropped
-> or the changeset description expanded to give a good explanation
-> why the change is actually needed.
+Hi,
 
-Agree, looks quite reasonable. I had a few nits as well but nothing
-major.
+On Tue, Mar 13, 2012 at 7:34 PM, Rob Herring <robherring2@gmail.com> wrote:
+> Arnd, Olof,
+>
+> Please pull these fixes for mach/io.h cleanup series. They apply on top
+> of my previous pull request.
+>
+> Cheers,
+> Rob
+>
+> The following changes since commit 5621caac1d9514b568f986b55ce5494b1d119d40:
+>
+> ?ARM: kill off __mem_pci (2012-03-06 21:34:45 -0600)
+>
+> are available in the git repository at:
+> ?git://sources.calxeda.com/kernel/linux.git io-cleanup-for-3.4
 
+Pulled into next/cleanup2. It had a couple of new conflicts, please
+double check arm-soc for-next but they should be alright.
 
-Thanks,
 
 -Olof
