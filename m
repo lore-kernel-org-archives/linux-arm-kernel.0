@@ -1,35 +1,23 @@
-From: B29397@freescale.com (Chen Peter-B29397)
-Date: Wed, 14 Mar 2012 03:30:26 +0000
-Subject: Want to Get Suggestion for MX28 USB Submisson
-In-Reply-To: <CAOMZO5C3Y3kP5k_CKkCVMVdDem2T82g6F3uL=8GCVfNKHpdymA@mail.gmail.com>
-References: <35AB98346D25394A9354ED89C4D76587225CFF@039-SN1MPN1-002.039d.mgd.msft.net>
- <201202041117.48190.marek.vasut@gmail.com>
- <F281D0F91ED19E4D8E63A7504E8A6498033336@039-SN2MPN1-021.039d.mgd.msft.net>
- <201202100447.14248.marek.vasut@gmail.com>
- <CAOMZO5C3Y3kP5k_CKkCVMVdDem2T82g6F3uL=8GCVfNKHpdymA@mail.gmail.com>
-Message-ID: <F281D0F91ED19E4D8E63A7504E8A6498093839@039-SN2MPN1-021.039d.mgd.msft.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Mar 2012 20:42:46 -0700
+Subject: [PATCH v3 07/12] ARM: EXYNOS: add interrupt definitions for
+ EXYNOS5250
+In-Reply-To: <1331652643-12626-8-git-send-email-kgene.kim@samsung.com>
+References: <1331652643-12626-1-git-send-email-kgene.kim@samsung.com>
+ <1331652643-12626-8-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CAOesGMgEg3Pem4ZMCEp341MxSrW7uajZ0wB1YWgQM-k=KSdiXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> 
-> Hi Peter,
-> 
-> On Fri, Feb 10, 2012 at 1:47 AM, Marek Vasut <marek.vasut@gmail.com>
-> wrote:
-> 
-> > Oh, so you're still working on it. All right then, I'll now dive into
-> the IIO
-> > LRADC driver and let you handle this.
-> 
-> Do you plan to re-submit the mxs usb driver?
-> 
-According to sascha's suggestion, it is better to re-submit after we have
-a generic USB PHY Layer in mainline.
+Hi
 
-Currently, Heikki's split PHY from OTG structure patches have mainlined, 
-next step is to submit a generic USB PHY driver.
+On Tue, Mar 13, 2012 at 8:30 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> ARM: EXYNOS: irqs.h for exynos4 and exynos5 - WIP
+> This patch adds the interrupt definitions for EXYNOS5250 at
+> <mach/irqs.h> file. Basically, now it is needed for EXYNOS5250
+> interrupt and will be updated for single zImage next time.
 
-> Regards,
-> 
-> Fabio Estevam
+Nit for when you stage the branch: Update the commit message a bit, I think?
+
+
+-Olof
