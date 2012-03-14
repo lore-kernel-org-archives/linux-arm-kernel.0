@@ -1,43 +1,41 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 14 Mar 2012 18:30:24 +0800
-Subject: [GIT PULL][for v3.4] pull request from board-specific branch in
- arch-pxa
-Message-ID: <CAN1soZyWmrzQzr0VHtrixdr2myv4ggJ1YBcS8OnuLJLOn2uVEQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 14 Mar 2012 10:33:52 +0000
+Subject: [PATCH v3 0/5] ARM: Initial support for Cortex-M3
+In-Reply-To: <20120314101928.GA29474@pengutronix.de>
+References: <20120314101928.GA29474@pengutronix.de>
+Message-ID: <20120314103352.GA20899@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On Wed, Mar 14, 2012 at 10:19:28AM +0000, Uwe Kleine-K?nig wrote:
+> this is the result of reworking Catalin's exception handling patch to
+> stick to the current pt_regs layout. I extended it by two words to save
+> the exception return value. (The 2nd word is unused and only to maintain
+> stack alignment.)
+> 
+> Other than that only minor cleanups were done (some of them were
+> suggested by Catalin in reply to my v2 series).
+> 
+> These patches are available at
+> 
+> 	git://git.pengutronix.de/git/ukl/linux.git cortexm3-for-rmk
+> 
+> basing on 3.3-rc7. There are some bits missing to allow a Cortex-M3 to
+> boot. They are contained in the branch efm32 in the same repository
+> together with support for the efm32 SoC if you're interested.
+> The most important parts missing (apart from SoC specific stuff) are
+> interrupt support and Makefile/Kconfig glue.
+> 
+> I'd be happy if these patches made it into 3.4-rc1.
 
-First, please help to _revert_ one commit 43de6a7dda6e9a7345e2 on
-arnd/pxa/board branch of arm-soc.git first. Since this commit is
-duplicated, and it's already merged into v3.3-rc7. I'm sorry on
-inconvenience.
+That's pretty ambitious. Most maintainers (including Russell) closed
+their trees by now. You can still aim for 3.5-rc1 and ideally have them
+in -next a few weeks before (though only once Russell is fine with the
+patches).
 
-commit 43de6a7dda6e9a7345e218e688f2092f991126f0
-Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-Date:   Tue Feb 28 10:57:48 2012 +0800
+> Any constructive feedback welcome.
 
-    ARM: pxa: add dummy clock for pxa25x and pxa27x
+I'll go through the patches sometime next week.
 
-
-Second, please help to pull these commits from arch-pxa git tree.
-
-The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
-
-  Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
-
-are available in the git repository at:
-  git://github.com/hzhuang1/linux.git board-specific
-
-Paul Parsons (3):
-      ARM: pxa/hx4700: Remove unwanted request for GPIO105
-      ARM: pxa/hx4700: Reduce sleep mode battery discharge by 35%
-      pxa/hx4700: Remove pcmcia platform_device structure
-
- arch/arm/mach-pxa/hx4700.c                  |   17 ++---------------
- arch/arm/mach-pxa/include/mach/mfp-pxa27x.h |    2 ++
- 2 files changed, 4 insertions(+), 15 deletions(-)
-
-
-Best Regards
-Haojian
+-- 
+Catalin
