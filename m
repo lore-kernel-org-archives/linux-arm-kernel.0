@@ -1,193 +1,58 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Thu, 15 Mar 2012 07:43:10 +1100
-Subject: [PATCH v3 6/6] mfd: mc13xxx: Add i2c driver
-In-Reply-To: <1331757790-10583-1-git-send-email-marc@cpdesign.com.au>
-References: <1331757790-10583-1-git-send-email-marc@cpdesign.com.au>
-Message-ID: <1331757790-10583-7-git-send-email-marc@cpdesign.com.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Mar 2012 21:40:54 +0000
+Subject: [PATCH v3 2/5] ARM: Add a printk loglevel modifier
+In-Reply-To: <20120314200630.GB2391@pengutronix.de>
+References: <20120314101928.GA29474@pengutronix.de>
+ <201203141312.51547.arnd@arndb.de> <20120314200630.GB2391@pengutronix.de>
+Message-ID: <201203142140.55052.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for mc13xxx family ICs connected via i2c.
+On Wednesday 14 March 2012, Uwe Kleine-K?nig wrote:
+> I don't get your reasoning here.
+> 
+> An (independant) printk (that is expected to start at a new line) must
+> start with KERN_SOMETHING iff the previous printk always ends in \n?
+> Probably not. 
+> 
+> Independently of the correctness of the first patch that splits the
+> printk I'm just taking it as an example:
+> 
+> In this case the two printks in question are:
+> 
+>                 printk("CPU: %s [%08x] revision %d (ARMv%s)", ...);
+>         #ifdef CONFIG_CPU_CP15
+>                 printk(KERN_CONT ", cr=%08lx\n", cr_alignment);
+>         #endif
+> 
+> and
+> 
+>                 printk("CPU: %s data cache, %s instruction cache\n", ...)
+> 
+> In this case it's correct to add KERN_INFO to the last printk, isn't it?
+> When would you consider it to be wrong?
 
-Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
----
- drivers/mfd/Kconfig       |    8 +++-
- drivers/mfd/Makefile      |    1 +
- drivers/mfd/mc13xxx-i2c.c |  128 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 136 insertions(+), 1 deletions(-)
- create mode 100644 drivers/mfd/mc13xxx-i2c.c
+I forgot about KERN_CONT, which did not exist until a few years ago
+and is still not all that common. Initially, KERN_CONT was just an
+empty string that was used to make it clear when a printk was
+intentionally used as a continuation of the previous line, rather
+than having no KERN_* at all.
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 501fee5..3a039ff 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -573,7 +573,7 @@ config MFD_MC13783
- 
- config MFD_MC13XXX
- 	tristate "Support Freescale MC13783 and MC13892"
--	depends on SPI_MASTER
-+	depends on SPI_MASTER || I2C
- 	select MFD_CORE
- 	select MFD_MC13783
- 	help
-@@ -590,6 +590,12 @@ config MFD_MC13XXX_SPI
- 	help
- 	  Select this if your MC13xxx is connected via an SPI bus.
- 
-+config MFD_MC13XXX_I2C
-+	tristate "MC13xxx I2C interface" if I2C
-+	default I2C
-+	help
-+	  Select this if your MC13xxx is connected via an I2C bus.
-+
- endif
- 
- config ABX500_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 2dc66ed..6d4566f 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_TWL6040_CORE)	+= twl6040-core.o twl6040-irq.o
- 
- obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
- obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
-+obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
- 
- obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
- 
-diff --git a/drivers/mfd/mc13xxx-i2c.c b/drivers/mfd/mc13xxx-i2c.c
-new file mode 100644
-index 0000000..1fb89af
---- /dev/null
-+++ b/drivers/mfd/mc13xxx-i2c.c
-@@ -0,0 +1,128 @@
-+/*
-+ * Copyright 2009-2010 Creative Product Design
-+ * Marc Reilly marc at cpdesign.com.au
-+ *
-+ * This program is free software; you can redistribute it and/or modify it under
-+ * the terms of the GNU General Public License version 2 as published by the
-+ * Free Software Foundation.
-+ */
-+
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/mutex.h>
-+#include <linux/mfd/core.h>
-+#include <linux/mfd/mc13xxx.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/i2c.h>
-+#include <linux/err.h>
-+
-+#include "mc13xxx.h"
-+
-+static const struct i2c_device_id mc13xxx_i2c_device_id[] = {
-+	{
-+		.name = "mc13783",
-+		.driver_data = MC13XXX_ID_MC13783
-+	}, {
-+		.name = "mc13892",
-+		.driver_data = MC13XXX_ID_MC13892,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(i2c, mc13xxx_i2c_device_id);
-+
-+static const struct of_device_id mc13xxx_dt_ids[] = {
-+	{ .compatible = "fsl,mc13783", .data = (void *) MC13XXX_ID_MC13783, },
-+	{ .compatible = "fsl,mc13892", .data = (void *) MC13XXX_ID_MC13892, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mc13xxx_dt_ids);
-+
-+static struct regmap_config mc13xxx_regmap_i2c_config = {
-+	.reg_bits = 8,
-+	.val_bits = 24,
-+
-+	.max_register = MC13XXX_NUMREGS,
-+
-+	.cache_type = REGCACHE_NONE,
-+};
-+
-+static int mc13xxx_i2c_probe(struct i2c_client *client,
-+		const struct i2c_device_id *id)
-+{
-+	const struct of_device_id *of_id;
-+	struct i2c_driver *idrv = to_i2c_driver(client->dev.driver);
-+	struct mc13xxx *mc13xxx;
-+	struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
-+	int ret;
-+
-+	of_id = of_match_device(mc13xxx_dt_ids, &client->dev);
-+	if (of_id)
-+		idrv->id_table =
-+			&mc13xxx_i2c_device_id[(enum mc13xxx_id) of_id->data];
-+
-+	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
-+	if (!mc13xxx)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(&client->dev, mc13xxx);
-+
-+	mc13xxx->dev = &client->dev;
-+	mutex_init(&mc13xxx->lock);
-+
-+	mc13xxx->regmap = regmap_init_i2c(client, &mc13xxx_regmap_i2c_config);
-+	if (IS_ERR(mc13xxx->regmap)) {
-+		ret = PTR_ERR(mc13xxx->regmap);
-+		dev_err(mc13xxx->dev, "Failed to initialize register map: %d\n",
-+				ret);
-+		dev_set_drvdata(&client->dev, NULL);
-+		return ret;
-+	}
-+
-+	ret = mc13xxx_common_init(mc13xxx, pdata, client->irq);
-+
-+	if (ret == 0 && (id->driver_data != mc13xxx->ictype))
-+		dev_warn(mc13xxx->dev,
-+				"device id doesn't match auto detection!\n");
-+
-+	return ret;
-+}
-+
-+static int __devexit mc13xxx_i2c_remove(struct i2c_client *client)
-+{
-+	struct mc13xxx *mc13xxx = dev_get_drvdata(&client->dev);
-+
-+	mc13xxx_common_cleanup(mc13xxx);
-+
-+	return 0;
-+}
-+
-+static struct i2c_driver mc13xxx_i2c_driver = {
-+	.id_table = mc13xxx_i2c_device_id,
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "mc13xxx",
-+		.of_match_table = mc13xxx_dt_ids,
-+	},
-+	.probe = mc13xxx_i2c_probe,
-+	.remove = __devexit_p(mc13xxx_i2c_remove),
-+};
-+
-+static int __init mc13xxx_i2c_init(void)
-+{
-+	return i2c_add_driver(&mc13xxx_i2c_driver);
-+}
-+subsys_initcall(mc13xxx_i2c_init);
-+
-+static void __exit mc13xxx_i2c_exit(void)
-+{
-+	i2c_del_driver(&mc13xxx_i2c_driver);
-+}
-+module_exit(mc13xxx_i2c_exit);
-+
-+MODULE_DESCRIPTION("i2c driver for Freescale MC13XXX PMIC");
-+MODULE_AUTHOR("Marc Reilly <marc@cpdesign.com.au");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.3.4
+In the example above, the first and the second line should get a KERN_INFO
+or one of the others.
+
+> If you want to have the first group of printks to always end in \n, I'd
+> have to do:
+> 
+>                 printk("CPU: %s [%08x] revision %d (ARMv%s)", ...);
+>         #ifdef CONFIG_CPU_CP15
+>                 printk(KERN_CONT ", cr=%08lx", cr_alignment);
+>         #endif
+>                 printk(KERN_CONT "\n");
+> 
+> but ISTR Linus (Torvalds) telling me that KERN_CONT "\n" is wrong and
+> should just be skipped.
+
+Ok, didn't know that.
+
+	Arnd
