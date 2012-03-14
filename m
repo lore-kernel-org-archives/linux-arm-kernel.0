@@ -1,65 +1,93 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 14 Mar 2012 13:05:05 +0000
-Subject: [PATCH 09/10] ARM: ux500: Enable PL310 Level 2 Cache Controller in
- Device Tree
+Date: Wed, 14 Mar 2012 13:05:06 +0000
+Subject: [PATCH 10/10] ARM: ux500: Enable PL022 SSP Controller in Device Tree
 In-Reply-To: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
 References: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1331730306-11461-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1331730306-11461-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This provides PL310 Level 2 Cache Controller Device Tree
-support for all u8500 based devices.
+This SSP Controller supports a number of serial communication methods.
+
+Namely:
+
+/**
+ * enum ssp_interface - interfaces allowed for this SSP Controller
+ * @SSP_INTERFACE_MOTOROLA_SPI: Motorola Interface
+ * @SSP_INTERFACE_TI_SYNC_SERIAL: Texas Instrument Synchronous Serial
+ * interface
+ * @SSP_INTERFACE_NATIONAL_MICROWIRE: National Semiconductor Microwire
+ * interface
+ * @SSP_INTERFACE_UNIDIRECTIONAL: Unidirectional interface (STn8810
+ * &STn8815 only)
+ */
+
+... and as such cannot be registered using of_register_spi_devices.
+Instead it can be registered simply as a primecell device.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/db8500.dtsi    |    8 ++++++++
- arch/arm/mach-ux500/cache-l2x0.c |    7 ++++++-
- 2 files changed, 14 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/db8500.dtsi      |    5 ++++-
+ arch/arm/mach-ux500/board-mop500.c |    6 +++---
+ 2 files changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
-index 9b5e06e..6ae7f69 100644
+index 6ae7f69..a9866a3 100644
 --- a/arch/arm/boot/dts/db8500.dtsi
 +++ b/arch/arm/boot/dts/db8500.dtsi
-@@ -29,6 +29,14 @@
- 			      <0xa0410100 0x100>;
+@@ -206,11 +206,14 @@
+ 		ssp at 80002000 {
+ 			compatible = "arm,pl022", "arm,primecell";
+ 			reg = <80002000 0x1000>;
+-			interrupts = <14>;
++			interrupts = <0 14 4>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
++
++			// Add one of these for each child device
+ 			cs-gpios = <&gpio0 31 &gpio4 14 &gpio4 16 &gpio6 22 &gpio7 0>;
++
  		};
  
-+		L2: l2-cache {
-+			compatible = "arm,pl310-cache";
-+			reg = <0xa0412000 0x1000>;
-+			interrupts = <0 13 4>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+
- 		pmu {
- 			compatible = "arm,cortex-a9-pmu";
- 			interrupts = <7>;
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index da5569d..77a75ed 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -5,6 +5,8 @@
-  */
+ 		uart at 80120000 {
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index ea0242a..d0799d5 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -443,7 +443,7 @@ static struct stedma40_chan_cfg ssp0_dma_cfg_tx = {
+ };
+ #endif
  
- #include <linux/io.h>
-+#include <linux/of.h>
-+
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <mach/hardware.h>
-@@ -45,7 +47,10 @@ static int __init ux500_l2x0_init(void)
- 	ux500_l2x0_unlock();
+-static struct pl022_ssp_controller ssp0_platform_data = {
++static struct pl022_ssp_controller ssp0_plat = {
+ 	.bus_id = 0,
+ #ifdef CONFIG_STE_DMA40
+ 	.enable_dma = 1,
+@@ -461,7 +461,7 @@ static struct pl022_ssp_controller ssp0_platform_data = {
  
- 	/* 64KB way size, 8 way associativity, force WA */
--	l2x0_init(l2x0_base, 0x3e060000, 0xc0000fff);
-+	if (of_have_populated_dt())
-+		l2x0_of_init(0x3e060000, 0xc0000fff);
-+	else
-+		l2x0_init(l2x0_base, 0x3e060000, 0xc0000fff);
+ static void __init mop500_spi_init(struct device *parent)
+ {
+-	db8500_add_ssp0(parent, &ssp0_platform_data);
++	db8500_add_ssp0(parent, &ssp0_plat);
+ }
  
- 	/*
- 	 * We can't disable l2 as we are in non secure mode, currently
+ #ifdef CONFIG_STE_DMA40
+@@ -749,6 +749,7 @@ struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
++	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+ 	{},
+ };
+ 
+@@ -804,7 +805,6 @@ static void __init u8500_init_machine(void)
+ 		hrefv60_sdi_init(parent);
+ 	}
+ 	mop500_i2c_init(parent);
+-	mop500_spi_init(parent);
+ 
+ 	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
+ 	i2c_register_board_info(2, mop500_i2c2_devices,
 -- 
 1.7.5.4
