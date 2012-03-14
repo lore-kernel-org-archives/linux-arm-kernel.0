@@ -1,22 +1,66 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 14 Mar 2012 16:43:21 +0800
-Subject: [PATCH v1 5/5] ARM: mxs: add mxs dma dt support
-In-Reply-To: <20120314083046.GD1180@shlinux2.ap.freescale.net>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-6-git-send-email-b29396@freescale.com>
- <4F604F9F.1070801@freescale.com>
- <20120314083046.GD1180@shlinux2.ap.freescale.net>
-Message-ID: <4F605A29.6080009@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Mar 2012 08:43:39 +0000
+Subject: Conflict between Versatile Express DT conversion and local timer
+ updates
+In-Reply-To: <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
+References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
+ <201203131155.16454.arnd@arndb.de>	<4F5F52A2.3050005@arm.com>
+ <201203131433.07214.arnd@arndb.de>
+ <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
+Message-ID: <4F605A3B.5030800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aisheng:
-> The non-dt way also does not have interrupt resource for dma device.
-> It seems the channel interrupt resource is handled in each client device.
-> I'm not familiar with gpmi-nand, but I guess you may need to handle
-> it in gpmi driver, just like mxs-mmc driver.
->
-ok, got it.
+On 14/03/12 00:52, Olof Johansson wrote:
+> On Tue, Mar 13, 2012 at 7:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 13 March 2012, Marc Zyngier wrote:
+>>> On 13/03/12 11:55, Arnd Bergmann wrote:
+>>>> On Tuesday 13 March 2012, Marc Zyngier wrote:
+>>>>> On 13/03/12 10:15, Russell King - ARM Linux wrote:
+>>
+>>>> d) create a new next/timer branch in arm-soc that has Pawel's
+>>>>    98ed4ceb "ARM: vexpress: Get rid of MMIO_P2V" (the first patch from
+>>>>    vexpress/dt, your patches and the ux500/timer series. Also put
+>>>>    98ed4ceb into the next/cleanup branch.
+>>>>
+>>>> Any of those will work for us, my preference would be on #4. I have
+>>>> created the next/timer branch in the arm-soc tree, so you can use
+>>>> that and either rebase your patches on top or merge your tree into
+>>>> it and fix up the merge conflicts.
+>>>
+>>> Thanks for doing that Arnd.
+>>>
+>>> I've thus created a new branch:
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>>> local_timers-for-arm-soc
+>>>
+>>> which contains the arm-soc next/timers branch as well as my local timers
+>>> series. I'd greatly appreciate if you could pull it for 3.4.
+>>>
+>>
+>> I've updated the next/timer branch with your changes now, but did not
+>> put it into the for-next branch because Olof is currently handling that.
+>>
+>> Olof, can you add it to for-next please? The timer branch should have
+>> no dependencies other than rmk/for-armsoc, so it can be fairly close to
+>> the start.
+> 
+> 
+> Thanks. I merged into for-next, but since there's already a history in
+> there and I didn't rebuild it, it's on top of everything else.
+> 
+> I got two trivial merge conflicts (and a few that git sorted out
+> automatically): one with the tegra makefile, the other with shmobile's
+> timer init.
+> 
+> Marc, please take a look at the next/timers merge in the arm-soc
+> for-next branch and let me know if they're OK. I'm pretty sure they
+> are though.
 
-thanks
-Huang Shijie
+Had a brief look, and it seems alright to me.
+
+Thanks Olof!
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
