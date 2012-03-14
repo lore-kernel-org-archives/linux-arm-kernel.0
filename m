@@ -1,245 +1,295 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Wed, 14 Mar 2012 12:38:22 +0100
-Subject: [PATCH] stmmac: Add device-tree support
-In-Reply-To: <20120312143825.GB13869@game.jcrosoft.org>
-References: <1331561157-3820-1-git-send-email-sr@denx.de>
- <20120312143825.GB13869@game.jcrosoft.org>
-Message-ID: <4F60832E.6060100@st.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 14 Mar 2012 12:41:43 +0100
+Subject: [PATCH] dmaengine: at_hdmac: add slave config operation
+Message-ID: <1331725303-26298-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/12/2012 3:38 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 15:05 Mon 12 Mar     , Stefan Roese wrote:
->> This patch adds support to configure the STMMAC ethernet driver via
->> device-tree instead of platform_data.
->>
->> Currently, only the properties needed on SPEAr600 are provided. All
->> other properties should be added once needed on other platforms.
->>
->> Signed-off-by: Stefan Roese <sr@denx.de>
->> Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
->> Cc: Viresh Kumar <viresh.kumar@st.com>
->> ---
->>  Documentation/devicetree/bindings/net/stmmac.txt   |   38 +++++++++++
->>  .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   66 +++++++++++++++++++-
->>  2 files changed, 103 insertions(+), 1 deletion(-)
->>  create mode 100644 Documentation/devicetree/bindings/net/stmmac.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/stmmac.txt b/Documentation/devicetree/bindings/net/stmmac.txt
->> new file mode 100644
->> index 0000000..386a47f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/stmmac.txt
->> @@ -0,0 +1,38 @@
->> +* STMicroelectronics 10/100/1000 Ethernet driver (GMAC)
->> +
->> +Required properties:
->> +- compatible: Should be "stm,gmac"
+This patch introduces DMA_SLAVE_CONFIG to at_hdmac Atmel DMA driver.
 
-> this IP have 2 version at least the GMAC for the second generation and mac for
-> the first generation
+It is needed to fix a regression in the use of atmel-mci.c driver on Atmel
+AT91 platforms brouth by e2b35f3:
+"dmaengine/dw_dmac: Fix dw_dmac user drivers to adapt to slave_config changes"
 
-yes you are right. STMMAC supports two device generations I named:
-dwma10/100 and dwmac1000 (gmac).
+We remove some parts of the private structure "at_dma_slave" and use the
+information provided by "struct dma_slave_config": source/destination
+peripheral registers and access width.
 
-Concerning the latter, we support several different versions of the
-synopsys GMAC cores ... from 3.30 to 3.61a.
+AT_DMA_SLAVE_WIDTH_* values used previously are not needed anymore as we
+now use the standard ones. Although some conversion functions are needed to
+match register expected values.
 
-For example, stx7108 and Stx7109 have the same GMAC core (also SPEAr600
-IIRC).
-SPEAr13xx has 3.50a
-New ST SoC Stxh415 has the 3.60a. etc.
+Some AT91 sub-architecture specific files are slightly touched by this patch
+but it cannot be split because it can break compilation.
 
->> +- reg: Address and length of the register set for the device
->> +- interrupt-parent: Should be the phandle for the interrupt controller
->> +  that services interrupts for this device
->> +- interrupts: Should contain the STMMAC interrupts
->> +- interrupt-names: Should contain the interrupt names "macirq"
->> +  "eth_wake_irq" if this interrupt is supported in the "interrupts"
->> +  property
-> optionnal
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/at91sam9g45_devices.c   |    1 -
+ arch/arm/mach-at91/include/mach/at_hdmac.h |   15 -------
+ drivers/dma/at_hdmac.c                     |   56 +++++++++++++++++++++------
+ drivers/dma/at_hdmac_regs.h                |   32 ++++++++++++++++
+ 4 files changed, 75 insertions(+), 29 deletions(-)
 
-yes
-
-note that there will be a new field for lpi IRQ as well
-
->> +- phy-mode: String, operation mode of the PHY interface.
->> +  Supported values are: "mii", "rmii", "gmii", "rgmii".
->> +- phy-addr: MDIO address of the PHY
->> +
->> +Optional properties:
->> +- stm,prog-burst-len: Specify the burst length
->> +- stm,has-gmac: Indicates that the controller supports 1000Mbps
-> this IP support more mode 10/100/300/1000
-
-has_gmac was used to understand on devices w/o the HW cap registers if
-the core is a gmac... another useful parameter could be : enh_desc
-
-In fact, there are several possible HW configurations:
-
-gmac core + enh desc
-gmac core + norm_desc
-mac  core + norm_des
-
-...
-
-W/o cap register (present in new cores newer than 3.50) we need to pass
-this info from the plt.
-
->> +- stm,has-pmt: Indicates that the controller supports power management
->> +- mac-address: 6 bytes, mac address
->> +
->> +Examples:
->> +
->> +	gmac0: stmmac at e0800000 {
->> +		compatible = "stm,gmac";
->> +		reg = <0xe0800000 0x8000>;
->> +		interrupt-parent = <&vic1>;
->> +		interrupts = <24 23>;
->> +		interrupt-names = "macirq", "eth_wake_irq";
->> +		mac-address = [000000000000]; /* Filled in by U-Boot */
->> +
->> +		stm,prog-burst-len = <8>;
->> +		stm,has-gmac;
->> +		stm,has-pmt;
->> +
->> +		phy-mode = "gmii";
->> +		phy-addr = <0>;
->> +	};
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->> index 3aad981..fcf46c7 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
->> @@ -24,8 +24,43 @@
->>  
->>  #include <linux/platform_device.h>
->>  #include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_net.h>
->>  #include "stmmac.h"
->>  
->> +#ifdef CONFIG_OF
->> +static int __devinit stmmac_probe_config_dt(struct platform_device *pdev,
->> +					    struct plat_stmmacenet_data *plat,
->> +					    const char **mac)
->> +{
->> +	struct device_node *np = pdev->dev.of_node;
->> +
->> +	if (!np)
->> +		return -ENODEV;
->> +
->> +	*mac = of_get_mac_address(np);
->> +
->> +	plat->interface = of_get_phy_mode(np);
->> +	of_property_read_u32(np, "phy-addr", &plat->phy_addr);
->> +	plat->mdio_bus_data = devm_kzalloc(&pdev->dev,
->> +					   sizeof(struct stmmac_mdio_bus_data),
->> +					   GFP_KERNEL);
->> +
->> +	/*
->> +	 * Currently only the properties needed on SPEAr600
->> +	 * are provided. All other properties should be added
->> +	 * once needed on other platforms.
->> +	 */
->> +	of_property_read_u32(np, "stm,prog-burst-len", &plat->pbl);
->> +	if (of_get_property(np, "stm,has-gmac", NULL))
->> +		plat->has_gmac = 1;
->> +	if (of_get_property(np, "stm,has-pmt", NULL))
->> +		plat->pmt = 1;
->> +
->> +	return 0;
->> +}
->> +#endif /* CONFIG_OF */
->> +
->>  /**
->>   * stmmac_pltfr_probe
->>   * @pdev: platform device pointer
->> @@ -39,7 +74,8 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
->>  	struct resource *res;
->>  	void __iomem *addr = NULL;
->>  	struct stmmac_priv *priv = NULL;
->> -	struct plat_stmmacenet_data *plat_dat;
->> +	struct plat_stmmacenet_data *plat_dat = NULL;
->> +	const char *mac = NULL;
->>  
->>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>  	if (!res)
->> @@ -58,6 +94,22 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
->>  		ret = -ENOMEM;
->>  		goto out_release_region;
->>  	}
->> +
->> +#ifdef CONFIG_OF
->> +	plat_dat = devm_kzalloc(&pdev->dev, sizeof(struct plat_stmmacenet_data),
->> +				GFP_KERNEL);
->> +	if (!plat_dat) {
->> +		pr_err("%s: ERROR: no memory", __func__);
->> +		ret = -ENOMEM;
->> +		goto out_unmap;
->> +	}
->> +
->> +	ret = stmmac_probe_config_dt(pdev, plat_dat, &mac);
->> +	if (ret) {
->> +		pr_err("%s: main dt probe failed", __func__);
->> +		goto out_unmap;
->> +	}
->> +#else
-> This must be check at runtime, we can boot a kernel with or without DT.
-> 
-> Best Reards,
-> J.
->>  	plat_dat = pdev->dev.platform_data;
->>  
->>  	/* Custom initialisation (if needed)*/
->> @@ -66,6 +118,7 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
->>  		if (unlikely(ret))
->>  			goto out_unmap;
->>  	}
->> +#endif
->>  
->>  	priv = stmmac_dvr_probe(&(pdev->dev), plat_dat, addr);
->>  	if (!priv) {
->> @@ -73,6 +126,10 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
->>  		goto out_unmap;
->>  	}
->>  
->> +	/* Get MAC address if available (DT) */
->> +	if (mac)
->> +		memcpy(priv->dev->dev_addr, mac, ETH_ALEN);
->> +
->>  	/* Get the MAC information */
->>  	priv->dev->irq = platform_get_irq_byname(pdev, "macirq");
->>  	if (priv->dev->irq == -ENXIO) {
->> @@ -178,6 +235,12 @@ static const struct dev_pm_ops stmmac_pltfr_pm_ops = {
->>  static const struct dev_pm_ops stmmac_pltfr_pm_ops;
->>  #endif /* CONFIG_PM */
->>  
->> +static const struct of_device_id stmmac_dt_ids[] = {
->> +	{ .compatible = "stm,gmac", },
->> +	{ /* sentinel */ }
->> +};
->> +MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
->> +
->>  static struct platform_driver stmmac_driver = {
->>  	.probe = stmmac_pltfr_probe,
->>  	.remove = stmmac_pltfr_remove,
->> @@ -185,6 +248,7 @@ static struct platform_driver stmmac_driver = {
->>  		   .name = STMMAC_RESOURCE_NAME,
->>  		   .owner = THIS_MODULE,
->>  		   .pm = &stmmac_pltfr_pm_ops,
->> +		   .of_match_table = of_match_ptr(stmmac_dt_ids),
->>  		   },
->>  };
->>  
->> -- 
->> 1.7.9.2
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe netdev" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 96e2adc..28d3401 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -432,7 +432,6 @@ void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data)
+ 
+ 	/* DMA slave channel configuration */
+ 	atslave->dma_dev = &at_hdmac_device.dev;
+-	atslave->reg_width = AT_DMA_SLAVE_WIDTH_32BIT;
+ 	atslave->cfg = ATC_FIFOCFG_HALFFIFO
+ 			| ATC_SRC_H2SEL_HW | ATC_DST_H2SEL_HW;
+ 	atslave->ctrla = ATC_SCSIZE_16 | ATC_DCSIZE_16;
+diff --git a/arch/arm/mach-at91/include/mach/at_hdmac.h b/arch/arm/mach-at91/include/mach/at_hdmac.h
+index 187cb58..fff48d1 100644
+--- a/arch/arm/mach-at91/include/mach/at_hdmac.h
++++ b/arch/arm/mach-at91/include/mach/at_hdmac.h
+@@ -24,18 +24,6 @@ struct at_dma_platform_data {
+ };
+ 
+ /**
+- * enum at_dma_slave_width - DMA slave register access width.
+- * @AT_DMA_SLAVE_WIDTH_8BIT: Do 8-bit slave register accesses
+- * @AT_DMA_SLAVE_WIDTH_16BIT: Do 16-bit slave register accesses
+- * @AT_DMA_SLAVE_WIDTH_32BIT: Do 32-bit slave register accesses
+- */
+-enum at_dma_slave_width {
+-	AT_DMA_SLAVE_WIDTH_8BIT = 0,
+-	AT_DMA_SLAVE_WIDTH_16BIT,
+-	AT_DMA_SLAVE_WIDTH_32BIT,
+-};
+-
+-/**
+  * struct at_dma_slave - Controller-specific information about a slave
+  * @dma_dev: required DMA master device
+  * @tx_reg: physical address of data register used for
+@@ -48,9 +36,6 @@ enum at_dma_slave_width {
+  */
+ struct at_dma_slave {
+ 	struct device		*dma_dev;
+-	dma_addr_t		tx_reg;
+-	dma_addr_t		rx_reg;
+-	enum at_dma_slave_width	reg_width;
+ 	u32			cfg;
+ 	u32			ctrla;
+ };
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 5d225dd..b015a5c 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -647,6 +647,7 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ {
+ 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+ 	struct at_dma_slave	*atslave = chan->private;
++	struct dma_slave_config	*sconfig = &atchan->dma_sconfig;
+ 	struct at_desc		*first = NULL;
+ 	struct at_desc		*prev = NULL;
+ 	u32			ctrla;
+@@ -668,19 +669,18 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 		return NULL;
+ 	}
+ 
+-	reg_width = atslave->reg_width;
+-
+ 	ctrla = ATC_DEFAULT_CTRLA | atslave->ctrla;
+ 	ctrlb = ATC_IEN;
+ 
+ 	switch (direction) {
+ 	case DMA_MEM_TO_DEV:
++		reg_width = convert_buswidth(sconfig->dst_addr_width);
+ 		ctrla |=  ATC_DST_WIDTH(reg_width);
+ 		ctrlb |=  ATC_DST_ADDR_MODE_FIXED
+ 			| ATC_SRC_ADDR_MODE_INCR
+ 			| ATC_FC_MEM2PER
+ 			| ATC_SIF(AT_DMA_MEM_IF) | ATC_DIF(AT_DMA_PER_IF);
+-		reg = atslave->tx_reg;
++		reg = sconfig->dst_addr;
+ 		for_each_sg(sgl, sg, sg_len, i) {
+ 			struct at_desc	*desc;
+ 			u32		len;
+@@ -708,13 +708,14 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 		}
+ 		break;
+ 	case DMA_DEV_TO_MEM:
++		reg_width = convert_buswidth(sconfig->src_addr_width);
+ 		ctrla |=  ATC_SRC_WIDTH(reg_width);
+ 		ctrlb |=  ATC_DST_ADDR_MODE_INCR
+ 			| ATC_SRC_ADDR_MODE_FIXED
+ 			| ATC_FC_PER2MEM
+ 			| ATC_SIF(AT_DMA_PER_IF) | ATC_DIF(AT_DMA_MEM_IF);
+ 
+-		reg = atslave->rx_reg;
++		reg = sconfig->src_addr;
+ 		for_each_sg(sgl, sg, sg_len, i) {
+ 			struct at_desc	*desc;
+ 			u32		len;
+@@ -790,12 +791,15 @@ err_out:
+  * atc_dma_cyclic_fill_desc - Fill one period decriptor
+  */
+ static int
+-atc_dma_cyclic_fill_desc(struct at_dma_slave *atslave, struct at_desc *desc,
++atc_dma_cyclic_fill_desc(struct dma_chan *chan, struct at_desc *desc,
+ 		unsigned int period_index, dma_addr_t buf_addr,
+-		size_t period_len, enum dma_transfer_direction direction)
++		unsigned int reg_width, size_t period_len,
++		enum dma_transfer_direction direction)
+ {
+-	u32		ctrla;
+-	unsigned int	reg_width = atslave->reg_width;
++	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
++	struct at_dma_slave	*atslave = chan->private;
++	struct dma_slave_config	*sconfig = &atchan->dma_sconfig;
++	u32			ctrla;
+ 
+ 	/* prepare common CRTLA value */
+ 	ctrla =   ATC_DEFAULT_CTRLA | atslave->ctrla
+@@ -806,7 +810,7 @@ atc_dma_cyclic_fill_desc(struct at_dma_slave *atslave, struct at_desc *desc,
+ 	switch (direction) {
+ 	case DMA_MEM_TO_DEV:
+ 		desc->lli.saddr = buf_addr + (period_len * period_index);
+-		desc->lli.daddr = atslave->tx_reg;
++		desc->lli.daddr = sconfig->dst_addr;
+ 		desc->lli.ctrla = ctrla;
+ 		desc->lli.ctrlb = ATC_DST_ADDR_MODE_FIXED
+ 				| ATC_SRC_ADDR_MODE_INCR
+@@ -816,7 +820,7 @@ atc_dma_cyclic_fill_desc(struct at_dma_slave *atslave, struct at_desc *desc,
+ 		break;
+ 
+ 	case DMA_DEV_TO_MEM:
+-		desc->lli.saddr = atslave->rx_reg;
++		desc->lli.saddr = sconfig->src_addr;
+ 		desc->lli.daddr = buf_addr + (period_len * period_index);
+ 		desc->lli.ctrla = ctrla;
+ 		desc->lli.ctrlb = ATC_DST_ADDR_MODE_INCR
+@@ -847,9 +851,11 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+ {
+ 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+ 	struct at_dma_slave	*atslave = chan->private;
++	struct dma_slave_config	*sconfig = &atchan->dma_sconfig;
+ 	struct at_desc		*first = NULL;
+ 	struct at_desc		*prev = NULL;
+ 	unsigned long		was_cyclic;
++	unsigned int		reg_width;
+ 	unsigned int		periods = buf_len / period_len;
+ 	unsigned int		i;
+ 
+@@ -869,8 +875,13 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+ 		return NULL;
+ 	}
+ 
++	if (sconfig->direction == DMA_MEM_TO_DEV)
++		reg_width = convert_buswidth(sconfig->dst_addr_width);
++	else
++		reg_width = convert_buswidth(sconfig->src_addr_width);
++
+ 	/* Check for too big/unaligned periods and unaligned DMA buffer */
+-	if (atc_dma_cyclic_check_values(atslave->reg_width, buf_addr,
++	if (atc_dma_cyclic_check_values(reg_width, buf_addr,
+ 					period_len, direction))
+ 		goto err_out;
+ 
+@@ -882,8 +893,8 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+ 		if (!desc)
+ 			goto err_desc_get;
+ 
+-		if (atc_dma_cyclic_fill_desc(atslave, desc, i, buf_addr,
+-						period_len, direction))
++		if (atc_dma_cyclic_fill_desc(chan, desc, i, buf_addr,
++					     reg_width, period_len, direction))
+ 			goto err_desc_get;
+ 
+ 		atc_desc_chain(&first, &prev, desc);
+@@ -906,6 +917,23 @@ err_out:
+ 	return NULL;
+ }
+ 
++static int set_runtime_config(struct dma_chan *chan,
++			      struct dma_slave_config *sconfig)
++{
++	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
++
++	/* Check if it is chan is configured for slave transfers */
++	if (!chan->private)
++		return -EINVAL;
++
++	memcpy(&atchan->dma_sconfig, sconfig, sizeof(*sconfig));
++
++	convert_burst(&atchan->dma_sconfig.src_maxburst);
++	convert_burst(&atchan->dma_sconfig.dst_maxburst);
++
++	return 0;
++}
++
+ 
+ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		       unsigned long arg)
+@@ -966,6 +994,8 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		clear_bit(ATC_IS_CYCLIC, &atchan->status);
+ 
+ 		spin_unlock_irqrestore(&atchan->lock, flags);
++	} else if (cmd == DMA_SLAVE_CONFIG) {
++		return set_runtime_config(chan, (struct dma_slave_config *)arg);
+ 	} else {
+ 		return -ENXIO;
+ 	}
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index 08fd8a0..897a8bc 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -207,6 +207,7 @@ enum atc_status {
+  * @save_cfg: configuration register that is saved on suspend/resume cycle
+  * @save_dscr: for cyclic operations, preserve next descriptor address in
+  *             the cyclic list on suspend/resume cycle
++ * @dma_sconfig: configuration for slave transfers, passed via DMA_SLAVE_CONFIG
+  * @lock: serializes enqueue/dequeue operations to descriptors lists
+  * @active_list: list of descriptors dmaengine is being running on
+  * @queue: list of descriptors ready to be submitted to engine
+@@ -222,6 +223,7 @@ struct at_dma_chan {
+ 	struct tasklet_struct	tasklet;
+ 	u32			save_cfg;
+ 	u32			save_dscr;
++	struct dma_slave_config dma_sconfig;
+ 
+ 	spinlock_t		lock;
+ 
+@@ -243,6 +245,36 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
+ 	return container_of(dchan, struct at_dma_chan, chan_common);
+ }
+ 
++/*
++ * Fix sconfig's burst size according to at_hdmac. We need to convert them as:
++ * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3, 32 -> 4, 64 -> 5, 128 -> 6, 256 -> 7.
++ *
++ * This can be done by finding most significant bit set.
++ */
++static inline void convert_burst(u32 *maxburst)
++{
++	if (*maxburst > 1)
++		*maxburst = fls(*maxburst) - 2;
++	else
++		*maxburst = 0;
++}
++
++/*
++ * Fix sconfig's bus width according to at_hdmac.
++ * 1 byte -> 0, 2 bytes -> 1, 4 bytes -> 2.
++ */
++static inline u8 convert_buswidth(enum dma_slave_buswidth addr_width)
++{
++	switch (addr_width) {
++	case DMA_SLAVE_BUSWIDTH_2_BYTES:
++		return 1;
++	case DMA_SLAVE_BUSWIDTH_4_BYTES:
++		return 2;
++	default:
++		/* For 1 byte width or fallback */
++		return 0;
++	}
++}
+ 
+ /*--  Controller  ------------------------------------------------------*/
+ 
+-- 
+1.7.9
