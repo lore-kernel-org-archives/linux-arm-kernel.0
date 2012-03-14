@@ -1,118 +1,167 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Mar 2012 07:26:26 -0700
-Subject: [PATCH 1/5] ARM: EXYNOS: Remove GIC save & restore function
+Date: Wed, 14 Mar 2012 07:26:27 -0700
+Subject: [PATCH 2/5] ARM: EXYNOS: Rename of function for pm.c
 In-Reply-To: <1331735190-28773-1-git-send-email-kgene.kim@samsung.com>
 References: <1331735190-28773-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1331735190-28773-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1331735190-28773-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jongpill Lee <boyko.lee@samsung.com>
 
-This patch removes GIC save & restore functino in pm.c. Because when
-enalbe CPU_PM feature, GIC driver execute save and restore function
-in CPU_PM notifier.
-So it is not needed to GIC save & restore function at pm.c file.
+This patch changes the function name of pmc. to support new
+EXYNOS SoCs commonly.
 
 Signed-off-by: Jongpill Lee <boyko.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos/pm.c |   83 ---------------------------------------------
- 1 files changed, 0 insertions(+), 83 deletions(-)
+ arch/arm/mach-exynos/pm.c |   55 +++++++++++++++++++++++----------------------
+ 1 files changed, 28 insertions(+), 27 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index f105bd2..696f0bf 100644
+index 696f0bf..abc1def 100644
 --- a/arch/arm/mach-exynos/pm.c
 +++ b/arch/arm/mach-exynos/pm.c
-@@ -64,89 +64,6 @@ static struct sleep_save exynos4_vpll_save[] = {
+@@ -1,9 +1,8 @@
+-/* linux/arch/arm/mach-exynos4/pm.c
+- *
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++/*
++ * Copyright (c) 2011-2012 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+- * EXYNOS4210 - Power Management support
++ * EXYNOS - Power Management support
+  *
+  * Based on arch/arm/mach-s3c2410/pm.c
+  * Copyright (c) 2006 Simtec Electronics
+@@ -63,7 +62,7 @@ static struct sleep_save exynos4_vpll_save[] = {
+ 	SAVE_ITEM(EXYNOS4_VPLL_CON1),
  };
  
- static struct sleep_save exynos4_core_save[] = {
--	/* GIC side */
--	SAVE_ITEM(S5P_VA_GIC_CPU + 0x000),
--	SAVE_ITEM(S5P_VA_GIC_CPU + 0x004),
--	SAVE_ITEM(S5P_VA_GIC_CPU + 0x008),
--	SAVE_ITEM(S5P_VA_GIC_CPU + 0x00C),
--	SAVE_ITEM(S5P_VA_GIC_CPU + 0x014),
--	SAVE_ITEM(S5P_VA_GIC_CPU + 0x018),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x000),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x004),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x100),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x104),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x108),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x300),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x304),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x308),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x400),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x404),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x408),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x40C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x410),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x414),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x418),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x41C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x420),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x424),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x428),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x42C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x430),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x434),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x438),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x43C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x440),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x444),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x448),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x44C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x450),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x454),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x458),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x45C),
--
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x800),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x804),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x808),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x80C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x810),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x814),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x818),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x81C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x820),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x824),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x828),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x82C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x830),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x834),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x838),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x83C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x840),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x844),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x848),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x84C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x850),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x854),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x858),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0x85C),
--
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC00),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC04),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC08),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC0C),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC10),
--	SAVE_ITEM(S5P_VA_GIC_DIST + 0xC14),
--
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x000),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x010),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x020),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x030),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x040),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x050),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x060),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x070),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x080),
--	SAVE_ITEM(S5P_VA_COMBINER_BASE + 0x090),
--
+-static struct sleep_save exynos4_core_save[] = {
++static struct sleep_save exynos_core_save[] = {
  	/* SROM side */
  	SAVE_ITEM(S5P_SROM_BW),
  	SAVE_ITEM(S5P_SROM_BC0),
+@@ -83,7 +82,7 @@ static struct sleep_save exynos4_l2cc_save[] = {
+ /* For Cortex-A9 Diagnostic and Power control register */
+ static unsigned int save_arm_register[2];
+ 
+-static int exynos4_cpu_suspend(unsigned long arg)
++static int exynos_cpu_suspend(unsigned long arg)
+ {
+ 	outer_flush_all();
+ 
+@@ -94,11 +93,11 @@ static int exynos4_cpu_suspend(unsigned long arg)
+ 	panic("sleep resumed to originator?");
+ }
+ 
+-static void exynos4_pm_prepare(void)
++static void exynos_pm_prepare(void)
+ {
+ 	u32 tmp;
+ 
+-	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
++	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+ 	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
+ 	s3c_pm_do_save(exynos4_epll_save, ARRAY_SIZE(exynos4_epll_save));
+ 	s3c_pm_do_save(exynos4_vpll_save, ARRAY_SIZE(exynos4_vpll_save));
+@@ -123,10 +122,10 @@ static void exynos4_pm_prepare(void)
+ 
+ }
+ 
+-static int exynos4_pm_add(struct device *dev, struct subsys_interface *sif)
++static int exynos_pm_add(struct device *dev, struct subsys_interface *sif)
+ {
+-	pm_cpu_prep = exynos4_pm_prepare;
+-	pm_cpu_sleep = exynos4_cpu_suspend;
++	pm_cpu_prep = exynos_pm_prepare;
++	pm_cpu_sleep = exynos_cpu_suspend;
+ 
+ 	return 0;
+ }
+@@ -198,13 +197,13 @@ static void exynos4_restore_pll(void)
+ 	} while (epll_wait || vpll_wait);
+ }
+ 
+-static struct subsys_interface exynos4_pm_interface = {
++static struct subsys_interface exynos_pm_interface = {
+ 	.name		= "exynos4_pm",
+ 	.subsys		= &exynos4_subsys,
+-	.add_dev	= exynos4_pm_add,
++	.add_dev	= exynos_pm_add,
+ };
+ 
+-static __init int exynos4_pm_drvinit(void)
++static __init int exynos_pm_drvinit(void)
+ {
+ 	struct clk *pll_base;
+ 	unsigned int tmp;
+@@ -217,18 +216,20 @@ static __init int exynos4_pm_drvinit(void)
+ 	tmp |= ((0xFF << 8) | (0x1F << 1));
+ 	__raw_writel(tmp, S5P_WAKEUP_MASK);
+ 
+-	pll_base = clk_get(NULL, "xtal");
++	if (!soc_is_exynos5250()) {
++		pll_base = clk_get(NULL, "xtal");
+ 
+-	if (!IS_ERR(pll_base)) {
+-		pll_base_rate = clk_get_rate(pll_base);
+-		clk_put(pll_base);
++		if (!IS_ERR(pll_base)) {
++			pll_base_rate = clk_get_rate(pll_base);
++			clk_put(pll_base);
++		}
+ 	}
+ 
+-	return subsys_interface_register(&exynos4_pm_interface);
++	return subsys_interface_register(&exynos_pm_interface);
+ }
+-arch_initcall(exynos4_pm_drvinit);
++arch_initcall(exynos_pm_drvinit);
+ 
+-static int exynos4_pm_suspend(void)
++static int exynos_pm_suspend(void)
+ {
+ 	unsigned long tmp;
+ 
+@@ -258,7 +259,7 @@ static int exynos4_pm_suspend(void)
+ 	return 0;
+ }
+ 
+-static void exynos4_pm_resume(void)
++static void exynos_pm_resume(void)
+ {
+ 	unsigned long tmp;
+ 
+@@ -297,7 +298,7 @@ static void exynos4_pm_resume(void)
+ 	__raw_writel((1 << 28), S5P_PAD_RET_EBIA_OPTION);
+ 	__raw_writel((1 << 28), S5P_PAD_RET_EBIB_OPTION);
+ 
+-	s3c_pm_do_restore_core(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
++	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+ 
+ 	exynos4_restore_pll();
+ 
+@@ -316,14 +317,14 @@ early_wakeup:
+ 	return;
+ }
+ 
+-static struct syscore_ops exynos4_pm_syscore_ops = {
+-	.suspend	= exynos4_pm_suspend,
+-	.resume		= exynos4_pm_resume,
++static struct syscore_ops exynos_pm_syscore_ops = {
++	.suspend	= exynos_pm_suspend,
++	.resume		= exynos_pm_resume,
+ };
+ 
+ static __init int exynos4_pm_syscore_init(void)
+ {
+-	register_syscore_ops(&exynos4_pm_syscore_ops);
++	register_syscore_ops(&exynos_pm_syscore_ops);
+ 	return 0;
+ }
+ arch_initcall(exynos4_pm_syscore_init);
 -- 
 1.7.4.4
