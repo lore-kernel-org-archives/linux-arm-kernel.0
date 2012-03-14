@@ -1,183 +1,278 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Mar 2012 13:38:59 -0500
-Subject: [PATCH v6 3/3] clk: basic clock hardware types
-In-Reply-To: <20120314182345.GB29317@pengutronix.de>
-References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
- <1331366064-1273-4-git-send-email-mturquette@linaro.org>
- <20120314182345.GB29317@pengutronix.de>
-Message-ID: <4F60E5C3.1090006@gmail.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Wed, 14 Mar 2012 20:39:04 +0200
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <000501cd0184$f088cb20$d19a6160$%han@samsung.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+ <000501cd0184$f088cb20$d19a6160$%han@samsung.com>
+Message-ID: <4F60E5C8.3040804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2012 01:23 PM, Sascha Hauer wrote:
-> On Fri, Mar 09, 2012 at 11:54:24PM -0800, Mike Turquette wrote:
->> Many platforms support simple gateable clocks, fixed-rate clocks,
->> adjustable divider clocks and multi-parent multiplexer clocks.
+On 03/14/2012 03:51 AM, Jingoo Han wrote:
+>> -----Original Message-----
+>> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
+>> Sent: Tuesday, March 13, 2012 7:11 PM
+>> To: Jingoo Han
+>> Cc: linux-fbdev at vger.kernel.org; FlorianSchandinat at gmx.de; linux-arm-kernel at lists.infradead.org; linux-
+>> samsung-soc at vger.kernel.org; kgene.kim at samsung.com; ben-linux at fluff.org; patches at linaro.org; Kyungmin
+>> Park; JeongHyeon Kim; Heiko Stuebner; Kwangwoo Lee; Mark Brown; Peter Korsgaard; Darius Augulis; Maurus
+>> Cuelenaere
+>> Subject: Re: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
 >>
->> This patch introduces basic clock types for the above-mentioned hardware
->> which share some common characteristics.
+>> On 13 March 2012 15:17, Jingoo Han<jg1.han@samsung.com>  wrote:
+>>>> -----Original Message-----
+>>>> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
+>>>> Sent: Tuesday, March 13, 2012 6:00 AM
+>>>> To: linux-fbdev at vger.kernel.org
+>>>> Cc: FlorianSchandinat at gmx.de; linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
+>>>> kgene.kim at samsung.com; jg1.han at samsung.com; ben-linux at fluff.org; patches at linaro.org; Kyungmin Park;
+>>>> JeongHyeon Kim; Heiko Stuebner; Kwangwoo Lee; Mark Brown; Peter Korsgaard; Darius Augulis; Maurus
+>>>> Cuelenaere
+>>>> Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+>>>>
+>>>> For all the Samsung SoC based boards which have the platform data for
+>>>> s3c-fb driver, the 'default_win' element in the platform data is removed
+>>>> and the lcd panel video timing values are moved out of individual window
+>>>> configuration data.
+>>>>
+>>>> Cc: Jingoo Han<jg1.han@samsung.com>
+>>>> Cc: Kyungmin Park<kyungmin.park@samsung.com>
+>>>> Cc: JeongHyeon Kim<jhkim@insignal.co.kr>
+>>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>>>> Cc: Heiko Stuebner<heiko@sntech.de>
+>>>> Cc: Ben Dooks<ben-linux@fluff.org>
+>>>> Cc: Kwangwoo Lee<kwangwoo.lee@gmail.com>
+>>>> Cc: Mark Brown<broonie@opensource.wolfsonmicro.com>
+>>>> Cc: Peter Korsgaard<jacmet@sunsite.dk>
+>>>> Cc: Darius Augulis<augulis.darius@gmail.com>
+>>>> Cc: Maurus Cuelenaere<mcuelenaere@gmail.com>
+>>>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+>>>> ---
+>>>>   arch/arm/mach-exynos/mach-nuri.c           |   26 ++++++++++-------
+>>>>   arch/arm/mach-exynos/mach-origen.c         |   24 ++++++++++-------
+>>>>   arch/arm/mach-exynos/mach-smdkv310.c       |   28 +++++++++++--------
+>>>>   arch/arm/mach-exynos/mach-universal_c210.c |   26 ++++++++++-------
+>>>>   arch/arm/mach-s3c24xx/mach-smdk2416.c      |   27 ++++++++++--------
+>>>>   arch/arm/mach-s3c64xx/mach-anw6410.c       |   25 ++++++++++-------
+>>>>   arch/arm/mach-s3c64xx/mach-crag6410.c      |   25 ++++++++++-------
+>>>>   arch/arm/mach-s3c64xx/mach-hmt.c           |   24 ++++++++++-------
+>>>>   arch/arm/mach-s3c64xx/mach-mini6410.c      |   40 ++++++++++++---------------
+>>>>   arch/arm/mach-s3c64xx/mach-real6410.c      |   40 ++++++++++++---------------
+>>>>   arch/arm/mach-s3c64xx/mach-smartq5.c       |   26 ++++++++++-------
+>>>>   arch/arm/mach-s3c64xx/mach-smartq7.c       |   26 ++++++++++-------
+>>>>   arch/arm/mach-s3c64xx/mach-smdk6410.c      |   25 ++++++++++-------
+>>>>   arch/arm/mach-s5p64x0/mach-smdk6440.c      |   24 ++++++++++-------
+>>>>   arch/arm/mach-s5p64x0/mach-smdk6450.c      |   24 ++++++++++-------
+>>>>   arch/arm/mach-s5pc100/mach-smdkc100.c      |   27 ++++++++++--------
+>>>>   arch/arm/mach-s5pv210/mach-aquila.c        |   36 +++++++++++--------------
+>>>>   arch/arm/mach-s5pv210/mach-goni.c          |   26 ++++++++++-------
+>>>>   arch/arm/mach-s5pv210/mach-smdkv210.c      |   24 ++++++++++-------
+>>>>   19 files changed, 285 insertions(+), 238 deletions(-)
+>>>>
+>>> [.....]
+>>>
+>>>> diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+>>>> index c34c2ab..24dcdc9 100644
+>>>> --- a/arch/arm/mach-s3c64xx/mach-mini6410.c
+>>>> +++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+>>>> @@ -153,36 +153,32 @@ static struct s3c2410_platform_nand mini6410_nand_info = {
+>>>>
+>>>>   static struct s3c_fb_pd_win mini6410_fb_win[] = {
+>>>>        {
+>>>> -             .win_mode       = {     /* 4.3" 480x272 */
+>>>> -                     .left_margin    = 3,
+>>>> -                     .right_margin   = 2,
+>>>> -                     .upper_margin   = 1,
+>>>> -                     .lower_margin   = 1,
+>>>> -                     .hsync_len      = 40,
+>>>> -                     .vsync_len      = 1,
+>>>> -                     .xres           = 480,
+>>>> -                     .yres           = 272,
+>>>> -             },
+>>>>                .max_bpp        = 32,
+>>>>                .default_bpp    = 16,
+>>>> +             .xres           = 480,
+>>>> +             .yres           = 272,
+>>>>        }, {
+>>>> -             .win_mode       = {     /* 7.0" 800x480 */
+>>>> -                     .left_margin    = 8,
+>>>> -                     .right_margin   = 13,
+>>>> -                     .upper_margin   = 7,
+>>>> -                     .lower_margin   = 5,
+>>>> -                     .hsync_len      = 3,
+>>>> -                     .vsync_len      = 1,
+>>>> -                     .xres           = 800,
+>>>> -                     .yres           = 480,
+>>>> -             },
+>>>>                .max_bpp        = 32,
+>>>>                .default_bpp    = 16,
+>>>> +             .xres           = 800,
+>>>> +             .yres           = 480,
+>>>>        },
+>>>>   };
+>>>>
+>>>> +static struct fb_videomode mini6410_lcd_timing = {
+>>>> +     .left_margin    = 8,
+>>>> +     .right_margin   = 13,
+>>>> +     .upper_margin   = 7,
+>>>> +     .lower_margin   = 5,
+>>>> +     .hsync_len      = 3,
+>>>> +     .vsync_len      = 1,
+>>>> +     .xres           = 800,
+>>>> +     .yres           = 480,
+>>>> +};
+>>>> +
+>>>>   static struct s3c_fb_platdata mini6410_lcd_pdata __initdata = {
+>>>>        .setup_gpio     = s3c64xx_fb_gpio_setup_24bpp,
+>>>> +     .vtiming        =&mini6410_lcd_timing,
+>>>>        .win[0]         =&mini6410_fb_win[0],
+>>>>        .vidcon0        = VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+>>>>        .vidcon1        = VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+>>>> @@ -310,8 +306,8 @@ static void __init mini6410_machine_init(void)
+>>>>        mini6410_lcd_pdata.win[0] =&mini6410_fb_win[features.lcd_index];
+>>>>
+>>>>        printk(KERN_INFO "MINI6410: selected LCD display is %dx%d\n",
+>>>> -             mini6410_lcd_pdata.win[0]->win_mode.xres,
+>>>> -             mini6410_lcd_pdata.win[0]->win_mode.yres);
+>>>> +             mini6410_lcd_pdata.win[0]->xres,
+>>>> +             mini6410_lcd_pdata.win[0]->yres);
+>>>>
+>>>>        s3c_nand_set_platdata(&mini6410_nand_info);
+>>>>        s3c_fb_set_platdata(&mini6410_lcd_pdata);
+>>>> diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+>>>> index be2a9a2..41e4f74 100644
+>>>> --- a/arch/arm/mach-s3c64xx/mach-real6410.c
+>>>> +++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+>>>> @@ -119,36 +119,32 @@ static struct platform_device real6410_device_eth = {
+>>>>
+>>>>   static struct s3c_fb_pd_win real6410_fb_win[] = {
+>>>>        {
+>>>> -             .win_mode       = {     /* 4.3" 480x272 */
+>>>> -                     .left_margin    = 3,
+>>>> -                     .right_margin   = 2,
+>>>> -                     .upper_margin   = 1,
+>>>> -                     .lower_margin   = 1,
+>>>> -                     .hsync_len      = 40,
+>>>> -                     .vsync_len      = 1,
+>>>> -                     .xres           = 480,
+>>>> -                     .yres           = 272,
+>>>> -             },
+>>>>                .max_bpp        = 32,
+>>>>                .default_bpp    = 16,
+>>>> +             .xres           = 480,
+>>>> +             .yres           = 272,
+>>>>        }, {
+>>>> -             .win_mode       = {     /* 7.0" 800x480 */
+>>>> -                     .left_margin    = 8,
+>>>> -                     .right_margin   = 13,
+>>>> -                     .upper_margin   = 7,
+>>>> -                     .lower_margin   = 5,
+>>>> -                     .hsync_len      = 3,
+>>>> -                     .vsync_len      = 1,
+>>>> -                     .xres           = 800,
+>>>> -                     .yres           = 480,
+>>>> -             },
+>>>>                .max_bpp        = 32,
+>>>>                .default_bpp    = 16,
+>>>> +             .xres           = 800,
+>>>> +             .yres           = 480,
+>>>>        },
+>>>>   };
+>>>>
+>>>> +static struct fb_videomode real6410_lcd_timing = {
+>>>> +     .left_margin    = 3,
+>>>> +     .right_margin   = 2,
+>>>> +     .upper_margin   = 1,
+>>>> +     .lower_margin   = 1,
+>>>> +     .hsync_len      = 40,
+>>>> +     .vsync_len      = 1,
+>>>> +     .xres           = 800,
+>>>> +     .yres           = 480,
+>>>> +};
+>>>
+>>> What is the difference between mini6410_lcd_timing and real6410_lcd_timing?
+>>> In my opinion, it would be good as follows:
+>>>
+>>> +static struct fb_videomode real6410_lcd_timing = {
+>>> +       .left_margin    = 8,
+>>> +       .right_margin   = 13,
+>>> +       .upper_margin   = 7,
+>>> +       .lower_margin   = 5,
+>>> +       .hsync_len      = 3,
+>>> +       .vsync_len      = 1,
+>>> +       .xres           = 800,
+>>> +       .yres           = 480,
+>>> +};
+>>>
+>>>
+>> Before this patch series, both real6410 and mini6410 had 'default_win'
+>> = 0 in the platform data. And, the s3c-fb driver selected the video
+>> timing from the window selected by the default_win parameter in s3c-fb
+>> platform data, i.e window 0 for both mini6440 and real6410. So, in
+>> this patch, while moving the timing values out of window data, the
+>> timing values for window 0 was selected.
 >>
->> Based on original work by Jeremy Kerr and contribution by Jamie Iles.
->> Dividers and multiplexor clocks originally contributed by Richard Zhao &
->> Sascha Hauer.
->>
->> Signed-off-by: Mike Turquette <mturquette@linaro.org>
->> Signed-off-by: Mike Turquette <mturquette@ti.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Arnd Bergman <arnd.bergmann@linaro.org>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Shawn Guo <shawn.guo@freescale.com>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Jamie Iles <jamie@jamieiles.com>
->> Cc: Richard Zhao <richard.zhao@linaro.org>
->> Cc: Saravana Kannan <skannan@codeaurora.org>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> Cc: Linus Walleij <linus.walleij@stericsson.com>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Amit Kucheria <amit.kucheria@linaro.org>
->> Cc: Deepak Saxena <dsaxena@linaro.org>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> ---
->> Changes since v5:
->>  * standardized the hw-specific locking in the basic clock types
->>  * export the individual ops for each basic clock type
->>  * improve registration for single-parent basic clocks (thanks Sascha)
->>  * fixed bugs in gate clock's static initializers (thanks Andrew)
->>
->>  drivers/clk/Makefile         |    3 +-
->>  drivers/clk/clk-divider.c    |  204 ++++++++++++++++++++++++++++++++++++++++++
->>  drivers/clk/clk-fixed-rate.c |   82 +++++++++++++++++
->>  drivers/clk/clk-gate.c       |  157 ++++++++++++++++++++++++++++++++
->>  drivers/clk/clk-mux.c        |  123 +++++++++++++++++++++++++
->>  include/linux/clk-private.h  |  124 +++++++++++++++++++++++++
->>  include/linux/clk-provider.h |  127 ++++++++++++++++++++++++++
->>  7 files changed, 819 insertions(+), 1 deletions(-)
->>  create mode 100644 drivers/clk/clk-divider.c
->>  create mode 100644 drivers/clk/clk-fixed-rate.c
->>  create mode 100644 drivers/clk/clk-gate.c
->>  create mode 100644 drivers/clk/clk-mux.c
->>
->> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->> index ff362c4..1f736bc 100644
->> --- a/drivers/clk/Makefile
->> +++ b/drivers/clk/Makefile
->> @@ -1,3 +1,4 @@
->>  
->>  obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
->> -obj-$(CONFIG_COMMON_CLK)	+= clk.o
->> +obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-fixed-rate.o clk-gate.o \
->> +				   clk-mux.o clk-divider.o
->> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
->> new file mode 100644
->> index 0000000..c0c4e0b
->> --- /dev/null
->> +++ b/drivers/clk/clk-divider.c
->> @@ -0,0 +1,204 @@
->> +/*
->> + * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
->> + * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
->> + * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * Adjustable divider clock implementation
->> + */
->> +
->> +#include <linux/clk-provider.h>
->> +#include <linux/module.h>
->> +#include <linux/slab.h>
->> +#include <linux/io.h>
->> +#include <linux/err.h>
->> +#include <linux/string.h>
->> +
->> +/*
->> + * DOC: basic adjustable divider clock that cannot gate
->> + *
->> + * Traits of this clock:
->> + * prepare - clk_prepare only ensures that parents are prepared
->> + * enable - clk_enable only ensures that parents are enabled
->> + * rate - rate is adjustable.  clk->rate = parent->rate / divisor
->> + * parent - fixed parent.  No clk_set_parent support
->> + */
->> +
->> +#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
->> +
->> +static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->> +		unsigned long parent_rate)
->> +{
->> +	struct clk_divider *divider = to_clk_divider(hw);
->> +	unsigned int div;
->> +	unsigned long flags = 0;
->> +
->> +	if (divider->lock)
->> +		spin_lock_irqsave(divider->lock, flags);
->> +
->> +	div = readl(divider->reg) >> divider->shift;
->> +	div &= (1 << divider->width) - 1;
->> +
->> +	if (divider->lock)
->> +		spin_unlock_irqrestore(divider->lock, flags);
->> +
->> +	if (!(divider->flags & CLK_DIVIDER_ONE_BASED))
->> +		div++;
->> +
->> +	return parent_rate / div;
->> +}
->> +EXPORT_SYMBOL_GPL(clk_divider_recalc_rate);
->> +
->> +static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->> +		unsigned long *best_parent_rate)
->> +{
->> +	struct clk_divider *divider = to_clk_divider(hw);
->> +	int i, bestdiv = 0;
->> +	unsigned long parent_rate, best = 0, now, maxdiv;
->> +
->> +	maxdiv = (1 << divider->width);
-> 
-> We need a check for rate == 0 here:
-> 
-> 	if (rate == 0)
-> 		rate = 1;
-> 
-> Otherwise we divide by zero below.
-> 
->> +
->> +	if (divider->flags & CLK_DIVIDER_ONE_BASED)
->> +		maxdiv--;
->> +
->> +	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
->> +		parent_rate = __clk_get_rate(__clk_get_parent(hw->clk));
->> +		bestdiv = parent_rate / rate;
-> 
-> It's a bit strange but due to integer maths you must use DIV_ROUND_UP
-> in round_rate and div = parent_rate / rate in set_rate.
-> 
-> Example:
-> 
-> parent_rate = 100
-> rate = 34
-> 
-> Now the best divider would be 3 (100/3 = 33), but the above
-> results in 2. With DIV_ROUND_UP round_rate correctly returns
-> 33. Now when you use DIV_ROUND_UP in set_rate the resulting
-> divider would be 4 which is wrong whereas 100/33 returns the correct
-> result.
+>> The timing value for window 1 was never used on mini6410 and real6410.
+>> So I would suggest to use timing value of window 0 in this patch.
+> OK, I see.
+> Then, as you mentioned above, the timing value of mini6410 and real6410 should be same.
+> Also, the mini6410 should use the timing value for window 0 as below.
+>
+> Also, this timing value is used for 4.3" 480x272 LCD.
+> So, xres and yres would be 480 and 272, respectively, instead of 800 and 480.
+>
+> The mini6410 seems to use 4.3" 480x272 LCD as default LCD.
+> Please refer to 'http://www.friendlyarm.net/products/mini6410'.
+>
+> Also, real6410 seems to use 4.3" 480x272 LCD as default LCD.
+> http://s3c6410kits.googlecode.com/files/overview_Real6410.pdf
+>
+> Therefore, given this, the timing value of mini6410 and real6410 would be as follows.
+>
+> +static struct fb_videomode mini6410_lcd_timing = {
+> +	.left_margin	= 8,
+> +	.right_margin	= 13,
+> +	.upper_margin	= 7,
+> +	.lower_margin	= 5,
+> +	.hsync_len	= 3,
+> +	.vsync_len	= 1,
+> +	.xres		= 480,
+> +	.yres		= 272,
+> +};
+>
+> +static struct fb_videomode real6410_lcd_timing = {
+> +	.left_margin	= 8,
+> +	.right_margin	= 13,
+> +	.upper_margin	= 7,
+> +	.lower_margin	= 5,
+> +	.hsync_len	= 3,
+> +	.vsync_len	= 1,
+> +	.xres		= 480,
+> +	.yres		= 272,
+> +};
+>
+> Darius Augulis, can you confirm it?
+> (Darius Augulis is a maintainer for real6410 and mini6410 boards.)
 
-This gets into the problem with round_rate. You can't specify whether to
-round up or down. For something like an SD card you would want to pass
-in the max freq for the card and get back something less than or equal
-to it. For something like an LCD pixel clock, you need a frequency
-greater than or equal to the requested freq to maintain a minimum
-refresh rate. There's been some discussion about this some time back.
+Are you going to leave only single LCD resolution for every of two 
+boards? If so, then my answer is no.
+I have mini6410 with both 4.3" and 7" LCDs and real6410 with 7" LCD. Now 
+we have possibility to choose LCD size dynamically - leave it there.
+What you mean "default" 4.3" size LCD? The 7" size LCD is also provided 
+by board sellers - I've bought it.
 
-But for now we shouldn't fix round_rate, and your solution is right (or
-at least safer).
+regards,
+Darius Augulis
 
-Rob
+>
+> Best regards,
+> Jingoo Han
+>
+>> Thanks for your comments.
+>>
+>> Regards,
+>> Thomas.
+>
