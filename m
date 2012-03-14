@@ -1,295 +1,164 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 14 Mar 2012 12:41:43 +0100
-Subject: [PATCH] dmaengine: at_hdmac: add slave config operation
-Message-ID: <1331725303-26298-1-git-send-email-nicolas.ferre@atmel.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 14 Mar 2012 14:06:34 +0200
+Subject: OMAP DSS device tree design problems
+In-Reply-To: <4F5FCE64.5070902@ti.com>
+References: <1331559930.2097.100.camel@deskari>  <4F5FCE64.5070902@ti.com>
+Message-ID: <1331726794.2386.66.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces DMA_SLAVE_CONFIG to at_hdmac Atmel DMA driver.
+On Tue, 2012-03-13 at 23:47 +0100, Cousson, Benoit wrote:
 
-It is needed to fix a regression in the use of atmel-mci.c driver on Atmel
-AT91 platforms brouth by e2b35f3:
-"dmaengine/dw_dmac: Fix dw_dmac user drivers to adapt to slave_config changes"
+> I'm just wondering if the multiple panels is something supported by the 
+> DSI protocol or it is a HW hacks done on TI board only?
 
-We remove some parts of the private structure "at_dma_slave" and use the
-information provided by "struct dma_slave_config": source/destination
-peripheral registers and access width.
+In theory both, but the driver doesn't support multiple panels connected
+to single DSI output at the same time. And that is, in a way, easier
+regarding DT, as all the configuration parameters are specific to DSI
+and the panel.
 
-AT_DMA_SLAVE_WIDTH_* values used previously are not needed anymore as we
-now use the standard ones. Although some conversion functions are needed to
-match register expected values.
+But the case at hand is that two panels are connected to single DSI
+output, but there's an external switch/mux between the DSI output or
+GPIO lines and the panels. It's not a HW hack on TI development boards
+only. The means to switch between the two displays can be anything, from
+setting a single GPIO to, say, sending i2c commands to some mux chip.
 
-Some AT91 sub-architecture specific files are slightly touched by this patch
-but it cannot be split because it can break compilation.
+> > However, here the problem is that while ultimately we're interested in
+> > the ddr-clk rate, calculation of the rate is non-trivial and may need
+> > customizations at times. So instead of the clock rate we actually need
+> > to define a bunch of dividers/multipliers.
+> 
+> Well, in theory you should not. This is up to the clock provider to 
+> convert the clock rate in the proper n/m value. This is how it is done 
+> for the regular OMAP DPLLs.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91sam9g45_devices.c   |    1 -
- arch/arm/mach-at91/include/mach/at_hdmac.h |   15 -------
- drivers/dma/at_hdmac.c                     |   56 +++++++++++++++++++++------
- drivers/dma/at_hdmac_regs.h                |   32 ++++++++++++++++
- 4 files changed, 75 insertions(+), 29 deletions(-)
+Right. But it's a non trivial problem. There are multiple
+dividers/multipliers in the path, and the clocks from different points
+at that path are used for different purposes. Some of the div/mul fields
+are quite wide, so there are a lot of numbers to iterate. 
 
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 96e2adc..28d3401 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -432,7 +432,6 @@ void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data)
- 
- 	/* DMA slave channel configuration */
- 	atslave->dma_dev = &at_hdmac_device.dev;
--	atslave->reg_width = AT_DMA_SLAVE_WIDTH_32BIT;
- 	atslave->cfg = ATC_FIFOCFG_HALFFIFO
- 			| ATC_SRC_H2SEL_HW | ATC_DST_H2SEL_HW;
- 	atslave->ctrla = ATC_SCSIZE_16 | ATC_DCSIZE_16;
-diff --git a/arch/arm/mach-at91/include/mach/at_hdmac.h b/arch/arm/mach-at91/include/mach/at_hdmac.h
-index 187cb58..fff48d1 100644
---- a/arch/arm/mach-at91/include/mach/at_hdmac.h
-+++ b/arch/arm/mach-at91/include/mach/at_hdmac.h
-@@ -24,18 +24,6 @@ struct at_dma_platform_data {
- };
- 
- /**
-- * enum at_dma_slave_width - DMA slave register access width.
-- * @AT_DMA_SLAVE_WIDTH_8BIT: Do 8-bit slave register accesses
-- * @AT_DMA_SLAVE_WIDTH_16BIT: Do 16-bit slave register accesses
-- * @AT_DMA_SLAVE_WIDTH_32BIT: Do 32-bit slave register accesses
-- */
--enum at_dma_slave_width {
--	AT_DMA_SLAVE_WIDTH_8BIT = 0,
--	AT_DMA_SLAVE_WIDTH_16BIT,
--	AT_DMA_SLAVE_WIDTH_32BIT,
--};
--
--/**
-  * struct at_dma_slave - Controller-specific information about a slave
-  * @dma_dev: required DMA master device
-  * @tx_reg: physical address of data register used for
-@@ -48,9 +36,6 @@ enum at_dma_slave_width {
-  */
- struct at_dma_slave {
- 	struct device		*dma_dev;
--	dma_addr_t		tx_reg;
--	dma_addr_t		rx_reg;
--	enum at_dma_slave_width	reg_width;
- 	u32			cfg;
- 	u32			ctrla;
- };
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 5d225dd..b015a5c 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -647,6 +647,7 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- {
- 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
- 	struct at_dma_slave	*atslave = chan->private;
-+	struct dma_slave_config	*sconfig = &atchan->dma_sconfig;
- 	struct at_desc		*first = NULL;
- 	struct at_desc		*prev = NULL;
- 	u32			ctrla;
-@@ -668,19 +669,18 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		return NULL;
- 	}
- 
--	reg_width = atslave->reg_width;
--
- 	ctrla = ATC_DEFAULT_CTRLA | atslave->ctrla;
- 	ctrlb = ATC_IEN;
- 
- 	switch (direction) {
- 	case DMA_MEM_TO_DEV:
-+		reg_width = convert_buswidth(sconfig->dst_addr_width);
- 		ctrla |=  ATC_DST_WIDTH(reg_width);
- 		ctrlb |=  ATC_DST_ADDR_MODE_FIXED
- 			| ATC_SRC_ADDR_MODE_INCR
- 			| ATC_FC_MEM2PER
- 			| ATC_SIF(AT_DMA_MEM_IF) | ATC_DIF(AT_DMA_PER_IF);
--		reg = atslave->tx_reg;
-+		reg = sconfig->dst_addr;
- 		for_each_sg(sgl, sg, sg_len, i) {
- 			struct at_desc	*desc;
- 			u32		len;
-@@ -708,13 +708,14 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		}
- 		break;
- 	case DMA_DEV_TO_MEM:
-+		reg_width = convert_buswidth(sconfig->src_addr_width);
- 		ctrla |=  ATC_SRC_WIDTH(reg_width);
- 		ctrlb |=  ATC_DST_ADDR_MODE_INCR
- 			| ATC_SRC_ADDR_MODE_FIXED
- 			| ATC_FC_PER2MEM
- 			| ATC_SIF(AT_DMA_PER_IF) | ATC_DIF(AT_DMA_MEM_IF);
- 
--		reg = atslave->rx_reg;
-+		reg = sconfig->src_addr;
- 		for_each_sg(sgl, sg, sg_len, i) {
- 			struct at_desc	*desc;
- 			u32		len;
-@@ -790,12 +791,15 @@ err_out:
-  * atc_dma_cyclic_fill_desc - Fill one period decriptor
-  */
- static int
--atc_dma_cyclic_fill_desc(struct at_dma_slave *atslave, struct at_desc *desc,
-+atc_dma_cyclic_fill_desc(struct dma_chan *chan, struct at_desc *desc,
- 		unsigned int period_index, dma_addr_t buf_addr,
--		size_t period_len, enum dma_transfer_direction direction)
-+		unsigned int reg_width, size_t period_len,
-+		enum dma_transfer_direction direction)
- {
--	u32		ctrla;
--	unsigned int	reg_width = atslave->reg_width;
-+	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-+	struct at_dma_slave	*atslave = chan->private;
-+	struct dma_slave_config	*sconfig = &atchan->dma_sconfig;
-+	u32			ctrla;
- 
- 	/* prepare common CRTLA value */
- 	ctrla =   ATC_DEFAULT_CTRLA | atslave->ctrla
-@@ -806,7 +810,7 @@ atc_dma_cyclic_fill_desc(struct at_dma_slave *atslave, struct at_desc *desc,
- 	switch (direction) {
- 	case DMA_MEM_TO_DEV:
- 		desc->lli.saddr = buf_addr + (period_len * period_index);
--		desc->lli.daddr = atslave->tx_reg;
-+		desc->lli.daddr = sconfig->dst_addr;
- 		desc->lli.ctrla = ctrla;
- 		desc->lli.ctrlb = ATC_DST_ADDR_MODE_FIXED
- 				| ATC_SRC_ADDR_MODE_INCR
-@@ -816,7 +820,7 @@ atc_dma_cyclic_fill_desc(struct at_dma_slave *atslave, struct at_desc *desc,
- 		break;
- 
- 	case DMA_DEV_TO_MEM:
--		desc->lli.saddr = atslave->rx_reg;
-+		desc->lli.saddr = sconfig->src_addr;
- 		desc->lli.daddr = buf_addr + (period_len * period_index);
- 		desc->lli.ctrla = ctrla;
- 		desc->lli.ctrlb = ATC_DST_ADDR_MODE_INCR
-@@ -847,9 +851,11 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
- {
- 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
- 	struct at_dma_slave	*atslave = chan->private;
-+	struct dma_slave_config	*sconfig = &atchan->dma_sconfig;
- 	struct at_desc		*first = NULL;
- 	struct at_desc		*prev = NULL;
- 	unsigned long		was_cyclic;
-+	unsigned int		reg_width;
- 	unsigned int		periods = buf_len / period_len;
- 	unsigned int		i;
- 
-@@ -869,8 +875,13 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
- 		return NULL;
- 	}
- 
-+	if (sconfig->direction == DMA_MEM_TO_DEV)
-+		reg_width = convert_buswidth(sconfig->dst_addr_width);
-+	else
-+		reg_width = convert_buswidth(sconfig->src_addr_width);
-+
- 	/* Check for too big/unaligned periods and unaligned DMA buffer */
--	if (atc_dma_cyclic_check_values(atslave->reg_width, buf_addr,
-+	if (atc_dma_cyclic_check_values(reg_width, buf_addr,
- 					period_len, direction))
- 		goto err_out;
- 
-@@ -882,8 +893,8 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
- 		if (!desc)
- 			goto err_desc_get;
- 
--		if (atc_dma_cyclic_fill_desc(atslave, desc, i, buf_addr,
--						period_len, direction))
-+		if (atc_dma_cyclic_fill_desc(chan, desc, i, buf_addr,
-+					     reg_width, period_len, direction))
- 			goto err_desc_get;
- 
- 		atc_desc_chain(&first, &prev, desc);
-@@ -906,6 +917,23 @@ err_out:
- 	return NULL;
- }
- 
-+static int set_runtime_config(struct dma_chan *chan,
-+			      struct dma_slave_config *sconfig)
-+{
-+	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-+
-+	/* Check if it is chan is configured for slave transfers */
-+	if (!chan->private)
-+		return -EINVAL;
-+
-+	memcpy(&atchan->dma_sconfig, sconfig, sizeof(*sconfig));
-+
-+	convert_burst(&atchan->dma_sconfig.src_maxburst);
-+	convert_burst(&atchan->dma_sconfig.dst_maxburst);
-+
-+	return 0;
-+}
-+
- 
- static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		       unsigned long arg)
-@@ -966,6 +994,8 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- 		clear_bit(ATC_IS_CYCLIC, &atchan->status);
- 
- 		spin_unlock_irqrestore(&atchan->lock, flags);
-+	} else if (cmd == DMA_SLAVE_CONFIG) {
-+		return set_runtime_config(chan, (struct dma_slave_config *)arg);
- 	} else {
- 		return -ENXIO;
- 	}
-diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index 08fd8a0..897a8bc 100644
---- a/drivers/dma/at_hdmac_regs.h
-+++ b/drivers/dma/at_hdmac_regs.h
-@@ -207,6 +207,7 @@ enum atc_status {
-  * @save_cfg: configuration register that is saved on suspend/resume cycle
-  * @save_dscr: for cyclic operations, preserve next descriptor address in
-  *             the cyclic list on suspend/resume cycle
-+ * @dma_sconfig: configuration for slave transfers, passed via DMA_SLAVE_CONFIG
-  * @lock: serializes enqueue/dequeue operations to descriptors lists
-  * @active_list: list of descriptors dmaengine is being running on
-  * @queue: list of descriptors ready to be submitted to engine
-@@ -222,6 +223,7 @@ struct at_dma_chan {
- 	struct tasklet_struct	tasklet;
- 	u32			save_cfg;
- 	u32			save_dscr;
-+	struct dma_slave_config dma_sconfig;
- 
- 	spinlock_t		lock;
- 
-@@ -243,6 +245,36 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
- 	return container_of(dchan, struct at_dma_chan, chan_common);
- }
- 
-+/*
-+ * Fix sconfig's burst size according to at_hdmac. We need to convert them as:
-+ * 1 -> 0, 4 -> 1, 8 -> 2, 16 -> 3, 32 -> 4, 64 -> 5, 128 -> 6, 256 -> 7.
-+ *
-+ * This can be done by finding most significant bit set.
-+ */
-+static inline void convert_burst(u32 *maxburst)
-+{
-+	if (*maxburst > 1)
-+		*maxburst = fls(*maxburst) - 2;
-+	else
-+		*maxburst = 0;
-+}
-+
-+/*
-+ * Fix sconfig's bus width according to at_hdmac.
-+ * 1 byte -> 0, 2 bytes -> 1, 4 bytes -> 2.
-+ */
-+static inline u8 convert_buswidth(enum dma_slave_buswidth addr_width)
-+{
-+	switch (addr_width) {
-+	case DMA_SLAVE_BUSWIDTH_2_BYTES:
-+		return 1;
-+	case DMA_SLAVE_BUSWIDTH_4_BYTES:
-+		return 2;
-+	default:
-+		/* For 1 byte width or fallback */
-+		return 0;
-+	}
-+}
- 
- /*--  Controller  ------------------------------------------------------*/
- 
--- 
-1.7.9
+And in many cases it's important to get sometimes exact, and sometimes
+almost exact, clock rate, but still at times go with a less exact clock
+rate if that gives you lower power consumption, or some other similar
+side effect.
+
+So we currently calculate the dividers manually in most cases.
+
+> > and the Taal driver would ignore those, but dsi driver would use them?
+> > This looks like quite easy solution to this, but also doesn't feel
+> > right. So my current idea is to have clk-div tables in the dsi node,
+> > something like this:
+> >
+> > dsi1 {
+> > 	omap-specific-clk-divs =<
+> > 		250 1 2 3 4 5 6 7 /* divs that produce 250MHz clk */
+> > 		350 7 6 5 4 3 2 1 /* divs that produce 350MHz clk */
+> > 	>;
+> 
+> That's the idea, except that this will represent the clock provider.
+
+Hmm... So. Should I have something like:
+
+dsi1 {
+	dsi1-pll: dsipll {
+	 	clk-table = <
+ 			250 1 2 3 4 5 6 7 /* 250MHz clk */
+ 			350 7 6 5 4 3 2 1 /* 350MHz clk */
+		>;
+	};
+
+	taal {
+		dsi-clk-src = <&dsi1-pll>;
+		dsi-clk-rate = <250000000>;
+	};
+}
+
+But no, I don't think that's correct. The panel is not using the DSI
+PLL. DSI protocol engine and DSI PHY are using the DSI PLL, and they
+produce the output on the DSI bus, with the speed that the panel wants.
+
+> > 	taal {
+> > 		dsi-ddr-clk =<250000000>;
+> 
+> And here you will have a phandle to the clock provider. And use it to 
+> set the proper clock rate.
+
+I'm not sure if a "clock provider" is correct here. It's not really a
+clock, in the strict sense, that goes to the panel from OMAP. It's the
+speed of the DSI bus we are talking about here.
+
+> > lanes =<
+> > 	/* pad-pair number, polarity */
+> > 	1 0	/* DSI pad pair 1 is used for clk, pol +/-  */
+> > 	2 1	/* DSI pad pair 2 is used for data1, pol -/+ */
+> > 	0 0	/* DSI pad pair 0 is used for data2, pol +/- */
+> >> ;
+> >
+> > Now, I don't quite know where this data should be. If it's in the
+> > dsi-node, it doesn't work with multiple panels.
+> 
+> Is the lane configuration only dependent of the panel?
+
+If you mean, is the lane config the same on every board that uses the
+panel, then no. The lane config tells which pin on OMAP is used for
+which purpose in the DSI bus.
+
+So if the DSI panel supports two datalanes, it means it has 6 DSI pins:
+2 for clk +/-, 2 for data1, 2 for data2. The HW designed then connects,
+say, the panel's CLK+ pin to one of OMAPs DSI pins. The OMAP pin has to
+be configured in the system config level for DSI operation, and also we
+need to configure the function of the pin to CLK+ in the DSI HW module.
+
+> > But then, it's quite
+> > OMAP specific thing. While other platforms probably need some kind of
+> > pad configuration also, it may be something totally different. And so it
+> > doesn't feel right in the taal-node either.
+> >
+> > And a look-up table like in the clock case doesn't make much sense
+> > either, as we don't have a key here, as we had in the clock case (the
+> > dsi-ddr-clk).
+> 
+> The lane configuration code will belong to the DSI driver. The data will 
+> belong to the panel. The panel might use some phandle to the various DSI 
+> lane config a provide the needed information.
+> 
+> This look pretty similar to the pinmux device tree binding that is 
+> currently under discussion.
+> 
+> > So basically the only option I've come up with is to define the lane
+> > configuration in the panel's data, and let the dsi driver peek there and
+> > configure the HW. And this doesn't feel right.
+> 
+> This is fine, except for the last part. The panel driver should retrieve 
+> the data from the panel node, and call some DSI configuration API using 
+> the DSI phandle retrieved from the panel node as well or using the 
+> parent node directly if the hierarchy is always the same.
+
+Ok. Then the data format for the lane configuration needs to be generic
+so that it fits to all platforms. The one I had is omap specific.
+
+Hmm... Perhaps then something like this:
+
+lanes = <
+	2	/* clk + */
+	3	/* clk - */
+	4	/* data1 + */
+	5	/* data1 - */
+	0	/* data2 + */
+	1	/* data2 - */
+	>;
+
+Here the number maps to a DSI pin on the particular DSI output used by
+the panel. The DSI driver then needs to use some logic to decide what to
+do to convert the pin number in the lane data to actual HW
+configuration.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120314/90d018e7/attachment-0001.sig>
