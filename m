@@ -1,31 +1,28 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 14 Mar 2012 17:26:55 +0100
-Subject: [PATCH v3 2/2] DMAEngine: Add DMAEngine driver based on old MSM
- DMA APIs
-In-Reply-To: <1331548364-27845-1-git-send-email-kumarrav@codeaurora.org>
-References: <1331548364-27845-1-git-send-email-kumarrav@codeaurora.org>
-Message-ID: <4F60C6CF.4090608@metafoo.de>
+From: davej@redhat.com (Dave Jones)
+Date: Wed, 14 Mar 2012 12:44:54 -0400
+Subject: [GIT PULL] cpufreq: OMAP updates for v3.4
+In-Reply-To: <CANOLnON91vXWb2L-FXjz3sqq-9j5SaEodtpt_yvFiN33D4Q3Ow@mail.gmail.com>
+References: <87y5rci2na.fsf@ti.com>
+ <CANOLnON91vXWb2L-FXjz3sqq-9j5SaEodtpt_yvFiN33D4Q3Ow@mail.gmail.com>
+Message-ID: <20120314164454.GB2968@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> [...]
-> +
-> +struct dma_async_tx_descriptor *msm_dma_prep_interleaved(struct dma_chan *dchan,
-> +					struct dma_interleaved_template *xt,
-> +					unsigned long flags, void *context)
-> +{
-> +
-> +	struct msm_dma_chan *chan;
-> +	struct msm_dma_desc_sw *new;
-> +	struct adm_box_cmd_t *box_cmd_vaddr;
-> +	u32 *cmd_cntrl = context;
-> +
-> +	if (!dchan)
-> +		return ERR_PTR(-EINVAL);
+On Wed, Mar 14, 2012 at 06:41:51PM +0200, Grazvydas Ignotas wrote:
 
-This is supposed to return either NULL or a valid descriptor.
+ > > Afzal Mohammed (1):
+ > > ? ? ?cpufreq: OMAP: specify range for voltage scaling
+ > >
+ > > Kevin Hilman (1):
+ > > ? ? ?cpufreq: OMAP: scale voltage along with frequency
+ > >
+ > > Russell King (1):
+ > > ? ? ?cpufreq: OMAP driver depends CPUfreq tables
+ > 
+ > It seems this one got messed up, it says "default ARCH_OMAP2PLUS"
+ > instead of depends.
+ > Can it be dropped and resent, or do we need a fixup patch?
 
-> +
-> +	if (!xt)
-> +		return ERR_PTR(-EINVAL);
-> [...
+Please send a follow-up patch if necessary.
+
+	Dave
