@@ -1,120 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 14 Mar 2012 15:36:32 +0000
-Subject: [PATCH 08/10] ARM: ux500: Enable PL011 AMBA UART Controller for
- Device Tree
-In-Reply-To: <4F60B280.1080404@gmail.com>
-References: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
- <1331730306-11461-9-git-send-email-lee.jones@linaro.org>
- <4F60B280.1080404@gmail.com>
-Message-ID: <4F60BB00.2080306@linaro.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Wed, 14 Mar 2012 11:37:24 -0400
+Subject: [PATCH v2 0/4] omap hsmmc device tree support
+In-Reply-To: <1331564560-23276-1-git-send-email-rnayak@ti.com> (Rajendra
+ Nayak's message of "Mon, 12 Mar 2012 20:32:36 +0530")
+References: <1331564560-23276-1-git-send-email-rnayak@ti.com>
+Message-ID: <87pqcfdwi3.fsf@laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/12 15:00, Rob Herring wrote:
-> On 03/14/2012 08:05 AM, Lee Jones wrote:
->> Enables the 3 UARTs found on a u8500 using DT.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>  arch/arm/boot/dts/db8500.dtsi      |    6 +++---
->>  arch/arm/boot/dts/snowball.dts     |   12 ++++++++++++
->>  arch/arm/mach-ux500/board-mop500.c |    4 +++-
->>  3 files changed, 18 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/db8500.dtsi b/arch/arm/boot/dts/db8500.dtsi
->> index 35d0146..9b5e06e 100644
->> --- a/arch/arm/boot/dts/db8500.dtsi
->> +++ b/arch/arm/boot/dts/db8500.dtsi
->> @@ -208,19 +208,19 @@
->>  		uart at 80120000 {
->>  			compatible = "arm,pl011", "arm,primecell";
->>  			reg = <0x80120000 0x1000>;
->> -			interrupts = <11>;
->> +			interrupts = <0 11 0x4>;
->>  			status = "disabled";
->>  		};
->>  		uart at 80121000 {
->>  			compatible = "arm,pl011", "arm,primecell";
->>  			reg = <0x80121000 0x1000>;
->> -			interrupts = <19>;
->> +			interrupts = <0 19 0x4>;
->>  			status = "disabled";
->>  		};
->>  		uart at 80007000 {
->>  			compatible = "arm,pl011", "arm,primecell";
->>  			reg = <0x80007000 0x1000>;
->> -			interrupts = <26>;
->> +			interrupts = <0 26 0x4>;
->>  			status = "disabled";
->>  		};
->>  
->> diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
->> index 34bfd79..359c6d6 100644
->> --- a/arch/arm/boot/dts/snowball.dts
->> +++ b/arch/arm/boot/dts/snowball.dts
->> @@ -96,6 +96,18 @@
->>  			status = "enabled";
->>  		};
->>  
->> +		uart at 80120000 {
->> +			status = "okay";
->> +		};
->> +
->> +		uart at 80121000 {
->> +			status = "okay";
->> +		};
->> +
->> +		uart at 80007000 {
->> +			status = "okay";
->> +		};
->> +
->>  		i2c at 80004000 {
->>  			tc3589x at 42 {
->>  				//compatible = "tc3589x";
->> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
->> index 482b86e..ea0242a 100644
->> --- a/arch/arm/mach-ux500/board-mop500.c
->> +++ b/arch/arm/mach-ux500/board-mop500.c
->> @@ -746,6 +746,9 @@ MACHINE_END
->>  #ifdef CONFIG_MACH_UX500_DT
->>  
->>  struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
->> +	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
->> +	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
->> +	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
-> 
-> Unless I'm blind, the pl011 driver doesn't take any platform data.
+Hi,
 
-I guess you must be blind then? =:-)
+On Mon, Mar 12 2012, Rajendra Nayak wrote:
+> The series adds device tree support for OMAP hsmmc
+> driver.
+>
+> Changes in V2:
+> -1- Minor fixes based on comments from Grant.
+> -2- Added a seperate compatible for omap3.
+> -3- Added a new binding "ti,needs-special-reset"
+> to handle some mmc modules which need special
+> softreset sequence.
+> -4- Updated board dts files with "status = disable;"
+> for unused mmc modules.
+>
+> Rob,
+> I retained your ack on patch 1 despite the additional
+> binding that I added to handle the special softreset
+> sequence. Let me know if you have any issues with it.
+>
+> Chris.
+> Patch 1 and Patch 2 apply cleanly on mmc-next and can
+> be taken in from the mmc tree after relevent acks from
+> DT folks.
+> Patch 3 and Patch 4 which update dts files, I plan to
+> push via linux-omap/Tony's tree.
 
-linux/amba/serial.h:
+Thanks, I've pushed patches 1 and 2 to mmc-next for 3.4, with Balaji's
+Tested-by.
 
-struct amba_pl011_data {
-        bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
-        void *dma_rx_param;
-        void *dma_tx_param;
-        void (*init) (void);
-        void (*exit) (void);
-        void (*reset) (void);
-};
-
->>  	{},
->>  };
->>  
->> @@ -802,7 +805,6 @@ static void __init u8500_init_machine(void)
->>  	}
->>  	mop500_i2c_init(parent);
->>  	mop500_spi_init(parent);
->> -	mop500_uart_init(parent);
->>  
->>  	i2c_register_board_info(0, mop500_i2c0_devices, i2c0_devs);
->>  	i2c_register_board_info(2, mop500_i2c2_devices,
-> 
-
-
+- Chris.
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
