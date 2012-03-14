@@ -1,59 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Mar 2012 17:52:13 -0700
-Subject: Conflict between Versatile Express DT conversion and local timer
- updates
-In-Reply-To: <201203131433.07214.arnd@arndb.de>
-References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
- <201203131155.16454.arnd@arndb.de> <4F5F52A2.3050005@arm.com>
- <201203131433.07214.arnd@arndb.de>
-Message-ID: <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
+Date: Tue, 13 Mar 2012 17:52:40 -0700
+Subject: [GIT PULL v2] Samsung cleanup EXYNOS clock for v3.4
+In-Reply-To: <4F5C6310.5010402@samsung.com>
+References: <4F5C6310.5010402@samsung.com>
+Message-ID: <CAOesGMjPxTL8EDKgbJ7Ubsn2-Esgj+vobwGPkRNJWRW8CZd8+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2012 at 7:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 13 March 2012, Marc Zyngier wrote:
->> On 13/03/12 11:55, Arnd Bergmann wrote:
->> > On Tuesday 13 March 2012, Marc Zyngier wrote:
->> >> On 13/03/12 10:15, Russell King - ARM Linux wrote:
+On Sun, Mar 11, 2012 at 12:32 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Hi Arnd, Olof,
 >
->> > d) create a new next/timer branch in arm-soc that has Pawel's
->> > ? ?98ed4ceb "ARM: vexpress: Get rid of MMIO_P2V" (the first patch from
->> > ? ?vexpress/dt, your patches and the ux500/timer series. Also put
->> > ? ?98ed4ceb into the next/cleanup branch.
->> >
->> > Any of those will work for us, my preference would be on #4. I have
->> > created the next/timer branch in the arm-soc tree, so you can use
->> > that and either rebase your patches on top or merge your tree into
->> > it and fix up the merge conflicts.
->>
->> Thanks for doing that Arnd.
->>
->> I've thus created a new branch:
->> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
->> local_timers-for-arm-soc
->>
->> which contains the arm-soc next/timers branch as well as my local timers
->> series. I'd greatly appreciate if you could pull it for 3.4.
->>
+> I rebased cleanup-exynos-clock on top of cleanup-use-static as per Olof's
+> suggestion.
 >
-> I've updated the next/timer branch with your changes now, but did not
-> put it into the for-next branch because Olof is currently handling that.
+> Please pull it from:
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/cleanup-exynos-clock
 >
-> Olof, can you add it to for-next please? The timer branch should have
-> no dependencies other than rmk/for-armsoc, so it can be fairly close to
-> the start.
+> If any problems, please kindly let me know.
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> The following changes since commit c15a04338b5a6d4305d107a5b6c0cd43418b7f3e:
+>
+> ?Merge branch 'next/cleanup-use-static' into next/cleanup-exynos-clock
+> (2012-03-10 22:21:36 -0800)
+>
+> are available in the git repository at:
+>
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> next/cleanup-exynos-clock
 
-
-Thanks. I merged into for-next, but since there's already a history in
-there and I didn't rebuild it, it's on top of everything else.
-
-I got two trivial merge conflicts (and a few that git sorted out
-automatically): one with the tegra makefile, the other with shmobile's
-timer init.
-
-Marc, please take a look at the next/timers merge in the arm-soc
-for-next branch and let me know if they're OK. I'm pretty sure they
-are though.
+Thanks, pulled into next/cleanup.
 
 
 -Olof
