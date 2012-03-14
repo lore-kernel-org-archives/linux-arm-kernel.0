@@ -1,39 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 14 Mar 2012 22:53:44 +0100
-Subject: [PATCH v3 1/5] ARM: protect usage of cr_alignment by #ifdef
- CONFIG_CPU_CP15
-In-Reply-To: <alpine.LFD.2.02.1203141710210.24151@xanadu.home>
-References: <20120314101928.GA29474@pengutronix.de>
- <1331720483-10075-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <alpine.LFD.2.02.1203141103080.24151@xanadu.home>
- <20120314195120.GA2391@pengutronix.de>
- <alpine.LFD.2.02.1203141710210.24151@xanadu.home>
-Message-ID: <20120314215344.GD2391@pengutronix.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 14 Mar 2012 15:06:37 -0700
+Subject: [PATCH] OMAP3: OPP: Test for IVA subsystem before attempting to
+ add IVA OPP
+In-Reply-To: <CAOMWX4eYQvwHfpci1AgLO8kk1yxzB-zruMQQvLXeLnxbfUHFgw@mail.gmail.com>
+ (Nishanth Menon's message of "Wed, 14 Mar 2012 16:35:17 -0500")
+References: <1331746695-24372-1-git-send-email-mvs@tigris.de>
+ <874ntqg9yr.fsf@ti.com>
+ <CAOMWX4eYQvwHfpci1AgLO8kk1yxzB-zruMQQvLXeLnxbfUHFgw@mail.gmail.com>
+Message-ID: <8762e6et1u.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Nicolas,
+"Menon, Nishanth" <nm@ti.com> writes:
 
-On Wed, Mar 14, 2012 at 05:19:53PM -0400, Nicolas Pitre wrote:
-> On Wed, 14 Mar 2012, Uwe Kleine-K?nig wrote:
-> > On Wed, Mar 14, 2012 at 11:24:36AM -0400, Nicolas Pitre wrote:
-> > > >  	flush_cache_all();
-> > > > +#ifdef CONFIG_CPU_CP15
-> > > >  	set_cr(cr_alignment);
-> > > > +#endif
-> > > 
-> > > However it might be best to provide a dummy set_cr() instead of 
-> > > #ifdef'ing it out everywhere.
-> > What should the dummy set_cr do? Print a runtime warning if called with
-> > != 0?
-> 
-> Maybe not.  In fact if that code path is used, then something might be 
-> wrong at a higher level.
-And that's why I choosed not to implement a dummy set_cr ...
+> On Wed, Mar 14, 2012 at 16:15, Kevin Hilman <khilman@ti.com> wrote:
+>> Maximilian Schwerin <mvs@tigris.de> writes:
+>>
+>>> From: Steve Sakoman <steve@sakoman.com>
+>>>
+>>> Don't try to add IVA OPPs for OMAP3 versions not containing an IVA
+>>> subsystem, as this would make omap_init_opp_table fail.
+>>>
+>>> Signed-off-by: Steve Sakoman <steve@sakoman.com>
+>>> Signed-off-by: Maximilian Schwerin <mvs@tigris.de>
+>>
+>> Minor: patch subjects for arch/arm/* core code need to have the ARM:
+>> prefix also.
+>>
+>> Also, please run scripts/checkpatch.pl on your patch and fix the
+>> warnings.
+>>
+>>> ---
+>>> ?arch/arm/mach-omap2/opp.c | ? ?4 ++++
+>>> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/opp.c b/arch/arm/mach-omap2/opp.c
+>>> index 9262a6b..414f2ec 100644
+>>> --- a/arch/arm/mach-omap2/opp.c
+>>> +++ b/arch/arm/mach-omap2/opp.c
+>>> @@ -62,6 +62,10 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__, i);
+>>> ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+>>> ? ? ? ? ? ? ? }
+>>> +
+>>> + ? ? ? ? ? ? if ((strcmp(opp_def->hwmod_name,"iva") == 0) && !omap3_has_iva())
+>>> + ? ? ? ? ? ? ? ? ? ? continue;
+>>> +
+>>> ? ? ? ? ? ? ? oh = omap_hwmod_lookup(opp_def->hwmod_name);
+>>> ? ? ? ? ? ? ? if (!oh || !oh->od) {
+>>> ? ? ? ? ? ? ? ? ? ? ? pr_warn("%s: no hwmod or odev for %s, [%d] "
+>>
+>> Wouldn't the one-liner below do the same thing?
+>>
+>> Actually, your patch makes it less noisy at boot time, avoiding the
+>> pr_warn(), so is probably better.
+>
+> The only issue i have with current patch is that it focusses to solve
+> a specific device IVA.
+> we could have similar variances if we had SGX/AESS device etc
+> registered in the common
+> table. a generic solution might be preferable - could we reduce the
+> severity of pr_warn to pr_debug and do a continue instead?
 
-Best regards
-Uwe
+I agree, that would be a better generic solution.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kevin
