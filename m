@@ -1,62 +1,70 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 14 Mar 2012 09:54:47 +0100
-Subject: [PATCH v1 3/5] ARM: imx28evk: add mmc dt support
-In-Reply-To: <20120314082024.GB1180@shlinux2.ap.freescale.net>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-4-git-send-email-b29396@freescale.com>
- <4F5F5C22.1080506@gmail.com>
- <20120313165214.GO26642@pengutronix.de>
- <4F5F879E.4030407@gmail.com>
- <20120314073035.GI18320@game.jcrosoft.org>
- <20120314082024.GB1180@shlinux2.ap.freescale.net>
-Message-ID: <20120314085447.GL18320@game.jcrosoft.org>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Wed, 14 Mar 2012 14:48:40 +0530
+Subject: [PATCH v3 1/2] dmaengine: Add support for per xfer specific
+ privatedata
+In-Reply-To: <1331569796.1727.9.camel@vkoul-udesk3>
+References: <1331548336-27802-1-git-send-email-kumarrav@codeaurora.org>
+ <1331569796.1727.9.camel@vkoul-udesk3>
+Message-ID: <4F606270.1020709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:20 Wed 14 Mar     , Dong Aisheng wrote:
-> On Wed, Mar 14, 2012 at 03:30:35PM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 12:45 Tue 13 Mar     , Rob Herring wrote:
-> > > On 03/13/2012 11:52 AM, Sascha Hauer wrote:
-> > > > On Tue, Mar 13, 2012 at 09:39:30AM -0500, Rob Herring wrote:
-> > > >> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
-> > > >>> From: Dong Aisheng <dong.aisheng@linaro.org>
-> > > >>>
-> > > >>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > > >>> ---
-> > > >>>  arch/arm/boot/dts/imx28-evk.dts |   14 ++++++++++++++
-> > > >>>  arch/arm/boot/dts/imx28.dtsi    |   33 +++++++++++++++++++++++++++++++++
-> > > >>>  arch/arm/mach-mxs/imx28-dt.c    |    2 ++
-> > > >>>  3 files changed, 49 insertions(+), 0 deletions(-)
-> > > >>
-> > > >> snip
-> > > >>
-> > > >>> diff --git a/arch/arm/mach-mxs/imx28-dt.c b/arch/arm/mach-mxs/imx28-dt.c
-> > > >>> index 78d1129..429b88e 100644
-> > > >>> --- a/arch/arm/mach-mxs/imx28-dt.c
-> > > >>> +++ b/arch/arm/mach-mxs/imx28-dt.c
-> > > >>> @@ -23,6 +23,8 @@ static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
-> > > >>>  	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
-> > > >>>  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
-> > > >>>  	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
-> > > >>> +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP0_BASE_ADDR, "mxs-mmc.0", NULL),
-> > > >>> +	OF_DEV_AUXDATA("fsl,imx28-mmc", MX28_SSP1_BASE_ADDR, "mxs-mmc.1", NULL),
-> > > >>
-> > > >> Why is this needed?
-> > > > 
-> > > > These are needed for the drivers which have still the mxs-mmc.* names
-> > > > to find their clocks. Alternatively we could also add the appropriate
-> > > > clocks to the clock file. Don't know if that's better though.
-> > > 
-> > > Ah, yes I should have known that... If clk lookup is all that's needed,
-> > > I'd suggest adding the necessary clk lookups either here or in the clock
-> > > code. Not much difference, but at least it removes the use of
-> > > *_BASE_ADDR defines.
-> > Agreed we do this on AT91
-> > 
-> I'm willing to do like that.
-> But i'm new to this, can you help point our where the code i can reference
-> in Rob suggested way?
-mach-at91
+On 3/12/2012 9:59 PM, Vinod Koul wrote:
+> On Mon, 2012-03-12 at 16:02 +0530, Ravi Kumar V wrote:
+>> Add new argument to DMA SG and Interleave mode for passing
+>> per transfer specific private data, using this it enables the
+>> dma devices which needs to pass the parameters which changes per
+>> each transfer.
+>>
+>> Signed-off-by: Ravi Kumar V<kumarrav@codeaurora.org>
+>> ---
+>>   include/linux/dmaengine.h |    4 ++--
+>>   1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> index 679b349..b8f0495 100644
+>> --- a/include/linux/dmaengine.h
+>> +++ b/include/linux/dmaengine.h
+>> @@ -570,7 +570,7 @@ struct dma_device {
+>>   		struct dma_chan *chan,
+>>   		struct scatterlist *dst_sg, unsigned int dst_nents,
+>>   		struct scatterlist *src_sg, unsigned int src_nents,
+>> -		unsigned long flags);
+>> +		unsigned long flags, void *context);
+> Please follow the related discussion we had. Alexandre had already
+> posted updated and this needs to follow.
+> Also this way you break the existing drivers which use this API, not
+> sure why you posted without fixing them?
+>
+I have gone through the discussion in
+https://lkml.org/lkml/2012/2/6/300
+As per my understanding
+1.we need to add new transaction types DMA_SG_EXT & DMA_INTERLEAVE_EXT.
+2.Add context parameter to existing API's.
+3.Typecast the context parameter with architecture specific structure 
+there by restricting client drivers to pass only arch specific parameter.
+4.Fix existing code and client drivers for using new API.
 
-Best Regards,
-J.
+My suggestion is instead of adding context parameter in existing API's, 
+how it would be if we can add a new API for each DMA transaction types 
+available in dmaengine for passing transaction specific parameter?
+so that existing clients and dma drivers will not be disturbed.
+
+>>   	struct dma_async_tx_descriptor *(*device_prep_slave_sg)(
+>>   		struct dma_chan *chan, struct scatterlist *sgl,
+>> @@ -581,7 +581,7 @@ struct dma_device {
+>>   		size_t period_len, enum dma_transfer_direction direction);
+>>   	struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
+>>   		struct dma_chan *chan, struct dma_interleaved_template *xt,
+>> -		unsigned long flags);
+>> +		unsigned long flags, void *context);
+>>   	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>>   		unsigned long arg);
+>>
+>
+>
+
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
