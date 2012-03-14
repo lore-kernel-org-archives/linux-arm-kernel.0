@@ -1,53 +1,82 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 Mar 2012 02:38:09 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP2+: hwmod: remove link arrays
-Message-ID: <alpine.DEB.2.00.1203140231150.7269@utopia.booyaka.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 14 Mar 2012 16:38:20 +0800
+Subject: [PATCH] ARM: pxa: fix regulator related build fail in
+ magician_defconfig
+In-Reply-To: <1331242494-3157-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1331084814.11802.YahooMailClassic@web29012.mail.ird.yahoo.com>
+ <1331242494-3157-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CAN1soZzDRR4XQ34WDL48=j+Ff8t5fsCFaccqZAKOQ1OAPeDXcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+On Fri, Mar 9, 2012 at 5:34 AM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
+> commit 737f360d5bef5e01c6cfa755dca0b449a154c1e0 (linux-next)
+>
+> ?"regulator: Remove support for supplies specified by struct device"
+>
+> deletes the field from the struct, but this platform was still trying
+> to set those fields. ?Convert them to use the REGULATOR_SUPPLY macro.
+>
+> arch/arm/mach-pxa/magician.c:581: error: unknown field 'dev' specified in initializer
+> arch/arm/mach-pxa/magician.c:581: warning: initialization from incompatible pointer type
+> arch/arm/mach-pxa/magician.c:585: error: unknown field 'dev' specified in initializer
+> arch/arm/mach-pxa/magician.c:585: warning: initialization from incompatible pointer type
+>
+> arch/arm/mach-pxa/hx4700.c:683: error: unknown field 'dev' specified in initializer
+> arch/arm/mach-pxa/hx4700.c:683: warning: initialization from incompatible pointer type
+> arch/arm/mach-pxa/hx4700.c:687: error: unknown field 'dev' specified in initializer
+> arch/arm/mach-pxa/hx4700.c:687: warning: initialization from incompatible pointer type
+>
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
+>
+> [v3: fix arg2 in REGULATOR_SUPPLY to have correct names ]
+>
+> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+> index f2c23ea..b6a338b 100644
+> --- a/arch/arm/mach-pxa/hx4700.c
+> +++ b/arch/arm/mach-pxa/hx4700.c
+> @@ -679,14 +679,8 @@ static struct platform_device power_supply = {
+> ?*/
+>
+> ?static struct regulator_consumer_supply bq24022_consumers[] = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .dev = &gpio_vbus.dev,
+> - ? ? ? ? ? ? ? .supply = "vbus_draw",
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .dev = &power_supply.dev,
+> - ? ? ? ? ? ? ? .supply = "ac_draw",
+> - ? ? ? },
+> + ? ? ? REGULATOR_SUPPLY("vbus_draw", "gpio-vbus"),
+> + ? ? ? REGULATOR_SUPPLY("ac_draw", "pda-power"),
 
-The following changes since commit 5f43ef65748c19b954756485ddaef657ac71b649:
-
-  Merge branch 'hwmod_misc_devel_3.4' into MERGE_sr_and_hwmod_data (2012-03-08 21:03:17 -0700)
-
-are available in the git repository at:
-
-  git://git.pwsan.com/linux-2.6 hwmod_remove_link_arrays_cleanup_3.4
-
-for you to fetch changes up to afce19b152eedea0402561087dd939b23b53f3cb:
-
-  ARM: OMAP2xxx: hwmod data: start to fix the IVA1, IVA2 and DSP (2012-03-08 21:04:50 -0700)
-
-The base commit for this pull request is a merge of your SR branch with 
-the 'hwmod_misc_devel_3.4' branch, since this series has dependencies on 
-both of those.
-
-
-- Paul
-
-----------------------------------------------------------------
-Paul Walmsley (12):
-      ARM: OMAP2+: hwmod: add _find_mpu_rt_port()
-      ARM: OMAP2+: hwmod: add function to iterate over struct omap_hwmod_ocp_if
-      ARM: OMAP2+: hwmod: consolidate finding the MPU port index and storing it
-      ARM: OMAP2+: hwmod: add support for link registration
-      ARM: OMAP2+: hwmod data: convert to link registration
-      ARM: OMAP: hwmod: remove code support for direct hwmod registration
-      ARM: OMAP2+: hwmod data: remove forward declarations, reorganize
-      ARM: OMAP2xxx: hwmod data: share common hwmods between OMAP2420 and OMAP2430
-      ARM: OMAP2xxx: hwmod data: share common interface data
-      ARM: OMAP3: hwmod data: fix IVA interface clock
-      ARM: OMAP3: hwmod data: add IVA hard reset lines, main clock, clockdomain
-      ARM: OMAP2xxx: hwmod data: start to fix the IVA1, IVA2 and DSP
-
- arch/arm/mach-omap2/omap_hwmod.c                   |  410 ++-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         | 1563 +-----
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         | 2316 +++-------
- .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  266 +-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  562 +++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 5081 +++++++++-----------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         | 4882 ++++++++-----------
- arch/arm/mach-omap2/omap_hwmod_common_data.h       |   71 +-
- arch/arm/plat-omap/include/plat/omap_hwmod.h       |   31 +-
- 9 files changed, 6341 insertions(+), 8841 deletions(-)
+How do you think about Mark's comments? Use dev_name() at here.
+> ?};
+>
+> ?static struct regulator_init_data bq24022_init_data = {
+> diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+> index 3d6baf9..1a18e63 100644
+> --- a/arch/arm/mach-pxa/magician.c
+> +++ b/arch/arm/mach-pxa/magician.c
+> @@ -577,14 +577,8 @@ static struct platform_device power_supply = {
+> ?*/
+>
+> ?static struct regulator_consumer_supply bq24022_consumers[] = {
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .dev = &gpio_vbus.dev,
+> - ? ? ? ? ? ? ? .supply = "vbus_draw",
+> - ? ? ? },
+> - ? ? ? {
+> - ? ? ? ? ? ? ? .dev = &power_supply.dev,
+> - ? ? ? ? ? ? ? .supply = "ac_draw",
+> - ? ? ? },
+> + ? ? ? REGULATOR_SUPPLY("vbus_draw", "gpio-vbus"),
+> + ? ? ? REGULATOR_SUPPLY("ac_draw", "pda-power"),
+> ?};
+>
+> ?static struct regulator_init_data bq24022_init_data = {
+> --
+> 1.7.9.1
+>
