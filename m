@@ -1,129 +1,39 @@
-From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
-Date: Wed, 14 Mar 2012 15:16:43 +0100
-Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20120314124512.GG1180@shlinux2.ap.freescale.net>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-2-git-send-email-b29396@freescale.com>
- <20120313172351.97C5E3E053B@localhost>
- <20120314124512.GG1180@shlinux2.ap.freescale.net>
-Message-ID: <20120314141643.GP3852@pengutronix.de>
+From: dhowells@redhat.com (David Howells)
+Date: Wed, 14 Mar 2012 14:18:08 +0000
+Subject: [PATCH] ARM: Fix missing linux/types.h #inclusion in
+ asm/hardware/iop3xx.h
+Message-ID: <20120314141808.2354.62573.stgit@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 08:45:23PM +0800, Dong Aisheng wrote:
-> On Wed, Mar 14, 2012 at 01:23:51AM +0800, Grant Likely wrote:
-> > On Tue, 13 Mar 2012 16:47:04 +0800, Dong Aisheng <b29396@freescale.com> wrote:
-> > > From: Dong Aisheng <dong.aisheng@linaro.org>
-> > > 
-> > > This patch includes basic dt support which can boot via nfs rootfs.
-> > > 
-> > > Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
-> > > ---
-> > >  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
-> > >  arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
-> > >  arch/arm/boot/dts/imx28.dtsi                  |   88 +++++++++++++++++++++++++
-> > >  arch/arm/mach-mxs/Kconfig                     |    9 +++
-> > >  arch/arm/mach-mxs/Makefile                    |    1 +
-> > >  arch/arm/mach-mxs/imx28-dt.c                  |   67 +++++++++++++++++++
-> > >  6 files changed, 200 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> > > index 54bddda..9f21faf 100644
-> > > --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> > > +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> > > @@ -1,6 +1,10 @@
-> > >  Freescale i.MX Platforms Device Tree Bindings
-> > >  -----------------------------------------------
-> > >  
-> > > +i.MX28 Evaluation Kit
-> > > +Required root node properties:
-> > > +    - compatible = "fsl,imx28-evk", "fsl,imx28";
-> > > +
-> > >  i.MX51 Babbage Board
-> > >  Required root node properties:
-> > >      - compatible = "fsl,imx51-babbage", "fsl,imx51";
-> > > diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-> > > new file mode 100644
-> > > index 0000000..9758dc4
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/imx28-evk.dts
-> > > @@ -0,0 +1,31 @@
-> > > +/*
-> > > + * Copyright 2012 Freescale Semiconductor, Inc.
-> > > + *
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +/dts-v1/;
-> > > +/include/ "imx28.dtsi"
-> > > +
-> > > +/ {
-> > > +	model = "Freescale i.MX28 Evaluation Kit";
-> > > +	compatible = "fsl,imx28-evk", "fsl,imx28";
-> > > +
-> > > +	memory {
-> > > +		device_type = "memory";
-> > > +		reg = <0x40000000 0x08000000>;
-> > > +	};
-> > > +
-> > > +	ahb at 80080000 {
-> > > +		fec at 800f0000 {
-> > > +			phy-mode = "rmii";
-> > > +			local-mac-address = [00 04 9F 01 7D 5B];
-> > 
-> > Generally a bad idea to put a specific mac address into the device tree.
-> > Better to fill it with zeros.  Otherwise all the dev boards will end up using
-> > the same value.
-> > 
-> Yes, this issue also exists on other platfroms like mx6q.
-> One way is to dynamically get mac address by reading otp register as non-dt does
-> like:
-> static int __init mx28evk_fec_get_mac(void)
-> {
->         int i;
->         u32 val;
->         const u32 *ocotp = mxs_get_ocotp();
-> 
->         if (!ocotp)
->                 return -ETIMEDOUT;
-> 
->         /*
->          * OCOTP only stores the last 4 octets for each mac address,
->          * so hard-code Freescale OUI (00:04:9f) here.
->          */
->         for (i = 0; i < 2; i++) {
->                 val = ocotp[i];
->                 mx28_fec_pdata[i].mac[0] = 0x00;
->                 mx28_fec_pdata[i].mac[1] = 0x04;
->                 mx28_fec_pdata[i].mac[2] = 0x9f;
->                 mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
->                 mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
->                 mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
->         }
-> 
->         return 0;
-> }
-> 
-> But it seems this needs pass mac address to fec driver via platforom data which is
-> not friendly to dt.
-> 
-> Another way may be changing fec driver to get the fixed part of mac address(first
-> two bytes) from device tree and read the left dynamical part from otp which i'm not
-> sure is better enough.
-> 
-> BTW, filling with zeros seems not work since it's invalid mac address.
+arch/arm/include/asm/hardware/iop3xx.h needs to include linux/types.h to avoid
+the following errors:
 
-Yes, that's the idea of using this value...
+In file included from arch/arm/plat-iop/restart.c:10:0:
+/data/fs/linux-2.6-fscache/arch/arm/include/asm/hardware/iop3xx.h:239:1: error: unknown type name 'u32'
+/data/fs/linux-2.6-fscache/arch/arm/include/asm/hardware/iop3xx.h: In function 'read_tmr0':
+/data/fs/linux-2.6-fscache/arch/arm/include/asm/hardware/iop3xx.h:241:2: error: unknown type name 'u32'
+/data/fs/linux-2.6-fscache/arch/arm/include/asm/hardware/iop3xx.h: At top level:
+/data/fs/linux-2.6-fscache/arch/arm/include/asm/hardware/iop3xx.h:246:31: error: unknown type name 'u32'
+...
 
-Sascha
+Signed-off-by: David Howells <dhowells@redhat.com>
+---
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ arch/arm/include/asm/hardware/iop3xx.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardware/iop3xx.h b/arch/arm/include/asm/hardware/iop3xx.h
+index 077c323..2ff2c75 100644
+--- a/arch/arm/include/asm/hardware/iop3xx.h
++++ b/arch/arm/include/asm/hardware/iop3xx.h
+@@ -231,6 +231,9 @@ extern int iop3xx_get_init_atu(void);
+ 
+ 
+ #ifndef __ASSEMBLY__
++
++#include <linux/types.h>
++
+ void iop3xx_map_io(void);
+ void iop_init_cp6_handler(void);
+ void iop_init_time(unsigned long tickrate);
