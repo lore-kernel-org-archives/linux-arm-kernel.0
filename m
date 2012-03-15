@@ -1,62 +1,33 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Thu, 15 Mar 2012 11:57:52 -0400
-Subject: [alsa-devel] [PATCH v3 09/11] ASoC: fsl: remove the fatal error
- checking on codec-handle
-In-Reply-To: <CA+7tXig6=gz8utcnV8qUs6=JnwEz8+tqc-57v-xNcYcK_AAHXw@mail.gmail.com>
-References: <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
- <4F591B8D.8090705@freescale.com>
- <20120309013216.GH2499@S2101-09.ap.freescale.net>
- <4F5FD706.8040209@freescale.com>
- <20120313234638.GY3177@opensource.wolfsonmicro.com>
- <4F6008FA.3040805@freescale.com>
- <20120314122723.GC3133@opensource.wolfsonmicro.com>
- <4F612319.50302@freescale.com>
- <20120315130253.GA6065@S2101-09.ap.freescale.net>
- <4F61F080.4090800@freescale.com>
- <20120315142115.GB6065@S2101-09.ap.freescale.net>
- <CA+7tXig6=gz8utcnV8qUs6=JnwEz8+tqc-57v-xNcYcK_AAHXw@mail.gmail.com>
-Message-ID: <CA+7tXiiJyLAm1ytyqQYgbJ_roUtXwxqhFWKEBk+4jY_HV5V8Zg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Mar 2012 16:57:20 +0100
+Subject: [PATCH 4/6] rtc: Kconfig: remove dependency for AT91 rtc driver
+In-Reply-To: <cover.1331826095.git.nicolas.ferre@atmel.com>
+References: <cover.1331826095.git.nicolas.ferre@atmel.com>
+Message-ID: <7dce7bba2113315bf484570e3e0ad234c68c610b.1331826095.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 11:39 AM, Trent Piepho <tpiepho@gmail.com> wrote:
-> On Thu, Mar 15, 2012 at 10:21 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> On Thu, Mar 15, 2012 at 01:37:06PM +0000, Tabi Timur-B04825 wrote:
->> ...
->> > The PowerPC MPC8610 has two SSIs, and I have a hacked up board that has
->> > both connected to two CS4270s. ?This is how I tested multiple SSI support
->> > in my driver.
->> >
->> > Since my driver supports any number of SSIs, I expect any changes to it to
->> > continue that support.
->> >
->> I think it can still easily get supported with the binding like below.
->>
->> sound {
->> ? ? ?compatible = "fsl,imx51-babbage-sgtl5000",
->> ? ? ? ? ? ? ? ? ? "fsl,imx-audio-sgtl5000";
->> ? ? ?model = "imx51-babbage-sgtl5000";
->> ? ? ?ssi-controller = <&ssi1, &ssi2>;
->> ? ? ?audio-codec = <&sgtl5000_1, &sgtl5000_2>;
->> ? ? ?mux-int-port = <1>;
->> ? ? ?mux-ext-port = <3>;
->> };
->
-> How would you support binding the imx51 ESAI controller?
+This will allow to select this driver for newer SoCs.
+Keep dependency on AT91 because of the use of an header
+file located in include/mach directory.
 
-Sorry about previous email, laptop touchpad emitted a spurious click,
-which caused text window in gmail to become deselected, which caused a
-subsequent enter to send the email rather than creating a new line.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/rtc/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-For esai, would you add something like:
-    esai-controller = <&esai1>;
-    esai-audio-codec = <&sgtl5000_3>;
-
-That seems rather ugly to me.
-
-It seems to me in most device bindings where one piece of hardware is
-attached to another, than the one upstream has in its binding a
-phandle to the one downstream.  But here we have a third binding with
-two lists of devices and an implied link between devices in
-corresponding positions in the lists.  Does any other device binding
-work like that?
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 3a125b8..918736e 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -831,7 +831,7 @@ config RTC_DRV_AT32AP700X
+ 
+ config RTC_DRV_AT91RM9200
+ 	tristate "AT91RM9200 or some AT91SAM9 RTC"
+-	depends on ARCH_AT91RM9200 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
++	depends on ARCH_AT91
+ 	help
+ 	  Driver for the internal RTC (Realtime Clock) module found on
+ 	  Atmel AT91RM9200's and some  AT91SAM9 chips. On AT91SAM9 chips
+-- 
+1.7.9
