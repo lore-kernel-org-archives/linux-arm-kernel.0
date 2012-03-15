@@ -1,218 +1,70 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Thu, 15 Mar 2012 23:47:37 +0530
-Subject: [PATCH v2 7/7] misc: emif: add debugfs entries for emif
-In-Reply-To: <1331835457-5390-1-git-send-email-aneesh@ti.com>
-References: <1331835457-5390-1-git-send-email-aneesh@ti.com>
-Message-ID: <1331835457-5390-8-git-send-email-aneesh@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 15 Mar 2012 13:24:31 -0500
+Subject: [PATCH] OMAP: clock: fix race in disable all clocks
+Message-ID: <1331835871-13328-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debug entries for:
-	1. calculated registers per frequency
-	2. last polled value of MR4(temperature level
-	   of LPDDR2 memory)
+clk_disable_unused is invoked when CONFIG_OMAP_RESET_CLOCKS=y.
+Since clk_disable_unused is called as lateinitcall, there can
+be more than a few workqueues executing off secondary CPU(s).
+The current code does the following:
+a) checks if clk is unused
+b) holds lock
+c) disables clk
+d) unlocks
 
-Cc: Greg KH <greg@kroah.com>
-Signed-off-by: Aneesh V <aneesh@ti.com>
----
-v2:
-- Corrected the frequency value shown in
-  register cache dump
-- replaced __init with __init_or_module
----
- drivers/misc/emif.c |  138 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 138 insertions(+), 0 deletions(-)
+Between (a) and (b) being executed on CPU0, It is possible to
+have a driver executing on CPU1 which could do a get_sync->clk_get
+(and increase the use_count) of the clock which was just about
+to be disabled by clk_disable_unused.
 
-diff --git a/drivers/misc/emif.c b/drivers/misc/emif.c
-index 270a0e4..6d2f776 100644
---- a/drivers/misc/emif.c
-+++ b/drivers/misc/emif.c
-@@ -18,6 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/interrupt.h>
- #include <linux/slab.h>
-+#include <linux/debugfs.h>
- #include <linux/seq_file.h>
- #include <linux/module.h>
- #include <linux/list.h>
-@@ -47,6 +48,7 @@
-  *				frequency change (i.e. corresponding to the
-  *				frequency in effect at the moment)
-  * @plat_data:			Pointer to saved platform data.
-+ * @debugfs_root:		dentry to the root folder for EMIF in debugfs
-  */
- struct emif_data {
- 	u8				duplicate;
-@@ -60,6 +62,7 @@ struct emif_data {
- 	struct emif_regs		*regs_cache[EMIF_MAX_NUM_FREQUENCIES];
- 	struct emif_regs		*curr_regs;
- 	struct emif_platform_data	*plat_data;
-+	struct dentry			*debugfs_root;
- };
+We ensure instead that the entire list traversal is protected by
+the lock allowing for parent child clock traversal which could be
+potentially be done by runtime operations to be safe as well.
+
+Reported-by: Todd Poynor <toddpoynor@google.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+To confirm this in reality happens, I setup a trap as follows:
+  @@ -450,6 +450,8 @@ static int __init clk_disable_unused(void)
+  			continue;
+  
+  		spin_lock_irqsave(&clockfw_lock, flags);
+ +		WARN(ck->usecount, "XXXX->RACECONDITION FOR CLOCK %s\n",
+ +			ck->name);
+  		arch_clock->clk_disable_unused(ck);
+  		spin_unlock_irqrestore(&clockfw_lock, flags);
+  	}
+Resultant log: http://pastebin.pandaboard.org/index.php/view/66400792
+
+ arch/arm/plat-omap/clock.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 567e4b5..8030cc1 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -442,6 +442,8 @@ static int __init clk_disable_unused(void)
+ 		return 0;
  
- static struct emif_data *emif1;
-@@ -68,6 +71,130 @@ static unsigned long	irq_state;
- static u32		t_ck; /* DDR clock period in ps */
- static LIST_HEAD(device_list);
+ 	pr_info("clock: disabling unused clocks to save power\n");
++
++	spin_lock_irqsave(&clockfw_lock, flags);
+ 	list_for_each_entry(ck, &clocks, node) {
+ 		if (ck->ops == &clkops_null)
+ 			continue;
+@@ -449,10 +451,9 @@ static int __init clk_disable_unused(void)
+ 		if (ck->usecount > 0 || !ck->enable_reg)
+ 			continue;
  
-+static void do_emif_regdump_show(struct seq_file *s, struct emif_data *emif,
-+	struct emif_regs *regs)
-+{
-+	u32 type = emif->plat_data->device_info->type;
-+	u32 ip_rev = emif->plat_data->ip_rev;
-+
-+	seq_printf(s, "EMIF register cache dump for %dMHz\n",
-+		regs->freq/1000000);
-+
-+	seq_printf(s, "ref_ctrl_shdw\t: 0x%08x\n", regs->ref_ctrl_shdw);
-+	seq_printf(s, "sdram_tim1_shdw\t: 0x%08x\n", regs->sdram_tim1_shdw);
-+	seq_printf(s, "sdram_tim2_shdw\t: 0x%08x\n", regs->sdram_tim2_shdw);
-+	seq_printf(s, "sdram_tim3_shdw\t: 0x%08x\n", regs->sdram_tim3_shdw);
-+
-+	if (ip_rev == EMIF_4D) {
-+		seq_printf(s, "read_idle_ctrl_shdw_normal\t: 0x%08x\n",
-+			regs->read_idle_ctrl_shdw_normal);
-+		seq_printf(s, "read_idle_ctrl_shdw_volt_ramp\t: 0x%08x\n",
-+			regs->read_idle_ctrl_shdw_volt_ramp);
-+	} else if (ip_rev == EMIF_4D5) {
-+		seq_printf(s, "dll_calib_ctrl_shdw_normal\t: 0x%08x\n",
-+			regs->dll_calib_ctrl_shdw_normal);
-+		seq_printf(s, "dll_calib_ctrl_shdw_volt_ramp\t: 0x%08x\n",
-+			regs->dll_calib_ctrl_shdw_volt_ramp);
-+	}
-+
-+	if (type == DDR_TYPE_LPDDR2_S2 || type == DDR_TYPE_LPDDR2_S4) {
-+		seq_printf(s, "ref_ctrl_shdw_derated\t: 0x%08x\n",
-+			regs->ref_ctrl_shdw_derated);
-+		seq_printf(s, "sdram_tim1_shdw_derated\t: 0x%08x\n",
-+			regs->sdram_tim1_shdw_derated);
-+		seq_printf(s, "sdram_tim3_shdw_derated\t: 0x%08x\n",
-+			regs->sdram_tim3_shdw_derated);
-+	}
-+}
-+
-+static int emif_regdump_show(struct seq_file *s, void *unused)
-+{
-+	struct emif_data	*emif	= s->private;
-+	struct emif_regs	**regs_cache;
-+	int			i;
-+
-+	if (emif->duplicate)
-+		regs_cache = emif1->regs_cache;
-+	else
-+		regs_cache = emif->regs_cache;
-+
-+	for (i = 0; i < EMIF_MAX_NUM_FREQUENCIES && regs_cache[i]; i++) {
-+		do_emif_regdump_show(s, emif, regs_cache[i]);
-+		seq_printf(s, "\n");
-+	}
-+
-+	return 0;
-+}
-+
-+static int emif_regdump_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, emif_regdump_show, inode->i_private);
-+}
-+
-+static const struct file_operations emif_regdump_fops = {
-+	.open			= emif_regdump_open,
-+	.read			= seq_read,
-+	.release		= single_release,
-+};
-+
-+static int emif_mr4_show(struct seq_file *s, void *unused)
-+{
-+	struct emif_data *emif = s->private;
-+
-+	seq_printf(s, "MR4=%d\n", emif->temperature_level);
-+	return 0;
-+}
-+
-+static int emif_mr4_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, emif_mr4_show, inode->i_private);
-+}
-+
-+static const struct file_operations emif_mr4_fops = {
-+	.open			= emif_mr4_open,
-+	.read			= seq_read,
-+	.release		= single_release,
-+};
-+
-+static int __init_or_module emif_debugfs_init(struct emif_data *emif)
-+{
-+	struct dentry	*dentry;
-+	int		ret;
-+
-+	dentry = debugfs_create_dir(dev_name(emif->dev), NULL);
-+	if (IS_ERR(dentry)) {
-+		ret = PTR_ERR(dentry);
-+		goto err0;
-+	}
-+	emif->debugfs_root = dentry;
-+
-+	dentry = debugfs_create_file("regcache_dump", S_IRUGO,
-+			emif->debugfs_root, emif, &emif_regdump_fops);
-+	if (IS_ERR(dentry)) {
-+		ret = PTR_ERR(dentry);
-+		goto err1;
-+	}
-+
-+	dentry = debugfs_create_file("mr4", S_IRUGO,
-+			emif->debugfs_root, emif, &emif_mr4_fops);
-+	if (IS_ERR(dentry)) {
-+		ret = PTR_ERR(dentry);
-+		goto err1;
-+	}
-+
-+	return 0;
-+err1:
-+	debugfs_remove_recursive(emif->debugfs_root);
-+err0:
-+	return ret;
-+}
-+
-+static void __exit emif_debugfs_exit(struct emif_data *emif)
-+{
-+	debugfs_remove_recursive(emif->debugfs_root);
-+	emif->debugfs_root = NULL;
-+}
-+
- /*
-  * Calculate the period of DDR clock from frequency value
-  */
-@@ -1175,6 +1302,7 @@ static int __init_or_module emif_probe(struct platform_device *pdev)
+-		spin_lock_irqsave(&clockfw_lock, flags);
+ 		arch_clock->clk_disable_unused(ck);
+-		spin_unlock_irqrestore(&clockfw_lock, flags);
  	}
++	spin_unlock_irqrestore(&clockfw_lock, flags);
  
- 	emif_onetime_settings(emif);
-+	emif_debugfs_init(emif);
- 	disable_and_clear_all_interrupts(emif);
- 	setup_interrupts(emif, irq);
- 
-@@ -1198,6 +1326,15 @@ error:
- 	return -ENODEV;
+ 	return 0;
  }
- 
-+static int __exit emif_remove(struct platform_device *pdev)
-+{
-+	struct emif_data *emif = platform_get_drvdata(pdev);
-+
-+	emif_debugfs_exit(emif);
-+
-+	return 0;
-+}
-+
- static void emif_shutdown(struct platform_device *pdev)
- {
- 	struct emif_data	*emif = platform_get_drvdata(pdev);
-@@ -1508,6 +1645,7 @@ static void __attribute__((unused)) freq_post_notify_handling(void)
- }
- 
- static struct platform_driver emif_driver = {
-+	.remove		= __exit_p(emif_remove),
- 	.shutdown	= emif_shutdown,
- 	.driver = {
- 		.name = "emif",
 -- 
-1.7.1
+1.7.0.4
