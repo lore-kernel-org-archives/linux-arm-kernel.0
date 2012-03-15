@@ -1,53 +1,66 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 15 Mar 2012 10:10:19 -0700
-Subject: [PATCH 6/6] ARM: OMAP: fix cpufreq build
-In-Reply-To: <E1S87xU-0000N8-6u@rmk-PC.arm.linux.org.uk> (Russell King's
- message of "Thu, 15 Mar 2012 10:31:00 +0000")
-References: <20120315102845.GB16389@n2100.arm.linux.org.uk>
- <E1S87xU-0000N8-6u@rmk-PC.arm.linux.org.uk>
-Message-ID: <87aa3hdc3o.fsf@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 15 Mar 2012 17:11:13 +0000
+Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
+ codec-handle
+In-Reply-To: <4F621C60.5090700@freescale.com>
+References: <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
+ <4F591B8D.8090705@freescale.com>
+ <20120309013216.GH2499@S2101-09.ap.freescale.net>
+ <4F5FD706.8040209@freescale.com>
+ <20120313234638.GY3177@opensource.wolfsonmicro.com>
+ <4F6008FA.3040805@freescale.com>
+ <20120314122723.GC3133@opensource.wolfsonmicro.com>
+ <4F612319.50302@freescale.com>
+ <20120315142702.GL3138@opensource.wolfsonmicro.com>
+ <4F621C60.5090700@freescale.com>
+Message-ID: <20120315171112.GP3138@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King <rmk+kernel@arm.linux.org.uk> writes:
+On Thu, Mar 15, 2012 at 11:44:16AM -0500, Timur Tabi wrote:
+> Mark Brown wrote:
 
-> OMAPs cpufreq requires the frequency table support, but nothing ensures
-> that this is selected.  This can result in configurations which fail to
-> build:
->
-> drivers/built-in.o:(.data+0x5238): undefined reference to `cpufreq_freq_attr_scaling_available_freqs'
-> drivers/cpufreq/omap-cpufreq.c:88: undefined reference to `cpufreq_frequency_table_target'
-> drivers/cpufreq/omap-cpufreq.c:60: undefined reference to `cpufreq_frequency_table_verify'
-> drivers/cpufreq/omap-cpufreq.c:186: undefined reference to `cpufreq_frequency_table_cpuinfo'
-> drivers/cpufreq/omap-cpufreq.c:190: undefined reference to `cpufreq_frequency_table_get_attr'
->
-> Fix this by introducing a new configuration variable and having that
-> select CPU_FREQ_TABLE.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    2 +-
->  arch/arm/mach-omap2/clock.c                  |    2 +-
->  arch/arm/mach-omap2/clock.h                  |    2 +-
->  arch/arm/plat-omap/clock.c                   |    2 +-
->  arch/arm/plat-omap/include/plat/clock.h      |    4 ++--
+> > The SoC is the bit of silicon with the CPU and other devices on it like
+> > the DMA controller and SSI or whatever ports.  The card is the PCB this
+> > has been soldered down onto.
 
-The arch/arm/* stuff is all code that has been removed, but the pull
-request didn't make it in time for v3.4:
+> Well, I asked about the difference between the soc BINDING and the card
+> BINDING.  On PowerPC, at least, there's no distinct binding for either.
+> For example, I2C devices are on the PCB, but they're listed as child nodes
+> of the I2C controller, which is on the SoC.
 
-   http://www.spinics.net/lists/arm-kernel/msg164545.html
+Right, but this is the problem in a nutshell - there's nowhere to put
+the board binding so the SoC code has to know about and do it.
 
-Initially, this was intended as a cleanup because it was just dead code
-removal, but since we missed v3.4, maybe we should pull out 
-"ARM: OMAP: clock: cleanup CPUfreq leftovers" and submit for 3.4-rc.
+> However, I don't like the way this is being represented as a PowerPC vs.
+> ARM issue, because that's just not correct.  It's an "old binding" vs "new
+> binding" issue.  For example:
 
->  drivers/cpufreq/Kconfig.arm                  |    5 +++++
->  drivers/cpufreq/Makefile                     |    2 +-
+I think that's just creeping in because the old binding is the existing
+practice on PowerPC.
 
-This change was included in my CPUfreq pull request to Dave Jones.  He
-has pulled it into his fixes branch[1], but I don't see it upstream.
-I've just sent a mail to Dave asking about it.
+> +	/*
+> +	 * In case of imx, the machine driver uses new binding which does
+> +	 * not require SSI driver to trigger machine driver's probe, but
+> +	 * the pcm device needs to be registered here.
+> +	 */
+> +	if (ssi_private->ssi_on_imx) {
+> +		ssi_private->imx_pcm_pdev =
+> +			platform_device_register_simple("imx-pcm-audio",
 
-Kevin
+> This prohibits me from using the new binding on any future PowerPC parts,
+> because it clearly says "iMX" on everything.
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/davej/cpufreq.git fixes
+So long as it's internal to the code (which the above is) I don't think
+it really matters, the code can be changed later.  We need to do
+something about DMA controllers in general, and there was some recent
+discussion on the DT list about a generic binding for them, so leaving
+the code as-is with nothing in the DT itself seems like a good place to
+leave things initially.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/896de2a3/attachment.sig>
