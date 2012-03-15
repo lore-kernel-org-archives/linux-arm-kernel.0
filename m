@@ -1,33 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 08:48:32 +0000
-Subject: [PATCH v4 10/10] pwm-backlight: Add rudimentary device tree
- support
-In-Reply-To: <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <201203150848.32500.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Mar 2012 10:04:34 +0100
+Subject: [PATCH] move pwm drivers to new framework
+Message-ID: <1331802277-12477-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Thierry Reding wrote:
-> +
-> +       pwm = of_pwm_request(node, "pwm", 0);
-> +       if (IS_ERR(pwm))
-> +               return PTR_ERR(pwm);
+This series is based on Thierrys pwm-v4 patches. It moves the existing
+i.MX, samsung and vt8500 drivers over to the new framework. This is only
+compile tested, no runtime tests at all. I can test the i.MX driver myself,
+but it would be good to have some testers for samsung and vt8500.
 
-It's interesting that the (so far) only user of of_pwm_request() doesn't
-actually give a meaningful argument as the name of the pwm property.
+Sascha
 
-Maybe rename that function to of_pwm_request_named() and provide a helper
-that just does this:?
+The following changes since commit 07e34a1f9a21c9f72e86a4e1ec64cc2150c89389:
 
-static inline struct pwm_device *of_pwm_request(struct device_node *np, int index)
-{
-	return of_pwm_request_named(np, "pwm", index);
-}
+  pwm: temporary fixup (2012-03-15 09:44:52 +0100)
 
-Any device that just has needs one pwm or uses more than one but has no
-reason to name them can just use this helper then and use the default pwm
-property name.
+are available in the git repository at:
 
-	Arnd
+  git://git.pengutronix.de/git/imx/linux-2.6.git pwm-v4
+
+for you to fetch changes up to dc7c38dab4355ff3a43e5b9356d180e72a923ed3:
+
+  ARM vt8500: Move vt8500 pwm driver to pwm framework (2012-03-15 09:45:49 +0100)
+
+----------------------------------------------------------------
+Sascha Hauer (3):
+      ARM i.MX: Move i.MX pwm driver to pwm framework
+      ARM Samsung: Move s3c pwm driver to pwm framework
+      ARM vt8500: Move vt8500 pwm driver to pwm framework
+
+ arch/arm/mach-vt8500/Makefile                      |    2 -
+ arch/arm/plat-mxc/Kconfig                          |    6 -
+ arch/arm/plat-mxc/Makefile                         |    1 -
+ arch/arm/plat-samsung/Makefile                     |    4 -
+ drivers/pwm/Kconfig                                |   27 +++
+ drivers/pwm/Makefile                               |    5 +
+ arch/arm/plat-mxc/pwm.c => drivers/pwm/pwm-imx.c   |  155 ++++++---------
+ .../pwm.c => drivers/pwm/pwm-samsung.c             |  215 ++++++++------------
+ .../mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c  |  124 ++++--------
+ 9 files changed, 216 insertions(+), 323 deletions(-)
+ rename arch/arm/plat-mxc/pwm.c => drivers/pwm/pwm-imx.c (66%)
+ rename arch/arm/plat-samsung/pwm.c => drivers/pwm/pwm-samsung.c (61%)
+ rename arch/arm/mach-vt8500/pwm.c => drivers/pwm/pwm-vt8500.c (64%)
