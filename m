@@ -1,66 +1,61 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Fri, 16 Mar 2012 00:19:20 +0530
-Subject: [PATCH v3 1/2] dmaengine: Add support for per xfer specific
- privatedata
-In-Reply-To: <4F606270.1020709@codeaurora.org>
-References: <1331548336-27802-1-git-send-email-kumarrav@codeaurora.org>
- <1331569796.1727.9.camel@vkoul-udesk3> <4F606270.1020709@codeaurora.org>
-Message-ID: <4F6239B0.6040507@codeaurora.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Mar 2012 19:50:04 +0100
+Subject: [PATCH 1/2] ARM: imx6q: add pll round_rate support
+In-Reply-To: <20120315151521.GB5701@richard-laptop>
+References: <1331713379-8437-1-git-send-email-richard.zhao@linaro.org>
+ <1331713379-8437-2-git-send-email-richard.zhao@linaro.org>
+ <20120314085228.GM3852@pengutronix.de>
+ <20120315144601.GA5701@richard-laptop>
+ <20120315150048.GC3852@pengutronix.de>
+ <20120315151521.GB5701@richard-laptop>
+Message-ID: <20120315185004.GD3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/14/2012 2:48 PM, Ravi Kumar V wrote:
-> On 3/12/2012 9:59 PM, Vinod Koul wrote:
->> On Mon, 2012-03-12 at 16:02 +0530, Ravi Kumar V wrote:
->>> Add new argument to DMA SG and Interleave mode for passing
->>> per transfer specific private data, using this it enables the
->>> dma devices which needs to pass the parameters which changes per
->>> each transfer.
->>>
->>> Signed-off-by: Ravi Kumar V<kumarrav@codeaurora.org>
->>> ---
->>> include/linux/dmaengine.h | 4 ++--
->>> 1 files changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->>> index 679b349..b8f0495 100644
->>> --- a/include/linux/dmaengine.h
->>> +++ b/include/linux/dmaengine.h
->>> @@ -570,7 +570,7 @@ struct dma_device {
->>> struct dma_chan *chan,
->>> struct scatterlist *dst_sg, unsigned int dst_nents,
->>> struct scatterlist *src_sg, unsigned int src_nents,
->>> - unsigned long flags);
->>> + unsigned long flags, void *context);
->> Please follow the related discussion we had. Alexandre had already
->> posted updated and this needs to follow.
->> Also this way you break the existing drivers which use this API, not
->> sure why you posted without fixing them?
->>
-I have gone through the discussion in
-https://lkml.org/lkml/2012/2/6/300
-As per my understanding
-1.we need to add new transaction types DMA_SG_EXT & DMA_INTERLEAVE_EXT.
-2.Add context parameter to existing API's.
-3.Typecast the context parameter with architecture specific structure
-there by restricting client drivers to pass only arch specific parameter.
-4.Add inline functions as suggested by Russell
-and then
-5.Fix existing code and client drivers for using new API.
+On Thu, Mar 15, 2012 at 11:15:23PM +0800, Richard Zhao wrote:
+> On Thu, Mar 15, 2012 at 04:00:48PM +0100, Sascha Hauer wrote:
+> > On Thu, Mar 15, 2012 at 10:46:04PM +0800, Richard Zhao wrote:
+> > > On Wed, Mar 14, 2012 at 09:52:28AM +0100, Sascha Hauer wrote:
+> > > > On Wed, Mar 14, 2012 at 04:22:58PM +0800, Richard Zhao wrote:
+> > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+> > > > > ---
+> > > > >  
+> > > > >  #define DEF_PLL(name)					\
+> > > > >  	static struct clk name = {			\
+> > > > > @@ -681,6 +741,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
+> > > > >  		.disable	= pll_disable,		\
+> > > > >  		.get_rate	= name##_get_rate,	\
+> > > > >  		.set_rate	= name##_set_rate,	\
+> > > > > +		.round_rate	= name##_round_rate,	\
+> > > > 
+> > > > I hope this ## stuff is gone soon with the generic clock framework. It
+> > > > is so ugly and inefficient.
+> > > I hope this doesn't prevent this two patches go in.
+> > 
+> > Given that we are short from getting a generic clock framework (and I
+> > think this time it's for real) and that you are not mention in any words
+> > what these patches fix I don't see a reason for merging them.
+> I think the cpu clock is a great challenge for generic clock framework.
+> When it set_rate, it includes reparent, and change parent's parent's rate.
+> I don't see any upstream code like that till now. and it's really what
+> we need.
 
-Hi Vinod,
+Then do a clk_set_parent, clk_set_rate and a clk_set_parent again
+in your cpufreq driver. The notifying mechanism even allows you to
+block any concurrent change in between these three steps if necessary.
+Noone says that these three steps have to be encapsulated in a single
+clk_set_rate call like you did in your patch.
 
-I am ready to follow above steps and also suggested by Russell and 
-submit new patch.
-Please can you confirm me so that i will start work.
+> 
+> And it also block cpufreq from upstreaming.
 
-My suggestion is instead of adding context parameter in existing API's,
-how it would be if we can add a new API for each DMA transaction types
-available in dmaengine for passing transaction specific parameter?
-so that existing clients and dma drivers will not be disturbed.
+Yes, and that's a good way to tell your management why you have to
+invest some time into porting i.MX6 to the generic clock framework ;)
 
-Thanks
-Ravi Kumar
+Sascha
+
 -- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
