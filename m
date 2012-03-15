@@ -1,43 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 13:39:36 +0000
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <201203151138.51508.sr@denx.de>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <4F61AFAB.6080301@st.com> <201203151138.51508.sr@denx.de>
-Message-ID: <201203151339.36173.arnd@arndb.de>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Thu, 15 Mar 2012 19:10:42 +0530
+Subject: [PATCH v3 6/6] mfd: mc13xxx: Add i2c driver
+In-Reply-To: <1331757790-10583-7-git-send-email-marc@cpdesign.com.au>
+References: <1331757790-10583-1-git-send-email-marc@cpdesign.com.au>
+ <1331757790-10583-7-git-send-email-marc@cpdesign.com.au>
+Message-ID: <CAM=Q2cssNF2TSWHjcbG4wsABBXhquYoKq_scC6bDcq8kdoosyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 March 2012, Stefan Roese wrote:
-> On Thursday 15 March 2012 10:00:27 Viresh Kumar wrote:
-> > On 3/15/2012 2:18 PM, Stefan Roese wrote:
-> > >>> > > +static const struct of_device_id vic_of_match[] __initconst = {
-> > >>> > > +     { .compatible = "arm,pl190-vic", .data = vic_of_init, },
-> > >>> > > +     { /* Sentinel */ }
-> > >>> > > +};
-> > >>> > > +
-> > >>> > > +static void __init spear6xx_dt_init_irq(void)
-> > >>> > > +{
-> > >>> > > +     of_irq_init(vic_of_match);
-> > >>> > > +}
-> > >>> > > +
-> > >> > 
-> > >> > What about adding this routine in vic.c file, which can then be used
-> > >> > by all platforms, instead of replicating this code.
-> > > 
-> > > We can't move vic_of_match to the vic.c, since there are differences
-> > > between the boards using it. And only moving spear6xx_dt_init_irq()
-> > > (renamed of course) doesn't seem worth it.
-> > 
-> > I knew this. Actually my thought was, we have two compatible strings for
-> > vic: pl190 and pl192.
-> > 
-> > So, create two vic_of_match* arrays and two vic*_dt_init_irq() routines.
-> > That will solve the issue i believe.
-> 
-> I still don't think its worth it. But please feel free to send an add-on 
-> patch, to "clean this up".
+Hi Marc,
 
-What's wrong with one vic_dt_init_irq() function and an array with two entries?
+On Thu, Mar 15, 2012 at 2:13 AM, Marc Reilly <marc@cpdesign.com.au> wrote:
+> Adds support for mc13xxx family ICs connected via i2c.
+>
+> Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
+> ---
+<snip>
 
-	Arnd
+> +static int mc13xxx_i2c_probe(struct i2c_client *client,
+> + ? ? ? ? ? ? ? const struct i2c_device_id *id)
+> +{
+> + ? ? ? const struct of_device_id *of_id;
+> + ? ? ? struct i2c_driver *idrv = to_i2c_driver(client->dev.driver);
+> + ? ? ? struct mc13xxx *mc13xxx;
+> + ? ? ? struct mc13xxx_platform_data *pdata = dev_get_platdata(&client->dev);
+> + ? ? ? int ret;
+> +
+> + ? ? ? of_id = of_match_device(mc13xxx_dt_ids, &client->dev);
+> + ? ? ? if (of_id)
+> + ? ? ? ? ? ? ? idrv->id_table =
+> + ? ? ? ? ? ? ? ? ? ? ? &mc13xxx_i2c_device_id[(enum mc13xxx_id) of_id->data];
+> +
+> + ? ? ? mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
+> + ? ? ? if (!mc13xxx)
+> + ? ? ? ? ? ? ? return -ENOMEM;
+> +
+> + ? ? ? dev_set_drvdata(&client->dev, mc13xxx);
+> +
+> + ? ? ? mc13xxx->dev = &client->dev;
+> + ? ? ? mutex_init(&mc13xxx->lock);
+> +
+> + ? ? ? mc13xxx->regmap = regmap_init_i2c(client, &mc13xxx_regmap_i2c_config);
+> + ? ? ? if (IS_ERR(mc13xxx->regmap)) {
+> + ? ? ? ? ? ? ? ret = PTR_ERR(mc13xxx->regmap);
+> + ? ? ? ? ? ? ? dev_err(mc13xxx->dev, "Failed to initialize register map: %d\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ret);
+> + ? ? ? ? ? ? ? dev_set_drvdata(&client->dev, NULL);
+Are we  leaking mc13xxx here
+May be you can consider using devm* functions ?
+
+>  + ? ? ? ? ? ? ? return ret;
+> + ? ? ? }
+> +
