@@ -1,20 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 16:39:38 +0000
-Subject: linux-next: build failure after merge of the final tree (arm-soc
- tree related)
-In-Reply-To: <20120315002020.GA16189@titan.lakedaemon.net>
-References: <20120315105901.7b10c9f4de9374a613436988@canb.auug.org.au>
- <20120315002020.GA16189@titan.lakedaemon.net>
-Message-ID: <201203151639.38223.arnd@arndb.de>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Thu, 15 Mar 2012 17:43:55 +0100
+Subject: [PATCH 00/10] PM: Create the AVS class of drivers
+Message-ID: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 March 2012, Jason Cooper wrote:
-> That's my mistake.  I did a pull request for the wrong branch.  Olof,
-> could you please drop the offending branch and I'll submit a new pull
-> request once I have a chance to test Arnd's irq patch?
+From: Jean Pihet <j-pihet@ti.com>
 
-I reverted this in the for-next branch for now. The two initial patches
-from the kirkwood/board branch are still present.
+AVS is a power management technique which controls the operating
+voltage of a device in order to optimize (i.e. reduce) its power
+consumption. The voltage is adapted depending on static factors
+(chip manufacturing process) and dynamic factors (temperature
+depending performance).
+AVS is also called SmartReflex on OMAP devices.
 
-	Arnd
+To that end, create the AVS framework in drivers/power/avs and
+move the OMAP SmartReflex code to the new directory.
+
+In preparation to the move of the OMAP code the following changes have been
+made:
+- split the include files into generic and platform specific code,
+- fill in platform data from the device initialization code and pass
+  it to the driver,
+- create CONFIG_AVS* config options accordingly.
+
+The platform integration data for SmartReflex is passed from hwmod
+and the voltage layer to the driver using pdata.
+
+
+Tested on OMAP3 Beagleboard using omap2plus_defconfig with the
+CONFIG_POWER_AVS* options set.
+Based on master branch of the l-o git tree (3.3.0-rc6) [1], commit
+85244e0edd240da2004bb2ab7cbcbc67a336f20d.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+
+
+Jean Pihet (10):
+  ARM: OMAP3+: voltage: export functions to plat/voltage.h
+  ARM: OMAP2+: SmartReflex: move the platform specific macros in
+    plat-omap
+  ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
+  ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of
+    voltage domains.
+  ARM: OMAP3: hwmod: rename the smartreflex entries
+  ARM: OMAP2+: SmartReflex: use the platform header file for voltage
+    functions
+  ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
+  ARM: OMAP2+: SmartReflex: Use per-OPP data structure
+  ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
+  ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
+
+ arch/arm/mach-omap2/Makefile                  |    4 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |   11 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c    |    3 +-
+ arch/arm/mach-omap2/pm.h                      |    2 +-
+ arch/arm/mach-omap2/smartreflex-class3.c      |   60 --
+ arch/arm/mach-omap2/smartreflex.c             | 1165 -------------------------
+ arch/arm/mach-omap2/smartreflex.h             |  256 ------
+ arch/arm/mach-omap2/sr_device.c               |   38 +-
+ arch/arm/mach-omap2/voltage.h                 |    1 -
+ arch/arm/mach-omap2/vp.h                      |    2 -
+ arch/arm/plat-omap/Kconfig                    |   31 -
+ arch/arm/plat-omap/include/plat/smartreflex.h |   95 ++
+ arch/arm/plat-omap/include/plat/voltage.h     |    3 +
+ drivers/power/Kconfig                         |    2 +
+ drivers/power/Makefile                        |    2 +
+ drivers/power/avs/Kconfig                     |   45 +
+ drivers/power/avs/Makefile                    |    2 +
+ drivers/power/avs/smartreflex-class3.c        |   60 ++
+ drivers/power/avs/smartreflex.c               | 1117 ++++++++++++++++++++++++
+ drivers/power/avs/smartreflex.h               |  238 +++++
+ 20 files changed, 1604 insertions(+), 1533 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/smartreflex-class3.c
+ delete mode 100644 arch/arm/mach-omap2/smartreflex.c
+ delete mode 100644 arch/arm/mach-omap2/smartreflex.h
+ create mode 100644 arch/arm/plat-omap/include/plat/smartreflex.h
+ create mode 100644 drivers/power/avs/Kconfig
+ create mode 100644 drivers/power/avs/Makefile
+ create mode 100644 drivers/power/avs/smartreflex-class3.c
+ create mode 100644 drivers/power/avs/smartreflex.c
+ create mode 100644 drivers/power/avs/smartreflex.h
+
+-- 
+1.7.5.4
