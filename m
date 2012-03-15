@@ -1,75 +1,20 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 15 Mar 2012 16:32:12 +0000
-Subject: [PATCH 4/4] ARM: opcodes: Opcode definitions for the Virtualization
- Extensions
-In-Reply-To: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
-References: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1331829132-9762-5-git-send-email-dave.martin@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 16:39:38 +0000
+Subject: linux-next: build failure after merge of the final tree (arm-soc
+ tree related)
+In-Reply-To: <20120315002020.GA16189@titan.lakedaemon.net>
+References: <20120315105901.7b10c9f4de9374a613436988@canb.auug.org.au>
+ <20120315002020.GA16189@titan.lakedaemon.net>
+Message-ID: <201203151639.38223.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For now, this patch just adds a definition for the HVC instruction.
-More can be added here later, as needed.
+On Thursday 15 March 2012, Jason Cooper wrote:
+> That's my mistake.  I did a pull request for the wrong branch.  Olof,
+> could you please drop the offending branch and I'll submit a new pull
+> request once I have a chance to test Arnd's irq patch?
 
-Now that we have a real example of how to use the opcode injection
-macros properly, this patch also adds a cross-reference from the
-explanation in opcodes.h (since without an example, figuring out
-how to use the macros is not that easy).
+I reverted this in the for-next branch for now. The two initial patches
+from the kirkwood/board branch are still present.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/include/asm/opcodes-virt.h |   29 +++++++++++++++++++++++++++++
- arch/arm/include/asm/opcodes.h      |    2 ++
- 2 files changed, 31 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/opcodes-virt.h
-
-diff --git a/arch/arm/include/asm/opcodes-virt.h b/arch/arm/include/asm/opcodes-virt.h
-new file mode 100644
-index 0000000..b85665a
---- /dev/null
-+++ b/arch/arm/include/asm/opcodes-virt.h
-@@ -0,0 +1,29 @@
-+/*
-+ * opcodes-virt.h: Opcode definitions for the ARM virtualization extensions
-+ * Copyright (C) 2012  Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
-+#ifndef __ASM_ARM_OPCODES_VIRT_H
-+#define __ASM_ARM_OPCODES_VIRT_H
-+
-+#include <asm/opcodes.h>
-+
-+#define __HVC(imm16) __inst_arm_thumb32(				\
-+	0xE1400070 | (((imm16) & 0xFFF0) << 4) | ((imm16) & 0x000F),	\
-+	0xF7E08000 | (((imm16) & 0xF000) << 4) | ((imm16) & 0x0FFF)	\
-+)
-+
-+#endif /* ! __ASM_ARM_OPCODES_VIRT_H */
-diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-index 50ef0be..89ff5b9 100644
---- a/arch/arm/include/asm/opcodes.h
-+++ b/arch/arm/include/asm/opcodes.h
-@@ -193,6 +193,8 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
-  * specify the ARM and Thumb alternatives at the same time.  This ensures
-  * that the correct opcode gets emitted depending on the instruction set
-  * used for the kernel build.
-+ *
-+ * Look@opcodes-virt.h for an example of how to use these macros.
-  */
- #include <linux/stringify.h>
- 
--- 
-1.7.4.1
+	Arnd
