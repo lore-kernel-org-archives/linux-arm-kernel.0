@@ -1,78 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 15 Mar 2012 15:18:43 +0100
-Subject: [PATCH v4] of: introduce helper to manage boolean
-In-Reply-To: <20120315095454.9294E3E08CB@localhost>
-References: <1331660903-10193-1-git-send-email-plagnioj@jcrosoft.com>
- <20120315095454.9294E3E08CB@localhost>
-Message-ID: <20120315141843.GQ18320@game.jcrosoft.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 15 Mar 2012 14:31:35 +0000
+Subject: [PATCH v4 09/15] ARM: ux500: convert to twd_local_timer_register()
+ interface
+In-Reply-To: <4F61D6CA.8060002@arm.com>
+References: <1327061042-14857-1-git-send-email-marc.zyngier@arm.com>
+ <1327061042-14857-10-git-send-email-marc.zyngier@arm.com>
+ <CANmRt2gjhg-nznAOxQHA1g7EX+F4uEjp1nW5iT3Rtw4s8y5uGg@mail.gmail.com>
+ <4F60D7DD.50705@linaro.org> <4F61D6CA.8060002@arm.com>
+Message-ID: <4F61FD47.4030603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03:54 Thu 15 Mar     , Grant Likely wrote:
-> On Tue, 13 Mar 2012 18:48:23 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > of_property_read_bool
-> > 
-> > Search for a property in a device node.
-> > Returns true if the property exist false otherwise.
-> > 
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Acked-by: Rob Herring <rob.herring@calxeda.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+On 15/03/12 11:47, Marc Zyngier wrote:
+> On 14/03/12 17:39, Lee Jones wrote:
 > 
-> One comment below; but otherwise:
+>> NAK: Won't build. :(
 > 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Thanks for noticing this.
 > 
-> Feel free to merge via whatever tree needs it.
-> 
-> g.
-> 
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > ---
-> > v4:
-> > 
-> > 	send the right version
-> > 
-> > 	include Grant comment
-> > 
-> > 	Grant can I get the go please?
-> > 
-> > Best Regards,
-> > J.
-> >  include/linux/of.h |   16 ++++++++++++++++
-> >  1 files changed, 16 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/include/linux/of.h b/include/linux/of.h
-> > index a75a831..a992cdf 100644
-> > --- a/include/linux/of.h
-> > +++ b/include/linux/of.h
-> > @@ -342,6 +342,22 @@ static inline int of_machine_is_compatible(const char *compat)
-> >  #define of_match_node(_matches, _node)	NULL
-> >  #endif /* CONFIG_OF */
-> >  
-> > +/**
-> > + * of_property_read_bool - Findfrom a property
-> > + * @np:		device node from which the property value is to be read.
-> > + * @propname:	name of the property to be searched.
-> > + *
-> > + * Search for a property in a device node.
-> > + * Returns true if the property exist false otherwise.
-> > + */
-> > +static inline bool of_property_read_bool(const struct device_node *np,
-> > +					 const char *propname)
-> > +{
-> > +	struct property *prop = of_find_property(np, propname, NULL);
-> > +
-> > +	return prop ? true : false;
-> > +}
-> 
-> Could simply be:
-> {
-> 	return of_find_property(...) != NULL;
-ok fine no preference sned the pull to Arnd with the reset of the DT for at91
+> I've just pushed a fix to local_timers-for-arm-soc, and the patch should
+> be on the ML shortly.
 
-please check the USB too I gusee they can go too  but maybe  for the atmel
-high-speed device you will have some comment
+I have tested it. Works okay.
 
-Best Regards,
-J.
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
