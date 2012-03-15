@@ -1,78 +1,57 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 15 Mar 2012 17:30:49 +0100
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <201203150922.06379.arnd@arndb.de>
-References: <4F22DEF2.5000807@ti.com>
- <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
- <201203150922.06379.arnd@arndb.de>
-Message-ID: <4F621939.9040906@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 15 Mar 2012 16:32:08 +0000
+Subject: [PATCH 0/4] ARM: opcodes: Facilitate custom opcode injection
+Message-ID: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2012 10:22 AM, Arnd Bergmann wrote:
-> On Thursday 15 March 2012, Nicolas Ferre wrote:
->> Add some basic helpers to retrieve a DMA controller device_node and the
->> DMA request specifications. By making DMA controllers register a generic
->> translation function, we allow the management of any type of DMA requests
->> specification.
->> The void * output of an of_dma_xlate() function that will be implemented
->> by the DMA controller can carry any type of "dma-request" argument.
->>
->> The DMA client will search its associated DMA controller in the list and
->> call the registered of_dam_xlate() function to retrieve the request values.
->>
->> One simple xlate function is provided for the "single number" type of
->> request binding.
->>
->> This implementation is independent from dmaengine so it can also be used
->> by legacy drivers.
->>
->> For legacy reason another API will export the DMA request number into a
->> Linux resource of type IORESOURCE_DMA.
->
-> This looks very good. I missed the first version of this patch, but was
-> thinking of very similar bindings.
->
->> +Client drivers should specify the DMA request property using a phandle to
->> +the controller. If needed, the DMA request identity on that controller is then
->> +added followed by optional request specifications.
->> +
->> +Required property:
->> +    - dma-request: List of phandle + dma-request + request specifications,
->> +      one group per request "line".
->> +Optional property:
->> +    - dma-request-names: list of strings in the same order as the dma-request
->> +      in the dma-request property.
->> +
->> +
->> +Example:
->> +
->> +	i2c1: i2c at 1 {
->> +		...
->> +		dma-request =<&sdma 2&sdma 3>;
->> +		dma-request-names = "tx", "rx";
->> +		...
->> +	};
->
-> This is slightly different from how the proposed pwm binding works that
-> Thierry is working on, which uses an arbitrary property name instead of
-> requiring the use of a specific property but then allowing to give names
-> in another property.
->
-> I don't care much which way it's done, but please try to agree on one
-> approach that is used for both.
->
-> The one you have here is already used by reg and irq, while the other
-> one is used in gpio.
+Since my "uniform assembler" series had some problems and did not
+meet with widespread agreement, this can't be used as a basis for a
+mechanism to safely inject custom instruction opcodes (which was my
+immediate reason for writing those patchse).
 
-This was done like IRQ on purpose, because an Interrupt ReQuest line and 
-a DMA Request line are really similar for the HW point of view at IP level.
-I'm not sure what Thierry have done for pwm, but I thing that having the 
-same scheme for reg, irq and dma was what we agreed with Grant during 
-Plumbers.
+This series follows a more conventional approach to achieve the
+goal for safe opcode injection across all kernel endianness and
+instruction set configurations.
 
-GPIO scheme will be probably good enough as well, but the idea was to be 
-consistent in the binding for similar information.
+I have made best efforts to verify that these patches do the right
+thing for big-endian configurations, but review/testing from people
+who are actively working with big-endian targets would be
+appreciated.  There's no code in the kernel using these macros yet,
+but you can experiment with the __HVC() macro added by the final
+patch.  If this disassembles correctly in vmlinux (see below), then
+the macros should be safe for your configuration.
 
-Regards,
-Benoit
+
+Note that for BE8 targets, you _will_ get weird-looking instruction
+data in your .o files:  because the ".inst" family of assembler
+directives is relatively new I use data directives instead.  This
+means that the data for those directives has to be pre-swapped by
+the opcode injection macros, whereas _instruction_ data should get
+byteswapped by the linker in the final link (with ld --be8).  Using
+data directives brings some complexity, but it is the only way to
+ensure compatibility with older assembler versions.
+
+To check correctness, you should therefore review the final linker
+output (vmlinux) if you want to be certain what the final
+instruction stream looks like.  You may need to strip data mapping
+symbols (strip -N'$d') from vmlinux in order for the injected
+instructions to be disassembled properly -- note that this has no
+effect on the run-time meaning of the image.
+
+For BE32 the situation is simpler again, because like LE, BE32 uses
+the same endianness for data and instructions.
+
+Dave Martin (4):
+  ARM: opcodes: Don't define the thumb32 byteswapping macros for BE32
+  ARM: opcodes: Make opcode byteswapping macros assembly-compatible
+  ARM: opcodes: Add helpers for emitting custom opcodes
+  ARM: opcodes: Opcode definitions for the Virtualization Extensions
+
+ arch/arm/include/asm/opcodes-virt.h |   29 ++++++
+ arch/arm/include/asm/opcodes.h      |  181 ++++++++++++++++++++++++++++++++---
+ 2 files changed, 195 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/include/asm/opcodes-virt.h
+
+-- 
+1.7.4.1
