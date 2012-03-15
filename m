@@ -1,40 +1,43 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 15 Mar 2012 20:44:08 +1100
-Subject: Conflict between Versatile Express DT conversion and local
- timer updates
-In-Reply-To: <20120315093615.GB15988@n2100.arm.linux.org.uk>
-References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
- <201203131155.16454.arnd@arndb.de> <4F5F52A2.3050005@arm.com>
- <201203131433.07214.arnd@arndb.de>
- <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
- <4F605A3B.5030800@arm.com>
- <20120315181718.d80071db25428a7b5113ef9a@canb.auug.org.au>
- <20120315092140.GA15988@n2100.arm.linux.org.uk>
- <20120315093615.GB15988@n2100.arm.linux.org.uk>
-Message-ID: <20120315204408.457caee20a959d8172e6ba97@canb.auug.org.au>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Mar 2012 10:45:27 +0100
+Subject: [PATCH v4 09/10] pwm: Add PXA support
+In-Reply-To: <20120315092134.GA29841@avionic-0098.adnet.avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
+ <4F61343A.80103@gmail.com>
+ <20120315065631.GB20502@avionic-0098.mockup.avionic-design.de>
+ <20120315090540.GW3852@pengutronix.de>
+ <20120315092134.GA29841@avionic-0098.adnet.avionic-design.de>
+Message-ID: <20120315094527.GY3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Thu, 15 Mar 2012 09:36:15 +0000 Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->
-> On Thu, Mar 15, 2012 at 09:21:40AM +0000, Russell King - ARM Linux wrote:
-> > It shouldn't be in my tree anymore - I removed it a couple of days ago
-> > and pushed that out.
+On Thu, Mar 15, 2012 at 10:21:34AM +0100, Thierry Reding wrote:
+> * Sascha Hauer wrote:
+> > On Thu, Mar 15, 2012 at 07:56:31AM +0100, Thierry Reding wrote:
+> > > Actually I wasn't planning on keeping this patch at all. Sascha already has
+> > > the existing PWM providers converted to his original framework and offered to
+> > > rebase them onto this series once the dust settles. I only used them as
+> > > testbed to see how the driver interface works out for different hardware. But
+> > > I also think that if Sascha hasn't cleaned the driver up yet it should either
+> > > be done in his conversion patches or as follow ups.
+> > 
+> > All I have is a simple conversion to the new framework, nothing more.  I
+> > rebased my patches yesterday onto this series (unfortunately due to the
+> > additional argument pwm_device the patches do not look like just moving
+> > the drivers anymore). I also skipped the PXA patch since I saw that you
+> > already have this one. I just posted the patches to the list.
 > 
-> Sorry, it didn't get pushed out (the last push was 10 mins before I
-> removed it.  So yes, you're right.  Should be gone in your next pull.
+> Okay, I'll keep my Blackfin and PXA converted drivers then and will fix the
+> issues with the PXA driver brought up by Ryan. Would you be okay if I took
+> your conversion patches and added them to my series?
 
-Thanks for that.
+Sure, go ahead.
+
+Sascha
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/b7f02718/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
