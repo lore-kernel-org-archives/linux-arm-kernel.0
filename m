@@ -1,40 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Mar 2012 19:57:53 +0000
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <4F621939.9040906@ti.com>
-References: <4F22DEF2.5000807@ti.com>
- <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
- <201203150922.06379.arnd@arndb.de> <4F621939.9040906@ti.com>
-Message-ID: <20120315195753.GA2842@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 20:01:12 +0000
+Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
+In-Reply-To: <1362815.uO65s14ojU@avalon>
+References: <20120315175000.897f1172c296d4a687be0537@canb.auug.org.au>
+ <1362815.uO65s14ojU@avalon>
+Message-ID: <201203152001.12353.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 05:30:49PM +0100, Cousson, Benoit wrote:
-> This was done like IRQ on purpose, because an Interrupt ReQuest line and  
-> a DMA Request line are really similar for the HW point of view at IP 
-> level.
+On Thursday 15 March 2012, Laurent Pinchart wrote:
+> The following patch (5d7220ec000f rebased on top of 1740d3448012) shows the
+> correct conflict resolution in my opinion.
+> 
+> From f040ba69632a54c86767974768d68b308901061c Mon Sep 17 00:00:00 2001
+> From: Magnus Damm <damm@opensource.se>
+> Date: Wed, 29 Feb 2012 12:37:19 +0900
+> Subject: [PATCH] ARM: mach-shmobile: sh7372 map_io and init_early update
+> 
+> ARM: mach-shmobile: sh7372 map_io and init_early update
+> 
+> Update the sh7372 SoC and the AP4EVB and Mackerel boards to make use
+> of the functions sh7372_map_io() and sh7372_add_early_devices().
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-I'm not sure about that at all levels.  Sure, at hardware level they're
-the same, but I think the flat numeric namespace for IRQs has been
-proven to be a problem when there's multiple IRQ controllers in the
-system.
+Hi Laurent,
 
-> I'm not sure what Thierry have done for pwm, but I thing that having the  
-> same scheme for reg, irq and dma was what we agreed with Grant during  
-> Plumbers.
+I've merged Paul's branch into my renesas/soc branch, because I don't
+rebase the branches once they are merged into arm-soc. Thanks a lot
+for the resolution you suggested, I used the same resulting code
+in the merge commit.
 
-I really don't like these behind-the-scenes discussions which never then
-get followed up in public, and people then start quoting what was "agreed"
-as that's the way things must be done.
+I'm not particularly happy about how we got here. Obviously, the bug
+fixes that Paul sent should have gone through the arm-soc tree to
+avoid this situation, and they should have been based on a -rc release
+rather than some random commit after -rc6. It's not a big issue
+because the next/soc branch already contains -rc7 though.
 
-It's a bit like folk at the recent Linaro Connect apparantly discussing
-my machine registry and deciding that it should be shut down.  No one
-has yet talked to me about that or even done the curtesy of asking me
-what my view is.
-
-As far as I'm concerned for DMA stuff, there is currently no real solution
-for a DT representation; TI have asked me to take over the conversion of
-OMAP DMA support to the DMA engine API, and I'm not yet convinced that
-the existing numbering system is the right solution - especially as
-there's several overlapping numberspaces for OMAP DMA numbers which
-are SoC specific.
+	Arnd
