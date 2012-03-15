@@ -1,36 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Mar 2012 10:51:22 -0700
-Subject: [PATCH 1/2] ARM: OMAP: powerdomain: Wait for powerdomain
- transition in pwrdm_state_switch()
-In-Reply-To: <alpine.DEB.2.00.1203151129160.26218@utopia.booyaka.com>
-References: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
- <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
- <alpine.DEB.2.00.1203151129160.26218@utopia.booyaka.com>
-Message-ID: <20120315175122.GB7276@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 15 Mar 2012 13:22:13 -0400
+Subject: linux-next: build failure after merge of the final tree
+ (arm-soc tree related)
+In-Reply-To: <201203151639.38223.arnd@arndb.de>
+References: <20120315105901.7b10c9f4de9374a613436988@canb.auug.org.au>
+ <20120315002020.GA16189@titan.lakedaemon.net>
+ <201203151639.38223.arnd@arndb.de>
+Message-ID: <20120315172213.GC20243@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [120315 10:35]:
-> On Mon, 12 Mar 2012, Santosh Shilimkar wrote:
+On Thu, Mar 15, 2012 at 04:39:38PM +0000, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Jason Cooper wrote:
+> > That's my mistake.  I did a pull request for the wrong branch.  Olof,
+> > could you please drop the offending branch and I'll submit a new pull
+> > request once I have a chance to test Arnd's irq patch?
 > 
-> > Commit b1cbdb00d{OMAP: clockdomain: Wait for powerdomain to be ON
-> > when using clockdomain force wakeup} was assuming that pwrdm_state_switch()
-> > does wait for the powerdomain transition which is not the case.
-> > 
-> > Fix this API by adding the pwrdm_wait_transition().
-> > 
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > CC: Rajendra Nayak <rnayak@ti.com>
-> > CC: Paul Walmsley <paul@pwsan.com>
-> 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
-> 
-> Sounds like this fixes a major kernel oops bug for Tony so this should go 
-> in ASAP to v3.3-rc series.
+> I reverted this in the for-next branch for now. The two initial patches
+> from the kirkwood/board branch are still present.
 
-Got a random oops with this one applied still, just happened
-to take longer this time :(
+Okay, thanks.  I've rebased onto next/boards and merged the
+depends/irqdomain branch.  I'm making progress, but not finished yet.
 
-Regards,
+How is a pull-request done in the above scenario?  is my merge commit
+included in the series?  what is the pull-request based on?
+next/boards, or depends/irqdomain?
 
-Tony
+thx,
+
+Jason.
