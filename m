@@ -1,23 +1,40 @@
-From: dhowells@redhat.com (David Howells)
-Date: Thu, 15 Mar 2012 22:25:15 +0000
-Subject: [PATCH] Fixes after disintegration of asm/system.h for ARM
-In-Reply-To: <4F626AFF.1060501@samsung.com>
-References: <4F626AFF.1060501@samsung.com>
- <20120315212619.31098.94700.stgit@warthog.procyon.org.uk>
-Message-ID: <463.1331850315@redhat.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 15 Mar 2012 17:01:45 -0600 (MDT)
+Subject: [PATCH 1/2] ARM: OMAP: powerdomain: Wait for powerdomain
+ transition in pwrdm_state_switch()
+In-Reply-To: <20120315175122.GB7276@atomide.com>
+References: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
+ <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.00.1203151129160.26218@utopia.booyaka.com>
+ <20120315175122.GB7276@atomide.com>
+Message-ID: <alpine.DEB.2.00.1203151701290.2133@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Thu, 15 Mar 2012, Tony Lindgren wrote:
 
-> >   arch/arm/mach-s3c2410/s3c2410.c              |    1 +
-> >   arch/arm/mach-s3c2412/s3c2412.c              |    1 +
-> >   arch/arm/mach-s3c2416/s3c2416.c              |    1 +
-> >   arch/arm/mach-s3c2440/s3c244x.c              |    1 +
-> >   arch/arm/mach-s3c2443/s3c2443.c              |    1 +
+> * Paul Walmsley <paul@pwsan.com> [120315 10:35]:
+> > On Mon, 12 Mar 2012, Santosh Shilimkar wrote:
+> > 
+> > > Commit b1cbdb00d{OMAP: clockdomain: Wait for powerdomain to be ON
+> > > when using clockdomain force wakeup} was assuming that pwrdm_state_switch()
+> > > does wait for the powerdomain transition which is not the case.
+> > > 
+> > > Fix this API by adding the pwrdm_wait_transition().
+> > > 
+> > > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > > CC: Rajendra Nayak <rnayak@ti.com>
+> > > CC: Paul Walmsley <paul@pwsan.com>
+> > 
+> > Acked-by: Paul Walmsley <paul@pwsan.com>
+> > 
+> > Sounds like this fixes a major kernel oops bug for Tony so this should go 
+> > in ASAP to v3.3-rc series.
 > 
-> Just note, above files have been moved into mach-s3c24xx/
+> Got a random oops with this one applied still, just happened
+> to take longer this time :(
 
-Thanks.  Hopefully GIT should handle that.
+Oh well.  Will queue it for v3.4-rc1 then...
 
-David
+
+- Paul
