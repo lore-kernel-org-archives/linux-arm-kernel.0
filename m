@@ -1,52 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Mar 2012 15:44:21 +0000
-Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
-In-Reply-To: <201203151532.44363.arnd@arndb.de>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <CAFEEs1kz+QT_4Yc6byS4se0EMZvqA5hp5CvLvvtNgC++AJboxA@mail.gmail.com>
- <4F6209DA.1080809@linaro.org> <201203151532.44363.arnd@arndb.de>
-Message-ID: <4F620E55.4000701@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 15:52:09 +0000
+Subject: [GIT PULL] DaVinci fixes for v3.3
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317F5E48@DBDE01.ent.ti.com>
+References: <DF0F476B391FA8409C78302C7BA518B6317F5E48@DBDE01.ent.ti.com>
+Message-ID: <201203151552.09922.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/12 15:32, Arnd Bergmann wrote:
-> On Thursday 15 March 2012, Lee Jones wrote:
->>> I would like to see what the minimal required change is to support DT
->>> for mmci without factorization.
->>> 1. Minimal change in mmci.
->>> 2. Add mmci_dt.c which contains the DT-populate code.
->>>
->>> The factorization could be done as step 2 I think.
->>>
->>> What do you say?
->>
->> I'm wondering what the difference is as the work has already been done.
->>
->> It was Arnd's suggestion to separate out the two types of variants, and
->> I'm quite fond of the new (fully featured) layout.
+On Wednesday 14 March 2012, Nori, Sekhar wrote:
+> Hi Arnd, Olof,
 > 
-> Right, I usually prefer cleanups or other refactoring to be done first, and
-> then features added on top.
+> Can you please pull the following DaVinci fixes for v3.3.
+> They fix a build and section mismatch warning.
 > 
-> You could in theory add have just patches 3/4/5 all applied without
-> the refactoring, but that I would be worried that this causes dependencies
-> between the mmci driver and ux500 specific functionality like the
-> stedma40_filter function.
+> Thanks,
+> Sekhar
+> 
+> The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
+>   Linus Torvalds (1):
+>         Linux 3.3-rc7
+> 
+> are available in the git repository at:
+> 
+>   git://gitorious.org/linux-davinci/linux-davinci.git fixes
+> 
+> Uwe Kleine-K??????nig (2):
+>       ARM: davinci: cpufreq: fix compiler warning
+>       ARM: davinci: DA850: move da850_register_pm to .init.text
+> 
+>  arch/arm/mach-davinci/cpufreq.c |    2 +-
+>  arch/arm/mach-davinci/da850.c   |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-
+> 
 
-It's a possibility that we may have run into that even with this new
-layout. Remember you suggested that the u300 variant may be better off
-going into the ARM variant's file, but I wasn't quite sure, as it was an
-ST product. Well the afore mentioned function may still cause us some
-trouble. I am in the mists of some regression testing now. I'll report
-back when I know more.
+Hi Sekhar,
 
-Kind regards,
-Lee
+I've applied these two to the next/fixes-non-critical branch for v3.4,
+not the fixes branch for v3.3 because they both look like they have
+no impact on production systems other than the build warnings.
 
+If I missed something and one or both patches are indeed required for 3.3,
+please let me know.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-M: +44 77 88 633 515
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
