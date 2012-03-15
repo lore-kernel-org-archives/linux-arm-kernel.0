@@ -1,58 +1,78 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 15 Mar 2012 16:24:13 +0000
-Subject: [alsa-devel] [PATCH v3 09/11] ASoC: fsl: remove the fatal error
- checking on codec-handle
-In-Reply-To: <CA+7tXiiJyLAm1ytyqQYgbJ_roUtXwxqhFWKEBk+4jY_HV5V8Zg@mail.gmail.com>
-References: <4F5FD706.8040209@freescale.com>
- <20120313234638.GY3177@opensource.wolfsonmicro.com>
- <4F6008FA.3040805@freescale.com>
- <20120314122723.GC3133@opensource.wolfsonmicro.com>
- <4F612319.50302@freescale.com>
- <20120315130253.GA6065@S2101-09.ap.freescale.net>
- <4F61F080.4090800@freescale.com>
- <20120315142115.GB6065@S2101-09.ap.freescale.net>
- <CA+7tXig6=gz8utcnV8qUs6=JnwEz8+tqc-57v-xNcYcK_AAHXw@mail.gmail.com>
- <CA+7tXiiJyLAm1ytyqQYgbJ_roUtXwxqhFWKEBk+4jY_HV5V8Zg@mail.gmail.com>
-Message-ID: <20120315162413.GO3138@opensource.wolfsonmicro.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 15 Mar 2012 17:30:49 +0100
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <201203150922.06379.arnd@arndb.de>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <201203150922.06379.arnd@arndb.de>
+Message-ID: <4F621939.9040906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 11:57:52AM -0400, Trent Piepho wrote:
+On 3/15/2012 10:22 AM, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Nicolas Ferre wrote:
+>> Add some basic helpers to retrieve a DMA controller device_node and the
+>> DMA request specifications. By making DMA controllers register a generic
+>> translation function, we allow the management of any type of DMA requests
+>> specification.
+>> The void * output of an of_dma_xlate() function that will be implemented
+>> by the DMA controller can carry any type of "dma-request" argument.
+>>
+>> The DMA client will search its associated DMA controller in the list and
+>> call the registered of_dam_xlate() function to retrieve the request values.
+>>
+>> One simple xlate function is provided for the "single number" type of
+>> request binding.
+>>
+>> This implementation is independent from dmaengine so it can also be used
+>> by legacy drivers.
+>>
+>> For legacy reason another API will export the DMA request number into a
+>> Linux resource of type IORESOURCE_DMA.
+>
+> This looks very good. I missed the first version of this patch, but was
+> thinking of very similar bindings.
+>
+>> +Client drivers should specify the DMA request property using a phandle to
+>> +the controller. If needed, the DMA request identity on that controller is then
+>> +added followed by optional request specifications.
+>> +
+>> +Required property:
+>> +    - dma-request: List of phandle + dma-request + request specifications,
+>> +      one group per request "line".
+>> +Optional property:
+>> +    - dma-request-names: list of strings in the same order as the dma-request
+>> +      in the dma-request property.
+>> +
+>> +
+>> +Example:
+>> +
+>> +	i2c1: i2c at 1 {
+>> +		...
+>> +		dma-request =<&sdma 2&sdma 3>;
+>> +		dma-request-names = "tx", "rx";
+>> +		...
+>> +	};
+>
+> This is slightly different from how the proposed pwm binding works that
+> Thierry is working on, which uses an arbitrary property name instead of
+> requiring the use of a specific property but then allowing to give names
+> in another property.
+>
+> I don't care much which way it's done, but please try to agree on one
+> approach that is used for both.
+>
+> The one you have here is already used by reg and irq, while the other
+> one is used in gpio.
 
-> which caused text window in gmail to become deselected, which caused a
-> subsequent enter to send the email rather than creating a new line.
+This was done like IRQ on purpose, because an Interrupt ReQuest line and 
+a DMA Request line are really similar for the HW point of view at IP level.
+I'm not sure what Thierry have done for pwm, but I thing that having the 
+same scheme for reg, irq and dma was what we agreed with Grant during 
+Plumbers.
 
-> For esai, would you add something like:
->     esai-controller = <&esai1>;
->     esai-audio-codec = <&sgtl5000_3>;
+GPIO scheme will be probably good enough as well, but the idea was to be 
+consistent in the binding for similar information.
 
-> That seems rather ugly to me.
-
-None of these examples seem particularly to reflect realistic audio
-hardware; they're more describing a board with multiple distinct audio
-subsystems on it than a single card.  Remember that nothing at all is
-fixed about how the card binding works internally, the card driver is
-free to pick any binding that makes sense for the systems it supports.
-Shoehorning every possible card into the same binding is definitely a
-really bad idea.
-
-> It seems to me in most device bindings where one piece of hardware is
-> attached to another, than the one upstream has in its binding a
-> phandle to the one downstream.  But here we have a third binding with
-> two lists of devices and an implied link between devices in
-> corresponding positions in the lists.  Does any other device binding
-> work like that?
-
-There's no upstream and downstream here, really.  But like I say none of
-this looks like realistic hardware anyway.
-
-*Please* go and read the previous discussions of audio bindings for
-SoCs, while it's more understandable with people who haven't been
-involved before its still tiresome to have to go back to square one.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/8ed7c6cc/attachment.sig>
+Regards,
+Benoit
