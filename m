@@ -1,86 +1,62 @@
 From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Thu, 15 Mar 2012 17:43:55 +0100
-Subject: [PATCH 00/10] PM: Create the AVS class of drivers
-Message-ID: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
+Date: Thu, 15 Mar 2012 17:43:56 +0100
+Subject: [PATCH 01/10] ARM: OMAP3+: voltage: export functions to plat/voltage.h
+In-Reply-To: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
+References: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
+Message-ID: <1331829845-9526-2-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean Pihet <j-pihet@ti.com>
 
-AVS is a power management technique which controls the operating
-voltage of a device in order to optimize (i.e. reduce) its power
-consumption. The voltage is adapted depending on static factors
-(chip manufacturing process) and dynamic factors (temperature
-depending performance).
-AVS is also called SmartReflex on OMAP devices.
+Move some functions from mach-omap2/ dir to the plat/ dir.
+The SmartReflex class driver is a user of the basic voltage domains
+functions (enable, disable, reset).
 
-To that end, create the AVS framework in drivers/power/avs and
-move the OMAP SmartReflex code to the new directory.
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/voltage.h             |    1 -
+ arch/arm/mach-omap2/vp.h                  |    2 --
+ arch/arm/plat-omap/include/plat/voltage.h |    3 +++
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-In preparation to the move of the OMAP code the following changes have been
-made:
-- split the include files into generic and platform specific code,
-- fill in platform data from the device initialization code and pass
-  it to the driver,
-- create CONFIG_AVS* config options accordingly.
-
-The platform integration data for SmartReflex is passed from hwmod
-and the voltage layer to the driver using pdata.
-
-
-Tested on OMAP3 Beagleboard using omap2plus_defconfig with the
-CONFIG_POWER_AVS* options set.
-Based on master branch of the l-o git tree (3.3.0-rc6) [1], commit
-85244e0edd240da2004bb2ab7cbcbc67a336f20d.
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-
-
-Jean Pihet (10):
-  ARM: OMAP3+: voltage: export functions to plat/voltage.h
-  ARM: OMAP2+: SmartReflex: move the platform specific macros in
-    plat-omap
-  ARM: OMAP3+: SmartReflex: class drivers should use struct omap_sr *
-  ARM: OMAP2+: smartreflex: Use the names from hwmod data instead of
-    voltage domains.
-  ARM: OMAP3: hwmod: rename the smartreflex entries
-  ARM: OMAP2+: SmartReflex: use the platform header file for voltage
-    functions
-  ARM: OMAP2+: SmartReflex: introduce a busy loop condition test macro
-  ARM: OMAP2+: SmartReflex: Use per-OPP data structure
-  ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
-  ARM: OMAP: SmartReflex: Move smartreflex driver to drivers/
-
- arch/arm/mach-omap2/Makefile                  |    4 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c    |   11 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c    |    3 +-
- arch/arm/mach-omap2/pm.h                      |    2 +-
- arch/arm/mach-omap2/smartreflex-class3.c      |   60 --
- arch/arm/mach-omap2/smartreflex.c             | 1165 -------------------------
- arch/arm/mach-omap2/smartreflex.h             |  256 ------
- arch/arm/mach-omap2/sr_device.c               |   38 +-
- arch/arm/mach-omap2/voltage.h                 |    1 -
- arch/arm/mach-omap2/vp.h                      |    2 -
- arch/arm/plat-omap/Kconfig                    |   31 -
- arch/arm/plat-omap/include/plat/smartreflex.h |   95 ++
- arch/arm/plat-omap/include/plat/voltage.h     |    3 +
- drivers/power/Kconfig                         |    2 +
- drivers/power/Makefile                        |    2 +
- drivers/power/avs/Kconfig                     |   45 +
- drivers/power/avs/Makefile                    |    2 +
- drivers/power/avs/smartreflex-class3.c        |   60 ++
- drivers/power/avs/smartreflex.c               | 1117 ++++++++++++++++++++++++
- drivers/power/avs/smartreflex.h               |  238 +++++
- 20 files changed, 1604 insertions(+), 1533 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/smartreflex-class3.c
- delete mode 100644 arch/arm/mach-omap2/smartreflex.c
- delete mode 100644 arch/arm/mach-omap2/smartreflex.h
- create mode 100644 arch/arm/plat-omap/include/plat/smartreflex.h
- create mode 100644 drivers/power/avs/Kconfig
- create mode 100644 drivers/power/avs/Makefile
- create mode 100644 drivers/power/avs/smartreflex-class3.c
- create mode 100644 drivers/power/avs/smartreflex.c
- create mode 100644 drivers/power/avs/smartreflex.h
-
+diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+index 16a1b09..a81dea8 100644
+--- a/arch/arm/mach-omap2/voltage.h
++++ b/arch/arm/mach-omap2/voltage.h
+@@ -167,6 +167,5 @@ int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
+ 			  int (*fn)(struct voltagedomain *voltdm,
+ 				    struct powerdomain *pwrdm));
+ int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
+-void voltdm_reset(struct voltagedomain *voltdm);
+ unsigned long voltdm_get_voltage(struct voltagedomain *voltdm);
+ #endif
+diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
+index 7c155d2..837cb8d 100644
+--- a/arch/arm/mach-omap2/vp.h
++++ b/arch/arm/mach-omap2/vp.h
+@@ -118,8 +118,6 @@ extern struct omap_vp_instance omap4_vp_iva;
+ extern struct omap_vp_instance omap4_vp_core;
+ 
+ void omap_vp_init(struct voltagedomain *voltdm);
+-void omap_vp_enable(struct voltagedomain *voltdm);
+-void omap_vp_disable(struct voltagedomain *voltdm);
+ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
+ 			      unsigned long target_volt);
+ int omap_vp_update_errorgain(struct voltagedomain *voltdm,
+diff --git a/arch/arm/plat-omap/include/plat/voltage.h b/arch/arm/plat-omap/include/plat/voltage.h
+index 0a6a482..1842709 100644
+--- a/arch/arm/plat-omap/include/plat/voltage.h
++++ b/arch/arm/plat-omap/include/plat/voltage.h
+@@ -16,5 +16,8 @@ struct voltagedomain;
+ struct voltagedomain *voltdm_lookup(const char *name);
+ int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
+ unsigned long voltdm_get_voltage(struct voltagedomain *voltdm);
++void voltdm_reset(struct voltagedomain *voltdm);
+ 
++void omap_vp_enable(struct voltagedomain *voltdm);
++void omap_vp_disable(struct voltagedomain *voltdm);
+ #endif
 -- 
 1.7.5.4
