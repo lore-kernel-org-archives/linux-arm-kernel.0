@@ -1,24 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Mar 2012 20:36:27 +0000
-Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
-In-Reply-To: <CAFEEs1=TJaCYmaWd7zd28NsV8ubZBpBn7p=Mi7vGtmV_vpfh1w@mail.gmail.com>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <CAFEEs1kz+QT_4Yc6byS4se0EMZvqA5hp5CvLvvtNgC++AJboxA@mail.gmail.com>
- <4F6209DA.1080809@linaro.org> <201203151532.44363.arnd@arndb.de>
- <CAFEEs1=TJaCYmaWd7zd28NsV8ubZBpBn7p=Mi7vGtmV_vpfh1w@mail.gmail.com>
-Message-ID: <20120315203627.GB2311@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 20:41:53 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <20120315195753.GA2842@n2100.arm.linux.org.uk>
+References: <4F22DEF2.5000807@ti.com> <4F621939.9040906@ti.com>
+ <20120315195753.GA2842@n2100.arm.linux.org.uk>
+Message-ID: <201203152041.53754.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 08:12:49PM +0100, Per Forlin wrote:
-> About refactoring
-> There are numbers of patches stashed up for MMCI waiting for verdict
-> here http://git.kernel.org/?p=linux/kernel/git/linusw/linux-stericsson.git;a=shortlog;h=refs/heads/mmci.
-> If doing a refactorization please rebase it on top of these patches.
+On Thursday 15 March 2012, Russell King - ARM Linux wrote:
+> On Thu, Mar 15, 2012 at 05:30:49PM +0100, Cousson, Benoit wrote:
+> > This was done like IRQ on purpose, because an Interrupt ReQuest line and  
+> > a DMA Request line are really similar for the HW point of view at IP 
+> > level.
+> 
+> I'm not sure about that at all levels.  Sure, at hardware level they're
+> the same, but I think the flat numeric namespace for IRQs has been
+> proven to be a problem when there's multiple IRQ controllers in the
+> system.
 
-Quite a number of these are in linux-next via my tree:
+In the DT bindings, both IRQ and the suggested DMA are not flat number
+spaces, but instead can be of arbitrarly length defined by the controller.
 
-http://ftp.arm.linux.org.uk/git/?p=linux-next.git;a=shortlog;h=7437cfa532842ce75189826742bddf1ba137f58e
+> As far as I'm concerned for DMA stuff, there is currently no real solution
+> for a DT representation; TI have asked me to take over the conversion of
+> OMAP DMA support to the DMA engine API, and I'm not yet convinced that
+> the existing numbering system is the right solution - especially as
+> there's several overlapping numberspaces for OMAP DMA numbers which
+> are SoC specific.
 
-There's 10 there, out of the 17 in Linus' tree.  See my previous replies
-on why that's the case.
+The numbers definitely need to become local to each of the controllers, but
+that is the case pretty much automatically using the proposed binding,
+because each dma request identifier starts with the phandle of the
+controller.
+
+	Arnd
