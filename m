@@ -1,51 +1,91 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 15 Mar 2012 18:59:28 +0800
-Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20321.37353.63115.664975@ipc1.ka-ro>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-2-git-send-email-b29396@freescale.com>
- <20120313172351.97C5E3E053B@localhost>
- <20120314124512.GG1180@shlinux2.ap.freescale.net>
- <20120314141643.GP3852@pengutronix.de>
- <20120315030206.GB13022@shlinux2.ap.freescale.net>
- <20321.37353.63115.664975@ipc1.ka-ro>
-Message-ID: <20120315105927.GE13022@shlinux2.ap.freescale.net>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 15 Mar 2012 16:33:29 +0530
+Subject: [PATCH v3] ARM: SPEAr600: Add device-tree support to SPEAr600
+ boards
+In-Reply-To: <1331808632-22585-1-git-send-email-sr@denx.de>
+References: <1331808632-22585-1-git-send-email-sr@denx.de>
+Message-ID: <4F61CC81.1020902@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 02:53:29PM +0800, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Dong Aisheng writes:
-> > On Wed, Mar 14, 2012 at 10:16:43PM +0800, s.hauer at pengutronix.de wrote:
-> > > On Wed, Mar 14, 2012 at 08:45:23PM +0800, Dong Aisheng wrote:
-> > > > On Wed, Mar 14, 2012 at 01:23:51AM +0800, Grant Likely wrote:
-> [...]
-> > > > But it seems this needs pass mac address to fec driver via platforom data which is
-> > > > not friendly to dt.
-> > > > 
-> > > > Another way may be changing fec driver to get the fixed part of mac address(first
-> > > > two bytes) from device tree and read the left dynamical part from otp which i'm not
-> > > > sure is better enough.
-> > > > 
-> > > > BTW, filling with zeros seems not work since it's invalid mac address.
-> > > 
-> > > Yes, that's the idea of using this value...
-> > > 
-> > But comparing to use an invalid value, why not just do not define that
-> > local-mac-address property?
-> > 
-> Because a MAC address is by definition a GLOBALLY UNIQUE IDENTIFIER
-> which is contrary to coding a "valid" default value for it somewhere!
-> The owner of a certain MAC address range (OUI) is responsible for
-> ensuring the uniqueness. Thus only they may assign a specific MAC
-> address to a specific device.
-> 
-Yes, you're correct.
-So i propose to read the MAC address from MX28 OTP in fec driver instead of
-define it in device tree in my last mail.
-http://www.spinics.net/lists/arm-kernel/msg165040.html
-Do you have any comment on that way?
+On 3/15/2012 4:20 PM, Stefan Roese wrote:
 
-Regards
-Dong Aisheng
+> diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+
+> +/ {
+> +       compatible = "st,spear600";
+> +
+> +       cpus {
+> +               cpu at 0 {
+> +                       compatible = "arm,arm926ejs";
+> +               };
+> +       };
+> +
+> +       memory {
+> +               device_type = "memory";
+> +               reg = <0 0x40000000>; /* Real value updated by U-Boot */
+> +       };
+> +
+> +       ahb {
+
+What is the significance of this name? As i see gpio/spi etc in this list,
+which are on apb bus.
+
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "simple-bus";
+> +               ranges;
+> +
+
+> +               /* local/cpu GPIO */
+> +               gpio0: gpio at f0100000 {
+> +                       #gpio-cells = <2>;
+> +                       compatible = "arm,pl061", "arm,primecell";
+> +                       gpio-controller;
+> +                       reg = <0xf0100000 0x1000>;
+> +                       interrupt-parent = <&vic0>;
+> +                       interrupts = <18>;
+> +               };
+> +
+> +               /* basic GPIO */
+> +               gpio1: gpio at fc980000 {
+> +                       #gpio-cells = <2>;
+> +                       compatible = "arm,pl061", "arm,primecell";
+> +                       gpio-controller;
+> +                       reg = <0xfc980000 0x1000>;
+> +                       interrupt-parent = <&vic1>;
+> +                       interrupts = <19>;
+> +               };
+> +
+> +               /* appl GPIO */
+> +               gpio2: gpio at d8100000 {
+> +                       #gpio-cells = <2>;
+> +                       compatible = "arm,pl061", "arm,primecell";
+> +                       gpio-controller;
+> +                       reg = <0xd8100000 0x1000>;
+> +                       interrupt-parent = <&vic1>;
+> +                       interrupts = <4>;
+> +               };
+> +
+
+> +};
+
+> diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+> index ac70e0d..358f280 100644
+> --- a/arch/arm/mach-spear6xx/clock.c
+> +++ b/arch/arm/mach-spear6xx/clock.c
+> @@ -641,8 +641,8 @@ static struct clk_lookup spear_clk_lookups[] = {
+>         { .con_id = "gpt0_synth_clk",   .clk = &gpt0_synth_clk},
+>         { .con_id = "gpt2_synth_clk",   .clk = &gpt2_synth_clk},
+>         { .con_id = "gpt3_synth_clk",   .clk = &gpt3_synth_clk},
+> -       { .dev_id = "uart0",            .clk = &uart0_clk},
+> -       { .dev_id = "uart1",            .clk = &uart1_clk},
+> +       { .dev_id = "d0000000.serial",  .clk = &uart0_clk},
+> +       { .dev_id = "d0080000.serial",  .clk = &uart1_clk},
+
+I didn't got Jean's comment at that time, but now it is ultra clear.
+
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
+
+-- 
+viresh
