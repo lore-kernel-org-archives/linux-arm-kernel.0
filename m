@@ -1,186 +1,65 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 15 Mar 2012 13:53:20 -0400 (EDT)
-Subject: [PATCH 2/4] ARM: opcodes: Make opcode byteswapping macros
- assembly-compatible
-In-Reply-To: <1331829132-9762-3-git-send-email-dave.martin@linaro.org>
-References: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
- <1331829132-9762-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.02.1203151351180.24151@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 17:53:25 +0000
+Subject: [PATCH 5/5] MMC: mmci: Add required documentation for Device Tree
+ bindings
+In-Reply-To: <1331734803-17954-6-git-send-email-lee.jones@linaro.org>
+References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
+ <1331734803-17954-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <201203151753.25774.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Mar 2012, Dave Martin wrote:
+On Wednesday 14 March 2012, Lee Jones wrote:
 
-> Most of the existing macros don't work with assembler, due to the
-> use of type casts and C functions from <linux/swab.h>.
-> 
-> This patch abstracts out those operations and provides simple
-> explicit versions for use in assembly code.
-> 
-> __opcode_is_thumb32() and __opcode_is_thumb16() are also converted
-> to do bitmask-based testing to avoid confusion if these are used in
-> assembly code (the assembler typically treats all arithmetic values
-> as signed).
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Some more comments about the individual properties
 
-OK.  One really has to read through the whole series to see the point of 
-this.
+> +Required properties:
+> +- compatible             : contains "arm,pl18x", "arm,primecell".
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Better use the exact number for 'x' here.
 
+> +- reg                    : contains pl18x registers and length.
+> +- interrupts             : contains the device IRQ(s).
 
+You should document what the first and second interrupts are,
+respectively, if there is more than one.
 
-> ---
->  arch/arm/include/asm/opcodes.h |   97 +++++++++++++++++++++++++++++++++------
->  1 files changed, 82 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-> index cf877c8..32730a8 100644
-> --- a/arch/arm/include/asm/opcodes.h
-> +++ b/arch/arm/include/asm/opcodes.h
-> @@ -19,6 +19,33 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
->  
->  
->  /*
-> + * Assembler opcode byteswap helpers.
-> + * These are only intended for use by this header: don't use them directly,
-> + * because they will be suboptimal in most cases.
-> + */
-> +#define ___asm_opcode_swab32(x) (	\
-> +	  (((x) << 24) & 0xFF000000)	\
-> +	| (((x) <<  8) & 0x00FF0000)	\
-> +	| (((x) >>  8) & 0x0000FF00)	\
-> +	| (((x) >> 24) & 0x000000FF)	\
-> +)
-> +#define ___asm_opcode_swab16(x) (	\
-> +	  (((x) << 8) & 0xFF00)		\
-> +	| (((x) >> 8) & 0x00FF)		\
-> +)
-> +#define ___asm_opcode_swahb32(x) (	\
-> +	  (((x) << 8) & 0xFF00FF00)	\
-> +	| (((x) >> 8) & 0x00FF00FF)	\
-> +)
-> +#define ___asm_opcode_swahw32(x) (	\
-> +	  (((x) << 16) & 0xFFFF0000)	\
-> +	| (((x) >> 16) & 0x0000FFFF)	\
-> +)
-> +#define ___asm_opcode_identity32(x) ((x) & 0xFFFFFFFF)
-> +#define ___asm_opcode_identity16(x) ((x) & 0xFFFF)
+> +- arm,primecell-periphid : contains the PrimeCell Peripheral ID.
+
+This one should be optional.
+
 > +
-> +
-> +/*
->   * Opcode byteswap helpers
->   *
->   * These macros help with converting instructions between a canonical integer
-> @@ -41,30 +68,58 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
->   * Note that values in the range 0x0000E800..0xE7FFFFFF intentionally do not
->   * represent any valid Thumb-2 instruction.  For this range,
->   * __opcode_is_thumb32() and __opcode_is_thumb16() will both be false.
-> + *
-> + * The ___asm variants are intended only for use by this header, in situations
-> + * involving inline assembler.  For .S files, the normal __opcode_*() macros
-> + * should do the right thing.
->   */
-> +#ifdef __ASSEMBLY__
->  
-> -#ifndef __ASSEMBLY__
-> +#define ___opcode_swab32(x) ___asm_opcode_swab32(x)
-> +#define ___opcode_swab16(x) ___asm_opcode_swab16(x)
-> +#define ___opcode_swahb32(x) ___asm_opcode_swahb32(x)
-> +#define ___opcode_swahw32(x) ___asm_opcode_swahw32(x)
-> +#define ___opcode_identity32(x) ___asm_opcode_identity32(x)
-> +#define ___opcode_identity16(x) ___asm_opcode_identity16(x)
-> +
-> +#else /* ! __ASSEMBLY__ */
->  
->  #include <linux/types.h>
->  #include <linux/swab.h>
->  
-> +#define ___opcode_swab32(x) swab32(x)
-> +#define ___opcode_swab16(x) swab16(x)
-> +#define ___opcode_swahb32(x) swahb32(x)
-> +#define ___opcode_swahw32(x) swahw32(x)
-> +#define ___opcode_identity32(x) ((u32)(x))
-> +#define ___opcode_identity16(x) ((u16)(x))
-> +
-> +#endif /* ! __ASSEMBLY__ */
-> +
-> +
->  #ifdef CONFIG_CPU_ENDIAN_BE8
->  
-> -#define __opcode_to_mem_arm(x) swab32(x)
-> -#define __opcode_to_mem_thumb16(x) swab16(x)
-> -#define __opcode_to_mem_thumb32(x) swahb32(x)
-> +#define __opcode_to_mem_arm(x) ___opcode_swab32(x)
-> +#define __opcode_to_mem_thumb16(x) ___opcode_swab16(x)
-> +#define __opcode_to_mem_thumb32(x) ___opcode_swahb32(x)
-> +#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_swab32(x)
-> +#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_swab16(x)
-> +#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahb32(x)
->  
->  #else /* ! CONFIG_CPU_ENDIAN_BE8 */
->  
-> -#define __opcode_to_mem_arm(x) ((u32)(x))
-> -#define __opcode_to_mem_thumb16(x) ((u16)(x))
-> +#define __opcode_to_mem_arm(x) ___opcode_identity32(x)
-> +#define __opcode_to_mem_thumb16(x) ___opcode_identity16(x)
-> +#define ___asm_opcode_to_mem_arm(x) ___asm_opcode_identity32(x)
-> +#define ___asm_opcode_to_mem_thumb16(x) ___asm_opcode_identity16(x)
->  #ifndef CONFIG_CPU_ENDIAN_BE32
->  /*
->   * On BE32 systems, using 32-bit accesses to store Thumb instructions will not
->   * work in all cases, due to alignment constraints.  For now, a correct
->   * version is not proivided for BE32.
->   */
-> -#define __opcode_to_mem_thumb32(x) swahw32(x)
-> +#define __opcode_to_mem_thumb32(x) ___opcode_swahw32(x)
-> +#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahw32(x)
->  #endif
->  
->  #endif /* ! CONFIG_CPU_ENDIAN_BE8 */
-> @@ -78,15 +133,27 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
->  /* Operations specific to Thumb opcodes */
->  
->  /* Instruction size checks: */
-> -#define __opcode_is_thumb32(x) ((u32)(x) >= 0xE8000000UL)
-> -#define __opcode_is_thumb16(x) ((u32)(x) < 0xE800UL)
-> +#define __opcode_is_thumb32(x) (		\
-> +	   ((x) & 0xF8000000) == 0xE8000000	\
-> +	|| ((x) & 0xF0000000) == 0xF0000000	\
-> +)
-> +#define __opcode_is_thumb16(x) (					\
-> +	   ((x) & 0xFFFF0000) == 0					\
-> +	&& !(((x) & 0xF800) == 0xE800 || ((x) & 0xF000) == 0xF000)	\
-> +)
->  
->  /* Operations to construct or split 32-bit Thumb instructions: */
-> -#define __opcode_thumb32_first(x) ((u16)((x) >> 16))
-> -#define __opcode_thumb32_second(x) ((u16)(x))
-> -#define __opcode_thumb32_compose(first, second) \
-> -	(((u32)(u16)(first) << 16) | (u32)(u16)(second))
-> -
-> -#endif /* __ASSEMBLY__ */
-> +#define __opcode_thumb32_first(x) (___opcode_identity16((x) >> 16))
-> +#define __opcode_thumb32_second(x) (___opcode_identity16(x))
-> +#define __opcode_thumb32_compose(first, second) (			\
-> +	  (___opcode_identity32(___opcode_identity16(first)) << 16)	\
-> +	| ___opcode_identity32(___opcode_identity16(second))		\
-> +)
-> +#define ___asm_opcode_thumb32_first(x) (___asm_opcode_identity16((x) >> 16))
-> +#define ___asm_opcode_thumb32_second(x) (___asm_opcode_identity16(x))
-> +#define ___asm_opcode_thumb32_compose(first, second) (			    \
-> +	  (___asm_opcode_identity32(___asm_opcode_identity16(first)) << 16) \
-> +	| ___asm_opcode_identity32(___asm_opcode_identity16(second))	    \
-> +)
->  
->  #endif /* __ASM_ARM_OPCODES_H */
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> +Optional properties:
+> +- ocr_mask               : contains the regulator oscillator mask
+
+Not sure about this one. If it's for the regulators, we should be
+using the regulator bindings.
+
+> +- wp-gpios               : contains any write protect (ro) gpios
+> +- cd-gpios               : contains any card detection gpios
+> +- cd-invert              : indicates whether the cd gpio is inverted 
+> +- clock_frequency        : contains the maximum operating frequency
+
+The name should be 'clock-frequency', not 'clock_frequency'.
+
+> +- mmc_cap_4_bit_data     : indicates whether device is 4 bit capable
+> +- mmc_cap_8_bit_data     : indicates whether device is 8 bit capable
+> +- mmc_cap_mmc_highspeed  : indicates whether MMC is high speed capable
+> +- mmc_cap_sd_highspeed   : indicates whether SD is high speed capable
+
+I would strongly recommend using the same naming as sdhci here. I think
+tegra has set a precedent.
+
+> +ux500 variant specific properties:
+> +- gpio-en                : contains the level-shifter enable gpio
+> +- gpio-vsel              : contains the level-shifter voltage select gpio
+
+I think these need to be 'en-gpios' and 'vsel-gpios', in order for the
+gpio binding to work.
+
+> +- tx_dst_dev_type        : contains the tx destination device (DMA) 
+> +- rx_src_dev_type        : contains the rx source device (DMA)
+
+As Russell commented already, these should not be here.
+
+	Arnd
