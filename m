@@ -1,113 +1,52 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 15 Mar 2012 16:32:31 +0100
-Subject: [PATCH v2] ARM: SPEAr600: Add device-tree support to SPEAr600
- boards
-In-Reply-To: <201203142001.58762.sr@denx.de>
-References: <1331737232-25477-1-git-send-email-sr@denx.de>
- <201203141749.05899.sr@denx.de>
- <20120314172435.GP18320@game.jcrosoft.org>
- <201203142001.58762.sr@denx.de>
-Message-ID: <20120315153231.GA7757@game.jcrosoft.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 15 Mar 2012 15:44:21 +0000
+Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
+In-Reply-To: <201203151532.44363.arnd@arndb.de>
+References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
+ <CAFEEs1kz+QT_4Yc6byS4se0EMZvqA5hp5CvLvvtNgC++AJboxA@mail.gmail.com>
+ <4F6209DA.1080809@linaro.org> <201203151532.44363.arnd@arndb.de>
+Message-ID: <4F620E55.4000701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:01 Wed 14 Mar     , Stefan Roese wrote:
-> On Wednesday 14 March 2012 18:24:35 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > diff --git a/arch/arm/boot/dts/spear600-evb.dts
-> > > > > b/arch/arm/boot/dts/spear600-evb.dts new file mode 100644
-> > > > > index 0000000..cbfda8d
-> > > > > --- /dev/null
-> > > > > +++ b/arch/arm/boot/dts/spear600-evb.dts
-> > > > > @@ -0,0 +1,30 @@
-> > > > > +/*
-> > > > > + * Copyright 2012 Stefan Roese <sr@denx.de>
-> > > > > + *
-> > > > > + * The code contained herein is licensed under the GNU General
-> > > > > Public + * License. You may obtain a copy of the GNU General Public
-> > > > > License + * Version 2 or later at the following locations:
-> > > > > + *
-> > > > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > > > + * http://www.gnu.org/copyleft/gpl.html
-> > > > > + */
-> > > > > +
-> > > > > +/dts-v1/;
-> > > > > +/include/ "spear600.dtsi"
-> > > > > +
-> > > > > +/ {
-> > > > > +	model = "ST SPEAr600 Evaluation Board";
-> > > > > +	compatible = "st,spear600-evb", "st,spear600";
-> > > > > +	#address-cells = <1>;
-> > > > > +	#size-cells = <1>;
-> > > > 
-> > > > please put the mem size here
-> > > 
-> > > Might I ask why? Other *.dtsi files don't have it either.
-> > 
-> > do not expect the bootloader to put it. I t's not mandatory
+On 15/03/12 15:32, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Lee Jones wrote:
+>>> I would like to see what the minimal required change is to support DT
+>>> for mmci without factorization.
+>>> 1. Minimal change in mmci.
+>>> 2. Add mmci_dt.c which contains the DT-populate code.
+>>>
+>>> The factorization could be done as step 2 I think.
+>>>
+>>> What do you say?
+>>
+>> I'm wondering what the difference is as the work has already been done.
+>>
+>> It was Arnd's suggestion to separate out the two types of variants, and
+>> I'm quite fond of the new (fully featured) layout.
 > 
-> But the memory node it is already present in spear600.dtsi (see below). Do we 
-> really need to duplicate this in the board specific dts file?
-no if the mem is the same size please drop the commentabout bootloader update
-it's a common knowlegde on DT for ARM
->  
-> > > > > +
-> > > > > +	soc {
-> > > > > +		gmac0: ethernet at e0800000 {
-> > > > > +			phy-mode = "gmii";
-> > > > > +		};
-> > > > > +
-> > > > > +		i2c at d0200000 {
-> > > > > +			clock-frequency = <400000>;
-> > > > > +		};
-> > > > > +	};
-> > > > > +};
-> > > > > diff --git a/arch/arm/boot/dts/spear600.dtsi
-> > > > > b/arch/arm/boot/dts/spear600.dtsi new file mode 100644
-> > > > > index 0000000..e45e58f
-> > > > > --- /dev/null
-> > > > > +++ b/arch/arm/boot/dts/spear600.dtsi
-> > > > > @@ -0,0 +1,162 @@
-> > > > > +/*
-> > > > > + * Copyright 2012 Stefan Roese <sr@denx.de>
-> > > > > + *
-> > > > > + * The code contained herein is licensed under the GNU General
-> > > > > Public + * License. You may obtain a copy of the GNU General Public
-> > > > > License + * Version 2 or later at the following locations:
-> > > > > + *
-> > > > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > > > + * http://www.gnu.org/copyleft/gpl.html
-> > > > > + */
-> > > > > +
-> > > > > +/include/ "skeleton.dtsi"
-> > > > > +
-> > > > > +/ {
-> > > > > +	compatible = "st,spear600";
-> > > > > +
-> > > > > +	cpus {
-> > > > > +		cpu at 0 {
-> > > > > +			compatible = "arm,arm926ejs";
-> > > > > +		};
-> > > > > +	};
-> > > > > +
-> > > > > +	memory {
-> > > > > +		device_type = "memory";
-> > > > > +		reg = <0 0>; /* Filled by U-Boot */
-> > > > 
-> > > > please put the max mem of the SoC here
-> > > 
-> > > Why? It's always updated by the bootloader. And a max. mem size (when not
-> > > updated to the correct mem size by the bootloader) would crash the board
-> > > if it is equipped with less memory.
-> > 
-> > yes but we descripbe the soc here and on the dts you reduce it
-> > Never expect the bootloader to update it.
+> Right, I usually prefer cleanups or other refactoring to be done first, and
+> then features added on top.
 > 
-> Without update to real size we're doomed.
-yes but the board dts is supposed to udpate it
+> You could in theory add have just patches 3/4/5 all applied without
+> the refactoring, but that I would be worried that this causes dependencies
+> between the mmci driver and ux500 specific functionality like the
+> stedma40_filter function.
 
-you put the max in the soc dtsi
+It's a possibility that we may have run into that even with this new
+layout. Remember you suggested that the u300 variant may be better off
+going into the ARM variant's file, but I wasn't quite sure, as it was an
+ST product. Well the afore mentioned function may still cause us some
+trouble. I am in the mists of some regression testing now. I'll report
+back when I know more.
 
-and the real mem size in board dts
+Kind regards,
+Lee
 
-Best Regards,
-J.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+M: +44 77 88 633 515
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
