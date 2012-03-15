@@ -1,35 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 16:10:44 +0000
-Subject: [GIT PULL][for v3.4] pull request from board-specific branch in
- arch-pxa
-In-Reply-To: <CAN1soZyWmrzQzr0VHtrixdr2myv4ggJ1YBcS8OnuLJLOn2uVEQ@mail.gmail.com>
-References: <CAN1soZyWmrzQzr0VHtrixdr2myv4ggJ1YBcS8OnuLJLOn2uVEQ@mail.gmail.com>
-Message-ID: <201203151610.44491.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Mar 2012 17:11:45 +0100
+Subject: [PATCH 10/10] ARM: ux500: Enable PL022 SSP Controller in Device
+ Tree
+In-Reply-To: <1331730306-11461-11-git-send-email-lee.jones@linaro.org>
+References: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
+ <1331730306-11461-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaYDjyYDo9HCkHSyQrQuQP3Hp7TUZKTCXOseeoLxXh6Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Haojian Zhuang wrote:
-> Second, please help to pull these commits from arch-pxa git tree.
-> 
-> The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
-> 
->   Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
-> 
-> are available in the git repository at:
->   git://github.com/hzhuang1/linux.git board-specific
-> 
-> Paul Parsons (3):
->       ARM: pxa/hx4700: Remove unwanted request for GPIO105
->       ARM: pxa/hx4700: Reduce sleep mode battery discharge by 35%
->       pxa/hx4700: Remove pcmcia platform_device structure
-> 
->  arch/arm/mach-pxa/hx4700.c                  |   17 ++---------------
->  arch/arm/mach-pxa/include/mach/mfp-pxa27x.h |    2 ++
->  2 files changed, 4 insertions(+), 15 deletions(-)
-> 
+On Wed, Mar 14, 2012 at 2:05 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Pulled into next/boards,
+> This SSP Controller supports a number of serial communication methods.
+>
+> Namely:
+>
+> /**
+> ?* enum ssp_interface - interfaces allowed for this SSP Controller
+> ?* @SSP_INTERFACE_MOTOROLA_SPI: Motorola Interface
+> ?* @SSP_INTERFACE_TI_SYNC_SERIAL: Texas Instrument Synchronous Serial
+> ?* interface
+> ?* @SSP_INTERFACE_NATIONAL_MICROWIRE: National Semiconductor Microwire
+> ?* interface
+> ?* @SSP_INTERFACE_UNIDIRECTIONAL: Unidirectional interface (STn8810
+> ?* &STn8815 only)
+> ?*/
+>
+> ... and as such cannot be registered using of_register_spi_devices.
+> Instead it can be registered simply as a primecell device.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Thanks!
+Why is the commit message all about what the patch cannot do rather
+than on what it does, anyway, begin with stating what you do and
+its:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-	ARnd
+Yours,
+Linus Walleij
