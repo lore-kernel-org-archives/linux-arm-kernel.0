@@ -1,33 +1,32 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Mar 2012 16:57:16 +0100
-Subject: [PATCH 0/6] AT91 drivers Kconfig cleanup
-Message-ID: <cover.1331826095.git.nicolas.ferre@atmel.com>
+Date: Thu, 15 Mar 2012 16:57:22 +0100
+Subject: [PATCH 6/6] hwrng: Kconfig: remove dependency for atmel-rng driver
+In-Reply-To: <cover.1331826095.git.nicolas.ferre@atmel.com>
+References: <cover.1331826095.git.nicolas.ferre@atmel.com>
+Message-ID: <c3455cec019bedacc6ff58cf8cd2ae25cdeb212f.1331826095.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a series which deals with AT91 drivers Kconfig entries. Its goal is
-to remove too restrictive dependencies on SoC names.
-This will allow to add support for newer SoC seamlessly.
+This will allow to select this driver for newer SoCs. Make sure to
+keep dependency on HAVE_CLK to avoid breaking other machines.
 
-One question remains: should I submit those patches through dedicated
-sub-maintainer's git trees or can I queue the whole series in arm-soc?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/char/hw_random/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Nicolas Ferre (6):
-  dmaengine: Kconfig: fix Atmel at_hdmac entry
-  mmc: Kconfig: remove choice between at91_mci and atmel-mci
-  mmc: atmel-mci: remove the need for CONFIG_MMC_ATMELMCI_DMA
-  rtc: Kconfig: remove dependency for AT91 rtc driver
-  Input: Kconfig: remove dependency for atmel_tsadcc driver
-  hwrng: Kconfig: remove dependency for atmel-rng driver
-
- drivers/char/hw_random/Kconfig    |    2 +-
- drivers/dma/Kconfig               |    5 ++---
- drivers/input/touchscreen/Kconfig |    4 ++--
- drivers/mmc/host/Kconfig          |   23 ++---------------------
- drivers/mmc/host/atmel-mci.c      |    2 --
- drivers/rtc/Kconfig               |    2 +-
- 6 files changed, 8 insertions(+), 30 deletions(-)
-
-Best regards,
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index 0689bf6..b2402eb 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -62,7 +62,7 @@ config HW_RANDOM_AMD
+ 
+ config HW_RANDOM_ATMEL
+ 	tristate "Atmel Random Number Generator support"
+-	depends on HW_RANDOM && ARCH_AT91SAM9G45
++	depends on HW_RANDOM && HAVE_CLK
+ 	default HW_RANDOM
+ 	---help---
+ 	  This driver provides kernel-side support for the Random Number
 -- 
 1.7.9
