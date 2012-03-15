@@ -1,103 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Mar 2012 20:30:37 +0000
-Subject: [PATCH 2/5] MMC: mmci: Seperate ARM variants from generic code
-In-Reply-To: <201203151823.32882.arnd@arndb.de>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <201203151746.56678.arnd@arndb.de>
- <20120315175443.GG15988@n2100.arm.linux.org.uk>
- <201203151823.32882.arnd@arndb.de>
-Message-ID: <20120315203037.GA2311@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 20:36:35 +0000
+Subject: [GIT PULL v2] DaVinci DM644x video display support
+In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317F13DB@DBDE01.ent.ti.com>
+References: <DF0F476B391FA8409C78302C7BA518B6317F13DB@DBDE01.ent.ti.com>
+Message-ID: <201203152036.36133.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 06:23:32PM +0000, Arnd Bergmann wrote:
-> On Thursday 15 March 2012, Russell King - ARM Linux wrote:
-> > On Thu, Mar 15, 2012 at 05:46:56PM +0000, Arnd Bergmann wrote:
-> > > Can you elaborate? I suggested the split in order to keep the ux500
-> > > specific parts local to one file. With the device tree conversion,
-> > > we really want to have them out of the platform code, but sticking them
-> > > into the main driver seems wrong, too.
-> > 
-> > You're talking about the data structures which describe what quirks to
-> > apply for the ux500 parts, rather than the actual quirks themselves.
-> > That's not a particularly clever thing to do because it separates out
-> > the selection of the works from the rest of the driver, which means
-> > simply searching for the flags to find out what's applied for what has
-> > to span several files.
+On Sunday 11 March 2012, Nori, Sekhar wrote:
+> Hi Arnd, Olof,
 > 
-> Right, that is a disadvantage, but it's also how a lot of other
-> drivers work, in particular sdhci.
+> Can you please pull these two patches adding support
+> for DaVinci DM644x V4L2 display support for v3.4.
 > 
-> My reasoning is roughly this:
+> These patches heavily depend on the clean-up series sent
+> earlier. I have re-generated the pull request against
+> v3.4/cleanup branch of my tree (already pulled earlier
+> and unchanged since) as suggested by Olof.
 > 
-> * we want to get rid of arch/arm/mach-ux500/board-mop500-sdi.c
-> * the sdi0_configure() and mop500_sdi0_vdd_handler() functions
->   need to be moved somewhere in order to do that, so they should
->   be with the driver.
+> Let me know if this works for you.
 
-I don't believe they should.  MMCI _is_ the peripheral itself.  All the
-stuff that's in board-mop500-sdi.c seems to be doing is configuration
-type stuff for the SoC that its been integrated into.  Are you seriously
-advocating having multiple drivers for essentially the same hardware?
+Looks good, applied to the next/drivers branch now.
+Sorry for missing the pull request earlier, that was my fault
+and I should have pulled it already.
 
-> * we don't want them in mmci.c, so we create a new file for these.
-> * in order to call do the setup from sdi0_configure right, it needs
->   to be done in the probe() function
+I got a small merge conflict, see the resolution below.
 
-I've always disagreed with this whole approach of "drivers should callback
-into generic code to claim their GPIOs".  If the GPIO is dedicated by a
-platform to a function, then that function is there independent of whether
-the driver is present or not.  In many cases, it is totally _wrong_ to
-leave a signal which should be driven unconfigured - if the board design
-is such that its intended to be an output and there's no pull-up, it
-could end up floating at half-supply which will eat power.
+	Arnd
 
-I have always been of the opinion that resources like GPIOs which are
-under platform control should be requested and configured by the platform
-and not by their respective drivers.
+commit e594a97c8c74533ec105b2ac9194217e918f172f
+Merge: f66f9bd d5be5f5
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Thu Mar 15 20:33:47 2012 +0000
 
-Have you noticed how much of the configuration is tweaked depending on
-which init function is called?
+    Merge branch 'v3.4/features' of git://gitorious.org/linux-davinci/linux-davinci into next/drivers
+    
+    * 'v3.4/features' of git://gitorious.org/linux-davinci/linux-davinci:
+      ARM: davinci: dm644x evm: add support for VPBE display
+      ARM: davinci: dm644x: add support for v4l2 video display
+    
+    * included from the davinci/cleanup branch:
+      ARM: davinci: dm644x: don't force vpfe registeration on all boards
+      ARM: davinci: dm644x: fix inconsistent variable naming
+      ARM: davinci: dm644x: improve readability using macro
+      ARM: davinci: streamline sysmod access
+      ARM: davinci: create new common platform header for davinci
+      ARM: davinci: dm646x: move private definitions to C file
+      ARM: davinci: dm365: move private definitions to C file
+      ARM: davinci: dm644x: move private definitions to C file
+    
+    Conflicts:
+    	arch/arm/mach-davinci/board-dm644x-evm.c
+    	arch/arm/mach-davinci/board-neuros-osd2.c
+    	arch/arm/mach-davinci/board-sffsdr.c
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> * if we want to have a separate probe function, we also need to
->   have a separate amba_driver structure
-> * the variant_data in mmci.c belongs with the amba_id, so that
->   also gets moved to the ux500 file.
-> 
-> If you have a better solution for one or more of these, I'm
-> all ears.
-
-Are you really advocating having mmci_foo.c where foo is an ever
-increasing number of SoCs with the MMCI integrated because you want
-to integrate SoC specific details into the MMCI peripheral driver?
-
-> The alternatives that I can see are:
-> a) keep using auxdata to supply a platform_data pointer and
->    do everything in the main driver. Problem: we want to
->    avoid auxdata if possible
-> b) move the code from patch 4 into mmci.c using #ifdef.
->    Problem: it's ugly code that has nothing to do with mmci
->    in general.
-> c) use the regulator framework to do the voltage selection
->    here, and have only generic code in mmci.c. This may
->    be the best solution, but I have no idea if this is
->    actually possible, or how to do it.
-
-Let's ignore the DMA stuff for the time being - that's a separate problem
-which needs to be addressed once we work out how to deal with how DMA
-engine stuff gets resolved with DT based systems.
-
-The remainder of it (mmci_platform_data) looks like it can be easily
-represented as DT properties, the exception to that is the ios_handler.
-I think the right solution for that is to move to the regulator framework,
-but allow the driver to continue having the ios callback if there is
-no attached regulator.  It needs that because of the four integrated
-regulator control bits (which are entirely undefined.)
-
-We _do_ need a solution for GPIO-controlled voltage regulators, as these
-are actually quite common - see the various soc-common using PCMCIA
-drivers.
-
-So I think actually a bit more thought is required here, and there's a
-need to use some of the facilities such as regulator which are now present
-that weren't when the driver was originally written some 9 years ago.
+diff --cc arch/arm/mach-davinci/board-dm644x-evm.c
+index 1247ecd,3854235..3683306
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@@ -40,7 -39,9 +39,9 @@@
+  #include <mach/usb.h>
+  #include <mach/aemif.h>
+  
++ #include "davinci.h"
++ 
+ -#define DM644X_EVM_PHY_ID		"0:01"
+ +#define DM644X_EVM_PHY_ID		"davinci_mdio-0:01"
+  #define LXT971_PHY_ID	(0x001378e2)
+  #define LXT971_PHY_MASK	(0xfffffff0)
+  
+diff --cc arch/arm/mach-davinci/board-neuros-osd2.c
+index 8d34f51,3d12a3a..a772bb4
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@@ -39,7 -38,9 +38,9 @@@
+  #include <mach/mmc.h>
+  #include <mach/usb.h>
+  
++ #include "davinci.h"
++ 
+ -#define NEUROS_OSD2_PHY_ID		"0:01"
+ +#define NEUROS_OSD2_PHY_ID		"davinci_mdio-0:01"
+  #define LXT971_PHY_ID			0x001378e2
+  #define LXT971_PHY_MASK			0xfffffff0
+  
+diff --cc arch/arm/mach-davinci/board-sffsdr.c
+index 31da3c5,897cec5..76e67509
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@@ -42,7 -41,9 +41,9 @@@
+  #include <mach/mux.h>
+  #include <mach/usb.h>
+  
++ #include "davinci.h"
++ 
+ -#define SFFSDR_PHY_ID		"0:01"
+ +#define SFFSDR_PHY_ID		"davinci_mdio-0:01"
+  static struct mtd_partition davinci_sffsdr_nandflash_partition[] = {
+  	/* U-Boot Environment: Block 0
+  	 * UBL:                Block 1
