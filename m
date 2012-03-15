@@ -1,31 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 17:49:07 +0000
-Subject: [PATCH 5/5] MMC: mmci: Add required documentation for Device Tree
- bindings
-In-Reply-To: <20120315173508.GE15988@n2100.arm.linux.org.uk>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <1331734803-17954-6-git-send-email-lee.jones@linaro.org>
- <20120315173508.GE15988@n2100.arm.linux.org.uk>
-Message-ID: <201203151749.07673.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Mar 2012 10:51:22 -0700
+Subject: [PATCH 1/2] ARM: OMAP: powerdomain: Wait for powerdomain
+ transition in pwrdm_state_switch()
+In-Reply-To: <alpine.DEB.2.00.1203151129160.26218@utopia.booyaka.com>
+References: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
+ <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.00.1203151129160.26218@utopia.booyaka.com>
+Message-ID: <20120315175122.GB7276@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 March 2012, Russell King - ARM Linux wrote:
+* Paul Walmsley <paul@pwsan.com> [120315 10:35]:
+> On Mon, 12 Mar 2012, Santosh Shilimkar wrote:
 > 
-> On Wed, Mar 14, 2012 at 02:20:03PM +0000, Lee Jones wrote:
-> > +ux500 variant specific properties:
-> > +- gpio-en                : contains the level-shifter enable gpio
-> > +- gpio-vsel              : contains the level-shifter voltage select gpio
-> > +- tx_dst_dev_type        : contains the tx destination device (DMA) 
-> > +- rx_src_dev_type        : contains the rx source device (DMA)
+> > Commit b1cbdb00d{OMAP: clockdomain: Wait for powerdomain to be ON
+> > when using clockdomain force wakeup} was assuming that pwrdm_state_switch()
+> > does wait for the powerdomain transition which is not the case.
+> > 
+> > Fix this API by adding the pwrdm_wait_transition().
+> > 
+> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > CC: Rajendra Nayak <rnayak@ti.com>
+> > CC: Paul Walmsley <paul@pwsan.com>
 > 
-> So what about the DMA support being proposed elsewhere?
+> Acked-by: Paul Walmsley <paul@pwsan.com>
 > 
-> This sounds like we're inventing one DMA solution for one bit of the tree
-> and another DMA solution for another bit.  This is madness.
+> Sounds like this fixes a major kernel oops bug for Tony so this should go 
+> in ASAP to v3.3-rc series.
 
-Agreed. I originally made a similar comment for an early version but had not
-noticed that it made it into this one. This should be using the proper DMA
-bindings, or just auxdata while we're not entirely there yet.
+Got a random oops with this one applied still, just happened
+to take longer this time :(
 
-	Arnd
+Regards,
+
+Tony
