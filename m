@@ -1,34 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 16:04:58 +0000
-Subject: [GIT PULL][for v3.4] pull request from board-specific branch in
- arch-pxa
-In-Reply-To: <CAN1soZyWmrzQzr0VHtrixdr2myv4ggJ1YBcS8OnuLJLOn2uVEQ@mail.gmail.com>
-References: <CAN1soZyWmrzQzr0VHtrixdr2myv4ggJ1YBcS8OnuLJLOn2uVEQ@mail.gmail.com>
-Message-ID: <201203151604.58969.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 15 Mar 2012 16:57:19 +0100
+Subject: [PATCH 3/6] mmc: atmel-mci: remove the need for
+ CONFIG_MMC_ATMELMCI_DMA
+In-Reply-To: <cover.1331826095.git.nicolas.ferre@atmel.com>
+References: <cover.1331826095.git.nicolas.ferre@atmel.com>
+Message-ID: <c7df6b7863557d95bb8457f5c2b4002ea44c86ff.1331826095.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Haojian Zhuang wrote:
-> First, please help to revert one commit 43de6a7dda6e9a7345e2 on
-> arnd/pxa/board branch of arm-soc.git first. Since this commit is
-> duplicated, and it's already merged into v3.3-rc7. I'm sorry on
-> inconvenience.
-> 
-> commit 43de6a7dda6e9a7345e218e688f2092f991126f0
-> Author: Haojian Zhuang <haojian.zhuang@marvell.com>
-> Date:   Tue Feb 28 10:57:48 2012 +0800
-> 
->     ARM: pxa: add dummy clock for pxa25x and pxa27x
-> 
+This Kconfig option is not needed anymore, so remove it.
 
-I need clarification on this:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mmc/host/Kconfig     |   10 ----------
+ drivers/mmc/host/atmel-mci.c |    2 --
+ 2 files changed, 0 insertions(+), 12 deletions(-)
 
-I can see the clock was added in 389eda15e "ARM: pxa: add clk support in
-gpio driver" as well as 7557c175f6 "ARM: pxa: add dummy clock for sa1100-rtc",
-but removed in a55b5ada "Revert "ARM: pxa: add dummy clock for sa1100-rtc""
-and then added again in bbdc818b2 "ARM: pxa: add dummy clock for pxa25x
-and pxa27x". I want to make sure I'm not making the mess any bigger than
-it already is. So you want the dummy clocks for pxa25x and pxa27x removed
-again, never to come back, right?
-
-	Arnd
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 455a414..a6fc44a 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -288,16 +288,6 @@ config MMC_ATMELMCI
+ 
+ 	  If unsure, say N.
+ 
+-config MMC_ATMELMCI_DMA
+-	bool "Atmel MCI DMA support"
+-	depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
+-	help
+-	  Say Y here to have the Atmel MCI driver use a DMA engine to
+-	  do data transfers and thus increase the throughput and
+-	  reduce the CPU utilization.
+-
+-	  If unsure, say N.
+-
+ config MMC_IMX
+ 	tristate "Motorola i.MX Multimedia Card Interface support"
+ 	depends on ARCH_MX1
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index e4449a5..b5693fd 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -2164,10 +2164,8 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 	atmci_readl(host, ATMCI_SR);
+ 	clk_disable(host->mck);
+ 
+-#ifdef CONFIG_MMC_ATMELMCI_DMA
+ 	if (host->dma.chan)
+ 		dma_release_channel(host->dma.chan);
+-#endif
+ 
+ 	free_irq(platform_get_irq(pdev, 0), host);
+ 	iounmap(host->regs);
+-- 
+1.7.9
