@@ -1,22 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Mar 2012 09:36:15 +0000
-Subject: Conflict between Versatile Express DT conversion and local
- timer updates
-In-Reply-To: <20120315092140.GA15988@n2100.arm.linux.org.uk>
-References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
- <201203131155.16454.arnd@arndb.de> <4F5F52A2.3050005@arm.com>
- <201203131433.07214.arnd@arndb.de>
- <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
- <4F605A3B.5030800@arm.com>
- <20120315181718.d80071db25428a7b5113ef9a@canb.auug.org.au>
- <20120315092140.GA15988@n2100.arm.linux.org.uk>
-Message-ID: <20120315093615.GB15988@n2100.arm.linux.org.uk>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 15 Mar 2012 09:42:20 +0000
+Subject: [PATCH] arm:da850: register musb device
+In-Reply-To: <4F6081C3.4070905@mvista.com>
+References: <1331651015-32586-1-git-send-email-prakash.pm@ti.com>
+ <4F5F7F91.8010301@mvista.com>
+ <A73F36158E33644199EB82C5EC81C7BC3178406C@DBDE01.ent.ti.com>
+ <4F6081C3.4070905@mvista.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC31784B33@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 09:21:40AM +0000, Russell King - ARM Linux wrote:
-> It shouldn't be in my tree anymore - I removed it a couple of days ago
-> and pushed that out.
+Hi Sergei,
 
-Sorry, it didn't get pushed out (the last push was 10 mins before I
-removed it.  So yes, you're right.  Should be gone in your next pull.
+On Wed, Mar 14, 2012 at 17:02:19, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 14-03-2012 10:16, Manjunathappa, Prakash wrote:
+> 
+> >>> Properly set up the OTG mode thru the CFGCHIP2 register, enable the
+> >>> USB0_DRVVBUS pin,
+> 
+> >>      I don't see where you are enabling it.
+> 
+> > Yes, I will correct the message.
+> 
+> >>> and finally register the MUSB platform device.
+> 
+>     Also, you're registering the MUSB device for DA850/OMAP-L138 EVM board, 
+> not the whole DA850/OMAP-L138 SoC, so that should be reflected in the subject.
+> 
+
+True, I will fix the subject.
+
+Thanks,
+Prakash
+
+> >>> Signed-off-by: Ajay Kumar Gupta<ajay.gupta@ti.com>
+> >>> Signed-off-by: Manjunathappa, Prakash<prakash.pm@ti.com>
+> 
+> WBR, Sergei
+> 
