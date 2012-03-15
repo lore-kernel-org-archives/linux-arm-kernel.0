@@ -1,65 +1,113 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 17:53:25 +0000
-Subject: [PATCH 5/5] MMC: mmci: Add required documentation for Device Tree
- bindings
-In-Reply-To: <1331734803-17954-6-git-send-email-lee.jones@linaro.org>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <1331734803-17954-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <201203151753.25774.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 15 Mar 2012 13:54:22 -0400 (EDT)
+Subject: [PATCH 3/4] ARM: opcodes: Add helpers for emitting custom opcodes
+In-Reply-To: <1331829132-9762-4-git-send-email-dave.martin@linaro.org>
+References: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
+ <1331829132-9762-4-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.02.1203151354040.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Lee Jones wrote:
+On Thu, 15 Mar 2012, Dave Martin wrote:
 
-Some more comments about the individual properties
+> This patch adds some __inst_() macros for injecting custom opcodes
+> in assembler (both inline and in .S files).  They should make it
+> easier and cleaner to get things right in little-/big-
+> endian/ARM/Thumb-2 kernels without a lot of #ifdefs.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-> +Required properties:
-> +- compatible             : contains "arm,pl18x", "arm,primecell".
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Better use the exact number for 'x' here.
 
-> +- reg                    : contains pl18x registers and length.
-> +- interrupts             : contains the device IRQ(s).
-
-You should document what the first and second interrupts are,
-respectively, if there is more than one.
-
-> +- arm,primecell-periphid : contains the PrimeCell Peripheral ID.
-
-This one should be optional.
-
+> ---
+>  arch/arm/include/asm/opcodes.h |   69 ++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 69 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+> index 32730a8..50ef0be 100644
+> --- a/arch/arm/include/asm/opcodes.h
+> +++ b/arch/arm/include/asm/opcodes.h
+> @@ -156,4 +156,73 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+>  	| ___asm_opcode_identity32(___asm_opcode_identity16(second))	    \
+>  )
+>  
+> +/*
+> + * Opcode injection helpers
+> + *
+> + * In rare cases it is necessary to assemble an opcode which the
+> + * assembler does not support directly, or which would normally be
+> + * rejected because of the CFLAGS or AFLAGS used to build the affected
+> + * file.
+> + *
+> + * Before using these macros, consider carefully whether it is feasible
+> + * instead to change the build flags for your file, or whether it really
+> + * makes sense to support old assembler versions when building that
+> + * particular kernel feature.
+> + *
+> + * The macros defined here should only be used where there is no viable
+> + * alternative.
+> + *
+> + *
+> + * __inst_arm(x): emit the specified ARM opcode
+> + * __inst_thumb16(x): emit the specified 16-bit Thumb opcode
+> + * __inst_thumb32(x): emit the specified 32-bit Thumb opcode
+> + *
+> + * __inst_arm_thumb16(arm, thumb): emit either the specified arm or
+> + *	16-bit Thumb opcode, depending on whether an ARM or Thumb-2
+> + *	kernel is being built
+> + *
+> + * __inst_arm_thumb32(arm, thumb): emit either the specified arm or
+> + *	32-bit Thumb opcode, depending on whether an ARM or Thumb-2
+> + *	kernel is being built
+> + *
+> + *
+> + * Note that using these macros directly is poor practice.  Instead, you
+> + * should use them to define human-readable wrapper macros to encode the
+> + * instructions that you care about.  In code which might run on ARMv7 or
+> + * above, you can usually use the __inst_arm_thumb{16,32} macros to
+> + * specify the ARM and Thumb alternatives at the same time.  This ensures
+> + * that the correct opcode gets emitted depending on the instruction set
+> + * used for the kernel build.
+> + */
+> +#include <linux/stringify.h>
 > +
-> +Optional properties:
-> +- ocr_mask               : contains the regulator oscillator mask
-
-Not sure about this one. If it's for the regulators, we should be
-using the regulator bindings.
-
-> +- wp-gpios               : contains any write protect (ro) gpios
-> +- cd-gpios               : contains any card detection gpios
-> +- cd-invert              : indicates whether the cd gpio is inverted 
-> +- clock_frequency        : contains the maximum operating frequency
-
-The name should be 'clock-frequency', not 'clock_frequency'.
-
-> +- mmc_cap_4_bit_data     : indicates whether device is 4 bit capable
-> +- mmc_cap_8_bit_data     : indicates whether device is 8 bit capable
-> +- mmc_cap_mmc_highspeed  : indicates whether MMC is high speed capable
-> +- mmc_cap_sd_highspeed   : indicates whether SD is high speed capable
-
-I would strongly recommend using the same naming as sdhci here. I think
-tegra has set a precedent.
-
-> +ux500 variant specific properties:
-> +- gpio-en                : contains the level-shifter enable gpio
-> +- gpio-vsel              : contains the level-shifter voltage select gpio
-
-I think these need to be 'en-gpios' and 'vsel-gpios', in order for the
-gpio binding to work.
-
-> +- tx_dst_dev_type        : contains the tx destination device (DMA) 
-> +- rx_src_dev_type        : contains the rx source device (DMA)
-
-As Russell commented already, these should not be here.
-
-	Arnd
+> +#define __inst_arm(x) ___inst_arm(___asm_opcode_to_mem_arm(x))
+> +#define __inst_thumb32(x) ___inst_thumb32(				\
+> +	___asm_opcode_to_mem_thumb16(___asm_opcode_thumb32_first(x)),	\
+> +	___asm_opcode_to_mem_thumb16(___asm_opcode_thumb32_second(x))	\
+> +)
+> +#define __inst_thumb16(x) ___inst_thumb16(___asm_opcode_to_mem_thumb16(x))
+> +
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +#define __inst_arm_thumb16(arm_opcode, thumb_opcode) \
+> +	__inst_thumb16(thumb_opcode)
+> +#define __inst_arm_thumb32(arm_opcode, thumb_opcode) \
+> +	__inst_thumb32(thumb_opcode)
+> +#else
+> +#define __inst_arm_thumb16(arm_opcode, thumb_opcode) __inst_arm(arm_opcode)
+> +#define __inst_arm_thumb32(arm_opcode, thumb_opcode) __inst_arm(arm_opcode)
+> +#endif
+> +
+> +/* Helpers for the helpers.  Don't use these directly. */
+> +#ifdef __ASSEMBLY__
+> +#define ___inst_arm(x) .long x
+> +#define ___inst_thumb16(x) .short x
+> +#define ___inst_thumb32(first, second) .short first, second
+> +#else
+> +#define ___inst_arm(x) ".long " __stringify(x) "\n\t"
+> +#define ___inst_thumb16(x) ".short " __stringify(x) "\n\t"
+> +#define ___inst_thumb32(first, second) \
+> +	".short " __stringify(first) ", " __stringify(second) "\n\t"
+> +#endif
+> +
+>  #endif /* __ASM_ARM_OPCODES_H */
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
