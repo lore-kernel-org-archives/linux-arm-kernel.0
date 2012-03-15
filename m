@@ -1,56 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Mar 2012 16:57:19 +0100
-Subject: [PATCH 3/6] mmc: atmel-mci: remove the need for
- CONFIG_MMC_ATMELMCI_DMA
-In-Reply-To: <cover.1331826095.git.nicolas.ferre@atmel.com>
-References: <cover.1331826095.git.nicolas.ferre@atmel.com>
-Message-ID: <c7df6b7863557d95bb8457f5c2b4002ea44c86ff.1331826095.git.nicolas.ferre@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Mar 2012 17:05:44 +0100
+Subject: [PATCH 05/10] ARM: ux500: db8500: list most devices in the
+ snowball device tree
+In-Reply-To: <201203141359.46109.arnd@arndb.de>
+References: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
+ <1331730306-11461-6-git-send-email-lee.jones@linaro.org>
+ <201203141359.46109.arnd@arndb.de>
+Message-ID: <CACRpkdanB7A55DV5TkADdWDmaySC4ZjZMgP74tF8WdN7gNQ7EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This Kconfig option is not needed anymore, so remove it.
+On Wed, Mar 14, 2012 at 2:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 14 March 2012, Lee Jones wrote:
+>> + ? ? ? ? ? ? ? pmu {
+>> + ? ? ? ? ? ? ? ? ? ? ? compatible = "arm,cortex-a9-pmu";
+>> + ? ? ? ? ? ? ? ? ? ? ? interrupts = <7>;
+>> + ? ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? ? rtc at 80154000 {
+>> + ? ? ? ? ? ? ? ? ? ? ? compatible = "stericsson,db8500-rtc";
+>> + ? ? ? ? ? ? ? ? ? ? ? reg = <0x80154000 0x1000>;
+>> + ? ? ? ? ? ? ? ? ? ? ? interrupts = <18>;
+>> + ? ? ? ? ? ? ? };
+>> +
+>> + ? ? ? ? ? ? ? gpio0: gpio at 8012e000 {
+>> + ? ? ? ? ? ? ? ? ? ? ? compatible = "stericsson,db8500-gpio",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "stmicroelectronics,nomadik-gpio";
+>> + ? ? ? ? ? ? ? ? ? ? ? reg = ?<0x8012e000 0x80>;
+>> + ? ? ? ? ? ? ? ? ? ? ? interrupts = <119>;
+>> + ? ? ? ? ? ? ? ? ? ? ? supports-sleepmode;
+>> + ? ? ? ? ? ? ? ? ? ? ? gpio-controller;
+>> + ? ? ? ? ? ? ? };
+>
+> Reading through it one more time, I realized that all the interrupt
+> numbers are incorrect here and you fix them up one by one in the
+> later patches. I think it would be more logical if you could just
+> fix correct them here and then later just add the additional properties
+> and enable the device.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/mmc/host/Kconfig     |   10 ----------
- drivers/mmc/host/atmel-mci.c |    2 --
- 2 files changed, 0 insertions(+), 12 deletions(-)
+Lee, fix up the IRQs and it's
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 455a414..a6fc44a 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -288,16 +288,6 @@ config MMC_ATMELMCI
- 
- 	  If unsure, say N.
- 
--config MMC_ATMELMCI_DMA
--	bool "Atmel MCI DMA support"
--	depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE
--	help
--	  Say Y here to have the Atmel MCI driver use a DMA engine to
--	  do data transfers and thus increase the throughput and
--	  reduce the CPU utilization.
--
--	  If unsure, say N.
--
- config MMC_IMX
- 	tristate "Motorola i.MX Multimedia Card Interface support"
- 	depends on ARCH_MX1
-diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-index e4449a5..b5693fd 100644
---- a/drivers/mmc/host/atmel-mci.c
-+++ b/drivers/mmc/host/atmel-mci.c
-@@ -2164,10 +2164,8 @@ static int __exit atmci_remove(struct platform_device *pdev)
- 	atmci_readl(host, ATMCI_SR);
- 	clk_disable(host->mck);
- 
--#ifdef CONFIG_MMC_ATMELMCI_DMA
- 	if (host->dma.chan)
- 		dma_release_channel(host->dma.chan);
--#endif
- 
- 	free_irq(platform_get_irq(pdev, 0), host);
- 	iounmap(host->regs);
--- 
-1.7.9
+Thanks,
+Linus Walleij
