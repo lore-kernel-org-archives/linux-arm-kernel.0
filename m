@@ -1,43 +1,42 @@
-From: per.forlin@stericsson.com (Per Forlin)
-Date: Thu, 15 Mar 2012 16:06:40 +0100
-Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
-In-Reply-To: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAFEEs1kz+QT_4Yc6byS4se0EMZvqA5hp5CvLvvtNgC++AJboxA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 15 Mar 2012 23:07:04 +0800
+Subject: [PATCH 1/2] ARM: imx6q: add pll round_rate support
+In-Reply-To: <20120315150048.GC3852@pengutronix.de>
+References: <1331713379-8437-1-git-send-email-richard.zhao@linaro.org>
+ <1331713379-8437-2-git-send-email-richard.zhao@linaro.org>
+ <20120314085228.GM3852@pengutronix.de>
+ <20120315144601.GA5701@richard-laptop>
+ <20120315150048.GC3852@pengutronix.de>
+Message-ID: <CAAQ0ZWRfgaj2W8m6RvHwtwExSF=hT5ysyxmw9vQriFm5es6Mhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I would like to see what the minimal required change is to support DT
-for mmci without factorization.
-1. Minimal change in mmci.
-2. Add mmci_dt.c which contains the DT-populate code.
-
-The factorization could be done as step 2 I think.
-
-What do you say?
-
-BR
-Per
-
-On Wed, Mar 14, 2012 at 3:19 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> This patch-set splits out ux500 and ARM specific variants from mmci
-> core code, applies generic bindings for use by all variants, then
-> enables the ux500 variant for use with Device Tree.
+On 15 March 2012 23:00, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Thu, Mar 15, 2012 at 10:46:04PM +0800, Richard Zhao wrote:
+>> On Wed, Mar 14, 2012 at 09:52:28AM +0100, Sascha Hauer wrote:
+>> > On Wed, Mar 14, 2012 at 04:22:58PM +0800, Richard Zhao wrote:
+>> > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+>> > > ---
+>> > >
+>> > > ?#define DEF_PLL(name) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> > > ? static struct clk name = { ? ? ? ? ? ? ? ? ? ? ?\
+>> > > @@ -681,6 +741,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
+>> > > ? ? ? ? ? .disable ? ? ? ?= pll_disable, ? ? ? ? ?\
+>> > > ? ? ? ? ? .get_rate ? ? ? = name##_get_rate, ? ? ?\
+>> > > ? ? ? ? ? .set_rate ? ? ? = name##_set_rate, ? ? ?\
+>> > > + ? ? ? ? .round_rate ? ? = name##_round_rate, ? ?\
+>> >
+>> > I hope this ## stuff is gone soon with the generic clock framework. It
+>> > is so ugly and inefficient.
+>> I hope this doesn't prevent this two patches go in.
 >
-> ?Documentation/devicetree/bindings/mmc/mmci.txt | ? 27 +++
-> ?arch/arm/boot/dts/db8500.dtsi ? ? ? ? ? ? ? ? ?| ? ?6 +-
-> ?arch/arm/boot/dts/snowball.dts ? ? ? ? ? ? ? ? | ? 30 +++-
-> ?arch/arm/mach-ux500/board-mop500.c ? ? ? ? ? ? | ? ?3 +-
-> ?drivers/mmc/host/Makefile ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
-> ?drivers/mmc/host/mmci-arm.c ? ? ? ? ? ? ? ? ? ?| ? 65 ++++++
-> ?drivers/mmc/host/mmci-ux500.c ? ? ? ? ? ? ? ? ?| ?260 ++++++++++++++++++++++++
-> ?drivers/mmc/host/mmci.c ? ? ? ? ? ? ? ? ? ? ? ?| ?194 +++++-------------
-> ?drivers/mmc/host/mmci.h ? ? ? ? ? ? ? ? ? ? ? ?| ? 37 ++++
-> ?9 files changed, 473 insertions(+), 151 deletions(-)
+> Given that we are short from getting a generic clock framework (and I
+> think this time it's for real) and that you are not mention in any words
+> what these patches fix I don't see a reason for merging them.
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+And I agree with Sascha.  Since I'm resuming my imx6 common clk
+migration, you can keep an eye on the patches to ensure the changes
+you are proposing here get rolled in.
+
+Regards,
+Shawn
