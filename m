@@ -1,61 +1,93 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Mar 2012 19:50:04 +0100
-Subject: [PATCH 1/2] ARM: imx6q: add pll round_rate support
-In-Reply-To: <20120315151521.GB5701@richard-laptop>
-References: <1331713379-8437-1-git-send-email-richard.zhao@linaro.org>
- <1331713379-8437-2-git-send-email-richard.zhao@linaro.org>
- <20120314085228.GM3852@pengutronix.de>
- <20120315144601.GA5701@richard-laptop>
- <20120315150048.GC3852@pengutronix.de>
- <20120315151521.GB5701@richard-laptop>
-Message-ID: <20120315185004.GD3852@pengutronix.de>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 15 Mar 2012 12:02:38 -0700
+Subject: [PATCH v2 1/7] misc: ddr: add LPDDR2 data from JESD209-2
+In-Reply-To: <1331835457-5390-2-git-send-email-aneesh@ti.com>
+References: <1331835457-5390-1-git-send-email-aneesh@ti.com>
+ <1331835457-5390-2-git-send-email-aneesh@ti.com>
+Message-ID: <20120315190238.GD11142@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 11:15:23PM +0800, Richard Zhao wrote:
-> On Thu, Mar 15, 2012 at 04:00:48PM +0100, Sascha Hauer wrote:
-> > On Thu, Mar 15, 2012 at 10:46:04PM +0800, Richard Zhao wrote:
-> > > On Wed, Mar 14, 2012 at 09:52:28AM +0100, Sascha Hauer wrote:
-> > > > On Wed, Mar 14, 2012 at 04:22:58PM +0800, Richard Zhao wrote:
-> > > > > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > > > > ---
-> > > > >  
-> > > > >  #define DEF_PLL(name)					\
-> > > > >  	static struct clk name = {			\
-> > > > > @@ -681,6 +741,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
-> > > > >  		.disable	= pll_disable,		\
-> > > > >  		.get_rate	= name##_get_rate,	\
-> > > > >  		.set_rate	= name##_set_rate,	\
-> > > > > +		.round_rate	= name##_round_rate,	\
-> > > > 
-> > > > I hope this ## stuff is gone soon with the generic clock framework. It
-> > > > is so ugly and inefficient.
-> > > I hope this doesn't prevent this two patches go in.
-> > 
-> > Given that we are short from getting a generic clock framework (and I
-> > think this time it's for real) and that you are not mention in any words
-> > what these patches fix I don't see a reason for merging them.
-> I think the cpu clock is a great challenge for generic clock framework.
-> When it set_rate, it includes reparent, and change parent's parent's rate.
-> I don't see any upstream code like that till now. and it's really what
-> we need.
-
-Then do a clk_set_parent, clk_set_rate and a clk_set_parent again
-in your cpufreq driver. The notifying mechanism even allows you to
-block any concurrent change in between these three steps if necessary.
-Noone says that these three steps have to be encapsulated in a single
-clk_set_rate call like you did in your patch.
-
+On Thu, Mar 15, 2012 at 11:47:31PM +0530, Aneesh V wrote:
+> add LPDDR2 data from the JEDEC spec JESD209-2. The data
+> includes:
 > 
-> And it also block cpufreq from upstreaming.
+> 1. Addressing information for LPDDR2 memories of different
+>    densities and types(S2/S4)
+> 2. AC timing data.
+> 
+> This data will useful for memory controller device drivers
 
-Yes, and that's a good way to tell your management why you have to
-invest some time into porting i.MX6 to the generic clock framework ;)
+Right now, only one driver, right?
 
-Sascha
+> +#ifndef __ASSEMBLY__
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Why is this needed?
+
+> +/* Structure for DDR addressing info from the JEDEC spec */
+> +struct lpddr2_addressing {
+> +	u32 num_banks;
+> +	u32 tREFI_ns;
+> +	u32 tRFCab_ps;
+> +};
+
+Do these structures cross the user/kernel boundry somehow?  If so,
+please use the proper kernel types for this.
+
+> --- a/lib/Makefile
+> +++ b/lib/Makefile
+> @@ -123,6 +123,9 @@ obj-$(CONFIG_SIGNATURE) += digsig.o
+>  
+>  obj-$(CONFIG_CLZ_TAB) += clz_tab.o
+>  
+> +obj-$(CONFIG_DDR) += jedec_ddr_data.o
+> +
+> +
+
+Why the extra line?
+
+>  hostprogs-y	:= gen_crc32table
+>  clean-files	:= crc32table.h
+>  
+> diff --git a/lib/jedec_ddr_data.c b/lib/jedec_ddr_data.c
+> new file mode 100644
+> index 0000000..fc223d6
+> --- /dev/null
+> +++ b/lib/jedec_ddr_data.c
+> @@ -0,0 +1,135 @@
+> +/*
+> + * DDR addressing details and AC timing parameters from JEDEC specs
+> + *
+> + * Copyright (C) 2012 Texas Instruments, Inc.
+> + *
+> + * Aneesh V <aneesh@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <misc/jedec_ddr.h>
+> +#include <linux/module.h>
+> +
+> +/* LPDDR2 addressing details from JESD209-2 section 2.4 */
+> +const struct lpddr2_addressing
+> +	lpddr2_jedec_addressing_table[NUM_DDR_ADDR_TABLE_ENTRIES] = {
+> +	{B4, T_REFI_15_6, T_RFC_90}, /* 64M */
+> +	{B4, T_REFI_15_6, T_RFC_90}, /* 128M */
+> +	{B4, T_REFI_7_8,  T_RFC_90}, /* 256M */
+> +	{B4, T_REFI_7_8,  T_RFC_90}, /* 512M */
+> +	{B8, T_REFI_7_8, T_RFC_130}, /* 1GS4 */
+> +	{B8, T_REFI_3_9, T_RFC_130}, /* 2GS4 */
+> +	{B8, T_REFI_3_9, T_RFC_130}, /* 4G */
+> +	{B8, T_REFI_3_9, T_RFC_210}, /* 8G */
+> +	{B4, T_REFI_7_8, T_RFC_130}, /* 1GS2 */
+> +	{B4, T_REFI_3_9, T_RFC_130}, /* 2GS2 */
+> +};
+> +EXPORT_SYMBOL(lpddr2_jedec_addressing_table);
+
+EXPORT_SYMBOL_GPL for these and the others?
+
+thanks,
+
+greg k-h
