@@ -1,77 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 20:58:30 +0000
-Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
-In-Reply-To: <CAFEEs1=TJaCYmaWd7zd28NsV8ubZBpBn7p=Mi7vGtmV_vpfh1w@mail.gmail.com>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <201203151532.44363.arnd@arndb.de>
- <CAFEEs1=TJaCYmaWd7zd28NsV8ubZBpBn7p=Mi7vGtmV_vpfh1w@mail.gmail.com>
-Message-ID: <201203152058.31398.arnd@arndb.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 15 Mar 2012 22:19:22 +0100
+Subject: [PATCH 10/10] ARM: OMAP: SmartReflex: Move smartreflex driver to
+ drivers/
+In-Reply-To: <1331829845-9526-11-git-send-email-j-pihet@ti.com>
+References: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
+ <1331829845-9526-11-git-send-email-j-pihet@ti.com>
+Message-ID: <201203152219.22985.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 March 2012, Per Forlin wrote:
-> On Thu, Mar 15, 2012 at 4:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 15 March 2012, Lee Jones wrote:
-> >> > I would like to see what the minimal required change is to support DT
-> >> > for mmci without factorization.
-> >> > 1. Minimal change in mmci.
-> >> > 2. Add mmci_dt.c which contains the DT-populate code.
-> >> >
-> >> > The factorization could be done as step 2 I think.
-> >> >
-> >> > What do you say?
-> >>
-> >> I'm wondering what the difference is as the work has already been done.
-> >>
-> >> It was Arnd's suggestion to separate out the two types of variants, and
-> >> I'm quite fond of the new (fully featured) layout.
-> >
-> > Right, I usually prefer cleanups or other refactoring to be done first, and
-> > then features added on top.
-> >
-> > You could in theory add have just patches 3/4/5 all applied without
-> > the refactoring, but that I would be worried that this causes dependencies
-> > between the mmci driver and ux500 specific functionality like the
-> > stedma40_filter function.
-> >
-> About DT
-> I think I need to catch up on the DT-design a bit. I will try to catch
-> up on the DT-implementation and maybe then the refactorization will
-> make sense to me :)
+On Thursday, March 15, 2012, jean.pihet at newoldbits.com wrote:
+> From: Jean Pihet <j-pihet@ti.com>
 > 
-> Board specific data in mmci-driver
-> The stedma40 filter function is not really specific for ux500. ux500
-> use stedma40 but it should be possible to replace this DMA.IP with
-> some other DMA-controller. This is board specific configuration. You
-> should not need to change the mmci-driver just because the dma-driver
-> has changed, right?
-> Or will the board-configuration now be placed in mmci-ux500?
+> After a clean-up of the interfaces the OMAP IP driver and class
+> support code is now a generic driver.
+> Move it to drivers/power/avs/.
+> 
+> The build is controlled by the following Kconfig options:
+>  . CONFIG_POWER_AVS: general knob for Adaptive Voltage Scaling support,
+>  . CONFIG_POWER_AVS_OMAP: AVS support on OMAP containing the version 1
+>     or version 2 of the SmartReflex IP,
+>  . CONFIG_POWER_AVS_OMAP_CLASS3: Class 3 implementation of Smartreflex.
+> 
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> ---
+[...]
+> diff --git a/drivers/power/Makefile b/drivers/power/Makefile
+> index e429008..e4a8fd2 100644
+> --- a/drivers/power/Makefile
+> +++ b/drivers/power/Makefile
+> @@ -41,3 +41,5 @@ obj-$(CONFIG_CHARGER_GPIO)	+= gpio-charger.o
+>  obj-$(CONFIG_CHARGER_MANAGER)	+= charger-manager.o
+>  obj-$(CONFIG_CHARGER_MAX8997)	+= max8997_charger.o
+>  obj-$(CONFIG_CHARGER_MAX8998)	+= max8998_charger.o
+> +
+> +obj-$(CONFIG_POWER_AVS)		+= avs/
+> diff --git a/drivers/power/avs/Kconfig b/drivers/power/avs/Kconfig
+> new file mode 100644
+> index 0000000..35b21c4
+> --- /dev/null
+> +++ b/drivers/power/avs/Kconfig
+> @@ -0,0 +1,45 @@
+> +menuconfig POWER_AVS
+> +	tristate "Adaptive Voltage Scaling class support"
+> +	help
+> +	  AVS is a power management technique which finely controls the
+> +	  operating voltage of a device in order to optimize (i.e. reduce)
+> +	  its power consumption.
+> +	  At a given operating point the voltage is adapted depending on
+> +	  static factors (chip manufacturing process) and dynamic factors
+> +	  (temperature depending performance).
+> +	  AVS is also called SmartReflex on OMAP devices.
+> +
+> +	  Say Y here to enable Adaptive Voltage Scaling class support.
+> +
+> +if POWER_AVS
+> +
+> +config POWER_AVS_OMAP
 
-Right, the DMA configuration does not really belong in there, but
-the voltage setup might (unless we convert that to the regulator
-setup).
+I think it would be better to keep this and the next one in the OMAP
+arch Kconfig.
 
-> Common DT populate code for all mmc host drivers
-> Some parts of the DT-population is common for all the host driver, for
-> instance setting the CAP and CAP2. This code should be moved to a
-> common place to be used by other host drivers as well.
+> +	bool "AVS support for the OMAP IP versions 1&2"
+> +	depends on (ARCH_OMAP3 || ARCH_OMAP4) && PM
+> +	help
+> +	  Say Y to enable AVS support on OMAP containing the version 1 or
+> +	  version 2 of the SmartReflex IP.
+> +	  V1 is the 65nm version used in OMAP3430.
+> +	  V2 is the update for the 45nm version of the IP used in OMAP3630
+> +	  and OMAP4430
+> +
+> +	  Please note, that by default SmartReflex is only
+> +	  initialized and not enabled. To enable the automatic voltage
+> +	  compensation for vdd mpu and vdd core from user space,
+> +	  user must write 1 to
+> +		/debug/smartreflex/sr_<X>/autocomp,
+> +	  where X is mpu_iva or core for OMAP3.
+> +	  Optionally autocompensation can be enabled in the kernel
+> +	  by default during system init via the enable_on_init flag
+> +	  which an be passed as platform data to the smartreflex driver.
+> +
+> +config POWER_AVS_OMAP_CLASS3
+> +	bool "Class 3 mode of Smartreflex Implementation"
+> +	depends on POWER_AVS_OMAP && TWL4030_CORE
+> +	help
+> +	  Say Y to enable Class 3 implementation of Smartreflex
+> +
+> +	  Class 3 implementation of Smartreflex employs continuous hardware
+> +	  voltage calibration.
+> +
+> +endif # POWER_AVS
 
-Good idea, yes. We should also have a generic mmc binding document
-that describes how to set flags like 8-bit mode. We already have
-two conflicting variants in .dts files and we should make sure
-we bring everybody back together here.
-
-> About refactoring
-> There are numbers of patches stashed up for MMCI waiting for verdict
-> here http://git.kernel.org/?p=linux/kernel/git/linusw/linux-stericsson.git;a=shortlog;h=refs/heads/mmci.
-> If doing a refactorization please rebase it on top of these patches.
-> This needs to be done carefully, there may be more to considerations
-> than just DT. Maybe the timing is better to do this for 4.5, just
-> after 4.4 is closed. Then we can make sure that all new patches are
-> made on top of the refactorized base.
-
-Yes, thanks for the info. Doing this for 3.4 is definitely out of the
-question then, and hopefully we can use the new dma bindings when it's
-done for 3.5
-
-	Arnd
+Thanks,
+Rafael
