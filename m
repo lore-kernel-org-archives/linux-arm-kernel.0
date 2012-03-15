@@ -1,58 +1,54 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Thu, 15 Mar 2012 12:12:27 +0100
-Subject: [PATCH v12 2/3] ARM: EXYNOS: Change System MMU platform device
- definitions
-In-Reply-To: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
-References: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
-Message-ID: <20120315111227.GA2384@amd.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Thu, 15 Mar 2012 16:36:24 +0530
+Subject: [PATCH-V3 1/3] ARM: OMAP3/4: omap_hwmod: Add rstst_off field to
+ struct omap_hwmod_omap4_prcm
+In-Reply-To: <1331809586-24652-1-git-send-email-hvaibhav@ti.com>
+References: <1331809586-24652-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <1331809586-24652-2-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 05:32:39PM +0900, Cho KyongHo wrote:
-> Handling System MMUs with an identifier is not flexible to manage
-> System MMU platform devices because of the following reasons:
-> 1. A device driver which needs to handle System MMU must know the ID.
-> 2. A System MMU may not present in some implementations of Exynos family.
-> 3. Handling System MMU with IOMMU API does not require an ID.
-> 
-> This patch is the result of removing ID of System MMUs.
-> Instead, a device driver that needs to handle its System MMU must
-> use IOMMU API while its descriptor of platform device is given.
-> 
-> This patch also includes the following enhancements:
-> - A System MMU device becomes a child if its power domain device.
-> - clkdev
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                    |   10 +-
->  arch/arm/mach-exynos/Makefile                   |    2 +-
->  arch/arm/mach-exynos/clock-exynos4.c            |   79 ++--
->  arch/arm/mach-exynos/clock-exynos4.h            |    2 +
->  arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
->  arch/arm/mach-exynos/clock-exynos4212.c         |   28 ++-
->  arch/arm/mach-exynos/clock-exynos5.c            |   90 +++++
->  arch/arm/mach-exynos/dev-sysmmu.c               |  457 ++++++++++++----------
->  arch/arm/mach-exynos/include/mach/irqs.h        |   25 +-
->  arch/arm/mach-exynos/include/mach/map.h         |   38 ++
->  arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
->  arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 --
->  arch/arm/mach-exynos/include/mach/sysmmu.h      |   88 +++--
->  arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
->  arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
->  15 files changed, 529 insertions(+), 336 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-sysmmu.h
+In case of AM33XX device, XXX_RSTST register offset is not
+consistent across PRM modules/instances,
 
-This patch doesn't apply cleanly against upstream Linux (v3.3-rcX).
-Please rebase to upstream and resend. The other 2 patches apply fine.
+PRM_XXX            RSTST
+=========================
+PRM_PER_MOD:       0x04
+PRM_WKUP_MOD:      0x0C
+PRM_MPU_MOD:       NA
+PRM_DEVICE_MOD:    0x08
 
+This means, we need to pass on XXX_RSTST register offset
+information through omap_hwmod data, similar to XXX_RSTCTRL.
 
-	Joerg
+Currently, this field is only applicable and used for AM33XX devices.
 
--- 
-AMD Operating System Research Center
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index ce75c30..1cfa008 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -377,11 +377,13 @@ struct omap_hwmod_omap2_prcm {
+  * struct omap_hwmod_omap4_prcm - OMAP4-specific PRCM data
+  * @clkctrl_reg: PRCM address of the clock control register
+  * @rstctrl_reg: address of the XXX_RSTCTRL register located in the PRM
++ * @rstst_reg: (AM33XX Only) address of the XXX_RSTST register located in the PRM
+  * @submodule_wkdep_bit: bit shift of the WKDEP range
+  */
+ struct omap_hwmod_omap4_prcm {
+ 	u16		clkctrl_offs;
+ 	u16		rstctrl_offs;
++	u16		rstst_offs;
+ 	u16		context_offs;
+ 	u8		submodule_wkdep_bit;
+ 	u8		modulemode;
+--
+1.7.0.4
