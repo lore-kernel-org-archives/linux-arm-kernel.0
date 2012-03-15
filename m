@@ -1,40 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Mar 2012 17:11:45 +0100
-Subject: [PATCH 10/10] ARM: ux500: Enable PL022 SSP Controller in Device
- Tree
-In-Reply-To: <1331730306-11461-11-git-send-email-lee.jones@linaro.org>
-References: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
- <1331730306-11461-11-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaYDjyYDo9HCkHSyQrQuQP3Hp7TUZKTCXOseeoLxXh6Lg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 16:13:04 +0000
+Subject: [GIT PULL][for 3.4] pull request from fixes-non-critical branch
+ in arch-pxa git
+In-Reply-To: <CAN1soZy5LR2vFF4BNgiuUcWubCdt1+a+nEwVM24WavOR8oJRkA@mail.gmail.com>
+References: <CAN1soZy5LR2vFF4BNgiuUcWubCdt1+a+nEwVM24WavOR8oJRkA@mail.gmail.com>
+Message-ID: <201203151613.04323.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 2:05 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday 14 March 2012, Haojian Zhuang wrote:
+> Please help to pull commits from fixes-non-critical branch in arch-pxa git tree.
+> 
+> The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
+> 
+>   Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
+> 
+> are available in the git repository at:
+>   git://github.com/hzhuang1/linux.git fixes-non-critical
+> 
 
-> This SSP Controller supports a number of serial communication methods.
->
-> Namely:
->
-> /**
-> ?* enum ssp_interface - interfaces allowed for this SSP Controller
-> ?* @SSP_INTERFACE_MOTOROLA_SPI: Motorola Interface
-> ?* @SSP_INTERFACE_TI_SYNC_SERIAL: Texas Instrument Synchronous Serial
-> ?* interface
-> ?* @SSP_INTERFACE_NATIONAL_MICROWIRE: National Semiconductor Microwire
-> ?* interface
-> ?* @SSP_INTERFACE_UNIDIRECTIONAL: Unidirectional interface (STn8810
-> ?* &STn8815 only)
-> ?*/
->
-> ... and as such cannot be registered using of_register_spi_devices.
-> Instead it can be registered simply as a primecell device.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Pulled into next/maintainers branch. This one will be sent right after the
+next/fixes-non-critical branch.
 
-Why is the commit message all about what the patch cannot do rather
-than on what it does, anyway, begin with stating what you do and
-its:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks,
 
-Yours,
-Linus Walleij
+	Arnd
