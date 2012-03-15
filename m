@@ -1,33 +1,58 @@
-From: aneesh@ti.com (Aneesh V)
-Date: Fri, 16 Mar 2012 01:31:15 +0530
-Subject: [PATCH v2 0/7] Add TI EMIF SDRAM controller driver
-In-Reply-To: <20120315190444.GE11142@kroah.com>
-References: <1331835457-5390-1-git-send-email-aneesh@ti.com>
- <20120315190444.GE11142@kroah.com>
-Message-ID: <4F624A8B.7040407@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 18:23:32 +0000
+Subject: [PATCH 2/5] MMC: mmci: Seperate ARM variants from generic code
+In-Reply-To: <20120315175443.GG15988@n2100.arm.linux.org.uk>
+References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
+ <201203151746.56678.arnd@arndb.de>
+ <20120315175443.GG15988@n2100.arm.linux.org.uk>
+Message-ID: <201203151823.32882.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2012 12:34 AM, Greg KH wrote:
-> On Thu, Mar 15, 2012 at 11:47:30PM +0530, Aneesh V wrote:
->> Add a driver for the EMIF SDRAM controller used in TI SoCs
->>
->> EMIF is an SDRAM controller that supports, based on its revision,
->> one or more of LPDDR2/DDR2/DDR3 protocols.This driver adds support
->> for LPDDR2.
->>
->> The driver supports the following features:
->> - Calculates the DDR AC timing parameters to be set in EMIF
->>    registers using data from the device data-sheets and based
->>    on the DDR frequency. If data from data-sheets is not available
->>    default timing values from the JEDEC spec are used. These
->>    will be safe, but not necessarily optimal
->> - API for changing timings during DVFS or at boot-up
->
-> Is this a kernel/user API, or just an in-kernel API?
+On Thursday 15 March 2012, Russell King - ARM Linux wrote:
+> On Thu, Mar 15, 2012 at 05:46:56PM +0000, Arnd Bergmann wrote:
+> > Can you elaborate? I suggested the split in order to keep the ux500
+> > specific parts local to one file. With the device tree conversion,
+> > we really want to have them out of the platform code, but sticking them
+> > into the main driver seems wrong, too.
+> 
+> You're talking about the data structures which describe what quirks to
+> apply for the ux500 parts, rather than the actual quirks themselves.
+> That's not a particularly clever thing to do because it separates out
+> the selection of the works from the rest of the driver, which means
+> simply searching for the flags to find out what's applied for what has
+> to span several files.
 
-That's just an in-kernel API or more precisely callbacks to be
-registered for DDR frequency change events.
+Right, that is a disadvantage, but it's also how a lot of other
+drivers work, in particular sdhci.
 
-thanks,
-Aneesh
+My reasoning is roughly this:
+
+* we want to get rid of arch/arm/mach-ux500/board-mop500-sdi.c
+* the sdi0_configure() and mop500_sdi0_vdd_handler() functions
+  need to be moved somewhere in order to do that, so they should
+  be with the driver.
+* we don't want them in mmci.c, so we create a new file for these.
+* in order to call do the setup from sdi0_configure right, it needs
+  to be done in the probe() function
+* if we want to have a separate probe function, we also need to
+  have a separate amba_driver structure
+* the variant_data in mmci.c belongs with the amba_id, so that
+  also gets moved to the ux500 file.
+
+If you have a better solution for one or more of these, I'm
+all ears.
+
+The alternatives that I can see are:
+a) keep using auxdata to supply a platform_data pointer and
+   do everything in the main driver. Problem: we want to
+   avoid auxdata if possible
+b) move the code from patch 4 into mmci.c using #ifdef.
+   Problem: it's ugly code that has nothing to do with mmci
+   in general.
+c) use the regulator framework to do the voltage selection
+   here, and have only generic code in mmci.c. This may
+   be the best solution, but I have no idea if this is
+   actually possible, or how to do it.
+
+	arnd
