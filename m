@@ -1,28 +1,59 @@
-From: mgherzan@gmail.com (Mircea Gherzan)
-Date: Thu, 15 Mar 2012 08:23:43 +0100
-Subject: [PATCH v7] ARM: net: JIT compiler for packet filters
-In-Reply-To: <20120213160248.GA25655@n2100.arm.linux.org.uk>
-References: <1325937154-2656-1-git-send-email-mgherzan@gmail.com>
- <4F392DFD.4070600@gmail.com> <20120213160248.GA25655@n2100.arm.linux.org.uk>
-Message-ID: <4F6198FF.90801@gmail.com>
+From: augulis.darius@gmail.com (Darius Augulis)
+Date: Thu, 15 Mar 2012 09:42:03 +0200
+Subject: [PATCH v2 3/3] ARM: Samsung: Rework platform data of s3c-fb driver
+In-Reply-To: <001501cd0241$6bb53560$431fa020$%han@samsung.com>
+References: <1331585999-8604-1-git-send-email-thomas.abraham@linaro.org>
+ <1331585999-8604-4-git-send-email-thomas.abraham@linaro.org>
+ <002f01cd00fe$5df84fa0$19e8eee0$%han@samsung.com>
+ <CAJuYYwSUf-gsVesduMggSuues9OLOR6DUDAAMg_tL=e3=3c0tQ@mail.gmail.com>
+ <000501cd0184$f088cb20$d19a6160$%han@samsung.com>
+ <4F60E5C8.3040804@gmail.com>
+ <001501cd0241$6bb53560$431fa020$%han@samsung.com>
+Message-ID: <CAEYLNCp5e=86rpRi2C-5OJptTyEeXAn8JHhbWw_BqGzSaDD9wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 13.02.2012 17:02, schrieb Russell King - ARM Linux:
-> On Mon, Feb 13, 2012 at 04:36:29PM +0100, Mircea Gherzan wrote:
->> Gentle ping. This patch has been in the tracking system for over a
->> month. Is there any reason not to apply it in arm/for-next?
-> 
-> Yes.  It needs quite a review to make sure that there's absolutely no
-> possibility for userspace to be able to generate malicious ARM code
-> and then have it executed.  Or put it another way: security paranoia.
+Hi,
 
-Are there any specific security aspects you're thinking of? Leaks to
-userspace, divisions by zero and invalid packet offsets are already
-taken care of.
+>
+> Yes, only single LCD resolution will be left.
+>
+>> I have mini6410 with both 4.3" and 7" LCDs and real6410 with 7" LCD. Now
+>> we have possibility to choose LCD size dynamically - leave it there.
+>> What you mean "default" 4.3" size LCD? The 7" size LCD is also provided
+>> by board sellers - I've bought it.
+>
+> OK, I see.
+> Both mini6410 and real6410 provide both 4.3" and 7" LCDs,
+> so you needs to select both LCDs.
+>
+> Um, usually, single LCD is provided on the single board.
+> Also, the daughter board with another kind LCD can be connected to the board.
 
-> I'm afraid that I've not been able to look at it at all yet, and I
-> haven't seen anyone looking at the code from that aspect.
+There is single board - mini6410 (or real6410) and it's name doesn't
+depend on connected LCD size.
+We know, that this board is available with different sizes of LCD and
+currently we have in kernel support for both sizes.
+It might be so, that it's implemented not in perfect way, but it was
+accepted and at least it's working.
+If you want to rework s3c-fb platform data and driver framework, you
+should not drop any functionality created by other people.
 
-Thanks,
-Mircea
+>
+> However, .win_mode is used not for LCD, but for windows of FIMD IP.
+> Actually, our current framework does not support to choose multi LCD,
+> so, I understand that you use .win_mode[1] as second LCD.
+> However, that's not accurate way to select multi LCD.
+>
+> Thomas, can you consider Augulis's opinion?
+> I think that the method to select multi LCDs is necessary.
+>
+> Ideal process is such as:
+> ?1. add the patch to support to select multi LCDs
+> ?2. apply above patch to make the mini6410 and real6410 to select multi LCDs.
+> ?3. apply Thomas's patchset to remove timing value from .win_mode variable.
+
+Yes, this would be the right way to go.
+
+regards,
+Darius A.
