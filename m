@@ -1,49 +1,58 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 15 Mar 2012 12:06:44 +0100
-Subject: [PATCH 4/6] ARM: OMAP: fix missing __devexit_p() annotations
-In-Reply-To: <E1S87wp-0000Mz-V8@rmk-PC.arm.linux.org.uk>
-References: <20120315102845.GB16389@n2100.arm.linux.org.uk>
- <E1S87wp-0000Mz-V8@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAORVsuUVC4hpotK=eybA=Eqtfg0+PivjwRUENjCwcLG2dp1Ucg@mail.gmail.com>
+From: joerg.roedel@amd.com (Joerg Roedel)
+Date: Thu, 15 Mar 2012 12:12:27 +0100
+Subject: [PATCH v12 2/3] ARM: EXYNOS: Change System MMU platform device
+ definitions
+In-Reply-To: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
+References: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
+Message-ID: <20120315111227.GA2384@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Thu, Mar 15, 2012 at 11:30 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Missing __devexit_p() annotations in driver structures for remove functions
-> marked with __devexit is waiting for build errors to happen, such as:
->
-> `omap_system_dma_remove' referenced in section `.data' of arch/arm/plat-omap/bui
-> lt-in.o: defined in discarded section `.devexit.text' of arch/arm/plat-omap/buil
-> t-in.o
->
-> Add the necessary annotation, and as a result of audit, fix others which
-> are also missing in arch/arm/*omap*.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+On Thu, Mar 15, 2012 at 05:32:39PM +0900, Cho KyongHo wrote:
+> Handling System MMUs with an identifier is not flexible to manage
+> System MMU platform devices because of the following reasons:
+> 1. A device driver which needs to handle System MMU must know the ID.
+> 2. A System MMU may not present in some implementations of Exynos family.
+> 3. Handling System MMU with IOMMU API does not require an ID.
+> 
+> This patch is the result of removing ID of System MMUs.
+> Instead, a device driver that needs to handle its System MMU must
+> use IOMMU API while its descriptor of platform device is given.
+> 
+> This patch also includes the following enhancements:
+> - A System MMU device becomes a child if its power domain device.
+> - clkdev
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
 > ---
-> ?arch/arm/mach-omap2/smartreflex.c | ? ?2 +-
-> ?arch/arm/plat-omap/dma.c ? ? ? ? ?| ? ?2 +-
-> ?2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 7e755bb..47c77a1 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -1012,7 +1012,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
-> ?}
->
-> ?static struct platform_driver smartreflex_driver = {
-> - ? ? ? .remove ? ? ? ? = omap_sr_remove,
-> + ? ? ? .remove ? ? ? ? = __devexit_p(omap_sr_remove),
-> ? ? ? ?.driver ? ? ? ? = {
-> ? ? ? ? ? ? ? ?.name ? = "smartreflex",
-> ? ? ? ?},
-Tony already has this change in his master branch, commit
-149f1d5c8d2fd6879cdf93ca70f1cb745e698a1e ('ARM: OMAP2+: Fix devexit
-for smartreflex when CONFIG_HOTPLUG is not set').
+>  arch/arm/mach-exynos/Kconfig                    |   10 +-
+>  arch/arm/mach-exynos/Makefile                   |    2 +-
+>  arch/arm/mach-exynos/clock-exynos4.c            |   79 ++--
+>  arch/arm/mach-exynos/clock-exynos4.h            |    2 +
+>  arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
+>  arch/arm/mach-exynos/clock-exynos4212.c         |   28 ++-
+>  arch/arm/mach-exynos/clock-exynos5.c            |   90 +++++
+>  arch/arm/mach-exynos/dev-sysmmu.c               |  457 ++++++++++++----------
+>  arch/arm/mach-exynos/include/mach/irqs.h        |   25 +-
+>  arch/arm/mach-exynos/include/mach/map.h         |   38 ++
+>  arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
+>  arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 --
+>  arch/arm/mach-exynos/include/mach/sysmmu.h      |   88 +++--
+>  arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
+>  arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
+>  15 files changed, 529 insertions(+), 336 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-sysmmu.h
 
-Jean
+This patch doesn't apply cleanly against upstream Linux (v3.3-rcX).
+Please rebase to upstream and resend. The other 2 patches apply fine.
+
+
+	Joerg
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
