@@ -1,41 +1,30 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 15 Mar 2012 13:40:35 -0400 (EDT)
-Subject: [PATCH 1/4] ARM: opcodes: Don't define the thumb32 byteswapping
- macros for BE32
-In-Reply-To: <1331829132-9762-2-git-send-email-dave.martin@linaro.org>
-References: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
- <1331829132-9762-2-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.02.1203151337150.24151@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 15 Mar 2012 17:43:44 +0000
+Subject: [PATCH v3 4/6] mfd: mc13xxx-core: use regmap for register access
+In-Reply-To: <1331757790-10583-5-git-send-email-marc@cpdesign.com.au>
+References: <1331757790-10583-1-git-send-email-marc@cpdesign.com.au>
+ <1331757790-10583-5-git-send-email-marc@cpdesign.com.au>
+Message-ID: <20120315174343.GQ3138@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Mar 2012, Dave Martin wrote:
+On Thu, Mar 15, 2012 at 07:43:08AM +1100, Marc Reilly wrote:
+> This change converts the mc13xxx core to use regmap rather than direct
+> spi r/w.
+> The spidev member of mc13xxx struct becomes redundant and is removed.
+> Extra debugging aids are added to mc13xxx_reg_rmw.
+> Mutex init is moved to before regmap init.
 
-> The existing __mem_to_opcode_thumb32() is incorrect for BE32
-> platforms.  However, these don't support Thumb-2 kernels, so this
-> option is not so relevant for those platforms anyway.
-> 
-> This operation is complicated by the lack of unaligned memory
-> access support prior to ARMv6.
-> 
-> Rather than provide a "working" macro which will probably won't get
-> used (or worse, will get misused), this patch removes the macro for
-> BE32 kernels.  People manipulating Thumb opcodes prior to ARMv6
-> should almost certainly be splitting these operations into
-> halfwords anyway, using __opcode_thumb32_{first,second,compose}()
-> and the 16-bit opcode transformations.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Reviwed-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> +/*
-> + * On BE32 systems, using 32-bit accesses to store Thumb instructions will not
-> + * work in all cases, due to alignment constraints.  For now, a correct
-> + * version is not proivided for BE32.
-
-s/proivided/provided/
-
-
-Nicolas
+For rmw please push the trace down into regmap as a new tracepoint if
+you find it useful; one of the wins from regmap is intended to be the
+trace and diagnostic infrastructure you get for free with it.  At the
+minute only the underlying reads and writes have trace.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/ea3df634/attachment.sig>
