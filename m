@@ -1,91 +1,49 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 15 Mar 2012 16:33:29 +0530
-Subject: [PATCH v3] ARM: SPEAr600: Add device-tree support to SPEAr600
- boards
-In-Reply-To: <1331808632-22585-1-git-send-email-sr@denx.de>
-References: <1331808632-22585-1-git-send-email-sr@denx.de>
-Message-ID: <4F61CC81.1020902@st.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 15 Mar 2012 12:06:44 +0100
+Subject: [PATCH 4/6] ARM: OMAP: fix missing __devexit_p() annotations
+In-Reply-To: <E1S87wp-0000Mz-V8@rmk-PC.arm.linux.org.uk>
+References: <20120315102845.GB16389@n2100.arm.linux.org.uk>
+ <E1S87wp-0000Mz-V8@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAORVsuUVC4hpotK=eybA=Eqtfg0+PivjwRUENjCwcLG2dp1Ucg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2012 4:20 PM, Stefan Roese wrote:
+Russell,
 
-> diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+On Thu, Mar 15, 2012 at 11:30 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Missing __devexit_p() annotations in driver structures for remove functions
+> marked with __devexit is waiting for build errors to happen, such as:
+>
+> `omap_system_dma_remove' referenced in section `.data' of arch/arm/plat-omap/bui
+> lt-in.o: defined in discarded section `.devexit.text' of arch/arm/plat-omap/buil
+> t-in.o
+>
+> Add the necessary annotation, and as a result of audit, fix others which
+> are also missing in arch/arm/*omap*.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> ---
+> ?arch/arm/mach-omap2/smartreflex.c | ? ?2 +-
+> ?arch/arm/plat-omap/dma.c ? ? ? ? ?| ? ?2 +-
+> ?2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index 7e755bb..47c77a1 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -1012,7 +1012,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
+> ?}
+>
+> ?static struct platform_driver smartreflex_driver = {
+> - ? ? ? .remove ? ? ? ? = omap_sr_remove,
+> + ? ? ? .remove ? ? ? ? = __devexit_p(omap_sr_remove),
+> ? ? ? ?.driver ? ? ? ? = {
+> ? ? ? ? ? ? ? ?.name ? = "smartreflex",
+> ? ? ? ?},
+Tony already has this change in his master branch, commit
+149f1d5c8d2fd6879cdf93ca70f1cb745e698a1e ('ARM: OMAP2+: Fix devexit
+for smartreflex when CONFIG_HOTPLUG is not set').
 
-> +/ {
-> +       compatible = "st,spear600";
-> +
-> +       cpus {
-> +               cpu at 0 {
-> +                       compatible = "arm,arm926ejs";
-> +               };
-> +       };
-> +
-> +       memory {
-> +               device_type = "memory";
-> +               reg = <0 0x40000000>; /* Real value updated by U-Boot */
-> +       };
-> +
-> +       ahb {
-
-What is the significance of this name? As i see gpio/spi etc in this list,
-which are on apb bus.
-
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "simple-bus";
-> +               ranges;
-> +
-
-> +               /* local/cpu GPIO */
-> +               gpio0: gpio at f0100000 {
-> +                       #gpio-cells = <2>;
-> +                       compatible = "arm,pl061", "arm,primecell";
-> +                       gpio-controller;
-> +                       reg = <0xf0100000 0x1000>;
-> +                       interrupt-parent = <&vic0>;
-> +                       interrupts = <18>;
-> +               };
-> +
-> +               /* basic GPIO */
-> +               gpio1: gpio at fc980000 {
-> +                       #gpio-cells = <2>;
-> +                       compatible = "arm,pl061", "arm,primecell";
-> +                       gpio-controller;
-> +                       reg = <0xfc980000 0x1000>;
-> +                       interrupt-parent = <&vic1>;
-> +                       interrupts = <19>;
-> +               };
-> +
-> +               /* appl GPIO */
-> +               gpio2: gpio at d8100000 {
-> +                       #gpio-cells = <2>;
-> +                       compatible = "arm,pl061", "arm,primecell";
-> +                       gpio-controller;
-> +                       reg = <0xd8100000 0x1000>;
-> +                       interrupt-parent = <&vic1>;
-> +                       interrupts = <4>;
-> +               };
-> +
-
-> +};
-
-> diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-> index ac70e0d..358f280 100644
-> --- a/arch/arm/mach-spear6xx/clock.c
-> +++ b/arch/arm/mach-spear6xx/clock.c
-> @@ -641,8 +641,8 @@ static struct clk_lookup spear_clk_lookups[] = {
->         { .con_id = "gpt0_synth_clk",   .clk = &gpt0_synth_clk},
->         { .con_id = "gpt2_synth_clk",   .clk = &gpt2_synth_clk},
->         { .con_id = "gpt3_synth_clk",   .clk = &gpt3_synth_clk},
-> -       { .dev_id = "uart0",            .clk = &uart0_clk},
-> -       { .dev_id = "uart1",            .clk = &uart1_clk},
-> +       { .dev_id = "d0000000.serial",  .clk = &uart0_clk},
-> +       { .dev_id = "d0080000.serial",  .clk = &uart1_clk},
-
-I didn't got Jean's comment at that time, but now it is ultra clear.
-
-Acked-by: Viresh Kumar <viresh.kumar@st.com>
-
--- 
-viresh
+Jean
