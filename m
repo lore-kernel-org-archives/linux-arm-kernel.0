@@ -1,283 +1,154 @@
 From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Thu, 15 Mar 2012 17:43:59 +0100
-Subject: [PATCH 04/10] ARM: OMAP2+: smartreflex: Use the names from hwmod data
- instead of voltage domains.
+Date: Thu, 15 Mar 2012 17:44:04 +0100
+Subject: [PATCH 09/10] ARM: OMAP2+: SmartReflex: add POWER_AVS Kconfig options
 In-Reply-To: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
 References: <1331829845-9526-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1331829845-9526-5-git-send-email-j-pihet@ti.com>
+Message-ID: <1331829845-9526-10-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jean Pihet <j-pihet@ti.com>
 
-Associate a name with each SmartReflex instance from the hwmod data,
-rather than attempting to reuse the name of a voltage domain. The name
-from hwmod better reflects the smartreflex integration in the system.
+Add a Kconfig menu (POWER_AVS) and rename the Kconfig options
+for the OMAP SmartReflex implementation:
+ CONFIG_OMAP_SMARTREFLEX renames to CONFIG_POWER_AVS_OMAP
+ CONFIG_OMAP_SMARTREFLEX_CLASS3 renames to CONFIG_POWER_AVS_OMAP_CLASS3
 
-Also have the name passed to the drivers using pdata, which helps to remove
-any dependencies on SoC-specific structures.
+This change makes the SmartReflex implementation ready for the move
+to drivers/.
 
 Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex-class3.c      |    4 +-
- arch/arm/mach-omap2/smartreflex.c             |   65 ++++++++++---------------
- arch/arm/mach-omap2/sr_device.c               |    1 +
- arch/arm/plat-omap/include/plat/smartreflex.h |    3 +
- 4 files changed, 32 insertions(+), 41 deletions(-)
+ arch/arm/mach-omap2/Makefile      |    5 ++-
+ arch/arm/mach-omap2/pm.h          |    2 +-
+ arch/arm/mach-omap2/smartreflex.h |    6 ++--
+ arch/arm/plat-omap/Kconfig        |   45 ++++++++++++++++++++++++------------
+ 4 files changed, 37 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
-index a105077..9a19ce7 100644
---- a/arch/arm/mach-omap2/smartreflex-class3.c
-+++ b/arch/arm/mach-omap2/smartreflex-class3.c
-@@ -18,8 +18,8 @@ static int sr_class3_enable(struct omap_sr *sr)
- 	unsigned long volt = voltdm_get_voltage(sr->voltdm);
- 
- 	if (!volt) {
--		pr_warning("%s: Curr voltage unknown. Cannot enable sr_%s\n",
--				__func__, sr->voltdm->name);
-+		pr_warning("%s: Curr voltage unknown. Cannot enable %s\n",
-+				__func__, sr->name);
- 		return -ENODATA;
- 	}
- 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 57a484d..8e3ef66 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -184,7 +184,7 @@ static void sr_set_regfields(struct omap_sr *sr)
- 		sr->err_weight = OMAP3430_SR_ERRWEIGHT;
- 		sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
- 		sr->accum_data = OMAP3430_SR_ACCUMDATA;
--		if (!(strcmp(sr->voltdm->name, "mpu"))) {
-+		if (!(strcmp(sr->name, "sr1"))) {
- 			sr->senn_avgweight = OMAP3430_SR1_SENNAVGWEIGHT;
- 			sr->senp_avgweight = OMAP3430_SR1_SENPAVGWEIGHT;
- 		} else {
-@@ -235,19 +235,13 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
-  */
- static int sr_late_init(struct omap_sr *sr_info)
- {
--	char *name;
- 	struct omap_sr_data *pdata = sr_info->pdev->dev.platform_data;
- 	struct resource *mem;
- 	int ret = 0;
- 
- 	if (sr_class->notify && sr_class->notify_flags && sr_info->irq) {
--		name = kasprintf(GFP_KERNEL, "sr_%s", sr_info->voltdm->name);
--		if (name == NULL) {
--			ret = -ENOMEM;
--			goto error;
--		}
- 		ret = request_irq(sr_info->irq, sr_interrupt,
--				0, name, sr_info);
-+				  0, sr_info->name, sr_info);
- 		if (ret)
- 			goto error;
- 		disable_irq(sr_info->irq);
-@@ -266,7 +260,6 @@ error:
- 	dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"
- 		"interrupt handler. Smartreflex will"
- 		"not function as desired\n", __func__);
--	kfree(name);
- 	kfree(sr_info);
- 
- 	return ret;
-@@ -396,8 +389,7 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
- 	struct omap_sr *sr = _sr_lookup(voltdm);
- 
- 	if (IS_ERR(sr)) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: omap_sr struct for voltdm not found\n",	__func__);
- 		return PTR_ERR(sr);
- 	}
- 
-@@ -464,8 +456,7 @@ int sr_disable_errgen(struct voltagedomain *voltdm)
- 	struct omap_sr *sr = _sr_lookup(voltdm);
- 
- 	if (IS_ERR(sr)) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: omap_sr struct for voltdm not found\n",	__func__);
- 		return PTR_ERR(sr);
- 	}
- 
-@@ -515,8 +506,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
- 	struct omap_sr *sr = _sr_lookup(voltdm);
- 
- 	if (IS_ERR(sr)) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: omap_sr struct for voltdm not found\n",	__func__);
- 		return PTR_ERR(sr);
- 	}
- 
-@@ -601,8 +591,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
- 	int ret;
- 
- 	if (IS_ERR(sr)) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: omap_sr struct for voltdm not found\n",	__func__);
- 		return PTR_ERR(sr);
- 	}
- 
-@@ -655,8 +644,7 @@ void sr_disable(struct voltagedomain *voltdm)
- 	struct omap_sr *sr = _sr_lookup(voltdm);
- 
- 	if (IS_ERR(sr)) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: omap_sr struct for voltdm not found\n",	__func__);
- 		return;
- 	}
- 
-@@ -736,8 +724,7 @@ void omap_sr_enable(struct voltagedomain *voltdm)
- 	struct omap_sr *sr = _sr_lookup(voltdm);
- 
- 	if (IS_ERR(sr)) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: omap_sr struct for voltdm not found\n",	__func__);
- 		return;
- 	}
- 
-@@ -769,8 +756,7 @@ void omap_sr_disable(struct voltagedomain *voltdm)
- 	struct omap_sr *sr = _sr_lookup(voltdm);
- 
- 	if (IS_ERR(sr)) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: omap_sr struct for voltdm not found\n",	__func__);
- 		return;
- 	}
- 
-@@ -802,8 +788,7 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
- 	struct omap_sr *sr = _sr_lookup(voltdm);
- 
- 	if (IS_ERR(sr)) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, voltdm->name);
-+		pr_warning("%s: omap_sr struct for voltdm not found\n",	__func__);
- 		return;
- 	}
- 
-@@ -890,7 +875,6 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	struct dentry *nvalue_dir;
- 	struct omap_volt_data *volt_data;
- 	int i, ret = 0;
--	char *name;
- 
- 	sr_info = kzalloc(sizeof(struct omap_sr), GFP_KERNEL);
- 	if (!sr_info) {
-@@ -927,6 +911,14 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_irq_safe(&pdev->dev);
- 
-+	sr_info->name = kasprintf(GFP_KERNEL, "sr_%s", pdata->name);
-+	if (!sr_info->name) {
-+		dev_err(&pdev->dev, "%s: Unable to alloc SR instance name\n",
-+			__func__);
-+		ret = -ENOMEM;
-+		goto err_release_region;
-+	}
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 9746529..30666fd 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -68,8 +68,9 @@ obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o \
+ obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o \
+ 					   cpuidle44xx.o
+ obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+-obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
+-obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
 +
- 	sr_info->pdev = pdev;
- 	sr_info->srid = pdev->id;
- 	sr_info->voltdm = pdata->voltdm;
-@@ -974,20 +966,12 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		}
- 	}
++obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o smartreflex.o
++obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)	+= smartreflex-class3.o
  
--	name = kasprintf(GFP_KERNEL, "sr_%s", sr_info->voltdm->name);
--	if (!name) {
--		dev_err(&pdev->dev, "%s: Unable to alloc debugfs name\n",
--			__func__);
--		ret = -ENOMEM;
--		goto err_iounmap;
--	}
--	sr_info->dbg_dir = debugfs_create_dir(name, sr_dbg_dir);
--	kfree(name);
-+	sr_info->dbg_dir = debugfs_create_dir(sr_info->name, sr_dbg_dir);
- 	if (IS_ERR_OR_NULL(sr_info->dbg_dir)) {
- 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory\n",
- 			__func__);
- 		ret = PTR_ERR(sr_info->dbg_dir);
--		goto err_iounmap;
-+		goto err_free_name;
- 	}
+ AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
+ AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index a051431..1a2d483 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -110,7 +110,7 @@ extern void enable_omap3630_toggle_l2_on_restore(void);
+ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
+ #endif		/* defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3) */
  
- 	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR,
-@@ -1009,10 +993,10 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 
- 	omap_voltage_get_volttable(sr_info->voltdm, &volt_data);
- 	if (!volt_data) {
--		dev_warn(&pdev->dev, "%s: No Voltage table for the"
--			" corresponding vdd vdd_%s. Cannot create debugfs"
-+		dev_warn(&pdev->dev, "%s: %s: No Voltage table for the"
-+			" corresponding vdd. Cannot create debugfs"
- 			"entries for n-values\n",
--			__func__, sr_info->voltdm->name);
-+			__func__, sr_info->name);
- 		ret = -ENODATA;
- 		goto err_debugfs;
- 	}
-@@ -1030,6 +1014,8 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 
- err_debugfs:
- 	debugfs_remove_recursive(sr_info->dbg_dir);
-+err_free_name:
-+	kfree(sr_info->name);
- err_iounmap:
- 	list_del(&sr_info->node);
- 	iounmap(sr_info->base);
-@@ -1066,6 +1052,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
- 
- 	list_del(&sr_info->node);
- 	iounmap(sr_info->base);
-+	kfree(sr_info->name);
- 	kfree(sr_info);
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(mem->start, resource_size(mem));
-diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
-index dad1473..2c74ebc 100644
---- a/arch/arm/mach-omap2/sr_device.c
-+++ b/arch/arm/mach-omap2/sr_device.c
-@@ -93,6 +93,7 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
- 		goto exit;
- 	}
- 
-+	sr_data->name = oh->name;
- 	sr_data->ip_type = oh->class->rev;
- 	sr_data->senn_mod = 0x1;
- 	sr_data->senp_mod = 0x1;
-diff --git a/arch/arm/plat-omap/include/plat/smartreflex.h b/arch/arm/plat-omap/include/plat/smartreflex.h
-index 3f46706..7bfc91a 100644
---- a/arch/arm/plat-omap/include/plat/smartreflex.h
-+++ b/arch/arm/plat-omap/include/plat/smartreflex.h
-@@ -20,6 +20,7 @@
- #include "voltage.h"
- 
- struct omap_sr {
-+	char				*name;
- 	struct list_head		node;
- 	struct platform_device		*pdev;
- 	struct omap_sr_nvalue_table	*nvalue_table;
-@@ -56,6 +57,7 @@ struct omap_sr_nvalue_table {
- /**
-  * struct omap_sr_data - Smartreflex platform data.
-  *
-+ * @name:		instance name
-  * @ip_type:		Smartreflex IP type.
-  * @senp_mod:		SENPENABLE value for the sr
-  * @senn_mod:		SENNENABLE value for sr
-@@ -67,6 +69,7 @@ struct omap_sr_nvalue_table {
-  * @voltdm:		Pointer to the voltage domain associated with the SR
+-#ifdef CONFIG_OMAP_SMARTREFLEX
++#ifdef CONFIG_POWER_AVS_OMAP
+ extern int omap_devinit_smartreflex(void);
+ extern void omap_enable_smartreflex_on_init(void);
+ #else
+diff --git a/arch/arm/mach-omap2/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
+index 3bd4fee..dbfb554 100644
+--- a/arch/arm/mach-omap2/smartreflex.h
++++ b/arch/arm/mach-omap2/smartreflex.h
+@@ -17,8 +17,8 @@
+  * published by the Free Software Foundation.
   */
- struct omap_sr_data {
-+	const char			*name;
- 	int				ip_type;
- 	u32				senp_mod;
- 	u32				senn_mod;
+ 
+-#ifndef __ASM_ARM_OMAP_SMARTREFLEX_H
+-#define __ASM_ARM_OMAP_SMARTREFLEX_H
++#ifndef __DRIVERS_POWER_AVS_SMARTREFLEX_H
++#define __DRIVERS_POWER_AVS_SMARTREFLEX_H
+ 
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+@@ -177,7 +177,7 @@ struct omap_sr_pmic_data {
+ };
+ 
+ 
+-#ifdef CONFIG_OMAP_SMARTREFLEX
++#ifdef CONFIG_POWER_AVS_OMAP
+ /*
+  * The smart reflex driver supports CLASS1 CLASS2 and CLASS3 SR.
+  * The smartreflex class driver should pass the class type.
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index f419a08..6ec9237 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -44,37 +44,52 @@ config OMAP_DEBUG_LEDS
+ 	depends on OMAP_DEBUG_DEVICES
+ 	default y if LEDS_CLASS
+ 
+-config OMAP_SMARTREFLEX
+-	bool "SmartReflex support"
+-	depends on (ARCH_OMAP3 || ARCH_OMAP4) && PM
++menuconfig POWER_AVS
++	tristate "Adaptive Voltage Scaling class support"
+ 	help
+-	  Say Y if you want to enable SmartReflex.
++	  AVS is a power management technique which finely controls the
++	  operating voltage of a device in order to optimize (i.e. reduce)
++	  its power consumption.
++	  At a given operating point the voltage is adapted depending on
++	  static factors (chip manufacturing process) and dynamic factors
++	  (temperature depending performance).
++	  AVS is also called SmartReflex on OMAP devices.
++
++	  Say Y here to enable Adaptive Voltage Scaling class support.
++
++if POWER_AVS
+ 
+-	  SmartReflex can perform continuous dynamic voltage
+-	  scaling around the nominal operating point voltage
+-	  according to silicon characteristics and operating
+-	  conditions. Enabling SmartReflex reduces power
+-	  consumption.
++config POWER_AVS_OMAP
++	bool "AVS support for the OMAP IP versions 1&2"
++	depends on (ARCH_OMAP3 || ARCH_OMAP4) && PM
++	help
++	  Say Y to enable AVS support on OMAP containing the version 1 or
++	  version 2 of the SmartReflex IP.
++	  V1 is the 65nm version used in OMAP3430.
++	  V2 is the update for the 45nm version of the IP used in OMAP3630
++	  and OMAP4430
+ 
+ 	  Please note, that by default SmartReflex is only
+-	  initialized. To enable the automatic voltage
+-	  compensation for vdd mpu  and vdd core from user space,
++	  initialized and not enabled. To enable the automatic voltage
++	  compensation for vdd mpu and vdd core from user space,
+ 	  user must write 1 to
+-		/debug/voltage/vdd_<X>/smartreflex/autocomp,
+-	  where X is mpu or core for OMAP3.
++		/debug/smartreflex/sr_<X>/autocomp,
++	  where X is mpu_iva or core for OMAP3.
+ 	  Optionally autocompensation can be enabled in the kernel
+ 	  by default during system init via the enable_on_init flag
+ 	  which an be passed as platform data to the smartreflex driver.
+ 
+-config OMAP_SMARTREFLEX_CLASS3
++config POWER_AVS_OMAP_CLASS3
+ 	bool "Class 3 mode of Smartreflex Implementation"
+-	depends on OMAP_SMARTREFLEX && TWL4030_CORE
++	depends on POWER_AVS_OMAP && TWL4030_CORE
+ 	help
+ 	  Say Y to enable Class 3 implementation of Smartreflex
+ 
+ 	  Class 3 implementation of Smartreflex employs continuous hardware
+ 	  voltage calibration.
+ 
++endif # POWER_AVS
++
+ config OMAP_RESET_CLOCKS
+ 	bool "Reset unused clocks during boot"
+ 	depends on ARCH_OMAP
 -- 
 1.7.5.4
