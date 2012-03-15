@@ -1,27 +1,40 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 15 Mar 2012 10:59:01 +1100
-Subject: linux-next: build failure after merge of the final tree (arm-soc
- tree related)
-Message-ID: <20120315105901.7b10c9f4de9374a613436988@canb.auug.org.au>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Thu, 15 Mar 2012 11:13:46 +1100
+Subject: [PATCH v4 09/10] pwm: Add PXA support
+In-Reply-To: <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <4F61343A.80103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 15/03/12 02:56, Thierry Reding wrote:
 
-After merging the final tree, today's linux-next build (powerpc
-allmodconfig) failed like this:
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
+> Changes in v3:
+>   - update PWM ops for changes in patch 2
 
-drivers/ata/sata_mv.c:4185:1: error: '__mod_of_device_table' aliased to undefined symbol 'mvsdio_dt_ids'
+Couple of quick notes, mostly for future work.
 
-Caused by commit f1e1e148c5cb ("ARM: kirkwood: sata_mv: add device tree
-binding").
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/df18df76/attachment.sig>
+> +	/* NOTE: the clock to PWM has to be enabled first
+> +	 * before writing to the registers
+> +	 */
+> +	clk_enable(pc->clk);
+
+
+Should be fixed to also call clk_prepare (and clk_unprepare after
+clk_disable). Could be done in a follow up patch.
+
+> +	__raw_writel(prescale, pc->mmio_base + offset + PWMCR);
+> +	__raw_writel(dc, pc->mmio_base + offset + PWMDCR);
+> +	__raw_writel(pv, pc->mmio_base + offset + PWMPCR);
+
+
+Should we fix this driver to use readl/writel instead of the __raw
+variants? The memory is properly ioremaped, and to my understanding the
+__raw memory accessors should be avoided outside of core code. This
+could be done in a follow up patch if you want to keep this patch as
+mostly just a move of the code.
+
+~Ryan
