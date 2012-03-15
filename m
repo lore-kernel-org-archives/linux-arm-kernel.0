@@ -1,52 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 15 Mar 2012 10:29:45 +0000
-Subject: [PATCH v4 03/10] pwm: Add device tree support
-In-Reply-To: <201203150840.42659.arnd@arndb.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-4-git-send-email-thierry.reding@avionic-design.de>
- <201203150840.42659.arnd@arndb.de>
-Message-ID: <20120315102944.GB3138@opensource.wolfsonmicro.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 15 Mar 2012 10:30:19 +0000
+Subject: [PATCH 4/6] ARM: OMAP: fix missing __devexit_p() annotations
+In-Reply-To: <20120315102845.GB16389@n2100.arm.linux.org.uk>
+References: <20120315102845.GB16389@n2100.arm.linux.org.uk>
+Message-ID: <E1S87wp-0000Mz-V8@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 08:40:42AM +0000, Arnd Bergmann wrote:
-> On Wednesday 14 March 2012, Thierry Reding wrote:
+Missing __devexit_p() annotations in driver structures for remove functions
+marked with __devexit is waiting for build errors to happen, such as:
 
-> > +static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-> > +{
+`omap_system_dma_remove' referenced in section `.data' of arch/arm/plat-omap/bui
+lt-in.o: defined in discarded section `.devexit.text' of arch/arm/plat-omap/buil
+t-in.o
 
-> > +	return ERR_PTR(-EPROBE_DEFER);
-> > +}
+Add the necessary annotation, and as a result of audit, fix others which
+are also missing in arch/arm/*omap*.
 
-> EPROBE_DEFER doesn't exist yet in my kernel, and I wonder if it's actually
-> safe to be used this way, because it can result in arbitrary drivers using
-> this to be put on the defered probe list. It certainly sounds like the
-> right thing to do in the long run though.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/smartreflex.c |    2 +-
+ arch/arm/plat-omap/dma.c          |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Similar code is going in for regulators in 3.4 along with the core
--EPROBE_DEFER change (though not OF specific) and I sent a similar patch
-for GPIOs too, hopefully Grant will ack it in time for it to make it in.
-
-My theory is that since you need to explicitly know that the thing
-you're requesting is there in order to request it (eg, have a PWM number
-or DT link) the overwhemlingly common case for a failure to request will
-be that the provider didn't register yet which is exactly the case where
-deferral is desired.  It therefore seems sensible to have the framework
-default the drivers to retrying rather than have almost every individual
-driver look at the failure, figure out if it was a missing provider, and
-then retry.  Drivers that have a good reason to fail can always check
-for -EPROBE_DEFER and override it.
-
-The result should be that we can take advantage of probe deferral over
-large areas of the kernel without having to go and explicitly modify so
-many drivers - if the frameworks like GPIO, clk and regulator can do
-this that ought to cover 90% of the cases where probe deferral will be
-needed without having to do anything more than have good error handling
-paths on probe which is a good idea anyway.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/09137da3/attachment.sig>
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index 7e755bb..47c77a1 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -1012,7 +1012,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
+ }
+ 
+ static struct platform_driver smartreflex_driver = {
+-	.remove         = omap_sr_remove,
++	.remove         = __devexit_p(omap_sr_remove),
+ 	.driver		= {
+ 		.name	= "smartreflex",
+ 	},
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index 002fb4d..cb856fe 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -2125,7 +2125,7 @@ static int __devexit omap_system_dma_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver omap_system_dma_driver = {
+ 	.probe		= omap_system_dma_probe,
+-	.remove		= omap_system_dma_remove,
++	.remove		= __devexit_p(omap_system_dma_remove),
+ 	.driver		= {
+ 		.name	= "omap_dma_system"
+ 	},
+-- 
+1.7.4.4
