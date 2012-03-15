@@ -1,75 +1,83 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 15 Mar 2012 22:21:18 +0800
-Subject: [PATCH v3 09/11] ASoC: fsl: remove the fatal error checking on
- codec-handle
-In-Reply-To: <4F61F080.4090800@freescale.com>
-References: <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
- <4F591B8D.8090705@freescale.com>
- <20120309013216.GH2499@S2101-09.ap.freescale.net>
- <4F5FD706.8040209@freescale.com>
- <20120313234638.GY3177@opensource.wolfsonmicro.com>
- <4F6008FA.3040805@freescale.com>
- <20120314122723.GC3133@opensource.wolfsonmicro.com>
- <4F612319.50302@freescale.com>
- <20120315130253.GA6065@S2101-09.ap.freescale.net>
- <4F61F080.4090800@freescale.com>
-Message-ID: <20120315142115.GB6065@S2101-09.ap.freescale.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 15 Mar 2012 03:54:54 -0600
+Subject: [PATCH v4] of: introduce helper to manage boolean
+In-Reply-To: <1331660903-10193-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1331660903-10193-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20120315095454.9294E3E08CB@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 01:37:06PM +0000, Tabi Timur-B04825 wrote:
-...
-> The PowerPC MPC8610 has two SSIs, and I have a hacked up board that has 
-> both connected to two CS4270s.  This is how I tested multiple SSI support 
-> in my driver.
+On Tue, 13 Mar 2012 18:48:23 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> of_property_read_bool
 > 
-> Since my driver supports any number of SSIs, I expect any changes to it to 
-> continue that support.
+> Search for a property in a device node.
+> Returns true if the property exist false otherwise.
 > 
-I think it can still easily get supported with the binding like below.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-sound {
-      compatible = "fsl,imx51-babbage-sgtl5000",
-                   "fsl,imx-audio-sgtl5000";
-      model = "imx51-babbage-sgtl5000";
-      ssi-controller = <&ssi1, &ssi2>;
-      audio-codec = <&sgtl5000_1, &sgtl5000_2>;
-      mux-int-port = <1>;
-      mux-ext-port = <3>;
-};
+One comment below; but otherwise:
 
-The only difference will be both ssi-controller and audio-codec become
-an array of phandles.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-...
-> I admit I may have been too hasty in giving that ACK, because I did not 
-> take the time to study the binding.  I figured that the new binding was 
-> superior to what I came up with years ago.
+Feel free to merge via whatever tree needs it.
+
+g.
+
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+> v4:
 > 
-> Now that I've studied the binding, I no longer believe that.  I don't 
-> understand what's so wonderful about the new binding that my driver has to 
-> support it *and* the old binding.  I think it would be easier if i.MX uses 
-> the original binding.
+> 	send the right version
 > 
-I do not think it would be easier for imx.  Looking at the imx-sgtl5000
-binding, you will find we have audmux port configuration encoded there.
-How would you suggest to get that fit into the PowerPC binding?
+> 	include Grant comment
+> 
+> 	Grant can I get the go please?
+> 
+> Best Regards,
+> J.
+>  include/linux/of.h |   16 ++++++++++++++++
+>  1 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index a75a831..a992cdf 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -342,6 +342,22 @@ static inline int of_machine_is_compatible(const char *compat)
+>  #define of_match_node(_matches, _node)	NULL
+>  #endif /* CONFIG_OF */
+>  
+> +/**
+> + * of_property_read_bool - Findfrom a property
+> + * @np:		device node from which the property value is to be read.
+> + * @propname:	name of the property to be searched.
+> + *
+> + * Search for a property in a device node.
+> + * Returns true if the property exist false otherwise.
+> + */
+> +static inline bool of_property_read_bool(const struct device_node *np,
+> +					 const char *propname)
+> +{
+> +	struct property *prop = of_find_property(np, propname, NULL);
+> +
+> +	return prop ? true : false;
+> +}
 
-...
-> Even if the new binding is "better", I do not see how it's SOOOOO much 
-> better that my driver has to support it.  The drawback in supporting both 
-> is the added complexity.
+Could simply be:
+{
+	return of_find_property(...) != NULL;
+}
 
-If you insist on that the driver should only support single binding,
-I would rather change mpc8610_hpcd and p1022_ds to use the new binding.
 
-...
-> But the driver already does this!  No one's asking you to add the code to 
-> perform these tasks.  Just use the existing code.
-
-Again, what's your suggestion to support audmux configuration with the
-existing binding?
+> +
+>  static inline int of_property_read_u32(const struct device_node *np,
+>  				       const char *propname,
+>  				       u32 *out_value)
+> -- 
+> 1.7.7
+> 
 
 -- 
-Regards,
-Shawn
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies,Ltd.
