@@ -1,43 +1,207 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Mar 2012 10:45:27 +0100
-Subject: [PATCH v4 09/10] pwm: Add PXA support
-In-Reply-To: <20120315092134.GA29841@avionic-0098.adnet.avionic-design.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
- <4F61343A.80103@gmail.com>
- <20120315065631.GB20502@avionic-0098.mockup.avionic-design.de>
- <20120315090540.GW3852@pengutronix.de>
- <20120315092134.GA29841@avionic-0098.adnet.avionic-design.de>
-Message-ID: <20120315094527.GY3852@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 15 Mar 2012 10:51:06 +0100
+Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
+In-Reply-To: <20120315175000.897f1172c296d4a687be0537@canb.auug.org.au>
+References: <20120315175000.897f1172c296d4a687be0537@canb.auug.org.au>
+Message-ID: <1362815.uO65s14ojU@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 10:21:34AM +0100, Thierry Reding wrote:
-> * Sascha Hauer wrote:
-> > On Thu, Mar 15, 2012 at 07:56:31AM +0100, Thierry Reding wrote:
-> > > Actually I wasn't planning on keeping this patch at all. Sascha already has
-> > > the existing PWM providers converted to his original framework and offered to
-> > > rebase them onto this series once the dust settles. I only used them as
-> > > testbed to see how the driver interface works out for different hardware. But
-> > > I also think that if Sascha hasn't cleaned the driver up yet it should either
-> > > be done in his conversion patches or as follow ups.
-> > 
-> > All I have is a simple conversion to the new framework, nothing more.  I
-> > rebased my patches yesterday onto this series (unfortunately due to the
-> > additional argument pwm_device the patches do not look like just moving
-> > the drivers anymore). I also skipped the PXA patch since I saw that you
-> > already have this one. I just posted the patches to the list.
+Hi Stephen,
+
+On Thursday 15 March 2012 17:50:00 Stephen Rothwell wrote:
+> Hi all,
 > 
-> Okay, I'll keep my Blackfin and PXA converted drivers then and will fix the
-> issues with the PXA driver brought up by Ryan. Would you be okay if I took
-> your conversion patches and added them to my series?
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-shmobile/board-mackerel.c between commit 1740d3448012
+> ("ARM: mach-shmobile: mackerel: Reserve DMA memory for the frame buffer")
+> from Linus' tree and commit 5d7220ec000f ("ARM: mach-shmobile: sh7372
+> map_io and init_early update") from the arm-soc tree.
+> 
+> The latter moved the code to another file
+> arch/arm/mach-shmobile/setup-sh7372.c and I have no idea how to fix this
+> up, so I just removed the change done by the former.
 
-Sure, go ahead.
+The following patch (5d7220ec000f rebased on top of 1740d3448012) shows the
+correct conflict resolution in my opinion.
 
-Sascha
+>From f040ba69632a54c86767974768d68b308901061c Mon Sep 17 00:00:00 2001
+From: Magnus Damm <damm@opensource.se>
+Date: Wed, 29 Feb 2012 12:37:19 +0900
+Subject: [PATCH] ARM: mach-shmobile: sh7372 map_io and init_early update
+
+ARM: mach-shmobile: sh7372 map_io and init_early update
+
+Update the sh7372 SoC and the AP4EVB and Mackerel boards to make use
+of the functions sh7372_map_io() and sh7372_add_early_devices().
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ arch/arm/mach-shmobile/board-ap4evb.c        |   25 ++-----------------------
+ arch/arm/mach-shmobile/board-mackerel.c      |   21 +++------------------
+ arch/arm/mach-shmobile/include/mach/common.h |    1 +
+ arch/arm/mach-shmobile/setup-sh7372.c        |   22 ++++++++++++++++++++++
+ 4 files changed, 28 insertions(+), 41 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
+index eeb4d96..c57ded1 100644
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
++++ b/arch/arm/mach-shmobile/board-ap4evb.c
+@@ -61,7 +61,6 @@
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/setup.h>
+ 
+@@ -1190,27 +1189,6 @@ static struct i2c_board_info i2c1_devices[] = {
+ 	},
+ };
+ 
+-static struct map_desc ap4evb_io_desc[] __initdata = {
+-	/* create a 1:1 entity map for 0xe6xxxxxx
+-	 * used by CPGA, INTC and PFC.
+-	 */
+-	{
+-		.virtual	= 0xe6000000,
+-		.pfn		= __phys_to_pfn(0xe6000000),
+-		.length		= 256 << 20,
+-		.type		= MT_DEVICE_NONSHARED
+-	},
+-};
+-
+-static void __init ap4evb_map_io(void)
+-{
+-	iotable_init(ap4evb_io_desc, ARRAY_SIZE(ap4evb_io_desc));
+-
+-	/* setup early devices and console here as well */
+-	sh7372_add_early_devices();
+-	shmobile_setup_console();
+-}
+-
+ #define GPIO_PORT9CR	0xE6051009
+ #define GPIO_PORT10CR	0xE605100A
+ #define USCCR1		0xE6058144
+@@ -1469,7 +1447,8 @@ static struct sys_timer ap4evb_timer = {
+ };
+ 
+ MACHINE_START(AP4EVB, "ap4evb")
+-	.map_io		= ap4evb_map_io,
++	.map_io		= sh7372_map_io,
++	.init_early	= sh7372_add_early_devices,
+ 	.init_irq	= sh7372_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_machine	= ap4evb_init,
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 7b53cda..b5bbab7 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -58,7 +58,6 @@
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+ #include <asm/mach-types.h>
+ 
+ /*
+@@ -1337,29 +1336,14 @@ static struct i2c_board_info i2c1_devices[] = {
+ 	},
+ };
+ 
+-static struct map_desc mackerel_io_desc[] __initdata = {
+-	/* create a 1:1 entity map for 0xe6xxxxxx
+-	 * used by CPGA, INTC and PFC.
+-	 */
+-	{
+-		.virtual	= 0xe6000000,
+-		.pfn		= __phys_to_pfn(0xe6000000),
+-		.length		= 256 << 20,
+-		.type		= MT_DEVICE_NONSHARED
+-	},
+-};
+-
+ static void __init mackerel_map_io(void)
+ {
+-	iotable_init(mackerel_io_desc, ARRAY_SIZE(mackerel_io_desc));
++	sh7372_map_io();
++
+ 	/* DMA memory@0xff200000 - 0xffdfffff. The default 2MB size isn't
+ 	 * enough to allocate the frame buffer memory.
+ 	 */
+ 	init_consistent_dma_size(12 << 20);
+-
+-	/* setup early devices and console here as well */
+-	sh7372_add_early_devices();
+-	shmobile_setup_console();
+ }
+ 
+ #define GPIO_PORT9CR	0xE6051009
+@@ -1592,6 +1576,7 @@ static struct sys_timer mackerel_timer = {
+ 
+ MACHINE_START(MACKEREL, "mackerel")
+ 	.map_io		= mackerel_map_io,
++	.init_early	= sh7372_add_early_devices,
+ 	.init_irq	= sh7372_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_machine	= mackerel_init,
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index e4b945e..b327402 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -30,6 +30,7 @@ extern struct clk sh7377_extalc1_clk;
+ extern struct clk sh7377_extal2_clk;
+ 
+ extern void sh7372_init_irq(void);
++extern void sh7372_map_io(void);
+ extern void sh7372_add_early_devices(void);
+ extern void sh7372_add_standard_devices(void);
+ extern void sh7372_clock_init(void);
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index a83cf51..12b4378 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -33,9 +33,28 @@
+ #include <linux/pm_domain.h>
+ #include <mach/hardware.h>
+ #include <mach/sh7372.h>
++#include <mach/common.h>
++#include <asm/mach/map.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++static struct map_desc sh7372_io_desc[] __initdata = {
++	/* create a 1:1 entity map for 0xe6xxxxxx
++	 * used by CPGA, INTC and PFC.
++	 */
++	{
++		.virtual	= 0xe6000000,
++		.pfn		= __phys_to_pfn(0xe6000000),
++		.length		= 256 << 20,
++		.type		= MT_DEVICE_NONSHARED
++	},
++};
++
++void __init sh7372_map_io(void)
++{
++	iotable_init(sh7372_io_desc, ARRAY_SIZE(sh7372_io_desc));
++}
++
+ /* SCIFA0 */
+ static struct plat_sci_port scif0_platform_data = {
+ 	.mapbase	= 0xe6c40000,
+@@ -1049,4 +1068,7 @@ void __init sh7372_add_early_devices(void)
+ {
+ 	early_platform_add_devices(sh7372_early_devices,
+ 				   ARRAY_SIZE(sh7372_early_devices));
++
++	/* setup early console here as well */
++	shmobile_setup_console();
+ }
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Laurent Pinchart
