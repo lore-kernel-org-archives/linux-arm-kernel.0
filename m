@@ -1,45 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 15:52:09 +0000
-Subject: [GIT PULL] DaVinci fixes for v3.3
-In-Reply-To: <DF0F476B391FA8409C78302C7BA518B6317F5E48@DBDE01.ent.ti.com>
-References: <DF0F476B391FA8409C78302C7BA518B6317F5E48@DBDE01.ent.ti.com>
-Message-ID: <201203151552.09922.arnd@arndb.de>
+Date: Thu, 15 Mar 2012 15:52:54 +0000
+Subject: [PATCH v9] mfd: Add anatop mfd driver
+In-Reply-To: <20120315120948.GG3138@opensource.wolfsonmicro.com>
+References: <1331797421-23731-1-git-send-email-paul.liu@linaro.org>
+ <201203150907.29895.arnd@arndb.de>
+ <20120315120948.GG3138@opensource.wolfsonmicro.com>
+Message-ID: <201203151552.54617.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Nori, Sekhar wrote:
-> Hi Arnd, Olof,
+On Thursday 15 March 2012, Mark Brown wrote:
+> There were some other mutterings about using regmap for memory mapped
+> devices, mostly from the point of view of building framework features
+> like this on top of it.  regmap currently makes some assumptions that
+> the I/O is going to be slow so approximately any amount of CPU time can
+> usefully be spent on avoiding I/O but we can probably do something about
+> that.  It also uses mutexes to lock I/O which might not be the most
+> sensible thing for memory mapped devices, but again that's solveable.
+> Right now there's no memory mapping support but there's no reason that
+> can't be added.
 > 
-> Can you please pull the following DaVinci fixes for v3.3.
-> They fix a build and section mismatch warning.
-> 
-> Thanks,
-> Sekhar
-> 
-> The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
->   Linus Torvalds (1):
->         Linux 3.3-rc7
-> 
-> are available in the git repository at:
-> 
->   git://gitorious.org/linux-davinci/linux-davinci.git fixes
-> 
-> Uwe Kleine-K??????nig (2):
->       ARM: davinci: cpufreq: fix compiler warning
->       ARM: davinci: DA850: move da850_register_pm to .init.text
-> 
->  arch/arm/mach-davinci/cpufreq.c |    2 +-
->  arch/arm/mach-davinci/da850.c   |    2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-
-> 
+> In short, it does seem sensible to want to have some support for this
+> for devices that use appropriate idioms.
 
-Hi Sekhar,
+Ok, I see. 
 
-I've applied these two to the next/fixes-non-critical branch for v3.4,
-not the fixes branch for v3.3 because they both look like they have
-no impact on production systems other than the build warnings.
+I guess there is no reason to change anything in Paul's patch now, but
+we can keep this in mind if we see a lot of similar drivers in the future.
 
-If I missed something and one or both patches are indeed required for 3.3,
-please let me know.
+Thanks,
 
 	Arnd
