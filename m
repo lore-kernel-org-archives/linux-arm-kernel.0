@@ -1,82 +1,88 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Mar 2012 10:05:40 +0100
-Subject: [PATCH v4 09/10] pwm: Add PXA support
-In-Reply-To: <20120315065631.GB20502@avionic-0098.mockup.avionic-design.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
- <4F61343A.80103@gmail.com>
- <20120315065631.GB20502@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20120315090540.GW3852@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 09:07:29 +0000
+Subject: [PATCH v9] mfd: Add anatop mfd driver
+In-Reply-To: <1331797421-23731-1-git-send-email-paul.liu@linaro.org>
+References: <1331797421-23731-1-git-send-email-paul.liu@linaro.org>
+Message-ID: <201203150907.29895.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 07:56:31AM +0100, Thierry Reding wrote:
-> * Ryan Mallon wrote:
-> > On 15/03/12 02:56, Thierry Reding wrote:
-> > 
-> > > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> > > ---
-> > > Changes in v3:
-> > >   - update PWM ops for changes in patch 2
-> > 
-> > Couple of quick notes, mostly for future work.
-> > 
-> > > +	/* NOTE: the clock to PWM has to be enabled first
-> > > +	 * before writing to the registers
-> > > +	 */
-> > > +	clk_enable(pc->clk);
-> > 
-> > 
-> > Should be fixed to also call clk_prepare (and clk_unprepare after
-> > clk_disable). Could be done in a follow up patch.
-> > 
-> > > +	__raw_writel(prescale, pc->mmio_base + offset + PWMCR);
-> > > +	__raw_writel(dc, pc->mmio_base + offset + PWMDCR);
-> > > +	__raw_writel(pv, pc->mmio_base + offset + PWMPCR);
-> > 
-> > 
-> > Should we fix this driver to use readl/writel instead of the __raw
-> > variants? The memory is properly ioremaped, and to my understanding the
-> > __raw memory accessors should be avoided outside of core code. This
-> > could be done in a follow up patch if you want to keep this patch as
-> > mostly just a move of the code.
+On Thursday 15 March 2012, Ying-Chun Liu (PaulLiu) wrote:
+> From: "Ying-Chun Liu (PaulLiu)" <paul.liu@linaro.org>
 > 
-> Actually I wasn't planning on keeping this patch at all. Sascha already has
-> the existing PWM providers converted to his original framework and offered to
-> rebase them onto this series once the dust settles. I only used them as
-> testbed to see how the driver interface works out for different hardware. But
-> I also think that if Sascha hasn't cleaned the driver up yet it should either
-> be done in his conversion patches or as follow ups.
+> Anatop is a mfd chip embedded in Freescale i.MX6Q SoC.
+> Anatop provides regulators and thermal.
+> This driver handles the address space and the operation of the mfd device.
 
-All I have is a simple conversion to the new framework, nothing more.  I
-rebased my patches yesterday onto this series (unfortunately due to the
-additional argument pwm_device the patches do not look like just moving
-the drivers anymore). I also skipped the PXA patch since I saw that you
-already have this one. I just posted the patches to the list.
+Hi Paul,
 
-> 
-> Sascha: how do you plan on going forward with this? It seems like the driver
-> interface is pretty much done now and I expect the next round to be the last,
-> unless I forget to properly work through the TODO list again. If you are busy
-> with other stuff I can probably find some time to help with porting your
-> converted drivers.
+This looks like a very nice and clean driver, good work!
 
-I haven't done drivers/mfd/twl6030-pwm.c. This one needs a bit more work
-as it currently does not register itself as a subdriver to the twl6030
-but just uses a globally available twl_i2c_write_u8() function. So if
-you have some time to spare it would be great if you could do this.
+Very broadly speaking, I wonder whether we could use the regmap
+infrastructure for these things in the future, but I would first
+need to understand whether that is actually in the scope of regmap.
 
-> 
-> I'm also wondering which tree this will go in through. Does it make sense to
-> have an extra tree just for the PWM framework or can it go in via some other
-> general purpose tree? Who do I need to prod?
+It seems that you just need a subset of what regmap provides,
+so it could work, but it might not actually be better than what
+you have now.
 
-Good question, I don't know.
+Mark, can you comment on that?
 
-Sascha
+> +u32 anatop_get_bits(struct anatop *adata, u32 addr, int bit_shift,
+> +		    int bit_width)
+> +{
+> +	u32 val, mask;
+> +
+> +	if (bit_width == 32)
+> +		mask = ~0;
+> +	else
+> +		mask = (1 << bit_width) - 1;
+> +
+> +	val = readl(adata->ioreg + addr);
+> +	val = (val >> bit_shift) & mask;
+> +
+> +	return val;
+> +}
+> +EXPORT_SYMBOL(anatop_get_bits);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I think the exports here should be EXPORT_SYMBOL_GPL. There is no reason
+why an out of tree driver would ever use these.
+
+> +static const struct of_device_id of_anatop_subdevice_match[] = {
+> +	{ .compatible = "fsl,anatop-regulator", },
+> +	{ .compatible = "fsl,anatop-thermal", },
+> +	{ },
+> +};
+> +
+> +static int __devinit of_anatop_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	void *ioreg;
+> +	struct anatop *drvdata;
+> +
+> +	ioreg = of_iomap(np, 0);
+> +	if (!ioreg)
+> +		return -EADDRNOTAVAIL;
+> +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+> +	if (!drvdata)
+> +		return -ENOMEM;
+> +	drvdata->ioreg = ioreg;
+> +	spin_lock_init(&drvdata->reglock);
+> +	platform_set_drvdata(pdev, drvdata);
+> +	of_platform_bus_probe(np, of_anatop_subdevice_match, dev);
+> +
+> +	return 0;
+> +}
+
+Why do you list the subdevices in of_anatop_subdevice_match()? I think you
+should just use 
+
+	of_platform_bus_probe(np, of_anatop_match, dev);
+
+here, using the same match table that you have in the platform_driver.
+That will automatically create platform devices for any children of this
+device, so you don't have to update the list above when you get new
+child drivers.
+
+	Arnd
