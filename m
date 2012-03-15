@@ -1,81 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Mar 2012 15:25:05 +0000
-Subject: [PATCH 3/5] MMC: mmci: Add generic Device Tree bindings to mmci
- core code
-In-Reply-To: <CAFEEs1mQr4hDC6RuvchfWe7HNq67Eh2bPtwyWN-tukw32-V0rg@mail.gmail.com>
+Date: Thu, 15 Mar 2012 15:25:14 +0000
+Subject: [PATCH 0/5] MMC: mmci: Provide bindings for Device Tree
+In-Reply-To: <CAFEEs1kz+QT_4Yc6byS4se0EMZvqA5hp5CvLvvtNgC++AJboxA@mail.gmail.com>
 References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <1331734803-17954-4-git-send-email-lee.jones@linaro.org>
- <CAFEEs1mQr4hDC6RuvchfWe7HNq67Eh2bPtwyWN-tukw32-V0rg@mail.gmail.com>
-Message-ID: <4F6209D1.9070805@linaro.org>
+ <CAFEEs1kz+QT_4Yc6byS4se0EMZvqA5hp5CvLvvtNgC++AJboxA@mail.gmail.com>
+Message-ID: <4F6209DA.1080809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/12 15:12, Per Forlin wrote:
-> On Wed, Mar 14, 2012 at 3:20 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> This adds the necessary bindings for collection of shared
->> attributes used in the mmci driver.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>  drivers/mmc/host/mmci.c |   43 +++++++++++++++++++++++++++++++++++++++++++
->>  1 files changed, 43 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index 23b41a5..9132ca8 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
->> @@ -30,6 +30,7 @@
->>  #include <linux/dma-mapping.h>
->>  #include <linux/amba/mmci.h>
->>  #include <linux/pm_runtime.h>
->> +#include <linux/of_gpio.h>
->>
->>  #include <asm/div64.h>
->>  #include <asm/io.h>
->> @@ -1056,11 +1057,47 @@ static const struct mmc_host_ops mmci_ops = {
->>        .get_cd         = mmci_get_cd,
->>  };
->>
->> +#ifdef CONFIG_OF
->> +static void mmci_dt_populate_generic_pdata(struct device_node *np,
->> +                                       struct mmci_platform_data *pdata)
->> +{
->> +       const void *prop;
->> +       int len;
->> +
->> +       of_property_read_u32(np, "wp-gpios", &pdata->gpio_wp);
->> +       if (!pdata->gpio_wp)
->> +               pdata->gpio_wp = -1;
->> +
->> +       of_property_read_u32(np, "cd-gpios", &pdata->gpio_cd);
->> +       if (!pdata->gpio_cd)
->> +               pdata->gpio_cd = -1;
->> +
->> +       if (of_get_property(np, "cd-invert", NULL))
->> +               pdata->cd_invert = true;
->> +       else
->> +               pdata->cd_invert = false;
->> +
->> +       of_property_read_u32(np, "clock_frequency", &pdata->f_max);
->> +       if (!pdata->f_max)
->> +               pr_warning("%s has no 'clock_frequency' property\n", np->full_name);
->> +
->> +       if (of_get_property(np, "mmc_cap_4_bit_data", NULL))
-> I have no previous experience with DT. Could you please bring some
-> light on this.
-> Is it really necessary to represent each bit in the CAP with a string?
+Hi Per,
 
-No, you can use a straight integer in the DT blob, but this makes it
-much easier to read.
+> I would like to see what the minimal required change is to support DT
+> for mmci without factorization.
+> 1. Minimal change in mmci.
+> 2. Add mmci_dt.c which contains the DT-populate code.
+> 
+> The factorization could be done as step 2 I think.
+> 
+> What do you say?
 
-> To add CAP_ERASE for instance I need to change the code here and
-> update the DT, right?
+I'm wondering what the difference is as the work has already been done.
 
-That's right, but no MMCI user makes use of it, so it would just be
-unnecessary/unused code clogging up the core driver.
+It was Arnd's suggestion to separate out the two types of variants, and
+I'm quite fond of the new (fully featured) layout.
 
 Kind regards,
 Lee
+
+> On Wed, Mar 14, 2012 at 3:19 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> This patch-set splits out ux500 and ARM specific variants from mmci
+>> core code, applies generic bindings for use by all variants, then
+>> enables the ux500 variant for use with Device Tree.
+>>
+>>  Documentation/devicetree/bindings/mmc/mmci.txt |   27 +++
+>>  arch/arm/boot/dts/db8500.dtsi                  |    6 +-
+>>  arch/arm/boot/dts/snowball.dts                 |   30 +++-
+>>  arch/arm/mach-ux500/board-mop500.c             |    3 +-
+>>  drivers/mmc/host/Makefile                      |    2 +-
+>>  drivers/mmc/host/mmci-arm.c                    |   65 ++++++
+>>  drivers/mmc/host/mmci-ux500.c                  |  260 ++++++++++++++++++++++++
+>>  drivers/mmc/host/mmci.c                        |  194 +++++-------------
+>>  drivers/mmc/host/mmci.h                        |   37 ++++
+>>  9 files changed, 473 insertions(+), 151 deletions(-)
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 
 -- 
 Lee Jones
