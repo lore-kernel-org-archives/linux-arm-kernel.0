@@ -1,26 +1,41 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 15 Mar 2012 11:44:50 +0100
-Subject: Lost fixes?
-In-Reply-To: <20120315102845.GB16389@n2100.arm.linux.org.uk>
-References: <20120315102845.GB16389@n2100.arm.linux.org.uk>
-Message-ID: <20120315104450.GA20705@sortiz-mobl>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 15 Mar 2012 11:38:51 +0100
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <4F61AFAB.6080301@st.com>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <201203150948.27918.sr@denx.de> <4F61AFAB.6080301@st.com>
+Message-ID: <201203151138.51508.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 10:28:45AM +0000, Russell King - ARM Linux wrote:
-> These fixes are a collection from other people which resolve various
-> issues found with the new kautobuilder.  They're now a month old, and
-> as far as I can see, have not been merged into Linus' tree.
+On Thursday 15 March 2012 10:00:27 Viresh Kumar wrote:
+> On 3/15/2012 2:18 PM, Stefan Roese wrote:
+> >>> > > +static const struct of_device_id vic_of_match[] __initconst = {
+> >>> > > +	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
+> >>> > > +	{ /* Sentinel */ }
+> >>> > > +};
+> >>> > > +
+> >>> > > +static void __init spear6xx_dt_init_irq(void)
+> >>> > > +{
+> >>> > > +	of_irq_init(vic_of_match);
+> >>> > > +}
+> >>> > > +
+> >> > 
+> >> > What about adding this routine in vic.c file, which can then be used
+> >> > by all platforms, instead of replicating this code.
+> > 
+> > We can't move vic_of_match to the vic.c, since there are differences
+> > between the boards using it. And only moving spear6xx_dt_init_irq()
+> > (renamed of course) doesn't seem worth it.
 > 
-> What's the status of them, and when are they going to be merged?
-For the drivers/mfd/da9052-spi.c part: A patch from Axel Lin has been living
-in my for-next branch for a while now. It's a section mismatch warning fix, so
-not something I consider worth sending to Linus after the merge window is
-closed. So it's queued for the next one.
+> I knew this. Actually my thought was, we have two compatible strings for
+> vic: pl190 and pl192.
+> 
+> So, create two vic_of_match* arrays and two vic*_dt_init_irq() routines.
+> That will solve the issue i believe.
 
-Cheers,
-Samuel.
+I still don't think its worth it. But please feel free to send an add-on 
+patch, to "clean this up".
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Thanks,
+Stefan
