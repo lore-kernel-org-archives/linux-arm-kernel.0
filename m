@@ -1,41 +1,144 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 15 Mar 2012 13:08:49 +1100
-Subject: linux-next: build failure after merge of the final tree
- (arm-soc tree related)
-In-Reply-To: <20120315002020.GA16189@titan.lakedaemon.net>
-References: <20120315105901.7b10c9f4de9374a613436988@canb.auug.org.au>
- <20120315002020.GA16189@titan.lakedaemon.net>
-Message-ID: <20120315130849.9274a279aed2b10eb90d5c2f@canb.auug.org.au>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Thu, 15 Mar 2012 10:57:09 +0800
+Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
+In-Reply-To: <4F60979E.3060704@gmail.com>
+References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
+ <1331628428-24017-2-git-send-email-b29396@freescale.com>
+ <4F5F5B3F.2000303@gmail.com>
+ <20120314062354.GA8494@shlinux2.ap.freescale.net>
+ <4F60979E.3060704@gmail.com>
+Message-ID: <20120315025707.GA13022@shlinux2.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-
-On Wed, 14 Mar 2012 20:20:20 -0400 Jason Cooper <jason@lakedaemon.net> wrote:
->
-> On Thu, Mar 15, 2012 at 10:59:01AM +1100, Stephen Rothwell wrote:
-> > 
-> > After merging the final tree, today's linux-next build (powerpc
-> > allmodconfig) failed like this:
-> > 
-> > drivers/ata/sata_mv.c:4185:1: error: '__mod_of_device_table' aliased to undefined symbol 'mvsdio_dt_ids'
-> > 
-> > Caused by commit f1e1e148c5cb ("ARM: kirkwood: sata_mv: add device tree
-> > binding").
+On Wed, Mar 14, 2012 at 09:05:34PM +0800, Rob Herring wrote:
+> On 03/14/2012 01:23 AM, Dong Aisheng wrote:
+> > On Tue, Mar 13, 2012 at 09:35:43AM -0500, Rob Herring wrote:
+> >> On 03/13/2012 03:47 AM, Dong Aisheng wrote:
+> >>> From: Dong Aisheng <dong.aisheng@linaro.org>
+> >>>
+> >>> This patch includes basic dt support which can boot via nfs rootfs.
+> >>>
+> >>> Signed-off-by: Dong Aisheng <dong.aisheng@linaro.org>
+> >>> ---
+> >>>  Documentation/devicetree/bindings/arm/fsl.txt |    4 +
+> >>>  arch/arm/boot/dts/imx28-evk.dts               |   31 +++++++++
+> >>>  arch/arm/boot/dts/imx28.dtsi                  |   88 +++++++++++++++++++++++++
+> >>>  arch/arm/mach-mxs/Kconfig                     |    9 +++
+> >>>  arch/arm/mach-mxs/Makefile                    |    1 +
+> >>>  arch/arm/mach-mxs/imx28-dt.c                  |   67 +++++++++++++++++++
+> >>>  6 files changed, 200 insertions(+), 0 deletions(-)
+> > ....
+> >>> +				interrupts = <47>;
+> >>> +			};
+> >>> +		};
+> >>> +	};
+> >>> +
+> >>> +	ahb at 80080000 {
+> >>> +		compatible = "simple-bus";
+> >>> +		#address-cells = <1>;
+> >>> +		#size-cells = <1>;
+> >>> +		reg = <0x80080000 0x80000>;
+> >>> +		ranges;
+> >>> +
+> >>> +		fec at 800f0000 {
+> >>> +			compatible = "fsl,imx28-fec";
+> >>> +			reg = <0x800f0000 0x4000>;
+> >>
+> >> This too IIRC.
+> >>
+> > The size is 16KB/0x4000 in iMX28 spec. :)
 > 
-> That's my mistake.  I did a pull request for the wrong branch.  Olof,
-> could you please drop the offending branch and I'll submit a new pull
-> request once I have a chance to test Arnd's irq patch?
+> Yes, but the module only uses <4KB. You waste virtual memory space by
+> mapping all the unused area. It's not really an issue when you have
+> <512MB of RAM, but does become an issue.
+> 
+Yes, it seems an issue of spec.
+And all other places are using the same size.
+The simplest way now may be just keep align with spec first.
 
-I will revert that commit today.
+> >>> +			interrupts = <101>;
+> >>> +			status = "disabled";
+> >>> +		};
+> >>> +
+> >>> +		fec at 800f4000 {
+> >>> +			compatible = "fsl,imx28-fec";
+> >>> +			reg = <0x800f4000 0x4000>;
+> >>> +			interrupts = <102>;
+> >>> +			status = "disabled";
+> >>> +		};
+> >>> +
+> >>> +	};
+> >>> +};
+> >>> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> >>> index c57f996..6ab66af 100644
+> >>> --- a/arch/arm/mach-mxs/Kconfig
+> >>> +++ b/arch/arm/mach-mxs/Kconfig
+> >>> @@ -17,6 +17,15 @@ config SOC_IMX28
+> >>>  
+> >>>  comment "MXS platforms:"
+> >>>  
+> >>> +config MACH_IMX28_DT
+> >>
+> >> Perhaps this should be more generic like MACH_MXS_DT to eventually
+> >> support MX23 as well?
+> >>
+> > I just did like the imx ways.
+> > But yes if we see the need when do imx23 dt support.
+> > 
+> >>> +	bool "Support i.MX28 platforms from device tree"
+> >>> +	select SOC_IMX28
+> >>> +	select USE_OF
+> >>> +	select MACH_MX28EVK
+> >>
+> >> This should not be selected here.
+> >>
+> > Like other imx soc dt board files, the imx28-dt.c may need to use some bits
+> > like pinmux in mx28evk.c board file.
+> > 
+> > Yes, currently i can remove it since it is using uboot pinmux setting.
+> > But when add other devices support which is not covered in u-boot like flexcan,
+> > i may need to use non-dt board's pinmux setting.
+> > So maybe we can keep it first and remove it when totally not dependent
+> > on non-dt files.
+> 
+> Okay either way, but my vote would be add it as needed.
+> 
+Your vote is ok to me.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/f3215000/attachment.sig>
+> >>> + * The code contained herein is licensed under the GNU General Public
+> >>> + * License. You may obtain a copy of the GNU General Public License
+> >>> + * Version 2 or later at the following locations:
+> >>> + *
+> >>> + * http://www.opensource.org/licenses/gpl-license.html
+> >>> + * http://www.gnu.org/copyleft/gpl.html
+> >>> + */
+> >>> +
+> >>> +#include <linux/init.h>
+> >>> +#include <linux/irqdomain.h>
+> >>> +#include <linux/of_irq.h>
+> >>> +#include <linux/of_platform.h>
+> >>> +#include <asm/mach/arch.h>
+> >>> +#include <asm/mach/time.h>
+> >>> +#include <mach/common.h>
+> >>> +#include <mach/mx28.h>
+> >>> +
+> >>> +static const struct of_dev_auxdata imx28_auxdata_lookup[] __initconst = {
+> >>> +	OF_DEV_AUXDATA("arm,pl011", MX28_DUART_BASE_ADDR, "duart", NULL),
+> >>> +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC0_BASE_ADDR, "imx28-fec.0", NULL),
+> >>> +	OF_DEV_AUXDATA("fsl,imx28-fec", MX28_ENET_MAC1_BASE_ADDR, "imx28-fec.1", NULL),
+> >>
+> >> Why do you need the old names?
+> >>
+> > To keep align with the old clocks.
+> > See arch/arm/mach-mxs/clock-mx28.c:
+> > _REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
+> > _REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
+> > Is there any better way to avoid this?
+> 
+> Yes, you can add more clock look-ups with the DT name.
+> 
+Got it.
+
+Regards
+Dong Aisheng
