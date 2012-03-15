@@ -1,64 +1,34 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Wed, 14 Mar 2012 19:31:19 -0500
-Subject: [PATCH v2 5/8] ARM: OMAP2+: hwmod: ensure that SYSCONFIG bits are
- reprogrammed after a reset
-In-Reply-To: <20120228053657.16278.76132.stgit@dusk>
-References: <20120228053524.16278.59430.stgit@dusk>
- <20120228053657.16278.76132.stgit@dusk>
-Message-ID: <CAB-zwWhAa3PprwDLzWLkBFUHPeJO3HN3M9mAZF=ohGTvP43jYA@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 14 Mar 2012 19:42:31 -0500
+Subject: [PATCH v4 02/10] pwm: Allow chips to support multiple PWMs.
+In-Reply-To: <20120314204935.GB12334@avionic-0098.mockup.avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-3-git-send-email-thierry.reding@avionic-design.de>
+ <ADE657CA350FB648AAC2C43247A983F0020695DB57DC@AUSP01VMBX24.collaborationhost.net>
+ <20120314204935.GB12334@avionic-0098.mockup.avionic-design.de>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F0020695DB587C@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-2012/2/27 Paul Walmsley <paul@pwsan.com>:
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index db4ad41..aeb6f4c 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -1490,13 +1490,22 @@ static int _reset(struct omap_hwmod *oh)
-> ? ? ? ?pr_debug("omap_hwmod: %s: resetting\n", oh->name);
+On Wednesday, March 14, 2012 1:50 PM, Thierry Reding wrote:
+> * H Hartley Sweeten wrote:
+>> On Wednesday, March 14, 2012 8:56 AM, Thierry Reding wrote:
+> [...]
+>>> +#ifdef CONFIG_DEBUG_FS
+>>> +	void			(*dbg_show)(struct pwm_chip *chip,
+>>> +					    struct seq_file *s);
+>>> +#endif
+>> 
+>> This doesn't compile...
+>> 
+>> include/linux/pwm.h:87: warning: 'struct seq_file' declared inside parameter list
+>> include/linux/pwm.h:87: warning: its scope is only this definition or declaration, which is probably not what you want
 >
-> ? ? ? ?if (oh->class->reset)
-> - ? ? ? ? ? ? ? return oh->class->reset(oh);
-> -
-> - ? ? ? if (!oh->rst_lines_cnt)
-> - ? ? ? ? ? ? ? return _ocp_softreset(oh);
-> + ? ? ? ? ? ? ? oh->class->reset(oh);
-> + ? ? ? else if (!oh->rst_lines_cnt)
-> + ? ? ? ? ? ? ? _ocp_softreset(oh);
-> + ? ? ? else
-> + ? ? ? ? ? ? ? for (i = 0; i < oh->rst_lines_cnt; i++)
-> + ? ? ? ? ? ? ? ? ? ? ? _assert_hardreset(oh, oh->rst_lines[i].name);
+> Okay, pwm.h probably needs a seq_file.h include. Thanks for noticing.
 
-If we reached here the reset lines will be asserted, and then the code
-below touches sysc registers on a module under reset.
+Or just a:
 
-This would crash on _setup->_setup_reset->_reset.
+struct seq_file;
 
-Adding a 'return 0' I believe fixes the behavior, boots the board and
-leaves the hwmod under reset.
-
--	else
-+	} else {
- 		for (i = 0; i < oh->rst_lines_cnt; i++)
- 			_assert_hardreset(oh, oh->rst_lines[i].name);
-+		return 0;
-+	}
-
->
-> - ? ? ? for (i = 0; i < oh->rst_lines_cnt; i++)
-> - ? ? ? ? ? ? ? _assert_hardreset(oh, oh->rst_lines[i].name);
-> + ? ? ? /*
-> + ? ? ? ?* OCP_SYSCONFIG bits need to be reprogrammed after a
-> + ? ? ? ?* softreset. ?The _enable() function should be split to avoid
-> + ? ? ? ?* the rewrite of the OCP_SYSCONFIG register.
-> + ? ? ? ?*/
-> + ? ? ? if (oh->class->sysc) {
-> + ? ? ? ? ? ? ? _update_sysc_cache(oh);
-> + ? ? ? ? ? ? ? _enable_sysc(oh);
-> + ? ? ? }
-
-Best Regards,
-
-Omar
+Regards,
+Hartley
