@@ -1,83 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 15 Mar 2012 03:54:54 -0600
-Subject: [PATCH v4] of: introduce helper to manage boolean
-In-Reply-To: <1331660903-10193-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1331660903-10193-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20120315095454.9294E3E08CB@localhost>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 15 Mar 2012 07:25:20 -0700
+Subject: [GIT PULL] Samsung EXYNOS5250 GPIO for v3.4
+Message-ID: <4F61FBD0.4040904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Mar 2012 18:48:23 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> of_property_read_bool
-> 
-> Search for a property in a device node.
-> Returns true if the property exist false otherwise.
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Hi Arnd, Olof,
 
-One comment below; but otherwise:
+Please pull EXYNOS5250 gpio for v3.4.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/soc-exynos5250-gpio
 
-Feel free to merge via whatever tree needs it.
+It is including add support GPIOlib for EXYNOS5250 and Grant Likely 
+already agreed to send this via arm-soc for v3.4. Actually, this is 
+needed for compilation of EXYNOS5250 arch. As a note, this has no 
+dependency with others for merging.
 
-g.
+If any problems, please let me know.
 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
-> v4:
-> 
-> 	send the right version
-> 
-> 	include Grant comment
-> 
-> 	Grant can I get the go please?
-> 
-> Best Regards,
-> J.
->  include/linux/of.h |   16 ++++++++++++++++
->  1 files changed, 16 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index a75a831..a992cdf 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -342,6 +342,22 @@ static inline int of_machine_is_compatible(const char *compat)
->  #define of_match_node(_matches, _node)	NULL
->  #endif /* CONFIG_OF */
->  
-> +/**
-> + * of_property_read_bool - Findfrom a property
-> + * @np:		device node from which the property value is to be read.
-> + * @propname:	name of the property to be searched.
-> + *
-> + * Search for a property in a device node.
-> + * Returns true if the property exist false otherwise.
-> + */
-> +static inline bool of_property_read_bool(const struct device_node *np,
-> +					 const char *propname)
-> +{
-> +	struct property *prop = of_find_property(np, propname, NULL);
-> +
-> +	return prop ? true : false;
-> +}
+Thanks.
 
-Could simply be:
-{
-	return of_find_property(...) != NULL;
-}
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
+The following changes since commit fde7d9049e55ab85a390be7f415d74c9f62dd0f9:
 
-> +
->  static inline int of_property_read_u32(const struct device_node *np,
->  				       const char *propname,
->  				       u32 *out_value)
-> -- 
-> 1.7.7
-> 
+   Linux 3.3-rc7 (2012-03-10 13:49:52 -0800)
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies,Ltd.
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+next/soc-exynos5250-gpio
+
+Sangsu Park (3):
+       ARM: EXYNOS: add support GPIO for EXYNOS5250
+       gpio/samsung: add support GPIOlib for EXYNOS5250
+       gpio/samsung: use ioremap() for EXYNOS4 GPIOlib
+
+  arch/arm/mach-exynos/common.c            |   15 -
+  arch/arm/mach-exynos/include/mach/gpio.h |  239 ++++++++++++---
+  arch/arm/mach-exynos/include/mach/map.h  |    4 +
+  drivers/gpio/gpio-samsung.c              |  487 
++++++++++++++++++++++++++++---
+  4 files changed, 637 insertions(+), 108 deletions(-)
