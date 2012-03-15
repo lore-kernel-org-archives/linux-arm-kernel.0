@@ -1,154 +1,127 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 08:40:42 +0000
-Subject: [PATCH v4 03/10] pwm: Add device tree support
-In-Reply-To: <1331740593-10807-4-git-send-email-thierry.reding@avionic-design.de>
-References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
- <1331740593-10807-4-git-send-email-thierry.reding@avionic-design.de>
-Message-ID: <201203150840.42659.arnd@arndb.de>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 15 Mar 2012 09:41:02 +0100
+Subject: [PATCH v2] ARM: SPEAr600: Add device-tree support to SPEAr600
+ boards
+In-Reply-To: <4F61A62A.3040501@st.com>
+References: <1331737232-25477-1-git-send-email-sr@denx.de>
+ <4F61A62A.3040501@st.com>
+Message-ID: <201203150941.02822.sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 March 2012, Thierry Reding wrote:
-> This patch adds helpers to support device tree bindings for the generic
-> PWM API. Device tree binding documentation for PWM controllers is also
-> provided.
+Hi Viresh,
+
+On Thursday 15 March 2012 09:19:54 Viresh Kumar wrote:
+> Hi Stefan,
 > 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
-> Changes in v4:
->   - add OF-specific code removed from patch 2
->   - make of_node_to_pwmchip() and of_pwm_simple_xlate() static
->   - rename of_get_named_pwm() to of_pwm_request(), return a struct
->     pwm_device, get rid of the now unused spec parameter and use the
->     device_node.name field as the PWM's name
->   - return a requested struct pwm_device from pwm_chip.of_xlate and
->     drop the now unused spec parameter
->   - move OF support code into drivers/pwm/core.c
->   - used deferred probing if a PWM chip is not available yet
+> Thanks for your patch. :)
+
+You are welcome. :)
+ 
+> I have looked carefully at the patch, regarding addresses and irq numbers,
+> and they look fine. Just few minor comments below:
 > 
-> Changes in v2:
->   - add device tree binding documentation
->   - add of_xlate to parse controller-specific PWM-specifier
+> On 3/14/2012 8:30 PM, Stefan Roese wrote:
+> > diff --git a/arch/arm/boot/dts/spear600.dtsi
+> > b/arch/arm/boot/dts/spear600.dtsi
+> > 
+> > +       soc {
+> > +               #address-cells = <1>;
+> > +               #size-cells = <1>;
+> > +               compatible = "simple-bus";
+> > +               ranges;
+> > +
+> > 
+> > +
+> > +               gmac0: ethernet at e0800000 {
+> 
+> There is no gmac1, so can name it gmac only.
 
-Looks very cool now, and much simpler!
+I have no strong preference here. Not sure, what the common practice is. But I 
+can remove the numbers on those single instance devices.
+ 
+> > +                       compatible = "st,spear600-gmac";
+> > +                       reg = <0xe0800000 0x8000>;
+> > +                       interrupt-parent = <&vic1>;
+> > +                       interrupts = <24 23>;
+> > +                       interrupt-names = "macirq", "eth_wake_irq";
+> > +                       mac-address = [000000000000]; /* Filled in by
+> > U-Boot */ +               };
+> > +
+> > 
+> > +               fsmc0: flash at d1800000 {
+> 
+> same.
+> 
+> > +                       status = "disabled";
+> > +                       compatible = "st,spear600-fsmc-nand";
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <1>;
+> > +                       reg = <0xd1800000 0x1000        /* FSMC Register
+> > */ +                              0xd2000000 0x4000>;      /* NAND Base
+> > */ +                       reg-names = "fsmc_regs", "nand_data";
+> > +               };
+> > +
+> > +               smi0: flash at fc000000 {
+> 
+> same
+> 
+> > +                       status = "disabled";
+> > +                       compatible = "st,spear600-smi";
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <1>;
+> > +                       reg = <0xfc000000 0x1000>;
+> > +                       interrupt-parent = <&vic1>;
+> > +                       interrupts = <12>;
+> > +               };
+> > +
+> > 
+> > diff --git a/arch/arm/mach-spear6xx/spear600_evb.c
+> > b/arch/arm/mach-spear6xx/spear600_evb.c index c6e4254..c4949aa 100644
+> > --- a/arch/arm/mach-spear6xx/spear600_evb.c
+> > +++ b/arch/arm/mach-spear6xx/spear600_evb.c
+> > @@ -32,9 +32,6 @@ static void __init spear600_evb_init(void)
+> > 
+> >  {
+> >  
+> >         unsigned int i;
+> 
+> Why don't we remove the devices from arrays above, which are now
+> supported by DT?
 
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index 6ea51dc..d47b8ee 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -57,6 +57,12 @@ config OF_GPIO
->  	help
->  	  OpenFirmware GPIO accessors
->  
-> +config OF_PWM
-> +	def_bool y
-> +	depends on PWM
-> +	help
-> +	  OpenFirmware PWM accessors
-> +
->  config OF_I2C
->  	def_tristate I2C
->  	depends on I2C && !SPARC
+This is the non-DT file (spear600_evb.c). I wanted to preserve it, so that it 
+still can be built. But thinking a bit more about it, the current mainline 
+SPEAr600 port only supports UART and GPIO as peripheral devices. And this 
+SPEAr600 DT patch also supports those and even more devices.
 
-You might want to remove this one now and just use CONFIG_OF in the driver,
-unless there is  a reason to keep it here.
+So why don't we make an even bigger "cut", and remove the non-DT SPEAr600 
+files/data completely now? If you give me your ACK on this, I'll squash this 
+into my patch as well, resulting in a nice diffstat. ;)
+ 
+> > -       /* call spear600 machine init function */
+> > -       spear600_init();
+> > -
+> > 
+> >         /* Add Platform Devices */
+> >         platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+> > 
+> > diff --git a/arch/arm/mach-spear6xx/spear6xx.c
+> > b/arch/arm/mach-spear6xx/spear6xx.c
+> > 
+> > +static const struct of_device_id vic_of_match[] __initconst = {
+> > +       { .compatible = "arm,pl190-vic", .data = vic_of_init, },
+> > +       { /* Sentinel */ }
+> > +};
+> > +
+> > +static void __init spear6xx_dt_init_irq(void)
+> > +{
+> > +       of_irq_init(vic_of_match);
+> > +}
+> > +
+> 
+> Did you checked this out?
 
-> +#ifdef CONFIG_OF_PWM
-> +static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-> +{
-> +	struct pwm_chip *chip;
-> +
-> +	mutex_lock(&pwm_lock);
-> +
-> +	list_for_each_entry(chip, &pwm_chips, list)
-> +		if (chip->dev && chip->dev->of_node == np) {
-> +			mutex_unlock(&pwm_lock);
-> +			return chip;
-> +		}
-> +
-> +	mutex_unlock(&pwm_lock);
-> +
-> +	return ERR_PTR(-EPROBE_DEFER);
-> +}
+Not yet. Sorry, I missed it. Will check now...
 
-EPROBE_DEFER doesn't exist yet in my kernel, and I wonder if it's actually
-safe to be used this way, because it can result in arbitrary drivers using
-this to be put on the defered probe list. It certainly sounds like the
-right thing to do in the long run though.
-
-> +#else
-> +static inline void of_pwmchip_add(struct pwm_chip *pc)
-> +{
-> +}
-> +
-> +static inline void of_pwmchip_remove(struct pwm_chip *pc)
-> +{
-> +}
-> +#endif /* CONFIG_OF_PWM */
-> +
->  /**
->   * pwm_set_chip_data - set private chip data for a PWM
->   * @pwm: PWM device
-> @@ -184,6 +254,7 @@ int pwmchip_add(struct pwm_chip *chip)
->  
->  	INIT_LIST_HEAD(&chip->list);
->  	list_add(&chip->list, &pwm_chips);
-> +	of_pwmchip_add(chip);
->  
->  out:
->  	mutex_unlock(&pwm_lock);
-
-You could express the same thing using 
-
-	if (IS_ENABLED(CONFIG_OF_PWM))
-		of_pwmchip_add(chip);
-
-The advantage of this is that you always get compile coverage for the
-entire file, but the function is automatically discarded by the
-compiler when the condition is false at compile time. That obviously
-doesn't work for exported functions.
-
-> +#ifdef CONFIG_OF
-> +/**
-> + * of_pwm_request() - request a PWM via the PWM framework
-> + * @np: device node to get the PWM from
-> + * @propname: property name containing PWM specifier(s)
-> + * @index: index of the PWM
-> + *
-> + * Returns the PWM device parsed from the phandle specified in the given
-> + * property of a device tree node or NULL on failure. Values parsed from
-> + * the device tree are stored in the returned PWM device object.
-> + */
-> +struct pwm_device *of_pwm_request(struct device_node *np,
-> +				  const char *propname, int index)
-> +{
-> +	struct pwm_device *pwm = NULL;
-> +	struct of_phandle_args args;
-> +	struct pwm_chip *pc;
-> +	int err;
-> +
-> +	err = of_parse_phandle_with_args(np, propname, "#pwm-cells", index,
-> +					 &args);
-
-Wow, I just looked up what of_parse_phandle_with_args() does and that is
-extremely helpful indeed.
-
->  /*
-> @@ -102,6 +104,12 @@ struct pwm_chip {
->  	unsigned int		npwm;
->  
->  	struct pwm_device	*pwms;
-> +
-> +#ifdef CONFIG_OF_PWM
-> +	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
-> +					    const struct of_phandle_args *args);
-> +	unsigned int		of_pwm_n_cells;
-> +#endif
->  };
->  
->  int pwm_set_chip_data(struct pwm_device *pwm, void *data);
-
-If you use IS_ENABLED() as I suggested above, this #ifdef will have to go
-away, too, which is a very small size overhead.
-
-	Arnd
+Thanks,
+Stefan
