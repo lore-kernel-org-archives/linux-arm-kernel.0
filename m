@@ -1,23 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Mar 2012 17:54:43 +0000
-Subject: [PATCH 2/5] MMC: mmci: Seperate ARM variants from generic code
-In-Reply-To: <201203151746.56678.arnd@arndb.de>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <4F622884.6060807@linaro.org> <20120315173714.GF15988@n2100.arm.linux.org.uk>
- <201203151746.56678.arnd@arndb.de>
-Message-ID: <20120315175443.GG15988@n2100.arm.linux.org.uk>
+From: kumarrav@codeaurora.org (Ravi Kumar V)
+Date: Thu, 15 Mar 2012 23:27:51 +0530
+Subject: [PATCH v3 2/2] DMAEngine: Add DMAEngine driver based on old MSM
+ DMA APIs
+In-Reply-To: <CAPDArRLs23VDJSWpX8xJsXfn+_SV2FcyzLYBF9UAxf=Rv9svGQ@mail.gmail.com>
+References: <1331548364-27845-1-git-send-email-kumarrav@codeaurora.org>
+ <20120312201421.GA3459@fifo99.com>
+ <CAPDArRLs23VDJSWpX8xJsXfn+_SV2FcyzLYBF9UAxf=Rv9svGQ@mail.gmail.com>
+Message-ID: <4F622D9F.1070101@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 05:46:56PM +0000, Arnd Bergmann wrote:
-> Can you elaborate? I suggested the split in order to keep the ux500
-> specific parts local to one file. With the device tree conversion,
-> we really want to have them out of the platform code, but sticking them
-> into the main driver seems wrong, too.
+On 3/13/2012 4:27 PM, Shantanu Gupta wrote:
+> Any info available(publicly) on so as to what all chipsets have this
+> capability ?
 
-You're talking about the data structures which describe what quirks to
-apply for the ux500 parts, rather than the actual quirks themselves.
-That's not a particularly clever thing to do because it separates out
-the selection of the works from the rest of the driver, which means
-simply searching for the flags to find out what's applied for what has
-to span several files.
+This is DMA engine driver for "Application Data Mover(ADM)" which in one 
+type of DMA device in most of the Qualcomm processors like snapdragon.
+
+>
+> On Tue, Mar 13, 2012 at 1:44 AM, Daniel Walker <dwalker@fifo99.com
+> <mailto:dwalker@fifo99.com>> wrote:
+>
+>     On Mon, Mar 12, 2012 at 04:02:44PM +0530, Ravi Kumar V wrote:
+>      > Add DMAEngine based driver using the old MSM DMA APIs internally.s
+>
+>     What do you mean by this?
+>
+>      > The benefit of this approach is that not all the drivers
+>      > have to get converted to DMAEngine APIs simultaneosly while
+>      > both the drivers can stay enabled in the kernel. The client
+>      > drivers using the old MSM APIs directly can now convert to
+>      > DMAEngine one by one.
+>
+>     Which drivers?
+>
+>     Daniel
+>     --
+>     To unsubscribe from this list: send the line "unsubscribe
+>     linux-arm-msm" in
+>     the body of a message to majordomo at vger.kernel.org
+>     <mailto:majordomo@vger.kernel.org>
+>     More majordomo info at http://vger.kernel.org/majordomo-info.html
+>
+>
+
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
