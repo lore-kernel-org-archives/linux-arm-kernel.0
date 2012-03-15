@@ -1,40 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Mar 2012 09:26:52 +0000
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <201203150922.06379.arnd@arndb.de>
-References: <4F22DEF2.5000807@ti.com>
- <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
- <201203150922.06379.arnd@arndb.de>
-Message-ID: <20120315092652.GA16389@n2100.arm.linux.org.uk>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 15 Mar 2012 14:30:27 +0530
+Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
+In-Reply-To: <201203150948.27918.sr@denx.de>
+References: <1331650032-15274-1-git-send-email-sr@denx.de>
+ <4F604321.9000204@st.com> <201203150948.27918.sr@denx.de>
+Message-ID: <4F61AFAB.6080301@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 09:22:06AM +0000, Arnd Bergmann wrote:
-> On Thursday 15 March 2012, Nicolas Ferre wrote:
-> > Add some basic helpers to retrieve a DMA controller device_node and the
-> > DMA request specifications. By making DMA controllers register a generic
-> > translation function, we allow the management of any type of DMA requests
-> > specification.
-> > The void * output of an of_dma_xlate() function that will be implemented
-> > by the DMA controller can carry any type of "dma-request" argument.
-> > 
-> > The DMA client will search its associated DMA controller in the list and
-> > call the registered of_dam_xlate() function to retrieve the request values.
-> > 
-> > One simple xlate function is provided for the "single number" type of
-> > request binding.
-> > 
-> > This implementation is independent from dmaengine so it can also be used
-> > by legacy drivers.
-> > 
-> > For legacy reason another API will export the DMA request number into a
-> > Linux resource of type IORESOURCE_DMA.
-> 
-> This looks very good. I missed the first version of this patch, but was
-> thinking of very similar bindings.
+On 3/15/2012 2:18 PM, Stefan Roese wrote:
+>>> > > +static const struct of_device_id vic_of_match[] __initconst = {
+>>> > > +	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
+>>> > > +	{ /* Sentinel */ }
+>>> > > +};
+>>> > > +
+>>> > > +static void __init spear6xx_dt_init_irq(void)
+>>> > > +{
+>>> > > +	of_irq_init(vic_of_match);
+>>> > > +}
+>>> > > +
+>> > 
+>> > What about adding this routine in vic.c file, which can then be used
+>> > by all platforms, instead of replicating this code.
+> We can't move vic_of_match to the vic.c, since there are differences between 
+> the boards using it. And only moving spear6xx_dt_init_irq() (renamed of 
+> course) doesn't seem worth it.
 
-There's one issue which is concerning me - when we switch OMAP to use
-DMA engine, it won't use numeric stuff anymore but the DMA engine way
-of requesting a channel (match function + data).
+I knew this. Actually my thought was, we have two compatible strings for vic:
+pl190 and pl192.
 
-How does that fit into this scheme?
+So, create two vic_of_match* arrays and two vic*_dt_init_irq() routines.
+That will solve the issue i believe.
+
+-- 
+viresh
