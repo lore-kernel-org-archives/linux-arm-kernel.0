@@ -1,25 +1,110 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 15 Mar 2012 17:34:04 -0600 (MDT)
-Subject: [PATCH 1/2] ARM: OMAP: powerdomain: Wait for powerdomain
- transition in pwrdm_state_switch()
-In-Reply-To: <20120315232256.GC7276@atomide.com>
-References: <1331562873-29535-1-git-send-email-santosh.shilimkar@ti.com>
- <1331562873-29535-2-git-send-email-santosh.shilimkar@ti.com>
- <alpine.DEB.2.00.1203151129160.26218@utopia.booyaka.com>
- <20120315175122.GB7276@atomide.com>
- <alpine.DEB.2.00.1203151701290.2133@utopia.booyaka.com>
- <20120315232256.GC7276@atomide.com>
-Message-ID: <alpine.DEB.2.00.1203151733360.5007@utopia.booyaka.com>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 15 Mar 2012 16:37:19 -0700
+Subject: [PATCHv2 0/5] coupled cpuidle state support
+In-Reply-To: <1331749794-8056-1-git-send-email-ccross@android.com>
+References: <1331749794-8056-1-git-send-email-ccross@android.com>
+Message-ID: <CAMbhsRQAw2+as13NVvWkh7ojyRs+jNpFist2gmiiEY52U=o84A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Mar 2012, Tony Lindgren wrote:
+On Wed, Mar 14, 2012 at 11:29 AM, Colin Cross <ccross@android.com> wrote:
+> On some ARM SMP SoCs (OMAP4460, Tegra 2, and probably more), the
+> cpus cannot be independently powered down, either due to
+> sequencing restrictions (on Tegra 2, cpu 0 must be the last to
+> power down), or due to HW bugs (on OMAP4460, a cpu powering up
+> will corrupt the gic state unless the other cpu runs a work
+> around). ?Each cpu has a power state that it can enter without
+> coordinating with the other cpu (usually Wait For Interrupt, or
+> WFI), and one or more "coupled" power states that affect blocks
+> shared between the cpus (L2 cache, interrupt controller, and
+> sometimes the whole SoC). ?Entering a coupled power state must
+> be tightly controlled on both cpus.
+>
+> The easiest solution to implementing coupled cpu power states is
+> to hotplug all but one cpu whenever possible, usually using a
+> cpufreq governor that looks at cpu load to determine when to
+> enable the secondary cpus. ?This causes problems, as hotplug is an
+> expensive operation, so the number of hotplug transitions must be
+> minimized, leading to very slow response to loads, often on the
+> order of seconds.
+>
+> This patch series implements an alternative solution, where each
+> cpu will wait in the WFI state until all cpus are ready to enter
+> a coupled state, at which point the coupled state function will
+> be called on all cpus at approximately the same time.
+>
+> Once all cpus are ready to enter idle, they are woken by an smp
+> cross call. ?At this point, there is a chance that one of the
+> cpus will find work to do, and choose not to enter suspend. ?A
+> final pass is needed to guarantee that all cpus will call the
+> power state enter function at the same time. ?During this pass,
+> each cpu will increment the ready counter, and continue once the
+> ready counter matches the number of online coupled cpus. ?If any
+> cpu exits idle, the other cpus will decrement their counter and
+> retry.
+>
+> To use coupled cpuidle states, a cpuidle driver must:
+>
+> ? Set struct cpuidle_device.coupled_cpus to the mask of all
+> ? coupled cpus, usually the same as cpu_possible_mask if all cpus
+> ? are part of the same cluster. ?The coupled_cpus mask must be
+> ? set in the struct cpuidle_device for each cpu.
+>
+> ? Set struct cpuidle_device.safe_state to a state that is not a
+> ? coupled state. ?This is usually WFI.
+>
+> ? Set CPUIDLE_FLAG_COUPLED in struct cpuidle_state.flags for each
+> ? state that affects multiple cpus.
+>
+> ? Provide a struct cpuidle_state.enter function for each state
+> ? that affects multiple cpus. ?This function is guaranteed to be
+> ? called on all cpus at approximately the same time. ?The driver
+> ? should ensure that the cpus all abort together if any cpu tries
+> ? to abort once the function is called.
+>
+> This series has been tested by implementing a test cpuidle state
+> that uses the parallel barrier helper function to verify that
+> all cpus call the function at the same time.
+>
+> This patch set has a few disadvantages over the hotplug governor,
+> but I think they are all fairly minor:
+> ? * Worst-case interrupt latency can be increased. ?If one cpu
+> ? ? receives an interrupt while the other is spinning in the
+> ? ? ready_count loop, the second cpu will be stuck with
+> ? ? interrupts off until the first cpu finished processing
+> ? ? its interrupt and exits idle. ?This will increase the worst
+> ? ? case interrupt latency by the worst-case interrupt processing
+> ? ? time, but should be very rare.
+> ? * Interrupts are processed while still inside pm_idle.
+> ? ? Normally, interrupts are only processed at the very end of
+> ? ? pm_idle, just before it returns to the idle loop. ?Coupled
+> ? ? states requires processing interrupts inside
+> ? ? cpuidle_enter_state_coupled in order to distinguish between
+> ? ? the smp_cross_call from another cpu that is now idle and an
+> ? ? interrupt that should cause idle to exit.
+> ? ? I don't see a way to fix this without either being able to
+> ? ? read the next pending irq from the interrupt chip, or
+> ? ? querying the irq core for which interrupts were processed.
+> ? * Since interrupts are processed inside cpuidle, the next
+> ? ? timer event could change. ?The new timer event will be
+> ? ? handled correctly, but the idle state decision made by
+> ? ? the governor will be out of date, and will not be revisited.
+> ? ? The governor select function could be called again every time,
+> ? ? but this could lead to a lot of work being done by an idle
+> ? ? cpu if the other cpu was mostly busy.
+>
+> v2:
+> ? * removed the coupled lock, replacing it with atomic counters
+> ? * added a check for outstanding pokes before beginning the
+> ? ? final transition to avoid extra wakeups
+> ? * made the cpuidle_coupled struct completely private
+> ? * fixed kerneldoc comment formatting
+> ? * added a patch with a helper function for resynchronizing
+> ? ? cpus after aborting idle
+> ? * added a patch (not for merging) to add trace events for
+> ? ? verification and performance testing
 
-> It seems that I need this patch plus need to undo the wrong
-> serial muxing in commit 7496ba30 (ARM: OMAP2+: UART: Add default mux
-> for all uarts) to make my zoom3 boot reliably.
-
-Okay.  Well want to take the powerdomain patch for the v3.3-rc series 
-then?
-
-- Paul
+I forgot to mention, this patch series is on v3.3-rc7, and will
+conflict with the cpuidle timekeeping patches.  If those go in first
+(which is likely), I will rework this series on top of it.  I left it
+on v3.3-rc7 now to make testing easier.
