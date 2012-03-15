@@ -1,53 +1,62 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 15 Mar 2012 07:53:29 +0100
-Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
-In-Reply-To: <20120315030206.GB13022@shlinux2.ap.freescale.net>
-References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
- <1331628428-24017-2-git-send-email-b29396@freescale.com>
- <20120313172351.97C5E3E053B@localhost>
- <20120314124512.GG1180@shlinux2.ap.freescale.net>
- <20120314141643.GP3852@pengutronix.de>
- <20120315030206.GB13022@shlinux2.ap.freescale.net>
-Message-ID: <20321.37353.63115.664975@ipc1.ka-ro>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 15 Mar 2012 18:06:23 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20120315180623.ba48c5a9765ac8e4a0a17c41@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-Dong Aisheng writes:
-> On Wed, Mar 14, 2012 at 10:16:43PM +0800, s.hauer at pengutronix.de wrote:
-> > On Wed, Mar 14, 2012 at 08:45:23PM +0800, Dong Aisheng wrote:
-> > > On Wed, Mar 14, 2012 at 01:23:51AM +0800, Grant Likely wrote:
-[...]
-> > > But it seems this needs pass mac address to fec driver via platforom data which is
-> > > not friendly to dt.
-> > > 
-> > > Another way may be changing fec driver to get the fixed part of mac address(first
-> > > two bytes) from device tree and read the left dynamical part from otp which i'm not
-> > > sure is better enough.
-> > > 
-> > > BTW, filling with zeros seems not work since it's invalid mac address.
-> > 
-> > Yes, that's the idea of using this value...
-> > 
-> But comparing to use an invalid value, why not just do not define that
-> local-mac-address property?
-> 
-Because a MAC address is by definition a GLOBALLY UNIQUE IDENTIFIER
-which is contrary to coding a "valid" default value for it somewhere!
-The owner of a certain MAC address range (OUI) is responsible for
-ensuring the uniqueness. Thus only they may assign a specific MAC
-address to a specific device.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-shmobile/setup-sh7367.c between commit 250a27237e0e ("ARM:
+shmobile: remove NR_IRQS") from the arm tree and commit 237caf9e6b0c
+("ARM: mach-shmobile: sh7367 map_io and init_early update") from the
+arm-soc tree.
 
-
-Lothar Wa?mann
+Just context changes.  I fixed it up (see below) and can carry the fix as
+necessary.
 -- 
-___________________________________________________________
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+diff --cc arch/arm/mach-shmobile/setup-sh7367.c
+index 8e848198,a51e1a1..0000000
+--- a/arch/arm/mach-shmobile/setup-sh7367.c
++++ b/arch/arm/mach-shmobile/setup-sh7367.c
+@@@ -29,9 -29,28 +29,29 @@@
+  #include <linux/serial_sci.h>
+  #include <linux/sh_timer.h>
+  #include <mach/hardware.h>
+ +#include <mach/irqs.h>
++ #include <mach/common.h>
+  #include <asm/mach-types.h>
+  #include <asm/mach/arch.h>
++ #include <asm/mach/map.h>
++ #include <asm/mach/time.h>
++ 
++ static struct map_desc sh7367_io_desc[] __initdata = {
++ 	/* create a 1:1 entity map for 0xe6xxxxxx
++ 	 * used by CPGA, INTC and PFC.
++ 	 */
++ 	{
++ 		.virtual	= 0xe6000000,
++ 		.pfn		= __phys_to_pfn(0xe6000000),
++ 		.length		= 256 << 20,
++ 		.type		= MT_DEVICE_NONSHARED
++ 	},
++ };
++ 
++ void __init sh7367_map_io(void)
++ {
++ 	iotable_init(sh7367_io_desc, ARRAY_SIZE(sh7367_io_desc));
++ }
+  
+  /* SCIFA0 */
+  static struct plat_sci_port scif0_platform_data = {
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/32f13eae/attachment-0001.sig>
