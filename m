@@ -1,75 +1,66 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 15 Mar 2012 17:56:28 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20120315175628.ca8afd4482712e1043212416@canb.auug.org.au>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 15 Mar 2012 07:56:31 +0100
+Subject: [PATCH v4 09/10] pwm: Add PXA support
+In-Reply-To: <4F61343A.80103@gmail.com>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-10-git-send-email-thierry.reding@avionic-design.de>
+ <4F61343A.80103@gmail.com>
+Message-ID: <20120315065631.GB20502@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+* Ryan Mallon wrote:
+> On 15/03/12 02:56, Thierry Reding wrote:
+> 
+> > Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> > ---
+> > Changes in v3:
+> >   - update PWM ops for changes in patch 2
+> 
+> Couple of quick notes, mostly for future work.
+> 
+> > +	/* NOTE: the clock to PWM has to be enabled first
+> > +	 * before writing to the registers
+> > +	 */
+> > +	clk_enable(pc->clk);
+> 
+> 
+> Should be fixed to also call clk_prepare (and clk_unprepare after
+> clk_disable). Could be done in a follow up patch.
+> 
+> > +	__raw_writel(prescale, pc->mmio_base + offset + PWMCR);
+> > +	__raw_writel(dc, pc->mmio_base + offset + PWMDCR);
+> > +	__raw_writel(pv, pc->mmio_base + offset + PWMPCR);
+> 
+> 
+> Should we fix this driver to use readl/writel instead of the __raw
+> variants? The memory is properly ioremaped, and to my understanding the
+> __raw memory accessors should be avoided outside of core code. This
+> could be done in a follow up patch if you want to keep this patch as
+> mostly just a move of the code.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-shmobile/setup-r8a7740.c between commit 250a27237e0e ("ARM:
-shmobile: remove NR_IRQS") from the arm tree and commit d3ab7221489f
-("ARM: mach-shmobile: r8a7740 map_io and init_early update") from the
-arm-soc tree.
+Actually I wasn't planning on keeping this patch at all. Sascha already has
+the existing PWM providers converted to his original framework and offered to
+rebase them onto this series once the dust settles. I only used them as
+testbed to see how the driver interface works out for different hardware. But
+I also think that if Sascha hasn't cleaned the driver up yet it should either
+be done in his conversion patches or as follow ups.
 
-Just context changes.  I fixed it up (see below) and can carry the fix as
-necessary.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Sascha: how do you plan on going forward with this? It seems like the driver
+interface is pretty much done now and I expect the next round to be the last,
+unless I forget to properly work through the TODO list again. If you are busy
+with other stuff I can probably find some time to help with porting your
+converted drivers.
 
-diff --cc arch/arm/mach-shmobile/setup-r8a7740.c
-index fa15d81,74e5234..0000000
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@@ -25,9 -25,41 +25,42 @@@
-  #include <linux/serial_sci.h>
-  #include <linux/sh_timer.h>
-  #include <mach/r8a7740.h>
- +#include <mach/irqs.h>
-+ #include <mach/common.h>
-  #include <asm/mach-types.h>
-+ #include <asm/mach/map.h>
-  #include <asm/mach/arch.h>
-+ #include <asm/mach/time.h>
-+ 
-+ static struct map_desc r8a7740_io_desc[] __initdata = {
-+ 	 /*
-+ 	  * for CPGA/INTC/PFC
-+ 	  * 0xe6000000-0xefffffff -> 0xe6000000-0xefffffff
-+ 	  */
-+ 	{
-+ 		.virtual	= 0xe6000000,
-+ 		.pfn		= __phys_to_pfn(0xe6000000),
-+ 		.length		= 160 << 20,
-+ 		.type		= MT_DEVICE_NONSHARED
-+ 	},
-+ #ifdef CONFIG_CACHE_L2X0
-+ 	/*
-+ 	 * for l2x0_init()
-+ 	 * 0xf0100000-0xf0101000 -> 0xf0002000-0xf0003000
-+ 	 */
-+ 	{
-+ 		.virtual	= 0xf0002000,
-+ 		.pfn		= __phys_to_pfn(0xf0100000),
-+ 		.length		= PAGE_SIZE,
-+ 		.type		= MT_DEVICE_NONSHARED
-+ 	},
-+ #endif
-+ };
-+ 
-+ void __init r8a7740_map_io(void)
-+ {
-+ 	iotable_init(r8a7740_io_desc, ARRAY_SIZE(r8a7740_io_desc));
-+ }
-  
-  /* SCIFA0 */
-  static struct plat_sci_port scif0_platform_data = {
+I'm also wondering which tree this will go in through. Does it make sense to
+have an extra tree just for the PWM framework or can it go in via some other
+general purpose tree? Who do I need to prod?
+
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
-Size: 836 bytes
+Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/d0bcf050/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/b37c86ec/attachment.sig>
