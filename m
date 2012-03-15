@@ -1,55 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Mar 2012 09:59:33 -0700
-Subject: [PATCH 4/6] ARM: OMAP: fix missing __devexit_p() annotations
-In-Reply-To: <CAORVsuUVC4hpotK=eybA=Eqtfg0+PivjwRUENjCwcLG2dp1Ucg@mail.gmail.com>
-References: <20120315102845.GB16389@n2100.arm.linux.org.uk>
- <E1S87wp-0000Mz-V8@rmk-PC.arm.linux.org.uk>
- <CAORVsuUVC4hpotK=eybA=Eqtfg0+PivjwRUENjCwcLG2dp1Ucg@mail.gmail.com>
-Message-ID: <20120315165932.GY12083@atomide.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 15 Mar 2012 10:00:35 -0700
+Subject: [GIT PULL] cpufreq: OMAP updates for v3.4
+In-Reply-To: <20120307203031.GA7672@redhat.com>
+References: <87y5rci2na.fsf@ti.com> <20120307203031.GA7672@redhat.com>
+Message-ID: <4F622033.6030403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jean Pihet <jean.pihet@newoldbits.com> [120315 04:09]:
-> Russell,
-> 
-> On Thu, Mar 15, 2012 at 11:30 AM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > Missing __devexit_p() annotations in driver structures for remove functions
-> > marked with __devexit is waiting for build errors to happen, such as:
-> >
-> > `omap_system_dma_remove' referenced in section `.data' of arch/arm/plat-omap/bui
-> > lt-in.o: defined in discarded section `.devexit.text' of arch/arm/plat-omap/buil
-> > t-in.o
-> >
-> > Add the necessary annotation, and as a result of audit, fix others which
-> > are also missing in arch/arm/*omap*.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> > ?arch/arm/mach-omap2/smartreflex.c | ? ?2 +-
-> > ?arch/arm/plat-omap/dma.c ? ? ? ? ?| ? ?2 +-
-> > ?2 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> > index 7e755bb..47c77a1 100644
-> > --- a/arch/arm/mach-omap2/smartreflex.c
-> > +++ b/arch/arm/mach-omap2/smartreflex.c
-> > @@ -1012,7 +1012,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
-> > ?}
-> >
-> > ?static struct platform_driver smartreflex_driver = {
-> > - ? ? ? .remove ? ? ? ? = omap_sr_remove,
-> > + ? ? ? .remove ? ? ? ? = __devexit_p(omap_sr_remove),
-> > ? ? ? ?.driver ? ? ? ? = {
-> > ? ? ? ? ? ? ? ?.name ? = "smartreflex",
-> > ? ? ? ?},
-> Tony already has this change in his master branch, commit
-> 149f1d5c8d2fd6879cdf93ca70f1cb745e698a1e ('ARM: OMAP2+: Fix devexit
-> for smartreflex when CONFIG_HOTPLUG is not set').
+Hi Dave,
 
-Also same commit in arm-soc/for-next.
+On 03/07/2012 12:30 PM, Dave Jones wrote:
+> On Wed, Mar 07, 2012 at 12:20:41PM -0800, Kevin Hilman wrote:
+>   >  Dave,
+>   >
+>   >  Please pull the following OMAP CPUfreq driver changes for v3.4.
+>
+> pulled, thanks.
 
-Regards,
+Looks like these got pulled into your fixes branch, but I don't see them 
+in linux-next?  Are these on their way upstream?
 
-Tony
+Kevin
