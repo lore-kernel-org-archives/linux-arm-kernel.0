@@ -1,81 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2012 09:22:06 +0000
-Subject: [PATCH] of: Add generic device tree DMA helpers
-In-Reply-To: <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
-References: <4F22DEF2.5000807@ti.com>
- <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201203150922.06379.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Mar 2012 09:21:40 +0000
+Subject: Conflict between Versatile Express DT conversion and local
+ timer updates
+In-Reply-To: <20120315181718.d80071db25428a7b5113ef9a@canb.auug.org.au>
+References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
+ <201203131155.16454.arnd@arndb.de> <4F5F52A2.3050005@arm.com>
+ <201203131433.07214.arnd@arndb.de>
+ <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
+ <4F605A3B.5030800@arm.com>
+ <20120315181718.d80071db25428a7b5113ef9a@canb.auug.org.au>
+Message-ID: <20120315092140.GA15988@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 March 2012, Nicolas Ferre wrote:
-> Add some basic helpers to retrieve a DMA controller device_node and the
-> DMA request specifications. By making DMA controllers register a generic
-> translation function, we allow the management of any type of DMA requests
-> specification.
-> The void * output of an of_dma_xlate() function that will be implemented
-> by the DMA controller can carry any type of "dma-request" argument.
+On Thu, Mar 15, 2012 at 06:17:18PM +1100, Stephen Rothwell wrote:
+> Hi all,
 > 
-> The DMA client will search its associated DMA controller in the list and
-> call the registered of_dam_xlate() function to retrieve the request values.
+> On Wed, 14 Mar 2012 08:43:39 +0000 Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >
+> > On 14/03/12 00:52, Olof Johansson wrote:
+> > > On Tue, Mar 13, 2012 at 7:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > >> On Tuesday 13 March 2012, Marc Zyngier wrote:
+> > >>> On 13/03/12 11:55, Arnd Bergmann wrote:
+> > >>>> On Tuesday 13 March 2012, Marc Zyngier wrote:
+> > >>>>> On 13/03/12 10:15, Russell King - ARM Linux wrote:
+> > >>
+> > >>>> d) create a new next/timer branch in arm-soc that has Pawel's
+> > >>>>    98ed4ceb "ARM: vexpress: Get rid of MMIO_P2V" (the first patch from
+> > >>>>    vexpress/dt, your patches and the ux500/timer series. Also put
+> > >>>>    98ed4ceb into the next/cleanup branch.
+> > >>>>
+> > >>>> Any of those will work for us, my preference would be on #4. I have
+> > >>>> created the next/timer branch in the arm-soc tree, so you can use
+> > >>>> that and either rebase your patches on top or merge your tree into
+> > >>>> it and fix up the merge conflicts.
+> > >>>
+> > >>> Thanks for doing that Arnd.
+> > >>>
+> > >>> I've thus created a new branch:
+> > >>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> > >>> local_timers-for-arm-soc
+> > >>>
+> > >>> which contains the arm-soc next/timers branch as well as my local timers
+> > >>> series. I'd greatly appreciate if you could pull it for 3.4.
+> > >>>
+> > >>
+> > >> I've updated the next/timer branch with your changes now, but did not
+> > >> put it into the for-next branch because Olof is currently handling that.
+> > >>
+> > >> Olof, can you add it to for-next please? The timer branch should have
+> > >> no dependencies other than rmk/for-armsoc, so it can be fairly close to
+> > >> the start.
+> > > 
+> > > 
+> > > Thanks. I merged into for-next, but since there's already a history in
+> > > there and I didn't rebuild it, it's on top of everything else.
+> > > 
+> > > I got two trivial merge conflicts (and a few that git sorted out
+> > > automatically): one with the tegra makefile, the other with shmobile's
+> > > timer init.
+> > > 
+> > > Marc, please take a look at the next/timers merge in the arm-soc
+> > > for-next branch and let me know if they're OK. I'm pretty sure they
+> > > are though.
+> > 
+> > Had a brief look, and it seems alright to me.
+> > 
+> > Thanks Olof!
 > 
-> One simple xlate function is provided for the "single number" type of
-> request binding.
-> 
-> This implementation is independent from dmaengine so it can also be used
-> by legacy drivers.
-> 
-> For legacy reason another API will export the DMA request number into a
-> Linux resource of type IORESOURCE_DMA.
+> ok, it looks like Marc's series is now in both the arm and arm-soc trees
+> (and causing some conflicts due to other changes to the files involved
+> and some resolved conflicts).
 
-This looks very good. I missed the first version of this patch, but was
-thinking of very similar bindings.
-
-> +Client drivers should specify the DMA request property using a phandle to
-> +the controller. If needed, the DMA request identity on that controller is then
-> +added followed by optional request specifications.
-> +
-> +Required property:
-> +    - dma-request: List of phandle + dma-request + request specifications,
-> +      one group per request "line".
-> +Optional property:
-> +    - dma-request-names: list of strings in the same order as the dma-request
-> +      in the dma-request property.
-> +
-> +
-> +Example:
-> +
-> +	i2c1: i2c at 1 {
-> +		...
-> +		dma-request = <&sdma 2 &sdma 3>;
-> +		dma-request-names = "tx", "rx";
-> +		...
-> +	};
-
-This is slightly different from how the proposed pwm binding works that
-Thierry is working on, which uses an arbitrary property name instead of
-requiring the use of a specific property but then allowing to give names
-in another property.
-
-I don't care much which way it's done, but please try to agree on one
-approach that is used for both.
-
-The one you have here is already used by reg and irq, while the other
-one is used in gpio.
-
-> +/**
-> + * of_get_dma_request() - Get the associated DMA request data
-> + * @np:		device node to get DMA request from
-> + * @index:	index of the DMA request
-> + * @out_data:	a output that can be filled in by the of_dma_xlate() function
-> + *
-> + * Returns return value of of_dma_xlate() and fills out_data (if provided).
-> + * On error returns the appropriate errno value.
-> + */
-
-I would suggest provinding a helper function around this one that directly
-calls __dma_request_channel(). AFAICT, you should be able to let the dma
-controller provide a generic filter function in struct of_dma that the
-driver can use by default.
-
-	Arnd
+It shouldn't be in my tree anymore - I removed it a couple of days ago
+and pushed that out.
