@@ -1,78 +1,107 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Mar 2012 17:46:38 -0700
-Subject: [GIT PULL] ARM: OMAP: i2c, gpio, spi, regulator and mmc DTS
- updates
-In-Reply-To: <4F612C29.40608@ti.com>
-References: <4F612C29.40608@ti.com>
-Message-ID: <20120315004638.GW12083@atomide.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 14 Mar 2012 17:51:48 -0700
+Subject: [PATCH v6 2/3] clk: introduce the common clock framework
+In-Reply-To: <20120313120507.GS3852@pengutronix.de>
+References: <1331366064-1273-1-git-send-email-mturquette@linaro.org>
+ <1331366064-1273-3-git-send-email-mturquette@linaro.org>
+ <20120311113414.GM3852@pengutronix.de>
+ <CAJOA=zMdkLB-DCPOk=kz5mn6BK6A_swocyCHJHeGE6H7FxBbmQ@mail.gmail.com>
+ <20120312115117.GN3852@pengutronix.de>
+ <CAJOA=zPx0ARsoO4ueSTMe_z2Gs4xG4P2qn1=-vHFf7_k=+K6hQ@mail.gmail.com>
+ <20120313120507.GS3852@pengutronix.de>
+Message-ID: <CAJOA=zMT4vK7WPF7iEH9kN6GHHAv-LChHoadzieqV-Wd3Qj=WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Mar 13, 2012 at 5:05 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Mon, Mar 12, 2012 at 08:16:36PM -0700, Turquette, Mike wrote:
+>> On Mon, Mar 12, 2012 at 4:51 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> > I tried another
+>> > approach on the weekend which basically does not try to do all in a
+>> > single recursion but instead sets the rate in multiple steps:
+>> >
+>> > 1) call a function which calculates all new rates of affected clocks
+>> > ? in a rate change and safes the value in a clk->new_rate field. This
+>> > ? function returns the topmost clock which has to be changed.
+>> > 2) starting from the topmost clock notify all clients. This walks the
+>> > ? whole subtree even if a notfifier refuses the change. If necessary
+>> > ? we can walk the whole subtree again to abort the change.
+>> > 3) actually change rates starting from the topmost clocks and notify
+>> > ? all clients on the way. I changed the set_rate callback to void.
+>> > ? Instead of failing (what is failing in case of set_rate? The clock
+>> > ? will still have some rate) I check for the result with
+>> > ? clk_ops->recalc_rate.
+>
+> The way described above works for me now, see this branch:
+>
+> git://git.pengutronix.de/git/imx/linux-2.6.git v3.3-rc6-clkv6-fixup
+>
+> You may not necessarily like it as it changes quite a lot in the rate
+> changing code.
 
-* Cousson, Benoit <b-cousson@ti.com> [120314 16:41]:
-> Hi Tony,
-> 
-> Here are the remaining DTS patches for 3.4.
-> 
-> On top of the previous pull request, I just added the MMC DTS since the driver adaptation just got queued.
-> 
-> It will be still be good to have that for 3.4 if possible, otherwise we will have a bunch of drivers DT adapted but no DTS file to use them :-(
+I tried that code and I really like it!  It is much more readable and
+feels less "fragile" than the previous recursive __clk_set_rate.  I
+did quite a bit of testing with this code today.  One of the tests
+looks like this:
 
-This might be doable as a follow-up patch series at the end
-of the merge window or at -rc1 when the related driver changes
-have been merged.
+    pll         (adjustable to anything)
+     |
+clk_divider     (5 bits wide)
+     |
+   dummy        (no clk_ops)
 
-Arnd and Olof, what do you guys think?
+The new code did a fine job arbitrating rates for the PLL and the
+intermediate divider even if I put weird constraints on the PLL.  For
+instance if I artificially limited it to a minimum of 600MHz and then
+ran clk_set_rate(dummy, 300MHz) it would lock at 600MHz and set
+clk_divider to divide-by-2.  Setting to 600MHz or more set the divider
+back to 1 and relocked the PLL appropriately.  Pretty cool.
 
-Regards,
+I also tested the notifiers with this code and they seem to function
+properly.  I'll take this code in for v7.  Thanks a lot for this
+helpful contribution.
 
-Tony
+I did find that MULT_ROUND_UP caused trouble for my PLL's round_rate
+implementation.  Maybe my PLL code is fragile but a quick fix was to
+make sure that we send the exact value we want to the round_rate code.
+ I also feel this is more correct.  Let me know what you think:
 
- 
-> This series is based on your lo/dt-part2 branch.
-> 
-> Thanks,
-> Benoit
-> 
-> 
-> The following changes since commit 328ae2cb50af2f96b6061eb462aa92966a462bbc:
->   Ilya Yanok (1):
->         arm/dts: mt_ventoux: very basic support for TeeJet Mt.Ventoux board
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git for_3.4/dts/all
-> 
-> Benoit Cousson (11):
->       arm/dts: twl6030: Add DTS file for twl6030 PMIC
->       arm/dts: twl4030: Add DTS file for twl4030 PM + Audio IC
->       arm/dts: omap4-panda: Add twl6030 and i2c EEPROM
->       arm/dts: omap4-sdp: Add twl6030, i2c3 and i2c4 devices
->       arm/dts: omap3-beagle: Add twl4030 and i2c EEPROM
->       ARM: OMAP2+: board-generic: Remove i2c static init
->       arm/dts: OMAP4: Add gpio nodes
->       arm/dts: OMAP3: Add gpio nodes
->       arm/dts: OMAP4: Add SPI controller nodes
->       arm/dts: OMAP3: Add SPI controller nodes
->       arm/dts: omap4-sdp: Add ks8851 ethernet SPI device
-> 
-> Rajendra Nayak (3):
->       arm/dts: twl: Pass regulator data from dt
->       arm/dts: OMAP4: Add mmc controller nodes and board data
->       arm/dts: OMAP3: Add mmc controller nodes and board data
-> 
->  arch/arm/boot/dts/omap3-beagle.dts  |   49 +++++++++++++++
->  arch/arm/boot/dts/omap3.dtsi        |  102 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap4-panda.dts   |   56 +++++++++++++++++
->  arch/arm/boot/dts/omap4-sdp.dts     |   97 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap4.dtsi        |  117 +++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/twl4030.dtsi      |   39 ++++++++++++
->  arch/arm/boot/dts/twl6030.dtsi      |   86 +++++++++++++++++++++++++
->  arch/arm/mach-omap2/board-generic.c |   37 +----------
->  arch/arm/mach-omap2/devices.c       |    4 +-
->  arch/arm/mach-omap2/gpio.c          |    8 ++-
->  10 files changed, 557 insertions(+), 38 deletions(-)
->  create mode 100644 arch/arm/boot/dts/twl4030.dtsi
->  create mode 100644 arch/arm/boot/dts/twl6030.dtsi
-> 
+8<---------------------------------------------------------------
+
+commit 189fecedb175d0366759246c4192f45b0bc39a50
+Author: Mike Turquette <mturquette@linaro.org>
+Date:   Wed Mar 14 17:29:51 2012 -0700
+
+    clk-divider.c: round the actual rate we care about
+
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 86ca9cd..06ef4a0 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -47,12 +47,6 @@ static unsigned long clk_divider_recalc_rate(struct
+clk_hw *hw,
+ }
+ EXPORT_SYMBOL_GPL(clk_divider_recalc_rate);
+
+-/*
+- * The reverse of DIV_ROUND_UP: The maximum number which
+- * divided by m is r
+- */
+-#define MULT_ROUND_UP(r, m) ((r) * (m) + (m) - 1)
+-
+ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 		unsigned long *best_parent_rate)
+ {
+@@ -84,9 +78,9 @@ static int clk_divider_bestdiv(struct clk_hw *hw,
+unsigned long rate,
+
+ 	for (i = 1; i <= maxdiv; i++) {
+ 		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+-				MULT_ROUND_UP(rate, i));
++				(rate * i));
+ 		now = parent_rate / i;
+-		if (now <= rate && now >= best) {
++		if (now <= rate && now > best) {
+ 			bestdiv = i;
+ 			best = now;
+ 			*best_parent_rate = parent_rate;
