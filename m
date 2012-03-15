@@ -1,50 +1,46 @@
-From: kumarrav@codeaurora.org (Ravi Kumar V)
-Date: Thu, 15 Mar 2012 23:27:51 +0530
-Subject: [PATCH v3 2/2] DMAEngine: Add DMAEngine driver based on old MSM
- DMA APIs
-In-Reply-To: <CAPDArRLs23VDJSWpX8xJsXfn+_SV2FcyzLYBF9UAxf=Rv9svGQ@mail.gmail.com>
-References: <1331548364-27845-1-git-send-email-kumarrav@codeaurora.org>
- <20120312201421.GA3459@fifo99.com>
- <CAPDArRLs23VDJSWpX8xJsXfn+_SV2FcyzLYBF9UAxf=Rv9svGQ@mail.gmail.com>
-Message-ID: <4F622D9F.1070101@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Mar 2012 17:58:16 +0000
+Subject: [PATCH 5/5] MMC: mmci: Add required documentation for Device
+ Tree bindings
+In-Reply-To: <201203151749.07673.arnd@arndb.de>
+References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
+ <1331734803-17954-6-git-send-email-lee.jones@linaro.org>
+ <20120315173508.GE15988@n2100.arm.linux.org.uk>
+ <201203151749.07673.arnd@arndb.de>
+Message-ID: <20120315175816.GH15988@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/13/2012 4:27 PM, Shantanu Gupta wrote:
-> Any info available(publicly) on so as to what all chipsets have this
-> capability ?
+On Thu, Mar 15, 2012 at 05:49:07PM +0000, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Russell King - ARM Linux wrote:
+> > 
+> > On Wed, Mar 14, 2012 at 02:20:03PM +0000, Lee Jones wrote:
+> > > +ux500 variant specific properties:
+> > > +- gpio-en                : contains the level-shifter enable gpio
+> > > +- gpio-vsel              : contains the level-shifter voltage select gpio
+> > > +- tx_dst_dev_type        : contains the tx destination device (DMA) 
+> > > +- rx_src_dev_type        : contains the rx source device (DMA)
+> > 
+> > So what about the DMA support being proposed elsewhere?
+> > 
+> > This sounds like we're inventing one DMA solution for one bit of the tree
+> > and another DMA solution for another bit.  This is madness.
+> 
+> Agreed. I originally made a similar comment for an early version but had not
+> noticed that it made it into this one. This should be using the proper DMA
+> bindings, or just auxdata while we're not entirely there yet.
 
-This is DMA engine driver for "Application Data Mover(ADM)" which in one 
-type of DMA device in most of the Qualcomm processors like snapdragon.
+It's something that I'm also concerned with the main OF DMA patches.  It's
+not at all clear what we want from DMA bindings yet because we've hardly
+started converting from platform specific DMA APIs to the DMA engine based
+APIs.
 
->
-> On Tue, Mar 13, 2012 at 1:44 AM, Daniel Walker <dwalker@fifo99.com
-> <mailto:dwalker@fifo99.com>> wrote:
->
->     On Mon, Mar 12, 2012 at 04:02:44PM +0530, Ravi Kumar V wrote:
->      > Add DMAEngine based driver using the old MSM DMA APIs internally.s
->
->     What do you mean by this?
->
->      > The benefit of this approach is that not all the drivers
->      > have to get converted to DMAEngine APIs simultaneosly while
->      > both the drivers can stay enabled in the kernel. The client
->      > drivers using the old MSM APIs directly can now convert to
->      > DMAEngine one by one.
->
->     Which drivers?
->
->     Daniel
->     --
->     To unsubscribe from this list: send the line "unsubscribe
->     linux-arm-msm" in
->     the body of a message to majordomo at vger.kernel.org
->     <mailto:majordomo@vger.kernel.org>
->     More majordomo info at http://vger.kernel.org/majordomo-info.html
->
->
+The way DMA channels are selected by DMA APIs is significantly different
+from the DMA engine based API, and I remain worried that we're locking in
+to a platform specific DMA API method.
 
+I think the DMA parts should be left alone until there has been much more
+of an effort to convert to DMA engine based APIs for the various platforms.
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Note: OMAP DMA is something I've been asked to take over, and is something
+I've been looking at over the last couple of weeks so far.
