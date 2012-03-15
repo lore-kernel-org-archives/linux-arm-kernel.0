@@ -1,113 +1,23 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 15 Mar 2012 13:54:22 -0400 (EDT)
-Subject: [PATCH 3/4] ARM: opcodes: Add helpers for emitting custom opcodes
-In-Reply-To: <1331829132-9762-4-git-send-email-dave.martin@linaro.org>
-References: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
- <1331829132-9762-4-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.02.1203151354040.24151@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Mar 2012 17:54:43 +0000
+Subject: [PATCH 2/5] MMC: mmci: Seperate ARM variants from generic code
+In-Reply-To: <201203151746.56678.arnd@arndb.de>
+References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
+ <4F622884.6060807@linaro.org> <20120315173714.GF15988@n2100.arm.linux.org.uk>
+ <201203151746.56678.arnd@arndb.de>
+Message-ID: <20120315175443.GG15988@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Mar 2012, Dave Martin wrote:
+On Thu, Mar 15, 2012 at 05:46:56PM +0000, Arnd Bergmann wrote:
+> Can you elaborate? I suggested the split in order to keep the ux500
+> specific parts local to one file. With the device tree conversion,
+> we really want to have them out of the platform code, but sticking them
+> into the main driver seems wrong, too.
 
-> This patch adds some __inst_() macros for injecting custom opcodes
-> in assembler (both inline and in .S files).  They should make it
-> easier and cleaner to get things right in little-/big-
-> endian/ARM/Thumb-2 kernels without a lot of #ifdefs.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> ---
->  arch/arm/include/asm/opcodes.h |   69 ++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 69 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
-> index 32730a8..50ef0be 100644
-> --- a/arch/arm/include/asm/opcodes.h
-> +++ b/arch/arm/include/asm/opcodes.h
-> @@ -156,4 +156,73 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
->  	| ___asm_opcode_identity32(___asm_opcode_identity16(second))	    \
->  )
->  
-> +/*
-> + * Opcode injection helpers
-> + *
-> + * In rare cases it is necessary to assemble an opcode which the
-> + * assembler does not support directly, or which would normally be
-> + * rejected because of the CFLAGS or AFLAGS used to build the affected
-> + * file.
-> + *
-> + * Before using these macros, consider carefully whether it is feasible
-> + * instead to change the build flags for your file, or whether it really
-> + * makes sense to support old assembler versions when building that
-> + * particular kernel feature.
-> + *
-> + * The macros defined here should only be used where there is no viable
-> + * alternative.
-> + *
-> + *
-> + * __inst_arm(x): emit the specified ARM opcode
-> + * __inst_thumb16(x): emit the specified 16-bit Thumb opcode
-> + * __inst_thumb32(x): emit the specified 32-bit Thumb opcode
-> + *
-> + * __inst_arm_thumb16(arm, thumb): emit either the specified arm or
-> + *	16-bit Thumb opcode, depending on whether an ARM or Thumb-2
-> + *	kernel is being built
-> + *
-> + * __inst_arm_thumb32(arm, thumb): emit either the specified arm or
-> + *	32-bit Thumb opcode, depending on whether an ARM or Thumb-2
-> + *	kernel is being built
-> + *
-> + *
-> + * Note that using these macros directly is poor practice.  Instead, you
-> + * should use them to define human-readable wrapper macros to encode the
-> + * instructions that you care about.  In code which might run on ARMv7 or
-> + * above, you can usually use the __inst_arm_thumb{16,32} macros to
-> + * specify the ARM and Thumb alternatives at the same time.  This ensures
-> + * that the correct opcode gets emitted depending on the instruction set
-> + * used for the kernel build.
-> + */
-> +#include <linux/stringify.h>
-> +
-> +#define __inst_arm(x) ___inst_arm(___asm_opcode_to_mem_arm(x))
-> +#define __inst_thumb32(x) ___inst_thumb32(				\
-> +	___asm_opcode_to_mem_thumb16(___asm_opcode_thumb32_first(x)),	\
-> +	___asm_opcode_to_mem_thumb16(___asm_opcode_thumb32_second(x))	\
-> +)
-> +#define __inst_thumb16(x) ___inst_thumb16(___asm_opcode_to_mem_thumb16(x))
-> +
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +#define __inst_arm_thumb16(arm_opcode, thumb_opcode) \
-> +	__inst_thumb16(thumb_opcode)
-> +#define __inst_arm_thumb32(arm_opcode, thumb_opcode) \
-> +	__inst_thumb32(thumb_opcode)
-> +#else
-> +#define __inst_arm_thumb16(arm_opcode, thumb_opcode) __inst_arm(arm_opcode)
-> +#define __inst_arm_thumb32(arm_opcode, thumb_opcode) __inst_arm(arm_opcode)
-> +#endif
-> +
-> +/* Helpers for the helpers.  Don't use these directly. */
-> +#ifdef __ASSEMBLY__
-> +#define ___inst_arm(x) .long x
-> +#define ___inst_thumb16(x) .short x
-> +#define ___inst_thumb32(first, second) .short first, second
-> +#else
-> +#define ___inst_arm(x) ".long " __stringify(x) "\n\t"
-> +#define ___inst_thumb16(x) ".short " __stringify(x) "\n\t"
-> +#define ___inst_thumb32(first, second) \
-> +	".short " __stringify(first) ", " __stringify(second) "\n\t"
-> +#endif
-> +
->  #endif /* __ASM_ARM_OPCODES_H */
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+You're talking about the data structures which describe what quirks to
+apply for the ux500 parts, rather than the actual quirks themselves.
+That's not a particularly clever thing to do because it separates out
+the selection of the works from the rest of the driver, which means
+simply searching for the flags to find out what's applied for what has
+to span several files.
