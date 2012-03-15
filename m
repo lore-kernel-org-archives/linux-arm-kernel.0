@@ -1,37 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 15 Mar 2012 16:57:21 +0100
-Subject: [PATCH 5/6] Input: Kconfig: remove dependency for atmel_tsadcc driver
-In-Reply-To: <cover.1331826095.git.nicolas.ferre@atmel.com>
-References: <cover.1331826095.git.nicolas.ferre@atmel.com>
-Message-ID: <531cf3ace390f3673a73792f15f9c7cd6aeb273d.1331826095.git.nicolas.ferre@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 16:04:58 +0000
+Subject: [GIT PULL][for v3.4] pull request from board-specific branch in
+ arch-pxa
+In-Reply-To: <CAN1soZyWmrzQzr0VHtrixdr2myv4ggJ1YBcS8OnuLJLOn2uVEQ@mail.gmail.com>
+References: <CAN1soZyWmrzQzr0VHtrixdr2myv4ggJ1YBcS8OnuLJLOn2uVEQ@mail.gmail.com>
+Message-ID: <201203151604.58969.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow to select this driver for newer SoCs.
-Keep dependency on AT91 because of the use of an header
-file located in include/mach directory.
+On Wednesday 14 March 2012, Haojian Zhuang wrote:
+> First, please help to revert one commit 43de6a7dda6e9a7345e2 on
+> arnd/pxa/board branch of arm-soc.git first. Since this commit is
+> duplicated, and it's already merged into v3.3-rc7. I'm sorry on
+> inconvenience.
+> 
+> commit 43de6a7dda6e9a7345e218e688f2092f991126f0
+> Author: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Date:   Tue Feb 28 10:57:48 2012 +0800
+> 
+>     ARM: pxa: add dummy clock for pxa25x and pxa27x
+> 
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/input/touchscreen/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+I need clarification on this:
 
-diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-index 4af2a18..3900c64 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -432,10 +432,10 @@ config TOUCHSCREEN_TOUCHWIN
- 
- config TOUCHSCREEN_ATMEL_TSADCC
- 	tristate "Atmel Touchscreen Interface"
--	depends on ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-+	depends on ARCH_AT91
- 	help
- 	  Say Y here if you have a 4-wire touchscreen connected to the
--          ADC Controller on your Atmel SoC (such as the AT91SAM9RL).
-+          ADC Controller on your Atmel SoC.
- 
- 	  If unsure, say N.
- 
--- 
-1.7.9
+I can see the clock was added in 389eda15e "ARM: pxa: add clk support in
+gpio driver" as well as 7557c175f6 "ARM: pxa: add dummy clock for sa1100-rtc",
+but removed in a55b5ada "Revert "ARM: pxa: add dummy clock for sa1100-rtc""
+and then added again in bbdc818b2 "ARM: pxa: add dummy clock for pxa25x
+and pxa27x". I want to make sure I'm not making the mess any bigger than
+it already is. So you want the dummy clocks for pxa25x and pxa27x removed
+again, never to come back, right?
+
+	Arnd
