@@ -1,46 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Mar 2012 17:58:16 +0000
-Subject: [PATCH 5/5] MMC: mmci: Add required documentation for Device
- Tree bindings
-In-Reply-To: <201203151749.07673.arnd@arndb.de>
-References: <1331734803-17954-1-git-send-email-lee.jones@linaro.org>
- <1331734803-17954-6-git-send-email-lee.jones@linaro.org>
- <20120315173508.GE15988@n2100.arm.linux.org.uk>
- <201203151749.07673.arnd@arndb.de>
-Message-ID: <20120315175816.GH15988@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 15 Mar 2012 13:58:28 -0400 (EDT)
+Subject: [PATCH 4/4] ARM: opcodes: Opcode definitions for the
+ Virtualization Extensions
+In-Reply-To: <1331829132-9762-5-git-send-email-dave.martin@linaro.org>
+References: <1331829132-9762-1-git-send-email-dave.martin@linaro.org>
+ <1331829132-9762-5-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.02.1203151355570.24151@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 05:49:07PM +0000, Arnd Bergmann wrote:
-> On Thursday 15 March 2012, Russell King - ARM Linux wrote:
-> > 
-> > On Wed, Mar 14, 2012 at 02:20:03PM +0000, Lee Jones wrote:
-> > > +ux500 variant specific properties:
-> > > +- gpio-en                : contains the level-shifter enable gpio
-> > > +- gpio-vsel              : contains the level-shifter voltage select gpio
-> > > +- tx_dst_dev_type        : contains the tx destination device (DMA) 
-> > > +- rx_src_dev_type        : contains the rx source device (DMA)
-> > 
-> > So what about the DMA support being proposed elsewhere?
-> > 
-> > This sounds like we're inventing one DMA solution for one bit of the tree
-> > and another DMA solution for another bit.  This is madness.
+On Thu, 15 Mar 2012, Dave Martin wrote:
+
+> For now, this patch just adds a definition for the HVC instruction.
+> More can be added here later, as needed.
 > 
-> Agreed. I originally made a similar comment for an early version but had not
-> noticed that it made it into this one. This should be using the proper DMA
-> bindings, or just auxdata while we're not entirely there yet.
+> Now that we have a real example of how to use the opcode injection
+> macros properly, this patch also adds a cross-reference from the
+> explanation in opcodes.h (since without an example, figuring out
+> how to use the macros is not that easy).
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-It's something that I'm also concerned with the main OF DMA patches.  It's
-not at all clear what we want from DMA bindings yet because we've hardly
-started converting from platform specific DMA APIs to the DMA engine based
-APIs.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-The way DMA channels are selected by DMA APIs is significantly different
-from the DMA engine based API, and I remain worried that we're locking in
-to a platform specific DMA API method.
+Maybe this would be a good idea to document in one of the patch logs why 
+you didn't go with the assembler macro route like it is done in 
+unified.h for the various it instructions.
 
-I think the DMA parts should be left alone until there has been much more
-of an effort to convert to DMA engine based APIs for the various platforms.
-
-Note: OMAP DMA is something I've been asked to take over, and is something
-I've been looking at over the last couple of weeks so far.
+> ---
+>  arch/arm/include/asm/opcodes-virt.h |   29 +++++++++++++++++++++++++++++
+>  arch/arm/include/asm/opcodes.h      |    2 ++
+>  2 files changed, 31 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/include/asm/opcodes-virt.h
+> 
+> diff --git a/arch/arm/include/asm/opcodes-virt.h b/arch/arm/include/asm/opcodes-virt.h
+> new file mode 100644
+> index 0000000..b85665a
+> --- /dev/null
+> +++ b/arch/arm/include/asm/opcodes-virt.h
+> @@ -0,0 +1,29 @@
+> +/*
+> + * opcodes-virt.h: Opcode definitions for the ARM virtualization extensions
+> + * Copyright (C) 2012  Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +#ifndef __ASM_ARM_OPCODES_VIRT_H
+> +#define __ASM_ARM_OPCODES_VIRT_H
+> +
+> +#include <asm/opcodes.h>
+> +
+> +#define __HVC(imm16) __inst_arm_thumb32(				\
+> +	0xE1400070 | (((imm16) & 0xFFF0) << 4) | ((imm16) & 0x000F),	\
+> +	0xF7E08000 | (((imm16) & 0xF000) << 4) | ((imm16) & 0x0FFF)	\
+> +)
+> +
+> +#endif /* ! __ASM_ARM_OPCODES_VIRT_H */
+> diff --git a/arch/arm/include/asm/opcodes.h b/arch/arm/include/asm/opcodes.h
+> index 50ef0be..89ff5b9 100644
+> --- a/arch/arm/include/asm/opcodes.h
+> +++ b/arch/arm/include/asm/opcodes.h
+> @@ -193,6 +193,8 @@ extern asmlinkage unsigned int arm_check_condition(u32 opcode, u32 psr);
+>   * specify the ARM and Thumb alternatives at the same time.  This ensures
+>   * that the correct opcode gets emitted depending on the instruction set
+>   * used for the kernel build.
+> + *
+> + * Look at opcodes-virt.h for an example of how to use these macros.
+>   */
+>  #include <linux/stringify.h>
+>  
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
