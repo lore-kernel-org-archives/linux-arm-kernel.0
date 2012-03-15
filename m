@@ -1,41 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Mar 2012 10:52:31 +0100
-Subject: [alsa-devel] [PATCH v4] ASoC: add imx-sgtl5000 machine driver
- working with fsl_ssi
-In-Reply-To: <4F612394.4060703@freescale.com>
-References: <1331553537-19789-1-git-send-email-shawn.guo@linaro.org>
- <20120314090115.GN3852@pengutronix.de>
- <4F612394.4060703@freescale.com>
-Message-ID: <20120315095230.GZ3852@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 10:09:23 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <20120315092652.GA16389@n2100.arm.linux.org.uk>
+References: <4F22DEF2.5000807@ti.com> <201203150922.06379.arnd@arndb.de>
+ <20120315092652.GA16389@n2100.arm.linux.org.uk>
+Message-ID: <201203151009.24161.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 06:02:44PM -0500, Timur Tabi wrote:
-> Sascha Hauer wrote:
-> > What are the next steps here? Now we have fsl_ssi.c and imx-ssi.c, one
-> > for dt bindings and the other one for platform bindings and also AC97
-> > support. They should probably get merged some day which might be a bit
-> > difficult since currently I don't see the platform users moving over
-> > to devicetree and the seem to be no AC97 users in powerpc.
+On Thursday 15 March 2012, Russell King - ARM Linux wrote:
+> On Thu, Mar 15, 2012 at 09:22:06AM +0000, Arnd Bergmann wrote:
+> > On Thursday 15 March 2012, Nicolas Ferre wrote:
+> > > Add some basic helpers to retrieve a DMA controller device_node and the
+> > > DMA request specifications. By making DMA controllers register a generic
+> > > translation function, we allow the management of any type of DMA requests
+> > > specification.
+> > > The void * output of an of_dma_xlate() function that will be implemented
+> > > by the DMA controller can carry any type of "dma-request" argument.
+> > > 
+> > > The DMA client will search its associated DMA controller in the list and
+> > > call the registered of_dam_xlate() function to retrieve the request values.
+> > > 
+> > > One simple xlate function is provided for the "single number" type of
+> > > request binding.
+> > > 
+> > > This implementation is independent from dmaengine so it can also be used
+> > > by legacy drivers.
+> > > 
+> > > For legacy reason another API will export the DMA request number into a
+> > > Linux resource of type IORESOURCE_DMA.
+> > 
+> > This looks very good. I missed the first version of this patch, but was
+> > thinking of very similar bindings.
 > 
-> I don't have any problem with adding AC97 support to fsl_ssi.c, assuming
-> it's not a huge mess.  I don't know enough about AC97 to know how easy
-> that is, though.
+> There's one issue which is concerning me - when we switch OMAP to use
+> DMA engine, it won't use numeric stuff anymore but the DMA engine way
+> of requesting a channel (match function + data).
+> 
+> How does that fit into this scheme?
 
->From the hardware side it's basically calling setup_channel_to_ac97()
-and providing AC97 register read/write functions. One ugly detail is
-that we need a bus reset function. This basically means putting the
-pins in gpio mode and issuing the reset manually. The SSI unit does
-not provide a way to reset the bus.
-I don't know how this AC97 stuff integrates into the devicetree. Anyway,
-that's a topic for future discussions and shouldn't block the current
-patches. I just want to make sure that the original imx-ssi driver is
-not removed as long as the fsl_ssi driver does not have AC97 support.
+I haven't looked at the omap dma driver much, but if it just uses a
+channel number, then I'd assume the data would be a single u32 cell
+with that number, and the match function would be trivial.
 
-Sascha
+Is that what you are asking about or am I missing the point?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
