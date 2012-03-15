@@ -1,38 +1,33 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu, 15 Mar 2012 09:48:27 +0100
-Subject: [PATCH] ARM: SPEAr600: Add device-tree support to SPEAr600 boards
-In-Reply-To: <4F604321.9000204@st.com>
-References: <1331650032-15274-1-git-send-email-sr@denx.de>
- <4F604321.9000204@st.com>
-Message-ID: <201203150948.27918.sr@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2012 08:48:32 +0000
+Subject: [PATCH v4 10/10] pwm-backlight: Add rudimentary device tree
+ support
+In-Reply-To: <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
+References: <1331740593-10807-1-git-send-email-thierry.reding@avionic-design.de>
+ <1331740593-10807-11-git-send-email-thierry.reding@avionic-design.de>
+Message-ID: <201203150848.32500.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh,
+On Wednesday 14 March 2012, Thierry Reding wrote:
+> +
+> +       pwm = of_pwm_request(node, "pwm", 0);
+> +       if (IS_ERR(pwm))
+> +               return PTR_ERR(pwm);
 
-On Wednesday 14 March 2012 08:05:05 Viresh Kumar wrote:
-> > +static const char *spear600_dt_board_compat[] = {
-> > +	"st,spear600-evb",
-> > +	NULL
-> > +};
-> > +
-> > +static const struct of_device_id vic_of_match[] __initconst = {
-> > +	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
-> > +	{ /* Sentinel */ }
-> > +};
-> > +
-> > +static void __init spear6xx_dt_init_irq(void)
-> > +{
-> > +	of_irq_init(vic_of_match);
-> > +}
-> > +
-> 
-> What about adding this routine in vic.c file, which can then be used
-> by all platforms, instead of replicating this code.
+It's interesting that the (so far) only user of of_pwm_request() doesn't
+actually give a meaningful argument as the name of the pwm property.
 
-We can't move vic_of_match to the vic.c, since there are differences between 
-the boards using it. And only moving spear6xx_dt_init_irq() (renamed of 
-course) doesn't seem worth it.
+Maybe rename that function to of_pwm_request_named() and provide a helper
+that just does this:?
 
-Thanks,
-Stefan
+static inline struct pwm_device *of_pwm_request(struct device_node *np, int index)
+{
+	return of_pwm_request_named(np, "pwm", index);
+}
+
+Any device that just has needs one pwm or uses more than one but has no
+reason to name them can just use this helper then and use the default pwm
+property name.
+
+	Arnd
