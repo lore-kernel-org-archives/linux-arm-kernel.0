@@ -1,5 +1,5 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 15 Mar 2012 12:22:04 +0100
+From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
+Date: Thu, 15 Mar 2012 12:24:19 +0100
 Subject: [PATCH v1 1/5] ARM: imx28: add basic dt support
 In-Reply-To: <20120315105927.GE13022@shlinux2.ap.freescale.net>
 References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
@@ -10,13 +10,11 @@ References: <1331628428-24017-1-git-send-email-b29396@freescale.com>
  <20120315030206.GB13022@shlinux2.ap.freescale.net>
  <20321.37353.63115.664975@ipc1.ka-ro>
  <20120315105927.GE13022@shlinux2.ap.freescale.net>
-Message-ID: <20321.53468.310199.875966@ipc1.ka-ro>
+Message-ID: <20120315112419.GA3852@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Dong Aisheng writes:
+On Thu, Mar 15, 2012 at 06:59:28PM +0800, Dong Aisheng wrote:
 > On Thu, Mar 15, 2012 at 02:53:29PM +0800, Lothar Wa?mann wrote:
 > > Hi,
 > > 
@@ -50,35 +48,18 @@ Dong Aisheng writes:
 > define it in device tree in my last mail.
 > http://www.spinics.net/lists/arm-kernel/msg165040.html
 > Do you have any comment on that way?
-> 
-That patch sets the OUI to the Freescale owned MAC range. Thus only
-Freescale products may be able to use the driver.
 
-Anyway there is no definite spec how the MAC address(es) are stored
-in the fuse map. Thus reading the MAC from there is more or less
-platform specific.
+Yes, you could do that. Otherwise it's perfectly fine to pass the MAC
+address in the device tree, it's just not ok to put specific values
+into the kernel source. You could leave the values blank and let the
+bootloader fill them in. Or you could fill in valid values before you
+compile the devicetree, but be prepared for surprises once you have
+two boards in your network and use the devicetree for both.
 
-Currently I'm setting up the MAC address for our TX28 from the fuses
-in the platform code passed via platform_data, but that will obviously
-not work with DT.
+Sascha
 
-The correct way would probably be to pass the MAC from the bootloader
-via a DT blob. But that would require all bootloaders to be updated
-first to support DTS. :(
-
-An intermediate solution could be using OF_DEV_AUXDATA to pass a
-platform_data struct that may contain a MAC address set up by the
-platform code.
-
-
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
