@@ -1,76 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Mar 2012 09:21:40 +0000
-Subject: Conflict between Versatile Express DT conversion and local
- timer updates
-In-Reply-To: <20120315181718.d80071db25428a7b5113ef9a@canb.auug.org.au>
-References: <20120312231016.GC10830@n2100.arm.linux.org.uk>
- <201203131155.16454.arnd@arndb.de> <4F5F52A2.3050005@arm.com>
- <201203131433.07214.arnd@arndb.de>
- <CAOesGMjo=JT3TKwne+m5XUpkBMQFKQLZrr1T60m+Wx7YgqMiOA@mail.gmail.com>
- <4F605A3B.5030800@arm.com>
- <20120315181718.d80071db25428a7b5113ef9a@canb.auug.org.au>
-Message-ID: <20120315092140.GA15988@n2100.arm.linux.org.uk>
+Date: Thu, 15 Mar 2012 09:26:52 +0000
+Subject: [PATCH] of: Add generic device tree DMA helpers
+In-Reply-To: <201203150922.06379.arnd@arndb.de>
+References: <4F22DEF2.5000807@ti.com>
+ <1331800690-21518-1-git-send-email-nicolas.ferre@atmel.com>
+ <201203150922.06379.arnd@arndb.de>
+Message-ID: <20120315092652.GA16389@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 06:17:18PM +1100, Stephen Rothwell wrote:
-> Hi all,
-> 
-> On Wed, 14 Mar 2012 08:43:39 +0000 Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >
-> > On 14/03/12 00:52, Olof Johansson wrote:
-> > > On Tue, Mar 13, 2012 at 7:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > >> On Tuesday 13 March 2012, Marc Zyngier wrote:
-> > >>> On 13/03/12 11:55, Arnd Bergmann wrote:
-> > >>>> On Tuesday 13 March 2012, Marc Zyngier wrote:
-> > >>>>> On 13/03/12 10:15, Russell King - ARM Linux wrote:
-> > >>
-> > >>>> d) create a new next/timer branch in arm-soc that has Pawel's
-> > >>>>    98ed4ceb "ARM: vexpress: Get rid of MMIO_P2V" (the first patch from
-> > >>>>    vexpress/dt, your patches and the ux500/timer series. Also put
-> > >>>>    98ed4ceb into the next/cleanup branch.
-> > >>>>
-> > >>>> Any of those will work for us, my preference would be on #4. I have
-> > >>>> created the next/timer branch in the arm-soc tree, so you can use
-> > >>>> that and either rebase your patches on top or merge your tree into
-> > >>>> it and fix up the merge conflicts.
-> > >>>
-> > >>> Thanks for doing that Arnd.
-> > >>>
-> > >>> I've thus created a new branch:
-> > >>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-> > >>> local_timers-for-arm-soc
-> > >>>
-> > >>> which contains the arm-soc next/timers branch as well as my local timers
-> > >>> series. I'd greatly appreciate if you could pull it for 3.4.
-> > >>>
-> > >>
-> > >> I've updated the next/timer branch with your changes now, but did not
-> > >> put it into the for-next branch because Olof is currently handling that.
-> > >>
-> > >> Olof, can you add it to for-next please? The timer branch should have
-> > >> no dependencies other than rmk/for-armsoc, so it can be fairly close to
-> > >> the start.
-> > > 
-> > > 
-> > > Thanks. I merged into for-next, but since there's already a history in
-> > > there and I didn't rebuild it, it's on top of everything else.
-> > > 
-> > > I got two trivial merge conflicts (and a few that git sorted out
-> > > automatically): one with the tegra makefile, the other with shmobile's
-> > > timer init.
-> > > 
-> > > Marc, please take a look at the next/timers merge in the arm-soc
-> > > for-next branch and let me know if they're OK. I'm pretty sure they
-> > > are though.
+On Thu, Mar 15, 2012 at 09:22:06AM +0000, Arnd Bergmann wrote:
+> On Thursday 15 March 2012, Nicolas Ferre wrote:
+> > Add some basic helpers to retrieve a DMA controller device_node and the
+> > DMA request specifications. By making DMA controllers register a generic
+> > translation function, we allow the management of any type of DMA requests
+> > specification.
+> > The void * output of an of_dma_xlate() function that will be implemented
+> > by the DMA controller can carry any type of "dma-request" argument.
 > > 
-> > Had a brief look, and it seems alright to me.
+> > The DMA client will search its associated DMA controller in the list and
+> > call the registered of_dam_xlate() function to retrieve the request values.
 > > 
-> > Thanks Olof!
+> > One simple xlate function is provided for the "single number" type of
+> > request binding.
+> > 
+> > This implementation is independent from dmaengine so it can also be used
+> > by legacy drivers.
+> > 
+> > For legacy reason another API will export the DMA request number into a
+> > Linux resource of type IORESOURCE_DMA.
 > 
-> ok, it looks like Marc's series is now in both the arm and arm-soc trees
-> (and causing some conflicts due to other changes to the files involved
-> and some resolved conflicts).
+> This looks very good. I missed the first version of this patch, but was
+> thinking of very similar bindings.
 
-It shouldn't be in my tree anymore - I removed it a couple of days ago
-and pushed that out.
+There's one issue which is concerning me - when we switch OMAP to use
+DMA engine, it won't use numeric stuff anymore but the DMA engine way
+of requesting a channel (match function + data).
+
+How does that fit into this scheme?
