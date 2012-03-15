@@ -1,84 +1,113 @@
-From: tpiepho@gmail.com (Trent Piepho)
-Date: Thu, 15 Mar 2012 11:39:46 -0400
-Subject: [alsa-devel] [PATCH v3 09/11] ASoC: fsl: remove the fatal error
- checking on codec-handle
-In-Reply-To: <20120315142115.GB6065@S2101-09.ap.freescale.net>
-References: <1331225990-27308-10-git-send-email-shawn.guo@linaro.org>
- <4F591B8D.8090705@freescale.com>
- <20120309013216.GH2499@S2101-09.ap.freescale.net>
- <4F5FD706.8040209@freescale.com>
- <20120313234638.GY3177@opensource.wolfsonmicro.com>
- <4F6008FA.3040805@freescale.com>
- <20120314122723.GC3133@opensource.wolfsonmicro.com>
- <4F612319.50302@freescale.com>
- <20120315130253.GA6065@S2101-09.ap.freescale.net>
- <4F61F080.4090800@freescale.com>
- <20120315142115.GB6065@S2101-09.ap.freescale.net>
-Message-ID: <CA+7tXig6=gz8utcnV8qUs6=JnwEz8+tqc-57v-xNcYcK_AAHXw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 15 Mar 2012 16:32:31 +0100
+Subject: [PATCH v2] ARM: SPEAr600: Add device-tree support to SPEAr600
+ boards
+In-Reply-To: <201203142001.58762.sr@denx.de>
+References: <1331737232-25477-1-git-send-email-sr@denx.de>
+ <201203141749.05899.sr@denx.de>
+ <20120314172435.GP18320@game.jcrosoft.org>
+ <201203142001.58762.sr@denx.de>
+Message-ID: <20120315153231.GA7757@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2012 at 10:21 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Thu, Mar 15, 2012 at 01:37:06PM +0000, Tabi Timur-B04825 wrote:
-> ...
-> > The PowerPC MPC8610 has two SSIs, and I have a hacked up board that has
-> > both connected to two CS4270s. ?This is how I tested multiple SSI support
-> > in my driver.
-> >
-> > Since my driver supports any number of SSIs, I expect any changes to it to
-> > continue that support.
-> >
-> I think it can still easily get supported with the binding like below.
->
-> sound {
-> ? ? ?compatible = "fsl,imx51-babbage-sgtl5000",
-> ? ? ? ? ? ? ? ? ? "fsl,imx-audio-sgtl5000";
-> ? ? ?model = "imx51-babbage-sgtl5000";
-> ? ? ?ssi-controller = <&ssi1, &ssi2>;
-> ? ? ?audio-codec = <&sgtl5000_1, &sgtl5000_2>;
-> ? ? ?mux-int-port = <1>;
-> ? ? ?mux-ext-port = <3>;
-> };
+On 20:01 Wed 14 Mar     , Stefan Roese wrote:
+> On Wednesday 14 March 2012 18:24:35 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > diff --git a/arch/arm/boot/dts/spear600-evb.dts
+> > > > > b/arch/arm/boot/dts/spear600-evb.dts new file mode 100644
+> > > > > index 0000000..cbfda8d
+> > > > > --- /dev/null
+> > > > > +++ b/arch/arm/boot/dts/spear600-evb.dts
+> > > > > @@ -0,0 +1,30 @@
+> > > > > +/*
+> > > > > + * Copyright 2012 Stefan Roese <sr@denx.de>
+> > > > > + *
+> > > > > + * The code contained herein is licensed under the GNU General
+> > > > > Public + * License. You may obtain a copy of the GNU General Public
+> > > > > License + * Version 2 or later at the following locations:
+> > > > > + *
+> > > > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > > > + * http://www.gnu.org/copyleft/gpl.html
+> > > > > + */
+> > > > > +
+> > > > > +/dts-v1/;
+> > > > > +/include/ "spear600.dtsi"
+> > > > > +
+> > > > > +/ {
+> > > > > +	model = "ST SPEAr600 Evaluation Board";
+> > > > > +	compatible = "st,spear600-evb", "st,spear600";
+> > > > > +	#address-cells = <1>;
+> > > > > +	#size-cells = <1>;
+> > > > 
+> > > > please put the mem size here
+> > > 
+> > > Might I ask why? Other *.dtsi files don't have it either.
+> > 
+> > do not expect the bootloader to put it. I t's not mandatory
+> 
+> But the memory node it is already present in spear600.dtsi (see below). Do we 
+> really need to duplicate this in the board specific dts file?
+no if the mem is the same size please drop the commentabout bootloader update
+it's a common knowlegde on DT for ARM
+>  
+> > > > > +
+> > > > > +	soc {
+> > > > > +		gmac0: ethernet at e0800000 {
+> > > > > +			phy-mode = "gmii";
+> > > > > +		};
+> > > > > +
+> > > > > +		i2c at d0200000 {
+> > > > > +			clock-frequency = <400000>;
+> > > > > +		};
+> > > > > +	};
+> > > > > +};
+> > > > > diff --git a/arch/arm/boot/dts/spear600.dtsi
+> > > > > b/arch/arm/boot/dts/spear600.dtsi new file mode 100644
+> > > > > index 0000000..e45e58f
+> > > > > --- /dev/null
+> > > > > +++ b/arch/arm/boot/dts/spear600.dtsi
+> > > > > @@ -0,0 +1,162 @@
+> > > > > +/*
+> > > > > + * Copyright 2012 Stefan Roese <sr@denx.de>
+> > > > > + *
+> > > > > + * The code contained herein is licensed under the GNU General
+> > > > > Public + * License. You may obtain a copy of the GNU General Public
+> > > > > License + * Version 2 or later at the following locations:
+> > > > > + *
+> > > > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > > > + * http://www.gnu.org/copyleft/gpl.html
+> > > > > + */
+> > > > > +
+> > > > > +/include/ "skeleton.dtsi"
+> > > > > +
+> > > > > +/ {
+> > > > > +	compatible = "st,spear600";
+> > > > > +
+> > > > > +	cpus {
+> > > > > +		cpu at 0 {
+> > > > > +			compatible = "arm,arm926ejs";
+> > > > > +		};
+> > > > > +	};
+> > > > > +
+> > > > > +	memory {
+> > > > > +		device_type = "memory";
+> > > > > +		reg = <0 0>; /* Filled by U-Boot */
+> > > > 
+> > > > please put the max mem of the SoC here
+> > > 
+> > > Why? It's always updated by the bootloader. And a max. mem size (when not
+> > > updated to the correct mem size by the bootloader) would crash the board
+> > > if it is equipped with less memory.
+> > 
+> > yes but we descripbe the soc here and on the dts you reduce it
+> > Never expect the bootloader to update it.
+> 
+> Without update to real size we're doomed.
+yes but the board dts is supposed to udpate it
 
-How would you support binding the imx51 ESAI controller?
+you put the max in the soc dtsi
 
->
-> The only difference will be both ssi-controller and audio-codec become
-> an array of phandles.
->
-> ...
-> > I admit I may have been too hasty in giving that ACK, because I did not
-> > take the time to study the binding. ?I figured that the new binding was
-> > superior to what I came up with years ago.
-> >
-> > Now that I've studied the binding, I no longer believe that. ?I don't
-> > understand what's so wonderful about the new binding that my driver has to
-> > support it *and* the old binding. ?I think it would be easier if i.MX uses
-> > the original binding.
-> >
-> I do not think it would be easier for imx. ?Looking at the imx-sgtl5000
-> binding, you will find we have audmux port configuration encoded there.
-> How would you suggest to get that fit into the PowerPC binding?
->
-> ...
-> > Even if the new binding is "better", I do not see how it's SOOOOO much
-> > better that my driver has to support it. ?The drawback in supporting both
-> > is the added complexity.
->
-> If you insist on that the driver should only support single binding,
-> I would rather change mpc8610_hpcd and p1022_ds to use the new binding.
->
-> ...
-> > But the driver already does this! ?No one's asking you to add the code to
-> > perform these tasks. ?Just use the existing code.
->
-> Again, what's your suggestion to support audmux configuration with the
-> existing binding?
->
-> --
-> Regards,
-> Shawn
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+and the real mem size in board dts
+
+Best Regards,
+J.
