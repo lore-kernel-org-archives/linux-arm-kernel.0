@@ -1,51 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Mar 2012 11:47:26 +0000
-Subject: [PATCH -next] ARM: ux500: fix compilation after local timer rework
-Message-ID: <1331812046-21062-1-git-send-email-marc.zyngier@arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 15 Mar 2012 12:09:48 +0000
+Subject: [PATCH v9] mfd: Add anatop mfd driver
+In-Reply-To: <201203150907.29895.arnd@arndb.de>
+References: <1331797421-23731-1-git-send-email-paul.liu@linaro.org>
+ <201203150907.29895.arnd@arndb.de>
+Message-ID: <20120315120948.GG3138@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-ux500/timer.c lacked the inclusion of mach/irqs.h, and thus
-failed to compile. Fix it and also remove an unused variable.
+On Thu, Mar 15, 2012 at 09:07:29AM +0000, Arnd Bergmann wrote:
 
-Test compiled only.
+> Very broadly speaking, I wonder whether we could use the regmap
+> infrastructure for these things in the future, but I would first
+> need to understand whether that is actually in the scope of regmap.
 
-Reported-by: Lee Jones <lee.jones@linaro.org>
-Cc: Arnd Bergman <arnd@arndb.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-Arnd,
+> It seems that you just need a subset of what regmap provides,
+> so it could work, but it might not actually be better than what
+> you have now.
 
-I've pushed this patch to my local_timers-for-arm-soc. If you can pull
-it one more time, that would be great.
+> Mark, can you comment on that?
 
-Thanks,
+There were some other mutterings about using regmap for memory mapped
+devices, mostly from the point of view of building framework features
+like this on top of it.  regmap currently makes some assumptions that
+the I/O is going to be slow so approximately any amount of CPU time can
+usefully be spent on avoiding I/O but we can probably do something about
+that.  It also uses mutexes to lock I/O which might not be the most
+sensible thing for memory mapped devices, but again that's solveable.
+Right now there's no memory mapping support but there's no reason that
+can't be added.
 
-	M.
-
- arch/arm/mach-ux500/timer.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index fbeed7e..e9d5807 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -14,6 +14,7 @@
- 
- #include <mach/setup.h>
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- 
- #ifdef CONFIG_HAVE_ARM_TWD
- static DEFINE_TWD_LOCAL_TIMER(u5500_twd_local_timer,
-@@ -41,7 +42,6 @@ static void __init ux500_timer_init(void)
- {
- 	void __iomem *mtu_timer_base;
- 	void __iomem *prcmu_timer_base;
--	int err;
- 
- 	if (cpu_is_u5500()) {
- 		mtu_timer_base = __io_address(U5500_MTU0_BASE);
--- 
-1.7.7.1
+In short, it does seem sensible to want to have some support for this
+for devices that use appropriate idioms.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20120315/37f8408c/attachment.sig>
