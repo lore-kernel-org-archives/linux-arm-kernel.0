@@ -1,70 +1,25 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 15 Mar 2012 07:39:25 -0700
-Subject: [PATCH v12 2/3] ARM: EXYNOS: Change System MMU platform device
- definitions
-In-Reply-To: <20120315111227.GA2384@amd.com>
-References: <000201cd0286$2e6fbb40$8b4f31c0$%cho@samsung.com>
- <20120315111227.GA2384@amd.com>
-Message-ID: <4F61FF1D.5000502@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Mar 2012 15:39:38 +0100
+Subject: [PATCH 03/10] ARM: ux500: combine the board init functions for DT
+ boot
+In-Reply-To: <1331730306-11461-4-git-send-email-lee.jones@linaro.org>
+References: <1331730306-11461-1-git-send-email-lee.jones@linaro.org>
+ <1331730306-11461-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZUWQ9W4YUjqrowKoYo=HhGXg-arHacRDUD1s17Fucv1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/12 04:12, Joerg Roedel wrote:
-> On Thu, Mar 15, 2012 at 05:32:39PM +0900, Cho KyongHo wrote:
+On Wed, Mar 14, 2012 at 2:04 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-KyongHo, I looked at 'Cho KyongHo <pullip.cho ...>' and 'KyongHo Cho 
-<pullip.cho ...>' in this series, which one do you want to use?
-
->> Handling System MMUs with an identifier is not flexible to manage
->> System MMU platform devices because of the following reasons:
->> 1. A device driver which needs to handle System MMU must know the ID.
->> 2. A System MMU may not present in some implementations of Exynos family.
->> 3. Handling System MMU with IOMMU API does not require an ID.
->>
->> This patch is the result of removing ID of System MMUs.
->> Instead, a device driver that needs to handle its System MMU must
->> use IOMMU API while its descriptor of platform device is given.
->>
->> This patch also includes the following enhancements:
->> - A System MMU device becomes a child if its power domain device.
->> - clkdev
->>
->> Cc: Kukjin Kim<kgene.kim@samsung.com>
->> Signed-off-by: KyongHo Cho<pullip.cho@samsung.com>
->> ---
->>   arch/arm/mach-exynos/Kconfig                    |   10 +-
->>   arch/arm/mach-exynos/Makefile                   |    2 +-
->>   arch/arm/mach-exynos/clock-exynos4.c            |   79 ++--
->>   arch/arm/mach-exynos/clock-exynos4.h            |    2 +
->>   arch/arm/mach-exynos/clock-exynos4210.c         |   11 +
->>   arch/arm/mach-exynos/clock-exynos4212.c         |   28 ++-
->>   arch/arm/mach-exynos/clock-exynos5.c            |   90 +++++
->>   arch/arm/mach-exynos/dev-sysmmu.c               |  457 ++++++++++++----------
->>   arch/arm/mach-exynos/include/mach/irqs.h        |   25 +-
->>   arch/arm/mach-exynos/include/mach/map.h         |   38 ++
->>   arch/arm/mach-exynos/include/mach/regs-clock.h  |    5 +
->>   arch/arm/mach-exynos/include/mach/regs-sysmmu.h |   28 --
->>   arch/arm/mach-exynos/include/mach/sysmmu.h      |   88 +++--
->>   arch/arm/mach-exynos/mach-armlex4210.c          |    1 -
->>   arch/arm/mach-exynos/mach-smdkv310.c            |    1 -
->>   15 files changed, 529 insertions(+), 336 deletions(-)
->>   delete mode 100644 arch/arm/mach-exynos/include/mach/regs-sysmmu.h
+> From: Arnd Bergmann <arnd@arndb.de>
 >
-> This patch doesn't apply cleanly against upstream Linux (v3.3-rcX).
-> Please rebase to upstream and resend. The other 2 patches apply fine.
+> This lets us move over evertything to device tree one by one.
 >
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Yes, as KyoungHo said, this has been created on top of Samsung tree 
-for-next because this touches many exynos stuff which has been changed 
-from Samsung tree for upcoming merge window. So if you're ok on this, 
-1st patch and this should be sent to upstream via samsung tree even 
-though I can't find any topic branch for this yet. And if you want topic 
-branch for your tree, let me know, I can provide it.
+Clever!
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Yours,
+Linus Walleij
