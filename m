@@ -1,154 +1,74 @@
-From: richard.zhao@linaro.org (Richard Zhao)
-Date: Thu, 15 Mar 2012 22:46:04 +0800
-Subject: [PATCH 1/2] ARM: imx6q: add pll round_rate support
-In-Reply-To: <20120314085228.GM3852@pengutronix.de>
-References: <1331713379-8437-1-git-send-email-richard.zhao@linaro.org>
- <1331713379-8437-2-git-send-email-richard.zhao@linaro.org>
- <20120314085228.GM3852@pengutronix.de>
-Message-ID: <20120315144601.GA5701@richard-laptop>
+From: pintu_agarwal@yahoo.com (PINTU KUMAR)
+Date: Thu, 15 Mar 2012 07:53:23 -0700 (PDT)
+Subject: [INFO] : Hibernation and Resume between 2 similar devices
+In-Reply-To: <10238.1331746385@turing-police.cc.vt.edu>
+References: <28119509.96581331614425960.JavaMail.weblogic@epml27>
+ <201203132136.56353.rjw@sisk.pl>
+ <1331720518.14716.YahooMailNeo@web162005.mail.bf1.yahoo.com>
+ <10238.1331746385@turing-police.cc.vt.edu>
+Message-ID: <1331823203.99847.YahooMailNeo@web162001.mail.bf1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2012 at 09:52:28AM +0100, Sascha Hauer wrote:
-> On Wed, Mar 14, 2012 at 04:22:58PM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
-> > ---
-> >  arch/arm/mach-imx/clock-imx6q.c |   85 +++++++++++++++++++++++++++++++++-----
-> >  1 files changed, 73 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
-> > index e4e4f5e..3d5dc56 100644
-> > --- a/arch/arm/mach-imx/clock-imx6q.c
-> > +++ b/arch/arm/mach-imx/clock-imx6q.c
-> > @@ -519,6 +519,18 @@ static int pll1_sys_set_rate(struct clk *clk, unsigned long rate)
-> >  	return 0;
-> >  }
-> >  
-> > +static unsigned long pll1_sys_round_rate(struct clk *clk, unsigned long rate)
-> > +{
-> > +	u32 div;
-> > +	unsigned long parent_rate = clk_get_rate(clk->parent);
-> > +
-> > +	rate = rate < FREQ_650M ? FREQ_650M : rate;
-> > +	rate = rate > FREQ_1300M ? FREQ_1300M : rate;
-> > +
-> > +	div = rate * 2 / parent_rate;
-> > +	return parent_rate * div / 2;
-> > +}
-> > +
-> >  static unsigned long pll8_enet_get_rate(struct clk *clk)
-> >  {
-> >  	u32 div = (readl_relaxed(PLL8_ENET) & BM_PLL_ENET_DIV_SELECT) >>
-> > @@ -567,6 +579,20 @@ static int pll8_enet_set_rate(struct clk *clk, unsigned long rate)
-> >  	return 0;
-> >  }
-> >  
-> > +static unsigned long pll8_enet_round_rate(struct clk *clk, unsigned long rate)
-> > +{
-> > +	if (rate >= 125000000)
-> > +		rate = 125000000;
-> > +	else if (rate >= 100000000)
-> > +		rate = 100000000;
-> > +	else if (rate >= 50000000)
-> > +		rate = 50000000;
-> > +	else
-> > +		rate = 25000000;
-> > +	return rate;
-> > +}
-> > +
-> > +
-> >  static unsigned long pll_av_get_rate(struct clk *clk)
-> >  {
-> >  	void __iomem *reg = (clk == &pll4_audio) ? PLL4_AUDIO : PLL5_VIDEO;
-> > @@ -606,6 +632,25 @@ static int pll_av_set_rate(struct clk *clk, unsigned long rate)
-> >  	return 0;
-> >  }
-> >  
-> > +static unsigned long pll_av_round_rate(struct clk *clk, unsigned long rate)
-> > +{
-> > +	unsigned long parent_rate = clk_get_rate(clk->parent);
-> > +	u32 div;
-> > +	u32 mfn, mfd = 1000000;
-> > +	s64 temp64;
-> > +
-> > +	rate = rate < FREQ_650M ? FREQ_650M : rate;
-> > +	rate = rate > FREQ_1300M ? FREQ_1300M : rate;
-> > +
-> > +	div = rate / parent_rate;
-> > +	temp64 = (u64) (parent_rate - (div * parent_rate));
-> > +        temp64 *= mfd;
-> > +        do_div(temp64, parent_rate);
-> > +        mfn = temp64;
-> > +
-> > +        return (parent_rate * div) + ((parent_rate / mfd) * mfn);
-> > +}
-> > +
-> >  static void __iomem *pll_get_div_reg_bit(struct clk *clk, u32 *bp, u32 *bm)
-> >  {
-> >  	void __iomem *reg;
-> > @@ -662,18 +707,33 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
-> >  	return 0;
-> >  }
-> >  
-> > -#define pll2_bus_get_rate	pll_get_rate
-> > -#define pll2_bus_set_rate	pll_set_rate
-> > -#define pll3_usb_otg_get_rate	pll_get_rate
-> > -#define pll3_usb_otg_set_rate	pll_set_rate
-> > -#define pll7_usb_host_get_rate	pll_get_rate
-> > -#define pll7_usb_host_set_rate	pll_set_rate
-> > -#define pll4_audio_get_rate	pll_av_get_rate
-> > -#define pll4_audio_set_rate	pll_av_set_rate
-> > -#define pll5_video_get_rate	pll_av_get_rate
-> > -#define pll5_video_set_rate	pll_av_set_rate
-> > -#define pll6_mlb_get_rate	NULL
-> > -#define pll6_mlb_set_rate	NULL
-> > +static unsigned long pll_round_rate(struct clk *clk, unsigned long rate)
-> > +{
-> > +	if (rate >= FREQ_528M)
-> > +		rate = FREQ_528M;
-> > +	else
-> > +		rate = FREQ_480M;
-> > +	return rate;
-> > +}
-> > +
-> > +#define pll2_bus_get_rate		pll_get_rate
-> > +#define pll2_bus_set_rate		pll_set_rate
-> > +#define pll2_bus_round_rate		pll_round_rate
-> > +#define pll3_usb_otg_get_rate		pll_get_rate
-> > +#define pll3_usb_otg_set_rate		pll_set_rate
-> > +#define pll3_usb_otg_round_rate		pll_round_rate
-> > +#define pll7_usb_host_get_rate		pll_get_rate
-> > +#define pll7_usb_host_set_rate		pll_set_rate
-> > +#define pll7_usb_host_round_rate	pll_round_rate
-> > +#define pll4_audio_get_rate		pll_av_get_rate
-> > +#define pll4_audio_set_rate		pll_av_set_rate
-> > +#define pll4_audio_round_rate		pll_av_round_rate
-> > +#define pll5_video_get_rate		pll_av_get_rate
-> > +#define pll5_video_set_rate		pll_av_set_rate
-> > +#define pll5_video_round_rate		pll_av_round_rate
-> > +#define pll6_mlb_get_rate		NULL
-> > +#define pll6_mlb_set_rate		NULL
-> > +#define pll6_mlb_round_rate		NULL
-> >  
-> >  #define DEF_PLL(name)					\
-> >  	static struct clk name = {			\
-> > @@ -681,6 +741,7 @@ static int pll_set_rate(struct clk *clk, unsigned long rate)
-> >  		.disable	= pll_disable,		\
-> >  		.get_rate	= name##_get_rate,	\
-> >  		.set_rate	= name##_set_rate,	\
-> > +		.round_rate	= name##_round_rate,	\
-> 
-> I hope this ## stuff is gone soon with the generic clock framework. It
-> is so ugly and inefficient.
-I hope this doesn't prevent this two patches go in.
 
-Thanks
-Richard
+
+----- Original Message -----
+> From: "Valdis.Kletnieks at vt.edu" <Valdis.Kletnieks@vt.edu>
+> To: PINTU KUMAR <pintu_agarwal@yahoo.com>
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>; "linux-kernel at vger.kernel.org" <linux-kernel@vger.kernel.org>; "linux-arm-kernel at lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+> Sent: Wednesday, 14 March 2012 11:03 PM
+> Subject: Re: [INFO] : Hibernation and Resume between 2 similar devices
 > 
-> Sascha
+> On Wed, 14 Mar 2012 03:21:58 PDT, PINTU KUMAR said:
+>> > From: Rafael J. Wysocki <rjw@sisk.pl>
+>> > Not out of the box (you'd need to hack the kernel for that to work 
+> I think,
+>> > at least on x86) and the devices would need to be _exactly_ identical.
+>> > Moreover, if there is read-write mass storage in them, the filesystems 
+> on
+>> > both would have to be exactly identical as well (including metadata 
+> and data
+>> > layout etc.).
 > 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>> Suppose in "Device 1" during hibernation, I have a file say 
+> "file1.txt" opened whose inode number is say "123456".
+>> This opened state of file1.txt will be captured in hibernation image.
+>> Now assume that same "file1.txt" is also present (not opened) in 
+> "Device2" but whose inode number is say "567890".
+>> Now if I reboot "Device 2" and try to resume from hibernated 
+> image of "Device 1", what would happen to "file1.txt" ??
+> 
+> Rafael was quite clear - the mass storage has to be *identical*.? You reboot
+> with the image of "Device 1", that had file1.txt open, what will 
+> happen when
+> you close (or write, or sync) the file is this:
+> 
+> 1) You'll write data out to disk into whatever blocks were owned by inode
+> 12345, no matter who actually owns them on Device2's storage.
+> 
+> 2) You'll write out inode 12345 to disk, no matter what used to be there.
+> 
+> Note that you'll do this same thing for *every single* file that was open 
+> when
+> you hibernated, which means you'll corrupt every file that was opened *and*
+> every file that was closed but was using the same blocks on the new disk as the
+> open file was using on the original disk.
+> 
+> In short, you just completely corrupted the file system. 
+
+Yes, consider that 2 devices are identical in all respect.
+ok lets discard the file (write, save) scenario after the resume. My doubt was, will I get the snapshot of file in RAM after I resume ?
+Ok leave the file case.
+
+Consider the case of?few application (which is already present in both the devices)?, 
+lets say : In Device 1 we opened : Browser, calculator, a photo (already existing).
+Then I captured the hibernated image in a swap file.
+My I want to restore/resume this hibernated image from another _similar_ device.
+After I resume, will I able to restore the same applications in Device 2 ????
+
+Ok, if something cannot be resumed, we can throw it away.
+I mean, during hibernation, if we opened 10 apps, and during resume we get only 5, that should be ok.
+We can discard which ever is not relevant for Device 2.
+?
+
+> 
